@@ -46,7 +46,7 @@ _CRITICAL_PINS: tuple[tuple[str, str, str], ...] = (
         "aiohttp",
         "3.10.0",
         "Imported unconditionally by core/agent_client.py (Copilot / GitHub "
-        "Models) and the Graphiti validators; dropping it makes those paths "
+        "Models); dropping it makes those paths "
         "raise ModuleNotFoundError at runtime.",
     ),
 )

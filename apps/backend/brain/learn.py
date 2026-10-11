@@ -367,3 +367,9 @@ def task_learning(
         "notes": notes,
         "proposals": proposals,
     }
+
+
+def on_merge(event) -> None:
+    """`core.merge_event` subscriber: mark the build note accepted."""
+    if rel := record_merge(event.project_dir, event.spec_name):
+        print(f"  brain: merge recorded in {rel}")

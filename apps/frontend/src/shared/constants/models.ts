@@ -667,12 +667,3 @@ export const DEFAULT_AGENT_PROFILES: AgentProfile[] = [
 		phaseThinking: QUICK_PHASE_THINKING,
 	},
 ];
-
-// ============================================
-// Memory Backends
-// ============================================
-
-export const MEMORY_BACKENDS = [
-	{ value: "file", label: "File-based (default)" },
-	{ value: "graphiti", label: "Graphiti (LadybugDB)" },
-] as const;

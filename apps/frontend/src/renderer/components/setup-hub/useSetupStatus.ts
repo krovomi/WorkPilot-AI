@@ -146,11 +146,6 @@ export function computeSetupCategories(
 				kind: "project",
 				section: "linear",
 			}),
-			// Memory/Graphiti has no single credential — enabled is enough.
-			integrationItem("memory", env?.graphitiEnabled, true, {
-				kind: "project",
-				section: "memory",
-			}),
 			// CI/CD is "configured" once a real provider is chosen
 			// ("" means auto-detect / unset, "none" means explicitly disabled).
 			integrationItem(

@@ -98,7 +98,7 @@ apps/frontend/src/
 
 ### External Service Integration
 - **grepai**: Semantic code search (localhost:9000)
-- **Graphiti**: Memory system for knowledge retention
+- **Shared brain**: Obsidian vault memory for knowledge retention (`brain/`)
 - **GitHub/GitLab**: Issue import and PR management
 - **Claude API**: Multi-profile authentication
 

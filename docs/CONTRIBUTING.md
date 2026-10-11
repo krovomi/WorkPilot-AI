@@ -77,7 +77,7 @@ Before contributing, ensure you have the following installed:
 - **Node.js 24+** - For the Electron frontend
 - **npm 10+** - Package manager for the frontend (comes with Node.js)
 - **uv** (recommended) or **pip** - Python package manager
-- **CMake** - Required for building native dependencies (e.g., LadybugDB)
+- **CMake** - Required for building some native dependencies
 - **Git** - Version control
 
 ### Installing Python 3.12
@@ -885,7 +885,7 @@ The core autonomous coding framework:
 - **Entry Points**: `run.py` (build runner), `spec_runner.py` (spec creator)
 - **Agent System**: `core/agent.py`, `core/client.py`, `prompts/`
 - **Execution**: `coordinator.py` (parallel), `core/worktree.py` (isolation)
-- **Memory**: `memory.py` (file-based), `graphiti_memory.py` (graph-based)
+- **Memory**: `brain/project_memory.py` (the shared brain), opened through `memory/store.py`
 - **QA**: `qa/loop.py`, `prompts/qa_*.md`
 
 ### Electron Frontend (`apps/frontend/`)

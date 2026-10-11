@@ -5,7 +5,6 @@
 export { changelogMock } from "./changelog-mock";
 export { claudeProfileMock } from "./claude-profile-mock";
 export { contextMock } from "./context-mock";
-export { infrastructureMock } from "./infrastructure-mock";
 export { insightsMock } from "./insights-mock";
 export { integrationMock } from "./integration-mock";
 export { mockInsightsSessions, mockProjects, mockTasks } from "./mock-data";

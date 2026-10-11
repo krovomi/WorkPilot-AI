@@ -19,7 +19,6 @@ from .models import (
     CHROME_DEVTOOLS_TOOLS,
     CONTEXT7_TOOLS,
     ELECTRON_TOOLS,
-    GRAPHITI_MCP_TOOLS,
     LINEAR_TOOLS,
     PUPPETEER_TOOLS,
     VERIFY_TOOLS,
@@ -103,8 +102,6 @@ def mcp_tools_for_servers(servers: list[str]) -> list[str]:
             tools.extend(CONTEXT7_TOOLS)
         elif server == "linear":
             tools.extend(LINEAR_TOOLS)
-        elif server == "graphiti":
-            tools.extend(GRAPHITI_MCP_TOOLS)
         elif server == "electron":
             tools.extend(ELECTRON_TOOLS)
         elif server == "puppeteer":

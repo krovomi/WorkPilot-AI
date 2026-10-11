@@ -66,12 +66,6 @@ export function createHookProxy(
 		get setShowLinearKey() {
 			return hookRef.current.setShowLinearKey;
 		},
-		get showOpenAIKey() {
-			return hookRef.current.showOpenAIKey;
-		},
-		get setShowOpenAIKey() {
-			return hookRef.current.setShowOpenAIKey;
-		},
 		get showGitHubToken() {
 			return hookRef.current.showGitHubToken;
 		},

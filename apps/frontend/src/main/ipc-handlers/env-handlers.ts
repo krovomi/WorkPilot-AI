@@ -439,66 +439,8 @@ export function registerEnvHandlers(
 		if (config.defaultBranch !== undefined) {
 			existingVars.DEFAULT_BRANCH = config.defaultBranch;
 		}
-		if (config.graphitiEnabled !== undefined) {
-			existingVars.GRAPHITI_ENABLED = config.graphitiEnabled ? "true" : "false";
-		}
-		// Memory Provider Configuration
-		if (config.graphitiProviderConfig) {
-			const pc = config.graphitiProviderConfig;
-			if (pc.embeddingProvider)
-				existingVars.GRAPHITI_EMBEDDER_PROVIDER = pc.embeddingProvider;
-			// graphiti-core needs an LLM to ingest episodes (entity extraction).
-			// Derive it from the embedding provider; for Ollama this keeps the
-			// whole memory stack local.
-			if (pc.embeddingProvider === "ollama" && pc.ollamaLlmModel) {
-				existingVars.GRAPHITI_LLM_PROVIDER = "ollama";
-				existingVars.OLLAMA_LLM_MODEL = pc.ollamaLlmModel;
-			} else if (pc.embeddingProvider === "openai" && pc.openaiApiKey) {
-				existingVars.GRAPHITI_LLM_PROVIDER = "openai";
-			} else if (pc.embeddingProvider === "google" && pc.googleApiKey) {
-				existingVars.GRAPHITI_LLM_PROVIDER = "google";
-			} else if (pc.embeddingProvider === "openrouter" && pc.openrouterApiKey) {
-				existingVars.GRAPHITI_LLM_PROVIDER = "openrouter";
-			}
-			// OpenAI Embeddings
-			if (pc.openaiApiKey) existingVars.OPENAI_API_KEY = pc.openaiApiKey;
-			if (pc.openaiEmbeddingModel)
-				existingVars.OPENAI_EMBEDDING_MODEL = pc.openaiEmbeddingModel;
-			// Azure OpenAI Embeddings
-			if (pc.azureOpenaiApiKey)
-				existingVars.AZURE_OPENAI_API_KEY = pc.azureOpenaiApiKey;
-			if (pc.azureOpenaiBaseUrl)
-				existingVars.AZURE_OPENAI_BASE_URL = pc.azureOpenaiBaseUrl;
-			if (pc.azureOpenaiEmbeddingDeployment)
-				existingVars.AZURE_OPENAI_EMBEDDING_DEPLOYMENT =
-					pc.azureOpenaiEmbeddingDeployment;
-			// Voyage Embeddings
-			if (pc.voyageApiKey) existingVars.VOYAGE_API_KEY = pc.voyageApiKey;
-			if (pc.voyageEmbeddingModel)
-				existingVars.VOYAGE_EMBEDDING_MODEL = pc.voyageEmbeddingModel;
-			// Google Embeddings
-			if (pc.googleApiKey) existingVars.GOOGLE_API_KEY = pc.googleApiKey;
-			if (pc.googleEmbeddingModel)
-				existingVars.GOOGLE_EMBEDDING_MODEL = pc.googleEmbeddingModel;
-			// Ollama Embeddings
-			if (pc.ollamaBaseUrl) existingVars.OLLAMA_BASE_URL = pc.ollamaBaseUrl;
-			if (pc.ollamaEmbeddingModel)
-				existingVars.OLLAMA_EMBEDDING_MODEL = pc.ollamaEmbeddingModel;
-			if (pc.ollamaEmbeddingDim)
-				existingVars.OLLAMA_EMBEDDING_DIM = String(pc.ollamaEmbeddingDim);
-			// LadybugDB (embedded database)
-			if (pc.dbPath) existingVars.GRAPHITI_DB_PATH = pc.dbPath;
-			if (pc.database) existingVars.GRAPHITI_DATABASE = pc.database;
-		}
-		// Legacy fields (still supported)
 		if (config.openaiApiKey !== undefined) {
 			existingVars.OPENAI_API_KEY = config.openaiApiKey;
-		}
-		if (config.graphitiDatabase !== undefined) {
-			existingVars.GRAPHITI_DATABASE = config.graphitiDatabase;
-		}
-		if (config.graphitiDbPath !== undefined) {
-			existingVars.GRAPHITI_DB_PATH = config.graphitiDbPath;
 		}
 		if (config.enableFancyUi !== undefined) {
 			existingVars.ENABLE_FANCY_UI = config.enableFancyUi ? "true" : "false";
@@ -535,7 +477,6 @@ export function registerEnvHandlers(
 					? "true"
 					: "false";
 			}
-			// Note: graphitiEnabled is already handled via GRAPHITI_ENABLED above
 		}
 
 		// Token savings (rtk). Written to the same .workpilot/.env the backend
@@ -739,43 +680,15 @@ ${
 ${existingVars.CUSTOM_MCP_SERVERS ? `CUSTOM_MCP_SERVERS=${existingVars.CUSTOM_MCP_SERVERS}` : "# CUSTOM_MCP_SERVERS=[]"}
 
 # =============================================================================
-# MEMORY INTEGRATION
-# Embedding providers: OpenAI, Google AI, Azure OpenAI, Ollama, Voyage
+# PROVIDER KEYS
+# Read by provider clients and the local OCR / Ollama engines.
 # =============================================================================
-${existingVars.GRAPHITI_ENABLED ? `GRAPHITI_ENABLED=${existingVars.GRAPHITI_ENABLED}` : "# GRAPHITI_ENABLED=true"}
-
-# Embedding Provider (for semantic search - optional, keyword search works without)
-${existingVars.GRAPHITI_EMBEDDER_PROVIDER ? `GRAPHITI_EMBEDDER_PROVIDER=${existingVars.GRAPHITI_EMBEDDER_PROVIDER}` : "# GRAPHITI_EMBEDDER_PROVIDER=ollama"}
-
-# LLM used by graphiti-core to ingest episodes (entity extraction)
-${existingVars.GRAPHITI_LLM_PROVIDER ? `GRAPHITI_LLM_PROVIDER=${existingVars.GRAPHITI_LLM_PROVIDER}` : "# GRAPHITI_LLM_PROVIDER=ollama"}
-${existingVars.OLLAMA_LLM_MODEL ? `OLLAMA_LLM_MODEL=${existingVars.OLLAMA_LLM_MODEL}` : "# OLLAMA_LLM_MODEL=qwen3:4b"}
-
-# OpenAI Embeddings
 ${existingVars.OPENAI_API_KEY ? `OPENAI_API_KEY=${existingVars.OPENAI_API_KEY}` : "# OPENAI_API_KEY="}
-${existingVars.OPENAI_EMBEDDING_MODEL ? `OPENAI_EMBEDDING_MODEL=${existingVars.OPENAI_EMBEDDING_MODEL}` : "# OPENAI_EMBEDDING_MODEL=text-embedding-3-small"}
-
-# Azure OpenAI Embeddings
 ${existingVars.AZURE_OPENAI_API_KEY ? `AZURE_OPENAI_API_KEY=${existingVars.AZURE_OPENAI_API_KEY}` : "# AZURE_OPENAI_API_KEY="}
 ${existingVars.AZURE_OPENAI_BASE_URL ? `AZURE_OPENAI_BASE_URL=${existingVars.AZURE_OPENAI_BASE_URL}` : "# AZURE_OPENAI_BASE_URL="}
-${existingVars.AZURE_OPENAI_EMBEDDING_DEPLOYMENT ? `AZURE_OPENAI_EMBEDDING_DEPLOYMENT=${existingVars.AZURE_OPENAI_EMBEDDING_DEPLOYMENT}` : "# AZURE_OPENAI_EMBEDDING_DEPLOYMENT="}
-
-# Voyage AI Embeddings
 ${existingVars.VOYAGE_API_KEY ? `VOYAGE_API_KEY=${existingVars.VOYAGE_API_KEY}` : "# VOYAGE_API_KEY="}
-${existingVars.VOYAGE_EMBEDDING_MODEL ? `VOYAGE_EMBEDDING_MODEL=${existingVars.VOYAGE_EMBEDDING_MODEL}` : "# VOYAGE_EMBEDDING_MODEL=voyage-3"}
-
-# Google AI Embeddings
 ${existingVars.GOOGLE_API_KEY ? `GOOGLE_API_KEY=${existingVars.GOOGLE_API_KEY}` : "# GOOGLE_API_KEY="}
-${existingVars.GOOGLE_EMBEDDING_MODEL ? `GOOGLE_EMBEDDING_MODEL=${existingVars.GOOGLE_EMBEDDING_MODEL}` : "# GOOGLE_EMBEDDING_MODEL=text-embedding-004"}
-
-# Ollama Embeddings (Local - free)
 ${existingVars.OLLAMA_BASE_URL ? `OLLAMA_BASE_URL=${existingVars.OLLAMA_BASE_URL}` : "# OLLAMA_BASE_URL=http://localhost:11434"}
-${existingVars.OLLAMA_EMBEDDING_MODEL ? `OLLAMA_EMBEDDING_MODEL=${existingVars.OLLAMA_EMBEDDING_MODEL}` : "# OLLAMA_EMBEDDING_MODEL=embeddinggemma"}
-${existingVars.OLLAMA_EMBEDDING_DIM ? `OLLAMA_EMBEDDING_DIM=${existingVars.OLLAMA_EMBEDDING_DIM}` : "# OLLAMA_EMBEDDING_DIM=768"}
-
-# LadybugDB Database (embedded - no Docker required)
-${existingVars.GRAPHITI_DATABASE ? `GRAPHITI_DATABASE=${existingVars.GRAPHITI_DATABASE}` : "# GRAPHITI_DATABASE=auto_claude_memory"}
-${existingVars.GRAPHITI_DB_PATH ? `GRAPHITI_DB_PATH=${existingVars.GRAPHITI_DB_PATH}` : "# GRAPHITI_DB_PATH=~/.workpilot/memories"}
 `;
 
 		return content;
@@ -815,7 +728,6 @@ ${existingVars.GRAPHITI_DB_PATH ? `GRAPHITI_DB_PATH=${existingVars.GRAPHITI_DB_P
 				azureDevOpsEnabled: false,
 				jiraEnabled: false,
 				teamsNotificationsEnabled: false,
-				graphitiEnabled: false,
 				enableFancyUi: true,
 				claudeTokenIsGlobal: false,
 				openaiKeyIsGlobal: false,
@@ -1019,10 +931,6 @@ ${existingVars.GRAPHITI_DB_PATH ? `GRAPHITI_DB_PATH=${existingVars.GRAPHITI_DB_P
 				config.defaultBranch = vars.DEFAULT_BRANCH;
 			}
 
-			if (vars.GRAPHITI_ENABLED?.toLowerCase() === "true") {
-				config.graphitiEnabled = true;
-			}
-
 			// OpenAI API Key: project-specific takes precedence, then global
 			if (vars.OPENAI_API_KEY) {
 				config.openaiApiKey = vars.OPENAI_API_KEY;
@@ -1032,59 +940,8 @@ ${existingVars.GRAPHITI_DB_PATH ? `GRAPHITI_DB_PATH=${existingVars.GRAPHITI_DB_P
 				config.openaiKeyIsGlobal = true;
 			}
 
-			if (vars.GRAPHITI_DATABASE) {
-				config.graphitiDatabase = vars.GRAPHITI_DATABASE;
-			}
-			if (vars.GRAPHITI_DB_PATH) {
-				config.graphitiDbPath = vars.GRAPHITI_DB_PATH;
-			}
-
 			if (vars.ENABLE_FANCY_UI?.toLowerCase() === "false") {
 				config.enableFancyUi = false;
-			}
-
-			// Populate graphitiProviderConfig from .env file (embeddings only - no LLM provider)
-			const embeddingProvider = vars.GRAPHITI_EMBEDDER_PROVIDER;
-			if (
-				embeddingProvider ||
-				vars.AZURE_OPENAI_API_KEY ||
-				vars.VOYAGE_API_KEY ||
-				vars.GOOGLE_API_KEY ||
-				vars.OLLAMA_BASE_URL
-			) {
-				config.graphitiProviderConfig = {
-					embeddingProvider:
-						(embeddingProvider as
-							| "openai"
-							| "voyage"
-							| "azure_openai"
-							| "ollama"
-							| "google") || "ollama",
-					// OpenAI Embeddings
-					openaiApiKey: vars.OPENAI_API_KEY,
-					openaiEmbeddingModel: vars.OPENAI_EMBEDDING_MODEL,
-					// Azure OpenAI Embeddings
-					azureOpenaiApiKey: vars.AZURE_OPENAI_API_KEY,
-					azureOpenaiBaseUrl: vars.AZURE_OPENAI_BASE_URL,
-					azureOpenaiEmbeddingDeployment:
-						vars.AZURE_OPENAI_EMBEDDING_DEPLOYMENT,
-					// Voyage Embeddings
-					voyageApiKey: vars.VOYAGE_API_KEY,
-					voyageEmbeddingModel: vars.VOYAGE_EMBEDDING_MODEL,
-					// Google Embeddings
-					googleApiKey: vars.GOOGLE_API_KEY,
-					googleEmbeddingModel: vars.GOOGLE_EMBEDDING_MODEL,
-					// Ollama Embeddings
-					ollamaBaseUrl: vars.OLLAMA_BASE_URL,
-					ollamaEmbeddingModel: vars.OLLAMA_EMBEDDING_MODEL,
-					ollamaEmbeddingDim: vars.OLLAMA_EMBEDDING_DIM
-						? Number.parseInt(vars.OLLAMA_EMBEDDING_DIM, 10)
-						: undefined,
-					ollamaLlmModel: vars.OLLAMA_LLM_MODEL,
-					// LadybugDB
-					database: vars.GRAPHITI_DATABASE,
-					dbPath: vars.GRAPHITI_DB_PATH,
-				};
 			}
 
 			// MCP Server Configuration (per-project overrides)
@@ -1092,7 +949,6 @@ ${existingVars.GRAPHITI_DB_PATH ? `GRAPHITI_DB_PATH=${existingVars.GRAPHITI_DB_P
 			config.mcpServers = {
 				context7Enabled: vars.CONTEXT7_ENABLED?.toLowerCase() !== "false", // default true
 				context7ApiKey: vars.CONTEXT7_API_KEY,
-				graphitiEnabled: config.graphitiEnabled, // follows GRAPHITI_ENABLED
 				linearMcpEnabled: vars.LINEAR_MCP_ENABLED?.toLowerCase() !== "false", // default true
 				electronEnabled: vars.ELECTRON_MCP_ENABLED?.toLowerCase() === "true", // default false
 				puppeteerEnabled: vars.PUPPETEER_MCP_ENABLED?.toLowerCase() === "true", // default false

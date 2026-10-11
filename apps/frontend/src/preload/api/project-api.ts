@@ -6,12 +6,9 @@ import type {
 	ContextSearchResult,
 	GitBranchDetail,
 	GitStatus,
-	GraphitiConnectionTestResult,
-	GraphitiMemoryStatus,
-	GraphitiValidationResult,
+	MemoryStatus,
 	MemoryEpisode,
 	ProjectIndex,
-	InfrastructureStatus,
 	InitializationResult,
 	IPCResult,
 	KanbanBoardState,
@@ -96,7 +93,7 @@ export interface ProjectAPI {
 	refreshProjectIndex: (projectId: string) => Promise<IPCResult<ProjectIndex>>;
 	getMemoryStatus: (
 		projectId: string,
-	) => Promise<IPCResult<GraphitiMemoryStatus>>;
+	) => Promise<IPCResult<MemoryStatus>>;
 	searchMemories: (
 		projectId: string,
 		query: string,
@@ -154,28 +151,6 @@ export interface ProjectAPI {
 		}>
 	>;
 	getDefaultProjectLocation: () => Promise<string | null>;
-
-	// Memory Infrastructure Operations (LadybugDB - no Docker required)
-	getMemoryInfrastructureStatus: (
-		dbPath?: string,
-	) => Promise<IPCResult<InfrastructureStatus>>;
-	listMemoryDatabases: (dbPath?: string) => Promise<IPCResult<string[]>>;
-	testMemoryConnection: (
-		dbPath?: string,
-		database?: string,
-	) => Promise<IPCResult<GraphitiValidationResult>>;
-
-	// Graphiti Validation Operations
-	validateLLMApiKey: (
-		provider: string,
-		apiKey: string,
-	) => Promise<IPCResult<GraphitiValidationResult>>;
-	testGraphitiConnection: (config: {
-		dbPath?: string;
-		database?: string;
-		llmProvider: string;
-		apiKey: string;
-	}) => Promise<IPCResult<GraphitiConnectionTestResult>>;
 
 	// Ollama Model Management
 	onDownloadProgress: (
@@ -485,36 +460,6 @@ export const createProjectAPI = (): ProjectAPI => ({
 
 	getDefaultProjectLocation: (): Promise<string | null> =>
 		ipcRenderer.invoke(IPC_CHANNELS.DIALOG_GET_DEFAULT_PROJECT_LOCATION),
-
-	// Memory Infrastructure Operations (LadybugDB - no Docker required)
-	getMemoryInfrastructureStatus: (
-		dbPath?: string,
-	): Promise<IPCResult<InfrastructureStatus>> =>
-		ipcRenderer.invoke(IPC_CHANNELS.MEMORY_STATUS, dbPath),
-
-	listMemoryDatabases: (dbPath?: string): Promise<IPCResult<string[]>> =>
-		ipcRenderer.invoke(IPC_CHANNELS.MEMORY_LIST_DATABASES, dbPath),
-
-	testMemoryConnection: (
-		dbPath?: string,
-		database?: string,
-	): Promise<IPCResult<GraphitiValidationResult>> =>
-		ipcRenderer.invoke(IPC_CHANNELS.MEMORY_TEST_CONNECTION, dbPath, database),
-
-	// Graphiti Validation Operations
-	validateLLMApiKey: (
-		provider: string,
-		apiKey: string,
-	): Promise<IPCResult<GraphitiValidationResult>> =>
-		ipcRenderer.invoke(IPC_CHANNELS.GRAPHITI_VALIDATE_LLM, provider, apiKey),
-
-	testGraphitiConnection: (config: {
-		dbPath?: string;
-		database?: string;
-		llmProvider: string;
-		apiKey: string;
-	}): Promise<IPCResult<GraphitiConnectionTestResult>> =>
-		ipcRenderer.invoke(IPC_CHANNELS.GRAPHITI_TEST_CONNECTION, config),
 
 	// Ollama Model Management
 	onDownloadProgress: (

@@ -65,7 +65,7 @@ Optional `.env-files/.env` settings:
 | `AUTO_BUILD_MODEL` | Override Claude model |
 | `DEBUG=true` | Enable debug logging |
 | `LINEAR_API_KEY` | Enable Linear integration |
-| `GRAPHITI_ENABLED=true` | Enable memory system |
+| `BRAIN_ENABLED=false` | Turn memory (the shared brain) off |
 
 ## Troubleshooting
 
@@ -91,7 +91,7 @@ backend/
 ├── core/                # Client, auth, worktree, platform abstraction
 ├── prompts/             # Prompt templates (60+ specialized agents)
 ├── skills/              # Token-optimized dynamic skill execution
-├── integrations/        # External services (GitHub, GitLab, Azure, Linear, Jira, Graphiti)
+├── integrations/        # External services (GitHub, GitLab, Azure, Linear, Jira)
 ├── merge/               # Semantic git merge handling
 ├── project/             # Project / stack detection
 ├── context/             # Task context building

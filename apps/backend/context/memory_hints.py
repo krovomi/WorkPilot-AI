@@ -4,16 +4,12 @@ Historical Hints from the Shared Brain
 
 Cross-session context for the context builder and the GitHub runners: what the
 project's memory in the Obsidian vault (`brain.project_memory`) knows about a
-task. The module keeps its name because the imports do; it has not talked to
-Graphiti since the vault became the one memory.
+task. Whether hints can be asked for at all is ``is_memory_enabled``.
 """
 
 from memory.store import get_graph_hints, is_memory_enabled
 
-
-def is_graphiti_enabled() -> bool:
-    """Whether hints can be asked for — i.e. whether memory is on."""
-    return is_memory_enabled()
+__all__ = ["fetch_graph_hints", "is_memory_enabled"]
 
 
 async def fetch_graph_hints(

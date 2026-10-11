@@ -19,7 +19,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Validate platform-specific dependencies BEFORE any imports that might
-# trigger graphiti_core -> real_ladybug -> pywintypes import chain (ACS-253)
+# trigger a pywintypes import (the MCP library imports win32api; ACS-253)
 from cli.utils import import_dotenv
 from core.auth import ensure_claude_code_oauth_token, get_auth_token
 from core.debug import (

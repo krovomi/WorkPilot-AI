@@ -62,7 +62,7 @@ WorkPilot-AI/
 │   │   ├── context/                  # Task context building, semantic search
 │   │   ├── runners/                  # 66 standalone runners (spec, roadmap, insights, github, self-healing, etc.)
 │   │   ├── services/                 # Background services, recovery orchestration
-│   │   ├── integrations/             # linear, github, windsurf_proxy (graphiti/: legacy, no longer a memory)
+│   │   ├── integrations/             # linear, github, windsurf_proxy
 │   │   ├── project/                  # Project analysis, security profiles
 │   │   ├── merge/                    # Intent-aware semantic merge for parallel agents
 │   │   └── prompts/                  # Agent system prompts (.md)

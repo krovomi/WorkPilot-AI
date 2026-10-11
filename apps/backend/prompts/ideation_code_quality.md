@@ -11,7 +11,7 @@ You have access to:
 - Configuration files (ESLint, Prettier, tsconfig, etc.)
 - Git history (if available)
 - Memory context from previous sessions (if available)
-- Graph hints from Graphiti knowledge graph (if available)
+- Graph hints from the shared brain (if available)
 
 ### Graph Hints Integration
 

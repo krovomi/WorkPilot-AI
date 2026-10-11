@@ -85,7 +85,7 @@ if sys.platform == "win32":
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Validate platform-specific dependencies BEFORE any imports that might
-# trigger graphiti_core -> real_ladybug -> pywintypes import chain (ACS-253)
+# trigger a pywintypes import (the MCP library imports win32api; ACS-253)
 from core.dependency_validator import validate_platform_dependencies
 
 validate_platform_dependencies()
@@ -142,7 +142,7 @@ Examples:
   python spec_runner.py --task "Update text" --complexity simple
 
   # Complex integration (auto-detected)
-  python spec_runner.py --task "Add Graphiti memory integration with FalkorDB"
+  python spec_runner.py --task "Add Redis caching to the user service"
 
   # Interactive mode
   python spec_runner.py --interactive

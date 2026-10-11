@@ -182,8 +182,6 @@ import {
 	createSmartEstimationAPI,
 	type SmartEstimationAPI,
 } from "./modules/smart-estimation-api";
-import type { TeamSyncAPI } from "./modules/team-sync-api";
-import { createTeamSyncAPI } from "./modules/team-sync-api";
 import type { TestGenerationAPI } from "./modules/test-generation-api";
 import { createTestGenerationAPI } from "./modules/test-generation-api";
 import type { DesignToCodeAPI } from "./modules/design-to-code-api";
@@ -256,7 +254,6 @@ export interface ElectronAPI
 		DecisionLoggerAPI,
 		PairProgrammingAPI,
 		PipelineGeneratorAPI,
-		TeamSyncAPI,
 		ArenaAPI,
 		TestGenerationAPI,
 		CostAPI,
@@ -398,7 +395,6 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createDecisionLoggerAPI(),
 		...createPairProgrammingAPI(),
 		...createPipelineGeneratorAPI(),
-		...createTeamSyncAPI(),
 		...createArenaAPI(),
 		...createTestGenerationAPI(),
 		...createCostAPI(),

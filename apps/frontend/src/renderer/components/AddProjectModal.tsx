@@ -1123,7 +1123,6 @@ export function AddProjectModal({
 						autoBuildPath: "",
 						settings: {
 							model: "claude-3-5-sonnet-20241022",
-							memoryBackend: "file",
 							linearSync: false,
 							notifications: {
 								onTaskComplete: true,
@@ -1131,7 +1130,6 @@ export function AddProjectModal({
 								onReviewNeeded: true,
 								sound: true,
 							},
-							graphitiMcpEnabled: false,
 						},
 						createdAt: new Date(),
 						updatedAt: new Date(),

@@ -5,9 +5,9 @@ import {
 	type SetupItem,
 } from "../useSetupStatus";
 
-/** Minimal env config; `graphitiEnabled` is the only required field on the type. */
+/** Minimal env config; the tests only set the fields they read. */
 const env = (overrides: Partial<ProjectEnvConfig> = {}): ProjectEnvConfig =>
-	({ graphitiEnabled: false, ...overrides }) as ProjectEnvConfig;
+	({ ...overrides }) as ProjectEnvConfig;
 
 /** Pull a single item out of the computed result by category + item id. */
 const find = (
@@ -27,8 +27,8 @@ describe("computeSetupCategories", () => {
 		const result = computeSetupCategories({}, env());
 		expect(result.completed).toBe(0);
 		expect(result.percent).toBe(0);
-		// AI providers + 8 integrations.
-		expect(result.total).toBe(9);
+		// AI providers + 7 integrations.
+		expect(result.total).toBe(8);
 		expect(result.categories.every((c) => c.items.every((i) => i.state === "todo"))).toBe(
 			true,
 		);
@@ -109,16 +109,6 @@ describe("computeSetupCategories", () => {
 		).toBe("todo");
 	});
 
-	it("memory is 'done' as soon as graphiti is enabled (no separate credential)", () => {
-		expect(
-			find(
-				computeSetupCategories({}, env({ graphitiEnabled: true })),
-				"integrations",
-				"memory",
-			).state,
-		).toBe("done");
-	});
-
 	it("notifications need an enabled channel WITH its webhook", () => {
 		const ok = computeSetupCategories(
 			{},
@@ -147,7 +137,6 @@ describe("computeSetupCategories", () => {
 				jiraApiToken: "t",
 				linearEnabled: true,
 				linearApiKey: "t",
-				graphitiEnabled: true,
 				cicdProvider: "github",
 				teamsNotificationsEnabled: true,
 				teamsWebhookUrl: "https://hook",
@@ -176,7 +165,7 @@ describe("computeSetupCategories", () => {
 			const result = computeSetupCategories({}, null, false);
 			expect(
 				result.categories.find((c) => c.id === "integrations")?.items.length,
-			).toBe(8);
+			).toBe(7);
 		});
 
 		it("percent reflects only AI providers, not the untouchable integrations", () => {
@@ -195,6 +184,6 @@ describe("computeSetupCategories", () => {
 	it("defaults hasProject to true, preserving prior behaviour for callers that don't pass it", () => {
 		const result = computeSetupCategories({ anthropic: true }, env());
 		expect(result.hasProject).toBe(true);
-		expect(result.total).toBe(9);
+		expect(result.total).toBe(8);
 	});
 });

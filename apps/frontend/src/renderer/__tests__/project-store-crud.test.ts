@@ -14,7 +14,6 @@ import {
 function createTestProject(overrides: Partial<Project> = {}): Project {
 	const defaultSettings: ProjectSettings = {
 		model: "claude-3-opus",
-		memoryBackend: "graphiti",
 		linearSync: false,
 		notifications: {
 			onTaskComplete: true,
@@ -22,7 +21,6 @@ function createTestProject(overrides: Partial<Project> = {}): Project {
 			onReviewNeeded: true,
 			sound: false,
 		},
-		graphitiMcpEnabled: false,
 	};
 
 	return {

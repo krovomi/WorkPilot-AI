@@ -9,7 +9,28 @@ import type { BrowserWindow } from "electron";
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
 import { learningLoopService } from "../learning-loop-service";
+import { backendFetch } from "./_backend-fetch";
 import { safeSendToRenderer } from "./utils";
+
+interface LearningPatternsResponse {
+	patterns?: unknown[];
+	summary?: Record<string, unknown>;
+}
+
+function fetchLearningPatterns(projectDir: string) {
+	const query = new URLSearchParams({ project_dir: projectDir });
+	return backendFetch<LearningPatternsResponse>(
+		`/api/brain/learning-patterns?${query.toString()}`,
+		{ method: "GET" },
+		15_000,
+	);
+}
+
+function postJson(body: Record<string, string>): RequestInit {
+	// No headers here: backendFetch sets the JSON content type and the
+	// server-mode Authorization header, and an `init.headers` would replace them.
+	return { method: "POST", body: JSON.stringify(body) };
+}
 
 /**
  * Register all learning-loop-related IPC handlers
@@ -21,190 +42,55 @@ export function registerLearningLoopHandlers(
 	// Pattern CRUD operations (invoke/handle)
 	// ============================================
 
+	// The patterns are notes of the project's memory in the shared brain
+	// (`learning_loop/pattern_storage.py`); the backend reads and writes them.
+	// These handlers used to open `.workpilot/learning_loop/patterns.json`
+	// themselves, expecting `{ patterns: [...] }` where the backend wrote a
+	// bare list — so the page showed nothing, whatever the loop had learned.
+
 	ipcMain.handle(
 		IPC_CHANNELS.LEARNING_LOOP_GET_PATTERNS,
 		async (_event, projectDir: string) => {
-			try {
-				// Read patterns from the project's learning loop storage
-				const { readFileSync, existsSync } = require("node:fs");
-				const path = require("node:path");
-				const patternsPath = path.join(
-					projectDir,
-					".workpilot",
-					"learning_loop",
-					"patterns.json",
-				);
-
-				if (!existsSync(patternsPath)) {
-					return { success: true, data: [] };
-				}
-
-				const raw = readFileSync(patternsPath, "utf-8");
-				const data = JSON.parse(raw);
-				return { success: true, data: data.patterns || [] };
-				// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-			} catch (error: any) {
-				console.error("[LearningLoop] Failed to get patterns:", error);
-				return { success: false, error: error.message };
-			}
+			const result = await fetchLearningPatterns(projectDir);
+			return result.success
+				? { success: true, data: result.patterns ?? [] }
+				: { success: false, error: result.error };
 		},
 	);
 
 	ipcMain.handle(
 		IPC_CHANNELS.LEARNING_LOOP_GET_SUMMARY,
 		async (_event, projectDir: string) => {
-			try {
-				const { readFileSync, existsSync } = require("node:fs");
-				const path = require("node:path");
-				const patternsPath = path.join(
-					projectDir,
-					".workpilot",
-					"learning_loop",
-					"patterns.json",
-				);
-
-				if (!existsSync(patternsPath)) {
-					return {
-						success: true,
-						data: {
-							total_patterns: 0,
-							by_category: {},
-							by_phase: {},
-							by_type: {},
-							average_confidence: 0,
-							total_builds_analyzed: 0,
-							last_analyzed_at: null,
-							improvement_metrics: null,
-							enabled_count: 0,
-							disabled_count: 0,
-						},
-					};
-				}
-
-				const raw = readFileSync(patternsPath, "utf-8");
-				const data = JSON.parse(raw);
-				const patterns = data.patterns || [];
-
-				// Compute summary from patterns
-				const byCategory: Record<string, number> = {};
-				const byPhase: Record<string, number> = {};
-				const byType: Record<string, number> = {};
-				let totalConfidence = 0;
-				let enabledCount = 0;
-				let disabledCount = 0;
-
-				for (const p of patterns) {
-					byCategory[p.category] = (byCategory[p.category] || 0) + 1;
-					byPhase[p.agent_phase] = (byPhase[p.agent_phase] || 0) + 1;
-					byType[p.pattern_type] = (byType[p.pattern_type] || 0) + 1;
-					totalConfidence += p.confidence || 0;
-					if (p.enabled !== false) {
-						enabledCount++;
-					} else {
-						disabledCount++;
-					}
-				}
-
-				return {
-					success: true,
-					data: {
-						total_patterns: patterns.length,
-						by_category: byCategory,
-						by_phase: byPhase,
-						by_type: byType,
-						average_confidence:
-							patterns.length > 0 ? totalConfidence / patterns.length : 0,
-						total_builds_analyzed: data.metadata?.total_builds_analyzed || 0,
-						last_analyzed_at: data.metadata?.last_analyzed_at || null,
-						improvement_metrics: data.metadata?.improvement_metrics || null,
-						enabled_count: enabledCount,
-						disabled_count: disabledCount,
-					},
-				};
-				// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-			} catch (error: any) {
-				console.error("[LearningLoop] Failed to get summary:", error);
-				return { success: false, error: error.message };
-			}
+			const result = await fetchLearningPatterns(projectDir);
+			return result.success
+				? { success: true, data: result.summary }
+				: { success: false, error: result.error };
 		},
 	);
 
 	ipcMain.handle(
 		IPC_CHANNELS.LEARNING_LOOP_DELETE_PATTERN,
 		async (_event, projectDir: string, patternId: string) => {
-			try {
-				const { readFileSync, writeFileSync, existsSync } = require("node:fs");
-				const path = require("node:path");
-				const patternsPath = path.join(
-					projectDir,
-					".workpilot",
-					"learning_loop",
-					"patterns.json",
-				);
-
-				if (!existsSync(patternsPath)) {
-					return { success: false, error: "No patterns file found" };
-				}
-
-				const raw = readFileSync(patternsPath, "utf-8");
-				const data = JSON.parse(raw);
-				const before = data.patterns?.length || 0;
-				data.patterns = (data.patterns || []).filter(
-					(p: { pattern_id: string; enabled?: boolean }) =>
-						p.pattern_id !== patternId,
-				);
-				const after = data.patterns.length;
-
-				if (before === after) {
-					return { success: false, error: "Pattern not found" };
-				}
-
-				writeFileSync(patternsPath, JSON.stringify(data, null, 2), "utf-8");
-				return { success: true };
-				// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-			} catch (error: any) {
-				console.error("[LearningLoop] Failed to delete pattern:", error);
-				return { success: false, error: error.message };
-			}
+			const result = await backendFetch(
+				"/api/brain/learning-patterns/delete",
+				postJson({ project_dir: projectDir, pattern_id: patternId }),
+			);
+			return result.success
+				? { success: true }
+				: { success: false, error: result.error };
 		},
 	);
 
 	ipcMain.handle(
 		IPC_CHANNELS.LEARNING_LOOP_TOGGLE_PATTERN,
 		async (_event, projectDir: string, patternId: string) => {
-			try {
-				const { readFileSync, writeFileSync, existsSync } = require("node:fs");
-				const path = require("node:path");
-				const patternsPath = path.join(
-					projectDir,
-					".workpilot",
-					"learning_loop",
-					"patterns.json",
-				);
-
-				if (!existsSync(patternsPath)) {
-					return { success: false, error: "No patterns file found" };
-				}
-
-				const raw = readFileSync(patternsPath, "utf-8");
-				const data = JSON.parse(raw);
-				const pattern = (data.patterns || []).find(
-					(p: { pattern_id: string; enabled?: boolean }) =>
-						p.pattern_id === patternId,
-				);
-
-				if (!pattern) {
-					return { success: false, error: "Pattern not found" };
-				}
-
-				pattern.enabled = !pattern.enabled;
-				writeFileSync(patternsPath, JSON.stringify(data, null, 2), "utf-8");
-				return { success: true, data: pattern.enabled };
-				// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-			} catch (error: any) {
-				console.error("[LearningLoop] Failed to toggle pattern:", error);
-				return { success: false, error: error.message };
-			}
+			const result = await backendFetch<{ enabled: boolean }>(
+				"/api/brain/learning-patterns/toggle",
+				postJson({ project_dir: projectDir, pattern_id: patternId }),
+			);
+			return result.success
+				? { success: true, data: result.enabled }
+				: { success: false, error: result.error };
 		},
 	);
 

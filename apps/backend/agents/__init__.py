@@ -27,9 +27,7 @@ __all__ = [
     # Memory
     "debug_memory_system_status",
     "get_memory_context",
-    "get_graphiti_context",
     "save_session_memory",
-    "save_session_to_graphiti",
     # Session
     "run_agent_session",
     "post_session_processing",
@@ -59,16 +57,12 @@ def __getattr__(name):
     elif name in (
         "debug_memory_system_status",
         "get_memory_context",
-        "get_graphiti_context",
         "save_session_memory",
-        "save_session_to_graphiti",
     ):
         from .memory_manager import (
             debug_memory_system_status,
-            get_graphiti_context,
             get_memory_context,
             save_session_memory,
-            save_session_to_graphiti,
         )
 
         return locals()[name]

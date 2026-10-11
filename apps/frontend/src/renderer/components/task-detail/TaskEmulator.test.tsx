@@ -23,7 +23,6 @@ const project: Project = {
 	autoBuildPath: ".workpilot",
 	settings: {
 		model: "claude",
-		memoryBackend: "file",
 		linearSync: false,
 		notifications: {
 			onTaskComplete: false,
@@ -31,7 +30,6 @@ const project: Project = {
 			onReviewNeeded: false,
 			sound: false,
 		},
-		graphitiMcpEnabled: false,
 	},
 	createdAt: new Date("2026-06-05T08:00:00.000Z"),
 	updatedAt: new Date("2026-06-05T08:00:00.000Z"),

@@ -11,7 +11,6 @@ import {
 	Cloud,
 	Code,
 	Compass,
-	Database,
 	FolderOpen,
 	Globe,
 	Loader2,
@@ -136,7 +135,6 @@ export type AppSection =
 	| "sandbox"
 	| "guardrails"
 	| "anomaly-detection"
-	| "memory"
 	// Multi-utilisateurs (serveur, admin uniquement)
 	| "team-invitations"
 	// Système & Maintenance
@@ -156,8 +154,7 @@ export type ProjectSettingsSection =
 	| "github"
 	| "gitlab"
 	| "linear"
-	| "teams"
-	| "memory";
+	| "teams";
 
 export type SettingsTheme =
 	| "project" // Projet
@@ -222,12 +219,6 @@ const createSettingsThemes = (t: {
 			{ id: "jira", icon: JiraIcon, label: "Jira", type: "project" },
 			{ id: "figma", icon: Palette, label: "Figma", type: "project" },
 			{ id: "linear", icon: Zap, label: "Linear", type: "project" },
-			{
-				id: "memory",
-				icon: Database,
-				label: t("projectSections.memory.title"),
-				type: "project",
-			},
 			{
 				id: "cicd",
 				icon: Workflow,

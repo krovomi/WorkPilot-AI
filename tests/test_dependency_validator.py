@@ -515,117 +515,13 @@ class TestExitWithPywin32Error:
 class TestImportOrderPreventsEarlyFailure:
     """
     Tests that validate the ACS-253 fix: dependency validation happens
-    BEFORE graphiti imports that trigger pywintypes.
+    BEFORE imports that trigger pywintypes (the MCP library's win32api).
     """
-
-    def test_validate_platform_dependencies_does_not_import_graphiti(self):
-        """
-        validate_platform_dependencies should not trigger graphiti imports.
-
-        This test ensures the fix for ACS-253 is working: the dependency
-        validator runs early and doesn't import modules that would trigger
-        the graphiti_core -> real_ladybug -> pywintypes import chain.
-        """
-        import builtins
-
-        # Track imports made during validation
-        imported_modules = set()
-        original_import = builtins.__import__
-
-        def tracking_import(name, *args, **kwargs):
-            imported_modules.add(name)
-            return original_import(name, *args, **kwargs)
-
-        # Use non-Windows platform to avoid pywin32 import issues on Windows CI
-        with (
-            patch("builtins.__import__", side_effect=tracking_import),
-            patch("core.dependency_validator.is_windows", return_value=False),
-            patch("core.dependency_validator.is_linux", return_value=True),
-            patch("sys.version_info", (3, 11, 0)),
-        ):
-            validate_platform_dependencies()
-
-        # Verify graphiti-related modules were NOT imported
-        assert "graphiti_core" not in imported_modules
-        assert "real_ladybug" not in imported_modules
-        assert "graphiti_config" not in imported_modules
-
-    def test_cli_utils_lazy_import_of_graphiti_config(self):
-        """
-        cli/utils.py directly imports graphiti_config lazily in validate_environment().
-
-        The fix ensures that graphiti_config is NOT imported at the module level
-        in cli/utils.py (line 59). Instead, it's imported lazily inside the
-        validate_environment() function where it's actually used.
-
-        Note: graphiti_config may still be imported transitively through other
-        modules imported by cli.utils (e.g., linear_integration, spec.pipeline).
-        The key fix is that the DIRECT import from cli/utils.py is lazy.
-        """
-        import ast
-
-        # Read cli/utils.py to verify the import is NOT at module level
-        backend_dir = Path(__file__).parent.parent / "apps" / "backend"
-        utils_py = backend_dir / "cli" / "utils.py"
-        utils_content = utils_py.read_text(encoding="utf-8")
-
-        # Parse the file with AST to find the first function definition
-        tree = ast.parse(utils_content)
-
-        # Find the line number of the first top-level function
-        first_function_lineno = None
-        for node in tree.body:
-            if isinstance(node, ast.FunctionDef):
-                first_function_lineno = node.lineno
-                break
-            elif isinstance(node, (ast.AsyncFunctionDef, ast.ClassDef)):
-                # Skip async functions and classes, find first regular function
-                continue
-
-        assert first_function_lineno is not None, (
-            "Could not find first function in cli/utils.py"
-        )
-
-        # Check module-level imports (before the first function)
-        lines = utils_content.split("\n")
-        module_level_imports = "\n".join(lines[:first_function_lineno])
-
-        assert "from graphiti_config import" not in module_level_imports, (
-            "graphiti_config should not be imported at module level in cli/utils.py"
-        )
-
-        # Verify that graphiti_config IS imported inside validate_environment()
-        validate_env_lineno = None
-        validate_env_end_lineno = len(lines)  # Initialize to end of file
-        for node in tree.body:
-            if (
-                isinstance(node, ast.FunctionDef)
-                and node.name == "validate_environment"
-            ):
-                validate_env_lineno = node.lineno
-                # Find the end of the function (next top-level node or end of file)
-                node_index = tree.body.index(node)
-                if node_index + 1 < len(tree.body):
-                    next_node = tree.body[node_index + 1]
-                    validate_env_end_lineno = next_node.lineno
-                break
-
-        assert validate_env_lineno is not None, (
-            "Could not find validate_environment function"
-        )
-
-        # Look for the import within the function's body
-        validate_env_block = "\n".join(
-            lines[validate_env_lineno - 1 : validate_env_end_lineno]
-        )
-        assert (
-            "from graphiti_config import get_graphiti_status" in validate_env_block
-        ), "graphiti_config should be imported inside validate_environment()"
 
     def test_entry_points_validate_before_cli_imports(self):
         """
         Entry points (run.py, spec_runner.py) should validate dependencies
-        BEFORE importing cli modules that might trigger graphiti imports.
+        BEFORE importing cli modules that might trigger pywintypes imports.
         """
         # Read entry point files and verify the order
         backend_dir = Path(__file__).parent.parent / "apps" / "backend"

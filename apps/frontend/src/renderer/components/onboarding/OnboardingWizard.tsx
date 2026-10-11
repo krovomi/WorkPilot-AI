@@ -15,7 +15,6 @@ import { AuthChoiceStep } from "./AuthChoiceStep";
 import { ClaudeCodeStep } from "./ClaudeCodeStep";
 import { CompletionStep } from "./CompletionStep";
 import { DevToolsStep } from "./DevToolsStep";
-import { MemoryStep } from "./MemoryStep";
 import { OAuthStep } from "./OAuthStep";
 import { PrivacyStep } from "./PrivacyStep";
 import { WelcomeStep } from "./WelcomeStep";
@@ -36,7 +35,6 @@ type WizardStepId =
 	| "claude-code"
 	| "devtools"
 	| "privacy"
-	| "memory"
 	| "completion";
 
 // Step configuration with translation keys
@@ -47,7 +45,6 @@ const WIZARD_STEPS: { id: WizardStepId; labelKey: string }[] = [
 	{ id: "claude-code", labelKey: "steps.claudeCode" },
 	{ id: "devtools", labelKey: "steps.devtools" },
 	{ id: "privacy", labelKey: "steps.privacy" },
-	{ id: "memory", labelKey: "steps.memory" },
 	{ id: "completion", labelKey: "steps.done" },
 ];
 
@@ -103,8 +100,8 @@ export function OnboardingWizard({
 	}, [currentStepIndex, currentStepId]);
 
 	const goToPreviousStep = useCallback(() => {
-		// If going back from memory and oauth was bypassed, go back to auth-choice (skip oauth)
-		if (currentStepId === "memory" && oauthBypassed) {
+		// If going back from completion and oauth was bypassed, go back to auth-choice (skip oauth)
+		if (currentStepId === "completion" && oauthBypassed) {
 			// Find index of auth-choice step
 			const authChoiceIndex = WIZARD_STEPS.findIndex(
 				(step) => step.id === "auth-choice",
@@ -120,13 +117,15 @@ export function OnboardingWizard({
 	}, [currentStepIndex, currentStepId, oauthBypassed]);
 
 	// Handler for when API key path is chosen - skips oauth step
-	const handleSkipToMemory = useCallback(() => {
+	const handleSkipToCompletion = useCallback(() => {
 		setOauthBypassed(true);
 		setCompletedSteps((prev) => new Set(prev).add("auth-choice"));
 
-		// Find index of memory step
-		const memoryIndex = WIZARD_STEPS.findIndex((step) => step.id === "memory");
-		setCurrentStepIndex(memoryIndex);
+		// Find index of completion step
+		const completionIndex = WIZARD_STEPS.findIndex(
+			(step) => step.id === "completion",
+		);
+		setCurrentStepIndex(completionIndex);
 	}, []);
 
 	// Reset wizard state (for re-running) - defined before skipWizard/finishWizard that use it
@@ -184,7 +183,7 @@ export function OnboardingWizard({
 						onNext={goToNextStep}
 						onBack={goToPreviousStep}
 						onSkip={completeWizard}
-						onAPIKeyPathComplete={handleSkipToMemory}
+						onAPIKeyPathComplete={handleSkipToCompletion}
 					/>
 				);
 			case "oauth":
@@ -207,8 +206,6 @@ export function OnboardingWizard({
 				return <DevToolsStep onNext={goToNextStep} onBack={goToPreviousStep} />;
 			case "privacy":
 				return <PrivacyStep onNext={goToNextStep} onBack={goToPreviousStep} />;
-			case "memory":
-				return <MemoryStep onNext={goToNextStep} onBack={goToPreviousStep} />;
 			case "completion":
 				return (
 					<CompletionStep

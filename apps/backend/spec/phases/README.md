@@ -46,7 +46,7 @@ apps/backend/spec/
 - `phase_context()` - Relevant file discovery
 
 ### `requirements_phases.py` (RequirementsPhaseMixin)
-- `phase_historical_context()` - Graphiti knowledge graph integration
+- `phase_historical_context()` - Hints from the shared brain (`memory.store`)
 - `phase_requirements()` - Interactive and automated requirements gathering
 - `phase_research()` - External integration validation
 

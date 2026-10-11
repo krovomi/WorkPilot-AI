@@ -10,7 +10,7 @@
 
 import type {
 	ContextSearchResult,
-	GraphitiMemoryStatus,
+	MemoryStatus,
 	MemoryEpisode,
 } from "../../../shared/types";
 import { backendFetch } from "../_backend-fetch";
@@ -27,7 +27,7 @@ interface BrainMemoriesResponse {
 }
 
 /** Where the vault is, and whether it exists yet — in the tab's status shape. */
-export async function fetchBrainMemoryStatus(): Promise<GraphitiMemoryStatus> {
+export async function fetchBrainMemoryStatus(): Promise<MemoryStatus> {
 	const result = await backendFetch<BrainStatusResponse>(
 		"/api/brain/status",
 		{ method: "GET" },
