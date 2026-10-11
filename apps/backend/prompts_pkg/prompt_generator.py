@@ -467,6 +467,8 @@ Before marking complete, verify:
 - NEVER write production code without a failing test that requires it
 - If the test fails after implementation, FIX IT before committing
 - If you encounter a blocker, document it in build-progress.txt
+- Never `git push`: the build is reviewed and merged by WorkPilot, not by you
+- Never change git configuration (`git config`, `git -c`)
 """)
     else:
         sections.append(f"""## Instructions
@@ -496,6 +498,8 @@ Before marking complete, verify:
 - Focus ONLY on this subtask - don't modify unrelated code
 - If verification fails, FIX IT before committing
 - If you encounter a blocker, document it in build-progress.txt
+- Never `git push`: the build is reviewed and merged by WorkPilot, not by you
+- Never change git configuration (`git config`, `git -c`)
 """)
 
     # Note: Linear updates are now handled by Python orchestrator via linear_updater.py

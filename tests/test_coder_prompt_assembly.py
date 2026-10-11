@@ -64,6 +64,19 @@ def test_the_core_reaches_every_stack(tmp_path):
         assert part in text, part
 
 
+@pytest.mark.parametrize("tdd", [False, True])
+def test_the_git_rules_reach_every_subtask(tmp_path, monkeypatch, tdd):
+    # The two rules of coder.md the served prompt did not carry. The others —
+    # self-critique, session insights — are the Quality Checklist and
+    # `extract_session_insights`, which runs after every session.
+    if tdd:
+        monkeypatch.setenv("TDD_MODE", "true")
+    text = _prompt(tmp_path)
+    assert ("TDD Cycle" in text) is tdd
+    assert "Never `git push`" in text
+    assert "Never change git configuration" in text
+
+
 def test_the_dotnet_module_only_reaches_a_dotnet_project(tmp_path):
     python = tmp_path / "py"
     python.mkdir()
