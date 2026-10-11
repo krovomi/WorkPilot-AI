@@ -13,7 +13,6 @@ import { RepositorySection } from "../RepositorySection";
 
 const baseSettings: ProjectSettings = {
 	model: "claude-3-haiku-20240307",
-	memoryBackend: "file",
 	linearSync: false,
 	notifications: {
 		onTaskComplete: true,
@@ -21,7 +20,6 @@ const baseSettings: ProjectSettings = {
 		onReviewNeeded: true,
 		sound: false,
 	},
-	graphitiMcpEnabled: false,
 };
 
 function createProject(overrides: Partial<Project> = {}): Project {

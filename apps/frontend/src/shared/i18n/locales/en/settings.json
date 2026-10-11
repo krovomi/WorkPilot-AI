@@ -891,26 +891,6 @@
 			"integrationDescription": "Connect to Azure DevOps for work item management",
 			"syncDescription": "Sync with Azure DevOps Backlog"
 		},
-		"memory": {
-			"title": "Memory (Graphiti)",
-			"description": "Graphiti memory backend",
-			"integrationTitle": "Memory Settings",
-			"integrationDescription": "Configure Graphiti memory backend for cross-session context",
-			"syncDescription": "Configure Graphiti memory",
-			"enableMemory": "Enable memory",
-			"enableMemoryDescription": "Persistent cross-session memory backed by LadybugDB (embedded database)",
-			"fileBasedMemoryDescription": "Using file-based memory. Session insights are stored locally in JSON files. Enable memory for persistent cross-session context with semantic search.",
-			"enableAgentMemoryAccess": "Enable agent memory access",
-			"enableAgentMemoryAccessDescription": "Let agents search and add to the knowledge graph through MCP",
-			"graphitiMcpServerUrl": "Graphiti MCP server URL",
-			"graphitiMcpServerUrlDescription": "Graphiti MCP server URL for agent memory access",
-			"embeddingProvider": "Embedding provider",
-			"embeddingProviderDescription": "Provider for semantic search (optional — keyword search works without it)",
-			"databaseName": "Database name",
-			"databaseNameDescription": "Stored in ~/.workpilot/memories/",
-			"databasePath": "Database path (optional)",
-			"databasePathDescription": "Custom storage location. Defaults to ~/.workpilot/memories/"
-		},
 		"flagshipModel": "Flagship model: {{model}}",
 		"tierFlagship": "Flagship",
 		"supportsThinking": "Thinking",
@@ -1025,7 +1005,6 @@
 		"apiKeys": "API Keys",
 		"apiKeysInfo": "Keys set here are used as defaults. Individual projects can override these in their settings.",
 		"openaiKey": "OpenAI API Key",
-		"openaiKeyDescription": "Required for Graphiti memory backend (embeddings)",
 		"toast": {
 			"authSuccess": "Profile Authenticated",
 			"authSuccessWithEmail": "Connected as {{email}}",
@@ -1355,11 +1334,6 @@
 				"description": "Documentation lookup for libraries. Pages for libraries the codebase has no example of are downloaded before each build.",
 				"apiKeyPlaceholder": "Context7 API key (optional)",
 				"apiKeyHint": "Without a key, Context7 applies its anonymous per-IP quota. Free keys: context7.com/dashboard"
-			},
-			"graphiti": {
-				"name": "Graphiti Memory",
-				"description": "Knowledge graph for cross-session context",
-				"notConfigured": "Requires memory configuration (see Memory settings)"
 			},
 			"linear": {
 				"name": "Linear",

@@ -8,7 +8,6 @@
 
 import {
 	AlertCircle,
-	Brain,
 	CheckCircle2,
 	ChevronDown,
 	ChevronRight,
@@ -171,7 +170,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
 			"WebFetch",
 			"WebSearch",
 		],
-		mcp_servers: ["context7", "graphiti-memory", "auto-claude"],
+		mcp_servers: ["context7", "auto-claude"],
 		mcp_optional: ["linear"],
 		settingsSource: { type: "phase", phase: "planning" },
 	},
@@ -189,7 +188,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
 			"WebFetch",
 			"WebSearch",
 		],
-		mcp_servers: ["context7", "graphiti-memory", "auto-claude"],
+		mcp_servers: ["context7", "auto-claude"],
 		mcp_optional: ["linear"],
 		settingsSource: { type: "phase", phase: "coding" },
 	},
@@ -201,7 +200,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
 			"Validates acceptance criteria. Uses Electron or Puppeteer based on project type.",
 		category: "qa",
 		tools: ["Read", "Glob", "Grep", "Bash", "WebFetch", "WebSearch"],
-		mcp_servers: ["context7", "graphiti-memory", "auto-claude"],
+		mcp_servers: ["context7", "auto-claude"],
 		mcp_optional: ["linear", "electron", "puppeteer"],
 		settingsSource: { type: "phase", phase: "qa" },
 	},
@@ -220,7 +219,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
 			"WebFetch",
 			"WebSearch",
 		],
-		mcp_servers: ["context7", "graphiti-memory", "auto-claude"],
+		mcp_servers: ["context7", "auto-claude"],
 		mcp_optional: ["linear", "electron", "puppeteer"],
 		settingsSource: { type: "phase", phase: "qa" },
 	},
@@ -344,19 +343,6 @@ const MCP_SERVERS: Record<
 			"mcp__context7__resolve-library-id",
 			"mcp__context7__query-docs",
 			"mcp__context7__get-library-docs",
-		],
-	},
-	"graphiti-memory": {
-		name: "Graphiti Memory",
-		description:
-			"Knowledge graph for cross-session context. Requires GRAPHITI_MCP_URL env var.",
-		icon: Brain,
-		tools: [
-			"mcp__graphiti-memory__search_nodes",
-			"mcp__graphiti-memory__search_facts",
-			"mcp__graphiti-memory__add_episode",
-			"mcp__graphiti-memory__get_episodes",
-			"mcp__graphiti-memory__get_entity_edge",
 		],
 	},
 	"auto-claude": {
@@ -523,7 +509,7 @@ const MCP_CATEGORY_GROUPS: Array<{
 	{
 		labelKey: "mcp.categories.core",
 		fallback: "Core",
-		ids: ["context7", "graphiti-memory"],
+		ids: ["context7"],
 	},
 	{
 		labelKey: "mcp.categories.projectMgmt",
@@ -560,7 +546,6 @@ const MCP_CATEGORY_GROUPS: Array<{
 // All available MCP servers that can be added to agents
 const ALL_MCP_SERVERS = [
 	"context7",
-	"graphiti-memory",
 	"linear",
 	"electron",
 	"puppeteer",
@@ -677,8 +662,6 @@ function AgentCard({
 			switch (mcp) {
 				case "context7":
 					return mcpServerStates.context7Enabled !== false;
-				case "graphiti-memory":
-					return mcpServerStates.graphitiEnabled !== false;
 				case "linear":
 					return mcpServerStates.linearMcpEnabled !== false;
 				case "electron":
@@ -1570,7 +1553,6 @@ export function AgentTools() {
 	// Count enabled MCP servers
 	const enabledCount = [
 		mcpServers.context7Enabled !== false,
-		mcpServers.graphitiEnabled && envConfig?.graphitiProviderConfig,
 		mcpServers.linearMcpEnabled !== false && envConfig?.linearEnabled,
 		mcpServers.electronEnabled,
 		mcpServers.puppeteerEnabled,
@@ -1746,33 +1728,6 @@ export function AgentTools() {
 										</p>
 									</div>
 								)}
-
-								{/* Graphiti Memory */}
-								<div className="flex items-center justify-between py-2 border-b border-border last:border-0">
-									<div className="flex items-center gap-3">
-										<Brain className="h-4 w-4 text-muted-foreground" />
-										<div>
-											<span className="text-sm font-medium">
-												{t("settings:mcp.servers.graphiti.name")}
-											</span>
-											<p className="text-xs text-muted-foreground">
-												{envConfig.graphitiProviderConfig
-													? t("settings:mcp.servers.graphiti.description")
-													: t("settings:mcp.servers.graphiti.notConfigured")}
-											</p>
-										</div>
-									</div>
-									<Switch
-										checked={
-											mcpServers.graphitiEnabled !== false &&
-											!!envConfig.graphitiProviderConfig
-										}
-										onCheckedChange={(checked) =>
-											updateMcpServer("graphitiEnabled", checked)
-										}
-										disabled={!envConfig.graphitiProviderConfig}
-									/>
-								</div>
 
 								{/* Linear */}
 								<div className="flex items-center justify-between py-2 border-b border-border last:border-0">

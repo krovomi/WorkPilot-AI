@@ -142,20 +142,6 @@ const PROJECT_JOURNEYS: JourneyTable = {
 			condition: () => nonEmpty(env()?.linearApiKey),
 		},
 	],
-	memory: [
-		{
-			anchor: GUIDE_ANCHORS.memory.enable,
-			titleKey: "steps.memory.enable.title",
-			descKey: "steps.memory.enable.desc",
-			condition: () => Boolean(env()?.graphitiEnabled),
-		},
-		{
-			anchor: GUIDE_ANCHORS.memory.embeddingProvider,
-			titleKey: "steps.memory.embeddingProvider.title",
-			descKey: "steps.memory.embeddingProvider.desc",
-			optional: true,
-		},
-	],
 	cicd: [
 		{
 			anchor: GUIDE_ANCHORS.cicd.provider,

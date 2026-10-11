@@ -11,7 +11,6 @@ import type {
 	ProjectSettings as ProjectSettingsType,
 } from "../../../../shared/types";
 import { GeneralSettings } from "../../project-settings/GeneralSettings";
-import { SecuritySettings } from "../../project-settings/SecuritySettings";
 import { InitializationGuard } from "../common/InitializationGuard";
 import { AzureDevOpsIntegration } from "../integrations/AzureDevOpsIntegration";
 import { ChannelNotificationsIntegration } from "../integrations/ChannelNotificationsIntegration";
@@ -38,8 +37,6 @@ interface SectionRouterProps {
 	updateEnvConfig: (updates: Partial<ProjectEnvConfig>) => void;
 	showLinearKey: boolean;
 	setShowLinearKey: React.Dispatch<React.SetStateAction<boolean>>;
-	showOpenAIKey: boolean;
-	setShowOpenAIKey: React.Dispatch<React.SetStateAction<boolean>>;
 	showGitHubToken: boolean;
 	setShowGitHubToken: React.Dispatch<React.SetStateAction<boolean>>;
 	gitHubConnectionStatus: GitHubSyncStatus | null;
@@ -82,8 +79,6 @@ export function SectionRouter({
 	updateEnvConfig,
 	showLinearKey,
 	setShowLinearKey,
-	showOpenAIKey,
-	setShowOpenAIKey,
 	showGitHubToken,
 	setShowGitHubToken,
 	gitHubConnectionStatus,
@@ -302,33 +297,6 @@ export function SectionRouter({
 						<ChannelNotificationsIntegration
 							envConfig={envConfig}
 							updateEnvConfig={updateEnvConfig}
-						/>
-					</InitializationGuard>
-				</SettingsSection>
-			);
-
-		case "memory":
-			return (
-				<SettingsSection
-					title={t("projectSections.memory.integrationTitle")}
-					description={t("projectSections.memory.integrationDescription")}
-				>
-					<InitializationGuard
-						initialized={!!project.autoBuildPath}
-						title={t("projectSections.memory.integrationTitle")}
-						description={t("projectSections.memory.syncDescription")}
-					>
-						<SecuritySettings
-							envConfig={envConfig}
-							settings={settings}
-							setSettings={setSettings}
-							updateEnvConfig={updateEnvConfig}
-							showOpenAIKey={showOpenAIKey}
-							setShowOpenAIKey={setShowOpenAIKey}
-							expanded={true}
-							onToggle={() => {
-								/* noop */
-							}}
 						/>
 					</InitializationGuard>
 				</SettingsSection>

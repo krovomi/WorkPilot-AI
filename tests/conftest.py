@@ -135,8 +135,6 @@ _PROTECTED_PACKAGES = [
     "linear_updater",
     # Memory & graph
     "memory",
-    "graphiti_config",
-    "graphiti_providers",
     # Recovery & analysis
     "recovery",
     "insight_extractor",

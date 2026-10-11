@@ -6,7 +6,6 @@ import { fileURLToPath } from "node:url";
 import { app } from "electron";
 import { MODEL_ID_MAP } from "../shared/constants";
 import type { AppSettings } from "../shared/types";
-import { buildMemoryEnvVars } from "./memory-env-builder";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -224,8 +223,6 @@ export class LearningLoopService extends EventEmitter {
 				if (settings.globalAnthropicApiKey) {
 					processEnv.ANTHROPIC_API_KEY = settings.globalAnthropicApiKey;
 				}
-				// Graphiti memory config so outcome episodes reach the knowledge graph
-				Object.assign(processEnv, buildMemoryEnvVars(settings));
 			}
 		} catch {
 			// Ignore settings read errors

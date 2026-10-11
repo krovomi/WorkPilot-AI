@@ -43,10 +43,6 @@ export const GUIDE_ANCHORS = {
 		enable: "linear.enable",
 		apiKey: "linear.apiKey",
 	},
-	memory: {
-		enable: "memory.enable",
-		embeddingProvider: "memory.embeddingProvider",
-	},
 	cicd: {
 		provider: "cicd.provider",
 	},

@@ -14,8 +14,8 @@ import {
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type {
-	GraphitiMemoryState,
-	GraphitiMemoryStatus,
+	MemoryState,
+	MemoryStatus,
 	MemoryEpisode,
 } from "../../../shared/types";
 import { cn } from "../../lib/utils";
@@ -31,8 +31,8 @@ import { MemoryCard } from "./MemoryCard";
 type FilterCategory = keyof typeof memoryFilterCategories;
 
 interface MemoriesTabProps {
-	readonly memoryStatus: GraphitiMemoryStatus | null;
-	readonly memoryState: GraphitiMemoryState | null;
+	readonly memoryStatus: MemoryStatus | null;
+	readonly memoryState: MemoryState | null;
 	readonly recentMemories: MemoryEpisode[];
 	readonly memoriesLoading: boolean;
 	readonly searchResults: Array<{

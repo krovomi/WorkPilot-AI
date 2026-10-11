@@ -35,7 +35,7 @@ sys.path.insert(0, str(_backend_dir))
 sys.path.insert(0, str(_project_root))
 
 # Validate platform-specific dependencies BEFORE any imports that might
-# trigger graphiti_core -> real_ladybug -> pywintypes import chain (ACS-253)
+# trigger a pywintypes import (the MCP library imports win32api; ACS-253)
 from core.dependency_validator import validate_platform_dependencies
 
 validate_platform_dependencies()

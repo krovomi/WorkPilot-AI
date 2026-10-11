@@ -80,7 +80,6 @@ def _exit_with_pywin32_error() -> None:
         "\n"
         "WorkPilot AI requires pywin32 on Windows for:\n"
         "  - MCP library (win32api, win32con, win32job modules)\n"
-        "  - LadybugDB/Graphiti memory integration\n"
         "\n"
         f"{activation_step}"
         "\n"

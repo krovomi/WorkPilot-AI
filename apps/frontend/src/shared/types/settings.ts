@@ -8,10 +8,7 @@ import type {
 	ChangelogEmojiLevel,
 	ChangelogFormat,
 } from "./changelog";
-import type {
-	GraphitiEmbeddingProvider,
-	NotificationSettings,
-} from "./project";
+import type { NotificationSettings } from "./project";
 
 // Color theme types for multi-theme support
 export type ColorTheme =
@@ -305,23 +302,6 @@ export interface AppSettings {
 	// Ollama / local LLM provider config (set in the provider page).
 	globalOllamaApiUrl?: string;
 	globalOllamaModel?: string;
-	// Graphiti LLM provider settings (legacy)
-	graphitiLlmProvider?: "openai" | "anthropic" | "google" | "groq" | "ollama";
-	ollamaBaseUrl?: string;
-	// Memory/Graphiti configuration (app-wide, set during onboarding)
-	memoryEnabled?: boolean;
-	memoryEmbeddingProvider?: GraphitiEmbeddingProvider;
-	memoryOllamaEmbeddingModel?: string;
-	memoryOllamaEmbeddingDim?: number;
-	memoryOllamaLlmModel?: string;
-	memoryVoyageApiKey?: string;
-	memoryVoyageEmbeddingModel?: string;
-	memoryAzureApiKey?: string;
-	memoryAzureBaseUrl?: string;
-	memoryAzureEmbeddingDeployment?: string;
-	// Agent Memory Access (MCP) - app-wide defaults
-	graphitiMcpEnabled?: boolean;
-	graphitiMcpUrl?: string;
 	// Onboarding wizard completion state
 	onboardingCompleted?: boolean;
 	// Setup Hub home-screen banner dismissed by the user

@@ -1,7 +1,7 @@
 """
 Context Mesh — Cross-Project Intelligence
 
-Exploits the Graphiti knowledge graph to create cross-project intelligence:
+Builds cross-project intelligence from what each project learned:
 a knowledge network that enriches itself with every interaction and transfers
 patterns between all of the user's projects.
 

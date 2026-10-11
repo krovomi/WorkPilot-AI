@@ -11,7 +11,6 @@ import {
 	changelogMock,
 	claudeProfileMock,
 	contextMock,
-	infrastructureMock,
 	insightsMock,
 	integrationMock,
 	phase35Mock,
@@ -147,7 +146,6 @@ const browserMockAPI: Partial<ElectronAPI> = {
 	...insightsMock,
 
 	// Infrastructure & Docker Operations
-	...infrastructureMock,
 
 	// API Profile Management (custom Anthropic-compatible endpoints)
 	getAPIProfiles: async () => ({

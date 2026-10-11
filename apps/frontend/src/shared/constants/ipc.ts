@@ -517,15 +517,6 @@ export const IPC_CHANNELS = {
 	GITHUB_TRIAGE_COMPLETE: "github:triage:complete",
 	GITHUB_TRIAGE_ERROR: "github:triage:error",
 
-	// Memory Infrastructure status (LadybugDB - no Docker required)
-	MEMORY_STATUS: "memory:status",
-	MEMORY_LIST_DATABASES: "memory:listDatabases",
-	MEMORY_TEST_CONNECTION: "memory:testConnection",
-
-	// Graphiti validation
-	GRAPHITI_VALIDATE_LLM: "graphiti:validateLlm",
-	GRAPHITI_TEST_CONNECTION: "graphiti:testConnection",
-
 	// Ollama model detection and management
 	OLLAMA_CHECK_STATUS: "ollama:checkStatus",
 	OLLAMA_CHECK_INSTALLED: "ollama:checkInstalled",

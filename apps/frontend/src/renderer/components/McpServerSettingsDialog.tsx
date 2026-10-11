@@ -31,7 +31,6 @@ type ToggleKey = keyof McpServers;
 /** Server id -> the project setting that switches it on and off. */
 const TOGGLE_BY_SERVER: Record<string, ToggleKey> = {
 	context7: "context7Enabled",
-	"graphiti-memory": "graphitiEnabled",
 	linear: "linearMcpEnabled",
 	electron: "electronEnabled",
 	puppeteer: "puppeteerEnabled",
@@ -78,15 +77,11 @@ export function McpServerSettingsDialog({
 	if (!serverId) return null;
 
 	const toggleKey = TOGGLE_BY_SERVER[serverId];
-	// A toggle the user cannot honour is worse than no toggle: Graphiti and
-	// Linear only start when their own configuration exists, so the switch is
-	// disabled and the reason is stated instead of failing at build time.
+	// A toggle the user cannot honour is worse than no toggle: Linear only
+	// starts when its own configuration exists, so the switch is disabled and
+	// the reason is stated instead of failing at build time.
 	const requirementMet =
-		serverId === "graphiti-memory"
-			? Boolean(envConfig?.graphitiProviderConfig)
-			: serverId === "linear"
-				? Boolean(envConfig?.linearEnabled)
-				: true;
+		serverId === "linear" ? Boolean(envConfig?.linearEnabled) : true;
 	const enabled =
 		toggleKey === "electronEnabled" ||
 		toggleKey === "puppeteerEnabled" ||

@@ -20,7 +20,7 @@
 			},
 			"memory": {
 				"title": "Memory & Context",
-				"description": "Persistent memory across sessions with Graphiti"
+				"description": "Persistent memory across sessions in the shared brain"
 			},
 			"parallel": {
 				"title": "Parallel Execution",

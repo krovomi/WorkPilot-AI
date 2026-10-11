@@ -1,8 +1,8 @@
 import { create } from "zustand";
 import type {
 	ContextSearchResult,
-	GraphitiMemoryState,
-	GraphitiMemoryStatus,
+	MemoryState,
+	MemoryStatus,
 	MemoryEpisode,
 	ProjectIndex,
 } from "../../shared/types";
@@ -14,8 +14,8 @@ interface ContextState {
 	indexError: string | null;
 
 	// Memory Status
-	memoryStatus: GraphitiMemoryStatus | null;
-	memoryState: GraphitiMemoryState | null;
+	memoryStatus: MemoryStatus | null;
+	memoryState: MemoryState | null;
 	memoryLoading: boolean;
 	memoryError: string | null;
 
@@ -32,8 +32,8 @@ interface ContextState {
 	setProjectIndex: (index: ProjectIndex | null) => void;
 	setIndexLoading: (loading: boolean) => void;
 	setIndexError: (error: string | null) => void;
-	setMemoryStatus: (status: GraphitiMemoryStatus | null) => void;
-	setMemoryState: (state: GraphitiMemoryState | null) => void;
+	setMemoryStatus: (status: MemoryStatus | null) => void;
+	setMemoryState: (state: MemoryState | null) => void;
 	setMemoryLoading: (loading: boolean) => void;
 	setMemoryError: (error: string | null) => void;
 	setRecentMemories: (memories: MemoryEpisode[]) => void;

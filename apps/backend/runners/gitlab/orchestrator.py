@@ -316,7 +316,7 @@ class GitLabOrchestrator:
             # Save result
             result.save(self.gitlab_dir)
 
-            # Store review learnings to Graphiti memory (non-blocking)
+            # Store review learnings in the shared brain (non-blocking)
             if store_review_learnings and findings:
                 try:
                     changed_paths = [

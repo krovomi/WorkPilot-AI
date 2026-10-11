@@ -4,7 +4,7 @@ Deep Context Provider
 
 Enriches PR reviews with deep codebase context by integrating:
 - Context Builder: project patterns, conventions, related code
-- Graphiti Memory: historical insights, past bugs, regression patterns
+- Shared brain memory: historical insights, past bugs, regression patterns
 - Architecture Enforcement: architectural rule validation
 
 This provider is called during PR review to give the AI reviewer
@@ -200,7 +200,7 @@ class DeepContextProvider:
 
     Integrates:
     1. Context Builder — finds related code, patterns, conventions
-    2. Graphiti Memory — retrieves historical insights and past bugs
+    2. Shared brain memory — retrieves historical insights and past bugs
     3. Architecture Enforcement — checks architectural rules
     """
 

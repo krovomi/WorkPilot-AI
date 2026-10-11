@@ -102,9 +102,6 @@ _mocked_module_names = [
     "validate_spec",
     # Memory
     "memory",
-    "memory.graphiti_helpers",
-    "graphiti_config",
-    "graphiti_providers",
     # Recovery & misc
     "recovery",
     "insight_extractor",

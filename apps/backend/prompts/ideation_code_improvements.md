@@ -68,7 +68,7 @@ cat memory/patterns.md 2>/dev/null || echo "No patterns documented"
 # Look at existing roadmap if available (to avoid duplicates)
 cat ../roadmap/roadmap.json 2>/dev/null | head -100 || echo "No roadmap"
 
-# Check for graph hints (historical insights from Graphiti)
+# Check for graph hints (historical insights from the shared brain)
 cat graph_hints.json 2>/dev/null || echo "No graph hints available"
 ```
 

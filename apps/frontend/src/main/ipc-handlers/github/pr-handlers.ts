@@ -16,8 +16,6 @@ import { IPC_CHANNELS, MODEL_ID_MAP } from "../../../shared/constants";
 import type { Project } from "../../../shared/types";
 import type { AuthFailureInfo } from "../../../shared/types/terminal";
 import { getAugmentedEnv } from "../../env-utils";
-import { getDefaultDbPath, getMemoryService } from "../../memory-service";
-import { readSettingsFile } from "../../settings-utils";
 import { getGitHubConfig, githubFetch, normalizeRepoReference } from "./utils";
 import { createIPCCommunicators } from "./utils/ipc-communicator";
 import { createContextLogger } from "./utils/logger";
@@ -385,148 +383,6 @@ export interface PRReviewMemory {
 	isFollowup: boolean;
 }
 
-/**
- * Save PR review insights to the Electron memory layer (LadybugDB)
- *
- * Called after a PR review completes to persist learnings for cross-session context.
- * Extracts key findings, patterns, and gotchas from the review result.
- *
- * @param result The completed PR review result
- * @param repo Repository name (owner/repo)
- * @param isFollowup Whether this is a follow-up review
- */
-async function savePRReviewToMemory(
-	result: PRReviewResult,
-	repo: string,
-	isFollowup: boolean = false,
-): Promise<void> {
-	const settings = readSettingsFile();
-	if (!settings?.memoryEnabled) {
-		debugLog("Memory not enabled, skipping PR review memory save");
-		return;
-	}
-
-	try {
-		const memoryService = getMemoryService({
-			dbPath: getDefaultDbPath(),
-			database: "auto_claude_memory",
-		});
-
-		// Build the memory content with comprehensive insights
-		// We want to capture ALL meaningful findings so the AI can learn from patterns
-
-		// Prioritize findings: critical > high > medium > low
-		// Include all critical/high, top 5 medium, top 3 low
-		const criticalFindings = result.findings.filter(
-			(f) => f.severity === "critical",
-		);
-		const highFindings = result.findings.filter((f) => f.severity === "high");
-		const mediumFindings = result.findings
-			.filter((f) => f.severity === "medium")
-			.slice(0, 5);
-		const lowFindings = result.findings
-			.filter((f) => f.severity === "low")
-			.slice(0, 3);
-
-		const keyFindingsToSave = [
-			...criticalFindings,
-			...highFindings,
-			...mediumFindings,
-			...lowFindings,
-		].map((f) => ({
-			severity: f.severity,
-			category: f.category,
-			title: f.title,
-			description: f.description.substring(0, 500), // Truncate for storage
-			file: f.file,
-			line: f.line,
-		}));
-
-		// Extract gotchas: security issues, critical bugs, and common mistakes
-		const gotchaCategories = [
-			"security",
-			"error_handling",
-			"data_validation",
-			"race_condition",
-		];
-		const gotchasToSave = result.findings
-			.filter(
-				(f) =>
-					f.severity === "critical" ||
-					f.severity === "high" ||
-					gotchaCategories.includes(f.category?.toLowerCase() || ""),
-			)
-			.map(
-				(f) => `[${f.category}] ${f.title}: ${f.description.substring(0, 300)}`,
-			);
-
-		// Extract patterns: group findings by category to identify recurring issues
-		const categoryGroups = result.findings.reduce(
-			(acc, f) => {
-				const cat = f.category || "general";
-				acc[cat] = (acc[cat] || 0) + 1;
-				return acc;
-			},
-			{} as Record<string, number>,
-		);
-
-		// Patterns are categories that appear multiple times (indicates a systematic issue)
-		const patternsToSave = Object.entries(categoryGroups)
-			.filter(([_, count]) => count >= 2)
-			.map(([category, count]) => `${category}: ${count} occurrences`);
-
-		const memoryContent: PRReviewMemory = {
-			prNumber: result.prNumber,
-			repo,
-			verdict: result.overallStatus || "unknown",
-			timestamp: new Date().toISOString(),
-			summary: {
-				verdict: result.overallStatus || "unknown",
-				finding_counts: {
-					critical: criticalFindings.length,
-					high: highFindings.length,
-					medium: result.findings.filter((f) => f.severity === "medium").length,
-					low: result.findings.filter((f) => f.severity === "low").length,
-				},
-				total_findings: result.findings.length,
-			},
-			keyFindings: keyFindingsToSave,
-			patterns: patternsToSave,
-			gotchas: gotchasToSave,
-			isFollowup,
-		};
-
-		// Add follow-up specific info if applicable
-		if (isFollowup && result.resolvedFindings && result.unresolvedFindings) {
-			memoryContent.summary.verdict_reasoning = `Resolved: ${result.resolvedFindings.length}, Unresolved: ${result.unresolvedFindings.length}`;
-		}
-
-		// Save to memory as a pr_review episode
-		const episodeName = `PR #${result.prNumber} ${isFollowup ? "Follow-up " : ""}Review - ${repo}`;
-		const saveResult = await memoryService.addEpisode(
-			episodeName,
-			memoryContent,
-			"pr_review",
-			`pr_review_${repo.replace("/", "_")}`,
-		);
-
-		if (saveResult.success) {
-			debugLog("PR review saved to memory", {
-				prNumber: result.prNumber,
-				episodeId: saveResult.id,
-			});
-		} else {
-			debugLog("Failed to save PR review to memory", {
-				error: saveResult.error,
-			});
-		}
-	} catch (error) {
-		// Don't fail the review if memory save fails
-		debugLog("Error saving PR review to memory", {
-			error: error instanceof Error ? error.message : error,
-		});
-	}
-}
 
 /**
  * PR data from GitHub API
@@ -1458,12 +1314,6 @@ async function runPRReview(
 
 		// Finalize logs with success
 		logCollector.finalize(true);
-
-		// Save PR review insights to memory (async, non-blocking)
-		// biome-ignore lint/style/noNonNullAssertion: value is guaranteed by context
-		savePRReviewToMemory(result.data!, repo, false).catch((err) => {
-			debugLog("Failed to save PR review to memory", { error: err.message });
-		});
 
 		// biome-ignore lint/style/noNonNullAssertion: value is guaranteed by context
 		return result.data!;
@@ -3112,14 +2962,6 @@ export function registerPRHandlers(
 
 						// Finalize logs with success
 						logCollector.finalize(true);
-
-						// Save follow-up PR review insights to memory (async, non-blocking)
-						// biome-ignore lint/style/noNonNullAssertion: value is guaranteed by context
-						savePRReviewToMemory(result.data!, repo, true).catch((err) => {
-							debugLog("Failed to save follow-up PR review to memory", {
-								error: err.message,
-							});
-						});
 
 						debugLog("Follow-up review completed", {
 							prNumber,

@@ -14,14 +14,9 @@ export interface Project {
 
 export interface ProjectSettings {
 	model: string;
-	memoryBackend: "graphiti" | "file";
 	linearSync: boolean;
 	linearTeamId?: string;
 	notifications: NotificationSettings;
-	/** Enable Graphiti MCP server for agent-accessible knowledge graph */
-	graphitiMcpEnabled: boolean;
-	/** Graphiti MCP server URL (default: http://localhost:8000/mcp/) */
-	graphitiMcpUrl?: string;
 	/** Main branch name for worktree creation (default: auto-detected or 'main') */
 	mainBranch?: string;
 	/** Include CLAUDE.md instructions in agent system prompt (default: true) */
@@ -166,7 +161,7 @@ export interface ConventionsInfo {
 	git_hooks?: string;
 }
 
-export interface GraphitiMemoryStatus {
+export interface MemoryStatus {
 	enabled: boolean;
 	available: boolean;
 	database?: string;
@@ -174,109 +169,7 @@ export interface GraphitiMemoryStatus {
 	reason?: string;
 }
 
-// Memory Infrastructure Types
-export interface MemoryDatabaseStatus {
-	kuzuInstalled: boolean;
-	databasePath: string;
-	databaseExists: boolean;
-	databases: string[];
-	error?: string;
-}
-
-export interface InfrastructureStatus {
-	memory: MemoryDatabaseStatus;
-	ready: boolean; // True if memory database is available
-}
-
-// Graphiti Validation Types
-export interface GraphitiValidationResult {
-	success: boolean;
-	message: string;
-	details?: {
-		provider?: string;
-		model?: string;
-		latencyMs?: number;
-	};
-}
-
-export interface GraphitiConnectionTestResult {
-	database: GraphitiValidationResult;
-	llmProvider: GraphitiValidationResult;
-	ready: boolean;
-}
-
-// Memory Provider Types
-// Embedding Providers: OpenAI, Voyage AI, Azure OpenAI, Ollama (local), Google, OpenRouter
-// Note: LLM provider removed - Claude SDK handles RAG queries
-export type GraphitiEmbeddingProvider =
-	| "openai"
-	| "voyage"
-	| "azure_openai"
-	| "ollama"
-	| "google"
-	| "openrouter";
-
-// Legacy type aliases for backward compatibility
-export type GraphitiLLMProvider =
-	| "openai"
-	| "anthropic"
-	| "azure_openai"
-	| "ollama"
-	| "google"
-	| "groq"
-	| "openrouter";
-
-export interface GraphitiProviderConfig {
-	// Embedding Provider. A small LLM is still required for episode ingestion
-	// (entity extraction in graphiti-core); it is derived from the embedding
-	// provider, or runs locally via Ollama (ollamaLlmModel).
-	embeddingProvider: GraphitiEmbeddingProvider;
-	embeddingModel?: string; // Embedding model, uses provider default if not specified
-
-	// OpenAI Embeddings
-	openaiApiKey?: string;
-	openaiEmbeddingModel?: string;
-
-	// Azure OpenAI Embeddings
-	azureOpenaiApiKey?: string;
-	azureOpenaiBaseUrl?: string;
-	azureOpenaiEmbeddingDeployment?: string;
-
-	// Voyage AI Embeddings
-	voyageApiKey?: string;
-	voyageEmbeddingModel?: string;
-
-	// Google AI Embeddings
-	googleApiKey?: string;
-	googleEmbeddingModel?: string;
-
-	// OpenRouter (multi-provider aggregator)
-	openrouterApiKey?: string;
-	openrouterBaseUrl?: string; // Default: https://openrouter.ai/api/v1
-	openrouterLlmModel?: string; // LLM model selection (e.g., 'anthropic/claude-sonnet-4')
-	openrouterEmbeddingModel?: string;
-
-	// Ollama Embeddings (local, no API key required)
-	ollamaBaseUrl?: string; // Default: http://localhost:11434
-	ollamaEmbeddingModel?: string;
-	ollamaEmbeddingDim?: number;
-	ollamaLlmModel?: string; // Local LLM used by graphiti-core for episode ingestion
-
-	// LadybugDB settings (embedded database - no Docker required)
-	database?: string; // Database name (default: auto_claude_memory)
-	dbPath?: string; // Database storage path (default: ~/.workpilot/memories)
-}
-
-export interface GraphitiProviderInfo {
-	id: GraphitiLLMProvider;
-	name: string;
-	description: string;
-	requiresApiKey: boolean;
-	defaultModel: string;
-	supportedModels: string[];
-}
-
-export interface GraphitiMemoryState {
+export interface MemoryState {
 	initialized: boolean;
 	database?: string;
 	indices_built: boolean;
@@ -319,8 +212,8 @@ export interface ContextSearchResult {
 
 export interface ProjectContextData {
 	projectIndex: ProjectIndex | null;
-	memoryStatus: GraphitiMemoryStatus | null;
-	memoryState: GraphitiMemoryState | null;
+	memoryStatus: MemoryStatus | null;
+	memoryState: MemoryState | null;
 	recentMemories: MemoryEpisode[];
 	isLoading: boolean;
 	error?: string;
@@ -388,16 +281,9 @@ export interface ProjectEnvConfig {
 	// Git/Worktree Settings
 	defaultBranch?: string; // Base branch for worktree creation (e.g., 'main', 'develop')
 
-	// Graphiti Memory Integration (V2 - Multi-provider support)
-	// Uses LadybugDB embedded database (no Docker required, Python 3.12+)
-	graphitiEnabled: boolean;
-	graphitiProviderConfig?: GraphitiProviderConfig; // Provider configuration
-	// Legacy fields (still supported for backward compatibility)
 	openaiApiKey?: string;
 	// Indicates if the OpenAI key is from global settings (not project-specific)
 	openaiKeyIsGlobal?: boolean;
-	graphitiDatabase?: string;
-	graphitiDbPath?: string;
 
 	// UI Settings
 	enableFancyUi: boolean;
@@ -408,8 +294,6 @@ export interface ProjectEnvConfig {
 		context7Enabled?: boolean;
 		/** Context7 API key - optional, raises the quota above anonymous */
 		context7ApiKey?: string;
-		/** Graphiti knowledge graph - default: true (if graphitiProviderConfig set) */
-		graphitiEnabled?: boolean;
 		/** Linear MCP integration - default: follows linearEnabled */
 		linearMcpEnabled?: boolean;
 		/** Electron desktop automation (QA only) - default: false */

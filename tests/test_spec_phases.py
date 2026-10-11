@@ -80,8 +80,6 @@ _mocked_module_names = [
     "spec.validate_pkg.validators",
     # Validate spec (legacy)
     "validate_spec",
-    # Graphiti
-    "graphiti_providers",
     # Integrations
     "integrations",
     "integrations.linear",
@@ -98,10 +96,6 @@ for name in _mocked_module_names:
     sys.modules[name] = MagicMock()
 
 # Set up specific mock attributes
-mock_graphiti = sys.modules["graphiti_providers"]
-mock_graphiti.is_graphiti_enabled = MagicMock(return_value=False)
-mock_graphiti.get_graph_hints = AsyncMock(return_value=[])
-
 mock_validate_spec = sys.modules["validate_spec"]
 mock_validate_spec.auto_fix_plan = MagicMock(return_value=False)
 
@@ -335,7 +329,7 @@ class TestPhaseHistoricalContext:
         assert result.retries == 0
 
     @pytest.mark.asyncio
-    async def test_historical_context_graphiti_disabled(
+    async def test_historical_context_memory_disabled(
         self,
         temp_dir: Path,
         spec_dir: Path,

@@ -4,9 +4,9 @@ import { computeSetupCategories } from "../../setup-hub/useSetupStatus";
 import { GUIDE_ANCHORS } from "../anchors";
 import { buildTodoTour } from "../tour-steps";
 
-/** Minimal env config; only `graphitiEnabled` is required by the type. */
+/** Minimal env config; the tests only set the fields they read. */
 const env = (overrides: Partial<ProjectEnvConfig> = {}): ProjectEnvConfig =>
-	({ graphitiEnabled: false, ...overrides }) as ProjectEnvConfig;
+	({ ...overrides }) as ProjectEnvConfig;
 
 /** All anchors present in the produced tour, in order. */
 const anchorsOf = (status: ReturnType<typeof computeSetupCategories>) =>
@@ -72,7 +72,6 @@ describe("buildTodoTour", () => {
 				jiraApiToken: "t",
 				linearEnabled: true,
 				linearApiKey: "t",
-				graphitiEnabled: true,
 				cicdProvider: "github",
 				teamsNotificationsEnabled: true,
 				teamsWebhookUrl: "https://hook",

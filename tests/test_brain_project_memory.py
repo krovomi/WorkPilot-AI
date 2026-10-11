@@ -395,11 +395,3 @@ def test_review_findings_become_gotchas_high_severity_only(vault, spec):
     )
     gotchas = ProjectMemory(project="shop").load_gotchas()
     assert len(gotchas) == 1 and "SQL built by concatenation" in gotchas[0]
-
-
-def test_no_agent_gets_the_graphiti_server_by_default(monkeypatch):
-    from agents.tools_pkg.models import AGENT_CONFIGS, get_required_mcp_servers
-
-    monkeypatch.setenv("GRAPHITI_MCP_URL", "http://localhost:9000/mcp/")
-    for agent_type in AGENT_CONFIGS:
-        assert "graphiti" not in get_required_mcp_servers(agent_type)

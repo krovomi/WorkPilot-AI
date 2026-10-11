@@ -91,7 +91,6 @@ import { registerLinearHandlers } from "./linear-handlers";
 import { registerLiveCompanionHandlers } from "./live-companion-handlers";
 import { registerMcpHandlers } from "./mcp-handlers";
 import { registerMcpMarketplaceHandlers } from "./mcp-marketplace-handlers";
-import { registerMemoryHandlers } from "./memory-handlers";
 import { registerMultiRepoHandlers } from "./multi-repo-handlers";
 import { setupNaturalLanguageGitHandlers } from "./natural-language-git-handlers";
 import { registerNotebookAgentHandlers } from "./notebook-agent-handlers";
@@ -210,7 +209,6 @@ export { registerLinearHandlers } from "./linear-handlers";
 export { registerLiveCompanionHandlers } from "./live-companion-handlers";
 export { registerMcpHandlers } from "./mcp-handlers";
 export { registerMcpMarketplaceHandlers } from "./mcp-marketplace-handlers";
-export { registerMemoryHandlers } from "./memory-handlers";
 export { registerMultiRepoHandlers } from "./multi-repo-handlers";
 export { setupNaturalLanguageGitHandlers } from "./natural-language-git-handlers";
 export { registerNotebookAgentHandlers } from "./notebook-agent-handlers";
@@ -353,9 +351,6 @@ export function setupIpcHandlers(
 
 	// Insights handlers
 	registerInsightsHandlers(getMainWindow);
-
-	// Memory & infrastructure handlers (for Graphiti/LadybugDB)
-	registerMemoryHandlers();
 
 	// Ollama handlers (detection, installation, model downloads)
 	registerOllamaHandlers();

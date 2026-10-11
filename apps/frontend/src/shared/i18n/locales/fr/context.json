@@ -91,11 +91,6 @@
 		"noMemoriesYet": "Aucune mémoire pour le moment. Les builds, les sessions QA et les revues de PR écrivent ce qu'ils apprennent dans le cerveau partagé.",
 		"noMatchingMemories": "Aucune mémoire ne correspond au filtre sélectionné.",
 		"showAll": "Afficher toutes les mémoires",
-		"reasons.notConfigured": "Graphiti non configuré",
-		"reasons.openaiKeyNotSet": "OPENAI_API_KEY non défini (requis pour les embeddings OpenAI)",
-		"reasons.googleKeyNotSet": "GOOGLE_API_KEY non défini (requis pour les embeddings Google AI)",
-		"reasons.voyageKeyNotSet": "VOYAGE_API_KEY non défini (requis pour les embeddings Voyage AI)",
-		"reasons.azureKeyNotSet": "AZURE_OPENAI_API_KEY non défini (requis pour les embeddings Azure OpenAI)",
 		"brainHint": "Chaque build écrit ce qu'il apprend dans le cerveau partagé — un vault Obsidian que lisent tous les agents. Il est créé à la première écriture ; pour utiliser un vault existant ou un distant git, ouvrez Réglages → Intégrations → Cerveau partagé.",
 		"reasons.brainNotCreated": "Le cerveau partagé n'existe pas encore",
 		"reasons.brainUnreachable": "Le backend est injoignable : impossible de lire le cerveau partagé"

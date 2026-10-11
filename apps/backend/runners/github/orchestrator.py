@@ -636,9 +636,6 @@ class GitHubOrchestrator:
                     flush=True,
                 )
 
-            # Note: PR review memory is now saved by the Electron app after the review completes
-            # This ensures memory is saved to the embedded LadybugDB managed by the app
-
             # Mark as reviewed (head_sha already fetched above)
             if head_sha:
                 self.bot_detector.mark_reviewed(pr_number, head_sha)
@@ -1046,9 +1043,6 @@ class GitHubOrchestrator:
 
             # Save result
             await result.save(self.github_dir)
-
-            # Note: PR review memory is now saved by the Electron app after the review completes
-            # This ensures memory is saved to the embedded LadybugDB managed by the app
 
             # Mark as reviewed with new commit SHA
             if result.reviewed_commit_sha:
