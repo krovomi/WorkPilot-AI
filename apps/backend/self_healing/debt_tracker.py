@@ -15,13 +15,10 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from debug import debug, debug_section
+    from core.debug import debug
 except ImportError:
 
     def debug(module: str, message: str, **kwargs):
-        pass
-
-    def debug_section(module: str, message: str):
         pass
 
 

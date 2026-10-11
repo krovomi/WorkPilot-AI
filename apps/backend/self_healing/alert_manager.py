@@ -39,7 +39,7 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from debug import debug, debug_section, debug_warning
+    from core.debug import debug, debug_section, debug_warning
 except ImportError:
 
     def debug(module: str, message: str, **kwargs):

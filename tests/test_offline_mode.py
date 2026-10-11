@@ -9,7 +9,6 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "backend"))
 from core import offline_policy
-
 from runners import offline_mode_runner as runner
 
 

@@ -15,7 +15,7 @@ _backend_dir = Path(__file__).parent.parent / "apps" / "backend"
 if str(_backend_dir) not in sys.path:
     sys.path.insert(0, str(_backend_dir))
 
-from worktree import (
+from core.worktree import (
     PullRequestResult,
     WorktreeInfo,
 )

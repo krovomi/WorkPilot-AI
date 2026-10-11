@@ -25,18 +25,18 @@ from core.agent_client import (
     MessageRole,
 )
 from core.conversation_log import append_message as _log_append_message
-from debug import debug, debug_detailed, debug_error, debug_section, debug_success
-from insight_extractor import extract_session_insights
-from linear_updater import (
-    linear_subtask_completed,
-    linear_subtask_failed,
-)
-from progress import (
+from core.debug import debug, debug_detailed, debug_error, debug_section, debug_success
+from core.progress import (
     count_subtasks_detailed,
     is_build_complete,
 )
-from recovery import RecoveryManager
+from insight_extractor import extract_session_insights
+from integrations.linear.updater import (
+    linear_subtask_completed,
+    linear_subtask_failed,
+)
 from security.tool_input_validator import get_safe_tool_input
+from services.recovery import RecoveryManager
 from task_logger import (
     LogEntryType,
     LogPhase,

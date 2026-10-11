@@ -52,9 +52,11 @@ language git runners, the code playground, the Linear updater, the PR
 follow-up review. None passed a denial, so the user's and the project's
 settings files decided what they could do; an empty `allowed_tools` approves
 nothing and refuses nothing. Each now goes through `create_simple_client`
-with a registered type (`voice_command`, `git_command`, `code_playground`,
-`linear_updater`, `pr_followup_reviewer`, `insights`), and
-`tests/test_sdk_options_factories.py` fails on any other construction.
+with a registered type (`git_command`, `code_playground`, `linear_updater`,
+`pr_followup_reviewer`, `insights`), and
+`tests/test_sdk_options_factories.py` fails on any other construction. The
+voice runner's model path, and `voice_command` with it, was removed in lot L9:
+nothing called it, commands are classified by keywords.
 
 **The simple client serves hookless types only.** It installs none of
 `create_client`'s hooks — no command allowlist, no write-path guard, no

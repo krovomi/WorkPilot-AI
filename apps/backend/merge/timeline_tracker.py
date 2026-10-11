@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 # Import debug utilities
 try:
-    from debug import debug, debug_success, debug_warning
+    from core.debug import debug, debug_success, debug_warning
 except ImportError:
 
     def debug(*args, **kwargs):

@@ -11,7 +11,7 @@
 |----------|---------|
 | **Core Build** | planner.md, coder.md, coder_recovery.md |
 | **QA** | qa_reviewer.md, qa_fixer.md, validation_fixer.md |
-| **Spec Pipeline** | spec_gatherer.md, spec_researcher.md, spec_writer.md, spec_critic.md, spec_quick.md, complexity_assessor.md |
+| **Spec Pipeline** | spec_researcher.md, spec_writer.md, spec_critic.md, spec_quick.md, complexity_assessor.md |
 | **Ideation** | ideation_code_improvements.md, ideation_code_quality.md, ideation_documentation.md, ideation_performance.md, ideation_security.md, ideation_ui_ux.md |
 | **Incidents** | incident_cicd_analyzer.md, incident_proactive_analyzer.md, incident_production_responder.md |
 | **Analysis** | architecture_reviewer.md, architecture_visualizer.md, breaking_change_detector.md, performance_profiler.md, insight_extractor.md, learning_analyzer.md |

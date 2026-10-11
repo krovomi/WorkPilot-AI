@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from agents.impact_analyzer import ImpactAnalysis
+from core.debug import debug_warning
 from core.gh_executable import get_gh_executable, invalidate_gh_cache
 from core.git_executable import get_git_executable, get_isolated_git_env
 from core.git_provider import (
@@ -35,7 +36,6 @@ from core.worktree_common import (
     _with_retry,
     _wt,
 )
-from debug import debug_warning
 
 # The name the monolith logged under (`core.worktree`), kept so logging
 # configuration and log filters keyed on it still match.

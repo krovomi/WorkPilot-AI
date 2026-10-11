@@ -46,7 +46,7 @@ from .types import (
 
 # Import debug utilities
 try:
-    from debug import debug, debug_success
+    from core.debug import debug, debug_success
 except ImportError:
 
     def debug(*args, **kwargs):

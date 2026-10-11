@@ -24,7 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "backend")
 
 import security.profile as profile_module  # noqa: E402
 import security.shell_validators as shell_validators  # noqa: E402
-from project_analyzer import BASE_COMMANDS, SecurityProfile  # noqa: E402
+from project import BASE_COMMANDS, SecurityProfile  # noqa: E402
 from security.command_guard import (  # noqa: E402
     MAX_SUBSTITUTION_DEPTH,
     validate_command_line,

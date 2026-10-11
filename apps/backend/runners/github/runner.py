@@ -76,7 +76,7 @@ from core.sentry import capture_exception, init_sentry, set_context
 
 init_sentry(component="github-runner")
 
-from debug import debug_error
+from core.debug import debug_error
 
 # Add github runner directory to path for direct imports
 sys.path.insert(0, str(Path(__file__).parent))

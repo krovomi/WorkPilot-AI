@@ -21,7 +21,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "apps" / "backend"))
 
-from ci_discovery import (
+from analysis.ci_discovery import (
     HAS_YAML,
     CIConfig,
     CIDiscovery,

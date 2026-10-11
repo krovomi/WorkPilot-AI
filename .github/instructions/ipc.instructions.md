@@ -22,10 +22,6 @@ renderer  →  globalThis.electronAPI.<method>()  →  preload/api/*  →  ipcRe
 4. Pas de `Buffer` ni d'objet non-sérialisable dans les payloads IPC.
 5. `contextIsolation: true` doit rester activé — **jamais** désactiver dans `electron.vite.config.ts`.
 
-## Génération de types
-
-`pnpm validate:provider-types` régénère/valide les types via `scripts/generate-provider-types.js`. À lancer après modification d'un type IPC partagé.
-
 ## Anti-patterns
 
 - Ajouter une méthode `electronAPI.xxx` sans handler côté main → throw silencieux en prod.

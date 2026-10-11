@@ -20,11 +20,6 @@
 			"createPrCta": "Créer la PR pour la revue"
 		}
 	},
-	"terminal": {
-		"openTerminal": "Ouvrir le terminal",
-		"openInbuilt": "Ouvrir dans le terminal intégré",
-		"openExternal": "Ouvrir dans le terminal externe"
-	},
 	"merge": {
 		"buildReadyForReview": "Build prêt pour révision",
 		"view": "Voir",

@@ -526,6 +526,8 @@ Action:
 - **ActionExecutor** : Exécution des actions
 - **TemplateEngine** : Gestion des templates
 
+> **Lot L8 de l'audit** : `HooksDialog` n'était monté nulle part et a été supprimé avec `hooks-store.ts` et le namespace i18n `hooks`. Le backend est conservé ; remonter l'interface est une décision produit.
+
 **Frontend Interface**
 - **HooksDialog** : Interface principale de gestion
 - **HookEditor** : Éditeur de hooks avec formulaire
@@ -546,10 +548,6 @@ Pour exécuter les tests du Hooks System :
 # Tests backend (Python)
 cd apps/backend
 .venv/bin/pytest tests/hooks/ -v
-
-# Tests frontend (Vitest)
-cd apps/frontend
-npm test -- --run src/renderer/stores/__tests__/hooks-store.test.ts
 ```
 
 ##### 💡 Tips d'utilisation
@@ -2502,6 +2500,8 @@ L'Auto-Refactor Agent est maintenant disponible dans l'interface WorkPilot AI ! 
 
 ##### 🛠️ Architecture technique
 
+> **Lot L8 de l'audit** : `AutoRefactorDialog` n'était monté nulle part et a été supprimé avec `auto-refactor-store.ts`, son test et le namespace i18n `autoRefactor`. Le reste de la chaîne (IPC, service main, runner) est conservé ; remonter l'interface est une décision produit.
+
 L'Auto-Refactor Agent suit le flux suivant :
 1. **Frontend** : Le composant `AutoRefactorDialog` envoie la requête via IPC
 2. **Main Process** : Le service `AutoRefactorService` lance le runner Python
@@ -2517,10 +2517,6 @@ Pour exécuter les tests de cette fonctionnalité :
 # Tests backend (Python)
 cd apps/backend
 .venv/bin/pytest tests/test_auto_refactor_runner.py -v
-
-# Tests frontend (Vitest)
-cd apps/frontend
-npm test -- --run src/renderer/stores/__tests__/auto-refactor-store.test.ts
 ```
 
 ##### 📈 Métriques et monitoring
@@ -3054,6 +3050,8 @@ Journal structuré léger des décisions de chaque agent — version simplifiée
 - `apps/frontend/src/main/ipc-handlers/agent-events-handlers.ts` — Bypass XState pour les events `DECISION_LOG_ENTRY`, forwarding direct vers le renderer via `agentDecision:entry`.
 - `apps/frontend/src/preload/api/modules/decision-logger-api.ts` — `DecisionLoggerAPI` avec `getDecisionLog`, `clearDecisionLog`, `onDecisionLogEntry`.
 
+> **Lot L8 de l'audit** : `DecisionTimeline` n'était monté nulle part et a été supprimé avec `decision-logger-store.ts` (les deux fichiers ci-dessous n'existent plus). Le reste de la chaîne (IPC, service main, runner) est conservé ; remonter l'interface est une décision produit.
+
 **Frontend — UI :**
 
 - `apps/frontend/src/renderer/stores/decision-logger-store.ts` — Zustand store avec `entriesByTask`, merge historique/live, déduplication par `id+session_id`.
@@ -3323,6 +3321,9 @@ Génération et maintenance automatique de la documentation technique.
 - Backend : `apps/backend/documentation/` (doc_analyzer, doc_generator, doc_updater, models) + `runners/documentation_agent_runner.py`
 - Frontend service : `apps/frontend/src/main/documentation-agent-service.ts`
 - IPC handlers : `apps/frontend/src/main/ipc-handlers/documentation-agent-handlers.ts`
+
+> **Lot L8 de l'audit** : `DocumentationAgentDashboard` n'était monté nulle part et a été supprimé avec `documentation-agent-store.ts` (les deux lignes ci-dessous). Le reste de la chaîne (IPC, service main, runner) est conservé ; remonter l'interface est une décision produit.
+
 - Store : `apps/frontend/src/renderer/stores/documentation-agent-store.ts`
 - UI : `apps/frontend/src/renderer/components/documentation-agent/DocumentationAgentDashboard.tsx`
 - Types supportés : README, API docs, contribution guide, docstrings/JSDoc, diagrammes de séquence Mermaid

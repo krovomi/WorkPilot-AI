@@ -110,5 +110,5 @@ from project.command_registry import BASE_COMMANDS
 All imports have been verified to work correctly:
 - Direct package imports
 - Individual module imports
-- Backward compatibility with existing code (project_analyzer.py, etc.)
+- Backward compatibility with existing code (`from project import …`)
 - Data integrity (all 381 command definitions preserved)

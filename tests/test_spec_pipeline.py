@@ -44,14 +44,14 @@ _mocked_module_names = [
     "init",
     # Config & phases
     "phase_config",
-    "phase_event",
+    "core.phase_event",
     # Logging & UI
-    "debug",
+    "core.debug",
     "ui",
     "ui.capabilities",
     "task_logger",
-    "linear_updater",
-    "progress",
+    "integrations.linear.updater",
+    "core.progress",
     # Prompts
     "prompts_pkg",
     "prompts_pkg.project_context",

@@ -25,6 +25,7 @@ import unicodedata
 from datetime import datetime
 from pathlib import Path
 
+from core.debug import debug_warning
 from core.git_executable import run_git
 
 # Helpers and types live in `core.worktree_common`, the PR half in
@@ -48,7 +49,6 @@ from core.worktree_common import (  # noqa: F401
     _wt,
 )
 from core.worktree_pr import WorktreePRMixin
-from debug import debug_warning
 
 logger = logging.getLogger(__name__)
 

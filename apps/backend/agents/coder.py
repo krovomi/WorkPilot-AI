@@ -41,7 +41,18 @@ try:
     )
 except ImportError:
     _ut_start_build = _ut_finish_build = _ut_record_task = None  # type: ignore[assignment]
-from linear_updater import (
+from core.phase_event import ExecutionPhase, emit_phase
+from core.progress import (
+    count_subtasks,
+    count_subtasks_detailed,
+    get_current_phase,
+    get_next_subtask,
+    is_build_complete,
+    print_build_complete_banner,
+    print_progress_summary,
+    print_session_header,
+)
+from integrations.linear.updater import (
     LinearTaskState,
     is_linear_enabled,
     linear_build_complete,
@@ -54,24 +65,13 @@ from phase_config import (
     get_phase_thinking_budget,
     load_task_metadata,
 )
-from phase_event import ExecutionPhase, emit_phase
-from progress import (
-    count_subtasks,
-    count_subtasks_detailed,
-    get_current_phase,
-    get_next_subtask,
-    is_build_complete,
-    print_build_complete_banner,
-    print_progress_summary,
-    print_session_header,
-)
-from prompt_generator import (
+from prompts_pkg.prompt_generator import (
     format_context_for_prompt,
     generate_planner_prompt,
     generate_subtask_prompt,
     load_subtask_context,
 )
-from prompts import (
+from prompts_pkg.prompts import (
     constitution_section,
     docintel_section,
     is_first_run,
@@ -79,8 +79,8 @@ from prompts import (
     uiux_section,
     workflow_reports_section,
 )
-from recovery import RecoveryManager
 from security.constants import PROJECT_DIR_ENV_VAR
+from services.recovery import RecoveryManager
 from task_logger import (
     LogEntryType,
     LogPhase,

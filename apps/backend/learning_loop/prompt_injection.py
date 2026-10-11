@@ -51,7 +51,6 @@ _PHASE_BY_AGENT: dict[str, str] = {
     "context_mesh_analyzer": "planning",
     "live_companion_analyzer": "planning",
     "spec_writer": "planning",
-    "spec_gatherer": "planning",
     "spec_researcher": "planning",
     "spec_self_critique": "planning",
     # Writing it.

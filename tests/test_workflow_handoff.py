@@ -182,7 +182,7 @@ class TestTheReadersReceiveIt:
     """The section is only worth something where a prompt is built."""
 
     def test_the_qa_reviewer_prompt_carries_the_review(self, tmp_path: Path):
-        from prompts import get_qa_reviewer_prompt
+        from prompts_pkg.prompts import get_qa_reviewer_prompt
 
         project = tmp_path / "project"
         project.mkdir()
@@ -199,7 +199,7 @@ class TestTheReadersReceiveIt:
         self, tmp_path: Path
     ):
         """It fixes what the reviewer decided, not what the review proposed."""
-        from prompts import get_qa_fixer_prompt
+        from prompts_pkg.prompts import get_qa_fixer_prompt
 
         project = tmp_path / "project"
         project.mkdir()

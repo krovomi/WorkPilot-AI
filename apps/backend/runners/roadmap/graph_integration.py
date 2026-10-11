@@ -9,7 +9,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-from debug import debug, debug_error, debug_success
+from core.debug import debug, debug_error, debug_success
 from memory.store import get_graph_hints, is_memory_enabled
 from ui import print_status
 

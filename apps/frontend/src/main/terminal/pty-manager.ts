@@ -20,7 +20,6 @@ import type { TerminalProcess, WindowGetter, WindowsShellType } from "./types";
 /**
  * Shutdown flag to prevent PTY handlers from accessing destroyed resources
  * (e.g., BrowserWindow.webContents) during app shutdown.
- * Follows the same pattern as isShuttingDown in pty-daemon-client.ts.
  *
  * Part of the shutdown guard pattern for GitHub issue #1469: without this flag,
  * PTY onData/onExit callbacks can fire after BrowserWindow is destroyed,
