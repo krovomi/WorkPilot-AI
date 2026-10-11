@@ -208,6 +208,33 @@ SKILL_PHASE_AGENTS = {
 }
 _DEFAULT_AGENT = "analyzer"
 
+# The lenses of the `review` phase, by effort (`skills/tooling/review-lenses`).
+# Decided here rather than by the model reading the effort line: what an effort
+# level buys is the engine's answer, it is printed and tested, and a reviewer
+# told "apply lenses 1, 2" does not have to work the table out first. The
+# lenses replace the review roster — a security-auditor subagent re-reading the
+# same diff to answer the security lens's question is the same question paid
+# twice (audit F11) — so the phase runs `roster: solo`.
+REVIEW_LENSES: dict[int, str] = {
+    1: "Correction et tests",
+    2: "Sécurité",
+    3: "Conformité à la demande",
+    4: "Adversariale",
+}
+REVIEW_LENSES_BY_EFFORT: dict[str, tuple[int, ...]] = {
+    "none": (),
+    "low": (),
+    "medium": (1, 2),
+    "high": (1, 2, 3),
+    "ultrathink": (1, 2, 3, 4),
+}
+
+
+def review_lenses(effort: str) -> tuple[int, ...]:
+    """The lenses the `review` phase applies at ``effort``."""
+    return REVIEW_LENSES_BY_EFFORT.get(effort, REVIEW_LENSES_BY_EFFORT["medium"])
+
+
 # Where a phase's output lands, relative to the spec directory.
 OUTPUT_DIRNAME = "workflow"
 
@@ -520,6 +547,13 @@ def _build_prompt(resolved, body: str, ctx: PhaseContext) -> str:
         f"EFFORT: {ctx.effort}",
         f"DISPATCH: {resolved.dispatch}",
     ]
+    if phase.id == "review":
+        lenses = review_lenses(ctx.effort)
+        lines.append(
+            "LENSES: "
+            + ", ".join(f"{n}. {REVIEW_LENSES[n]}" for n in lenses)
+            + " — apply these and no other."
+        )
     if resolved.degraded_from:
         lines.append(
             f"NOTE: this phase asked for `{resolved.degraded_from}` and was "

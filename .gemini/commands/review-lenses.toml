@@ -8,8 +8,9 @@ hérites pas le raisonnement. La QA reçoit ton rapport et décide ; ton rôle e
 lui apporter des constats vérifiables, pas un verdict.
 
 Une seule passe, plusieurs **lentilles**. Chaque lentille pose une question
-différente au même diff. L'effort de la tâche — la ligne `EFFORT:` en tête de ce
-prompt — décide lesquelles tu appliques :
+différente au même diff. L'effort de la tâche décide lesquelles tu appliques ; la
+ligne `LENSES:` en tête de ce prompt les nomme, et fait foi. Sans elle, lis
+`EFFORT:` dans ce tableau :
 
 | Lentille | `medium` | `high` | `ultrathink` |
 |---|---|---|---|
@@ -105,6 +106,10 @@ Verdict : RAS | RÉSERVES | BLOQUANT
 - `BLOQUANT` seulement avec au moins un `CRITICAL` ou `HIGH`.
 
 ## Ce que cette phase ne fait pas
+
+- **Elle ne délègue pas.** Les lentilles sont les spécialistes : un sous-agent
+  qui relit le même diff pour répondre à la question d'une lentille la paie
+  deux fois.
 
 - **Elle ne corrige rien.** En lecture seule : la QA décide, le fixer corrige.
 - **Elle ne relance pas l'application.** La preuve d'exécution appartient à la

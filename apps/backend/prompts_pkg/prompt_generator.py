@@ -221,8 +221,8 @@ relative to this location. Do NOT use absolute paths.
 
 **⚠️ CRITICAL:** Before ANY git command or file operation, run `pwd` to verify your current
 directory. If you've used `cd` to change directories, you MUST use paths relative to your
-NEW location, not the working directory. See the PATH CONFUSION PREVENTION section in the
-coder prompt for detailed examples.
+NEW location, not the working directory: after `cd apps/frontend`, it is `git add src/file.ts`,
+not `git add apps/frontend/src/file.ts`. Prefer staying at the working directory root.
 
 **Important Files:**
 - Spec: `{relative_spec}/spec.md`

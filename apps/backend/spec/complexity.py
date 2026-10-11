@@ -44,6 +44,10 @@ class ComplexityAssessment:
     needs_research: bool = False
     needs_self_critique: bool = False
 
+    # Who decided: "heuristic", "complexity_assessor" or "override". Written to
+    # complexity_assessment.json so a reader can tell a free guess from a paid one.
+    assessed_by: str = "heuristic"
+
     def phases_to_run(self) -> list[str]:
         """Return list of phase names to run based on complexity."""
         # If AI provided recommended phases, use those
@@ -74,6 +78,22 @@ class ComplexityAssessment:
                 "planning",
                 "validation",
             ]
+
+
+# The `complexity_assessor` session (a 21 KB prompt, plus the files it reads) is
+# opened only when the heuristic below is less sure than this. The heuristic
+# says 0.9 when every signal points to a small task and 0.85 when one strong
+# signal points to a large one; 0.75 is its fall-through, "nothing decided
+# this", and that is the case a model is worth paying to settle.
+AI_ASSESSMENT_CONFIDENCE_THRESHOLD = 0.8
+
+
+def needs_ai_assessment(
+    heuristic: ComplexityAssessment,
+    threshold: float = AI_ASSESSMENT_CONFIDENCE_THRESHOLD,
+) -> bool:
+    """Whether the heuristic's verdict is too uncertain to stand on its own."""
+    return heuristic.confidence < threshold
 
 
 class ComplexityAnalyzer:
@@ -433,6 +453,7 @@ async def run_ai_complexity_assessment(
                 recommended_phases=data.get("recommended_phases", []),
                 needs_research=flags.get("needs_research", False),
                 needs_self_critique=flags.get("needs_self_critique", False),
+                assessed_by="complexity_assessor",
             )
 
         return None
@@ -460,6 +481,7 @@ def save_assessment(spec_dir: Path, assessment: ComplexityAssessment) -> Path:
                 "phases_to_run": phases,
                 "needs_research": assessment.needs_research,
                 "needs_self_critique": assessment.needs_self_critique,
+                "assessed_by": assessment.assessed_by,
                 "created_at": datetime.now().isoformat(),
             },
             f,
