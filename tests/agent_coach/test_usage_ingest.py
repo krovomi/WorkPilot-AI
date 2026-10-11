@@ -135,7 +135,11 @@ def test_load_from_usage_empty_project(tmp_path: Path) -> None:
 
 def _load_runner():
     runner_path = (
-        Path(__file__).resolve().parents[2] / "apps" / "backend" / "runners" / "agent_coach_runner.py"
+        Path(__file__).resolve().parents[2]
+        / "apps"
+        / "backend"
+        / "runners"
+        / "agent_coach_runner.py"
     )
     spec = importlib.util.spec_from_file_location("_coach_runner_test", runner_path)
     assert spec and spec.loader

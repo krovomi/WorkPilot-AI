@@ -11,10 +11,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import websockets
-from websockets.server import WebSocketServerProtocol
-
 from streaming.streaming_manager import StreamingManager
 from streaming.websocket_server import StreamingWebSocketServer
+from websockets.server import WebSocketServerProtocol
 
 
 class TestStreamingManager:
