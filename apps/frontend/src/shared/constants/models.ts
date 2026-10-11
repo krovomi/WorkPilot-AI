@@ -443,6 +443,48 @@ export function isModelForeignToProvider(
 	return isAnthropicNativeVersionedModelId(id);
 }
 
+/**
+ * Le modèle hérité des réglages, sous la forme où `provider` le sert.
+ *
+ * Le catalogue statique est généré : il retarde sur ce que le catalogue live
+ * — donc la liste des réglages — propose déjà. Le traiter comme la liste de
+ * ce que le fournisseur sert remplaçait « Claude Sonnet 5.5 », choisi dans les
+ * réglages, par le modèle phare (`claude-fable-5-1`) au seul motif que le
+ * fichier généré ne le connaissait pas encore.
+ *
+ * Un modèle n'est donc ramené au catalogue (`resolveModelForProviderCatalog`)
+ * que sur une preuve qu'il n'est pas de ce fournisseur : il lui est étranger
+ * ({@link isModelForeignToProvider}), ou — hors Claude, dont la famille se
+ * reconnaît à son nom — un autre catalogue le propose et pas le sien. Un
+ * modèle que le catalogue connaît sous une autre graphie prend celle du
+ * fournisseur (`claude-sonnet-4-6` → `claude-sonnet-4.6` chez Copilot).
+ */
+export function adaptInheritedModelToProvider(
+	model: string,
+	provider: string,
+): string {
+	const name = provider.trim().toLowerCase();
+	const own = getModelsForProvider(name);
+	if (!model || !own.length) return model;
+
+	const spelled = resolveCatalogModelValue(model, own);
+	if (own.some((m) => m.value === spelled)) return spelled;
+
+	const isClaude = name === "claude" || name === "anthropic";
+	const key = getCanonicalModelKey(model);
+	const offeredElsewhere =
+		!isClaude &&
+		Object.values(PROVIDER_MODELS_MAP).some(
+			(list) =>
+				list !== own &&
+				list.some((m) => getCanonicalModelKey(m.value) === key),
+		);
+
+	return isModelForeignToProvider(model, name) || offeredElsewhere
+		? resolveModelForProviderCatalog(model, own, name)
+		: model;
+}
+
 // Maps thinking levels to budget tokens (null = no extended thinking)
 export const THINKING_BUDGET_MAP: Record<string, number | null> = {
 	none: null,
@@ -578,57 +620,6 @@ export const DEFAULT_FEATURE_THINKING: FeatureThinkingConfig = {
 	testGenerator: "medium", // Balanced thinking for test generation
 	codeReview: "medium", // Balanced thinking for code review
 	voiceControl: "low", // Fast thinking for voice control
-};
-
-// Feature labels for UI display
-export const FEATURE_LABELS: Record<
-	keyof FeatureModelConfig,
-	{ label: string; description: string }
-> = {
-	insights: {
-		label: "Insights Chat",
-		description: "Ask questions about your codebase",
-	},
-	ideation: {
-		label: "Ideation",
-		description: "Generate feature ideas and improvements",
-	},
-	roadmap: {
-		label: "Roadmap",
-		description: "Create strategic feature roadmaps",
-	},
-	"natural-language-git": {
-		label: "Natural Language Git",
-		description: "Execute Git commands using natural language",
-	},
-	githubIssues: {
-		label: "GitHub Issues",
-		description: "Automated issue triage and labeling",
-	},
-	githubPrs: {
-		label: "GitHub PR Review",
-		description: "AI-powered pull request reviews",
-	},
-	utility: {
-		label: "Utility",
-		description: "Commit messages and merge conflict resolution",
-	},
-	promptOptimizer: {
-		label: "Prompt Optimizer",
-		description: "AI-powered prompt enhancement with project context",
-	},
-	testGenerator: {
-		label: "Test Generation Agent",
-		description: "AI-powered test generation and coverage analysis",
-	},
-	codeReview: {
-		label: "Code Review Agent",
-		description: "AI-powered code review and quality analysis",
-	},
-	voiceControl: {
-		label: "Voice Control",
-		description: "Voice-activated development commands",
-	},
 };
 
 // Default agent profiles for preset model/thinking configurations

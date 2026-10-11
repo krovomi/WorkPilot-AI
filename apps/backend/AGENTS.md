@@ -75,10 +75,14 @@ propre dict `agents` : **il gagne sur les défauts**.
 
 ## Détection de projet
 
-`project/framework_detector.py` (Node, Python, Ruby, PHP, Dart) ·
-`project/command_registry/languages.py` (`LANGUAGE_COMMANDS`) ·
-`runners/pipeline_generator_runner.py::detect_project_stack()` ·
-`spec/validation_strategy.py::detect_project_type()`
+**Une porte : `project/stack.py`.** Langages et frameworks (`technology_stack`,
+`frameworks` : `StackDetector` + `FrameworkDetector`), manifestes à la racine
+(`detect_project_stack`, `detect_languages` pour les overlays de sous-agents), type
+d'application (`detect_project_type`), framework HTTP (`detect_api_stack`), marqueurs
+(`detect_markers`), et les portes paresseuses vers `uiux.stack`, `mobile.stacks` et
+`test_generation.stack_aware`. Un nouveau lecteur prend une réponse existante ici
+plutôt que d'écrire un douzième détecteur. `tests/test_project_stack.py` épingle les
+réponses sur des projets fixtures.
 
 ## Règles
 

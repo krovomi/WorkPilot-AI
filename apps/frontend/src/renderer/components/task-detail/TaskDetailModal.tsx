@@ -241,6 +241,8 @@ const getReviewReasonBadgeText = (
 			return t("tasks:modal.badges.approvePlan");
 		case "stopped":
 			return t("tasks:modal.badges.stopped");
+		case "qa_unverified":
+			return t("tasks:modal.badges.qaUnverified");
 		default:
 			return t("tasks:modal.badges.qaIssues");
 	}

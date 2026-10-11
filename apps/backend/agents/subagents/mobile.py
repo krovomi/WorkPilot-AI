@@ -36,7 +36,7 @@ from .phases import AgentSpec
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["MobileOverlay", "overlay_for", "MOBILE_ROLES"]
+__all__ = ["MobileOverlay", "overlay_for", "MOBILE_ROLES", "MOBILE_SPECS"]
 
 MOBILE_ROLES = ("device-runner", "store-readiness-auditor")
 
@@ -120,6 +120,14 @@ _STORE_AUDITOR = AgentSpec(
 )
 
 
+#: The two roles, by name — what `overlay_for` adds and what the harness
+#: build emits.
+MOBILE_SPECS: dict[str, AgentSpec] = {
+    "device-runner": _DEVICE_RUNNER,
+    "store-readiness-auditor": _STORE_AUDITOR,
+}
+
+
 def _commands(stack: Any) -> tuple[list[str], list[str]]:
     """The stack's own test and build commands, as the roster should see them.
 
@@ -171,9 +179,6 @@ def overlay_for(project_dir: Path | str | None) -> MobileOverlay | None:
         platforms=stack.platforms,
         test_commands=tests,
         build_commands=builds,
-        extra_agents={
-            "device-runner": _DEVICE_RUNNER,
-            "store-readiness-auditor": _STORE_AUDITOR,
-        },
+        extra_agents=dict(MOBILE_SPECS),
         notes=stack.notes,
     )

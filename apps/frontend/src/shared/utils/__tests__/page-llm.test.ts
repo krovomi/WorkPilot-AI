@@ -205,6 +205,57 @@ describe("inherited provider models", () => {
 		).toContain(resolved.model);
 	});
 
+	it("keeps a Claude release the generated catalogue does not know yet", () => {
+		// « Claude Sonnet 5.5 », choisi dans les réglages depuis le catalogue
+		// live, devenait le modèle phare (claude-fable-5-1) faute d'être dans le
+		// fichier généré.
+		for (const selectedProvider of ["claude", "anthropic"]) {
+			const resolved = resolvePageLlm(
+				{
+					selectedProvider,
+					featureModels: {
+						...DEFAULT_FEATURE_MODELS,
+						promptOptimizer: "claude-sonnet-5-5",
+					},
+				},
+				"prompt-optimizer",
+			);
+			expect(resolved.model).toBe("claude-sonnet-5-5");
+			expect(resolved.modelSource).toBe("settings");
+		}
+	});
+
+	it("keeps a local tag pulled by hand", () => {
+		const resolved = resolvePageLlm(
+			{
+				selectedProvider: "ollama",
+				featureModels: {
+					...DEFAULT_FEATURE_MODELS,
+					promptOptimizer: "gemma4:12b-it-q4_K_M",
+				},
+			},
+			"prompt-optimizer",
+		);
+		expect(resolved.model).toBe("gemma4:12b-it-q4_K_M");
+	});
+
+	it("still adapts a model another provider's catalogue offers", () => {
+		const resolved = resolvePageLlm(
+			{
+				selectedProvider: "openai",
+				featureModels: {
+					...DEFAULT_FEATURE_MODELS,
+					promptOptimizer: "gemini-3.1-pro",
+				},
+			},
+			"prompt-optimizer",
+		);
+		expect(
+			getModelsForProvider("openai").map((model) => model.value),
+		).toContain(resolved.model);
+		expect(resolved.modelSource).toBe("default");
+	});
+
 	it("keeps an already compatible feature model and its source", () => {
 		const model = getModelsForProvider("openai")[0].value;
 		const resolved = resolvePageLlm(

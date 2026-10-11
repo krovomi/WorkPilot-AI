@@ -208,74 +208,17 @@ class ParallelFollowupReviewer:
         # Use provided project_root or fall back to default
         working_dir = project_root or self.project_dir
 
-        # Load agent prompts from files
-        resolution_prompt = self._load_prompt("pr_followup_resolution_agent.md")
-        newcode_prompt = self._load_prompt("pr_followup_newcode_agent.md")
-        comment_prompt = self._load_prompt("pr_followup_comment_agent.md")
-        validator_prompt = self._load_prompt("pr_finding_validator.md")
+        # Declared once, in the registry, with the orchestrator's specialists:
+        # `finding-validator` is the same agent in both reviews.
+        from agents.subagents.pr_review import pr_review_agents
 
         # CRITICAL: Inject working directory into all prompts
         # Subagents don't inherit cwd from parent, so they need explicit path info
         with_working_dir = create_working_dir_injector(working_dir)
 
-        return {
-            "resolution-verifier": AgentDefinition(
-                description=(
-                    "Resolution verification specialist. Use to verify whether previous "
-                    "findings have been addressed. Analyzes diffs to determine if issues "
-                    "are truly fixed, partially fixed, or still unresolved. "
-                    "Invoke when: There are previous findings to verify."
-                ),
-                prompt=with_working_dir(
-                    resolution_prompt,
-                    "You verify whether previous findings are resolved.",
-                ),
-                tools=["Read", "Grep", "Glob"],
-                model="inherit",
-            ),
-            "new-code-reviewer": AgentDefinition(
-                description=(
-                    "New code analysis specialist. Reviews code added since last review "
-                    "for security, logic, quality issues, and regressions. "
-                    "Invoke when: There are substantial code changes (>50 lines diff) or "
-                    "changes to security-sensitive areas."
-                ),
-                prompt=with_working_dir(
-                    newcode_prompt, "You review new code for issues."
-                ),
-                tools=["Read", "Grep", "Glob"],
-                model="inherit",
-            ),
-            "comment-analyzer": AgentDefinition(
-                description=(
-                    "Comment and feedback analyst. Processes contributor comments and "
-                    "AI tool reviews (CodeRabbit, Cursor, Gemini, etc.) to identify "
-                    "unanswered questions and valid concerns. "
-                    "Invoke when: There are comments or formal reviews since last review."
-                ),
-                prompt=with_working_dir(
-                    comment_prompt, "You analyze comments and feedback."
-                ),
-                tools=["Read", "Grep", "Glob"],
-                model="inherit",
-            ),
-            "finding-validator": AgentDefinition(
-                description=(
-                    "Finding re-investigation specialist. Re-investigates unresolved findings "
-                    "to validate they are actually real issues, not false positives. "
-                    "Actively reads the code at the finding location with fresh eyes. "
-                    "Can confirm findings as valid OR dismiss them as false positives. "
-                    "CRITICAL: Invoke for ALL unresolved findings after resolution-verifier runs. "
-                    "Invoke when: There are findings marked as unresolved that need validation."
-                ),
-                prompt=with_working_dir(
-                    validator_prompt,
-                    "You validate whether unresolved findings are real issues.",
-                ),
-                tools=["Read", "Grep", "Glob"],
-                model="inherit",
-            ),
-        }
+        return pr_review_agents(
+            self._load_prompt, with_working_dir, roster="pr-followup"
+        )
 
     def _format_previous_findings(self, context: FollowupReviewContext) -> str:
         """Format previous findings for the prompt."""

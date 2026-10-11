@@ -408,13 +408,15 @@ async def _agent_workflow_call(proj: Path, prompt: str) -> tuple[bool, str]:
     when the client could not be built, so the caller degrades to `_agnostic_call`.
     """
     try:
-        from core.client import _get_active_provider, create_agent_client
+        from core.client import create_agent_client, peek_active_provider
         from core.oneshot import _extract_text, _resolve_model
     except ImportError as exc:
         return False, f"agent runner not available: {exc}"
 
     try:
-        provider = _get_active_provider(proj)
+        # Peeked, like `_skill_body_for_provider`: a palette command is not the
+        # session a "resume with X" choice was made for, and must not eat it.
+        provider = peek_active_provider(proj)
         model = _resolve_model(provider, None, proj)
         # spec_dir == project_dir: the Quick-Command bar is project-scoped (no
         # per-task spec). agent_type="coder" carries the read+write+web tool set
