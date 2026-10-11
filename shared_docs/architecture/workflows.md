@@ -82,6 +82,27 @@ review rather than a phase, and the profile says so: `high` and `ultrathink`
 run the same phases, as do `none` and `low` (planning runs at every level; the
 two differ in thinking budget only).
 
+The engine picks the lenses, not the model: `workflows.runner.REVIEW_LENSES_BY_EFFORT`
+puts a `LENSES:` line in the review prompt, and the skill's table — what a
+model reads without that line — is held to the same table by
+`tests/test_review_lenses.py`. The phase declares `roster: solo`: the lenses
+are the specialists. Under `pr_reviewer` it was handed the review roster, a
+security-auditor, a regression-hunter and a test-coverage-auditor, each a
+session re-reading the same diff to answer a lens's question a second time.
+
+**How many sessions read the diff** (audit F11), counted on the resolved
+profile by `tests/test_review_lenses.py`: at `ultrathink` on a code task,
+four — `review`, the `verifier` session of `verify` (the proof of execution),
+the first QA pass (the decision) and `architecture-map` (after QA, past its
+significance filter). Five on a phone app, where `store-readiness` reads the
+manifests after QA. At `none` and `low`, one: QA. Further QA passes are
+bounded by the QA budget, which follows the QA phase's effort
+(`qa.budget.QA_ITERATIONS_BY_EFFORT`, 3 to 20 passes, `WORKPILOT_QA_MAX_ITERATIONS`
+to override within the old ceiling of 50). The audit's count included a
+per-subtask self-review: it never ran — `coder.md`, which prescribed it, was
+given to no session, and `agents/self_review.py` is opt-in and writes a stub
+from `git diff` without a model.
+
 **Every skill phase is read by the agent that comes next** (`workflows/handoff.py`).
 `run_skill_phase` writes each report to `<spec_dir>/workflow/<phase>.md`; until
 the handoff, only `workflow/verify.md` was ever read back. The rule is the

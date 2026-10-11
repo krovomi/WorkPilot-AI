@@ -5,19 +5,42 @@
 
 ## Agent Prompts (`apps/backend/prompts/`)
 
-37 root-level prompts + 18 GitHub-specific prompts in `prompts/github/`.
+28 root-level prompts + 16 GitHub-specific prompts in `prompts/github/`, plus the
+MCP-tool sections in `prompts/mcp_tools/` and `prompts/teams/`.
 
 | Category | Prompts |
 |----------|---------|
-| **Core Build** | planner.md, coder.md, coder_recovery.md |
+| **Core Build** | planner.md, followup_planner.md — the coder has no prompt file, see below |
 | **QA** | qa_reviewer.md, qa_fixer.md, validation_fixer.md |
 | **Spec Pipeline** | spec_researcher.md, spec_writer.md, spec_critic.md, spec_quick.md, complexity_assessor.md |
 | **Ideation** | ideation_code_improvements.md, ideation_code_quality.md, ideation_documentation.md, ideation_performance.md, ideation_security.md, ideation_ui_ux.md |
 | **Incidents** | incident_cicd_analyzer.md, incident_proactive_analyzer.md, incident_production_responder.md |
-| **Analysis** | architecture_reviewer.md, architecture_visualizer.md, breaking_change_detector.md, performance_profiler.md, insight_extractor.md, learning_analyzer.md |
-| **Advanced** | browser_agent.md, code_migration.md, documentation_agent.md, environment_cloner.md, multi_repo_planner.md, intent_templates.md, followup_planner.md |
+| **Analysis** | architecture_reviewer.md, architecture_visualizer.md, architecture_map_delta.md, architecture_map_repair.md, insight_extractor.md, learning_analyzer.md |
 | **Roadmap** | roadmap_discovery.md, roadmap_features.md, competitor_analysis.md |
-| **GitHub** | issue_analyzer.md, issue_triager.md, pr_reviewer.md, pr_orchestrator.md, pr_parallel_orchestrator.md, pr_finding_validator.md, pr_template_filler.md, pr_ai_triage.md, pr_codebase_fit_agent.md, + 9 more |
+| **GitHub** | issue_triager.md, pr_reviewer.md, pr_parallel_orchestrator.md, pr_finding_validator.md, pr_template_filler.md, pr_ai_triage.md, pr_codebase_fit_agent.md, pr_security_agent.md, pr_quality_agent.md, pr_logic_agent.md, pr_structural.md, pr_followup.md, pr_followup_orchestrator.md, pr_followup_resolution_agent.md, pr_followup_newcode_agent.md, pr_followup_comment_agent.md |
+
+**Every prompt in this table has a loader.** Eleven did not (audit F10, lot L10):
+`coder_recovery.md`, `intent_templates.md`, `environment_cloner.md`,
+`performance_profiler.md`, `documentation_agent.md`, `code_migration.md`,
+`multi_repo_planner.md`, `breaking_change_detector.md`, `browser_agent.md`,
+`github/pr_orchestrator.md` and `github/issue_analyzer.md` — about 51 KB that no
+code, workflow, skill or frontend file loaded by name or by a dynamic path. The
+features they were named after (documentation agent, performance profiler,
+browser agent, code migration, multi-repo) run from their own runners, which
+never read them. Before adding a prompt, add the line that loads it.
+
+**The coder's prompt is assembled, not loaded.** `coder.md` (35 KB) was the
+twelfth orphan: since the coder loop moved to one session per subtask, each
+session is prompted by `prompts_pkg.prompt_generator.generate_subtask_prompt`
+— an effort preamble (`workflows.runner.effort_preamble`: effort, methodology
+path, dispatch), the environment, the subtask, its files and verification —
+and `get_coding_prompt`, the only reader of `coder.md`, had no caller. The
+"STEP 6.5 self-critique" the file prescribed after every subtask was therefore
+never asked of any model. What the assembled prompt carries depends on the
+stack: the `.NET Build Tools` section only in a project with C#/F#/VB project
+files, the stack-aware test plan only for the files a subtask touches, the UI
+rules (`uiux_section`) only on subtasks whose files are UI.
+`tests/test_coder_prompt_assembly.py` holds the assembly to that.
 
 **A spec prompt runs under the config its work needs.** Every LLM phase of the
 spec pipeline used to run as `spec_writer`, whatever the prompt.

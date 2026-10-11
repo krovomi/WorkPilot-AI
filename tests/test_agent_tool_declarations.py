@@ -56,7 +56,8 @@ _DECLARED_HERE: dict[str, list[str]] = {
     "pr_finding_validator": ["github/pr_finding_validator.md"],
     "pr_template_filler": ["github/pr_template_filler.md"],
     "planner": ["planner.md"],
-    "coder": ["coder.md"],
+    # `coder` loads no prompt file: its prompt is assembled per subtask by
+    # `prompts_pkg.prompt_generator.generate_subtask_prompt`.
     "qa_reviewer": ["qa_reviewer.md"],
     "qa_fixer": ["qa_fixer.md"],
 }
