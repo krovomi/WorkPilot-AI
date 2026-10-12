@@ -9,7 +9,8 @@
 		"bmad": {
 			"version": "6.12.0",
 			"source": "bmad-code-org/bmad-method",
-			"path": "skills/bmad"
+			"path": "skills/bmad",
+			"upstreamTreeSha": "a11fc87d7482af474682754c9cbdaff2c89482b3"
 		},
 		"comms": {
 			"version": "1.0.0",
@@ -24,17 +25,20 @@
 		"hermes": {
 			"version": "0.0.1",
 			"source": "NousResearch/hermes-agent",
-			"path": "skills/hermes"
+			"path": "skills/hermes",
+			"upstreamTreeSha": "68e2bc9be73059728ccd1b337f1e8cebe80b3e2c"
 		},
 		"impeccable": {
 			"version": "0.0.1",
 			"source": "pbakaus/impeccable",
-			"path": "skills/impeccable"
+			"path": "skills/impeccable",
+			"upstreamTreeSha": "a8790128bac9c6652101b9cd803d4c4ff5fa1879"
 		},
 		"mattpocock": {
 			"version": "0.0.1",
 			"source": "mattpocock/skills",
-			"path": "skills/mattpocock"
+			"path": "skills/mattpocock",
+			"upstreamTreeSha": "3ce485319972aae46dec0c2ac34cf4a7f28f7414"
 		},
 		"mobile": {
 			"version": "1.0.0",
@@ -44,7 +48,8 @@
 		"superpowers": {
 			"version": "0.0.1",
 			"source": "obra/superpowers",
-			"path": "skills/superpowers"
+			"path": "skills/superpowers",
+			"upstreamTreeSha": "4ac675daa3415bc836f707c7e60237ac7b66c7d5"
 		},
 		"tooling": {
 			"version": "1.0.0",
@@ -54,7 +59,11 @@
 		"ui-ux-pro-max": {
 			"version": "2.15.0",
 			"source": "nextlevelbuilder/ui-ux-pro-max-skill",
-			"path": "skills/ui-ux-pro-max"
+			"path": "skills/ui-ux-pro-max",
+			"upstreamTreeSha": "314cf196f07ca25114aef7582210db79282fe54e"
+		},
+		"claude-mem": {
+			"upstreamTreeSha": "722b7a21593d5fbd8ecaef99e1e994e2bfb374ec"
 		}
 	},
 	"skills": {
