@@ -2,7 +2,7 @@
 
 **Autonomous multi-agent coding framework that plans, builds, and validates software for you.**
 
-![WorkPilot AI Kanban Board](.github/assets/WorkPilot-AI-Kanban.png)
+![WorkPilot AI Kanban Board](<img width="1897" height="1158" alt="image" src="https://github.com/user-attachments/assets/e9372e82-7e12-4d48-a1a1-7767c874a6fe" />)
 
 [![License](https://img.shields.io/badge/license-AGPL--3.0-green?style=flat-square)](./LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-Join%20Community-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/KCXaPBr4Dj)
