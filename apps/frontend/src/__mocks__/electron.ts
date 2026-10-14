@@ -193,6 +193,15 @@ export const desktopCapturer = {
 	),
 };
 
+// No OS keyring by default: secrets are kept as written, as on a Linux box
+// without one. Tests of the encryption path mock their own safeStorage.
+export const safeStorage = {
+	isEncryptionAvailable: createMockFn(() => false),
+	getSelectedStorageBackend: createMockFn(() => "basic_text"),
+	encryptString: createMockFn((value: string) => Buffer.from(value, "utf-8")),
+	decryptString: createMockFn((value: Buffer) => value.toString("utf-8")),
+};
+
 export default {
 	app,
 	ipcMain,
@@ -204,4 +213,5 @@ export default {
 	nativeTheme,
 	screen,
 	desktopCapturer,
+	safeStorage,
 };

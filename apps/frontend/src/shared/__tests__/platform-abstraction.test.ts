@@ -34,7 +34,7 @@ const ABSTRACTION = ["main/platform", "shared/platform.ts"];
  */
 const ALLOWED = new Map<string, string>([
 	[
-		"main/ipc-handlers/settings-handlers.ts:382",
+		"main/ipc-handlers/settings-handlers.ts:381",
 		"console.warn de diagnostic",
 	],
 	[
@@ -45,7 +45,7 @@ const ALLOWED = new Map<string, string>([
 		"main/services/ollama-portable.ts:333",
 		"message d'erreur : nomme la plateforme réellement rencontrée",
 	],
-	["main/app-logger.ts:165", "métadonnée de log"],
+	["main/app-logger.ts:187", "métadonnée de log"],
 	[
 		"main/claude-profile/credential-utils.ts:1533",
 		"message « Unsupported platform » : la plateforme brute est l'information",
