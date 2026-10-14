@@ -79,6 +79,7 @@ fichier-ci reste l'autorité sur les règles.
 | Workflows déclaratifs | [workflows.md](architecture/workflows.md) | `workflow.yaml`, élagage par effort, fenêtres, rosters, passage de phase ; le logger de workflow. |
 | Pause et reprise | [pause-resume.md](architecture/pause-resume.md) | `core/pause_state.py`, `BuildPaused` / `BuildHalted`, reprendre une phase sans la payer deux fois. |
 | Gestion du contexte | [context-management.md](architecture/context-management.md) | Artefacts sobres (un fait, un endroit) et politique compact / clear par tâche, native ou émulée. |
+| Harness de contexte (plan) | [context-harness.md](architecture/context-harness.md) | Plan, rien n'est construit : une boucle unique, préfixe stable, troncature à la source, mesure par appel. |
 | Mode hors-ligne | [offline-mode.md](architecture/offline-mode.md) | `airgapStrict` comme barrière, sinon comme défaut. |
 | Architecture frontend | [frontend-architecture.md](architecture/frontend-architecture.md) | Stores, activité de fond et barre latérale, agents, profils, terminaux, liens d'auth. |
 | Panneau de tâche | [frontend-task-panel.md](architecture/frontend-task-panel.md) | Progression (`shared/progress.ts`), onglet Overview, critères d'acceptation, graphe des changements. |
