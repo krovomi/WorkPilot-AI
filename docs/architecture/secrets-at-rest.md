@@ -226,9 +226,3 @@ reads it instead:
   takes the URL stored for that channel (closed list) unless a new one was
   typed, and has the backend post it. Before, the renderer did that fetch
   itself.
-
-## Not covered here
-
-The backend's own `.env` (`apps/backend/.env` in development,
-`userData/backend/.env` in production), written by `settings-handlers.ts`,
-still holds `CLAUDE_CODE_OAUTH_TOKEN` in clear.
