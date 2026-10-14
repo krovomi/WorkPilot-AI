@@ -582,6 +582,13 @@ def _clear_planning_failures(spec_dir: Path) -> None:
         pass
 
 
+def _subtask_completed(spec_dir: Path, subtask_id: str) -> bool:
+    """Whether the plan already marks ``subtask_id`` completed."""
+    plan = load_implementation_plan(spec_dir)
+    subtask = find_subtask_in_plan(plan, subtask_id) if plan else None
+    return bool(subtask) and subtask.get("status") == "completed"
+
+
 def _emit_phase_failure(
     spec_dir: Path,
     phase: str,
@@ -1848,9 +1855,20 @@ async def run_autonomous_agent(
             # Context window past the task's threshold (or "compact / new
             # thread now" from the task panel): the guard already compacted or
             # cleared what the next session replays. Re-loop WITHOUT advancing
-            # the subtask, exactly like a hot swap.
+            # the subtask, exactly like a hot swap — unless the agent had
+            # already marked it completed before the safe point the guard
+            # stopped at. That session ended like any other and needs the same
+            # post-session processing: without it the plan never reached the
+            # main project's copy the Kanban reads, and on the last subtask
+            # ALL_SUBTASKS_DONE was never emitted.
             if status == "context_reset":
-                continue
+                if not (
+                    subtask_id
+                    and current_log_phase == LogPhase.CODING
+                    and _subtask_completed(spec_dir, subtask_id)
+                ):
+                    continue
+                status = "complete" if is_build_complete(spec_dir) else "continue"
 
             # Hot LLM swap requested mid-session: the session ended early so we can
             # rebuild the client with the new provider/model. Re-loop WITHOUT
