@@ -89,7 +89,10 @@ import { ensureOllamaReady } from "./services/ollama-portable";
 import { ensureOAuthServerRunning } from "./oauth-server";
 import { openExternalUrl } from "./open-external";
 import { isMacOS, isWindows } from "./platform";
-import { migrateProjectEnvSecrets } from "./project-env-file";
+import {
+	migrateProjectEnvSecrets,
+	migrateRootEnvCicdKeys,
+} from "./project-env-file";
 import { ensureProjectEnvFilesIgnored } from "./project-initializer";
 import { projectStore } from "./project-store";
 import { pythonEnvManager } from "./python-env-manager";
@@ -832,6 +835,13 @@ async function migrateSecretsAtRest(): Promise<void> {
 			console.warn("[main] profiles.json: secrets kept in clear rewritten");
 		}
 		const projects = projectStore.getProjects();
+		// CI/CD trigger settings first: they move into .workpilot/.env, encrypted.
+		const rootEnvFiles = migrateRootEnvCicdKeys(projects);
+		if (rootEnvFiles > 0) {
+			console.warn(
+				`[main] CI/CD settings moved from the root .env to .workpilot/.env in ${rootEnvFiles} project(s)`,
+			);
+		}
 		const projectEnvFiles = migrateProjectEnvSecrets(projects);
 		if (projectEnvFiles > 0) {
 			console.warn(
