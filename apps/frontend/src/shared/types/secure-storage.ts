@@ -1,6 +1,6 @@
 /**
  * Whether the credentials WorkPilot keeps on disk are protected by the OS.
- * See shared_docs/architecture/secrets-at-rest.md.
+ * See docs/architecture/secrets-at-rest.md.
  */
 export interface SecureStorageStatus {
 	/**

@@ -1,6 +1,6 @@
 /**
  * Secrets at rest — the one place the main process turns a credential into
- * what is written to disk, and back. See shared_docs/architecture/secrets-at-rest.md.
+ * what is written to disk, and back. See docs/architecture/secrets-at-rest.md.
  *
  * A stored secret is `enc:<base64>`: Electron safeStorage ciphertext under a
  * key the OS keeps (Keychain, DPAPI, libsecret, KWallet). Without such a key

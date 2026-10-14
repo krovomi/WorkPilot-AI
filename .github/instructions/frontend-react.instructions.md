@@ -5,9 +5,11 @@ description: 'Conventions React renderer WorkPilot AI : TypeScript strict, Zusta
 
 # Frontend React (renderer) — Instructions
 
+> Résumé pour Copilot. Les règles normatives sont dans `docs/rules/frontend.md` ; elles priment.
+
 ## Stack
 
-- **React 18** + TypeScript strict (`apps/frontend/tsconfig.json`).
+- **React 19** + TypeScript 7 strict (`apps/frontend/tsconfig.json`).
 - **Zustand** pour le state global (un store par domaine, voir `stores/`).
 - **react-i18next** (FR + EN obligatoires, `shared/i18n/locales/{fr,en}/*.json`).
 - **shadcn/ui** dans `components/ui/` (Radix + Tailwind).
@@ -32,5 +34,5 @@ description: 'Conventions React renderer WorkPilot AI : TypeScript strict, Zusta
 ## Anti-patterns
 
 - `useState` pour data partagée entre 2+ composants frères → utiliser un store Zustand.
-- `useEffect` avec `globalThis.electronAPI` sans cleanup d'event listener.
+- Abonner une page aux événements du main dans un `useEffect` : les listeners s'enregistrent une fois, dans `stores/global-listeners.ts`.
 - Hardcoder une couleur Tailwind hors du design-system (`apps/frontend/design.json`).

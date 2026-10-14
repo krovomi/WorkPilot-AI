@@ -5,6 +5,8 @@ description: 'Conventions IPC WorkPilot AI : preload bridge, namespaces, types p
 
 # IPC (preload bridge) — Instructions
 
+> Résumé pour Copilot. Les règles normatives sont dans `docs/rules/frontend.md` et la règle S6 de `docs/rules/security.md` ; elles priment.
+
 ## Architecture
 
 ```
@@ -20,7 +22,9 @@ renderer  →  globalThis.electronAPI.<method>()  →  preload/api/*  →  ipcRe
    - Un **handler** dans `main/ipc-handlers/`.
 3. Retours IPC suivent le pattern `{ success: boolean; data?: T; error?: string }` (cf. types existants).
 4. Pas de `Buffer` ni d'objet non-sérialisable dans les payloads IPC.
-5. `contextIsolation: true` doit rester activé — **jamais** désactiver dans `electron.vite.config.ts`.
+5. `contextIsolation: true`, `sandbox: true`, `nodeIntegration: false` restent activés (`src/main/index.ts`, `createWindow`).
+6. Aucun nouvel appel au passthrough générique `invoke(channel, …)` (`preload/api/modules/generic-ipc-api.ts`) : un canal = une méthode typée.
+7. Le handler main revalide ses arguments ; un handler sensible vérifie l'expéditeur (`event.senderFrame`).
 
 ## Anti-patterns
 

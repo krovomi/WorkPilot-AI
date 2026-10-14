@@ -1,0 +1,69 @@
+# AGENTS.md — index du paquet `security/`
+
+Ce qui applique les règles de [`docs/rules/security.md`](../../../docs/rules/security.md) côté
+backend, et ce qui n'applique rien. Les règles font foi ; ce fichier dit où regarder.
+
+> Backend : [`../AGENTS.md`](../AGENTS.md) · Racine : [`../../../AGENTS.md`](../../../AGENTS.md)
+
+## Les barrières actives
+
+Posées par `create_client()` (`core/client.py`) comme hooks PreToolUse du SDK Claude ; les
+providers hors SDK passent par `core/runtimes/tool_executor.py`, qui appelle les mêmes refus.
+
+| Outil | Barrière | Où | Test |
+|---|---|---|---|
+| Bash | allowlist par projet + validateurs par commande | `hooks.py` (`bash_security_hook`) → `command_guard.py` (`validate_command_line`) → `validator_registry.py` | `tests/test_security_command_guard.py`, `tests/security/` |
+| Bash | profil de sécurité du projet (commandes de base + stack + scripts + perso) | `profile.py` (`get_security_profile`), `project/command_registry/` | `tests/test_security.py`, `tests/test_security_cache.py` |
+| Bash | secrets dans un `git commit` émis par un agent | `git_validators.py` → `scan_secrets.py` | `tests/test_scan_secrets.py` |
+| Write / Edit | écritures confinées au projet, à la spec et à `<tmp>/workpilot` | `path_guard.py` (`make_write_path_hook`) ; hors SDK `_resolve_within_project` | `tests/test_security_path_guard.py` |
+| Bash / Write | garde-fous déclarés par le projet (`.workpilot/guardrails.*`) | `guardrails.py` | — |
+| Write / Edit | caractères invisibles retirés | `watermarks/` | `tests/test_watermarks_hook.py` |
+| Read | fichiers retenus par la préparation des pièces jointes | `docintel/read_guard.py` | — |
+| tous | outils non déclarés refusés | `agents/tools_pkg/permissions.py` (`undeclared_builtin_tools`) | `tests/test_agent_tool_declarations.py`, `tests/test_agent_tool_rights.py`, `tests/test_non_sdk_rights.py` |
+
+## Contenu externe
+
+| Quoi | Où |
+|---|---|
+| nettoyage + scan d'injection + journal | `untrusted.py` (`clean_untrusted`, `quote_untrusted`, `record_untrusted`) |
+| scanner d'injection | `injection_guard/` (`get_default_scanner`) ; `WORKPILOT_INJECTION_GUARD=block` durcit `quote_untrusted` |
+| nettoyage brut | `content_sanitizer.py` (utilisé par `untrusted.py`) |
+| appliqué aujourd'hui à | GitHub (`runners/github/context_gatherer.py`, `runners/github/batch_issues.py`) ; GitLab et Azure DevOps ont encore leur propre assainisseur |
+
+Tests : `tests/test_security_untrusted.py`, `tests/injection_guard/test_middleware.py`,
+`tests/backend/security_suite/`.
+
+## Hors de ce paquet
+
+| Sujet | Où | Test |
+|---|---|---|
+| Autorisation du mode serveur | `server/authz/` (`require_permission`, `mount_guarded`, `scope.py`), `server/integration.py` | `tests/backend/test_feature_router_authz.py`, `tests/backend/test_project_scope_coverage.py` |
+| Authentification du mode serveur | `server/auth/` (JWT, argon2id, OIDC), `server/ratelimit.py` | `tests/backend/test_auth_session_lifecycle.py` |
+| Chemins côté API | `core/api_safety.py` (`validated_dir`) | `tests/test_api_safety.py` |
+| Redaction des logs | `core/log_redaction.py` | `tests/core/test_log_redaction.py` |
+| Hors-ligne strict | `core/offline_policy.py` | `tests/test_offline_mode.py` |
+| Secrets des pièces jointes | `docintel/redact.py` | `tests/backend/security_suite/test_secret_scanning.py` |
+| Sandbox Codex | `core/codex_cli_client.py` (`codex_sandbox_for`) | `tests/test_non_sdk_rights.py` |
+
+## Ce qui ne protège rien aujourd'hui
+
+À ne pas citer comme une barrière : ces modules existent mais ne sont branchés sur aucun chemin
+d'exécution d'agent.
+
+- `sandbox.py`, `anomaly_detector.py` : n'alimentent qu'un endpoint de statut.
+- `git_hooks.py`, `auto_integration.py` : `initialize_security` n'a aucun appelant, et le dépôt
+  utilise `.husky/` (`core.hooksPath`), que `git_hooks.py install` ne touche pas.
+- `audit_trail.py`, `main.py` : sans importeur ; l'audit vivant est le paquet `audit_trail/`.
+- `secure_subprocess.py` : un seul appelant ; la plupart des sous-processus appellent
+  `subprocess` directement (voir la règle S4).
+- `tool_input_validator.py` : extrait l'entrée d'un outil pour l'affichage, ne refuse rien.
+
+Brancher l'un d'eux, c'est une PR avec un test qui prouve le refus.
+
+## Outils manuels
+
+```bash
+cd apps/backend
+python security/scan_secrets.py --staged-only        # ou --all-files, --path <dir>, --json
+python -m security.security_orchestrator             # scan complet (Bandit, secrets, rapports)
+```

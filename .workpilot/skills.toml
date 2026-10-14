@@ -34,7 +34,7 @@ ui-ux-pro-max = "latest"   # UI/UX design intelligence (Basic) — contextual: o
 #   hermes-learned -- the loop's own output (learning_loop/hermes_adopt.py).
 #     Leaving it out is the gate that keeps agent-authored prose away from
 #     every harness until a person lists it, with the pack in front of them
-#     (shared_docs/architecture/hermes.md). tests/test_skills_toml_packs.py
+#     (docs/architecture/hermes.md). tests/test_skills_toml_packs.py
 #     fails if it appears here.
 #   claude-mem -- an optional pack (skills/README.md): only its pack.json is
 #     committed and it emits nothing. `pnpm run skills:bootstrap --pack

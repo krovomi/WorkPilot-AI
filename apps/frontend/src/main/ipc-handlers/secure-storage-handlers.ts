@@ -11,7 +11,7 @@ let unsubscribe: (() => void) | undefined;
 
 /**
  * Whether stored secrets are protected by the OS keyring. The renderer warns
- * when they are not (shared_docs/architecture/secrets-at-rest.md).
+ * when they are not (docs/architecture/secrets-at-rest.md).
  */
 export function registerSecureStorageHandlers(): void {
 	ipcMain.handle(
