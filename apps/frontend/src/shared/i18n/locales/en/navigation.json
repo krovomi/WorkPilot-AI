@@ -144,6 +144,12 @@
 		"downloadError": "Failed to download update",
 		"readOnlyVolumeWarning": "Move to Applications folder to update"
 	},
+	"secureStorageBanner": {
+		"title": "API keys stored without encryption",
+		"description": "No system keyring is available, so your API keys and tokens are kept on this device without OS encryption, in files only your user account can read.",
+		"action": "Install or unlock a keyring (GNOME Keyring, KWallet…) and restart WorkPilot AI: your keys will then be encrypted.",
+		"dismiss": "Dismiss"
+	},
 	"claudeCode": {
 		"checking": "Checking Claude Code...",
 		"upToDate": "Claude Code is up to date",

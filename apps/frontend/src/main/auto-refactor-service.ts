@@ -5,6 +5,7 @@ import path from "node:path";
 import { app } from "electron";
 import { MODEL_ID_MAP } from "../shared/constants";
 import type { AppSettings } from "../shared/types";
+import { readSettingsFile } from "./settings-utils";
 
 /**
  * Result of auto-refactor analysis
@@ -175,12 +176,9 @@ export class AutoRefactorService extends EventEmitter {
 
 		// Read OAuth token from settings if available
 		try {
-			const settingsPath = path.join(app.getPath("userData"), "settings.json");
-			if (existsSync(settingsPath)) {
-				const { readFileSync } = require("node:fs");
-				const settings: AppSettings = JSON.parse(
-					readFileSync(settingsPath, "utf-8"),
-				);
+			// Through settings-utils: it decrypts the stored keys.
+			const settings = readSettingsFile() as Partial<AppSettings> | undefined;
+			if (settings) {
 				if (settings.globalClaudeOAuthToken) {
 					processEnv.CLAUDE_OAUTH_TOKEN = settings.globalClaudeOAuthToken;
 				}

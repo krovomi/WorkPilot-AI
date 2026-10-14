@@ -5,6 +5,7 @@ import path from "node:path";
 import { app } from "electron";
 import { MODEL_ID_MAP } from "../shared/constants";
 import type { AppSettings } from "../shared/types";
+import { readSettingsFile } from "./settings-utils";
 
 export interface CodeMigrationResult {
 	status: string;
@@ -129,12 +130,9 @@ export class CodeMigrationService extends EventEmitter {
 			...(process.env as Record<string, string>),
 		};
 		try {
-			const settingsPath = path.join(app.getPath("userData"), "settings.json");
-			if (existsSync(settingsPath)) {
-				const { readFileSync } = require("node:fs");
-				const settings: AppSettings = JSON.parse(
-					readFileSync(settingsPath, "utf-8"),
-				);
+			// Through settings-utils: it decrypts the stored keys.
+			const settings = readSettingsFile() as Partial<AppSettings> | undefined;
+			if (settings) {
 				if (settings.globalClaudeOAuthToken)
 					env.CLAUDE_OAUTH_TOKEN = settings.globalClaudeOAuthToken;
 				if (settings.globalAnthropicApiKey)

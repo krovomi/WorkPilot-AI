@@ -49,7 +49,7 @@ from .parser import (
     split_command_segments,
     unwrap_rtk_prefixes,
 )
-from .validator import VALIDATORS
+from .validator import LINE_VALIDATORS, VALIDATORS
 
 if TYPE_CHECKING:  # pragma: no cover - import is for typing only
     from project import SecurityProfile
@@ -105,6 +105,15 @@ def validate_command_line(
             cmd_segment = unwrap_rtk_prefixes(command)
 
         allowed, reason = validator(cmd_segment)
+        if not allowed:
+            return False, reason
+
+    # Rules about the whole line rather than one command in it — a redirection
+    # writes through whichever command it follows. Unwrapped for the reason
+    # the segments are: `rtk tee file` writes as `tee`.
+    unwrapped = unwrap_rtk_prefixes(command)
+    for line_validator in LINE_VALIDATORS:
+        allowed, reason = line_validator(unwrapped)
         if not allowed:
             return False, reason
 
