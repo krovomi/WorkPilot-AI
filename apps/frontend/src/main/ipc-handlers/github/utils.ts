@@ -8,8 +8,8 @@ import { promisify } from "node:util";
 import type { Project } from "../../../shared/types";
 import { getToolPath } from "../../cli-tool-manager";
 import { getAugmentedEnv } from "../../env-utils";
+import { getProjectEnvPath, readProjectEnvFile } from "../../project-env-file";
 import type { GitHubConfig } from "./types";
-import { getProjectEnvPath, readProjectEnv } from "../../project-env-file";
 
 const execFileAsync = promisify(execFile);
 
@@ -65,13 +65,11 @@ export async function getGitHubTokenForSubprocess(): Promise<string | null> {
  * Falls back to gh CLI token if GITHUB_TOKEN not in .env
  */
 export function getGitHubConfig(project: Project): GitHubConfig | null {
-	if (!project.autoBuildPath) return null;
-	const envPath = getProjectEnvPath(project.path, project.autoBuildPath);
-	if (!existsSync(envPath)) return null;
+	const envPath = getProjectEnvPath(project);
+	if (!envPath || !existsSync(envPath)) return null;
 
 	try {
-		// Through project-env-file, which decrypts the stored token.
-		const vars = readProjectEnv(envPath);
+		const vars = readProjectEnvFile(envPath);
 		let token: string | undefined = vars.GITHUB_TOKEN;
 		const repo = vars.GITHUB_REPO;
 

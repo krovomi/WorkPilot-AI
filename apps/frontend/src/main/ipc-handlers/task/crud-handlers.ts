@@ -25,6 +25,7 @@ import type {
 import { slugifySpecTitle } from "../../../shared/utils/spec-slug";
 import type { AgentManager } from "../../agent";
 import { getAppLanguage } from "../../app-language";
+import { readProjectEnv } from "../../project-env-file";
 import { projectStore } from "../../project-store";
 import { specInterviewService } from "../../spec-interview-service";
 import { taskStateManager } from "../../task-state-manager";
@@ -36,15 +37,13 @@ import { findTaskWorktree, isPathWithinBase } from "../../worktree-paths";
 import { inlineAzureDevOpsImages } from "../shared/azure-attachments";
 import { stripHtml } from "../shared/sanitize";
 import { findTaskAndProject } from "./shared";
-import { readProjectEnvFor } from "../../project-env-file";
 
 /** Charge le PAT et l'URL d'organisation Azure DevOps depuis le `.env` projet. */
 function loadAzureDevOpsConfig(
 	projectPath: string,
 	autoBuildPath: string,
 ): { pat: string | null; orgUrl: string | null } {
-	// Through project-env-file, which decrypts the stored PAT.
-	const vars = readProjectEnvFor(projectPath, autoBuildPath);
+	const vars = readProjectEnv({ path: projectPath, autoBuildPath });
 	return {
 		pat: vars.AZURE_DEVOPS_PAT || null,
 		orgUrl: vars.AZURE_DEVOPS_ORG_URL || null,

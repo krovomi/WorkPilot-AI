@@ -24,9 +24,9 @@ import type {
 } from "../../shared/types";
 import { slugifySpecTitle } from "../../shared/utils/spec-slug";
 import type { AgentManager } from "../agent";
+import { readProjectEnv } from "../project-env-file";
 import { projectStore } from "../project-store";
 import { sanitizeText, sanitizeUrl } from "./shared/sanitize";
-import { readProjectEnvFor } from "../project-env-file";
 
 /**
  * Register all linear-related IPC handlers
@@ -43,10 +43,7 @@ export function registerLinearHandlers(
 	 * Helper to get Linear API key from project env
 	 */
 	const getLinearApiKey = (project: Project): string | null => {
-		if (!project.autoBuildPath) return null;
-		// Through project-env-file, which decrypts the stored token.
-		const vars = readProjectEnvFor(project.path, project.autoBuildPath);
-		return vars.LINEAR_API_KEY || null;
+		return readProjectEnv(project).LINEAR_API_KEY || null;
 	};
 
 	/**

@@ -1,116 +1,206 @@
 /**
- * A project's `.workpilot/.env` — the one module that reads and writes it.
- * See docs/architecture/secrets-at-rest.md.
+ * A project's `.workpilot/.env` — the one place the main process reads and
+ * writes it. See docs/architecture/secrets-at-rest.md.
  *
- * The file holds the project's integration settings and the tokens that go
- * with them (GitHub, GitLab, Linear, Jira, Jenkins, Context7, provider keys).
- * Secrets are encrypted at the file boundary, like settings.json: a secret
- * value is written `enc:<base64>` by secret-storage, or in clear in a 0600
- * file when no OS keyring can encrypt it (the UI then warns). Every caller
- * reads and writes plaintext; Python subprocesses get the decrypted values in
- * their environment, which wins over the file on the backend side.
+ * The Python backend reads this file with its own parsers and cannot call
+ * safeStorage, so its secrets come in two kinds
+ * (shared/constants/project-env-secrets.json):
  *
- * The CLI run without the desktop app cannot decrypt an `enc:` value: it
- * ignores it, says so once, and reads the variable from its own environment.
+ * - `encrypted`: Python only gets them from its environment, which the main
+ *   process builds from this file. They are stored `enc:` like the keys of
+ *   settings.json, and decrypted here whenever the file is read.
+ * - `readable`: the backend reads them from the file itself, in processes the
+ *   app starts without the project's environment (the API server, the PR
+ *   review runners). Ciphertext there would break Figma import, notifications,
+ *   Context7 and custom MCP servers, so they stay in clear — in a 0600 file,
+ *   and named by the status the sidebar banner reads.
+ *
+ * Every other line is written back byte for byte: comments, order, and the
+ * keys this module knows nothing about.
  */
 
-import { execFileSync } from "node:child_process";
-import {
-	chmodSync,
-	existsSync,
-	mkdirSync,
-	readFileSync,
-	writeFileSync,
-} from "node:fs";
+import { chmodSync, mkdirSync, promises as fsPromises, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { getToolPath } from "./cli-tool-manager";
-import { parseEnvFile } from "./ipc-handlers/utils";
-import { ensureGitignoreEntries } from "./project-initializer";
+import projectEnvSecrets from "../shared/constants/project-env-secrets.json";
 import {
 	decryptSecret,
 	encryptSecret,
 	isEncryptedSecret,
+	setReadableSecrets,
 } from "./secret-storage";
 
-export const DEFAULT_AUTO_BUILD_PATH = ".workpilot";
+export const ENCRYPTED_PROJECT_ENV_KEYS: ReadonlySet<string> = new Set(
+	projectEnvSecrets.encrypted,
+);
+export const READABLE_PROJECT_ENV_SECRET_KEYS: ReadonlySet<string> = new Set(
+	projectEnvSecrets.readable,
+);
 
-/**
- * Keys whose value is a credential. A pattern, not a list: integrations add
- * keys (`CICD_GITHUB_TOKEN`, `FIGMA_ACCESS_TOKEN`…) that no type names. A
- * webhook URL embeds its own secret, so it counts. `JIRA_PROJECT_KEY` does
- * not end in one of these and stays readable.
- */
-const SECRET_PROJECT_ENV_KEY =
-	/(?:_TOKEN|_API_KEY|_ACCESS_KEY|_SECRET_KEY|_SECRET|_PASSWORD|_PAT|_WEBHOOK_URL)$/;
-const SECRET_PROJECT_ENV_KEYS = new Set(["DOCINTEL_AZURE_KEY"]);
+/** Configuration, except for the HTTP headers where a bearer token goes. */
+const CUSTOM_MCP_SERVERS_KEY = "CUSTOM_MCP_SERVERS";
 
-export function isSecretProjectEnvKey(key: string): boolean {
-	return SECRET_PROJECT_ENV_KEY.test(key) || SECRET_PROJECT_ENV_KEYS.has(key);
+interface ProjectLocation {
+	path: string;
+	autoBuildPath?: string | null;
 }
 
-/** `KEY=value`, optionally `export KEY=value`; comments never match. */
-const ASSIGNMENT = /^(\s*(?:export\s+)?)([A-Za-z_][A-Za-z0-9_]*)(\s*=\s*)(.*?)(\s*)$/;
+interface EnvEntry {
+	key: string;
+	value: string;
+	/** Index of the `=` in the line, to rewrite the value and keep the rest. */
+	equalsIndex: number;
+}
 
-function unquote(value: string): string {
+/** `<project>/<autoBuildPath>/.env`, or null for a project not initialized. */
+export function getProjectEnvPath(project: ProjectLocation): string | null {
+	if (!project.autoBuildPath) return null;
+	return path.join(project.path, project.autoBuildPath, ".env");
+}
+
+/** Same reading as `parseEnvFile`: `KEY=value`, one pair of quotes removed. */
+function parseLine(line: string): EnvEntry | null {
+	const trimmed = line.trim();
+	if (!trimmed || trimmed.startsWith("#")) return null;
+	const equalsIndex = line.indexOf("=");
+	if (equalsIndex <= 0) return null;
+	const key = line.slice(0, equalsIndex).trim();
+	if (!key) return null;
+	let value = line.slice(equalsIndex + 1).trim();
 	if (
 		value.length >= 2 &&
 		((value.startsWith('"') && value.endsWith('"')) ||
 			(value.startsWith("'") && value.endsWith("'")))
 	) {
-		return value.slice(1, -1);
+		value = value.slice(1, -1);
 	}
-	return value;
+	return { key, value, equalsIndex };
 }
 
-/** Rewrites the value of every secret assignment; everything else is kept byte for byte. */
-function mapSecretValues(
-	content: string,
-	transform: (value: string) => string | undefined,
-): string {
-	return content
-		.split(/(\r?\n)/)
-		.map((part) => {
-			const match = ASSIGNMENT.exec(part);
-			if (!match) return part;
-			const [, lead, key, eq, rawValue, trail] = match;
-			if (!isSecretProjectEnvKey(key)) return part;
-			const value = unquote(rawValue);
-			if (!value) return part;
-			const next = transform(value);
-			if (next === undefined || next === value) return part;
-			return `${lead}${key}${eq}${next}${trail}`;
-		})
-		.join("");
-}
-
-/** The content to write: secret values encrypted, or kept in clear and the UI told. */
-export function encodeProjectEnvContent(content: string): string {
-	return mapSecretValues(content, (value) => encryptSecret(value));
+function rawEntries(content: string): Record<string, string> {
+	const vars: Record<string, string> = {};
+	for (const line of content.split(/\r?\n/)) {
+		const entry = parseLine(line);
+		if (entry) vars[entry.key] = entry.value;
+	}
+	return vars;
 }
 
 /**
- * The content callers work with: secret values decrypted. A value that cannot
- * be decrypted right now stays as stored, so writing the content back keeps it.
+ * The variables of a `.env` content, `enc:` values decrypted. A value that
+ * cannot be decrypted right now (keyring locked, another machine's
+ * ciphertext) is left out: a subprocess or an API call gets no token rather
+ * than ciphertext, and the file keeps it for a launch that can read it.
  */
-export function decodeProjectEnvContent(content: string): string {
-	return mapSecretValues(content, (value) =>
-		isEncryptedSecret(value) ? decryptSecret(value) : value,
-	);
+export function parseProjectEnv(content: string): Record<string, string> {
+	const vars: Record<string, string> = {};
+	for (const [key, value] of Object.entries(rawEntries(content))) {
+		if (!isEncryptedSecret(value)) {
+			vars[key] = value;
+			continue;
+		}
+		const secret = decryptSecret(value);
+		if (secret !== undefined) vars[key] = secret;
+	}
+	return vars;
 }
 
-/** Whether the content holds a secret value still written in clear. */
-export function hasPlaintextProjectEnvSecrets(content: string): boolean {
-	return Object.entries(parseEnvFile(content)).some(
+/** A project `.env` read and decrypted; `{}` when missing or unreadable. */
+export function readProjectEnvFile(envPath: string): Record<string, string> {
+	try {
+		return parseProjectEnv(readFileSync(envPath, "utf-8"));
+	} catch {
+		return {};
+	}
+}
+
+/** `readProjectEnvFile`, without blocking the main process. */
+export async function readProjectEnvFileAsync(
+	envPath: string,
+): Promise<Record<string, string>> {
+	try {
+		return parseProjectEnv(await fsPromises.readFile(envPath, "utf-8"));
+	} catch {
+		return {};
+	}
+}
+
+/** A project's `.env`, decrypted; `{}` when the project has none. */
+export function readProjectEnv(
+	project: ProjectLocation,
+): Record<string, string> {
+	const envPath = getProjectEnvPath(project);
+	return envPath ? readProjectEnvFile(envPath) : {};
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function holdsSecret(key: string, value: string): boolean {
+	if (!value.trim()) return false;
+	if (key !== CUSTOM_MCP_SERVERS_KEY) return true;
+	try {
+		const servers: unknown = JSON.parse(value);
+		return (
+			Array.isArray(servers) &&
+			servers.some(
+				(server) =>
+					isRecord(server) &&
+					isRecord(server.headers) &&
+					Object.values(server.headers).some(
+						(header) => typeof header === "string" && header.trim() !== "",
+					),
+			)
+		);
+	} catch {
+		return false;
+	}
+}
+
+/** Names of the `readable` secrets a `.env` content sets — never values. */
+export function readableSecretKeysOf(content: string): string[] {
+	return Object.entries(rawEntries(content))
+		.filter(
+			([key, value]) =>
+				READABLE_PROJECT_ENV_SECRET_KEYS.has(key) && holdsSecret(key, value),
+		)
+		.map(([key]) => key)
+		.sort();
+}
+
+function holdsPlaintextEncryptedKey(content: string): boolean {
+	return Object.entries(rawEntries(content)).some(
 		([key, value]) =>
-			value !== "" && isSecretProjectEnvKey(key) && !isEncryptedSecret(value),
+			ENCRYPTED_PROJECT_ENV_KEYS.has(key) &&
+			value !== "" &&
+			!isEncryptedSecret(value),
 	);
 }
 
-export function getProjectEnvPath(
-	projectPath: string,
-	autoBuildPath?: string | null,
-): string {
-	return path.join(projectPath, autoBuildPath || DEFAULT_AUTO_BUILD_PATH, ".env");
+/**
+ * `content` as written to disk: each `encrypted` key's value through
+ * `encryptSecret` (idempotent on `enc:`; in clear only when no OS keyring can
+ * encrypt, and then the UI is told). Every other line is kept as is.
+ */
+export function encodeProjectEnvContent(content: string): string {
+	return content
+		.split(/(\r?\n)/)
+		.map((segment) => {
+			const entry = parseLine(segment);
+			if (
+				!entry ||
+				!ENCRYPTED_PROJECT_ENV_KEYS.has(entry.key) ||
+				entry.value === "" ||
+				isEncryptedSecret(entry.value)
+			) {
+				return segment;
+			}
+			const stored = encryptSecret(entry.value);
+			// No keyring: the line stays exactly as it was, quotes included.
+			if (stored === entry.value) return segment;
+			return `${segment.slice(0, entry.equalsIndex + 1)}${stored}`;
+		})
+		.join("");
 }
 
 /** Owner read/write only (0600). Best effort: Windows ignores POSIX modes. */
@@ -122,151 +212,80 @@ function restrictToOwner(filePath: string): void {
 	}
 }
 
-/** The file's text with its secrets decrypted; undefined when it does not exist. */
-export function readProjectEnvContent(envPath: string): string | undefined {
+/**
+ * Write a project's `.env`: `encrypted` keys as `enc:`, owner-only (0600),
+ * and the `readable` secrets it keeps reported to the secure-storage status.
+ */
+export function writeProjectEnvFile(envPath: string, content: string): void {
+	mkdirSync(path.dirname(envPath), { recursive: true });
+	const encoded = encodeProjectEnvContent(content);
+	writeFileSync(envPath, encoded, { encoding: "utf-8", mode: 0o600 });
+	restrictToOwner(envPath);
+	setReadableSecrets(envPath, readableSecretKeysOf(encoded));
+}
+
+/**
+ * Bring a `.env` an earlier version wrote under this scheme: owner-only,
+ * `encrypted` keys still in clear rewritten as `enc:`, `readable` secrets
+ * reported. Without an OS keyring the values stay in clear and the banner
+ * says so. Returns true when the file was rewritten.
+ */
+export function migrateProjectEnvFile(envPath: string): boolean {
 	let content: string;
 	try {
 		content = readFileSync(envPath, "utf-8");
-	} catch (error) {
-		if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
-		throw error;
-	}
-	return decodeProjectEnvContent(content);
-}
-
-/**
- * The file's variables, secrets decrypted; empty when it does not exist or
- * cannot be read. A secret that cannot be decrypted right now is left out:
- * ciphertext is never a usable token, and handed to a subprocess it would win
- * over the variable the backend would otherwise read.
- */
-export function readProjectEnv(envPath: string): Record<string, string> {
-	let vars: Record<string, string>;
-	try {
-		const content = readProjectEnvContent(envPath);
-		vars = content === undefined ? {} : parseEnvFile(content);
 	} catch {
-		return {};
+		return false;
 	}
-	for (const [key, value] of Object.entries(vars)) {
-		if (isSecretProjectEnvKey(key) && isEncryptedSecret(value)) {
-			delete vars[key];
-		}
-	}
-	return vars;
-}
-
-/** Variables of a project's `.workpilot/.env`, secrets decrypted. */
-export function readProjectEnvFor(
-	projectPath: string,
-	autoBuildPath?: string | null,
-): Record<string, string> {
-	return readProjectEnv(getProjectEnvPath(projectPath, autoBuildPath));
-}
-
-/** Writes `content` with its secrets encrypted, in a file only its owner can read. */
-export function writeProjectEnvFile(envPath: string, content: string): void {
-	const encoded = encodeProjectEnvContent(content);
-	mkdirSync(path.dirname(envPath), { recursive: true });
-	writeFileSync(envPath, encoded, { encoding: "utf-8", mode: 0o600 });
-	// `mode` only applies when the file is created.
 	restrictToOwner(envPath);
+	setReadableSecrets(envPath, readableSecretKeysOf(content));
+	if (!holdsPlaintextEncryptedKey(content)) return false;
+
+	const encoded = encodeProjectEnvContent(content);
+	if (encoded === content) return false;
+	writeFileSync(envPath, encoded, { encoding: "utf-8", mode: 0o600 });
+	restrictToOwner(envPath);
+	return true;
 }
 
 /**
- * The file must never be committed: it may hold secrets in clear (no keyring)
- * and, encrypted or not, it is machine-local. When git does not ignore it,
- * `.workpilot/` is added to the project's .gitignore — the entry project
- * initialisation adds; a project opened before that ran may lack it.
- * Best effort: no git, or not a repository, leaves things as they are.
- */
-export function ensureProjectEnvIgnored(
-	projectPath: string,
-	envPath: string,
-): void {
-	if (!existsSync(path.join(projectPath, ".git"))) return;
-	const relative = path.relative(projectPath, envPath);
-	if (relative.startsWith("..") || path.isAbsolute(relative)) return;
-	try {
-		execFileSync(getToolPath("git"), ["check-ignore", "-q", "--", relative], {
-			cwd: projectPath,
-			stdio: "ignore",
-			timeout: 5000,
-		});
-		return; // exit 0: ignored
-	} catch (error) {
-		// exit 1: not ignored; anything else (128, spawn failure): unknown.
-		if ((error as { status?: number }).status !== 1) return;
-	}
-	const topDir = relative.split(path.sep)[0];
-	try {
-		ensureGitignoreEntries(projectPath, [`${topDir}/`]);
-		console.warn(
-			`[ProjectEnv] ${relative} was not ignored by git: added ${topDir}/ to .gitignore`,
-		);
-	} catch (error) {
-		console.warn("[ProjectEnv] Could not update .gitignore:", error);
-	}
-}
-
-/** Writes a project's `.workpilot/.env` and makes sure git ignores it. */
-export function writeProjectEnv(
-	projectPath: string,
-	autoBuildPath: string | null | undefined,
-	content: string,
-): void {
-	const envPath = getProjectEnvPath(projectPath, autoBuildPath);
-	writeProjectEnvFile(envPath, content);
-	ensureProjectEnvIgnored(projectPath, envPath);
-}
-
-export interface ProjectEnvLocation {
-	path: string;
-	autoBuildPath?: string | null;
-}
-
-/**
- * Startup migration: restricts every project's `.workpilot/.env` to 0600 and
- * rewrites it when a secret is still in clear. Without a keyring the rewrite
- * keeps the values in clear and raises the banner. Returns how many files
- * were rewritten. Never throws: a project that cannot be migrated is skipped.
+ * `migrateProjectEnvFile` for every project. Run once the app is ready
+ * (safeStorage needs it on Linux and Windows); a project that fails is
+ * skipped, never the others. Returns how many files were rewritten.
  */
 export function migrateProjectEnvSecrets(
-	projects: readonly ProjectEnvLocation[],
+	projects: readonly ProjectLocation[],
 ): number {
 	let rewritten = 0;
 	for (const project of projects) {
-		if (!project.autoBuildPath) continue;
-		const envPath = getProjectEnvPath(project.path, project.autoBuildPath);
+		const envPath = getProjectEnvPath(project);
+		if (!envPath) continue;
 		try {
-			if (!existsSync(envPath)) continue;
-			restrictToOwner(envPath);
-			const content = readFileSync(envPath, "utf-8");
-			ensureProjectEnvIgnored(project.path, envPath);
-			if (!hasPlaintextProjectEnvSecrets(content)) continue;
-			writeProjectEnvFile(envPath, content);
-			rewritten++;
+			if (migrateProjectEnvFile(envPath)) rewritten++;
 		} catch (error) {
-			console.warn(`[ProjectEnv] Could not migrate ${envPath}:`, error);
+			console.warn(
+				"[ProjectEnv] Could not migrate a project's .workpilot/.env:",
+				error instanceof Error ? error.message : error,
+			);
 		}
 	}
 	return rewritten;
 }
 
 /** A `CICD_…` assignment in a project's root `.env`. */
-const ROOT_CICD_ASSIGNMENT = /^\s*(?:export\s+)?(CICD_[A-Z0-9_]+)\s*=(.*)$/;
+const ROOT_CICD_ASSIGNMENT = /^\s*(?:export\s+)?CICD_[A-Z0-9_]+\s*=/;
 
 /**
  * The CI/CD triggers screen used to keep its settings and tokens
  * (`CICD_GITHUB_TOKEN`, `CICD_JENKINS_TOKEN`…) in the project's root `.env`:
  * in clear, in a file that belongs to the user's application and that git
  * does not necessarily ignore. Moves those lines to `.workpilot/.env`, where
- * they are encrypted, and removes them from the root file. A key already set
- * in `.workpilot/.env` keeps its value there. The `.workpilot/.env` is
- * written before the root file is touched, so an interrupted move loses
+ * the tokens are encrypted, and removes them from the root file. A key
+ * already set in `.workpilot/.env` keeps its value there. `.workpilot/.env`
+ * is written before the root file is touched, so an interrupted move loses
  * nothing. Returns whether anything moved.
  */
-export function moveRootEnvCicdKeys(project: ProjectEnvLocation): boolean {
+export function moveRootEnvCicdKeys(project: ProjectLocation): boolean {
 	const rootEnvPath = path.join(project.path, ".env");
 	let rootContent: string;
 	try {
@@ -276,30 +295,36 @@ export function moveRootEnvCicdKeys(project: ProjectEnvLocation): boolean {
 		throw error;
 	}
 
-	const moved: Array<[string, string]> = [];
+	const moved: EnvEntry[] = [];
 	const kept: string[] = [];
 	for (const line of rootContent.split(/(?<=\n)/)) {
-		const match = ROOT_CICD_ASSIGNMENT.exec(line.replace(/\r?\n$/, ""));
-		if (match) {
-			moved.push([match[1], unquote(match[2].trim())]);
-		} else {
-			kept.push(line);
-		}
+		const bare = line.replace(/\r?\n$/, "");
+		const entry = ROOT_CICD_ASSIGNMENT.test(bare) ? parseLine(bare.replace(/^\s*export\s+/, "")) : null;
+		if (entry) moved.push(entry);
+		else kept.push(line);
 	}
 	if (moved.length === 0) return false;
 
-	const envPath = getProjectEnvPath(project.path, project.autoBuildPath);
-	const current = readProjectEnvContent(envPath) ?? "";
-	const existing = parseEnvFile(current);
+	const envPath = getProjectEnvPath({
+		path: project.path,
+		autoBuildPath: project.autoBuildPath || ".workpilot",
+	}) as string;
+	let current = "";
+	try {
+		current = readFileSync(envPath, "utf-8");
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+	}
+	const existing = rawEntries(current);
 	const additions = moved.filter(
-		([key, value]) => value !== "" && !existing[key],
+		(entry) => entry.value !== "" && !existing[entry.key],
 	);
 	if (additions.length > 0) {
-		const base = current === "" || current.endsWith("\n") ? current : `${current}\n`;
-		writeProjectEnv(
-			project.path,
-			project.autoBuildPath,
-			`${base}${additions.map(([key, value]) => `${key}=${value}`).join("\n")}\n`,
+		const base =
+			current === "" || current.endsWith("\n") ? current : `${current}\n`;
+		writeProjectEnvFile(
+			envPath,
+			`${base}${additions.map((entry) => `${entry.key}=${entry.value}`).join("\n")}\n`,
 		);
 	}
 	// writeFileSync on an existing file keeps its mode: the user's file stays theirs.
@@ -307,9 +332,9 @@ export function moveRootEnvCicdKeys(project: ProjectEnvLocation): boolean {
 	return true;
 }
 
-/** Startup migration for every project; returns how many root `.env` files changed. */
+/** `moveRootEnvCicdKeys` for every project; returns how many root `.env` files changed. */
 export function migrateRootEnvCicdKeys(
-	projects: readonly ProjectEnvLocation[],
+	projects: readonly ProjectLocation[],
 ): number {
 	let moved = 0;
 	for (const project of projects) {
@@ -317,8 +342,8 @@ export function migrateRootEnvCicdKeys(
 			if (moveRootEnvCicdKeys(project)) moved++;
 		} catch (error) {
 			console.warn(
-				`[ProjectEnv] Could not move CI/CD settings out of ${path.join(project.path, ".env")}:`,
-				error,
+				"[ProjectEnv] Could not move the CI/CD settings out of a project's root .env:",
+				error instanceof Error ? error.message : error,
 			);
 		}
 	}

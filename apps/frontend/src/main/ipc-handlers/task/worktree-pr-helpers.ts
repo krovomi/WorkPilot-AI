@@ -14,6 +14,7 @@ import type {
 import { getAppLanguage } from "../../app-language";
 import { getToolPath } from "../../cli-tool-manager";
 import { killProcessGracefully } from "../../platform";
+import { readProjectEnv } from "../../project-env-file";
 import { parsePythonCommand } from "../../python-detector";
 import {
 	getConfiguredPythonPath,
@@ -29,7 +30,6 @@ import {
 	updateTaskMetadataVisualProof,
 } from "./plan-file-utils";
 import { GIT_BRANCH_REGEX } from "./worktree-git-refs";
-import { readProjectEnvFor } from "../../project-env-file";
 
 /**
  * Load the project's `.workpilot/.env` and return it as a flat key→value
@@ -49,9 +49,7 @@ import { readProjectEnvFor } from "../../project-env-file";
 export function loadProjectEnvForSubprocess(
 	project: { path: string; autoBuildPath?: string | null },
 ): Record<string, string> {
-	if (!project.autoBuildPath) return {};
-	// Through project-env-file: tokens decrypted, undecryptable ones left out.
-	return readProjectEnvFor(project.path, project.autoBuildPath);
+	return readProjectEnv(project);
 }
 
 // Maximum PR title length (GitHub's limit is 256 characters)

@@ -20,6 +20,7 @@ from agents.feature_wiring import (
     load_domain_addendum,
     suggest_routed_model,
 )
+from context_mgmt.reset_limit import ResetLimit
 from core.build_signals import BuildHalted, BuildPaused
 from core.client import create_agent_client
 from core.llm_optimization import should_inline_file_context
@@ -580,6 +581,13 @@ def _clear_planning_failures(spec_dir: Path) -> None:
     except OSError:
         # Le marqueur est un cache : le lecteur gere deja son absence.
         pass
+
+
+def _subtask_completed(spec_dir: Path, subtask_id: str) -> bool:
+    """Whether the plan already marks ``subtask_id`` completed."""
+    plan = load_implementation_plan(spec_dir)
+    subtask = find_subtask_in_plan(plan, subtask_id) if plan else None
+    return bool(subtask) and subtask.get("status") == "completed"
 
 
 def _emit_phase_failure(
@@ -1182,6 +1190,11 @@ async def run_autonomous_agent(
     MAX_REPEATED_GENERIC_ERRORS = 3
     last_generic_error_signature: str | None = None
     repeated_generic_error_count = 0
+
+    # A "context_reset" re-runs the subtask without counting an attempt. On a
+    # window too small for a fresh thread every re-run is cut again, so past a
+    # few in a row the rest of the subtask runs unmanaged (gauge only).
+    context_resets = ResetLimit()
 
     def _reset_concurrency_state() -> None:
         """Reset concurrency error tracking state after a successful session or non-concurrency error."""
@@ -1835,6 +1848,7 @@ async def run_autonomous_agent(
                     f"Starting {agent_type} session {iteration} for subtask {subtask_id or 'planning'}"
                 )
 
+            context_unit = (current_phase, subtask_id, phase_model)
             status, response, error_info = await run_agent_session(
                 client,
                 prompt,
@@ -1843,14 +1857,32 @@ async def run_autonomous_agent(
                 phase=current_log_phase,
                 streaming_wrapper=streaming_wrapper,
                 context_managed=True,
+                context_monitor_only=context_resets.monitor_only(context_unit),
             )
+            if context_resets.record(context_unit, status):
+                notice = context_resets.notice(f"subtask {subtask_id or 'planning'}")
+                if task_logger:
+                    task_logger.log_warning(notice, current_log_phase)
+                else:
+                    print_status(notice, "warning")
 
             # Context window past the task's threshold (or "compact / new
             # thread now" from the task panel): the guard already compacted or
             # cleared what the next session replays. Re-loop WITHOUT advancing
-            # the subtask, exactly like a hot swap.
+            # the subtask, exactly like a hot swap — unless the agent had
+            # already marked it completed before the safe point the guard
+            # stopped at. That session ended like any other and needs the same
+            # post-session processing: without it the plan never reached the
+            # main project's copy the Kanban reads, and on the last subtask
+            # ALL_SUBTASKS_DONE was never emitted.
             if status == "context_reset":
-                continue
+                if not (
+                    subtask_id
+                    and current_log_phase == LogPhase.CODING
+                    and _subtask_completed(spec_dir, subtask_id)
+                ):
+                    continue
+                status = "complete" if is_build_complete(spec_dir) else "continue"
 
             # Hot LLM swap requested mid-session: the session ended early so we can
             # rebuild the client with the new provider/model. Re-loop WITHOUT

@@ -20,7 +20,7 @@ project_root_abs = conftest_file.parent.parent.parent
 src_path_abs = project_root_abs / "src"
 
 # Ensure paths are in sys.path in correct order
-# First add project root, then src (this matches the root conftest.py order)
+# First add project root, then src, so src ends up first
 if str(project_root_abs) not in sys.path:
     sys.path.insert(0, str(project_root_abs))
 if str(src_path_abs) not in sys.path:

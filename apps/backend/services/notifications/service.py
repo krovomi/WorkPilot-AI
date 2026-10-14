@@ -21,8 +21,6 @@ import logging
 import os
 from pathlib import Path
 
-from core.project_env import drop_app_encrypted
-
 from .channels import send_to_channel
 from .models import (
     ChannelConfig,
@@ -66,7 +64,7 @@ def _parse_env_file(path: Path) -> dict[str, str]:
                 result[key] = value
     except OSError as exc:
         logger.debug("[Notifications] Could not read env file %s: %s", path, exc)
-    return drop_app_encrypted(result)
+    return result
 
 
 class NotificationService:

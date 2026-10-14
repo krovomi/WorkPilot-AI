@@ -32,7 +32,6 @@ from core.platform import (
     is_windows,
     validate_cli_path,
 )
-from core.project_env import usable_file_value
 
 logger = logging.getLogger(__name__)
 
@@ -540,11 +539,9 @@ def load_project_mcp_config(project_dir: Path) -> dict:
                     key, value = line.split("=", 1)
                     key = key.strip()
                     value = value.strip().strip("\"'")
-                    # Include global MCP toggles (an app-encrypted key is unusable here)
+                    # Include global MCP toggles
                     if key in mcp_keys:
-                        usable = usable_file_value(key, value)
-                        if usable is not None:
-                            config[key] = usable
+                        config[key] = value
                     # Include per-agent MCP overrides (AGENT_MCP_<agent>_ADD/REMOVE)
                     elif key.startswith("AGENT_MCP_"):
                         config[key] = value
@@ -1080,10 +1077,8 @@ def create_client(
         # the secret in every `ps` listing on the machine. Anonymous access
         # still works — rate limited per IP, which is fine for one developer
         # and hopeless for a machine running builds all day.
-        # A real environment variable wins over the file, as everywhere else:
-        # the desktop app passes the decrypted key that way.
-        context7_api_key = os.environ.get("CONTEXT7_API_KEY") or mcp_config.get(
-            "CONTEXT7_API_KEY", ""
+        context7_api_key = mcp_config.get(
+            "CONTEXT7_API_KEY", os.environ.get("CONTEXT7_API_KEY", "")
         )
         mcp_servers["context7"] = {
             "command": "npx",

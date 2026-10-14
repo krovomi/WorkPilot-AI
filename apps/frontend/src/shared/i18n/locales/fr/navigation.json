@@ -148,6 +148,8 @@
 		"title": "Clés API stockées sans chiffrement",
 		"description": "Aucun trousseau système n'est disponible : vos clés API et jetons sont conservés sur cet appareil sans chiffrement par l'OS, dans des fichiers lisibles uniquement par votre compte utilisateur.",
 		"action": "Installez ou déverrouillez un trousseau (GNOME Keyring, KWallet…) puis redémarrez WorkPilot AI : vos clés seront alors chiffrées.",
+		"readableDescription": "Le backend lit ces clés directement dans le .workpilot/.env de vos projets : elles y restent non chiffrées, dans un fichier lisible uniquement par votre compte utilisateur : {{keys}}.",
+		"readableAction": "Retirez des paramètres du projet les clés que vous n'utilisez plus.",
 		"dismiss": "Ignorer"
 	},
 	"claudeCode": {

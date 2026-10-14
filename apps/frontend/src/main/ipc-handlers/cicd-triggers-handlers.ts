@@ -20,10 +20,10 @@ import { ipcMain } from "electron";
 import type { Project } from "../../shared/types";
 import {
 	getProjectEnvPath,
-	readProjectEnvContent,
-	readProjectEnvFor,
-	writeProjectEnv,
+	readProjectEnv,
+	writeProjectEnvFile,
 } from "../project-env-file";
+import { ensureProjectEnvIgnored } from "../project-initializer";
 import { projectStore } from "../project-store";
 import { parsePythonCommand } from "../python-detector";
 import { getConfiguredPythonPath } from "../python-env-manager";
@@ -88,7 +88,7 @@ export const MASKED_TOKEN = "***";
 
 /** The CI/CD settings of a project, tokens decrypted — main process only. */
 function readCicdConfig(project: Project): Record<string, string> {
-	const vars = readProjectEnvFor(project.path, project.autoBuildPath);
+	const vars = readProjectEnv(withAutoBuildPath(project));
 	return Object.fromEntries(
 		Object.entries(vars).filter(([key]) => key.startsWith("CICD_")),
 	);
@@ -133,17 +133,26 @@ export function applyEnvUpdate(
 	return result.startsWith("\n") ? result.slice(1) : result;
 }
 
-function writeCicdConfig(
+/** The project with its `.workpilot` directory, initialized or not yet. */
+function withAutoBuildPath(project: Project): Project {
+	return { ...project, autoBuildPath: project.autoBuildPath || ".workpilot" };
+}
+
+async function writeCicdConfig(
 	project: Project,
 	update: Record<string, string>,
-): void {
-	const envPath = getProjectEnvPath(project.path, project.autoBuildPath);
-	const current = readProjectEnvContent(envPath) ?? "";
-	writeProjectEnv(
-		project.path,
-		project.autoBuildPath,
-		applyEnvUpdate(current, update),
-	);
+): Promise<void> {
+	const located = withAutoBuildPath(project);
+	const envPath = getProjectEnvPath(located) as string;
+	let current = "";
+	try {
+		// As stored: `enc:` values stay as they are, encoding is idempotent.
+		current = fs.readFileSync(envPath, "utf-8");
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+	}
+	writeProjectEnvFile(envPath, applyEnvUpdate(current, update));
+	await ensureProjectEnvIgnored(project.path, located.autoBuildPath as string);
 }
 
 async function runRunner(
@@ -250,14 +259,14 @@ export function registerCICDTriggersHandlers(): void {
 
 	ipcMain.handle(
 		"cicdTriggers:setConfig",
-		(_event, projectDir: unknown, config: unknown) => {
+		async (_event, projectDir: unknown, config: unknown) => {
 			const project = findKnownProject(projectDir);
 			if (!project) return UNKNOWN_PROJECT;
 			const parsed = toCicdEnvUpdate(config);
 			if (!parsed.ok) return { success: false, error: parsed.error };
 			try {
 				// Encrypted in .workpilot/.env (0600 + banner without a keyring).
-				writeCicdConfig(project, parsed.update);
+				await writeCicdConfig(project, parsed.update);
 				return { success: true };
 			} catch (err) {
 				return { success: false, error: String(err) };

@@ -453,6 +453,9 @@
 			"qaCoverageRejected": "QA pass #{{n}} rejected by the coverage gate; applying a fix, then re-reviewing (pass #{{next}}).",
 			"qaArchRejected": "QA pass #{{n}} rejected: {{count}} architecture violation(s); applying a fix, then re-reviewing (pass #{{next}}).",
 			"qaRejected": "QA pass #{{n}} rejected: {{count}} issue(s) found; applying a fix, then re-reviewing (pass #{{next}}).",
+			"qaCoverageRejectedHandover": "QA pass #{{n}} rejected by the coverage gate; handing over to human review.",
+			"qaArchRejectedHandover": "QA pass #{{n}} rejected: {{count}} architecture violation(s); handing over to human review.",
+			"qaRejectedHandover": "QA pass #{{n}} rejected: {{count}} issue(s) found; handing over to human review.",
 			"qaApproved": "QA pass #{{n}} approved: all criteria met, architecture clean. Validation complete.",
 			"qaManualVerification": "QA pass #{{n}}: code validated by review; manual verification required. Validation complete.",
 			"qaManualVerificationSandbox": "QA pass #{{n}}: code validated by review; manual verification required (environment limitation: tests can't run here). Validation complete.",
@@ -1882,7 +1885,8 @@
 			"tooltip": "{{used}} / {{window}} tokens · {{source}}",
 			"thresholdTooltip": "Threshold {{value}}% · mode {{mode}}",
 			"phase": "Phase: {{phase}}",
-			"open": "Context memory settings"
+			"open": "Context memory settings",
+			"notMeasured": "Not measured yet: the gauge fills as soon as the first agent session starts."
 		},
 		"handoff": {
 			"preparing": "Handoff…",

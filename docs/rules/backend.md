@@ -91,7 +91,7 @@ coder, la QA et la spec. Voir [`architecture/pause-resume.md`](../architecture/p
 
 - Ils vivent dans `tests/<paquet>/`, avec **une seule** configuration : le `pytest.ini` de la
   racine, lancé depuis la racine (CI comprise) : `pytest tests/ -v`.
-- Aucun appel LLM réel : fixtures et doubles. `conftest.py` (racine) isole les variables
+- Aucun appel LLM réel : fixtures et doubles. `tests/conftest.py` isole les variables
   d'environnement du shell de l'appelant.
 - Marqueurs : `unit`, `integration`, `e2e`, `streaming`, `performance`.
 - Un correctif de bug arrive avec son test de régression ; un refus de sécurité, avec le test qui
