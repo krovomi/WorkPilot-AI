@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import i18n from "../../shared/i18n";
-import type { SecureStorageStatus } from "../../shared/types/secure-storage";
+import type { SecureStorageStatus } from "../../shared/types/ipc";
 import {
 	setupSecureStorageListeners,
 	useSecureStorageStore,

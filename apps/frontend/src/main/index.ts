@@ -1161,7 +1161,7 @@ async function main() {
 
 	// Secrets at rest: earlier versions wrote API keys in clear. Encrypt them
 	// now that safeStorage is ready, before anything else reads or rewrites
-	// them (shared_docs/architecture/secrets-at-rest.md).
+	// them (docs/architecture/secrets-at-rest.md).
 	await migrateSecretsAtRest();
 
 	// Load and validate settings for agent manager configuration

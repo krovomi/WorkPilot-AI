@@ -14,8 +14,8 @@
  * `ipc-utils` (`invokeIpc` / `createIpcListener`); reaching back through the
  * bridge it is itself building is always the bug.
  *
- * `ElectronAPI` carries an `[x: string]: any` index signature, so the compiler
- * had nothing to say about any of it — hence a test.
+ * `ElectronAPI` carried an `[x: string]: any` index signature at the time, so
+ * the compiler had nothing to say about any of it — hence a test.
  */
 
 import { readdirSync, readFileSync } from "node:fs";

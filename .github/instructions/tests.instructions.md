@@ -14,9 +14,9 @@ description: 'Conventions tests WorkPilot AI : vitest (front), pytest (back), Pl
 
 ## Backend (pytest)
 
-- Fichiers : `tests/test_<module>.py` ou colocalisés.
+- Fichiers : `tests/<paquet>/test_<module>.py` ; un seul `pytest.ini`, lancé depuis la racine.
 - `conftest.py` racine pour fixtures partagées.
-- Marqueurs : `@pytest.mark.slow`, `@pytest.mark.integration` (cf. `pytest.ini`).
+- Marqueurs : `unit`, `integration`, `e2e`, `streaming`, `performance` (cf. `pytest.ini`).
 - Pas d'appel LLM réel — utiliser les fixtures de mock.
 
 ## E2E (Playwright)
@@ -31,3 +31,5 @@ description: 'Conventions tests WorkPilot AI : vitest (front), pytest (back), Pl
 2. Pas de `setTimeout` arbitraire — utiliser `waitFor` / `findBy`.
 3. Cleanup explicite (`afterEach`).
 4. Snapshot tests uniquement pour des structures stables (i18n, types).
+5. Jamais de vrai secret dans un test : valeur factice évidente.
+6. Un correctif de sécurité arrive avec un test qui prouve le refus (entrée hostile → rejet).

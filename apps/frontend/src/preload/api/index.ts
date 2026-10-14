@@ -30,6 +30,10 @@ import {
 	createBountyBoardAPI,
 } from "./modules/bounty-board-api";
 import { type TechDebtAPI, createTechDebtAPI } from "./modules/tech-debt-api";
+import {
+	type TimeTravelAPI,
+	createTimeTravelAPI,
+} from "./modules/time-travel-api";
 import { type TeamBotAPI, createTeamBotAPI } from "./modules/team-bot-api";
 import {
 	type ApiExplorerAPI,
@@ -290,6 +294,7 @@ export interface ElectronAPI
 		BountyBoardAPI,
 		TechDebtAPI,
 		TeamBotAPI,
+		TimeTravelAPI,
 		EnvSnapshotAPI,
 		OfflineModeAPI,
 		VisualProgrammingAPI,
@@ -433,6 +438,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createBountyBoardAPI(),
 		...createTechDebtAPI(),
 		...createTeamBotAPI(),
+		...createTimeTravelAPI(),
 		...createEnvSnapshotAPI(),
 		...createOfflineModeAPI(),
 		...createVisualProgrammingAPI(),
@@ -563,6 +569,8 @@ export type { SmartEstimationAPI } from "./modules/smart-estimation-api";
 export { createSmartEstimationAPI } from "./modules/smart-estimation-api";
 export type { TestGenerationAPI } from "./modules/test-generation-api";
 export { createTestGenerationAPI } from "./modules/test-generation-api";
+export type { TimeTravelAPI } from "./modules/time-travel-api";
+export { createTimeTravelAPI } from "./modules/time-travel-api";
 export type { DesignToCodeAPI } from "./modules/design-to-code-api";
 export { createDesignToCodeAPI } from "./modules/design-to-code-api";
 export type { VisualProgrammingAPI } from "./modules/visual-programming-api";

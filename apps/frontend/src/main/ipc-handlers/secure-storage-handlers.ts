@@ -1,7 +1,6 @@
 import { BrowserWindow, ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
-import type { IPCResult } from "../../shared/types";
-import type { SecureStorageStatus } from "../../shared/types/secure-storage";
+import type { IPCResult, SecureStorageStatus } from "../../shared/types";
 import {
 	getSecureStorageStatus,
 	onSecureStorageStatusChange,
@@ -11,7 +10,7 @@ let unsubscribe: (() => void) | undefined;
 
 /**
  * Whether stored secrets are protected by the OS keyring. The renderer warns
- * when they are not (shared_docs/architecture/secrets-at-rest.md).
+ * when they are not (docs/architecture/secrets-at-rest.md).
  */
 export function registerSecureStorageHandlers(): void {
 	ipcMain.handle(
