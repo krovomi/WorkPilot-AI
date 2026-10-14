@@ -9,6 +9,7 @@ The validation logic is organized into separate modules:
 - validation_models.py: Type definitions and common types
 - process_validators.py: Process management (pkill, kill, killall)
 - filesystem_validators.py: File system operations (chmod, rm, init.sh)
+- config_write_validators.py: Writes to the project's security configuration
 - git_validators.py: Git operations (commit with secret scanning)
 - database_validators.py: Database operations (postgres, mysql, redis, mongo)
 - validator_registry.py: Central registry of all validators
@@ -19,6 +20,7 @@ are re-exported from this module.
 
 # Re-export validation models
 # Re-export all validators for backwards compatibility
+from .config_write_validators import validate_security_config_writes
 from .database_validators import (
     validate_dropdb_command,
     validate_dropuser_command,
@@ -56,7 +58,7 @@ from .shell_validators import (
     validate_zsh_command,
 )
 from .validation_models import ValidationResult, ValidatorFunction
-from .validator_registry import VALIDATORS, get_validator
+from .validator_registry import LINE_VALIDATORS, VALIDATORS, get_validator
 
 # Define __all__ for explicit exports
 __all__ = [
@@ -64,6 +66,7 @@ __all__ = [
     "ValidationResult",
     "ValidatorFunction",
     # Registry
+    "LINE_VALIDATORS",
     "VALIDATORS",
     "get_validator",
     # Process validators
@@ -74,6 +77,7 @@ __all__ = [
     "validate_chmod_command",
     "validate_rm_command",
     "validate_init_script",
+    "validate_security_config_writes",
     # Git validators
     "validate_git_commit",
     "validate_git_command",
