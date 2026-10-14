@@ -13,6 +13,7 @@ Note: This test module mocks all dependencies to avoid importing
 the Claude SDK which is not available in the test environment.
 """
 
+import importlib
 import json
 import sys
 import tempfile
@@ -66,8 +67,8 @@ _mocked_module_names = [
 # Import them for real *before* `core` is replaced below; once it is, Python
 # cannot resolve a submodule of it ("'core' is not a package"). Without this
 # the file only collected when an earlier test file had imported them.
-import core.build_signals
-import core.pause_state
+importlib.import_module("core.build_signals")
+importlib.import_module("core.pause_state")
 
 for name in _mocked_module_names:
     if name in sys.modules:
