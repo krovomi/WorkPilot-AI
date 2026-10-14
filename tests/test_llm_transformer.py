@@ -62,15 +62,49 @@ const count = ref(0);
     )
 
 
+ENHANCED_VUE = """<template>
+  <div class="counter">
+    <p>Count: {{ count }}</p>
+    <button @click="count++">Increment</button>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref } from 'vue';
+
+const count = ref<number>(0);
+</script>"""
+
+
+def answering(transformer: LLMTransformer, *answers: str) -> list[str]:
+    """Replace the model with canned answers; return the prompts it received.
+
+    `_query` is the transformer's one call into `core.client`. These tests used
+    to be skipped unless `ANTHROPIC_API_KEY` was set, and then sent real
+    requests: the key gated nothing, since the module stopped reading it when
+    it moved to `create_agent_client` (#62). They exercise what this module
+    does with an answer, so the answer is canned.
+    """
+    prompts: list[str] = []
+
+    async def fake_query(prompt: str) -> str:
+        prompts.append(prompt)
+        return answers[min(len(prompts), len(answers)) - 1]
+
+    transformer._query = fake_query
+    return prompts
+
+
 class TestLLMTransformer:
     """Test LLM Transformer functionality."""
 
     def test_initialization(self, temp_project):
-        """Test LLM transformer initialization."""
+        """The key is not read from the environment (#62): `core.client`
+        resolves credentials, so the default is None."""
         transformer = LLMTransformer(temp_project)
 
         assert transformer.project_dir == Path(temp_project)
-        assert transformer.api_key == os.getenv("ANTHROPIC_API_KEY")
+        assert transformer.api_key is None
 
     def test_initialization_with_api_key(self, temp_project):
         """The key is retained, and no provider client is built from it.
@@ -119,10 +153,11 @@ class TestLLMTransformer:
         assert "react" in prompt.lower()
 
     @pytest.mark.asyncio
-    @pytest.mark.skipif(not os.getenv("ANTHROPIC_API_KEY"), reason="No API key")
     async def test_enhance_transformation(self, temp_project, sample_transformation):
         """Test LLM enhancement of transformation."""
         transformer = LLMTransformer(temp_project)
+        prompts = answering(transformer, ENHANCED_VUE)
+        original_after = sample_transformation.after
 
         enhanced = await transformer.enhance_transformation(
             sample_transformation,
@@ -140,13 +175,15 @@ class TestLLMTransformer:
 
         # Should have enhanced code
         assert len(enhanced.after) > 0
-        assert enhanced.after != sample_transformation.after  # Should be different
+        assert enhanced.after != original_after  # Should be different
+        assert enhanced.after == ENHANCED_VUE
+        assert len(prompts) == 1 and "useState" in prompts[0]
 
     @pytest.mark.asyncio
-    @pytest.mark.skipif(not os.getenv("ANTHROPIC_API_KEY"), reason="No API key")
     async def test_enhance_transformations_batch(self, temp_project):
         """Test batch enhancement of multiple transformations."""
         transformer = LLMTransformer(temp_project)
+        prompts = answering(transformer, ENHANCED_VUE)
 
         # Create multiple transformations
         transformations = [
@@ -175,31 +212,44 @@ class TestLLMTransformer:
 
         # All should be marked as enhanced
         assert all(hasattr(e, "llm_enhanced") and e.llm_enhanced for e in enhanced)
+        assert len(prompts) == 3
 
     @pytest.mark.asyncio
-    @pytest.mark.skipif(not os.getenv("ANTHROPIC_API_KEY"), reason="No API key")
     async def test_validate_transformation(self, temp_project, sample_transformation):
         """Test LLM validation of transformation."""
         transformer = LLMTransformer(temp_project)
+        answering(
+            transformer,
+            'Here is my review:\n{"valid": true, "confidence": 0.9, '
+            '"issues": [], "suggestions": ["add types"]}',
+        )
 
         is_valid = await transformer.validate_transformation(sample_transformation)
 
         # Should return boolean
         assert isinstance(is_valid, bool)
+        assert is_valid is True
+        assert sample_transformation.validation_passed is True
+        assert sample_transformation.confidence == 0.9
 
         # Should update validation status
         assert hasattr(sample_transformation, "validation_passed")
 
     @pytest.mark.asyncio
-    @pytest.mark.skipif(not os.getenv("ANTHROPIC_API_KEY"), reason="No API key")
     async def test_suggest_manual_changes(self, temp_project, sample_transformation):
         """Test LLM suggestions for manual review."""
         transformer = LLMTransformer(temp_project)
+        answering(
+            transformer,
+            '[{"line_number": 4, "description": "useState becomes ref", '
+            '"severity": "medium"}]',
+        )
 
         suggestions = await transformer.suggest_manual_changes(sample_transformation)
 
         # Should return list
         assert isinstance(suggestions, list)
+        assert len(suggestions) == 1
 
         # If suggestions exist, should have proper structure
         if suggestions:
@@ -235,8 +285,19 @@ class TestLLMTransformer:
 
     @pytest.mark.asyncio
     async def test_error_handling(self, temp_project):
-        """Test error handling in LLM enhancement."""
+        """A provider failure is recorded on the result, not raised.
+
+        The failure is injected at `_query`, the module's one call into
+        `core.client`. This test used to go through the real client and
+        relied on authentication failing: on a machine with a Claude login it
+        started the bundled CLI and sent the prompt.
+        """
         transformer = LLMTransformer(temp_project, api_key="invalid-key")
+
+        async def provider_fails(_prompt):
+            raise RuntimeError("provider request failed")
+
+        transformer._query = provider_fails
 
         bad_result = TransformationResult(
             file_path="test.jsx",
@@ -274,7 +335,6 @@ class TestLLMTransformerIntegration:
     """Integration tests for LLM transformer."""
 
     @pytest.mark.asyncio
-    @pytest.mark.skipif(not os.getenv("ANTHROPIC_API_KEY"), reason="No API key")
     async def test_full_enhancement_workflow(self, temp_project):
         """Test complete enhancement workflow."""
         from apps.backend.migration.transformer import TransformationEngine
@@ -311,6 +371,7 @@ export default function Component() {
 
         # Enhance with LLM
         llm_transformer = LLMTransformer(temp_project)
+        answering(llm_transformer, ENHANCED_VUE)
         enhanced = await llm_transformer.enhance_transformations_batch(
             results,
             "react",
