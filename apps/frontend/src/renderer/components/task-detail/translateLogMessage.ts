@@ -17,6 +17,9 @@ import type { TFunction } from "i18next";
 const QA_COVERAGE = /^QA pass #(\d+) rejected by the coverage gate/;
 const QA_ARCH = /^QA pass #(\d+) rejected: (\d+) architecture violation/;
 const QA_ISSUES = /^QA pass #(\d+) rejected: (\d+) issue/;
+// A rejection with no fix after it: the recurring-issue escalation, or the
+// last pass of the budget. Picks the `*Handover` variant of the three above.
+const QA_HANDOVER = /; handing over to human review\.$/;
 const QA_APPROVED = /^QA pass #(\d+) approved:/;
 const QA_MANUAL =
 	/^QA pass #(\d+): code validated by review; manual verification required( \(environment limitation[^)]*\))?/;
@@ -50,10 +53,11 @@ export function translateLogMessage(
 	// Each branch returns, so a later `match` only runs when every earlier one
 	// missed — the short-circuiting of the previous shared `let m` is kept
 	// without assigning inside a condition.
+	const handover = QA_HANDOVER.test(s) ? "Handover" : "";
 	const qaCoverage = s.match(QA_COVERAGE);
 	if (qaCoverage) {
 		const n = Number(qaCoverage[1]);
-		return t("tasks:execution.logMessages.qaCoverageRejected", {
+		return t(`tasks:execution.logMessages.qaCoverageRejected${handover}`, {
 			n,
 			next: n + 1,
 		});
@@ -61,7 +65,7 @@ export function translateLogMessage(
 	const qaArch = s.match(QA_ARCH);
 	if (qaArch) {
 		const n = Number(qaArch[1]);
-		return t("tasks:execution.logMessages.qaArchRejected", {
+		return t(`tasks:execution.logMessages.qaArchRejected${handover}`, {
 			n,
 			count: Number(qaArch[2]),
 			next: n + 1,
@@ -70,7 +74,7 @@ export function translateLogMessage(
 	const qaIssues = s.match(QA_ISSUES);
 	if (qaIssues) {
 		const n = Number(qaIssues[1]);
-		return t("tasks:execution.logMessages.qaRejected", {
+		return t(`tasks:execution.logMessages.qaRejected${handover}`, {
 			n,
 			count: Number(qaIssues[2]),
 			next: n + 1,
