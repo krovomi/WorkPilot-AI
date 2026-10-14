@@ -117,7 +117,7 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 |----------|-------------|
 | **GitHub** | Import issues, AI investigation, PR review, batch review wizard, auto-PR creation |
 | **GitLab** | Issues and merge request management with AI severity categorization |
-| **Azure DevOps** | Work item import, PR review, batch operations — _experimental: backend still returns mock data for several endpoints, see [docs/CONFIGURATION.md](docs/CONFIGURATION.md)_ |
+| **Azure DevOps** | Work item import, PR review, batch operations — _experimental: the PR details view (file list, diff stats) falls back to placeholder data when the Azure DevOps call fails, see [docs/CONFIGURATION.md](docs/CONFIGURATION.md#mock--stub-behaviors-to-be-aware-of)_ |
 | **Linear** | Bulk issue import with team/project filtering |
 | **Jira** | Issue management integration |
 | **MCP Marketplace** | Browse, install, and configure Model Context Protocol servers |
@@ -399,13 +399,13 @@ apps/frontend/src/
 #### Option 1 : Application Bureau (Recommandé)
 
 1. **Téléchargement**
-   - Visitez [GitHub Releases](https://github.com/krovomi/WorkPilot-AI/releases)
-   - Téléchargez la version stable pour votre plateforme
+   - Prenez le fichier de votre plateforme dans le tableau [Download](#download) en haut de
+     cette page (tenu à jour à chaque release), ou sur [GitHub Releases](https://github.com/krovomi/WorkPilot-AI/releases)
 
 2. **Installation**
-   - **Windows** : Exécutez `WorkPilot-AI-1.0.0-win32-x64.exe`
-   - **macOS** : Ouvrez `WorkPilot-AI-1.0.0-darwin-arm64.dmg`
-   - **Linux** : Lancez `WorkPilot-AI-1.0.0-linux-x86_64.AppImage`
+   - **Windows** : exécutez `WorkPilot-AI-<version>-win32-x64.exe`
+   - **macOS** : ouvrez `WorkPilot-AI-<version>-darwin-arm64.dmg` (Apple Silicon) ou `-darwin-x64.dmg` (Intel)
+   - **Linux** : lancez `WorkPilot-AI-<version>-linux-x86_64.AppImage` (ou le `.deb` / `.flatpak`)
 
 3. **Premier Lancement**
    - Lancez l'application
