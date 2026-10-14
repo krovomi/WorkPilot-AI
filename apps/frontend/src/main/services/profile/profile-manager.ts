@@ -4,6 +4,8 @@
  * Handles loading and saving profiles.json from the auto-claude directory.
  * Provides graceful handling for missing or corrupted files.
  * Uses file locking to prevent race conditions in concurrent operations.
+ * Each profile's apiKey is encrypted on disk and decrypted on load, so callers
+ * only ever see plaintext (see ../../secret-storage).
  */
 
 import { promises as fs } from "node:fs";
@@ -12,6 +14,38 @@ import type { APIProfile, ProfilesFile } from "@shared/types/profile";
 import { app } from "electron";
 // @ts-expect-error - no types available for proper-lockfile
 import * as lockfile from "proper-lockfile";
+import {
+	decryptSecretFields,
+	encryptSecretFields,
+	hasPlaintextSecretFields,
+} from "../../secret-storage";
+
+const isProfileSecret = (key: string): boolean => key === "apiKey";
+
+/** profiles.json as written: each profile's apiKey encrypted. */
+export function encodeProfilesForDisk(data: ProfilesFile): ProfilesFile {
+	if (!Array.isArray(data.profiles)) return data;
+	return {
+		...data,
+		profiles: data.profiles.map((profile) =>
+			encryptSecretFields(profile, isProfileSecret),
+		),
+	};
+}
+
+/**
+ * profiles.json as read: each apiKey decrypted. A key that cannot be decrypted
+ * right now is kept as stored, so saving the file back does not erase it.
+ */
+export function decodeProfilesFromDisk(data: ProfilesFile): ProfilesFile {
+	if (!Array.isArray(data.profiles)) return data;
+	return {
+		...data,
+		profiles: data.profiles.map((profile) =>
+			decryptSecretFields(profile, isProfileSecret),
+		),
+	};
+}
 
 /**
  * Get the path to profiles.json in the auto-claude directory
@@ -97,7 +131,7 @@ export async function loadProfilesFile(): Promise<ProfilesFile> {
 		// Validate parsed data structure
 		const isValid = isValidProfilesFile(data);
 		if (isValid) {
-			return data;
+			return decodeProfilesFromDisk(data);
 		}
 
 		// Validation failed - return default
@@ -122,8 +156,8 @@ export async function saveProfilesFile(data: ProfilesFile): Promise<void> {
 	await fs.mkdir(dir, { recursive: true });
 
 	// Write file with formatted JSON
-	const content = JSON.stringify(data, null, 2);
-	await fs.writeFile(filePath, content, "utf-8");
+	const content = JSON.stringify(encodeProfilesForDisk(data), null, 2);
+	await fs.writeFile(filePath, content, { encoding: "utf-8", mode: 0o600 });
 
 	// Set secure file permissions (user read/write only - 0600)
 	const permissionsValid = await validateFilePermissions(filePath);
@@ -193,6 +227,7 @@ export async function withProfilesLock<T>(fn: () => Promise<T>): Promise<T> {
 			await fs.writeFile(filePath, JSON.stringify(defaultData, null, 2), {
 				encoding: "utf-8",
 				flag: "wx",
+				mode: 0o600,
 			});
 		} catch (err: unknown) {
 			// If file was created by another process (race condition), that's fine
@@ -272,8 +307,12 @@ export async function atomicModifyProfiles(
 
 		try {
 			// Write to temp file
-			const content = JSON.stringify(modifiedFile, null, 2);
-			await fs.writeFile(tempPath, content, "utf-8");
+			const content = JSON.stringify(
+				encodeProfilesForDisk(modifiedFile),
+				null,
+				2,
+			);
+			await fs.writeFile(tempPath, content, { encoding: "utf-8", mode: 0o600 });
 
 			// Set permissions on temp file
 			await fs.chmod(tempPath, 0o600);
@@ -292,4 +331,35 @@ export async function atomicModifyProfiles(
 			throw error;
 		}
 	});
+}
+
+/**
+ * Encrypt the API keys an earlier version wrote in clear, and restrict the file
+ * to its owner. Run once the app is ready: safeStorage needs it on Linux and
+ * Windows. Without OS encryption the keys stay in clear and the UI warns.
+ * Returns true when the file was rewritten.
+ */
+export async function migrateProfilesSecrets(): Promise<boolean> {
+	const filePath = getProfilesFilePath();
+	let raw: unknown;
+	try {
+		raw = JSON.parse(await fs.readFile(filePath, "utf-8"));
+	} catch {
+		// No file yet, or one loadProfilesFile already treats as empty.
+		return false;
+	}
+	if (!isValidProfilesFile(raw)) return false;
+
+	await validateFilePermissions(filePath);
+	if (
+		!raw.profiles.some((profile) =>
+			hasPlaintextSecretFields(profile, isProfileSecret),
+		)
+	) {
+		return false;
+	}
+
+	// Load (decrypt) and save (encrypt) under the profiles lock.
+	await atomicModifyProfiles((file) => file);
+	return true;
 }

@@ -40,6 +40,7 @@ import { setupPromptOptimizerListeners } from "./prompt-optimizer-store";
 import { setupRegressionGuardianListeners } from "./regression-guardian-store";
 import { setupReleaseCoordinatorListeners } from "./release-coordinator-store";
 import { setupSandboxListeners } from "./sandbox-store";
+import { setupSecureStorageListeners } from "./secure-storage-store";
 import { setupSmartEstimationListeners } from "./smart-estimation-store";
 import { setupSpecRefinementListeners } from "./spec-refinement-store";
 import { setupVisualToCodeListeners } from "./visual-to-code-store";
@@ -103,6 +104,9 @@ const SETUPS: ReadonlyArray<readonly [string, ListenerSetup]> = [
 	["RegressionGuardian", setupRegressionGuardianListeners],
 	["ReleaseCoordinator", setupReleaseCoordinatorListeners],
 	["Sandbox", setupSandboxListeners],
+	// Not a page's feature: the sidebar's warning that stored API keys are
+	// not protected by the OS keyring.
+	["SecureStorage", setupSecureStorageListeners],
 	["SmartEstimation", setupSmartEstimationListeners],
 	["SpecRefinement", setupSpecRefinementListeners],
 	["VisualToCode", setupVisualToCodeListeners],

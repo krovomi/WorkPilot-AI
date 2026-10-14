@@ -1,10 +1,11 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { app } from "electron";
 import { MODEL_ID_MAP } from "../shared/constants";
 import type { AppSettings } from "../shared/types";
+import { readSettingsFile } from "./settings-utils";
 
 const SENTINEL = "__ARCH_VIZ_RESULT__:";
 
@@ -324,11 +325,9 @@ export class ArchitectureVisualizerService extends EventEmitter {
 			...(process.env as Record<string, string>),
 		};
 		try {
-			const settingsPath = path.join(app.getPath("userData"), "settings.json");
-			if (existsSync(settingsPath)) {
-				const settings: AppSettings = JSON.parse(
-					readFileSync(settingsPath, "utf-8"),
-				);
+			// Through settings-utils: it decrypts the stored keys.
+			const settings = readSettingsFile() as Partial<AppSettings> | undefined;
+			if (settings) {
 				if (settings.globalClaudeOAuthToken)
 					env.CLAUDE_OAUTH_TOKEN = settings.globalClaudeOAuthToken;
 				if (settings.globalAnthropicApiKey)

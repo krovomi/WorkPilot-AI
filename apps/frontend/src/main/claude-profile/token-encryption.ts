@@ -1,50 +1,35 @@
 /**
  * Token Encryption Module
- * Handles OAuth token encryption/decryption using OS keychain
+ * Handles OAuth token encryption/decryption using OS keychain.
+ * The policy (prefix, fallback, user warning) lives in ../secret-storage.
  */
 
-import { safeStorage } from "electron";
+import {
+	decryptSecret,
+	encryptSecret,
+	isEncryptedSecret,
+} from "../secret-storage";
 
 /**
  * Encrypt a token using the OS keychain (safeStorage API).
- * Returns base64-encoded encrypted data, or the raw token if encryption unavailable.
+ * Returns `enc:`-prefixed ciphertext. Without OS encryption the raw token is
+ * returned and the UI warns the user — never a silent plaintext fallback.
  */
 export function encryptToken(token: string): string {
-	try {
-		if (safeStorage.isEncryptionAvailable()) {
-			const encrypted = safeStorage.encryptString(token);
-			// Prefix with 'enc:' to identify encrypted tokens
-			return `enc:${encrypted.toString("base64")}`;
-		}
-	} catch (error) {
-		console.warn(
-			"[TokenEncryption] Encryption not available, storing token as-is:",
-			error,
-		);
-	}
-	return token;
+	return encryptSecret(token);
 }
 
 /**
  * Decrypt a token. Handles both encrypted (enc:...) and legacy plain tokens.
+ * Returns an empty string when the token cannot be decrypted.
  */
 export function decryptToken(storedToken: string): string {
-	try {
-		if (storedToken.startsWith("enc:") && safeStorage.isEncryptionAvailable()) {
-			const encryptedData = Buffer.from(storedToken.slice(4), "base64");
-			return safeStorage.decryptString(encryptedData);
-		}
-	} catch (error) {
-		console.error("[TokenEncryption] Failed to decrypt token:", error);
-		return ""; // Return empty string on decryption failure
-	}
-	// Return as-is for legacy unencrypted tokens
-	return storedToken;
+	return decryptSecret(storedToken) ?? "";
 }
 
 /**
  * Check if a token is encrypted
  */
 export function isTokenEncrypted(storedToken: string): boolean {
-	return storedToken.startsWith("enc:");
+	return isEncryptedSecret(storedToken);
 }
