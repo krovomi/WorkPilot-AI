@@ -418,7 +418,7 @@ export function UsageIndicator() {
 			const checkOAuthStatus = async () => {
 				try {
 					const profilesResult =
-						await globalThis.electronAPI.invoke("claude:profilesGet");
+						await globalThis.electronAPI.getClaudeProfiles();
 
 					if (profilesResult.success && profilesResult.data?.profiles) {
 						const oauthProfile = profilesResult.data.profiles.find(

@@ -3,6 +3,13 @@
  */
 
 import type { ElectronAPI as ComposedElectronAPI } from "../../preload/api";
+import type {
+	Checkpoint,
+	DecisionHeatmap,
+	DecisionScore,
+	ForkContext,
+	ForkSession,
+} from "./time-travel";
 
 // ============================================
 // Branch Types
@@ -58,6 +65,48 @@ export interface TabState {
  * bundle du renderer.
  */
 export interface ElectronAPI extends ComposedElectronAPI {}
+
+// ============================================
+// Agent Time Travel
+// ============================================
+
+/**
+ * What a `timeTravel:*` handler returns: the backend's JSON, or
+ * `{ success: false, error }` when the call failed. The payload field is the
+ * one `time-travel-store` reads once `success` is true.
+ */
+export interface TimeTravelResult {
+	success: boolean;
+	error?: string;
+}
+
+export interface TimeTravelCheckpointsResult extends TimeTravelResult {
+	checkpoints: Checkpoint[];
+}
+
+export interface TimeTravelCheckpointResult extends TimeTravelResult {
+	checkpoint: Checkpoint;
+}
+
+export interface TimeTravelForkResult extends TimeTravelResult {
+	fork: ForkSession;
+}
+
+export interface TimeTravelForksResult extends TimeTravelResult {
+	forks: ForkSession[];
+}
+
+export interface TimeTravelForkContextResult extends TimeTravelResult {
+	context: ForkContext;
+}
+
+export interface TimeTravelDecisionScoresResult extends TimeTravelResult {
+	scores: DecisionScore[];
+}
+
+export interface TimeTravelDecisionHeatmapResult extends TimeTravelResult {
+	heatmap: DecisionHeatmap;
+}
 
 /** Platform information exposed via contextBridge for platform-specific behavior */
 export interface PlatformInfo {
