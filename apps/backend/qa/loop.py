@@ -689,6 +689,12 @@ async def run_qa_validation_loop(
             emit_phase(ExecutionPhase.FAILED, "QA halted: local model can't call tools")
             return False
 
+        # A gate that overturns the reviewer's approval leaves its issues and
+        # its verdict here; the rejection handler below logs, records and fixes
+        # them like any other rejection.
+        gate_issues: list[dict] | None = None
+        gate_verdict = ""
+
         if status == "approved":
             # Reset error tracking on success
             consecutive_errors = 0
@@ -745,28 +751,13 @@ async def run_qa_validation_loop(
                         f"\n🏗️  Architecture enforcement found {len(arch_violations)} violation(s)"
                     )
 
-                    emit_phase(
-                        ExecutionPhase.QA_FIXING,
-                        "Fixing architecture violations",
-                    )
-                    task_event_emitter.emit(
-                        "QA_FAILED",
-                        {
-                            "iteration": qa_iteration,
-                            "issueCount": len(arch_violations),
-                            "issues": [
-                                v.get("description", "") for v in arch_violations[:5]
-                            ],
-                        },
-                    )
-
                     # Write architecture fix request for the fixer agent
                     write_architecture_fix_request(spec_dir, arch_report)
 
-                    # Override status to rejected so the fixer loop handles it
+                    # Override status to rejected: the rejection handler below
+                    # logs, records and runs the fixer on these issues.
                     status = "rejected"
-                    # Record this as a rejection due to architecture
-                    arch_issues = [
+                    gate_issues = [
                         {
                             "title": f"Architecture: {v.get('type', 'violation')}",
                             "description": v.get("description", ""),
@@ -774,24 +765,10 @@ async def run_qa_validation_loop(
                         }
                         for v in arch_violations
                     ]
-                    record_iteration(
-                        spec_dir,
-                        qa_iteration,
-                        "rejected",
-                        arch_issues,
-                        iteration_duration,
+                    gate_verdict = (
+                        f"QA pass #{qa_iteration} rejected: "
+                        f"{len(arch_violations)} architecture violation(s)"
                     )
-                    if task_logger:
-                        task_logger.log_error(
-                            f"QA pass #{qa_iteration} rejected: "
-                            f"{len(arch_violations)} architecture violation(s); "
-                            f"applying a fix, then re-reviewing "
-                            f"(pass #{qa_iteration + 1}).",
-                            LogPhase.VALIDATION,
-                        )
-
-                    # Fall through to the rejected handler below
-                    # (which will run the fixer)
 
             except ImportError:
                 # architecture package not available — skip gracefully
@@ -848,23 +825,6 @@ async def run_qa_validation_loop(
                             f"below {coverage_report['min_coverage']}% threshold"
                         )
 
-                        emit_phase(
-                            ExecutionPhase.QA_FIXING,
-                            "Fixing insufficient test coverage",
-                        )
-
-                        coverage_issues = build_coverage_issues(coverage_report)
-                        task_event_emitter.emit(
-                            "QA_FAILED",
-                            {
-                                "iteration": qa_iteration,
-                                "issueCount": len(coverage_issues),
-                                "issues": [
-                                    i["description"] for i in coverage_issues[:5]
-                                ],
-                            },
-                        )
-
                         # Write a coverage-specific fix request for the fixer agent
                         write_coverage_fix_request(spec_dir, coverage_report)
 
@@ -873,25 +833,13 @@ async def run_qa_validation_loop(
                         # "approved" qa_signoff written by the reviewer.
                         mark_signoff_rejected(spec_dir, coverage_report)
 
-                        # Override status so the fixer loop handles it
+                        # Override status to rejected: the rejection handler
+                        # below logs, records and runs the fixer on these issues.
                         status = "rejected"
-                        record_iteration(
-                            spec_dir,
-                            qa_iteration,
-                            "rejected",
-                            coverage_issues,
-                            iteration_duration,
+                        gate_issues = build_coverage_issues(coverage_report)
+                        gate_verdict = (
+                            f"QA pass #{qa_iteration} rejected by the coverage gate"
                         )
-                        # Trace explicite du verdict de CETTE passe, pour que
-                        # l'utilisateur comprenne pourquoi une nouvelle passe suit.
-                        if task_logger:
-                            task_logger.log_error(
-                                f"QA pass #{qa_iteration} rejected by the coverage "
-                                f"gate; applying a fix, then re-reviewing "
-                                f"(pass #{qa_iteration + 1}).",
-                                LogPhase.VALIDATION,
-                            )
-                        # Fall through to the rejected handler below
 
                 except ImportError:
                     debug_warning(
@@ -1005,7 +953,11 @@ async def run_qa_validation_loop(
 
             return True
 
-        elif status == "rejected":
+        # Not an `elif`: a gate above can turn the reviewer's approval into a
+        # rejection, and an `elif` chained to `if status == "approved"` never
+        # ran for it — the fixer was skipped and the next pass re-reviewed the
+        # same code, until the budget ran out.
+        if status == "rejected":
             # Reset error tracking on valid response (rejected is a valid response)
             consecutive_errors = 0
             last_error_context = None
@@ -1018,29 +970,32 @@ async def run_qa_validation_loop(
             )
             print(f"\n❌ QA found issues. Iteration {qa_iteration}/{max_iterations}")
 
-            # Get issues from QA report
-            qa_status = get_qa_signoff_status(spec_dir)
-            current_issues = qa_status.get("issues_found", []) if qa_status else []
+            if gate_issues is not None:
+                current_issues = gate_issues
+                verdict = gate_verdict
+            else:
+                # Get issues from QA report
+                qa_status = get_qa_signoff_status(spec_dir)
+                current_issues = qa_status.get("issues_found", []) if qa_status else []
+                verdict = (
+                    f"QA pass #{qa_iteration} rejected: {len(current_issues)} "
+                    "issue(s) found"
+                )
             debug(
                 "qa_loop",
                 "Issues found by QA",
                 issue_count=len(current_issues),
                 issues=current_issues[:3] if current_issues else [],  # Show first 3
             )
-            if task_logger:
-                task_logger.log_error(
-                    f"QA pass #{qa_iteration} rejected: {len(current_issues)} "
-                    f"issue(s) found; applying a fix, then re-reviewing "
-                    f"(pass #{qa_iteration + 1}).",
-                    LogPhase.VALIDATION,
-                )
+            # A gate's issues share one title; their description says what failed.
+            issue_label = "description" if gate_issues is not None else "title"
             task_event_emitter.emit(
                 "QA_FAILED",
                 {
                     "iteration": qa_iteration,
                     "issueCount": len(current_issues),
                     "issues": [
-                        issue.get("title", "")
+                        issue.get(issue_label, "")
                         for issue in (current_issues[:5] if current_issues else [])
                     ],
                 },
@@ -1057,6 +1012,17 @@ async def run_qa_validation_loop(
             record_iteration(
                 spec_dir, qa_iteration, "rejected", current_issues, iteration_duration
             )
+
+            # The verdict says what comes next: it used to promise a fix and
+            # another pass even on the last pass, right before the hand-over.
+            if task_logger:
+                if has_recurring or qa_iteration >= max_iterations:
+                    outcome = "handing over to human review."
+                else:
+                    outcome = (
+                        f"applying a fix, then re-reviewing (pass #{qa_iteration + 1})."
+                    )
+                task_logger.log_error(f"{verdict}; {outcome}", LogPhase.VALIDATION)
 
             if has_recurring:
                 debug_error(
@@ -1143,7 +1109,9 @@ async def run_qa_validation_loop(
 
             # QA_FIX_REQUEST.md est rendu depuis issues_found : le fixer lit
             # les issues de cette passe, jamais celles d'une passe précédente.
-            _ensure_fix_request_file(spec_dir, current_issues, qa_iteration)
+            # Un gate a déjà écrit le sien, plus précis : on le garde.
+            if gate_issues is None:
+                _ensure_fix_request_file(spec_dir, current_issues, qa_iteration)
 
             try:
                 fix_client = create_agent_client(

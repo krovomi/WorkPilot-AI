@@ -50,6 +50,35 @@ describe("translateLogMessage", () => {
 		).toBe('tasks:execution.logMessages.qaApproved {"n":2}');
 	});
 
+	it("uses the handover variant when no fix follows the rejection", () => {
+		expect(
+			translateLogMessage(
+				fakeT,
+				"QA pass #3 rejected by the coverage gate; handing over to human review.",
+			),
+		).toBe(
+			'tasks:execution.logMessages.qaCoverageRejectedHandover {"n":3,"next":4}',
+		);
+
+		expect(
+			translateLogMessage(
+				fakeT,
+				"QA pass #5 rejected: 2 architecture violation(s); handing over to human review.",
+			),
+		).toBe(
+			'tasks:execution.logMessages.qaArchRejectedHandover {"n":5,"count":2,"next":6}',
+		);
+
+		expect(
+			translateLogMessage(
+				fakeT,
+				"QA pass #8 rejected: 1 issue(s) found; handing over to human review.",
+			),
+		).toBe(
+			'tasks:execution.logMessages.qaRejectedHandover {"n":8,"count":1,"next":9}',
+		);
+	});
+
 	it("distinguishes plain vs sandbox manual-verification", () => {
 		expect(
 			translateLogMessage(

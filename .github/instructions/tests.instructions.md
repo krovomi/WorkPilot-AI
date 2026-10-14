@@ -15,7 +15,7 @@ description: 'Conventions tests WorkPilot AI : vitest (front), pytest (back), Pl
 ## Backend (pytest)
 
 - Fichiers : `tests/<paquet>/test_<module>.py` ; un seul `pytest.ini`, lancé depuis la racine.
-- `conftest.py` racine pour fixtures partagées.
+- `tests/conftest.py` pour les fixtures partagées.
 - Marqueurs : `unit`, `integration`, `e2e`, `streaming`, `performance` (cf. `pytest.ini`).
 - Pas d'appel LLM réel — utiliser les fixtures de mock.
 
