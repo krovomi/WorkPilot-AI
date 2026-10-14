@@ -593,8 +593,14 @@ def get_electron_debug_port() -> int:
 
 
 def should_use_claude_md() -> bool:
-    """Check if CLAUDE.md instructions should be included in the agent's context."""
-    return os.environ.get("USE_CLAUDE_MD", "").lower() == "true"
+    """Check if CLAUDE.md instructions should be included in the agent's context.
+
+    On unless USE_CLAUDE_MD says no. The frontend sends "false" for a project
+    that turned `useClaudeMd` off; many runners, the FastAPI server and the CLI
+    never receive the variable, and the setting's default is on.
+    """
+    value = os.environ.get("USE_CLAUDE_MD", "").strip().lower()
+    return value not in ("0", "false", "no", "off")
 
 
 #: Claude Code's own switch for memory files. Set to "1", the CLI loads no
@@ -612,7 +618,7 @@ def apply_claude_md_setting(sdk_env: dict[str, str]) -> bool:
     system prompt does not replace. Turning the source off would also drop the
     project's skills and hooks, so the setting answers with the CLI's memory
     switch instead. Off, the switch is assigned rather than defaulted: the
-    project said no.
+    project said no. `create_simple_client` applies it too.
 
     Returns:
         True when CLAUDE.md stays on, False when the switch was set.
