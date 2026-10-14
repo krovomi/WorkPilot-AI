@@ -272,50 +272,12 @@ rejected and sent back for fixes while coverage is below the threshold. E2E
 coverage is best-effort. Write tests covering every branch, error path and edge
 case.
 
-### Unit Tests
-| Test | File | What to Verify |
-|------|------|----------------|
-| [Test Name] | `[path/to/test or "Test file to be created"]` | [What this test should verify] |
-
-**IF NO SPECIFIC TESTS**: Create standard tests for the functionality (e.g., "Unit tests for new function", "Integration tests for API endpoints", etc.)
-
-### Integration Tests
-| Test | Services | What to Verify |
-|------|----------|----------------|
-| [Test Name] | [service-a ↔ service-b] | [API contract, data flow] |
-
-**IF SINGLE SERVICE**: Use "Integration test for service with dependencies" or skip if not applicable.
-
-### End-to-End Tests
-| Flow | Steps | Expected Outcome |
-|------|-------|------------------|
-| [User Flow] | 1. [Step] 2. [Step] | [Expected result] |
-
-**IF NOT APPLICABLE**: Use "Manual testing of new functionality" or skip.
-
-### Browser Verification (if frontend)
-| Page/Component | URL | Checks |
-|----------------|-----|--------|
-| [Component] | `http://localhost:[port]/[path]` | [What to verify] |
-
-**IF NOT FRONTEND**: Replace with appropriate verification method (API testing, CLI testing, etc.)
-
-### Database Verification (if applicable)
-| Check | Query/Command | Expected |
-|-------|---------------|----------|
-| [Migration exists] | `[command]` | [Expected output] |
-
-**IF NOT APPLICABLE**: Skip or use "Data persistence verification" as needed.
-
-### QA Sign-off Requirements
-- [ ] All unit tests pass
-- [ ] All integration tests pass
-- [ ] All E2E tests pass
-- [ ] Browser verification complete (if applicable)
-- [ ] Database state verified (if applicable)
-- [ ] No regressions in existing functionality
-- [ ] Code follows established patterns
-- [ ] No security vulnerabilities introduced
+### Checks
+One bullet per check, each tied to a requirement when it has one. Cover only the
+kinds that apply (unit, integration, e2e, browser, database); no tables.
+- [unit] (FR-001) `[test file]` — [what it verifies]
+- [integration] (FR-002) [service-a ↔ service-b] — [contract or data flow]
+- [browser] `http://localhost:[port]/[path]` — [what to see, no console errors]
 
 SPEC_EOF
 ```
@@ -333,27 +295,15 @@ grep -E "^##? Workflow Type" spec.md && echo "✓ Workflow Type"
 grep -E "^##? Task Scope" spec.md && echo "✓ Task Scope"
 grep -E "^##? Success Criteria" spec.md && echo "✓ Success Criteria"
 
-# Check file length (should be substantial)
-wc -l spec.md
 ```
 
 If any section is missing, add it immediately.
 
 ---
 
-## PHASE 4: SIGNAL COMPLETION
+## PHASE 4: FINISH
 
-```
-=== SPEC DOCUMENT CREATED ===
-
-File: spec.md
-Sections: [list of sections]
-Length: [line count] lines
-
-Required sections: ✓ All present
-
-Next phase: Implementation Planning
-```
+End with one line: `spec.md written`. No banner or section list.
 
 ---
 
@@ -372,10 +322,11 @@ Next phase: Implementation Planning
 ## COMMON ISSUES TO AVOID
 
 1. **Missing sections** - Every required section must exist
-2. **Empty tables** - Fill in tables with data from context
-3. **Generic content** - Be specific to this project and task
-4. **Invalid markdown** - Check table formatting, code blocks
-5. **Too short** - Spec should be comprehensive (500+ chars)
+2. **Generic content** - Be specific to this project and task
+3. **Invalid markdown** - Check code blocks and lists
+4. **Padding** - Bullets, not paragraphs. A section that does not apply gets one
+   line saying so (required sections) or is left out (the others). Length is
+   not quality: the planner and QA read every line you write
 
 ---
 

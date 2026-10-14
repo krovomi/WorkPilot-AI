@@ -79,3 +79,11 @@ prompt-driven: `runners/github/duplicates.py` compares embeddings, and
 `runners/github/orchestrator.py` drives `auto_fix_issue`. The
 `duplicate_detector.md` and `pr_fixer.md` this table used to name were left over
 from an earlier design and loaded by nothing.
+
+**Artifacts are written once.** The build prompts ask for the fields the
+orchestrator reads and nothing more: the QA reviewer records `qa_signoff` and a
+`Verdict:` line, and `qa_report.md` / `QA_FIX_REQUEST.md` are rendered from it;
+the planner no longer writes `verification_strategy`, `qa_acceptance` or a
+narrative `build-progress.txt`. The shared rules live in
+`core/llm_optimization.ARTIFACT_RULES`; see
+[context-management.md](context-management.md).

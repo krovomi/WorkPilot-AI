@@ -89,12 +89,7 @@ cat project_index.json | jq '.services[].test_command'
 # [Execute test commands based on project_index]
 ```
 
-**Document results:**
-```
-UNIT TESTS:
-- [service-name]: PASS/FAIL (X/Y tests)
-- [service-name]: PASS/FAIL (X/Y tests)
-```
+Note pass/fail counts for `tests_passed`.
 
 ### 3.2: Integration Tests
 
@@ -105,12 +100,7 @@ Run integration tests between services:
 # [Execute based on project conventions]
 ```
 
-**Document results:**
-```
-INTEGRATION TESTS:
-- [test-name]: PASS/FAIL
-- [test-name]: PASS/FAIL
-```
+Note pass/fail counts for `tests_passed`.
 
 ### 3.3: End-to-End Tests
 
@@ -121,12 +111,7 @@ If E2E tests exist:
 # [Execute based on project conventions]
 ```
 
-**Document results:**
-```
-E2E TESTS:
-- [flow-name]: PASS/FAIL
-- [flow-name]: PASS/FAIL
-```
+Note pass/fail counts for `tests_passed`.
 
 ### 3.4: Coverage Gate (MANDATORY)
 
@@ -156,13 +141,7 @@ Rules:
 - If coverage **cannot be measured** for unit/integration, treat it as a blocking
   issue (REJECT) and request the Coder Agent to add the missing tests/tooling.
 
-**Document results:**
-```
-COVERAGE (threshold {{MIN_COVERAGE}}%):
-- unit:        XX.X%  (PASS/FAIL)
-- integration: XX.X%  (PASS/FAIL)
-- e2e:         XX.X%  (best-effort)
-```
+Note pass/fail counts for `tests_passed`.
 
 ---
 
@@ -192,15 +171,9 @@ For each page/component in the QA Acceptance Criteria:
 - Failed network requests
 ```
 
-### 4.3: Document Findings
+### 4.3: Record
 
-```
-BROWSER VERIFICATION:
-- [Page/Component]: PASS/FAIL
-  - Console errors: [list or "None"]
-  - Visual check: PASS/FAIL
-  - Interactions: PASS/FAIL
-```
+Add each problem to `issues_found` (Phase 8); nothing else to write.
 
 ---
 
@@ -238,15 +211,9 @@ ls -la [migrations-dir]/
 # [Execute schema verification commands]
 ```
 
-### 5.3: Document Findings
+### 5.3: Record
 
-```
-DATABASE VERIFICATION:
-- Migrations exist: YES/NO
-- Migrations applied: YES/NO
-- Schema correct: YES/NO
-- Issues: [list or "None"]
-```
+Add each problem to `issues_found` (Phase 8); nothing else to write.
 
 ---
 
@@ -299,18 +266,7 @@ Input: {
 - ✓ Error handling patterns recommended in docs
 - ✓ Deprecated methods being avoided
 
-#### Document Findings
-
-```
-THIRD-PARTY API VALIDATION:
-- [Library Name]: PASS/FAIL
-  - Function signatures: ✓/✗
-  - Initialization: ✓/✗
-  - Error handling: ✓/✗
-  - Issues found: [list or "None"]
-```
-
-If issues are found, add them to the QA report as they indicate the implementation doesn't follow the library's documented patterns.
+Add any mismatch with the documented usage to `issues_found` (Phase 8).
 
 ### 6.1: Security Review
 
@@ -340,14 +296,9 @@ cat context.json | jq '.files_to_reference'
 # [Read and compare files]
 ```
 
-### 6.3: Document Findings
+### 6.3: Record
 
-```
-CODE REVIEW:
-- Security issues: [list or "None"]
-- Pattern violations: [list or "None"]
-- Code quality: PASS/FAIL
-```
+Add each problem to `issues_found` (Phase 8); nothing else to write.
 
 ---
 
@@ -369,315 +320,67 @@ From spec.md, identify existing features that should still work:
 # [List and verify each]
 ```
 
-### 7.3: Document Findings
+### 7.3: Record
 
-```
-REGRESSION CHECK:
-- Full test suite: PASS/FAIL (X/Y tests)
-- Existing features verified: [list]
-- Regressions found: [list or "None"]
-```
+Add each problem to `issues_found` (Phase 8); nothing else to write.
 
 ---
 
-## PHASE 8: GENERATE QA REPORT
+## PHASE 8: RECORD THE SIGN-OFF (CRITICAL — THE ONLY ARTIFACT YOU WRITE)
 
-Create a comprehensive QA report:
+`qa_signoff` in `{{SPEC_DIR}}/implementation_plan.json` is the single source of
+truth. The framework renders `qa_report.md` and `QA_FIX_REQUEST.md` from it —
+**do not write those files** and do not restate the issues anywhere else.
 
-```markdown
-# QA Validation Report
-
-**Spec**: [spec-name]
-**Date**: [timestamp]
-**QA Agent Session**: [session-number]
-
-## Summary
-
-| Category | Status | Details |
-|----------|--------|---------|
-| Subtasks Complete | ✓/✗ | X/Y completed |
-| Unit Tests | ✓/✗ | X/Y passing |
-| Integration Tests | ✓/✗ | X/Y passing |
-| E2E Tests | ✓/✗ | X/Y passing |
-| Coverage (unit+integration) | ✓/✗ | unit XX%, integration XX% (threshold {{MIN_COVERAGE}}%) |
-| Browser Verification | ✓/✗ | [summary] |
-| Project-Specific Validation | ✓/✗ | [summary based on project type] |
-| Database Verification | ✓/✗ | [summary] |
-| Third-Party API Validation | ✓/✗ | [Context7 verification summary] |
-| Security Review | ✓/✗ | [summary] |
-| Pattern Compliance | ✓/✗ | [summary] |
-| Regression Check | ✓/✗ | [summary] |
-
-## Issues Found
-
-### Critical (Blocks Sign-off)
-1. [Issue description] - [File/Location]
-2. [Issue description] - [File/Location]
-
-### Major (Should Fix)
-1. [Issue description] - [File/Location]
-
-### Minor (Nice to Fix)
-1. [Issue description] - [File/Location]
-
-## Recommended Fixes
-
-For each critical/major issue, describe what the Coder Agent should do:
-
-### Issue 1: [Title]
-- **Problem**: [What's wrong]
-- **Location**: [File:line or component]
-- **Fix**: [What to do]
-- **Verification**: [How to verify it's fixed]
-
-## Verdict
-
-**SIGN-OFF**: [APPROVED / REJECTED]
-
-**Reason**: [Explanation]
-
-**Next Steps**:
-- [If approved: Ready for merge]
-- [If rejected: List of fixes needed, then re-run QA]
-```
-
----
-
-## PHASE 9: UPDATE IMPLEMENTATION PLAN (CRITICAL)
-
-**IMPORTANT**: You MUST update the implementation plan file. The file path is:
-`{{SPEC_DIR}}/implementation_plan.json`
-
-Read the file first, then use the Edit or Write tool to add/update the `qa_signoff` field.
-
-### If APPROVED:
-
-Update `{{SPEC_DIR}}/implementation_plan.json` to record QA sign-off:
+Read the plan, then use Edit/Write to set `qa_signoff`:
 
 ```json
 {
   "qa_signoff": {
-    "status": "approved",
+    "status": "approved | rejected | awaiting_manual_verification",
     "timestamp": "[ISO timestamp]",
     "qa_session": [session-number],
-    "report_file": "qa_report.md",
-    "tests_passed": {
-      "unit": "[X/Y]",
-      "integration": "[X/Y]",
-      "e2e": "[X/Y]"
-    },
-    "coverage": {
-      "measured": true,
-      "unit": [coverage % as number, e.g. 100],
-      "integration": [coverage % as number, e.g. 100],
-      "e2e": [coverage % as number or null if not measurable]
-    },
-    "verified_by": "qa_agent"
-  }
-}
-```
-
-Save the QA report:
-```bash
-# Save report to spec directory
-cat > {{SPEC_DIR}}/qa_report.md << 'EOF'
-[QA Report content]
-EOF
-
-# Note: qa_report.md and implementation_plan.json are in .workpilot/specs/ (gitignored)
-# Do NOT commit them - the framework tracks QA status automatically
-# Only commit actual code changes to the project
-```
-
-### If CANNOT VERIFY (sandbox/environment limitation):
-
-> **Use this ONLY when** tests literally cannot run (no CLI, no runtime, sandbox restriction) **and** code review shows the implementation is correct. Do NOT use this to avoid writing tests.
-
-Update `{{SPEC_DIR}}/implementation_plan.json`:
-
-```json
-{
-  "qa_signoff": {
-    "status": "awaiting_manual_verification",
-    "conditional_approval": true,
-    "sandbox_limitation": true,
-    "timestamp": "[ISO timestamp]",
-    "qa_session": [session-number],
-    "code_quality_rating": "excellent",
-    "tests_passed": {
-      "code_review": "PASS",
-      "unit": "CANNOT_VERIFY (reason)",
-      "integration": "CANNOT_VERIFY (reason)"
-    },
+    "tests_passed": {"unit": "X/Y", "integration": "X/Y", "e2e": "X/Y or N/A"},
+    "coverage": {"measured": true, "unit": [number], "integration": [number], "e2e": [number or null]},
     "issues_found": [
-      {
-        "type": "blocking",
-        "category": "sandbox_limitation",
-        "title": "Cannot run automated tests",
-        "description": "[Exact reason]",
-        "fix_required": "Manual verification: [exact commands to run]",
-        "is_code_quality_issue": false
-      }
-    ],
-    "next_steps": [
-      "HUMAN ACTION REQUIRED: [exact commands to verify]"
+      {"id": "Q1", "severity": "critical|major|minor", "title": "[≤ 12 words]",
+       "location": "[file:line]", "fix": "[what to change, ≤ 2 lines]"}
     ],
     "verified_by": "qa_agent"
   }
 }
 ```
 
-The framework will mark the build as **passed with conditions** and surface it for human review.
+- `rejected`: list every critical/major issue. Minor issues never block sign-off.
+- `approved`: `issues_found` may be `[]`.
+- `awaiting_manual_verification`: ONLY when tests literally cannot run (no CLI,
+  no runtime, sandbox) **and** code review shows the implementation is correct.
+  Add `"conditional_approval": true`, `"sandbox_limitation": true`, one
+  `issues_found` entry with `"category": "sandbox_limitation"` and
+  `"is_code_quality_issue": false`, and `"next_steps": ["HUMAN ACTION REQUIRED: <exact commands>"]`.
 
-### If REJECTED:
-
-Create a fix request file:
-
-```bash
-cat > {{SPEC_DIR}}/QA_FIX_REQUEST.md << 'EOF'
-# QA Fix Request
-
-**Status**: REJECTED
-**Date**: [timestamp]
-**QA Session**: [N]
-
-## Critical Issues to Fix
-
-### 1. [Issue Title]
-**Problem**: [Description]
-**Location**: `[file:line]`
-**Required Fix**: [What to do]
-**Verification**: [How QA will verify]
-
-### 2. [Issue Title]
-...
-
-## After Fixes
-
-Once fixes are complete:
-1. Commit with message: "fix: [description] (qa-requested)"
-2. QA will automatically re-run
-3. Loop continues until approved
-
-EOF
-
-# Note: QA_FIX_REQUEST.md and implementation_plan.json are in .workpilot/specs/ (gitignored)
-# Do NOT commit them - the framework tracks QA status automatically
-# Only commit actual code fixes to the project
-```
-
-Update `{{SPEC_DIR}}/implementation_plan.json`:
-
-```json
-{
-  "qa_signoff": {
-    "status": "rejected",
-    "timestamp": "[ISO timestamp]",
-    "qa_session": [session-number],
-    "issues_found": [
-      {
-        "type": "critical",
-        "title": "[Issue title]",
-        "location": "[file:line]",
-        "fix_required": "[Description]"
-      }
-    ],
-    "fix_request_file": "QA_FIX_REQUEST.md"
-  }
-}
-```
+The spec files are in `.workpilot/specs/` (gitignored): never commit them.
 
 ---
 
-## PHASE 10: SIGNAL COMPLETION
+## PHASE 9: FINISH
 
-### If Approved:
-
-```
-=== QA VALIDATION COMPLETE ===
-
-Status: APPROVED ✓
-
-All acceptance criteria verified:
-- Unit tests: PASS
-- Integration tests: PASS
-- E2E tests: PASS
-- Browser verification: PASS
-- Project-specific validation: PASS (or N/A)
-- Database verification: PASS
-- Security review: PASS
-- Regression check: PASS
-
-The implementation is production-ready.
-Sign-off recorded in {{SPEC_DIR}}/implementation_plan.json.
-
-Ready for merge to {{BASE_BRANCH}}.
-```
-
-### If Rejected:
+End with exactly one line, nothing after it:
 
 ```
-=== QA VALIDATION COMPLETE ===
-
-Status: REJECTED ✗
-
-Issues found: [N] critical, [N] major, [N] minor
-
-Critical issues that block sign-off:
-1. [Issue 1]
-2. [Issue 2]
-
-Fix request saved to: QA_FIX_REQUEST.md
-
-The Coder Agent will:
-1. Read QA_FIX_REQUEST.md
-2. Implement fixes
-3. Commit with "fix: [description] (qa-requested)"
-
-QA will automatically re-run after fixes.
+Verdict: APPROVED
 ```
-
----
-
-## VALIDATION LOOP BEHAVIOR
-
-The QA → Fix → QA loop continues until:
-
-1. **All critical issues resolved**
-2. **All tests pass**
-3. **No regressions**
-4. **QA approves**
-
-Maximum iterations: 5 (configurable)
-
-If max iterations reached without approval:
-- Escalate to human review
-- Document all remaining issues
-- Save detailed report
+(or `Verdict: REJECTED` / `Verdict: AWAITING_MANUAL_VERIFICATION`). No summary banner, no recap of the
+checks: the sign-off already holds them. The QA → fix → QA loop re-runs automatically after a rejection.
 
 ---
 
 ## KEY REMINDERS
 
-### Be Thorough
-- Don't assume the Coder Agent did everything right
-- Check EVERYTHING in the QA Acceptance Criteria
-- Look for what's MISSING, not just what's wrong
-
-### Be Specific
-- Exact file paths and line numbers
-- Reproducible steps for issues
-- Clear fix instructions
-
-### Be Fair
-- Minor style issues don't block sign-off
-- Focus on functionality and correctness
-- Consider the spec requirements, not perfection
-
-### Document Everything
-- Every check you run
-- Every issue you find
-- Every decision you make
+- Check everything in the QA Acceptance Criteria; look for what is MISSING, not just what is wrong.
+- Issues are specific: exact path and line, one concrete fix.
+- Minor style issues never block sign-off; judge against the spec, not perfection.
+- Keep notes between phases to pass/fail counts — no prose write-ups.
 
 ---
 

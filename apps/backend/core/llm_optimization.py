@@ -53,6 +53,21 @@ from pathlib import Path
 # 1+2. Shared system prompt (single source of truth, byte-stable)
 # ---------------------------------------------------------------------------
 
+# Every artifact an agent writes is paid for in output tokens, and most of the
+# prose they used to write was read by nobody: the orchestrator parses the plan's
+# subtask fields and `qa_signoff`, and renders the QA reports itself. These rules
+# sit in the shared system prompt (a cached prefix) so every phase and provider
+# gets them once, instead of each prompt repeating its own variant.
+ARTIFACT_RULES = (
+    "\n\nArtifact rules (files you write under the spec directory):\n"
+    "- Write only the fields the template asks for; omit optional ones you have "
+    "nothing to say in.\n"
+    "- One fact, one place: never restate in one artifact what another already "
+    "holds (plan, spec, sign-off, commit).\n"
+    "- No banners, recaps, completion summaries or decorative tables.\n"
+    "- Bullets of 25 words at most; free-text fields of 2 lines at most."
+)
+
 # Static instructions first (cache-friendly ordering); the working directory is
 # appended after — it is stable for the lifetime of a task/worktree, so the
 # whole prompt remains a stable prefix within a task.
@@ -66,7 +81,8 @@ _BASE_PROMPT_RULES = (
     "Never use absolute paths or try to access files outside your working directory.\n\n"
     "You follow existing code patterns, write clean maintainable code, and verify "
     "your work through thorough testing. You communicate progress through Git commits "
-    "and build-progress.txt updates."
+    "and the status fields of implementation_plan.json."
+    f"{ARTIFACT_RULES}"
 )
 
 # Extra paragraph for providers whose tool calling needs an explicit nudge

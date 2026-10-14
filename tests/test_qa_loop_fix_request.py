@@ -15,14 +15,28 @@ def ensure_helper():
     return _ensure_fix_request_file
 
 
-def test_keeps_existing_file_untouched(tmp_path: Path, ensure_helper) -> None:
+def test_rewrites_a_file_left_by_an_earlier_pass(tmp_path: Path, ensure_helper) -> None:
+    """The issues of THIS pass win: a stale file sent the fixer after old ones."""
     fix_request = tmp_path / "QA_FIX_REQUEST.md"
     fix_request.write_text("contenu existant", encoding="utf-8")
 
     created = ensure_helper(tmp_path, [{"title": "x"}], qa_iteration=1)
 
     assert created is True
-    assert fix_request.read_text(encoding="utf-8") == "contenu existant"
+    content = fix_request.read_text(encoding="utf-8")
+    assert "contenu existant" not in content
+    assert "x" in content
+
+
+def test_keeps_existing_file_when_there_are_no_issues(
+    tmp_path: Path, ensure_helper
+) -> None:
+    """Human feedback is written by the UI with no `issues_found` behind it."""
+    fix_request = tmp_path / "QA_FIX_REQUEST.md"
+    fix_request.write_text("retour humain", encoding="utf-8")
+
+    assert ensure_helper(tmp_path, [], qa_iteration=1) is True
+    assert fix_request.read_text(encoding="utf-8") == "retour humain"
 
 
 def test_synthesizes_from_issues_when_missing(tmp_path: Path, ensure_helper) -> None:

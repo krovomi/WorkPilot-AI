@@ -581,6 +581,151 @@ def is_no_test_project(spec_dir: Path, project_dir: Path) -> bool:
 
 
 # =============================================================================
+# REPORTS RENDERED FROM THE SIGN-OFF
+# =============================================================================
+#
+# The reviewer used to write the same issues up to five times: qa_report.md,
+# QA_FIX_REQUEST.md, `issues_found`, a completion banner and its final message.
+# Every one of those was output tokens, and only `issues_found` was read by
+# code. The sign-off is now the single source and both files are rendered from
+# it here, in a fixed short shape that costs nothing to produce.
+
+
+def _issue_field(issue: dict[str, Any], *keys: str) -> str:
+    for key in keys:
+        value = issue.get(key)
+        if isinstance(value, str) and value.strip():
+            return " ".join(value.split())
+    return ""
+
+
+def _issue_lines(issues: list[dict[str, Any]]) -> list[str]:
+    lines: list[str] = []
+    for idx, issue in enumerate(issues, start=1):
+        if not isinstance(issue, dict):
+            continue
+        title = _issue_field(issue, "title", "summary") or f"Issue {idx}"
+        severity = _issue_field(issue, "severity", "type", "priority") or "issue"
+        location = _issue_field(issue, "location", "file")
+        fix = _issue_field(
+            issue, "fix", "fix_required", "description", "details", "message"
+        )
+        head = f"{idx}. [{severity}] {title}"
+        if location:
+            head += f" — `{location}`"
+        lines.append(head)
+        if fix:
+            lines.append(f"   Fix: {fix}")
+    return lines
+
+
+def _tests_verdict(tests_passed: Any) -> str | None:
+    """`pass`, `fail` or None, from the sign-off's `tests_passed` values.
+
+    `cli/build_commands._verdict_in` reads `Tests: pass|fail` out of the report
+    for the tests-pass hard gate, so the rendered report states it whenever the
+    sign-off lets us tell.
+    """
+    if not isinstance(tests_passed, dict) or not tests_passed:
+        return None
+    seen = False
+    for value in tests_passed.values():
+        text = str(value).strip().lower()
+        if not text:
+            continue
+        if "fail" in text:
+            return "fail"
+        if "/" in text:
+            done, _, total = text.partition("/")
+            try:
+                if int(done.split()[0]) < int(total.split()[0]):
+                    return "fail"
+            except (ValueError, IndexError):
+                continue
+            seen = True
+        elif text.startswith("pass"):
+            seen = True
+    return "pass" if seen else None
+
+
+def render_qa_report(spec_dir: Path, signoff: dict[str, Any] | None) -> bool:
+    """Write `qa_report.md` from the reviewer's `qa_signoff`. Never raises.
+
+    The visual QA section is put back afterwards, between its markers, so the
+    file keeps describing the captures as `write_visual_qa_report` left them.
+    """
+    if not isinstance(signoff, dict) or not signoff.get("status"):
+        return False
+    status = str(signoff.get("status"))
+    verdict = {"approved": "APPROVED", "rejected": "REJECTED"}.get(status, status)
+    lines = ["# QA Report", "", f"**SIGN-OFF**: {verdict}"]
+    session = signoff.get("qa_session")
+    if session is not None:
+        lines.append(f"Session: {session}")
+    tests = signoff.get("tests_passed")
+    if isinstance(tests, dict) and tests:
+        lines.append(
+            "Results: " + " · ".join(f"{k} {v}" for k, v in tests.items() if v)
+        )
+    tests_verdict = _tests_verdict(tests)
+    if tests_verdict:
+        lines.append(f"Tests: {tests_verdict}")
+    coverage = signoff.get("coverage")
+    if isinstance(coverage, dict):
+        parts = [
+            f"{k} {v}%"
+            for k, v in coverage.items()
+            if k != "measured" and isinstance(v, (int, float))
+        ]
+        if parts:
+            lines.append("Coverage: " + " · ".join(parts))
+    issues = signoff.get("issues_found") or []
+    if isinstance(issues, list) and issues:
+        lines += ["", f"## Issues ({len(issues)})", "", *_issue_lines(issues)]
+    next_steps = signoff.get("next_steps")
+    if isinstance(next_steps, list) and next_steps:
+        lines += ["", "## Next steps", ""]
+        lines += [f"- {' '.join(str(step).split())}" for step in next_steps]
+    report = spec_dir / "qa_report.md"
+    try:
+        if report.is_symlink():
+            return False
+        report.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    except OSError:
+        return False
+    write_visual_qa_report(spec_dir)
+    return True
+
+
+def render_fix_request(
+    spec_dir: Path, issues: list[dict[str, Any]], qa_iteration: int
+) -> bool:
+    """Write `QA_FIX_REQUEST.md` from `issues_found`. Never raises.
+
+    Always rewritten when there are issues: a file left by an earlier pass
+    would otherwise send the fixer after problems that are already gone.
+    """
+    body = _issue_lines([i for i in issues if isinstance(i, dict)])
+    if not body:
+        return False
+    lines = [
+        f"# QA Fix Request (pass {qa_iteration})",
+        "",
+        *body,
+        "",
+        "When done: set `qa_signoff.status` to `fixes_applied` and "
+        "`ready_for_qa_revalidation: true` in implementation_plan.json.",
+    ]
+    try:
+        (spec_dir / "QA_FIX_REQUEST.md").write_text(
+            "\n".join(lines) + "\n", encoding="utf-8"
+        )
+    except OSError:
+        return False
+    return True
+
+
+# =============================================================================
 # VISUAL QA (docintel lot E)
 # =============================================================================
 

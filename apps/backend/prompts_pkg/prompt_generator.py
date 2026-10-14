@@ -227,7 +227,7 @@ not `git add apps/frontend/src/file.ts`. Prefer staying at the working directory
 **Important Files:**
 - Spec: `{relative_spec}/spec.md`
 - Plan: `{relative_spec}/implementation_plan.json`
-- Progress: `{relative_spec}/build-progress.txt`
+- Progress (blockers only, one line each): `{relative_spec}/build-progress.txt`
 - Context: `{relative_spec}/context.json`
 
 ---
@@ -466,7 +466,7 @@ Before marking complete, verify:
 - Focus ONLY on this subtask - don't modify unrelated code
 - NEVER write production code without a failing test that requires it
 - If the test fails after implementation, FIX IT before committing
-- If you encounter a blocker, document it in build-progress.txt
+- If you hit a blocker, append ONE line to build-progress.txt (`[subtask-id] blocker: ...`)
 - Never `git push`: the build is reviewed and merged by WorkPilot, not by you
 - Never change git configuration (`git config`, `git -c`)
 """)
@@ -497,7 +497,7 @@ Before marking complete, verify:
 
 - Focus ONLY on this subtask - don't modify unrelated code
 - If verification fails, FIX IT before committing
-- If you encounter a blocker, document it in build-progress.txt
+- If you hit a blocker, append ONE line to build-progress.txt (`[subtask-id] blocker: ...`)
 - Never `git push`: the build is reviewed and merged by WorkPilot, not by you
 - Never change git configuration (`git config`, `git -c`)
 """)
@@ -569,8 +569,7 @@ Your spec file is located at: `{relative_spec}/spec.md`
 
 Store all build artifacts in this spec directory:
 - `{relative_spec}/implementation_plan.json` - Subtask-based implementation plan
-- `{relative_spec}/build-progress.txt` - Progress notes
-- `{relative_spec}/init.sh` - Environment setup script
+- `{relative_spec}/init.sh` - Environment setup script (only if missing)
 
 The project root is your current working directory. Implement code in the project root,
 not in the spec directory.

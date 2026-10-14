@@ -165,8 +165,14 @@ If the session failed:
 - Extract what was learned from the failure
 - Recommendations should address how to succeed next time
 
+### Size limits (only this much is ever read back)
+- At most 3 entries in `file_insights`, `patterns_discovered`,
+  `gotchas_discovered` and `recommendations` each; fewer is fine
+- Every string at most 25 words; omit a field rather than pad it
+- Empty arrays are better than generic advice
+
 ### Multiple files changed
-- Prioritize the most important 3-5 files
+- Prioritize the most important 3 files
 - Skip boilerplate changes (package-lock.json, etc.)
 - Focus on files central to the feature
 

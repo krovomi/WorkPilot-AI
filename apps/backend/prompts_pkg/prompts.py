@@ -212,8 +212,7 @@ Your spec file is located at: `{spec_dir}/spec.md`
 
 You MUST use the Write tool to create these files in the spec directory:
 - `{spec_dir}/implementation_plan.json` - Subtask-based implementation plan (USE WRITE TOOL!)
-- `{spec_dir}/build-progress.txt` - Progress notes (USE WRITE TOOL!)
-- `{spec_dir}/init.sh` - Environment setup script (USE WRITE TOOL!)
+- `{spec_dir}/init.sh` - Environment setup script, only if missing (USE WRITE TOOL!)
 
 DO NOT just describe what these files should contain. You MUST actually call the Write tool
 with the file path and complete content to create them.
