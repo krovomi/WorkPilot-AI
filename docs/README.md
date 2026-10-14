@@ -19,7 +19,7 @@ fichiers y renvoient.
 | [`linux.md`](linux.md), [`windows-development.md`](windows-development.md) | notes par plateforme | guide |
 | [`providers/`](providers/) | architecture détaillée des providers Claude Code et GitHub Copilot | référence |
 | [`features/`](features/), [`integrations/`](integrations/) | une feature ou une intégration optionnelle expliquée à l'utilisateur | guide |
-| [`product/`](product/) | idées et pistes produit (backlog, non normatif) | archive vivante |
+| [Backlog produit](https://github.com/krovomi/WorkPilot-AI/issues/343) | idées et pistes produit : une issue par piste, sous l'issue parente #343 | backlog (issues) |
 | [`audit/`](audit/) | l'audit de nettoyage et ses lots ; un historique, pas une règle | historique |
 | [`validation/`](validation/) | captures de validation manuelle | preuves |
 

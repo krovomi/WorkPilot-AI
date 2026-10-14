@@ -32,6 +32,9 @@ class Situation:
     tool_output_ratio: float = 0.0
     # The provider rejected the prompt as too long.
     prompt_too_long: bool = False
+    # Fill of a thread that replayed nothing, at its first measured turn (0
+    # when unknown): a reset brings the next thread back to at least this.
+    floor_pct: float = 0.0
 
 
 def recommended_action(situation: Situation) -> str:
@@ -80,12 +83,20 @@ def decide(
       threshold is reached too — the handoff then is the deterministic one.
     * Compaction on a provider that compacts natively is left to it below the
       hard threshold: the provider does it in place, without a restart.
+    * A thread whose floor is already past the threshold would come back past
+      it after a reset, to be cut again at its first safe point: it is cut at
+      the hard threshold only, and only if that leaves it room to work.
     """
     if manual in ("compact", "clear"):
         return Decision(manual, "manual", "requested from the task panel")
     if situation.prompt_too_long and policy.enabled:
         return Decision("clear", "auto", "prompt too long for the context window")
     if not policy.enabled or percent < policy.threshold_pct:
+        return None
+    if situation.floor_pct >= policy.threshold_pct and (
+        percent < policy.hard_threshold_pct
+        or situation.floor_pct >= policy.hard_threshold_pct
+    ):
         return None
     action = action_for_policy(policy, situation)
     if action == "compact" and native_compact and percent < policy.hard_threshold_pct:

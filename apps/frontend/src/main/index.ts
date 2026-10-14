@@ -9,13 +9,7 @@ const require = createRequire(import.meta.url);
 // Make require globally available for Sentry's require-in-the-middle hooks
 globalThis.require = require;
 
-import {
-	accessSync,
-	existsSync,
-	readFileSync,
-	rmSync,
-	writeFileSync,
-} from "node:fs";
+import { accessSync, existsSync, rmSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 // Load .env file FIRST before any other imports that might use process.env
@@ -96,8 +90,13 @@ import { ensureOAuthServerRunning } from "./oauth-server";
 import { openExternalUrl } from "./open-external";
 import { isMacOS, isWindows } from "./platform";
 import { pythonEnvManager } from "./python-env-manager";
+import { migrateProfilesSecrets } from "./services/profile/profile-manager";
 import { initSentryMain } from "./sentry";
-import { readSettingsFile } from "./settings-utils";
+import {
+	migrateSettingsSecrets,
+	readSettingsFile,
+	writeSettingsFile,
+} from "./settings-utils";
 import { TerminalManager } from "./terminal-manager";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -817,19 +816,34 @@ async function setupMacOSDockIcon() {
 	}
 }
 
+// Encrypt the secrets settings.json and profiles.json still hold in clear.
+// Without OS encryption they stay as they are and the UI warns the user.
+async function migrateSecretsAtRest(): Promise<void> {
+	try {
+		if (migrateSettingsSecrets()) {
+			console.warn("[main] settings.json: secrets kept in clear rewritten");
+		}
+		if (await migrateProfilesSecrets()) {
+			console.warn("[main] profiles.json: secrets kept in clear rewritten");
+		}
+	} catch (error) {
+		console.warn("[main] Failed to encrypt stored secrets:", error);
+	}
+}
+
 // Load and validate settings for agent manager configuration
 function loadAndValidateSettings() {
-	const settingsPath = join(app.getPath("userData"), "settings.json");
-
 	try {
-		const settings = JSON.parse(readFileSync(settingsPath, "utf-8"));
+		// Through settings-utils, the one reader that decrypts secret fields
+		// (and the one writer that encrypts them back).
+		const settings = readSettingsFile() as Partial<AppSettings> | undefined;
+		if (!settings) return; // No settings file yet — expected on first run
 		let validAutoBuildPath = settings.autoBuildPath;
 
 		// Validate and migrate autoBuildPath if it exists
 		if (validAutoBuildPath) {
 			validAutoBuildPath = validateAndMigrateAutoBuildPath(
 				validAutoBuildPath,
-				settingsPath,
 				settings,
 			);
 		}
@@ -863,8 +877,7 @@ function loadAndValidateSettings() {
 // Validate and migrate autoBuildPath - must contain runners/spec_runner.py
 function validateAndMigrateAutoBuildPath(
 	autoBuildPath: string,
-	settingsPath: string,
-	settings: Record<string, unknown>,
+	settings: Partial<AppSettings>,
 ): string | undefined {
 	const specRunnerPath = join(autoBuildPath, "runners", "spec_runner.py");
 	let specRunnerExists = false;
@@ -908,7 +921,7 @@ function validateAndMigrateAutoBuildPath(
 
 			// Save the corrected setting - we're the only process modifying settings at startup
 			try {
-				writeFileSync(settingsPath, JSON.stringify(settings, null, 2), "utf-8");
+				writeSettingsFile(settings);
 			} catch (writeError) {
 				console.warn(
 					"[main] Failed to save migrated autoBuildPath:",
@@ -1145,6 +1158,11 @@ async function main() {
 
 	// Initialize agent manager
 	agentManager = new AgentManager();
+
+	// Secrets at rest: earlier versions wrote API keys in clear. Encrypt them
+	// now that safeStorage is ready, before anything else reads or rewrites
+	// them (docs/architecture/secrets-at-rest.md).
+	await migrateSecretsAtRest();
 
 	// Load and validate settings for agent manager configuration
 	loadAndValidateSettings();

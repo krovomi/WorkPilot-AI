@@ -3,12 +3,17 @@
  *
  * Handles loading and saving profiles.json from the auto-claude directory.
  * Provides graceful handling for missing or corrupted files.
+ * API keys go through the same disk encoding as services/profile/profile-manager.
  */
 
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { app } from "electron";
 import type { ProfilesFile } from "../../shared/types/profile";
+import {
+	decodeProfilesFromDisk,
+	encodeProfilesForDisk,
+} from "../services/profile/profile-manager";
 
 /**
  * Get the path to profiles.json in the auto-claude directory
@@ -28,7 +33,7 @@ export async function loadProfilesFile(): Promise<ProfilesFile> {
 	try {
 		const content = await fs.readFile(filePath, "utf-8");
 		const data = JSON.parse(content) as ProfilesFile;
-		return data;
+		return decodeProfilesFromDisk(data);
 	} catch (_error) {
 		// File doesn't exist or is corrupted - return default
 		return {
@@ -40,7 +45,7 @@ export async function loadProfilesFile(): Promise<ProfilesFile> {
 }
 
 /**
- * Save profiles.json to disk
+ * Save profiles.json to disk, API keys encrypted, file mode 0600
  * Creates the auto-claude directory if it doesn't exist
  */
 export async function saveProfilesFile(data: ProfilesFile): Promise<void> {
@@ -59,8 +64,9 @@ export async function saveProfilesFile(data: ProfilesFile): Promise<void> {
 	}
 
 	// Write file with formatted JSON
-	const content = JSON.stringify(data, null, 2);
-	await fs.writeFile(filePath, content, "utf-8");
+	const content = JSON.stringify(encodeProfilesForDisk(data), null, 2);
+	await fs.writeFile(filePath, content, { encoding: "utf-8", mode: 0o600 });
+	await validateFilePermissions(filePath);
 }
 
 /**
