@@ -21,7 +21,6 @@ github-issues/
 ├── utils/                # Utilities (21 lines)
 ├── index.ts              # Module exports
 ├── README.md             # This file
-├── REFACTORING_SUMMARY.md
 └── ARCHITECTURE.md
 ```
 
@@ -262,7 +261,6 @@ import { GitHubIssues } from './components/github-issues';
 ## Documentation
 
 - **README.md** (this file) - Module overview and usage
-- **REFACTORING_SUMMARY.md** - Detailed refactoring metrics and benefits
 - **ARCHITECTURE.md** - In-depth architecture documentation
 
 ## Contributing

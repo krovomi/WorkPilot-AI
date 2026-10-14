@@ -31,7 +31,7 @@ AI-assisted PRs go through the same review process as any other contribution. Tr
 - [Prerequisites](#prerequisites)
 - [Quick Start](#quick-start)
 - [Development Setup](#development-setup)
-- [Pre-commit Hooks](#pre-commit-hooks)
+- [Git Hooks](#git-hooks)
 - [Code Style](#code-style)
 - [Testing](#testing)
 - [Continuous Integration](#continuous-integration)
@@ -221,53 +221,25 @@ WorkPilot AI automatically downloads prebuilt binaries for Windows. If prebuilts
 
 > **Note:** For regular usage, we recommend downloading the pre-built releases from [GitHub Releases](https://github.com/krovomi/WorkPilot-AI/releases). Running from source is primarily for contributors and those testing unreleased features.
 
-## Pre-commit Hooks
+## Git Hooks
 
-We use [pre-commit](https://pre-commit.com/) to run linting and formatting checks before each commit. This ensures code quality and consistency across the project.
+Hooks live in `.husky/` and are plain shell scripts — no `pre-commit` framework, no extra
+Python package. `pnpm install` at the root runs `prepare`, which points git at them
+(`git config core.hooksPath .husky`). Run it once after cloning if you installed otherwise.
 
-### Setup
+| Hook | What runs | Escape hatch |
+|------|-----------|--------------|
+| `pre-commit` | On **staged files only**: `ruff format` + `ruff check --fix` (Python), `biome check --write` (frontend), re-stage, then `scripts/staged-tests.js` | `PRE_COMMIT_SKIP_TESTS=1` skips the tests, not the formatters |
+| `commit-msg` | Conventional Commits: `type(scope)!?: description`, first line ≤ 100 characters | — |
+| `pre-push` | `scripts/pre-push.js`: ruff check + format check, `skills_cli build --check`, Biome lint | `PRE_PUSH_FULL=1` adds pytest, `tsc` and vitest; `PRE_PUSH_SKIP=1` skips everything |
 
-```bash
-# Install pre-commit
-pip install pre-commit
+The tool versions are pinned (ruff `0.15.7`, Biome `2.5.11`): any other version produces a diff
+CI rejects. `git commit --no-verify` exists, but CI runs the same checks — it only moves the
+failure later.
 
-# Install the git hooks (run once after cloning)
-pre-commit install
-```
-
-### What Runs on Commit
-
-When you commit, the following checks run automatically:
-
-| Check | Scope | Description |
-|-------|-------|-------------|
-| **ruff** | `apps/backend/` | Python linter with auto-fix |
-| **ruff-format** | `apps/backend/` | Python code formatter |
-| **eslint** | `apps/frontend/` | TypeScript/React linter |
-| **typecheck** | `apps/frontend/` | TypeScript type checking |
-| **trailing-whitespace** | All files | Removes trailing whitespace |
-| **end-of-file-fixer** | All files | Ensures files end with newline |
-| **check-yaml** | All files | Validates YAML syntax |
-| **check-added-large-files** | All files | Prevents large file commits |
-
-### Running Manually
-
-```bash
-# Run all checks on all files
-pre-commit run --all-files
-
-# Run a specific hook
-pre-commit run ruff --all-files
-
-# Skip hooks temporarily (not recommended)
-git commit --no-verify -m "message"
-```
-
-### If a Check Fails
-
-1. **Ruff auto-fixes**: Some issues are fixed automatically. Stage the changes and commit again.
-2. **ESLint errors**: Fix the reported issues in your code.
-3. **Type errors**: Resolve TypeScript type issues before committing.
+**No hook scans for secrets.** Do not count on one: keep credentials in `.env-files/*.env`
+(git-ignored) and read [docs/rules/security.md](rules/security.md) before touching anything
+that handles them.
 
 ## Code Style
 
@@ -384,7 +356,7 @@ with open(path, "rb") as f:  # Correct
     data = f.read()
 ```
 
-Our pre-commit hooks automatically check for missing encoding parameters. See [docs/windows-development.md](windows-development.md) for the encoding rules and Windows-specific development guidance.
+No hook checks this: run `python scripts/check_encoding.py` before pushing Python that opens files. See [docs/windows-development.md](windows-development.md) for the encoding rules and Windows-specific development guidance.
 
 ## Testing
 
@@ -896,7 +868,7 @@ Desktop interface:
 - **Renderer**: `src/renderer/` - React UI components
 - **Shared**: `src/shared/` - Types and utilities
 
-For detailed architecture information, see [CLAUDE.md](CLAUDE.md).
+For the rules every change follows, see [CLAUDE.md](CLAUDE.md) and [rules/](rules/); for the documentation map, [README.md](README.md).
 
 ---
 
