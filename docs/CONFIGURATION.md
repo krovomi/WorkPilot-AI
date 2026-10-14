@@ -261,17 +261,34 @@ is taken so the user knows the output is not live data:
   currently returns empty/mock payloads for every endpoint. Treat it as a
   scaffold until a real database-backed implementation lands.
 
-## QA coverage gate
+## QA validation loop
 
-Once the QA reviewer approves a pass, the coverage gate
-([apps/backend/qa/coverage_gate.py](../apps/backend/qa/coverage_gate.py)) checks the
-percentages the reviewer recorded in `implementation_plan.json` → `qa_signoff.coverage`.
-It reads its threshold from the backend process environment; the build CLI also loads
-`.env-files/.env`, where a value already set in the environment wins:
+The QA loop ([apps/backend/qa/](../apps/backend/qa/)) reads these from the backend process
+environment; the build CLI also loads `.env-files/.env`, where a value already set in the
+environment wins:
 
 | Variable | Default | Meaning |
 | --- | ---: | --- |
+| `WORKPILOT_QA_MAX_ITERATIONS` | by effort | Review passes a task may run, whatever its QA effort. Capped at 50; a value below 1 or that is not a number is ignored. |
 | `WORKPILOT_QA_MIN_COVERAGE` | 100 | Minimum coverage, in percent, of the `unit` **and** `integration` tests; `e2e` below it only warns. `0` disables the gate. Clamped to 0–100; a value that is not a number falls back to 100. |
+
+### Review budget
+
+Without `WORKPILOT_QA_MAX_ITERATIONS`, the budget
+([apps/backend/qa/budget.py](../apps/backend/qa/budget.py)) follows the effort of the
+task's QA phase (`phaseThinking.qa`, `high` by default): 3 passes at `none`, 5 at `low`,
+8 at `medium`, 12 at `high`, 20 at `ultrathink`; an unknown effort gets 12. The budget
+belongs to the task: a build paused and resumed in the middle of QA continues its count,
+and feedback a person writes opens a new budget. An issue that keeps coming back escalates
+to a human (`QA_ESCALATION.md`) before the budget runs out. A task that spends its budget
+without approval lands in human review, flagged with errors.
+
+### Coverage gate
+
+Once the QA reviewer approves a pass, the coverage gate
+([apps/backend/qa/coverage_gate.py](../apps/backend/qa/coverage_gate.py)) checks the
+percentages the reviewer recorded in `implementation_plan.json` → `qa_signoff.coverage`
+against `WORKPILOT_QA_MIN_COVERAGE`.
 
 A pass below the threshold, or whose coverage the reviewer did not measure (no value, or
 `measured: false`), is rejected: the QA fixer receives a `QA_FIX_REQUEST.md` listing the
