@@ -109,6 +109,15 @@ export interface ProjectAPI {
 		projectId: string,
 		config: Partial<ProjectEnvConfig>,
 	) => Promise<IPCResult>;
+	/**
+	 * Send a test message to a notification channel. The main process uses the
+	 * URL stored for the project unless `url` is a new one (not the mask).
+	 */
+	testNotificationWebhook: (
+		projectId: string,
+		channel: string,
+		url?: string,
+	) => Promise<IPCResult<{ delivered: boolean }>>;
 	checkClaudeAuth: (projectId: string) => Promise<IPCResult<ClaudeAuthResult>>;
 	invokeClaudeSetup: (
 		projectId: string,
@@ -395,6 +404,18 @@ export const createProjectAPI = (): ProjectAPI => ({
 		config: Partial<ProjectEnvConfig>,
 	): Promise<IPCResult> =>
 		ipcRenderer.invoke(IPC_CHANNELS.ENV_UPDATE, projectId, config),
+
+	testNotificationWebhook: (
+		projectId: string,
+		channel: string,
+		url?: string,
+	): Promise<IPCResult<{ delivered: boolean }>> =>
+		ipcRenderer.invoke(
+			IPC_CHANNELS.ENV_TEST_NOTIFICATION_WEBHOOK,
+			projectId,
+			channel,
+			url,
+		),
 
 	checkClaudeAuth: (projectId: string): Promise<IPCResult<ClaudeAuthResult>> =>
 		ipcRenderer.invoke(IPC_CHANNELS.ENV_CHECK_CLAUDE_AUTH, projectId),

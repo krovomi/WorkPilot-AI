@@ -153,6 +153,35 @@ the rest, as `encrypted` keys:
   root `.env`. It writes `.workpilot/.env` first, where a value already set
   wins. The root file then loses only those lines and keeps its mode.
 
+### What the renderer sees
+
+The renderer is not trusted (rule S6 of
+[`docs/rules/security.md`](../rules/security.md)), so `ENV_GET` never hands
+it a project secret, whether it is encrypted or readable. Each secret field
+that is set reads as `MASKED_SECRET` (`shared/constants/secrets.ts`), which
+is enough to tell "configured" from "not configured". The fields are listed
+in `PROJECT_ENV_SECRET_FIELDS` in `env-handlers.ts`, plus
+`mcpServers.context7ApiKey`. When a project falls back to the global Claude
+token or OpenAI key, that value is masked the same way.
+
+The settings screens save the whole config on every edit, so the mask comes
+back. `ENV_UPDATE` treats it as "keep the stored value"
+(`unmaskProjectEnvUpdate`). Text typed after the mask is the new value; the
+mask's character never occurs in a token or a URL. This also stops a
+whole-config save from copying the global Claude token into the project
+file.
+
+Two screens used to send the value itself somewhere. The main process now
+reads it instead:
+
+- **Jira connection test.** It passes `projectId`. A masked or empty token
+  means the project's stored token. Without a project, the test is refused.
+- **Notification webhook test.** It goes through
+  `env:testNotificationWebhook(projectId, channel, url?)`. The main process
+  takes the URL stored for that channel (closed list) unless a new one was
+  typed, and has the backend post it. Before, the renderer did that fetch
+  itself.
+
 ## Not covered here
 
 The backend's own `.env` (`apps/backend/.env` in development,

@@ -33,11 +33,14 @@ interface JiraSyncStatus {
  * Connects to the backend JIRA connector at src/connectors/jira/.
  */
 export function JiraIntegration({
+	projectId,
 	envConfig,
 	updateEnvConfig,
 	showJiraToken,
 	setShowJiraToken,
 }: {
+	/** Lets the main process test with the stored token: the field only holds its mask. */
+	readonly projectId?: string;
 	readonly envConfig: ProjectEnvConfig | null;
 	readonly updateEnvConfig: (updates: Partial<ProjectEnvConfig>) => void;
 	readonly showJiraToken: boolean;
@@ -88,7 +91,10 @@ export function JiraIntegration({
 				return;
 			}
 
+			// The token field holds the mask unless a new token was typed: the
+			// main process then tests with the project's stored token.
 			const result = await test({
+				projectId,
 				instanceUrl: jiraInstanceUrl,
 				email: jiraEmail,
 				apiToken: jiraApiToken,
