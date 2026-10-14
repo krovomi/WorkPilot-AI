@@ -119,6 +119,7 @@ import { registerSelfHealingHandlers } from "./self-healing-handlers";
 import { registerServerAdminHandlers } from "./server-admin-handlers";
 import { registerServerAuthHandlers } from "./server-auth-handlers";
 import { registerJevHandlers } from "./jev-handlers";
+import { registerSecureStorageHandlers } from "./secure-storage-handlers";
 import { registerSettingsHandlers } from "./settings-handlers";
 import { setupSmartEstimationHandlers } from "./smart-estimation-handlers";
 import { registerAgentCoachHandlers } from "./agent-coach-handlers";
@@ -308,6 +309,7 @@ export function setupIpcHandlers(
 	// Settings and dialog handlers
 	registerSettingsHandlers(agentManager, getMainWindow);
 	registerJevHandlers();
+	registerSecureStorageHandlers();
 
 	// Multi-user server mode: connection + login (local / Entra ID)
 	registerServerAuthHandlers(getMainWindow);

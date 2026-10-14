@@ -155,18 +155,28 @@ class ToolExecutor:
             if not self.working_directory.is_dir():
                 raise ValueError("Tool working directory does not exist")
 
-    def _resolve_within_project(self, path: str) -> Path:
+    def _resolve_within_project(self, path: str, *, for_write: bool = False) -> Path:
         """Resolve a user-supplied path and reject anything outside project_dir.
 
         Why: agent-supplied paths can be relative ('../etc/passwd') or absolute
         ('/etc/passwd'). Without this guard, Path / userpath happily escapes
         the sandbox, since Path('/safe') / Path('/etc/x') -> Path('/etc/x').
+
+        `for_write` also refuses the project's security configuration
+        (`security.path_guard.protected_config_refusal`) — the rule the SDK's
+        write-path hook applies, for the providers that never reach it.
+        Reading those files stays allowed: what they grant is no secret.
         """
         candidate = (self.working_directory / path).resolve()
         try:
             candidate.relative_to(self.project_dir)
         except ValueError:
             raise ValueError(f"Path '{path}' is outside the project directory")
+        if for_write:
+            from security.path_guard import protected_config_refusal
+
+            if refusal := protected_config_refusal(path, self.working_directory):
+                raise ValueError(refusal)
         return candidate
 
     async def execute(self, tool_name: str, arguments: dict[str, Any]) -> Any:
@@ -290,7 +300,7 @@ class ToolExecutor:
         if not path:
             raise ValueError("Path is required for write_file")
 
-        file_path = self._resolve_within_project(path)
+        file_path = self._resolve_within_project(path, for_write=True)
 
         # The user's guardrails, which the SDK applies to every write tool
         # (`.workpilot/guardrails.yaml`: a path no agent may touch, content no
@@ -506,7 +516,7 @@ class ToolExecutor:
         if not path:
             raise ValueError("Path is required for create_directory")
 
-        dir_path = self._resolve_within_project(path)
+        dir_path = self._resolve_within_project(path, for_write=True)
         try:
             dir_path.mkdir(parents=True, exist_ok=True)
             return f"Successfully created directory {path}"
