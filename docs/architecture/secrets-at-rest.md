@@ -35,6 +35,7 @@ plaintext:
 | `settings.json` | `settings-utils.ts` — `readSettingsFile`, `readSettingsFileAsync`, `writeSettingsFile` | `isSecretSettingsKey`: `global…ApiKey`, `…AccessKey`, `…Token`, `…Secret`, `…Password`, `customProviderApiKey` |
 | `profiles.json` | `services/profile/profile-manager.ts` (`encodeProfilesForDisk` / `decodeProfilesFromDisk`), reused by `utils/profile-manager.ts` | `apiKey` |
 | Claude profiles | `claude-profile/token-encryption.ts` | `oauthToken` |
+| `<project>/.workpilot/.env` | `project-env-file.ts` — `readProjectEnv`, `writeProjectEnvFile` | the `encrypted` list of `project-env-secrets.json` (below) |
 
 That is why no module parses `settings.json` itself any more: the dozen
 services that did so to inject `ANTHROPIC_API_KEY` or `CLAUDE_OAUTH_TOKEN`
@@ -83,8 +84,53 @@ such as `apiKey` or `authorization`). It keeps the recognisable prefix, so a
 reader still knows what leaked, and leaves `max_tokens=4096` or
 `hasToken: true` alone.
 
+## A project's `.workpilot/.env`
+
+The settings screen writes each project's integration tokens to
+`<project>/.workpilot/.env`, and the Python backend reads that file with its
+own parsers. Python cannot call `safeStorage`, so the file holds two kinds of
+secrets, listed in `apps/frontend/src/shared/constants/project-env-secrets.json`:
+
+| Kind | Keys | On disk | How Python gets the value |
+|---|---|---|---|
+| `encrypted` | `CLAUDE_CODE_OAUTH_TOKEN`, `LINEAR_API_KEY`, `GITHUB_TOKEN`, `GITLAB_TOKEN`, `AZURE_DEVOPS_PAT`, `JIRA_API_TOKEN`, `CICD_JENKINS_TOKEN`, `OPENAI_API_KEY`, `AZURE_OPENAI_API_KEY`, `VOYAGE_API_KEY`, `GOOGLE_API_KEY` | `enc:` ciphertext | only from its environment, which the main process builds from this file and decrypts on the way (`getCombinedEnv`, `loadProjectEnvForSubprocess`, `loadProjectEnvVars`) |
+| `readable` | `CONTEXT7_API_KEY`, `CUSTOM_MCP_SERVERS` (when a server has HTTP headers), `FIGMA_ACCESS_TOKEN`, `DOCINTEL_AZURE_KEY`, the five notification webhook URLs | in clear, file `0600` | from the file itself |
+
+The split follows the readers, not how sensitive a key is. A `readable` key is
+read from the file by processes the app starts without the project's
+environment: the long-lived API server (Figma import, notifications, docintel)
+and the runners that build a client for any project (`create_client` loads
+`CONTEXT7_API_KEY` and `CUSTOM_MCP_SERVERS` through
+`load_project_mcp_config`). Ciphertext there would silently break those
+features. Those keys therefore stay in clear and are reported to the status as
+`readableSecretKeys`. The banner then names them even when a keyring exists,
+because a secret in clear is never kept without the user being told.
+
+`apps/frontend/src/main/project-env-file.ts` is the one reader and writer in
+the main process. Every handler that reads the file (Linear, Jira, GitHub,
+GitLab, Azure DevOps, CI pipelines, PR creation, the agent process) goes
+through `readProjectEnv`, which decrypts. A value it cannot decrypt is left
+out: a subprocess gets no token rather than ciphertext, and the file keeps the
+value. `writeProjectEnvFile` encrypts the `encrypted` keys and keeps every
+other line byte for byte. `migrateProjectEnvSecrets` runs at startup and when a
+project is added: it rewrites the tokens an earlier version wrote in clear and
+restricts the file to its owner.
+
+Git must ignore the file. `initializeProject` ignores `.workpilot/`, but a
+`.env` saved before initialization, or a `.workpilot/` renamed from a legacy
+`.auto-claude/`, never went through it. `ensureProjectEnvIgnored` asks
+`git check-ignore` and, when the file is not ignored, adds `.workpilot/.env`
+itself, never the directory: a team that commits `.workpilot/specs/` through a
+negation keeps doing so.
+
+`tests/test_project_env_secrets.py` holds the backend to the split: no reader
+of the file returns an `enc:` value, the `readable` keys still reach their
+readers, and a new module that opens the file fails the test until it is
+classified. On the frontend, `env-handlers-secrets.test.ts` fails when the
+`.env` template gains a key that looks like a secret and is not classified.
+
 ## Not covered here
 
-A project's `.workpilot/.env` still holds the tokens the Python backend reads
-(`CLAUDE_CODE_OAUTH_TOKEN`, `LINEAR_API_KEY`…). The backend cannot call
-`safeStorage`; protecting that file needs a different design.
+The backend's own `.env` (`apps/backend/.env` in development,
+`userData/backend/.env` in production), written by `settings-handlers.ts`,
+still holds `CLAUDE_CODE_OAUTH_TOKEN` in clear.

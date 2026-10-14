@@ -64,6 +64,7 @@ describe("secret-storage", () => {
 			expect(storage.getSecureStorageStatus()).toEqual({
 				keyringAvailable: true,
 				backend: "gnome_libsecret",
+				readableSecretKeys: [],
 				secretsAtRisk: false,
 			});
 		});
@@ -116,6 +117,7 @@ describe("secret-storage", () => {
 			expect(storage.getSecureStorageStatus()).toEqual({
 				keyringAvailable: false,
 				backend: "basic_text",
+				readableSecretKeys: [],
 				secretsAtRisk: true,
 			});
 			// What basic_text encrypted earlier still reads back.
@@ -138,6 +140,45 @@ describe("secret-storage", () => {
 			storage.decryptSecret("legacy-plain-key");
 
 			expect(storage.getSecureStorageStatus().secretsAtRisk).toBe(true);
+		});
+	});
+
+	describe("secrets kept readable on purpose", () => {
+		it("put the status at risk even with a keyring, naming keys, never values", async () => {
+			const storage = await load();
+			const listener = vi.fn();
+			storage.onSecureStorageStatusChange(listener);
+
+			storage.setReadableSecrets("/a/.workpilot/.env", ["SLACK_WEBHOOK_URL"]);
+			storage.setReadableSecrets("/b/.workpilot/.env", [
+				"CONTEXT7_API_KEY",
+				"SLACK_WEBHOOK_URL",
+			]);
+
+			expect(storage.getSecureStorageStatus()).toEqual({
+				keyringAvailable: true,
+				backend: "gnome_libsecret",
+				readableSecretKeys: ["CONTEXT7_API_KEY", "SLACK_WEBHOOK_URL"],
+				secretsAtRisk: true,
+			});
+			expect(listener).toHaveBeenCalledTimes(2);
+		});
+
+		it("clear with the file that held them, and only publish a change", async () => {
+			const storage = await load();
+			const listener = vi.fn();
+			storage.onSecureStorageStatusChange(listener);
+			storage.setReadableSecrets("/a/.workpilot/.env", ["CONTEXT7_API_KEY"]);
+			storage.setReadableSecrets("/a/.workpilot/.env", ["CONTEXT7_API_KEY"]);
+			expect(listener).toHaveBeenCalledTimes(1);
+
+			storage.setReadableSecrets("/a/.workpilot/.env", []);
+
+			expect(storage.getSecureStorageStatus()).toMatchObject({
+				readableSecretKeys: [],
+				secretsAtRisk: false,
+			});
+			expect(listener).toHaveBeenCalledTimes(2);
 		});
 	});
 

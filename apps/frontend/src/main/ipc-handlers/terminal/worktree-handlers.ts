@@ -24,6 +24,7 @@ import type {
 import { debugError, debugLog } from "../../../shared/utils/debug-logger";
 import { getToolPath } from "../../cli-tool-manager";
 import { isWindows } from "../../platform";
+import { readProjectEnvFile } from "../../project-env-file";
 import { projectStore } from "../../project-store";
 import { getIsolatedGitEnv } from "../../utils/git-isolation";
 import {
@@ -32,7 +33,6 @@ import {
 	getTerminalWorktreeMetadataPath,
 	getTerminalWorktreePath,
 } from "../../worktree-paths";
-import { parseEnvFile } from "../utils";
 
 // Promisify execFile for async operations
 const execFileAsync = promisify(execFile);
@@ -229,21 +229,13 @@ function getDefaultBranch(projectPath: string): string {
 		return project.settings.mainBranch;
 	}
 
-	const envPath = path.join(projectPath, ".workpilot", ".env");
-	if (existsSync(envPath)) {
-		try {
-			const content = readFileSync(envPath, "utf-8");
-			const vars = parseEnvFile(content);
-			if (vars.DEFAULT_BRANCH) {
-				debugLog(
-					"[TerminalWorktree] Using DEFAULT_BRANCH from env config:",
-					vars.DEFAULT_BRANCH,
-				);
-				return vars.DEFAULT_BRANCH;
-			}
-		} catch (error) {
-			debugError("[TerminalWorktree] Error reading env file:", error);
-		}
+	const vars = readProjectEnvFile(path.join(projectPath, ".workpilot", ".env"));
+	if (vars.DEFAULT_BRANCH) {
+		debugLog(
+			"[TerminalWorktree] Using DEFAULT_BRANCH from env config:",
+			vars.DEFAULT_BRANCH,
+		);
+		return vars.DEFAULT_BRANCH;
 	}
 
 	for (const branch of ["main", "master"]) {
