@@ -36,7 +36,6 @@ _mocked_module_names = [
     "core.simple_client",
     "core.task_event",
     "core.workspace",
-    "core.workspace.models",
     "core.file_utils",
     "core.plan_normalization",
     "core.platform",
@@ -98,6 +97,25 @@ _mocked_module_names = [
     "integrations.linear",
     "integrations.linear.updater",
 ]
+
+# `core.build_signals` and `core.pause_state` have no dependencies, and the
+# code under test imports them (`qa/loop.py`, `spec/pipeline/orchestrator.py`,
+# since the pause/halt signals of #151). They are not mocked: a MagicMock
+# `BuildPaused` cannot be caught, and a MagicMock `is_paused()` is truthy.
+# Import them for real *before* `core` is replaced below; once it is, Python
+# cannot resolve a submodule of it ("'core' is not a package"). Without this
+# the file only collected when an earlier test file had imported them.
+import core.build_signals
+import core.pause_state
+
+# `SpecOrchestrator` numbers spec folders through `core.workspace.models.
+# SpecNumberLock`, and the numbering tests below assert real numbers. A
+# MagicMock lock hands `create_spec_dir` a MagicMock number, which cannot be
+# formatted as `{n:03d}`. In a full run the real lock was used anyway, because
+# an earlier file had already imported `spec.pipeline`; run alone, the file
+# failed 24 tests. The module holds only dataclasses and enums, and
+# `tests/conftest.py` already keeps it real (`_MODULES_TO_PRESERVE`).
+import core.workspace.models
 
 for name in _mocked_module_names:
     if name in sys.modules:
