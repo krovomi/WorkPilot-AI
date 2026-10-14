@@ -2,9 +2,10 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { app } from "electron";
+import type { AppSettings } from "../shared/types";
 import { pythonEnvManager } from "./python-env-manager";
 import { credentialManager } from "./services/credential-manager";
+import { readSettingsFile } from "./settings-utils";
 import { getEffectiveSourcePath } from "./updater/path-resolver";
 
 /**
@@ -95,10 +96,9 @@ export class DesignToCodeService {
 		env.PYTHONUTF8 = "1";
 		env.PYTHONUNBUFFERED = "1";
 		try {
-			const settingsPath = path.join(app.getPath("userData"), "settings.json");
-			if (existsSync(settingsPath)) {
-				const { readFileSync } = require("node:fs");
-				const settings = JSON.parse(readFileSync(settingsPath, "utf-8"));
+			// Through settings-utils: it decrypts the stored keys.
+			const settings = readSettingsFile() as Partial<AppSettings> | undefined;
+			if (settings) {
 				if (settings.globalClaudeOAuthToken)
 					env.CLAUDE_OAUTH_TOKEN = settings.globalClaudeOAuthToken;
 				if (settings.globalAnthropicApiKey)
