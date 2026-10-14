@@ -814,6 +814,12 @@ def create_client(
     #   MCP servers to make deferral worthwhile.
     sdk_env.setdefault("ENABLE_PROMPT_CACHING_1H", "1")
     sdk_env.setdefault("ENABLE_TOOL_SEARCH", "auto:5")
+    # Native compaction at the task's context threshold (context_mgmt): the CLI
+    # summarises in place, mid-turn, instead of WorkPilot restarting the thread.
+    from context_mgmt import native_auto_compact_env
+
+    for _key, _value in native_auto_compact_env(spec_dir).items():
+        sdk_env.setdefault(_key, _value)
 
     # OpenTelemetry observability (opt-in). When AUTO_CLAUDE_OTEL_ENDPOINT is
     # set (e.g. `http://localhost:4318` for a local OTLP collector / Jaeger),
@@ -2442,6 +2448,9 @@ def create_agent_client(
                 agent_type,
                 reasoning_effort,
             )
+            from context_mgmt import codex_auto_compact_limit
+            from context_mgmt.windows import resolve_context_window
+
             return CodexCliAgentClient(
                 model=model or None,
                 system_prompt=openai_system_prompt,
@@ -2449,6 +2458,9 @@ def create_agent_client(
                 agent_type=agent_type,
                 reasoning_effort=reasoning_effort,
                 thread_id=resume,
+                auto_compact_token_limit=codex_auto_compact_limit(
+                    spec_dir, resolve_context_window(model or "codex")
+                ),
             )
 
         if openai_uses_codex_cli():

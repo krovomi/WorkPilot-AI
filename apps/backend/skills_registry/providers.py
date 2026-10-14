@@ -38,6 +38,11 @@ class ProviderCapabilities:
     effort: str
     degrades_to: str | None
     note: str = ""
+    # How the context window is managed (see the `context` field documented at
+    # the top of providers.yaml). Unknown providers get the conservative
+    # answer: WorkPilot emulates compaction and can only estimate the fill.
+    context_compact: str = "emulated"
+    context_usage: str = "estimated"
 
     @property
     def supports_subagents(self) -> bool:
@@ -67,6 +72,7 @@ def load_providers(repo_root: Path | None = None) -> dict[str, ProviderCapabilit
     out: dict[str, ProviderCapabilities] = {}
     for name, cfg in raw.items():
         cfg = cfg or {}
+        context = cfg.get("context") or {}
         out[name] = ProviderCapabilities(
             name=name,
             adapter=cfg.get("adapter"),
@@ -74,6 +80,8 @@ def load_providers(repo_root: Path | None = None) -> dict[str, ProviderCapabilit
             effort=str(cfg.get("effort", "none")),
             degrades_to=cfg.get("degrades_to"),
             note=str(cfg.get("note", "") or ""),
+            context_compact=str(context.get("compact", "emulated")),
+            context_usage=str(context.get("usage", "estimated")),
         )
     return out
 

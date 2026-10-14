@@ -125,6 +125,7 @@ Why each feature is built the way it is. Read the file before changing the featu
 | Bounty Board | [bounty-board.md](../shared_docs/architecture/bounty-board.md) | Contests scored on artifacts; absent evidence renormalises, never scores zero. |
 | Declarative workflows | [workflows.md](../shared_docs/architecture/workflows.md) | `workflow.yaml`, effort pruning, windows, rosters, phase handoff; the workflow logger. |
 | Pause and resume | [pause-resume.md](../shared_docs/architecture/pause-resume.md) | `core/pause_state.py`, `BuildPaused` / `BuildHalted`, resuming a phase without paying for it twice. |
+| Context management | [context-management.md](../shared_docs/architecture/context-management.md) | Lean artifacts (one fact, one place; QA reports rendered from the sign-off), and the per-task compact / clear policy with its gauge, native or emulated per provider. |
 | Offline mode | [offline-mode.md](../shared_docs/architecture/offline-mode.md) | `airgapStrict` as a barrier, otherwise a default; the strict switch where the barrier shows. |
 | Frontend architecture | [frontend-architecture.md](../shared_docs/architecture/frontend-architecture.md) | Stores, background activity and the sidebar, agent management, profiles, terminals, auth links. |
 | Task panel | [frontend-task-panel.md](../shared_docs/architecture/frontend-task-panel.md) | Task progress (`shared/progress.ts`), the Overview tab, acceptance criteria, the change graph. |

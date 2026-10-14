@@ -16,6 +16,15 @@
 #   effort      how reasoning depth is expressed, so phase_config can map onto it
 #   degrades_to what actually runs when `adapter` is null. Surfaced in the task
 #               feed, never silent.
+#   context     how a session's context window is managed (context_mgmt/):
+#                 compact  native    the provider summarises its own history
+#                                    (Claude `/compact`, Codex auto-compaction)
+#                          emulated  WorkPilot summarises the conversation log
+#                                    and the next session replays the summary
+#                 usage    exact     the provider reports the window fill
+#                          reported  per-turn prompt tokens are reported
+#                          estimated only characters can be counted
+#               "clear" (a fresh thread seeded with a handoff) works everywhere.
 #
 # Adding a real adapter for a provider is a strictly better outcome than
 # listing it here with `adapter: null`. This file records the current truth,
@@ -26,12 +35,18 @@ claude:
   subagents: native
   effort: thinking_budget
   degrades_to: null
+  context:
+    compact: native
+    usage: exact
 
 copilot:
   adapter: CopilotAgentClient
   subagents: native
   effort: thinking_budget
   degrades_to: null
+  context:
+    compact: emulated
+    usage: reported
   note: Converts AgentDefinition to its own SubagentDefinition.
 
 windsurf:
@@ -39,6 +54,9 @@ windsurf:
   subagents: none
   effort: none
   degrades_to: null
+  context:
+    compact: emulated
+    usage: reported
   note: >-
     Dual-mode (gRPC to the local IDE language server, or REST with
     OpenAI-compatible function calling). Neither mode carries subagents.
@@ -48,28 +66,47 @@ openai:
   subagents: none
   effort: reasoning_effort
   degrades_to: null
+  context:
+    compact: emulated
+    usage: reported
+  note: >-
+    With OPENAI_AUTH_MODE=codex-cli the task runs on CodexCliAgentClient, whose
+    threads compact natively (model_auto_compact_token_limit); context_mgmt
+    resolves that from the client, not from this entry.
 
 google:
   adapter: GoogleAgentClient
   subagents: none
   effort: thinking_budget
   degrades_to: null
+  context:
+    compact: emulated
+    usage: reported
 
 ollama:
   adapter: LocalAgentClient
   subagents: none
   effort: none
   degrades_to: null
+  context:
+    compact: emulated
+    usage: reported
 local:
   adapter: LocalAgentClient
   subagents: none
   effort: none
   degrades_to: null
+  context:
+    compact: emulated
+    usage: reported
 lmstudio:
   adapter: LocalAgentClient
   subagents: none
   effort: none
   degrades_to: null
+  context:
+    compact: emulated
+    usage: reported
 
 # ---------------------------------------------------------------------------
 # OpenAI-compatible endpoints, driven by CompatibleProviderAgentClient.
@@ -80,18 +117,27 @@ mistral:
   subagents: none
   effort: none
   degrades_to: null
+  context:
+    compact: emulated
+    usage: reported
 
 deepseek:
   adapter: CompatibleProviderAgentClient
   subagents: none
   effort: none
   degrades_to: null
+  context:
+    compact: emulated
+    usage: reported
 
 grok:
   adapter: CompatibleProviderAgentClient
   subagents: none
   effort: none
   degrades_to: null
+  context:
+    compact: emulated
+    usage: reported
 
 # ---------------------------------------------------------------------------
 # No agentic adapter yet. Selecting one of these runs the task on the Claude
@@ -104,12 +150,18 @@ meta:
   subagents: none
   effort: none
   degrades_to: claude
+  context:
+    compact: native
+    usage: exact
 
 aws:
   adapter: null
   subagents: none
   effort: thinking_budget
   degrades_to: claude
+  context:
+    compact: native
+    usage: exact
   note: Bedrock-hosted Anthropic models; the degradation is closer than it looks.
 
 cursor:
@@ -117,12 +169,18 @@ cursor:
   subagents: none
   effort: none
   degrades_to: claude
+  context:
+    compact: native
+    usage: exact
 
 custom:
   adapter: null
   subagents: none
   effort: none
   degrades_to: claude
+  context:
+    compact: native
+    usage: exact
   note: >-
     An Anthropic-compatible gateway configured through ANTHROPIC_BASE_URL. The
     degradation is intentional here: routing through the Claude SDK is exactly
