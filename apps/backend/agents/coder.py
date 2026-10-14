@@ -20,6 +20,7 @@ from agents.feature_wiring import (
     load_domain_addendum,
     suggest_routed_model,
 )
+from context_mgmt.reset_limit import ResetLimit
 from core.build_signals import BuildHalted, BuildPaused
 from core.client import create_agent_client
 from core.llm_optimization import should_inline_file_context
@@ -1183,6 +1184,11 @@ async def run_autonomous_agent(
     last_generic_error_signature: str | None = None
     repeated_generic_error_count = 0
 
+    # A "context_reset" re-runs the subtask without counting an attempt. On a
+    # window too small for a fresh thread every re-run is cut again, so past a
+    # few in a row the rest of the subtask runs unmanaged (gauge only).
+    context_resets = ResetLimit()
+
     def _reset_concurrency_state() -> None:
         """Reset concurrency error tracking state after a successful session or non-concurrency error."""
         nonlocal \
@@ -1835,6 +1841,7 @@ async def run_autonomous_agent(
                     f"Starting {agent_type} session {iteration} for subtask {subtask_id or 'planning'}"
                 )
 
+            context_unit = (current_phase, subtask_id, phase_model)
             status, response, error_info = await run_agent_session(
                 client,
                 prompt,
@@ -1843,7 +1850,14 @@ async def run_autonomous_agent(
                 phase=current_log_phase,
                 streaming_wrapper=streaming_wrapper,
                 context_managed=True,
+                context_monitor_only=context_resets.monitor_only(context_unit),
             )
+            if context_resets.record(context_unit, status):
+                notice = context_resets.notice(f"subtask {subtask_id or 'planning'}")
+                if task_logger:
+                    task_logger.log_warning(notice, current_log_phase)
+                else:
+                    print_status(notice, "warning")
 
             # Context window past the task's threshold (or "compact / new
             # thread now" from the task panel): the guard already compacted or

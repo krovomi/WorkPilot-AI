@@ -98,6 +98,24 @@ AUTO = ContextPolicy()
         (99, ContextPolicy(mode="off"), Situation(), True, False, None, None),
         (10, ContextPolicy(mode="off"), Situation(), True, False, "clear", "clear"),
         (10, AUTO, Situation(prompt_too_long=True), True, False, None, "clear"),
+        # a thread that started past the threshold would restart past it:
+        # no cut below the hard threshold...
+        (60, AUTO, Situation(floor_pct=55), True, False, None, None),
+        # ...one at it, where a new thread still has room to work...
+        (82, AUTO, Situation(floor_pct=55), True, False, None, "compact"),
+        # ...and none when even the hard threshold is below the floor
+        (95, AUTO, Situation(floor_pct=85), True, False, None, None),
+        (60, AUTO, Situation(floor_pct=45), True, False, None, "compact"),
+        (60, AUTO, Situation(floor_pct=85), True, False, "clear", "clear"),
+        (
+            10,
+            AUTO,
+            Situation(prompt_too_long=True, floor_pct=85),
+            True,
+            False,
+            None,
+            "clear",
+        ),
     ],
 )
 def test_decision_table(percent, policy, situation, ready, native, manual, expected):
@@ -401,14 +419,22 @@ def test_native_compaction_settings_follow_the_policy(tmp_path: Path):
 
 
 class _SlowClient(_FakeClient):
-    """Yields to the event loop between messages, like a real stream does."""
+    """Yields to the event loop between messages, like a real stream does.
+
+    The reported fill (tokens of the 1 000-token window, one per message) grows
+    from 30 % to 60 % unless ``fills`` says otherwise.
+    """
+
+    def __init__(self, provider, model, messages, fills: list[int] | None = None):
+        super().__init__(provider, model, messages)
+        self._fills = fills or [300] + [600] * (len(messages) - 1)
 
     async def receive_response(self) -> AsyncIterator[AgentMessage]:
         import asyncio
 
-        for message in self._messages:
+        for message, fill in zip(self._messages, self._fills, strict=True):
             await asyncio.sleep(0)
-            self.last_context_tokens = 600  # 60 % of the 1 000-token window
+            self.last_context_tokens = fill
             yield message
             await asyncio.sleep(0)
 
@@ -437,3 +463,122 @@ async def test_handoff_is_prepared_in_parallel_then_used(tmp_path: Path, monkeyp
     assert len(calls) == 1  # prepared once, in the background, then reused
     log = read_log(spec, "grok", "grok-4")
     assert "SUMMARY FROM THE BACKGROUND" in log[0]["content"][0]["text"]
+
+
+# ── a thread a reset cannot help ─────────────────────────────────────────────
+
+
+def _task_events(out: str) -> list[dict]:
+    return [
+        json.loads(line.split(":", 1)[1])
+        for line in out.splitlines()
+        if line.startswith("__TASK_EVENT__:")
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("fills", "expected"),
+    [
+        # 60 % from the first turn: a new thread would start there again
+        ([600] * 6, "continue"),
+        # the hard threshold (80 %) still cuts, the next thread has room
+        ([600, 600, 850, 850], "context_reset"),
+    ],
+)
+async def test_a_fresh_thread_that_starts_past_the_threshold_is_not_cut_there(
+    tmp_path: Path, monkeypatch, fills, expected
+):
+    from agents.session import _run_agent_client_session
+
+    async def fake_summary(_entries, **_kwargs):
+        return "SUMMARY"
+
+    monkeypatch.setattr("context_mgmt.guard.summarize_conversation", fake_summary)
+    spec = _spec(tmp_path)  # auto, 50 %, nothing to replay
+    messages = [_text(f"step {i}") for i in range(len(fills))]
+    client = _SlowClient("deepseek", "deepseek-chat", messages, fills=fills)
+
+    status, _response, _info = await _run_agent_client_session(
+        client, "code it", spec, phase=LogPhase.CODING, context_managed=True
+    )
+
+    assert status == expected
+
+
+@pytest.mark.asyncio
+async def test_a_replayed_thread_has_no_floor(tmp_path: Path, monkeypatch):
+    """A reset can shrink what a thread replays: only a fresh one has a floor."""
+    from agents.session import _run_agent_client_session
+
+    async def fake_summary(_entries, **_kwargs):
+        return "SUMMARY"
+
+    monkeypatch.setattr("context_mgmt.guard.summarize_conversation", fake_summary)
+    spec = _spec(tmp_path)
+    _write_log(spec, "deepseek", "deepseek-chat", [_entry("assistant", "earlier")])
+    messages = [_text(f"step {i}") for i in range(6)]
+    client = _SlowClient("deepseek", "deepseek-chat", messages, fills=[600] * 6)
+
+    status, _response, _info = await _run_agent_client_session(
+        client, "code it", spec, phase=LogPhase.CODING, context_managed=True
+    )
+
+    assert client.resumed
+    assert status == "context_reset"
+
+
+@pytest.mark.asyncio
+async def test_a_monitor_only_guard_measures_and_never_acts(tmp_path: Path, capsys):
+    from agents.session import _run_agent_client_session
+
+    spec = _spec(tmp_path)
+    _write_log(
+        spec,
+        "deepseek",
+        "deepseek-chat",
+        [_entry("assistant", "x" * 3_000, subtask="s-0") for _ in range(3)],
+    )
+    write_context_action(spec, "clear")
+    client = _SlowClient(
+        "deepseek", "deepseek-chat", [_text("a"), _text("b")], fills=[900, 950]
+    )
+
+    status, _response, _info = await _run_agent_client_session(
+        client,
+        "next subtask",
+        spec,
+        phase=LogPhase.CODING,
+        context_managed=True,
+        context_monitor_only=True,
+    )
+
+    assert status != "context_reset"  # past the hard threshold, still not cut
+    assert client.resumed  # the oversized replay is not cleared before sending
+    assert (spec / "CONTEXT_ACTION.json").exists()  # left for a managed session
+    events = _task_events(capsys.readouterr().out)
+    assert not [e for e in events if e["type"] == "CONTEXT_ACTION_APPLIED"]
+    usage = [e for e in events if e["type"] == "CONTEXT_USAGE"]
+    assert usage and usage[-1]["percent"] == 95.0  # the gauge keeps measuring
+
+
+def test_reset_limit_counts_the_resets_of_one_unit_in_a_row():
+    from context_mgmt.reset_limit import ResetLimit
+
+    limit = ResetLimit(cap=3)
+    unit = ("coding", "1.1", "qwen2.5-coder")
+    assert not limit.record(unit, "context_reset")
+    assert not limit.record(unit, "context_reset")
+    assert not limit.record(unit, "continue")  # ended on its own: not a loop
+    assert not limit.monitor_only(unit)
+    assert [limit.record(unit, "context_reset") for _ in range(3)] == [
+        False,
+        False,
+        True,
+    ]
+    assert limit.monitor_only(unit)
+    assert not limit.record(unit, "context_reset")  # reported once
+    assert not limit.record(unit, "continue")
+    assert limit.monitor_only(unit)  # for the rest of the subtask
+    assert not limit.monitor_only(("coding", "1.1", "qwen2.5-coder:32k"))
+    assert not limit.monitor_only(("coding", "1.2", "qwen2.5-coder"))
