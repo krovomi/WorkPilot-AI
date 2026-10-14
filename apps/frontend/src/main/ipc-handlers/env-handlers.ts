@@ -16,7 +16,12 @@ import {
 import { app, type BrowserWindow, ipcMain } from "../electron-utils";
 import { getSpawnCommand, getSpawnOptions } from "../env-utils";
 import { projectStore } from "../project-store";
-import { envTemplateKeys, parseEnvFile, unownedEnvLines } from "./utils";
+import {
+	envTemplateKeys,
+	findEnvLineBreak,
+	parseEnvFile,
+	unownedEnvLines,
+} from "./utils";
 
 // GitLab environment variable keys
 const GITLAB_ENV_KEYS = {
@@ -1057,6 +1062,16 @@ ${otherLines.join("\n")}
 			projectId: string,
 			config: Partial<ProjectEnvConfig>,
 		): Promise<IPCResult> => {
+			// Checked before anything is touched: the renderer is not trusted,
+			// and a value holding a line break would write lines of its own.
+			const lineBreakAt = findEnvLineBreak(config);
+			if (lineBreakAt !== null) {
+				return {
+					success: false,
+					error: `Line breaks are not allowed in project settings (${lineBreakAt})`,
+				};
+			}
+
 			const project = projectStore.getProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
