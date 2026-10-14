@@ -1220,7 +1220,10 @@ def get_agentic_capabilities():
 
         {"providers": {"<name>": {"hasAdapter": bool, "degradesTo": str|None,
                                   "subagents": str, "effort": str,
-                                  "note": str}, ...}}
+                                  "note": str,
+                                  "contextCompact": "native"|"emulated",
+                                  "contextUsage": "exact"|"reported"|"estimated"},
+                       ...}}
     """
     from skills_registry.providers import load_providers
 
@@ -1232,6 +1235,8 @@ def get_agentic_capabilities():
                 "subagents": caps.subagents,
                 "effort": caps.effort,
                 "note": caps.note,
+                "contextCompact": caps.context_compact,
+                "contextUsage": caps.context_usage,
             }
             for name, caps in load_providers().items()
         }

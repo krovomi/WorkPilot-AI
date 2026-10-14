@@ -105,6 +105,7 @@ def build_codex_exec_args(
     prompt: str,
     thread_id: str | None,
     sandbox: str = "workspace-write",
+    auto_compact_token_limit: int | None = None,
 ) -> list[str]:
     """Build a shell-free Codex command; the prompt is always sent on stdin."""
     # Both values are deliberately excluded from launcher arguments. ``cwd``
@@ -135,6 +136,12 @@ def build_codex_exec_args(
     if reasoning_effort:
         effort = _validated_option(reasoning_effort, "reasoning effort")
         args.extend(["-c", f'model_reasoning_effort="{effort}"'])
+    if isinstance(auto_compact_token_limit, int) and auto_compact_token_limit > 0:
+        # Codex compacts its thread natively past this many tokens; the task's
+        # context policy sets it (context_mgmt.codex_auto_compact_limit).
+        args.extend(
+            ["-c", f"model_auto_compact_token_limit={auto_compact_token_limit}"]
+        )
     args.append("-")
     return args
 
@@ -216,8 +223,10 @@ class CodexCliAgentClient(AgentClient):
         thread_id: str | None = None,
         executable: str | None = None,
         process_factory: _ProcessFactory | None = None,
+        auto_compact_token_limit: int | None = None,
     ) -> None:
         self.model = resolve_codex_model(model) or "default"
+        self._auto_compact_token_limit = auto_compact_token_limit
         self.system_prompt = system_prompt
         self._project_dir = str(Path(project_dir))
         self._agent_type = agent_type
@@ -229,6 +238,10 @@ class CodexCliAgentClient(AgentClient):
         self.thread_id = thread_id
         self.last_session_id = thread_id
         self.last_usage: dict[str, int] | None = None
+        # Context fill of the latest turn, read by context_mgmt's guard.
+        self.last_context_tokens: int | None = None
+        self.context_window_tokens: int | None = None
+        self.context_usage_source = "reported"
 
     async def __aenter__(self) -> CodexCliAgentClient:
         return self
@@ -275,6 +288,7 @@ class CodexCliAgentClient(AgentClient):
             prompt=prompt,
             thread_id=self.thread_id,
             sandbox=codex_sandbox_for(self._agent_type),
+            auto_compact_token_limit=self._auto_compact_token_limit,
         )
         command = build_windows_command(logical_args[0], logical_args[1:])
         process = await self._process_factory(
@@ -361,6 +375,10 @@ class CodexCliAgentClient(AgentClient):
                             for key, value in usage.items()
                             if isinstance(value, (int, float))
                         }
+                        # input_tokens covers the whole thread the turn sent.
+                        self.last_context_tokens = (
+                            self.last_usage.get("input_tokens") or None
+                        )
                 elif event_type in {"turn.failed", "error"}:
                     detail = (
                         event.get("message")

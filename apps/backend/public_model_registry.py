@@ -74,7 +74,17 @@ PROVIDER_IDS: dict[str, str] = {
     "aws": "amazon-bedrock",
 }
 
-_KEPT_FIELDS = ("id", "name", "reasoning", "tool_call", "status", "release_date")
+# `limit` carries `context` (the window) that context_mgmt reads for models
+# the client cannot size itself.
+_KEPT_FIELDS = (
+    "id",
+    "name",
+    "reasoning",
+    "tool_call",
+    "status",
+    "release_date",
+    "limit",
+)
 
 _lock = threading.Lock()
 
@@ -283,3 +293,33 @@ def models_for(
     if not models:
         return None
     return models, float(snapshot["fetched_at"])
+
+
+def cached_context_window(model: str | None) -> int | None:
+    """The context window models.dev records for ``model``, from the cache only.
+
+    Never downloads: a session start must not wait on a 5 MB document. None
+    when the model is unknown, the cache was never written, or predates the
+    `limit` field.
+    """
+    if not model or not is_enabled():
+        return None
+    data = _read_cache()
+    if not data:
+        return None
+    wanted = model.strip().lower()
+    for models in data["providers"].values():
+        if not isinstance(models, list):
+            continue
+        for record in models:
+            if not _is_record(record) or record["id"].lower() != wanted:
+                continue
+            limit = record.get("limit")
+            context = limit.get("context") if isinstance(limit, dict) else None
+            if (
+                isinstance(context, int)
+                and not isinstance(context, bool)
+                and context > 0
+            ):
+                return context
+    return None

@@ -136,6 +136,11 @@ class OpenAIAgentClient(AgentClient):
         self._mcp_manager: Any = None
         # Usage accumulated across the session's turns
         self.last_usage: dict | None = None
+        # Context fill of the latest turn (prompt tokens the provider reported),
+        # read by context_mgmt's guard; None until a turn reports it.
+        self.last_context_tokens: int | None = None
+        self.context_window_tokens: int | None = None
+        self.context_usage_source = "reported"
 
     def set_tool_working_directory(self, directory: str) -> None:
         """Set relative tool paths without changing the project security boundary."""
@@ -356,6 +361,8 @@ class OpenAIAgentClient(AgentClient):
             _u = data.get("usage", {})
             _total_in += _u.get("prompt_tokens", 0)
             _total_out += _u.get("completion_tokens", 0)
+            if _u.get("prompt_tokens"):
+                self.last_context_tokens = int(_u["prompt_tokens"])
 
             choices = data.get("choices", [])
             if not choices:

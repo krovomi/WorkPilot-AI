@@ -1,6 +1,8 @@
 import { ipcRenderer } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
 import type {
+	ContextAction,
+	ContextPolicy,
 	ImageAttachment,
 	ImplementationPlan,
 	IPCResult,
@@ -10,6 +12,7 @@ import type {
 	SupportedIDE,
 	SupportedTerminal,
 	Task,
+	TaskContextEvent,
 	TaskLogStreamChunk,
 	TaskLogs,
 	TaskMetadata,
@@ -94,6 +97,24 @@ export interface TaskAPI {
 		configPhase: "spec" | "planning" | "coding" | "qa",
 		change: { provider?: string; model?: string; effort?: string },
 	) => Promise<IPCResult>;
+	/** One-shot compact / clear of the running session's context window. */
+	requestContextAction: (
+		taskId: string,
+		action: ContextAction,
+	) => Promise<IPCResult>;
+	/** Live edit of the task's context policy (every spec dir copy). */
+	updateContextPolicy: (
+		taskId: string,
+		policy: Partial<ContextPolicy>,
+	) => Promise<IPCResult<{ contextPolicy: ContextPolicy }>>;
+	/** CONTEXT_USAGE / CONTEXT_ACTION_APPLIED events of running tasks. */
+	onTaskContextUsage: (
+		callback: (
+			taskId: string,
+			event: TaskContextEvent,
+			projectId?: string,
+		) => void,
+	) => () => void;
 	generateSpecInterview: (
 		taskId: string,
 	) => Promise<IPCResult<import("../../shared/types").SpecInterviewQuestion[]>>;
@@ -421,6 +442,39 @@ export const createTaskAPI = (): TaskAPI => ({
 		change: { provider?: string; model?: string; effort?: string },
 	): Promise<IPCResult> =>
 		ipcRenderer.invoke(IPC_CHANNELS.TASK_HOT_SWAP, taskId, configPhase, change),
+
+	requestContextAction: (
+		taskId: string,
+		action: ContextAction,
+	): Promise<IPCResult> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_CONTEXT_ACTION, taskId, action),
+
+	updateContextPolicy: (
+		taskId: string,
+		policy: Partial<ContextPolicy>,
+	): Promise<IPCResult<{ contextPolicy: ContextPolicy }>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_CONTEXT_POLICY_UPDATE, taskId, policy),
+
+	onTaskContextUsage: (
+		callback: (
+			taskId: string,
+			event: TaskContextEvent,
+			projectId?: string,
+		) => void,
+	): (() => void) => {
+		const handler = (
+			_event: Electron.IpcRendererEvent,
+			taskId: string,
+			event: TaskContextEvent,
+			projectId?: string,
+		): void => {
+			callback(taskId, event, projectId);
+		};
+		ipcRenderer.on(IPC_CHANNELS.TASK_CONTEXT_USAGE, handler);
+		return () => {
+			ipcRenderer.removeListener(IPC_CHANNELS.TASK_CONTEXT_USAGE, handler);
+		};
+	},
 
 	generateSpecInterview: (
 		taskId: string,

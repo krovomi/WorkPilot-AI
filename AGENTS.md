@@ -33,6 +33,7 @@ apps/backend/          Python. Agents, pipeline, API FastAPI (port 9000).
   core/client.py       LA fabrique de clients LLM — tout passe par là
   core/pause_state.py  LE drapeau de pause coopérative — lu par coder, QA et spec
   core/build_signals.py BuildPaused / BuildHalted : remontent jusqu'à handle_build_command
+  context_mgmt/        fenêtre de contexte par session : jauge, compact / clear au seuil, relais préparé en parallèle
   cli/build_commands.py enchaînement des phases d'un build
   phase_config.py      modèle + budget de réflexion par phase et par provider
   model_router/        classification de tâche → tier qualité → modèle

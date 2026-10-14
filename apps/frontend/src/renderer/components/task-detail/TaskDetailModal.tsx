@@ -97,6 +97,11 @@ import {
 	useArchitectureDelta,
 } from "../../stores/architecture-delta-store";
 import { TaskArchitectureDelta } from "./TaskArchitectureDelta";
+import { ContextGauge } from "./ContextGauge";
+import {
+	isContextActiveStatus,
+	useContextUsageStore,
+} from "../../stores/context-usage-store";
 import { TaskChangeGraph } from "./TaskChangeGraph";
 import { EditableTaskTitle } from "./EditableTaskTitle";
 import { TaskOverview } from "./TaskOverview";
@@ -533,6 +538,7 @@ function TaskDetailModalContent({
 	const { t } = useTranslation(["tasks", "mobile"]);
 	const { toast } = useToast();
 	const state = useTaskDetail({ task });
+	const hasContextUsage = useContextUsageStore((s) => !!s.usage[task.id]);
 	const { maximized, toggle: toggleMaximized } = useDialogMaximize(
 		"workpilot:task-detail-maximized",
 	);
@@ -1212,19 +1218,28 @@ function TaskDetailModalContent({
 								</div>
 							</div>
 
-							{/* Progress bar - only show when running or has progress */}
+							{/* Progress bar - only show when running or has progress.
+							    The context gauge sits next to it; it renders nothing
+							    unless the task runs or reported its context usage. */}
 							{(state.isRunning || completedSubtasks > 0) &&
-								(totalSubtasks > 0 || state.hasActiveExecution) && (
-									<div className="mt-3 flex items-center gap-3">
-										<Progress
-											value={headerProgressPercent}
-											className="h-1.5 flex-1"
-										/>
-										<span className="text-xs text-muted-foreground tabular-nums w-10 text-right">
-											{headerProgressPercent}%
-										</span>
+							(totalSubtasks > 0 || state.hasActiveExecution) ? (
+								<div className="mt-3 flex items-center gap-3">
+									<Progress
+										value={headerProgressPercent}
+										className="h-1.5 flex-1"
+									/>
+									<span className="text-xs text-muted-foreground tabular-nums w-10 text-right">
+										{headerProgressPercent}%
+									</span>
+									<ContextGauge task={task} />
+								</div>
+							) : (
+								(isContextActiveStatus(task.status) || hasContextUsage) && (
+									<div className="mt-3 flex items-center justify-end">
+										<ContextGauge task={task} />
 									</div>
-								)}
+								)
+							)}
 
 							{/* Warnings - compact inline */}
 							{(state.isStuck || state.isIncomplete) && (

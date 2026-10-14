@@ -55,6 +55,11 @@ class ClaudeAgentClient(AgentClient):
         self.last_result_msg: Any | None = None
         self.last_session_id: str | None = None
         self.last_usage: dict | None = None
+        # Context fill of the latest assistant turn (context_mgmt's guard):
+        # what the request carried, cached or not.
+        self.last_context_tokens: int | None = None
+        self.context_window_tokens: int | None = None
+        self.context_usage_source = "exact"
         # Optional history queued by resume() for the next query() call.
         self._resumed_history: list[AgentMessage] = []
 
@@ -103,6 +108,19 @@ class ClaudeAgentClient(AgentClient):
             # on the AgentClient path — without it, the Kanban "Reprendre"
             # button can't find a session_id when the user uses the
             # provider-agnostic factory.
+            if type(raw_msg).__name__ == "AssistantMessage":
+                _turn = getattr(raw_msg, "usage", None)
+                if isinstance(_turn, dict):
+                    _fill = sum(
+                        int(_turn.get(key) or 0)
+                        for key in (
+                            "input_tokens",
+                            "cache_read_input_tokens",
+                            "cache_creation_input_tokens",
+                        )
+                    )
+                    if _fill:
+                        self.last_context_tokens = _fill
             if type(raw_msg).__name__ == "ResultMessage":
                 self.last_result_msg = raw_msg
                 self.last_session_id = getattr(raw_msg, "session_id", None)

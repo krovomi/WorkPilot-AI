@@ -303,6 +303,11 @@ class CopilotAgentClient(AgentClient):
         self._copilot_token_expires_at: float = 0.0
         # Usage tracking (Copilot API doesn't expose token counts — subscription-based)
         self.last_usage: dict | None = None
+        # Context fill of the latest turn (prompt tokens the provider reported),
+        # read by context_mgmt's guard; None until a turn reports it.
+        self.last_context_tokens: int | None = None
+        self.context_window_tokens: int | None = None
+        self.context_usage_source = "reported"
 
     @staticmethod
     def _get_github_token_from_cli() -> str:
@@ -882,6 +887,11 @@ class CopilotAgentClient(AgentClient):
                             return
                         else:
                             data = await resp.json()
+                            # Some Copilot models do report `usage`; when they
+                            # do, it is the context fill the guard measures.
+                            _cu = data.get("usage") if isinstance(data, dict) else None
+                            if isinstance(_cu, dict) and _cu.get("prompt_tokens"):
+                                self.last_context_tokens = int(_cu["prompt_tokens"])
                     break  # request succeeded — leave the retry loop
                 except (
                     _asyncio.TimeoutError,

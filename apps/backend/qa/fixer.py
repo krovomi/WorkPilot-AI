@@ -218,8 +218,12 @@ async def run_qa_fixer_session(
         debug_error("qa_fixer", "QA_FIX_REQUEST.md not found")
         return "error", "QA_FIX_REQUEST.md not found"
 
-    # Load fixer prompt
-    prompt = load_qa_fixer_prompt()
+    # Load fixer prompt through its builder: {{SPEC_DIR}} / {{MIN_COVERAGE}}
+    # filled in and the verify section attached. The raw file used to be sent
+    # as is, placeholders and all.
+    from prompts_pkg import get_qa_fixer_prompt
+
+    prompt = get_qa_fixer_prompt(spec_dir, project_dir)
     debug_detailed("qa_fixer", "Loaded QA fixer prompt", prompt_length=len(prompt))
 
     # Retrieve memory context for fixer (past fixes, patterns, gotchas)
@@ -564,6 +568,22 @@ async def _run_qa_fixer_agent_client_session(
 
     current_tool = None
 
+    # The context gauge follows QA too. Each pass already starts on a fresh
+    # thread (nothing is replayed), so the guard only measures here.
+    from agents.session import _make_context_guard
+
+    context_guard = _make_context_guard(
+        client,
+        spec_dir,
+        "validation",
+        None,
+        provider,
+        str(getattr(client, "model", "") or ""),
+    )
+    if context_guard is not None:
+        context_guard.monitor_only = True
+        context_guard.base_chars = len(prompt)
+
     try:
         debug("qa_fixer", f"Sending query to {provider}...")
         await client.query(prompt)
@@ -579,6 +599,11 @@ async def _run_qa_fixer_agent_client_session(
                 f"Received message #{message_count}",
                 msg_type=agent_msg.type_name,
             )
+            if context_guard is not None:
+                try:
+                    context_guard.observe(agent_msg)
+                except Exception:  # noqa: BLE001 - the gauge is a mirror
+                    pass
 
             for block in agent_msg.content:
                 if block.type == ContentBlockType.TEXT and block.text:
@@ -743,6 +768,10 @@ async def _run_qa_fixer_agent_client_session(
                     current_tool = None
 
         print("\n" + "-" * 70 + "\n")
+
+        from agents.session import record_client_usage
+
+        record_client_usage(client, spec_dir, "validation", agent_type="qa_fixer")
 
         # Shared post-processing: check fix status, save memory
         _fix_result = await _process_fixer_result(

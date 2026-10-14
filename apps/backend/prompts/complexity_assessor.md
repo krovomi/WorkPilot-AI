@@ -195,37 +195,37 @@ cat > complexity_assessment.json << 'EOF'
   "complexity": "[simple|standard|complex]",
   "workflow_type": "[feature|refactor|investigation|migration|simple]",
   "confidence": [0.0-1.0],
-  "reasoning": "[2-3 sentence explanation]",
+  "reasoning": "[≤ 2 sentences]",
 
   "analysis": {
     "scope": {
       "estimated_files": [number],
       "estimated_services": [number],
       "is_cross_cutting": [true|false],
-      "notes": "[brief explanation]"
+      "notes": "[≤ 12 words]"
     },
     "integrations": {
       "external_services": ["list", "of", "services"],
       "new_dependencies": ["list", "of", "packages"],
       "research_needed": [true|false],
-      "notes": "[brief explanation]"
+      "notes": "[≤ 12 words]"
     },
     "infrastructure": {
       "docker_changes": [true|false],
       "database_changes": [true|false],
       "config_changes": [true|false],
-      "notes": "[brief explanation]"
+      "notes": "[≤ 12 words]"
     },
     "knowledge": {
       "patterns_exist": [true|false],
       "research_required": [true|false],
       "unfamiliar_tech": ["list", "if", "any"],
-      "notes": "[brief explanation]"
+      "notes": "[≤ 12 words]"
     },
     "risk": {
       "level": "[low|medium|high]",
       "concerns": ["list", "of", "concerns"],
-      "notes": "[brief explanation]"
+      "notes": "[≤ 12 words]"
     }
   },
 

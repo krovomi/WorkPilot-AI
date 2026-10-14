@@ -44,7 +44,12 @@ import type {
 	TaskPriority,
 	ThinkingLevel,
 } from "../../shared/types";
+import type { ContextPolicy } from "../../shared/types/task";
 import type { MobilePlatform } from "../../shared/types/mobile";
+import {
+	resolveContextPolicy,
+	sameContextPolicy,
+} from "../../shared/utils/context-policy";
 import type {
 	PhaseModelConfig,
 	PhaseThinkingConfig,
@@ -237,6 +242,9 @@ export function TaskEditDialog({
 	// TDD override (per-task)
 	const [tddMode, setTddMode] = useState(task.metadata?.tddMode ?? false);
 	const [verifyLoop, setVerifyLoop] = useState(task.metadata?.verifyLoop ?? true);
+	const [contextPolicy, setContextPolicy] = useState<ContextPolicy>(() =>
+		resolveContextPolicy(task.metadata),
+	);
 	const [mobileTargets, setMobileTargets] = useState<MobilePlatform[]>(
 		task.metadata?.mobileTargets ?? [],
 	);
@@ -294,6 +302,7 @@ export function TaskEditDialog({
 			);
 			setTddMode(task.metadata?.tddMode ?? false);
 			setVerifyLoop(task.metadata?.verifyLoop ?? true);
+			setContextPolicy(resolveContextPolicy(task.metadata));
 			setMobileTargets(task.metadata?.mobileTargets ?? []);
 			const openedEngine = engineForTask();
 			setEngine(openedEngine);
@@ -385,6 +394,10 @@ export function TaskEditDialog({
 		// The engine is "changed" only when it differs from what the dialog
 		// opened with, so plain edits rewrite none of it.
 		const engineChanged = JSON.stringify(engine) !== initialEngineRef.current;
+		const contextPolicyChanged = !sameContextPolicy(
+			contextPolicy,
+			resolveContextPolicy(task.metadata),
+		);
 
 		// Edit mode short-circuits when nothing changed. Duplicate always creates.
 		if (!isDuplicate) {
@@ -400,6 +413,7 @@ export function TaskEditDialog({
 					(task.metadata?.requireReviewBeforeCoding ?? false) ||
 				tddMode !== (task.metadata?.tddMode ?? false) ||
 				verifyLoop !== (task.metadata?.verifyLoop ?? true) ||
+				contextPolicyChanged ||
 				!sameTargets(mobileTargets, task.metadata?.mobileTargets) ||
 				JSON.stringify(images) !==
 					JSON.stringify(task.metadata?.attachedImages || []);
@@ -438,6 +452,9 @@ export function TaskEditDialog({
 		if (verifyLoop !== (task.metadata?.verifyLoop ?? true)) {
 			metadataUpdates.verifyLoop = verifyLoop;
 		}
+		if (contextPolicyChanged) {
+			metadataUpdates.contextPolicy = { ...contextPolicy };
+		}
 
 		if (isDuplicate) {
 			// Clone the source task (copies spec.md/requirements/metadata/attachments
@@ -464,6 +481,14 @@ export function TaskEditDialog({
 			description: trimmedDescription,
 			metadata: metadataUpdates,
 		});
+
+		if (success && contextPolicyChanged) {
+			// TASK_UPDATE rewrites only the main copy of task_metadata.json; a
+			// worktree copy the backend will resume from must get it too.
+			void globalThis.electronAPI
+				?.updateContextPolicy?.(task.id, contextPolicy)
+				.catch(() => undefined);
+		}
 
 		if (success) {
 			onOpenChange(false);
@@ -610,6 +635,9 @@ export function TaskEditDialog({
 				onTddModeChange={setTddMode}
 				verifyLoop={verifyLoop}
 				onVerifyLoopChange={setVerifyLoop}
+				contextPolicy={contextPolicy}
+				onContextPolicyChange={setContextPolicy}
+				contextProvider={engine.coding?.provider}
 				disabled={isSaving}
 				error={error}
 				onError={setError}

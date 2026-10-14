@@ -146,25 +146,9 @@ Flag any divergences.
 
 ## PHASE 2: CATALOG ISSUES
 
-Create a list of all issues found:
-
-```
-ISSUES FOUND:
-
-1. [SEVERITY: HIGH] Package name incorrect
-   - Spec says: "graphiti-core real_ladybug"
-   - Research says: "graphiti-core" with separate "real_ladybug" dependency
-   - Location: Line 45, Requirements section
-
-2. [SEVERITY: MEDIUM] Missing edge case
-   - Requirement: "Handle connection failures"
-   - Spec: No error handling specified
-   - Location: Implementation Notes section
-
-3. [SEVERITY: LOW] Inconsistent terminology
-   - Uses both "memory" and "episode" for same concept
-   - Location: Throughout document
-```
+List the issues in your head or as terse bullets (severity, location, what is
+wrong). They are recorded once, in `critique_report.json` (Phase 4) — do not
+write them out anywhere else.
 
 ---
 
@@ -183,10 +167,9 @@ sed -i 's/graphiti-core real_ladybug/graphiti-core\nreal_ladybug/g' spec.md
 # Or rewrite sections as needed
 ```
 
-**For each fix**:
-1. Make the change in spec.md
-2. Verify the change was applied
-3. Document what was changed
+**For each fix**: edit only the affected lines of spec.md (never rewrite the
+whole file to fix a section), then check the change applied. If you found no
+issues, do not touch spec.md at all.
 
 ---
 
@@ -200,15 +183,15 @@ cat > critique_report.json << 'EOF'
     {
       "severity": "high|medium|low",
       "category": "accuracy|completeness|consistency|feasibility|alignment",
-      "description": "[What was wrong]",
+      "description": "[What was wrong, ≤ 1 line]",
       "location": "[Where in spec.md]",
-      "fix_applied": "[What was changed]",
+      "fix_applied": "[What was changed, ≤ 1 line]",
       "verified": true
     }
   ],
   "issues_fixed": true,
   "no_issues_found": false,
-  "critique_summary": "[Brief summary of critique]",
+  "critique_summary": "[one sentence]",
   "confidence_level": "high|medium|low",
   "recommendations": [
     "[Any remaining concerns or suggestions]"
@@ -253,25 +236,9 @@ grep -E "^##? Success Criteria" spec.md
 
 ---
 
-## PHASE 6: SIGNAL COMPLETION
+## PHASE 6: FINISH
 
-```
-=== SPEC CRITIQUE COMPLETE ===
-
-Issues Found: [count]
-- High severity: [count]
-- Medium severity: [count]
-- Low severity: [count]
-
-Fixes Applied: [count]
-Confidence Level: [high/medium/low]
-
-Summary:
-[Brief summary of what was found and fixed]
-
-critique_report.json created successfully.
-spec.md has been updated with fixes.
-```
+End with one line: `critique done: N issues fixed`. No banner.
 
 ---
 

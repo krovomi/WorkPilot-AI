@@ -57,6 +57,7 @@ from .report import (
     has_recurring_issues,
     is_no_test_project,
     record_iteration,
+    render_fix_request,
     run_visual_qa,
     write_visual_qa_report,
 )
@@ -67,91 +68,34 @@ def _ensure_fix_request_file(
     spec_dir: Path, issues: list[dict], qa_iteration: int
 ) -> bool:
     """
-    Garantit qu'un ``QA_FIX_REQUEST.md`` existe avant de lancer le fixer.
+    Garantit qu'un ``QA_FIX_REQUEST.md`` à jour existe avant de lancer le fixer.
 
-    Le QA reviewer est censé écrire ce fichier via le prompt
-    ``qa_reviewer.md`` (commande ``cat > QA_FIX_REQUEST.md << EOF``). En
-    pratique, certains modèles (ou des sessions interrompues) oublient
-    cette étape et la boucle échoue ensuite avec
-    ``Fixer error: QA_FIX_REQUEST.md not found``.
-
-    Pour rendre la boucle robuste, on synthétise le fichier à partir des
-    issues déjà connues (``issues_found`` du sign-off) avant d'invoquer le
-    fixer si aucun fichier n'a été produit.
-
-    Args:
-        spec_dir: Dossier du spec courant.
-        issues: Liste des issues remontées par le reviewer.
-        qa_iteration: Itération QA en cours, pour traçabilité.
+    Le fichier est rendu par Python depuis ``issues_found`` (le reviewer ne le
+    rédige plus : c'était une quatrième copie des mêmes issues, en tokens de
+    sortie). Il est réécrit à chaque passe qui a des issues, sinon une version
+    d'une passe précédente enverrait le fixer sur des problèmes déjà corrigés.
+    Sans issues, un fichier existant (retour humain) est conservé.
 
     Returns:
-        ``True`` si le fichier existe à la sortie (déjà présent ou
-        synthétisé), ``False`` si on n'a pas pu le créer (issues vides).
+        ``True`` si le fichier existe à la sortie, ``False`` sinon.
     """
     fix_request_file = spec_dir / "QA_FIX_REQUEST.md"
-    if fix_request_file.exists():
-        return True
-
-    if not issues:
-        debug_warning(
+    if issues and render_fix_request(spec_dir, issues, qa_iteration):
+        debug(
             "qa_loop",
-            "Cannot synthesize QA_FIX_REQUEST.md: reviewer reported no issues",
-            iteration=qa_iteration,
-        )
-        return False
-
-    lines: list[str] = [
-        "# QA Fix Request",
-        "",
-        f"_Auto-généré par la boucle QA (itération {qa_iteration}) car le "
-        "reviewer n'a pas produit de fichier explicite._",
-        "",
-        "## Issues à corriger",
-        "",
-    ]
-    for idx, issue in enumerate(issues, start=1):
-        title = issue.get("title") or issue.get("summary") or f"Issue {idx}"
-        description = (
-            issue.get("description")
-            or issue.get("details")
-            or issue.get("message")
-            or ""
-        )
-        severity = issue.get("severity") or issue.get("priority") or "unknown"
-        lines.append(f"### {idx}. {title}")
-        lines.append("")
-        lines.append(f"- **Sévérité** : {severity}")
-        if description:
-            lines.append("")
-            lines.append(description.strip())
-        lines.append("")
-
-    lines.append("## Verification")
-    lines.append("")
-    lines.append(
-        "Après application des correctifs, mettre à jour "
-        "`implementation_plan.json` avec `ready_for_qa_revalidation: true`."
-    )
-    lines.append("")
-
-    try:
-        fix_request_file.write_text("\n".join(lines), encoding="utf-8")
-        debug_warning(
-            "qa_loop",
-            "Synthesized QA_FIX_REQUEST.md from issues_found "
-            "(reviewer did not produce one)",
+            "Rendered QA_FIX_REQUEST.md from issues_found",
             iteration=qa_iteration,
             issue_count=len(issues),
-            path=str(fix_request_file),
         )
         return True
-    except OSError as exc:
-        debug_error(
-            "qa_loop",
-            f"Failed to synthesize QA_FIX_REQUEST.md: {exc}",
-            iteration=qa_iteration,
-        )
-        return False
+    if fix_request_file.exists():
+        return True
+    debug_warning(
+        "qa_loop",
+        "Cannot write QA_FIX_REQUEST.md: reviewer reported no issues",
+        iteration=qa_iteration,
+    )
+    return False
 
 
 # Configuration
@@ -1197,13 +1141,8 @@ async def run_qa_validation_loop(
             )
             print("\nRunning QA Fixer Agent...")
 
-            # Garde-fou : le reviewer DOIT avoir écrit QA_FIX_REQUEST.md, mais
-            # certaines sessions (modèles trop concis, interruption réseau)
-            # produisent qa_report.md sans rejouer le `cat > QA_FIX_REQUEST.md`
-            # final. Sans ce fichier le fixer renvoie immédiatement "error" et
-            # la boucle échoue avec "Fixer error: QA_FIX_REQUEST.md not found".
-            # On le synthétise depuis les issues déjà connues pour permettre
-            # au fixer de travailler.
+            # QA_FIX_REQUEST.md est rendu depuis issues_found : le fixer lit
+            # les issues de cette passe, jamais celles d'une passe précédente.
             _ensure_fix_request_file(spec_dir, current_issues, qa_iteration)
 
             try:

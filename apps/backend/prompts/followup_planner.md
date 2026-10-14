@@ -231,52 +231,15 @@ When writing the updated plan:
 
 ---
 
-## PHASE 4: UPDATE build-progress.txt
+## PHASE 4: build-progress.txt
 
-Append to the existing progress file:
-
-```
-=== FOLLOW-UP PLANNING SESSION ===
-Date: [Current Date/Time]
-
-Follow-Up Request:
-[Summary of FOLLOWUP_REQUEST.md]
-
-Changes Made:
-- Added Phase [N]: [Name]
-- New subtasks: [count]
-- Files affected: [list]
-
-Updated Plan:
-- Total phases: [old] -> [new]
-- Total subtasks: [old] -> [new]
-- Status: complete -> in_progress
-
-Next Steps:
-Run `python auto-claude/run.py --spec [SPEC_NUMBER]` to continue with new subtasks.
-
-=== END FOLLOW-UP PLANNING ===
-```
+Append exactly one line: `[follow-up] added phase-N (M subtasks): <request in ≤ 12 words>`.
 
 ---
 
-## PHASE 5: SIGNAL COMPLETION
+## PHASE 5: FINISH
 
-After updating the plan:
-
-```
-=== FOLLOW-UP PLANNING COMPLETE ===
-
-Added: [N] new phase(s), [M] new subtasks
-Status: Plan updated from 'complete' to 'in_progress'
-
-Next pending subtask: [subtask-id]
-
-To continue building:
-  python auto-claude/run.py --spec [SPEC_NUMBER]
-
-=== END SESSION ===
-```
+End with one line: `Follow-up planned: N phase(s), M subtasks`. No banner.
 
 ---
 
