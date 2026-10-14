@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { BrowserWindow } from "electron";
 import { ipcMain } from "electron";
-import { IPC_CHANNELS } from "../../shared/constants";
+import { IPC_CHANNELS, MASKED_SECRET_CHAR } from "../../shared/constants";
 import type {
 	ImageAttachment,
 	IPCResult,
@@ -397,8 +397,27 @@ except Exception as e:
 		IPC_CHANNELS.JIRA_TEST_CONNECTION,
 		async (
 			_,
-			config: { instanceUrl: string; email: string; apiToken: string },
+			input: {
+				projectId?: string;
+				instanceUrl: string;
+				email: string;
+				apiToken: string;
+			},
 		): Promise<IPCResult<JiraSyncStatus>> => {
+			// The settings screen holds the mask ENV_GET handed it, never the
+			// token: a masked or empty token is the project's stored one.
+			const typed = String(input?.apiToken ?? "").replaceAll(
+				MASKED_SECRET_CHAR,
+				"",
+			);
+			const project = input?.projectId
+				? projectStore.getProject(input.projectId)
+				: undefined;
+			const config = {
+				instanceUrl: input?.instanceUrl,
+				email: input?.email,
+				apiToken: typed || (project ? getJiraConfig(project).apiToken : null),
+			};
 			if (!config.instanceUrl || !config.email || !config.apiToken) {
 				return {
 					success: false,

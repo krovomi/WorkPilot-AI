@@ -258,6 +258,7 @@ export function SectionRouter({
 						description="Enable Jira integration to sync issues with your backlog"
 					>
 						<JiraIntegration
+							projectId={project.id}
 							envConfig={envConfig}
 							updateEnvConfig={updateEnvConfig}
 							showJiraToken={showAzureDevOpsToken}
@@ -295,6 +296,7 @@ export function SectionRouter({
 						description={t("settings:channelNotifications.initGuardDescription")}
 					>
 						<ChannelNotificationsIntegration
+							projectId={project.id}
 							envConfig={envConfig}
 							updateEnvConfig={updateEnvConfig}
 						/>
