@@ -69,7 +69,7 @@ httpx[http2]>=0.28.1
 # (core/agent_client.py). It was
 # never declared, so those code paths raised ModuleNotFoundError at runtime on
 # any environment that did not happen to pull aiohttp in transitively.
-aiohttp>=3.14.3
+aiohttp>=3.14.5
 h2>=4.4.1  # HTTP/2 support for Windsurf gRPC proxy
 sqlalchemy>=2.1.1
 psutil>=7.2.2
