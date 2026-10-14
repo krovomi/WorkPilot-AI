@@ -111,7 +111,9 @@ l'UI n'existe pas.
   `tests/backend/test_feature_router_authz.py` échoue sinon. Masquer un bouton n'est pas un contrôle.
 - Un client ne fournit jamais de chemin (`project_dir`, `spec_dir`, `file_path`…), ni en query ni
   dans le corps JSON : il donne un `project_id` et le serveur résout son checkout
-  (`server/authz/scope.py`). Le middleware ne filtre que la query : un corps se valide dans la route.
+  (`server/authz/scope.py`). Le middleware refuse ces clés (`CLIENT_PATH_PARAMS`) en query et dans
+  le corps (JSON à toute profondeur, formulaire) ; `tests/backend/test_project_scope_coverage.py`
+  balaie les paramètres et les modèles de corps de chaque route.
 - Le projet d'un autre tenant répond 404, jamais 403.
 - Le backend écoute sur `127.0.0.1` ; CORS est une liste explicite. Ni `0.0.0.0`, ni `*`.
 - Échec fermé : si le mode serveur ne se monte pas, le backend ne démarre pas

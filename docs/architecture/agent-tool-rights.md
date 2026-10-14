@@ -75,6 +75,7 @@ accepts an MCP server only if its type declares it (`linear_updater` declares
 |---|---|
 | `bash_security_hook` then the guardrails hook on `Bash` | `ToolExecutor._run_command` asks `security.hooks.command_refusal` — `validate_command_line` on the project's profile, then `guardrails_hook` — and answers the model with the refusal. rtk rewrites only an allowed command, as its hook sits behind those two |
 | the guardrails hook on every write tool | `_write_file` asks `guardrail_refusal("Write", …)` before the watermark cleaning |
+| the write-path hook (`security.path_guard`) refuses the security configuration — `.workpilot-allowlist`, `.workpilot-security.json`, `.workpilot/guardrails.*`, `.claude_settings.json`, `.claude/settings*.json` — even inside the project | `_write_file` and `_create_directory` resolve with `for_write=True`, which asks the same `protected_config_refusal`. A shell write to those files is refused on both by `security.config_write_validators`, a line validator `command_guard` runs on every command line |
 | a custom MCP server starts if `_validate_custom_mcp_server` accepts it and `get_required_mcp_servers` keeps it for the type (`AGENT_MCP_<type>_ADD`) | `load_mcp_server_configs_for(agent_type, …)` asks both; the bridge used to start every configured server, with a laxer validator, for every type |
 
 **An approval must name a tool the session has.** MCP tools are called
