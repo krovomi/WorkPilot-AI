@@ -56,12 +56,13 @@ Fichiers générés qui ont leur `--check` en CI — les régénérer, ne pas le
 
 | Hook | Ce qui tourne | Échappatoire |
 |---|---|---|
-| `pre-commit` | sur les fichiers indexés : ruff format + fix, Biome, puis les tests ciblés | `PRE_COMMIT_SKIP_TESTS=1` (tests seulement) |
+| `pre-commit` | sur les fichiers indexés : ruff format + fix, Biome, scan des secrets (bloquant), puis les tests ciblés | `PRE_COMMIT_SKIP_TESTS=1` (tests seulement) |
 | `commit-msg` | Conventional Commits, première ligne ≤ 100 caractères | — |
 | `pre-push` | ruff, `skills_cli build --check`, Biome | `PRE_PUSH_FULL=1` ajoute pytest, tsc, Vitest ; `PRE_PUSH_SKIP=1` saute tout |
 
 Un agent n'utilise ni `--no-verify` ni `PRE_PUSH_SKIP` pour faire passer un changement : il corrige.
-Aucun hook ne cherche de secrets (règle S1 de [`security.md`](security.md)).
+Le scan des secrets porte sur tout fichier indexé, pas seulement Python et frontend ; un faux
+positif se traite par la règle S1 de [`security.md`](security.md), jamais par `--no-verify`.
 
 ## Branches, commits, PR
 

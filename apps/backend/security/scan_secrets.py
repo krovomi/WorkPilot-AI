@@ -5,9 +5,14 @@ Secret Scanning Script for WorkPilot AI Framework
 
 Scans staged git files for potential secrets before commit.
 Designed to prevent accidental exposure of API keys, tokens, and credentials.
+`.husky/pre-commit` runs it on every commit to this repository; staged files
+are read from the index, so what is scanned is what the commit holds.
 
-Usage:
-    python scan_secrets.py [--staged-only] [--all-files] [--path PATH]
+Usage (from the repository root):
+    python apps/backend/security/scan_secrets.py [--staged-only] [--all-files] [--path PATH]
+
+A line carrying `pragma: allowlist secret` is not reported; a regex in
+`.secretsignore` at the root skips every path it matches.
 
 Exit codes:
     0 - No secrets detected
@@ -38,9 +43,12 @@ GENERIC_PATTERNS = [
         r'(?:access[_-]?token|auth[_-]?token|bearer[_-]?token|token)\s*[:=]\s*["\']([a-zA-Z0-9_-]{32,})["\']',
         "Generic access token",
     ),
-    # Password patterns
+    # Password patterns. A bare `pass` must start a word or a camelCase hump:
+    # `db_pass` and `dbPass` are passwords, `INTERFACE_BYPASS` and `compass`
+    # are not. `password` keeps matching inside `dbPassword`.
     (
-        r'(?:password|passwd|pwd|pass)\s*[:=]\s*["\']([^"\']{8,})["\']',
+        r"(?:password|passwd|pwd|(?<![a-z])pass|(?<=(?-i:[a-z]))(?-i:P)ass)"
+        r'\s*[:=]\s*["\']([^"\']{8,})["\']',
         "Password assignment",
     ),
     # Generic secret patterns
@@ -50,8 +58,20 @@ GENERIC_PATTERNS = [
     ),
     # Bearer tokens in headers
     (r'["\']?[Bb]earer\s+([a-zA-Z0-9_-]{20,})["\']?', "Bearer token"),
-    # Base64-encoded secrets (longer than typical, may be credentials)
-    (r'["\'][A-Za-z0-9+/]{64,}={0,2}["\']', "Potential base64-encoded secret"),
+    # Base64-encoded secrets (longer than typical, may be credentials). A quoted
+    # run of hex is a digest — the SHA-256 of a lockfile, a vendor manifest, a
+    # download checksum — not base64: every one of them used to match.
+    (
+        r'["\'](?![0-9a-f]+["\'])[A-Za-z0-9+/]{64,}={0,2}["\']',
+        "Potential base64-encoded secret",
+    ),
+    # A hex secret is told from a digest by the word that names it — the only
+    # thing that flagged `"jwtSecret": "<hex>"` was the base64 pattern above.
+    (
+        r"(?:secret|token|api[_-]?key|passw(?:or)?d|private[_-]?key)[^\n]{0,30}?"
+        r'["\'][0-9a-f]{32,}["\']',
+        "Hex-encoded secret",
+    ),
 ]
 
 # Service-specific patterns (known formats)
@@ -86,9 +106,11 @@ SERVICE_PATTERNS = [
     # Discord
     (r"[MN][A-Za-z\d]{23,}\.[\w-]{6}\.[\w-]{27}", "Discord Bot Token"),
     (r"https://discord(?:app)?\.com/api/webhooks/\d+/[\w-]+", "Discord Webhook URL"),
-    # Twilio
-    (r"SK[a-f0-9]{32}", "Twilio API Key"),
-    (r"AC[a-f0-9]{32}", "Twilio Account SID"),
+    # Twilio — a whole token with an uppercase prefix. Patterns run with
+    # IGNORECASE, and `ac` followed by 32 hex digits occurs inside most
+    # SHA-256 digests and many git SHAs.
+    (r"\b(?-i:SK[a-f0-9]{32})\b", "Twilio API Key"),
+    (r"\b(?-i:AC[a-f0-9]{32})\b", "Twilio Account SID"),
     # SendGrid
     (r"SG\.[a-zA-Z0-9_-]{22}\.[a-zA-Z0-9_-]{43}", "SendGrid API Key"),
     # Mailchimp
@@ -289,6 +311,9 @@ FALSE_POSITIVE_PATTERNS = [
     r"\bCHANGEME\b",
     r"INSERT[-_]?YOUR",
     r"REPLACE[-_]?WITH",
+    # Inline opt-out for one line, in detect-secrets' spelling. Narrower than a
+    # .secretsignore entry, which blinds the whole file.
+    r"pragma:\s*allowlist[ -]secret",
 ]
 
 
@@ -405,18 +430,65 @@ def scan_content(content: str, file_path: str) -> list[SecretMatch]:
 
 
 def get_staged_files() -> list[str]:
-    """Get list of staged files from git (excluding deleted files)."""
+    """Get list of staged files from git (excluding deleted files).
+
+    Renamed files count (`R`): a file moved and edited in the same commit is
+    new content. `-z` keeps a non-ASCII path as is — without it git quotes it,
+    and the quoted name matches no file.
+    """
     try:
         result = subprocess.run(
-            ["git", "diff", "--cached", "--name-only", "--diff-filter=ACM"],
+            ["git", "diff", "--cached", "--name-only", "--diff-filter=ACMR", "-z"],
             capture_output=True,
-            text=True,
+            encoding="utf-8",
+            errors="surrogateescape",
             check=True,
         )
-        files = [f.strip() for f in result.stdout.splitlines() if f.strip()]
-        return files
-    except subprocess.CalledProcessError:
+        return [f for f in result.stdout.split("\0") if f]
+    except (OSError, subprocess.CalledProcessError):
         return []
+
+
+def read_staged_blobs(files: list[str], project_dir: Path) -> dict[str, str]:
+    """Each file as it will be committed: its blob in the index.
+
+    The working tree can differ — a hunk staged and then edited away, a partial
+    `git add -p` — and a pre-commit scan of the working tree passes the secret
+    that is actually in the commit. One `git cat-file --batch` for all files.
+    A path git cannot resolve (a submodule) is left out.
+    """
+    names = [f for f in files if "\n" not in f]
+    if not names:
+        return {}
+    try:
+        output = subprocess.run(
+            ["git", "cat-file", "--batch"],
+            input="".join(f":{name}\n" for name in names).encode(
+                "utf-8", "surrogateescape"
+            ),
+            capture_output=True,
+            cwd=project_dir,
+            check=True,
+        ).stdout
+    except (OSError, subprocess.CalledProcessError):
+        return {}
+
+    blobs: dict[str, str] = {}
+    pos = 0
+    for name in names:
+        end = output.find(b"\n", pos)
+        if end < 0:
+            break
+        header = output[pos:end].split()
+        pos = end + 1
+        # "<oid> <type> <size>", or "<object> missing"
+        if len(header) != 3 or not header[2].isdigit():
+            continue
+        size = int(header[2])
+        if header[1] == b"blob":
+            blobs[name] = output[pos : pos + size].decode("utf-8", errors="ignore")
+        pos += size + 1
+    return blobs
 
 
 def get_all_tracked_files() -> list[str]:
@@ -437,19 +509,25 @@ def get_all_tracked_files() -> list[str]:
 def scan_files(
     files: list[str],
     project_dir: Path | None = None,
+    staged: bool = False,
 ) -> list[SecretMatch]:
-    """Scan a list of files for secrets."""
+    """Scan a list of files for secrets.
+
+    With `staged`, read each file from the index rather than the working tree.
+    """
     if project_dir is None:
         project_dir = Path.cwd()
 
     custom_ignores = load_secretsignore(project_dir)
+    files = [f for f in files if not should_skip_file(f, custom_ignores)]
     all_matches = []
 
-    for file_path in files:
-        # Skip files based on ignore patterns
-        if should_skip_file(file_path, custom_ignores):
-            continue
+    if staged:
+        for file_path, content in read_staged_blobs(files, project_dir).items():
+            all_matches.extend(scan_content(content, file_path))
+        return all_matches
 
+    for file_path in files:
         full_path = project_dir / file_path
 
         # Skip if file doesn't exist or is a directory
@@ -503,8 +581,9 @@ def print_results(matches: list[SecretMatch]) -> None:
 
     print(f"\n{RED}{'=' * 60}{NC}")
     print(f"\n{YELLOW}If these are false positives, you can:{NC}")
-    print("  1. Add patterns to .secretsignore (create if needed)")
-    print("  2. Use environment variables instead of hardcoded values")
+    print("  1. End the line with `# pragma: allowlist secret`")
+    print("  2. Add a path regex to .secretsignore (create if needed)")
+    print("  3. Use environment variables instead of hardcoded values")
     print()
     print(f"{RED}Commit blocked to protect against leaking secrets.{NC}")
 
@@ -577,6 +656,7 @@ def main() -> int:
         files = get_all_tracked_files()
     else:
         files = get_staged_files()
+    staged = not args.path and not args.all_files
 
     if not files:
         if not args.quiet:
@@ -586,8 +666,8 @@ def main() -> int:
     if not args.quiet and not args.json:
         print(f"Scanning {len(files)} file(s) for secrets...")
 
-    # Scan files
-    matches = scan_files(files, project_dir)
+    # Scan files — staged ones as they sit in the index, what the commit holds
+    matches = scan_files(files, project_dir, staged=staged)
 
     # Output results
     if args.json:
