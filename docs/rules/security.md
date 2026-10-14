@@ -53,10 +53,15 @@ l'UI n'existe pas.
   ou avertir l'utilisateur ; ne pas retomber silencieusement sur du texte clair.
   `apps/frontend/src/main/secret-storage.ts` décide de la forme sur disque (`enc:…`) ; sans
   trousseau, fichier `0600` et bannière dans l'UI. `settings.json` ne se lit et ne s'écrit que par
-  `settings-utils.ts`, `profiles.json` que par les profile managers : un module qui parse le
-  fichier lui-même reçoit du chiffré. Un fichier qu'un autre processus lit lui-même (le `.env` du
-  backend, que Python charge depuis les sources) ne peut pas contenir `enc:` : `0600`, signalé par
-  `reportPlaintextSecretFile`, et la bannière le nomme. → [`architecture/secrets-at-rest.md`](../architecture/secrets-at-rest.md)
+  `settings-utils.ts`, `profiles.json` que par les profile managers, `<projet>/.workpilot/.env`
+  que par `project-env-file.ts` : un module qui parse le fichier lui-même reçoit du chiffré. Une
+  clé secrète du `.env` de projet se classe dans `shared/constants/project-env-secrets.json` :
+  `encrypted` si Python ne la lit que dans son environnement, `readable` s'il la lit dans le
+  fichier (laissée en clair, nommée par la bannière) ; `tests/test_project_env_secrets.py` le
+  vérifie. Le `.env` du backend ne s'écrit que par `source-env.ts` et ne se lit, pour un
+  sous-processus, que par `loadBackendEnv` : chiffré une fois packagé, lisible depuis les sources
+  où Python le charge lui-même (`0600`, clés nommées par la bannière via `setReadableSecrets`).
+  → [`architecture/secrets-at-rest.md`](../architecture/secrets-at-rest.md)
 - `core/auth.py` ne lit que `AUTH_TOKEN_ENV_VARS` ; `ANTHROPIC_API_KEY` en est exclu exprès.
 - **Le hook `pre-commit` cherche les secrets** dans tout fichier indexé
   (`security/scan_secrets.py --staged-only`, qui lit l'index) et bloque le commit ; sans

@@ -364,7 +364,7 @@ export function ContextGauge({ task }: { task: Task }) {
 					</PopoverTrigger>
 				</TooltipTrigger>
 				<TooltipContent side="bottom" className="text-xs">
-					<div>{tokensText ?? t("tasks:contextManagement.title")}</div>
+					<div>{tokensText ?? t("tasks:contextManagement.gauge.notMeasured")}</div>
 					<div className="text-muted-foreground">
 						{t("tasks:contextManagement.gauge.thresholdTooltip", {
 							value: threshold,
@@ -394,10 +394,19 @@ export function ContextGauge({ task }: { task: Task }) {
 						<div className="text-sm font-semibold text-foreground">
 							{t("tasks:contextManagement.title")}
 						</div>
-						{tokensText && (
+						{tokensText ? (
 							<div className="text-[11px] tabular-nums text-muted-foreground">
 								{tokensText}
 							</div>
+						) : (
+							// Running without a reading yet: "–" is "not measured",
+							// not 0% (the process is starting, no session has begun).
+							<p
+								className="text-[11px] text-muted-foreground"
+								data-testid="context-gauge-not-measured"
+							>
+								{t("tasks:contextManagement.gauge.notMeasured")}
+							</p>
 						)}
 						{usage && (
 							<div className="truncate text-[11px] text-muted-foreground">

@@ -4,7 +4,7 @@
  * The backend's own .env (the source env) holds the Claude token the
  * environment dialog saves. Packaged, only the main process reads it: its
  * secrets are encrypted. Running from source, Python loads it itself: its
- * secrets stay in clear, the file is 0600 and the UI names it.
+ * secrets stay in clear, the file is 0600 and the UI names their keys.
  */
 
 import {
@@ -156,9 +156,11 @@ describe("backend .env secrets", () => {
 			);
 
 			expect(variable(onDisk(), "CLAUDE_CODE_OAUTH_TOKEN")).toBe(TOKEN);
+			// At risk for want of a keyring, not as a key Python must read
 			expect(getSecureStorageStatus()).toMatchObject({
+				keyringAvailable: false,
 				secretsAtRisk: true,
-				encryptionUnavailable: true,
+				readableSecretKeys: [],
 			});
 		});
 
@@ -206,7 +208,7 @@ describe("backend .env secrets", () => {
 	});
 
 	describe("from source: Python loads the file itself", () => {
-		it("keeps the token in clear, readable by Python, and names the file", async () => {
+		it("keeps the token in clear, readable by Python, and names its key", async () => {
 			const { writeSourceEnvFile, getSecureStorageStatus } = await load();
 
 			writeSourceEnvFile(
@@ -218,8 +220,7 @@ describe("backend .env secrets", () => {
 			expect(getSecureStorageStatus()).toMatchObject({
 				keyringAvailable: true,
 				secretsAtRisk: true,
-				encryptionUnavailable: false,
-				plaintextFiles: [envFile()],
+				readableSecretKeys: ["CLAUDE_CODE_OAUTH_TOKEN"],
 			});
 		});
 
@@ -235,7 +236,7 @@ describe("backend .env secrets", () => {
 			expect(statSync(envFile()).mode & 0o777).toBe(0o600);
 		});
 
-		it("stops naming the file once the token is cleared", async () => {
+		it("stops naming the key once the token is cleared", async () => {
 			const { writeSourceEnvFile, getSecureStorageStatus } = await load();
 			const file = { envPath: envFile(), readByBackend: true };
 
@@ -244,7 +245,7 @@ describe("backend .env secrets", () => {
 
 			expect(getSecureStorageStatus()).toMatchObject({
 				secretsAtRisk: false,
-				plaintextFiles: [],
+				readableSecretKeys: [],
 			});
 		});
 
@@ -259,7 +260,7 @@ describe("backend .env secrets", () => {
 			expect(getSecureStorageStatus().secretsAtRisk).toBe(false);
 		});
 
-		it("migration restricts an existing file and names it, without rewriting it", async () => {
+		it("migration restricts an existing file and names its keys, without rewriting it", async () => {
 			const content = `# local\nOPENAI_API_KEY=sk-test-0000\n`;
 			writeFileSync(envFile(), content, { mode: 0o644 });
 			const { migrateSourceEnvSecrets, getSecureStorageStatus } = await load();
@@ -270,10 +271,12 @@ describe("backend .env secrets", () => {
 
 			expect(onDisk()).toBe(content);
 			if (!isWindows) expect(statSync(envFile()).mode & 0o777).toBe(0o600);
-			expect(getSecureStorageStatus().plaintextFiles).toEqual([envFile()]);
+			expect(getSecureStorageStatus().readableSecretKeys).toEqual([
+				"OPENAI_API_KEY",
+			]);
 		});
 
-		it("tells the UI as soon as the file is named", async () => {
+		it("tells the UI as soon as the key is named", async () => {
 			const { writeSourceEnvFile, onSecureStorageStatusChange } = await load();
 			const listener = vi.fn();
 			onSecureStorageStatusChange(listener);
@@ -286,7 +289,7 @@ describe("backend .env secrets", () => {
 			expect(listener).toHaveBeenLastCalledWith(
 				expect.objectContaining({
 					secretsAtRisk: true,
-					plaintextFiles: [envFile()],
+					readableSecretKeys: ["CLAUDE_CODE_OAUTH_TOKEN"],
 				}),
 			);
 		});

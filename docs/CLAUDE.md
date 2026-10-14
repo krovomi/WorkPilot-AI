@@ -60,7 +60,7 @@ fichier-ci reste l'autorité sur les règles.
 | Vue produit | [product-overview.md](architecture/product-overview.md) | La liste complète des features. |
 | Prompts d'agents | [agent-prompts.md](architecture/agent-prompts.md) | Quel prompt de `apps/backend/prompts/` sert quel agent. |
 | Droits d'outils | [agent-tool-rights.md](architecture/agent-tool-rights.md) | Une liste d'outils déclarée est un droit des deux côtés : `disallowed_tools` du SDK, garde de l'exécuteur, sandbox Codex. |
-| Secrets au repos | [secrets-at-rest.md](architecture/secrets-at-rest.md) | Clés et jetons de l'app chiffrés par `safeStorage`, avertissement sans trousseau, `.env` du backend, migration, redaction des logs Electron. |
+| Secrets au repos | [secrets-at-rest.md](architecture/secrets-at-rest.md) | Clés et jetons de l'app chiffrés par `safeStorage`, avertissement sans trousseau, migration, redaction des logs Electron ; le `.env` de projet et celui du backend : jetons chiffrés, clés lues par le backend nommées. |
 | Pipeline de spec | [spec-pipeline.md](architecture/spec-pipeline.md) | Reprise de plan, traçabilité `FR-###`, `[NEEDS CLARIFICATION]`, constitutions spec-kit. |
 | Skills | [skills.md](architecture/skills.md) | `skills/` est la source, `scripts/skills_cli.py` le seul écrivain ; frontmatter lu par `parse_frontmatter`. |
 | hermes-agent | [hermes.md](architecture/hermes.md) | Ingestion, tri et adoption des skills d'hermes, et `SOUL.md`. Rien n'accorde la confiance à la place de quelqu'un. |
@@ -79,6 +79,7 @@ fichier-ci reste l'autorité sur les règles.
 | Workflows déclaratifs | [workflows.md](architecture/workflows.md) | `workflow.yaml`, élagage par effort, fenêtres, rosters, passage de phase ; le logger de workflow. |
 | Pause et reprise | [pause-resume.md](architecture/pause-resume.md) | `core/pause_state.py`, `BuildPaused` / `BuildHalted`, reprendre une phase sans la payer deux fois. |
 | Gestion du contexte | [context-management.md](architecture/context-management.md) | Artefacts sobres (un fait, un endroit) et politique compact / clear par tâche, native ou émulée. |
+| Harness de contexte (plan) | [context-harness.md](architecture/context-harness.md) | Plan, rien n'est construit : une boucle unique, préfixe stable, troncature à la source, mesure par appel. |
 | Mode hors-ligne | [offline-mode.md](architecture/offline-mode.md) | `airgapStrict` comme barrière, sinon comme défaut. |
 | Architecture frontend | [frontend-architecture.md](architecture/frontend-architecture.md) | Stores, activité de fond et barre latérale, agents, profils, terminaux, liens d'auth. |
 | Panneau de tâche | [frontend-task-panel.md](architecture/frontend-task-panel.md) | Progression (`shared/progress.ts`), onglet Overview, critères d'acceptation, graphe des changements. |

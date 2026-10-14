@@ -148,11 +148,9 @@
 		"title": "API keys stored without encryption",
 		"description": "No system keyring is available, so your API keys and tokens are kept on this device without OS encryption, in files only your user account can read.",
 		"action": "Install or unlock a keyring (GNOME Keyring, KWallet…) and restart WorkPilot AI: your keys will then be encrypted.",
-		"dismiss": "Dismiss",
-		"plaintextFiles": {
-			"description": "WorkPilot AI is running from source, and the Python backend reads its own .env itself, so the tokens in it are kept in clear, readable only by your user account:",
-			"action": "To keep your Claude credentials encrypted, configure Claude in Settings, then remove the token from this file."
-		}
+		"readableDescription": "The backend reads these keys straight from your projects' .workpilot/.env (or, when WorkPilot AI runs from source, from its own .env), so they stay unencrypted there, in a file only your user account can read: {{keys}}.",
+		"readableAction": "Remove from the project settings any key you no longer use. Running from source, configure Claude in Settings, where credentials are encrypted, and remove its token from the backend's .env.",
+		"dismiss": "Dismiss"
 	},
 	"claudeCode": {
 		"checking": "Checking Claude Code...",

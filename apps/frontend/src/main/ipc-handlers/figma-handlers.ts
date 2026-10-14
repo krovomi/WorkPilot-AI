@@ -9,11 +9,13 @@
  * l'autre dit s'il y en a une.
  */
 
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
 import type { IPCResult } from "../../shared/types";
+import { writeProjectEnvFile } from "../project-env-file";
+import { ensureProjectEnvIgnored } from "../project-initializer";
 import { projectStore } from "../project-store";
 
 export const FIGMA_TOKEN_KEY = "FIGMA_ACCESS_TOKEN";
@@ -96,12 +98,17 @@ export function registerFigmaHandlers(): void {
 			if (token === null) {
 				return { success: false, error: "invalid-token" };
 			}
-			const file = envPath(projectId);
-			if (!file) return { success: false, error: "not-initialized" };
+			const project = projectStore.getProject(projectId);
+			if (!project?.autoBuildPath) {
+				return { success: false, error: "not-initialized" };
+			}
+			const file = path.join(project.path, project.autoBuildPath, ".env");
 			try {
+				await ensureProjectEnvIgnored(project.path, project.autoBuildPath);
 				const current = readEnv(file);
-				mkdirSync(path.dirname(file), { recursive: true });
-				writeFileSync(file, withFigmaToken(current, token), "utf-8");
+				// Owner-only, and the banner names the token: the backend reads it
+				// from this file in the API server, so it cannot be encrypted.
+				writeProjectEnvFile(file, withFigmaToken(current, token));
 				return { success: true, data: token !== "" };
 			} catch {
 				return { success: false, error: "write-failed" };

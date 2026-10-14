@@ -13,10 +13,6 @@
  * Reading never destroys: a value that cannot be decrypted right now (keyring
  * locked, safeStorage not ready yet) is handed back unchanged by the field
  * helpers, so a later write keeps it instead of replacing the key with nothing.
- *
- * A file another process reads itself cannot hold `enc:` values: its writer
- * keeps it 0600 and reports it here (reportPlaintextSecretFile), so the UI
- * names it for as long as it holds a secret.
  */
 
 import { safeStorage } from "electron";
@@ -32,9 +28,9 @@ const listeners = new Set<StatusListener>();
 let secretsStored = false;
 /** A secret was written in clear because encryption failed or was unavailable. */
 let plaintextWritten = false;
-/** Files holding a secret in clear because a process without safeStorage reads them. */
-const plaintextFiles = new Set<string>();
 let decryptWarned = false;
+/** File → the secret keys it keeps readable on purpose (names only). */
+const readableSecrets = new Map<string, readonly string[]>();
 /**
  * Ciphertext → plaintext. Settings are re-read on every log line; this keeps
  * that from costing a DPAPI / keyring round trip per secret each time.
@@ -65,24 +61,46 @@ function keyringAvailable(backend = selectedBackend()): boolean {
 	return safeStorageReady() && backend !== "basic_text";
 }
 
+function readableSecretKeys(): string[] {
+	return [...new Set([...readableSecrets.values()].flat())].sort();
+}
+
 export function getSecureStorageStatus(): SecureStorageStatus {
 	const backend = selectedBackend();
 	const available = keyringAvailable(backend);
-	const encryptionUnavailable =
-		plaintextWritten || (secretsStored && !available);
+	const readable = readableSecretKeys();
 	return {
 		keyringAvailable: available,
 		backend,
-		secretsAtRisk: encryptionUnavailable || plaintextFiles.size > 0,
-		encryptionUnavailable,
-		plaintextFiles: [...plaintextFiles],
+		readableSecretKeys: readable,
+		secretsAtRisk:
+			plaintextWritten || (secretsStored && !available) || readable.length > 0,
 	};
+}
+
+/**
+ * Record the secrets `source` keeps in clear on purpose, because a process
+ * that cannot call safeStorage reads them there (a project's `.workpilot/.env`,
+ * read by the Python backend). An empty list clears the source. The status
+ * names them so the UI warns, keyring or not.
+ */
+export function setReadableSecrets(
+	source: string,
+	keys: readonly string[],
+): void {
+	const before = readableSecretKeys().join("\n");
+	if (keys.length > 0) {
+		readableSecrets.set(source, [...keys]);
+	} else {
+		readableSecrets.delete(source);
+	}
+	if (readableSecretKeys().join("\n") !== before) publish();
 }
 
 /**
  * Called with the current status whenever what is on disk may have changed
  * it: the first secret seen this session, the first one written in clear, a
- * file starting or ceasing to hold a secret in clear. Returns the unsubscribe.
+ * change in the secrets kept readable. Returns the unsubscribe.
  */
 export function onSecureStorageStatusChange(
 	listener: StatusListener,
@@ -116,29 +134,6 @@ function notePlaintextWritten(): void {
 	console.warn(
 		"[SecretStorage] No OS keyring: secrets are written in clear to owner-only (0600) files and the user is warned.",
 	);
-	publish();
-}
-
-/**
- * Record whether `filePath` holds a secret in clear. For a file another
- * process reads itself (the Python backend's own `.env` in development), which
- * therefore cannot hold `enc:` values: its writer keeps it 0600 and calls this
- * after every write, so the UI names the file while it holds a secret and
- * stops once it no longer does.
- */
-export function reportPlaintextSecretFile(
-	filePath: string,
-	holdsSecret: boolean,
-): void {
-	if (holdsSecret === plaintextFiles.has(filePath)) return;
-	if (holdsSecret) {
-		plaintextFiles.add(filePath);
-		console.warn(
-			`[SecretStorage] ${filePath} is read by another process, so its secrets stay in clear (owner-only 0600) and the user is warned.`,
-		);
-	} else {
-		plaintextFiles.delete(filePath);
-	}
 	publish();
 }
 

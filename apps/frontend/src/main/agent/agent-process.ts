@@ -1,6 +1,6 @@
 import { buildJevEnvironment } from "../jev/environment";
 import { spawn } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { app } from "electron";
@@ -25,6 +25,7 @@ import { getClaudeProfileManager } from "../claude-profile-manager";
 import { getToolInfo } from "../cli-tool-manager";
 import { getAugmentedEnv } from "../env-utils";
 import { isWindows, killProcessGracefully } from "../platform";
+import { readProjectEnv } from "../project-env-file";
 import { projectStore } from "../project-store";
 import { buildTaskProviderEnv, type TaskProviderPlan } from "./task-provider-env";
 import { parsePythonCommand, validatePythonPath } from "../python-detector";
@@ -710,55 +711,10 @@ export class AgentProcessManager {
 	}
 
 	/**
-	 * Parse environment variables from a .env file content.
-	 * Filters out empty values to prevent overriding valid tokens from profiles.
-	 */
-	private parseEnvFile(envPath: string): Record<string, string> {
-		if (!existsSync(envPath)) {
-			return {};
-		}
-
-		try {
-			const envContent = readFileSync(envPath, "utf-8");
-			const envVars: Record<string, string> = {};
-
-			// Handle both Unix (\n) and Windows (\r\n) line endings
-			for (const line of envContent.split(/\r?\n/)) {
-				const trimmed = line.trim();
-				// Skip comments and empty lines
-				if (!trimmed || trimmed.startsWith("#")) {
-					continue;
-				}
-
-				const eqIndex = trimmed.indexOf("=");
-				if (eqIndex > 0) {
-					const key = trimmed.substring(0, eqIndex).trim();
-					let value = trimmed.substring(eqIndex + 1).trim();
-
-					// Remove quotes if present
-					if (
-						(value.startsWith('"') && value.endsWith('"')) ||
-						(value.startsWith("'") && value.endsWith("'"))
-					) {
-						value = value.slice(1, -1);
-					}
-
-					// Skip empty values to prevent overriding valid values from other sources
-					if (value) {
-						envVars[key] = value;
-					}
-				}
-			}
-
-			return envVars;
-		} catch {
-			return {};
-		}
-	}
-
-	/**
 	 * Load environment variables from project's .workpilot/.env file
-	 * This contains frontend-configured settings (integrations, MCP toggles)
+	 * This contains frontend-configured settings (integrations, MCP toggles).
+	 * Its tokens are stored encrypted: this is where they become plaintext
+	 * again, in the subprocess environment, never on disk.
 	 */
 	private loadProjectEnv(projectPath: string): Record<string, string> {
 		// Find project by path to get autoBuildPath
@@ -769,8 +725,10 @@ export class AgentProcessManager {
 			return {};
 		}
 
-		const envPath = path.join(projectPath, project.autoBuildPath, ".env");
-		return this.parseEnvFile(envPath);
+		// Skip empty values to prevent overriding valid values from other sources
+		return Object.fromEntries(
+			Object.entries(readProjectEnv(project)).filter(([, value]) => value),
+		);
 	}
 
 	/**

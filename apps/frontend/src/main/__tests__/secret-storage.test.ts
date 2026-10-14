@@ -64,9 +64,8 @@ describe("secret-storage", () => {
 			expect(storage.getSecureStorageStatus()).toEqual({
 				keyringAvailable: true,
 				backend: "gnome_libsecret",
+				readableSecretKeys: [],
 				secretsAtRisk: false,
-				encryptionUnavailable: false,
-				plaintextFiles: [],
 			});
 		});
 
@@ -118,9 +117,8 @@ describe("secret-storage", () => {
 			expect(storage.getSecureStorageStatus()).toEqual({
 				keyringAvailable: false,
 				backend: "basic_text",
+				readableSecretKeys: [],
 				secretsAtRisk: true,
-				encryptionUnavailable: true,
-				plaintextFiles: [],
 			});
 			// What basic_text encrypted earlier still reads back.
 			expect(storage.decryptSecret(fakeEncrypted("older"))).toBe("older");
@@ -131,10 +129,7 @@ describe("secret-storage", () => {
 			const storage = await load();
 
 			expect(storage.encryptSecret("sk-plain")).toBe("sk-plain");
-			expect(storage.getSecureStorageStatus()).toMatchObject({
-				secretsAtRisk: true,
-				encryptionUnavailable: true,
-			});
+			expect(storage.getSecureStorageStatus().secretsAtRisk).toBe(true);
 		});
 
 		it("flags secrets already on disk, not only new writes", async () => {
@@ -148,41 +143,42 @@ describe("secret-storage", () => {
 		});
 	});
 
-	describe("a file another process reads, so kept in clear", () => {
-		it("is named to the UI while it holds a secret, keyring or not", async () => {
+	describe("secrets kept readable on purpose", () => {
+		it("put the status at risk even with a keyring, naming keys, never values", async () => {
 			const storage = await load();
 			const listener = vi.fn();
 			storage.onSecureStorageStatusChange(listener);
 
-			storage.reportPlaintextSecretFile("/repo/apps/backend/.env", true);
+			storage.setReadableSecrets("/a/.workpilot/.env", ["SLACK_WEBHOOK_URL"]);
+			storage.setReadableSecrets("/b/.workpilot/.env", [
+				"CONTEXT7_API_KEY",
+				"SLACK_WEBHOOK_URL",
+			]);
 
 			expect(storage.getSecureStorageStatus()).toEqual({
 				keyringAvailable: true,
 				backend: "gnome_libsecret",
+				readableSecretKeys: ["CONTEXT7_API_KEY", "SLACK_WEBHOOK_URL"],
 				secretsAtRisk: true,
-				encryptionUnavailable: false,
-				plaintextFiles: ["/repo/apps/backend/.env"],
 			});
-			expect(listener).toHaveBeenCalledTimes(1);
-			expect(warn).toHaveBeenCalledWith(
-				expect.stringContaining("/repo/apps/backend/.env"),
-			);
+			expect(listener).toHaveBeenCalledTimes(2);
 		});
 
-		it("stops being named once it holds none, telling the UI only on change", async () => {
+		it("clear with the file that held them, and only publish a change", async () => {
 			const storage = await load();
 			const listener = vi.fn();
 			storage.onSecureStorageStatusChange(listener);
+			storage.setReadableSecrets("/a/.workpilot/.env", ["CONTEXT7_API_KEY"]);
+			storage.setReadableSecrets("/a/.workpilot/.env", ["CONTEXT7_API_KEY"]);
+			expect(listener).toHaveBeenCalledTimes(1);
 
-			storage.reportPlaintextSecretFile("/repo/apps/backend/.env", true);
-			storage.reportPlaintextSecretFile("/repo/apps/backend/.env", true);
-			storage.reportPlaintextSecretFile("/repo/apps/backend/.env", false);
+			storage.setReadableSecrets("/a/.workpilot/.env", []);
 
-			expect(listener).toHaveBeenCalledTimes(2);
 			expect(storage.getSecureStorageStatus()).toMatchObject({
+				readableSecretKeys: [],
 				secretsAtRisk: false,
-				plaintextFiles: [],
 			});
+			expect(listener).toHaveBeenCalledTimes(2);
 		});
 	});
 

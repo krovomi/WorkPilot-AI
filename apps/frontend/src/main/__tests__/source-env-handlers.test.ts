@@ -192,7 +192,7 @@ describe("AUTOBUILD_SOURCE_ENV handlers", () => {
 			env.dev = true;
 		});
 
-		it("keeps the token readable by Python, 0600, and names the file to the UI", async () => {
+		it("keeps the token readable by Python, 0600, and names its key to the UI", async () => {
 			const { update, get, status } = await register();
 			const envFile = path.join(backendDir, ".env");
 
@@ -204,7 +204,7 @@ describe("AUTOBUILD_SOURCE_ENV handlers", () => {
 			if (!isWindows) expect(statSync(envFile).mode & 0o777).toBe(0o600);
 			expect(status()).toMatchObject({
 				secretsAtRisk: true,
-				plaintextFiles: [envFile],
+				readableSecretKeys: ["CLAUDE_CODE_OAUTH_TOKEN"],
 			});
 			expect((await get()).data).toMatchObject({ claudeOAuthToken: TOKEN });
 		});
@@ -218,6 +218,9 @@ describe("AUTOBUILD_SOURCE_ENV handlers", () => {
 		for (const claudeOAuthToken of [
 			`${TOKEN}\nEXTRA=1`,
 			`${TOKEN}\rEXTRA=1`,
+			// A line break for Python's str.splitlines(), not for parseEnvFile
+			`${TOKEN}\u2028EXTRA=1`,
+			`${TOKEN}\0`,
 			{ toString: () => TOKEN },
 		]) {
 			const result = await update({ claudeOAuthToken });

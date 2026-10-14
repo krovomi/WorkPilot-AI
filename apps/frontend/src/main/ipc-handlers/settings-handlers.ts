@@ -56,7 +56,7 @@ import {
 	writeSourceEnvFile,
 } from "../source-env";
 import { testGenerationService } from "../test-generation-service";
-import { parseEnvFile } from "./utils";
+import { findEnvLineBreak, parseEnvFile } from "./utils";
 import { getCurrentOS } from "../platform";
 
 
@@ -1240,7 +1240,9 @@ export function registerSettingsHandlers(
 				// Revalidated here (rule S6): the file holds one variable per line.
 				if (
 					token !== undefined &&
-					(typeof token !== "string" || /[\r\n\0]/.test(token))
+					(typeof token !== "string" ||
+						token.includes("\0") ||
+						findEnvLineBreak(token) !== null)
 				) {
 					return { success: false, error: "Invalid Claude OAuth token" };
 				}

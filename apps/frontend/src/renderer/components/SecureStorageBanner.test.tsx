@@ -11,25 +11,20 @@ import { SecureStorageBanner } from "./SecureStorageBanner";
 const protectedStatus: SecureStorageStatus = {
 	keyringAvailable: true,
 	backend: "gnome_libsecret",
+	readableSecretKeys: [],
 	secretsAtRisk: false,
-	encryptionUnavailable: false,
-	plaintextFiles: [],
 };
 const atRiskStatus: SecureStorageStatus = {
 	keyringAvailable: false,
 	backend: "basic_text",
+	readableSecretKeys: [],
 	secretsAtRisk: true,
-	encryptionUnavailable: true,
-	plaintextFiles: [],
 };
-const BACKEND_ENV = "/home/dev/WorkPilot-AI/apps/backend/.env";
-/** Running from source with a keyring: only the backend's .env is in clear. */
-const plaintextFileStatus: SecureStorageStatus = {
+const readableStatus: SecureStorageStatus = {
 	keyringAvailable: true,
 	backend: "gnome_libsecret",
+	readableSecretKeys: ["CONTEXT7_API_KEY"],
 	secretsAtRisk: true,
-	encryptionUnavailable: false,
-	plaintextFiles: [BACKEND_ENV],
 };
 
 describe("SecureStorageBanner", () => {
@@ -56,29 +51,6 @@ describe("SecureStorageBanner", () => {
 		);
 	});
 
-	it("names a file kept in clear for Python, without blaming a keyring that works", () => {
-		useSecureStorageStore.getState().setStatus(plaintextFileStatus);
-		render(<SecureStorageBanner />);
-
-		const alert = screen.getByRole("alert");
-		expect(alert).toHaveTextContent("API keys stored without encryption");
-		expect(alert).toHaveTextContent("the Python backend reads its own .env");
-		expect(alert).toHaveTextContent(BACKEND_ENV);
-		expect(alert).not.toHaveTextContent("No system keyring is available");
-	});
-
-	it("gives both reasons when both hold", () => {
-		useSecureStorageStore.getState().setStatus({
-			...atRiskStatus,
-			plaintextFiles: [BACKEND_ENV],
-		});
-		render(<SecureStorageBanner />);
-
-		const alert = screen.getByRole("alert");
-		expect(alert).toHaveTextContent("No system keyring is available");
-		expect(alert).toHaveTextContent(BACKEND_ENV);
-	});
-
 	it("is translated in French", async () => {
 		await i18n.changeLanguage("fr");
 		useSecureStorageStore.getState().setStatus(atRiskStatus);
@@ -87,16 +59,6 @@ describe("SecureStorageBanner", () => {
 		expect(screen.getByRole("alert")).toHaveTextContent(
 			"Clés API stockées sans chiffrement",
 		);
-	});
-
-	it("names the file kept in clear in French too", async () => {
-		await i18n.changeLanguage("fr");
-		useSecureStorageStore.getState().setStatus(plaintextFileStatus);
-		render(<SecureStorageBanner />);
-
-		const alert = screen.getByRole("alert");
-		expect(alert).toHaveTextContent("le backend Python lit lui-même son .env");
-		expect(alert).toHaveTextContent(BACKEND_ENV);
 	});
 
 	it("can be dismissed for the session, and comes back for newly exposed secrets", () => {
@@ -113,6 +75,39 @@ describe("SecureStorageBanner", () => {
 		// Protected, then exposed again: a new warning.
 		useSecureStorageStore.getState().setStatus(protectedStatus);
 		useSecureStorageStore.getState().setStatus(atRiskStatus);
+		expect(useSecureStorageStore.getState().dismissed).toBe(false);
+	});
+
+	it("names the project keys kept readable, even with a keyring", () => {
+		useSecureStorageStore.getState().setStatus(readableStatus);
+		render(<SecureStorageBanner />);
+
+		const alert = screen.getByRole("alert");
+		expect(alert).toHaveTextContent("CONTEXT7_API_KEY");
+		expect(alert).toHaveTextContent(".workpilot/.env");
+		expect(alert).not.toHaveTextContent("No system keyring");
+	});
+
+	it("speaks of the missing keyring first when there is none", () => {
+		useSecureStorageStore
+			.getState()
+			.setStatus({ ...atRiskStatus, readableSecretKeys: ["CONTEXT7_API_KEY"] });
+		render(<SecureStorageBanner />);
+
+		expect(screen.getByRole("alert")).toHaveTextContent("No system keyring");
+	});
+
+	it("comes back when a project key it has not named yet is kept readable", () => {
+		useSecureStorageStore.getState().setStatus(readableStatus);
+		useSecureStorageStore.getState().dismiss();
+
+		useSecureStorageStore.getState().setStatus(readableStatus);
+		expect(useSecureStorageStore.getState().dismissed).toBe(true);
+
+		useSecureStorageStore.getState().setStatus({
+			...readableStatus,
+			readableSecretKeys: ["CONTEXT7_API_KEY", "SLACK_WEBHOOK_URL"],
+		});
 		expect(useSecureStorageStore.getState().dismissed).toBe(false);
 	});
 

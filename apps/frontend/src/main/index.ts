@@ -90,6 +90,9 @@ import { ensureOllamaReady } from "./services/ollama-portable";
 import { ensureOAuthServerRunning } from "./oauth-server";
 import { openExternalUrl } from "./open-external";
 import { isMacOS, isWindows } from "./platform";
+import { migrateProjectEnvSecrets } from "./project-env-file";
+import { ensureProjectEnvFilesIgnored } from "./project-initializer";
+import { projectStore } from "./project-store";
 import { pythonEnvManager } from "./python-env-manager";
 import { migrateProfilesSecrets } from "./services/profile/profile-manager";
 import { initSentryMain } from "./sentry";
@@ -818,9 +821,10 @@ async function setupMacOSDockIcon() {
 	}
 }
 
-// Encrypt the secrets settings.json, profiles.json and the backend's .env
-// still hold in clear. Without OS encryption they stay as they are and the UI
-// warns the user; so it does for the backend's .env while Python reads it.
+// Encrypt the secrets settings.json, profiles.json, each project's
+// .workpilot/.env and the backend's .env still hold in clear. Without OS
+// encryption they stay as they are and the UI warns the user, as it does for
+// the secrets the backend must read from a file itself.
 async function migrateSecretsAtRest(): Promise<void> {
 	try {
 		if (migrateSettingsSecrets()) {
@@ -829,6 +833,18 @@ async function migrateSecretsAtRest(): Promise<void> {
 		if (await migrateProfilesSecrets()) {
 			console.warn("[main] profiles.json: secrets kept in clear rewritten");
 		}
+		const projects = projectStore.getProjects();
+		const projectEnvFiles = migrateProjectEnvSecrets(projects);
+		if (projectEnvFiles > 0) {
+			console.warn(
+				`[main] .workpilot/.env: tokens kept in clear rewritten in ${projectEnvFiles} project(s)`,
+			);
+		}
+		// One git call per project: off the launch path, which only needs
+		// the files encrypted before anything reads them.
+		void ensureProjectEnvFilesIgnored(projects).catch((error) =>
+			console.warn("[main] Could not check .workpilot/.env is ignored:", error),
+		);
 		const { envPath, readByBackend } = getSourceEnvPath();
 		if (envPath && migrateSourceEnvSecrets({ envPath, readByBackend })) {
 			console.warn("[main] backend .env: secrets kept in clear rewritten");

@@ -26,6 +26,7 @@ import type {
 } from "../../shared/types";
 import { slugifySpecTitle } from "../../shared/utils/spec-slug";
 import type { AgentManager } from "../agent";
+import { readProjectEnv } from "../project-env-file";
 import { projectStore } from "../project-store";
 import {
 	parseAcceptanceCriteriaText,
@@ -42,7 +43,6 @@ import {
 	stripControlChars,
 	stripHtml,
 } from "./shared/sanitize";
-import { parseEnvFile } from "./utils";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -73,14 +73,8 @@ export function registerAzureDevOpsHandlers(
 		if (!project.autoBuildPath) {
 			return { pat: null, orgUrl: null, projectName: null };
 		}
-		const envPath = path.join(project.path, project.autoBuildPath, ".env");
-		if (!existsSync(envPath)) {
-			return { pat: null, orgUrl: null, projectName: null };
-		}
-
 		try {
-			const content = readFileSync(envPath, "utf-8");
-			const vars = parseEnvFile(content);
+			const vars = readProjectEnv(project);
 			return {
 				pat: vars.AZURE_DEVOPS_PAT || null,
 				orgUrl: vars.AZURE_DEVOPS_ORG_URL || null,
