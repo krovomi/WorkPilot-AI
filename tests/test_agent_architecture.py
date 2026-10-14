@@ -18,114 +18,19 @@ import ast
 import inspect
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
 
 # Add apps/backend directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "apps" / "backend"))
 
-# ---------------------------------------------------------------------------
-# Module-level sys.modules mocking
-# ---------------------------------------------------------------------------
-# Several test classes import `core.agent` and `agents.tools_pkg`, which pull in
-# deep dependency chains (core.agent, agents.tools_pkg, etc.) that require
-# packages not installed in the CI test environment.  Pre-populate
-# sys.modules so Python's import machinery never attempts real resolution.
-# ---------------------------------------------------------------------------
-_mocked_module_names = [
-    # External SDKs
-    "claude_code_sdk",
-    "claude_code_sdk.types",
-    "claude_agent_sdk",
-    "claude_agent_sdk.types",
-    # Core infrastructure
-    "core",
-    "core.agent",
-    "core.auth",
-    "core.client",
-    "core.simple_client",
-    "core.task_event",
-    "core.workspace",
-    "core.workspace.models",
-    "core.file_utils",
-    "core.plan_normalization",
-    "core.platform",
-    "core.git_executable",
-    "core.sentry",
-    "client",
-    # Config & phases
-    "phase_config",
-    "core.phase_event",
-    # Logging & UI
-    "core.debug",
-    "ui",
-    "ui.capabilities",
-    "task_logger",
-    "integrations.linear.updater",
-    "core.progress",
-    # Prompts
-    "prompts_pkg.prompts",
-    "prompts_pkg",
-    "prompts_pkg.project_context",
-    "prompts_pkg.prompt_generator",
-    # Security
-    "security",
-    "security.constants",
-    "security.tool_input_validator",
-    "security.bash_security_hook",
-    # Agents package
-    "agents",
-    "agents.base",
-    "agents.coder",
-    "agents.planner",
-    "agents.session",
-    "agents.utils",
-    "agents.memory_manager",
-    "agents.tools_pkg",
-    "agents.tools_pkg.models",
-    "agents.tools_pkg.permissions",
-    "agents.tools_pkg.registry",
-    "agents.tools_pkg.tools",
-    "agents.tools_pkg.tools.memory",
-    "agents.tools_pkg.tools.progress",
-    "agents.tools_pkg.tools.qa",
-    "agents.tools_pkg.tools.subtask",
-    # Spec
-    "spec",
-    "spec.validate_pkg",
-    "spec.validate_pkg.auto_fix",
-    "spec.validate_pkg.spec_validator",
-    "spec.validate_pkg.validators",
-    "spec.complexity",
-    "spec.compaction",
-    "validate_spec",
-    # Memory
-    "memory",
-    # Recovery & misc
-    "services.recovery",
-    "insight_extractor",
-    # Integrations
-    "integrations",
-    "integrations.linear",
-]
-for _name in _mocked_module_names:
-    sys.modules[_name] = MagicMock()
-
-# Wire up core.agent so `from core.agent import *` exposes a callable
-_mock_core_agent = sys.modules["core.agent"]
-_mock_core_agent.run_autonomous_agent = MagicMock()
-_mock_core_agent.run_autonomous_agent.__name__ = "run_autonomous_agent"
-_mock_core_agent.__all__ = ["run_autonomous_agent"]
-
-# Flag: tests that inspect real module internals (function signatures, tool
-# lists) cannot run against MagicMock stubs.  They are skipped when
-# mocking is active.
-_MODULES_ARE_MOCKED = True
-_skip_needs_real = pytest.mark.skipif(
-    _MODULES_ARE_MOCKED,
-    reason="Skipped: real backend modules not available (CI mocked environment)",
-)
+# These tests read the real backend modules. They used to run against a
+# MagicMock `core`, `agents`, `claude_agent_sdk`... installed at import time
+# "because the packages are not installed in CI", with a hard-coded
+# `_MODULES_ARE_MOCKED = True` that skipped the eight tests reading a
+# signature or a tool list. `claude-agent-sdk` is in
+# apps/backend/requirements.txt, which CI installs, so nothing needed the
+# mocks and those eight tests never ran.
 
 
 class TestNoExternalParallelism:
@@ -194,7 +99,6 @@ class TestCLIInterface:
 class TestAgentEntryPoint:
     """Verify the agent entry point function signature."""
 
-    @_skip_needs_real
     def test_no_parallel_parameters(self):
         """Agent entry point should not accept parallel configuration."""
         from core.agent import run_autonomous_agent
@@ -210,7 +114,6 @@ class TestAgentEntryPoint:
             "Agent should not accept a 'parallel' parameter."
         )
 
-    @_skip_needs_real
     def test_required_parameters(self):
         """Agent entry point has required parameters."""
         from core.agent import run_autonomous_agent
@@ -222,7 +125,6 @@ class TestAgentEntryPoint:
         for param in expected:
             assert param in param_names, f"Expected parameter '{param}' not found"
 
-    @_skip_needs_real
     def test_is_async(self):
         """Agent entry point is async."""
         from core.agent import run_autonomous_agent
@@ -317,7 +219,6 @@ class TestProjectDocumentation:
 class TestElectronToolScoping:
     """Verify Electron MCP tools are scoped to QA agents only."""
 
-    @_skip_needs_real
     def test_qa_reviewer_has_electron_tools_when_enabled(self, monkeypatch):
         """QA reviewer gets Electron tools when ELECTRON_MCP_ENABLED=true and project is Electron."""
         monkeypatch.setenv("ELECTRON_MCP_ENABLED", "true")
@@ -341,7 +242,6 @@ class TestElectronToolScoping:
         for tool in ELECTRON_TOOLS:
             assert tool in qa_tools, f"Expected {tool} in qa_reviewer tools"
 
-    @_skip_needs_real
     def test_qa_fixer_has_electron_tools_when_enabled(self, monkeypatch):
         """QA fixer gets Electron tools when ELECTRON_MCP_ENABLED=true and project is Electron."""
         monkeypatch.setenv("ELECTRON_MCP_ENABLED", "true")
@@ -361,7 +261,6 @@ class TestElectronToolScoping:
         for tool in ELECTRON_TOOLS:
             assert tool in qa_fixer_tools, f"Expected {tool} in qa_fixer tools"
 
-    @_skip_needs_real
     def test_coder_no_electron_tools(self, monkeypatch):
         """Coder should NOT get Electron tools even when enabled and project is Electron."""
         monkeypatch.setenv("ELECTRON_MCP_ENABLED", "true")
@@ -378,7 +277,6 @@ class TestElectronToolScoping:
             "This prevents context token bloat for agents that don't need desktop automation."
         )
 
-    @_skip_needs_real
     def test_planner_no_electron_tools(self, monkeypatch):
         """Planner should NOT get Electron tools even when enabled and project is Electron."""
         monkeypatch.setenv("ELECTRON_MCP_ENABLED", "true")
@@ -395,7 +293,6 @@ class TestElectronToolScoping:
             "This prevents context token bloat for agents that don't need desktop automation."
         )
 
-    @_skip_needs_real
     def test_no_electron_tools_when_disabled(self, monkeypatch):
         """No agent gets Electron tools when ELECTRON_MCP_ENABLED is not set."""
         monkeypatch.delenv("ELECTRON_MCP_ENABLED", raising=False)
