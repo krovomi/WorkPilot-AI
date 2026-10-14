@@ -159,6 +159,16 @@ Ordre recommandé : L1, L2, L3, L4, L5, L6, L7, L8, L9, L10, L11, L12, L14, L15,
   `run_insight_extraction` (`analysis/insight_extractor.py`) lançait la session puis ne renvoyait
   rien, si bien que même un `agent_type` valide n'aurait jamais alimenté la mémoire ; elle renvoie
   désormais l'objet JSON lu par `spec.plan_recovery.extract_json_document`.
+- **Suivi (extracteur d'insights).** Le registre réparé, l'extracteur n'écrivait toujours rien, pour
+  trois raisons que `tests/test_agent_type_registry.py` ne voit pas (il remplace la fabrique de
+  runtime) : `cli_provider=None` faisait résoudre `anthropic`, qui n'est pas un provider SDK
+  (`is_claude_sdk`), d'où `LiteLLMRuntime` avec le token OAuth comme clé d'API, refusé puis remplacé
+  par les insights génériques ; le prompt était cherché dans `analysis/prompts/`, absent depuis le
+  déplacement du module, et le modèle recevait un fallback d'une ligne sans schéma ;
+  `save_session_memory` n'écrivait les insights structurés que si `file_insights` était non vide.
+  Corrigés (`EXTRACTION_PROVIDER = "claude"`, `PROMPT_FILE` dans `apps/backend/prompts/`,
+  `_has_extracted_facts`), plus `ClaudeSDKRuntime` qui acceptait mal un `project_dir` en `str`.
+  Gardé par `tests/test_insight_extractor_wiring.py`.
 - **Preuve** : `get_agent_config("insight_extractor")` lève `ValueError: Unknown agent type`
   (`agents/tools_pkg/models.py:476-495`). Appelants :
   `agents/impact_analyzer.py:305`, `architecture/ai_reviewer.py:76`, `migration/llm_transformer.py:75`,

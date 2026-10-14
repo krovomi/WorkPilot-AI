@@ -161,6 +161,30 @@ async def get_memory_context(
     return "\n".join(sections)
 
 
+def _has_extracted_facts(discoveries: dict | None) -> bool:
+    """Whether the insight extractor found something worth a note of its own.
+
+    The structured write used to hinge on ``file_insights`` alone: a session
+    whose extraction found patterns, gotchas or an explained outcome but no
+    per-file insight filed none of them, so patterns/ and outcomes/ stayed
+    empty. The generic fallback (extraction off or failed) carries an outcome
+    with no explanation — that one is not a fact, and is not filed.
+    """
+    if not isinstance(discoveries, dict):
+        return False
+    if any(
+        discoveries.get(key)
+        for key in ("file_insights", "patterns_discovered", "gotchas_discovered")
+    ):
+        return True
+    outcome = discoveries.get("approach_outcome")
+    return isinstance(outcome, dict) and bool(
+        outcome.get("why_it_worked")
+        or outcome.get("why_it_failed")
+        or outcome.get("alternatives_tried")
+    )
+
+
 async def save_session_memory(
     spec_dir: Path,
     project_dir: Path,
@@ -207,7 +231,7 @@ async def save_session_memory(
 
     try:
         saved = await memory.save_session_insights(session_num, insights)
-        if discoveries and discoveries.get("file_insights"):
+        if _has_extracted_facts(discoveries):
             saved = await memory.save_structured_insights(discoveries) or saved
         if saved:
             logger.info(f"Session {session_num} insights saved to the brain")
