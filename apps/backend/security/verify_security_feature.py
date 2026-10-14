@@ -154,7 +154,7 @@ def main():
         "git_hooks.py",
         "auto_integration.py",
         "FEATURE_STATUS.json",
-        "README.md",
+        "AGENTS.md",
     ]
     missing = []
     for file in required_files:

@@ -245,6 +245,5 @@ import { ErrorDisplay } from './common';
 
 ## Related Documentation
 
-- See `REFACTORING_SUMMARY.md` for detailed refactoring analysis
 - See individual component files for inline documentation
 - See TypeScript interfaces for prop specifications

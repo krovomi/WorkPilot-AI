@@ -10,6 +10,10 @@
 qu'un `view` complet d'un fichier > 1 000 lignes. Voir
 `.github/hooks/pre-tool-large-file.hook.md`.
 
+**Règles normatives** : [`docs/CLAUDE.md`](../docs/CLAUDE.md) et [`docs/rules/`](../docs/rules/)
+(sécurité, backend, frontend, workflow) ; elles priment sur ce fichier et sur les
+`.instructions.md`. Une vulnérabilité se signale par [`docs/SECURITY.md`](../docs/SECURITY.md).
+
 **Bloc BMAD ci-dessous** : géré par BMAD method, ne pas éditer manuellement.
 <!-- /COPILOT:HEADER -->
 

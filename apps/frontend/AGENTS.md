@@ -1,51 +1,70 @@
 # AGENTS.md — index du frontend
 
-Electron + React + TypeScript + Vite + Zustand + Tailwind. ~570 composants, ~110 stores,
-~150 modules de handlers IPC. Ce fichier donne les points d'entrée.
+Electron + React + TypeScript + Vite + Zustand + Tailwind. ~570 composants, ~110 stores, ~180
+modules de handlers IPC. Ce fichier donne les points d'entrée.
 
-> Règles normatives : [`../../docs/CLAUDE.md`](../../docs/CLAUDE.md) · Racine : [`../../AGENTS.md`](../../AGENTS.md)
-> Contribution frontend : [`CONTRIBUTING.md`](CONTRIBUTING.md)
+> Règles (normatif) : [`docs/rules/frontend.md`](../../docs/rules/frontend.md), sécurité Electron :
+> règle S6 de [`docs/rules/security.md`](../../docs/rules/security.md) · Racine :
+> [`../../AGENTS.md`](../../AGENTS.md) · Contribution : [`CONTRIBUTING.md`](CONTRIBUTING.md)
 
 ## Les trois processus
 
 | Dossier | Processus | Rôle |
 |---|---|---|
-| `src/main/` | Electron main | accès disque, git, worktrees, spawn du backend, terminaux, IPC |
-| `src/preload/` | preload | expose l'API IPC au renderer via `contextBridge` |
-| `src/renderer/` | renderer | l'UI React. **Aucun accès direct au système** — tout passe par l'IPC. |
+| `src/main/` | main Electron | disque, git, worktrees, lancement du backend, terminaux, handlers IPC (`src/main/ipc-handlers/`) |
+| `src/preload/` | preload | expose l'API IPC au renderer via `contextBridge` (`src/preload/api/`) |
+| `src/renderer/` | renderer | l'UI React ; aucun accès système, tout passe par l'IPC |
+| `src/shared/` | — | types, constantes (`constants/ipc.ts`), i18n (`i18n/locales/{en,fr}/`), utilitaires |
 
 ## Fichiers volumineux — ne pas ouvrir en entier
 
-| Fichier | Lignes | Index |
+| Fichier | Lignes | Voisins / index |
 |---|---|---|
-| `src/main/claude-profile/usage-monitor.ts` | ~4 600 | une seule classe, non découpée (lot L11) |
-| `src/main/ipc-handlers/task/worktree-handlers.ts` | ~3 600 | IDE/terminaux, refs git et helpers de PR dans `worktree-ide-terminal.ts`, `worktree-git-refs.ts`, `worktree-pr-helpers.ts` |
-| `src/renderer/components/KanbanBoard.tsx` | ~3 250 | [`kanban/AGENTS.md`](src/renderer/components/kanban/AGENTS.md) ; colonnes dans `kanban/KanbanColumn.tsx` |
+| `src/main/claude-profile/usage-monitor.ts` | ~4 600 | une seule classe |
+| `src/main/ipc-handlers/task/worktree-handlers.ts` | ~3 600 | `worktree-ide-terminal.ts`, `worktree-git-refs.ts`, `worktree-pr-helpers.ts` |
 | `src/main/app-emulator-service.ts` | ~3 250 | — |
+| `src/renderer/components/KanbanBoard.tsx` | ~3 250 | [`kanban/AGENTS.md`](src/renderer/components/kanban/AGENTS.md) ; colonnes dans `kanban/KanbanColumn.tsx` |
 | `src/main/ipc-handlers/task/execution-handlers.ts` | ~3 100 | — |
-| `src/main/ipc-handlers/github/pr-handlers.ts` | ~2 500 | GraphQL, logs de revue et attente CI dans `pr-graphql.ts`, `pr-logs.ts`, `pr-ci-wait.ts` |
-| `src/renderer/components/api-explorer/ApiExplorer.tsx` | ~730 | un fichier par panneau : `RequestPanel.tsx`, `EnvironmentManager.tsx`, `ExportDialog.tsx` |
-| `src/main/mobile-service.ts` | ~600 | pilote un émulateur Android / simulateur Apple ; toute la détection vient de `apps/backend/mobile/` |
-| `src/renderer/stores/task-store.ts` | ~1 300 | — |
+| `src/main/ipc-handlers/github/pr-handlers.ts` | ~2 350 | `pr-graphql.ts`, `pr-logs.ts`, `pr-ci-wait.ts` |
+| `src/renderer/stores/task-store.ts` | ~1 850 | — |
 
-Cibler avec `grep -n`, lire le voisinage, éditer. Le hook `pre-tool-large-file` bloque
-les lectures complètes au-delà de 1 000 lignes.
+Chercher le symbole (`grep -n`), lire le voisinage, éditer. Rien ne bloque une lecture complète :
+c'est une discipline, pas un garde-fou.
 
-## Conventions
+## Où ajouter quoi
 
-- **i18n obligatoire.** Tout texte visible passe par `react-i18next`. Locales sous
-  `src/renderer/locales/{en,fr}/`. Un texte en dur est un bug, pas un détail.
-- **Jamais `process.platform` en direct** — passer par `src/main/platform/`.
-- **IPC nommé** — les canaux vivent dans `src/shared/constants/ipc.ts` et
-  `ipc-namespaces.ts`. Pas de chaîne littérale.
-- **Zustand** — un store par domaine sous `src/renderer/stores/`. Sélecteurs granulaires :
-  `useX((s) => s.champ)`, jamais le store entier, sinon tout re-rend.
-- **Biome 2.5.11** exactement (`pnpm run lint`). Une autre version reformate tout.
+| Je veux… | Je touche |
+|---|---|
+| un canal IPC | `src/shared/constants/ipc.ts` (ou `ipc-namespaces.ts`), `src/shared/types/ipc.ts`, `src/preload/api/`, `src/main/ipc-handlers/` |
+| un écouteur d'événements du main | `src/renderer/stores/global-listeners.ts` — jamais un `useEffect` de page |
+| un texte visible | une clé dans `src/shared/i18n/locales/en/` **et** `fr/` |
+| une détection d'OS ou d'exécutable | `src/main/platform/` |
+| une couleur ou un thème | `src/shared/constants/themes.ts` |
+
+## Sécurité
+
+| Garde | Où | Test |
+|---|---|---|
+| Fenêtre principale : isolation, sandbox, pas de Node | `src/main/index.ts` (`createWindow`) | — |
+| Webviews : préférences imposées, schémas de `src` autorisés | `src/main/security/webview-policy.ts` | `webview-policy.test.ts` |
+| Navigation et nouvelles fenêtres | `src/main/index.ts` (`setupExternalLinkHandler`, `setupWebviewGuards`) | — |
+| Permissions (micro de la dictée) | `src/main/security/dictation-permission.ts` | `dictation-permission.test.ts` |
+| URL externes, protocoles en liste fermée | `src/main/open-external.ts` (`openExternalUrl`) | `open-external.test.ts` |
+| Variables d'environnement venues d'un dépôt | `src/main/claude-code-settings/env-sanitizer.ts` ([SECURITY.md](src/main/claude-code-settings/SECURITY.md)) | `env-sanitizer.test.ts` |
+| Chiffrement des jetons | `src/main/claude-profile/token-encryption.ts` (`safeStorage`) | — |
+| Identifiants (trousseau, fichiers restreints) | `src/main/claude-profile/credential-utils.ts` | `credential-utils.test.ts` |
+| Assainissement texte / URL | `src/main/ipc-handlers/shared/sanitize.ts` | `sanitize.test.ts` |
+| Échappement shell | `src/shared/utils/shell-escape.ts` | — |
+| Chemins dans un worktree | `src/main/worktree-paths.ts` (`isPathWithinBase`) | — |
+| CSP du renderer | `src/renderer/index.html` | — |
+
+Le preload expose encore un passthrough générique (`src/preload/api/modules/generic-ipc-api.ts`) :
+historique, à ne pas étendre ni réutiliser pour un nouveau canal.
 
 ## Tests
 
 | Type | Où | Commande |
 |---|---|---|
-| Unitaires | `src/**/__tests__/` | `pnpm test` (vitest) |
+| Unitaires | `src/**/__tests__/`, `*.test.ts(x)` | `pnpm test` (Vitest) |
 | Intégration | `src/__tests__/integration/` | `pnpm test` |
 | E2E | `e2e/` | `pnpm run test:e2e` (Playwright) |
