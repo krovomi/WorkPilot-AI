@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { DEFAULT_APP_SETTINGS, IPC_CHANNELS } from "../../shared/constants";
 import type {
@@ -15,6 +15,8 @@ import {
 } from "../claude-cli-utils";
 import { type BrowserWindow, ipcMain } from "../electron-utils";
 import { getSpawnCommand, getSpawnOptions } from "../env-utils";
+import { readProjectEnvFile, writeProjectEnvFile } from "../project-env-file";
+import { ensureProjectEnvIgnored } from "../project-initializer";
 import { projectStore } from "../project-store";
 import { readSettingsFile } from "../settings-utils";
 import { parseEnvFile } from "./utils";
@@ -727,16 +729,8 @@ ${existingVars.OLLAMA_BASE_URL ? `OLLAMA_BASE_URL=${existingVars.OLLAMA_BASE_URL
 				openaiKeyIsGlobal: false,
 			};
 
-			// Parse project-specific .env if it exists
-			let vars: Record<string, string> = {};
-			if (existsSync(envPath)) {
-				try {
-					const content = readFileSync(envPath, "utf-8");
-					vars = parseEnvFile(content);
-				} catch {
-					// Continue with empty vars
-				}
-			}
+			// Parse project-specific .env if it exists, tokens decrypted
+			const vars = readProjectEnvFile(envPath);
 
 			// Claude OAuth Token: project-specific takes precedence, then global
 			if (vars.CLAUDE_CODE_OAUTH_TOKEN) {
@@ -1021,7 +1015,7 @@ ${existingVars.OLLAMA_BASE_URL ? `OLLAMA_BASE_URL=${existingVars.OLLAMA_BASE_URL
 			// If the project hasn't been initialized yet (no .workpilot/ on disk yet),
 			// bootstrap autoBuildPath so integration config set at creation time (e.g. Azure/Jira
 			// from AddProjectModal) can still be persisted. The .workpilot/ directory itself is
-			// created below by the mkdirSync fallback when writing the .env file.
+			// created below by writeProjectEnvFile when writing the .env file.
 			let autoBuildPath = project.autoBuildPath;
 			if (!autoBuildPath) {
 				autoBuildPath = ".workpilot";
@@ -1044,14 +1038,11 @@ ${existingVars.OLLAMA_BASE_URL ? `OLLAMA_BASE_URL=${existingVars.OLLAMA_BASE_URL
 				// Generate new content
 				const newContent = generateEnvContent(config, existingContent);
 
-				// Ensure parent directory exists (handles case where .workpilot was deleted or not created)
-				const envDir = path.dirname(envPath);
-				if (!existsSync(envDir)) {
-					mkdirSync(envDir, { recursive: true });
-				}
-
-				// Write to file
-				writeFileSync(envPath, newContent, "utf-8");
+				// A .env written before initialization has no .gitignore entry yet
+				await ensureProjectEnvIgnored(project.path, autoBuildPath);
+				// Tokens encrypted, file owner-only, parent directory created when
+				// .workpilot was deleted or never made (project-env-file)
+				writeProjectEnvFile(envPath, newContent);
 
 				return { success: true };
 			} catch (error) {

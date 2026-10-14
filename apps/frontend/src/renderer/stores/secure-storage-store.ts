@@ -10,6 +10,15 @@ interface SecureStorageState {
 	refresh(): Promise<void>;
 }
 
+/** A key the previous status did not name: the user has not been told yet. */
+function namesNewKeys(
+	previous: SecureStorageStatus | null,
+	next: SecureStorageStatus,
+): boolean {
+	const known = new Set(previous?.readableSecretKeys ?? []);
+	return next.readableSecretKeys.some((key) => !known.has(key));
+}
+
 export const useSecureStorageStore = create<SecureStorageState>((set) => ({
 	status: null,
 	dismissed: false,
@@ -17,7 +26,10 @@ export const useSecureStorageStore = create<SecureStorageState>((set) => ({
 	setStatus: (status) =>
 		set((state) => ({
 			status,
-			dismissed: state.dismissed && !!state.status?.secretsAtRisk,
+			dismissed:
+				state.dismissed &&
+				!!state.status?.secretsAtRisk &&
+				!namesNewKeys(state.status, status),
 		})),
 	dismiss: () => set({ dismissed: true }),
 	refresh: async () => {

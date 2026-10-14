@@ -3,22 +3,35 @@ import { useTranslation } from "react-i18next";
 import { cn } from "../lib/utils";
 import { useSecureStorageStore } from "../stores/secure-storage-store";
 
+const NO_KEYS: string[] = [];
+
 interface SecureStorageBannerProps {
 	className?: string;
 }
 
 /**
  * Sidebar warning shown while API keys or tokens are stored without the OS
- * keyring (Linux without GNOME Keyring / KWallet, typically). Rule S1: a
- * secret is never written in clear without the user being told.
+ * keyring (Linux without GNOME Keyring / KWallet, typically), or kept in clear
+ * in a project's `.workpilot/.env` because the Python backend reads them from
+ * there. Rule S1: a secret is never written in clear without the user being
+ * told.
  */
 export function SecureStorageBanner({ className }: SecureStorageBannerProps) {
 	const { t } = useTranslation("navigation");
 	const atRisk = useSecureStorageStore((s) => !!s.status?.secretsAtRisk);
+	const keyringAvailable = useSecureStorageStore(
+		(s) => !!s.status?.keyringAvailable,
+	);
+	const readableKeys = useSecureStorageStore(
+		(s) => s.status?.readableSecretKeys ?? NO_KEYS,
+	);
 	const dismissed = useSecureStorageStore((s) => s.dismissed);
 	const dismiss = useSecureStorageStore((s) => s.dismiss);
 
 	if (!atRisk || dismissed) return null;
+
+	// No keyring covers every secret; with one, only the readable keys remain.
+	const onlyReadable = keyringAvailable && readableKeys.length > 0;
 
 	return (
 		<div
@@ -45,10 +58,16 @@ export function SecureStorageBanner({ className }: SecureStorageBannerProps) {
 				</button>
 			</div>
 			<p className="text-xs text-muted-foreground mb-1">
-				{t("secureStorageBanner.description")}
+				{onlyReadable
+					? t("secureStorageBanner.readableDescription", {
+							keys: readableKeys.join(", "),
+						})
+					: t("secureStorageBanner.description")}
 			</p>
 			<p className="text-xs text-muted-foreground">
-				{t("secureStorageBanner.action")}
+				{onlyReadable
+					? t("secureStorageBanner.readableAction")
+					: t("secureStorageBanner.action")}
 			</p>
 		</div>
 	);

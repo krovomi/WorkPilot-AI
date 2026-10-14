@@ -11,11 +11,19 @@ import { SecureStorageBanner } from "./SecureStorageBanner";
 const protectedStatus: SecureStorageStatus = {
 	keyringAvailable: true,
 	backend: "gnome_libsecret",
+	readableSecretKeys: [],
 	secretsAtRisk: false,
 };
 const atRiskStatus: SecureStorageStatus = {
 	keyringAvailable: false,
 	backend: "basic_text",
+	readableSecretKeys: [],
+	secretsAtRisk: true,
+};
+const readableStatus: SecureStorageStatus = {
+	keyringAvailable: true,
+	backend: "gnome_libsecret",
+	readableSecretKeys: ["CONTEXT7_API_KEY"],
 	secretsAtRisk: true,
 };
 
@@ -67,6 +75,39 @@ describe("SecureStorageBanner", () => {
 		// Protected, then exposed again: a new warning.
 		useSecureStorageStore.getState().setStatus(protectedStatus);
 		useSecureStorageStore.getState().setStatus(atRiskStatus);
+		expect(useSecureStorageStore.getState().dismissed).toBe(false);
+	});
+
+	it("names the project keys kept readable, even with a keyring", () => {
+		useSecureStorageStore.getState().setStatus(readableStatus);
+		render(<SecureStorageBanner />);
+
+		const alert = screen.getByRole("alert");
+		expect(alert).toHaveTextContent("CONTEXT7_API_KEY");
+		expect(alert).toHaveTextContent(".workpilot/.env");
+		expect(alert).not.toHaveTextContent("No system keyring");
+	});
+
+	it("speaks of the missing keyring first when there is none", () => {
+		useSecureStorageStore
+			.getState()
+			.setStatus({ ...atRiskStatus, readableSecretKeys: ["CONTEXT7_API_KEY"] });
+		render(<SecureStorageBanner />);
+
+		expect(screen.getByRole("alert")).toHaveTextContent("No system keyring");
+	});
+
+	it("comes back when a project key it has not named yet is kept readable", () => {
+		useSecureStorageStore.getState().setStatus(readableStatus);
+		useSecureStorageStore.getState().dismiss();
+
+		useSecureStorageStore.getState().setStatus(readableStatus);
+		expect(useSecureStorageStore.getState().dismissed).toBe(true);
+
+		useSecureStorageStore.getState().setStatus({
+			...readableStatus,
+			readableSecretKeys: ["CONTEXT7_API_KEY", "SLACK_WEBHOOK_URL"],
+		});
 		expect(useSecureStorageStore.getState().dismissed).toBe(false);
 	});
 

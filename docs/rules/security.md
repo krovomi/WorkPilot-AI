@@ -50,6 +50,13 @@ l'UI n'existe pas.
   jeton, ni le corps d'une requête d'authentification.
 - **Nouveau stockage d'identifiant** côté Electron : `safeStorage`. S'il est indisponible, refuser
   ou avertir l'utilisateur ; ne pas retomber silencieusement sur du texte clair.
+- **Un fichier de secrets, un lecteur** : `settings.json` par `settings-utils.ts`, `profiles.json`
+  par les gestionnaires de profils, `<projet>/.workpilot/.env` par `project-env-file.ts` ; tous
+  chiffrent par `secret-storage.ts` (préfixe `enc:`). Une nouvelle clé secrète du `.env` de projet
+  se classe dans `shared/constants/project-env-secrets.json` : `encrypted` si Python ne la lit que
+  dans son environnement, `readable` s'il la lit dans le fichier (laissée en clair, nommée par la
+  bannière). `tests/test_project_env_secrets.py` le vérifie.
+  → [architecture/secrets-at-rest.md](../architecture/secrets-at-rest.md)
 - `core/auth.py` ne lit que `AUTH_TOKEN_ENV_VARS` ; `ANTHROPIC_API_KEY` en est exclu exprès.
 - **Aucun hook git ne cherche de secrets.** Avant un commit, relire `git diff --cached` ;
   `security/scan_secrets.py --staged-only` le fait à la main. Le hook Bash le lance sur un

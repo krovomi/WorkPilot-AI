@@ -1,5 +1,5 @@
-import { existsSync, readFileSync } from "node:fs";
-import path from "node:path";
+import { existsSync } from "node:fs";
+import { readProjectEnv } from "../../project-env-file";
 import { readSettingsFile } from "../../settings-utils";
 
 export interface EnvironmentVars {
@@ -57,21 +57,7 @@ export function loadProjectEnvVars(
 	projectPath: string,
 	autoBuildPath?: string,
 ): EnvironmentVars {
-	if (!autoBuildPath) {
-		return {};
-	}
-
-	const projectEnvPath = path.join(projectPath, autoBuildPath, ".env");
-	if (!existsSync(projectEnvPath)) {
-		return {};
-	}
-
-	try {
-		const envContent = readFileSync(projectEnvPath, "utf-8");
-		return parseEnvFile(envContent);
-	} catch {
-		return {};
-	}
+	return readProjectEnv({ path: projectPath, autoBuildPath });
 }
 
 /**

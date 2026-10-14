@@ -52,6 +52,8 @@ c'est une discipline, pas un garde-fou.
 | URL externes, protocoles en liste fermée | `src/main/open-external.ts` (`openExternalUrl`) | `open-external.test.ts` |
 | Variables d'environnement venues d'un dépôt | `src/main/claude-code-settings/env-sanitizer.ts` ([SECURITY.md](src/main/claude-code-settings/SECURITY.md)) | `env-sanitizer.test.ts` |
 | Chiffrement des jetons | `src/main/claude-profile/token-encryption.ts` (`safeStorage`) | — |
+| Secrets au repos, bannière sans trousseau | `src/main/secret-storage.ts` | `secret-storage.test.ts` |
+| `.workpilot/.env` de projet : jetons `enc:`, 0600, ignoré par git | `src/main/project-env-file.ts`, `shared/constants/project-env-secrets.json` | `project-env-file.test.ts`, `tests/test_project_env_secrets.py` |
 | Identifiants (trousseau, fichiers restreints) | `src/main/claude-profile/credential-utils.ts` | `credential-utils.test.ts` |
 | Assainissement texte / URL | `src/main/ipc-handlers/shared/sanitize.ts` | `sanitize.test.ts` |
 | Échappement shell | `src/shared/utils/shell-escape.ts` | — |

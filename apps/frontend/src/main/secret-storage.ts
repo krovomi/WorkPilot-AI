@@ -29,6 +29,8 @@ let secretsStored = false;
 /** A secret was written in clear because encryption failed or was unavailable. */
 let plaintextWritten = false;
 let decryptWarned = false;
+/** File → the secret keys it keeps readable on purpose (names only). */
+const readableSecrets = new Map<string, readonly string[]>();
 /**
  * Ciphertext → plaintext. Settings are re-read on every log line; this keeps
  * that from costing a DPAPI / keyring round trip per secret each time.
@@ -59,20 +61,46 @@ function keyringAvailable(backend = selectedBackend()): boolean {
 	return safeStorageReady() && backend !== "basic_text";
 }
 
+function readableSecretKeys(): string[] {
+	return [...new Set([...readableSecrets.values()].flat())].sort();
+}
+
 export function getSecureStorageStatus(): SecureStorageStatus {
 	const backend = selectedBackend();
 	const available = keyringAvailable(backend);
+	const readable = readableSecretKeys();
 	return {
 		keyringAvailable: available,
 		backend,
-		secretsAtRisk: plaintextWritten || (secretsStored && !available),
+		readableSecretKeys: readable,
+		secretsAtRisk:
+			plaintextWritten || (secretsStored && !available) || readable.length > 0,
 	};
 }
 
 /**
+ * Record the secrets `source` keeps in clear on purpose, because a process
+ * that cannot call safeStorage reads them there (a project's `.workpilot/.env`,
+ * read by the Python backend). An empty list clears the source. The status
+ * names them so the UI warns, keyring or not.
+ */
+export function setReadableSecrets(
+	source: string,
+	keys: readonly string[],
+): void {
+	const before = readableSecretKeys().join("\n");
+	if (keys.length > 0) {
+		readableSecrets.set(source, [...keys]);
+	} else {
+		readableSecrets.delete(source);
+	}
+	if (readableSecretKeys().join("\n") !== before) publish();
+}
+
+/**
  * Called with the current status whenever what is on disk may have changed
- * it: the first secret seen this session, the first one written in clear.
- * Returns the unsubscribe.
+ * it: the first secret seen this session, the first one written in clear, a
+ * change in the secrets kept readable. Returns the unsubscribe.
  */
 export function onSecureStorageStatusChange(
 	listener: StatusListener,

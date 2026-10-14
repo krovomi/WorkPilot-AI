@@ -5,17 +5,16 @@
  */
 
 import { spawn } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { AUTO_BUILD_PATHS, getSpecsDir } from "../../../shared/constants";
 import type {
 	WorktreeCreatePROptions,
 	VisualProofRun,
 } from "../../../shared/types";
-import { parseEnvFile } from "../utils";
 import { getAppLanguage } from "../../app-language";
 import { getToolPath } from "../../cli-tool-manager";
 import { killProcessGracefully } from "../../platform";
+import { readProjectEnv } from "../../project-env-file";
 import { parsePythonCommand } from "../../python-detector";
 import {
 	getConfiguredPythonPath,
@@ -50,14 +49,7 @@ import { GIT_BRANCH_REGEX } from "./worktree-git-refs";
 export function loadProjectEnvForSubprocess(
 	project: { path: string; autoBuildPath?: string | null },
 ): Record<string, string> {
-	if (!project.autoBuildPath) return {};
-	const envPath = path.join(project.path, project.autoBuildPath, ".env");
-	if (!existsSync(envPath)) return {};
-	try {
-		return parseEnvFile(readFileSync(envPath, "utf-8"));
-	} catch {
-		return {};
-	}
+	return readProjectEnv(project);
 }
 
 // Maximum PR title length (GitHub's limit is 256 characters)
