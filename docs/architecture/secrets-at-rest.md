@@ -128,8 +128,30 @@ is never handed to an MCP server or a webhook as if it were the secret.
 encrypted). The two do not meet: `auth.py` reads environment variables, and
 the main process never passes a value it could not decrypt.
 
+### CI/CD trigger settings
+
+The CI/CD triggers screen used to keep its settings and tokens
+(`CICD_GITHUB_TOKEN`, `CICD_GITLAB_TOKEN`, `CICD_AZURE_TOKEN`,
+`CICD_JENKINS_TOKEN`…) in the project's **root** `.env`: in clear, in a file
+that belongs to the user's application and that WorkPilot's `.gitignore`
+entries do not cover. They now live in `.workpilot/.env` with the rest:
+
+- `cicd-triggers-handlers.ts` reads and writes them through `project-env-file`.
+  The directory the renderer names must be one of the user's projects
+  (`findKnownProject`); only the fields of `CICD_CONFIG_KEYS` are written, a
+  value spanning lines is refused, and a token sent back as the `***` mask
+  `getConfig` shows keeps its stored value.
+- The runner receives only the `CICD_*` settings, decrypted, in its
+  environment — the root `.env` is no longer spread into it — and
+  `cicd_triggers_runner.load_env` lets the environment win over that file.
+- `migrateRootEnvCicdKeys` moves the `CICD_*` lines out of each root `.env` at
+  startup. `.workpilot/.env` is written first and keeps a value it already
+  has; the root file loses only those lines and keeps its mode.
+
+`ENV_UPDATE` rewrites `.workpilot/.env` from a template; the keys it does not
+manage (these, the Figma token, rtk, ui-ux…) are carried over under "Other
+settings" instead of being dropped.
+
 ## Not covered here
 
-The project-root `.env` that the CI/CD triggers and cross-language
-translation screens write (`CICD_*_TOKEN`) is still plaintext and is not under
-`.workpilot/`. `ENV_GET` returns the project tokens to the renderer unmasked.
+`ENV_GET` returns the project tokens to the renderer unmasked.

@@ -91,7 +91,10 @@ import { openExternalUrl } from "./open-external";
 import { isMacOS, isWindows } from "./platform";
 import { pythonEnvManager } from "./python-env-manager";
 import { migrateProfilesSecrets } from "./services/profile/profile-manager";
-import { migrateProjectEnvSecrets } from "./project-env-file";
+import {
+	migrateProjectEnvSecrets,
+	migrateRootEnvCicdKeys,
+} from "./project-env-file";
 import { projectStore } from "./project-store";
 import { initSentryMain } from "./sentry";
 import {
@@ -828,6 +831,13 @@ async function migrateSecretsAtRest(): Promise<void> {
 		}
 		if (await migrateProfilesSecrets()) {
 			console.warn("[main] profiles.json: secrets kept in clear rewritten");
+		}
+		// CI/CD trigger settings first: they move into .workpilot/.env, encrypted.
+		const rootEnvFiles = migrateRootEnvCicdKeys(projectStore.getProjects());
+		if (rootEnvFiles > 0) {
+			console.warn(
+				`[main] CI/CD settings moved from the root .env to .workpilot/.env in ${rootEnvFiles} project(s)`,
+			);
 		}
 		const projectEnvFiles = migrateProjectEnvSecrets(projectStore.getProjects());
 		if (projectEnvFiles > 0) {

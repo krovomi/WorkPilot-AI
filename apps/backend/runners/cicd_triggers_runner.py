@@ -21,6 +21,12 @@ from pathlib import Path
 
 
 def load_env(project_dir: str) -> dict:
+    """The process environment, with the project's root `.env` underneath it.
+
+    The desktop app passes the CI/CD settings (kept encrypted in
+    `.workpilot/.env`) as environment variables; a stale value left in the
+    root `.env` must not override them.
+    """
     env = dict(os.environ)
     env_path = Path(project_dir) / ".env"
     if env_path.exists():
@@ -33,7 +39,7 @@ def load_env(project_dir: str) -> dict:
                 continue
             key = line[:eq].strip()
             val = line[eq + 1 :].strip().strip("\"'")
-            env[key] = val
+            env.setdefault(key, val)
     return env
 
 

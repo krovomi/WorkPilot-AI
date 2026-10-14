@@ -693,7 +693,19 @@ ${existingVars.GOOGLE_API_KEY ? `GOOGLE_API_KEY=${existingVars.GOOGLE_API_KEY}` 
 ${existingVars.OLLAMA_BASE_URL ? `OLLAMA_BASE_URL=${existingVars.OLLAMA_BASE_URL}` : "# OLLAMA_BASE_URL=http://localhost:11434"}
 `;
 
-		return content;
+		// Keys this template does not manage are other writers' (Figma token,
+		// CI/CD triggers, rtk, ui-ux…): rewriting the file must not drop them.
+		const written = parseEnvFile(content);
+		const preserved = Object.entries(existingVars).filter(
+			([key, value]) => value !== "" && !(key in written),
+		);
+		if (preserved.length === 0) return content;
+		return `${content}
+# =============================================================================
+# OTHER SETTINGS (written by other WorkPilot screens)
+# =============================================================================
+${preserved.map(([key, value]) => `${key}=${value}`).join("\n")}
+`;
 	};
 
 	ipcMain.handle(

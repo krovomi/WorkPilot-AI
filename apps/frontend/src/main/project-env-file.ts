@@ -252,3 +252,75 @@ export function migrateProjectEnvSecrets(
 	}
 	return rewritten;
 }
+
+/** A `CICD_…` assignment in a project's root `.env`. */
+const ROOT_CICD_ASSIGNMENT = /^\s*(?:export\s+)?(CICD_[A-Z0-9_]+)\s*=(.*)$/;
+
+/**
+ * The CI/CD triggers screen used to keep its settings and tokens
+ * (`CICD_GITHUB_TOKEN`, `CICD_JENKINS_TOKEN`…) in the project's root `.env`:
+ * in clear, in a file that belongs to the user's application and that git
+ * does not necessarily ignore. Moves those lines to `.workpilot/.env`, where
+ * they are encrypted, and removes them from the root file. A key already set
+ * in `.workpilot/.env` keeps its value there. The `.workpilot/.env` is
+ * written before the root file is touched, so an interrupted move loses
+ * nothing. Returns whether anything moved.
+ */
+export function moveRootEnvCicdKeys(project: ProjectEnvLocation): boolean {
+	const rootEnvPath = path.join(project.path, ".env");
+	let rootContent: string;
+	try {
+		rootContent = readFileSync(rootEnvPath, "utf-8");
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+		throw error;
+	}
+
+	const moved: Array<[string, string]> = [];
+	const kept: string[] = [];
+	for (const line of rootContent.split(/(?<=\n)/)) {
+		const match = ROOT_CICD_ASSIGNMENT.exec(line.replace(/\r?\n$/, ""));
+		if (match) {
+			moved.push([match[1], unquote(match[2].trim())]);
+		} else {
+			kept.push(line);
+		}
+	}
+	if (moved.length === 0) return false;
+
+	const envPath = getProjectEnvPath(project.path, project.autoBuildPath);
+	const current = readProjectEnvContent(envPath) ?? "";
+	const existing = parseEnvFile(current);
+	const additions = moved.filter(
+		([key, value]) => value !== "" && !existing[key],
+	);
+	if (additions.length > 0) {
+		const base = current === "" || current.endsWith("\n") ? current : `${current}\n`;
+		writeProjectEnv(
+			project.path,
+			project.autoBuildPath,
+			`${base}${additions.map(([key, value]) => `${key}=${value}`).join("\n")}\n`,
+		);
+	}
+	// writeFileSync on an existing file keeps its mode: the user's file stays theirs.
+	writeFileSync(rootEnvPath, kept.join(""), "utf-8");
+	return true;
+}
+
+/** Startup migration for every project; returns how many root `.env` files changed. */
+export function migrateRootEnvCicdKeys(
+	projects: readonly ProjectEnvLocation[],
+): number {
+	let moved = 0;
+	for (const project of projects) {
+		try {
+			if (moveRootEnvCicdKeys(project)) moved++;
+		} catch (error) {
+			console.warn(
+				`[ProjectEnv] Could not move CI/CD settings out of ${path.join(project.path, ".env")}:`,
+				error,
+			);
+		}
+	}
+	return moved;
+}

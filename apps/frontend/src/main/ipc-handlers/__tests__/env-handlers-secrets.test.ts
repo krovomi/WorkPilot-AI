@@ -112,4 +112,24 @@ describe("ENV_UPDATE / ENV_GET secrets", () => {
 		expect(raw).toContain(`GITHUB_TOKEN=${fakeEncrypted("ghp_secret")}`);
 		expect(raw).toContain("GITHUB_REPO=owner/repo");
 	});
+
+	it("keeps the keys other screens wrote (Figma, CI/CD triggers)", async () => {
+		const envPath = path.join(state.project.path, ".workpilot", ".env");
+		const { writeProjectEnvFile } = await import("../../project-env-file");
+		writeProjectEnvFile(
+			envPath,
+			"FIGMA_ACCESS_TOKEN=figd_secret\nCICD_GITHUB_TOKEN=ghp_cicd_secret\nCICD_AUTO_TRIGGER=true\n",
+		);
+
+		await invoke(IPC_CHANNELS.ENV_UPDATE, "p1", { githubRepo: "owner/repo" });
+
+		const raw = readFileSync(envPath, "utf-8");
+		expect(raw).toContain("GITHUB_REPO=owner/repo");
+		expect(raw).toContain(`FIGMA_ACCESS_TOKEN=${fakeEncrypted("figd_secret")}`);
+		expect(raw).toContain(
+			`CICD_GITHUB_TOKEN=${fakeEncrypted("ghp_cicd_secret")}`,
+		);
+		expect(raw).toContain("CICD_AUTO_TRIGGER=true");
+		expect(raw).not.toContain("secret");
+	});
 });
