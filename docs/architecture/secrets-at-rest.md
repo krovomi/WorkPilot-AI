@@ -83,8 +83,53 @@ such as `apiKey` or `authorization`). It keeps the recognisable prefix, so a
 reader still knows what leaked, and leaves `max_tokens=4096` or
 `hasToken: true` alone.
 
+## A project's `.workpilot/.env`
+
+Each project's `.workpilot/.env` holds the tokens of its integrations
+(`CLAUDE_CODE_OAUTH_TOKEN`, `GITHUB_TOKEN`, `GITLAB_TOKEN`, `LINEAR_API_KEY`,
+`JIRA_API_TOKEN`, `AZURE_DEVOPS_PAT`, `CICD_JENKINS_TOKEN`, `CONTEXT7_API_KEY`,
+`FIGMA_ACCESS_TOKEN`, provider keys, notification webhook URLs) next to
+settings that are not secret. The Python backend cannot call `safeStorage`,
+but it does not need to: it never loads the file in bulk. The main process
+reads it and passes its variables to every Python subprocess it spawns
+(`AgentProcessManager.getCombinedEnv`, `loadProjectEnvForSubprocess`), and the
+backend readers that look at the file for a few keys of their own let a real
+environment variable win.
+
+So the file is encrypted at its boundary, like `settings.json`:
+
+| | |
+|---|---|
+| Reader / writer | `apps/frontend/src/main/project-env-file.ts` — `readProjectEnv`, `readProjectEnvFor`, `readProjectEnvContent`, `writeProjectEnv`, `writeProjectEnvFile` |
+| Secret keys | `isSecretProjectEnvKey`: `…_TOKEN`, `…_API_KEY`, `…_ACCESS_KEY`, `…_SECRET`, `…_PASSWORD`, `…_PAT`, `…_WEBHOOK_URL`, `DOCINTEL_AZURE_KEY` |
+| On disk | `KEY=enc:<base64>`, every other line byte for byte; `0600` |
+| Without a keyring | the value in clear, `0600`, the sidebar banner |
+| Migration | `migrateProjectEnvSecrets`, run with the others for every known project |
+| Git | each write and the migration check `git check-ignore`; when the file is not ignored, `.workpilot/` is added to the project's `.gitignore` |
+
+A secret that cannot be decrypted right now is left out by `readProjectEnv`:
+handed to a subprocess, ciphertext would win over the variable the backend
+would otherwise read, and sent to an API it is not a token. The content
+readers keep it as stored, so a save does not lose it.
+
+### The CLI without the desktop app
+
+`python run.py` and `runners/spec_runner.py` load `.env-files/.env` and the
+process environment, never the project file in bulk; integration tokens have
+always come from there. The few readers that do read the project file —
+`core/client.py` (`CONTEXT7_API_KEY`), `docintel/settings.py`
+(`DOCINTEL_AZURE_KEY`, `FIGMA_ACCESS_TOKEN`), `libdocs/preflight.py`,
+`services/notifications/service.py` (webhook URLs) — go through
+`core/project_env.py`: an `enc:` value counts as absent, a warning names the
+key once and says to export it, and an exported variable is used. Ciphertext
+is never handed to an MCP server or a webhook as if it were the secret.
+
+`core/auth.py` gives `enc:` another meaning (a token the Claude Code CLI
+encrypted). The two do not meet: `auth.py` reads environment variables, and
+the main process never passes a value it could not decrypt.
+
 ## Not covered here
 
-A project's `.workpilot/.env` still holds the tokens the Python backend reads
-(`CLAUDE_CODE_OAUTH_TOKEN`, `LINEAR_API_KEY`…). The backend cannot call
-`safeStorage`; protecting that file needs a different design.
+The project-root `.env` that the CI/CD triggers and cross-language
+translation screens write (`CICD_*_TOKEN`) is still plaintext and is not under
+`.workpilot/`. `ENV_GET` returns the project tokens to the renderer unmasked.

@@ -145,6 +145,17 @@ Tokens prefixed with `enc:` are Claude Code CLI-encrypted. They are
 auto-decrypted via `_try_decrypt_token`. If decryption fails, the backend
 raises a clear error pointing the user at `claude setup-token`.
 
+### A project's `.workpilot/.env` from the CLI
+
+The desktop app encrypts the tokens it writes to a project's `.workpilot/.env`
+(`KEY=enc:<base64>`, OS keyring). It passes them decrypted to the backend it
+spawns. Run without the app (`python run.py`, `runners/spec_runner.py`), the
+backend cannot decrypt them: such a value is ignored with a warning naming the
+key. Export the variable in the shell or put it in `.env-files/.env`; a real
+environment variable always wins over the file. Without an OS keyring the app
+writes them in clear, in a `0600` file, and the CLI reads them as before.
+See [architecture/secrets-at-rest.md](architecture/secrets-at-rest.md#a-projects-workpilotenv).
+
 ---
 
 ## 4. Multi-user server mode — tenants, roles and permissions

@@ -338,7 +338,7 @@ const GITIGNORE_ENTRIES = [
  * Ensure entries exist in the project's .gitignore file.
  * Creates .gitignore if it doesn't exist.
  */
-function ensureGitignoreEntries(projectPath: string, entries: string[]): void {
+export function ensureGitignoreEntries(projectPath: string, entries: string[]): void {
 	const gitignorePath = path.join(projectPath, ".gitignore");
 
 	// Read existing content atomically (no TOCTOU)

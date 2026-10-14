@@ -51,7 +51,7 @@ c'est une discipline, pas un garde-fou.
 | Permissions (micro de la dictée) | `src/main/security/dictation-permission.ts` | `dictation-permission.test.ts` |
 | URL externes, protocoles en liste fermée | `src/main/open-external.ts` (`openExternalUrl`) | `open-external.test.ts` |
 | Variables d'environnement venues d'un dépôt | `src/main/claude-code-settings/env-sanitizer.ts` ([SECURITY.md](src/main/claude-code-settings/SECURITY.md)) | `env-sanitizer.test.ts` |
-| Secrets au repos : `safeStorage`, `0600` et bannière sans trousseau | `src/main/secret-storage.ts`, via `src/main/settings-utils.ts`, `src/main/services/profile/profile-manager.ts`, `src/main/claude-profile/token-encryption.ts` | `secret-storage.test.ts`, `settings-utils-secrets.test.ts`, `profile-secrets.test.ts` |
+| Secrets au repos : `safeStorage`, `0600` et bannière sans trousseau | `src/main/secret-storage.ts`, via `src/main/settings-utils.ts`, `src/main/services/profile/profile-manager.ts`, `src/main/claude-profile/token-encryption.ts`, `src/main/project-env-file.ts` (`.workpilot/.env` des projets) | `secret-storage.test.ts`, `settings-utils-secrets.test.ts`, `profile-secrets.test.ts`, `project-env-file.test.ts`, `env-handlers-secrets.test.ts` |
 | Redaction des logs (fichier, console, rapports de debug) | `src/main/app-logger.ts`, `src/shared/utils/secret-redaction.ts` | `secret-redaction.test.ts`, `app-logger-redaction.test.ts` |
 | Identifiants (trousseau, fichiers restreints) | `src/main/claude-profile/credential-utils.ts` | `credential-utils.test.ts` |
 | Assainissement texte / URL | `src/main/ipc-handlers/shared/sanitize.ts` | `sanitize.test.ts` |

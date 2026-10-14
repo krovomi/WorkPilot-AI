@@ -10,6 +10,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from core.project_env import drop_app_encrypted
+
 ENABLED_ENV = "DOCINTEL_ENABLED"
 LOCAL_OCR_ENV = "DOCINTEL_LOCAL_OCR"
 OCR_LANGS_ENV = "DOCINTEL_OCR_LANGS"
@@ -75,6 +77,7 @@ def read_keys(project_dir: Path | None, keys: tuple[str, ...]) -> dict[str, str]
             key, raw = line.split("=", 1)
             if key.strip() in keys:
                 values[key.strip()] = raw.strip().strip("\"'")
+    values = drop_app_encrypted(values)
     for key in keys:
         if key in os.environ:
             values[key] = os.environ[key]

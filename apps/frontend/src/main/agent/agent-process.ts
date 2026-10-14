@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { app } from "electron";
+import { readProjectEnvFor } from "../project-env-file";
 
 // ESM-compatible __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -768,8 +769,12 @@ export class AgentProcessManager {
 			return {};
 		}
 
-		const envPath = path.join(projectPath, project.autoBuildPath, ".env");
-		return this.parseEnvFile(envPath);
+		// Through project-env-file: tokens decrypted, undecryptable ones left
+		// out. Empty values are dropped so they never override a profile token.
+		const vars = readProjectEnvFor(projectPath, project.autoBuildPath);
+		return Object.fromEntries<string>(
+			Object.entries(vars).filter(([, value]) => value !== ""),
+		);
 	}
 
 	/**

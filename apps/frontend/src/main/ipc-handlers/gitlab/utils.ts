@@ -3,13 +3,12 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { access, readFile } from "node:fs/promises";
-import path from "node:path";
+import { access } from "node:fs/promises";
 import type { Project } from "../../../shared/types";
 import { getAugmentedEnv } from "../../env-utils";
 import { getIsolatedGitEnv } from "../../utils/git-isolation";
-import { parseEnvFile } from "../utils";
 import type { GitLabConfig } from "./types";
+import { getProjectEnvPath, readProjectEnv } from "../../project-env-file";
 
 const DEFAULT_GITLAB_URL = "https://gitlab.com";
 
@@ -133,12 +132,12 @@ export async function getGitLabConfig(
 	project: Project,
 ): Promise<GitLabConfig | null> {
 	if (!project.autoBuildPath) return null;
-	const envPath = path.join(project.path, project.autoBuildPath, ".env");
+	const envPath = getProjectEnvPath(project.path, project.autoBuildPath);
 	if (!(await fileExists(envPath))) return null;
 
 	try {
-		const content = await readFile(envPath, "utf-8");
-		const vars = parseEnvFile(content);
+		// Through project-env-file, which decrypts the stored token.
+		const vars = readProjectEnv(envPath);
 
 		// Check if GitLab is explicitly disabled
 		if (vars[GITLAB_ENV_KEYS.ENABLED]?.toLowerCase() === "false") {

@@ -26,6 +26,8 @@ import os
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+from core.project_env import drop_app_encrypted
+
 from .cache import DocsCache
 from .context7 import (
     Context7Client,
@@ -207,7 +209,7 @@ def project_env(project_dir: Path) -> dict[str, str]:
         key = key.strip()
         if key in _SETTINGS_KEYS:
             values[key] = raw.strip().strip("\"'")
-    return values
+    return drop_app_encrypted(values)
 
 
 def read_task_text(spec_dir: Path) -> str:

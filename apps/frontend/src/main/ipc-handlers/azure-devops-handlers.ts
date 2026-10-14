@@ -42,7 +42,7 @@ import {
 	stripControlChars,
 	stripHtml,
 } from "./shared/sanitize";
-import { parseEnvFile } from "./utils";
+import { readProjectEnvFor } from "../project-env-file";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -73,22 +73,13 @@ export function registerAzureDevOpsHandlers(
 		if (!project.autoBuildPath) {
 			return { pat: null, orgUrl: null, projectName: null };
 		}
-		const envPath = path.join(project.path, project.autoBuildPath, ".env");
-		if (!existsSync(envPath)) {
-			return { pat: null, orgUrl: null, projectName: null };
-		}
-
-		try {
-			const content = readFileSync(envPath, "utf-8");
-			const vars = parseEnvFile(content);
-			return {
-				pat: vars.AZURE_DEVOPS_PAT || null,
-				orgUrl: vars.AZURE_DEVOPS_ORG_URL || null,
-				projectName: vars.AZURE_DEVOPS_PROJECT || null,
-			};
-		} catch {
-			return { pat: null, orgUrl: null, projectName: null };
-		}
+		// Through project-env-file, which decrypts the stored PAT.
+		const vars = readProjectEnvFor(project.path, project.autoBuildPath);
+		return {
+			pat: vars.AZURE_DEVOPS_PAT || null,
+			orgUrl: vars.AZURE_DEVOPS_ORG_URL || null,
+			projectName: vars.AZURE_DEVOPS_PROJECT || null,
+		};
 	};
 
 	/**

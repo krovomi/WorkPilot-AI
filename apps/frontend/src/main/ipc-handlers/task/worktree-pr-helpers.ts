@@ -5,14 +5,12 @@
  */
 
 import { spawn } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { AUTO_BUILD_PATHS, getSpecsDir } from "../../../shared/constants";
 import type {
 	WorktreeCreatePROptions,
 	VisualProofRun,
 } from "../../../shared/types";
-import { parseEnvFile } from "../utils";
 import { getAppLanguage } from "../../app-language";
 import { getToolPath } from "../../cli-tool-manager";
 import { killProcessGracefully } from "../../platform";
@@ -31,6 +29,7 @@ import {
 	updateTaskMetadataVisualProof,
 } from "./plan-file-utils";
 import { GIT_BRANCH_REGEX } from "./worktree-git-refs";
+import { readProjectEnvFor } from "../../project-env-file";
 
 /**
  * Load the project's `.workpilot/.env` and return it as a flat key→value
@@ -51,13 +50,8 @@ export function loadProjectEnvForSubprocess(
 	project: { path: string; autoBuildPath?: string | null },
 ): Record<string, string> {
 	if (!project.autoBuildPath) return {};
-	const envPath = path.join(project.path, project.autoBuildPath, ".env");
-	if (!existsSync(envPath)) return {};
-	try {
-		return parseEnvFile(readFileSync(envPath, "utf-8"));
-	} catch {
-		return {};
-	}
+	// Through project-env-file: tokens decrypted, undecryptable ones left out.
+	return readProjectEnvFor(project.path, project.autoBuildPath);
 }
 
 // Maximum PR title length (GitHub's limit is 256 characters)

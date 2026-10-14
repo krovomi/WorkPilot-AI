@@ -1,6 +1,4 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import path from "node:path";
 import { DEFAULT_APP_SETTINGS, IPC_CHANNELS } from "../../shared/constants";
 import type {
 	AppSettings,
@@ -15,6 +13,12 @@ import {
 } from "../claude-cli-utils";
 import { type BrowserWindow, ipcMain } from "../electron-utils";
 import { getSpawnCommand, getSpawnOptions } from "../env-utils";
+import {
+	getProjectEnvPath,
+	readProjectEnv,
+	readProjectEnvContent,
+	writeProjectEnv,
+} from "../project-env-file";
 import { projectStore } from "../project-store";
 import { readSettingsFile } from "../settings-utils";
 import { parseEnvFile } from "./utils";
@@ -704,7 +708,7 @@ ${existingVars.OLLAMA_BASE_URL ? `OLLAMA_BASE_URL=${existingVars.OLLAMA_BASE_URL
 				return { success: false, error: "Project not initialized" };
 			}
 
-			const envPath = path.join(project.path, project.autoBuildPath, ".env");
+			const envPath = getProjectEnvPath(project.path, project.autoBuildPath);
 
 			// Load global settings for fallbacks — through settings-utils, which
 			// decrypts the stored keys.
@@ -727,16 +731,9 @@ ${existingVars.OLLAMA_BASE_URL ? `OLLAMA_BASE_URL=${existingVars.OLLAMA_BASE_URL
 				openaiKeyIsGlobal: false,
 			};
 
-			// Parse project-specific .env if it exists
-			let vars: Record<string, string> = {};
-			if (existsSync(envPath)) {
-				try {
-					const content = readFileSync(envPath, "utf-8");
-					vars = parseEnvFile(content);
-				} catch {
-					// Continue with empty vars
-				}
-			}
+			// Parse project-specific .env if it exists — through project-env-file,
+			// which decrypts the stored tokens.
+			const vars = readProjectEnv(envPath);
 
 			// Claude OAuth Token: project-specific takes precedence, then global
 			if (vars.CLAUDE_CODE_OAUTH_TOKEN) {
@@ -1021,37 +1018,25 @@ ${existingVars.OLLAMA_BASE_URL ? `OLLAMA_BASE_URL=${existingVars.OLLAMA_BASE_URL
 			// If the project hasn't been initialized yet (no .workpilot/ on disk yet),
 			// bootstrap autoBuildPath so integration config set at creation time (e.g. Azure/Jira
 			// from AddProjectModal) can still be persisted. The .workpilot/ directory itself is
-			// created below by the mkdirSync fallback when writing the .env file.
+			// created below when writing the .env file.
 			let autoBuildPath = project.autoBuildPath;
 			if (!autoBuildPath) {
 				autoBuildPath = ".workpilot";
 				projectStore.updateAutoBuildPath(project.id, autoBuildPath);
 			}
 
-			const envPath = path.join(project.path, autoBuildPath, ".env");
+			const envPath = getProjectEnvPath(project.path, autoBuildPath);
 
 			try {
-				// Read existing content if file exists (atomic read, no TOCTOU)
-				let existingContent: string | undefined;
-				try {
-					existingContent = readFileSync(envPath, "utf-8");
-				} catch (readErr: unknown) {
-					if ((readErr as NodeJS.ErrnoException).code !== "ENOENT")
-						throw readErr;
-					// File doesn't exist yet - existingContent stays undefined
-				}
+				// Existing content, secrets decrypted (undefined when the file doesn't exist yet)
+				const existingContent = readProjectEnvContent(envPath);
 
 				// Generate new content
 				const newContent = generateEnvContent(config, existingContent);
 
-				// Ensure parent directory exists (handles case where .workpilot was deleted or not created)
-				const envDir = path.dirname(envPath);
-				if (!existsSync(envDir)) {
-					mkdirSync(envDir, { recursive: true });
-				}
-
-				// Write to file
-				writeFileSync(envPath, newContent, "utf-8");
+				// Secrets encrypted (or 0600 + banner without a keyring), parent
+				// directory created, and .workpilot/ kept out of git.
+				writeProjectEnv(project.path, autoBuildPath, newContent);
 
 				return { success: true };
 			} catch (error) {

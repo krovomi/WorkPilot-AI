@@ -43,6 +43,7 @@ import {
 import { parseEnvFile } from "./ipc-handlers/utils";
 import { learningLoopService } from "./learning-loop-service";
 import { projectStore } from "./project-store";
+import { readProjectEnvFor } from "./project-env-file";
 
 const DEFAULT_POLL_SECONDS = 60;
 /** Re-resolve provider credentials at most every 5 minutes per project. */
@@ -63,19 +64,19 @@ const MONITORED_STATUSES: ReadonlySet<TaskStatus> = new Set([
  */
 export function readMergedProjectEnv(project: Project): MergedEnv {
 	const merged: MergedEnv = {};
-	const candidates = [
-		path.join(project.path, ".env"),
-		path.join(project.path, project.autoBuildPath || ".workpilot", ".env"),
-	];
-	for (const envPath of candidates) {
-		try {
-			if (existsSync(envPath)) {
-				Object.assign(merged, parseEnvFile(readFileSync(envPath, "utf-8")));
-			}
-		} catch {
-			/* unreadable env file — ignore */
+	const rootEnvPath = path.join(project.path, ".env");
+	try {
+		if (existsSync(rootEnvPath)) {
+			Object.assign(merged, parseEnvFile(readFileSync(rootEnvPath, "utf-8")));
 		}
+	} catch {
+		/* unreadable env file — ignore */
 	}
+	// Through project-env-file, which decrypts the stored tokens.
+	Object.assign(
+		merged,
+		readProjectEnvFor(project.path, project.autoBuildPath),
+	);
 	return merged;
 }
 

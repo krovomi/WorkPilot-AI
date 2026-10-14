@@ -35,25 +35,20 @@ import { cleanupWorktree } from "../../utils/worktree-cleanup";
 import { findTaskWorktree, isPathWithinBase } from "../../worktree-paths";
 import { inlineAzureDevOpsImages } from "../shared/azure-attachments";
 import { stripHtml } from "../shared/sanitize";
-import { parseEnvFile } from "../utils";
 import { findTaskAndProject } from "./shared";
+import { readProjectEnvFor } from "../../project-env-file";
 
 /** Charge le PAT et l'URL d'organisation Azure DevOps depuis le `.env` projet. */
 function loadAzureDevOpsConfig(
 	projectPath: string,
 	autoBuildPath: string,
 ): { pat: string | null; orgUrl: string | null } {
-	try {
-		const envPath = path.join(projectPath, autoBuildPath, ".env");
-		if (!existsSync(envPath)) return { pat: null, orgUrl: null };
-		const vars = parseEnvFile(readFileSync(envPath, "utf-8"));
-		return {
-			pat: vars.AZURE_DEVOPS_PAT || null,
-			orgUrl: vars.AZURE_DEVOPS_ORG_URL || null,
-		};
-	} catch {
-		return { pat: null, orgUrl: null };
-	}
+	// Through project-env-file, which decrypts the stored PAT.
+	const vars = readProjectEnvFor(projectPath, autoBuildPath);
+	return {
+		pat: vars.AZURE_DEVOPS_PAT || null,
+		orgUrl: vars.AZURE_DEVOPS_ORG_URL || null,
+	};
 }
 
 /**
