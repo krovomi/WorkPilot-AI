@@ -12,7 +12,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { IPC_CHANNELS } from "../../../shared/constants";
+import { IPC_CHANNELS, MASKED_SECRET } from "../../../shared/constants";
 import projectEnvSecrets from "../../../shared/constants/project-env-secrets.json";
 import type { IPCResult, ProjectEnvConfig } from "../../../shared/types";
 import {
@@ -100,7 +100,7 @@ describe("env-handlers and secrets at rest", () => {
 		rmSync(project.path, { recursive: true, force: true });
 	});
 
-	it("writes integration tokens encrypted and reads them back in clear", async () => {
+	it("writes integration tokens encrypted and hands the renderer only their mask", async () => {
 		const config: Partial<ProjectEnvConfig> = {
 			claudeOAuthToken: "sk-ant-oat01-project",
 			githubEnabled: true,
@@ -124,13 +124,16 @@ describe("env-handlers and secrets at rest", () => {
 		expect(written).toContain(`GITHUB_TOKEN=${fakeEncrypted("ghp_projectToken")}`);
 		expect(written).toContain("GITHUB_REPO=acme/app");
 
+		// The renderer is not trusted (rule S6): it learns which tokens are set.
 		const read = await invoke<ProjectEnvConfig>(IPC_CHANNELS.ENV_GET, project.id);
 		expect(read.data).toMatchObject({
-			claudeOAuthToken: "sk-ant-oat01-project",
-			githubToken: "ghp_projectToken",
-			jiraApiToken: "jira-token-value",
-			cicdJenkinsToken: "jenkins-token-value",
+			claudeOAuthToken: MASKED_SECRET,
+			githubToken: MASKED_SECRET,
+			githubRepo: "acme/app",
+			jiraApiToken: MASKED_SECRET,
+			cicdJenkinsToken: MASKED_SECRET,
 		});
+		expect(JSON.stringify(read.data)).not.toContain("ghp_projectToken");
 	});
 
 	it("keeps an encrypted token across a save that does not touch it", async () => {

@@ -161,6 +161,7 @@ vi.mock("../project-initializer", () => ({
 // Mock project-store BEFORE agent-process imports it
 vi.mock("../project-store", () => ({
 	projectStore: {
+		getProjects: vi.fn(() => []),
 		getProject: vi.fn(),
 		listProjects: vi.fn(),
 		createProject: vi.fn(),
@@ -269,6 +270,7 @@ vi.mock("../env-utils", () => ({
 }));
 
 import { getToolInfo } from "../cli-tool-manager";
+import { projectStore } from "../project-store";
 import { pythonEnvManager } from "../python-env-manager";
 import * as rateLimitDetector from "../rate-limit-detector";
 import * as profileService from "../services/profile";
@@ -1168,6 +1170,33 @@ describe("AgentProcessManager - API Profile Env Injection (Story 2.3)", () => {
 			const lines = await emitStdout("Project directory: /home/user/app\n");
 
 			expect(lines.join("")).toContain("Project directory: /home/user/app");
+		});
+	});
+
+	describe("useClaudeMd reaches the backend as USE_CLAUDE_MD", () => {
+		/**
+		 * The backend reads an absent USE_CLAUDE_MD as on, so a project that
+		 * turned CLAUDE.md off has to say "false": leaving the variable out
+		 * would load it anyway.
+		 */
+		function combinedEnvFor(useClaudeMd: boolean | undefined) {
+			vi.spyOn(processManager, "loadAutoBuildEnv").mockReturnValue({});
+			vi.mocked(projectStore.getProjects).mockReturnValue([
+				{ path: "/fake/project", settings: { useClaudeMd } },
+			] as unknown as ReturnType<typeof projectStore.getProjects>);
+			return processManager.getCombinedEnv("/fake/project");
+		}
+
+		it("sends true when the setting is on", () => {
+			expect(combinedEnvFor(true).USE_CLAUDE_MD).toBe("true");
+		});
+
+		it("sends true when the setting was never set (its default)", () => {
+			expect(combinedEnvFor(undefined).USE_CLAUDE_MD).toBe("true");
+		});
+
+		it("sends false when the setting is off", () => {
+			expect(combinedEnvFor(false).USE_CLAUDE_MD).toBe("false");
 		});
 	});
 });

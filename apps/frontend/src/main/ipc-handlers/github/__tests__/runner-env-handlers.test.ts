@@ -261,6 +261,47 @@ describe("GitHub runner env usage", () => {
 		);
 	});
 
+	it("says USE_CLAUDE_MD=false when useClaudeMd is off", async () => {
+		// The backend reads an absent variable as on: "off" has to be sent.
+		const project = projectRef.current;
+		if (project) {
+			project.settings.useClaudeMd = false;
+		}
+
+		const { registerPRHandlers } = await import("../pr-handlers");
+
+		mockRunPythonSubprocess.mockReturnValue({
+			process: { pid: 125 },
+			promise: Promise.resolve({
+				success: true,
+				exitCode: 0,
+				stdout: "",
+				stderr: "",
+				data: {
+					prNumber: 125,
+					repo: "test/repo",
+					success: true,
+					findings: [],
+					summary: "",
+					overallStatus: "comment",
+					reviewedAt: new Date().toISOString(),
+				},
+			}),
+		});
+
+		registerPRHandlers(() => createMockWindow());
+		await mockIpcMain.emit(
+			IPC_CHANNELS.GITHUB_PR_REVIEW,
+			projectRef.current?.id,
+			125,
+		);
+
+		expect(mockGetRunnerEnv).toHaveBeenCalledWith(
+			{ USE_CLAUDE_MD: "false" },
+			{ jevWorkflow: "github-review", page: "github-prs" },
+		);
+	});
+
 	it("passes runner env to triage subprocess", async () => {
 		const { registerTriageHandlers } = await import("../triage-handlers");
 

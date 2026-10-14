@@ -150,6 +150,12 @@ def create_simple_client(
     # Get environment variables for SDK (including CLAUDE_CONFIG_DIR if set)
     sdk_env = get_sdk_env_vars()
 
+    # No `setting_sources` here means every source, CLAUDE.md included: the
+    # project's `useClaudeMd` setting decides, as in `create_client`.
+    from core.client import apply_claude_md_setting
+
+    apply_claude_md_setting(sdk_env)
+
     # Get the config dir for profile-specific credential lookup
     # CLAUDE_CONFIG_DIR enables per-profile Keychain entries with SHA256-hashed service names
     config_dir = sdk_env.get("CLAUDE_CONFIG_DIR")
