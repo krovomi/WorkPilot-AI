@@ -551,7 +551,7 @@ To add support for new migrations:
 
 ## License
 
-MIT - See LICENSE file
+AGPL-3.0, like the rest of WorkPilot AI: see the [`LICENSE`](../../../LICENSE) file at the repository root.
 
 ## Support
 
