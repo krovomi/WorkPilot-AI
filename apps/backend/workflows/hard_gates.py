@@ -39,7 +39,7 @@ __all__ = [
     "APP_VERIFIED",
 ]
 
-TESTS_PASS = "tests-pass"
+TESTS_PASS = "tests-pass"  # pragma: allowlist secret
 
 # The verification loop's verdict (`verify/record.py`): the application the
 # task changed was launched, showed no error, and reached the changed state.

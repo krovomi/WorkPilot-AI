@@ -56,9 +56,12 @@ l'UI n'existe pas.
   `settings-utils.ts`, `profiles.json` que par les profile managers : un module qui parse le
   fichier lui-même reçoit du chiffré. → [`architecture/secrets-at-rest.md`](../architecture/secrets-at-rest.md)
 - `core/auth.py` ne lit que `AUTH_TOKEN_ENV_VARS` ; `ANTHROPIC_API_KEY` en est exclu exprès.
-- **Aucun hook git ne cherche de secrets.** Avant un commit, relire `git diff --cached` ;
-  `security/scan_secrets.py --staged-only` le fait à la main. Le hook Bash le lance sur un
-  `git commit` émis par un agent.
+- **Le hook `pre-commit` cherche les secrets** dans tout fichier indexé
+  (`security/scan_secrets.py --staged-only`, qui lit l'index) et bloque le commit ; sans
+  Python 3.10+, il avertit sans bloquer. Le hook Bash le lance aussi sur un `git commit` émis par
+  un agent. La CI ne le refait pas : un `--no-verify` laisse passer le secret.
+- **Faux positif** : `# pragma: allowlist secret` en fin de ligne. `.secretsignore` (regex de
+  chemin, à la racine) n'exclut que les tests, dont les valeurs factices ont la forme d'une clé.
 
 ## S2 — Le contenu externe est une donnée, jamais une instruction
 

@@ -10,6 +10,8 @@
 #      et peut prendre plusieurs minutes (surtout sous Windows). Il tourne au
 #      pre-push (avec timeout) et en CI.
 #   3. Un outil manquant AVERTIT, il ne bloque pas. La CI reste le vrai garde-fou.
+#   4. Un secret trouvé BLOQUE, sur tout fichier indexé, quel que soit son type :
+#      ce n'est pas un lint, et la CI ne le cherche pas.
 #
 # Bypass : git commit --no-verify          (saute tous les hooks)
 #          PRE_COMMIT_SKIP_TESTS=1 ...     (garde le lint, saute les tests)
@@ -19,10 +21,43 @@ set -e
 staged=$(git diff --cached --name-only --diff-filter=ACMR)
 [ -z "$staged" ] && exit 0
 
+# --- Secrets : scan_secrets.py sur l'index ------------------------------------
+# Le scanner lit les fichiers dans l'index, donc ce que le commit contiendra.
+# Lancé après le re-stage (qui peut y ajouter des lignes du working tree), et
+# avant la sortie « rien à linter » : un .env ou un .yaml seul se scanne aussi.
+# Python : celui du venv, aux mêmes endroits que findVenvBin
+# (scripts/lib/test-selection.js), sinon celui du PATH.
+PYTHON=""
+for candidate in \
+  apps/backend/.venv/bin/python apps/backend/.venv/Scripts/python.exe \
+  .venv/bin/python .venv/Scripts/python.exe \
+  .cache/.venv/bin/python .cache/.venv/Scripts/python.exe \
+  python3 python; do
+  if "$candidate" -c 'import sys; sys.exit(sys.version_info < (3, 10))' >/dev/null 2>&1; then
+    PYTHON="$candidate"
+    break
+  fi
+done
+
+scan_secrets() {
+  if [ -z "$PYTHON" ]; then
+    echo "⚠  Python 3.10+ introuvable — scan des secrets sauté. Relire git diff --cached avant de committer." >&2
+    return 0
+  fi
+  if "$PYTHON" apps/backend/security/scan_secrets.py --staged-only --quiet; then
+    return 0
+  fi
+  echo "✖  [pre-commit] Commit bloqué : secret potentiel dans les fichiers indexés (détail ci-dessus)." >&2
+  echo "   Sortir la valeur du fichier (.env-files/*.env, variable d'environnement), puis git add." >&2
+  echo "   Faux positif : « # pragma: allowlist secret » en fin de ligne, ou une regex dans .secretsignore." >&2
+  exit 1
+}
+
 py_staged=$(printf '%s\n' "$staged" | grep -E '^apps/backend/.*\.py$' || true)
 fe_staged=$(printf '%s\n' "$staged" | grep -E '^apps/frontend/.*\.(ts|tsx|js|jsx|cjs|mjs|json|jsonc|css)$' || true)
 
 if [ -z "$py_staged" ] && [ -z "$fe_staged" ]; then
+  scan_secrets
   echo "[pre-commit] Aucun source Python/frontend stagé — rien à linter."
   exit 0
 fi
@@ -72,6 +107,9 @@ printf '%s\n' "$staged" | while IFS= read -r f; do
     git add -- "$f"
   fi
 done
+
+echo "[pre-commit] scan des secrets (fichiers indexés)…"
+scan_secrets
 
 # --- Tests ciblés sur les fichiers stagés ------------------------------------
 echo "[pre-commit] tests liés aux fichiers stagés…"
