@@ -1,4 +1,11 @@
 version: 2
+
+# Grouping: minor and patch updates of one ecosystem arrive as a single pull
+# request, so a quiet week is one PR to review instead of five. Major updates
+# match no group and keep their own pull request each: they are the ones that
+# break, and one breaking bump hidden in a batch would block the rest.
+# Dependabot puts a dependency in the FIRST group whose rules it matches, so a
+# group that must win (react, below) is listed before the catch-all.
 updates:
   # Python dependencies
   - package-ecosystem: pip
@@ -11,6 +18,13 @@ updates:
       - python
     commit-message:
       prefix: "chore(deps)"
+    groups:
+      pip-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
 
   # npm dependencies.
   # Root, not /apps/frontend: this is a pnpm workspace, and pnpm-lock.yaml +
@@ -43,6 +57,14 @@ updates:
           - react-dom
           - "@types/react"
           - "@types/react-dom"
+      # After react on purpose: those four must stay together whatever the
+      # update type, and the first matching group wins.
+      npm-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
 
   # GitHub Actions
   - package-ecosystem: github-actions
@@ -55,3 +77,10 @@ updates:
       - ci
     commit-message:
       prefix: "ci(deps)"
+    groups:
+      github-actions-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
