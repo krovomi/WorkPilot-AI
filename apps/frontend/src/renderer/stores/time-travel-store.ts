@@ -90,49 +90,6 @@ export interface TimeTravelState {
 }
 
 // ---------------------------------------------------------------------------
-// IPC helper
-// ---------------------------------------------------------------------------
-
-const ipc = (
-	window as unknown as {
-		electronAPI: Record<
-			string,
-			(...args: unknown[]) => Promise<Record<string, unknown>>
-		>;
-	}
-).electronAPI;
-
-async function ipcInvoke<T = Record<string, unknown>>(
-	channel: string,
-	...args: unknown[]
-): Promise<T> {
-	if (ipc?.invoke) {
-		return (
-			ipc as unknown as {
-				invoke: (channel: string, ...args: unknown[]) => Promise<T>;
-			}
-		).invoke(channel, ...args);
-	}
-	// Fallback: direct window.electronAPI call pattern
-	const fn = (
-		window as unknown as Record<
-			string,
-			Record<string, (...args: unknown[]) => Promise<T>>
-		>
-	).electronAPI;
-	if (fn) {
-		// Try the IPC channel directly — electronAPI exposes handlers by channel name
-		const handler = (
-			fn as unknown as Record<string, (...args: unknown[]) => Promise<T>>
-		)[channel];
-		if (typeof handler === "function") {
-			return handler(...args);
-		}
-	}
-	throw new Error(`IPC channel not available: ${channel}`);
-}
-
-// ---------------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------------
 
@@ -161,11 +118,9 @@ export const useTimeTravelStore = create<TimeTravelState>((set) => ({
 	generateCheckpoints: async (sessionId: string) => {
 		set({ checkpointsLoading: true, error: null });
 		try {
-			const res = await ipcInvoke<{
-				success: boolean;
-				checkpoints: Checkpoint[];
-				error?: string;
-			}>("timeTravel:generateCheckpoints", sessionId);
+			const res = await window.electronAPI.generateTimeTravelCheckpoints(
+				sessionId,
+			);
 			if (res.success) {
 				set({ checkpoints: res.checkpoints || [], checkpointsLoading: false });
 			} else {
@@ -182,11 +137,9 @@ export const useTimeTravelStore = create<TimeTravelState>((set) => ({
 	fetchCheckpoints: async (sessionId: string) => {
 		set({ checkpointsLoading: true, error: null });
 		try {
-			const res = await ipcInvoke<{
-				success: boolean;
-				checkpoints: Checkpoint[];
-				error?: string;
-			}>("timeTravel:getCheckpoints", sessionId);
+			const res = await window.electronAPI.getTimeTravelCheckpoints(
+				sessionId,
+			);
 			if (res.success) {
 				set({ checkpoints: res.checkpoints || [], checkpointsLoading: false });
 			} else {
@@ -204,11 +157,12 @@ export const useTimeTravelStore = create<TimeTravelState>((set) => ({
 		description?: string,
 	) => {
 		try {
-			const res = await ipcInvoke<{
-				success: boolean;
-				checkpoint: Checkpoint;
-				error?: string;
-			}>("timeTravel:addCheckpoint", sessionId, stepIndex, label, description);
+			const res = await window.electronAPI.addTimeTravelCheckpoint(
+				sessionId,
+				stepIndex,
+				label,
+				description,
+			);
 			if (res.success && res.checkpoint) {
 				set((s) => ({
 					checkpoints: [...s.checkpoints, res.checkpoint].sort(
@@ -223,7 +177,10 @@ export const useTimeTravelStore = create<TimeTravelState>((set) => ({
 
 	deleteCheckpoint: async (sessionId: string, checkpointId: string) => {
 		try {
-			await ipcInvoke("timeTravel:deleteCheckpoint", sessionId, checkpointId);
+			await window.electronAPI.deleteTimeTravelCheckpoint(
+				sessionId,
+				checkpointId,
+			);
 			set((s) => ({
 				checkpoints: s.checkpoints.filter((cp) => cp.id !== checkpointId),
 				selectedCheckpoint:
@@ -244,11 +201,7 @@ export const useTimeTravelStore = create<TimeTravelState>((set) => ({
 
 	forkSession: async (sessionId, checkpointId, options) => {
 		try {
-			const res = await ipcInvoke<{
-				success: boolean;
-				fork: ForkSession;
-				error?: string;
-			}>("timeTravel:forkSession", sessionId, {
+			const res = await window.electronAPI.forkTimeTravelSession(sessionId, {
 				checkpoint_id: checkpointId,
 				modified_prompt: options.modifiedPrompt || "",
 				additional_instructions: options.additionalInstructions || "",
@@ -276,11 +229,7 @@ export const useTimeTravelStore = create<TimeTravelState>((set) => ({
 	fetchForks: async (sessionId?: string) => {
 		set({ forksLoading: true, error: null });
 		try {
-			const res = await ipcInvoke<{
-				success: boolean;
-				forks: ForkSession[];
-				error?: string;
-			}>("timeTravel:listForks", sessionId);
+			const res = await window.electronAPI.listTimeTravelForks(sessionId);
 			if (res.success) {
 				set({ forks: res.forks || [], forksLoading: false });
 			} else {
@@ -293,11 +242,7 @@ export const useTimeTravelStore = create<TimeTravelState>((set) => ({
 
 	fetchForkContext: async (forkId: string) => {
 		try {
-			const res = await ipcInvoke<{
-				success: boolean;
-				context: ForkContext;
-				error?: string;
-			}>("timeTravel:getForkContext", forkId);
+			const res = await window.electronAPI.getTimeTravelForkContext(forkId);
 			if (res.success) {
 				set({ forkContext: res.context });
 			}
@@ -308,7 +253,7 @@ export const useTimeTravelStore = create<TimeTravelState>((set) => ({
 
 	deleteFork: async (forkId: string) => {
 		try {
-			await ipcInvoke("timeTravel:deleteFork", forkId);
+			await window.electronAPI.deleteTimeTravelFork(forkId);
 			set((s) => ({
 				forks: s.forks.filter((f) => f.fork_id !== forkId),
 				selectedFork:
@@ -339,11 +284,9 @@ export const useTimeTravelStore = create<TimeTravelState>((set) => ({
 	scoreDecisions: async (sessionId: string) => {
 		set({ decisionScoresLoading: true, error: null });
 		try {
-			const res = await ipcInvoke<{
-				success: boolean;
-				scores: DecisionScore[];
-				error?: string;
-			}>("timeTravel:scoreDecisions", sessionId);
+			const res = await window.electronAPI.scoreTimeTravelDecisions(
+				sessionId,
+			);
 			if (res.success) {
 				set({ decisionScores: res.scores || [], decisionScoresLoading: false });
 			} else {
@@ -360,11 +303,9 @@ export const useTimeTravelStore = create<TimeTravelState>((set) => ({
 	fetchDecisionScores: async (sessionId: string) => {
 		set({ decisionScoresLoading: true, error: null });
 		try {
-			const res = await ipcInvoke<{
-				success: boolean;
-				scores: DecisionScore[];
-				error?: string;
-			}>("timeTravel:getDecisionScores", sessionId);
+			const res = await window.electronAPI.getTimeTravelDecisionScores(
+				sessionId,
+			);
 			if (res.success) {
 				set({ decisionScores: res.scores || [], decisionScoresLoading: false });
 			} else {
@@ -378,11 +319,9 @@ export const useTimeTravelStore = create<TimeTravelState>((set) => ({
 	fetchDecisionHeatmap: async (sessionId: string) => {
 		set({ decisionHeatmapLoading: true, error: null });
 		try {
-			const res = await ipcInvoke<{
-				success: boolean;
-				heatmap: DecisionHeatmap;
-				error?: string;
-			}>("timeTravel:getDecisionHeatmap", sessionId);
+			const res = await window.electronAPI.getTimeTravelDecisionHeatmap(
+				sessionId,
+			);
 			if (res.success) {
 				set({ decisionHeatmap: res.heatmap, decisionHeatmapLoading: false });
 			} else {
