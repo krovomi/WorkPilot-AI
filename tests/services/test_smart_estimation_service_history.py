@@ -20,7 +20,7 @@ sys.path.insert(0, str(backend_path))
 sys.modules.setdefault("claude_agent_sdk", unittest.mock.MagicMock())
 
 # Other suites stub `services.smart_estimation_service` into sys.modules to
-# import their subject without its dependency chain (see the root conftest).
+# import their subject without its dependency chain (see tests/conftest.py).
 # This one needs the real module, so drop any stub before importing it.
 for _poisoned in ("services", "services.smart_estimation_service"):
     if isinstance(sys.modules.get(_poisoned), MagicMock):
