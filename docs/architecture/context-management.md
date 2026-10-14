@@ -92,7 +92,11 @@ the frontend gauge's table.
    once past the hard threshold (`min(threshold + 30, 85)`) with the
    deterministic handoff (plan state, `git status`, recent commits, last errors,
    last message). Native compaction is left to the provider below the hard
-   threshold.
+   threshold. A thread that replayed nothing takes its first measured fill as
+   its **floor**: a reset would bring the next thread back to at least that.
+   When the floor is already past the threshold, the soft cut would only
+   restart it there, so such a thread is cut at the hard threshold, and only
+   when its floor is below it.
 3. **On "prompt too long"** (`context_mgmt/recovery.py`): one clear per subtask
    instead of halting the build; a second failure halts as before.
 
@@ -101,6 +105,16 @@ without advancing the subtask, exactly like a hot swap. Only callers that pass
 `run_agent_session(..., context_managed=True)` get that status; the other users
 of `run_agent_session` are untouched. QA passes always start fresh (nothing is
 replayed), so their guard only measures.
+
+A re-run is not an attempt, so `MAX_SUBTASK_RETRIES` never stops it. On a
+window too small for a fresh thread (Ollama or LM Studio with an 8k–16k
+`num_ctx` under the coder prompt), every re-run used to be cut again, with no
+end and no progress. `context_mgmt/reset_limit.py` caps it: after three resets
+in a row on the same phase, subtask and model, the loop passes
+`context_monitor_only=True` for the rest of that subtask. The guard then only
+measures, before the replay as during the session, and the task log says so
+once. A session that ends on its own resets the count. The next subtask, or a
+hot swap to another model, gets a managing guard again.
 
 A clear archives every live log as `.cleared.` (retired, never replayed or
 inherited), forgets the Claude resume pointer (`.session.json`,
