@@ -350,8 +350,8 @@ importers:
         specifier: '>= 3.4.6'
         version: 3.4.15
       dotenv:
-        specifier: ^17.2.3
-        version: 17.2.4
+        specifier: ^18.0.7
+        version: 18.0.7
       electron-log:
         specifier: ^5.4.4
         version: 5.4.4
@@ -3402,9 +3402,10 @@ packages:
     resolution: {integrity: sha512-uBq4egWHTcTt33a72vpSG0z3HnPuIl6NqYcTrKEg2azoEyl2hpW0zqlxysq2pK9HlDIHyHyakeYaYnSAwd8bow==}
     engines: {node: '>=12'}
 
-  dotenv@17.2.4:
-    resolution: {integrity: sha512-mudtfb4zRB4bVvdj0xRo+e6duH1csJRM8IukBqfTRvHotn9+LBXB8ynAidP9zHqoRC/fsllXgk4kCKlR21fIhw==}
+  dotenv@18.0.7:
+    resolution: {integrity: sha512-QEvMEF8ca3GNZJJnAbOgxpj5ULhBvnMcURp+XKrtvqFNPgjBvYoswQ0Jl2cO7JzCjxZjJhr9ZuIEhlrRxMft/Q==}
     engines: {node: '>=12'}
+    hasBin: true
 
   dotenv@17.4.2:
     resolution: {integrity: sha512-nI4U3TottKAcAD9LLud4Cb7b2QztQMUEfHbvhTH09bqXTxnSie8WnjPALV/WMCrJZ6UV/qHJ6L03OqO3LcdYZw==}
@@ -8532,7 +8533,7 @@ snapshots:
 
   dotenv@16.6.1: {}
 
-  dotenv@17.2.4: {}
+  dotenv@18.0.7: {}
 
   dotenv@17.4.2: {}
 
