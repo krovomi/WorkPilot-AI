@@ -242,6 +242,12 @@ class ContextGuard:
         except Exception:  # noqa: BLE001
             pass
 
+    def report_start(self, prompt: str) -> None:
+        """First reading of a session that replays nothing: its prompt alone."""
+        self.base_chars = len(prompt)
+        self._measure()
+        self.emit_usage(force=True)
+
     def _pct_for_chars(self, chars: int) -> float:
         return min(100.0, 100.0 * (chars // CHARS_PER_TOKEN) / max(self.window, 1))
 

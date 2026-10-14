@@ -406,6 +406,103 @@ async def test_oversized_replay_of_a_finished_subtask_is_cleared_before_sending(
     assert usage[-1]["compactSupport"] == "emulated"
 
 
+def _usage_events(out: str) -> list[dict]:
+    return [
+        event
+        for event in (
+            json.loads(line.split(":", 1)[1])
+            for line in out.splitlines()
+            if line.startswith("__TASK_EVENT__:")
+        )
+        if event["type"] == "CONTEXT_USAGE"
+    ]
+
+
+class TextBlock:  # named like the SDK's: the spec runner dispatches on it
+    def __init__(self, text: str) -> None:
+        self.text = text
+
+
+class AssistantMessage:
+    def __init__(self, text: str, usage: dict) -> None:
+        self.content = [TextBlock(text)]
+        self.usage = usage
+
+
+@pytest.mark.asyncio
+async def test_spec_sessions_feed_the_gauge_from_the_raw_claude_stream(
+    tmp_path: Path, monkeypatch, capsys
+):
+    """Spec creation runs the raw SDK client: the gauge reads its usage too."""
+    import core.client
+    from spec.pipeline.agent_runner import AgentRunner
+
+    spec = _spec(tmp_path)
+
+    class RawClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            return False
+
+        async def query(self, prompt: str) -> None:  # noqa: ARG002
+            return None
+
+        async def receive_response(self):
+            yield AssistantMessage(
+                "The spec covers the flag, its default and the migration.",
+                {"input_tokens": 2_000, "cache_read_input_tokens": 40_000},
+            )
+
+    monkeypatch.setattr(core.client, "_get_active_provider", lambda *_: "claude")
+    monkeypatch.setattr(core.client, "create_client", lambda **_: RawClient())
+    runner = AgentRunner(spec.parents[2], spec, "claude-sonnet-4-5")
+
+    await runner.run_agent("spec_writer.md")
+
+    usage = _usage_events(capsys.readouterr().out)
+    assert usage, "no reading reached the gauge"
+    assert {event["phase"] for event in usage} == {"spec"}
+    # A first reading before anything is sent, then the turn's exact fill.
+    assert usage[0]["source"] == "estimated"
+    assert usage[-1]["usedTokens"] == 42_000
+    assert usage[-1]["source"] == "exact"
+
+
+@pytest.mark.asyncio
+async def test_spec_sessions_on_an_agent_client_are_measured_never_cut(
+    tmp_path: Path, capsys
+):
+    from spec.pipeline.agent_runner import AgentRunner
+
+    spec = _spec(tmp_path, {"mode": "auto", "thresholdPct": 30})
+    write_context_action(spec, "clear")
+
+    class Client(_FakeClient):
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            return False
+
+    client = Client(
+        "deepseek",
+        "deepseek-chat",
+        [_text("The spec covers the flag, its default and the migration.")],
+    )
+    client.last_context_tokens = 950  # past the threshold: still only measured
+    runner = AgentRunner(spec.parents[2], spec, "deepseek-chat")
+
+    success, _response = await runner._run_with_agent_client(client, "write it")
+
+    assert success
+    assert (spec / "CONTEXT_ACTION.json").exists()  # never acted on
+    usage = _usage_events(capsys.readouterr().out)
+    assert usage and usage[-1]["phase"] == "spec"
+    assert usage[-1]["percent"] == 95.0
+
+
 @pytest.mark.asyncio
 async def test_prompt_too_long_is_recovered_once_per_subtask(tmp_path: Path):
     from context_mgmt.recovery import recover_from_prompt_too_long

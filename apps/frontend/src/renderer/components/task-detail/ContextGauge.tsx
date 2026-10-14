@@ -400,7 +400,7 @@ export function ContextGauge({ task }: { task: Task }) {
 							</div>
 						) : (
 							// Running without a reading yet: "–" is "not measured",
-							// not 0%. Spec creation sends none at all.
+							// not 0% (the process is starting, no session has begun).
 							<p
 								className="text-[11px] text-muted-foreground"
 								data-testid="context-gauge-not-measured"

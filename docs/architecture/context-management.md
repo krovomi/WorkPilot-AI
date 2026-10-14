@@ -102,6 +102,13 @@ without advancing the subtask, exactly like a hot swap. Only callers that pass
 of `run_agent_session` are untouched. QA passes always start fresh (nothing is
 replayed), so their guard only measures.
 
+Spec creation sessions (`spec/pipeline/agent_runner.py`) are measured the same
+way, under the phase `spec`. They report a first reading before anything is
+sent, so the gauge leaves its "–" as soon as a session starts. On Claude the
+pipeline reads the raw `ClaudeSDKClient` stream, and `context_mgmt/sdk_usage.py`
+(`SdkUsageProbe`) gives the guard the fill that `ClaudeAgentClient` measures
+elsewhere, with the same formula (`claude_context_fill`).
+
 The coder re-runs the subtask only if it is still unfinished. If the agent had
 already marked it completed before the safe point, the session ends like any
 other: post-session processing syncs the plan to the main project (the copy the

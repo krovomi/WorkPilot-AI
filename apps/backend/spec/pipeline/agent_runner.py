@@ -255,6 +255,13 @@ class AgentRunner:
         message_count = 0
         tool_count = 0
 
+        from context_mgmt.sdk_usage import SdkUsageProbe
+
+        usage_probe = SdkUsageProbe()
+        context_gauge = self._context_gauge(
+            usage_probe, active_provider, self.model, prompt
+        )
+
         try:
             async with client:
                 debug("agent_runner", "Sending query to Claude SDK...")
@@ -266,6 +273,8 @@ class AgentRunner:
                 async for msg in client.receive_response():
                     msg_type = type(msg).__name__
                     message_count += 1
+                    usage_probe.update(msg)
+                    self._observe(context_gauge, msg)
                     debug_detailed(
                         "agent_runner",
                         f"Received message #{message_count}",
@@ -467,6 +476,37 @@ class AgentRunner:
                 self.task_logger.log_error(f"Agent error: {e}", LogPhase.PLANNING)
             return False, str(e)
 
+    def _context_gauge(self, usage_source, provider: str, model: str, prompt: str):
+        """A measure-only context guard for this spec session, or None.
+
+        Spec sessions are never compacted or cleared (nothing is replayed, and
+        the pipeline has no loop to rebuild a client in): the guard only feeds
+        the task's gauge, starting with a reading before anything is sent.
+        ``usage_source`` is the AgentClient, or an ``SdkUsageProbe`` for the
+        raw Claude SDK stream.
+        """
+        try:
+            from agents.session import _make_context_guard
+
+            guard = _make_context_guard(
+                usage_source, self.spec_dir, "spec", None, provider, model
+            )
+            if guard is not None:
+                guard.monitor_only = True
+                guard.report_start(prompt)
+            return guard
+        except Exception:  # noqa: BLE001 - the gauge is a mirror
+            return None
+
+    @staticmethod
+    def _observe(guard, message) -> None:
+        if guard is None:
+            return
+        try:
+            guard.observe(message)
+        except Exception:  # noqa: BLE001 - the gauge is a mirror
+            pass
+
     def _log_client_configuration(self, provider, model, thinking_budget):
         if self.task_logger:
             self.task_logger.set_llm(provider, model)
@@ -508,6 +548,12 @@ class AgentRunner:
                 client.set_tool_working_directory(str(working_directory.resolve()))
             async with client:
                 provider = client.provider_name()
+                context_gauge = self._context_gauge(
+                    client,
+                    provider,
+                    str(getattr(client, "model", "") or ""),
+                    prompt,
+                )
                 debug("agent_runner", f"Sending query to {provider} agent client...")
                 await client.query(prompt)
                 debug_success("agent_runner", f"Query sent to {provider}")
@@ -517,6 +563,7 @@ class AgentRunner:
 
                 async for msg in client.receive_response():
                     message_count += 1
+                    self._observe(context_gauge, msg)
 
                     for block in msg.content:
                         if block.type == ContentBlockType.TEXT and block.text:
