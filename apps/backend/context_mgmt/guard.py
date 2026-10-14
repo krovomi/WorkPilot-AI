@@ -110,8 +110,13 @@ class ContextGuard:
         self._last_emit = (-100.0, 0.0)
         self.preparer = HandoffPreparer()
         # Measure and emit only: for sessions whose caller cannot rebuild its
-        # client (QA passes, which start fresh anyway).
+        # client (QA passes, which start fresh anyway), or whose resets stopped
+        # helping (``reset_limit``).
         self.monitor_only = False
+        # Set by ``pre_session`` when nothing is replayed. The first fill such
+        # a thread measures is the least a reset could bring it back to.
+        self._fresh = False
+        self.floor_pct: float | None = None
 
     # ── state ────────────────────────────────────────────────────────────
     @property
@@ -153,6 +158,7 @@ class ContextGuard:
         return Situation(
             compactions_in_subtask=self._compactions(),
             tool_output_ratio=_tool_output_ratio(entries) if entries else 0.0,
+            floor_pct=self.floor_pct or 0.0,
             **kw,
         )
 
@@ -259,17 +265,17 @@ class ContextGuard:
         replay_chars = sum(_entry_chars(e) for e in entries)
         self.base_chars = replay_chars + len(message)
         self._measure()
-        # A request with nothing to replay is left for the running session.
-        manual = (
-            consume_context_action(self.spec_dir, self.phase, self.subtask_id)
-            if entries
-            else None
-        )
-        boundary = bool(entries) and self._is_task_boundary(entries)
+        if self.monitor_only or not entries:
+            # Nothing to act on, or not allowed to: a request with nothing to
+            # replay is left for the running session.
+            self._fresh = not entries
+            self.emit_usage(force=True)
+            return entries
+        manual = consume_context_action(self.spec_dir, self.phase, self.subtask_id)
         decision = decide(
             self.percent,
             self.policy,
-            self._situation(entries, at_task_boundary=boundary),
+            self._situation(entries, at_task_boundary=self._is_task_boundary(entries)),
             # Nothing runs in the background before a session: the handoff
             # used here is the deterministic one, available now.
             handoff_ready=True,
@@ -278,7 +284,7 @@ class ContextGuard:
             native_compact=False,
             manual=manual.action if manual else None,
         )
-        if decision is None or not entries:
+        if decision is None:
             self.emit_usage(force=True)
             return entries
         before = self.percent
@@ -289,6 +295,7 @@ class ContextGuard:
             entries = self._compact(entries, summary)
         self.base_chars = sum(_entry_chars(e) for e in entries) + len(message)
         self._measure()
+        self._fresh = not entries
         self._emit_applied(decision, before, self.percent)
         self.emit_usage(force=True)
         return entries
@@ -328,6 +335,8 @@ class ContextGuard:
                 Decision("compact", "auto", "native compaction"), before, None
             )
         self._measure()
+        if self._fresh and self.floor_pct is None:
+            self.floor_pct = self.percent
         if not self.monitor_only:
             self._watch_for_actions()
         self.emit_usage()

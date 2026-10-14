@@ -8,7 +8,7 @@ session runner: ``ContextGuard``; for the client factories:
 from .decide import Decision, Situation, decide, recommended_action
 from .guard import ContextGuard
 from .policy import ContextPolicy, load_context_policy, policy_from_dict
-from .resets import MAX_CONSECUTIVE_RESETS, ResetBudget, budget_spent_message
+from .reset_limit import MAX_CONSECUTIVE_RESETS, ResetLimit
 
 
 def native_auto_compact_env(spec_dir) -> dict[str, str]:
@@ -42,9 +42,8 @@ __all__ = [
     "ContextGuard",
     "ContextPolicy",
     "Decision",
-    "ResetBudget",
+    "ResetLimit",
     "Situation",
-    "budget_spent_message",
     "codex_auto_compact_limit",
     "decide",
     "load_context_policy",

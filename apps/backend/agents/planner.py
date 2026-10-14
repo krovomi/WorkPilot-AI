@@ -8,7 +8,7 @@ Handles follow-up planner sessions for adding new subtasks to completed specs.
 import logging
 from pathlib import Path
 
-from context_mgmt.resets import ResetBudget, budget_spent_message
+from context_mgmt.reset_limit import ResetLimit
 from core.client import create_agent_client
 from core.phase_event import ExecutionPhase, emit_phase
 from phase_config import (
@@ -231,15 +231,14 @@ async def run_followup_planner(
             handle_rate_limit_pause,
         )
 
-        # Past this budget of consecutive context resets, planning sessions only
-        # measure: a thread that is full from its first turns cannot loop.
-        context_resets = ResetBudget()
-
+        # Same cap on resets in a row as the coder loop (`ResetLimit`).
+        context_resets = ResetLimit()
         while True:
             # One client per attempt: a retry after a rate-limit pause or a hot
             # swap opens a session of its own, under whatever the task's
             # metadata says now.
             client = _create_planning_client(project_dir, spec_dir, model)
+            context_unit = ("planning", getattr(client, "model", None))
             async with client:
                 status, response, error_info = await run_agent_session(
                     client,
@@ -248,13 +247,14 @@ async def run_followup_planner(
                     verbose,
                     phase=LogPhase.PLANNING,
                     context_managed=True,
-                    context_monitor_only=context_resets.exhausted("planning"),
+                    context_monitor_only=context_resets.monitor_only(context_unit),
                 )
-            if context_resets.record(status):
-                spent = budget_spent_message("follow-up planning")
-                print_status(spent, "warning")
+            if context_resets.record(context_unit, status):
+                notice = context_resets.notice("the follow-up planning")
                 if task_logger:
-                    task_logger.log_info(spent)
+                    task_logger.log_warning(notice, LogPhase.PLANNING)
+                else:
+                    print_status(notice, "warning")
 
             # The context guard compacted or cleared the thread: run the
             # planning session again on what it left to replay.

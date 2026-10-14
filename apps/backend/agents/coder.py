@@ -20,7 +20,7 @@ from agents.feature_wiring import (
     load_domain_addendum,
     suggest_routed_model,
 )
-from context_mgmt.resets import ResetBudget, budget_spent_message
+from context_mgmt.reset_limit import ResetLimit
 from core.build_signals import BuildHalted, BuildPaused
 from core.client import create_agent_client
 from core.llm_optimization import should_inline_file_context
@@ -1191,6 +1191,11 @@ async def run_autonomous_agent(
     last_generic_error_signature: str | None = None
     repeated_generic_error_count = 0
 
+    # A "context_reset" re-runs the subtask without counting an attempt. On a
+    # window too small for a fresh thread every re-run is cut again, so past a
+    # few in a row the rest of the subtask runs unmanaged (gauge only).
+    context_resets = ResetLimit()
+
     def _reset_concurrency_state() -> None:
         """Reset concurrency error tracking state after a successful session or non-concurrency error."""
         nonlocal \
@@ -1200,11 +1205,6 @@ async def run_autonomous_agent(
         consecutive_concurrency_errors = 0
         current_retry_delay = INITIAL_RETRY_DELAY_SECONDS
         concurrency_error_context = None
-
-    # Consecutive context resets of the current subtask (or planning): past the
-    # budget its sessions only measure, so a window too small for the prompt
-    # cannot loop a subtask forever.
-    context_resets = ResetBudget()
 
     while True:
         iteration += 1
@@ -1848,6 +1848,7 @@ async def run_autonomous_agent(
                     f"Starting {agent_type} session {iteration} for subtask {subtask_id or 'planning'}"
                 )
 
+            context_unit = (current_phase, subtask_id, phase_model)
             status, response, error_info = await run_agent_session(
                 client,
                 prompt,
@@ -1856,15 +1857,14 @@ async def run_autonomous_agent(
                 phase=current_log_phase,
                 streaming_wrapper=streaming_wrapper,
                 context_managed=True,
-                context_monitor_only=context_resets.exhausted(
-                    (current_log_phase, subtask_id)
-                ),
+                context_monitor_only=context_resets.monitor_only(context_unit),
             )
-            if context_resets.record(status):
-                _spent = budget_spent_message(subtask_id or "planning")
-                print_status(_spent, "warning")
+            if context_resets.record(context_unit, status):
+                notice = context_resets.notice(f"subtask {subtask_id or 'planning'}")
                 if task_logger:
-                    task_logger.log_info(_spent)
+                    task_logger.log_warning(notice, current_log_phase)
+                else:
+                    print_status(notice, "warning")
 
             # Context window past the task's threshold (or "compact / new
             # thread now" from the task panel): the guard already compacted or

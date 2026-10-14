@@ -1183,8 +1183,9 @@ async def run_agent_session(
         context_managed: Let the context guard (context_mgmt) compact or clear
             the thread. Only for callers that handle the "context_reset" status
             by rebuilding their client and running the session again.
-        context_monitor_only: With ``context_managed``, measure only: the
-            guard never closes the thread (the caller's reset budget is spent).
+        context_monitor_only: With ``context_managed``, the guard measures and
+            feeds the gauge but never compacts or clears: for a caller whose
+            resets stopped helping (``context_mgmt.reset_limit``).
 
     Returns:
         (status, response_text, error_info) where:
