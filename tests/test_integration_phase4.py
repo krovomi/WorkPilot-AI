@@ -546,7 +546,11 @@ class TestCrossValidation:
     @pytest.fixture
     def mock_reviewer(self, tmp_path):
         """Create a mock ParallelOrchestratorReviewer instance."""
-        from models import GitHubRunnerConfig
+        # The module this file loaded above, not `from models import ...`:
+        # tests/conftest.py evicts `sys.modules["models"]` before every test
+        # (`_DEPENDENT_EVICT`), and the bare name then resolves only when an
+        # earlier test file put `runners/github` on `sys.path`.
+        GitHubRunnerConfig = models_module.GitHubRunnerConfig
 
         config = GitHubRunnerConfig(token="test-token", repo="test/repo")
         # Create minimal directory structure
