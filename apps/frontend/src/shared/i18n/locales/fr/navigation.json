@@ -188,6 +188,20 @@
 		"versionSwitchFailed": "Échec du changement de version",
 		"terminalUnavailable": "Impossible d'ouvrir un terminal. Mettez à jour Claude Code depuis un terminal manuellement."
 	},
+	"agentCli": {
+		"checking": "Vérification de {{name}}...",
+		"installed": "{{name}} installé",
+		"installedWithVersion": "{{name}} ({{version}})",
+		"notFound": "{{name}} introuvable",
+		"error": "Impossible de vérifier {{name}}",
+		"installedShort": "Installé",
+		"notInstalledShort": "Non installé",
+		"checkingShort": "Vérification...",
+		"version": "Version",
+		"notInstalledDescription": "{{name}} n'est pas dans votre PATH. Installez-le, connectez-vous une fois dans un terminal, puis actualisez.",
+		"signInHint": "WorkPilot utilise la connexion propre à la CLI et ne lit jamais ses identifiants.",
+		"viewDocs": "Voir la documentation de {{name}}"
+	},
 	"codex": {
 		"checking": "Vérification Codex CLI...",
 		"installed": "Codex CLI installé",

@@ -140,6 +140,40 @@ grok:
     usage: reported
 
 # ---------------------------------------------------------------------------
+# Coding-agent CLIs driven as subprocesses (core/agent_clients/cli_subprocess.py).
+# They bring their own tools, sessions and login; WorkPilot hands the prompt
+# on stdin and reads JSON events back, as with the Codex CLI.
+# ---------------------------------------------------------------------------
+
+opencode:
+  adapter: OpenCodeCliAgentClient
+  subagents: none
+  effort: none
+  degrades_to: null
+  context:
+    compact: emulated
+    usage: reported
+  note: >-
+    `opencode run --format json`. A type declaring none of Write/Edit/Bash runs
+    the built-in `plan` agent. OpenCode also compacts a session on its own when
+    the window fills (compaction.auto, on by default), but `run` has no command
+    to compact on demand, hence `emulated`. step_finish events report tokens.
+
+antigravity:
+  adapter: AntigravityCliAgentClient
+  subagents: none
+  effort: reasoning_effort
+  degrades_to: null
+  context:
+    compact: emulated
+    usage: reported
+  note: >-
+    Google Antigravity CLI (`agy`) in stream-json print mode; --effort
+    low|medium|high. It cannot be restricted to read-only, so a type declaring
+    none of Write/Edit/Bash is refused. `/compact` exists interactively but is
+    not documented in print mode. Alias: agy.
+
+# ---------------------------------------------------------------------------
 # No agentic adapter yet. Selecting one of these runs the task on the Claude
 # SDK. That is a real limitation, not a configuration detail, so it is stated
 # here and traced into the task feed at run time.

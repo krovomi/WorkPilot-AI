@@ -57,6 +57,7 @@ import { setupConflictPredictorHandlers } from "./conflict-predictor-handlers";
 import { registerContextAwareSnippetsHandlers } from "./context-aware-snippets-handlers";
 import { registerContextHandlers } from "./context-handlers";
 import { registerContextMeshHandlers } from "./context-mesh-handlers";
+import { registerAgentCliHandlers } from "./agent-cli-handlers";
 import { registerCopilotCliHandlers } from "./copilot-cli-handlers";
 import { registerCopilotOAuthHandlers } from "./copilot-oauth-handlers";
 import { registerCostHandlers } from "./cost-handlers";
@@ -177,6 +178,7 @@ export { setupConflictPredictorHandlers } from "./conflict-predictor-handlers";
 export { registerContextAwareSnippetsHandlers } from "./context-aware-snippets-handlers";
 export { registerContextHandlers } from "./context-handlers";
 export { registerContextMeshHandlers } from "./context-mesh-handlers";
+export { registerAgentCliHandlers } from "./agent-cli-handlers";
 export { registerCopilotCliHandlers } from "./copilot-cli-handlers";
 export { registerCopilotOAuthHandlers } from "./copilot-oauth-handlers";
 export { registerCostHandlers } from "./cost-handlers";
@@ -390,6 +392,9 @@ export function setupIpcHandlers(
 
 	// Credential Manager handlers (centralized auth and usage management)
 	registerCredentialHandlers();
+
+	// Agent CLIs driven as providers (OpenCode, Google Antigravity): installed?
+	registerAgentCliHandlers();
 
 	// GitHub Copilot CLI handlers (CLI-based authentication)
 	registerGitHubCopilotHandlers();

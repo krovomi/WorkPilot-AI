@@ -126,6 +126,7 @@ import {
 	type AutoRefactorAPI,
 	createAutoRefactorAPI,
 } from "./modules/auto-refactor-api";
+import { type AgentCliAPI, createAgentCliAPI } from "./modules/agent-cli-api";
 import {
 	type CopilotCliAPI,
 	createCopilotCliAPI,
@@ -232,6 +233,7 @@ export interface ElectronAPI
 		DebugAPI,
 		ClaudeCodeAPI,
 		CopilotCliAPI,
+		AgentCliAPI,
 		CopilotOAuthAPI,
 		McpAPI,
 		ProfileAPI,
@@ -373,6 +375,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createDebugAPI(),
 		...createClaudeCodeAPI(),
 		...createCopilotCliAPI(),
+		...createAgentCliAPI(),
 		...createCopilotOAuthAPI(),
 		...createMcpAPI(),
 		...createProfileAPI(),
@@ -527,6 +530,8 @@ export { createCodePlaygroundAPI } from "./modules/code-playground-api";
 export { createConflictPredictorAPI } from "./modules/conflict-predictor-api";
 export type { ContextAwareSnippetsAPI } from "./modules/context-aware-snippets-api";
 export { createContextAwareSnippetsAPI } from "./modules/context-aware-snippets-api";
+export type { AgentCliAPI } from "./modules/agent-cli-api";
+export { createAgentCliAPI } from "./modules/agent-cli-api";
 export type { CopilotCliAPI } from "./modules/copilot-cli-api";
 export { createCopilotCliAPI } from "./modules/copilot-cli-api";
 export type { DebugAPI } from "./modules/debug-api";

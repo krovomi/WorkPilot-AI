@@ -101,6 +101,7 @@ _PROVIDER_ALIASES = {
     "anthropic": "claude",
     "lm-studio": "lmstudio",
     "llama-cpp": "local",
+    "agy": "antigravity",
 }
 
 

@@ -657,6 +657,7 @@ const browserMockAPI: Partial<ElectronAPI> = {
 	}),
 	checkClaudeOAuth: async () => ({ isAuthenticated: false }),
 	checkOpenAICodexOAuth: async () => ({ isAuthenticated: false }),
+	checkAgentCli: async (tool) => ({ tool, installed: false }),
 	updateCodexCli: async () => ({
 		success: false,
 		error: "Not available in browser mode",

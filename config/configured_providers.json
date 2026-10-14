@@ -49,6 +49,16 @@
 			"name": "aws",
 			"label": "Amazon Web Services (AWS)",
 			"description": "Offre des API LLM intégrées à ses services cloud."
+		},
+		{
+			"name": "opencode",
+			"label": "OpenCode (CLI)",
+			"description": "Agent de code open source piloté via la CLI opencode, avec sa propre connexion aux fournisseurs."
+		},
+		{
+			"name": "antigravity",
+			"label": "Google Antigravity (CLI)",
+			"description": "Agent de code de Google piloté via la CLI agy, avec sa propre connexion Google."
 		}
 	]
 }
