@@ -1882,7 +1882,8 @@
 			"tooltip": "{{used}} / {{window}} jetons · {{source}}",
 			"thresholdTooltip": "Seuil {{value}} % · mode {{mode}}",
 			"phase": "Phase : {{phase}}",
-			"open": "Réglages de la mémoire de contexte"
+			"open": "Réglages de la mémoire de contexte",
+			"notMeasured": "Pas encore mesuré : la jauge se remplit dès la première session de planification ou de code. La création de la spec n'est pas mesurée."
 		},
 		"handoff": {
 			"preparing": "Relais…",
