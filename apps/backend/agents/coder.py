@@ -20,6 +20,7 @@ from agents.feature_wiring import (
     load_domain_addendum,
     suggest_routed_model,
 )
+from context_mgmt.resets import ResetBudget, budget_spent_message
 from core.build_signals import BuildHalted, BuildPaused
 from core.client import create_agent_client
 from core.llm_optimization import should_inline_file_context
@@ -1200,6 +1201,11 @@ async def run_autonomous_agent(
         current_retry_delay = INITIAL_RETRY_DELAY_SECONDS
         concurrency_error_context = None
 
+    # Consecutive context resets of the current subtask (or planning): past the
+    # budget its sessions only measure, so a window too small for the prompt
+    # cannot loop a subtask forever.
+    context_resets = ResetBudget()
+
     while True:
         iteration += 1
 
@@ -1850,7 +1856,15 @@ async def run_autonomous_agent(
                 phase=current_log_phase,
                 streaming_wrapper=streaming_wrapper,
                 context_managed=True,
+                context_monitor_only=context_resets.exhausted(
+                    (current_log_phase, subtask_id)
+                ),
             )
+            if context_resets.record(status):
+                _spent = budget_spent_message(subtask_id or "planning")
+                print_status(_spent, "warning")
+                if task_logger:
+                    task_logger.log_info(_spent)
 
             # Context window past the task's threshold (or "compact / new
             # thread now" from the task panel): the guard already compacted or

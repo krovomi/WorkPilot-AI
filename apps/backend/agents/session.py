@@ -1164,6 +1164,7 @@ async def run_agent_session(
     phase: LogPhase = LogPhase.CODING,
     streaming_wrapper: Any = None,
     context_managed: bool = False,
+    context_monitor_only: bool = False,
 ) -> tuple[str, str, dict]:
     """
     Run a single agent session using Claude Agent SDK or any AgentClient provider.
@@ -1182,6 +1183,8 @@ async def run_agent_session(
         context_managed: Let the context guard (context_mgmt) compact or clear
             the thread. Only for callers that handle the "context_reset" status
             by rebuilding their client and running the session again.
+        context_monitor_only: With ``context_managed``, measure only: the
+            guard never closes the thread (the caller's reset budget is spent).
 
     Returns:
         (status, response_text, error_info) where:
@@ -1202,6 +1205,7 @@ async def run_agent_session(
             phase,
             streaming_wrapper=streaming_wrapper,
             context_managed=context_managed,
+            context_monitor_only=context_monitor_only,
         )
 
     debug_section("session", f"Agent Session - {phase.value}")
@@ -1933,6 +1937,7 @@ async def _run_agent_client_session(
     phase: LogPhase = LogPhase.CODING,
     streaming_wrapper: Any = None,
     context_managed: bool = False,
+    context_monitor_only: bool = False,
 ) -> tuple[str, str, dict]:
     """
     Run a single agent session using any AgentClient provider.
@@ -1985,6 +1990,8 @@ async def _run_agent_client_session(
         if context_managed
         else None
     )
+    if context_guard is not None and context_monitor_only:
+        context_guard.monitor_only = True
 
     # If a prior session for this spec left a conversation log, replay it into
     # the client so the LLM has the same context — even when this run uses a

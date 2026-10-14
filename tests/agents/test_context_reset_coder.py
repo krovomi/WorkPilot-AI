@@ -121,3 +121,45 @@ async def test_reset_before_the_subtask_is_done_reruns_it(coder_loop, monkeypatc
     post.assert_awaited_once()
     assert post.await_args.kwargs["subtask_id"] == "1.1"
     assert "ALL_SUBTASKS_DONE" in emitted
+
+
+@pytest.mark.asyncio
+async def test_a_subtask_reset_too_often_runs_its_next_sessions_monitor_only(
+    coder_loop, monkeypatch
+):
+    """A window full from the first turns must not loop a subtask forever."""
+    from context_mgmt.resets import MAX_CONSECUTIVE_RESETS
+
+    coder, project, spec, post, emitted = coder_loop
+    plan = _plan()
+    plan["phases"][0]["subtasks"].append(
+        {"id": "1.2", "description": "More work", "status": "pending"}
+    )
+    (spec / "implementation_plan.json").write_text(json.dumps(plan), encoding="utf-8")
+    calls: list[bool] = []
+
+    async def session(*args, **kwargs):
+        monitor_only = kwargs.get("context_monitor_only", False)
+        calls.append(monitor_only)
+        if not monitor_only:
+            return "context_reset", "", {"context_reset": True, "action": "clear"}
+        # Only measured, never cut: the session runs to its end and the
+        # subtask gets done.
+        for subtask in plan["phases"][0]["subtasks"]:
+            if subtask["status"] == "pending":
+                subtask["status"] = "completed"
+                break
+        (spec / "implementation_plan.json").write_text(
+            json.dumps(plan), encoding="utf-8"
+        )
+        done = all(s["status"] == "completed" for s in plan["phases"][0]["subtasks"])
+        return ("complete" if done else "continue"), "done", {}
+
+    monkeypatch.setattr(coder, "run_agent_session", session)
+    await coder.run_autonomous_agent(project, spec, "test-model", max_iterations=12)
+
+    budget = [False] * MAX_CONSECUTIVE_RESETS + [True]
+    # Each subtask gets its own budget.
+    assert calls == budget + budget
+    assert [c.kwargs["subtask_id"] for c in post.await_args_list] == ["1.1", "1.2"]
+    assert "ALL_SUBTASKS_DONE" in emitted

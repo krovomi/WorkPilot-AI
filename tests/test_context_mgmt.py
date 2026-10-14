@@ -23,6 +23,7 @@ from context_mgmt.marker import (
     write_context_action,
 )
 from context_mgmt.policy import ContextPolicy, load_context_policy, policy_from_dict
+from context_mgmt.resets import MAX_CONSECUTIVE_RESETS, ResetBudget
 from context_mgmt.windows import CONTEXT_WINDOW_BY_MODEL_PREFIX, window_from_table
 from core.agent_client import AgentMessage, ContentBlock, ContentBlockType, MessageRole
 from task_logger import LogPhase
@@ -309,6 +310,50 @@ async def test_manual_request_ends_the_session_at_a_safe_point(tmp_path: Path):
     assert info["action"] == "clear"
     assert not (spec / "CONTEXT_ACTION.json").exists()
     assert (spec / "context" / "handoff_pending.md").exists()
+
+
+@pytest.mark.asyncio
+async def test_monitor_only_sessions_measure_but_never_close_the_thread(
+    tmp_path: Path, capsys
+):
+    """What a spent reset budget asks for: the gauge moves, the thread stays."""
+    from agents.session import _run_agent_client_session
+
+    async def run(root: Path, monitor_only: bool) -> str:
+        spec = _spec(root, {"mode": "auto", "thresholdPct": 30})
+        write_context_action(spec, "clear")
+        client = _FakeClient("deepseek", "deepseek-chat", [_text("x" * 4_000)])
+        client.last_context_tokens = 950  # 95 % of the fake 1 000-token window
+        status, _response, _info = await _run_agent_client_session(
+            client,
+            "code it",
+            spec,
+            phase=LogPhase.CODING,
+            context_managed=True,
+            context_monitor_only=monitor_only,
+        )
+        return status
+
+    assert await run(tmp_path / "managed", monitor_only=False) == "context_reset"
+    capsys.readouterr()
+    assert await run(tmp_path / "monitored", monitor_only=True) != "context_reset"
+    assert "CONTEXT_USAGE" in capsys.readouterr().out
+
+
+def test_reset_budget_counts_consecutive_resets_per_piece_of_work():
+    budget = ResetBudget()
+    for _ in range(MAX_CONSECUTIVE_RESETS - 1):
+        assert not budget.exhausted("s-1")
+        assert not budget.record("context_reset")
+    assert not budget.exhausted("s-1")
+    assert budget.record("context_reset")  # this reset spends it
+    assert budget.exhausted("s-1")
+    assert not budget.record("context_reset")  # reported once
+    # Another piece of work starts afresh; any other outcome ends the run.
+    assert not budget.exhausted("s-2")
+    budget.record("context_reset")
+    budget.record("continue")
+    assert not budget.exhausted("s-2")
 
 
 @pytest.mark.asyncio

@@ -102,6 +102,19 @@ without advancing the subtask, exactly like a hot swap. Only callers that pass
 of `run_agent_session` are untouched. QA passes always start fresh (nothing is
 replayed), so their guard only measures.
 
+The coder re-runs the subtask only if it is still unfinished. If the agent had
+already marked it completed before the safe point, the session ends like any
+other: post-session processing syncs the plan to the main project (the copy the
+Kanban reads) and, on the last subtask, emits `ALL_SUBTASKS_DONE`.
+
+Resets are budgeted (`context_mgmt/resets.py`): after
+`MAX_CONSECUTIVE_RESETS` (3) in a row on the same subtask or planning, the next
+sessions run with `context_monitor_only=True`. The gauge keeps measuring, but
+nothing closes the thread, manual requests included. A window too small for the
+prompt itself would otherwise cut every session at its first safe point and
+never let the work advance. Any other session outcome, or the next subtask,
+starts a fresh budget.
+
 A clear archives every live log as `.cleared.` (retired, never replayed or
 inherited), forgets the Claude resume pointer (`.session.json`,
 `AUTO_CLAUDE_RESUME_SESSION_ID`) and leaves `context/handoff_pending.md`, which

@@ -8,6 +8,7 @@ Handles follow-up planner sessions for adding new subtasks to completed specs.
 import logging
 from pathlib import Path
 
+from context_mgmt.resets import ResetBudget, budget_spent_message
 from core.client import create_agent_client
 from core.phase_event import ExecutionPhase, emit_phase
 from phase_config import (
@@ -230,6 +231,10 @@ async def run_followup_planner(
             handle_rate_limit_pause,
         )
 
+        # Past this budget of consecutive context resets, planning sessions only
+        # measure: a thread that is full from its first turns cannot loop.
+        context_resets = ResetBudget()
+
         while True:
             # One client per attempt: a retry after a rate-limit pause or a hot
             # swap opens a session of its own, under whatever the task's
@@ -243,7 +248,13 @@ async def run_followup_planner(
                     verbose,
                     phase=LogPhase.PLANNING,
                     context_managed=True,
+                    context_monitor_only=context_resets.exhausted("planning"),
                 )
+            if context_resets.record(status):
+                spent = budget_spent_message("follow-up planning")
+                print_status(spent, "warning")
+                if task_logger:
+                    task_logger.log_info(spent)
 
             # The context guard compacted or cleared the thread: run the
             # planning session again on what it left to replay.
