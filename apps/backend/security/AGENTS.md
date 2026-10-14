@@ -15,7 +15,8 @@ providers hors SDK passent par `core/runtimes/tool_executor.py`, qui appelle les
 | Bash | allowlist par projet + validateurs par commande | `hooks.py` (`bash_security_hook`) → `command_guard.py` (`validate_command_line`) → `validator_registry.py` | `tests/test_security_command_guard.py`, `tests/security/` |
 | Bash | profil de sécurité du projet (commandes de base + stack + scripts + perso) | `profile.py` (`get_security_profile`), `project/command_registry/` | `tests/test_security.py`, `tests/test_security_cache.py` |
 | Bash | secrets dans un `git commit` émis par un agent | `git_validators.py` → `scan_secrets.py` | `tests/test_scan_secrets.py` |
-| Write / Edit | écritures confinées au projet, à la spec et à `<tmp>/workpilot` | `path_guard.py` (`make_write_path_hook`) ; hors SDK `_resolve_within_project` | `tests/test_security_path_guard.py` |
+| Bash | écriture de la configuration de sécurité (allowlist, profil, garde-fous, réglages SDK), quelle que soit la commande | `config_write_validators.py`, validateur de ligne (`LINE_VALIDATORS` de `validator_registry.py`) | `tests/security/test_config_write_validators.py` |
+| Write / Edit | écritures confinées au projet, à la spec et à `<tmp>/workpilot` ; la configuration de sécurité refusée même dans le projet | `path_guard.py` (`make_write_path_hook`, `protected_config_refusal`) ; hors SDK `_resolve_within_project(..., for_write=True)` | `tests/test_security_path_guard.py` |
 | Bash / Write | garde-fous déclarés par le projet (`.workpilot/guardrails.*`) | `guardrails.py` | — |
 | Write / Edit | caractères invisibles retirés | `watermarks/` | `tests/test_watermarks_hook.py` |
 | Read | fichiers retenus par la préparation des pièces jointes | `docintel/read_guard.py` | — |
