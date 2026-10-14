@@ -172,3 +172,36 @@ export function parseEnvFile(content: string): Record<string, string> {
 	}
 	return result;
 }
+
+/**
+ * The keys a generated .env template prints, set (`KEY=value`) or offered
+ * commented out (`# KEY=default`). A prose comment does not count: the key
+ * must be an identifier directly followed by `=`.
+ */
+export function envTemplateKeys(template: string): Set<string> {
+	const keys = new Set<string>();
+	for (const line of template.split(/\r?\n/)) {
+		const match = /^(?:#\s*)?([A-Za-z_][A-Za-z0-9_]*)\s*=/.exec(line);
+		if (match) keys.add(match[1]);
+	}
+	return keys;
+}
+
+/**
+ * The `KEY=value` lines of `content` whose key is not owned, exactly as
+ * written (only the line ending is dropped). The key is read the way
+ * parseEnvFile reads it.
+ */
+export function unownedEnvLines(
+	content: string,
+	isOwned: (key: string) => boolean,
+): string[] {
+	return content.split(/\r?\n/).filter((line) => {
+		const trimmed = line.trim();
+		if (!trimmed || trimmed.startsWith("#")) return false;
+		const equalsIndex = trimmed.indexOf("=");
+		return (
+			equalsIndex > 0 && !isOwned(trimmed.substring(0, equalsIndex).trim())
+		);
+	});
+}

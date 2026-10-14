@@ -16,7 +16,7 @@ import {
 import { app, type BrowserWindow, ipcMain } from "../electron-utils";
 import { getSpawnCommand, getSpawnOptions } from "../env-utils";
 import { projectStore } from "../project-store";
-import { parseEnvFile } from "./utils";
+import { envTemplateKeys, parseEnvFile, unownedEnvLines } from "./utils";
 
 // GitLab environment variable keys
 const GITLAB_ENV_KEYS = {
@@ -658,6 +658,22 @@ ${existingVars.LINEAR_MCP_ENABLED ? `LINEAR_MCP_ENABLED=${existingVars.LINEAR_MC
 ${existingVars.ELECTRON_MCP_ENABLED ? `ELECTRON_MCP_ENABLED=${existingVars.ELECTRON_MCP_ENABLED}` : "# ELECTRON_MCP_ENABLED=false"}
 # Puppeteer browser automation - QA agents only (default: disabled)
 ${existingVars.PUPPETEER_MCP_ENABLED ? `PUPPETEER_MCP_ENABLED=${existingVars.PUPPETEER_MCP_ENABLED}` : "# PUPPETEER_MCP_ENABLED=false"}
+# Chrome DevTools browser automation - coder and QA agents (default: disabled)
+${existingVars.CHROME_DEVTOOLS_MCP_ENABLED ? `CHROME_DEVTOOLS_MCP_ENABLED=${existingVars.CHROME_DEVTOOLS_MCP_ENABLED}` : "# CHROME_DEVTOOLS_MCP_ENABLED=false"}
+
+# =============================================================================
+# TOKEN SAVINGS (rtk)
+# Condensed command output, for the models only (default: enabled)
+# =============================================================================
+${existingVars.RTK_ENABLED ? `RTK_ENABLED=${existingVars.RTK_ENABLED}` : "# RTK_ENABLED=true"}
+${existingVars.RTK_MODEL_FACING ? `RTK_MODEL_FACING=${existingVars.RTK_MODEL_FACING}` : "# RTK_MODEL_FACING=true"}
+
+# =============================================================================
+# UI/UX DESIGN SYSTEM (ui-ux-pro-max)
+# Only on tasks that touch an interface (default: enabled)
+# =============================================================================
+${existingVars.UIUX_ENABLED ? `UIUX_ENABLED=${existingVars.UIUX_ENABLED}` : "# UIUX_ENABLED=true"}
+${existingVars.UIUX_PERSIST_MASTER ? `UIUX_PERSIST_MASTER=${existingVars.UIUX_PERSIST_MASTER}` : "# UIUX_PERSIST_MASTER=true"}
 
 # =============================================================================
 # PER-AGENT MCP OVERRIDES
@@ -691,7 +707,29 @@ ${existingVars.GOOGLE_API_KEY ? `GOOGLE_API_KEY=${existingVars.GOOGLE_API_KEY}` 
 ${existingVars.OLLAMA_BASE_URL ? `OLLAMA_BASE_URL=${existingVars.OLLAMA_BASE_URL}` : "# OLLAMA_BASE_URL=http://localhost:11434"}
 `;
 
-		return content;
+		// A key the template does not print belongs to someone else: the Figma
+		// token (figma-handlers.ts), the docintel / watermarks / verify / libdocs
+		// switches, AI_PROVIDER, a line written by hand. Carried over as written,
+		// since parseEnvFile strips quotes. AGENT_MCP_* is the template's even
+		// when it prints none: an override update may have just removed them.
+		const templateKeys = envTemplateKeys(content);
+		const otherLines = existingContent
+			? unownedEnvLines(
+					existingContent,
+					(key) => templateKeys.has(key) || key.startsWith("AGENT_MCP_"),
+				)
+			: [];
+		if (otherLines.length === 0) {
+			return content;
+		}
+
+		return `${content}
+# =============================================================================
+# OTHER SETTINGS
+# Not managed by this screen, kept as written
+# =============================================================================
+${otherLines.join("\n")}
+`;
 	};
 
 	ipcMain.handle(
