@@ -12,7 +12,7 @@ faster-whisper>=1.2.1
 websockets>=17.1
 
 # TOML parsing fallback for Python < 3.11
-tomli>=2.0.0; python_version < "3.11"
+tomli>=2.5.0; python_version < "3.11"
 
 # YAML parsing. Imported behind try/except by api_watcher/contract_parser.py,
 # analysis/ci_discovery.py, environment/capturer.py and
@@ -34,7 +34,7 @@ pywin32>=312; sys_platform == "win32"
 google-generativeai>=0.8.6
 
 # Pydantic for structured output schemas
-pydantic>=2.13.5
+pydantic>=2.14.0
 
 # Rich for beautiful CLI formatting (intent recognition)
 rich>=15.0.0
@@ -51,7 +51,7 @@ bandit>=1.9.4
 # pip-audit for dependency vulnerability scanning (optional but recommended)
 # Install separately: pip install pip-audit
 
-fastapi>=0.142.2
+fastapi>=0.143.0
 uvicorn[standard]>=0.54.0
 slowapi>=0.1.10
 
@@ -83,7 +83,7 @@ msrest>=0.7.1           # Required by azure-devops SDK
 defusedxml>=0.7.1
 
 # Anthropic SDK for Claude API integration
-anthropic>=1.11.0
+anthropic>=1.13.0
 
 # Browser Agent (Feature #20) — headless Chromium for screenshots/E2E.
 # After install, the Chromium binary must be fetched once:
