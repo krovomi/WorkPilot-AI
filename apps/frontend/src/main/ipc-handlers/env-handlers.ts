@@ -13,9 +13,10 @@ import {
 	getClaudeCliInvocation,
 	getClaudeCliInvocationAsync,
 } from "../claude-cli-utils";
-import { app, type BrowserWindow, ipcMain } from "../electron-utils";
+import { type BrowserWindow, ipcMain } from "../electron-utils";
 import { getSpawnCommand, getSpawnOptions } from "../env-utils";
 import { projectStore } from "../project-store";
+import { readSettingsFile } from "../settings-utils";
 import { parseEnvFile } from "./utils";
 
 // GitLab environment variable keys
@@ -157,9 +158,6 @@ export function registerEnvHandlers(
 	// ============================================
 	// Environment Configuration Operations
 	// ============================================
-
-	// Get settings file path
-	const settingsPath = path.join(app.getPath("userData"), "settings.json");
 
 	/**
 	 * Generate .env file content from config
@@ -708,16 +706,12 @@ ${existingVars.OLLAMA_BASE_URL ? `OLLAMA_BASE_URL=${existingVars.OLLAMA_BASE_URL
 
 			const envPath = path.join(project.path, project.autoBuildPath, ".env");
 
-			// Load global settings for fallbacks
-			let globalSettings: AppSettings = { ...DEFAULT_APP_SETTINGS };
-			if (existsSync(settingsPath)) {
-				try {
-					const content = readFileSync(settingsPath, "utf-8");
-					globalSettings = { ...globalSettings, ...JSON.parse(content) };
-				} catch {
-					// Use defaults
-				}
-			}
+			// Load global settings for fallbacks — through settings-utils, which
+			// decrypts the stored keys.
+			const globalSettings: AppSettings = {
+				...DEFAULT_APP_SETTINGS,
+				...readSettingsFile(),
+			};
 
 			// Default config
 			const config: ProjectEnvConfig = {

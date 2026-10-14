@@ -46,10 +46,15 @@ l'UI n'existe pas.
   un rapport de QA, un commentaire de PR.
 - **Logs** : l'API backend installe `core/log_redaction.py` (`install_global_redaction`) au
   démarrage de `provider_api.py` ; un nouveau point d'entrée (runner, CLI) l'installe aussi. Côté
-  UI, une clé s'affiche masquée (`maskApiKey`). Ne jamais logger un en-tête `Authorization`, un
+  Electron, `app-logger.ts` expurge chaque message avant écriture (hook electron-log,
+  `shared/utils/secret-redaction.ts`). Côté UI, une clé s'affiche masquée (`maskApiKey`). Ne jamais logger un en-tête `Authorization`, un
   jeton, ni le corps d'une requête d'authentification.
 - **Nouveau stockage d'identifiant** côté Electron : `safeStorage`. S'il est indisponible, refuser
   ou avertir l'utilisateur ; ne pas retomber silencieusement sur du texte clair.
+  `apps/frontend/src/main/secret-storage.ts` décide de la forme sur disque (`enc:…`) ; sans
+  trousseau, fichier `0600` et bannière dans l'UI. `settings.json` ne se lit et ne s'écrit que par
+  `settings-utils.ts`, `profiles.json` que par les profile managers : un module qui parse le
+  fichier lui-même reçoit du chiffré. → [`architecture/secrets-at-rest.md`](../architecture/secrets-at-rest.md)
 - `core/auth.py` ne lit que `AUTH_TOKEN_ENV_VARS` ; `ANTHROPIC_API_KEY` en est exclu exprès.
 - **Le hook `pre-commit` cherche les secrets** dans tout fichier indexé
   (`security/scan_secrets.py --staged-only`, qui lit l'index) et bloque le commit ; sans

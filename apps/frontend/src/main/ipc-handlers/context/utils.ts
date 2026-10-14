@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { app } from "electron";
+import { readSettingsFile } from "../../settings-utils";
 
 export interface EnvironmentVars {
 	[key: string]: string;
@@ -11,24 +11,12 @@ export interface GlobalSettings {
 	globalOpenAIApiKey?: string;
 }
 
-const settingsPath = path.join(app.getPath("userData"), "settings.json");
-
 /**
  * Get the auto-build source path from settings
  */
 export function getAutoBuildSourcePath(): string | null {
-	if (existsSync(settingsPath)) {
-		try {
-			const content = readFileSync(settingsPath, "utf-8");
-			const settings = JSON.parse(content);
-			if (settings.autoBuildPath && existsSync(settings.autoBuildPath)) {
-				return settings.autoBuildPath;
-			}
-		} catch {
-			// Fall through to null
-		}
-	}
-	return null;
+	const { autoBuildPath } = loadGlobalSettings();
+	return autoBuildPath && existsSync(autoBuildPath) ? autoBuildPath : null;
 }
 
 /**
@@ -87,17 +75,8 @@ export function loadProjectEnvVars(
 }
 
 /**
- * Load global settings from user data directory
+ * Load global settings from user data directory (secret fields decrypted)
  */
 export function loadGlobalSettings(): GlobalSettings {
-	if (!existsSync(settingsPath)) {
-		return {};
-	}
-
-	try {
-		const settingsContent = readFileSync(settingsPath, "utf-8");
-		return JSON.parse(settingsContent);
-	} catch {
-		return {};
-	}
+	return (readSettingsFile() as GlobalSettings | undefined) ?? {};
 }
