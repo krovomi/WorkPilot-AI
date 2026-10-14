@@ -6,7 +6,6 @@ import {
 	readdirSync,
 	readFileSync,
 	statSync,
-	writeFileSync,
 } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -49,9 +48,15 @@ import {
 } from "../cli-tool-manager";
 import { credentialManager } from "../services/credential-manager";
 import { openExternalUrl } from "../open-external";
+import { decryptSecret } from "../secret-storage";
 import { readSettingsFile, writeSettingsFile } from "../settings-utils";
+import {
+	getPackagedSourceEnvPath,
+	SOURCE_ENV_TOKEN_KEY,
+	writeSourceEnvFile,
+} from "../source-env";
 import { testGenerationService } from "../test-generation-service";
-import { parseEnvFile } from "./utils";
+import { findEnvLineBreak, parseEnvFile } from "./utils";
 import { getCurrentOS } from "../platform";
 
 
@@ -416,6 +421,61 @@ const detectAutoBuildSourcePath = (): string | null => {
 		"[detectAutoBuildSourcePath] Set DEBUG=1 environment variable for detailed path checking.",
 	);
 	return null;
+};
+
+/**
+ * Where the backend's own .env lives (../source-env.ts writes it).
+ *
+ * In production, the .env file is NOT bundled (excluded in electron-builder config).
+ * We store the source .env in app userData directory instead, which is writable.
+ * The sourcePath points to the bundled backend for reference, but envPath is in userData.
+ *
+ * `readByBackend`: in development the file is `<backend>/.env`, which the Python
+ * runners load themselves, so it cannot hold `enc:` values. No Python code knows
+ * the userData copy: the main process layers it, decrypted, into the backend's
+ * subprocess environments (loadBackendEnv).
+ */
+export const getSourceEnvPath = (): {
+	sourcePath: string | null;
+	envPath: string | null;
+	isProduction: boolean;
+	readByBackend: boolean;
+} => {
+	const savedSettings = readSettingsFile();
+	const settings = { ...DEFAULT_APP_SETTINGS, ...savedSettings };
+
+	// Get autoBuildPath from settings or try to auto-detect
+	let sourcePath: string | null = settings.autoBuildPath || null;
+	if (!sourcePath) {
+		sourcePath = detectAutoBuildSourcePath();
+	}
+
+	if (!sourcePath) {
+		return {
+			sourcePath: null,
+			envPath: null,
+			isProduction: !is.dev,
+			readByBackend: is.dev,
+		};
+	}
+
+	// In production, use userData directory for .env since resources may be read-only
+	// In development, use the actual source path
+	let envPath: string;
+	if (is.dev) {
+		envPath = path.join(sourcePath, ".env");
+	} else {
+		// Production: store .env in userData/backend/.env, where loadBackendEnv reads it
+		envPath = getPackagedSourceEnvPath();
+		mkdirSync(path.dirname(envPath), { recursive: true });
+	}
+
+	return {
+		sourcePath,
+		envPath,
+		isProduction: !is.dev,
+		readByBackend: is.dev,
+	};
 };
 
 /**
@@ -1109,52 +1169,6 @@ export function registerSettingsHandlers(
 	// WorkPilot AI Source Environment Operations
 	// ============================================
 
-	/**
-	 * Helper to get source .env path from settings
-	 *
-	 * In production mode, the .env file is NOT bundled (excluded in electron-builder config).
-	 * We store the source .env in app userData directory instead, which is writable.
-	 * The sourcePath points to the bundled backend for reference, but envPath is in userData.
-	 */
-	const getSourceEnvPath = (): {
-		sourcePath: string | null;
-		envPath: string | null;
-		isProduction: boolean;
-	} => {
-		const savedSettings = readSettingsFile();
-		const settings = { ...DEFAULT_APP_SETTINGS, ...savedSettings };
-
-		// Get autoBuildPath from settings or try to auto-detect
-		let sourcePath: string | null = settings.autoBuildPath || null;
-		if (!sourcePath) {
-			sourcePath = detectAutoBuildSourcePath();
-		}
-
-		if (!sourcePath) {
-			return { sourcePath: null, envPath: null, isProduction: !is.dev };
-		}
-
-		// In production, use userData directory for .env since resources may be read-only
-		// In development, use the actual source path
-		let envPath: string;
-		if (is.dev) {
-			envPath = path.join(sourcePath, ".env");
-		} else {
-			// Production: store .env in userData/backend/.env
-			const userDataBackendDir = path.join(app.getPath("userData"), "backend");
-			if (!existsSync(userDataBackendDir)) {
-				mkdirSync(userDataBackendDir, { recursive: true });
-			}
-			envPath = path.join(userDataBackendDir, ".env");
-		}
-
-		return {
-			sourcePath,
-			envPath,
-			isProduction: !is.dev,
-		};
-	};
-
 	ipcMain.handle(
 		IPC_CHANNELS.AUTOBUILD_SOURCE_ENV_GET,
 		async (): Promise<IPCResult<SourceEnvConfig>> => {
@@ -1185,8 +1199,9 @@ export function registerSettingsHandlers(
 				// First, check source .env file
 				if (envExists && envPath) {
 					const content = readFileSync(envPath, "utf-8");
-					const vars = parseEnvFile(content);
-					claudeOAuthToken = vars.CLAUDE_CODE_OAUTH_TOKEN;
+					const stored = parseEnvFile(content)[SOURCE_ENV_TOKEN_KEY];
+					// Undefined while the keyring cannot decrypt it: the global token stands in
+					claudeOAuthToken = stored ? decryptSecret(stored) : undefined;
 					hasClaudeToken = !!claudeOAuthToken && claudeOAuthToken.length > 0;
 				}
 
@@ -1221,7 +1236,18 @@ export function registerSettingsHandlers(
 		IPC_CHANNELS.AUTOBUILD_SOURCE_ENV_UPDATE,
 		async (_, config: { claudeOAuthToken?: string }): Promise<IPCResult> => {
 			try {
-				const { sourcePath, envPath } = getSourceEnvPath();
+				const token = config?.claudeOAuthToken;
+				// Revalidated here (rule S6): the file holds one variable per line.
+				if (
+					token !== undefined &&
+					(typeof token !== "string" ||
+						token.includes("\0") ||
+						findEnvLineBreak(token) !== null)
+				) {
+					return { success: false, error: "Invalid Claude OAuth token" };
+				}
+
+				const { sourcePath, envPath, readByBackend } = getSourceEnvPath();
 
 				if (!sourcePath || !envPath) {
 					return {
@@ -1254,28 +1280,12 @@ export function registerSettingsHandlers(
 				}
 
 				// Update with new values
-				if (config.claudeOAuthToken !== undefined) {
-					existingVars.CLAUDE_CODE_OAUTH_TOKEN = config.claudeOAuthToken;
+				if (token !== undefined) {
+					existingVars[SOURCE_ENV_TOKEN_KEY] = token;
 				}
 
-				// Generate content
-				const lines: string[] = [
-					"# WorkPilot AI Framework Environment Variables",
-					"# Managed by WorkPilot AI UI",
-					"",
-					"# Claude Code OAuth Token (REQUIRED)",
-					`CLAUDE_CODE_OAUTH_TOKEN=${existingVars.CLAUDE_CODE_OAUTH_TOKEN || ""}`,
-					"",
-				];
-
-				// Preserve other existing variables
-				for (const [key, value] of Object.entries(existingVars)) {
-					if (key !== "CLAUDE_CODE_OAUTH_TOKEN") {
-						lines.push(`${key}=${value}`);
-					}
-				}
-
-				writeFileSync(envPath, lines.join("\n"), "utf-8");
+				// Encrypted unless Python reads the file; 0600 and a warning otherwise
+				writeSourceEnvFile({ envPath, readByBackend }, existingVars);
 
 				return { success: true };
 			} catch (error) {

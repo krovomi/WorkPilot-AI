@@ -71,6 +71,7 @@ import {
 	pauseRunningTasksForShutdown,
 	resumeTasksInterruptedByAppExit,
 } from "./ipc-handlers/task/interrupted-runs";
+import { getSourceEnvPath } from "./ipc-handlers/settings-handlers";
 import { initializeUsageMonitorForwarding } from "./ipc-handlers/terminal-handlers";
 import { setupIpcHandlers } from "./ipc-setup";
 import {
@@ -103,6 +104,7 @@ import {
 	readSettingsFile,
 	writeSettingsFile,
 } from "./settings-utils";
+import { migrateSourceEnvSecrets } from "./source-env";
 import { TerminalManager } from "./terminal-manager";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -822,10 +824,10 @@ async function setupMacOSDockIcon() {
 	}
 }
 
-// Encrypt the secrets settings.json, profiles.json and each project's
-// .workpilot/.env still hold in clear. Without OS encryption they stay as they
-// are and the UI warns the user, as it does for the project secrets the
-// backend must read from the file.
+// Encrypt the secrets settings.json, profiles.json, each project's
+// .workpilot/.env and the backend's .env still hold in clear. Without OS
+// encryption they stay as they are and the UI warns the user, as it does for
+// the secrets the backend must read from a file itself.
 async function migrateSecretsAtRest(): Promise<void> {
 	try {
 		if (migrateSettingsSecrets()) {
@@ -853,6 +855,10 @@ async function migrateSecretsAtRest(): Promise<void> {
 		void ensureProjectEnvFilesIgnored(projects).catch((error) =>
 			console.warn("[main] Could not check .workpilot/.env is ignored:", error),
 		);
+		const { envPath, readByBackend } = getSourceEnvPath();
+		if (envPath && migrateSourceEnvSecrets({ envPath, readByBackend })) {
+			console.warn("[main] backend .env: secrets kept in clear rewritten");
+		}
 	} catch (error) {
 		console.warn("[main] Failed to encrypt stored secrets:", error);
 	}
