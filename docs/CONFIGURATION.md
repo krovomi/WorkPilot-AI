@@ -275,6 +275,49 @@ is taken so the user knows the output is not live data:
   currently returns empty/mock payloads for every endpoint. Treat it as a
   scaffold until a real database-backed implementation lands.
 
+## QA validation loop
+
+The QA loop ([apps/backend/qa/](../apps/backend/qa/)) reads these from the backend process
+environment; the build CLI also loads `.env-files/.env`, where a value already set in the
+environment wins:
+
+| Variable | Default | Meaning |
+| --- | ---: | --- |
+| `WORKPILOT_QA_MAX_ITERATIONS` | by effort | Review passes a task may run, whatever its QA effort. Capped at 50; a value below 1 or that is not a number is ignored. |
+| `WORKPILOT_QA_RECURRING_THRESHOLD` | 8 | Occurrences of the same issue, across passes, that make QA escalate to a human. Bounded by the budget; a value below 2 or that is not a number falls back to 8. |
+| `WORKPILOT_QA_MIN_COVERAGE` | 100 | Minimum coverage, in percent, of the `unit` **and** `integration` tests; `e2e` below it only warns. `0` disables the gate. Clamped to 0–100; a value that is not a number falls back to 100. |
+
+### Review budget
+
+Without `WORKPILOT_QA_MAX_ITERATIONS`, the budget
+([apps/backend/qa/budget.py](../apps/backend/qa/budget.py)) follows the effort of the
+task's QA phase (`phaseThinking.qa`, `high` by default): 3 passes at `none`, 5 at `low`,
+8 at `medium`, 12 at `high`, 20 at `ultrathink`; an unknown effort gets 12. The budget
+belongs to the task: a build paused and resumed in the middle of QA continues its count,
+and feedback a person writes opens a new budget. A task that spends its budget without
+approval lands in human review, flagged with errors.
+
+An issue reported `WORKPILOT_QA_RECURRING_THRESHOLD` times, counting the current pass and
+the earlier ones (the same issue, or one similar enough), escalates to a human with a
+`QA_ESCALATION.md` instead of another fix. The threshold never exceeds the budget, so the
+escalation stays reachable at every effort: at `none`, 3 occurrences are enough. Issues the
+fixer cannot act on, such as "requires manual verification" or "cannot verify without
+runtime", never count toward it.
+
+### Coverage gate
+
+Once the QA reviewer approves a pass, the coverage gate
+([apps/backend/qa/coverage_gate.py](../apps/backend/qa/coverage_gate.py)) checks the
+percentages the reviewer recorded in `implementation_plan.json` → `qa_signoff.coverage`
+against `WORKPILOT_QA_MIN_COVERAGE`.
+
+A pass below the threshold, or whose coverage the reviewer did not measure (no value, or
+`measured: false`), is rejected: the QA fixer receives a `QA_FIX_REQUEST.md` listing the
+gaps, then a new review runs, within the task's QA budget. A project without integration
+tests never passes at 100: lower the threshold or set it to `0`. The same value is written
+into the spec writer, planner, QA reviewer and QA fixer prompts, so the agents aim at the
+threshold the gate enforces.
+
 ## Verification loop (`verify`)
 
 The runtime verification phase (`apps/backend/verify/`, see
