@@ -54,7 +54,9 @@ l'UI n'existe pas.
   `apps/frontend/src/main/secret-storage.ts` décide de la forme sur disque (`enc:…`) ; sans
   trousseau, fichier `0600` et bannière dans l'UI. `settings.json` ne se lit et ne s'écrit que par
   `settings-utils.ts`, `profiles.json` que par les profile managers : un module qui parse le
-  fichier lui-même reçoit du chiffré. → [`architecture/secrets-at-rest.md`](../architecture/secrets-at-rest.md)
+  fichier lui-même reçoit du chiffré. Un fichier qu'un autre processus lit lui-même (le `.env` du
+  backend, que Python charge depuis les sources) ne peut pas contenir `enc:` : `0600`, signalé par
+  `reportPlaintextSecretFile`, et la bannière le nomme. → [`architecture/secrets-at-rest.md`](../architecture/secrets-at-rest.md)
 - `core/auth.py` ne lit que `AUTH_TOKEN_ENV_VARS` ; `ANTHROPIC_API_KEY` en est exclu exprès.
 - **Le hook `pre-commit` cherche les secrets** dans tout fichier indexé
   (`security/scan_secrets.py --staged-only`, qui lit l'index) et bloque le commit ; sans

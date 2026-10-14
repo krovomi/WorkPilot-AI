@@ -13,6 +13,10 @@
  * Reading never destroys: a value that cannot be decrypted right now (keyring
  * locked, safeStorage not ready yet) is handed back unchanged by the field
  * helpers, so a later write keeps it instead of replacing the key with nothing.
+ *
+ * A file another process reads itself cannot hold `enc:` values: its writer
+ * keeps it 0600 and reports it here (reportPlaintextSecretFile), so the UI
+ * names it for as long as it holds a secret.
  */
 
 import { safeStorage } from "electron";
@@ -28,6 +32,8 @@ const listeners = new Set<StatusListener>();
 let secretsStored = false;
 /** A secret was written in clear because encryption failed or was unavailable. */
 let plaintextWritten = false;
+/** Files holding a secret in clear because a process without safeStorage reads them. */
+const plaintextFiles = new Set<string>();
 let decryptWarned = false;
 /**
  * Ciphertext → plaintext. Settings are re-read on every log line; this keeps
@@ -62,17 +68,21 @@ function keyringAvailable(backend = selectedBackend()): boolean {
 export function getSecureStorageStatus(): SecureStorageStatus {
 	const backend = selectedBackend();
 	const available = keyringAvailable(backend);
+	const encryptionUnavailable =
+		plaintextWritten || (secretsStored && !available);
 	return {
 		keyringAvailable: available,
 		backend,
-		secretsAtRisk: plaintextWritten || (secretsStored && !available),
+		secretsAtRisk: encryptionUnavailable || plaintextFiles.size > 0,
+		encryptionUnavailable,
+		plaintextFiles: [...plaintextFiles],
 	};
 }
 
 /**
  * Called with the current status whenever what is on disk may have changed
- * it: the first secret seen this session, the first one written in clear.
- * Returns the unsubscribe.
+ * it: the first secret seen this session, the first one written in clear, a
+ * file starting or ceasing to hold a secret in clear. Returns the unsubscribe.
  */
 export function onSecureStorageStatusChange(
 	listener: StatusListener,
@@ -106,6 +116,29 @@ function notePlaintextWritten(): void {
 	console.warn(
 		"[SecretStorage] No OS keyring: secrets are written in clear to owner-only (0600) files and the user is warned.",
 	);
+	publish();
+}
+
+/**
+ * Record whether `filePath` holds a secret in clear. For a file another
+ * process reads itself (the Python backend's own `.env` in development), which
+ * therefore cannot hold `enc:` values: its writer keeps it 0600 and calls this
+ * after every write, so the UI names the file while it holds a secret and
+ * stops once it no longer does.
+ */
+export function reportPlaintextSecretFile(
+	filePath: string,
+	holdsSecret: boolean,
+): void {
+	if (holdsSecret === plaintextFiles.has(filePath)) return;
+	if (holdsSecret) {
+		plaintextFiles.add(filePath);
+		console.warn(
+			`[SecretStorage] ${filePath} is read by another process, so its secrets stay in clear (owner-only 0600) and the user is warned.`,
+		);
+	} else {
+		plaintextFiles.delete(filePath);
+	}
 	publish();
 }
 

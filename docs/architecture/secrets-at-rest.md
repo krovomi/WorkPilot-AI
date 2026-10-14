@@ -7,9 +7,10 @@
 
 The desktop app keeps credentials in three files under `userData`:
 `settings.json` (the global provider keys and tokens), `auto-claude/profiles.json`
-(each API profile's `apiKey`) and the Claude profiles (`oauthToken`). All three
-used to be written in clear, or encrypted only when Electron `safeStorage`
-happened to work and silently in clear otherwise.
+(each API profile's `apiKey`) and the Claude profiles (`oauthToken`), plus the
+backend's own `.env`, where the environment dialog saves the Claude token. All
+of them used to be written in clear, or encrypted only when Electron
+`safeStorage` happened to work and silently in clear otherwise.
 
 One module now decides what a secret looks like on disk —
 `apps/frontend/src/main/secret-storage.ts`:
@@ -19,6 +20,7 @@ One module now decides what a secret looks like on disk —
 | OS keyring (Keychain, DPAPI, libsecret, KWallet) | `enc:<base64>` safeStorage ciphertext | nothing |
 | No keyring: `safeStorage` unavailable, or Linux `basic_text` | the secret itself, in a `0600` file | the sidebar banner (`SecureStorageBanner`), logged once |
 | Encryption throws although a keyring is reported | the secret itself, in a `0600` file | the same banner |
+| A process that cannot call `safeStorage` reads the file itself (the backend's `.env` from source) | the secret itself, in a `0600` file | the banner, naming the file |
 
 `basic_text` counts as no keyring: it encrypts with a key compiled into
 Chromium, which protects nothing. Writing in clear there is what lets the next
@@ -35,6 +37,7 @@ plaintext:
 | `settings.json` | `settings-utils.ts` — `readSettingsFile`, `readSettingsFileAsync`, `writeSettingsFile` | `isSecretSettingsKey`: `global…ApiKey`, `…AccessKey`, `…Token`, `…Secret`, `…Password`, `customProviderApiKey` |
 | `profiles.json` | `services/profile/profile-manager.ts` (`encodeProfilesForDisk` / `decodeProfilesFromDisk`), reused by `utils/profile-manager.ts` | `apiKey` |
 | Claude profiles | `claude-profile/token-encryption.ts` | `oauthToken` |
+| the backend's `.env` (the "source env") | `source-env.ts` (`writeSourceEnvFile`), read back by the `AUTOBUILD_SOURCE_ENV_*` handlers | `isSourceEnvSecretKey`: `CLAUDE_CODE_OAUTH_TOKEN`, `…_API_KEY`, `…_TOKEN`, `…_SECRET`, `…_PAT`… |
 
 That is why no module parses `settings.json` itself any more: the dozen
 services that did so to inject `ANTHROPIC_API_KEY` or `CLAUDE_OAUTH_TOKEN`
@@ -42,6 +45,35 @@ into a Python subprocess would now hand it the ciphertext.
 
 The key pattern is a pattern, not a list, because the provider grid names keys
 the `AppSettings` type does not (`globalAzureApiKey`, `globalAwsAccessKey`…).
+
+## The backend's own `.env`
+
+`AUTOBUILD_SOURCE_ENV_UPDATE` saves the Claude token to the backend's `.env`.
+That file has two locations (`getSourceEnvPath` in `settings-handlers.ts`), and
+who reads each one decides what a secret looks like in it:
+
+| Running | File | Read by | Secrets |
+|---|---|---|---|
+| from source | `apps/backend/.env` | the main process (`loadAutoBuildEnv` in `agent/agent-process.ts`, `oneshot-llm.ts`, `changelog/changelog-service.ts`, `insights/config.ts`) **and Python itself**: `runners/github/runner.py` and `runners/gitlab/runner.py` load `Path(__file__).parent.parent.parent / ".env"`, and `provider_api.py`, run directly, calls a bare `load_dotenv()`, which walks up from `apps/backend/` | in clear, `0600`, named by the banner |
+| packaged | `<userData>/backend/.env` | the main process only, through the `AUTOBUILD_SOURCE_ENV_GET` / `_CHECK_TOKEN` handlers. No Python code knows this path | `enc:`, like `settings.json` |
+
+Python cannot call `safeStorage`, so a file it loads cannot hold `enc:` values:
+`python-dotenv` would load the ciphertext wherever the variable is not
+already set, as when a runner is started by hand. That file keeps
+its secrets in clear, and `writeSourceEnvFile` reports it through
+`reportPlaintextSecretFile`, so the banner names it for as long as it holds a
+secret, keyring or not. Its advice: configure Claude in Settings, whose
+credentials are encrypted, and remove the token from the file. In the agent
+processes, the Claude profile's token already wins over the file's
+(`setupProcessEnvironment` spreads it after the `.env` values).
+
+The packaged copy is read by no subprocess at all. The four `loadAutoBuildEnv`
+readers resolve the backend source (`<resources>/backend`,
+`<userData>/backend-source` or `autoBuildPath`), never `<userData>/backend`.
+A reader that starts reading that file has to decrypt its secret fields first.
+
+The handler revalidates its argument (rule S6): the token is a string on one
+line, since the file holds one variable per line.
 
 ## Reading never destroys
 
@@ -54,19 +86,25 @@ the credential manager deletes placeholder profiles on startup.
 
 ## Migration
 
-`migrateSettingsSecrets` and `migrateProfilesSecrets` run once, after
-`app.whenReady()` and before anything else reads the files. They restrict both
-files to `0600` and rewrite them only when a secret is still in clear. Without
-a keyring the rewrite keeps the values in clear and raises the banner.
+`migrateSettingsSecrets`, `migrateProfilesSecrets` and `migrateSourceEnvSecrets`
+run once, after `app.whenReady()` and before anything else reads the files.
+They restrict the files to `0600` and rewrite them only when a secret is still
+in clear. Without a keyring the rewrite keeps the values in clear and raises
+the banner. The backend's `.env` from source is never rewritten: it is
+restricted, and named by the banner if it holds a secret.
 
 ## Status and warning
 
-`getSecureStorageStatus()` returns `keyringAvailable`, the Linux `backend`, and
-`secretsAtRisk`: a secret was written in clear this session, or secrets exist
-while no keyring does. The renderer pulls it on start (`secureStorage:status`)
-and the main process pushes it (`secureStorage:statusChanged`) the first time a
-secret is seen and the first time one is written in clear. Dismissing the
-banner lasts for the session; secrets newly exposed bring it back.
+`getSecureStorageStatus()` returns `keyringAvailable`, the Linux `backend`,
+`encryptionUnavailable` (a secret was written in clear this session, or secrets
+exist while no keyring does), `plaintextFiles` (files holding a secret in clear
+because another process reads them) and `secretsAtRisk`, true for either. The
+renderer pulls it on start (`secureStorage:status`) and the main process pushes
+it (`secureStorage:statusChanged`) the first time a secret is seen, the first
+time one is written in clear, and when a file joins or leaves `plaintextFiles`.
+The banner gives the keyring advice for the first reason and lists the files
+for the second. Dismissing it lasts for the session; secrets newly exposed
+bring it back.
 
 ## Logs
 

@@ -54,7 +54,7 @@ function decodeSettings(content: string): Record<string, unknown> | undefined {
 }
 
 /** Owner read/write only (0600). Best effort: Windows ignores POSIX modes. */
-function restrictToOwner(filePath: string): void {
+export function restrictToOwner(filePath: string): void {
 	try {
 		chmodSync(filePath, 0o600);
 	} catch {

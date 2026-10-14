@@ -71,6 +71,7 @@ import {
 	pauseRunningTasksForShutdown,
 	resumeTasksInterruptedByAppExit,
 } from "./ipc-handlers/task/interrupted-runs";
+import { getSourceEnvPath } from "./ipc-handlers/settings-handlers";
 import { initializeUsageMonitorForwarding } from "./ipc-handlers/terminal-handlers";
 import { setupIpcHandlers } from "./ipc-setup";
 import {
@@ -97,6 +98,7 @@ import {
 	readSettingsFile,
 	writeSettingsFile,
 } from "./settings-utils";
+import { migrateSourceEnvSecrets } from "./source-env";
 import { TerminalManager } from "./terminal-manager";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -816,8 +818,9 @@ async function setupMacOSDockIcon() {
 	}
 }
 
-// Encrypt the secrets settings.json and profiles.json still hold in clear.
-// Without OS encryption they stay as they are and the UI warns the user.
+// Encrypt the secrets settings.json, profiles.json and the backend's .env
+// still hold in clear. Without OS encryption they stay as they are and the UI
+// warns the user; so it does for the backend's .env while Python reads it.
 async function migrateSecretsAtRest(): Promise<void> {
 	try {
 		if (migrateSettingsSecrets()) {
@@ -825,6 +828,10 @@ async function migrateSecretsAtRest(): Promise<void> {
 		}
 		if (await migrateProfilesSecrets()) {
 			console.warn("[main] profiles.json: secrets kept in clear rewritten");
+		}
+		const { envPath, readByBackend } = getSourceEnvPath();
+		if (envPath && migrateSourceEnvSecrets({ envPath, readByBackend })) {
+			console.warn("[main] backend .env: secrets kept in clear rewritten");
 		}
 	} catch (error) {
 		console.warn("[main] Failed to encrypt stored secrets:", error);

@@ -12,11 +12,24 @@ const protectedStatus: SecureStorageStatus = {
 	keyringAvailable: true,
 	backend: "gnome_libsecret",
 	secretsAtRisk: false,
+	encryptionUnavailable: false,
+	plaintextFiles: [],
 };
 const atRiskStatus: SecureStorageStatus = {
 	keyringAvailable: false,
 	backend: "basic_text",
 	secretsAtRisk: true,
+	encryptionUnavailable: true,
+	plaintextFiles: [],
+};
+const BACKEND_ENV = "/home/dev/WorkPilot-AI/apps/backend/.env";
+/** Running from source with a keyring: only the backend's .env is in clear. */
+const plaintextFileStatus: SecureStorageStatus = {
+	keyringAvailable: true,
+	backend: "gnome_libsecret",
+	secretsAtRisk: true,
+	encryptionUnavailable: false,
+	plaintextFiles: [BACKEND_ENV],
 };
 
 describe("SecureStorageBanner", () => {
@@ -43,6 +56,29 @@ describe("SecureStorageBanner", () => {
 		);
 	});
 
+	it("names a file kept in clear for Python, without blaming a keyring that works", () => {
+		useSecureStorageStore.getState().setStatus(plaintextFileStatus);
+		render(<SecureStorageBanner />);
+
+		const alert = screen.getByRole("alert");
+		expect(alert).toHaveTextContent("API keys stored without encryption");
+		expect(alert).toHaveTextContent("the Python backend reads its own .env");
+		expect(alert).toHaveTextContent(BACKEND_ENV);
+		expect(alert).not.toHaveTextContent("No system keyring is available");
+	});
+
+	it("gives both reasons when both hold", () => {
+		useSecureStorageStore.getState().setStatus({
+			...atRiskStatus,
+			plaintextFiles: [BACKEND_ENV],
+		});
+		render(<SecureStorageBanner />);
+
+		const alert = screen.getByRole("alert");
+		expect(alert).toHaveTextContent("No system keyring is available");
+		expect(alert).toHaveTextContent(BACKEND_ENV);
+	});
+
 	it("is translated in French", async () => {
 		await i18n.changeLanguage("fr");
 		useSecureStorageStore.getState().setStatus(atRiskStatus);
@@ -51,6 +87,16 @@ describe("SecureStorageBanner", () => {
 		expect(screen.getByRole("alert")).toHaveTextContent(
 			"Clés API stockées sans chiffrement",
 		);
+	});
+
+	it("names the file kept in clear in French too", async () => {
+		await i18n.changeLanguage("fr");
+		useSecureStorageStore.getState().setStatus(plaintextFileStatus);
+		render(<SecureStorageBanner />);
+
+		const alert = screen.getByRole("alert");
+		expect(alert).toHaveTextContent("le backend Python lit lui-même son .env");
+		expect(alert).toHaveTextContent(BACKEND_ENV);
 	});
 
 	it("can be dismissed for the session, and comes back for newly exposed secrets", () => {

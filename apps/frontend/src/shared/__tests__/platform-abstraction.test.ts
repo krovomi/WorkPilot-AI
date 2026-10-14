@@ -34,7 +34,7 @@ const ABSTRACTION = ["main/platform", "shared/platform.ts"];
  */
 const ALLOWED = new Map<string, string>([
 	[
-		"main/ipc-handlers/settings-handlers.ts:381",
+		"main/ipc-handlers/settings-handlers.ts:382",
 		"console.warn de diagnostic",
 	],
 	[

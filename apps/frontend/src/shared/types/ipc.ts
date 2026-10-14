@@ -127,11 +127,22 @@ export interface SecureStorageStatus {
 	/** Linux only: the safeStorage backend Electron selected. */
 	backend: string | null;
 	/**
-	 * At least one secret is on disk without keyring protection. The UI warns
-	 * while this is true: a secret is never kept in clear without the user
-	 * being told.
+	 * At least one secret is on disk without keyring protection, for either
+	 * reason below. The UI warns while this is true: a secret is never kept in
+	 * clear without the user being told.
 	 */
 	secretsAtRisk: boolean;
+	/**
+	 * Secrets are kept in clear because no OS keyring could encrypt them (none
+	 * available, or encryption failed). Installing or unlocking one fixes it.
+	 */
+	encryptionUnavailable: boolean;
+	/**
+	 * Files holding a secret in clear whatever the keyring, because a process
+	 * that cannot call safeStorage reads them itself: the Python backend's own
+	 * `.env` when running from source. Owner-only (0600).
+	 */
+	plaintextFiles: string[];
 }
 
 /** Platform information exposed via contextBridge for platform-specific behavior */

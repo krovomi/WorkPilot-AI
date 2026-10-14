@@ -65,6 +65,8 @@ describe("secret-storage", () => {
 				keyringAvailable: true,
 				backend: "gnome_libsecret",
 				secretsAtRisk: false,
+				encryptionUnavailable: false,
+				plaintextFiles: [],
 			});
 		});
 
@@ -117,6 +119,8 @@ describe("secret-storage", () => {
 				keyringAvailable: false,
 				backend: "basic_text",
 				secretsAtRisk: true,
+				encryptionUnavailable: true,
+				plaintextFiles: [],
 			});
 			// What basic_text encrypted earlier still reads back.
 			expect(storage.decryptSecret(fakeEncrypted("older"))).toBe("older");
@@ -127,7 +131,10 @@ describe("secret-storage", () => {
 			const storage = await load();
 
 			expect(storage.encryptSecret("sk-plain")).toBe("sk-plain");
-			expect(storage.getSecureStorageStatus().secretsAtRisk).toBe(true);
+			expect(storage.getSecureStorageStatus()).toMatchObject({
+				secretsAtRisk: true,
+				encryptionUnavailable: true,
+			});
 		});
 
 		it("flags secrets already on disk, not only new writes", async () => {
@@ -138,6 +145,44 @@ describe("secret-storage", () => {
 			storage.decryptSecret("legacy-plain-key");
 
 			expect(storage.getSecureStorageStatus().secretsAtRisk).toBe(true);
+		});
+	});
+
+	describe("a file another process reads, so kept in clear", () => {
+		it("is named to the UI while it holds a secret, keyring or not", async () => {
+			const storage = await load();
+			const listener = vi.fn();
+			storage.onSecureStorageStatusChange(listener);
+
+			storage.reportPlaintextSecretFile("/repo/apps/backend/.env", true);
+
+			expect(storage.getSecureStorageStatus()).toEqual({
+				keyringAvailable: true,
+				backend: "gnome_libsecret",
+				secretsAtRisk: true,
+				encryptionUnavailable: false,
+				plaintextFiles: ["/repo/apps/backend/.env"],
+			});
+			expect(listener).toHaveBeenCalledTimes(1);
+			expect(warn).toHaveBeenCalledWith(
+				expect.stringContaining("/repo/apps/backend/.env"),
+			);
+		});
+
+		it("stops being named once it holds none, telling the UI only on change", async () => {
+			const storage = await load();
+			const listener = vi.fn();
+			storage.onSecureStorageStatusChange(listener);
+
+			storage.reportPlaintextSecretFile("/repo/apps/backend/.env", true);
+			storage.reportPlaintextSecretFile("/repo/apps/backend/.env", true);
+			storage.reportPlaintextSecretFile("/repo/apps/backend/.env", false);
+
+			expect(listener).toHaveBeenCalledTimes(2);
+			expect(storage.getSecureStorageStatus()).toMatchObject({
+				secretsAtRisk: false,
+				plaintextFiles: [],
+			});
 		});
 	});
 
