@@ -245,10 +245,13 @@ The single-user API let a caller pass `project_dir`, an absolute filesystem
 path, and read it. On a shared server that is a cross-tenant read and write, so
 in server mode it is refused outright (HTTP 400) and callers identify a project
 by `project_id`; the server resolves its own checkout. Two barriers enforce it:
-the auth middleware rejects the parameter in a query string, and
-`core.api_safety.validated_dir` confines resolution to `WORKPILOT_REPOS_ROOT`
-when no allowed root is given — which also covers the endpoints that read a
-path out of a JSON body.
+the auth middleware rejects the key (`server.integration.CLIENT_PATH_PARAMS`)
+in the query string and anywhere in the body — JSON at any depth, or form
+fields — and `core.api_safety.validated_dir` confines resolution to
+`WORKPILOT_REPOS_ROOT` when no allowed root is given, as a backstop.
+`tests/backend/test_project_scope_coverage.py` walks every route's parameters
+and body models, so a new path-taking field fails the build until it is either
+refused or explicitly exempted with its reason.
 
 ### Quotas
 
