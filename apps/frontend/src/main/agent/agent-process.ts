@@ -25,6 +25,7 @@ import { getClaudeProfileManager } from "../claude-profile-manager";
 import { getToolInfo } from "../cli-tool-manager";
 import { getAugmentedEnv } from "../env-utils";
 import { isWindows, killProcessGracefully } from "../platform";
+import { readProjectEnv } from "../project-env-file";
 import { projectStore } from "../project-store";
 import { buildTaskProviderEnv, type TaskProviderPlan } from "./task-provider-env";
 import { parsePythonCommand, validatePythonPath } from "../python-detector";
@@ -757,7 +758,9 @@ export class AgentProcessManager {
 
 	/**
 	 * Load environment variables from project's .workpilot/.env file
-	 * This contains frontend-configured settings (integrations, MCP toggles)
+	 * This contains frontend-configured settings (integrations, MCP toggles).
+	 * Its tokens are stored encrypted: this is where they become plaintext
+	 * again, in the subprocess environment, never on disk.
 	 */
 	private loadProjectEnv(projectPath: string): Record<string, string> {
 		// Find project by path to get autoBuildPath
@@ -768,8 +771,10 @@ export class AgentProcessManager {
 			return {};
 		}
 
-		const envPath = path.join(projectPath, project.autoBuildPath, ".env");
-		return this.parseEnvFile(envPath);
+		// Skip empty values to prevent overriding valid values from other sources
+		return Object.fromEntries(
+			Object.entries(readProjectEnv(project)).filter(([, value]) => value),
+		);
 	}
 
 	/**

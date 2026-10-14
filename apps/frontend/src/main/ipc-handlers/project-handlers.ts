@@ -20,8 +20,10 @@ import { appEmulatorService } from "../app-emulator-service";
 import { changelogService } from "../changelog-service";
 import { getToolPath } from "../cli-tool-manager";
 import { insightsService } from "../insights-service";
+import { migrateProjectEnvSecrets } from "../project-env-file";
 import {
 	checkGitStatusAsync,
+	ensureProjectEnvFilesIgnored,
 	hasLocalSource,
 	initializeGit,
 	initializeProject,
@@ -757,6 +759,11 @@ export function registerProjectHandlers(
 				}
 
 				const project = projectStore.addProject(projectPath);
+				// A .workpilot/.env from an earlier version or another install:
+				// tokens encrypted, file owner-only, ignored by git, readable
+				// secrets reported.
+				migrateProjectEnvSecrets([project]);
+				await ensureProjectEnvFilesIgnored([project]);
 				const warning = checkProjectDirIsGitRoot(projectPath);
 				return warning
 					? { success: true, data: project, warning }
