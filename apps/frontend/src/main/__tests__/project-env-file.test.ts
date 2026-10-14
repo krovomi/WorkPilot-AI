@@ -257,4 +257,67 @@ describe("project-env-file", () => {
 			).toBe(0);
 		});
 	});
+
+	describe("CI/CD settings in the project's root .env", () => {
+		function rootEnv(): string {
+			return path.join(dir, ".env");
+		}
+
+		it("moves them to .workpilot/.env, encrypted, and keeps the user's own lines", async () => {
+			writeFileSync(
+				rootEnv(),
+				'DATABASE_URL=postgres://localhost/app\nCICD_PROVIDER=github\nCICD_GITHUB_TOKEN="ghp_cicd0000"\n# CICD_JENKINS_TOKEN=\nPORT=3000\n',
+				{ mode: 0o640 },
+			);
+			const { moveRootEnvCicdKeys, readProjectEnvFile } = await load();
+
+			expect(
+				moveRootEnvCicdKeys({ path: dir, autoBuildPath: ".workpilot" }),
+			).toBe(true);
+
+			expect(readFileSync(rootEnv(), "utf-8")).toBe(
+				"DATABASE_URL=postgres://localhost/app\n# CICD_JENKINS_TOKEN=\nPORT=3000\n",
+			);
+			if (!isWindows()) {
+				expect(statSync(rootEnv()).mode & 0o777).toBe(0o640);
+			}
+			const raw = readFileSync(envPath, "utf-8");
+			expect(raw).not.toContain("ghp_cicd0000");
+			expect(raw).toContain(`CICD_GITHUB_TOKEN=${fakeEncrypted("ghp_cicd0000")}`);
+			expect(readProjectEnvFile(envPath)).toMatchObject({
+				CICD_PROVIDER: "github",
+				CICD_GITHUB_TOKEN: "ghp_cicd0000",
+			});
+		});
+
+		it("keeps a value already set in .workpilot/.env", async () => {
+			const { moveRootEnvCicdKeys, readProjectEnvFile, writeProjectEnvFile } =
+				await load();
+			writeProjectEnvFile(envPath, "GITHUB_REPO=o/r\nCICD_PROVIDER=azure\n");
+			writeFileSync(rootEnv(), "CICD_PROVIDER=github\nCICD_GITLAB_REF=dev\n");
+
+			moveRootEnvCicdKeys({ path: dir, autoBuildPath: ".workpilot" });
+
+			expect(readProjectEnvFile(envPath)).toEqual({
+				GITHUB_REPO: "o/r",
+				CICD_PROVIDER: "azure",
+				CICD_GITLAB_REF: "dev",
+			});
+			expect(readFileSync(rootEnv(), "utf-8")).toBe("");
+		});
+
+		it("leaves a root .env without CI/CD settings alone", async () => {
+			writeFileSync(rootEnv(), "PORT=3000\n");
+			const { migrateRootEnvCicdKeys } = await load();
+
+			expect(
+				migrateRootEnvCicdKeys([
+					{ path: dir, autoBuildPath: ".workpilot" },
+					{ path: path.join(dir, "missing"), autoBuildPath: null },
+				]),
+			).toBe(0);
+			expect(readFileSync(rootEnv(), "utf-8")).toBe("PORT=3000\n");
+			expect(() => readFileSync(envPath, "utf-8")).toThrow();
+		});
+	});
 });
