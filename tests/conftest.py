@@ -1253,3 +1253,58 @@ def _reset_rate_limiter() -> None:
     module = sys.modules.get("runners.github.rate_limiter")
     if module is not None:
         module.RateLimiter.reset_instance()
+
+
+# ── No live model call ─────────────────────────────────────────────────
+#
+# `tests/test_sdk_structured_output.py` is the one test allowed to drive the
+# real Claude API, behind `WORKPILOT_RUN_LIVE_API_TESTS=1`.
+
+
+_LIVE_API_OPT_IN = {"1", "true", "yes", "on"}
+
+
+@pytest.fixture(autouse=True)
+def _no_live_claude_cli(monkeypatch: pytest.MonkeyPatch):
+    """Fail a test that starts the Claude Code CLI behind the Agent SDK.
+
+    Every model call goes through `core.client`, and on the Claude provider
+    that ends in `SubprocessCLITransport.connect`, which spawns the bundled
+    CLI and sends the prompt. Whether a test got that far used to depend on
+    the machine: `test_llm_transformer.py::test_error_handling` passed here
+    because authentication failed, and on a developer machine with a Claude
+    login it sent a real request (or hung until the network gave up).
+
+    The connect raises, and the test is failed at teardown as well, because
+    the code under test often catches the exception and records it (the
+    migration transformer turns it into `result.errors`), which would
+    otherwise pass silently. A test that needs a client uses a double.
+    Yields the list of refusals; only the guard's own test clears it.
+    """
+    if (
+        os.environ.get("WORKPILOT_RUN_LIVE_API_TESTS", "").strip().lower()
+        in _LIVE_API_OPT_IN
+    ):
+        yield
+        return
+    try:
+        from claude_agent_sdk._internal.transport import subprocess_cli
+    except ImportError:  # the skills-eval job installs three packages
+        yield
+        return
+
+    reached: list[str] = []
+    message = (
+        "This test started the Claude Code CLI (a real model call). "
+        "Replace the client with a double; live tests need "
+        "WORKPILOT_RUN_LIVE_API_TESTS=1."
+    )
+
+    async def _refuse(self) -> None:
+        reached.append(message)
+        raise RuntimeError(message)
+
+    monkeypatch.setattr(subprocess_cli.SubprocessCLITransport, "connect", _refuse)
+    yield reached
+    if reached:
+        pytest.fail(message, pytrace=False)
