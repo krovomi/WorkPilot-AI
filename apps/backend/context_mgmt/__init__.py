@@ -1,6 +1,6 @@
 """Context-window management for agent sessions: measure, compact, clear.
 
-See ``shared_docs/architecture/context-management.md``. Entry point for the
+See ``docs/architecture/context-management.md``. Entry point for the
 session runner: ``ContextGuard``; for the client factories:
 ``native_auto_compact_env`` / ``codex_auto_compact_limit``.
 """

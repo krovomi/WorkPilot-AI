@@ -1,109 +1,101 @@
 # AGENTS.md — index du backend
 
-Python 3.13+, FastAPI sur le port **9000**, WebSocket sur **8765**.
-~100 packages de premier niveau. Ce fichier donne les points d'entrée qui comptent.
+Python 3.12+, FastAPI sur `127.0.0.1:9000`, WebSocket sur `:8765`. Une centaine de paquets de
+premier niveau ; ce fichier donne ceux qui comptent.
 
-> Règles normatives : [`../../docs/CLAUDE.md`](../../docs/CLAUDE.md) · Racine : [`../../AGENTS.md`](../../AGENTS.md)
+> Règles (normatif) : [`docs/rules/backend.md`](../../docs/rules/backend.md), sécurité :
+> [`docs/rules/security.md`](../../docs/rules/security.md) · Racine : [`../../AGENTS.md`](../../AGENTS.md)
 
 ## Le chemin critique
 
-Toute interaction LLM passe par ces fichiers. Les modifier touche l'ensemble du produit.
+Toute interaction LLM passe par ces fichiers ; les modifier touche tout le produit.
 
 | Fichier | Lignes | Rôle |
 |---|---|---|
-| `core/client.py` | ~2 700 | **la fabrique**. `create_client()` (SDK Claude) et `create_agent_client()` (multi-provider). Résout modèle, outils, serveurs MCP, sous-agents. |
-| `core/agent_clients/` | ~5 700 | un module par provider (`base`, `claude`, `copilot`, `openai`, `google`, `compatible`, `local`, `windsurf`) ; `core/agent_client.py` les réexporte |
-| `core/worktree.py` + `worktree_pr.py` + `worktree_common.py` | ~3 400 | worktrees par spec ; la création de PR/MR est le mixin `WorktreePRMixin` |
-| `agents/session.py` | ~2 200 | la boucle de session : streaming, reprise, erreurs, rate limits |
+| `core/client.py` | ~2 750 | **la fabrique** : `create_client()` (SDK Claude), `create_agent_client()` (multi-provider) ; modèle, outils, MCP, sous-agents, hooks de sécurité |
+| `core/simple_client.py` | — | client sans hooks, refusé aux types qui écrivent ou exécutent |
+| `core/agent_clients/` | ~6 800 | un module par provider (`claude`, `copilot`, `openai`, `google`, `compatible`, `local`, `windsurf`…) ; `core/agent_client.py` les réexporte |
+| `core/worktree.py` + `worktree_pr.py` + `worktree_common.py` | ~3 450 | worktrees par spec ; la création de PR/MR est le mixin `WorktreePRMixin` |
+| `agents/session.py` | ~2 500 | boucle de session : streaming, reprise, erreurs, rate limits |
 | `agents/coder.py` | ~2 700 | l'agent d'implémentation, découpage en sous-tâches |
-| `cli/build_commands.py` | ~540 | enchaîne les phases d'un build : planning → coding → QA |
+| `cli/build_commands.py` | ~1 300 | enchaîne les phases d'un build : planning → coding → QA |
 | `qa/loop.py` | ~1 350 | boucle de validation QA |
-| `provider_api.py` | ~2 000 | monte tous les routeurs FastAPI du domaine |
+| `provider_api.py` | ~2 050 | point d'entrée FastAPI : monte les routeurs, CORS, redaction des logs |
 
 ## Modèle, effort, routage
 
 | Fichier | Contenu |
 |---|---|
-| `phase_config.py` | `MODEL_ID_MAP`, `THINKING_BUDGET_MAP` (`none`/`low`/`medium`/`high`/`ultrathink`), `DEFAULT_PHASE_MODELS`, `PROVIDER_DEFAULT_MODELS` (11 providers), `get_phase_model()`, `get_phase_thinking_budget()` |
-| `models_registry.py` | catalogue des modèles et de leurs capacités |
-| `model_router/router.py` | `TaskClass` (8 classes) × `QualityTier` (budget/balanced/premium) → choix de modèle |
-| `core/phase_event.py` | émission des événements de phase vers l'UI |
+| `phase_config.py` | `MODEL_ID_MAP`, `THINKING_BUDGET_MAP`, `DEFAULT_PHASE_MODELS`, `PROVIDER_DEFAULT_MODELS`, `get_phase_model()`, `get_phase_thinking_budget()` |
+| `models_registry.py` | catalogue livré des modèles et de leurs capacités |
+| `model_router/router.py` | `TaskClass` × `QualityTier` (budget / balanced / premium) → modèle |
+| `core/phase_event.py` | événements de phase vers l'UI |
+| `core/pause_state.py`, `core/build_signals.py` | pause coopérative ; `BuildPaused` / `BuildHalted` |
+| `context_mgmt/` | fenêtre de contexte par session : jauge, compact / clear au seuil |
 
-## Agents et sous-agents
-
-| Fichier | Rôle |
-|---|---|
-| `agents/subagents/__init__.py` | `resolve` : le roster servi à un `agent_type` (défauts de phase, overlays, cap) |
-| `agents/subagents/phases.py` | sous-agents par défaut par phase (Kanban, planner, QA…) |
-| `agents/subagents/languages/` | overlays par langage (.NET, Python, TypeScript, Java, Go, Rust) |
-| `agents/subagents/pr_review.py` | les relecteurs de PR, prompts sous `prompts/github/` |
-| `agents/subagents/mobile.py` | `device-runner` et `store-readiness-auditor` |
-| `prompts/` | les prompts système réels (39 + 18 sous `github/`) |
-
-La sélection se fait par `agent_type` dans `core/client.py`. L'appelant peut passer son
-propre dict `agents` : **il gagne sur les défauts**.
-
-## Skills
+## Agents, sous-agents, skills
 
 | Chemin | Rôle |
 |---|---|
-| `skills_registry/frontmatter.py` | **le** parseur de frontmatter. Tout lecteur passe par là. |
-| `slash_commands/api.py` | sert `.agents/skills/*/SKILL.md` à la palette du Kanban |
-| `skills/skill_manager.py` | chargement progressif des skills Python (`angular/`, `migration/`) |
-| `skills_registry/acquire.py` | `skills-cli add/update/remove` — plan puis apply, testable hors ligne |
-| `skills_registry/upstream.py` | provenance par tree SHA, partagée avec `scripts/skills_sync.py` |
-| `skills_registry/agents.py` | émet le registre de sous-agents vers chaque harness, noms d'outils traduits |
-| `skills_registry/classify.py` | classe une release upstream : non-cassante / potentielle / cassante |
+| `agents/tools_pkg/models.py` | `AGENT_CONFIGS` : les outils de chaque type d'agent |
+| `agents/subagents/__init__.py` | `resolve` : le roster servi à un `agent_type` ; un dict `agents` passé par l'appelant gagne |
+| `agents/subagents/phases.py` | sous-agents par défaut par phase |
+| `agents/subagents/languages/` | overlays par langage (.NET, Python, TypeScript, Java, Go, Rust) |
+| `agents/subagents/pr_review.py` | relecteurs de PR, prompts sous `prompts/github/` |
+| `prompts/` | les prompts système réels (une quarantaine, dont `github/`) |
+| `skills_registry/frontmatter.py` | **le** parseur de frontmatter |
+| `skills_registry/agents.py` | émet le registre de sous-agents vers chaque harness |
+| `skills_registry/acquire.py`, `upstream.py`, `classify.py` | `skills-cli add/update/remove`, provenance par tree SHA, classement des releases amont |
+| `slash_commands/api.py` | sert `.agents/skills/*/SKILL.md` à la barre de commandes du Kanban |
+| `skills/` | skills Python exécutables ([index](skills/AGENTS.md)) |
 
-## Apprentissage et autonomie
+## Sécurité et mode serveur
 
-| Package | Rôle |
+| Chemin | Rôle |
 |---|---|
-| `learning_loop/` | extrait les patterns succès/échec des builds — des notes du vault (`pattern_storage.py`) — et les injecte, un seul injecteur plafonné en tokens |
-| `learning_loop/observe.py` | la phase `observe` : écrit sous `skills/_proposed/`, ne touche jamais un pack |
-| `learning_loop/replay.py` | replay A/B sur les épisodes dorés — la porte que `tests/skills_eval/` exécute |
-| `mem_search/` | récupération par paliers (index ~100 tokens → timeline → détail par ID), vault compris (`BrainSource`) |
-| `brain/` | le cerveau partagé entre agents : vault Obsidian, `graph.json` Graphify, sync git, serveur MCP `workpilot-brain` (`runners/brain_runner.py`, `runners/brain_mcp.py`) |
-| `brain/project_memory.py` + `memory/store.py` | **la seule mémoire** : ce que les builds apprennent, dans le vault. `memory/`, `agents/memory_manager.py` et les outils `record_*` passent par là ; Graphiti a été retiré (lot L7) |
-| `core/merge_event.py` | un merge publié une fois ; usage_tracker, learning loop, cerveau et `uiux.knowledge` s'y abonnent |
-| `core/workpilot_layout.py` | un dossier par feature sous `.workpilot/` : les anciens noms sont déplacés, jamais supprimés |
-| `libdocs/` | phase `docs` : télécharge via Context7 la doc des bibliothèques dont le dépôt n'a aucun exemple, avant le planning |
-| `mobile/` | apps smartphone : `stacks` (Android/Apple/Flutter/RN/MAUI/KMP/Capacitor + commandes), `devices` (émulateurs et simulateurs réels), `readiness` (constructible ici ?), `prompt` (la section donnée à chaque phase) |
-| `verify/` | la boucle de vérification (`/verify`) : `detect`, `launch`, `errors`, `devtools` (Chrome DevTools MCP piloté en Python), `endpoints`, `loop`, `replay` ; outils `verify_*` servis par `tool_executor` et par le serveur MCP `workpilot-verify` |
-| `skills_registry/overlays.py` | un skill surchargé par fournisseur : base → `providers/_sdk|_executor.md` → `providers/<fournisseur>.md`, fusion par section |
-| `continuous_ai/daemon.py` | boucle de polling par module, avec plafond de coût journalier |
-| `self_healing/` | surveillance, checks de santé, remédiation |
-| `task_logger/` | capture structurée de toutes les traces d'exécution |
-| `api_watcher/breaking_change_detector.py` | classe un diff de contrat en non-breaking / potentiel / breaking |
+| `security/` | allowlist de commandes, écritures confinées, contenu non fiable ([index](security/AGENTS.md)) |
+| `injection_guard/` | scanner d'injection de prompt |
+| `server/auth/`, `server/authz/` | authentification (JWT, OIDC) ; permissions, rôles, tenants, portée de projet |
+| `core/api_safety.py` | chemins acceptés par l'API locale |
+| `core/offline_policy.py` | hors-ligne strict (`airgapStrict`) |
+| `core/log_redaction.py` | filtre de redaction des logs |
 
-## Détection de projet
+## Mémoire, apprentissage, autonomie
 
-**Une porte : `project/stack.py`.** Langages et frameworks (`technology_stack`,
-`frameworks` : `StackDetector` + `FrameworkDetector`), manifestes à la racine
-(`detect_project_stack`, `detect_languages` pour les overlays de sous-agents), type
-d'application (`detect_project_type`), framework HTTP (`detect_api_stack`), marqueurs
-(`detect_markers`), et les portes paresseuses vers `uiux.stack`, `mobile.stacks` et
-`test_generation.stack_aware`. Un nouveau lecteur prend une réponse existante ici
-plutôt que d'écrire un douzième détecteur. `tests/test_project_stack.py` épingle les
-réponses sur des projets fixtures.
+| Paquet | Rôle |
+|---|---|
+| `brain/` | le cerveau partagé : vault Obsidian, `graph.json`, sync git, serveur MCP `workpilot-brain` |
+| `brain/project_memory.py` | **la seule mémoire** des builds (pièges, conventions, sessions) |
+| `mem_search/` | lecture de la mémoire par paliers (index → timeline → détail) |
+| `learning_loop/` | patterns des builds, phase `observe` (`skills/_proposed/`), replay A/B |
+| `hermes/` | hermes-agent : doctor, persona `SOUL.md`, cycle d'apprentissage |
+| `core/merge_event.py` | un merge publié une fois ; mémoire, apprentissage et `uiux` s'y abonnent |
+| `core/workpilot_layout.py` | un dossier par feature sous `.workpilot/` |
+| `continuous_ai/daemon.py`, `self_healing/` | boucles autonomes avec plafond de coût ; surveillance et remédiation |
 
-## Règles
+## Préparer et vérifier un build
 
-- **Jamais `anthropic.Anthropic()` en direct.** Toujours `create_client()`.
-- **Type hints partout**, `ruff` 0.15.7 (`ruff check apps/backend/`, `ruff format --check`).
-- Les tests vivent dans `../../tests/<paquet>/` (lot L11). Il reste ici ceux de
-  Graphiti (lot L7) et `runners/github/test_context_gatherer.py` ; six modules de production portent
-  seulement le préfixe `test_` (`agents/test_generator.py`, `analysis/test_discovery.py`…).
-- **Une seule configuration pytest** : le `pytest.ini` de la racine, lancé depuis la
-  racine (CI comprise). Son `pythonpath = apps/backend . ./src` rend les imports plats
-  (`from phase_config import …`, `from agents.coder import …`).
-- **Importer le module réel, jamais un fichier de la racine qui le réexporte.**
-  Les shims de compatibilité de la racine (`debug.py`, `progress.py`,
-  `worktree.py`, `workspace.py`…) ont été retirés au lot L9 de l'audit :
-  `from core.debug import …`, `from core.worktree import …`, `from qa import …`.
-  À la racine restent des modules propres (`phase_config.py`,
-  `models_registry.py`…), des points d'entrée lancés par chemin ou par uvicorn (`run.py`,
-  `start_backend.py`, `provider_api.py`, `websocket_server.py`, `analyzer.py`,
-  `commit_message.py`…) et un réexport en sursis : `insight_extractor.py`
-  (sa cible charge `analysis/__init__.py`, qui n'est pas paresseux). Les shims Graphiti
-  sont partis avec le paquet (lot L7).
+| Paquet | Rôle |
+|---|---|
+| `project/stack.py` | **la** détection de pile (langages, frameworks, type d'app, marqueurs) |
+| `libdocs/` | docs des bibliothèques sans exemple dans le dépôt, avant le planning |
+| `docintel/` | pièces jointes : diagrammes, OCR (`engines/`), PDF, ERD, séquences, C4, tableaux, captures ; `redact.py` masque les secrets |
+| `rtk/` | sortie de commande condensée avant lecture par un modèle |
+| `watermarks/` | caractères invisibles retirés de chaque fichier généré |
+| `uiux/` | design system et règles de pile UI, seulement si la tâche touche l'interface |
+| `mobile/` | Android / Apple : piles, appareils, `readiness.py` (constructible ici ?) |
+| `verify/` | boucle `/verify` : lancer l'app, erreurs → correction, preuve |
+| `architecture_visualizer/` | carte archify du projet et delta par tâche |
+| `bounty_board/` | N modèles sur une spec, preuves mesurées, juge anonyme |
+| `vendor/archify/`, `vendor/watermarks/` | code vendorisé et épinglé (`scripts/vendor_*.py`) |
+
+## Imports et tests
+
+Imports plats depuis la racine du backend (`from phase_config import …`) ; tests dans
+`../../tests/<paquet>/`, une seule configuration (`pytest.ini` à la racine). Il reste ici
+`runners/github/test_context_gatherer.py` ; six modules de production portent seulement le
+préfixe `test_` (`agents/test_generator.py`, `analysis/test_discovery.py`…).
+
+À la racine du backend restent des modules propres (`phase_config.py`, `models_registry.py`) et des
+points d'entrée lancés par chemin ou par uvicorn (`run.py`, `start_backend.py`, `provider_api.py`,
+`analyzer.py`, `commit_message.py`) ; `insight_extractor.py` est un réexport en sursis.

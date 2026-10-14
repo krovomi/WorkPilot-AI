@@ -3,6 +3,8 @@
 `KanbanBoard.tsx` fait ~3 250 lignes, `KanbanColumn.tsx` ~1 080. **Ne pas les ouvrir en entier.** Ce fichier donne les
 points d'entrée : cibler la ligne, lire 40 lignes autour, éditer.
 
+> Règles du frontend : [`docs/rules/frontend.md`](../../../../../../docs/rules/frontend.md) · Index frontend : [`apps/frontend/AGENTS.md`](../../../../AGENTS.md)
+
 Les numéros de ligne dérivent à chaque modification. Ils indiquent un voisinage, pas une
 adresse : confirmer avec `grep -n "<nom>" KanbanBoard.tsx` avant d'éditer.
 
@@ -13,11 +15,11 @@ adresse : confirmer avec `grep -n "<nom>" KanbanBoard.tsx` avant d'éditer.
 | `../KanbanBoard.tsx` | ~3 250 | le tableau : drag-and-drop, sélection en masse, file d'attente, dialogues |
 | `KanbanColumn.tsx` | ~1 080 | une colonne : `DroppableColumn`, `WipLimitPopover`, `SortableColumnWrapper`, comparateurs mémo, `COLUMN_RENDER_CAP` (lot L11) |
 | `KanbanToolbar.tsx` | ~400 | barre d'outils au-dessus du tableau |
-| `QuickCommandBar.tsx` | ~300 | palette `/slash` — lit `.agents/skills/` via le backend |
+| `QuickCommandBar.tsx` | ~360 | palette `/slash` — lit `.agents/skills/` via le backend |
 | `../RoadmapKanbanView.tsx` | ~350 | vue roadmap, tableau distinct |
-| `../task-detail/TaskMobilePreview.tsx` | ~350 | onglet *Mobile* : plateforme, appareil, run, capture, logs |
+| `../task-detail/TaskMobilePreview.tsx` | ~430 | onglet *Mobile* : plateforme, appareil, run, capture, logs |
 | `../../stores/mobile-store.ts` | ~200 | plateforme / appareil / dernière capture sélectionnés |
-| `../../stores/task-store.ts` | ~1 300 | état des tâches (Zustand) |
+| `../../stores/task-store.ts` | ~1 850 | état des tâches (Zustand) |
 | `../../stores/kanban-settings-store.ts` | — | largeur, ordre, collapse, WIP par colonne |
 | `../../../shared/constants/task.ts` | — | `TASK_STATUS_COLUMNS`, libellés de statut |
 | `../../hooks/useKanbanAccessibility.ts` | — | annonces aria-live pour le drag-and-drop |

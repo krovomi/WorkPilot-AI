@@ -4,7 +4,7 @@
 `skills/hermes-learned/` without a person reading them first. What keeps that
 prose away from every harness is not the adopter — it is that the pack is absent
 from `.workpilot/skills.toml`, so `resolver.resolve` rejects each of its skills
-at the `pack-pin` gate (shared_docs/architecture/hermes.md). One line in
+at the `pack-pin` gate (docs/architecture/hermes.md). One line in
 `[packs]` lifts the gate for the whole pack, and that line belongs to a person,
 in a pull request that says so; it once slipped in next to the other packs.
 """
@@ -31,7 +31,7 @@ def test_the_adopted_pack_is_not_listed_in_this_repos_packs():
     assert config.packs, ".workpilot/skills.toml must keep a non-empty [packs]"
     assert ADOPTED_PACK not in config.packs, (
         f"`{ADOPTED_PACK}` is the learning loop's own output and must stay out "
-        "of [packs]; see shared_docs/architecture/hermes.md"
+        "of [packs]; see docs/architecture/hermes.md"
     )
 
 
