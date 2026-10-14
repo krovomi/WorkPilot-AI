@@ -35,6 +35,7 @@ echo.
 echo 📋 What's been set up:
 echo    • Git hooks path configured to .husky
 echo    • Pre-commit hook will run automatically before each commit
+echo    • Secret scan of staged files ^(blocks the commit^)
 echo    • Automatic ruff formatting for backend code
 echo    • Automatic ruff linting for backend code
 echo    • Frontend lint and typecheck

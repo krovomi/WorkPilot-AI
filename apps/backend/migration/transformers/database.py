@@ -367,7 +367,7 @@ class DatabaseTransformer:
         # Replace mysql2 connection with pg Pool
         code = re.sub(
             r"const\s+connection\s*=\s*mysql\.createConnection\s*\({[^}]+}\)",
-            "const pool = new Pool({\n  host: 'localhost',\n  port: 5432,\n  database: 'mydb',\n  user: 'postgres',\n  password: 'password'\n})",
+            "const pool = new Pool({\n  host: 'localhost',\n  port: 5432,\n  database: 'mydb',\n  user: 'postgres',\n  password: 'password'\n})",  # pragma: allowlist secret
             code,
         )
 
@@ -388,7 +388,7 @@ class DatabaseTransformer:
             r'user\s*=\s*[\'"][^\'"]+ [\'"],?\s*'
             r'passwd\s*=\s*[\'"][^\'"]+ [\'"],?\s*'
             r'db\s*=\s*[\'"][^\'"]+ [\'"]',
-            "host='localhost', user='postgres', password='password', database='mydb'",
+            "host='localhost', user='postgres', password='password', database='mydb'",  # pragma: allowlist secret
             code,
         )
 
