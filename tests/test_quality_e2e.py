@@ -47,10 +47,11 @@ def test_quality_scorer_self_analysis():
 def test_quality_scorer_example_bad_code():
     from review.quality_scorer import QualityScorer
 
-    example_file = Path("example_bad_code.py")
-    if not example_file.exists():
-        pytest.skip("example_bad_code.py not found")
-    scorer = QualityScorer(Path("."))
+    # The fixture moved from the repository root to tests/fixtures/
+    # (ea3c4ddb); the test kept looking in the working directory and skipped.
+    fixtures = Path(__file__).parent / "fixtures"
+    assert (fixtures / "example_bad_code.py").is_file()
+    scorer = QualityScorer(fixtures)
     score = scorer.score_pr("", ["example_bad_code.py"], "")
     assert score.critical_issues > 0
     assert score.total_issues >= 3
