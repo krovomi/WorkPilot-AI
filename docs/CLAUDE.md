@@ -44,6 +44,13 @@ declare the tool, do not lean on the settings file's blanket grants. Only `core/
 type declaring `Write`, `Edit` or `Bash`. Outside the SDK, commands, writes and MCP servers pass
 the SDK's own checks.
 
+**Secrets at rest go through `secret-storage`** — An API key or token the desktop app
+stores is encrypted with Electron `safeStorage` (`enc:` prefix) by
+`apps/frontend/src/main/secret-storage.ts`. Without an OS keyring it is written to a
+`0600` file and the UI warns — never a silent plaintext fallback. Read and write
+`settings.json` only through `settings-utils.ts` and `profiles.json` only through the
+profile managers: a module that parses the file itself gets ciphertext.
+
 **PR target** — Always target the `develop` branch for PRs to krovomi/WorkPilot-AI, NOT `main`.
 
 ## Project Structure
@@ -108,6 +115,7 @@ Why each feature is built the way it is. Read the file before changing the featu
 | Product overview | [product-overview.md](../shared_docs/architecture/product-overview.md) | The full feature list. |
 | Agent prompts | [agent-prompts.md](../shared_docs/architecture/agent-prompts.md) | Which prompt in `apps/backend/prompts/` serves which agent. |
 | Agent tool rights | [agent-tool-rights.md](../shared_docs/architecture/agent-tool-rights.md) | A declared tool list is a right on both halves: `disallowed_tools` on the SDK, the executor's gate, Codex's sandbox. |
+| Secrets at rest | [secrets-at-rest.md](../shared_docs/architecture/secrets-at-rest.md) | `safeStorage` encryption of stored keys and tokens, the no-keyring warning, migration, log redaction. |
 | Spec pipeline | [spec-pipeline.md](../shared_docs/architecture/spec-pipeline.md) | Plan recovery, `FR-###` traceability and `[NEEDS CLARIFICATION]`, spec-kit constitutions. Reshaping a plan never invents a description. |
 | Skills | [skills.md](../shared_docs/architecture/skills.md) | `skills/` is the source and `scripts/skills_cli.py` the only writer; frontmatter is read only through `skills_registry.frontmatter.parse_frontmatter`. |
 | hermes-agent | [hermes.md](../shared_docs/architecture/hermes.md) | Ingest, triage and adoption of hermes-authored skills, and `SOUL.md`. Nothing grants trust on someone's behalf. |

@@ -49,12 +49,11 @@ import {
 } from "../cli-tool-manager";
 import { credentialManager } from "../services/credential-manager";
 import { openExternalUrl } from "../open-external";
-import { getSettingsPath, readSettingsFile } from "../settings-utils";
+import { readSettingsFile, writeSettingsFile } from "../settings-utils";
 import { testGenerationService } from "../test-generation-service";
 import { parseEnvFile } from "./utils";
 import { getCurrentOS } from "../platform";
 
-const settingsPath = getSettingsPath();
 
 /**
  * Get fallback spell check languages when preferred languages are not available
@@ -561,11 +560,7 @@ export function registerSettingsHandlers(
 			// Persist migration changes
 			if (needsSave) {
 				try {
-					writeFileSync(
-						settingsPath,
-						JSON.stringify(settings, null, 2),
-						"utf-8",
-					);
+					writeSettingsFile(settings);
 				} catch (error) {
 					console.error("[SETTINGS_GET] Failed to persist migration:", error);
 					// Continue anyway - settings will be migrated in-memory for this session
@@ -611,11 +606,7 @@ export function registerSettingsHandlers(
 					}
 				}
 
-				writeFileSync(
-					settingsPath,
-					JSON.stringify(newSettings, null, 2),
-					"utf-8",
-				);
+				writeSettingsFile(newSettings);
 
 				// Apply Python path if changed
 				if (settings.pythonPath || settings.autoBuildPath) {

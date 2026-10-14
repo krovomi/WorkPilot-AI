@@ -151,6 +151,7 @@ import { PromptOptimizerDialog } from "./prompt-optimizer/PromptOptimizerDialog"
 import { RateLimitIndicator } from "./RateLimitIndicator";
 import { SmartEstimationDialog } from "./smart-estimation/SmartEstimationDialog";
 import { TestGenerationDialog } from "./test-generation/TestGenerationDialog";
+import { SecureStorageBanner } from "./SecureStorageBanner";
 import { UpdateBanner } from "./UpdateBanner";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui";
 // UI
@@ -2392,6 +2393,9 @@ export function Sidebar({
 
 				{/* Update Banner - shows when app update is available */}
 				<UpdateBanner />
+
+				{/* API keys stored without the OS keyring (rule S1) */}
+				<SecureStorageBanner />
 
 				{/* Bottom section with CLI/Settings collapsible panel and New Task */}
 				<div
