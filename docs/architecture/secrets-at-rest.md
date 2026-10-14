@@ -128,8 +128,29 @@ is never handed to an MCP server or a webhook as if it were the secret.
 encrypted). The two do not meet: `auth.py` reads environment variables, and
 the main process never passes a value it could not decrypt.
 
-## Not covered here
+### What the renderer sees
 
-The project-root `.env` that the CI/CD triggers and cross-language
-translation screens write (`CICD_*_TOKEN`) is still plaintext and is not under
-`.workpilot/`. `ENV_GET` returns the project tokens to the renderer unmasked.
+The renderer is not trusted (rule S6 of
+[`docs/rules/security.md`](../rules/security.md)), so `ENV_GET` never hands it
+a project token. Each secret field that is set (`PROJECT_ENV_SECRET_FIELDS` in
+`env-handlers.ts`, plus `mcpServers.context7ApiKey`) reads as `MASKED_SECRET`
+(`shared/constants/secrets.ts`), which is enough to tell "configured" from
+"not configured". The global Claude token or OpenAI key a project falls back
+to is masked the same way.
+
+The settings screens save the whole config on every edit, so the mask comes
+back. `ENV_UPDATE` treats it as "keep the stored value"
+(`unmaskProjectEnvUpdate`). Text typed after the mask is the new value, since
+the mask's character never occurs in a token or a URL. That also stops a
+whole-config save from copying the global Claude token into the project file.
+
+Two screens used to send the value itself somewhere, and now let the main
+process read it:
+
+- The Jira connection test passes `projectId`. A masked or empty token means
+  the project's stored token, and without a project the test is refused.
+- The notification webhook test goes through
+  `env:testNotificationWebhook(projectId, channel, url?)`. The main process
+  takes the stored URL for that channel (closed list) unless a new one was
+  typed, and has the backend post it. Before, the renderer did that fetch
+  itself.

@@ -21,6 +21,11 @@ export const integrationMock = {
 		success: true,
 	}),
 
+	testNotificationWebhook: async () => ({
+		success: true,
+		data: { delivered: true },
+	}),
+
 	// WorkPilot AI Source Environment Operations
 	getSourceEnv: async () => ({
 		success: true,

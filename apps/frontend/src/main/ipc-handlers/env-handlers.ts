@@ -1,5 +1,10 @@
 import { spawn } from "node:child_process";
-import { DEFAULT_APP_SETTINGS, IPC_CHANNELS } from "../../shared/constants";
+import {
+	DEFAULT_APP_SETTINGS,
+	IPC_CHANNELS,
+	MASKED_SECRET,
+	MASKED_SECRET_CHAR,
+} from "../../shared/constants";
 import type {
 	AppSettings,
 	ClaudeAuthResult,
@@ -17,10 +22,12 @@ import {
 	getProjectEnvPath,
 	readProjectEnv,
 	readProjectEnvContent,
+	readProjectEnvFor,
 	writeProjectEnv,
 } from "../project-env-file";
 import { projectStore } from "../project-store";
 import { readSettingsFile } from "../settings-utils";
+import { backendFetch } from "./_backend-fetch";
 import { parseEnvFile } from "./utils";
 
 // GitLab environment variable keys
@@ -94,6 +101,85 @@ const CICD_ENV_KEYS = {
 	JENKINS_USER: "CICD_JENKINS_USER",
 	JENKINS_TOKEN: "CICD_JENKINS_TOKEN",
 } as const;
+
+/**
+ * The `ProjectEnvConfig` fields that hold a secret. ENV_GET never hands their
+ * value to the renderer (rule S6): a set one reads as MASKED_SECRET.
+ */
+export const PROJECT_ENV_SECRET_FIELDS = [
+	"claudeOAuthToken",
+	"linearApiKey",
+	"githubToken",
+	"gitlabToken",
+	"azureDevOpsPat",
+	"jiraApiToken",
+	"cicdJenkinsToken",
+	"openaiApiKey",
+	"teamsWebhookUrl",
+	"slackWebhookUrl",
+	"discordWebhookUrl",
+	"googleChatWebhookUrl",
+	"notifyWebhookUrl",
+] as const satisfies readonly (keyof ProjectEnvConfig)[];
+
+/** `config` as the renderer may see it: every set secret replaced by the mask. */
+export function maskProjectEnvSecrets(
+	config: ProjectEnvConfig,
+): ProjectEnvConfig {
+	const masked: ProjectEnvConfig = { ...config };
+	for (const field of PROJECT_ENV_SECRET_FIELDS) {
+		if (masked[field]) masked[field] = MASKED_SECRET;
+	}
+	if (masked.mcpServers?.context7ApiKey) {
+		masked.mcpServers = {
+			...masked.mcpServers,
+			context7ApiKey: MASKED_SECRET,
+		};
+	}
+	return masked;
+}
+
+/**
+ * What a secret sent back by the renderer means: undefined (keep the stored
+ * value) for the mask, or the text typed after or around it.
+ */
+function unmaskSecret(value: string | undefined): string | undefined {
+	if (typeof value !== "string" || !value.includes(MASKED_SECRET_CHAR)) {
+		return value;
+	}
+	const typed = value.replaceAll(MASKED_SECRET_CHAR, "");
+	return typed === "" ? undefined : typed;
+}
+
+/** `config` from the renderer with masked secrets dropped, so they keep their stored value. */
+export function unmaskProjectEnvUpdate(
+	config: Partial<ProjectEnvConfig>,
+): Partial<ProjectEnvConfig> {
+	const result: Partial<ProjectEnvConfig> = { ...config };
+	for (const field of PROJECT_ENV_SECRET_FIELDS) {
+		if (!(field in result)) continue;
+		const value = unmaskSecret(result[field]);
+		if (value === undefined) delete result[field];
+		else result[field] = value;
+	}
+	if (result.mcpServers && "context7ApiKey" in result.mcpServers) {
+		const mcpServers = { ...result.mcpServers };
+		const value = unmaskSecret(mcpServers.context7ApiKey);
+		if (value === undefined) delete mcpServers.context7ApiKey;
+		else mcpServers.context7ApiKey = value;
+		result.mcpServers = mcpServers;
+	}
+	return result;
+}
+
+/** Notification channel (as the backend names it) → the `.workpilot/.env` key of its webhook URL. */
+const NOTIFICATION_WEBHOOK_KEYS: Readonly<Record<string, string>> = {
+	teams: TEAMS_ENV_KEYS.WEBHOOK_URL,
+	slack: SLACK_ENV_KEYS.WEBHOOK_URL,
+	discord: DISCORD_ENV_KEYS.WEBHOOK_URL,
+	google_chat: GOOGLE_CHAT_ENV_KEYS.WEBHOOK_URL,
+	webhook: NOTIFY_WEBHOOK_ENV_KEYS.WEBHOOK_URL,
+};
 
 /**
  * Helper to generate .env line (DRY)
@@ -999,7 +1085,8 @@ ${existingVars.OLLAMA_BASE_URL ? `OLLAMA_BASE_URL=${existingVars.OLLAMA_BASE_URL
 				}
 			}
 
-			return { success: true, data: config };
+			// Secrets stay in the main process: the renderer learns which are set.
+			return { success: true, data: maskProjectEnvSecrets(config) };
 		},
 	);
 
@@ -1031,8 +1118,12 @@ ${existingVars.OLLAMA_BASE_URL ? `OLLAMA_BASE_URL=${existingVars.OLLAMA_BASE_URL
 				// Existing content, secrets decrypted (undefined when the file doesn't exist yet)
 				const existingContent = readProjectEnvContent(envPath);
 
-				// Generate new content
-				const newContent = generateEnvContent(config, existingContent);
+				// Generate new content. A secret sent back as the mask ENV_GET
+				// showed keeps its stored value.
+				const newContent = generateEnvContent(
+					unmaskProjectEnvUpdate(config),
+					existingContent,
+				);
 
 				// Secrets encrypted (or 0600 + banner without a keyring), parent
 				// directory created, and .workpilot/ kept out of git.
@@ -1049,6 +1140,49 @@ ${existingVars.OLLAMA_BASE_URL ? `OLLAMA_BASE_URL=${existingVars.OLLAMA_BASE_URL
 							: "Failed to update .env file",
 				};
 			}
+		},
+	);
+
+	/**
+	 * Send a test message to a notification channel. The URL is the one stored
+	 * in the project's `.workpilot/.env`: the renderer only holds the mask. A
+	 * URL the renderer passes is used only when it is a new one (not the mask).
+	 * The backend validates it and posts it (a renderer fetch would hit CORS).
+	 */
+	ipcMain.handle(
+		IPC_CHANNELS.ENV_TEST_NOTIFICATION_WEBHOOK,
+		async (
+			_,
+			projectId: unknown,
+			channel: unknown,
+			url?: unknown,
+		): Promise<IPCResult<{ delivered: boolean }>> => {
+			const project =
+				typeof projectId === "string"
+					? projectStore.getProject(projectId)
+					: undefined;
+			if (!project) return { success: false, error: "Project not found" };
+			const key =
+				typeof channel === "string"
+					? NOTIFICATION_WEBHOOK_KEYS[channel]
+					: undefined;
+			if (!key) return { success: false, error: "Unknown channel" };
+
+			const typed =
+				typeof url === "string" ? unmaskSecret(url.trim()) : undefined;
+			const webhookUrl =
+				typed ||
+				readProjectEnvFor(project.path, project.autoBuildPath)[key] ||
+				"";
+			if (!webhookUrl) return { success: false, error: "No webhook URL" };
+
+			const result = await backendFetch<{ success?: boolean; error?: string }>(
+				"/api/notifications/test",
+				// backendFetch sets the JSON content type (and auth in server mode).
+				{ method: "POST", body: JSON.stringify({ channel, url: webhookUrl }) },
+			);
+			if (!result.success) return { success: false, error: result.error };
+			return { success: true, data: { delivered: true } };
 		},
 	);
 
