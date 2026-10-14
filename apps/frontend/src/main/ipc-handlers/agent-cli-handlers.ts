@@ -18,7 +18,12 @@ import {
 	isAgentCliTool,
 } from "../../shared/types/agent-cli";
 import { getAugmentedEnv } from "../env-utils";
-import { findExecutable, getPathDelimiter, requiresShell } from "../platform";
+import {
+	findExecutable,
+	getPathDelimiter,
+	isSecurePath,
+	requiresShell,
+} from "../platform";
 
 const execFileAsync = promisify(execFile);
 
@@ -35,22 +40,20 @@ async function readVersion(
 	executable: string,
 	env: Record<string, string>,
 ): Promise<string | undefined> {
-	const options = {
-		encoding: "utf-8" as const,
-		timeout: 5000,
-		windowsHide: true,
-		env,
-	};
+	// A `.cmd` launcher (npm global install on Windows) only runs through
+	// cmd.exe, and a command line built for cmd.exe from a PATH entry is a
+	// command line nobody controls. Finding it is enough to say "installed";
+	// its version stays unknown rather than paid for with a shell.
+	if (requiresShell(executable) || !isSecurePath(executable)) {
+		return undefined;
+	}
 	try {
-		// A `.cmd` launcher (npm global install on Windows) needs cmd.exe. The
-		// path comes from our own PATH search, never from the renderer.
-		const result = requiresShell(executable)
-			? await execFileAsync(
-					env.ComSpec || process.env.ComSpec || "cmd.exe",
-					["/d", "/s", "/c", `""${executable}" --version"`],
-					options,
-				)
-			: await execFileAsync(executable, ["--version"], options);
+		const result = await execFileAsync(executable, ["--version"], {
+			encoding: "utf-8",
+			timeout: 5000,
+			windowsHide: true,
+			env,
+		});
 		return extractAgentCliVersion(`${result.stdout}\n${result.stderr}`);
 	} catch {
 		return undefined;

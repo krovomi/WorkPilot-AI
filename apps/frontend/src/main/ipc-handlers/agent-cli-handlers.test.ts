@@ -5,7 +5,13 @@ vi.mock("../platform", async (importOriginal) => ({
 	...(await importOriginal<typeof import("../platform")>()),
 	findExecutable: vi.fn(() => null),
 }));
+vi.mock("node:child_process", async (importOriginal) => ({
+	...(await importOriginal<typeof import("node:child_process")>()),
+	execFile: vi.fn(),
+}));
 
+import { execFile } from "node:child_process";
+import { findExecutable } from "../platform";
 import { checkAgentCli, extractAgentCliVersion } from "./agent-cli-handlers";
 
 describe("agent CLI handlers", () => {
@@ -26,5 +32,18 @@ describe("agent CLI handlers", () => {
 	it("reports a CLI that is not on PATH as not installed", async () => {
 		const result = await checkAgentCli("antigravity");
 		expect(result).toEqual({ tool: "antigravity", installed: false });
+	});
+
+	it("never runs a .cmd launcher through a shell", async () => {
+		vi.mocked(findExecutable).mockReturnValueOnce(
+			"C:\\Users\\me\\AppData\\Roaming\\npm\\opencode.cmd",
+		);
+		const result = await checkAgentCli("opencode");
+		expect(result).toEqual({
+			tool: "opencode",
+			installed: true,
+			version: undefined,
+		});
+		expect(execFile).not.toHaveBeenCalled();
 	});
 });
