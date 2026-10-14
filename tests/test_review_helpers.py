@@ -202,10 +202,6 @@ class TestReviewMenuOptions:
 
         assert len(options) == 5
 
-    @pytest.mark.xfail(
-        reason="Test isolation issue: review module mocked by test_spec_pipeline.py persists due to Python import caching. Passes when run individually.",
-        strict=False,
-    )
     def test_get_review_menu_options_keys(self) -> None:
         """get_review_menu_options() has correct keys."""
         options = get_review_menu_options()

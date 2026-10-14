@@ -214,7 +214,9 @@ it("names the paused task and takes its model from the official library", async 
 	expect(screen.queryByRole("textbox", { name: "Model ID" })).toBeNull();
 
 	// Flush provider loading before advancing the library search debounce.
-	await act(async () => {});
+	await act(async () => {
+		/* intentionally empty - act() flushes the pending provider promises */
+	});
 	await act(async () => {
 		await vi.advanceTimersByTimeAsync(250);
 	});
