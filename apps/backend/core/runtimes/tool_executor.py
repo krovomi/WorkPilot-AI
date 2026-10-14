@@ -9,6 +9,7 @@ import asyncio
 import fnmatch
 import json
 import logging
+import math
 import os
 import re
 import signal
@@ -117,6 +118,45 @@ _SEARCH_MAX_RESULTS = 200
 _SEARCH_LINE_CHARS = 300
 
 
+_DEFAULT_COMMAND_TIMEOUT = 120.0
+#: Below this a shell command is killed before it can do anything.
+_MIN_COMMAND_TIMEOUT = 1.0
+
+
+def _command_timeout() -> float:
+    """Seconds a shell command may run (env: ``LOCAL_COMMAND_TIMEOUT``).
+
+    Never raises: the agent clients build the executor inside a ``try`` and
+    fall back to text-only mode on any error, so a typo here used to leave the
+    agent with no tools at all. Unset or empty is the default; anything that
+    is not a finite number is the default with a warning; a value below
+    ``_MIN_COMMAND_TIMEOUT`` (``0`` or negative included) is raised to it.
+    """
+    raw = os.environ.get("LOCAL_COMMAND_TIMEOUT")
+    if not raw or not raw.strip():
+        return _DEFAULT_COMMAND_TIMEOUT
+    try:
+        value = float(raw)
+    except ValueError:
+        value = math.nan
+    if not math.isfinite(value):
+        logger.warning(
+            "Invalid LOCAL_COMMAND_TIMEOUT=%r — using %gs",
+            raw,
+            _DEFAULT_COMMAND_TIMEOUT,
+        )
+        return _DEFAULT_COMMAND_TIMEOUT
+    if value < _MIN_COMMAND_TIMEOUT:
+        logger.warning(
+            "LOCAL_COMMAND_TIMEOUT=%r is below %gs — using %gs",
+            raw,
+            _MIN_COMMAND_TIMEOUT,
+            _MIN_COMMAND_TIMEOUT,
+        )
+        return _MIN_COMMAND_TIMEOUT
+    return value
+
+
 def _glob_matches(relative: str, pattern: str) -> bool:
     """`fnmatch` on a posix relative path, where `**/x` also names a root `x`."""
     name = relative.rsplit("/", 1)[-1]
@@ -138,7 +178,7 @@ class ToolExecutor:
         spec_dir: str | Path | None = None,
         agent_type: str | None = None,
     ):
-        self.command_timeout = float(os.environ.get("LOCAL_COMMAND_TIMEOUT", "120"))
+        self.command_timeout = _command_timeout()
         # Whose rights `execute` enforces. ``None`` keeps the executor
         # permissive, which is what a bare `ToolExecutor(project_dir)` — the
         # terminal, the tests — has always been.
