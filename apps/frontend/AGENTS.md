@@ -57,9 +57,11 @@ c'est une discipline, pas un garde-fou.
 | Échappement shell | `src/shared/utils/shell-escape.ts` | — |
 | Chemins dans un worktree | `src/main/worktree-paths.ts` (`isPathWithinBase`) | — |
 | CSP du renderer | `src/renderer/index.html` | — |
+| Passthrough IPC générique : liste fermée de canaux | `src/preload/api/modules/generic-ipc-api.ts` | `generic-ipc-allowlist.test.ts` |
 
-Le preload expose encore un passthrough générique (`src/preload/api/modules/generic-ipc-api.ts`) :
-historique, à ne pas étendre ni réutiliser pour un nouveau canal.
+Le passthrough générique (`invoke` / `send` / `on`) ne transmet que les canaux de ses listes et
+refuse les autres. Historique : une feature migrée vers un module typé retire ses entrées ; un
+nouveau canal n'y entre jamais.
 
 ## Tests
 

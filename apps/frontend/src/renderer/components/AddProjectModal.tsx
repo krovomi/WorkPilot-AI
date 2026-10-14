@@ -225,10 +225,7 @@ export function AddProjectModal({
 		const gitConfigPath = `${projectPath}/.git/config`;
 
 		try {
-			const result = await globalThis.electronAPI.invoke(
-				"fileExplorer:read",
-				gitConfigPath,
-			);
+			const result = await globalThis.electronAPI.readFile(gitConfigPath);
 
 			if (result.success && result.data) {
 				const configContent = result.data;

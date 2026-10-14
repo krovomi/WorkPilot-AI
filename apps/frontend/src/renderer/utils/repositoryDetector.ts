@@ -25,10 +25,7 @@ export async function detectRepositoryProvider(
 		const gitConfigPath = `${projectPath}/.git/config`;
 
 		try {
-			const result = await window.electronAPI.invoke(
-				"fileExplorer:read",
-				gitConfigPath,
-			);
+			const result = await window.electronAPI.readFile(gitConfigPath);
 			if (result.success && result.data) {
 				const configContent = result.data;
 

@@ -34,9 +34,6 @@ declare global {
 				error?: string;
 			}>;
 
-			// Generic invoke method
-			invoke: (channel: string, ...args: unknown[]) => Promise<unknown>;
-
 			// Self-Healing API
 			selfHealing: {
 				getDashboard(
