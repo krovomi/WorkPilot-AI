@@ -31,7 +31,7 @@ description: 'Conventions backend Python WorkPilot AI : FastAPI, agents multi-LL
 ## Tests
 
 - Dans `tests/<paquet>/` ; un seul `pytest.ini`, à la racine : `pytest tests/ -v` depuis la racine.
-- `conftest.py` à la racine pour les fixtures partagées.
+- `tests/conftest.py` pour les fixtures partagées.
 - Mocker les LLM via les fixtures existantes (pas d'appel réseau).
 
 ## Token-saving
