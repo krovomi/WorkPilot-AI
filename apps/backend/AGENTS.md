@@ -92,9 +92,9 @@ Toute interaction LLM passe par ces fichiers ; les modifier touche tout le produ
 ## Imports et tests
 
 Imports plats depuis la racine du backend (`from phase_config import …`) ; tests dans
-`../../tests/<paquet>/`, une seule configuration (`pytest.ini` à la racine). Il reste ici
-`runners/github/test_context_gatherer.py` ; six modules de production portent seulement le
-préfixe `test_` (`agents/test_generator.py`, `analysis/test_discovery.py`…).
+`../../tests/<paquet>/`, une seule configuration (`pytest.ini` à la racine, `testpaths = tests`) ;
+aucun test ne vit ici. Six modules de production portent seulement le préfixe `test_`
+(`agents/test_generator.py`, `analysis/test_discovery.py`…) : pytest ne les collecte pas.
 
 À la racine du backend restent des modules propres (`phase_config.py`, `models_registry.py`) et des
 points d'entrée lancés par chemin ou par uvicorn (`run.py`, `start_backend.py`, `provider_api.py`,
