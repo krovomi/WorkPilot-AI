@@ -391,3 +391,217 @@ SECRET=changeme
         # .example files should be skipped by default
         matches = scan_files([".env.example"], temp_dir)
         assert len(matches) == 0
+
+
+# A fake key, built at runtime so no key-shaped literal sits in the source.
+FAKE_KEY = "sk-" + "0a1b2c3d4e" * 3
+
+
+class TestPatternPrecision:
+    """Shapes that used to match although they are no secret, and their neighbours that are."""
+
+    def test_hex_digest_is_not_base64(self):
+        """A quoted SHA-256 (lockfile, vendor manifest) is a digest, not base64."""
+        content = '"contentSha256": "' + "0123456789abcdef" * 4 + '",'
+        assert scan_content(content, "skills-lock.json") == []
+
+    def test_base64_blob_is_still_flagged(self):
+        import base64
+
+        blob = base64.b64encode(bytes(range(48))).decode()
+        matches = scan_content(f'data = "{blob}"', "config.py")
+        assert any(m.pattern_name == "Potential base64-encoded secret" for m in matches)
+
+    def test_twilio_shape_inside_a_digest_is_not_flagged(self):
+        digest = "8496cd" + "ac" + "0123456789abcdef" * 2 + "b60f4dea"
+        assert scan_content(f"sha: {digest}", "VENDOR.json") == []
+
+    def test_twilio_sid_is_flagged(self):
+        sid = "AC" + "0123456789abcdef" * 2
+        matches = scan_content(f"account = {sid}", "config.py")
+        assert any(m.pattern_name == "Twilio Account SID" for m in matches)
+
+    def test_pass_inside_a_word_is_not_a_password(self):
+        matches = scan_content('INTERFACE_BYPASS = "interface_bypass"', "x.py")
+        assert matches == []
+
+    @pytest.mark.parametrize(
+        "name", ["db_pass", "DB_PASS", "dbPass", "dbPassword", "adminPassword"]
+    )
+    def test_pass_variable_is_still_a_password(self, name: str):
+        matches = scan_content(f'{name} = "correct-horse-battery"', "x.py")
+        assert any(m.pattern_name == "Password assignment" for m in matches)
+
+    def test_named_hex_secret_is_flagged_although_digests_are_not(self):
+        matches = scan_content(
+            '"jwtSecret": "' + "0123456789abcdef" * 4 + '"', "a.json"
+        )
+        assert any(m.pattern_name == "Hex-encoded secret" for m in matches)
+
+    def test_allowlist_pragma_silences_its_line_only(self):
+        content = (
+            f'KEY = "{FAKE_KEY}"  # pragma: allowlist secret\nOTHER = "{FAKE_KEY}"\n'
+        )
+        matches = scan_content(content, "x.py")
+        assert matches and {m.line_number for m in matches} == {2}
+
+
+class TestStagedScan:
+    """`--staged-only` scans what the commit holds: the index, not the working tree."""
+
+    def _scan(self, repo: Path) -> list[SecretMatch]:
+        return scan_files(get_staged_files(), repo, staged=True)
+
+    def test_secret_in_the_index_is_found_after_the_file_was_cleaned(
+        self, temp_git_repo: Path, stage_files, monkeypatch
+    ):
+        monkeypatch.chdir(temp_git_repo)
+        stage_files({"config.py": f'API_KEY = "{FAKE_KEY}"\n'})
+        (temp_git_repo / "config.py").write_text("API_KEY = None\n", encoding="utf-8")
+
+        assert {m.file_path for m in self._scan(temp_git_repo)} == {"config.py"}
+
+    def test_unstaged_secret_is_not_reported(
+        self, temp_git_repo: Path, stage_files, monkeypatch
+    ):
+        monkeypatch.chdir(temp_git_repo)
+        stage_files({"config.py": "API_KEY = None\n"})
+        (temp_git_repo / "config.py").write_text(
+            f'API_KEY = "{FAKE_KEY}"\n', encoding="utf-8"
+        )
+
+        assert self._scan(temp_git_repo) == []
+
+    def test_renamed_and_edited_file_is_scanned(
+        self, temp_git_repo: Path, stage_files, monkeypatch
+    ):
+        import subprocess
+
+        monkeypatch.chdir(temp_git_repo)
+        body = "".join(f"x{i} = {i}\n" for i in range(20))
+        stage_files({"a.py": body})
+        subprocess.run(["git", "commit", "-qm", "a"], check=True, capture_output=True)
+        subprocess.run(["git", "mv", "a.py", "b.py"], check=True, capture_output=True)
+        # Similar enough that git reports a rename (R), not a delete and an add.
+        stage_files({"b.py": body + f'API_KEY = "{FAKE_KEY}"\n'})
+
+        assert {m.file_path for m in self._scan(temp_git_repo)} == {"b.py"}
+
+    def test_non_ascii_path_is_scanned(
+        self, temp_git_repo: Path, stage_files, monkeypatch
+    ):
+        monkeypatch.chdir(temp_git_repo)
+        stage_files({"paramètres.py": f'API_KEY = "{FAKE_KEY}"\n'})
+
+        assert {m.file_path for m in self._scan(temp_git_repo)} == {"paramètres.py"}
+
+
+def _shell_hooks_runnable() -> bool:
+    import shutil
+
+    from core.platform import is_windows
+
+    return not is_windows() and bool(shutil.which("sh") and shutil.which("node"))
+
+
+@pytest.mark.skipif(
+    not _shell_hooks_runnable(), reason="needs sh and node, on a POSIX host"
+)
+class TestPreCommitHook:
+    """`.husky/pre-commit` blocks a commit carrying a secret and lets a clean one through."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    COPIED = (
+        ".husky/pre-commit",
+        "apps/backend/security/scan_secrets.py",
+        "scripts/staged-tests.js",
+        "scripts/lib/test-selection.js",
+    )
+
+    @pytest.fixture
+    def repo(self, temp_git_repo: Path, tmp_path: Path):
+        import os
+        import shutil
+        import sys
+
+        for rel in self.COPIED:
+            target = temp_git_repo / rel
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(self.ROOT / rel, target)
+        venv_python = temp_git_repo / "apps/backend/.venv/bin/python"
+        venv_python.parent.mkdir(parents=True)
+        venv_python.symlink_to(sys.executable)
+        self.env = {
+            **os.environ,
+            "HOME": str(tmp_path),
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "PRE_COMMIT_SKIP_TESTS": "1",
+        }
+        return temp_git_repo
+
+    def _commit(self, repo: Path, files: dict[str, str], env: dict | None = None):
+        import subprocess
+
+        for name, content in files.items():
+            (repo / name).parent.mkdir(parents=True, exist_ok=True)
+            (repo / name).write_text(content, encoding="utf-8")
+            subprocess.run(["git", "add", name], cwd=repo, check=True)
+        head = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=repo, capture_output=True, text=True
+        ).stdout
+        result = subprocess.run(
+            ["git", "-c", "core.hooksPath=.husky", "commit", "-m", "chore: x"],
+            cwd=repo,
+            env=env or self.env,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
+        moved = (
+            subprocess.run(
+                ["git", "rev-parse", "HEAD"], cwd=repo, capture_output=True, text=True
+            ).stdout
+            != head
+        )
+        return result, moved
+
+    def test_blocks_a_secret_in_a_file_nothing_lints(self, repo: Path):
+        result, committed = self._commit(repo, {"settings.yaml": f"key: {FAKE_KEY}\n"})
+
+        assert not committed
+        assert "Commit bloqué : secret potentiel" in result.stderr
+
+    def test_blocks_a_secret_in_a_linted_python_file(self, repo: Path):
+        result, committed = self._commit(
+            repo, {"apps/backend/settings.py": f'API_KEY = "{FAKE_KEY}"\n'}
+        )
+
+        assert not committed
+        assert "Commit bloqué : secret potentiel" in result.stderr
+
+    def test_lets_a_clean_commit_through(self, repo: Path):
+        result, committed = self._commit(repo, {"settings.yaml": "key: null\n"})
+
+        assert committed, result.stderr
+
+    def test_missing_python_warns_without_blocking(self, repo: Path, tmp_path: Path):
+        import shutil
+
+        (repo / "apps/backend/.venv/bin/python").unlink()
+        # A PATH with git and grep, and no Python.
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+        for tool in ("git", "grep"):
+            wrapper = bin_dir / tool
+            wrapper.write_text(
+                f'#!/bin/sh\nexec "{shutil.which(tool)}" "$@"\n', encoding="utf-8"
+            )
+            wrapper.chmod(0o755)
+        env = {**self.env, "PATH": str(bin_dir)}
+
+        result, committed = self._commit(
+            repo, {"settings.yaml": f"key: {FAKE_KEY}\n"}, env=env
+        )
+
+        assert committed, result.stderr
+        assert "Python 3.10+ introuvable" in result.stderr

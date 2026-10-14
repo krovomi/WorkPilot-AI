@@ -642,7 +642,7 @@ Les hooks sont volontairement **rapides**. La CI (`ci.yml`, `lint.yml`) rejoue l
 
 | Étage | Ce qui tourne | Budget |
 |-------|---------------|--------|
-| `pre-commit` | ruff + biome **sur les fichiers stagés uniquement**, puis les tests liés à ces fichiers | quelques secondes |
+| `pre-commit` | ruff + biome **sur les fichiers stagés uniquement**, scan des secrets (bloquant), puis les tests liés à ces fichiers | quelques secondes |
 | `pre-push` | ruff check, ruff format --check, biome lint | < 30 s |
 | CI | pytest, typecheck, vitest, build — sur 3 OS | — |
 

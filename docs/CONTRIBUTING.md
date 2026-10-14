@@ -229,7 +229,7 @@ Python package. `pnpm install` at the root runs `prepare`, which points git at t
 
 | Hook | What runs | Escape hatch |
 |------|-----------|--------------|
-| `pre-commit` | On **staged files only**: `ruff format` + `ruff check --fix` (Python), `biome check --write` (frontend), re-stage, then `scripts/staged-tests.js` | `PRE_COMMIT_SKIP_TESTS=1` skips the tests, not the formatters |
+| `pre-commit` | On **staged files only**: `ruff format` + `ruff check --fix` (Python), `biome check --write` (frontend), re-stage, secret scan (blocks the commit), then `scripts/staged-tests.js` | `PRE_COMMIT_SKIP_TESTS=1` skips the tests, not the formatters or the secret scan |
 | `commit-msg` | Conventional Commits: `type(scope)!?: description`, first line ≤ 100 characters | — |
 | `pre-push` | `scripts/pre-push.js`: ruff check + format check, `skills_cli build --check`, Biome lint | `PRE_PUSH_FULL=1` adds pytest, `tsc` and vitest; `PRE_PUSH_SKIP=1` skips everything |
 
@@ -237,9 +237,13 @@ The tool versions are pinned (ruff `0.15.7`, Biome `2.5.11`): any other version 
 CI rejects. `git commit --no-verify` exists, but CI runs the same checks — it only moves the
 failure later.
 
-**No hook scans for secrets.** Do not count on one: keep credentials in `.env-files/*.env`
-(git-ignored) and read [docs/rules/security.md](rules/security.md) before touching anything
-that handles them.
+**`pre-commit` scans every staged file for secrets**, whatever its type
+(`apps/backend/security/scan_secrets.py --staged-only`, which reads the index), and blocks the
+commit on a match; without Python 3.10+ it warns and lets the commit through. CI does not repeat
+the scan, so `--no-verify` lets a secret in. A false positive takes `# pragma: allowlist secret`
+at the end of its line; `.secretsignore` (path regexes, at the root) only excludes tests. Keep
+credentials in `.env-files/*.env` (git-ignored) and read [docs/rules/security.md](rules/security.md)
+before touching anything that handles them.
 
 ## Code Style
 
