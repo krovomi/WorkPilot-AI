@@ -39,6 +39,7 @@ const envConfig = {
 function renderJira() {
 	return render(
 		<JiraIntegration
+			projectId="p1"
 			envConfig={envConfig}
 			updateEnvConfig={vi.fn()}
 			showJiraToken={false}
@@ -75,7 +76,10 @@ describe("Jira connection test", () => {
 		clickTestConnection();
 
 		await waitFor(() => expect(testJiraConnection).toHaveBeenCalledTimes(1));
+		// projectId lets the main process use the stored token: the field
+		// holds the mask ENV_GET hands the renderer.
 		expect(testJiraConnection).toHaveBeenCalledWith({
+			projectId: "p1",
 			instanceUrl: "https://example.atlassian.net",
 			email: "someone@example.com",
 			apiToken: "a-token",

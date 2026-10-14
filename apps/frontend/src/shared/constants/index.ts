@@ -24,6 +24,8 @@ export * from "./models";
 export * from "./phase-protocol";
 // Roadmap constants
 export * from "./roadmap";
+
+export * from "./secrets";
 // Spell check configuration
 export * from "./spellcheck";
 // Task-related constants

@@ -28,6 +28,8 @@ export interface JiraAPI {
 		issueKey: string,
 	) => Promise<IPCResult<ImageAttachment[]>>;
 	testJiraConnection: (config: {
+		/** Lets the main process use the stored token when `apiToken` is the mask. */
+		projectId?: string;
 		instanceUrl: string;
 		email: string;
 		apiToken: string;
@@ -62,6 +64,8 @@ export const createJiraAPI = (): JiraAPI => ({
 		invokeIpc(IPC_CHANNELS.JIRA_GET_ATTACHMENTS, projectId, issueKey),
 
 	testJiraConnection: (config: {
+		/** Lets the main process use the stored token when `apiToken` is the mask. */
+		projectId?: string;
 		instanceUrl: string;
 		email: string;
 		apiToken: string;
