@@ -1885,7 +1885,8 @@
 			"tooltip": "{{used}} / {{window}} tokens · {{source}}",
 			"thresholdTooltip": "Threshold {{value}}% · mode {{mode}}",
 			"phase": "Phase: {{phase}}",
-			"open": "Context memory settings"
+			"open": "Context memory settings",
+			"notMeasured": "Not measured yet: the gauge fills as soon as the first agent session starts."
 		},
 		"handoff": {
 			"preparing": "Handoff…",
