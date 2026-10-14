@@ -8,6 +8,7 @@ historical behavior (no auth, no DB).
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from importlib import import_module
 
@@ -71,8 +72,17 @@ CLIENT_PATH_PARAMS = frozenset(
         "outputPath",
         "target_path",
         "targetPath",
+        # The i18n scaler reads and rewrites the locale files under this
+        # directory (`/api/i18n-scaler/mutate`).
+        "locales_dir",
+        "localesDir",
     }
 )
+
+#: The body media types a route can read fields from. FastAPI parses a body as
+#: JSON when it declares no content type or a JSON one, and as a form for the
+#: other two; anything else reaches no declared body parameter.
+_FORM_TYPES = frozenset({"application/x-www-form-urlencoded", "multipart/form-data"})
 
 
 async def _attach_principal(request: Request, claims: dict) -> None:
@@ -112,13 +122,72 @@ async def _attach_principal(request: Request, claims: dict) -> None:
     )
 
 
-def _reject_client_supplied_paths(request: Request) -> JSONResponse | None:
+def _path_keys_in(payload: object) -> set[str]:
+    """Every key of `CLIENT_PATH_PARAMS` anywhere in a decoded JSON body.
+
+    Nested as well as top level: FastAPI embeds a model under its parameter
+    name when a route takes more than one body parameter, and a route that
+    takes a bare ``dict`` (`/api/slash-commands/run`) reads whatever keys it
+    likes. Walked with a stack, not recursion — the depth is the client's.
+    """
+    found: set[str] = set()
+    stack = [payload]
+    while stack:
+        node = stack.pop()
+        if isinstance(node, dict):
+            found.update(k for k in node if k in CLIENT_PATH_PARAMS)
+            stack.extend(node.values())
+        elif isinstance(node, list):
+            stack.extend(node)
+    return found
+
+
+async def _body_path_keys(request: Request) -> set[str]:
+    """The `CLIENT_PATH_PARAMS` keys a request carries in its body.
+
+    Reading the body here does not consume it: Starlette caches what a
+    middleware reads and replays it to the route. Any body that is not a form
+    is tried as JSON, whatever content type it declares — wider than FastAPI's
+    own rule, so nothing FastAPI reads as JSON goes unread here. A body that
+    does not parse is not judged: the route refuses it on its own, with a 422.
+    """
+    media_type = (
+        request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+    )
+    body = await request.body()
+    if not body:
+        return set()
+
+    if media_type in _FORM_TYPES:
+        try:
+            form = await request.form()
+        except Exception:  # noqa: BLE001 - malformed form: the route's 422
+            return set()
+        try:
+            return set(CLIENT_PATH_PARAMS.intersection(form.keys()))
+        finally:
+            await form.close()
+
+    try:
+        payload = json.loads(body)
+    except (ValueError, RecursionError):
+        return set()
+    return _path_keys_in(payload)
+
+
+async def _reject_client_supplied_paths(request: Request) -> JSONResponse | None:
     """Refuse a request that hands the server a filesystem path to work on.
 
     Enforced centrally rather than endpoint by endpoint, because the failure
     mode being prevented is precisely that someone adds an endpoint and forgets.
+    The query string and the body are both read: about forty routes take
+    `project_dir`, `spec_dir` or `file_path` in a JSON body, where a check on
+    the query string alone never looked.
     """
-    offending = sorted(CLIENT_PATH_PARAMS.intersection(request.query_params.keys()))
+    offending = sorted(
+        CLIENT_PATH_PARAMS.intersection(request.query_params.keys())
+        | await _body_path_keys(request)
+    )
     if not offending:
         return None
     return JSONResponse(
@@ -209,7 +278,7 @@ def mount_server_mode(app: FastAPI) -> bool:
                 status_code=500, content={"detail": "Authorization unavailable"}
             )
 
-        forbidden = _reject_client_supplied_paths(request)
+        forbidden = await _reject_client_supplied_paths(request)
         if forbidden is not None:
             return forbidden
 

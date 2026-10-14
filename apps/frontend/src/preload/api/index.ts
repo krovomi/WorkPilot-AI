@@ -216,6 +216,10 @@ import {
 	type ServerAuthAPI,
 } from "./modules/server-auth-api";
 import { createJevAPI, type JevAPI } from "./jev-api";
+import {
+	createSecureStorageAPI,
+	type SecureStorageAPI,
+} from "./secure-storage-api";
 import { createSettingsAPI, type SettingsAPI } from "./settings-api";
 import { createTaskAPI, type TaskAPI } from "./task-api";
 import { createTerminalAPI, type TerminalAPI } from "./terminal-api";
@@ -227,6 +231,7 @@ export interface ElectronAPI
 		TaskAPI,
 		SettingsAPI,
 		JevAPI,
+		SecureStorageAPI,
 		FileAPI,
 		AgentAPI,
 		IdeationAPI,
@@ -374,6 +379,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createTaskAPI(),
 		...createSettingsAPI(),
 		...createJevAPI(),
+		...createSecureStorageAPI(),
 		...createFileAPI(),
 		...createAgentAPI(),
 		...createAppUpdateAPI(),

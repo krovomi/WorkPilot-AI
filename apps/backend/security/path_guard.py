@@ -51,12 +51,28 @@ Symlinks are resolved before the comparison, so a link planted inside the
 worktree is judged by where it points. A link planted *between* this check and
 the write is not covered — that race is the kernel's to lose, and closing it
 would mean opening the file here, which is the write.
+
+What is refused inside the roots
+--------------------------------
+The files that decide what an agent may do live in the project, so "inside
+the roots" was not enough. `.workpilot-allowlist` and
+`.workpilot-security.json` are the command allowlist, which
+`security.profile.get_security_profile` reloads as soon as their mtime
+changes; `.workpilot/guardrails.*` is the user's own policy;
+`.claude_settings.json` and `.claude/settings*.json` are the SDK's
+permissions. An agent that could write one could widen its own rights for its
+next command. `protected_config_target` names them, and the same table serves
+the non-SDK executor (`core.runtimes.tool_executor`) and the Bash validator
+(`security.config_write_validators`), so the three barriers cannot disagree on
+what they protect.
 """
 
 from __future__ import annotations
 
+import fnmatch
 import logging
 import os
+import re
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -65,7 +81,11 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "GUARDED_WRITE_TOOLS",
+    "PROTECTED_CONFIG_DIRS",
+    "PROTECTED_CONFIG_NAMES",
     "make_write_path_hook",
+    "protected_config_refusal",
+    "protected_config_target",
     "resolve_write_roots",
     "workpilot_scratch_dir",
 ]
@@ -81,6 +101,126 @@ _PATH_FIELDS = ("file_path", "notebook_path")
 
 #: Extra roots, `os.pathsep`-separated. Additive only.
 WRITE_ROOTS_ENV_VAR = "WORKPILOT_WRITE_ROOTS"
+
+#: Security configuration recognised by its file name, wherever it sits:
+#: `.workpilot-security.json` is kept in the spec directory as often as at the
+#: project root (`ProjectAnalyzer.get_profile_path`), and a worktree carries its
+#: own copies (`workspace_setup`).
+PROTECTED_CONFIG_NAMES: tuple[str, ...] = (
+    ".workpilot-allowlist",
+    ".workpilot-security.json",
+    ".claude_settings.json",
+)
+
+#: Security configuration recognised by its directory *and* its name:
+#: `.workpilot/guardrails.yaml` is the user's policy, `config/guardrails.yaml`
+#: is the project's own business. Names are `fnmatch` patterns.
+PROTECTED_CONFIG_DIRS: dict[str, tuple[str, ...]] = {
+    ".workpilot": ("guardrails.yaml", "guardrails.yml", "guardrails.json"),
+    ".claude": ("settings*.json",),
+}
+
+_GLOB_CHARS = frozenset("*?[")
+
+
+def _fold(component: str) -> str:
+    """A path component as the file system that will receive it compares it.
+
+    Windows and macOS compare names without case, Windows drops trailing dots
+    and spaces, and NTFS reads `name:stream` as `name`. Folding all three on
+    every platform costs a false refusal on Linux for a name nobody uses, and
+    saves a bypass where the name is the same file.
+    """
+    return component.split(":", 1)[0].rstrip(" .").casefold()
+
+
+def _component_matches(component: str, pattern: str, *, glob: bool) -> bool:
+    folded = _fold(component)
+    if glob and _GLOB_CHARS.intersection(folded):
+        # The shell does not let a wildcard match a leading dot: `*` is not
+        # `.workpilot-allowlist`, `.*` is.
+        if pattern.startswith(".") and not folded.startswith("."):
+            return False
+        return fnmatch.fnmatchcase(pattern, folded)
+    return fnmatch.fnmatchcase(folded, pattern)
+
+
+def _lexical_parts(path: str) -> list[str]:
+    """The components of `path`, `..` folded in, on either separator.
+
+    Lexical on purpose: the shell hands a validator text, and `/` or `\\`
+    separate components on whichever platform the line will run.
+    """
+    parts: list[str] = []
+    for part in re.split(r"[\\/]+", path):
+        if part in ("", "."):
+            continue
+        if part == ".." and parts and parts[-1] != "..":
+            parts.pop()
+            continue
+        parts.append(part)
+    return parts
+
+
+def protected_config_target(
+    path: str | Path,
+    *,
+    glob: bool = False,
+    directories: bool = False,
+) -> str | None:
+    """The security configuration file `path` names, or ``None``.
+
+    Judged on the text alone; `glob=True` also answers for a shell wildcard
+    that would expand to one (`.workpilot-allow*`, `.claude/*`), and
+    `directories=True` for the directory that holds one (`rm -rf .claude`),
+    which a shell can replace whole. The answer is the file as the path
+    spells it, for the refusal message.
+    """
+    parts = _lexical_parts(str(path))
+    if not parts:
+        return None
+
+    name = parts[-1]
+    if any(_component_matches(name, p, glob=glob) for p in PROTECTED_CONFIG_NAMES):
+        return name
+    if directories and any(
+        _component_matches(name, d, glob=glob) for d in PROTECTED_CONFIG_DIRS
+    ):
+        return f"{name}/"
+
+    if len(parts) >= 2:
+        for directory, patterns in PROTECTED_CONFIG_DIRS.items():
+            if not _component_matches(parts[-2], directory, glob=glob):
+                continue
+            if any(_component_matches(name, p, glob=glob) for p in patterns):
+                return f"{parts[-2]}/{name}"
+    return None
+
+
+def protected_config_refusal(path: str, base: Path | None) -> str | None:
+    """Why an agent may not write `path`, or ``None`` when it may.
+
+    Judged twice: on the path as written, and on where it resolves, so a link
+    planted in the worktree (`notes.txt -> .workpilot-allowlist`) or a
+    directory reached through one is judged by what it points at.
+    """
+    target = protected_config_target(path)
+    if target is None:
+        candidate = Path(path).expanduser()
+        if not candidate.is_absolute() and base is not None:
+            candidate = base / candidate
+        resolved = _resolved(candidate)
+        if resolved is not None:
+            target = protected_config_target(resolved)
+    if target is None:
+        return None
+    return (
+        f"Refusing to write '{path}': {target} is security configuration — it "
+        "decides which commands and writes this build's agents are allowed, "
+        "and an agent does not change its own rights. If the task needs a "
+        "command or a permission it does not have, say so in your output and "
+        "leave the change to the user."
+    )
 
 
 def workpilot_scratch_dir() -> Path:
@@ -189,6 +329,29 @@ def make_write_path_hook(
             # message. Answering here would race it with a worse one.
             return {}
 
+        targets = _target_paths(tool_input)
+        if not targets:
+            return {}
+
+        for target in targets:
+            if roots and not is_within_roots(target, roots, base):
+                listed = ", ".join(str(root) for root in roots)
+                logger.warning("write refused outside build roots: %s", target)
+                return _deny(
+                    f"Refusing to write '{target}': it resolves outside "
+                    f"this build's directories ({listed}). A build writes "
+                    "in its own checkout — edit a file there, or have the "
+                    "user add the directory to "
+                    f"{WRITE_ROOTS_ENV_VAR} if it really belongs to this "
+                    "build."
+                )
+
+            # Not conditional on the roots: what the file decides does not
+            # depend on where the build was told it may write.
+            if refusal := protected_config_refusal(target, base):
+                logger.warning("write refused on security configuration: %s", target)
+                return _deny(refusal)
+
         if not roots:
             # Nothing to confine against means the caller gave neither a
             # project nor a spec directory. Refusing every write would break a
@@ -196,33 +359,17 @@ def make_write_path_hook(
             logger.warning(
                 "write path guard inactive for %s: no roots resolved", tool_name
             )
-            return {}
-
-        targets = _target_paths(tool_input)
-        if not targets:
-            return {}
-
-        for target in targets:
-            if is_within_roots(target, roots, base):
-                continue
-
-            listed = ", ".join(str(root) for root in roots)
-            logger.warning("write refused outside build roots: %s", target)
-            return {
-                "hookSpecificOutput": {
-                    "hookEventName": "PreToolUse",
-                    "permissionDecision": "deny",
-                    "permissionDecisionReason": (
-                        f"Refusing to write '{target}': it resolves outside "
-                        f"this build's directories ({listed}). A build writes "
-                        "in its own checkout — edit a file there, or have the "
-                        "user add the directory to "
-                        f"{WRITE_ROOTS_ENV_VAR} if it really belongs to this "
-                        "build."
-                    ),
-                }
-            }
 
         return {}
 
     return _hook
+
+
+def _deny(reason: str) -> dict[str, Any]:
+    return {
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny",
+            "permissionDecisionReason": reason,
+        }
+    }
