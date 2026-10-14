@@ -86,6 +86,13 @@ _MODULES_TO_PRESERVE = [
     "core.workspace.models",
     "review",
     "review.state",
+    # Three files mock the `agents` package. Deleting the mock re-imported a
+    # new `agents` object with no `coder` attribute while the real
+    # `agents.coder` stayed in sys.modules, so `monkeypatch.setattr(
+    # "agents.coder.X", ...)` raised "module 'agents' has no attribute
+    # 'coder'" (test_issue_884_plan_schema.py after test_cleanup_stray_plan.py
+    # and test_spec_pipeline.py).
+    "agents",
 ]
 _real_modules: dict[str, _types.ModuleType] = {}
 for _mod_name in _MODULES_TO_PRESERVE:
