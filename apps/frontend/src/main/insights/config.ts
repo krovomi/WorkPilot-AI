@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { getOAuthModeClearVars } from "../agent/env-utils";
 import { getAugmentedEnv } from "../env-utils";
@@ -11,6 +11,7 @@ import {
 import { getBestAvailableProfileEnv } from "../rate-limit-detector";
 import { getPageProviderEnv } from "../services/page-llm-config";
 import { getAPIProfileEnv } from "../services/profile";
+import { loadBackendEnv } from "../source-env";
 import { getEffectiveSourcePath } from "../updater/path-resolver";
 
 /**
@@ -72,44 +73,14 @@ export class InsightsConfig {
 	}
 
 	/**
-	 * Load environment variables from auto-claude .env file
+	 * Load environment variables from the backend's .env, plus the copy the UI
+	 * saves when packaged, secrets decrypted (../source-env.ts)
 	 */
 	loadAutoBuildEnv(): Record<string, string> {
 		const autoBuildSource = this.getAutoBuildSourcePath();
 		if (!autoBuildSource) return {};
 
-		const envPath = path.join(autoBuildSource, ".env");
-		if (!existsSync(envPath)) return {};
-
-		try {
-			const envContent = readFileSync(envPath, "utf-8");
-			const envVars: Record<string, string> = {};
-
-			// Handle both Unix (\n) and Windows (\r\n) line endings
-			for (const line of envContent.split(/\r?\n/)) {
-				const trimmed = line.trim();
-				if (!trimmed || trimmed.startsWith("#")) continue;
-
-				const eqIndex = trimmed.indexOf("=");
-				if (eqIndex > 0) {
-					const key = trimmed.substring(0, eqIndex).trim();
-					let value = trimmed.substring(eqIndex + 1).trim();
-
-					if (
-						(value.startsWith('"') && value.endsWith('"')) ||
-						(value.startsWith("'") && value.endsWith("'"))
-					) {
-						value = value.slice(1, -1);
-					}
-
-					envVars[key] = value;
-				}
-			}
-
-			return envVars;
-		} catch {
-			return {};
-		}
+		return loadBackendEnv(autoBuildSource);
 	}
 
 	/**

@@ -60,7 +60,7 @@ fichier-ci reste l'autorité sur les règles.
 | Vue produit | [product-overview.md](architecture/product-overview.md) | La liste complète des features. |
 | Prompts d'agents | [agent-prompts.md](architecture/agent-prompts.md) | Quel prompt de `apps/backend/prompts/` sert quel agent. |
 | Droits d'outils | [agent-tool-rights.md](architecture/agent-tool-rights.md) | Une liste d'outils déclarée est un droit des deux côtés : `disallowed_tools` du SDK, garde de l'exécuteur, sandbox Codex. |
-| Secrets au repos | [secrets-at-rest.md](architecture/secrets-at-rest.md) | Clés et jetons de l'app chiffrés par `safeStorage`, avertissement sans trousseau, migration, redaction des logs Electron ; le `.env` de projet : jetons chiffrés, clés lues par le backend nommées. |
+| Secrets au repos | [secrets-at-rest.md](architecture/secrets-at-rest.md) | Clés et jetons de l'app chiffrés par `safeStorage`, avertissement sans trousseau, migration, redaction des logs Electron ; le `.env` de projet et celui du backend : jetons chiffrés, clés lues par le backend nommées. |
 | Pipeline de spec | [spec-pipeline.md](architecture/spec-pipeline.md) | Reprise de plan, traçabilité `FR-###`, `[NEEDS CLARIFICATION]`, constitutions spec-kit. |
 | Skills | [skills.md](architecture/skills.md) | `skills/` est la source, `scripts/skills_cli.py` le seul écrivain ; frontmatter lu par `parse_frontmatter`. |
 | hermes-agent | [hermes.md](architecture/hermes.md) | Ingestion, tri et adoption des skills d'hermes, et `SOUL.md`. Rien n'accorde la confiance à la place de quelqu'un. |

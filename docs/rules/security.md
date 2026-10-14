@@ -58,7 +58,10 @@ l'UI n'existe pas.
   clé secrète du `.env` de projet se classe dans `shared/constants/project-env-secrets.json` :
   `encrypted` si Python ne la lit que dans son environnement, `readable` s'il la lit dans le
   fichier (laissée en clair, nommée par la bannière) ; `tests/test_project_env_secrets.py` le
-  vérifie. → [`architecture/secrets-at-rest.md`](../architecture/secrets-at-rest.md)
+  vérifie. Le `.env` du backend ne s'écrit que par `source-env.ts` et ne se lit, pour un
+  sous-processus, que par `loadBackendEnv` : chiffré une fois packagé, lisible depuis les sources
+  où Python le charge lui-même (`0600`, clés nommées par la bannière via `setReadableSecrets`).
+  → [`architecture/secrets-at-rest.md`](../architecture/secrets-at-rest.md)
 - `core/auth.py` ne lit que `AUTH_TOKEN_ENV_VARS` ; `ANTHROPIC_API_KEY` en est exclu exprès.
 - **Le hook `pre-commit` cherche les secrets** dans tout fichier indexé
   (`security/scan_secrets.py --staged-only`, qui lit l'index) et bloque le commit ; sans
