@@ -86,16 +86,36 @@ def _safe_default_value(field_type: Any) -> Any:
 # Dataclasses to round-trip through asdict. We pick non-trivial ones from
 # each agent module that we know are exposed.
 _DATACLASS_TARGETS = [
-    ("agents.debugger", "Breakpoint", {"id": "b1", "file": "x.py", "line": 1}),
-    ("agents.documenter", "SymbolDoc", {"name": "foo", "kind": "function"}),
-    ("agents.documenter", "ModuleInfo", {"path": "x.py", "name": "x"}),
-    ("agents.feedback_learning", "FeedbackEntry", {"id": "f1", "agent": "coder"}),
+    ("agents.debugger", "Breakpoint", {"id": "b1", "tool": "Write"}),
+    ("agents.documenter", "SymbolDoc", {"name": "foo", "symbol_type": "function"}),
+    ("agents.documenter", "ModuleInfo", {"module_path": "x.py", "name": "x"}),
+    (
+        "agents.feedback_learning",
+        "FeedbackEntry",
+        {
+            "feedback_id": "f1",
+            "session_id": "s1",
+            "action_id": "a1",
+            "project_id": "p1",
+            "rating": "positive",
+            "agent_type": "coder",
+        },
+    ),
     (
         "agents.migration_agent",
         "DetectedDependency",
-        {"name": "react", "version": "18.0.0"},
+        {"name": "react", "current_version": "18.0.0"},
     ),
-    ("agents.refactorer", "CodeSmell", {"file_path": "x.py", "line": 1}),
+    (
+        "agents.refactorer",
+        "CodeSmell",
+        {
+            "smell_type": "long_method",
+            "severity": "low",
+            "file_path": "x.py",
+            "line_start": 1,
+        },
+    ),
 ]
 
 
@@ -118,7 +138,9 @@ def test_dataclass_minimal_instantiation(
                 full_kwargs[f.name] = _safe_default_value(f.type)
         instance = cls(**full_kwargs)
     except TypeError as e:
-        pytest.skip(f"{class_name} requires non-trivial constructor args: {e}")
+        # A skip here hid six renamed fields for as long as nobody read the
+        # skip reasons: the kwargs above named fields that no longer exist.
+        pytest.fail(f"{class_name}: _DATACLASS_TARGETS is stale: {e}")
 
     # Must round-trip cleanly via asdict
     d = asdict(instance)
