@@ -261,6 +261,25 @@ is taken so the user knows the output is not live data:
   currently returns empty/mock payloads for every endpoint. Treat it as a
   scaffold until a real database-backed implementation lands.
 
+## QA coverage gate
+
+Once the QA reviewer approves a pass, the coverage gate
+([apps/backend/qa/coverage_gate.py](../apps/backend/qa/coverage_gate.py)) checks the
+percentages the reviewer recorded in `implementation_plan.json` → `qa_signoff.coverage`.
+It reads its threshold from the backend process environment; the build CLI also loads
+`.env-files/.env`, where a value already set in the environment wins:
+
+| Variable | Default | Meaning |
+| --- | ---: | --- |
+| `WORKPILOT_QA_MIN_COVERAGE` | 100 | Minimum coverage, in percent, of the `unit` **and** `integration` tests; `e2e` below it only warns. `0` disables the gate. Clamped to 0–100; a value that is not a number falls back to 100. |
+
+A pass below the threshold, or whose coverage the reviewer did not measure (no value, or
+`measured: false`), is rejected: the QA fixer receives a `QA_FIX_REQUEST.md` listing the
+gaps, then a new review runs, within the task's QA budget. A project without integration
+tests never passes at 100: lower the threshold or set it to `0`. The same value is written
+into the spec writer, planner, QA reviewer and QA fixer prompts, so the agents aim at the
+threshold the gate enforces.
+
 ## Verification loop (`verify`)
 
 The runtime verification phase (`apps/backend/verify/`, see
