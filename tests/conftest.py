@@ -1201,3 +1201,55 @@ def _isolated_brain(tmp_path_factory, monkeypatch):
     monkeypatch.setenv("WORKPILOT_BRAIN_DIR", str(base / "brain"))
     monkeypatch.setenv("WORKPILOT_BRAIN_CONFIG", str(base / "brain.json"))
     monkeypatch.setenv("WORKPILOT_BRAIN_HOME", str(base / "home"))
+
+
+# ── Ambient state is not input ─────────────────────────────────────────
+#
+# These two lived in a repository-root `conftest.py` while some tests still
+# sat under `apps/backend/`. Every test now lives under `tests/`, so they
+# belong here.
+
+
+@pytest.fixture(autouse=True)
+def _isolate_ambient_provider_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep the caller's shell out of the provider-resolution path.
+
+    `core.auth` treats a non-empty `ANTHROPIC_BASE_URL` as "API profile mode"
+    and raises when `ANTHROPIC_AUTH_TOKEN` is missing. Both are ordinary
+    variables to export — WorkPilot's own API-profile mode sets them, and so
+    does the Claude Code CLI — so any test touching auth passed or failed
+    depending on whose shell ran it. Seven did, here.
+
+    A test that wants either variable sets it explicitly; ambient values are
+    not input. `monkeypatch` restores whatever was there afterwards.
+    """
+    monkeypatch.delenv("ANTHROPIC_BASE_URL", raising=False)
+    monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter_singleton() -> None:
+    """Hand every test a fresh `RateLimiter`.
+
+    `RateLimiter` is a process-wide singleton, so a test that configures it —
+    a zero refill rate, an exhausted budget, a mocked method — leaves that
+    configuration behind for everything that runs afterwards in the same
+    session. `gh_client` then unpacked `check_github_available()` into
+    `available, msg` and got an empty tuple. `test_rate_limiter.py` already
+    resets in its `setup_method`, which protected its own class and no one
+    else's.
+
+    Read from `sys.modules` rather than imported: importing the runner exits
+    the interpreter in an environment without its dependencies (the
+    skills-eval job installs three packages). A module nobody imported holds
+    no singleton to reset.
+    """
+    _reset_rate_limiter()
+    yield
+    _reset_rate_limiter()
+
+
+def _reset_rate_limiter() -> None:
+    module = sys.modules.get("runners.github.rate_limiter")
+    if module is not None:
+        module.RateLimiter.reset_instance()
