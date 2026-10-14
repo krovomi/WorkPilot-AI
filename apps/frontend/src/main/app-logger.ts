@@ -12,6 +12,7 @@
  * - Always-on logging (not dependent on DEBUG flag)
  * - Debug info collection for support/bug reports
  * - Beta version detection for enhanced logging
+ * - Secret redaction: API keys and tokens never reach a log file or a debug report
  */
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
@@ -20,6 +21,10 @@ import { dirname, join } from "node:path";
 import { app } from "electron";
 import log from "electron-log/main.js";
 import { PROVIDER_MODELS_MAP } from "../shared/constants/models";
+import {
+	redactSecrets,
+	redactValue,
+} from "../shared/utils/secret-redaction";
 // Import the colored logs utility
 import { frontendLog } from "./colored-logs";
 // Import settings utilities for model info
@@ -43,6 +48,23 @@ log.transports.file.fileName = "main.log";
 // `[hh:mm:ss] [debug] ...` via electron-log). On conserve uniquement le
 // transport fichier pour la persistance des logs.
 log.transports.console.level = false;
+
+type LogHook = (typeof log.hooks)[number];
+
+/**
+ * Redacts a message before any transport writes it: this process's calls and
+ * the renderers' (electron-log forwards them here). What counts as a secret
+ * is decided in shared/utils/secret-redaction.ts.
+ */
+export const redactLogMessage: LogHook = (message) => ({
+	...message,
+	data: message.data.map((item) => redactValue(item)),
+});
+
+// The electron-log test doubles have no hooks array.
+if (Array.isArray(log.hooks)) {
+	log.hooks.push(redactLogMessage);
+}
 
 /**
  * Get current LLM model and provider information for logging
@@ -204,7 +226,9 @@ export function getRecentLogs(maxLines: number = 200): string[] {
 
 		const content = readFileSync(logPath, "utf-8");
 		const lines = content.split("\n").filter((line) => line.trim());
-		return lines.slice(-maxLines);
+		// Lines written before redaction existed may still carry a secret, and
+		// these end up in debug reports users paste into issues.
+		return lines.slice(-maxLines).map(redactSecrets);
 	} catch (error) {
 		log.error("Failed to read recent logs:", error);
 		return [];
@@ -305,36 +329,43 @@ export function listLogFiles(): Array<{
 // Re-export the logger for use in other modules
 export const logger = log;
 
+/**
+ * The console copy is redacted here; the file copy by the redactLogMessage hook.
+ */
+function consoleArgs(message: string, args: unknown[]): [string, ...unknown[]] {
+	return [redactSecrets(message), ...args.map((arg) => redactValue(arg))];
+}
+
 // Export convenience methods that match console API with frontend coloration and model/provider info
 export const appLog = {
 	debug: (message: string, ...args: unknown[]) => {
 		// Use frontendLog for colored output (now includes model info automatically)
-		frontendLog.debug(message, ...args);
+		frontendLog.debug(...consoleArgs(message, args));
 		// Also log to file with model info
 		const modelInfoString = getModelInfoString();
 		const modifiedArgs = [modelInfoString, message, ...args];
 		log.debug(...modifiedArgs);
 	},
 	info: (message: string, ...args: unknown[]) => {
-		frontendLog.info(message, ...args);
+		frontendLog.info(...consoleArgs(message, args));
 		const modelInfoString = getModelInfoString();
 		const modifiedArgs = [modelInfoString, message, ...args];
 		log.info(...modifiedArgs);
 	},
 	warn: (message: string, ...args: unknown[]) => {
-		frontendLog.warn(message, ...args);
+		frontendLog.warn(...consoleArgs(message, args));
 		const modelInfoString = getModelInfoString();
 		const modifiedArgs = [modelInfoString, message, ...args];
 		log.warn(...modifiedArgs);
 	},
 	error: (message: string, ...args: unknown[]) => {
-		frontendLog.error(message, ...args);
+		frontendLog.error(...consoleArgs(message, args));
 		const modelInfoString = getModelInfoString();
 		const modifiedArgs = [modelInfoString, message, ...args];
 		log.error(...modifiedArgs);
 	},
 	log: (message: string, ...args: unknown[]) => {
-		frontendLog.info(message, ...args);
+		frontendLog.info(...consoleArgs(message, args));
 		const modelInfoString = getModelInfoString();
 		const modifiedArgs = [modelInfoString, message, ...args];
 		log.info(...modifiedArgs);

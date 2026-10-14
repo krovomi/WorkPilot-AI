@@ -144,6 +144,12 @@
 		"downloadError": "Échec du téléchargement de la mise à jour",
 		"readOnlyVolumeWarning": "Déplacez l'app dans le dossier Applications pour mettre à jour"
 	},
+	"secureStorageBanner": {
+		"title": "Clés API stockées sans chiffrement",
+		"description": "Aucun trousseau système n'est disponible : vos clés API et jetons sont conservés sur cet appareil sans chiffrement par l'OS, dans des fichiers lisibles uniquement par votre compte utilisateur.",
+		"action": "Installez ou déverrouillez un trousseau (GNOME Keyring, KWallet…) puis redémarrez WorkPilot AI : vos clés seront alors chiffrées.",
+		"dismiss": "Ignorer"
+	},
 	"claudeCode": {
 		"checking": "Vérification du CLI IA...",
 		"upToDate": "Le CLI IA est à jour",

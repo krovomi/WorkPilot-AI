@@ -10,6 +10,9 @@ export const IPC_CHANNELS = {
 	JEV_STATUS: "jev:status",
 	JEV_SAVE_KEY: "jev:saveKey",
 	JEV_CLEAR_KEY: "jev:clearKey",
+	// Secrets at rest: is the OS keyring protecting stored API keys / tokens?
+	SECURE_STORAGE_STATUS: "secureStorage:status",
+	SECURE_STORAGE_STATUS_CHANGED: "secureStorage:statusChanged", // main → renderer
 	// Project operations
 	PROJECT_ADD: "project:add",
 	PROJECT_REMOVE: "project:remove",
