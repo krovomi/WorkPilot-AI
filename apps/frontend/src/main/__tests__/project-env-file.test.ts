@@ -1,13 +1,13 @@
 /**
  * @vitest-environment node
  *
- * A project's `.workpilot/.env` holds integration tokens the Python backend
- * reads. project-env-file is its only reader and writer: secret values
- * encrypted on write, decrypted on read, legacy plaintext migrated, the file
- * restricted to its owner, and git told to ignore it.
+ * A project's `.workpilot/.env` (project-env-file.ts): the tokens the backend
+ * only takes from its environment are stored `enc:`, the ones it reads from
+ * the file stay readable and are named to the UI, the file is owner-only, and
+ * an earlier version's file is migrated. Rule S1: never a secret in clear
+ * without the user being told.
  */
 
-import { execFileSync } from "node:child_process";
 import {
 	mkdirSync,
 	mkdtempSync,
@@ -19,320 +19,242 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import projectEnvSecrets from "../../shared/constants/project-env-secrets.json";
 import {
 	fakeEncrypted,
 	sharedFakeSafeStorage,
 } from "../../__tests__/helpers/fake-safe-storage";
+import { isWindows } from "../platform";
 
 vi.mock("electron", async () => {
 	const { sharedFakeSafeStorage } = await import(
 		"../../__tests__/helpers/fake-safe-storage"
 	);
-	return {
-		app: { getPath: () => tmpdir() },
-		safeStorage: sharedFakeSafeStorage().safeStorage,
-	};
+	return { safeStorage: sharedFakeSafeStorage().safeStorage };
 });
 
-vi.mock("../cli-tool-manager", () => ({
-	getToolPath: (tool: string) => tool,
-	getToolPathAsync: async (tool: string) => tool,
+// The keyring backend check only exists on Linux; pin it for every CI OS.
+vi.mock("../platform", async (importOriginal) => ({
+	...(await importOriginal<typeof import("../platform")>()),
+	isLinux: () => true,
 }));
 
 const fake = sharedFakeSafeStorage();
-const isWindows = process.platform === "win32";
 
-type ProjectEnvFile = typeof import("../project-env-file");
-type SecretStorage = typeof import("../secret-storage");
-
-async function load(): Promise<ProjectEnvFile & SecretStorage> {
+async function load() {
 	vi.resetModules();
-	return {
-		...(await import("../project-env-file")),
-		...(await import("../secret-storage")),
-	};
+	const projectEnv = await import("../project-env-file");
+	const storage = await import("../secret-storage");
+	return { ...projectEnv, storage };
 }
 
-function hasGit(): boolean {
-	try {
-		execFileSync("git", ["--version"], { stdio: "ignore" });
-		return true;
-	} catch {
-		return false;
-	}
-}
+const LEGACY_ENV = [
+	"# WorkPilot AI Framework Environment Variables",
+	"CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-legacy",
+	"LINEAR_ENABLED=true",
+	'GITHUB_TOKEN="ghp_legacyToken"',
+	"# GITLAB_TOKEN=",
+	"CONTEXT7_API_KEY=ctx7sk-readable",
+	"SLACK_WEBHOOK_URL=https://example.com/slack-webhook-0000",
+	"DEFAULT_BRANCH=main",
+	"",
+].join("\n");
 
-const SAMPLE = `# WorkPilot AI Framework Environment Variables
-CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-secret
-GITHUB_ENABLED=true
-GITHUB_REPO=owner/repo
-GITHUB_TOKEN="ghp_secret"
-JIRA_PROJECT_KEY=PROJ
-# LINEAR_API_KEY=
-SLACK_WEBHOOK_URL=https://hooks.slack.com/services/secret
-`;
-
-describe("project .workpilot/.env secrets", () => {
-	let projectDir: string;
+describe("project-env-file", () => {
+	let dir: string;
 	let envPath: string;
+	let warn: ReturnType<typeof vi.spyOn>;
 
 	beforeEach(() => {
 		fake.reset();
-		projectDir = mkdtempSync(path.join(tmpdir(), "project-env-"));
-		envPath = path.join(projectDir, ".workpilot", ".env");
-		vi.spyOn(console, "warn").mockImplementation(() => undefined);
+		warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+		dir = mkdtempSync(path.join(tmpdir(), "project-env-"));
+		envPath = path.join(dir, ".workpilot", ".env");
 	});
 
 	afterEach(() => {
-		rmSync(projectDir, { recursive: true, force: true });
-		vi.restoreAllMocks();
+		warn.mockRestore();
+		rmSync(dir, { recursive: true, force: true });
 	});
 
-	it("names the secret keys and leaves configuration readable", async () => {
-		const { isSecretProjectEnvKey } = await load();
-
-		for (const key of [
-			"CLAUDE_CODE_OAUTH_TOKEN",
-			"GITHUB_TOKEN",
-			"GITLAB_TOKEN",
-			"LINEAR_API_KEY",
-			"JIRA_API_TOKEN",
-			"AZURE_DEVOPS_PAT",
-			"CICD_JENKINS_TOKEN",
-			"OPENAI_API_KEY",
-			"CONTEXT7_API_KEY",
-			"FIGMA_ACCESS_TOKEN",
-			"DOCINTEL_AZURE_KEY",
-			"SLACK_WEBHOOK_URL",
-			"NOTIFY_WEBHOOK_URL",
-		]) {
-			expect(isSecretProjectEnvKey(key), key).toBe(true);
-		}
-		for (const key of [
-			"GITHUB_REPO",
-			"GITHUB_ENABLED",
-			"JIRA_PROJECT_KEY",
-			"JIRA_EMAIL",
-			"CICD_JENKINS_USER",
-			"SLACK_NOTIFICATIONS_ENABLED",
-			"CUSTOM_MCP_SERVERS",
-			"AGENT_MCP_coder_ADD",
-			"OLLAMA_BASE_URL",
-		]) {
-			expect(isSecretProjectEnvKey(key), key).toBe(false);
-		}
-	});
-
-	it("writes secret values encrypted and every other line as is", async () => {
-		const { writeProjectEnvFile } = await load();
-
-		writeProjectEnvFile(envPath, SAMPLE);
-
-		const raw = readFileSync(envPath, "utf-8");
-		expect(raw).not.toContain("secret");
-		expect(raw).toBe(`# WorkPilot AI Framework Environment Variables
-CLAUDE_CODE_OAUTH_TOKEN=${fakeEncrypted("sk-ant-oat01-secret")}
-GITHUB_ENABLED=true
-GITHUB_REPO=owner/repo
-GITHUB_TOKEN=${fakeEncrypted("ghp_secret")}
-JIRA_PROJECT_KEY=PROJ
-# LINEAR_API_KEY=
-SLACK_WEBHOOK_URL=${fakeEncrypted("https://hooks.slack.com/services/secret")}
-`);
-	});
-
-	it("reads the secrets back decrypted", async () => {
-		const { writeProjectEnvFile, readProjectEnv, readProjectEnvFor } =
-			await load();
-		writeProjectEnvFile(envPath, SAMPLE);
-
-		const expected = {
-			CLAUDE_CODE_OAUTH_TOKEN: "sk-ant-oat01-secret",
-			GITHUB_ENABLED: "true",
-			GITHUB_REPO: "owner/repo",
-			GITHUB_TOKEN: "ghp_secret",
-			JIRA_PROJECT_KEY: "PROJ",
-			SLACK_WEBHOOK_URL: "https://hooks.slack.com/services/secret",
-		};
-		expect(readProjectEnv(envPath)).toEqual(expected);
-		expect(readProjectEnvFor(projectDir, ".workpilot")).toEqual(expected);
-		expect(readProjectEnvFor(projectDir, undefined)).toEqual(expected);
-	});
-
-	it("reads nothing from a file that does not exist", async () => {
-		const { readProjectEnv, readProjectEnvContent } = await load();
-
-		expect(readProjectEnv(envPath)).toEqual({});
-		expect(readProjectEnvContent(envPath)).toBeUndefined();
-	});
-
-	it("is idempotent: encrypted values are not encrypted twice", async () => {
-		const { writeProjectEnvFile, readProjectEnvContent } = await load();
-		writeProjectEnvFile(envPath, SAMPLE);
-		const first = readFileSync(envPath, "utf-8");
-
-		writeProjectEnvFile(envPath, first);
-
-		expect(readFileSync(envPath, "utf-8")).toBe(first);
-		expect(readProjectEnvContent(envPath)).toBe(
-			SAMPLE.replace('"ghp_secret"', "ghp_secret"),
+	it("classifies every key once", () => {
+		const overlap = projectEnvSecrets.encrypted.filter((key) =>
+			projectEnvSecrets.readable.includes(key),
 		);
+		expect(overlap).toEqual([]);
 	});
 
-	it.skipIf(isWindows)("restricts the file to its owner (0600)", async () => {
-		mkdirSync(path.dirname(envPath), { recursive: true });
-		writeFileSync(envPath, "GITHUB_REPO=a/b\n", { mode: 0o644 });
-		const { writeProjectEnvFile } = await load();
+	describe("with an OS keyring", () => {
+		it("writes encrypted keys as enc:, keeps every other line as is", async () => {
+			const { writeProjectEnvFile } = await load();
 
-		writeProjectEnvFile(envPath, SAMPLE);
+			writeProjectEnvFile(envPath, LEGACY_ENV);
 
-		expect(statSync(envPath).mode & 0o777).toBe(0o600);
+			const written = readFileSync(envPath, "utf-8");
+			expect(written).not.toContain("sk-ant-oat01-legacy");
+			expect(written).not.toContain("ghp_legacyToken");
+			expect(written).toContain(
+				`CLAUDE_CODE_OAUTH_TOKEN=${fakeEncrypted("sk-ant-oat01-legacy")}`,
+			);
+			expect(written).toContain(`GITHUB_TOKEN=${fakeEncrypted("ghp_legacyToken")}`);
+			expect(written).toContain("# WorkPilot AI Framework Environment Variables");
+			expect(written).toContain("# GITLAB_TOKEN=");
+			expect(written).toContain("LINEAR_ENABLED=true");
+			expect(written).toContain("DEFAULT_BRANCH=main");
+		});
+
+		it.skipIf(isWindows())("writes the file owner-only", async () => {
+			const { writeProjectEnvFile } = await load();
+
+			writeProjectEnvFile(envPath, LEGACY_ENV);
+
+			expect(statSync(envPath).mode & 0o777).toBe(0o600);
+		});
+
+		it("reads back plaintext, for subprocesses and handlers alike", async () => {
+			const { writeProjectEnvFile, readProjectEnv } = await load();
+			writeProjectEnvFile(envPath, LEGACY_ENV);
+
+			const vars = readProjectEnv({ path: dir, autoBuildPath: ".workpilot" });
+
+			expect(vars.CLAUDE_CODE_OAUTH_TOKEN).toBe("sk-ant-oat01-legacy");
+			expect(vars.GITHUB_TOKEN).toBe("ghp_legacyToken");
+			expect(vars.DEFAULT_BRANCH).toBe("main");
+			expect(vars.GITLAB_TOKEN).toBeUndefined();
+		});
+
+		it("does not encrypt twice, and preserves CRLF line endings", async () => {
+			const { encodeProjectEnvContent } = await load();
+			const crlf = "GITHUB_TOKEN=ghp_x\r\nGITHUB_REPO=a/b\r\n";
+
+			const once = encodeProjectEnvContent(crlf);
+
+			expect(once).toBe(`GITHUB_TOKEN=${fakeEncrypted("ghp_x")}\r\nGITHUB_REPO=a/b\r\n`);
+			expect(encodeProjectEnvContent(once)).toBe(once);
+			expect(fake.calls.encrypt).toBe(1);
+		});
+
+		it("leaves out a value it cannot decrypt, and the file keeps it", async () => {
+			const blob = fakeEncrypted("ghp_other_machine");
+			const { writeProjectEnvFile, readProjectEnvFile } = await load();
+			writeProjectEnvFile(envPath, `GITHUB_TOKEN=${blob}\nGITHUB_REPO=a/b\n`);
+			fake.state.failDecrypt = true;
+
+			const vars = readProjectEnvFile(envPath);
+
+			expect(vars).toEqual({ GITHUB_REPO: "a/b" });
+			expect(readFileSync(envPath, "utf-8")).toContain(`GITHUB_TOKEN=${blob}`);
+		});
+
+		it("keeps readable secrets in clear and names them to the status", async () => {
+			const { writeProjectEnvFile, storage } = await load();
+
+			writeProjectEnvFile(envPath, LEGACY_ENV);
+
+			const written = readFileSync(envPath, "utf-8");
+			expect(written).toContain("CONTEXT7_API_KEY=ctx7sk-readable");
+			expect(written).toContain(
+				"SLACK_WEBHOOK_URL=https://example.com/slack-webhook-0000",
+			);
+			const status = storage.getSecureStorageStatus();
+			expect(status.readableSecretKeys).toEqual([
+				"CONTEXT7_API_KEY",
+				"SLACK_WEBHOOK_URL",
+			]);
+			expect(status.secretsAtRisk).toBe(true);
+			expect(JSON.stringify(status)).not.toContain("ctx7sk-readable");
+		});
+
+		it("clears the warning once the readable secrets are removed", async () => {
+			const { writeProjectEnvFile, storage } = await load();
+			writeProjectEnvFile(envPath, "CONTEXT7_API_KEY=ctx7sk-readable\n");
+
+			writeProjectEnvFile(envPath, "# CONTEXT7_API_KEY=\n");
+
+			expect(storage.getSecureStorageStatus()).toMatchObject({
+				readableSecretKeys: [],
+				secretsAtRisk: false,
+			});
+		});
+
+		it("counts custom MCP servers as a secret only when they carry headers", async () => {
+			const { readableSecretKeysOf } = await load();
+			const plain = JSON.stringify([{ id: "a", type: "command", command: "npx" }]);
+			const withAuth = JSON.stringify([
+				{ id: "b", type: "http", url: "https://x", headers: { Authorization: "Bearer t" } },
+			]);
+
+			expect(readableSecretKeysOf(`CUSTOM_MCP_SERVERS=${plain}`)).toEqual([]);
+			expect(readableSecretKeysOf(`CUSTOM_MCP_SERVERS=${withAuth}`)).toEqual([
+				"CUSTOM_MCP_SERVERS",
+			]);
+		});
 	});
 
 	describe("without an OS keyring", () => {
-		async function expectClearAndWarned(): Promise<void> {
-			const { writeProjectEnvFile, getSecureStorageStatus } = await load();
-
-			writeProjectEnvFile(envPath, SAMPLE);
-
-			expect(readFileSync(envPath, "utf-8")).toBe(SAMPLE);
-			expect(getSecureStorageStatus().secretsAtRisk).toBe(true);
-			if (!isWindows) {
-				expect(statSync(envPath).mode & 0o777).toBe(0o600);
-			}
-		}
-
-		it("safeStorage unavailable: writes in clear in a 0600 file and warns", async () => {
+		it("writes tokens in clear and flags them — never silently", async () => {
 			fake.state.ready = false;
-			await expectClearAndWarned();
-		});
+			const { writeProjectEnvFile, storage } = await load();
 
-		it.skipIf(process.platform !== "linux")(
-			"Linux basic_text backend: writes in clear in a 0600 file and warns",
-			async () => {
-				fake.state.backend = "basic_text";
-				await expectClearAndWarned();
-			},
-		);
-	});
+			writeProjectEnvFile(envPath, "GITHUB_TOKEN=ghp_plain\n");
 
-	describe("a value that cannot be decrypted right now", () => {
-		const locked = `GITHUB_REPO=owner/repo\nGITHUB_TOKEN=${fakeEncrypted("ghp_secret")}\n`;
-
-		beforeEach(() => {
-			mkdirSync(path.dirname(envPath), { recursive: true });
-			writeFileSync(envPath, locked);
-			fake.state.failDecrypt = true;
-		});
-
-		it("is never handed out as a token", async () => {
-			const { readProjectEnv } = await load();
-
-			expect(readProjectEnv(envPath)).toEqual({ GITHUB_REPO: "owner/repo" });
-		});
-
-		it("is kept as stored when the file is written back", async () => {
-			const { readProjectEnvContent, writeProjectEnvFile } = await load();
-
-			const content = readProjectEnvContent(envPath);
-			expect(content).toBe(locked);
-			writeProjectEnvFile(envPath, `${content}GITHUB_ENABLED=true\n`);
-
-			expect(readFileSync(envPath, "utf-8")).toBe(
-				`${locked}GITHUB_ENABLED=true\n`,
-			);
+			expect(readFileSync(envPath, "utf-8")).toBe("GITHUB_TOKEN=ghp_plain\n");
+			expect(storage.getSecureStorageStatus()).toMatchObject({
+				keyringAvailable: false,
+				secretsAtRisk: true,
+			});
 		});
 	});
 
-	describe("startup migration", () => {
-		it("encrypts a file written in clear and restricts it", async () => {
+	describe("migration", () => {
+		it("encrypts the tokens an earlier version wrote in clear, once", async () => {
 			mkdirSync(path.dirname(envPath), { recursive: true });
-			writeFileSync(envPath, SAMPLE, { mode: 0o644 });
-			const { migrateProjectEnvSecrets, readProjectEnv } = await load();
+			writeFileSync(envPath, LEGACY_ENV, { mode: 0o644 });
+			const { migrateProjectEnvSecrets } = await load();
+			const project = { path: dir, autoBuildPath: ".workpilot" };
 
-			expect(
-				migrateProjectEnvSecrets([
-					{ path: projectDir, autoBuildPath: ".workpilot" },
-				]),
-			).toBe(1);
+			expect(migrateProjectEnvSecrets([project])).toBe(1);
+			expect(migrateProjectEnvSecrets([project])).toBe(0);
 
-			const raw = readFileSync(envPath, "utf-8");
-			expect(raw).not.toContain("secret");
-			expect(raw).toContain("GITHUB_REPO=owner/repo");
-			expect(readProjectEnv(envPath).GITHUB_TOKEN).toBe("ghp_secret");
-			if (!isWindows) {
-				expect(statSync(envPath).mode & 0o777).toBe(0o600);
-			}
+			const migrated = readFileSync(envPath, "utf-8");
+			expect(migrated).not.toContain("sk-ant-oat01-legacy");
+			expect(migrated).not.toContain("ghp_legacyToken");
+			expect(migrated).toContain("CONTEXT7_API_KEY=ctx7sk-readable");
+			expect(migrated.split("\n")).toHaveLength(LEGACY_ENV.split("\n").length);
+			if (!isWindows()) expect(statSync(envPath).mode & 0o777).toBe(0o600);
 		});
 
-		it("leaves an already encrypted file alone", async () => {
-			const { migrateProjectEnvSecrets, writeProjectEnvFile } = await load();
-			writeProjectEnvFile(envPath, SAMPLE);
-			const before = readFileSync(envPath, "utf-8");
-			const encryptions = fake.calls.encrypt;
+		it("reports readable secrets of files it does not rewrite", async () => {
+			mkdirSync(path.dirname(envPath), { recursive: true });
+			writeFileSync(envPath, "FIGMA_ACCESS_TOKEN=figd_readable\n");
+			const { migrateProjectEnvFile, storage } = await load();
 
-			expect(
-				migrateProjectEnvSecrets([
-					{ path: projectDir, autoBuildPath: ".workpilot" },
-				]),
-			).toBe(0);
-			expect(readFileSync(envPath, "utf-8")).toBe(before);
-			expect(fake.calls.encrypt).toBe(encryptions);
+			expect(migrateProjectEnvFile(envPath)).toBe(false);
+			expect(storage.getSecureStorageStatus().readableSecretKeys).toEqual([
+				"FIGMA_ACCESS_TOKEN",
+			]);
 		});
 
-		it("skips projects without a file or not initialised", async () => {
+		it("without a keyring, leaves the file and raises the warning", async () => {
+			mkdirSync(path.dirname(envPath), { recursive: true });
+			writeFileSync(envPath, LEGACY_ENV);
+			fake.state.ready = false;
+			const { migrateProjectEnvFile, storage } = await load();
+
+			expect(migrateProjectEnvFile(envPath)).toBe(false);
+			expect(readFileSync(envPath, "utf-8")).toBe(LEGACY_ENV);
+			expect(storage.getSecureStorageStatus().secretsAtRisk).toBe(true);
+		});
+
+		it("skips projects without a file or not initialized", async () => {
 			const { migrateProjectEnvSecrets } = await load();
 
 			expect(
 				migrateProjectEnvSecrets([
-					{ path: projectDir, autoBuildPath: ".workpilot" },
-					{ path: projectDir, autoBuildPath: null },
-					{ path: path.join(projectDir, "missing"), autoBuildPath: ".workpilot" },
+					{ path: dir, autoBuildPath: ".workpilot" },
+					{ path: dir, autoBuildPath: null },
 				]),
 			).toBe(0);
-		});
-	});
-
-	describe.skipIf(!hasGit())("git ignores the file", () => {
-		function git(...args: string[]): void {
-			execFileSync("git", args, { cwd: projectDir, stdio: "ignore" });
-		}
-
-		it("adds .workpilot/ to .gitignore when git would track the file", async () => {
-			git("init", "-q");
-			writeFileSync(path.join(projectDir, ".gitignore"), "node_modules/\n");
-			const { writeProjectEnv } = await load();
-
-			writeProjectEnv(projectDir, ".workpilot", SAMPLE);
-
-			const gitignore = readFileSync(
-				path.join(projectDir, ".gitignore"),
-				"utf-8",
-			);
-			expect(gitignore).toContain("node_modules/\n");
-			expect(gitignore).toContain(".workpilot/\n");
-		});
-
-		it("leaves .gitignore alone when the file is already ignored", async () => {
-			git("init", "-q");
-			writeFileSync(path.join(projectDir, ".gitignore"), ".workpilot/\n");
-			const { writeProjectEnv } = await load();
-
-			writeProjectEnv(projectDir, ".workpilot", SAMPLE);
-
-			expect(readFileSync(path.join(projectDir, ".gitignore"), "utf-8")).toBe(
-				".workpilot/\n",
-			);
-		});
-
-		it("touches nothing outside a git repository", async () => {
-			const { writeProjectEnv } = await load();
-
-			writeProjectEnv(projectDir, ".workpilot", SAMPLE);
-
-			expect(() =>
-				readFileSync(path.join(projectDir, ".gitignore"), "utf-8"),
-			).toThrow();
 		});
 	});
 });

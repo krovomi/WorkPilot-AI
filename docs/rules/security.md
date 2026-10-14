@@ -53,10 +53,12 @@ l'UI n'existe pas.
   ou avertir l'utilisateur ; ne pas retomber silencieusement sur du texte clair.
   `apps/frontend/src/main/secret-storage.ts` décide de la forme sur disque (`enc:…`) ; sans
   trousseau, fichier `0600` et bannière dans l'UI. `settings.json` ne se lit et ne s'écrit que par
-  `settings-utils.ts`, `profiles.json` que par les profile managers : un module qui parse le
-  fichier lui-même reçoit du chiffré. Le `.workpilot/.env` d'un projet ne se lit et ne s'écrit
-  que par `project-env-file.ts` ; la CLI sans l'app ignore une valeur `enc:` et le dit
-  (`core/project_env.py`). → [`architecture/secrets-at-rest.md`](../architecture/secrets-at-rest.md)
+  `settings-utils.ts`, `profiles.json` que par les profile managers, `<projet>/.workpilot/.env`
+  que par `project-env-file.ts` : un module qui parse le fichier lui-même reçoit du chiffré. Une
+  clé secrète du `.env` de projet se classe dans `shared/constants/project-env-secrets.json` :
+  `encrypted` si Python ne la lit que dans son environnement, `readable` s'il la lit dans le
+  fichier (laissée en clair, nommée par la bannière) ; `tests/test_project_env_secrets.py` le
+  vérifie. → [`architecture/secrets-at-rest.md`](../architecture/secrets-at-rest.md)
 - `core/auth.py` ne lit que `AUTH_TOKEN_ENV_VARS` ; `ANTHROPIC_API_KEY` en est exclu exprès.
 - **Le hook `pre-commit` cherche les secrets** dans tout fichier indexé
   (`security/scan_secrets.py --staged-only`, qui lit l'index) et bloque le commit ; sans

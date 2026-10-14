@@ -1,5 +1,4 @@
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { BrowserWindow } from "electron";
@@ -13,9 +12,9 @@ import type {
 	Project,
 } from "../../shared/types";
 import type { AgentManager } from "../agent";
+import { readProjectEnv } from "../project-env-file";
 import { projectStore } from "../project-store";
 import { downloadJiraImageAttachments } from "./shared/jira-attachments";
-import { getProjectEnvPath, readProjectEnv } from "../project-env-file";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -47,19 +46,8 @@ export function registerJiraHandlers(
 				projectKey: null,
 			};
 		}
-		const envPath = getProjectEnvPath(project.path, project.autoBuildPath);
-		if (!existsSync(envPath)) {
-			return {
-				instanceUrl: null,
-				email: null,
-				apiToken: null,
-				projectKey: null,
-			};
-		}
-
 		try {
-			// Through project-env-file, which decrypts the stored token.
-			const vars = readProjectEnv(envPath);
+			const vars = readProjectEnv(project);
 			return {
 				instanceUrl: vars.JIRA_INSTANCE_URL || null,
 				email: vars.JIRA_EMAIL || null,

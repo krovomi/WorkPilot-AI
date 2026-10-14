@@ -1885,7 +1885,8 @@
 			"tooltip": "{{used}} / {{window}} jetons · {{source}}",
 			"thresholdTooltip": "Seuil {{value}} % · mode {{mode}}",
 			"phase": "Phase : {{phase}}",
-			"open": "Réglages de la mémoire de contexte"
+			"open": "Réglages de la mémoire de contexte",
+			"notMeasured": "Pas encore mesuré : la jauge se remplit dès que la première session d'agent démarre."
 		},
 		"handoff": {
 			"preparing": "Relais…",

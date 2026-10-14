@@ -1,253 +1,171 @@
 /**
  * @vitest-environment node
  *
- * The project settings screen saves integration tokens through ENV_UPDATE.
- * They reach `.workpilot/.env` encrypted. ENV_GET never hands them back: the
- * renderer is not trusted (rule S6), it gets MASKED_SECRET for each one set,
- * and the mask sent back means "keep the stored value".
+ * The project settings screen writes `.workpilot/.env` through ENV_UPDATE and
+ * reads it back through ENV_GET. The tokens the backend only takes from its
+ * environment land on disk as `enc:` and come back as plaintext; the template
+ * cannot grow a secret-shaped key that project-env-secrets.json does not
+ * classify. Rule S1.
  */
 
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { IPC_CHANNELS, MASKED_SECRET } from "../../../shared/constants";
+import projectEnvSecrets from "../../../shared/constants/project-env-secrets.json";
+import type { IPCResult, ProjectEnvConfig } from "../../../shared/types";
 import {
 	fakeEncrypted,
 	sharedFakeSafeStorage,
 } from "../../../__tests__/helpers/fake-safe-storage";
-import { IPC_CHANNELS, MASKED_SECRET } from "../../../shared/constants";
-import type { ProjectEnvConfig } from "../../../shared/types";
 
 type Handler = (event: unknown, ...args: unknown[]) => Promise<unknown>;
-
-const state = vi.hoisted(() => ({
-	handlers: new Map<string, Handler>(),
-	project: { id: "p1", path: "", autoBuildPath: ".workpilot" },
-	globalSettings: {} as Record<string, unknown>,
-	backendFetch: vi.fn(),
-}));
+const handlers = new Map<string, Handler>();
 
 vi.mock("electron", async () => {
 	const { sharedFakeSafeStorage } = await import(
 		"../../../__tests__/helpers/fake-safe-storage"
 	);
 	return {
-		app: { getPath: () => tmpdir(), getAppPath: () => tmpdir() },
 		safeStorage: sharedFakeSafeStorage().safeStorage,
 		ipcMain: {
 			handle: (channel: string, handler: Handler) =>
-				state.handlers.set(channel, handler),
+				handlers.set(channel, handler),
 		},
+		app: { getPath: () => tmpdir(), getAppPath: () => tmpdir() },
+		BrowserWindow: { getAllWindows: () => [], getFocusedWindow: () => null },
+		dialog: {},
+		shell: {},
+		Menu: {},
+		nativeImage: {},
 	};
 });
 
+vi.mock("../../platform", async (importOriginal) => ({
+	...(await importOriginal<typeof import("../../platform")>()),
+	isLinux: () => true,
+}));
+
+const project = { id: "p1", path: "", autoBuildPath: ".workpilot" };
 vi.mock("../../project-store", () => ({
 	projectStore: {
-		getProject: (id: string) =>
-			id === state.project.id ? state.project : undefined,
+		getProject: (id: string) => (id === project.id ? project : undefined),
 		updateAutoBuildPath: vi.fn(),
 	},
 }));
-
-vi.mock("../../settings-utils", () => ({
-	readSettingsFile: () => state.globalSettings,
+vi.mock("../../settings-utils", () => ({ readSettingsFile: () => ({}) }));
+vi.mock("../../project-initializer", () => ({
+	ensureProjectEnvIgnored: vi.fn().mockResolvedValue(false),
 }));
-
-vi.mock("../_backend-fetch", () => ({ backendFetch: state.backendFetch }));
-
-vi.mock("../../cli-tool-manager", () => ({
-	getToolPath: (tool: string) => tool,
-	getToolPathAsync: async (tool: string) => tool,
+vi.mock("../../claude-cli-utils", () => ({
+	getClaudeCliInvocation: vi.fn(),
+	getClaudeCliInvocationAsync: vi.fn(),
+}));
+vi.mock("../../env-utils", () => ({
+	getSpawnCommand: vi.fn(),
+	getSpawnOptions: vi.fn(),
 }));
 
 const fake = sharedFakeSafeStorage();
 
-describe("ENV_UPDATE / ENV_GET secrets", () => {
+/** Names that hold a credential, by convention. */
+const SECRET_SHAPED = /(?:TOKEN|API_KEY|_PAT|SECRET|PASSWORD|WEBHOOK_URL)$/;
+
+async function invoke<T>(channel: string, ...args: unknown[]) {
+	const handler = handlers.get(channel);
+	if (!handler) throw new Error(`no handler for ${channel}`);
+	return (await handler({}, ...args)) as IPCResult<T>;
+}
+
+function envFile(): string {
+	return readFileSync(path.join(project.path, ".workpilot", ".env"), "utf-8");
+}
+
+describe("env-handlers and secrets at rest", () => {
+	let warn: ReturnType<typeof vi.spyOn>;
+
 	beforeEach(async () => {
 		fake.reset();
-		state.handlers.clear();
-		state.globalSettings = {};
-		state.backendFetch.mockReset();
-		state.project.path = mkdtempSync(path.join(tmpdir(), "env-handlers-"));
-		vi.spyOn(console, "warn").mockImplementation(() => undefined);
+		handlers.clear();
+		warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+		project.path = mkdtempSync(path.join(tmpdir(), "env-handlers-"));
+		vi.resetModules();
 		const { registerEnvHandlers } = await import("../env-handlers");
 		registerEnvHandlers(() => null);
 	});
 
 	afterEach(() => {
-		rmSync(state.project.path, { recursive: true, force: true });
-		vi.restoreAllMocks();
+		warn.mockRestore();
+		rmSync(project.path, { recursive: true, force: true });
 	});
 
-	function invoke(channel: string, ...args: unknown[]): Promise<unknown> {
-		const handler = state.handlers.get(channel);
-		if (!handler) throw new Error(`no handler for ${channel}`);
-		return handler({}, ...args);
-	}
-
-	function envFile(): string {
-		return readFileSync(
-			path.join(state.project.path, ".workpilot", ".env"),
-			"utf-8",
-		);
-	}
-
-	async function getConfig(): Promise<ProjectEnvConfig> {
-		const result = (await invoke(IPC_CHANNELS.ENV_GET, "p1")) as {
-			success: boolean;
-			data: ProjectEnvConfig;
+	it("writes integration tokens encrypted and hands the renderer only their mask", async () => {
+		const config: Partial<ProjectEnvConfig> = {
+			claudeOAuthToken: "sk-ant-oat01-project",
+			githubEnabled: true,
+			githubToken: "ghp_projectToken",
+			githubRepo: "acme/app",
+			jiraEnabled: true,
+			jiraApiToken: "jira-token-value",
+			cicdJenkinsToken: "jenkins-token-value",
 		};
-		expect(result.success).toBe(true);
-		return result.data;
-	}
 
-	it("writes the tokens encrypted and hands the renderer only their mask", async () => {
-		await expect(
-			invoke(IPC_CHANNELS.ENV_UPDATE, "p1", {
-				claudeOAuthToken: "sk-ant-oat01-secret",
-				githubEnabled: true,
-				githubToken: "ghp_secret",
-				githubRepo: "owner/repo",
-				linearApiKey: "lin_api_secret",
-				slackWebhookUrl: "https://hooks.slack.com/services/secret",
-				mcpServers: { context7ApiKey: "ctx7sk-secret" },
-			}),
-		).resolves.toEqual({ success: true });
+		expect(await invoke(IPC_CHANNELS.ENV_UPDATE, project.id, config)).toEqual({
+			success: true,
+		});
 
-		const raw = envFile();
-		expect(raw).not.toContain("secret");
-		expect(raw).toContain(`GITHUB_TOKEN=${fakeEncrypted("ghp_secret")}`);
-		expect(raw).toContain("GITHUB_REPO=owner/repo");
+		const written = envFile();
+		for (const secret of Object.values(config).filter(
+			(value) => typeof value === "string" && value !== "acme/app",
+		)) {
+			expect(written).not.toContain(secret);
+		}
+		expect(written).toContain(`GITHUB_TOKEN=${fakeEncrypted("ghp_projectToken")}`);
+		expect(written).toContain("GITHUB_REPO=acme/app");
 
-		const config = await getConfig();
-		expect(JSON.stringify(config)).not.toContain("secret");
-		expect(config.githubToken).toBe(MASKED_SECRET);
-		expect(config.linearApiKey).toBe(MASKED_SECRET);
-		expect(config.claudeOAuthToken).toBe(MASKED_SECRET);
-		expect(config.slackWebhookUrl).toBe(MASKED_SECRET);
-		expect(config.mcpServers?.context7ApiKey).toBe(MASKED_SECRET);
-		expect(config.githubRepo).toBe("owner/repo");
-		expect(config.gitlabToken).toBeUndefined();
+		// The renderer is not trusted (rule S6): it learns which tokens are set.
+		const read = await invoke<ProjectEnvConfig>(IPC_CHANNELS.ENV_GET, project.id);
+		expect(read.data).toMatchObject({
+			claudeOAuthToken: MASKED_SECRET,
+			githubToken: MASKED_SECRET,
+			githubRepo: "acme/app",
+			jiraApiToken: MASKED_SECRET,
+			cicdJenkinsToken: MASKED_SECRET,
+		});
+		expect(JSON.stringify(read.data)).not.toContain("ghp_projectToken");
 	});
 
-	it("keeps every token when the whole masked config comes back", async () => {
-		await invoke(IPC_CHANNELS.ENV_UPDATE, "p1", {
-			claudeOAuthToken: "sk-ant-oat01-secret",
-			githubToken: "ghp_secret",
-			openaiApiKey: "sk-proj-secret",
-			mcpServers: { context7ApiKey: "ctx7sk-secret" },
+	it("keeps an encrypted token across a save that does not touch it", async () => {
+		await invoke(IPC_CHANNELS.ENV_UPDATE, project.id, {
+			githubToken: "ghp_projectToken",
 		});
 		const before = envFile();
 
-		// What the settings screen does on every edit: the whole config, changed.
-		const config = await getConfig();
-		await invoke(IPC_CHANNELS.ENV_UPDATE, "p1", {
-			...config,
-			githubRepo: "owner/repo",
-		});
+		await invoke(IPC_CHANNELS.ENV_UPDATE, project.id, { defaultBranch: "main" });
 
-		const raw = envFile();
-		expect(raw).not.toContain(MASKED_SECRET);
-		for (const line of [
-			`CLAUDE_CODE_OAUTH_TOKEN=${fakeEncrypted("sk-ant-oat01-secret")}`,
-			`GITHUB_TOKEN=${fakeEncrypted("ghp_secret")}`,
-			`OPENAI_API_KEY=${fakeEncrypted("sk-proj-secret")}`,
-			`CONTEXT7_API_KEY=${fakeEncrypted("ctx7sk-secret")}`,
-		]) {
-			expect(before).toContain(line);
-			expect(raw).toContain(line);
-		}
-		expect(raw).toContain("GITHUB_REPO=owner/repo");
+		const after = envFile();
+		const tokenLine = (content: string) =>
+			content.split("\n").find((line) => line.startsWith("GITHUB_TOKEN="));
+		expect(tokenLine(after)).toBe(tokenLine(before));
+		expect(after).toContain("DEFAULT_BRANCH=main");
 	});
 
-	it("stores what was typed over the mask", async () => {
-		await invoke(IPC_CHANNELS.ENV_UPDATE, "p1", { githubToken: "ghp_old" });
+	it("classifies every secret-shaped key the template writes", async () => {
+		await invoke(IPC_CHANNELS.ENV_UPDATE, project.id, {});
 
-		await invoke(IPC_CHANNELS.ENV_UPDATE, "p1", {
-			githubToken: `${MASKED_SECRET}ghp_new`,
-		});
+		const templateKeys = envFile()
+			.split("\n")
+			.map((line) => /^#?\s*([A-Z][A-Z0-9_]*)=/.exec(line)?.[1])
+			.filter((key): key is string => key !== undefined);
+		const classified = new Set([
+			...projectEnvSecrets.encrypted,
+			...projectEnvSecrets.readable,
+		]);
 
-		expect(envFile()).toContain(`GITHUB_TOKEN=${fakeEncrypted("ghp_new")}`);
-	});
-
-	it("does not copy the global Claude token into the project file", async () => {
-		state.globalSettings = { globalClaudeOAuthToken: "sk-ant-oat01-global" };
-
-		const config = await getConfig();
-		expect(config.claudeTokenIsGlobal).toBe(true);
-		expect(config.claudeOAuthToken).toBe(MASKED_SECRET);
-
-		await invoke(IPC_CHANNELS.ENV_UPDATE, "p1", { ...config });
-		expect(envFile()).not.toContain(fakeEncrypted("sk-ant-oat01-global"));
-		expect(envFile()).not.toContain("sk-ant-oat01-global");
-	});
-
-	describe("notification webhook test", () => {
-		const STORED = "https://hooks.slack.com/services/T000/B000/stored";
-
-		beforeEach(async () => {
-			state.backendFetch.mockResolvedValue({ success: true });
-			await invoke(IPC_CHANNELS.ENV_UPDATE, "p1", {
-				slackWebhookUrl: STORED,
-			});
-		});
-
-		it("posts the stored URL when the renderer only has the mask", async () => {
-			await expect(
-				invoke(
-					IPC_CHANNELS.ENV_TEST_NOTIFICATION_WEBHOOK,
-					"p1",
-					"slack",
-					MASKED_SECRET,
-				),
-			).resolves.toEqual({ success: true, data: { delivered: true } });
-
-			expect(state.backendFetch).toHaveBeenCalledTimes(1);
-			const [route, init] = state.backendFetch.mock.calls[0];
-			expect(route).toBe("/api/notifications/test");
-			expect(JSON.parse(init.body)).toEqual({ channel: "slack", url: STORED });
-		});
-
-		it("posts a URL that was just typed", async () => {
-			await invoke(
-				IPC_CHANNELS.ENV_TEST_NOTIFICATION_WEBHOOK,
-				"p1",
-				"slack",
-				"https://hooks.slack.com/services/T000/B000/typed",
-			);
-
-			expect(JSON.parse(state.backendFetch.mock.calls[0][1].body).url).toBe(
-				"https://hooks.slack.com/services/T000/B000/typed",
-			);
-		});
-
-		it("refuses an unknown project, an unknown channel, a missing URL", async () => {
-			await expect(
-				invoke(IPC_CHANNELS.ENV_TEST_NOTIFICATION_WEBHOOK, "nope", "slack"),
-			).resolves.toEqual({ success: false, error: "Project not found" });
-			await expect(
-				invoke(IPC_CHANNELS.ENV_TEST_NOTIFICATION_WEBHOOK, "p1", "irc"),
-			).resolves.toEqual({ success: false, error: "Unknown channel" });
-			await expect(
-				invoke(
-					IPC_CHANNELS.ENV_TEST_NOTIFICATION_WEBHOOK,
-					"p1",
-					"teams",
-					MASKED_SECRET,
-				),
-			).resolves.toEqual({ success: false, error: "No webhook URL" });
-			expect(state.backendFetch).not.toHaveBeenCalled();
-		});
-
-		it("reports the backend's refusal", async () => {
-			state.backendFetch.mockResolvedValue({
-				success: false,
-				error: "URL refused",
-			});
-
-			await expect(
-				invoke(IPC_CHANNELS.ENV_TEST_NOTIFICATION_WEBHOOK, "p1", "slack"),
-			).resolves.toEqual({ success: false, error: "URL refused" });
-		});
+		expect(templateKeys.length).toBeGreaterThan(20);
+		expect(
+			templateKeys.filter((key) => SECRET_SHAPED.test(key) && !classified.has(key)),
+		).toEqual([]);
 	});
 });

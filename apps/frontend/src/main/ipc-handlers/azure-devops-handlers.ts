@@ -26,6 +26,7 @@ import type {
 } from "../../shared/types";
 import { slugifySpecTitle } from "../../shared/utils/spec-slug";
 import type { AgentManager } from "../agent";
+import { readProjectEnv } from "../project-env-file";
 import { projectStore } from "../project-store";
 import {
 	parseAcceptanceCriteriaText,
@@ -42,7 +43,6 @@ import {
 	stripControlChars,
 	stripHtml,
 } from "./shared/sanitize";
-import { readProjectEnvFor } from "../project-env-file";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -73,13 +73,16 @@ export function registerAzureDevOpsHandlers(
 		if (!project.autoBuildPath) {
 			return { pat: null, orgUrl: null, projectName: null };
 		}
-		// Through project-env-file, which decrypts the stored PAT.
-		const vars = readProjectEnvFor(project.path, project.autoBuildPath);
-		return {
-			pat: vars.AZURE_DEVOPS_PAT || null,
-			orgUrl: vars.AZURE_DEVOPS_ORG_URL || null,
-			projectName: vars.AZURE_DEVOPS_PROJECT || null,
-		};
+		try {
+			const vars = readProjectEnv(project);
+			return {
+				pat: vars.AZURE_DEVOPS_PAT || null,
+				orgUrl: vars.AZURE_DEVOPS_ORG_URL || null,
+				projectName: vars.AZURE_DEVOPS_PROJECT || null,
+			};
+		} catch {
+			return { pat: null, orgUrl: null, projectName: null };
+		}
 	};
 
 	/**

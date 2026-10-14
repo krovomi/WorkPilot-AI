@@ -35,6 +35,7 @@ plaintext:
 | `settings.json` | `settings-utils.ts` — `readSettingsFile`, `readSettingsFileAsync`, `writeSettingsFile` | `isSecretSettingsKey`: `global…ApiKey`, `…AccessKey`, `…Token`, `…Secret`, `…Password`, `customProviderApiKey` |
 | `profiles.json` | `services/profile/profile-manager.ts` (`encodeProfilesForDisk` / `decodeProfilesFromDisk`), reused by `utils/profile-manager.ts` | `apiKey` |
 | Claude profiles | `claude-profile/token-encryption.ts` | `oauthToken` |
+| `<project>/.workpilot/.env` | `project-env-file.ts` — `readProjectEnv`, `writeProjectEnvFile` | the `encrypted` list of `project-env-secrets.json` (below) |
 
 That is why no module parses `settings.json` itself any more: the dozen
 services that did so to inject `ANTHROPIC_API_KEY` or `CLAUDE_OAUTH_TOKEN`
@@ -85,72 +86,80 @@ reader still knows what leaked, and leaves `max_tokens=4096` or
 
 ## A project's `.workpilot/.env`
 
-Each project's `.workpilot/.env` holds the tokens of its integrations
-(`CLAUDE_CODE_OAUTH_TOKEN`, `GITHUB_TOKEN`, `GITLAB_TOKEN`, `LINEAR_API_KEY`,
-`JIRA_API_TOKEN`, `AZURE_DEVOPS_PAT`, `CICD_JENKINS_TOKEN`, `CONTEXT7_API_KEY`,
-`FIGMA_ACCESS_TOKEN`, provider keys, notification webhook URLs) next to
-settings that are not secret. The Python backend cannot call `safeStorage`,
-but it does not need to: it never loads the file in bulk. The main process
-reads it and passes its variables to every Python subprocess it spawns
-(`AgentProcessManager.getCombinedEnv`, `loadProjectEnvForSubprocess`), and the
-backend readers that look at the file for a few keys of their own let a real
-environment variable win.
+The settings screen writes each project's integration tokens to
+`<project>/.workpilot/.env`, and the Python backend reads that file with its
+own parsers. Python cannot call `safeStorage`, so the file holds two kinds of
+secrets, listed in `apps/frontend/src/shared/constants/project-env-secrets.json`:
 
-So the file is encrypted at its boundary, like `settings.json`:
+| Kind | Keys | On disk | How Python gets the value |
+|---|---|---|---|
+| `encrypted` | `CLAUDE_CODE_OAUTH_TOKEN`, `LINEAR_API_KEY`, `GITHUB_TOKEN`, `GITLAB_TOKEN`, `AZURE_DEVOPS_PAT`, `JIRA_API_TOKEN`, `CICD_JENKINS_TOKEN`, `OPENAI_API_KEY`, `AZURE_OPENAI_API_KEY`, `VOYAGE_API_KEY`, `GOOGLE_API_KEY` | `enc:` ciphertext | only from its environment, which the main process builds from this file and decrypts on the way (`getCombinedEnv`, `loadProjectEnvForSubprocess`, `loadProjectEnvVars`) |
+| `readable` | `CONTEXT7_API_KEY`, `CUSTOM_MCP_SERVERS` (when a server has HTTP headers), `FIGMA_ACCESS_TOKEN`, `DOCINTEL_AZURE_KEY`, the five notification webhook URLs | in clear, file `0600` | from the file itself |
 
-| | |
-|---|---|
-| Reader / writer | `apps/frontend/src/main/project-env-file.ts` — `readProjectEnv`, `readProjectEnvFor`, `readProjectEnvContent`, `writeProjectEnv`, `writeProjectEnvFile` |
-| Secret keys | `isSecretProjectEnvKey`: `…_TOKEN`, `…_API_KEY`, `…_ACCESS_KEY`, `…_SECRET`, `…_PASSWORD`, `…_PAT`, `…_WEBHOOK_URL`, `DOCINTEL_AZURE_KEY` |
-| On disk | `KEY=enc:<base64>`, every other line byte for byte; `0600` |
-| Without a keyring | the value in clear, `0600`, the sidebar banner |
-| Migration | `migrateProjectEnvSecrets`, run with the others for every known project |
-| Git | each write and the migration check `git check-ignore`; when the file is not ignored, `.workpilot/` is added to the project's `.gitignore` |
+The split follows the readers, not how sensitive a key is. A `readable` key is
+read from the file by processes the app starts without the project's
+environment: the long-lived API server (Figma import, notifications, docintel)
+and the runners that build a client for any project (`create_client` loads
+`CONTEXT7_API_KEY` and `CUSTOM_MCP_SERVERS` through
+`load_project_mcp_config`). Ciphertext there would silently break those
+features. Those keys therefore stay in clear and are reported to the status as
+`readableSecretKeys`. The banner then names them even when a keyring exists,
+because a secret in clear is never kept without the user being told.
 
-A secret that cannot be decrypted right now is left out by `readProjectEnv`:
-handed to a subprocess, ciphertext would win over the variable the backend
-would otherwise read, and sent to an API it is not a token. The content
-readers keep it as stored, so a save does not lose it.
+`apps/frontend/src/main/project-env-file.ts` is the one reader and writer in
+the main process. Every handler that reads the file (Linear, Jira, GitHub,
+GitLab, Azure DevOps, CI pipelines, PR creation, the agent process) goes
+through `readProjectEnv`, which decrypts. A value it cannot decrypt is left
+out: a subprocess gets no token rather than ciphertext, and the file keeps the
+value. `writeProjectEnvFile` encrypts the `encrypted` keys and keeps every
+other line byte for byte. `migrateProjectEnvSecrets` runs at startup and when a
+project is added: it rewrites the tokens an earlier version wrote in clear and
+restricts the file to its owner.
 
-### The CLI without the desktop app
+Git must ignore the file. `initializeProject` ignores `.workpilot/`, but a
+`.env` saved before initialization, or a `.workpilot/` renamed from a legacy
+`.auto-claude/`, never went through it. `ensureProjectEnvIgnored` asks
+`git check-ignore` and, when the file is not ignored, adds `.workpilot/.env`
+itself, never the directory: a team that commits `.workpilot/specs/` through a
+negation keeps doing so.
 
-`python run.py` and `runners/spec_runner.py` load `.env-files/.env` and the
-process environment, never the project file in bulk; integration tokens have
-always come from there. The few readers that do read the project file —
-`core/client.py` (`CONTEXT7_API_KEY`), `docintel/settings.py`
-(`DOCINTEL_AZURE_KEY`, `FIGMA_ACCESS_TOKEN`), `libdocs/preflight.py`,
-`services/notifications/service.py` (webhook URLs) — go through
-`core/project_env.py`: an `enc:` value counts as absent, a warning names the
-key once and says to export it, and an exported variable is used. Ciphertext
-is never handed to an MCP server or a webhook as if it were the secret.
-
-`core/auth.py` gives `enc:` another meaning (a token the Claude Code CLI
-encrypted). The two do not meet: `auth.py` reads environment variables, and
-the main process never passes a value it could not decrypt.
+`tests/test_project_env_secrets.py` holds the backend to the split: no reader
+of the file returns an `enc:` value, the `readable` keys still reach their
+readers, and a new module that opens the file fails the test until it is
+classified. On the frontend, `env-handlers-secrets.test.ts` fails when the
+`.env` template gains a key that looks like a secret and is not classified.
 
 ### What the renderer sees
 
 The renderer is not trusted (rule S6 of
-[`docs/rules/security.md`](../rules/security.md)), so `ENV_GET` never hands it
-a project token. Each secret field that is set (`PROJECT_ENV_SECRET_FIELDS` in
-`env-handlers.ts`, plus `mcpServers.context7ApiKey`) reads as `MASKED_SECRET`
-(`shared/constants/secrets.ts`), which is enough to tell "configured" from
-"not configured". The global Claude token or OpenAI key a project falls back
-to is masked the same way.
+[`docs/rules/security.md`](../rules/security.md)), so `ENV_GET` never hands
+it a project secret, whether it is encrypted or readable. Each secret field
+that is set reads as `MASKED_SECRET` (`shared/constants/secrets.ts`), which
+is enough to tell "configured" from "not configured". The fields are listed
+in `PROJECT_ENV_SECRET_FIELDS` in `env-handlers.ts`, plus
+`mcpServers.context7ApiKey`. When a project falls back to the global Claude
+token or OpenAI key, that value is masked the same way.
 
 The settings screens save the whole config on every edit, so the mask comes
 back. `ENV_UPDATE` treats it as "keep the stored value"
-(`unmaskProjectEnvUpdate`). Text typed after the mask is the new value, since
-the mask's character never occurs in a token or a URL. That also stops a
-whole-config save from copying the global Claude token into the project file.
+(`unmaskProjectEnvUpdate`). Text typed after the mask is the new value; the
+mask's character never occurs in a token or a URL. This also stops a
+whole-config save from copying the global Claude token into the project
+file.
 
-Two screens used to send the value itself somewhere, and now let the main
-process read it:
+Two screens used to send the value itself somewhere. The main process now
+reads it instead:
 
-- The Jira connection test passes `projectId`. A masked or empty token means
-  the project's stored token, and without a project the test is refused.
-- The notification webhook test goes through
+- **Jira connection test.** It passes `projectId`. A masked or empty token
+  means the project's stored token. Without a project, the test is refused.
+- **Notification webhook test.** It goes through
   `env:testNotificationWebhook(projectId, channel, url?)`. The main process
-  takes the stored URL for that channel (closed list) unless a new one was
+  takes the URL stored for that channel (closed list) unless a new one was
   typed, and has the backend post it. Before, the renderer did that fetch
   itself.
+
+## Not covered here
+
+The backend's own `.env` (`apps/backend/.env` in development,
+`userData/backend/.env` in production), written by `settings-handlers.ts`,
+still holds `CLAUDE_CODE_OAUTH_TOKEN` in clear.

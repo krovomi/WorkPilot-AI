@@ -4,7 +4,6 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { app } from "electron";
-import { readProjectEnvFor } from "../project-env-file";
 
 // ESM-compatible __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -26,6 +25,7 @@ import { getClaudeProfileManager } from "../claude-profile-manager";
 import { getToolInfo } from "../cli-tool-manager";
 import { getAugmentedEnv } from "../env-utils";
 import { isWindows, killProcessGracefully } from "../platform";
+import { readProjectEnv } from "../project-env-file";
 import { projectStore } from "../project-store";
 import { buildTaskProviderEnv, type TaskProviderPlan } from "./task-provider-env";
 import { parsePythonCommand, validatePythonPath } from "../python-detector";
@@ -758,7 +758,9 @@ export class AgentProcessManager {
 
 	/**
 	 * Load environment variables from project's .workpilot/.env file
-	 * This contains frontend-configured settings (integrations, MCP toggles)
+	 * This contains frontend-configured settings (integrations, MCP toggles).
+	 * Its tokens are stored encrypted: this is where they become plaintext
+	 * again, in the subprocess environment, never on disk.
 	 */
 	private loadProjectEnv(projectPath: string): Record<string, string> {
 		// Find project by path to get autoBuildPath
@@ -769,11 +771,9 @@ export class AgentProcessManager {
 			return {};
 		}
 
-		// Through project-env-file: tokens decrypted, undecryptable ones left
-		// out. Empty values are dropped so they never override a profile token.
-		const vars = readProjectEnvFor(projectPath, project.autoBuildPath);
-		return Object.fromEntries<string>(
-			Object.entries(vars).filter(([, value]) => value !== ""),
+		// Skip empty values to prevent overriding valid values from other sources
+		return Object.fromEntries(
+			Object.entries(readProjectEnv(project)).filter(([, value]) => value),
 		);
 	}
 

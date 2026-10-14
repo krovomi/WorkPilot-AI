@@ -9,15 +9,13 @@
  * l'autre dit s'il y en a une.
  */
 
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
 import type { IPCResult } from "../../shared/types";
-import {
-	ensureProjectEnvIgnored,
-	getProjectEnvPath,
-	readProjectEnvContent,
-	writeProjectEnvFile,
-} from "../project-env-file";
+import { writeProjectEnvFile } from "../project-env-file";
+import { ensureProjectEnvIgnored } from "../project-initializer";
 import { projectStore } from "../project-store";
 
 export const FIGMA_TOKEN_KEY = "FIGMA_ACCESS_TOKEN";
@@ -50,23 +48,23 @@ export function hasFigmaToken(content: string): boolean {
 }
 
 /**
- * Le contenu du `.env`, jetons déchiffrés, "" s'il n'existe pas encore. Lu
- * d'un seul appel, sans `existsSync` avant : un test puis une lecture laissent
- * une fenêtre où le fichier change entre les deux.
+ * Le contenu du `.env`, "" s'il n'existe pas encore. Lu d'un seul appel,
+ * sans `existsSync` avant : un test puis une lecture laissent une fenêtre où
+ * le fichier change entre les deux.
  */
 function readEnv(file: string): string {
-	return readProjectEnvContent(file) ?? "";
+	try {
+		return readFileSync(file, "utf-8");
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code === "ENOENT") return "";
+		throw error;
+	}
 }
 
-function envLocation(
-	projectId: string,
-): { file: string; projectPath: string } | null {
+function envPath(projectId: string): string | null {
 	const project = projectStore.getProject(projectId);
 	if (!project?.autoBuildPath) return null;
-	return {
-		file: getProjectEnvPath(project.path, project.autoBuildPath),
-		projectPath: project.path,
-	};
+	return path.join(project.path, project.autoBuildPath, ".env");
 }
 
 export function registerFigmaHandlers(): void {
@@ -76,11 +74,11 @@ export function registerFigmaHandlers(): void {
 			_,
 			projectId: string,
 		): Promise<IPCResult<{ configured: boolean; fromEnvironment: boolean }>> => {
-			const location = envLocation(projectId);
+			const file = envPath(projectId);
 			let configured = false;
-			if (location) {
+			if (file) {
 				try {
-					configured = hasFigmaToken(readEnv(location.file));
+					configured = hasFigmaToken(readEnv(file));
 				} catch {
 					configured = false;
 				}
@@ -100,13 +98,17 @@ export function registerFigmaHandlers(): void {
 			if (token === null) {
 				return { success: false, error: "invalid-token" };
 			}
-			const location = envLocation(projectId);
-			if (!location) return { success: false, error: "not-initialized" };
+			const project = projectStore.getProject(projectId);
+			if (!project?.autoBuildPath) {
+				return { success: false, error: "not-initialized" };
+			}
+			const file = path.join(project.path, project.autoBuildPath, ".env");
 			try {
-				const current = readEnv(location.file);
-				// Chiffré par secret-storage (ou 0600 + bannière sans trousseau).
-				writeProjectEnvFile(location.file, withFigmaToken(current, token));
-				ensureProjectEnvIgnored(location.projectPath, location.file);
+				await ensureProjectEnvIgnored(project.path, project.autoBuildPath);
+				const current = readEnv(file);
+				// Owner-only, and the banner names the token: the backend reads it
+				// from this file in the API server, so it cannot be encrypted.
+				writeProjectEnvFile(file, withFigmaToken(current, token));
 				return { success: true, data: token !== "" };
 			} catch {
 				return { success: false, error: "write-failed" };

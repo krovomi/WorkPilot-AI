@@ -89,10 +89,11 @@ import { ensureOllamaReady } from "./services/ollama-portable";
 import { ensureOAuthServerRunning } from "./oauth-server";
 import { openExternalUrl } from "./open-external";
 import { isMacOS, isWindows } from "./platform";
+import { migrateProjectEnvSecrets } from "./project-env-file";
+import { ensureProjectEnvFilesIgnored } from "./project-initializer";
+import { projectStore } from "./project-store";
 import { pythonEnvManager } from "./python-env-manager";
 import { migrateProfilesSecrets } from "./services/profile/profile-manager";
-import { migrateProjectEnvSecrets } from "./project-env-file";
-import { projectStore } from "./project-store";
 import { initSentryMain } from "./sentry";
 import {
 	migrateSettingsSecrets,
@@ -819,8 +820,9 @@ async function setupMacOSDockIcon() {
 }
 
 // Encrypt the secrets settings.json, profiles.json and each project's
-// .workpilot/.env still hold in clear.
-// Without OS encryption they stay as they are and the UI warns the user.
+// .workpilot/.env still hold in clear. Without OS encryption they stay as they
+// are and the UI warns the user, as it does for the project secrets the
+// backend must read from the file.
 async function migrateSecretsAtRest(): Promise<void> {
 	try {
 		if (migrateSettingsSecrets()) {
@@ -829,12 +831,18 @@ async function migrateSecretsAtRest(): Promise<void> {
 		if (await migrateProfilesSecrets()) {
 			console.warn("[main] profiles.json: secrets kept in clear rewritten");
 		}
-		const projectEnvFiles = migrateProjectEnvSecrets(projectStore.getProjects());
+		const projects = projectStore.getProjects();
+		const projectEnvFiles = migrateProjectEnvSecrets(projects);
 		if (projectEnvFiles > 0) {
 			console.warn(
-				`[main] .workpilot/.env: secrets kept in clear rewritten in ${projectEnvFiles} project(s)`,
+				`[main] .workpilot/.env: tokens kept in clear rewritten in ${projectEnvFiles} project(s)`,
 			);
 		}
+		// One git call per project: off the launch path, which only needs
+		// the files encrypted before anything reads them.
+		void ensureProjectEnvFilesIgnored(projects).catch((error) =>
+			console.warn("[main] Could not check .workpilot/.env is ignored:", error),
+		);
 	} catch (error) {
 		console.warn("[main] Failed to encrypt stored secrets:", error);
 	}

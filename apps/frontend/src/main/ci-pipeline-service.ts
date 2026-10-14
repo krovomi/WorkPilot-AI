@@ -42,8 +42,8 @@ import {
 } from "./ipc-handlers/task/plan-file-utils";
 import { parseEnvFile } from "./ipc-handlers/utils";
 import { learningLoopService } from "./learning-loop-service";
+import { readProjectEnvFile } from "./project-env-file";
 import { projectStore } from "./project-store";
-import { readProjectEnvFor } from "./project-env-file";
 
 const DEFAULT_POLL_SECONDS = 60;
 /** Re-resolve provider credentials at most every 5 minutes per project. */
@@ -72,10 +72,12 @@ export function readMergedProjectEnv(project: Project): MergedEnv {
 	} catch {
 		/* unreadable env file — ignore */
 	}
-	// Through project-env-file, which decrypts the stored tokens.
+	// The workpilot one through project-env-file, which decrypts its tokens.
 	Object.assign(
 		merged,
-		readProjectEnvFor(project.path, project.autoBuildPath),
+		readProjectEnvFile(
+			path.join(project.path, project.autoBuildPath || ".workpilot", ".env"),
+		),
 	);
 	return merged;
 }
