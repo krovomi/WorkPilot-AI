@@ -593,13 +593,42 @@ def get_electron_debug_port() -> int:
 
 
 def should_use_claude_md() -> bool:
-    """Check if CLAUDE.md instructions should be included in system prompt."""
+    """Check if CLAUDE.md instructions should be included in the agent's context."""
     return os.environ.get("USE_CLAUDE_MD", "").lower() == "true"
+
+
+#: Claude Code's own switch for memory files. Set to "1", the CLI loads no
+#: CLAUDE.md at all: user, project, `.claude/CLAUDE.md`, `CLAUDE.local.md`,
+#: `.claude/rules/`, nor the nested CLAUDE.md of a folder the agent reads.
+#: See code.claude.com/docs/en/env-vars.
+DISABLE_CLAUDE_MD_ENV = "CLAUDE_CODE_DISABLE_CLAUDE_MDS"
+
+
+def apply_claude_md_setting(sdk_env: dict[str, str]) -> bool:
+    """Let the project's `useClaudeMd` setting decide whether CLAUDE.md loads.
+
+    The SDK, not WorkPilot, reads CLAUDE.md: the "project" setting source
+    makes Claude Code put it in the session's user context, which a custom
+    system prompt does not replace. Turning the source off would also drop the
+    project's skills and hooks, so the setting answers with the CLI's memory
+    switch instead. Off, the switch is assigned rather than defaulted: the
+    project said no.
+
+    Returns:
+        True when CLAUDE.md stays on, False when the switch was set.
+    """
+    if should_use_claude_md():
+        return True
+    sdk_env[DISABLE_CLAUDE_MD_ENV] = "1"
+    return False
 
 
 def load_claude_md(project_dir: Path) -> str | None:
     """
     Load CLAUDE.md content from project root if it exists.
+
+    The prompt preview reads it to show the file; a session never injects it,
+    Claude Code loads it (see `apply_claude_md_setting`).
 
     Args:
         project_dir: Root directory of the project
@@ -1286,35 +1315,11 @@ def create_client(
 
     base_prompt = build_base_system_prompt(project_dir)
 
-    # CLAUDE.md loading strategy: hybrid (setting_sources + manual fallback).
-    #
-    # Primary path: `setting_sources=["project","user","local"]` (added below to
-    # ClaudeAgentOptions) lets the SDK natively load <cwd>/CLAUDE.md,
-    # <cwd>/.claude/CLAUDE.md, project rules, and skills with proper prompt-cache
-    # prefix handling — no manual concatenation needed.
-    #
-    # Fallback: if the SDK can't find a CLAUDE.md (e.g. user disabled the
-    # "project" setting source, or CLAUDE.md lives at an unusual path), we
-    # still inject it manually into the system prompt when USE_CLAUDE_MD=true.
-    # This preserves the historical behavior for projects that rely on it.
-    if should_use_claude_md():
-        # SDK-native loading path expects CLAUDE.md at <cwd>/CLAUDE.md or
-        # <cwd>/.claude/CLAUDE.md. If found there, skip manual injection so
-        # the SDK can cache the prefix once across cards.
-        sdk_native_paths = [
-            project_dir / "CLAUDE.md",
-            project_dir / ".claude" / "CLAUDE.md",
-        ]
-        sdk_will_load = any(p.exists() for p in sdk_native_paths)
-        if sdk_will_load:
-            print("   - CLAUDE.md: loaded via setting_sources (SDK-native, cached)")
-        else:
-            claude_md_content = load_claude_md(project_dir)
-            if claude_md_content:
-                base_prompt = f"{base_prompt}\n\n# Project Instructions (from CLAUDE.md)\n\n{claude_md_content}"
-                print("   - CLAUDE.md: injected manually (fallback)")
-            else:
-                print("   - CLAUDE.md: not found in project root")
+    # CLAUDE.md is Claude Code's to load, through the "project" setting source
+    # below; this prompt never carries it. The project setting `useClaudeMd`
+    # (USE_CLAUDE_MD) switches it off in the CLI's environment.
+    if apply_claude_md_setting(sdk_env):
+        print("   - CLAUDE.md: loaded by Claude Code (setting_sources)")
     else:
         print("   - CLAUDE.md: disabled by project settings")
 
@@ -1451,7 +1456,9 @@ def create_client(
         # setting_sources auto-loads CLAUDE.md, project rules, skills, and
         # filesystem-defined hooks from ~/.claude (user), <cwd>/.claude (project),
         # and .claude/settings.local.json (local). The SDK handles prompt-cache
-        # prefixing automatically for these sources.
+        # prefixing automatically for these sources. CLAUDE.md and the rules
+        # files follow the project's `useClaudeMd` setting; skills and hooks
+        # do not (`apply_claude_md_setting`).
         # See: code.claude.com/docs/en/agent-sdk/claude-code-features
         "setting_sources": ["project", "user", "local"],
         "env": sdk_env,  # Pass ANTHROPIC_BASE_URL etc. to subprocess
