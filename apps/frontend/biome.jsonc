@@ -11,17 +11,17 @@
 	"linter": {
 		"enabled": true,
 		"rules": {
-			"recommended": true,
+			"preset": "recommended",
 			"a11y": "warn",
 			"complexity": {
-				"recommended": true,
+				"preset": "recommended",
 				"noBannedTypes": "off",
 				"noExcessiveLinesPerFunction": "off",
 				"useLiteralKeys": "off",
 				"useArrowFunction": "off"
 			},
 			"correctness": {
-				"recommended": true,
+				"preset": "recommended",
 				"noNodejsModules": "off",
 				"useImportExtensions": "off",
 				"noUnusedFunctionParameters": "warn",
@@ -29,7 +29,7 @@
 				"useExhaustiveDependencies": "warn"
 			},
 			"security": {
-				"recommended": true,
+				"preset": "recommended",
 				// noSecrets: disabled due to excessive false positives (2700+ warnings)
 				// It flags normal strings like "Settings", "Integrations", etc. as potential secrets
 				"noSecrets": "off",
@@ -39,7 +39,7 @@
 				"noDangerouslySetInnerHtml": "warn"
 			},
 			"style": {
-				"recommended": true,
+				"preset": "recommended",
 				"noDefaultExport": "off",
 				"useNamingConvention": "off",
 				"noProcessEnv": "off",
@@ -48,7 +48,7 @@
 				"useTemplate": "off"
 			},
 			"suspicious": {
-				"recommended": true,
+				"preset": "recommended",
 				"noConsole": {
 					"level": "warn",
 					"options": {

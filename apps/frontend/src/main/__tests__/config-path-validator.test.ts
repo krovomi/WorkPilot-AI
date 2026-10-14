@@ -60,13 +60,16 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { isValidConfigDir } from "../utils/config-path-validator";
 
+// A fixed home keeps the suite hermetic: the real one depends on who runs it.
+// As root it is /root, which the tests below assert is someone else's home.
+// path.resolve gives it the current drive on Windows, like any absolute path.
+const FAKE_HOME = path.resolve(path.sep, "home", "wp-test-user");
+
 describe("isValidConfigDir - Security Validation", () => {
-	let _originalHomedir: string;
 	let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
 
 	beforeEach(() => {
-		// Store original homedir for restoration
-		_originalHomedir = os.homedir();
+		vi.spyOn(os, "homedir").mockReturnValue(FAKE_HOME);
 
 		// Spy on console.warn to suppress warning output during tests
 		consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {
@@ -75,8 +78,7 @@ describe("isValidConfigDir - Security Validation", () => {
 	});
 
 	afterEach(() => {
-		// Restore console.warn
-		consoleWarnSpy.mockRestore();
+		vi.restoreAllMocks();
 	});
 
 	describe("Valid paths - Should ACCEPT", () => {
