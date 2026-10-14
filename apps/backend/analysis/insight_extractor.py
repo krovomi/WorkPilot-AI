@@ -38,6 +38,23 @@ from core.runtimes import create_agent_runtime
 # extended thinking, so thinking_default is set to "none" in models.py
 DEFAULT_EXTRACTION_MODEL = "claude-haiku-4-5-20251001"
 
+# The prompt lives with the other agent prompts, in apps/backend/prompts/. It
+# used to be looked up next to this module, which was right while the module sat
+# at the backend root and wrong once it moved into analysis/: the file was never
+# found, and the model got a one-line fallback without the JSON schema, so the
+# keys record_structured reads ("path", "pattern", "approach_outcome"…) were
+# whatever the model guessed.
+PROMPT_FILE = (
+    Path(__file__).resolve().parent.parent / "prompts" / "insight_extractor.md"
+)
+
+# The extractor runs on Claude: its default model is Haiku and it is gated on
+# the Claude Code OAuth token. "claude" is the provider name ProviderConfig maps
+# to the Claude Agent SDK runtime; left unset, the factory resolved "anthropic",
+# which is not an SDK provider, and the session went to LiteLLM with the OAuth
+# token as an API key — rejected, caught, and replaced by generic insights.
+EXTRACTION_PROVIDER = "claude"
+
 # Maximum diff size to send to the LLM (avoid context limits)
 MAX_DIFF_CHARS = 15000
 
@@ -278,7 +295,7 @@ def _get_attempt_history(recovery_manager: Any, subtask_id: str) -> list[dict]:
 
 def _build_extraction_prompt(inputs: dict) -> str:
     """Build the prompt for insight extraction."""
-    prompt_file = Path(__file__).parent / "prompts" / "insight_extractor.md"
+    prompt_file = PROMPT_FILE
 
     if prompt_file.exists():
         base_prompt = prompt_file.read_text(encoding="utf-8")
@@ -370,7 +387,7 @@ async def run_insight_extraction(
             phase="insight_extraction",
             project_dir=project_dir,
             agent_type="insight_extractor",
-            cli_provider=None,
+            cli_provider=EXTRACTION_PROVIDER,
             cli_model=get_extraction_model(),
             cli_thinking=None,
             config=None,

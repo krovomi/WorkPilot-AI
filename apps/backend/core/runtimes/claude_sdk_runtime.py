@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import AsyncGenerator
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -52,7 +53,10 @@ class ClaudeSDKRuntime(AgentRuntime):
                 agent_type=self.agent_type,
                 model=getattr(self.config, "model", "claude-3-sonnet-20240229"),
                 max_thinking_tokens=self.cli_thinking,
-                cwd=self.project_dir if self.project_dir else None,
+                # create_simple_client calls cwd.resolve(): a str project_dir
+                # (the factory's signature allows one) used to fail here, be
+                # logged, and leave every session "not initialized".
+                cwd=Path(self.project_dir) if self.project_dir else None,
                 max_turns=self.max_turns,
             )
             logger.info(
