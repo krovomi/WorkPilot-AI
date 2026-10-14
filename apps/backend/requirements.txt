@@ -12,7 +12,7 @@ faster-whisper>=1.2.1
 websockets>=17.1
 
 # TOML parsing fallback for Python < 3.11
-tomli>=2.0.0; python_version < "3.11"
+tomli>=2.5.0; python_version < "3.11"
 
 # YAML parsing. Imported behind try/except by api_watcher/contract_parser.py,
 # analysis/ci_discovery.py, environment/capturer.py and
