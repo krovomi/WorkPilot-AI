@@ -13,14 +13,21 @@
  *   only the main process reads it. Its secrets are `enc:`, like those of
  *   settings.json, or in clear in a 0600 file with the warning when no OS
  *   keyring can encrypt them.
+ *
+ * Whoever builds a backend subprocess's environment reads it through
+ * loadBackendEnv, which decrypts.
  */
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
+import { app } from "electron";
 import { isSensitiveKey } from "../shared/utils/secret-redaction";
 import { parseEnvFile } from "./ipc-handlers/utils";
 import {
+	decryptSecret,
 	encryptSecretFields,
 	hasPlaintextSecretFields,
+	isEncryptedSecret,
 	reportPlaintextSecretFile,
 } from "./secret-storage";
 import { restrictToOwner } from "./settings-utils";
@@ -31,6 +38,14 @@ export interface SourceEnvFile {
 	envPath: string;
 	/** Python loads the file itself (running from source): no `enc:` in it. */
 	readByBackend: boolean;
+}
+
+/**
+ * Packaged, where the UI saves the source env: the bundled backend sits in
+ * read-only resources, and its own `.env` is left out of the bundle.
+ */
+export function getPackagedSourceEnvPath(): string {
+	return path.join(app.getPath("userData"), "backend", ".env");
 }
 
 /** `AZURE_DEVOPS_PAT`: a credential the generic key pattern does not name. */
@@ -115,4 +130,46 @@ export function migrateSourceEnvSecrets(file: SourceEnvFile): boolean {
 
 	writeSourceEnvFile(file, vars);
 	return true;
+}
+
+/** The variables of an env file with a value; none when it cannot be read. */
+function readEnvValues(envPath: string): Record<string, string> {
+	if (!existsSync(envPath)) return {};
+	try {
+		const values: Record<string, string> = {};
+		for (const [key, value] of Object.entries(
+			parseEnvFile(readFileSync(envPath, "utf-8")),
+		)) {
+			// An empty line (`CLAUDE_CODE_OAUTH_TOKEN=`) sets nothing: it must not
+			// mask a value another layer provides.
+			if (value) values[key] = value;
+		}
+		return values;
+	} catch {
+		return {};
+	}
+}
+
+/**
+ * What a backend subprocess gets from the `.env` files: the backend source's
+ * own, then, packaged, the copy the UI saves under userData, which wins. Its
+ * secrets come back decrypted. One the keyring cannot decrypt right now is
+ * left out, never handed to Python as ciphertext: the profile token, layered
+ * after this by every caller, stands in.
+ */
+export function loadBackendEnv(autoBuildSource: string): Record<string, string> {
+	const env = {
+		...readEnvValues(path.join(autoBuildSource, ".env")),
+		...(app.isPackaged ? readEnvValues(getPackagedSourceEnvPath()) : {}),
+	};
+	for (const [key, value] of Object.entries(env)) {
+		if (!isSourceEnvSecretKey(key) || !isEncryptedSecret(value)) continue;
+		const secret = decryptSecret(value);
+		if (secret) {
+			env[key] = secret;
+		} else {
+			delete env[key];
+		}
+	}
+	return env;
 }

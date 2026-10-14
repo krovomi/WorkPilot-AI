@@ -2,7 +2,6 @@ import { spawn } from "node:child_process";
 import {
 	existsSync,
 	mkdtempSync,
-	readFileSync,
 	rmSync,
 	writeFileSync,
 } from "node:fs";
@@ -22,6 +21,7 @@ import {
 } from "./rate-limit-detector";
 import { credentialManager } from "./services/credential-manager";
 import { getAPIProfileEnv } from "./services/profile";
+import { loadBackendEnv } from "./source-env";
 
 // ESM-compatible __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -143,34 +143,6 @@ function resolveBackendSource(override?: string): string | null {
 	return null;
 }
 
-/** Parse the backend's `.env` into key/value pairs (best-effort). */
-function loadAutoBuildEnv(autoBuildSource: string): Record<string, string> {
-	const envPath = path.join(autoBuildSource, ".env");
-	if (!existsSync(envPath)) return {};
-	try {
-		const envVars: Record<string, string> = {};
-		for (const line of readFileSync(envPath, "utf-8").split(/\r?\n/)) {
-			const trimmed = line.trim();
-			if (!trimmed || trimmed.startsWith("#")) continue;
-			const eqIndex = trimmed.indexOf("=");
-			if (eqIndex > 0) {
-				const key = trimmed.substring(0, eqIndex).trim();
-				let value = trimmed.substring(eqIndex + 1).trim();
-				if (
-					(value.startsWith('"') && value.endsWith('"')) ||
-					(value.startsWith("'") && value.endsWith("'"))
-				) {
-					value = value.slice(1, -1);
-				}
-				envVars[key] = value;
-			}
-		}
-		return envVars;
-	} catch {
-		return {};
-	}
-}
-
 /**
  * Build the subprocess environment. Layers, in order: backend `.env`, the Claude
  * API/OAuth profile env (so the Claude provider authenticates), then the active
@@ -186,7 +158,7 @@ async function buildEnv(
 	autoBuildSource: string,
 	provider?: string,
 ): Promise<NodeJS.ProcessEnv> {
-	const autoBuildEnv = loadAutoBuildEnv(autoBuildSource);
+	const autoBuildEnv = loadBackendEnv(autoBuildSource);
 	const apiProfileEnv = await getAPIProfileEnv();
 	const isApiProfileActive = Object.keys(apiProfileEnv).length > 0;
 	const profileEnv = isApiProfileActive ? {} : getBestAvailableProfileEnv().env;

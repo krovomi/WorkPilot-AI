@@ -8,6 +8,7 @@
  */
 
 import {
+	mkdirSync,
 	mkdtempSync,
 	readFileSync,
 	rmSync,
@@ -22,14 +23,19 @@ import {
 	sharedFakeSafeStorage,
 } from "../../__tests__/helpers/fake-safe-storage";
 
-const paths = vi.hoisted(() => ({ userData: "" }));
+const paths = vi.hoisted(() => ({ userData: "", packaged: false }));
 
 vi.mock("electron", async () => {
 	const { sharedFakeSafeStorage } = await import(
 		"../../__tests__/helpers/fake-safe-storage"
 	);
 	return {
-		app: { getPath: () => paths.userData },
+		app: {
+			getPath: () => paths.userData,
+			get isPackaged() {
+				return paths.packaged;
+			},
+		},
 		safeStorage: sharedFakeSafeStorage().safeStorage,
 	};
 });
@@ -66,6 +72,7 @@ describe("backend .env secrets", () => {
 	beforeEach(() => {
 		fake.reset();
 		paths.userData = mkdtempSync(path.join(tmpdir(), "source-env-"));
+		paths.packaged = false;
 		vi.spyOn(console, "warn").mockImplementation(() => undefined);
 	});
 
@@ -282,6 +289,83 @@ describe("backend .env secrets", () => {
 					plaintextFiles: [envFile()],
 				}),
 			);
+		});
+	});
+
+	describe("what a backend subprocess gets (loadBackendEnv)", () => {
+		let backendDir: string;
+
+		beforeEach(() => {
+			backendDir = path.join(paths.userData, "resources-backend");
+			mkdirSync(backendDir);
+			mkdirSync(path.join(paths.userData, "backend"));
+		});
+
+		it("packaged, the token the UI saved, decrypted, over the bundled backend's", async () => {
+			paths.packaged = true;
+			writeFileSync(
+				path.join(backendDir, ".env"),
+				"DEBUG=true\nCLAUDE_CODE_OAUTH_TOKEN=bundled-0000\n",
+			);
+			const { writeSourceEnvFile, getPackagedSourceEnvPath, loadBackendEnv } =
+				await load();
+			writeSourceEnvFile(
+				{ envPath: getPackagedSourceEnvPath(), readByBackend: false },
+				{ CLAUDE_CODE_OAUTH_TOKEN: TOKEN },
+			);
+
+			expect(loadBackendEnv(backendDir)).toEqual({
+				DEBUG: "true",
+				CLAUDE_CODE_OAUTH_TOKEN: TOKEN,
+			});
+		});
+
+		it("leaves out a token the keyring cannot decrypt, never passing ciphertext", async () => {
+			paths.packaged = true;
+			const { writeSourceEnvFile, getPackagedSourceEnvPath, loadBackendEnv } =
+				await load();
+			writeSourceEnvFile(
+				{ envPath: getPackagedSourceEnvPath(), readByBackend: false },
+				{ CLAUDE_CODE_OAUTH_TOKEN: TOKEN, DEBUG: "true" },
+			);
+			fake.state.failDecrypt = true;
+
+			expect(loadBackendEnv(backendDir)).toEqual({ DEBUG: "true" });
+		});
+
+		it("an empty line in the saved copy does not mask the backend's value", async () => {
+			paths.packaged = true;
+			writeFileSync(
+				path.join(backendDir, ".env"),
+				"CLAUDE_CODE_OAUTH_TOKEN=from-backend-0000\n",
+			);
+			const { writeSourceEnvFile, getPackagedSourceEnvPath, loadBackendEnv } =
+				await load();
+			// The writer always emits the token line, empty when there is none.
+			writeSourceEnvFile(
+				{ envPath: getPackagedSourceEnvPath(), readByBackend: false },
+				{},
+			);
+
+			expect(loadBackendEnv(backendDir).CLAUDE_CODE_OAUTH_TOKEN).toBe(
+				"from-backend-0000",
+			);
+		});
+
+		it("from source, reads the backend's own .env as Python does, and nothing else", async () => {
+			writeFileSync(
+				path.join(backendDir, ".env"),
+				`CLAUDE_CODE_OAUTH_TOKEN=${TOKEN}\n`,
+			);
+			writeFileSync(
+				path.join(paths.userData, "backend", ".env"),
+				"CLAUDE_CODE_OAUTH_TOKEN=stale-0000\n",
+			);
+			const { loadBackendEnv } = await load();
+
+			expect(loadBackendEnv(backendDir)).toEqual({
+				CLAUDE_CODE_OAUTH_TOKEN: TOKEN,
+			});
 		});
 	});
 });

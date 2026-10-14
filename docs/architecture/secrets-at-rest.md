@@ -37,7 +37,7 @@ plaintext:
 | `settings.json` | `settings-utils.ts` — `readSettingsFile`, `readSettingsFileAsync`, `writeSettingsFile` | `isSecretSettingsKey`: `global…ApiKey`, `…AccessKey`, `…Token`, `…Secret`, `…Password`, `customProviderApiKey` |
 | `profiles.json` | `services/profile/profile-manager.ts` (`encodeProfilesForDisk` / `decodeProfilesFromDisk`), reused by `utils/profile-manager.ts` | `apiKey` |
 | Claude profiles | `claude-profile/token-encryption.ts` | `oauthToken` |
-| the backend's `.env` (the "source env") | `source-env.ts` (`writeSourceEnvFile`), read back by the `AUTOBUILD_SOURCE_ENV_*` handlers | `isSourceEnvSecretKey`: `CLAUDE_CODE_OAUTH_TOKEN`, `…_API_KEY`, `…_TOKEN`, `…_SECRET`, `…_PAT`… |
+| the backend's `.env` (the "source env") | `source-env.ts`: `writeSourceEnvFile`, and `loadBackendEnv` for subprocess environments; the `AUTOBUILD_SOURCE_ENV_*` handlers read the token back | `isSourceEnvSecretKey`: `CLAUDE_CODE_OAUTH_TOKEN`, `…_API_KEY`, `…_TOKEN`, `…_SECRET`, `…_PAT`… |
 
 That is why no module parses `settings.json` itself any more: the dozen
 services that did so to inject `ANTHROPIC_API_KEY` or `CLAUDE_OAUTH_TOKEN`
@@ -55,7 +55,7 @@ who reads each one decides what a secret looks like in it:
 | Running | File | Read by | Secrets |
 |---|---|---|---|
 | from source | `apps/backend/.env` | the main process (`loadAutoBuildEnv` in `agent/agent-process.ts`, `oneshot-llm.ts`, `changelog/changelog-service.ts`, `insights/config.ts`) **and Python itself**: `runners/github/runner.py` and `runners/gitlab/runner.py` load `Path(__file__).parent.parent.parent / ".env"`, and `provider_api.py`, run directly, calls a bare `load_dotenv()`, which walks up from `apps/backend/` | in clear, `0600`, named by the banner |
-| packaged | `<userData>/backend/.env` | the main process only, through the `AUTOBUILD_SOURCE_ENV_GET` / `_CHECK_TOKEN` handlers. No Python code knows this path | `enc:`, like `settings.json` |
+| packaged | `<userData>/backend/.env` | the main process only: the `AUTOBUILD_SOURCE_ENV_GET` / `_CHECK_TOKEN` handlers, and the same four readers through `loadBackendEnv`, which decrypts. No Python code knows this path | `enc:`, like `settings.json` |
 
 Python cannot call `safeStorage`, so a file it loads cannot hold `enc:` values:
 `python-dotenv` would load the ciphertext wherever the variable is not
@@ -67,10 +67,15 @@ credentials are encrypted, and remove the token from the file. In the agent
 processes, the Claude profile's token already wins over the file's
 (`setupProcessEnvironment` spreads it after the `.env` values).
 
-The packaged copy is read by no subprocess at all. The four `loadAutoBuildEnv`
-readers resolve the backend source (`<resources>/backend`,
-`<userData>/backend-source` or `autoBuildPath`), never `<userData>/backend`.
-A reader that starts reading that file has to decrypt its secret fields first.
+The four readers share one function, `loadBackendEnv` in `source-env.ts`. It
+reads the `.env` of the backend source they run (`<resources>/backend`,
+`<userData>/backend-source` or `autoBuildPath`), then, packaged, the copy the UI
+saved under userData, which wins: otherwise the token saved from the dialog
+would reach no subprocess, since the bundle leaves its own `.env` out. Secrets
+come back decrypted. One the keyring cannot decrypt right now is left out,
+never handed to Python as ciphertext, and so is an empty line, which the writer
+always emits for the token: neither masks a value from another layer. Every
+caller layers the Claude profile after it, so the profile's token still wins.
 
 The handler revalidates its argument (rule S6): the token is a string on one
 line, since the file holds one variable per line.

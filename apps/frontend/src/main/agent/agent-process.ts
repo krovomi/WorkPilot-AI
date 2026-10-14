@@ -40,6 +40,7 @@ import {
 } from "../rate-limit-detector";
 import { credentialManager } from "../services/credential-manager";
 import { getAPIProfileEnv } from "../services/profile";
+import { loadBackendEnv } from "../source-env";
 import type { AgentEvents } from "./agent-events";
 import type { AgentState } from "./agent-state";
 import { getOAuthModeClearVars } from "./env-utils";
@@ -773,7 +774,8 @@ export class AgentProcessManager {
 	}
 
 	/**
-	 * Load environment variables from auto-claude .env file
+	 * Load environment variables from the backend's .env, plus the copy the UI
+	 * saves when packaged, secrets decrypted (../source-env.ts)
 	 */
 	loadAutoBuildEnv(): Record<string, string> {
 		const autoBuildSource = this.getAutoBuildSourcePath();
@@ -781,8 +783,7 @@ export class AgentProcessManager {
 			return {};
 		}
 
-		const envPath = path.join(autoBuildSource, ".env");
-		return this.parseEnvFile(envPath);
+		return loadBackendEnv(autoBuildSource);
 	}
 
 	/**

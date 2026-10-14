@@ -40,6 +40,9 @@ vi.mock("electron", async () => {
 		app: {
 			getPath: () => env.userData,
 			getAppPath: () => env.userData,
+			get isPackaged() {
+				return !env.dev;
+			},
 		},
 		dialog: { showOpenDialog: vi.fn() },
 		shell: { openExternal: vi.fn() },
@@ -157,6 +160,20 @@ describe("AUTOBUILD_SOURCE_ENV handlers", () => {
 				envExists: true,
 			});
 			expect((await check()).data).toMatchObject({ hasToken: true });
+		});
+
+		it("hands the saved token, decrypted, to the backend's subprocesses", async () => {
+			const { update } = await register();
+			await update({ claudeOAuthToken: TOKEN });
+
+			// One of the four readers that build a backend subprocess environment
+			const { InsightsConfig } = await import("../insights/config");
+			const insights = new InsightsConfig();
+			insights.configure(undefined, backendDir);
+
+			expect(insights.loadAutoBuildEnv()).toMatchObject({
+				CLAUDE_CODE_OAUTH_TOKEN: TOKEN,
+			});
 		});
 
 		it("never hands the renderer ciphertext it cannot decrypt", async () => {

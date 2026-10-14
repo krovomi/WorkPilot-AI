@@ -50,7 +50,11 @@ import { credentialManager } from "../services/credential-manager";
 import { openExternalUrl } from "../open-external";
 import { decryptSecret } from "../secret-storage";
 import { readSettingsFile, writeSettingsFile } from "../settings-utils";
-import { SOURCE_ENV_TOKEN_KEY, writeSourceEnvFile } from "../source-env";
+import {
+	getPackagedSourceEnvPath,
+	SOURCE_ENV_TOKEN_KEY,
+	writeSourceEnvFile,
+} from "../source-env";
 import { testGenerationService } from "../test-generation-service";
 import { parseEnvFile } from "./utils";
 import { getCurrentOS } from "../platform";
@@ -428,7 +432,8 @@ const detectAutoBuildSourcePath = (): string | null => {
  *
  * `readByBackend`: in development the file is `<backend>/.env`, which the Python
  * runners load themselves, so it cannot hold `enc:` values. No Python code knows
- * the userData copy.
+ * the userData copy: the main process layers it, decrypted, into the backend's
+ * subprocess environments (loadBackendEnv).
  */
 export const getSourceEnvPath = (): {
 	sourcePath: string | null;
@@ -460,12 +465,9 @@ export const getSourceEnvPath = (): {
 	if (is.dev) {
 		envPath = path.join(sourcePath, ".env");
 	} else {
-		// Production: store .env in userData/backend/.env
-		const userDataBackendDir = path.join(app.getPath("userData"), "backend");
-		if (!existsSync(userDataBackendDir)) {
-			mkdirSync(userDataBackendDir, { recursive: true });
-		}
-		envPath = path.join(userDataBackendDir, ".env");
+		// Production: store .env in userData/backend/.env, where loadBackendEnv reads it
+		envPath = getPackagedSourceEnvPath();
+		mkdirSync(path.dirname(envPath), { recursive: true });
 	}
 
 	return {

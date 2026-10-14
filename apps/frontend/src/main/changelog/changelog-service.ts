@@ -27,6 +27,7 @@ import type {
 import { getToolInfo } from "../cli-tool-manager";
 import { getValidatedPythonPath } from "../python-detector";
 import { getConfiguredPythonPath } from "../python-env-manager";
+import { loadBackendEnv } from "../source-env";
 import { ChangelogGenerator } from "./generator";
 import {
 	getBranchDiffCommits,
@@ -143,44 +144,14 @@ export class ChangelogService extends EventEmitter {
 	}
 
 	/**
-	 * Load environment variables from auto-claude .env file
+	 * Load environment variables from the backend's .env, plus the copy the UI
+	 * saves when packaged, secrets decrypted (../source-env.ts)
 	 */
 	private loadAutoBuildEnv(): Record<string, string> {
 		const autoBuildSource = this.getAutoBuildSourcePath();
 		if (!autoBuildSource) return {};
 
-		const envPath = path.join(autoBuildSource, ".env");
-		if (!existsSync(envPath)) return {};
-
-		try {
-			const envContent = readFileSync(envPath, "utf-8");
-			const envVars: Record<string, string> = {};
-
-			// Handle both Unix (\n) and Windows (\r\n) line endings
-			for (const line of envContent.split(/\r?\n/)) {
-				const trimmed = line.trim();
-				if (!trimmed || trimmed.startsWith("#")) continue;
-
-				const eqIndex = trimmed.indexOf("=");
-				if (eqIndex > 0) {
-					const key = trimmed.substring(0, eqIndex).trim();
-					let value = trimmed.substring(eqIndex + 1).trim();
-
-					if (
-						(value.startsWith('"') && value.endsWith('"')) ||
-						(value.startsWith("'") && value.endsWith("'"))
-					) {
-						value = value.slice(1, -1);
-					}
-
-					envVars[key] = value;
-				}
-			}
-
-			return envVars;
-		} catch {
-			return {};
-		}
+		return loadBackendEnv(autoBuildSource);
 	}
 
 	/**
