@@ -261,10 +261,35 @@ export interface TaskDraft {
 	requireReviewBeforeCoding?: boolean;
 	tddMode?: boolean;
 	verifyLoop?: boolean;
+	/** Context-window policy chosen in the wizard (absent = defaults). */
+	contextPolicy?: ContextPolicy;
 	mobileTargets?: MobilePlatform[];
 	acceptanceCriteria?: string[];
 	extraNote?: string;
 	savedAt: Date;
+}
+
+/**
+ * What the backend does when the agent session's context window fills up.
+ *  - "compact": summarise the history and keep going in the same thread;
+ *  - "clear": start a fresh thread seeded with the handoff summary;
+ *  - "auto": the backend picks one of the two from context;
+ *  - "off": nothing automatic (the manual buttons still work).
+ */
+export type ContextPolicyMode = "auto" | "compact" | "clear" | "off";
+
+/**
+ * Per-task context-window policy, persisted as `contextPolicy` in
+ * `task_metadata.json`. The backend re-reads the file during the run, so an
+ * edit takes effect live. Absent means DEFAULT_CONTEXT_POLICY
+ * (shared/utils/context-policy.ts).
+ */
+export interface ContextPolicy {
+	mode: ContextPolicyMode;
+	/** Percentage of the window at which to act: 30..90, step 5. */
+	thresholdPct: number;
+	/** Prepare the handoff summary in the background before the threshold. */
+	prepareHandoff: boolean;
 }
 
 // Task metadata from ideation or manual entry
@@ -426,6 +451,10 @@ export interface TaskMetadata {
 	// true -> force it, undefined -> inherit the project default. Injected as
 	// WORKPILOT_VERIFY_LOOP at spawn time.
 	verifyLoop?: boolean;
+
+	// Context-window management (compact / clear at a threshold). Read live by
+	// the backend; absent = defaults (auto, 50%, handoff prepared in parallel).
+	contextPolicy?: ContextPolicy;
 
 	// Agent configuration (from agent profile or manual selection)
 	provider?: string; // Active LLM provider (e.g. 'anthropic', 'openai', 'google', 'ollama', ...)

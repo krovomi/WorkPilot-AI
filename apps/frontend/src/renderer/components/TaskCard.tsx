@@ -87,6 +87,7 @@ import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
 import { TaskEngineChip } from "./task-engine/TaskEngineChip";
+import { ContextGaugeMini } from "./task-detail/ContextGauge";
 import { FormulaBadge } from "./formula-lab/FormulaBadge";
 import { Checkbox } from "./ui/checkbox";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
@@ -1603,6 +1604,9 @@ export const TaskCard = memo(function TaskCard({
 								{!task.metadata?.appliedFormula && (
 									<TaskEngineChip task={task} />
 								)}
+								{/* Context-window fill of the running session (renders
+								    nothing until the backend reports it). */}
+								<ContextGaugeMini task={task} />
 								<FormulaBadge
 									task={task}
 									projectPath={currentProject?.path}

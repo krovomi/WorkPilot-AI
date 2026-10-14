@@ -1839,5 +1839,82 @@
 		"title": "La QA n'a pas pu valider cette tâche",
 		"unknown": "L'agent QA s'est arrêté sans indiquer de raison. Ouvrez l'onglet Journaux pour voir les dernières sorties.",
 		"hint": "Le travail est terminé ; seule la vérification automatique manque. Relisez les changements vous-même avant de fusionner, ou relancez la tâche pour repasser la QA."
+	},
+	"contextManagement": {
+		"title": "Mémoire de contexte",
+		"description": "Quand la fenêtre de contexte de l'agent se remplit, la résumer ou passer le relais à un nouveau fil.",
+		"summary": "{{mode}} · seuil {{threshold}} %",
+		"summaryOff": "Désactivé — manuel uniquement",
+		"toggle": "Afficher les réglages de contexte",
+		"modeLabel": "Quand le seuil est atteint",
+		"modes": {
+			"auto": "Auto",
+			"compact": "Compacter",
+			"clear": "Nouveau fil",
+			"off": "Désactivé"
+		},
+		"modeHints": {
+			"auto": "Choisit entre compaction et nouveau fil selon la situation (fournisseur, phase, relais prêt).",
+			"compact": "Résume l'historique et continue dans le même fil.",
+			"clear": "Démarre un nouveau fil amorcé avec le résumé de relais.",
+			"off": "Rien d'automatique. Vous pouvez toujours compacter ou ouvrir un nouveau fil à la main."
+		},
+		"threshold": {
+			"label": "Seuil",
+			"value": "{{value}} %",
+			"hint": "Agir quand la fenêtre de contexte atteint ce niveau."
+		},
+		"prepareHandoff": {
+			"label": "Préparer le relais en parallèle",
+			"hint": "Rédige le résumé de relais en arrière-plan dès le seuil, pendant que l'agent continue : la bascule est instantanée."
+		},
+		"provider": {
+			"native": "{{provider}} : compaction native",
+			"emulated": "{{provider}} : compaction émulée par résumé"
+		},
+		"source": {
+			"exact": "exact",
+			"reported": "rapporté",
+			"estimated": "estimé"
+		},
+		"gauge": {
+			"ariaLabel": "Fenêtre de contexte remplie à {{percent}} %",
+			"tooltip": "{{used}} / {{window}} jetons · {{source}}",
+			"thresholdTooltip": "Seuil {{value}} % · mode {{mode}}",
+			"phase": "Phase : {{phase}}",
+			"open": "Réglages de la mémoire de contexte"
+		},
+		"handoff": {
+			"preparing": "Relais…",
+			"ready": "Relais prêt",
+			"preparingTooltip": "Le résumé de relais est en cours de préparation en arrière-plan.",
+			"readyTooltip": "Le résumé de relais est prêt : la bascule sera instantanée."
+		},
+		"actions": {
+			"compactNow": "Compacter maintenant",
+			"newThread": "Nouveau fil",
+			"recommended": "Recommandé",
+			"compactTooltip": "Résume l'historique et continue dans le même fil. L'agent garde son élan ; les détails anciens sont condensés.",
+			"newThreadTooltip": "Démarre un nouveau fil amorcé avec le résumé de relais. Le contexte le plus propre, mais l'historique mot pour mot est laissé de côté.",
+			"requested": "Demandé — appliqué au prochain point sûr.",
+			"failed": "Impossible d'envoyer la demande : {{error}}",
+			"notRunning": "Disponible pendant l'exécution de la tâche."
+		},
+		"history": {
+			"title": "Actions récentes",
+			"empty": "Aucune compaction ni nouveau fil pour l'instant.",
+			"compact": "Compacté {{before}} % → {{after}} %",
+			"compactNoAfter": "Compacté à {{before}} %",
+			"clear": "Nouveau fil à {{before}} %",
+			"auto": "auto",
+			"manual": "manuel",
+			"native": "natif"
+		},
+		"toast": {
+			"compacted": "Contexte compacté : {{before}} % → {{after}} %",
+			"compactedNoAfter": "Contexte compacté (depuis {{before}} %)",
+			"cleared": "Nouveau fil démarré (relais à {{before}} %)",
+			"saveFailed": "Impossible d'enregistrer les réglages de contexte"
+		}
 	}
 }

@@ -12,6 +12,7 @@ import type { BrowserWindow } from "electron";
 import type { AgentManager } from "../../agent";
 import type { PythonEnvManager } from "../../python-env-manager";
 import { registerTaskArchiveHandlers } from "./archive-handlers";
+import { registerTaskContextHandlers } from "./context-handlers";
 import { registerTaskCRUDHandlers } from "./crud-handlers";
 import { registerTaskExecutionHandlers } from "./execution-handlers";
 import { registerTaskLogsHandlers } from "./logs-handlers";
@@ -30,6 +31,9 @@ export function registerTaskHandlers(
 
 	// Register execution handlers (start, stop, review, status management, recovery)
 	registerTaskExecutionHandlers(agentManager, getMainWindow);
+
+	// Register context-window handlers (manual compact/clear, live policy edit)
+	registerTaskContextHandlers(agentManager);
 
 	// Register worktree handlers (status, diff, merge, discard, list)
 	registerWorktreeHandlers(pythonEnvManager, getMainWindow);

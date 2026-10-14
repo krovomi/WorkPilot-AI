@@ -42,11 +42,17 @@ import type {
 	TaskComplexity,
 	TaskDraft,
 	TaskImpact,
+	ContextPolicy,
 	TaskMetadata,
 	TaskPriority,
 	ThinkingLevel,
 } from "../../shared/types";
 import type { MobilePlatform } from "../../shared/types/mobile";
+import {
+	DEFAULT_CONTEXT_POLICY,
+	isDefaultContextPolicy,
+	normalizeContextPolicy,
+} from "../../shared/utils/context-policy";
 import type {
 	PhaseModelConfig,
 	PhaseThinkingConfig,
@@ -201,6 +207,10 @@ export function TaskCreationWizard({
 	// TDD override (per-task) - default false (inherit project setting)
 	const [tddMode, setTddMode] = useState(false);
 	const [verifyLoop, setVerifyLoop] = useState(true);
+	// Context-window management (compact / new thread at a threshold).
+	const [contextPolicy, setContextPolicy] = useState<ContextPolicy>(() => ({
+		...DEFAULT_CONTEXT_POLICY,
+	}));
 	// Empty is the default and means "every platform the project has":
 	// a card that names none on a mobile repo is not asking for none.
 	const [mobileTargets, setMobileTargets] = useState<MobilePlatform[]>([]);
@@ -264,6 +274,7 @@ export function TaskCreationWizard({
 				setRequireReviewBeforeCoding(draft.requireReviewBeforeCoding ?? false);
 				setTddMode(draft.tddMode ?? false);
 				setVerifyLoop(draft.verifyLoop ?? true);
+				setContextPolicy(normalizeContextPolicy(draft.contextPolicy));
 				setMobileTargets(draft.mobileTargets ?? []);
 				setAcceptanceCriteria(
 					ensureAtLeastOne(toDrafts(draft.acceptanceCriteria ?? [])),
@@ -305,6 +316,7 @@ export function TaskCreationWizard({
 				setImages([]);
 				setReferencedFiles([]);
 				setRequireReviewBeforeCoding(false);
+				setContextPolicy({ ...DEFAULT_CONTEXT_POLICY });
 				setAcceptanceCriteria(ensureAtLeastOne([]));
 				setExtraNote("");
 				setBaseBranch(PROJECT_DEFAULT_BRANCH);
@@ -399,6 +411,7 @@ export function TaskCreationWizard({
 			requireReviewBeforeCoding,
 			tddMode,
 			verifyLoop,
+			contextPolicy,
 			mobileTargets,
 			acceptanceCriteria: toCriteria(acceptanceCriteria),
 			extraNote,
@@ -423,6 +436,7 @@ export function TaskCreationWizard({
 			requireReviewBeforeCoding,
 			tddMode,
 			verifyLoop,
+			contextPolicy,
 			mobileTargets,
 			acceptanceCriteria,
 			extraNote,
@@ -624,6 +638,11 @@ export function TaskCreationWizard({
 			if (tddMode) metadata.tddMode = true;
 			// Only an explicit "off" is stored: absent means the project default.
 			if (!verifyLoop) metadata.verifyLoop = false;
+			// Absent means the defaults (auto, 50%, handoff prepared): only a
+			// policy that differs is written.
+			if (!isDefaultContextPolicy(contextPolicy)) {
+				metadata.contextPolicy = { ...contextPolicy };
+			}
 			if (mobileTargets.length > 0) metadata.mobileTargets = mobileTargets;
 			const criteria = toCriteria(acceptanceCriteria);
 			if (criteria.length > 0) metadata.acceptanceCriteria = criteria;
@@ -688,6 +707,7 @@ export function TaskCreationWizard({
 		setImages([]);
 		setReferencedFiles([]);
 		setRequireReviewBeforeCoding(false);
+		setContextPolicy({ ...DEFAULT_CONTEXT_POLICY });
 		setAcceptanceCriteria(ensureAtLeastOne([]));
 		setExtraNote("");
 		setBaseBranch(PROJECT_DEFAULT_BRANCH);
@@ -901,6 +921,9 @@ export function TaskCreationWizard({
 					onTddModeChange={setTddMode}
 					verifyLoop={verifyLoop}
 					onVerifyLoopChange={setVerifyLoop}
+					contextPolicy={contextPolicy}
+					onContextPolicyChange={setContextPolicy}
+					contextProvider={engine.coding?.provider}
 					mobileTargets={mobileTargets}
 					onMobileTargetsChange={setMobileTargets}
 					disabled={isCreating}
