@@ -11,10 +11,13 @@ Architecture (one module per provider under ``core/agent_clients/``):
     ├── ClaudeAgentClient                   claude.py — wraps ClaudeSDKClient
     ├── CopilotAgentClient                  copilot.py — GitHub Copilot Models API
     ├── WindsurfAgentClient                 windsurf.py
-    └── OpenAIAgentClient                   openai.py — chat completions
-        ├── GoogleAgentClient               google.py
-        ├── CompatibleProviderAgentClient   compatible.py
-        └── LocalAgentClient                local.py — Ollama, LM Studio…
+    ├── OpenAIAgentClient                   openai.py — chat completions
+    │   ├── GoogleAgentClient               google.py
+    │   ├── CompatibleProviderAgentClient   compatible.py
+    │   └── LocalAgentClient                local.py — Ollama, LM Studio…
+    └── CliSubprocessAgentClient            cli_subprocess.py — a coding-agent CLI
+        ├── OpenCodeCliAgentClient          opencode_cli.py — `opencode run`
+        └── AntigravityCliAgentClient       antigravity_cli.py — `agy` print mode
 
 Usage:
     from core.agent_client import create_agent_client
@@ -34,6 +37,12 @@ Usage:
 """
 
 from __future__ import annotations
+
+from .agent_clients.antigravity_cli import (  # noqa: F401
+    AntigravityCliAgentClient,
+    AntigravityCliAuthenticationError,
+    AntigravityCliError,
+)
 
 # Every adapter moved to `core/agent_clients/<provider>.py` (audit lot L11, F36).
 # Re-exported here, private names included, so the module keeps its whole
@@ -120,6 +129,11 @@ from .agent_clients.local import (  # noqa: F401
 from .agent_clients.openai import (  # noqa: F401
     OpenAIAgentClient,
     _openai_cost_usd,
+)
+from .agent_clients.opencode_cli import (  # noqa: F401
+    OpenCodeCliAgentClient,
+    OpenCodeCliAuthenticationError,
+    OpenCodeCliError,
 )
 from .agent_clients.windsurf import (  # noqa: F401
     WindsurfAgentClient,

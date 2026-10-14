@@ -26,6 +26,7 @@ import {
 } from "../../../shared/types/mobile";
 import { providerRegistry } from "../../../shared/services/providerRegistry";
 import type {
+	ContextPolicy,
 	ImageAttachment,
 	TaskCategory,
 	TaskComplexity,
@@ -55,6 +56,7 @@ import {
 } from "../ui/select";
 import { Textarea } from "../ui/textarea";
 import { ClassificationFields } from "./ClassificationFields";
+import { ContextPolicyFields } from "./ContextPolicyFields";
 import { ImagePreviewModal } from "./ImagePreviewModal";
 import { RichTextEditor } from "./RichTextEditor";
 import { TaskDictation } from "./TaskDictation";
@@ -137,6 +139,11 @@ interface TaskFormFieldsProps {
 	/** The verification loop for this task; omitted, the field is not shown. */
 	verifyLoop?: boolean;
 	onVerifyLoopChange?: (enabled: boolean) => void;
+	/** Context-window policy for this task; omitted, the field is not shown. */
+	contextPolicy?: ContextPolicy;
+	onContextPolicyChange?: (policy: ContextPolicy) => void;
+	/** Provider of the coding phase, for the native / emulated compaction hint. */
+	contextProvider?: string | null;
 	/** Smartphone platforms this task targets. Empty means "whatever the project has". */
 	mobileTargets: MobilePlatform[];
 	onMobileTargetsChange: (targets: MobilePlatform[]) => void;
@@ -213,6 +220,9 @@ export function TaskFormFields({
 	onTddModeChange,
 	verifyLoop,
 	onVerifyLoopChange,
+	contextPolicy,
+	onContextPolicyChange,
+	contextProvider,
 	mobileTargets,
 	onMobileTargetsChange,
 	disabled = false,
@@ -816,6 +826,19 @@ export function TaskFormFields({
 								<p className="text-xs text-muted-foreground">{t("tasks:verify.form.hint")}</p>
 							</div>
 						</div>
+					)}
+
+					{/* Context-window management: compact / new thread at a
+					    threshold. Collapsed by default — the defaults suit most
+					    tasks. */}
+					{contextPolicy && onContextPolicyChange && (
+						<ContextPolicyFields
+							value={contextPolicy}
+							onChange={onContextPolicyChange}
+							provider={contextProvider}
+							disabled={disabled}
+							idPrefix={idPrefix}
+						/>
 					)}
 
 					{/* Smartphone targets. Checking neither is the default and means

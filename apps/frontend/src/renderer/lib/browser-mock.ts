@@ -657,6 +657,7 @@ const browserMockAPI: Partial<ElectronAPI> = {
 	}),
 	checkClaudeOAuth: async () => ({ isAuthenticated: false }),
 	checkOpenAICodexOAuth: async () => ({ isAuthenticated: false }),
+	checkAgentCli: async (tool) => ({ tool, installed: false }),
 	updateCodexCli: async () => ({
 		success: false,
 		error: "Not available in browser mode",
@@ -772,6 +773,19 @@ const browserMockAPI: Partial<ElectronAPI> = {
 	onPipelineStatus: () => () => {
 		/* noop */
 	},
+	// Context-window management: registered at startup by global-listeners.
+	// No backend in the preview, so the commands report unavailable.
+	onTaskContextUsage: () => () => {
+		/* noop */
+	},
+	requestContextAction: async () => ({
+		success: false,
+		error: "browser preview",
+	}),
+	updateContextPolicy: async () => ({
+		success: false,
+		error: "browser preview",
+	}),
 
 	// Auto-Refactor API
 	startAutoRefactor: async () => ({ success: false, error: "browser preview" }),

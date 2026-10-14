@@ -814,6 +814,12 @@ def create_client(
     #   MCP servers to make deferral worthwhile.
     sdk_env.setdefault("ENABLE_PROMPT_CACHING_1H", "1")
     sdk_env.setdefault("ENABLE_TOOL_SEARCH", "auto:5")
+    # Native compaction at the task's context threshold (context_mgmt): the CLI
+    # summarises in place, mid-turn, instead of WorkPilot restarting the thread.
+    from context_mgmt import native_auto_compact_env
+
+    for _key, _value in native_auto_compact_env(spec_dir).items():
+        sdk_env.setdefault(_key, _value)
 
     # OpenTelemetry observability (opt-in). When AUTO_CLAUDE_OTEL_ENDPOINT is
     # set (e.g. `http://localhost:4318` for a local OTLP collector / Jaeger),
@@ -1737,6 +1743,9 @@ _PROVIDER_ALIASES: dict[str, str] = {
     "windsurf": "windsurf",
     "cursor": "cursor",
     "custom": "custom",
+    "opencode": "opencode",
+    "antigravity": "antigravity",
+    "agy": "antigravity",
 }
 
 
@@ -1766,11 +1775,14 @@ def _locked_task_provider(spec_dir: Path) -> str | None:
 def _normalize_provider_name(provider: str) -> str:
     """Lower-case a provider name and fold "anthropic" into "claude".
 
-    Only that alias is folded here: "gemini" keeps its own branch in
+    "agy" is folded into "antigravity" as well. Only those aliases are folded here: "gemini" keeps its own branch in
     `create_agent_client`, and an unknown name must reach the degraded path
     unchanged so its log line names it.
     """
     name = provider.lower().strip()
+    if name == "agy":
+        # The Antigravity binary's name, as a user may well type it.
+        return "antigravity"
     return "claude" if name == "anthropic" else name
 
 
@@ -1916,8 +1928,11 @@ def _resolve_active_provider(
         "windsurf",
         "cursor",
         "custom",
+        "opencode",
+        "antigravity",
+        "agy",
     ):
-        return env_provider, True
+        return _normalize_provider_name(env_provider), True
 
     # 3. Project-level setting from spec's parent project
     if spec_dir:
@@ -1951,8 +1966,11 @@ def _resolve_active_provider(
                                 "windsurf",
                                 "cursor",
                                 "custom",
+                                "opencode",
+                                "antigravity",
+                                "agy",
                             ):
-                                return value, True
+                                return _normalize_provider_name(value), True
             except Exception:
                 # Une source de provider illisible : on passe a la suivante, c'est le but de la chaine.
                 pass
@@ -2442,6 +2460,9 @@ def create_agent_client(
                 agent_type,
                 reasoning_effort,
             )
+            from context_mgmt import codex_auto_compact_limit
+            from context_mgmt.windows import resolve_context_window
+
             return CodexCliAgentClient(
                 model=model or None,
                 system_prompt=openai_system_prompt,
@@ -2449,6 +2470,9 @@ def create_agent_client(
                 agent_type=agent_type,
                 reasoning_effort=reasoning_effort,
                 thread_id=resume,
+                auto_compact_token_limit=codex_auto_compact_limit(
+                    spec_dir, resolve_context_window(model or "codex")
+                ),
             )
 
         if openai_uses_codex_cli():
@@ -2631,6 +2655,60 @@ def create_agent_client(
             project_dir=str(project_dir),
             agent_type=agent_type,
             spec_dir=str(spec_dir),
+        )
+
+    elif provider in ("opencode", "antigravity"):
+        # Coding-agent CLIs that bring their own tools, sessions and context
+        # management (core/agent_clients/cli_subprocess.py). Each CLI owns its
+        # login; the agent type's declaration picks its rights (OpenCode's
+        # `plan` agent for a read-only type; Antigravity refuses one).
+        from core.llm_optimization import build_base_system_prompt
+
+        cli_prompt = system_prompt or build_base_system_prompt(project_dir)
+        if not system_prompt:
+            cli_prompt = _inject_domain_addendum(cli_prompt, agent_type, spec_dir)
+
+        if provider == "opencode":
+            from core.agent_client import OpenCodeCliAgentClient
+
+            logger.info(
+                "[create_agent_client] Using OpenCodeCliAgentClient "
+                "(model=%s, agent_type=%s, resume=%s)",
+                model,
+                agent_type,
+                bool(resume),
+            )
+            return OpenCodeCliAgentClient(
+                model=model or None,
+                system_prompt=cli_prompt,
+                project_dir=str(project_dir),
+                agent_type=agent_type,
+                session_id=resume,
+            )
+
+        from core.agent_client import AntigravityCliAgentClient
+
+        try:
+            from phase_config import thinking_level_from_budget
+
+            thinking_level = thinking_level_from_budget(max_thinking_tokens)
+        except Exception:  # noqa: BLE001 - effort is optional on this CLI
+            thinking_level = None
+        logger.info(
+            "[create_agent_client] Using AntigravityCliAgentClient "
+            "(model=%s, agent_type=%s, effort=%s, resume=%s)",
+            model,
+            agent_type,
+            thinking_level,
+            bool(resume),
+        )
+        return AntigravityCliAgentClient(
+            model=model or None,
+            system_prompt=cli_prompt,
+            project_dir=str(project_dir),
+            agent_type=agent_type,
+            thinking_level=thinking_level,
+            conversation_id=resume,
         )
 
     else:

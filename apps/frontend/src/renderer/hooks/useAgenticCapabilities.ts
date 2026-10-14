@@ -18,6 +18,14 @@ import { useEffect, useState } from "react";
 export interface AgenticCapability {
 	hasAdapter: boolean;
 	degradesTo: string | null;
+	/**
+	 * How the backend compacts this provider's context: its own API
+	 * ("native") or by summarising the history itself ("emulated").
+	 * Absent on an older backend.
+	 */
+	contextCompact?: "native" | "emulated";
+	/** How precisely the context fill is known for this provider. */
+	contextUsage?: "exact" | "reported" | "estimated";
 }
 
 export type AgenticCapabilities = Record<string, AgenticCapability>;
@@ -61,6 +69,10 @@ export interface AgenticCapabilitiesState {
 	hasAdapter: (provider: string) => boolean;
 	/** Ce qui répondrait à sa place, ou `null` quand la question ne se pose pas. */
 	degradesTo: (provider: string) => string | null;
+	/** Compaction native ou émulée ; `null` quand la matrice ne le dit pas. */
+	contextCompact: (provider: string) => "native" | "emulated" | null;
+	/** Précision du remplissage de contexte ; `null` quand inconnue. */
+	contextUsage: (provider: string) => "exact" | "reported" | "estimated" | null;
 	loaded: boolean;
 }
 
@@ -88,6 +100,16 @@ export function useAgenticCapabilities(): AgenticCapabilitiesState {
 			const entry = capabilities[canonical(provider)];
 			if (!entry || entry.hasAdapter) return null;
 			return entry.degradesTo || "claude";
+		},
+		contextCompact: (provider) => {
+			const value = capabilities[canonical(provider)]?.contextCompact;
+			return value === "native" || value === "emulated" ? value : null;
+		},
+		contextUsage: (provider) => {
+			const value = capabilities[canonical(provider)]?.contextUsage;
+			return value === "exact" || value === "reported" || value === "estimated"
+				? value
+				: null;
 		},
 		loaded,
 	};

@@ -49,6 +49,7 @@ from .criteria import (
     load_implementation_plan,
     save_implementation_plan,
 )
+from .report import render_qa_report
 
 try:
     from core.usage_tracker import record_qa_result as _ut_record_qa
@@ -808,6 +809,22 @@ async def _run_qa_agent_client_session(
 
     current_tool = None
 
+    # The context gauge follows QA too. Each pass already starts on a fresh
+    # thread (nothing is replayed), so the guard only measures here.
+    from agents.session import _make_context_guard
+
+    context_guard = _make_context_guard(
+        client,
+        spec_dir,
+        "validation",
+        None,
+        provider,
+        str(getattr(client, "model", "") or ""),
+    )
+    if context_guard is not None:
+        context_guard.monitor_only = True
+        context_guard.base_chars = len(prompt)
+
     try:
         debug("qa_reviewer", f"Sending query to {provider}...")
         await client.query(prompt)
@@ -823,6 +840,11 @@ async def _run_qa_agent_client_session(
                 f"Received message #{message_count}",
                 msg_type=agent_msg.type_name,
             )
+            if context_guard is not None:
+                try:
+                    context_guard.observe(agent_msg)
+                except Exception:  # noqa: BLE001 - the gauge is a mirror
+                    pass
 
             for block in agent_msg.content:
                 if block.type == ContentBlockType.TEXT and block.text:
@@ -988,6 +1010,10 @@ async def _run_qa_agent_client_session(
 
         print("\n" + "-" * 70 + "\n")
 
+        from agents.session import record_client_usage
+
+        record_client_usage(client, spec_dir, "validation", agent_type="qa_reviewer")
+
         # Shared post-processing: check QA result, save memory, extract verdict
         _qa_result = await _process_qa_result(
             spec_dir,
@@ -1071,6 +1097,9 @@ async def _process_qa_result(
         status = None
     else:
         status = get_qa_signoff_status(spec_dir)
+        # qa_report.md is rendered from the sign-off rather than written by the
+        # reviewer: one copy of the issues in output tokens, not five.
+        render_qa_report(spec_dir, status)
     debug(
         "qa_reviewer",
         "QA session completed",
@@ -1174,6 +1203,7 @@ async def _process_qa_result(
         )
 
         if _programmatic_qa_signoff(spec_dir, extracted_verdict, qa_session):
+            render_qa_report(spec_dir, get_qa_signoff_status(spec_dir))
             debug_success(
                 "qa_reviewer",
                 f"Programmatically wrote qa_signoff: {extracted_verdict}",

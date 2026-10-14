@@ -3,7 +3,10 @@
  *
  * Pure SVG (no dependency). Colour shifts red → amber → emerald as the
  * probability climbs, so a glance conveys risk without reading the number.
+ * Drawn by the shared ui/progress-ring.
  */
+
+import { ProgressRing } from "../ui/progress-ring";
 
 export interface SuccessRingProps {
 	/** Probability in [0, 1]. */
@@ -33,55 +36,19 @@ export function SuccessRing({
 	className,
 }: SuccessRingProps) {
 	const clamped = Math.max(0, Math.min(1, value));
-	const radius = (size - stroke) / 2;
-	const circumference = 2 * Math.PI * radius;
-	const offset = circumference * (1 - clamped);
 	const color = ringColor(clamped);
-	const center = size / 2;
+	const percent = Math.round(clamped * 100);
 
 	return (
-		<div
+		<ProgressRing
+			value={clamped * 100}
+			size={size}
+			stroke={stroke}
+			color={color}
 			className={className}
-			style={{ width: size, height: size, position: "relative" }}
-		>
-			<svg
-				width={size}
-				height={size}
-				viewBox={`0 0 ${size} ${size}`}
-				role="img"
-				aria-label={`${Math.round(clamped * 100)}% success`}
-			>
-				<circle
-					cx={center}
-					cy={center}
-					r={radius}
-					fill="none"
-					stroke="currentColor"
-					strokeWidth={stroke}
-					className="text-muted-foreground/20"
-				/>
-				<circle
-					cx={center}
-					cy={center}
-					r={radius}
-					fill="none"
-					stroke={color}
-					strokeWidth={stroke}
-					strokeLinecap="round"
-					strokeDasharray={circumference}
-					strokeDashoffset={offset}
-					transform={`rotate(-90 ${center} ${center})`}
-					style={{ transition: "stroke-dashoffset 0.4s ease, stroke 0.4s ease" }}
-				/>
-			</svg>
-			{showLabel && (
-				<span
-					className="absolute inset-0 flex items-center justify-center font-semibold tabular-nums"
-					style={{ fontSize: size * 0.28, color }}
-				>
-					{Math.round(clamped * 100)}
-				</span>
-			)}
-		</div>
+			ariaLabel={`${percent}% success`}
+			label={showLabel ? percent : undefined}
+			labelStyle={{ fontSize: size * 0.28, color }}
+		/>
 	);
 }

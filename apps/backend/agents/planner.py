@@ -237,8 +237,18 @@ async def run_followup_planner(
             client = _create_planning_client(project_dir, spec_dir, model)
             async with client:
                 status, response, error_info = await run_agent_session(
-                    client, prompt, spec_dir, verbose, phase=LogPhase.PLANNING
+                    client,
+                    prompt,
+                    spec_dir,
+                    verbose,
+                    phase=LogPhase.PLANNING,
+                    context_managed=True,
                 )
+
+            # The context guard compacted or cleared the thread: run the
+            # planning session again on what it left to replay.
+            if status == "context_reset":
+                continue
 
             # Hot LLM swap requested mid-session: retry under the new
             # provider/model/effort for planning. The conversation log is

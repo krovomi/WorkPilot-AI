@@ -361,6 +361,9 @@ async def _maybe_replay_conversation(
     provider: str,
     model: str,
     phase: str | None = None,
+    *,
+    guard: Any = None,
+    message: str = "",
 ) -> None:
     """If a prior conversation log exists for this spec, deserialize it and
     hand it to ``client.resume()`` so the new provider picks up the context.
@@ -391,6 +394,9 @@ async def _maybe_replay_conversation(
         entries = read_log_for_phase_resume(spec_dir, provider, model, phase)
         log_file = conversation_log_path(spec_dir, provider, model)
         if not entries:
+            if guard is not None:
+                # Nothing to replay, but a manual request may still be pending.
+                await guard.pre_session([], message)
             return
 
         # First pass: drop entries that have no business being re-injected
@@ -474,6 +480,13 @@ async def _maybe_replay_conversation(
                 running // 1024,
             )
         entries = sized
+
+        if guard is not None:
+            # Before anything is sent: a replay already past the threshold is
+            # cleared (finished subtask) or compacted (same one) here, for free.
+            entries = await guard.pre_session(entries, message)
+            if not entries:
+                return
 
         history = [deserialize_message(e) for e in entries]
         debug(
@@ -1150,6 +1163,7 @@ async def run_agent_session(
     verbose: bool = False,
     phase: LogPhase = LogPhase.CODING,
     streaming_wrapper: Any = None,
+    context_managed: bool = False,
 ) -> tuple[str, str, dict]:
     """
     Run a single agent session using Claude Agent SDK or any AgentClient provider.
@@ -1165,10 +1179,13 @@ async def run_agent_session(
         spec_dir: Spec directory path
         verbose: Whether to show detailed output
         phase: Current execution phase for logging
+        context_managed: Let the context guard (context_mgmt) compact or clear
+            the thread. Only for callers that handle the "context_reset" status
+            by rebuilding their client and running the session again.
 
     Returns:
         (status, response_text, error_info) where:
-        - status: "continue", "complete", or "error"
+        - status: "continue", "complete", "error", "hot_swap" or "context_reset"
         - response_text: Agent's response text
         - error_info: Dict with error details (empty if no error):
             - "type": "tool_concurrency" or "other"
@@ -1184,6 +1201,7 @@ async def run_agent_session(
             verbose,
             phase,
             streaming_wrapper=streaming_wrapper,
+            context_managed=context_managed,
         )
 
     debug_section("session", f"Agent Session - {phase.value}")
@@ -1847,6 +1865,66 @@ async def run_agent_session(
 # =============================================================================
 
 
+def _make_context_guard(
+    client: AgentClient,
+    spec_dir: Path,
+    phase: str,
+    subtask_id: str | None,
+    provider: str,
+    model: str,
+):
+    """The session's context guard, or None if it cannot be built."""
+    try:
+        from context_mgmt import ContextGuard
+        from core.task_event import TaskEventEmitter
+
+        return ContextGuard(
+            spec_dir=spec_dir,
+            project_dir=spec_dir.parent.parent.parent,
+            phase=phase,
+            subtask_id=subtask_id,
+            client=client,
+            provider=provider,
+            model=model,
+            emitter=TaskEventEmitter.from_spec_dir(spec_dir),
+        )
+    except Exception as exc:  # noqa: BLE001 - no guard, same session as before
+        logger.debug("[context] guard unavailable: %s", exc)
+        return None
+
+
+def record_client_usage(
+    client, spec_dir: Path, phase: str, agent_type: str | None = None
+) -> None:
+    """Record an AgentClient's ``last_usage`` in the usage tracker. Never raises.
+
+    Shared by the build sessions and the QA reviewer/fixer, which run their own
+    loops and used to report usage to the replay recorder only — their output
+    tokens never reached the cost data.
+    """
+    if _record_usage is None:
+        return
+    try:
+        _usage = getattr(client, "last_usage", None)
+        if not isinstance(_usage, dict):
+            return
+        _record_usage(
+            spec_dir=spec_dir,
+            project_dir=spec_dir.parent.parent.parent,
+            phase=phase,
+            agent_type=agent_type or phase,
+            model=getattr(client, "model", "unknown"),
+            provider=client.provider_name(),
+            input_tokens=_usage.get("input_tokens", 0),
+            output_tokens=_usage.get("output_tokens", 0),
+            cost_usd=_usage.get("cost_usd", 0.0),
+            cache_creation_input_tokens=_usage.get("cache_creation_input_tokens", 0),
+            cache_read_input_tokens=_usage.get("cache_read_input_tokens", 0),
+        )
+    except Exception as _ute:  # noqa: BLE001 - telemetry never stops a build
+        logger.debug("[usage_tracker] AgentClient usage recording failed: %s", _ute)
+
+
 async def _run_agent_client_session(
     client: AgentClient,
     message: str,
@@ -1854,6 +1932,7 @@ async def _run_agent_client_session(
     verbose: bool = False,
     phase: LogPhase = LogPhase.CODING,
     streaming_wrapper: Any = None,
+    context_managed: bool = False,
 ) -> tuple[str, str, dict]:
     """
     Run a single agent session using any AgentClient provider.
@@ -1899,6 +1978,14 @@ async def _run_agent_client_session(
     if task_logger:
         task_logger.set_llm(provider, log_model)
 
+    context_guard = (
+        _make_context_guard(
+            client, spec_dir, phase.value, log_subtask_id, provider, log_model
+        )
+        if context_managed
+        else None
+    )
+
     # If a prior session for this spec left a conversation log, replay it into
     # the client so the LLM has the same context — even when this run uses a
     # different provider than the one that originally produced the transcript.
@@ -1920,11 +2007,25 @@ async def _run_agent_client_session(
         )
     else:
         await _maybe_replay_conversation(
-            client, spec_dir, provider, log_model, phase.value
+            client,
+            spec_dir,
+            provider,
+            log_model,
+            phase.value,
+            guard=context_guard,
+            message=message,
         )
         message = _maybe_inject_pending_tool_use_note(
             message, spec_dir, provider, log_model
         )
+    if context_guard is not None:
+        # A thread closed by "clear" left a handoff note: the new thread starts
+        # from it. Consumed once.
+        from context_mgmt.handoff import consume_pending_handoff
+
+        message = consume_pending_handoff(spec_dir) + message
+        if not context_guard.base_chars:
+            context_guard.base_chars = len(message)
 
     try:
         # Persist the initial user message before the network call so a process
@@ -1957,6 +2058,7 @@ async def _run_agent_client_session(
         # next session — where a local model's 8k window has no room for it.
         status_text = ""
         _hot_swap_pending = False  # set when a live provider/model swap is detected
+        _context_decision = None  # set when the context guard closes the session
         debug("session", "Starting to receive response stream...")
 
         _session_marker_written = False
@@ -2189,7 +2291,33 @@ async def _run_agent_client_session(
             except Exception:  # noqa: BLE001 - never break the agent loop on this
                 pass
 
+            # Context guard: measure the window fill, prepare the handoff in the
+            # background past the threshold, and stop at a safe point (no tool
+            # call in flight) when the policy or the task panel asks for it.
+            if context_guard is not None:
+                try:
+                    context_guard.observe(agent_msg)
+                    _context_decision = context_guard.decision_at_safe_point()
+                except Exception as _cg_err:  # noqa: BLE001
+                    logger.debug("[context] guard failed: %s", _cg_err)
+                    _context_decision = None
+                if _context_decision is not None:
+                    debug(
+                        "session",
+                        f"Context {_context_decision.action} — ending for client rebuild",
+                    )
+                    break
+
         print("\n" + "-" * 70 + "\n")
+
+        if _context_decision is not None:
+            await context_guard.apply(_context_decision)
+            record_client_usage(client, spec_dir, phase.value)
+            return (
+                "context_reset",
+                response_text,
+                {"context_reset": True, "action": _context_decision.action},
+            )
 
         if _hot_swap_pending:
             # Signal the caller to rebuild the client (new provider/model) and
@@ -2214,32 +2342,7 @@ async def _run_agent_client_session(
             )
 
         # Record token usage from AgentClient (best-effort via duck typing)
-        if _record_usage is not None:
-            try:
-                _usage = getattr(client, "last_usage", None)
-                if _usage is not None:
-                    _project_dir = spec_dir.parent.parent.parent
-                    _record_usage(
-                        spec_dir=spec_dir,
-                        project_dir=_project_dir,
-                        phase=phase.value,
-                        agent_type=phase.value,
-                        model=getattr(client, "model", "unknown"),
-                        provider=client.provider_name(),
-                        input_tokens=_usage.get("input_tokens", 0),
-                        output_tokens=_usage.get("output_tokens", 0),
-                        cost_usd=_usage.get("cost_usd", 0.0),
-                        cache_creation_input_tokens=_usage.get(
-                            "cache_creation_input_tokens", 0
-                        ),
-                        cache_read_input_tokens=_usage.get(
-                            "cache_read_input_tokens", 0
-                        ),
-                    )
-            except Exception as _ute:
-                logger.debug(
-                    "[usage_tracker] AgentClient usage recording failed: %s", _ute
-                )
+        record_client_usage(client, spec_dir, phase.value)
 
         if is_build_complete(spec_dir):
             debug_success(

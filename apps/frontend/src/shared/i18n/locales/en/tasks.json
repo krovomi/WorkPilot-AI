@@ -1839,5 +1839,82 @@
 		"title": "QA could not verify this task",
 		"unknown": "The QA agent stopped without reporting why. Open the Logs tab for the last output.",
 		"hint": "The work is complete; only the automatic check is missing. Review the changes yourself before merging, or relaunch the task to run QA again."
+	},
+	"contextManagement": {
+		"title": "Context memory",
+		"description": "When the agent's context window fills up, summarise it or hand off to a fresh thread.",
+		"summary": "{{mode}} · threshold {{threshold}}%",
+		"summaryOff": "Off — manual only",
+		"toggle": "Show context settings",
+		"modeLabel": "When the threshold is reached",
+		"modes": {
+			"auto": "Auto",
+			"compact": "Compact",
+			"clear": "New thread",
+			"off": "Off"
+		},
+		"modeHints": {
+			"auto": "Picks compaction or a new thread from the situation (provider, phase, handoff ready).",
+			"compact": "Summarises the history and keeps going in the same thread.",
+			"clear": "Starts a fresh thread seeded with the handoff summary.",
+			"off": "Nothing automatic. You can still compact or start a new thread by hand."
+		},
+		"threshold": {
+			"label": "Threshold",
+			"value": "{{value}}%",
+			"hint": "Act when the context window reaches this level."
+		},
+		"prepareHandoff": {
+			"label": "Prepare the handoff in parallel",
+			"hint": "Writes the handoff summary in the background once the threshold is reached, while the agent keeps working, so the switch is instant."
+		},
+		"provider": {
+			"native": "{{provider}}: native compaction",
+			"emulated": "{{provider}}: compaction emulated by summary"
+		},
+		"source": {
+			"exact": "exact",
+			"reported": "reported",
+			"estimated": "estimated"
+		},
+		"gauge": {
+			"ariaLabel": "Context window {{percent}}% full",
+			"tooltip": "{{used}} / {{window}} tokens · {{source}}",
+			"thresholdTooltip": "Threshold {{value}}% · mode {{mode}}",
+			"phase": "Phase: {{phase}}",
+			"open": "Context memory settings"
+		},
+		"handoff": {
+			"preparing": "Handoff…",
+			"ready": "Handoff ready",
+			"preparingTooltip": "The handoff summary is being prepared in the background.",
+			"readyTooltip": "The handoff summary is ready: the switch will be instant."
+		},
+		"actions": {
+			"compactNow": "Compact now",
+			"newThread": "New thread",
+			"recommended": "Recommended",
+			"compactTooltip": "Summarise the history and continue in the same thread. The agent keeps its momentum; older details are condensed.",
+			"newThreadTooltip": "Start a fresh thread seeded with the handoff summary. The cleanest context, but the verbatim history is left behind.",
+			"requested": "Requested — applied at the next safe point.",
+			"failed": "Could not send the request: {{error}}",
+			"notRunning": "Available while the task is running."
+		},
+		"history": {
+			"title": "Recent actions",
+			"empty": "No compaction or new thread yet.",
+			"compact": "Compacted {{before}}% → {{after}}%",
+			"compactNoAfter": "Compacted at {{before}}%",
+			"clear": "New thread from {{before}}%",
+			"auto": "auto",
+			"manual": "manual",
+			"native": "native"
+		},
+		"toast": {
+			"compacted": "Context compacted: {{before}}% → {{after}}%",
+			"compactedNoAfter": "Context compacted (from {{before}}%)",
+			"cleared": "New thread started (handoff from {{before}}%)",
+			"saveFailed": "Could not save the context settings"
+		}
 	}
 }

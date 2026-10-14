@@ -1206,6 +1206,8 @@ class LocalAgentClient(OpenAIAgentClient):
             + len(_json.dumps(self._tool_definitions))
         ) // self._CHARS_PER_TOKEN
         num_ctx = self._resolve_num_ctx(prompt_tokens_est)
+        # The window this session actually runs in, for context_mgmt's gauge.
+        self.context_window_tokens = num_ctx
         session = self._get_http_client()
         _total_in = 0
         _total_out = 0
@@ -1581,6 +1583,8 @@ class LocalAgentClient(OpenAIAgentClient):
             connect_retries = 0
             _total_in += int(data.get("prompt_eval_count", 0) or 0)
             _total_out += int(data.get("eval_count", 0) or 0)
+            if data.get("prompt_eval_count"):
+                self.last_context_tokens = int(data["prompt_eval_count"])
 
             message = data.get("message") or {}
             content = message.get("content") or ""

@@ -25,6 +25,8 @@ export type ApiProvider =
 	| "meta"
 	| "cursor"
 	| "aws"
+	| "opencode"
+	| "antigravity"
 	| "unknown";
 
 /**
@@ -183,6 +185,10 @@ export function getProviderLabel(provider: ApiProvider): string {
 			return "Cursor";
 		case "aws":
 			return "AWS Bedrock";
+		case "opencode":
+			return "OpenCode";
+		case "antigravity":
+			return "Google Antigravity";
 		case "unknown":
 			return "Unknown";
 	}
@@ -222,6 +228,10 @@ export function getProviderBadgeColor(provider: ApiProvider): string {
 			return "bg-violet-500/10 text-violet-500 border-violet-500/20 hover:bg-violet-500/15";
 		case "aws":
 			return "bg-amber-500/10 text-amber-500 border-amber-500/20 hover:bg-amber-500/15";
+		case "opencode":
+			return "bg-slate-500/10 text-slate-500 border-slate-500/20 hover:bg-slate-500/15";
+		case "antigravity":
+			return "bg-indigo-500/10 text-indigo-500 border-indigo-500/20 hover:bg-indigo-500/15";
 		case "unknown":
 			return "bg-gray-500/10 text-gray-500 border-gray-500/20 hover:bg-gray-500/15";
 	}

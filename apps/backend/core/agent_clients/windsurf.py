@@ -119,6 +119,11 @@ class WindsurfAgentClient(AgentClient):
         self._tool_definitions: list[dict[str, Any]] = []
         # Usage accumulated across REST turns (gRPC mode: credits only, no token count)
         self.last_usage: dict | None = None
+        # Context fill of the latest turn (prompt tokens the provider reported),
+        # read by context_mgmt's guard; None until a turn reports it.
+        self.last_context_tokens: int | None = None
+        self.context_window_tokens: int | None = None
+        self.context_usage_source = "reported"
         # Ordered list of base URLs to try.  `server.codeium.com` is the
         # documented base for analytics/billing, but chat completions may live
         # elsewhere — or may not be exposed at all for sk-ws-* keys.
@@ -1124,6 +1129,8 @@ class WindsurfAgentClient(AgentClient):
                 )
                 _ws_total_in += usage.get("prompt_tokens", 0)
                 _ws_total_out += usage.get("completion_tokens", 0)
+                if usage.get("prompt_tokens"):
+                    self.last_context_tokens = int(usage["prompt_tokens"])
 
             choices = data.get("choices", [])
             if not choices:

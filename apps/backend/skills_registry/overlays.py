@@ -94,6 +94,7 @@ _ALIASES = {
     "llama-cpp": "local",
     "github-copilot": "copilot",
     "gemini": "google",
+    "agy": "antigravity",
 }
 
 

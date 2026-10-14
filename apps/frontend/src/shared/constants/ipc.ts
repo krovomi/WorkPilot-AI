@@ -52,6 +52,9 @@ export const IPC_CHANNELS = {
 	TASK_RESET: "task:reset", // Full reset: discard plan/subtasks, worktree and runtime artifacts; keep the spec and go back to backlog
 	TASK_RERUN_PHASE: "task:rerunPhase", // Re-run one execution phase on demand (planning/coding/validation); cascade-invalidates downstream phases and restarts
 	TASK_HOT_SWAP: "task:hotSwap", // Live provider/model/effort change during a running phase (applied at the next turn, context replayed)
+	TASK_CONTEXT_ACTION: "task:contextAction", // One-shot compact/clear of the running session's context (writes CONTEXT_ACTION.json in every spec dir copy)
+	TASK_CONTEXT_POLICY_UPDATE: "task:contextPolicyUpdate", // Merge `contextPolicy` into task_metadata.json of every spec dir copy (main + worktree) — read live by the backend
+	TASK_CONTEXT_USAGE: "task:contextUsage", // Event (main -> renderer): CONTEXT_USAGE / CONTEXT_ACTION_APPLIED task events, forwarded untouched
 	TASK_CHECK_PLAN_CONFLICTS: "task:checkPlanConflicts", // Detect file overlaps between this task's plan and other active tasks (parallel worktrees)
 
 	// CI/CD pipeline loop (« Build rouge » column) — provider-agnostic (Azure DevOps, GitHub Actions, GitLab CI, Jenkins)

@@ -271,7 +271,16 @@ def _read_log_file(log_file: Path) -> list[dict[str, Any]]:
 # prompt-too-long halt, trimmed by the replay cap, or split out of the legacy
 # single file. Shared by archive_all_logs and the carry-over scan below, because
 # "which files are live conversation logs" has to have one answer.
-_RETIRED_LOG_MARKERS = (".too-long.", ".trimmed.", ".archived.", ".migrated")
+_RETIRED_LOG_MARKERS = (
+    ".too-long.",
+    ".trimmed.",
+    ".archived.",
+    ".migrated",
+    # context_mgmt: a thread closed by "clear", or the history a compaction
+    # replaced. Live logs only; these stay on disk as the audit trail.
+    ".cleared.",
+    ".compacted.",
+)
 
 # How many messages a model inherits when it takes a phase over from another
 # one. Deliberately below the replay cap in agents/session.py: a carry-over is
@@ -487,3 +496,56 @@ def clear_log(
                 logger.warning(f"Could not delete conversation log {path}: {e}")
     except OSError as e:
         logger.warning(f"Could not delete conversation log(s) in {spec_dir}: {e}")
+
+
+def replace_with_summary(
+    spec_dir: Path,
+    provider: str | None,
+    model: str | None,
+    *,
+    phase: str,
+    summary: str,
+    keep_tail: int = 8,
+    subtask_id: str | None = None,
+) -> bool:
+    """Compact one model's log: a summary entry plus the phase's last turns.
+
+    The full log is archived (``.compacted.``) first, so nothing is lost; the
+    live log then holds what the next session replays. The tail never starts on
+    a tool result whose call was summarised away. Best-effort — never raises.
+    """
+    try:
+        log_file = conversation_log_path(spec_dir, provider, model)
+        entries = _read_log_file(log_file)
+        tail = [e for e in entries if (e.get("phase") or "") == phase][-keep_tail:]
+        while tail and tail[0].get("role") != "assistant":
+            tail = tail[1:]
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        if log_file.exists():
+            log_file.rename(spec_dir / f"{log_file.stem}.{timestamp}.compacted.jsonl")
+        summary_entry: dict[str, Any] = {
+            "v": SCHEMA_VERSION,
+            "ts": datetime.now(timezone.utc)
+            .isoformat(timespec="milliseconds")
+            .replace("+00:00", "Z"),
+            "phase": phase,
+            "provider": provider or "",
+            "model": model or "",
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "## CONTEXT SUMMARY (earlier turns compacted)\n\n"
+                    + summary.strip(),
+                }
+            ],
+        }
+        if subtask_id:
+            summary_entry["subtask_id"] = subtask_id
+        with log_file.open("wb") as f:
+            for entry in [summary_entry, *tail]:
+                f.write((json.dumps(entry, ensure_ascii=False) + "\n").encode("utf-8"))
+        return True
+    except Exception as e:  # noqa: BLE001 - compaction is best-effort
+        logger.warning("Could not compact conversation log in %s: %s", spec_dir, e)
+        return False

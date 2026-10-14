@@ -136,6 +136,7 @@ import { AzureDevOpsSetupModal } from "./AzureDevOpsSetupModal";
 import { AppEmulatorDialog } from "./app-emulator/AppEmulatorDialog";
 import { ArenaDialog } from "./arena/ArenaDialog";
 import { ClaudeCodeStatusBadge } from "./ClaudeCodeStatusBadge";
+import { AgentCliStatusBadge } from "./AgentCliStatusBadge";
 import { CodexCliStatusBadge } from "./CodexCliStatusBadge";
 import { CopilotCliStatusBadge } from "./CopilotCliStatusBadge";
 import { CodePlaygroundDialog } from "./code-playground/CodePlaygroundDialog";
@@ -2443,6 +2444,11 @@ export function Sidebar({
 								/>
 								<CodexCliStatusBadge
 									onNavigateToTerminals={() => onViewChange?.("terminals", true)}
+									isCollapsed={isCollapsed}
+								/>
+								<AgentCliStatusBadge tool="opencode" isCollapsed={isCollapsed} />
+								<AgentCliStatusBadge
+									tool="antigravity"
 									isCollapsed={isCollapsed}
 								/>
 							</div>

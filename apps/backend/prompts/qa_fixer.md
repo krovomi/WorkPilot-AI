@@ -42,16 +42,10 @@ If the `QA_FIX_REQUEST.md` mentions **architecture violations**, these are
 # 1. Read the QA fix request (YOUR PRIMARY TASK)
 cat {{SPEC_DIR}}/QA_FIX_REQUEST.md
 
-# 2. Read the QA report (full context on issues)
-cat {{SPEC_DIR}}/qa_report.md 2>/dev/null || echo "No detailed report"
-
-# 3. Read the spec (requirements)
+# 2. Read the spec (requirements)
 cat {{SPEC_DIR}}/spec.md
 
-# 4. Read the implementation plan (see qa_signoff status)
-cat {{SPEC_DIR}}/implementation_plan.json
-
-# 5. Check current state
+# 3. Check current state
 git status
 git log --oneline -5
 ```
@@ -66,21 +60,8 @@ git log --oneline -5
 
 ## PHASE 1: PARSE FIX REQUIREMENTS
 
-From `QA_FIX_REQUEST.md`, extract:
-
-```
-FIXES REQUIRED:
-1. [Issue Title]
-   - Location: [file:line]
-   - Problem: [description]
-   - Fix: [what to do]
-   - Verify: [how QA will check]
-
-2. [Issue Title]
-   ...
-```
-
-Create a mental checklist. You must address EVERY issue.
+Each numbered entry of `QA_FIX_REQUEST.md` is one issue (id, severity, location, fix).
+Address EVERY one; do not rewrite the list.
 
 ---
 
@@ -302,20 +283,7 @@ stays below {{MIN_COVERAGE}}%.
 
 ## PHASE 5: SELF-VERIFICATION
 
-Before committing, verify each fix from QA_FIX_REQUEST.md:
-
-```
-SELF-VERIFICATION:
-□ Issue 1: [title] - FIXED
-  - Verified by: [how you verified]
-□ Issue 2: [title] - FIXED
-  - Verified by: [how you verified]
-...
-
-ALL ISSUES ADDRESSED: YES/NO
-```
-
-If any issue is not fixed, go back to Phase 3.
+Re-check each issue of QA_FIX_REQUEST.md against the code and the tests. If any is not fixed, go back to Phase 3.
 
 ---
 
@@ -360,18 +328,7 @@ git add . ':!.workpilot'
 # 2. Run git status to see what git sees
 # 3. Adjust your paths accordingly
 
-git commit -m "fix: Address QA issues (qa-requested)
-
-Fixes:
-- [Issue 1 title]
-- [Issue 2 title]
-- [Issue 3 title]
-
-Verified:
-- All tests pass
-- Issues verified locally
-
-QA Fix Session: [N]"
+git commit -m "fix: address QA issues Q1, Q2 (qa-requested)"
 ```
 
 **CRITICAL**: The `:!.workpilot` pathspec exclusion ensures spec files are NEVER committed.
@@ -390,12 +347,8 @@ Update `{{SPEC_DIR}}/implementation_plan.json` to signal fixes are complete:
     "status": "fixes_applied",
     "timestamp": "[ISO timestamp]",
     "fix_session": [session-number],
-    "issues_fixed": [
-      {
-        "title": "[Issue title]",
-        "fix_commit": "[commit hash]"
-      }
-    ],
+    "issues_fixed": ["Q1", "Q2"],
+    "fix_commit": "[commit hash]",
     "ready_for_qa_revalidation": true
   }
 }
@@ -403,24 +356,9 @@ Update `{{SPEC_DIR}}/implementation_plan.json` to signal fixes are complete:
 
 ---
 
-## PHASE 8: SIGNAL COMPLETION
+## PHASE 8: FINISH
 
-```
-=== QA FIXES COMPLETE ===
-
-Issues fixed: [N]
-
-1. [Issue 1] - FIXED
-   Commit: [hash]
-
-2. [Issue 2] - FIXED
-   Commit: [hash]
-
-All tests passing.
-Ready for QA re-validation.
-
-The QA Agent will now re-run validation.
-```
+End with one line: `Fixes applied: Q1, Q2`. No banner, no recap — the plan holds the record.
 
 ---
 
@@ -493,10 +431,9 @@ npx prisma migrate dev --name [name]
 - Check for regressions
 - Minimal changes only
 
-### Document Clearly
-- What you fixed
-- How you verified
-- Commit messages
+### Write Little
+- One-line commit message, issue ids only
+- No summaries or recaps: `qa_signoff` is the record
 
 ### Git Configuration - NEVER MODIFY
 **CRITICAL**: You MUST NOT modify git user configuration. Never run:

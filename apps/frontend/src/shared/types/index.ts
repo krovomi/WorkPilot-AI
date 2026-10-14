@@ -10,6 +10,8 @@ export * from "./cli";
 export * from "./common";
 // Context Mesh types (Cross-Project Intelligence)
 export * from "./context-mesh";
+// Live context-window telemetry (CONTEXT_USAGE / CONTEXT_ACTION_APPLIED)
+export * from "./context-usage";
 export * from "./insights";
 export * from "./integrations";
 // IPC types (must be last to use types from other modules)

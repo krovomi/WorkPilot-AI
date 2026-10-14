@@ -131,6 +131,10 @@ DEEPSEEK_MODEL = _DEEPSEEK_ENTRY.model_id if _DEEPSEEK_ENTRY else "deepseek-v3"
 _GROK_ENTRY = get_default("grok")
 GROK_MODEL = _GROK_ENTRY.model_id if _GROK_ENTRY else "grok-4.3"
 
+#: The model id a CLI-backed provider (OpenCode, Antigravity) reads as "use
+#: the CLI's own default".
+CLI_DEFAULT_MODEL = "default"
+
 PROVIDER_DEFAULT_MODELS: dict[str, dict[str, str]] = {
     # Anthropic / Claude — use Claude shorthands (resolved by resolve_model_id)
     "anthropic": {
@@ -214,6 +218,21 @@ PROVIDER_DEFAULT_MODELS: dict[str, dict[str, str]] = {
         "planning": WINDSURF_MODEL,
         "coding": WINDSURF_MODEL,
         "qa": WINDSURF_MODEL,
+    },
+    # Coding-agent CLIs: "default" leaves the model to the CLI's own
+    # configuration (the one the user signed in and set up there), rather than
+    # falling through to a Claude id that `opencode -m` / `agy --model` reject.
+    "opencode": {
+        "spec": CLI_DEFAULT_MODEL,
+        "planning": CLI_DEFAULT_MODEL,
+        "coding": CLI_DEFAULT_MODEL,
+        "qa": CLI_DEFAULT_MODEL,
+    },
+    "antigravity": {
+        "spec": CLI_DEFAULT_MODEL,
+        "planning": CLI_DEFAULT_MODEL,
+        "coding": CLI_DEFAULT_MODEL,
+        "qa": CLI_DEFAULT_MODEL,
     },
 }
 

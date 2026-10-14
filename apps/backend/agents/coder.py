@@ -1842,7 +1842,15 @@ async def run_autonomous_agent(
                 verbose=verbose,
                 phase=current_log_phase,
                 streaming_wrapper=streaming_wrapper,
+                context_managed=True,
             )
+
+            # Context window past the task's threshold (or "compact / new
+            # thread now" from the task panel): the guard already compacted or
+            # cleared what the next session replays. Re-loop WITHOUT advancing
+            # the subtask, exactly like a hot swap.
+            if status == "context_reset":
+                continue
 
             # Hot LLM swap requested mid-session: the session ended early so we can
             # rebuild the client with the new provider/model. Re-loop WITHOUT
@@ -1952,6 +1960,9 @@ async def run_autonomous_agent(
                 plan_validated = True
                 planning_retry_context = None
                 _clear_planning_failures(spec_dir)  # success → reset the cap
+                from implementation_plan.progress_file import write_progress_header
+
+                write_progress_header(spec_dir)
                 _report_traceability()
                 await _run_post_planning_phases()
             else:
@@ -2286,6 +2297,23 @@ async def run_autonomous_agent(
                 # string-match path so a partial deploy (only one side updated)
                 # still breaks the loop instead of spinning on the error.
                 _reset_concurrency_state()
+                # Unless the task's context policy allows a fresh thread: the
+                # conversation is then different, and the retry can succeed.
+                from context_mgmt.recovery import recover_from_prompt_too_long
+
+                if recover_from_prompt_too_long(
+                    spec_dir,
+                    project_dir,
+                    current_log_phase.value,
+                    subtask_id,
+                    provider=client.provider_name(),
+                    model=str(getattr(client, "model", "") or ""),
+                ):
+                    print_status(
+                        "Prompt too long — new thread started from a handoff note",
+                        "warning",
+                    )
+                    continue
                 from services.rate_limit_shield import handle_prompt_too_long
 
                 handle_prompt_too_long(
