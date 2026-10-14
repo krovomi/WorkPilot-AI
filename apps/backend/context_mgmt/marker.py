@@ -92,5 +92,7 @@ def consume_context_action(
     try:
         _path(spec_dir).unlink(missing_ok=True)
     except OSError:
+        # An undeletable marker is read again at the next safe point, which
+        # repeats the same requested action: harmless, and better than none.
         pass
     return request

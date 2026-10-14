@@ -708,14 +708,11 @@ def render_fix_request(
     body = _issue_lines([i for i in issues if isinstance(i, dict)])
     if not body:
         return False
-    lines = [
-        f"# QA Fix Request (pass {qa_iteration})",
-        "",
-        *body,
-        "",
+    closing = (
         "When done: set `qa_signoff.status` to `fixes_applied` and "
-        "`ready_for_qa_revalidation: true` in implementation_plan.json.",
-    ]
+        "`ready_for_qa_revalidation: true` in implementation_plan.json."
+    )
+    lines = [f"# QA Fix Request (pass {qa_iteration})", "", *body, "", closing]
     try:
         (spec_dir / "QA_FIX_REQUEST.md").write_text(
             "\n".join(lines) + "\n", encoding="utf-8"

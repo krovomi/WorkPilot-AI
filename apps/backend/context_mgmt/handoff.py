@@ -264,6 +264,7 @@ def consume_pending_handoff(spec_dir: Path) -> str:
     try:
         path.replace(path.with_name("handoff_last.md"))
     except OSError:
+        # Kept for the audit trail only; the note is consumed either way.
         pass
     text = raw.strip()
     if not text:

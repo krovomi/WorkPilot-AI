@@ -62,6 +62,7 @@ def recover_from_prompt_too_long(
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(state), encoding="utf-8")
     except OSError:
+        # Without the count a second recovery may run; the clear itself is done.
         pass
     try:
         from core.task_event import TaskEventEmitter

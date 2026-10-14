@@ -143,6 +143,8 @@ class ContextGuard:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(json.dumps(state), encoding="utf-8")
         except OSError:
+            # The count only steers "auto" towards a clear; losing it costs at
+            # most one extra compaction.
             pass
 
     def _situation(
