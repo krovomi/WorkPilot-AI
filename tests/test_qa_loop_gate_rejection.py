@@ -170,11 +170,10 @@ async def test_a_coverage_rejection_runs_the_fixer(harness, monkeypatch):
     # One fix after each rejected pass but the last, on the gate's own request.
     assert [iteration for iteration, _ in harness.fixer_calls] == [1, 2]
     assert all("Couverture de tests" in request for _, request in harness.fixer_calls)
+    fix = "applying a fix, then re-reviewing"
     assert harness.logger.errors == [
-        "QA pass #1 rejected by the coverage gate; applying a fix, then "
-        "re-reviewing (pass #2).",
-        "QA pass #2 rejected by the coverage gate; applying a fix, then "
-        "re-reviewing (pass #3).",
+        f"QA pass #1 rejected by the coverage gate; {fix} (pass #2).",
+        f"QA pass #2 rejected by the coverage gate; {fix} (pass #3).",
         "QA pass #3 rejected by the coverage gate; handing over to human review.",
     ]
     # One verdict per pass: a second QA_FAILED while the card is in
@@ -203,8 +202,7 @@ async def test_an_architecture_rejection_runs_the_fixer(harness, monkeypatch):
 
     assert harness.fixer_calls == [(1, "# Architecture fix request")]
     assert harness.logger.errors == [
-        "QA pass #1 rejected: 1 architecture violation(s); applying a fix, then "
-        "re-reviewing (pass #2).",
+        "QA pass #1 rejected: 1 architecture violation(s); applying a fix, then re-reviewing (pass #2).",
     ]
     assert harness.emitter.events.count("QA_FAILED") == 1
     assert harness.emitter.events[-1] == "QA_PASSED"
