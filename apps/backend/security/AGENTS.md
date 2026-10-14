@@ -43,6 +43,7 @@ Tests : `tests/test_security_untrusted.py`, `tests/injection_guard/test_middlewa
 | Redaction des logs | `core/log_redaction.py` | `tests/core/test_log_redaction.py` |
 | Hors-ligne strict | `core/offline_policy.py` | `tests/test_offline_mode.py` |
 | Secrets des pièces jointes | `docintel/redact.py` | `tests/backend/security_suite/test_secret_scanning.py` |
+| Secrets d'un commit sur ce dépôt | `.husky/pre-commit` → `scan_secrets.py --staged-only` (lit l'index) | `tests/test_scan_secrets.py` |
 | Sandbox Codex | `core/codex_cli_client.py` (`codex_sandbox_for`) | `tests/test_non_sdk_rights.py` |
 
 ## Ce qui ne protège rien aujourd'hui
@@ -63,7 +64,7 @@ Brancher l'un d'eux, c'est une PR avec un test qui prouve le refus.
 ## Outils manuels
 
 ```bash
-cd apps/backend
-python security/scan_secrets.py --staged-only        # ou --all-files, --path <dir>, --json
-python -m security.security_orchestrator             # scan complet (Bandit, secrets, rapports)
+# depuis la racine : c'est là que vit .secretsignore
+python apps/backend/security/scan_secrets.py --staged-only   # ou --all-files, --path <dir>, --json
+cd apps/backend && python -m security.security_orchestrator  # scan complet (Bandit, secrets, rapports)
 ```
