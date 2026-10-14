@@ -9,6 +9,8 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from typing import Any
 
+from context_mgmt.sdk_usage import claude_context_fill
+
 from .base import (
     AgentClient,
     AgentMessage,
@@ -109,18 +111,9 @@ class ClaudeAgentClient(AgentClient):
             # button can't find a session_id when the user uses the
             # provider-agnostic factory.
             if type(raw_msg).__name__ == "AssistantMessage":
-                _turn = getattr(raw_msg, "usage", None)
-                if isinstance(_turn, dict):
-                    _fill = sum(
-                        int(_turn.get(key) or 0)
-                        for key in (
-                            "input_tokens",
-                            "cache_read_input_tokens",
-                            "cache_creation_input_tokens",
-                        )
-                    )
-                    if _fill:
-                        self.last_context_tokens = _fill
+                _fill = claude_context_fill(getattr(raw_msg, "usage", None))
+                if _fill:
+                    self.last_context_tokens = _fill
             if type(raw_msg).__name__ == "ResultMessage":
                 self.last_result_msg = raw_msg
                 self.last_session_id = getattr(raw_msg, "session_id", None)

@@ -93,6 +93,17 @@ describe("ContextGauge", () => {
 		expect(screen.getByTestId("context-gauge")).toHaveTextContent("–");
 	});
 
+	it("explains the placeholder in the popover until a reading arrives", async () => {
+		wrap(<ContextGauge task={makeTask("in_progress")} />);
+		fireEvent.click(screen.getByTestId("context-gauge"));
+		expect(await screen.findByTestId("context-gauge-not-measured")).toHaveTextContent(
+			"tasks:contextManagement.gauge.notMeasured",
+		);
+
+		act(() => useContextUsageStore.getState().applyEvent("t1", usage));
+		expect(screen.queryByTestId("context-gauge-not-measured")).not.toBeInTheDocument();
+	});
+
 	it("shows the percent, the zone and the handoff badge", () => {
 		useContextUsageStore.getState().applyEvent("t1", usage);
 		wrap(<ContextGauge task={makeTask("in_progress")} />);

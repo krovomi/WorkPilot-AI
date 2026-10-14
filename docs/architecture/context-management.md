@@ -106,6 +106,11 @@ without advancing the subtask, exactly like a hot swap. Only callers that pass
 of `run_agent_session` are untouched. QA passes always start fresh (nothing is
 replayed), so their guard only measures.
 
+The coder re-runs the subtask only if it is still unfinished. If the agent had
+already marked it completed before the safe point, the session ends like any
+other: post-session processing syncs the plan to the main project (the copy the
+Kanban reads) and, on the last subtask, emits `ALL_SUBTASKS_DONE`.
+
 A re-run is not an attempt, so `MAX_SUBTASK_RETRIES` never stops it. On a
 window too small for a fresh thread (Ollama or LM Studio with an 8k–16k
 `num_ctx` under the coder prompt), every re-run used to be cut again, with no
@@ -115,6 +120,13 @@ in a row on the same phase, subtask and model, the loop passes
 measures, before the replay as during the session, and the task log says so
 once. A session that ends on its own resets the count. The next subtask, or a
 hot swap to another model, gets a managing guard again.
+
+Spec creation sessions (`spec/pipeline/agent_runner.py`) only measure too, like
+QA passes, under the phase `spec`. They report a first reading before anything is
+sent, so the gauge leaves its "–" as soon as a session starts. On Claude the
+pipeline reads the raw `ClaudeSDKClient` stream, and `context_mgmt/sdk_usage.py`
+(`SdkUsageProbe`) gives the guard the fill that `ClaudeAgentClient` measures
+elsewhere, with the same formula (`claude_context_fill`).
 
 A clear archives every live log as `.cleared.` (retired, never replayed or
 inherited), forgets the Claude resume pointer (`.session.json`,
