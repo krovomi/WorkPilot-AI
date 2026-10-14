@@ -4,6 +4,7 @@ Its loop re-runs planning on every "context_reset". A thread that is full from
 its first turns would otherwise re-run it forever.
 """
 
+import importlib
 import json
 
 import pytest
@@ -57,9 +58,10 @@ async def test_followup_planning_runs_monitor_only_once_the_budget_is_spent(
 
     monkeypatch.setattr(planner, "_create_planning_client", lambda *a, **kw: Client())
     monkeypatch.setattr(planner, "run_agent_session", session)
-    monkeypatch.setattr(
-        "prompts_pkg.prompts.get_followup_planner_prompt", lambda _spec: "plan it"
-    )
+    # The module the planner will import, whatever an earlier test left in
+    # sys.modules under that name.
+    prompts = importlib.import_module("prompts_pkg.prompts")
+    monkeypatch.setattr(prompts, "get_followup_planner_prompt", lambda _spec: "plan it")
 
     await planner.run_followup_planner(temp_git_repo, spec, "test-model")
 
