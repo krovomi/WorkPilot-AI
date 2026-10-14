@@ -83,18 +83,18 @@ function getReviewKey(projectId: string, prNumber: number): string {
 
 /**
  * Returns env var overrides derived from project settings for runner subprocesses.
- * - CLAUDE.md usage: enabled unless explicitly opted out.
+ * - CLAUDE.md usage: enabled unless explicitly opted out. Sent either way: the
+ *   backend reads an absent variable as on, so "off" must be said.
  * - Strict TDD (Red-Green-Refactor): enabled only when opted in.
  */
-function getClaudeMdEnv(project: Project): Record<string, string> | undefined {
-	const env: Record<string, string> = {};
-	if (project.settings?.useClaudeMd !== false) {
-		env.USE_CLAUDE_MD = "true";
-	}
+function getClaudeMdEnv(project: Project): Record<string, string> {
+	const env: Record<string, string> = {
+		USE_CLAUDE_MD: project.settings?.useClaudeMd !== false ? "true" : "false",
+	};
 	if (project.settings?.tddMode) {
 		env.TDD_MODE = "true";
 	}
-	return Object.keys(env).length > 0 ? env : undefined;
+	return env;
 }
 
 /**

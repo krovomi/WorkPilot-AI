@@ -689,10 +689,10 @@ export class AgentProcessManager {
 		const project = projects.find((p) => p.path === projectPath);
 
 		if (project?.settings) {
-			// CLAUDE.md integration (enabled by default)
-			if (project.settings.useClaudeMd !== false) {
-				env.USE_CLAUDE_MD = "true";
-			}
+			// CLAUDE.md integration (enabled by default). Sent either way: the
+			// backend reads an absent variable as on, so "off" must be said.
+			env.USE_CLAUDE_MD =
+				project.settings.useClaudeMd !== false ? "true" : "false";
 
 			// Strict TDD (Red-Green-Refactor) mode (opt-in)
 			if (project.settings.tddMode) {

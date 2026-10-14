@@ -37,14 +37,24 @@ class TestSmoke:
 
 
 class TestClaudeMd:
-    def test_disabled_when_env_var_unset(
+    def test_disabled_when_flag_false(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.delenv("USE_CLAUDE_MD", raising=False)
+        monkeypatch.setenv("USE_CLAUDE_MD", "false")
         (tmp_path / "CLAUDE.md").write_text("hello", encoding="utf-8")
         snap = build_prompt_preview(tmp_path, tmp_path)
         assert snap.claude_md_included is False
         assert "hello" not in snap.system_prompt
+
+    def test_included_when_env_var_unset(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Unset is the setting's default, on, as in `create_client`."""
+        monkeypatch.delenv("USE_CLAUDE_MD", raising=False)
+        (tmp_path / "CLAUDE.md").write_text("hello", encoding="utf-8")
+        snap = build_prompt_preview(tmp_path, tmp_path)
+        assert snap.claude_md_included is True
+        assert "hello" in snap.system_prompt
 
     def test_included_when_flag_on_and_file_present(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
