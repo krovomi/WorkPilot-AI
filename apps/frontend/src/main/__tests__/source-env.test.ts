@@ -147,7 +147,8 @@ describe("backend .env secrets", () => {
 		});
 
 		it("without a keyring, keeps the token in clear and warns — never silently", async () => {
-			fake.state.backend = "basic_text";
+			// No keyring on any OS (basic_text only counts on Linux)
+			fake.state.ready = false;
 			const { writeSourceEnvFile, getSecureStorageStatus } = await load();
 
 			writeSourceEnvFile(
