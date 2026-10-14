@@ -190,7 +190,7 @@ pnpm run skills:bootstrap --pack hermes
 
 Hermes also *writes* skills, from its own experience, on surfaces WorkPilot never sees.
 Those arrive as candidates under `skills/_proposed/` and are promoted by nothing — see
-[shared_docs/architecture/hermes.md](../shared_docs/architecture/hermes.md).
+[docs/architecture/hermes.md](../docs/architecture/hermes.md).
 
 ## AnyDoc document inputs
 

@@ -50,6 +50,10 @@ TRANSLATE_MODEL = "claude-haiku-4-5"
 SOURCE_FILES = [
     "README.md",
     "docs/CLAUDE.md",
+    "docs/rules/security.md",
+    "docs/rules/backend.md",
+    "docs/rules/frontend.md",
+    "docs/rules/workflow.md",
     "docs/CLI-USAGE.md",
 ]
 
