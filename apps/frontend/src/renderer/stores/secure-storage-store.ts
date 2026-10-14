@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { SecureStorageStatus } from "../../shared/types/secure-storage";
+import type { SecureStorageStatus } from "../../shared/types/ipc";
 
 interface SecureStorageState {
 	status: SecureStorageStatus | null;

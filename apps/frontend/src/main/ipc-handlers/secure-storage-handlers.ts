@@ -1,7 +1,6 @@
 import { BrowserWindow, ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
-import type { IPCResult } from "../../shared/types";
-import type { SecureStorageStatus } from "../../shared/types/secure-storage";
+import type { IPCResult, SecureStorageStatus } from "../../shared/types";
 import {
 	getSecureStorageStatus,
 	onSecureStorageStatusChange,

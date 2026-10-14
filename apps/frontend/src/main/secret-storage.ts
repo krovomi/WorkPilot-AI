@@ -16,7 +16,7 @@
  */
 
 import { safeStorage } from "electron";
-import type { SecureStorageStatus } from "../shared/types/secure-storage";
+import type { SecureStorageStatus } from "../shared/types/ipc";
 import { isLinux } from "./platform";
 
 export const ENCRYPTED_SECRET_PREFIX = "enc:";

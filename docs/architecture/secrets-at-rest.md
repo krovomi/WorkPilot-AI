@@ -1,7 +1,7 @@
 # Secrets at rest
 
-> Design rationale for a rule of [`docs/CLAUDE.md`](../CLAUDE.md),
-> which stays the normative file: where the two disagree, `docs/CLAUDE.md` wins.
+> Design rationale for rule S1 of [`docs/rules/security.md`](../rules/security.md),
+> which stays the normative file: where the two disagree, the rule wins.
 
 ## A secret on disk is encrypted, or the user is told
 

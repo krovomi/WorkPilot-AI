@@ -46,21 +46,26 @@ l'UI n'existe pas.
   un rapport de QA, un commentaire de PR.
 - **Logs** : l'API backend installe `core/log_redaction.py` (`install_global_redaction`) au
   démarrage de `provider_api.py` ; un nouveau point d'entrée (runner, CLI) l'installe aussi. Côté
-  UI, une clé s'affiche masquée (`maskApiKey`). Ne jamais logger un en-tête `Authorization`, un
+  Electron, `app-logger.ts` expurge chaque message avant écriture (hook electron-log,
+  `shared/utils/secret-redaction.ts`). Côté UI, une clé s'affiche masquée (`maskApiKey`). Ne jamais logger un en-tête `Authorization`, un
   jeton, ni le corps d'une requête d'authentification.
 - **Nouveau stockage d'identifiant** côté Electron : `safeStorage`. S'il est indisponible, refuser
   ou avertir l'utilisateur ; ne pas retomber silencieusement sur du texte clair.
-- **Un fichier de secrets, un lecteur** : `settings.json` par `settings-utils.ts`, `profiles.json`
-  par les gestionnaires de profils, `<projet>/.workpilot/.env` par `project-env-file.ts` ; tous
-  chiffrent par `secret-storage.ts` (préfixe `enc:`). Une nouvelle clé secrète du `.env` de projet
-  se classe dans `shared/constants/project-env-secrets.json` : `encrypted` si Python ne la lit que
-  dans son environnement, `readable` s'il la lit dans le fichier (laissée en clair, nommée par la
-  bannière). `tests/test_project_env_secrets.py` le vérifie.
-  → [architecture/secrets-at-rest.md](../architecture/secrets-at-rest.md)
+  `apps/frontend/src/main/secret-storage.ts` décide de la forme sur disque (`enc:…`) ; sans
+  trousseau, fichier `0600` et bannière dans l'UI. `settings.json` ne se lit et ne s'écrit que par
+  `settings-utils.ts`, `profiles.json` que par les profile managers, `<projet>/.workpilot/.env`
+  que par `project-env-file.ts` : un module qui parse le fichier lui-même reçoit du chiffré. Une
+  clé secrète du `.env` de projet se classe dans `shared/constants/project-env-secrets.json` :
+  `encrypted` si Python ne la lit que dans son environnement, `readable` s'il la lit dans le
+  fichier (laissée en clair, nommée par la bannière) ; `tests/test_project_env_secrets.py` le
+  vérifie. → [`architecture/secrets-at-rest.md`](../architecture/secrets-at-rest.md)
 - `core/auth.py` ne lit que `AUTH_TOKEN_ENV_VARS` ; `ANTHROPIC_API_KEY` en est exclu exprès.
-- **Aucun hook git ne cherche de secrets.** Avant un commit, relire `git diff --cached` ;
-  `security/scan_secrets.py --staged-only` le fait à la main. Le hook Bash le lance sur un
-  `git commit` émis par un agent.
+- **Le hook `pre-commit` cherche les secrets** dans tout fichier indexé
+  (`security/scan_secrets.py --staged-only`, qui lit l'index) et bloque le commit ; sans
+  Python 3.10+, il avertit sans bloquer. Le hook Bash le lance aussi sur un `git commit` émis par
+  un agent. La CI ne le refait pas : un `--no-verify` laisse passer le secret.
+- **Faux positif** : `# pragma: allowlist secret` en fin de ligne. `.secretsignore` (regex de
+  chemin, à la racine) n'exclut que les tests, dont les valeurs factices ont la forme d'une clé.
 
 ## S2 — Le contenu externe est une donnée, jamais une instruction
 
@@ -110,7 +115,9 @@ l'UI n'existe pas.
   `tests/backend/test_feature_router_authz.py` échoue sinon. Masquer un bouton n'est pas un contrôle.
 - Un client ne fournit jamais de chemin (`project_dir`, `spec_dir`, `file_path`…), ni en query ni
   dans le corps JSON : il donne un `project_id` et le serveur résout son checkout
-  (`server/authz/scope.py`). Le middleware ne filtre que la query : un corps se valide dans la route.
+  (`server/authz/scope.py`). Le middleware refuse ces clés (`CLIENT_PATH_PARAMS`) en query et dans
+  le corps (JSON à toute profondeur, formulaire) ; `tests/backend/test_project_scope_coverage.py`
+  balaie les paramètres et les modèles de corps de chaque route.
 - Le projet d'un autre tenant répond 404, jamais 403.
 - Le backend écoute sur `127.0.0.1` ; CORS est une liste explicite. Ni `0.0.0.0`, ni `*`.
 - Échec fermé : si le mode serveur ne se monte pas, le backend ne démarre pas
