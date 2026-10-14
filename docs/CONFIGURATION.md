@@ -8,6 +8,9 @@ configuration. It covers:
 3. The authentication token resolution order.
 4. Multi-user server mode: tenants, roles and permissions.
 
+The sections after these four list the environment variables each feature
+reads, starting with [where they are read from](#where-environment-variables-are-read-from).
+
 ---
 
 ## 1. LLM provider registry — `configured_providers.json`
@@ -122,11 +125,25 @@ Implemented in [apps/backend/core/auth.py](../apps/backend/core/auth.py)
 | 5 | `.credentials.json` in (3) or (4) | File-based storage. |
 | 6 | System credential store | macOS Keychain, Windows Credential Manager, Linux Secret Service (via `secretstorage`). |
 
+### API profile mode (`ANTHROPIC_BASE_URL`)
+
+Setting `ANTHROPIC_BASE_URL` sends the Claude Agent SDK to an Anthropic-compatible
+endpoint instead of the OAuth sign-in. In that mode `ANTHROPIC_AUTH_TOKEN` is
+required (the session stops with an error without it) and
+`CLAUDE_CODE_OAUTH_TOKEN` is dropped. A base URL set next to an OAuth token but
+without `ANTHROPIC_AUTH_TOKEN` is taken as stale: it is removed, with a warning,
+and OAuth is used. The desktop app sets the variable from the active API
+profile and clears it in OAuth mode, so setting it by hand only matters for the
+CLI.
+
 ### Deliberately **not** supported
 
 - **`ANTHROPIC_API_KEY`** is intentionally excluded. Supporting it could
   silently bill the user's API credits if the OAuth path misconfigures —
   a failure mode we've explicitly ruled out.
+- **`CLAUDE_API_KEY`** is not a token source either. It only makes the
+  provider list report Claude as configured, so a build can still stop for
+  lack of an OAuth token while the UI shows Claude as available.
 
 ### Linux-specific requirement
 
@@ -172,6 +189,10 @@ for a PostgreSQL-backed deployment.
 | `WORKPILOT_REPOS_ROOT` | `~/.workpilot/server-repos` | Where the server clones registered repositories — and, in server mode, the **only** directory tree a request can resolve a path inside. |
 | `WORKPILOT_SECRETS_MASTER_KEY` | — | Fernet key encrypting per-user integration secrets. |
 | `WORKPILOT_MAX_CONCURRENT_RUNS` | `3` | Deployment-wide ceiling. Per-organization ceilings are set in the console (see quotas below). |
+| `WORKPILOT_WS_URL` | `ws://127.0.0.1:8765` | Where the API pushes board events (projects, specs, runs) to the streaming WebSocket server. Change it only when that server is not on the API's loopback. |
+
+Sign-in, invitations and email have their own variables, after
+[Quotas](#quotas).
 
 ### Tenancy
 
@@ -221,8 +242,9 @@ tenant. Organizations create custom roles instead; their permission list is
 validated against the catalog on write.
 
 **Effective permissions are resolved per request from the database, never
-carried in the token.** A token lives 15 minutes; a permission removed from a
-role has to bite on the next request, not a quarter of an hour later.
+carried in the token.** An access token lives 15 minutes by default
+(`WORKPILOT_ACCESS_TOKEN_TTL_MINUTES`); a permission removed from a role has to
+bite on the next request, not a quarter of an hour later.
 
 An organization can also switch permissions off wholesale — a licence tier or a
 feature flag — through `disabled_permissions` in its settings, subtracted from
@@ -248,6 +270,95 @@ Per-organization ceilings on members, projects, concurrent runs and monthly
 token budget, set in the console. **Absent means unlimited**, and an
 organization with no quota row is unconstrained — so an upgraded deployment
 behaves exactly as it did before quotas existed.
+
+### Sign-in and sessions
+
+The variables of this section and the next two are read once, on first use, by
+[apps/backend/server/config.py](../apps/backend/server/config.py). A number that
+does not parse is logged and replaced by its default. A boolean is true for
+`1`, `true`, `yes` or `on`; set but empty, it is false.
+
+| Variable | Default | Meaning |
+| --- | ---: | --- |
+| `WORKPILOT_ACCESS_TOKEN_TTL_MINUTES` | 15 | Lifetime of an access token, also sent to clients as `expires_in`. |
+| `WORKPILOT_REFRESH_TOKEN_TTL_DAYS` | 14 | Lifetime of a sign-in session (refresh token) before the user signs in again. |
+| `WORKPILOT_JWT_ISSUER` | `workpilot` | `iss` claim written into, and required on, every token the server issues. The API and the WebSocket server must agree on it; changing it invalidates the access tokens in flight. |
+| `WORKPILOT_ENTRA_TENANT_ID` | — | Microsoft Entra ID directory (tenant) whose keys and issuer sign-in tokens are checked against. |
+| `WORKPILOT_ENTRA_CLIENT_ID` | — | Application (client) ID of the Entra app registration, checked as the token audience. |
+
+Entra sign-in is on only when both Entra variables are set; local accounts work
+either way. Neither identifier is a secret: `GET /auth/config` hands both to the
+sign-in page.
+
+### Invitations and local passwords
+
+| Variable | Default | Meaning |
+| --- | ---: | --- |
+| `WORKPILOT_PUBLIC_BASE_URL` | — | Public URL of the server, the base of invitation links (`<url>/invite?token=…`). Without it the link is relative and the administrator completes it. |
+| `WORKPILOT_INVITATION_TTL_HOURS` | 72 | How long an invitation link stays usable. |
+| `WORKPILOT_PASSWORD_MIN_LENGTH` | 12 | Minimum length of a local password. It can only raise the floor: a value below 12 keeps 12. |
+| `WORKPILOT_PASSWORD_HIBP_CHECK` | `false` | Refuses a new local password found in Have I Been Pwned. Only the first five hex characters of its SHA-1 leave the server; when the service cannot be reached, the password is accepted. |
+| `WORKPILOT_ADMIN_PASSWORD` | — | Password of the first administrator, read by `python -m server.scripts.create_admin <email>` (run from `apps/backend`) instead of prompting. Remove it from the environment once the account exists. |
+
+### Invitation email (SMTP)
+
+Invitation emails go out only when both `WORKPILOT_SMTP_HOST` and
+`WORKPILOT_SMTP_FROM` are set. Otherwise, or when sending fails, the API returns
+the link for the administrator to pass on.
+
+| Variable | Default | Meaning |
+| --- | ---: | --- |
+| `WORKPILOT_SMTP_HOST` | — | SMTP server. |
+| `WORKPILOT_SMTP_PORT` | 587 | SMTP port. It does not follow `WORKPILOT_SMTP_USE_SSL`: set 465 yourself. |
+| `WORKPILOT_SMTP_USER` | — | SMTP login; no authentication when empty. |
+| `WORKPILOT_SMTP_PASSWORD` | — | SMTP password, used only with a login. A secret: keep it out of tracked files. |
+| `WORKPILOT_SMTP_FROM` | — | `From:` address of the emails. |
+| `WORKPILOT_SMTP_USE_TLS` | `true` | Upgrades the connection with STARTTLS. Ignored when `WORKPILOT_SMTP_USE_SSL` is on. |
+| `WORKPILOT_SMTP_USE_SSL` | `false` | TLS from the first byte (port 465). |
+
+Keep one of the two TLS options on: with both off, the email and the SMTP
+credentials travel in clear text.
+
+---
+
+## Where environment variables are read from
+
+The desktop app and the CLI do not read the same files. A variable already set
+in the environment a process starts with is never overwritten by a file it
+loads.
+
+- **The CLI** (`run.py`) loads `.env-files/.env` at the WorkPilot root.
+- **The desktop app** loads `.env-files/.env` into its own environment when it
+  starts. The local API (`127.0.0.1:9000`) and the streaming WebSocket server
+  (`:8765`) inherit that environment as is.
+- **A task the app runs** (spec, planning, coding, QA) gets that environment,
+  overlaid in this order, later winning: `apps/backend/.env`, the project's
+  `.workpilot/.env` (written by Project settings), then the Claude profile and
+  provider credentials the app derives from Settings. A value set in Settings
+  therefore beats the same variable set by hand.
+- The local API never reads a project's `.workpilot/.env`: a variable read by an
+  API route belongs in `.env-files/.env`.
+
+Most variables are read when the process that uses them starts; restart the app,
+or re-run the task, after changing one.
+
+## Local API, WebSocket server and data at rest
+
+These apply with or without server mode.
+
+| Variable | Default | Meaning |
+| --- | ---: | --- |
+| `WORKPILOT_EXTRA_CORS_ORIGINS` | — | Comma-separated origins added to the local API's built-in localhost and Electron list, with credentials allowed. Never `*`: with credentials allowed, it lets any origin in. |
+| `WORKPILOT_WS_ALLOWED_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000,file://` | Comma-separated browser origins allowed to open the streaming WebSocket. It replaces the default list, entries are not trimmed: write them without spaces. |
+| `AUDIT_TRAIL_ALLOWED_ROOTS` | — | Desktop mode: directories, separated by `:` (`;` on Windows), under which the audit-trail panel may keep a project's trail (`<project>/.workpilot/audit-trail`); a directory outside them is refused. Unset, any directory is accepted. In server mode a client cannot name a directory at all (see [Paths are no longer supplied by the client](#paths-are-no-longer-supplied-by-the-client)). |
+| `AUDIT_TRAIL_FERNET_KEY` | — | Fernet key encrypting each new audit-trail line on disk; lines written before stay readable. Every process that writes trails needs it: the API and the build agents. There is one key and no rotation: changing it makes the lines encrypted with the old one unreadable. |
+| `VALIDATED_KEYS_FERNET_KEY` | — | Fernet key encrypting the hashes of provider API keys already checked (`validated_keys.sqlite3`). |
+| `VALIDATED_KEYS_TTL_DAYS` | 30 | Days after which a provider key counts as unchecked and is validated again. Minimum 1. |
+| `ANALYTICS_DATABASE_URL` | `sqlite:///<WorkPilot root>/data/analytics.db` | SQLAlchemy URL of the build-analytics database (dashboard, estimates, agent health), written by the builds. The engine is synchronous: a URL other than SQLite needs a synchronous driver installed. |
+
+Both Fernet keys are secrets. Check the backend log after setting one: a key
+that is not a valid Fernet key is reported there, and the data is then written
+unencrypted.
 
 ---
 
@@ -324,10 +435,29 @@ the backend environment, then from `.workpilot/.env`:
 | `VERIFY_PERF_REGRESSION` | 10 | Score drop, in points, against the per-route baseline reported as a regression. |
 | `VERIFY_BROWSER` | `auto` | `auto` (chrome-devtools-mcp, then Playwright), `devtools`, `playwright`, `off`. |
 | `VERIFY_CHROME_PATH` | — | A specific Chrome/Chromium binary. |
+| `CHROME_PATH` | — | Same, read when `VERIFY_CHROME_PATH` is unset. A path that is not an existing file is ignored. |
+
+## Local and OpenAI-compatible endpoints
+
+The `ollama` provider talks to Ollama's native API; `lm-studio` and `llama-cpp`
+use their OpenAI-compatible one. The desktop app sets `OLLAMA_BASE_URL` and
+`OLLAMA_MODEL` from Settings; set them by hand for the CLI.
+
+| Variable | Default | Meaning |
+| --- | ---: | --- |
+| `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | Ollama server. In offline mode it is the only URL variable the `ollama` provider reads. |
+| `LOCAL_LLM_BASE_URL` | — | Same, read when `OLLAMA_BASE_URL` is unset; it must point at an Ollama server. |
+| `LMSTUDIO_BASE_URL` | `http://127.0.0.1:1234` | LM Studio server. It must be a loopback address, offline mode or not. Also the last fallback for the Ollama URL. |
+| `LLAMA_CPP_BASE_URL` | `http://127.0.0.1:8080` | llama.cpp server. It must be a loopback address, offline mode or not. |
+| `OLLAMA_MODEL` | registry default for Ollama | Model a local provider runs when no valid model was selected, or when a model only a hosted provider serves reaches it. |
+| `LOCAL_LLM_MODEL` | — | Same, read when `OLLAMA_MODEL` is unset. |
+| `OLLAMA_API_KEY`, `LOCAL_LLM_API_KEY`, `LMSTUDIO_API_KEY` | — | Bearer token for an LM Studio or llama.cpp server that requires one, read in this order. Ollama's native API is sent no token. Secrets. |
 
 ## Local generation deadlines
 
-Ollama native chat requests have independent limits, in seconds, configured in the backend process environment:
+Requests to local models have these limits, in seconds, configured in the
+backend process environment. `LOCAL_LLM_REQUEST_TIMEOUT` also caps LM Studio and
+llama.cpp requests; the other two apply to Ollama's native chat only:
 
 | Variable | Default | Meaning |
 | --- | ---: | --- |
@@ -338,3 +468,166 @@ Ollama native chat requests have independent limits, in seconds, configured in t
 The heartbeat checks silence every 30 seconds. On a deadline, transport error or truncated response, the request is cancelled and spec creation fails explicitly without retrying the same failing generation. Connection-establishment retries remain bounded. These limits do not make an oversized model faster: use a model that fits the available hardware. Raise them only deliberately for a known slow workload.
 
 In-flight progress counts received **fragments**, not tokenizer tokens. Exact output token usage comes from Ollama's final `eval_count`; a fragment may contain multiple tokens, and tool arguments can be buffered by the server.
+
+`OLLAMA_STREAM` (default `true`) streams each Ollama turn; `false`, `0`, `no` or
+`off` sends one non-streaming request per turn, without the fragment counter. The
+client also falls back to a non-streaming request on its own when the server
+rejects a streamed tool-calling turn.
+
+## Claude Agent SDK sessions
+
+Read by every Claude session WorkPilot starts through `create_client()` (spec,
+planner, coder, QA…).
+
+| Variable | Default | Meaning |
+| --- | ---: | --- |
+| `AUTO_CLAUDE_MAX_TURNS` | 1000 | Maximum agent turns in one session. A value that is not an integer stops the session from starting. |
+| `AUTO_CLAUDE_MAX_BUDGET_USD` | 5.0 | Spending cap, in US dollars, of one session — not of the task. Past it the SDK ends the session and the Kanban offers to resume. A value that is not a number stops the session from starting. |
+| `AUTO_CLAUDE_EFFORT` | by agent type | Forces the SDK `effort` level (`low`, `medium`, `high`, `xhigh`, `max`) of sessions on an Opus model; other models ignore it. Without it: `xhigh` for the planner and the coder, `low` for explorers, `high` for QA and the rest. Separate from the per-phase thinking budget. |
+| `AUTO_CLAUDE_OTEL_ENDPOINT` | — | OTLP endpoint, such as `http://localhost:4318`. When set, each session exports traces, metrics and logs over OTLP `http/protobuf` as the service `workpilot-<agent type>`, and these settings replace any `OTEL_*` variable of the same name. Point it only at a collector you control. |
+| `AUTO_CLAUDE_AGENT_DEBUGGER` | off | `1`, `true`, `yes` or `on` attaches the Agent Debugger's breakpoints to every session, even when the debugger was not opened for that task. |
+| `CLAUDE_CLI_PATH` | the SDK's bundled CLI | `claude` executable the SDK launches. Ignored when it is not an existing file or holds shell metacharacters, `..` or a variable reference. The desktop app sets it from detection or the Claude path setting. |
+| `CLAUDE_CODE_GIT_BASH_PATH` | detected | Windows only: the Git for Windows `bash.exe` the Claude Code CLI needs; WorkPilot also looks for `git.exe` next to it. The desktop app sets it when it finds one. |
+
+## Provider selection and endpoints
+
+The desktop app writes these from Settings into each task's environment (see
+[Where environment variables are read from](#where-environment-variables-are-read-from)):
+setting them by hand matters mainly for the CLI and headless runs.
+
+| Variable | Default | Meaning |
+| --- | ---: | --- |
+| `AUTO_CLAUDE_PROVIDER` | — | Default provider when nothing more specific names one: a task's own engine, the provider picked in the UI, `SELECTED_LLM_PROVIDER` and `task_metadata.json` all win over it. Accepted: `claude`, `copilot`, `openai`, `google`, `gemini`, `ollama`, `meta`, `mistral`, `deepseek`, `grok`, `aws`, `windsurf`, `cursor`, `custom`, `opencode`, `antigravity`, `agy`. Any other value, `anthropic` included, is ignored. |
+| `OPENAI_AUTH_MODE` | `api-key` | `codex-cli` runs OpenAI sessions through the logged-in Codex CLI instead of the API key. A model only the API serves still goes to the API when a key is configured. |
+| `GOOGLE_API_KEY` | — | Gemini API key of the `google` and `gemini` providers; their agent sessions read no other source. Secret. |
+| `MISTRAL_BASE_URL` | `https://api.mistral.ai` | Mistral API base, with or without `/v1`. |
+| `DEEPSEEK_BASE_URL` | `https://api.deepseek.com` | Same, for DeepSeek. |
+| `GROK_BASE_URL` | `https://api.x.ai` | Same, for xAI Grok. |
+
+For the three base URLs, agent sessions prefer the variable to the URL saved in
+the provider configuration; the model list does the opposite.
+
+The `meta`, `aws` and `cursor` providers have no adapter of their own: their
+credentials only feed the provider status, and their builds run on Claude.
+
+### Windsurf
+
+| Variable | Default | Meaning |
+| --- | ---: | --- |
+| `WINDSURF_API_KEY` | — | Windsurf credential, read first. With none of the three set, WorkPilot reads the key of the installed Windsurf IDE. An `sk-ws-` key is replaced by a different one found in the IDE's state, taken as newer. Secret. |
+| `WINDSURF_OAUTH_TOKEN` | — | Read second; also what the provider status checks. Secret. |
+| `CODEIUM_API_KEY` | — | Read third, the legacy name. Secret. |
+| `WINDSURF_BASE_URL` | probed | Pins the Windsurf REST base, an enterprise endpoint for example, and turns off probing. |
+
+## GitHub Copilot client
+
+Read once when the backend starts. A value that is not a number is logged and
+replaced by its default.
+
+| Variable | Default | Meaning |
+| --- | ---: | --- |
+| `COPILOT_REQUEST_TOTAL_TIMEOUT` | 600 | Ceiling, in seconds, on one chat request. |
+| `COPILOT_REQUEST_CONNECT_TIMEOUT` | 20 | Seconds to open the connection. |
+| `COPILOT_REQUEST_SOCK_READ_TIMEOUT` | 540 | Longest silence, in seconds, between two reads. Replies are not streamed, so it is in practice how long the model may take to answer. |
+| `COPILOT_TIMEOUT_MAX_RETRIES` | 2 | Retries of a request that timed out before the turn fails. |
+| `COPILOT_RATE_LIMIT_MAX_RETRIES` | 6 | Retries on HTTP 429, 500, 502, 503 or 529 before the error surfaces. |
+| `COPILOT_RATE_LIMIT_BACKOFF` | 5 | Base wait, in seconds, when the server sends no `Retry-After`; it doubles at each attempt. |
+| `COPILOT_RATE_LIMIT_MAX_BACKOFF` | 60 | Cap, in seconds, on one wait, `Retry-After` included. |
+| `COPILOT_MAX_CONSECUTIVE_EMPTY_RESPONSES` | 4 | Successive empty replies resent before the session gives up. |
+| `COPILOT_EMPTY_RESPONSE_BACKOFF` | 2 | Base wait, in seconds, before resending an empty reply; it grows with each one. |
+
+## Non-Claude agent context and tools
+
+The first three variables apply to the agent clients WorkPilot drives itself:
+OpenAI with an API key, Gemini, Mistral, DeepSeek, Grok, the local providers,
+Copilot and Windsurf. Claude sessions and the CLI-based clients (Codex CLI,
+OpenCode, Antigravity) are not affected.
+
+| Variable | Default | Meaning |
+| --- | ---: | --- |
+| `LLM_TOOL_RESULT_MAX_CHARS` | 10000 | Characters of one tool result kept in the conversation (minimum 1000); the cut keeps the start and the end. On Ollama it is also capped from the model's context length. |
+| `LLM_HISTORY_CHAR_BUDGET` | 300000 | Conversation size, in characters (minimum 50000), above which the oldest tool results are replaced by a placeholder. The system prompt, the first request and the last eight messages are always kept. Also capped on Ollama. |
+| `LOCAL_COMMAND_TIMEOUT` | 120 | Seconds before a shell command run by the agent is killed. Despite its name, not limited to local models. Must be a positive number. |
+| `LLM_INLINE_FILE_CONTEXT` | `auto` | Whether the coder's prompt includes excerpts of the files to modify and of the pattern files: `auto` for providers other than Claude at effort `none`, `low` or `medium`; `always` for every provider, Claude included; `never` for none. |
+
+## Auxiliary models
+
+| Variable | Default | Meaning |
+| --- | ---: | --- |
+| `UTILITY_MODEL_ID` | `DEFAULT_UTILITY_MODEL` ([core/model_config.py](../apps/backend/core/model_config.py)) | Model of the utility calls: the AI merge resolver and, when a pull request is created, the template filler and the impact analysis. The desktop app sets it for merges from the utility model in Settings. |
+| `UTILITY_THINKING_BUDGET` | off | Thinking budget, in tokens, of the same calls; empty or `0` turns it off. The desktop app sets it for merges. |
+| `INSIGHT_EXTRACTION_ENABLED` | `true` | After each coder session, an LLM pass extracts insights into the project memory. Only `true`, `1` or `yes` keep it on (`on` turns it off). It also needs a Claude token. |
+| `INSIGHT_EXTRACTOR_MODEL` | `DEFAULT_EXTRACTION_MODEL` ([analysis/insight_extractor.py](../apps/backend/analysis/insight_extractor.py)) | Model of that pass. It always runs on Claude: give a Claude model id. |
+
+## Forges, notifications and MCP servers
+
+### Forges
+
+Project settings writes `GITHUB_REPO` and `GITLAB_PROJECT` into the project's
+`.workpilot/.env`.
+
+| Variable | Default | Meaning |
+| --- | ---: | --- |
+| `GITHUB_REPO` | detected | The project's `owner/repo`, for the GitHub views, the CI loop and the GitHub runner when it cannot detect it. |
+| `GITLAB_PROJECT` | — | The project's `group/project`, for the same uses on GitLab. |
+| `AZURE_DEVOPS_EXT_PAT` | — | Read when `AZURE_DEVOPS_PAT` is unset (it is the Azure DevOps CLI's name for it): pushes a task branch and opens its pull request. Secret. |
+| `GITHUB_BOT_TOKEN` | — | Token of the GitHub automation runner's bot account (PR review, auto-fix, triage) when `--bot-token` is not given. It only identifies that account, so the runner skips what the bot wrote itself; nothing is posted with it. Secret. |
+| `MAX_PR_WORKTREES` | 10 | PR-review worktrees kept in `.workpilot/github/pr/worktrees`; the oldest go beyond that. |
+| `PR_WORKTREE_MAX_AGE_DAYS` | 7 | Age, in days, past which a PR-review worktree is removed, checked before each new review. `0` removes them all. |
+
+### Notifications
+
+When WorkPilot opens a task's pull request, it posts to every enabled channel.
+A channel needs its switch set to `true` and a webhook URL. The process
+environment wins over the project's `.workpilot/.env`, which Project settings >
+Notifications writes. A webhook URL is a credential: keep it out of tracked
+files. Only public `http` and `https` addresses are accepted.
+
+| Channel | Switch | Webhook URL |
+| --- | --- | --- |
+| Microsoft Teams | `TEAMS_NOTIFICATIONS_ENABLED` | `TEAMS_WEBHOOK_URL` |
+| Slack | `SLACK_NOTIFICATIONS_ENABLED` | `SLACK_WEBHOOK_URL` |
+| Discord | `DISCORD_NOTIFICATIONS_ENABLED` | `DISCORD_WEBHOOK_URL` |
+| Google Chat | `GOOGLE_CHAT_NOTIFICATIONS_ENABLED` | `GOOGLE_CHAT_WEBHOOK_URL` |
+| Generic webhook | `NOTIFY_WEBHOOK_ENABLED` | `NOTIFY_WEBHOOK_URL` |
+
+`SLACK_WEBHOOK_URL` and `TEAMS_WEBHOOK_URL` are also where a hook's `send_slack`
+or `send_teams` action posts when it names no URL.
+
+### Third-party MCP servers
+
+These credentials go only to an MCP server an agent may be given. A server starts
+when the project adds it to an agent (`AGENT_MCP_<agent>_ADD`, written by the
+agent tools screen) and its variables are set; otherwise it is skipped without a
+message. WorkPilot's own integrations read other names, in the last column.
+
+| Server | Variables | WorkPilot's own integration reads |
+| --- | --- | --- |
+| `github` | `GITHUB_PERSONAL_ACCESS_TOKEN` | `GITHUB_TOKEN`, or the `gh` CLI |
+| `brave-search` | `BRAVE_API_KEY` | — |
+| `jira` | `JIRA_URL`, `JIRA_USERNAME`, `JIRA_API_TOKEN` | `JIRA_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN` |
+| `azure-devops` | `AZURE_DEVOPS_ORG`, `AZURE_DEVOPS_TOKEN` | `AZURE_DEVOPS_ORG_URL`, `AZURE_DEVOPS_PAT` |
+| `sentry` | `SENTRY_AUTH_TOKEN` | — (error reporting uses `SENTRY_DSN`) |
+| `slack` | `SLACK_BOT_TOKEN` | — |
+| `postman` | `POSTMAN_API_KEY` | — |
+| `teams` | `TEAMS_WEBHOOK_URL` | the same, for notifications |
+
+## Agent features
+
+Opt-in features. Those marked *API* are read by the local API: put them in
+`.env-files/.env`.
+
+| Variable | Default | Meaning |
+| --- | ---: | --- |
+| `WORKPILOT_LOOP_DETECTION_ENABLED` | off | `1`, `true`, `yes` or `on`: from the coder's second iteration, a diff that repeats one of the last four pauses the build, with the event in the audit trail. It resumes like any paused build. |
+| `WORKPILOT_AUTO_PROMOTE_THRESHOLD` | off | *API.* Integer from 0 to 100. Enables "Accept & skip human review" in the QA promotion dialog when the build's QA score reaches it; the score is 0 unless QA signed off. Nothing moves a card on its own. |
+| `WORKPILOT_PARALLEL_VARIATIONS` | 1 | *API.* How many variations, 1 to 5, the "Parallel variations" dialog may prepare; `1` leaves the feature off. |
+| `AUTO_TEST_GENERATION` | on | `false`, and only `false`, removes the "automated tests" section from each subtask's coding prompt. That section tells the coder which kinds of tests to write, with the test libraries the project already has. |
+| `AUTO_FIX_MAX_ATTEMPTS` | 5 | CLI: attempts of `run.py --spec … --auto-fix` when `--auto-fix-max-attempts` is not given. |
+
+## Debug and console output
+
+| Variable | Default | Meaning |
+| --- | ---: | --- |
+| `DEBUG_LEVEL` | 1 | With `DEBUG` on (see [CLI-USAGE.md](CLI-USAGE.md)): `1` basic messages, `2` adds the detailed ones, `3` the verbose ones. |
+| `ENABLE_FANCY_UI` | `true` | Any value other than `true`, `1`, `yes` or `on` turns off Unicode symbols, colours and interactive menus in the backend CLI. |
