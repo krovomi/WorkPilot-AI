@@ -23,9 +23,16 @@ from security.untrusted import clean_untrusted
 
 logger = logging.getLogger(__name__)
 
+# `phase_config` is a top-level backend module, importable the same way in
+# both modes. It used to sit in the relative block as `..phase_config`, which
+# names `runners.phase_config` — a module that does not exist — so imported as
+# `runners.github.batch_issues` the block always failed and fell back to the
+# sibling imports below, which only resolve when `runners/github` itself is on
+# `sys.path` (the `runner.py` entry point).
+from phase_config import resolve_model_id
+
 # Import validators
 try:
-    from ..phase_config import resolve_model_id
     from .batch_validator import BatchValidator
     from .duplicates import SIMILAR_THRESHOLD
     from .file_lock import locked_json_write
@@ -33,7 +40,6 @@ except (ImportError, ValueError, SystemError):
     from batch_validator import BatchValidator
     from duplicates import SIMILAR_THRESHOLD
     from file_lock import locked_json_write
-    from phase_config import resolve_model_id
 
 
 class ClaudeBatchAnalyzer:
