@@ -93,7 +93,7 @@ secrets, listed in `apps/frontend/src/shared/constants/project-env-secrets.json`
 
 | Kind | Keys | On disk | How Python gets the value |
 |---|---|---|---|
-| `encrypted` | `CLAUDE_CODE_OAUTH_TOKEN`, `LINEAR_API_KEY`, `GITHUB_TOKEN`, `GITLAB_TOKEN`, `AZURE_DEVOPS_PAT`, `JIRA_API_TOKEN`, `CICD_JENKINS_TOKEN`, `OPENAI_API_KEY`, `AZURE_OPENAI_API_KEY`, `VOYAGE_API_KEY`, `GOOGLE_API_KEY` | `enc:` ciphertext | only from its environment, which the main process builds from this file and decrypts on the way (`getCombinedEnv`, `loadProjectEnvForSubprocess`, `loadProjectEnvVars`) |
+| `encrypted` | `CLAUDE_CODE_OAUTH_TOKEN`, `LINEAR_API_KEY`, `GITHUB_TOKEN`, `GITLAB_TOKEN`, `AZURE_DEVOPS_PAT`, `JIRA_API_TOKEN`, `CICD_JENKINS_TOKEN`, `CICD_GITHUB_TOKEN`, `CICD_GITLAB_TOKEN`, `CICD_AZURE_TOKEN`, `OPENAI_API_KEY`, `AZURE_OPENAI_API_KEY`, `VOYAGE_API_KEY`, `GOOGLE_API_KEY` | `enc:` ciphertext | only from its environment, which the main process builds from this file and decrypts on the way (`getCombinedEnv`, `loadProjectEnvForSubprocess`, `loadProjectEnvVars`) |
 | `readable` | `CONTEXT7_API_KEY`, `CUSTOM_MCP_SERVERS` (when a server has HTTP headers), `FIGMA_ACCESS_TOKEN`, `DOCINTEL_AZURE_KEY`, the five notification webhook URLs | in clear, file `0600` | from the file itself |
 
 The split follows the readers, not how sensitive a key is. A `readable` key is
@@ -128,6 +128,30 @@ of the file returns an `enc:` value, the `readable` keys still reach their
 readers, and a new module that opens the file fails the test until it is
 classified. On the frontend, `env-handlers-secrets.test.ts` fails when the
 `.env` template gains a key that looks like a secret and is not classified.
+
+### CI/CD trigger settings
+
+The CI/CD triggers screen used to keep its settings and tokens
+(`CICD_GITHUB_TOKEN`, `CICD_GITLAB_TOKEN`, `CICD_AZURE_TOKEN`,
+`CICD_JENKINS_TOKEN`…) in the project's **root** `.env`. That file belongs to
+the user's application, the tokens sat in it in clear, and WorkPilot's
+`.gitignore` entries do not cover it. They now live in `.workpilot/.env` with
+the rest, as `encrypted` keys:
+
+- `cicd-triggers-handlers.ts` reads and writes them through
+  `project-env-file`. It also checks what the renderer sends:
+  - the directory must be one of the user's projects (`findKnownProject`);
+  - only the fields of `CICD_CONFIG_KEYS` are written;
+  - a value spanning lines is refused;
+  - a token sent back as the `***` mask `getConfig` shows keeps its stored
+    value.
+- The runner receives only the decrypted `CICD_*` settings in its
+  environment; the root `.env` is no longer spread into it.
+  `cicd_triggers_runner.load_env` lets that environment win over the root
+  file.
+- At startup, `migrateRootEnvCicdKeys` moves the `CICD_*` lines out of each
+  root `.env`. It writes `.workpilot/.env` first, where a value already set
+  wins. The root file then loses only those lines and keeps its mode.
 
 ### What the renderer sees
 
