@@ -244,6 +244,11 @@ AI-assisted feature planning with competitor analysis and audience targeting.
 
 ## Architecture Détaillée
 
+> Pour une lecture guidée — y compris sans prérequis technique — ouvrez l'atlas
+> [`docs/audit/WorkPilot-architecture.html`](docs/audit/WorkPilot-architecture.html) (vue « Pour tous »,
+> schémas cliquables, constats, feuille de route). Les justifications de conception sont dans
+> [`docs/architecture/`](docs/architecture/).
+
 ### Vue d'Ensemble
 
 WorkPilot AI est une application de bureau autonome basée sur une architecture multi-agents qui orchestre le cycle de vie complet du développement logiciel. Le système combine un backend Python puissant avec une interface utilisateur Electron moderne pour offrir une expérience de développement transparente.

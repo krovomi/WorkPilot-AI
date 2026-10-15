@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Atlas WorkPilot AI</title>
-<meta name="description" content="Audit d'architecture de WorkPilot AI après les lots L1 à L17 et L13 : mémoire, skills par provider, pipeline Kanban, agents, constats et plan de nettoyage.">
+<meta name="description" content="Atlas d'architecture de WorkPilot AI : explication pour tous, topologie, mémoire, skills par provider, pipeline Kanban, sous-agents sur tout provider, constats, feuille de route par type de tâche.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,500..800&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -193,8 +193,9 @@ ol.prio,ul.plain{margin:0;padding-left:20px;display:flex;flex-direction:column;g
 <body>
 <div class="shell">
 <nav class="rail" aria-label="Vues">
-  <div class="brand">Atlas WorkPilot&nbsp;AI<small>audit d'architecture · commit 7ef6fca + lot L13<br>comparé à b46a031 · 11 oct. 2026</small></div>
+  <div class="brand">Atlas WorkPilot&nbsp;AI<small>atlas d'architecture · develop e3e468f + PR #454<br>revu le 15 oct. 2026 · base 7ef6fca</small></div>
   <div class="tabs" role="tablist">
+    <button role="tab" data-v="tous">Pour tous<span class="k">00</span></button>
     <button role="tab" data-v="synthese" aria-selected="true">Synthèse<span class="k">01</span></button>
     <button role="tab" data-v="memoire">Mémoire<span class="k">02</span></button>
     <button role="tab" data-v="skills">Skills × providers<span class="k">03</span></button>
@@ -203,15 +204,86 @@ ol.prio,ul.plain{margin:0;padding-left:20px;display:flex;flex-direction:column;g
     <button role="tab" data-v="audit">Constats &amp; plan<span class="k">06</span></button>
     <button role="tab" data-v="nettoyage">Nettoyage<span class="k">07</span></button>
     <button role="tab" data-v="evolutions">Évolutions<span class="k">08</span></button>
+    <button role="tab" data-v="route">Feuille de route<span class="k">09</span></button>
   </div>
   <div class="foot">
-    <span>Tout est cliquable : nœuds, étapes, constats. Chaque affirmation cite son fichier. Les chiffres sont mesurés sur le dépôt, pas recopiés de la doc.</span>
+    <span>Commencez par <b>Pour tous</b> si vous n'êtes pas développeur. Tout est cliquable : nœuds, étapes, constats. Chaque affirmation cite son fichier.</span>
     <div><span class="lbl">Thème</span><div class="theme chips" id="theme-pick"></div></div>
     <span>Cahier de tâches pour agents : <code>docs/audit/AUDIT-NETTOYAGE.md</code></span>
   </div>
 </nav>
 
 <main>
+<!-- ============ 00 POUR TOUS ============ -->
+<section class="view" id="v-tous" hidden>
+  <div class="eyebrow">00 · Lecture sans prérequis technique</div>
+  <h1>WorkPilot AI expliqué en dix minutes</h1>
+  <p class="lede">Cette page s'adresse à un comité d'architecture et à toute personne qui veut comprendre ce que fait le produit sans lire de code. Les vues suivantes (01 à 09) donnent les preuves, fichier par fichier.</p>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>Ce que fait WorkPilot, en une image</h2>
+      <p>Imaginez un <b>atelier</b>. Vous déposez une demande sur un tableau (le <b>Kanban</b>) : « ajouter un export PDF », « corriger ce bug ». Un <b>chef d'atelier</b> (l'agent <i>planner</i>) lit la demande, visite le chantier (votre code) et écrit un plan en étapes. Un <b>compagnon</b> (l'agent <i>coder</i>) réalise chaque étape, dans une copie isolée du chantier (un <b>worktree</b>) pour ne rien casser. Un <b>contrôleur</b> (l'agent <i>QA</i>) vérifie le résultat contre la demande, renvoie ce qui ne va pas, et une personne relit avant d'intégrer.</p>
+      <p>Les « agents » sont des modèles d'IA auxquels WorkPilot donne un rôle, des règles et des outils limités. Le modèle lui-même peut venir de plusieurs fournisseurs (<b>providers</b>) : Anthropic (Claude), OpenAI, GitHub Copilot, Google, Mistral, ou un modèle local sur la machine. WorkPilot est l'atelier ; le provider est l'artisan qu'on y fait venir.</p>
+    </div>
+    <div class="card">
+      <h2>Le trajet d'une carte, en sept étapes</h2>
+      <ol class="prio">
+        <li><b>Spécification</b> — la demande est reformulée en exigences vérifiables ; la complexité est estimée.</li>
+        <li><b>Planification</b> — un plan en sous-tâches ; une personne l'approuve (arrêt volontaire).</li>
+        <li><b>Préparations sans IA</b> — documentation des bibliothèques, pièces jointes lues, design system si l'interface est touchée. Aucun jeton dépensé.</li>
+        <li><b>Codage</b> — une session par sous-tâche, méthode « test d'abord ». L'agent peut confier une question à un <b>sous-agent</b> spécialisé (lancer les tests, cartographier un module) qui travaille à part et ne rend que sa conclusion.</li>
+        <li><b>Revue</b> — une lecture critique du code produit, avec des angles choisis selon l'effort demandé (correction, sécurité, conformité…).</li>
+        <li><b>Vérification et QA</b> — l'application est lancée pour de vrai ; les critères d'acceptation sont contrôlés ; les défauts reviennent au compagnon.</li>
+        <li><b>Intégration</b> — relecture humaine, puis fusion dans la branche principale. Ce qui a été appris (pièges, conventions) est rangé dans une mémoire partagée pour la prochaine carte.</li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>Trois garde-fous qu'il faut connaître</h2>
+      <ul class="plain">
+        <li><b>Un agent n'a que les outils de son rôle.</b> Un relecteur ne peut pas modifier le code ni lancer une commande ; c'est écrit dans une table et vérifié par un test, sur tous les providers.</li>
+        <li><b>Tout ce qui vient de l'extérieur est une donnée, jamais un ordre.</b> Le texte d'un ticket, d'une page web ou d'une pièce jointe est nettoyé et encadré avant d'entrer dans un prompt ; une instruction qui s'y cache n'est pas exécutée.</li>
+        <li><b>Aucun secret ne sort de son coffre.</b> Clés et jetons sont chiffrés au repos, masqués dans les journaux, et un contrôle bloque un commit qui en contiendrait un.</li>
+      </ul>
+      <p class="note">Référence : <code>docs/rules/security.md</code> (règles S1 à S8).</p>
+    </div>
+    <div class="card">
+      <h2>Ce que coûte une carte, et comment on le contient</h2>
+      <p>Chaque échange avec un modèle se paie en <b>jetons</b> (grossièrement, des morceaux de mots). WorkPilot contient la dépense de quatre façons : il ne joue que les phases que le niveau d'effort choisi achète (le profil affiché avant le build est ce qui s'exécute) ; les préparations qui n'ont pas besoin d'IA sont faites par du code ordinaire ; un sous-agent ne rend au parent qu'une conclusion bornée, jamais son travail complet ; et les résultats d'outils trop longs sont paginés ou déposés dans un fichier au lieu d'être relus à chaque tour.</p>
+      <p class="note">Vue 04 : le simulateur montre, pour une carte donnée, les phases jouées et celles qui sont élaguées.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Ce qui a changé le 15 octobre 2026</h2>
+    <div class="tbl"><table><thead><tr><th>Changement</th><th>Avant</th><th>Après</th><th>Pour qui c'est important</th></tr></thead><tbody>
+      <tr><td><b>Les sous-agents fonctionnent avec tous les fournisseurs</b> (PR #454)</td><td>Seul Claude déléguait réellement. Sur Copilot, OpenAI, Google, Mistral… l'équipe de spécialistes était composée puis jamais proposée au modèle ; le tableau de bord annonçait pourtant une délégation.</td><td>Trois états honnêtes : <i>natif</i> (Claude), <i>émulé</i> (tout fournisseur piloté par la boucle WorkPilot : un outil <code>delegate</code> et une session enfant par délégation), <i>aucun</i> (les CLI comme Codex). Même équipe, mêmes règles, quel que soit l'artisan.</td><td>Direction technique : plus de dépendance à un seul fournisseur pour la qualité du build. Achats : le choix du provider devient un choix de coût, pas de capacité.</td></tr>
+      <tr><td><b>Un plan pour traiter chaque type de carte à sa façon</b> (PR #455)</td><td>Un seul parcours, conçu pour « construire une fonctionnalité », joué pour tout : un bug payait des phases inutiles ; une tâche d'exploitation (relancer un traitement, tourner une clé) n'avait pas de place.</td><td>Un plan en six lots : reconnaître le type (bug, correctif urgent, enquête, exploitation « RUN », refactoring, tests, documentation, étude) sans dépenser de jetons quand une catégorie le dit déjà, un parcours par type, BMAD appelé seulement là où il apporte un document, et les tâches RUN exécutées par du code ordinaire avec arrêt avant toute étape irréversible.</td><td>Métier et exploitation : WorkPilot pourra prendre des tickets qui ne sont pas des « features ». Finance : moins de jetons par bug.</td></tr>
+      <tr><td><b>La documentation dit ce que le code fait</b> (PR #456)</td><td>Le README des agents décrivait une façade disparue et ignorait les sous-agents ; un exemple citait un chemin BMAD qui n'existe plus.</td><td>README racine, backend, agents et skills réalignés ; le faux fichier <code>_bmad/…/resolve_customization.py</code> commité est documenté avec ses effets.</td><td>Nouveaux arrivants et auditeurs.</td></tr>
+    </tbody></table></div>
+  </div>
+
+  <div class="card">
+    <h2>Petit glossaire</h2>
+    <div class="tbl"><table><tbody>
+      <tr><th>Provider</th><td>Le fournisseur du modèle d'IA (Anthropic, OpenAI, GitHub Copilot, Google, Mistral, un modèle local…). WorkPilot sait les piloter tous ; <code>capabilities/providers.yaml</code> dit honnêtement ce que chacun sait faire.</td></tr>
+      <tr><th>Agent / agent_type</th><td>Un rôle donné à un modèle : planner, coder, QA reviewer… Chaque rôle a sa liste d'outils autorisés.</td></tr>
+      <tr><th>Sous-agent, roster</th><td>Un spécialiste (lanceur de tests, auditeur de sécurité, cartographe du code…) qu'un agent peut appeler. Le <i>roster</i> est l'équipe de spécialistes mise à disposition d'une phase. Un sous-agent travaille dans son propre contexte et ne rend qu'une conclusion bornée.</td></tr>
+      <tr><th>Délégation émulée</th><td>Quand le fournisseur n'a pas de mécanisme natif de sous-agents, WorkPilot le reproduit : un outil <code>delegate</code> dans la session, et une session enfant du même fournisseur par délégation.</td></tr>
+      <tr><th>Workflow, phase</th><td>Le parcours d'une carte, décrit dans un fichier YAML lisible (<code>workflows/feature-build/workflow.yaml</code>). Une phase est une étape ; certaines ne coûtent aucun jeton (déterministes).</td></tr>
+      <tr><th>Effort</th><td>Le niveau de réflexion demandé (none → ultrathink). Il décide des phases jouées et de la profondeur de la revue.</td></tr>
+      <tr><th>Skill</th><td>Un mode d'emploi en Markdown qu'un agent lit pour faire une chose bien (lancer une vérification, écrire un plan de test). La source est <code>skills/</code> ; les copies lues par les outils sont générées.</td></tr>
+      <tr><th>BMAD</th><td>Une méthode agile outillée (50 skills vendorisés en v6.12). Retirée du pipeline par défaut ; disponible à la demande quand le projet cible l'a installée.</td></tr>
+      <tr><th>Worktree</th><td>Une copie de travail isolée du dépôt, une par carte : l'agent y travaille sans toucher la branche principale.</td></tr>
+      <tr><th>Cerveau partagé</th><td>La mémoire des builds (un coffre Obsidian versionné) que tous les agents lisent et écrivent : pièges, conventions, décisions.</td></tr>
+      <tr><th>Jeton (token)</th><td>L'unité facturée par un fournisseur d'IA ; un mot vaut environ un jeton et demi. Tout ce qui est dans le contexte d'une session est payé à chaque tour.</td></tr>
+    </tbody></table></div>
+  </div>
+</section>
+
 <!-- ============ 01 SYNTHÈSE ============ -->
 <section class="view" id="v-synthese">
   <div class="eyebrow">01 · Vue macroscopique</div>
@@ -223,7 +295,7 @@ ol.prio,ul.plain{margin:0;padding-left:20px;display:flex;flex-direction:column;g
     <div class="fig"><b>14</b><span>phases du workflow</span><em>19 annoncées à b46a031 · profil = exécuté (L6) · store-readiness devenue lentille de review (L10)</em></div>
     <div class="fig"><b>87</b><span>skills émis dans <code>.agents/skills</code></span><em>84 à b46a031</em></div>
     <div class="fig warn"><b>4</b><span>packs sans SKILL.md committé</span><em>superpowers, mattpocock, impeccable, claude-mem : récupérés à la demande</em></div>
-    <div class="fig"><b>15</b><span>providers dans la matrice</span></div>
+    <div class="fig"><b>17</b><span>providers dans la matrice</span><em>11 avec sous-agents (1 natif, 10 émulés, PR #454) · 6 sans</em></div>
     <div class="fig"><b>21 Ko</b><span><code>docs/CLAUDE.md</code> chargé à chaque session</span><em>268 Ko à b46a031 (L4)</em></div>
     <div class="fig"><b>0</b><span>ligne Graphiti / LadybugDB</span><em>−12,8 k (lot L7)</em></div>
     <div class="fig"><b>−47 k</b><span>lignes de code net depuis b46a031 (hors docs)</span><em>+37 k / −84 k · lots L7 à L11</em></div>
@@ -244,8 +316,9 @@ ol.prio,ul.plain{margin:0;padding-left:20px;display:flex;flex-direction:column;g
 
   <div class="grid2">
     <div class="card">
-      <h2>Les six faits qui comptent aujourd'hui</h2>
+      <h2>Les sept faits qui comptent aujourd'hui</h2>
       <ol class="prio">
+        <li><b>Le roster de sous-agents atteint le modèle sur tout provider</b> (PR #454, 15 oct.) : il n'arrivait qu'au SDK Claude ; Copilot était déclaré <i>natif</i> sans rien recevoir. Trois états désormais dans <code>providers.yaml</code> — <i>native</i>, <i>emulated</i> (outil <code>delegate</code> + session enfant du même client), <i>none</i> (CLI) — et le profil de workflow ne promet plus une délégation qui n'a pas lieu (<button class="fref" data-f="F49">F49</button>).</li>
         <li><b>Une seule mémoire</b> (corrigé, lot L7) : Graphiti / LadybugDB retiré (−12,8 k lignes), les patterns du learning loop vivent dans le vault, un seul injecteur, un <code>MergeEvent</code> par merge (<button class="fref" data-f="F6">F6</button> <button class="fref" data-f="F7">F7</button> <button class="fref" data-f="F14">F14</button> <button class="fref" data-f="F34">F34</button>).</li>
         <li><b>78 vues dans la barre latérale, sans donnée d'usage jusqu'ici</b> (<button class="fref" data-f="F19">F19</button>) : le lot L13 compte maintenant visites et temps passé par vue (Réglages → Debug &amp; Logs). Aucune page n'est retirée avant d'avoir lu ces chiffres.</li>
         <li><b>Les droits d'un agent sont ceux qu'il déclare</b> (corrigé, lots L5, L15, L16) : <code>disallowed_tools</code> dérivé de la déclaration, mêmes droits dans <code>tool_executor</code> et Codex, une seule fabrique d'options SDK (<button class="fref" data-f="F40">F40</button> <button class="fref" data-f="F41">F41</button> <button class="fref" data-f="F43">F43</button>).</li>
@@ -257,7 +330,7 @@ ol.prio,ul.plain{margin:0;padding-left:20px;display:flex;flex-direction:column;g
     <div class="card">
       <h2>Ce qui est déjà sain (et l'est resté)</h2>
       <ul class="plain">
-        <li>Une seule fabrique de clients ; la matrice <code>capabilities/providers.yaml</code> décide sous-agents, effort et famille de surcharges de skill.</li>
+        <li>Une seule fabrique de clients ; la matrice <code>capabilities/providers.yaml</code> décide sous-agents (natif / émulé / aucun), effort et famille de surcharges de skill. Le roster est attaché en un seul point (<code>create_agent_client</code>) pour tous les providers.</li>
         <li>Une règle ne vit plus qu'à un endroit : sous-agents dans <code>agents/subagents/</code>, détection de pile dans <code>project/stack.py</code>, globs de surface en alias YAML, tests sous <code>tests/</code> avec une seule configuration pytest.</li>
         <li>Les nouvelles features réutilisent l'existant : <code>verify</code> s'appuie sur <code>AppEmulatorRunner</code>, <code>mobile.stacks</code>, <code>docintel</code> ; <code>uiux</code> sur le cerveau et la prévision du plan.</li>
         <li>Les phases conditionnelles sont maintenant décidées sur les fichiers prévus par le plan (<code>narrow_to_forecast</code>) : une tâche backend ne paie plus les phases web.</li>
@@ -390,9 +463,29 @@ ol.prio,ul.plain{margin:0;padding-left:20px;display:flex;flex-direction:column;g
   <p class="note">Le lot L9 a retiré <code>spec_gatherer</code>, <code>analysis</code> et <code>voice_command</code>, qui n'avaient aucun appelant.</p>
   <p class="note">* <code>brain</code> est ajouté à tout agent qui a des outils quand un cerveau existe (<code>models.py</code>, <code>get_required_mcp_servers</code>) ; <code>uiux</code> l'est aussi, mais seulement sur une tâche que le préflight juge UI. <code>chrome-devtools</code> est filtré tant que <code>CHROME_DEVTOOLS_MCP_ENABLED</code> est faux.</p>
 
+
+  <div class="card">
+    <h2>Comment une délégation s'exécute, provider par provider</h2>
+    <p>Jusqu'au 15 octobre, le roster n'atteignait le modèle que sur Claude. La PR #454 le rend effectif partout où WorkPilot pilote lui-même la boucle d'outils. Choisissez un état pour suivre le chemin ; cliquez un nœud pour son rôle et ses fichiers.</p>
+    <div class="controls"><div class="ctl"><span class="lbl">État du provider</span><div class="chips" id="deleg-filter"></div></div></div>
+    <div class="split">
+      <div class="card">
+        <div class="legend"><span><s></s>composant</span><span><s class="nw"></s>nouveau (PR #454)</span><span><s class="st"></s>donnée</span><span><i></i>appel</span><span><i class="r"></i>lecture / retour</span></div>
+        <div class="diagram-wrap"><svg id="d-deleg" role="img" aria-label="Chemin d'une délégation selon le provider"></svg></div>
+      </div>
+      <aside class="card detail" id="p-deleg"><p class="empty">Choisissez un état ou cliquez un nœud.</p></aside>
+    </div>
+    <div class="tbl"><table><thead><tr><th>État</th><th>Providers</th><th>Comment le roster atteint le modèle</th><th>Ce qu'un enfant peut faire</th><th>Coût</th></tr></thead><tbody>
+      <tr><td><b>native</b></td><td>Claude (SDK)</td><td><code>agents=</code> du SDK et son outil <code>Agent</code> ; le parent choisit sur la <code>description</code> de chaque spécialiste.</td><td>Les outils de sa définition, dans le même worktree, sous les hooks du SDK.</td><td>La description du roster dans le préfixe ; le résultat borné (2 000 jetons).</td></tr>
+      <tr><td><b>emulated</b></td><td>Copilot, OpenAI, Gemini, Ollama / LM Studio, Mistral, DeepSeek, Grok, Windsurf</td><td><code>create_agent_client</code> attache le roster ; <code>_freeze_tools</code> ajoute <b>un</b> outil <code>delegate</code> dont la description liste les spécialistes ; <code>LoopAdapter.run_tool</code> l'intercepte et lance <code>run_delegation</code>.</td><td>Une <b>session enfant</b> du même client (<code>spawn_child</code>), prompt = rôle + contrat de retour, 20 tours, outils traduits (<code>Read</code>→<code>read_file</code>, <code>Bash</code>→<code>run_command</code>…) et restreints par <code>ToolExecutor.allowed_tools</code> ; jamais plus que ce que le type parent déclare ; pas de pont MCP ; pas de délégation imbriquée.</td><td>Idem : une ligne par spécialiste dans le préfixe, un schéma unique ; les appels de l'enfant vont sur le ledger du parent sous <code>subagent:&lt;nom&gt;</code>.</td></tr>
+      <tr><td><b>none</b></td><td>Codex CLI, OpenCode, Antigravity ; Meta, AWS, Cursor, Custom (repli sur le SDK Claude, roster omis)</td><td>Aucun ; le moteur dégrade <code>subagent-per-task</code> en <code>sequential-reset</code>. Le registre atteint les CLI comme fichiers (<code>.agents/agents/</code>, <code>.codex/agents/</code>).</td><td>—</td><td>Aucun.</td></tr>
+    </tbody></table></div>
+    <p class="note">Justification : <code>docs/architecture/delegation.md</code>. Tests : <code>tests/harness/test_delegation.py</code>, <code>tests/test_agent_client_factory.py::TestRosterReachesEveryLoopClient</code>, <code>tests/test_agent_tool_rights.py</code> (le scope d'un enfant ne s'élargit jamais).</p>
+  </div>
+
   <div class="card">
     <h2>Catalogue des sous-agents, regroupés par rôle</h2>
-    <p class="note">Les groupes rassemblent les définitions qui répondent à la même question. Une ligne par définition ; la colonne « Source » dit où elle est déclarée (5 sources différentes).</p>
+    <p class="note">Les groupes rassemblent les définitions qui répondent à la même question. Depuis le lot L11, une question = une définition (<code>phases.SPECS</code>, <code>pr_review.PR_SPECIALISTS</code>, <code>mobile.MOBILE_SPECS</code>) et chaque roster est une liste de noms. Les personas de pack (<code>skills/*/agents/*.md</code>) ne sont émises que vers les IDE.</p>
     <div class="tbl"><table id="t-sub"><thead><tr><th>Sous-agent</th><th>Outils</th><th>Modèle</th><th>Source</th><th>Atteint par</th></tr></thead><tbody></tbody></table></div>
   </div>
 </section>
@@ -445,6 +538,79 @@ ol.prio,ul.plain{margin:0;padding-left:20px;display:flex;flex-direction:column;g
     <div class="tbl"><table id="t-evo"><thead><tr><th>Constat</th><th>Statut</th><th>Ce qui a changé</th></tr></thead><tbody></tbody></table></div>
   </div>
 </section>
+
+<!-- ============ 09 FEUILLE DE ROUTE ============ -->
+<section class="view" id="v-route" hidden>
+  <div class="eyebrow">09 · Feuille de route · types de tâche Kanban</div>
+  <h1>Traiter chaque type de carte à sa façon</h1>
+  <p class="lede">Résumé lisible de <code>docs/architecture/kanban-task-types.md</code> (PR #455, mergée le 15 oct.). Aucun lot n'est livré : cette vue dit ce que chacun ajoute, ce qu'il réutilise, ce qu'il coûte et ce qu'il prouve. Le lot 3 s'appuie sur la délégation de la PR #454 pour donner un lanceur de tests à tout provider.</p>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>Le constat, en une phrase</h2>
+      <p>WorkPilot sait <b>construire une fonctionnalité</b> ; il joue ce parcours pour toute carte, quelle que soit son intention. Un bug paie des phases de feature, un incident attend la QA, une tâche d'exploitation n'a pas de place. Les pièces qui distingueraient les cartes existent déjà (catégorie saisie, classifieur d'intention, type d'item importé, complexité, prompts d'incident, boucle de vérification, pack BMAD) et ne sont pas branchées (<button class="fref" data-f="F51">F51</button>).</p>
+      <h3 style="margin-top:8px">Cinq principes</h3>
+      <ol class="prio">
+        <li><b>Un type = un workflow YAML</b>, jamais un <code>if</code> dans le coder : la spécialisation est de la donnée, relue par les tests sur un clone frais.</li>
+        <li><b>Classer avant de payer</b> : catégorie ou label (0 jeton) → mots du titre (0 jeton) → un seul appel à faible effort en cas de doute. Le type est affiché et modifiable avant le build.</li>
+        <li><b>BMAD est une capacité, pas une phase par défaut</b> : appelé par <code>impl:</code> là où il apporte un document, remplacé par l'équivalent WorkPilot (<code>fallback:</code>) quand le projet ne l'a pas — jamais sauté en silence.</li>
+        <li><b>Tout provider</b> : aucune phase ne nomme un outil propre à Claude ; les contrôles déterministes tournent sans modèle.</li>
+        <li><b>Chaque jeton a un lecteur</b> : un rapport que personne ne lit n'est pas produit ; un type court a un workflow court.</li>
+      </ol>
+    </div>
+    <div class="card">
+      <h2>Les types reconnus</h2>
+      <div class="tbl"><table><thead><tr><th>Type</th><th>Reconnu par</th><th>Ce qu'on en attend</th><th>Ce qu'on ne paie plus</th></tr></thead><tbody>
+        <tr><td><code>feature</code></td><td>défaut</td><td>le pipeline actuel</td><td>—</td></tr>
+        <tr><td><code>bug_fix</code></td><td>catégorie, type Jira/Azure = Bug, mots-clés</td><td><b>reproduire</b> avant de corriger : un test rouge qui devient vert, une cause racine écrite</td><td>brainstorm, PRD, design system, carte d'architecture</td></tr>
+        <tr><td><code>hotfix</code></td><td>bug + urgence (priorité, mots prod / incident)</td><td>le correctif minimal, vérifié ; relecture humaine <b>avant</b> le merge</td><td>QA itérative (une passe), revue réduite</td></tr>
+        <tr><td><code>investigation</code></td><td>pourquoi / comprendre / flaky…</td><td>un rapport : cause probable, preuves fichier:ligne, options ; <b>aucun code</b></td><td>coding, QA, verify</td></tr>
+        <tr><td><code>run</code> (exploitation)</td><td>relancer, purger, migrer, déployer, rotation…</td><td>une <b>procédure exécutée</b> et journalisée, arrêt avant toute étape irréversible</td><td>spec, planner, coding, QA</td></tr>
+        <tr><td><code>refactoring</code></td><td>catégorie, mots-clés</td><td>comportement inchangé prouvé : mêmes tests avant / après</td><td>brainstorm, PRD</td></tr>
+        <tr><td><code>test</code> · <code>docs</code> · <code>spike</code></td><td>catégorie, mots-clés</td><td>des tests qui passent · le document relu contre le code · une branche jetable et un verdict</td><td>presque tout le reste</td></tr>
+      </tbody></table></div>
+      <p class="note">Un type non reconnu est <code>feature</code> ; un type reconnu avec une confiance faible est proposé, pas imposé.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Les six lots, dans l'ordre</h2>
+    <div class="tbl"><table id="t-route"><thead><tr><th>Lot</th><th>Ce qu'il ajoute</th><th>Ce qu'il réutilise</th><th>Coût en jetons</th><th>Ce qu'il prouve</th><th>Dépend de</th></tr></thead><tbody>
+      <tr><td><b>0 · Le type comme donnée</b></td><td><code>tasks/classify.py</code> (pur) ; le type écrit dans <code>task_metadata.json</code> ; badge et sélecteur dans le modal (i18n en + fr)</td><td><code>TaskCategory</code>, règles d'<code>intent/</code>, type d'item importé, <code>complexity_assessor</code></td><td>0 dans ~80 % des cas ; un appel <i>low</i> sinon</td><td>table titre → type ; le type est dans les métadonnées après la spec</td><td>—</td></tr>
+      <tr><td><b>1 · Un workflow par type</b></td><td><code>workflows/&lt;type&gt;/workflow.yaml</code> ×8, <code>workflows/registry.py</code>, champs <code>fallback:</code> et <code>irreversible:</code></td><td>le moteur (élagage, <code>when</code>, <code>roster</code>, gates), <code>handoff.py</code>, les skills <code>tooling/</code></td><td>moins qu'aujourd'hui sur tout type non-feature</td><td>chaque <code>impl</code> et <code>fallback</code> résout sur un clone frais, à tout effort, pour chaque provider</td><td>lot 0</td></tr>
+      <tr><td><b>2 · BMAD à la demande</b></td><td><code>impl: bmad/…</code> + <code>fallback:</code> sur brainstorm, PRD (feature complexe), deep-recon, étude, rétro ; mock <code>_bmad/</code> qui échoue ; <code>uv</code> dans l'allowlist avec validateur</td><td>le pack vendorisé, <code>requires</code>, <code>skills:bootstrap</code></td><td>2 à 6 k par skill, seulement dans sa phase, jamais dans un autre préfixe</td><td>un <code>requires</code> non satisfait substitue et l'écrit dans le profil</td><td>lot 1 (<button class="fref" data-f="F50">F50</button>)</td></tr>
+      <tr><td><b>3 · RUN sûr</b></td><td>agent <code>operator</code> sans <code>Write</code> ; <code>tooling/runbook</code> (le modèle écrit la procédure) ; <code>tooling/execute-runbook</code> déterministe (Python l'exécute) ; pause avant l'irréversible ; journal ; <code>.workpilot/environments.toml</code></td><td><code>pause_state</code>, <code>verify</code>, allowlist de commandes, pagination, redaction des logs</td><td>0 pendant l'exécution</td><td>une étape irréversible ne s'exécute pas sans reprise ; une commande hors allowlist est refusée</td><td>lot 1 ; PR #454 pour un test-runner sur tout provider</td></tr>
+      <tr><td><b>4 · Rosters et prompts par type</b></td><td>rosters <code>bugfix</code>, <code>operator</code> ; prompts <code>reproducer</code>, <code>operator</code>, <code>runbook_writer</code> ; prompts d'incident comme lentilles d'enquête</td><td><code>phases.SPECS</code>, overlays de langage</td><td>un roster plus court pour un type plus court</td><td><code>test_subagents_coverage</code> étendu</td><td>lot 1</td></tr>
+      <tr><td><b>5 · L'origine renseigne le type</b></td><td>labels et types d'item GitHub / GitLab / Jira / Azure → <code>classify</code> ; idéation et roadmap → type</td><td>les connecteurs existants</td><td>0</td><td>tests par connecteur ; le corps d'une issue reste une donnée (S2)</td><td>lot 0</td></tr>
+      <tr><td><b>6 · Mesurer</b></td><td>le type comme dimension du learning loop et d'<code>agent_coach</code> ; sessions qui lisent le diff comptées par type ; profil résolu montrant type, workflow, substitutions</td><td><code>observe.py</code>, <code>test_review_lenses</code></td><td>0</td><td>un hotfix au-delà de deux lectures du diff est un échec de test</td><td>n'importe lequel</td></tr>
+    </tbody></table></div>
+    <div class="mach" style="margin-top:12px"><span class="s">lot 0 · type</span><span class="a">→</span><span class="s">lot 1 · workflows + fallback</span><span class="a">→</span><span class="s">lots 2, 3, 4, 5 en parallèle</span><span class="a">→</span><span class="s h">lot 6 · mesure</span></div>
+    <p class="note">Chaque lot est une PR vers <code>develop</code>, verte sur <code>validate_impls</code>, <code>test_docs_context</code>, <code>test_agent_tool_declarations</code> et <code>test_workflow_engine</code>, sur les trois OS de la CI.</p>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>Ce que le plan refuse</h2>
+      <ul class="plain">
+        <li>Un <code>if kind == "bug"</code> dans <code>coder.py</code> ou <code>build_commands.py</code>.</li>
+        <li>Une phase BMAD obligatoire, ou présente dans un profil sans <code>_bmad/</code>.</li>
+        <li>Un type décidé par un appel modèle quand une catégorie ou un label le donnait déjà.</li>
+        <li>Une étape RUN jouée par le modèle : il écrit la procédure, Python l'exécute.</li>
+        <li>Un outil, un roster ou une phase qui n'existe que sur Claude.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h2>Pour un comité : les questions à trancher</h2>
+      <ol class="prio">
+        <li><b>Le mock <code>_bmad/</code></b> : le retirer (BMAD sort de la palette de ce dépôt) ou le faire échouer (plan B des skills actif) ? Le plan recommande la seconde option (<button class="fref" data-f="F50">F50</button>).</li>
+        <li><b>RUN</b> : quel périmètre d'environnements au départ ? Le plan limite au worktree tant que <code>.workpilot/environments.toml</code> n'est pas déclaré, et n'y met jamais une valeur de secret.</li>
+        <li><b>Hotfix</b> : la relecture humaine passe du planning au merge. Est-ce acceptable pour l'équipe qui opère la prod ?</li>
+        <li><b>Mesure</b> : le lot 6 peut précéder les autres pour avoir une base de comparaison (jetons par type aujourd'hui).</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
 </main>
 </div>
 
@@ -521,7 +687,7 @@ nodes:[
  {id:"verifyb",x:294,y:324,w:222,h:46,kind:"new",label:"verify/ · boucle runtime",sub:"lancer · erreurs · preuve · replay",info:"#292 : lance l'application modifiée, lit les erreurs, corrige tant que leur nombre baisse, conduit l'app jusqu'à l'état visé (session <code>verifier</code> à effort ≥ medium), trace la performance, garde captures et score. Réutilise <code>AppEmulatorRunner</code>, <code>mobile.stacks</code>, <code>docintel</code>.",files:["apps/backend/verify/loop.py","apps/backend/verify/tools.py","apps/backend/verify/mcp_server.py"],f:["F11"]},
  {id:"wf",x:564,y:44,w:272,h:46,label:"Moteur de workflow",sub:"workflows/feature-build · 15 phases",info:"Phases élaguées par effort, conditionnées par les fichiers (prévus par le plan puis réels), dégradées selon le provider. Lot L6 : toute implémentation se résout sur un clone, et chaque rapport de phase skill est remis à l'agent suivant (<code>workflows/handoff.py</code>).",files:["apps/backend/workflows/engine.py","apps/backend/workflows/runner.py","apps/backend/workflows/forecast.py","apps/backend/workflows/handoff.py"],f:["F2","F3","F20","F38"]},
  {id:"factory",x:564,y:110,w:272,h:56,kind:"hub",label:"core/client.py",sub:"create_client · create_agent_client",info:"LA fabrique. Résout modèle, outils (<code>AGENT_CONFIGS</code>), serveurs MCP (brain, uiux, verify…), roster de sous-agents, hooks (rtk, watermarks, read_guard, sécurité). Les adaptateurs vivent dans <code>core/agent_clients/&lt;provider&gt;.py</code>, réexportés par <code>core/agent_client.py</code> (lot L11).",files:["apps/backend/core/client.py","apps/backend/core/agent_client.py","apps/backend/agents/tools_pkg/models.py"],f:["F1","F36"]},
- {id:"roster",x:564,y:182,w:132,h:46,label:"Rosters",sub:"subagents/",files:["apps/backend/agents/subagents/"],f:["F5","F8","F9"]},
+ {id:"roster",x:564,y:182,w:132,h:46,label:"Rosters",sub:"subagents/ · delegation",info:"Un registre (<code>phases.py</code>, overlays de langage et mobile, relecteurs PR), composé par <code>resolve()</code>. Depuis #454 il atteint tout provider de la boucle WorkPilot par <code>harness/*/delegation.py</code>.",files:["apps/backend/agents/subagents/","apps/backend/harness/domain/delegation.py","apps/backend/harness/application/delegation.py"],f:["F5","F8","F9","F49"]},
  {id:"prompts",x:704,y:182,w:132,h:46,label:"Prompts",sub:"592 Ko · 49 .md",files:["apps/backend/prompts/"],f:["F10"]},
  {id:"skills",x:564,y:244,w:272,h:46,kind:"store",label:".agents/skills",sub:"87 skills · généré par skills_cli",files:["skills/","scripts/skills_cli.py"],f:["F2","F12"]},
  {id:"hooks",x:564,y:300,w:272,h:46,label:"Hooks transverses",sub:"rtk · watermarks · read_guard · bash_security",info:"Enregistrés une fois dans la fabrique (SDK Claude) et dans <code>tool_executor</code> (autres providers)."},
@@ -529,10 +695,10 @@ nodes:[
  {id:"brain",x:564,y:420,w:272,h:56,kind:"store",label:"Cerveau partagé",sub:"vault Obsidian · graph.json · git",info:"Mémoire des builds, instructions partagées, connaissances. Servi en MCP à tous les agents qui ont des outils.",files:["apps/backend/brain/"],f:["F7"]},
  {id:"ll",x:564,y:492,w:272,h:46,kind:"store",label:"learning_loop",sub:"patterns → notes du vault (lot L7)",files:["apps/backend/learning_loop/pattern_storage.py"],f:["F7"]},
  {id:"p_claude",x:884,y:44,w:272,h:46,label:"Claude SDK",sub:"sous-agents natifs · hooks SDK"},
- {id:"p_copilot",x:884,y:100,w:272,h:46,label:"Copilot",sub:"sous-agents natifs (convertis)"},
- {id:"p_api",x:884,y:156,w:272,h:46,label:"OpenAI · Google · Windsurf",sub:"pas de sous-agents · tool_executor"},
- {id:"p_local",x:884,y:212,w:272,h:46,label:"Ollama · LM Studio · local",sub:"LocalAgentClient · airgap"},
- {id:"p_compat",x:884,y:268,w:272,h:46,label:"Mistral · DeepSeek · Grok",sub:"CompatibleProviderAgentClient",f:["F18"]},
+ {id:"p_copilot",x:884,y:100,w:272,h:46,label:"Copilot",sub:"sous-agents émulés (delegate)",info:"Déclaré <i>natif</i> jusqu'au 15 oct. sans que rien n'atteigne le modèle. Depuis #454 : roster attaché par la fabrique, outil <code>delegate</code>, session enfant par délégation.",f:["F49"]},
+ {id:"p_api",x:884,y:156,w:272,h:46,label:"OpenAI · Google · Windsurf",sub:"sous-agents émulés · tool_executor",info:"Boucle WorkPilot (<code>harness/application/loop.py</code>) : le roster est offert comme outil <code>delegate</code>, chaque délégation est une session enfant du même client avec les seuls outils du spécialiste. OpenAI sous <code>OPENAI_AUTH_MODE=codex-cli</code> : aucun (CLI).",f:["F49"]},
+ {id:"p_local",x:884,y:212,w:272,h:46,label:"Ollama · LM Studio · local",sub:"LocalAgentClient · airgap · émulés"},
+ {id:"p_compat",x:884,y:268,w:272,h:46,label:"Mistral · DeepSeek · Grok",sub:"CompatibleProviderAgentClient · émulés",f:["F18","F49"]},
  {id:"p_deg",x:884,y:324,w:272,h:46,label:"Meta · AWS · Cursor · Custom",sub:"pas d'adaptateur → SDK Claude"},
  {id:"mcp",x:884,y:400,w:272,h:56,label:"Serveurs MCP",sub:"workpilot · brain · uiux · verify · docintel…",info:"Pour le SDK Claude : serveurs stdio. Pour les autres providers, brain, uiux et verify sont exécutés en processus par <code>tool_executor</code>."},
  {id:"ext",x:884,y:472,w:272,h:46,label:"Agents externes",sub:"Claude Code · Codex · hermes · Gemini…",info:"Lisent <code>.agents/skills</code>, se branchent sur les serveurs MCP. Claude Code charge aussi <code>CLAUDE.md</code> → <code>docs/CLAUDE.md</code> (21 Ko, ramené aux règles par le lot L4) à chaque session.",f:["F23"]}
@@ -654,12 +820,12 @@ nodes:[
  {id:"r_ext",x:705,y:490,w:220,h:44,label:"Harness externes",sub:"Copilot · Codex · Cursor · Gemini CLI · hermes"},
  {id:"factory",x:960,y:44,w:200,h:46,kind:"hub",label:"core/client.py",sub:"create_agent_client"},
  {id:"pv_claude",x:960,y:110,w:200,h:40,label:"Claude",sub:"natif · _sdk"},
- {id:"pv_copilot",x:960,y:160,w:200,h:40,label:"Copilot",sub:"natif (converti) · _executor"},
- {id:"pv_openai",x:960,y:210,w:200,h:40,label:"OpenAI",sub:"séquentiel · _executor"},
- {id:"pv_google",x:960,y:260,w:200,h:40,label:"Google",sub:"séquentiel · _executor"},
- {id:"pv_local",x:960,y:310,w:200,h:40,label:"Ollama / LM Studio",sub:"séquentiel · airgap · _executor"},
- {id:"pv_windsurf",x:960,y:360,w:200,h:40,label:"Windsurf",sub:"séquentiel · tool hint"},
- {id:"pv_compat",x:960,y:410,w:200,h:40,label:"Mistral · DeepSeek · Grok",sub:"compatible · _executor"},
+ {id:"pv_copilot",x:960,y:160,w:200,h:40,label:"Copilot",sub:"émulé · _executor"},
+ {id:"pv_openai",x:960,y:210,w:200,h:40,label:"OpenAI",sub:"émulé (Codex CLI : aucun) · _executor"},
+ {id:"pv_google",x:960,y:260,w:200,h:40,label:"Google",sub:"émulé · _executor"},
+ {id:"pv_local",x:960,y:310,w:200,h:40,label:"Ollama / LM Studio",sub:"émulé · airgap · _executor"},
+ {id:"pv_windsurf",x:960,y:360,w:200,h:40,label:"Windsurf",sub:"émulé · tool hint"},
+ {id:"pv_compat",x:960,y:410,w:200,h:40,label:"Mistral · DeepSeek · Grok",sub:"émulé · compatible · _executor"},
  {id:"pv_deg",x:960,y:460,w:200,h:40,label:"Meta · AWS · Cursor · Custom",sub:"→ SDK Claude · _sdk"}
 ],
 edges:[["p_bmad","b_cli"],["p_hermes","b_cli"],["p_tool","b_cli"],["p_dotnet","b_cli"],["p_mobile","b_cli"],["p_comms","b_cli"],["p_uiux","b_cli"],["p_opt","b_cli","missing"],["b_lock","b_cli","read"],["p_reg","b_agents"],["p_dotnet","b_agents"],["p_mobile","b_agents"],["p_reg","r_roster"],["p_bund","r_base"],["p_uiux","r_det"],["p_uiux","r_mcp"],
@@ -669,15 +835,15 @@ edges:[["p_bmad","b_cli"],["p_hermes","b_cli"],["p_tool","b_cli"],["p_dotnet","b
  ["factory","pv_claude"],["factory","pv_copilot"],["factory","pv_openai"],["factory","pv_google"],["factory","pv_local"],["factory","pv_windsurf"],["factory","pv_compat"],["factory","pv_deg"],["pv_deg","pv_claude"]]};
 const PROVIDERS=[
  {id:"claude",nm:"Claude",node:"pv_claude",adapter:"ClaudeAgentClient",sub:"natifs",effort:"thinking_budget",dispatch:"subagent-per-task",fam:"_sdk",skills:"slash · phases · méthodologie · base · setting_sources · roster · MCP uiux/verify",tools:"SDK (hooks natifs)",note:"Seul provider qui charge aussi <code>.claude/</code> et <code>CLAUDE.md</code> du projet cible."},
- {id:"copilot",nm:"Copilot",node:"pv_copilot",adapter:"CopilotAgentClient",sub:"natifs (AgentDefinition → SubagentDefinition)",effort:"thinking_budget",dispatch:"subagent-per-task",fam:"_executor + copilot.md",skills:"slash · phases · méthodologie · base · roster · uiux/verify en processus",tools:"client Copilot",note:""},
- {id:"openai",nm:"OpenAI",node:"pv_openai",adapter:"OpenAIAgentClient",sub:"aucun",effort:"reasoning_effort",dispatch:"sequential-reset",fam:"_executor",skills:"slash · phases · méthodologie · base · uiux/verify en processus",tools:"tool_executor (rtk, watermarks, brain, uiux, verify)",note:"Roster omis (<code>resolve</code> renvoie None). Codex CLI possible pour l'auth ChatGPT."},
- {id:"google",nm:"Google",node:"pv_google",adapter:"GoogleAgentClient",sub:"aucun",effort:"thinking_budget",dispatch:"sequential-reset",fam:"_executor",skills:"slash · phases · méthodologie · base · uiux/verify en processus",tools:"tool_executor",note:""},
- {id:"local",nm:"Ollama / LM Studio / local",node:"pv_local",adapter:"LocalAgentClient",sub:"aucun",effort:"aucun",dispatch:"sequential-reset",fam:"_executor + ollama.md",skills:"slash · phases · méthodologie · base · uiux/verify en processus",tools:"tool_executor",note:"Cible du mode hors-ligne ; un modèle sans appel d'outil est écarté."},
- {id:"windsurf",nm:"Windsurf",node:"pv_windsurf",adapter:"WindsurfAgentClient",sub:"aucun",effort:"aucun",dispatch:"sequential-reset",fam:"_executor",skills:"slash · phases · méthodologie · base (+ tool hint)",tools:"gRPC IDE ou REST",note:""},
- {id:"compat",nm:"Mistral · DeepSeek · Grok",node:"pv_compat",adapter:"CompatibleProviderAgentClient",sub:"aucun",effort:"aucun",dispatch:"sequential-reset",fam:"_executor",skills:"slash · phases · méthodologie · base · uiux/verify en processus",tools:"tool_executor",note:"<span class=\"tag warn\">doc divergente</span> docs/CLAUDE.md (Arena, Bounty Board) dit qu'ils dégradent vers Claude ; <code>providers.yaml</code> leur donne un adaptateur (F18)."},
- {id:"deg",nm:"Meta · AWS · Cursor · Custom",node:"pv_deg",adapter:"aucun → SDK Claude",sub:"aucun (natifs via Claude)",effort:"aucun (AWS : thinking)",dispatch:"subagent-per-task sur Claude",fam:"_sdk + <provider>.md",skills:"comme Claude",tools:"SDK Claude",note:"Refusés par l'Arena et le Bounty Board (une victoire serait attribuée au mauvais éditeur)."}];
+ {id:"copilot",nm:"Copilot",node:"pv_copilot",adapter:"CopilotAgentClient",sub:"émulés (delegate + session enfant)",effort:"thinking_budget",dispatch:"subagent-per-task",fam:"_executor + copilot.md",skills:"slash · phases · méthodologie · base · roster · uiux/verify en processus",tools:"client Copilot · tool_executor",note:"Déclaré <i>natif</i> avant #454 alors que sa boucle n'exposait aucun outil de délégation (F49)."},
+ {id:"openai",nm:"OpenAI",node:"pv_openai",adapter:"OpenAIAgentClient",sub:"émulés (delegate + session enfant)",effort:"reasoning_effort",dispatch:"subagent-per-task",fam:"_executor",skills:"slash · phases · méthodologie · base · roster · uiux/verify en processus",tools:"tool_executor (rtk, watermarks, brain, uiux, verify)",note:"Sous <code>OPENAI_AUTH_MODE=codex-cli</code> la tâche tourne sur le Codex CLI : aucun roster, dispatch dégradé en <code>sequential-reset</code> (lu par le moteur depuis #454)."},
+ {id:"google",nm:"Google",node:"pv_google",adapter:"GoogleAgentClient",sub:"émulés (delegate + session enfant)",effort:"reasoning_effort",dispatch:"subagent-per-task",fam:"_executor",skills:"slash · phases · méthodologie · base · uiux/verify en processus",tools:"tool_executor",note:""},
+ {id:"local",nm:"Ollama / LM Studio / local",node:"pv_local",adapter:"LocalAgentClient",sub:"émulés (delegate + session enfant)",effort:"aucun",dispatch:"subagent-per-task",fam:"_executor + ollama.md",skills:"slash · phases · méthodologie · base · uiux/verify en processus",tools:"tool_executor",note:"Cible du mode hors-ligne ; un modèle sans appel d'outil est écarté."},
+ {id:"windsurf",nm:"Windsurf",node:"pv_windsurf",adapter:"WindsurfAgentClient",sub:"émulés (delegate + session enfant)",effort:"aucun",dispatch:"subagent-per-task",fam:"_executor",skills:"slash · phases · méthodologie · base (+ tool hint)",tools:"gRPC IDE ou REST",note:""},
+ {id:"compat",nm:"Mistral · DeepSeek · Grok",node:"pv_compat",adapter:"CompatibleProviderAgentClient",sub:"émulés (delegate + session enfant)",effort:"aucun",dispatch:"subagent-per-task",fam:"_executor",skills:"slash · phases · méthodologie · base · uiux/verify en processus",tools:"tool_executor",note:"<span class=\"tag warn\">doc divergente</span> docs/CLAUDE.md (Arena, Bounty Board) dit qu'ils dégradent vers Claude ; <code>providers.yaml</code> leur donne un adaptateur (F18)."},
+ {id:"deg",nm:"Meta · AWS · Cursor · Custom",node:"pv_deg",adapter:"aucun → SDK Claude",sub:"aucun (roster volontairement omis sur le SDK de repli)",effort:"aucun (AWS : thinking)",dispatch:"subagent-per-task sur Claude",fam:"_sdk + <provider>.md",skills:"comme Claude",tools:"SDK Claude",note:"Refusés par l'Arena et le Bounty Board (une victoire serait attribuée au mauvais éditeur)."}];
 const PACKS=[
- ["bmad",50,"vendorisé","aucune phase (lot L6) : commandes de la barre seulement, si _bmad/ est présent","bmad-prd, bmad-review, bmad-walkthrough, bmad-create-prd, bmad-code-review, bmad-quick-dev, bmad-party-mode… (50)"],
+ ["bmad",50,"vendorisé","aucune phase (lot L6) : commandes de la barre seulement, si _bmad/ est présent ; la feuille de route (vue 09) le rappelle par impl + fallback là où il est documentaire","bmad-prd, bmad-review, bmad-walkthrough, bmad-create-prd, bmad-code-review, bmad-quick-dev, bmad-party-mode… (50)"],
  ["hermes",12,"vendorisé","aucun","systematic-debugging, spike, sdlc-review, simplify-code, python-debugpy, node-inspect-debugger, claude-code, codex, opencode, github, computer-use, codebase-inspection"],
  ["tooling",7,"natif WorkPilot","analyze, verify, verify-replay (architecture-map : voir F20)","spec-analyze, architecture-map, mem-search, convert-documents-to-markdown, webapp-testing, mcp-builder, verify (+4 surcharges provider)"],
  ["ui-ux-pro-max",1,"vendorisé (#291)","ui-design-system","ui-ux-pro-max (+ données BM25 : 22 stacks, styles, palettes, typographies, 119 règles UX)"],
@@ -707,14 +873,15 @@ const CFG={
  commit_message:{tools:"—",mcp:"—",think:"low",roster:"solo"},
  pr_template_filler:{tools:"Read Glob Grep",mcp:"brain*",think:"low",roster:"solo"},
  merge_resolver:{tools:"—",mcp:"—",think:"low",roster:"solo"}};
-const ROSTERS={verify:["test-runner"],kanban:["code-reviewer","test-runner","spec-explorer"],planner:["architecture-analyst","dependency-tracer"],qa:["qa-acceptance-checker","qa-test-evidence"],review:["security-auditor","regression-hunter","test-coverage-auditor"],research:["codebase-surveyor","evidence-collector"],spec:["prior-art-finder","constraint-collector"],solo:[]};
+const ROSTERS={verify:["test-runner"],kanban:["code-reviewer","test-runner","architecture-analyst"],planner:["architecture-analyst","dependency-tracer"],qa:["qa-acceptance-checker","test-runner"],review:["security-auditor","regression-hunter","test-coverage-auditor"],research:["architecture-analyst","evidence-collector"],spec:["prior-art-finder","constraint-collector"],solo:[]};
 const EFF=["none","low","medium","high","ultrathink"];
 const ge=(a,b)=>EFF.indexOf(a)>=EFF.indexOf(b);
 const sim={complexity:"standard",effort:"medium",provider:"claude",engine:"uniform",touch:new Set(["front","back"]),target:"web",attach:"none",lang:"dotnet",qa:"ok"};
 const provInfo=p=>PROVIDERS.find(x=>x.id===p);
-const nativeSub=p=>["claude","copilot","deg"].includes(p);
+const subMode=p=>p==="claude"?"native":p==="deg"?"none":"emulated";
+const nativeSub=p=>subMode(p)!=="none";
 function provFor(kind){return sim.engine==="mixed"&&kind!=="coding"?"claude":sim.provider}
-function rosterFor(name,p){if(!nativeSub(p))return [];const r=[...(ROSTERS[name]||[])];
+function rosterFor(name,p){if(subMode(p)==="none")return [];const r=[...(ROSTERS[name]||[])];
   if(sim.touch.has("mobile"))r.push("device-runner","store-readiness-auditor");return r}
 function attachInfo(){return {none:"",shot:"Capture → OCR local (Tesseract par défaut), secrets masqués ou image repeinte/retenue, injection_guard.",drawio:"draw.io / Excalidraw lus comme structure (boîtes, flèches) ; conformance avec le graphe de modules.",pdf:"PDF scanné → pages rendues → OCR → propositions d'exigences FR-### (validées par une personne).",trace:"Trace de pile → fichier:ligne du dépôt (stacktrace.py) ; section « Where it broke ».",http:"Postman / OpenAPI / .http / curl → brouillon de test d'intégration dans la pile du projet.",figma:"Lien Figma → attachments/<nom>.figma.json, contrat de la revue visuelle."}[sim.attach]}
 function buildSteps(){
@@ -757,7 +924,7 @@ function buildSteps(){
   phase({win:"planning → coding",nm:"mobile-design",impl:"mobile/mobile-design-review",min:"medium",when:()=>mobile,agent:"pr_reviewer",prov:"planning",dispatch:"fresh-context"});
   const cp=provFor("coding"),cnative=nativeSub(cp);
   step({win:"coding",nm:"coding",impl:"tooling/tdd-cycle",status:"run",agent:"coder",prov:"coding",builtin:true,dispatch:cnative?"subagent-per-task":"sequential-reset",
-    warn:(!cnative?"Provider sans sous-agents : sous-tâches en séquence avec remise à zéro du contexte.":""),
+    warn:(!cnative?"Provider sans sous-agents (SDK de repli, roster omis) : sous-tâches en séquence avec remise à zéro du contexte.":subMode(cp)==="emulated"?"Sous-agents émulés : outil delegate dans la session, une session enfant du même client par délégation (harness/application/delegation.py).":""),
     info:`Une session par sous-tâche. Prompt assemblé par generate_subtask_prompt (noyau + modules selon la pile : .NET, plan de tests ; coder.md supprimé, lot L10) + contexte de sous-tâche + mémoire + patterns + docs + ADR/pièces jointes + en-tête et chemin des rapports analyze / mobile-design (handoff)${ui?" + design system (sous-tâches UI)":""}${mobile?" + section mobile":""}. Overlay langage <b>${esc(sim.lang)}</b> injecté dans test-runner.`,files:["agents/coder.py","prompts_pkg/prompt_generator.py"],f:["F10"]});
   phase({win:"coding → verify",nm:"design-check",impl:"impeccable (npx impeccable detect)",det:true,when:()=>front,kind:"script",info:"59 règles locales, jamais élaguée. Passe par la commande gate de pack.json (npx, réseau), même sans SKILL.md.",files:["workflows/gates.py","skills/impeccable/pack.json"]});
   phase({win:"coding → verify",nm:"review",impl:"tooling/review-lenses",min:"medium",agent:"pr_reviewer",prov:"qa",dispatch:"fresh-context",info:`Revue unique à lentilles, choisies par le moteur (ligne LENSES:), sans sous-agents (roster solo, lot L10) : correction et tests, sécurité${ge(sim.effort,"high")?", conformité aux critères et à traceability.json":""}${ge(sim.effort,"ultrathink")?", lecture adversariale":""}${mobile?", publication mobile (lentille 5, procédure mobile-store-readiness)":""}. Rapport remis au QA reviewer (handoff, F38), qui décide.`,files:["skills/tooling/review-lenses/SKILL.md","workflows/handoff.py"],f:["F11"]});
@@ -933,18 +1100,51 @@ const AGENTS=[
 const SUBS=[
  ["Revue de code générale",[["code-reviewer","R","sonnet","phases.py · kanban","coder, rosters non aliasés"],["quality-reviewer","R","—","pr_review.py","orchestrateur PR"]]],
  ["Sécurité",[["security-auditor","R","sonnet","phases.py · review","pr_reviewer"],["security-reviewer","R","—","pr_review.py","orchestrateur PR"]]],
- ["Exécution des tests",[["test-runner","Bash R","inherit","phases.py · kanban","coder (+ overlay langage/mobile)"],["qa-test-evidence","Bash R","inherit","phases.py · qa","qa_reviewer/fixer, verifier (+ overlay langage/mobile, lot L5)"]]],
- ["Vérifier une affirmation",[["evidence-collector","R","sonnet","phases.py · research","idéation, insights"],["finding-validator","R","—","pr_review.py + parallel_followup_reviewer.py:262","PR (déclaré 2×)"]]],
- ["Cartographier le code",[["spec-explorer","R","—","phases.py · kanban","coder"],["codebase-surveyor","R","sonnet","phases.py · research","idéation"],["architecture-analyst","R","sonnet","phases.py · planner","planner, analyze"]]],
+ ["Exécution des tests",[["test-runner","Bash R","inherit","phases.py · kanban · qa · verify","coder, QA, verifier (+ overlay langage/mobile) ; qa-test-evidence fusionné (lot L11)"]]],
+ ["Vérifier une affirmation",[["evidence-collector","R","sonnet","phases.py · research","idéation, insights"],["finding-validator","R","—","pr_review.py (PR_SPECIALISTS)","revue et suivi PR (une seule déclaration, lot L11)"]]],
+ ["Cartographier le code",[["architecture-analyst","R","sonnet","phases.py · kanban · planner · research","coder, planner, analyze, idéation ; spec-explorer et codebase-surveyor fusionnés (lot L11)"]]],
  ["Impact / régression",[["dependency-tracer","R","sonnet","phases.py · planner","planner"],["regression-hunter","R","sonnet","phases.py · review","pr_reviewer"]]],
  ["Couverture / critères",[["test-coverage-auditor","R","sonnet","phases.py · review","pr_reviewer"],["qa-acceptance-checker","R","sonnet","phases.py · qa","QA, verifier, spec-conformance"]]],
  ["Spec",[["prior-art-finder","R","sonnet","phases.py · spec","spec_writer, spec_validation"],["constraint-collector","R","sonnet","phases.py · spec","idem"]]],
- ["Revue PR spécialisée",[["logic-reviewer","R","—","pr_review.py","orchestrateur PR"],["codebase-fit-reviewer","R","—","pr_review.py","orchestrateur PR"],["ai-triage-reviewer","R","—","pr_review.py","orchestrateur PR"],["resolution-verifier","R","—","parallel_followup_reviewer.py:222 (inline)","suivi PR"],["new-code-reviewer","R","—","parallel_followup_reviewer.py:236 (inline)","suivi PR"],["comment-analyzer","R","—","parallel_followup_reviewer.py:249 (inline)","suivi PR"]]],
- ["Mobile",[["device-runner","Bash R","—","subagents/mobile.py","rosters de phase non vides d'un projet mobile (lot L5)"],["store-readiness-auditor","R","—","subagents/mobile.py","idem"],["mobile-release-manager","—","—","skills/mobile/agents","harness externes uniquement"],["mobile-architect · android-engineer · ios-engineer","—","—","skills/mobile/agents","harness externes uniquement"]]],
- [".NET",[["net-architect","—","—","skills/dotnet/agents","harness externes uniquement"],["bmad-net-architect","—","—","skills/dotnet/agents","idem (doublon de net-architect)"],["performance-analyst","—","—","skills/dotnet/agents","idem"],["bmad-performance-analyst","—","—","skills/dotnet/agents","idem (doublon)"]]]];
+ ["Revue PR spécialisée",[["logic-reviewer","R","—","pr_review.py","orchestrateur PR"],["codebase-fit-reviewer","R","—","pr_review.py","orchestrateur PR"],["ai-triage-reviewer","R","—","pr_review.py","orchestrateur PR"],["resolution-verifier","R","—","pr_review.py · PR_ROSTERS[pr-followup]","suivi PR"],["new-code-reviewer","R","—","pr_review.py · PR_ROSTERS[pr-followup]","suivi PR"],["comment-analyzer","R","—","pr_review.py · PR_ROSTERS[pr-followup]","suivi PR"]]],
+ ["Mobile",[["device-runner","Bash R","—","subagents/mobile.py","rosters de phase non vides d'un projet mobile (lot L5)"],["store-readiness-auditor","R","—","subagents/mobile.py","idem"],["mobile-architect · android-engineer · ios-engineer","—","—","skills/mobile/agents","harness externes uniquement (.agents/agents)"]]],
+ [".NET",[["net-architect","—","—","skills/dotnet/agents","harness externes uniquement (.agents/agents)"],["performance-analyst","—","—","skills/dotnet/agents","idem"],["dotnet-framework-48-expert","—","—","skills/dotnet/agents","idem ; les doublons bmad-* ont été retirés"]]]];
+
+/* ---------- 05 délégation (PR #454) ---------- */
+const DELEG={w:1180,h:470,lanes:[{x:10,w:300,label:"Fabrique"},{x:330,w:300,label:"Session parent"},{x:650,w:260,label:"Exécution"},{x:930,w:240,label:"Retour"}],
+nodes:[
+ {id:"dg_resolve",x:24,y:44,w:272,h:46,label:"agents.subagents.resolve()",sub:"défauts de phase · overlays · plafond 7",info:"Le roster composé : défauts de la phase, commandes du langage détecté pliées dans test-runner, overlay mobile, agents de l'appelant (gagnent toujours), plafond à sept. Identique pour tous les providers.",files:["apps/backend/agents/subagents/__init__.py"]},
+ {id:"dg_attach",x:24,y:112,w:272,h:46,kind:"new",label:"create_agent_client → client.agents",sub:"un seul point d'attache",info:"Construit le client (une branche par provider) puis, si <code>use_subagents</code> et <code>client.delegates()</code>, pose le roster en <code>SubagentDefinition</code> portables (alias de palier → <code>inherit</code>). Avant #454 seule la branche Copilot convertissait les agents de l'appelant, sans appeler <code>resolve()</code>.",files:["apps/backend/core/client.py"],f:["F49"]},
+ {id:"dg_native",x:24,y:190,w:272,h:46,label:"Claude : create_client",sub:"agents= du SDK · outil Agent",info:"Voie native inchangée : le SDK reçoit le roster avec le contrat de retour et autorise son outil <code>Agent</code>.",files:["apps/backend/core/client.py"]},
+ {id:"dg_cli",x:24,y:268,w:272,h:46,label:"CLI : Codex · OpenCode · Antigravity",sub:"aucun roster · sequential-reset",info:"Ces clients apportent leurs propres outils ; le moteur dégrade le dispatch. Pour <code>openai</code>, l'état dépend de <code>OPENAI_AUTH_MODE</code> (lu par <code>workflows/engine.py</code>).",files:["apps/backend/workflows/engine.py","apps/backend/core/agent_clients/cli_subprocess.py"]},
+ {id:"dg_freeze",x:344,y:44,w:272,h:46,kind:"new",label:"_freeze_tools + delegate",sub:"un schéma, la description liste le roster",info:"Le jeu d'outils de la session est figé une fois (préfixe en cache). Quand la session a un roster et n'est pas elle-même un enfant, un unique outil <code>delegate</code> s'y ajoute ; sa description nomme chaque spécialiste avec sa <code>description</code>, c'est là-dessus que le modèle choisit.",files:["apps/backend/core/agent_clients/base.py","apps/backend/harness/domain/delegation.py"]},
+ {id:"dg_loop",x:344,y:112,w:272,h:46,label:"Boucle WorkPilot (run_turns)",sub:"assemble · appelle · exécute · décide",info:"La boucle unique de tous les providers hors SDK. Depuis #454 : les appels <code>delegate</code> d'un même tour s'exécutent ensemble (<code>_together</code>) et sont réinjectés dans l'ordre demandé ; les autres outils restent séquentiels.",files:["apps/backend/harness/application/loop.py"]},
+ {id:"dg_runtool",x:344,y:190,w:272,h:46,kind:"new",label:"LoopAdapter.run_tool",sub:"intercepte delegate avant MCP / executor",info:"Un enfant (scope posé) ou une session sans roster reçoit un refus lisible ; sinon <code>run_delegation</code>.",files:["apps/backend/core/agent_clients/base.py"]},
+ {id:"dg_child",x:664,y:44,w:232,h:56,kind:"new",label:"spawn_child()",sub:"copie superficielle · état transitoire remis à zéro",info:"Identifiants, endpoint, modèle, projet partagés par référence ; requête en attente, exécuteur, connexion, ledger, jeu d'outils et roster remis à zéro. Prompt système = préambule + rôle + contrat ; 20 tours ; modèle du spécialiste s'il en nomme un.",files:["apps/backend/core/agent_clients/base.py","apps/backend/harness/application/delegation.py"]},
+ {id:"dg_scope",x:664,y:120,w:232,h:56,kind:"new",label:"Outils restreints",sub:"TOOL_TRANSLATION · allowed_tools",info:"<code>Read</code>→<code>read_file</code>, <code>Grep</code>→<code>search_files</code>, <code>Glob</code>→<code>find_files</code>, <code>Bash</code>→<code>run_command</code>, <code>Write/Edit</code>→<code>write_file</code>. <code>ToolExecutor.allowed_tools</code> passe <b>après</b> la porte du type parent : un enfant ne peut que rétrécir, jamais élargir (règle S3). Aucun pont MCP.",files:["apps/backend/harness/domain/delegation.py","apps/backend/core/runtimes/tool_executor.py"],f:["F40"]},
+ {id:"dg_run",x:664,y:196,w:232,h:46,label:"Même worktree, mêmes gardes",sub:"allowlist · écritures confinées · rtk",info:"L'enfant tourne la même boucle que le parent, dans le même répertoire, sous les mêmes hooks de sécurité.",files:["apps/backend/security/"]},
+ {id:"dg_result",x:944,y:44,w:216,h:56,kind:"store",label:"receive_result",sub:"borné à 2 000 jetons · délimité (S2)",info:"Seul le dernier message texte de l'enfant revient : coupé au plafond et marqué si trop long, encadré comme donnée non fiable (<code>quote_untrusted</code>).",files:["apps/backend/harness/application/subagents.py","apps/backend/harness/domain/subagents.py"]},
+ {id:"dg_ledger",x:944,y:120,w:216,h:46,kind:"store",label:"Ledger du parent",sub:"fil subagent:<nom>",info:"Chaque appel de l'enfant est reporté sur le ledger du parent ; le retour est mesuré (<code>record_return</code>). Le coût d'une délégation est donc visible dans les insights de la tâche.",files:["apps/backend/harness/domain/ledger.py"]},
+ {id:"dg_parent",x:944,y:196,w:216,h:46,label:"Le parent continue",sub:"lit la conclusion, jamais le travail",info:"Un échec d'enfant est un résultat que le parent lit, jamais une exception."}
+],
+edges:[["dg_resolve","dg_attach"],["dg_attach","dg_native"],["dg_attach","dg_freeze"],["dg_freeze","dg_loop"],["dg_loop","dg_runtool"],["dg_runtool","dg_child"],["dg_child","dg_scope"],["dg_scope","dg_run"],["dg_run","dg_result","read"],["dg_result","dg_ledger","read"],["dg_result","dg_parent","read"],["dg_parent","dg_loop","read"]]};
+const DELEG_SETS={native:"dg_resolve dg_attach dg_native dg_result dg_ledger dg_parent",emulated:"dg_resolve dg_attach dg_freeze dg_loop dg_runtool dg_child dg_scope dg_run dg_result dg_ledger dg_parent",none:"dg_resolve dg_attach dg_cli"};
+const DELEG_DESC={native:"Claude : le SDK reçoit le roster (<code>agents=</code>) et expose son outil <code>Agent</code> ; WorkPilot n'ajoute que le contrat de retour et le hook qui borne le résultat.",emulated:"Copilot, OpenAI, Gemini, Ollama / LM Studio, Mistral, DeepSeek, Grok, Windsurf : WorkPilot reproduit la délégation lui-même, de l'outil <code>delegate</code> à la session enfant, avec les mêmes bornes que sur Claude.",none:"Codex CLI, OpenCode, Antigravity et les providers sans adaptateur : aucun roster à l'exécution ; le profil de workflow le dit (<code>sequential-reset</code>)."};
 
 /* ---------- 06 constats ---------- */
 const FINDINGS=[
+ {id:"F49",sev:"haute",cat:"bug",st:"résolu",v:"vérifié",t:"Le roster de sous-agents n'atteignait le modèle que sur Claude ; Copilot déclaré natif sans rien recevoir",
+  c:"<b>Corrigé par la PR #454</b> (15 oct.). La branche Copilot de <code>create_agent_client</code> convertissait les agents fournis par l'appelant sans jamais appeler <code>resolve()</code>, et <code>CopilotAgentClient</code> n'exposait aucun outil de délégation (<code>run_subagents()</code> sans appelant) ; les branches OpenAI, Google, local, Windsurf, compatibles ignoraient l'argument. <code>providers.yaml</code> déclarait Copilot <i>native</i>, donc le profil de workflow annonçait <code>subagent-per-task</code> sur un build qui jouait chaque phase seul. Désormais : trois états (<i>native</i> / <i>emulated</i> / <i>none</i>), roster attaché en un point pour tous les clients de la boucle, outil <code>delegate</code>, session enfant à outils restreints, résultat borné sur le ledger du parent, vague parallèle, Codex CLI lu depuis le mode d'auth.",
+  p:"core/client.py (create_agent_client, _portable_roster) · core/agent_clients/base.py (spawn_child, _freeze_tools, run_tool) · harness/domain/delegation.py · harness/application/delegation.py · harness/application/loop.py · core/runtimes/tool_executor.py (allowed_tools) · capabilities/providers.yaml · workflows/engine.py",
+  r:"Fait. Reste à observer une première session réelle sur Copilot ou OpenAI (log <code>[delegation]</code>) : la logique est couverte par des doubles, pas par un endpoint.",g:"Un build de qualité égale quel que soit le provider ; le profil affiché est honnête.",k:"La voie native Claude, le registre, l'émission vers .agents/agents."},
+ {id:"F50",sev:"moy",cat:"dette",st:"ouvert",v:"vérifié",t:"Le faux _bmad/scripts/resolve_customization.py commité réussit avec un code 0",
+  c:"Ajouté par #171 (« temporary mock »), ré-inclus par <code>.gitignore</code>, et recréé par le job CI <code>skills</code>. Il satisfait la gate <code>requires</code> pour que <code>skills-cli build</code> émette les 50 skills BMAD dans <code>.agents/skills/</code>. Effets dans ce dépôt : la palette liste 50 commandes BMAD sans runtime ; un skill lancé ici reçoit « Mock runtime active » avec succès, donc son plan B (lire <code>customize.toml</code>) ne se déclenche jamais ; <code>skills:bootstrap</code> voit le fichier et saute l'installeur réel.",
+  p:"_bmad/scripts/resolve_customization.py · .gitignore:268 · .github/workflows/lint.yml:169 · skills/bmad/VENDOR.json (runtime_gate)",
+  r:"Décision à prendre : soit retirer le mock, l'exception de .gitignore et l'étape CI (les skills BMAD sortent alors de .agents/skills de ce dépôt), soit le remplacer par un mock qui <b>échoue</b> (code 2) pour que le plan B des skills fonctionne — c'est ce que la feuille de route (lot 2) propose.",g:"Plus de commandes qui échouent à l'appel ; bootstrap réel possible.",k:"Le pack bmad vendorisé et son --check."},
+ {id:"F51",sev:"haute",cat:"architecture",st:"partiel",v:"lu",t:"Un seul workflow (feature-build) joué pour tout type de carte",
+  c:"Un bug paie <code>brainstorm</code> et le planner de feature ; un incident attend la QA ; une tâche d'exploitation (RUN) n'a pas de parcours. Les pièces qui distingueraient les cartes existent sans être branchées : <code>TaskCategory</code> (UI), <code>intent/</code> (importé nulle part), le type d'item Jira / Azure, la complexité de spec, les prompts <code>incident_*</code>, <code>self_healing</code>, <code>verify</code>, et un moteur capable de porter plusieurs YAML mais qui en charge un seul, en dur (<code>cli/build_commands.py:162</code>).",
+  p:"workflows/feature-build/workflow.yaml · cli/build_commands.py:162 · apps/frontend/src/shared/types/task.ts (TaskCategory) · apps/backend/intent/ · spec/complexity.py",
+  r:"<b>Plan accepté</b> (PR #455, <code>docs/architecture/kanban-task-types.md</code>, vue 09) : type comme donnée (lot 0), un YAML par type + registre + <code>fallback:</code> (lot 1), BMAD par impl + fallback (lot 2), RUN sûr (lot 3), rosters et prompts par type (lot 4), origine → type (lot 5), mesure (lot 6). Rien n'est livré.",g:"Moins de jetons par bug ; des tickets d'exploitation traitables ; BMAD à la demande.",k:"feature-build inchangé pour les features."},
  {id:"F1",sev:"crit",cat:"bug",st:"résolu",v:"vérifié",t:"Sept features LLM échouent en silence : agent_type absent d'AGENT_CONFIGS",
   c:"<b>Corrigé par le lot L1</b> : les sept entrées existent, gardées par <code>tests/test_agent_type_registry.py</code> ; <code>run_insight_extraction</code>, qui ne renvoyait jamais le résultat de sa session, renvoie désormais l'objet JSON. <b>Suivi</b> : l'extracteur restait muet pour trois autres raisons, invisibles du test L1 qui remplace la fabrique de runtime : provider <code>anthropic</code> → LiteLLM avec le token OAuth comme clé d'API, prompt cherché dans <code>analysis/prompts/</code> (absent), écriture structurée conditionnée à <code>file_insights</code>. Corrigés, gardés par <code>tests/test_insight_extractor_wiring.py</code>. — <code>impact_analyzer</code>, <code>architecture_reviewer</code>, <code>migration</code>, <code>insight_extractor</code>, <code>learning_analyzer</code>, <code>context_mesh_analyzer</code>, <code>live_companion_analyzer</code> sont passés à la fabrique mais absents du registre (29 entrées). <code>get_agent_config</code> lève <code>ValueError: Unknown agent type</code> (reproduit au commit b46a031). Les appelants attrapent et journalisent : l'extracteur d'insights, seul écrivain prévu de patterns/, codebase/ et outcomes/ dans le vault, ne produit rien. <code>PHASE_ALIASES</code> leur attribue pourtant déjà un roster.",
   p:"agents/impact_analyzer.py:305 · architecture/ai_reviewer.py:76 · migration/llm_transformer.py:75 · analysis/insight_extractor.py:379 · learning_loop/service.py:110 · context_mesh/mesh_service.py:266 · live_companion/analyzer.py:122 · agents/tools_pkg/models.py:476-495",
@@ -1147,6 +1347,7 @@ const FINDINGS=[
   p:"self_healing/incident_responder/orchestrator.py (_run_healing_pipeline, _skip_step, _reopen_claimed_heal) · runners/self_healing_runner.py · renderer/components/self-healing/HealingTimeline.tsx, IncidentCard.tsx · tests/test_self_healing_pipeline.py",
   r:"Fait. Reste à câbler : une session de correction par <code>create_agent_client</code> dans un worktree, la boucle QA (qui exige une spec par incident) et la PR par <code>WorktreeManager</code> ; chaque étape câblée remplace son skip.",g:"Un incident réparé l'est vraiment.",k:"La détection des trois modes et leurs prompts, la vérification à l'exécution, le cycle hermes dans le finally."}];
 const PLAN=[
+ ['P5','Types de tâche Kanban (feuille de route, vue 09)','Lots 0 à 6 de docs/architecture/kanban-task-types.md : type comme donnée, un workflow par type, BMAD par impl + fallback, RUN sûr, rosters par type, origine → type, mesure','F50, F51','Moins de jetons par bug, tickets RUN traitables, BMAD à la demande'],
  ["P0","Features cassées (fait)","Fait : F1 et F24 (lot L1), F20 (lot L2), F21 câblé et F22 (lot L3)","F1, F24, F20, F21, F22","Features restaurées, mémoire alimentée"],
  ["P0","Self-healing","Fait (lot L17) : câbler correctif, QA et PR, ou ne plus les déclarer faits (lot L17)","F48","Un incident résolu l'est vraiment"],
  ["P1","Événements IPC perdus","Fait (lot L14) : relais main → renderer par getMainWindow ; API d'ouverture de dossier ; parité IPC étendue au pont générique","F37","Progression visible sur six pages"],
@@ -1300,6 +1501,9 @@ function init(){
 
   // 01
   const dm=drawDiagram($("#d-macro"),MACRO,n=>{dm.focus(dm.neighbours(n.id),n.id);$("#p-macro").innerHTML=detailHTML(n)});
+  // 05 délégation
+  const ddel=drawDiagram($("#d-deleg"),DELEG,n=>{ddel.focus(ddel.neighbours(n.id),n.id);$("#p-deleg").innerHTML=detailHTML(n)});
+  chips("#deleg-filter",[["emulated","Émulé (10 providers)"],["native","Natif (Claude)"],["none","Aucun (CLI, repli)"]],{initial:"emulated",onChange:v=>{const ids=new Set(DELEG_SETS[v].split(" "));ddel.focus(ids);$("#p-deleg").innerHTML=`<h3>${v}</h3><p>${DELEG_DESC[v]}</p>`}});
   // 02
   const dmem=drawDiagram($("#d-mem"),MEM,n=>{dmem.focus(dmem.neighbours(n.id),n.id);$("#p-mem").innerHTML=detailHTML(n)});
   chips("#mem-filter",MEM_FEATURES,{initial:"all",onChange:v=>{if(v==="all"){dmem.focus(null);$("#p-mem").innerHTML=`<p class="empty">${MEM_DESC.all} Cliquez un nœud ou choisissez une feature.</p>`;return}

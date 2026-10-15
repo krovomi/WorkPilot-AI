@@ -20,7 +20,7 @@ fichiers y renvoient.
 | [`providers/`](providers/) | architecture détaillée des providers Claude Code et GitHub Copilot | référence |
 | [`features/`](features/), [`integrations/`](integrations/) | une feature ou une intégration optionnelle expliquée à l'utilisateur | guide |
 | [Backlog produit](https://github.com/krovomi/WorkPilot-AI/issues/343) | idées et pistes produit : une issue par piste, sous l'issue parente #343 | backlog (issues) |
-| [`audit/`](audit/) | l'audit de nettoyage et ses lots ; un historique, pas une règle | historique |
+| [`audit/`](audit/) | l'atlas d'architecture (`WorkPilot-architecture.html`, vue « Pour tous » lisible sans prérequis technique, feuille de route par type de tâche) et le cahier de nettoyage ; un historique, pas une règle | atlas · historique |
 | [`validation/`](validation/) | captures de validation manuelle | preuves |
 
 Les instructions des agents de code se répartissent ainsi : [`../AGENTS.md`](../AGENTS.md) (index lu
