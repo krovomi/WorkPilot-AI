@@ -83,7 +83,9 @@ fichier survit à la reconstruction : nos nœuds portent
 **Le rappel descend une échelle.** `brain_recall` répond aux niveaux 1 et 2 —
 les nœuds, leurs voisins, leur frontmatter — et `brain_read_note` au niveau 3,
 dans un appel séparé : décider quel fichier mérite d'être ouvert est tout
-l'intérêt des deux premiers.
+l'intérêt des deux premiers. Une note ou un skill trop long pour un résultat
+arrive par pages (`offset`, `limit`), sous le plafond du client
+([harness, lot 3b](context-harness.md)).
 
 **Chaque modification est poussée, chaque lecture est précédée d'un pull.**
 `Brain.write` finit toujours pareil — graphe reconstruit, condensé réécrit,

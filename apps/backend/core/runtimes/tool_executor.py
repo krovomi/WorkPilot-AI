@@ -7,6 +7,7 @@ Handles execution of tools during agent sessions.
 
 import asyncio
 import fnmatch
+import hashlib
 import json
 import logging
 import math
@@ -16,13 +17,26 @@ import signal
 from pathlib import Path
 from typing import Any
 
-from core.llm_optimization import tool_result_max_chars
-from harness.domain.paging import FOOTER_RESERVE, page_items, page_lines, render_page
+from core.llm_optimization import tool_result_max_chars, truncate_tool_result
+from harness.domain.paging import (
+    FOOTER_RESERVE,
+    page_items,
+    page_lines,
+    render_page,
+    spill_excerpt,
+)
 from rtk import rewrite_command as rtk_rewrite
 from watermarks import clean_generated
 from watermarks import record as watermarks_record
 
 logger = logging.getLogger(__name__)
+
+#: Where a command output too long for one result is written, under the spec
+#: directory: ignored by git like the rest of it, and per task.
+SPILL_DIR = "tool-output"
+#: The most of one output kept on disk. Beyond it, the file keeps a head and a
+#: tail like a result would: a command that prints megabytes is not read whole.
+SPILL_MAX_CHARS = 2_000_000
 
 
 def _pick_arg(arguments: dict[str, Any], *names: str, default: Any = None) -> Any:
@@ -333,14 +347,21 @@ class ToolExecutor:
             # offered only on a task whose preflight said it is about the UI.
             from uiux.integration import execute_tool as uiux_execute
 
-            return await uiux_execute(tool_name, arguments, self.project_dir)
+            return self._fit_output(
+                await uiux_execute(tool_name, arguments, self.project_dir)
+            )
         elif _is_brain_tool(tool_name):
             # The shared brain: the same tools the Claude SDK reaches over MCP,
             # executed in-process for every other provider.
             from brain.runtime import execute_tool, task_ref
 
-            return await execute_tool(
-                tool_name, arguments, task=task_ref(self.project_dir, self.spec_dir)
+            return self._fit_output(
+                await execute_tool(
+                    tool_name,
+                    arguments,
+                    task=task_ref(self.project_dir, self.spec_dir),
+                    max_chars=self._page_chars(),
+                )
             )
         elif _is_verify_tool(tool_name):
             # The verification loop's tools: the same ones the Claude SDK
@@ -348,11 +369,13 @@ class ToolExecutor:
             # Copilot, OpenAI, Gemini, Ollama… drive the app identically.
             from verify.tools import execute_tool as execute_verify_tool
 
-            return await execute_verify_tool(
-                tool_name,
-                arguments,
-                project_dir=self.project_dir,
-                spec_dir=self.spec_dir,
+            return self._fit_output(
+                await execute_verify_tool(
+                    tool_name,
+                    arguments,
+                    project_dir=self.project_dir,
+                    spec_dir=self.spec_dir,
+                )
             )
         else:
             raise ValueError(f"Unknown tool: {tool_name}")
@@ -719,12 +742,70 @@ class ToolExecutor:
                     return "(no matches found)"
 
                 raise RuntimeError(
-                    f"Command failed with code {process.returncode}: {combined}"
+                    f"Command failed with code {process.returncode}: "
+                    f"{self._fit_output(combined)}"
                 )
 
-            return stdout
+            return self._fit_output(stdout)
         except Exception as e:
             raise RuntimeError(f"Error running command {command}: {e}")
+
+    def _fit_output(self, output: Any) -> Any:
+        """A command's or an in-process tool's output as the model reads it.
+
+        Whole when it fits under the result cap. Longer, it is written to a
+        file under the spec directory and the model reads its head, its tail
+        and the path to the rest (`spill_excerpt`) — the client's head-and-tail
+        cut afterwards lost the middle of a build log for good.
+
+        The file is a copy of what the model would have read, masked first by
+        the secret table the pre-commit scan uses (`docintel.redact`): a
+        secret a command printed is not left behind in the spec directory.
+        Without that table, or without a spec directory inside the project
+        (where `read_file` can reach it), nothing is written and the output
+        is returned as before.
+        """
+        max_chars = self._page_chars()
+        if not isinstance(output, str) or len(output) <= max_chars:
+            return output
+        directory = self._spill_dir()
+        if directory is None:
+            return output
+        try:
+            from docintel.redact import redact_text
+
+            masked, _kinds = redact_text(output)
+        except Exception:  # noqa: BLE001 - fail closed: write nothing unmasked
+            logger.warning(
+                "long command output not written to disk: the secret scan is unavailable"
+            )
+            return output
+        if output.endswith("\n") and not masked.endswith("\n"):
+            masked += "\n"
+        masked = truncate_tool_result(masked, SPILL_MAX_CHARS)
+        digest = hashlib.sha256(masked.encode("utf-8")).hexdigest()[:16]
+        target = directory / f"command-{digest}.txt"
+        try:
+            directory.mkdir(parents=True, exist_ok=True)
+            if target.resolve().parent != directory:
+                return output
+            target.write_text(masked, encoding="utf-8", newline="")
+        except OSError as error:
+            logger.warning("long command output not written to disk: %s", error)
+            return output
+        location = Path(os.path.relpath(target, self.working_directory)).as_posix()
+        return spill_excerpt(masked, max_chars=max_chars, location=location)
+
+    def _spill_dir(self) -> Path | None:
+        """The spill directory, resolved, when `read_file` can reach it."""
+        if self.spec_dir is None:
+            return None
+        directory = (self.spec_dir / SPILL_DIR).resolve()
+        try:
+            directory.relative_to(self.project_dir)
+        except ValueError:
+            return None
+        return directory
 
     async def _stop_command(self, process) -> None:
         """Reap the shell and its children when a command times out or is cancelled."""
