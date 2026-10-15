@@ -12,6 +12,7 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 from harness.domain import from_chat_completion
+from harness.domain.progress import ProgressTracker
 
 # Common token-optimization trunk shared by every generic (OpenAI-style)
 # multi-turn loop: head+tail tool-result truncation and over-budget history
@@ -291,6 +292,7 @@ class OpenAIAgentClient(AgentClient):
         _total_in = 0
         _total_out = 0
         self._start_usage_ledger()
+        progress = ProgressTracker()
 
         for turn in range(self.max_turns):
             payload: dict[str, Any] = {
@@ -415,6 +417,7 @@ class OpenAIAgentClient(AgentClient):
             assistant_msg["tool_calls"] = tool_calls
             messages.append(assistant_msg)
 
+            turn_calls: list[tuple[str, Any, str]] = []
             for tc in tool_calls:
                 func = tc.get("function", {})
                 tool_name = func.get("name", "")
@@ -489,6 +492,12 @@ class OpenAIAgentClient(AgentClient):
                         "content": truncate_tool_result(result_text),
                     }
                 )
+                turn_calls.append((tool_name, args, result_text))
+
+            stop = self._check_progress(progress, turn_calls, messages)
+            if stop is not None:
+                yield stop
+                break
 
             # Elide stale tool results once the conversation exceeds the char
             # budget (no-op below budget, preserving OpenAI's automatic
@@ -499,11 +508,14 @@ class OpenAIAgentClient(AgentClient):
                     f"[OpenAIAgentClient] History compaction: elided {compacted} "
                     "stale tool result(s)"
                 )
-
-        logger.warning(
-            f"[OpenAIAgentClient] Reached max_turns ({self.max_turns}) — stopping tool loop"
-        )
-        print(f"[OpenAIAgentClient] ⚠️ Reached max turns ({self.max_turns})", flush=True)
+        else:
+            logger.warning(
+                f"[OpenAIAgentClient] Reached max_turns ({self.max_turns}) — stopping tool loop"
+            )
+            print(
+                f"[OpenAIAgentClient] ⚠️ Reached max turns ({self.max_turns})",
+                flush=True,
+            )
         self.last_usage = {
             "input_tokens": _total_in,
             "output_tokens": _total_out,
