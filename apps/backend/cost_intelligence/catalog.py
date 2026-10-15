@@ -362,57 +362,35 @@ UNPRICED_PROVIDERS: dict[str, str] = {
     ),
 }
 
-_NOT_A_DEEPSEEK_NAME = (
-    "not a DeepSeek API name: the API serves deepseek-flash and deepseek-v4-pro"
-)
+# Registry models the catalog leaves unpriced, provider → model → why. Empty:
+# every model models_registry.py offers outside UNPRICED_PROVIDERS has a row.
+UNPRICED_MODELS: dict[str, dict[str, str]] = {}
 
-# Registry models the catalog leaves unpriced, and why. Most are ids the
-# provider's API does not serve; models_registry.py is the place to fix them.
-UNPRICED_MODELS: dict[str, dict[str, str]] = {
-    "openai": {
-        "gpt-5.5-mini": "not on OpenAI's pricing or model pages",
-        "o4": "not on OpenAI's pricing or model pages",
-    },
-    "google": {
-        "gemini-3.1-flash": "no such model: Google lists 3.1 Flash-Lite only",
-        "gemini-2.0-flash": "shut down on 2026-06-01",
-        "gemini-2.0-flash-thinking": "not on Google's pricing or model pages",
-        "gemini-1.5-pro": "not on Google's pricing or model pages",
-        "gemini-1.5-flash": "not on Google's pricing or model pages",
-    },
-    "grok": {
-        "grok-4.1-fast": "not an xAI slug (grok-4-1-fast-*, retired 2026-05-15)",
-        "grok-2": "not on xAI's model or retirement pages",
-        "grok-2-mini": "not on xAI's model or retirement pages",
-    },
-    "mistral": {
-        "mistral-large-3": "not a Mistral API name: mistral-large-2512",
-        "mistral-large-2": "mistral-large-2411, retired 2026-05-31",
-        "mistral-small-4": "not a Mistral API name: mistral-small-2603",
-        "mistral-small-3": "Small 3.x retired (3.2 on 2026-07-31)",
-        "magistral-medium-2506": "retired on 2025-11-30",
-        "magistral-small-2506": "retired on 2025-11-30",
-        "devstral-2512": "retired on 2026-07-31",
-        "ministral-3-14b": "not a Mistral API name: ministral-14b-2512",
-        "ministral-3-8b": "not a Mistral API name: ministral-8b-2512",
-        "ministral-3-3b": "not a Mistral API name: ministral-3b-2512",
-        "mistral-7b": "open-mistral-7b, retired 2025-03-30",
-    },
-    "deepseek": {
-        "deepseek-chat": "retired on 2026-07-24",
-        "deepseek-reasoner": "retired on 2026-07-24",
-        "deepseek-v4": _NOT_A_DEEPSEEK_NAME,
-        "deepseek-v3": _NOT_A_DEEPSEEK_NAME,
-        "deepseek-v3.2": _NOT_A_DEEPSEEK_NAME,
-        "deepseek-r1": _NOT_A_DEEPSEEK_NAME,
-        "deepseek-r2": _NOT_A_DEEPSEEK_NAME,
-        "deepseek-coder-v2": _NOT_A_DEEPSEEK_NAME,
-        "deepseek-coder-v3": _NOT_A_DEEPSEEK_NAME,
-    },
-    "aws": {
-        "meta.llama-3.3-70b": "not a Bedrock id: meta.llama3-3-70b-instruct-v1:0",
-    },
-}
+# Providers billed per seat, per plan or not at all (local inference): any of
+# their models costs $0 a token, whether it has a row above or not.
+FLAT_RATE_PROVIDERS: tuple[str, ...] = ("copilot", "windsurf", "cursor", "ollama")
+
+
+def price_table() -> dict[str, dict[str, dict[str, float]]]:
+    """The built-in input and output prices: provider → model → USD per 1M tokens.
+
+    For estimates that only budget input and output tokens:
+    scheduling/cost_estimator.py, and the renderer's cost previews.
+    """
+    return {
+        provider: {
+            model: {"input": row["input"], "output": row["output"]}
+            for model, row in models.items()
+        }
+        for provider, models in _DEFAULT_CATALOG.items()
+    }
+
+
+def renderer_price_data() -> dict[str, object]:
+    """The prices the renderer reads, as scripts/generate_model_catalog.py
+    writes them to apps/frontend/src/shared/constants/model-pricing.generated.json.
+    """
+    return {"flatRateProviders": list(FLAT_RATE_PROVIDERS), "prices": price_table()}
 
 
 class PricingCatalog:

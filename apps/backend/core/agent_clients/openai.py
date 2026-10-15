@@ -13,16 +13,6 @@ from typing import Any
 
 from harness.domain import from_chat_completion
 
-# Layout-agnostic import: the backend runs under two package layouts —
-# top-level (apps/backend on sys.path, e.g. `python -m cli.main`, run.py) and
-# repo-root (apps.backend.* on sys.path). Hard-coding `apps.backend.models_registry`
-# crashed the streaming-server spawn (index.ts launches `cli.main` with cwd on
-# sys.path but WITHOUT repo root), which killed live log streaming and forced the
-# slower file-watch fallback. Mirror the try/except used for core.* below.
-try:
-    from models_registry import get_pricing
-except ImportError:  # pragma: no cover - alternate package layout
-    from apps.backend.models_registry import get_pricing
 # Common token-optimization trunk shared by every generic (OpenAI-style)
 # multi-turn loop: head+tail tool-result truncation and over-budget history
 # compaction. The module is importable under both package layouts.
@@ -57,29 +47,27 @@ logger = logging.getLogger(__name__.rpartition(".agent_clients.")[0] + ".agent_c
 # =============================================================================
 
 
-def _openai_cost_usd(model: str, input_tokens: int, output_tokens: int) -> float:
-    """Estimate cost in USD for an OpenAI API call using registry lookup."""
-    # Try exact match
-    entry = get_pricing("openai", model)
-    if entry:
-        in_rate = entry.price_input
-        out_rate = entry.price_output
-        return (input_tokens * in_rate + output_tokens * out_rate) / 1_000_000
+def _openai_cost_usd(
+    model: str, input_tokens: int, output_tokens: int, provider: str = "openai"
+) -> float:
+    """Estimate cost in USD for a call, from the pricing catalog.
 
-    # Try prefix match (e.g. "gpt-4o-2024-11-20" → "gpt-4o")
-    # This handles dated snapshots by checking if model starts with a known model
+    $0 when the catalog has no price for the model. The import is local and
+    layout-agnostic: the backend runs both with apps/backend on sys.path
+    (`python -m cli.main`, which the streaming server spawns) and from the repo
+    root (apps.backend.*).
+    """
     try:
-        from models_registry import list_provider
+        from cost_intelligence.catalog import PricingCatalog
     except ImportError:  # pragma: no cover - alternate package layout
-        from apps.backend.models_registry import list_provider
+        from apps.backend.cost_intelligence.catalog import PricingCatalog
 
-    for registry_entry in list_provider("openai"):
-        if model.startswith(registry_entry.model_id):
-            in_rate = registry_entry.price_input
-            out_rate = registry_entry.price_output
-            return (input_tokens * in_rate + output_tokens * out_rate) / 1_000_000
-
-    return 0.0
+    pricing = PricingCatalog().get_pricing(provider, model)
+    if pricing is None:
+        return 0.0
+    return pricing.cost_for_tokens(
+        input_tokens=input_tokens, output_tokens=output_tokens
+    )
 
 
 class OpenAIAgentClient(AgentClient):
@@ -415,7 +403,9 @@ class OpenAIAgentClient(AgentClient):
                 self.last_usage = {
                     "input_tokens": _total_in,
                     "output_tokens": _total_out,
-                    "cost_usd": _openai_cost_usd(self.model, _total_in, _total_out),
+                    "cost_usd": _openai_cost_usd(
+                        self.model, _total_in, _total_out, self._provider_name
+                    ),
                 }
                 return
 
@@ -517,7 +507,9 @@ class OpenAIAgentClient(AgentClient):
         self.last_usage = {
             "input_tokens": _total_in,
             "output_tokens": _total_out,
-            "cost_usd": _openai_cost_usd(self.model, _total_in, _total_out),
+            "cost_usd": _openai_cost_usd(
+                self.model, _total_in, _total_out, self._provider_name
+            ),
         }
 
     def provider_name(self) -> str:
