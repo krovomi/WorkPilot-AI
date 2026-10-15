@@ -86,6 +86,7 @@ import {
 } from "./security/webview-policy";
 import { canUseDictationMicrophone } from "./security/dictation-permission";
 import { initializeCredentialIntegration } from "./services/credential-integration";
+import { selectLinuxPasswordStore } from "./linux-password-store";
 import { ensureOllamaReady } from "./services/ollama-portable";
 import { ensureOAuthServerRunning } from "./oauth-server";
 import { openExternalUrl } from "./open-external";
@@ -576,6 +577,9 @@ if (isWindows()) {
 	app.commandLine.appendSwitch("disable-gpu-shader-disk-cache");
 	app.commandLine.appendSwitch("disable-gpu-program-cache");
 }
+
+// Linux without a declared desktop (WSL…): use the running keyring, not basic_text
+selectLinuxPasswordStore();
 
 // Fonction pour attendre que le backend soit prêt
 async function waitForBackendReady(url: string, timeoutMs = 10000) {

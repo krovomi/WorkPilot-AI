@@ -52,6 +52,7 @@ c'est une discipline, pas un garde-fou.
 | URL externes, protocoles en liste fermée | `src/main/open-external.ts` (`openExternalUrl`) | `open-external.test.ts` |
 | Variables d'environnement venues d'un dépôt | `src/main/claude-code-settings/env-sanitizer.ts` ([SECURITY.md](src/main/claude-code-settings/SECURITY.md)) | `env-sanitizer.test.ts` |
 | Secrets au repos : `safeStorage`, `0600` et bannière sans trousseau | `src/main/secret-storage.ts`, via `src/main/settings-utils.ts`, `src/main/services/profile/profile-manager.ts`, `src/main/claude-profile/token-encryption.ts` | `secret-storage.test.ts`, `settings-utils-secrets.test.ts`, `profile-secrets.test.ts` |
+| Trousseau Linux sans bureau déclaré (WSL) : `--password-store=gnome-libsecret` si un Secret Service tourne | `src/main/linux-password-store.ts`, appelé avant `ready` par `src/main/index.ts` | `linux-password-store.test.ts` |
 | `.workpilot/.env` de projet : jetons `enc:`, 0600, ignoré par git | `src/main/project-env-file.ts`, `src/shared/constants/project-env-secrets.json` | `project-env-file.test.ts`, `tests/test_project_env_secrets.py` |
 | `.env` du backend : jeton `enc:` une fois packagé, lisible par Python depuis les sources (0600, signalé) | `src/main/source-env.ts` (`writeSourceEnvFile`, `loadBackendEnv`) | `source-env.test.ts`, `source-env-handlers.test.ts` |
 | Redaction des logs (fichier, console, rapports de debug) | `src/main/app-logger.ts`, `src/shared/utils/secret-redaction.ts` | `secret-redaction.test.ts`, `app-logger-redaction.test.ts` |
