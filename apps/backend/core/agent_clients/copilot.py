@@ -1291,6 +1291,13 @@ class CopilotAgentClient(AgentClient):
     def supports_subagents(self) -> bool:
         return True
 
+    def delegates(self) -> bool:
+        # The model reaches the roster through ``delegate``; a child session
+        # of this client runs each one with its tools. ``run_subagents`` below
+        # is the earlier, tool-less wave, kept for callers that have a prompt
+        # to fan out rather than a model deciding.
+        return True
+
     def provider_name(self) -> str:
         return "copilot"
 
