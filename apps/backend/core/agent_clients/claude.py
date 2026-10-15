@@ -10,7 +10,9 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 from context_mgmt.sdk_usage import claude_context_fill
+from harness.application.subagents import SUBAGENT_TOOLS, content_text
 from harness.domain import from_split_cache
+from harness.domain.subagents import measure_returned
 
 from .base import (
     AgentClient,
@@ -103,6 +105,8 @@ class ClaudeAgentClient(AgentClient):
         # The CLI streams one AssistantMessage per content block, each carrying
         # the usage of the API call they came from: one call, counted once.
         counted_calls: set[str] = set()
+        # The sub-agent tool calls of this response, until their result comes back.
+        pending_subagents: set[str] = set()
         async for raw_msg in self._client.receive_response():
             # The init SystemMessage names the session before any work is
             # done; session.py persists it right away so a run interrupted
@@ -150,7 +154,35 @@ class ClaudeAgentClient(AgentClient):
                         ),
                         "cache_read_input_tokens": _u.get("cache_read_input_tokens", 0),
                     }
+            self._note_subagent_result(raw_msg, pending_subagents)
             yield self._wrap_sdk_message(raw_msg)
+
+    def _note_subagent_result(self, raw_msg: Any, pending: set[str]) -> None:
+        """Record what a sub-agent brought back, as the parent reads it.
+
+        The PostToolUse hook ``create_client`` registers has bounded the result
+        already; the ledger measures what is left (harness lot 5).
+        """
+        message_type = type(raw_msg).__name__
+        content = getattr(raw_msg, "content", None)
+        if message_type not in ("AssistantMessage", "UserMessage") or not isinstance(
+            content, list
+        ):
+            return
+        for block in content:
+            block_type = type(block).__name__
+            if (
+                block_type == "ToolUseBlock"
+                and getattr(block, "name", None) in SUBAGENT_TOOLS
+            ):
+                pending.add(getattr(block, "id", None))
+            elif (
+                block_type == "ToolResultBlock"
+                and getattr(block, "tool_use_id", None) in pending
+            ):
+                pending.discard(block.tool_use_id)
+                text = content_text(getattr(block, "content", None)) or ""
+                self._record_subagent_return(measure_returned(text))
 
     def _wrap_sdk_message(self, raw_msg: Any) -> AgentMessage:
         """Convert a raw Claude SDK message to AgentMessage.
