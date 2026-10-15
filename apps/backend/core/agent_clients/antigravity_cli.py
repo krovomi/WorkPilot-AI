@@ -49,6 +49,7 @@ from contextlib import aclosing
 from typing import Any
 
 from core.platform import build_windows_command, find_executable
+from harness.domain import CallUsage, from_ambiguous_cache_read
 
 from .base import AgentMessage, MessageRole
 from .cli_subprocess import (
@@ -166,26 +167,11 @@ def context_tokens_from_usage(usage: dict[str, Any]) -> int | None:
     """The prompt tokens one step sent — what the window held for it.
 
     Whether ``input_tokens`` already includes ``cache_read_tokens`` is not
-    documented. ``total_tokens`` settles it when present: a total that covers
-    input, output, thinking *and* the cache reads means they are separate. With
-    no total the cache reads are added — over-counting compacts a little early,
-    under-counting overflows.
+    documented; ``harness.domain.from_ambiguous_cache_read`` settles it from
+    ``total_tokens``, and the guard and the usage ledger read it the same way.
     """
-    if not isinstance(usage, dict):
-        return None
-    fresh = as_int(usage.get("input_tokens"))
-    cached = as_int(usage.get("cache_read_tokens"))
-    if not fresh and not cached:
-        return None
-    total = usage.get("total_tokens")
-    if isinstance(total, (int, float)) and not isinstance(total, bool) and cached:
-        visible = (
-            fresh
-            + as_int(usage.get("output_tokens"))
-            + as_int(usage.get("thinking_tokens"))
-        )
-        return fresh + cached if int(total) >= visible + cached else fresh
-    return fresh + cached
+    read = from_ambiguous_cache_read(usage)
+    return read.prompt if read is not None else None
 
 
 def _stderr_error_line(stderr: str) -> str:
@@ -322,6 +308,10 @@ class AntigravityCliAgentClient(CliSubprocessAgentClient):
             raise _antigravity_error(error) from error
 
         self.last_context_tokens = None
+        self._start_usage_ledger()
+        # Usage comes per step on step_update, possibly on several updates of
+        # the same step: the last one of each step is that step's call.
+        step_calls: dict[Any, CallUsage] = {}
         stderr_task = asyncio.create_task(process.stderr.read())
         buffers: dict[Any, str] = {}
         text_seen = False
@@ -352,7 +342,10 @@ class AntigravityCliAgentClient(CliSubprocessAgentClient):
                     if step_type == "agent_response" and isinstance(delta, str):
                         buffers[index] = buffers.get(index, "") + delta
                     usage = step.get("usage")
-                    context = context_tokens_from_usage(usage)
+                    step_call = from_ambiguous_cache_read(usage)
+                    if step_call is not None:
+                        step_calls[index] = step_call
+                    context = step_call.prompt if step_call is not None else None
                     if context is not None:
                         usage_seen = True
                         self.last_context_tokens = context
@@ -391,6 +384,12 @@ class AntigravityCliAgentClient(CliSubprocessAgentClient):
                         if self.last_context_tokens is None:
                             self.last_context_tokens = context_tokens_from_usage(usage)
                         usage_seen = usage_seen or self.last_context_tokens is not None
+                        if not step_calls:
+                            # No step reported usage: the process total is one call.
+                            self._record_call(from_ambiguous_cache_read(usage))
+                    for step_call in step_calls.values():
+                        self._record_call(step_call)
+                    step_calls.clear()
                     denied = result.get("denied_actions")
                     if isinstance(denied, list) and denied:
                         yield text_message(
@@ -410,6 +409,9 @@ class AntigravityCliAgentClient(CliSubprocessAgentClient):
                         text_seen = True
                         yield text_message(MessageRole.ASSISTANT, response)
 
+            # Steps of a stream that ended without its result event.
+            for step_call in step_calls.values():
+                self._record_call(step_call)
             returncode = await process.wait()
             stderr = (await stderr_task).decode("utf-8", "replace")
             if returncode != 0:

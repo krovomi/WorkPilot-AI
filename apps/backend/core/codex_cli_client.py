@@ -25,6 +25,7 @@ from core.agent_client import (
     MessageRole,
 )
 from core.platform import build_windows_command, find_executable
+from harness.domain import from_flat_cached_input
 
 logger = logging.getLogger(__name__)
 
@@ -312,6 +313,7 @@ class CodexCliAgentClient(AgentClient):
 
         prompt = self._compose_prompt(self._pending_query)
         self._pending_query = None
+        self._start_usage_ledger()
         try:
             async with aclosing(self._receive_response_attempt(prompt)) as attempt:
                 async for message in attempt:
@@ -379,6 +381,7 @@ class CodexCliAgentClient(AgentClient):
                         self.last_context_tokens = (
                             self.last_usage.get("input_tokens") or None
                         )
+                        self._record_call(from_flat_cached_input(usage))
                 elif event_type in {"turn.failed", "error"}:
                     detail = (
                         event.get("message")

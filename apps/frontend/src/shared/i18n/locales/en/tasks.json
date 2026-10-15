@@ -1886,7 +1886,10 @@
 			"thresholdTooltip": "Threshold {{value}}% · mode {{mode}}",
 			"phase": "Phase: {{phase}}",
 			"open": "Context memory settings",
-			"notMeasured": "Not measured yet: the gauge fills as soon as the first agent session starts."
+			"notMeasured": "Not measured yet: the gauge fills as soon as the first agent session starts.",
+			"cache": "Cache: {{ratio}}% of the prompt read back",
+			"cacheRewrites": "Cache: {{ratio}}% of the prompt read back · prefix rewritten {{count}}×",
+			"cacheNotReported": "Cache: not reported by this provider"
 		},
 		"handoff": {
 			"preparing": "Handoff…",

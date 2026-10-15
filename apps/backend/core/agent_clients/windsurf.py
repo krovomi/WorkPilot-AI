@@ -10,6 +10,8 @@ import logging
 from collections.abc import AsyncIterator
 from typing import Any
 
+from harness.domain import from_chat_completion
+
 # Common token-optimization trunk shared by every generic (OpenAI-style)
 # multi-turn loop: head+tail tool-result truncation and over-budget history
 # compaction. The module is importable under both package layouts.
@@ -1019,6 +1021,7 @@ class WindsurfAgentClient(AgentClient):
 
         _ws_total_in = 0
         _ws_total_out = 0
+        self._start_usage_ledger()
 
         for turn in range(self.max_turns):
             payload: dict[str, Any] = {
@@ -1131,6 +1134,7 @@ class WindsurfAgentClient(AgentClient):
                 _ws_total_out += usage.get("completion_tokens", 0)
                 if usage.get("prompt_tokens"):
                     self.last_context_tokens = int(usage["prompt_tokens"])
+                self._record_call(from_chat_completion(usage))
 
             choices = data.get("choices", [])
             if not choices:

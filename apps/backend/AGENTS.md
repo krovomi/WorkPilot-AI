@@ -32,6 +32,7 @@ Toute interaction LLM passe par ces fichiers ; les modifier touche tout le produ
 | `core/phase_event.py` | événements de phase vers l'UI |
 | `core/pause_state.py`, `core/build_signals.py` | pause coopérative ; `BuildPaused` / `BuildHalted` |
 | `context_mgmt/` | fenêtre de contexte par session : jauge, compact / clear au seuil |
+| `harness/domain/` | harness de contexte ([plan](../../docs/architecture/context-harness.md)) : chaque appel mesuré dans une unité commune à tous les providers (`harness/domain/usage.py`, `harness/domain/ledger.py`) |
 
 ## Agents, sous-agents, skills
 

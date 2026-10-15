@@ -314,6 +314,21 @@ export function ContextGauge({ task }: { task: Task }) {
 				source: t(`tasks:contextManagement.source.${usage.source}`),
 			})
 		: null;
+	// How much of each prompt the provider's cache served. `null` means the
+	// provider reports no cache (unknown, never "0%"); `undefined` is an event
+	// from a backend that predates the figure, shown as nothing.
+	let cacheText: string | null = null;
+	if (usage?.cacheHitRatio === null) {
+		cacheText = t("tasks:contextManagement.gauge.cacheNotReported");
+	} else if (typeof usage?.cacheHitRatio === "number") {
+		const ratio = Math.round(usage.cacheHitRatio * 100);
+		cacheText = usage.prefixRewrites
+			? t("tasks:contextManagement.gauge.cacheRewrites", {
+					ratio,
+					count: usage.prefixRewrites,
+				})
+			: t("tasks:contextManagement.gauge.cache", { ratio });
+	}
 	const handoffState = usage?.handoffState ?? "idle";
 	const buttonsDisabled = !active || !!pending;
 
@@ -414,6 +429,14 @@ export function ContextGauge({ task }: { task: Task }) {
 								{usage.phase
 									? ` · ${t("tasks:contextManagement.gauge.phase", { phase: usage.phase })}`
 									: ""}
+							</div>
+						)}
+						{cacheText && (
+							<div
+								className="text-[11px] tabular-nums text-muted-foreground"
+								data-testid="context-gauge-cache"
+							>
+								{cacheText}
 							</div>
 						)}
 					</div>
