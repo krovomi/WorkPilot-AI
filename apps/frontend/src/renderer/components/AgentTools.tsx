@@ -50,6 +50,7 @@ import type { ThinkingLevel } from "../../shared/types/settings";
 import {
 	type AgentSettingsSource,
 	resolveAgentSettings as resolveAgentModelConfig,
+	useProjectEnvConfig,
 	useResolvedAgentSettings,
 } from "../hooks";
 import { useProjectStore } from "../stores/project-store";
@@ -1072,8 +1073,12 @@ export function AgentTools() {
 	const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
 		new Set(["spec", "build", "qa"]),
 	);
-	const [envConfig, setEnvConfig] = useState<ProjectEnvConfig | null>(null);
-	const [, setIsLoading] = useState(false);
+	// Bound to the project it was read for, so a save fired while another
+	// project is loading cannot write this one's settings into it.
+	const { envConfig, setEnvConfig } = useProjectEnvConfig(
+		selectedProjectId,
+		selectedProject?.autoBuildPath,
+	);
 
 	// Custom MCP server dialog state
 	const [showCustomMcpDialog, setShowCustomMcpDialog] = useState(false);
@@ -1085,30 +1090,6 @@ export function AgentTools() {
 		Record<string, McpHealthCheckResult>
 	>({});
 	const [testingServers, setTestingServers] = useState<Set<string>>(new Set());
-
-	// Load project env config when project changes
-	useEffect(() => {
-		if (selectedProjectId && selectedProject?.autoBuildPath) {
-			setIsLoading(true);
-			globalThis.electronAPI
-				.getProjectEnv(selectedProjectId)
-				.then((result) => {
-					if (result.success && result.data) {
-						setEnvConfig(result.data);
-					} else {
-						setEnvConfig(null);
-					}
-				})
-				.catch(() => {
-					setEnvConfig(null);
-				})
-				.finally(() => {
-					setIsLoading(false);
-				});
-		} else {
-			setEnvConfig(null);
-		}
-	}, [selectedProjectId, selectedProject?.autoBuildPath]);
 
 	// Update MCP server toggle
 	// Which server's settings are open. A custom server routes to the editor it
@@ -1162,7 +1143,7 @@ export function AgentTools() {
 				);
 			}
 		},
-		[selectedProjectId, envConfig],
+		[selectedProjectId, envConfig, setEnvConfig],
 	);
 
 	// rtk — same shape as updateMcpServer, separate key. rtk is not an MCP
@@ -1195,7 +1176,7 @@ export function AgentTools() {
 				);
 			}
 		},
-		[selectedProjectId, envConfig],
+		[selectedProjectId, envConfig, setEnvConfig],
 	);
 
 	// ui-ux-pro-max — same shape as updateTokenSavings, its own key.
@@ -1216,7 +1197,7 @@ export function AgentTools() {
 				setEnvConfig((prev) => (prev ? { ...prev, uiux: envConfig.uiux } : null));
 			}
 		},
-		[selectedProjectId, envConfig],
+		[selectedProjectId, envConfig, setEnvConfig],
 	);
 
 	// Handle adding an MCP to an agent
@@ -1272,7 +1253,7 @@ export function AgentTools() {
 				);
 			}
 		},
-		[selectedProjectId, envConfig],
+		[selectedProjectId, envConfig, setEnvConfig],
 	);
 
 	// Handle removing an MCP from an agent
@@ -1335,7 +1316,7 @@ export function AgentTools() {
 				);
 			}
 		},
-		[selectedProjectId, envConfig],
+		[selectedProjectId, envConfig, setEnvConfig],
 	);
 
 	// Handle saving a custom MCP server
@@ -1373,7 +1354,7 @@ export function AgentTools() {
 				);
 			}
 		},
-		[selectedProjectId, envConfig],
+		[selectedProjectId, envConfig, setEnvConfig],
 	);
 
 	// Handle deleting a custom MCP server
@@ -1433,7 +1414,7 @@ export function AgentTools() {
 				);
 			}
 		},
-		[selectedProjectId, envConfig],
+		[selectedProjectId, envConfig, setEnvConfig],
 	);
 
 	// Check health of all custom MCP servers
