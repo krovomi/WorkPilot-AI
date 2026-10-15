@@ -76,7 +76,7 @@ sens partout, une boucle unique, et la troncature à la source.
 |---|---|---|
 | Propriété de la boucle | boucles tierces : Claude Agent SDK (`max_turns` 1000, `max_budget_usd` 5), Codex, OpenCode, Antigravity. Boucles WorkPilot : **cinq copies** de `for turn in range(self.max_turns)` dans `core/agent_clients/` (OpenAI et ses dérivés, Ollama/LM Studio, Copilot, Windsurf ×2) | une boucle partagée ; un plafond de coût hors SDK Claude |
 | Assemblage | un seul builder, `build_base_system_prompt` (`core/llm_optimization.py`), sans horodatage ; outils dans un ordre fixe ; `prompt_cache_key` côté OpenAI | le chemin absolu du worktree est la **deuxième phrase** du system : le préfixe change d'une tâche à l'autre, quel que soit le provider. La constitution spec-kit est inlinée dans le prompt de *chaque* sous-tâche |
-| Mesure | chaque client remplit `last_usage` et `last_context_tokens` ; `record_client_usage` (`agents/session.py`) l'écrit **par session** dans `core/usage_tracker.py` | `input_tokens` n'a pas le même sens partout : la part non cachée chez Claude, le total cache compris chez OpenCode et Codex. Les boucles WorkPilot ne lisent aucun champ de cache ; Codex garde `cached_input_tokens` mais `record_client_usage` ne le transmet pas. Ni taux de hit, ni coût par appel |
+| Mesure | chaque client remplit `last_usage` et `last_context_tokens` ; `record_client_usage` (`agents/session.py`) l'écrit **par session** dans `core/usage_tracker.py` | `input_tokens` n'a pas le même sens partout : la part non cachée chez Claude (le sens que `core/usage_tracker.py` attend), le total cache compris chez OpenCode et Codex. OpenCode y passe en plus ses champs de cache : ses tokens d'entrée sont comptés deux fois dans le bilan carbone et les tableaux de bord. Les boucles WorkPilot ne lisent aucun champ de cache ; Codex garde `cached_input_tokens` mais `record_client_usage` ne le transmet pas. Ni taux de hit, ni coût par appel |
 | Compaction | `context_mgmt/` : garde par tâche, seuil 50 % par défaut (30–90), *compact* ou *clear*, handoff préparé en fond par le provider de la tâche, cap de 3 resets ; native sur Claude et Codex, émulée ailleurs | un seuil calculé sur la fenêtre annoncée, pas sur la fenêtre *payable* (palier de prix à 200 k chez certains providers) |
 | Tool clearing | boucles WorkPilot : `compact_messages` remplace les vieux résultats par un marqueur au-delà de 300 k caractères. Claude Code purge de son côté | pas de règle d'âge (« plus vieux que N tours »), pas de gain minimal |
 | Troncature | rtk sur Bash ; boucles WorkPilot : résultat coupé à 10 k caractères (70 % tête / 30 % queue), recherche à 200 correspondances. Claude Code plafonne nativement (table ci-dessus) | `read_file` lit le fichier entier puis en coupe le milieu, sans `offset`/`limit` ; aucune pagination par curseur ; aucun plafond natif réglé par WorkPilot |
@@ -213,8 +213,8 @@ Sans mesure, chaque lot suivant est un pari.
   premier dont l'écriture dépasse la moitié du prompt) — un signal qui ne demande pas de voir la
   requête, donc valable pour les boucles tierces aussi.
 - Chaque client garde son parsing et y ajoute un appel au format qui lui correspond ;
-  `record_client_usage` écrit le résumé de session, avec un `input_tokens` qui a enfin le même
-  sens partout (cache compris).
+  `record_client_usage` écrit le résumé de session dans le sens que `core/usage_tracker.py`
+  attend déjà pour tous : `input_tokens` est la part non cachée, le cache a ses deux champs.
 - Le taux de hit rejoint l'événement `CONTEXT_USAGE` ; la jauge du panneau de tâche l'affiche,
   clés i18n `en` et `fr`, et « non rapporté » pour un provider sans champ de cache.
 - Ligne de base : une dizaine de tâches réelles rejouées, sur plusieurs providers, avec coût par
