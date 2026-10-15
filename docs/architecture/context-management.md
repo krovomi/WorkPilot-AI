@@ -76,7 +76,11 @@ duck-typed attributes: `last_context_tokens`, `context_window_tokens`,
 `context_usage_source`. The window comes from the client (Ollama's `num_ctx`),
 then models.dev's `limit.context` (cache only, `public_model_registry`), then
 the prefix table in `context_mgmt/windows.py`, which a test keeps in step with
-the frontend gauge's table.
+the frontend gauge's table. The guard then plans for the *payable* window,
+`effective_window`: where a model bills a longer prompt at a higher rate
+(`LONG_CONTEXT_THRESHOLDS` in the price catalog), the window stops there, and
+the threshold, the gauge and both native settings are shares of it
+([harness, lot 4](context-harness.md)).
 
 ### When it acts
 
