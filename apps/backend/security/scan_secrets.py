@@ -24,6 +24,7 @@ import argparse
 import re
 import subprocess
 import sys
+import traceback
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -629,7 +630,10 @@ def main() -> int:
         "--all-files", "-a", action="store_true", help="Scan all tracked files"
     )
     parser.add_argument(
-        "--path", "-p", type=str, help="Scan a specific file or directory"
+        "--path",
+        "-p",
+        type=str,
+        help="Scan a file or directory inside the project (the current directory)",
     )
     parser.add_argument("--json", action="store_true", help="Output results as JSON")
     parser.add_argument(
@@ -642,12 +646,23 @@ def main() -> int:
 
     # Determine which files to scan
     if args.path:
-        path = Path(args.path)
+        # Resolved (symlinks included), then checked against the resolved root:
+        # a relative path, `..` or a link out of the project is judged by where
+        # it lands. Files are named relative to the root, with `/`, as git names
+        # them, so .secretsignore matches them the same way on every OS.
+        root = project_dir.resolve()
+        path = Path(args.path).resolve()
+        if not path.is_relative_to(root):
+            print(
+                f"{RED}Error: Path outside the project ({root}): {args.path}{NC}",
+                file=sys.stderr,
+            )
+            return 2
         if path.is_file():
-            files = [str(path)]
+            files = [path.relative_to(root).as_posix()]
         elif path.is_dir():
             files = [
-                str(f.relative_to(project_dir)) for f in path.rglob("*") if f.is_file()
+                f.relative_to(root).as_posix() for f in path.rglob("*") if f.is_file()
             ]
         else:
             print(f"{RED}Error: Path not found: {args.path}{NC}", file=sys.stderr)
@@ -680,4 +695,10 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except Exception:
+        # A crash is neither a clean scan (0) nor a finding (1): exit 2, as
+        # documented, so the hook and CI see a scan that did not happen.
+        traceback.print_exc()
+        sys.exit(2)
