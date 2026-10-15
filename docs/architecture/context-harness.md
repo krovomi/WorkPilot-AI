@@ -1,6 +1,7 @@
 # Harness de contexte : le plan
 
-> **Statut : plan ; le lot 0 (mesurer) est livré, sauf sa ligne de base.** Ce fichier fixe la cible
+> **Statut : plan ; livrés : le lot 0 (mesurer, sauf sa ligne de base) et le lot 1a (un budget par
+> session pour tous).** Ce fichier fixe la cible
 > et l'ordre des lots ; chaque lot livré remplace sa section par la justification de ce qui existe. [`docs/CLAUDE.md`](../CLAUDE.md)
 > reste normatif : là où les deux divergent, il gagne. Le mécanisme existant de compaction et de
 > reset est décrit dans [`context-management.md`](context-management.md), que ce plan prolonge sans
@@ -74,7 +75,7 @@ sens partout, une boucle unique, et la troncature à la source.
 
 | Sujet | Aujourd'hui | Ce qui manque |
 |---|---|---|
-| Propriété de la boucle | boucles tierces : Claude Agent SDK (`max_turns` 1000, `max_budget_usd` 5), Codex, OpenCode, Antigravity. Boucles WorkPilot : **cinq copies** de `for turn in range(self.max_turns)` dans `core/agent_clients/` (OpenAI et ses dérivés, Ollama/LM Studio, Copilot, Windsurf ×2) | une boucle partagée ; un plafond de coût hors SDK Claude |
+| Propriété de la boucle | boucles tierces : Claude Agent SDK (`max_turns` 1000), Codex, OpenCode, Antigravity. Boucles WorkPilot : **cinq copies** de `for turn in range(self.max_turns)` dans `core/agent_clients/` (OpenAI et ses dérivés, Ollama/LM Studio, Copilot, Windsurf ×2). Lot 1a : un même plafond de coût par session pour tous | une boucle partagée (lot 1b) |
 | Assemblage | un seul builder, `build_base_system_prompt` (`core/llm_optimization.py`), sans horodatage ; outils dans un ordre fixe ; `prompt_cache_key` côté OpenAI | le chemin absolu du worktree est la **deuxième phrase** du system : le préfixe change d'une tâche à l'autre, quel que soit le provider. La constitution spec-kit est inlinée dans le prompt de *chaque* sous-tâche |
 | Mesure | lot 0 livré : chaque client lit l'usage de chaque appel dans l'unité commune de `harness/domain/` et le cumule dans son `usage_ledger` ; `record_client_usage` en tire les champs du suivi des coûts, `CONTEXT_USAGE` le taux de hit et les réécritures de préfixe | la ligne de base sur des tâches réelles ; le coût par appel (seul le coût de session est connu) |
 | Compaction | `context_mgmt/` : garde par tâche, seuil 50 % par défaut (30–90), *compact* ou *clear*, handoff préparé en fond par le provider de la tâche, cap de 3 resets ; native sur Claude et Codex, émulée ailleurs | un seuil calculé sur la fenêtre annoncée, pas sur la fenêtre *payable* (palier de prix à 200 k chez certains providers) |
@@ -238,12 +239,39 @@ dépendent.
 
 ### Lot 1 — Une seule boucle
 
-Le harness proprement dit : `harness/application/loop.py` remplace les cinq copies.
+Le harness proprement dit. Découpé en deux : l'arrêt au plafond de coût, qui manquait à tous les
+providers sauf Claude, d'abord ; le remplacement des cinq boucles ensuite.
 
-- La boucle porte les quatre arrêts : fin naturelle, `max_turns`, **`max_cost_usd`**, absence de
-  progrès. Le coût vient du ledger, donc du même calcul pour tous.
-- Les boucles tierces reçoivent le même plafond de coût côté WorkPilot : au-delà, la session est
-  arrêtée à son prochain point sûr, comme le fait déjà `ContextGuard`.
+**Lot 1a — Un budget par session, pour tous (livré).**
+
+- `harness/domain/cost.py` : `TokenPrices` (USD par million de tokens, par nature de token),
+  `call_cost` (le coût d'un appel du ledger), `over_budget` (la règle d'arrêt). Un fournisseur qui
+  ne rapporte pas son cache est compté au tarif d'entrée plein sur tout le prompt : l'estimation
+  se trompe vers le haut, jamais vers le bas. Une dépense inconnue n'arrête jamais une session.
+- `harness/application/budget.py` : le plafond est `AUTO_CLAUDE_MAX_BUDGET_USD` (5 USD par défaut,
+  0 ou moins le supprime, une valeur illisible retombe sur le défaut), la variable que le SDK
+  Claude lisait déjà ; `create_client` la lit par la même fonction. Les prix viennent de
+  `cost_intelligence/catalog.py`, une donnée par modèle ; un modèle `vendeur/modèle` (OpenCode)
+  est cherché chez son vendeur.
+- Le contrôle a lieu à un seul endroit, `_run_agent_client_session`, après chaque message, pour
+  tout client qui ne plafonne pas lui-même (`enforces_own_budget`, vrai pour le seul client
+  Claude, dont le SDK s'arrête à `max_budget_usd`). Au-delà, la session s'arrête comme le SDK
+  l'arrête : statut `continue`, marqueur de session `error_max_budget_usd` pour que le Kanban
+  propose de reprendre, et `{"budget_exceeded": True, "spent_usd": …}` pour l'appelant.
+- Un modèle sans prix connu ne peut pas être mesuré : sa session n'est pas plafonnée, et le
+  journal le dit une fois par provider et modèle. Le catalogue est donc la limite de ce lot : un
+  modèle récent qui n'y figure pas n'a pas de plafond tant qu'on ne l'y ajoute pas.
+- Le contrôle voit l'usage quand le client le rapporte : une CLI qui ne le donne qu'en fin de
+  tour (Codex) n'est arrêtée qu'après ce tour.
+
+Tests : `tests/harness/test_cost.py`, `tests/harness/test_session_budget.py` (la session s'arrête
+à l'appel qui dépasse, va au bout sous le plafond, et un modèle sans prix tourne sans plafond).
+
+**Lot 1b — Une seule boucle (reste à faire).** `harness/application/loop.py` remplace les cinq
+copies.
+
+- La boucle porte les arrêts restants : fin naturelle, `max_turns`, absence de progrès (que
+  Copilot détecte seul aujourd'hui) ; le budget est déjà commun (1a).
 - Les adaptateurs gardent le protocole ; `ToolExecutor` reste le seul exécuteur.
 
 *Sortie :* les cinq boucles passent par `loop.py` ; les tests existants des clients passent sans
