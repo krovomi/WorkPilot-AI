@@ -263,6 +263,42 @@ WorkPilot AI est une application de bureau autonome basée sur une architecture 
 - **Migration Agent** - Migration de frameworks et bibliothèques
 - **Memory Manager** - Le cerveau partagé : un vault Obsidian lu et écrit par tous les agents
 
+#### Sous-agents spécialisés
+Les sous-agents ne sont pas déclarés par chaque agent : ils vivent dans **un seul registre**,
+[`apps/backend/agents/subagents/`](apps/backend/agents/subagents/), et chaque session reçoit un
+*roster* composé par `agents.subagents.resolve()` depuis `core/client.py` :
+
+1. **Défauts de phase** (`phases.py`) — p. ex. coder : `code-reviewer`, `test-runner`,
+   `architecture-analyst` ; planner : `architecture-analyst`, `dependency-tracer` ;
+   QA : `qa-acceptance-checker`, `test-runner` ; revue : `security-auditor`, `regression-hunter`,
+   `test-coverage-auditor` ; les appels d'une seule réponse (message de commit…) n'en ont aucun.
+2. **Overlays de langage** (`languages/` : .NET, Python, TypeScript, Java, Go, Rust) — la pile
+   détectée injecte ses commandes (`dotnet test --nologo`…) dans le prompt du `test-runner`.
+3. **Overlay mobile** — ajoute `device-runner` et `store-readiness-auditor` sur une app mobile.
+4. **Agents fournis par l'appelant** — gagnent toujours (relecteurs de PR de `pr_review.py`).
+5. **Plafond** de 7 sous-agents.
+
+Le roster atteint le modèle sur tout provider (`capabilities/providers.yaml`) :
+- `native` — Claude : `agents=` du SDK et son outil `Agent` ;
+- `emulated` — Copilot, OpenAI, Gemini, Ollama / LM Studio, Mistral, DeepSeek, Grok, Windsurf :
+  un outil `delegate` dont la description liste les spécialistes, et une **session enfant** du même
+  client par délégation, avec les seuls outils du spécialiste et un résultat borné
+  ([`docs/architecture/delegation.md`](docs/architecture/delegation.md)) ;
+- `none` — les CLI (Codex, OpenCode, Antigravity) apportent leurs outils et ne reçoivent pas de roster.
+
+Ce que rend un sous-agent est borné et traité comme une donnée non fiable
+(`harness/application/subagents.py`). Le même registre, plus les personas des packs
+(`skills/dotnet/agents/net-architect.md`, `skills/mobile/agents/…`), est émis dans
+`.agents/agents/` pour les IDE (Copilot, Codex, Claude Code) ; ces personas de pack ne font pas
+partie des rosters du pipeline. Détail : [`apps/backend/agents/README.md`](apps/backend/agents/README.md#subagents).
+
+#### Méthode BMAD
+BMAD n'est plus une étape du pipeline (`workflows/feature-build/workflow.yaml` ne l'appelle plus),
+mais reste disponible en **skills à la demande** : 50 skills BMAD v6.12.0 vendorisés dans
+[`skills/bmad/`](skills/bmad/) par `scripts/vendor_bmad.py`. Ils ont besoin du runtime `_bmad/`
+que l'installeur BMAD écrit **dans le projet cible** (`pnpm run skills:bootstrap`) ; sans lui,
+ils sont masqués de la barre de commandes. Voir [`skills/README.md`](skills/README.md#runtime-gates).
+
 ### Architecture Technique
 
 #### Backend Python (`apps/backend/`)
@@ -272,11 +308,15 @@ apps/backend/
 │   ├── client.py        # Client Claude Agent SDK
 │   ├── auth.py          # Gestion multi-profils OAuth
 │   ├── worktree.py      # Isolation des espaces de travail Git
-│   └── platform.py      # Abstraction cross-plateforme
+│   └── platform/        # Abstraction cross-plateforme
 ├── agents/              # Logique d'exécution des agents
 │   ├── planner.py       # Agent de planification
 │   ├── coder.py         # Agent de développement
-│   └── session.py       # Gestion des sessions
+│   ├── session.py       # Gestion des sessions
+│   └── subagents/       # Registre des sous-agents (phases, langages, mobile, revue de PR)
+├── harness/             # Harness de contexte : budgets, pagination, résultats des sous-agents
+├── skills_registry/     # Build des skills et émission des agents vers les harnesses
+├── workflows/           # Moteur des workflows déclaratifs (workflows/*/workflow.yaml)
 ├── qa/                  # Pipeline de validation QA
 │   ├── reviewer.py      # Validation des critères
 │   ├── fixer.py         # Résolution automatique
@@ -299,7 +339,7 @@ apps/backend/
 ├── flaky_test_detective/# Détection des tests instables
 ├── streaming/           # Diffusion temps réel des sessions d'agents
 ├── server/              # Mode serveur multi-utilisateurs (auth, claims)
-└── prompts/             # Prompts des agents (60+ agents spécialisés)
+└── prompts/             # Prompts système réels des agents (~50, dont github/)
 ```
 
 > Le backend s'est étoffé en **90+ modules spécialisés** (accessibilité, dérive d'architecture, gouvernance de licences, orchestration multi-repo, etc.). Voir [apps/backend/README.md](apps/backend/README.md) et la [table des modules du wiki](https://github.com/krovomi/WorkPilot-AI/wiki) pour l'inventaire complet auto-généré.
