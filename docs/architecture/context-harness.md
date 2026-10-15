@@ -631,7 +631,7 @@ un autre ordre : tout ce qui suit est réécrit.
 
 | Famille | Outils | Ordre | En cours de session | Effort |
 |---|---|---|---|---|
-| Claude Agent SDK | ceux de la CLI, moins `disallowed_tools` (`undeclared_builtin_tools`) ; serveurs MCP de `get_required_mcp_servers` ; `allowed_tools` ne fait qu'approuver | listes fixes côté WorkPilot ; dans le prompt, celui de la CLI | options fixées au lancement de la CLI ; ni `set_model` ni changement d'outils | `max_thinking_tokens` depuis le réglage de la phase ; `effort` (Opus seulement) depuis une table par type d'agent, ou `AUTO_CLAUDE_EFFORT` |
+| Claude Agent SDK | ceux de la CLI, moins `disallowed_tools` (`undeclared_builtin_tools`) ; serveurs MCP de `get_required_mcp_servers` ; `allowed_tools` ne fait qu'approuver | listes fixes côté WorkPilot ; dans le prompt, celui de la CLI | options fixées au lancement de la CLI ; ni `set_model` ni changement d'outils | `max_thinking_tokens` depuis le réglage de la phase ; `effort` (Opus seulement) depuis le même réglage (`claude_effort`), ou `AUTO_CLAUDE_EFFORT` |
 | Codex CLI | les siens ; WorkPilot ne passe que `--sandbox`, tiré de la déclaration du type | celui de la CLI | les mêmes arguments à chaque requête | `model_reasoning_effort` depuis le réglage de la phase |
 | OpenCode | les siens ; `--agent build` ou `plan` selon la déclaration | celui de la CLI | idem | aucun : pas de réglage confirmé dans le dépôt |
 | Antigravity | les siens ; mode et sandbox selon la déclaration | celui de la CLI | idem | `--effort` depuis le réglage de la phase |

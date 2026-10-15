@@ -9,6 +9,7 @@ from core.llm_optimization import (
     _TOOL_USE_HINT,
     _message_len,
     build_base_system_prompt,
+    claude_effort,
     compact_messages,
     openai_prompt_cache_key,
     openai_reasoning_effort,
@@ -80,6 +81,34 @@ class TestOpenAIReasoningEffort:
 
     def test_empty_model(self):
         assert openai_reasoning_effort("", 16384) is None
+
+
+# ---------------------------------------------------------------------------
+# Claude effort mapping
+# ---------------------------------------------------------------------------
+
+
+class TestClaudeEffort:
+    @pytest.mark.parametrize(
+        ("level", "expected"),
+        [
+            ("none", "low"),  # Opus 5.5 cannot turn thinking off
+            ("low", "low"),
+            ("medium", "medium"),
+            ("high", "high"),
+            ("ultrathink", "xhigh"),  # the deepest level every Opus takes
+        ],
+    )
+    def test_each_level_of_the_selector(self, level, expected):
+        from phase_config import THINKING_BUDGET_MAP
+
+        assert claude_effort(THINKING_BUDGET_MAP[level]) == expected
+
+    def test_a_zero_budget_is_no_thinking(self):
+        assert claude_effort(0) == "low"
+
+    def test_unknown_budget_falls_back_to_medium(self):
+        assert claude_effort(12345) == "medium"
 
 
 # ---------------------------------------------------------------------------

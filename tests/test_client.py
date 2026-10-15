@@ -742,3 +742,103 @@ class TestClaudeOptionsEffortGuard:
 
         assert client is mock_sdk_client
         assert "effort" not in captured
+
+
+class TestClaudeEffortFollowsTheUser:
+    """On Opus, `effort` is the user's thinking level for the phase.
+
+    Opus 5.5 accepts no thinking budget, so `effort` is its only reasoning
+    control; a table keyed by agent type used to overrule the selector.
+    """
+
+    def _effort(self, tmp_path, monkeypatch, model, agent_type, **kwargs):
+        import dataclasses
+
+        import core.client as client_module
+
+        monkeypatch.setenv(
+            "CLAUDE_CODE_OAUTH_TOKEN", "sk-ant-oat01-valid-plaintext-token"
+        )
+        monkeypatch.setattr(
+            "core.auth.get_token_from_keychain", lambda _config_dir=None: None
+        )
+        captured = {}
+
+        @dataclasses.dataclass
+        class CapturingOptions:
+            def __init__(self, **options):
+                captured.update(options)
+
+        with (
+            patch.object(client_module, "ClaudeAgentOptions", CapturingOptions),
+            patch.object(client_module, "_claude_options_supports", lambda _f: True),
+            patch("core.client.ClaudeSDKClient", return_value=MagicMock()),
+        ):
+            client_module.create_client(tmp_path, tmp_path, model, agent_type, **kwargs)
+        return captured.get("effort")
+
+    @pytest.mark.parametrize(
+        ("level", "expected"),
+        [
+            ("none", "low"),
+            ("low", "low"),
+            ("medium", "medium"),
+            ("high", "high"),
+            ("ultrathink", "xhigh"),
+        ],
+    )
+    def test_the_coder_runs_at_the_users_level(
+        self, tmp_path, monkeypatch, level, expected
+    ):
+        from phase_config import THINKING_BUDGET_MAP
+
+        monkeypatch.delenv("AUTO_CLAUDE_EFFORT", raising=False)
+        effort = self._effort(
+            tmp_path,
+            monkeypatch,
+            "claude-opus-5-5",
+            "coder",
+            max_thinking_tokens=THINKING_BUDGET_MAP[level],
+        )
+        assert effort == expected
+
+    def test_the_agent_type_no_longer_decides(self, tmp_path, monkeypatch):
+        # The planner and the coder used to get "xhigh" whatever the user chose.
+        monkeypatch.delenv("AUTO_CLAUDE_EFFORT", raising=False)
+        for agent_type in ("planner", "coder", "qa_reviewer"):
+            assert (
+                self._effort(
+                    tmp_path,
+                    monkeypatch,
+                    "claude-opus-5-5",
+                    agent_type,
+                    max_thinking_tokens=1024,
+                )
+                == "low"
+            )
+
+    def test_the_env_var_still_forces_a_level(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("AUTO_CLAUDE_EFFORT", "max")
+        assert (
+            self._effort(
+                tmp_path,
+                monkeypatch,
+                "claude-opus-5-5",
+                "coder",
+                max_thinking_tokens=1024,
+            )
+            == "max"
+        )
+
+    def test_a_model_other_than_opus_gets_no_effort(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("AUTO_CLAUDE_EFFORT", raising=False)
+        assert (
+            self._effort(
+                tmp_path,
+                monkeypatch,
+                "claude-sonnet-5-5",
+                "coder",
+                max_thinking_tokens=16384,
+            )
+            is None
+        )

@@ -271,6 +271,30 @@ def openai_reasoning_effort(
     return _OPENAI_EFFORT_BY_LEVEL.get(level)
 
 
+# Claude's `effort` has no "off": Opus 5.5 rejects disabled thinking at every
+# effort, so "none" is the lowest effort. "xhigh" is the deepest level every
+# Opus takes (the SDK falls back to "high" where it does not exist); "max"
+# stays reachable through AUTO_CLAUDE_EFFORT.
+_CLAUDE_EFFORT_BY_LEVEL: dict[str, str] = {
+    "none": "low",
+    "low": "low",
+    "medium": "medium",
+    "high": "high",
+    "ultrathink": "xhigh",
+}
+
+
+def claude_effort(thinking_budget: int | None) -> str:
+    """Translate the Kanban thinking budget to the Claude Agent SDK's `effort`.
+
+    The budget is the user's level for the phase, resolved by the caller; no
+    budget (or 0) is the level "none".
+    """
+    if not thinking_budget:
+        return _CLAUDE_EFFORT_BY_LEVEL["none"]
+    return _CLAUDE_EFFORT_BY_LEVEL[_thinking_level_from_budget(thinking_budget)]
+
+
 # ---------------------------------------------------------------------------
 # 4. Prompt-cache routing key (OpenAI automatic caching)
 # ---------------------------------------------------------------------------

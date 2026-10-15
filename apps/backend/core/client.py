@@ -1636,32 +1636,21 @@ def create_client(
     if denied := undeclared_builtin_tools(agent_type):
         options_kwargs["disallowed_tools"] = denied
 
-    # Reasoning effort, gated on Opus 4.x (only Opus models support this param).
-    # Docs recommend "xhigh" on Opus 4.7 for coding/agentic tasks; cheaper
-    # phases get "low" to save tokens. Env var override wins so a user can
-    # force a level for debugging.
+    # Reasoning effort, on Opus only. It follows the user's thinking level for
+    # the phase, which the caller resolved into `max_thinking_tokens`: on Opus
+    # 5.5 a thinking budget is not accepted and effort is the only control, so
+    # a fixed table here would silently overrule the selector. The env var
+    # still wins, to force a level for debugging.
     # See: code.claude.com/docs/en/agent-sdk/agent-loop#effort-level
     #
     # Only emit the kwarg when the installed SDK actually supports it: older
     # ``claude_agent_sdk`` builds lack the ``effort`` field and would otherwise
     # raise "unexpected keyword argument 'effort'", aborting the agent run.
     if "opus" in (model or "").lower():
-        _effort_map = {
-            "explorer": "low",
-            "lint": "low",
-            "status": "low",
-            "documenter": "medium",
-            "qa_reviewer": "high",
-            "qa_fixer": "high",
-            "verifier": "high",
-            "validation": "high",
-            "planner": "xhigh",
-            "architect": "xhigh",
-            "coder": "xhigh",
-            "dev": "xhigh",
-        }
-        _effort = os.environ.get("AUTO_CLAUDE_EFFORT") or _effort_map.get(
-            agent_type, "high"
+        from core.llm_optimization import claude_effort
+
+        _effort = os.environ.get("AUTO_CLAUDE_EFFORT") or claude_effort(
+            max_thinking_tokens
         )
         if _claude_options_supports("effort"):
             options_kwargs["effort"] = _effort
