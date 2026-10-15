@@ -78,6 +78,10 @@ l'UI n'existe pas.
   une décision qui en dépend passe par une liste fermée écrite dans le code.
 - Une pièce jointe n'arrive à un agent que par la préparation `docintel` (scan d'injection,
   redaction des secrets) ; `docintel/read_guard.py` refuse la lecture d'un fichier retenu.
+- Un corps de skill est un cas à part : `.agents/skills/<nom>/SKILL.md` est une procédure que
+  tout agent peut suivre, donc il est **refusé** et non nettoyé quand il s'adresse à l'agent
+  plutôt qu'au lecteur (gate 4 du resolver, `skills_registry/injection_gate.py`). Ce qu'un skill
+  dit de faire reste du ressort de la revue humaine de la PR qui le vendorise.
 - Un nouveau connecteur (forge, ticketing, web, MCP) réutilise `clean_untrusted`. Pas de nouvel
   assainisseur local : il en existe déjà un pour GitLab et un pour Azure DevOps, à résorber.
 - Une instruction lue dans un ticket, une page ou un fichier du dépôt cible ne s'exécute pas.

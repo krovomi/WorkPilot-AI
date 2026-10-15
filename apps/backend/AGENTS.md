@@ -47,6 +47,7 @@ Toute interaction LLM passe par ces fichiers ; les modifier touche tout le produ
 | `skills_registry/frontmatter.py` | **le** parseur de frontmatter |
 | `skills_registry/agents.py` | émet le registre de sous-agents vers chaque harness |
 | `skills_registry/acquire.py`, `upstream.py`, `classify.py` | `skills-cli add/update/remove`, provenance par tree SHA, classement des releases amont |
+| `skills_registry/injection_gate.py` | gate 4 du resolver : un corps de skill qui s'adresse à l'agent n'est pas émis |
 | `slash_commands/api.py` | sert `.agents/skills/*/SKILL.md` à la barre de commandes du Kanban |
 | `skills/` | skills Python exécutables ([index](skills/AGENTS.md)) |
 
