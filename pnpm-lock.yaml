@@ -430,10 +430,10 @@ importers:
         version: 2.5.15
       '@electron-toolkit/preload':
         specifier: ^3.0.2
-        version: 3.0.2(electron@41.10.6(supports-color@8.1.1))
+        version: 3.0.2(electron@44.7.0(supports-color@8.1.1))
       '@electron-toolkit/utils':
         specifier: ^4.0.0
-        version: 4.0.0(electron@41.10.6(supports-color@8.1.1))
+        version: 4.0.0(electron@44.7.0(supports-color@8.1.1))
       '@electron/rebuild':
         specifier: 4.0.3
         version: 4.0.3(supports-color@8.1.1)
@@ -456,8 +456,8 @@ importers:
         specifier: ^14.6.7
         version: 14.6.7(@testing-library/dom@10.4.2)
       '@types/better-sqlite3':
-        specifier: ^7.6.13
-        version: 7.6.13
+        specifier: ^9.6.0
+        version: 9.6.0
       '@types/minimatch':
         specifier: ^6.0.0
         version: 6.0.0
@@ -486,8 +486,8 @@ importers:
         specifier: ^10.1.0
         version: 10.1.0
       electron:
-        specifier: 41.10.6
-        version: 41.10.6(supports-color@8.1.1)
+        specifier: 44.7.0
+        version: 44.7.0(supports-color@8.1.1)
       electron-builder:
         specifier: ^26.15.3
         version: 26.15.3(electron-builder-squirrel-windows@26.15.3)(supports-color@8.1.1)
@@ -2243,8 +2243,8 @@ packages:
   '@types/aria-query@5.0.4':
     resolution: {integrity: sha512-rfT93uj5s0PRL7EzccGMs3brplhcrghnDoV26NqKhCAS1hVo+WdNsPvE/yb6ilfr5hi2MEk6d5EWJTKdxg8jVw==}
 
-  '@types/better-sqlite3@7.6.13':
-    resolution: {integrity: sha512-NMv9ASNARoKksWtsq/SHakpYAYnhBrQgGD8zkLYk/jaK8jUGn08CfEdTRgYhMypUQAfzSP8W6gNLe0q19/t4VA==}
+  '@types/better-sqlite3@9.6.0':
+    resolution: {integrity: sha512-ZEEwBSgMu7GYJOynoagg5X9JbxfL6dTJDsgViJIqh67jV44kyOr9RXfmFjLK5rzC4MWssP06t9hu/JwGDnUbCg==}
 
   '@types/cacheable-request@6.0.3':
     resolution: {integrity: sha512-IQ3EbTzGxIigb1I3qPZc1rWJnH0BmSKv5QYTalEwweFvyBDLSAe24zP0le/hyi7ecGfZVlIVAg4BZqb8WBwKqw==}
@@ -3180,8 +3180,8 @@ packages:
     resolution: {integrity: sha512-bO3y10YikuUwUuDUQRM4KfwNkKhnpVO7IPdbsrejwN9/AABJzzTQ4GeHwyzNSrVO+tEH3/Np255a3sVZpZDjvg==}
     engines: {node: '>=8.0.0'}
 
-  electron@41.10.6:
-    resolution: {integrity: sha512-NEB7QnVpT2p8S9U5jOCPAtCyhl1WjRT/ODvJP6ec1/dZRUmf/EjYVOBb/dthCmJh4bISqpAroGJ/xRRxX7VwJw==}
+  electron@44.7.0:
+    resolution: {integrity: sha512-aUq9/zLAAFYc+a9gy6cd0C3Y/N/RmovLCD8TV8LhIzNhuND6HEgsu96jJz9cbAxvckSPv+Trf2PKEjktoZgFkw==}
     engines: {node: '>= 22.12.0'}
     hasBin: true
 
@@ -5743,13 +5743,13 @@ snapshots:
 
   '@electron-internal/extract-zip@1.0.5': {}
 
-  '@electron-toolkit/preload@3.0.2(electron@41.10.6(supports-color@8.1.1))':
+  '@electron-toolkit/preload@3.0.2(electron@44.7.0(supports-color@8.1.1))':
     dependencies:
-      electron: 41.10.6(supports-color@8.1.1)
+      electron: 44.7.0(supports-color@8.1.1)
 
-  '@electron-toolkit/utils@4.0.0(electron@41.10.6(supports-color@8.1.1))':
+  '@electron-toolkit/utils@4.0.0(electron@44.7.0(supports-color@8.1.1))':
     dependencies:
-      electron: 41.10.6(supports-color@8.1.1)
+      electron: 44.7.0(supports-color@8.1.1)
 
   '@electron/asar@3.4.1':
     dependencies:
@@ -7112,7 +7112,7 @@ snapshots:
 
   '@types/aria-query@5.0.4': {}
 
-  '@types/better-sqlite3@7.6.13':
+  '@types/better-sqlite3@9.6.0':
     dependencies:
       '@types/node': 26.6.5
 
@@ -8083,7 +8083,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  electron@41.10.6(supports-color@8.1.1):
+  electron@44.7.0(supports-color@8.1.1):
     dependencies:
       '@electron-internal/extract-zip': 1.0.5
       '@electron/get': 5.1.0(supports-color@8.1.1)
