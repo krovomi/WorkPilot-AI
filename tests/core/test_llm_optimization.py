@@ -1,11 +1,13 @@
 """Tests for the LLM token-optimization common trunk (core/llm_optimization.py)."""
 
+import json
 from pathlib import Path
 
 import pytest
 from core.llm_optimization import (
     _ELIDED_PLACEHOLDER,
     _TOOL_USE_HINT,
+    _message_len,
     build_base_system_prompt,
     compact_messages,
     openai_prompt_cache_key,
@@ -193,6 +195,33 @@ def _conversation(n_tool_results: int, result_size: int = 5000) -> list[dict]:
     return messages
 
 
+def _write_call(i: int, body: str) -> dict:
+    arguments = json.dumps({"file_path": f"src/module_{i}.py", "content": body})
+    return {
+        "id": f"call_{i}",
+        "type": "function",
+        "function": {"name": "write_file", "arguments": arguments},
+    }
+
+
+def _writes(n: int, file_chars: int) -> list[dict]:
+    """A conversation of n writes, each handing a whole file to write_file."""
+    messages: list[dict] = [
+        {"role": "system", "content": "system prompt"},
+        {"role": "user", "content": "task prompt — implement the feature"},
+    ]
+    for i in range(n):
+        messages.append(
+            {
+                "role": "assistant",
+                "content": f"writing {i}",
+                "tool_calls": [_write_call(i, "x" * file_chars)],
+            }
+        )
+        messages.append({"role": "tool", "tool_call_id": f"call_{i}", "content": "ok"})
+    return messages
+
+
 class TestCompactMessages:
     def test_noop_under_budget(self):
         messages = _conversation(3)
@@ -264,6 +293,61 @@ class TestCompactMessages:
                 {"role": "tool", "tool_call_id": f"call_{i}", "content": "r" * 10_000}
             )
             assert compact_messages(messages, char_budget=190_000, keep_recent=2) == 0
+
+    def test_tool_call_arguments_count_and_old_ones_go(self):
+        # Ten writes of a whole file: the history is the files they carried. A
+        # budget that counted only `content` saw 4 k of 400 k and cleared nothing.
+        messages = _writes(10, file_chars=40_000)
+        assert compact_messages(messages, char_budget=300_000, keep_recent=4) > 0
+        total = sum(_message_len(m) for m in messages)
+        assert total <= 180_000  # down to 60 % of the budget, in one batch
+        first_call = messages[2]["tool_calls"][0]
+        arguments = json.loads(first_call["function"]["arguments"])
+        # The call stays: its id, its name and its path; only the file went.
+        assert first_call["id"] == "call_0"
+        assert first_call["function"]["name"] == "write_file"
+        assert arguments["file_path"] == "src/module_0.py"
+        assert arguments["content"].startswith("[argument elided to save context")
+        assert messages[2]["content"] == "writing 0"
+        # The latest write is whole.
+        latest = json.loads(messages[-2]["tool_calls"][0]["function"]["arguments"])
+        assert latest["content"] == "x" * 40_000
+
+    def test_arguments_sent_as_an_object_stay_an_object(self):
+        # Ollama sends a tool call's arguments as an object, not a JSON string.
+        messages = _writes(10, file_chars=40_000)
+        for message in messages:
+            for call in message.get("tool_calls", []):
+                function = call["function"]
+                function["arguments"] = json.loads(function["arguments"])
+        compact_messages(messages, char_budget=300_000, keep_recent=4)
+        arguments = messages[2]["tool_calls"][0]["function"]["arguments"]
+        assert isinstance(arguments, dict)
+        assert arguments["file_path"] == "src/module_0.py"
+        assert arguments["content"].startswith("[argument elided to save context")
+
+    def test_arguments_that_are_not_an_object_are_left_as_sent(self):
+        messages = _writes(10, file_chars=40_000)
+        for message in messages[:6]:
+            for call in message.get("tool_calls", []):
+                call["function"]["arguments"] = "not json " + "y" * 40_000
+        before = [dict(m) for m in messages[:6]]
+        compact_messages(messages, char_budget=300_000, keep_recent=4)
+        for kept, original in zip(messages[:6], before, strict=True):
+            assert kept.get("tool_calls") == original.get("tool_calls")
+
+    def test_short_arguments_are_not_worth_a_rewrite(self):
+        # Only long arguments go: a call whose arguments are all short is
+        # not a candidate, however old it is.
+        messages = _conversation(20, result_size=10_000)
+        for i, message in enumerate(messages):
+            if message["role"] == "assistant":
+                message["tool_calls"] = [_write_call(i, "short body")]
+        compact_messages(messages, char_budget=190_000, keep_recent=2)
+        for message in messages:
+            for call in message.get("tool_calls", []):
+                body = json.loads(call["function"]["arguments"])["content"]
+                assert body == "short body"
 
     def test_a_batch_that_frees_little_is_not_worth_a_rewrite(self):
         # Over the budget, but almost all of it is recent or protected: eliding

@@ -151,7 +151,7 @@ async def test_cancelling_the_wave_cancels_every_sub_agent():
     await _settle()
     run.cancel()
     with pytest.raises(asyncio.CancelledError):
-        await run
+        await asyncio.gather(run)
     await _settle()
     assert cancelled == ["first"]
 

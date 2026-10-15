@@ -82,7 +82,7 @@ sens partout, une boucle unique, et la troncature à la source.
 | Assemblage | un seul builder, `build_base_system_prompt` (`core/llm_optimization.py`), sans horodatage ; outils dans un ordre fixe ; `prompt_cache_key` côté OpenAI. Lot 2 : segments ordonnés par stabilité (`harness/domain/layout.py`), chemin du worktree en dernier, bloc de tâche en tête de chaque sous-tâche | des points de coupure de cache à la frontière tâche / sous-tâche chez Anthropic, que la CLI ne laisse pas poser |
 | Mesure | lot 0 livré : chaque client lit l'usage de chaque appel dans l'unité commune de `harness/domain/` et le cumule dans son `usage_ledger` ; `record_client_usage` en tire les champs du suivi des coûts, `CONTEXT_USAGE` le taux de hit et les réécritures de préfixe | la ligne de base sur des tâches réelles ; le coût par appel (seul le coût de session est connu) |
 | Compaction | `context_mgmt/` : garde par tâche, seuil 50 % par défaut (30–90), *compact* ou *clear*, handoff préparé en fond par le provider de la tâche, cap de 3 resets ; native sur Claude et Codex, émulée ailleurs. Lot 4 : le seuil est une part de la fenêtre *payable* | D2 : le seuil par défaut, tranché sur la ligne de base |
-| Tool clearing | boucles WorkPilot : `compact_messages` remplace les vieux résultats par un marqueur au-delà de 300 k caractères ; lot 4 : par lots, jusqu'à 60 % du budget, et seulement pour un gain d'au moins 10 %. Claude Code purge de son côté | — |
+| Tool clearing | boucles WorkPilot : `compact_messages` remplace les vieux résultats par un marqueur au-delà de 300 k caractères ; lot 4 : par lots, jusqu'à 60 % du budget, et seulement pour un gain d'au moins 10 % ; les arguments des appels comptent, et les longs partent des vieux appels. Claude Code purge de son côté | — |
 | Troncature | rtk sur Bash ; boucles WorkPilot : résultat coupé à 10 k caractères (70 % tête / 30 % queue). Lot 3 : `read_file`, `search_files` et `find_files` paginent sous ce plafond ; une longue sortie de `run_command` ou d'un outil exécuté dans le processus va dans un fichier ; le cerveau pagine ses notes et ses skills. Claude Code plafonne nativement (table ci-dessus) | aucun plafond natif réglé par WorkPilot : la ligne de base dira s'il faut baisser ceux de Claude Code |
 | Mémoire externe | cerveau (vault, `graph.json`, serveur MCP 9 outils), `implementation_plan.json`, `build-progress.txt`, `handoff_pending.md`, rapports de phase plafonnés. Lot 3b : les sorties longues des boucles WorkPilot vont dans `<spec>/tool-output/`, relues par `read_file` | un `MemoryPort` unique, avec la boucle partagée (lot 1b-ii) |
 | Sous-agents | registre `agents/subagents/`, roster ≤ 7 ; Claude et Copilot. Lot 5 : contrat `{conclusion, files, evidence}` sous 2 000 tokens, résultat coupé et marqué au-delà, délimité comme une donnée (hook PostToolUse sur Claude, `run_subagents` sur Copilot) ; Copilot les lance en échelon | `run_subagents` n'a pas d'appelant en production |
@@ -435,6 +435,17 @@ préfixe refacture tout ce qui suit : c'était une réécriture par tour.
   nom et les arguments de l'outil, reste en place, et le modèle peut relancer l'outil.
 - Le point sûr tient : la purge a lieu entre deux appels au modèle, et les derniers messages, où
   sont les appels en cours, n'y entrent pas.
+- **Les arguments comptent.** La taille d'un message compte aussi les arguments de ses appels
+  d'outils. Avant, le budget ne voyait que le texte : un historique d'écritures, fait surtout des
+  fichiers que portaient les `write_file`, passait sous le budget sans être vu. Les évals rejouées
+  l'ont mesuré : dix écritures de 40 000 caractères envoyaient environ 406 000 caractères, et le
+  budget en voyait 4 264. Un vieil appel est désormais purgeable : seules ses valeurs de plus de
+  1 000 caractères sont remplacées par un marqueur. Le nom de l'outil, l'identifiant de l'appel et
+  les arguments courts (le chemin) restent, donc le modèle sait ce qu'il a écrit et où, et peut le
+  relire. Les arguments gardent leur forme : une chaîne JSON (OpenAI et compatibles, Copilot,
+  Windsurf REST), un objet (Ollama). Un argument qui n'est pas un objet JSON reste tel quel. Le
+  mode texte de Windsurf garde ses appels dans le texte de l'assistant : ils sont comptés, pas
+  purgés.
 
 **Planifier pour la fenêtre payable.** Plusieurs modèles facturent tout le prompt plus cher au-delà
 d'une taille : Claude Haiku 5.5 au-delà de 100 000 tokens (5×), Gemini 3.1 Pro et 2.5 Pro au-delà
@@ -460,9 +471,11 @@ ligne bien avant de compacter.
 du lot 0 avec les passes QA et le coût par sous-tâche à 50, 70 et 80 %.
 
 Tests : `tests/harness/test_policies.py` (par table : sous le seuil rien, au-dessus les plus vieux
-jusqu'à la cible, seulement des résultats d'outils, jamais les derniers messages, gain minimal),
+jusqu'à la cible, seulement ce qui est purgeable, jamais les derniers messages, gain minimal, une
+entrée qui garde une partie d'elle-même ne compte que ce qui part),
 `tests/core/test_llm_optimization.py` (une purge descend à 60 % en un lot, les tours suivants ne
-purgent plus, un lot qui libère peu n'a pas lieu), `tests/test_effective_window.py` (fenêtre par
+purgent plus, un lot qui libère peu n'a pas lieu ; les arguments comptent, et ceux des vieux appels
+partent, en gardant leur forme ; des arguments courts ou qui ne sont pas un objet restent), `tests/test_effective_window.py` (fenêtre par
 modèle, seuils natifs de Claude et de Codex, jauge mesurée sur la fenêtre payable).
 
 *Sortie :* resets de contexte par sous-tâche et coût par sous-tâche en baisse sur la ligne de
