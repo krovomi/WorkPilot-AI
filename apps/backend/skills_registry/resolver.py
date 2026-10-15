@@ -57,7 +57,26 @@ from .packs import Pack, SkillSource
 from .project import ProjectConfig
 from .targets import satisfies, targets_match
 
-__all__ = ["Resolution", "Rejection", "resolve", "check_requires"]
+__all__ = ["Resolution", "Rejection", "resolve", "check_requires", "is_mock_runtime"]
+
+#: The first-line marker of a runtime file this repository commits in place of
+#: a real one, so a build can emit the gated skills. A mock satisfies the build
+#: gate (the file exists) and nothing else: the palette and `skills:bootstrap`
+#: ask `is_mock_runtime` and treat it as absent.
+MOCK_RUNTIME_MARKER = "workpilot-mock"
+
+
+def is_mock_runtime(path: Path) -> bool:
+    """Whether ``path`` is a committed stand-in rather than the real runtime.
+
+    Reads the first three lines only; an unreadable file is not a mock.
+    """
+    try:
+        with path.open(encoding="utf-8", errors="replace") as fh:
+            head = "".join(fh.readline() for _ in range(3))
+    except OSError:
+        return False
+    return MOCK_RUNTIME_MARKER in head
 
 
 @dataclass(frozen=True)
@@ -86,7 +105,9 @@ class Resolution:
         return [r for r in self.rejected if r.name == name]
 
 
-def check_requires(requires: dict[str, Any], project_dir: Path) -> tuple[bool, str]:
+def check_requires(
+    requires: dict[str, Any], project_dir: Path, *, accept_mock: bool = True
+) -> tuple[bool, str]:
     """Verify a skill's runtime prerequisites.
 
     Supported keys:
@@ -105,6 +126,12 @@ def check_requires(requires: dict[str, Any], project_dir: Path) -> tuple[bool, s
     third-party content: without the check, `runtime: "../../.ssh/id_rsa"`
     would turn this gate into a filesystem probe, reporting through the
     command palette whether a file exists anywhere the backend can reach.
+
+    ``accept_mock`` is the build's reading: a committed stand-in
+    (``is_mock_runtime``) counts as present so the gated skills are emitted.
+    The palette and the bootstrap pass ``False``: a command whose runtime is
+    a mock fails on invocation, and a bootstrap that sees one has nothing to
+    skip.
     """
     for key, value in requires.items():
         if key == "runtime":
@@ -113,6 +140,8 @@ def check_requires(requires: dict[str, Any], project_dir: Path) -> tuple[bool, s
                 return False, f"runtime escapes the project directory: {value}"
             if not target.exists():
                 return False, f"runtime not present: {value}"
+            if not accept_mock and is_mock_runtime(target):
+                return False, f"runtime is WorkPilot's mock, not the real one: {value}"
         elif key == "command":
             # A list means alternatives: `python3` on Unix, `python` on
             # Windows. Any one of them being present satisfies the gate.
