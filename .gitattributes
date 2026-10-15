@@ -47,3 +47,16 @@ graphify-out/graph.json merge=graphify
 .agents/agents/** linguist-generated=true
 .gemini/commands/** linguist-generated=true
 .claude-plugin/marketplace.json linguist-generated=true
+
+# A bundled resource travels with its skill as a byte copy (`plan.copies` in
+# skills_registry/build.py), so it is stored exactly as its source holds it.
+# Otherwise a vendored tree kept byte-for-byte above (`skills/bmad/** -text`)
+# ships a CRLF asset whose emitted copy alone git normalises, and `skills:check`
+# reports that file as stale on every machine, for ever: rebuilding cannot
+# settle it, because the next checkout normalises the copy again.
+.agents/skills/** -text
+# The SKILL.md is re-rendered rather than copied, and Python writes it with the
+# platform's line ending, so it stays normalised: a build run on Windows must
+# not commit CRLF documents. Same for the agent files and the Gemini commands,
+# which are rendered the same way and keep the default above.
+.agents/skills/*/SKILL.md text eol=lf
