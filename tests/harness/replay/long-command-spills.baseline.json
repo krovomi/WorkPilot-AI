@@ -1,0 +1,32 @@
+{
+  "metrics": {
+    "calls": 6,
+    "clearings": 0,
+    "nudged_at_turn": null,
+    "payable_window_tokens": 128000,
+    "peak_window_share": 0.0437,
+    "prefix_breaks": 0,
+    "profiles": {
+      "blocks": {
+        "cache_hit_ratio": 0.7926,
+        "prefix_rewrites": 0,
+        "prefix_rewrites_outside_clearing": 0
+      },
+      "token_prefix": {
+        "cache_hit_ratio": 0.7821,
+        "prefix_rewrites": 0,
+        "prefix_rewrites_outside_clearing": 0
+      },
+      "unreported": {
+        "cache_hit_ratio": null,
+        "prefix_rewrites": 0,
+        "prefix_rewrites_outside_clearing": 0
+      }
+    },
+    "spilled_outputs": 1,
+    "stopped_at_turn": null,
+    "task_prefix_share": null,
+    "tool_result_share": 0.5704
+  },
+  "scenario": "long-command-spills"
+}

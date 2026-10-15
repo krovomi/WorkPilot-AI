@@ -4,8 +4,9 @@
 > par session pour tous), le lot 1b-i (l'arrêt sur absence de progrès), le lot 2 (un préfixe stable, sauf D3), le lot 3 (troncature à la
 > source, sauf les plafonds natifs, réglés sur la ligne de base), le lot 4 (purge par lots et
 > fenêtre payable, sauf D2), le lot 5 (sous-agents sous contrat, résultat borné et marqué,
-> lancement échelonné, sauf le `MemoryPort`) et le lot 6 (un jeu d'outils trié et figé par
-> session, sauf la réduction des phases de build).** Ce fichier fixe la cible
+> lancement échelonné, sauf le `MemoryPort`), le lot 6 (un jeu d'outils trié et figé par
+> session, sauf la réduction des phases de build) et le lot 8 (les évals rejouées en CI, sauf la
+> campagne avec LLM).** Ce fichier fixe la cible
 > et l'ordre des lots ; chaque lot livré remplace sa section par la justification de ce qui existe. [`docs/CLAUDE.md`](../CLAUDE.md)
 > reste normatif : là où les deux divergent, il gagne. Le mécanisme existant de compaction et de
 > reset est décrit dans [`context-management.md`](context-management.md), que ce plan prolonge sans
@@ -90,7 +91,7 @@ sens partout, une boucle unique, et la troncature à la source.
 | Outils dynamiques | `AGENT_CONFIGS` par type d'agent ; MCP ajoutés selon la tâche ; schémas MCP différés sur Claude (`ENABLE_TOOL_SEARCH=auto:5`). Lot 6 : un jeu d'outils canonique, trié et figé par session dans les boucles WorkPilot (`harness/domain/tools.py`) ; ni cerveau ni ui-ux pour un type sans outils | rien par sous-tâche ; la réduction des phases de build, mesurée par `tool_weights` |
 | Effort et routage | effort par phase (`phase_config.py`), traduit par provider (`reasoning_effort`, budget de réflexion) ; routeur de complexité et `model_router` presque toujours éteints | pas d'escalade automatique |
 | Récupération de code | `context/search.py` : correspondance de sous-chaînes ; grepai seulement pour l'autofix | ni BM25, ni fusion, ni budget d'extraits |
-| Évals | `tests/skills_eval/` : 6 épisodes rejoués sans LLM en CI | aucun banc qui fasse tourner l'agent sur des tâches réelles |
+| Évals | `tests/skills_eval/` : 6 épisodes rejoués sans LLM en CI. Lot 8 : cinq sessions enregistrées rejouées à chaque PR dans le code de production (`harness/application/replay.py`), mesurées sous trois formes de cache (`harness/domain/evals.py`) et comparées à leur base | la campagne avec LLM, qui attend la ligne de base du lot 0 et un budget approuvé |
 
 ## La cible : trois couches, une seule boucle
 
@@ -690,14 +691,74 @@ même `reasoning_effort` ; le poids de chaque type).
 - **Le test qui tranche** : les tâches de l'éval à 5, 20 et 50 extraits, courbe des passes QA et
   du coût. On garde le budget où la qualité plafonne.
 
-### Lot 8 — Évals en continu
+### Lot 8 — Évals en continu (livré, sauf la campagne avec LLM)
 
-- **En CI, sans LLM** : des transcriptions enregistrées rejouées dans l'assembleur. On vérifie la
-  stabilité du préfixe, la composition et les budgets, de façon déterministe, à chaque PR.
-- **À la demande, avec LLM** : 50 tâches réelles réparties sur plusieurs providers, coût mesuré et
-  approuvé avant chaque campagne. Jamais d'égalité stricte sur une sortie de modèle : on juge le
-  résultat (tests, QA), pas le texte.
-- Une régression de taux de hit ou de coût par sous-tâche bloque comme une régression de test.
+Une session enregistrée se rejoue à chaque PR, sans modèle, dans le code de production. Le modèle
+est la seule pièce absente : tout ce que WorkPilot fait entre deux de ses réponses est le vrai code,
+appelé dans l'ordre d'une boucle WorkPilot. Les boucles elles-mêmes ne sont pas pilotées : le
+lot 1b-ii les réécrit, et le rejeu doit lui survivre. Ni horloge, ni hasard, ni réseau.
+
+- **Le rejeu** (`harness/application/replay.py`) : le system (`system_prompt_segments`, assemblé
+  par `layout`) et les définitions d'outils du type d'agent ; le bloc de tâche du coder
+  (`_coding_task_segments`, sur un projet écrit depuis la fixture : la constitution et l'ADR passent
+  par leurs vrais lecteurs) ; puis chaque tour. Les outils tournent dans `ToolExecutor` : lecture et
+  recherche paginent à la source. Une commande n'est pas lancée : sa sortie enregistrée passe par
+  `_fit_output` et se déverse comme une vraie. Viennent ensuite `truncate_tool_result`, la règle
+  d'absence de progrès et `compact_messages`. La fenêtre est celle d'`effective_window`, prise sur
+  la table des fenêtres et non sur le cache models.dev de la machine. rtk et le cerveau, qui
+  diffèrent d'une machine à l'autre, sont coupés par leurs propres interrupteurs.
+- **Le cache, par capacité** (`harness/domain/evals.py`, pur) : aucun provider n'est appelé, donc
+  `PromptCache` dit ce que chaque forme de cache servirait à chaque requête. Préfixe de tokens
+  (OpenAI et compatibles, DeepSeek, Gemini) : le plus long préfixe partagé avec une requête
+  antérieure, à partir de 1 024 tokens, par pas de 128. Par blocs (Anthropic) : des blocs entiers ;
+  une correspondance partielle dans un bloc ne sert rien. Non rapporté (Copilot, Windsurf,
+  LM Studio, Ollama) : inconnu. Ces nombres sont écrits dans le format d'usage de la forme et relus
+  par le lecteur de production dans un `UsageLedger` : taux de hit et réécritures sont ceux que la
+  jauge montrerait. Quatre caractères par token, l'estimation de `context_mgmt`. Une entrée de
+  cache n'expire pas : sa durée de vie reste à D3.
+- **Les fixtures** (`tests/harness/replay/`) : un JSON par scénario, dont le format est décrit en
+  tête de `replay.py` ; `profiles.json` pour les trois formes de cache ; `<id>.baseline.json` à côté
+  de chaque scénario. Un texte long s'écrit comme une ligne répétée
+  (`{"repeat": n, "line": "…{n}…"}`) : un journal de 2 400 lignes tient en quelques lignes. Tout est
+  synthétique : ni secret, ni donnée réelle.
+
+| Scénario | Ce qu'il garde | Base (blocs / préfixe de tokens) |
+|---|---|---|
+| `coding-subtask-reads` | lot 2 : deux sous-tâches envoient le même system, les mêmes outils et le même bloc de tâche | 10 appels, bloc de tâche partagé 1,0, sorties d'outils 47,8 %, hit 0,789 / 0,789 |
+| `long-command-spills` | lot 3b : 2 438 lignes déversées, la cause de l'échec relue au milieu par `read_file` | 6 appels, 1 déversement, sorties d'outils 57,0 %, hit 0,793 / 0,782 |
+| `search-paging` | lot 3a : une recherche de plusieurs centaines de résultats, page par page, puis resserrée | 7 appels, sorties d'outils 63,9 %, hit 0,765 / 0,759 |
+| `past-clearing-budget` | lot 4 : 44 pages lues au-delà du budget, une purge en un lot ; fenêtre payable 200 000 sur 1 million annoncé | 47 appels, 1 purge, 1 réécriture, sorties d'outils 93,5 %, pic à 37,9 % de la fenêtre payable, hit 0,931 / 0,930 |
+| `looping-model` | lot 1b-i : la même commande, le même échec, en d'autres mots | relance au 3e tour, arrêt au 5e, 5 appels, hit 0,757 / 0,735 |
+
+- **Ce qui est vérifié.** Des invariants, vrais de tout scénario quelle que soit sa base : aucun
+  résultat d'outil au-delà de son plafond ; aucune réécriture de préfixe hors purge (le critère de
+  sortie du lot 2) ; pas de taux de hit là où le provider ne rapporte pas le cache ; l'arrêt au
+  cinquième tour identique. Puis la base : `regressions` nomme chaque nombre qui s'est dégradé
+  (taux de hit, réécritures, part des sorties d'outils, part du bloc de tâche partagée, part de la
+  fenêtre payable). Un nombre qui décrit un comportement (appels, purges, déversements, fenêtre
+  payable, tours de relance et d'arrêt) ne doit pas changer du tout. Un ratio a une marge d'un
+  point, qui absorbe une retouche de prompt ; un compteur n'en a pas.
+- **Rafraîchir une base**, pour accepter un progrès ou un changement voulu :
+  `WORKPILOT_REFRESH_REPLAY_BASELINES=1 pytest tests/harness/test_replay_evals.py`, puis committer
+  les bases avec le changement : la revue voit le diff. Refusé quand `CI` est posé.
+- **Les évals voient une régression** : quatre tests cassent le code exprès. Une ligne volatile
+  dans le bloc de tâche fait tomber la part partagée de 1,0 à 0,76. Une purge d'un résultat par
+  tour, comme avant le lot 4, donne 10 purges et 10 réécritures au lieu d'une, et un taux de hit de
+  0,64 au lieu de 0,93. La fenêtre annoncée à la place de la payable change
+  `payable_window_tokens`. Une page plus longue que le plafond est vue par l'invariant.
+- **Le format d'une campagne** : les nombres d'un scénario (`metrics` de la base) sont ceux qu'une
+  campagne écrirait par tâche et par provider, et `regressions` les lit de la même façon.
+
+**Reste à faire : la campagne avec LLM.** 50 tâches réelles réparties sur plusieurs providers,
+coût mesuré et approuvé avant chaque campagne ; jamais d'égalité stricte sur une sortie de modèle,
+on juge le résultat (tests, QA), pas le texte. Elle attend la ligne de base du lot 0, et un budget
+approuvé par l'utilisateur. Elle y ajoutera le coût par sous-tâche terminée, qui bloquera comme
+une régression de test.
+
+Tests : `tests/harness/test_evals.py` (le cache de chaque forme, par table ; les deux mesures ; le
+juge : un nombre pire, meilleur ou dans la marge, inconnu contre 0, une mesure d'un seul côté),
+`tests/harness/test_replay_evals.py` (chaque scénario contre sa base, les invariants, les quatre
+régressions provoquées).
 
 ## Les indicateurs
 

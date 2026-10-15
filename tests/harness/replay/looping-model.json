@@ -1,0 +1,267 @@
+{
+  "format": 1,
+  "id": "looping-model",
+  "why_this_is_here": "A local model that reruns the same failing test, with the same result, turn after turn, in different words. Guards lot 1b-i: it is nudged once after the third identical turn and stopped at the fifth, instead of running to max_turns with the whole conversation sent again each time.",
+  "model": "qwen3-coder",
+  "agent_type": "coder",
+  "tool_use_hint": true,
+  "effort": "EFFORT: medium\nWORKFLOW PHASE: coding — implement the subtask, run its tests, commit.",
+  "files": {
+    "src/cart/__init__.py": [
+      "\"\"\"Cart.\"\"\"\n"
+    ],
+    "src/cart/totals.py": [
+      "\"\"\"Cart totals.\"\"\"\n",
+      "\n",
+      "\n",
+      "class Cart:\n",
+      "    def __init__(self) -> None:\n",
+      "        self.lines: list[tuple[str, int, int]] = []\n",
+      "\n",
+      "    def add(self, sku: str, *, quantity: int, unit_price_cents: int) -> None:\n",
+      "        self.lines.append((sku, quantity, unit_price_cents))\n",
+      "\n",
+      "    @property\n",
+      "    def total_cents(self) -> int:\n",
+      "        return round(sum(q * p for _, q, p in self.lines) / 100 + 0.01) * 100\n"
+    ]
+  },
+  "sessions": [
+    {
+      "subtask": [
+        "# Subtask 1.4 — fix the cart total\n",
+        "\n",
+        "`Cart.total_cents` is off by a cent. Fix it.\n",
+        "\n",
+        "Files to modify: src/cart/totals.py\n",
+        "Verification: pytest -q tests/test_cart.py\n"
+      ],
+      "turns": [
+        {
+          "text": "Running the cart tests.",
+          "calls": [
+            {
+              "tool": "run_command",
+              "arguments": {
+                "command": "pytest -q tests/test_cart.py"
+              },
+              "output": [
+                "F                                                                        [100%]\n",
+                "=================================== FAILURES ===================================\n",
+                "______________________________ test_cart_total ________________________________\n",
+                "\n",
+                "    def test_cart_total():\n",
+                "        cart = Cart()\n",
+                "        cart.add(\"SKU-3\", quantity=3, unit_price_cents=333)\n",
+                ">       assert cart.total_cents == 999\n",
+                "E       assert 1000 == 999\n",
+                "E        +  where 1000 = Cart(lines=1).total_cents\n",
+                "\n",
+                "tests/test_cart.py:9: AssertionError\n",
+                "=========================== short test summary info ============================\n",
+                "FAILED tests/test_cart.py::test_cart_total - assert 1000 == 999\n",
+                "1 failed in 0.07s\n"
+              ]
+            }
+          ]
+        },
+        {
+          "text": "Let me run the tests again.",
+          "calls": [
+            {
+              "tool": "run_command",
+              "arguments": {
+                "command": "pytest -q tests/test_cart.py"
+              },
+              "output": [
+                "F                                                                        [100%]\n",
+                "=================================== FAILURES ===================================\n",
+                "______________________________ test_cart_total ________________________________\n",
+                "\n",
+                "    def test_cart_total():\n",
+                "        cart = Cart()\n",
+                "        cart.add(\"SKU-3\", quantity=3, unit_price_cents=333)\n",
+                ">       assert cart.total_cents == 999\n",
+                "E       assert 1000 == 999\n",
+                "E        +  where 1000 = Cart(lines=1).total_cents\n",
+                "\n",
+                "tests/test_cart.py:9: AssertionError\n",
+                "=========================== short test summary info ============================\n",
+                "FAILED tests/test_cart.py::test_cart_total - assert 1000 == 999\n",
+                "1 failed in 0.07s\n"
+              ]
+            }
+          ]
+        },
+        {
+          "text": "Running them once more to check.",
+          "calls": [
+            {
+              "tool": "run_command",
+              "arguments": {
+                "command": "pytest -q tests/test_cart.py"
+              },
+              "output": [
+                "F                                                                        [100%]\n",
+                "=================================== FAILURES ===================================\n",
+                "______________________________ test_cart_total ________________________________\n",
+                "\n",
+                "    def test_cart_total():\n",
+                "        cart = Cart()\n",
+                "        cart.add(\"SKU-3\", quantity=3, unit_price_cents=333)\n",
+                ">       assert cart.total_cents == 999\n",
+                "E       assert 1000 == 999\n",
+                "E        +  where 1000 = Cart(lines=1).total_cents\n",
+                "\n",
+                "tests/test_cart.py:9: AssertionError\n",
+                "=========================== short test summary info ============================\n",
+                "FAILED tests/test_cart.py::test_cart_total - assert 1000 == 999\n",
+                "1 failed in 0.07s\n"
+              ]
+            }
+          ]
+        },
+        {
+          "text": "Trying the tests again.",
+          "calls": [
+            {
+              "tool": "run_command",
+              "arguments": {
+                "command": "pytest -q tests/test_cart.py"
+              },
+              "output": [
+                "F                                                                        [100%]\n",
+                "=================================== FAILURES ===================================\n",
+                "______________________________ test_cart_total ________________________________\n",
+                "\n",
+                "    def test_cart_total():\n",
+                "        cart = Cart()\n",
+                "        cart.add(\"SKU-3\", quantity=3, unit_price_cents=333)\n",
+                ">       assert cart.total_cents == 999\n",
+                "E       assert 1000 == 999\n",
+                "E        +  where 1000 = Cart(lines=1).total_cents\n",
+                "\n",
+                "tests/test_cart.py:9: AssertionError\n",
+                "=========================== short test summary info ============================\n",
+                "FAILED tests/test_cart.py::test_cart_total - assert 1000 == 999\n",
+                "1 failed in 0.07s\n"
+              ]
+            }
+          ]
+        },
+        {
+          "text": "Running the cart tests again.",
+          "calls": [
+            {
+              "tool": "run_command",
+              "arguments": {
+                "command": "pytest -q tests/test_cart.py"
+              },
+              "output": [
+                "F                                                                        [100%]\n",
+                "=================================== FAILURES ===================================\n",
+                "______________________________ test_cart_total ________________________________\n",
+                "\n",
+                "    def test_cart_total():\n",
+                "        cart = Cart()\n",
+                "        cart.add(\"SKU-3\", quantity=3, unit_price_cents=333)\n",
+                ">       assert cart.total_cents == 999\n",
+                "E       assert 1000 == 999\n",
+                "E        +  where 1000 = Cart(lines=1).total_cents\n",
+                "\n",
+                "tests/test_cart.py:9: AssertionError\n",
+                "=========================== short test summary info ============================\n",
+                "FAILED tests/test_cart.py::test_cart_total - assert 1000 == 999\n",
+                "1 failed in 0.07s\n"
+              ]
+            }
+          ]
+        },
+        {
+          "text": "One more run.",
+          "calls": [
+            {
+              "tool": "run_command",
+              "arguments": {
+                "command": "pytest -q tests/test_cart.py"
+              },
+              "output": [
+                "F                                                                        [100%]\n",
+                "=================================== FAILURES ===================================\n",
+                "______________________________ test_cart_total ________________________________\n",
+                "\n",
+                "    def test_cart_total():\n",
+                "        cart = Cart()\n",
+                "        cart.add(\"SKU-3\", quantity=3, unit_price_cents=333)\n",
+                ">       assert cart.total_cents == 999\n",
+                "E       assert 1000 == 999\n",
+                "E        +  where 1000 = Cart(lines=1).total_cents\n",
+                "\n",
+                "tests/test_cart.py:9: AssertionError\n",
+                "=========================== short test summary info ============================\n",
+                "FAILED tests/test_cart.py::test_cart_total - assert 1000 == 999\n",
+                "1 failed in 0.07s\n"
+              ]
+            }
+          ]
+        },
+        {
+          "text": "Running the tests.",
+          "calls": [
+            {
+              "tool": "run_command",
+              "arguments": {
+                "command": "pytest -q tests/test_cart.py"
+              },
+              "output": [
+                "F                                                                        [100%]\n",
+                "=================================== FAILURES ===================================\n",
+                "______________________________ test_cart_total ________________________________\n",
+                "\n",
+                "    def test_cart_total():\n",
+                "        cart = Cart()\n",
+                "        cart.add(\"SKU-3\", quantity=3, unit_price_cents=333)\n",
+                ">       assert cart.total_cents == 999\n",
+                "E       assert 1000 == 999\n",
+                "E        +  where 1000 = Cart(lines=1).total_cents\n",
+                "\n",
+                "tests/test_cart.py:9: AssertionError\n",
+                "=========================== short test summary info ============================\n",
+                "FAILED tests/test_cart.py::test_cart_total - assert 1000 == 999\n",
+                "1 failed in 0.07s\n"
+              ]
+            }
+          ]
+        },
+        {
+          "text": "Checking again.",
+          "calls": [
+            {
+              "tool": "run_command",
+              "arguments": {
+                "command": "pytest -q tests/test_cart.py"
+              },
+              "output": [
+                "F                                                                        [100%]\n",
+                "=================================== FAILURES ===================================\n",
+                "______________________________ test_cart_total ________________________________\n",
+                "\n",
+                "    def test_cart_total():\n",
+                "        cart = Cart()\n",
+                "        cart.add(\"SKU-3\", quantity=3, unit_price_cents=333)\n",
+                ">       assert cart.total_cents == 999\n",
+                "E       assert 1000 == 999\n",
+                "E        +  where 1000 = Cart(lines=1).total_cents\n",
+                "\n",
+                "tests/test_cart.py:9: AssertionError\n",
+                "=========================== short test summary info ============================\n",
+                "FAILED tests/test_cart.py::test_cart_total - assert 1000 == 999\n",
+                "1 failed in 0.07s\n"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
