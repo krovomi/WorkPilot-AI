@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 import os
 from abc import ABC, abstractmethod
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterable, Mapping
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
@@ -24,6 +24,7 @@ from harness.domain.progress import (
     turn_fingerprint,
 )
 from harness.domain.subagents import SubagentReturn
+from harness.domain.tools import ToolSet
 
 # The name the monolith logged under, kept so logging configuration and log
 # filters keyed on it still match: `core.agent_client`, or
@@ -290,6 +291,23 @@ class AgentClient(ABC):
     # SDK does). The session runner caps every other client itself
     # (harness.application.budget).
     enforces_own_budget: bool = False
+    # The tools this session sends, in canonical form and fixed when the
+    # session starts (``harness.application.tools``). ``None`` for a client
+    # that sends no tools of its own: the CLIs bring theirs.
+    tool_set: ToolSet | None = None
+
+    def _freeze_tools(self, definitions: Iterable[Mapping[str, Any]]) -> None:
+        """The session's tools: sorted, serialized one way, computed once.
+
+        Every turn sends ``_tool_definitions`` as set here; a second
+        preparation in the same session keeps the first set.
+        """
+        from harness.application.tools import session_tools
+
+        self.tool_set = session_tools(
+            definitions, held=self.tool_set, owner=self.provider_name()
+        )
+        self._tool_definitions = list(self.tool_set.tools)
 
     def _start_usage_ledger(self) -> UsageLedger:
         """A fresh ledger for the response about to be received."""

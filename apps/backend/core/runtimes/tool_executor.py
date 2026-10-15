@@ -25,6 +25,7 @@ from harness.domain.paging import (
     render_page,
     spill_excerpt,
 )
+from harness.domain.tools import canonical_tools
 from rtk import rewrite_command as rtk_rewrite
 from watermarks import clean_generated
 from watermarks import record as watermarks_record
@@ -99,8 +100,8 @@ def _as_bool(value: Any) -> bool:
 
 #: Executor tool -> the declarations (`AGENT_CONFIGS[...]["tools"]`) that
 #: grant it. A tool absent from this table is not gated: reading a file,
-#: listing a directory, and the brain, ui-ux and verify tools, which decide
-#: their own audience.
+#: listing a directory, and the verify tools, which decide their own audience.
+#: The brain and ui-ux tools go to every type that declares a tool at all.
 #:
 #: This is the non-Claude half of `undeclared_builtin_tools`. The executor used
 #: to offer `write_file` and `run_command` to every agent type and to run any
@@ -123,13 +124,21 @@ def executor_may_use(agent_type: str | None, tool_name: str) -> bool:
     caller outside the product (every product agent_type is registered), and
     the executor built from a bare project directory keeps working as before.
     """
-    grants = EXECUTOR_GRANTS.get(tool_name)
-    if grants is None or agent_type is None:
+    if agent_type is None:
         return True
     from agents.tools_pkg.permissions import declared_tools
 
     declared = declared_tools(agent_type)
     if declared is None:
+        return True
+    # The brain and ui-ux reach every type that has tools at all, as
+    # `get_required_mcp_servers` decides for the Claude SDK. A type that
+    # declares none (a commit message, a handoff summary) answers in text:
+    # their schemas would be paid on each of its calls for nothing.
+    if _is_brain_tool(tool_name) or _is_uiux_tool(tool_name):
+        return bool(declared)
+    grants = EXECUTOR_GRANTS.get(tool_name)
+    if grants is None:
         return True
     return any(grant in declared for grant in grants)
 
@@ -1058,6 +1067,9 @@ def get_tool_definitions(
         # non-Claude providers (Copilot, Windsurf, ...) only see write_file and
         # never call the tool the prompt asks for, so the plan file is never
         # written and the planning phase fails with "Did not create plan file".
+        # `analyze_project` sat next to it until lot 6 of the context harness:
+        # `execute` never had a branch for it, so it was paid in every prompt
+        # and answered "Unknown tool" to every call.
         base_tools.extend(
             [
                 {
@@ -1083,19 +1095,19 @@ def get_tool_definitions(
                         "required": ["file_path", "CodeContent", "EmptyFile"],
                     },
                 },
-                {
-                    "name": "analyze_project",
-                    "description": "Analyze the project structure",
-                    "parameters": {"type": "object", "properties": {}},
-                },
             ]
         )
 
-    # Every agent type, like `create_client` does for the Claude SDK.
+    # Every agent type that has tools at all, like `create_client` does for the
+    # Claude SDK (`executor_may_use` drops them for a type that declares none).
     base_tools.extend(_brain_tool_definitions())
     base_tools.extend(_uiux_tool_definitions(spec_dir))
     # The verifier, like `create_client` gives it the `workpilot-verify` server.
     base_tools.extend(_verify_tool_definitions(agent_type))
     # Only what the type declares (`EXECUTOR_GRANTS`): a reviewer is offered
     # no `write_file` and no `run_command`, and `execute` refuses them too.
-    return [tool for tool in base_tools if executor_may_use(agent_type, tool["name"])]
+    # Sorted and serialized one way (`harness.domain.tools`): the definitions
+    # sit in the cached prefix of every provider that caches one.
+    return canonical_tools(
+        tool for tool in base_tools if executor_may_use(agent_type, tool["name"])
+    )

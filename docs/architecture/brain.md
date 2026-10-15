@@ -307,7 +307,7 @@ qu'elle a été écrite normalement.
 |---|---|
 | `get_required_mcp_servers` + `create_client` | le serveur `workpilot-brain` et ses outils autorisés, pour **tout** agent qui a des outils (pas `commit_message` ni `merge_resolver`). Il n'est pas déclaré agent par agent dans `AGENT_CONFIGS` : une liste à tenir à jour, c'est la prochaine feature débranchée. `AGENT_MCP_<agent>_REMOVE=brain` le retire |
 | `build_base_system_prompt` | `awareness_section` : rappel graph-first, apprendre en travaillant, et les instructions partagées **en plus** des règles de la tâche. Lue sur disque, jamais tirée du réseau, stable au byte près pour le cache de prompt |
-| `tool_executor` | les mêmes outils pour Copilot, OpenAI, Gemini, Ollama…, exécutés dans le processus |
+| `tool_executor` | les mêmes outils pour Copilot, OpenAI, Gemini, Ollama…, exécutés dans le processus, au même public : un type qui ne déclare aucun outil n'en reçoit pas, et l'exécuteur les lui refuse |
 
 L'apprentissage a deux moitiés. Les agents écrivent quand ils remarquent
 quelque chose (le prompt le leur demande) ; ça dépend d'un modèle qui le décide.
