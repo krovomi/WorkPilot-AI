@@ -246,11 +246,31 @@ class TestCompactMessages:
         # Recent text-mode result protected
         assert "recent result" in messages[5]["content"]
 
-    def test_stops_once_under_budget(self):
+    def test_clears_in_one_batch_down_to_well_under_the_budget(self):
+        # Every elision rewrites the cached prefix from that point: one batch
+        # down to 60 % of the budget, not one result per turn at the edge.
         messages = _conversation(20, result_size=10_000)
-        # Budget large enough that only ~2 elisions are needed
         compact_messages(messages, char_budget=190_000, keep_recent=2)
-        elided_count = sum(
-            1 for m in messages if m.get("content") == _ELIDED_PLACEHOLDER
-        )
-        assert 1 <= elided_count <= 3
+        total = sum(len(m["content"]) for m in messages)
+        assert total <= 114_000
+        assert total > 100_000  # and no further than it needs to
+
+    def test_the_turns_after_a_batch_clear_nothing(self):
+        messages = _conversation(20, result_size=10_000)
+        assert compact_messages(messages, char_budget=190_000, keep_recent=2) > 0
+        for i in range(20, 27):  # seven more results: still under the budget
+            messages.append({"role": "assistant", "content": f"calling tool {i}"})
+            messages.append(
+                {"role": "tool", "tool_call_id": f"call_{i}", "content": "r" * 10_000}
+            )
+            assert compact_messages(messages, char_budget=190_000, keep_recent=2) == 0
+
+    def test_a_batch_that_frees_little_is_not_worth_a_rewrite(self):
+        # Over the budget, but almost all of it is recent or protected: eliding
+        # the one old result would rewrite the prefix to save 2 % of it.
+        messages = _conversation(1, result_size=2_000)
+        messages.append({"role": "assistant", "content": "a" * 120_000})
+        messages.append({"role": "tool", "tool_call_id": "x", "content": "r" * 10})
+        before = [dict(m) for m in messages]
+        assert compact_messages(messages, char_budget=100_000, keep_recent=2) == 0
+        assert messages == before
