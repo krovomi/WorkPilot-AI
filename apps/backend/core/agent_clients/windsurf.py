@@ -7,33 +7,32 @@ every name defined here.
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
+from contextlib import aclosing
 from typing import Any
 
+from harness.application.loop import run_turns
 from harness.domain import from_chat_completion
-from harness.domain.progress import ProgressTracker
+from harness.domain.stop import StopReason
+from harness.ports import Measured, Outcome, Reply, ToolCall, ToolResult
 
 # Common token-optimization trunk shared by every generic (OpenAI-style)
-# multi-turn loop: head+tail tool-result truncation and over-budget history
-# compaction. The module is importable under both package layouts.
+# multi-turn loop: head+tail tool-result truncation. The module is importable
+# under both package layouts.
 try:
-    from core.llm_optimization import (
-        compact_messages,
-        truncate_tool_result,
-    )
+    from core.llm_optimization import truncate_tool_result
 except ImportError:  # pragma: no cover - alternate package layout
-    from apps.backend.core.llm_optimization import (
-        compact_messages,
-        truncate_tool_result,
-    )
+    from apps.backend.core.llm_optimization import truncate_tool_result
 from .base import (
     CONTENT_TYPE_JSON,
     AgentClient,
     AgentMessage,
     ContentBlock,
     ContentBlockType,
+    LoopAdapter,
     MessageRole,
 )
+from .openai import ChatCompletionsAdapter
 
 # The name the monolith logged under, kept so logging configuration and log
 # filters keyed on it still match: `core.agent_client`, or
@@ -664,18 +663,10 @@ class WindsurfAgentClient(AgentClient):
         5. Repeat until the model responds without tool calls (or max_turns)
 
         This consumes Windsurf credits because all inference goes through
-        the local Windsurf IDE language server → Codeium cloud.
+        the local Windsurf IDE language server → Codeium cloud. The loop is
+        the shared WorkPilot loop (``harness.application.loop``) driving
+        ``_WindsurfTextAdapter``.
         """
-
-        import asyncio as _asyncio
-
-        from integrations.windsurf_proxy import grpc_client as _grpc_mod
-        from integrations.windsurf_proxy.auth import (
-            discover_credentials,
-            invalidate_process_cache,
-        )
-        from integrations.windsurf_proxy.cascade_client import cascade_chat
-        from integrations.windsurf_proxy.grpc_client import stream_chat
         from integrations.windsurf_proxy.models import requires_cascade, resolve_model
 
         model_enum, model_name = resolve_model(self.model)
@@ -711,253 +702,20 @@ class WindsurfAgentClient(AgentClient):
         # Text mode reports no usage: the ledger stays empty rather than
         # holding the previous response's calls, so nothing downstream
         # measures this response against another one's numbers.
-        self._start_usage_ledger()
-        progress = ProgressTracker()
-
-        for turn in range(self.max_turns):
-            logger.info(
-                f"[WindsurfAgent] gRPC turn {turn + 1}/{self.max_turns}: "
-                f"sending {len(messages)} messages..."
-            )
-
-            # Send to Windsurf via gRPC — retry once with fresh credentials on Cascade session errors
-            text_parts: list[str] = []
-            turn_error: Exception | None = None
-            for attempt in range(2):
-                if attempt > 0:
-                    # Invalidate process cache so discover_credentials() fetches a
-                    # fresh CSRF token instead of returning the cached stale one.
-                    logger.warning(
-                        "[WindsurfAgent] Refreshing credentials before retry"
-                    )
-                    _grpc_mod._panel_initialized = False
-                    invalidate_process_cache()
-                    await _asyncio.sleep(1.5)
-                    try:
-                        self._credentials = discover_credentials()
-                    except Exception as refresh_err:
-                        logger.error(
-                            f"[WindsurfAgent] Credential refresh failed: {refresh_err}"
-                        )
-                        break
-
-                text_parts = []
-                try:
-                    if use_cascade:
-                        # Cascade flattens the whole conversation into one
-                        # text payload, so we pass the already-built messages
-                        # list (incl. system prompt + tool preamble) and let
-                        # cascade_chat stitch it server-side.
-                        full = await cascade_chat(
-                            credentials=self._credentials,
-                            messages=messages,
-                            model_enum=model_enum,
-                            model_uid=model_name,
-                        )
-                        if full:
-                            text_parts.append(full)
-                    else:
-                        async for chunk in stream_chat(
-                            credentials=self._credentials,
-                            messages=messages,
-                            model_enum=model_enum,
-                            model_name=model_name,
-                            system_prompt=full_system_prompt,
-                        ):
-                            text_parts.append(chunk)
-                    turn_error = None
-                except Exception as e:
-                    turn_error = e
-                    err_str = str(e).lower()
-                    if attempt == 0 and (
-                        "failed_precondition" in err_str or "cascade session" in err_str
-                    ):
-                        logger.warning(
-                            f"[WindsurfAgent] Cascade session error on turn {turn + 1}, retrying: {e}"
-                        )
-                        _grpc_mod._panel_initialized = False
-                        continue
-                    logger.error(
-                        f"[WindsurfAgent] gRPC streaming error (turn {turn + 1}): {e}"
-                    )
-                    break
-
-                # Windsurf sometimes returns the Cascade session error as HTTP 200 text.
-                # Detect this and retry with fresh credentials (same as _grpc_response).
-                if turn_error is None and attempt == 0:
-                    partial_text = "".join(text_parts).lower()
-                    if (
-                        "failed_precondition" in partial_text
-                        and "cascade session" in partial_text
-                    ):
-                        logger.warning(
-                            f"[WindsurfAgent] Cascade session error in response text on turn {turn + 1}, "
-                            "retrying with fresh credentials"
-                        )
-                        _grpc_mod._panel_initialized = False
-                        invalidate_process_cache()
-                        await _asyncio.sleep(1.5)
-                        try:
-                            self._credentials = discover_credentials()
-                        except Exception as refresh_err:
-                            logger.error(
-                                f"[WindsurfAgent] Credential refresh failed: {refresh_err}"
-                            )
-                            break
-                        continue  # retry with fresh credentials
-
-                break  # success or non-retryable error
-
-            if turn_error is not None:
-                yield AgentMessage(
-                    role=MessageRole.SYSTEM,
-                    content=[
-                        ContentBlock(
-                            type=ContentBlockType.TEXT,
-                            text=f"Windsurf gRPC error: {turn_error}",
-                        )
-                    ],
-                )
-                return
-
-            full_text = "".join(text_parts)
-            if not full_text:
-                yield AgentMessage(
-                    role=MessageRole.ASSISTANT,
-                    content=[
-                        ContentBlock(
-                            type=ContentBlockType.TEXT,
-                            text="(Empty response from Windsurf)",
-                        )
-                    ],
-                )
-                return
-
-            # Parse tool calls from text
-            clean_text, tool_calls = self._parse_tool_calls_from_text(full_text)
-
-            logger.info(
-                f"[WindsurfAgent] gRPC turn {turn + 1}: "
-                f"text_len={len(clean_text)}, tool_calls={len(tool_calls)}"
-            )
-
-            # Yield text content (the non-tool-call part)
-            if clean_text:
-                yield AgentMessage(
-                    role=MessageRole.ASSISTANT,
-                    content=[ContentBlock(type=ContentBlockType.TEXT, text=clean_text)],
-                )
-
-            # No tool calls → done
-            if not tool_calls:
-                if not clean_text:
-                    yield AgentMessage(
-                        role=MessageRole.ASSISTANT,
-                        content=[
-                            ContentBlock(
-                                type=ContentBlockType.TEXT,
-                                text="(No response from Windsurf)",
-                            )
-                        ],
-                    )
-                logger.info(
-                    f"[WindsurfAgent] gRPC session complete after {turn + 1} turn(s)"
-                )
-                return
-
-            # Add assistant message to conversation history
-            messages.append({"role": "assistant", "content": full_text})
-
-            # Execute each tool call and collect results
-            result_parts: list[str] = []
-            turn_calls: list[tuple[str, Any, str]] = []
-            for i, tc in enumerate(tool_calls):
-                tool_name = tc["name"]
-                tool_args = tc["arguments"]
-                tool_id = f"grpc_{turn}_{i}_{tool_name}"
-
-                logger.info(
-                    f"[WindsurfAgent] gRPC turn {turn + 1}: "
-                    f"tool_call {tool_name}({list(tool_args.keys())})"
-                )
-                print(f"[WindsurfAgent] 🔧 Tool: {tool_name}", flush=True)
-
-                # Yield TOOL_USE block
-                yield AgentMessage(
-                    role=MessageRole.ASSISTANT,
-                    content=[
-                        ContentBlock(
-                            type=ContentBlockType.TOOL_USE,
-                            tool_name=tool_name,
-                            tool_id=tool_id,
-                            tool_input=tool_args,
-                        )
-                    ],
-                )
-
-                # Execute tool
-                result_text = ""
-                is_error = False
-                try:
-                    result = await self._tool_executor.execute(tool_name, tool_args)
-                    result_text = str(result) if result is not None else ""
-                except Exception as e:
-                    result_text = f"Error: {e}"
-                    is_error = True
-                    logger.warning(f"[WindsurfAgent] Tool {tool_name} failed: {e}")
-
-                # Yield TOOL_RESULT block
-                yield AgentMessage(
-                    role=MessageRole.ASSISTANT,
-                    content=[
-                        ContentBlock(
-                            type=ContentBlockType.TOOL_RESULT,
-                            tool_use_id=tool_id,
-                            is_error=is_error,
-                            result_content=result_text,
-                        )
-                    ],
-                )
-
-                # Format result for next gRPC message (head+tail truncation —
-                # build/test verdicts sit at the END of the output)
-                status = "error" if is_error else "success"
-                truncated = truncate_tool_result(result_text, limit=8000)
-                result_parts.append(
-                    f'<tool_result name="{tool_name}" status="{status}">\n'
-                    f"{truncated}\n"
-                    f"</tool_result>"
-                )
-                turn_calls.append((tool_name, tool_args, result_text))
-
-            # Add tool results as a user message for the next turn
-            results_message = "\n\n".join(result_parts)
-            messages.append({"role": "user", "content": results_message})
-
-            stop = self._check_progress(progress, turn_calls, messages)
-            if stop is not None:
-                yield stop
-                return
-
-            # Elide stale tool results once the conversation exceeds the char
-            # budget (text-mode results are user messages starting with
-            # <tool_result — compact_messages handles both shapes).
-            compacted = compact_messages(messages)
-            if compacted:
-                logger.info(
-                    f"[WindsurfAgent] History compaction: elided {compacted} "
-                    "stale tool result(s)"
-                )
-
-            # Continue loop — next turn sends updated conversation
-
-        logger.warning(
-            f"[WindsurfAgent] gRPC reached max_turns ({self.max_turns}) — stopping"
+        ledger = self._start_usage_ledger()
+        adapter = _WindsurfTextAdapter(
+            self,
+            messages,
+            system_prompt=full_system_prompt,
+            model_enum=model_enum,
+            model_name=model_name,
+            use_cascade=use_cascade,
         )
-        print(
-            f"[WindsurfAgent] ⚠️ Reached max turns ({self.max_turns})",
-            flush=True,
-        )
+        async with aclosing(
+            run_turns(adapter, max_turns=self.max_turns, ledger=ledger)
+        ) as turns:
+            async for message in turns:
+                yield message
 
     # =================================================================
     # REST mode (OpenAI-compatible function calling)
@@ -1010,9 +768,10 @@ class WindsurfAgentClient(AgentClient):
         2. If response contains tool_calls → execute each tool, add results, continue
         3. If no tool_calls → yield final text response and stop
         4. Repeat up to max_turns
-        """
-        import json as _json
 
+        The loop is the shared WorkPilot loop (``harness.application.loop``)
+        driving ``_WindsurfRestAdapter``.
+        """
         session = self._ensure_http_client()
 
         messages: list[dict[str, Any]] = []
@@ -1041,288 +800,384 @@ class WindsurfAgentClient(AgentClient):
             flush=True,
         )
 
-        _ws_total_in = 0
-        _ws_total_out = 0
-        self._start_usage_ledger()
-        progress = ProgressTracker()
-
-        for turn in range(self.max_turns):
-            payload: dict[str, Any] = {
-                "model": self.model,
-                "messages": messages,
-                "stream": False,
-            }
-            if tools:
-                payload["tools"] = tools
-                payload["tool_choice"] = "auto"
-
-            logger.info(
-                f"[WindsurfAgent] Turn {turn + 1}/{self.max_turns}: "
-                f"sending {len(messages)} messages to API..."
-            )
-
-            # ----------------------------------------------------------
-            # URL probing:  On the first request, try each base URL in
-            # turn until one returns a non-404/non-502 status.  Once a
-            # working URL is found it is cached for subsequent turns.
-            # ----------------------------------------------------------
-            urls_to_try: list[str]
-            if not self._rest_url_probed:
-                urls_to_try = [
-                    f"{base}/chat/completions" for base in self._rest_base_urls
-                ]
-            else:
-                urls_to_try = [url]
-
-            data: dict[str, Any] | None = None
-            last_error_status: int = 0
-            last_error_text: str = ""
-
-            for try_url in urls_to_try:
-                try:
-                    async with session.post(try_url, json=payload) as resp:
-                        resp_status = resp.status
-                        if resp_status == 200:
-                            data = await resp.json()
-                            # Cache the working base URL
-                            if not self._rest_url_probed:
-                                base = try_url.removesuffix("/chat/completions")
-                                self._rest_base_url = base
-                                url = try_url
-                                self._rest_url_probed = True
-                                logger.info(
-                                    f"[WindsurfAgent] ✅ Found working endpoint: {try_url}"
-                                )
-                                print(
-                                    f"[WindsurfAgent] ✅ Working endpoint: {try_url}",
-                                    flush=True,
-                                )
-                            break  # success
-                        else:
-                            error_text = await resp.text()
-                            logger.warning(
-                                f"[WindsurfAgent] Endpoint {try_url} returned HTTP {resp_status}: {error_text[:200]}"
-                            )
-                            last_error_status = resp_status
-                            last_error_text = error_text
-                            # 404/502 → try next URL; other errors → stop probing
-                            if resp_status not in (404, 502, 503):
-                                break
-                except Exception as probe_err:
-                    logger.warning(
-                        f"[WindsurfAgent] Endpoint {try_url} failed: {probe_err}"
-                    )
-                    last_error_status = 0
-                    last_error_text = str(probe_err)
-
-            if data is None:
-                # All URLs failed
-                self._rest_url_probed = True  # don't re-probe
-                error_msg = (
-                    f"Windsurf REST API error ({last_error_status}): {last_error_text}"
-                    if last_error_status
-                    else f"Windsurf REST API error: {last_error_text}"
-                )
-                logger.error(f"[WindsurfAgent] {error_msg}")
-                print(
-                    f"[WindsurfAgent] ❌ All endpoints failed: {error_msg[:200]}",
-                    flush=True,
-                )
-                yield AgentMessage(
-                    role=MessageRole.SYSTEM,
-                    content=[
-                        ContentBlock(
-                            type=ContentBlockType.TEXT,
-                            text=error_msg,
-                        )
-                    ],
-                )
-                return
-
-            logger.info(
-                f"[WindsurfAgent] Turn {turn + 1}: API responded 200 OK "
-                f"(keys={list(data.keys())})"
-            )
-
-            # Parse usage from response (for logging and cost tracking)
-            usage = data.get("usage", {})
-            if usage:
-                logger.info(
-                    f"[WindsurfAgent] Token usage: "
-                    f"prompt={usage.get('prompt_tokens', '?')}, "
-                    f"completion={usage.get('completion_tokens', '?')}, "
-                    f"total={usage.get('total_tokens', '?')}"
-                )
-                _ws_total_in += usage.get("prompt_tokens", 0)
-                _ws_total_out += usage.get("completion_tokens", 0)
-                if usage.get("prompt_tokens"):
-                    self.last_context_tokens = int(usage["prompt_tokens"])
-                self._record_call(from_chat_completion(usage))
-
-            choices = data.get("choices", [])
-            if not choices:
-                logger.warning(f"[WindsurfAgent] Empty choices in response: {data}")
-                yield AgentMessage(
-                    role=MessageRole.ASSISTANT,
-                    content=[
-                        ContentBlock(
-                            type=ContentBlockType.TEXT,
-                            text="(Empty response from Windsurf REST API)",
-                        )
-                    ],
-                )
-                return
-
-            message = choices[0].get("message", {})
-            content = message.get("content", "")
-            tool_calls = message.get("tool_calls", [])
-            finish_reason = choices[0].get("finish_reason", "")
-
-            logger.info(
-                f"[WindsurfAgent] Turn {turn + 1}: "
-                f"content_len={len(content or '')}, "
-                f"tool_calls={len(tool_calls)}, "
-                f"finish_reason={finish_reason}"
-            )
-
-            # Yield text content if present
-            if content:
-                yield AgentMessage(
-                    role=MessageRole.ASSISTANT,
-                    content=[ContentBlock(type=ContentBlockType.TEXT, text=content)],
-                )
-
-            # No tool calls → done
-            if not tool_calls:
-                if not content:
-                    yield AgentMessage(
-                        role=MessageRole.ASSISTANT,
-                        content=[
-                            ContentBlock(
-                                type=ContentBlockType.TEXT,
-                                text="(No response from Windsurf)",
-                            )
-                        ],
-                    )
-                logger.info(
-                    f"[WindsurfAgent] Session complete after {turn + 1} turn(s) "
-                    f"(finish_reason={finish_reason})"
-                )
-                # Windsurf uses credits (not per-token billing) — store tokens, cost=0
-                self.last_usage = {
-                    "input_tokens": _ws_total_in,
-                    "output_tokens": _ws_total_out,
-                    "cost_usd": 0.0,
-                }
-                return
-
-            # Add assistant message (with tool_calls) to conversation history
-            assistant_msg: dict[str, Any] = {"role": "assistant"}
-            if content:
-                assistant_msg["content"] = content
-            assistant_msg["tool_calls"] = tool_calls
-            messages.append(assistant_msg)
-
-            # Execute each tool call
-            turn_calls: list[tuple[str, Any, str]] = []
-            for tc in tool_calls:
-                func = tc.get("function", {})
-                tool_name = func.get("name", "")
-                tool_id = tc.get("id", f"call_{turn}_{tool_name}")
-
-                try:
-                    args = _json.loads(func.get("arguments", "{}"))
-                except (_json.JSONDecodeError, TypeError):
-                    args = {}
-
-                logger.info(
-                    f"[WindsurfAgent] Turn {turn + 1}: tool_call {tool_name}({list(args.keys())})"
-                )
-                print(f"[WindsurfAgent] 🔧 Tool: {tool_name}", flush=True)
-
-                # Yield TOOL_USE block so session handler counts it
-                yield AgentMessage(
-                    role=MessageRole.ASSISTANT,
-                    content=[
-                        ContentBlock(
-                            type=ContentBlockType.TOOL_USE,
-                            tool_name=tool_name,
-                            tool_id=tool_id,
-                            tool_input=args,
-                        )
-                    ],
-                )
-
-                # Execute tool
-                result_text = ""
-                is_error = False
-                if self._tool_executor:
-                    try:
-                        result = await self._tool_executor.execute(tool_name, args)
-                        result_text = str(result) if result is not None else ""
-                    except Exception as e:
-                        result_text = f"Tool error: {e}"
-                        is_error = True
-                        logger.warning(f"[WindsurfAgent] Tool {tool_name} failed: {e}")
-                else:
-                    result_text = "Tool executor not available (no project_dir)"
-                    is_error = True
-
-                # Yield TOOL_RESULT block so session handler logs it
-                yield AgentMessage(
-                    role=MessageRole.ASSISTANT,
-                    content=[
-                        ContentBlock(
-                            type=ContentBlockType.TOOL_RESULT,
-                            tool_use_id=tool_id,
-                            is_error=is_error,
-                            result_content=result_text,
-                        )
-                    ],
-                )
-
-                # Add tool result to conversation for next API call (head+tail
-                # truncation — build/test verdicts sit at the END of the output)
-                messages.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": tool_id,
-                        "content": truncate_tool_result(result_text),
-                    }
-                )
-                turn_calls.append((tool_name, args, result_text))
-
-            stop = self._check_progress(progress, turn_calls, messages)
-            if stop is not None:
-                yield stop
-                break
-
-            # Elide stale tool results once the conversation exceeds the char
-            # budget (no-op below budget, preserving the cacheable prefix).
-            compacted = compact_messages(messages)
-            if compacted:
-                logger.info(
-                    f"[WindsurfAgent] History compaction: elided {compacted} "
-                    "stale tool result(s)"
-                )
-
-            # Continue loop — next turn will send updated messages with tool results
-        else:
-            logger.warning(
-                f"[WindsurfAgent] Reached max_turns ({self.max_turns}) — stopping tool loop"
-            )
-            print(
-                f"[WindsurfAgent] ⚠️ Reached max turns ({self.max_turns})",
-                flush=True,
-            )
-        self.last_usage = {
-            "input_tokens": _ws_total_in,
-            "output_tokens": _ws_total_out,
-            "cost_usd": 0.0,
-        }
+        ledger = self._start_usage_ledger()
+        adapter = _WindsurfRestAdapter(
+            self, messages, tools=tools, session=session, url=url
+        )
+        async with aclosing(
+            run_turns(adapter, max_turns=self.max_turns, ledger=ledger)
+        ) as turns:
+            async for message in turns:
+                yield message
 
     def supports_subagents(self) -> bool:
         return False
 
     def provider_name(self) -> str:
         return "windsurf"
+
+
+# =============================================================================
+# The two Windsurf protocols, for the WorkPilot loop
+# =============================================================================
+
+
+class _WindsurfTextAdapter(LoopAdapter):
+    """Text mode: gRPC to the local Windsurf IDE, which has no function
+    calling. The tools are described in the system prompt, the calls parsed
+    from ``<tool_call>`` tags in the answer, and the results of a turn go back
+    as one user message of ``<tool_result>`` tags. No usage is reported."""
+
+    label = "WindsurfAgent"
+
+    def __init__(
+        self,
+        client: WindsurfAgentClient,
+        messages: list[dict[str, Any]],
+        *,
+        system_prompt: str,
+        model_enum: int,
+        model_name: str,
+        use_cascade: bool,
+    ):
+        super().__init__(client, messages)
+        self.system_prompt = system_prompt
+        self.model_enum = model_enum
+        self.model_name = model_name
+        self.use_cascade = use_cascade
+
+    def assemble(self, turn: int) -> list[dict[str, Any]]:
+        logger.info(
+            f"[WindsurfAgent] gRPC turn {turn + 1}/{self.client.max_turns}: "
+            f"sending {len(self.messages)} messages..."
+        )
+        return self.messages
+
+    async def call(
+        self, messages: list[dict[str, Any]], turn: int
+    ) -> AsyncIterator[Any]:
+        import asyncio as _asyncio
+
+        from integrations.windsurf_proxy import grpc_client as _grpc_mod
+        from integrations.windsurf_proxy.auth import (
+            discover_credentials,
+            invalidate_process_cache,
+        )
+        from integrations.windsurf_proxy.cascade_client import cascade_chat
+        from integrations.windsurf_proxy.grpc_client import stream_chat
+
+        client = self.client
+        # Send to Windsurf via gRPC — retry once with fresh credentials on Cascade session errors
+        text_parts: list[str] = []
+        turn_error: Exception | None = None
+        for attempt in range(2):
+            if attempt > 0:
+                # Invalidate process cache so discover_credentials() fetches a
+                # fresh CSRF token instead of returning the cached stale one.
+                logger.warning("[WindsurfAgent] Refreshing credentials before retry")
+                _grpc_mod._panel_initialized = False
+                invalidate_process_cache()
+                await _asyncio.sleep(1.5)
+                try:
+                    client._credentials = discover_credentials()
+                except Exception as refresh_err:
+                    logger.error(
+                        f"[WindsurfAgent] Credential refresh failed: {refresh_err}"
+                    )
+                    break
+
+            text_parts = []
+            try:
+                if self.use_cascade:
+                    # Cascade flattens the whole conversation into one
+                    # text payload, so we pass the already-built messages
+                    # list (incl. system prompt + tool preamble) and let
+                    # cascade_chat stitch it server-side.
+                    full = await cascade_chat(
+                        credentials=client._credentials,
+                        messages=messages,
+                        model_enum=self.model_enum,
+                        model_uid=self.model_name,
+                    )
+                    if full:
+                        text_parts.append(full)
+                else:
+                    async for chunk in stream_chat(
+                        credentials=client._credentials,
+                        messages=messages,
+                        model_enum=self.model_enum,
+                        model_name=self.model_name,
+                        system_prompt=self.system_prompt,
+                    ):
+                        text_parts.append(chunk)
+                turn_error = None
+            except Exception as e:
+                turn_error = e
+                err_str = str(e).lower()
+                if attempt == 0 and (
+                    "failed_precondition" in err_str or "cascade session" in err_str
+                ):
+                    logger.warning(
+                        f"[WindsurfAgent] Cascade session error on turn {turn + 1}, retrying: {e}"
+                    )
+                    _grpc_mod._panel_initialized = False
+                    continue
+                logger.error(
+                    f"[WindsurfAgent] gRPC streaming error (turn {turn + 1}): {e}"
+                )
+                break
+
+            # Windsurf sometimes returns the Cascade session error as HTTP 200 text.
+            # Detect this and retry with fresh credentials (same as _grpc_response).
+            if turn_error is None and attempt == 0:
+                partial_text = "".join(text_parts).lower()
+                if (
+                    "failed_precondition" in partial_text
+                    and "cascade session" in partial_text
+                ):
+                    logger.warning(
+                        f"[WindsurfAgent] Cascade session error in response text on turn {turn + 1}, "
+                        "retrying with fresh credentials"
+                    )
+                    _grpc_mod._panel_initialized = False
+                    invalidate_process_cache()
+                    await _asyncio.sleep(1.5)
+                    try:
+                        client._credentials = discover_credentials()
+                    except Exception as refresh_err:
+                        logger.error(
+                            f"[WindsurfAgent] Credential refresh failed: {refresh_err}"
+                        )
+                        break
+                    continue  # retry with fresh credentials
+
+            break  # success or non-retryable error
+
+        if turn_error is not None:
+            yield self.notice(f"Windsurf gRPC error: {turn_error}")
+            yield Outcome.HALT
+            return
+
+        full_text = "".join(text_parts)
+        if not full_text:
+            yield self.text("(Empty response from Windsurf)")
+            yield Outcome.HALT
+            return
+
+        # Parse tool calls from text
+        clean_text, tool_calls = client._parse_tool_calls_from_text(full_text)
+
+        logger.info(
+            f"[WindsurfAgent] gRPC turn {turn + 1}: "
+            f"text_len={len(clean_text)}, tool_calls={len(tool_calls)}"
+        )
+        calls = tuple(
+            ToolCall(f"grpc_{turn}_{i}_{tc['name']}", tc["name"], tc["arguments"])
+            for i, tc in enumerate(tool_calls)
+        )
+        # The whole answer goes back, tags included.
+        yield Reply(clean_text, calls, raw=full_text)
+
+    def settle(self, reply: Reply, turn: int) -> tuple[list[Any], Outcome]:
+        notes = [] if reply.text else [self.text("(No response from Windsurf)")]
+        logger.info(f"[WindsurfAgent] gRPC session complete after {turn + 1} turn(s)")
+        return notes, Outcome.DONE
+
+    async def execute(self, call: ToolCall) -> ToolResult:
+        return await self.run_tool(call, error_prefix="Error")
+
+    def reinject(self, reply: Reply, results: Sequence[ToolResult]) -> None:
+        self.messages.append({"role": "assistant", "content": reply.raw})
+        # Format each result for the next gRPC message (head+tail truncation —
+        # build/test verdicts sit at the END of the output), and add them as
+        # one user message.
+        result_parts: list[str] = []
+        for call, result in zip(reply.calls, results, strict=True):
+            status = "error" if result.is_error else "success"
+            truncated = truncate_tool_result(result.text, limit=8000)
+            result_parts.append(
+                f'<tool_result name="{call.name}" status="{status}">\n'
+                f"{truncated}\n"
+                f"</tool_result>"
+            )
+        self.messages.append({"role": "user", "content": "\n\n".join(result_parts)})
+
+    def finish(self, reason: StopReason) -> None:
+        if reason == "max_turns":
+            max_turns = self.client.max_turns
+            logger.warning(
+                f"[WindsurfAgent] gRPC reached max_turns ({max_turns}) — stopping"
+            )
+            print(f"[WindsurfAgent] ⚠️ Reached max turns ({max_turns})", flush=True)
+
+
+class _WindsurfRestAdapter(ChatCompletionsAdapter):
+    """REST mode: OpenAI-compatible chat completions with function calling,
+    on the first base URL that answers. Windsurf bills credits: the tokens are
+    totalled, the cost is 0."""
+
+    label = "WindsurfAgent"
+    silence = "(No response from Windsurf)"
+
+    def __init__(
+        self,
+        client: WindsurfAgentClient,
+        messages: list[dict[str, Any]],
+        *,
+        tools: list[dict[str, Any]],
+        session: Any,
+        url: str,
+    ):
+        super().__init__(client, messages)
+        self.tools = tools
+        self.session = session
+        self.url = url
+        self.total_in = 0
+        self.total_out = 0
+
+    def assemble(self, turn: int) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "model": self.client.model,
+            "messages": self.messages,
+            "stream": False,
+        }
+        if self.tools:
+            payload["tools"] = self.tools
+            payload["tool_choice"] = "auto"
+
+        logger.info(
+            f"[WindsurfAgent] Turn {turn + 1}/{self.client.max_turns}: "
+            f"sending {len(self.messages)} messages to API..."
+        )
+        return payload
+
+    async def call(self, payload: dict[str, Any], turn: int) -> AsyncIterator[Any]:
+        client = self.client
+        # ----------------------------------------------------------
+        # URL probing:  On the first request, try each base URL in
+        # turn until one returns a non-404/non-502 status.  Once a
+        # working URL is found it is cached for subsequent turns.
+        # ----------------------------------------------------------
+        urls_to_try: list[str]
+        if not client._rest_url_probed:
+            urls_to_try = [
+                f"{base}/chat/completions" for base in client._rest_base_urls
+            ]
+        else:
+            urls_to_try = [self.url]
+
+        data: dict[str, Any] | None = None
+        last_error_status: int = 0
+        last_error_text: str = ""
+
+        for try_url in urls_to_try:
+            try:
+                async with self.session.post(try_url, json=payload) as resp:
+                    resp_status = resp.status
+                    if resp_status == 200:
+                        data = await resp.json()
+                        # Cache the working base URL
+                        if not client._rest_url_probed:
+                            base = try_url.removesuffix("/chat/completions")
+                            client._rest_base_url = base
+                            self.url = try_url
+                            client._rest_url_probed = True
+                            logger.info(
+                                f"[WindsurfAgent] ✅ Found working endpoint: {try_url}"
+                            )
+                            print(
+                                f"[WindsurfAgent] ✅ Working endpoint: {try_url}",
+                                flush=True,
+                            )
+                        break  # success
+                    else:
+                        error_text = await resp.text()
+                        logger.warning(
+                            f"[WindsurfAgent] Endpoint {try_url} returned HTTP {resp_status}: {error_text[:200]}"
+                        )
+                        last_error_status = resp_status
+                        last_error_text = error_text
+                        # 404/502 → try next URL; other errors → stop probing
+                        if resp_status not in (404, 502, 503):
+                            break
+            except Exception as probe_err:
+                logger.warning(
+                    f"[WindsurfAgent] Endpoint {try_url} failed: {probe_err}"
+                )
+                last_error_status = 0
+                last_error_text = str(probe_err)
+
+        if data is None:
+            # All URLs failed
+            client._rest_url_probed = True  # don't re-probe
+            error_msg = (
+                f"Windsurf REST API error ({last_error_status}): {last_error_text}"
+                if last_error_status
+                else f"Windsurf REST API error: {last_error_text}"
+            )
+            logger.error(f"[WindsurfAgent] {error_msg}")
+            print(
+                f"[WindsurfAgent] ❌ All endpoints failed: {error_msg[:200]}",
+                flush=True,
+            )
+            yield self.notice(error_msg)
+            yield Outcome.HALT
+            return
+
+        logger.info(
+            f"[WindsurfAgent] Turn {turn + 1}: API responded 200 OK "
+            f"(keys={list(data.keys())})"
+        )
+
+        # Parse usage from response (for logging and cost tracking)
+        usage = data.get("usage", {})
+        if usage:
+            logger.info(
+                f"[WindsurfAgent] Token usage: "
+                f"prompt={usage.get('prompt_tokens', '?')}, "
+                f"completion={usage.get('completion_tokens', '?')}, "
+                f"total={usage.get('total_tokens', '?')}"
+            )
+            self.total_in += usage.get("prompt_tokens", 0)
+            self.total_out += usage.get("completion_tokens", 0)
+            if usage.get("prompt_tokens"):
+                client.last_context_tokens = int(usage["prompt_tokens"])
+            yield Measured(from_chat_completion(usage))
+
+        choices = data.get("choices", [])
+        if not choices:
+            logger.warning(f"[WindsurfAgent] Empty choices in response: {data}")
+            yield self.text("(Empty response from Windsurf REST API)")
+            yield Outcome.HALT
+            return
+        yield self.read_choice(choices, turn)
+
+    def settle(self, reply: Reply, turn: int) -> tuple[list[Any], Outcome]:
+        notes = [] if reply.text else [self.text(self.silence)]
+        logger.info(
+            f"[WindsurfAgent] Session complete after {turn + 1} turn(s) "
+            f"(finish_reason={self.finish_reason})"
+        )
+        return notes, Outcome.DONE
+
+    async def execute(self, call: ToolCall) -> ToolResult:
+        return await self.run_tool(
+            call, unavailable="Tool executor not available (no project_dir)"
+        )
+
+    def finish(self, reason: StopReason) -> None:
+        client = self.client
+        if reason == "max_turns":
+            logger.warning(
+                f"[WindsurfAgent] Reached max_turns ({client.max_turns}) — stopping tool loop"
+            )
+            print(
+                f"[WindsurfAgent] ⚠️ Reached max turns ({client.max_turns})",
+                flush=True,
+            )
+        # Windsurf uses credits (not per-token billing) — store tokens, cost=0
+        client.last_usage = {
+            "input_tokens": self.total_in,
+            "output_tokens": self.total_out,
+            "cost_usd": 0.0,
+        }

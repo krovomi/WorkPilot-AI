@@ -1,7 +1,8 @@
 # Harness de contexte : le plan
 
 > **Statut : plan ; livrés : le lot 0 (mesurer, sauf sa ligne de base), le lot 1a (un budget
-> par session pour tous), le lot 1b-i (l'arrêt sur absence de progrès), le lot 2 (un préfixe stable, sauf D3), le lot 3 (troncature à la
+> par session pour tous), le lot 1b-i (l'arrêt sur absence de progrès), le lot 1b-ii (une seule
+> boucle WorkPilot pour tous les providers), le lot 2 (un préfixe stable, sauf D3), le lot 3 (troncature à la
 > source, sauf les plafonds natifs, réglés sur la ligne de base), le lot 4 (purge par lots et
 > fenêtre payable, sauf D2), le lot 5 (sous-agents sous contrat, résultat borné et marqué,
 > lancement échelonné, sauf le `MemoryPort`), le lot 6 (un jeu d'outils trié et figé par
@@ -80,7 +81,7 @@ sens partout, une boucle unique, et la troncature à la source.
 
 | Sujet | Aujourd'hui | Ce qui manque |
 |---|---|---|
-| Propriété de la boucle | boucles tierces : Claude Agent SDK (`max_turns` 1000), Codex, OpenCode, Antigravity. Boucles WorkPilot : **cinq copies** de `for turn in range(self.max_turns)` dans `core/agent_clients/` (OpenAI et ses dérivés, Ollama/LM Studio, Copilot, Windsurf ×2). Lot 1a : un même plafond de coût par session pour tous ; lot 1b-i : le même arrêt sur absence de progrès | une boucle partagée (lot 1b-ii) |
+| Propriété de la boucle | boucles tierces : Claude Agent SDK (`max_turns` 1000), Codex, OpenCode, Antigravity. Boucles WorkPilot : une seule, `harness/application/loop.py`, derrière `ModelPort` ; un adaptateur par protocole dans `core/agent_clients/` (chat compatible OpenAI, étendu par Copilot et Windsurf REST ; Ollama ; Windsurf texte). Lot 1a : un même plafond de coût par session pour tous ; lot 1b-i : le même arrêt sur absence de progrès | — |
 | Assemblage | un seul builder, `build_base_system_prompt` (`core/llm_optimization.py`), sans horodatage ; outils dans un ordre fixe ; `prompt_cache_key` côté OpenAI. Lot 2 : segments ordonnés par stabilité (`harness/domain/layout.py`), chemin du worktree en dernier, bloc de tâche en tête de chaque sous-tâche | des points de coupure de cache à la frontière tâche / sous-tâche chez Anthropic, que la CLI ne laisse pas poser |
 | Mesure | lot 0 livré : chaque client lit l'usage de chaque appel dans l'unité commune de `harness/domain/` et le cumule dans son `usage_ledger` ; `record_client_usage` en tire les champs du suivi des coûts, `CONTEXT_USAGE` le taux de hit et les réécritures de préfixe | la ligne de base sur des tâches réelles ; le coût par appel (seul le coût de session est connu) |
 | Compaction | `context_mgmt/` : garde par tâche, seuil 50 % par défaut (30–90), *compact* ou *clear*, handoff préparé en fond par le provider de la tâche, cap de 3 resets ; native sur Claude et Codex, émulée ailleurs. Lot 4 : le seuil est une part de la fenêtre *payable* | D2 : le seuil par défaut, tranché sur la ligne de base |
@@ -298,14 +299,46 @@ arrêt, un résultat qui change remet à zéro), `tests/harness/test_no_progress
 cinq boucles relance après le troisième tour identique et s'arrête au cinquième, sans atteindre
 `max_turns` ; un appel dont le résultat change va au bout).
 
-**Lot 1b-ii — Une seule boucle (reste à faire).** `harness/application/loop.py` remplace les cinq
-copies ; les adaptateurs gardent le protocole (format des messages, appel, lecture de la réponse),
-`ToolExecutor` reste le seul exécuteur. C'est un remaniement : il n'économise aucun token, et les
-deux boucles Windsurf n'ont aucun test qui les fasse tourner. D'abord des tests de caractérisation
-de ces deux boucles, ensuite le remplacement.
+**Lot 1b-ii — Une seule boucle (livré).** Les cinq copies de la boucle WorkPilot (OpenAI et ses
+dérivés, Copilot, Ollama, Windsurf REST et texte) n'en font plus qu'une. C'est un remaniement : il
+n'économise aucun token et ne change aucun comportement.
 
-*Sortie :* les cinq boucles passent par `loop.py` ; les tests existants des clients passent sans
-modification de leurs attentes.
+- `harness/application/loop.py` (`run_turns`) : la boucle, écrite une fois. Un tour : assembler la
+  requête, appeler le modèle, mesurer l'appel, exécuter les outils, réinjecter leurs résultats,
+  décider. Elle ne contient ni seuil ni nom de provider.
+- `harness/domain/stop.py` (pur) : `stop_reason`, les trois raisons d'arrêt de la boucle dans leur
+  ordre : fin naturelle, absence de progrès, `max_turns`. Au dernier tour, un modèle qui finit a
+  fini. Un tour relancé (réponse vide, modèle téléchargé, relance) compte comme un autre. Le
+  plafond de coût reste à `_run_agent_client_session` (lot 1a).
+- `harness/ports.py` : `ModelPort`, ce que la boucle demande à un provider, et les types échangés
+  (`ToolCall`, `ToolResult`, `Reply`, `Measured`, `Outcome`). Un appel rend ses messages
+  (pulsation, erreur), sa mesure, puis une réponse ou une issue : `AGAIN` dépense le tour, `HALT`
+  arrête la réponse sans ses totaux.
+- Les adaptateurs gardent le protocole : format des messages, appel HTTP ou gRPC, lecture de la
+  réponse et des appels d'outils. `ChatCompletionsAdapter` (OpenAI) que Copilot et Windsurf REST
+  étendent, Ollama, Windsurf texte. Ils restent à côté de leur client dans `core/agent_clients/`,
+  pas dans `harness/adapters/` : les tests des clients modifient les constantes de ces modules
+  (délais, reprises), lues au moment de l'appel.
+- `LoopAdapter` (`core/agent_clients/base.py`) leur donne les messages du runner, les journaux, la
+  purge, et `run_tool`, qui passe chaque appel au `ToolExecutor` ou au pont MCP du client comme
+  avant : la boucle n'ajoute aucun chemin d'exécution. `create_agent_client()` reste la seule
+  fabrique.
+- Quand le runner cesse de lire (plafond de coût), la boucle referme l'appel en cours : le
+  `finally` de l'adaptateur s'exécute, comme quand la boucle était en ligne.
+- Quatre défauts relevés en caractérisant sont épinglés par des tests, pas corrigés : un
+  `"tool_calls": null` fait planter OpenAI, Copilot et Windsurf REST, un `"usage": null` OpenAI ;
+  l'appel servi par le repli GitHub Models de Copilot n'est pas mesuré ; en mode texte Windsurf,
+  une erreur de session Cascade reçue en texte, sans identifiants à rafraîchir, est rendue comme
+  la réponse du modèle.
+
+Tests : d'abord la caractérisation, contre l'ancien code : `tests/core/test_windsurf_loops.py` (les
+deux boucles Windsurf, qu'aucun test ne faisait tourner), `tests/core/test_openai_loop.py`,
+`test_copilot_loop.py` et `test_ollama_loop.py` (ce que les autres tests laissaient de côté) :
+messages rendus et leur ordre, format de réinjection, troncature, mesure, chaque fin, purge. Puis
+`tests/harness/test_stop.py` (par table) et `tests/harness/test_loop.py` (la boucle contre un port
+factice : ordre, mesure, relance, arrêt, fermeture ; ni nom de provider ni import d'un client dans
+la boucle et son port). Les tests existants des clients passent sans modification de leurs
+attentes.
 
 ### Lot 2 — Un préfixe stable (livré, sauf D3)
 

@@ -1,6 +1,7 @@
 """The provider-agnostic contract every agent client speaks: messages,
-content blocks, subagent definitions, the `AgentClient` ABC, and the helpers
-several providers share (environment parsing, Retry-After, output nudges).
+content blocks, subagent definitions, the `AgentClient` ABC, the helpers
+several providers share (environment parsing, Retry-After, output nudges),
+and `LoopAdapter`, the base of every adapter of the shared WorkPilot loop.
 
 Split out of `core/agent_client.py` (audit lot L11, F36), which re-exports
 every name defined here.
@@ -17,14 +18,17 @@ from enum import Enum
 from typing import Any
 
 from harness.domain import CallUsage, UsageLedger
-from harness.domain.progress import (
-    NO_PROGRESS_STOP,
-    PROGRESS_NUDGE,
-    ProgressTracker,
-    turn_fingerprint,
-)
+from harness.domain.stop import StopReason
 from harness.domain.subagents import SubagentReturn
 from harness.domain.tools import ToolSet
+from harness.ports import ToolCall, ToolResult
+
+# Common token-optimization trunk shared by every WorkPilot loop: over-budget
+# history compaction. The module is importable under both package layouts.
+try:
+    from core.llm_optimization import compact_messages
+except ImportError:  # pragma: no cover - alternate package layout
+    from apps.backend.core.llm_optimization import compact_messages
 
 # The name the monolith logged under, kept so logging configuration and log
 # filters keyed on it still match: `core.agent_client`, or
@@ -328,33 +332,6 @@ class AgentClient(ABC):
             self.usage_ledger = UsageLedger()
         self.usage_ledger.record_return(report)
 
-    def _check_progress(
-        self,
-        tracker: ProgressTracker,
-        turn_calls: list[tuple[str, Any, str]],
-        messages: list[dict[str, Any]],
-    ) -> AgentMessage | None:
-        """The no-progress rule after a turn of tool calls, for every loop.
-
-        ``turn_calls`` is the turn's (name, arguments, result) list. When the
-        same turn has repeated long enough, the nudge is appended to
-        ``messages`` (once); when it goes on, the returned notice ends the
-        loop. None: carry on (``harness.domain.progress``).
-        """
-        verdict = tracker.observe(turn_fingerprint(turn_calls))
-        if verdict == "nudge":
-            messages.append({"role": "user", "content": PROGRESS_NUDGE})
-            return None
-        if verdict == "stop":
-            logger.warning("[%s] %s", self.provider_name(), NO_PROGRESS_STOP)
-            return AgentMessage(
-                role=MessageRole.SYSTEM,
-                content=[
-                    ContentBlock(type=ContentBlockType.TEXT, text=NO_PROGRESS_STOP)
-                ],
-            )
-        return None
-
     def resumes_native_session(self) -> bool:
         """Whether the provider itself rehydrates an earlier session.
 
@@ -457,3 +434,124 @@ class AgentClient(ABC):
             lines.append("")
         lines.append("=== END PRIOR CONVERSATION — continue from here ===")
         return "\n".join(lines)
+
+
+# =============================================================================
+# The adapters of the WorkPilot loop
+# =============================================================================
+
+
+class LoopAdapter:
+    """What every adapter of the WorkPilot loop shares.
+
+    The loop is ``harness.application.loop.run_turns``; an adapter is one
+    response of one provider behind its port (``harness.ports.ModelPort``):
+    the conversation as that provider writes it, and the state its turns
+    carry. Subclasses keep the protocol (``assemble``, ``call``, ``settle``,
+    ``execute``, ``reinject``); this class turns the loop's events into the
+    client's messages and logs them under the client's name.
+    """
+
+    # The prefix of the client's log lines, e.g. "OpenAIAgentClient".
+    label = "AgentClient"
+
+    def __init__(self, client: AgentClient, messages: list[dict[str, Any]]):
+        self.client = client
+        self.messages = messages
+
+    @property
+    def provider(self) -> str:
+        return self.client.provider_name()
+
+    def text(self, text: str) -> AgentMessage:
+        return AgentMessage(
+            role=MessageRole.ASSISTANT,
+            content=[ContentBlock(type=ContentBlockType.TEXT, text=text)],
+        )
+
+    def notice(self, text: str) -> AgentMessage:
+        return AgentMessage(
+            role=MessageRole.SYSTEM,
+            content=[ContentBlock(type=ContentBlockType.TEXT, text=text)],
+        )
+
+    def tool_use(self, call: ToolCall) -> AgentMessage:
+        return AgentMessage(
+            role=MessageRole.ASSISTANT,
+            content=[
+                ContentBlock(
+                    type=ContentBlockType.TOOL_USE,
+                    tool_name=call.name,
+                    tool_id=call.id,
+                    tool_input=call.arguments,
+                )
+            ],
+        )
+
+    def tool_result(self, call: ToolCall, result: ToolResult) -> AgentMessage:
+        return AgentMessage(
+            role=MessageRole.ASSISTANT,
+            content=[
+                ContentBlock(
+                    type=ContentBlockType.TOOL_RESULT,
+                    tool_use_id=call.id,
+                    is_error=result.is_error,
+                    result_content=result.text,
+                )
+            ],
+        )
+
+    def announce(self, call: ToolCall, turn: int) -> None:
+        logger.info(
+            f"[{self.label}] Turn {turn + 1}: "
+            f"tool_call {call.name}({list(call.arguments.keys())})"
+        )
+        print(f"[{self.label}] 🔧 Tool: {call.name}", flush=True)
+
+    def remind(self, text: str) -> None:
+        self.messages.append({"role": "user", "content": text})
+
+    def history_budget(self) -> int | None:
+        """The conversation's char budget before clearing; None: the shared one."""
+        return None
+
+    def clear(self) -> None:
+        # Elide stale tool results once the conversation exceeds the char
+        # budget (no-op below budget, preserving the cacheable prefix).
+        compacted = compact_messages(self.messages, char_budget=self.history_budget())
+        if compacted:
+            logger.info(
+                f"[{self.label}] History compaction: elided {compacted} "
+                "stale tool result(s)"
+            )
+
+    def finish(self, reason: StopReason) -> None:
+        """Nothing to total by default; adapters that keep totals override."""
+
+    async def run_tool(
+        self,
+        call: ToolCall,
+        *,
+        mcp: Any = None,
+        error_prefix: str = "Tool error",
+        unavailable: str = "Tool executor not available",
+    ) -> ToolResult:
+        """One call, through the client's MCP bridge when it serves the tool,
+        else its ``ToolExecutor``: the only two ways a WorkPilot loop runs a
+        tool. A failure is a result the model reads, never an exception."""
+        if mcp is not None and mcp.has_tool(call.name):
+            try:
+                result = await mcp.call(call.name, call.arguments)
+            except Exception as e:
+                logger.warning(f"[{self.label}] MCP tool {call.name} failed: {e}")
+                return ToolResult(f"MCP tool error: {e}", is_error=True)
+            return ToolResult(str(result) if result is not None else "")
+        executor = getattr(self.client, "_tool_executor", None)
+        if not executor:
+            return ToolResult(unavailable, is_error=True)
+        try:
+            result = await executor.execute(call.name, call.arguments)
+        except Exception as e:
+            logger.warning(f"[{self.label}] Tool {call.name} failed: {e}")
+            return ToolResult(f"{error_prefix}: {e}", is_error=True)
+        return ToolResult(str(result) if result is not None else "")

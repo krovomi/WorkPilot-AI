@@ -7,32 +7,31 @@ every name defined here.
 
 from __future__ import annotations
 
+import json
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
+from contextlib import aclosing
 from typing import Any
 
+from harness.application.loop import run_turns
 from harness.domain import from_chat_completion
-from harness.domain.progress import ProgressTracker
+from harness.domain.stop import StopReason
+from harness.ports import Measured, Outcome, Reply, ToolCall, ToolResult
 
 # Common token-optimization trunk shared by every generic (OpenAI-style)
-# multi-turn loop: head+tail tool-result truncation and over-budget history
-# compaction. The module is importable under both package layouts.
+# multi-turn loop: head+tail tool-result truncation. The module is importable
+# under both package layouts.
 try:
-    from core.llm_optimization import (
-        compact_messages,
-        truncate_tool_result,
-    )
+    from core.llm_optimization import truncate_tool_result
 except ImportError:  # pragma: no cover - alternate package layout
-    from apps.backend.core.llm_optimization import (
-        compact_messages,
-        truncate_tool_result,
-    )
+    from apps.backend.core.llm_optimization import truncate_tool_result
 from .base import (
     CONTENT_TYPE_JSON,
     AgentClient,
     AgentMessage,
     ContentBlock,
     ContentBlockType,
+    LoopAdapter,
     MessageRole,
     SubagentDefinition,
 )
@@ -69,6 +68,177 @@ def _openai_cost_usd(
     return pricing.cost_for_tokens(
         input_tokens=input_tokens, output_tokens=output_tokens
     )
+
+
+class ChatCompletionsAdapter(LoopAdapter):
+    """The OpenAI chat-completions protocol, for the WorkPilot loop.
+
+    An answer is the first choice's message; its tool calls carry their
+    arguments as a JSON string; the assistant turn goes back with its calls,
+    each result as a ``tool`` message, cut head and tail. Copilot and
+    Windsurf REST speak it too: they keep their own call and endings.
+    """
+
+    label = "OpenAIAgentClient"
+    # What a reply with neither text nor tool call reads as.
+    silence = "(No response from OpenAI)"
+
+    def __init__(self, client: AgentClient, messages: list[dict[str, Any]]):
+        super().__init__(client, messages)
+        self.finish_reason = ""
+
+    def read_choice(self, choices: list[dict[str, Any]], turn: int) -> Reply:
+        message = choices[0].get("message", {})
+        content = message.get("content") or ""
+        tool_calls = message.get("tool_calls", [])
+        self.finish_reason = choices[0].get("finish_reason", "")
+
+        logger.info(
+            f"[{self.label}] Turn {turn + 1}: "
+            f"content_len={len(content)}, tool_calls={len(tool_calls)}, "
+            f"finish_reason={self.finish_reason}"
+        )
+        if not tool_calls:
+            return Reply(content)
+        calls = tuple(self._tool_call(tc, turn) for tc in tool_calls)
+        return Reply(content, calls, raw=tool_calls)
+
+    @staticmethod
+    def _tool_call(tc: dict[str, Any], turn: int) -> ToolCall:
+        func = tc.get("function", {})
+        tool_name = func.get("name", "")
+        tool_id = tc.get("id", f"call_{turn}_{tool_name}")
+        try:
+            args = json.loads(func.get("arguments", "{}"))
+        except (json.JSONDecodeError, TypeError):
+            args = {}
+        return ToolCall(tool_id, tool_name, args)
+
+    def settle(self, reply: Reply, turn: int) -> tuple[list[Any], Outcome]:
+        notes = [] if reply.text else [self.text(self.silence)]
+        logger.info(f"[{self.label}] Session complete after {turn + 1} turn(s)")
+        return notes, Outcome.DONE
+
+    def reinject(self, reply: Reply, results: Sequence[ToolResult]) -> None:
+        assistant_msg: dict[str, Any] = {"role": "assistant"}
+        if reply.text:
+            assistant_msg["content"] = reply.text
+        assistant_msg["tool_calls"] = reply.raw
+        self.messages.append(assistant_msg)
+        for call, result in zip(reply.calls, results, strict=True):
+            # Head+tail truncation — build/test verdicts sit at the END.
+            self.messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": call.id,
+                    "content": truncate_tool_result(result.text),
+                }
+            )
+
+
+class _OpenAIAdapter(ChatCompletionsAdapter):
+    """One response of ``OpenAIAgentClient`` and the clients that extend it."""
+
+    def __init__(
+        self,
+        client: OpenAIAgentClient,
+        messages: list[dict[str, Any]],
+        *,
+        tools: list[dict[str, Any]],
+        session: Any,
+        headers: dict[str, str],
+    ):
+        super().__init__(client, messages)
+        self.tools = tools
+        self.session = session
+        self.headers = headers
+        self.total_in = 0
+        self.total_out = 0
+
+    def assemble(self, turn: int) -> dict[str, Any]:
+        client = self.client
+        payload: dict[str, Any] = {
+            "model": client.model,
+            "messages": self.messages,
+            "stream": False,
+        }
+        if self.tools:
+            payload["tools"] = self.tools
+            payload["tool_choice"] = "auto"
+        # Provider-specific token optimizations (omitted when None):
+        if client._reasoning_effort:
+            payload["reasoning_effort"] = client._reasoning_effort
+        if client._prompt_cache_key:
+            payload["prompt_cache_key"] = client._prompt_cache_key
+
+        logger.info(
+            f"[OpenAIAgentClient] Turn {turn + 1}/{client.max_turns}: "
+            f"sending {len(self.messages)} messages..."
+        )
+        return payload
+
+    async def call(self, payload: dict[str, Any], turn: int) -> AsyncIterator[Any]:
+        client = self.client
+        data: Any = None
+        failure: str | None = None
+        try:
+            async with self.session.post(
+                client._api_base,
+                json=payload,
+                headers=self.headers,
+                allow_redirects=not getattr(client, "_offline_only", False),
+            ) as resp:
+                if resp.status != 200:
+                    error_text = await resp.text()
+                    logger.error(
+                        f"[OpenAIAgentClient] API error ({resp.status}): {error_text[:500]}"
+                    )
+                    failure = f"OpenAI API error ({resp.status}): {error_text}"
+                else:
+                    data = await resp.json()
+        except Exception as e:
+            logger.error(f"[OpenAIAgentClient] Request failed: {e}")
+            failure = client._describe_request_error(e)
+        if failure is not None:
+            yield self.notice(failure)
+            yield Outcome.HALT
+            return
+
+        # Accumulate token usage from each turn
+        _u = data.get("usage", {})
+        self.total_in += _u.get("prompt_tokens", 0)
+        self.total_out += _u.get("completion_tokens", 0)
+        if _u.get("prompt_tokens"):
+            client.last_context_tokens = int(_u["prompt_tokens"])
+        yield Measured(from_chat_completion(_u))
+
+        choices = data.get("choices", [])
+        if not choices:
+            yield self.text("(Empty response from OpenAI)")
+            yield Outcome.HALT
+            return
+        yield self.read_choice(choices, turn)
+
+    async def execute(self, call: ToolCall) -> ToolResult:
+        return await self.run_tool(call, mcp=self.client._mcp_manager)
+
+    def finish(self, reason: StopReason) -> None:
+        client = self.client
+        if reason == "max_turns":
+            logger.warning(
+                f"[OpenAIAgentClient] Reached max_turns ({client.max_turns}) — stopping tool loop"
+            )
+            print(
+                f"[OpenAIAgentClient] ⚠️ Reached max turns ({client.max_turns})",
+                flush=True,
+            )
+        client.last_usage = {
+            "input_tokens": self.total_in,
+            "output_tokens": self.total_out,
+            "cost_usd": _openai_cost_usd(
+                client.model, self.total_in, self.total_out, client._provider_name
+            ),
+        }
 
 
 class OpenAIAgentClient(AgentClient):
@@ -239,10 +409,9 @@ class OpenAIAgentClient(AgentClient):
         """Execute the queued prompt against the OpenAI API (/v1/chat/completions).
 
         Requires a valid OpenAI API key (sk-...) from https://platform.openai.com/api-keys.
-        Implements a full multi-turn tool-use loop.
+        The multi-turn tool-use loop is the shared WorkPilot loop
+        (``harness.application.loop``); ``_OpenAIAdapter`` speaks the protocol.
         """
-        import json as _json
-
         if not self._pending_query:
             return
 
@@ -299,240 +468,15 @@ class OpenAIAgentClient(AgentClient):
 
         session = self._get_http_client()
 
-        _total_in = 0
-        _total_out = 0
-        self._start_usage_ledger()
-        progress = ProgressTracker()
-
-        for turn in range(self.max_turns):
-            payload: dict[str, Any] = {
-                "model": self.model,
-                "messages": messages,
-                "stream": False,
-            }
-            if tools:
-                payload["tools"] = tools
-                payload["tool_choice"] = "auto"
-            # Provider-specific token optimizations (omitted when None):
-            if self._reasoning_effort:
-                payload["reasoning_effort"] = self._reasoning_effort
-            if self._prompt_cache_key:
-                payload["prompt_cache_key"] = self._prompt_cache_key
-
-            logger.info(
-                f"[OpenAIAgentClient] Turn {turn + 1}/{self.max_turns}: "
-                f"sending {len(messages)} messages..."
-            )
-
-            try:
-                async with session.post(
-                    self._api_base,
-                    json=payload,
-                    headers=request_headers,
-                    allow_redirects=not getattr(self, "_offline_only", False),
-                ) as resp:
-                    if resp.status != 200:
-                        error_text = await resp.text()
-                        logger.error(
-                            f"[OpenAIAgentClient] API error ({resp.status}): {error_text[:500]}"
-                        )
-                        yield AgentMessage(
-                            role=MessageRole.SYSTEM,
-                            content=[
-                                ContentBlock(
-                                    type=ContentBlockType.TEXT,
-                                    text=f"OpenAI API error ({resp.status}): {error_text}",
-                                )
-                            ],
-                        )
-                        return
-                    data = await resp.json()
-            except Exception as e:
-                logger.error(f"[OpenAIAgentClient] Request failed: {e}")
-                yield AgentMessage(
-                    role=MessageRole.SYSTEM,
-                    content=[
-                        ContentBlock(
-                            type=ContentBlockType.TEXT,
-                            text=self._describe_request_error(e),
-                        )
-                    ],
-                )
-                return
-
-            # Accumulate token usage from each turn
-            _u = data.get("usage", {})
-            _total_in += _u.get("prompt_tokens", 0)
-            _total_out += _u.get("completion_tokens", 0)
-            if _u.get("prompt_tokens"):
-                self.last_context_tokens = int(_u["prompt_tokens"])
-            self._record_call(from_chat_completion(_u))
-
-            choices = data.get("choices", [])
-            if not choices:
-                yield AgentMessage(
-                    role=MessageRole.ASSISTANT,
-                    content=[
-                        ContentBlock(
-                            type=ContentBlockType.TEXT,
-                            text="(Empty response from OpenAI)",
-                        )
-                    ],
-                )
-                return
-
-            message = choices[0].get("message", {})
-            content = message.get("content") or ""
-            tool_calls = message.get("tool_calls", [])
-            finish_reason = choices[0].get("finish_reason", "")
-
-            logger.info(
-                f"[OpenAIAgentClient] Turn {turn + 1}: "
-                f"content_len={len(content)}, tool_calls={len(tool_calls)}, "
-                f"finish_reason={finish_reason}"
-            )
-
-            if content:
-                yield AgentMessage(
-                    role=MessageRole.ASSISTANT,
-                    content=[ContentBlock(type=ContentBlockType.TEXT, text=content)],
-                )
-
-            if not tool_calls:
-                if not content:
-                    yield AgentMessage(
-                        role=MessageRole.ASSISTANT,
-                        content=[
-                            ContentBlock(
-                                type=ContentBlockType.TEXT,
-                                text="(No response from OpenAI)",
-                            )
-                        ],
-                    )
-                logger.info(
-                    f"[OpenAIAgentClient] Session complete after {turn + 1} turn(s)"
-                )
-                self.last_usage = {
-                    "input_tokens": _total_in,
-                    "output_tokens": _total_out,
-                    "cost_usd": _openai_cost_usd(
-                        self.model, _total_in, _total_out, self._provider_name
-                    ),
-                }
-                return
-
-            assistant_msg: dict[str, Any] = {"role": "assistant"}
-            if content:
-                assistant_msg["content"] = content
-            assistant_msg["tool_calls"] = tool_calls
-            messages.append(assistant_msg)
-
-            turn_calls: list[tuple[str, Any, str]] = []
-            for tc in tool_calls:
-                func = tc.get("function", {})
-                tool_name = func.get("name", "")
-                tool_id = tc.get("id", f"call_{turn}_{tool_name}")
-
-                try:
-                    args = _json.loads(func.get("arguments", "{}"))
-                except (_json.JSONDecodeError, TypeError):
-                    args = {}
-
-                logger.info(
-                    f"[OpenAIAgentClient] Turn {turn + 1}: tool_call {tool_name}({list(args.keys())})"
-                )
-                print(f"[OpenAIAgentClient] 🔧 Tool: {tool_name}", flush=True)
-
-                yield AgentMessage(
-                    role=MessageRole.ASSISTANT,
-                    content=[
-                        ContentBlock(
-                            type=ContentBlockType.TOOL_USE,
-                            tool_name=tool_name,
-                            tool_id=tool_id,
-                            tool_input=args,
-                        )
-                    ],
-                )
-
-                result_text = ""
-                is_error = False
-                if self._mcp_manager is not None and self._mcp_manager.has_tool(
-                    tool_name
-                ):
-                    try:
-                        result = await self._mcp_manager.call(tool_name, args)
-                        result_text = str(result) if result is not None else ""
-                    except Exception as e:
-                        result_text = f"MCP tool error: {e}"
-                        is_error = True
-                        logger.warning(
-                            f"[OpenAIAgentClient] MCP tool {tool_name} failed: {e}"
-                        )
-                elif self._tool_executor:
-                    try:
-                        result = await self._tool_executor.execute(tool_name, args)
-                        result_text = str(result) if result is not None else ""
-                    except Exception as e:
-                        result_text = f"Tool error: {e}"
-                        is_error = True
-                        logger.warning(
-                            f"[OpenAIAgentClient] Tool {tool_name} failed: {e}"
-                        )
-                else:
-                    result_text = "Tool executor not available"
-                    is_error = True
-
-                yield AgentMessage(
-                    role=MessageRole.ASSISTANT,
-                    content=[
-                        ContentBlock(
-                            type=ContentBlockType.TOOL_RESULT,
-                            tool_use_id=tool_id,
-                            is_error=is_error,
-                            result_content=result_text,
-                        )
-                    ],
-                )
-
-                messages.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": tool_id,
-                        "content": truncate_tool_result(result_text),
-                    }
-                )
-                turn_calls.append((tool_name, args, result_text))
-
-            stop = self._check_progress(progress, turn_calls, messages)
-            if stop is not None:
-                yield stop
-                break
-
-            # Elide stale tool results once the conversation exceeds the char
-            # budget (no-op below budget, preserving OpenAI's automatic
-            # prefix cache for normal-sized sessions).
-            compacted = compact_messages(messages)
-            if compacted:
-                logger.info(
-                    f"[OpenAIAgentClient] History compaction: elided {compacted} "
-                    "stale tool result(s)"
-                )
-        else:
-            logger.warning(
-                f"[OpenAIAgentClient] Reached max_turns ({self.max_turns}) — stopping tool loop"
-            )
-            print(
-                f"[OpenAIAgentClient] ⚠️ Reached max turns ({self.max_turns})",
-                flush=True,
-            )
-        self.last_usage = {
-            "input_tokens": _total_in,
-            "output_tokens": _total_out,
-            "cost_usd": _openai_cost_usd(
-                self.model, _total_in, _total_out, self._provider_name
-            ),
-        }
+        ledger = self._start_usage_ledger()
+        adapter = _OpenAIAdapter(
+            self, messages, tools=tools, session=session, headers=request_headers
+        )
+        async with aclosing(
+            run_turns(adapter, max_turns=self.max_turns, ledger=ledger)
+        ) as turns:
+            async for message in turns:
+                yield message
 
     def provider_name(self) -> str:
         return self._provider_name
