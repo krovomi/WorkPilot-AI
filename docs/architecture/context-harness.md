@@ -325,11 +325,16 @@ n'économise aucun token et ne change aucun comportement.
   fabrique.
 - Quand le runner cesse de lire (plafond de coût), la boucle referme l'appel en cours : le
   `finally` de l'adaptateur s'exécute, comme quand la boucle était en ligne.
-- Quatre défauts relevés en caractérisant sont épinglés par des tests, pas corrigés : un
-  `"tool_calls": null` fait planter OpenAI, Copilot et Windsurf REST, un `"usage": null` OpenAI ;
-  l'appel servi par le repli GitHub Models de Copilot n'est pas mesuré ; en mode texte Windsurf,
-  une erreur de session Cascade reçue en texte, sans identifiants à rafraîchir, est rendue comme
-  la réponse du modèle.
+- Quatre défauts relevés en caractérisant, corrigés ensuite, chacun avec son test :
+  - un champ `null` d'une réponse compatible OpenAI (`tool_calls`, `usage`, `choices`,
+    `message`, `finish_reason`) faisait planter OpenAI, Copilot et Windsurf REST ; il vaut
+    maintenant un champ absent ;
+  - l'appel servi par le repli GitHub Models de Copilot n'était pas mesuré ; il l'est, comme les
+    suivants ;
+  - Windsurf renvoie parfois son erreur de session Cascade en texte, avec un 200. Sans identifiants
+    à rafraîchir, elle était rendue comme la réponse du modèle, en mode texte comme dans l'appel
+    unique sans outils ; c'est maintenant une erreur ;
+  - les identifiants étaient rafraîchis deux fois de suite sur cette erreur ; ils le sont une fois.
 
 Tests : d'abord la caractérisation, contre l'ancien code : `tests/core/test_windsurf_loops.py` (les
 deux boucles Windsurf, qu'aucun test ne faisait tourner), `tests/core/test_openai_loop.py`,

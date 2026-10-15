@@ -608,17 +608,19 @@ async def test_google_and_compatible_providers_run_the_same_loop(costs, monkeypa
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("data", "error"),
+    "data",
     [
-        ({"choices": [{"message": {"content": "hi", "tool_calls": None}}]}, TypeError),
-        ({"usage": None, "choices": [{"message": {"content": "hi"}}]}, AttributeError),
+        {"choices": [{"message": {"content": "hi", "tool_calls": None}}]},
+        {"usage": None, "choices": [{"message": {"content": "hi"}}]},
+        {"choices": [{"message": {"content": "hi"}, "finish_reason": None}]},
     ],
 )
-async def test_a_null_field_raises(costs, data, error):
-    """Pins two bugs reported with lot 1b-ii: ``"tool_calls": null`` crashes
-    the turn's log line, ``"usage": null`` the usage reading, where an
-    OpenAI-compatible endpoint that sends them should end the turn."""
+async def test_a_null_field_ends_the_turn(costs, data):
+    """An OpenAI-compatible endpoint may send a field as ``null``. The turn
+    ends with its text: ``"tool_calls": null`` crashed the turn's log line,
+    ``"usage": null`` the usage reading."""
     client, _session = _client([_Response(200, data)])
 
-    with pytest.raises(error):
-        await _collect(client)
+    messages = await _collect(client)
+
+    assert _shape(messages) == [("assistant", "text", "hi")]

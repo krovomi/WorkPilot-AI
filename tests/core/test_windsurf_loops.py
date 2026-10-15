@@ -565,10 +565,9 @@ async def test_rest_the_ledger_restarts_before_the_first_message(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_rest_a_null_tool_calls_field_raises(monkeypatch):
-    """Pins a bug reported with lot 1b-ii: the turn's log line takes the
-    length of ``tool_calls``, so an endpoint that sends ``null`` crashes the
-    loop instead of ending the turn."""
+async def test_rest_a_null_tool_calls_field_ends_the_turn(monkeypatch):
+    """An endpoint that sends ``"tool_calls": null`` ends the turn with its
+    text. The turn's log line took its length and crashed the loop."""
     client, _session = _rest_client(
         [
             _Response(
@@ -578,8 +577,9 @@ async def test_rest_a_null_tool_calls_field_raises(monkeypatch):
         monkeypatch=monkeypatch,
     )
 
-    with pytest.raises(TypeError):
-        await _collect(client)
+    messages = await _collect(client)
+
+    assert _shape(messages) == [("assistant", "text", "hi")]
 
 
 # =============================================================================
@@ -828,18 +828,19 @@ async def test_text_mode_a_session_error_sent_as_text_is_retried(cascade, monkey
 
     assert _shape(messages) == [("assistant", "text", "Recovered.")]
     assert len(fake.requests) == 2
-    # Refreshed twice: once on reading the error, again on the retry itself.
-    assert seen == {"discover": 2, "invalidate": 2, "sleeps": [1.5, 1.5]}
+    # Refreshed once, by the retry. It was refreshed twice: once on reading
+    # the error, again on the retry itself.
+    assert seen == {"discover": 1, "invalidate": 1, "sleeps": [1.5]}
     assert fake.credentials == ["creds-1", "creds-2"]
 
 
 @pytest.mark.asyncio
-async def test_text_mode_a_session_error_that_cannot_refresh_reads_as_an_answer(
+async def test_text_mode_a_session_error_that_cannot_refresh_is_an_error(
     cascade, monkeypatch
 ):
-    """Pins a bug reported with lot 1b-ii: when the session error comes back
-    as text and the credentials cannot be refreshed, the error text is
-    yielded as the model's answer instead of an error."""
+    """A session error that comes back as text, with credentials that cannot
+    be refreshed, ends the response as an error. It was yielded as the model's
+    answer."""
     import integrations.windsurf_proxy.auth as auth
 
     _patch_refresh(monkeypatch)
@@ -854,7 +855,9 @@ async def test_text_mode_a_session_error_that_cannot_refresh_reads_as_an_answer(
 
     messages = await _collect(client)
 
-    assert _shape(messages) == [("assistant", "text", error_text)]
+    assert _shape(messages) == [
+        ("system", "text", f"Windsurf gRPC error: {error_text}")
+    ]
 
 
 @pytest.mark.asyncio
@@ -955,3 +958,29 @@ async def test_text_mode_without_tools_is_a_single_request(cascade):
     assert _shape(messages) == [("assistant", "text", f"Answer {_tag()}")]
     assert len(fake.requests) == 1
     assert fake.requests[0][0] == {"role": "system", "content": "be brief"}
+
+
+@pytest.mark.asyncio
+async def test_without_tools_a_session_error_that_cannot_refresh_is_an_error(
+    cascade, monkeypatch
+):
+    """The single-shot path (no tools) reads the session error the same way:
+    as an error, never as the model's answer."""
+    import integrations.windsurf_proxy.auth as auth
+
+    _patch_refresh(monkeypatch)
+
+    def no_ide():
+        raise RuntimeError("Windsurf is not running")
+
+    monkeypatch.setattr(auth, "discover_credentials", no_ide)
+    error_text = "failed_precondition: cascade session error"
+    fake = cascade([error_text])
+    client = _text_client(tools=False)
+
+    messages = await _collect(client)
+
+    assert _shape(messages) == [
+        ("system", "text", f"Windsurf gRPC error: {error_text}")
+    ]
+    assert len(fake.requests) == 1

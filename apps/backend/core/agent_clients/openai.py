@@ -88,10 +88,11 @@ class ChatCompletionsAdapter(LoopAdapter):
         self.finish_reason = ""
 
     def read_choice(self, choices: list[dict[str, Any]], turn: int) -> Reply:
-        message = choices[0].get("message", {})
+        # An OpenAI-compatible endpoint may send a field as null: `or`, not a default.
+        message = choices[0].get("message") or {}
         content = message.get("content") or ""
-        tool_calls = message.get("tool_calls", [])
-        self.finish_reason = choices[0].get("finish_reason", "")
+        tool_calls = message.get("tool_calls") or []
+        self.finish_reason = choices[0].get("finish_reason") or ""
 
         logger.info(
             f"[{self.label}] Turn {turn + 1}: "
@@ -105,7 +106,7 @@ class ChatCompletionsAdapter(LoopAdapter):
 
     @staticmethod
     def _tool_call(tc: dict[str, Any], turn: int) -> ToolCall:
-        func = tc.get("function", {})
+        func = tc.get("function") or {}
         tool_name = func.get("name", "")
         tool_id = tc.get("id", f"call_{turn}_{tool_name}")
         try:
@@ -205,14 +206,14 @@ class _OpenAIAdapter(ChatCompletionsAdapter):
             return
 
         # Accumulate token usage from each turn
-        _u = data.get("usage", {})
+        _u = data.get("usage") or {}
         self.total_in += _u.get("prompt_tokens", 0)
         self.total_out += _u.get("completion_tokens", 0)
         if _u.get("prompt_tokens"):
             client.last_context_tokens = int(_u["prompt_tokens"])
         yield Measured(from_chat_completion(_u))
 
-        choices = data.get("choices", [])
+        choices = data.get("choices") or []
         if not choices:
             yield self.text("(Empty response from OpenAI)")
             yield Outcome.HALT
