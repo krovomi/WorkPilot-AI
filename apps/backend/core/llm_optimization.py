@@ -34,10 +34,9 @@ Design (matches industry guidance from Anthropic / OpenAI / Google docs):
 6. **History compaction** — the generic multi-turn loops (OpenAI-style message
    lists used by Copilot / OpenAI / Windsurf) grow unbounded: old tool results
    are re-sent at full price on every turn. `compact_messages()` elides stale
-   tool results once the conversation exceeds a char budget. It only triggers
-   ABOVE the budget so the cacheable prefix stays byte-stable for normal-sized
-   sessions (compacting early would invalidate the automatic prefix cache every
-   turn, costing more than it saves).
+   tool results once the conversation exceeds a char budget, in one batch down
+   to well under it (`harness.domain.policies`): every elision rewrites the
+   cached prefix from that point, so it happens rarely and frees a lot.
 
 The Claude path is intentionally untouched beyond the shared system prompt:
 the Claude Agent SDK already performs prompt caching (1h TTL is enabled in
@@ -51,6 +50,7 @@ import re
 from pathlib import Path
 
 from harness.domain.layout import Segment, Stability, assemble
+from harness.domain.policies import ClearingPolicy, Entry, plan_clearing
 
 # ---------------------------------------------------------------------------
 # 1+2. Shared system prompt (single source of truth, byte-stable)
@@ -409,43 +409,41 @@ def compact_messages(
 ) -> int:
     """Elide stale tool results in an OpenAI-style message list (in place).
 
-    Only triggers when the total content size exceeds `char_budget`. Never
-    touches: the system message(s), the first user message (the task prompt),
-    assistant messages (they carry tool_calls structure), or the `keep_recent`
-    most recent messages. Eligible messages are elided oldest-first until the
-    conversation fits the budget.
+    Only triggers when the total content size exceeds `char_budget`, and then
+    elides oldest-first, in one batch, down to 60 % of it
+    (`ClearingPolicy.for_budget`): the next turns fit without another rewrite
+    of the cached prefix. A batch that would free less than a tenth of the
+    budget is not worth that rewrite and is skipped. Never touches: the system
+    message(s), the first user message (the task prompt), assistant messages
+    (they carry the tool calls, so the model can run one again), or the
+    `keep_recent` most recent messages.
 
-    Returns the number of messages elided (0 when under budget).
+    Returns the number of messages elided (0 when nothing was).
     """
     budget = char_budget if char_budget is not None else history_char_budget()
-    total = sum(_message_len(m) for m in messages)
-    if total <= budget:
-        return 0
-
-    # Locate the first user message (task prompt) — protected.
     first_user_idx = next(
         (i for i, m in enumerate(messages) if m.get("role") == "user"), None
     )
-    cutoff = max(0, len(messages) - keep_recent)
+    entries = [
+        Entry(_message_len(msg), idx != first_user_idx and _is_tool_result(msg))
+        for idx, msg in enumerate(messages)
+    ]
+    chosen = plan_clearing(
+        entries,
+        ClearingPolicy.for_budget(budget, keep_recent=keep_recent),
+        marker_chars=len(_ELIDED_PLACEHOLDER),
+    )
+    for idx in chosen:
+        messages[idx]["content"] = _ELIDED_PLACEHOLDER
+    return len(chosen)
 
-    elided = 0
-    for idx, msg in enumerate(messages):
-        if total <= budget:
-            break
-        if idx >= cutoff or idx == first_user_idx:
-            continue
-        role = msg.get("role")
-        content = msg.get("content")
-        if not isinstance(content, str) or len(content) <= len(_ELIDED_PLACEHOLDER):
-            continue
 
-        is_tool_message = role == "tool"
-        is_text_tool_result = role == "user" and _TEXT_TOOL_RESULT_RE.match(content)
-        if not (is_tool_message or is_text_tool_result):
-            continue
-
-        total -= len(content) - len(_ELIDED_PLACEHOLDER)
-        msg["content"] = _ELIDED_PLACEHOLDER
-        elided += 1
-
-    return elided
+def _is_tool_result(message: dict) -> bool:
+    """A tool's answer: a ``tool`` message, or Windsurf's text-mode result."""
+    content = message.get("content")
+    if not isinstance(content, str):
+        return False
+    role = message.get("role")
+    return role == "tool" or (
+        role == "user" and bool(_TEXT_TOOL_RESULT_RE.match(content))
+    )
