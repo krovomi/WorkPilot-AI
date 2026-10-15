@@ -121,16 +121,23 @@ For non-Anthropic providers, tier aliases such as `sonnet` are rewritten to
 
 ### Which providers actually use it
 
-- **Claude**: `create_client` composes the roster, binds the result contract and
-  allow-lists the SDK's `Agent` tool. The parent model decides when to delegate, from
-  each specialist's `description`; no prompt names the roster.
-- **Copilot**: declared `native`, but the Copilot branch of `create_agent_client`
-  converts only the `agents` dict the caller passes and never calls `resolve()`
-  (`roster` is accepted and unused). `CopilotAgentClient` stores them, and its turn
-  loop exposes no delegation tool; `run_subagents()` has no production caller. A
-  Kanban build on Copilot therefore runs without subagents, while the workflow
-  profile still reports `subagent-per-task` for `coding`.
-- **Every other provider**: no roster (`subagents: none`).
+`capabilities/providers.yaml` declares three states (rationale:
+`docs/architecture/delegation.md`):
+
+- **`native` — Claude**: `create_client` composes the roster, binds the result
+  contract and allow-lists the SDK's `Agent` tool. The parent model decides when to
+  delegate, from each specialist's `description`; no prompt names the roster.
+- **`emulated` — every client that runs the WorkPilot loop** (Copilot, OpenAI,
+  Gemini, Ollama / LM Studio, Mistral, DeepSeek, Grok, Windsurf): `create_agent_client`
+  attaches the same composed roster, `_freeze_tools` offers it as one `delegate` tool
+  whose description lists the specialists, and `LoopAdapter.run_tool` runs each
+  delegation as a child session of the same client (`spawn_child`) with the
+  specialist's role as system prompt and its tools translated to the executor's
+  vocabulary and nothing else (`ToolExecutor.allowed_tools`, which only narrows the
+  type's grant). Several delegations in one turn run together; a child cannot delegate.
+- **`none` — the CLIs** (Codex, OpenCode, Antigravity) bring their own tools and take
+  no roster; the engine degrades `subagent-per-task` to `sequential-reset`. `openai`
+  under `OPENAI_AUTH_MODE=codex-cli` is read from the auth mode.
 
 ### At run time
 

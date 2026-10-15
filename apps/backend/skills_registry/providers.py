@@ -46,7 +46,17 @@ class ProviderCapabilities:
 
     @property
     def supports_subagents(self) -> bool:
-        return self.subagents == "native"
+        """Whether a roster reaches the model on this provider, by any route.
+
+        ``native`` (the Claude SDK) and ``emulated`` (the ``delegate`` tool
+        and a child session per delegation) both do; ``none`` is the CLIs and
+        the providers without an adapter.
+        """
+        return self.subagents in ("native", "emulated")
+
+    @property
+    def emulates_subagents(self) -> bool:
+        return self.subagents == "emulated"
 
     @property
     def has_adapter(self) -> bool:

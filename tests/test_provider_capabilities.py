@@ -42,14 +42,36 @@ class TestMatrix:
         missing = configured - declared
         assert not missing, f"providers with no declared capabilities: {missing}"
 
-    @pytest.mark.parametrize("name", ["claude", "copilot"])
-    def test_only_claude_and_copilot_run_subagents(self, name):
-        assert get_provider_capabilities(name).supports_subagents
+    def test_only_claude_runs_subagents_natively(self):
+        caps = get_provider_capabilities("claude")
+        assert caps.supports_subagents
+        assert not caps.emulates_subagents
 
     @pytest.mark.parametrize(
-        "name", ["openai", "google", "ollama", "windsurf", "mistral", "deepseek"]
+        "name",
+        [
+            "copilot",
+            "openai",
+            "google",
+            "ollama",
+            "local",
+            "lmstudio",
+            "windsurf",
+            "mistral",
+            "deepseek",
+            "grok",
+        ],
     )
-    def test_everything_else_does_not(self, name):
+    def test_every_loop_provider_emulates_them(self, name):
+        # The WorkPilot loop offers the roster as `delegate` and runs a child
+        # session per delegation: a roster reaches the model on all of these.
+        caps = get_provider_capabilities(name)
+        assert caps.has_adapter
+        assert caps.supports_subagents
+        assert caps.emulates_subagents
+
+    @pytest.mark.parametrize("name", ["opencode", "antigravity", "meta", "aws"])
+    def test_the_clis_and_the_adapterless_do_not(self, name):
         assert not get_provider_capabilities(name).supports_subagents
 
     @pytest.mark.parametrize("name", ["meta", "aws", "cursor", "custom"])

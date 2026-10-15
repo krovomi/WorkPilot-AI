@@ -253,6 +253,11 @@ class ToolExecutor:
         # shared cap (``tool_result_max_chars``); a client with a small window
         # sets its own.
         self.result_max_chars: int | None = None
+        # A narrower set than the type's, in the executor's vocabulary: what a
+        # delegated child session may run (``harness.application.delegation``).
+        # ``None`` is the type's own set. Checked after the type's gate, never
+        # instead of it: a child cannot be granted what its parent's type lacks.
+        self.allowed_tools: frozenset[str] | None = None
         self.working_directory = self.project_dir
         if working_directory is not None:
             self.working_directory = self._resolve_within_project(working_directory)
@@ -322,6 +327,13 @@ class ToolExecutor:
                 f"Tool '{tool_name}' is not available to this agent "
                 f"({self.agent_type}): its role does not include it. "
                 "Work with the tools you were given."
+            )
+
+        if self.allowed_tools is not None and tool_name not in self.allowed_tools:
+            logger.info("tool %s refused: outside the delegated scope", tool_name)
+            return (
+                f"Tool '{tool_name}' is not available to this sub-agent: its role "
+                "does not include it. Work with the tools you were given."
             )
 
         if tool_name == "read_file":
