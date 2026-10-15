@@ -1609,3 +1609,14 @@ le câblage étant un chantier à part (décrit ci-dessous).
 Statut des constats de l'audit précédent : F1, F3, F4, F5, F7, F8, F9, F10, F12, F16, F17, F19 **ouverts** ;
 F2, F13 **partiels** ; F6, F11, F14, F18 **aggravés** ; F15 **atténué**. Nouveaux : F20 à F36.
 Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16.
+
+## Annexe C — Ce qui a changé le 15 octobre 2026 (`7ef6fca` → `e3e468f` + PR #454)
+
+| PR | Changement | Effet sur les constats |
+|---|---|---|
+| #454 | Le roster de sous-agents atteint le modèle sur tout provider de la boucle WorkPilot (états `native` / `emulated` / `none`, outil `delegate`, session enfant à outils restreints, vague parallèle, Codex CLI lu depuis le mode d'auth) | **F49** nouveau, résolu par la PR elle-même ; F18 : la matrice dit maintenant ce que chaque provider fait des sous-agents |
+| #455 | Plan par lots pour spécialiser le traitement par type de carte (`docs/architecture/kanban-task-types.md`) | **F51** nouveau, partiel (plan accepté, rien livré) ; **F50** nouveau (mock `_bmad/` qui réussit), décision à prendre au lot 2 |
+| #456 | README racine, backend, agents, skills réalignés sur le code | aucun |
+
+Les trois constats sont décrits dans l'atlas (`WorkPilot-architecture.html`, vue 06) ; la feuille de
+route est la vue 09, lisible sans prérequis technique comme la vue 00.
