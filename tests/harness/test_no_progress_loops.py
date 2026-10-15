@@ -28,6 +28,9 @@ from harness.domain.progress import (
     REPEATS_BEFORE_STOP,
 )
 
+# ``_OllamaSession.post`` takes a ``json=`` argument, which shadows the module.
+_dumps = json.dumps
+
 READ_CALL = {
     "id": "call_1",
     "function": {"name": "read_file", "arguments": json.dumps({"path": "a.py"})},
