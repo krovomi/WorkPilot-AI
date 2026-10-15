@@ -35,6 +35,10 @@ class ClaudeAgentClient(AgentClient):
     with hasattr()/getattr() patterns.
     """
 
+    # The SDK stops a session at max_budget_usd itself (create_client sets it
+    # from the same cap): the session runner does not add its own.
+    enforces_own_budget = True
+
     def __init__(self, sdk_client: Any):
         """
         Args:
