@@ -247,6 +247,22 @@ mask's character never occurs in a token or a URL. This also stops a
 whole-config save from copying the global Claude token into the project
 file.
 
+Saving the whole config is also why the renderer's copy is **bound to the
+project it was read for**. Loading is asynchronous, so for a few renders a
+screen holds the previous project's configuration while the selected project
+is already the new one — and the fields are uncontrolled inputs whose `onBlur`
+fires exactly then, as the pointer leaves them for the project switcher. A save
+in that window wrote one project's settings into another project's file. It was
+found on disk: a local-only test project with no git remote at all held
+`GITHUB_REPO=krovomi/WorkPilot-AI`, `GITHUB_AUTO_SYNC=true` and another
+project's Context7 key — the key in clear, because the copy predates the mask
+above. `useProjectEnvConfig` therefore *derives* `envConfig` rather than
+storing it, null unless what was loaded belongs to the project selected right
+now, so the existing `if (!envConfig) return` guards hold in every ordering; a
+check in an effect would still leave the render in between. The settings
+dialog's `committedEnvConfigRef` carries the same project id and refuses a save
+whose base belongs elsewhere.
+
 Two screens used to send the value itself somewhere. The main process now
 reads it instead:
 

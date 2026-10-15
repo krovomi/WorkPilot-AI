@@ -10,6 +10,7 @@ import type {
 	ProjectEnvConfig,
 	ProjectSettings as ProjectSettingsType,
 } from "../../../../shared/types";
+import type { LoadedProjectEnv } from "../../../hooks";
 import { checkGitHubConnection as checkGitHubConnectionGlobal } from "../../../stores/github";
 import { setProjectEnvConfig } from "../../../stores/project-env-store";
 import {
@@ -130,8 +131,12 @@ export function useProjectSettings(
 	const [isLoadingEnv, setIsLoadingEnv] = useState(false);
 	const [envError, setEnvError] = useState<string | null>(null);
 	// Ref to track the latest committed config - used to handle concurrent updateEnvConfig calls
-	// This ensures rapid updates don't lose changes due to stale state reads
-	const committedEnvConfigRef = useRef<ProjectEnvConfig | null>(null);
+	// This ensures rapid updates don't lose changes due to stale state reads.
+	// It carries the project it was read for: a save sends the whole
+	// configuration, so one built on another project's base would write that
+	// project's settings — its repository, its tokens — into this one's file.
+	// See hooks/useProjectEnvConfig, which binds the same way for the MCP page.
+	const committedEnvConfigRef = useRef<LoadedProjectEnv | null>(null);
 
 	// Password visibility toggles
 	const [showClaudeToken, setShowClaudeToken] = useState(false);
@@ -210,7 +215,10 @@ export function useProjectSettings(
 					const result = await window.electronAPI.getProjectEnv(project.id);
 					if (result.success && result.data) {
 						setEnvConfig(result.data);
-						committedEnvConfigRef.current = result.data;
+						committedEnvConfigRef.current = {
+							projectId: project.id,
+							config: result.data,
+						};
 						// Update the shared store so other components (like Sidebar) can react
 						setProjectEnvConfig(project.id, result.data);
 					} else {
@@ -440,7 +448,10 @@ export function useProjectSettings(
 				const envResult = await window.electronAPI.getProjectEnv(project.id);
 				if (envResult.success && envResult.data) {
 					setEnvConfig(envResult.data);
-					committedEnvConfigRef.current = envResult.data;
+					committedEnvConfigRef.current = {
+						projectId: project.id,
+						config: envResult.data,
+					};
 					// Update global store so Sidebar reflects correct GitHub/GitLab enabled state
 					setProjectEnvConfig(project.id, envResult.data);
 				}
@@ -497,7 +508,10 @@ export function useProjectSettings(
 				const envResult = await window.electronAPI.getProjectEnv(project.id);
 				if (envResult.success && envResult.data) {
 					setEnvConfig(envResult.data);
-					committedEnvConfigRef.current = envResult.data;
+					committedEnvConfigRef.current = {
+						projectId: project.id,
+						config: envResult.data,
+					};
 					// Update global store so Sidebar and other components reflect changes
 					setProjectEnvConfig(project.id, envResult.data);
 				}
@@ -542,7 +556,18 @@ export function useProjectSettings(
 	const updateEnvConfig = async (updates: Partial<ProjectEnvConfig>) => {
 		// Use the committed ref as base to handle concurrent calls correctly
 		// This ensures rapid updates don't lose changes due to stale state reads
-		const baseConfig = committedEnvConfigRef.current || envConfig;
+		const loaded = committedEnvConfigRef.current;
+		if (loaded && loaded.projectId !== project.id) {
+			// The dialog moved to another project while this field was losing
+			// focus. Saving would write the previous project's whole
+			// configuration here; the reload that is already running is what
+			// provides a base for this project.
+			console.warn(
+				"[useProjectSettings] the loaded configuration belongs to another project — skipping save.",
+			);
+			return;
+		}
+		const baseConfig = loaded?.config || envConfig;
 		if (!baseConfig) {
 			console.warn(
 				"[useProjectSettings] updateEnvConfig called but baseConfig is null — skipping save. Updates:",
@@ -567,7 +592,7 @@ export function useProjectSettings(
 
 		// Update the ref BEFORE the await (optimistically) to prevent race conditions
 		// If two calls happen rapidly, the second will see the first's changes in the ref
-		committedEnvConfigRef.current = newConfig;
+		committedEnvConfigRef.current = { projectId: project.id, config: newConfig };
 
 		// Update the shared store so other components (like Sidebar) can react immediately
 		setProjectEnvConfig(project.id, newConfig);
