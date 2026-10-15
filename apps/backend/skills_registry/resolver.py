@@ -1,6 +1,6 @@
 """Deciding which skills a project actually gets.
 
-Three gates, in order. A skill has to clear all three:
+Four gates, in order. A skill has to clear all four:
 
 1. **Pack selection and pin** — ``skills.toml``'s ``[packs]`` table is a
    *want-list*: a pack it does not name is not resolved at all, and a pack it
@@ -25,6 +25,12 @@ Three gates, in order. A skill has to clear all three:
    is on. This is the axis that keeps .NET 10 guidance away from a .NET
    Framework 4.8 codebase.
 3. **Runtime prerequisites** — ``requires`` must be satisfiable *right now*.
+4. **Prompt injection** — the body must not read as an instruction addressed to
+   the agent that will follow it. Last because it is the only gate that reads
+   content, so it only ever looks at what the first three kept, and a refusal
+   here leaves a clean duplicate of the same name free to win the collision
+   below. Why it exists, and why it refuses rather than cleans:
+   ``injection_gate``.
 
 Gate 3 is what fixes the failure this whole registry was built for: 76 BMAD
 skills were committed pointing at ``_bmad/core/tasks/workflow.xml``, a path that
@@ -43,6 +49,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from security.untrusted import GUARD_MODE_ENV_VAR
+
+from .injection_gate import GATE as INJECTION_GATE
+from .injection_gate import scan_skill_body
 from .packs import Pack, SkillSource
 from .project import ProjectConfig
 from .targets import satisfies, targets_match
@@ -58,7 +68,7 @@ class Rejection:
     kind: str
     pack: str
     gate: str
-    """``pack-pin`` | ``targets`` | ``requires`` | ``name-collision``"""
+    """``pack-pin`` | ``targets`` | ``requires`` | ``injection`` | ``name-collision``"""
     reason: str
 
 
@@ -227,6 +237,25 @@ def resolve(
                         Rejection(src.name, src.kind, pack.name, "requires", reason)
                     )
                     continue
+
+            verdict = scan_skill_body(src.body, source=f"{pack.name}/{src.name}")
+            if verdict.refused:
+                result.rejected.append(
+                    Rejection(
+                        src.name,
+                        src.kind,
+                        pack.name,
+                        INJECTION_GATE,
+                        f"the body of {src.path.name} reads as a prompt "
+                        f"injection, which a {src.kind} every agent follows may "
+                        f"not: {verdict.summary}. It is refused rather than "
+                        f"cleaned — read the file, and remove the passage or "
+                        f"stop vendoring the pack. "
+                        f"{GUARD_MODE_ENV_VAR}=report downgrades this to a "
+                        f"warning.",
+                    )
+                )
+                continue
 
             owner = claimed.get((src.kind, src.name))
             if owner is not None:

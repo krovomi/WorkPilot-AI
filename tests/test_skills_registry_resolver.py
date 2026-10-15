@@ -1,4 +1,8 @@
-"""Tests for skill resolution: the three gates, and the non-regression promise.
+"""Tests for skill resolution: the gates, and the non-regression promise.
+
+Gate 4, prompt injection, has its own file
+(`test_skills_registry_injection_gate.py`): it is the only gate that reads a
+body, and the false-positive half of its promise needs the real `skills/`.
 
 The promise this file pins down: **a project targeting an older toolchain keeps
 resolving to the skills written for it, no matter what newer variants ship.**

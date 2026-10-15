@@ -53,3 +53,43 @@ manager = SkillManager("apps/backend/skills")
 skill = manager.load_skill("framework-migration")
 result = skill.execute_script("analyze_stack.py", {"project-root": "/path/to/project"})
 ```
+
+## Gate 4 : un corps de skill ne s'adresse pas à l'agent
+
+Un skill n'est pas un document : `.agents/skills/<nom>/SKILL.md` est une procédure que tout agent
+connecté peut charger et suivre, sur n'importe quel provider, dans toutes les sessions suivantes.
+Or `skills/` est alimenté par quatre chemins — `skills-cli add` puis le `bootstrap` (le dépôt d'un
+tiers, à sa propre cadence de release), le job hebdomadaire `skills-sync`, l'adoption hermes, et
+l'écriture à la main — et un corps ne devient une instruction qu'au moment où le build l'émet.
+La barrière est donc une **quatrième porte du resolver** (`skills_registry/injection_gate.py`),
+posée à la frontière d'émission : une seule porte couvre les quatre chemins, là où un contrôle par
+chemin manquerait le cinquième.
+
+**Refusé, pas nettoyé.** `clean_untrusted` retire les porteurs et rend un texte utilisable, ce qui
+est la bonne réponse pour une issue qu'un agent doit quand même lire. C'est la mauvaise ici :
+personne n'a besoin d'un skill vendorisé dont on a ôté la charge, et réécrire le fichier d'un tiers
+ferait que le contenu émis ne correspond plus au tree SHA enregistré dans `skills-lock.json`. Le
+skill n'est pas émis, et `skills-cli why <skill>` dit pourquoi.
+
+**Le corps brut *et* le corps nettoyé sont scannés**, et c'est la porte elle-même, pas un détail :
+l'assainisseur retire les commentaires HTML et tronque au-delà d'un plafond, donc ne scanner que sa
+sortie répond « safe » pour un fichier que le build émet *avec le commentaire dedans*, et ne voit
+rien après la troncature.
+
+**Ce qui refuse est une liste fermée, pas un seuil.** Un skill qui parle de travaux dangereux
+contient légitimement du texte dangereux : au premier passage, la porte a refusé `claude-code` et
+`computer-use` (commandes destructrices, maniement d'identifiants) puis `bmad-prfaq` (« act as a
+customer »). Seuls les verdicts qui signifient *ce corps parle à l'agent* refusent — balises et
+marqueurs de rôle, ordres explicites d'oubli, d'écrasement d'instruction ou d'extraction de prompt.
+Un marqueur ou une balise ne s'écrit pas par accident ; une tournure verbale si. Le reste est
+rapporté. Ce qu'un skill dit de *faire* reste du ressort de la revue humaine de la PR qui le
+vendorise : cette porte n'est pas une revue, et rien n'y accorde la confiance à la place de
+quelqu'un.
+
+**Un scanner absent ne refuse rien**, comme partout ailleurs (`security/untrusted.py` : la
+détection ne vaut jamais un build échoué). C'est une barrière contre un amont empoisonné, pas une
+dépendance du build. `WORKPILOT_INJECTION_GUARD=report` rétrograde un refus en avertissement.
+
+`tests/test_skills_registry_injection_gate.py` tient les deux moitiés de la promesse : le refus
+(dont la charge cachée dans un commentaire HTML) et l'absence de faux positif, en scannant
+**chaque `SKILL.md` commité** du dépôt.
