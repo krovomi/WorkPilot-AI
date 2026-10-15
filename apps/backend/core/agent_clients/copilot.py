@@ -12,6 +12,8 @@ import re
 from collections.abc import AsyncIterator
 from typing import Any
 
+from harness.domain import from_chat_completion
+
 # Common token-optimization trunk shared by every generic (OpenAI-style)
 # multi-turn loop: head+tail tool-result truncation and over-budget history
 # compaction. The module is importable under both package layouts.
@@ -579,6 +581,7 @@ class CopilotAgentClient(AgentClient):
         # Copilot is subscription-based — no token counts in API response.
         # Mark as "recorded" immediately so session.py always logs a Copilot entry.
         self.last_usage = {"input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0}
+        self._start_usage_ledger()
 
         prompt = self._pending_query
         self._pending_query = None
@@ -892,6 +895,7 @@ class CopilotAgentClient(AgentClient):
                             _cu = data.get("usage") if isinstance(data, dict) else None
                             if isinstance(_cu, dict) and _cu.get("prompt_tokens"):
                                 self.last_context_tokens = int(_cu["prompt_tokens"])
+                            self._record_call(from_chat_completion(_cu))
                     break  # request succeeded — leave the retry loop
                 except (
                     _asyncio.TimeoutError,

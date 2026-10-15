@@ -20,6 +20,7 @@ from core.agent_clients.antigravity_cli import (
     build_antigravity_args,
     context_tokens_from_usage,
 )
+from harness.domain import CallUsage
 
 
 class _LineReader:
@@ -363,6 +364,11 @@ async def test_turn_parses_stream_json_events(tmp_path: Path) -> None:
         "cache_read_tokens": 0,
         "total_tokens": 1357,
     }
+    # One call per step that reported usage; the process total is not a call.
+    assert client.usage_ledger.calls == [
+        CallUsage(prompt=500, cache_read=None, cache_write=None, output=20),
+        CallUsage(prompt=800, cache_read=None, cache_write=None, output=30),
+    ]
 
 
 @pytest.mark.asyncio

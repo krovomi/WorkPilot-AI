@@ -18,6 +18,7 @@ from core.agent_client import (
     LocalModelRuntimeError,
     MessageRole,
 )
+from harness.domain import CallUsage
 
 
 @pytest.fixture(autouse=True)
@@ -130,6 +131,9 @@ async def test_streamed_chunks_become_one_assistant_turn():
         "output_tokens": 12,
         "cost_usd": 0.0,
     }
+    # Ollama says nothing about a cache: unknown, and the empty reply is no call.
+    assert client.usage_ledger.calls == [CallUsage(900, None, None, 12)]
+    assert client.usage_ledger.cache_hit_ratio() is None
 
 
 @pytest.mark.asyncio

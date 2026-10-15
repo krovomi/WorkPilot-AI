@@ -37,6 +37,7 @@ from contextlib import aclosing
 from typing import Any
 
 from core.platform import build_windows_command, find_executable
+from harness.domain import from_step_tokens
 
 from .base import AgentMessage, MessageRole
 from .cli_subprocess import (
@@ -245,6 +246,7 @@ class OpenCodeCliAgentClient(CliSubprocessAgentClient):
             raise _opencode_error(error) from error
 
         self.last_context_tokens = None
+        self._start_usage_ledger()
         stderr_task = asyncio.create_task(process.stderr.read())
         text_seen = False
         tool_seen = False
@@ -307,6 +309,7 @@ class OpenCodeCliAgentClient(CliSubprocessAgentClient):
                         totals["reasoning_tokens"] += as_int(tokens.get("reasoning"))
                         totals["cache_read_input_tokens"] += read
                         totals["cache_creation_input_tokens"] += write
+                        self._record_call(from_step_tokens(tokens))
                 elif event_type == "error":
                     raise _opencode_error(_error_detail(event))
 

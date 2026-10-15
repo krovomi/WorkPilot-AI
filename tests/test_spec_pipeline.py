@@ -10,6 +10,7 @@ Tests the spec/pipeline.py module functionality including:
 - Specs directory path resolution
 """
 
+import importlib
 import json
 import sys
 import time
@@ -105,8 +106,8 @@ _mocked_module_names = [
 # Import them for real *before* `core` is replaced below; once it is, Python
 # cannot resolve a submodule of it ("'core' is not a package"). Without this
 # the file only collected when an earlier test file had imported them.
-import core.build_signals
-import core.pause_state
+importlib.import_module("core.build_signals")
+importlib.import_module("core.pause_state")
 
 # `SpecOrchestrator` numbers spec folders through `core.workspace.models.
 # SpecNumberLock`, and the numbering tests below assert real numbers. A
@@ -115,7 +116,7 @@ import core.pause_state
 # an earlier file had already imported `spec.pipeline`; run alone, the file
 # failed 24 tests. The module holds only dataclasses and enums, and
 # `tests/conftest.py` already keeps it real (`_MODULES_TO_PRESERVE`).
-import core.workspace.models
+importlib.import_module("core.workspace.models")
 
 for name in _mocked_module_names:
     if name in sys.modules:

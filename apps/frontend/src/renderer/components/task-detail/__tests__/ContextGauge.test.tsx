@@ -104,6 +104,39 @@ describe("ContextGauge", () => {
 		expect(screen.queryByTestId("context-gauge-not-measured")).not.toBeInTheDocument();
 	});
 
+	it("shows the cache share, and 'not reported' rather than 0% without one", async () => {
+		useContextUsageStore
+			.getState()
+			.applyEvent("t1", { ...usage, cacheHitRatio: 0.874, prefixRewrites: 0 });
+		wrap(<ContextGauge task={makeTask("in_progress")} />);
+		fireEvent.click(screen.getByTestId("context-gauge"));
+		expect(await screen.findByTestId("context-gauge-cache")).toHaveTextContent(
+			'tasks:contextManagement.gauge.cache:{"ratio":87}',
+		);
+
+		act(() =>
+			useContextUsageStore
+				.getState()
+				.applyEvent("t1", { ...usage, cacheHitRatio: 0.4, prefixRewrites: 2 }),
+		);
+		expect(screen.getByTestId("context-gauge-cache")).toHaveTextContent(
+			'tasks:contextManagement.gauge.cacheRewrites:{"ratio":40,"count":2}',
+		);
+
+		act(() =>
+			useContextUsageStore
+				.getState()
+				.applyEvent("t1", { ...usage, cacheHitRatio: null, prefixRewrites: 0 }),
+		);
+		expect(screen.getByTestId("context-gauge-cache")).toHaveTextContent(
+			"tasks:contextManagement.gauge.cacheNotReported",
+		);
+
+		// An event from a backend that predates the figure shows nothing.
+		act(() => useContextUsageStore.getState().applyEvent("t1", usage));
+		expect(screen.queryByTestId("context-gauge-cache")).not.toBeInTheDocument();
+	});
+
 	it("shows the percent, the zone and the handoff badge", () => {
 		useContextUsageStore.getState().applyEvent("t1", usage);
 		wrap(<ContextGauge task={makeTask("in_progress")} />);

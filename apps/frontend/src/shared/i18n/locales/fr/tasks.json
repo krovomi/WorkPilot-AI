@@ -1886,7 +1886,10 @@
 			"thresholdTooltip": "Seuil {{value}} % · mode {{mode}}",
 			"phase": "Phase : {{phase}}",
 			"open": "Réglages de la mémoire de contexte",
-			"notMeasured": "Pas encore mesuré : la jauge se remplit dès que la première session d'agent démarre."
+			"notMeasured": "Pas encore mesuré : la jauge se remplit dès que la première session d'agent démarre.",
+			"cache": "Cache : {{ratio}} % du prompt relu",
+			"cacheRewrites": "Cache : {{ratio}} % du prompt relu · préfixe réécrit {{count}} fois",
+			"cacheNotReported": "Cache : non rapporté par ce provider"
 		},
 		"handoff": {
 			"preparing": "Relais…",

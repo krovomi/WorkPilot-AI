@@ -12,6 +12,8 @@ import re
 from collections.abc import AsyncIterator
 from typing import Any
 
+from harness.domain import from_eval_counts
+
 # Common token-optimization trunk shared by every generic (OpenAI-style)
 # multi-turn loop: head+tail tool-result truncation and over-budget history
 # compaction. The module is importable under both package layouts.
@@ -1211,6 +1213,7 @@ class LocalAgentClient(OpenAIAgentClient):
         session = self._get_http_client()
         _total_in = 0
         _total_out = 0
+        self._start_usage_ledger()
         # Pull-on-demand guard: if the requested model isn't installed, we pull
         # it once (it may be a library name like "qwen2.5-coder" the user never
         # ran `ollama pull` on) and retry, instead of failing with a 404.
@@ -1585,6 +1588,8 @@ class LocalAgentClient(OpenAIAgentClient):
             _total_out += int(data.get("eval_count", 0) or 0)
             if data.get("prompt_eval_count"):
                 self.last_context_tokens = int(data["prompt_eval_count"])
+            if data.get("prompt_eval_count") or data.get("eval_count"):
+                self._record_call(from_eval_counts(data))
 
             message = data.get("message") or {}
             content = message.get("content") or ""
