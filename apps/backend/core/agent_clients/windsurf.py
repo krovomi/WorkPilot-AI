@@ -11,6 +11,7 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 from harness.domain import from_chat_completion
+from harness.domain.progress import ProgressTracker
 
 # Common token-optimization trunk shared by every generic (OpenAI-style)
 # multi-turn loop: head+tail tool-result truncation and over-budget history
@@ -702,6 +703,11 @@ class WindsurfAgentClient(AgentClient):
         # their pages under that, instead of being cut in the middle.
         if self._tool_executor is not None:
             self._tool_executor.result_max_chars = 8000
+        # Text mode reports no usage: the ledger stays empty rather than
+        # holding the previous response's calls, so nothing downstream
+        # measures this response against another one's numbers.
+        self._start_usage_ledger()
+        progress = ProgressTracker()
 
         for turn in range(self.max_turns):
             logger.info(
@@ -859,6 +865,7 @@ class WindsurfAgentClient(AgentClient):
 
             # Execute each tool call and collect results
             result_parts: list[str] = []
+            turn_calls: list[tuple[str, Any, str]] = []
             for i, tc in enumerate(tool_calls):
                 tool_name = tc["name"]
                 tool_args = tc["arguments"]
@@ -916,10 +923,16 @@ class WindsurfAgentClient(AgentClient):
                     f"{truncated}\n"
                     f"</tool_result>"
                 )
+                turn_calls.append((tool_name, tool_args, result_text))
 
             # Add tool results as a user message for the next turn
             results_message = "\n\n".join(result_parts)
             messages.append({"role": "user", "content": results_message})
+
+            stop = self._check_progress(progress, turn_calls, messages)
+            if stop is not None:
+                yield stop
+                return
 
             # Elide stale tool results once the conversation exceeds the char
             # budget (text-mode results are user messages starting with
@@ -1026,6 +1039,7 @@ class WindsurfAgentClient(AgentClient):
         _ws_total_in = 0
         _ws_total_out = 0
         self._start_usage_ledger()
+        progress = ProgressTracker()
 
         for turn in range(self.max_turns):
             payload: dict[str, Any] = {
@@ -1205,6 +1219,7 @@ class WindsurfAgentClient(AgentClient):
             messages.append(assistant_msg)
 
             # Execute each tool call
+            turn_calls: list[tuple[str, Any, str]] = []
             for tc in tool_calls:
                 func = tc.get("function", {})
                 tool_name = func.get("name", "")
@@ -1270,6 +1285,12 @@ class WindsurfAgentClient(AgentClient):
                         "content": truncate_tool_result(result_text),
                     }
                 )
+                turn_calls.append((tool_name, args, result_text))
+
+            stop = self._check_progress(progress, turn_calls, messages)
+            if stop is not None:
+                yield stop
+                break
 
             # Elide stale tool results once the conversation exceeds the char
             # budget (no-op below budget, preserving the cacheable prefix).
@@ -1281,14 +1302,14 @@ class WindsurfAgentClient(AgentClient):
                 )
 
             # Continue loop — next turn will send updated messages with tool results
-
-        logger.warning(
-            f"[WindsurfAgent] Reached max_turns ({self.max_turns}) — stopping tool loop"
-        )
-        print(
-            f"[WindsurfAgent] ⚠️ Reached max turns ({self.max_turns})",
-            flush=True,
-        )
+        else:
+            logger.warning(
+                f"[WindsurfAgent] Reached max_turns ({self.max_turns}) — stopping tool loop"
+            )
+            print(
+                f"[WindsurfAgent] ⚠️ Reached max turns ({self.max_turns})",
+                flush=True,
+            )
         self.last_usage = {
             "input_tokens": _ws_total_in,
             "output_tokens": _ws_total_out,
