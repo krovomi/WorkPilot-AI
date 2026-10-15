@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 from core.llm_optimization import (
     _ELIDED_PLACEHOLDER,
+    _TOOL_USE_HINT,
     build_base_system_prompt,
     compact_messages,
     openai_prompt_cache_key,
@@ -28,13 +29,18 @@ class TestBuildBaseSystemPrompt:
         # Prompt caching is a prefix match — the builder must be deterministic.
         assert build_base_system_prompt(tmp_path) == build_base_system_prompt(tmp_path)
 
-    def test_tool_use_hint_appended(self, tmp_path: Path):
+    def test_tool_use_hint_added_before_the_working_directory(self, tmp_path: Path):
         without = build_base_system_prompt(tmp_path)
         with_hint = build_base_system_prompt(tmp_path, tool_use_hint=True)
         assert "You MUST use the provided tools" not in without
         assert "You MUST use the provided tools" in with_hint
-        # The hint is appended AFTER the stable base (cache-friendly ordering)
-        assert with_hint.startswith(without)
+        # The hint adds itself and nothing else. It is the same for every task
+        # of a provider, so it sits with the shared rules, before the worktree's
+        # path (cache-friendly ordering, tests/harness/test_stable_prefix.py).
+        assert with_hint.replace(_TOOL_USE_HINT, "", 1) == without
+        assert with_hint.index("You MUST use the provided tools") < with_hint.index(
+            "Your working directory is"
+        )
 
     def test_accepts_string_path(self, tmp_path: Path):
         assert build_base_system_prompt(str(tmp_path)) == build_base_system_prompt(

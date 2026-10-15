@@ -53,6 +53,7 @@ from core.progress import (
     print_progress_summary,
     print_session_header,
 )
+from harness.domain.layout import Segment, Stability, assemble
 from integrations.linear.updater import (
     LinearTaskState,
     is_linear_enabled,
@@ -620,6 +621,43 @@ def _emit_phase_failure(
         TaskEventEmitter.from_spec_dir(spec_dir).emit(event, payload)
     except Exception:
         logger.debug("Failed to emit %s event", event, exc_info=True)
+
+
+def _coding_task_segments(
+    project_dir: Path, spec_dir: Path, effort: str
+) -> list[Segment]:
+    """The part of a coding prompt that every subtask of the task shares.
+
+    It leads each subtask's prompt (harness lot 2,
+    `docs/architecture/context-harness.md`). Every section here is the same
+    from one subtask to the next, and each ends on the blank line that
+    separates it from what follows.
+    """
+
+    def section(name: str, text: str, stability: Stability) -> Segment:
+        return Segment(name, f"{text}\n\n" if text else "", stability)
+
+    return [
+        # The constitution applies to every subtask, not to the one that
+        # happens to mention a library — so it goes in whole, each time.
+        section("constitution", constitution_section(project_dir), Stability.PROJECT),
+        # Same reasoning: the platform rules apply to every subtask, not to
+        # the one that happens to mention a device.
+        section("mobile", mobile_section(project_dir), Stability.PROJECT),
+        section("effort", effort, Stability.TASK),
+        # The ADRs bind every subtask too; the attachments come with them
+        # because a subtask implementing a screen is the one that needs the
+        # mockup.
+        section("documents", docintel_section(project_dir, spec_dir), Stability.TASK),
+        # What `analyze` and `mobile-design` found between planning and
+        # coding — each report's head and path rather than its body, since
+        # this section is paid on every subtask (`workflows.handoff`).
+        section(
+            "reports",
+            workflow_reports_section(spec_dir, "coding", inline=False),
+            Stability.TASK,
+        ),
+    ]
 
 
 def _docs_section(spec_dir: Path, subtask: dict | None = None) -> str:
@@ -1708,7 +1746,7 @@ async def run_autonomous_agent(
             phase = find_phase_for_subtask(plan, subtask_id) if plan else {}
 
             # Generate focused, minimal prompt for this subtask
-            prompt = generate_subtask_prompt(
+            subtask_prompt = generate_subtask_prompt(
                 spec_dir=spec_dir,
                 project_dir=project_dir,
                 subtask=next_subtask,
@@ -1716,12 +1754,21 @@ async def run_autonomous_agent(
                 attempt_count=attempt_count,
                 recovery_hints=recovery_hints,
             )
-            if workflow_plan is not None and effort_preamble is not None:
-                prompt = (
-                    effort_preamble(workflow_plan, "coding", _workflow_repo_root)
-                    + "\n\n"
-                    + prompt
-                )
+            effort = (
+                effort_preamble(workflow_plan, "coding", _workflow_repo_root)
+                if workflow_plan is not None and effort_preamble is not None
+                else ""
+            )
+            # What every subtask of the task shares first, the subtask after
+            # it: each subtask is a new session, and a provider that caches
+            # the first tokens of a prompt reads that block from its cache
+            # instead of being billed for it again behind a subtask header.
+            prompt = assemble(
+                [
+                    *_coding_task_segments(project_dir, spec_dir, effort),
+                    Segment("subtask", subtask_prompt, Stability.SESSION),
+                ]
+            )
 
             # Interrupted mid-subtask: the replayed transcript shows what the
             # previous session did, this says its end was not a conclusion.
@@ -1765,32 +1812,8 @@ async def run_autonomous_agent(
             if docs_context:
                 prompt += "\n\n" + docs_context
 
-            # The constitution applies to every subtask, not to the one that
-            # happens to mention a library — so it goes in whole, each time.
-            constitution = constitution_section(project_dir)
-            if constitution:
-                prompt += "\n\n" + constitution
-
-            # Same for the ADRs; the attachments come with them because a
-            # subtask implementing a screen is the one that needs the mockup.
-            documents = docintel_section(project_dir, spec_dir)
-            if documents:
-                prompt += "\n\n" + documents
-
-            # What `analyze` and `mobile-design` found between planning and
-            # coding — each report's head and path rather than its body, since
-            # this section is paid on every subtask (`workflows.handoff`).
-            reports = workflow_reports_section(spec_dir, "coding", inline=False)
-            if reports:
-                prompt += "\n\n" + reports
-
-            # Same reasoning as the constitution: the platform rules apply to
-            # every subtask, not to the one that happens to mention a device.
-            mobile = mobile_section(project_dir)
-            if mobile:
-                prompt += "\n\n" + mobile
-
-            # The opposite of the two above, deliberately: the design system
+            # The opposite of the constitution and the platform rules,
+            # deliberately (`_coding_task_segments`): the design system
             # goes to the subtasks whose declared files are on the interface,
             # and to none other — a full-stack task pays for it on its front
             # end only, a backend task never (`uiux.prompt`).
