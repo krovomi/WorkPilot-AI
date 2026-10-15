@@ -84,6 +84,8 @@ l'enfant ne ponte aucun serveur MCP.
 ## Tests
 
 `tests/harness/test_delegation.py` (traduction, outil, session enfant sur un client factice,
-interception, vague), `tests/test_agent_client_factory.py::TestRosterReachesEveryLoopClient`,
+interception, vague), `tests/harness/test_delegation_end_to_end.py` (le vrai `OpenAIAgentClient`
+contre un serveur OpenAI-compatible local scripté : outil `delegate` sur le fil, session enfant avec
+les seuls outils du spécialiste, `run_command` réellement exécuté, conclusion bornée, ledger), `tests/test_agent_client_factory.py::TestRosterReachesEveryLoopClient`,
 `tests/test_agent_tool_rights.py` (le scope ne s'élargit jamais),
 `tests/test_provider_capabilities.py`, `tests/test_workflow_engine.py::TestCodexDispatch`.

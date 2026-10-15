@@ -103,17 +103,36 @@ def test_a_missing_skills_dir_is_empty_not_an_error(tmp_path: Path):
 
 
 def test_this_repos_committed_palette_is_all_runnable():
-    """Nothing in `.agents/skills/` should be gated on this checkout.
+    """Everything in `.agents/skills/` is listed here, with one bounded exception.
 
-    If this fails, an output was committed that the build would not have
-    emitted here — someone hand-edited `.agents/skills/` or committed after a
-    bootstrap that the next clone will not have.
+    The exception is a skill gated on the mock runtime this repository commits
+    for its own build (`_bmad/scripts/resolve_customization.py`, F50): it is
+    emitted so `build --check` agrees locally and in CI, and the palette hides
+    it because it would fail on invocation. Anything else hidden means an
+    output was committed that the build would not have emitted here — someone
+    hand-edited `.agents/skills/` or committed after a bootstrap that the next
+    clone will not have.
     """
+    from skills_registry.frontmatter import parse_frontmatter
+    from skills_registry.resolver import is_mock_runtime
+
     listed = names(REPO_ROOT)
     on_disk = {
         p.parent.name for p in (REPO_ROOT / ".agents" / "skills").glob("*/SKILL.md")
     }
-    assert listed == on_disk, f"committed but unusable here: {sorted(on_disk - listed)}"
+    hidden = on_disk - listed
+    for name in sorted(hidden):
+        meta, _ = parse_frontmatter(
+            (REPO_ROOT / ".agents" / "skills" / name / "SKILL.md").read_text(
+                encoding="utf-8"
+            )
+        )
+        runtime = (meta.get("metadata") or {}).get("workpilot", {}).get("requires", {})
+        runtime = runtime.get("runtime") if isinstance(runtime, dict) else None
+        assert runtime and is_mock_runtime(REPO_ROOT / runtime), (
+            f"committed but unusable here, and not gated on the mock: {name}"
+        )
+    assert listed <= on_disk
 
 
 # ── the gate must not become a filesystem probe ───────────────────────────────
@@ -169,3 +188,41 @@ def test_a_legitimate_nested_runtime_still_resolves(tmp_path: Path):
 def test_an_escaping_runtime_hides_the_command_from_the_palette(tmp_path: Path):
     write_skill(tmp_path, "probe", requires={"runtime": "../../../etc/passwd"})
     assert names(tmp_path) == set()
+
+
+def test_the_committed_mock_runtime_hides_the_command(tmp_path: Path):
+    """The stand-in this repository commits for its own build is not a
+    runtime: a command gated on it would fail on invocation, so the palette
+    treats it as absent (F50)."""
+    write_skill(
+        tmp_path,
+        "bmad-create-prd",
+        requires={"runtime": "_bmad/scripts/resolve_customization.py"},
+    )
+    runtime = tmp_path / "_bmad" / "scripts"
+    runtime.mkdir(parents=True)
+    (runtime / "resolve_customization.py").write_text(
+        '#!/usr/bin/env python3\n"""workpilot-mock — not BMAD\'s runtime."""\n',
+        encoding="utf-8",
+    )
+    assert names(tmp_path) == set()
+    # The real thing has no marker and is listed.
+    (runtime / "resolve_customization.py").write_text(
+        "#!/usr/bin/env python3\nprint('resolved')\n", encoding="utf-8"
+    )
+    assert names(tmp_path) == {"bmad-create-prd"}
+
+
+def test_the_build_gate_still_accepts_the_mock(tmp_path: Path):
+    """`skills-cli build` must keep emitting the gated skills from this
+    repository: the mock exists for that, and for nothing else."""
+    from skills_registry.resolver import check_requires
+
+    runtime = tmp_path / "_bmad" / "scripts"
+    runtime.mkdir(parents=True)
+    (runtime / "resolve_customization.py").write_text(
+        "#!/usr/bin/env python3\n# workpilot-mock\n", encoding="utf-8"
+    )
+    requires = {"runtime": "_bmad/scripts/resolve_customization.py"}
+    assert check_requires(requires, tmp_path)[0] is True
+    assert check_requires(requires, tmp_path, accept_mock=False)[0] is False
