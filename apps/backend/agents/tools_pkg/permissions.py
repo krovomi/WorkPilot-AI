@@ -118,6 +118,10 @@ def mcp_tools_for_servers(servers: list[str]) -> list[str]:
             from uiux.integration import MCP_TOOL_NAMES as UIUX_TOOL_NAMES
 
             tools.extend(UIUX_TOOL_NAMES)
+        elif server == "code":
+            from harness.tools.code_search import MCP_TOOL_NAMES as CODE_TOOL_NAMES
+
+            tools.extend(CODE_TOOL_NAMES)
         # workpilot tools are already added via config["auto_claude_tools"]
 
     return tools
@@ -150,6 +154,19 @@ def declared_tools(agent_type: str) -> frozenset[str] | None:
     if config is None:
         return None
     return frozenset(config.get("tools", []))
+
+
+def declared_servers(agent_type: str) -> frozenset[str] | None:
+    """The MCP servers an agent type declares, or ``None`` for a type nobody registered.
+
+    A WorkPilot server is a right like a tool: `tool_executor` offers its
+    tools to the other providers only when the type declares it, as
+    `create_client` starts it only then.
+    """
+    config = AGENT_CONFIGS.get(agent_type)
+    if config is None:
+        return None
+    return frozenset(config.get("mcp_servers", []))
 
 
 def undeclared_builtin_tools(agent_type: str) -> list[str]:

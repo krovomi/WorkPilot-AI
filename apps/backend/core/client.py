@@ -723,6 +723,13 @@ def _brain_mcp_tools() -> tuple[str, ...]:
     return MCP_TOOL_NAMES
 
 
+def _code_search_mcp_tools() -> tuple[str, ...]:
+    """`search_code`'s MCP tool names, for the permission allowlist."""
+    from harness.tools.code_search import MCP_TOOL_NAMES
+
+    return MCP_TOOL_NAMES
+
+
 def _claude_transcript_exists(session_id: str, config_dir: str | None) -> bool:
     """Whether the Claude SDK has an on-disk transcript for ``session_id``.
 
@@ -1054,6 +1061,11 @@ def create_client(
                     if "uiux" in required_servers
                     else []
                 ),
+                *(
+                    [f"{tool}(*)" for tool in _code_search_mcp_tools()]
+                    if "code" in required_servers
+                    else []
+                ),
                 *[f"{tool}(*)" for tool in browser_tools_permissions],
             ],
         },
@@ -1091,6 +1103,8 @@ def create_client(
         mcp_servers_list.append("workpilot-brain (shared brain)")
     if "uiux" in required_servers:
         mcp_servers_list.append("workpilot-uiux (ui-ux-pro-max design data)")
+    if "code" in required_servers:
+        mcp_servers_list.append("workpilot-code (ranked code excerpts)")
     if "workpilot" in required_servers and auto_claude_tools_enabled:
         mcp_servers_list.append(f"workpilot ({agent_type} tools)")
     if mcp_servers_list:
@@ -1289,6 +1303,15 @@ def create_client(
         mcp_servers["workpilot-verify"] = verify_server_config(
             project_dir, spec_dir, keep_apps=True
         )
+
+    # Ranked code excerpts (`harness/tools/code_search.py`) for a type that
+    # declares them: the same `search_code` the other providers get in-process
+    # from `tool_executor`, over the session's project only.
+    if "code" in required_servers:
+        from harness.tools.code_search import SERVER_KEY as CODE_SERVER_KEY
+        from harness.tools.code_search import mcp_server_config as code_server_config
+
+        mcp_servers[CODE_SERVER_KEY] = code_server_config(project_dir)
 
     # Add custom workpilot MCP server if required and available
     if "workpilot" in required_servers and auto_claude_tools_enabled:

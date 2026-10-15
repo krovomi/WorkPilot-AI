@@ -53,6 +53,7 @@ from .models import (
     is_electron_mcp_enabled,
 )
 from .permissions import (
+    declared_servers,
     declared_tools,
     get_all_agent_types,
     get_allowed_tools,
@@ -66,6 +67,7 @@ __all__ = [
     # Main API
     "create_auto_claude_mcp_server",
     "get_allowed_tools",
+    "declared_servers",
     "declared_tools",
     "undeclared_builtin_tools",
     "hooked_grants",
