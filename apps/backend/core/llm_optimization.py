@@ -10,7 +10,8 @@ Design (matches industry guidance from Anthropic / OpenAI / Google docs):
 1. **Stable prefix** — every provider with prompt caching (Anthropic explicit,
    OpenAI automatic >= 1024 tokens, Gemini implicit) caches on an exact prefix
    match. The shared system prompt is built once here so all providers send the
-   same byte-stable text, and volatile data never leads the prompt.
+   same byte-stable text, assembled by `harness.domain.layout` from the most
+   stable segment to the least: the worktree's path comes last.
 
 2. **Single system prompt source** — `build_base_system_prompt()` replaces the
    four copies that used to live inline in `core/client.py` (Claude / Copilot /
@@ -49,6 +50,8 @@ import os
 import re
 from pathlib import Path
 
+from harness.domain.layout import Segment, Stability, assemble
+
 # ---------------------------------------------------------------------------
 # 1+2. Shared system prompt (single source of truth, byte-stable)
 # ---------------------------------------------------------------------------
@@ -68,15 +71,16 @@ ARTIFACT_RULES = (
     "- Bullets of 25 words at most; free-text fields of 2 lines at most."
 )
 
-# Static instructions first (cache-friendly ordering); the working directory is
-# appended after — it is stable for the lifetime of a task/worktree, so the
-# whole prompt remains a stable prefix within a task.
+# The role and the rules: the same text for every task, on every provider. The
+# working directory is not in it: it differs from one worktree to the next, so
+# it comes last (`system_prompt_segments`), after everything tasks share.
 _BASE_PROMPT_STATIC = (
     "You are an expert full-stack developer building production-quality software. "
 )
 
 _BASE_PROMPT_RULES = (
-    "Your filesystem access is RESTRICTED to this directory only. "
+    "Your filesystem access is RESTRICTED to your working directory, given at the "
+    "end of this prompt. "
     "Use relative paths (starting with ./) for all file operations. "
     "Never use absolute paths or try to access files outside your working directory.\n\n"
     "You follow existing code patterns, write clean maintainable code, and verify "
@@ -97,6 +101,8 @@ _TOOL_USE_HINT = (
     "actually do it by calling the tools."
 )
 
+_DOCUMENT_SKILL = "convert-documents-to-markdown"
+
 
 def build_base_system_prompt(
     project_dir: Path | str,
@@ -107,7 +113,7 @@ def build_base_system_prompt(
 
     Args:
         project_dir: Working directory of the agent (resolved to absolute).
-        tool_use_hint: Append the explicit "use the tools" paragraph required
+        tool_use_hint: Add the explicit "use the tools" paragraph required
             by providers without native agentic tool training (Windsurf gRPC
             text-mode, OpenAI generic loop).
 
@@ -116,42 +122,64 @@ def build_base_system_prompt(
         tool_use_hint) pair — never embed timestamps or per-request data here,
         it would invalidate provider-side prompt caches on every call.
     """
+    return assemble(system_prompt_segments(project_dir, tool_use_hint=tool_use_hint))
+
+
+def system_prompt_segments(
+    project_dir: Path | str, *, tool_use_hint: bool = False
+) -> list[Segment]:
+    """The shared system prompt as segments, from the most stable to the least.
+
+    What every task shares (role, rules, the tool hint of a provider, rtk, the
+    brain's instructions) comes first, then the project's document skill, then
+    the worktree's absolute path. A provider that caches on the first tokens of
+    a prompt (OpenAI and its compatibles, DeepSeek, Gemini) can then reuse the
+    shared part from one task to the next; with the path second, as it used to
+    be, every task started a prefix of its own after one sentence.
+    """
     resolved = Path(project_dir).resolve()
-    prompt = (
-        f"{_BASE_PROMPT_STATIC}"
-        f"Your working directory is: {resolved}\n"
-        f"{_BASE_PROMPT_RULES}"
-    )
+    return [
+        Segment("rules", _BASE_PROMPT_STATIC + _BASE_PROMPT_RULES, Stability.STATIC),
+        Segment(
+            "tool_use_hint", _TOOL_USE_HINT if tool_use_hint else "", Stability.STATIC
+        ),
+        Segment("rtk", _rtk_awareness(), Stability.STATIC),
+        Segment("brain", _brain_awareness(), Stability.STATIC),
+        Segment("document_skill", _document_skill_section(resolved), Stability.PROJECT),
+        Segment(
+            "working_directory",
+            f"\n\nYour working directory is: {resolved}",
+            Stability.TASK,
+        ),
+    ]
+
+
+def _document_skill_section(resolved: Path) -> str:
+    """How to read document inputs: the project's skill when it has one."""
     # Bundled instructions also reach consumer worktrees without .agents/skills.
     from skills_registry.bundled import load_bundled_skill
 
-    document_skill_name = "convert-documents-to-markdown"
     project_skill_paths = (
-        f".agents/skills/{document_skill_name}/SKILL.md",
-        f".claude/commands/{document_skill_name}.md",
+        f".agents/skills/{_DOCUMENT_SKILL}/SKILL.md",
+        f".claude/commands/{_DOCUMENT_SKILL}.md",
     )
     project_skill = next(
         (path for path in project_skill_paths if (resolved / path).is_file()), None
     )
     if project_skill:
-        prompt += (
+        return (
             f"\n\nFor document inputs, first read ./{project_skill} and follow "
             "the project's document skill, within the task's permissions and network policy."
         )
-    else:
-        document_skill = load_bundled_skill(document_skill_name)
-        if document_skill is not None:
-            prompt += (
-                "\n\nDefault document handling follows. If the user invokes a project "
-                "or user command overriding this skill, follow that command's instructions "
-                "instead, within the task's permissions and network policy.\n\n"
-                + document_skill[1]
-            )
-    if tool_use_hint:
-        prompt += _TOOL_USE_HINT
-    prompt += _rtk_awareness()
-    prompt += _brain_awareness()
-    return prompt
+    document_skill = load_bundled_skill(_DOCUMENT_SKILL)
+    if document_skill is None:
+        return ""
+    return (
+        "\n\nDefault document handling follows. If the user invokes a project "
+        "or user command overriding this skill, follow that command's instructions "
+        "instead, within the task's permissions and network policy.\n\n"
+        + document_skill[1]
+    )
 
 
 def _brain_awareness() -> str:

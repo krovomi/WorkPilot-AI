@@ -1,7 +1,8 @@
 # Harness de contexte : le plan
 
 > **Statut : plan ; livrés : le lot 0 (mesurer, sauf sa ligne de base), le lot 1a (un budget
-> par session pour tous) et le lot 3a (lire et chercher par pages).** Ce fichier fixe la cible
+> par session pour tous), le lot 2 (un préfixe stable, sauf D3) et le lot 3a (lire et chercher
+> par pages).** Ce fichier fixe la cible
 > et l'ordre des lots ; chaque lot livré remplace sa section par la justification de ce qui existe. [`docs/CLAUDE.md`](../CLAUDE.md)
 > reste normatif : là où les deux divergent, il gagne. Le mécanisme existant de compaction et de
 > reset est décrit dans [`context-management.md`](context-management.md), que ce plan prolonge sans
@@ -76,7 +77,7 @@ sens partout, une boucle unique, et la troncature à la source.
 | Sujet | Aujourd'hui | Ce qui manque |
 |---|---|---|
 | Propriété de la boucle | boucles tierces : Claude Agent SDK (`max_turns` 1000), Codex, OpenCode, Antigravity. Boucles WorkPilot : **cinq copies** de `for turn in range(self.max_turns)` dans `core/agent_clients/` (OpenAI et ses dérivés, Ollama/LM Studio, Copilot, Windsurf ×2). Lot 1a : un même plafond de coût par session pour tous | une boucle partagée (lot 1b) |
-| Assemblage | un seul builder, `build_base_system_prompt` (`core/llm_optimization.py`), sans horodatage ; outils dans un ordre fixe ; `prompt_cache_key` côté OpenAI | le chemin absolu du worktree est la **deuxième phrase** du system : le préfixe change d'une tâche à l'autre, quel que soit le provider. La constitution spec-kit est inlinée dans le prompt de *chaque* sous-tâche |
+| Assemblage | un seul builder, `build_base_system_prompt` (`core/llm_optimization.py`), sans horodatage ; outils dans un ordre fixe ; `prompt_cache_key` côté OpenAI. Lot 2 : segments ordonnés par stabilité (`harness/domain/layout.py`), chemin du worktree en dernier, bloc de tâche en tête de chaque sous-tâche | des points de coupure de cache à la frontière tâche / sous-tâche chez Anthropic, que la CLI ne laisse pas poser |
 | Mesure | lot 0 livré : chaque client lit l'usage de chaque appel dans l'unité commune de `harness/domain/` et le cumule dans son `usage_ledger` ; `record_client_usage` en tire les champs du suivi des coûts, `CONTEXT_USAGE` le taux de hit et les réécritures de préfixe | la ligne de base sur des tâches réelles ; le coût par appel (seul le coût de session est connu) |
 | Compaction | `context_mgmt/` : garde par tâche, seuil 50 % par défaut (30–90), *compact* ou *clear*, handoff préparé en fond par le provider de la tâche, cap de 3 resets ; native sur Claude et Codex, émulée ailleurs | un seuil calculé sur la fenêtre annoncée, pas sur la fenêtre *payable* (palier de prix à 200 k chez certains providers) |
 | Tool clearing | boucles WorkPilot : `compact_messages` remplace les vieux résultats par un marqueur au-delà de 300 k caractères. Claude Code purge de son côté | pas de règle d'âge (« plus vieux que N tours »), pas de gain minimal |
@@ -267,7 +268,7 @@ providers sauf Claude, d'abord ; le remplacement des cinq boucles ensuite.
 Tests : `tests/harness/test_cost.py`, `tests/harness/test_session_budget.py` (la session s'arrête
 à l'appel qui dépasse, va au bout sous le plafond, et un modèle sans prix tourne sans plafond).
 
-**Lot 1b — Une seule boucle (reste à faire, après les lots 2 et 3).** `harness/application/loop.py`
+**Lot 1b — Une seule boucle (reste à faire, après le lot 3).** `harness/application/loop.py`
 remplace les cinq copies. C'est un remaniement : il n'économise aucun token, alors que les lots 2
 et 3 en économisent. Il passe donc après eux.
 
@@ -278,23 +279,50 @@ et 3 en économisent. Il passe donc après eux.
 *Sortie :* les cinq boucles passent par `loop.py` ; les tests existants des clients passent sans
 modification de leurs attentes. *Tests :* chaque condition d'arrêt, avec un modèle factice.
 
-### Lot 2 — Un préfixe stable
+### Lot 2 — Un préfixe stable (livré, sauf D3)
 
-- `harness/domain/layout.py` : le system devient une suite de segments typés par stabilité.
-  `build_base_system_prompt`, partagé par tous les providers, en est la première implémentation.
-- Le chemin absolu du worktree passe **après** les parties statiques (règles, `ARTIFACT_RULES`,
-  skill de documents, rtk), pour que ce préfixe se partage d'une tâche à l'autre.
-- Un **bloc de tâche** stable (constitution spec-kit, préambule d'effort, mémoire du projet) se
-  place juste après le system, avant la partie propre à la sous-tâche : chaque nouvelle session
-  de sous-tâche le relit depuis le cache au lieu de le repayer.
-- Les rosters de sous-agents vides par défaut pour les types à tâche unique (`commit_message`…) :
-  une définition inutile est du contexte payé à chaque tour (« The Unwired Loop »).
-- D3 tranché sur la mesure, là où un réglage existe.
+Chaque provider qui cache un prompt cache un préfixe : un octet qui change tôt fait repayer tout
+ce qui le suit. Deux choses changeaient trop tôt : le chemin absolu du worktree était la deuxième
+phrase du system partagé, et les sections communes à toutes les sous-tâches d'une tâche venaient
+après le texte propre à la sous-tâche.
 
-*Sortie :* à partir du deuxième appel d'une session, sur chaque provider qui rapporte le cache, le
-cache couvre au moins le préfixe, et le ledger ne compte aucune réécriture de préfixe hors
-compaction. *Tests :* deux assemblages successifs d'une même session ont un préfixe identique
-octet pour octet ; l'assembleur refuse un segment volatil placé avant un stable.
+- `harness/domain/layout.py` (pur) : un `Segment` porte un nom, un texte et une `Stability` —
+  qui le partage : statique (toutes les tâches de l'installation, sur un provider donné), projet,
+  tâche, session, tour. `assemble` joint les segments tels quels et refuse (`LayoutError`) un
+  segment placé après un plus volatil que lui ; un segment vide ne tient aucune place.
+  `shared_prefix` rend ce que partagent les détenteurs d'une classe.
+- **Le system partagé** (`build_base_system_prompt`, tous les providers) est assemblé par
+  `system_prompt_segments` : rôle et règles (`ARTIFACT_RULES` compris), rappel d'outils du
+  provider, rtk, cerveau (statiques), skill de documents (projet), puis le chemin du worktree
+  (tâche), en dernier. La règle d'accès disait « this directory » derrière le chemin ; elle dit
+  désormais « your working directory, given at the end of this prompt ». L'addendum de domaine de
+  la spec (`_inject_domain_addendum`) reste ajouté après lui : il est de la classe tâche.
+- **Le bloc de tâche** (`_coding_task_segments`, `agents/coder.py`) ouvre le prompt de chaque
+  sous-tâche : constitution spec-kit et règles de plateforme mobile (projet), préambule d'effort,
+  ADR et pièces jointes, rapports des phases précédentes (tâche). Le texte de la sous-tâche vient
+  ensuite, et son en-tête d'environnement, stable sur la tâche, le prolonge. Avant, seul le
+  préambule d'effort précédait la sous-tâche ; le reste la suivait.
+- **Rosters** : déjà en place. `agents/subagents/phases.py` donne le roster vide `solo` à chaque
+  type à tâche unique (`commit_message`, `merge_resolver`…), et
+  `tests/test_subagents_coverage.py` vérifie que seul `coder` retombe sur le roster par défaut.
+
+Ce que l'ordre rapporte dépend de la forme du cache, que le harness lit et ne suppose pas :
+
+| Cache | Providers | Gain |
+|---|---|---|
+| préfixe de tokens, automatique | OpenAI et les compatibles, DeepSeek, Gemini implicite ; Codex CLI, Antigravity et OpenCode, qui envoient notre system en tête de leur message | deux sous-tâches d'une tâche partagent system, outils, bloc de tâche et en-tête d'environnement ; deux tâches partagent le system jusqu'au chemin, pourvu qu'elles atteignent le même cache (OpenAI route par `prompt_cache_key`, posé par tâche et par phase, et une CLI peut placer son propre dossier de travail avant notre texte) |
+| par blocs, jusqu'à un point de coupure | Anthropic (Claude Agent SDK) | rien de mesurable : le system et le premier message sont chacun un seul bloc, et une correspondance partielle à l'intérieur d'un bloc n'existe pas. Il faudrait un point de coupure à la frontière tâche / sous-tâche, que la CLI ne laisse pas poser. L'ordre n'y coûte rien |
+| local ou non rapporté | Ollama, LM Studio, Copilot, Windsurf | un serveur local qui garde le KV d'un préfixe commun traite le prompt plus vite ; rien n'est facturé ni mesuré |
+
+**Reste à faire** : D3, qui se tranche sur les écarts entre appels mesurés par la ligne de base
+du lot 0. Et le critère de sortie, mesuré sur cette même ligne de base : à partir du deuxième
+appel d'une session, sur chaque provider qui rapporte le cache, le cache couvre au moins le
+préfixe, et le ledger ne compte aucune réécriture de préfixe hors compaction.
+
+Tests : `tests/harness/test_layout.py` (ordre accepté ou refusé, segments vides, préfixe partagé
+par classe), `tests/harness/test_stable_prefix.py` (deux worktrees envoient le même system
+jusqu'à leur chemin, avec ou sans rappel d'outils ; le chemin est le seul segment de tâche et le
+dernier ; deux sous-tâches partagent le bloc de tâche octet pour octet).
 
 ### Lot 3 — Troncature à la source
 
