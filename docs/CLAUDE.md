@@ -76,6 +76,7 @@ fichier-ci reste l'autorité sur les règles.
 | Applications mobiles | [mobile.md](architecture/mobile.md) | Détection de pile, appareils, chaîne d'outils ; iOS seulement sur macOS. |
 | Boucle de vérification | [verify.md](architecture/verify.md) | Lancer l'app, corriger, confirmer l'état, mesurer, garder la preuve. |
 | Bounty Board | [bounty-board.md](architecture/bounty-board.md) | Concours notés sur artefacts ; une preuve absente renormalise, ne vaut jamais zéro. |
+| Délégation aux sous-agents | [delegation.md](architecture/delegation.md) | `native` (Claude), `emulated` (outil `delegate` + session enfant du même client sur la boucle WorkPilot), `none` (CLI) ; le scope d'un enfant ne s'élargit jamais. |
 | Workflows déclaratifs | [workflows.md](architecture/workflows.md) | `workflow.yaml`, élagage par effort, fenêtres, rosters, passage de phase ; le logger de workflow. |
 | Pause et reprise | [pause-resume.md](architecture/pause-resume.md) | `core/pause_state.py`, `BuildPaused` / `BuildHalted`, reprendre une phase sans la payer deux fois. |
 | Gestion du contexte | [context-management.md](architecture/context-management.md) | Artefacts sobres (un fait, un endroit) et politique compact / clear par tâche, native ou émulée. |

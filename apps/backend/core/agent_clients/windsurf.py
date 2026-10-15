@@ -805,7 +805,12 @@ class WindsurfAgentClient(AgentClient):
                 yield message
 
     def supports_subagents(self) -> bool:
-        return False
+        # Emulated, in both modes: ``delegate`` runs a child session
+        # (``harness.application.delegation``).
+        return True
+
+    def delegates(self) -> bool:
+        return True
 
     def provider_name(self) -> str:
         return "windsurf"

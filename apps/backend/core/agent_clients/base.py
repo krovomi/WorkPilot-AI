@@ -9,6 +9,7 @@ every name defined here.
 
 from __future__ import annotations
 
+import copy
 import logging
 import os
 from abc import ABC, abstractmethod
@@ -299,17 +300,73 @@ class AgentClient(ABC):
     # session starts (``harness.application.tools``). ``None`` for a client
     # that sends no tools of its own: the CLIs bring theirs.
     tool_set: ToolSet | None = None
+    # The sub-agent roster this session may delegate to, by name
+    # (``agents.subagents.resolve``): ``SubagentDefinition``s, or the SDK's
+    # ``AgentDefinition``s on the Claude client, which runs them natively. On
+    # every other client the roster is offered to the model as the one
+    # ``delegate`` tool and run as a child session of this client
+    # (``harness.application.delegation``). Empty: nothing to delegate to.
+    agents: dict[str, Any] = {}
+    # Set on a child session: the executor tools it may run, and nothing else.
+    delegation_scope: frozenset[str] | None = None
+
+    # The attributes a child session must not share with its parent: what the
+    # parent is in the middle of (its query, its tools, its connection, its
+    # ledger). Everything else — credentials, endpoints, model, project — is
+    # exactly what the child needs and is copied by reference.
+    _CHILD_RESET: tuple[str, ...] = (
+        "_pending_query",
+        "_tool_executor",
+        "_mcp_manager",
+        "_http_client",
+        "_resumed_history",
+        "usage_ledger",
+        "tool_set",
+        "last_usage",
+        "last_context_tokens",
+    )
+
+    def delegates(self) -> bool:
+        """Whether this session runs its roster itself, as child sessions.
+
+        True for a client that runs the WorkPilot loop: the roster reaches
+        the model as the ``delegate`` tool. The Claude client (native) and the
+        CLIs (their own tools, no roster) answer False.
+        """
+        return False
+
+    def spawn_child(self) -> AgentClient:
+        """A fresh session of this client, for one sub-agent.
+
+        A shallow copy with the transient state reset: the child opens its own
+        connection and executor in ``__aenter__``, exactly as a new client
+        would, and cannot delegate in turn. A client whose state does not fit
+        that shape overrides this.
+        """
+        child = copy.copy(self)
+        for attribute in self._CHILD_RESET:
+            if hasattr(child, attribute):
+                setattr(child, attribute, None)
+        child._tool_definitions = []
+        child.agents = {}
+        child.delegation_scope = None
+        return child
 
     def _freeze_tools(self, definitions: Iterable[Mapping[str, Any]]) -> None:
         """The session's tools: sorted, serialized one way, computed once.
 
         Every turn sends ``_tool_definitions`` as set here; a second
-        preparation in the same session keeps the first set.
+        preparation in the same session keeps the first set. A session with a
+        roster and no delegated scope of its own also sends ``delegate``.
         """
+        from harness.application.delegation import delegate_tool_definition
         from harness.application.tools import session_tools
 
+        offered = list(definitions)
+        if self.agents and self.delegates() and self.delegation_scope is None:
+            offered.append(delegate_tool_definition(self.agents))
         self.tool_set = session_tools(
-            definitions, held=self.tool_set, owner=self.provider_name()
+            offered, held=self.tool_set, owner=self.provider_name()
         )
         self._tool_definitions = list(self.tool_set.tools)
 
@@ -538,7 +595,19 @@ class LoopAdapter:
     ) -> ToolResult:
         """One call, through the client's MCP bridge when it serves the tool,
         else its ``ToolExecutor``: the only two ways a WorkPilot loop runs a
-        tool. A failure is a result the model reads, never an exception."""
+        tool — plus ``delegate``, which runs a child session of the client
+        (``harness.application.delegation``). A failure is a result the model
+        reads, never an exception."""
+        from harness.application.delegation import is_delegation, run_delegation
+
+        if is_delegation(call.name):
+            if not self.client.agents or self.client.delegation_scope is not None:
+                return ToolResult(
+                    "No specialist is available to this session. Do the task "
+                    "yourself with the tools you were given.",
+                    is_error=True,
+                )
+            return ToolResult(await run_delegation(self.client, call.arguments))
         if mcp is not None and mcp.has_tool(call.name):
             try:
                 result = await mcp.call(call.name, call.arguments)

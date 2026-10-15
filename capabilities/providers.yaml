@@ -11,8 +11,17 @@
 #   adapter     the client class that drives this provider agentically.
 #               `null` means there is none — see `degrades_to`.
 #   subagents   native   the provider runs real subagents in their own context
+#                        (the Claude Agent SDK: `agents=` and its Agent tool)
+#               emulated WorkPilot runs them: the roster is offered to the model
+#                        as the `delegate` tool, and each delegation is a child
+#                        session of the same client with the specialist's tools
+#                        (harness/application/delegation.py). Every provider
+#                        driven by the WorkPilot loop is in this state.
 #               none     it cannot; the workflow runs phases sequentially with
-#                        a context reset instead of dispatching in parallel
+#                        a context reset instead of dispatching in parallel.
+#                        The CLIs (Codex, OpenCode, Antigravity) bring their
+#                        own tools and take no roster at run time; the registry
+#                        reaches them as files (`.codex/agents/`, …).
 #   effort      how reasoning depth is expressed, so phase_config can map onto it
 #   degrades_to what actually runs when `adapter` is null. Surfaced in the task
 #               feed, never silent.
@@ -41,17 +50,17 @@ claude:
 
 copilot:
   adapter: CopilotAgentClient
-  subagents: native
+  subagents: emulated
   effort: thinking_budget
   degrades_to: null
   context:
     compact: emulated
     usage: reported
-  note: Converts AgentDefinition to its own SubagentDefinition.
+  note: Was declared native while nothing reached the model; see `emulated`.
 
 windsurf:
   adapter: WindsurfAgentClient
-  subagents: none
+  subagents: emulated
   effort: none
   degrades_to: null
   context:
@@ -59,11 +68,12 @@ windsurf:
     usage: reported
   note: >-
     Dual-mode (gRPC to the local IDE language server, or REST with
-    OpenAI-compatible function calling). Neither mode carries subagents.
+    OpenAI-compatible function calling). Sub-agents are emulated in both: a
+    child session of this client per delegation.
 
 openai:
   adapter: OpenAIAgentClient
-  subagents: none
+  subagents: emulated
   effort: reasoning_effort
   degrades_to: null
   context:
@@ -76,7 +86,7 @@ openai:
 
 google:
   adapter: GoogleAgentClient
-  subagents: none
+  subagents: emulated
   effort: reasoning_effort
   degrades_to: null
   context:
@@ -85,7 +95,7 @@ google:
 
 ollama:
   adapter: LocalAgentClient
-  subagents: none
+  subagents: emulated
   effort: none
   degrades_to: null
   context:
@@ -93,7 +103,7 @@ ollama:
     usage: reported
 local:
   adapter: LocalAgentClient
-  subagents: none
+  subagents: emulated
   effort: none
   degrades_to: null
   context:
@@ -101,7 +111,7 @@ local:
     usage: reported
 lmstudio:
   adapter: LocalAgentClient
-  subagents: none
+  subagents: emulated
   effort: none
   degrades_to: null
   context:
@@ -114,7 +124,7 @@ lmstudio:
 
 mistral:
   adapter: CompatibleProviderAgentClient
-  subagents: none
+  subagents: emulated
   effort: none
   degrades_to: null
   context:
@@ -123,7 +133,7 @@ mistral:
 
 deepseek:
   adapter: CompatibleProviderAgentClient
-  subagents: none
+  subagents: emulated
   effort: none
   degrades_to: null
   context:
@@ -132,7 +142,7 @@ deepseek:
 
 grok:
   adapter: CompatibleProviderAgentClient
-  subagents: none
+  subagents: emulated
   effort: none
   degrades_to: null
   context:

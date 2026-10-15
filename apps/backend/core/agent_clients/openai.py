@@ -356,7 +356,9 @@ class OpenAIAgentClient(AgentClient):
                 logger.warning(
                     f"[OpenAIAgentClient] Tool executor init failed (text-only mode): {e}"
                 )
-        if not getattr(self, "_offline_only", False):
+        # A delegated child bridges no MCP server: its tools are its role's,
+        # and a bridge is paid in connection time and schema on every call.
+        if not getattr(self, "_offline_only", False) and self.delegation_scope is None:
             definitions += await self._bridge_mcp_tools()
         # One tool set for the whole session, MCP tools included: sorted and
         # serialized one way (harness.domain.tools), so every turn — and every
@@ -506,7 +508,13 @@ class OpenAIAgentClient(AgentClient):
         return f"OpenAI API error: {exc}"
 
     def supports_subagents(self) -> bool:
-        return False
+        # Emulated: the roster is offered as the ``delegate`` tool and each
+        # delegation runs as a child session of this client
+        # (``harness.application.delegation``).
+        return True
+
+    def delegates(self) -> bool:
+        return True
 
     async def run_subagents(
         self,

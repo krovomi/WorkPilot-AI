@@ -224,6 +224,24 @@ class TestTheExecutorRefusesWhatWasNeverOffered:
         )
         assert (tmp_path / "x").exists()
 
+    def test_a_delegated_scope_narrows_the_type_but_never_widens_it(self, tmp_path):
+        # A child session (harness.application.delegation) runs its specialist's
+        # tools and nothing else: a coder's test-runner may run commands but
+        # not write; a reviewer's cannot run commands however the scope reads.
+        from core.runtimes.tool_executor import ToolExecutor
+
+        executor = ToolExecutor(str(tmp_path), agent_type="coder")
+        executor.allowed_tools = frozenset({"run_command", "read_file"})
+        result = self._run(executor, "write_file", {"path": "x.txt", "content": "y"})
+        assert "not available to this sub-agent" in result
+        assert not (tmp_path / "x.txt").exists()
+
+        reviewer = ToolExecutor(str(tmp_path), agent_type="pr_reviewer")
+        reviewer.allowed_tools = frozenset({"run_command"})
+        result = self._run(reviewer, "run_command", {"command": "touch pwned"})
+        assert "not available to this agent" in result
+        assert not (tmp_path / "pwned").exists()
+
 
 class TestTheReadOnlySearch:
     """What a reviewer searches with once `run_command` is gone."""
