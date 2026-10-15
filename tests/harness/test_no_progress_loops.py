@@ -10,7 +10,6 @@ told once, then stopped (``harness.domain.progress``).
 from __future__ import annotations
 
 import json
-from json import dumps as _dumps  # `json` is the post() keyword below
 from unittest.mock import AsyncMock
 
 import pytest
