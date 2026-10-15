@@ -40,7 +40,7 @@ pydantic>=2.14.0
 rich>=15.0.0
 
 # Error tracking (optional - requires SENTRY_DSN environment variable)
-sentry-sdk>=2.70.0
+sentry-sdk>=2.71.0
 
 # Security-First Features
 # Basic secret scanning is built-in, these enhance capabilities
