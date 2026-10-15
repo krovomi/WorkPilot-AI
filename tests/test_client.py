@@ -744,6 +744,28 @@ class TestClaudeOptionsEffortGuard:
         assert "effort" not in captured
 
 
+def _create_client_options(tmp_path, model, agent_type="coder", **kwargs) -> dict:
+    """The options `create_client` hands to `ClaudeAgentOptions`."""
+    import dataclasses
+
+    import core.client as client_module
+
+    captured = {}
+
+    @dataclasses.dataclass
+    class CapturingOptions:
+        def __init__(self, **options):
+            captured.update(options)
+
+    with (
+        patch.object(client_module, "ClaudeAgentOptions", CapturingOptions),
+        patch.object(client_module, "_claude_options_supports", lambda _f: True),
+        patch("core.client.ClaudeSDKClient", return_value=MagicMock()),
+    ):
+        client_module.create_client(tmp_path, tmp_path, model, agent_type, **kwargs)
+    return captured
+
+
 class TestClaudeEffortFollowsTheUser:
     """On Opus, `effort` is the user's thinking level for the phase.
 
@@ -752,30 +774,14 @@ class TestClaudeEffortFollowsTheUser:
     """
 
     def _effort(self, tmp_path, monkeypatch, model, agent_type, **kwargs):
-        import dataclasses
-
-        import core.client as client_module
-
         monkeypatch.setenv(
             "CLAUDE_CODE_OAUTH_TOKEN", "sk-ant-oat01-valid-plaintext-token"
         )
         monkeypatch.setattr(
             "core.auth.get_token_from_keychain", lambda _config_dir=None: None
         )
-        captured = {}
-
-        @dataclasses.dataclass
-        class CapturingOptions:
-            def __init__(self, **options):
-                captured.update(options)
-
-        with (
-            patch.object(client_module, "ClaudeAgentOptions", CapturingOptions),
-            patch.object(client_module, "_claude_options_supports", lambda _f: True),
-            patch("core.client.ClaudeSDKClient", return_value=MagicMock()),
-        ):
-            client_module.create_client(tmp_path, tmp_path, model, agent_type, **kwargs)
-        return captured.get("effort")
+        options = _create_client_options(tmp_path, model, agent_type, **kwargs)
+        return options.get("effort")
 
     @pytest.mark.parametrize(
         ("level", "expected"),
@@ -842,3 +848,57 @@ class TestClaudeEffortFollowsTheUser:
             )
             is None
         )
+
+
+class TestToolSearchStaysOffBehindAProxy:
+    """`ENABLE_TOOL_SEARCH` is WorkPilot's default only on Anthropic's own API.
+
+    Behind another base URL the CLI keeps tool search off: a proxy that does
+    not forward `tool_reference` blocks would lose every deferred MCP tool.
+    """
+
+    def _env(self, tmp_path, monkeypatch, base_url=None) -> dict:
+        monkeypatch.setattr(
+            "core.auth.get_token_from_keychain", lambda _config_dir=None: None
+        )
+        if base_url is None:
+            monkeypatch.delenv("ANTHROPIC_BASE_URL", raising=False)
+            monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
+            monkeypatch.setenv(
+                "CLAUDE_CODE_OAUTH_TOKEN", "sk-ant-oat01-valid-plaintext-token"
+            )
+        else:
+            monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
+            monkeypatch.setenv("ANTHROPIC_BASE_URL", base_url)
+            monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "sk-test-0000")
+        return _create_client_options(tmp_path, "claude-sonnet-5-5")["env"]
+
+    def test_on_by_default_against_anthropic(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("ENABLE_TOOL_SEARCH", raising=False)
+        assert self._env(tmp_path, monkeypatch)["ENABLE_TOOL_SEARCH"] == "auto:5"
+
+    def test_on_against_anthropics_host_set_explicitly(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("ENABLE_TOOL_SEARCH", raising=False)
+        env = self._env(tmp_path, monkeypatch, "https://api.anthropic.com")
+        assert env["ENABLE_TOOL_SEARCH"] == "auto:5"
+
+    @pytest.mark.parametrize(
+        "base_url",
+        [
+            "https://llm-proxy.example.com/anthropic",
+            "http://localhost:4000",
+            "https://api.anthropic.com.example.com",
+        ],
+    )
+    def test_left_to_the_cli_behind_a_proxy(self, tmp_path, monkeypatch, base_url):
+        monkeypatch.delenv("ENABLE_TOOL_SEARCH", raising=False)
+        assert "ENABLE_TOOL_SEARCH" not in self._env(tmp_path, monkeypatch, base_url)
+
+    @pytest.mark.parametrize("base_url", [None, "http://localhost:4000"])
+    def test_a_value_the_user_exported_is_not_overridden(
+        self, tmp_path, monkeypatch, base_url
+    ):
+        # The SDK starts the CLI with the process environment, then this env on
+        # top: leaving the key out is what lets the user's value through.
+        monkeypatch.setenv("ENABLE_TOOL_SEARCH", "true")
+        assert "ENABLE_TOOL_SEARCH" not in self._env(tmp_path, monkeypatch, base_url)

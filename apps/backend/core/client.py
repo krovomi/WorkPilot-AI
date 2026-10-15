@@ -188,6 +188,21 @@ def _claude_options_supports(field_name: str) -> bool:
         return False
 
 
+def _is_anthropic_api(base_url: str | None) -> bool:
+    """True when the CLI talks to Anthropic's own API: no base URL, or its host.
+
+    The same test the bundled CLI makes before it turns tool search on.
+    """
+    if not (base_url or "").strip():
+        return True
+    from urllib.parse import urlsplit
+
+    try:
+        return urlsplit(base_url.strip()).hostname == "api.anthropic.com"
+    except ValueError:
+        return False
+
+
 # BUG FIX #12: Monkey-patch SDK message parser to handle unknown message types
 # gracefully instead of raising MessageParseError. The Claude CLI may send message
 # types (e.g., "rate_limit_event") that the SDK version doesn't recognize yet.
@@ -859,9 +874,17 @@ def create_client(
     #   cards instead of paying full input price every 5 minutes.
     # - tool-search auto:5: defers MCP tool schemas when their combined size
     #   exceeds 5% of the context window. Activates only when there are enough
-    #   MCP servers to make deferral worthwhile.
+    #   MCP servers to make deferral worthwhile. Only on Anthropic's own API:
+    #   behind another base URL the CLI leaves tool search off, because a
+    #   proxy that does not forward `tool_reference` blocks loses every
+    #   deferred tool, and a value here would override that guard. A value the
+    #   user exported reaches the CLI untouched (the SDK passes the process
+    #   environment, then this dict on top of it).
     sdk_env.setdefault("ENABLE_PROMPT_CACHING_1H", "1")
-    sdk_env.setdefault("ENABLE_TOOL_SEARCH", "auto:5")
+    if "ENABLE_TOOL_SEARCH" not in os.environ and _is_anthropic_api(
+        sdk_env.get("ANTHROPIC_BASE_URL")
+    ):
+        sdk_env.setdefault("ENABLE_TOOL_SEARCH", "auto:5")
     # Native compaction at the task's context threshold (context_mgmt): the CLI
     # summarises in place, mid-turn, instead of WorkPilot restarting the thread.
     from context_mgmt import native_auto_compact_env

@@ -136,6 +136,13 @@ and OAuth is used. The desktop app sets the variable from the active API
 profile and clears it in OAuth mode, so setting it by hand only matters for the
 CLI.
 
+Against Anthropic's own API, WorkPilot sets `ENABLE_TOOL_SEARCH=auto:5`: MCP tool
+schemas are deferred once they weigh more than 5% of the context window. Behind
+any other base URL it sets nothing, and the Claude Code CLI keeps tool search
+off, because a proxy that does not forward `tool_reference` blocks would lose
+every deferred tool. If your proxy forwards them, export `ENABLE_TOOL_SEARCH`
+(`true`, `auto` or `auto:N`); a value you export is never overridden.
+
 ### Deliberately **not** supported
 
 - **`ANTHROPIC_API_KEY`** is intentionally excluded. Supporting it could
