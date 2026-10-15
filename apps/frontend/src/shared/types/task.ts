@@ -329,6 +329,44 @@ export type TaskCategory =
 	| "infrastructure"
 	| "testing";
 
+/**
+ * The kind of work a card asks for — decided without a model from the
+ * category, the imported item's type or the words of the title
+ * (`apps/backend/tasks/classify.py`), and overridable in the task detail.
+ * Lot 0 of docs/architecture/kanban-task-types.md: today it is data; later
+ * lots pick a workflow from it.
+ */
+export type TaskKind =
+	| "feature"
+	| "bug_fix"
+	| "hotfix"
+	| "investigation"
+	| "run"
+	| "refactoring"
+	| "test"
+	| "docs"
+	| "spike";
+
+export const TASK_KINDS: readonly TaskKind[] = [
+	"feature",
+	"bug_fix",
+	"hotfix",
+	"investigation",
+	"run",
+	"refactoring",
+	"test",
+	"docs",
+	"spike",
+];
+
+/** Who decided the kind. `user` is never overwritten by the backend. */
+export type TaskKindSource =
+	| "user"
+	| "category"
+	| "import"
+	| "keywords"
+	| "default";
+
 export interface TaskMetadata {
 	// Origin tracking
 	sourceType?:
@@ -387,6 +425,11 @@ export interface TaskMetadata {
 	complexity?: TaskComplexity;
 	impact?: TaskImpact;
 	priority?: TaskPriority;
+	// The kind of work (see TaskKind). Written by the spec pipeline, or by the
+	// user from the task detail (kindSource "user"), which the backend keeps.
+	kind?: TaskKind;
+	kindConfidence?: number; // 0-1; below 0.6 the kind is a proposal
+	kindSource?: TaskKindSource;
 
 	// Context
 	rationale?: string; // Why this task matters

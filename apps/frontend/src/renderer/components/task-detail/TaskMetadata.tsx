@@ -57,6 +57,7 @@ import {
 } from "./acceptance-criteria-draft";
 import { extractAcceptanceCriteriaFromDescription } from "../../../shared/utils/acceptance-criteria";
 import { TaskBlockers } from "./TaskBlockers";
+import { TaskKindBadge } from "./TaskKindBadge";
 
 // Schéma de sanitization personnalisé permettant les styles inline
 const customSanitizeSchema = {
@@ -514,7 +515,8 @@ export function TaskMetadata({ task, editable = true }: TaskMetadataProps) {
 
 	const hasClassification =
 		task.metadata &&
-		(task.metadata.category ||
+		(task.metadata.kind ||
+			task.metadata.category ||
 			task.metadata.priority ||
 			task.metadata.complexity ||
 			task.metadata.impact ||
@@ -723,6 +725,8 @@ export function TaskMetadata({ task, editable = true }: TaskMetadataProps) {
 				<div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/50 bg-background/30 px-4 py-2">
 					{hasClassification ? (
 						<div className="flex flex-wrap items-center gap-1.5">
+							{/* Kind of work: decided without a model, overridable here */}
+							<TaskKindBadge task={task} editable />
 							{/* Category */}
 							{task.metadata?.category && (
 								<Badge

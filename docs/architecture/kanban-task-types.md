@@ -70,22 +70,27 @@ Le plan branche ces pièces. Il n'ajoute un module que là où rien n'existe.
 Un type non reconnu est `feature`. Un type reconnu avec confiance < 0.6 est **proposé**, pas
 imposé : le modal le montre, le build attend la confirmation si `gate: human` est actif.
 
-## Lot 0 — le type de tâche comme donnée
+## Lot 0 — le type de tâche comme donnée — **livré**
 
-- `apps/backend/tasks/classify.py` (nouveau, pur) : `classify(title, description, metadata) ->
-  TaskKind(kind, confidence, source)`. Ordre : `metadata.category` → type importé → règles de
-  `intent/` (réutilisées, sans appel modèle) → `None`. Pas d'appel LLM ici.
-- `spec/pipeline/orchestrator.py` : avant `complexity_assessment`, si `classify` rend
-  `None` ou < 0.6, **un** appel sous `agent_type="complexity_assessor"` (déjà `solo`, déjà
-  `low`) dont le prompt demande aussi le type. Sortie structurée, écrite dans
-  `task_metadata.json` (`kind`, `kindConfidence`, `kindSource`).
-- Frontend : `TaskKind` dans `shared/types/task.ts`, badge dans la carte et le modal,
-  sélecteur pour le changer (i18n `en`+`fr`). L'endpoint `/api/workflow-profile/` prend le type
-  en compte (lot 1).
-- Preuve : `tests/tasks/test_classify.py` (table titre → type, 0 token), un test d'intégration
-  qui vérifie que `task_metadata.json` porte le type après la spec.
+- `apps/backend/tasks/classify.py` (pur) : `classify(title, description, metadata) ->
+  Classification(kind, confidence, source, reasons)`. Ordre : choix de l'utilisateur
+  (`kindSource == "user"`, jamais écrasé) → `metadata.category` → type importé (`jiraType`,
+  `azureDevOpsType`, labels reconnus) → mots du titre et de la description (FR + EN, accents
+  ignorés) → `feature` à faible confiance. Un `bug_fix` avec urgence (priorité `urgent` /
+  `critical`, mots *prod*, *incident*, *hotfix*…) est un `hotfix`. `intent/` n'avait pas de
+  règles réutilisables (classifieur LLM seul) : les règles sont ici.
+- `apps/backend/tasks/metadata.py` : `classify_spec` écrit `kind`, `kindConfidence`,
+  `kindSource` dans `task_metadata.json` sans toucher au reste ; `spec/pipeline/orchestrator.py`
+  l'appelle avant `complexity_assessment`. Aucun appel modèle ; l'appel `low` en cas de doute
+  (`confidence < 0.6`) est laissé au lot 1, qui saura quoi en faire.
+- Frontend : `TaskKind`, `TaskKindSource` et les champs sur `TaskMetadata`
+  (`shared/types/task.ts`) ; `TaskKindBadge` (badge sur la carte Kanban, sélecteur dans le détail
+  de tâche qui persiste `kindSource: "user"` via `task:update`) ; i18n `tasks:kind.*` en `en` et
+  `fr`.
+- Preuve : `tests/tasks/test_classify.py` (table titre → type, catégorie, import, urgence, choix
+  utilisateur, fichier de métadonnées), `TaskKindBadge.test.tsx`.
 
-Coût : 0 token dans 80 % des cas (catégorie ou mots-clés), un appel `low` sinon.
+Coût : 0 token.
 
 ## Lot 1 — un workflow par type, choisi par le moteur
 
@@ -256,6 +261,7 @@ lot 6 (mesure) après n'importe lequel
 
 Chaque lot est une PR vers `develop`, verte sur `validate_impls`, `test_docs_context`,
 `test_agent_tool_declarations` et `test_workflow_engine`, sur les trois OS de la CI.
+État : lot 0 livré ; lots 1 à 6 à faire.
 
 ## Ce que le plan refuse
 
