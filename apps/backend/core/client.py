@@ -854,7 +854,7 @@ def create_client(
     # summarises in place, mid-turn, instead of WorkPilot restarting the thread.
     from context_mgmt import native_auto_compact_env
 
-    for _key, _value in native_auto_compact_env(spec_dir).items():
+    for _key, _value in native_auto_compact_env(spec_dir, model).items():
         sdk_env.setdefault(_key, _value)
 
     # OpenTelemetry observability (opt-in). When AUTO_CLAUDE_OTEL_ENDPOINT is
@@ -2487,7 +2487,7 @@ def create_agent_client(
                 reasoning_effort=reasoning_effort,
                 thread_id=resume,
                 auto_compact_token_limit=codex_auto_compact_limit(
-                    spec_dir, resolve_context_window(model or "codex")
+                    spec_dir, resolve_context_window(model or "codex"), model
                 ),
             )
 
