@@ -348,9 +348,15 @@ class _WavePort:
     def reinject(self, reply: Reply, results) -> None:
         self.reinjected = list(zip(reply.calls, results, strict=True))
 
-    def remind(self, text: str) -> None: ...
-    def clear(self) -> None: ...
-    def finish(self, reason) -> None: ...
+    def remind(self, text: str) -> None:
+        pass
+
+    def clear(self) -> None:
+        pass
+
+    def finish(self, reason) -> None:
+        pass
+
     def text(self, text: str) -> Any:
         return ("text", text)
 

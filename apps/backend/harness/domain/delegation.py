@@ -86,15 +86,14 @@ def delegate_tool_definition(agents: Mapping[str, Any]) -> dict[str, Any]:
     single schema costs the same whatever the roster's size — only the
     description grows, by one line per specialist.
     """
-    lines = [
+    intro = (
         "Hand one self-contained task to a specialist sub-agent, which works "
         "in a fresh context with its own tools and returns only its "
         "conclusion. Use it for work whose detail you do not need in your "
         "own context (running the tests, surveying an unfamiliar area, "
-        "reviewing a diff). Several delegations in one turn run in parallel.",
-        "",
-        "Specialists:",
-    ]
+        "reviewing a diff). Several delegations in one turn run in parallel."
+    )
+    lines = [intro, "", "Specialists:"]
     for name in sorted(agents):
         lines.append(f"- {name}: {_description_of(agents[name]).strip()}")
     return {
