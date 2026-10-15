@@ -11,6 +11,8 @@ from core.llm_optimization import (
     build_base_system_prompt,
     claude_effort,
     compact_messages,
+    copilot_thinking_budget,
+    gemini_reasoning_effort,
     openai_prompt_cache_key,
     openai_reasoning_effort,
     should_inline_file_context,
@@ -109,6 +111,68 @@ class TestClaudeEffort:
 
     def test_unknown_budget_falls_back_to_medium(self):
         assert claude_effort(12345) == "medium"
+
+
+class TestGeminiReasoningEffort:
+    @pytest.mark.parametrize(
+        ("level", "expected"),
+        [
+            ("none", "low"),  # "none" is refused by 2.5 Pro and every 3.x model
+            ("low", "low"),
+            ("medium", "medium"),
+            ("high", "high"),
+            ("ultrathink", "high"),
+        ],
+    )
+    def test_each_level_of_the_selector(self, level, expected):
+        from phase_config import THINKING_BUDGET_MAP
+
+        for model in ("gemini-3.1-pro-preview", "gemini-2.5-flash", "gemini-4-argon"):
+            assert (
+                gemini_reasoning_effort(model, THINKING_BUDGET_MAP[level]) == expected
+            )
+
+    @pytest.mark.parametrize("model", ["gemini-2.0-flash", "gemini-1.5-pro", ""])
+    def test_a_model_without_thinking_gets_none(self, model):
+        assert gemini_reasoning_effort(model, 16384) is None
+
+
+class TestCopilotThinkingBudget:
+    SUPPORTS = {"min_thinking_budget": 1024, "max_thinking_budget": 32000}
+
+    @pytest.mark.parametrize(
+        ("budget", "expected"),
+        [(1024, 1024), (16384, 16384), (63999, 32000), (500, 1024)],
+    )
+    def test_the_budget_is_kept_inside_the_models_bounds(self, budget, expected):
+        assert copilot_thinking_budget(budget, {"supports": self.SUPPORTS}) == expected
+
+    def test_the_answer_keeps_room_under_the_output_limit(self):
+        capabilities = {
+            "supports": self.SUPPORTS,
+            "limits": {"max_output_tokens": 16000},
+        }
+        assert copilot_thinking_budget(63999, capabilities) == 15999
+
+    @pytest.mark.parametrize(
+        "capabilities",
+        [
+            None,
+            {},
+            {"supports": {}},
+            {"supports": {"max_thinking_budget": 0}},
+            {"supports": {"max_thinking_budget": True}},
+            {"supports": {"max_thinking_budget": "32000"}},
+            # bounds that leave no room: min above what the output allows
+            {"supports": SUPPORTS, "limits": {"max_output_tokens": 512}},
+        ],
+    )
+    def test_no_budget_for_a_model_that_takes_none(self, capabilities):
+        assert copilot_thinking_budget(16384, capabilities) is None
+
+    @pytest.mark.parametrize("budget", [None, 0])
+    def test_no_budget_when_the_user_asked_for_none(self, budget):
+        assert copilot_thinking_budget(budget, {"supports": self.SUPPORTS}) is None
 
 
 # ---------------------------------------------------------------------------

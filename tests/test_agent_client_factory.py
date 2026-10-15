@@ -273,6 +273,20 @@ class TestCreateAgentClient:
         assert isinstance(client, GoogleAgentClient)
         assert client.provider_name() == "google"
 
+    @pytest.mark.parametrize("provider", ["google", "gemini"])
+    def test_gemini_runs_at_the_users_effort(self, tmp_path, monkeypatch, provider):
+        from core.client import create_agent_client
+
+        monkeypatch.setenv("GOOGLE_API_KEY", "google-key")
+        client = create_agent_client(
+            project_dir=tmp_path,
+            spec_dir=tmp_path,
+            model="gemini-3.1-pro-preview",
+            provider=provider,
+            max_thinking_tokens=1024,
+        )
+        assert client._reasoning_effort == "low"
+
     @patch("core.client._get_cached_project_data")
     @patch("core.client.load_project_mcp_config")
     @patch("core.client.get_allowed_tools")
@@ -302,6 +316,31 @@ class TestCreateAgentClient:
         assert isinstance(client, AgentClient)
         assert client.model == "gpt-4o"
         assert client.provider_name() == "copilot"
+
+    @patch("core.client._get_cached_project_data")
+    @patch("core.client.load_project_mcp_config")
+    @patch("core.client.get_allowed_tools")
+    def test_copilot_gets_the_users_thinking_budget(
+        self, mock_tools, mock_mcp, mock_cache, tmp_path, monkeypatch
+    ):
+        from core.client import create_agent_client
+
+        monkeypatch.setenv("GITHUB_TOKEN", "ghp_test_token")
+        mock_cache.return_value = ({}, {})
+        mock_mcp.return_value = {}
+        mock_tools.return_value = ["Read"]
+        monkeypatch.setattr("core.client.is_linear_enabled", lambda: False)
+
+        client = create_agent_client(
+            project_dir=tmp_path,
+            spec_dir=tmp_path,
+            model="claude-sonnet-4.5",
+            agent_type="coder",
+            provider="copilot",
+            max_thinking_tokens=16384,
+        )
+
+        assert client._thinking_budget == 16384
 
     @patch("core.client.create_client")
     def test_invalid_provider_falls_back_to_claude(self, mock_create_client, tmp_path):

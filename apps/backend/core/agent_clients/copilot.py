@@ -301,6 +301,8 @@ class _CopilotAdapter(ChatCompletionsAdapter):
         if self.tools:
             payload["tools"] = self.tools
             payload["tool_choice"] = "auto"
+        if client._session_thinking_budget and not client._using_github_models:
+            payload["thinking_budget"] = client._session_thinking_budget
 
         logger.info(
             f"[CopilotAgentClient] Turn {turn + 1}/{client.max_turns}: "
@@ -364,6 +366,8 @@ class _CopilotAdapter(ChatCompletionsAdapter):
                         request_headers["Authorization"] = (
                             f"Bearer {client.github_token}"
                         )
+                        # A Copilot field, which GitHub Models does not take.
+                        payload.pop("thinking_budget", None)
                         # Retry this turn with the GitHub Models API
                         async with session.post(
                             client._github_models_api_base,
@@ -464,6 +468,9 @@ class _CopilotAdapter(ChatCompletionsAdapter):
                             )
                             client.model = fallback
                             payload["model"] = fallback
+                            # The budget's bounds were the old model's.
+                            client._session_thinking_budget = None
+                            payload.pop("thinking_budget", None)
                             continue
                         # A different 400 (e.g. malformed request) — surface.
                         logger.error(
@@ -737,10 +744,16 @@ class CopilotAgentClient(AgentClient):
         github_token: str | None = None,
         agent_type: str = "coder",
         spec_dir: str | None = None,
+        thinking_budget: int | None = None,
     ):
         import os
 
         self.model = _normalize_copilot_model_id(model) or "gpt-4o"
+        # The user's thinking budget for the phase. What reaches the API is
+        # `_session_thinking_budget`: kept inside the bounds Copilot's
+        # `/models` gives this model, or None when it takes no budget.
+        self._thinking_budget = thinking_budget
+        self._session_thinking_budget: int | None = None
         # See OpenAIAgentClient: only for the watermark ledger's spec directory.
         self._spec_dir = spec_dir
         self.system_prompt = system_prompt
@@ -757,6 +770,8 @@ class CopilotAgentClient(AgentClient):
 
         # Real Copilot chat endpoint (not api.github.com)
         self._api_base = "https://api.githubcopilot.com/chat/completions"
+        # The models this account can use, and what each supports.
+        self._models_url = "https://api.githubcopilot.com/models"
         # Fallback: GitHub Models API (works when org blocks api.githubcopilot.com)
         self._github_models_api_base = (
             "https://models.inference.ai.azure.com/chat/completions"
@@ -986,6 +1001,56 @@ class CopilotAgentClient(AgentClient):
                         f"Copilot token exchange failed ({resp.status}): {error_text}{token_hint}"
                     )
 
+    async def _resolve_thinking_budget(
+        self, session: Any, headers: dict[str, str]
+    ) -> int | None:
+        """The `thinking_budget` this session sends, or None to send none.
+
+        Copilot's `/models` says, per model, whether it takes a thinking
+        budget and within which bounds; a model it does not list, or a failed
+        lookup, sends none, as before. Never raises: the effort is an
+        optimisation, not a reason to stop a session.
+        """
+        if not self._thinking_budget or self._using_github_models:
+            return None
+        from core.llm_optimization import copilot_thinking_budget
+
+        try:
+            token = await self._get_copilot_token()
+            async with session.get(
+                self._models_url,
+                headers={**headers, "Authorization": f"Bearer {token}"},
+            ) as resp:
+                if resp.status != 200:
+                    await resp.text()
+                    logger.info(
+                        "[CopilotAgentClient] /models answered %s; "
+                        "no thinking budget sent",
+                        resp.status,
+                    )
+                    return None
+                data = await resp.json()
+        except Exception as error:  # noqa: BLE001 - effort is an optimisation
+            logger.info(
+                "[CopilotAgentClient] /models unavailable (%s); "
+                "no thinking budget sent",
+                error,
+            )
+            return None
+        models = data.get("data") if isinstance(data, dict) else None
+        for entry in models if isinstance(models, list) else []:
+            if isinstance(entry, dict) and entry.get("id") == self.model:
+                budget = copilot_thinking_budget(
+                    self._thinking_budget, entry.get("capabilities")
+                )
+                logger.info(
+                    "[CopilotAgentClient] thinking_budget=%s (model=%s)",
+                    budget,
+                    self.model,
+                )
+                return budget
+        return None
+
     async def resume(self, history: list[AgentMessage]) -> None:
         """Preload conversation history, truncating to Copilot's context window.
 
@@ -1098,6 +1163,9 @@ class CopilotAgentClient(AgentClient):
         )
 
         session = self._get_http_client()
+        self._session_thinking_budget = await self._resolve_thinking_budget(
+            session, request_headers
+        )
 
         adapter = _CopilotAdapter(
             self, messages, tools=tools, session=session, headers=request_headers

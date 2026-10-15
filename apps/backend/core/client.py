@@ -2426,6 +2426,7 @@ def create_agent_client(
             cwd=str(project_dir.resolve()),
             agent_type=agent_type,
             spec_dir=str(spec_dir),
+            thinking_budget=max_thinking_tokens,
         )
 
     elif provider == "claude":
@@ -2571,7 +2572,10 @@ def create_agent_client(
         # Google Gemini via its OpenAI-compatible endpoint — reuses the proven
         # OpenAI tool-use loop (GoogleAgentClient subclasses OpenAIAgentClient).
         from core.agent_client import GoogleAgentClient
-        from core.llm_optimization import build_base_system_prompt
+        from core.llm_optimization import (
+            build_base_system_prompt,
+            gemini_reasoning_effort,
+        )
 
         if system_prompt:
             gemini_system_prompt = system_prompt
@@ -2584,10 +2588,15 @@ def create_agent_client(
             )
 
         resolved_gemini_model = model or "gemini-2.5-pro"
+        gemini_effort = gemini_reasoning_effort(
+            resolved_gemini_model, max_thinking_tokens
+        )
         logger.info(
-            "[create_agent_client] Using GoogleAgentClient (model=%s, agent_type=%s)",
+            "[create_agent_client] Using GoogleAgentClient "
+            "(model=%s, agent_type=%s, reasoning_effort=%s)",
             resolved_gemini_model,
             agent_type,
+            gemini_effort,
         )
         return GoogleAgentClient(
             model=resolved_gemini_model,
@@ -2595,24 +2604,30 @@ def create_agent_client(
             max_turns=50,
             project_dir=str(project_dir),
             agent_type=agent_type,
+            reasoning_effort=gemini_effort,
             spec_dir=str(spec_dir),
         )
 
     elif provider == "gemini":
         from core.agent_client import GoogleAgentClient
-        from core.llm_optimization import build_base_system_prompt
+        from core.llm_optimization import (
+            build_base_system_prompt,
+            gemini_reasoning_effort,
+        )
 
         gemini_prompt = system_prompt or build_base_system_prompt(
             project_dir, tool_use_hint=True
         )
         if not system_prompt:
             gemini_prompt = _inject_domain_addendum(gemini_prompt, agent_type, spec_dir)
+        gemini_model = model or "gemini-2.5-pro"
         return GoogleAgentClient(
-            model=model or "gemini-2.5-pro",
+            model=gemini_model,
             system_prompt=gemini_prompt,
             max_turns=50,
             project_dir=str(project_dir),
             agent_type=agent_type,
+            reasoning_effort=gemini_reasoning_effort(gemini_model, max_thinking_tokens),
             spec_dir=str(spec_dir),
         )
 
