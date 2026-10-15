@@ -9,13 +9,18 @@ from .decide import Decision, Situation, decide, recommended_action
 from .guard import ContextGuard
 from .policy import ContextPolicy, load_context_policy, policy_from_dict
 from .reset_limit import MAX_CONSECUTIVE_RESETS, ResetLimit
+from .windows import effective_window, resolve_context_window
 
 
-def native_auto_compact_env(spec_dir) -> dict[str, str]:
+def native_auto_compact_env(spec_dir, model: str | None = None) -> dict[str, str]:
     """Env vars that make the Claude CLI auto-compact at the task's threshold.
 
-    Empty when the policy is off or asks for clears only: the CLI keeps its own
-    default then, and WorkPilot's guard decides alone.
+    The CLI reads the percentage against the model's whole window; where the
+    model bills a longer prompt at a higher rate, the percentage is scaled so
+    that it lands at the task's threshold of the payable window instead
+    (`effective_window`). Empty when the policy is off or asks for clears
+    only: the CLI keeps its own default then, and WorkPilot's guard decides
+    alone.
     """
     try:
         policy = load_context_policy(spec_dir) if spec_dir else None
@@ -23,18 +28,26 @@ def native_auto_compact_env(spec_dir) -> dict[str, str]:
         return {}
     if policy is None or policy.mode not in ("auto", "compact"):
         return {}
-    return {"CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": str(policy.threshold_pct)}
+    window = resolve_context_window(model)
+    pct = policy.threshold_pct * effective_window(model, window) / window
+    return {"CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": str(max(1, int(pct)))}
 
 
-def codex_auto_compact_limit(spec_dir, window_tokens: int) -> int | None:
-    """``model_auto_compact_token_limit`` for Codex, or None to keep its default."""
+def codex_auto_compact_limit(
+    spec_dir, window_tokens: int, model: str | None = None
+) -> int | None:
+    """``model_auto_compact_token_limit`` for Codex, or None to keep its default.
+
+    A share of the payable window (`effective_window`), not of the announced
+    one.
+    """
     try:
         policy = load_context_policy(spec_dir) if spec_dir else None
     except Exception:  # noqa: BLE001
         return None
     if policy is None or policy.mode not in ("auto", "compact") or window_tokens <= 0:
         return None
-    return int(window_tokens * policy.threshold_pct / 100)
+    return int(effective_window(model, window_tokens) * policy.threshold_pct / 100)
 
 
 __all__ = [
