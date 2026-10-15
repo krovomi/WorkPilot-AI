@@ -16,6 +16,8 @@ import signal
 from pathlib import Path
 from typing import Any
 
+from core.llm_optimization import tool_result_max_chars
+from harness.domain.paging import FOOTER_RESERVE, page_items, page_lines, render_page
 from rtk import rewrite_command as rtk_rewrite
 from watermarks import clean_generated
 from watermarks import record as watermarks_record
@@ -44,6 +46,26 @@ def _pick_arg(arguments: dict[str, Any], *names: str, default: Any = None) -> An
         if value is not None and value != "":
             return value
     return default
+
+
+def _as_int(value: Any) -> int | None:
+    """A tool-arg count or position as an int, or None when absent or unreadable.
+
+    Models send numbers as strings often enough (``"401"``) that a strict check
+    would turn a valid request into an error.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float) and math.isfinite(value):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value.strip())
+        except ValueError:
+            return None
+    return None
 
 
 def _as_bool(value: Any) -> bool:
@@ -189,11 +211,22 @@ class ToolExecutor:
         # a project directory alone. Without it the content is still cleaned —
         # what is lost is the record of it, not the cleaning.
         self.spec_dir = Path(spec_dir) if spec_dir else None
+        # The longest tool result the client keeps for the model, which the
+        # paging tools fit under (truncation at source: a page and how to read
+        # on, rather than a head and a tail cut after the fact). None: the
+        # shared cap (``tool_result_max_chars``); a client with a small window
+        # sets its own.
+        self.result_max_chars: int | None = None
         self.working_directory = self.project_dir
         if working_directory is not None:
             self.working_directory = self._resolve_within_project(working_directory)
             if not self.working_directory.is_dir():
                 raise ValueError("Tool working directory does not exist")
+
+    def _page_chars(self) -> int:
+        """Characters a page may hold, under the client's cap and its footer."""
+        cap = self.result_max_chars or tool_result_max_chars()
+        return max(500, cap - FOOTER_RESERVE)
 
     def _resolve_within_project(self, path: str, *, for_write: bool = False) -> Path:
         """Resolve a user-supplied path and reject anything outside project_dir.
@@ -256,7 +289,11 @@ class ToolExecutor:
             )
 
         if tool_name == "read_file":
-            return await self._read_file(_pick_arg(arguments, *path_aliases))
+            return await self._read_file(
+                _pick_arg(arguments, *path_aliases),
+                offset=_as_int(_pick_arg(arguments, "offset", "start_line", "line")),
+                limit=_as_int(_pick_arg(arguments, "limit", "lines", "max_lines")),
+            )
         elif tool_name in ("write_file", "Write"):  # "Write" = planner alias
             return await self._write_file(
                 _pick_arg(arguments, *path_aliases),
@@ -272,11 +309,13 @@ class ToolExecutor:
                 _pick_arg(arguments, "pattern", "regex", "query"),
                 _pick_arg(arguments, *dir_aliases, default="."),
                 _pick_arg(arguments, "glob", "include", "file_pattern"),
+                offset=_as_int(_pick_arg(arguments, "offset", "skip")) or 0,
             )
         elif tool_name == "find_files":
             return await self._find_files(
                 _pick_arg(arguments, "pattern", "glob", "name"),
                 _pick_arg(arguments, *dir_aliases, default="."),
+                offset=_as_int(_pick_arg(arguments, "offset", "skip")) or 0,
             )
         elif tool_name == "list_files":
             return await self._list_files(
@@ -318,8 +357,16 @@ class ToolExecutor:
         else:
             raise ValueError(f"Unknown tool: {tool_name}")
 
-    async def _read_file(self, path: str | None) -> str:
-        """Read a file and return its contents."""
+    async def _read_file(
+        self, path: str | None, *, offset: int | None = None, limit: int | None = None
+    ) -> str:
+        """A file's contents, a page at a time when it does not fit.
+
+        A file that fits under the result cap comes back whole, as it always
+        did. A longer one comes back as its first page (or the page at
+        ``offset``, ``limit`` lines at most) followed by the line range and the
+        offset that reads on: nothing is lost to a cut in the middle.
+        """
         if not path:
             raise ValueError("Path is required for read_file")
 
@@ -329,9 +376,14 @@ class ToolExecutor:
 
         try:
             with open(file_path, encoding="utf-8") as f:
-                return f.read()
+                text = f.read()
         except Exception as e:
             raise RuntimeError(f"Error reading file {path}: {e}")
+        return render_page(
+            page_lines(
+                text, offset=offset or 1, limit=limit, max_chars=self._page_chars()
+            )
+        )
 
     async def _write_file(
         self, path: str | None, content: str | None = None, empty_file: bool = False
@@ -498,13 +550,19 @@ class ToolExecutor:
                 yield full.relative_to(self.project_dir).as_posix(), full
 
     async def _search_files(
-        self, pattern: str | None, directory: str = ".", glob: str | None = None
+        self,
+        pattern: str | None,
+        directory: str = ".",
+        glob: str | None = None,
+        *,
+        offset: int = 0,
     ) -> str:
         """Lines matching a regular expression — the executor's Grep.
 
         Read-only by construction, so a reviewer that declares Grep and no
         shell can still search the project it reviews: without it, taking
-        `run_command` away would have taken search with it.
+        `run_command` away would have taken search with it. Paged: a page of
+        matches under the result cap, then the offset that reads on.
         """
         if not pattern:
             raise ValueError("pattern is required for search_files")
@@ -512,44 +570,63 @@ class ToolExecutor:
             regex = re.compile(pattern)
         except re.error as e:
             raise ValueError(f"Invalid regular expression {pattern!r}: {e}")
-        results: list[str] = []
-        for relative, full in self._walk_files(directory):
-            if glob and not _glob_matches(relative, glob):
-                continue
-            try:
-                if full.stat().st_size > _SEARCH_MAX_FILE_BYTES:
-                    continue
-                raw = full.read_bytes()
-            except OSError:
-                continue
-            if b"\0" in raw[:8192]:
-                continue  # binary
-            text = raw.decode("utf-8", errors="replace")
-            for number, line in enumerate(text.splitlines(), start=1):
-                if regex.search(line):
-                    results.append(f"{relative}:{number}: {line[:_SEARCH_LINE_CHARS]}")
-                    if len(results) >= _SEARCH_MAX_RESULTS:
-                        results.append(
-                            f"(stopped at {_SEARCH_MAX_RESULTS} matches; narrow the "
-                            "pattern, the directory or the glob)"
-                        )
-                        return "\n".join(results)
-        return "\n".join(results) if results else "(no matches found)"
 
-    async def _find_files(self, pattern: str | None, directory: str = ".") -> str:
-        """Files whose project-relative path matches a glob — the executor's Glob."""
+        def matches():
+            for relative, full in self._walk_files(directory):
+                if glob and not _glob_matches(relative, glob):
+                    continue
+                try:
+                    if full.stat().st_size > _SEARCH_MAX_FILE_BYTES:
+                        continue
+                    raw = full.read_bytes()
+                except OSError:
+                    continue
+                if b"\0" in raw[:8192]:
+                    continue  # binary
+                text = raw.decode("utf-8", errors="replace")
+                for number, line in enumerate(text.splitlines(), start=1):
+                    if regex.search(line):
+                        yield f"{relative}:{number}: {line[:_SEARCH_LINE_CHARS]}"
+
+        results, next_offset = page_items(
+            matches(),
+            offset=offset,
+            max_items=_SEARCH_MAX_RESULTS,
+            max_chars=self._page_chars(),
+        )
+        if not results:
+            return "(no matches found)" if not offset else "(no more matches)"
+        if next_offset is not None:
+            results.append(
+                f"(more matches: call search_files again with offset={next_offset}, "
+                "or narrow the pattern, the directory or the glob)"
+            )
+        return "\n".join(results)
+
+    async def _find_files(
+        self, pattern: str | None, directory: str = ".", *, offset: int = 0
+    ) -> str:
+        """Files whose project-relative path matches a glob — the executor's Glob. Paged."""
         if not pattern:
             raise ValueError("pattern is required for find_files")
-        found: list[str] = []
-        for relative, _full in self._walk_files(directory):
-            if _glob_matches(relative, pattern):
-                found.append(relative)
-                if len(found) >= _SEARCH_MAX_RESULTS:
-                    found.append(
-                        f"(stopped at {_SEARCH_MAX_RESULTS} files; narrow the pattern)"
-                    )
-                    break
-        return "\n".join(found) if found else "(no files found)"
+        found, next_offset = page_items(
+            (
+                relative
+                for relative, _full in self._walk_files(directory)
+                if _glob_matches(relative, pattern)
+            ),
+            offset=offset,
+            max_items=_SEARCH_MAX_RESULTS,
+            max_chars=self._page_chars(),
+        )
+        if not found:
+            return "(no files found)" if not offset else "(no more files)"
+        if next_offset is not None:
+            found.append(
+                f"(more files: call find_files again with offset={next_offset}, "
+                "or narrow the pattern)"
+            )
+        return "\n".join(found)
 
     async def _create_directory(self, path: str | None) -> str:
         """Create a directory (and parents)."""
@@ -752,14 +829,26 @@ def get_tool_definitions(
     base_tools = [
         {
             "name": "read_file",
-            "description": "Read a file directly, including paths with spaces. Prefer this over shell cat.",
+            "description": (
+                "Read a file directly, including paths with spaces. Prefer this "
+                "over shell cat. A long file comes back a page at a time, followed "
+                "by its line range and the offset that reads on."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "path": {
                         "type": "string",
                         "description": "Path to the file to read",
-                    }
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "description": "First line to read (1-based). Default 1.",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Most lines to return. Default: as many as fit.",
+                    },
                 },
                 "required": ["path"],
             },
@@ -815,6 +904,10 @@ def get_tool_definitions(
                         "type": "string",
                         "description": "Only search files matching this glob, e.g. **/*.py",
                     },
+                    "offset": {
+                        "type": "integer",
+                        "description": "Matches to skip, to read the next page. Default 0.",
+                    },
                 },
                 "required": ["pattern"],
             },
@@ -830,6 +923,10 @@ def get_tool_definitions(
                         "type": "string",
                         "description": "Directory to search in",
                         "default": ".",
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "description": "Files to skip, to read the next page. Default 0.",
                     },
                 },
                 "required": ["pattern"],
