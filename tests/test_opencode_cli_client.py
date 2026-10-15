@@ -14,6 +14,7 @@ from core.agent_clients.opencode_cli import (
     opencode_agent_for,
     resolve_opencode_model,
 )
+from harness.domain import CallUsage
 
 
 class _LineReader:
@@ -261,6 +262,13 @@ async def test_turn_sends_prompt_on_stdin_and_parses_events(tmp_path: Path) -> N
         "cache_read_input_tokens": 2000,
         "cache_creation_input_tokens": 50,
     }
+    # One call per step, `input` being the uncached part: the ledger gives the
+    # usage tracker its own sense of input_tokens, which last_usage does not.
+    assert client.usage_ledger.calls == [
+        CallUsage(prompt=1050, cache_read=900, cache_write=50, output=20, reasoning=5),
+        CallUsage(prompt=1140, cache_read=1100, cache_write=0, output=10, reasoning=5),
+    ]
+    assert client.usage_ledger.tracker_fields()["input_tokens"] == 100 + 40
 
 
 @pytest.mark.asyncio

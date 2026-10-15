@@ -10,6 +10,7 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 from context_mgmt.sdk_usage import claude_context_fill
+from harness.domain import from_split_cache
 
 from .base import (
     AgentClient,
@@ -94,6 +95,10 @@ class ClaudeAgentClient(AgentClient):
         existing code using hasattr(msg, 'content') patterns continues
         to work during the migration period.
         """
+        self._start_usage_ledger()
+        # The CLI streams one AssistantMessage per content block, each carrying
+        # the usage of the API call they came from: one call, counted once.
+        counted_calls: set[str] = set()
         async for raw_msg in self._client.receive_response():
             # The init SystemMessage names the session before any work is
             # done; session.py persists it right away so a run interrupted
@@ -110,10 +115,23 @@ class ClaudeAgentClient(AgentClient):
             # on the AgentClient path — without it, the Kanban "Reprendre"
             # button can't find a session_id when the user uses the
             # provider-agnostic factory.
+            if getattr(raw_msg, "subtype", None) == "compact_boundary":
+                # Native compaction rebuilt the thread: its next call starts cold.
+                self.usage_ledger.boundary()
             if type(raw_msg).__name__ == "AssistantMessage":
-                _fill = claude_context_fill(getattr(raw_msg, "usage", None))
+                _usage = getattr(raw_msg, "usage", None)
+                _fill = claude_context_fill(_usage)
                 if _fill:
                     self.last_context_tokens = _fill
+                _call_id = getattr(raw_msg, "message_id", None)
+                if not _call_id or _call_id not in counted_calls:
+                    if _call_id:
+                        counted_calls.add(_call_id)
+                    # A sub-agent's calls share its own prefix, not the parent's.
+                    self._record_call(
+                        from_split_cache(_usage),
+                        thread=getattr(raw_msg, "parent_tool_use_id", None),
+                    )
             if type(raw_msg).__name__ == "ResultMessage":
                 self.last_result_msg = raw_msg
                 self.last_session_id = getattr(raw_msg, "session_id", None)

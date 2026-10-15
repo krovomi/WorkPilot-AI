@@ -1,7 +1,7 @@
 # Harness de contexte : le plan
 
-> **Statut : plan, rien n'est construit.** Ce fichier fixe la cible et l'ordre des lots ; chaque
-> lot livré remplace sa section par la justification de ce qui existe. [`docs/CLAUDE.md`](../CLAUDE.md)
+> **Statut : plan ; le lot 0 (mesurer) est livré, sauf sa ligne de base.** Ce fichier fixe la cible
+> et l'ordre des lots ; chaque lot livré remplace sa section par la justification de ce qui existe. [`docs/CLAUDE.md`](../CLAUDE.md)
 > reste normatif : là où les deux divergent, il gagne. Le mécanisme existant de compaction et de
 > reset est décrit dans [`context-management.md`](context-management.md), que ce plan prolonge sans
 > le remplacer.
@@ -76,7 +76,7 @@ sens partout, une boucle unique, et la troncature à la source.
 |---|---|---|
 | Propriété de la boucle | boucles tierces : Claude Agent SDK (`max_turns` 1000, `max_budget_usd` 5), Codex, OpenCode, Antigravity. Boucles WorkPilot : **cinq copies** de `for turn in range(self.max_turns)` dans `core/agent_clients/` (OpenAI et ses dérivés, Ollama/LM Studio, Copilot, Windsurf ×2) | une boucle partagée ; un plafond de coût hors SDK Claude |
 | Assemblage | un seul builder, `build_base_system_prompt` (`core/llm_optimization.py`), sans horodatage ; outils dans un ordre fixe ; `prompt_cache_key` côté OpenAI | le chemin absolu du worktree est la **deuxième phrase** du system : le préfixe change d'une tâche à l'autre, quel que soit le provider. La constitution spec-kit est inlinée dans le prompt de *chaque* sous-tâche |
-| Mesure | chaque client remplit `last_usage` et `last_context_tokens` ; `record_client_usage` (`agents/session.py`) l'écrit **par session** dans `core/usage_tracker.py` | `input_tokens` n'a pas le même sens partout : la part non cachée chez Claude (le sens que `core/usage_tracker.py` attend), le total cache compris chez OpenCode et Codex. OpenCode y passe en plus ses champs de cache : ses tokens d'entrée sont comptés deux fois dans le bilan carbone et les tableaux de bord. Les boucles WorkPilot ne lisent aucun champ de cache ; Codex garde `cached_input_tokens` mais `record_client_usage` ne le transmet pas. Ni taux de hit, ni coût par appel |
+| Mesure | lot 0 livré : chaque client lit l'usage de chaque appel dans l'unité commune de `harness/domain/` et le cumule dans son `usage_ledger` ; `record_client_usage` en tire les champs du suivi des coûts, `CONTEXT_USAGE` le taux de hit et les réécritures de préfixe | la ligne de base sur des tâches réelles ; le coût par appel (seul le coût de session est connu) |
 | Compaction | `context_mgmt/` : garde par tâche, seuil 50 % par défaut (30–90), *compact* ou *clear*, handoff préparé en fond par le provider de la tâche, cap de 3 resets ; native sur Claude et Codex, émulée ailleurs | un seuil calculé sur la fenêtre annoncée, pas sur la fenêtre *payable* (palier de prix à 200 k chez certains providers) |
 | Tool clearing | boucles WorkPilot : `compact_messages` remplace les vieux résultats par un marqueur au-delà de 300 k caractères. Claude Code purge de son côté | pas de règle d'âge (« plus vieux que N tours »), pas de gain minimal |
 | Troncature | rtk sur Bash ; boucles WorkPilot : résultat coupé à 10 k caractères (70 % tête / 30 % queue), recherche à 200 correspondances. Claude Code plafonne nativement (table ci-dessus) | `read_file` lit le fichier entier puis en coupe le milieu, sans `offset`/`limit` ; aucune pagination par curseur ; aucun plafond natif réglé par WorkPilot |
@@ -191,38 +191,50 @@ boucles tierces. Pas d'injection préalable « au cas où ».
 Chaque lot se termine sur un critère mesuré, pas sur une date, et vaut pour tous les providers :
 un lot qui ne servirait qu'une famille dit pourquoi.
 
-### Lot 0 — Mesurer
+### Lot 0 — Mesurer (livré, sauf la ligne de base)
 
-Sans mesure, chaque lot suivant est un pari.
+Sans mesure, chaque lot suivant est un pari. Ce qui existe :
 
-- `harness/domain/usage.py` : un appel se décrit par cinq nombres — entrée non cachée, lue depuis
-  le cache, écrite dans le cache, sortie, raisonnement — chacun « inconnu » quand le provider ne
-  le rapporte pas. Une fonction pure par **format d'usage**, pas par provider :
+- **Un appel, cinq nombres** (`harness/domain/usage.py`) : prompt (cache compris), lu depuis le
+  cache, écrit dans le cache, sortie, raisonnement. Un champ que le provider ne rapporte pas vaut
+  `None`, jamais 0. Une fonction pure par **format d'usage**, pas par provider :
 
-  | Format | Qui l'émet | Lecture |
+  | Lecteur | Format | Qui l'émet |
   |---|---|---|
-  | non caché + lu + écrit séparés | Claude Agent SDK (`AssistantMessage.usage`) | tels quels |
-  | total + part cachée | OpenAI et compatibles (`prompt_tokens`, `prompt_tokens_details.cached_tokens`), Codex (`input_tokens`, `cached_input_tokens`) | non caché = total − cachée |
-  | hit + miss | DeepSeek (`prompt_cache_hit_tokens`, `prompt_cache_miss_tokens`) | lu = hit, non caché = miss |
-  | non caché + `cache.read` + `cache.write` | OpenCode (`step_finish`) | tels quels |
-  | entrée + lu, inclusion ambiguë | Antigravity | tranché par `total_tokens`, comme `context_tokens_from_usage` |
-  | total sans cache | Ollama, LM Studio (`prompt_eval_count`), Copilot, Windsurf (`prompt_tokens`) | cache « inconnu » |
+  | `from_split_cache` | non caché + lu + écrit séparés | Claude Agent SDK (`AssistantMessage.usage`) |
+  | `from_chat_completion` | total + part cachée (`prompt_tokens_details.cached_tokens`), ou hit + miss (`prompt_cache_hit_tokens`, `prompt_cache_miss_tokens`) | OpenAI et les compatibles (Google, Mistral, DeepSeek, xAI), Copilot, Windsurf REST, LM Studio |
+  | `from_flat_cached_input` | `input_tokens` qui inclut `cached_input_tokens` | Codex CLI (`turn.completed`) |
+  | `from_step_tokens` | `input` non caché, `cache.read`, `cache.write` | OpenCode (`step_finish`) |
+  | `from_ambiguous_cache_read` | inclusion non documentée, tranchée par `total_tokens` | Antigravity (par étape) ; `context_tokens_from_usage` s'en sert aussi |
+  | `from_eval_counts` | `prompt_eval_count`, `eval_count`, rien sur un cache | Ollama |
 
-- `harness/domain/ledger.py` : la session cumule ses appels, calcule le taux de hit sur les seuls
-  appels qui rapportent le cache, et compte les **réécritures de préfixe** (un appel après le
-  premier dont l'écriture dépasse la moitié du prompt) — un signal qui ne demande pas de voir la
-  requête, donc valable pour les boucles tierces aussi.
-- Chaque client garde son parsing et y ajoute un appel au format qui lui correspond ;
-  `record_client_usage` écrit le résumé de session dans le sens que `core/usage_tracker.py`
-  attend déjà pour tous : `input_tokens` est la part non cachée, le cache a ses deux champs.
-- Le taux de hit rejoint l'événement `CONTEXT_USAGE` ; la jauge du panneau de tâche l'affiche,
-  clés i18n `en` et `fr`, et « non rapporté » pour un provider sans champ de cache.
-- Ligne de base : une dizaine de tâches réelles rejouées, sur plusieurs providers, avec coût par
-  sous-tâche terminée, passes QA, resets de contexte, taux de hit, réécritures de préfixe.
+- **La session** (`harness/domain/ledger.py`, `UsageLedger`) : cumule les appels par fil (le fil
+  principal, ou un sous-agent : chacun a son propre préfixe), calcule le taux de hit sur les seuls
+  appels qui rapportent un cache, et compte les **réécritures de préfixe** : un appel qui relit
+  moins de la moitié du prompt de l'appel précédent du même fil (au-delà de 1 024 tokens, sous
+  lesquels aucun provider ne cache). Le préfixe a changé, ou le cache a expiré : dans les deux
+  cas l'appel a payé ce qu'il aurait dû relire. Le signal ne demande pas de voir la requête, il
+  vaut donc pour les boucles tierces.
+- **Chaque client** garde son parsing et enregistre chaque appel au format qui lui correspond
+  (`AgentClient._record_call`) ; le ledger repart à chaque réponse. Le client Claude compte un
+  appel une fois, alors que la CLI envoie un `AssistantMessage` par bloc de contenu
+  (`message_id`). `SdkUsageProbe` fait de même pour la création de spec, qui lit le flux brut.
+- **Le suivi des coûts** : `session_usage_fields` (`agents/session.py`) prend le côté entrée dans
+  le ledger, donc dans le sens que `core/usage_tracker.py` attend pour tous (`input_tokens` = part
+  non cachée), et la sortie dans `last_usage`, dont le sens est le même partout et dont le total
+  de session est le plus complet. Ce qui corrige deux erreurs : OpenCode comptait son cache deux
+  fois, et le `cached_input_tokens` de Codex ne parvenait pas au suivi.
+- **La jauge** : `CONTEXT_USAGE` porte `cacheHitRatio` et `prefixRewrites` ; le popover de la
+  jauge les affiche (clés `tasks:contextManagement.gauge.cache*`, `en` et `fr`), et « non
+  rapporté » pour un provider sans champ de cache.
 
-*Sortie :* les KPI ci-dessous sont lus pour chaque tâche, quel que soit son provider, et la ligne
-de base est écrite. *Tests :* chaque format d'usage par table, dont les champs absents ; le ledger
-ne contient jamais un corps de message.
+Tests : `tests/harness/` (chaque format par table, champs absents compris ; le ledger ; chaque
+client ; le suivi des coûts ; l'événement), les tests des clients CLI, et `ContextGauge.test.tsx`.
+
+**Reste à faire** : la ligne de base. Une dizaine de tâches réelles, sur plusieurs providers,
+avec coût par sous-tâche terminée, passes QA, resets de contexte, taux de hit, réécritures de
+préfixe. Elle demande de vrais appels, donc un budget approuvé ; les cibles des lots suivants en
+dépendent.
 
 ### Lot 1 — Une seule boucle
 
@@ -251,7 +263,7 @@ modification de leurs attentes. *Tests :* chaque condition d'arrêt, avec un mod
 - D3 tranché sur la mesure, là où un réglage existe.
 
 *Sortie :* à partir du deuxième appel d'une session, sur chaque provider qui rapporte le cache, le
-cache couvre au moins le préfixe, et aucun appel ne réécrit plus de la moitié du prompt hors
+cache couvre au moins le préfixe, et le ledger ne compte aucune réécriture de préfixe hors
 compaction. *Tests :* deux assemblages successifs d'une même session ont un préfixe identique
 octet pour octet ; l'assembleur refuse un segment volatil placé avant un stable.
 
@@ -351,7 +363,7 @@ pas le cache n'a pas de taux de hit, il n'a pas un taux nul.
 | Indicateur | Calcul | Ce qu'on fait quand il dérive |
 |---|---|---|
 | Taux de hit du cache | lu ÷ (non caché + lu + écrit), sur les appels qui rapportent le cache | chercher l'invalidateur : différence entre deux requêtes successives |
-| Réécritures de préfixe | appels, hors premier et hors compaction, où l'écriture dépasse la moitié du prompt | même diagnostic ; c'est la régression silencieuse la plus chère |
+| Réécritures de préfixe | appels qui relisent moins de la moitié du prompt de l'appel précédent du même fil, hors compaction | même diagnostic ; c'est la régression silencieuse la plus chère |
 | Part des sorties d'outils | tokens de résultats d'outils ÷ tokens du contexte | lot 3, puis lot 4 |
 | Coût par sous-tâche terminée | coût cumulé ÷ sous-tâches terminées | jamais par requête : une requête moins chère qui demande plus de tours ne l'est pas |
 | Resets de contexte | resets par sous-tâche, et sous-tâches au cap | seuil (D2), fenêtre effective, troncature |

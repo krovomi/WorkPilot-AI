@@ -16,6 +16,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+from harness.domain import CallUsage, UsageLedger
+
 # The name the monolith logged under, kept so logging configuration and log
 # filters keyed on it still match: `core.agent_client`, or
 # `apps.backend.core.agent_client` under the repo-root layout.
@@ -271,6 +273,25 @@ class AgentClient(ABC):
     def provider_name(self) -> str:
         """Return the provider identifier (e.g., 'claude', 'copilot')."""
         ...
+
+    # Every model call of the current response, read into the harness's common
+    # unit (``harness.domain``): the client knows its provider's usage format,
+    # nothing downstream does. Read by ``record_client_usage`` and the context
+    # guard; ``None`` until the client records a call.
+    usage_ledger: UsageLedger | None = None
+
+    def _start_usage_ledger(self) -> UsageLedger:
+        """A fresh ledger for the response about to be received."""
+        self.usage_ledger = UsageLedger()
+        return self.usage_ledger
+
+    def _record_call(
+        self, usage: CallUsage | None, *, thread: str | None = None
+    ) -> None:
+        """One model call, already read from the provider's format."""
+        if self.usage_ledger is None:
+            self.usage_ledger = UsageLedger()
+        self.usage_ledger.record(usage, thread=thread)
 
     def resumes_native_session(self) -> bool:
         """Whether the provider itself rehydrates an earlier session.

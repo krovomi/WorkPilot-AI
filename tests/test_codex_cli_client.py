@@ -14,6 +14,7 @@ from core.codex_cli_client import (
     build_codex_exec_args,
 )
 from core.oneshot import _build_client, oneshot_completion
+from harness.domain import CallUsage
 
 
 class _LineReader:
@@ -254,6 +255,10 @@ async def test_stream_translates_final_message_usage_and_thread(tmp_path: Path) 
         "output_tokens": 3,
         "reasoning_output_tokens": 1,
     }
+    assert client.usage_ledger.calls == [
+        CallUsage(prompt=10, cache_read=2, cache_write=None, output=3, reasoning=1)
+    ]
+    assert client.usage_ledger.tracker_fields()["input_tokens"] == 8
     assert process.stdin.data == b"work"
 
 

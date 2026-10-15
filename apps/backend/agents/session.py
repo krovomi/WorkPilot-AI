@@ -1898,6 +1898,36 @@ def _make_context_guard(
         return None
 
 
+def session_usage_fields(client) -> dict[str, int] | None:
+    """A session's tokens in the usage tracker's sense, whatever the provider.
+
+    ``core.usage_tracker`` takes ``input_tokens`` as the uncached part, beside
+    the two cache fields. Clients' ``last_usage`` did not agree on that (the
+    whole prompt on OpenCode, Codex and the OpenAI-style loops), so the input
+    side comes from the client's ``usage_ledger``, already read into one unit
+    (``harness.domain``). Output tokens mean the same everywhere and the
+    session total is the more complete count (a streamed call's own usage may
+    predate its last tokens), so ``last_usage`` keeps them when it has them.
+    ``None`` when the client reported nothing.
+    """
+    usage = getattr(client, "last_usage", None)
+    usage = usage if isinstance(usage, dict) else None
+    ledger = getattr(client, "usage_ledger", None)
+    if ledger is not None and getattr(ledger, "calls", None):
+        fields = ledger.tracker_fields()
+        if usage is not None and usage.get("output_tokens"):
+            fields["output_tokens"] = int(usage["output_tokens"])
+        return fields
+    if usage is None:
+        return None
+    return {
+        "input_tokens": usage.get("input_tokens", 0),
+        "output_tokens": usage.get("output_tokens", 0),
+        "cache_creation_input_tokens": usage.get("cache_creation_input_tokens", 0),
+        "cache_read_input_tokens": usage.get("cache_read_input_tokens", 0),
+    }
+
+
 def record_client_usage(
     client, spec_dir: Path, phase: str, agent_type: str | None = None
 ) -> None:
@@ -1911,7 +1941,8 @@ def record_client_usage(
         return
     try:
         _usage = getattr(client, "last_usage", None)
-        if not isinstance(_usage, dict):
+        tokens = session_usage_fields(client)
+        if tokens is None:
             return
         _record_usage(
             spec_dir=spec_dir,
@@ -1920,11 +1951,8 @@ def record_client_usage(
             agent_type=agent_type or phase,
             model=getattr(client, "model", "unknown"),
             provider=client.provider_name(),
-            input_tokens=_usage.get("input_tokens", 0),
-            output_tokens=_usage.get("output_tokens", 0),
-            cost_usd=_usage.get("cost_usd", 0.0),
-            cache_creation_input_tokens=_usage.get("cache_creation_input_tokens", 0),
-            cache_read_input_tokens=_usage.get("cache_read_input_tokens", 0),
+            cost_usd=(_usage.get("cost_usd", 0.0) if isinstance(_usage, dict) else 0.0),
+            **tokens,
         )
     except Exception as _ute:  # noqa: BLE001 - telemetry never stops a build
         logger.debug("[usage_tracker] AgentClient usage recording failed: %s", _ute)
