@@ -10,7 +10,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "../../ui/select";
-import type { IssueListHeaderProps } from "../types";
+import type { FilterState, IssueListHeaderProps } from "../types";
 
 export function IssueListHeader({
 	projectPath,
@@ -66,7 +66,10 @@ export function IssueListHeader({
 						className="pl-9"
 					/>
 				</div>
-				<Select value={filterState} onValueChange={onFilterChange}>
+				<Select
+					value={filterState}
+					onValueChange={(value) => onFilterChange(value as FilterState)}
+				>
 					<SelectTrigger className="w-32">
 						<Filter className="h-4 w-4 mr-2" />
 						<SelectValue />

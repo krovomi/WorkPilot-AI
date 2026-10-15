@@ -331,7 +331,7 @@ export function DevToolsStep({ onNext, onBack }: DevToolsStepProps) {
 							</Label>
 							<Select
 								value={preferredIDE}
-								onValueChange={(value: SupportedIDE) => setPreferredIDE(value)}
+								onValueChange={(value) => setPreferredIDE(value as SupportedIDE)}
 								disabled={isSaving}
 							>
 								<SelectTrigger>
@@ -383,8 +383,8 @@ export function DevToolsStep({ onNext, onBack }: DevToolsStepProps) {
 							</Label>
 							<Select
 								value={preferredTerminal}
-								onValueChange={(value: SupportedTerminal) =>
-									setPreferredTerminal(value)
+								onValueChange={(value) =>
+									setPreferredTerminal(value as SupportedTerminal)
 								}
 								disabled={isSaving}
 							>

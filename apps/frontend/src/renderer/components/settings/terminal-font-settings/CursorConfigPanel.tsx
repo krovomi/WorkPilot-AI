@@ -65,8 +65,8 @@ export function CursorConfigPanel({
 	];
 
 	// Handle cursor style change
-	const handleCursorStyleChange = (value: "block" | "underline" | "bar") => {
-		onSettingChange("cursorStyle", value);
+	const handleCursorStyleChange = (value: string) => {
+		onSettingChange("cursorStyle", value as TerminalFontSettings["cursorStyle"]);
 	};
 
 	// Handle cursor blink change
