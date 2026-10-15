@@ -336,6 +336,9 @@ n'économise aucun token et ne change aucun comportement.
     à rafraîchir, elle était rendue comme la réponse du modèle, en mode texte comme dans l'appel
     unique sans outils ; c'est maintenant une erreur ;
   - les identifiants étaient rafraîchis deux fois de suite sur cette erreur ; ils le sont une fois.
+- Le `last_usage` de Copilot valait toujours zéro, alors que des modèles Copilot rapportent leur
+  `usage` : c'est maintenant le total de ce que les appels de la réponse ont rapporté (coût 0.0,
+  un abonnement), et None quand aucun n'a rien rapporté, qui n'est pas une mesure de zéro.
 
 Tests : d'abord la caractérisation, contre l'ancien code : `tests/core/test_windsurf_loops.py` (les
 deux boucles Windsurf, qu'aucun test ne faisait tourner), `tests/core/test_openai_loop.py`,

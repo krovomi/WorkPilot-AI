@@ -20,7 +20,7 @@ from harness.application.subagents import (
     receive_result,
     subagent_messages,
 )
-from harness.domain import from_chat_completion
+from harness.domain import CallUsage, from_chat_completion
 from harness.domain.stop import StopReason
 from harness.ports import Measured, Outcome, Reply, ToolCall, ToolResult
 
@@ -251,6 +251,9 @@ class _CopilotAdapter(ChatCompletionsAdapter):
         # rejection. Guards against an infinite retry loop if even the fallback
         # model is unavailable on the user's Copilot plan.
         self.model_fallback_attempted = False
+        # The tokens the calls of this response reported (`_add_to_totals`).
+        self.total_in = 0
+        self.total_out = 0
 
     def _measure(self, data: Any) -> Measured:
         """The usage of one answered call, and the context fill it reports."""
@@ -259,7 +262,25 @@ class _CopilotAdapter(ChatCompletionsAdapter):
         usage = data.get("usage") if isinstance(data, dict) else None
         if isinstance(usage, dict) and usage.get("prompt_tokens"):
             self.client.last_context_tokens = int(usage["prompt_tokens"])
-        return Measured(from_chat_completion(usage))
+        call = from_chat_completion(usage)
+        if call is not None:
+            self._add_to_totals(call)
+        return Measured(call)
+
+    def _add_to_totals(self, call: CallUsage) -> None:
+        """The response's totals so far, as ``last_usage``: what was reported.
+
+        Copilot is a subscription, so tokens are counted, not billed per
+        token: the cost stays 0.0. A response with no reported call keeps
+        ``last_usage`` at None, which is not a measurement of zero.
+        """
+        self.total_in += call.prompt or 0
+        self.total_out += call.output or 0
+        self.client.last_usage = {
+            "input_tokens": self.total_in,
+            "output_tokens": self.total_out,
+            "cost_usd": 0.0,
+        }
 
     def assemble(self, turn: int) -> dict[str, Any]:
         client = self.client
@@ -790,7 +811,8 @@ class CopilotAgentClient(AgentClient):
         # Copilot session token cache (expires ~30 min)
         self._copilot_token: str = ""
         self._copilot_token_expires_at: float = 0.0
-        # Usage tracking (Copilot API doesn't expose token counts — subscription-based)
+        # The latest response's reported tokens (cost 0.0: a subscription);
+        # None when no call reported usage.
         self.last_usage: dict | None = None
         # Context fill of the latest turn (prompt tokens the provider reported),
         # read by context_mgmt's guard; None until a turn reports it.
@@ -1114,9 +1136,9 @@ class CopilotAgentClient(AgentClient):
         if not self._pending_query:
             return
 
-        # Copilot is subscription-based — no token counts in API response.
-        # Mark as "recorded" immediately so session.py always logs a Copilot entry.
-        self.last_usage = {"input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0}
+        # This response's totals, from the calls that report `usage`
+        # (`_CopilotAdapter._add_to_totals`); None until one does.
+        self.last_usage = None
         ledger = self._start_usage_ledger()
 
         prompt = self._pending_query
