@@ -27,100 +27,23 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+# Layout-agnostic import: the backend runs with apps/backend on sys.path and
+# from the repo root (apps.backend.*).
+try:
+    from cost_intelligence.catalog import PricingCatalog, price_table
+except ImportError:  # pragma: no cover - alternate package layout
+    from apps.backend.cost_intelligence.catalog import PricingCatalog, price_table
+
 logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Pricing database — cost per 1M tokens (USD)
+# Pricing — cost per 1M tokens (USD)
 # ---------------------------------------------------------------------------
 
-PROVIDER_PRICING: dict[str, dict[str, dict[str, float]]] = {
-    "anthropic": {
-        # Claude 4.6
-        "claude-opus-4-6": {"input": 15.0, "output": 75.0},
-        "claude-sonnet-4-6": {"input": 3.0, "output": 15.0},
-        # Claude 4.5
-        "claude-opus-4-5-20251101": {"input": 15.0, "output": 75.0},
-        "claude-sonnet-4-5-20250929": {"input": 3.0, "output": 15.0},
-        "claude-haiku-4-5-20251001": {"input": 0.80, "output": 4.0},
-        # Claude 4
-        "claude-opus-4-20250514": {"input": 15.0, "output": 75.0},
-        "claude-sonnet-4-20250514": {"input": 3.0, "output": 15.0},
-        "claude-haiku-4-20250514": {"input": 0.25, "output": 1.25},
-        # Claude 3.5
-        "claude-3-5-sonnet-20241022": {"input": 3.0, "output": 15.0},
-        "claude-3-5-haiku-20241022": {"input": 0.80, "output": 4.0},
-    },
-    "openai": {
-        # GPT-5
-        "gpt-5.2": {"input": 5.0, "output": 20.0},
-        # GPT-4o
-        "gpt-4o": {"input": 2.50, "output": 10.0},
-        "gpt-4o-mini": {"input": 0.15, "output": 0.60},
-        # GPT-4.1
-        "gpt-4.1": {"input": 2.0, "output": 8.0},
-        "gpt-4.1-mini": {"input": 0.40, "output": 1.60},
-        "gpt-4.1-nano": {"input": 0.10, "output": 0.40},
-        # GPT-4
-        "gpt-4-turbo": {"input": 10.0, "output": 30.0},
-        "gpt-4": {"input": 30.0, "output": 60.0},
-        # GPT-3.5
-        "gpt-3.5-turbo": {"input": 0.50, "output": 1.50},
-        # o-series reasoning
-        "o3": {"input": 10.0, "output": 40.0},
-        "o3-mini": {"input": 1.10, "output": 4.40},
-        "o4-mini": {"input": 1.10, "output": 4.40},
-        "o1": {"input": 15.0, "output": 60.0},
-        "o1-mini": {"input": 3.0, "output": 12.0},
-    },
-    "google": {
-        # Gemini 2.5
-        "gemini-2.5-pro": {"input": 1.25, "output": 10.0},
-        "gemini-2.5-flash": {"input": 0.15, "output": 0.60},
-        # Gemini 2.0
-        "gemini-2.0-flash": {"input": 0.10, "output": 0.40},
-        "gemini-2.0-pro": {"input": 1.25, "output": 5.0},
-        # Gemini 1.5
-        "gemini-1.5-pro": {"input": 1.25, "output": 5.0},
-        "gemini-1.5-flash": {"input": 0.075, "output": 0.30},
-        # Gemini 3.0
-        "gemini-3.0": {"input": 2.0, "output": 8.0},
-    },
-    "mistral": {
-        "mistral-large": {"input": 2.0, "output": 6.0},
-        "mistral-medium": {"input": 2.7, "output": 8.1},
-        "mistral-small": {"input": 0.20, "output": 0.60},
-        "codestral": {"input": 0.30, "output": 0.90},
-        "pixtral-large": {"input": 2.0, "output": 6.0},
-        "mistral-nemo": {"input": 0.15, "output": 0.15},
-    },
-    "deepseek": {
-        "deepseek-chat": {"input": 0.14, "output": 0.28},
-        "deepseek-coder": {"input": 0.14, "output": 0.28},
-        "deepseek-r1": {"input": 0.55, "output": 2.19},
-        "deepseek-v3": {"input": 0.27, "output": 1.10},
-    },
-    "grok": {
-        "grok-3": {"input": 3.0, "output": 15.0},
-        "grok-3-mini": {"input": 0.30, "output": 0.50},
-        "grok-2": {"input": 2.0, "output": 10.0},
-        "grok-2-mini": {"input": 0.30, "output": 1.0},
-    },
-    "cohere": {
-        "command-r-plus": {"input": 2.50, "output": 10.0},
-        "command-r": {"input": 0.15, "output": 0.60},
-        "command-a": {"input": 2.50, "output": 10.0},
-    },
-    "ollama": {},  # Local models — free
-    "meta": {
-        "llama-4-maverick": {"input": 0.0, "output": 0.0},
-        "llama-4-scout": {"input": 0.0, "output": 0.0},
-        "llama-3.3-70b": {"input": 0.0, "output": 0.0},
-        "llama-3.1-405b": {"input": 0.0, "output": 0.0},
-        "llama-3.1-70b": {"input": 0.0, "output": 0.0},
-        "llama-3.1-8b": {"input": 0.0, "output": 0.0},
-    },
-}
+# The input and output prices of cost_intelligence/catalog.py, the one place
+# prices are kept (each provider's official pricing page, cited there).
+PROVIDER_PRICING: dict[str, dict[str, dict[str, float]]] = price_table()
 
 
 class AlertLevel(Enum):
@@ -298,6 +221,7 @@ class CostEstimator:
         self._budgets: dict[str, ProjectBudget] = {}
         self._alerts: list[BudgetAlert] = []
         self._custom_pricing: dict[str, dict[str, dict[str, float]]] = {}
+        self._catalog = PricingCatalog()
         # Track the last alert level emitted per project so we don't append a
         # new alert on every recorded usage once a threshold is crossed
         # (which previously caused unbounded list growth + UI alert spam).
@@ -323,19 +247,11 @@ class CostEstimator:
         if custom:
             return custom
 
-        provider_models = PROVIDER_PRICING.get(provider, {})
-        if model in provider_models:
-            return provider_models[model]
-
-        # Fuzzy match — only accept date-suffix variants of the SAME base
-        # model. The previous `startswith` rule matched `gpt-4o-mini` against
-        # `gpt-4` (and vice-versa), which could mis-bill by 200x or silently
-        # undercount spend, breaking budget alarms. We now require an exact
-        # match or a `<base>-<suffix>` form so `gpt-4-0314` still resolves to
-        # `gpt-4` but `gpt-4o-mini` does not.
-        for known_model, pricing in provider_models.items():
-            if model == known_model or model.startswith(known_model + "-"):
-                return pricing
+        # The catalog's own matching: a dated or tagged id resolves to its
+        # model; another version or variant (gpt-4o-mini vs gpt-4) never does.
+        pricing = self._catalog.get_pricing(provider, model)
+        if pricing is not None:
+            return {"input": pricing.input, "output": pricing.output}
 
         return {"input": 0.0, "output": 0.0}
 

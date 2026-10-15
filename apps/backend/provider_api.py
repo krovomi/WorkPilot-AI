@@ -401,13 +401,13 @@ def get_env_provider_config(name: str) -> dict | None:
     # Google Gemini
     if name == "google" and os.getenv("GOOGLE_API_KEY"):
         default_model = get_default("google")
-        model_id = default_model.model_id if default_model else "gemini-3.1-pro"
+        model_id = default_model.model_id if default_model else "gemini-3.1-pro-preview"
         return {"api_key": os.getenv("GOOGLE_API_KEY"), "model": model_id}
 
     # Mistral AI
     if name == "mistral" and os.getenv("MISTRAL_API_KEY"):
         default_model = get_default("mistral")
-        model_id = default_model.model_id if default_model else "mistral-large-3"
+        model_id = default_model.model_id if default_model else "mistral-large-2512"
         return {
             "api_key": os.getenv("MISTRAL_API_KEY"),
             "model": model_id,
@@ -417,7 +417,7 @@ def get_env_provider_config(name: str) -> dict | None:
     # DeepSeek
     if name == "deepseek" and os.getenv("DEEPSEEK_API_KEY"):
         default_model = get_default("deepseek")
-        model_id = default_model.model_id if default_model else "deepseek-v4"
+        model_id = default_model.model_id if default_model else "deepseek-flash"
         return {
             "api_key": os.getenv("DEEPSEEK_API_KEY"),
             "model": model_id,
