@@ -1,0 +1,635 @@
+{
+  "format": 1,
+  "id": "past-clearing-budget",
+  "why_this_is_here": "A long session that reads a 6,000-line seed page by page, past the history budget. Guards lot 4: old tool results are cleared in one batch down to 60 % of the budget, so the prefix is rewritten once and the next turns clear nothing; the window is the payable one, not the million tokens announced.",
+  "model": "gemini-3.1-pro",
+  "agent_type": "coder",
+  "tool_use_hint": true,
+  "effort": "EFFORT: medium\nWORKFLOW PHASE: coding — implement the subtask, run its tests, commit.",
+  "files": {
+    "db/seed/catalog_seed.sql": [
+      "-- Catalogue seed, exported from the legacy shop (prices in euros).\n",
+      {
+        "repeat": 6000,
+        "line": "INSERT INTO catalogue VALUES ({n}, 'SKU-{n}', 'Item {n}', 12.{n}, 'EUR');"
+      }
+    ],
+    "db/migrations/0007_products_in_cents.py": [
+      "\"\"\"Move the catalogue to the products table, prices in cents.\"\"\"\n"
+    ]
+  },
+  "sessions": [
+    {
+      "subtask": [
+        "# Subtask 4.2 — port the catalogue seed\n",
+        "\n",
+        "Rewrite the seed for the `products` table: one row per catalogue row, price as integer cents. Check every row: some legacy prices have more than two decimals.\n",
+        "\n",
+        "Files to modify: db/migrations/0007_products_in_cents.py\n"
+      ],
+      "turns": [
+        {
+          "text": "Reading the seed.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 1,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 111,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 221,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 331,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 441,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 551,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 661,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 771,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 881,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 991,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 1101,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 1211,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 1321,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 1431,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 1541,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 1651,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 1761,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 1871,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 1981,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 2091,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 2201,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 2311,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 2421,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 2531,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 2641,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 2751,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 2861,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 2971,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 3081,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 3191,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 3301,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 3411,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 3521,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 3631,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 3741,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 3851,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 3961,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 4071,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 4181,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 4291,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 4401,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 4511,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 4621,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Reading on.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "db/seed/catalog_seed.sql",
+                "offset": 4731,
+                "limit": 110
+              }
+            }
+          ]
+        },
+        {
+          "text": "Writing the migration.",
+          "calls": [
+            {
+              "tool": "write_file",
+              "arguments": {
+                "path": "db/migrations/0007_products_in_cents.py",
+                "content": "\"\"\"Move the catalogue to the products table, prices in cents.\"\"\"\n\nfrom decimal import ROUND_HALF_EVEN, Decimal\n\n\ndef cents(price: str) -> int:\n    return int((Decimal(price) * 100).quantize(Decimal(1), ROUND_HALF_EVEN))\n"
+              }
+            }
+          ]
+        },
+        {
+          "calls": [
+            {
+              "tool": "run_command",
+              "arguments": {
+                "command": "python -m pytest -q tests/migrations"
+              },
+              "output": [
+                "...                                                                      [100%]\n",
+                "3 passed in 0.12s\n"
+              ]
+            }
+          ]
+        },
+        {
+          "text": "Done: the migration converts every price with ROUND_HALF_EVEN; 4,840 rows checked."
+        }
+      ]
+    }
+  ]
+}
