@@ -1,7 +1,7 @@
 # Harness de contexte : le plan
 
 > **Statut : plan ; livrés : le lot 0 (mesurer, sauf sa ligne de base), le lot 1a (un budget
-> par session pour tous), le lot 2 (un préfixe stable, sauf D3), le lot 3 (troncature à la
+> par session pour tous), le lot 1b-i (l'arrêt sur absence de progrès), le lot 2 (un préfixe stable, sauf D3), le lot 3 (troncature à la
 > source, sauf les plafonds natifs, réglés sur la ligne de base) et le lot 4 (purge par lots et
 > fenêtre payable, sauf D2).** Ce fichier fixe la cible
 > et l'ordre des lots ; chaque lot livré remplace sa section par la justification de ce qui existe. [`docs/CLAUDE.md`](../CLAUDE.md)
@@ -77,7 +77,7 @@ sens partout, une boucle unique, et la troncature à la source.
 
 | Sujet | Aujourd'hui | Ce qui manque |
 |---|---|---|
-| Propriété de la boucle | boucles tierces : Claude Agent SDK (`max_turns` 1000), Codex, OpenCode, Antigravity. Boucles WorkPilot : **cinq copies** de `for turn in range(self.max_turns)` dans `core/agent_clients/` (OpenAI et ses dérivés, Ollama/LM Studio, Copilot, Windsurf ×2). Lot 1a : un même plafond de coût par session pour tous | une boucle partagée (lot 1b) |
+| Propriété de la boucle | boucles tierces : Claude Agent SDK (`max_turns` 1000), Codex, OpenCode, Antigravity. Boucles WorkPilot : **cinq copies** de `for turn in range(self.max_turns)` dans `core/agent_clients/` (OpenAI et ses dérivés, Ollama/LM Studio, Copilot, Windsurf ×2). Lot 1a : un même plafond de coût par session pour tous ; lot 1b-i : le même arrêt sur absence de progrès | une boucle partagée (lot 1b-ii) |
 | Assemblage | un seul builder, `build_base_system_prompt` (`core/llm_optimization.py`), sans horodatage ; outils dans un ordre fixe ; `prompt_cache_key` côté OpenAI. Lot 2 : segments ordonnés par stabilité (`harness/domain/layout.py`), chemin du worktree en dernier, bloc de tâche en tête de chaque sous-tâche | des points de coupure de cache à la frontière tâche / sous-tâche chez Anthropic, que la CLI ne laisse pas poser |
 | Mesure | lot 0 livré : chaque client lit l'usage de chaque appel dans l'unité commune de `harness/domain/` et le cumule dans son `usage_ledger` ; `record_client_usage` en tire les champs du suivi des coûts, `CONTEXT_USAGE` le taux de hit et les réécritures de préfixe | la ligne de base sur des tâches réelles ; le coût par appel (seul le coût de session est connu) |
 | Compaction | `context_mgmt/` : garde par tâche, seuil 50 % par défaut (30–90), *compact* ou *clear*, handoff préparé en fond par le provider de la tâche, cap de 3 resets ; native sur Claude et Codex, émulée ailleurs. Lot 4 : le seuil est une part de la fenêtre *payable* | D2 : le seuil par défaut, tranché sur la ligne de base |
@@ -142,7 +142,7 @@ apps/backend/harness/
 3. **Troncature à la source.** Un outil de WorkPilot ne rend jamais plus que son plafond ; au-delà,
    il rend un extrait, le total, et le moyen de lire la suite (curseur, `offset`).
 4. **Trois conditions d'arrêt, toujours** : fin naturelle, plafond d'itérations, plafond de coût.
-   Plus l'absence de progrès, que Copilot détecte déjà.
+   Plus l'absence de progrès : les mêmes appels avec les mêmes résultats, tour après tour (lot 1b-i).
 5. **Chaque appel mesuré, dans une seule unité.** Un appel se décrit partout par les mêmes cinq
    nombres : entrée non cachée, lue depuis le cache, écrite dans le cache, sortie, raisonnement.
    Un champ que le provider ne rapporte pas vaut « inconnu », jamais zéro.
@@ -241,8 +241,9 @@ dépendent.
 
 ### Lot 1 — Une seule boucle
 
-Le harness proprement dit. Découpé en deux : l'arrêt au plafond de coût, qui manquait à tous les
-providers sauf Claude, d'abord ; le remplacement des cinq boucles ensuite.
+Le harness proprement dit. Découpé en trois : l'arrêt au plafond de coût, qui manquait à tous les
+providers sauf Claude, d'abord ; l'arrêt sur absence de progrès ensuite ; le remplacement des cinq
+boucles enfin.
 
 **Lot 1a — Un budget par session, pour tous (livré).**
 
@@ -269,16 +270,39 @@ providers sauf Claude, d'abord ; le remplacement des cinq boucles ensuite.
 Tests : `tests/harness/test_cost.py`, `tests/harness/test_session_budget.py` (la session s'arrête
 à l'appel qui dépasse, va au bout sous le plafond, et un modèle sans prix tourne sans plafond).
 
-**Lot 1b — Une seule boucle (reste à faire, après le lot 3).** `harness/application/loop.py`
-remplace les cinq copies. C'est un remaniement : il n'économise aucun token, alors que les lots 2
-et 3 en économisent. Il passe donc après eux.
+**Lot 1b-i — L'arrêt sur absence de progrès, pour tous (livré).** Les cinq boucles s'arrêtaient
+déjà sur la fin naturelle et à `max_turns`. Entre les deux, un modèle qui appelait le même outil
+avec les mêmes arguments et recevait la même réponse recommençait jusqu'à `max_turns`, chaque tour
+renvoyant toute la conversation. Copilot comptait seulement les appels annoncés mais vides.
 
-- La boucle porte les arrêts restants : fin naturelle, `max_turns`, absence de progrès (que
-  Copilot détecte seul aujourd'hui) ; le budget est déjà commun (1a).
-- Les adaptateurs gardent le protocole ; `ToolExecutor` reste le seul exécuteur.
+- `harness/domain/progress.py` (pur) : l'empreinte d'un tour (nom, arguments et résultat de chaque
+  appel) et `ProgressTracker`, qui compte les tours identiques à la suite : au troisième, le modèle
+  reçoit une fois `PROGRESS_NUDGE` (changer d'approche, ou finir et dire ce qui bloque) ; au
+  cinquième, la boucle s'arrête sur `NO_PROGRESS_STOP`, un message système. Un résultat qui change
+  (un test qui passe, un fichier qui existe) est un progrès, même pour le même appel.
+- `AgentClient._check_progress` (`core/agent_clients/base.py`) l'applique après chaque tour
+  d'outils, dans les cinq boucles : OpenAI et ses dérivés (Google, compatibles, LM Studio), Copilot
+  (en plus de sa garde sur les appels vides), Ollama, Windsurf REST et texte. La fin de boucle reste
+  la même : un arrêt pour absence de progrès fixe `last_usage` comme `max_turns` le faisait.
+- Windsurf texte (gRPC) ne remettait jamais son ledger à zéro : il repart vide à chaque réponse,
+  au lieu de garder les appels de la précédente.
+- Deux fixtures de `tests/test_copilot_integration.py` simulaient une « investigation » par le
+  même `dir` quatorze fois ; elles passent désormais une commande par tour, comme leur `idx`
+  l'annonçait. Leurs assertions sont inchangées.
+
+Tests : `tests/harness/test_progress.py` (empreinte, compte des répétitions, relance une fois puis
+arrêt, un résultat qui change remet à zéro), `tests/harness/test_no_progress_loops.py` (chacune des
+cinq boucles relance après le troisième tour identique et s'arrête au cinquième, sans atteindre
+`max_turns` ; un appel dont le résultat change va au bout).
+
+**Lot 1b-ii — Une seule boucle (reste à faire).** `harness/application/loop.py` remplace les cinq
+copies ; les adaptateurs gardent le protocole (format des messages, appel, lecture de la réponse),
+`ToolExecutor` reste le seul exécuteur. C'est un remaniement : il n'économise aucun token, et les
+deux boucles Windsurf n'ont aucun test qui les fasse tourner. D'abord des tests de caractérisation
+de ces deux boucles, ensuite le remplacement.
 
 *Sortie :* les cinq boucles passent par `loop.py` ; les tests existants des clients passent sans
-modification de leurs attentes. *Tests :* chaque condition d'arrêt, avec un modèle factice.
+modification de leurs attentes.
 
 ### Lot 2 — Un préfixe stable (livré, sauf D3)
 

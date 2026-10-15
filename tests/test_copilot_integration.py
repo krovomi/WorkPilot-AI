@@ -663,12 +663,15 @@ class TestCopilotWriteNowNudge:
         return _Session()
 
     def _run_command_call(self, idx):
+        # A different command each turn, as an investigation runs: the same
+        # call with the same result turn after turn is the no-progress loop
+        # every client now stops (harness.domain.progress).
         return [
             {
                 "id": f"call_{idx}",
                 "function": {
                     "name": "run_command",
-                    "arguments": '{"command": "dir"}',
+                    "arguments": f'{{"command": "dir src/part_{idx}"}}',
                 },
             }
         ]
@@ -1083,12 +1086,15 @@ class TestCopilotEmptyToolCallsGuard:
         return _Session()
 
     def _run_command_call(self, idx):
+        # A different command each turn, as an investigation runs: the same
+        # call with the same result turn after turn is the no-progress loop
+        # every client now stops (harness.domain.progress).
         return [
             {
                 "id": f"call_{idx}",
                 "function": {
                     "name": "run_command",
-                    "arguments": '{"command": "dir"}',
+                    "arguments": f'{{"command": "dir src/part_{idx}"}}',
                 },
             }
         ]

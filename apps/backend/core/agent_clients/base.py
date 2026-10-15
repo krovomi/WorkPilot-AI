@@ -17,6 +17,12 @@ from enum import Enum
 from typing import Any
 
 from harness.domain import CallUsage, UsageLedger
+from harness.domain.progress import (
+    NO_PROGRESS_STOP,
+    PROGRESS_NUDGE,
+    ProgressTracker,
+    turn_fingerprint,
+)
 
 # The name the monolith logged under, kept so logging configuration and log
 # filters keyed on it still match: `core.agent_client`, or
@@ -296,6 +302,33 @@ class AgentClient(ABC):
         if self.usage_ledger is None:
             self.usage_ledger = UsageLedger()
         self.usage_ledger.record(usage, thread=thread)
+
+    def _check_progress(
+        self,
+        tracker: ProgressTracker,
+        turn_calls: list[tuple[str, Any, str]],
+        messages: list[dict[str, Any]],
+    ) -> AgentMessage | None:
+        """The no-progress rule after a turn of tool calls, for every loop.
+
+        ``turn_calls`` is the turn's (name, arguments, result) list. When the
+        same turn has repeated long enough, the nudge is appended to
+        ``messages`` (once); when it goes on, the returned notice ends the
+        loop. None: carry on (``harness.domain.progress``).
+        """
+        verdict = tracker.observe(turn_fingerprint(turn_calls))
+        if verdict == "nudge":
+            messages.append({"role": "user", "content": PROGRESS_NUDGE})
+            return None
+        if verdict == "stop":
+            logger.warning("[%s] %s", self.provider_name(), NO_PROGRESS_STOP)
+            return AgentMessage(
+                role=MessageRole.SYSTEM,
+                content=[
+                    ContentBlock(type=ContentBlockType.TEXT, text=NO_PROGRESS_STOP)
+                ],
+            )
+        return None
 
     def resumes_native_session(self) -> bool:
         """Whether the provider itself rehydrates an earlier session.
