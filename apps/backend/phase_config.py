@@ -93,7 +93,9 @@ DEFAULT_PHASE_MODELS: dict[str, str] = {
 # Keys must match provider names from provider_api.py / ProviderContext.
 
 _GOOGLE_ENTRY = get_default("google")
-GOOGLE_GEMINI_MODEL = _GOOGLE_ENTRY.model_id if _GOOGLE_ENTRY else "gemini-3.1-pro"
+GOOGLE_GEMINI_MODEL = (
+    _GOOGLE_ENTRY.model_id if _GOOGLE_ENTRY else "gemini-3.1-pro-preview"
+)
 
 _META_ENTRY = get_default("meta")
 META_LLAMA_MODEL = _META_ENTRY.model_id if _META_ENTRY else "meta-llama/llama-4-scout"
@@ -123,10 +125,10 @@ _OPENAI_ENTRY = get_default("openai")
 OPENAI_MODEL = _OPENAI_ENTRY.model_id if _OPENAI_ENTRY else "gpt-5.5"
 
 _MISTRAL_ENTRY = get_default("mistral")
-MISTRAL_MODEL = _MISTRAL_ENTRY.model_id if _MISTRAL_ENTRY else "mistral-large-3"
+MISTRAL_MODEL = _MISTRAL_ENTRY.model_id if _MISTRAL_ENTRY else "mistral-large-2512"
 
 _DEEPSEEK_ENTRY = get_default("deepseek")
-DEEPSEEK_MODEL = _DEEPSEEK_ENTRY.model_id if _DEEPSEEK_ENTRY else "deepseek-v3"
+DEEPSEEK_MODEL = _DEEPSEEK_ENTRY.model_id if _DEEPSEEK_ENTRY else "deepseek-flash"
 
 _GROK_ENTRY = get_default("grok")
 GROK_MODEL = _GROK_ENTRY.model_id if _GROK_ENTRY else "grok-4.3"

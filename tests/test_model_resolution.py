@@ -361,21 +361,25 @@ class TestTheAnthropicCatalogIsCurrent:
     @pytest.mark.parametrize(
         "model_id,price_input,price_output",
         [
+            ("claude-opus-5-5", 4.0, 20.0),
             ("claude-opus-5", 5.0, 25.0),
             ("claude-opus-4-8", 5.0, 25.0),
+            ("claude-sonnet-5-5", 2.0, 10.0),
             ("claude-sonnet-5", 2.0, 10.0),
             ("claude-haiku-4-5", 1.0, 5.0),
             ("claude-fable-5", 10.0, 50.0),
         ],
     )
     def test_published_pricing(self, model_id, price_input, price_output):
-        """Cost estimates are only as honest as this table."""
-        from models_registry import get_pricing
+        """Cost estimates are only as honest as the pricing catalog."""
+        from cost_intelligence.catalog import PricingCatalog
+        from models_registry import list_provider
 
-        entry = get_pricing("anthropic", model_id)
-        assert entry is not None, f"{model_id} missing from the registry"
-        assert entry.price_input == price_input
-        assert entry.price_output == price_output
+        assert model_id in {e.model_id for e in list_provider("anthropic")}
+        pricing = PricingCatalog().get_pricing("anthropic", model_id)
+        assert pricing is not None, f"{model_id} has no catalog price"
+        assert pricing.input == price_input
+        assert pricing.output == price_output
 
     def test_every_alias_resolves_to_a_registered_model(self):
         """An alias pointing at nothing reaches the API as an unknown model."""

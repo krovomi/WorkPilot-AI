@@ -7,12 +7,17 @@ that ratio, silently. An unknown model is reported and left uncapped instead.
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 from cost_intelligence.catalog import (
+    FLAT_RATE_PROVIDERS,
     UNPRICED_MODELS,
     UNPRICED_PROVIDERS,
     ModelPricing,
     PricingCatalog,
+    renderer_price_data,
 )
 from models_registry import REGISTRY
 
@@ -137,3 +142,18 @@ def test_unpriced_lists_name_only_offered_models():
     ]
     assert stale == []
     assert set(UNPRICED_PROVIDERS) <= {e.provider for e in REGISTRY}
+
+
+def test_flat_rate_providers_are_unpriced_providers():
+    assert set(FLAT_RATE_PROVIDERS) <= set(UNPRICED_PROVIDERS)
+
+
+def test_renderer_prices_are_generated_from_the_catalog():
+    """The renderer's cost previews read the catalog, never a copy of it."""
+    path = (
+        Path(__file__).resolve().parents[2]
+        / "apps/frontend/src/shared/constants/model-pricing.generated.json"
+    )
+    assert json.loads(path.read_text(encoding="utf-8")) == renderer_price_data(), (
+        "Run python scripts/generate_model_catalog.py"
+    )

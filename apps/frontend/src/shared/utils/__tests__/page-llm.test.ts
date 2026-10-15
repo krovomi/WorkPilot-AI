@@ -245,7 +245,7 @@ describe("inherited provider models", () => {
 				selectedProvider: "openai",
 				featureModels: {
 					...DEFAULT_FEATURE_MODELS,
-					promptOptimizer: "gemini-3.1-pro",
+					promptOptimizer: "gemini-3.1-pro-preview",
 				},
 			},
 			"prompt-optimizer",
