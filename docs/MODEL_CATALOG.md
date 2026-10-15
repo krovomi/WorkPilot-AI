@@ -2,19 +2,30 @@
 
 ## Source de vérité
 
-`apps/backend/models_registry.py` définit le catalogue livré avec WorkPilot.
-`provider_catalog()` alimente le fallback de l'API et le fichier frontend généré
-`apps/frontend/src/shared/constants/model-catalog.generated.json`.
+`apps/backend/models_registry.py` définit le catalogue livré avec WorkPilot : des
+identifiants d'API vérifiés sur la liste officielle de chaque provider (la date est
+dans chaque section). `provider_catalog()` alimente le fallback de l'API et le fichier
+frontend généré `apps/frontend/src/shared/constants/model-catalog.generated.json`.
 Ne pas ajouter de listes de modèles dans les composants.
 
-Après une modification du registre :
+Les prix n'y sont pas : `apps/backend/cost_intelligence/catalog.py` les tient, relevés
+sur la page de prix officielle de chaque provider. Le plafond par session, les
+estimations (`cost_intelligence/`, `scheduling/cost_estimator.py`) et les aperçus de
+coût du renderer (`model-pricing.generated.json`, lu par
+`renderer/lib/model-pricing.ts`) lisent tous ce catalogue.
+`tests/cost_intelligence/test_catalog.py` vérifie que chaque modèle du registre y a un
+prix, ou une raison écrite de n'en pas avoir.
+
+Après une modification du registre ou des prix :
 
 ```sh
 python scripts/generate_model_catalog.py
 python scripts/generate_model_catalog.py --check
 ```
 
-Le test `tests/test_model_catalog_releases.py` vérifie que les deux côtés restent identiques.
+Les tests `tests/test_model_catalog_releases.py` (modèles) et
+`tests/cost_intelligence/test_catalog.py` (prix) vérifient que les deux côtés restent
+identiques.
 Les anciens identifiants restent valides : une mise à jour du catalogue ne change pas
 le modèle enregistré dans une tâche.
 
