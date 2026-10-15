@@ -34,25 +34,19 @@
 			"value": "claude-opus-4-6",
 			"label": "Claude Opus 4.6",
 			"tier": "flagship",
-			"supportsThinking": false
+			"supportsThinking": true
 		},
 		{
 			"value": "claude-opus-4-5-20251101",
 			"label": "Claude Opus 4.5",
 			"tier": "flagship",
-			"supportsThinking": false
+			"supportsThinking": true
 		},
 		{
 			"value": "claude-opus-4-5",
 			"label": "Claude Opus 4.5",
 			"tier": "flagship",
-			"supportsThinking": false
-		},
-		{
-			"value": "claude-opus-4-20250514",
-			"label": "Claude Opus 4",
-			"tier": "flagship",
-			"supportsThinking": false
+			"supportsThinking": true
 		},
 		{
 			"value": "claude-sonnet-4-5-20250929",
@@ -70,31 +64,43 @@
 			"value": "claude-sonnet-4-6",
 			"label": "Claude Sonnet 4.6",
 			"tier": "standard",
-			"supportsThinking": false
+			"supportsThinking": true
 		},
 		{
 			"value": "claude-sonnet-4-5",
 			"label": "Claude Sonnet 4.5",
 			"tier": "standard",
-			"supportsThinking": false
-		},
-		{
-			"value": "claude-sonnet-4-20250514",
-			"label": "Claude Sonnet 4",
-			"tier": "standard",
-			"supportsThinking": false
+			"supportsThinking": true
 		},
 		{
 			"value": "claude-haiku-4-5-20251001",
 			"label": "Claude Haiku 4.5",
 			"tier": "fast",
-			"supportsThinking": false
+			"supportsThinking": true
 		},
 		{
 			"value": "claude-haiku-4-5",
 			"label": "Claude Haiku 4.5",
 			"tier": "fast",
-			"supportsThinking": false
+			"supportsThinking": true
+		},
+		{
+			"value": "claude-opus-5-5",
+			"label": "Claude Opus 5.5",
+			"tier": "flagship",
+			"supportsThinking": true
+		},
+		{
+			"value": "claude-sonnet-5-5",
+			"label": "Claude Sonnet 5.5",
+			"tier": "standard",
+			"supportsThinking": true
+		},
+		{
+			"value": "claude-haiku-5-5",
+			"label": "Claude Haiku 5.5",
+			"tier": "fast",
+			"supportsThinking": true
 		}
 	],
 	"openai": [
@@ -135,20 +141,8 @@
 			"supportsThinking": true
 		},
 		{
-			"value": "gpt-5.5-mini",
-			"label": "GPT-5.5 Mini",
-			"tier": "standard",
-			"supportsThinking": true
-		},
-		{
 			"value": "gpt-5.2",
 			"label": "GPT-5.2",
-			"tier": "flagship",
-			"supportsThinking": true
-		},
-		{
-			"value": "o4",
-			"label": "O4",
 			"tier": "flagship",
 			"supportsThinking": true
 		},
@@ -165,12 +159,6 @@
 			"supportsThinking": false
 		},
 		{
-			"value": "gpt-4.1-nano",
-			"label": "GPT-4.1 Nano",
-			"tier": "fast",
-			"supportsThinking": false
-		},
-		{
 			"value": "gpt-4o",
 			"label": "GPT-4o",
 			"tier": "standard",
@@ -183,70 +171,52 @@
 			"supportsThinking": false
 		},
 		{
-			"value": "gpt-4-turbo",
-			"label": "GPT-4 Turbo",
-			"tier": "flagship",
-			"supportsThinking": false
-		},
-		{
-			"value": "gpt-4",
-			"label": "GPT-4",
-			"tier": "flagship",
-			"supportsThinking": false
-		},
-		{
-			"value": "gpt-3.5-turbo",
-			"label": "GPT-3.5 Turbo",
-			"tier": "fast",
-			"supportsThinking": false
-		},
-		{
-			"value": "o1",
-			"label": "O1",
-			"tier": "flagship",
-			"supportsThinking": true
-		},
-		{
-			"value": "o1-mini",
-			"label": "O1 Mini",
-			"tier": "standard",
-			"supportsThinking": true
-		},
-		{
-			"value": "o1-pro",
-			"label": "O1 Pro",
-			"tier": "flagship",
-			"supportsThinking": true
-		},
-		{
 			"value": "o3",
 			"label": "O3",
 			"tier": "flagship",
 			"supportsThinking": true
 		},
 		{
-			"value": "o3-mini",
-			"label": "O3 Mini",
+			"value": "gpt-6.1-sol",
+			"label": "GPT-6.1 Sol",
 			"tier": "standard",
 			"supportsThinking": true
 		},
 		{
-			"value": "o4-mini",
-			"label": "O4 Mini",
+			"value": "gpt-6-luna",
+			"label": "GPT-6 Luna",
+			"tier": "fast",
+			"supportsThinking": true
+		},
+		{
+			"value": "gpt-5.4-pro",
+			"label": "GPT-5.4 Pro",
+			"tier": "flagship",
+			"supportsThinking": true
+		},
+		{
+			"value": "gpt-5.4",
+			"label": "GPT-5.4",
 			"tier": "standard",
+			"supportsThinking": true
+		},
+		{
+			"value": "gpt-5.4-mini",
+			"label": "GPT-5.4 Mini",
+			"tier": "fast",
 			"supportsThinking": true
 		}
 	],
 	"google": [
 		{
-			"value": "gemini-3.1-pro",
+			"value": "gemini-3.1-pro-preview",
 			"label": "Gemini 3.1 Pro",
 			"tier": "flagship",
 			"supportsThinking": true
 		},
 		{
-			"value": "gemini-3.1-flash",
-			"label": "Gemini 3.1 Flash",
+			"value": "gemini-3.8-flash",
+			"label": "Gemini 3.8 Flash",
 			"tier": "standard",
 			"supportsThinking": true
 		},
@@ -254,191 +224,101 @@
 			"value": "gemini-3.1-flash-lite",
 			"label": "Gemini 3.1 Flash Lite",
 			"tier": "fast",
-			"supportsThinking": false
+			"supportsThinking": true
 		},
 		{
 			"value": "gemini-2.5-pro",
 			"label": "Gemini 2.5 Pro",
 			"tier": "standard",
-			"supportsThinking": false
+			"supportsThinking": true
 		},
 		{
 			"value": "gemini-2.5-flash",
 			"label": "Gemini 2.5 Flash",
 			"tier": "fast",
-			"supportsThinking": false
+			"supportsThinking": true
 		},
 		{
-			"value": "gemini-2.0-flash",
-			"label": "Gemini 2.0 Flash",
-			"tier": "fast",
-			"supportsThinking": false
-		},
-		{
-			"value": "gemini-3-flash",
+			"value": "gemini-3-flash-preview",
 			"label": "Gemini 3 Flash",
-			"tier": "flagship",
-			"supportsThinking": false
-		},
-		{
-			"value": "gemini-2.0-flash-thinking",
-			"label": "Gemini 2.0 Flash Thinking",
 			"tier": "standard",
 			"supportsThinking": true
 		},
 		{
-			"value": "gemini-1.5-pro",
-			"label": "Gemini 1.5 Pro",
-			"tier": "standard",
-			"supportsThinking": false
+			"value": "gemini-4-argon",
+			"label": "Gemini 4 Argon",
+			"tier": "flagship",
+			"supportsThinking": true
 		},
 		{
-			"value": "gemini-1.5-flash",
-			"label": "Gemini 1.5 Flash",
+			"value": "gemini-3.5-flash-lite",
+			"label": "Gemini 3.5 Flash Lite",
 			"tier": "fast",
-			"supportsThinking": false
+			"supportsThinking": true
 		}
 	],
 	"mistral": [
 		{
-			"value": "mistral-large-3",
+			"value": "mistral-large-2512",
 			"label": "Mistral Large 3",
 			"tier": "flagship",
 			"supportsThinking": false
 		},
 		{
-			"value": "magistral-medium-2506",
-			"label": "Magistral Medium",
-			"tier": "flagship",
-			"supportsThinking": true
-		},
-		{
-			"value": "magistral-small-2506",
-			"label": "Magistral Small",
-			"tier": "standard",
-			"supportsThinking": true
-		},
-		{
-			"value": "mistral-small-4",
+			"value": "mistral-small-2603",
 			"label": "Mistral Small 4",
 			"tier": "standard",
 			"supportsThinking": false
 		},
 		{
-			"value": "mistral-large-2",
-			"label": "Mistral Large 2",
-			"tier": "standard",
-			"supportsThinking": false
-		},
-		{
-			"value": "devstral-2512",
-			"label": "Devstral 2512",
+			"value": "mistral-medium-3-5",
+			"label": "Mistral Medium 3.5",
 			"tier": "flagship",
 			"supportsThinking": false
 		},
 		{
-			"value": "ministral-3-14b",
+			"value": "ministral-14b-2512",
 			"label": "Ministral 3 14B",
 			"tier": "standard",
 			"supportsThinking": false
 		},
 		{
-			"value": "ministral-3-8b",
+			"value": "ministral-8b-2512",
 			"label": "Ministral 3 8B",
 			"tier": "standard",
 			"supportsThinking": false
 		},
 		{
-			"value": "ministral-3-3b",
+			"value": "ministral-3b-2512",
 			"label": "Ministral 3 3B",
 			"tier": "fast",
 			"supportsThinking": false
 		},
 		{
-			"value": "mistral-medium-3",
-			"label": "Mistral Medium 3",
-			"tier": "standard",
-			"supportsThinking": false
-		},
-		{
-			"value": "mistral-small-3",
-			"label": "Mistral Small 3",
-			"tier": "fast",
-			"supportsThinking": false
-		},
-		{
-			"value": "codestral",
+			"value": "codestral-2508",
 			"label": "Codestral",
 			"tier": "standard",
 			"supportsThinking": false
 		},
 		{
-			"value": "mistral-7b",
-			"label": "Mistral 7B",
-			"tier": "fast",
+			"value": "mistral-large-4",
+			"label": "Mistral Large 4 (preview)",
+			"tier": "flagship",
 			"supportsThinking": false
 		}
 	],
 	"deepseek": [
 		{
-			"value": "deepseek-v4",
-			"label": "DeepSeek V4",
+			"value": "deepseek-v4-pro",
+			"label": "DeepSeek V4 Pro",
 			"tier": "flagship",
 			"supportsThinking": true
 		},
 		{
-			"value": "deepseek-v4-flash",
-			"label": "DeepSeek V4 Flash",
+			"value": "deepseek-flash",
+			"label": "DeepSeek V4.1 Flash",
 			"tier": "standard",
 			"supportsThinking": true
-		},
-		{
-			"value": "deepseek-reasoner",
-			"label": "DeepSeek Reasoner",
-			"tier": "flagship",
-			"supportsThinking": true
-		},
-		{
-			"value": "deepseek-chat",
-			"label": "DeepSeek Chat",
-			"tier": "standard",
-			"supportsThinking": false
-		},
-		{
-			"value": "deepseek-v3",
-			"label": "DeepSeek V3",
-			"tier": "standard",
-			"supportsThinking": false
-		},
-		{
-			"value": "deepseek-coder-v3",
-			"label": "DeepSeek Coder V3",
-			"tier": "standard",
-			"supportsThinking": false
-		},
-		{
-			"value": "deepseek-v3.2",
-			"label": "DeepSeek V3.2",
-			"tier": "flagship",
-			"supportsThinking": false
-		},
-		{
-			"value": "deepseek-r2",
-			"label": "DeepSeek R2",
-			"tier": "flagship",
-			"supportsThinking": true
-		},
-		{
-			"value": "deepseek-r1",
-			"label": "DeepSeek R1",
-			"tier": "standard",
-			"supportsThinking": true
-		},
-		{
-			"value": "deepseek-coder-v2",
-			"label": "DeepSeek Coder V2",
-			"tier": "standard",
-			"supportsThinking": false
 		}
 	],
 	"grok": [
@@ -455,34 +335,16 @@
 			"supportsThinking": true
 		},
 		{
-			"value": "grok-4",
-			"label": "Grok 4",
+			"value": "grok-4.7",
+			"label": "Grok 4.7",
 			"tier": "flagship",
 			"supportsThinking": true
 		},
 		{
-			"value": "grok-2",
-			"label": "Grok 2",
+			"value": "grok-build-0.1",
+			"label": "Grok Build 0.1",
 			"tier": "standard",
 			"supportsThinking": false
-		},
-		{
-			"value": "grok-2-mini",
-			"label": "Grok 2 Mini",
-			"tier": "fast",
-			"supportsThinking": false
-		},
-		{
-			"value": "grok-4.1-fast",
-			"label": "Grok 4.1 Fast",
-			"tier": "fast",
-			"supportsThinking": false
-		},
-		{
-			"value": "grok-3",
-			"label": "Grok 3",
-			"tier": "standard",
-			"supportsThinking": true
 		}
 	],
 	"meta": [
@@ -841,70 +703,82 @@
 			"supportsThinking": true
 		},
 		{
-			"value": "anthropic.claude-opus-4-8-v1",
-			"label": "Claude Opus 4.8 v1 (Bedrock)",
-			"tier": "flagship",
-			"supportsThinking": true
-		},
-		{
 			"value": "anthropic.claude-fable-5",
 			"label": "Claude Fable 5 (Bedrock)",
 			"tier": "flagship",
 			"supportsThinking": true
 		},
 		{
-			"value": "anthropic.claude-opus-4-6",
+			"value": "anthropic.claude-opus-4-6-v1",
 			"label": "Claude Opus 4.6 (Bedrock)",
 			"tier": "flagship",
-			"supportsThinking": false
-		},
-		{
-			"value": "anthropic.claude-opus-4-6-v1",
-			"label": "Claude Opus 4.6 v1 (Bedrock)",
-			"tier": "flagship",
-			"supportsThinking": false
+			"supportsThinking": true
 		},
 		{
 			"value": "anthropic.claude-sonnet-4-6",
 			"label": "Claude Sonnet 4.6 (Bedrock)",
 			"tier": "standard",
-			"supportsThinking": false
+			"supportsThinking": true
 		},
 		{
-			"value": "meta.llama-3.3-70b",
+			"value": "meta.llama3-3-70b-instruct-v1:0",
 			"label": "Llama 3.3 70B (Bedrock)",
 			"tier": "standard",
 			"supportsThinking": false
 		},
 		{
-			"value": "anthropic.claude-opus-4-7-v1",
+			"value": "anthropic.claude-opus-4-7",
 			"label": "Claude Opus 4.7 (Bedrock)",
 			"tier": "flagship",
 			"supportsThinking": true
 		},
 		{
-			"value": "anthropic.claude-sonnet-4-6-v1",
-			"label": "Claude Sonnet 4.6 (Bedrock)",
-			"tier": "standard",
-			"supportsThinking": true
-		},
-		{
-			"value": "anthropic.claude-sonnet-4-5-v1",
+			"value": "anthropic.claude-sonnet-4-5-20250929-v1:0",
 			"label": "Claude Sonnet 4.5 (Bedrock)",
 			"tier": "standard",
 			"supportsThinking": true
 		},
 		{
-			"value": "amazon.titan-text-premier-v1",
-			"label": "Amazon Titan Premier",
+			"value": "meta.llama3-70b-instruct-v1:0",
+			"label": "Llama 3 70B (Bedrock)",
 			"tier": "standard",
 			"supportsThinking": false
 		},
 		{
-			"value": "meta.llama3-70b-instruct-v1",
-			"label": "Llama 3 70B (Bedrock)",
+			"value": "anthropic.claude-fable-5-1",
+			"label": "Claude Fable 5.1 (Bedrock)",
+			"tier": "flagship",
+			"supportsThinking": true
+		},
+		{
+			"value": "anthropic.claude-opus-5-5",
+			"label": "Claude Opus 5.5 (Bedrock)",
+			"tier": "flagship",
+			"supportsThinking": true
+		},
+		{
+			"value": "anthropic.claude-opus-5",
+			"label": "Claude Opus 5 (Bedrock)",
+			"tier": "flagship",
+			"supportsThinking": true
+		},
+		{
+			"value": "anthropic.claude-sonnet-5-5",
+			"label": "Claude Sonnet 5.5 (Bedrock)",
 			"tier": "standard",
-			"supportsThinking": false
+			"supportsThinking": true
+		},
+		{
+			"value": "anthropic.claude-sonnet-5",
+			"label": "Claude Sonnet 5 (Bedrock)",
+			"tier": "standard",
+			"supportsThinking": true
+		},
+		{
+			"value": "anthropic.claude-haiku-5-5",
+			"label": "Claude Haiku 5.5 (Bedrock)",
+			"tier": "fast",
+			"supportsThinking": true
 		}
 	],
 	"copilot": [
@@ -1104,25 +978,19 @@
 			"value": "claude-opus-4-6",
 			"label": "Claude Opus 4.6",
 			"tier": "flagship",
-			"supportsThinking": false
+			"supportsThinking": true
 		},
 		{
 			"value": "claude-opus-4-5-20251101",
 			"label": "Claude Opus 4.5",
 			"tier": "flagship",
-			"supportsThinking": false
+			"supportsThinking": true
 		},
 		{
 			"value": "claude-opus-4-5",
 			"label": "Claude Opus 4.5",
 			"tier": "flagship",
-			"supportsThinking": false
-		},
-		{
-			"value": "claude-opus-4-20250514",
-			"label": "Claude Opus 4",
-			"tier": "flagship",
-			"supportsThinking": false
+			"supportsThinking": true
 		},
 		{
 			"value": "claude-sonnet-4-5-20250929",
@@ -1140,43 +1008,55 @@
 			"value": "claude-sonnet-4-6",
 			"label": "Claude Sonnet 4.6",
 			"tier": "standard",
-			"supportsThinking": false
+			"supportsThinking": true
 		},
 		{
 			"value": "claude-sonnet-4-5",
 			"label": "Claude Sonnet 4.5",
 			"tier": "standard",
-			"supportsThinking": false
-		},
-		{
-			"value": "claude-sonnet-4-20250514",
-			"label": "Claude Sonnet 4",
-			"tier": "standard",
-			"supportsThinking": false
+			"supportsThinking": true
 		},
 		{
 			"value": "claude-haiku-4-5-20251001",
 			"label": "Claude Haiku 4.5",
 			"tier": "fast",
-			"supportsThinking": false
+			"supportsThinking": true
 		},
 		{
 			"value": "claude-haiku-4-5",
 			"label": "Claude Haiku 4.5",
 			"tier": "fast",
-			"supportsThinking": false
+			"supportsThinking": true
+		},
+		{
+			"value": "claude-opus-5-5",
+			"label": "Claude Opus 5.5",
+			"tier": "flagship",
+			"supportsThinking": true
+		},
+		{
+			"value": "claude-sonnet-5-5",
+			"label": "Claude Sonnet 5.5",
+			"tier": "standard",
+			"supportsThinking": true
+		},
+		{
+			"value": "claude-haiku-5-5",
+			"label": "Claude Haiku 5.5",
+			"tier": "fast",
+			"supportsThinking": true
 		}
 	],
 	"gemini": [
 		{
-			"value": "gemini-3.1-pro",
+			"value": "gemini-3.1-pro-preview",
 			"label": "Gemini 3.1 Pro",
 			"tier": "flagship",
 			"supportsThinking": true
 		},
 		{
-			"value": "gemini-3.1-flash",
-			"label": "Gemini 3.1 Flash",
+			"value": "gemini-3.8-flash",
+			"label": "Gemini 3.8 Flash",
 			"tier": "standard",
 			"supportsThinking": true
 		},
@@ -1184,49 +1064,37 @@
 			"value": "gemini-3.1-flash-lite",
 			"label": "Gemini 3.1 Flash Lite",
 			"tier": "fast",
-			"supportsThinking": false
+			"supportsThinking": true
 		},
 		{
 			"value": "gemini-2.5-pro",
 			"label": "Gemini 2.5 Pro",
 			"tier": "standard",
-			"supportsThinking": false
+			"supportsThinking": true
 		},
 		{
 			"value": "gemini-2.5-flash",
 			"label": "Gemini 2.5 Flash",
 			"tier": "fast",
-			"supportsThinking": false
+			"supportsThinking": true
 		},
 		{
-			"value": "gemini-2.0-flash",
-			"label": "Gemini 2.0 Flash",
-			"tier": "fast",
-			"supportsThinking": false
-		},
-		{
-			"value": "gemini-3-flash",
+			"value": "gemini-3-flash-preview",
 			"label": "Gemini 3 Flash",
-			"tier": "flagship",
-			"supportsThinking": false
-		},
-		{
-			"value": "gemini-2.0-flash-thinking",
-			"label": "Gemini 2.0 Flash Thinking",
 			"tier": "standard",
 			"supportsThinking": true
 		},
 		{
-			"value": "gemini-1.5-pro",
-			"label": "Gemini 1.5 Pro",
-			"tier": "standard",
-			"supportsThinking": false
+			"value": "gemini-4-argon",
+			"label": "Gemini 4 Argon",
+			"tier": "flagship",
+			"supportsThinking": true
 		},
 		{
-			"value": "gemini-1.5-flash",
-			"label": "Gemini 1.5 Flash",
+			"value": "gemini-3.5-flash-lite",
+			"label": "Gemini 3.5 Flash Lite",
 			"tier": "fast",
-			"supportsThinking": false
+			"supportsThinking": true
 		}
 	],
 	"local": [
