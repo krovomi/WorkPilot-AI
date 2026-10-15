@@ -370,6 +370,58 @@ UNPRICED_MODELS: dict[str, dict[str, str]] = {}
 # their models costs $0 a token, whether it has a row above or not.
 FLAT_RATE_PROVIDERS: tuple[str, ...] = ("copilot", "windsurf", "cursor", "ollama")
 
+# Prompt size, in tokens, above which a model bills every token of the request
+# at a higher rate — the long-context thresholds the notes above cite, from the
+# same pages. A session plans for the smaller of this and the model's window
+# (`context_mgmt.windows.effective_window`): the room past it is there, and
+# paid several times over. Keys resolve like price keys (`_resolve_key`).
+_LONG_CONTEXT_OPENAI = (
+    "gpt-6-astra",
+    "gpt-6-sol",
+    "gpt-6-luna",
+    "gpt-5.6-sol",
+    "gpt-5.6-terra",
+    "gpt-5.6-luna",
+    "gpt-5.5",
+    "gpt-5.5-pro",
+    "gpt-5.4",
+    "gpt-5.4-pro",
+)
+LONG_CONTEXT_THRESHOLDS: dict[str, int] = {
+    "claude-haiku-5-5": 100_000,
+    **dict.fromkeys(_LONG_CONTEXT_OPENAI, 272_000),
+    "gemini-3.1-pro": 200_000,
+    "gemini-2.5-pro": 200_000,
+    # xAI bills a prompt of 200K tokens or more at 2×: plan for one below it.
+    **dict.fromkeys(_GROK, 199_999),
+}
+
+
+def _resolve_key(keys, model: str) -> str | None:
+    """The key that names ``model``: itself, or the longest key it extends
+    with a snapshot suffix. A key never names a shorter id, nor a later version
+    of itself."""
+    if model in keys:
+        return model
+    best = ""
+    for key in keys:
+        if (
+            len(key) > len(best)
+            and model.startswith(key)
+            and _SNAPSHOT_SUFFIX.fullmatch(model, len(key))
+        ):
+            best = key
+    return best or None
+
+
+def long_context_threshold(model: str | None) -> int | None:
+    """Prompt tokens past which ``model`` bills more, or None when it does not."""
+    if not model:
+        return None
+    name = model.strip().lower().rsplit("/", 1)[-1]
+    key = _resolve_key(LONG_CONTEXT_THRESHOLDS, name)
+    return LONG_CONTEXT_THRESHOLDS[key] if key else None
+
 
 def price_table() -> dict[str, dict[str, dict[str, float]]]:
     """The built-in input and output prices: provider → model → USD per 1M tokens.
@@ -411,17 +463,8 @@ class PricingCatalog:
         never prices a shorter id, nor a later version of itself.
         """
         models = self._pricing.get(provider.lower(), {})
-        if model in models:
-            return models[model]
-        best = ""
-        for key in models:
-            if (
-                len(key) > len(best)
-                and model.startswith(key)
-                and _SNAPSHOT_SUFFIX.fullmatch(model, len(key))
-            ):
-                best = key
-        return models[best] if best else None
+        key = _resolve_key(models, model)
+        return models[key] if key else None
 
     def calculate_cost(
         self,
