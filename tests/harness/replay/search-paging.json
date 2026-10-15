@@ -1,0 +1,165 @@
+{
+  "format": 1,
+  "id": "search-paging",
+  "why_this_is_here": "A search with hundreds of matches across a payments service. Guards lot 3a: search_files returns a page under the result cap and the offset of the next, the model reads on and then narrows, and no result is ever cut after the fact.",
+  "model": "grok-4.7",
+  "agent_type": "coder",
+  "tool_use_hint": true,
+  "effort": "EFFORT: medium\nWORKFLOW PHASE: coding — implement the subtask, run its tests, commit.",
+  "files": {
+    "src/payments/__init__.py": [
+      "\"\"\"Payments.\"\"\"\n"
+    ],
+    "src/payments/declines.py": [
+      "\"\"\"Card declines: what the gateway answered, and what we tell the customer.\"\"\"\n",
+      "\n",
+      "from __future__ import annotations\n",
+      "\n",
+      "import logging\n",
+      "\n",
+      "from .models import Decision, Payment\n",
+      "\n",
+      "logger = logging.getLogger(__name__)\n",
+      "\n",
+      {
+        "repeat": 140,
+        "line": "def handle_decline_{n}(payment: Payment) -> Decision:\n    logger.warning(\"declined payment %s: gateway code {n}\", payment.id)\n    return Decision.REJECT\n"
+      }
+    ],
+    "src/payments/retries.py": [
+      "\"\"\"Card declines: what the gateway answered, and what we tell the customer.\"\"\"\n",
+      "\n",
+      "from __future__ import annotations\n",
+      "\n",
+      "import logging\n",
+      "\n",
+      "from .models import Decision, Payment\n",
+      "\n",
+      "logger = logging.getLogger(__name__)\n",
+      "\n",
+      {
+        "repeat": 140,
+        "line": "def retry_after_{n}(payment: Payment) -> Decision:\n    logger.warning(\"gateway timeout on %s (attempt {n}), retrying\", payment.id)\n    return Decision.RETRY\n"
+      }
+    ],
+    "src/payments/refunds.py": [
+      "\"\"\"Card declines: what the gateway answered, and what we tell the customer.\"\"\"\n",
+      "\n",
+      "from __future__ import annotations\n",
+      "\n",
+      "import logging\n",
+      "\n",
+      "from .models import Decision, Payment\n",
+      "\n",
+      "logger = logging.getLogger(__name__)\n",
+      "\n",
+      {
+        "repeat": 60,
+        "line": "def refund_{n}(payment: Payment) -> Decision:\n    logger.warning(\"refund %s queued behind chargeback {n}\", payment.id)\n    return Decision.HOLD\n"
+      }
+    ],
+    "tests/test_declines.py": [
+      "from payments.declines import handle_decline_1\n",
+      "from payments.models import Decision, Payment\n",
+      "\n",
+      "\n",
+      "def test_a_decline_rejects():\n",
+      "    assert handle_decline_1(Payment(id=\"p-1\")) is Decision.REJECT\n"
+    ]
+  },
+  "sessions": [
+    {
+      "subtask": [
+        "# Subtask 3.1 — structured decline events\n",
+        "\n",
+        "Declines are logged as free text. Replace the `logger.warning` call of every decline handler with `events.decline(payment, code)`.\n",
+        "\n",
+        "Files to modify: src/payments/declines.py\n",
+        "Verification: pytest -q tests/test_declines.py\n"
+      ],
+      "turns": [
+        {
+          "text": "Finding every warning first.",
+          "calls": [
+            {
+              "tool": "search_files",
+              "arguments": {
+                "pattern": "logger\\.warning\\("
+              }
+            }
+          ]
+        },
+        {
+          "text": "More than a page. Reading on.",
+          "calls": [
+            {
+              "tool": "search_files",
+              "arguments": {
+                "pattern": "logger\\.warning\\(",
+                "offset": 97
+              }
+            }
+          ]
+        },
+        {
+          "text": "Narrowing to the decline handlers.",
+          "calls": [
+            {
+              "tool": "search_files",
+              "arguments": {
+                "pattern": "declined payment",
+                "glob": "src/payments/declines.py"
+              }
+            },
+            {
+              "tool": "find_files",
+              "arguments": {
+                "pattern": "src/payments/*.py"
+              }
+            }
+          ]
+        },
+        {
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "src/payments/declines.py",
+                "limit": 40
+              }
+            }
+          ]
+        },
+        {
+          "text": "Rewriting the handlers.",
+          "calls": [
+            {
+              "tool": "write_file",
+              "arguments": {
+                "path": "src/payments/declines.py",
+                "content": "\"\"\"Card declines: what the gateway answered, and what we tell the customer.\"\"\"\n\nfrom __future__ import annotations\n\nfrom . import events\n\nfrom .models import Decision, Payment\n\ndef handle_decline_1(payment: Payment) -> Decision:\n    events.decline(payment, 1)\n    return Decision.REJECT\ndef handle_decline_2(payment: Payment) -> Decision:\n    events.decline(payment, 2)\n    return Decision.REJECT\ndef handle_decline_3(payment: Payment) -> Decision:\n    events.decline(payment, 3)\n    return Decision.REJECT\ndef handle_decline_4(payment: Payment) -> Decision:\n    events.decline(payment, 4)\n    return Decision.REJECT\ndef handle_decline_5(payment: Payment) -> Decision:\n    events.decline(payment, 5)\n    return Decision.REJECT\ndef handle_decline_6(payment: Payment) -> Decision:\n    events.decline(payment, 6)\n    return Decision.REJECT\ndef handle_decline_7(payment: Payment) -> Decision:\n    events.decline(payment, 7)\n    return Decision.REJECT\ndef handle_decline_8(payment: Payment) -> Decision:\n    events.decline(payment, 8)\n    return Decision.REJECT\ndef handle_decline_9(payment: Payment) -> Decision:\n    events.decline(payment, 9)\n    return Decision.REJECT\ndef handle_decline_10(payment: Payment) -> Decision:\n    events.decline(payment, 10)\n    return Decision.REJECT\ndef handle_decline_11(payment: Payment) -> Decision:\n    events.decline(payment, 11)\n    return Decision.REJECT\ndef handle_decline_12(payment: Payment) -> Decision:\n    events.decline(payment, 12)\n    return Decision.REJECT\ndef handle_decline_13(payment: Payment) -> Decision:\n    events.decline(payment, 13)\n    return Decision.REJECT\ndef handle_decline_14(payment: Payment) -> Decision:\n    events.decline(payment, 14)\n    return Decision.REJECT\ndef handle_decline_15(payment: Payment) -> Decision:\n    events.decline(payment, 15)\n    return Decision.REJECT\ndef handle_decline_16(payment: Payment) -> Decision:\n    events.decline(payment, 16)\n    return Decision.REJECT\ndef handle_decline_17(payment: Payment) -> Decision:\n    events.decline(payment, 17)\n    return Decision.REJECT\ndef handle_decline_18(payment: Payment) -> Decision:\n    events.decline(payment, 18)\n    return Decision.REJECT\ndef handle_decline_19(payment: Payment) -> Decision:\n    events.decline(payment, 19)\n    return Decision.REJECT\ndef handle_decline_20(payment: Payment) -> Decision:\n    events.decline(payment, 20)\n    return Decision.REJECT\ndef handle_decline_21(payment: Payment) -> Decision:\n    events.decline(payment, 21)\n    return Decision.REJECT\ndef handle_decline_22(payment: Payment) -> Decision:\n    events.decline(payment, 22)\n    return Decision.REJECT\ndef handle_decline_23(payment: Payment) -> Decision:\n    events.decline(payment, 23)\n    return Decision.REJECT\ndef handle_decline_24(payment: Payment) -> Decision:\n    events.decline(payment, 24)\n    return Decision.REJECT\ndef handle_decline_25(payment: Payment) -> Decision:\n    events.decline(payment, 25)\n    return Decision.REJECT\ndef handle_decline_26(payment: Payment) -> Decision:\n    events.decline(payment, 26)\n    return Decision.REJECT\ndef handle_decline_27(payment: Payment) -> Decision:\n    events.decline(payment, 27)\n    return Decision.REJECT\ndef handle_decline_28(payment: Payment) -> Decision:\n    events.decline(payment, 28)\n    return Decision.REJECT\ndef handle_decline_29(payment: Payment) -> Decision:\n    events.decline(payment, 29)\n    return Decision.REJECT\ndef handle_decline_30(payment: Payment) -> Decision:\n    events.decline(payment, 30)\n    return Decision.REJECT\ndef handle_decline_31(payment: Payment) -> Decision:\n    events.decline(payment, 31)\n    return Decision.REJECT\ndef handle_decline_32(payment: Payment) -> Decision:\n    events.decline(payment, 32)\n    return Decision.REJECT\ndef handle_decline_33(payment: Payment) -> Decision:\n    events.decline(payment, 33)\n    return Decision.REJECT\ndef handle_decline_34(payment: Payment) -> Decision:\n    events.decline(payment, 34)\n    return Decision.REJECT\ndef handle_decline_35(payment: Payment) -> Decision:\n    events.decline(payment, 35)\n    return Decision.REJECT\ndef handle_decline_36(payment: Payment) -> Decision:\n    events.decline(payment, 36)\n    return Decision.REJECT\ndef handle_decline_37(payment: Payment) -> Decision:\n    events.decline(payment, 37)\n    return Decision.REJECT\ndef handle_decline_38(payment: Payment) -> Decision:\n    events.decline(payment, 38)\n    return Decision.REJECT\ndef handle_decline_39(payment: Payment) -> Decision:\n    events.decline(payment, 39)\n    return Decision.REJECT\ndef handle_decline_40(payment: Payment) -> Decision:\n    events.decline(payment, 40)\n    return Decision.REJECT\ndef handle_decline_41(payment: Payment) -> Decision:\n    events.decline(payment, 41)\n    return Decision.REJECT\ndef handle_decline_42(payment: Payment) -> Decision:\n    events.decline(payment, 42)\n    return Decision.REJECT\ndef handle_decline_43(payment: Payment) -> Decision:\n    events.decline(payment, 43)\n    return Decision.REJECT\ndef handle_decline_44(payment: Payment) -> Decision:\n    events.decline(payment, 44)\n    return Decision.REJECT\ndef handle_decline_45(payment: Payment) -> Decision:\n    events.decline(payment, 45)\n    return Decision.REJECT\ndef handle_decline_46(payment: Payment) -> Decision:\n    events.decline(payment, 46)\n    return Decision.REJECT\ndef handle_decline_47(payment: Payment) -> Decision:\n    events.decline(payment, 47)\n    return Decision.REJECT\ndef handle_decline_48(payment: Payment) -> Decision:\n    events.decline(payment, 48)\n    return Decision.REJECT\ndef handle_decline_49(payment: Payment) -> Decision:\n    events.decline(payment, 49)\n    return Decision.REJECT\ndef handle_decline_50(payment: Payment) -> Decision:\n    events.decline(payment, 50)\n    return Decision.REJECT\ndef handle_decline_51(payment: Payment) -> Decision:\n    events.decline(payment, 51)\n    return Decision.REJECT\ndef handle_decline_52(payment: Payment) -> Decision:\n    events.decline(payment, 52)\n    return Decision.REJECT\ndef handle_decline_53(payment: Payment) -> Decision:\n    events.decline(payment, 53)\n    return Decision.REJECT\ndef handle_decline_54(payment: Payment) -> Decision:\n    events.decline(payment, 54)\n    return Decision.REJECT\ndef handle_decline_55(payment: Payment) -> Decision:\n    events.decline(payment, 55)\n    return Decision.REJECT\ndef handle_decline_56(payment: Payment) -> Decision:\n    events.decline(payment, 56)\n    return Decision.REJECT\ndef handle_decline_57(payment: Payment) -> Decision:\n    events.decline(payment, 57)\n    return Decision.REJECT\ndef handle_decline_58(payment: Payment) -> Decision:\n    events.decline(payment, 58)\n    return Decision.REJECT\ndef handle_decline_59(payment: Payment) -> Decision:\n    events.decline(payment, 59)\n    return Decision.REJECT\ndef handle_decline_60(payment: Payment) -> Decision:\n    events.decline(payment, 60)\n    return Decision.REJECT\ndef handle_decline_61(payment: Payment) -> Decision:\n    events.decline(payment, 61)\n    return Decision.REJECT\ndef handle_decline_62(payment: Payment) -> Decision:\n    events.decline(payment, 62)\n    return Decision.REJECT\ndef handle_decline_63(payment: Payment) -> Decision:\n    events.decline(payment, 63)\n    return Decision.REJECT\ndef handle_decline_64(payment: Payment) -> Decision:\n    events.decline(payment, 64)\n    return Decision.REJECT\ndef handle_decline_65(payment: Payment) -> Decision:\n    events.decline(payment, 65)\n    return Decision.REJECT\ndef handle_decline_66(payment: Payment) -> Decision:\n    events.decline(payment, 66)\n    return Decision.REJECT\ndef handle_decline_67(payment: Payment) -> Decision:\n    events.decline(payment, 67)\n    return Decision.REJECT\ndef handle_decline_68(payment: Payment) -> Decision:\n    events.decline(payment, 68)\n    return Decision.REJECT\ndef handle_decline_69(payment: Payment) -> Decision:\n    events.decline(payment, 69)\n    return Decision.REJECT\ndef handle_decline_70(payment: Payment) -> Decision:\n    events.decline(payment, 70)\n    return Decision.REJECT\ndef handle_decline_71(payment: Payment) -> Decision:\n    events.decline(payment, 71)\n    return Decision.REJECT\ndef handle_decline_72(payment: Payment) -> Decision:\n    events.decline(payment, 72)\n    return Decision.REJECT\ndef handle_decline_73(payment: Payment) -> Decision:\n    events.decline(payment, 73)\n    return Decision.REJECT\ndef handle_decline_74(payment: Payment) -> Decision:\n    events.decline(payment, 74)\n    return Decision.REJECT\ndef handle_decline_75(payment: Payment) -> Decision:\n    events.decline(payment, 75)\n    return Decision.REJECT\ndef handle_decline_76(payment: Payment) -> Decision:\n    events.decline(payment, 76)\n    return Decision.REJECT\ndef handle_decline_77(payment: Payment) -> Decision:\n    events.decline(payment, 77)\n    return Decision.REJECT\ndef handle_decline_78(payment: Payment) -> Decision:\n    events.decline(payment, 78)\n    return Decision.REJECT\ndef handle_decline_79(payment: Payment) -> Decision:\n    events.decline(payment, 79)\n    return Decision.REJECT\ndef handle_decline_80(payment: Payment) -> Decision:\n    events.decline(payment, 80)\n    return Decision.REJECT\ndef handle_decline_81(payment: Payment) -> Decision:\n    events.decline(payment, 81)\n    return Decision.REJECT\ndef handle_decline_82(payment: Payment) -> Decision:\n    events.decline(payment, 82)\n    return Decision.REJECT\ndef handle_decline_83(payment: Payment) -> Decision:\n    events.decline(payment, 83)\n    return Decision.REJECT\ndef handle_decline_84(payment: Payment) -> Decision:\n    events.decline(payment, 84)\n    return Decision.REJECT\ndef handle_decline_85(payment: Payment) -> Decision:\n    events.decline(payment, 85)\n    return Decision.REJECT\ndef handle_decline_86(payment: Payment) -> Decision:\n    events.decline(payment, 86)\n    return Decision.REJECT\ndef handle_decline_87(payment: Payment) -> Decision:\n    events.decline(payment, 87)\n    return Decision.REJECT\ndef handle_decline_88(payment: Payment) -> Decision:\n    events.decline(payment, 88)\n    return Decision.REJECT\ndef handle_decline_89(payment: Payment) -> Decision:\n    events.decline(payment, 89)\n    return Decision.REJECT\ndef handle_decline_90(payment: Payment) -> Decision:\n    events.decline(payment, 90)\n    return Decision.REJECT\ndef handle_decline_91(payment: Payment) -> Decision:\n    events.decline(payment, 91)\n    return Decision.REJECT\ndef handle_decline_92(payment: Payment) -> Decision:\n    events.decline(payment, 92)\n    return Decision.REJECT\ndef handle_decline_93(payment: Payment) -> Decision:\n    events.decline(payment, 93)\n    return Decision.REJECT\ndef handle_decline_94(payment: Payment) -> Decision:\n    events.decline(payment, 94)\n    return Decision.REJECT\ndef handle_decline_95(payment: Payment) -> Decision:\n    events.decline(payment, 95)\n    return Decision.REJECT\ndef handle_decline_96(payment: Payment) -> Decision:\n    events.decline(payment, 96)\n    return Decision.REJECT\ndef handle_decline_97(payment: Payment) -> Decision:\n    events.decline(payment, 97)\n    return Decision.REJECT\ndef handle_decline_98(payment: Payment) -> Decision:\n    events.decline(payment, 98)\n    return Decision.REJECT\ndef handle_decline_99(payment: Payment) -> Decision:\n    events.decline(payment, 99)\n    return Decision.REJECT\ndef handle_decline_100(payment: Payment) -> Decision:\n    events.decline(payment, 100)\n    return Decision.REJECT\ndef handle_decline_101(payment: Payment) -> Decision:\n    events.decline(payment, 101)\n    return Decision.REJECT\ndef handle_decline_102(payment: Payment) -> Decision:\n    events.decline(payment, 102)\n    return Decision.REJECT\ndef handle_decline_103(payment: Payment) -> Decision:\n    events.decline(payment, 103)\n    return Decision.REJECT\ndef handle_decline_104(payment: Payment) -> Decision:\n    events.decline(payment, 104)\n    return Decision.REJECT\ndef handle_decline_105(payment: Payment) -> Decision:\n    events.decline(payment, 105)\n    return Decision.REJECT\ndef handle_decline_106(payment: Payment) -> Decision:\n    events.decline(payment, 106)\n    return Decision.REJECT\ndef handle_decline_107(payment: Payment) -> Decision:\n    events.decline(payment, 107)\n    return Decision.REJECT\ndef handle_decline_108(payment: Payment) -> Decision:\n    events.decline(payment, 108)\n    return Decision.REJECT\ndef handle_decline_109(payment: Payment) -> Decision:\n    events.decline(payment, 109)\n    return Decision.REJECT\ndef handle_decline_110(payment: Payment) -> Decision:\n    events.decline(payment, 110)\n    return Decision.REJECT\ndef handle_decline_111(payment: Payment) -> Decision:\n    events.decline(payment, 111)\n    return Decision.REJECT\ndef handle_decline_112(payment: Payment) -> Decision:\n    events.decline(payment, 112)\n    return Decision.REJECT\ndef handle_decline_113(payment: Payment) -> Decision:\n    events.decline(payment, 113)\n    return Decision.REJECT\ndef handle_decline_114(payment: Payment) -> Decision:\n    events.decline(payment, 114)\n    return Decision.REJECT\ndef handle_decline_115(payment: Payment) -> Decision:\n    events.decline(payment, 115)\n    return Decision.REJECT\ndef handle_decline_116(payment: Payment) -> Decision:\n    events.decline(payment, 116)\n    return Decision.REJECT\ndef handle_decline_117(payment: Payment) -> Decision:\n    events.decline(payment, 117)\n    return Decision.REJECT\ndef handle_decline_118(payment: Payment) -> Decision:\n    events.decline(payment, 118)\n    return Decision.REJECT\ndef handle_decline_119(payment: Payment) -> Decision:\n    events.decline(payment, 119)\n    return Decision.REJECT\ndef handle_decline_120(payment: Payment) -> Decision:\n    events.decline(payment, 120)\n    return Decision.REJECT\ndef handle_decline_121(payment: Payment) -> Decision:\n    events.decline(payment, 121)\n    return Decision.REJECT\ndef handle_decline_122(payment: Payment) -> Decision:\n    events.decline(payment, 122)\n    return Decision.REJECT\ndef handle_decline_123(payment: Payment) -> Decision:\n    events.decline(payment, 123)\n    return Decision.REJECT\ndef handle_decline_124(payment: Payment) -> Decision:\n    events.decline(payment, 124)\n    return Decision.REJECT\ndef handle_decline_125(payment: Payment) -> Decision:\n    events.decline(payment, 125)\n    return Decision.REJECT\ndef handle_decline_126(payment: Payment) -> Decision:\n    events.decline(payment, 126)\n    return Decision.REJECT\ndef handle_decline_127(payment: Payment) -> Decision:\n    events.decline(payment, 127)\n    return Decision.REJECT\ndef handle_decline_128(payment: Payment) -> Decision:\n    events.decline(payment, 128)\n    return Decision.REJECT\ndef handle_decline_129(payment: Payment) -> Decision:\n    events.decline(payment, 129)\n    return Decision.REJECT\ndef handle_decline_130(payment: Payment) -> Decision:\n    events.decline(payment, 130)\n    return Decision.REJECT\ndef handle_decline_131(payment: Payment) -> Decision:\n    events.decline(payment, 131)\n    return Decision.REJECT\ndef handle_decline_132(payment: Payment) -> Decision:\n    events.decline(payment, 132)\n    return Decision.REJECT\ndef handle_decline_133(payment: Payment) -> Decision:\n    events.decline(payment, 133)\n    return Decision.REJECT\ndef handle_decline_134(payment: Payment) -> Decision:\n    events.decline(payment, 134)\n    return Decision.REJECT\ndef handle_decline_135(payment: Payment) -> Decision:\n    events.decline(payment, 135)\n    return Decision.REJECT\ndef handle_decline_136(payment: Payment) -> Decision:\n    events.decline(payment, 136)\n    return Decision.REJECT\ndef handle_decline_137(payment: Payment) -> Decision:\n    events.decline(payment, 137)\n    return Decision.REJECT\ndef handle_decline_138(payment: Payment) -> Decision:\n    events.decline(payment, 138)\n    return Decision.REJECT\ndef handle_decline_139(payment: Payment) -> Decision:\n    events.decline(payment, 139)\n    return Decision.REJECT\ndef handle_decline_140(payment: Payment) -> Decision:\n    events.decline(payment, 140)\n    return Decision.REJECT\n"
+              }
+            }
+          ]
+        },
+        {
+          "calls": [
+            {
+              "tool": "run_command",
+              "arguments": {
+                "command": "pytest -q tests/test_declines.py"
+              },
+              "output": [
+                ".                                                                        [100%]\n",
+                "1 passed in 0.05s\n"
+              ]
+            }
+          ]
+        },
+        {
+          "text": "Done: the 140 decline handlers emit `events.decline`; retries and refunds are untouched."
+        }
+      ]
+    }
+  ]
+}
