@@ -56,3 +56,22 @@ def test_a_clearing_that_frees_less_than_its_minimum_is_skipped():
 def test_for_budget():
     policy = ClearingPolicy.for_budget(300_000, keep_recent=8)
     assert policy == ClearingPolicy(300_000, 180_000, 8, 30_000)
+
+
+def test_an_entry_that_keeps_part_of_itself_counts_only_what_goes():
+    # A past call loses its long arguments, not itself: 900 chars, 100 kept.
+    entries = [
+        Entry(900, clearable=True, cleared_chars=100),
+        _other(300),
+        _other(1),
+        _other(1),
+    ]
+    assert plan_clearing(entries, POLICY, marker_chars=MARKER) == [0]
+    # Nothing to gain when what it keeps is all it has.
+    entries = [
+        Entry(900, clearable=True, cleared_chars=900),
+        _other(300),
+        _other(1),
+        _other(1),
+    ]
+    assert plan_clearing(entries, POLICY, marker_chars=MARKER) == []
