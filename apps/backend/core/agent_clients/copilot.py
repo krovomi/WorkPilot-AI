@@ -10,44 +10,32 @@ from __future__ import annotations
 import functools
 import logging
 import re
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Sequence
+from contextlib import aclosing
 from typing import Any
 
+from harness.application.loop import run_turns
 from harness.application.subagents import (
     launch_staggered,
     receive_result,
     subagent_messages,
 )
 from harness.domain import from_chat_completion
-from harness.domain.progress import ProgressTracker
+from harness.domain.stop import StopReason
+from harness.ports import Measured, Outcome, Reply, ToolCall, ToolResult
 
-# Common token-optimization trunk shared by every generic (OpenAI-style)
-# multi-turn loop: head+tail tool-result truncation and over-budget history
-# compaction. The module is importable under both package layouts.
-try:
-    from core.llm_optimization import (
-        compact_messages,
-        truncate_tool_result,
-    )
-except ImportError:  # pragma: no cover - alternate package layout
-    from apps.backend.core.llm_optimization import (
-        compact_messages,
-        truncate_tool_result,
-    )
 from .base import (
     _FILE_WRITE_TOOL_NAMES,
     _WRITE_NUDGE_TURNS_REMAINING,
     CONTENT_TYPE_JSON,
     AgentClient,
     AgentMessage,
-    ContentBlock,
-    ContentBlockType,
-    MessageRole,
     SubagentDefinition,
     _env_float,
     _parse_retry_after,
     _required_output,
 )
+from .openai import ChatCompletionsAdapter
 
 # The name the monolith logged under, kept so logging configuration and log
 # filters keyed on it still match: `core.agent_client`, or
@@ -220,6 +208,475 @@ _COPILOT_MAX_CONSECUTIVE_EMPTY_RESPONSES = int(
 )
 # Base back-off (seconds) between empty-response re-samples; grows linearly.
 _COPILOT_EMPTY_RESPONSE_BACKOFF = _env_float("COPILOT_EMPTY_RESPONSE_BACKOFF", 2.0)
+
+
+class _CopilotAdapter(ChatCompletionsAdapter):
+    """One response of ``CopilotAgentClient``: the chat-completions protocol,
+    with Copilot's token refresh, retries, GitHub Models fallback, and the
+    guards and nudges of its turns."""
+
+    label = "CopilotAgentClient"
+    silence = "(No response from Copilot)"
+
+    def __init__(
+        self,
+        client: CopilotAgentClient,
+        messages: list[dict[str, Any]],
+        *,
+        tools: list[dict[str, Any]],
+        session: Any,
+        headers: dict[str, str],
+    ):
+        super().__init__(client, messages)
+        self.tools = tools
+        self.session = session
+        self.headers = headers
+        # Track whether this session must end by writing an output file (a
+        # planner or spec_writer session that was offered a write tool) and
+        # whether it has done so. Used to inject a budget-aware "write now"
+        # nudge before turns run out.
+        must_write, self.output_file = _required_output(client._agent_type)
+        self.has_write_tool = must_write and any(
+            td.get("name") in _FILE_WRITE_TOOL_NAMES for td in client._tool_definitions
+        )
+        self.write_tool_used = False
+        self.write_nudge_sent = False
+        # Number of CONSECUTIVE turns that returned finish_reason=tool_calls with
+        # an empty tool_calls array. Reset whenever a turn does real work.
+        self.consecutive_empty_tool_calls = 0
+        # Number of CONSECUTIVE turns whose response contained no usable choices
+        # (a transient API hiccup). Reset whenever a turn returns a real choice.
+        self.consecutive_empty_responses = 0
+        # Whether we already swapped the model after a 400 "model_not_supported"
+        # rejection. Guards against an infinite retry loop if even the fallback
+        # model is unavailable on the user's Copilot plan.
+        self.model_fallback_attempted = False
+
+    def assemble(self, turn: int) -> dict[str, Any]:
+        client = self.client
+        # Budget-aware "write now" nudge: when a planner/spec_writer session
+        # is about to run out of turns but has never called the Write tool,
+        # force it to stop investigating and produce its output file. Without
+        # this, large-codebase planning loops exhaust max_turns on read-only
+        # exploration and the phase fails with "Did not create plan file".
+        if (
+            self.has_write_tool
+            and not self.write_tool_used
+            and not self.write_nudge_sent
+            and (client.max_turns - turn) <= _WRITE_NUDGE_TURNS_REMAINING
+        ):
+            self.messages.append(
+                {
+                    "role": "user",
+                    "content": (
+                        "You are about to run out of turns. STOP investigating "
+                        "now — do not run any more exploration commands. "
+                        f"Immediately call the Write tool to create {self.output_file} "
+                        "in the spec directory with its COMPLETE content, based "
+                        "on what you already know. This is mandatory: if you do "
+                        "not write the file now, the whole task fails."
+                    ),
+                }
+            )
+            self.write_nudge_sent = True
+            logger.warning(
+                "[CopilotAgentClient] Injected write-now nudge "
+                f"(turn {turn + 1}/{client.max_turns}, Write tool still unused)"
+            )
+
+        payload: dict[str, Any] = {
+            "model": client.model,
+            "messages": self.messages,
+            "stream": False,
+        }
+        if self.tools:
+            payload["tools"] = self.tools
+            payload["tool_choice"] = "auto"
+
+        logger.info(
+            f"[CopilotAgentClient] Turn {turn + 1}/{client.max_turns}: "
+            f"sending {len(self.messages)} messages..."
+        )
+        return payload
+
+    async def call(self, payload: dict[str, Any], turn: int) -> AsyncIterator[Any]:
+        client = self.client
+        session = self.session
+        request_headers = self.headers
+        try:
+            copilot_token = await client._get_copilot_token()
+        except Exception as e:
+            logger.error(f"[CopilotAgentClient] Token refresh failed: {e}")
+            yield self.notice(f"Copilot auth error: {e}")
+            yield Outcome.HALT
+            return
+
+        request_headers["Authorization"] = f"Bearer {copilot_token}"
+
+        # Determine which endpoint to use
+        api_url = (
+            client._github_models_api_base
+            if client._using_github_models
+            else client._api_base
+        )
+
+        # For GitHub Models API, use the raw GitHub token directly (not the Copilot session token)
+        if client._using_github_models:
+            request_headers["Authorization"] = f"Bearer {client.github_token}"
+
+        import asyncio as _asyncio
+
+        import aiohttp
+
+        data = None
+        measured: Measured | None = None
+        # Two independent retry budgets so a burst of rate-limit (429)
+        # responses never eats the connection-error budget and vice-versa.
+        connection_attempts = 0
+        rate_limit_attempts = 0
+        while True:
+            try:
+                async with session.post(
+                    api_url, json=payload, headers=request_headers
+                ) as resp:
+                    if resp.status == 403 and not client._using_github_models:
+                        # Copilot API blocked (org restriction) — fallback to GitHub Models API
+                        error_text = await resp.text()
+                        logger.warning(
+                            f"[CopilotAgentClient] Copilot API returned 403 — "
+                            f"falling back to GitHub Models API at {client._github_models_api_base}"
+                        )
+                        print(
+                            "[CopilotAgentClient] [INFO] Copilot API blocked by org. "
+                            "Falling back to GitHub Models API.",
+                            flush=True,
+                        )
+                        client._using_github_models = True
+                        request_headers["Authorization"] = (
+                            f"Bearer {client.github_token}"
+                        )
+                        # Retry this turn with the GitHub Models API
+                        async with session.post(
+                            client._github_models_api_base,
+                            json=payload,
+                            headers=request_headers,
+                        ) as retry_resp:
+                            if retry_resp.status != 200:
+                                retry_error = await retry_resp.text()
+                                logger.error(
+                                    f"[CopilotAgentClient] GitHub Models API error ({retry_resp.status}): {retry_error[:500]}"
+                                )
+                                yield self.notice(
+                                    f"GitHub Models API error ({retry_resp.status}): {retry_error}"
+                                )
+                                yield Outcome.HALT
+                                return
+                            data = await retry_resp.json()
+                    elif resp.status in _COPILOT_RETRYABLE_STATUSES:
+                        # Transient failure (429 rate-limit or 5xx hiccup).
+                        # Wait — honouring ``Retry-After`` when the server
+                        # sends it, else exponential back-off — and retry
+                        # instead of aborting the turn. This is what keeps
+                        # subtasks flowing through short Copilot per-minute
+                        # rate-limit windows rather than surfacing a 429.
+                        error_text = await resp.text()
+                        if rate_limit_attempts < _COPILOT_RATE_LIMIT_MAX_RETRIES:
+                            rate_limit_attempts += 1
+                            retry_after = _parse_retry_after(
+                                resp.headers, _COPILOT_RATE_LIMIT_MAX_BACKOFF
+                            )
+                            if retry_after is not None:
+                                wait_s = retry_after
+                            else:
+                                wait_s = min(
+                                    _COPILOT_RATE_LIMIT_BACKOFF
+                                    * (2 ** (rate_limit_attempts - 1)),
+                                    _COPILOT_RATE_LIMIT_MAX_BACKOFF,
+                                )
+                            kind = (
+                                "rate limited"
+                                if resp.status == 429
+                                else f"transient error {resp.status}"
+                            )
+                            logger.warning(
+                                f"[CopilotAgentClient] {kind} — retry "
+                                f"{rate_limit_attempts}/"
+                                f"{_COPILOT_RATE_LIMIT_MAX_RETRIES} "
+                                f"in {wait_s:.0f}s"
+                            )
+                            print(
+                                f"[CopilotAgentClient] [WARN] Copilot {kind} "
+                                f"— waiting {wait_s:.0f}s then retrying "
+                                f"({rate_limit_attempts}/"
+                                f"{_COPILOT_RATE_LIMIT_MAX_RETRIES})...",
+                                flush=True,
+                            )
+                            await _asyncio.sleep(wait_s)
+                            continue
+                        # Budget exhausted — surface the error as before.
+                        logger.error(
+                            f"[CopilotAgentClient] API error ({resp.status}) "
+                            f"after {rate_limit_attempts} retries: "
+                            f"{error_text[:500]}"
+                        )
+                        yield self.notice(
+                            f"Copilot API error ({resp.status}): {error_text}"
+                        )
+                        yield Outcome.HALT
+                        return
+                    elif (
+                        resp.status == 400
+                        and not self.model_fallback_attempted
+                        and not client._using_github_models
+                    ):
+                        # The Copilot API rejected the requested model. This
+                        # happens when a task carries an Anthropic-native
+                        # versioned id (e.g. "claude-sonnet-4-5") or a
+                        # flagship not yet served by the user's Copilot plan
+                        # (e.g. "claude-opus-4.8"). Swap to a supported model
+                        # and retry the turn instead of failing the phase.
+                        error_text = await resp.text()
+                        if "model_not_supported" in error_text:
+                            fallback = _copilot_fallback_model(client.model)
+                            self.model_fallback_attempted = True
+                            logger.warning(
+                                "[CopilotAgentClient] Model "
+                                f"'{client.model}' not supported by Copilot — "
+                                f"falling back to '{fallback}' and retrying."
+                            )
+                            print(
+                                "[CopilotAgentClient] [WARN] Model "
+                                f"'{client.model}' not supported — switching to "
+                                f"'{fallback}'.",
+                                flush=True,
+                            )
+                            client.model = fallback
+                            payload["model"] = fallback
+                            continue
+                        # A different 400 (e.g. malformed request) — surface.
+                        logger.error(
+                            f"[CopilotAgentClient] API error (400): {error_text[:500]}"
+                        )
+                        yield self.notice(f"Copilot API error (400): {error_text}")
+                        yield Outcome.HALT
+                        return
+                    elif resp.status != 200:
+                        error_text = await resp.text()
+                        logger.error(
+                            f"[CopilotAgentClient] API error ({resp.status}): {error_text[:500]}"
+                        )
+                        yield self.notice(
+                            f"Copilot API error ({resp.status}): {error_text}"
+                        )
+                        yield Outcome.HALT
+                        return
+                    else:
+                        data = await resp.json()
+                        # Some Copilot models do report `usage`; when they
+                        # do, it is the context fill the guard measures.
+                        _cu = data.get("usage") if isinstance(data, dict) else None
+                        if isinstance(_cu, dict) and _cu.get("prompt_tokens"):
+                            client.last_context_tokens = int(_cu["prompt_tokens"])
+                        measured = Measured(from_chat_completion(_cu))
+                break  # request succeeded — leave the retry loop
+            except (
+                _asyncio.TimeoutError,
+                aiohttp.ClientError,
+            ) as e:
+                # A hung/stalled or transient connection error. Retry before
+                # failing so a single bad response no longer freezes the whole
+                # phase. A full-duration TIMEOUT gets a tighter retry budget
+                # than a (cheap, fast-failing) connection error: each timeout
+                # retry costs another full ceiling, so we cap it to bound the
+                # worst-case "stuck" window.
+                is_timeout = isinstance(e, _asyncio.TimeoutError)
+                max_retries = (
+                    _COPILOT_TIMEOUT_MAX_RETRIES
+                    if is_timeout
+                    else _COPILOT_REQUEST_MAX_RETRIES
+                )
+                if connection_attempts < max_retries:
+                    backoff = _COPILOT_REQUEST_RETRY_BACKOFF * (connection_attempts + 1)
+                    logger.warning(
+                        f"[CopilotAgentClient] Request stalled/failed "
+                        f"({type(e).__name__}: {e}) — retry "
+                        f"{connection_attempts + 1}/{max_retries} "
+                        f"in {backoff:.0f}s"
+                    )
+                    print(
+                        "[CopilotAgentClient] [WARN] Copilot API request "
+                        f"stalled — retrying ({connection_attempts + 1}/"
+                        f"{max_retries})...",
+                        flush=True,
+                    )
+                    connection_attempts += 1
+                    await _asyncio.sleep(backoff)
+                    continue
+                logger.error(
+                    f"[CopilotAgentClient] Request failed after "
+                    f"{connection_attempts + 1} attempt(s): {e}"
+                )
+                yield self.notice(f"Copilot API error (timeout/connection): {e}")
+                yield Outcome.HALT
+                return
+            except Exception as e:
+                logger.error(f"[CopilotAgentClient] Request failed: {e}")
+                yield self.notice(f"Copilot API error: {e}")
+                yield Outcome.HALT
+                return
+
+        if measured is not None:
+            yield measured
+
+        if data is None:
+            # All retries exhausted without a usable response.
+            logger.error("[CopilotAgentClient] No response data after retries")
+            yield Outcome.HALT
+            return
+
+        choices = data.get("choices", [])
+        if not choices:
+            # A 200 response with no choices is almost always a transient
+            # server-side hiccup, not a genuine "done" signal. Re-issue the
+            # same turn after a short back-off instead of killing the whole
+            # session on the first empty response. Only give up once the
+            # consecutive-empty budget is exhausted.
+            self.consecutive_empty_responses += 1
+            if (
+                self.consecutive_empty_responses
+                <= _COPILOT_MAX_CONSECUTIVE_EMPTY_RESPONSES
+            ):
+                backoff = (
+                    _COPILOT_EMPTY_RESPONSE_BACKOFF * self.consecutive_empty_responses
+                )
+                logger.warning(
+                    f"[CopilotAgentClient] Turn {turn + 1}: empty choices in "
+                    f"response — retrying "
+                    f"({self.consecutive_empty_responses}/"
+                    f"{_COPILOT_MAX_CONSECUTIVE_EMPTY_RESPONSES}) "
+                    f"in {backoff:.0f}s"
+                )
+                print(
+                    "[CopilotAgentClient] [WARN] Empty response from Copilot "
+                    f"— retrying ({self.consecutive_empty_responses}/"
+                    f"{_COPILOT_MAX_CONSECUTIVE_EMPTY_RESPONSES})...",
+                    flush=True,
+                )
+                await _asyncio.sleep(backoff)
+                # Retry — don't end the session on a transient empty.
+                yield Outcome.AGAIN
+                return
+            logger.error(
+                f"[CopilotAgentClient] {self.consecutive_empty_responses} consecutive "
+                "empty responses — giving up"
+            )
+            yield self.text("(Empty response from Copilot)")
+            yield Outcome.HALT
+            return
+
+        # A usable choice arrived — clear the transient-empty guard counter.
+        self.consecutive_empty_responses = 0
+        yield self.read_choice(choices, turn)
+
+    def settle(self, reply: Reply, turn: int) -> tuple[list[Any], Outcome]:
+        content = reply.text
+        if self.finish_reason == "tool_calls":
+            # Copilot API returned finish_reason=tool_calls but no actual tool_calls —
+            # this can occur with Claude models via the OpenAI-compatible Copilot API.
+            # Add the partial assistant message and prompt the model to proceed with tools.
+            self.consecutive_empty_tool_calls += 1
+            if (
+                self.consecutive_empty_tool_calls
+                > _COPILOT_MAX_CONSECUTIVE_EMPTY_TOOL_CALLS
+            ):
+                # The model keeps "intending" to call a tool but never
+                # emits one. Stop re-sampling so we don't spin through the
+                # entire turn budget producing no work. End the session
+                # with whatever content we have so the phase can surface a
+                # real failure instead of silently looping.
+                logger.error(
+                    f"[CopilotAgentClient] Turn {turn + 1}: "
+                    f"{self.consecutive_empty_tool_calls} consecutive empty "
+                    "tool_calls responses — aborting to avoid a spin loop"
+                )
+                notice = self.notice(
+                    "Copilot API returned no actionable tool "
+                    f"calls for {self.consecutive_empty_tool_calls} "
+                    "consecutive turns — stopping to avoid an "
+                    "infinite loop."
+                )
+                return [notice], Outcome.HALT
+            logger.warning(
+                f"[CopilotAgentClient] Turn {turn + 1}: finish_reason=tool_calls "
+                "but no tool_calls in response — retrying with nudge "
+                f"({self.consecutive_empty_tool_calls}/"
+                f"{_COPILOT_MAX_CONSECUTIVE_EMPTY_TOOL_CALLS})"
+            )
+            if content:
+                self.messages.append({"role": "assistant", "content": content})
+            self.messages.append(
+                {
+                    "role": "user",
+                    "content": "Please proceed by calling the appropriate tools to complete your task.",
+                }
+            )
+            return [], Outcome.AGAIN  # retry — don't return early
+
+        # The model wants to STOP. For planner/spec_writer sessions the
+        # output file is mandatory, yet the model often "finishes" by
+        # DESCRIBING the plan in prose without ever calling the Write
+        # tool — leaving the planning phase to fail with "Did not create
+        # plan file". If Write is required and still unused, refuse the
+        # early stop once and force the model to write.
+        if (
+            self.has_write_tool
+            and not self.write_tool_used
+            and not self.write_nudge_sent
+            and turn < self.client.max_turns - 1
+        ):
+            if content:
+                self.messages.append({"role": "assistant", "content": content})
+            self.messages.append(
+                {
+                    "role": "user",
+                    "content": (
+                        "You have NOT yet created the required output file. "
+                        "Do not stop and do not just describe it in text. "
+                        "You MUST call the Write tool now to create "
+                        f"{self.output_file} in the spec directory with its "
+                        "COMPLETE content, based on your investigation so "
+                        "far. Call the Write tool now."
+                    ),
+                }
+            )
+            self.write_nudge_sent = True
+            logger.warning(
+                f"[CopilotAgentClient] Turn {turn + 1}: model tried to stop "
+                "without writing the plan — forcing a Write retry"
+            )
+            return [], Outcome.AGAIN  # retry — don't return early
+
+        return super().settle(reply, turn)
+
+    def reinject(self, reply: Reply, results: Sequence[ToolResult]) -> None:
+        # Real tool calls arrived — the model is making progress, so clear the
+        # empty-response guard counter.
+        self.consecutive_empty_tool_calls = 0
+        if any(call.name in _FILE_WRITE_TOOL_NAMES for call in reply.calls):
+            self.write_tool_used = True
+        super().reinject(reply, results)
+
+    async def execute(self, call: ToolCall) -> ToolResult:
+        # Executed locally: Copilot has no MCP bridge.
+        return await self.run_tool(call)
+
+    def finish(self, reason: StopReason) -> None:
+        if reason == "max_turns":
+            max_turns = self.client.max_turns
+            logger.warning(
+                f"[CopilotAgentClient] Reached max_turns ({max_turns}) — stopping tool loop"
+            )
+            print(f"[CopilotAgentClient] ⚠️ Reached max turns ({max_turns})", flush=True)
 
 
 # =============================================================================
@@ -575,21 +1032,20 @@ class CopilotAgentClient(AgentClient):
     async def receive_response(self) -> AsyncIterator[AgentMessage]:
         """Execute the queued prompt against the Copilot Models API.
 
-        Implements a full multi-turn tool-use loop:
+        Implements a full multi-turn tool-use loop, the shared WorkPilot loop
+        (``harness.application.loop``) driving ``_CopilotAdapter``:
         1. Send messages + tool definitions to API
         2. If response contains tool_calls → execute each tool locally, add results, continue
         3. If no tool_calls → yield final text response and stop
         4. Repeat up to max_turns
         """
-        import json as _json
-
         if not self._pending_query:
             return
 
         # Copilot is subscription-based — no token counts in API response.
         # Mark as "recorded" immediately so session.py always logs a Copilot entry.
         self.last_usage = {"input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0}
-        self._start_usage_ledger()
+        ledger = self._start_usage_ledger()
 
         prompt = self._pending_query
         self._pending_query = None
@@ -636,619 +1092,14 @@ class CopilotAgentClient(AgentClient):
 
         session = self._get_http_client()
 
-        # Track whether this session must end by writing an output file (a
-        # planner or spec_writer session that was offered a write tool) and
-        # whether it has done so. Used to inject a budget-aware "write now"
-        # nudge before turns run out.
-        must_write, output_file = _required_output(self._agent_type)
-        has_write_tool = must_write and any(
-            td.get("name") in _FILE_WRITE_TOOL_NAMES for td in self._tool_definitions
+        adapter = _CopilotAdapter(
+            self, messages, tools=tools, session=session, headers=request_headers
         )
-        write_tool_used = False
-        write_nudge_sent = False
-        # Number of CONSECUTIVE turns that returned finish_reason=tool_calls with
-        # an empty tool_calls array. Reset whenever a turn does real work.
-        consecutive_empty_tool_calls = 0
-        # Number of CONSECUTIVE turns whose response contained no usable choices
-        # (a transient API hiccup). Reset whenever a turn returns a real choice.
-        consecutive_empty_responses = 0
-        # Whether we already swapped the model after a 400 "model_not_supported"
-        # rejection. Guards against an infinite retry loop if even the fallback
-        # model is unavailable on the user's Copilot plan.
-        model_fallback_attempted = False
-        # The same calls with the same results turn after turn: nudged once,
-        # then stopped (harness.domain.progress). Distinct from the empty
-        # tool_calls guard above, which catches calls announced but not made.
-        progress = ProgressTracker()
-
-        for turn in range(self.max_turns):
-            try:
-                copilot_token = await self._get_copilot_token()
-            except Exception as e:
-                logger.error(f"[CopilotAgentClient] Token refresh failed: {e}")
-                yield AgentMessage(
-                    role=MessageRole.SYSTEM,
-                    content=[
-                        ContentBlock(
-                            type=ContentBlockType.TEXT, text=f"Copilot auth error: {e}"
-                        )
-                    ],
-                )
-                return
-
-            request_headers["Authorization"] = f"Bearer {copilot_token}"
-
-            # Budget-aware "write now" nudge: when a planner/spec_writer session
-            # is about to run out of turns but has never called the Write tool,
-            # force it to stop investigating and produce its output file. Without
-            # this, large-codebase planning loops exhaust max_turns on read-only
-            # exploration and the phase fails with "Did not create plan file".
-            if (
-                has_write_tool
-                and not write_tool_used
-                and not write_nudge_sent
-                and (self.max_turns - turn) <= _WRITE_NUDGE_TURNS_REMAINING
-            ):
-                messages.append(
-                    {
-                        "role": "user",
-                        "content": (
-                            "You are about to run out of turns. STOP investigating "
-                            "now — do not run any more exploration commands. "
-                            f"Immediately call the Write tool to create {output_file} "
-                            "in the spec directory with its COMPLETE content, based "
-                            "on what you already know. This is mandatory: if you do "
-                            "not write the file now, the whole task fails."
-                        ),
-                    }
-                )
-                write_nudge_sent = True
-                logger.warning(
-                    "[CopilotAgentClient] Injected write-now nudge "
-                    f"(turn {turn + 1}/{self.max_turns}, Write tool still unused)"
-                )
-
-            payload: dict[str, Any] = {
-                "model": self.model,
-                "messages": messages,
-                "stream": False,
-            }
-            if tools:
-                payload["tools"] = tools
-                payload["tool_choice"] = "auto"
-
-            logger.info(
-                f"[CopilotAgentClient] Turn {turn + 1}/{self.max_turns}: "
-                f"sending {len(messages)} messages..."
-            )
-
-            # Determine which endpoint to use
-            api_url = (
-                self._github_models_api_base
-                if self._using_github_models
-                else self._api_base
-            )
-
-            # For GitHub Models API, use the raw GitHub token directly (not the Copilot session token)
-            if self._using_github_models:
-                request_headers["Authorization"] = f"Bearer {self.github_token}"
-
-            import asyncio as _asyncio
-
-            import aiohttp
-
-            data = None
-            # Two independent retry budgets so a burst of rate-limit (429)
-            # responses never eats the connection-error budget and vice-versa.
-            connection_attempts = 0
-            rate_limit_attempts = 0
-            while True:
-                try:
-                    async with session.post(
-                        api_url, json=payload, headers=request_headers
-                    ) as resp:
-                        if resp.status == 403 and not self._using_github_models:
-                            # Copilot API blocked (org restriction) — fallback to GitHub Models API
-                            error_text = await resp.text()
-                            logger.warning(
-                                f"[CopilotAgentClient] Copilot API returned 403 — "
-                                f"falling back to GitHub Models API at {self._github_models_api_base}"
-                            )
-                            print(
-                                "[CopilotAgentClient] [INFO] Copilot API blocked by org. "
-                                "Falling back to GitHub Models API.",
-                                flush=True,
-                            )
-                            self._using_github_models = True
-                            request_headers["Authorization"] = (
-                                f"Bearer {self.github_token}"
-                            )
-                            # Retry this turn with the GitHub Models API
-                            async with session.post(
-                                self._github_models_api_base,
-                                json=payload,
-                                headers=request_headers,
-                            ) as retry_resp:
-                                if retry_resp.status != 200:
-                                    retry_error = await retry_resp.text()
-                                    logger.error(
-                                        f"[CopilotAgentClient] GitHub Models API error ({retry_resp.status}): {retry_error[:500]}"
-                                    )
-                                    yield AgentMessage(
-                                        role=MessageRole.SYSTEM,
-                                        content=[
-                                            ContentBlock(
-                                                type=ContentBlockType.TEXT,
-                                                text=f"GitHub Models API error ({retry_resp.status}): {retry_error}",
-                                            )
-                                        ],
-                                    )
-                                    return
-                                data = await retry_resp.json()
-                        elif resp.status in _COPILOT_RETRYABLE_STATUSES:
-                            # Transient failure (429 rate-limit or 5xx hiccup).
-                            # Wait — honouring ``Retry-After`` when the server
-                            # sends it, else exponential back-off — and retry
-                            # instead of aborting the turn. This is what keeps
-                            # subtasks flowing through short Copilot per-minute
-                            # rate-limit windows rather than surfacing a 429.
-                            error_text = await resp.text()
-                            if rate_limit_attempts < _COPILOT_RATE_LIMIT_MAX_RETRIES:
-                                rate_limit_attempts += 1
-                                retry_after = _parse_retry_after(
-                                    resp.headers, _COPILOT_RATE_LIMIT_MAX_BACKOFF
-                                )
-                                if retry_after is not None:
-                                    wait_s = retry_after
-                                else:
-                                    wait_s = min(
-                                        _COPILOT_RATE_LIMIT_BACKOFF
-                                        * (2 ** (rate_limit_attempts - 1)),
-                                        _COPILOT_RATE_LIMIT_MAX_BACKOFF,
-                                    )
-                                kind = (
-                                    "rate limited"
-                                    if resp.status == 429
-                                    else f"transient error {resp.status}"
-                                )
-                                logger.warning(
-                                    f"[CopilotAgentClient] {kind} — retry "
-                                    f"{rate_limit_attempts}/"
-                                    f"{_COPILOT_RATE_LIMIT_MAX_RETRIES} "
-                                    f"in {wait_s:.0f}s"
-                                )
-                                print(
-                                    f"[CopilotAgentClient] [WARN] Copilot {kind} "
-                                    f"— waiting {wait_s:.0f}s then retrying "
-                                    f"({rate_limit_attempts}/"
-                                    f"{_COPILOT_RATE_LIMIT_MAX_RETRIES})...",
-                                    flush=True,
-                                )
-                                await _asyncio.sleep(wait_s)
-                                continue
-                            # Budget exhausted — surface the error as before.
-                            logger.error(
-                                f"[CopilotAgentClient] API error ({resp.status}) "
-                                f"after {rate_limit_attempts} retries: "
-                                f"{error_text[:500]}"
-                            )
-                            yield AgentMessage(
-                                role=MessageRole.SYSTEM,
-                                content=[
-                                    ContentBlock(
-                                        type=ContentBlockType.TEXT,
-                                        text=f"Copilot API error ({resp.status}): {error_text}",
-                                    )
-                                ],
-                            )
-                            return
-                        elif (
-                            resp.status == 400
-                            and not model_fallback_attempted
-                            and not self._using_github_models
-                        ):
-                            # The Copilot API rejected the requested model. This
-                            # happens when a task carries an Anthropic-native
-                            # versioned id (e.g. "claude-sonnet-4-5") or a
-                            # flagship not yet served by the user's Copilot plan
-                            # (e.g. "claude-opus-4.8"). Swap to a supported model
-                            # and retry the turn instead of failing the phase.
-                            error_text = await resp.text()
-                            if "model_not_supported" in error_text:
-                                fallback = _copilot_fallback_model(self.model)
-                                model_fallback_attempted = True
-                                logger.warning(
-                                    "[CopilotAgentClient] Model "
-                                    f"'{self.model}' not supported by Copilot — "
-                                    f"falling back to '{fallback}' and retrying."
-                                )
-                                print(
-                                    "[CopilotAgentClient] [WARN] Model "
-                                    f"'{self.model}' not supported — switching to "
-                                    f"'{fallback}'.",
-                                    flush=True,
-                                )
-                                self.model = fallback
-                                payload["model"] = fallback
-                                continue
-                            # A different 400 (e.g. malformed request) — surface.
-                            logger.error(
-                                f"[CopilotAgentClient] API error (400): {error_text[:500]}"
-                            )
-                            yield AgentMessage(
-                                role=MessageRole.SYSTEM,
-                                content=[
-                                    ContentBlock(
-                                        type=ContentBlockType.TEXT,
-                                        text=f"Copilot API error (400): {error_text}",
-                                    )
-                                ],
-                            )
-                            return
-                        elif resp.status != 200:
-                            error_text = await resp.text()
-                            logger.error(
-                                f"[CopilotAgentClient] API error ({resp.status}): {error_text[:500]}"
-                            )
-                            yield AgentMessage(
-                                role=MessageRole.SYSTEM,
-                                content=[
-                                    ContentBlock(
-                                        type=ContentBlockType.TEXT,
-                                        text=f"Copilot API error ({resp.status}): {error_text}",
-                                    )
-                                ],
-                            )
-                            return
-                        else:
-                            data = await resp.json()
-                            # Some Copilot models do report `usage`; when they
-                            # do, it is the context fill the guard measures.
-                            _cu = data.get("usage") if isinstance(data, dict) else None
-                            if isinstance(_cu, dict) and _cu.get("prompt_tokens"):
-                                self.last_context_tokens = int(_cu["prompt_tokens"])
-                            self._record_call(from_chat_completion(_cu))
-                    break  # request succeeded — leave the retry loop
-                except (
-                    _asyncio.TimeoutError,
-                    aiohttp.ClientError,
-                ) as e:
-                    # A hung/stalled or transient connection error. Retry before
-                    # failing so a single bad response no longer freezes the whole
-                    # phase. A full-duration TIMEOUT gets a tighter retry budget
-                    # than a (cheap, fast-failing) connection error: each timeout
-                    # retry costs another full ceiling, so we cap it to bound the
-                    # worst-case "stuck" window.
-                    is_timeout = isinstance(e, _asyncio.TimeoutError)
-                    max_retries = (
-                        _COPILOT_TIMEOUT_MAX_RETRIES
-                        if is_timeout
-                        else _COPILOT_REQUEST_MAX_RETRIES
-                    )
-                    if connection_attempts < max_retries:
-                        backoff = _COPILOT_REQUEST_RETRY_BACKOFF * (
-                            connection_attempts + 1
-                        )
-                        logger.warning(
-                            f"[CopilotAgentClient] Request stalled/failed "
-                            f"({type(e).__name__}: {e}) — retry "
-                            f"{connection_attempts + 1}/{max_retries} "
-                            f"in {backoff:.0f}s"
-                        )
-                        print(
-                            "[CopilotAgentClient] [WARN] Copilot API request "
-                            f"stalled — retrying ({connection_attempts + 1}/"
-                            f"{max_retries})...",
-                            flush=True,
-                        )
-                        connection_attempts += 1
-                        await _asyncio.sleep(backoff)
-                        continue
-                    logger.error(
-                        f"[CopilotAgentClient] Request failed after "
-                        f"{connection_attempts + 1} attempt(s): {e}"
-                    )
-                    yield AgentMessage(
-                        role=MessageRole.SYSTEM,
-                        content=[
-                            ContentBlock(
-                                type=ContentBlockType.TEXT,
-                                text=f"Copilot API error (timeout/connection): {e}",
-                            )
-                        ],
-                    )
-                    return
-                except Exception as e:
-                    logger.error(f"[CopilotAgentClient] Request failed: {e}")
-                    yield AgentMessage(
-                        role=MessageRole.SYSTEM,
-                        content=[
-                            ContentBlock(
-                                type=ContentBlockType.TEXT,
-                                text=f"Copilot API error: {e}",
-                            )
-                        ],
-                    )
-                    return
-
-            if data is None:
-                # All retries exhausted without a usable response.
-                logger.error("[CopilotAgentClient] No response data after retries")
-                return
-
-            choices = data.get("choices", [])
-            if not choices:
-                # A 200 response with no choices is almost always a transient
-                # server-side hiccup, not a genuine "done" signal. Re-issue the
-                # same turn after a short back-off instead of killing the whole
-                # session on the first empty response. Only give up once the
-                # consecutive-empty budget is exhausted.
-                consecutive_empty_responses += 1
-                if (
-                    consecutive_empty_responses
-                    <= _COPILOT_MAX_CONSECUTIVE_EMPTY_RESPONSES
-                ):
-                    backoff = (
-                        _COPILOT_EMPTY_RESPONSE_BACKOFF * consecutive_empty_responses
-                    )
-                    logger.warning(
-                        f"[CopilotAgentClient] Turn {turn + 1}: empty choices in "
-                        f"response — retrying "
-                        f"({consecutive_empty_responses}/"
-                        f"{_COPILOT_MAX_CONSECUTIVE_EMPTY_RESPONSES}) "
-                        f"in {backoff:.0f}s"
-                    )
-                    print(
-                        "[CopilotAgentClient] [WARN] Empty response from Copilot "
-                        f"— retrying ({consecutive_empty_responses}/"
-                        f"{_COPILOT_MAX_CONSECUTIVE_EMPTY_RESPONSES})...",
-                        flush=True,
-                    )
-                    await _asyncio.sleep(backoff)
-                    continue  # retry — don't end the session on a transient empty
-                logger.error(
-                    f"[CopilotAgentClient] {consecutive_empty_responses} consecutive "
-                    "empty responses — giving up"
-                )
-                yield AgentMessage(
-                    role=MessageRole.ASSISTANT,
-                    content=[
-                        ContentBlock(
-                            type=ContentBlockType.TEXT,
-                            text="(Empty response from Copilot)",
-                        )
-                    ],
-                )
-                return
-
-            # A usable choice arrived — clear the transient-empty guard counter.
-            consecutive_empty_responses = 0
-
-            message = choices[0].get("message", {})
-            content = message.get("content") or ""
-            tool_calls = message.get("tool_calls", [])
-            finish_reason = choices[0].get("finish_reason", "")
-
-            logger.info(
-                f"[CopilotAgentClient] Turn {turn + 1}: "
-                f"content_len={len(content)}, tool_calls={len(tool_calls)}, "
-                f"finish_reason={finish_reason}"
-            )
-
-            # Yield text content if present
-            if content:
-                yield AgentMessage(
-                    role=MessageRole.ASSISTANT,
-                    content=[ContentBlock(type=ContentBlockType.TEXT, text=content)],
-                )
-
-            # No tool calls returned
-            if not tool_calls:
-                if finish_reason == "tool_calls":
-                    # Copilot API returned finish_reason=tool_calls but no actual tool_calls —
-                    # this can occur with Claude models via the OpenAI-compatible Copilot API.
-                    # Add the partial assistant message and prompt the model to proceed with tools.
-                    consecutive_empty_tool_calls += 1
-                    if (
-                        consecutive_empty_tool_calls
-                        > _COPILOT_MAX_CONSECUTIVE_EMPTY_TOOL_CALLS
-                    ):
-                        # The model keeps "intending" to call a tool but never
-                        # emits one. Stop re-sampling so we don't spin through the
-                        # entire turn budget producing no work. End the session
-                        # with whatever content we have so the phase can surface a
-                        # real failure instead of silently looping.
-                        logger.error(
-                            f"[CopilotAgentClient] Turn {turn + 1}: "
-                            f"{consecutive_empty_tool_calls} consecutive empty "
-                            "tool_calls responses — aborting to avoid a spin loop"
-                        )
-                        yield AgentMessage(
-                            role=MessageRole.SYSTEM,
-                            content=[
-                                ContentBlock(
-                                    type=ContentBlockType.TEXT,
-                                    text=(
-                                        "Copilot API returned no actionable tool "
-                                        f"calls for {consecutive_empty_tool_calls} "
-                                        "consecutive turns — stopping to avoid an "
-                                        "infinite loop."
-                                    ),
-                                )
-                            ],
-                        )
-                        return
-                    logger.warning(
-                        f"[CopilotAgentClient] Turn {turn + 1}: finish_reason=tool_calls "
-                        "but no tool_calls in response — retrying with nudge "
-                        f"({consecutive_empty_tool_calls}/"
-                        f"{_COPILOT_MAX_CONSECUTIVE_EMPTY_TOOL_CALLS})"
-                    )
-                    if content:
-                        messages.append({"role": "assistant", "content": content})
-                    messages.append(
-                        {
-                            "role": "user",
-                            "content": "Please proceed by calling the appropriate tools to complete your task.",
-                        }
-                    )
-                    continue  # retry — don't return early
-
-                # The model wants to STOP. For planner/spec_writer sessions the
-                # output file is mandatory, yet the model often "finishes" by
-                # DESCRIBING the plan in prose without ever calling the Write
-                # tool — leaving the planning phase to fail with "Did not create
-                # plan file". If Write is required and still unused, refuse the
-                # early stop once and force the model to write.
-                if (
-                    has_write_tool
-                    and not write_tool_used
-                    and not write_nudge_sent
-                    and turn < self.max_turns - 1
-                ):
-                    if content:
-                        messages.append({"role": "assistant", "content": content})
-                    messages.append(
-                        {
-                            "role": "user",
-                            "content": (
-                                "You have NOT yet created the required output file. "
-                                "Do not stop and do not just describe it in text. "
-                                "You MUST call the Write tool now to create "
-                                f"{output_file} in the spec directory with its "
-                                "COMPLETE content, based on your investigation so "
-                                "far. Call the Write tool now."
-                            ),
-                        }
-                    )
-                    write_nudge_sent = True
-                    logger.warning(
-                        f"[CopilotAgentClient] Turn {turn + 1}: model tried to stop "
-                        "without writing the plan — forcing a Write retry"
-                    )
-                    continue  # retry — don't return early
-
-                if not content:
-                    yield AgentMessage(
-                        role=MessageRole.ASSISTANT,
-                        content=[
-                            ContentBlock(
-                                type=ContentBlockType.TEXT,
-                                text="(No response from Copilot)",
-                            )
-                        ],
-                    )
-                logger.info(
-                    f"[CopilotAgentClient] Session complete after {turn + 1} turn(s)"
-                )
-                return
-
-            # Add assistant message (with tool_calls) to conversation history
-            # Real tool calls arrived — the model is making progress, so clear the
-            # empty-response guard counter.
-            consecutive_empty_tool_calls = 0
-            assistant_msg: dict[str, Any] = {"role": "assistant"}
-            if content:
-                assistant_msg["content"] = content
-            assistant_msg["tool_calls"] = tool_calls
-            messages.append(assistant_msg)
-
-            # Execute each tool call
-            turn_calls: list[tuple[str, Any, str]] = []
-            for tc in tool_calls:
-                func = tc.get("function", {})
-                tool_name = func.get("name", "")
-                tool_id = tc.get("id", f"call_{turn}_{tool_name}")
-
-                try:
-                    args = _json.loads(func.get("arguments", "{}"))
-                except (_json.JSONDecodeError, TypeError):
-                    args = {}
-
-                logger.info(
-                    f"[CopilotAgentClient] Turn {turn + 1}: tool_call {tool_name}({list(args.keys())})"
-                )
-                print(f"[CopilotAgentClient] 🔧 Tool: {tool_name}", flush=True)
-
-                if tool_name in _FILE_WRITE_TOOL_NAMES:
-                    write_tool_used = True
-
-                # Yield TOOL_USE block so session handler can log it
-                yield AgentMessage(
-                    role=MessageRole.ASSISTANT,
-                    content=[
-                        ContentBlock(
-                            type=ContentBlockType.TOOL_USE,
-                            tool_name=tool_name,
-                            tool_id=tool_id,
-                            tool_input=args,
-                        )
-                    ],
-                )
-
-                # Execute tool locally
-                result_text = ""
-                is_error = False
-                if self._tool_executor:
-                    try:
-                        result = await self._tool_executor.execute(tool_name, args)
-                        result_text = str(result) if result is not None else ""
-                    except Exception as e:
-                        result_text = f"Tool error: {e}"
-                        is_error = True
-                        logger.warning(
-                            f"[CopilotAgentClient] Tool {tool_name} failed: {e}"
-                        )
-                else:
-                    result_text = "Tool executor not available"
-                    is_error = True
-
-                # Yield TOOL_RESULT block so session handler can log it
-                yield AgentMessage(
-                    role=MessageRole.ASSISTANT,
-                    content=[
-                        ContentBlock(
-                            type=ContentBlockType.TOOL_RESULT,
-                            tool_use_id=tool_id,
-                            is_error=is_error,
-                            result_content=result_text,
-                        )
-                    ],
-                )
-
-                # Add tool result for next API call (head+tail truncation —
-                # build/test verdicts sit at the END of the output)
-                messages.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": tool_id,
-                        "content": truncate_tool_result(result_text),
-                    }
-                )
-                turn_calls.append((tool_name, args, result_text))
-
-            stop = self._check_progress(progress, turn_calls, messages)
-            if stop is not None:
-                yield stop
-                return
-
-            # Elide stale tool results once the conversation exceeds the char
-            # budget (no-op below budget, preserving the cacheable prefix).
-            compacted = compact_messages(messages)
-            if compacted:
-                logger.info(
-                    f"[CopilotAgentClient] History compaction: elided {compacted} "
-                    "stale tool result(s)"
-                )
-
-            # Continue loop — next turn sends updated messages with tool results
-
-        logger.warning(
-            f"[CopilotAgentClient] Reached max_turns ({self.max_turns}) — stopping tool loop"
-        )
-        print(
-            f"[CopilotAgentClient] ⚠️ Reached max turns ({self.max_turns})", flush=True
-        )
+        async with aclosing(
+            run_turns(adapter, max_turns=self.max_turns, ledger=ledger)
+        ) as turns:
+            async for message in turns:
+                yield message
 
     async def run_subagents(
         self,
