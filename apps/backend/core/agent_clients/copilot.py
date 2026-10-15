@@ -13,6 +13,7 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 from harness.domain import from_chat_completion
+from harness.domain.progress import ProgressTracker
 
 # Common token-optimization trunk shared by every generic (OpenAI-style)
 # multi-turn loop: head+tail tool-result truncation and over-budget history
@@ -648,6 +649,10 @@ class CopilotAgentClient(AgentClient):
         # rejection. Guards against an infinite retry loop if even the fallback
         # model is unavailable on the user's Copilot plan.
         model_fallback_attempted = False
+        # The same calls with the same results turn after turn: nudged once,
+        # then stopped (harness.domain.progress). Distinct from the empty
+        # tool_calls guard above, which catches calls announced but not made.
+        progress = ProgressTracker()
 
         for turn in range(self.max_turns):
             try:
@@ -1142,6 +1147,7 @@ class CopilotAgentClient(AgentClient):
             messages.append(assistant_msg)
 
             # Execute each tool call
+            turn_calls: list[tuple[str, Any, str]] = []
             for tc in tool_calls:
                 func = tc.get("function", {})
                 tool_name = func.get("name", "")
@@ -1212,6 +1218,12 @@ class CopilotAgentClient(AgentClient):
                         "content": truncate_tool_result(result_text),
                     }
                 )
+                turn_calls.append((tool_name, args, result_text))
+
+            stop = self._check_progress(progress, turn_calls, messages)
+            if stop is not None:
+                yield stop
+                return
 
             # Elide stale tool results once the conversation exceeds the char
             # budget (no-op below budget, preserving the cacheable prefix).

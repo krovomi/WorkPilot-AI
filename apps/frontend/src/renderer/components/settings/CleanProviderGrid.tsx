@@ -232,7 +232,7 @@ export function CleanProviderGrid({
 					<div className="flex gap-2">
 						<Select
 							value={filterStatus}
-							onValueChange={(value: FilterStatus) => updateFilterStatus(value)}
+							onValueChange={(value) => updateFilterStatus(value as FilterStatus)}
 						>
 							<SelectTrigger className="w-48 bg-background border-border">
 								<Filter className="w-4 h-4 mr-2 text-muted-foreground" />
@@ -258,7 +258,7 @@ export function CleanProviderGrid({
 
 						<Select
 							value={sortBy}
-							onValueChange={(value: SortBy) => updateSortBy(value)}
+							onValueChange={(value) => updateSortBy(value as SortBy)}
 						>
 							<SelectTrigger className="w-48 bg-background border-border">
 								<SelectValue placeholder={t("providerGrid.sort.placeholder")} />

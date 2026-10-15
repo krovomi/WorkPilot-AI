@@ -13,6 +13,7 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 from harness.domain import from_eval_counts
+from harness.domain.progress import ProgressTracker
 
 # Common token-optimization trunk shared by every generic (OpenAI-style)
 # multi-turn loop: head+tail tool-result truncation and over-budget history
@@ -1284,6 +1285,7 @@ class LocalAgentClient(OpenAIAgentClient):
                 "baissez l'effort de réflexion de cette phase."
             )
 
+        progress = ProgressTracker()
         for turn in range(self.max_turns):
             payload: dict[str, Any] = {
                 "model": self.model,
@@ -1714,6 +1716,7 @@ class LocalAgentClient(OpenAIAgentClient):
                 {"role": "assistant", "content": content, "tool_calls": tool_calls}
             )
 
+            turn_calls: list[tuple[str, Any, str]] = []
             for i, tc in enumerate(tool_calls):
                 func = tc.get("function", {}) or {}
                 tool_name = func.get("name", "")
@@ -1790,6 +1793,12 @@ class LocalAgentClient(OpenAIAgentClient):
                         ),
                     }
                 )
+                turn_calls.append((tool_name, args, result_text))
+
+            stop = self._check_progress(progress, turn_calls, messages)
+            if stop is not None:
+                yield stop
+                break
 
             compacted = compact_messages(
                 messages, char_budget=self._local_history_budget()
@@ -1799,10 +1808,10 @@ class LocalAgentClient(OpenAIAgentClient):
                     f"[LocalAgentClient] History compaction: elided {compacted} "
                     "stale tool result(s)"
                 )
-
-        logger.warning(
-            f"[LocalAgentClient] Reached max_turns ({self.max_turns}) — stopping"
-        )
+        else:
+            logger.warning(
+                f"[LocalAgentClient] Reached max_turns ({self.max_turns}) — stopping"
+            )
         self.last_usage = {
             "input_tokens": _total_in,
             "output_tokens": _total_out,
