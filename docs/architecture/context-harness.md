@@ -3,8 +3,9 @@
 > **Statut : plan ; livrés : le lot 0 (mesurer, sauf sa ligne de base), le lot 1a (un budget
 > par session pour tous), le lot 1b-i (l'arrêt sur absence de progrès), le lot 2 (un préfixe stable, sauf D3), le lot 3 (troncature à la
 > source, sauf les plafonds natifs, réglés sur la ligne de base), le lot 4 (purge par lots et
-> fenêtre payable, sauf D2) et le lot 5 (sous-agents sous contrat, résultat borné et marqué,
-> lancement échelonné, sauf le `MemoryPort`).** Ce fichier fixe la cible
+> fenêtre payable, sauf D2), le lot 5 (sous-agents sous contrat, résultat borné et marqué,
+> lancement échelonné, sauf le `MemoryPort`) et le lot 6 (un jeu d'outils trié et figé par
+> session, sauf la réduction des phases de build).** Ce fichier fixe la cible
 > et l'ordre des lots ; chaque lot livré remplace sa section par la justification de ce qui existe. [`docs/CLAUDE.md`](../CLAUDE.md)
 > reste normatif : là où les deux divergent, il gagne. Le mécanisme existant de compaction et de
 > reset est décrit dans [`context-management.md`](context-management.md), que ce plan prolonge sans
@@ -86,7 +87,7 @@ sens partout, une boucle unique, et la troncature à la source.
 | Troncature | rtk sur Bash ; boucles WorkPilot : résultat coupé à 10 k caractères (70 % tête / 30 % queue). Lot 3 : `read_file`, `search_files` et `find_files` paginent sous ce plafond ; une longue sortie de `run_command` ou d'un outil exécuté dans le processus va dans un fichier ; le cerveau pagine ses notes et ses skills. Claude Code plafonne nativement (table ci-dessus) | aucun plafond natif réglé par WorkPilot : la ligne de base dira s'il faut baisser ceux de Claude Code |
 | Mémoire externe | cerveau (vault, `graph.json`, serveur MCP 9 outils), `implementation_plan.json`, `build-progress.txt`, `handoff_pending.md`, rapports de phase plafonnés. Lot 3b : les sorties longues des boucles WorkPilot vont dans `<spec>/tool-output/`, relues par `read_file` | un `MemoryPort` unique, avec la boucle partagée (lot 1b-ii) |
 | Sous-agents | registre `agents/subagents/`, roster ≤ 7 ; Claude et Copilot. Lot 5 : contrat `{conclusion, files, evidence}` sous 2 000 tokens, résultat coupé et marqué au-delà, délimité comme une donnée (hook PostToolUse sur Claude, `run_subagents` sur Copilot) ; Copilot les lance en échelon | `run_subagents` n'a pas d'appelant en production |
-| Outils dynamiques | `AGENT_CONFIGS` par type d'agent ; MCP ajoutés selon la tâche ; schémas MCP différés sur Claude (`ENABLE_TOOL_SEARCH=auto:5`) | rien par phase dans une même tâche, ni pour les autres providers |
+| Outils dynamiques | `AGENT_CONFIGS` par type d'agent ; MCP ajoutés selon la tâche ; schémas MCP différés sur Claude (`ENABLE_TOOL_SEARCH=auto:5`). Lot 6 : un jeu d'outils canonique, trié et figé par session dans les boucles WorkPilot (`harness/domain/tools.py`) ; ni cerveau ni ui-ux pour un type sans outils | rien par sous-tâche ; la réduction des phases de build, mesurée par `tool_weights` |
 | Effort et routage | effort par phase (`phase_config.py`), traduit par provider (`reasoning_effort`, budget de réflexion) ; routeur de complexité et `model_router` presque toujours éteints | pas d'escalade automatique |
 | Récupération de code | `context/search.py` : correspondance de sous-chaînes ; grepai seulement pour l'autofix | ni BM25, ni fusion, ni budget d'extraits |
 | Évals | `tests/skills_eval/` : 6 épisodes rejoués sans LLM en CI | aucun banc qui fasse tourner l'agent sur des tâches réelles |
@@ -580,15 +581,104 @@ identique octet pour octet).
 *Sortie :* tokens remontés par sous-agent bornés ; écritures de cache par vague de sous-agents
 divisées.
 
-### Lot 6 — Outils dynamiques et effort
+### Lot 6 — Outils dynamiques et effort (livré, sauf la réduction des phases de build)
 
-- Jeu d'outils figé **par session**, choisi par phase et par sous-tâche : changer d'outils en cours
-  de session reconstruit tout le cache. Là où le provider sait différer les schémas (Claude Code),
-  on le règle ; ailleurs, WorkPilot réduit le jeu d'outils de la phase.
-- Effort par phase depuis le réglage de l'utilisateur, fixe dans une session : chez les providers
-  qui le rendent dans le préfixe, le changer en cours de route invalide le cache.
+Chaque provider qui cache un préfixe y met les définitions d'outils, juste après le system. Un outil
+ajouté en cours de session, les mêmes outils dans un autre ordre, le même schéma avec ses clés dans
+un autre ordre : tout ce qui suit est réécrit.
 
-*Sortie :* les définitions d'outils pèsent moins dans le préfixe des phases qui n'en ont pas besoin.
+**Où se choisissent les outils, et ce qui peut bouger.**
+
+| Famille | Outils | Ordre | En cours de session | Effort |
+|---|---|---|---|---|
+| Claude Agent SDK | ceux de la CLI, moins `disallowed_tools` (`undeclared_builtin_tools`) ; serveurs MCP de `get_required_mcp_servers` ; `allowed_tools` ne fait qu'approuver | listes fixes côté WorkPilot ; dans le prompt, celui de la CLI | options fixées au lancement de la CLI ; ni `set_model` ni changement d'outils | `max_thinking_tokens` depuis le réglage de la phase ; `effort` (Opus seulement) depuis une table par type d'agent, ou `AUTO_CLAUDE_EFFORT` |
+| Codex CLI | les siens ; WorkPilot ne passe que `--sandbox`, tiré de la déclaration du type | celui de la CLI | les mêmes arguments à chaque requête | `model_reasoning_effort` depuis le réglage de la phase |
+| OpenCode | les siens ; `--agent build` ou `plan` selon la déclaration | celui de la CLI | idem | aucun : pas de réglage confirmé dans le dépôt |
+| Antigravity | les siens ; mode et sandbox selon la déclaration | celui de la CLI | idem | `--effort` depuis le réglage de la phase |
+| Boucles WorkPilot : OpenAI et compatibles, Google, Ollama, LM Studio, Copilot, Windsurf | `get_tool_definitions` (exécuteur, cerveau, ui-ux, verify) ; pour la famille OpenAI, les outils des serveurs MCP pontés | l'ordre écrit dans le code, puis celui des serveurs et de leur `list_tools`, et les clés des schémas dans l'ordre du serveur : rien ne garantissait ces trois-là | préparés une fois, dans `__aenter__` ; aucune boucle ne les reconstruisait par tour | `reasoning_effort` (modèles de raisonnement OpenAI) ; aucun ailleurs |
+
+L'effort se résout une fois, à la création du client (`_effort_for`, depuis le réglage de la phase).
+Un changement (hot swap, reset de contexte, sous-tâche suivante) arrive avec un nouveau client, donc
+une nouvelle session : rien n'était à corriger de ce côté.
+
+**Un jeu d'outils par session.**
+
+- `harness/domain/tools.py` (pur) : la forme canonique d'un jeu d'outils, trié par nom, les clés
+  triées à toute profondeur, chaque liste dans son ordre (l'ordre d'une liste est une donnée) ;
+  `serialize`, la seule sérialisation ; `ToolSet` : les outils, leur empreinte (SHA-256), leur
+  taille, leur poids estimé. `hold` : dans une session, l'empreinte ne change pas ; un autre jeu lève
+  `ToolSetChanged`.
+- `harness/application/tools.py` : `session_tools` fige le jeu au début de la session ; une seconde
+  préparation dans la même session garde le premier jeu et le journalise. `tool_weights` pèse chaque
+  type d'agent dans l'unité de la jauge (`CHARS_PER_TOKEN`, 4 caractères par token).
+- `AgentClient._freeze_tools` : OpenAI (et Google, les compatibles, Ollama, LM Studio, qui en
+  héritent), Copilot et Windsurf préparent leurs outils une fois, outils MCP pontés compris. Chaque
+  tour envoie les mêmes octets, et deux sessions qui reçoivent les mêmes outils aussi, quel que soit
+  l'ordre du serveur MCP. Les corps des boucles ne changent pas.
+- `get_tool_definitions` rend la forme canonique : `LiteLLMRuntime` en profite aussi.
+
+**Ce qui est retiré.** Aucun droit de `AGENT_CONFIGS` ne change.
+
+- `analyze_project`, offert au `planner` et au `spec_writer` hors SDK : `ToolExecutor.execute` n'a
+  jamais eu de branche pour lui. Il était payé dans chaque prompt et répondait « Unknown tool ».
+- Les outils du cerveau (9 schémas, ~870 tokens) et d'ui-ux (4, ~525 tokens) aux types qui ne
+  déclarent aucun outil : `commit_message`, `merge_resolver`, `spec_compaction`, `git_command`,
+  `code_playground`, `linear_updater`, `pr_followup_reviewer`. Sur le SDK Claude,
+  `get_required_mcp_servers` ne les donne qu'aux types qui ont des outils ; l'exécuteur les offrait à
+  tous. `executor_may_use` porte désormais la même règle, pour l'offre et pour l'exécution. Ces types
+  répondent en texte, par exemple un one-shot (`core/oneshot.py`) ou le résumé de handoff
+  (`context_mgmt/handoff.py`) sur un provider hors Claude.
+
+**Le poids, par type** (`tool_weights` : boucles WorkPilot, en tokens estimés, sans MCP ponté) :
+
+| Types | Sans cerveau | Cerveau | Cerveau, tâche UI |
+|---|---|---|---|
+| sans outils (les 7 ci-dessus) | 181 | 181 (avant : 1 050) | 181 (avant : 1 574) |
+| lecture seule : relecteurs, analyseurs, `insights`, `spec_critic`… | 428 | 1 297 | 1 821 |
+| `architecture_visualizer` | 497 | 1 366 | 1 891 |
+| `qa_reviewer`, `qa_fixer`, spec, roadmap, idéation | 586 | 1 455 | 1 980 |
+| `coder` | 637 | 1 506 | 2 030 |
+| `planner`, `spec_writer` | 696 (avant : 726) | 1 565 (avant : 1 595) | 2 089 (avant : 2 119) |
+| `verifier` | 1 998 | 2 867 | 3 392 |
+
+Sur le SDK Claude, le poids des outils intégrés appartient à la CLI. Avec un cerveau et
+`chrome-devtools`, le `coder` approuve 45 outils MCP, le `verifier` 54.
+
+**La voie native.** Claude Code diffère les schémas MCP au-delà de 5 % de la fenêtre :
+`ENABLE_TOOL_SEARCH=auto:5`, déjà posé par `create_client`, et lu par la CLI livrée avec le SDK
+(2.1.300 : `true`, `auto`, `auto:N`, `force`). La CLI rapporte aussi des outils intégrés différés
+(`deferredBuiltinTools`), sans réglage documenté : rien n'est posé. Codex, OpenCode, Antigravity et
+l'API chat completions : aucun réglage confirmé dans le dépôt, rien n'est posé.
+
+**Reste à faire.**
+
+- Réduire les phases de build. Candidats mesurés, droits inchangés : le cerveau sur les analyseurs
+  one-shot à lecture seule (`insight_extractor`, `learning_analyzer`, `live_companion_analyzer`,
+  `migration`, `batch_*`, `pr_template_filler`, `impact_analyzer` : ~870 tokens par appel, deux tiers
+  de leur poids) ; ui-ux sur les relecteurs et les analyseurs d'une tâche UI (~525) ; `list_files` à
+  côté de `find_files` (~50) ; l'alias `Write` à côté de `write_file` (~110, nommé par le prompt du
+  planner).
+- Le choix par sous-tâche : une sous-tâche reçoit les outils de sa phase ; rien ne retire, par
+  exemple, `chrome-devtools` d'une sous-tâche backend.
+- La garde par tour : la boucle partagée (lot 1b-ii) appellera `hold` à chaque tour. Aujourd'hui, les
+  cinq boucles envoient la liste que `__aenter__` a préparée, et un test le vérifie.
+- L'effort de Claude : `effort` (Opus) vient d'une table par type d'agent, pas du réglage de
+  l'utilisateur ; sur les modèles à réflexion adaptative, `max_thinking_tokens` ne vaut plus que oui
+  ou non. L'aligner sur le réglage change le coût des sessions Opus : c'est une décision de produit.
+- `capabilities/providers.yaml` annonce `effort: thinking_budget` pour Copilot et Google ; leurs
+  clients n'envoient aucun effort.
+
+Tests : `tests/harness/test_tools.py` (par table : un jeu dans n'importe quel ordre sérialisé d'une
+seule façon, clés triées à toute profondeur, ordre des listes gardé, champs absents, empreinte,
+poids arrondi au-dessus, `hold`), `tests/harness/test_session_tools.py` (chaque type reçoit ses
+outils triés et canoniques ; un type sans outils n'a ni cerveau ni ui-ux, et l'exécuteur lui refuse
+un outil du cerveau ; plus d'`analyze_project` ; OpenAI fige ses outils et ceux d'un serveur MCP dans
+un seul ordre, quel que soit l'ordre du serveur ; Copilot et Windsurf figent à l'entrée ; une seconde
+préparation garde le premier jeu ; chaque tour des cinq boucles envoie les mêmes outils, et OpenAI le
+même `reasoning_effort` ; le poids de chaque type).
+
+*Sortie :* atteinte pour les types sans outils (1 050 → 181 tokens avec un cerveau) et le planner
+(−30) ; pas pour les phases de build, dont la réduction attend une décision sur les droits.
 
 ### Lot 7 — Contexte de code
 

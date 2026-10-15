@@ -160,6 +160,7 @@ class OpenAIAgentClient(AgentClient):
         return self._http_client
 
     async def __aenter__(self):
+        definitions: list[dict[str, Any]] = list(self._tool_definitions)
         if self._project_dir:
             try:
                 from core.runtimes.tool_executor import (
@@ -173,23 +174,33 @@ class OpenAIAgentClient(AgentClient):
                     spec_dir=getattr(self, "_spec_dir", None),
                     agent_type=self._agent_type,
                 )
-                self._tool_definitions = get_tool_definitions(
+                definitions = get_tool_definitions(
                     self._agent_type, getattr(self, "_spec_dir", None)
                 )
                 logger.info(
                     f"[OpenAIAgentClient] Tool execution enabled: "
-                    f"{len(self._tool_definitions)} tools for agent_type={self._agent_type}"
+                    f"{len(definitions)} tools for agent_type={self._agent_type}"
                 )
             except Exception as e:
                 logger.warning(
                     f"[OpenAIAgentClient] Tool executor init failed (text-only mode): {e}"
                 )
-        if getattr(self, "_offline_only", False):
-            return self
-        # Bridge configured MCP servers (best-effort) so their tools are exposed
-        # alongside the built-in toolset. Never fail client setup on MCP errors.
-        # Only the servers this type may reach: the same per-agent answer the
-        # Claude SDK gets from `create_client`.
+        if not getattr(self, "_offline_only", False):
+            definitions += await self._bridge_mcp_tools()
+        # One tool set for the whole session, MCP tools included: sorted and
+        # serialized one way (harness.domain.tools), so every turn — and every
+        # session given the same tools — sends the same bytes.
+        if definitions:
+            self._freeze_tools(definitions)
+        return self
+
+    async def _bridge_mcp_tools(self) -> list[dict[str, Any]]:
+        """The tools of the configured MCP servers, bridged for this session.
+
+        Only the servers this type may reach: the same per-agent answer the
+        Claude SDK gets from `create_client`. Best-effort: an MCP error never
+        fails client setup.
+        """
         try:
             from core.mcp_tools import MCPToolManager, load_mcp_server_configs_for
 
@@ -202,16 +213,15 @@ class OpenAIAgentClient(AgentClient):
                 mcp_defs = manager.tool_definitions()
                 if mcp_defs:
                     self._mcp_manager = manager
-                    self._tool_definitions = list(self._tool_definitions) + mcp_defs
                     logger.info(
                         f"[OpenAIAgentClient] MCP enabled: {len(mcp_defs)} tool(s) "
                         f"from {len(servers)} server(s)"
                     )
-                else:
-                    await manager.aclose()
+                    return mcp_defs
+                await manager.aclose()
         except Exception as e:  # noqa: BLE001 — MCP must never block client setup
             logger.warning(f"[OpenAIAgentClient] MCP bridge unavailable: {e}")
-        return self
+        return []
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         if self._mcp_manager is not None:
