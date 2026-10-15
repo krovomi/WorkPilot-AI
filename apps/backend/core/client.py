@@ -240,6 +240,7 @@ except ImportError:
 
 
 from docintel.read_guard import make_read_guard_hook
+from harness.application.budget import session_budget_usd
 from integrations.linear.updater import is_linear_enabled
 from prompts_pkg.project_context import detect_project_capabilities, load_project_index
 from rtk import rtk_rewrite_hook
@@ -1453,10 +1454,12 @@ def create_client(
             "Stop": [HookMatcher(hooks=[_make_stop_hook(spec_dir)])],
         },
         "max_turns": int(os.environ.get("AUTO_CLAUDE_MAX_TURNS", "1000")),
-        # Budget cap as a meaningful runaway guard. The error path
-        # (`error_max_budget_usd`) is already handled in agents/session.py.
-        # Default tuned for typical Kanban cards; users can raise via env.
-        "max_budget_usd": float(os.environ.get("AUTO_CLAUDE_MAX_BUDGET_USD", "5.0")),
+        # Budget cap as a meaningful runaway guard, the same per-session cap
+        # every other client gets from the session runner
+        # (harness.application.budget). The error path (`error_max_budget_usd`)
+        # is already handled in agents/session.py. Users can raise it via env;
+        # 0 or less removes it.
+        "max_budget_usd": session_budget_usd(),
         "cwd": str(project_dir.resolve()),
         "settings": str(settings_file.resolve()),
         # setting_sources auto-loads CLAUDE.md, project rules, skills, and
