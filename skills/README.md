@@ -51,7 +51,7 @@ paths: "**/*.cs,**/*.csproj"        # optional: auto-activation globs
 metadata:
   workpilot:
     targets: { dotnet: ">=10.0" }   # optional: overrides the pack default
-    requires: { runtime: "_bmad/core/tasks/workflow.xml" }   # optional
+    requires: { runtime: "_bmad/scripts/resolve_customization.py" }   # optional
     min_effort: medium              # optional
 ---
 
@@ -92,6 +92,25 @@ The gate is applied twice, because the two readings answer different questions.
 `.agents/skills/` holds. `workflows/runner.py` applies it again, against the **project
 directory a phase is about to run in**, before starting the session — the build cannot
 answer that question on a machine it will never see.
+
+### The `_bmad/` mock in this repository
+
+`_bmad/scripts/resolve_customization.py` is committed (re-included by `.gitignore`), and the
+`skills` job in `.github/workflows/lint.yml` writes the same file on the runner. It is a
+**three-line mock** (`print("Mock runtime active")`), not BMAD's runtime: it only satisfies the
+gate so that `skills-cli build` emits the 50 BMAD skills into the committed `.agents/skills/`, and
+`build --check` gives the same answer locally and in CI. It was added in #171 as temporary.
+
+Know what it does in a checkout of *this* repository:
+
+* the read-time gate passes, so the Kanban palette lists the BMAD commands;
+* a BMAD skill run here gets `Mock runtime active` with exit code 0 instead of its merged
+  customization, so the skill's own fallback ("on failure, read `customize.toml`") never fires;
+* `skills:bootstrap` sees `produces` already present and skips the real installer
+  (use `--force`).
+
+None of this reaches a target project: `workflows/runner.py` and the palette check the project
+the task runs in, where only BMAD's installer writes `_bmad/`.
 
 ## Harnesses
 
