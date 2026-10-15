@@ -496,6 +496,119 @@ class TestStagedScan:
         assert {m.file_path for m in self._scan(temp_git_repo)} == {"paramètres.py"}
 
 
+class TestPathArgument:
+    """`--path` is resolved, then must lie in the project: the cwd, as for .secretsignore.
+
+    The script runs as a process, because its exit status is what the hook and
+    CI read: 0 clean, 1 secret found, 2 the scan did not happen.
+    """
+
+    SCANNER = (
+        Path(__file__).resolve().parent.parent / "apps/backend/security/scan_secrets.py"
+    )
+
+    @pytest.fixture
+    def project(self, tmp_path: Path) -> Path:
+        project = tmp_path / "project"
+        (project / "fixtures").mkdir(parents=True)
+        (project / "fixtures" / "config.py").write_text(
+            f'API_KEY = "{FAKE_KEY}"\n', encoding="utf-8"
+        )
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        (outside / "config.py").write_text(
+            f'API_KEY = "{FAKE_KEY}"\n', encoding="utf-8"
+        )
+        return project
+
+    def _run(self, project: Path, path: str):
+        import subprocess
+        import sys
+
+        return subprocess.run(
+            [sys.executable, str(self.SCANNER), "--path", path, "--json"],
+            cwd=project,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
+
+    def _reported_files(self, result) -> set[str]:
+        import json
+
+        return {m["file"] for m in json.loads(result.stdout)["matches"]}
+
+    @pytest.mark.parametrize(
+        "spelling", ["fixtures", "./fixtures", "fixtures/../fixtures"]
+    )
+    def test_a_relative_directory_is_scanned(self, project: Path, spelling: str):
+        result = self._run(project, spelling)
+
+        assert result.returncode == 1, result.stderr
+        assert self._reported_files(result) == {"fixtures/config.py"}
+
+    def test_an_absolute_directory_is_scanned(self, project: Path):
+        result = self._run(project, str(project / "fixtures"))
+
+        assert result.returncode == 1, result.stderr
+        assert self._reported_files(result) == {"fixtures/config.py"}
+
+    def test_a_relative_file_is_named_from_the_root(self, project: Path):
+        result = self._run(project, "./fixtures/config.py")
+
+        assert result.returncode == 1, result.stderr
+        assert self._reported_files(result) == {"fixtures/config.py"}
+
+    def test_a_relative_directory_honours_secretsignore(self, project: Path):
+        (project / ".secretsignore").write_text("^fixtures/\n", encoding="utf-8")
+
+        result = self._run(project, "fixtures")
+
+        assert result.returncode == 0, result.stderr
+        assert self._reported_files(result) == set()
+
+    @pytest.mark.parametrize("where", ["relative", "absolute"])
+    def test_a_path_outside_the_project_is_refused(self, project: Path, where: str):
+        outside = project.parent / "outside"
+        path = "../outside" if where == "relative" else str(outside)
+
+        result = self._run(project, path)
+
+        assert result.returncode == 2
+        assert "outside the project" in result.stderr
+        assert result.stdout == ""
+
+    def test_a_file_outside_the_project_is_refused(self, project: Path):
+        result = self._run(project, "../outside/config.py")
+
+        assert result.returncode == 2
+        assert "outside the project" in result.stderr
+
+    def test_a_symlink_is_judged_by_where_it_points(self, project: Path):
+        (project / "innocent.py").symlink_to(project.parent / "outside" / "config.py")
+
+        result = self._run(project, "innocent.py")
+
+        assert result.returncode == 2
+        assert "outside the project" in result.stderr
+
+    def test_a_missing_path_is_an_error(self, project: Path):
+        result = self._run(project, "nowhere")
+
+        assert result.returncode == 2
+        assert "Path not found" in result.stderr
+
+    def test_a_crash_exits_2_not_as_a_finding_nor_clean(self, project: Path):
+        # An invalid regex in .secretsignore raises during the scan.
+        (project / ".secretsignore").write_text("(\n", encoding="utf-8")
+
+        result = self._run(project, "fixtures")
+
+        assert result.returncode == 2
+        assert result.stdout == ""
+        assert "Traceback" in result.stderr
+
+
 def _shell_hooks_runnable() -> bool:
     import shutil
 
