@@ -45,9 +45,11 @@ core/client.py), context management and dynamic tool loading.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 from pathlib import Path
+from typing import Any
 
 from harness.domain.layout import Segment, Stability, assemble
 from harness.domain.policies import ClearingPolicy, Entry, plan_clearing
@@ -344,6 +346,12 @@ _KEEP_RECENT_MESSAGES = 8
 
 _ELIDED_PLACEHOLDER = "[tool result elided to save context — re-run the tool if needed]"
 
+# A past tool call's argument longer than this (a whole file handed to
+# write_file) is elided with the old results; the call, its name and its short
+# arguments (the path) stay, so the model knows what it did and can read it back.
+_LONG_ARGUMENT_CHARS = 1_000
+_ELIDED_ARGUMENT = "[argument elided to save context — {chars} chars, already used]"
+
 # Windsurf text-mode embeds tool results in user messages with this prefix.
 _TEXT_TOOL_RESULT_RE = re.compile(r"^<tool_result\b")
 
@@ -357,8 +365,85 @@ def history_char_budget() -> int:
 
 
 def _message_len(message: dict) -> int:
+    """What a message weighs in the request: its text and its tool calls' arguments.
+
+    The arguments are counted too: a history of writes is mostly the files they
+    carried, and a budget that saw only ``content`` never saw them.
+    """
     content = message.get("content")
-    return len(content) if isinstance(content, str) else 0
+    size = len(content) if isinstance(content, str) else 0
+    for call in _tool_calls(message):
+        size += _arguments_len(_call_arguments(call))
+    return size
+
+
+def _tool_calls(message: dict) -> list[dict]:
+    calls = message.get("tool_calls")
+    if not isinstance(calls, list):
+        return []
+    return [call for call in calls if isinstance(call, dict)]
+
+
+def _call_arguments(call: dict) -> Any:
+    function = call.get("function")
+    return function.get("arguments") if isinstance(function, dict) else None
+
+
+def _arguments_len(arguments: Any) -> int:
+    """Arguments as sent: a JSON string (OpenAI and alike) or an object (Ollama)."""
+    if isinstance(arguments, str):
+        return len(arguments)
+    if isinstance(arguments, (dict, list)):
+        return len(json.dumps(arguments, ensure_ascii=False))
+    return 0
+
+
+def _elided_arguments(arguments: Any) -> Any:
+    """The arguments with each long string value elided, in the shape they came.
+
+    Arguments that are not a JSON object are left as they are.
+    """
+    parsed = arguments
+    if isinstance(arguments, str):
+        try:
+            parsed = json.loads(arguments)
+        except ValueError:
+            return arguments
+    if not isinstance(parsed, dict):
+        return arguments
+    elided = {
+        key: (
+            _ELIDED_ARGUMENT.format(chars=len(value))
+            if isinstance(value, str) and len(value) > _LONG_ARGUMENT_CHARS
+            else value
+        )
+        for key, value in parsed.items()
+    }
+    if elided == parsed:
+        return arguments
+    if isinstance(arguments, str):
+        return json.dumps(elided, ensure_ascii=False)
+    return elided
+
+
+def _elided_call_message(message: dict) -> dict | None:
+    """A past tool call with its long arguments elided, or ``None`` if none are."""
+    calls = message.get("tool_calls")
+    if message.get("role") != "assistant" or not isinstance(calls, list):
+        return None
+    new_calls: list[Any] = []
+    changed = False
+    for call in calls:
+        arguments = _call_arguments(call) if isinstance(call, dict) else None
+        elided = _elided_arguments(arguments)
+        if elided is arguments:
+            new_calls.append(call)
+            continue
+        changed = True
+        new_calls.append(
+            {**call, "function": {**call["function"], "arguments": elided}}
+        )
+    return {**message, "tool_calls": new_calls} if changed else None
 
 
 def should_inline_file_context(
@@ -407,16 +492,20 @@ def compact_messages(
     char_budget: int | None = None,
     keep_recent: int = _KEEP_RECENT_MESSAGES,
 ) -> int:
-    """Elide stale tool results in an OpenAI-style message list (in place).
+    """Elide stale tool results and long past arguments, in place.
+
+    The message list is OpenAI-style, as every WorkPilot loop keeps it.
 
     Only triggers when the total content size exceeds `char_budget`, and then
     elides oldest-first, in one batch, down to 60 % of it
     (`ClearingPolicy.for_budget`): the next turns fit without another rewrite
     of the cached prefix. A batch that would free less than a tenth of the
-    budget is not worth that rewrite and is skipped. Never touches: the system
-    message(s), the first user message (the task prompt), assistant messages
-    (they carry the tool calls, so the model can run one again), or the
-    `keep_recent` most recent messages.
+    budget is not worth that rewrite and is skipped. The size counts the
+    arguments of tool calls; a past call keeps its name and short arguments,
+    and only its long ones go (a whole file handed to a write), so the model
+    still sees what it did, and where, and can read it back. Never touches: the system
+    message(s), the first user message (the task prompt), an assistant's text,
+    or the `keep_recent` most recent messages.
 
     Returns the number of messages elided (0 when nothing was).
     """
@@ -424,17 +513,29 @@ def compact_messages(
     first_user_idx = next(
         (i for i, m in enumerate(messages) if m.get("role") == "user"), None
     )
-    entries = [
-        Entry(_message_len(msg), idx != first_user_idx and _is_tool_result(msg))
-        for idx, msg in enumerate(messages)
-    ]
+    entries: list[Entry] = []
+    lighter: dict[int, dict] = {}
+    for idx, msg in enumerate(messages):
+        size = _message_len(msg)
+        if idx != first_user_idx and _is_tool_result(msg):
+            entries.append(Entry(size, clearable=True))
+            continue
+        elided = _elided_call_message(msg)
+        if elided is None:
+            entries.append(Entry(size, clearable=False))
+            continue
+        lighter[idx] = elided
+        entries.append(Entry(size, clearable=True, cleared_chars=_message_len(elided)))
     chosen = plan_clearing(
         entries,
         ClearingPolicy.for_budget(budget, keep_recent=keep_recent),
         marker_chars=len(_ELIDED_PLACEHOLDER),
     )
     for idx in chosen:
-        messages[idx]["content"] = _ELIDED_PLACEHOLDER
+        if idx in lighter:
+            messages[idx]["tool_calls"] = lighter[idx]["tool_calls"]
+        else:
+            messages[idx]["content"] = _ELIDED_PLACEHOLDER
     return len(chosen)
 
 

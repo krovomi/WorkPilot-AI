@@ -13,7 +13,9 @@ So a clearing happens only above ``trigger_chars``, goes down to
 ``min_gain_chars``: a rewrite that frees little costs more than it saves.
 It never touches what the caller protects (the system prompt, the task), the
 ``keep_recent`` latest messages (the work in progress, and any tool call still
-waiting for its result), nor anything but a tool result.
+waiting for its result), nor anything the caller does not mark clearable: a
+tool result, or a past tool call whose long arguments (a whole file handed to a
+write) can go while the call itself stays.
 
 Pure, table-tested in ``tests/harness/test_policies.py``.
 """
@@ -48,15 +50,18 @@ class Entry:
     """What the policy knows of one message: its size, and whether it may go."""
 
     chars: int
-    clearable: bool  # a tool result the caller does not protect
+    clearable: bool  # a tool result or a past call the caller does not protect
+    # What is left once cleared; ``None``: the marker that replaces a result.
+    cleared_chars: int | None = None
 
 
 def plan_clearing(
     entries: Sequence[Entry], policy: ClearingPolicy, *, marker_chars: int
 ) -> list[int]:
-    """The indexes of the tool results to clear now, oldest first, or none.
+    """The indexes of the entries to clear now, oldest first, or none.
 
-    ``marker_chars`` is the size of what replaces a cleared result.
+    ``marker_chars`` is the size of what replaces a cleared result, for an
+    entry that does not say what it keeps (``cleared_chars``).
     """
     total = sum(entry.chars for entry in entries)
     if total <= policy.trigger_chars:
@@ -67,10 +72,11 @@ def plan_clearing(
     for index, entry in enumerate(entries[:cutoff]):
         if total - gain <= policy.target_chars:
             break
-        if not entry.clearable or entry.chars <= marker_chars:
+        left = marker_chars if entry.cleared_chars is None else entry.cleared_chars
+        if not entry.clearable or entry.chars <= left:
             continue
         chosen.append(index)
-        gain += entry.chars - marker_chars
+        gain += entry.chars - left
     if gain < policy.min_gain_chars:
         return []
     return chosen
