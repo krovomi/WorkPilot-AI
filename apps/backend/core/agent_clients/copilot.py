@@ -252,6 +252,15 @@ class _CopilotAdapter(ChatCompletionsAdapter):
         # model is unavailable on the user's Copilot plan.
         self.model_fallback_attempted = False
 
+    def _measure(self, data: Any) -> Measured:
+        """The usage of one answered call, and the context fill it reports."""
+        # Some Copilot models do report `usage`; when they do, it is the
+        # context fill the guard measures.
+        usage = data.get("usage") if isinstance(data, dict) else None
+        if isinstance(usage, dict) and usage.get("prompt_tokens"):
+            self.client.last_context_tokens = int(usage["prompt_tokens"])
+        return Measured(from_chat_completion(usage))
+
     def assemble(self, turn: int) -> dict[str, Any]:
         client = self.client
         # Budget-aware "write now" nudge: when a planner/spec_writer session
@@ -372,6 +381,9 @@ class _CopilotAdapter(ChatCompletionsAdapter):
                                 yield Outcome.HALT
                                 return
                             data = await retry_resp.json()
+                            # The call the fallback answered is paid like any
+                            # other: it is measured too.
+                            measured = self._measure(data)
                     elif resp.status in _COPILOT_RETRYABLE_STATUSES:
                         # Transient failure (429 rate-limit or 5xx hiccup).
                         # Wait — honouring ``Retry-After`` when the server
@@ -472,12 +484,7 @@ class _CopilotAdapter(ChatCompletionsAdapter):
                         return
                     else:
                         data = await resp.json()
-                        # Some Copilot models do report `usage`; when they
-                        # do, it is the context fill the guard measures.
-                        _cu = data.get("usage") if isinstance(data, dict) else None
-                        if isinstance(_cu, dict) and _cu.get("prompt_tokens"):
-                            client.last_context_tokens = int(_cu["prompt_tokens"])
-                        measured = Measured(from_chat_completion(_cu))
+                        measured = self._measure(data)
                 break  # request succeeded — leave the retry loop
             except (
                 _asyncio.TimeoutError,
@@ -534,7 +541,7 @@ class _CopilotAdapter(ChatCompletionsAdapter):
             yield Outcome.HALT
             return
 
-        choices = data.get("choices", [])
+        choices = data.get("choices") or []
         if not choices:
             # A 200 response with no choices is almost always a transient
             # server-side hiccup, not a genuine "done" signal. Re-issue the
@@ -1166,8 +1173,9 @@ class CopilotAgentClient(AgentClient):
             self._record_call(
                 from_chat_completion(data.get("usage")), thread=f"subagent:{name}"
             )
-            choices = data.get("choices", [])
-            text = choices[0].get("message", {}).get("content", "") if choices else ""
+            choices = data.get("choices") or []
+            message = (choices[0].get("message") or {}) if choices else {}
+            text = message.get("content") or ""
             result, report = receive_result(
                 name, text or "", spec_dir=getattr(self, "_spec_dir", None)
             )

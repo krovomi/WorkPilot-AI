@@ -40,6 +40,12 @@ from .openai import ChatCompletionsAdapter
 logger = logging.getLogger(__name__.rpartition(".agent_clients.")[0] + ".agent_client")
 
 
+def _is_cascade_session_error(text: str) -> bool:
+    """Whether Windsurf answered with its Cascade session error, as text."""
+    lowered = text.lower()
+    return "failed_precondition" in lowered and "cascade session" in lowered
+
+
 # =============================================================================
 # Windsurf Agent Client — dual-mode (gRPC proxy + REST fallback)
 # =============================================================================
@@ -505,30 +511,18 @@ class WindsurfAgentClient(AgentClient):
                 logger.error(f"[WindsurfAgent] gRPC streaming error: {e}")
                 break
 
-            # Windsurf sometimes streams the error as text (HTTP 200) with no real content.
-            # Detect this: if the full response is only the error message, retry.
+            # Windsurf sometimes streams the error as text (HTTP 200): an error,
+            # not the model's answer. Retry once; the next attempt refreshes the
+            # credentials, and if it cannot, the error is reported as one.
             full_text = "".join(text_parts)
-            if (
-                "failed_precondition" in full_text.lower()
-                and "cascade session" in full_text.lower()
-                and attempt == 0
-            ):
-                logger.warning(
-                    "[WindsurfAgent] Cascade session error in response text, retrying with fresh credentials"
-                )
-                _grpc_mod._panel_initialized = False
-                invalidate_process_cache()
-                import asyncio as _asyncio
-
-                await _asyncio.sleep(1.5)
-                try:
-                    self._credentials = discover_credentials()
-                except Exception as refresh_err:
-                    logger.error(
-                        f"[WindsurfAgent] Credential refresh failed: {refresh_err}"
+            if last_error is None and _is_cascade_session_error(full_text):
+                last_error = RuntimeError(full_text.strip()[:500])
+                if attempt == 0:
+                    logger.warning(
+                        "[WindsurfAgent] Cascade session error in response text, retrying with fresh credentials"
                     )
-                    break
-                continue
+                    _grpc_mod._panel_initialized = False
+                    continue
 
             break  # success or non-retryable error
 
@@ -927,29 +921,20 @@ class _WindsurfTextAdapter(LoopAdapter):
                 )
                 break
 
-            # Windsurf sometimes returns the Cascade session error as HTTP 200 text.
-            # Detect this and retry with fresh credentials (same as _grpc_response).
-            if turn_error is None and attempt == 0:
-                partial_text = "".join(text_parts).lower()
-                if (
-                    "failed_precondition" in partial_text
-                    and "cascade session" in partial_text
-                ):
+            # Windsurf sometimes returns the Cascade session error as HTTP 200
+            # text: an error, not the model's answer (same as _grpc_response).
+            # Retry once; the next attempt refreshes the credentials, and if it
+            # cannot, the error is reported as one.
+            full_text = "".join(text_parts)
+            if turn_error is None and _is_cascade_session_error(full_text):
+                turn_error = RuntimeError(full_text.strip()[:500])
+                if attempt == 0:
                     logger.warning(
                         f"[WindsurfAgent] Cascade session error in response text on turn {turn + 1}, "
                         "retrying with fresh credentials"
                     )
                     _grpc_mod._panel_initialized = False
-                    invalidate_process_cache()
-                    await _asyncio.sleep(1.5)
-                    try:
-                        client._credentials = discover_credentials()
-                    except Exception as refresh_err:
-                        logger.error(
-                            f"[WindsurfAgent] Credential refresh failed: {refresh_err}"
-                        )
-                        break
-                    continue  # retry with fresh credentials
+                    continue
 
             break  # success or non-retryable error
 
@@ -1130,7 +1115,7 @@ class _WindsurfRestAdapter(ChatCompletionsAdapter):
         )
 
         # Parse usage from response (for logging and cost tracking)
-        usage = data.get("usage", {})
+        usage = data.get("usage") or {}
         if usage:
             logger.info(
                 f"[WindsurfAgent] Token usage: "
@@ -1144,7 +1129,7 @@ class _WindsurfRestAdapter(ChatCompletionsAdapter):
                 client.last_context_tokens = int(usage["prompt_tokens"])
             yield Measured(from_chat_completion(usage))
 
-        choices = data.get("choices", [])
+        choices = data.get("choices") or []
         if not choices:
             logger.warning(f"[WindsurfAgent] Empty choices in response: {data}")
             yield self.text("(Empty response from Windsurf REST API)")

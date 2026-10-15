@@ -296,9 +296,11 @@ async def test_a_403_falls_back_to_github_models_for_the_rest_of_the_response():
         "Bearer ghp_test",
     ]
     assert client._using_github_models is True
-    # Pins a gap reported with lot 1b-ii: the call answered by the fallback
-    # request is not measured; the later ones are.
-    assert client.usage_ledger.calls == [CallUsage(90, None, None, 9)]
+    # Every answered call is measured, the one the fallback answered too.
+    assert client.usage_ledger.calls == [
+        CallUsage(70, None, None, 7),
+        CallUsage(90, None, None, 9),
+    ]
 
 
 @pytest.mark.asyncio
@@ -426,8 +428,8 @@ async def test_the_ledger_restarts_before_the_first_message():
 
 
 @pytest.mark.asyncio
-async def test_a_null_tool_calls_field_raises():
-    """Pins a bug reported with lot 1b-ii (see ``test_openai_loop``)."""
+async def test_a_null_tool_calls_field_ends_the_turn():
+    """``"tool_calls": null`` ends the turn with its text (see ``test_openai_loop``)."""
     client, _session = _client(
         [
             _Response(
@@ -436,5 +438,6 @@ async def test_a_null_tool_calls_field_raises():
         ]
     )
 
-    with pytest.raises(TypeError):
-        await _collect(client)
+    messages = await _collect(client)
+
+    assert _shape(messages) == [("assistant", "text", "hi")]
