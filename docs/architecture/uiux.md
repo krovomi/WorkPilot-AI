@@ -110,7 +110,7 @@ recorded reason.
 | coder | `uiux_section(spec_dir, subtask)` — only on subtasks whose declared files are UI; a full-stack task pays for it on its front end only |
 | skill phases | `mobile-design` designs against it rather than beside it; `review` holds the diff to it |
 | QA reviewer | the design system plus upstream's canonical pre-delivery checklist |
-| any agent of a UI task | `uiux_search`, `uiux_stack_guidelines`, `uiux_design_system`, `uiux_project_design_system` — over MCP for Claude (`get_required_mcp_servers` adds `uiux`, `AGENT_MCP_<agent>_REMOVE=uiux` removes it), in-process in `tool_executor` for Copilot, OpenAI/Codex, Gemini, Ollama… |
+| any agent of a UI task that declares tools | `uiux_search`, `uiux_stack_guidelines`, `uiux_design_system`, `uiux_project_design_system` — over MCP for Claude (`get_required_mcp_servers` adds `uiux`, `AGENT_MCP_<agent>_REMOVE=uiux` removes it), in-process in `tool_executor` for Copilot, OpenAI/Codex, Gemini, Ollama… |
 
 The tools are why there is a server at all: on a React or .NET project the Bash
 allowlist has no `python`, and widening it for one skill would widen it for

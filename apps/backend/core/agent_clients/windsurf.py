@@ -366,8 +366,13 @@ class WindsurfAgentClient(AgentClient):
                     spec_dir=getattr(self, "_spec_dir", None),
                     agent_type=self._agent_type,
                 )
-                self._tool_definitions = get_tool_definitions(
-                    self._agent_type, getattr(self, "_spec_dir", None)
+                # Fixed for the session, sorted and serialized one way
+                # (harness.domain.tools): the same bytes on every turn, as
+                # function definitions (REST) or as text in the system (gRPC).
+                self._freeze_tools(
+                    get_tool_definitions(
+                        self._agent_type, getattr(self, "_spec_dir", None)
+                    )
                 )
                 mode_label = (
                     "gRPC text-based"

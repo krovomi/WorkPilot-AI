@@ -20,7 +20,7 @@ A declaration is now a right, on both halves of the product, from one answer —
 |---|---|
 | `undeclared_builtin_tools(agent_type)` | the guarded built-ins (`Write`; `Edit`, `MultiEdit`, `NotebookEdit` riding on `Edit`; `Bash`; `WebFetch`, `WebSearch`) the type does not declare. Reading is not guarded |
 | `create_client`, `create_simple_client` | pass that list as `disallowed_tools`: the tool leaves the model's context, and the denial wins over the settings file's allow rules. `READ_ONLY_AGENT_TYPES` keep `permission_mode="plan"` on top |
-| `get_tool_definitions(agent_type)` | offers `write_file`, `Write`, `create_directory` only to a type declaring `Write` or `Edit`, `run_command` only to one declaring `Bash` |
+| `get_tool_definitions(agent_type)` | offers `write_file`, `Write`, `create_directory` only to a type declaring `Write` or `Edit`, `run_command` only to one declaring `Bash`, and the brain's and ui-ux's tools only to one declaring a tool at all — the audience `get_required_mcp_servers` gives their servers on the SDK |
 | `ToolExecutor(agent_type=…).execute` | refuses the same tools by name, answering the model with an error rather than raising — the one point that also covers a native `tool_call` nobody offered. Every client passes its `agent_type` |
 | `codex_sandbox_for(agent_type)` | `--sandbox read-only` for a type declaring none of `Write`, `Edit`, `Bash`; `workspace-write` otherwise. `codex exec resume` has no `--sandbox`, so a resumed thread gets `-c sandbox_mode="…"` |
 
