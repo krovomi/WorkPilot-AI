@@ -698,6 +698,10 @@ class WindsurfAgentClient(AgentClient):
             f"consumes Windsurf credits)",
             flush=True,
         )
+        # Text mode keeps 8k chars of a tool result: the paging tools fit
+        # their pages under that, instead of being cut in the middle.
+        if self._tool_executor is not None:
+            self._tool_executor.result_max_chars = 8000
 
         for turn in range(self.max_turns):
             logger.info(

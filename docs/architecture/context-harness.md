@@ -1,7 +1,7 @@
 # Harness de contexte : le plan
 
-> **Statut : plan ; livrés : le lot 0 (mesurer, sauf sa ligne de base) et le lot 1a (un budget par
-> session pour tous).** Ce fichier fixe la cible
+> **Statut : plan ; livrés : le lot 0 (mesurer, sauf sa ligne de base), le lot 1a (un budget
+> par session pour tous) et le lot 3a (lire et chercher par pages).** Ce fichier fixe la cible
 > et l'ordre des lots ; chaque lot livré remplace sa section par la justification de ce qui existe. [`docs/CLAUDE.md`](../CLAUDE.md)
 > reste normatif : là où les deux divergent, il gagne. Le mécanisme existant de compaction et de
 > reset est décrit dans [`context-management.md`](context-management.md), que ce plan prolonge sans
@@ -80,7 +80,7 @@ sens partout, une boucle unique, et la troncature à la source.
 | Mesure | lot 0 livré : chaque client lit l'usage de chaque appel dans l'unité commune de `harness/domain/` et le cumule dans son `usage_ledger` ; `record_client_usage` en tire les champs du suivi des coûts, `CONTEXT_USAGE` le taux de hit et les réécritures de préfixe | la ligne de base sur des tâches réelles ; le coût par appel (seul le coût de session est connu) |
 | Compaction | `context_mgmt/` : garde par tâche, seuil 50 % par défaut (30–90), *compact* ou *clear*, handoff préparé en fond par le provider de la tâche, cap de 3 resets ; native sur Claude et Codex, émulée ailleurs | un seuil calculé sur la fenêtre annoncée, pas sur la fenêtre *payable* (palier de prix à 200 k chez certains providers) |
 | Tool clearing | boucles WorkPilot : `compact_messages` remplace les vieux résultats par un marqueur au-delà de 300 k caractères. Claude Code purge de son côté | pas de règle d'âge (« plus vieux que N tours »), pas de gain minimal |
-| Troncature | rtk sur Bash ; boucles WorkPilot : résultat coupé à 10 k caractères (70 % tête / 30 % queue), recherche à 200 correspondances. Claude Code plafonne nativement (table ci-dessus) | `read_file` lit le fichier entier puis en coupe le milieu, sans `offset`/`limit` ; aucune pagination par curseur ; aucun plafond natif réglé par WorkPilot |
+| Troncature | rtk sur Bash ; boucles WorkPilot : résultat coupé à 10 k caractères (70 % tête / 30 % queue). Lot 3a : `read_file`, `search_files` et `find_files` paginent sous ce plafond. Claude Code plafonne nativement (table ci-dessus) | `run_command` coupe encore le milieu d'une longue sortie ; les serveurs MCP de WorkPilot ne paginent pas ; aucun plafond natif réglé par WorkPilot |
 | Mémoire externe | cerveau (vault, `graph.json`, serveur MCP 9 outils), `implementation_plan.json`, `build-progress.txt`, `handoff_pending.md`, rapports de phase plafonnés | pas de déversement des sorties longues vers un fichier relisible dans les boucles WorkPilot |
 | Sous-agents | registre `agents/subagents/`, roster ≤ 7 ; Claude et Copilot | « rends une synthèse structurée » n'est qu'une consigne : rien ne la vérifie ; Copilot les lance tous à la fois |
 | Outils dynamiques | `AGENT_CONFIGS` par type d'agent ; MCP ajoutés selon la tâche ; schémas MCP différés sur Claude (`ENABLE_TOOL_SEARCH=auto:5`) | rien par phase dans une même tâche, ni pour les autres providers |
@@ -267,8 +267,9 @@ providers sauf Claude, d'abord ; le remplacement des cinq boucles ensuite.
 Tests : `tests/harness/test_cost.py`, `tests/harness/test_session_budget.py` (la session s'arrête
 à l'appel qui dépasse, va au bout sous le plafond, et un modèle sans prix tourne sans plafond).
 
-**Lot 1b — Une seule boucle (reste à faire).** `harness/application/loop.py` remplace les cinq
-copies.
+**Lot 1b — Une seule boucle (reste à faire, après les lots 2 et 3).** `harness/application/loop.py`
+remplace les cinq copies. C'est un remaniement : il n'économise aucun token, alors que les lots 2
+et 3 en économisent. Il passe donc après eux.
 
 - La boucle porte les arrêts restants : fin naturelle, `max_turns`, absence de progrès (que
   Copilot détecte seul aujourd'hui) ; le budget est déjà commun (1a).
@@ -299,21 +300,40 @@ octet pour octet ; l'assembleur refuse un segment volatil placé avant un stable
 
 La voie WorkPilot vaut pour tous ; la voie native est un réglage en plus, jamais une condition.
 
-- `read_file(path, offset, limit)` et `search(pattern, max_results, cursor)` dans `ToolExecutor` ;
-  la réponse dit combien il y a en tout et comment lire la suite.
-- **Déversement** : une sortie au-delà du plafond est écrite dans le dossier de la spec
-  (`path_guard` s'applique), le modèle reçoit un extrait, le total et le chemin à relire par
-  `offset` — ce que Claude Code fait déjà pour Bash, étendu à toutes les boucles WorkPilot.
-- Plafonds par outil plutôt qu'un plafond global de 10 k caractères ; rtk garde son rôle sur Bash.
-- Les serveurs MCP de WorkPilot (cerveau, `workpilot`) paginent : 200 lignes au plus, un curseur
-  pour la suite. C'est la voie qui atteint aussi les boucles tierces.
+**Lot 3a — Lire et chercher par pages (livré).** Les boucles WorkPilot (OpenAI et les compatibles,
+Ollama/LM Studio, Copilot, Windsurf) lisent et cherchent par `ToolExecutor`, et coupaient ensuite un
+long résultat en une tête et une queue : le milieu d'un long fichier était illisible, et le modèle ne
+pouvait pas le demander.
+
+- `harness/domain/paging.py` (pur) : `page_lines` rend une suite de lignes sous un plafond de
+  caractères, `render_page` la fait suivre de sa plage et de l'`offset` qui lit la suite, `page_items`
+  pagine une liste produite à la demande (une recherche s'arrête de parcourir les fichiers dès que la
+  page est pleine).
+- `read_file(path, offset, limit)` : un fichier qui tient sous le plafond revient entier, exactement
+  comme avant ; un plus long revient page par page, chaque ligne atteignable.
+  `search_files(…, offset)` et `find_files(…, offset)` paginent leurs résultats de la même façon. Les
+  schémas offerts au modèle décrivent ces paramètres ; `offset` et `limit` reçus en chaîne sont lus.
+- Le plafond est celui du client (`ToolExecutor.result_max_chars`) : le partagé
+  (`LLM_TOOL_RESULT_MAX_CHARS`, 10 000 caractères), celui de la fenêtre d'Ollama
+  (`_local_tool_result_cap`), 8 000 en mode texte Windsurf. Une page tient dessous, la coupe d'après
+  ne la touche plus.
+
+Tests : `tests/harness/test_paging.py`, `tests/core/runtimes/test_tool_executor_paging.py` (un fichier
+de 3 000 lignes lu en entier page par page, recherche paginée sans doublon, chemin hors racine refusé).
+
+**Reste à faire (lot 3b).**
+
+- **Déversement** de `run_command` : une sortie au-delà du plafond est écrite dans le dossier de la
+  spec (`path_guard` s'applique), le modèle reçoit un extrait, le total et le chemin à relire par
+  `read_file` et `offset` — ce que Claude Code fait déjà pour Bash.
+- Les serveurs MCP de WorkPilot (cerveau, `workpilot`) paginent : c'est la voie qui atteint aussi
+  les boucles tierces.
 - Voie native, par capacité déclarée : Claude Code expose ses plafonds (table plus haut), posés
   dans `sdk_env` comme l'auto-compaction aujourd'hui. Pour Codex, OpenCode et Antigravity, on
   documente leurs réglages avant d'en dépendre.
 
 *Sortie :* la part des sorties d'outils dans le contexte baisse sur la ligne de base, sans hausse
-des passes QA. *Tests :* un fichier de 50 000 lignes rend un extrait, le total et un curseur
-valide ; un chemin hors racine reste refusé.
+des passes QA.
 
 ### Lot 4 — Clearing et compaction
 

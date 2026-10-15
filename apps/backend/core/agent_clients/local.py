@@ -1210,6 +1210,9 @@ class LocalAgentClient(OpenAIAgentClient):
         num_ctx = self._resolve_num_ctx(prompt_tokens_est)
         # The window this session actually runs in, for context_mgmt's gauge.
         self.context_window_tokens = num_ctx
+        # The paging tools fit their pages under the cap this window allows.
+        if self._tool_executor is not None:
+            self._tool_executor.result_max_chars = self._local_tool_result_cap()
         session = self._get_http_client()
         _total_in = 0
         _total_out = 0
