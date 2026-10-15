@@ -103,8 +103,8 @@ phase, whose lenses already are the specialists).
 ### How `resolve()` composes a roster
 
 1. **Provider check** — only providers declared `subagents: native` in
-   `capabilities/providers.yaml` (today Claude and Copilot) get a roster; the others
-   get `None`. The workflow engine's `sequential-reset` dispatch also disables it.
+   `capabilities/providers.yaml` get a roster; the others get `None`. The workflow
+   engine's `sequential-reset` dispatch also disables it.
 2. **Phase defaults** — `ROSTERS[phase]`.
 3. **Language overlays** — the stack detected on disk specialises `test-runner`
    with concrete commands (`dotnet test --nologo`, `pytest -x`, …). Overlays only
@@ -118,6 +118,19 @@ phase, whose lenses already are the specialists).
 
 For non-Anthropic providers, tier aliases such as `sonnet` are rewritten to
 `inherit`, so the specialist runs on the model the user chose.
+
+### Which providers actually use it
+
+- **Claude**: `create_client` composes the roster, binds the result contract and
+  allow-lists the SDK's `Agent` tool. The parent model decides when to delegate, from
+  each specialist's `description`; no prompt names the roster.
+- **Copilot**: declared `native`, but the Copilot branch of `create_agent_client`
+  converts only the `agents` dict the caller passes and never calls `resolve()`
+  (`roster` is accepted and unused). `CopilotAgentClient` stores them, and its turn
+  loop exposes no delegation tool; `run_subagents()` has no production caller. A
+  Kanban build on Copilot therefore runs without subagents, while the workflow
+  profile still reports `subagent-per-task` for `coding`.
+- **Every other provider**: no roster (`subagents: none`).
 
 ### At run time
 

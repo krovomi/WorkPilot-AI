@@ -276,8 +276,13 @@ Les sous-agents ne sont pas déclarés par chaque agent : ils vivent dans **un s
    détectée injecte ses commandes (`dotnet test --nologo`…) dans le prompt du `test-runner`.
 3. **Overlay mobile** — ajoute `device-runner` et `store-readiness-auditor` sur une app mobile.
 4. **Agents fournis par l'appelant** — gagnent toujours (relecteurs de PR de `pr_review.py`).
-5. **Plafond** de 7 sous-agents ; seuls les providers `subagents: native` de
-   `capabilities/providers.yaml` (Claude, Copilot) en reçoivent.
+5. **Plafond** de 7 sous-agents.
+
+En pratique, **seul Claude** reçoit ce roster : `create_client` le compose et ouvre l'outil
+`Agent` du SDK, et le modèle décide seul quand déléguer, d'après la `description` de chaque
+spécialiste. Copilot est déclaré `subagents: native`, mais `create_agent_client` ne lui transmet
+que les agents passés explicitement par l'appelant, et sa boucle n'expose aucun outil de
+délégation : une carte Kanban sur Copilot tourne sans sous-agent. Les autres providers n'en ont pas.
 
 Ce que rend un sous-agent est borné et traité comme une donnée non fiable
 (`harness/application/subagents.py`). Le même registre, plus les personas des packs
