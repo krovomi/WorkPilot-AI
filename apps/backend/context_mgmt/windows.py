@@ -71,3 +71,24 @@ def resolve_context_window(model: str | None, client_window: int | None = None) 
     except Exception:  # noqa: BLE001 - the table answers
         pass
     return window_from_table(model)
+
+
+def effective_window(model: str | None, window: int) -> int:
+    """The window a session plans for: ``window``, or less where the model
+    bills a longer prompt at a higher rate.
+
+    Grok, Gemini Pro, several GPT models and Claude Haiku 5.5 charge every
+    token of a request past a size two to five times over
+    (`cost_intelligence.catalog.LONG_CONTEXT_THRESHOLDS`). A threshold set as a
+    share of the announced window would let a session cross that line before
+    it ever compacts; set as a share of this one, it does not.
+    """
+    try:
+        from cost_intelligence.catalog import long_context_threshold
+
+        threshold = long_context_threshold(model)
+    except Exception:  # noqa: BLE001 - the announced window answers
+        threshold = None
+    if threshold and 0 < threshold < window:
+        return threshold
+    return window

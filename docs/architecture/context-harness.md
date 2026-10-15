@@ -1,8 +1,9 @@
 # Harness de contexte : le plan
 
 > **Statut : plan ; livrés : le lot 0 (mesurer, sauf sa ligne de base), le lot 1a (un budget
-> par session pour tous), le lot 2 (un préfixe stable, sauf D3) et le lot 3 (troncature à la
-> source, sauf les plafonds natifs, réglés sur la ligne de base).** Ce fichier fixe la cible
+> par session pour tous), le lot 2 (un préfixe stable, sauf D3), le lot 3 (troncature à la
+> source, sauf les plafonds natifs, réglés sur la ligne de base) et le lot 4 (purge par lots et
+> fenêtre payable, sauf D2).** Ce fichier fixe la cible
 > et l'ordre des lots ; chaque lot livré remplace sa section par la justification de ce qui existe. [`docs/CLAUDE.md`](../CLAUDE.md)
 > reste normatif : là où les deux divergent, il gagne. Le mécanisme existant de compaction et de
 > reset est décrit dans [`context-management.md`](context-management.md), que ce plan prolonge sans
@@ -79,8 +80,8 @@ sens partout, une boucle unique, et la troncature à la source.
 | Propriété de la boucle | boucles tierces : Claude Agent SDK (`max_turns` 1000), Codex, OpenCode, Antigravity. Boucles WorkPilot : **cinq copies** de `for turn in range(self.max_turns)` dans `core/agent_clients/` (OpenAI et ses dérivés, Ollama/LM Studio, Copilot, Windsurf ×2). Lot 1a : un même plafond de coût par session pour tous | une boucle partagée (lot 1b) |
 | Assemblage | un seul builder, `build_base_system_prompt` (`core/llm_optimization.py`), sans horodatage ; outils dans un ordre fixe ; `prompt_cache_key` côté OpenAI. Lot 2 : segments ordonnés par stabilité (`harness/domain/layout.py`), chemin du worktree en dernier, bloc de tâche en tête de chaque sous-tâche | des points de coupure de cache à la frontière tâche / sous-tâche chez Anthropic, que la CLI ne laisse pas poser |
 | Mesure | lot 0 livré : chaque client lit l'usage de chaque appel dans l'unité commune de `harness/domain/` et le cumule dans son `usage_ledger` ; `record_client_usage` en tire les champs du suivi des coûts, `CONTEXT_USAGE` le taux de hit et les réécritures de préfixe | la ligne de base sur des tâches réelles ; le coût par appel (seul le coût de session est connu) |
-| Compaction | `context_mgmt/` : garde par tâche, seuil 50 % par défaut (30–90), *compact* ou *clear*, handoff préparé en fond par le provider de la tâche, cap de 3 resets ; native sur Claude et Codex, émulée ailleurs | un seuil calculé sur la fenêtre annoncée, pas sur la fenêtre *payable* (palier de prix à 200 k chez certains providers) |
-| Tool clearing | boucles WorkPilot : `compact_messages` remplace les vieux résultats par un marqueur au-delà de 300 k caractères. Claude Code purge de son côté | pas de règle d'âge (« plus vieux que N tours »), pas de gain minimal |
+| Compaction | `context_mgmt/` : garde par tâche, seuil 50 % par défaut (30–90), *compact* ou *clear*, handoff préparé en fond par le provider de la tâche, cap de 3 resets ; native sur Claude et Codex, émulée ailleurs. Lot 4 : le seuil est une part de la fenêtre *payable* | D2 : le seuil par défaut, tranché sur la ligne de base |
+| Tool clearing | boucles WorkPilot : `compact_messages` remplace les vieux résultats par un marqueur au-delà de 300 k caractères ; lot 4 : par lots, jusqu'à 60 % du budget, et seulement pour un gain d'au moins 10 %. Claude Code purge de son côté | — |
 | Troncature | rtk sur Bash ; boucles WorkPilot : résultat coupé à 10 k caractères (70 % tête / 30 % queue). Lot 3 : `read_file`, `search_files` et `find_files` paginent sous ce plafond ; une longue sortie de `run_command` ou d'un outil exécuté dans le processus va dans un fichier ; le cerveau pagine ses notes et ses skills. Claude Code plafonne nativement (table ci-dessus) | aucun plafond natif réglé par WorkPilot : la ligne de base dira s'il faut baisser ceux de Claude Code |
 | Mémoire externe | cerveau (vault, `graph.json`, serveur MCP 9 outils), `implementation_plan.json`, `build-progress.txt`, `handoff_pending.md`, rapports de phase plafonnés. Lot 3b : les sorties longues des boucles WorkPilot vont dans `<spec>/tool-output/`, relues par `read_file` | un `MemoryPort` unique (lot 5) |
 | Sous-agents | registre `agents/subagents/`, roster ≤ 7 ; Claude et Copilot | « rends une synthèse structurée » n'est qu'une consigne : rien ne la vérifie ; Copilot les lance tous à la fois |
@@ -389,26 +390,58 @@ client).
 *Sortie :* la part des sorties d'outils dans le contexte baisse sur la ligne de base, sans hausse
 des passes QA.
 
-### Lot 4 — Clearing et compaction
+### Lot 4 — Clearing et compaction (livré, sauf D2)
 
-- **Clearing par lots**, voie WorkPilot (`harness/domain/policies.py`) : un résultat d'outil plus
-  vieux que N tours devient un marqueur qui garde l'appel et dit comment relancer. On ne purge
-  qu'au-delà d'un gain minimal : chaque purge réécrit le cache à partir du point purgé, purger un
-  peu à chaque tour coûte plus qu'il ne rapporte. Remplace le seuil fixe de 300 k caractères de
-  `compact_messages`.
-- Sur une boucle tierce, la purge et la compaction sont les siennes : le harness règle le seuil
-  (`CLAUDE_AUTOCOMPACT_PCT_OVERRIDE`, `model_auto_compact_token_limit`, déjà posés par
-  `context_mgmt`) et mesure. Claude Code purge déjà les vieux résultats ; rien à ajouter là.
-- **Fenêtre effective** dans `context_mgmt/windows.py` : `min(fenêtre, palier de prix)` ; D2
-  appliqué.
+**Purger par lots.** Les boucles WorkPilot remplaçaient les vieux résultats d'outils par un
+marqueur dès que la conversation dépassait 300 000 caractères, et s'arrêtaient dès qu'elle
+repassait dessous : au tour suivant elle redépassait, et un résultat de plus partait. Chaque
+purge réécrit la conversation à partir du premier message touché, et un provider qui cache un
+préfixe refacture tout ce qui suit : c'était une réécriture par tour.
+
+- `harness/domain/policies.py` (pur) : `plan_clearing` choisit les résultats à purger, du plus vieux
+  au plus récent, au-delà de `trigger_chars` et jusqu'à `target_chars` ; il ne fait rien si le lot
+  libère moins que `min_gain_chars`, une réécriture qui libère peu coûtant plus qu'elle ne
+  rapporte. Il ne touche ni ce que l'appelant protège, ni les `keep_recent` derniers messages (le
+  travail en cours, donc aussi un appel d'outil qui attend son résultat), ni rien d'autre qu'un
+  résultat d'outil. `ClearingPolicy.for_budget` : déclenchement au budget
+  (`LLM_HISTORY_CHAR_BUDGET`, 300 000 caractères), descente à 60 %, gain minimal de 10 %.
+- `compact_messages` (`core/llm_optimization.py`), qu'appellent les cinq boucles WorkPilot, passe par
+  elle sans changer de signature. Le marqueur garde l'appel : le message de l'assistant, avec le
+  nom et les arguments de l'outil, reste en place, et le modèle peut relancer l'outil.
+- Le point sûr tient : la purge a lieu entre deux appels au modèle, et les derniers messages, où
+  sont les appels en cours, n'y entrent pas.
+
+**Planifier pour la fenêtre payable.** Plusieurs modèles facturent tout le prompt plus cher au-delà
+d'une taille : Claude Haiku 5.5 au-delà de 100 000 tokens (5×), Gemini 3.1 Pro et 2.5 Pro au-delà
+de 200 000, Grok à partir de 200 000 (2×), plusieurs GPT au-delà de 272 000. Un seuil de compaction
+pris sur la fenêtre annoncée (un million pour Gemini 3.1 Pro) laissait la session franchir cette
+ligne bien avant de compacter.
+
+- Les paliers sont des données du catalogue de prix, la seule source des prix :
+  `LONG_CONTEXT_THRESHOLDS` (`cost_intelligence/catalog.py`), relevés sur les mêmes pages que les
+  tarifs, et résolus comme eux (identifiant exact, ou suffixe de version ; un `vendeur/modèle`
+  OpenCode est lu sous son modèle).
+- `effective_window` (`context_mgmt/windows.py`) : `min(fenêtre, palier)`. `ContextGuard` mesure
+  contre elle, donc la jauge affiche le pourcentage de la fenêtre payable, et la compaction et
+  le *clear* se déclenchent à la part voulue de cette fenêtre-là.
+- Sur une boucle tierce, la purge et la compaction restent les siennes ; le harness règle son
+  seuil sur la même fenêtre : `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` est mis à l'échelle (la CLI le lit
+  contre la fenêtre entière) et `model_auto_compact_token_limit` de Codex est pris sur la fenêtre
+  payable. Claude Code purge déjà les vieux résultats ; rien à ajouter là.
 - La compaction émulée (« résumé + 8 dernières entrées ») reste sur les providers qui ne lient
   pas le raisonnement au préfixe ; les autres n'utilisent que la compaction serveur ou le *clear*.
-- Jamais de compaction au milieu d'un tour d'outils : la règle du point sûr de `ContextGuard`
-  s'applique aussi au clearing.
+
+**Reste à faire.** D2 : le seuil par défaut (50 % aujourd'hui), à trancher sur la ligne de base
+du lot 0 avec les passes QA et le coût par sous-tâche à 50, 70 et 80 %.
+
+Tests : `tests/harness/test_policies.py` (par table : sous le seuil rien, au-dessus les plus vieux
+jusqu'à la cible, seulement des résultats d'outils, jamais les derniers messages, gain minimal),
+`tests/core/test_llm_optimization.py` (une purge descend à 60 % en un lot, les tours suivants ne
+purgent plus, un lot qui libère peu n'a pas lieu), `tests/test_effective_window.py` (fenêtre par
+modèle, seuils natifs de Claude et de Codex, jauge mesurée sur la fenêtre payable).
 
 *Sortie :* resets de contexte par sous-tâche et coût par sous-tâche en baisse sur la ligne de
-base, passes QA stables. *Tests :* la politique de clearing par table (âge, gain minimal, jamais
-les N derniers messages, jamais un appel d'outil en attente).
+base, passes QA stables.
 
 ### Lot 5 — Sous-agents et mémoire externe
 

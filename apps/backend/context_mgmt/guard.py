@@ -42,7 +42,7 @@ from .handoff import (
 )
 from .marker import consume_context_action, read_context_action, request_targets
 from .policy import load_context_policy
-from .windows import resolve_context_window
+from .windows import effective_window, resolve_context_window
 
 logger = logging.getLogger(__name__)
 
@@ -97,8 +97,13 @@ class ContextGuard:
         self.model = model
         self.emitter = emitter
         self.caps = context_capabilities(provider)
-        self.window = resolve_context_window(
-            model, getattr(client, "context_window_tokens", None)
+        # The payable window: the threshold below is a share of it, so a
+        # session compacts before its prompt reaches a long-context rate.
+        self.window = effective_window(
+            model,
+            resolve_context_window(
+                model, getattr(client, "context_window_tokens", None)
+            ),
         )
         self.base_chars = 0
         self.stream_chars = 0
@@ -167,7 +172,7 @@ class ContextGuard:
         reported = getattr(self.client, "last_context_tokens", None)
         window = getattr(self.client, "context_window_tokens", None)
         if isinstance(window, int) and window > 0:
-            self.window = window
+            self.window = effective_window(self.model, window)
         if isinstance(reported, int) and reported > 0:
             self.used_tokens = reported
             self.source = getattr(self.client, "context_usage_source", None) or (
