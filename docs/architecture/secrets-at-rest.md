@@ -27,6 +27,37 @@ Chromium, which protects nothing. Writing in clear there is what lets the next
 launch with a keyring encrypt for real — the startup migration only rewrites
 values still in clear.
 
+## Linux without a declared desktop (WSL)
+
+Chromium chooses its Linux password store from the desktop the session
+declares: `XDG_CURRENT_DESKTOP`, `DESKTOP_SESSION`, `GNOME_DESKTOP_SESSION_ID`,
+`KDE_FULL_SESSION`. With none of them set it picks `basic_text`, whatever runs
+on the session bus. That is the default under WSL, a bare X server or an SSH
+session: a user who starts GNOME Keyring in their shell profile still got the
+banner asking them to install one.
+
+`apps/frontend/src/main/linux-password-store.ts` handles that one case before
+`ready`, when Chromium reads the switch. With no desktop declared, a session
+bus address set and `org.freedesktop.secrets` owned on that bus (`dbus-send`
+calling `NameHasOwner`), it adds `--password-store=gnome-libsecret`.
+
+- An explicit `--password-store`, `basic` included, always wins.
+- A declared desktop keeps Chromium's choice, even one it does not recognise
+  (`i3`, `sway`): forcing libsecret where KWallet holds the key would make
+  every `enc:` value unreadable. Such a session passes the flag itself.
+- A Secret Service D-Bus could only activate does not count: starting it
+  opens a "create a keyring" prompt the user never asked for.
+- The probe gets the bus address and `XDG_RUNTIME_DIR`, not the app's
+  environment, which holds the `.env-files` secrets by then (rule S4).
+
+If libsecret then fails (keyring locked, prompt refused),
+`safeStorage.isEncryptionAvailable()` is false: Chromium only reports a key
+the store returned, while `getSelectedStorageBackend()` names the store asked
+for. `secret-storage.ts` keeps writing in clear and the banner stays, as
+before. The values encrypted in a session with the keyring need it in the
+next: launched without it, they cannot be decrypted and are kept as they are
+(see *Reading never destroys*).
+
 ## One reader, one writer per file
 
 Encryption happens at the file boundary, so every caller keeps seeing
