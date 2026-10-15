@@ -169,6 +169,7 @@ overrides:
   '@radix-ui/react-dismissable-layer': 1.1.20
   '@radix-ui/react-focus-guards': 1.1.6
   '@electron/rebuild': 4.0.3
+  node-abi: ^4.33.0
   '@hono/node-server': '>= 1.19.15'
   '@opentelemetry/core': '>= 2.8.0'
   '@xmldom/xmldom': ^0.8.15
@@ -2417,9 +2418,6 @@ packages:
   '@types/node@24.12.2':
     resolution: {integrity: sha512-A1sre26ke7HDIuY/M23nd9gfB+nrmhtYyMINbjI1zHJxYteKR6qSMX56FsmjMcDb3SMcjJg5BiRRgOCC/yBD0g==}
 
-  '@types/node@25.2.2':
-    resolution: {integrity: sha512-BkmoP5/FhRYek5izySdkOneRyXYN35I860MFAGupTdebyE66uZaR+bXLHq8k4DirE5DwQi3NuhvRU1jqTVwUrQ==}
-
   '@types/node@26.6.5':
     resolution: {integrity: sha512-uMzsv9stDdofIZBx4UGh4Z9ZgXnGC9seRDscilBcTHAeOFk67MZg/k9bWVfO+bk4qZmG+l52hRnLwUiH2LnJTg==}
 
@@ -4236,8 +4234,8 @@ packages:
     resolution: {integrity: sha512-NMPBRMJgiQHjbd8phG3Vebdx4kZ1H121rbl5IkMqeOsahptB9BKo/d7oJ3zTXqTgagn2bWlNSXkh0QUGM31RYg==}
     engines: {node: '>=18'}
 
-  node-abi@4.26.0:
-    resolution: {integrity: sha512-8QwIZqikRvDIkXS2S93LjzhsSPJuIbfaMETWH+Bx8oOT9Sa9UsUtBFQlc3gBNd1+QINjaTloitXr1W3dQLi9Iw==}
+  node-abi@4.37.0:
+    resolution: {integrity: sha512-O9XXMXLeRHQtvh43NCah3y9N1K69tecOmu8Y5p2ay4iXvtpbQr0VaroJF9EmRVp3vkdoj3qn4IFfX+ZYtC94fw==}
     engines: {node: '>=22.12.0'}
 
   node-addon-api@7.1.1:
@@ -5841,7 +5839,7 @@ snapshots:
       detect-libc: 2.1.2
       got: 11.8.6
       graceful-fs: 4.2.11
-      node-abi: 4.26.0
+      node-abi: 4.37.0
       node-api-version: 0.2.1
       node-gyp: 11.5.0(supports-color@8.1.1)
       ora: 5.4.1
@@ -7165,7 +7163,7 @@ snapshots:
     dependencies:
       '@types/http-cache-semantics': 4.2.0
       '@types/keyv': 3.1.4
-      '@types/node': 25.2.2
+      '@types/node': 26.6.5
       '@types/responselike': 1.0.3
 
   '@types/chai@5.2.3':
@@ -7322,7 +7320,7 @@ snapshots:
 
   '@types/keyv@3.1.4':
     dependencies:
-      '@types/node': 25.2.2
+      '@types/node': 26.6.5
 
   '@types/mdast@4.0.4':
     dependencies:
@@ -7335,10 +7333,6 @@ snapshots:
   '@types/ms@2.1.0': {}
 
   '@types/node@24.12.2':
-    dependencies:
-      undici-types: 7.16.0
-
-  '@types/node@25.2.2':
     dependencies:
       undici-types: 7.16.0
 
@@ -7356,7 +7350,7 @@ snapshots:
 
   '@types/responselike@1.0.3':
     dependencies:
-      '@types/node': 25.2.2
+      '@types/node': 26.6.5
 
   '@types/semver@7.8.0': {}
 
@@ -9404,7 +9398,7 @@ snapshots:
     dependencies:
       content-type: 2.1.0
 
-  node-abi@4.26.0:
+  node-abi@4.37.0:
     dependencies:
       semver: 7.8.5
 
