@@ -77,7 +77,7 @@ openai:
 google:
   adapter: GoogleAgentClient
   subagents: none
-  effort: thinking_budget
+  effort: reasoning_effort
   degrades_to: null
   context:
     compact: emulated

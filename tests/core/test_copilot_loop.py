@@ -21,7 +21,6 @@ from harness.domain import CallUsage
 ELIDED = "[tool result elided to save context — re-run the tool if needed]"
 COPILOT_URL = "https://api.githubcopilot.com/chat/completions"
 MODELS_URL = "https://models.inference.ai.azure.com/chat/completions"
-ZERO_USAGE = {"input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0}
 
 
 class _Executor:
@@ -196,12 +195,17 @@ async def test_a_tool_turn_is_yielded_executed_and_sent_back():
             "content": truncate_tool_result(long),
         },
     ]
-    # Every reported call is measured; the totals stay the subscription's zeros.
+    # Every reported call is measured, and `last_usage` is their totals; the
+    # cost stays 0.0, Copilot being a subscription.
     assert client.usage_ledger.calls == [
         CallUsage(1_000, None, None, 10),
         CallUsage(1_500, None, None, 20),
     ]
-    assert client.last_usage == ZERO_USAGE
+    assert client.last_usage == {
+        "input_tokens": 2_500,
+        "output_tokens": 30,
+        "cost_usd": 0.0,
+    }
     assert client.last_context_tokens == 1_500
 
 
@@ -268,7 +272,8 @@ async def test_a_token_refresh_failure_ends_before_any_request():
 
     assert _shape(messages) == [("system", "text", "Copilot auth error: no token")]
     assert session.payloads == []
-    assert client.last_usage == ZERO_USAGE
+    # Nothing was measured: no usage, not a usage of zero.
+    assert client.last_usage is None
 
 
 @pytest.mark.asyncio
@@ -340,7 +345,7 @@ async def test_a_retried_empty_response_spends_a_turn(monkeypatch):
     # Two turns, two empty answers: max_turns ends it before the empty cap.
     assert len(session.payloads) == 2
     assert messages == []
-    assert client.last_usage == ZERO_USAGE
+    assert client.last_usage is None
 
 
 @pytest.mark.asyncio
@@ -391,7 +396,8 @@ async def test_max_turns_ends_the_response():
         False,
         "attempt 3",
     )
-    assert client.last_usage == ZERO_USAGE
+    # The answers reported no usage.
+    assert client.last_usage is None
 
 
 @pytest.mark.asyncio

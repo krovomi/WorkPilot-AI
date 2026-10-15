@@ -271,6 +271,97 @@ def openai_reasoning_effort(
     return _OPENAI_EFFORT_BY_LEVEL.get(level)
 
 
+# Claude's `effort` has no "off": Opus 5.5 rejects disabled thinking at every
+# effort, so "none" is the lowest effort. "xhigh" is the deepest level every
+# Opus takes (the SDK falls back to "high" where it does not exist); "max"
+# stays reachable through AUTO_CLAUDE_EFFORT.
+_CLAUDE_EFFORT_BY_LEVEL: dict[str, str] = {
+    "none": "low",
+    "low": "low",
+    "medium": "medium",
+    "high": "high",
+    "ultrathink": "xhigh",
+}
+
+
+def claude_effort(thinking_budget: int | None) -> str:
+    """Translate the Kanban thinking budget to the Claude Agent SDK's `effort`.
+
+    The budget is the user's level for the phase, resolved by the caller; no
+    budget (or 0) is the level "none".
+    """
+    if not thinking_budget:
+        return _CLAUDE_EFFORT_BY_LEVEL["none"]
+    return _CLAUDE_EFFORT_BY_LEVEL[_thinking_level_from_budget(thinking_budget)]
+
+
+# Gemini's OpenAI-compatible endpoint takes `reasoning_effort` on its thinking
+# models (ai.google.dev/gemini-api/docs/openai). "none" turns thinking off on
+# 2.5 Flash only and is refused by 2.5 Pro and the 3.x models, so the level
+# "none" asks for the lowest effort every model takes; "high" is the ceiling.
+_GEMINI_EFFORT_BY_LEVEL: dict[str, str] = {
+    "none": "low",
+    "low": "low",
+    "medium": "medium",
+    "high": "high",
+    "ultrathink": "high",
+}
+
+# Gemini 2.5 and later think; earlier models have no reasoning setting.
+_GEMINI_THINKING_MODEL_RE = re.compile(r"^(models/)?gemini-(2\.5|[3-9])")
+
+
+def gemini_reasoning_effort(model: str, thinking_budget: int | None) -> str | None:
+    """Translate the Kanban thinking budget to Gemini's `reasoning_effort`.
+
+    None when the model has no thinking to set.
+    """
+    if not model or not _GEMINI_THINKING_MODEL_RE.match(model):
+        return None
+    if not thinking_budget:
+        return _GEMINI_EFFORT_BY_LEVEL["none"]
+    return _GEMINI_EFFORT_BY_LEVEL[_thinking_level_from_budget(thinking_budget)]
+
+
+def _positive_int(value: Any) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        return None
+    return value
+
+
+def copilot_thinking_budget(
+    thinking_budget: int | None, capabilities: Any
+) -> int | None:
+    """The `thinking_budget` Copilot's chat completions take, or None to omit it.
+
+    `capabilities` is a model's entry from Copilot's `/models`: `supports`
+    gives `min_thinking_budget` and `max_thinking_budget`, and a model without
+    a maximum takes no budget. The user's budget is kept inside those bounds,
+    and below the model's `limits.max_output_tokens`, since a thinking budget
+    must leave room for the answer.
+    """
+    if not thinking_budget or not isinstance(capabilities, dict):
+        return None
+    supports = capabilities.get("supports")
+    if not isinstance(supports, dict):
+        return None
+    highest = _positive_int(supports.get("max_thinking_budget"))
+    if highest is None:
+        return None
+    limits = capabilities.get("limits")
+    output = (
+        _positive_int(limits.get("max_output_tokens"))
+        if isinstance(limits, dict)
+        else None
+    )
+    if output is not None:
+        highest = min(highest, output - 1)
+    lowest = _positive_int(supports.get("min_thinking_budget")) or 0
+    if highest < lowest:
+        return None
+    return max(lowest, min(thinking_budget, highest))
+
+
 # ---------------------------------------------------------------------------
 # 4. Prompt-cache routing key (OpenAI automatic caching)
 # ---------------------------------------------------------------------------

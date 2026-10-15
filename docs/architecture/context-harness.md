@@ -90,7 +90,7 @@ sens partout, une boucle unique, et la troncature à la source.
 | Troncature | rtk sur Bash ; boucles WorkPilot : résultat coupé à 10 k caractères (70 % tête / 30 % queue). Lot 3 : `read_file`, `search_files` et `find_files` paginent sous ce plafond ; une longue sortie de `run_command` ou d'un outil exécuté dans le processus va dans un fichier ; le cerveau pagine ses notes et ses skills. Claude Code plafonne nativement (table ci-dessus) | aucun plafond natif réglé par WorkPilot : la ligne de base dira s'il faut baisser ceux de Claude Code |
 | Mémoire externe | cerveau (vault, `graph.json`, serveur MCP 9 outils), `implementation_plan.json`, `build-progress.txt`, `handoff_pending.md`, rapports de phase plafonnés. Lot 3b : les sorties longues des boucles WorkPilot vont dans `<spec>/tool-output/`, relues par `read_file` | un `MemoryPort` unique, avec la boucle partagée (lot 1b-ii) |
 | Sous-agents | registre `agents/subagents/`, roster ≤ 7 ; Claude et Copilot. Lot 5 : contrat `{conclusion, files, evidence}` sous 2 000 tokens, résultat coupé et marqué au-delà, délimité comme une donnée (hook PostToolUse sur Claude, `run_subagents` sur Copilot) ; Copilot les lance en échelon | `run_subagents` n'a pas d'appelant en production |
-| Outils dynamiques | `AGENT_CONFIGS` par type d'agent ; MCP ajoutés selon la tâche ; schémas MCP différés sur Claude (`ENABLE_TOOL_SEARCH=auto:5`). Lot 6 : un jeu d'outils canonique, trié et figé par session dans les boucles WorkPilot (`harness/domain/tools.py`) ; ni cerveau ni ui-ux pour un type sans outils | rien par sous-tâche ; la réduction des phases de build, mesurée par `tool_weights` |
+| Outils dynamiques | `AGENT_CONFIGS` par type d'agent ; MCP ajoutés selon la tâche ; schémas MCP différés sur Claude face à l'API d'Anthropic (`ENABLE_TOOL_SEARCH=auto:5`). Lot 6 : un jeu d'outils canonique, trié et figé par session dans les boucles WorkPilot (`harness/domain/tools.py`) ; ni cerveau ni ui-ux pour un type sans outils | rien par sous-tâche ; la réduction des phases de build, mesurée par `tool_weights` |
 | Effort et routage | effort par phase (`phase_config.py`), traduit par provider (`reasoning_effort`, budget de réflexion) ; routeur de complexité et `model_router` presque toujours éteints | pas d'escalade automatique |
 | Récupération de code | `context/search.py` : correspondance de sous-chaînes ; grepai seulement pour l'autofix. Lot 7 : `search_code`, BM25 sur des morceaux par symbole fusionné par RRF avec une recherche exacte d'identifiants, 5 à 8 extraits par appel avec curseur, servi en MCP (`workpilot-code`) et par `ToolExecutor` aux types qui déclarent `code` | l'éval qui tranche (5, 20, 50 extraits), sur la ligne de base du lot 0 |
 | Évals | `tests/skills_eval/` : 6 épisodes rejoués sans LLM en CI. Lot 8 : cinq sessions enregistrées rejouées à chaque PR dans le code de production (`harness/application/replay.py`), mesurées sous trois formes de cache (`harness/domain/evals.py`) et comparées à leur base | la campagne avec LLM, qui attend la ligne de base du lot 0 et un budget approuvé |
@@ -336,6 +336,9 @@ n'économise aucun token et ne change aucun comportement.
     à rafraîchir, elle était rendue comme la réponse du modèle, en mode texte comme dans l'appel
     unique sans outils ; c'est maintenant une erreur ;
   - les identifiants étaient rafraîchis deux fois de suite sur cette erreur ; ils le sont une fois.
+- Le `last_usage` de Copilot valait toujours zéro, alors que des modèles Copilot rapportent leur
+  `usage` : c'est maintenant le total de ce que les appels de la réponse ont rapporté (coût 0.0,
+  un abonnement), et None quand aucun n'a rien rapporté, qui n'est pas une mesure de zéro.
 
 Tests : d'abord la caractérisation, contre l'ancien code : `tests/core/test_windsurf_loops.py` (les
 deux boucles Windsurf, qu'aucun test ne faisait tourner), `tests/core/test_openai_loop.py`,
@@ -631,11 +634,11 @@ un autre ordre : tout ce qui suit est réécrit.
 
 | Famille | Outils | Ordre | En cours de session | Effort |
 |---|---|---|---|---|
-| Claude Agent SDK | ceux de la CLI, moins `disallowed_tools` (`undeclared_builtin_tools`) ; serveurs MCP de `get_required_mcp_servers` ; `allowed_tools` ne fait qu'approuver | listes fixes côté WorkPilot ; dans le prompt, celui de la CLI | options fixées au lancement de la CLI ; ni `set_model` ni changement d'outils | `max_thinking_tokens` depuis le réglage de la phase ; `effort` (Opus seulement) depuis une table par type d'agent, ou `AUTO_CLAUDE_EFFORT` |
+| Claude Agent SDK | ceux de la CLI, moins `disallowed_tools` (`undeclared_builtin_tools`) ; serveurs MCP de `get_required_mcp_servers` ; `allowed_tools` ne fait qu'approuver | listes fixes côté WorkPilot ; dans le prompt, celui de la CLI | options fixées au lancement de la CLI ; ni `set_model` ni changement d'outils | `max_thinking_tokens` depuis le réglage de la phase ; `effort` (Opus seulement) depuis le même réglage (`claude_effort`), ou `AUTO_CLAUDE_EFFORT` |
 | Codex CLI | les siens ; WorkPilot ne passe que `--sandbox`, tiré de la déclaration du type | celui de la CLI | les mêmes arguments à chaque requête | `model_reasoning_effort` depuis le réglage de la phase |
 | OpenCode | les siens ; `--agent build` ou `plan` selon la déclaration | celui de la CLI | idem | aucun : pas de réglage confirmé dans le dépôt |
 | Antigravity | les siens ; mode et sandbox selon la déclaration | celui de la CLI | idem | `--effort` depuis le réglage de la phase |
-| Boucles WorkPilot : OpenAI et compatibles, Google, Ollama, LM Studio, Copilot, Windsurf | `get_tool_definitions` (exécuteur, cerveau, ui-ux, verify) ; pour la famille OpenAI, les outils des serveurs MCP pontés | l'ordre écrit dans le code, puis celui des serveurs et de leur `list_tools`, et les clés des schémas dans l'ordre du serveur : rien ne garantissait ces trois-là | préparés une fois, dans `__aenter__` ; aucune boucle ne les reconstruisait par tour | `reasoning_effort` (modèles de raisonnement OpenAI) ; aucun ailleurs |
+| Boucles WorkPilot : OpenAI et compatibles, Google, Ollama, LM Studio, Copilot, Windsurf | `get_tool_definitions` (exécuteur, cerveau, ui-ux, verify) ; pour la famille OpenAI, les outils des serveurs MCP pontés | l'ordre écrit dans le code, puis celui des serveurs et de leur `list_tools`, et les clés des schémas dans l'ordre du serveur : rien ne garantissait ces trois-là | préparés une fois, dans `__aenter__` ; aucune boucle ne les reconstruisait par tour | `reasoning_effort` (modèles de raisonnement OpenAI, modèles Gemini qui réfléchissent : `gemini_reasoning_effort`) ; `thinking_budget` sur Copilot, dans les bornes que `/models` donne au modèle (`copilot_thinking_budget`) ; aucun ailleurs |
 
 L'effort se résout une fois, à la création du client (`_effort_for`, depuis le réglage de la phase).
 Un changement (hot swap, reset de contexte, sous-tâche suivante) arrive avec un nouveau client, donc
@@ -686,7 +689,10 @@ Sur le SDK Claude, le poids des outils intégrés appartient à la CLI. Avec un 
 
 **La voie native.** Claude Code diffère les schémas MCP au-delà de 5 % de la fenêtre :
 `ENABLE_TOOL_SEARCH=auto:5`, déjà posé par `create_client`, et lu par la CLI livrée avec le SDK
-(2.1.300 : `true`, `auto`, `auto:N`, `force`). La CLI rapporte aussi des outils intégrés différés
+(2.1.300 : `true`, `auto`, `auto:N`, `force`). Posé seulement face à l'API d'Anthropic : derrière
+une autre URL de base, la CLI laisse la recherche d'outils éteinte, car un proxy qui ne relaie pas
+les blocs `tool_reference` perdrait tout outil différé ; une valeur exportée par l'utilisateur
+passe telle quelle. La CLI rapporte aussi des outils intégrés différés
 (`deferredBuiltinTools`), sans réglage documenté : rien n'est posé. Codex, OpenCode, Antigravity et
 l'API chat completions : aucun réglage confirmé dans le dépôt, rien n'est posé.
 
