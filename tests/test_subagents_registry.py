@@ -233,11 +233,18 @@ class TestCallerPrecedence:
 
 class TestProviderGating:
     def test_provider_without_subagents_gets_no_roster(self, tmp_path):
-        assert resolve("coder", project_dir=tmp_path, provider="mistral") is None
-        assert resolve("coder", project_dir=tmp_path, provider="openai") is None
+        # The CLIs bring their own tools; a roster would be composed for nobody.
+        assert resolve("coder", project_dir=tmp_path, provider="opencode") is None
+        assert resolve("coder", project_dir=tmp_path, provider="antigravity") is None
 
     def test_provider_with_native_subagents_gets_one(self, tmp_path):
         assert resolve("coder", project_dir=tmp_path, provider="claude")
+
+    @pytest.mark.parametrize("provider", ["mistral", "openai", "copilot", "ollama"])
+    def test_provider_with_emulated_subagents_gets_one_too(self, tmp_path, provider):
+        # The WorkPilot loop runs the roster itself (`delegate`): the same
+        # specialists as Claude's, composed the same way.
+        assert resolve("coder", project_dir=tmp_path, provider=provider)
         assert resolve("coder", project_dir=tmp_path, provider="copilot")
 
 
@@ -481,5 +488,5 @@ class TestProviderDegradationReachesTheClient:
         (tmp_path / "pyproject.toml").write_text(
             "[project]\nname='x'\n", encoding="utf-8"
         )
-        assert resolve("coder", project_dir=tmp_path, provider="mistral") is None
+        assert resolve("coder", project_dir=tmp_path, provider="opencode") is None
         assert resolve("coder", project_dir=tmp_path, provider="claude") is not None

@@ -25,6 +25,7 @@ import logging
 import os
 import threading
 import time
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -2252,7 +2253,114 @@ def _portable_subagent_model(model: str | None) -> str:
     return "inherit" if model.lower() in _ANTHROPIC_TIER_ALIASES else model
 
 
+def _portable_roster(agents: Mapping[str, Any] | None) -> dict[str, Any]:
+    """The roster as ``SubagentDefinition``s, models made portable.
+
+    `resolve()` hands back the SDK's ``AgentDefinition``s when the SDK is
+    importable, plain dicts otherwise; a client that runs the roster itself
+    reads one shape. A definition with no description is dropped: it is what
+    the model picks on, and a nameless specialist is never chosen.
+    """
+    from core.agent_client import SubagentDefinition
+
+    roster: dict[str, Any] = {}
+    for name, defn in (agents or {}).items():
+        if isinstance(defn, SubagentDefinition):
+            roster[name] = defn
+            continue
+        if isinstance(defn, Mapping):
+            fields = dict(defn)
+        elif hasattr(defn, "description"):
+            fields = {
+                "description": getattr(defn, "description", ""),
+                "prompt": getattr(defn, "prompt", ""),
+                "tools": getattr(defn, "tools", None) or [],
+                "model": getattr(defn, "model", "inherit"),
+            }
+        else:
+            continue
+        if not str(fields.get("description") or "").strip():
+            continue
+        roster[name] = SubagentDefinition(
+            description=str(fields.get("description") or ""),
+            prompt=str(fields.get("prompt") or ""),
+            tools=list(fields.get("tools") or []),
+            model=_portable_subagent_model(fields.get("model") or "inherit"),
+        )
+    return roster
+
+
 def create_agent_client(
+    project_dir: Path,
+    spec_dir: Path,
+    model: str,
+    agent_type: str = "coder",
+    max_thinking_tokens: int | None | _Unset = _UNSET,
+    output_format: dict | None = None,
+    agents: dict | None = None,
+    provider: str | None = None,
+    resume: str | None = None,
+    system_prompt: str | None = None,
+    use_subagents: bool = True,
+    roster: str | None = None,
+) -> "AgentClient":  # noqa: F821
+    """A provider-agnostic agent client, with its sub-agent roster attached.
+
+    The client comes from ``_build_agent_client`` (one branch per provider).
+    The roster is the same for every provider — ``agents.subagents.resolve``:
+    phase defaults, the detected stack's overlays, the caller's ``agents``
+    winning, capped — and it is attached here, once, rather than in each
+    branch: the Copilot branch used to convert the caller's dict and nobody
+    else did, so every provider but Claude ran every phase alone while the
+    workflow profile announced ``subagent-per-task``.
+
+    The Claude branch composes it inside ``create_client`` (the SDK runs it
+    natively). Every client that ``delegates()`` gets it here and offers it
+    to the model as the ``delegate`` tool (``harness.application.delegation``).
+    The CLIs bring their own tools and take no roster: the engine already
+    degrades their dispatch to ``sequential-reset``.
+    """
+    client = _build_agent_client(
+        project_dir,
+        spec_dir,
+        model,
+        agent_type=agent_type,
+        max_thinking_tokens=max_thinking_tokens,
+        output_format=output_format,
+        agents=agents,
+        provider=provider,
+        resume=resume,
+        system_prompt=system_prompt,
+        use_subagents=use_subagents,
+        roster=roster,
+    )
+    if not use_subagents or not client.delegates():
+        return client
+    try:
+        from agents.subagents import resolve as _resolve_subagents
+
+        composed = _resolve_subagents(
+            agent_type,
+            project_dir=project_dir,
+            user_agents=agents,
+            provider=client.provider_name(),
+            roster_name=roster,
+        )
+    except Exception as exc:  # roster composition never breaks client creation
+        logger.debug("subagent resolution failed for %s: %s", agent_type, exc)
+        composed = agents
+    client.agents = _portable_roster(composed)
+    if client.agents:
+        logger.info(
+            "[create_agent_client] %s delegates to %d specialist(s): %s",
+            client.provider_name(),
+            len(client.agents),
+            ", ".join(sorted(client.agents)),
+        )
+    return client
+
+
+def _build_agent_client(
     project_dir: Path,
     spec_dir: Path,
     model: str,
@@ -2307,11 +2415,7 @@ def create_agent_client(
     Raises:
         ValueError: If agent_type is unknown or provider is unsupported
     """
-    from core.agent_client import (
-        ClaudeAgentClient,
-        CopilotAgentClient,
-        SubagentDefinition,
-    )
+    from core.agent_client import ClaudeAgentClient, CopilotAgentClient
 
     # Normalize to Path objects in case strings are passed
     if isinstance(project_dir, str):
@@ -2383,28 +2487,6 @@ def create_agent_client(
             base_prompt = build_base_system_prompt(project_dir)
             base_prompt = _inject_domain_addendum(base_prompt, agent_type, spec_dir)
 
-        # Convert agents dict to SubagentDefinition if provided
-        copilot_agents: dict[str, SubagentDefinition] | None = None
-        if agents and use_subagents:
-            copilot_agents = {}
-            for name, defn in agents.items():
-                # Handle both AgentDefinition (Claude SDK) and dict formats
-                if hasattr(defn, "description"):
-                    copilot_agents[name] = SubagentDefinition(
-                        description=getattr(defn, "description", ""),
-                        prompt=getattr(defn, "prompt", ""),
-                        tools=getattr(defn, "tools", []),
-                        model=_portable_subagent_model(
-                            getattr(defn, "model", "inherit")
-                        ),
-                    )
-                elif isinstance(defn, dict):
-                    defn = dict(defn)
-                    defn["model"] = _portable_subagent_model(
-                        defn.get("model", "inherit")
-                    )
-                    copilot_agents[name] = SubagentDefinition(**defn)
-
         # Get allowed tools for the agent type
         _, project_capabilities = _get_cached_project_data(project_dir)
         from integrations.linear.updater import is_linear_enabled as _is_linear_enabled
@@ -2422,7 +2504,6 @@ def create_agent_client(
             model=model,
             system_prompt=base_prompt,
             allowed_tools=allowed_tools_list,
-            agents=copilot_agents,
             cwd=str(project_dir.resolve()),
             agent_type=agent_type,
             spec_dir=str(spec_dir),

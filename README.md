@@ -283,11 +283,13 @@ Les sous-agents ne sont pas déclarés par chaque agent : ils vivent dans **un s
 4. **Agents fournis par l'appelant** — gagnent toujours (relecteurs de PR de `pr_review.py`).
 5. **Plafond** de 7 sous-agents.
 
-En pratique, **seul Claude** reçoit ce roster : `create_client` le compose et ouvre l'outil
-`Agent` du SDK, et le modèle décide seul quand déléguer, d'après la `description` de chaque
-spécialiste. Copilot est déclaré `subagents: native`, mais `create_agent_client` ne lui transmet
-que les agents passés explicitement par l'appelant, et sa boucle n'expose aucun outil de
-délégation : une carte Kanban sur Copilot tourne sans sous-agent. Les autres providers n'en ont pas.
+Le roster atteint le modèle sur tout provider (`capabilities/providers.yaml`) :
+- `native` — Claude : `agents=` du SDK et son outil `Agent` ;
+- `emulated` — Copilot, OpenAI, Gemini, Ollama / LM Studio, Mistral, DeepSeek, Grok, Windsurf :
+  un outil `delegate` dont la description liste les spécialistes, et une **session enfant** du même
+  client par délégation, avec les seuls outils du spécialiste et un résultat borné
+  ([`docs/architecture/delegation.md`](docs/architecture/delegation.md)) ;
+- `none` — les CLI (Codex, OpenCode, Antigravity) apportent leurs outils et ne reçoivent pas de roster.
 
 Ce que rend un sous-agent est borné et traité comme une donnée non fiable
 (`harness/application/subagents.py`). Le même registre, plus les personas des packs

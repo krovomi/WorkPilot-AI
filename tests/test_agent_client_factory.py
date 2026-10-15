@@ -500,3 +500,102 @@ class TestCreateAgentClient:
         assert "security" in client.agents
         assert client.agents["security"].description == "Security checker"
         assert client.agents["security"].prompt == "Check for vulnerabilities"
+
+
+class TestRosterReachesEveryLoopClient:
+    """`create_agent_client` attaches the composed roster to every client
+    that runs the WorkPilot loop; the Claude branch composes its own inside
+    `create_client`, and the CLIs take none."""
+
+    @pytest.mark.parametrize(
+        ("provider", "env", "model"),
+        [
+            ("openai", "OPENAI_API_KEY", "gpt-4o"),
+            ("mistral", "MISTRAL_API_KEY", "mistral-small-latest"),
+            ("google", "GOOGLE_API_KEY", "gemini-3-flash"),
+        ],
+    )
+    def test_a_loop_client_gets_the_phase_roster(
+        self, provider, env, model, tmp_path, monkeypatch
+    ):
+        from core.agent_client import SubagentDefinition
+        from core.client import create_agent_client
+
+        monkeypatch.setenv(env, "key")
+        client = create_agent_client(
+            project_dir=tmp_path,
+            spec_dir=tmp_path,
+            model=model,
+            agent_type="coder",
+            provider=provider,
+        )
+        assert client.delegates()
+        # The Kanban roster, in the portable shape every loop client reads.
+        assert {"code-reviewer", "test-runner", "architecture-analyst"} <= set(
+            client.agents
+        )
+        assert all(isinstance(d, SubagentDefinition) for d in client.agents.values())
+
+    def test_the_callers_agents_win_and_tier_aliases_turn_portable(
+        self, tmp_path, monkeypatch
+    ):
+        from core.client import create_agent_client
+
+        monkeypatch.setenv("OPENAI_API_KEY", "key")
+        mine = MagicMock()
+        mine.description = "Mine"
+        mine.prompt = "p"
+        mine.tools = ["Read"]
+        mine.model = "sonnet"
+        client = create_agent_client(
+            project_dir=tmp_path,
+            spec_dir=tmp_path,
+            model="gpt-4o",
+            agent_type="coder",
+            provider="openai",
+            agents={"test-runner": mine},
+        )
+        assert client.agents["test-runner"].description == "Mine"
+        assert client.agents["test-runner"].model == "inherit"
+
+    def test_use_subagents_false_attaches_nothing(self, tmp_path, monkeypatch):
+        from core.client import create_agent_client
+
+        monkeypatch.setenv("OPENAI_API_KEY", "key")
+        client = create_agent_client(
+            project_dir=tmp_path,
+            spec_dir=tmp_path,
+            model="gpt-4o",
+            agent_type="coder",
+            provider="openai",
+            use_subagents=False,
+        )
+        assert not client.agents
+
+    def test_a_solo_type_gets_none(self, tmp_path, monkeypatch):
+        from core.client import create_agent_client
+
+        monkeypatch.setenv("OPENAI_API_KEY", "key")
+        client = create_agent_client(
+            project_dir=tmp_path,
+            spec_dir=tmp_path,
+            model="gpt-4o",
+            agent_type="commit_message",
+            provider="openai",
+        )
+        assert not client.agents
+
+    def test_a_cli_takes_no_roster(self, tmp_path, monkeypatch):
+        from core.client import create_agent_client
+
+        monkeypatch.setenv("OPENAI_AUTH_MODE", "codex-cli")
+        client = create_agent_client(
+            project_dir=tmp_path,
+            spec_dir=tmp_path,
+            model="gpt-5.6-sol",
+            agent_type="coder",
+            provider="openai",
+        )
+        assert isinstance(client, CodexCliAgentClient)
+        assert not client.delegates()
+        assert not getattr(client, "agents", None)

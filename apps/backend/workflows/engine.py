@@ -208,6 +208,13 @@ def resolve_profile(
             from skills_registry.providers import get_provider_capabilities
 
             supports_subagents = get_provider_capabilities(provider).supports_subagents
+            # `openai` is two clients: the REST one emulates a roster, the
+            # Codex CLI brings its own tools and takes none. The matrix is
+            # static; the auth mode decides which one a build gets.
+            if supports_subagents and provider == "openai":
+                from core.codex_cli_client import openai_uses_codex_cli
+
+                supports_subagents = not openai_uses_codex_cli()
         except Exception as exc:  # capability lookup must not block a build
             logger.debug("provider capability lookup failed: %s", exc)
 

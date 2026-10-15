@@ -263,7 +263,7 @@ class TestProviderDegradation:
         assert coding.dispatch == "subagent-per-task"
         assert coding.degraded_from is None
 
-    @pytest.mark.parametrize("provider", ["mistral", "openai", "google"])
+    @pytest.mark.parametrize("provider", ["opencode", "antigravity", "meta"])
     def test_it_degrades_to_sequential_where_there_are_no_subagents(
         self, workflow, provider
     ):
@@ -278,7 +278,7 @@ class TestProviderDegradation:
     def test_degradation_removes_no_phases(self, workflow):
         capable = resolve_profile(workflow, "high", provider="claude", changed_files=[])
         limited = resolve_profile(
-            workflow, "high", provider="mistral", changed_files=[]
+            workflow, "high", provider="opencode", changed_files=[]
         )
         assert capable.phase_ids == limited.phase_ids
 
@@ -286,7 +286,7 @@ class TestProviderDegradation:
 class TestDescribe:
     def test_summary_names_what_runs_and_what_was_dropped(self, workflow):
         text = resolve_profile(
-            workflow, "low", provider="mistral", changed_files=[]
+            workflow, "low", provider="opencode", changed_files=[]
         ).describe()
         assert "feature-build" in text and "low" in text
         assert "verify" in text
@@ -324,3 +324,25 @@ class TestImplementations:
 
         ungated = validate_impls(workflow, {"impeccable": set()})
         assert "design-check" in {m.phase_id for m in ungated}
+
+
+class TestCodexDispatch:
+    def test_openai_under_the_codex_cli_degrades_the_dispatch(
+        self, workflow, monkeypatch
+    ):
+        # The REST client emulates the roster; the Codex CLI brings its own
+        # tools and takes none, and the profile must say so.
+        monkeypatch.setenv("OPENAI_AUTH_MODE", "codex-cli")
+        profile = resolve_profile(
+            workflow, "medium", provider="openai", changed_files=[]
+        )
+        coding = next(r for r in profile.run if r.id == "coding")
+        assert coding.dispatch == "sequential-reset"
+
+    def test_openai_over_the_api_keeps_it(self, workflow, monkeypatch):
+        monkeypatch.setenv("OPENAI_AUTH_MODE", "api-key")
+        profile = resolve_profile(
+            workflow, "medium", provider="openai", changed_files=[]
+        )
+        coding = next(r for r in profile.run if r.id == "coding")
+        assert coding.dispatch == "subagent-per-task"
