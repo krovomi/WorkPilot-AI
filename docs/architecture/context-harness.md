@@ -6,8 +6,9 @@
 > source, sauf les plafonds natifs, réglés sur la ligne de base), le lot 4 (purge par lots et
 > fenêtre payable, sauf D2), le lot 5 (sous-agents sous contrat, résultat borné et marqué,
 > lancement échelonné, sauf le `MemoryPort`), le lot 6 (un jeu d'outils trié et figé par
-> session, sauf la réduction des phases de build) et le lot 8 (les évals rejouées en CI, sauf la
-> campagne avec LLM).** Ce fichier fixe la cible
+> session, sauf la réduction des phases de build), le lot 7 (`search_code` : extraits de code
+> classés pour tous les providers, sauf l'éval qui tranche) et le lot 8 (les évals rejouées en CI,
+> sauf la campagne avec LLM).** Ce fichier fixe la cible
 > et l'ordre des lots ; chaque lot livré remplace sa section par la justification de ce qui existe. [`docs/CLAUDE.md`](../CLAUDE.md)
 > reste normatif : là où les deux divergent, il gagne. Le mécanisme existant de compaction et de
 > reset est décrit dans [`context-management.md`](context-management.md), que ce plan prolonge sans
@@ -91,7 +92,7 @@ sens partout, une boucle unique, et la troncature à la source.
 | Sous-agents | registre `agents/subagents/`, roster ≤ 7 ; Claude et Copilot. Lot 5 : contrat `{conclusion, files, evidence}` sous 2 000 tokens, résultat coupé et marqué au-delà, délimité comme une donnée (hook PostToolUse sur Claude, `run_subagents` sur Copilot) ; Copilot les lance en échelon | `run_subagents` n'a pas d'appelant en production |
 | Outils dynamiques | `AGENT_CONFIGS` par type d'agent ; MCP ajoutés selon la tâche ; schémas MCP différés sur Claude (`ENABLE_TOOL_SEARCH=auto:5`). Lot 6 : un jeu d'outils canonique, trié et figé par session dans les boucles WorkPilot (`harness/domain/tools.py`) ; ni cerveau ni ui-ux pour un type sans outils | rien par sous-tâche ; la réduction des phases de build, mesurée par `tool_weights` |
 | Effort et routage | effort par phase (`phase_config.py`), traduit par provider (`reasoning_effort`, budget de réflexion) ; routeur de complexité et `model_router` presque toujours éteints | pas d'escalade automatique |
-| Récupération de code | `context/search.py` : correspondance de sous-chaînes ; grepai seulement pour l'autofix | ni BM25, ni fusion, ni budget d'extraits |
+| Récupération de code | `context/search.py` : correspondance de sous-chaînes ; grepai seulement pour l'autofix. Lot 7 : `search_code`, BM25 sur des morceaux par symbole fusionné par RRF avec une recherche exacte d'identifiants, 5 à 8 extraits par appel avec curseur, servi en MCP (`workpilot-code`) et par `ToolExecutor` aux types qui déclarent `code` | l'éval qui tranche (5, 20, 50 extraits), sur la ligne de base du lot 0 |
 | Évals | `tests/skills_eval/` : 6 épisodes rejoués sans LLM en CI. Lot 8 : cinq sessions enregistrées rejouées à chaque PR dans le code de production (`harness/application/replay.py`), mesurées sous trois formes de cache (`harness/domain/evals.py`) et comparées à leur base | la campagne avec LLM, qui attend la ligne de base du lot 0 et un budget approuvé |
 
 ## La cible : trois couches, une seule boucle
@@ -719,15 +720,79 @@ même `reasoning_effort` ; le poids de chaque type).
 *Sortie :* atteinte pour les types sans outils (1 050 → 181 tokens avec un cerveau) et le planner
 (−30) ; pas pour les phases de build, dont la réduction attend une décision sur les droits.
 
-### Lot 7 — Contexte de code
+### Lot 7 — Contexte de code (livré, sauf l'éval qui tranche)
 
-- Outil `search_code` (D4), servi en MCP : BM25 sur des morceaux découpés par symbole (fonction,
-  classe), chaque morceau préfixé de son chemin et de son symbole — la version gratuite du
-  contextual retrieval. Fusion RRF avec la recherche exacte (identifiants) ; vecteurs denses
-  seulement en option, et locaux sous `airgapStrict`.
-- 5 à 8 extraits par appel, curseur pour la suite.
-- **Le test qui tranche** : les tâches de l'éval à 5, 20 et 50 extraits, courbe des passes QA et
-  du coût. On garde le budget où la qualité plafonne.
+Un modèle cherchait le code par `search_files` (une regex, ligne à ligne) ou par le shell : il
+devait deviner les mots exacts, puis lisait des fichiers entiers pour une fonction. Ce qui existait
+ne servait pas un modèle en session : `context/search.py` compte des sous-chaînes pour le pipeline
+de spec, et grepai, un serveur HTTP de vecteurs à lancer à part, n'est branché qu'à l'autofix de
+revue (`review/quality_*.py`). `search_code` (D4) ne les réutilise pas et ne les remplace pas.
+
+- **Découpage** (`harness/domain/code_chunks.py`, pur) : un morceau par symbole. Python par `ast`
+  (fonctions, classes, méthodes `Classe.méthode`, décorateurs et commentaires juste au-dessus
+  compris). TypeScript/JavaScript, C#, Java, Go et Rust par motifs de déclaration, le corps fermé
+  par les accolades comptées hors chaînes et commentaires. Le reste, ou un Python qui ne se parse
+  pas, par fenêtres de 60 lignes. Le code entre deux symboles devient un morceau `code` de sa
+  classe ou du module ; un symbole de plus de 120 lignes est coupé en parties qui gardent son nom.
+  Chaque morceau est indexé précédé de son chemin et de son symbole : la version gratuite du
+  contextual retrieval.
+- **Classement** (`harness/domain/code_ranking.py`, pur) : BM25 (k1 1,2 ; b 0,75) sur des termes
+  qui coupent `camelCase` et `snake_case` et gardent aussi l'identifiant entier, sans casse ni
+  soulignés : `overBudget` et `over_budget` se rejoignent. Une recherche exacte classe d'abord le
+  morceau qui *définit* un identifiant de la requête, puis ceux qui le contiennent entier.
+  Reciprocal Rank Fusion (k = 60) fusionne les deux listes par leur seul rang.
+- **Résultats** (`harness/application/code_search.py`) : 6 extraits par appel par défaut, 8 au plus
+  (`CODE_SEARCH_RESULTS`, `CODE_SEARCH_MAX_RESULTS`, plafond 20). Un extrait montre au plus 30
+  lignes et 1 500 caractères : la signature, puis la fenêtre qui contient le plus de termes de la
+  requête. Chaque résultat donne `chemin:première-dernière · symbole (genre)`, qu'une lecture
+  reprend exactement. La page tient sous le plafond du client et finit par l'`offset` de la suite
+  (`page_items`, lot 3) ; chaque classement va jusqu'à 200 résultats.
+- **Index** : construit au premier appel d'un projet, gardé en mémoire, rien sur disque. Avant
+  chaque recherche, la liste des fichiers est relue ; un fichier dont la date ou la taille a changé
+  est relu, un fichier disparu est oublié, les autres coûtent un `lstat`. Borné : 20 000 fichiers,
+  48 Mo de source, 1 Mo par fichier, deux projets en cache. Un index plafonné le dit dans chaque
+  réponse, même vide.
+- **Servi à tous, comme le cerveau.** Le serveur MCP `workpilot-code`
+  (`harness/tools/code_search_mcp.py`, lancé par `runners/code_search_mcp.py`, sans SDK, un seul
+  projet) sert le SDK Claude par `create_client`, et tout agent qu'une personne y branche. Le même
+  outil s'exécute dans le processus par `ToolExecutor` pour OpenAI et les compatibles,
+  Ollama/LM Studio, Copilot et Windsurf, paginé sous leur plafond de résultat.
+- **Un droit déclaré** : `"code"` dans `AGENT_CONFIGS[...]["mcp_servers"]`, pour les types qui
+  explorent le code pour savoir où agir ou quoi vérifier : planner, coder, QA, verifier, les
+  relecteurs de PR, analyzer, impact_analyzer, architecture_*, ideation, roadmap_discovery et
+  spec_critic (brainstorm). Pas pour un type dont toute l'entrée est dans le prompt. `ToolExecutor`
+  lit la même déclaration (`EXECUTOR_SERVER_GRANTS`) ; `AGENT_MCP_<type>_REMOVE=code` le retire.
+- **Les règles tiennent.** S4 : les fichiers sont ceux de git (`ls-files --cached --others
+  --exclude-standard`, jamais un fichier ignoré ni `.git`), sinon un parcours qui ne suit aucun
+  lien. Chaque chemin est résolu, liens compris, puis gardé seulement dans la racine ; un lien, un
+  binaire, un fichier trop gros, une dépendance ou `.workpilot/` ne sont jamais lus. S1 : chaque
+  extrait passe par la table de secrets du hook `pre-commit` (`docintel.redact`) ; sans elle,
+  aucun code ne sort, seulement les emplacements. S2 : la requête n'est découpée qu'en mots par un
+  motif fixe, jamais compilée, jamais un chemin. S7 : aucun réseau. Les vecteurs denses restent
+  hors du lot : ils demanderaient un modèle d'embeddings, donc une dépendance.
+
+Tests : `tests/harness/test_code_chunks.py` (chaque langage par table, chaque ligne dans un seul
+morceau, repli en fenêtres, parties d'un long symbole), `tests/harness/test_code_ranking.py`
+(termes par table, ordre BM25 sur un petit corpus, suppression et compaction, recherche exacte,
+RRF par table, fenêtre de l'extrait), `tests/harness/test_code_search.py` (la définition d'abord,
+plage relisible, pages et curseur sans perte ni doublon, réglages, fichier modifié relu et
+supprimé oublié, cache borné ; S4 : lien vers l'extérieur avec et sans git, chemin `..` ou absolu,
+fichier ignoré, `.git`, binaire, fichier trop gros ; S1 : secret masqué, aucun code sans la table ;
+S2 : requêtes hostiles), `tests/harness/test_code_search_serving.py` (déclaré par les seuls types
+voulus, offert et refusé par l'exécuteur selon la déclaration, listé et appelé par le serveur MCP,
+lancé par son runner, attaché par `create_client` sans approbation orpheline).
+`tests/test_agent_tool_declarations.py` refuse un prompt qui nomme `search_code` sous un type qui
+ne le déclare pas.
+
+**Reste à faire.** Le test qui tranche : les tâches de l'éval à 5, 20 et 50 extraits, courbe des
+passes QA et du coût, pour garder le budget où la qualité plafonne. Il demande de vrais appels :
+il attend la ligne de base du lot 0 et un budget approuvé. Hors de ce lot : Codex, OpenCode et
+Antigravity lancés par WorkPilot ne reçoivent aucun serveur MCP de WorkPilot (ni cerveau, ni
+verify), ils l'atteignent quand une personne branche le serveur ; le client simple (insights,
+commandes du Kanban) ne démarre que les serveurs que son appelant lui passe.
+
+*Sortie :* moins de fichiers lus en entier et moins de tokens de sorties d'outils par sous-tâche
+sur la ligne de base, passes QA stables.
 
 ### Lot 8 — Évals en continu (livré, sauf la campagne avec LLM)
 

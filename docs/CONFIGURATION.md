@@ -563,6 +563,21 @@ OpenCode, Antigravity) are not affected.
 | `LOCAL_COMMAND_TIMEOUT` | 120 | Seconds before a shell command run by the agent is killed. Despite its name, not limited to local models. Must be a positive number. |
 | `LLM_INLINE_FILE_CONTEXT` | `auto` | Whether the coder's prompt includes excerpts of the files to modify and of the pattern files: `auto` for providers other than Claude at effort `none`, `low` or `medium`; `always` for every provider, Claude included; `never` for none. |
 
+## Code search
+
+`search_code` returns ranked excerpts of the project's code to the agent types
+that declare it, on every provider: over the `workpilot-code` MCP server on
+Claude, in-process on the others
+([context harness, lot 7](architecture/context-harness.md)). It reads only the
+project's files that git does not ignore, masks secrets in what it returns, and
+uses no network.
+
+| Variable | Default | Meaning |
+| --- | ---: | --- |
+| `CODE_SEARCH_RESULTS` | 6 | Excerpts a call returns when the model asks for no number. |
+| `CODE_SEARCH_MAX_RESULTS` | 8 | The most excerpts one call may return (at most 20). |
+| `WORKPILOT_CODE_ROOT` | the working directory | The project the `workpilot-code` server answers for when it is started without `--project-dir`. |
+
 ## Auxiliary models
 
 | Variable | Default | Meaning |

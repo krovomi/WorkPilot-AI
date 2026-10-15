@@ -29,6 +29,13 @@ Browser automation via [chrome-devtools-mcp](https://github.com/ChromeDevTools/c
 
 ### grepai Integration
 
+Build agents do not use grepai: they search code with `search_code`, ranked
+excerpts served over the `workpilot-code` MCP server and in-process by the tool
+executor, local and with no server to start (lot 7 of the
+[context harness](context-harness.md)). grepai is wired to the review autofix
+only (`review/quality_autofix.py`, `review/quality_extended.py`), through a
+grepai server reached over HTTP.
+
 Semantic code search tool integrated for enhanced AI agent code exploration:
 
 **Setup:**

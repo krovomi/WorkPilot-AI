@@ -31,6 +31,24 @@ files) and `find_files` (a glob). Both stay inside the project, follow no link,
 skip `.git`, dependencies, binaries and files over 1 MB, and stop at 200
 results.
 
+**A WorkPilot server is declared like a tool.** `search_code` (ranked code
+excerpts, lot 7 of the [context harness](context-harness.md)) is served by the
+`workpilot-code` MCP server, so it is declared where servers are:
+`"code"` in `AGENT_CONFIGS[agent_type]["mcp_servers"]`, by the types that
+explore the code (build, QA, review, analysis, discovery, `spec_critic`). One
+declaration, read on both halves:
+
+| Where | What it does with it |
+|---|---|
+| `get_required_mcp_servers`, `create_client` | start `workpilot-code` on the session's project and approve `mcp__workpilot-code__search_code`; `AGENT_MCP_<type>_REMOVE=code` takes both away |
+| `get_tool_definitions`, `ToolExecutor.execute` | offer and run `search_code` only for a type declaring `code` (`EXECUTOR_SERVER_GRANTS`, read through `declared_servers`); refuse it by name otherwise |
+| `create_simple_client` | as for any server: started only when the caller passes it, and only if the type declares it |
+
+The brain stays the exception: it reaches every type with tools, without a
+declaration. `tests/test_agent_tool_declarations.py` holds the other direction
+here too: a prompt that names `search_code` under a type that does not declare
+`code` fails.
+
 An unregistered `agent_type` stays permissive on every row: every type the
 product passes is registered (`test_every_literal_agent_type_is_registered`),
 so an unknown one is a test or an outside caller. The other direction is held

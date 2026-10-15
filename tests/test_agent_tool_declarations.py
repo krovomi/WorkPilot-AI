@@ -138,6 +138,8 @@ def test_each_prompt_is_run_with_the_tools_it_uses(row):
         assert "Write" in tools, f"{path.name} asks for the Write tool"
     if "mcp__context7__" in text:
         assert "context7" in config["mcp_servers"], f"{path.name} asks Context7"
+    if re.search(r"\bsearch_code\b", text):  # not `mcp__github__search_code`
+        assert "code" in config["mcp_servers"], f"{path.name} asks search_code"
     if re.search(r"\bWeb(?:Search|Fetch)\b", text):
         assert {"WebSearch", "WebFetch"} <= tools, f"{path.name} searches the web"
 
