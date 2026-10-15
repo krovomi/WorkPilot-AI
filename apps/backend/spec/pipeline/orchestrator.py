@@ -6,6 +6,7 @@ Main orchestration logic for spec creation with dynamic complexity adaptation.
 """
 
 import json
+import logging
 from collections.abc import Callable
 from pathlib import Path
 
@@ -399,6 +400,11 @@ class SpecOrchestrator:
             # Update phase executor's task description
             phase_executor.task_description = self.task_description
 
+        # The card's kind, from what is already known (category, imported
+        # type, the words of the task): no model, written to task_metadata.json
+        # for the UI and the lots that follow (kanban-task-types.md, lot 0).
+        self._record_task_kind()
+
         # === CREATE LINEAR TASK (if enabled) ===
         await self._create_linear_task_if_enabled()
 
@@ -561,6 +567,22 @@ class SpecOrchestrator:
             print_status(f"Linear task created: {linear_state.task_id}", "success")
         else:
             print_status("Linear task creation failed (continuing without)", "warning")
+
+    def _record_task_kind(self) -> None:
+        """Classify the card and record the verdict; never fails the spec."""
+        try:
+            from tasks import classify_spec
+
+            text = self.task_description or ""
+            title, _, rest = text.partition("\n")
+            verdict = classify_spec(self.spec_dir, title, rest)
+            print_status(
+                f"Task kind: {verdict.kind.value} "
+                f"({verdict.source}, {verdict.confidence:.0%})",
+                "info",
+            )
+        except Exception as exc:  # noqa: BLE001 — context, not a condition
+            logging.getLogger(__name__).warning("task kind not recorded: %s", exc)
 
     async def _phase_complexity_assessment_with_requirements(
         self,

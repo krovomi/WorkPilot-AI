@@ -606,6 +606,31 @@
 			"tech-debt": "Dette technique"
 		}
 	},
+	"kind": {
+		"label": "Type",
+		"proposed": "proposé",
+		"chosen": "choisi par vous",
+		"change": "Changer le type de cette tâche",
+		"values": {
+			"feature": "Fonctionnalité",
+			"bug_fix": "Correction de bug",
+			"hotfix": "Correctif urgent",
+			"investigation": "Enquête",
+			"run": "Exploitation (RUN)",
+			"refactoring": "Refactoring",
+			"test": "Tests",
+			"docs": "Documentation",
+			"spike": "Étude / POC"
+		},
+		"source": {
+			"user": "choisi par vous",
+			"category": "d'après la catégorie",
+			"import": "d'après l'élément importé",
+			"keywords": "d'après le titre",
+			"default": "par défaut"
+		},
+		"help": "Décidé sans IA d'après la catégorie, l'élément importé ou les mots du titre. Changez-le s'il est faux : les prochaines versions choisiront le parcours à partir de lui."
+	},
 	"images": {
 		"removeImageAriaLabel": "Supprimer l'image {{filename}}",
 		"pasteHint": "Astuce : Collez des captures d'écran directement avec {{shortcut}} pour ajouter des images de référence."

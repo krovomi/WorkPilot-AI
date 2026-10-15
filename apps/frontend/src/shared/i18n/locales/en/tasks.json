@@ -606,6 +606,31 @@
 			"tech-debt": "Tech debt"
 		}
 	},
+	"kind": {
+		"label": "Kind",
+		"proposed": "proposed",
+		"chosen": "chosen by you",
+		"change": "Change the kind of this task",
+		"values": {
+			"feature": "Feature",
+			"bug_fix": "Bug fix",
+			"hotfix": "Hotfix",
+			"investigation": "Investigation",
+			"run": "Operations (RUN)",
+			"refactoring": "Refactoring",
+			"test": "Tests",
+			"docs": "Documentation",
+			"spike": "Spike / study"
+		},
+		"source": {
+			"user": "chosen by you",
+			"category": "from the category",
+			"import": "from the imported item",
+			"keywords": "from the title",
+			"default": "default"
+		},
+		"help": "Decided without AI from the category, the imported item or the words of the title. Change it if it is wrong: later versions will pick the workflow from it."
+	},
 	"images": {
 		"removeImageAriaLabel": "Remove image {{filename}}",
 		"pasteHint": "Tip: Paste screenshots directly with {{shortcut}} to add reference images."

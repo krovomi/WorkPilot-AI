@@ -82,6 +82,7 @@ import {
 import { PhaseProgressIndicator } from "./PhaseProgressIndicator";
 import { SessionCompactionBadge } from "./SessionCompactionBadge";
 import { StreamingSessionButton } from "./streaming/StreamingSessionButton";
+import { TaskKindBadge } from "./task-detail/TaskKindBadge";
 import { SyncFromBranchDialog } from "./task-detail/task-review/SyncFromBranchDialog";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -623,6 +624,9 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 				</Badge>
 			) : null}
 
+			{/* Kind of work (bug, hotfix, RUN…), decided without a model */}
+			<TaskKindBadge task={task} className="text-[10px] px-1.5 py-0" />
+
 			{/* Category badge with icon */}
 			{task.metadata?.category && (
 				<Badge
@@ -1147,6 +1151,8 @@ function taskCardPropsAreEqual(
 			nextTask.executionProgress?.overallProgress &&
 		prevTask.subtasks.length === nextTask.subtasks.length &&
 		prevTask.metadata?.category === nextTask.metadata?.category &&
+		prevTask.metadata?.kind === nextTask.metadata?.kind &&
+		prevTask.metadata?.kindSource === nextTask.metadata?.kindSource &&
 		prevTask.metadata?.complexity === nextTask.metadata?.complexity &&
 		prevTask.metadata?.archivedAt === nextTask.metadata?.archivedAt &&
 		prevTask.metadata?.prUrl === nextTask.metadata?.prUrl &&
