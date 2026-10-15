@@ -7,11 +7,17 @@ every name defined here.
 
 from __future__ import annotations
 
+import functools
 import logging
 import re
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from typing import Any
 
+from harness.application.subagents import (
+    launch_staggered,
+    receive_result,
+    subagent_messages,
+)
 from harness.domain import from_chat_completion
 from harness.domain.progress import ProgressTracker
 
@@ -239,10 +245,11 @@ class CopilotAgentClient(AgentClient):
         openai-intent, user-agent, x-github-api-version
 
     Sub-agent Strategy:
-    When sub-agents are defined, CopilotAgentClient spawns parallel
-    asyncio tasks — each making its own chat/completions call with
-    the sub-agent's specialized system prompt. Results are collected
-    and injected back into the orchestrator's context as tool results.
+    ``run_subagents`` gives each sub-agent its own chat/completions call,
+    the shared context first and its role last; the first runs alone until
+    its response arrives, then the rest together. Each result is bounded
+    to the sub-agent contract's cap and delimited as data
+    (``harness.application.subagents``).
     """
 
     # IDE impersonation headers — required by the Copilot API gateway.
@@ -1248,28 +1255,28 @@ class CopilotAgentClient(AgentClient):
         agents: dict[str, SubagentDefinition],
         context_prompt: str,
     ) -> dict[str, str]:
-        """Run sub-agents in parallel using the Copilot Models API.
+        """Run sub-agents through the Copilot Models API, staggered.
 
-        Each sub-agent gets its own API call with its specialized
-        system prompt and the shared context. Results are returned
-        as a dict mapping agent_name -> response_text.
+        Each sub-agent is one API call: the contract and the shared context
+        first, the prefix the whole wave shares, and its own role last. The
+        first runs alone until its response arrives, then the rest together
+        (``harness.application.subagents``). What each returns is bounded to
+        the contract's cap and delimited as data before the caller sees it;
+        the ledger records every call and every result.
 
         Args:
             agents: Dict of agent_name -> SubagentDefinition
             context_prompt: Shared context/prompt for all agents
 
         Returns:
-            Dict mapping agent_name -> agent response text
+            Dict mapping agent_name -> what the parent may read of its result
+            (an ``Error`` text when its call failed)
         """
-        import asyncio
 
-        async def _run_one(name: str, defn: SubagentDefinition) -> tuple[str, str]:
+        async def _run_one(
+            name: str, defn: SubagentDefinition, started: Callable[[], None]
+        ) -> str:
             """Run a single sub-agent API call."""
-            messages = [
-                {"role": "system", "content": defn.prompt},
-                {"role": "user", "content": context_prompt},
-            ]
-
             copilot_token = await self._get_copilot_token()
             session = self._get_http_client()
             payload = {
@@ -1278,7 +1285,7 @@ class CopilotAgentClient(AgentClient):
                     if defn.model != "inherit"
                     else self.model
                 ),
-                "messages": messages,
+                "messages": subagent_messages(defn.prompt, context_prompt),
                 "stream": False,
             }
             request_headers = {
@@ -1292,30 +1299,43 @@ class CopilotAgentClient(AgentClient):
                 async with session.post(
                     self._api_base, json=payload, headers=request_headers
                 ) as resp:
+                    # The response has begun: the request is not streamed, so
+                    # this is the earliest point the protocol gives.
+                    started()
                     if resp.status != 200:
                         error_text = await resp.text()
-                        return (name, f"Error ({resp.status}): {error_text}")
+                        return f"Error ({resp.status}): {error_text}"
                     data = await resp.json()
-
-                choices = data.get("choices", [])
-                if choices:
-                    return (name, choices[0].get("message", {}).get("content", ""))
-                return (name, "")
             except Exception as e:
                 logger.error(f"[CopilotSubagent:{name}] Error: {e}")
-                return (name, f"Error: {e}")
+                return f"Error: {e}"
 
-        # Run all sub-agents in parallel
-        tasks = [_run_one(name, defn) for name, defn in agents.items()]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+            if not isinstance(data, dict):
+                data = {}
+            self._record_call(
+                from_chat_completion(data.get("usage")), thread=f"subagent:{name}"
+            )
+            choices = data.get("choices", [])
+            text = choices[0].get("message", {}).get("content", "") if choices else ""
+            result, report = receive_result(
+                name, text or "", spec_dir=getattr(self, "_spec_dir", None)
+            )
+            self._record_subagent_return(report)
+            return result
+
+        outcomes = await launch_staggered(
+            {
+                name: functools.partial(_run_one, name, defn)
+                for name, defn in agents.items()
+            }
+        )
 
         output: dict[str, str] = {}
-        for result in results:
-            if isinstance(result, Exception):
-                logger.error(f"[CopilotSubagent] Task failed: {result}")
+        for name, outcome in outcomes.items():
+            if isinstance(outcome, BaseException):
+                logger.error(f"[CopilotSubagent] Task failed: {outcome}")
                 continue
-            name, text = result
-            output[name] = text
+            output[name] = outcome
 
         return output
 
