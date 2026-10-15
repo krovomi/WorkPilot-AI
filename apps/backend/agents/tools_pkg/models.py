@@ -198,6 +198,13 @@ def is_electron_mcp_enabled() -> bool:
 # =============================================================================
 # Single source of truth for phase → tools → MCP servers mapping.
 # This enables phase-aware tool control and context window optimization.
+#
+# "code" is `search_code` (`harness/tools/code_search.py`): ranked excerpts of
+# the project's code, a right like any tool. The types that explore the code to
+# find where to act or what to check declare it (build, review, analysis,
+# discovery); those whose whole input is in their prompt do not. The Claude SDK
+# reaches it over the `workpilot-code` server, every other provider through
+# `tool_executor`, which reads this same declaration.
 
 AGENT_CONFIGS = {
     # ═══════════════════════════════════════════════════════════════════════
@@ -225,7 +232,9 @@ AGENT_CONFIGS = {
         # ends up reviewing their own. The spec pipeline's self-critique, which
         # does rewrite spec.md, runs under `spec_self_critique`.
         "tools": BASE_READ_TOOLS,
-        "mcp_servers": [],  # Self-critique, no external tools
+        # Code search only: the brainstorm compares approaches with how the
+        # project already solves neighbouring problems.
+        "mcp_servers": ["code"],
         "auto_claude_tools": [],
         "thinking_default": "ultrathink",
     },
@@ -259,7 +268,7 @@ AGENT_CONFIGS = {
     # ═══════════════════════════════════════════════════════════════════════
     "planner": {
         "tools": BASE_READ_TOOLS + BASE_WRITE_TOOLS + WEB_TOOLS,
-        "mcp_servers": ["context7", "workpilot"],
+        "mcp_servers": ["context7", "workpilot", "code"],
         "mcp_servers_optional": ["linear"],  # Only if project setting enabled
         "auto_claude_tools": [
             TOOL_GET_BUILD_PROGRESS,
@@ -270,7 +279,7 @@ AGENT_CONFIGS = {
     },
     "coder": {
         "tools": BASE_READ_TOOLS + BASE_WRITE_TOOLS + WEB_TOOLS,
-        "mcp_servers": ["context7", "workpilot", "chrome-devtools"],
+        "mcp_servers": ["context7", "workpilot", "chrome-devtools", "code"],
         "mcp_servers_optional": ["linear"],
         "auto_claude_tools": [
             TOOL_UPDATE_SUBTASK_STATUS,
@@ -293,6 +302,7 @@ AGENT_CONFIGS = {
             "workpilot",
             "browser",
             "chrome-devtools",
+            "code",
         ],
         "mcp_servers_optional": ["linear"],  # For updating issue status
         "auto_claude_tools": [
@@ -309,6 +319,7 @@ AGENT_CONFIGS = {
             "workpilot",
             "browser",
             "chrome-devtools",
+            "code",
         ],
         "mcp_servers_optional": ["linear"],
         "auto_claude_tools": [
@@ -332,6 +343,7 @@ AGENT_CONFIGS = {
             "verify",
             "browser",
             "chrome-devtools",
+            "code",
         ],
         "mcp_servers_optional": [],
         "auto_claude_tools": [
@@ -353,10 +365,10 @@ AGENT_CONFIGS = {
         "thinking_default": "none",
     },
     # AI Analyzer (runners/ai_analyzer) — project-wide read-only inspection.
-    # No MCP servers: it's a pure code-walk that writes nothing.
+    # A pure code-walk that writes nothing: code search is its only server.
     "analyzer": {
         "tools": BASE_READ_TOOLS,
-        "mcp_servers": [],
+        "mcp_servers": ["code"],
         "auto_claude_tools": [],
         "thinking_default": "low",
     },
@@ -367,7 +379,7 @@ AGENT_CONFIGS = {
     # `deliver` away from reporting an artifact nobody validated.
     "architecture_visualizer": {
         "tools": BASE_READ_TOOLS + ["Write"],
-        "mcp_servers": [],
+        "mcp_servers": ["code"],
         "auto_claude_tools": [],
         "thinking_default": "high",
     },
@@ -391,7 +403,7 @@ AGENT_CONFIGS = {
     },
     "pr_reviewer": {
         "tools": BASE_READ_TOOLS + WEB_TOOLS,  # Read-only
-        "mcp_servers": ["context7"],
+        "mcp_servers": ["context7", "code"],
         "auto_claude_tools": [],
         "thinking_default": "high",
     },
@@ -400,7 +412,7 @@ AGENT_CONFIGS = {
         # NOTE: Do NOT add "Task" here - the SDK auto-allows Task when agents are defined
         # via the --agents flag. Explicitly adding it interferes with agent registration.
         "tools": BASE_READ_TOOLS + WEB_TOOLS,
-        "mcp_servers": ["context7"],
+        "mcp_servers": ["context7", "code"],
         "auto_claude_tools": [],
         "thinking_default": "high",
     },
@@ -408,7 +420,7 @@ AGENT_CONFIGS = {
         # Read-only for parallel followup reviewer
         # NOTE: Do NOT add "Task" here - same reason as pr_orchestrator_parallel
         "tools": BASE_READ_TOOLS + WEB_TOOLS,
-        "mcp_servers": ["context7"],
+        "mcp_servers": ["context7", "code"],
         "auto_claude_tools": [],
         "thinking_default": "high",
     },
@@ -427,7 +439,7 @@ AGENT_CONFIGS = {
         # Standalone validator for re-checking findings against actual code
         # Called separately from orchestrator to validate findings with fresh context
         "tools": BASE_READ_TOOLS,
-        "mcp_servers": [],
+        "mcp_servers": ["code"],
         "auto_claude_tools": [],
         "thinking_default": "medium",
     },
@@ -455,7 +467,7 @@ AGENT_CONFIGS = {
     "impact_analyzer": {
         # agents/impact_analyzer.py — blast radius of a finished change.
         "tools": BASE_READ_TOOLS,
-        "mcp_servers": [],
+        "mcp_servers": ["code"],
         "auto_claude_tools": [],
         "thinking_default": "medium",
     },
@@ -464,7 +476,7 @@ AGENT_CONFIGS = {
         # caller reads the verdict back from `<spec_dir>/architecture_report.json`,
         # so it needs Bash and Write. Not Edit: a reviewer does not touch code.
         "tools": BASE_READ_TOOLS + ["Write", "Bash"],
-        "mcp_servers": [],
+        "mcp_servers": ["code"],
         "auto_claude_tools": [],
         "thinking_default": "high",
     },
@@ -550,7 +562,7 @@ AGENT_CONFIGS = {
     # needs Edit. Until the executor named them, the roadmap ran as `coder`.
     "roadmap_discovery": {
         "tools": BASE_READ_TOOLS + WEB_TOOLS + ["Write", "Bash"],
-        "mcp_servers": ["context7"],
+        "mcp_servers": ["context7", "code"],
         "auto_claude_tools": [],
         "thinking_default": "high",
     },
@@ -567,7 +579,7 @@ AGENT_CONFIGS = {
         # grants of the settings file; those no longer decide what a type
         # may do (see `undeclared_builtin_tools`), so the config says it.
         "tools": BASE_READ_TOOLS + WEB_TOOLS + ["Write", "Bash"],
-        "mcp_servers": [],
+        "mcp_servers": ["code"],
         "auto_claude_tools": [],
         "thinking_default": "high",
     },
@@ -629,6 +641,9 @@ def _map_mcp_server_name(
         "chrome-devtools": "chrome-devtools",
         "verify": "verify",
         "workpilot-verify": "verify",
+        "code": "code",
+        "workpilot-code": "code",
+        "search_code": "code",
         "workpilot": "workpilot",
         "github": "github",
         "brave-search": "brave-search",

@@ -101,7 +101,8 @@ def _as_bool(value: Any) -> bool:
 #: Executor tool -> the declarations (`AGENT_CONFIGS[...]["tools"]`) that
 #: grant it. A tool absent from this table is not gated: reading a file,
 #: listing a directory, and the verify tools, which decide their own audience.
-#: The brain and ui-ux tools go to every type that declares a tool at all.
+#: The brain and ui-ux tools go to every type that declares a tool at all;
+#: `search_code` is gated by `EXECUTOR_SERVER_GRANTS`.
 #:
 #: This is the non-Claude half of `undeclared_builtin_tools`. The executor used
 #: to offer `write_file` and `run_command` to every agent type and to run any
@@ -117,6 +118,14 @@ EXECUTOR_GRANTS: dict[str, tuple[str, ...]] = {
 }
 
 
+#: Executor tool -> the MCP server whose declaration
+#: (`AGENT_CONFIGS[...]["mcp_servers"]`) grants it: the tool a Claude session
+#: reaches over that server, run here for the other providers.
+EXECUTOR_SERVER_GRANTS: dict[str, str] = {
+    "search_code": "code",
+}
+
+
 def executor_may_use(agent_type: str | None, tool_name: str) -> bool:
     """Whether `agent_type` may be offered — and may run — `tool_name`.
 
@@ -126,8 +135,12 @@ def executor_may_use(agent_type: str | None, tool_name: str) -> bool:
     """
     if agent_type is None:
         return True
-    from agents.tools_pkg.permissions import declared_tools
+    from agents.tools_pkg.permissions import declared_servers, declared_tools
 
+    server = EXECUTOR_SERVER_GRANTS.get(tool_name)
+    if server is not None:
+        servers = declared_servers(agent_type)
+        return servers is None or server in servers
     declared = declared_tools(agent_type)
     if declared is None:
         return True
@@ -369,6 +382,20 @@ class ToolExecutor:
                     tool_name,
                     arguments,
                     task=task_ref(self.project_dir, self.spec_dir),
+                    max_chars=self._page_chars(),
+                )
+            )
+        elif _is_code_search_tool(tool_name):
+            # Ranked code excerpts: the tool the Claude SDK reaches over the
+            # `workpilot-code` server, paged under this client's result cap and
+            # masked for secrets before they come back.
+            from harness.tools.code_search import execute_tool as search_code
+
+            return self._fit_output(
+                await search_code(
+                    tool_name,
+                    arguments,
+                    project_dir=self.project_dir,
                     max_chars=self._page_chars(),
                 )
             )
@@ -876,6 +903,25 @@ def _is_verify_tool(name: str) -> bool:
         return False
 
 
+def _is_code_search_tool(name: str) -> bool:
+    try:
+        from harness.tools.code_search import is_code_search_tool
+
+        return is_code_search_tool(name)
+    except Exception:  # noqa: BLE001 - an optional tool never breaks dispatch
+        return False
+
+
+def _code_search_tool_definitions() -> list[dict[str, Any]]:
+    """`search_code`; `get_tool_definitions` keeps it for the types that declare it."""
+    try:
+        from harness.tools.code_search import tool_definitions
+
+        return tool_definitions()
+    except Exception:  # noqa: BLE001 - an optional tool never breaks a session
+        return []
+
+
 #: The agent types that drive a verification and get the `verify_*` tools.
 VERIFY_AGENT_TYPES = frozenset({"verifier"})
 
@@ -1104,6 +1150,9 @@ def get_tool_definitions(
     base_tools.extend(_uiux_tool_definitions(spec_dir))
     # The verifier, like `create_client` gives it the `workpilot-verify` server.
     base_tools.extend(_verify_tool_definitions(agent_type))
+    # Ranked code excerpts, for a type that declares them
+    # (`EXECUTOR_SERVER_GRANTS`), like `create_client` starts `workpilot-code`.
+    base_tools.extend(_code_search_tool_definitions())
     # Only what the type declares (`EXECUTOR_GRANTS`): a reviewer is offered
     # no `write_file` and no `run_command`, and `execute` refuses them too.
     # Sorted and serialized one way (`harness.domain.tools`): the definitions
