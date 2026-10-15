@@ -185,31 +185,35 @@ class _OllamaResponse:
         return False
 
 
+# Built here: inside post(), `json` is aiohttp's keyword, not the module.
+_OLLAMA_READ_LINE = (
+    json.dumps(
+        {
+            "message": {
+                "content": "",
+                "tool_calls": [
+                    {
+                        "function": {
+                            "name": "read_file",
+                            "arguments": {"path": "a.py"},
+                        }
+                    }
+                ],
+            },
+            "done": True,
+        }
+    )
+    + "\n"
+)
+
+
 class _OllamaSession:
     def __init__(self):
         self.payloads: list[dict] = []
 
     def post(self, url, json=None, timeout=None, *, allow_redirects=True):  # noqa: A002
         self.payloads.append({"messages": [dict(m) for m in json["messages"]]})
-        return _OllamaResponse(
-            _dumps(
-                {
-                    "message": {
-                        "content": "",
-                        "tool_calls": [
-                            {
-                                "function": {
-                                    "name": "read_file",
-                                    "arguments": {"path": "a.py"},
-                                }
-                            }
-                        ],
-                    },
-                    "done": True,
-                }
-            )
-            + "\n"
-        )
+        return _OllamaResponse(_OLLAMA_READ_LINE)
 
 
 @pytest.mark.asyncio
