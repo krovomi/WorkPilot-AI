@@ -206,12 +206,24 @@ def is_brain_tool(name: str) -> bool:
     return name in AGENT_TOOL_NAMES
 
 
-def _call(name: str, arguments: dict[str, Any], task: str | None = None) -> str:
+def _call(
+    name: str,
+    arguments: dict[str, Any],
+    task: str | None = None,
+    max_chars: int | None = None,
+) -> str:
     from .mcp_server import _call as call
     from .vault import Brain
 
     try:
-        payload = call(Brain(), name, dict(arguments or {}), trusted=False, task=task)
+        payload = call(
+            Brain(),
+            name,
+            dict(arguments or {}),
+            trusted=False,
+            task=task,
+            max_chars=max_chars,
+        )
     except (KeyError, ValueError, OSError) as exc:
         detail = f"missing argument {exc}" if isinstance(exc, KeyError) else str(exc)
         return f"Error: {detail}"
@@ -221,7 +233,14 @@ def _call(name: str, arguments: dict[str, Any], task: str | None = None) -> str:
 
 
 async def execute_tool(
-    name: str, arguments: dict[str, Any], task: str | None = None
+    name: str,
+    arguments: dict[str, Any],
+    task: str | None = None,
+    max_chars: int | None = None,
 ) -> str:
-    """Run a brain tool off the event loop: a read may pull, a write pushes."""
-    return await asyncio.to_thread(_call, name, arguments, task)
+    """Run a brain tool off the event loop: a read may pull, a write pushes.
+
+    ``max_chars`` pages a note or a skill under the caller's result cap
+    rather than the stdio server's.
+    """
+    return await asyncio.to_thread(_call, name, arguments, task, max_chars)

@@ -3,7 +3,13 @@
 from __future__ import annotations
 
 import pytest
-from harness.domain.paging import LinePage, page_items, page_lines, render_page
+from harness.domain.paging import (
+    LinePage,
+    page_items,
+    page_lines,
+    render_page,
+    spill_excerpt,
+)
 
 TEXT = "".join(f"line {n}\n" for n in range(1, 101))  # 100 lines, 8-9 chars each
 
@@ -92,3 +98,39 @@ def test_page_items(offset, max_items, max_chars, expected, next_offset):
         ["a", "bb", "ccc"], offset=offset, max_items=max_items, max_chars=max_chars
     )
     assert page == (expected, next_offset)
+
+
+LOG = "".join(f"step {n}\n" for n in range(1, 1001))  # 1,000 lines
+
+
+def test_a_spill_excerpt_says_first_where_the_whole_output_is():
+    excerpt = spill_excerpt(LOG, max_chars=1_000, location="spec/out.txt")
+    assert len(excerpt) <= 1_000
+    note = excerpt.splitlines()[0]
+    assert note.startswith("[output of ") and "1000 lines" in note
+    assert "spec/out.txt" in note
+
+
+def test_a_spill_excerpt_shows_whole_lines_from_both_ends_and_where_the_gap_starts():
+    excerpt = spill_excerpt(LOG, max_chars=1_000, location="spec/out.txt")
+    body = excerpt.splitlines()[1:]
+    gap = next(i for i, line in enumerate(body) if line.startswith("... [lines "))
+    head, tail = body[:gap], body[gap + 1 :]
+    assert head == [f"step {n}" for n in range(1, len(head) + 1)]
+    assert tail == [f"step {n}" for n in range(1001 - len(tail), 1001)]
+    first_hidden = len(head) + 1
+    assert f"lines {first_hidden}–{1000 - len(tail)} not shown" in body[gap]
+    assert f"offset={first_hidden}" in body[gap]
+
+
+def test_the_part_a_spill_excerpt_hides_is_read_back_from_its_offset():
+    excerpt = spill_excerpt(LOG, max_chars=1_000, location="spec/out.txt")
+    offset = int(excerpt.split("offset=")[1].split("]")[0])
+    page = page_lines(LOG, offset=offset, max_chars=100_000)
+    assert page.text.splitlines()[0] == f"step {offset}"
+
+
+def test_a_single_line_longer_than_the_excerpt_is_left_to_the_file():
+    excerpt = spill_excerpt("x" * 5_000, max_chars=1_000, location="out.txt")
+    assert len(excerpt) <= 1_000
+    assert "lines 1–1 not shown" in excerpt and "offset=1" in excerpt

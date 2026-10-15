@@ -558,7 +558,7 @@ OpenCode, Antigravity) are not affected.
 
 | Variable | Default | Meaning |
 | --- | ---: | --- |
-| `LLM_TOOL_RESULT_MAX_CHARS` | 10000 | Characters of one tool result kept in the conversation (minimum 1000); the cut keeps the start and the end. `read_file`, `search_files` and `find_files` page under it instead, and say which offset reads on, so nothing is cut from them. On Ollama it is also capped from the model's context length. |
+| `LLM_TOOL_RESULT_MAX_CHARS` | 10000 | Characters of one tool result kept in the conversation (minimum 1000); the cut keeps the start and the end. `read_file`, `search_files` and `find_files` page under it instead, and say which offset reads on, so nothing is cut from them; a longer `run_command` output is written, secrets masked, to `<spec>/tool-output/` and the model reads its head, its tail and the offset of the rest. On Ollama it is also capped from the model's context length. |
 | `LLM_HISTORY_CHAR_BUDGET` | 300000 | Conversation size, in characters (minimum 50000), above which the oldest tool results are replaced by a placeholder. The system prompt, the first request and the last eight messages are always kept. Also capped on Ollama. |
 | `LOCAL_COMMAND_TIMEOUT` | 120 | Seconds before a shell command run by the agent is killed. Despite its name, not limited to local models. Must be a positive number. |
 | `LLM_INLINE_FILE_CONTEXT` | `auto` | Whether the coder's prompt includes excerpts of the files to modify and of the pattern files: `auto` for providers other than Claude at effort `none`, `low` or `medium`; `always` for every provider, Claude included; `never` for none. |
