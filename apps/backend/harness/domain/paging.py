@@ -111,3 +111,53 @@ def page_items(
         used += cost
         position += 1
     return page, None
+
+
+def spill_excerpt(text: str, *, max_chars: int, location: str) -> str:
+    """What the model reads of an output written whole to ``location``.
+
+    A command's output cannot be paged by asking for it again: running the
+    command twice may not give the same output, and may cost minutes. So the
+    whole output goes to a file, and the result says so first — where the file
+    is, how long it is — then shows its head and its tail in whole lines, with
+    the exact ``offset`` at which the part not shown begins. A build puts its
+    first error near the start and its verdict at the end; the middle is one
+    ``read_file`` away instead of lost.
+
+    The note comes first so that a client that cuts the result afterwards,
+    keeping its head, keeps the way to the rest.
+    """
+    lines = text.splitlines(keepends=True)
+    total = len(lines)
+    note = (
+        f"[output of {len(text)} characters, {total} lines; all of it is in "
+        f"{location}: read the part not shown with read_file and offset]\n"
+    )
+    gap_reserve = len(location) + 120
+    budget = max(0, max_chars - len(note) - gap_reserve)
+    head: list[str] = []
+    used = 0
+    for line in lines:
+        if used + len(line) > budget // 2:
+            break
+        head.append(line)
+        used += len(line)
+    tail: list[str] = []
+    for line in reversed(lines[len(head) :]):
+        if used + len(line) > budget:
+            break
+        tail.append(line)
+        used += len(line)
+    tail.reverse()
+    first_hidden = len(head) + 1
+    last_hidden = total - len(tail)
+    if last_hidden < first_hidden:
+        return note + text
+    head_text = "".join(head)
+    if head_text and not head_text.endswith("\n"):
+        head_text += "\n"
+    gap = (
+        f"... [lines {first_hidden}–{last_hidden} not shown: "
+        f"read_file {location} with offset={first_hidden}] ...\n"
+    )
+    return note + head_text + gap + "".join(tail)

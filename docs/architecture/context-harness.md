@@ -1,8 +1,8 @@
 # Harness de contexte : le plan
 
 > **Statut : plan ; livrés : le lot 0 (mesurer, sauf sa ligne de base), le lot 1a (un budget
-> par session pour tous), le lot 2 (un préfixe stable, sauf D3) et le lot 3a (lire et chercher
-> par pages).** Ce fichier fixe la cible
+> par session pour tous), le lot 2 (un préfixe stable, sauf D3) et le lot 3 (troncature à la
+> source, sauf les plafonds natifs, réglés sur la ligne de base).** Ce fichier fixe la cible
 > et l'ordre des lots ; chaque lot livré remplace sa section par la justification de ce qui existe. [`docs/CLAUDE.md`](../CLAUDE.md)
 > reste normatif : là où les deux divergent, il gagne. Le mécanisme existant de compaction et de
 > reset est décrit dans [`context-management.md`](context-management.md), que ce plan prolonge sans
@@ -81,8 +81,8 @@ sens partout, une boucle unique, et la troncature à la source.
 | Mesure | lot 0 livré : chaque client lit l'usage de chaque appel dans l'unité commune de `harness/domain/` et le cumule dans son `usage_ledger` ; `record_client_usage` en tire les champs du suivi des coûts, `CONTEXT_USAGE` le taux de hit et les réécritures de préfixe | la ligne de base sur des tâches réelles ; le coût par appel (seul le coût de session est connu) |
 | Compaction | `context_mgmt/` : garde par tâche, seuil 50 % par défaut (30–90), *compact* ou *clear*, handoff préparé en fond par le provider de la tâche, cap de 3 resets ; native sur Claude et Codex, émulée ailleurs | un seuil calculé sur la fenêtre annoncée, pas sur la fenêtre *payable* (palier de prix à 200 k chez certains providers) |
 | Tool clearing | boucles WorkPilot : `compact_messages` remplace les vieux résultats par un marqueur au-delà de 300 k caractères. Claude Code purge de son côté | pas de règle d'âge (« plus vieux que N tours »), pas de gain minimal |
-| Troncature | rtk sur Bash ; boucles WorkPilot : résultat coupé à 10 k caractères (70 % tête / 30 % queue). Lot 3a : `read_file`, `search_files` et `find_files` paginent sous ce plafond. Claude Code plafonne nativement (table ci-dessus) | `run_command` coupe encore le milieu d'une longue sortie ; les serveurs MCP de WorkPilot ne paginent pas ; aucun plafond natif réglé par WorkPilot |
-| Mémoire externe | cerveau (vault, `graph.json`, serveur MCP 9 outils), `implementation_plan.json`, `build-progress.txt`, `handoff_pending.md`, rapports de phase plafonnés | pas de déversement des sorties longues vers un fichier relisible dans les boucles WorkPilot |
+| Troncature | rtk sur Bash ; boucles WorkPilot : résultat coupé à 10 k caractères (70 % tête / 30 % queue). Lot 3 : `read_file`, `search_files` et `find_files` paginent sous ce plafond ; une longue sortie de `run_command` ou d'un outil exécuté dans le processus va dans un fichier ; le cerveau pagine ses notes et ses skills. Claude Code plafonne nativement (table ci-dessus) | aucun plafond natif réglé par WorkPilot : la ligne de base dira s'il faut baisser ceux de Claude Code |
+| Mémoire externe | cerveau (vault, `graph.json`, serveur MCP 9 outils), `implementation_plan.json`, `build-progress.txt`, `handoff_pending.md`, rapports de phase plafonnés. Lot 3b : les sorties longues des boucles WorkPilot vont dans `<spec>/tool-output/`, relues par `read_file` | un `MemoryPort` unique (lot 5) |
 | Sous-agents | registre `agents/subagents/`, roster ≤ 7 ; Claude et Copilot | « rends une synthèse structurée » n'est qu'une consigne : rien ne la vérifie ; Copilot les lance tous à la fois |
 | Outils dynamiques | `AGENT_CONFIGS` par type d'agent ; MCP ajoutés selon la tâche ; schémas MCP différés sur Claude (`ENABLE_TOOL_SEARCH=auto:5`) | rien par phase dans une même tâche, ni pour les autres providers |
 | Effort et routage | effort par phase (`phase_config.py`), traduit par provider (`reasoning_effort`, budget de réflexion) ; routeur de complexité et `model_router` presque toujours éteints | pas d'escalade automatique |
@@ -349,16 +349,42 @@ pouvait pas le demander.
 Tests : `tests/harness/test_paging.py`, `tests/core/runtimes/test_tool_executor_paging.py` (un fichier
 de 3 000 lignes lu en entier page par page, recherche paginée sans doublon, chemin hors racine refusé).
 
-**Reste à faire (lot 3b).**
+**Lot 3b — Déverser ce qui ne se relit pas, paginer le cerveau (livré, sauf les plafonds
+natifs).** Une commande ne se pagine pas en la relançant : la relancer peut ne pas donner la même
+sortie, et coûter des minutes.
 
-- **Déversement** de `run_command` : une sortie au-delà du plafond est écrite dans le dossier de la
-  spec (`path_guard` s'applique), le modèle reçoit un extrait, le total et le chemin à relire par
-  `read_file` et `offset` — ce que Claude Code fait déjà pour Bash.
-- Les serveurs MCP de WorkPilot (cerveau, `workpilot`) paginent : c'est la voie qui atteint aussi
-  les boucles tierces.
-- Voie native, par capacité déclarée : Claude Code expose ses plafonds (table plus haut), posés
-  dans `sdk_env` comme l'auto-compaction aujourd'hui. Pour Codex, OpenCode et Antigravity, on
-  documente leurs réglages avant d'en dépendre.
+- **Déversement** (`ToolExecutor._fit_output`) : une sortie de `run_command` plus longue qu'une page
+  est écrite entière dans `<spec>/tool-output/command-<empreinte>.txt`, et le modèle lit
+  `spill_excerpt` (`harness/domain/paging.py`, pur) : d'abord la note qui dit où est le tout et sa
+  taille, puis la tête et la queue en lignes entières, avec l'`offset` exact où commence la partie
+  cachée, relue par `read_file`. La note vient en premier : un client qui coupe le résultat ensuite
+  en garde la tête, donc le chemin. Une commande qui échoue déverse sa sortie de la même façon, et
+  les outils exécutés dans le processus (cerveau, `uiux`, `verify`) aussi.
+- **Ce qui est écrit** : la copie est masquée par la table de secrets du hook `pre-commit`
+  (`docintel.redact`) avant l'écriture (S1) ; sans cette table, rien n'est écrit et le résultat est
+  coupé comme avant. Le dossier se résout (liens compris) et doit rester dans le projet, là où
+  `read_file` l'atteint : sans dossier de spec, ou avec un dossier hors du projet ou lié vers
+  l'extérieur, rien n'est écrit. Une sortie de plus de 2 millions de caractères garde sa tête et sa
+  queue sur disque aussi.
+- **Le cerveau pagine** : `brain_read_note` et `brain_skill` prennent `offset` et `limit` ; un texte
+  qui tient revient entier, exactement comme avant, un plus long revient par pages de 40 000
+  caractères au plus, ou moins quand le client a baissé `MAX_MCP_OUTPUT_TOKENS` (un serveur MCP
+  hérite de l'environnement du client qui le lance). Dans une boucle WorkPilot, la page suit le
+  plafond du client. C'est la voie qui atteint aussi les boucles tierces.
+- **Le serveur `workpilot`** n'a rien à paginer : ses outils rendent un statut, et
+  `get_session_context` est déjà borné (20 découvertes, 15 pièges, 15 motifs).
+
+**Reste à faire.** La voie native : Claude Code plafonne déjà Bash, Read et MCP par défaut (table
+plus haut) ; les baisser échange du contexte contre des appels d'outils, un pari que la ligne de base
+du lot 0 tranchera. Pour Codex, OpenCode et Antigravity, documenter leurs réglages avant d'en
+dépendre.
+
+Tests : `tests/harness/test_paging.py` (l'extrait : note d'abord, lignes entières, `offset` exact de
+la partie cachée), `tests/core/runtimes/test_tool_executor_spill.py` (sortie courte inchangée,
+longue écrite et relue ligne par ligne, secret masqué, rien d'écrit sans table de secrets, sans
+dossier de spec, hors du projet ou à travers un lien ; une commande qui échoue déverse aussi),
+`tests/test_brain_paging.py` (note et skill lus en entier page par page, page sous le plafond du
+client).
 
 *Sortie :* la part des sorties d'outils dans le contexte baisse sur la ligne de base, sans hausse
 des passes QA.

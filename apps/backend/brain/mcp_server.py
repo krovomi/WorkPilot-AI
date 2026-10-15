@@ -12,7 +12,7 @@ The tools are the recall ladder and the write path, nothing else:
 |---|---|
 | `brain_recall` | 1 + 2 — graph hits, their neighbours and their frontmatter |
 | `query_graph`, `get_node`, `shortest_path` | 1 — Graphify's own tool names, so a skill written for Graphify's server works here |
-| `brain_read_note` | 3 — one note, in full |
+| `brain_read_note` | 3 — one note, in full, or a page of it when it is long |
 | `brain_instructions` | the shared instructions, to apply in addition to the agent's own |
 | `brain_skill` | a skill stored in the brain (``graph-first-recall``…) |
 | `brain_write_note`, `brain_remember` | write, then commit / pull / push |
@@ -32,6 +32,8 @@ import traceback
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
+
+from harness.domain.paging import FOOTER_RESERVE, page_lines, render_page
 
 from .home import digest_path
 from .memories import instructions as list_instructions
@@ -54,6 +56,38 @@ SERVER_INSTRUCTIONS = (
 )
 
 _STR = {"type": "string"}
+
+#: The most of a note or a skill one call returns. A longer one comes a page at
+#: a time, followed by the offset that reads on (`harness.domain.paging`): an
+#: MCP client caps what it keeps of a tool result (Claude Code at 25,000 tokens,
+#: WorkPilot's own loops at their result cap), and its cut loses the middle.
+READ_MAX_CHARS = 40_000
+
+#: Claude Code's cap on an MCP result, in tokens. An MCP server inherits the
+#: environment of the client that starts it, so a cap the user lowered is
+#: visible here, and a page is made to fit under it.
+MCP_OUTPUT_TOKENS_ENV = "MAX_MCP_OUTPUT_TOKENS"
+#: Characters per token assumed when converting that cap: low on purpose, so a
+#: page of code or of French prose still fits.
+_CHARS_PER_TOKEN = 3
+
+
+def read_max_chars() -> int:
+    """The page size of a read: `READ_MAX_CHARS`, or less under a lower client cap."""
+    tokens = _line_arg(os.environ.get(MCP_OUTPUT_TOKENS_ENV))
+    if tokens is None or tokens <= 0:
+        return READ_MAX_CHARS
+    return max(1_000, min(READ_MAX_CHARS, tokens * _CHARS_PER_TOKEN))
+
+
+_PAGE = {
+    "offset": {
+        "type": "integer",
+        "minimum": 1,
+        "description": "first line to read, when a previous read said where to go on",
+    },
+    "limit": {"type": "integer", "minimum": 1, "description": "lines to read at most"},
+}
 
 
 def _schema(props: dict[str, Any], required: list[str] | None = None) -> dict[str, Any]:
@@ -104,8 +138,11 @@ TOOLS: list[dict[str, Any]] = [
     },
     {
         "name": "brain_read_note",
-        "description": "Niveau 3 : le contenu complet d'une note (chemin relatif = source_file).",
-        "inputSchema": _schema({"path": _STR}, ["path"]),
+        "description": (
+            "Niveau 3 : le contenu complet d'une note (chemin relatif = source_file). "
+            "Une note longue arrive par pages : la fin du corps donne l'offset de la suite."
+        ),
+        "inputSchema": _schema({"path": _STR, **_PAGE}, ["path"]),
         "annotations": {"readOnlyHint": True},
     },
     {
@@ -118,8 +155,11 @@ TOOLS: list[dict[str, Any]] = [
     },
     {
         "name": "brain_skill",
-        "description": "Lire un skill stocké dans le cerveau (sans nom : la liste).",
-        "inputSchema": _schema({"name": _STR}),
+        "description": (
+            "Lire un skill stocké dans le cerveau (sans nom : la liste). "
+            "Un skill long arrive par pages, comme une note."
+        ),
+        "inputSchema": _schema({"name": _STR, **_PAGE}),
         "annotations": {"readOnlyHint": True},
     },
     {
@@ -189,6 +229,27 @@ TASK_ENV = "WORKPILOT_BRAIN_TASK"
 what an agent writes during a build shows up on that task's card."""
 
 
+def _line_arg(value: Any) -> int | None:
+    """A line number or count sent by a model, or None when absent or unreadable."""
+    if isinstance(value, bool):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _page(text: str, args: dict[str, Any], max_chars: int) -> str:
+    """``text`` whole when it fits and no offset is asked, else the page asked."""
+    page = page_lines(
+        text,
+        offset=_line_arg(args.get("offset")) or 1,
+        limit=_line_arg(args.get("limit")),
+        max_chars=max(500, max_chars - FOOTER_RESERVE),
+    )
+    return render_page(page)
+
+
 def _trusted_default() -> bool:
     return os.environ.get(ORIGIN_ENV, "").strip().lower() != "workpilot"
 
@@ -200,9 +261,12 @@ def _call(
     *,
     trusted: bool | None = None,
     task: str | None = None,
+    max_chars: int | None = None,
 ) -> Any:
     if trusted is None:
         trusted = _trusted_default()
+    if max_chars is None:
+        max_chars = read_max_chars()
     if task is None:
         task = os.environ.get(TASK_ENV, "").strip() or None
     graph_tools: dict[str, Callable[[], Any]] = {
@@ -220,7 +284,8 @@ def _call(
     if name == "brain_recall":
         return brain.recall(args["query"], limit=int(args.get("limit", 5)))
     if name == "brain_read_note":
-        return brain.read(args["path"])
+        note = brain.read(args["path"])
+        return {**note, "body": _page(note["body"], args, max_chars)}
     if name == "brain_instructions":
         brain.before_read()
         who = args.get("agent")
@@ -230,7 +295,8 @@ def _call(
         ]
     if name == "brain_skill":
         brain.before_read()
-        return _skills(brain, args.get("name"))
+        skill = _skills(brain, args.get("name"))
+        return _page(skill, args, max_chars) if isinstance(skill, str) else skill
     if name == "brain_write_note":
         return brain.write(
             args["title"],
