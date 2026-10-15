@@ -421,7 +421,7 @@ async def test_the_ledger_restarts_before_the_first_message():
     await _collect(client)
     await client.query("again")
 
-    async for _msg in client.receive_response():
+    async for _ in client.receive_response():
         assert client.usage_ledger.calls == [CallUsage(10, None, None, 1)]
 
 

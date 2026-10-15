@@ -66,47 +66,49 @@ class Outcome(Enum):
 class ModelPort(Protocol):
     """One response of one provider, as the loop drives it."""
 
+    # A docstring is each method's whole body: a protocol only declares.
+
     @property
-    def provider(self) -> str: ...
+    def provider(self) -> str:
+        """The provider's name, for log lines."""
 
     def assemble(self, turn: int) -> Any:
         """This turn's request, from the conversation so far."""
-        ...
 
     def call(self, request: Any, turn: int) -> AsyncIterator[Any]:
         """Send the request and read the answer (see the module docstring)."""
-        ...
 
     def settle(self, reply: Reply, turn: int) -> tuple[list[Any], Outcome]:
         """A reply with no tool call: the messages it adds, and whether it ends
         the response, is asked again, or halts it."""
-        ...
 
-    def announce(self, call: ToolCall, turn: int) -> None: ...
+    def announce(self, call: ToolCall, turn: int) -> None:
+        """Log that ``call`` is about to run."""
 
-    async def execute(self, call: ToolCall) -> ToolResult: ...
+    async def execute(self, call: ToolCall) -> ToolResult:
+        """Run ``call`` through the client's executor or MCP bridge."""
 
     def reinject(self, reply: Reply, results: Sequence[ToolResult]) -> None:
         """The assistant turn and its results, back into the conversation."""
-        ...
 
     def remind(self, text: str) -> None:
         """A note to the model, appended to the conversation."""
-        ...
 
     def clear(self) -> None:
         """Clear old tool results, when ``harness.domain.policies`` says so."""
-        ...
 
     def finish(self, reason: StopReason) -> None:
         """The response is over, for ``reason``: totals, last log line."""
-        ...
 
     # The messages the session runner receives.
-    def text(self, text: str) -> Any: ...
+    def text(self, text: str) -> Any:
+        """The model's text, as a message."""
 
-    def notice(self, text: str) -> Any: ...
+    def notice(self, text: str) -> Any:
+        """A note from WorkPilot (an error, a stop), as a message."""
 
-    def tool_use(self, call: ToolCall) -> Any: ...
+    def tool_use(self, call: ToolCall) -> Any:
+        """A tool call, as a message."""
 
-    def tool_result(self, call: ToolCall, result: ToolResult) -> Any: ...
+    def tool_result(self, call: ToolCall, result: ToolResult) -> Any:
+        """A tool's result, as a message."""

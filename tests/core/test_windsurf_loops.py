@@ -559,7 +559,7 @@ async def test_rest_the_ledger_restarts_before_the_first_message(monkeypatch):
     await _collect(client)
     await client.query("again")
 
-    async for _msg in client.receive_response():
+    async for _ in client.receive_response():
         # The session runner prices the ledger after every message.
         assert client.usage_ledger.calls == [CallUsage(10, None, None, 1)]
 

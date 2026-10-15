@@ -554,7 +554,7 @@ async def test_the_ledger_restarts_before_the_first_message():
     await client.query("again")
 
     seen = []
-    async for _msg in client.receive_response():
+    async for _ in client.receive_response():
         seen.append(list(client.usage_ledger.calls))
 
     # Empty at the context line, this response's call after it.

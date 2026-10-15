@@ -341,7 +341,7 @@ class _CopilotAdapter(ChatCompletionsAdapter):
                 ) as resp:
                     if resp.status == 403 and not client._using_github_models:
                         # Copilot API blocked (org restriction) — fallback to GitHub Models API
-                        error_text = await resp.text()
+                        await resp.text()  # read the refusal before the next request
                         logger.warning(
                             f"[CopilotAgentClient] Copilot API returned 403 — "
                             f"falling back to GitHub Models API at {client._github_models_api_base}"
