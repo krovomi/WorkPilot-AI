@@ -14,6 +14,10 @@ Two signals come out of it besides the totals:
   changed (an edited system prompt, a reordered tool list) or the cache
   expired. Either way, the call paid for what it should have read.
 
+It also keeps what each sub-agent brought back into the session's context
+(:class:`~harness.domain.subagents.SubagentReturn`): how much, and whether it
+was cut to the contract's cap.
+
 Pure, table-tested in ``tests/harness/test_ledger.py``.
 """
 
@@ -21,6 +25,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from .subagents import SubagentReturn
 from .usage import CallUsage
 
 # Below this many prompt tokens no provider caches (Anthropic's smallest
@@ -43,6 +48,7 @@ class UsageLedger:
 
     calls: list[CallUsage] = field(default_factory=list)
     prefix_rewrites: int = 0
+    returns: list[SubagentReturn] = field(default_factory=list)
     _last_prompt: dict[str | None, int] = field(
         default_factory=dict, init=False, repr=False
     )
@@ -62,6 +68,11 @@ class UsageLedger:
         if usage.prompt is not None:
             self._last_prompt[thread] = usage.prompt
         self.calls.append(usage)
+
+    def record_return(self, report: SubagentReturn | None) -> None:
+        """One sub-agent result, as the parent read it. ``None`` is ignored."""
+        if report is not None:
+            self.returns.append(report)
 
     def boundary(self, *, thread: str | None = None) -> None:
         """The thread starts over (compaction, fresh thread): the next cold call is expected."""
@@ -128,4 +139,7 @@ class UsageLedger:
             "outputTokens": self.output,
             "cacheHitRatio": None if ratio is None else round(ratio, 4),
             "prefixRewrites": self.prefix_rewrites,
+            "subagentReturns": len(self.returns),
+            "subagentReturnTokens": sum(r.returned_tokens for r in self.returns),
+            "subagentReturnsCut": sum(1 for r in self.returns if r.cut),
         }

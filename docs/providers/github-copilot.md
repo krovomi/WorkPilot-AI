@@ -111,7 +111,9 @@ sequenceDiagram
 **Méthodes principales** :
 - `query()` : Met en file la requête
 - `receive_response()` : Exécute et stream la réponse
-- `run_subagents()` : Exécute des sous-agents parallèles
+- `run_subagents()` : Exécute des sous-agents, le premier seul jusqu'à sa réponse, puis les autres
+  ensemble ; chaque résultat est borné et délimité comme une donnée
+  ([harness, lot 5](../architecture/context-harness.md))
 
 **Authentification** : `GITHUB_TOKEN` avec scope Copilot
 

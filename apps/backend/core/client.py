@@ -241,6 +241,11 @@ except ImportError:
 
 from docintel.read_guard import make_read_guard_hook
 from harness.application.budget import session_budget_usd
+from harness.application.subagents import (
+    SUBAGENT_TOOLS,
+    bind_contract,
+    make_subagent_result_hook,
+)
 from integrations.linear.updater import is_linear_enabled
 from prompts_pkg.project_context import detect_project_capabilities, load_project_index
 from rtk import rtk_rewrite_hook
@@ -1386,6 +1391,11 @@ def create_client(
     # hands pixels to the model. The prompt already says so; this is the
     # backstop. It answers only for files the record names.
     _read_guard_hook = make_read_guard_hook(spec_dir)
+    # What a sub-agent brings back is cut to the contract's cap, marked when
+    # cut, and delimited as data before the parent reads it (harness lot 5).
+    # The CLI runs the sub-agent; its tool's PostToolUse is where WorkPilot
+    # sees the result first.
+    _subagent_result_hook = make_subagent_result_hook(spec_dir)
 
     # Build options dict, conditionally including output_format
     options_kwargs: dict[str, Any] = {
@@ -1449,6 +1459,10 @@ def create_client(
                 ),
                 # Debugger breakpoints (any tool). Empty unless this run opted in.
                 *_debugger_hooks,
+            ],
+            "PostToolUse": [
+                HookMatcher(matcher=tool, hooks=[_subagent_result_hook])
+                for tool in SUBAGENT_TOOLS
             ],
             "PreCompact": [HookMatcher(hooks=[_make_pre_compact_hook(spec_dir)])],
             "Stop": [HookMatcher(hooks=[_make_stop_hook(spec_dir)])],
@@ -1534,7 +1548,10 @@ def create_client(
         logger.debug("subagent resolution failed, using caller agents: %s", exc)
         _merged_agents = agents
     if _merged_agents:
-        options_kwargs["agents"] = _merged_agents
+        # Each sub-agent is told what it may bring back; the hook above holds
+        # it to that. Added here, not in the registry, whose prompts are also
+        # emitted to harnesses that WorkPilot does not receive results from.
+        options_kwargs["agents"] = bind_contract(_merged_agents)
         # Subagents are invoked via the built-in "Agent" tool — it must be
         # allowlisted, otherwise the SDK rejects the invocation. We mutate the
         # allowed_tools list in-place because it's already inside options_kwargs.

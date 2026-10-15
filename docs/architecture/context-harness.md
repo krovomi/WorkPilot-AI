@@ -2,8 +2,9 @@
 
 > **Statut : plan ; livrés : le lot 0 (mesurer, sauf sa ligne de base), le lot 1a (un budget
 > par session pour tous), le lot 1b-i (l'arrêt sur absence de progrès), le lot 2 (un préfixe stable, sauf D3), le lot 3 (troncature à la
-> source, sauf les plafonds natifs, réglés sur la ligne de base) et le lot 4 (purge par lots et
-> fenêtre payable, sauf D2).** Ce fichier fixe la cible
+> source, sauf les plafonds natifs, réglés sur la ligne de base), le lot 4 (purge par lots et
+> fenêtre payable, sauf D2) et le lot 5 (sous-agents sous contrat, résultat borné et marqué,
+> lancement échelonné, sauf le `MemoryPort`).** Ce fichier fixe la cible
 > et l'ordre des lots ; chaque lot livré remplace sa section par la justification de ce qui existe. [`docs/CLAUDE.md`](../CLAUDE.md)
 > reste normatif : là où les deux divergent, il gagne. Le mécanisme existant de compaction et de
 > reset est décrit dans [`context-management.md`](context-management.md), que ce plan prolonge sans
@@ -83,8 +84,8 @@ sens partout, une boucle unique, et la troncature à la source.
 | Compaction | `context_mgmt/` : garde par tâche, seuil 50 % par défaut (30–90), *compact* ou *clear*, handoff préparé en fond par le provider de la tâche, cap de 3 resets ; native sur Claude et Codex, émulée ailleurs. Lot 4 : le seuil est une part de la fenêtre *payable* | D2 : le seuil par défaut, tranché sur la ligne de base |
 | Tool clearing | boucles WorkPilot : `compact_messages` remplace les vieux résultats par un marqueur au-delà de 300 k caractères ; lot 4 : par lots, jusqu'à 60 % du budget, et seulement pour un gain d'au moins 10 %. Claude Code purge de son côté | — |
 | Troncature | rtk sur Bash ; boucles WorkPilot : résultat coupé à 10 k caractères (70 % tête / 30 % queue). Lot 3 : `read_file`, `search_files` et `find_files` paginent sous ce plafond ; une longue sortie de `run_command` ou d'un outil exécuté dans le processus va dans un fichier ; le cerveau pagine ses notes et ses skills. Claude Code plafonne nativement (table ci-dessus) | aucun plafond natif réglé par WorkPilot : la ligne de base dira s'il faut baisser ceux de Claude Code |
-| Mémoire externe | cerveau (vault, `graph.json`, serveur MCP 9 outils), `implementation_plan.json`, `build-progress.txt`, `handoff_pending.md`, rapports de phase plafonnés. Lot 3b : les sorties longues des boucles WorkPilot vont dans `<spec>/tool-output/`, relues par `read_file` | un `MemoryPort` unique (lot 5) |
-| Sous-agents | registre `agents/subagents/`, roster ≤ 7 ; Claude et Copilot | « rends une synthèse structurée » n'est qu'une consigne : rien ne la vérifie ; Copilot les lance tous à la fois |
+| Mémoire externe | cerveau (vault, `graph.json`, serveur MCP 9 outils), `implementation_plan.json`, `build-progress.txt`, `handoff_pending.md`, rapports de phase plafonnés. Lot 3b : les sorties longues des boucles WorkPilot vont dans `<spec>/tool-output/`, relues par `read_file` | un `MemoryPort` unique, avec la boucle partagée (lot 1b-ii) |
+| Sous-agents | registre `agents/subagents/`, roster ≤ 7 ; Claude et Copilot. Lot 5 : contrat `{conclusion, files, evidence}` sous 2 000 tokens, résultat coupé et marqué au-delà, délimité comme une donnée (hook PostToolUse sur Claude, `run_subagents` sur Copilot) ; Copilot les lance en échelon | `run_subagents` n'a pas d'appelant en production |
 | Outils dynamiques | `AGENT_CONFIGS` par type d'agent ; MCP ajoutés selon la tâche ; schémas MCP différés sur Claude (`ENABLE_TOOL_SEARCH=auto:5`) | rien par phase dans une même tâche, ni pour les autres providers |
 | Effort et routage | effort par phase (`phase_config.py`), traduit par provider (`reasoning_effort`, budget de réflexion) ; routeur de complexité et `model_router` presque toujours éteints | pas d'escalade automatique |
 | Récupération de code | `context/search.py` : correspondance de sous-chaînes ; grepai seulement pour l'autofix | ni BM25, ni fusion, ni budget d'extraits |
@@ -467,23 +468,104 @@ modèle, seuils natifs de Claude et de Codex, jauge mesurée sur la fenêtre pay
 *Sortie :* resets de contexte par sous-tâche et coût par sous-tâche en baisse sur la ligne de
 base, passes QA stables.
 
-### Lot 5 — Sous-agents et mémoire externe
+### Lot 5 — Sous-agents et mémoire externe (livré, sauf le `MemoryPort`)
 
-- **Contrat de conclusion** : un sous-agent rend `{conclusion, fichiers, preuves}` dans un plafond
-  de tokens. Là où WorkPilot reçoit le résultat (Copilot, et toute boucle WorkPilot qui en
-  gagnerait), le harness tronque et le signale au lieu de faire confiance à la consigne ; sur une
-  boucle tierce, par son hook de fin d'outil s'il existe (Claude Code : PostToolUse), et le ledger
-  mesure ce qui remonte.
-- **Lancement échelonné** : un cache n'est lisible qu'une fois la première réponse commencée. On
-  lance un sous-agent, on attend son premier token, puis les autres, pour qu'ils lisent le préfixe
-  au lieu de l'écrire chacun (Copilot les lance aujourd'hui tous à la fois).
-- **Routage aux frontières** : un modèle plus petit sert un sous-agent ou une nouvelle session,
-  jamais un changement de modèle au milieu d'une session (le cache est lié au modèle, chez tous).
-- **Mémoire** : un `MemoryPort` unique au-dessus du cerveau et des fichiers de la spec, relu à la
-  demande par outil (MCP) plutôt qu'injecté.
+Un sous-agent travaille dans un contexte neuf pour que seule sa conclusion remonte. C'était une
+consigne (« rends une synthèse structurée ») que rien ne vérifiait : un sous-agent qui collait un
+log entier dans son dernier message le mettait dans le contexte du parent, renvoyé à chaque appel
+suivant. Et Copilot lançait les sous-agents d'une vague tous à la fois.
+
+**Où WorkPilot reçoit le résultat d'un sous-agent.**
+
+| Famille | Providers | Où le résultat arrive |
+|---|---|---|
+| Boucle tierce | Claude (Agent SDK) | l'outil `Agent` de la CLI (`Task` avant lui) ; son hook PostToolUse, posé par `create_client`, le voit avant le parent |
+| Boucle WorkPilot | Copilot | `CopilotAgentClient.run_subagents`, un appel par sous-agent |
+| Sans sous-agents | Codex CLI, OpenCode, Antigravity, OpenAI et les compatibles (Google, Mistral, DeepSeek, xAI), Ollama, LM Studio, Windsurf | nulle part : `subagents: none` dans `capabilities/providers.yaml`, et `resolve` ne leur compose aucun roster |
+
+`run_subagents` n'a pas d'appelant en production : la boucle Copilot n'offre au modèle aucun outil
+de délégation, et `create_agent_client` ne lui transmet que les `agents` de l'appelant. Le contrat
+et l'échelonnement y sont en place pour le premier appelant, ou pour la boucle partagée (lot 1b-ii).
+Les spécialistes de la revue de PR (`parallel_orchestrator_reviewer.py`) ne sont pas des
+sous-agents : chacun est une session entière, dont la sortie est un schéma JSON validé et non un
+texte remis à un parent.
+
+- **Le contrat** (`harness/domain/subagents.py`, pur) : un sous-agent rend
+  `{conclusion, files, evidence}` en moins de 2 000 tokens, soit 8 000 caractères estimés à 4 par
+  token ; le verdict ne dépend d'aucun compteur de provider. `parse_conclusion` lit l'objet JSON,
+  dans un bloc de code ou non, et tolère le texte brut, qui devient toute la conclusion.
+  `bound_result` laisse passer un résultat sous le plafond tel qu'il est venu. Au-delà, il coupe
+  et marque : la marque vient en tête, avec la taille reçue, ce qui manque et ce qui reste (les
+  lignes montrées ; ou la conclusion, puis autant de fichiers et de preuves qu'il en tient). Une
+  conclusion qu'il faut couper prend toute la place. Un résultat vide est marqué aussi.
+- **Recevoir** (`harness/application/subagents.py`, `receive_result`) : le résultat est borné,
+  puis délimité comme une donnée par `quote_untrusted` (S2). Le sanitizer échappe les balises de
+  la clôture : un sous-agent ne peut pas la fermer lui-même. Le plafond reste sous les 10 000
+  caractères que `security/untrusted.py` garde d'un texte : la délimitation ne coupe pas une
+  seconde fois. Sur Claude, le hook PostToolUse (`make_subagent_result_hook`) ne remplace que le
+  texte de la sortie de l'outil (`updatedToolOutput`), qui garde la forme que la CLI vérifie ; la
+  CLI livrée avec le SDK 0.2.167 (2.1.300) l'applique à tout outil, et garde l'original si la forme ne
+  correspond pas. Une sortie sans contenu (sous-agent lancé en arrière-plan) n'est pas touchée.
+- **Le dire au sous-agent**, là où son prompt part chez le provider : `bind_contract` ajoute le
+  contrat à une copie de chaque définition du roster que `create_client` donne au SDK, et
+  `subagent_messages` le place dans le message système de chaque appel Copilot. Le registre
+  `agents/subagents/` et ses sorties générées (`.agents/agents/`) ne changent pas : des harnesses
+  dont WorkPilot ne reçoit pas les résultats les lisent.
+- **Mesurer** : le ledger garde chaque retour (`SubagentReturn` : tokens reçus, tokens lus par le
+  parent, coupé ou non), et `summary()` en donne le nombre, les tokens et les coupes. Copilot
+  enregistre aussi chaque appel de sous-agent, sur son propre fil. Le client Claude mesure le
+  résultat tel que le parent le lit, après le hook ; un résultat coupé porte dans sa marque la
+  taille qu'il avait (`measure_returned`).
+- **Lancement échelonné** (`launch_staggered`) : le premier sous-agent part seul, les autres
+  ensemble dès que sa réponse a commencé. Copilot n'envoie pas en flux : le signal est l'arrivée
+  de la réponse. Les autres partent aussi si le premier échoue ou ne rend rien, et au plus tard
+  après 30 secondes : un premier qui bloque ne retient personne. Chaque résultat revient sous son
+  nom, une exception comprise ; annuler la vague annule chaque sous-agent. Pour qu'il y ait un
+  préfixe à relire, chaque appel Copilot met en tête ce que la vague partage (le contrat, puis le
+  contexte) et le rôle du sous-agent en dernier : en message système, le rôle rendait chaque
+  préfixe unique. Un provider sans cache n'y perd que l'avance du premier. Sur Claude Code, la CLI
+  lance les sous-agents elle-même : le harness ne peut pas les échelonner.
+- **Routage aux frontières** : rien ne change de modèle au milieu d'une session. Le modèle se
+  choisit à la création du client : par phase (`get_phase_model`), par le routeur avant les
+  sessions du planner et du coder (`apply_router_override`, éteint par défaut), par « Reprendre
+  avec », qui crée un nouveau client. Un sous-agent tourne sur un modèle plus petit là où le roster le demande
+  (`sonnet` pour les relecteurs, sur Claude ; `inherit` ailleurs, `_portable_subagent_model`) :
+  c'est une frontière, son contexte est neuf. Les seuls changements en cours de session sont des
+  replis sur refus : Copilot sur un `400 model_not_supported`, Codex, OpenCode et Antigravity qui
+  réessaient une fois avec le modèle par défaut de leur CLI. Le modèle refusé ne sert plus ; son
+  cache est perdu de toute façon. Aucune garde n'est ajoutée : refuser le repli ferait échouer la
+  phase sans rien économiser.
+- **Mémoire : le `MemoryPort` n'est pas construit.** Le cerveau se relit déjà à la demande par
+  outil, sur toutes les boucles : serveur MCP `workpilot-brain` pour les boucles tierces, les mêmes
+  outils exécutés dans le processus pour les boucles WorkPilot, paginés depuis le lot 3b. Les
+  fichiers de la spec (`implementation_plan.json`, `build-progress.txt`, `handoff_pending.md`,
+  `tool-output/`) se relisent par `read_file` ou `Read`, paginés depuis le lot 3a. Un port
+  au-dessus des deux n'ajouterait qu'une indirection à une implémentation unique ; sa place est
+  dans `harness/ports.py`, avec la boucle partagée (lot 1b-ii), son premier client. L'extrait de
+  mémoire que le coder injecte par sous-tâche (`get_memory_context` : 3 motifs, 3 pièges, 5 notes,
+  3 sessions) reste injecté. Il vient après le bloc de tâche, donc il ne touche pas au préfixe ; le
+  passer à la demande se tranche sur la ligne de base.
+
+**Reste à faire.** Le `MemoryPort`, avec le lot 1b-ii. La mesure de sortie, sur la ligne de base
+du lot 0 : tokens remontés par sous-agent, et écritures de cache par vague. Copilot ne rapporte
+pas son cache : l'échelonnement y est un pari sur un cache côté serveur, que la ligne de base ne
+pourra pas trancher.
+
+Tests : `tests/harness/test_subagents.py` (par table : le parseur, JSON, bloc de code ou texte
+brut ; sous le plafond rien ne change ; au-delà, la marque d'abord, des lignes entières, la
+conclusion avant fichiers et preuves ; un résultat vide marqué ; le plafond borne ce qui revient,
+quelle que soit la taille ; le contrat dit une fois ; le ledger), `tests/harness/test_subagent_results.py`
+(résultat délimité comme une donnée, clôture impossible à fermer, coupe intacte à travers la
+délimitation, roster copié avec le contrat, hook : forme de la sortie gardée, sortie vide
+marquée, autres outils et sorties sans contenu ignorés ; `create_client` pose le hook et le
+contrat ; le ledger Claude mesure chaque retour), `tests/harness/test_staggered_launch.py` (avec
+des faux : les autres partent seulement après le début du premier, et ensemble ; un premier qui
+échoue, ne rend rien ou ne commence jamais ne retient personne ; aucun résultat perdu ; annuler la
+vague annule tout ; Copilot envoie les autres après la première réponse, avec un préfixe
+identique octet pour octet).
 
 *Sortie :* tokens remontés par sous-agent bornés ; écritures de cache par vague de sous-agents
-divisées. *Tests :* une conclusion hors contrat est tronquée et marquée.
+divisées.
 
 ### Lot 6 — Outils dynamiques et effort
 

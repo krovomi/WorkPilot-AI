@@ -23,6 +23,7 @@ from harness.domain.progress import (
     ProgressTracker,
     turn_fingerprint,
 )
+from harness.domain.subagents import SubagentReturn
 
 # The name the monolith logged under, kept so logging configuration and log
 # filters keyed on it still match: `core.agent_client`, or
@@ -302,6 +303,12 @@ class AgentClient(ABC):
         if self.usage_ledger is None:
             self.usage_ledger = UsageLedger()
         self.usage_ledger.record(usage, thread=thread)
+
+    def _record_subagent_return(self, report: SubagentReturn | None) -> None:
+        """What one sub-agent brought back into this client's context."""
+        if self.usage_ledger is None:
+            self.usage_ledger = UsageLedger()
+        self.usage_ledger.record_return(report)
 
     def _check_progress(
         self,
