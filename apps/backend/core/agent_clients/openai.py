@@ -11,6 +11,8 @@ import logging
 from collections.abc import AsyncIterator
 from typing import Any
 
+from harness.domain import from_chat_completion
+
 # Layout-agnostic import: the backend runs under two package layouts —
 # top-level (apps/backend on sys.path, e.g. `python -m cli.main`, run.py) and
 # repo-root (apps.backend.* on sys.path). Hard-coding `apps.backend.models_registry`
@@ -300,6 +302,7 @@ class OpenAIAgentClient(AgentClient):
 
         _total_in = 0
         _total_out = 0
+        self._start_usage_ledger()
 
         for turn in range(self.max_turns):
             payload: dict[str, Any] = {
@@ -363,6 +366,7 @@ class OpenAIAgentClient(AgentClient):
             _total_out += _u.get("completion_tokens", 0)
             if _u.get("prompt_tokens"):
                 self.last_context_tokens = int(_u["prompt_tokens"])
+            self._record_call(from_chat_completion(_u))
 
             choices = data.get("choices", [])
             if not choices:

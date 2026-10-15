@@ -190,6 +190,10 @@ class ContextGuard:
             return
         self._last_emit = (self.percent, now)
         policy = self.policy
+        # The cache as the client measured it, call by call (harness.domain):
+        # None while nothing reported a cache, which the gauge shows as such.
+        ledger = getattr(self.client, "usage_ledger", None)
+        cache = ledger.summary() if ledger is not None else {}
         try:
             self.emitter.emit(
                 "CONTEXT_USAGE",
@@ -207,6 +211,8 @@ class ContextGuard:
                     "handoffState": self.preparer.state,
                     "recommended": recommended_action(self._situation()),
                     "compactSupport": self.caps.compact,
+                    "cacheHitRatio": cache.get("cacheHitRatio"),
+                    "prefixRewrites": cache.get("prefixRewrites", 0),
                 },
             )
         except Exception:  # noqa: BLE001 - the gauge is a mirror

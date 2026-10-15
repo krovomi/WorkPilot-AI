@@ -146,6 +146,9 @@ straight to the renderer, before XState. The renderer shows:
 * a gauge in the task detail header (ring, threshold tick, handoff state,
   tokens / window, and a popover to change mode and threshold live and to
   trigger *Compact now* or *New thread*, with the recommended one highlighted);
+* in that popover, the share of the prompt the provider's cache served and the prefix
+  rewrites, from the client's usage ledger ([`context-harness.md`](context-harness.md),
+  lot 0), or "not reported" for a provider without a cache field;
 * a mini gauge on the Kanban card while the task runs;
 * a toast for every applied action;
 * the policy fields at task creation and in the edit dialog.

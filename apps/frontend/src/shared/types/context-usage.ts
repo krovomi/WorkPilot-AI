@@ -46,6 +46,14 @@ export interface TaskContextUsageEvent extends TaskContextEventBase {
 	handoffState: ContextHandoffState;
 	recommended: ContextAction;
 	compactSupport: ContextCompactSupport;
+	/**
+	 * Share of the prompt the provider served from its cache (0-1), over the
+	 * calls that report a cache. `null`: the provider reports none — unknown,
+	 * not 0. Absent from events of an older backend.
+	 */
+	cacheHitRatio?: number | null;
+	/** Calls that reused less than half of the previous call's prompt. */
+	prefixRewrites?: number;
 }
 
 export interface TaskContextActionAppliedEvent extends TaskContextEventBase {
