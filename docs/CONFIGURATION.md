@@ -136,6 +136,13 @@ and OAuth is used. The desktop app sets the variable from the active API
 profile and clears it in OAuth mode, so setting it by hand only matters for the
 CLI.
 
+Against Anthropic's own API, WorkPilot sets `ENABLE_TOOL_SEARCH=auto:5`: MCP tool
+schemas are deferred once they weigh more than 5% of the context window. Behind
+any other base URL it sets nothing, and the Claude Code CLI keeps tool search
+off, because a proxy that does not forward `tool_reference` blocks would lose
+every deferred tool. If your proxy forwards them, export `ENABLE_TOOL_SEARCH`
+(`true`, `auto` or `auto:N`); a value you export is never overridden.
+
 ### Deliberately **not** supported
 
 - **`ANTHROPIC_API_KEY`** is intentionally excluded. Supporting it could
@@ -496,7 +503,7 @@ planner, coder, QA…).
 | --- | ---: | --- |
 | `AUTO_CLAUDE_MAX_TURNS` | 1000 | Maximum agent turns in one session. A value that is not an integer stops the session from starting. |
 | `AUTO_CLAUDE_MAX_BUDGET_USD` | 5.0 | Spending cap, in US dollars, of one session — not of the task — on every provider. Past it the session ends (the Claude SDK ends it itself; for the other providers the session runner does, from each call's measured usage and the model's price in `cost_intelligence/catalog.py`) and the Kanban offers to resume. A model without a known price is not capped. 0 or less removes the cap; a value that is not a number falls back to 5.0. |
-| `AUTO_CLAUDE_EFFORT` | by agent type | Forces the SDK `effort` level (`low`, `medium`, `high`, `xhigh`, `max`) of sessions on an Opus model; other models ignore it. Without it: `xhigh` for the planner and the coder, `low` for explorers, `high` for QA and the rest. Separate from the per-phase thinking budget. |
+| `AUTO_CLAUDE_EFFORT` | the phase's thinking level | Forces the SDK `effort` level (`low`, `medium`, `high`, `xhigh`, `max`) of sessions on an Opus model; other models ignore it. Without it, the effort follows the thinking level the user chose for the phase: `none` and `low` → `low`, `medium` → `medium`, `high` → `high`, `ultrathink` → `xhigh`. Opus 5.5 takes no thinking budget, so this is its only reasoning control. |
 | `AUTO_CLAUDE_OTEL_ENDPOINT` | — | OTLP endpoint, such as `http://localhost:4318`. When set, each session exports traces, metrics and logs over OTLP `http/protobuf` as the service `workpilot-<agent type>`, and these settings replace any `OTEL_*` variable of the same name. Point it only at a collector you control. |
 | `AUTO_CLAUDE_AGENT_DEBUGGER` | off | `1`, `true`, `yes` or `on` attaches the Agent Debugger's breakpoints to every session, even when the debugger was not opened for that task. |
 | `CLAUDE_CLI_PATH` | the SDK's bundled CLI | `claude` executable the SDK launches. Ignored when it is not an existing file or holds shell metacharacters, `..` or a variable reference. The desktop app sets it from detection or the Claude path setting. |

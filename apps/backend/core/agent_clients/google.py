@@ -25,8 +25,9 @@ class GoogleAgentClient(OpenAIAgentClient):
       - the API key (GEMINI_API_KEY, falling back to GOOGLE_API_KEY),
       - the default model.
 
-    The OpenAI-only `reasoning_effort` / `prompt_cache_key` payload params are
-    not part of Gemini's compatibility layer, so they are forced off here.
+    Gemini's compatibility layer takes `reasoning_effort` on its thinking
+    models (`gemini_reasoning_effort` maps the user's level onto it); it has
+    no `prompt_cache_key`, which is forced off here.
     """
 
     def __init__(
@@ -36,7 +37,7 @@ class GoogleAgentClient(OpenAIAgentClient):
         max_turns: int = 50,
         project_dir: str | None = None,
         agent_type: str = "coder",
-        reasoning_effort: str | None = None,  # accepted for parity; unused on Gemini
+        reasoning_effort: str | None = None,
         prompt_cache_key: str | None = None,  # accepted for parity; unused on Gemini
         spec_dir: str | None = None,
     ):
@@ -48,7 +49,7 @@ class GoogleAgentClient(OpenAIAgentClient):
             max_turns=max_turns,
             project_dir=project_dir,
             agent_type=agent_type,
-            reasoning_effort=None,
+            reasoning_effort=reasoning_effort,
             prompt_cache_key=None,
             spec_dir=spec_dir,
         )
