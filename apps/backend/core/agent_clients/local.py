@@ -7,27 +7,29 @@ every name defined here.
 
 from __future__ import annotations
 
+import json
 import logging
 import re
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
+from contextlib import aclosing
 from typing import Any
 
+from harness.application.loop import run_turns
 from harness.domain import from_eval_counts
-from harness.domain.progress import ProgressTracker
+from harness.domain.stop import StopReason
+from harness.ports import Measured, Outcome, Reply, ToolCall, ToolResult
 
 # Common token-optimization trunk shared by every generic (OpenAI-style)
-# multi-turn loop: head+tail tool-result truncation and over-budget history
-# compaction. The module is importable under both package layouts.
+# multi-turn loop: head+tail tool-result truncation and the history budget.
+# The module is importable under both package layouts.
 try:
     from core.llm_optimization import (
-        compact_messages,
         history_char_budget,
         tool_result_max_chars,
         truncate_tool_result,
     )
 except ImportError:  # pragma: no cover - alternate package layout
     from apps.backend.core.llm_optimization import (
-        compact_messages,
         history_char_budget,
         tool_result_max_chars,
         truncate_tool_result,
@@ -37,6 +39,7 @@ from .base import (
     AgentMessage,
     ContentBlock,
     ContentBlockType,
+    LoopAdapter,
     MessageRole,
     _env_flag,
     _env_float,
@@ -1154,14 +1157,13 @@ class LocalAgentClient(OpenAIAgentClient):
 
         Message/tool shapes stay native throughout (tool-call arguments are
         objects, tool results use ``role: "tool"``), so multi-turn tool calling
-        round-trips correctly.
+        round-trips correctly. The loop is the shared WorkPilot loop
+        (``harness.application.loop``) driving ``_OllamaAdapter``.
         """
         if self._api_format == "openai":
             async for message in super().receive_response():
                 yield message
             return
-
-        import json as _json
 
         if not self._pending_query:
             return
@@ -1206,7 +1208,7 @@ class LocalAgentClient(OpenAIAgentClient):
         # BEFORE the first request and reused for every turn (see _num_ctx).
         prompt_tokens_est = (
             sum(len(str(m.get("content") or "")) for m in messages)
-            + len(_json.dumps(self._tool_definitions))
+            + len(json.dumps(self._tool_definitions))
         ) // self._CHARS_PER_TOKEN
         num_ctx = self._resolve_num_ctx(prompt_tokens_est)
         # The window this session actually runs in, for context_mgmt's gauge.
@@ -1215,26 +1217,9 @@ class LocalAgentClient(OpenAIAgentClient):
         if self._tool_executor is not None:
             self._tool_executor.result_max_chars = self._local_tool_result_cap()
         session = self._get_http_client()
-        _total_in = 0
-        _total_out = 0
-        self._start_usage_ledger()
-        # Pull-on-demand guard: if the requested model isn't installed, we pull
-        # it once (it may be a library name like "qwen2.5-coder" the user never
-        # ran `ollama pull` on) and retry, instead of failing with a 404.
-        model_pull_attempted = False
-        # Tool-use coaxing: a tools-capable local model that only narrates gets
-        # ONE explicit "call the tools" nudge before we declare it unable to act.
-        any_tool_called = False
-        tool_use_nudge_sent = False
-        # Stream the turn unless the server (or the user, via OLLAMA_STREAM=0)
-        # says otherwise. Cleared on the one documented failure mode below.
-        stream_chunks = _env_flag("OLLAMA_STREAM", True)
-        # One /api/ps diagnosis per session, on the first turn that stalls.
-        placement_reported = False
-        # Transient-connection guard: a freshly auto-started or model-reloading
-        # server can briefly refuse a connection. Retry a few times (reset on any
-        # success) before declaring "Ollama ne répond pas".
-        connect_retries = 0
+        # Restarted before the first message: the session runner prices it
+        # after every one.
+        ledger = self._start_usage_ledger()
 
         logger.info(
             f"[LocalAgentClient] Starting session (model={self.model}, "
@@ -1285,538 +1270,14 @@ class LocalAgentClient(OpenAIAgentClient):
                 "baissez l'effort de réflexion de cette phase."
             )
 
-        progress = ProgressTracker()
-        for turn in range(self.max_turns):
-            payload: dict[str, Any] = {
-                "model": self.model,
-                "messages": messages,
-                # Streamed so the heartbeat can report real output instead of
-                # elapsed time; see _format_generation_progress. Cleared below
-                # if the server turns out not to support streaming with tools.
-                "stream": stream_chunks,
-                "options": {"num_ctx": num_ctx},
-            }
-            if tools:
-                payload["tools"] = tools
-
-            try:
-                import asyncio as _asyncio
-                import time as _time
-
-                import aiohttp as _aiohttp
-
-                # Accumulator the reader task fills and the heartbeat reads.
-                acc: dict[str, Any] = {
-                    "content": "",
-                    "tool_calls": [],
-                    "tokens": 0,
-                    "status": None,
-                    "error_body": "",
-                    "last_output_at": _time.monotonic(),
-                }
-
-                async def _post_chat(
-                    turn_payload: dict[str, Any] = payload,
-                    sink: dict[str, Any] = acc,
-                ) -> None:
-                    """One chat turn, folded into `sink` as it arrives.
-
-                    `turn_payload` and `sink` are default arguments so the
-                    coroutine binds THIS turn's objects rather than the loop
-                    variables.
-                    """
-                    async with session.post(
-                        url,
-                        json=turn_payload,
-                        allow_redirects=False,
-                        # Overrides the session's 5-minute default; see
-                        # _LOCAL_CHAT_SOCK_READ_TIMEOUT.
-                        timeout=_aiohttp.ClientTimeout(
-                            total=self._request_timeout,
-                            sock_connect=_LOCAL_CHAT_CONNECT_TIMEOUT,
-                            sock_read=_LOCAL_CHAT_SOCK_READ_TIMEOUT,
-                        ),
-                    ) as resp:
-                        sink["status"] = resp.status
-                        if resp.status != 200:
-                            sink["error_body"] = await resp.text()
-                            return
-                        # Streaming sends NDJSON, one object per token batch;
-                        # non-streaming sends a single object of the same shape
-                        # on one line. Both fold through _merge_native_chunk.
-                        async for raw_line in resp.content:
-                            line = raw_line.strip()
-                            if not line:
-                                continue
-                            try:
-                                chunk = _json.loads(line)
-                            except ValueError:
-                                continue
-                            if _merge_native_chunk(sink, chunk):
-                                sink["last_output_at"] = _time.monotonic()
-                            if sink.get("done") or sink.get("error"):
-                                break
-
-                # A local model can work for minutes with nothing to show. The
-                # heartbeat reports what the reader has actually accumulated —
-                # which turn, how many tokens, how long since the last one — so
-                # a slow run and a wedged one no longer print the same line.
-                request = _asyncio.ensure_future(_post_chat())
-                started_at = _time.monotonic()
-                try:
-                    while True:
-                        finished, _pending = await _asyncio.wait(
-                            {request}, timeout=_LOCAL_HEARTBEAT_SECONDS
-                        )
-                        if finished:
-                            break
-                        now = _time.monotonic()
-                        elapsed = int(now - started_at)
-                        has_output = bool(acc.get("tokens") or acc.get("tool_calls"))
-                        silence_limit = (
-                            self._generation_idle_timeout
-                            if has_output and stream_chunks
-                            else self._initial_output_timeout
-                        )
-                        if (
-                            now - started_at >= self._request_timeout
-                            or now - acc["last_output_at"] >= silence_limit
-                        ):
-                            raise LocalModelRuntimeError(
-                                f"Génération locale interrompue pour « {self.model} » : délai dépassé "
-                                f"({int(now - started_at)} s, {int(now - acc['last_output_at'])} s sans sortie). "
-                                "Choisissez un modèle plus petit ou vérifiez les ressources du serveur, puis relancez."
-                            )
-                        # On the first heartbeat that has nothing to show, ask the
-                        # server where it put the model. At 30 seconds, not at five
-                        # minutes: a model running on the CPU is knowable as soon as
-                        # it is loaded, and the four wasted minutes were the point of
-                        # the complaint. Latched only once an answer comes back —
-                        # the model may still be loading on the first pass — and
-                        # never retried after that: it cannot change while the model
-                        # stays resident, and a heartbeat must not become a poller.
-                        if not placement_reported:
-                            placement = self._loaded_model_placement()
-                            if placement and placement["loaded"]:
-                                placement_reported = True
-                                logger.info(
-                                    "[LocalAgentClient] %s loaded with "
-                                    "%d/%d bytes in VRAM.",
-                                    self.model,
-                                    placement["size_vram"],
-                                    placement["size"],
-                                )
-                                yield _system_text(
-                                    _format_placement_diagnosis(
-                                        self.model,
-                                        size=placement["size"],
-                                        size_vram=placement["size_vram"],
-                                        parameter_size=placement["parameter_size"],
-                                    )
-                                )
-                            elif placement and elapsed >= _LOCAL_NOT_LOADED_GRACE:
-                                # Not resident yet. Said once, and only after a grace
-                                # period, because a model genuinely being read off
-                                # disk occupies this state for a while and a warning
-                                # on the first heartbeat would cry wolf every run.
-                                placement_reported = True
-                                logger.warning(
-                                    "[LocalAgentClient] %s is not loaded on %s after "
-                                    "%ds; loaded there: %s",
-                                    self.model,
-                                    self._server_root(),
-                                    elapsed,
-                                    placement["others"] or "none",
-                                )
-                                yield _system_text(
-                                    _format_not_loaded_diagnosis(
-                                        self.model,
-                                        server_root=self._server_root(),
-                                        others=placement["others"],
-                                    )
-                                )
-                        yield _system_text(
-                            _format_generation_progress(
-                                self.model,
-                                turn=turn + 1,
-                                max_turns=self.max_turns,
-                                elapsed=elapsed,
-                                tokens=int(acc.get("tokens", 0)),
-                                silent_for=int(now - acc["last_output_at"]),
-                                streaming=stream_chunks,
-                            )
-                        )
-                    request.result()  # re-raise transport failures below
-                finally:
-                    if not request.done():
-                        request.cancel()
-                        try:
-                            await request
-                        except _asyncio.CancelledError:
-                            # Expected after request.cancel(): await reader cleanup
-                            # without replacing the original failure or cancellation.
-                            pass
-
-                status = acc.get("status") or 0
-                if status != 200:
-                    error_text = acc.get("error_body", "")
-                    # Model not installed → pull it once, then retry the turn.
-                    if "not found" in error_text.lower() and not model_pull_attempted:
-                        model_pull_attempted = True
-
-                        # A hosted-only id can never be pulled: asking the
-                        # Ollama registry for a Claude manifest is a round
-                        # trip whose only possible outcome is "file does not
-                        # exist". Say what is actually wrong instead.
-                        from phase_config import is_hosted_only_model
-
-                        if is_hosted_only_model(self.model):
-                            logger.error(
-                                "[LocalAgentClient] %s is a hosted-only model; "
-                                "refusing to pull it from the Ollama registry.",
-                                self.model,
-                            )
-                            yield _system_text(
-                                f"« {self.model} » est un modèle d'API "
-                                "(Claude/GPT/Gemini) : il ne peut pas "
-                                "s'exécuter sur un serveur local. Choisissez "
-                                "un modèle Ollama dans le sélecteur de la "
-                                "phase, ou changez le fournisseur de la tâche."
-                            )
-                            return
-
-                        logger.warning(
-                            "[LocalAgentClient] Model %s not installed — "
-                            "pulling on demand.",
-                            self.model,
-                        )
-                        yield _system_text(
-                            f"📥 Modèle « {self.model} » non installé "
-                            "— téléchargement automatique en cours "
-                            "(cela peut prendre plusieurs minutes)…"
-                        )
-                        pulled = False
-                        pull_err = "téléchargement interrompu"
-                        async for kind, detail in self._pull_ollama_model_stream():
-                            if kind == "progress":
-                                yield _system_text(detail)
-                            elif kind == "done":
-                                pulled = True
-                            else:
-                                pull_err = detail
-                        if pulled:
-                            yield _system_text(
-                                f"✅ Modèle « {self.model} » téléchargé — "
-                                "reprise de la phase."
-                            )
-                            continue  # retry the same turn now that it exists
-                        yield _system_text(
-                            f"Échec du téléchargement du modèle "
-                            f"« {self.model} » : {pull_err}"
-                        )
-                        return
-                    # Tool calling over a streamed response is recent in Ollama.
-                    # A server too old to do both refuses the request rather
-                    # than degrading, so fall back once to a single-shot turn
-                    # instead of failing the phase. Same code path either way —
-                    # only the heartbeat loses its token counter.
-                    if stream_chunks and "stream" in error_text.lower():
-                        stream_chunks = False
-                        logger.warning(
-                            "[LocalAgentClient] Server rejected a streamed "
-                            "tool-calling turn (%s) — retrying without streaming.",
-                            error_text[:200],
-                        )
-                        continue
-                    logger.error(
-                        f"[LocalAgentClient] API error ({status}): {error_text[:500]}"
-                    )
-                    raise LocalModelRuntimeError(
-                        f"Ollama API error ({status}): {error_text}"
-                    )
-                # Ollama can also report a failure mid-stream, with HTTP 200
-                # already sent. Surface it the same way rather than treating the
-                # truncated content as a finished turn.
-                if acc.get("error"):
-                    logger.error(
-                        "[LocalAgentClient] Stream error: %s", acc["error"][:500]
-                    )
-                    raise LocalModelRuntimeError(f"Ollama API error: {acc['error']}")
-                if not acc.get("done"):
-                    raise LocalModelRuntimeError(
-                        "Ollama a fermé le flux avant la fin de la réponse."
-                    )
-                data = {
-                    "message": {
-                        "content": acc.get("content", ""),
-                        "tool_calls": acc.get("tool_calls") or [],
-                    },
-                    "prompt_eval_count": acc.get("prompt_eval_count", 0),
-                    "eval_count": acc.get("eval_count", 0),
-                }
-            except Exception as e:
-                # A connection failure can be transient — the server may be cold-
-                # starting (just auto-launched) or reloading a model. Retry a few
-                # times with backoff before declaring it down, so a healthy but
-                # momentarily-unavailable Ollama doesn't surface "ne répond pas".
-                if (
-                    not isinstance(e, (TimeoutError, LocalModelRuntimeError))
-                    and self._is_connection_error(e)
-                    and connect_retries < _LOCAL_MAX_CONNECT_RETRIES
-                ):
-                    import asyncio as _asyncio
-
-                    connect_retries += 1
-                    logger.warning(
-                        "[LocalAgentClient] Connection to %s failed (%s) — "
-                        "retry %d/%d after backoff.",
-                        url,
-                        e,
-                        connect_retries,
-                        _LOCAL_MAX_CONNECT_RETRIES,
-                    )
-                    await _asyncio.sleep(1.5 * connect_retries)
-                    continue
-                logger.error(f"[LocalAgentClient] Request failed: {e}")
-                if isinstance(e, LocalModelRuntimeError):
-                    raise
-                detail = (
-                    self._describe_request_error(e) or "délai de génération dépassé"
-                )
-                raise LocalModelRuntimeError(
-                    f"Génération locale interrompue : {detail}"
-                ) from e
-
-            # Reached the server this turn — clear the transient-failure counter.
-            connect_retries = 0
-            _total_in += int(data.get("prompt_eval_count", 0) or 0)
-            _total_out += int(data.get("eval_count", 0) or 0)
-            if data.get("prompt_eval_count"):
-                self.last_context_tokens = int(data["prompt_eval_count"])
-            if data.get("prompt_eval_count") or data.get("eval_count"):
-                self._record_call(from_eval_counts(data))
-
-            message = data.get("message") or {}
-            content = message.get("content") or ""
-            tool_calls = message.get("tool_calls") or []
-
-            # Fallback for local models that emit tool calls as JSON inside the
-            # message *content* instead of the structured tool_calls field (very
-            # common for GGUF/qwen on Ollama). Recover them so the agent can act
-            # instead of looping with "the model called no tool".
-            if not tool_calls and content:
-                recovered = _extract_text_tool_calls(
-                    content, {td.get("name", "") for td in self._tool_definitions}
-                )
-                if recovered:
-                    logger.info(
-                        "[LocalAgentClient] Recovered %d tool call(s) from inline "
-                        "text content.",
-                        len(recovered),
-                    )
-                    tool_calls = recovered
-                    # Keep any narration that PRECEDED the tool-call payload so the
-                    # model's reasoning is still logged (activity feed +
-                    # conversation transcript) instead of being silently dropped.
-                    # Cut from the first JSON ('{'/'[') or XML ('<tool') marker on.
-                    _markers = [content.find("{"), content.find("[")]
-                    _markers.append(content.lower().find("<tool"))
-                    _cut = min((m for m in _markers if m >= 0), default=-1)
-                    _head = (content[:_cut] if _cut >= 0 else content).strip()
-                    content = _head if len(_head) >= 12 else ""
-
-            logger.info(
-                f"[LocalAgentClient] Turn {turn + 1}: content_len={len(content)}, "
-                f"tool_calls={len(tool_calls)}"
-            )
-
-            if content:
-                yield AgentMessage(
-                    role=MessageRole.ASSISTANT,
-                    content=[ContentBlock(type=ContentBlockType.TEXT, text=content)],
-                )
-
-            if not tool_calls:
-                if not content:
-                    yield AgentMessage(
-                        role=MessageRole.ASSISTANT,
-                        content=[
-                            ContentBlock(
-                                type=ContentBlockType.TEXT,
-                                text="(No response from Ollama)",
-                            )
-                        ],
-                    )
-
-                action = _next_no_tool_action(
-                    any_tool_called=any_tool_called,
-                    tools_offered=bool(tools),
-                    has_content=bool(content),
-                    waiting_for_human=_looks_like_waiting_for_human(content),
-                    nudge_sent=tool_use_nudge_sent,
-                    turn=turn,
-                    max_turns=self.max_turns,
-                )
-
-                # The model stalled — it narrated, printed file content, or asked
-                # the (non-existent) human to run commands — and hasn't been
-                # corrected yet → nudge once and retry. A tools-capable model
-                # (qwen2.5-coder, llama3.1, …) usually just needs to be told to
-                # act on its own rather than describe the work or wait for input.
-                if action == "nudge":
-                    tool_use_nudge_sent = True
-                    logger.warning(
-                        "[LocalAgentClient] Model %s replied without a tool call — "
-                        "nudging once to use the tools instead of narrating.",
-                        self.model,
-                    )
-                    messages.append({"role": "assistant", "content": content})
-                    messages.append({"role": "user", "content": _TOOL_USE_NUDGE})
-                    continue  # retry — don't burn the turn as a failure
-
-                # Tools were offered, the model was nudged, and it STILL only
-                # narrated → it can't drive tools for this task. Flag it (agentic
-                # phases read this to halt fast) and surface an actionable hint.
-                if action == "give_up":
-                    logger.warning(
-                        "[LocalAgentClient] Model %s emitted no tool call even after "
-                        "a nudge — treating as unable to drive tools.",
-                        self.model,
-                    )
-                    self.tool_calling_unsupported = True
-                    yield AgentMessage(
-                        role=MessageRole.SYSTEM,
-                        content=[
-                            ContentBlock(
-                                type=ContentBlockType.TEXT,
-                                text=(
-                                    f"⚠️ Le modèle local « {self.model} » n'a appelé "
-                                    "aucun outil alors que la tâche en exige (même après "
-                                    "une relance). Il décrit le travail au lieu de "
-                                    "l'exécuter. Passez cette phase à un modèle plus "
-                                    "capable — un modèle local plus grand, ou un "
-                                    "fournisseur cloud (Claude) — puis relancez."
-                                ),
-                            )
-                        ],
-                    )
-
-                # action == "end" (finished or empty) falls through here too.
-                self.last_usage = {
-                    "input_tokens": _total_in,
-                    "output_tokens": _total_out,
-                    "cost_usd": 0.0,
-                }
-                return
-
-            # A real tool call arrived: the model is acting. Keep the assistant
-            # turn (native shape) in history for context.
-            any_tool_called = True
-            messages.append(
-                {"role": "assistant", "content": content, "tool_calls": tool_calls}
-            )
-
-            turn_calls: list[tuple[str, Any, str]] = []
-            for i, tc in enumerate(tool_calls):
-                func = tc.get("function", {}) or {}
-                tool_name = func.get("name", "")
-                # Native arguments are already an object; tolerate a string too.
-                raw_args = func.get("arguments", {})
-                if isinstance(raw_args, str):
-                    try:
-                        args = _json.loads(raw_args or "{}")
-                    except (_json.JSONDecodeError, TypeError):
-                        args = {}
-                else:
-                    args = raw_args or {}
-                tool_id = tc.get("id") or f"call_{turn}_{i}_{tool_name}"
-
-                logger.info(
-                    f"[LocalAgentClient] Turn {turn + 1}: "
-                    f"tool_call {tool_name}({list(args.keys())})"
-                )
-                print(f"[LocalAgentClient] 🔧 Tool: {tool_name}", flush=True)
-
-                yield AgentMessage(
-                    role=MessageRole.ASSISTANT,
-                    content=[
-                        ContentBlock(
-                            type=ContentBlockType.TOOL_USE,
-                            tool_name=tool_name,
-                            tool_id=tool_id,
-                            tool_input=args,
-                        )
-                    ],
-                )
-
-                result_text = ""
-                is_error = False
-                if self._mcp_manager is not None and self._mcp_manager.has_tool(
-                    tool_name
-                ):
-                    try:
-                        result = await self._mcp_manager.call(tool_name, args)
-                        result_text = str(result) if result is not None else ""
-                    except Exception as e:
-                        result_text = f"MCP tool error: {e}"
-                        is_error = True
-                elif self._tool_executor:
-                    try:
-                        result = await self._tool_executor.execute(tool_name, args)
-                        result_text = str(result) if result is not None else ""
-                    except Exception as e:
-                        result_text = f"Tool error: {e}"
-                        is_error = True
-                else:
-                    result_text = "Tool executor not available"
-                    is_error = True
-
-                yield AgentMessage(
-                    role=MessageRole.ASSISTANT,
-                    content=[
-                        ContentBlock(
-                            type=ContentBlockType.TOOL_RESULT,
-                            tool_use_id=tool_id,
-                            is_error=is_error,
-                            result_content=result_text,
-                        )
-                    ],
-                )
-
-                # Native tool result message.
-                messages.append(
-                    {
-                        "role": "tool",
-                        "tool_name": tool_name,
-                        "content": truncate_tool_result(
-                            result_text, limit=self._local_tool_result_cap()
-                        ),
-                    }
-                )
-                turn_calls.append((tool_name, args, result_text))
-
-            stop = self._check_progress(progress, turn_calls, messages)
-            if stop is not None:
-                yield stop
-                break
-
-            compacted = compact_messages(
-                messages, char_budget=self._local_history_budget()
-            )
-            if compacted:
-                logger.info(
-                    f"[LocalAgentClient] History compaction: elided {compacted} "
-                    "stale tool result(s)"
-                )
-        else:
-            logger.warning(
-                f"[LocalAgentClient] Reached max_turns ({self.max_turns}) — stopping"
-            )
-        self.last_usage = {
-            "input_tokens": _total_in,
-            "output_tokens": _total_out,
-            "cost_usd": 0.0,
-        }
+        adapter = _OllamaAdapter(
+            self, messages, tools=tools, session=session, url=url, num_ctx=num_ctx
+        )
+        async with aclosing(
+            run_turns(adapter, max_turns=self.max_turns, ledger=ledger)
+        ) as turns:
+            async for message in turns:
+                yield message
 
     def _describe_request_error(self, exc: Exception) -> str:
         """Turn a raw connection failure into an actionable, localized hint.
@@ -1835,3 +1296,525 @@ class LocalAgentClient(OpenAIAgentClient):
                 "automatiques), ou lancez « ollama serve » manuellement."
             )
         return f"Erreur API LLM local: {exc}"
+
+
+# =============================================================================
+# Ollama's native protocol, for the WorkPilot loop
+# =============================================================================
+
+
+class _OllamaAdapter(LoopAdapter):
+    """One response of ``LocalAgentClient`` over Ollama's native ``/api/chat``.
+
+    Message and tool shapes stay native: tool-call arguments are objects (or,
+    from many GGUF models, JSON in the text, recovered here), a result goes
+    back as a ``tool`` message naming its tool, cut to the local cap. The
+    call streams so the heartbeat can report what the server has produced,
+    pulls a missing model once, and falls back once to a single-shot turn on
+    a server that cannot stream tool calls.
+    """
+
+    label = "LocalAgentClient"
+
+    def __init__(
+        self,
+        client: LocalAgentClient,
+        messages: list[dict[str, Any]],
+        *,
+        tools: list[dict[str, Any]],
+        session: Any,
+        url: str,
+        num_ctx: int,
+    ):
+        super().__init__(client, messages)
+        self.tools = tools
+        self.session = session
+        self.url = url
+        self.num_ctx = num_ctx
+        self.total_in = 0
+        self.total_out = 0
+        # Pull-on-demand guard: if the requested model isn't installed, we pull
+        # it once (it may be a library name like "qwen2.5-coder" the user never
+        # ran `ollama pull` on) and retry, instead of failing with a 404.
+        self.model_pull_attempted = False
+        # Tool-use coaxing: a tools-capable local model that only narrates gets
+        # ONE explicit "call the tools" nudge before we declare it unable to act.
+        self.any_tool_called = False
+        self.tool_use_nudge_sent = False
+        # Stream the turn unless the server (or the user, via OLLAMA_STREAM=0)
+        # says otherwise. Cleared on the one documented failure mode below.
+        self.stream_chunks = _env_flag("OLLAMA_STREAM", True)
+        # One /api/ps diagnosis per session, on the first turn that stalls.
+        self.placement_reported = False
+        # Transient-connection guard: a freshly auto-started or model-reloading
+        # server can briefly refuse a connection. Retry a few times (reset on any
+        # success) before declaring "Ollama ne répond pas".
+        self.connect_retries = 0
+
+    @property
+    def model(self) -> str:
+        """The model this response talks to."""
+        return self.client.model
+
+    def assemble(self, turn: int) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "model": self.model,
+            "messages": self.messages,
+            # Streamed so the heartbeat can report real output instead of
+            # elapsed time; see _format_generation_progress. Cleared below
+            # if the server turns out not to support streaming with tools.
+            "stream": self.stream_chunks,
+            "options": {"num_ctx": self.num_ctx},
+        }
+        if self.tools:
+            payload["tools"] = self.tools
+        return payload
+
+    async def call(self, payload: dict[str, Any], turn: int) -> AsyncIterator[Any]:
+        import json as _json
+
+        client = self.client
+        session = self.session
+        url = self.url
+        stream_chunks = self.stream_chunks
+        try:
+            import asyncio as _asyncio
+            import time as _time
+
+            import aiohttp as _aiohttp
+
+            # Accumulator the reader task fills and the heartbeat reads.
+            acc: dict[str, Any] = {
+                "content": "",
+                "tool_calls": [],
+                "tokens": 0,
+                "status": None,
+                "error_body": "",
+                "last_output_at": _time.monotonic(),
+            }
+
+            async def _post_chat(
+                turn_payload: dict[str, Any] = payload,
+                sink: dict[str, Any] = acc,
+            ) -> None:
+                """One chat turn, folded into `sink` as it arrives.
+
+                `turn_payload` and `sink` are default arguments so the
+                coroutine binds THIS turn's objects rather than the loop
+                variables.
+                """
+                async with session.post(
+                    url,
+                    json=turn_payload,
+                    allow_redirects=False,
+                    # Overrides the session's 5-minute default; see
+                    # _LOCAL_CHAT_SOCK_READ_TIMEOUT.
+                    timeout=_aiohttp.ClientTimeout(
+                        total=client._request_timeout,
+                        sock_connect=_LOCAL_CHAT_CONNECT_TIMEOUT,
+                        sock_read=_LOCAL_CHAT_SOCK_READ_TIMEOUT,
+                    ),
+                ) as resp:
+                    sink["status"] = resp.status
+                    if resp.status != 200:
+                        sink["error_body"] = await resp.text()
+                        return
+                    # Streaming sends NDJSON, one object per token batch;
+                    # non-streaming sends a single object of the same shape
+                    # on one line. Both fold through _merge_native_chunk.
+                    async for raw_line in resp.content:
+                        line = raw_line.strip()
+                        if not line:
+                            continue
+                        try:
+                            chunk = _json.loads(line)
+                        except ValueError:
+                            continue
+                        if _merge_native_chunk(sink, chunk):
+                            sink["last_output_at"] = _time.monotonic()
+                        if sink.get("done") or sink.get("error"):
+                            break
+
+            # A local model can work for minutes with nothing to show. The
+            # heartbeat reports what the reader has actually accumulated —
+            # which turn, how many tokens, how long since the last one — so
+            # a slow run and a wedged one no longer print the same line.
+            request = _asyncio.ensure_future(_post_chat())
+            started_at = _time.monotonic()
+            try:
+                while True:
+                    finished, _pending = await _asyncio.wait(
+                        {request}, timeout=_LOCAL_HEARTBEAT_SECONDS
+                    )
+                    if finished:
+                        break
+                    now = _time.monotonic()
+                    elapsed = int(now - started_at)
+                    has_output = bool(acc.get("tokens") or acc.get("tool_calls"))
+                    silence_limit = (
+                        client._generation_idle_timeout
+                        if has_output and stream_chunks
+                        else client._initial_output_timeout
+                    )
+                    if (
+                        now - started_at >= client._request_timeout
+                        or now - acc["last_output_at"] >= silence_limit
+                    ):
+                        raise LocalModelRuntimeError(
+                            f"Génération locale interrompue pour « {self.model} » : délai dépassé "
+                            f"({int(now - started_at)} s, {int(now - acc['last_output_at'])} s sans sortie). "
+                            "Choisissez un modèle plus petit ou vérifiez les ressources du serveur, puis relancez."
+                        )
+                    # On the first heartbeat that has nothing to show, ask the
+                    # server where it put the model. At 30 seconds, not at five
+                    # minutes: a model running on the CPU is knowable as soon as
+                    # it is loaded, and the four wasted minutes were the point of
+                    # the complaint. Latched only once an answer comes back —
+                    # the model may still be loading on the first pass — and
+                    # never retried after that: it cannot change while the model
+                    # stays resident, and a heartbeat must not become a poller.
+                    if not self.placement_reported:
+                        placement = client._loaded_model_placement()
+                        if placement and placement["loaded"]:
+                            self.placement_reported = True
+                            logger.info(
+                                "[LocalAgentClient] %s loaded with "
+                                "%d/%d bytes in VRAM.",
+                                self.model,
+                                placement["size_vram"],
+                                placement["size"],
+                            )
+                            yield self.notice(
+                                _format_placement_diagnosis(
+                                    self.model,
+                                    size=placement["size"],
+                                    size_vram=placement["size_vram"],
+                                    parameter_size=placement["parameter_size"],
+                                )
+                            )
+                        elif placement and elapsed >= _LOCAL_NOT_LOADED_GRACE:
+                            # Not resident yet. Said once, and only after a grace
+                            # period, because a model genuinely being read off
+                            # disk occupies this state for a while and a warning
+                            # on the first heartbeat would cry wolf every run.
+                            self.placement_reported = True
+                            logger.warning(
+                                "[LocalAgentClient] %s is not loaded on %s after "
+                                "%ds; loaded there: %s",
+                                self.model,
+                                client._server_root(),
+                                elapsed,
+                                placement["others"] or "none",
+                            )
+                            yield self.notice(
+                                _format_not_loaded_diagnosis(
+                                    self.model,
+                                    server_root=client._server_root(),
+                                    others=placement["others"],
+                                )
+                            )
+                    yield self.notice(
+                        _format_generation_progress(
+                            self.model,
+                            turn=turn + 1,
+                            max_turns=client.max_turns,
+                            elapsed=elapsed,
+                            tokens=int(acc.get("tokens", 0)),
+                            silent_for=int(now - acc["last_output_at"]),
+                            streaming=stream_chunks,
+                        )
+                    )
+                request.result()  # re-raise transport failures below
+            finally:
+                if not request.done():
+                    request.cancel()
+                    try:
+                        await request
+                    except _asyncio.CancelledError:
+                        # Expected after request.cancel(): await reader cleanup
+                        # without replacing the original failure or cancellation.
+                        pass
+
+            status = acc.get("status") or 0
+            if status != 200:
+                error_text = acc.get("error_body", "")
+                # Model not installed → pull it once, then retry the turn.
+                if "not found" in error_text.lower() and not self.model_pull_attempted:
+                    self.model_pull_attempted = True
+
+                    # A hosted-only id can never be pulled: asking the
+                    # Ollama registry for a Claude manifest is a round
+                    # trip whose only possible outcome is "file does not
+                    # exist". Say what is actually wrong instead.
+                    from phase_config import is_hosted_only_model
+
+                    if is_hosted_only_model(self.model):
+                        logger.error(
+                            "[LocalAgentClient] %s is a hosted-only model; "
+                            "refusing to pull it from the Ollama registry.",
+                            self.model,
+                        )
+                        yield self.notice(
+                            f"« {self.model} » est un modèle d'API "
+                            "(Claude/GPT/Gemini) : il ne peut pas "
+                            "s'exécuter sur un serveur local. Choisissez "
+                            "un modèle Ollama dans le sélecteur de la "
+                            "phase, ou changez le fournisseur de la tâche."
+                        )
+                        yield Outcome.HALT
+                        return
+
+                    logger.warning(
+                        "[LocalAgentClient] Model %s not installed — "
+                        "pulling on demand.",
+                        self.model,
+                    )
+                    yield self.notice(
+                        f"📥 Modèle « {self.model} » non installé "
+                        "— téléchargement automatique en cours "
+                        "(cela peut prendre plusieurs minutes)…"
+                    )
+                    pulled = False
+                    pull_err = "téléchargement interrompu"
+                    async for kind, detail in client._pull_ollama_model_stream():
+                        if kind == "progress":
+                            yield self.notice(detail)
+                        elif kind == "done":
+                            pulled = True
+                        else:
+                            pull_err = detail
+                    if pulled:
+                        yield self.notice(
+                            f"✅ Modèle « {self.model} » téléchargé — "
+                            "reprise de la phase."
+                        )
+                        # Retry the same turn now that it exists.
+                        yield Outcome.AGAIN
+                        return
+                    yield self.notice(
+                        f"Échec du téléchargement du modèle "
+                        f"« {self.model} » : {pull_err}"
+                    )
+                    yield Outcome.HALT
+                    return
+                # Tool calling over a streamed response is recent in Ollama.
+                # A server too old to do both refuses the request rather
+                # than degrading, so fall back once to a single-shot turn
+                # instead of failing the phase. Same code path either way —
+                # only the heartbeat loses its token counter.
+                if stream_chunks and "stream" in error_text.lower():
+                    self.stream_chunks = False
+                    logger.warning(
+                        "[LocalAgentClient] Server rejected a streamed "
+                        "tool-calling turn (%s) — retrying without streaming.",
+                        error_text[:200],
+                    )
+                    yield Outcome.AGAIN
+                    return
+                logger.error(
+                    f"[LocalAgentClient] API error ({status}): {error_text[:500]}"
+                )
+                raise LocalModelRuntimeError(
+                    f"Ollama API error ({status}): {error_text}"
+                )
+            # Ollama can also report a failure mid-stream, with HTTP 200
+            # already sent. Surface it the same way rather than treating the
+            # truncated content as a finished turn.
+            if acc.get("error"):
+                logger.error("[LocalAgentClient] Stream error: %s", acc["error"][:500])
+                raise LocalModelRuntimeError(f"Ollama API error: {acc['error']}")
+            if not acc.get("done"):
+                raise LocalModelRuntimeError(
+                    "Ollama a fermé le flux avant la fin de la réponse."
+                )
+            data = {
+                "message": {
+                    "content": acc.get("content", ""),
+                    "tool_calls": acc.get("tool_calls") or [],
+                },
+                "prompt_eval_count": acc.get("prompt_eval_count", 0),
+                "eval_count": acc.get("eval_count", 0),
+            }
+        except Exception as e:
+            # A connection failure can be transient — the server may be cold-
+            # starting (just auto-launched) or reloading a model. Retry a few
+            # times with backoff before declaring it down, so a healthy but
+            # momentarily-unavailable Ollama doesn't surface "ne répond pas".
+            if (
+                not isinstance(e, (TimeoutError, LocalModelRuntimeError))
+                and client._is_connection_error(e)
+                and self.connect_retries < _LOCAL_MAX_CONNECT_RETRIES
+            ):
+                import asyncio as _asyncio
+
+                self.connect_retries += 1
+                logger.warning(
+                    "[LocalAgentClient] Connection to %s failed (%s) — "
+                    "retry %d/%d after backoff.",
+                    url,
+                    e,
+                    self.connect_retries,
+                    _LOCAL_MAX_CONNECT_RETRIES,
+                )
+                await _asyncio.sleep(1.5 * self.connect_retries)
+                yield Outcome.AGAIN
+                return
+            logger.error(f"[LocalAgentClient] Request failed: {e}")
+            if isinstance(e, LocalModelRuntimeError):
+                raise
+            detail = client._describe_request_error(e) or "délai de génération dépassé"
+            raise LocalModelRuntimeError(
+                f"Génération locale interrompue : {detail}"
+            ) from e
+
+        # Reached the server this turn — clear the transient-failure counter.
+        self.connect_retries = 0
+        self.total_in += int(data.get("prompt_eval_count", 0) or 0)
+        self.total_out += int(data.get("eval_count", 0) or 0)
+        if data.get("prompt_eval_count"):
+            client.last_context_tokens = int(data["prompt_eval_count"])
+        if data.get("prompt_eval_count") or data.get("eval_count"):
+            yield Measured(from_eval_counts(data))
+
+        message = data.get("message") or {}
+        content = message.get("content") or ""
+        tool_calls = message.get("tool_calls") or []
+
+        # Fallback for local models that emit tool calls as JSON inside the
+        # message *content* instead of the structured tool_calls field (very
+        # common for GGUF/qwen on Ollama). Recover them so the agent can act
+        # instead of looping with "the model called no tool".
+        if not tool_calls and content:
+            recovered = _extract_text_tool_calls(
+                content, {td.get("name", "") for td in client._tool_definitions}
+            )
+            if recovered:
+                logger.info(
+                    "[LocalAgentClient] Recovered %d tool call(s) from inline "
+                    "text content.",
+                    len(recovered),
+                )
+                tool_calls = recovered
+                # Keep any narration that PRECEDED the tool-call payload so the
+                # model's reasoning is still logged (activity feed +
+                # conversation transcript) instead of being silently dropped.
+                # Cut from the first JSON ('{'/'[') or XML ('<tool') marker on.
+                _markers = [content.find("{"), content.find("[")]
+                _markers.append(content.lower().find("<tool"))
+                _cut = min((m for m in _markers if m >= 0), default=-1)
+                _head = (content[:_cut] if _cut >= 0 else content).strip()
+                content = _head if len(_head) >= 12 else ""
+
+        logger.info(
+            f"[LocalAgentClient] Turn {turn + 1}: content_len={len(content)}, "
+            f"tool_calls={len(tool_calls)}"
+        )
+        calls = tuple(self._tool_call(tc, i, turn) for i, tc in enumerate(tool_calls))
+        yield Reply(content, calls, raw=tool_calls)
+
+    @staticmethod
+    def _tool_call(tc: dict[str, Any], index: int, turn: int) -> ToolCall:
+        func = tc.get("function", {}) or {}
+        tool_name = func.get("name", "")
+        # Native arguments are already an object; tolerate a string too.
+        raw_args = func.get("arguments", {})
+        if isinstance(raw_args, str):
+            try:
+                args = json.loads(raw_args or "{}")
+            except (json.JSONDecodeError, TypeError):
+                args = {}
+        else:
+            args = raw_args or {}
+        tool_id = tc.get("id") or f"call_{turn}_{index}_{tool_name}"
+        return ToolCall(tool_id, tool_name, args)
+
+    def settle(self, reply: Reply, turn: int) -> tuple[list[Any], Outcome]:
+        client = self.client
+        content = reply.text
+        notes = [] if content else [self.text("(No response from Ollama)")]
+
+        action = _next_no_tool_action(
+            any_tool_called=self.any_tool_called,
+            tools_offered=bool(self.tools),
+            has_content=bool(content),
+            waiting_for_human=_looks_like_waiting_for_human(content),
+            nudge_sent=self.tool_use_nudge_sent,
+            turn=turn,
+            max_turns=client.max_turns,
+        )
+
+        # The model stalled — it narrated, printed file content, or asked
+        # the (non-existent) human to run commands — and hasn't been
+        # corrected yet → nudge once and retry. A tools-capable model
+        # (qwen2.5-coder, llama3.1, …) usually just needs to be told to
+        # act on its own rather than describe the work or wait for input.
+        if action == "nudge":
+            self.tool_use_nudge_sent = True
+            logger.warning(
+                "[LocalAgentClient] Model %s replied without a tool call — "
+                "nudging once to use the tools instead of narrating.",
+                self.model,
+            )
+            self.messages.append({"role": "assistant", "content": content})
+            self.messages.append({"role": "user", "content": _TOOL_USE_NUDGE})
+            return notes, Outcome.AGAIN  # retry — don't burn the turn as a failure
+
+        # Tools were offered, the model was nudged, and it STILL only
+        # narrated → it can't drive tools for this task. Flag it (agentic
+        # phases read this to halt fast) and surface an actionable hint.
+        if action == "give_up":
+            logger.warning(
+                "[LocalAgentClient] Model %s emitted no tool call even after "
+                "a nudge — treating as unable to drive tools.",
+                self.model,
+            )
+            client.tool_calling_unsupported = True
+            notes.append(
+                self.notice(
+                    f"⚠️ Le modèle local « {self.model} » n'a appelé "
+                    "aucun outil alors que la tâche en exige (même après "
+                    "une relance). Il décrit le travail au lieu de "
+                    "l'exécuter. Passez cette phase à un modèle plus "
+                    "capable — un modèle local plus grand, ou un "
+                    "fournisseur cloud (Claude) — puis relancez."
+                )
+            )
+
+        # action == "end" (finished or empty) ends the response too.
+        return notes, Outcome.DONE
+
+    async def execute(self, call: ToolCall) -> ToolResult:
+        return await self.run_tool(call, mcp=self.client._mcp_manager)
+
+    def reinject(self, reply: Reply, results: Sequence[ToolResult]) -> None:
+        # A real tool call arrived: the model is acting. Keep the assistant
+        # turn (native shape) in history for context.
+        self.any_tool_called = True
+        self.messages.append(
+            {"role": "assistant", "content": reply.text, "tool_calls": reply.raw}
+        )
+        cap = self.client._local_tool_result_cap()
+        for call, result in zip(reply.calls, results, strict=True):
+            # Native tool result message.
+            self.messages.append(
+                {
+                    "role": "tool",
+                    "tool_name": call.name,
+                    "content": truncate_tool_result(result.text, limit=cap),
+                }
+            )
+
+    def history_budget(self) -> int:
+        return self.client._local_history_budget()
+
+    def finish(self, reason: StopReason) -> None:
+        client = self.client
+        if reason == "max_turns":
+            logger.warning(
+                f"[LocalAgentClient] Reached max_turns ({client.max_turns}) — stopping"
+            )
+        client.last_usage = {
+            "input_tokens": self.total_in,
+            "output_tokens": self.total_out,
+            "cost_usd": 0.0,
+        }
