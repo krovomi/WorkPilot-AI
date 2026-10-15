@@ -95,19 +95,22 @@ answer that question on a machine it will never see.
 
 ### The `_bmad/` mock in this repository
 
-`_bmad/scripts/resolve_customization.py` is committed (re-included by `.gitignore`), and the
-`skills` job in `.github/workflows/lint.yml` writes the same file on the runner. It is a
-**three-line mock** (`print("Mock runtime active")`), not BMAD's runtime: it only satisfies the
-gate so that `skills-cli build` emits the 50 BMAD skills into the committed `.agents/skills/`, and
-`build --check` gives the same answer locally and in CI. It was added in #171 as temporary.
+`_bmad/scripts/resolve_customization.py` is committed (re-included by `.gitignore`). It is
+**WorkPilot's stand-in**, not BMAD's runtime: its first line carries the `workpilot-mock`
+marker, and it **fails** (exit 2, a message on stderr) when a skill runs it. It exists so that
+`skills-cli build` emits the 50 BMAD skills into the committed `.agents/skills/` and
+`build --check` gives the same answer locally and in CI; the `skills` job of `lint.yml` checks
+that the file is still a mock and still fails.
 
-Know what it does in a checkout of *this* repository:
+What it means in a checkout of *this* repository:
 
-* the read-time gate passes, so the Kanban palette lists the BMAD commands;
-* a BMAD skill run here gets `Mock runtime active` with exit code 0 instead of its merged
-  customization, so the skill's own fallback ("on failure, read `customize.toml`") never fires;
-* `skills:bootstrap` sees `produces` already present and skips the real installer
-  (use `--force`).
+* the build gate passes (`check_requires`, the file exists), so the skills are emitted;
+* the command palette passes `accept_mock=False` and **hides** the BMAD commands: a command
+  whose runtime is a mock would fail on invocation;
+* `skills:bootstrap` (`bootstrap_satisfied`) does not count a mock as installed, so
+  `pnpm run skills:bootstrap -- --pack bmad` runs the real installer;
+* a BMAD skill run here anyway gets a non-zero exit and reads its own `customize.toml`, as its
+  procedure says to do on failure.
 
 None of this reaches a target project: `workflows/runner.py` and the palette check the project
 the task runs in, where only BMAD's installer writes `_bmad/`.

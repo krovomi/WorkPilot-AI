@@ -169,7 +169,9 @@ def _runtime_is_present(meta: dict[str, Any], project_dir: Path) -> bool:
 
     A malformed or unrecognised `requires` hides the command rather than
     showing it. A command that cannot run is worse than one that is missing:
-    the user picks it, waits, and gets an error.
+    the user picks it, waits, and gets an error. The mock runtime this
+    repository commits for its own build counts as missing here, for the
+    same reason.
     """
     requires = workpilot_meta(meta).get("requires")
     if not requires:
@@ -178,7 +180,7 @@ def _runtime_is_present(meta: dict[str, Any], project_dir: Path) -> bool:
         logger.debug("skill has a non-mapping `requires`, hidden from the palette")
         return False
     try:
-        ok, reason = check_requires(requires, project_dir)
+        ok, reason = check_requires(requires, project_dir, accept_mock=False)
     except Exception as exc:  # noqa: BLE001 - a bad gate hides, never crashes
         logger.debug("requires check failed, hiding command: %s", exc)
         return False
