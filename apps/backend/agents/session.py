@@ -30,6 +30,7 @@ from core.progress import (
     count_subtasks_detailed,
     is_build_complete,
 )
+from harness.application.budget import BUDGET_ENV
 from insight_extractor import extract_session_insights
 from integrations.linear.updater import (
     linear_subtask_completed,
@@ -1898,6 +1899,37 @@ def _make_context_guard(
         return None
 
 
+# (provider, model) pairs whose missing price was already reported.
+_UNPRICED_REPORTED: set[tuple[str, str]] = set()
+
+
+def _session_budget(client):
+    """The spending cap the runner enforces for ``client``, or None. Never raises.
+
+    When the cap cannot be measured (no known price for the model), the task
+    log says so once, and the session runs uncapped as before.
+    """
+    try:
+        from harness.application.budget import budget_for
+
+        budget = budget_for(client)
+    except Exception as _be:  # noqa: BLE001 - a missing cap never stops a build
+        logger.debug("[budget] unavailable: %s", _be)
+        return None
+    if budget is not None and not budget.measurable:
+        unpriced = (client.provider_name(), getattr(client, "model", "?"))
+        if unpriced not in _UNPRICED_REPORTED:
+            _UNPRICED_REPORTED.add(unpriced)
+            print(
+                f"No price known for {unpriced[0]} / {unpriced[1]}: the "
+                f"${budget.cap_usd:.2f} session budget cannot be measured and is "
+                "not enforced.",
+                flush=True,
+            )
+        return None
+    return budget
+
+
 def session_usage_fields(client) -> dict[str, int] | None:
     """A session's tokens in the usage tracker's sense, whatever the provider.
 
@@ -2098,6 +2130,11 @@ async def _run_agent_client_session(
         debug("session", "Starting to receive response stream...")
 
         _session_marker_written = False
+        # One spending cap per session for every client the SDK does not
+        # already cap (harness.application.budget), measured from the client's
+        # usage ledger after each message.
+        _budget = _session_budget(client)
+        _budget_spent: float | None = None
         async for agent_msg in client.receive_response():  # noqa: SIM113 — result msg needs post-loop handling
             message_count += 1
 
@@ -2344,6 +2381,18 @@ async def _run_agent_client_session(
                     )
                     break
 
+            if _budget is not None and _budget.exceeded(
+                getattr(client, "usage_ledger", None)
+            ):
+                _budget_spent = _budget.spent(getattr(client, "usage_ledger", None))
+                print(
+                    f"\nSession budget reached: about ${_budget_spent:.2f} spent of "
+                    f"${_budget.cap_usd:.2f} — ending this session. Raise "
+                    f"{BUDGET_ENV} to allow more.",
+                    flush=True,
+                )
+                break
+
         print("\n" + "-" * 70 + "\n")
 
         if _context_decision is not None:
@@ -2372,9 +2421,9 @@ async def _run_agent_client_session(
                 provider=provider,
                 model=getattr(client, "model", None),
                 phase=phase.value,
-                subtype=getattr(
-                    getattr(client, "last_result_msg", None), "subtype", None
-                ),
+                subtype="error_max_budget_usd"
+                if _budget_spent is not None
+                else getattr(getattr(client, "last_result_msg", None), "subtype", None),
             )
 
         # Record token usage from AgentClient (best-effort via duck typing)
@@ -2466,7 +2515,15 @@ async def _run_agent_client_session(
         # A turn that produced nothing but status lines (a provider error the
         # classifiers above did not recognise) still has to tell the caller
         # what happened — returning "" would look like a silent, successful turn.
-        return "continue", response_text or status_text.strip(), {}
+        # A session stopped at its budget continues like one the SDK stopped
+        # at max_budget_usd: the caller decides, as it does there.
+        return (
+            "continue",
+            response_text or status_text.strip(),
+            {"budget_exceeded": True, "spent_usd": round(_budget_spent, 4)}
+            if _budget_spent is not None
+            else {},
+        )
 
     except Exception as e:
         is_concurrency = is_tool_concurrency_error(e)

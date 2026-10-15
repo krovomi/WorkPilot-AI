@@ -279,6 +279,10 @@ class AgentClient(ABC):
     # nothing downstream does. Read by ``record_client_usage`` and the context
     # guard; ``None`` until the client records a call.
     usage_ledger: UsageLedger | None = None
+    # Whether the client stops a session at its own spending cap (the Claude
+    # SDK does). The session runner caps every other client itself
+    # (harness.application.budget).
+    enforces_own_budget: bool = False
 
     def _start_usage_ledger(self) -> UsageLedger:
         """A fresh ledger for the response about to be received."""

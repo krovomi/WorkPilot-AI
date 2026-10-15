@@ -495,7 +495,7 @@ planner, coder, QA…).
 | Variable | Default | Meaning |
 | --- | ---: | --- |
 | `AUTO_CLAUDE_MAX_TURNS` | 1000 | Maximum agent turns in one session. A value that is not an integer stops the session from starting. |
-| `AUTO_CLAUDE_MAX_BUDGET_USD` | 5.0 | Spending cap, in US dollars, of one session — not of the task. Past it the SDK ends the session and the Kanban offers to resume. A value that is not a number stops the session from starting. |
+| `AUTO_CLAUDE_MAX_BUDGET_USD` | 5.0 | Spending cap, in US dollars, of one session — not of the task — on every provider. Past it the session ends (the Claude SDK ends it itself; for the other providers the session runner does, from each call's measured usage and the model's price in `cost_intelligence/catalog.py`) and the Kanban offers to resume. A model without a known price is not capped. 0 or less removes the cap; a value that is not a number falls back to 5.0. |
 | `AUTO_CLAUDE_EFFORT` | by agent type | Forces the SDK `effort` level (`low`, `medium`, `high`, `xhigh`, `max`) of sessions on an Opus model; other models ignore it. Without it: `xhigh` for the planner and the coder, `low` for explorers, `high` for QA and the rest. Separate from the per-phase thinking budget. |
 | `AUTO_CLAUDE_OTEL_ENDPOINT` | — | OTLP endpoint, such as `http://localhost:4318`. When set, each session exports traces, metrics and logs over OTLP `http/protobuf` as the service `workpilot-<agent type>`, and these settings replace any `OTEL_*` variable of the same name. Point it only at a collector you control. |
 | `AUTO_CLAUDE_AGENT_DEBUGGER` | off | `1`, `true`, `yes` or `on` attaches the Agent Debugger's breakpoints to every session, even when the debugger was not opened for that task. |
