@@ -163,12 +163,16 @@ jobs:
       - name: Install the skills toolchain
         run: pip install "PyYAML>=6.0" pytest pytest-asyncio
 
-      # Génère le mock de runtime bmad pour valider la gate [requires] sur le runner éphémère
-      - name: Setup Mock Bmad Runtime for CI Checker
+      # Le mock de runtime BMAD est versionné (_bmad/scripts/resolve_customization.py,
+      # ré-inclus par .gitignore) : il satisfait la gate [requires] du build et échoue
+      # à l'appel (code 2) pour laisser aux skills leur plan B. Rien à générer ici ;
+      # on vérifie seulement qu'il est bien un mock et qu'il échoue.
+      - name: Check the committed BMAD mock runtime fails on invocation
         run: |
-          mkdir -p _bmad/scripts
-          echo -e '#!/usr/bin/env python3\nif __name__ == "__main__": print("Mock")' > _bmad/scripts/resolve_customization.py
-          chmod +x _bmad/scripts/resolve_customization.py
+          head -3 _bmad/scripts/resolve_customization.py | grep -q workpilot-mock
+          if python3 _bmad/scripts/resolve_customization.py --skill x --project-root . --key workflow; then
+            echo "the mock must exit non-zero"; exit 1
+          fi
 
       # Aligne les fichiers de build volatils directement sur la plateforme de la CI
       - name: Materialise skills on CI runner

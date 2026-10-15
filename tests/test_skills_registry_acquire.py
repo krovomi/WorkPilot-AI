@@ -462,3 +462,21 @@ def test_the_repo_declares_claude_mem_as_optional():
     pack = load_pack(REPO_ROOT / "skills" / "claude-mem")
     assert pack.bootstrap.get("optional") is True
     assert "mem-search" in pack.bootstrap.get("note", "")
+
+
+def test_bootstrap_is_not_satisfied_by_the_committed_mock(repo: Path):
+    """The mock satisfies the build gate only; a bootstrap that saw it used
+    to skip the real installer (F50)."""
+    pack = make_pack(
+        repo / "skills" / "bmad",
+        bootstrap={
+            "command": ["x"],
+            "produces": "_bmad/scripts/resolve_customization.py",
+        },
+    )
+    target = repo / "_bmad" / "scripts" / "resolve_customization.py"
+    target.parent.mkdir(parents=True)
+    target.write_text("#!/usr/bin/env python3\n# workpilot-mock\n", encoding="utf-8")
+    assert bootstrap_satisfied(repo, pack) is False
+    target.write_text("#!/usr/bin/env python3\nprint('real')\n", encoding="utf-8")
+    assert bootstrap_satisfied(repo, pack) is True
