@@ -79,6 +79,7 @@ Toute interaction LLM passe par ces fichiers ; les modifier touche tout le produ
 
 | Paquet | Rôle |
 |---|---|
+| `tasks/` | le **type** d'une carte (`bug_fix`, `hotfix`, `run`, `investigation`…) décidé sans modèle (`classify.py`) et écrit dans `task_metadata.json` (`metadata.py`) ; lot 0 de [kanban-task-types.md](../../docs/architecture/kanban-task-types.md) |
 | `project/stack.py` | **la** détection de pile (langages, frameworks, type d'app, marqueurs) |
 | `libdocs/` | docs des bibliothèques sans exemple dans le dépôt, avant le planning |
 | `docintel/` | pièces jointes : diagrammes, OCR (`engines/`), PDF, ERD, séquences, C4, tableaux, captures ; `redact.py` masque les secrets |
