@@ -92,13 +92,13 @@ class Report:
     withheld: bool = False
 
 
-def _workflow_path() -> Path:
-    return (
-        Path(__file__).resolve().parents[3]
-        / "workflows"
-        / "feature-build"
-        / "workflow.yaml"
-    )
+def _workflow_path(spec_dir: Path | str) -> Path:
+    """The workflow this spec runs under — the kind's, not always the
+    feature pipeline's. A bug-fix's `reproduce` report reaches its planner
+    only if the declared order read here is the bug-fix workflow's."""
+    from .registry import workflow_for_spec
+
+    return workflow_for_spec(Path(spec_dir))
 
 
 def _session_phases_skipped() -> frozenset[str]:
@@ -142,7 +142,7 @@ def reports_for(
     """
     from .spec import load_workflow
 
-    workflow = load_workflow(workflow_path or _workflow_path())
+    workflow = load_workflow(workflow_path or _workflow_path(spec_dir))
     declared = [phase.id for phase in workflow.phases]
     out: list[Report] = []
     for phase_id in feeding_phases(declared, consumer):

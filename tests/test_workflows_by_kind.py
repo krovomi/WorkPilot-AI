@@ -197,6 +197,8 @@ class TestEveryWorkflow:
         for phase in _load(name).phases:
             if phase.fallback:
                 pack, _, skill = phase.fallback.partition("/")
+                if pack == "workpilot":
+                    continue  # WorkPilot's own Python, not a skill on disk
                 assert skill in available.get(pack, set()), (name, phase.id)
 
     @pytest.mark.parametrize("name", WORKFLOWS)

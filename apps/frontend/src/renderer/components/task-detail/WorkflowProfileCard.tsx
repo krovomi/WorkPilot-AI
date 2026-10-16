@@ -242,7 +242,11 @@ function PhaseRow({ phase }: { readonly phase: WorkflowPhasePayload }) {
 				})
 			: phase.skipReason === "untouched"
 				? t("workflowProfile:phase.skippedUntouched")
-				: null;
+				: phase.skipReason === "task"
+					? t("workflowProfile:phase.skippedTask", {
+							facts: (phase.whenTask ?? []).join(", "),
+						})
+					: null;
 
 	const dispatchLabel = t(
 		`workflowProfile:phase.dispatch.${phase.dispatch}`,
@@ -315,10 +319,17 @@ function PhaseRow({ phase }: { readonly phase: WorkflowPhasePayload }) {
 				{skipDetail && (
 					<div className="mt-0.5 text-muted-foreground">{skipDetail}</div>
 				)}
-				{phase.runs && phase.conditional && (
+				{phase.runs && phase.whenGlobs.length > 0 && (
 					<div className="mt-0.5 text-muted-foreground">
 						{t("workflowProfile:phase.conditional", {
 							globs: phase.whenGlobs.join(", "),
+						})}
+					</div>
+				)}
+				{phase.runs && (phase.whenTask?.length ?? 0) > 0 && (
+					<div className="mt-0.5 text-muted-foreground">
+						{t("workflowProfile:phase.conditionalTask", {
+							facts: (phase.whenTask ?? []).join(", "),
 						})}
 					</div>
 				)}

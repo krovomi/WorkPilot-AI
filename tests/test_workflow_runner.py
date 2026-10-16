@@ -73,7 +73,7 @@ class TestPhaseWindows:
         # `mobile-design` is conditional on its files
         # being touched, and an unknown change set runs a conditional phase —
         # erring towards running is the safe direction the engine documents.
-        assert [r.id for r in pre] == ["brainstorm"]
+        assert [r.id for r in pre] == ["prd", "brainstorm"]
         assert [r.id for r in planned] == [
             "analyze",
             "ui-design-system",
@@ -718,17 +718,31 @@ class TestRuntimeGateAtRunTime:
         The three BMAD phases this workflow declared needed `_bmad/` in the
         project being built. Almost no project has it, so each was resolved,
         printed in the profile, and stopped before its session on every build.
-        A methodology that needs a runtime belongs to the projects that have
-        it — the command palette offers it there — not to the default pipeline.
+        A methodology that needs a runtime is declarable only with a fallback
+        that needs none: the projects that have the runtime get it, the others
+        get the fallback, and nobody gets a phase that stops before its
+        session.
         """
         for phase in workflow.phases:
             found = find_skill_body(REPO_ROOT, phase.pack, phase.skill)
             if found is None:
                 continue
             _body, _path, requires = found
-            assert not requires.get("runtime"), (
-                f"{phase.id} names {phase.impl}, which needs {requires['runtime']}"
+            if not requires.get("runtime"):
+                continue
+            # Lot 2: a runtime-gated methodology may be declared, on the
+            # condition that a fallback with no such gate stands in for it
+            # — the engine substitutes it and the profile says so.
+            assert phase.fallback, (
+                f"{phase.id} names {phase.impl}, which needs "
+                f"{requires['runtime']}, and declares no fallback"
             )
+            pack, _, skill = phase.fallback.partition("/")
+            if pack == "workpilot":
+                continue
+            fallback = find_skill_body(REPO_ROOT, pack, skill)
+            assert fallback is not None, (phase.id, phase.fallback)
+            assert not fallback[2].get("runtime"), (phase.id, phase.fallback)
 
 
 class TestPhaseLabels:

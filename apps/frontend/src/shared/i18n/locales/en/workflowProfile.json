@@ -18,11 +18,13 @@
 		"skipped": "skipped",
 		"skippedByEffort": "needs effort {{minEffort}} or above",
 		"skippedUntouched": "no matching files changed",
+		"skippedTask": "not this task — needs {{facts}}",
 		"hardGate": "Never skipped — {{gate}}",
 		"always": "Always runs",
 		"deterministic": "No API call",
 		"humanGate": "Stops for approval",
 		"conditional": "Only when {{globs}} change",
+		"conditionalTask": "Only on a task where {{facts}}",
 		"dispatch": {
 			"inline": "inline",
 			"fresh-context": "fresh context",

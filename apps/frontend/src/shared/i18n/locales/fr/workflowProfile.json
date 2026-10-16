@@ -18,11 +18,13 @@
 		"skipped": "sautée",
 		"skippedByEffort": "demande un effort ≥ {{minEffort}}",
 		"skippedUntouched": "aucun fichier concerné modifié",
+		"skippedTask": "pas cette tâche — il faut {{facts}}",
 		"hardGate": "Jamais sautée — {{gate}}",
 		"always": "Toujours exécutée",
 		"deterministic": "Aucun appel API",
 		"humanGate": "S'arrête pour approbation",
 		"conditional": "Seulement si {{globs}} change",
+		"conditionalTask": "Seulement sur une tâche où {{facts}}",
 		"dispatch": {
 			"inline": "en ligne",
 			"fresh-context": "contexte neuf",

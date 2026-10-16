@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import fnmatch
 import logging
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -48,6 +49,7 @@ __all__ = [
     "ResolvedPhase",
     "ExecutionProfile",
     "MissingImpl",
+    "ProjectCheck",
     "narrow_to_forecast",
     "pack_inventory",
     "resolve_profile",
@@ -83,6 +85,7 @@ DETERMINISTIC_PHASES = frozenset({"design-check", "ui-design-system", "verify-re
 
 _SKIP_EFFORT = "effort"
 _SKIP_UNTOUCHED = "untouched"
+_SKIP_TASK = "task"
 
 
 @dataclass(frozen=True)
@@ -170,11 +173,14 @@ class ExecutionProfile:
                 f"  {marker} {resolved.id:<{width}} {resolved.phase.impl}{suffix}"
             )
         for phase, why in self.skipped:
-            detail = (
-                f"needs effort ≥ {phase.min_effort}"
-                if why == _SKIP_EFFORT
-                else "no matching files changed"
-            )
+            if why == _SKIP_EFFORT:
+                detail = f"needs effort ≥ {phase.min_effort}"
+            elif why == _SKIP_TASK:
+                detail = "not this task: " + " and ".join(
+                    f"{f} == {v}" for f, v in phase.when_task
+                )
+            else:
+                detail = "no matching files changed"
             lines.append(f"  - {phase.id:<{width}} skipped ({detail})")
         return "\n".join(lines)
 
@@ -208,6 +214,21 @@ def _touched(globs: tuple[str, ...], changed_files: list[str] | None) -> bool:
     return False
 
 
+def _matches_task(
+    conditions: tuple[tuple[str, str], ...], facts: Mapping[str, str] | None
+) -> bool:
+    """Whether the task's known facts satisfy every ``kind ==`` / ``complexity
+    ==`` term. A fact the build does not know is read as matching, for the
+    reason `_touched` runs on an unknown change set."""
+    if not conditions:
+        return True
+    for field_name, value in conditions:
+        known = (facts or {}).get(field_name)
+        if known is not None and known != value:
+            return False
+    return True
+
+
 def _degrade(
     phase: Phase,
     supports_subagents: bool,
@@ -237,11 +258,18 @@ def _why_unresolved(
     phase_id: str,
     available: dict[str, set[str]],
     gated: frozenset[str] | set[str],
+    *,
+    project: ProjectCheck | None = None,
 ) -> str | None:
     """Why ``impl`` cannot be found in the inventory, or None when it can.
 
     One answer for the resolver and for `validate_impls`, so the profile and
     the warning under it cannot disagree about what "installed" means.
+
+    With ``project``, a skill that is on disk but whose ``requires`` is not
+    met in the project being built is unresolved too — "installed" for a
+    BMAD skill means the project has `_bmad/`, and that is the question the
+    profile has to answer before a session is paid for.
     """
     pack, _, skill = impl.partition("/")
     if pack in BUILTIN_PACKS:
@@ -255,11 +283,46 @@ def _why_unresolved(
         )
     if skill not in skills:
         return f"pack {pack!r} provides no skill named {skill!r}"
+    if project is not None:
+        return _unmet_requires(impl, project)
     return None
 
 
+@dataclass(frozen=True)
+class ProjectCheck:
+    """Where to read a skill's ``requires`` from, and which project to check
+    it against. ``repo_root`` is this repository (the skills); ``project_dir``
+    is the one being built (where `_bmad/` would be)."""
+
+    repo_root: Path
+    project_dir: Path
+
+
+def _unmet_requires(impl: str, project: ProjectCheck) -> str | None:
+    """The reason a skill cannot start in the project, or None when it can.
+
+    Reads the same `requires` the runner reads, through the same functions,
+    so the profile printed before the build and the decision made at run
+    time cannot disagree. A committed mock runtime does not count: it fails
+    on invocation, which is the failure this exists to turn into a sentence.
+    """
+    try:
+        from .runner import find_skill_body, skill_requires
+    except ImportError as exc:  # pragma: no cover - import-time environment
+        return f"cannot verify the runtime requirement: {exc}"
+    pack, _, skill = impl.partition("/")
+    found = find_skill_body(project.repo_root, pack, skill)
+    if found is None:
+        return f"no SKILL.md for {impl}"
+    _body, _source, requires = found
+    satisfied, why = skill_requires(requires, project.project_dir)
+    return None if satisfied else why
+
+
 def _substitute(
-    phase: Phase, inventory: tuple[dict[str, set[str]], frozenset[str]] | None
+    phase: Phase,
+    inventory: tuple[dict[str, set[str]], frozenset[str]] | None,
+    project: ProjectCheck | None,
 ) -> tuple[Phase, str | None, str]:
     """The phase to run, and what it stands in for.
 
@@ -270,10 +333,13 @@ def _substitute(
     if inventory is None or not phase.fallback:
         return phase, None, ""
     available, gated = inventory
-    why = _why_unresolved(phase.impl, phase.id, available, gated)
+    why = _why_unresolved(phase.impl, phase.id, available, gated, project=project)
     if why is None:
         return phase, None, ""
-    if _why_unresolved(phase.fallback, phase.id, available, gated) is not None:
+    if (
+        _why_unresolved(phase.fallback, phase.id, available, gated, project=project)
+        is not None
+    ):
         return phase, None, ""
     return phase.with_impl(phase.fallback), phase.impl, why
 
@@ -285,13 +351,19 @@ def resolve_profile(
     provider: str | None = None,
     changed_files: list[str] | None = None,
     inventory: tuple[dict[str, set[str]], frozenset[str]] | None = None,
+    project: ProjectCheck | None = None,
+    task: Mapping[str, str] | None = None,
 ) -> ExecutionProfile:
     """Decide which phases run, how, and by which implementation.
 
     ``inventory`` is what `pack_inventory` returns. With it, a phase whose
     ``impl`` is not installed and whose ``fallback`` is runs the fallback, and
-    the profile records the substitution. Without it, no substitution is made
-    here — the runner still falls back at run time, against the target project.
+    the profile records the substitution. ``project`` extends "installed" to
+    "and its runtime is in the project being built" (`ProjectCheck`), which
+    is the question a BMAD phase turns on. Without them, no substitution is
+    made here — the runner still falls back at run time, against the target
+    project. ``task`` is `task_facts.task_facts`: the kind and complexity a
+    ``when: kind == …`` condition is read against.
     """
     supports_subagents = True
     if provider:
@@ -326,11 +398,14 @@ def resolve_profile(
 
         # A hard gate still runs, but a conditional phase with nothing to look
         # at has no work to do regardless of its gate status.
+        if not _matches_task(phase.when_task, task):
+            profile.skipped.append((phase, _SKIP_TASK))
+            continue
         if not _touched(phase.when_globs, changed_files):
             profile.skipped.append((phase, _SKIP_UNTOUCHED))
             continue
 
-        played, declared_impl, why = _substitute(phase, inventory)
+        played, declared_impl, why = _substitute(phase, inventory, project)
         profile.run.append(
             _degrade(
                 played,

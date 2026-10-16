@@ -298,11 +298,15 @@ Ce que rend un sous-agent est borné et traité comme une donnée non fiable
 partie des rosters du pipeline. Détail : [`apps/backend/agents/README.md`](apps/backend/agents/README.md#subagents).
 
 #### Méthode BMAD
-BMAD n'est plus une étape du pipeline (`workflows/feature-build/workflow.yaml` ne l'appelle plus),
-mais reste disponible en **skills à la demande** : 50 skills BMAD v6.12.0 vendorisés dans
-[`skills/bmad/`](skills/bmad/) par `scripts/vendor_bmad.py`. Ils ont besoin du runtime `_bmad/`
-que l'installeur BMAD écrit **dans le projet cible** (`pnpm run skills:bootstrap`) ; sans lui,
-ils sont masqués de la barre de commandes. Voir [`skills/README.md`](skills/README.md#runtime-gates).
+BMAD est une **capacité à la demande**, jamais une étape obligatoire : 50 skills BMAD v6.12.0
+vendorisés dans [`skills/bmad/`](skills/bmad/) par `scripts/vendor_bmad.py`. Ils ont besoin du
+runtime `_bmad/` que l'installeur BMAD écrit **dans le projet cible** (`pnpm run skills:bootstrap
+--pack bmad`) ; sans lui, ils sont masqués de la barre de commandes. Dans les workflows, BMAD
+n'entre que là où sa valeur est documentaire — `brainstorm` (`bmad-brainstorming`), le `prd` d'une
+feature complexe à `ultrathink` (`bmad-prd`), la recherche d'un spike (`bmad-deep-recon`) — et
+toujours avec un `fallback:` WorkPilot que le moteur substitue quand le projet n'a pas le runtime,
+en l'écrivant dans le profil. Voir [`skills/README.md`](skills/README.md#runtime-gates) et
+[`docs/architecture/kanban-task-types.md`](docs/architecture/kanban-task-types.md).
 
 ### Architecture Technique
 

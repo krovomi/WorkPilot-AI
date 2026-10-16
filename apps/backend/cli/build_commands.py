@@ -125,6 +125,7 @@ def _resolve_workflow_profile(
     changed_files: list[str] | None = None,
     *,
     announce: bool = True,
+    project_dir: Path | None = None,
 ):
     """Resolve the declarative workflow for this build, or None when disabled.
 
@@ -182,6 +183,9 @@ def _resolve_workflow_profile(
             if announce:
                 print(f"  (could not read the installed packs: {exc})")
 
+        from workflows.engine import ProjectCheck
+        from workflows.task_facts import task_facts
+
         profile = resolve_profile(
             workflow,
             effort,
@@ -194,6 +198,11 @@ def _resolve_workflow_profile(
             provider=peek_active_provider(spec_dir),
             changed_files=changed_files,
             inventory=inventory,
+            # "Installed" for a skill with a runtime requirement (BMAD's
+            # `_bmad/`) is a question about the project being built, so the
+            # profile answers it there and substitutes the fallback up front.
+            project=(ProjectCheck(repo_root, project_dir) if project_dir else None),
+            task=task_facts(spec_dir),
         )
         if not announce:
             return profile
@@ -767,7 +776,7 @@ def handle_build_command(
     # sequence below stays the execution path. Opt-in until the golden profiles
     # have run against real builds — this function is the entry point of every
     # build in the product.
-    _profile = _resolve_workflow_profile(spec_dir)
+    _profile = _resolve_workflow_profile(spec_dir, project_dir=project_dir)
 
     print_banner()
     print(f"\nProject directory: {project_dir}")
@@ -1015,7 +1024,9 @@ def handle_build_command(
         # build starting.
         _changed = _changed_files(worktree_manager, spec_dir.name)
         _post_profile = (
-            _resolve_workflow_profile(spec_dir, _changed, announce=False)
+            _resolve_workflow_profile(
+                spec_dir, _changed, announce=False, project_dir=working_dir
+            )
             if _profile is not None
             else None
         )
