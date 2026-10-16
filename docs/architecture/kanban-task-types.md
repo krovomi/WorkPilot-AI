@@ -135,36 +135,55 @@ Coût : 0 token.
 Coût : aucun token nouveau sur `feature` ; un `bug_fix` paie `reproduce` (une session) et ne paie
 plus brainstorm, design system, carte d'architecture ; `investigation` et `run` paient une session.
 
-## Lot 2 — BMAD à la demande, par `impl` + `fallback`
+## Lot 2 — BMAD à la demande, par `impl` + `fallback` — **livré**
 
-BMAD apporte de la valeur **documentaire** : cadrer un besoin flou, produire un PRD ou une
-architecture, animer une rétro. Il n'en apporte pas pour exécuter du code. Le lot le rend
-appelable là, et là seulement.
+BMAD apporte de la valeur **documentaire** : cadrer un besoin flou, produire un PRD, faire une
+recherche technique. Il n'en apporte pas pour exécuter du code. Le lot le rend appelable là, et
+là seulement — et seulement dans les projets qui l'ont installé.
 
-- `feature-build` : `brainstorm` gagne `impl: bmad/bmad-brainstorming`, `fallback:
-  tooling/brainstorm-approaches` ; `min_effort: high` inchangé. Une phase optionnelle
-  `prd` (`impl: bmad/bmad-create-prd`, `fallback: workpilot/spec`, `min_effort: ultrathink`,
-  `when: kind == feature and complexity == complex`) **avant** la spec WorkPilot, dont la
-  sortie est handée au planner (`handoff.py`) — un PRD que personne ne lit est le défaut
-  qu'on a déjà corrigé une fois.
-- `investigation` : `impl: bmad/bmad-deep-recon`, `fallback: tooling/brainstorm-approaches`.
-- `spike` : `impl: bmad/bmad-technical-research`, `fallback: tooling/brainstorm-approaches`.
-- Nouveau workflow `retro` (déclenché à la main, pas par une carte) :
-  `impl: bmad/bmad-retrospective` sur les N dernières cartes mergées, `fallback:
-  workpilot/observe`.
-- Mécanique : `workflows/runner.py` applique déjà `requires` contre le **projet cible** ;
-  avec `fallback`, un `requires` non satisfait **substitue** et le profil l'écrit (« prd :
-  bmad absent → workpilot/spec »). `skills:bootstrap --pack bmad` reste l'opt-in par projet.
-- Le faux `_bmad/scripts/resolve_customization.py` du dépôt est remplacé par un mock qui
-  **échoue** (`exit 2`) : les skills gardent leur plan B (`customize.toml`), la palette et le
-  profil cessent d'annoncer BMAD là où il n'est pas installé, et `skills:build` continue
-  d'émettre les 50 skills dans `.agents/skills/` grâce à `requires` satisfait côté build.
-- Tout provider : les skills BMAD sont des `SKILL.md` lus par l'agent de la phase ; rien n'y
-  est propre à Claude. Leurs scripts (`uv run …`) tournent via `run_command` sous allowlist —
-  `uv` est à ajouter à `project/command_registry/` avec validateur (il exécute du code).
-- Coût : un skill BMAD vaut 2 à 6 k tokens de prompt ; il n'est lu que dans sa phase, jamais
-  dans le préfixe d'une autre. `min_effort` et `when` font qu'un bug à `medium` n'en charge
-  aucun.
+- `feature-build` : `brainstorm` est `impl: bmad/bmad-brainstorming`, `fallback:
+  tooling/brainstorm-approaches` (`min_effort: high` inchangé). Une phase `prd`
+  (`impl: bmad/bmad-prd`, `fallback: workpilot/spec`, `min_effort: ultrathink`, `when: kind ==
+  feature and complexity == complex`) avant `brainstorm`, remise au planner par `handoff.py`.
+  `bmad-create-prd` et `bmad-technical-research` sont des shims dépréciés en amont : les phases
+  nomment `bmad-prd` et `bmad-deep-recon` directement.
+- `spike` : `brainstorm` est `impl: bmad/bmad-deep-recon`, `fallback: tooling/brainstorm-approaches`.
+  `investigation` **garde** `tooling/investigate` : `deep-recon` est une recherche marché /
+  technique sur le web, pas une enquête dans un code — la mettre là aurait payé le mauvais
+  skill.
+- `when:` sait lire la tâche (`workflows/spec.py`) : `kind == <type>`, `complexity ==
+  <niveau>`, `touches("…")`, joints par `and` ; valeurs en liste fermée, une faute de frappe est
+  une erreur de chargement. Les faits viennent de `task_metadata.json` et de
+  `complexity_assessment.json` (`workflows/task_facts.py`) ; un fait inconnu vaut « oui »,
+  comme un diff inconnu pour `touches`. Le profil et l'API disent `skipped (not this task)`.
+- « Installé » se juge **dans le projet cible** : `engine.resolve_profile(..., project=
+  ProjectCheck(repo, projet))` lit le `requires` du skill (les mêmes `find_skill_body` /
+  `skill_requires` que le runner) ; sans `_bmad/`, la phase est substituée **avant** le build
+  et le profil l'écrit (« brainstorm : tooling/brainstorm-approaches [for
+  bmad/bmad-brainstorming: runtime not present] »). Le mock `_bmad/` de ce dépôt ne compte
+  jamais comme le vrai (`accept_mock=False` au runtime aussi) : il échouerait au premier appel.
+  `skills:bootstrap --pack bmad` reste l'opt-in par projet.
+- Un `fallback: workpilot/<x>` est WorkPilot lui-même : `prd` → `workpilot/spec` veut dire « le
+  `spec.md` déjà écrit est le document produit » ; une telle phase n'ouvre aucune session et
+  n'appartient à aucune fenêtre (`phases_between`).
+- `handoff.py` lit désormais le workflow **du type** de la spec (`registry.workflow_for_spec`),
+  pas toujours `feature-build` : le rapport `reproduce` d'un bug atteint son planner (trou du
+  lot 1, corrigé ici).
+- Tout provider : les skills BMAD sont des `SKILL.md` lus par l'agent de la phase ; le prompt
+  nomme la source de la procédure (`PROCEDURE SOURCE`, d'où se résolvent `references/`,
+  `customize.toml`, `scripts/`) et dit que la phase est non interactive. `uv` / `uvx` sont déjà
+  dans l'allowlist (`project/command_registry/package_managers.py`), au même titre que `npx`.
+- Non livré, et pourquoi : le workflow `retro` (BMAD rétrospective sur les N dernières cartes
+  mergées) n'a pas d'exécuteur — un build part d'une spec, pas d'un lot de cartes — et un
+  workflow que rien ne joue est exactement ce que ce dépôt refuse d'écrire. Il viendra avec le
+  déclencheur manuel qui saura le lancer.
+- Preuve : `tests/test_workflows_bmad_on_demand.py` (grammaire `when`, faits de la tâche, aucun
+  BMAD sur un projet nu à tout effort pour chaque workflow, le mock refusé, BMAD joué quand le
+  runtime est là, aucun PRD sur une feature simple ni sur un bug, fallback `workpilot/` sans
+  session ni fenêtre, handoff par type, API).
+
+Coût : un skill BMAD vaut 2 à 6 k tokens de prompt ; il n'est lu que dans sa phase. Un bug à
+`medium` n'en charge aucun ; une feature simple à `ultrathink` non plus.
 
 ## Lot 3 — RUN sûr : irréversible, pause, journal
 
@@ -229,7 +248,7 @@ lot 6 (mesure) après n'importe lequel
 
 Chaque lot est une PR vers `develop`, verte sur `validate_impls`, `test_docs_context`,
 `test_agent_tool_declarations` et `test_workflow_engine`, sur les trois OS de la CI.
-État : lots 0 et 1 livrés ; lots 2 à 6 à faire.
+État : lots 0, 1 et 2 livrés ; lots 3 à 6 à faire.
 
 ## Ce que le plan refuse
 

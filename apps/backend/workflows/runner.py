@@ -52,6 +52,8 @@ import os
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
+from .engine import BUILTIN_PACKS
+
 logger = logging.getLogger(__name__)
 
 __all__ = [
@@ -140,6 +142,8 @@ CONFIG_PHASE = {
     # Phases of the per-kind workflows (`workflows/registry.py`). Before the
     # code is written, they are planning costs; what reads the finished work
     # is a QA cost.
+    # A product document before the spec is read: a spec cost.
+    "prd": "spec",
     "reproduce": "planning",
     "investigate": "planning",
     "procedure": "planning",
@@ -216,6 +220,10 @@ SKILL_PHASE_AGENTS = {
     "architecture-map": "architecture_visualizer",
     # `reproduce` writes the failing test that proves the bug, so it runs
     # under the coder; its roster is `verify` (a test runner, nothing else).
+    # Read-only like `brainstorm`: the PRD comes back as the session's
+    # answer and is written to `workflow/prd.md` for the planner, not into
+    # the project by the model.
+    "prd": "spec_critic",
     "reproduce": "coder",
     # Read-only by construction: an investigation that edits code is a fix
     # nobody asked for, and a runbook is reviewed by a human before anything
@@ -454,6 +462,12 @@ def phases_between(profile, *, after: str | None, before: str | None) -> list:
             continue
         if resolved.id in _ELSEWHERE:
             continue
+        if resolved.phase.pack in BUILTIN_PACKS:
+            # Played by WorkPilot's own Python, not by a skill session — or
+            # already done by it: a `prd` phase whose BMAD skill cannot start
+            # falls back to `workpilot/spec`, and the spec pipeline wrote
+            # `spec.md` before this file was read. Nothing to open.
+            continue
         out.append(resolved)
     return out
 
@@ -541,7 +555,11 @@ def skill_requires(requires: dict, project_dir: Path) -> tuple[bool, str]:
         from skills_registry.resolver import check_requires
     except ImportError as exc:  # pragma: no cover - import-time environment
         return False, f"cannot verify the runtime requirement: {exc}"
-    return check_requires(requires, project_dir)
+    # `accept_mock=False`: the build's reading counts WorkPilot's committed
+    # stand-in as present so the gated skills are *emitted*; a phase that
+    # *runs* one would hand a session a runtime that exits 2 on its first
+    # call. Same reading as the command palette.
+    return check_requires(requires, project_dir, accept_mock=False)
 
 
 def _constitution(project_dir: Path) -> str:
@@ -602,7 +620,9 @@ def _uiux(spec_dir: Path, phase_id: str) -> str:
         return ""
 
 
-def _build_prompt(resolved, body: str, ctx: PhaseContext) -> str:
+def _build_prompt(
+    resolved, body: str, ctx: PhaseContext, source: Path | None = None
+) -> str:
     """The procedure, plus the minimum context needed to apply it.
 
     The effort level is injected rather than branched on inside the skill. A
@@ -645,6 +665,19 @@ def _build_prompt(resolved, body: str, ctx: PhaseContext) -> str:
         f"SPEC DIRECTORY: {ctx.spec_dir}",
         f"PROJECT DIRECTORY: {ctx.project_dir}",
     ]
+    if source is not None:
+        # Where the procedure's own files are. A vendored skill (BMAD) refers
+        # to `references/…`, `customize.toml`, `scripts/…` by bare path,
+        # resolved from the directory its SKILL.md lives in; without this
+        # line a model looks for them in the project and reports failure.
+        lines.append(
+            f"PROCEDURE SOURCE: {source} (bare paths resolve from {source.parent})"
+        )
+    lines.append(
+        "NON-INTERACTIVE: nobody answers during this phase. Where the procedure "
+        "asks the user to choose, take its autonomous or default option and say "
+        "which; write what the inputs cannot settle as [NEEDS CLARIFICATION]."
+    )
     if ctx.changed_files:
         shown = ctx.changed_files[:60]
         lines.append(f"FILES CHANGED BY THIS TASK ({len(ctx.changed_files)}):")
@@ -823,6 +856,15 @@ async def run_skill_phase(resolved, ctx: PhaseContext) -> PhaseOutcome:
     phase = resolved.phase
     impl = phase.impl
 
+    if phase.pack in BUILTIN_PACKS:
+        return PhaseOutcome(
+            phase.id,
+            impl,
+            resolved.dispatch,
+            True,
+            detail="implemented by WorkPilot itself; no session to open",
+        )
+
     deterministic = _DETERMINISTIC_RUNNERS.get(phase.id)
     if deterministic is not None:
         # The engine is a subprocess; keep the event loop free while it runs.
@@ -893,7 +935,7 @@ async def run_skill_phase(resolved, ctx: PhaseContext) -> PhaseOutcome:
             roster=phase.roster,
             provider=explicit_provider,
         )
-        prompt = _build_prompt(resolved, body, ctx)
+        prompt = _build_prompt(resolved, body, ctx, source)
         if jev_advice:
             prompt += "\n\n" + jev_advice
         async with client:
