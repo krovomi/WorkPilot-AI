@@ -425,6 +425,13 @@ export interface WorkflowPhasePayload {
 	/** "effort" | "untouched" — why it was dropped, when it was. */
 	skipReason: string | null;
 	deterministic: boolean;
+	/** The `<pack>/<skill>` played when `impl` is not installed, if declared. */
+	fallback: string | null;
+	/** The phase changes something a discarded branch cannot undo. */
+	irreversible: boolean;
+	/** Set when `impl` is the fallback: the implementation the workflow declared. */
+	substitutedFrom: string | null;
+	substitutionReason: string;
 }
 
 export interface WorkflowLevelPayload {

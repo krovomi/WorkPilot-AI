@@ -1,0 +1,27 @@
+name: investigation
+description: >-
+  A report and no code: the probable cause with its `file:line` evidence,
+  the hypotheses tried and discarded, the options. Chosen by
+  `workflows/registry.py` for cards of kind `investigation`. The workflow
+  declares neither `planning` nor `coding`, so the coder loop is not
+  started (`cli/build_commands._workflow_writes_code`); the card goes to
+  human review with the report when the phase has written it.
+
+phases:
+  - id: investigate
+    impl: tooling/investigate
+    roster: research
+    dispatch: fresh-context
+    always: true
+    description: >-
+      Read-only by construction — it runs under the `analyzer` agent, which
+      cannot write — with the research roster: an architecture analyst and
+      an evidence collector. Never pruned, because it is the whole task.
+      The report lands in `<spec_dir>/workflow/investigate.md`.
+
+  - id: observe
+    impl: workpilot/observe
+    always: true
+    description: >-
+      What the investigation taught about the project, filed for the builds
+      that follow.

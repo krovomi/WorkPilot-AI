@@ -30,12 +30,26 @@ Phase fields
                 write, ``roster`` decides which specialists it may dispatch to
                 — and binding them meant a read-only audit could only get the
                 right specialists by being handed write access.
+``fallback``    ``<pack>/<skill>`` played when ``impl`` does not resolve — the
+                pack is not installed, the skill is not on disk, or its
+                ``requires`` is not met in the target project. This is what
+                makes an optional methodology (BMAD) declarable without a hole
+                in the profile: the phase is **substituted**, never silently
+                dropped, and the profile says so. A fallback that does not
+                resolve either is reported by ``validate_impls`` like any
+                missing implementation.
+``irreversible`` the phase changes something outside the worktree that cannot
+                be undone by discarding the branch (a deployment, a data
+                migration, a purge). Data for the runner: a later lot pauses
+                the build before such a phase and resumes it only on an
+                explicit human go. Declared here so a workflow can already say
+                it, and so the UI can show it.
 """
 
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -85,6 +99,8 @@ class Phase:
     gate: str | None = None
     agent: str | None = None
     roster: str | None = None
+    fallback: str | None = None
+    irreversible: bool = False
     description: str = ""
     # Lenses applied only when the task touches their files, as
     # ``((name, globs), ...)``: ``lenses: {store-readiness: touches("…")}``.
@@ -102,6 +118,16 @@ class Phase:
     @property
     def skill(self) -> str:
         return self.impl.split("/", 1)[1] if "/" in self.impl else self.impl
+
+    def with_impl(self, impl: str) -> Phase:
+        """The same phase played by another implementation.
+
+        Used by the engine to substitute ``fallback`` for ``impl``: everything
+        else about the phase — its id, agent, roster, gates — is unchanged, and
+        the result carries no fallback of its own, so a substitution happens
+        once.
+        """
+        return replace(self, impl=impl, fallback=None)
 
 
 @dataclass(frozen=True)
@@ -166,6 +192,20 @@ def _parse_phase(raw: Any, index: int) -> Phase:
     gate = raw.get("gate")
     if gate not in (None, "human"):
         raise WorkflowError(f"phase {phase_id!r}: gate {gate!r} — only 'human' exists")
+    fallback = raw.get("fallback")
+    if fallback is not None:
+        fallback = str(fallback)
+        if "/" not in fallback:
+            raise WorkflowError(
+                f"phase {phase_id!r}: fallback {fallback!r} must be '<pack>/<skill>'"
+            )
+        if fallback == str(impl):
+            raise WorkflowError(
+                f"phase {phase_id!r}: fallback {fallback!r} is the impl itself"
+            )
+    irreversible = raw.get("irreversible", False)
+    if not isinstance(irreversible, bool):
+        raise WorkflowError(f"phase {phase_id!r}: 'irreversible' must be a boolean")
 
     return Phase(
         id=str(phase_id),
@@ -178,6 +218,8 @@ def _parse_phase(raw: Any, index: int) -> Phase:
         gate=gate,
         agent=(str(raw["agent"]) if raw.get("agent") else None),
         roster=(str(raw["roster"]) if raw.get("roster") else None),
+        fallback=fallback,
+        irreversible=irreversible,
         description=str(raw.get("description", "")),
         conditional_lenses=_parse_lenses(raw.get("lenses"), str(phase_id)),
     )

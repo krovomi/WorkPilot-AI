@@ -1,0 +1,98 @@
+description = "Pour une tâche d'exploitation (relancer, purger, migrer des données, déployer, faire tourner une clé), écrire la procédure avant de l'exécuter — à partir du runbook du projet (`.workpilot/runbooks/*.md`) quand il existe, sinon de la demande et des scripts du dépôt. Chaque étape nomme sa commande, l'effet attendu, comment le vérifier et si elle est réversible. Rien n'est exécuté : la procédure est relue par une personne d'abord."
+prompt = """
+# runbook — écrire la procédure, ne pas la jouer
+
+Une tâche RUN ne construit rien : elle change l'état de quelque chose qui
+tourne. L'erreur ne se corrige pas en relançant le build, donc la procédure
+s'écrit **avant**, en entier, et une personne la relit avant que quoi que ce
+soit ne s'exécute. Cette phase écrit ; une phase ultérieure, déterministe,
+joue les étapes une à une et s'arrête avant toute étape irréversible.
+
+Personne ne répond aux questions pendant cette phase. Une valeur inconnue
+(un nom d'environnement, une date de coupure) est un paramètre nommé de la
+procédure, pas une supposition.
+
+## Entrées
+
+| Fichier | Ce qu'on y cherche |
+|---|---|
+| `<spec_dir>/spec.md`, `requirements.json` | ce qui doit changer, où, et pour quand |
+| `.workpilot/runbooks/*.md` du projet | une procédure déjà écrite pour cette opération ou une voisine — elle fait foi |
+| `.workpilot/environments.toml` du projet, s'il existe | les environnements déclarés, leurs commandes de santé, les **noms** de variables |
+| les scripts du dépôt (`scripts/`, `Makefile`, `package.json`, `*.csproj`, CI) | les commandes que le projet utilise déjà pour cette opération |
+| la documentation du projet | les précautions écrites : sauvegarde, fenêtre, ordre |
+
+Réutilise une procédure existante plutôt que d'en écrire une seconde ; dis ce
+que tu y as changé et pourquoi.
+
+## Méthode
+
+1. **Nomme l'opération** et son résultat observable : « après, X est dans
+   l'état Y, vérifiable par Z ».
+2. **Identifie l'environnement** visé. Sans déclaration dans le projet, la
+   procédure ne tourne que dans l'arbre de travail de la tâche ; dis-le.
+3. **Découpe en étapes**, chacune avec :
+   - la commande exacte, sans interpolation d'entrée externe ;
+   - l'effet attendu et **comment le constater** (une commande de lecture,
+     une sortie attendue) ;
+   - **réversible : oui | non**, et si oui, la commande qui annule ;
+   - la précondition (sauvegarde faite, service arrêté, fenêtre ouverte).
+4. **Place une sauvegarde ou un point de retour** avant la première étape
+   irréversible, ou écris qu'il n'en existe pas et ce que cela implique.
+5. **Écris la vérification finale** : l'état attendu, la commande qui le
+   montre, et ce qui compte comme échec.
+6. **Liste ce qui manque** pour exécuter : paramètres inconnus, accès,
+   fenêtre à convenir.
+
+À effort `low`, la procédure minimale ; à `high` et au-delà, écris aussi le
+chemin de retour arrière complet et les signes qu'il faut l'emprunter.
+
+## Rapport
+
+Termine par ceci, et rien d'autre :
+
+```markdown
+## Opération
+
+… — résultat attendu : …
+Environnement : <nom déclaré | arbre de travail seulement>
+Source : `.workpilot/runbooks/<fichier>` (adapté : …) | écrite pour cette tâche
+
+## Préconditions
+
+- …
+
+## Étapes
+
+### 1. <nom>
+Commande : `…`
+Effet attendu : … — vérifier par : `…`
+Réversible : oui (`…`) | non
+Précondition : …
+
+### 2. …
+
+## Vérification finale
+
+État attendu : … — commande : `…` — échec si : …
+
+## Retour arrière
+
+…
+
+## Paramètres à fournir
+
+- `<NOM>` : …
+- [NEEDS CLARIFICATION: …]
+```
+
+## Ce que cette phase ne fait pas
+
+- **Elle n'exécute rien** : ni commande d'écriture, ni commande « juste pour
+  voir » qui modifie un état. Les commandes de lecture servent à vérifier les
+  préconditions, c'est tout.
+- **Elle ne contient aucun secret** : une variable est nommée, jamais valuée.
+- **Elle n'invente pas de commande** : une commande qui n'existe pas dans le
+  projet ni dans sa chaîne d'outils est un paramètre à fournir, pas une
+  étape.
+"""

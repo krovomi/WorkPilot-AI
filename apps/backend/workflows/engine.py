@@ -21,6 +21,16 @@ Degrading by provider
 A phase asking for ``subagent-per-task`` on a provider with no subagents cannot
 have it. It degrades to sequential execution with a context reset — same
 isolation, no parallelism — rather than silently pretending to dispatch.
+
+Substituting by availability
+----------------------------
+A phase whose ``impl`` is not installed and that declares a ``fallback`` is
+played by the fallback. The substitution is made here, once, when the resolver
+is given the pack inventory (`pack_inventory`), and it is recorded on the
+resolved phase and printed in the profile — "played by X, Y is not installed" —
+so what the user is shown is what runs. Without an inventory nothing is
+substituted and the runner makes the same decision at run time, against the
+target project, where a skill's ``requires`` is checked.
 """
 
 from __future__ import annotations
@@ -78,14 +88,24 @@ _SKIP_UNTOUCHED = "untouched"
 @dataclass(frozen=True)
 class ResolvedPhase:
     phase: Phase
+    """The phase as it will run. When a fallback was substituted this is the
+    phase *with the fallback as its impl*, so every consumer — the runner, the
+    coder's preamble, the API — reads the implementation that actually runs."""
     dispatch: str
     """What will actually happen, after provider degradation."""
     degraded_from: str | None = None
     reason: str = ""
+    substituted_from: str | None = None
+    """The ``impl`` the workflow declared, when ``phase.impl`` is its fallback."""
+    substitution_reason: str = ""
 
     @property
     def id(self) -> str:
         return self.phase.id
+
+    @property
+    def impl(self) -> str:
+        return self.phase.impl
 
 
 @dataclass
@@ -140,6 +160,11 @@ class ExecutionProfile:
                 suffix = f"  [{resolved.degraded_from} → {resolved.dispatch}: {resolved.reason}]"
             elif resolved.dispatch != "inline":
                 suffix = f"  [{resolved.dispatch}]"
+            if resolved.substituted_from:
+                suffix += (
+                    f"  [for {resolved.substituted_from}: "
+                    f"{resolved.substitution_reason}]"
+                )
             marker = "!" if resolved.phase.hard_gate else " "
             lines.append(
                 f"  {marker} {resolved.id:<{width}} {resolved.phase.impl}{suffix}"
@@ -183,15 +208,74 @@ def _touched(globs: tuple[str, ...], changed_files: list[str] | None) -> bool:
     return False
 
 
-def _degrade(phase: Phase, supports_subagents: bool) -> ResolvedPhase:
+def _degrade(
+    phase: Phase,
+    supports_subagents: bool,
+    *,
+    substituted_from: str | None = None,
+    substitution_reason: str = "",
+) -> ResolvedPhase:
     if phase.dispatch == "subagent-per-task" and not supports_subagents:
         return ResolvedPhase(
             phase=phase,
             dispatch="sequential-reset",
             degraded_from="subagent-per-task",
             reason="provider runs no subagents",
+            substituted_from=substituted_from,
+            substitution_reason=substitution_reason,
         )
-    return ResolvedPhase(phase=phase, dispatch=phase.dispatch)
+    return ResolvedPhase(
+        phase=phase,
+        dispatch=phase.dispatch,
+        substituted_from=substituted_from,
+        substitution_reason=substitution_reason,
+    )
+
+
+def _why_unresolved(
+    impl: str,
+    phase_id: str,
+    available: dict[str, set[str]],
+    gated: frozenset[str] | set[str],
+) -> str | None:
+    """Why ``impl`` cannot be found in the inventory, or None when it can.
+
+    One answer for the resolver and for `validate_impls`, so the profile and
+    the warning under it cannot disagree about what "installed" means.
+    """
+    pack, _, skill = impl.partition("/")
+    if pack in BUILTIN_PACKS:
+        return None
+    if phase_id in DETERMINISTIC_PHASES and pack in gated:
+        return None
+    skills = available.get(pack)
+    if skills is None:
+        return (
+            f"pack {pack!r} is not installed (pnpm run skills:bootstrap --pack {pack})"
+        )
+    if skill not in skills:
+        return f"pack {pack!r} provides no skill named {skill!r}"
+    return None
+
+
+def _substitute(
+    phase: Phase, inventory: tuple[dict[str, set[str]], frozenset[str]] | None
+) -> tuple[Phase, str | None, str]:
+    """The phase to run, and what it stands in for.
+
+    Only a declared fallback that itself resolves is substituted: standing a
+    missing implementation in for another missing one would hide the gap
+    `validate_impls` exists to show.
+    """
+    if inventory is None or not phase.fallback:
+        return phase, None, ""
+    available, gated = inventory
+    why = _why_unresolved(phase.impl, phase.id, available, gated)
+    if why is None:
+        return phase, None, ""
+    if _why_unresolved(phase.fallback, phase.id, available, gated) is not None:
+        return phase, None, ""
+    return phase.with_impl(phase.fallback), phase.impl, why
 
 
 def resolve_profile(
@@ -200,8 +284,15 @@ def resolve_profile(
     *,
     provider: str | None = None,
     changed_files: list[str] | None = None,
+    inventory: tuple[dict[str, set[str]], frozenset[str]] | None = None,
 ) -> ExecutionProfile:
-    """Decide which phases run, and how."""
+    """Decide which phases run, how, and by which implementation.
+
+    ``inventory`` is what `pack_inventory` returns. With it, a phase whose
+    ``impl`` is not installed and whose ``fallback`` is runs the fallback, and
+    the profile records the substitution. Without it, no substitution is made
+    here — the runner still falls back at run time, against the target project.
+    """
     supports_subagents = True
     if provider:
         try:
@@ -239,7 +330,15 @@ def resolve_profile(
             profile.skipped.append((phase, _SKIP_UNTOUCHED))
             continue
 
-        profile.run.append(_degrade(phase, supports_subagents))
+        played, declared_impl, why = _substitute(phase, inventory)
+        profile.run.append(
+            _degrade(
+                played,
+                supports_subagents,
+                substituted_from=declared_impl,
+                substitution_reason=why,
+            )
+        )
 
     return profile
 
@@ -318,6 +417,10 @@ def validate_impls(
     disk — so it is not reported. Reporting it sent people to bootstrap a pack
     the phase did not need.
 
+    A phase whose ``impl`` is missing but whose ``fallback`` resolves is not
+    missing: the resolver plays the fallback and the profile says so. It is
+    reported only when neither resolves, with both reasons.
+
     Reported, never fatal. Several packs are vendored on demand, so a fresh
     clone legitimately has phases it cannot run yet; the answer is to tell the
     user which bootstrap they are missing, not to refuse to build. Discovering
@@ -325,28 +428,13 @@ def validate_impls(
     """
     missing: list[MissingImpl] = []
     for phase in workflow.phases:
-        if phase.pack in BUILTIN_PACKS:
+        why = _why_unresolved(phase.impl, phase.id, available, gated)
+        if why is None:
             continue
-        if phase.id in DETERMINISTIC_PHASES and phase.pack in gated:
-            continue
-        skills = available.get(phase.pack)
-        if skills is None:
-            missing.append(
-                MissingImpl(
-                    phase.id,
-                    phase.impl,
-                    phase.pack,
-                    f"pack {phase.pack!r} is not installed "
-                    f"(pnpm run skills:bootstrap --pack {phase.pack})",
-                )
-            )
-        elif phase.skill not in skills:
-            missing.append(
-                MissingImpl(
-                    phase.id,
-                    phase.impl,
-                    phase.pack,
-                    f"pack {phase.pack!r} provides no skill named {phase.skill!r}",
-                )
-            )
+        if phase.fallback:
+            why_fallback = _why_unresolved(phase.fallback, phase.id, available, gated)
+            if why_fallback is None:
+                continue
+            why = f"{why}; fallback {phase.fallback}: {why_fallback}"
+        missing.append(MissingImpl(phase.id, phase.impl, phase.pack, why))
     return missing

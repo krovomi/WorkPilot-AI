@@ -600,6 +600,14 @@
 			"contentSha256": "024e2ddd893111fa45275f01b7bb8472f2653131acfc687f88b1f3e30226773e",
 			"targets": {}
 		},
+		"investigate": {
+			"kind": "skill",
+			"pack": "tooling",
+			"packVersion": "1.0.0",
+			"source": "skills/tooling/investigate/SKILL.md",
+			"contentSha256": "d36e6002a54240cb1f879cc7cb975c3bd1fce67926221b43301f786dc53f32b1",
+			"targets": {}
+		},
 		"ios-developer": {
 			"kind": "skill",
 			"pack": "mobile",
@@ -737,6 +745,14 @@
 				"dotnet": ">=10.0"
 			}
 		},
+		"proofread": {
+			"kind": "skill",
+			"pack": "tooling",
+			"packVersion": "1.0.0",
+			"source": "skills/tooling/proofread/SKILL.md",
+			"contentSha256": "5fcb08da7d5d9b8454668e3db7101232b8a8b934dd595020c101d67ea4a0a414",
+			"targets": {}
+		},
 		"python-debugpy": {
 			"kind": "skill",
 			"pack": "hermes",
@@ -745,12 +761,28 @@
 			"contentSha256": "9879a67fefdfb47022c92eabf3dfca80868c54d78bb1d6bd27d56742d0f65ea4",
 			"targets": {}
 		},
+		"reproduce": {
+			"kind": "skill",
+			"pack": "tooling",
+			"packVersion": "1.0.0",
+			"source": "skills/tooling/reproduce/SKILL.md",
+			"contentSha256": "9bc996e97e03e9480bd52fee505e2f8bc625b5c59219f4128e8803d082259972",
+			"targets": {}
+		},
 		"review-lenses": {
 			"kind": "skill",
 			"pack": "tooling",
 			"packVersion": "1.0.0",
 			"source": "skills/tooling/review-lenses/SKILL.md",
-			"contentSha256": "df02c45210310676944fe9f5cfdcefdad093092ac10a299898b2e5427f4e451c",
+			"contentSha256": "3e6c1ea805ef84b29cf1aa85125c046e9ba37430865758ad029bdefa81a30693",
+			"targets": {}
+		},
+		"runbook": {
+			"kind": "skill",
+			"pack": "tooling",
+			"packVersion": "1.0.0",
+			"source": "skills/tooling/runbook/SKILL.md",
+			"contentSha256": "6e8d784f25605593f20cd277c2a79684a7bc5a984cc8787d1fc92bbfa9d86b39",
 			"targets": {}
 		},
 		"sdlc-review": {
@@ -783,6 +815,14 @@
 			"packVersion": "0.0.1",
 			"source": "skills/hermes/spike/SKILL.md",
 			"contentSha256": "4473123d3dadc62b1b247c2a4c32694c39b3b02e342d76584035e887a0e78b74",
+			"targets": {}
+		},
+		"spike-verdict": {
+			"kind": "skill",
+			"pack": "tooling",
+			"packVersion": "1.0.0",
+			"source": "skills/tooling/spike-verdict/SKILL.md",
+			"contentSha256": "c0e06425d4b9968c3ee75bf77875feeeda10a83279314d93533292320347cc1b",
 			"targets": {}
 		},
 		"systematic-debugging": {
@@ -1136,6 +1176,7 @@
 		".agents/skills/github/templates/feature-request.md",
 		".agents/skills/github/templates/pr-body-bugfix.md",
 		".agents/skills/github/templates/pr-body-feature.md",
+		".agents/skills/investigate/SKILL.md",
 		".agents/skills/ios-developer/SKILL.md",
 		".agents/skills/mcp-builder/SKILL.md",
 		".agents/skills/mem-search/SKILL.md",
@@ -1154,11 +1195,15 @@
 		".agents/skills/net-developer/scripts/create_project.py",
 		".agents/skills/node-inspect-debugger/SKILL.md",
 		".agents/skills/opencode/SKILL.md",
+		".agents/skills/proofread/SKILL.md",
 		".agents/skills/python-debugpy/SKILL.md",
+		".agents/skills/reproduce/SKILL.md",
 		".agents/skills/review-lenses/SKILL.md",
+		".agents/skills/runbook/SKILL.md",
 		".agents/skills/sdlc-review/SKILL.md",
 		".agents/skills/simplify-code/SKILL.md",
 		".agents/skills/spec-analyze/SKILL.md",
+		".agents/skills/spike-verdict/SKILL.md",
 		".agents/skills/spike/SKILL.md",
 		".agents/skills/systematic-debugging/SKILL.md",
 		".agents/skills/tdd-cycle/SKILL.md",
@@ -1283,6 +1328,7 @@
 		".gemini/commands/convert-documents-to-markdown.toml",
 		".gemini/commands/cross-platform-mobile.toml",
 		".gemini/commands/github.toml",
+		".gemini/commands/investigate.toml",
 		".gemini/commands/ios-developer.toml",
 		".gemini/commands/ios-engineer.toml",
 		".gemini/commands/mcp-builder.toml",
@@ -1297,11 +1343,15 @@
 		".gemini/commands/node-inspect-debugger.toml",
 		".gemini/commands/opencode.toml",
 		".gemini/commands/performance-analyst.toml",
+		".gemini/commands/proofread.toml",
 		".gemini/commands/python-debugpy.toml",
+		".gemini/commands/reproduce.toml",
 		".gemini/commands/review-lenses.toml",
+		".gemini/commands/runbook.toml",
 		".gemini/commands/sdlc-review.toml",
 		".gemini/commands/simplify-code.toml",
 		".gemini/commands/spec-analyze.toml",
+		".gemini/commands/spike-verdict.toml",
 		".gemini/commands/spike.toml",
 		".gemini/commands/systematic-debugging.toml",
 		".gemini/commands/tdd-cycle.toml",

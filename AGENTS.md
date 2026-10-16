@@ -54,7 +54,7 @@ src/                 Python partagé : connecteurs (Jira, Azure DevOps, grepai�
 tests/               pytest ; les tests frontend vivent près du code
 skills/              source des skills (packs) ; .agents/skills/ = sortie lue en production
 capabilities/        harnesses et providers supportés (YAML)
-workflows/           workflows déclaratifs (feature-build/workflow.yaml)
+workflows/           workflows déclaratifs, un par type de tâche (feature-build, bug-fix, run…)
 config/  deploy/     registre de providers ; image Docker du mode serveur
 scripts/             build, release, hooks, vendorisation, wiki
 docs/                règles, architecture, guides, politique de sécurité

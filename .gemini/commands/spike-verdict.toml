@@ -1,0 +1,83 @@
+description = "Conclure un spike — POC, prototype, comparaison de bibliothèques ou d'approches — par un verdict écrit : la question posée, ce qui a été essayé, ce qui a été mesuré ou constaté, et une recommandation (adopter, écarter, creuser) avec ce qu'il resterait à faire pour un vrai développement. Le code du spike est jetable ; le verdict est la livraison."
+prompt = """
+# spike-verdict — ce qu'on a appris, ce qu'on décide
+
+Un spike existe pour répondre à une question avant d'y engager un
+développement. Son code n'a pas vocation à être mergé ; ce qui en reste est
+un verdict que quelqu'un peut lire sans avoir suivi le travail. Cette phase
+l'écrit, en lecture seule, à partir de ce que le spike a produit.
+
+## Entrées
+
+| Fichier | Ce qu'on y cherche |
+|---|---|
+| `<spec_dir>/spec.md`, `requirements.json` | la question du spike et ce qui compterait comme réponse |
+| `<spec_dir>/workflow/brainstorm.md`, s'il existe | les approches envisagées avant de coder |
+| `<spec_dir>/implementation_plan.json` | ce qui a été tenté, sous-tâche par sous-tâche |
+| les fichiers changés par la tâche (listés plus haut dans ce prompt) | le prototype lui-même |
+| les sorties de commandes, mesures, captures laissées dans l'arbre de travail | les faits |
+
+## Méthode
+
+1. **Rappelle la question** et le critère de réponse, tels qu'ils étaient
+   posés — pas tels que le spike les a reformulés en chemin.
+2. **Résume ce qui a été essayé**, approche par approche : ce qui a marché,
+   ce qui a bloqué, et où (`fichier:ligne`).
+3. **Rapporte les faits** : une mesure avec sa commande et ses conditions, un
+   comportement constaté avec sa preuve. Une impression n'est pas un fait ;
+   dis-le quand il n'y a qu'une impression.
+4. **Tranche** : adopter, écarter, ou creuser — et sur quel critère. Si le
+   spike ne permet pas de trancher, dis ce qu'il aurait fallu et pourquoi ce
+   n'était pas possible ici.
+5. **Décris le chemin** vers un développement réel si la recommandation est
+   d'adopter : ce que le prototype ne fait pas (tests, erreurs, sécurité,
+   migration), les dépendances à justifier, les décisions d'architecture à
+   prendre.
+
+À effort `low`, le verdict et son critère ; à `high` et au-delà, compare aussi
+avec ce que le projet fait déjà pour un problème voisin.
+
+## Rapport
+
+Termine par ceci, et rien d'autre :
+
+```markdown
+## Question
+
+… — compterait comme réponse : …
+
+## Essayé
+
+### A — <nom>
+Résultat : … (`fichier:ligne`)
+Bloqué sur : …
+
+### B — …
+
+## Faits
+
+- mesure / constat — commande : `…` — conditions : …
+
+## Verdict
+
+adopter | écarter | creuser — critère : …
+
+## Pour un vrai développement
+
+- ne fait pas encore : …
+- dépendances à justifier : …
+- décisions à prendre : …
+
+## Hypothèses
+
+- [NEEDS CLARIFICATION: …]
+```
+
+## Ce que cette phase ne fait pas
+
+- **Elle ne nettoie pas le prototype** pour le rendre mergeable : le code du
+  spike est jetable, le verdict ne l'est pas.
+- **Elle n'écrit rien** dans le dépôt.
+- **Elle ne décide pas à la place du lecteur** sur ce que le spike ne montre
+  pas : « creuser » est un verdict honnête.
+"""
