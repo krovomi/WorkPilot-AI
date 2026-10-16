@@ -22,14 +22,11 @@ Without the file, a RUN only ever runs in the task's worktree.
 
 from __future__ import annotations
 
-import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
 
 import tomllib
-
-logger = logging.getLogger(__name__)
 
 __all__ = ["Environment", "EnvironmentsError", "load_environments", "environment_for"]
 
