@@ -9,12 +9,17 @@ description: >-
 
 phases:
   - id: brainstorm
-    impl: tooling/brainstorm-approaches
+    impl: bmad/bmad-deep-recon
+    fallback: tooling/brainstorm-approaches
     always: true
     description: >-
       Two or three ways to answer the spike's question, side by side, before
       the planner commits to one. On a feature this is bought from `high`;
-      on a spike it is the point, so it runs at every effort level.
+      on a spike it is the point, so it runs at every effort level. BMAD's
+      technical research (`deep-recon`) when the project has installed its
+      runtime — a spike that compares libraries or approaches is what it is
+      for; WorkPilot's own approach comparison otherwise, substituted by the
+      engine and printed in the profile.
 
   - id: planning
     impl: workpilot/planner

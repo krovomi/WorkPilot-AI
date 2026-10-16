@@ -105,8 +105,9 @@ def _phase_payload(phase, *, resolved=None, skip_reason: str | None = None) -> d
         "hardGate": phase.hard_gate,
         "always": phase.always,
         "gate": phase.gate,
-        "conditional": bool(phase.when_globs),
+        "conditional": bool(phase.when_globs or phase.when_task),
         "whenGlobs": list(phase.when_globs),
+        "whenTask": [f"{f} == {v}" for f, v in phase.when_task],
         "runs": resolved is not None,
         "dispatch": resolved.dispatch if resolved else phase.dispatch,
         "degradedFrom": resolved.degraded_from if resolved else None,
@@ -152,7 +153,7 @@ def _serialise(workflow, profile, *, missing: list | None = None) -> dict:
     }
 
 
-def _levels(workflow, provider: str | None) -> list[dict]:
+def _levels(workflow, provider: str | None, **context) -> list[dict]:
     """What each effort level runs, so the UI can price a change of level.
 
     Resolved with no change set, which is the same forecast the CLI banner
@@ -167,7 +168,7 @@ def _levels(workflow, provider: str | None) -> list[dict]:
     for level in EFFORT_ORDER:
         if level == "none":
             continue
-        profile = resolve_profile(workflow, level, provider=provider)
+        profile = resolve_profile(workflow, level, provider=provider, **context)
         out.append(
             {
                 "effort": level,
@@ -176,6 +177,11 @@ def _levels(workflow, provider: str | None) -> list[dict]:
             }
         )
     return out
+
+
+def _project_of(spec_dir: Path) -> Path:
+    """The project a spec belongs to: `<project>/.workpilot/specs/<spec>`."""
+    return Path(spec_dir).resolve().parents[2]
 
 
 def _inventory():
@@ -256,9 +262,20 @@ def workflow_profile(
         # Side-effect-free provider resolution. See the module docstring.
         resolved_provider = provider or get_phase_provider(sd, phase="coding")
 
-        profile = resolve_profile(
-            loaded, level, provider=resolved_provider, inventory=_inventory()
-        )
+        from .engine import ProjectCheck
+        from .task_facts import task_facts
+
+        # What the resolver needs to answer for *this* project and task:
+        # which fallbacks stand in (the project's installed runtimes) and
+        # which `when: kind == …` phases apply. The level comparison below
+        # is priced with the same facts, so it prices this task, not an
+        # imaginary one.
+        context = {
+            "inventory": _inventory(),
+            "project": ProjectCheck(_REPO_ROOT, _project_of(sd)),
+            "task": task_facts(sd),
+        }
+        profile = resolve_profile(loaded, level, provider=resolved_provider, **context)
         payload = _serialise(loaded, profile, missing=_missing_impls(loaded, profile))
         from core.offline_policy import airgap_status
         from integrations.jev.observations import read_observations
@@ -268,7 +285,7 @@ def workflow_profile(
             "airgapStrict": airgap_status(sd, project_dir)["airgapStrict"],
         }
         if include_levels:
-            payload["levels"] = _levels(loaded, resolved_provider)
+            payload["levels"] = _levels(loaded, resolved_provider, **context)
         return {"success": True, "profile": payload}
     except Exception:  # noqa: BLE001
         logger.exception("workflow profile resolution failed")

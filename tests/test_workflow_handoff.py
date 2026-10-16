@@ -52,7 +52,7 @@ def spec_dir(tmp_path: Path) -> Path:
 
 class TestWhoReadsWhat:
     def test_the_planner_reads_what_came_before_planning(self):
-        assert feeding_phases(declared(), "planning") == ["brainstorm"]
+        assert feeding_phases(declared(), "planning") == ["prd", "brainstorm"]
 
     def test_the_coder_reads_what_came_between_planning_and_coding(self):
         assert feeding_phases(declared(), "coding") == ["analyze", "mobile-design"]

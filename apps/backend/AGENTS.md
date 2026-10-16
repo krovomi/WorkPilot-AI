@@ -80,7 +80,7 @@ Toute interaction LLM passe par ces fichiers ; les modifier touche tout le produ
 | Paquet | Rôle |
 |---|---|
 | `tasks/` | le **type** d'une carte (`bug_fix`, `hotfix`, `run`, `investigation`…) décidé sans modèle (`classify.py`) et écrit dans `task_metadata.json` (`metadata.py`) ; lot 0 de [kanban-task-types.md](../../docs/architecture/kanban-task-types.md) |
-| `workflows/` | le moteur des workflows déclaratifs : `spec.py` (le YAML, `fallback`, `irreversible`), `registry.py` (type de carte → `workflows/<nom>/workflow.yaml`), `engine.py` (élagage, dégradation, substitution par `fallback`), `runner.py` (fenêtres, phases de skill), `hard_gates.py` (`tests-pass`, `app-verified`, `tests-unchanged`), `api.py` ; [justification](../../docs/architecture/workflows.md) |
+| `workflows/` | le moteur des workflows déclaratifs : `spec.py` (le YAML, `fallback`, `irreversible`), `registry.py` (type de carte → `workflows/<nom>/workflow.yaml`), `engine.py` (élagage, dégradation, substitution par `fallback` jugée dans le projet cible), `task_facts.py` (type et complexité lus pour `when:`), `runner.py` (fenêtres, phases de skill), `handoff.py` (le rapport d'une phase au prochain lecteur, selon le workflow du type), `hard_gates.py` (`tests-pass`, `app-verified`, `tests-unchanged`), `api.py` ; [justification](../../docs/architecture/workflows.md) |
 | `project/stack.py` | **la** détection de pile (langages, frameworks, type d'app, marqueurs) |
 | `libdocs/` | docs des bibliothèques sans exemple dans le dépôt, avant le planning |
 | `docintel/` | pièces jointes : diagrammes, OCR (`engines/`), PDF, ERD, séquences, C4, tableaux, captures ; `redact.py` masque les secrets |

@@ -21,8 +21,26 @@ phases:
       skipping it saves anything. First, because every phase after it reasons
       about those APIs.
 
+  - id: prd
+    impl: bmad/bmad-prd
+    fallback: workpilot/spec
+    min_effort: ultrathink
+    when: kind == feature and complexity == complex
+    dispatch: fresh-context
+    description: >-
+      A product requirements document, by BMAD, on the one kind of task
+      where a second product document earns its reading: a complex feature at
+      the highest effort. Handed to the planner (`workflows.handoff`), which
+      is the only reason it is worth a session. Everywhere else the WorkPilot
+      spec is the product document, and that is what the fallback says:
+      `workpilot/spec` is `spec.md`, already written before this file is
+      read, so a project without BMAD's `_bmad/` runtime runs nothing here
+      and the profile says so. `skills:bootstrap --pack bmad` is the opt-in,
+      per project.
+
   - id: brainstorm
-    impl: tooling/brainstorm-approaches
+    impl: bmad/bmad-brainstorming
+    fallback: tooling/brainstorm-approaches
     min_effort: high
     description: >-
       Two or three ways of doing the task, side by side — files, precedent in
@@ -32,10 +50,13 @@ phases:
       `[NEEDS CLARIFICATION]`. The report is handed to the planner
       (`workflows.handoff`), which is the only reason it is worth a session.
 
+      BMAD's brainstorming facilitation when the project has installed its
+      runtime; WorkPilot's own approach comparison otherwise — substituted by
+      the engine, printed in the profile, never skipped in silence. The two
+      read the same inputs and are handed to the same planner.
+
       There is no `spec` phase: the spec pipeline has written `spec.md` before
-      this file is read. The BMAD PRD skill it used to run needs the `_bmad/`
-      runtime, so it never opened a session — and would have written a second
-      product document nobody reads.
+      this file is read.
 
   - id: planning
     impl: workpilot/planner

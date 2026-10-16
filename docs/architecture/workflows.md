@@ -69,8 +69,23 @@ resolved phase, which the printed profile and the API show (`substitutedFrom`);
 the runner makes the same decision again at run time against the target
 project (`_locate_procedure`), and the phase's outcome names what actually ran.
 `validate_impls` reports a phase only when neither resolves. This is what makes
-an optional methodology (BMAD, lot 2) declarable without a hole in the profile.
-`irreversible: true` is parsed and shown; the runner acts on it in lot 3.
+an optional methodology declarable without a hole in the profile: `brainstorm`
+names `bmad/bmad-brainstorming` with `tooling/brainstorm-approaches` as its
+fallback, and a project without BMAD's `_bmad/` runtime runs the fallback.
+"Installed" is judged in the project being built (`ProjectCheck`), and the
+committed mock runtime never counts as the real one. A fallback of the form
+`workpilot/<x>` is WorkPilot's own Python — `prd` → `workpilot/spec` means the
+spec already written is the product document — so it opens no session and
+belongs to no window. `irreversible: true` is parsed and shown; the runner
+acts on it in lot 3.
+
+**`when:` on the task.** Besides `touches("…")`, a phase may require
+`kind == <kind>` or `complexity == <level>`, joined by `and`; the facts come
+from `task_metadata.json` and `complexity_assessment.json`
+(`workflows/task_facts.py`), and an unknown fact reads as matching, the same
+rule as an unknown diff. The profile and the API say `skipped (not this task)`.
+The handoff (`workflows/handoff.py`) reads the spec's own workflow, so a
+bug-fix's `reproduce` report reaches its planner.
 
 A skill phase runs where the workflow file declares it. The window is looked up
 by phase id in the **declared** order, so inserting a phase into

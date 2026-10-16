@@ -46,8 +46,9 @@ def write_workflow(tmp_path: Path, body: str) -> Path:
 class TestSpecParsing:
     def test_the_shipped_workflow_loads(self, workflow):
         assert workflow.name == "feature-build"
-        assert [p.id for p in workflow.phases][:3] == [
+        assert [p.id for p in workflow.phases][:4] == [
             "docs",
+            "prd",
             "brainstorm",
             "planning",
         ]
@@ -143,7 +144,10 @@ class TestEffortPruning:
         assert sets["low"] - sets["none"] == set()
         assert sets["medium"] - sets["low"] == {"analyze", "review"}
         assert sets["high"] - sets["medium"] == {"brainstorm"}
-        assert sets["ultrathink"] - sets["high"] == set()
+        # With no task facts the conditional PRD phase reads as matching
+        # (unknown means run); `test_workflows_by_kind` pins that a simple
+        # feature or a bug never gets it.
+        assert sets["ultrathink"] - sets["high"] == {"prd"}
 
     def test_the_cheapest_level_runs_only_what_cannot_be_skipped(self, workflow):
         """Coding, QA, the hard gate, and the two near-free phases.

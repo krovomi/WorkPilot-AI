@@ -65,7 +65,7 @@ class TestResolution:
         assert by_id["brainstorm"]["skipReason"] == "effort"
         assert by_id["brainstorm"]["minEffort"] == "high"
         # …and the position is preserved, not filtered out.
-        assert [p["id"] for p in res["profile"]["phases"]][1] == "brainstorm"
+        assert [p["id"] for p in res["profile"]["phases"]][2] == "brainstorm"
 
     def test_the_hard_gate_runs_at_the_cheapest_level(self, project):
         res = ask(project, effort="low")
@@ -93,9 +93,11 @@ class TestResolution:
         res = ask(project, effort="medium")
         counts = {lvl["effort"]: lvl["count"] for lvl in res["profile"]["levels"]}
         assert counts["low"] < counts["medium"] < counts["high"]
-        # The top level buys the review's adversarial lens, not a phase: one
-        # review with more lenses rather than a second pass after QA.
-        assert counts["ultrathink"] == counts["high"]
+        # The top level buys the review's adversarial lens and, on a complex
+        # feature, the PRD phase. This spec records no kind and no
+        # assessment, and an unknown fact reads as matching, so the PRD is
+        # counted here — priced for this task as the engine would run it.
+        assert counts["ultrathink"] == counts["high"] + 1
 
     def test_levels_can_be_left_out(self, project):
         res = ask(project, effort="medium", includeLevels="false")

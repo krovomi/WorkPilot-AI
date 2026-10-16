@@ -416,6 +416,8 @@ export interface WorkflowPhasePayload {
 	gate: string | null;
 	conditional: boolean;
 	whenGlobs: string[];
+	/** `kind == feature`, `complexity == complex`: the task facts the phase needs. */
+	whenTask?: string[];
 	/** False for a phase this effort level or change set dropped. */
 	runs: boolean;
 	dispatch: string;
