@@ -5,10 +5,10 @@
 > de conception de la feature (`docs/architecture/`, une ligne dans `docs/CLAUDE.md`) ; chaque lot
 > livré remplace sa section « à faire » par ce qui a été fait, comme `context-harness.md`.
 >
-> Faits sur pi relevés le 16 octobre 2026 sur pi.dev/docs/latest et le dépôt
-> `earendil-works/pi` (npm `@earendil-works/pi-coding-agent` **1.3.0**). Ce qui est marqué
-> **[à vérifier]** n'a pas pu être confirmé dans la documentation et se vérifie au lot 0, contre
-> le binaire installé, avant d'écrire une ligne de produit.
+> Faits sur pi relevés le 16 octobre 2026 sur pi.dev/docs/latest et dans la source du dépôt
+> `earendil-works/pi` (`main` à `698a2d2`, `packages/coding-agent` en version **1.3.0**). Le lot 0
+> a tranché les douze points marqués **[à vérifier]** en lisant cette source (§ 3) ; ce qui reste à
+> faire contre le binaire est la capture des fixtures, et elle est dite comme telle.
 
 ## 1. Ce qu'est pi, et ce qu'il est pour WorkPilot
 
@@ -87,29 +87,41 @@ contrat de l'adaptateur (comme `tests/test_opencode_cli_client.py` encode le flu
 ≥ 22.19 (note : `.workpilot/skills.toml` cible Node 20 pour **ce** dépôt ; pi apporte son propre
 Node, rien ne change ici), un provider connecté dans pi (`pi` puis `/login`, ou `ANTHROPIC_API_KEY`).
 
-**À vérifier, dans l'ordre, chacun avec sa preuve consignée dans ce fichier :**
+**Réponses, lues dans la source** (`packages/coding-agent/src/`, chemins cités pour que la
+prochaine version de pi se revérifie au même endroit) :
 
-| # | Question | Pourquoi ça compte | Comment |
+| # | Question | Réponse | Où |
 |---|---|---|---|
-| V1 | Dans un dossier qui a `AGENTS.md` **et** `CLAUDE.md`, pi charge-t-il les deux ou le premier trouvé ? | `CLAUDE.md` ici est trois lignes `@import` que pi ne développe pas ; si pi ne lit que `CLAUDE.md`, il ne voit **rien** des règles | `pi --mode json -p "quote the first heading of your context files"` à la racine ; comparer avec `-nc` |
-| V2 | `--skill <path>` accepte-t-il un **dossier** (découverte récursive) ou un seul `SKILL.md` ? | décide si un projet non approuvé peut recevoir `.agents/skills/` explicitement | essai avec `--skill .agents/skills` |
-| V3 | Forme exacte des événements `--mode json` : `message_end.message.usage` (`input`, `output`, `cacheRead`, `cacheWrite`, `totalTokens`, `cost.total`), `stopReason`, `errorMessage`, `tool_execution_end.result` | c'est le contrat de `receive_response` | capturer un run avec un outil, un run en erreur d'auth, un run avec modèle inconnu → `tests/fixtures/pi/*.jsonl` |
-| V4 | `PI_CODING_AGENT_SESSION_DIR` est-il honoré en mode json, et le nom du fichier de session est-il `<timestamp>_<id>.jsonl` sous `--<cwd>--/` ? | les sessions d'une tâche doivent vivre dans `.workpilot/specs/<spec>/` (ignoré par git), pas dans `~/.pi` ; « sessions may contain secrets » | run avec la variable, lister le dossier |
-| V5 | `--session <path>` reprend-il une session dont le fichier est hors du `sessionDir` courant ? | reprise d'un turn à l'autre | deux runs, le second avec `--session <fichier du premier>` |
-| V6 | Lanceur Windows : `pi.cmd` (npm) ou `pi.exe` (install.ps1) ? `build_windows_command` ajoute `cmd.exe` pour `.cmd` ; `_SAFE_OPTION_VALUE` refuse alors `\`, espaces, `%` | tout chemin passé en option doit être relatif avec `/`, ou passer par l'environnement | `where pi` ; essai avec `--session-dir .workpilot/x` |
-| V7 | `--tools read,grep,find,ls` refuse-t-il réellement `edit`/`write`/`bash` (l'outil n'existe pas pour le modèle, pas seulement « déconseillé ») ? Un nom inconnu dans `--tools` est-il une erreur ? | la barrière de droits des types en lecture seule | run avec un prompt qui demande d'écrire un fichier ; vérifier qu'aucun fichier n'apparaît |
-| V8 | `--thinking` : valeurs acceptées par modèle (`off\|minimal\|low\|medium\|high\|xhigh\|max`) ; comportement sur un modèle sans réflexion (erreur ou ignoré ?) | `effort: reasoning_effort` dans `providers.yaml` | essais |
-| V9 | Avec `trust.json` sans entrée pour le projet et sans `--approve`, les skills de `.agents/skills/` sont-ils absents du prompt système ? Y a-t-il une trace sur stderr ? | confirme le silence que le lot 2 doit rendre visible | run json, lire stderr |
-| V10 | `-ne` (no extensions) retire-t-il aussi `builtin:mcp` ? `-e builtin:mcp` après `-ne` le rétablit-il ? | le lot 3/4 décide si WorkPilot peut n'autoriser **que** le MCP intégré | essais |
-| V11 | Forme de `~/.pi/agent/trust.json` (clés, chemins canoniques, casse sous Windows) et de `~/.pi/agent/mcp.json` ; pi réécrit-il `mcp.json` pendant qu'il tourne (comme Claude Code avec `~/.claude.json`) ? | `brain/agents.py` + `brain/connect.py` | lire les fichiers après `/trust` et `pi mcp add` |
-| V12 | Codes de sortie en mode json : confirmé « non nul seulement si l'invocation lève » ; donc une réponse `stopReason: error` sort à 0 | l'adaptateur doit lire `stopReason`, pas le code | run avec clé invalide |
+| V1 | `AGENTS.md` **et** `CLAUDE.md` dans le même dossier : les deux, ou le premier ? | **Le premier trouvé, dans l'ordre** `AGENTS.override.md`, `AGENTS.md`, `AGENTS.MD`, `CLAUDE.md`, `CLAUDE.MD` — ici `AGENTS.md` gagne et `CLAUDE.md` n'est pas lu : rien à changer. Chargés : le fichier de `~/.pi/agent`, puis ceux de `cwd` et de **tous** ses parents (jusqu'à la racine du disque, pas du dépôt). Un worktree git imbriqué sous le dépôt principal (c'est le cas de `.workpilot/worktrees/tasks/<spec>/`) **masque** l'`AGENTS.md` du dépôt principal pour ne pas l'appliquer deux fois. | `core/resource-loader.ts` : `loadContextFileFromDir`, `loadProjectContextFiles`, `findShadowedContextFile` |
+| V2 | `--skill <path>` : fichier ou dossier ? | **Dossier accepté, découverte récursive** (`loadSkillsFromDirInternal`), ou un `.md` seul ; chemin relatif résolu depuis `cwd` ; un chemin absent est un simple avertissement. Ces chemins sont de source `cli`, chargés **même avec `--no-skills`** et **sans passer par la confiance du projet** (seule la découverte automatique de `.pi/skills` et `.agents/skills` est gardée par `hasTrustRequiringProjectResources`). | `core/skills.ts` : `loadSkills` ; `core/trust-manager.ts` |
+| V3 | Forme des événements json | Un `session` d'en-tête (`version: 3`, `id`, `cwd`), puis les événements de `AgentSessionEvent` tels quels, sauf `message_update` réduit à `{usage, assistantMessageEvent}`. `message_end.message` (rôle `assistant`) porte `content[]` (`text`, `thinking`, `toolCall`), `usage` (`input`, `output`, `cacheRead`, `cacheWrite`, `reasoning?`, `totalTokens`, `cost{…}`), `stopReason`, `errorMessage?`, `model`, `provider`. `tool_execution_start` = `{toolCallId, toolName, args}` ; `tool_execution_end` = `{toolCallId, toolName, result, isError, durationMs?}`. **Reste à capturer** : les fixtures réelles (`tests/fixtures/pi/*.jsonl`), ce qui demande un provider connecté — Ollama local suffit. | `modes/json-event.ts`, `modes/print-mode.ts`, `core/agent-session.ts`, `packages/ai/src/types.ts` |
+| V4 | `PI_CODING_AGENT_SESSION_DIR` honoré ? nom des fichiers ? | **Oui** (`ENV_SESSION_DIR`, surchargé par `--session-dir`). Dossier par défaut `~/.pi/agent/sessions/--<cwd avec / \ : remplacés par ->--/`, fichier `<timestamp>_<id>.jsonl` (les `:` et `.` du timestamp deviennent `-`). | `config.ts` : `ENV_SESSION_DIR` ; `core/session-manager.ts` : `getDefaultSessionDirPath` |
+| V5 | Reprendre par chemin ou par id ? | **Par id, sans chemin** : `--session <arg>` sans `/`, `\` ni `.jsonl` est cherché par id exact dans le `sessionDir` courant, puis par préfixe, puis dans tous les projets. Un UUID passe `_SAFE_OPTION_VALUE` ; aucun chemin n'entre en argv. | `main.ts` : `resolveSessionPath`, `findLocalSessionByExactId` |
+| V6 | Lanceur Windows | Les deux existent : `pi.cmd` (npm, `bin` de `package.json`) et un binaire autonome (`install.ps1`, `pi-windows-x64.zip`). WorkPilot ne sait pas lequel est sur le PATH : **les contraintes de `validated_option` s'appliquent dans tous les cas**, et `build_windows_command` fait le reste pour le `.cmd`. | `packages/coding-agent/package.json`, `scripts/build-binaries.sh` |
+| V7 | `--tools` : barrière réelle ? nom inconnu ? | **Allowlist réelle** : une liste de noms devient `allowedToolNames`, le filtre que `AgentSession` applique à tout outil, intégré ou d'extension (`createToolNameMatcher`) ; un outil hors liste n'existe pas pour le modèle. Un nom inconnu ne lève rien (il ne correspond à rien). Mélanger `name` et `+name`/`-name` **est** une erreur (`getToolListError`). Intégrés : `read`, `bash`, `powershell`, `edit`, `write`, `grep`, `find`, `ls` ; défaut `read, bash, edit, write`. | `core/sdk.ts` (≈ l. 280), `core/agent-session.ts` (`_allowedTools`), `core/settings-manager.ts` |
+| V8 | `--thinking` | Un niveau invalide est un **avertissement** et est ignoré ; un niveau que le modèle ne supporte pas est **ramené** au plus proche supporté (`clampThinkingLevel`), jamais une erreur ; sans modèle, `off`. | `cli/args.ts`, `core/sdk.ts`, `packages/ai/src/models.ts` |
+| V9 | Projet non approuvé en mode json : silence ? | **Oui, silence total.** Ordre : `--approve`/`--no-approve` → événement `project_trust` d'une extension (utilisateur) → `trust.json` (entrée la plus proche en remontant les parents) → `defaultProjectTrust` (`ask` par défaut) → sans UI, **`false`**, sans diagnostic ni ligne sur stderr. Et la question ne se pose que si le projet a quelque chose à approuver : `.pi/{settings.json, mcp.json, extensions, skills, prompts, themes, SYSTEM.md, APPEND_SYSTEM.md}` ou un `.agents/skills/` dans `cwd` ou un parent. | `core/project-trust.ts` : `resolveProjectTrusted` ; `core/trust-manager.ts` : `hasTrustRequiringProjectResources` |
+| V10 | `-ne` et `builtin:mcp` | `-ne` ne garde que les `-e` de la ligne de commande ; les intégrés (`builtin:mcp`, `llama.cpp`, `codemode`, `tool-search`) font partie des extensions découvertes, donc **tombent avec `-ne`** ; **`-e builtin:mcp` les rétablit un par un**. `--no-mcp` seul = `disabledBuiltinExtensions: ["mcp"]`. | `core/resource-loader.ts` (≈ l. 578), `core/package-manager.ts` (≈ l. 975-1005), `main.ts` |
+| V11 | `trust.json`, `mcp.json` | `trust.json` = `{ "<chemin canonique>": true \| false }` ; lecture par **ancêtre le plus proche** (`findNearestTrustEntry`), écriture sous verrou (`proper-lockfile`), chemins passés par `realpath`. Conséquence utile : **approuver la racine du projet couvre ses worktrees** sous `.workpilot/worktrees/`. `mcp.json` n'est écrit que par `/mcp` et `pi mcp add`, jamais pendant un run : `_connect_json` convient. | `core/trust-manager.ts`, `extensions/mcp/index.ts` |
+| V12 | Code de sortie en mode json | **0 même sur `stopReason: error`** : seul le mode `text` met `exitCode = 1` sur `error`/`aborted`/`length` ; `1` si l'invocation lève ; `143`/`129` sur SIGTERM/SIGHUP. L'adaptateur lit `stopReason`. | `modes/print-mode.ts` : `runPrintMode` |
 
-**Livrables du lot 0.** Ce fichier complété (faits, pas suppositions), `tests/fixtures/pi/` (flux
-capturés, secrets masqués par `safe_error_text` avant commit — le hook `pre-commit` scanne), et
-une décision écrite sur V1 : si pi ne lit que `CLAUDE.md` quand les deux existent, le lot 1
-ajoute à `CLAUDE.md` une ligne qui renvoie **humainement** vers `AGENTS.md` (« si tu ne développes
-pas `@import`, lis `AGENTS.md` »), ce qui ne coûte rien à Claude Code et sauve tout harness qui
-préfère `CLAUDE.md`.
+**Deux décisions que ces réponses changent** (reportées au § 5.2) :
+
+1. **Les skills du projet passent par `--skill`, pas par la confiance.** V2 et V9 ensemble : la
+   confiance de pi garde deux choses de nature différente — des skills (de la prose que le modèle
+   lit) et des extensions (du code qui s'exécute dans le processus). WorkPilot sert déjà
+   `.agents/skills/` du projet cible à ses agents sur tous les providers (`slash_commands/api.py`,
+   le SDK) ; ne pas les donner à pi serait une régression propre à ce provider, et `--approve` pour
+   les obtenir ouvrirait aussi `.pi/extensions/`. `--skill .agents/skills` (relatif au `cwd`) donne
+   exactement les skills, rien d'autre, avec le standing qu'ils ont ailleurs. Les extensions, le
+   `mcp.json` et les prompts du projet restent derrière `/trust`, décision de la personne.
+2. **La reprise se fait par id.** V5 : `--session <uuid>` est résolu dans le `sessionDir` posé
+   par `PI_CODING_AGENT_SESSION_DIR` ; aucun chemin en argv, aucun cas Windows à traiter.
+
+**Reste du lot 0, contre le binaire** : capturer `tests/fixtures/pi/` (un run avec outil, un run
+en erreur d'authentification, un run avec un modèle inconnu, un run `--tools read,grep,find,ls`
+où le modèle tente d'écrire) — secrets masqués par `safe_error_text` avant commit, le hook
+`pre-commit` scanne. Un provider local (Ollama via `models.json`) suffit et ne coûte rien.
 
 ## 4. Lot 1 — pi comme harness, et comme agent du cerveau
 
@@ -249,8 +261,8 @@ pi:
 **Commande** (`build_pi_args`, sans shell, le prompt n'y entre jamais) :
 
 ```
-pi --mode json [--session <file>|--session-id <uuid>] [--model provider/id] [--thinking <level>]
-   --tools <allowlist> [--no-approve]
+pi --mode json [--session-id <uuid> | --session <uuid>] [--model provider/id] [--thinking <level>]
+   --tools <allowlist> --skill .agents/skills
 ```
 
 | Décision | Pourquoi |
@@ -258,10 +270,11 @@ pi --mode json [--session <file>|--session-id <uuid>] [--model provider/id] [--t
 | Prompt système + historique rejoué en **préambule stdin**, comme OpenCode (`_take_prompt`) | V6 : un chemin absolu Windows ne passe pas `_SAFE_OPTION_VALUE` ; `--append-system-prompt <chemin relatif>` est l'amélioration du lot 3 (préfixe stable pour le cache, harness lot 2) |
 | `--tools` construit depuis `declared_tools(agent_type)` traduits par `harnesses.yaml` `pi.tools` ; `ls` ajouté dès que `Read` est déclaré ; type non enregistré → pas de `--tools` (permissif, comme `ToolExecutor`) | une seule source de vocabulaire ; un type en lecture seule devient **réellement** incapable d'écrire (V7), là où Antigravity refuse et OpenCode fait confiance à `plan` |
 | `powershell` jamais ajouté | un deuxième shell que l'allowlist de commandes ne voit pas |
-| Session : `PI_CODING_AGENT_SESSION_DIR=<spec_dir>/pi-sessions` dans `_subprocess_env` ; `--session-id <uuid4>` au premier turn ; `--session <fichier>` ensuite (`validated_option` : le chemin est relatif au `cwd`, en `/`) | les sessions d'une tâche sont un artefact de la tâche, ignoré par git ; aucun chemin absolu en argv (V4, V5, V6) |
+| Session : `PI_CODING_AGENT_SESSION_DIR=<spec_dir>/pi-sessions` dans `_subprocess_env` ; `--session-id <uuid4>` au premier turn ; `--session <le même uuid>` ensuite, résolu par id exact dans ce dossier (V5) | les sessions d'une tâche sont un artefact de la tâche, ignoré par git ; aucun chemin en argv (V4, V5, V6) |
+| Skills du projet : `--skill .agents/skills` (relatif au `cwd`, V2) quand le dossier existe ; jamais `--approve` | les skills ont sur pi le standing qu'ils ont sur les autres providers ; les extensions, `mcp.json` et prompts du projet restent derrière `/trust` (§ 3, décision 1) |
 | Modèle : `qualify_provider_model` extrait de `resolve_opencode_model` vers `cli_subprocess.py` (même table `_PROVIDER_BY_PREFIX`, même repli « default ») | OpenCode et pi prennent tous deux `provider/model` ; une fonction, deux appelants |
 | `--thinking` depuis `thinking_level_from_budget(max_thinking_tokens)` quand le résultat est un niveau que pi connaît ; sinon rien | comme Antigravity ; un budget custom (`"12000 tokens"`) n'est pas un niveau |
-| **Jamais `--approve`.** Avant le spawn, `pi_trust_state(project_dir)` lit `~/.pi/agent/trust.json` (V11) : `trusted` / `untrusted` / `undecided` ; `undecided` ou `untrusted` → une ligne dans le feed de tâche : « pi n'a pas chargé les skills du projet : lancer `pi` dans le checkout puis `/trust` » | le silence de V9, rendu visible ; la décision reste à la personne (hermes.md) |
+| **Jamais `--approve`.** Avant le spawn, `pi_trust_state(project_dir)` lit `~/.pi/agent/trust.json` (V11 : entrée la plus proche en remontant les parents, chemins résolus par `Path.resolve()`) : `trusted` / `untrusted` / `undecided`. Si le projet a un `.pi/` avec extensions, `mcp.json` ou prompts et n'est pas approuvé → une ligne dans le feed de tâche : « pi n'a pas chargé `.pi/` de ce projet : lancer `pi` dans le checkout puis `/trust` ». Les skills, eux, sont déjà passés par `--skill`. | le silence de V9, rendu visible ; la décision reste à la personne (hermes.md) |
 | `--no-mcp` **non** passé | les serveurs de l'utilisateur sont les siens ; `workpilot-brain`/`workpilot-code` arrivent par `brain connect` (lot 1) |
 | Erreurs : `message_end.message.stopReason == "error"` ou `"aborted"` → `PiCliError` (le code de sortie est 0, V12) ; `errorMessage` passé par `safe_error_text` ; marqueurs d'auth (`unauthorized`, `invalid api key`, `authentication`, `no api key`) → `PiCliAuthenticationError` nommant la réparation (`pi` puis `/login`, ou la variable d'environnement du provider) ; modèle inconnu → un retry sur « default », comme OpenCode | `_opencode_error`, à l'identique |
 | `stopReason == "length"` | `PiCliError` explicite : la réponse est partielle, ne pas la logger comme un succès |
@@ -425,8 +438,8 @@ les deux fichiers de `docs/audit/` mis à jour dans la même PR.
 
 | Risque | Mitigation |
 |---|---|
-| pi ne lit que `CLAUDE.md` quand les deux existent (V1) et perd donc les règles | ligne humaine dans `CLAUDE.md` (lot 0/1) ; au pire, `-nc` + `AGENTS.md` en préambule stdin |
-| Le flux json change entre deux versions de pi (1.x bouge vite : `session.version: 3`) | fixtures versionnées, `pi --version` tracé dans le feed, tolérance aux champs inconnus (ignorer, ne pas lever) |
+| pi remonte `AGENTS.md` jusqu'à la racine du disque (V1) : un `AGENTS.md` dans `C:\Repositories\` ou `~` entre dans le prompt | documenté dans `integrations/pi.md` ; c'est le comportement de pi pour tout projet, pas un défaut de WorkPilot |
+| Le flux json change entre deux versions de pi (1.x bouge vite : `session.version: 3`) | fixtures versionnées, `pi --version` tracé dans le feed, tolérance aux champs inconnus (ignorer, ne pas lever) ; les réponses du § 3 citent le fichier source pour être revérifiées à chaque montée de version |
 | `trust.json` : chemins canoniques, casse Windows, liens symboliques | `Path.resolve()` des deux côtés avant comparaison (S4) ; test Windows en CI |
 | Un `.pi/extensions/*.ts` du projet cible s'exécute si la personne a approuvé le checkout | c'est sa décision, documentée dans `integrations/pi.md` ; WorkPilot ne l'étend jamais (`--approve` interdit par un test) |
 | Node 22.19 requis par pi, absent de la machine | détecté par `pi --version` (badge) ; message qui renvoie à pi.dev, pas une installation silencieuse |
