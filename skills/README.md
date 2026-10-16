@@ -109,11 +109,17 @@ What it means in a checkout of *this* repository:
   whose runtime is a mock would fail on invocation;
 * `skills:bootstrap` (`bootstrap_satisfied`) does not count a mock as installed, so
   `pnpm run skills:bootstrap -- --pack bmad` runs the real installer;
+* a workflow phase that names a BMAD skill (`brainstorm`, `prd`, a spike's research) is
+  **substituted** by its `fallback:` — the engine (`workflows/engine.py`, given the project)
+  and the runner (`workflows/runner.py`, `accept_mock=False`) both read the mock as absent, and
+  the profile prints what stands in and why;
 * a BMAD skill run here anyway gets a non-zero exit and reads its own `customize.toml`, as its
   procedure says to do on failure.
 
-None of this reaches a target project: `workflows/runner.py` and the palette check the project
-the task runs in, where only BMAD's installer writes `_bmad/`.
+None of this reaches a target project: the engine, the runner and the palette check the project
+the task runs in, where only BMAD's installer writes `_bmad/`. How a workflow declares BMAD and
+what stands in without it: [`docs/architecture/kanban-task-types.md`](../docs/architecture/kanban-task-types.md)
+(lot 2).
 
 ## Harnesses
 

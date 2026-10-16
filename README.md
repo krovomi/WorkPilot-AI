@@ -81,7 +81,9 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 | **Pause & Resume** | Suspend a running task and resume later with full context preserved, optionally on a different provider |
 | **Per-Phase Re-run** | Redo any phase (planning, coding, validation) on demand without restarting the whole task |
 | **PR-First Review Flow** | Guided human-review with a DoD checklist, "approve & close", and reversible task abandon |
-| **Declarative Workflows** | A build is described as phases in `workflows/<name>/workflow.yaml`; the engine resolves them against your effort level, the provider's capabilities, and the files the task touches. On by default |
+| **Declarative Workflows** | A build is described as phases in `workflows/<name>/workflow.yaml`; the engine resolves them against your effort level, the provider's capabilities, the files the task touches and the task itself (`when: kind == … and complexity == …`). On by default |
+| **One Workflow per Task Kind** | A card's kind (`feature`, `bug_fix`, `hotfix`, `investigation`, `run`, `refactoring`, `test`, `docs`, `spike`) is decided without a model from its category, imported item type or wording, shown and editable on the card, and picks the workflow that runs: a bug is reproduced before it is fixed, an investigation writes a report and no code, a RUN writes a procedure a person reads first. Every implementation a workflow names resolves on a fresh clone, on every provider |
+| **Optional Methodologies by `fallback:`** | A phase may name a methodology that needs a runtime in the target project (BMAD's `_bmad/`) and a WorkPilot fallback; the engine substitutes the fallback when the runtime is absent and shows it in the profile. Nothing is skipped in silence |
 | **Resolved Profile Preview** | See which phases your effort setting bought — and what the next level up would add — in the task detail modal, *before* the build starts |
 
 ### Multi-Agent Orchestration
@@ -260,6 +262,24 @@ WorkPilot AI est une application de bureau autonome basée sur une architecture 
 2. **Agent Coder** - Implémente les fonctionnalités avec des sous-agents parallèles
 3. **Agent QA Reviewer** - Valide les implémentations selon les critères d'acceptation
 4. **Agent QA Fixer** - Résout automatiquement les problèmes identifiés
+
+C'est le parcours d'une **fonctionnalité** (`workflows/feature-build/workflow.yaml`). Le **type de la
+carte** — décidé sans modèle à la création de la spec (`apps/backend/tasks/classify.py`), affiché et
+modifiable sur la carte — choisit le workflow réellement joué (`apps/backend/workflows/registry.py`) :
+
+| Type | Workflow | Ce qui change |
+|---|---|---|
+| `feature` (ou type inconnu) | `feature-build` | le parcours ci-dessus ; `prd` BMAD sur une feature complexe à `ultrathink` |
+| `bug_fix` | `bug-fix` | `reproduce` d'abord (le test rouge, la cause probable), pas de brainstorm ni de carte d'architecture |
+| `hotfix` | `hotfix` | `reproduce`, revue indépendante à tout effort, pas de préflight de docs |
+| `investigation` | `investigation` | un rapport (`investigate`, lecture seule) et **aucun code** ; le coder n'est pas lancé |
+| `run` | `run` | la procédure écrite (`runbook`), relue par une personne ; l'exécution est le lot 3 |
+| `refactoring` | `refactoring` | gate `tests-unchanged` : le diff ne touche aucun test |
+| `test` | `test` | plan, tests écrits en TDD, revue, suite verte |
+| `docs` | `docs` | le document, relu contre le code (`proofread`), sans boucle QA |
+| `spike` | `spike` | approches comparées, prototype jetable, `verdict` |
+
+Détail et plan par lots : [`docs/architecture/kanban-task-types.md`](docs/architecture/kanban-task-types.md).
 
 #### Agents Spécialisés
 - **Test Generator** - Génération de tests unitaires et d'intégration
