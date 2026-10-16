@@ -921,33 +921,33 @@ function kindSteps(step,phase){
   const brain=()=>step({win:"fin",nm:"Note de build dans le cerveau",status:"run",kind:"script",mem:"knowledge/projects/<p>/builds/<spec>.md",files:["cli/build_commands.py"]});
   const noCoder=(what)=>step({win:"fin",nm:"Carte → revue humaine",status:"run",kind:"script",info:`Ce workflow ne déclare ni planning ni coding : la boucle du coder n'est pas lancée (<code>_workflow_writes_code</code>). ${what} La carte passe en revue humaine avec le rapport (QA_PASSED), ou en erreur avec la raison si la phase n'a pas pu tourner (<code>_conclude_without_coder</code>).`,files:["cli/build_commands.py (_workflow_writes_code, _conclude_without_coder)"]});
   const noQa=()=>step({win:"fin",nm:"Carte → revue humaine",status:"run",kind:"script",info:"Ce workflow ne déclare pas de QA : le build se clôt après ses phases et la carte passe en revue humaine (QA_PASSED émis par le build).",files:["cli/build_commands.py"]});
-  if(k==="bug_fix"){step({stage:`B · Build (workflow ${wf}, 8 phases)`});docs();reproduce();planning(true);coding("tooling/tdd-cycle",true);review("medium");verify("tests-pass,app-verified");qa();observe();brain()}
+  if(k==="bug_fix"){step({stage:`B · Build (workflow ${wf}, 8 phases)`});docs();reproduce();planning(true);coding("tooling/tdd-cycle",true);review("medium");verify("tests-pass,app-verified");qa();observe();brain();}
   else if(k==="hotfix"){step({stage:`B · Build (workflow ${wf}, 7 phases)`});reproduce();planning(false);coding("tooling/tdd-cycle",true);review("medium",true);verify("tests-pass,app-verified");qa();observe();brain();
-    step({win:"fin",nm:"Non exprimable encore",status:"skip",why:"QA à une passe et gate humaine avant le merge : la boucle QA et le Kanban ne le savent pas encore",kind:"script",info:"Dit tel quel dans workflows/hotfix/workflow.yaml et dans kanban-task-types.md."})}
+    step({win:"fin",nm:"Non exprimable encore",status:"skip",why:"QA à une passe et gate humaine avant le merge : la boucle QA et le Kanban ne le savent pas encore",kind:"script",info:"Dit tel quel dans workflows/hotfix/workflow.yaml et dans kanban-task-types.md."});}
   else if(k==="investigation"){step({stage:`B · Build (workflow ${wf}, 2 phases)`});
     step({win:"avant planning",nm:"investigate",impl:"tooling/investigate",status:"run",agent:"analyzer",prov:"planning",roster:"research",dispatch:"fresh-context",info:"Lecture seule par construction (agent analyzer : Read, Glob, Grep). Faits, hypothèses confirmées ou infirmées, cause probable avec son degré de certitude, options. Rapport dans <spec>/workflow/investigate.md.",files:["skills/tooling/investigate/SKILL.md"]});
-    observe();noCoder("Le rapport est la livraison.");brain()}
+    observe();noCoder("Le rapport est la livraison.");brain();}
   else if(k==="run"){step({stage:`B · Build (workflow ${wf}, 2 phases)`});
     step({win:"avant planning",nm:"procedure",impl:"tooling/runbook",status:"run",agent:"analyzer",prov:"planning",roster:"solo",dispatch:"fresh-context",info:"La procédure écrite avant toute exécution : chaque étape avec sa commande, l'effet attendu, comment le vérifier, réversible ou non ; à partir des runbooks du projet (.workpilot/runbooks/) quand ils existent. Agent en lecture seule ; <code>gate: human</code> : une personne relit. Rien n'est exécuté.",files:["skills/tooling/runbook/SKILL.md"]});
     step({win:"exécution",nm:"execute (lot 3)",status:"skip",why:"pas encore livré : l'exécuteur déterministe, l'agent operator et la pause avant l'irréversible sont le lot 3",kind:"script",info:"Déclarer la phase avant qu'un exécuteur existe décrirait un pipeline que personne ne joue — ce que ce dépôt refuse.",files:["docs/architecture/kanban-task-types.md (lot 3)"]});
-    observe();noCoder("La procédure est la livraison.");brain()}
+    observe();noCoder("La procédure est la livraison.");brain();}
   else if(k==="refactoring"){step({stage:`B · Build (workflow ${wf}, 10 phases)`});docs();planning(true);
     phase({win:"planning → coding",nm:"analyze",impl:"tooling/spec-analyze",min:"medium",agent:"spec_validation",roster:"planner",prov:"planning",dispatch:"fresh-context",info:"Le plan contre les conventions du projet : un refactoring qui viole un ADR pour faire plus propre est la régression visée."});
     coding("tooling/tdd-cycle",true);
     phase({win:"coding → verify",nm:"design-check",impl:"impeccable (gate)",det:true,when:()=>front,kind:"script",info:"59 règles locales sur les fichiers déplacés."});
     review("medium");verify("tests-pass,app-verified,tests-unchanged");qa();
     phase({win:"après qa",nm:"architecture-map",impl:"tooling/architecture-map",min:"medium",when:()=>code,agent:"architecture_visualizer",prov:"qa",dispatch:"fresh-context",info:"Ce que le refactoring a déplacé dans la topologie — une frontière qui bouge sans qu'une feature change."});
-    observe();brain()}
+    observe();brain();}
   else if(k==="test"){step({stage:`B · Build (workflow ${wf}, 7 phases)`});docs();planning(true);coding("tooling/tdd-cycle",true);review("medium");verify("tests-pass");qa();observe();brain();
-    step({win:"fin",nm:"mutation-check (plus tard)",status:"skip",why:"la preuve déterministe « casser la cible, voir les tests rougir » n'est pas livrée ; la revue pose la question",kind:"script"})}
+    step({win:"fin",nm:"mutation-check (plus tard)",status:"skip",why:"la preuve déterministe « casser la cible, voir les tests rougir » n'est pas livrée ; la revue pose la question",kind:"script"});}
   else if(k==="docs"){step({stage:`B · Build (workflow ${wf}, 4 phases)`});planning(false);coding("workpilot/coder",false);
     step({win:"coding → fin",nm:"proofread",impl:"tooling/proofread",status:"run",agent:"pr_reviewer",prov:"qa",roster:"solo",dispatch:"fresh-context",info:"Chaque commande, chemin, nom, valeur par défaut et exemple du document vérifié dans le code, par un lecteur qui ne l'a pas écrit. Jamais élaguée.",files:["skills/tooling/proofread/SKILL.md"]});
-    observe();noQa();brain()}
+    observe();noQa();brain();}
   else if(k==="spike"){step({stage:`B · Build (workflow ${wf}, 5 phases)`});
     step({win:"avant planning",nm:"brainstorm",impl:bmadImpl("bmad/bmad-deep-recon","tooling/brainstorm-approaches"),status:"run",agent:"spec_critic",prov:"spec",dispatch:"inline",info:`Toujours jouée sur une étude : c'est son objet. ${bmadNote("bmad/bmad-deep-recon","tooling/brainstorm-approaches")}`,files:["workflows/spike/workflow.yaml"]});
     planning(false);coding("workpilot/coder",true);
     step({win:"coding → fin",nm:"verdict",impl:"tooling/spike-verdict",status:"run",agent:"pr_reviewer",prov:"qa",roster:"solo",dispatch:"fresh-context",info:"La question, ce qui a été essayé, ce qui a été mesuré, adopter / écarter / creuser, et ce qu'un vrai développement exigerait. Le code du spike est jetable ; le verdict est la livraison. Jamais élaguée.",files:["skills/tooling/spike-verdict/SKILL.md"]});
-    observe();noQa();brain()}
+    observe();noQa();brain();}
   step({stage:"C · Sortie"});
   step({win:"sortie",nm:"Merge local, PR vers develop, CI",status:"run",agent:"pr_template_filler",prov:"coding",info:"Comme pour une feature : merge sémantique, commit_message + pr_template_filler, self-healing CI/CD.",files:["cli/workspace_commands.py","agents/pr_template_filler.py"]});
 }
@@ -978,7 +978,7 @@ function buildSteps(){
   step({win:"spec",nm:"validation",status:"run",agent:"spec_writer",prov:"spec",prompt:"validation_fixer.md si erreurs",info:"Valide spec.md / implementation_plan.json ; traçabilité FR-### calculée (traceability.json). Récupération du plan (plan_recovery.py) en cas de format inattendu.",files:["spec/phases/planning_phases.py:254","spec/traceability.py","spec/plan_recovery.py"]});
   if(sim.complexity!=="simple")step({win:"gate",nm:"plan_review (gate humaine)",status:"run",kind:"human",info:"La carte passe en human_review / plan_review jusqu'à approbation."});
   // B · build
-  if(sim.kind!=="feature"){kindSteps(step,phase);return s}
+  if(sim.kind!=="feature"){kindSteps(step,phase);return s;}
   step({stage:"B · Build (run.py → workflow feature-build, 16 phases)"});
   step({win:"avant planning",nm:"docs",impl:"workpilot/libdocs",status:"run",kind:"script",info:"Docs Context7 des bibliothèques sans exemple dans le dépôt. Sans LLM. Toujours exécuté.",files:["libdocs/preflight.py"]});
   step({win:"avant planning",nm:"docintel (préflight)",status:sim.attach==="none"?"skip":"run",why:sim.attach==="none"?"aucune pièce jointe ni trace dans la description":"",kind:"script",info:attachInfo(),files:["docintel/preflight.py"]});
