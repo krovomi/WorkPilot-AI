@@ -372,6 +372,18 @@ AGENT_CONFIGS = {
         "auto_claude_tools": [],
         "thinking_default": "low",
     },
+    # Writes the procedure of a RUN task (`procedure` phase, `tooling/runbook`)
+    # and may run an allowlisted command to check a precondition — a health
+    # endpoint, a `git status`. No `Write`, no `Edit`: an operation on a
+    # running system is not a code change, and the procedure comes back as
+    # the session's answer, written by the runner. Bash goes through the
+    # same allowlist and validators as every agent's.
+    "operator": {
+        "tools": BASE_READ_TOOLS + ["Bash"],
+        "mcp_servers": ["code"],
+        "auto_claude_tools": [],
+        "thinking_default": "medium",
+    },
     # Authors the archify JSON model of a project's architecture. Reads the
     # codebase and writes one JSON file; the renderer, the validator and the
     # comparator are run by Python around the session, not by the agent, so it

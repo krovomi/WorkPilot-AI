@@ -47,9 +47,11 @@ not run says so, and `succeeded` is None rather than True.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 from dataclasses import dataclass, field, replace
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .engine import BUILTIN_PACKS
@@ -65,6 +67,7 @@ __all__ = [
     "PhaseRun",
     "BUILTIN_EXECUTORS",
     "CONFIG_PHASE",
+    "irreversible_gate",
     "log_phase_for",
     "execution_phase_for",
     "SKILL_PHASE_AGENTS",
@@ -149,6 +152,9 @@ CONFIG_PHASE = {
     "procedure": "planning",
     "verdict": "qa",
     "proofread": "qa",
+    # A RUN's execution is paid for as coding: no model runs in it, the
+    # label only says where its journal lands.
+    "execute": "coding",
 }
 _DEFAULT_CONFIG_PHASE = "coding"
 
@@ -229,7 +235,9 @@ SKILL_PHASE_AGENTS = {
     # nobody asked for, and a runbook is reviewed by a human before anything
     # executes it (lot 3 adds the `operator` agent that plays it).
     "investigate": "analyzer",
-    "procedure": "analyzer",
+    # The operator reads the project and may run allowlisted commands to
+    # check a precondition; it cannot write code (no Write, no Edit).
+    "procedure": "operator",
     "verdict": "pr_reviewer",
     "proofread": "pr_reviewer",
 }
@@ -764,6 +772,87 @@ def _announce(phase_id: str) -> None:
         logger.debug("could not announce phase %s: %s", phase_id, exc)
 
 
+def _kept_frozen(ctx: PhaseContext, phase_id: str) -> bool:
+    try:
+        from .execute import is_frozen
+
+        return is_frozen(ctx.spec_dir, phase_id)
+    except Exception as exc:  # noqa: BLE001 - a marker never stops a phase
+        logger.debug("frozen check skipped for %s: %s", phase_id, exc)
+        return False
+
+
+#: Where the gate below records that it stopped, next to the phase's report.
+IRREVERSIBLE_MARKER = "{phase_id}.pause.json"
+
+
+def irreversible_gate(spec_dir: Path, phase_id: str) -> None:
+    """Stop before an irreversible phase; let it through on an explicit resume.
+
+    The first time the build reaches the phase, the gate writes a marker
+    (`workflow/<id>.pause.json`), marks the build paused in the one pause
+    store (`core.pause_state`, which the Kanban reads to show the Resume
+    control), prints what would run, and raises `BuildPaused` — the signal
+    that unwinds to the entry point without finalizing anything. Resuming
+    clears the pause flag and restarts the build; the window re-enters the
+    phase, finds the marker with the pause lifted, consumes it and proceeds.
+
+    The marker is consumed, not kept: a build re-run later on the same spec
+    stops again. An agent cannot pass this gate — it writes no file in the
+    spec's `workflow/` directory and does not touch the pause store (rule
+    S3: an agent never edits its own guard-rails).
+    """
+    from core.build_signals import BuildPaused
+    from core.pause_state import is_paused, write_pause_state
+
+    workflow = Path(spec_dir) / OUTPUT_DIRNAME
+    workflow.mkdir(parents=True, exist_ok=True)
+    marker = workflow / IRREVERSIBLE_MARKER.format(phase_id=phase_id)
+    if marker.is_file() and not is_paused(spec_dir):
+        try:
+            marker.unlink()
+        except OSError as exc:
+            logger.warning("could not consume %s: %s", marker, exc)
+        print(
+            f"\n▶ {phase_id}: resumed by the user — the irreversible phase starts now."
+        )
+        return
+
+    steps = _irreversible_preview(spec_dir)
+    marker.write_text(
+        json.dumps(
+            {
+                "phase": phase_id,
+                "status": "awaiting-resume",
+                "written": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    write_pause_state(spec_dir, phase=phase_id)
+    print("\n" + "=" * 70)
+    print(f"  ⏸  {phase_id.upper()} IS IRREVERSIBLE — PAUSED BEFORE IT STARTS")
+    print("=" * 70)
+    if steps:
+        print(steps)
+    print(
+        "\nNothing has been executed. Read the procedure, then resume the task "
+        "from the Kanban to play it; stop the task to abandon it."
+    )
+    raise BuildPaused(phase=phase_id)
+
+
+def _irreversible_preview(spec_dir: Path) -> str:
+    """What the paused phase would play, when a procedure exists."""
+    try:
+        from .runbook import load_runbook
+
+        return load_runbook(spec_dir).describe()
+    except Exception as exc:  # noqa: BLE001 - a preview is a courtesy
+        return f"(no readable procedure yet: {exc})"
+
+
 def _run_ui_design_system(resolved, ctx: PhaseContext) -> PhaseOutcome:
     """`ui-design-system`: the design system the coder will build against.
 
@@ -864,6 +953,25 @@ async def run_skill_phase(resolved, ctx: PhaseContext) -> PhaseOutcome:
             True,
             detail="implemented by WorkPilot itself; no session to open",
         )
+
+    # A phase whose report is frozen — a RUN's procedure once its execution
+    # has started — is kept, not rewritten: a resumed build re-enters this
+    # window, and the person resumed on the text they read.
+    if _kept_frozen(ctx, phase.id):
+        report = ctx.spec_dir / OUTPUT_DIRNAME / f"{phase.id}.md"
+        return PhaseOutcome(
+            phase.id,
+            impl,
+            resolved.dispatch,
+            True,
+            detail="kept: execution has started on this report",
+            output_path=report,
+        )
+
+    # Declared irreversible: nothing starts until a person has resumed the
+    # build on purpose. Raises `BuildPaused` the first time through.
+    if phase.irreversible:
+        irreversible_gate(ctx.spec_dir, phase.id)
 
     deterministic = _DETERMINISTIC_RUNNERS.get(phase.id)
     if deterministic is not None:
@@ -1048,6 +1156,21 @@ async def _run_verify_replay(resolved, ctx: PhaseContext) -> PhaseOutcome:
     return await run_replay_phase(resolved, ctx)
 
 
+async def _run_execute(resolved, ctx: PhaseContext) -> PhaseOutcome:
+    """The `execute` phase of a RUN: `workflows.execute`, no model at all."""
+    try:
+        from .execute import run_execute_phase
+    except ImportError as exc:  # pragma: no cover - import-time environment
+        return PhaseOutcome(
+            resolved.phase.id,
+            resolved.phase.impl,
+            resolved.dispatch,
+            None,
+            detail=f"unavailable: {exc}",
+        )
+    return await run_execute_phase(resolved, ctx)
+
+
 async def _run_architecture_map(resolved, ctx: PhaseContext) -> PhaseOutcome:
     """The `architecture-map` phase: `archify.phase`, imported when it runs."""
     try:
@@ -1080,6 +1203,7 @@ CUSTOM_EXECUTORS = {
     "verify": _run_verify_loop,
     "verify-replay": _run_verify_replay,
     "architecture-map": _run_architecture_map,
+    "execute": _run_execute,
 }
 
 

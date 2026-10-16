@@ -81,7 +81,12 @@ BUILTIN_PACKS = frozenset({"workpilot"})
 # recorded scenario, recorded endpoint calls): no token at any effort level, so
 # never pruned. It has no pack `gate` command, so `run_deterministic_gates`
 # steps over it; the runner's `CUSTOM_EXECUTORS` runs it in its window.
-DETERMINISTIC_PHASES = frozenset({"design-check", "ui-design-system", "verify-replay"})
+#
+# `execute` plays a RUN's procedure with Python (`workflows/execute.py`): no
+# model, no token at any effort, so never pruned; `CUSTOM_EXECUTORS` runs it.
+DETERMINISTIC_PHASES = frozenset(
+    {"design-check", "ui-design-system", "verify-replay", "execute"}
+)
 
 _SKIP_EFFORT = "effort"
 _SKIP_UNTOUCHED = "untouched"

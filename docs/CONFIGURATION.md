@@ -457,6 +457,35 @@ the backend environment, then from `.workpilot/.env`:
 | `VERIFY_CHROME_PATH` | — | A specific Chrome/Chromium binary. |
 | `CHROME_PATH` | — | Same, read when `VERIFY_CHROME_PATH` is unset. A path that is not an existing file is ignored. |
 
+## RUN tasks — `.workpilot/environments.toml`
+
+A card of kind `run` (an operation on something that runs: restart, purge, migrate data,
+deploy, rotate) plays a procedure a model wrote and a person read
+([architecture/kanban-task-types.md](architecture/kanban-task-types.md), lot 3). Where it may
+act is declared in the project, in `<project>/.workpilot/environments.toml`:
+
+```toml
+[environments.staging]
+description = "the staging stack"
+health = ["curl -fsS https://staging.example.test/healthz"]
+variables = ["STAGING_DB_URL", "STAGING_API_TOKEN"]
+```
+
+| Key | Meaning |
+| --- | --- |
+| `health` | Commands run before the first step; one that fails stops the run. Through the project's command allowlist like every step. |
+| `variables` | The **names** of the variables the steps read. Their values live in the operator's environment (or the project's `.env` vault) and reach the step's process only; they are never read by the model, printed, or written to the journal. A value in this file is refused. |
+
+Without the file, a RUN runs only in the task's worktree. A procedure that names an environment
+the project did not declare is blocked, not redirected: the operator who wrote
+`Environnement : production` meant production.
+
+What the execution writes, in the spec's `workflow/` directory: `run.md` (the journal — each
+command, its exit code, its output cut to a page with secrets masked), `run-state.json`
+(status and the next step, so a failed run resumes where it stopped), `procedure.frozen.json`
+(the procedure being played is never rewritten by a model), `execute.pause.json` (present
+until the person resumes the build that stopped before the irreversible phase).
+
 ## Local and OpenAI-compatible endpoints
 
 The `ollama` provider talks to Ollama's native API; `lm-studio` and `llama-cpp`

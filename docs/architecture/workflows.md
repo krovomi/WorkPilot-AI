@@ -48,6 +48,7 @@ a `gate` command is implemented by that gate (`pack_inventory`).
 | `docs` | the preflight (`libdocs.run_preflight`), before planning — no API call, never pruned |
 | `reproduce`, `investigate`, `procedure`, `proofread`, `verdict` | the engine, as one-shot skill sessions of the per-kind workflows (`skills/tooling/`) |
 | the `tests-unchanged` hard gate | the engine (`workflows/hard_gates.py`), from the task's real diff |
+| `execute` (a RUN's procedure) | the engine, through a dedicated executor (`workflows/execute.py`): no model, behind the irreversible gate and the command allowlist |
 
 **One workflow per task kind.** The workflow a build loads is the card's kind's
 (`tasks/classify.py` → `task_metadata.json` → `workflows/registry.py`):
@@ -76,8 +77,19 @@ fallback, and a project without BMAD's `_bmad/` runtime runs the fallback.
 committed mock runtime never counts as the real one. A fallback of the form
 `workpilot/<x>` is WorkPilot's own Python — `prd` → `workpilot/spec` means the
 spec already written is the product document — so it opens no session and
-belongs to no window. `irreversible: true` is parsed and shown; the runner
-acts on it in lot 3.
+belongs to no window.
+
+**`irreversible: true`.** The runner stops before such a phase
+(`irreversible_gate`): it writes `workflow/<id>.pause.json`, marks the build
+paused in the one pause store (`core/pause_state.py`, which the Kanban reads
+to offer Resume), prints the steps that would run and raises `BuildPaused`.
+Resuming lifts the flag and restarts the build; the window re-enters the
+phase, consumes the marker and lets it through once. A RUN's `execute` phase
+is the one declared so far: `workflows/execute.py` then plays the procedure
+with Python — every command behind the project's allowlist, a journal in
+`workflow/run.md`, a state in `run-state.json`, the procedure frozen so a
+resumed `procedure` phase keeps the text the person read. Environments it
+may act on: `.workpilot/environments.toml` (`workflows/environments.py`).
 
 **`when:` on the task.** Besides `touches("…")`, a phase may require
 `kind == <kind>` or `complexity == <level>`, joined by `and`; the facts come
