@@ -185,22 +185,55 @@ là seulement — et seulement dans les projets qui l'ont installé.
 Coût : un skill BMAD vaut 2 à 6 k tokens de prompt ; il n'est lu que dans sa phase. Un bug à
 `medium` n'en charge aucun ; une feature simple à `ultrathink` non plus.
 
-## Lot 3 — RUN sûr : irréversible, pause, journal
+## Lot 3 — RUN sûr : irréversible, pause, journal — **livré**
 
-- `irreversible: true` sur une phase → le runner pose un `BuildPaused` **avant** de la
-  lancer (`core/pause_state.py`, repris), avec la liste des étapes à jouer dans le feed ; la
-  reprise est explicite dans l'UI. Jamais contournable par l'agent (il ne touche pas ses
-  garde-fous, S3).
-- `tooling/execute-runbook` est **déterministe** (`CUSTOM_EXECUTORS`, comme `verify`) : le
-  modèle a produit la procédure au lot 1, Python l'exécute ; aucun token pendant l'exécution,
-  et une étape qui échoue arrête le reste et laisse l'état écrit.
-- Journal : `<spec_dir>/workflow/run.md` (étape, commande, code retour, sortie paginée via
-  `harness.domain.paging`, secrets masqués par `core/log_redaction.py`).
-- Environnement cible : déclaré dans `.workpilot/environments.toml` (nom, commandes de
-  santé, variables **nommées**, jamais leurs valeurs — S1) ; sans déclaration, RUN ne
-  tourne que dans le worktree.
-- Preuve : un test qui démontre qu'une étape `irreversible` ne s'exécute pas sans reprise, et
-  qu'une commande hors allowlist est refusée dans la procédure.
+- `irreversible: true` sur une phase → `workflows/runner.py::irreversible_gate` s'arrête
+  **avant** de la lancer : marqueur `workflow/<phase>.pause.json`, drapeau de pause dans le
+  seul magasin (`core/pause_state.py`, lu par le Kanban pour afficher *Reprendre*), la liste
+  des étapes imprimée (celles marquées *IRREVERSIBLE* signalées), `BuildPaused`. La reprise
+  (`TASK_RESUME` lève le drapeau et relance le build) réentre la fenêtre : le marqueur est
+  consommé et la phase joue ; un build relancé plus tard s'arrête de nouveau. L'agent ne
+  peut pas passer la porte : il n'écrit pas dans `workflow/` et ne touche pas au magasin de
+  pause (S3). Côté Electron, `isCooperativelyPaused` lit aussi `pause_state.json` sur disque :
+  une pause posée par le backend n'est pas prise pour une sortie inattendue.
+- `tooling/execute-runbook` est **déterministe** (`CUSTOM_EXECUTORS`, `workflows/execute.py`) :
+  `workflows/runbook.py` lit `workflow/procedure.md` tel que le skill `runbook` l'écrit (étapes
+  numérotées, `Commande`, `vérifier par`, `Réversible`, vérification finale, paramètres) et
+  **refuse** ce qu'il faudrait interpréter — étape sans commande, paramètre à fournir,
+  `[NEEDS CLARIFICATION]`, `<PLACEHOLDER>`. Python joue les étapes une à une, chaque commande
+  passée par `security.hooks.command_refusal` (allowlist + garde-fous, la même porte que
+  `ToolExecutor.run_command`) ; une commande refusée ou une étape qui échoue (code retour, ou
+  sa vérification) **arrête le reste** et laisse l'état écrit. Aucun jeton pendant l'exécution.
+- Journal `workflow/run.md` (étape, commande, code retour, sortie coupée à une page par
+  `harness.domain.paging.spill_excerpt`, secrets masqués par `core.log_redaction.redact_text`,
+  fonction ajoutée pour cela) ; état `workflow/run-state.json` (`running` / `done` / `failed`
+  / `refused` / `blocked`, `next_step`) : un échec reprend à l'étape échouée, une procédure
+  modifiée après le début bloque (« the procedure changed since execution started »), une
+  exécution finie ne se rejoue pas.
+- La procédure est **figée** au premier pas (`workflow/procedure.frozen.json`) : la phase
+  `procedure` d'un build repris garde le texte lu par la personne au lieu d'ouvrir une
+  session (`run_skill_phase`, `_kept_frozen`).
+- Environnement cible : `.workpilot/environments.toml` (`workflows/environments.py`) — nom,
+  commandes `health` jouées d'abord, **noms** de variables transmis au processus des étapes,
+  jamais leurs valeurs (une valeur dans le fichier est refusée, S1). Sans déclaration, RUN ne
+  tourne que dans l'arbre de travail ; un environnement nommé mais non déclaré **bloque**, il ne
+  redirige pas. Documenté dans `docs/CONFIGURATION.md`.
+- Agent `operator` (`AGENT_CONFIGS`) : `Read`, `Glob`, `Grep`, `Bash` sous allowlist, **pas**
+  `Write`/`Edit` ; la phase `procedure` tourne dessous et peut vérifier une précondition.
+- `workflows/run/workflow.yaml` : `procedure` (gate humaine) → `execute` (`irreversible:
+  true`, `always`) → `observe`. `execute` est déterministe (`DETERMINISTIC_PHASES`), donc
+  jamais élaguée.
+- Ce que ce lot ne fait pas : la pause a lieu avant la **phase**, pas avant chaque étape
+  `Réversible : non` — la personne relit la liste entière, étapes irréversibles signalées, et
+  reprend une fois ; une pause par étape serait une seconde question à laquelle elle a déjà
+  répondu. `Retour arrière` reste une information pour la personne : aucune commande d'annulation
+  n'est jouée automatiquement.
+- Preuve : `tests/test_workflows_run_execute.py` — une phase irréversible ne s'exécute pas sans
+  reprise (premier passage : `BuildPaused`, rien d'exécuté ; passage repris : joué ; build
+  ultérieur : nouvel arrêt), une commande hors allowlist est refusée et arrête la procédure,
+  une étape qui échoue arrête le reste, reprise à l'étape suivante, procédure modifiée bloquée,
+  secrets masqués dans le journal, environnement déclaré vérifié d'abord et variables nommées
+  transmises, environnement non déclaré bloqué, procédure figée gardée sans session.
 
 ## Lot 4 — rosters et prompts par type
 
@@ -248,7 +281,7 @@ lot 6 (mesure) après n'importe lequel
 
 Chaque lot est une PR vers `develop`, verte sur `validate_impls`, `test_docs_context`,
 `test_agent_tool_declarations` et `test_workflow_engine`, sur les trois OS de la CI.
-État : lots 0, 1 et 2 livrés ; lots 3 à 6 à faire.
+État : lots 0 à 3 livrés ; lots 4 à 6 à faire.
 
 ## Ce que le plan refuse
 

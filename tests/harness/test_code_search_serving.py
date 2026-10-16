@@ -50,6 +50,9 @@ CODE_SEARCH_TYPES = frozenset(
         "qa_fixer",
         "verifier",
         "analyzer",
+        # The RUN operator looks for the scripts and runbooks a procedure
+        # reuses; ranked code search is cheaper than grepping the project.
+        "operator",
         "architecture_visualizer",
         "architecture_reviewer",
         "impact_analyzer",

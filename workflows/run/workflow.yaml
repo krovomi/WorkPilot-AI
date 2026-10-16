@@ -1,34 +1,51 @@
 name: run
 description: >-
   An operation on something that runs — restart, purge, migrate data,
-  deploy, rotate — is not a build. This lot writes the procedure and stops:
-  every step with its command, expected effect, how to check it and whether
-  it can be undone, derived from the project's runbooks when it has them.
-  Nothing is executed. The deterministic executor that plays the steps one
-  by one, pauses before an irreversible one and journals each output is the
-  next lot (`docs/architecture/kanban-task-types.md`, lot 3), as is the
-  `operator` agent; declaring those phases before they run would describe a
-  pipeline nobody executes. Chosen by `workflows/registry.py` for cards of
-  kind `run`; the coder loop is not started.
+  deploy, rotate — is not a build. The procedure is written first, by a
+  model under a read-only agent, and read by a person; then WorkPilot's own
+  Python plays it step by step, behind the project's command allowlist,
+  journaling every command, stopping at the first failure, and never before
+  an explicit resume: the `execute` phase is declared irreversible, so the
+  build pauses before it starts. Chosen by `workflows/registry.py` for cards
+  of kind `run`; the coder loop is not started. Environments the procedure
+  may target are declared in `.workpilot/environments.toml`; without it a
+  RUN runs only in the task's worktree.
 
 phases:
   - id: procedure
     impl: tooling/runbook
+    agent: operator
     roster: solo
     dispatch: fresh-context
     gate: human
     always: true
     description: >-
-      The procedure, written for a person to read before anything runs.
-      Under the read-only `analyzer` agent: this phase may read the
-      project's runbooks, environment declaration and scripts, and may not
-      run a command that changes a state. `gate: human` is the reason the
-      phase exists — the next lot's executor starts only from a procedure a
-      person has read.
+      The procedure, written for a person to read before anything runs:
+      each step with its command, expected effect, how to check it and
+      whether it can be undone, from the project's runbooks when it has
+      them. Under the `operator` agent — read the project, run an
+      allowlisted command to check a precondition, write no code. Once
+      execution has started the report is frozen: a resumed build keeps the
+      text the person read rather than asking for another.
+
+  - id: execute
+    impl: tooling/execute-runbook
+    irreversible: true
+    always: true
+    description: >-
+      Python plays the procedure (`workflows/execute.py`): no session, no
+      token, on every provider. `irreversible: true` makes the runner stop
+      before this phase with the steps printed, mark the build paused and
+      wait for the person to resume from the Kanban; nothing is executed
+      before that. Each command goes through the project's allowlist and
+      guardrails; a refused command stops the run. Health checks of the
+      declared environment run first; its named variables reach the steps'
+      processes and nothing else. The journal is `workflow/run.md`, the
+      state `workflow/run-state.json`.
 
   - id: observe
     impl: workpilot/observe
     always: true
     description: >-
-      The procedure written, kept in the build memory so the next operation
-      of the same kind starts from it.
+      The procedure written and played, kept in the build memory so the
+      next operation of the same kind starts from it.

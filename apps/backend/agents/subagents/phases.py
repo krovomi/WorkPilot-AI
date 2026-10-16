@@ -115,6 +115,10 @@ PHASE_ALIASES: dict[str, str] = {
     "insights": "research",
     "insight_extractor": "research",
     "analyzer": "research",
+    # Writes a RUN's procedure from the project's runbooks and scripts; a
+    # specialist re-reading the same files would be the question paid twice,
+    # and the execution that follows is Python's, not a session's.
+    "operator": "solo",
     "context_mesh_analyzer": "research",
     "learning_analyzer": "research",
     "live_companion_analyzer": "research",

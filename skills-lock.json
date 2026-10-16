@@ -592,6 +592,14 @@
 				"ios": ">=16.0"
 			}
 		},
+		"execute-runbook": {
+			"kind": "skill",
+			"pack": "tooling",
+			"packVersion": "1.0.0",
+			"source": "skills/tooling/execute-runbook/SKILL.md",
+			"contentSha256": "347106797db75636f5c4082f648cd09bfe19d5bcab107e00194c450e806759d7",
+			"targets": {}
+		},
 		"github": {
 			"kind": "skill",
 			"pack": "hermes",
@@ -1159,6 +1167,7 @@
 		".agents/skills/convert-documents-to-markdown/LICENSE",
 		".agents/skills/convert-documents-to-markdown/SKILL.md",
 		".agents/skills/cross-platform-mobile/SKILL.md",
+		".agents/skills/execute-runbook/SKILL.md",
 		".agents/skills/github/SKILL.md",
 		".agents/skills/github/references/auth.md",
 		".agents/skills/github/references/ci-troubleshooting.md",
@@ -1327,6 +1336,7 @@
 		".gemini/commands/computer-use.toml",
 		".gemini/commands/convert-documents-to-markdown.toml",
 		".gemini/commands/cross-platform-mobile.toml",
+		".gemini/commands/execute-runbook.toml",
 		".gemini/commands/github.toml",
 		".gemini/commands/investigate.toml",
 		".gemini/commands/ios-developer.toml",

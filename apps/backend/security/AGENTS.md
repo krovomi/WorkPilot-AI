@@ -13,6 +13,7 @@ providers hors SDK passent par `core/runtimes/tool_executor.py`, qui appelle les
 | Outil | Barrière | Où | Test |
 |---|---|---|---|
 | Bash | allowlist par projet + validateurs par commande | `hooks.py` (`bash_security_hook`) → `command_guard.py` (`validate_command_line`) → `validator_registry.py` | `tests/test_security_command_guard.py`, `tests/security/` |
+| Bash | les étapes d'une procédure RUN jouées par Python (`workflows/execute.py`) passent par `hooks.command_refusal` avant toute exécution ; l'arrêt avant la phase irréversible est `workflows/runner.py` (`irreversible_gate`) | `hooks.py` → `command_guard.py` | `tests/test_workflows_run_execute.py` |
 | Bash | profil de sécurité du projet (commandes de base + stack + scripts + perso) | `profile.py` (`get_security_profile`), `project/command_registry/` | `tests/test_security.py`, `tests/test_security_cache.py` |
 | Bash | secrets dans un `git commit` émis par un agent | `git_validators.py` → `scan_secrets.py` | `tests/test_scan_secrets.py` |
 | Bash | écriture de la configuration de sécurité (allowlist, profil, garde-fous, réglages SDK), quelle que soit la commande | `config_write_validators.py`, validateur de ligne (`LINE_VALIDATORS` de `validator_registry.py`) | `tests/security/test_config_write_validators.py` |
