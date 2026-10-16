@@ -290,12 +290,25 @@ function PhaseRow({ phase }: { readonly phase: WorkflowPhasePayload }) {
 							{t("workflowProfile:phase.humanGate")}
 						</Badge>
 					)}
+					{phase.irreversible && (
+						<Badge variant="destructive" className="text-[10px]">
+							{t("workflowProfile:phase.irreversible")}
+						</Badge>
+					)}
 				</div>
 				{phase.degradedFrom && (
 					<div className="mt-0.5 text-amber-600 dark:text-amber-400">
 						{t("workflowProfile:phase.degraded", {
 							from: phase.degradedFrom,
 							reason: phase.degradedReason,
+						})}
+					</div>
+				)}
+				{phase.substitutedFrom && (
+					<div className="mt-0.5 text-amber-600 dark:text-amber-400">
+						{t("workflowProfile:phase.substituted", {
+							from: phase.substitutedFrom,
+							reason: phase.substitutionReason,
 						})}
 					</div>
 				)}

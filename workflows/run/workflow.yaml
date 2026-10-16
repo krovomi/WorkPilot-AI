@@ -1,0 +1,34 @@
+name: run
+description: >-
+  An operation on something that runs — restart, purge, migrate data,
+  deploy, rotate — is not a build. This lot writes the procedure and stops:
+  every step with its command, expected effect, how to check it and whether
+  it can be undone, derived from the project's runbooks when it has them.
+  Nothing is executed. The deterministic executor that plays the steps one
+  by one, pauses before an irreversible one and journals each output is the
+  next lot (`docs/architecture/kanban-task-types.md`, lot 3), as is the
+  `operator` agent; declaring those phases before they run would describe a
+  pipeline nobody executes. Chosen by `workflows/registry.py` for cards of
+  kind `run`; the coder loop is not started.
+
+phases:
+  - id: procedure
+    impl: tooling/runbook
+    roster: solo
+    dispatch: fresh-context
+    gate: human
+    always: true
+    description: >-
+      The procedure, written for a person to read before anything runs.
+      Under the read-only `analyzer` agent: this phase may read the
+      project's runbooks, environment declaration and scripts, and may not
+      run a command that changes a state. `gate: human` is the reason the
+      phase exists — the next lot's executor starts only from a procedure a
+      person has read.
+
+  - id: observe
+    impl: workpilot/observe
+    always: true
+    description: >-
+      The procedure written, kept in the build memory so the next operation
+      of the same kind starts from it.

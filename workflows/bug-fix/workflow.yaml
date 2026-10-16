@@ -1,0 +1,84 @@
+name: bug-fix
+description: >-
+  A bug is reproduced before it is fixed. The first phase writes the test
+  that fails for the reason described — or the command that shows the defect
+  — and names the probable cause and the fix's perimeter; the planner and the
+  coder read that report (`workflows.handoff`). Nothing the feature pipeline
+  pays for a new capability is paid here: no brainstorm, no design system, no
+  architecture map. Chosen by `workflows/registry.py` for cards of kind
+  `bug_fix`; every implementation named here resolves on a fresh clone.
+
+phases:
+  - id: docs
+    impl: workpilot/libdocs
+    always: true
+    description: >-
+      Library documentation for the APIs the fix touches, decided without a
+      model. Free, so never pruned.
+
+  - id: reproduce
+    impl: tooling/reproduce
+    agent: coder
+    roster: verify
+    dispatch: fresh-context
+    always: true
+    description: >-
+      The failing test, or the command that shows the defect, written before
+      anything is changed; the probable cause with its `file:line`; the
+      perimeter of the fix. Runs under the coder because it writes the test,
+      with a roster of one test runner. Never pruned: a fix without a
+      reproduction corrects the description, not necessarily the behaviour.
+      Its report is the planner's first input.
+
+  - id: planning
+    impl: workpilot/planner
+    gate: human
+    description: >-
+      The existing planner, fed the reproduction report. A bug's plan is
+      short — the fix, the regression test already written, what must stay
+      identical — and the coder loop cannot start without one, so it is never
+      pruned.
+
+  - id: coding
+    impl: tooling/tdd-cycle
+    dispatch: subagent-per-task
+    description: >-
+      Red is already there (`reproduce` wrote it); green and refactor remain.
+      Degrades to sequential execution on providers without subagents.
+
+  - id: review
+    impl: tooling/review-lenses
+    min_effort: medium
+    dispatch: fresh-context
+    roster: solo
+    description: >-
+      A reader that did not write the fix: correctness and security at
+      medium, conformance from high, the adversarial reading at ultrathink.
+      Handed to the QA reviewer. At low effort the coder's own self-review is
+      what there is.
+
+  - id: verify
+    impl: tooling/verify
+    agent: verifier
+    roster: verify
+    dispatch: fresh-context
+    hard_gate: tests-pass,app-verified
+    description: >-
+      The application launched with the fix in place, the error gone, the
+      state reached. The gate `tests-pass` is read from the QA report; the
+      reproduction test is part of that suite now, so a red reproduction
+      fails the gate. A dedicated `repro-green` gate that names the test
+      written by `reproduce` is a later lot.
+
+  - id: qa
+    impl: workpilot/qa-loop
+    always: true
+    description: >-
+      The QA reviewer/fixer loop, on the acceptance criteria of the bug.
+
+  - id: observe
+    impl: workpilot/observe
+    always: true
+    description: >-
+      What this fix taught: the correction the user made, the blind spot. Run
+      by `learning_loop/observe.py`, near-free.

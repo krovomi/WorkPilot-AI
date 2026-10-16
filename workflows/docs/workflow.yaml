@@ -1,0 +1,38 @@
+name: docs
+description: >-
+  The document, proofread against the code. Three phases and no QA loop:
+  plan what to write, write it, read it with the repository open. Chosen by
+  `workflows/registry.py` for cards of kind `docs`. With no `qa` declared the
+  build ends after the proofreading and the card goes to human review, which
+  is where a document is read.
+
+phases:
+  - id: planning
+    impl: workpilot/planner
+    description: >-
+      The existing planner: which files, which sections, which existing
+      documents to update or link. No human gate on a documentation plan —
+      the review that matters is of the text.
+
+  - id: coding
+    impl: workpilot/coder
+    description: >-
+      The coder loop writing prose rather than code; no TDD cycle to name.
+
+  - id: proofread
+    impl: tooling/proofread
+    dispatch: fresh-context
+    roster: solo
+    always: true
+    description: >-
+      Every command, path, name, default and example in the document checked
+      in the code, by a reader that did not write it, under the read-only
+      `pr_reviewer` agent. Never pruned: a documentation task without this
+      phase ships whatever the writer believed.
+
+  - id: observe
+    impl: workpilot/observe
+    always: true
+    description: >-
+      What the document uncovered about the project — an option nobody had
+      written down, a stale README — filed for the next build.

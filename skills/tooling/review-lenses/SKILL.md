@@ -29,8 +29,10 @@ Une cinquième lentille, **5. Publication mobile**, ne dépend pas de l'effort m
 des fichiers : elle s'applique quand la tâche touche une application smartphone,
 et la ligne `LENSES:` la nomme alors, avec la procédure qu'elle suit.
 
-À un effort inférieur à `medium` cette phase ne tourne pas : la relecture du
-coder sur sa propre sous-tâche est ce qu'il y a.
+À un effort inférieur à `medium`, cette phase ne tourne pas sur une
+fonctionnalité : la relecture du coder sur sa propre sous-tâche est ce qu'il y
+a. Les workflows qui la gardent à tout niveau (un hotfix) appliquent alors les
+lentilles 1 et 2, et rien d'autre.
 
 ## Entrées
 
@@ -106,7 +108,7 @@ l'ordre ; une lentille sans constat l'écrit explicitement.
 ```markdown
 ## Revue à lentilles
 
-Effort : <medium|high|ultrathink> — lentilles appliquées : <1, 2, …>
+Effort : <low|medium|high|ultrathink> — lentilles appliquées : <1, 2, …>
 
 ### 1. Correction et tests
 - [HIGH] correction — `src/orders/service.py:42` — le total ignore la remise — `apply_discount` n'est jamais appelé

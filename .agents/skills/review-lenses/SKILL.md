@@ -7,7 +7,7 @@ metadata:
     provenance: WorkPilot — revue unique à lentilles (audit F3/F11) ; la lentille adversariale reprend l'intention de bmad-review
     pack: tooling
     version: 1.0.0
-    content_sha256: df02c45210310676944fe9f5cfdcefdad093092ac10a299898b2e5427f4e451c
+    content_sha256: 3e6c1ea805ef84b29cf1aa85125c046e9ba37430865758ad029bdefa81a30693
 ---
 
 # review-lenses — une revue, plusieurs questions
@@ -33,8 +33,10 @@ Une cinquième lentille, **5. Publication mobile**, ne dépend pas de l'effort m
 des fichiers : elle s'applique quand la tâche touche une application smartphone,
 et la ligne `LENSES:` la nomme alors, avec la procédure qu'elle suit.
 
-À un effort inférieur à `medium` cette phase ne tourne pas : la relecture du
-coder sur sa propre sous-tâche est ce qu'il y a.
+À un effort inférieur à `medium`, cette phase ne tourne pas sur une
+fonctionnalité : la relecture du coder sur sa propre sous-tâche est ce qu'il y
+a. Les workflows qui la gardent à tout niveau (un hotfix) appliquent alors les
+lentilles 1 et 2, et rien d'autre.
 
 ## Entrées
 
@@ -110,7 +112,7 @@ l'ordre ; une lentille sans constat l'écrit explicitement.
 ```markdown
 ## Revue à lentilles
 
-Effort : <medium|high|ultrathink> — lentilles appliquées : <1, 2, …>
+Effort : <low|medium|high|ultrathink> — lentilles appliquées : <1, 2, …>
 
 ### 1. Correction et tests
 - [HIGH] correction — `src/orders/service.py:42` — le total ignore la remise — `apply_discount` n'est jamais appelé

@@ -155,13 +155,33 @@ def _resolve_workflow_profile(
     try:
         from core.client import peek_active_provider
         from phase_config import get_phase_thinking
+        from workflows.registry import load_workflow_for_spec
 
-        from workflows import load_workflow, resolve_profile
+        from workflows import resolve_profile
 
         repo_root = Path(__file__).resolve().parents[3]
-        workflow_path = repo_root / "workflows" / "feature-build" / "workflow.yaml"
-        workflow = load_workflow(workflow_path)
+        # The workflow is the card's kind's (`workflows/registry.py`): a bug
+        # reproduces before it fixes, an investigation writes a report and no
+        # code, a RUN plays a procedure. A card with no recorded kind gets
+        # `feature-build`, the pipeline every card used to get.
+        workflow = load_workflow_for_spec(spec_dir, repo_root)
         effort = get_phase_thinking(spec_dir, "coding")
+
+        # What is installed, so a phase whose `impl` is missing and whose
+        # `fallback` is not runs the fallback — recorded in the profile, not
+        # discovered mid-build. Advisory: without it nothing is substituted
+        # here and the runner decides at run time.
+        inventory = None
+        try:
+            from skills_registry.packs import load_packs
+
+            from workflows import pack_inventory
+
+            inventory = pack_inventory(load_packs(repo_root / "skills"))
+        except Exception as exc:  # noqa: BLE001 - advisory only
+            if announce:
+                print(f"  (could not read the installed packs: {exc})")
+
         profile = resolve_profile(
             workflow,
             effort,
@@ -173,30 +193,91 @@ def _resolve_workflow_profile(
             # anything.
             provider=peek_active_provider(spec_dir),
             changed_files=changed_files,
+            inventory=inventory,
         )
         if not announce:
             return profile
         print("\n" + profile.describe())
 
         # Naming an uninstalled implementation up front beats discovering it
-        # halfway through a build.
-        try:
-            from skills_registry.packs import load_packs
+        # halfway through a build. A phase played by its fallback is not
+        # missing — the profile above already says what it runs.
+        if inventory is not None:
+            try:
+                from workflows import validate_impls
 
-            from workflows import pack_inventory, validate_impls
-
-            available, gated = pack_inventory(load_packs(repo_root / "skills"))
-            for miss in validate_impls(workflow, available, gated=gated):
-                if profile.will_run(miss.phase_id):
-                    print(f"  ⚠ {miss.phase_id}: {miss.reason}")
-        except Exception as exc:  # noqa: BLE001 - advisory only
-            print(f"  (could not check phase implementations: {exc})")
+                available, gated = inventory
+                for miss in validate_impls(workflow, available, gated=gated):
+                    if profile.will_run(miss.phase_id):
+                        print(f"  ⚠ {miss.phase_id}: {miss.reason}")
+            except Exception as exc:  # noqa: BLE001 - advisory only
+                print(f"  (could not check phase implementations: {exc})")
 
         return profile
     except Exception as exc:  # noqa: BLE001 - never block a build
         if announce:
             print(f"⚠ Workflow engine disabled for this run: {exc}")
         return None
+
+
+def _workflow_writes_code(profile) -> bool:
+    """Whether the coder loop has anything to do under this workflow.
+
+    `run_autonomous_agent` owns `planning` and `coding`; a workflow that
+    declares neither has no plan to write and no subtask to implement, so
+    starting the loop would plan a feature nobody asked for. No profile (the
+    engine is off) means the pipeline it always ran: the loop runs.
+    """
+    if profile is None:
+        return True
+    declared = set(getattr(profile, "declared", ()) or ())
+    return bool(declared & {"planning", "coding"})
+
+
+def _conclude_without_coder(profile, run, spec_dir: Path, source_spec_dir) -> None:
+    """Settle the card after a build in which no coder ran.
+
+    The spec pipeline moved the card to *planning*; nothing else would move it
+    on. When every phase produced its output the card goes to human review,
+    which is where a report or a procedure is read. When one could not, the
+    card carries the reason rather than a bare error badge. Never raises.
+    """
+    outcomes = list(getattr(run, "outcomes", None) or [])
+    failed = [o for o in outcomes if getattr(o, "succeeded", True) is not True]
+    try:
+        from core.agent import sync_spec_to_source
+
+        sync_spec_to_source(spec_dir, source_spec_dir)
+    except Exception as exc:  # noqa: BLE001 - a sync never fails a build
+        from core.debug import debug_warning
+
+        debug_warning("run.py", f"Spec sync skipped: {exc}")
+    try:
+        from core.task_event import TaskEventEmitter
+
+        emitter = TaskEventEmitter.from_spec_dir(spec_dir)
+        name = getattr(profile, "workflow", "workflow")
+        if failed:
+            detail = "; ".join(
+                f"{o.phase_id}: {o.detail}" for o in failed if getattr(o, "detail", "")
+            )
+            emitter.emit(
+                "PLANNING_FAILED",
+                {
+                    "error": f"workflow {name!r}: {detail or 'a phase did not run'}",
+                    "recoverable": True,
+                },
+            )
+        else:
+            emitter.emit("QA_PASSED", {"iteration": 0, "testsRun": {}})
+    except Exception as exc:  # noqa: BLE001 - best-effort
+        from core.debug import debug_warning
+
+        debug_warning("run.py", f"Could not settle the card: {exc}")
+    print(
+        f"\nWorkflow '{getattr(profile, 'workflow', '?')}' writes no code: "
+        + ("the phases above are the build." if not failed else "a phase did not run.")
+    )
 
 
 def _run_deterministic_gates(profile, working_dir: Path, spec_dir: Path):
@@ -546,7 +627,12 @@ def _run_convention_pass(
         debug_warning("run.py", f"Convention pass skipped: {exc}")
 
 
-def _report_hard_gates(profile, spec_dir: Path, tests_passed: bool | None) -> None:
+def _report_hard_gates(
+    profile,
+    spec_dir: Path,
+    tests_passed: bool | None,
+    changed_files: list[str] | None = None,
+) -> None:
     """Say whether the workflow's non-negotiable gates actually held.
 
     Reports; does not abort. The build has already produced a worktree and a
@@ -559,7 +645,9 @@ def _report_hard_gates(profile, spec_dir: Path, tests_passed: bool | None) -> No
     try:
         from workflows import evaluate_hard_gates
 
-        report = evaluate_hard_gates(profile, spec_dir, tests_passed=tests_passed)
+        report = evaluate_hard_gates(
+            profile, spec_dir, tests_passed=tests_passed, changed_files=changed_files
+        )
         if summary := report.describe():
             print("\n" + summary)
         if report.blocking:
@@ -863,26 +951,36 @@ def handle_build_command(
         )
         if _pre_ctx is not None:
             _pre_ctx.jev_run = jev_run
-        _run_workflow_phases(_profile, _pre_ctx, after=None, before="planning")
-
-        asyncio.run(
-            run_autonomous_agent(
-                project_dir=working_dir,  # Use worktree if isolated
-                spec_dir=spec_dir,
-                model=model,
-                max_iterations=max_iterations,
-                verbose=verbose,
-                source_spec_dir=source_spec_dir,  # For syncing progress back to main project
-                streaming_session_id=streaming_session_id,
-                # B.6: the two phases this call owns — `planning` and `coding` —
-                # stop being an opaque internal sequence. The profile decides
-                # whether planning is bought at this effort and whether coding
-                # may dispatch to subagents.
-                profile=_profile,
-                jev_run=jev_run,
-            )
+        _pre_run = _run_workflow_phases(
+            _profile, _pre_ctx, after=None, before="planning"
         )
-        debug_success("run.py", "Agent execution completed")
+
+        # A workflow that declares neither `planning` nor `coding` — an
+        # investigation, a RUN — asks for no code: the coder loop is not
+        # started, and the skill phases above *are* the build. Everything
+        # below still runs on what they wrote (gates, hard gates, observe),
+        # and the card is moved on by `_conclude_without_coder`.
+        if _workflow_writes_code(_profile):
+            asyncio.run(
+                run_autonomous_agent(
+                    project_dir=working_dir,  # Use worktree if isolated
+                    spec_dir=spec_dir,
+                    model=model,
+                    max_iterations=max_iterations,
+                    verbose=verbose,
+                    source_spec_dir=source_spec_dir,  # For syncing progress back to main project
+                    streaming_session_id=streaming_session_id,
+                    # B.6: the two phases this call owns — `planning` and `coding` —
+                    # stop being an opaque internal sequence. The profile decides
+                    # whether planning is bought at this effort and whether coding
+                    # may dispatch to subagents.
+                    profile=_profile,
+                    jev_run=jev_run,
+                )
+            )
+            debug_success("run.py", "Agent execution completed")
+        else:
+            _conclude_without_coder(_profile, _pre_run, spec_dir, source_spec_dir)
 
         # Encoding-safety pass: editing UTF-8 files (notably .resx with a BOM)
         # can mangle accented characters into the Unicode replacement char "�".
@@ -1011,7 +1109,15 @@ def handle_build_command(
             # human_review instead of leaving the kanban card stuck.
             from core.progress import is_build_complete
 
-            if is_build_complete(spec_dir) and is_qa_approved(spec_dir):
+            # A workflow that declares no `qa` (docs, spike) ends the build
+            # here; the card would otherwise wait in qa_review for a verdict
+            # nothing will give. Human review is the next step either way.
+            _no_qa_declared = _profile is not None and "qa" not in (
+                getattr(_profile, "declared", ()) or ()
+            )
+            if is_build_complete(spec_dir) and (
+                is_qa_approved(spec_dir) or _no_qa_declared
+            ):
                 try:
                     from core.task_event import TaskEventEmitter
 
@@ -1042,7 +1148,7 @@ def handle_build_command(
         # with a red suite. Evaluated here, from the same test evidence the
         # observe phase records, so the two cannot disagree.
         _tests_green = _tests_went_green(spec_dir)
-        _report_hard_gates(_post_profile or _profile, spec_dir, _tests_green)
+        _report_hard_gates(_post_profile or _profile, spec_dir, _tests_green, _changed)
 
         # The `observe` phase. Marked `always: true` in the workflow, so it
         # runs at every effort level — it costs no API call, it only reads what

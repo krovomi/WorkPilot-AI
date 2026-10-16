@@ -1,0 +1,70 @@
+name: hotfix
+description: >-
+  The minimal, verified fix, ready to merge; everything else afterwards. The
+  bug-fix pipeline with the library preflight dropped and the independent
+  review kept at every effort level — the urgency is a reason to read the
+  diff twice, not to skip it. Chosen by `workflows/registry.py` for cards of
+  kind `hotfix`. What this lot cannot yet do and says so: a QA loop capped to
+  a single pass, and a human gate placed before the merge rather than after
+  the plan — both are the coder loop's and the Kanban's to add.
+
+phases:
+  - id: reproduce
+    impl: tooling/reproduce
+    agent: coder
+    roster: verify
+    dispatch: fresh-context
+    always: true
+    description: >-
+      The failing test or the command that shows the incident, the probable
+      cause, the perimeter. Under pressure this is the phase most tempting
+      to skip and the one that most often saves a second hotfix.
+
+  - id: planning
+    impl: workpilot/planner
+    description: >-
+      The planner, fed the reproduction report; the plan is one or two
+      subtasks. No human gate here: the review that matters on a hotfix is
+      of the diff, and it is the independent `review` phase below plus the
+      person who merges.
+
+  - id: coding
+    impl: tooling/tdd-cycle
+    dispatch: subagent-per-task
+    description: >-
+      Green and refactor on the test `reproduce` wrote. Nothing beyond the
+      perimeter the reproduction report drew.
+
+  - id: review
+    impl: tooling/review-lenses
+    always: true
+    dispatch: fresh-context
+    roster: solo
+    description: >-
+      Never pruned on a hotfix. At low effort the engine's lens table gives
+      correctness and security and nothing else — the reduced review the
+      kind asks for; conformance and the adversarial reading come with the
+      higher levels, as on every build.
+
+  - id: verify
+    impl: tooling/verify
+    agent: verifier
+    roster: verify
+    dispatch: fresh-context
+    hard_gate: tests-pass,app-verified
+    description: >-
+      The application launched with the fix, the incident gone. The gates
+      are the proof the merge is made on.
+
+  - id: qa
+    impl: workpilot/qa-loop
+    always: true
+    description: >-
+      The QA loop. A one-pass cap is not expressible here yet; until it is,
+      the loop runs as on every build.
+
+  - id: observe
+    impl: workpilot/observe
+    always: true
+    description: >-
+      What the incident taught, filed for the next one.

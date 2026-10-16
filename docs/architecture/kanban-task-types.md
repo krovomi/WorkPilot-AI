@@ -92,80 +92,48 @@ imposé : le modal le montre, le build attend la confirmation si `gate: human` e
 
 Coût : 0 token.
 
-## Lot 1 — un workflow par type, choisi par le moteur
+## Lot 1 — un workflow par type, choisi par le moteur — **livré**
 
-- `workflows/<kind>/workflow.yaml` pour `bug-fix`, `hotfix`, `investigation`, `run`,
-  `refactoring`, `test`, `docs`, `spike`. `feature-build` ne change pas.
-- `workflows/registry.py` (nouveau) : `workflow_for(kind) -> Path`, défaut `feature-build`.
-  `cli/build_commands.py:162` et `workflows/api.py` l'appellent au lieu du chemin en dur.
-- `workflows/spec.py` : deux champs. `fallback: <impl>` (l'implémentation jouée quand
-  `impl` ne résout pas — c'est ce qui rend BMAD optionnel sans trou dans le profil) et
-  `irreversible: true` sur une phase (lot 3).
-- `tests/test_workflow_engine.py::TestImplementations` étendu à **chaque** workflow : chaque
-  `impl` et chaque `fallback` résout sur un clone frais, à tout effort, pour chaque provider
-  de `providers.yaml` (le profil est honnête partout).
+- `workflows/<nom>/workflow.yaml` pour `bug-fix`, `hotfix`, `investigation`, `run`,
+  `refactoring`, `test`, `docs`, `spike` ; `feature-build` ne change pas. Chaque `impl` résout
+  sur un clone frais (`tests/test_workflows_by_kind.py` le vérifie à tout effort, pour chaque
+  provider de `providers.yaml`) ; cinq procédures nouvelles dans `skills/tooling/` :
+  `reproduce`, `investigate`, `runbook`, `proofread`, `spike-verdict`, émises par
+  `skills:build` et lues par tout provider.
+- `apps/backend/workflows/registry.py` : `WORKFLOW_BY_KIND` (table fermée : un dossier
+  `workflows/` que nul type ne nomme est un fichier que personne ne joue), `workflow_for(kind)`,
+  `workflow_for_spec(spec_dir)` (lit `kind` dans `task_metadata.json`), défaut `feature-build`.
+  `cli/build_commands._resolve_workflow_profile` et `workflows/api.py` l'appellent ; la carte
+  et le build choisissent donc le même pipeline. Un YAML spécialisé illisible retombe sur le
+  défaut, en le disant.
+- `workflows/spec.py` : `fallback: <pack>/<skill>` et `irreversible: true` (données ; le
+  runner les lira au lot 3). `engine.resolve_profile(..., inventory=)` **substitue** le
+  `fallback` quand l'`impl` n'est pas installée et l'écrit sur `ResolvedPhase.substituted_from`
+  — le profil imprimé et l'API (`substitutedFrom`, `substitutionReason`) le montrent ;
+  `validate_impls` ne signale une phase que si ni l'une ni l'autre ne résout. Le runner refait
+  la même décision à l'exécution contre le **projet cible** (`_locate_procedure` : skill absent
+  ou `requires` non satisfait → fallback), et la sortie de phase nomme ce qui a réellement tourné.
+- Un workflow sans `planning` ni `coding` (investigation, run) **ne lance pas la boucle du
+  coder** (`_workflow_writes_code`) : les phases de skill sont le build, la carte passe en
+  revue humaine avec le rapport (`_conclude_without_coder`), ou en erreur avec la raison si une
+  phase n'a pas pu tourner. Un workflow sans `qa` (docs, spike) clôt le build après ses phases.
+  Les fenêtres (`phases_between`) savent fermer sur une borne que le workflow ne déclare pas :
+  `before: qa` sans QA va jusqu'au bout, `after: coding` sans coder est vide.
+- Hard gate nouveau, déterministe : `tests-unchanged` (`workflows/hard_gates.py`, lu sur le diff
+  réel : aucun fichier de test touché), sur `refactoring`. `repro-green` reste à faire : le
+  test écrit par `reproduce` fait partie de la suite, donc `tests-pass` le lit déjà.
+- Ce que ce lot dit ne pas faire encore : `run` **écrit** la procédure (`procedure`, `gate:
+  human`, agent `analyzer` en lecture seule) et s'arrête — l'exécuteur déterministe, l'agent
+  `operator` et la pause avant l'irréversible sont le lot 3 ; `hotfix` garde la QA en boucle
+  (la passe unique n'est pas exprimable) ; les workflows qui écrivent du code gardent
+  `planning`, parce que la boucle du coder planifie à son premier tour quoi qu'en dise le
+  profil ; la classification `low` en cas de doute n'est pas branchée.
+- Preuve : `tests/test_workflows_by_kind.py` (registre, résolution sur clone frais × effort ×
+  provider, substitution dans le moteur et dans le runner, fenêtres sans bornes, gate
+  `tests-unchanged`, API par type), les suites `test_workflow_*` inchangées.
 
-Squelettes (les `impl` existent déjà, sauf mention) :
-
-```yaml
-# workflows/bug-fix/workflow.yaml
-phases:
-  - id: reproduce          # nouveau skill tooling/reproduce : écrire le test qui échoue,
-    impl: tooling/reproduce   # ou la commande qui montre le bug ; rapport = preuve
-    agent: coder
-    roster: verify          # test-runner seulement
-    dispatch: fresh-context
-  - id: planning           # le planner, mais nourri du rapport `reproduce` (handoff)
-    impl: workpilot/planner
-    gate: human
-    min_effort: medium      # à low/none : le coder part du rapport, sans plan
-  - id: coding
-    impl: tooling/tdd-cycle
-    dispatch: subagent-per-task
-  - id: review
-    impl: tooling/review-lenses
-    roster: solo
-    lenses: [correctness, regression]   # `regression` : nouvelle lentille — le test de reproduce passe, aucun autre ne change de verdict
-  - id: verify
-    impl: tooling/verify
-    hard_gate: tests-pass,repro-green   # nouveau hard gate : le test écrit en `reproduce` est vert
-  - id: qa
-    impl: workpilot/qa-loop
-    min_effort: medium
-  - id: observe
-    impl: workpilot/observe
-```
-
-```yaml
-# workflows/run/workflow.yaml  — RUN : exécuter, pas construire
-phases:
-  - id: procedure          # nouveau skill tooling/runbook : lire le runbook du projet
-    impl: tooling/runbook     # (.workpilot/runbooks/*.md) ou le dériver de la demande ;
-    agent: operator           # sortie = liste d'étapes, chacune : commande, effet attendu,
-    roster: solo              # réversible oui/non
-    dispatch: fresh-context
-    gate: human              # l'utilisateur relit la procédure avant toute exécution
-  - id: execute
-    impl: tooling/execute-runbook   # déterministe : Python joue les étapes une à une,
-    irreversible: true              # journalise chaque sortie, s'arrête avant une étape
-                                    # marquée irréversible et redemande (pause coopérative)
-  - id: confirm
-    impl: tooling/verify     # l'état attendu est atteint (verify existe déjà)
-    hard_gate: app-verified
-  - id: record               # déterministe : la procédure jouée + sorties → .workpilot/runbooks/
-    impl: workpilot/observe     # et la mémoire des builds (brain)
-```
-
-L'agent `operator` est une entrée `AGENT_CONFIGS` nouvelle : `Read`, `Grep`, `Glob`, `Bash`
-sous allowlist, **pas** `Write`/`Edit` — on n'écrit pas de code en RUN. Les commandes
-dangereuses passent par les validateurs de `project/command_registry/` ; une commande hors
-allowlist est **refusée**, pas confirmée (règle S3).
-
-`hotfix` = `bug-fix` sans `planning`, `qa` à une passe, `gate: human` sur une phase finale
-`merge-ready` ; `investigation` = `brainstorm`-like en `research` + `report`, rien d'autre ;
-`refactoring` = `feature-build` moins brainstorm/PRD, `hard_gate: tests-unchanged` (nouveau,
-déterministe : le diff ne touche aucun fichier de test, la liste des tests collectés est la
-même avant/après) ; `test`, `docs`, `spike` : deux ou trois phases chacun.
+Coût : aucun token nouveau sur `feature` ; un `bug_fix` paie `reproduce` (une session) et ne paie
+plus brainstorm, design system, carte d'architecture ; `investigation` et `run` paient une session.
 
 ## Lot 2 — BMAD à la demande, par `impl` + `fallback`
 
@@ -261,7 +229,7 @@ lot 6 (mesure) après n'importe lequel
 
 Chaque lot est une PR vers `develop`, verte sur `validate_impls`, `test_docs_context`,
 `test_agent_tool_declarations` et `test_workflow_engine`, sur les trois OS de la CI.
-État : lot 0 livré ; lots 1 à 6 à faire.
+État : lots 0 et 1 livrés ; lots 2 à 6 à faire.
 
 ## Ce que le plan refuse
 

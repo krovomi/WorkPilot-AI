@@ -46,6 +46,31 @@ a `gate` command is implemented by that gate (`pack_inventory`).
 | `qa` | `qa_loop`, which the profile can switch off |
 | `observe` | the engine (`learning_loop/observe.py`) |
 | `docs` | the preflight (`libdocs.run_preflight`), before planning — no API call, never pruned |
+| `reproduce`, `investigate`, `procedure`, `proofread`, `verdict` | the engine, as one-shot skill sessions of the per-kind workflows (`skills/tooling/`) |
+| the `tests-unchanged` hard gate | the engine (`workflows/hard_gates.py`), from the task's real diff |
+
+**One workflow per task kind.** The workflow a build loads is the card's kind's
+(`tasks/classify.py` → `task_metadata.json` → `workflows/registry.py`):
+`bug-fix`, `hotfix`, `investigation`, `run`, `refactoring`, `test`, `docs`,
+`spike`, and `feature-build` for a feature or a card with no recorded kind.
+The registry is a closed table, read by `cli/build_commands.py` and by the
+profile API, so the card and the build show the same pipeline. A workflow that
+declares neither `planning` nor `coding` does not start the coder loop: its
+skill phases are the build, and the card goes to human review with their
+reports. The windows below close on a boundary the workflow does not declare
+(`before: qa` with no QA pass runs to the end; `after: coding` with no coder is
+empty). Why each kind runs what it runs: [kanban-task-types.md](kanban-task-types.md).
+
+**`fallback:`.** A phase may name a second implementation, played when the
+first is not installed — the pack is not vendored, the skill is not on disk,
+or its `requires` is not met in the target project. The engine substitutes it
+when it is given the pack inventory and records the substitution on the
+resolved phase, which the printed profile and the API show (`substitutedFrom`);
+the runner makes the same decision again at run time against the target
+project (`_locate_procedure`), and the phase's outcome names what actually ran.
+`validate_impls` reports a phase only when neither resolves. This is what makes
+an optional methodology (BMAD, lot 2) declarable without a hole in the profile.
+`irreversible: true` is parsed and shown; the runner acts on it in lot 3.
 
 A skill phase runs where the workflow file declares it. The window is looked up
 by phase id in the **declared** order, so inserting a phase into
