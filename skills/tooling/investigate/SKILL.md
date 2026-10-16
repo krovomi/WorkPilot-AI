@@ -1,0 +1,94 @@
+---
+name: investigate
+description: Comprendre un comportement sans le modifier — pourquoi un test est intermittent, d'où vient une lenteur, ce qui se passe réellement dans un chemin de code — et rendre un rapport avec la cause probable, ses preuves `fichier:ligne`, les pistes écartées et les options pour la suite. En lecture seule ; aucun code n'est écrit. Le rapport est la livraison.
+metadata:
+  workpilot:
+    phase: investigate
+---
+
+# investigate — comprendre, ne rien changer
+
+Une investigation livre une explication, pas un correctif. Le lecteur en fera
+une carte de correction, une décision d'architecture, ou rien : c'est à lui de
+choisir, avec des preuves en main. Un rapport qui conclut « j'ai corrigé au
+passage » a répondu à une autre question, sans en avoir reçu le mandat.
+
+Personne ne répond aux questions pendant cette phase. Ce qui ne se tranche pas
+avec le code et les traces disponibles devient une hypothèse écrite.
+
+## Entrées
+
+| Fichier | Ce qu'on y cherche |
+|---|---|
+| `<spec_dir>/spec.md` | la question posée, le comportement observé, ce qui a déjà été tenté |
+| `<spec_dir>/requirements.json` | la demande telle qu'elle a été tapée |
+| `<spec_dir>/context.json` | les fichiers que le pipeline de spec a jugés pertinents |
+| le code et son historique (`git log`, `git blame`) | depuis quand, par quel changement |
+| les logs, traces, captures joints (sous `docintel`, plus haut dans ce prompt) | les faits |
+| les tests existants | ce qui est couvert, ce qui ne l'est pas |
+
+## Méthode
+
+1. **Pose la question** en une phrase, et dis ce qui compterait comme réponse :
+   une ligne de code, une condition de course, une donnée, une configuration.
+2. **Rassemble les faits** avant les théories : ce que les traces montrent,
+   ce que le code fait réellement sur le chemin concerné (lis-le, ne le
+   déduis pas du nom des fonctions), depuis quand (`git log -S`, `git blame`
+   sur les lignes suspectes).
+3. **Formule deux ou trois hypothèses** et, pour chacune, ce qui la confirmerait
+   ou l'infirmerait. Vérifie ce qui peut l'être en lecture seule : une
+   commande d'observation, un test existant lancé, un `grep` sur les appels.
+4. **Écarte** ce que les faits contredisent, et garde la trace de pourquoi :
+   une piste écartée avec sa raison vaut autant qu'une piste retenue, elle
+   évite au suivant de la rouvrir.
+5. **Conclus** sur la cause probable, avec son degré de certitude et ce qui
+   manque pour la confirmer. Puis les options : corriger, contourner, mesurer
+   davantage, ne rien faire — avec le coût et le risque de chacune.
+
+À effort `low`, deux hypothèses et la plus probable ; à `high` et au-delà,
+cherche activement l'hypothèse qui contredit la description de la tâche.
+
+## Rapport
+
+Termine par ceci, et rien d'autre :
+
+```markdown
+## Question
+
+…
+
+## Faits
+
+- `fichier:ligne` — …
+- trace / log : …
+- depuis : <commit court> (<date>) — …
+
+## Hypothèses
+
+### H1 — <nom court>
+Prédit : … Vérifié par : … Verdict : confirmée | infirmée | ouverte
+
+### H2 — …
+
+## Cause probable
+
+<H?> — certitude : haute | moyenne | basse. Manque pour confirmer : …
+
+## Options
+
+1. … — coût : … risque : …
+2. …
+
+## Hypothèses non tranchées
+
+- [NEEDS CLARIFICATION: …]
+```
+
+## Ce que cette phase ne fait pas
+
+- **Elle n'écrit rien** dans le dépôt : ni correctif, ni test, ni
+  instrumentation laissée en place.
+- **Elle ne recommande pas sans preuve** : une option proposée s'appuie sur un
+  fait cité plus haut, pas sur une habitude.
+- **Elle n'étend pas la question** : un second problème aperçu en chemin est
+  noté en une ligne dans les faits, pas investigué.

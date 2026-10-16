@@ -42,7 +42,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/workflow-profile", tags=["workflow-profile"])
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
-_DEFAULT_WORKFLOW = "feature-build"
 
 
 # What a caller is told when their request is rejected.
@@ -95,11 +94,12 @@ def _phase_payload(phase, *, resolved=None, skip_reason: str | None = None) -> d
     that only lists what survived cannot answer "what would I get for one level
     more", which is the whole reason someone opens it.
     """
+    played = resolved.phase if resolved is not None else phase
     return {
         "id": phase.id,
-        "impl": phase.impl,
-        "pack": phase.pack,
-        "skill": phase.skill,
+        "impl": played.impl,
+        "pack": played.pack,
+        "skill": played.skill,
         "description": phase.description.strip(),
         "minEffort": phase.min_effort,
         "hardGate": phase.hard_gate,
@@ -112,6 +112,12 @@ def _phase_payload(phase, *, resolved=None, skip_reason: str | None = None) -> d
         "degradedFrom": resolved.degraded_from if resolved else None,
         "degradedReason": resolved.reason if resolved else "",
         "skipReason": skip_reason,
+        "fallback": phase.fallback,
+        "irreversible": phase.irreversible,
+        # When the declared impl is not installed and the fallback is, `impl`
+        # above is the fallback — what runs — and this names what was declared.
+        "substitutedFrom": resolved.substituted_from if resolved else None,
+        "substitutionReason": resolved.substitution_reason if resolved else "",
     }
 
 
@@ -172,14 +178,28 @@ def _levels(workflow, provider: str | None) -> list[dict]:
     return out
 
 
-def _missing_impls(workflow, profile) -> list:
-    """Phases whose pack is not installed. Advisory, never fatal."""
+def _inventory():
+    """What is installed, for fallback substitution. None when unreadable."""
     try:
         from skills_registry.packs import load_packs
 
-        from .engine import pack_inventory, validate_impls
+        from .engine import pack_inventory
 
-        available, gated = pack_inventory(load_packs(_REPO_ROOT / "skills"))
+        return pack_inventory(load_packs(_REPO_ROOT / "skills"))
+    except Exception as exc:  # noqa: BLE001 - advisory only
+        logger.debug("could not read the installed packs: %s", exc)
+        return None
+
+
+def _missing_impls(workflow, profile) -> list:
+    """Phases whose pack is not installed. Advisory, never fatal."""
+    try:
+        from .engine import validate_impls
+
+        inventory = _inventory()
+        if inventory is None:
+            return []
+        available, gated = inventory
         return [
             m
             for m in validate_impls(workflow, available, gated=gated)
@@ -197,13 +217,24 @@ def workflow_profile(
     spec_id: str | None = Query(None),
     effort: str | None = Query(None, description="Override the task's effort level"),
     provider: str | None = Query(None, description="Override the resolved provider"),
-    workflow: str = Query(_DEFAULT_WORKFLOW),
+    workflow: str | None = Query(
+        None,
+        description=(
+            "Override the workflow. Without it, the one the task's kind maps "
+            "to (`workflows/registry.py`), which is what the build runs."
+        ),
+    ),
     include_levels: bool = Query(True, alias="includeLevels"),
 ):
     """The resolved execution profile for a spec."""
     try:
         sd = resolve_spec_dir(spec_dir, project_dir, spec_id)
-        path = _workflow_path(workflow)
+        if workflow:
+            path = _workflow_path(workflow)
+        else:
+            from .registry import workflow_for_spec
+
+            path = workflow_for_spec(sd, _REPO_ROOT)
     except SpecAddressError as exc:
         # The detail goes to the log; the caller gets the literal reason. An
         # exception message here would carry a resolved filesystem path.
@@ -225,7 +256,9 @@ def workflow_profile(
         # Side-effect-free provider resolution. See the module docstring.
         resolved_provider = provider or get_phase_provider(sd, phase="coding")
 
-        profile = resolve_profile(loaded, level, provider=resolved_provider)
+        profile = resolve_profile(
+            loaded, level, provider=resolved_provider, inventory=_inventory()
+        )
         payload = _serialise(loaded, profile, missing=_missing_impls(loaded, profile))
         from core.offline_policy import airgap_status
         from integrations.jev.observations import read_observations

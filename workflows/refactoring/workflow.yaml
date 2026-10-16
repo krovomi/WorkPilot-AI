@@ -1,0 +1,93 @@
+name: refactoring
+description: >-
+  Behaviour unchanged, and proved: the same tests before and after, none of
+  them modified. The feature pipeline without what a new capability needs
+  (brainstorm, design system, mobile review), and with one more
+  non-negotiable gate — `tests-unchanged`, deterministic: the diff touches
+  no test file. Chosen by `workflows/registry.py` for cards of kind
+  `refactoring`.
+
+phases:
+  - id: docs
+    impl: workpilot/libdocs
+    always: true
+    description: >-
+      Library documentation for what the refactoring touches, decided
+      without a model.
+
+  - id: planning
+    impl: workpilot/planner
+    gate: human
+    description: >-
+      The existing planner. A refactoring plan names what moves, what it is
+      replaced by, and the tests that pin the behaviour — which it must not
+      touch.
+
+  - id: analyze
+    impl: tooling/spec-analyze
+    min_effort: medium
+    dispatch: fresh-context
+    roster: planner
+    description: >-
+      The plan against the project's own conventions, before any code is
+      written: a refactoring that violates an ADR to look tidier is the
+      regression this phase exists to catch.
+
+  - id: coding
+    impl: tooling/tdd-cycle
+    dispatch: subagent-per-task
+    description: >-
+      Red is the existing suite; it stays green at every step. No new test
+      is written and none is changed — `tests-unchanged` below reads the
+      diff.
+
+  - id: design-check
+    impl: impeccable/impeccable
+    when: touches("**/*.tsx,**/*.jsx,**/*.css,**/*.scss,**/*.vue,**/*.svelte,**/*.astro,**/*.html,**/*.less,**/*.sass,**/*.razor,**/*.cshtml")
+    description: >-
+      Frontend only, no API call: impeccable's detectors on the files the
+      refactoring moved.
+
+  - id: review
+    impl: tooling/review-lenses
+    min_effort: medium
+    dispatch: fresh-context
+    roster: solo
+    description: >-
+      A reader that did not move the code: correctness and security at
+      medium, conformance from high. Handed to the QA reviewer.
+
+  - id: verify
+    impl: tooling/verify
+    agent: verifier
+    roster: verify
+    dispatch: fresh-context
+    hard_gate: tests-pass,app-verified,tests-unchanged
+    description: >-
+      The application launched after the refactoring, the same state
+      reached. Three gates: the suite is green, the app verified, and the
+      diff touched no test file — the last one evaluated from the real diff
+      by `workflows.hard_gates`, on every provider.
+
+  - id: qa
+    impl: workpilot/qa-loop
+    always: true
+    description: >-
+      The QA loop, on the acceptance criterion a refactoring has: nothing
+      observable changed.
+
+  - id: architecture-map
+    impl: tooling/architecture-map
+    min_effort: medium
+    when: touches("**/*.py,**/*.ts,**/*.tsx,**/*.js,**/*.jsx,**/*.mjs,**/*.go,**/*.rs,**/*.java,**/*.cs,**/*.kt,**/*.rb,**/*.php,**/*.swift,**/Dockerfile,**/docker-compose*.yml,**/docker-compose*.yaml,**/*.tf,**/*.csproj,**/pyproject.toml,**/package.json,**/go.mod,**/pom.xml")
+    dispatch: fresh-context
+    description: >-
+      What the refactoring changed in the system's topology — a refactoring
+      is the kind of task that moves a boundary without changing a feature,
+      which is exactly what a diff does not show.
+
+  - id: observe
+    impl: workpilot/observe
+    always: true
+    description: >-
+      What the refactoring taught, filed for the next one.

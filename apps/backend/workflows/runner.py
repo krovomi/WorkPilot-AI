@@ -49,7 +49,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -92,6 +92,9 @@ __all__ = [
 # by `libdocs.run_preflight` — whatever methodology they name, and the
 # methodology they name is handed to that executor rather than replacing it.
 BUILTIN_EXECUTORS = frozenset({"docs", "planning", "coding", "qa"})
+# The same four in the order the build runs them. `phases_between` reads it to
+# close a window whose named boundary a workflow does not declare.
+_BUILTIN_ORDER = ("docs", "planning", "coding", "qa")
 
 # Phases executed by another part of the engine: `design-check` by
 # `gates.run_deterministic_gates`, `observe` by `learning_loop.observe`.
@@ -134,6 +137,14 @@ CONFIG_PHASE = {
     "verify-replay": "qa",
     # Architecture mapping runs after QA and describes the system topology changes.
     "architecture-map": "qa",
+    # Phases of the per-kind workflows (`workflows/registry.py`). Before the
+    # code is written, they are planning costs; what reads the finished work
+    # is a QA cost.
+    "reproduce": "planning",
+    "investigate": "planning",
+    "procedure": "planning",
+    "verdict": "qa",
+    "proofread": "qa",
 }
 _DEFAULT_CONFIG_PHASE = "coding"
 
@@ -203,6 +214,16 @@ SKILL_PHASE_AGENTS = {
     # path, it would run under the agent allowed to write the model rather
     # than the read-only default.
     "architecture-map": "architecture_visualizer",
+    # `reproduce` writes the failing test that proves the bug, so it runs
+    # under the coder; its roster is `verify` (a test runner, nothing else).
+    "reproduce": "coder",
+    # Read-only by construction: an investigation that edits code is a fix
+    # nobody asked for, and a runbook is reviewed by a human before anything
+    # executes it (lot 3 adds the `operator` agent that plays it).
+    "investigate": "analyzer",
+    "procedure": "analyzer",
+    "verdict": "pr_reviewer",
+    "proofread": "pr_reviewer",
 }
 _DEFAULT_AGENT = "analyzer"
 
@@ -227,9 +248,13 @@ REVIEW_LENSES: dict[int, str] = {
 CONDITIONAL_LENSES: dict[str, tuple[int, str, str]] = {
     "store-readiness": (5, "Publication mobile", "mobile/mobile-store-readiness"),
 }
+# `none` and `low` name the smallest review there is, not an empty one: the
+# feature pipeline never opens `review` below medium (`min_effort`), but the
+# hotfix pipeline keeps it at every level, and a reviewer told to apply no
+# lens "and no other" would have nothing to do.
 REVIEW_LENSES_BY_EFFORT: dict[str, tuple[int, ...]] = {
-    "none": (),
-    "low": (),
+    "none": (1, 2),
+    "low": (1, 2),
     "medium": (1, 2),
     "high": (1, 2, 3),
     "ultrathink": (1, 2, 3, 4),
@@ -384,23 +409,46 @@ def phases_between(profile, *, after: str | None, before: str | None) -> list:
     """
     declared = getattr(profile, "declared", ()) or tuple(r.id for r in profile.run)
 
-    def _at(phase_id: str | None, fallback: int) -> int:
-        if phase_id is None:
-            return fallback
+    def _index(phase_id: str) -> int | None:
         try:
             return declared.index(phase_id)
         except ValueError:
-            return fallback
+            return None
 
-    start = _at(after, -1)
-    stop = _at(before, len(declared))
+    def _start(phase_id: str | None) -> int | None:
+        if phase_id is None:
+            return -1
+        return _index(phase_id)
+
+    def _stop(phase_id: str | None) -> int:
+        if phase_id is None:
+            return len(declared)
+        # A boundary this workflow does not declare: the window runs up to the
+        # next built-in phase it does declare, or to the end. `before="qa"` on
+        # a workflow with no QA pass runs the phases that follow coding; it
+        # does not drop them.
+        order = _BUILTIN_ORDER
+        following = order[order.index(phase_id) :] if phase_id in order else ()
+        for candidate in (phase_id, *following):
+            position = _index(candidate)
+            if position is not None:
+                return position
+        return len(declared)
+
+    start = _start(after)
+    if start is None:
+        # The window opens after a phase this workflow never runs, so it
+        # never opens: whatever sits past the (absent) boundary was already
+        # the previous window's, which ran to the next declared boundary.
+        return []
+    stop = _stop(before)
     if start >= stop:
         return []
 
     out = []
     for resolved in profile.run:
-        position = _at(resolved.id, -1)
-        if not (start < position < stop):
+        position = _index(resolved.id)
+        if position is None or not (start < position < stop):
             continue
         if resolved.id in BUILTIN_EXECUTORS:
             continue
@@ -786,38 +834,21 @@ async def run_skill_phase(resolved, ctx: PhaseContext) -> PhaseOutcome:
     config_phase = CONFIG_PHASE.get(phase.id, _DEFAULT_CONFIG_PHASE)
     explicit_provider, provider = phase_provider(ctx.spec_dir, config_phase)
 
-    found = find_skill_body(ctx.repo_root, phase.pack, phase.skill, provider)
-    if found is None:
-        return PhaseOutcome(
-            phase.id,
-            impl,
-            resolved.dispatch,
-            None,
-            detail=(
-                f"no SKILL.md for {impl} — run "
-                f"`pnpm run skills:bootstrap --pack {phase.pack}`"
-            ),
-        )
-    body, source, requires = found
+    procedure, why = _locate_procedure(phase, ctx, provider)
+    if procedure is None:
+        return PhaseOutcome(phase.id, impl, resolved.dispatch, None, detail=why)
+    body, source, played = procedure
+    if played != impl:
+        # The declared implementation cannot start here; the fallback can.
+        # Said once, in the outcome the user reads, and the phase goes on
+        # under the implementation that runs — `impl` from here on is the
+        # fallback, so the output and the handoff name what was played.
+        logger.info("phase %s: %s", phase.id, why)
+        print(f"  ↳ {phase.id}: {why}")
+        impl = played
+        phase = phase.with_impl(played)
+        resolved = replace(resolved, phase=phase)
     logger.debug("phase %s: procedure from %s", phase.id, source)
-
-    # The procedure exists; can it run *here*? A skill whose runtime is absent
-    # is not a skill that fails, it is a skill that cannot start — and saying
-    # so costs nothing, where starting it costs a full session that ends with
-    # the model reporting it could not find the files it was told to read.
-    satisfied, why = skill_requires(requires, ctx.project_dir)
-    if not satisfied:
-        return PhaseOutcome(
-            phase.id,
-            impl,
-            resolved.dispatch,
-            None,
-            detail=(
-                f"{why} — {impl} needs it in {ctx.project_dir}; "
-                f"install it there (`skills:bootstrap --pack {phase.pack}`) "
-                f"or point this phase at another implementation"
-            ),
-        )
 
     try:
         from agents.session import run_agent_session
@@ -900,6 +931,49 @@ async def run_skill_phase(resolved, ctx: PhaseContext) -> PhaseOutcome:
         detail=(f"→ {output_path.name}" if output_path else ""),
         output_path=output_path,
     )
+
+
+def _locate_procedure(
+    phase, ctx: PhaseContext, provider: str | None
+) -> tuple[tuple[str, Path, str] | None, str]:
+    """The procedure a phase runs here: its body, where it came from, and the
+    implementation it belongs to — the declared one, or the fallback when the
+    declared one cannot start.
+
+    "Cannot start" is two things, checked in this order for each candidate:
+    the skill is not on disk, or it is and its ``requires`` is not met in the
+    target project. A skill whose runtime is absent is not a skill that fails,
+    it is a skill that cannot start — and saying so costs nothing, where
+    starting it costs a full session that ends with the model reporting it
+    could not find the files it was told to read.
+
+    Returns ``(None, reason)`` when no candidate can start; the reason names
+    every one that was tried.
+    """
+    reasons: list[str] = []
+    candidates = [phase.impl] + ([phase.fallback] if phase.fallback else [])
+    for candidate in candidates:
+        pack, _, skill = candidate.partition("/")
+        found = find_skill_body(ctx.repo_root, pack, skill, provider)
+        if found is None:
+            reasons.append(
+                f"no SKILL.md for {candidate} — run "
+                f"`pnpm run skills:bootstrap --pack {pack}`"
+            )
+            continue
+        body, source, requires = found
+        satisfied, why = skill_requires(requires, ctx.project_dir)
+        if not satisfied:
+            reasons.append(
+                f"{why} — {candidate} needs it in {ctx.project_dir}; "
+                f"install it there (`skills:bootstrap --pack {pack}`) "
+                f"or point this phase at another implementation"
+            )
+            continue
+        if candidate != phase.impl:
+            return (body, source, candidate), (f"played by {candidate} — {reasons[0]}")
+        return (body, source, candidate), ""
+    return None, "; ".join(reasons)
 
 
 async def _run_verify_loop(resolved, ctx: PhaseContext) -> PhaseOutcome:
