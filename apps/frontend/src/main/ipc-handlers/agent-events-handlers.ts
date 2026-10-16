@@ -113,6 +113,26 @@ function isCooperativelyPaused(
 			}
 		}
 	} catch {
+		// fall through to the pause store
+	}
+	try {
+		// The one pause store (`pause_state.json`), read from disk: the backend
+		// itself writes it when a workflow phase declared `irreversible: true`
+		// stops before starting (a RUN task's `execute`), and the scanned
+		// `task.metadata` below may predate that write.
+		if (task && project) {
+			const statePath = path.join(
+				path.dirname(getPlanPath(project, task)),
+				AUTO_BUILD_PATHS.PAUSE_STATE,
+			);
+			if (existsSync(statePath)) {
+				const state = JSON.parse(readFileSync(statePath, "utf-8")) as {
+					enabled?: boolean;
+				};
+				if (state?.enabled) return true;
+			}
+		}
+	} catch {
 		// fall through to metadata
 	}
 	return task?.metadata?.paused?.enabled === true;

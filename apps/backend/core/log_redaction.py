@@ -157,6 +157,20 @@ class RedactingFilter(logging.Filter):
         return out
 
 
+def redact_text(text: str) -> str:
+    """``text`` with the same secrets masked as the log filter masks.
+
+    For text that is written somewhere other than a log — the journal of a
+    RUN task's execution, say — and must carry no key, token or secret-named
+    environment value. Patterns are read once per call so a variable set
+    after import is still masked.
+    """
+    try:
+        return RedactingFilter()._redact(text)
+    except Exception:  # noqa: BLE001 - never lose the text over the mask
+        return text
+
+
 # ---------------------------------------------------------------------------
 # Installer
 

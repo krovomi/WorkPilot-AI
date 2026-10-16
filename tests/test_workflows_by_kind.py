@@ -274,7 +274,7 @@ class TestEveryWorkflow:
         workflow = _load(name)
         ids = [p.id for p in workflow.phases]
         last_consumer = max((ids.index(c) for c in CONSUMERS if c in ids), default=-1)
-        deliverables = {"investigate", "procedure", "verdict", "proofread"}
+        deliverables = {"investigate", "procedure", "execute", "verdict", "proofread"}
         allowed_after = {"architecture-map", "verify-replay", "observe"}
         for i, phase in enumerate(workflow.phases):
             if i > last_consumer and phase.id not in BUILTIN_EXECUTORS:
@@ -319,21 +319,27 @@ class TestEveryWorkflow:
         verify = _load("refactoring").phase("verify")
         assert TESTS_UNCHANGED in (verify.hard_gate or "")
 
-    def test_the_run_workflow_executes_nothing_yet(self):
-        """Lot 3 adds the executor; until then declaring it would describe a
-        phase nobody runs, which is the one thing a workflow must not do."""
-        ids = [p.id for p in _load("run").phases]
-        assert "execute" not in ids
-        assert _load("run").phase("procedure").gate == "human"
+    def test_the_run_workflow_executes_behind_an_irreversible_gate(self):
+        """Lot 3: the executor exists, and the phase that runs it is declared
+        irreversible so the build stops before it until a person resumes."""
+        wf = _load("run")
+        ids = [p.id for p in wf.phases]
+        assert ids == ["procedure", "execute", "observe"]
+        assert wf.phase("procedure").gate == "human"
+        assert wf.phase("execute").irreversible is True
 
-    def test_the_run_and_investigation_phases_are_read_only(self):
+    def test_the_run_and_investigation_phases_write_no_code(self):
+        """An investigation reads only; the operator may run an allowlisted
+        command to check a precondition but never edits a file."""
         from agents.tools_pkg.models import AGENT_CONFIGS
 
-        for name, phase_id in (("run", "procedure"), ("investigation", "investigate")):
-            phase = _load(name).phase(phase_id)
-            agent = phase.agent or SKILL_PHASE_AGENTS.get(phase_id, "analyzer")
-            tools = set(AGENT_CONFIGS[agent]["tools"])
-            assert not tools & {"Write", "Edit", "Bash"}, (name, agent, tools)
+        investigate = _load("investigation").phase("investigate")
+        agent = investigate.agent or SKILL_PHASE_AGENTS.get("investigate", "analyzer")
+        assert not set(AGENT_CONFIGS[agent]["tools"]) & {"Write", "Edit", "Bash"}
+        procedure = _load("run").phase("procedure")
+        agent = procedure.agent or SKILL_PHASE_AGENTS.get("procedure", "analyzer")
+        assert agent == "operator"
+        assert not set(AGENT_CONFIGS[agent]["tools"]) & {"Write", "Edit"}
 
     def test_the_skills_the_workflows_name_are_emitted(self):
         """`.agents/skills/` is what the build reads; `skills:build --check`
@@ -372,10 +378,13 @@ class TestSpecFields:
         assert workflow.phase("execute").fallback is None
         assert workflow.phase("execute").irreversible is True
 
-    def test_they_default_off(self):
+    def test_only_a_run_execution_is_irreversible(self):
+        """`irreversible` is off everywhere but on the one phase that acts on
+        something a discarded branch cannot undo (lot 3)."""
         for name in WORKFLOWS:
             for phase in _load(name).phases:
-                assert phase.irreversible is False, (name, phase.id)
+                expected = name == "run" and phase.id == "execute"
+                assert phase.irreversible is expected, (name, phase.id)
 
     @pytest.mark.parametrize(
         "body,message",
