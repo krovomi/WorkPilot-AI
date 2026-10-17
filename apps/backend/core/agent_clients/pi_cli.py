@@ -525,7 +525,9 @@ class PiCliAgentClient(CliSubprocessAgentClient):
         workpilot temp root — never ``~/.pi``, which belongs to the person."""
         if spec_dir:
             return Path(spec_dir) / "pi-sessions"
-        digest = hashlib.sha1(self._project_dir.encode("utf-8")).hexdigest()[:12]  # noqa: S324 - a name, not a secret
+        digest = hashlib.sha1(
+            self._project_dir.encode("utf-8"), usedforsecurity=False
+        ).hexdigest()[:12]
         return Path(tempfile.gettempdir()) / "workpilot" / "pi-sessions" / digest
 
     def provider_name(self) -> str:
