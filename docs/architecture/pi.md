@@ -1,6 +1,6 @@
 # pi (pi.dev) — plan d'intégration par lots
 
-> **Statut : plan, rien n'est livré.** Un lot = une PR vers `develop`. Les lots sont ordonnés par
+> **Statut : lots 0 et 1 livrés, lot 2 en cours.** Un lot = une PR vers `develop`. Les lots sont ordonnés par
 > dépendance, jamais par durée (règle 11 de `docs/CLAUDE.md`). Ce fichier devient la justification
 > de conception de la feature (`docs/architecture/`, une ligne dans `docs/CLAUDE.md`) ; chaque lot
 > livré remplace sa section « à faire » par ce qui a été fait, comme `context-harness.md`.
@@ -141,9 +141,12 @@ LLM. Ce que ces captures ont appris en plus de la source :
 
 À chaque montée de version de pi : `python tests/fixtures/pi/capture.py`, relire le diff.
 
-## 4. Lot 1 — pi comme harness, et comme agent du cerveau
+## 4. Lot 1 — pi comme harness, et comme agent du cerveau (livré)
 
 Aucun provider encore : ce lot rend pi **connu** du dépôt et du cerveau, à l'identique de hermes.
+Livré tel que décrit ci-dessous ; les sorties de skills n'ont pas bougé (`skills:check` : 485
+fichiers à jour, `agnostic` + `gemini`), `connect(root, "pi")` écrit `mcpServers` dans
+`~/.pi/agent/mcp.json` sur `--apply` seulement, et `$PI_AGENT_DIR/` suit `PI_CODING_AGENT_DIR`.
 
 ### 4.1 `capabilities/harnesses.yaml` — entrée `pi`
 

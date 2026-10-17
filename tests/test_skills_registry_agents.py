@@ -65,6 +65,28 @@ def test_copilot_gets_its_own_vocabulary():
     assert unknown == []
 
 
+def test_pi_speaks_its_own_tool_names():
+    """pi's built-in tools; `Glob` is its `find`, and `Task` has no counterpart.
+
+    This map is also what the pi provider adapter reads to build its `--tools`
+    allowlist, so the six canonical names must all be there.
+    """
+    translated, unknown = MATRIX["pi"].translate_tools(
+        ["Read", "Write", "Edit", "Bash", "Grep", "Glob", "Task"]
+    )
+    assert translated == ["read", "write", "edit", "bash", "grep", "find", "Task"]
+    assert unknown == ["Task"]
+
+
+def test_pi_emits_nothing_by_default():
+    """pi reads `.agents/skills/` and AGENTS.md natively (see harnesses.yaml)."""
+    pi = MATRIX["pi"]
+    assert pi.default is False
+    assert pi.skills_path == ".agents/skills"
+    assert pi.agents_path is None
+    assert pi.subagents == "none"
+
+
 def test_an_unmapped_tool_passes_through_and_is_reported():
     """Dropping it would leave an agent silently unable to do its job."""
     harness = MATRIX["copilot"]
@@ -155,7 +177,7 @@ def test_agents_land_in_each_harness_own_directory():
         assert list(emission.files) == [f"{expected}/code-reviewer.md"], name
 
 
-@pytest.mark.parametrize("name", ["cursor", "gemini", "opencode"])
+@pytest.mark.parametrize("name", ["cursor", "gemini", "opencode", "pi"])
 def test_a_harness_with_no_subagents_gets_no_agent_files(name: str):
     """Writing a persona into its skills directory would present a delegation
     target as instructions the user is meant to follow."""

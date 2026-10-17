@@ -1,7 +1,7 @@
 # AGENTS.md — WorkPilot AI
 
 Point d'entrée de tout agent de code : Claude Code, Codex, Copilot, Cursor, Gemini, OpenCode,
-Amp, hermes… Ce fichier est un **index** : il dit où regarder. Ce qui est permis est écrit dans
+Amp, hermes, pi… Ce fichier est un **index** : il dit où regarder. Ce qui est permis est écrit dans
 [`docs/CLAUDE.md`](docs/CLAUDE.md) et [`docs/rules/`](docs/rules/), qui font foi en cas de désaccord.
 
 ## Le produit

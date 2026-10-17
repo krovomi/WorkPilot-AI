@@ -13,6 +13,18 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### ✨ Nouveautés
 
+- **pi (pi.dev) est connu du dépôt et du cerveau** (lot 1 de
+  [`docs/architecture/pi.md`](docs/architecture/pi.md)). Comme harness, pi lit
+  `AGENTS.md` et `.agents/skills/` nativement, donc `capabilities/harnesses.yaml`
+  le liste avec son vocabulaire d'outils et n'émet rien — aucune sortie de
+  skills ne change. Comme agent du cerveau partagé, `brain/agents.py` sait où
+  pi garde ses instructions (`~/.pi/agent/AGENTS.md`, ou `PI_CODING_AGENT_DIR`)
+  et sa configuration MCP (`~/.pi/agent/mcp.json`) : `brain connect` et
+  `bridge` le branchent comme les autres, sur `--apply`, après sauvegarde.
+  La confiance qu'un projet demande à pi (`/trust`) reste une décision de la
+  personne ; rien ici ne l'accorde. Les fixtures `tests/fixtures/pi/` sont six
+  flux réels de pi 1.3.0 capturés sans secret (`capture.py`).
+
 - **Les fichiers générés sortent propres.** Espaces de largeur nulle, espaces
   exotiques, contrôles bidirectionnels, caractères de balise : c'est ainsi qu'une
   marque de provenance voyage dans la sortie d'un modèle, et elle survit à chaque
