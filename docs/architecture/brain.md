@@ -30,7 +30,7 @@ the vault's. They are notes of the vault now — see
 ## Le cerveau partagé (Obsidian + Graphify + MCP)
 
 Chaque agent a sa mémoire — `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, le
-`MEMORY.md` de hermes, le workspace d'OpenClaw — et aucun ne lit celle des
+`MEMORY.md` de hermes, l'`AGENTS.md` de `~/.pi/agent` pour pi, le workspace d'OpenClaw — et aucun ne lit celle des
 autres. Une préférence dite à Claude Code un lundi est inconnue de Codex le
 mardi. `apps/backend/brain/` est **un seul cerveau que tous les agents lisent et
 écrivent, et qu'aucun ne possède** : un vault Obsidian, un `graph.json` au
@@ -135,6 +135,9 @@ synchronisation ne rafraîchit que les fichiers qui portent déjà le bloc.
 fragment est rendu à la personne. TOML et YAML sont écrits en bloc délimité et
 non par aller-retour de parseur, qui effacerait les commentaires d'un fichier
 édité à la main. `connect_all --apply` n'installe rien chez un agent absent.
+pi lit `~/.pi/agent/mcp.json` (clé `mcpServers`, le format par défaut) et ne
+l'écrit que sur `pi mcp add` ou `/mcp`, jamais pendant un run, donc le fichier
+est écrit en place ; `PI_CODING_AGENT_DIR` déplace tout son dossier d'agent.
 Pour Claude Code, la CLI `claude mcp add-json --scope user` est préférée à
 l'édition de `~/.claude.json`, que Claude Code réécrit pendant qu'il tourne.
 

@@ -528,6 +528,51 @@ def test_connect_all_does_not_install_config_for_absent_agents(
     results = {r.agent: r.action for r in connect_all(tmp_path / "brain", apply=True)}
     assert results["cursor"] == "absent"
     assert not (_isolated_home / ".cursor").exists()
+    assert results["pi"] == "absent"
+    assert not (_isolated_home / ".pi").exists()
+
+
+# ---------------------------------------------------------------------------
+# pi (pi.dev): its agent directory is ~/.pi/agent, or PI_CODING_AGENT_DIR
+# ---------------------------------------------------------------------------
+
+
+def test_pi_paths_follow_its_agent_directory(_isolated_home, monkeypatch):
+    from brain.agents import agent
+
+    spec = agent("pi")
+    monkeypatch.delenv("PI_CODING_AGENT_DIR", raising=False)
+    assert spec.bridge_path() == _isolated_home / ".pi" / "agent" / "AGENTS.md"
+    assert spec.mcp_path() == _isolated_home / ".pi" / "agent" / "mcp.json"
+    assert spec.global_paths() == [_isolated_home / ".pi" / "agent" / "AGENTS.md"]
+
+    monkeypatch.setenv("PI_CODING_AGENT_DIR", str(_isolated_home / "elsewhere"))
+    assert spec.mcp_path() == _isolated_home / "elsewhere" / "mcp.json"
+    assert spec.bridge_path() == _isolated_home / "elsewhere" / "AGENTS.md"
+
+
+def test_connect_pi_writes_mcp_servers_into_its_json(
+    tmp_path, _isolated_home, monkeypatch
+):
+    """pi's mcp.json is the default `mcpServers` map, written only on --apply and
+    only beside what the person already configured there."""
+    monkeypatch.delenv("PI_CODING_AGENT_DIR", raising=False)
+    cfg = _isolated_home / ".pi" / "agent" / "mcp.json"
+    cfg.parent.mkdir(parents=True)
+    cfg.write_text(
+        json.dumps({"mcpServers": {"theirs": {"command": "x", "args": []}}}),
+        encoding="utf-8",
+    )
+    root = tmp_path / "brain"
+    assert connect(root, "pi").action == "preview"
+    assert json.loads(cfg.read_text(encoding="utf-8"))["mcpServers"].keys() == {
+        "theirs"
+    }
+    assert connect(root, "pi", apply=True).action == "written"
+    data = json.loads(cfg.read_text(encoding="utf-8"))
+    assert set(data["mcpServers"]) == {"theirs", SERVER_NAME}
+    assert data["mcpServers"][SERVER_NAME]["env"]["WORKPILOT_BRAIN_DIR"] == str(root)
+    assert connect(root, "pi", apply=True).action == "unchanged"
 
 
 # ---------------------------------------------------------------------------
