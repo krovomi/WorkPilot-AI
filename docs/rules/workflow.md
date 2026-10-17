@@ -79,7 +79,7 @@ positif se traite par la règle S1 de [`security.md`](security.md), jamais par `
 
 | Workflow | Vérifie |
 |---|---|
-| `ci.yml` | pytest et frontend (typecheck, tests, build) sur Linux, Windows, macOS |
+| `ci.yml` | pytest et frontend (typecheck, tests, build) sur Linux, Windows, macOS ; chaque test pytest en échec est aussi une annotation du job, lisible sans ouvrir le journal |
 | `lint.yml` | ruff, Biome, `--check` des fichiers vendorisés et des skills, évaluation des skills |
 | `quality-security.yml` | CodeQL étendu, Bandit, pip-audit, pnpm audit |
 | `codeql.yml` | CodeQL sur Actions, JS/TS, Python |
