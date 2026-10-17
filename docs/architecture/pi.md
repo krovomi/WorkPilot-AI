@@ -118,10 +118,28 @@ prochaine version de pi se revérifie au même endroit) :
 2. **La reprise se fait par id.** V5 : `--session <uuid>` est résolu dans le `sessionDir` posé
    par `PI_CODING_AGENT_SESSION_DIR` ; aucun chemin en argv, aucun cas Windows à traiter.
 
-**Reste du lot 0, contre le binaire** : capturer `tests/fixtures/pi/` (un run avec outil, un run
-en erreur d'authentification, un run avec un modèle inconnu, un run `--tools read,grep,find,ls`
-où le modèle tente d'écrire) — secrets masqués par `safe_error_text` avant commit, le hook
-`pre-commit` scanne. Un provider local (Ollama via `models.json`) suffit et ne coûte rien.
+**Fixtures, livrées** : `tests/fixtures/pi/*.jsonl` sont six flux **réels** de pi 1.3.0
+(`VERSION`), capturés par `tests/fixtures/pi/capture.py` contre un serveur OpenAI-compatible
+factice qui scripte une réponse par identifiant de modèle (`models.json` dans un
+`PI_CODING_AGENT_DIR` temporaire, clé fictive `sk-test-0000`, aucun réseau). Les événements sont
+ceux de pi, seuls les mots du modèle sont faux — c'est le contrat de l'adaptateur, pas celui du
+LLM. Ce que ces captures ont appris en plus de la source :
+
+- `message_start`/`message_end` arrivent aussi pour les rôles `system`, `user` et `toolResult` :
+  l'adaptateur filtre sur `message.role == "assistant"`.
+- Avec `PI_CODING_AGENT_SESSION_DIR`, le fichier de session est **directement** dans ce dossier
+  (pas de sous-dossier `--cwd--`) ; un `--session-id` inconnu crée la session avec cet id, en
+  prévenant sur stderr ; `--session <uuid>` la reprend (`resume-by-id.jsonl`, même id, un seul fichier).
+- Une 401 du provider donne `stopReason: "error"`, `errorMessage: "401: {…\"code\":\"invalid_api_key\"}"`,
+  **rien sur stderr, code de sortie 0** (`auth-error.jsonl`).
+- Un modèle absent de `models.json` n'est **pas** refusé par pi (« Using custom model id », stderr) :
+  c'est le provider qui tranche, et sa réponse arrive comme ci-dessus (`unknown-model.jsonl`).
+- Sous `--tools read,grep,find,ls`, un appel `write` reçoit `Tool write not found` (`isError: true`)
+  et aucun fichier n'apparaît (`readonly-write-refused.jsonl`) — la barrière de V7, observée.
+- `agent_end.messages` rejoue toute la conversation (élidé dans les fixtures) ; l'adaptateur ne
+  lit que `agent_settled`.
+
+À chaque montée de version de pi : `python tests/fixtures/pi/capture.py`, relire le diff.
 
 ## 4. Lot 1 — pi comme harness, et comme agent du cerveau
 
