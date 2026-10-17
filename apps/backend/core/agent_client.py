@@ -17,6 +17,7 @@ Architecture (one module per provider under ``core/agent_clients/``):
     │   └── LocalAgentClient                local.py — Ollama, LM Studio…
     └── CliSubprocessAgentClient            cli_subprocess.py — a coding-agent CLI
         ├── OpenCodeCliAgentClient          opencode_cli.py — `opencode run`
+        ├── PiCliAgentClient                pi_cli.py — `pi --mode json`
         └── AntigravityCliAgentClient       antigravity_cli.py — `agy` print mode
 
 Usage:
@@ -134,6 +135,11 @@ from .agent_clients.opencode_cli import (  # noqa: F401
     OpenCodeCliAgentClient,
     OpenCodeCliAuthenticationError,
     OpenCodeCliError,
+)
+from .agent_clients.pi_cli import (  # noqa: F401
+    PiCliAgentClient,
+    PiCliAuthenticationError,
+    PiCliError,
 )
 from .agent_clients.windsurf import (  # noqa: F401
     WindsurfAgentClient,

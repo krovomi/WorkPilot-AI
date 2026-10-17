@@ -23,7 +23,7 @@ them):
    format and read back by the production reader into a ``UsageLedger``. The
    window is the payable one (``context_mgmt.windows.effective_window``).
 
-A third-party loop (Claude Agent SDK, Codex, OpenCode, Antigravity) runs its
+A third-party loop (Claude Agent SDK, Codex, OpenCode, Antigravity, pi) runs its
 own tools and its own clearing; it is measured by the same ledger, and its
 prompt is the same system and task block, which this replay covers.
 

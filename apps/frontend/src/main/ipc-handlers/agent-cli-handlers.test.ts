@@ -34,6 +34,12 @@ describe("agent CLI handlers", () => {
 		expect(result).toEqual({ tool: "antigravity", installed: false });
 	});
 
+	it("knows pi by its executable", async () => {
+		const result = await checkAgentCli("pi");
+		expect(result).toEqual({ tool: "pi", installed: false });
+		expect(findExecutable).toHaveBeenLastCalledWith("pi", expect.any(Array));
+	});
+
 	it("never runs a .cmd launcher through a shell", async () => {
 		vi.mocked(findExecutable).mockReturnValueOnce(
 			"C:\\Users\\me\\AppData\\Roaming\\npm\\opencode.cmd",

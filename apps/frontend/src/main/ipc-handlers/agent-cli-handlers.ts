@@ -1,9 +1,9 @@
 /**
  * Agent CLI handlers — is OpenCode (`opencode`) / Google Antigravity (`agy`)
- * installed, and which version.
+ * / pi (`pi`) installed, and which version.
  *
- * The backend drives both as providers (`core/agent_clients/opencode_cli.py`,
- * `antigravity_cli.py`). Each CLI owns its login, so the only thing worth
+ * The backend drives the three as providers (`core/agent_clients/opencode_cli.py`,
+ * `antigravity_cli.py`, `pi_cli.py`). Each CLI owns its login, so the only thing worth
  * checking from here is that the executable resolves and answers `--version`.
  * The tool name is validated against a closed list: nothing the renderer sends
  * reaches a command line.

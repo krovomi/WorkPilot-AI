@@ -9,7 +9,7 @@ loops then send that set unchanged, turn after turn.
 
 ``tool_weights`` measures what each agent type's set weighs in the prefix, in
 the unit of the context gauge (``context_mgmt.guard.CHARS_PER_TOKEN``). The
-CLIs (Claude Code, Codex, OpenCode, Antigravity) bring their own tools: their
+CLIs (Claude Code, Codex, OpenCode, Antigravity, pi) bring their own tools: their
 weight is theirs to report.
 """
 

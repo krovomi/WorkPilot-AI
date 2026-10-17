@@ -1,6 +1,6 @@
 # pi (pi.dev) — plan d'intégration par lots
 
-> **Statut : lots 0 et 1 livrés, lot 2 en cours.** Un lot = une PR vers `develop`. Les lots sont ordonnés par
+> **Statut : lots 0 à 5 livrés** (lot 5 en partie, dit au § 8). Un lot = une PR vers `develop`. Les lots sont ordonnés par
 > dépendance, jamais par durée (règle 11 de `docs/CLAUDE.md`). Ce fichier devient la justification
 > de conception de la feature (`docs/architecture/`, une ligne dans `docs/CLAUDE.md`) ; chaque lot
 > livré remplace sa section « à faire » par ce qui a été fait, comme `context-harness.md`.
@@ -252,10 +252,25 @@ matrice). Le pack `skills/hermes` (vendorisé, amont) n'est pas touché : une pr
 | `docs/audit/WorkPilot-architecture.html` | nœud « Agents externes » (`Claude Code · Codex · hermes · Gemini… · pi`), section 02 (table des agents du cerveau) |
 | `CHANGELOG.md` `[Unreleased]` | entrée *Nouveautés* |
 
-## 5. Lot 2 — pi comme provider, mode `--mode json` (une invocation par turn)
+## 5. Lot 2 — pi comme provider, mode `--mode json` (une invocation par turn) (livré)
 
 Le cœur. Même frontière qu'OpenCode : processus par turn, prompt sur stdin, JSONL en sortie, le
-CLI possède ses outils, sa session et sa connexion.
+CLI possède ses outils, sa session et sa connexion. Livré tel que décrit ci-dessous, avec trois
+précisions prises en l'écrivant :
+
+- **L'allowlist nomme aussi les outils MCP** des serveurs que le type déclare
+  (`get_required_mcp_servers` → `mcp_tools_for_servers`), dans la graphie de pi
+  (`mcp__<serveur>__<outil>`, tout autre caractère remplacé par `_`). pi n'expose par défaut
+  les outils MCP qu'à son bac à sable `codemode`, que l'allowlist n'accorde pas ; `brain connect`
+  écrit donc l'entrée `workpilot-brain` avec `"exposure": "direct"` (`AgentSpec.mcp_extras`).
+- **Un id de session est un id** (`^[A-Za-z0-9-]{8,64}$`) : pi lit `--session` comme un chemin
+  dès qu'il contient `/`, `\` ou finit en `.jsonl`, et écrit `--session-id` dans un nom de
+  fichier. `_SAFE_OPTION_VALUE`, qui admet `.` et `/`, ne suffisait pas (S4).
+- **Un modèle inconnu n'est pas refusé par pi** mais par le fournisseur, en `stopReason: error` ;
+  le retry sur « default » se déclenche sur ce message, comme OpenCode.
+
+`qualify_provider_model` (`cli_subprocess.py`) est désormais partagé avec OpenCode. Guide
+utilisateur : [`../integrations/pi.md`](../integrations/pi.md).
 
 ### 5.1 `capabilities/providers.yaml`
 
@@ -378,66 +393,69 @@ variables), `docs/architecture/delegation.md` (ligne `none`), `context-managemen
 d'audit (`AUDIT-NETTOYAGE.md` : annexe ; `WorkPilot-architecture.html` : la ligne `none` de la
 table des sous-agents, l'inventaire de `core/agent_clients/`).
 
-## 6. Lot 3 — Mode RPC : un processus par session, compaction à la demande
+## 6. Lot 3 — Mode RPC : un processus par session (livré)
 
-Ce que le mode json ne peut pas donner et que le harness de contexte veut :
+`WORKPILOT_PI_MODE=rpc` (ou `PiCliAgentClient(mode="rpc")`) lance `pi --mode rpc` une fois par
+session et lui parle en JSON sur stdin ; le défaut reste `json`, le mode que toutes les fixtures
+prouvent. Ce que le processus persistant donne, et ce qui en a été fait :
 
-| Capacité | RPC | Effet dans WorkPilot |
-|---|---|---|
-| `compact {customInstructions?}` | oui | `providers.yaml` `context.compact: native` ; `context_mgmt/decide.py` laisse pi compacter sous le seuil dur, comme Codex |
-| `abort` | oui | `BuildPaused` / `BuildHalted` / annulation → `abort` puis fermeture de stdin, au lieu de `terminate()` |
-| `get_state` (`isStreaming`, `isCompacting`, `messageCount`, `sessionFile`) | oui | jauge et reprise exactes |
-| `set_model`, `set_thinking_level` | oui | changement de phase sans relancer le processus |
-| `steer` / `follow_up` | oui | hors périmètre (la boucle WorkPilot n'a pas de steering) — noté, pas câblé |
-| `extension_ui_request` (`select`, `confirm`, `input`…) | arrive si une extension pose une question | **toujours** répondu `{"cancelled": true}` : un run sans UI ne demande rien à personne ; tracé dans le feed pour que l'extension soit identifiée |
+| Capacité | Fait |
+|---|---|
+| `prompt` → événements → `agent_settled` | un turn ; la réponse `{"disposition":"started"}` précède les événements ; `success: false` est une erreur expurgée |
+| `get_state` après chaque turn | `sessionId` repris, `model.contextWindow` → `context_window_tokens` (inconnu en json) |
+| `abort` | envoyé sur annulation du turn (`CancelledError`) avant d'arrêter le processus |
+| `compact` à la demande | `PiCliAgentClient.compact()` ; `success: false` « Nothing to compact » n'est pas une erreur ; `provider_name()` vaut `pi-rpc` et `context_mgmt/capabilities.py` le déclare `native` — la jauge laisse pi compacter, comme Codex |
+| `extension_ui_request` | **toujours** répondu `{"cancelled": true}` et tracé : un run sans UI ne demande rien à personne |
+| arrêt | stdin fermé, `terminate()` seulement si pi s'attarde ; le prompt système est envoyé une fois par session, dans le premier `prompt` |
+| `steer` / `follow_up` | hors périmètre, comme prévu |
 
-**Forme.** Même classe, un mode : `PiCliAgentClient(mode="json"|"rpc")`, choisi par
-`WORKPILOT_PI_MODE` (défaut `json` tant que le lot 3 n'est pas sorti de l'expérimentation, puis
-`rpc`). Le processus vit le temps du `async with client:` ; `receive_response` envoie `prompt` et
-lit jusqu'à `agent_settled`. `--append-system-prompt .workpilot/specs/<spec>/pi/system.md`
-(chemin relatif, V6) remplace le préambule stdin : le prompt système devient un préfixe stable
-d'un turn à l'autre (harness, lot 2 : « du plus stable au plus volatil »).
+Fixture `rpc-session.jsonl` (47 événements réels : `get_state`, `prompt`, `compact` refusé,
+second `prompt`, `abort`, `get_state`) et `tests/test_pi_cli_client.py` (un processus pour deux
+turns, compaction, arrêt propre, question d'extension, prompt refusé, flux coupé). Le préambule
+stdin reste la façon de passer le prompt système, en json comme en rpc : `--append-system-prompt`
+prendrait un chemin ou un texte en argv (V6).
 
-Tests : protocole `id`/`response` ; `agent_settled` et non `agent_end` ; `abort` sur annulation ;
-`extension_ui_request` → `cancelled` ; `compact` déclenché par `context_mgmt` et `compaction_end`
-lu ; un processus qui meurt entre deux turns → erreur claire, pas un blocage.
+## 7. Lot 4 — Garde-fous (livré : option B, bornée)
 
-## 7. Lot 4 — Parité des garde-fous (à décider après le lot 2, options écrites)
+Deux barrières, en plus de `--tools` :
 
-Sur le SDK Claude, les hooks `PreToolUse` de `create_client()` sont la barrière (allowlist de
-commandes, écritures confinées, watermarks, `read_guard`). Sur OpenCode et Antigravity, WorkPilot
-s'appuie sur le worktree isolé et les droits du CLI ; c'est l'état documenté
-(`agent-tool-rights.md`). pi offre, en plus, un point d'accroche que les autres CLI n'ont pas :
-l'événement `tool_call` d'une extension peut **bloquer** (`{ block: true, reason }`) et modifier
-`event.input`.
+1. **L'environnement est construit.** `ENV_DENYLIST` retire du sous-processus pi les variables
+   d'injection de chargeur (`LD_*`, `DYLD_*`, `NODE_OPTIONS` — la liste que
+   `claude-code-settings/env-sanitizer.ts` refuse d'un dépôt), la clé JEV (`TYPESAFE_API_KEY`) et
+   le jeton OAuth de Claude Code. Les identifiants de fournisseur que la personne a posés pour pi
+   (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_AUTH_TOKEN`…) restent : c'est le processus
+   qui en a besoin (S4).
+2. **Un garde-fou d'écriture dans le processus pi** (`core/agent_clients/pi_guard/workpilot-guard.js`,
+   ESM sans import, chargé par `--extension .workpilot/pi-guard/workpilot-guard.js`). Il bloque
+   `write` et `edit` hors des racines du build et sur les fichiers qui décident des droits d'un
+   agent — exactement la politique de `security/path_guard.py` (`resolve_write_roots`,
+   `PROTECTED_CONFIG_NAMES`, `PROTECTED_CONFIG_DIRS`), plus `.pi/` et le dossier du garde-fou
+   lui-même. La politique est calculée en Python et passée par `WORKPILOT_PI_GUARD` (JSON) : les
+   deux barrières lisent la même table, et rien dans argv n'est un chemin absolu. Sans politique
+   le garde-fou **ferme** (toute écriture refusée, en le disant). Le fichier est recopié depuis la
+   source à chaque run — une copie altérée par `bash` ne dure qu'un run — et `.workpilot/` est
+   retiré de toute branche poussée (`_strip_workpilot_artifacts`). Prouvé contre pi 1.3.0 :
+   `guard-escape-refused.jsonl` (`../escape.txt`), `guard-config-refused.jsonl`
+   (`.workpilot-allowlist`), `guard-inside-allowed.jsonl` (`notes/ok.txt` écrit).
 
-| Option | Ce qu'elle donne | Ce qu'elle coûte |
-|---|---|---|
-| **A — parité CLI** (défaut après lot 2) : `--tools` + worktree, rien d'autre | même standing qu'OpenCode ; zéro code TS | `bash` sans allowlist, écritures hors projet possibles si le modèle le veut |
-| **B — extension `workpilot-guard.ts`** écrite par WorkPilot dans `<spec>/pi/` avant le spawn, chargée par `-e .workpilot/specs/<spec>/pi/workpilot-guard.ts` (relatif, V6) : chemins d'écriture confinés au `cwd`, `<spec>` et `<tmp>/workpilot` (port de `protected-paths.ts`), denylist de commandes miroir de `security/command_registry` (pas l'allowlist complète : ses validateurs sont en Python) | la première vraie barrière sur un CLI | du TypeScript à maintenir en face du Python ; **n'est pas** l'allowlist (un miroir partiel qui prétend l'être est le genre de demi-vérité que `providers.yaml` existe pour finir) |
-| **C — l'extension interroge le backend** (`127.0.0.1:9000`, route avec permission) pour chaque `bash` | l'allowlist réelle, les validateurs réels | latence par outil ; une route de plus à garder (S5) ; dépendance du processus pi au backend |
+Ce que le lot 4 **ne** fait pas, et pourquoi : `bash` n'est pas jugé dans pi (option C, une route
+du backend par commande) — l'allowlist et ses validateurs sont en Python, et un miroir partiel qui
+se dirait allowlist serait la demi-vérité que `providers.yaml` existe pour finir. Sur `bash`, pi a
+le standing d'OpenCode et d'Antigravity : le worktree isolé, et `--tools` qui le retire aux types
+qui ne le déclarent pas. `guard=False` existe pour les tests et les appelants hors produit, et ne
+se lit dans aucun réglage.
 
-Recommandation : A au lot 2 (dit tel quel dans `agent-tool-rights.md`), B si un incident ou une
-revue le demande, C seulement si B s'avère insuffisant. Les watermarks restent hors de pi : le
-retrait se fait côté Python sur les fichiers du worktree à la fin du turn, comme pour les
-providers hors SDK (`watermarks.md`).
+## 8. Lot 5 — Confort (livré en partie)
 
-## 8. Lot 5 — Confort (chacun indépendant, aucun requis)
-
-- **Sous-agents** : `agents_path: .pi/agents` + l'extension d'exemple `subagent/` ; les définitions
-  du registre (`agents/subagents/`) émises avec `translate_tools` — `Task` reste non traduit et le
-  build le dit. `subagents` reste `none` dans `providers.yaml` tant que WorkPilot ne lit pas ce
-  que l'extension fait.
-- **Prompt templates** : `.pi/prompts/<skill>.md` générés depuis les skills, comme
-  `.gemini/commands/*.toml` (`format: prompt-template`) — utile seulement si `/skill:name` ne suffit
-  pas à quelqu'un.
-- **Catalogue de modèles** : `pi --list-models` → `pi_models.py` à côté de `codex_models.py`, servi
-  au sélecteur à la place de la liste statique de `providerRegistry.ts`.
-- **`skills/tooling/pi`** : la procédure « piloter pi sans UI » (json, rpc, trust) pour les agents
-  qui en auraient besoin, au format portable (noms canoniques, table de traduction).
-- **Doctor Kanban** : une carte « pi » (installé, version, trust du checkout, MCP `workpilot-brain`
-  présent dans `~/.pi/agent/mcp.json`), calquée sur `HermesLearningCard` mais sans cycle —
-  rendue seulement si pi est installé.
+- **`skills/tooling/pi`** : la procédure « piloter pi sans interface » (json, rpc, trust,
+  diagnostic), émise dans `.agents/skills/pi/` et `.gemini/commands/pi.toml` par `skills:build`.
+- **Non faits, délibérément** : l'émission de `.pi/agents/*.md` (pi n'a pas de sous-agents natifs ;
+  son extension d'exemple en a, et WorkPilot ne lirait pas ce qu'elle fait — `subagents: none`
+  reste vrai) ; les prompt templates `.pi/prompts/` (`/skill:<nom>` suffit) ; un catalogue
+  `pi --list-models` dans le sélecteur (il faudrait lancer pi depuis l'UI ; la liste statique de
+  `providerRegistry.ts` et « pi default » couvrent l'usage) ; une carte Kanban « doctor » (le badge
+  de la barre latérale et la ligne du fil de tâche sur la confiance disent déjà ce qu'il y a à faire).
+  Chacun se reprend comme un lot à part s'il manque à quelqu'un.
 
 ## 9. Commandes de vérification (chaque lot)
 

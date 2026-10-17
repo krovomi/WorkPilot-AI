@@ -61,7 +61,7 @@ Deux familles de boucles :
 
 | Famille | Providers | Ce que le harness fait |
 |---|---|---|
-| **Boucle tierce** : un SDK ou une CLI tient la boucle | Claude (Claude Agent SDK, et les providers sans adaptateur qui retombent dessus), Codex CLI, OpenCode, Antigravity | règle les seuils et plafonds que la boucle expose, fournit le prompt assemblé et des outils MCP de WorkPilot qui tronquent à la source, mesure chaque tour, coupe la session au plafond de coût |
+| **Boucle tierce** : un SDK ou une CLI tient la boucle | Claude (Claude Agent SDK, et les providers sans adaptateur qui retombent dessus), Codex CLI, OpenCode, Antigravity, pi | règle les seuils et plafonds que la boucle expose, fournit le prompt assemblé et des outils MCP de WorkPilot qui tronquent à la source, mesure chaque tour, coupe la session au plafond de coût |
 | **Boucle WorkPilot** : `core/agent_clients/` tient la boucle | OpenAI, Google, Mistral, DeepSeek, xAI (compatibles OpenAI), Ollama, LM Studio, Copilot, Windsurf | tout : assemblage, troncature, purge, compaction, arrêts, mesure |
 
 Ce que l'on sait aujourd'hui des voies natives des boucles tierces. « Non documenté » veut dire que
@@ -538,7 +538,7 @@ suivant. Et Copilot lançait les sous-agents d'une vague tous à la fois.
 |---|---|---|
 | Boucle tierce | Claude (Agent SDK) | l'outil `Agent` de la CLI (`Task` avant lui) ; son hook PostToolUse, posé par `create_client`, le voit avant le parent |
 | Boucle WorkPilot | Copilot | `CopilotAgentClient.run_subagents`, un appel par sous-agent |
-| Sans sous-agents | Codex CLI, OpenCode, Antigravity, OpenAI et les compatibles (Google, Mistral, DeepSeek, xAI), Ollama, LM Studio, Windsurf | nulle part : `subagents: none` dans `capabilities/providers.yaml`, et `resolve` ne leur compose aucun roster |
+| Sans sous-agents | Codex CLI, OpenCode, Antigravity, pi, OpenAI et les compatibles (Google, Mistral, DeepSeek, xAI), Ollama, LM Studio, Windsurf | nulle part : `subagents: none` dans `capabilities/providers.yaml`, et `resolve` ne leur compose aucun roster |
 
 `run_subagents` n'a pas d'appelant en production : la boucle Copilot n'offre au modèle aucun outil
 de délégation, et `create_agent_client` ne lui transmet que les `agents` de l'appelant. Le contrat

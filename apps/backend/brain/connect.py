@@ -79,7 +79,11 @@ def snippet(spec: AgentSpec, root: Path) -> str:
         ]
         return "\n".join(lines)
     key = "servers" if spec.name == "copilot" else "mcpServers"
-    return json.dumps({key: {SERVER_NAME: entry}}, indent=2, ensure_ascii=False)
+    return json.dumps(
+        {key: {SERVER_NAME: {**entry, **dict(spec.mcp_extras)}}},
+        indent=2,
+        ensure_ascii=False,
+    )
 
 
 @dataclass
@@ -148,7 +152,7 @@ def _connect_json(
             text,
             reason=f"{spec.mcp_key[0]} is not a map",
         )
-    entry = server_entry(root)
+    entry = {**server_entry(root), **dict(spec.mcp_extras)}
     if servers.get(SERVER_NAME) == entry:
         return ConnectResult(spec.name, str(path), "unchanged", text)
     if not apply:

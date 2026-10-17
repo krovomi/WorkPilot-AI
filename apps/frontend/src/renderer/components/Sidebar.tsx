@@ -2455,6 +2455,7 @@ export function Sidebar({
 									tool="antigravity"
 									isCollapsed={isCollapsed}
 								/>
+								<AgentCliStatusBadge tool="pi" isCollapsed={isCollapsed} />
 							</div>
 						</CollapsibleContent>
 					</Collapsible>

@@ -572,6 +572,9 @@ def test_connect_pi_writes_mcp_servers_into_its_json(
     data = json.loads(cfg.read_text(encoding="utf-8"))
     assert set(data["mcpServers"]) == {"theirs", SERVER_NAME}
     assert data["mcpServers"][SERVER_NAME]["env"]["WORKPILOT_BRAIN_DIR"] == str(root)
+    # pi declares MCP tools to its codemode sandbox only unless told otherwise;
+    # `direct` is what lets the provider's `--tools` allowlist name them.
+    assert data["mcpServers"][SERVER_NAME]["exposure"] == "direct"
     assert connect(root, "pi", apply=True).action == "unchanged"
 
 

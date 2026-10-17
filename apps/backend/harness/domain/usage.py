@@ -161,6 +161,34 @@ def from_step_tokens(tokens: Mapping[str, Any] | None) -> CallUsage | None:
     )
 
 
+def from_pi_usage(usage: Mapping[str, Any] | None) -> CallUsage | None:
+    """pi's ``usage`` block: ``input`` (uncached), ``cacheRead``, ``cacheWrite``,
+    ``output``, ``reasoning``.
+
+    Emitted by pi (`@earendil-works/pi-ai`) on every assistant ``message_end``;
+    pi normalises every API to this split, subtracting the cached part from
+    ``input`` itself. Its ``cost`` is left to the caller as information: the
+    ledger prices the call on its own, and two figures that disagree are an
+    alert a single one could never raise.
+    """
+    if not isinstance(usage, Mapping):
+        return None
+    uncached = _count(usage.get("input"))
+    read = _count(usage.get("cacheRead"))
+    write = _count(usage.get("cacheWrite"))
+    prompt = _sum_known(uncached, read, write)
+    output = _count(usage.get("output"))
+    if prompt is None and output is None:
+        return None
+    return CallUsage(
+        prompt=prompt,
+        cache_read=read,
+        cache_write=write,
+        output=output,
+        reasoning=_count(usage.get("reasoning")),
+    )
+
+
 def from_ambiguous_cache_read(usage: Mapping[str, Any] | None) -> CallUsage | None:
     """``input_tokens`` and ``cache_read_tokens``, inclusion not documented.
 

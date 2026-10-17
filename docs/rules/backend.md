@@ -39,6 +39,7 @@ Un identifiant de modèle ne s'écrit pas en dur : il vient de `phase_config.py`
 - `create_client` et `create_simple_client` passent `undeclared_builtin_tools` en `disallowed_tools` ;
 - `ToolExecutor(agent_type=…)` n'offre et n'exécute que ce que le type déclare ;
 - Codex tourne en `--sandbox read-only` pour un type qui n'écrit ni n'exécute de commande ;
+- pi reçoit la déclaration comme allowlist `--tools` (dans ses mots, par `capabilities/harnesses.yaml`), et le garde-fou d'écriture de `path_guard` chargé dans son processus ;
 - le client simple n'a pas de hooks et refuse un type qui déclare `Write`, `Edit` ou `Bash`.
 
 Un prompt qui utilise un outil que son type ne déclare pas fait échouer
