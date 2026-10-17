@@ -67,6 +67,15 @@ project adheres to [Semantic Versioning](https://semver.org/).
   insécable est porteur de sens en typographie française), `WATERMARKS_STRIP_BIDI`
   (durcissement Trojan Source), `WATERMARKS_MAX_BYTES`.
 
+### 🛠️ Qualité
+
+- **La CI nomme le test qui échoue.** Chaque ligne `FAILED` / `ERROR` du résumé
+  de pytest devient une annotation du job (`ci.yml`), lisible sans le journal
+  brut (#468). Première prise : le test du journal d'un RUN demandait au shell
+  d'étendre `$RUN_API_TOKEN`, ce que `cmd.exe` ne fait pas ; il parle désormais
+  la syntaxe du shell de la plateforme (`%VAR%` sous Windows), et le job Windows
+  repasse au vert.
+
 ---
 
 ## 1.2.1 - La build macOS Intel, et la chaîne de release qui la publie
