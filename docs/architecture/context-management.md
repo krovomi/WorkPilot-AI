@@ -69,7 +69,7 @@ does not mirror it:
 |---|---|---|
 | Claude (and the providers that degrade to it) | native: `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` set to the threshold in `create_client`'s `sdk_env`; the CLI compacts mid-turn and emits `compact_boundary` | `AssistantMessage.usage` per turn (input + cache) |
 | Codex CLI | native: `-c model_auto_compact_token_limit=<threshold × window>` | `turn.completed.usage.input_tokens` |
-| OpenAI API, Gemini, DeepSeek, xAI, Mistral, Copilot, Windsurf, Ollama/LM Studio, OpenCode, Antigravity | emulated: the conversation log is rewritten (`conversation_log.replace_with_summary`) and replayed | the last turn's `prompt_tokens` / `prompt_eval_count` where reported, else characters ÷ 4 |
+| OpenAI API, Gemini, DeepSeek, xAI, Mistral, Copilot, Windsurf, Ollama/LM Studio, OpenCode, Antigravity, pi | emulated: the conversation log is rewritten (`conversation_log.replace_with_summary`) and replayed | the last turn's `prompt_tokens` / `prompt_eval_count` where reported, else characters ÷ 4 |
 
 Clear works the same everywhere. Clients expose the fill through three
 duck-typed attributes: `last_context_tokens`, `context_window_tokens`,

@@ -1815,7 +1815,39 @@ _PROVIDER_ALIASES: dict[str, str] = {
     "opencode": "opencode",
     "antigravity": "antigravity",
     "agy": "antigravity",
+    "pi": "pi",
 }
+
+
+def _trace_pi_trust(spec_dir: Path | None, trust: str) -> None:
+    """Say in the task feed that pi skipped the project's `.pi/` resources.
+
+    `undecided` is the silent failure the trust gate produces in a run without
+    a UI; `untrusted` is a decision the person took. Both are reported, neither
+    is overridden: the fix is one `/trust` in pi, run by a person in the checkout.
+    """
+    if trust == "untrusted":
+        message = (
+            "pi: this project's .pi/ resources (extensions, mcp.json, prompts) "
+            "are not loaded — the checkout is marked untrusted in pi's trust.json."
+        )
+    else:
+        message = (
+            "pi: this project's .pi/ resources (extensions, mcp.json, prompts) "
+            "are not loaded — the checkout is not trusted in pi yet. To load "
+            "them, run `pi` in the project directory and `/trust`."
+        )
+    logger.warning("[pi-trust] %s", message)
+    if spec_dir is None:
+        return
+    try:
+        from task_logger import get_task_logger
+
+        tl = get_task_logger()
+        if tl is not None and Path(tl.spec_dir) == Path(spec_dir):
+            tl.log_info(f"⚠️ {message}")
+    except Exception as exc:  # pragma: no cover - tracing must not break a run
+        logger.debug("could not surface the pi trust state in the feed: %s", exc)
 
 
 def _locked_task_provider(spec_dir: Path) -> str | None:
@@ -2000,6 +2032,7 @@ def _resolve_active_provider(
         "opencode",
         "antigravity",
         "agy",
+        "pi",
     ):
         return _normalize_provider_name(env_provider), True
 
@@ -2038,6 +2071,7 @@ def _resolve_active_provider(
                                 "opencode",
                                 "antigravity",
                                 "agy",
+                                "pi",
                             ):
                                 return _normalize_provider_name(value), True
             except Exception:
@@ -2821,16 +2855,52 @@ def _build_agent_client(
             spec_dir=str(spec_dir),
         )
 
-    elif provider in ("opencode", "antigravity"):
+    elif provider in ("opencode", "antigravity", "pi"):
         # Coding-agent CLIs that bring their own tools, sessions and context
         # management (core/agent_clients/cli_subprocess.py). Each CLI owns its
         # login; the agent type's declaration picks its rights (OpenCode's
-        # `plan` agent for a read-only type; Antigravity refuses one).
+        # `plan` agent for a read-only type; Antigravity refuses one; pi gets
+        # the declaration as its `--tools` allowlist).
         from core.llm_optimization import build_base_system_prompt
 
         cli_prompt = system_prompt or build_base_system_prompt(project_dir)
         if not system_prompt:
             cli_prompt = _inject_domain_addendum(cli_prompt, agent_type, spec_dir)
+
+        if provider == "pi":
+            from core.agent_client import PiCliAgentClient
+
+            try:
+                from phase_config import thinking_level_from_budget
+
+                pi_level = thinking_level_from_budget(max_thinking_tokens)
+            except Exception:  # noqa: BLE001 - effort is optional on this CLI
+                pi_level = None
+            client = PiCliAgentClient(
+                model=model or None,
+                system_prompt=cli_prompt,
+                project_dir=str(project_dir),
+                agent_type=agent_type,
+                session_id=resume,
+                thinking_level=pi_level,
+                spec_dir=spec_dir,
+            )
+            trust = client.trust_state()
+            logger.info(
+                "[create_agent_client] Using PiCliAgentClient "
+                "(model=%s, agent_type=%s, tools=%s, resume=%s, project .pi trust=%s)",
+                model,
+                agent_type,
+                client.tools,
+                bool(resume),
+                trust,
+            )
+            if trust in ("undecided", "untrusted"):
+                # pi loads nothing from `<project>/.pi` without a decision, and
+                # says nothing about it in json mode. The skills are already
+                # passed explicitly; the rest is the person's call.
+                _trace_pi_trust(spec_dir, trust)
+            return client
 
         if provider == "opencode":
             from core.agent_client import OpenCodeCliAgentClient

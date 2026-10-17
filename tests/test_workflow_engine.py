@@ -267,7 +267,7 @@ class TestProviderDegradation:
         assert coding.dispatch == "subagent-per-task"
         assert coding.degraded_from is None
 
-    @pytest.mark.parametrize("provider", ["opencode", "antigravity", "meta"])
+    @pytest.mark.parametrize("provider", ["opencode", "antigravity", "pi", "meta"])
     def test_it_degrades_to_sequential_where_there_are_no_subagents(
         self, workflow, provider
     ):

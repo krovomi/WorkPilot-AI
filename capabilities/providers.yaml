@@ -183,6 +183,33 @@ antigravity:
     none of Write/Edit/Bash is refused. `/compact` exists interactively but is
     not documented in print mode. Alias: agy.
 
+pi:
+  adapter: PiCliAgentClient
+  subagents: none
+  effort: reasoning_effort
+  degrades_to: null
+  context:
+    compact: emulated
+    usage: reported
+  note: >-
+    `pi --mode json` (pi.dev) with the prompt on stdin. Rights are an
+    allowlist: the agent type's declaration, translated through
+    capabilities/harnesses.yaml `pi.tools` and pi's MCP names, becomes
+    `--tools`; a type declaring none of Write/Edit/Bash runs with
+    `read,grep,find,ls` and a write call is answered "Tool write not found"
+    (tests/fixtures/pi/readonly-write-refused.jsonl). Sessions live in the
+    task's spec directory (PI_CODING_AGENT_SESSION_DIR) and are resumed by id.
+    The project's skills reach pi explicitly (`--skill .agents/skills`); its
+    `.pi/` resources load only once a person trusted the checkout in pi, and
+    the adapter reports that state in the task feed rather than approving.
+    `--thinking` takes the phase's effort level. pi compacts on its own when
+    the window fills, and json mode has no compact-on-demand, hence
+    `emulated`; with WORKPILOT_PI_MODE=rpc the client reports itself as
+    `pi-rpc` and context_mgmt/capabilities.py declares it native, as for
+    Codex. The usage of every assistant message is reported. A write guard
+    (core/agent_clients/pi_guard/) runs inside pi with path_guard's policy.
+    Design: docs/architecture/pi.md.
+
 # ---------------------------------------------------------------------------
 # No agentic adapter yet. Selecting one of these runs the task on the Claude
 # SDK. That is a real limitation, not a configuration detail, so it is stated

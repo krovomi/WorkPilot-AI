@@ -310,7 +310,7 @@ Le roster atteint le modèle sur tout provider (`capabilities/providers.yaml`) :
   un outil `delegate` dont la description liste les spécialistes, et une **session enfant** du même
   client par délégation, avec les seuls outils du spécialiste et un résultat borné
   ([`docs/architecture/delegation.md`](docs/architecture/delegation.md)) ;
-- `none` — les CLI (Codex, OpenCode, Antigravity) apportent leurs outils et ne reçoivent pas de roster.
+- `none` — les CLI (Codex, OpenCode, Antigravity, pi) apportent leurs outils et ne reçoivent pas de roster.
 
 Ce que rend un sous-agent est borné et traité comme une donnée non fiable
 (`harness/application/subagents.py`). Le même registre, plus les personas des packs

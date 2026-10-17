@@ -59,6 +59,11 @@
 			"name": "antigravity",
 			"label": "Google Antigravity (CLI)",
 			"description": "Agent de code de Google piloté via la CLI agy, avec sa propre connexion Google."
+		},
+		{
+			"name": "pi",
+			"label": "pi (CLI)",
+			"description": "Agent de code minimal et extensible (pi.dev) piloté via la CLI pi, avec sa propre connexion aux fournisseurs."
 		}
 	]
 }

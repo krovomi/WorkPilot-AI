@@ -18,6 +18,7 @@ providers hors SDK passent par `core/runtimes/tool_executor.py`, qui appelle les
 | Bash | secrets dans un `git commit` émis par un agent | `git_validators.py` → `scan_secrets.py` | `tests/test_scan_secrets.py` |
 | Bash | écriture de la configuration de sécurité (allowlist, profil, garde-fous, réglages SDK), quelle que soit la commande | `config_write_validators.py`, validateur de ligne (`LINE_VALIDATORS` de `validator_registry.py`) | `tests/security/test_config_write_validators.py` |
 | Write / Edit | écritures confinées au projet, à la spec et à `<tmp>/workpilot` ; la configuration de sécurité refusée même dans le projet | `path_guard.py` (`make_write_path_hook`, `protected_config_refusal`) ; hors SDK `_resolve_within_project(..., for_write=True)` | `tests/test_security_path_guard.py` |
+| write / edit (pi) | la même politique, jugée **dans le processus pi** : `core/agent_clients/pi_guard/workpilot-guard.js`, chargé par `--extension`, politique calculée depuis `path_guard` et passée par `WORKPILOT_PI_GUARD` ; le dossier de ressources de pi (.pi) et le garde-fou lui-même refusés en plus ; `bash` non jugé (comme OpenCode, Antigravity) | `tests/test_pi_cli_client.py`, fixtures réelles `tests/fixtures/pi/guard-*.jsonl` |
 | Bash / Write | garde-fous déclarés par le projet (`.workpilot/guardrails.*`) | `guardrails.py` | — |
 | Write / Edit | caractères invisibles retirés | `watermarks/` | `tests/test_watermarks_hook.py` |
 | Read | fichiers retenus par la préparation des pièces jointes | `docintel/read_guard.py` | — |

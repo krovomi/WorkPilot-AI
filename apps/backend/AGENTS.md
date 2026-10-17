@@ -14,7 +14,7 @@ Toute interaction LLM passe par ces fichiers ; les modifier touche tout le produ
 |---|---|---|
 | `core/client.py` | ~2 750 | **la fabrique** : `create_client()` (SDK Claude), `create_agent_client()` (multi-provider) ; modèle, outils, MCP, sous-agents, hooks de sécurité |
 | `core/simple_client.py` | — | client sans hooks, refusé aux types qui écrivent ou exécutent |
-| `core/agent_clients/` | ~6 800 | un module par provider (`claude`, `copilot`, `openai`, `google`, `compatible`, `local`, `windsurf`…) ; `core/agent_client.py` les réexporte |
+| `core/agent_clients/` | ~6 800 | un module par provider (`claude`, `copilot`, `openai`, `google`, `compatible`, `local`, `windsurf`, les CLI `opencode_cli`, `antigravity_cli`, `pi_cli` sur `cli_subprocess`, `pi_guard/` le garde-fou chargé dans pi…) ; `core/agent_client.py` les réexporte |
 | `core/worktree.py` + `worktree_pr.py` + `worktree_common.py` | ~3 450 | worktrees par spec ; la création de PR/MR est le mixin `WorktreePRMixin` |
 | `agents/session.py` | ~2 500 | boucle de session : streaming, reprise, erreurs, rate limits |
 | `agents/coder.py` | ~2 700 | l'agent d'implémentation, découpage en sous-tâches |

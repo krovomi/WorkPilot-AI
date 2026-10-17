@@ -45,6 +45,7 @@ from .cli_subprocess import (
     ProcessFactory,
     as_int,
     declares_no_writes,
+    qualify_provider_model,
     safe_error_text,
     text_message,
     tool_messages,
@@ -55,18 +56,6 @@ logger = logging.getLogger(__name__)
 
 #: The two built-in OpenCode agents a WorkPilot agent type maps onto.
 OPENCODE_AGENTS = ("build", "plan")
-
-#: Model-id prefixes that name their provider unambiguously, for the bare ids
-#: a task inherits from another provider ("claude-sonnet-4-6" → anthropic/…).
-_PROVIDER_BY_PREFIX = (
-    ("claude-", "anthropic"),
-    ("gpt-", "openai"),
-    ("o1", "openai"),
-    ("o3", "openai"),
-    ("o4", "openai"),
-    ("gemini-", "google"),
-    ("grok-", "xai"),
-)
 
 
 class OpenCodeCliError(RuntimeError):
@@ -89,21 +78,8 @@ def resolve_opencode_model(model: str | None) -> str | None:
     provider is qualified when its family is unambiguous, and dropped otherwise
     rather than sent to fail.
     """
-    candidate = (model or "").strip()
-    if not candidate or candidate.lower() == "default":
-        return None
-    if "/" in candidate:
-        return candidate
-    lowered = candidate.lower()
-    for prefix, provider in _PROVIDER_BY_PREFIX:
-        if lowered.startswith(prefix):
-            return f"{provider}/{candidate}"
-    logger.warning(
-        "[OpenCodeCliAgentClient] Model %r is not a provider/model id; "
-        "using OpenCode's default model",
-        candidate,
-    )
-    return None
+    qualified = qualify_provider_model(model, cli="OpenCodeCliAgentClient")
+    return None if qualified == "default" else qualified
 
 
 def build_opencode_run_args(

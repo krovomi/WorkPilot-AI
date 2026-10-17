@@ -22,6 +22,16 @@ What each fixture proves (see docs/architecture/pi.md, lot 0):
 - ``readonly-write-refused.jsonl``: with ``--tools read,grep,find,ls`` a
   ``write`` call is answered ``Tool write not found`` and nothing is written.
 - ``length.jsonl``: an answer cut by the output limit is ``stopReason: "length"``.
+- ``guard-escape-refused.jsonl``, ``guard-config-refused.jsonl``,
+  ``guard-inside-allowed.jsonl``: with WorkPilot's write guard loaded
+  (``--extension .workpilot/pi-guard/workpilot-guard.js``, policy in
+  ``WORKPILOT_PI_GUARD``), a ``write`` to ``../escape.txt`` and to
+  ``.workpilot-allowlist`` are refused inside pi with the reason, and a write
+  to ``notes/ok.txt`` goes through.
+- ``rpc-session.jsonl``: one ``--mode rpc`` process driven over stdin —
+  ``get_state``, a ``prompt`` (settled), ``compact`` (refused: nothing to
+  compact), a second ``prompt``, ``abort``, ``get_state`` — then stdin closed
+  and exit 0. Every ``response`` echoes the command's ``id``.
 
 Everything pi runs here is confined to a temporary directory: its agent dir
 (``PI_CODING_AGENT_DIR``), its session dir and the project it works in.
@@ -45,6 +55,13 @@ PORT = 18765
 DUMMY_KEY = "sk-test-0000"
 SESSION_ID = "11111111-1111-4111-8111-111111111111"
 USAGE = {"prompt_tokens": 120, "completion_tokens": 9, "total_tokens": 129}
+
+#: Models that try one write each, for the guard fixtures.
+_WRITE_TARGETS = {
+    "fake-escape": "../escape.txt",
+    "fake-guardrail": ".workpilot-allowlist",
+    "fake-inside": "notes/ok.txt",
+}
 
 
 def _chunk(delta: dict, finish: str | None = None, usage: dict | None = None) -> bytes:
@@ -102,6 +119,19 @@ def _script(model: str, messages: list[dict]) -> list[bytes]:
             ]
         return [
             _chunk({"role": "assistant", "content": "I tried to write a file."}),
+            _chunk({}, "stop", USAGE),
+        ]
+    if model in _WRITE_TARGETS:
+        if not had_tool_result:
+            return [
+                _chunk({"role": "assistant", "content": ""}),
+                _tool_call(
+                    "call_w", "write", {"path": _WRITE_TARGETS[model], "content": "x"}
+                ),
+                _chunk({}, "tool_calls", USAGE),
+            ]
+        return [
+            _chunk({"role": "assistant", "content": "Tried."}),
             _chunk({}, "stop", USAGE),
         ]
     if model == "fake-length":
@@ -177,7 +207,8 @@ RUNS: tuple[tuple[str, str, list[str], str], ...] = (
 
 
 def _neutralise(line: str, project: str) -> str:
-    event = json.loads(line.replace(project, "/work/project"))
+    root = str(Path(project).parent)
+    event = json.loads(line.replace(project, "/work/project").replace(root, "/work"))
     if event.get("type") == "agent_end":
         event["messages"] = ["<elided: the whole conversation, already streamed above>"]
     message = event.get("message") if isinstance(event.get("message"), dict) else None
@@ -189,6 +220,74 @@ def _neutralise(line: str, project: str) -> str:
         # pi's own system prompt, several KB of prose: keep the shape, not the text.
         message["sections"] = dict.fromkeys(message.get("sections", {}), "<elided>")
     return json.dumps(event, ensure_ascii=False)
+
+
+RPC_SESSION_ID = "22222222-2222-4222-8222-222222222222"
+
+RPC_COMMANDS: tuple[tuple[dict, str], ...] = (
+    # command, the event that ends its exchange
+    ({"id": "s1", "type": "get_state"}, "response:get_state"),
+    (
+        {"id": "p1", "type": "prompt", "message": "SYS\n\nUse the ls tool, then stop."},
+        "agent_settled",
+    ),
+    ({"id": "c1", "type": "compact"}, "response:compact"),
+    ({"id": "p2", "type": "prompt", "message": "Second turn."}, "agent_settled"),
+    ({"id": "a1", "type": "abort"}, "response:abort"),
+    ({"id": "s2", "type": "get_state"}, "response:get_state"),
+)
+
+
+def _capture_rpc(pi: str, project: Path, env: dict[str, str]) -> list[str]:
+    """Drive one RPC process through RPC_COMMANDS; its stdout, line by line."""
+    process = subprocess.Popen(
+        [
+            pi,
+            "--mode",
+            "rpc",
+            "--model",
+            "fake/fake-tool",
+            "--session-id",
+            RPC_SESSION_ID,
+            "--tools",
+            "read,bash,edit,write,grep,find,ls",
+        ],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        bufsize=1,
+        cwd=project,
+        env=env,
+    )
+    assert process.stdin is not None and process.stdout is not None
+    lines: list[str] = []
+    for command, until in RPC_COMMANDS:
+        process.stdin.write(json.dumps(command) + "\n")
+        process.stdin.flush()
+        kind, _, name = until.partition(":")
+        for _ in range(500):
+            line = process.stdout.readline()
+            if not line:
+                break
+            lines.append(line.rstrip("\n"))
+            event = json.loads(line)
+            if kind == "agent_settled" and event.get("type") == "agent_settled":
+                break
+            if (
+                kind == "response"
+                and event.get("type") == "response"
+                and event.get("command") == name
+            ):
+                break
+    process.stdin.close()
+    try:
+        process.wait(timeout=20)
+    except subprocess.TimeoutExpired:
+        process.kill()
+    assert process.returncode == 0, process.stderr.read() if process.stderr else ""
+    return lines
 
 
 def main() -> int:
@@ -222,6 +321,7 @@ def main() -> int:
                                     "fake-write",
                                     "fake-auth",
                                     "fake-length",
+                                    *_WRITE_TARGETS,
                                 )
                             ],
                         }
@@ -273,6 +373,92 @@ def main() -> int:
         assert not (project / "should-not-exist.txt").exists(), (
             "the read-only allowlist let a write through"
         )
+        # The write guard, as the provider installs it (core/agent_clients/pi_cli.py).
+        backend = HERE.parent.parent.parent / "apps" / "backend"
+        guard_source = (
+            backend / "core" / "agent_clients" / "pi_guard" / "workpilot-guard.js"
+        )
+        guard_target = project / ".workpilot" / "pi-guard" / "workpilot-guard.js"
+        guard_target.parent.mkdir(parents=True)
+        guard_target.write_bytes(guard_source.read_bytes())
+        guard_env = {
+            **env,
+            "WORKPILOT_PI_GUARD": json.dumps(
+                {
+                    "roots": [str(project), str(root / "scratch")],
+                    "protectedNames": [
+                        ".workpilot-allowlist",
+                        ".workpilot-security.json",
+                        ".claude_settings.json",
+                    ],
+                    "protectedDirs": {
+                        ".workpilot": [
+                            "guardrails.yaml",
+                            "guardrails.yml",
+                            "guardrails.json",
+                        ],
+                        ".claude": ["settings*.json"],
+                    },
+                    "protectedPrefixes": [
+                        str(project / ".pi"),
+                        str(guard_target.parent),
+                    ],
+                    "caseInsensitive": os.name == "nt",
+                }
+            ),
+        }
+        for name, model in (
+            ("guard-escape-refused", "fake-escape"),
+            ("guard-config-refused", "fake-guardrail"),
+            ("guard-inside-allowed", "fake-inside"),
+        ):
+            result = subprocess.run(
+                [
+                    pi,
+                    "--mode",
+                    "json",
+                    "--model",
+                    f"fake/{model}",
+                    "--tools",
+                    "read,bash,edit,write,grep,find,ls",
+                    "--extension",
+                    ".workpilot/pi-guard/workpilot-guard.js",
+                ],
+                input="Write the file.",
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                cwd=project,
+                env=guard_env,
+                check=False,
+            )
+            lines = [
+                _neutralise(line, str(project))
+                for line in result.stdout.splitlines()
+                if line.strip()
+            ]
+            (HERE / f"{name}.jsonl").write_text(
+                "\n".join(lines) + "\n", encoding="utf-8"
+            )
+            print(
+                f"{name}.jsonl: {len(lines)} events, exit {result.returncode}, stderr: {result.stderr.strip()[:120] or '-'}"
+            )
+        assert not (root / "escape.txt").exists(), (
+            "the guard let a write escape the project"
+        )
+        assert not (project / ".workpilot-allowlist").exists(), (
+            "the guard let a guardrail file be written"
+        )
+        assert (project / "notes" / "ok.txt").exists(), (
+            "the guard refused a write inside the project"
+        )
+        rpc_lines = [
+            _neutralise(line, str(project)) for line in _capture_rpc(pi, project, env)
+        ]
+        (HERE / "rpc-session.jsonl").write_text(
+            "\n".join(rpc_lines) + "\n", encoding="utf-8"
+        )
+        print(f"rpc-session.jsonl: {len(rpc_lines)} events")
     (HERE / "VERSION").write_text(f"{version}\n", encoding="utf-8")
     server.shutdown()
     return 0

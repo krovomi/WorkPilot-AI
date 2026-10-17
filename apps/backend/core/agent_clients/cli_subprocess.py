@@ -49,6 +49,42 @@ _SAFE_OPTION_VALUE = re.compile(r"^[A-Za-z0-9._:/@#+-]+$")
 #: The declaration that makes an agent type able to change anything.
 WRITE_CAPABLE_TOOLS = frozenset({"Write", "Edit", "Bash"})
 
+#: Model-id prefixes that name their provider unambiguously, for the bare ids
+#: a task inherits from another provider ("claude-sonnet-4-6" → anthropic/…).
+#: OpenCode and pi both take `provider/model`, with these provider names.
+_PROVIDER_BY_PREFIX = (
+    ("claude-", "anthropic"),
+    ("gpt-", "openai"),
+    ("o1", "openai"),
+    ("o3", "openai"),
+    ("o4", "openai"),
+    ("gemini-", "google"),
+    ("grok-", "xai"),
+)
+
+
+def qualify_provider_model(model: str | None, *, cli: str) -> str:
+    """The ``provider/model`` id a CLI takes, or ``"default"`` for its own default.
+
+    A bare id inherited from another provider is qualified when its family is
+    unambiguous, and dropped otherwise rather than sent to fail.
+    """
+    candidate = (model or "").strip()
+    if not candidate or candidate.lower() == "default":
+        return "default"
+    if "/" in candidate:
+        return candidate
+    lowered = candidate.lower()
+    for prefix, provider in _PROVIDER_BY_PREFIX:
+        if lowered.startswith(prefix):
+            return f"{provider}/{candidate}"
+    logger.warning(
+        "[%s] Model %r is not a provider/model id; using the CLI's default model",
+        cli,
+        candidate,
+    )
+    return "default"
+
 
 def validated_option(value: str, label: str, cli: str) -> str:
     """Reject an option value that could alter a Windows launcher command."""

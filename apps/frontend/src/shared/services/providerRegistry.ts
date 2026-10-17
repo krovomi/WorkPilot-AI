@@ -45,7 +45,7 @@ export interface ProvidersResponse {
 }
 
 /**
- * Coding-agent CLIs (OpenCode, Google Antigravity) choose their model inside
+ * Coding-agent CLIs (OpenCode, Google Antigravity, pi) choose their model inside
  * the CLI the user signed in to; `default` hands that choice back to it. The
  * backend reads the same sentinel (`phase_config.CLI_DEFAULT_MODEL`).
  */
@@ -114,8 +114,34 @@ const ANTIGRAVITY_MODELS: Provider["models"] = [
 	},
 ];
 
+/**
+ * pi takes `provider/model` ids too (`pi --list-models`); `default` leaves the
+ * choice to the model pi was configured with.
+ */
+const PI_MODELS: Provider["models"] = [
+	{ value: CLI_DEFAULT_MODEL, label: "pi default", tier: "standard" },
+	{
+		value: "anthropic/claude-opus-5",
+		label: "Claude Opus 5",
+		tier: "flagship",
+		supportsThinking: true,
+	},
+	{
+		value: "anthropic/claude-sonnet-4-5",
+		label: "Claude Sonnet 4.5",
+		tier: "standard",
+		supportsThinking: true,
+	},
+	{
+		value: "openai/gpt-5.5",
+		label: "GPT-5.5",
+		tier: "fast",
+		supportsThinking: true,
+	},
+];
+
 /** The CLI each CLI-backed provider runs, as `checkAgentCli` names it. */
-const AGENT_CLI_PROVIDERS = new Set(["opencode", "antigravity"]);
+const AGENT_CLI_PROVIDERS = new Set(["opencode", "antigravity", "pi"]);
 
 /**
  * Registre central des providers LLM
@@ -314,6 +340,19 @@ class ProviderRegistry {
 			requiresOAuth: false,
 			requiresCLI: true,
 			models: PROVIDER_MODELS_MAP.antigravity ?? ANTIGRAVITY_MODELS,
+		});
+
+		// --- pi (CLI) ---
+		this.providers.set("pi", {
+			name: "pi",
+			label: "pi",
+			description:
+				"Minimal, extensible coding agent (pi.dev) driven through the pi CLI",
+			category: "special",
+			requiresApiKey: false,
+			requiresOAuth: false,
+			requiresCLI: true,
+			models: PROVIDER_MODELS_MAP.pi ?? PI_MODELS,
 		});
 	}
 

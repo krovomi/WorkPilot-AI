@@ -26,11 +26,13 @@ type BadgeStatus = "loading" | "installed" | "not-found" | "error";
 const TOOL_NAMES: Readonly<Record<AgentCliTool, string>> = {
 	opencode: "OpenCode CLI",
 	antigravity: "Antigravity CLI",
+	pi: "pi (pi.dev)",
 };
 
 const SHORT_NAMES: Readonly<Record<AgentCliTool, string>> = {
 	opencode: "OpenCode",
 	antigravity: "Antigravity",
+	pi: "pi",
 };
 
 interface AgentCliStatusBadgeProps {
@@ -48,7 +50,7 @@ function toBadgeStatus(result: AgentCliStatus | null): BadgeStatus {
 
 /**
  * Sidebar badge for a coding-agent CLI WorkPilot drives as a provider
- * (OpenCode, Google Antigravity). It only says whether the executable is on
+ * (OpenCode, Google Antigravity, pi). It only says whether the executable is on
  * PATH and its version: each CLI owns its own sign-in.
  */
 export function AgentCliStatusBadge({
