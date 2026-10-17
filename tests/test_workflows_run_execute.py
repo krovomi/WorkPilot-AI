@@ -36,6 +36,7 @@ from core.pause_state import (  # noqa: E402
     is_paused,
     read_pause_state,
 )
+from core.platform import is_windows  # noqa: E402
 from workflows.engine import DETERMINISTIC_PHASES, ResolvedPhase  # noqa: E402
 from workflows.environments import (  # noqa: E402
     EnvironmentsError,
@@ -346,8 +347,13 @@ class TestExecute:
         monkeypatch.setenv(
             "RUN_API_TOKEN", "topsecretvalue-0123456789"
         )  # pragma: allowlist secret
+        # A step is a shell line, played by the platform's own shell: sh
+        # expands `$VAR`, cmd.exe expands `%VAR%` and prints `$VAR` as is.
+        # Either way the secret has to reach the output for the journal to
+        # have something to mask.
+        variable = "%RUN_API_TOKEN%" if is_windows() else "$RUN_API_TOKEN"
         text = PROCEDURE.replace(
-            "Commande : `ls`", "Commande : `echo token=$RUN_API_TOKEN`"
+            "Commande : `ls`", f"Commande : `echo token={variable}`"
         )
         (spec / "workflow" / "procedure.md").write_text(text, encoding="utf-8")
         state = _run(load_runbook(spec), spec, project)
