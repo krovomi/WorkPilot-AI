@@ -85,7 +85,17 @@ jobs:
           # Depuis la racine, sans argument : pytest suit `testpaths` du
           # pytest.ini racine, la seule configuration du depot (lot L11, F31),
           # et son `pythonpath` remplace le PYTHONPATH que ce pas posait.
-          pytest -v --tb=short -x
+          #
+          # Chaque test en echec devient une annotation du job (`::error`) :
+          # le resume court de pytest est la seule ligne qui nomme le test,
+          # et un journal brut de 12 000 lignes n'est pas toujours lisible
+          # depuis l'API (le stockage des journaux n'est pas joignable de
+          # partout). Le code de sortie de pytest reste celui du pas.
+          log="$(mktemp)"
+          status=0
+          pytest -v --tb=short -x -rfE 2>&1 | tee "$log" || status=$?
+          grep -E '^(FAILED|ERROR) ' "$log" | sed 's/^/::error title=pytest::/' || true
+          exit "$status"
 
       - name: Run coverage (Linux + Python 3.13 only)
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.13'
