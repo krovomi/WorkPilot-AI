@@ -21,7 +21,7 @@ autres providers ignoraient le paramètre. Résultat : le profil de workflow ann
 |---|---|---|
 | `native` | Claude | `agents=` du SDK, outil `Agent` |
 | `emulated` | Copilot, OpenAI, Gemini, Ollama / LM Studio, Mistral, DeepSeek, Grok, Windsurf — tout client qui tourne sur la boucle WorkPilot | l'outil `delegate`, et une **session enfant** du même client par délégation |
-| `none` | Codex, OpenCode, Antigravity (des CLI qui apportent leurs outils), et les providers sans adaptateur | aucun ; l'engine dégrade `subagent-per-task` en `sequential-reset` |
+| `none` | Codex, OpenCode, Antigravity, pi (des CLI qui apportent leurs outils), et les providers sans adaptateur | aucun ; l'engine dégrade `subagent-per-task` en `sequential-reset` |
 
 `ProviderCapabilities.supports_subagents` vaut pour `native` et `emulated`. Le mode
 `openai` + `OPENAI_AUTH_MODE=codex-cli` est le cas où la matrice statique ne suffit pas :

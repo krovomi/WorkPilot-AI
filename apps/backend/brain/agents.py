@@ -64,6 +64,8 @@ class AgentSpec:
     """``json`` (an ``mcpServers`` map), ``toml`` (Codex), ``yaml`` (hermes) or ``manual``."""
     mcp_config: str | None = None
     mcp_key: tuple[str, ...] = ("mcpServers",)
+    mcp_extras: tuple[tuple[str, str], ...] = ()
+    """Fields this agent's server entry needs beyond command/args/env."""
     notes: str = ""
 
     def resolve(self, rel: str) -> Path:
@@ -163,6 +165,10 @@ AGENTS: tuple[AgentSpec, ...] = (
         project_memory=("AGENTS.md",),
         bridge_file="$PI_AGENT_DIR/AGENTS.md",
         mcp_config="$PI_AGENT_DIR/mcp.json",
+        # pi exposes MCP tools to its codemode sandbox only by default; `direct`
+        # declares them to the model under `mcp__workpilot-brain__<tool>`, the
+        # names the provider adapter's `--tools` allowlist can grant.
+        mcp_extras=(("exposure", "direct"),),
         notes=(
             "PI_CODING_AGENT_DIR overrides ~/.pi/agent; pi writes mcp.json only on "
             "`pi mcp add` and `/mcp`, never during a run; trust.json gates a "

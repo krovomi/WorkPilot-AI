@@ -18,7 +18,7 @@ fichiers y renvoient.
 | [`RELEASE.md`](RELEASE.md) | publier une version | mainteneurs |
 | [`linux.md`](linux.md), [`windows-development.md`](windows-development.md) | notes par plateforme | guide |
 | [`providers/`](providers/) | architecture détaillée des providers Claude Code et GitHub Copilot | référence |
-| [`features/`](features/), [`integrations/`](integrations/) | une feature ou une intégration optionnelle expliquée à l'utilisateur | guide |
+| [`features/`](features/), [`integrations/`](integrations/) | une feature ou une intégration optionnelle expliquée à l'utilisateur (JEV, [pi](integrations/pi.md)…) | guide |
 | [Backlog produit](https://github.com/krovomi/WorkPilot-AI/issues/343) | idées et pistes produit : une issue par piste, sous l'issue parente #343 | backlog (issues) |
 | [`audit/`](audit/) | l'atlas d'architecture (`WorkPilot-architecture.html`, vue « Pour tous » lisible sans prérequis technique, feuille de route par type de tâche) et le cahier de nettoyage ; un historique, pas une règle | atlas · historique |
 | [`validation/`](validation/) | captures de validation manuelle | preuves |

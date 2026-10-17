@@ -9,7 +9,7 @@ Two jobs, the same for every provider that runs sub-agents:
   instructions. WorkPilot receives a result in two places:
   ``CopilotAgentClient.run_subagents``, which it runs, and the PostToolUse hook
   ``create_client`` registers on the Claude Agent SDK's sub-agent tool
-  (``make_subagent_result_hook``). Codex, OpenCode and Antigravity run no
+  (``make_subagent_result_hook``). Codex, OpenCode, Antigravity and pi run no
   sub-agents, nor does any other WorkPilot loop.
 * **Launch them staggered** (``launch_staggered``). A prompt cache is readable
   once the first response has begun. Launched together, N sub-agents that

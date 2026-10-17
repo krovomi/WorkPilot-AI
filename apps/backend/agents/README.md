@@ -135,7 +135,7 @@ For non-Anthropic providers, tier aliases such as `sonnet` are rewritten to
   specialist's role as system prompt and its tools translated to the executor's
   vocabulary and nothing else (`ToolExecutor.allowed_tools`, which only narrows the
   type's grant). Several delegations in one turn run together; a child cannot delegate.
-- **`none` — the CLIs** (Codex, OpenCode, Antigravity) bring their own tools and take
+- **`none` — the CLIs** (Codex, OpenCode, Antigravity, pi) bring their own tools and take
   no roster; the engine degrades `subagent-per-task` to `sequential-reset`. `openai`
   under `OPENAI_AUTH_MODE=codex-cli` is read from the auth mode.
 

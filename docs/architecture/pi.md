@@ -1,6 +1,6 @@
 # pi (pi.dev) — plan d'intégration par lots
 
-> **Statut : lots 0 et 1 livrés, lot 2 en cours.** Un lot = une PR vers `develop`. Les lots sont ordonnés par
+> **Statut : lots 0, 1 et 2 livrés ; lots 3 à 5 à faire.** Un lot = une PR vers `develop`. Les lots sont ordonnés par
 > dépendance, jamais par durée (règle 11 de `docs/CLAUDE.md`). Ce fichier devient la justification
 > de conception de la feature (`docs/architecture/`, une ligne dans `docs/CLAUDE.md`) ; chaque lot
 > livré remplace sa section « à faire » par ce qui a été fait, comme `context-harness.md`.
@@ -252,10 +252,25 @@ matrice). Le pack `skills/hermes` (vendorisé, amont) n'est pas touché : une pr
 | `docs/audit/WorkPilot-architecture.html` | nœud « Agents externes » (`Claude Code · Codex · hermes · Gemini… · pi`), section 02 (table des agents du cerveau) |
 | `CHANGELOG.md` `[Unreleased]` | entrée *Nouveautés* |
 
-## 5. Lot 2 — pi comme provider, mode `--mode json` (une invocation par turn)
+## 5. Lot 2 — pi comme provider, mode `--mode json` (une invocation par turn) (livré)
 
 Le cœur. Même frontière qu'OpenCode : processus par turn, prompt sur stdin, JSONL en sortie, le
-CLI possède ses outils, sa session et sa connexion.
+CLI possède ses outils, sa session et sa connexion. Livré tel que décrit ci-dessous, avec trois
+précisions prises en l'écrivant :
+
+- **L'allowlist nomme aussi les outils MCP** des serveurs que le type déclare
+  (`get_required_mcp_servers` → `mcp_tools_for_servers`), dans la graphie de pi
+  (`mcp__<serveur>__<outil>`, tout autre caractère remplacé par `_`). pi n'expose par défaut
+  les outils MCP qu'à son bac à sable `codemode`, que l'allowlist n'accorde pas ; `brain connect`
+  écrit donc l'entrée `workpilot-brain` avec `"exposure": "direct"` (`AgentSpec.mcp_extras`).
+- **Un id de session est un id** (`^[A-Za-z0-9-]{8,64}$`) : pi lit `--session` comme un chemin
+  dès qu'il contient `/`, `\` ou finit en `.jsonl`, et écrit `--session-id` dans un nom de
+  fichier. `_SAFE_OPTION_VALUE`, qui admet `.` et `/`, ne suffisait pas (S4).
+- **Un modèle inconnu n'est pas refusé par pi** mais par le fournisseur, en `stopReason: error` ;
+  le retry sur « default » se déclenche sur ce message, comme OpenCode.
+
+`qualify_provider_model` (`cli_subprocess.py`) est désormais partagé avec OpenCode. Guide
+utilisateur : [`../integrations/pi.md`](../integrations/pi.md).
 
 ### 5.1 `capabilities/providers.yaml`
 

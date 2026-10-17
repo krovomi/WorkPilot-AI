@@ -27,6 +27,7 @@ export type ApiProvider =
 	| "aws"
 	| "opencode"
 	| "antigravity"
+	| "pi"
 	| "unknown";
 
 /**
@@ -189,6 +190,8 @@ export function getProviderLabel(provider: ApiProvider): string {
 			return "OpenCode";
 		case "antigravity":
 			return "Google Antigravity";
+		case "pi":
+			return "pi";
 		case "unknown":
 			return "Unknown";
 	}
@@ -232,6 +235,8 @@ export function getProviderBadgeColor(provider: ApiProvider): string {
 			return "bg-slate-500/10 text-slate-500 border-slate-500/20 hover:bg-slate-500/15";
 		case "antigravity":
 			return "bg-indigo-500/10 text-indigo-500 border-indigo-500/20 hover:bg-indigo-500/15";
+		case "pi":
+			return "bg-rose-500/10 text-rose-500 border-rose-500/20 hover:bg-rose-500/15";
 		case "unknown":
 			return "bg-gray-500/10 text-gray-500 border-gray-500/20 hover:bg-gray-500/15";
 	}
