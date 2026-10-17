@@ -1621,6 +1621,17 @@ Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 e
 Les trois constats sont décrits dans l'atlas (`WorkPilot-architecture.html`, vue 06) ; la feuille de
 route est la vue 09, lisible sans prérequis technique comme la vue 00.
 
+## Annexe E — Ce qui a changé le 17 octobre 2026 (pi, lots 0 et 1)
+
+| Lot | Changement | Effet sur les constats |
+|---|---|---|
+| plan | `docs/architecture/pi.md` : pi (pi.dev) comme harness et comme provider, par lots ; douze points vérifiés dans la source de pi 1.3.0 (`AGENTS.md` prime sur `CLAUDE.md`, `--skill` accepte un dossier hors de la barrière de confiance, `--session <id>` résolu dans `PI_CODING_AGENT_SESSION_DIR`, `--tools` allowlist réelle, projet non approuvé ignoré sans trace en mode json, code de sortie 0 sur `stopReason: error`) | aucun |
+| 0 | `tests/fixtures/pi/` : six flux réels de pi 1.3.0 (`tool-call`, `resume-by-id`, `auth-error`, `unknown-model`, `readonly-write-refused`, `length`) capturés par `capture.py` contre un serveur OpenAI-compatible factice, clé fictive, aucun réseau | aucun ; S1 tenue (aucun secret dans les fixtures) |
+| 1 | `capabilities/harnesses.yaml` : entrée `pi` (`default: false`, n'émet rien, `tools:` = `read`/`write`/`edit`/`bash`/`grep`/`find`) ; `brain/agents.py` : `AgentSpec("pi")` et le préfixe `$PI_AGENT_DIR/` (`PI_CODING_AGENT_DIR`, sinon `~/.pi/agent`) ; `tests/test_brain.py`, `tests/test_skills_registry_agents.py` | `skills:check` sans diff (485 fichiers, `agnostic` + `gemini`) ; inventaire : `capabilities/harnesses.yaml`, `brain/agents.py` |
+
+Vérification de cette annexe : `pytest tests/test_brain.py tests/test_skills_registry_agents.py tests/test_docs_context.py -q` ;
+`python scripts/skills_cli.py build --check`.
+
 ## Annexe D — Ce qui a changé le 16 octobre 2026 (PR #457 à #462, puis le lot 3)
 
 | PR | Changement | Effet sur les constats |

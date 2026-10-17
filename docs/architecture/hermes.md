@@ -264,6 +264,17 @@ agent definition is emitted — but an empty map claimed "nothing to translate",
 wrong in the one direction that matters: the day hermes gets an agents path, an empty map
 emits Claude's names verbatim.
 
+### pi lit les mêmes fichiers, derrière sa propre barrière
+
+[pi](https://pi.dev) est dans la même situation que hermes du côté harness : il lit
+`AGENTS.md` et `.agents/skills/` nativement (spécification Agent Skills), donc
+`capabilities/harnesses.yaml` le liste et n'émet rien. Sa barrière de confiance est
+l'équivalent de `hermes skills trust` : `/trust` dans pi, écrit dans `~/.pi/agent/trust.json`,
+et rien dans ce dépôt ne l'accorde. La différence est que pi **peut** être piloté sans
+interface (`--mode json`, `--mode rpc`), donc il est aussi un provider, ce que hermes n'est
+pas. Le détail et les faits vérifiés : [`pi.md`](pi.md). La colonne pi du tableau
+**Portability** d'un candidat hermes vient de `harnesses.yaml` comme les autres.
+
 ### `SOUL.md`
 
 `SOUL.md` at the root of this repository is the persona WorkPilot offers, and it is

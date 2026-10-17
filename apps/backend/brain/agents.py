@@ -34,6 +34,18 @@ def _hermes_home() -> Path:
     return home() / ".hermes"
 
 
+def _pi_agent_dir() -> Path:
+    """pi's agent directory: ``PI_CODING_AGENT_DIR``, else ``~/.pi/agent`` on every OS.
+
+    pi resolves it the same way (`config.ts`, `getAgentDir`) and does not use
+    ``LOCALAPPDATA`` on Windows, unlike hermes.
+    """
+    override = os.environ.get("PI_CODING_AGENT_DIR", "").strip()
+    if override:
+        return Path(override).expanduser()
+    return home() / ".pi" / "agent"
+
+
 @dataclass(frozen=True)
 class AgentSpec:
     name: str
@@ -57,6 +69,8 @@ class AgentSpec:
     def resolve(self, rel: str) -> Path:
         if rel.startswith("$HERMES_HOME/"):
             return _hermes_home() / rel.removeprefix("$HERMES_HOME/")
+        if rel.startswith("$PI_AGENT_DIR/"):
+            return _pi_agent_dir() / rel.removeprefix("$PI_AGENT_DIR/")
         return home() / rel
 
     def global_paths(self) -> list[Path]:
@@ -138,6 +152,22 @@ AGENTS: tuple[AgentSpec, ...] = (
         project_memory=(".windsurfrules",),
         bridge_file=".codeium/windsurf/memories/global_rules.md",
         mcp_config=".codeium/windsurf/mcp_config.json",
+    ),
+    AgentSpec(
+        name="pi",
+        label="pi",
+        global_memory=("$PI_AGENT_DIR/AGENTS.md",),
+        # pi reads AGENTS.md (over CLAUDE.md) from the project and its parents;
+        # it has no memory file of its own there — .pi/APPEND_SYSTEM.md is a
+        # prompt fragment, not a memory.
+        project_memory=("AGENTS.md",),
+        bridge_file="$PI_AGENT_DIR/AGENTS.md",
+        mcp_config="$PI_AGENT_DIR/mcp.json",
+        notes=(
+            "PI_CODING_AGENT_DIR overrides ~/.pi/agent; pi writes mcp.json only on "
+            "`pi mcp add` and `/mcp`, never during a run; trust.json gates a "
+            "project's .pi/ and is never written here"
+        ),
     ),
     AgentSpec(
         name="copilot",

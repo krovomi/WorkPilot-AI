@@ -125,7 +125,7 @@ what stands in without it: [`docs/architecture/kanban-task-types.md`](../docs/ar
 
 `capabilities/harnesses.yaml` says where each tool looks. `.agents/skills/` is the
 canonical output: the WorkPilot backend serves it to the Kanban palette regardless of
-which LLM drives the task, and Copilot, Codex, Cursor, Amp and Gemini read it natively.
+which LLM drives the task, and Copilot, Codex, Cursor, Amp, Gemini, hermes and pi read it natively.
 The rest are mirrors for tools that only look in their own directory.
 
 It also carries the **tool-name map**. The subagent registry is written in

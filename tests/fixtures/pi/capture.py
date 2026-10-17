@@ -93,7 +93,11 @@ def _script(model: str, messages: list[dict]) -> list[bytes]:
         if not had_tool_result:
             return [
                 _chunk({"role": "assistant", "content": ""}),
-                _tool_call("call_write_1", "write", {"path": "should-not-exist.txt", "content": "x"}),
+                _tool_call(
+                    "call_write_1",
+                    "write",
+                    {"path": "should-not-exist.txt", "content": "x"},
+                ),
                 _chunk({}, "tool_calls", USAGE),
             ]
         return [
@@ -148,11 +152,26 @@ class _Handler(BaseHTTPRequestHandler):
 
 RUNS: tuple[tuple[str, str, list[str], str], ...] = (
     # fixture, model, extra args, prompt
-    ("tool-call", "fake-tool", ["--session-id", SESSION_ID, "--tools", "read,bash,edit,write,grep,find,ls"], "Use the ls tool on the current directory, then stop."),
-    ("resume-by-id", "fake-tool", ["--session", SESSION_ID, "--tools", "read,bash,edit,write,grep,find,ls"], "Second turn."),
+    (
+        "tool-call",
+        "fake-tool",
+        ["--session-id", SESSION_ID, "--tools", "read,bash,edit,write,grep,find,ls"],
+        "Use the ls tool on the current directory, then stop.",
+    ),
+    (
+        "resume-by-id",
+        "fake-tool",
+        ["--session", SESSION_ID, "--tools", "read,bash,edit,write,grep,find,ls"],
+        "Second turn.",
+    ),
     ("auth-error", "fake-auth", [], "Hello"),
     ("unknown-model", "does-not-exist", [], "Hello"),
-    ("readonly-write-refused", "fake-write", ["--tools", "read,grep,find,ls"], "Write a file"),
+    (
+        "readonly-write-refused",
+        "fake-write",
+        ["--tools", "read,grep,find,ls"],
+        "Write a file",
+    ),
     ("length", "fake-length", [], "Hello"),
 )
 
@@ -162,9 +181,13 @@ def _neutralise(line: str, project: str) -> str:
     if event.get("type") == "agent_end":
         event["messages"] = ["<elided: the whole conversation, already streamed above>"]
     message = event.get("message") if isinstance(event.get("message"), dict) else None
-    if event.get("type") in ("message_start", "message_end") and message and message.get("role") == "system":
+    if (
+        event.get("type") in ("message_start", "message_end")
+        and message
+        and message.get("role") == "system"
+    ):
         # pi's own system prompt, several KB of prose: keep the shape, not the text.
-        message["sections"] = {key: "<elided>" for key in message.get("sections", {})}
+        message["sections"] = dict.fromkeys(message.get("sections", {}), "<elided>")
     return json.dumps(event, ensure_ascii=False)
 
 
@@ -177,7 +200,11 @@ def main() -> int:
     threading.Thread(target=server.serve_forever, daemon=True).start()
     with tempfile.TemporaryDirectory(prefix="workpilot-pi-fixtures-") as tmp:
         root = Path(tmp)
-        agent_dir, session_dir, project = root / "agent", root / "sessions", root / "project"
+        agent_dir, session_dir, project = (
+            root / "agent",
+            root / "sessions",
+            root / "project",
+        )
         for d in (agent_dir, session_dir, project):
             d.mkdir()
         (agent_dir / "models.json").write_text(
@@ -188,7 +215,15 @@ def main() -> int:
                             "baseUrl": f"http://127.0.0.1:{PORT}/v1",
                             "api": "openai-completions",
                             "apiKey": DUMMY_KEY,
-                            "models": [{"id": m} for m in ("fake-tool", "fake-write", "fake-auth", "fake-length")],
+                            "models": [
+                                {"id": m}
+                                for m in (
+                                    "fake-tool",
+                                    "fake-write",
+                                    "fake-auth",
+                                    "fake-length",
+                                )
+                            ],
                         }
                     }
                 },
@@ -196,15 +231,23 @@ def main() -> int:
             ),
             encoding="utf-8",
         )
-        (project / "AGENTS.md").write_text("# AGENTS.md (fixture project)\n", encoding="utf-8")
+        (project / "AGENTS.md").write_text(
+            "# AGENTS.md (fixture project)\n", encoding="utf-8"
+        )
         (project / "README.md").write_text("hello\n", encoding="utf-8")
         env = {
-            **{k: v for k, v in os.environ.items() if k in ("PATH", "SYSTEMROOT", "TEMP", "TMP", "HOME", "USERPROFILE")},
+            **{
+                k: v
+                for k, v in os.environ.items()
+                if k in ("PATH", "SYSTEMROOT", "TEMP", "TMP", "HOME", "USERPROFILE")
+            },
             "PI_CODING_AGENT_DIR": str(agent_dir),
             "PI_CODING_AGENT_SESSION_DIR": str(session_dir),
             "PI_SKIP_VERSION_CHECK": "1",
         }
-        version = subprocess.run([pi, "--version"], capture_output=True, text=True, env=env, check=False).stdout.strip()
+        version = subprocess.run(
+            [pi, "--version"], capture_output=True, text=True, env=env, check=False
+        ).stdout.strip()
         for name, model, extra, prompt in RUNS:
             result = subprocess.run(
                 [pi, "--mode", "json", "--model", f"fake/{model}", *extra],
@@ -216,10 +259,20 @@ def main() -> int:
                 env=env,
                 check=False,
             )
-            lines = [_neutralise(line, str(project)) for line in result.stdout.splitlines() if line.strip()]
-            (HERE / f"{name}.jsonl").write_text("\n".join(lines) + "\n", encoding="utf-8")
-            print(f"{name}.jsonl: {len(lines)} events, exit {result.returncode}, stderr: {result.stderr.strip()[:120] or '-'}")
-        assert not (project / "should-not-exist.txt").exists(), "the read-only allowlist let a write through"
+            lines = [
+                _neutralise(line, str(project))
+                for line in result.stdout.splitlines()
+                if line.strip()
+            ]
+            (HERE / f"{name}.jsonl").write_text(
+                "\n".join(lines) + "\n", encoding="utf-8"
+            )
+            print(
+                f"{name}.jsonl: {len(lines)} events, exit {result.returncode}, stderr: {result.stderr.strip()[:120] or '-'}"
+            )
+        assert not (project / "should-not-exist.txt").exists(), (
+            "the read-only allowlist let a write through"
+        )
     (HERE / "VERSION").write_text(f"{version}\n", encoding="utf-8")
     server.shutdown()
     return 0
