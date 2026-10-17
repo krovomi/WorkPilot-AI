@@ -943,8 +943,11 @@ class PiCliAgentClient(CliSubprocessAgentClient):
             try:
                 process.stdin.close()
                 await asyncio.wait_for(process.wait(), timeout=5)
-            except (OSError, RuntimeError, TimeoutError):
-                pass
+            except (OSError, RuntimeError, TimeoutError) as exc:
+                # The base class terminates (then kills) whatever is still running.
+                logger.debug(
+                    "[PiCliAgentClient] pi did not exit on stdin close: %s", exc
+                )
         task = self._rpc_stderr
         if task is not None and not task.done():
             task.cancel()
