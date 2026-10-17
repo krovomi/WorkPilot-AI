@@ -68,6 +68,25 @@ les outils MCP qu'à son bac à sable `codemode`, que WorkPilot n'accorde pas.
 | « pi's answer was cut by the model's output limit » | la réponse est partielle (`stopReason: length`) ; WorkPilot ne la compte pas comme un succès |
 | les skills ou extensions de `.pi/` ne sont pas chargés | le projet n'est pas approuvé dans pi (`/trust`) ; les skills de `.agents/skills/` arrivent de toute façon |
 
+## Deux modes, un garde-fou
+
+`WORKPILOT_PI_MODE=rpc` garde **un processus pi par session** au lieu d'un par phase : la fenêtre
+de contexte du modèle est connue, la compaction se demande à pi, une annulation lui est signalée
+(`abort`) avant d'arrêter le processus, et le prompt système n'est envoyé qu'une fois. Le défaut
+est `json`. Dans les deux modes, une question qu'une extension de pi poserait reçoit « annulé » :
+personne n'est là pour répondre.
+
+Dans les deux modes aussi, WorkPilot charge dans pi son garde-fou d'écriture
+(`.workpilot/pi-guard/workpilot-guard.js`, recopié avant chaque run, jamais poussé dans une PR) :
+un `write` ou un `edit` hors du worktree, du dossier de spec ou du dossier temporaire de WorkPilot
+est refusé, de même qu'une écriture sur `.workpilot-allowlist`, `.workpilot-security.json`,
+`.workpilot/guardrails.*`, `.claude/settings*.json` et `.pi/` — les mêmes règles que sur le SDK
+Claude. `bash` n'est pas jugé dans pi : le worktree isolé et `--tools` font ce qu'ils font sur
+OpenCode et Antigravity.
+
 Variables lues par l'adaptateur : `PI_CODING_AGENT_DIR` (où pi garde `trust.json` et `mcp.json`,
-par défaut `~/.pi/agent`). Posées par lui pour le sous-processus : `PI_CODING_AGENT_SESSION_DIR`,
-`PI_SKIP_VERSION_CHECK=1`.
+par défaut `~/.pi/agent`), `WORKPILOT_PI_MODE` (`json` ou `rpc`). Posées par lui pour le
+sous-processus : `PI_CODING_AGENT_SESSION_DIR`, `PI_SKIP_VERSION_CHECK=1`, `WORKPILOT_PI_GUARD`
+(la politique du garde-fou). Retirées de son environnement : `NODE_OPTIONS`, `LD_*`, `DYLD_*`,
+`TYPESAFE_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN` ; les clés de fournisseur que vous avez posées pour
+pi lui parviennent.

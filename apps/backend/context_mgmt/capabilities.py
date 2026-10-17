@@ -10,11 +10,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 # Client-level facts the provider matrix cannot express (see module docstring).
-_NATIVE_CLIENTS = {"openai-codex-cli"}
+# `pi-rpc`: a persistent pi process compacts on demand (`compact` over RPC)
+# where `pi --mode json` cannot; see core/agent_clients/pi_cli.py.
+_NATIVE_CLIENTS = {"openai-codex-cli", "pi-rpc"}
 
 # `provider_name()` of a client -> key of the provider matrix.
 _CLIENT_TO_PROVIDER = {
     "openai-codex-cli": "openai",
+    "pi-rpc": "pi",
     "gemini": "google",
     "xai": "grok",
     "lm-studio": "lmstudio",

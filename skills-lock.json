@@ -753,6 +753,14 @@
 				"dotnet": ">=10.0"
 			}
 		},
+		"pi": {
+			"kind": "skill",
+			"pack": "tooling",
+			"packVersion": "1.0.0",
+			"source": "skills/tooling/pi/SKILL.md",
+			"contentSha256": "06095dcd22e968ce2f682c88bbb4ac447252181326d631bbf97f39e38aff6e2e",
+			"targets": {}
+		},
 		"proofread": {
 			"kind": "skill",
 			"pack": "tooling",
@@ -1204,6 +1212,7 @@
 		".agents/skills/net-developer/scripts/create_project.py",
 		".agents/skills/node-inspect-debugger/SKILL.md",
 		".agents/skills/opencode/SKILL.md",
+		".agents/skills/pi/SKILL.md",
 		".agents/skills/proofread/SKILL.md",
 		".agents/skills/python-debugpy/SKILL.md",
 		".agents/skills/reproduce/SKILL.md",
@@ -1353,6 +1362,7 @@
 		".gemini/commands/node-inspect-debugger.toml",
 		".gemini/commands/opencode.toml",
 		".gemini/commands/performance-analyst.toml",
+		".gemini/commands/pi.toml",
 		".gemini/commands/proofread.toml",
 		".gemini/commands/python-debugpy.toml",
 		".gemini/commands/reproduce.toml",

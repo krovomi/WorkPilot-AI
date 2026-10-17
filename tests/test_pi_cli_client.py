@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 from core.agent_client import ContentBlockType, MessageRole, PiCliAgentClient
 from core.agent_clients.pi_cli import (
+    GUARD_RELATIVE,
     PI_THINKING_LEVELS,
     PROJECT_SKILLS_DIR,
     PiCliAuthenticationError,
@@ -202,7 +203,9 @@ def test_a_later_turn_resumes_by_id_not_by_path() -> None:
     assert "--session-id" not in args
     assert "--model" not in args and "--thinking" not in args
     assert "--tools" not in args and "--skill" not in args
-    assert not any("/" in a or "\\" in a for a in args[1:])
+    # The one path in the vector is the guard's, relative and constant.
+    assert args[args.index("--extension") + 1] == GUARD_RELATIVE
+    assert not any("\\" in a or a.startswith("/") or ":" in a for a in args[1:]), args
 
 
 def test_an_empty_allowlist_is_still_an_allowlist() -> None:
@@ -668,3 +671,376 @@ def test_pi_is_declared_in_both_capability_matrices() -> None:
     assert caps.has_adapter and caps.adapter == "PiCliAgentClient"
     assert not caps.supports_subagents
     assert caps.degrades_to is None
+
+
+# --- rpc mode: one process per session, on the real stream -------------------
+
+
+class _RpcProcess:
+    """A pi RPC process replayed from `rpc-session.jsonl`.
+
+    Each command written to stdin releases the fixture's lines up to the event
+    that ends that exchange (the `response` to it, or `agent_settled` for a
+    prompt), with the response's `id` rewritten to the id the client sent.
+    `readline` blocks like a pipe: it waits for a line, or for stdin to close.
+    """
+
+    def __init__(self, lines: list[str], *, exit_on_close: int = 0) -> None:
+        import asyncio
+
+        self._lines = [json.loads(line) for line in lines]
+        self._cursor = 0
+        self._canned: dict[str, dict] = {}
+        self._out: asyncio.Queue[bytes] = asyncio.Queue()
+        self.commands: list[dict] = []
+        self.returncode: int | None = None
+        self._exit_on_close = exit_on_close
+        self.terminated = False
+        self.stdin = self
+        self.stdout = self
+        self.stderr = _LineReader([])
+        self.closed = False
+
+    def skip_leading(self, command: str) -> None:
+        """Advance past an exchange the fixture holds but the client never makes.
+
+        Its response is kept: `get_state` is answered from it whenever the
+        client asks, at any point, so the client's own cadence of state reads
+        does not have to match the capture's.
+        """
+        while self._cursor < len(self._lines):
+            event = self._lines[self._cursor]
+            self._cursor += 1
+            if event.get("type") == "response" and event.get("command") == command:
+                self._canned[command] = event
+                return
+
+    # stdin
+    def write(self, data: bytes) -> None:
+        command = json.loads(data.decode())
+        self.commands.append(command)
+        if command.get("type") == "extension_ui_response":
+            return
+        kind = command["type"]
+        if kind in self._canned:
+            answer = {**self._canned[kind], "id": command.get("id")}
+            self._out.put_nowait((json.dumps(answer) + "\n").encode())
+            return
+        while self._cursor < len(self._lines):
+            event = dict(self._lines[self._cursor])
+            self._cursor += 1
+            if event.get("type") == "response" and event.get("command") == kind:
+                event["id"] = command.get("id")
+            self._out.put_nowait((json.dumps(event) + "\n").encode())
+            if kind == "prompt":
+                # pi answers a prompt right away (`disposition: started`) and
+                # the turn's events follow: the exchange ends at agent_settled.
+                if event.get("type") == "agent_settled":
+                    return
+            elif event.get("type") == "response" and event.get("command") == kind:
+                return
+        # The fixture ran out: the stream ends, as a dying process would.
+        self._out.put_nowait(b"")
+
+    async def drain(self) -> None:
+        return None
+
+    def close(self) -> None:
+        self.closed = True
+        self.returncode = self._exit_on_close
+        self._out.put_nowait(b"")
+
+    # stdout
+    async def readline(self) -> bytes:
+        return await self._out.get()
+
+    async def read(self) -> bytes:
+        return b""
+
+    async def wait(self) -> int:
+        if self.returncode is None:
+            self.returncode = 0
+        return self.returncode
+
+    def terminate(self) -> None:
+        self.terminated = True
+        self.returncode = -15
+
+    def kill(self) -> None:
+        self.terminated = True
+        self.returncode = -9
+
+
+def _rpc_client(tmp_path: Path, factory: _ProcessFactory, **kwargs) -> PiCliAgentClient:
+    return _client(tmp_path, factory, mode="rpc", **kwargs)
+
+
+@pytest.mark.asyncio
+async def test_rpc_keeps_one_process_for_two_turns(tmp_path: Path) -> None:
+    process = _RpcProcess(_fixture("rpc-session"))
+    factory = _ProcessFactory(process)
+    client = _rpc_client(tmp_path, factory, system_prompt="SYS")
+
+    # The client's first exchange is the prompt; the fixture opens with a
+    # get_state the client never makes.
+    process.skip_leading("get_state")
+
+    first = await _collect(client, "Use the ls tool, then stop.")
+    second = await _collect(client, "Second turn.")
+
+    assert len(factory.calls) == 1, "rpc starts one process per session"
+    args, kwargs = factory.calls[0]
+    assert "rpc" in args and "--mode" in args
+    assert kwargs["env"]["PI_CODING_AGENT_SESSION_DIR"] == str(
+        tmp_path / "spec" / "pi-sessions"
+    )
+    sent = [c["type"] for c in process.commands]
+    assert sent == ["prompt", "get_state", "prompt", "get_state"]
+    prompts = [c["message"] for c in process.commands if c["type"] == "prompt"]
+    assert prompts[0].startswith("SYS")
+    assert not prompts[1].startswith("SYS"), (
+        "the system prompt is sent once per session"
+    )
+    assert first[0].content[0].tool_name == "ls"
+    assert first[-1].content[0].text == "Listed the directory."
+    assert second[-1].role == MessageRole.ASSISTANT
+    assert client.provider_name() == "pi-rpc"
+    assert client.resumes_native_session()
+    assert client.context_usage_source == "reported"
+    assert client.context_window_tokens == 128000
+    assert client.last_session_id == "22222222-2222-4222-8222-222222222222"
+    assert not process.terminated
+
+
+@pytest.mark.asyncio
+async def test_rpc_compact_reports_what_pi_answered(tmp_path: Path) -> None:
+    process = _RpcProcess(_fixture("rpc-session"))
+    client = _rpc_client(tmp_path, _ProcessFactory(process))
+    process.skip_leading("get_state")
+    await _collect(client, "first")
+    # The fixture's compact was refused: "Nothing to compact (session too small)".
+    assert await client.compact() is False
+    assert any(c["type"] == "compact" for c in process.commands)
+
+
+@pytest.mark.asyncio
+async def test_rpc_shutdown_closes_stdin_rather_than_killing(tmp_path: Path) -> None:
+    process = _RpcProcess(_fixture("rpc-session"))
+    client = _rpc_client(tmp_path, _ProcessFactory(process))
+    process.skip_leading("get_state")
+    async with client:
+        await _collect(client, "first")
+    assert process.closed
+    assert not process.terminated
+
+
+@pytest.mark.asyncio
+async def test_rpc_answers_an_extension_question_with_cancelled(tmp_path: Path) -> None:
+    question = json.dumps(
+        {
+            "type": "extension_ui_request",
+            "id": "q1",
+            "method": "confirm",
+            "title": "Delete everything?",
+        }
+    )
+    settled = [
+        json.dumps(
+            {
+                "id": "p",
+                "type": "response",
+                "command": "prompt",
+                "success": True,
+                "data": {"disposition": "started"},
+            }
+        ),
+        question,
+        json.dumps(
+            {
+                "type": "message_end",
+                "message": {
+                    "role": "assistant",
+                    "content": [{"type": "text", "text": "ok"}],
+                    "stopReason": "stop",
+                },
+            }
+        ),
+        json.dumps({"type": "agent_settled", "aborted": False}),
+        json.dumps(
+            {
+                "id": "s",
+                "type": "response",
+                "command": "get_state",
+                "success": True,
+                "data": {"sessionId": SESSION},
+            }
+        ),
+    ]
+    process = _RpcProcess(settled)
+    client = _rpc_client(tmp_path, _ProcessFactory(process))
+    messages = await _collect(client, "go")
+    answers = [c for c in process.commands if c.get("type") == "extension_ui_response"]
+    assert answers == [{"type": "extension_ui_response", "id": "q1", "cancelled": True}]
+    assert messages[-1].content[0].text == "ok"
+
+
+@pytest.mark.asyncio
+async def test_rpc_refused_prompt_is_an_error(tmp_path: Path) -> None:
+    lines = [
+        json.dumps(
+            {
+                "id": "p",
+                "type": "response",
+                "command": "prompt",
+                "success": False,
+                "error": "Bearer sk-ant-api03-SECRETSECRETSECRETSECRET rejected",
+            }
+        ),
+    ]
+    process = _RpcProcess(lines)
+    client = _rpc_client(tmp_path, _ProcessFactory(process))
+    with pytest.raises(PiCliError) as excinfo:
+        await _collect(client, "go")
+    assert "SECRETSECRET" not in str(excinfo.value)
+
+
+@pytest.mark.asyncio
+async def test_rpc_stream_closing_before_settled_is_an_error(tmp_path: Path) -> None:
+    lines = [
+        json.dumps(
+            {
+                "id": "p",
+                "type": "response",
+                "command": "prompt",
+                "success": True,
+                "data": {"disposition": "started"},
+            }
+        ),
+        json.dumps(
+            {
+                "type": "message_end",
+                "message": {
+                    "role": "assistant",
+                    "content": [{"type": "text", "text": "half"}],
+                    "stopReason": "stop",
+                },
+            }
+        ),
+    ]
+    process = _RpcProcess(lines)
+    client = _rpc_client(tmp_path, _ProcessFactory(process))
+    with pytest.raises(PiCliError, match="before the turn settled"):
+        await _collect(client, "go")
+
+
+def test_rpc_is_opt_in_and_declared_native_for_compaction(monkeypatch) -> None:
+    from context_mgmt.capabilities import context_capabilities
+    from core.agent_clients.pi_cli import pi_mode
+
+    monkeypatch.delenv("WORKPILOT_PI_MODE", raising=False)
+    assert pi_mode() == "json"
+    assert pi_mode("rpc") == "rpc"
+    monkeypatch.setenv("WORKPILOT_PI_MODE", "rpc")
+    assert pi_mode() == "rpc"
+    assert pi_mode("nonsense") == "json"
+    assert context_capabilities("pi").compact == "emulated"
+    assert context_capabilities("pi-rpc").compact == "native"
+    assert context_capabilities("pi-rpc").provider == "pi"
+
+
+# --- lot 4: the write guard and the constructed environment ------------------
+
+
+def test_guard_policy_comes_from_path_guards_tables(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from core.agent_clients.pi_cli import pi_guard_policy
+    from security.path_guard import PROTECTED_CONFIG_DIRS, PROTECTED_CONFIG_NAMES
+
+    monkeypatch.delenv("WORKPILOT_WRITE_ROOTS", raising=False)
+    project = tmp_path / "wt"
+    spec = tmp_path / "spec"
+    project.mkdir()
+    spec.mkdir()
+    policy = pi_guard_policy(project, spec)
+    assert policy["roots"][:2] == [str(project.resolve()), str(spec.resolve())]
+    assert policy["protectedNames"] == list(PROTECTED_CONFIG_NAMES)
+    assert policy["protectedDirs"] == {
+        d: list(p) for d, p in PROTECTED_CONFIG_DIRS.items()
+    }
+    assert str(project / ".pi") in policy["protectedPrefixes"]
+    assert str(project / ".workpilot" / "pi-guard") in policy["protectedPrefixes"]
+
+
+def test_guard_is_installed_fresh_before_every_run(tmp_path: Path) -> None:
+    from core.agent_clients.pi_cli import GUARD_SOURCE, install_pi_guard
+
+    target = install_pi_guard(tmp_path)
+    assert target == tmp_path / GUARD_RELATIVE
+    assert target.read_bytes() == GUARD_SOURCE.read_bytes()
+    target.write_text("export default function () {}\n", encoding="utf-8")
+    assert install_pi_guard(tmp_path).read_bytes() == GUARD_SOURCE.read_bytes()
+
+
+@pytest.mark.asyncio
+async def test_a_run_loads_the_guard_and_hands_it_the_policy(tmp_path: Path) -> None:
+    factory = _ProcessFactory(_FakeProcess(_fixture("tool-call")))
+    client = _client(tmp_path, factory)
+    await _collect(client)
+    args, kwargs = factory.calls[0]
+    assert args[args.index("--extension") + 1] == GUARD_RELATIVE
+    assert (tmp_path / GUARD_RELATIVE).is_file()
+    policy = json.loads(kwargs["env"]["WORKPILOT_PI_GUARD"])
+    assert str(tmp_path.resolve()) in policy["roots"]
+    assert str((tmp_path / "spec").resolve()) in policy["roots"]
+
+
+@pytest.mark.asyncio
+async def test_the_guard_can_be_declined_only_explicitly(tmp_path: Path) -> None:
+    factory = _ProcessFactory(_FakeProcess(_fixture("tool-call")))
+    client = _client(tmp_path, factory, guard=False)
+    await _collect(client)
+    args, kwargs = factory.calls[0]
+    assert "--extension" not in args
+    assert "WORKPILOT_PI_GUARD" not in kwargs["env"]
+    assert not (tmp_path / GUARD_RELATIVE).exists()
+
+
+@pytest.mark.parametrize(
+    ("fixture", "refused", "marker"),
+    [
+        ("guard-escape-refused", True, "outside the build's directories"),
+        ("guard-config-refused", True, ".workpilot-allowlist"),
+        ("guard-inside-allowed", False, "Successfully wrote"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_the_guard_refuses_in_pi_what_the_sdk_hook_refuses(
+    tmp_path: Path, fixture: str, refused: bool, marker: str
+) -> None:
+    """Real pi 1.3.0 streams with the guard loaded (tests/fixtures/pi/capture.py)."""
+    factory = _ProcessFactory(_FakeProcess(_fixture(fixture)))
+    client = _client(tmp_path, factory)
+    messages = await _collect(client)
+    result = messages[1].content[0]
+    assert result.type == ContentBlockType.TOOL_RESULT
+    assert result.is_error is refused
+    assert marker in result.result_content
+
+
+def test_the_environment_is_built_not_inherited(tmp_path: Path, monkeypatch) -> None:
+    from core.agent_clients.pi_cli import ENV_DENYLIST
+
+    monkeypatch.setenv("NODE_OPTIONS", "--require evil.js")
+    monkeypatch.setenv("LD_PRELOAD", "/tmp/evil.so")
+    monkeypatch.setenv("TYPESAFE_API_KEY", "sk-test-0000")
+    monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "sk-test-0000")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-0000")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-0000")
+    client = _client(tmp_path, _ProcessFactory())
+    env = client._subprocess_env()
+    assert not ENV_DENYLIST & set(env)
+    # pi owns its login: the provider credentials a person set stay with it.
+    assert env["ANTHROPIC_API_KEY"] == "sk-test-0000"
+    assert env["OPENAI_API_KEY"] == "sk-test-0000"
+    assert env["PWD"] == str(tmp_path)

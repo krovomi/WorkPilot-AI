@@ -36,6 +36,17 @@ project adheres to [Semantic Versioning](https://semver.org/).
   ledger du harness (`from_pi_usage`), `--thinking` depuis l'effort de la
   phase, badge **pi** dans la barre latérale, guide
   [`docs/integrations/pi.md`](docs/integrations/pi.md).
+- **pi en mode RPC, et deux garde-fous** (lots 3 et 4). `WORKPILOT_PI_MODE=rpc`
+  garde un processus pi par session : compaction à la demande, `abort` sur
+  annulation, fenêtre du modèle lue dans `get_state`, prompt système envoyé
+  une fois ; une question d'extension reçoit « annulé ». L'environnement de
+  pi est construit (sans `NODE_OPTIONS`, `LD_*`, `DYLD_*`, clé JEV ni jeton
+  OAuth de Claude Code), et un garde-fou d'écriture est chargé dans pi avec
+  la politique de `security/path_guard` : hors du worktree, de la spec et du
+  dossier temporaire, ou sur un fichier de garde-fous, un `write`/`edit` est
+  refusé dans le processus pi lui-même — prouvé contre pi 1.3.0
+  (`tests/fixtures/pi/guard-*.jsonl`). Un skill `tooling/pi` dit comment
+  piloter pi sans interface (lot 5).
 
 - **Les fichiers générés sortent propres.** Espaces de largeur nulle, espaces
   exotiques, contrôles bidirectionnels, caractères de balise : c'est ainsi qu'une
