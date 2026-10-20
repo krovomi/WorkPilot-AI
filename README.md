@@ -21,12 +21,12 @@
 <!-- STABLE_DOWNLOADS -->
 | Platform | Download |
 |----------|----------|
-| **Windows** | [WorkPilot-AI-1.2.1-win32-x64.exe](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.3.0/WorkPilot-AI-1.3.0-win32-x64.exe) |
-| **macOS (Apple Silicon)** | [WorkPilot-AI-1.2.1-darwin-arm64.dmg](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.3.0/WorkPilot-AI-1.3.0-darwin-arm64.dmg) |
-| **macOS (Intel)** | [WorkPilot-AI-1.2.1-darwin-x64.dmg](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.3.0/WorkPilot-AI-1.3.0-darwin-x64.dmg) |
-| **Linux** | [WorkPilot-AI-1.2.1-linux-x86_64.AppImage](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.3.0/WorkPilot-AI-1.3.0-linux-x86_64.AppImage) |
-| **Linux (Debian)** | [WorkPilot-AI-1.2.1-linux-amd64.deb](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.3.0/WorkPilot-AI-1.3.0-linux-amd64.deb) |
-| **Linux (Flatpak)** | [WorkPilot-AI-1.2.1-linux-x86_64.flatpak](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.3.0/WorkPilot-AI-1.3.0-linux-x86_64.flatpak) |
+| **Windows** | [WorkPilot-AI-1.3.0-win32-x64.exe](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.3.0/WorkPilot-AI-1.3.0-win32-x64.exe) |
+| **macOS (Apple Silicon)** | [WorkPilot-AI-1.3.0-darwin-arm64.dmg](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.3.0/WorkPilot-AI-1.3.0-darwin-arm64.dmg) |
+| **macOS (Intel)** | [WorkPilot-AI-1.3.0-darwin-x64.dmg](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.3.0/WorkPilot-AI-1.3.0-darwin-x64.dmg) |
+| **Linux** | [WorkPilot-AI-1.3.0-linux-x86_64.AppImage](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.3.0/WorkPilot-AI-1.3.0-linux-x86_64.AppImage) |
+| **Linux (Debian)** | [WorkPilot-AI-1.3.0-linux-amd64.deb](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.3.0/WorkPilot-AI-1.3.0-linux-amd64.deb) |
+| **Linux (Flatpak)** | [WorkPilot-AI-1.3.0-linux-x86_64.flatpak](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.3.0/WorkPilot-AI-1.3.0-linux-x86_64.flatpak) |
 <!-- STABLE_DOWNLOADS_END -->
 
 ### Beta Release
