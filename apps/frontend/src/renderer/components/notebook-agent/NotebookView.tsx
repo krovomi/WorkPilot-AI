@@ -1,10 +1,6 @@
 import type React from "react";
-import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import {
-	setupNotebookAgentListeners,
-	useNotebookAgentStore,
-} from "../../stores/notebook-agent-store";
+import { useNotebookAgentStore } from "../../stores/notebook-agent-store";
 import type { ParsedNotebook } from "../../../shared/types/notebook-agent";
 
 interface NotebookViewProps {
@@ -15,11 +11,6 @@ export function NotebookView({
 	projectPath,
 }: NotebookViewProps): React.ReactElement {
 	const { t } = useTranslation("notebookAgent");
-
-	useEffect(() => {
-		const cleanup = setupNotebookAgentListeners();
-		return cleanup;
-	}, []);
 
 	const phase = useNotebookAgentStore((s) => s.phase);
 	const status = useNotebookAgentStore((s) => s.status);

@@ -260,7 +260,7 @@ describe("taskMachine", () => {
 			expect(snapshot.context.reviewReason).toBe("errors");
 		});
 
-		it("should transition to error on QA_AGENT_ERROR", () => {
+		it("should hand a complete build whose QA could not conclude to human review", () => {
 			const events: TaskEvent[] = [
 				{ type: "PLANNING_STARTED" },
 				{
@@ -273,9 +273,12 @@ describe("taskMachine", () => {
 				{ type: "QA_AGENT_ERROR", iteration: 1, consecutiveErrors: 3 },
 			];
 
+			// QA runs after coding is done: its agent failing leaves finished
+			// work unverified, not a failed task.
 			const snapshot = runEvents(events);
-			expect(snapshot.value).toBe("error");
-			expect(snapshot.context.reviewReason).toBe("errors");
+			expect(snapshot.value).toBe("human_review");
+			expect(snapshot.context.reviewReason).toBe("qa_unverified");
+			expect(snapshot.context.error).toContain("failed 3 time(s)");
 		});
 
 		it("should allow recovery from error via USER_RESUMED", () => {
@@ -606,6 +609,123 @@ describe("taskMachine", () => {
 			const snapshot = runEvents(events);
 			expect(snapshot.value).toBe("human_review");
 			expect(snapshot.context.reviewReason).toBe("qa_rejected");
+		});
+	});
+
+	describe("a failed task always says why", () => {
+		/**
+		 * The bug this pins: the card landed in review with a red "Has Errors"
+		 * badge and nothing behind it. `setError` was wired to PLANNING_FAILED
+		 * and CODING_FAILED only — and those were exactly the two events the
+		 * backend never emitted. Every real failure arrived as PROCESS_EXITED,
+		 * QA_MAX_ITERATIONS or QA_AGENT_ERROR and carried no message at all.
+		 */
+		const failures: { from: string; event: TaskEvent }[] = [
+			{
+				from: "planning",
+				event: {
+					type: "PLANNING_FAILED",
+					error: "The model produced no valid implementation_plan.json.",
+					recoverable: true,
+				},
+			},
+			{
+				from: "coding",
+				event: {
+					type: "CODING_FAILED",
+					subtaskId: "subtask-1-1",
+					error: "The local model never called a tool.",
+					attemptCount: 3,
+				},
+			},
+			{
+				from: "planning",
+				event: { type: "PROCESS_EXITED", exitCode: 1, unexpected: true },
+			},
+			{
+				from: "coding",
+				event: { type: "PROCESS_EXITED", exitCode: 137, unexpected: true },
+			},
+			{
+				from: "qa_review",
+				event: { type: "QA_MAX_ITERATIONS", iteration: 50, maxIterations: 50 },
+			},
+		];
+
+		for (const { from, event } of failures) {
+			it(`sets a message for ${event.type} from ${from}`, () => {
+				const snapshot = runEvents([event], from);
+
+				expect(snapshot.value).toBe("error");
+				expect(snapshot.context.reviewReason).toBe("errors");
+				expect(snapshot.context.error?.trim()).toBeTruthy();
+			});
+		}
+
+		it("quotes the backend's own message rather than paraphrasing it", () => {
+			const snapshot = runEvents(
+				[
+					{
+						type: "PLANNING_FAILED",
+						error: "Planning failed: switch the Planning phase to a cloud model.",
+						recoverable: true,
+					},
+				],
+				"planning",
+			);
+
+			expect(snapshot.context.error).toBe(
+				"Planning failed: switch the Planning phase to a cloud model.",
+			);
+		});
+
+		it("names the QA agent's last error, not only how many times it failed", () => {
+			const snapshot = runEvents(
+				[
+					{
+						type: "QA_AGENT_ERROR",
+						iteration: 3,
+						consecutiveErrors: 3,
+						error: "Agent session error: overloaded",
+					},
+				],
+				"qa_review",
+			);
+
+			expect(snapshot.context.error).toBe(
+				"The QA agent failed 3 time(s) in a row on review pass 3. Last error: Agent session error: overloaded",
+			);
+		});
+
+		for (const from of ["qa_review", "qa_fixing"]) {
+			it(`keeps a QA agent failure from ${from} out of the error state`, () => {
+				const snapshot = runEvents(
+					[{ type: "QA_AGENT_ERROR", iteration: 3, consecutiveErrors: 3 }],
+					from,
+				);
+
+				expect(snapshot.value).toBe("human_review");
+				expect(snapshot.context.reviewReason).toBe("qa_unverified");
+				expect(snapshot.context.error?.trim()).toBeTruthy();
+			});
+		}
+
+		it("clears the message when the user relaunches", () => {
+			const snapshot = runEvents(
+				[
+					{
+						type: "CODING_FAILED",
+						subtaskId: "subtask-1-1",
+						error: "boom",
+						attemptCount: 1,
+					},
+					{ type: "USER_RESUMED" },
+				],
+				"coding",
+			);
+
+			expect(snapshot.value).toBe("coding");
+			expect(snapshot.context.error).toBeUndefined();
 		});
 	});
 

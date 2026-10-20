@@ -14,8 +14,8 @@ import {
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type {
-	GraphitiMemoryState,
-	GraphitiMemoryStatus,
+	MemoryState,
+	MemoryStatus,
 	MemoryEpisode,
 } from "../../../shared/types";
 import { cn } from "../../lib/utils";
@@ -31,8 +31,8 @@ import { MemoryCard } from "./MemoryCard";
 type FilterCategory = keyof typeof memoryFilterCategories;
 
 interface MemoriesTabProps {
-	readonly memoryStatus: GraphitiMemoryStatus | null;
-	readonly memoryState: GraphitiMemoryState | null;
+	readonly memoryStatus: MemoryStatus | null;
+	readonly memoryState: MemoryState | null;
 	readonly recentMemories: MemoryEpisode[];
 	readonly memoriesLoading: boolean;
 	readonly searchResults: Array<{
@@ -170,11 +170,11 @@ export function MemoriesTab({
 								<div className="grid gap-3 sm:grid-cols-2 text-sm">
 									<InfoItem
 										label={t("context:memories.database")}
-										value={memoryStatus.database || "auto_claude_memory"}
+										value={memoryStatus.database || "WorkPilot Brain"}
 									/>
 									<InfoItem
 										label={t("context:memories.path")}
-										value={memoryStatus.dbPath || "~/.workpilot/memories"}
+										value={memoryStatus.dbPath || "~/.workpilot/brain"}
 									/>
 								</div>
 
@@ -244,11 +244,7 @@ export function MemoriesTab({
 										: t("context:memories.notConfigured")}
 								</p>
 								<p className="mt-2 text-xs">
-									{t("context:memories.enableInstructions")}{" "}
-									<code className="bg-muted px-1 py-0.5 rounded">
-										GRAPHITI_ENABLED=true
-									</code>{" "}
-									{t("context:memories.inProjectSettings")}.
+									{t("context:memories.brainHint")}
 								</p>
 							</div>
 						)}

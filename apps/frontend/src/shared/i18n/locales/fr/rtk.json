@@ -1,0 +1,41 @@
+{
+	"title": "Économie de tokens (rtk)",
+	"subtitle": "La sortie des commandes est condensée avant qu'un agent la lise — même comportement, mêmes codes de retour, une fraction des octets.",
+	"state": {
+		"absent": "non installé",
+		"disabled": "désactivé",
+		"degraded": "partiel",
+		"active": "actif"
+	},
+	"refresh": "Actualiser",
+	"expand": "Détails",
+	"collapse": "Masquer",
+	"allGood": "Tout ce dont rtk a besoin est en place.",
+	"checks": {
+		"title": "Conditions",
+		"install": "binaire rtk",
+		"version": "version",
+		"enabled": "activé pour ce projet",
+		"terminal-hook": "vos propres terminaux"
+	},
+	"savings": {
+		"title": "Ce qui a été mesuré",
+		"summary": "{{commands}} commandes condensées, {{percent}} % de moins en moyenne — environ {{tokens}} tokens non envoyés.",
+		"none": "Aucune commande n'est encore passée par rtk sur ce projet.",
+		"detail": "{{input}} octets de sortie sont devenus {{output}} octets.",
+		"caveat": "Une estimation : rtk n'embarque pas de tokenizer et compte octets / 4. La sortie shell n'est qu'une entrée parmi d'autres, et les entrées ne sont qu'une moitié de la facture.",
+		"unavailable": "rtk n'a aucun chiffre à rapporter ici."
+	},
+	"settings": {
+		"title": "Économie de tokens (rtk)",
+		"description": "rtk est un proxy CLI qui filtre le bruit de la sortie des commandes avant qu'un agent la lise. C'est un binaire sur votre machine : installé, WorkPilot y fait passer les commandes de ses agents et leur indique que la sortie est condensée. Absent, rien ne change.",
+		"enabled": "Faire passer les commandes des agents par rtk",
+		"enabledHint": "Couvre tous les agents : planner, coder, QA, spec, GitHub, auto-réparation et le reste. Ne coûte rien quand rtk n'est pas installé.",
+		"modelFacing": "Condenser aussi les captures de WorkPilot",
+		"modelFacingHint": "Les diffs et journaux que WorkPilot met lui-même dans un prompt. Jamais appliqué à une sortie que WorkPilot analyse.",
+		"notInstalled": "rtk n'est pas installé sur cette machine.",
+		"install": "Installer rtk",
+		"terminalHook": "Vos propres sessions Claude Code ne sont pas couvertes tant que vous n'avez pas lancé une fois :",
+		"learnMore": "rtk sur GitHub"
+	}
+}

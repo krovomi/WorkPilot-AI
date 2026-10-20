@@ -312,7 +312,7 @@ export function Worktrees({ projectId }: WorktreesProps) {
 				await loadWorktrees();
 				setShowDeleteConfirm(false);
 				toast({
-					title: t("common:actions.success"),
+					title: t("common:labels.success"),
 					description: t("common:worktrees.deleteSuccess", {
 						branch: worktreeToDelete.branch || worktreeToDelete.specName,
 					}),
@@ -510,7 +510,7 @@ export function Worktrees({ projectId }: WorktreesProps) {
 			);
 		} else {
 			toast({
-				title: t("common:actions.success"),
+				title: t("common:labels.success"),
 				description: t("common:worktrees.bulkDeleteSuccess", {
 					count: deletedCount,
 				}),
@@ -663,7 +663,7 @@ export function Worktrees({ projectId }: WorktreesProps) {
 						<AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
 						<div>
 							<p className="font-medium text-destructive">
-								{t("common:status.error")}
+								{t("common:labels.error")}
 							</p>
 							<p className="text-muted-foreground mt-1 whitespace-pre-line">
 								{error}

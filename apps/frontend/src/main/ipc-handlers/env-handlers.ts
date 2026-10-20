@@ -1,7 +1,12 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import path from "node:path";
-import { DEFAULT_APP_SETTINGS, IPC_CHANNELS } from "../../shared/constants";
+import {
+	DEFAULT_APP_SETTINGS,
+	IPC_CHANNELS,
+	MASKED_SECRET,
+	MASKED_SECRET_CHAR,
+} from "../../shared/constants";
 import type {
 	AppSettings,
 	ClaudeAuthResult,
@@ -13,10 +18,23 @@ import {
 	getClaudeCliInvocation,
 	getClaudeCliInvocationAsync,
 } from "../claude-cli-utils";
-import { app, type BrowserWindow, ipcMain } from "../electron-utils";
+import { type BrowserWindow, ipcMain } from "../electron-utils";
 import { getSpawnCommand, getSpawnOptions } from "../env-utils";
+import {
+	readProjectEnv,
+	readProjectEnvFile,
+	writeProjectEnvFile,
+} from "../project-env-file";
+import { ensureProjectEnvIgnored } from "../project-initializer";
 import { projectStore } from "../project-store";
-import { parseEnvFile } from "./utils";
+import {
+	envTemplateKeys,
+	findEnvLineBreak,
+	parseEnvFile,
+	unownedEnvLines,
+} from "./utils";
+import { readSettingsFile } from "../settings-utils";
+import { backendFetch } from "./_backend-fetch";
 
 // GitLab environment variable keys
 const GITLAB_ENV_KEYS = {
@@ -91,6 +109,85 @@ const CICD_ENV_KEYS = {
 } as const;
 
 /**
+ * The `ProjectEnvConfig` fields that hold a secret. ENV_GET never hands their
+ * value to the renderer (rule S6): a set one reads as MASKED_SECRET.
+ */
+export const PROJECT_ENV_SECRET_FIELDS = [
+	"claudeOAuthToken",
+	"linearApiKey",
+	"githubToken",
+	"gitlabToken",
+	"azureDevOpsPat",
+	"jiraApiToken",
+	"cicdJenkinsToken",
+	"openaiApiKey",
+	"teamsWebhookUrl",
+	"slackWebhookUrl",
+	"discordWebhookUrl",
+	"googleChatWebhookUrl",
+	"notifyWebhookUrl",
+] as const satisfies readonly (keyof ProjectEnvConfig)[];
+
+/** `config` as the renderer may see it: every set secret replaced by the mask. */
+export function maskProjectEnvSecrets(
+	config: ProjectEnvConfig,
+): ProjectEnvConfig {
+	const masked: ProjectEnvConfig = { ...config };
+	for (const field of PROJECT_ENV_SECRET_FIELDS) {
+		if (masked[field]) masked[field] = MASKED_SECRET;
+	}
+	if (masked.mcpServers?.context7ApiKey) {
+		masked.mcpServers = {
+			...masked.mcpServers,
+			context7ApiKey: MASKED_SECRET,
+		};
+	}
+	return masked;
+}
+
+/**
+ * What a secret sent back by the renderer means: undefined (keep the stored
+ * value) for the mask, or the text typed after or around it.
+ */
+function unmaskSecret(value: string | undefined): string | undefined {
+	if (typeof value !== "string" || !value.includes(MASKED_SECRET_CHAR)) {
+		return value;
+	}
+	const typed = value.replaceAll(MASKED_SECRET_CHAR, "");
+	return typed === "" ? undefined : typed;
+}
+
+/** `config` from the renderer with masked secrets dropped, so they keep their stored value. */
+export function unmaskProjectEnvUpdate(
+	config: Partial<ProjectEnvConfig>,
+): Partial<ProjectEnvConfig> {
+	const result: Partial<ProjectEnvConfig> = { ...config };
+	for (const field of PROJECT_ENV_SECRET_FIELDS) {
+		if (!(field in result)) continue;
+		const value = unmaskSecret(result[field]);
+		if (value === undefined) delete result[field];
+		else result[field] = value;
+	}
+	if (result.mcpServers && "context7ApiKey" in result.mcpServers) {
+		const mcpServers = { ...result.mcpServers };
+		const value = unmaskSecret(mcpServers.context7ApiKey);
+		if (value === undefined) delete mcpServers.context7ApiKey;
+		else mcpServers.context7ApiKey = value;
+		result.mcpServers = mcpServers;
+	}
+	return result;
+}
+
+/** Notification channel (as the backend names it) → the `.workpilot/.env` key of its webhook URL. */
+const NOTIFICATION_WEBHOOK_KEYS: Readonly<Record<string, string>> = {
+	teams: TEAMS_ENV_KEYS.WEBHOOK_URL,
+	slack: SLACK_ENV_KEYS.WEBHOOK_URL,
+	discord: DISCORD_ENV_KEYS.WEBHOOK_URL,
+	google_chat: GOOGLE_CHAT_ENV_KEYS.WEBHOOK_URL,
+	webhook: NOTIFY_WEBHOOK_ENV_KEYS.WEBHOOK_URL,
+};
+
+/**
  * Helper to generate .env line (DRY)
  * Uses explicit undefined/null check instead of truthiness to avoid
  * commenting out values that are empty strings (e.g., from cleared inputs).
@@ -157,9 +254,6 @@ export function registerEnvHandlers(
 	// ============================================
 	// Environment Configuration Operations
 	// ============================================
-
-	// Get settings file path
-	const settingsPath = path.join(app.getPath("userData"), "settings.json");
 
 	/**
 	 * Generate .env file content from config
@@ -439,66 +533,8 @@ export function registerEnvHandlers(
 		if (config.defaultBranch !== undefined) {
 			existingVars.DEFAULT_BRANCH = config.defaultBranch;
 		}
-		if (config.graphitiEnabled !== undefined) {
-			existingVars.GRAPHITI_ENABLED = config.graphitiEnabled ? "true" : "false";
-		}
-		// Memory Provider Configuration
-		if (config.graphitiProviderConfig) {
-			const pc = config.graphitiProviderConfig;
-			if (pc.embeddingProvider)
-				existingVars.GRAPHITI_EMBEDDER_PROVIDER = pc.embeddingProvider;
-			// graphiti-core needs an LLM to ingest episodes (entity extraction).
-			// Derive it from the embedding provider; for Ollama this keeps the
-			// whole memory stack local.
-			if (pc.embeddingProvider === "ollama" && pc.ollamaLlmModel) {
-				existingVars.GRAPHITI_LLM_PROVIDER = "ollama";
-				existingVars.OLLAMA_LLM_MODEL = pc.ollamaLlmModel;
-			} else if (pc.embeddingProvider === "openai" && pc.openaiApiKey) {
-				existingVars.GRAPHITI_LLM_PROVIDER = "openai";
-			} else if (pc.embeddingProvider === "google" && pc.googleApiKey) {
-				existingVars.GRAPHITI_LLM_PROVIDER = "google";
-			} else if (pc.embeddingProvider === "openrouter" && pc.openrouterApiKey) {
-				existingVars.GRAPHITI_LLM_PROVIDER = "openrouter";
-			}
-			// OpenAI Embeddings
-			if (pc.openaiApiKey) existingVars.OPENAI_API_KEY = pc.openaiApiKey;
-			if (pc.openaiEmbeddingModel)
-				existingVars.OPENAI_EMBEDDING_MODEL = pc.openaiEmbeddingModel;
-			// Azure OpenAI Embeddings
-			if (pc.azureOpenaiApiKey)
-				existingVars.AZURE_OPENAI_API_KEY = pc.azureOpenaiApiKey;
-			if (pc.azureOpenaiBaseUrl)
-				existingVars.AZURE_OPENAI_BASE_URL = pc.azureOpenaiBaseUrl;
-			if (pc.azureOpenaiEmbeddingDeployment)
-				existingVars.AZURE_OPENAI_EMBEDDING_DEPLOYMENT =
-					pc.azureOpenaiEmbeddingDeployment;
-			// Voyage Embeddings
-			if (pc.voyageApiKey) existingVars.VOYAGE_API_KEY = pc.voyageApiKey;
-			if (pc.voyageEmbeddingModel)
-				existingVars.VOYAGE_EMBEDDING_MODEL = pc.voyageEmbeddingModel;
-			// Google Embeddings
-			if (pc.googleApiKey) existingVars.GOOGLE_API_KEY = pc.googleApiKey;
-			if (pc.googleEmbeddingModel)
-				existingVars.GOOGLE_EMBEDDING_MODEL = pc.googleEmbeddingModel;
-			// Ollama Embeddings
-			if (pc.ollamaBaseUrl) existingVars.OLLAMA_BASE_URL = pc.ollamaBaseUrl;
-			if (pc.ollamaEmbeddingModel)
-				existingVars.OLLAMA_EMBEDDING_MODEL = pc.ollamaEmbeddingModel;
-			if (pc.ollamaEmbeddingDim)
-				existingVars.OLLAMA_EMBEDDING_DIM = String(pc.ollamaEmbeddingDim);
-			// LadybugDB (embedded database)
-			if (pc.dbPath) existingVars.GRAPHITI_DB_PATH = pc.dbPath;
-			if (pc.database) existingVars.GRAPHITI_DATABASE = pc.database;
-		}
-		// Legacy fields (still supported)
 		if (config.openaiApiKey !== undefined) {
 			existingVars.OPENAI_API_KEY = config.openaiApiKey;
-		}
-		if (config.graphitiDatabase !== undefined) {
-			existingVars.GRAPHITI_DATABASE = config.graphitiDatabase;
-		}
-		if (config.graphitiDbPath !== undefined) {
-			existingVars.GRAPHITI_DB_PATH = config.graphitiDbPath;
 		}
 		if (config.enableFancyUi !== undefined) {
 			existingVars.ENABLE_FANCY_UI = config.enableFancyUi ? "true" : "false";
@@ -510,6 +546,9 @@ export function registerEnvHandlers(
 				existingVars.CONTEXT7_ENABLED = config.mcpServers.context7Enabled
 					? "true"
 					: "false";
+			}
+			if (config.mcpServers.context7ApiKey !== undefined) {
+				existingVars.CONTEXT7_API_KEY = config.mcpServers.context7ApiKey;
 			}
 			if (config.mcpServers.linearMcpEnabled !== undefined) {
 				existingVars.LINEAR_MCP_ENABLED = config.mcpServers.linearMcpEnabled
@@ -532,7 +571,35 @@ export function registerEnvHandlers(
 					? "true"
 					: "false";
 			}
-			// Note: graphitiEnabled is already handled via GRAPHITI_ENABLED above
+		}
+
+		// Token savings (rtk). Written to the same .workpilot/.env the backend
+		// reads, so the toggle reaches the agent hook, the awareness paragraph
+		// and WorkPilot's own captures from one place.
+		if (config.tokenSavings) {
+			if (config.tokenSavings.rtkEnabled !== undefined) {
+				existingVars.RTK_ENABLED = config.tokenSavings.rtkEnabled
+					? "true"
+					: "false";
+			}
+			if (config.tokenSavings.rtkModelFacing !== undefined) {
+				existingVars.RTK_MODEL_FACING = config.tokenSavings.rtkModelFacing
+					? "true"
+					: "false";
+			}
+		}
+
+		// ui-ux-pro-max. Same file, same reason: `uiux/settings.py` reads it,
+		// and the environment still wins over it.
+		if (config.uiux) {
+			if (config.uiux.enabled !== undefined) {
+				existingVars.UIUX_ENABLED = config.uiux.enabled ? "true" : "false";
+			}
+			if (config.uiux.persistMaster !== undefined) {
+				existingVars.UIUX_PERSIST_MASTER = config.uiux.persistMaster
+					? "true"
+					: "false";
+			}
 		}
 
 		// Per-agent MCP overrides (add/remove MCPs from specific agents)
@@ -677,12 +744,30 @@ ${existingVars.ENABLE_FANCY_UI ? `ENABLE_FANCY_UI=${existingVars.ENABLE_FANCY_UI
 # =============================================================================
 # Context7 documentation lookup (default: enabled)
 ${existingVars.CONTEXT7_ENABLED ? `CONTEXT7_ENABLED=${existingVars.CONTEXT7_ENABLED}` : "# CONTEXT7_ENABLED=true"}
+# Context7 API key - optional; without it the quota is the anonymous per-IP one
+${existingVars.CONTEXT7_API_KEY ? `CONTEXT7_API_KEY=${existingVars.CONTEXT7_API_KEY}` : "# CONTEXT7_API_KEY="}
 # Linear MCP integration (default: follows LINEAR_API_KEY)
 ${existingVars.LINEAR_MCP_ENABLED ? `LINEAR_MCP_ENABLED=${existingVars.LINEAR_MCP_ENABLED}` : "# LINEAR_MCP_ENABLED=true"}
 # Electron desktop automation - QA agents only (default: disabled)
 ${existingVars.ELECTRON_MCP_ENABLED ? `ELECTRON_MCP_ENABLED=${existingVars.ELECTRON_MCP_ENABLED}` : "# ELECTRON_MCP_ENABLED=false"}
 # Puppeteer browser automation - QA agents only (default: disabled)
 ${existingVars.PUPPETEER_MCP_ENABLED ? `PUPPETEER_MCP_ENABLED=${existingVars.PUPPETEER_MCP_ENABLED}` : "# PUPPETEER_MCP_ENABLED=false"}
+# Chrome DevTools browser automation - coder and QA agents (default: disabled)
+${existingVars.CHROME_DEVTOOLS_MCP_ENABLED ? `CHROME_DEVTOOLS_MCP_ENABLED=${existingVars.CHROME_DEVTOOLS_MCP_ENABLED}` : "# CHROME_DEVTOOLS_MCP_ENABLED=false"}
+
+# =============================================================================
+# TOKEN SAVINGS (rtk)
+# Condensed command output, for the models only (default: enabled)
+# =============================================================================
+${existingVars.RTK_ENABLED ? `RTK_ENABLED=${existingVars.RTK_ENABLED}` : "# RTK_ENABLED=true"}
+${existingVars.RTK_MODEL_FACING ? `RTK_MODEL_FACING=${existingVars.RTK_MODEL_FACING}` : "# RTK_MODEL_FACING=true"}
+
+# =============================================================================
+# UI/UX DESIGN SYSTEM (ui-ux-pro-max)
+# Only on tasks that touch an interface (default: enabled)
+# =============================================================================
+${existingVars.UIUX_ENABLED ? `UIUX_ENABLED=${existingVars.UIUX_ENABLED}` : "# UIUX_ENABLED=true"}
+${existingVars.UIUX_PERSIST_MASTER ? `UIUX_PERSIST_MASTER=${existingVars.UIUX_PERSIST_MASTER}` : "# UIUX_PERSIST_MASTER=true"}
 
 # =============================================================================
 # PER-AGENT MCP OVERRIDES
@@ -705,46 +790,40 @@ ${
 ${existingVars.CUSTOM_MCP_SERVERS ? `CUSTOM_MCP_SERVERS=${existingVars.CUSTOM_MCP_SERVERS}` : "# CUSTOM_MCP_SERVERS=[]"}
 
 # =============================================================================
-# MEMORY INTEGRATION
-# Embedding providers: OpenAI, Google AI, Azure OpenAI, Ollama, Voyage
+# PROVIDER KEYS
+# Read by provider clients and the local OCR / Ollama engines.
 # =============================================================================
-${existingVars.GRAPHITI_ENABLED ? `GRAPHITI_ENABLED=${existingVars.GRAPHITI_ENABLED}` : "# GRAPHITI_ENABLED=true"}
-
-# Embedding Provider (for semantic search - optional, keyword search works without)
-${existingVars.GRAPHITI_EMBEDDER_PROVIDER ? `GRAPHITI_EMBEDDER_PROVIDER=${existingVars.GRAPHITI_EMBEDDER_PROVIDER}` : "# GRAPHITI_EMBEDDER_PROVIDER=ollama"}
-
-# LLM used by graphiti-core to ingest episodes (entity extraction)
-${existingVars.GRAPHITI_LLM_PROVIDER ? `GRAPHITI_LLM_PROVIDER=${existingVars.GRAPHITI_LLM_PROVIDER}` : "# GRAPHITI_LLM_PROVIDER=ollama"}
-${existingVars.OLLAMA_LLM_MODEL ? `OLLAMA_LLM_MODEL=${existingVars.OLLAMA_LLM_MODEL}` : "# OLLAMA_LLM_MODEL=qwen3:4b"}
-
-# OpenAI Embeddings
 ${existingVars.OPENAI_API_KEY ? `OPENAI_API_KEY=${existingVars.OPENAI_API_KEY}` : "# OPENAI_API_KEY="}
-${existingVars.OPENAI_EMBEDDING_MODEL ? `OPENAI_EMBEDDING_MODEL=${existingVars.OPENAI_EMBEDDING_MODEL}` : "# OPENAI_EMBEDDING_MODEL=text-embedding-3-small"}
-
-# Azure OpenAI Embeddings
 ${existingVars.AZURE_OPENAI_API_KEY ? `AZURE_OPENAI_API_KEY=${existingVars.AZURE_OPENAI_API_KEY}` : "# AZURE_OPENAI_API_KEY="}
 ${existingVars.AZURE_OPENAI_BASE_URL ? `AZURE_OPENAI_BASE_URL=${existingVars.AZURE_OPENAI_BASE_URL}` : "# AZURE_OPENAI_BASE_URL="}
-${existingVars.AZURE_OPENAI_EMBEDDING_DEPLOYMENT ? `AZURE_OPENAI_EMBEDDING_DEPLOYMENT=${existingVars.AZURE_OPENAI_EMBEDDING_DEPLOYMENT}` : "# AZURE_OPENAI_EMBEDDING_DEPLOYMENT="}
-
-# Voyage AI Embeddings
 ${existingVars.VOYAGE_API_KEY ? `VOYAGE_API_KEY=${existingVars.VOYAGE_API_KEY}` : "# VOYAGE_API_KEY="}
-${existingVars.VOYAGE_EMBEDDING_MODEL ? `VOYAGE_EMBEDDING_MODEL=${existingVars.VOYAGE_EMBEDDING_MODEL}` : "# VOYAGE_EMBEDDING_MODEL=voyage-3"}
-
-# Google AI Embeddings
 ${existingVars.GOOGLE_API_KEY ? `GOOGLE_API_KEY=${existingVars.GOOGLE_API_KEY}` : "# GOOGLE_API_KEY="}
-${existingVars.GOOGLE_EMBEDDING_MODEL ? `GOOGLE_EMBEDDING_MODEL=${existingVars.GOOGLE_EMBEDDING_MODEL}` : "# GOOGLE_EMBEDDING_MODEL=text-embedding-004"}
-
-# Ollama Embeddings (Local - free)
 ${existingVars.OLLAMA_BASE_URL ? `OLLAMA_BASE_URL=${existingVars.OLLAMA_BASE_URL}` : "# OLLAMA_BASE_URL=http://localhost:11434"}
-${existingVars.OLLAMA_EMBEDDING_MODEL ? `OLLAMA_EMBEDDING_MODEL=${existingVars.OLLAMA_EMBEDDING_MODEL}` : "# OLLAMA_EMBEDDING_MODEL=embeddinggemma"}
-${existingVars.OLLAMA_EMBEDDING_DIM ? `OLLAMA_EMBEDDING_DIM=${existingVars.OLLAMA_EMBEDDING_DIM}` : "# OLLAMA_EMBEDDING_DIM=768"}
-
-# LadybugDB Database (embedded - no Docker required)
-${existingVars.GRAPHITI_DATABASE ? `GRAPHITI_DATABASE=${existingVars.GRAPHITI_DATABASE}` : "# GRAPHITI_DATABASE=auto_claude_memory"}
-${existingVars.GRAPHITI_DB_PATH ? `GRAPHITI_DB_PATH=${existingVars.GRAPHITI_DB_PATH}` : "# GRAPHITI_DB_PATH=~/.workpilot/memories"}
 `;
 
-		return content;
+		// A key the template does not print belongs to someone else: the Figma
+		// token (figma-handlers.ts), the docintel / watermarks / verify / libdocs
+		// switches, AI_PROVIDER, a line written by hand. Carried over as written,
+		// since parseEnvFile strips quotes. AGENT_MCP_* is the template's even
+		// when it prints none: an override update may have just removed them.
+		const templateKeys = envTemplateKeys(content);
+		const otherLines = existingContent
+			? unownedEnvLines(
+					existingContent,
+					(key) => templateKeys.has(key) || key.startsWith("AGENT_MCP_"),
+				)
+			: [];
+		if (otherLines.length === 0) {
+			return content;
+		}
+
+		return `${content}
+# =============================================================================
+# OTHER SETTINGS
+# Not managed by this screen, kept as written
+# =============================================================================
+${otherLines.join("\n")}
+`;
 	};
 
 	ipcMain.handle(
@@ -761,16 +840,12 @@ ${existingVars.GRAPHITI_DB_PATH ? `GRAPHITI_DB_PATH=${existingVars.GRAPHITI_DB_P
 
 			const envPath = path.join(project.path, project.autoBuildPath, ".env");
 
-			// Load global settings for fallbacks
-			let globalSettings: AppSettings = { ...DEFAULT_APP_SETTINGS };
-			if (existsSync(settingsPath)) {
-				try {
-					const content = readFileSync(settingsPath, "utf-8");
-					globalSettings = { ...globalSettings, ...JSON.parse(content) };
-				} catch {
-					// Use defaults
-				}
-			}
+			// Load global settings for fallbacks — through settings-utils, which
+			// decrypts the stored keys.
+			const globalSettings: AppSettings = {
+				...DEFAULT_APP_SETTINGS,
+				...readSettingsFile(),
+			};
 
 			// Default config
 			const config: ProjectEnvConfig = {
@@ -781,22 +856,13 @@ ${existingVars.GRAPHITI_DB_PATH ? `GRAPHITI_DB_PATH=${existingVars.GRAPHITI_DB_P
 				azureDevOpsEnabled: false,
 				jiraEnabled: false,
 				teamsNotificationsEnabled: false,
-				graphitiEnabled: false,
 				enableFancyUi: true,
 				claudeTokenIsGlobal: false,
 				openaiKeyIsGlobal: false,
 			};
 
-			// Parse project-specific .env if it exists
-			let vars: Record<string, string> = {};
-			if (existsSync(envPath)) {
-				try {
-					const content = readFileSync(envPath, "utf-8");
-					vars = parseEnvFile(content);
-				} catch {
-					// Continue with empty vars
-				}
-			}
+			// Parse project-specific .env if it exists, tokens decrypted
+			const vars = readProjectEnvFile(envPath);
 
 			// Claude OAuth Token: project-specific takes precedence, then global
 			if (vars.CLAUDE_CODE_OAUTH_TOKEN) {
@@ -985,10 +1051,6 @@ ${existingVars.GRAPHITI_DB_PATH ? `GRAPHITI_DB_PATH=${existingVars.GRAPHITI_DB_P
 				config.defaultBranch = vars.DEFAULT_BRANCH;
 			}
 
-			if (vars.GRAPHITI_ENABLED?.toLowerCase() === "true") {
-				config.graphitiEnabled = true;
-			}
-
 			// OpenAI API Key: project-specific takes precedence, then global
 			if (vars.OPENAI_API_KEY) {
 				config.openaiApiKey = vars.OPENAI_API_KEY;
@@ -998,71 +1060,35 @@ ${existingVars.GRAPHITI_DB_PATH ? `GRAPHITI_DB_PATH=${existingVars.GRAPHITI_DB_P
 				config.openaiKeyIsGlobal = true;
 			}
 
-			if (vars.GRAPHITI_DATABASE) {
-				config.graphitiDatabase = vars.GRAPHITI_DATABASE;
-			}
-			if (vars.GRAPHITI_DB_PATH) {
-				config.graphitiDbPath = vars.GRAPHITI_DB_PATH;
-			}
-
 			if (vars.ENABLE_FANCY_UI?.toLowerCase() === "false") {
 				config.enableFancyUi = false;
-			}
-
-			// Populate graphitiProviderConfig from .env file (embeddings only - no LLM provider)
-			const embeddingProvider = vars.GRAPHITI_EMBEDDER_PROVIDER;
-			if (
-				embeddingProvider ||
-				vars.AZURE_OPENAI_API_KEY ||
-				vars.VOYAGE_API_KEY ||
-				vars.GOOGLE_API_KEY ||
-				vars.OLLAMA_BASE_URL
-			) {
-				config.graphitiProviderConfig = {
-					embeddingProvider:
-						(embeddingProvider as
-							| "openai"
-							| "voyage"
-							| "azure_openai"
-							| "ollama"
-							| "google") || "ollama",
-					// OpenAI Embeddings
-					openaiApiKey: vars.OPENAI_API_KEY,
-					openaiEmbeddingModel: vars.OPENAI_EMBEDDING_MODEL,
-					// Azure OpenAI Embeddings
-					azureOpenaiApiKey: vars.AZURE_OPENAI_API_KEY,
-					azureOpenaiBaseUrl: vars.AZURE_OPENAI_BASE_URL,
-					azureOpenaiEmbeddingDeployment:
-						vars.AZURE_OPENAI_EMBEDDING_DEPLOYMENT,
-					// Voyage Embeddings
-					voyageApiKey: vars.VOYAGE_API_KEY,
-					voyageEmbeddingModel: vars.VOYAGE_EMBEDDING_MODEL,
-					// Google Embeddings
-					googleApiKey: vars.GOOGLE_API_KEY,
-					googleEmbeddingModel: vars.GOOGLE_EMBEDDING_MODEL,
-					// Ollama Embeddings
-					ollamaBaseUrl: vars.OLLAMA_BASE_URL,
-					ollamaEmbeddingModel: vars.OLLAMA_EMBEDDING_MODEL,
-					ollamaEmbeddingDim: vars.OLLAMA_EMBEDDING_DIM
-						? Number.parseInt(vars.OLLAMA_EMBEDDING_DIM, 10)
-						: undefined,
-					ollamaLlmModel: vars.OLLAMA_LLM_MODEL,
-					// LadybugDB
-					database: vars.GRAPHITI_DATABASE,
-					dbPath: vars.GRAPHITI_DB_PATH,
-				};
 			}
 
 			// MCP Server Configuration (per-project overrides)
 			// Default: context7=true, linear=true (if API key set), electron/puppeteer=false
 			config.mcpServers = {
 				context7Enabled: vars.CONTEXT7_ENABLED?.toLowerCase() !== "false", // default true
-				graphitiEnabled: config.graphitiEnabled, // follows GRAPHITI_ENABLED
+				context7ApiKey: vars.CONTEXT7_API_KEY,
 				linearMcpEnabled: vars.LINEAR_MCP_ENABLED?.toLowerCase() !== "false", // default true
 				electronEnabled: vars.ELECTRON_MCP_ENABLED?.toLowerCase() === "true", // default false
 				puppeteerEnabled: vars.PUPPETEER_MCP_ENABLED?.toLowerCase() === "true", // default false
 				chromeDevtoolsEnabled:
 					vars.CHROME_DEVTOOLS_MCP_ENABLED?.toLowerCase() === "true", // default false
+			};
+
+			// Token savings (rtk) — both default true, because "on" costs
+			// nothing on a machine without rtk: every backend entry point
+			// answers "not installed" before doing any work.
+			config.tokenSavings = {
+				rtkEnabled: vars.RTK_ENABLED?.toLowerCase() !== "false",
+				rtkModelFacing: vars.RTK_MODEL_FACING?.toLowerCase() !== "false",
+			};
+
+			// ui-ux-pro-max — both default true: relevance is decided per
+			// task, and a backend task gets nothing whatever these say.
+			config.uiux = {
+				enabled: vars.UIUX_ENABLED?.toLowerCase() !== "false",
+				persistMaster: vars.UIUX_PERSIST_MASTER?.toLowerCase() !== "false",
 			};
 
 			// Parse per-agent MCP overrides (AGENT_MCP_<agent>_ADD/REMOVE)
@@ -1102,7 +1128,8 @@ ${existingVars.GRAPHITI_DB_PATH ? `GRAPHITI_DB_PATH=${existingVars.GRAPHITI_DB_P
 				}
 			}
 
-			return { success: true, data: config };
+			// Secrets stay in the main process: the renderer learns which are set.
+			return { success: true, data: maskProjectEnvSecrets(config) };
 		},
 	);
 
@@ -1113,6 +1140,16 @@ ${existingVars.GRAPHITI_DB_PATH ? `GRAPHITI_DB_PATH=${existingVars.GRAPHITI_DB_P
 			projectId: string,
 			config: Partial<ProjectEnvConfig>,
 		): Promise<IPCResult> => {
+			// Checked before anything is touched: the renderer is not trusted,
+			// and a value holding a line break would write lines of its own.
+			const lineBreakAt = findEnvLineBreak(config);
+			if (lineBreakAt !== null) {
+				return {
+					success: false,
+					error: `Line breaks are not allowed in project settings (${lineBreakAt})`,
+				};
+			}
+
 			const project = projectStore.getProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
@@ -1121,7 +1158,7 @@ ${existingVars.GRAPHITI_DB_PATH ? `GRAPHITI_DB_PATH=${existingVars.GRAPHITI_DB_P
 			// If the project hasn't been initialized yet (no .workpilot/ on disk yet),
 			// bootstrap autoBuildPath so integration config set at creation time (e.g. Azure/Jira
 			// from AddProjectModal) can still be persisted. The .workpilot/ directory itself is
-			// created below by the mkdirSync fallback when writing the .env file.
+			// created below by writeProjectEnvFile when writing the .env file.
 			let autoBuildPath = project.autoBuildPath;
 			if (!autoBuildPath) {
 				autoBuildPath = ".workpilot";
@@ -1142,16 +1179,17 @@ ${existingVars.GRAPHITI_DB_PATH ? `GRAPHITI_DB_PATH=${existingVars.GRAPHITI_DB_P
 				}
 
 				// Generate new content
-				const newContent = generateEnvContent(config, existingContent);
+				// A secret sent back as the mask ENV_GET showed keeps its stored value.
+				const newContent = generateEnvContent(
+					unmaskProjectEnvUpdate(config),
+					existingContent,
+				);
 
-				// Ensure parent directory exists (handles case where .workpilot was deleted or not created)
-				const envDir = path.dirname(envPath);
-				if (!existsSync(envDir)) {
-					mkdirSync(envDir, { recursive: true });
-				}
-
-				// Write to file
-				writeFileSync(envPath, newContent, "utf-8");
+				// A .env written before initialization has no .gitignore entry yet
+				await ensureProjectEnvIgnored(project.path, autoBuildPath);
+				// Tokens encrypted, file owner-only, parent directory created when
+				// .workpilot was deleted or never made (project-env-file)
+				writeProjectEnvFile(envPath, newContent);
 
 				return { success: true };
 			} catch (error) {
@@ -1164,6 +1202,49 @@ ${existingVars.GRAPHITI_DB_PATH ? `GRAPHITI_DB_PATH=${existingVars.GRAPHITI_DB_P
 							: "Failed to update .env file",
 				};
 			}
+		},
+	);
+
+	/**
+	 * Send a test message to a notification channel. The URL is the one stored
+	 * in the project's `.workpilot/.env`: the renderer only holds the mask. A
+	 * URL the renderer passes is used only when it is a new one (not the mask).
+	 * The backend validates it and posts it (a renderer fetch would hit CORS).
+	 */
+	ipcMain.handle(
+		IPC_CHANNELS.ENV_TEST_NOTIFICATION_WEBHOOK,
+		async (
+			_,
+			projectId: unknown,
+			channel: unknown,
+			url?: unknown,
+		): Promise<IPCResult<{ delivered: boolean }>> => {
+			const project =
+				typeof projectId === "string"
+					? projectStore.getProject(projectId)
+					: undefined;
+			if (!project) return { success: false, error: "Project not found" };
+			const key =
+				typeof channel === "string"
+					? NOTIFICATION_WEBHOOK_KEYS[channel]
+					: undefined;
+			if (!key) return { success: false, error: "Unknown channel" };
+
+			const typed =
+				typeof url === "string" ? unmaskSecret(url.trim()) : undefined;
+			const webhookUrl =
+				typed ||
+				readProjectEnv(project)[key] ||
+				"";
+			if (!webhookUrl) return { success: false, error: "No webhook URL" };
+
+			const result = await backendFetch<{ success?: boolean; error?: string }>(
+				"/api/notifications/test",
+				// backendFetch sets the JSON content type (and auth in server mode).
+				{ method: "POST", body: JSON.stringify({ channel, url: webhookUrl }) },
+			);
+			if (!result.success) return { success: false, error: result.error };
+			return { success: true, data: { delivered: true } };
 		},
 	);
 

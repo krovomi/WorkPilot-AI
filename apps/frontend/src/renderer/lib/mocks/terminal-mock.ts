@@ -82,10 +82,6 @@ export const terminalMock = {
 		},
 	}),
 
-	saveTerminalBuffer: async () => {
-		/* noop */
-	},
-
 	checkTerminalPtyAlive: async () => ({
 		success: true,
 		data: { alive: false },
@@ -138,9 +134,4 @@ export const terminalMock = {
 	onTerminalOAuthCodeNeeded: () => () => {
 		/* noop */
 	},
-
-	// OAuth code submission
-	submitOAuthCode: async () => ({
-		success: true,
-	}),
 };

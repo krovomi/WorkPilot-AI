@@ -27,14 +27,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-# Make claude_agent_sdk optional
+# Make claude_agent_sdk optional. Availability only: the client comes from
+# `create_simple_client`.
 try:
-    from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient
+    import claude_agent_sdk  # noqa: F401
 
     SDK_AVAILABLE = True
 except ImportError:
-    ClaudeAgentOptions = None
-    ClaudeSDKClient = None
     SDK_AVAILABLE = False
 
 # Linear status constants (matching Valma AI team setup)
@@ -46,15 +45,6 @@ STATUS_CANCELED = "Canceled"
 
 # State file name
 LINEAR_TASK_FILE = ".linear_task.json"
-
-# Linear MCP tools needed for updates
-LINEAR_TOOLS = [
-    "mcp__linear-server__list_teams",
-    "mcp__linear-server__create_issue",
-    "mcp__linear-server__update_issue",
-    "mcp__linear-server__create_comment",
-    "mcp__linear-server__list_issue_statuses",
-]
 
 
 @dataclass
@@ -116,19 +106,24 @@ def get_linear_api_key() -> str:
     return os.environ.get("LINEAR_API_KEY", "")
 
 
-def _create_linear_client() -> ClaudeSDKClient:
+def _create_linear_client():
     """
     Create a minimal Claude client with only Linear MCP tools.
     Used for focused mini-agent calls.
+
+    `linear_updater` declares the Linear server and no built-in tool. These
+    options used to be built here, with nothing denied and the approved tools
+    spelled `mcp__linear-server__…`, a server this session never had: no
+    Linear call was approved.
     """
     if not SDK_AVAILABLE:
         raise ImportError("claude_agent_sdk is not available")
 
     from core.auth import (
         ensure_claude_code_oauth_token,
-        get_sdk_env_vars,
         require_auth_token,
     )
+    from core.simple_client import create_simple_client
     from phase_config import resolve_model_id
 
     require_auth_token()  # Raises ValueError if no token found
@@ -138,23 +133,18 @@ def _create_linear_client() -> ClaudeSDKClient:
     if not linear_api_key:
         raise ValueError("LINEAR_API_KEY not set")
 
-    sdk_env = get_sdk_env_vars()
-
-    return ClaudeSDKClient(
-        options=ClaudeAgentOptions(
-            model=resolve_model_id("haiku"),  # Resolves via API Profile if configured
-            system_prompt="You are a Linear API assistant. Execute the requested Linear operation precisely.",
-            allowed_tools=LINEAR_TOOLS,
-            mcp_servers={
-                "linear": {
-                    "type": "http",
-                    "url": "https://mcp.linear.app/mcp",
-                    "headers": {"Authorization": f"Bearer {linear_api_key}"},
-                }
-            },
-            max_turns=10,  # Should complete in 1-3 turns
-            env=sdk_env,  # Pass ANTHROPIC_BASE_URL etc. to subprocess
-        )
+    return create_simple_client(
+        agent_type="linear_updater",
+        model=resolve_model_id("haiku"),  # Resolves via API Profile if configured
+        system_prompt="You are a Linear API assistant. Execute the requested Linear operation precisely.",
+        mcp_servers={
+            "linear": {
+                "type": "http",
+                "url": "https://mcp.linear.app/mcp",
+                "headers": {"Authorization": f"Bearer {linear_api_key}"},
+            }
+        },
+        max_turns=10,  # Should complete in 1-3 turns
     )
 
 
@@ -221,8 +211,8 @@ async def create_linear_task(
 
     prompt = f"""Create a Linear task with these details:
 
-1. First, use mcp__linear-server__list_teams to find the team ID
-2. Then, use mcp__linear-server__create_issue with:
+1. First, use mcp__linear__list_teams to find the team ID
+2. Then, use mcp__linear__create_issue with:
    - teamId: [the team ID from step 1]
    - title: "{title}"{desc_part}
 
@@ -296,8 +286,8 @@ async def update_linear_status(
 
     prompt = f"""Update Linear issue status:
 
-1. First, use mcp__linear-server__list_issue_statuses with teamId: "{state.team_id}" to find the state ID for "{new_status}"
-2. Then, use mcp__linear-server__update_issue with:
+1. First, use mcp__linear__list_issue_statuses with teamId: "{state.team_id}" to find the state ID for "{new_status}"
+2. Then, use mcp__linear__update_issue with:
    - issueId: "{state.task_id}"
    - stateId: [the state ID for "{new_status}" from step 1]
 
@@ -338,7 +328,7 @@ async def add_linear_comment(
 
     prompt = f"""Add a comment to Linear issue:
 
-Use mcp__linear-server__create_comment with:
+Use mcp__linear__create_comment with:
 - issueId: "{state.task_id}"
 - body: {json.dumps(comment)}
 

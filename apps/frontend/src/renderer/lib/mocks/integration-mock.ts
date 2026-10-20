@@ -11,7 +11,6 @@ export const integrationMock = {
 			linearEnabled: false,
 			githubEnabled: false,
 			gitlabEnabled: false,
-			graphitiEnabled: false,
 			azureDevOpsEnabled: false,
 			jiraEnabled: false,
 			enableFancyUi: true,
@@ -22,7 +21,12 @@ export const integrationMock = {
 		success: true,
 	}),
 
-	// Auto-Build Source Environment Operations
+	testNotificationWebhook: async () => ({
+		success: true,
+		data: { delivered: true },
+	}),
+
+	// WorkPilot AI Source Environment Operations
 	getSourceEnv: async () => ({
 		success: true,
 		data: {

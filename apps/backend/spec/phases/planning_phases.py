@@ -100,6 +100,8 @@ class PlanningPhaseMixin:
 
         errors = []
 
+        jev_advice = await self._jev_planning_advice()
+
         # Try Python script first (deterministic)
         self.ui.print_status("Trying planner.py (deterministic)...", "progress")
         success, output = self._run_script(
@@ -163,6 +165,7 @@ class PlanningPhaseMixin:
 
             success, output = await self.run_agent_fn(
                 "planner.md",
+                additional_context=jev_advice,
                 phase_name="planning",
             )
 
@@ -261,6 +264,11 @@ class PlanningPhaseMixin:
                     self.ui.print_status(f"{result.checkpoint}: FAIL", "error")
                 for err in result.errors:
                     print(f"    {self.ui.muted('Error:')} {err}")
+                # Warnings never fail the checkpoint, but they are the only
+                # place open questions and requirement coverage surface --
+                # collecting them and printing nothing made them unreadable.
+                for warn in result.warnings:
+                    print(f"    {self.ui.muted('Warning:')} {warn}")
 
             if all_valid:
                 print()

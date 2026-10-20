@@ -1,11 +1,15 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { TooltipProvider } from "./ui/tooltip";
 
 // Mock du contexte CLI : on contrôle le statut/version renvoyés au badge.
 const mockUseCliStatus = vi.fn();
+const refreshCatalog = vi.hoisted(() => vi.fn());
+vi.mock("@/hooks/useProviderModelCatalog", () => ({
+	refreshProviderModelCatalog: refreshCatalog,
+}));
 vi.mock("@/contexts/CliStatusContext", () => ({
 	useCliStatus: () => mockUseCliStatus(),
 }));
@@ -42,7 +46,32 @@ function renderBadge(ui: ReactElement) {
 describe("CodexCliStatusBadge", () => {
 	beforeEach(() => {
 		mockUseCliStatus.mockReset();
+		refreshCatalog.mockReset();
 	});
+	afterEach(() => vi.unstubAllGlobals());
+
+	it.each([true, false])(
+		"refreshes models only after a successful CLI update (%s)",
+		async (success) => {
+			setStatus("outdated", "1.0.0");
+			const update = vi
+				.fn()
+				.mockResolvedValue({ success, error: "update failed" });
+			vi.stubGlobal("electronAPI", { updateCodexCli: update });
+			renderBadge(<CodexCliStatusBadge />);
+			fireEvent.click(screen.getByRole("button", { name: /Codex/ }));
+			fireEvent.click(screen.getByRole("button", { name: "Update" }));
+			await waitFor(() => expect(update).toHaveBeenCalledOnce());
+			if (success) {
+				await waitFor(() =>
+					expect(refreshCatalog).toHaveBeenCalledWith("openai-codex"),
+				);
+			} else {
+				await screen.findByText("update failed");
+				expect(refreshCatalog).not.toHaveBeenCalled();
+			}
+		},
+	);
 
 	describe("mode replié (isCollapsed)", () => {
 		it("masque le libellé et le badge Update quand le statut est outdated", () => {

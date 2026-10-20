@@ -4,7 +4,7 @@ Deep Context Provider
 
 Enriches PR reviews with deep codebase context by integrating:
 - Context Builder: project patterns, conventions, related code
-- Graphiti Memory: historical insights, past bugs, regression patterns
+- Shared brain memory: historical insights, past bugs, regression patterns
 - Architecture Enforcement: architectural rule validation
 
 This provider is called during PR review to give the AI reviewer
@@ -200,7 +200,7 @@ class DeepContextProvider:
 
     Integrates:
     1. Context Builder — finds related code, patterns, conventions
-    2. Graphiti Memory — retrieves historical insights and past bugs
+    2. Shared brain memory — retrieves historical insights and past bugs
     3. Architecture Enforcement — checks architectural rules
     """
 
@@ -402,14 +402,11 @@ class DeepContextProvider:
         search_query: str,
         changed_files: list[str],
     ) -> dict:
-        """Query Graphiti memory for historical insights."""
+        """Query the project's memory (the shared brain) for historical insights."""
         try:
-            from context.graphiti_integration import (
-                fetch_graph_hints,
-                is_graphiti_enabled,
-            )
+            from context.memory_hints import fetch_graph_hints, is_memory_enabled
 
-            if not is_graphiti_enabled():
+            if not is_memory_enabled():
                 return {"insights": [], "past_bugs": [], "regression_risks": []}
 
             # Query for general insights about this area
@@ -556,10 +553,12 @@ async def store_review_learnings(
     changed_files: list[str],
 ) -> None:
     """
-    Store review findings as learnings in Graphiti memory.
+    Store the significant review findings in the project's memory (the shared brain).
 
-    Called after a review completes to build up project knowledge
-    for future reviews.
+    Called after a review (GitHub, GitLab, Azure DevOps) so the next review —
+    and the next build of the same project — knows where this code breaks.
+    Critical and high findings only: a memory that files every nit is one
+    nobody recalls from.
 
     Args:
         project_dir: Project root directory
@@ -569,47 +568,39 @@ async def store_review_learnings(
         changed_files: Files changed in the PR
     """
     try:
-        from context.graphiti_integration import is_graphiti_enabled
+        from memory.store import get_project_memory
 
-        if not is_graphiti_enabled():
+        memory = get_project_memory(None, project_dir)
+        if memory is None:
             return
 
-        from integrations.graphiti.memory import get_graphiti_memory
+        significant = [
+            f for f in findings if f.get("severity", "low") in ("critical", "high")
+        ]
 
-        # Create a temporary spec dir for memory scoping
-        github_dir = project_dir / ".workpilot" / "github"
-        github_dir.mkdir(parents=True, exist_ok=True)
+        def write() -> int:
+            stored = 0
+            for finding in significant:
+                title = str(finding.get("title") or "").strip()
+                description = str(finding.get("description") or "")[:500].strip()
+                file_path = str(finding.get("file") or "").strip()
+                where = f" (`{file_path}`)" if file_path else ""
+                gotcha = f"{title}{where}" if title else description
+                stored += memory.record_gotcha(
+                    gotcha,
+                    trigger=description if title else "",
+                    context=(
+                        f"review #{pr_number} « {pr_title} », "
+                        f"{finding.get('severity')} / {finding.get('category', 'unknown')}"
+                    ),
+                )
+            return stored
 
-        memory = get_graphiti_memory(github_dir, project_dir)
-
-        # Store significant findings as learnings
-        for finding in findings:
-            severity = finding.get("severity", "low")
-            if severity not in ("critical", "high"):
-                continue
-
-            category = finding.get("category", "unknown")
-            file_path = finding.get("file", "unknown")
-            title = finding.get("title", "")
-            description = finding.get("description", "")
-
-            episode_data = {
-                "pr_number": pr_number,
-                "pr_title": pr_title,
-                "finding_severity": severity,
-                "finding_category": category,
-                "file": file_path,
-                "title": title,
-                "description": description[:500],
-                "changed_files": changed_files[:10],
-            }
-
-            episode_type = "qa_result" if category == "security" else "gotcha"
-            memory.store_episode(episode_type, episode_data)
+        stored = int((await memory._read(write) if significant else 0) or 0)
+        await memory.close()
 
         safe_print(
-            f"[Deep Context] Stored {len([f for f in findings if f.get('severity') in ('critical', 'high')])} "
-            f"review learnings to memory",
+            f"[Deep Context] Stored {stored} review learnings to the shared brain",
             flush=True,
         )
 

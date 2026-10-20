@@ -10,6 +10,7 @@ import {
 	buildPhaseRerunPlanUpdate,
 	downstreamLogPhases,
 	rerunDiscardsWork,
+	startPhaseRerun,
 } from "../plan-rerun-utils";
 
 function makePlan() {
@@ -61,8 +62,9 @@ describe("buildPhaseRerunPlanUpdate", () => {
 		const plan = makePlan();
 		buildPhaseRerunPlanUpdate(plan, "validation");
 
-		const subtasks = (plan.phases as Array<{ subtasks: Array<{ status: string }> }>)[0]
-			.subtasks;
+		const subtasks = (
+			plan.phases as Array<{ subtasks: Array<{ status: string }> }>
+		)[0].subtasks;
 		expect(subtasks[0].status).toBe("completed"); // untouched
 		expect(subtasks[1].status).toBe("blocked");
 		expect(plan.qa_signoff).toEqual({ status: "pending" });
@@ -110,8 +112,62 @@ describe("buildPhaseRerunPlanUpdate", () => {
 			phases: [{ chunks: [{ id: "c1", status: "completed" }] }],
 		} as Record<string, unknown>;
 		buildPhaseRerunPlanUpdate(plan, "coding");
-		const chunks = (plan.phases as Array<{ chunks: Array<{ status: string }> }>)[0]
-			.chunks;
+		const chunks = (
+			plan.phases as Array<{ chunks: Array<{ status: string }> }>
+		)[0].chunks;
 		expect(chunks[0].status).toBe("pending");
 	});
+});
+
+it("revalidates planning even when a spec file already exists", async () => {
+	const calls: string[] = [];
+	await startPhaseRerun("planning", {
+		spec: async () => {
+			calls.push("spec");
+		},
+		execution: async () => {
+			calls.push("execution");
+		},
+		isRunning: () => true,
+	});
+	expect(calls).toEqual(["spec"]);
+});
+
+it.each([
+	"coding",
+	"validation",
+] as const)("keeps %s on the execution pipeline", async (phase) => {
+	const calls: string[] = [];
+	await startPhaseRerun(phase, {
+		spec: async () => {
+			calls.push("spec");
+		},
+		execution: async () => {
+			calls.push("execution");
+		},
+		isRunning: () => true,
+	});
+	expect(calls).toEqual(["execution"]);
+});
+
+it("does not report success after an early launch return", async () => {
+	await expect(
+		startPhaseRerun("planning", {
+			spec: async () => undefined,
+			execution: async () => undefined,
+			isRunning: () => false,
+		}),
+	).rejects.toThrow("did not start");
+});
+
+it("propagates launch errors", async () => {
+	await expect(
+		startPhaseRerun("planning", {
+			spec: async () => {
+				throw new Error("Python unavailable");
+			},
+			execution: async () => undefined,
+			isRunning: () => false,
+		}),
+	).rejects.toThrow("Python unavailable");
 });

@@ -90,14 +90,17 @@ for _pkg, _subpath in [
 _sdk_utils_path = _BACKEND / "runners" / "github" / "services" / "sdk_utils.py"
 if "runners.github.services.sdk_utils" not in sys.modules:
     _spec = importlib.util.spec_from_file_location(
-        "runners.github.services.sdk_utils", _sdk_utils_path,
+        "runners.github.services.sdk_utils",
+        _sdk_utils_path,
         submodule_search_locations=[],
     )
     _sdk_utils_mod = importlib.util.module_from_spec(_spec)
     sys.modules["runners.github.services.sdk_utils"] = _sdk_utils_mod
     _spec.loader.exec_module(_sdk_utils_mod)
 
-process_agent_stream = sys.modules["runners.github.services.sdk_utils"].process_agent_stream
+process_agent_stream = sys.modules[
+    "runners.github.services.sdk_utils"
+].process_agent_stream
 
 from core.agent_client import (
     AgentClient,
@@ -159,16 +162,19 @@ class TestClaudeIntegrationPath:
     @pytest.mark.asyncio
     async def test_claude_agent_client_full_stream(self):
         """ClaudeAgentClient wraps SDK stream and preserves raw messages."""
+
         # Simulate SDK messages using proper named classes (SimpleNamespace.__class__
         # assignment is not supported for built-in types)
         class TextBlock:
             def __init__(self, type_, text):
                 self.type = type_
                 self.text = text
+
         class AssistantMessage:
             def __init__(self, content, structured_output=None):
                 self.content = content
                 self.structured_output = structured_output
+
         text_block = TextBlock("text", "Analysis complete")
         assistant_msg = AssistantMessage(content=[text_block], structured_output=None)
 
@@ -268,6 +274,7 @@ class TestCopilotIntegrationPath:
     async def test_copilot_subagent_parallel_execution(self):
         """CopilotAgentClient.run_subagents executes agents in parallel."""
         import time
+
         client = CopilotAgentClient(model="gpt-4o", github_token="gho_test_oauth")
         # Pre-set a valid copilot token to avoid real HTTP token exchange
         client._copilot_token = "copilot_test_token"
@@ -275,7 +282,9 @@ class TestCopilotIntegrationPath:
 
         agents = {
             "sec": SubagentDefinition(description="Security", prompt="Check sec"),
-            "quality": SubagentDefinition(description="Quality", prompt="Check quality"),
+            "quality": SubagentDefinition(
+                description="Quality", prompt="Check quality"
+            ),
             "logic": SubagentDefinition(description="Logic", prompt="Check logic"),
         }
 
@@ -289,11 +298,13 @@ class TestCopilotIntegrationPath:
             resp.__aexit__ = AsyncMock(return_value=None)
             return resp
 
-        responses = iter([
-            make_response("No security issues found"),
-            make_response("Code quality is acceptable"),
-            make_response("Logic is sound"),
-        ])
+        responses = iter(
+            [
+                make_response("No security issues found"),
+                make_response("Code quality is acceptable"),
+                make_response("Logic is sound"),
+            ]
+        )
 
         mock_session = MagicMock()
         mock_session.post = MagicMock(side_effect=lambda *a, **kw: next(responses))
@@ -376,7 +387,7 @@ class TestProviderSwitching:
         auto_claude_dir = tmp_path / ".workpilot"
         auto_claude_dir.mkdir()
         env_file = auto_claude_dir / ".env"
-        env_file.write_text("AI_PROVIDER=copilot\n")
+        env_file.write_text("AI_PROVIDER=copilot\n", encoding="utf-8")
 
         client = create_agent_client(
             project_dir=tmp_path,
@@ -407,15 +418,18 @@ class TestProcessAgentStreamIntegration:
             def __init__(self, type_, text):
                 self.type = type_
                 self.text = text
+
         class ResultMessage:
             def __init__(self, type_, subtype, structured_output):
                 self.type = type_
                 self.subtype = subtype
                 self.structured_output = structured_output
+
         class AssistantMessage:
             def __init__(self, content, structured_output=None):
                 self.content = content
                 self.structured_output = structured_output
+
         text_block = TextBlock("text", "Review complete")
         result_msg_raw = ResultMessage("result", None, {"verdict": "approve"})
         assistant_msg = AssistantMessage(content=[text_block], structured_output=None)
@@ -494,6 +508,7 @@ class TestOrchestratorReviewerIntegration:
             create_agent_client,
             process_agent_stream,
         )
+
         assert callable(create_agent_client)
         assert callable(process_agent_stream)
 
@@ -503,15 +518,9 @@ class TestOrchestratorReviewerIntegration:
             create_agent_client,
             process_agent_stream,
         )
+
         assert callable(create_agent_client)
         assert callable(process_agent_stream)
-
-    def test_agent_definition_optional(self):
-        """AgentDefinition import should not crash even if claude_agent_sdk missing."""
-        # This test verifies the try/except pattern works
-        import runners.github.services.parallel_orchestrator_reviewer as mod
-        # AgentDefinition can be None or the real class — both are acceptable
-        assert hasattr(mod, "AgentDefinition")
 
 
 # =============================================================================
@@ -531,7 +540,7 @@ class TestSessionProviderRouting:
         class SimpleTestClient(AgentClient):
             def __init__(self):
                 self.stored_prompt = None
-                
+
             async def query(self, prompt):
                 # Store the prompt for test verification - this mock client
                 # doesn't need to process it since receive_response() provides
@@ -542,7 +551,10 @@ class TestSessionProviderRouting:
                 yield AgentMessage(
                     role=MessageRole.ASSISTANT,
                     content=[
-                        ContentBlock(type=ContentBlockType.TEXT, text="Task implemented successfully")
+                        ContentBlock(
+                            type=ContentBlockType.TEXT,
+                            text="Task implemented successfully",
+                        )
                     ],
                 )
 
@@ -558,8 +570,10 @@ class TestSessionProviderRouting:
 
         client = SimpleTestClient()
 
-        with patch("agents.session.is_build_complete", return_value=True), \
-             patch("agents.session.get_task_logger", return_value=None):
+        with (
+            patch("agents.session.is_build_complete", return_value=True),
+            patch("agents.session.get_task_logger", return_value=None),
+        ):
             status, text, error_info = await run_agent_session(
                 client=client,
                 message="implement feature",
@@ -581,13 +595,13 @@ class TestCopilotWriteNowNudge:
     turns remain — and must NOT inject it once the plan has been written.
     """
 
-    def _make_client(self, max_turns: int):
+    def _make_client(self, max_turns: int, agent_type: str = "spec_writer"):
         client = CopilotAgentClient(
             model="claude-sonnet-4.6",
             cwd=".",
             max_turns=max_turns,
             github_token="ghp_test",
-            agent_type="spec_writer",
+            agent_type=agent_type,
         )
         # Expose the Write tool, as get_tool_definitions does for spec_writer.
         client._tool_definitions = [
@@ -649,12 +663,15 @@ class TestCopilotWriteNowNudge:
         return _Session()
 
     def _run_command_call(self, idx):
+        # A different command each turn, as an investigation runs: the same
+        # call with the same result turn after turn is the no-progress loop
+        # every client now stops (harness.domain.progress).
         return [
             {
                 "id": f"call_{idx}",
                 "function": {
                     "name": "run_command",
-                    "arguments": '{"command": "dir"}',
+                    "arguments": f'{{"command": "dir src/part_{idx}"}}',
                 },
             }
         ]
@@ -681,8 +698,7 @@ class TestCopilotWriteNowNudge:
         asyncio.run(_drive())
 
         nudge_seen = any(
-            msg.get("role") == "user"
-            and "STOP investigating" in msg.get("content", "")
+            msg.get("role") == "user" and "STOP investigating" in msg.get("content", "")
             for payload in captured
             for msg in payload
         )
@@ -730,8 +746,7 @@ class TestCopilotWriteNowNudge:
         asyncio.run(_drive())
 
         nudge_seen = any(
-            msg.get("role") == "user"
-            and "STOP investigating" in msg.get("content", "")
+            msg.get("role") == "user" and "STOP investigating" in msg.get("content", "")
             for payload in captured
             for msg in payload
         )
@@ -792,6 +807,59 @@ class TestCopilotWriteNowNudge:
         ]
         assert "Write" in executed_tools
 
+    def _investigate_then_stop(self, agent_type: str) -> list:
+        """Investigate past the nudge window, stop once in prose, then for
+        good; return every payload sent."""
+        client = self._make_client(20, agent_type)
+        responses = [("", self._run_command_call(i), "tool_calls") for i in range(14)]
+        responses += [("done", [], "stop"), ("done", [], "stop")]
+        captured: list = []
+        client._get_http_client = lambda: self._fake_session(responses, captured)
+
+        async def _drive():
+            client._pending_query = "work"
+            async for _ in client.receive_response():
+                pass
+
+        asyncio.run(_drive())
+        return [msg for payload in captured for msg in payload]
+
+    @pytest.mark.parametrize("agent_type", ["coder", "qa_fixer", "ideation"])
+    def test_a_session_with_no_required_file_is_never_told_to_write_the_plan(
+        self, agent_type
+    ):
+        """Audit F45. A coder short of turns was told to write
+        implementation_plan.json "with the COMPLETE JSON content" — over the
+        plan it was executing."""
+        messages = self._investigate_then_stop(agent_type)
+        nudges = [
+            m
+            for m in messages
+            if m.get("role") == "user"
+            and (
+                "STOP investigating" in m.get("content", "")
+                or "call the write tool now" in m.get("content", "").lower()
+            )
+        ]
+        assert not nudges
+
+    def test_the_planner_is_told_the_plan(self):
+        messages = self._investigate_then_stop("planner")
+        nudge = next(
+            m for m in messages if "STOP investigating" in m.get("content", "")
+        )
+        assert "implementation_plan.json" in nudge["content"]
+
+    def test_the_spec_writer_is_pointed_at_its_instructions(self):
+        """`spec_writer` runs spec_writer.md (spec.md), planner.md (the plan),
+        complexity_assessor.md…: the nudge cannot name one file for all."""
+        messages = self._investigate_then_stop("spec_writer")
+        nudge = next(
+            m for m in messages if "STOP investigating" in m.get("content", "")
+        )
+        assert "implementation_plan.json" not in nudge["content"]
+        assert "your instructions require" in nudge["content"]
+
 
 class TestCopilotRequestRetry:
     """A hung/stalled Copilot API response must be retried, not hang forever.
@@ -823,7 +891,9 @@ class TestCopilotRequestRetry:
         a clean 'stop' response. ``exc`` defaults to a TimeoutError factory."""
 
         if exc is None:
-            exc = lambda: asyncio.TimeoutError("simulated stalled response")
+
+            def exc():
+                return asyncio.TimeoutError("simulated stalled response")
 
         class _Resp:
             def __init__(self, data):
@@ -1016,12 +1086,15 @@ class TestCopilotEmptyToolCallsGuard:
         return _Session()
 
     def _run_command_call(self, idx):
+        # A different command each turn, as an investigation runs: the same
+        # call with the same result turn after turn is the no-progress loop
+        # every client now stops (harness.domain.progress).
         return [
             {
                 "id": f"call_{idx}",
                 "function": {
                     "name": "run_command",
-                    "arguments": '{"command": "dir"}',
+                    "arguments": f'{{"command": "dir src/part_{idx}"}}',
                 },
             }
         ]
@@ -1084,4 +1157,3 @@ class TestCopilotEmptyToolCallsGuard:
         # Reached the natural 'stop', not the guard abort.
         assert any("all done" in t for t in texts)
         assert not any("infinite loop" in t.lower() for t in texts)
-

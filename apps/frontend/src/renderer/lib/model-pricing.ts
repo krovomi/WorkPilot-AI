@@ -1,15 +1,17 @@
 /**
- * Per-model pricing in USD per 1M tokens.
+ * Per-model pricing in USD per 1M tokens, for live cost previews in the
+ * renderer (where the backend isn't reachable as the user types).
  *
- * This is a pragmatic mirror of `apps/backend/cost_intelligence/catalog.py`
- * for use in the renderer where the backend isn't reachable (e.g. for live
- * cost previews that update as the user types). Keep input/output rates in
- * sync; cache/thinking/vision are intentionally omitted because the panels
- * that consume this estimate at the moment only have generic input+output
- * token budgets to work with.
- *
- * If you add a model here, mirror it in catalog.py and vice versa.
+ * The prices come from `apps/backend/cost_intelligence/catalog.py`, read from
+ * each provider's official pricing page, through `model-pricing.generated.json`
+ * (`python scripts/generate_model_catalog.py`, checked by `--check` and by
+ * tests/cost_intelligence/test_catalog.py). Change a price in the catalog,
+ * never here. Only input/output rates are mirrored: the panels that consume
+ * this estimate only have generic input+output token budgets to work with.
  */
+
+import { MODEL_ID_MAP } from "../../shared/constants/models";
+import generated from "../../shared/constants/model-pricing.generated.json";
 
 export interface ModelPricing {
 	/** Provider key (lower-case), matching `selectedProvider` in ProviderContext. */
@@ -22,126 +24,33 @@ export interface ModelPricing {
 	output: number;
 }
 
-const RAW: Record<string, Record<string, { input: number; output: number }>> = {
-	anthropic: {
-		"claude-opus-4-8": { input: 5.0, output: 25.0 },
-		// Fable 5 (Mythos-class, GA 2026-06-09) — prix public $10 / $50 par MTok.
-		"claude-fable-5": { input: 10.0, output: 50.0 },
-		// Mythos 5 — mêmes capacités/prix que Fable 5 (Project Glasswing).
-		"claude-mythos-5": { input: 10.0, output: 50.0 },
-		"claude-sonnet-4-8": { input: 3.0, output: 15.0 },
-		"claude-haiku-4-8": { input: 1.0, output: 5.0 },
-		"claude-opus-4-7": { input: 5.0, output: 25.0 },
-		"claude-sonnet-4-7": { input: 3.0, output: 15.0 },
-		"claude-haiku-4-7": { input: 1.0, output: 5.0 },
-		"claude-opus-4-6": { input: 5.0, output: 25.0 },
-		"claude-sonnet-5": { input: 3.0, output: 15.0 },
-		"claude-sonnet-4-6": { input: 3.0, output: 15.0 },
-		"claude-haiku-4-6": { input: 1.0, output: 5.0 },
-		"claude-opus-4-5": { input: 5.0, output: 25.0 },
-		"claude-opus-4-5-20251101": { input: 5.0, output: 25.0 },
-		"claude-sonnet-4-5": { input: 3.0, output: 15.0 },
-		"claude-sonnet-4-5-20250929": { input: 3.0, output: 15.0 },
-		"claude-haiku-4-5": { input: 1.0, output: 5.0 },
-		"claude-haiku-4-5-20251001": { input: 1.0, output: 5.0 },
-		// Shorthand aliases used by AVAILABLE_MODELS / MODEL_ID_MAP.
-		opus: { input: 5.0, output: 25.0 },
-		sonnet: { input: 3.0, output: 15.0 },
-		haiku: { input: 1.0, output: 5.0 },
-		"opus-4-5": { input: 5.0, output: 25.0 },
-		"sonnet-4-5": { input: 3.0, output: 15.0 },
-		"haiku-4-5": { input: 1.0, output: 5.0 },
-	},
-	// Non-Anthropic prices are best-effort estimates — verify against provider sheets.
-	openai: {
-		"gpt-5.1": { input: 1.25, output: 10.0 },
-		"gpt-5": { input: 1.25, output: 10.0 },
-		"gpt-5-mini": { input: 0.25, output: 2.0 },
-		"gpt-4.1": { input: 2.5, output: 10.0 },
-		"gpt-4o": { input: 2.5, output: 10.0 },
-		"gpt-4o-mini": { input: 0.15, output: 0.6 },
-		o3: { input: 2.0, output: 8.0 },
-	},
-	google: {
-		"gemini-3-pro": { input: 2.0, output: 12.0 },
-		"gemini-3-flash": { input: 0.3, output: 1.2 },
-		"gemini-2.5-pro": { input: 1.25, output: 5.0 },
-		"gemini-2.5-flash": { input: 0.15, output: 0.6 },
-	},
-	xai: {
-		"grok-4": { input: 5.0, output: 15.0 },
-	},
-	grok: {
-		"grok-4": { input: 5.0, output: 15.0 },
-		"grok-2": { input: 2.0, output: 10.0 },
-		"grok-2-mini": { input: 0.3, output: 0.5 },
-	},
-	mistral: {
-		"mistral-large": { input: 2.0, output: 6.0 },
-		"mistral-large-3": { input: 2.0, output: 6.0 },
-		codestral: { input: 0.3, output: 0.9 },
-	},
-	deepseek: {
-		"deepseek-v3": { input: 0.27, output: 1.1 },
-		"deepseek-v3.2": { input: 0.27, output: 1.1 },
-		"deepseek-coder-v3": { input: 0.14, output: 0.28 },
-	},
-	groq: {
-		"llama-3.3-70b": { input: 0.59, output: 0.79 },
-		"mixtral-8x7b": { input: 0.24, output: 0.24 },
-	},
-	together: {
-		"llama-3.3-70b": { input: 0.88, output: 0.88 },
-	},
-	fireworks: {
-		"llama-3.3-70b": { input: 0.9, output: 0.9 },
-	},
-	meta: {
-		"llama-3.3-70b": { input: 0.72, output: 0.72 },
-		"llama-4-maverick": { input: 2.0, output: 6.0 },
-	},
-	aws: {
-		"anthropic.claude-opus-4-8": { input: 5.0, output: 25.0 },
-		"anthropic.claude-opus-4-8-v1": { input: 5.0, output: 25.0 },
-		"anthropic.claude-fable-5": { input: 10.0, output: 50.0 },
-		"anthropic.claude-opus-4-6": { input: 5.0, output: 25.0 },
-		"anthropic.claude-sonnet-4-6": { input: 3.0, output: 15.0 },
-		"meta.llama-3.3-70b": { input: 0.72, output: 0.72 },
-	},
-	// Flat-rate seat licensing — token cost reported as 0 so widgets render
-	// without claiming bogus numbers. Display layer should annotate this.
-	copilot: {
-		"gpt-4.1": { input: 0, output: 0 },
-		"gpt-4o": { input: 0, output: 0 },
-		"claude-sonnet-4-6": { input: 0, output: 0 },
-		"gemini-2.5-pro": { input: 0, output: 0 },
-	},
-	windsurf: {
-		"windsurf-default": { input: 0, output: 0 },
-		"windsurf-premier": { input: 0, output: 0 },
-		"windsurf-cascade": { input: 0, output: 0 },
-		"swe-1.5": { input: 0, output: 0 },
-	},
-	cursor: {
-		"cursor-default": { input: 0, output: 0 },
-	},
-	ollama: {
-		"llama-3.3-70b": { input: 0, output: 0 },
-		"deepseek-coder-v3": { input: 0, output: 0 },
-		"mistral-large": { input: 0, output: 0 },
-		"qwen-2.5-72b": { input: 0, output: 0 },
-	},
-};
+type Rates = { input: number; output: number };
+
+const PRICES: Record<string, Record<string, Rates>> = generated.prices;
+const FLAT_RATE_PROVIDERS = new Set<string>(generated.flatRateProviders);
 
 // Aliases (provider name normalisation).
 const PROVIDER_ALIASES: Record<string, string> = {
 	claude: "anthropic",
 };
 
+// What may follow a catalog key in a model id that still names the keyed
+// model — the rule of `_SNAPSHOT_SUFFIX` in catalog.py: a date or build number
+// (-20251101, -2025-08-07, -0709, -001), -latest, -preview, -exp, -beta,
+// xAI's -reasoning / -non-reasoning, a Bedrock version (-v1:0), a Vertex
+// version (@20251101), a local tag (:70b), Claude's [1m]. Anything else is
+// another model at another price (gpt-5 → gpt-5.5, gpt-5.5 → gpt-5.5-mini).
+const TAG = String.raw`latest|preview|exp|experimental|beta|reasoning|non-reasoning|v\d+(?::\d+)?`;
+const SNAPSHOT_SUFFIX = new RegExp(
+	String.raw`^(?:-(?:\d{3,}|${TAG})(?:-(?:\d+|${TAG}))*)?(?:[@:].*|\[1m\])?$`,
+);
+
 /**
- * Look up pricing for a (provider, model) pair. Falls back to a prefix match
- * (e.g. "claude-sonnet-4-6-20251101" → "claude-sonnet-4-6") to mirror the
- * Python catalog's behaviour for versioned model IDs.
+ * Look up pricing for a (provider, model) pair, as the Python catalog does:
+ * an exact key wins, then the longest key the model id extends with a
+ * snapshot suffix ("claude-opus-4-5-20251101" → "claude-opus-4-5"). A key never
+ * prices a shorter id nor a later version of itself. A model of a flat-rate
+ * provider (Copilot, Windsurf, Cursor, Ollama) costs $0 a token, listed or not.
  *
  * Returns `null` when nothing matches — callers should treat that as
  * "unknown pricing", not "free".
@@ -151,18 +60,27 @@ export function getModelPricing(
 	model: string | undefined | null,
 ): ModelPricing | null {
 	if (!provider || !model) return null;
-	const key = (PROVIDER_ALIASES[provider.toLowerCase()] ?? provider.toLowerCase());
-	const models = RAW[key];
-	if (!models) return null;
+	const key = PROVIDER_ALIASES[provider.toLowerCase()] ?? provider.toLowerCase();
+	const models = PRICES[key];
+	// Shorthand aliases ("sonnet", "opus-5") stand for full Claude ids.
+	const id = key === "anthropic" ? (MODEL_ID_MAP[model] ?? model) : model;
 
-	if (models[model]) {
-		return { provider: key, model, ...models[model] };
-	}
-	// Prefix match (handles "claude-sonnet-4-6-20251101" → "claude-sonnet-4-6")
-	for (const [candidate, prices] of Object.entries(models)) {
-		if (model.startsWith(candidate) || candidate.startsWith(model)) {
-			return { provider: key, model: candidate, ...prices };
+	const exact = models?.[id];
+	if (exact) return { provider: key, model: id, ...exact };
+
+	let best = "";
+	for (const candidate of Object.keys(models ?? {})) {
+		if (
+			candidate.length > best.length &&
+			id.startsWith(candidate) &&
+			SNAPSHOT_SUFFIX.test(id.slice(candidate.length))
+		) {
+			best = candidate;
 		}
+	}
+	if (models && best) return { provider: key, model: best, ...models[best] };
+	if (FLAT_RATE_PROVIDERS.has(key)) {
+		return { provider: key, model: id, input: 0, output: 0 };
 	}
 	return null;
 }

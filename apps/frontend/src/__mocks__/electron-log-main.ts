@@ -6,6 +6,7 @@
  */
 
 const mockLog = {
+	hooks: [] as unknown[],
 	initialize: () => {
 		// Mock initialize function - no implementation needed
 	},

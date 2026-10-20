@@ -8,7 +8,6 @@
 
 import {
 	AlertCircle,
-	Brain,
 	CheckCircle2,
 	ChevronDown,
 	ChevronRight,
@@ -29,6 +28,7 @@ import {
 	RotateCcw,
 	Search,
 	Server,
+	Settings2,
 	Terminal,
 	Trash2,
 	Wrench,
@@ -50,11 +50,15 @@ import type { ThinkingLevel } from "../../shared/types/settings";
 import {
 	type AgentSettingsSource,
 	resolveAgentSettings as resolveAgentModelConfig,
+	useProjectEnvConfig,
 	useResolvedAgentSettings,
 } from "../hooks";
 import { useProjectStore } from "../stores/project-store";
 import { useSettingsStore } from "../stores/settings-store";
 import { CustomMcpDialog } from "./CustomMcpDialog";
+import { McpServerSettingsDialog } from "./McpServerSettingsDialog";
+import { TokenSavingsSettings } from "./settings/TokenSavingsSettings";
+import { UiUxSettings } from "./settings/UiUxSettings";
 import { Button } from "./ui/button";
 import {
 	Dialog,
@@ -63,6 +67,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "./ui/dialog";
+import { Input } from "./ui/input";
 import { ScrollArea } from "./ui/scroll-area";
 import { Switch } from "./ui/switch";
 
@@ -93,19 +98,20 @@ function getThinkingLabel(level: ThinkingLevel): string {
 
 const AGENT_CONFIGS: Record<string, AgentConfig> = {
 	// Spec Creation Phases - all use 'spec' phase settings
-	spec_gatherer: {
-		label: "Spec Gatherer",
-		description: "Collects initial requirements from user",
-		category: "spec",
-		tools: ["Read", "Glob", "Grep", "WebFetch", "WebSearch"],
-		mcp_servers: [],
-		settingsSource: { type: "phase", phase: "spec" },
-	},
 	spec_researcher: {
 		label: "Spec Researcher",
 		description: "Validates external integrations and APIs",
 		category: "spec",
-		tools: ["Read", "Glob", "Grep", "WebFetch", "WebSearch"],
+		tools: [
+			"Read",
+			"Glob",
+			"Grep",
+			"WebFetch",
+			"WebSearch",
+			"Write",
+			"Edit",
+			"Bash",
+		],
 		mcp_servers: ["context7"],
 		settingsSource: { type: "phase", phase: "spec" },
 	},
@@ -119,26 +125,18 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
 	},
 	spec_critic: {
 		label: "Spec Critic",
-		description: "Self-critique using deep analysis",
+		description: "Read-only review before planning (brainstorm phase)",
 		category: "spec",
 		tools: ["Read", "Glob", "Grep"],
 		mcp_servers: [],
 		settingsSource: { type: "phase", phase: "spec" },
 	},
-	spec_discovery: {
-		label: "Spec Discovery",
-		description: "Initial project discovery and analysis",
+	spec_self_critique: {
+		label: "Spec Self-Critique",
+		description: "Finds the spec's issues and fixes them in spec.md",
 		category: "spec",
-		tools: ["Read", "Glob", "Grep", "WebFetch", "WebSearch"],
-		mcp_servers: [],
-		settingsSource: { type: "phase", phase: "spec" },
-	},
-	spec_context: {
-		label: "Spec Context",
-		description: "Builds context from existing codebase",
-		category: "spec",
-		tools: ["Read", "Glob", "Grep"],
-		mcp_servers: [],
+		tools: ["Read", "Glob", "Grep", "Write", "Edit", "Bash"],
+		mcp_servers: ["context7"],
 		settingsSource: { type: "phase", phase: "spec" },
 	},
 	spec_validation: {
@@ -165,7 +163,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
 			"WebFetch",
 			"WebSearch",
 		],
-		mcp_servers: ["context7", "graphiti-memory", "auto-claude"],
+		mcp_servers: ["context7", "auto-claude"],
 		mcp_optional: ["linear"],
 		settingsSource: { type: "phase", phase: "planning" },
 	},
@@ -183,7 +181,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
 			"WebFetch",
 			"WebSearch",
 		],
-		mcp_servers: ["context7", "graphiti-memory", "auto-claude"],
+		mcp_servers: ["context7", "auto-claude"],
 		mcp_optional: ["linear"],
 		settingsSource: { type: "phase", phase: "coding" },
 	},
@@ -195,7 +193,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
 			"Validates acceptance criteria. Uses Electron or Puppeteer based on project type.",
 		category: "qa",
 		tools: ["Read", "Glob", "Grep", "Bash", "WebFetch", "WebSearch"],
-		mcp_servers: ["context7", "graphiti-memory", "auto-claude"],
+		mcp_servers: ["context7", "auto-claude"],
 		mcp_optional: ["linear", "electron", "puppeteer"],
 		settingsSource: { type: "phase", phase: "qa" },
 	},
@@ -214,8 +212,27 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
 			"WebFetch",
 			"WebSearch",
 		],
-		mcp_servers: ["context7", "graphiti-memory", "auto-claude"],
+		mcp_servers: ["context7", "auto-claude"],
 		mcp_optional: ["linear", "electron", "puppeteer"],
+		settingsSource: { type: "phase", phase: "qa" },
+	},
+	verifier: {
+		label: "Verifier",
+		description:
+			"Runs the verification loop: launches the app, fixes what breaks, drives it to the change, traces performance (Chrome DevTools MCP).",
+		category: "qa",
+		tools: [
+			"Read",
+			"Glob",
+			"Grep",
+			"Write",
+			"Edit",
+			"Bash",
+			"WebFetch",
+			"WebSearch",
+		],
+		mcp_servers: ["context7", "auto-claude", "workpilot-verify"],
+		mcp_optional: ["electron", "puppeteer", "chrome-devtools"],
 		settingsSource: { type: "phase", phase: "qa" },
 	},
 
@@ -250,15 +267,6 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
 		category: "utility",
 		tools: ["Read", "Glob", "Grep", "WebFetch", "WebSearch"],
 		mcp_servers: [],
-		settingsSource: { type: "feature", feature: "insights" },
-	},
-	analysis: {
-		label: "Analysis",
-		description: "Codebase analysis with context lookup",
-		category: "utility",
-		tools: ["Read", "Glob", "Grep", "WebFetch", "WebSearch"],
-		mcp_servers: ["context7"],
-		// Analysis uses same as insights
 		settingsSource: { type: "feature", feature: "insights" },
 	},
 	batch_analysis: {
@@ -313,22 +321,12 @@ const MCP_SERVERS: Record<
 		description:
 			"Documentation lookup for libraries and frameworks via @upstash/context7-mcp",
 		icon: Search,
+		// Both spellings of the fetch tool: @upstash/context7-mcp renamed
+		// get-library-docs to query-docs, and the server is started unpinned.
 		tools: [
 			"mcp__context7__resolve-library-id",
+			"mcp__context7__query-docs",
 			"mcp__context7__get-library-docs",
-		],
-	},
-	"graphiti-memory": {
-		name: "Graphiti Memory",
-		description:
-			"Knowledge graph for cross-session context. Requires GRAPHITI_MCP_URL env var.",
-		icon: Brain,
-		tools: [
-			"mcp__graphiti-memory__search_nodes",
-			"mcp__graphiti-memory__search_facts",
-			"mcp__graphiti-memory__add_episode",
-			"mcp__graphiti-memory__get_episodes",
-			"mcp__graphiti-memory__get_entity_edge",
 		],
 	},
 	"auto-claude": {
@@ -495,7 +493,7 @@ const MCP_CATEGORY_GROUPS: Array<{
 	{
 		labelKey: "mcp.categories.core",
 		fallback: "Core",
-		ids: ["context7", "graphiti-memory"],
+		ids: ["context7"],
 	},
 	{
 		labelKey: "mcp.categories.projectMgmt",
@@ -532,7 +530,6 @@ const MCP_CATEGORY_GROUPS: Array<{
 // All available MCP servers that can be added to agents
 const ALL_MCP_SERVERS = [
 	"context7",
-	"graphiti-memory",
 	"linear",
 	"electron",
 	"puppeteer",
@@ -566,6 +563,7 @@ interface AgentCardProps {
 	readonly customServers: CustomMcpServer[];
 	readonly onAddMcp: (agentId: string, mcpId: string) => void;
 	readonly onRemoveMcp: (agentId: string, mcpId: string) => void;
+	readonly onConfigureMcp: (mcpId: string) => void;
 }
 
 // Status indicator component for MCP servers
@@ -605,6 +603,7 @@ function AgentCard({
 	customServers,
 	onAddMcp,
 	onRemoveMcp,
+	onConfigureMcp,
 }: AgentCardProps) {
 	const [isExpanded, setIsExpanded] = useState(false);
 	const [showAddDialog, setShowAddDialog] = useState(false);
@@ -647,8 +646,6 @@ function AgentCard({
 			switch (mcp) {
 				case "context7":
 					return mcpServerStates.context7Enabled !== false;
-				case "graphiti-memory":
-					return mcpServerStates.graphitiEnabled !== false;
 				case "linear":
 					return mcpServerStates.linearMcpEnabled !== false;
 				case "electron":
@@ -804,10 +801,21 @@ function AgentCard({
 											key={server}
 											className="flex items-center justify-between group"
 										>
-											<div className="flex items-center gap-2 text-sm">
+											{/* The row itself opens the server's settings: seeing a
+											    server on an agent and changing that server used to be
+											    two unrelated places on the same screen. */}
+											<button
+												type="button"
+												onClick={(e) => {
+													e.stopPropagation();
+													onConfigureMcp(server);
+												}}
+												className="flex items-center gap-2 text-sm text-left rounded px-1 -mx-1 hover:bg-muted/60 transition-colors"
+												title={t("mcp.configureServer")}
+											>
 												<CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
 												<ServerIcon className="h-3.5 w-3.5 text-muted-foreground" />
-												<span className="font-medium">
+												<span className="font-medium group-hover:underline">
 													{serverInfo?.name || server}
 												</span>
 												{isAdded && (
@@ -815,20 +823,33 @@ function AgentCard({
 														{t("mcp.added")}
 													</span>
 												)}
-											</div>
-											{canRemove && (
+											</button>
+											<div className="flex items-center">
 												<button
 													type="button"
 													onClick={(e) => {
 														e.stopPropagation();
-														onRemoveMcp(id, server);
+														onConfigureMcp(server);
 													}}
-													className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-destructive transition-all"
-													title={t("mcp.remove")}
+													className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-primary transition-all"
+													title={t("mcp.configureServer")}
 												>
-													<X className="h-3.5 w-3.5" />
+													<Settings2 className="h-3.5 w-3.5" />
 												</button>
-											)}
+												{canRemove && (
+													<button
+														type="button"
+														onClick={(e) => {
+															e.stopPropagation();
+															onRemoveMcp(id, server);
+														}}
+														className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-destructive transition-all"
+														title={t("mcp.remove")}
+													>
+														<X className="h-3.5 w-3.5" />
+													</button>
+												)}
+											</div>
 										</div>
 									);
 								})}
@@ -1052,8 +1073,12 @@ export function AgentTools() {
 	const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
 		new Set(["spec", "build", "qa"]),
 	);
-	const [envConfig, setEnvConfig] = useState<ProjectEnvConfig | null>(null);
-	const [, setIsLoading] = useState(false);
+	// Bound to the project it was read for, so a save fired while another
+	// project is loading cannot write this one's settings into it.
+	const { envConfig, setEnvConfig } = useProjectEnvConfig(
+		selectedProjectId,
+		selectedProject?.autoBuildPath,
+	);
 
 	// Custom MCP server dialog state
 	const [showCustomMcpDialog, setShowCustomMcpDialog] = useState(false);
@@ -1066,35 +1091,32 @@ export function AgentTools() {
 	>({});
 	const [testingServers, setTestingServers] = useState<Set<string>>(new Set());
 
-	// Load project env config when project changes
-	useEffect(() => {
-		if (selectedProjectId && selectedProject?.autoBuildPath) {
-			setIsLoading(true);
-			globalThis.electronAPI
-				.getProjectEnv(selectedProjectId)
-				.then((result) => {
-					if (result.success && result.data) {
-						setEnvConfig(result.data);
-					} else {
-						setEnvConfig(null);
-					}
-				})
-				.catch(() => {
-					setEnvConfig(null);
-				})
-				.finally(() => {
-					setIsLoading(false);
-				});
-		} else {
-			setEnvConfig(null);
-		}
-	}, [selectedProjectId, selectedProject?.autoBuildPath]);
-
 	// Update MCP server toggle
+	// Which server's settings are open. A custom server routes to the editor it
+	// already has; a built-in one gets the dialog above.
+	const [configuringServerId, setConfiguringServerId] = useState<string | null>(
+		null,
+	);
+
+	const handleConfigureMcp = useCallback(
+		(mcpId: string) => {
+			const custom = (envConfig?.customMcpServers || []).find(
+				(server) => server.id === mcpId,
+			);
+			if (custom) {
+				setEditingCustomServer(custom);
+				setShowCustomMcpDialog(true);
+				return;
+			}
+			setConfiguringServerId(mcpId);
+		},
+		[envConfig],
+	);
+
 	const updateMcpServer = useCallback(
 		async (
 			key: keyof NonNullable<ProjectEnvConfig["mcpServers"]>,
-			value: boolean,
+			value: boolean | string,
 		) => {
 			if (!selectedProjectId || !envConfig) return;
 
@@ -1121,7 +1143,61 @@ export function AgentTools() {
 				);
 			}
 		},
-		[selectedProjectId, envConfig],
+		[selectedProjectId, envConfig, setEnvConfig],
+	);
+
+	// rtk — same shape as updateMcpServer, separate key. rtk is not an MCP
+	// server: it is a binary on the machine, and folding it into mcpServers
+	// would have the backend look for a server that does not exist.
+	const updateTokenSavings = useCallback(
+		async (
+			key: keyof NonNullable<ProjectEnvConfig["tokenSavings"]>,
+			value: boolean,
+		) => {
+			if (!selectedProjectId || !envConfig) return;
+
+			const newTokenSavings = {
+				...envConfig.tokenSavings,
+				[key]: value,
+			};
+
+			setEnvConfig((prev) =>
+				prev ? { ...prev, tokenSavings: newTokenSavings } : null,
+			);
+
+			try {
+				await globalThis.electronAPI.updateProjectEnv(selectedProjectId, {
+					tokenSavings: newTokenSavings,
+				});
+			} catch (error) {
+				console.error("Failed to update rtk config:", error);
+				setEnvConfig((prev) =>
+					prev ? { ...prev, tokenSavings: envConfig.tokenSavings } : null,
+				);
+			}
+		},
+		[selectedProjectId, envConfig, setEnvConfig],
+	);
+
+	// ui-ux-pro-max — same shape as updateTokenSavings, its own key.
+	const updateUiux = useCallback(
+		async (key: keyof NonNullable<ProjectEnvConfig["uiux"]>, value: boolean) => {
+			if (!selectedProjectId || !envConfig) return;
+
+			const newUiux = { ...envConfig.uiux, [key]: value };
+
+			setEnvConfig((prev) => (prev ? { ...prev, uiux: newUiux } : null));
+
+			try {
+				await globalThis.electronAPI.updateProjectEnv(selectedProjectId, {
+					uiux: newUiux,
+				});
+			} catch (error) {
+				console.error("Failed to update ui-ux-pro-max config:", error);
+				setEnvConfig((prev) => (prev ? { ...prev, uiux: envConfig.uiux } : null));
+			}
+		},
+		[selectedProjectId, envConfig, setEnvConfig],
 	);
 
 	// Handle adding an MCP to an agent
@@ -1177,7 +1253,7 @@ export function AgentTools() {
 				);
 			}
 		},
-		[selectedProjectId, envConfig],
+		[selectedProjectId, envConfig, setEnvConfig],
 	);
 
 	// Handle removing an MCP from an agent
@@ -1240,7 +1316,7 @@ export function AgentTools() {
 				);
 			}
 		},
-		[selectedProjectId, envConfig],
+		[selectedProjectId, envConfig, setEnvConfig],
 	);
 
 	// Handle saving a custom MCP server
@@ -1278,7 +1354,7 @@ export function AgentTools() {
 				);
 			}
 		},
-		[selectedProjectId, envConfig],
+		[selectedProjectId, envConfig, setEnvConfig],
 	);
 
 	// Handle deleting a custom MCP server
@@ -1338,7 +1414,7 @@ export function AgentTools() {
 				);
 			}
 		},
-		[selectedProjectId, envConfig],
+		[selectedProjectId, envConfig, setEnvConfig],
 	);
 
 	// Check health of all custom MCP servers
@@ -1441,7 +1517,6 @@ export function AgentTools() {
 	// Count enabled MCP servers
 	const enabledCount = [
 		mcpServers.context7Enabled !== false,
-		mcpServers.graphitiEnabled && envConfig?.graphitiProviderConfig,
 		mcpServers.linearMcpEnabled !== false && envConfig?.linearEnabled,
 		mcpServers.electronEnabled,
 		mcpServers.puppeteerEnabled,
@@ -1592,32 +1667,31 @@ export function AgentTools() {
 									/>
 								</div>
 
-								{/* Graphiti Memory */}
-								<div className="flex items-center justify-between py-2 border-b border-border last:border-0">
-									<div className="flex items-center gap-3">
-										<Brain className="h-4 w-4 text-muted-foreground" />
-										<div>
-											<span className="text-sm font-medium">
-												{t("settings:mcp.servers.graphiti.name")}
-											</span>
-											<p className="text-xs text-muted-foreground">
-												{envConfig.graphitiProviderConfig
-													? t("settings:mcp.servers.graphiti.description")
-													: t("settings:mcp.servers.graphiti.notConfigured")}
-											</p>
-										</div>
+								{/* Context7 API key — optional; without it the quota is
+								    the anonymous per-IP one, which a machine running
+								    builds all day exhausts. Saved on blur rather than on
+								    every keystroke: each save rewrites .workpilot/.env. */}
+								{mcpServers.context7Enabled !== false && (
+									<div className="pl-7 pb-2 space-y-1 border-b border-border last:border-0">
+										<Input
+											type="password"
+											placeholder={t(
+												"settings:mcp.servers.context7.apiKeyPlaceholder",
+											)}
+											defaultValue={mcpServers.context7ApiKey || ""}
+											onBlur={(e) => {
+												const value = e.target.value.trim();
+												if (value !== (mcpServers.context7ApiKey || "")) {
+													updateMcpServer("context7ApiKey", value);
+												}
+											}}
+											className="h-8 text-xs"
+										/>
+										<p className="text-xs text-muted-foreground">
+											{t("settings:mcp.servers.context7.apiKeyHint")}
+										</p>
 									</div>
-									<Switch
-										checked={
-											mcpServers.graphitiEnabled !== false &&
-											!!envConfig.graphitiProviderConfig
-										}
-										onCheckedChange={(checked) =>
-											updateMcpServer("graphitiEnabled", checked)
-										}
-										disabled={!envConfig.graphitiProviderConfig}
-									/>
-								</div>
+								)}
 
 								{/* Linear */}
 								<div className="flex items-center justify-between py-2 border-b border-border last:border-0">
@@ -1735,6 +1809,18 @@ export function AgentTools() {
 									</div>
 									<Switch checked={true} disabled />
 								</div>
+
+								{/* rtk — la condensation de sortie. Toujours visible :
+								    c'est ici qu'on découvre qu'elle existe. */}
+								<TokenSavingsSettings
+									tokenSavings={envConfig?.tokenSavings}
+									projectPath={selectedProject?.path}
+									onUpdate={updateTokenSavings}
+								/>
+
+								{/* ui-ux-pro-max — le design system des tâches qui touchent
+								    l'interface. Toujours visible, comme rtk. */}
+								<UiUxSettings uiux={envConfig?.uiux} onUpdate={updateUiux} />
 
 								{/* Custom MCP Servers Section */}
 								<div className="pt-4 border-t border-border">
@@ -1906,6 +1992,7 @@ export function AgentTools() {
 													customServers={envConfig?.customMcpServers || []}
 													onAddMcp={handleAddMcp}
 													onRemoveMcp={handleRemoveMcp}
+													onConfigureMcp={handleConfigureMcp}
 												/>
 											);
 										})}
@@ -1918,6 +2005,32 @@ export function AgentTools() {
 			</ScrollArea>
 
 			{/* Custom MCP Server Dialog */}
+			<McpServerSettingsDialog
+				open={configuringServerId !== null}
+				onOpenChange={(next) => {
+					if (!next) setConfiguringServerId(null);
+				}}
+				serverId={configuringServerId}
+				serverName={
+					(configuringServerId && MCP_SERVERS[configuringServerId]?.name) ||
+					configuringServerId ||
+					""
+				}
+				serverDescription={
+					configuringServerId
+						? MCP_SERVERS[configuringServerId]?.description
+						: undefined
+				}
+				icon={
+					configuringServerId
+						? MCP_SERVERS[configuringServerId]?.icon
+						: undefined
+				}
+				mcpServers={mcpServers}
+				envConfig={envConfig}
+				onUpdate={updateMcpServer}
+			/>
+
 			<CustomMcpDialog
 				open={showCustomMcpDialog}
 				onOpenChange={setShowCustomMcpDialog}

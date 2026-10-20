@@ -1,10 +1,9 @@
+import { useProviderModelCatalog } from "../../hooks/useProviderModelCatalog";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
 	DEFAULT_FEATURE_MODELS,
 	DEFAULT_FEATURE_THINKING,
-	FEATURE_LABELS,
-	getModelsForProvider,
 	providerSupportsThinking,
 	THINKING_LEVELS,
 } from "../../../shared/constants";
@@ -141,16 +140,9 @@ export function GeneralSettings({
 		globalThis.electronAPI
 			.getCliToolsInfo()
 			.then(
-				(result: {
-					success: boolean;
-					data?: {
-						python: ToolDetectionResult;
-						git: ToolDetectionResult;
-						gh: ToolDetectionResult;
-						glab: ToolDetectionResult;
-						claude: ToolDetectionResult;
-					};
-				}) => {
+				// Le type vient du pont, qui declare desormais `glab` comme le
+				// handler le renvoie.
+				(result) => {
 					if (cancelled || !result.success || !result.data) return;
 					setToolsInfo(result.data);
 					// Sync claudePath with detected path only when it differs, to avoid
@@ -158,10 +150,7 @@ export function GeneralSettings({
 					const detectedPath = result.data.claude?.found
 						? result.data.claude.path
 						: undefined;
-					if (
-						detectedPath &&
-						detectedPath !== settingsRef.current.claudePath
-					) {
+					if (detectedPath && detectedPath !== settingsRef.current.claudePath) {
 						onSettingsChangeRef.current({
 							...settingsRef.current,
 							claudePath: detectedPath,
@@ -183,7 +172,7 @@ export function GeneralSettings({
 	// Lit le provider actif depuis le contexte pour filtrer les modèles disponibles
 	const { selectedProvider } = useProviderContext();
 	const activeProvider = selectedProvider || "anthropic";
-	const providerModels = getModelsForProvider(activeProvider);
+	const { models: providerModels } = useProviderModelCatalog(activeProvider);
 	const supportsThinking = providerSupportsThinking(activeProvider);
 
 	if (section === "agent") {
@@ -247,7 +236,9 @@ export function GeneralSettings({
 							</div>
 
 							{(
-								Object.keys(FEATURE_LABELS) as Array<keyof FeatureModelConfig>
+								Object.keys(DEFAULT_FEATURE_MODELS) as Array<
+									keyof FeatureModelConfig
+								>
 							).map((feature) => {
 								const featureModels =
 									settings.featureModels || DEFAULT_FEATURE_MODELS;
@@ -272,10 +263,10 @@ export function GeneralSettings({
 									<div key={feature} className="space-y-2">
 										<div className="flex items-center justify-between">
 											<Label className="text-sm font-medium text-foreground">
-												{FEATURE_LABELS[feature].label}
+												{t(`general.features.${feature}.label`)}
 											</Label>
 											<span className="text-xs text-muted-foreground">
-												{FEATURE_LABELS[feature].description}
+												{t(`general.features.${feature}.description`)}
 											</span>
 										</div>
 										<div
@@ -302,7 +293,7 @@ export function GeneralSettings({
 													<SelectTrigger className="h-9">
 														<SelectValue />
 													</SelectTrigger>
-													<SelectContent>
+													<SelectContent searchable>
 														{providerModels.map((m) => (
 															<SelectItem key={m.value} value={m.value}>
 																{m.label}
@@ -339,7 +330,7 @@ export function GeneralSettings({
 																	key={level.value}
 																	value={level.value}
 																>
-																	{level.label}
+																	{t(`general.thinkingLevels.${level.value}`)}
 																</SelectItem>
 															))}
 														</SelectContent>

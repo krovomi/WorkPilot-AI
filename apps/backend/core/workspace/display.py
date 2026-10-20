@@ -6,6 +6,7 @@ Workspace Display
 Functions for displaying workspace information and build summaries.
 """
 
+from core.worktree import WorktreeManager
 from ui import (
     bold,
     error,
@@ -13,13 +14,12 @@ from ui import (
     print_status,
     success,
 )
-from worktree import WorktreeManager
 
 
 def show_build_summary(manager: WorktreeManager, spec_name: str) -> None:
     """Show a summary of what was built."""
     summary = manager.get_change_summary(spec_name)
-    files = manager.get_changed_files(spec_name)
+    manager.get_changed_files(spec_name)
 
     total = summary["new_files"] + summary["modified_files"] + summary["deleted_files"]
 

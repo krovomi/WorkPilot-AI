@@ -91,49 +91,50 @@ class JiraWorkItemsClient:
         """
         if issue_types is None:
             issue_types = DEFAULT_BACKLOG_TYPES
-        
+
         if status_filter is None:
             status_filter = ["To Do", "Backlog", "New"]
 
         api_client = self._get_api_client()
-        
+
         # Build JQL query
         jql_parts = [
             f'project = "{project}"',
-            f'issuetype in ({", ".join(issue_types)})',
-            f'status in ({", ".join(f'"{s}"' for s in status_filter)})'
+            f"issuetype in ({', '.join(issue_types)})",
+            f"status in ({', '.join(f'"{s}"' for s in status_filter)})",
         ]
         jql = " AND ".join(jql_parts)
-        
+
         params = {
             "jql": jql,
             "fields": "summary,description,status,issuetype,priority,assignee,reporter,labels,created,updated,project",
             "maxResults": max_items,
-            "startAt": 0
+            "startAt": 0,
         }
-        
+
         try:
             response = api_client.get(
-                f"{self._client.base_url}/rest/api/3/search",
-                params=params
+                f"{self._client.base_url}/rest/api/3/search", params=params
             )
             response.raise_for_status()
-            
+
             data = response.json()
             issues = []
-            
+
             for issue_data in data.get("issues", []):
                 issue = JiraIssue.from_api_response(issue_data)
                 issues.append(issue)
-                
+
             logger.info(f"Retrieved {len(issues)} backlog items for project {project}")
             return issues
-            
+
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 404:
                 raise JiraProjectNotFoundError(project)
             else:
-                raise JiraAPIError(f"Failed to list backlog items: {e}", e.response.status_code)
+                raise JiraAPIError(
+                    f"Failed to list backlog items: {e}", e.response.status_code
+                )
         except Exception as e:
             raise JiraAPIError(f"Failed to list backlog items: {e}")
 
@@ -151,29 +152,30 @@ class JiraWorkItemsClient:
             JiraAPIError: If the API call fails
         """
         api_client = self._get_api_client()
-        
+
         params = {
             "fields": "summary,description,status,issuetype,priority,assignee,reporter,labels,created,updated,project,comment,transitions"
         }
-        
+
         try:
             response = api_client.get(
-                f"{self._client.base_url}/rest/api/3/issue/{issue_key}",
-                params=params
+                f"{self._client.base_url}/rest/api/3/issue/{issue_key}", params=params
             )
             response.raise_for_status()
-            
+
             data = response.json()
             issue = JiraIssue.from_api_response(data)
-            
+
             logger.info(f"Retrieved details for issue {issue_key}")
             return issue
-            
+
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 404:
                 raise JiraIssueNotFoundError(issue_key)
             else:
-                raise JiraAPIError(f"Failed to get issue details: {e}", e.response.status_code)
+                raise JiraAPIError(
+                    f"Failed to get issue details: {e}", e.response.status_code
+                )
         except Exception as e:
             raise JiraAPIError(f"Failed to get issue details: {e}")
 
@@ -187,29 +189,26 @@ class JiraWorkItemsClient:
             JiraAPIError: If the API call fails
         """
         api_client = self._get_api_client()
-        
+
         try:
             response = api_client.get(f"{self._client.base_url}/rest/api/3/project")
             response.raise_for_status()
-            
+
             data = response.json()
             projects = []
-            
+
             for project_data in data:
                 project = JiraProject.from_api_response(project_data)
                 projects.append(project)
-                
+
             logger.info(f"Retrieved {len(projects)} projects")
             return projects
-            
+
         except Exception as e:
             raise JiraAPIError(f"Failed to list projects: {e}")
 
     def search_issues(
-        self,
-        jql: str,
-        max_results: int = 50,
-        fields: list[str] | None = None
+        self, jql: str, max_results: int = 50, fields: list[str] | None = None
     ) -> list[JiraIssue]:
         """Search issues using JQL (JIRA Query Language).
 
@@ -225,34 +224,28 @@ class JiraWorkItemsClient:
             JiraAPIError: If the API call fails
         """
         api_client = self._get_api_client()
-        
+
         if fields is None:
             fields = "summary,description,status,issuetype,priority,assignee,reporter,labels,created,updated,project"
-        
-        params = {
-            "jql": jql,
-            "fields": fields,
-            "maxResults": max_results,
-            "startAt": 0
-        }
-        
+
+        params = {"jql": jql, "fields": fields, "maxResults": max_results, "startAt": 0}
+
         try:
             response = api_client.get(
-                f"{self._client.base_url}/rest/api/3/search",
-                params=params
+                f"{self._client.base_url}/rest/api/3/search", params=params
             )
             response.raise_for_status()
-            
+
             data = response.json()
             issues = []
-            
+
             for issue_data in data.get("issues", []):
                 issue = JiraIssue.from_api_response(issue_data)
                 issues.append(issue)
-                
+
             logger.info(f"Search returned {len(issues)} issues for JQL: {jql[:100]}...")
             return issues
-            
+
         except Exception as e:
             raise JiraAPIError(f"Failed to search issues: {e}")
 
@@ -270,28 +263,34 @@ class JiraWorkItemsClient:
             JiraAPIError: If the API call fails
         """
         api_client = self._get_api_client()
-        
+
         try:
             response = api_client.get(
                 f"{self._client.base_url}/rest/api/3/issue/{issue_key}/transitions"
             )
             response.raise_for_status()
-            
+
             data = response.json()
             transitions = data.get("transitions", [])
-            
-            logger.info(f"Retrieved {len(transitions)} transitions for issue {issue_key}")
+
+            logger.info(
+                f"Retrieved {len(transitions)} transitions for issue {issue_key}"
+            )
             return transitions
-            
+
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 404:
                 raise JiraIssueNotFoundError(issue_key)
             else:
-                raise JiraAPIError(f"Failed to get issue transitions: {e}", e.response.status_code)
+                raise JiraAPIError(
+                    f"Failed to get issue transitions: {e}", e.response.status_code
+                )
         except Exception as e:
             raise JiraAPIError(f"Failed to get issue transitions: {e}")
 
-    def transition_issue(self, issue_key: str, transition_id: str, comment: str | None = None) -> bool:
+    def transition_issue(
+        self, issue_key: str, transition_id: str, comment: str | None = None
+    ) -> bool:
         """Transition an issue to a new status.
 
         Args:
@@ -307,32 +306,28 @@ class JiraWorkItemsClient:
             JiraAPIError: If the API call fails
         """
         api_client = self._get_api_client()
-        
-        payload = {
-            "transition": {
-                "id": transition_id
-            }
-        }
-        
+
+        payload = {"transition": {"id": transition_id}}
+
         if comment:
-            payload["update"] = {
-                "comment": [{"add": {"body": comment}}]
-            }
-        
+            payload["update"] = {"comment": [{"add": {"body": comment}}]}
+
         try:
             response = api_client.post(
                 f"{self._client.base_url}/rest/api/3/issue/{issue_key}/transitions",
-                json=payload
+                json=payload,
             )
             response.raise_for_status()
-            
+
             logger.info(f"Successfully transitioned issue {issue_key}")
             return True
-            
+
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 404:
                 raise JiraIssueNotFoundError(issue_key)
             else:
-                raise JiraAPIError(f"Failed to transition issue: {e}", e.response.status_code)
+                raise JiraAPIError(
+                    f"Failed to transition issue: {e}", e.response.status_code
+                )
         except Exception as e:
             raise JiraAPIError(f"Failed to transition issue: {e}")

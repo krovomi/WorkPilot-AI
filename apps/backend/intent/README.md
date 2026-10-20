@@ -69,7 +69,9 @@ recommender = IntentRecommender()
 recs = recommender.generate_recommendations(analysis)
 
 print(f"\nEstimated: {recs.estimated_complexity}")
-print(f"Duration: {recs.estimated_duration_hours[0]}-{recs.estimated_duration_hours[1]}h")
+print(
+    f"Duration: {recs.estimated_duration_hours[0]}-{recs.estimated_duration_hours[1]}h"
+)
 
 for rec in recs.recommendations:
     print(f"  • {rec.title}")

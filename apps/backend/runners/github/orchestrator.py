@@ -138,6 +138,12 @@ class GitHubOrchestrator:
         progress_callback: Callable[[ProgressCallback], None] | None = None,
     ):
         self.project_dir = Path(project_dir)
+        from integrations.jev.models import JevContext
+        from integrations.jev.runtime import JevRun
+
+        self._jev_worker = JevRun.from_env(
+            JevContext("github-review", self.project_dir)
+        )
         self.config = config
         self.progress_callback = progress_callback
 
@@ -455,6 +461,10 @@ class GitHubOrchestrator:
                 "analyzing", 30, "Running multi-pass review...", pr_number=pr_number
             )
 
+            from integrations.jev.reviews import evaluate_context
+
+            jev_observation = await evaluate_context(self._jev_worker, pr_context)
+
             # Delegate to PR Review Engine
             safe_print("[DEBUG orchestrator] Running multi-pass review...")
             (
@@ -565,6 +575,7 @@ class GitHubOrchestrator:
 
             # Create result
             result = PRReviewResult(
+                jev=jev_observation,
                 pr_number=pr_number,
                 repo=self.config.repo,
                 success=True,
@@ -624,9 +635,6 @@ class GitHubOrchestrator:
                     f"[DEBUG orchestrator] Failed to store review learnings: {e}",
                     flush=True,
                 )
-
-            # Note: PR review memory is now saved by the Electron app after the review completes
-            # This ensures memory is saved to the embedded LadybugDB managed by the app
 
             # Mark as reviewed (head_sha already fetched above)
             if head_sha:
@@ -974,7 +982,13 @@ class GitHubOrchestrator:
                         pr_number=pr_number,
                     ),
                 )
+                from integrations.jev.reviews import evaluate_context
+
+                jev_observation = await evaluate_context(
+                    self._jev_worker, followup_context, followup=True
+                )
                 result = await reviewer.review(followup_context)
+                result.jev = jev_observation
             else:
                 # Fall back to sequential follow-up reviewer
                 reviewer = FollowupReviewer(
@@ -988,7 +1002,13 @@ class GitHubOrchestrator:
                         pr_number=pr_number,
                     ),
                 )
+                from integrations.jev.reviews import evaluate_context
+
+                jev_observation = await evaluate_context(
+                    self._jev_worker, followup_context, followup=True
+                )
                 result = await reviewer.review_followup(followup_context)
+                result.jev = jev_observation
 
             # Fallback: ensure CI failures block merge even if AI didn't factor it in
             # (CI status was already passed to AI via followup_context.ci_status)
@@ -1023,9 +1043,6 @@ class GitHubOrchestrator:
 
             # Save result
             await result.save(self.github_dir)
-
-            # Note: PR review memory is now saved by the Electron app after the review completes
-            # This ensures memory is saved to the embedded LadybugDB managed by the app
 
             # Mark as reviewed with new commit SHA
             if result.reviewed_commit_sha:

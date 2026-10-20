@@ -1,11 +1,8 @@
 import type React from "react";
-import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import {
-	setupOnboardingAgentListeners,
-	useOnboardingAgentStore,
-} from "../../stores/onboarding-agent-store";
+import { useOnboardingAgentStore } from "../../stores/onboarding-agent-store";
 import type { OnboardingGuide } from "../../../shared/types/onboarding";
+import { useGeneratedText } from "./shared";
 
 interface OnboardingGuideViewProps {
 	readonly projectPath?: string;
@@ -18,6 +15,8 @@ function GuideBody({
 	readonly guide: OnboardingGuide;
 	readonly t: (key: string, options?: Record<string, unknown>) => string;
 }): React.ReactElement {
+	const generated = useGeneratedText();
+
 	return (
 		<div className="flex flex-col gap-4">
 			<div>
@@ -48,15 +47,27 @@ function GuideBody({
 								<span className="w-6 h-6 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-xs font-bold">
 									{guide.steps.indexOf(step) + 1}
 								</span>
-								<p className="text-sm font-medium">{step.title}</p>
+								<p className="text-sm font-medium">
+									{generated(step.titleI18n, step.title)}
+								</p>
 							</div>
 							<span className="text-xs text-(--text-secondary)">
 								{t("duration", { minutes: step.estimatedMinutes })}
 							</span>
 						</div>
-						<p className="text-sm text-(--text-secondary) mb-2 whitespace-pre-wrap">
-							{step.content}
-						</p>
+						{step.lines && step.lines.length > 0 ? (
+							<ul className="text-sm text-(--text-secondary) mb-2 space-y-1 list-disc list-inside">
+								{step.lines.map((line) => (
+									<li key={`${line.key}:${line.fallback}`}>
+										{generated(line)}
+									</li>
+								))}
+							</ul>
+						) : (
+							<p className="text-sm text-(--text-secondary) mb-2 whitespace-pre-wrap">
+								{step.content}
+							</p>
+						)}
 						{step.commands.length > 0 && (
 							<div className="space-y-1">
 								{step.commands.map((cmd) => (
@@ -75,7 +86,7 @@ function GuideBody({
 
 			{guide.summary && (
 				<p className="text-sm text-(--text-secondary) italic mt-2">
-					{guide.summary}
+					{generated(guide.summaryI18n, guide.summary)}
 				</p>
 			)}
 		</div>
@@ -86,11 +97,6 @@ export function OnboardingGuideView({
 	projectPath,
 }: OnboardingGuideViewProps): React.ReactElement {
 	const { t } = useTranslation("onboardingAgent");
-
-	useEffect(() => {
-		const cleanup = setupOnboardingAgentListeners();
-		return cleanup;
-	}, []);
 
 	const phase = useOnboardingAgentStore((s) => s.phase);
 	const status = useOnboardingAgentStore((s) => s.status);

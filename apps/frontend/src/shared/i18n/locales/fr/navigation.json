@@ -11,7 +11,8 @@
 		"gitIntegrations": "Git & Intégrations",
 		"planning": "Planification",
 		"toolbox": "Boîte à outils",
-		"favorites": "Favoris"
+		"favorites": "Favoris",
+		"administration": "Administration"
 	},
 	"favorites": {
 		"dropHint": "Déposer ici pour épingler"
@@ -33,13 +34,14 @@
 		"ideation": "Idéation",
 		"changelog": "Journal des modifications",
 		"context": "Contexte",
+		"architectureVisualizer": "Visualiseur d'architecture",
 		"githubIssues": "Issues GitHub",
 		"githubPRs": "PRs GitHub",
 		"gitlabIssues": "Issues GitLab",
 		"gitlabMRs": "MRs GitLab",
 		"worktrees": "Arbres de travail",
 		"agentTools": "Aperçu MCP",
-		"migration": "Assistant de migration",
+		"migration": "Migration de code",
 		"visualProgramming": "Programmation visuelle",
 		"dashboard": "Tableau de bord",
 		"analytics": "Analytiques",
@@ -84,6 +86,12 @@
 		"i18nAgent": "Agent i18n",
 		"onboardingAgent": "Agent d'intégration",
 		"flakyTests": "Détective de tests instables",
+		"performanceProfiler": "Profileur de performance",
+		"cicdTriggers": "Déclencheurs CI/CD",
+		"crossLanguageTranslation": "Traduction inter-langages",
+		"specApproval": "Approbation des specs",
+		"liveCompanion": "Compagnon en direct",
+		"contextMesh": "Maillage de contexte",
 		"docDrift": "Détecteur de dérive de documentation",
 		"compliance": "Collecteur de preuves de conformité",
 		"gitSurgeon": "Chirurgien d'historique Git",
@@ -98,7 +106,8 @@
 		"blastRadius": "Rayon d'impact",
 		"guardrails": "Guardrails d'Agent",
 		"envSnapshot": "Snapshots d'Environnement",
-		"offlineMode": "Mode Hors-Ligne"
+		"offlineMode": "Mode Hors-Ligne",
+		"administration": "Administration"
 	},
 	"search": {
 		"placeholder": "Rechercher...",
@@ -134,6 +143,14 @@
 		"dismiss": "Ignorer",
 		"downloadError": "Échec du téléchargement de la mise à jour",
 		"readOnlyVolumeWarning": "Déplacez l'app dans le dossier Applications pour mettre à jour"
+	},
+	"secureStorageBanner": {
+		"title": "Clés API stockées sans chiffrement",
+		"description": "Aucun trousseau système n'est disponible : vos clés API et jetons sont conservés sur cet appareil sans chiffrement par l'OS, dans des fichiers lisibles uniquement par votre compte utilisateur.",
+		"action": "Installez ou déverrouillez un trousseau (GNOME Keyring, KWallet…) puis redémarrez WorkPilot AI : vos clés seront alors chiffrées.",
+		"readableDescription": "Le backend lit ces clés directement dans le .workpilot/.env de vos projets (ou, quand WorkPilot AI tourne depuis les sources, dans son propre .env) : elles y restent non chiffrées, dans un fichier lisible uniquement par votre compte utilisateur : {{keys}}.",
+		"readableAction": "Retirez des paramètres du projet les clés que vous n'utilisez plus. Depuis les sources, configurez Claude dans les Paramètres, où les identifiants sont chiffrés, et retirez son jeton du .env du backend.",
+		"dismiss": "Ignorer"
 	},
 	"claudeCode": {
 		"checking": "Vérification du CLI IA...",
@@ -179,6 +196,20 @@
 		"versionSwitchFailed": "Échec du changement de version",
 		"terminalUnavailable": "Impossible d'ouvrir un terminal. Mettez à jour Claude Code depuis un terminal manuellement."
 	},
+	"agentCli": {
+		"checking": "Vérification de {{name}}...",
+		"installed": "{{name}} installé",
+		"installedWithVersion": "{{name}} ({{version}})",
+		"notFound": "{{name}} introuvable",
+		"error": "Impossible de vérifier {{name}}",
+		"installedShort": "Installé",
+		"notInstalledShort": "Non installé",
+		"checkingShort": "Vérification...",
+		"version": "Version",
+		"notInstalledDescription": "{{name}} n'est pas dans votre PATH. Installez-le, connectez-vous une fois dans un terminal, puis actualisez.",
+		"signInHint": "WorkPilot utilise la connexion propre à la CLI et ne lit jamais ses identifiants.",
+		"viewDocs": "Voir la documentation de {{name}}"
+	},
 	"codex": {
 		"checking": "Vérification Codex CLI...",
 		"installed": "Codex CLI installé",
@@ -196,5 +227,24 @@
 		"notInstalledDescription": "Codex CLI n'est pas installé. Cliquez sur « Installer » pour l'installer en arrière-plan :",
 		"installing": "Installation en cours, merci de patienter...",
 		"viewDocs": "Voir la documentation Codex CLI"
+	},
+	"activity": {
+		"badge": {
+			"running_one": "{{count}} traitement en cours",
+			"running_other": "{{count}} traitements en cours",
+			"success_one": "{{count}} traitement terminé",
+			"success_other": "{{count}} traitements terminés",
+			"error_one": "{{count}} traitement en échec",
+			"error_other": "{{count}} traitements en échec"
+		},
+		"kinds": {
+			"scanning": "Analyse",
+			"analyzing": "Analyse",
+			"generating": "Génération",
+			"optimizing": "Optimisation",
+			"discovering": "Exploration",
+			"build": "Build",
+			"ideation": "Idéation"
+		}
 	}
 }

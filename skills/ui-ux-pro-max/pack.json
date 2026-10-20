@@ -1,0 +1,16 @@
+{
+	"name": "ui-ux-pro-max",
+	"version": "2.15.0",
+	"description": "UI/UX design intelligence (Basic edition): a design system generator and stack-specific UI guidelines searched locally by a stdlib BM25 engine — no network, no model, no token.",
+	"targets": {},
+	"source": "nextlevelbuilder/ui-ux-pro-max-skill",
+	"maintainer": "upstream (vendored and committed)",
+	"bootstrap": {
+		"command": [
+			"python3",
+			"scripts/vendor_ui_ux_pro_max.py"
+		],
+		"produces": "skills/ui-ux-pro-max/ui-ux-pro-max/scripts/search.py",
+		"note": "Committed, not fetched on demand: the build pipeline (apps/backend/uiux) reads it, and the packaged app must have it without anyone running an install command. The script pins a tag, rewrites the one Claude-plugin-only path in SKILL.md, and records a receipt in VENDOR.json. Activation is contextual — only tasks that touch the interface pay for it."
+	}
+}

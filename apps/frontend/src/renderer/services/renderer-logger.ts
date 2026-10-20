@@ -2,8 +2,16 @@
  * Renderer Logger Service
  * =======================
  *
- * Service de logging coloré pour le processus renderer (frontend).
- * Utilise IPC pour communiquer avec le système de logs colorés du main process.
+ * Service de logging pour le processus renderer (frontend), écrit dans la
+ * console du renderer (DevTools).
+ *
+ * Il envoyait chaque message au main process sur le canal `renderer-log`, que
+ * personne n'écoutait : `setupRendererLogHandler` n'a jamais été appelé, si
+ * bien que tout ce qui passait par ici disparaissait sans trace. Le brancher
+ * aurait écrit chaque `debug` du renderer dans le stderr du main process, en
+ * production comme en développement — rien ne filtre par niveau, ni ici ni
+ * dans `colored-logs`. La console de DevTools, elle, range `debug` sous
+ * « Verbose », masqué par défaut : c'est le filtre qui manquait.
  *
  * Usage:
  * import { rendererLog } from './renderer-logger';
@@ -12,15 +20,6 @@
  * rendererLog.info('Action utilisateur');
  * rendererLog.error('Erreur survenue');
  */
-
-import type { ElectronAPI } from "../../shared/types";
-
-// Extend global interface for electronAPI
-declare global {
-	interface Window {
-		electronAPI: ElectronAPI;
-	}
-}
 
 // Interface pour les messages de log
 interface LogMessage {
@@ -41,7 +40,7 @@ export const rendererLog = {
 			module: "renderer",
 			args,
 		};
-		sendToMainProcess(logMessage);
+		writeToConsole(logMessage);
 	},
 
 	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
@@ -52,7 +51,7 @@ export const rendererLog = {
 			module: "renderer",
 			args,
 		};
-		sendToMainProcess(logMessage);
+		writeToConsole(logMessage);
 	},
 
 	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
@@ -63,7 +62,7 @@ export const rendererLog = {
 			module: "renderer",
 			args,
 		};
-		sendToMainProcess(logMessage);
+		writeToConsole(logMessage);
 	},
 
 	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
@@ -74,7 +73,7 @@ export const rendererLog = {
 			module: "renderer",
 			args,
 		};
-		sendToMainProcess(logMessage);
+		writeToConsole(logMessage);
 	},
 
 	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
@@ -85,91 +84,91 @@ export const rendererLog = {
 			module: "renderer",
 			args,
 		};
-		sendToMainProcess(logMessage);
+		writeToConsole(logMessage);
 	},
 
 	// Module-specific loggers
 	context: {
 		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 		debug: (message: string, ...args: any[]) => {
-			sendToMainProcess({ level: "debug", message, module: "context", args });
+			writeToConsole({ level: "debug", message, module: "context", args });
 		},
 		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 		info: (message: string, ...args: any[]) => {
-			sendToMainProcess({ level: "info", message, module: "context", args });
+			writeToConsole({ level: "info", message, module: "context", args });
 		},
 		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 		success: (message: string, ...args: any[]) => {
-			sendToMainProcess({ level: "success", message, module: "context", args });
+			writeToConsole({ level: "success", message, module: "context", args });
 		},
 		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 		warning: (message: string, ...args: any[]) => {
-			sendToMainProcess({ level: "warning", message, module: "context", args });
+			writeToConsole({ level: "warning", message, module: "context", args });
 		},
 		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 		error: (message: string, ...args: any[]) => {
-			sendToMainProcess({ level: "error", message, module: "context", args });
+			writeToConsole({ level: "error", message, module: "context", args });
 		},
 	},
 
 	github: {
 		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 		debug: (message: string, ...args: any[]) => {
-			sendToMainProcess({ level: "debug", message, module: "github", args });
+			writeToConsole({ level: "debug", message, module: "github", args });
 		},
 		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 		info: (message: string, ...args: any[]) => {
-			sendToMainProcess({ level: "info", message, module: "github", args });
+			writeToConsole({ level: "info", message, module: "github", args });
 		},
 		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 		success: (message: string, ...args: any[]) => {
-			sendToMainProcess({ level: "success", message, module: "github", args });
+			writeToConsole({ level: "success", message, module: "github", args });
 		},
 		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 		warning: (message: string, ...args: any[]) => {
-			sendToMainProcess({ level: "warning", message, module: "github", args });
+			writeToConsole({ level: "warning", message, module: "github", args });
 		},
 		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 		error: (message: string, ...args: any[]) => {
-			sendToMainProcess({ level: "error", message, module: "github", args });
+			writeToConsole({ level: "error", message, module: "github", args });
 		},
 	},
 
 	azure: {
 		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 		debug: (message: string, ...args: any[]) => {
-			sendToMainProcess({ level: "debug", message, module: "azure", args });
+			writeToConsole({ level: "debug", message, module: "azure", args });
 		},
 		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 		info: (message: string, ...args: any[]) => {
-			sendToMainProcess({ level: "info", message, module: "azure", args });
+			writeToConsole({ level: "info", message, module: "azure", args });
 		},
 		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 		success: (message: string, ...args: any[]) => {
-			sendToMainProcess({ level: "success", message, module: "azure", args });
+			writeToConsole({ level: "success", message, module: "azure", args });
 		},
 		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 		warning: (message: string, ...args: any[]) => {
-			sendToMainProcess({ level: "warning", message, module: "azure", args });
+			writeToConsole({ level: "warning", message, module: "azure", args });
 		},
 		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 		error: (message: string, ...args: any[]) => {
-			sendToMainProcess({ level: "error", message, module: "azure", args });
+			writeToConsole({ level: "error", message, module: "azure", args });
 		},
 	},
 
 	changelog: {
 		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 		debug: (message: string, ...args: any[]) => {
-			sendToMainProcess({ level: "debug", message, module: "changelog", args });
+			writeToConsole({ level: "debug", message, module: "changelog", args });
 		},
 		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 		info: (message: string, ...args: any[]) => {
-			sendToMainProcess({ level: "info", message, module: "changelog", args });
+			writeToConsole({ level: "info", message, module: "changelog", args });
 		},
 		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 		success: (message: string, ...args: any[]) => {
-			sendToMainProcess({
+			writeToConsole({
 				level: "success",
 				message,
 				module: "changelog",
@@ -178,7 +177,7 @@ export const rendererLog = {
 		},
 		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 		warning: (message: string, ...args: any[]) => {
-			sendToMainProcess({
+			writeToConsole({
 				level: "warning",
 				message,
 				module: "changelog",
@@ -187,37 +186,30 @@ export const rendererLog = {
 		},
 		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 		error: (message: string, ...args: any[]) => {
-			sendToMainProcess({ level: "error", message, module: "changelog", args });
+			writeToConsole({ level: "error", message, module: "changelog", args });
 		},
 	},
 };
 
-// Fonction pour envoyer les logs au main process
-function sendToMainProcess(logMessage: LogMessage): void {
-	try {
-		// Envoyer via IPC au main process
-		globalThis.electronAPI?.send?.("renderer-log", logMessage);
-	} catch (error) {
-		// Fallback vers console standard en cas d'erreur IPC
-		const fallbackMessage = `[Renderer Log Error] ${logMessage.level.toUpperCase()}: ${logMessage.message}`;
-		console.error(fallbackMessage, error);
-
-		// Afficher le message original avec console standard
-		switch (logMessage.level) {
-			case "debug":
-				break;
-			case "info":
-				console.info(logMessage.message, ...(logMessage.args || []));
-				break;
-			case "success":
-				break;
-			case "warning":
-				console.warn(`⚠️ ${logMessage.message}`, ...(logMessage.args || []));
-				break;
-			case "error":
-				console.error(`❌ ${logMessage.message}`, ...(logMessage.args || []));
-				break;
-		}
+// Écrit le message dans la console du renderer, préfixé de son module.
+function writeToConsole(logMessage: LogMessage): void {
+	const { level, message, module = "renderer", args = [] } = logMessage;
+	const text = module === "renderer" ? message : `[${module}] ${message}`;
+	switch (level) {
+		case "debug":
+			// biome-ignore lint/suspicious/noConsole: DevTools shows debug as "Verbose", hidden by default
+			console.debug(text, ...args);
+			break;
+		case "info":
+		case "success":
+			console.info(text, ...args);
+			break;
+		case "warning":
+			console.warn(text, ...args);
+			break;
+		case "error":
+			console.error(text, ...args);
+			break;
 	}
 }
 

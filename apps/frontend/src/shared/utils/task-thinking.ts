@@ -1,11 +1,13 @@
 import type { TaskLogPhase, TaskMetadata } from "../types";
 import {
 	DEFAULT_AGENT_PROFILES,
+	getModelsForProvider,
 	DEFAULT_PHASE_MODELS,
 	DEFAULT_PHASE_THINKING,
 	getCanonicalModelKey,
 	resolveCatalogModelValue,
 } from "../constants/models";
+import { canonicalLocalModelName, isEmbeddingModel } from "./local-models";
 import type {
 	AppSettings,
 	PhaseModelConfig,
@@ -17,14 +19,8 @@ import type {
 /**
  * Correspondance phase de logs → clé de configuration.
  *
- * La phase de logs « planning » affichée dans l'onglet Logs est le
- * **planificateur d'implémentation** (backend `agent_type="planner"`, phase de
- * config `"planning"`) — PAS la création de spec (qui a lieu à la création de la
- * tâche, dans une autre UI). Elle doit donc piloter la config `planning`, sinon
- * la sélection modèle/effort/fournisseur de « Planification » n'atteint jamais
- * le planificateur (qui lit `phaseModels.planning`) : l'utilisateur choisissait
- * p.ex. Sonnet 4.5 mais le backend gardait le modèle de `planning`. La phase de
- * config `"spec"` se règle à la création de la tâche.
+ * La ligne planning regroupe la creation de spec et le planificateur.
+ * Ses changements explicites sont appliques aux deux configurations.
  */
 export const LOG_PHASE_TO_CONFIG_PHASE: Record<
 	TaskLogPhase,
@@ -191,7 +187,11 @@ export function buildThinkingMetadataUpdate(
 	return {
 		isAutoProfile: true,
 		phaseModels: { ...base.phaseModels },
-		phaseThinking: { ...base.phaseThinking, [configPhase]: level },
+		phaseThinking: {
+			...base.phaseThinking,
+			...(logPhase === "planning" ? { spec: level } : {}),
+			[configPhase]: level,
+		},
 	};
 }
 
@@ -211,7 +211,11 @@ export function buildModelMetadataUpdate(
 	const base = basePhaseConfig(metadata, defaults);
 	return {
 		isAutoProfile: true,
-		phaseModels: { ...base.phaseModels, [configPhase]: model },
+		phaseModels: {
+			...base.phaseModels,
+			...(logPhase === "planning" ? { spec: model } : {}),
+			[configPhase]: model,
+		},
 		phaseThinking: { ...base.phaseThinking },
 	};
 }
@@ -252,7 +256,11 @@ export function buildProviderMetadataUpdate(
 	const base = basePhaseProviders(metadata, defaults);
 	const configPhase = LOG_PHASE_TO_CONFIG_PHASE[logPhase];
 	const update: Partial<TaskMetadata> = {
-		phaseProviders: { ...base, [configPhase]: provider },
+		phaseProviders: {
+			...base,
+			...(logPhase === "planning" ? { spec: provider } : {}),
+			[configPhase]: provider,
+		},
 	};
 
 	// Changing a phase's provider invalidates its persisted model: a model from
@@ -268,6 +276,7 @@ export function buildProviderMetadataUpdate(
 		update.isAutoProfile = true;
 		update.phaseModels = {
 			...baseModels.phaseModels,
+			...(logPhase === "planning" ? { spec: newDefaultModel } : {}),
 			[configPhase]: newDefaultModel,
 		};
 	}
@@ -302,27 +311,40 @@ interface ModelSelectOption {
  *    de sorte que l'étiquette correcte s'affiche sans doublon ;
  *  - sinon (modèle réellement absent, ex. autre fournisseur), on conserve le
  *    filet de sécurité : la valeur courante reste sélectionnable.
+ *
+ * **Fournisseurs locaux.** L'identité canonique d'Anthropic ne sait rien des
+ * tags Ollama : elle remplace les points par des tirets et ignore `:latest`,
+ * donc `llama3.3` (valeur persistée) et `llama3.3:latest` (tag réellement
+ * installé, retenu par `dedupeLocalCatalog`) lui paraissent être deux modèles.
+ * Le filet de sécurité injectait alors une seconde ligne — sans libellé curaté
+ * et sans le drapeau `installed` — si bien que le modèle sélectionné
+ * s'affichait « à télécharger » alors qu'il était sur le disque, et que le
+ * choisir relançait un `ollama pull` inutile. `isLocal` bascule sur l'identité
+ * d'Ollama, où le nom nu EST le tag `:latest`.
  */
 export function buildModelSelectOptions(
 	catalog: readonly ModelSelectOption[],
 	currentValue: string | undefined,
 	shortLabels: Record<string, string> = {},
+	isLocal = false,
 ): { options: ModelSelectOption[]; value: string } {
-	const options: ModelSelectOption[] = catalog.map((m) => ({
-		value: m.value,
-		label: m.label,
-		installed: m.installed,
-		param_b: m.param_b,
-	}));
-	const current = currentValue ?? "";
+	const keyOf = isLocal ? canonicalLocalModelName : getCanonicalModelKey;
+	const options: ModelSelectOption[] = catalog
+		.filter((m) => !isLocal || !isEmbeddingModel(m.value))
+		.map((m) => ({
+			value: m.value,
+			label: m.label,
+			installed: m.installed,
+			param_b: m.param_b,
+		}));
+	const current =
+		isLocal && isEmbeddingModel(currentValue ?? "") ? "" : (currentValue ?? "");
 	if (!current) return { options, value: current };
 
-	const currentKey = getCanonicalModelKey(current);
-	const inCatalog = options.some(
-		(m) => getCanonicalModelKey(m.value) === currentKey,
-	);
+	const currentKey = keyOf(current);
+	const match = options.find((m) => keyOf(m.value) === currentKey);
 
-	if (!inCatalog) {
+	if (!match) {
 		// Modèle non couvert par le catalogue : le rendre sélectionnable tel quel.
 		options.unshift({ value: current, label: shortLabels[current] || current });
 		return { options, value: current };
@@ -330,5 +352,31 @@ export function buildModelSelectOptions(
 
 	// Même version déjà présente : on aligne la sélection sur l'entrée du
 	// catalogue pour éviter un second élément au libellé brut.
-	return { options, value: resolveCatalogModelValue(current, options) };
+	return {
+		options,
+		value: isLocal ? match.value : resolveCatalogModelValue(current, options),
+	};
+}
+
+/** Replace the full task configuration when the global provider changes. */
+export function buildGlobalProviderMetadataUpdate(
+ provider: string,
+ settings: PhaseDefaultsSettings | undefined,
+): { provider: string; model: string; isAutoProfile: boolean; phaseProviders: PhaseProviderConfig; phaseModels: PhaseModelConfig; phaseThinking: PhaseThinkingConfig; thinkingLevel: ThinkingLevel } {
+ const defaults = resolvePhaseDefaults(settings, provider);
+ const catalog = getModelsForProvider(provider).filter(m => m.value !== "custom");
+ const local = ["ollama", "local", "lmstudio"].includes(provider);
+ const phaseModels = { ...defaults.phaseModels };
+ for (const phase of ["spec", "planning", "coding", "qa"] as const) {
+  const configured = settings?.providerPhaseModels?.[provider]?.[phase];
+  const model = phaseModels[phase];
+  const match = catalog.find(m => getCanonicalModelKey(m.value) === getCanonicalModelKey(model));
+  phaseModels[phase] = configured || (local ? settings?.globalOllamaModel?.trim() || match?.value || catalog[0]?.value || model : match?.value || catalog[0]?.value || model);
+ }
+ return {
+  provider, model: phaseModels.coding, isAutoProfile: true,
+  phaseProviders: { spec: provider, planning: provider, coding: provider, qa: provider },
+  phaseModels, phaseThinking: { ...defaults.phaseThinking },
+  thinkingLevel: defaults.phaseThinking.coding,
+ };
 }

@@ -38,14 +38,14 @@ class TestEnvVarTokenResolution:
     """Tests for environment variable token resolution."""
 
     @pytest.fixture(autouse=True)
-    def clear_env(self):
+    def clear_env(self, monkeypatch):
         """Clear auth environment variables before each test."""
+        # monkeypatch restores the original values at teardown, even when
+        # the code under test writes them itself: a direct pop would wipe a
+        # real token for every test that runs after this class.
         for var in AUTH_TOKEN_ENV_VARS:
-            os.environ.pop(var, None)
+            monkeypatch.delenv(var, raising=False)
         yield
-        # Cleanup after test
-        for var in AUTH_TOKEN_ENV_VARS:
-            os.environ.pop(var, None)
 
     def test_claude_oauth_token_from_env(self):
         """Reads CLAUDE_CODE_OAUTH_TOKEN from environment."""
@@ -166,7 +166,7 @@ class TestWindowsCredentialFiles:
 
         # Create a temporary credential file
         cred_file = tmp_path / ".credentials.json"
-        cred_file.write_text(credentials)
+        cred_file.write_text(credentials, encoding="utf-8")
 
         monkeypatch.setattr(platform, "system", lambda: "Windows")
         monkeypatch.setattr(
@@ -187,7 +187,7 @@ class TestWindowsCredentialFiles:
     def test_windows_credential_file_invalid_json(self, monkeypatch, tmp_path):
         """Returns None when credential file contains invalid JSON."""
         cred_file = tmp_path / ".credentials.json"
-        cred_file.write_text("invalid json")
+        cred_file.write_text("invalid json", encoding="utf-8")
 
         monkeypatch.setattr(platform, "system", lambda: "Windows")
         monkeypatch.setattr(
@@ -380,16 +380,16 @@ class TestRequireAuthToken:
     @pytest.fixture(autouse=True)
     def clear_env(self, monkeypatch):
         """Clear auth environment variables and mock keychain before each test."""
+        # monkeypatch restores the original values at teardown, even when
+        # the code under test writes them itself: a direct pop would wipe a
+        # real token for every test that runs after this class.
         for var in AUTH_TOKEN_ENV_VARS:
-            os.environ.pop(var, None)
+            monkeypatch.delenv(var, raising=False)
         # Mock keychain to return None (tests that need a token will set env var)
         monkeypatch.setattr(
             "core.auth.get_token_from_keychain", lambda _config_dir=None: None
         )
         yield
-        # Cleanup after test
-        for var in AUTH_TOKEN_ENV_VARS:
-            os.environ.pop(var, None)
 
     def test_require_token_returns_valid_token(self):
         """Returns token when valid token exists."""
@@ -443,16 +443,15 @@ class TestEnsureClaudeCodeOAuthToken:
     """Tests for ensure_claude_code_oauth_token function."""
 
     @pytest.fixture(autouse=True)
-    def clear_env(self):
+    def clear_env(self, monkeypatch):
         """Clear auth environment variables before each test."""
+        # monkeypatch restores the original values at teardown, even when
+        # the code under test writes them itself: a direct pop would wipe a
+        # real token for every test that runs after this class.
         for var in AUTH_TOKEN_ENV_VARS:
-            os.environ.pop(var, None)
-        os.environ.pop("CLAUDE_CODE_OAUTH_TOKEN", None)
+            monkeypatch.delenv(var, raising=False)
+        monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
         yield
-        # Cleanup after test
-        for var in AUTH_TOKEN_ENV_VARS:
-            os.environ.pop(var, None)
-        os.environ.pop("CLAUDE_CODE_OAUTH_TOKEN", None)
 
     def test_does_nothing_when_already_set(self):
         """Doesn't modify env var when CLAUDE_CODE_OAUTH_TOKEN is already set."""
@@ -489,14 +488,14 @@ class TestTokenSourceDetection:
     """Tests for get_auth_token_source function."""
 
     @pytest.fixture(autouse=True)
-    def clear_env(self):
+    def clear_env(self, monkeypatch):
         """Clear auth environment variables before each test."""
+        # monkeypatch restores the original values at teardown, even when
+        # the code under test writes them itself: a direct pop would wipe a
+        # real token for every test that runs after this class.
         for var in AUTH_TOKEN_ENV_VARS:
-            os.environ.pop(var, None)
+            monkeypatch.delenv(var, raising=False)
         yield
-        # Cleanup after test
-        for var in AUTH_TOKEN_ENV_VARS:
-            os.environ.pop(var, None)
 
     def test_source_env_var_claude_oauth(self):
         """Identifies CLAUDE_CODE_OAUTH_TOKEN as source."""
@@ -534,7 +533,7 @@ class TestTokenSourceDetection:
         credentials = json.dumps({"claudeAiOauth": {"accessToken": test_token}})
 
         cred_file = tmp_path / ".credentials.json"
-        cred_file.write_text(credentials)
+        cred_file.write_text(credentials, encoding="utf-8")
 
         monkeypatch.setattr(platform, "system", lambda: "Windows")
         monkeypatch.setattr(
@@ -1000,14 +999,14 @@ class TestTokenDecryptionKeychain:
     """Tests for encrypted token handling from keychain sources."""
 
     @pytest.fixture(autouse=True)
-    def clear_env(self):
+    def clear_env(self, monkeypatch):
         """Clear auth environment variables before each test."""
+        # monkeypatch restores the original values at teardown, even when
+        # the code under test writes them itself: a direct pop would wipe a
+        # real token for every test that runs after this class.
         for var in AUTH_TOKEN_ENV_VARS:
-            os.environ.pop(var, None)
+            monkeypatch.delenv(var, raising=False)
         yield
-        # Cleanup after test
-        for var in AUTH_TOKEN_ENV_VARS:
-            os.environ.pop(var, None)
 
     def test_keychain_encrypted_token_decryption_attempted(self, monkeypatch):
         """Verify encrypted tokens from keychain trigger decryption."""

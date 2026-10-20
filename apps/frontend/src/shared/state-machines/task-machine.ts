@@ -41,7 +41,13 @@ export type TaskEvent =
 			attemptCount: number;
 	  }
 	| { type: "QA_MAX_ITERATIONS"; iteration: number; maxIterations: number }
-	| { type: "QA_AGENT_ERROR"; iteration: number; consecutiveErrors: number }
+	| {
+			type: "QA_AGENT_ERROR";
+			iteration: number;
+			consecutiveErrors: number;
+			/** The last pass's own error, as the backend reported it. */
+			error?: string;
+	  }
 	| {
 			type: "PROCESS_EXITED";
 			exitCode: number;
@@ -111,7 +117,7 @@ export const taskMachine = createMachine(
 					PROCESS_EXITED: {
 						target: "error",
 						guard: "unexpectedExit",
-						actions: "setReviewReasonErrors",
+						actions: ["setReviewReasonErrors", "setError"],
 					},
 				},
 			},
@@ -122,7 +128,7 @@ export const taskMachine = createMachine(
 					PROCESS_EXITED: {
 						target: "error",
 						guard: "unexpectedExit",
-						actions: "setReviewReasonErrors",
+						actions: ["setReviewReasonErrors", "setError"],
 					},
 				},
 			},
@@ -148,7 +154,7 @@ export const taskMachine = createMachine(
 					PROCESS_EXITED: {
 						target: "error",
 						guard: "unexpectedExit",
-						actions: "setReviewReasonErrors",
+						actions: ["setReviewReasonErrors", "setError"],
 					},
 				},
 			},
@@ -161,9 +167,17 @@ export const taskMachine = createMachine(
 					},
 					QA_MAX_ITERATIONS: {
 						target: "error",
-						actions: "setReviewReasonErrors",
+						actions: ["setReviewReasonErrors", "setError"],
 					},
-					QA_AGENT_ERROR: { target: "error", actions: "setReviewReasonErrors" },
+					// QA only runs once every subtask is done. When its agent fails
+					// to reach a verdict the build is still complete — what is
+					// missing is the automatic validation, not the work. That is a
+					// review the user does by hand, not a failed task: the card
+					// stays out of `error`, and the message travels as a warning.
+					QA_AGENT_ERROR: {
+						target: "human_review",
+						actions: ["setReviewReasonQaUnverified", "setError"],
+					},
 					USER_STOPPED: {
 						target: "human_review",
 						actions: "setReviewReasonStopped",
@@ -171,7 +185,7 @@ export const taskMachine = createMachine(
 					PROCESS_EXITED: {
 						target: "error",
 						guard: "unexpectedExit",
-						actions: "setReviewReasonErrors",
+						actions: ["setReviewReasonErrors", "setError"],
 					},
 				},
 			},
@@ -188,9 +202,12 @@ export const taskMachine = createMachine(
 					},
 					QA_MAX_ITERATIONS: {
 						target: "error",
-						actions: "setReviewReasonErrors",
+						actions: ["setReviewReasonErrors", "setError"],
 					},
-					QA_AGENT_ERROR: { target: "error", actions: "setReviewReasonErrors" },
+					QA_AGENT_ERROR: {
+						target: "human_review",
+						actions: ["setReviewReasonQaUnverified", "setError"],
+					},
 					USER_STOPPED: {
 						target: "human_review",
 						actions: "setReviewReasonStopped",
@@ -198,7 +215,7 @@ export const taskMachine = createMachine(
 					PROCESS_EXITED: {
 						target: "error",
 						guard: "unexpectedExit",
-						actions: "setReviewReasonErrors",
+						actions: ["setReviewReasonErrors", "setError"],
 					},
 				},
 			},
@@ -262,19 +279,48 @@ export const taskMachine = createMachine(
 			setReviewReasonStopped: assign({ reviewReason: () => "stopped" }),
 			setReviewReasonQaRejected: assign({ reviewReason: () => "qa_rejected" }),
 			setReviewReasonErrors: assign({ reviewReason: () => "errors" }),
+			setReviewReasonQaUnverified: assign({
+				reviewReason: () => "qa_unverified",
+			}),
 			clearReviewReason: assign({
 				reviewReason: () => undefined,
 				error: () => undefined,
 			}),
+			// Every event that lands the task in `error` names the failure, and
+			// QA_AGENT_ERROR — which lands it in review — names what QA could
+			// not check.
+			//
+			// Before, only PLANNING_FAILED and CODING_FAILED did — and those two
+			// were the paths the backend never emitted. Every real failure
+			// arrived as PROCESS_EXITED, QA_MAX_ITERATIONS or QA_AGENT_ERROR,
+			// which set no message at all, so the card showed "Has Errors" and
+			// the user had no way to learn what had gone wrong short of opening
+			// the logs.
 			setError: assign({
 				error: ({ event }) => {
-					if (event.type === "PLANNING_FAILED") {
-						return event.error;
+					switch (event.type) {
+						case "PLANNING_FAILED":
+						case "CODING_FAILED":
+							return event.error;
+						case "QA_MAX_ITERATIONS":
+							return `QA gave up after ${event.maxIterations} review passes without approving the build.`;
+						case "QA_AGENT_ERROR":
+							// Without the backend's reason the count is all the
+							// user gets, and it does not say what to fix.
+							return `The QA agent failed ${event.consecutiveErrors} time(s) in a row on review pass ${event.iteration}.${
+								event.error ? ` Last error: ${event.error}` : ""
+							}`;
+						case "PROCESS_EXITED":
+							// The last resort: the backend stopped without saying
+							// why. Naming the exit code is still strictly better
+							// than an empty badge — it is what the user quotes when
+							// asking for help.
+							return `The build process exited unexpectedly with code ${event.exitCode}${
+								event.signal ? ` (signal ${event.signal})` : ""
+							}. See the task logs for the last output.`;
+						default:
+							return undefined;
 					}
-					if (event.type === "CODING_FAILED") {
-						return event.error;
-					}
-					return undefined;
 				},
 			}),
 		},

@@ -15,8 +15,16 @@ import "@testing-library/jest-dom";
 import type { Task, TaskLogs as TaskLogsType } from "../../../shared/types";
 import { TaskLogs } from "./TaskLogs";
 
+beforeEach(() => {
+ HTMLElement.prototype.scrollTo = vi.fn();
+ vi.stubGlobal("ResizeObserver", class {
+  observe() { /* Layout is simulated in jsdom. */ }
+  disconnect() { /* No browser observation to release. */ }
+ });
+});
+
 vi.mock("react-i18next", () => ({
-	useTranslation: () => ({ t: (key: string) => key }),
+	useTranslation: () => ({ t: (key: string) => key, i18n: { language: "en" } }),
 }));
 
 vi.mock("../../stores/settings-store", () => ({
@@ -33,7 +41,12 @@ vi.mock("../../hooks/use-toast", () => ({
 }));
 
 vi.mock("../../hooks/useProviderModelCatalog", () => ({
-	useProviderModelCatalog: () => ({ models: [] }),
+	useProviderModelCatalog: () => ({
+		models: [
+			{ value: "llama3.3", label: "Llama 3.3", installed: true },
+			{ value: "custom", label: "Custom" },
+		],
+	}),
 }));
 
 vi.mock("../../../shared/utils/providers", () => ({
@@ -201,4 +214,125 @@ describe("TaskLogs — bouton remonter au début", () => {
 			behavior: "smooth",
 		});
 	});
+});
+
+describe("local model log status icons", () => {
+	it.each(["⏳", "🧠", "📊", "📐", "⚠️"])("renders %s as SVG", (marker) => {
+		const logs = makePhaseLogs();
+		logs.phases.planning.entries = [
+			{
+				type: "info",
+				content: `${marker} Local status`,
+				timestamp: "2026-09-07T19:00:00Z",
+			} as never,
+		];
+		const { container } = render(
+			<TaskLogs
+				task={baseTask}
+				phaseLogs={logs}
+				isLoadingLogs={false}
+				expandedPhases={new Set(["planning"])}
+				isStuck={false}
+				logsEndRef={createRef<HTMLDivElement>()}
+				logsContainerRef={createRef<HTMLDivElement>()}
+				onLogsScroll={vi.fn()}
+				onTogglePhase={vi.fn()}
+			/>,
+		);
+		expect(container.textContent).toContain("Local status");
+		expect(container.textContent).not.toContain(marker);
+		expect(container.querySelector("svg.inline-block")).toBeTruthy();
+	});
+});
+
+it("opens official search outside the header when the select restores focus", async () => {
+	HTMLElement.prototype.scrollIntoView = vi.fn();
+	render(
+		<TaskLogs
+			task={{
+				...baseTask,
+				metadata: { provider: "ollama", model: "llama3.3" },
+			}}
+			phaseLogs={makePhaseLogs()}
+			isLoadingLogs={false}
+			expandedPhases={new Set()}
+			isStuck={false}
+			logsEndRef={createRef<HTMLDivElement>()}
+			logsContainerRef={createRef<HTMLDivElement>()}
+			onLogsScroll={vi.fn()}
+			onTogglePhase={vi.fn()}
+		/>,
+	);
+	const select = screen.getAllByLabelText("tasks:logs.model.selectAria")[0];
+	fireEvent.keyDown(select, { key: "ArrowDown" });
+	const option = await screen.findByRole("option", {
+		name: "tasks:logs.model.customOption",
+	});
+	expect(option.textContent).not.toContain("tasks:logs.model.download");
+	fireEvent.keyDown(option, { key: "Enter" });
+	const input = await screen.findByLabelText("tasks:logs.model.customAria");
+	fireEvent.blur(input);
+	expect(input).toBeInTheDocument();
+	expect(screen.getByRole("dialog")).toContainElement(input);
+	fireEvent.keyDown(input, { key: "Escape" });
+	expect(screen.queryByLabelText("tasks:logs.model.customAria")).toBeNull();
+});
+
+it("keeps the active execution visible after selecting another model", () => {
+	const logs = makePhaseLogs();
+	logs.phases.planning.status = "active";
+	logs.phases.planning.entries = [
+		{
+			timestamp: "2026-09-08T00:00:00Z",
+			type: "info",
+			content: "Active Llama request",
+			phase: "planning",
+			model: "llama3.3",
+			provider: "ollama",
+		},
+	];
+	render(
+		<TaskLogs
+			task={{
+				...baseTask,
+				metadata: { provider: "ollama", model: "qwen3:8b" },
+			}}
+			phaseLogs={logs}
+			isLoadingLogs={false}
+			expandedPhases={new Set(["planning"])}
+			isStuck={false}
+			logsEndRef={createRef<HTMLDivElement>()}
+			logsContainerRef={createRef<HTMLDivElement>()}
+			onLogsScroll={vi.fn()}
+			onTogglePhase={vi.fn()}
+		/>,
+	);
+	expect(
+		screen.getByText("tasks:logs.model.runningNotice"),
+	).toBeInTheDocument();
+	expect(screen.getByText("Active Llama request")).toBeInTheDocument();
+});
+
+it("follows content height changes after render inside the log frame", () => {
+ let notify: ResizeObserverCallback | undefined;
+ const disconnect = vi.fn();
+ vi.stubGlobal("ResizeObserver", class {
+  constructor(callback: ResizeObserverCallback) { notify = callback; }
+  observe() { /* Test explicitly triggers layout notifications. */ }
+  disconnect = disconnect;
+ });
+ const ref = createRef<HTMLDivElement>();
+ const view = renderLogs(ref);
+ const container = ref.current as HTMLDivElement;
+ container.scrollTo = vi.fn();
+ Object.defineProperty(container, "scrollHeight", { value: 2400, configurable: true });
+ expect(notify).toBeDefined();
+ notify?.([], {} as ResizeObserver);
+ expect(container.scrollTo).toHaveBeenLastCalledWith({ top: 2400, behavior: "instant" });
+ Object.defineProperty(container, "scrollHeight", { value: 2800, configurable: true });
+ notify?.([], {} as ResizeObserver);
+ expect(container.scrollTo).toHaveBeenLastCalledWith({ top: 2800, behavior: "instant" });
+ view.unmount();
+ expect(disconnect).toHaveBeenCalled();
+ vi.unstubAllGlobals();
 });

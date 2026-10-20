@@ -226,7 +226,7 @@ def auto_install_git_hooks() -> bool:
 
     # Check if our hooks are already installed
     if pre_commit_hook.exists():
-        content = pre_commit_hook.read_text()
+        content = pre_commit_hook.read_text(encoding="utf-8")
         if "WorkPilot AI Security Scanner" in content:
             return True  # Already installed
 
@@ -254,7 +254,9 @@ def ensure_security_reports_dir() -> Path:
     # Create .gitignore to avoid committing reports
     gitignore = reports_dir / ".gitignore"
     if not gitignore.exists():
-        gitignore.write_text("# Auto-generated security reports\n*\n!.gitignore\n")
+        gitignore.write_text(
+            "# Auto-generated security reports\n*\n!.gitignore\n", encoding="utf-8"
+        )
 
     return reports_dir
 

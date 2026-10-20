@@ -5,6 +5,7 @@ Validator Registry
 Central registry mapping command names to their validation functions.
 """
 
+from .config_write_validators import validate_security_config_writes
 from .database_validators import (
     validate_dropdb_command,
     validate_dropuser_command,
@@ -13,6 +14,10 @@ from .database_validators import (
     validate_mysqladmin_command,
     validate_psql_command,
     validate_redis_cli_command,
+)
+from .exec_validators import (
+    validate_source_command,
+    validate_tar_command,
 )
 from .filesystem_validators import (
     validate_chmod_command,
@@ -48,6 +53,12 @@ VALIDATORS: dict[str, ValidatorFunction] = {
     "bash": validate_bash_command,
     "sh": validate_sh_command,
     "zsh": validate_zsh_command,
+    # Commands that name a file whose contents would bypass the allowlist.
+    # `eval` and `find -exec` name a command rather than a file, so they are
+    # not here: `command_guard` recurses on what they name.
+    "source": validate_source_command,
+    ".": validate_source_command,
+    "tar": validate_tar_command,
     # Database - PostgreSQL
     "dropdb": validate_dropdb_command,
     "dropuser": validate_dropuser_command,
@@ -62,6 +73,18 @@ VALIDATORS: dict[str, ValidatorFunction] = {
     "mongosh": validate_mongosh_command,
     "mongo": validate_mongosh_command,  # Legacy mongo shell
 }
+
+#: Validators handed every command line, whatever command it runs. A
+#: redirection writes through a command (`echo x >> file`) that has no entry
+#: above, so a rule about *what is written* cannot be keyed on a command name.
+#: `command_guard.validate_command_line` runs these at every level it recurses
+#: into: `$(…)`, backticks, `eval`, `find -exec`.
+LINE_VALIDATORS: tuple[ValidatorFunction, ...] = (
+    # The project's security configuration: the allowlist, the security
+    # profile, the guardrails and the SDK settings. `path_guard` refuses the
+    # same files to the write tools.
+    validate_security_config_writes,
+)
 
 
 def get_validator(command_name: str) -> ValidatorFunction | None:

@@ -10,11 +10,10 @@ import os
 from pathlib import Path
 from typing import Any
 
-from project_analyzer import BASE_COMMANDS, SecurityProfile, is_command_allowed
+from project import BASE_COMMANDS, SecurityProfile
 
-from .parser import extract_commands, get_command_for_validation, split_command_segments
+from .command_guard import validate_command_line
 from .profile import get_security_profile
-from .validator import VALIDATORS
 
 
 async def bash_security_hook(
@@ -87,67 +86,66 @@ async def bash_security_hook(
     if not cwd:
         cwd = os.getcwd()
 
-    # Get or create security profile
-    # Note: In actual use, spec_dir would be passed through context
-    try:
-        profile = get_security_profile(Path(cwd))
-    except Exception as e:
-        # If profile creation fails, fall back to base commands only
-        print(f"Warning: Could not load security profile: {e}")
-        profile = SecurityProfile()
-        profile.base_commands = BASE_COMMANDS.copy()
-
-    # Extract all commands from the command string
-    commands = extract_commands(command)
-
-    if not commands:
-        # Could not parse - fail safe by blocking
+    allowed, reason = validate_command_line(command, _profile_for(Path(cwd)))
+    if not allowed:
         return {
             "hookSpecificOutput": {
                 "hookEventName": "PreToolUse",
                 "permissionDecision": "deny",
-                "permissionDecisionReason": f"Could not parse command for security validation: {command}",
+                "permissionDecisionReason": reason,
             }
         }
 
-    # Split into segments for per-command validation
-    segments = split_command_segments(command)
-
-    # Get all allowed commands
-    allowed = profile.get_all_allowed_commands()
-
-    # Check each command against the allowlist
-    for cmd in commands:
-        # Check if command is allowed
-        is_allowed, reason = is_command_allowed(cmd, profile)
-
-        if not is_allowed:
-            return {
-                "hookSpecificOutput": {
-                    "hookEventName": "PreToolUse",
-                    "permissionDecision": "deny",
-                    "permissionDecisionReason": reason,
-                }
-            }
-
-        # Additional validation for sensitive commands
-        if cmd in VALIDATORS:
-            cmd_segment = get_command_for_validation(cmd, segments)
-            if not cmd_segment:
-                cmd_segment = command
-
-            validator = VALIDATORS[cmd]
-            allowed, reason = validator(cmd_segment)
-            if not allowed:
-                return {
-                    "hookSpecificOutput": {
-                        "hookEventName": "PreToolUse",
-                        "permissionDecision": "deny",
-                        "permissionDecisionReason": reason,
-                    }
-                }
-
     return {}
+
+
+def _profile_for(project_dir: Path) -> SecurityProfile:
+    """The project's security profile, or the base commands when it cannot be
+    built: failing closed on the project's own additions, not on `ls`."""
+    # Note: In actual use, spec_dir would be passed through context
+    try:
+        return get_security_profile(project_dir)
+    except Exception as e:
+        print(f"Warning: Could not load security profile: {e}")
+        profile = SecurityProfile()
+        profile.base_commands = BASE_COMMANDS.copy()
+        return profile
+
+
+async def guardrail_refusal(
+    tool_name: str, tool_input: dict[str, Any], project_dir: Path
+) -> str | None:
+    """Why the user's guardrails deny this call, or ``None``.
+
+    `guardrails_hook`'s answer — `create_client` registers it on `Bash` and on
+    every write tool — for the providers that never reach the hook.
+    """
+    from .guardrails import guardrails_hook
+
+    verdict = await guardrails_hook(
+        {"tool_name": tool_name, "tool_input": tool_input},
+        project_root=project_dir,
+    )
+    output = verdict.get("hookSpecificOutput") or {}
+    if output.get("permissionDecision") == "deny":
+        return output.get("permissionDecisionReason") or "Refused by a guardrail"
+    return None
+
+
+async def command_refusal(command: str, project_dir: Path) -> str | None:
+    """Why `command` may not run in `project_dir`, or ``None`` when it may.
+
+    The answer `create_client`'s two `Bash` hooks give — the project's command
+    allowlist (`bash_security_hook`), then the user's guardrails — for the
+    providers that never reach them: Copilot, OpenAI and its kin, Windsurf and
+    LiteLLM run their commands through `ToolExecutor._run_command`, which
+    validated nothing. Judged on the command as the model wrote it; the
+    allowlist sees through an `rtk` prefix itself.
+    """
+    allowed, reason = validate_command_line(command, _profile_for(project_dir))
+    if not allowed:
+        return reason
+    return await guardrail_refusal("Bash", {"command": command}, project_dir)
 
 
 def validate_command(
@@ -156,6 +154,11 @@ def validate_command(
 ) -> tuple[bool, str]:
     """
     Validate a command string (for testing/debugging).
+
+    Answers from `validate_command_line`, the same function the hook uses.
+    This used to be a second copy of the logic, and the copies had already
+    drifted: on a command with no matching segment the hook handed the
+    validator the unwrapped line and this handed it the raw one.
 
     Args:
         command: Full command string to validate
@@ -168,26 +171,4 @@ def validate_command(
         project_dir = Path.cwd()
 
     profile = get_security_profile(project_dir)
-    commands = extract_commands(command)
-
-    if not commands:
-        return False, "Could not parse command"
-
-    segments = split_command_segments(command)
-
-    for cmd in commands:
-        is_allowed_result, reason = is_command_allowed(cmd, profile)
-        if not is_allowed_result:
-            return False, reason
-
-        if cmd in VALIDATORS:
-            cmd_segment = get_command_for_validation(cmd, segments)
-            if not cmd_segment:
-                cmd_segment = command
-
-            validator = VALIDATORS[cmd]
-            allowed, reason = validator(cmd_segment)
-            if not allowed:
-                return False, reason
-
-    return True, ""
+    return validate_command_line(command, profile)

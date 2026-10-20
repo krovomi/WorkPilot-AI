@@ -21,12 +21,23 @@ Degrading by provider
 A phase asking for ``subagent-per-task`` on a provider with no subagents cannot
 have it. It degrades to sequential execution with a context reset — same
 isolation, no parallelism — rather than silently pretending to dispatch.
+
+Substituting by availability
+----------------------------
+A phase whose ``impl`` is not installed and that declares a ``fallback`` is
+played by the fallback. The substitution is made here, once, when the resolver
+is given the pack inventory (`pack_inventory`), and it is recorded on the
+resolved phase and printed in the profile — "played by X, Y is not installed" —
+so what the user is shown is what runs. Without an inventory nothing is
+substituted and the runner makes the same decision at run time, against the
+target project, where a skill's ``requires`` is checked.
 """
 
 from __future__ import annotations
 
 import fnmatch
 import logging
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -38,34 +49,71 @@ __all__ = [
     "ResolvedPhase",
     "ExecutionProfile",
     "MissingImpl",
+    "ProjectCheck",
+    "narrow_to_forecast",
+    "pack_inventory",
     "resolve_profile",
     "validate_impls",
-    "DETERMINISTIC_PACKS",
+    "DETERMINISTIC_PHASES",
     "BUILTIN_PACKS",
 ]
 
 # Phases implemented by WorkPilot's own Python, not by a skill pack.
 BUILTIN_PACKS = frozenset({"workpilot"})
 
-# Packs whose phases run without an API call. Pruning them by effort saves
-# nothing, so they run at every level.
-DETERMINISTIC_PACKS = frozenset({"impeccable"})
+# Phases that run without an API call. Pruning them by effort saves nothing,
+# so they run at every level.
+#
+# Keyed by phase id, not by pack, and that distinction is load-bearing: a pack
+# is not deterministic, a *check* is. impeccable ships both — 59 local detector
+# rules (`design-check`) and 23 design commands a model has to read
+# (`frontend-design`) — so while this was `{"impeccable"}` the second one was
+# exempted from effort pruning it should obey, and handed to
+# `run_deterministic_gates`, which would have run the detector twice and
+# reported the same verdict under two phase ids.
+#
+# `ui-design-system` is the other kind of deterministic phase: not a gate but a
+# preflight. It runs ui-ux-pro-max's local engine (`uiux.preflight`) between
+# planning and coding — no model, no network — so it costs nothing at any
+# effort level, and the runner executes it rather than opening a session.
+#
+# `verify-replay` replays the verification after QA without a model (launch,
+# recorded scenario, recorded endpoint calls): no token at any effort level, so
+# never pruned. It has no pack `gate` command, so `run_deterministic_gates`
+# steps over it; the runner's `CUSTOM_EXECUTORS` runs it in its window.
+#
+# `execute` plays a RUN's procedure with Python (`workflows/execute.py`): no
+# model, no token at any effort, so never pruned; `CUSTOM_EXECUTORS` runs it.
+DETERMINISTIC_PHASES = frozenset(
+    {"design-check", "ui-design-system", "verify-replay", "execute"}
+)
 
 _SKIP_EFFORT = "effort"
 _SKIP_UNTOUCHED = "untouched"
+_SKIP_TASK = "task"
 
 
 @dataclass(frozen=True)
 class ResolvedPhase:
     phase: Phase
+    """The phase as it will run. When a fallback was substituted this is the
+    phase *with the fallback as its impl*, so every consumer — the runner, the
+    coder's preamble, the API — reads the implementation that actually runs."""
     dispatch: str
     """What will actually happen, after provider degradation."""
     degraded_from: str | None = None
     reason: str = ""
+    substituted_from: str | None = None
+    """The ``impl`` the workflow declared, when ``phase.impl`` is its fallback."""
+    substitution_reason: str = ""
 
     @property
     def id(self) -> str:
         return self.phase.id
+
+    @property
+    def impl(self) -> str:
+        return self.phase.impl
 
 
 @dataclass
@@ -120,16 +168,24 @@ class ExecutionProfile:
                 suffix = f"  [{resolved.degraded_from} → {resolved.dispatch}: {resolved.reason}]"
             elif resolved.dispatch != "inline":
                 suffix = f"  [{resolved.dispatch}]"
+            if resolved.substituted_from:
+                suffix += (
+                    f"  [for {resolved.substituted_from}: "
+                    f"{resolved.substitution_reason}]"
+                )
             marker = "!" if resolved.phase.hard_gate else " "
             lines.append(
                 f"  {marker} {resolved.id:<{width}} {resolved.phase.impl}{suffix}"
             )
         for phase, why in self.skipped:
-            detail = (
-                f"needs effort ≥ {phase.min_effort}"
-                if why == _SKIP_EFFORT
-                else "no matching files changed"
-            )
+            if why == _SKIP_EFFORT:
+                detail = f"needs effort ≥ {phase.min_effort}"
+            elif why == _SKIP_TASK:
+                detail = "not this task: " + " and ".join(
+                    f"{f} == {v}" for f, v in phase.when_task
+                )
+            else:
+                detail = "no matching files changed"
             lines.append(f"  - {phase.id:<{width}} skipped ({detail})")
         return "\n".join(lines)
 
@@ -147,23 +203,150 @@ def _touched(globs: tuple[str, ...], changed_files: list[str] | None) -> bool:
         return True
     for path in changed_files:
         normalised = str(path).replace("\\", "/")
+        name = Path(normalised).name
         for pattern in globs:
-            if fnmatch.fnmatch(normalised, pattern) or fnmatch.fnmatch(
-                Path(normalised).name, pattern
+            # `**/x` names `x` at the root too: fnmatch's `*` wants a
+            # separator, so `fnmatch("App.tsx", "**/*.tsx")` is False, and a
+            # change to the root `App.tsx` or `index.html` used to skip every
+            # frontend phase.
+            bare = pattern[3:] if pattern.startswith("**/") else None
+            if (
+                fnmatch.fnmatch(normalised, pattern)
+                or fnmatch.fnmatch(name, pattern)
+                or (bare is not None and fnmatch.fnmatch(normalised, bare))
             ):
                 return True
     return False
 
 
-def _degrade(phase: Phase, supports_subagents: bool) -> ResolvedPhase:
+def _matches_task(
+    conditions: tuple[tuple[str, str], ...], facts: Mapping[str, str] | None
+) -> bool:
+    """Whether the task's known facts satisfy every ``kind ==`` / ``complexity
+    ==`` term. A fact the build does not know is read as matching, for the
+    reason `_touched` runs on an unknown change set."""
+    if not conditions:
+        return True
+    for field_name, value in conditions:
+        known = (facts or {}).get(field_name)
+        if known is not None and known != value:
+            return False
+    return True
+
+
+def _degrade(
+    phase: Phase,
+    supports_subagents: bool,
+    *,
+    substituted_from: str | None = None,
+    substitution_reason: str = "",
+) -> ResolvedPhase:
     if phase.dispatch == "subagent-per-task" and not supports_subagents:
         return ResolvedPhase(
             phase=phase,
             dispatch="sequential-reset",
             degraded_from="subagent-per-task",
             reason="provider runs no subagents",
+            substituted_from=substituted_from,
+            substitution_reason=substitution_reason,
         )
-    return ResolvedPhase(phase=phase, dispatch=phase.dispatch)
+    return ResolvedPhase(
+        phase=phase,
+        dispatch=phase.dispatch,
+        substituted_from=substituted_from,
+        substitution_reason=substitution_reason,
+    )
+
+
+def _why_unresolved(
+    impl: str,
+    phase_id: str,
+    available: dict[str, set[str]],
+    gated: frozenset[str] | set[str],
+    *,
+    project: ProjectCheck | None = None,
+) -> str | None:
+    """Why ``impl`` cannot be found in the inventory, or None when it can.
+
+    One answer for the resolver and for `validate_impls`, so the profile and
+    the warning under it cannot disagree about what "installed" means.
+
+    With ``project``, a skill that is on disk but whose ``requires`` is not
+    met in the project being built is unresolved too — "installed" for a
+    BMAD skill means the project has `_bmad/`, and that is the question the
+    profile has to answer before a session is paid for.
+    """
+    pack, _, skill = impl.partition("/")
+    if pack in BUILTIN_PACKS:
+        return None
+    if phase_id in DETERMINISTIC_PHASES and pack in gated:
+        return None
+    skills = available.get(pack)
+    if skills is None:
+        return (
+            f"pack {pack!r} is not installed (pnpm run skills:bootstrap --pack {pack})"
+        )
+    if skill not in skills:
+        return f"pack {pack!r} provides no skill named {skill!r}"
+    if project is not None:
+        return _unmet_requires(impl, project)
+    return None
+
+
+@dataclass(frozen=True)
+class ProjectCheck:
+    """Where to read a skill's ``requires`` from, and which project to check
+    it against. ``repo_root`` is this repository (the skills); ``project_dir``
+    is the one being built (where `_bmad/` would be)."""
+
+    repo_root: Path
+    project_dir: Path
+
+
+def _unmet_requires(impl: str, project: ProjectCheck) -> str | None:
+    """The reason a skill cannot start in the project, or None when it can.
+
+    Reads the same `requires` the runner reads, through the same functions,
+    so the profile printed before the build and the decision made at run
+    time cannot disagree. A committed mock runtime does not count: it fails
+    on invocation, which is the failure this exists to turn into a sentence.
+    """
+    try:
+        from .runner import find_skill_body, skill_requires
+    except ImportError as exc:  # pragma: no cover - import-time environment
+        return f"cannot verify the runtime requirement: {exc}"
+    pack, _, skill = impl.partition("/")
+    found = find_skill_body(project.repo_root, pack, skill)
+    if found is None:
+        return f"no SKILL.md for {impl}"
+    _body, _source, requires = found
+    satisfied, why = skill_requires(requires, project.project_dir)
+    return None if satisfied else why
+
+
+def _substitute(
+    phase: Phase,
+    inventory: tuple[dict[str, set[str]], frozenset[str]] | None,
+    project: ProjectCheck | None,
+) -> tuple[Phase, str | None, str]:
+    """The phase to run, and what it stands in for.
+
+    Only a declared fallback that itself resolves is substituted: standing a
+    missing implementation in for another missing one would hide the gap
+    `validate_impls` exists to show.
+    """
+    if inventory is None or not phase.fallback:
+        return phase, None, ""
+    available, gated = inventory
+    why = _why_unresolved(phase.impl, phase.id, available, gated, project=project)
+    if why is None:
+        return phase, None, ""
+    if (
+        _why_unresolved(phase.fallback, phase.id, available, gated, project=project)
+        is not None
+    ):
+        return phase, None, ""
+    return phase.with_impl(phase.fallback), phase.impl, why
 
 
 def resolve_profile(
@@ -172,14 +355,34 @@ def resolve_profile(
     *,
     provider: str | None = None,
     changed_files: list[str] | None = None,
+    inventory: tuple[dict[str, set[str]], frozenset[str]] | None = None,
+    project: ProjectCheck | None = None,
+    task: Mapping[str, str] | None = None,
 ) -> ExecutionProfile:
-    """Decide which phases run, and how."""
+    """Decide which phases run, how, and by which implementation.
+
+    ``inventory`` is what `pack_inventory` returns. With it, a phase whose
+    ``impl`` is not installed and whose ``fallback`` is runs the fallback, and
+    the profile records the substitution. ``project`` extends "installed" to
+    "and its runtime is in the project being built" (`ProjectCheck`), which
+    is the question a BMAD phase turns on. Without them, no substitution is
+    made here — the runner still falls back at run time, against the target
+    project. ``task`` is `task_facts.task_facts`: the kind and complexity a
+    ``when: kind == …`` condition is read against.
+    """
     supports_subagents = True
     if provider:
         try:
             from skills_registry.providers import get_provider_capabilities
 
             supports_subagents = get_provider_capabilities(provider).supports_subagents
+            # `openai` is two clients: the REST one emulates a roster, the
+            # Codex CLI brings its own tools and takes none. The matrix is
+            # static; the auth mode decides which one a build gets.
+            if supports_subagents and provider == "openai":
+                from core.codex_cli_client import openai_uses_codex_cli
+
+                supports_subagents = not openai_uses_codex_cli()
         except Exception as exc:  # capability lookup must not block a build
             logger.debug("provider capability lookup failed: %s", exc)
 
@@ -191,7 +394,7 @@ def resolve_profile(
     )
 
     for phase in workflow.phases:
-        deterministic = phase.pack in DETERMINISTIC_PACKS
+        deterministic = phase.id in DETERMINISTIC_PHASES
 
         if phase.prunable and not deterministic:
             if not effort_at_least(effort, phase.min_effort):
@@ -200,13 +403,54 @@ def resolve_profile(
 
         # A hard gate still runs, but a conditional phase with nothing to look
         # at has no work to do regardless of its gate status.
+        if not _matches_task(phase.when_task, task):
+            profile.skipped.append((phase, _SKIP_TASK))
+            continue
         if not _touched(phase.when_globs, changed_files):
             profile.skipped.append((phase, _SKIP_UNTOUCHED))
             continue
 
-        profile.run.append(_degrade(phase, supports_subagents))
+        played, declared_impl, why = _substitute(phase, inventory, project)
+        profile.run.append(
+            _degrade(
+                played,
+                supports_subagents,
+                substituted_from=declared_impl,
+                substitution_reason=why,
+            )
+        )
 
     return profile
+
+
+def narrow_to_forecast(
+    profile: ExecutionProfile, changed_files: list[str] | None
+) -> ExecutionProfile:
+    """The same profile, with the conditional phases the forecast does not touch
+    moved to ``skipped``.
+
+    The profile a build starts with was resolved before anything was planned,
+    so every `when: touches(...)` phase was kept on "unknown — run". Once the
+    plan names its files (`workflows.forecast.planned_files`), the phases that
+    run *before* the code exists can be decided on that forecast. This only
+    ever removes: a phase effort pruned stays pruned, and ``None`` — no
+    forecast — returns the profile unchanged.
+    """
+    if not changed_files:
+        return profile
+    narrowed = ExecutionProfile(
+        workflow=profile.workflow,
+        effort=profile.effort,
+        provider=profile.provider,
+        skipped=list(profile.skipped),
+        declared=profile.declared,
+    )
+    for resolved in profile.run:
+        if _touched(resolved.phase.when_globs, changed_files):
+            narrowed.run.append(resolved)
+        else:
+            narrowed.skipped.append((resolved.phase, _SKIP_UNTOUCHED))
+    return narrowed
 
 
 @dataclass(frozen=True)
@@ -219,12 +463,43 @@ class MissingImpl:
     reason: str
 
 
+def pack_inventory(packs) -> tuple[dict[str, set[str]], frozenset[str]]:
+    """What `validate_impls` checks a workflow against, from loaded packs.
+
+    The skills each pack provides, and the packs whose implementation is a
+    `gate` command rather than a skill — the same field
+    `gates.run_deterministic_gates` executes. One helper for the three callers
+    (the build banner, the profile API, `skills:workflow`), so they cannot
+    disagree about what "installed" means.
+    """
+    packs = list(packs)
+    available = {p.name: {s.name for s in p.skills()} for p in packs}
+    gated = frozenset(
+        p.name for p in packs if (getattr(p, "gate", None) or {}).get("command")
+    )
+    return available, gated
+
+
 def validate_impls(
-    workflow: Workflow, available: dict[str, set[str]]
+    workflow: Workflow,
+    available: dict[str, set[str]],
+    *,
+    gated: frozenset[str] | set[str] = frozenset(),
 ) -> list[MissingImpl]:
     """Report phases whose implementation cannot be found.
 
-    ``available`` maps pack name to the skill names it provides.
+    ``available`` maps pack name to the skill names it provides; ``gated``
+    names the packs that declare a `gate` command (`pack_inventory` builds
+    both).
+
+    A deterministic phase whose pack declares a gate is implemented by that
+    gate — `design-check` runs impeccable's detector without any skill on
+    disk — so it is not reported. Reporting it sent people to bootstrap a pack
+    the phase did not need.
+
+    A phase whose ``impl`` is missing but whose ``fallback`` resolves is not
+    missing: the resolver plays the fallback and the profile says so. It is
+    reported only when neither resolves, with both reasons.
 
     Reported, never fatal. Several packs are vendored on demand, so a fresh
     clone legitimately has phases it cannot run yet; the answer is to tell the
@@ -233,26 +508,13 @@ def validate_impls(
     """
     missing: list[MissingImpl] = []
     for phase in workflow.phases:
-        if phase.pack in BUILTIN_PACKS:
+        why = _why_unresolved(phase.impl, phase.id, available, gated)
+        if why is None:
             continue
-        skills = available.get(phase.pack)
-        if skills is None:
-            missing.append(
-                MissingImpl(
-                    phase.id,
-                    phase.impl,
-                    phase.pack,
-                    f"pack {phase.pack!r} is not installed "
-                    f"(pnpm run skills:bootstrap --pack {phase.pack})",
-                )
-            )
-        elif phase.skill not in skills:
-            missing.append(
-                MissingImpl(
-                    phase.id,
-                    phase.impl,
-                    phase.pack,
-                    f"pack {phase.pack!r} provides no skill named {phase.skill!r}",
-                )
-            )
+        if phase.fallback:
+            why_fallback = _why_unresolved(phase.fallback, phase.id, available, gated)
+            if why_fallback is None:
+                continue
+            why = f"{why}; fallback {phase.fallback}: {why_fallback}"
+        missing.append(MissingImpl(phase.id, phase.impl, phase.pack, why))
     return missing

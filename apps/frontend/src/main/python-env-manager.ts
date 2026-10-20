@@ -133,6 +133,7 @@ export class PythonEnvManager extends EventEmitter {
 			"claude_agent_sdk",
 			"dotenv",
 			"pydantic_core",
+			"faster_whisper",
 			...(isWindows() ? platformCriticalPackages.win32 : []),
 		];
 		const optionalPackages = isLinux() ? platformOptionalPackages.linux : [];
@@ -199,11 +200,11 @@ export class PythonEnvManager extends EventEmitter {
 		// - claude_agent_sdk: Core agent SDK (required)
 		// - dotenv: Environment variable loading (required)
 		// - google.generativeai: Google AI/Gemini support (required for full functionality)
-		// - real_ladybug + graphiti_core: Graphiti memory system (Python 3.12+ only)
+		// - faster_whisper: local dictation
 		//
 		// IMPORTANT: we use importlib.util.find_spec (presence check) instead of
-		// actually `import`-ing the modules. Importing google.generativeai +
-		// graphiti_core cold on Windows costs ~28s, which blew past the old 15s
+		// actually `import`-ing the modules. Importing google.generativeai and
+		// its peers cold on Windows cost ~28s, which blew past the old 15s
 		// timeout — so a cold `pnpm run dev` wrongly concluded deps were missing
 		// and re-ran a full `pip install` on EVERY startup, freezing the main
 		// process. find_spec resolves the module locations without executing their
@@ -211,9 +212,7 @@ export class PythonEnvManager extends EventEmitter {
 		// child process (not execSync) so it never blocks the main event loop.
 		const checkScript = [
 			"import importlib.util as u, sys",
-			"mods = ['claude_agent_sdk', 'dotenv', 'google.generativeai']",
-			"if sys.version_info >= (3, 12):",
-			"    mods += ['real_ladybug', 'graphiti_core']",
+			"mods = ['claude_agent_sdk', 'dotenv', 'google.generativeai', 'faster_whisper']",
 			"def present(m):",
 			"    try:",
 			"        return u.find_spec(m) is not None",

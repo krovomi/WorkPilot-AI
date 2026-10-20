@@ -1,0 +1,92 @@
+name: Mobile device check
+
+# Manual, never on a pull request. Booting an Android emulator and building an
+# APK takes ten minutes and needs KVM; paying that on every PR would buy one
+# signal and cost every contributor a slow queue. The fast half of the same
+# question — does the code read the real toolchain honestly — runs on every PR
+# already, in `tests/test_mobile_toolchain_contract.py`, on all three OS.
+#
+# Run this before a release, or after touching apps/backend/mobile/.
+on:
+  workflow_dispatch:
+    inputs:
+      api-level:
+        description: Android API level to boot
+        required: false
+        default: '34'
+
+# A second run would fight the first for the KVM device.
+concurrency:
+  group: mobile-device-check-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    name: Android — boot, build, install, capture
+    # ubuntu-latest is the only hosted image with KVM, which the emulator needs
+    # to run at a usable speed. Without it the boot alone exceeds the timeout.
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+
+      - name: Setup Java
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        # The fixture deliberately commits no wrapper jar, so the build needs a
+        # Gradle from the environment — which is also the fallback branch of
+        # `_gradle_wrapper()` that no other job exercises.
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Report the toolchain before any device exists
+        # The honest-absence half of the contract, on a machine that genuinely
+        # has no emulator running yet.
+        run: python scripts/mobile_device_check.py --project-dir tests/fixtures/android-sample
+
+      - name: Boot an emulator, build, install, launch and capture
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: ${{ inputs.api-level || '34' }}
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          ram-size: 4096M
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          # One line, no backslash continuations: the action hands `script` to
+          # `sh -c` a line at a time, so a wrapped command arrives as
+          # `python scripts/mobile_device_check.py \` on its own and argparse
+          # sees no arguments at all. The first run failed exactly there, after
+          # the emulator had booted successfully.
+          script: python scripts/mobile_device_check.py --project-dir tests/fixtures/android-sample --platform android --require-device --launch
+
+      - name: Publish the captured frame
+        # Uploaded on failure too: a frame of the launcher instead of the app is
+        # the single most useful artifact when the launch step goes wrong.
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: android-device-frame
+          path: device-frame.png
+          if-no-files-found: warn

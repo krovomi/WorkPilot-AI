@@ -57,10 +57,33 @@ export function useTaskNotifications({
 
 				const viewLabel = translate("statusNotifications.view");
 
+				// A build that failed reaches the board as human_review with
+				// reviewReason "errors" — the same status a finished build gets.
+				// Announcing both as "Ready for Review" is how a failure came to
+				// look like a success, and the one sentence explaining it stayed
+				// in the log. Read the reason, not just the column.
+				const isFailure =
+					newStatus === "error" ||
+					(newStatus === "human_review" && task?.reviewReason === "errors");
+				// The build finished but QA could not reach a verdict: worth
+				// saying, not worth a red toast — nothing failed that blocks the
+				// user from reviewing the work.
+				const isQaUnverified =
+					newStatus === "human_review" &&
+					task?.reviewReason === "qa_unverified";
+				const failureDetail = task?.errorMessage?.trim();
+
 				toast({
-					title: translate(`statusNotifications.${newStatus}.title`),
-					description: taskTitle,
-					variant: newStatus === "error" ? "destructive" : "default",
+					title: isFailure
+						? translate("statusNotifications.error.title")
+						: isQaUnverified
+							? translate("statusNotifications.qa_unverified.title")
+							: translate(`statusNotifications.${newStatus}.title`),
+					description:
+						(isFailure || isQaUnverified) && failureDetail
+							? `${taskTitle} — ${failureDetail.split("\n")[0]}`
+							: taskTitle,
+					variant: isFailure ? "destructive" : "default",
 					onClick: handleView,
 					action: (
 						<ToastAction

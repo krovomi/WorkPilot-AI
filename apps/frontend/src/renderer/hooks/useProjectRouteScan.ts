@@ -29,13 +29,26 @@ export function useProjectRouteScan() {
 	);
 	const setProjectScanError = useApiExplorerStore((s) => s.setProjectScanError);
 	const setScannedProjectId = useApiExplorerStore((s) => s.setScannedProjectId);
+	const setScannedApiProjects = useApiExplorerStore(
+		(s) => s.setScannedApiProjects,
+	);
 	const setLastProjectScanAt = useApiExplorerStore(
 		(s) => s.setLastProjectScanAt,
 	);
 	const setSpecError = useApiExplorerStore((s) => s.setSpecError);
+	const setSpecUrl = useApiExplorerStore((s) => s.setSpecUrl);
+	const setSpecFilePath = useApiExplorerStore((s) => s.setSpecFilePath);
+	const setActiveProjectContext = useApiExplorerStore(
+		(s) => s.setActiveProjectContext,
+	);
 
 	const scan = useCallback(
 		async (projectId: string, projectPath: string, projectName: string) => {
+			setActiveProjectContext(projectId);
+			const explorerState = useApiExplorerStore.getState();
+			if (explorerState.scannedProjectId !== projectId) {
+				setSpec(null);
+			}
 			setIsProjectScanning(true);
 			setProjectScanError(null);
 			try {
@@ -43,19 +56,66 @@ export function useProjectRouteScan() {
 					projectPath,
 					projectName,
 				);
+				const projectState = useProjectStore.getState();
+				const currentProjectId =
+					projectState.activeProjectId ?? projectState.selectedProjectId;
+				if (currentProjectId !== projectId) return;
 				if (result.success && result.data) {
-					setSpec(result.data as OpenApiSpec);
-					setSpecSource("scan");
+					// Le scan vient d'un runner Python : le pont le type
+					// `Record<string, unknown>`, ce qui est honnete — personne ne
+					// valide la forme au passage. La conversion passe par `unknown`
+					// pour que ce saut de foi soit visible plutot qu'implicite.
+					setSpec(result.data as unknown as OpenApiSpec);
+					// The handler says where the document came from: a spec committed
+					// to the repository when there is one, the source scan otherwise.
+					setSpecSource(result.source ?? "scan");
+					setSpecFilePath(result.specFile ?? null);
 					setSpecError(null);
 					setScannedProjectId(projectId);
+					setScannedApiProjects(result.apiProjects ?? []);
 					setLastProjectScanAt(Date.now());
+
+					// Prefer the document the running application generates from the
+					// routes it actually registered. The probe is bounded in the main
+					// process — candidates, per-request timeout, total budget — and
+					// answers `data: null` when nothing is listening, which is the
+					// ordinary case and not an error.
+					const live = await window.electronAPI.probeLiveApiSpec(
+						projectPath,
+						result.frameworks ?? [],
+					);
+					const latestProjectState = useProjectStore.getState();
+					if (
+						(latestProjectState.activeProjectId ??
+							latestProjectState.selectedProjectId) !== projectId
+					) {
+						return;
+					}
+					if (live.success && live.data) {
+						setSpec(live.data as unknown as OpenApiSpec);
+						setSpecSource("url");
+						setSpecFilePath(null);
+						if (live.url) setSpecUrl(live.url);
+					}
 				} else {
 					setProjectScanError(result.error ?? "Failed to scan project routes");
 				}
 			} catch (err) {
-				setProjectScanError(String(err));
+				const projectState = useProjectStore.getState();
+				if (
+					(projectState.activeProjectId ?? projectState.selectedProjectId) ===
+					projectId
+				) {
+					setProjectScanError(String(err));
+				}
 			} finally {
-				setIsProjectScanning(false);
+				const projectState = useProjectStore.getState();
+				if (
+					(projectState.activeProjectId ?? projectState.selectedProjectId) ===
+					projectId
+				) {
+					setIsProjectScanning(false);
+				}
 			}
 		},
 		[
@@ -64,8 +124,12 @@ export function useProjectRouteScan() {
 			setIsProjectScanning,
 			setProjectScanError,
 			setScannedProjectId,
+			setScannedApiProjects,
 			setLastProjectScanAt,
 			setSpecError,
+			setSpecUrl,
+			setSpecFilePath,
+			setActiveProjectContext,
 		],
 	);
 

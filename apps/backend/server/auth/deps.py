@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from fastapi import Depends, HTTPException, Request
 from server.auth.jwt_tokens import TokenError, decode_access_token
 from server.db.engine import get_db
-from server.db.models import GlobalRole, ProjectMember, ProjectRole
+from server.db.models import GlobalRole, Project, ProjectMember, ProjectRole
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -65,9 +65,22 @@ _PROJECT_ROLE_RANK = {
 
 
 async def get_project_role(
-    db: AsyncSession, user: CurrentUser, project_id: str
+    db: AsyncSession, user: CurrentUser, project_id: str, org_id: str | None = None
 ) -> str | None:
-    """The user's role on a project. Global admins are implicit owners."""
+    """The user's role on a project. Platform admins are implicit owners.
+
+    ``org_id`` is the tenant the caller is acting in. When given, a project
+    belonging to any other tenant resolves to ``None`` — no role at all —
+    whatever membership rows happen to exist. That check lives here rather than
+    in each route so a route cannot forget it.
+    """
+    if org_id is not None and not user.is_admin:
+        owner_org = await db.scalar(
+            select(Project.org_id).where(Project.id == project_id)
+        )
+        if owner_org is not None and owner_org != org_id:
+            return None
+
     if user.is_admin:
         return ProjectRole.OWNER.value
     return await db.scalar(
@@ -92,10 +105,13 @@ def require_project_role(minimum: str = ProjectRole.VIEWER.value):
 
     async def _check(
         project_id: str,
+        request: Request,
         user: CurrentUser = Depends(get_current_user),
         db: AsyncSession = Depends(get_db),
     ) -> CurrentUser:
-        role = await get_project_role(db, user, project_id)
+        role = await get_project_role(
+            db, user, project_id, org_id=getattr(request.state, "org_id", None)
+        )
         if role is None:
             raise HTTPException(status_code=403, detail="Not a member of this project")
         if _PROJECT_ROLE_RANK.get(role, -1) < _PROJECT_ROLE_RANK[minimum]:

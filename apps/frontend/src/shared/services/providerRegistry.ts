@@ -4,6 +4,7 @@
  */
 
 import { PROVIDER_MODELS_MAP } from "../constants/models";
+import type { AgentCliTool } from "../types/agent-cli";
 import type { APIProfile } from "../types/profile";
 import { detectProvider } from "../utils/provider-detection";
 
@@ -42,6 +43,105 @@ export interface ProvidersResponse {
 	providers: Provider[];
 	status: Record<string, ProviderStatus>;
 }
+
+/**
+ * Coding-agent CLIs (OpenCode, Google Antigravity, pi) choose their model inside
+ * the CLI the user signed in to; `default` hands that choice back to it. The
+ * backend reads the same sentinel (`phase_config.CLI_DEFAULT_MODEL`).
+ */
+const CLI_DEFAULT_MODEL = "default";
+
+/** OpenCode takes `provider/model` ids (see `opencode models`). */
+const OPENCODE_MODELS: Provider["models"] = [
+	{ value: CLI_DEFAULT_MODEL, label: "OpenCode default", tier: "standard" },
+	{
+		value: "anthropic/claude-opus-5",
+		label: "Claude Opus 5",
+		tier: "flagship",
+		supportsThinking: true,
+	},
+	{
+		value: "anthropic/claude-sonnet-4-5",
+		label: "Claude Sonnet 4.5",
+		tier: "standard",
+		supportsThinking: true,
+	},
+	{
+		value: "openai/gpt-5.5",
+		label: "GPT-5.5",
+		tier: "flagship",
+		supportsThinking: true,
+	},
+	{
+		value: "google/gemini-3.1-pro",
+		label: "Gemini 3.1 Pro",
+		tier: "flagship",
+		supportsThinking: true,
+	},
+	{ value: "openai/gpt-5.5-mini", label: "GPT-5.5 mini", tier: "fast" },
+];
+
+/** Antigravity model slugs (see `agy models`). */
+const ANTIGRAVITY_MODELS: Provider["models"] = [
+	{
+		value: CLI_DEFAULT_MODEL,
+		label: "Antigravity default",
+		tier: "standard",
+	},
+	{
+		value: "gemini-3.1-pro",
+		label: "Gemini 3.1 Pro",
+		tier: "flagship",
+		supportsThinking: true,
+	},
+	{
+		value: "gemini-3-pro",
+		label: "Gemini 3 Pro",
+		tier: "standard",
+		supportsThinking: true,
+	},
+	{
+		value: "gemini-3.1-flash",
+		label: "Gemini 3.1 Flash",
+		tier: "fast",
+		supportsThinking: true,
+	},
+	{
+		value: "gemini-3-flash",
+		label: "Gemini 3 Flash",
+		tier: "fast",
+		supportsThinking: true,
+	},
+];
+
+/**
+ * pi takes `provider/model` ids too (`pi --list-models`); `default` leaves the
+ * choice to the model pi was configured with.
+ */
+const PI_MODELS: Provider["models"] = [
+	{ value: CLI_DEFAULT_MODEL, label: "pi default", tier: "standard" },
+	{
+		value: "anthropic/claude-opus-5",
+		label: "Claude Opus 5",
+		tier: "flagship",
+		supportsThinking: true,
+	},
+	{
+		value: "anthropic/claude-sonnet-4-5",
+		label: "Claude Sonnet 4.5",
+		tier: "standard",
+		supportsThinking: true,
+	},
+	{
+		value: "openai/gpt-5.5",
+		label: "GPT-5.5",
+		tier: "fast",
+		supportsThinking: true,
+	},
+];
+
+/** The CLI each CLI-backed provider runs, as `checkAgentCli` names it. */
+const AGENT_CLI_PROVIDERS = new Set(["opencode", "antigravity", "pi"]);
 
 /**
  * Registre central des providers LLM
@@ -167,16 +267,7 @@ class ProviderRegistry {
 			requiresApiKey: true,
 			requiresOAuth: false,
 			requiresCLI: false,
-			models: [
-				{
-					value: "grok-2",
-					label: "Grok 2",
-					tier: "flagship",
-					supportsThinking: true,
-				},
-				{ value: "grok-2-mini", label: "Grok 2 Mini", tier: "standard" },
-				{ value: "grok-beta", label: "Grok Beta", tier: "fast" },
-			],
+			models: PROVIDER_MODELS_MAP.grok || [],
 		});
 
 		// --- Custom/Enterprise ---
@@ -200,30 +291,7 @@ class ProviderRegistry {
 			requiresApiKey: true,
 			requiresOAuth: false,
 			requiresCLI: false,
-			models: [
-				{
-					value: "windsurf-default",
-					label: "Windsurf Default",
-					tier: "standard",
-				},
-				{
-					value: "windsurf-premier",
-					label: "Windsurf Premier",
-					tier: "flagship",
-				},
-				{
-					value: "windsurf-cascade",
-					label: "Windsurf Cascade",
-					tier: "flagship",
-					supportsThinking: true,
-				},
-				{ value: "gpt-4o", label: "GPT-4o", tier: "flagship" },
-				{
-					value: "claude-3.5-sonnet",
-					label: "Claude 3.5 Sonnet",
-					tier: "flagship",
-				},
-			],
+			models: PROVIDER_MODELS_MAP.windsurf || [],
 		});
 
 		// --- Cursor ---
@@ -235,18 +303,7 @@ class ProviderRegistry {
 			requiresApiKey: true,
 			requiresOAuth: false,
 			requiresCLI: false,
-			models: [
-				{ value: "cursor-default", label: "Cursor Default", tier: "standard" },
-				{ value: "cursor-pro", label: "Cursor Pro", tier: "flagship" },
-				{ value: "gpt-4o", label: "GPT-4o", tier: "flagship" },
-				{ value: "gpt-4-turbo", label: "GPT-4 Turbo", tier: "standard" },
-				{
-					value: "claude-3.5-sonnet",
-					label: "Claude 3.5 Sonnet",
-					tier: "flagship",
-				},
-				{ value: "claude-3-opus", label: "Claude 3 Opus", tier: "flagship" },
-			],
+			models: PROVIDER_MODELS_MAP.cursor || [],
 		});
 
 		// --- Ollama (Local) ---
@@ -259,6 +316,43 @@ class ProviderRegistry {
 			requiresOAuth: false,
 			requiresCLI: false,
 			models: PROVIDER_MODELS_MAP.ollama || [],
+		});
+
+		// --- OpenCode (CLI) ---
+		this.providers.set("opencode", {
+			name: "opencode",
+			label: "OpenCode",
+			description: "Open-source coding agent driven through the opencode CLI",
+			category: "special",
+			requiresApiKey: false,
+			requiresOAuth: false,
+			requiresCLI: true,
+			models: PROVIDER_MODELS_MAP.opencode ?? OPENCODE_MODELS,
+		});
+
+		// --- Google Antigravity (CLI) ---
+		this.providers.set("antigravity", {
+			name: "antigravity",
+			label: "Google Antigravity",
+			description: "Google's coding agent driven through the agy CLI",
+			category: "google",
+			requiresApiKey: false,
+			requiresOAuth: false,
+			requiresCLI: true,
+			models: PROVIDER_MODELS_MAP.antigravity ?? ANTIGRAVITY_MODELS,
+		});
+
+		// --- pi (CLI) ---
+		this.providers.set("pi", {
+			name: "pi",
+			label: "pi",
+			description:
+				"Minimal, extensible coding agent (pi.dev) driven through the pi CLI",
+			category: "special",
+			requiresApiKey: false,
+			requiresOAuth: false,
+			requiresCLI: true,
+			models: PROVIDER_MODELS_MAP.pi ?? PI_MODELS,
 		});
 	}
 
@@ -309,11 +403,29 @@ class ProviderRegistry {
 			if (name === "copilot" && provider.requiresCLI) {
 				if (typeof globalThis !== "undefined" && globalThis.electronAPI) {
 					// Dans Electron, utiliser Node.js pour vérifier gh CLI
-					const isAuthenticated =
-						await globalThis.electronAPI.checkCopilotAuth();
-					status.authenticated = isAuthenticated;
+					// `checkCopilotAuth` rend `{success, data?: {authenticated}}`, pas un
+					// booleen : l'objet entier etait affecte a `status.authenticated`,
+					// donc toujours truthy — Copilot passait pour authentifie meme
+					// quand gh CLI ne l'etait pas.
+					const authResult = await globalThis.electronAPI.checkCopilotAuth();
+					status.authenticated =
+						authResult.success && authResult.data?.authenticated === true;
 				} else {
 					// Fallback dans le navigateur (assume disponible pour le développement)
+					status.authenticated = true;
+				}
+				return status;
+			}
+
+			// CLI-backed providers: each CLI owns its login, so "installed" is
+			// the one thing WorkPilot can check.
+			if (AGENT_CLI_PROVIDERS.has(name)) {
+				const check = globalThis.electronAPI?.checkAgentCli;
+				if (check) {
+					const result = await check(name as AgentCliTool);
+					status.available = result.installed;
+					status.authenticated = result.installed;
+				} else {
 					status.authenticated = true;
 				}
 				return status;
@@ -448,6 +560,5 @@ export function getProvider(name: string): Provider | undefined {
 }
 
 export function getModelsForProvider(providerName: string): Provider["models"] {
-	const provider = providerRegistry.getProvider(providerName);
-	return provider?.models || [];
+	return PROVIDER_MODELS_MAP[providerName] || [];
 }

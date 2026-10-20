@@ -12,6 +12,7 @@ import {
 	FileText,
 	Flame,
 	GitCompare,
+	History,
 	Loader2,
 	Maximize2,
 	Minimize2,
@@ -56,6 +57,7 @@ import {
 	SelectValue,
 } from "../ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
+import { TimeTravelPanel } from "./TimeTravelPanel";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -999,6 +1001,10 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 								<GitCompare className="h-3.5 w-3.5 mr-1" />{" "}
 								{t("replay:compare")}
 							</TabsTrigger>
+							<TabsTrigger value="timeTravel" className="text-xs">
+								<History className="h-3.5 w-3.5 mr-1" />{" "}
+								{t("replay:timeTravel")}
+							</TabsTrigger>
 						</TabsList>
 
 						<div className="flex-1 overflow-auto">
@@ -1320,6 +1326,10 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 										</CardContent>
 									</Card>
 								)}
+							</TabsContent>
+
+							<TabsContent value="timeTravel" className="p-4 mt-0">
+								<TimeTravelPanel sessionId={activeSession.session_id} />
 							</TabsContent>
 						</div>
 					</Tabs>

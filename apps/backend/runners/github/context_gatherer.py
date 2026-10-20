@@ -24,6 +24,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from security.untrusted import clean_untrusted
+
 try:
     from .gh_client import GHClient, PRTooLargeError
     from .services.io_utils import safe_print
@@ -139,6 +141,16 @@ class AIBotComment:
     line: int | None  # Line number if it's an inline comment
     created_at: str
 
+    def __post_init__(self) -> None:
+        # A bot comment is still text fetched from GitHub, and "it came from
+        # CodeRabbit" is an author string anyone can take. Cleaned at ingest so
+        # the hidden-instruction carriers are gone before any prompt builder
+        # sees it; `clean_untrusted` is idempotent, so a `from_dict` round trip
+        # costs a second pass and changes nothing.
+        self.body = clean_untrusted(
+            self.body, kind="comment", source=f"github:comment#{self.comment_id}"
+        ).text
+
 
 # Known AI code review bots and their display names
 # Organized by category for maintainability
@@ -251,6 +263,17 @@ class PRContext:
     )
     # Deep codebase context (architecture, patterns, memory)
     deep_context: dict = field(default_factory=dict)
+    jev_outcome: object | None = None
+
+    def __post_init__(self) -> None:
+        # The title and the description are written by whoever opened the PR.
+        # This is the reviewer's entry point, so it is the one an attacker
+        # aims at: the agent that reads them has Bash and Write.
+        source = f"github:pr#{self.pr_number}"
+        self.title = clean_untrusted(self.title, kind="comment", source=source).text
+        self.description = clean_untrusted(
+            self.description, kind="pr_body", source=source
+        ).text
 
 
 class PRContextGatherer:
@@ -357,6 +380,24 @@ class PRContextGatherer:
             has_merge_conflicts=has_merge_conflicts,
             merge_state_status=merge_state_status,
         )
+
+    def _get_file_extension(self, file_path: str) -> str:
+        """Return the syntax highlighting language for a file."""
+        extension = Path(file_path).suffix.lower()
+
+        extensions = {
+            ".ts": "typescript",
+            ".tsx": "typescript",
+            ".js": "javascript",
+            ".jsx": "javascript",
+            ".py": "python",
+            ".json": "json",
+            ".md": "markdown",
+            ".yml": "yaml",
+            ".yaml": "yaml",
+        }
+
+        return extensions.get(extension, "")
 
     async def _fetch_pr_metadata(self) -> dict:
         """Fetch PR metadata from GitHub API via gh CLI."""
@@ -1012,7 +1053,7 @@ class PRContextGatherer:
                 if candidate.exists() and candidate.is_file():
                     try:
                         rel_path = candidate.relative_to(self.project_dir)
-                        return str(rel_path)
+                        return rel_path.as_posix()
                     except ValueError:
                         # File is outside project directory
                         return None
@@ -1023,7 +1064,7 @@ class PRContextGatherer:
                 if index_file.exists() and index_file.is_file():
                     try:
                         rel_path = index_file.relative_to(self.project_dir)
-                        return str(rel_path)
+                        return rel_path.as_posix()
                     except ValueError:
                         return None
 
@@ -1031,7 +1072,7 @@ class PRContextGatherer:
         if resolved.exists() and resolved.is_file():
             try:
                 rel_path = resolved.relative_to(self.project_dir)
-                return str(rel_path)
+                return rel_path.as_posix()
             except ValueError:
                 return None
 

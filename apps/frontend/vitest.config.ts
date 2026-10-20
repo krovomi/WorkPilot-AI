@@ -45,8 +45,7 @@ export default defineConfig({
 		},
 		// Setup files for test environment - use setupFiles to avoid vitest import issues
 		setupFiles: ["./src/__tests__/testSetup.ts"],
-		// Suppress internal worker state errors from vitest 2.x
-		dangerouslyIgnoreUnhandledErrors: true,
+
 		// Prevent vitest import issues
 		testTimeout: 30000,
 		hookTimeout: 30000,
@@ -70,9 +69,6 @@ export default defineConfig({
 			"@renderer": resolve(__dirname, "src/renderer"),
 			"@shared": resolve(__dirname, "src/shared"),
 			"@preload": resolve(__dirname, "src/preload"),
-			"@features": resolve(__dirname, "src/renderer/features"),
-			"@components": resolve(__dirname, "src/renderer/shared/components"),
-			"@hooks": resolve(__dirname, "src/renderer/shared/hooks"),
 			"@lib": resolve(__dirname, "src/renderer/lib"),
 		},
 	},

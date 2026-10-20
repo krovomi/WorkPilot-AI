@@ -9,13 +9,14 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from server.auth.deps import (
     CurrentUser,
     get_current_user,
     get_project_role,
     require_project_role,
 )
+from server.authz.principal import get_principal
 from server.db.engine import get_db
 from server.db.models import (
     AuditLog,
@@ -31,6 +32,7 @@ from server.schemas import (
     ProjectPublic,
 )
 from server.services.events import emit_board_event
+from server.services.quotas import enforce_project_quota
 from server.services.repos import RepoError, clone_project, delete_clone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -42,18 +44,40 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 
 @router.get("", response_model=list[ProjectPublic])
 async def list_projects(
+    request: Request,
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[ProjectPublic]:
-    """Projects the caller can see (all of them for admins)."""
-    if user.is_admin:
+    """Projects the caller can see, **within the organization they act in**.
+
+    An organization admin sees every project of their own tenant and none of
+    anyone else's. Before multi-tenancy this returned every project on the
+    deployment to any admin, which under a shared server would list other
+    customers' repositories by name and URL.
+    """
+    principal = get_principal(request)
+    org_id = principal.org_id
+
+    if principal.is_platform_admin and org_id is None:
+        # Operating the deployment without having picked a tenant: the listing
+        # is genuinely global, and only the platform role reaches here.
         projects = list(await db.scalars(select(Project).order_by(Project.created_at)))
+        roles = {p.id: ProjectRole.OWNER.value for p in projects}
+    elif principal.has("org.member.write") or user.is_admin:
+        # Admin *of this organization*: every project it owns.
+        projects = list(
+            await db.scalars(
+                select(Project)
+                .where(Project.org_id == org_id)
+                .order_by(Project.created_at)
+            )
+        )
         roles = {p.id: ProjectRole.OWNER.value for p in projects}
     else:
         result = await db.execute(
             select(Project, ProjectMember.role)
             .join(ProjectMember, ProjectMember.project_id == Project.id)
-            .where(ProjectMember.user_id == user.id)
+            .where(ProjectMember.user_id == user.id, Project.org_id == org_id)
             .order_by(Project.created_at)
         )
         rows = result.all()
@@ -71,10 +95,25 @@ async def list_projects(
 @router.post("", response_model=ProjectPublic, status_code=201)
 async def create_project(
     body: CreateProjectRequest,
+    request: Request,
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ProjectPublic:
+    principal = get_principal(request)
+    org_id = principal.org_id
+    if not org_id:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "No active organization: a project must belong to one. Send the "
+                "X-WorkPilot-Org header or call POST /auth/switch-org first."
+            ),
+        )
+
+    await enforce_project_quota(db, org_id)
+
     project = Project(
+        org_id=org_id,
         name=body.name,
         repo_url=body.repo_url.strip(),
         default_branch=body.default_branch.strip() or "main",
@@ -124,11 +163,17 @@ async def create_project(
 @router.get("/{project_id}", response_model=ProjectPublic)
 async def get_project(
     project_id: str,
+    request: Request,
     user: CurrentUser = Depends(require_project_role(ProjectRole.VIEWER.value)),
     db: AsyncSession = Depends(get_db),
 ) -> ProjectPublic:
     project = await db.get(Project, project_id)
     if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    principal = get_principal(request)
+    if not principal.is_platform_admin and project.org_id != principal.org_id:
+        # Reported as missing rather than forbidden: a 403 would confirm the id
+        # exists, which is itself a cross-tenant leak.
         raise HTTPException(status_code=404, detail="Project not found")
     item = ProjectPublic.model_validate(project)
     item.my_role = await get_project_role(db, user, project_id)

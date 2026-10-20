@@ -13,7 +13,7 @@ Benefits:
 - Each agent only sees tools relevant to their role via allowed_tools
 
 Usage:
-    from auto_claude_tools import create_auto_claude_mcp_server, get_allowed_tools
+    from agents.tools_pkg import create_auto_claude_mcp_server, get_allowed_tools
 
     # Create the MCP server
     mcp_server = create_auto_claude_mcp_server(spec_dir, project_dir)
@@ -21,12 +21,10 @@ Usage:
     # Get allowed tools for a specific agent type
     allowed_tools = get_allowed_tools("coder")
 
-    # Use in ClaudeAgentOptions
-    options = ClaudeAgentOptions(
-        mcp_servers={"workpilot": mcp_server},
-        allowed_tools=allowed_tools,
-        ...
-    )
+    # Never build ClaudeAgentOptions yourself: `core.client.create_client` (or
+    # `core.simple_client.create_simple_client`) is the one place that turns
+    # a type's declaration into rights, denials and hooks.
+    client = create_client(project_dir, spec_dir, model, agent_type="coder")
 """
 
 from .models import (
@@ -38,7 +36,6 @@ from .models import (
     # MCP tool lists
     CONTEXT7_TOOLS,
     ELECTRON_TOOLS,
-    GRAPHITI_MCP_TOOLS,
     LINEAR_TOOLS,
     PUPPETEER_TOOLS,
     # WorkPilot AI tool names
@@ -55,13 +52,26 @@ from .models import (
     get_required_mcp_servers,
     is_electron_mcp_enabled,
 )
-from .permissions import get_all_agent_types, get_allowed_tools
+from .permissions import (
+    declared_servers,
+    declared_tools,
+    get_all_agent_types,
+    get_allowed_tools,
+    hooked_grants,
+    mcp_tools_for_servers,
+    undeclared_builtin_tools,
+)
 from .registry import create_auto_claude_mcp_server, is_tools_available
 
 __all__ = [
     # Main API
     "create_auto_claude_mcp_server",
     "get_allowed_tools",
+    "declared_servers",
+    "declared_tools",
+    "undeclared_builtin_tools",
+    "hooked_grants",
+    "mcp_tools_for_servers",
     "is_tools_available",
     # Agent configuration registry
     "AGENT_CONFIGS",
@@ -76,7 +86,6 @@ __all__ = [
     # MCP tool lists
     "CONTEXT7_TOOLS",
     "LINEAR_TOOLS",
-    "GRAPHITI_MCP_TOOLS",
     "ELECTRON_TOOLS",
     "PUPPETEER_TOOLS",
     # WorkPilot AI tool name constants

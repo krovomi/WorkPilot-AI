@@ -9,6 +9,7 @@ import { promises as fs } from "node:fs";
 import { promisify } from "node:util";
 import { app, ipcMain } from "electron";
 import path from "node:path";
+import { isWindows } from "../platform";
 
 const execFileAsync = promisify(execFile);
 
@@ -101,7 +102,7 @@ async function getCodexVersion(): Promise<string | undefined> {
 	const home = os.homedir();
 
 	// Windows: check known global install paths (npm + pnpm)
-	if (process.platform === "win32") {
+	if (isWindows()) {
 		const candidates = [
 			path.join(home, "AppData", "Roaming", "npm", "codex.cmd"),
 			path.join(home, "AppData", "Local", "pnpm", "codex.CMD"),
@@ -177,9 +178,12 @@ function runShellCommand(
 	args: string[],
 ): Promise<{ code: number; stdout: string; stderr: string }> {
 	return new Promise((resolve, reject) => {
-		const isWindows = process.platform === "win32";
-		const child = spawn(cmd, args, {
-			shell: isWindows,
+		// With a shell (Windows), an argument holding a space would be split.
+		const shellArgs = isWindows()
+			? args.map((a) => (/\s/.test(a) ? `"${a}"` : a))
+			: args;
+		const child = spawn(cmd, shellArgs, {
+			shell: isWindows(),
 			windowsHide: true,
 			env: { ...process.env, CI: "1" },
 		});
@@ -246,6 +250,65 @@ async function pnpmCanInstallGlobally(): Promise<boolean> {
 	}
 }
 
+interface CodexInstall {
+	/** First `codex` on PATH, as the app resolves it. */
+	binPath: string;
+	owner: "pnpm" | "npm";
+	/** npm only: the global prefix that actually contains the package. */
+	npmPrefix?: string;
+}
+
+/**
+ * Where the `codex` that PATH resolves to really lives, and who owns it.
+ *
+ * The owner is judged from the real path. For npm the prefix is read from that
+ * same path (`<prefix>/lib/node_modules/@openai/codex`), because `npm install -g`
+ * writes to the prefix of whichever npm runs it — and a desktop-launched app
+ * often has a different node/npm (nvm, system) than the one that put `codex` on
+ * PATH. Installing with `--prefix` targets the copy the app really executes.
+ * `undefined` when no `codex` is found.
+ */
+async function detectCodexInstall(): Promise<CodexInstall | undefined> {
+	try {
+		const locator = isWindows() ? "where" : "which";
+		const probe = await execFileAsync(locator, ["codex"], {
+			encoding: "utf-8",
+			timeout: 5000,
+			windowsHide: true,
+		});
+		const first = probe.stdout.split(/\r?\n/).find((l) => l.trim());
+		if (!first) return undefined;
+		const binPath = first.trim();
+		const real = await fs.realpath(binPath).catch(() => binPath);
+		if (/pnpm/i.test(binPath) || /pnpm/i.test(real)) {
+			return { binPath, owner: "pnpm" };
+		}
+		const segments = real.split(path.sep);
+		const nm = segments.lastIndexOf("node_modules");
+		let npmPrefix: string | undefined;
+		if (nm > 0) {
+			const nodeModulesDir = segments.slice(0, nm + 1).join(path.sep);
+			// Unix: <prefix>/lib/node_modules — Windows: <prefix>/node_modules.
+			// A layout that does not match is left to npm's own default rather
+			// than guessed at.
+			const parent = path.dirname(nodeModulesDir);
+			const candidate = isWindows()
+				? parent
+				: path.basename(parent) === "lib"
+					? path.dirname(parent)
+					: undefined;
+			// The prefix reaches a shell on Windows (npm is a .cmd): refuse
+			// anything that is not a plain path.
+			if (candidate && !/["&|<>^%\r\n]/.test(candidate)) {
+				npmPrefix = candidate;
+			}
+		}
+		return { binPath, owner: "npm", npmPrefix };
+	} catch {
+		return undefined;
+	}
+}
+
 /**
  * Install or update @openai/codex globally.
  *
@@ -261,13 +324,23 @@ async function runCodexUpdate(): Promise<{
 	stdout: string;
 	stderr: string;
 }> {
-	const usePnpm = await pnpmCanInstallGlobally();
+	// The manager that owns the `codex` found on PATH wins: installing with the
+	// other one succeeds, writes to a different prefix, and leaves the binary the
+	// app actually runs on its old version.
+	const install = await detectCodexInstall();
+	const usePnpm = install
+		? install.owner === "pnpm"
+		: await pnpmCanInstallGlobally();
 	const manager = usePnpm ? "pnpm" : "npm";
+	const prefixArgs =
+		!usePnpm && install?.npmPrefix ? ["--prefix", install.npmPrefix] : [];
+	console.warn("[Codex CLI] Resolved install:", install, "manager:", manager);
 
 	try {
 		const result = await runShellCommand(manager, [
 			"install",
 			"-g",
+			...prefixArgs,
 			"@openai/codex@latest",
 		]);
 		return {
@@ -608,6 +681,18 @@ export function registerCredentialHandlers(): void {
 					latest,
 					isOutdated,
 				});
+
+				// The install command exiting 0 proves nothing about the binary the
+				// app runs: report it as a failure instead of a silent no-op.
+				if (isOutdated) {
+					return {
+						success: false,
+						version,
+						latest,
+						isOutdated,
+						error: `Codex CLI is still at ${version} after the update (latest: ${latest}). The \`codex\` used by the app is ${(await detectCodexInstall())?.binPath ?? "unknown"}; it is probably not managed by npm or pnpm (brew, cargo, standalone binary…). Update it the way it was installed.`,
+					};
+				}
 
 				return { success: true, version, latest, isOutdated };
 			} catch (error) {

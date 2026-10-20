@@ -22,6 +22,7 @@ import {
 // Icons
 import {
 	Accessibility,
+	Activity,
 	AlertTriangle,
 	BarChart3,
 	Bug,
@@ -33,6 +34,7 @@ import {
 	Calendar,
 	Camera,
 	CheckCircle,
+	ClipboardCheck,
 	ChevronRight,
 	Code,
 	Coins,
@@ -53,6 +55,7 @@ import {
 	HelpCircle,
 	History,
 	Layers,
+	Languages,
 	LayoutGrid,
 	Leaf,
 	Lightbulb,
@@ -60,15 +63,18 @@ import {
 	MessageSquare,
 	Mic,
 	Monitor,
+	Network,
 	PanelLeft,
 	PanelLeftClose,
 	Plus,
 	Puzzle,
+	Radio,
 	RefreshCcw,
 	Rocket,
 	RotateCcw,
 	Search,
 	Settings,
+	Share2,
 	Shield,
 	ShieldAlert,
 	ShieldCheck,
@@ -85,6 +91,7 @@ import {
 	Wand2,
 	WandSparkles,
 	WifiOff,
+	Workflow,
 	Wrench,
 	X,
 	Zap,
@@ -108,9 +115,17 @@ import {
 	loadProjectEnvConfig,
 	useProjectEnvStore,
 } from "@/stores/project-env-store";
+import { useAnyPermission } from "@/stores/permissions-store";
 // Stores
 import { useProjectStore } from "@/stores/project-store";
+import {
+	selectGroupBadge,
+	selectViewBadge,
+	useActivityStore,
+	useAttentionView,
+} from "@/stores/activity-store";
 import { openPromptOptimizerDialog } from "@/stores/prompt-optimizer-store";
+import { useServerSessionStore } from "@/stores/server-session-store";
 import { saveSettings, useSettingsStore } from "@/stores/settings-store";
 import { useSetupHubStore } from "@/stores/setup-hub-store";
 import { openTestGenerationDialog } from "@/stores/test-generation-store";
@@ -121,6 +136,7 @@ import { AzureDevOpsSetupModal } from "./AzureDevOpsSetupModal";
 import { AppEmulatorDialog } from "./app-emulator/AppEmulatorDialog";
 import { ArenaDialog } from "./arena/ArenaDialog";
 import { ClaudeCodeStatusBadge } from "./ClaudeCodeStatusBadge";
+import { AgentCliStatusBadge } from "./AgentCliStatusBadge";
 import { CodexCliStatusBadge } from "./CodexCliStatusBadge";
 import { CopilotCliStatusBadge } from "./CopilotCliStatusBadge";
 import { CodePlaygroundDialog } from "./code-playground/CodePlaygroundDialog";
@@ -133,7 +149,9 @@ import { LearningLoopDialog } from "./learning-loop/LearningLoopDialog";
 import { NaturalLanguageGitDialog } from "./natural-language-git/NaturalLanguageGitDialog";
 import { PromptOptimizerDialog } from "./prompt-optimizer/PromptOptimizerDialog";
 import { RateLimitIndicator } from "./RateLimitIndicator";
+import { SmartEstimationDialog } from "./smart-estimation/SmartEstimationDialog";
 import { TestGenerationDialog } from "./test-generation/TestGenerationDialog";
+import { SecureStorageBanner } from "./SecureStorageBanner";
 import { UpdateBanner } from "./UpdateBanner";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui";
 // UI
@@ -153,6 +171,7 @@ import {
 	SortableWrapper,
 	type SortableKind,
 } from "./sidebar/sortable-primitives";
+import { ActivityBadge } from "./sidebar/ActivityBadge";
 import { useSidebarPrefs } from "./sidebar/use-sidebar-prefs";
 import { VoiceControlDialog } from "./voice-control/VoiceControlDialog";
 
@@ -171,6 +190,8 @@ export type SidebarView =
 	| "worktrees"
 	| "agent-tools"
 	| "migration"
+	| "architecture-visualizer"
+	| "performance-profiler"
 	| "visual-to-code"
 	| "dashboard"
 	| "analytics"
@@ -226,6 +247,12 @@ export type SidebarView =
 	| "guardrails"
 	| "env-snapshot"
 	| "offline-mode"
+	| "cicd-triggers"
+	| "cross-language-translation"
+	| "spec-approval"
+	| "live-companion"
+	| "context-mesh"
+	| "administration"
 	| "phase35-hub";
 
 interface SidebarProps {
@@ -350,6 +377,12 @@ const navGroups: NavGroup[] = [
 				icon: UserCheck,
 				shortcut: "AC",
 			},
+			{
+				id: "live-companion",
+				labelKey: "navigation:items.liveCompanion",
+				icon: Radio,
+				shortcut: "LC",
+			},
 		],
 		defaultExpanded: false,
 	},
@@ -412,6 +445,18 @@ const navGroups: NavGroup[] = [
 				icon: AlertTriangle,
 				shortcut: "FT",
 			},
+			{
+				id: "performance-profiler",
+				labelKey: "navigation:items.performanceProfiler",
+				icon: Activity,
+				shortcut: "PF",
+			},
+			{
+				id: "cross-language-translation",
+				labelKey: "navigation:items.crossLanguageTranslation",
+				icon: Languages,
+				shortcut: "CX",
+			},
 		],
 		defaultExpanded: false,
 	},
@@ -431,6 +476,18 @@ const navGroups: NavGroup[] = [
 				labelKey: "navigation:items.context",
 				icon: BookOpen,
 				shortcut: "CT",
+			},
+			{
+				id: "context-mesh",
+				labelKey: "navigation:items.contextMesh",
+				icon: Share2,
+				shortcut: "CM",
+			},
+			{
+				id: "architecture-visualizer",
+				labelKey: "navigation:items.architectureVisualizer",
+				icon: Network,
+				shortcut: "AV",
 			},
 			{
 				id: "ideation",
@@ -471,6 +528,12 @@ const navGroups: NavGroup[] = [
 				shortcut: "CF",
 			},
 			{
+				id: "cicd-triggers",
+				labelKey: "navigation:items.cicdTriggers",
+				icon: Workflow,
+				shortcut: "CD",
+			},
+			{
 				id: "git-surgeon",
 				labelKey: "navigation:items.gitSurgeon",
 				icon: GitBranch,
@@ -501,6 +564,12 @@ const navGroups: NavGroup[] = [
 				labelKey: "navigation:items.costEstimator",
 				icon: Coins,
 				shortcut: "CE",
+			},
+			{
+				id: "spec-approval",
+				labelKey: "navigation:items.specApproval",
+				icon: ClipboardCheck,
+				shortcut: "SA",
 			},
 			{
 				id: "changelog",
@@ -742,6 +811,24 @@ const navGroups: NavGroup[] = [
 ];
 
 // GitHub nav items shown when GitHub is enabled
+// The administration console. Kept out of `navGroups` and appended only when
+// the signed-in user can actually reach it: in local mode, and for a member
+// with no administration permission, the entry would lead to a page that only
+// explains why it is empty.
+const administrationNavGroup: NavGroup = {
+	id: "administration",
+	labelKey: "navigation:groups.administration",
+	icon: ShieldCheck,
+	items: [
+		{
+			id: "administration",
+			labelKey: "navigation:items.administration",
+			icon: ShieldCheck,
+			shortcut: "AD",
+		},
+	],
+};
+
 const githubNavItems: NavItem[] = [
 	{
 		id: "github-issues",
@@ -773,6 +860,26 @@ const gitlabNavItems: NavItem[] = [
 	},
 ];
 
+/**
+ * How a menu entry is named, for anything outside the sidebar that has to say
+ * which page it is talking about — the activity centre, its toasts.
+ *
+ * Built from the same arrays the sidebar renders, so a page renamed here is
+ * renamed there too; a second hand-written table is how the two start
+ * disagreeing.
+ */
+const NAV_LABEL_KEYS: Partial<Record<SidebarView, string>> = Object.fromEntries(
+	[
+		...navGroups.flatMap((group) => group.items),
+		...githubNavItems,
+		...gitlabNavItems,
+	].map((item) => [item.id, item.labelKey]),
+);
+
+export function navItemLabelKey(view: SidebarView): string | undefined {
+	return NAV_LABEL_KEYS[view];
+}
+
 export function Sidebar({
 	onSettingsClick,
 	onNewTaskClick,
@@ -784,6 +891,24 @@ export function Sidebar({
 	const selectedProjectId = useProjectStore((state) => state.selectedProjectId);
 	const settings = useSettingsStore((state) => state.settings);
 	const openSetupHub = useSetupHubStore((state) => state.openSetupHub);
+
+	// Read once for the whole sidebar: one subscription feeds every badge,
+	// instead of one hook per menu entry over ~80 entries.
+	const activities = useActivityStore((state) => state.activities);
+	const attentionView = useAttentionView();
+	const badgeFor = useCallback(
+		(view: SidebarView) => selectViewBadge(activities, view, selectedProjectId),
+		[activities, selectedProjectId],
+	);
+	const groupBadgeFor = useCallback(
+		(items: NavItem[]) =>
+			selectGroupBadge(
+				activities,
+				items.map((item) => item.id),
+				selectedProjectId,
+			),
+		[activities, selectedProjectId],
+	);
 
 	const [showAddProjectModal, setShowAddProjectModal] = useState(false);
 	const [showGitSetupModal, setShowGitSetupModal] = useState(false);
@@ -906,6 +1031,19 @@ export function Sidebar({
 		(state) => state.envConfig?.gitlabEnabled ?? false,
 	);
 
+	// The administration console is reachable only in server mode, and only for
+	// someone holding at least one administration permission. `useAnyPermission`
+	// reports true in local mode, so the server-mode check is what keeps the
+	// entry out of the desktop app, where there is nothing to administer.
+	const isServerMode = useServerSessionStore((state) => state.mode) === "server";
+	const hasAdminPermission = useAnyPermission([
+		"org.member.read",
+		"org.role.read",
+		"org.quota.read",
+		"audit.read",
+	]);
+	const canAdminister = isServerMode && hasAdminPermission;
+
 	// Track the last loaded project ID to avoid redundant loads
 	const lastLoadedProjectIdRef = useRef<string | null>(null);
 
@@ -925,6 +1063,10 @@ export function Sidebar({
 			if (gitlabEnabled) {
 				integrationGroup.items.push(...gitlabNavItems);
 			}
+		}
+
+		if (canAdminister) {
+			groups.push({ ...administrationNavGroup, items: [...administrationNavGroup.items] });
 		}
 
 		// Apply custom group order
@@ -949,6 +1091,7 @@ export function Sidebar({
 	}, [
 		githubEnabled,
 		gitlabEnabled,
+		canAdminister,
 		sidebarPrefs.groupOrder,
 		sidebarPrefs.itemOrder,
 		mergeOrder,
@@ -1431,6 +1574,8 @@ export function Sidebar({
 		const isActive = activeView === item.id;
 		const Icon = item.icon;
 		const isPinned = pinnedItemsSet.has(item.id);
+		const badge = badgeFor(item.id);
+		const hasAttention = attentionView === item.id;
 
 		// Determine CSS classes based on collapsed state and sub-item status
 		const getLayoutClasses = () => {
@@ -1486,7 +1631,8 @@ export function Sidebar({
 				<button
 					type="button"
 					onClick={() => handleNavClick(item.id)}
-					disabled={!selectedProjectId}
+					// The console is deployment-scoped, not project-scoped.
+					disabled={!selectedProjectId && item.id !== "administration"}
 					aria-keyshortcuts={item.shortcut}
 					className={cn(
 						"flex w-full min-w-0 items-center rounded-lg text-sm transition-all duration-200",
@@ -1506,6 +1652,7 @@ export function Sidebar({
 							<span className="flex-1 text-left truncate">
 								{t(item.labelKey)}
 							</span>
+							<ActivityBadge badge={badge} attention={hasAttention} />
 							{item.shortcut && (
 								<kbd
 									className={cn(
@@ -1522,6 +1669,13 @@ export function Sidebar({
 					)}
 				</button>
 				{starButton}
+				{isCollapsed && (
+					<ActivityBadge
+						badge={badge}
+						attention={hasAttention}
+						variant="corner"
+					/>
+				)}
 			</div>
 		);
 
@@ -1561,12 +1715,13 @@ export function Sidebar({
 
 	const renderTooltipSubGroupItem = (item: NavItem) => {
 		const isActive = activeView === item.id;
+		const badge = badgeFor(item.id);
 		return (
 			<button
 				key={item.id}
 				type="button"
 				onClick={() => handleNavClick(item.id)}
-				disabled={!selectedProjectId}
+				disabled={!selectedProjectId && item.id !== "administration"}
 				aria-keyshortcuts={item.shortcut}
 				className={cn(
 					"w-full flex items-center gap-2 text-xs p-1 rounded text-left",
@@ -1577,6 +1732,7 @@ export function Sidebar({
 			>
 				<item.icon className="h-3 w-3 shrink-0" />
 				<span className="flex-1 truncate">{t(item.labelKey)}</span>
+				<ActivityBadge badge={badge} />
 				{item.shortcut && (
 					<kbd className="rounded border border-border bg-secondary px-1 font-mono text-[9px]">
 						{item.shortcut}
@@ -1743,14 +1899,20 @@ export function Sidebar({
 	const renderCollapsedGroup = (group: NavGroup, hasActiveItem: boolean) => {
 		const GroupIcon = group.icon;
 		const isFavorites = group.id === "__favorites__";
-		
+		// On the rail there is no room for a row, so the group icon carries the
+		// rollup of everything folded behind it.
+		const groupBadge = groupBadgeFor(group.items);
+		const groupAttention = group.items.some(
+			(item) => attentionView === item.id,
+		);
+
 		return (
 			<Tooltip key={group.id}>
 				<TooltipTrigger asChild>
 					<div className="flex flex-col items-center gap-1 py-2">
 						<div
 							className={cn(
-								"flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 hover:scale-105",
+								"relative flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 hover:scale-105",
 								hasActiveItem
 									? "bg-accent text-accent-foreground shadow-sm"
 									: "hover:bg-accent hover:text-accent-foreground",
@@ -1762,6 +1924,11 @@ export function Sidebar({
 									"h-4 w-4",
 									isFavorites && "fill-amber-400 text-amber-400",
 								)}
+							/>
+							<ActivityBadge
+								badge={groupBadge}
+								attention={groupAttention}
+								variant="corner"
 							/>
 						</div>
 					</div>
@@ -1865,6 +2032,12 @@ export function Sidebar({
 	const renderGroupButton = (group: NavGroup, isExpanded: boolean, hasActiveItem: boolean) => {
 		const isFavorites = group.id === "__favorites__";
 		const GroupIcon = group.icon;
+		// A collapsed group hides its entries, so it carries the worst state
+		// among them — otherwise work in a folded group is invisible.
+		const groupBadge = isExpanded ? null : groupBadgeFor(group.items);
+		const groupAttention = group.items.some(
+			(item) => attentionView === item.id,
+		);
 		
 		const toggleExpand = () => {
 			if (isFavorites) {
@@ -1908,6 +2081,10 @@ export function Sidebar({
 						"transition-opacity duration-200 group-hover/group-header:opacity-0",
 					)}
 				>
+					<ActivityBadge
+						badge={groupBadge}
+						attention={groupAttention && !isExpanded}
+					/>
 					<span
 						className={cn(
 							"text-xs px-1.5 py-0.5 rounded-full",
@@ -2217,6 +2394,9 @@ export function Sidebar({
 				{/* Update Banner - shows when app update is available */}
 				<UpdateBanner />
 
+				{/* API keys stored without the OS keyring (rule S1) */}
+				<SecureStorageBanner />
+
 				{/* Bottom section with CLI/Settings collapsible panel and New Task */}
 				<div
 					className={cn(
@@ -2270,6 +2450,12 @@ export function Sidebar({
 									onNavigateToTerminals={() => onViewChange?.("terminals", true)}
 									isCollapsed={isCollapsed}
 								/>
+								<AgentCliStatusBadge tool="opencode" isCollapsed={isCollapsed} />
+								<AgentCliStatusBadge
+									tool="antigravity"
+									isCollapsed={isCollapsed}
+								/>
+								<AgentCliStatusBadge tool="pi" isCollapsed={isCollapsed} />
 							</div>
 						</CollapsibleContent>
 					</Collapsible>
@@ -2440,6 +2626,7 @@ export function Sidebar({
 			/>
 			<AppEmulatorDialog />
 			<LearningLoopDialog />
+			<SmartEstimationDialog />
 
 			<ArenaDialog />
 		</TooltipProvider>

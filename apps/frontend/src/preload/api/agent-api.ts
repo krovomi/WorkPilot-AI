@@ -22,6 +22,7 @@ import { createGitHubAPI, type GitHubAPI } from "./modules/github-api";
 import { createGitLabAPI, type GitLabAPI } from "./modules/gitlab-api";
 import { createIdeationAPI, type IdeationAPI } from "./modules/ideation-api";
 import { createInsightsAPI, type InsightsAPI } from "./modules/insights-api";
+import { createFigmaAPI, type FigmaAPI } from "./modules/figma-api";
 import { createJiraAPI, type JiraAPI } from "./modules/jira-api";
 import { createLinearAPI, type LinearAPI } from "./modules/linear-api";
 import {
@@ -45,6 +46,7 @@ export interface AgentAPI
 		GitLabAPI,
 		AzureDevOpsAPI,
 		JiraAPI,
+		FigmaAPI,
 		ShellAPI,
 		PromptOptimizerAPI {}
 
@@ -63,6 +65,7 @@ export const createAgentAPI = (): AgentAPI => {
 	const gitlabAPI = createGitLabAPI();
 	const azureDevOpsAPI = createAzureDevOpsAPI();
 	const jiraAPI = createJiraAPI();
+	const figmaAPI = createFigmaAPI();
 	const shellAPI = createShellAPI();
 	const promptOptimizerAPI = createPromptOptimizerAPI();
 
@@ -94,6 +97,9 @@ export const createAgentAPI = (): AgentAPI => {
 		// Jira Integration API
 		...jiraAPI,
 
+		// Figma token (write-only)
+		...figmaAPI,
+
 		// Shell Operations API
 		...shellAPI,
 
@@ -113,6 +119,7 @@ export type {
 	GitLabAPI,
 	AzureDevOpsAPI,
 	JiraAPI,
+	FigmaAPI,
 	ShellAPI,
 	PromptOptimizerAPI,
 };

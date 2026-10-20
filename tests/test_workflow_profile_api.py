@@ -55,7 +55,7 @@ class TestResolution:
         res = ask(project, effort="high")
         assert res["success"] is True
         ids = [p["id"] for p in res["profile"]["phases"]]
-        assert ids[0] == "brainstorm"
+        assert ids[0] == "docs"
         assert ids[-1] == "observe"
 
     def test_dropped_phases_stay_in_place_with_a_reason(self, project):
@@ -65,13 +65,13 @@ class TestResolution:
         assert by_id["brainstorm"]["skipReason"] == "effort"
         assert by_id["brainstorm"]["minEffort"] == "high"
         # …and the position is preserved, not filtered out.
-        assert [p["id"] for p in res["profile"]["phases"]][0] == "brainstorm"
+        assert [p["id"] for p in res["profile"]["phases"]][2] == "brainstorm"
 
     def test_the_hard_gate_runs_at_the_cheapest_level(self, project):
         res = ask(project, effort="low")
         verify = next(p for p in res["profile"]["phases"] if p["id"] == "verify")
         assert verify["runs"] is True
-        assert verify["hardGate"] == "tests-pass"
+        assert verify["hardGate"] == "tests-pass,app-verified"
 
     def test_a_degradation_is_reported_not_hidden(self, project, monkeypatch):
         import types
@@ -92,7 +92,12 @@ class TestResolution:
     def test_each_level_is_priced(self, project):
         res = ask(project, effort="medium")
         counts = {lvl["effort"]: lvl["count"] for lvl in res["profile"]["levels"]}
-        assert counts["low"] < counts["medium"] < counts["high"] < counts["ultrathink"]
+        assert counts["low"] < counts["medium"] < counts["high"]
+        # The top level buys the review's adversarial lens and, on a complex
+        # feature, the PRD phase. This spec records no kind and no
+        # assessment, and an unknown fact reads as matching, so the PRD is
+        # counted here — priced for this task as the engine would run it.
+        assert counts["ultrathink"] == counts["high"] + 1
 
     def test_levels_can_be_left_out(self, project):
         res = ask(project, effort="medium", includeLevels="false")
@@ -197,3 +202,31 @@ class TestItRefusesToWander:
         assert res["reason"] == "missing"
         assert str(missing) not in res["error"]
         assert "nope" not in res["error"]
+
+
+def test_jev_profile_is_read_only(project, monkeypatch):
+    from integrations.jev.client import JevClient
+    from integrations.jev.observations import write_observation
+
+    async def forbidden(*args, **kwargs):
+        raise AssertionError("profile must not contact TypeSafe")
+
+    monkeypatch.setattr(JevClient, "post", forbidden)
+    monkeypatch.setenv("TYPESAFE_API_KEY", "test-key")
+    spec = project / ".workpilot" / "specs" / "001-x"
+    write_observation(
+        spec,
+        {
+            "version": 1,
+            "workflow": "feature-build",
+            "runId": "old-run",
+            "evaluations": [],
+        },
+    )
+    result = ask(project, effort="low")
+    assert result["success"] is True
+    assert result["profile"]["jev"]["observation"]["runId"] == "old-run"
+    assert result["profile"]["jev"]["airgapStrict"] is False
+    import os
+
+    assert os.environ["TYPESAFE_API_KEY"] == "test-key"

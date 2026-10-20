@@ -26,7 +26,7 @@ class PythonTransformer:
                 if not full_path.exists() or not file_path.endswith(".py"):
                     continue
 
-                content = full_path.read_text()
+                content = full_path.read_text(encoding="utf-8")
 
                 if not self._is_python2_code(content):
                     continue

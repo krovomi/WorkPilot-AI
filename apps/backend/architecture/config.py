@@ -110,7 +110,7 @@ def infer_architecture_config(
 
     # Detect frameworks from services or detected_stack
     frameworks = _get_frameworks(project_index)
-    languages = _get_languages(project_index)
+    _get_languages(project_index)
 
     # Monorepo: enforce service boundaries
     if project_type == "monorepo" and len(services) > 1:

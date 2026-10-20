@@ -103,16 +103,6 @@
 				"desc": "Paste a Linear API key (linear.app ▸ Settings ▸ API)."
 			}
 		},
-		"memory": {
-			"enable": {
-				"title": "Enable memory",
-				"desc": "Turn on persistent memory (Graphiti) so agents keep context across sessions."
-			},
-			"embeddingProvider": {
-				"title": "Embedding provider",
-				"desc": "Choose the embedding provider (local Ollama, OpenAI, Voyage…), then add its key if needed. Optional."
-			}
-		},
 		"cicd": {
 			"provider": {
 				"title": "CI/CD provider",

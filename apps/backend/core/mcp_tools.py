@@ -20,6 +20,10 @@ Each entry is ``{"id"|"name", "type": "command"|"http", ...}``:
   - command: ``command`` (+ optional ``args``)
   - http:    ``url`` (+ optional ``headers``)
 
+A client bridges only the servers its agent type may reach
+(`load_mcp_server_configs_for`): those a project adds to that agent, as on the
+SDK path.
+
 The whole bridge is best-effort: a server that fails to connect is skipped with
 a warning, never breaking the agent loop.
 """
@@ -102,9 +106,72 @@ def load_mcp_server_configs(project_dir: str | None) -> list[dict[str, Any]]:
     return _read_project_env_servers(project_dir)
 
 
+def load_mcp_server_configs_for(
+    agent_type: str,
+    project_dir: str | None,
+    spec_dir: str | Path | None = None,
+) -> list[dict[str, Any]]:
+    """The configured servers ``agent_type`` may reach.
+
+    The answer `create_client` gives on the Claude SDK, in both of its steps:
+
+    * a server must pass `_validate_custom_mcp_server` — ``id`` and ``name``,
+      a bare launcher from a short list (npx, node, python, uv…), no
+      interpreter flag that evaluates code, no field outside the schema. This
+      bridge's own check accepted any command, so a server the SDK refuses to
+      start was started here;
+    * it joins a session only when `get_required_mcp_servers` keeps it for the
+      type, which it does when the project adds it to that agent
+      (``AGENT_MCP_<type>_ADD``, the Agent Tools panel's per-agent toggle). The
+      bridge used to hand every configured server to every type — a
+      `pr_reviewer` reading a hostile diff could call whatever a server wired
+      up for the coder exposes.
+    """
+    from core.client import _validate_custom_mcp_server
+
+    servers = [
+        s
+        for s in load_mcp_server_configs(project_dir)
+        if _validate_custom_mcp_server(s)
+    ]
+    if not servers:
+        return []
+
+    from agents.tools_pkg import get_required_mcp_servers
+    from core.client import load_project_mcp_config
+
+    mcp_config = dict(load_project_mcp_config(Path(project_dir))) if project_dir else {}
+    # The servers this bridge actually has — the env var may name some the
+    # project's .env does not — so an ADD override can name any of them.
+    mcp_config["CUSTOM_MCP_SERVERS"] = servers
+    allowed = set(
+        get_required_mcp_servers(agent_type, None, False, mcp_config, spec_dir=spec_dir)
+    )
+    return [entry for entry in servers if entry["id"] in allowed]
+
+
 def _server_id(entry: dict[str, Any], index: int) -> str:
     raw = entry.get("id") or entry.get("name") or f"server{index}"
     return _sanitize(str(raw)) or f"server{index}"
+
+
+def _field(obj: Any, *names: str) -> Any:
+    """The first of ``names`` present on ``obj`` (attribute or key).
+
+    The `mcp` package renamed its fields to snake_case in 2.0
+    (`inputSchema` -> `input_schema`, `isError` -> `is_error`,
+    `structuredContent` -> `structured_content`), and it arrives here
+    unpinned, through `claude-agent-sdk`. Reading only the 1.x spelling made
+    every bridged tool schema-less and every tool error read as a success on a
+    2.x install — so both spellings are read.
+    """
+    for name in names:
+        value = getattr(obj, name, None)
+        if value is None and isinstance(obj, dict):
+            value = obj.get(name)
+        if value is not None:
+            return value
+    return None
 
 
 def _result_to_text(result: Any) -> str:
@@ -114,7 +181,7 @@ def _result_to_text(result: Any) -> str:
         content = result.get("content")
     if not content:
         # Some servers return structured content only.
-        structured = getattr(result, "structuredContent", None)
+        structured = _field(result, "structuredContent", "structured_content")
         if structured is not None:
             try:
                 return json.dumps(structured, ensure_ascii=False)
@@ -183,7 +250,7 @@ class MCPToolManager:
                     if not tname:
                         continue
                     full = f"{MCP_TOOL_PREFIX}{sid}__{_sanitize(tname)}"
-                    schema = getattr(tool, "inputSchema", None) or {
+                    schema = _field(tool, "inputSchema", "input_schema") or {
                         "type": "object",
                         "properties": {},
                     }
@@ -241,7 +308,7 @@ class MCPToolManager:
     async def call(self, name: str, arguments: dict[str, Any]) -> str:
         session, real = self._route[name]
         result = await session.call_tool(real, arguments or {})
-        if getattr(result, "isError", False):
+        if _field(result, "isError", "is_error"):
             return f"MCP tool error: {_result_to_text(result) or name}"
         return _result_to_text(result)
 

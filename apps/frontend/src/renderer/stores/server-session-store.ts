@@ -6,6 +6,7 @@
  * never sees the tokens themselves; they stay in the main process.
  */
 import { create } from "zustand";
+import { usePermissionsStore } from "./permissions-store";
 
 export interface ServerUser {
 	id: string;
@@ -66,6 +67,16 @@ export const useServerSessionStore = create<ServerSessionState>((set, get) => {
 			isAuthenticated: state.isAuthenticated,
 			configured: state.configured,
 		});
+
+		// Effective permissions belong to a session: resolve them when one
+		// starts, and drop them when it ends, so the UI never keeps masking
+		// (or unmasking) against the previous user's rights.
+		const permissions = usePermissionsStore.getState();
+		if (state.mode === "server" && state.isAuthenticated) {
+			void permissions.load();
+		} else {
+			permissions.reset();
+		}
 	};
 
 	return {

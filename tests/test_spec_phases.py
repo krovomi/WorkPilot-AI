@@ -44,14 +44,14 @@ _mocked_module_names = [
     "client",
     # Config & phases
     "phase_config",
-    "phase_event",
+    "core.phase_event",
     # Logging & UI
-    "debug",
+    "core.debug",
     "ui",
     "ui.capabilities",
     "task_logger",
-    "linear_updater",
-    "progress",
+    "integrations.linear.updater",
+    "core.progress",
     # Prompts
     "prompts_pkg",
     "prompts_pkg.project_context",
@@ -80,8 +80,6 @@ _mocked_module_names = [
     "spec.validate_pkg.validators",
     # Validate spec (legacy)
     "validate_spec",
-    # Graphiti
-    "graphiti_providers",
     # Integrations
     "integrations",
     "integrations.linear",
@@ -98,10 +96,6 @@ for name in _mocked_module_names:
     sys.modules[name] = MagicMock()
 
 # Set up specific mock attributes
-mock_graphiti = sys.modules["graphiti_providers"]
-mock_graphiti.is_graphiti_enabled = MagicMock(return_value=False)
-mock_graphiti.get_graph_hints = AsyncMock(return_value=[])
-
 mock_validate_spec = sys.modules["validate_spec"]
 mock_validate_spec.auto_fix_plan = MagicMock(return_value=False)
 
@@ -241,7 +235,7 @@ class TestPhaseDiscovery:
         # Create the project_index.json file
         index_file = spec_dir / "project_index.json"
         index_file.write_text(
-            json.dumps({"files": [1, 2, 3], "project_type": "python"})
+            json.dumps({"files": [1, 2, 3], "project_type": "python"}), encoding="utf-8"
         )
 
         executor = PhaseExecutor(
@@ -289,7 +283,8 @@ class TestPhaseDiscovery:
 
         # Always fail
         with patch(
-            "apps.backend.spec.phases.discovery_phases.discovery.run_discovery_script", return_value=(False, "Script failed")
+            "apps.backend.spec.phases.discovery_phases.discovery.run_discovery_script",
+            return_value=(False, "Script failed"),
         ):
             result = await executor.phase_discovery()
 
@@ -313,7 +308,9 @@ class TestPhaseHistoricalContext:
     ):
         """Historical context phase returns early if hints file exists."""
         hints_file = spec_dir / "graph_hints.json"
-        hints_file.write_text(json.dumps({"hints": [], "enabled": True}))
+        hints_file.write_text(
+            json.dumps({"hints": [], "enabled": True}), encoding="utf-8"
+        )
 
         executor = PhaseExecutor(
             project_dir=temp_dir,
@@ -332,7 +329,7 @@ class TestPhaseHistoricalContext:
         assert result.retries == 0
 
     @pytest.mark.asyncio
-    async def test_historical_context_graphiti_disabled(
+    async def test_historical_context_memory_disabled(
         self,
         temp_dir: Path,
         spec_dir: Path,
@@ -341,7 +338,7 @@ class TestPhaseHistoricalContext:
         mock_ui_module,
         mock_spec_validator,
     ):
-        """Historical context phase handles disabled Graphiti."""
+        """Historical context phase handles memory turned off."""
         executor = PhaseExecutor(
             project_dir=temp_dir,
             spec_dir=spec_dir,
@@ -352,11 +349,12 @@ class TestPhaseHistoricalContext:
             ui_module=mock_ui_module,
         )
 
-        with patch("graphiti_providers.is_graphiti_enabled", return_value=False):
+        with patch("memory.store.is_memory_enabled", return_value=False):
             result = await executor.phase_historical_context()
 
         assert result.success is True
-        assert (spec_dir / "graph_hints.json").exists()
+        hints = json.loads((spec_dir / "graph_hints.json").read_text(encoding="utf-8"))
+        assert hints["enabled"] is False
 
 
 class TestPhaseRequirements:
@@ -374,7 +372,9 @@ class TestPhaseRequirements:
     ):
         """Requirements phase returns early if file exists."""
         requirements_file = spec_dir / "requirements.json"
-        requirements_file.write_text(json.dumps({"task_description": "Test"}))
+        requirements_file.write_text(
+            json.dumps({"task_description": "Test"}), encoding="utf-8"
+        )
 
         executor = PhaseExecutor(
             project_dir=temp_dir,
@@ -419,7 +419,7 @@ class TestPhaseRequirements:
         assert (spec_dir / "requirements.json").exists()
 
         # Verify content
-        content = (spec_dir / "requirements.json").read_text()
+        content = (spec_dir / "requirements.json").read_text(encoding="utf-8")
         req = json.loads(content)
         assert req["task_description"] == "Add user authentication"
 
@@ -439,7 +439,9 @@ class TestPhaseContext:
     ):
         """Context phase returns early if file exists."""
         context_file = spec_dir / "context.json"
-        context_file.write_text(json.dumps({"task_description": "Test"}))
+        context_file.write_text(
+            json.dumps({"task_description": "Test"}), encoding="utf-8"
+        )
 
         executor = PhaseExecutor(
             project_dir=temp_dir,
@@ -510,9 +512,12 @@ class TestPhaseContext:
         )
 
         with patch(
-            "apps.backend.spec.context.run_context_discovery", return_value=(False, "Failed")
+            "apps.backend.spec.context.run_context_discovery",
+            return_value=(False, "Failed"),
         ):
-            with patch("apps.backend.spec.context.create_minimal_context") as mock_minimal:
+            with patch(
+                "apps.backend.spec.context.create_minimal_context"
+            ) as mock_minimal:
                 result = await executor.phase_context()
 
         mock_minimal.assert_called_once()
@@ -533,8 +538,10 @@ class TestPhaseQuickSpec:
         mock_spec_validator,
     ):
         """Quick spec phase returns early if files exist."""
-        (spec_dir / "spec.md").write_text("# Test Spec")
-        (spec_dir / "implementation_plan.json").write_text(json.dumps({"phases": []}))
+        (spec_dir / "spec.md").write_text("# Test Spec", encoding="utf-8")
+        (spec_dir / "implementation_plan.json").write_text(
+            json.dumps({"phases": []}), encoding="utf-8"
+        )
 
         executor = PhaseExecutor(
             project_dir=temp_dir,
@@ -566,7 +573,7 @@ class TestPhaseQuickSpec:
 
         # Agent creates spec.md on success
         async def agent_side_effect(*args, **kwargs):
-            (spec_dir / "spec.md").write_text("# Generated Spec")
+            (spec_dir / "spec.md").write_text("# Generated Spec", encoding="utf-8")
             return (True, "Done")
 
         agent_fn = AsyncMock(side_effect=agent_side_effect)
@@ -613,12 +620,12 @@ class TestPhaseQuickSpec:
             return PhaseResult("context", True, [], [], 0)
 
         async def spec_writing_ok():
-            (spec_dir / "spec.md").write_text("# Escalated Spec")
+            (spec_dir / "spec.md").write_text("# Escalated Spec", encoding="utf-8")
             return PhaseResult("spec_writing", True, [], [], 0)
 
         async def planning_ok():
             (spec_dir / "implementation_plan.json").write_text(
-                json.dumps({"phases": []})
+                json.dumps({"phases": []}), encoding="utf-8"
             )
             return PhaseResult("planning", True, [], [], 0)
 
@@ -680,6 +687,7 @@ class TestPhaseQuickSpec:
         assert result.phase == "quick_spec"
         # Planning must not run once spec_writing has failed
         planning_mock.assert_not_called()
+
     """Tests for phase_research method."""
 
     @pytest.mark.asyncio
@@ -693,7 +701,9 @@ class TestPhaseQuickSpec:
         mock_spec_validator,
     ):
         """Research phase returns early if file exists."""
-        (spec_dir / "research.json").write_text(json.dumps({"findings": []}))
+        (spec_dir / "research.json").write_text(
+            json.dumps({"findings": []}), encoding="utf-8"
+        )
 
         executor = PhaseExecutor(
             project_dir=temp_dir,
@@ -752,7 +762,9 @@ class TestPhaseSpecWriting:
         mock_spec_validator,
     ):
         """Spec writing phase returns early if valid spec exists."""
-        (spec_dir / "spec.md").write_text("# Test Spec\n\n## Overview\n")
+        (spec_dir / "spec.md").write_text(
+            "# Test Spec\n\n## Overview\n", encoding="utf-8"
+        )
 
         executor = PhaseExecutor(
             project_dir=temp_dir,
@@ -781,10 +793,12 @@ class TestPhaseSpecWriting:
         mock_spec_validator,
     ):
         """Spec writing phase regenerates invalid spec."""
-        (spec_dir / "spec.md").write_text("Invalid spec")
+        (spec_dir / "spec.md").write_text("Invalid spec", encoding="utf-8")
 
         async def agent_side_effect(*args, **kwargs):
-            (spec_dir / "spec.md").write_text("# Valid Spec\n\n## Overview\n")
+            (spec_dir / "spec.md").write_text(
+                "# Valid Spec\n\n## Overview\n", encoding="utf-8"
+            )
             return (True, "Done")
 
         agent_fn = AsyncMock(side_effect=agent_side_effect)
@@ -872,14 +886,15 @@ class TestPhaseSelfCritique:
         mock_spec_validator,
     ):
         """Self-critique returns early if already completed."""
-        (spec_dir / "spec.md").write_text("# Test Spec")
+        (spec_dir / "spec.md").write_text("# Test Spec", encoding="utf-8")
         (spec_dir / "critique_report.json").write_text(
             json.dumps(
                 {
                     "issues_fixed": True,
                     "no_issues_found": False,
                 }
-            )
+            ),
+            encoding="utf-8",
         )
 
         executor = PhaseExecutor(
@@ -913,7 +928,7 @@ class TestPhasePlanning:
     ):
         """Planning phase returns early if valid plan exists."""
         (spec_dir / "implementation_plan.json").write_text(
-            json.dumps({"phases": [{"phase": 1, "subtasks": []}]})
+            json.dumps({"phases": [{"phase": 1, "subtasks": []}]}), encoding="utf-8"
         )
 
         executor = PhaseExecutor(
@@ -985,7 +1000,9 @@ class TestPhaseValidation:
             project_dir=temp_dir,
             spec_dir=spec_dir,
             task_description="Test task",
-            spec_validator=mock_spec_validator(spec_valid=False, plan_valid=False, context_valid=False),
+            spec_validator=mock_spec_validator(
+                spec_valid=False, plan_valid=False, context_valid=False
+            ),
             run_agent_fn=agent_fn,
             task_logger=mock_task_logger,
             ui_module=mock_ui_module,
@@ -1055,9 +1072,11 @@ class TestPhaseWorkflow:
         """Running a phase twice with existing output is idempotent."""
         # Pre-create files
         (spec_dir / "requirements.json").write_text(
-            json.dumps({"task_description": "Test"})
+            json.dumps({"task_description": "Test"}), encoding="utf-8"
         )
-        (spec_dir / "context.json").write_text(json.dumps({"task_description": "Test"}))
+        (spec_dir / "context.json").write_text(
+            json.dumps({"task_description": "Test"}), encoding="utf-8"
+        )
 
         executor = PhaseExecutor(
             project_dir=temp_dir,
@@ -1089,7 +1108,9 @@ class TestPhaseWorkflow:
         mock_spec_validator,
     ):
         """Phases log messages to task logger."""
-        (spec_dir / "project_index.json").write_text(json.dumps({"files": []}))
+        (spec_dir / "project_index.json").write_text(
+            json.dumps({"files": []}), encoding="utf-8"
+        )
 
         executor = PhaseExecutor(
             project_dir=temp_dir,
@@ -1138,3 +1159,202 @@ class TestPhaseWorkflow:
 
         # Verify UI print_status was called
         assert mock_ui_module.print_status.called
+
+
+class TestPlaceholdersAreSaid:
+    """A phase whose agent produced nothing says so (audit F39).
+
+    The researcher and the critic used to get a placeholder file written for
+    them and report success, exactly like a phase that did its job — and the
+    placeholder was permanent: a resumed build skipped the phase because the
+    file existed, and the critique placeholder claimed `no_issues_found`.
+    """
+
+    @staticmethod
+    def _executor(temp_dir, spec_dir, agent_fn, validator, logger, ui):
+        return PhaseExecutor(
+            project_dir=temp_dir,
+            spec_dir=spec_dir,
+            task_description="Test task",
+            spec_validator=validator,
+            run_agent_fn=agent_fn,
+            task_logger=logger,
+            ui_module=ui,
+        )
+
+    @pytest.mark.asyncio
+    async def test_research_with_no_file_is_a_marked_placeholder(
+        self, temp_dir, spec_dir, mock_task_logger, mock_ui_module, mock_spec_validator
+    ):
+        (spec_dir / "requirements.json").write_text("{}", encoding="utf-8")
+        agent = AsyncMock(return_value=(True, "done"))  # succeeds, writes nothing
+        result = await self._executor(
+            temp_dir,
+            spec_dir,
+            agent,
+            mock_spec_validator(),
+            mock_task_logger,
+            mock_ui_module,
+        ).phase_research()
+
+        assert result.success is True
+        assert result.warnings and "placeholder" in result.warnings[0]
+        research = json.loads((spec_dir / "research.json").read_text(encoding="utf-8"))
+        assert research["placeholder"] is True
+
+    @pytest.mark.asyncio
+    async def test_research_that_failed_every_attempt_says_so(
+        self, temp_dir, spec_dir, mock_task_logger, mock_ui_module, mock_spec_validator
+    ):
+        (spec_dir / "requirements.json").write_text("{}", encoding="utf-8")
+        agent = AsyncMock(return_value=(False, "boom"))
+        result = await self._executor(
+            temp_dir,
+            spec_dir,
+            agent,
+            mock_spec_validator(),
+            mock_task_logger,
+            mock_ui_module,
+        ).phase_research()
+
+        assert result.success is True  # the pipeline moves on
+        assert result.retries == MAX_RETRIES
+        assert result.warnings and len(result.errors) == MAX_RETRIES
+
+    @pytest.mark.asyncio
+    async def test_a_resumed_build_researches_again_over_a_placeholder(
+        self, temp_dir, spec_dir, mock_task_logger, mock_ui_module, mock_spec_validator
+    ):
+        (spec_dir / "requirements.json").write_text("{}", encoding="utf-8")
+        (spec_dir / "research.json").write_text(
+            json.dumps({"placeholder": True, "research_skipped": True}),
+            encoding="utf-8",
+        )
+
+        async def researches(*args, **kwargs):
+            (spec_dir / "research.json").write_text(
+                json.dumps({"integrations_researched": ["x"]}), encoding="utf-8"
+            )
+            return (True, "done")
+
+        agent = AsyncMock(side_effect=researches)
+        result = await self._executor(
+            temp_dir,
+            spec_dir,
+            agent,
+            mock_spec_validator(),
+            mock_task_logger,
+            mock_ui_module,
+        ).phase_research()
+
+        assert agent.called, "the placeholder was taken for a result"
+        assert result.warnings == []
+
+    @pytest.mark.asyncio
+    async def test_a_critique_with_no_report_does_not_claim_no_issues(
+        self, temp_dir, spec_dir, mock_task_logger, mock_ui_module, mock_spec_validator
+    ):
+        (spec_dir / "spec.md").write_text("# Spec", encoding="utf-8")
+        agent = AsyncMock(return_value=(True, "done"))  # writes no report
+        result = await self._executor(
+            temp_dir,
+            spec_dir,
+            agent,
+            mock_spec_validator(),
+            mock_task_logger,
+            mock_ui_module,
+        ).phase_self_critique()
+
+        assert result.success is True
+        assert result.warnings and "placeholder" in result.warnings[0]
+        report = json.loads(
+            (spec_dir / "critique_report.json").read_text(encoding="utf-8")
+        )
+        assert report["placeholder"] is True
+        assert report["no_issues_found"] is False
+
+    @pytest.mark.asyncio
+    async def test_a_resumed_build_critiques_again_over_a_placeholder(
+        self, temp_dir, spec_dir, mock_task_logger, mock_ui_module, mock_spec_validator
+    ):
+        (spec_dir / "spec.md").write_text("# Spec", encoding="utf-8")
+        (spec_dir / "critique_report.json").write_text(
+            json.dumps({"placeholder": True, "no_issues_found": True}),
+            encoding="utf-8",
+        )
+        agent = AsyncMock(return_value=(True, "done"))
+        await self._executor(
+            temp_dir,
+            spec_dir,
+            agent,
+            mock_spec_validator(),
+            mock_task_logger,
+            mock_ui_module,
+        ).phase_self_critique()
+
+        assert agent.called
+
+    @pytest.mark.asyncio
+    async def test_an_unreadable_report_is_critiqued_again_not_crashed_on(
+        self, temp_dir, spec_dir, mock_task_logger, mock_ui_module, mock_spec_validator
+    ):
+        (spec_dir / "spec.md").write_text("# Spec", encoding="utf-8")
+        (spec_dir / "critique_report.json").write_text("{not json", encoding="utf-8")
+        agent = AsyncMock(return_value=(True, "done"))
+        result = await self._executor(
+            temp_dir,
+            spec_dir,
+            agent,
+            mock_spec_validator(),
+            mock_task_logger,
+            mock_ui_module,
+        ).phase_self_critique()
+
+        assert agent.called
+        assert result.success is True
+
+    @pytest.mark.asyncio
+    async def test_a_quick_spec_without_a_plan_says_the_plan_is_a_stand_in(
+        self, temp_dir, spec_dir, mock_task_logger, mock_ui_module, mock_spec_validator
+    ):
+        async def writes_spec_only(*args, **kwargs):
+            (spec_dir / "spec.md").write_text("# Spec", encoding="utf-8")
+            return (True, "done")
+
+        result = await self._executor(
+            temp_dir,
+            spec_dir,
+            AsyncMock(side_effect=writes_spec_only),
+            mock_spec_validator(),
+            mock_task_logger,
+            mock_ui_module,
+        ).phase_quick_spec()
+
+        assert result.success is True
+        assert result.warnings and "stand-in" in result.warnings[0]
+
+
+class TestPhaseNotes:
+    def test_a_successful_phase_owes_its_warnings_and_its_errors(self):
+        from apps.backend.spec.phases import phase_notes
+
+        result = PhaseResult(
+            "research", True, [], ["Attempt 1: failed"], 1, warnings=["placeholder"]
+        )
+        assert phase_notes("research", result) == [
+            "research: placeholder",
+            "research: Attempt 1: failed",
+        ]
+
+    def test_a_clean_phase_owes_nothing(self):
+        from apps.backend.spec.phases import phase_notes
+
+        assert phase_notes("research", PhaseResult("research", True, [], [], 0)) == []
+
+    def test_the_orchestrator_logs_them_as_warnings(self):
+        """Wired where the loop handles a successful result."""
+        source = (
+            Path(__file__).parent.parent / "apps/backend/spec/pipeline/orchestrator.py"
+        ).read_text(encoding="utf-8")
+        assert "phase_notes(phase_name, result)" in source
+        assert "LogEntryType.WARNING" in source

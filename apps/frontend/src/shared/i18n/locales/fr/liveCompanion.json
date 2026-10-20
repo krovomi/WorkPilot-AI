@@ -65,6 +65,7 @@
 		"close": "Fermer"
 	},
 	"fileChange": {
+		"title": "Modifications recentes",
 		"created": "Cree",
 		"modified": "Modifie",
 		"deleted": "Supprime",

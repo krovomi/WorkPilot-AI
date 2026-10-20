@@ -158,5 +158,5 @@ class VotingSystem:
     def _save_result(self, result: VotingResult) -> None:
         filename = f"vote_{int(result.timestamp * 1000)}.json"
         vote_file = self.votes_dir / filename
-        with open(vote_file, "w") as f:
+        with open(vote_file, "w", encoding="utf-8") as f:
             json.dump(result.to_dict(), f, indent=2)

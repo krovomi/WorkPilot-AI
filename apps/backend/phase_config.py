@@ -35,6 +35,9 @@ MODEL_ID_MAP: dict[str, str] = {
     "sonnet": "claude-sonnet-4-5-20250929",
     "haiku": "claude-haiku-4-5",
     # Numbered aliases → full Anthropic ids (mirror the frontend catalog).
+    "opus-5": "claude-opus-5",
+    "fable-5": "claude-fable-5",
+    "sonnet-5": "claude-sonnet-5",
     "opus-4-8": "claude-opus-4-8",
     "opus-4-7": "claude-opus-4-7",
     "opus-4-6": "claude-opus-4-6",
@@ -90,7 +93,9 @@ DEFAULT_PHASE_MODELS: dict[str, str] = {
 # Keys must match provider names from provider_api.py / ProviderContext.
 
 _GOOGLE_ENTRY = get_default("google")
-GOOGLE_GEMINI_MODEL = _GOOGLE_ENTRY.model_id if _GOOGLE_ENTRY else "gemini-3.1-pro"
+GOOGLE_GEMINI_MODEL = (
+    _GOOGLE_ENTRY.model_id if _GOOGLE_ENTRY else "gemini-3.1-pro-preview"
+)
 
 _META_ENTRY = get_default("meta")
 META_LLAMA_MODEL = _META_ENTRY.model_id if _META_ENTRY else "meta-llama/llama-4-scout"
@@ -120,13 +125,17 @@ _OPENAI_ENTRY = get_default("openai")
 OPENAI_MODEL = _OPENAI_ENTRY.model_id if _OPENAI_ENTRY else "gpt-5.5"
 
 _MISTRAL_ENTRY = get_default("mistral")
-MISTRAL_MODEL = _MISTRAL_ENTRY.model_id if _MISTRAL_ENTRY else "mistral-large-3"
+MISTRAL_MODEL = _MISTRAL_ENTRY.model_id if _MISTRAL_ENTRY else "mistral-large-2512"
 
 _DEEPSEEK_ENTRY = get_default("deepseek")
-DEEPSEEK_MODEL = _DEEPSEEK_ENTRY.model_id if _DEEPSEEK_ENTRY else "deepseek-v3"
+DEEPSEEK_MODEL = _DEEPSEEK_ENTRY.model_id if _DEEPSEEK_ENTRY else "deepseek-flash"
 
 _GROK_ENTRY = get_default("grok")
 GROK_MODEL = _GROK_ENTRY.model_id if _GROK_ENTRY else "grok-4.3"
+
+#: The model id a CLI-backed provider (OpenCode, Antigravity) reads as "use
+#: the CLI's own default".
+CLI_DEFAULT_MODEL = "default"
 
 PROVIDER_DEFAULT_MODELS: dict[str, dict[str, str]] = {
     # Anthropic / Claude — use Claude shorthands (resolved by resolve_model_id)
@@ -212,6 +221,27 @@ PROVIDER_DEFAULT_MODELS: dict[str, dict[str, str]] = {
         "coding": WINDSURF_MODEL,
         "qa": WINDSURF_MODEL,
     },
+    # Coding-agent CLIs: "default" leaves the model to the CLI's own
+    # configuration (the one the user signed in and set up there), rather than
+    # falling through to a Claude id that `opencode -m` / `agy --model` reject.
+    "opencode": {
+        "spec": CLI_DEFAULT_MODEL,
+        "planning": CLI_DEFAULT_MODEL,
+        "coding": CLI_DEFAULT_MODEL,
+        "qa": CLI_DEFAULT_MODEL,
+    },
+    "antigravity": {
+        "spec": CLI_DEFAULT_MODEL,
+        "planning": CLI_DEFAULT_MODEL,
+        "coding": CLI_DEFAULT_MODEL,
+        "qa": CLI_DEFAULT_MODEL,
+    },
+    "pi": {
+        "spec": CLI_DEFAULT_MODEL,
+        "planning": CLI_DEFAULT_MODEL,
+        "coding": CLI_DEFAULT_MODEL,
+        "qa": CLI_DEFAULT_MODEL,
+    },
 }
 
 DEFAULT_PHASE_THINKING: dict[str, str] = {
@@ -253,6 +283,11 @@ class TaskMetadataConfig(TypedDict, total=False):
     phaseProviders: PhaseProviderConfig
     model: str
     thinkingLevel: str
+    # The task owns its engine: provider, model and effort per phase were
+    # chosen for this task and nothing global (the default provider, an
+    # inherited SELECTED_LLM_PROVIDER) may replace them. Written by the
+    # frontend at creation, edit, resume and hot-swap.
+    engineLocked: bool
 
 
 Phase = Literal["spec", "planning", "coding", "qa"]
@@ -444,6 +479,66 @@ def get_phase_provider(
     return None
 
 
+LOCAL_PROVIDERS = frozenset({"ollama", "local", "lmstudio"})
+
+
+def is_local_provider(provider: str | None) -> bool:
+    """True when `provider` names a locally-hosted OpenAI-compatible server."""
+    return (provider or "").strip().lower() in LOCAL_PROVIDERS
+
+
+# Model ids that only ever exist behind a hosted API. A local server (Ollama,
+# LM Studio, llama.cpp…) can legitimately serve `mistral`, `deepseek-r1`,
+# `qwen2.5-coder` or `gemma3` — those names ARE in the Ollama library — so the
+# pattern stays deliberately narrow: the proprietary families nobody can pull.
+# Anything wider would reject a model the user really has on disk.
+_HOSTED_ONLY_MODEL_RE = re.compile(
+    r"^(claude-|chatgpt-|gpt-[0-9]|o[1-9](-|$)|gemini-|models/gemini-|grok-|"
+    r"anthropic\.|swe-1)",
+    re.IGNORECASE,
+)
+
+
+def is_hosted_only_model(model: str) -> bool:
+    """True when `model` is an API-only id that no local server can serve.
+
+    Handing one to Ollama is not a slow path, it is a guaranteed 404: the server
+    answers "model not found", the pull-on-demand fallback then asks the Ollama
+    registry for a Claude manifest, and the run dies on
+    ``pull model manifest: file does not exist`` — once per phase, with the real
+    cause (a hosted model id on a local provider) nowhere in the message.
+    """
+    return bool(model) and _HOSTED_ONLY_MODEL_RE.match(model.strip()) is not None
+
+
+def local_default_model() -> str:
+    """The model a local provider should run when nothing valid was selected.
+
+    Reads the live environment first so a model picked in Settings after import
+    time still wins (the frontend injects it as ``OLLAMA_MODEL`` /
+    ``LOCAL_LLM_MODEL``), then falls back to the module-level default.
+    """
+    return (
+        os.getenv("OLLAMA_MODEL")
+        or os.getenv("LOCAL_LLM_MODEL")
+        or OLLAMA_MODEL
+        or "llama3.3"
+    ).strip()
+
+
+def coerce_local_model(model: str | None) -> str:
+    """Return a model id a local server can actually serve.
+
+    A hosted-only id (or an empty one) is replaced by the configured local
+    model; anything else — including HF ids like ``hf.co/org/model`` and any
+    Ollama tag — is passed through untouched.
+    """
+    candidate = (model or "").strip()
+    if not candidate or is_hosted_only_model(candidate):
+        return local_default_model()
+    return candidate
+
+
 def _resolve_provider_model(model: str, provider: str | None) -> str:
     """
     Resolve a model identifier to a full model ID, provider-aware.
@@ -464,6 +559,16 @@ def _resolve_provider_model(model: str, provider: str | None) -> str:
     # form before it reaches the API, which rejects the dotted spelling.
     if not provider or provider in ("anthropic", "claude"):
         return resolve_model_id(normalize_anthropic_model_id(model))
+
+    # Local servers are the strictest case: they can only serve what is pulled
+    # on the machine, so a hosted-only id is resolved to the configured local
+    # model here rather than being discovered as a 404 mid-run. Checked before
+    # the MODEL_ID_MAP branch below, which would otherwise expand the "sonnet"
+    # shorthand into a full Claude id and hand THAT to Ollama.
+    if is_local_provider(provider):
+        return coerce_local_model(
+            resolve_model_id(model) if model in MODEL_ID_MAP else model
+        )
 
     # For non-Anthropic providers, check if it's a Claude shorthand
     # (could happen if user switched providers but metadata still has "sonnet")
@@ -506,8 +611,17 @@ def _resolve_cli_model(cli_model: str | None) -> str | None:
 def _resolve_auto_profile_model(
     metadata: TaskMetadataConfig, phase: Phase, cli_provider: str | None
 ) -> str | None:
-    """Resolve model from auto profile configuration."""
-    if not metadata.get("isAutoProfile") or not metadata.get("phaseModels"):
+    """Resolve model from auto profile configuration.
+
+    A task whose engine is locked reads its per-phase model the same way: the
+    model was chosen for that phase, whatever profile produced it. A locked
+    task missing one phase falls through to its single model rather than to
+    the Claude default, which would pair a Claude id with another provider.
+    """
+    if not metadata.get("phaseModels"):
+        return None
+    locked = bool(metadata.get("engineLocked"))
+    if not metadata.get("isAutoProfile") and not locked:
         return None
 
     phase_models = metadata["phaseModels"]
@@ -516,7 +630,11 @@ def _resolve_auto_profile_model(
         or _metadata_phase_provider(metadata, phase)
         or metadata.get("provider")
     )
-    model = phase_models.get(phase, DEFAULT_PHASE_MODELS[phase])
+    model = phase_models.get(phase)
+    if not model:
+        if locked:
+            return None
+        model = DEFAULT_PHASE_MODELS[phase]
     return _resolve_provider_model(model, provider)
 
 
@@ -529,6 +647,14 @@ def _resolve_single_model(
 
     provider = cli_provider or metadata.get("provider")
     return _resolve_provider_model(metadata["model"], provider)
+
+
+def is_engine_locked(spec_dir: Path | None) -> bool:
+    """Whether the task in `spec_dir` owns its provider/model/effort."""
+    if not spec_dir:
+        return False
+    metadata = load_task_metadata(Path(spec_dir))
+    return bool(metadata and metadata.get("engineLocked"))
 
 
 def _resolve_complexity_routing(

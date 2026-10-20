@@ -12,21 +12,15 @@ import fs from "node:fs";
 import path from "node:path";
 import type { BrowserWindow } from "electron";
 import { ipcMain } from "electron";
-import {
-	DEFAULT_FEATURE_MODELS,
-	DEFAULT_FEATURE_THINKING,
-	IPC_CHANNELS,
-	MODEL_ID_MAP,
-} from "../../../shared/constants";
-import type { AppSettings, Project } from "../../../shared/types";
+import { IPC_CHANNELS, MODEL_ID_MAP } from "../../../shared/constants";
+import type { Project } from "../../../shared/types";
 import type { AuthFailureInfo } from "../../../shared/types/terminal";
 import { getAugmentedEnv } from "../../env-utils";
-import { getDefaultDbPath, getMemoryService } from "../../memory-service";
-import { readSettingsFile } from "../../settings-utils";
-import { getGitHubConfig, githubFetch, normalizeRepoReference } from "./utils";
+import { getGitHubConfig, githubFetch } from "./utils";
 import { createIPCCommunicators } from "./utils/ipc-communicator";
 import { createContextLogger } from "./utils/logger";
 import { withProjectOrNull } from "./utils/project-middleware";
+import { getPageFeatureSettings } from "../../services/page-llm-config";
 import { getRunnerEnv } from "./utils/runner-env";
 import {
 	buildRunnerArgs,
@@ -35,192 +29,22 @@ import {
 	runPythonSubprocess,
 	validateGitHubModule,
 } from "./utils/subprocess-runner";
+import { fetchPRsFromGraphQL } from "./pr-graphql";
+import type { PRData, PRListResult } from "./pr-graphql";
+import {
+	sanitizeNetworkData,
+	getGitHubDir,
+	loadPRLogs,
+	PRLogCollector,
+} from "./pr-logs";
+import type { PRLogs } from "./pr-logs";
+import { performCIWaitCheck } from "./pr-ci-wait";
+import type { PRReviewProgress } from "./pr-ci-wait";
+// Moved to ./pr-ci-wait.ts (audit lot L11, F36); re-exported for existing importers.
+export type { PRReviewProgress } from "./pr-ci-wait";
 
-/**
- * GraphQL response type for PR list query
- * Note: repository can be null if the repo doesn't exist or user lacks access
- */
-interface GraphQLPRNode {
-	number: number;
-	title: string;
-	body: string | null;
-	state: string;
-	author: { login: string } | null;
-	headRefName: string;
-	baseRefName: string;
-	additions: number;
-	deletions: number;
-	changedFiles: number;
-	assignees: { nodes: Array<{ login: string }> };
-	createdAt: string;
-	updatedAt: string;
-	url: string;
-}
-
-interface GraphQLPRListResponse {
-	data: {
-		repository: {
-			pullRequests: {
-				pageInfo: {
-					hasNextPage: boolean;
-					endCursor: string | null;
-				};
-				nodes: GraphQLPRNode[];
-			};
-		} | null;
-	};
-	errors?: Array<{ message: string }>;
-}
-
-/**
- * Maps a GraphQL PR node to the frontend PRData format.
- * Shared between listPRs and listMorePRs handlers.
- */
-function mapGraphQLPRToData(pr: GraphQLPRNode): PRData {
-	return {
-		number: pr.number,
-		title: pr.title,
-		body: pr.body ?? "",
-		state: pr.state.toLowerCase(),
-		author: { login: pr.author?.login ?? "unknown" },
-		headRefName: pr.headRefName,
-		baseRefName: pr.baseRefName,
-		additions: pr.additions,
-		deletions: pr.deletions,
-		changedFiles: pr.changedFiles,
-		assignees: pr.assignees.nodes.map((a) => ({ login: a.login })),
-		files: [],
-		createdAt: pr.createdAt,
-		updatedAt: pr.updatedAt,
-		htmlUrl: pr.url,
-	};
-}
-
-/**
- * Make a GraphQL request to GitHub API
- */
-async function githubGraphQL<T>(
-	token: string,
-	query: string,
-	variables: Record<string, unknown> = {},
-): Promise<T> {
-	const response = await fetch("https://api.github.com/graphql", {
-		method: "POST",
-		headers: {
-			Authorization: `Bearer ${token}`,
-			"Content-Type": "application/json",
-			"User-Agent": "WorkPilot-AI",
-		},
-		body: JSON.stringify({ query, variables }),
-	});
-
-	if (!response.ok) {
-		// Log detailed error for debugging, throw generic message for safety
-		console.error(
-			`GitHub GraphQL HTTP error: ${response.status} ${response.statusText}`,
-		);
-		throw new Error("Failed to connect to GitHub API");
-	}
-
-	const result = (await response.json()) as T & {
-		errors?: Array<{ message: string }>;
-	};
-
-	// Check for GraphQL-level errors
-	if (result.errors && result.errors.length > 0) {
-		// Log detailed errors for debugging, throw generic message for safety
-		console.error(
-			`GitHub GraphQL errors: ${result.errors.map((e) => e.message).join(", ")}`,
-		);
-		throw new Error("GitHub API request failed");
-	}
-
-	return result;
-}
-
-/**
- * GraphQL query to fetch PRs with diff stats
- */
-const LIST_PRS_QUERY = `
-query($owner: String!, $repo: String!, $first: Int!, $after: String) {
-  repository(owner: $owner, name: $repo) {
-    pullRequests(states: OPEN, first: $first, after: $after, orderBy: {field: UPDATED_AT, direction: DESC}) {
-      pageInfo { hasNextPage endCursor }
-      nodes {
-        number
-        title
-        body
-        state
-        author { login }
-        headRefName
-        baseRefName
-        additions
-        deletions
-        changedFiles
-        assignees(first: 10) { nodes { login } }
-        createdAt
-        updatedAt
-        url
-      }
-    }
-  }
-}
-`;
-
-/**
- * Sanitize network data before writing to file
- * Removes potentially dangerous characters and limits length
- */
-function sanitizeNetworkData(data: string, maxLength = 1000000): string {
-	// Remove null bytes and other control characters except newlines/tabs/carriage returns
-	// Using code points instead of escape sequences to avoid no-control-regex ESLint rule
-	const controlCharsPattern = new RegExp(
-		"[" +
-			String.fromCharCode(
-				0x00,
-				0x01,
-				0x02,
-				0x03,
-				0x04,
-				0x05,
-				0x06,
-				0x07,
-				0x08,
-			) + // \x00-\x08
-			String.fromCharCode(0x0b, 0x0c) + // \x0B, \x0C (skip \x0A which is newline)
-			String.fromCharCode(
-				0x0e,
-				0x0f,
-				0x10,
-				0x11,
-				0x12,
-				0x13,
-				0x14,
-				0x15,
-				0x16,
-				0x17,
-				0x18,
-				0x19,
-				0x1a,
-				0x1b,
-				0x1c,
-				0x1d,
-				0x1e,
-				0x1f,
-			) + // \x0E-\x1F
-			String.fromCharCode(0x7f) + // \x7F (DEL)
-			"]",
-		"g",
-	);
-	let sanitized = data.replace(controlCharsPattern, "");
-
-	// Limit length to prevent DoS
-	if (sanitized.length > maxLength) {
-		sanitized = sanitized.substring(0, maxLength);
-	}
-
-	return sanitized;
-}
+// Moved to ./pr-graphql.ts (audit lot L11, F36); re-exported for existing importers.
+export type { PRData, PRListResult } from "./pr-graphql";
 
 // Debug logging
 const { debug: debugLog } = createContextLogger("GitHub PR");
@@ -259,18 +83,18 @@ function getReviewKey(projectId: string, prNumber: number): string {
 
 /**
  * Returns env var overrides derived from project settings for runner subprocesses.
- * - CLAUDE.md usage: enabled unless explicitly opted out.
+ * - CLAUDE.md usage: enabled unless explicitly opted out. Sent either way: the
+ *   backend reads an absent variable as on, so "off" must be said.
  * - Strict TDD (Red-Green-Refactor): enabled only when opted in.
  */
-function getClaudeMdEnv(project: Project): Record<string, string> | undefined {
-	const env: Record<string, string> = {};
-	if (project.settings?.useClaudeMd !== false) {
-		env.USE_CLAUDE_MD = "true";
-	}
+function getClaudeMdEnv(project: Project): Record<string, string> {
+	const env: Record<string, string> = {
+		USE_CLAUDE_MD: project.settings?.useClaudeMd !== false ? "true" : "false",
+	};
 	if (project.settings?.tddMode) {
 		env.TDD_MODE = "true";
 	}
-	return Object.keys(env).length > 0 ? env : undefined;
+	return env;
 }
 
 /**
@@ -300,6 +124,7 @@ export interface PRReviewFinding {
  * Complete PR review result
  */
 export interface PRReviewResult {
+	jev?: import("../../../shared/types/jev").JevObservation;
 	prNumber: number;
 	repo: string;
 	success: boolean;
@@ -388,876 +213,6 @@ export interface PRReviewMemory {
 	isFollowup: boolean;
 }
 
-/**
- * Save PR review insights to the Electron memory layer (LadybugDB)
- *
- * Called after a PR review completes to persist learnings for cross-session context.
- * Extracts key findings, patterns, and gotchas from the review result.
- *
- * @param result The completed PR review result
- * @param repo Repository name (owner/repo)
- * @param isFollowup Whether this is a follow-up review
- */
-async function savePRReviewToMemory(
-	result: PRReviewResult,
-	repo: string,
-	isFollowup: boolean = false,
-): Promise<void> {
-	const settings = readSettingsFile();
-	if (!settings?.memoryEnabled) {
-		debugLog("Memory not enabled, skipping PR review memory save");
-		return;
-	}
-
-	try {
-		const memoryService = getMemoryService({
-			dbPath: getDefaultDbPath(),
-			database: "auto_claude_memory",
-		});
-
-		// Build the memory content with comprehensive insights
-		// We want to capture ALL meaningful findings so the AI can learn from patterns
-
-		// Prioritize findings: critical > high > medium > low
-		// Include all critical/high, top 5 medium, top 3 low
-		const criticalFindings = result.findings.filter(
-			(f) => f.severity === "critical",
-		);
-		const highFindings = result.findings.filter((f) => f.severity === "high");
-		const mediumFindings = result.findings
-			.filter((f) => f.severity === "medium")
-			.slice(0, 5);
-		const lowFindings = result.findings
-			.filter((f) => f.severity === "low")
-			.slice(0, 3);
-
-		const keyFindingsToSave = [
-			...criticalFindings,
-			...highFindings,
-			...mediumFindings,
-			...lowFindings,
-		].map((f) => ({
-			severity: f.severity,
-			category: f.category,
-			title: f.title,
-			description: f.description.substring(0, 500), // Truncate for storage
-			file: f.file,
-			line: f.line,
-		}));
-
-		// Extract gotchas: security issues, critical bugs, and common mistakes
-		const gotchaCategories = [
-			"security",
-			"error_handling",
-			"data_validation",
-			"race_condition",
-		];
-		const gotchasToSave = result.findings
-			.filter(
-				(f) =>
-					f.severity === "critical" ||
-					f.severity === "high" ||
-					gotchaCategories.includes(f.category?.toLowerCase() || ""),
-			)
-			.map(
-				(f) => `[${f.category}] ${f.title}: ${f.description.substring(0, 300)}`,
-			);
-
-		// Extract patterns: group findings by category to identify recurring issues
-		const categoryGroups = result.findings.reduce(
-			(acc, f) => {
-				const cat = f.category || "general";
-				acc[cat] = (acc[cat] || 0) + 1;
-				return acc;
-			},
-			{} as Record<string, number>,
-		);
-
-		// Patterns are categories that appear multiple times (indicates a systematic issue)
-		const patternsToSave = Object.entries(categoryGroups)
-			.filter(([_, count]) => count >= 2)
-			.map(([category, count]) => `${category}: ${count} occurrences`);
-
-		const memoryContent: PRReviewMemory = {
-			prNumber: result.prNumber,
-			repo,
-			verdict: result.overallStatus || "unknown",
-			timestamp: new Date().toISOString(),
-			summary: {
-				verdict: result.overallStatus || "unknown",
-				finding_counts: {
-					critical: criticalFindings.length,
-					high: highFindings.length,
-					medium: result.findings.filter((f) => f.severity === "medium").length,
-					low: result.findings.filter((f) => f.severity === "low").length,
-				},
-				total_findings: result.findings.length,
-			},
-			keyFindings: keyFindingsToSave,
-			patterns: patternsToSave,
-			gotchas: gotchasToSave,
-			isFollowup,
-		};
-
-		// Add follow-up specific info if applicable
-		if (isFollowup && result.resolvedFindings && result.unresolvedFindings) {
-			memoryContent.summary.verdict_reasoning = `Resolved: ${result.resolvedFindings.length}, Unresolved: ${result.unresolvedFindings.length}`;
-		}
-
-		// Save to memory as a pr_review episode
-		const episodeName = `PR #${result.prNumber} ${isFollowup ? "Follow-up " : ""}Review - ${repo}`;
-		const saveResult = await memoryService.addEpisode(
-			episodeName,
-			memoryContent,
-			"pr_review",
-			`pr_review_${repo.replace("/", "_")}`,
-		);
-
-		if (saveResult.success) {
-			debugLog("PR review saved to memory", {
-				prNumber: result.prNumber,
-				episodeId: saveResult.id,
-			});
-		} else {
-			debugLog("Failed to save PR review to memory", {
-				error: saveResult.error,
-			});
-		}
-	} catch (error) {
-		// Don't fail the review if memory save fails
-		debugLog("Error saving PR review to memory", {
-			error: error instanceof Error ? error.message : error,
-		});
-	}
-}
-
-/**
- * PR data from GitHub API
- */
-export interface PRData {
-	number: number;
-	title: string;
-	body: string;
-	state: string;
-	author: { login: string };
-	headRefName: string;
-	baseRefName: string;
-	additions: number;
-	deletions: number;
-	changedFiles: number;
-	assignees: Array<{ login: string }>;
-	files: Array<{
-		path: string;
-		additions: number;
-		deletions: number;
-		status: string;
-	}>;
-	createdAt: string;
-	updatedAt: string;
-	htmlUrl: string;
-}
-
-/**
- * PR list result with pagination info
- */
-export interface PRListResult {
-	prs: PRData[];
-	hasNextPage: boolean; // True if more PRs exist beyond the 100 limit
-	endCursor?: string | null; // Cursor for fetching next page (null if no more pages)
-}
-
-/**
- * PR review progress status
- */
-export interface PRReviewProgress {
-	phase: "fetching" | "analyzing" | "generating" | "posting" | "complete";
-	prNumber: number;
-	progress: number;
-	message: string;
-}
-
-/**
- * Result of waiting for CI checks to complete
- */
-interface CIWaitResult {
-	/** Whether we successfully waited (no timeout) */
-	success: boolean;
-	/** Whether any checks are still pending (queued or in_progress) */
-	hasInProgress: boolean;
-	/** Number of checks currently pending (queued or in_progress) */
-	inProgressCount: number;
-	/** Names of checks still pending (if any) */
-	inProgressChecks: string[];
-	/** Whether we timed out waiting */
-	timedOut: boolean;
-	/** Total wait time in seconds */
-	waitTimeSeconds: number;
-}
-
-/**
- * Wait for CI checks to complete before starting AI review.
- *
- * Polls GitHub API to check if any CI checks are "queued" or "in_progress".
- * Blocks on BOTH statuses because:
- * - "queued" = CI has been triggered but not started yet
- * - "in_progress" = CI is actively running
- *
- * We wait for all checks to reach "completed" status before reviewing,
- * so our review doesn't report "CI is pending" when it will finish soon.
- *
- * @param token GitHub API token
- * @param repo Repository in "owner/repo" format
- * @param headSha The commit SHA to check CI status for
- * @param prNumber PR number (for progress updates)
- * @param sendProgress Callback to send progress updates to frontend
- * @param abortSignal Optional abort signal for cancellation support
- * @returns CIWaitResult with final CI status
- */
-async function waitForCIChecks(
-	token: string,
-	repo: string,
-	headSha: string,
-	prNumber: number,
-	sendProgress: (progress: PRReviewProgress) => void,
-	abortSignal?: AbortSignal,
-): Promise<CIWaitResult> {
-	const POLL_INTERVAL_MS = 20000; // 20 seconds
-	const MAX_WAIT_MINUTES = 30;
-	const MAX_WAIT_MS = MAX_WAIT_MINUTES * 60 * 1000; // 30 minutes
-	const MAX_ITERATIONS = Math.floor(MAX_WAIT_MS / POLL_INTERVAL_MS); // 90 iterations
-
-	let iteration = 0;
-	const startTime = Date.now();
-	// Track last known in-progress state for accurate timeout reporting
-	let lastInProgressCount = 0;
-	let lastInProgressNames: string[] = [];
-
-	debugLog("Starting CI wait check", {
-		prNumber,
-		headSha,
-		maxIterations: MAX_ITERATIONS,
-	});
-
-	while (iteration < MAX_ITERATIONS) {
-		// Check for cancellation
-		if (abortSignal?.aborted) {
-			debugLog("CI wait cancelled by user", { prNumber, iteration });
-			return {
-				success: false,
-				hasInProgress: lastInProgressCount > 0,
-				inProgressCount: lastInProgressCount,
-				inProgressChecks: lastInProgressNames,
-				timedOut: false,
-				waitTimeSeconds: Math.floor((Date.now() - startTime) / 1000),
-			};
-		}
-
-		try {
-			// Fetch check runs for the commit
-			const checkRuns = (await githubFetch(
-				token,
-				`/repos/${repo}/commits/${headSha}/check-runs`,
-			)) as {
-				total_count: number;
-				check_runs: Array<{
-					name: string;
-					status: "queued" | "in_progress" | "completed";
-					conclusion: string | null;
-				}>;
-			};
-
-			// Find checks that are not yet completed (queued or in_progress)
-			// We block on BOTH statuses to ensure CI is fully done before reviewing
-			const inProgressChecks = checkRuns.check_runs.filter(
-				(cr) => cr.status === "queued" || cr.status === "in_progress",
-			);
-
-			const inProgressCount = inProgressChecks.length;
-			const inProgressNames = inProgressChecks.map((cr) => cr.name);
-
-			// Track last known state for timeout reporting
-			lastInProgressCount = inProgressCount;
-			lastInProgressNames = inProgressNames;
-
-			debugLog("CI check status", {
-				prNumber,
-				iteration,
-				totalChecks: checkRuns.total_count,
-				inProgressCount,
-				inProgressNames,
-			});
-
-			// If no checks are pending (queued or in_progress), we can proceed
-			if (inProgressCount === 0) {
-				const waitTimeSeconds = Math.floor((Date.now() - startTime) / 1000);
-				debugLog("All CI checks completed, proceeding with review", {
-					prNumber,
-					waitTimeSeconds,
-				});
-
-				return {
-					success: true,
-					hasInProgress: false,
-					inProgressCount: 0,
-					inProgressChecks: [],
-					timedOut: false,
-					waitTimeSeconds,
-				};
-			}
-
-			// Checks are still running - send progress update and wait
-			iteration++;
-			const elapsedMinutes = Math.floor((Date.now() - startTime) / 60000);
-			const remainingMinutes = MAX_WAIT_MINUTES - elapsedMinutes;
-
-			const checkNames =
-				inProgressNames.length <= 3
-					? inProgressNames.join(", ")
-					: `${inProgressNames.slice(0, 3).join(", ")} and ${inProgressNames.length - 3} more`;
-
-			sendProgress({
-				phase: "fetching",
-				prNumber,
-				progress: 5, // Keep progress low during wait
-				message: `Waiting for CI checks to complete (${checkNames})... ${remainingMinutes}m remaining`,
-			});
-
-			debugLog("Waiting for CI checks", {
-				prNumber,
-				iteration,
-				inProgressCount,
-				elapsedMinutes,
-				remainingMinutes,
-			});
-
-			// Wait before next poll (with abort check)
-			await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
-
-			// Check for cancellation after wait
-			if (abortSignal?.aborted) {
-				debugLog("CI wait cancelled by user during poll interval", {
-					prNumber,
-					iteration,
-				});
-				return {
-					success: false,
-					hasInProgress: lastInProgressCount > 0,
-					inProgressCount: lastInProgressCount,
-					inProgressChecks: lastInProgressNames,
-					timedOut: false,
-					waitTimeSeconds: Math.floor((Date.now() - startTime) / 1000),
-				};
-			}
-		} catch (error) {
-			// If we fail to fetch CI status, log and continue with the review
-			// This prevents CI check failures from blocking reviews entirely
-			debugLog("Failed to fetch CI status, proceeding with review", {
-				prNumber,
-				error: error instanceof Error ? error.message : error,
-			});
-
-			return {
-				success: true,
-				hasInProgress: false, // Assume no in-progress on error
-				inProgressCount: 0,
-				inProgressChecks: [],
-				timedOut: false,
-				waitTimeSeconds: Math.floor((Date.now() - startTime) / 1000),
-			};
-		}
-	}
-
-	// Timed out waiting for CI checks
-	const waitTimeSeconds = Math.floor((Date.now() - startTime) / 1000);
-	debugLog("CI wait timed out, proceeding with review anyway", {
-		prNumber,
-		waitTimeSeconds,
-		maxWaitSeconds: MAX_WAIT_MS / 1000,
-		lastInProgressCount,
-		lastInProgressNames,
-	});
-
-	return {
-		success: false,
-		hasInProgress: true,
-		inProgressCount: lastInProgressCount,
-		inProgressChecks: lastInProgressNames,
-		timedOut: true,
-		waitTimeSeconds,
-	};
-}
-
-/**
- * Perform CI wait check before starting a PR review.
- *
- * Encapsulates the common logic for waiting on CI checks, including:
- * - Fetching the PR head SHA
- * - Calling waitForCIChecks
- * - Logging the result
- *
- * @param config GitHub config with token and repo
- * @param prNumber PR number
- * @param sendProgress Progress callback
- * @param reviewType Type of review for logging ("review" or "follow-up review")
- * @param abortSignal Optional abort signal for cancellation support
- * @returns true if the review should proceed, false if cancelled
- */
-async function performCIWaitCheck(
-	config: { token: string; repo: string },
-	prNumber: number,
-	sendProgress: (progress: PRReviewProgress) => void,
-	reviewType: "review" | "follow-up review",
-	abortSignal?: AbortSignal,
-): Promise<boolean> {
-	try {
-		sendProgress({
-			phase: "fetching",
-			prNumber,
-			progress: 5,
-			message: "Checking CI status...",
-		});
-
-		// Get PR head SHA for CI status check
-		const pr = (await githubFetch(
-			config.token,
-			`/repos/${config.repo}/pulls/${prNumber}`,
-		)) as { head: { sha: string } };
-
-		const ciWaitResult = await waitForCIChecks(
-			config.token,
-			config.repo,
-			pr.head.sha,
-			prNumber,
-			sendProgress,
-			abortSignal,
-		);
-
-		// Check if cancelled
-		if (
-			abortSignal?.aborted ||
-			(!ciWaitResult.success && !ciWaitResult.timedOut)
-		) {
-			debugLog(`CI wait cancelled, aborting ${reviewType}`, { prNumber });
-			return false;
-		}
-
-		if (ciWaitResult.timedOut) {
-			debugLog(`CI wait timed out, proceeding with ${reviewType}`, {
-				prNumber,
-				waitTimeSeconds: ciWaitResult.waitTimeSeconds,
-			});
-		} else if (ciWaitResult.waitTimeSeconds > 0) {
-			debugLog(`CI checks completed, starting ${reviewType}`, {
-				prNumber,
-				waitTimeSeconds: ciWaitResult.waitTimeSeconds,
-			});
-		}
-		return true;
-	} catch (ciError) {
-		// Don't fail the review if CI check fails, just log and proceed
-		debugLog(`Failed to check CI status, proceeding with ${reviewType}`, {
-			prNumber,
-			error: ciError instanceof Error ? ciError.message : ciError,
-		});
-		return true;
-	}
-}
-
-/**
- * Get the GitHub directory for a project
- */
-function getGitHubDir(project: Project): string {
-	return path.join(project.path, ".workpilot", "github");
-}
-
-/**
- * PR log phase type
- */
-type PRLogPhase = "context" | "analysis" | "synthesis";
-
-/**
- * PR log entry type
- */
-type PRLogEntryType =
-	| "text"
-	| "tool_start"
-	| "tool_end"
-	| "phase_start"
-	| "phase_end"
-	| "error"
-	| "success"
-	| "info";
-
-/**
- * Single PR log entry
- */
-interface PRLogEntry {
-	timestamp: string;
-	type: PRLogEntryType;
-	content: string;
-	phase: PRLogPhase;
-	source?: string;
-	detail?: string;
-	collapsed?: boolean;
-}
-
-/**
- * Phase log with entries
- */
-interface PRPhaseLog {
-	phase: PRLogPhase;
-	status: "pending" | "active" | "completed" | "failed";
-	started_at: string | null;
-	completed_at: string | null;
-	entries: PRLogEntry[];
-}
-
-/**
- * Complete PR logs structure
- */
-interface PRLogs {
-	pr_number: number;
-	repo: string;
-	created_at: string;
-	updated_at: string;
-	is_followup: boolean;
-	phases: {
-		context: PRPhaseLog;
-		analysis: PRPhaseLog;
-		synthesis: PRPhaseLog;
-	};
-}
-
-/**
- * Parse a log line and extract source and content
- * Returns null if line is not a log line
- */
-function parseLogLine(
-	line: string,
-): { source: string; content: string; isError: boolean } | null {
-	// Match patterns like [Context], [AI], [Orchestrator], [Followup], [DEBUG ...], [ParallelFollowup], [BotDetector], [ParallelOrchestrator]
-	const patterns = [
-		/^\[Context\]\s*(.*)$/,
-		/^\[AI\]\s*(.*)$/,
-		/^\[Orchestrator\]\s*(.*)$/,
-		/^\[Followup\]\s*(.*)$/,
-		/^\[ParallelFollowup\]\s*(.*)$/,
-		/^\[ParallelOrchestrator\]\s*(.*)$/,
-		/^\[BotDetector\]\s*(.*)$/,
-		/^\[PR Review Engine\]\s*(.*)$/,
-		/^\[DEBUG\s+(\w+)\]\s*(.*)$/,
-		/^\[ERROR\s+(\w+)\]\s*(.*)$/,
-	];
-
-	// Check for specialist agent logs first (Agent:agent-name format)
-	const agentMatch = line.match(/^\[Agent:([\w-]+)\]\s*(.*)$/);
-	if (agentMatch) {
-		return {
-			source: `Agent:${agentMatch[1]}`,
-			content: agentMatch[2],
-			isError: false,
-		};
-	}
-
-	// Check for parallel SDK specialist logs (Specialist:name format)
-	const specialistMatch = line.match(/^\[Specialist:([\w-]+)\]\s*(.*)$/);
-	if (specialistMatch) {
-		return {
-			source: `Specialist:${specialistMatch[1]}`,
-			content: specialistMatch[2],
-			isError: false,
-		};
-	}
-
-	for (const pattern of patterns) {
-		const match = line.match(pattern);
-		if (match) {
-			const isDebugOrError =
-				pattern.source.includes("DEBUG") || pattern.source.includes("ERROR");
-			if (isDebugOrError && match.length >= 3) {
-				// Skip debug messages that only show message types (not useful)
-				if (match[2].match(/^Message #\d+: \w+Message/)) {
-					return null;
-				}
-				return {
-					source: match[1],
-					content: match[2],
-					isError: pattern.source.includes("ERROR"),
-				};
-			}
-			const source = line.match(/^\[(\w+(?:\s+\w+)*)\]/)?.[1] || "Unknown";
-			return {
-				source,
-				content: match[1] || line,
-				isError: false,
-			};
-		}
-	}
-
-	// Check for PR progress messages [PR #XXX] [YY%] message
-	const prProgressMatch = line.match(/^\[PR #\d+\]\s*\[\s*(\d+)%\]\s*(.*)$/);
-	if (prProgressMatch) {
-		return {
-			source: "Progress",
-			content: `[${prProgressMatch[1]}%] ${prProgressMatch[2]}`,
-			isError: false,
-		};
-	}
-
-	// Check for progress messages [XX%]
-	const progressMatch = line.match(/^\[(\d+)%\]\s*(.*)$/);
-	if (progressMatch) {
-		return {
-			source: "Progress",
-			content: `[${progressMatch[1]}%] ${progressMatch[2]}`,
-			isError: false,
-		};
-	}
-
-	// Match final summary lines (Status:, Summary:, Findings:, etc.)
-	const summaryPatterns = [
-		/^(Status|Summary|Findings|Verdict|Is Follow-up|Resolved|Still Open|New Issues):\s*(.*)$/,
-		/^PR #\d+ (Follow-up )?Review Complete$/,
-		/^={10,}$/,
-		/^-{10,}$/,
-		// Markdown headers (## Summary, ### Resolution Status, etc.)
-		/^#{1,4}\s+.+$/,
-		// Bullet points with content (- ✅ **Resolved**, - **Blocking Issues**, etc.)
-		/^[-*]\s+.+$/,
-		// Indented bullet points for findings (  - [MEDIUM] ..., . [LOW] ...)
-		/^\s+[-.*]\s+\[.+$/,
-		// Lines with bold text at start (**Why NEEDS_REVISION:**, **Recommended Actions:**)
-		/^\*\*.+\*\*:?\s*$/,
-		// Numbered list items (1. Add DANGEROUS_FLAGS...)
-		/^\d+\.\s+.+$/,
-		// File references (File: apps/backend/...)
-		/^\s+File:\s+.+$/,
-	];
-	for (const pattern of summaryPatterns) {
-		const match = line.match(pattern);
-		if (match) {
-			return {
-				source: "Summary",
-				content: line,
-				isError: false,
-			};
-		}
-	}
-
-	return null;
-}
-
-/**
- * Determine the phase from source
- */
-function getPhaseFromSource(source: string): PRLogPhase {
-	// Context phase: gathering PR data, commits, files, feedback
-	// Note: "Followup" is context gathering for follow-up reviews (comparing commits, finding changes)
-	const contextSources = ["Context", "BotDetector", "Followup"];
-	// Analysis phase: AI agents analyzing code
-	const analysisSources = [
-		"AI",
-		"Orchestrator",
-		"ParallelOrchestrator",
-		"ParallelFollowup",
-		"orchestrator",
-		"PRReview", // Worktree creation and PR-specific analysis
-		"ClientCache", // SDK client cache operations
-	];
-	// Synthesis phase: final summary and results
-	// Note: "Progress" logs are redundant (shown in progress bar) but kept for completeness
-	const synthesisSources = ["PR Review Engine", "Summary", "Progress"];
-
-	if (contextSources.includes(source)) return "context";
-	if (analysisSources.includes(source)) return "analysis";
-	// Specialist agents (Agent:xxx and Specialist:xxx) are part of analysis phase
-	if (source.startsWith("Agent:")) return "analysis";
-	if (source.startsWith("Specialist:")) return "analysis";
-	if (synthesisSources.includes(source)) return "synthesis";
-	return "synthesis"; // Default to synthesis for unknown sources
-}
-
-/**
- * Create empty PR logs structure
- */
-function createEmptyPRLogs(
-	prNumber: number,
-	repo: string,
-	isFollowup: boolean,
-): PRLogs {
-	const now = new Date().toISOString();
-	const createEmptyPhase = (phase: PRLogPhase): PRPhaseLog => ({
-		phase,
-		status: "pending",
-		started_at: null,
-		completed_at: null,
-		entries: [],
-	});
-
-	return {
-		pr_number: prNumber,
-		repo,
-		created_at: now,
-		updated_at: now,
-		is_followup: isFollowup,
-		phases: {
-			context: createEmptyPhase("context"),
-			analysis: createEmptyPhase("analysis"),
-			synthesis: createEmptyPhase("synthesis"),
-		},
-	};
-}
-
-/**
- * Get PR logs file path
- */
-function getPRLogsPath(project: Project, prNumber: number): string {
-	return path.join(getGitHubDir(project), "pr", `logs_${prNumber}.json`);
-}
-
-/**
- * Load PR logs from disk
- */
-function loadPRLogs(project: Project, prNumber: number): PRLogs | null {
-	const logsPath = getPRLogsPath(project, prNumber);
-
-	try {
-		const rawData = fs.readFileSync(logsPath, "utf-8");
-		const sanitizedData = sanitizeNetworkData(rawData);
-		return JSON.parse(sanitizedData) as PRLogs;
-	} catch {
-		return null;
-	}
-}
-
-/**
- * Save PR logs to disk
- */
-function savePRLogs(project: Project, logs: PRLogs): void {
-	const logsPath = getPRLogsPath(project, logs.pr_number);
-	const prDir = path.dirname(logsPath);
-
-	if (!fs.existsSync(prDir)) {
-		fs.mkdirSync(prDir, { recursive: true });
-	}
-
-	logs.updated_at = new Date().toISOString();
-	fs.writeFileSync(logsPath, JSON.stringify(logs, null, 2), "utf-8");
-}
-
-/**
- * Add a log entry to PR logs
- * Returns true if the phase status changed (for triggering immediate save)
- */
-function addLogEntry(logs: PRLogs, entry: PRLogEntry): boolean {
-	const phase = logs.phases[entry.phase];
-	let statusChanged = false;
-
-	// Start the phase if it was pending
-	if (phase.status === "pending") {
-		phase.status = "active";
-		phase.started_at = entry.timestamp;
-		statusChanged = true;
-	}
-
-	phase.entries.push(entry);
-	return statusChanged;
-}
-
-/**
- * PR Log Collector - collects logs during review
- * Saves incrementally to disk so frontend can stream logs in real-time
- */
-class PRLogCollector {
-	private logs: PRLogs;
-	private project: Project;
-	private currentPhase: PRLogPhase = "context";
-	private entryCount: number = 0;
-	private saveInterval: number = 3; // Save every N entries for real-time streaming
-
-	constructor(
-		project: Project,
-		prNumber: number,
-		repo: string,
-		isFollowup: boolean,
-	) {
-		this.project = project;
-		this.logs = createEmptyPRLogs(prNumber, repo, isFollowup);
-		// Save initial empty logs so frontend sees the structure immediately
-		this.save();
-	}
-
-	processLine(line: string): void {
-		const parsed = parseLogLine(line);
-		if (!parsed) return;
-
-		const phase = getPhaseFromSource(parsed.source);
-
-		// Track phase transitions - mark previous phases as complete (only if they were active)
-		if (phase !== this.currentPhase) {
-			// When moving to a new phase, mark the previous phase as complete
-			// Only mark complete if the phase was actually active (received log entries)
-			// This prevents marking phases as "completed" if they were skipped
-			if (
-				this.currentPhase === "context" &&
-				(phase === "analysis" || phase === "synthesis")
-			) {
-				if (this.logs.phases.context.status === "active") {
-					this.markPhaseComplete("context", true);
-				}
-			}
-			if (this.currentPhase === "analysis" && phase === "synthesis") {
-				if (this.logs.phases.analysis.status === "active") {
-					this.markPhaseComplete("analysis", true);
-				}
-			}
-			this.currentPhase = phase;
-		}
-
-		const entry: PRLogEntry = {
-			timestamp: new Date().toISOString(),
-			type: parsed.isError ? "error" : "text",
-			content: parsed.content,
-			phase,
-			source: parsed.source,
-		};
-
-		const phaseStatusChanged = addLogEntry(this.logs, entry);
-		this.entryCount++;
-
-		// Save immediately if phase status changed (so frontend sees phase activation)
-		// OR save periodically for real-time streaming (every N entries)
-		if (phaseStatusChanged || this.entryCount % this.saveInterval === 0) {
-			this.save();
-		}
-	}
-
-	markPhaseComplete(phase: PRLogPhase, success: boolean): void {
-		const phaseLog = this.logs.phases[phase];
-		phaseLog.status = success ? "completed" : "failed";
-		phaseLog.completed_at = new Date().toISOString();
-		// Save immediately so frontend sees the status change
-		this.save();
-	}
-
-	save(): void {
-		savePRLogs(this.project, this.logs);
-	}
-
-	finalize(success: boolean): void {
-		// Mark active phases as completed based on success status
-		// Pending phases with no entries should stay pending (they never ran)
-		for (const phase of ["context", "analysis", "synthesis"] as PRLogPhase[]) {
-			const phaseLog = this.logs.phases[phase];
-			if (phaseLog.status === "active") {
-				this.markPhaseComplete(phase, success);
-			}
-			// Note: Pending phases stay pending - they never received any log entries
-			// This is correct behavior for follow-up reviews where some phases may be skipped
-		}
-		this.save();
-	}
-}
 
 /**
  * Get saved PR review result
@@ -1300,6 +255,7 @@ function getReviewResult(
 			error: data.error,
 			// Follow-up review fields (snake_case -> camelCase)
 			reviewedCommitSha: data.reviewed_commit_sha,
+			jev: data.jev,
 			reviewedFileBlobs: data.reviewed_file_blobs,
 			isFollowupReview: data.is_followup_review ?? false,
 			previousReviewId: data.previous_review_id,
@@ -1323,21 +279,13 @@ function getReviewResult(
  * Get GitHub PR model and thinking settings from app settings
  */
 function getGitHubPRSettings(): { model: string; thinkingLevel: string } {
-	const rawSettings = readSettingsFile() as Partial<AppSettings> | undefined;
-
-	// Get feature models/thinking with defaults
-	const featureModels = rawSettings?.featureModels ?? DEFAULT_FEATURE_MODELS;
-	const featureThinking =
-		rawSettings?.featureThinking ?? DEFAULT_FEATURE_THINKING;
-
-	// Get PR-specific settings (with fallback to defaults)
-	const modelShort =
-		featureModels.githubPrs ?? DEFAULT_FEATURE_MODELS.githubPrs;
-	const thinkingLevel =
-		featureThinking.githubPrs ?? DEFAULT_FEATURE_THINKING.githubPrs;
+	// Provider × LLM × effort : ce que la page a choisi, sinon les réglages.
+	// Une seule lecture, dans `services/page-llm-config`.
+	const { model: modelShort, thinkingLevel } =
+		getPageFeatureSettings("github-prs");
 
 	// Convert model short name to full model ID
-	const model = MODEL_ID_MAP[modelShort] ?? MODEL_ID_MAP.opus;
+	const model = MODEL_ID_MAP[modelShort] ?? modelShort;
 
 	debugLog("GitHub PR settings", { modelShort, model, thinkingLevel });
 
@@ -1394,7 +342,10 @@ async function runPRReview(
 	const logCollector = new PRLogCollector(project, prNumber, repo, false);
 
 	// Build environment with project settings
-	const subprocessEnv = await getRunnerEnv(getClaudeMdEnv(project));
+	const subprocessEnv = await getRunnerEnv(getClaudeMdEnv(project), {
+		jevWorkflow: "github-review",
+		page: "github-prs",
+	});
 
 	// Create operation ID for this review
 	const reviewKey = getReviewKey(project.id, prNumber);
@@ -1466,84 +417,12 @@ async function runPRReview(
 		// Finalize logs with success
 		logCollector.finalize(true);
 
-		// Save PR review insights to memory (async, non-blocking)
-		// biome-ignore lint/style/noNonNullAssertion: value is guaranteed by context
-		savePRReviewToMemory(result.data!, repo, false).catch((err) => {
-			debugLog("Failed to save PR review to memory", { error: err.message });
-		});
-
 		// biome-ignore lint/style/noNonNullAssertion: value is guaranteed by context
 		return result.data!;
 	} finally {
 		// Clean up the registry when done (success or error)
 		runningReviews.delete(reviewKey);
 		debugLog("Unregistered review process", { reviewKey });
-	}
-}
-
-/**
- * Shared helper to fetch PRs via GraphQL API.
- * Used by both listPRs and listMorePRs handlers to avoid code duplication.
- */
-async function fetchPRsFromGraphQL(
-	config: { token: string; repo: string },
-	cursor: string | null,
-	debugContext: string,
-): Promise<PRListResult> {
-	// Parse owner/repo from config - must be exactly "owner/repo" format
-	const normalizedRepo = normalizeRepoReference(config.repo);
-	const repoParts = normalizedRepo.split("/");
-	if (repoParts.length !== 2 || !repoParts[0] || !repoParts[1]) {
-		debugLog("Invalid repo format - expected 'owner/repo'", {
-			repo: config.repo,
-			normalized: normalizedRepo,
-			context: debugContext,
-		});
-		return { prs: [], hasNextPage: false, endCursor: null };
-	}
-	const [owner, repo] = repoParts;
-
-	try {
-		// Use GraphQL API to get PRs with diff stats (REST list endpoint doesn't include them)
-		// Fetches up to 100 open PRs (GitHub GraphQL max per request)
-		const response = await githubGraphQL<GraphQLPRListResponse>(
-			config.token,
-			LIST_PRS_QUERY,
-			{
-				owner,
-				repo,
-				first: 100, // GitHub GraphQL max is 100
-				after: cursor,
-			},
-		);
-
-		// Handle case where repository doesn't exist or user lacks access
-		if (!response.data.repository) {
-			debugLog("Repository not found or access denied", {
-				owner,
-				repo,
-				context: debugContext,
-			});
-			return { prs: [], hasNextPage: false, endCursor: null };
-		}
-
-		const { nodes: prNodes, pageInfo } = response.data.repository.pullRequests;
-
-		debugLog(`Fetched PRs via GraphQL (${debugContext})`, {
-			count: prNodes.length,
-			hasNextPage: pageInfo.hasNextPage,
-			endCursor: pageInfo.endCursor,
-		});
-		return {
-			prs: prNodes.map(mapGraphQLPRToData),
-			hasNextPage: pageInfo.hasNextPage,
-			endCursor: pageInfo.endCursor,
-		};
-	} catch (error) {
-		debugLog(`Failed to fetch PRs (${debugContext})`, {
-			error: error instanceof Error ? error.message : error,
-		});
-		return { prs: [], hasNextPage: false, endCursor: null };
 	}
 }
 
@@ -3039,7 +1918,10 @@ export function registerPRHandlers(
 						);
 
 						// Build environment with project settings
-						const followupEnv = await getRunnerEnv(getClaudeMdEnv(project));
+						const followupEnv = await getRunnerEnv(getClaudeMdEnv(project), {
+							jevWorkflow: "github-review",
+							page: "github-prs",
+						});
 
 						const { process: childProcess, promise } =
 							runPythonSubprocess<PRReviewResult>({
@@ -3116,14 +1998,6 @@ export function registerPRHandlers(
 
 						// Finalize logs with success
 						logCollector.finalize(true);
-
-						// Save follow-up PR review insights to memory (async, non-blocking)
-						// biome-ignore lint/style/noNonNullAssertion: value is guaranteed by context
-						savePRReviewToMemory(result.data!, repo, true).catch((err) => {
-							debugLog("Failed to save follow-up PR review to memory", {
-								error: err.message,
-							});
-						});
 
 						debugLog("Follow-up review completed", {
 							prNumber,

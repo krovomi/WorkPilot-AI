@@ -1,6 +1,12 @@
+import { resolvePageLlm } from "../../shared/utils/page-llm";
+import { useProviderModelCatalog } from "../hooks/useProviderModelCatalog";
+import { useSettingsStore } from "../stores/settings-store";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { AVAILABLE_MODELS, THINKING_LEVELS } from "../../shared/constants";
+import {
+	resolveCatalogModelValue,
+	THINKING_LEVELS,
+} from "../../shared/constants";
 import type {
 	InsightsModelConfig,
 	ModelType,
@@ -38,6 +44,9 @@ export function CustomModelModal({
 	open = true,
 }: CustomModelModalProps) {
 	const { t } = useTranslation("dialogs");
+	const settings = useSettingsStore((s) => s.settings);
+	const provider = resolvePageLlm(settings, "insights").provider || "anthropic";
+	const { models } = useProviderModelCatalog(provider);
 	const [model, setModel] = useState<ModelType>(
 		currentConfig?.model || "sonnet",
 	);
@@ -73,14 +82,14 @@ export function CustomModelModal({
 					<div className="space-y-2">
 						<Label htmlFor="model-select">{t("customModel.model")}</Label>
 						<Select
-							value={model}
+							value={resolveCatalogModelValue(model, models)}
 							onValueChange={(v) => setModel(v as ModelType)}
 						>
 							<SelectTrigger id="model-select">
 								<SelectValue />
 							</SelectTrigger>
-							<SelectContent>
-								{AVAILABLE_MODELS.map((m) => (
+							<SelectContent searchable>
+								{models.map((m) => (
 									<SelectItem key={m.value} value={m.value}>
 										{m.label}
 									</SelectItem>

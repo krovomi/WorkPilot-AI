@@ -75,6 +75,23 @@ interface SwarmActions {
 	reset: () => void;
 }
 
+// ─── Bridge ─────────────────────────────────────────────────────────────────
+
+/**
+ * The `electronAPI.swarm` bridge, or `null` when it is absent.
+ *
+ * The browser preview has no Electron bridge at all, and reaching through a
+ * missing one throws where the caller expects a rejected promise. Same reflex
+ * as `smart-estimation-store` since #71: degrade to a readable error rather
+ * than let a `TypeError` escape into React.
+ */
+function getSwarmBridge(): typeof globalThis.electronAPI.swarm | null {
+	const bridge = globalThis.electronAPI?.swarm;
+	return typeof bridge?.analyze === "function" ? bridge : null;
+}
+
+const BRIDGE_UNAVAILABLE = "Swarm mode is unavailable in this environment.";
+
 // ─── Initial State ──────────────────────────────────────────────────────────
 
 const initialState: SwarmState = {
@@ -103,12 +120,14 @@ export const useSwarmStore = create<SwarmState & SwarmActions>()(
 		setError: (error) => set({ error }),
 
 		analyzeSpec: async (specId) => {
+			const bridge = getSwarmBridge();
+			if (!bridge) {
+				set({ error: BRIDGE_UNAVAILABLE, isAnalyzing: false });
+				return;
+			}
 			set({ isAnalyzing: true, error: null, analysisStats: null });
 			try {
-				const result = await globalThis.electronAPI.swarm.analyze(
-					specId,
-					get().config,
-				);
+				const result = await bridge.analyze(specId, get().config);
 				if (result?.parallelismStats) {
 					set({
 						analysisStats: result.parallelismStats,
@@ -124,9 +143,14 @@ export const useSwarmStore = create<SwarmState & SwarmActions>()(
 		},
 
 		startSwarm: async (specId) => {
+			const bridge = getSwarmBridge();
+			if (!bridge) {
+				set({ error: BRIDGE_UNAVAILABLE, isExecuting: false });
+				return;
+			}
 			set({ isExecuting: true, error: null, subtaskLogs: {} });
 			try {
-				await globalThis.electronAPI.swarm.start(specId, get().config);
+				await bridge.start(specId, get().config);
 			} catch (err) {
 				set({
 					error: err instanceof Error ? err.message : String(err),
@@ -137,7 +161,7 @@ export const useSwarmStore = create<SwarmState & SwarmActions>()(
 
 		cancelSwarm: async () => {
 			try {
-				await globalThis.electronAPI.swarm.cancel();
+				await getSwarmBridge()?.cancel();
 			} catch {
 				// Best effort
 			}

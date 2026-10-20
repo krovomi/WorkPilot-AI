@@ -21,8 +21,10 @@ interface SortableProjectTabProps {
 	readonly isMissing?: boolean;
 	/** Called when the user picks a new folder to re-point the project at. */
 	readonly onRepath?: (projectId: string) => void;
-	// Optional control props for active tab
-	readonly onSettingsClick?: () => void;
+	// Optional control props for active tab.
+	// Receives the tab's own project id so the caller opens *this* project's
+	// settings rather than whatever project happens to be selected elsewhere.
+	readonly onSettingsClick?: (projectId: string) => void;
 }
 
 // Detect if running on macOS for keyboard shortcut display
@@ -312,7 +314,7 @@ export function SortableProjectTab({
 									)}
 									onClick={(e) => {
 										e.stopPropagation();
-										onSettingsClick();
+										onSettingsClick(project.id);
 									}}
 									aria-label={t("projectTab.settings")}
 								>

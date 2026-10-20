@@ -351,39 +351,16 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
 		status: {},
 	});
 	const [isLoading, setIsLoading] = useState(true);
+	const [isApplying, setIsApplying] = useState(false);
 
 	useEffect(() => {
 		const loadProviders = async () => {
 			setIsLoading(true);
 			try {
-				// Enrich settings with Claude OAuth status from CLI config files (main process)
-				// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-				const enrichedSettings = { ...(settings as Record<string, any>) };
-				try {
-					if (globalThis.electronAPI?.checkClaudeOAuth) {
-						const oauthResult = await globalThis.electronAPI.checkClaudeOAuth();
-						if (oauthResult.isAuthenticated) {
-							enrichedSettings.globalClaudeOAuthToken =
-								oauthResult.profileName || "oauth-authenticated";
-						}
-					}
-				} catch {
-					// IPC not available (e.g. in browser dev mode)
-				}
-				// Enrich settings with OpenAI Codex CLI OAuth status
-				try {
-					if (globalThis.electronAPI?.checkOpenAICodexOAuth) {
-						const oauthResult =
-							await globalThis.electronAPI.checkOpenAICodexOAuth();
-						if (oauthResult.isAuthenticated) {
-							enrichedSettings.globalOpenAICodexOAuthToken =
-								oauthResult.profileName || "codex-authenticated";
-						}
-					}
-				} catch {
-					// IPC not available
-				}
-				const data = await getStaticProviders(profiles, enrichedSettings);
+				const data = await getStaticProviders(
+					profiles,
+					settings as unknown as Record<string, unknown>,
+				);
 				setProvidersData(data);
 			} catch (error) {
 				console.error("Failed to load providers:", error);
@@ -439,22 +416,31 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
 			setShowAuthDialog(true);
 			return;
 		}
-		setSelected(value);
-		localStorage.setItem("selectedProvider", value);
-		const providerProfile = profiles.find(
-			(profile) => detectProvider(profile.baseUrl) === value,
-		);
-		if (providerProfile) {
-			setActiveProfile(providerProfile.id);
-		} else {
-			setActiveProfile(null);
-		}
+		if (isApplying) return;
+		setIsApplying(true);
 
 		// Communicate the provider selection to the backend
 		try {
 			if (globalThis.electronAPI?.selectProvider) {
-				await globalThis.electronAPI.selectProvider(value);
+				const result = await globalThis.electronAPI.selectProvider(value);
+				if (!result.success)
+					throw new Error(result.error || "Provider selection failed");
 			}
+
+			setSelected(value);
+			localStorage.setItem("selectedProvider", value);
+			const providerProfile = profiles.find(
+				(profile) => detectProvider(profile.baseUrl) === value,
+			);
+			if (providerProfile) {
+				setActiveProfile(providerProfile.id);
+			} else {
+				setActiveProfile(null);
+			}
+
+			useSettingsStore.getState().updateSettings({ selectedProvider: value });
+			// The default provider seeds new tasks only. A task owns its engine
+			// (shared/utils/task-engine.ts) and is never rewritten from here.
 
 			// Notifier immédiatement les composants du changement de provider
 			globalThis.dispatchEvent(
@@ -467,6 +453,12 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
 				"Failed to communicate provider selection to backend:",
 				error,
 			);
+			toast({
+				title: t("dialogs:providerSelector.updateFailed"),
+				variant: "destructive",
+			});
+		} finally {
+			setIsApplying(false);
 		}
 	};
 
@@ -581,13 +573,17 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
 				<Label htmlFor="provider-select" className="whitespace-nowrap">
 					{t("dialogs:providerSelector.label")}
 				</Label>
-				<Select value={selected} onValueChange={handleSelect}>
+				<Select
+					value={selected}
+					onValueChange={handleSelect}
+					disabled={isApplying}
+				>
 					<SelectTrigger id="provider-select" className="w-full">
 						<SelectValue
 							placeholder={t("dialogs:providerSelector.placeholder")}
 						/>
 					</SelectTrigger>
-					<SelectContent>{renderProviderContent()}</SelectContent>
+					<SelectContent searchable>{renderProviderContent()}</SelectContent>
 				</Select>
 			</div>
 

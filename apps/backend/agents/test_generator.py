@@ -646,12 +646,18 @@ class TestGeneratorAgent:
         max_tests_per_function: int = 3,
         project_path: str | None = None,
         on_event: Callable[[GenEvent], None] | None = None,
+        test_libraries: list[str] | None = None,
     ) -> TestGenerationResult:
         """Generate a complete unit test file for *file_path*.
 
         ``on_event`` — optional callback for live progress: pipeline ``stage``
         events and ``code`` chunks as the model streams the test file (see
         :data:`GenEvent`).
+
+        ``test_libraries`` — ids from ``test_generation.libraries``. Left out,
+        the project's own manifests decide; a project that references
+        FluentAssertions and Moq gets tests written with them without anyone
+        having to say so.
         """
         return asyncio.run(
             self._generate_unit_async(
@@ -660,6 +666,7 @@ class TestGeneratorAgent:
                 max_tests_per_function,
                 project_path,
                 on_event,
+                test_libraries,
             )
         )
 
@@ -669,10 +676,13 @@ class TestGeneratorAgent:
         target_module: str,
         project_path: str | None = None,
         on_event: Callable[[GenEvent], None] | None = None,
+        test_libraries: list[str] | None = None,
     ) -> TestGenerationResult:
         """Generate E2E tests from a user story."""
         return asyncio.run(
-            self._generate_e2e_async(user_story, target_module, project_path, on_event)
+            self._generate_e2e_async(
+                user_story, target_module, project_path, on_event, test_libraries
+            )
         )
 
     def generate_tdd_tests(
@@ -680,11 +690,43 @@ class TestGeneratorAgent:
         spec: dict[str, Any],
         project_path: str | None = None,
         on_event: Callable[[GenEvent], None] | None = None,
+        test_libraries: list[str] | None = None,
     ) -> TestGenerationResult:
         """Generate failing tests (TDD red phase) based on a spec."""
-        return asyncio.run(self._generate_tdd_async(spec, project_path, on_event))
+        return asyncio.run(
+            self._generate_tdd_async(spec, project_path, on_event, test_libraries)
+        )
 
     # ── Async implementations ────────────────────────────────────────
+
+    @staticmethod
+    def _libraries_section(
+        project_path: str | None,
+        framework_info: dict[str, str],
+        test_libraries: list[str] | None,
+    ) -> str:
+        """The prompt fragment naming what to write the tests against.
+
+        Never fatal: a project whose manifests cannot be read still gets a test
+        file, just one written in the language's default idiom. Losing a
+        generation over a missing csproj would be a worse trade than losing the
+        house assertion style.
+        """
+        try:
+            from test_generation.libraries import (
+                render_prompt_section,
+                resolve_selection,
+            )
+
+            selection = resolve_selection(
+                project_path or framework_info.get("project_root") or ".",
+                framework_info.get("language", "unknown"),
+                test_libraries,
+            )
+            return render_prompt_section(selection)
+        except Exception:  # noqa: BLE001 — a style hint is not worth a failure
+            logger.debug("could not resolve test libraries", exc_info=True)
+            return ""
 
     @staticmethod
     def _emit(on_event: Callable[[GenEvent], None] | None, event: GenEvent) -> None:
@@ -695,6 +737,32 @@ class TestGeneratorAgent:
             on_event(event)
         except Exception:  # noqa: BLE001 — progress reporting must never break generation
             logger.debug("test-gen on_event callback raised", exc_info=True)
+
+    @staticmethod
+    def _unreadable_source(file_path: str, reason: str | None) -> Exception:
+        """The failure for a source file the generator could not use.
+
+        ``reason`` comes from ``_read_file_or_reason`` — the exception that
+        stopped the read, or ``None`` when the file was readable and simply
+        empty. Both cases end the run, and the user's next move differs, so the
+        message says which one happened.
+        """
+        from core.error_details import FILE_NOT_FOUND, DetailedError, ErrorDetail
+
+        if reason is None:
+            message = (
+                f"The source file is empty, so there is nothing to test: {file_path}"
+            )
+        else:
+            message = f"The source file could not be read: {file_path}"
+        return DetailedError(
+            ErrorDetail(
+                message=message,
+                code=FILE_NOT_FOUND,
+                stage="read",
+                details=reason or f"path={file_path}\n0 bytes",
+            )
+        )
 
     async def _generate_with_events(
         self,
@@ -718,9 +786,9 @@ class TestGeneratorAgent:
         self, file_path: str, existing_test_path: str | None, project_path: str | None
     ) -> list[CoverageGap]:
         framework_info = self._project_analyzer.detect(file_path, project_path)
-        source = self._read_file(file_path)
+        source, read_error = self._read_file_or_reason(file_path)
         if not source:
-            raise FileNotFoundError(f"Cannot read source file: {file_path}")
+            raise self._unreadable_source(file_path, read_error)
 
         existing = (
             self._read_file(existing_test_path)
@@ -747,6 +815,7 @@ class TestGeneratorAgent:
         max_tests_per_function: int,
         project_path: str | None,
         on_event: Callable[[GenEvent], None] | None = None,
+        test_libraries: list[str] | None = None,
     ) -> TestGenerationResult:
         self._emit(on_event, {"type": "stage", "stage": "detect"})
         framework_info = self._project_analyzer.detect(file_path, project_path)
@@ -763,9 +832,9 @@ class TestGeneratorAgent:
         )
 
         self._emit(on_event, {"type": "stage", "stage": "read"})
-        source = self._read_file(file_path)
+        source, read_error = self._read_file_or_reason(file_path)
         if not source:
-            raise FileNotFoundError(f"Cannot read source file: {file_path}")
+            raise self._unreadable_source(file_path, read_error)
 
         existing = (
             self._read_file(existing_test_path)
@@ -778,7 +847,12 @@ class TestGeneratorAgent:
                 "type": "stage",
                 "stage": "read",
                 "status": "done",
-                "detail": f"{len(source.splitlines())} lignes",
+                # ``lines`` is the datum; ``detail`` is only the fallback for a
+                # consumer that cannot format it. The UI localises the count —
+                # this string used to be hardcoded French and read "105 lignes"
+                # to an English user.
+                "lines": len(source.splitlines()),
+                "detail": f"{len(source.splitlines())} lines",
             },
         )
 
@@ -790,7 +864,12 @@ class TestGeneratorAgent:
 
         self._emit(on_event, {"type": "stage", "stage": "generate"})
         prompt = self._generate_unit_prompt(
-            source, file_path, framework_info, existing, max_tests_per_function
+            source,
+            file_path,
+            framework_info,
+            existing,
+            max_tests_per_function,
+            self._libraries_section(project_path, framework_info, test_libraries),
         )
         response = await self._generate_with_events(prompt, project_path, on_event)
         return self._parse_generation_result(
@@ -803,6 +882,7 @@ class TestGeneratorAgent:
         target_module: str,
         project_path: str | None,
         on_event: Callable[[GenEvent], None] | None = None,
+        test_libraries: list[str] | None = None,
     ) -> TestGenerationResult:
         self._emit(on_event, {"type": "stage", "stage": "detect"})
         # Try to detect framework from target module; fall back to project_path
@@ -838,7 +918,12 @@ class TestGeneratorAgent:
         print("Asking the model to generate E2E tests...", flush=True)
 
         self._emit(on_event, {"type": "stage", "stage": "generate"})
-        prompt = self._generate_e2e_prompt(user_story, target_module, framework_info)
+        prompt = self._generate_e2e_prompt(
+            user_story,
+            target_module,
+            framework_info,
+            self._libraries_section(project_path, framework_info, test_libraries),
+        )
         response = await self._generate_with_events(prompt, project_path, on_event)
         return self._parse_generation_result(
             response, target_module, "e2e", framework_info
@@ -849,6 +934,7 @@ class TestGeneratorAgent:
         spec: dict[str, Any],
         project_path: str | None,
         on_event: Callable[[GenEvent], None] | None = None,
+        test_libraries: list[str] | None = None,
     ) -> TestGenerationResult:
         self._emit(on_event, {"type": "stage", "stage": "detect"})
         language = spec.get("language", "python")
@@ -901,7 +987,11 @@ class TestGeneratorAgent:
         )
 
         self._emit(on_event, {"type": "stage", "stage": "generate"})
-        prompt = self._generate_tdd_prompt(spec, framework_info)
+        prompt = self._generate_tdd_prompt(
+            spec,
+            framework_info,
+            self._libraries_section(project_path, framework_info, test_libraries),
+        )
         response = await self._generate_with_events(prompt, project_path, on_event)
         spec_name = spec.get("name", "feature")
         slug = re.sub(r"[^a-z0-9_]", "_", spec_name.lower())
@@ -932,8 +1022,24 @@ class TestGeneratorAgent:
 
         Raises on failure (including an empty response) so the runner surfaces a
         clear error rather than the UI hanging on "Asking the model…".
+
+        ``oneshot_completion`` degrades to an empty string on *any* provider
+        failure, so "empty response" used to be the only thing the UI could say
+        about a 401, a rate limit and an unreachable endpoint alike. The
+        ``on_error`` hook captures the real (redacted) diagnostic, and it is
+        re-raised as a ``DetailedError`` the runner forwards verbatim.
         """
+        from core.error_details import (
+            EMPTY_RESPONSE,
+            DetailedError,
+            ErrorDetail,
+        )
         from core.oneshot import oneshot_completion
+
+        failure: dict[str, Any] = {}
+
+        def _capture(detail: dict[str, Any]) -> None:
+            failure.update(detail)
 
         kwargs: dict[str, Any] = {}
         if on_delta is not None:
@@ -942,12 +1048,31 @@ class TestGeneratorAgent:
             prompt,
             system_prompt=_TEST_GEN_SYSTEM_PROMPT,
             project_dir=project_path,
+            on_error=_capture,
             **kwargs,
         )
         if not text or not text.strip():
-            raise RuntimeError(
-                "The LLM returned an empty response. Check that your AI provider "
-                "is selected and authenticated in Settings."
+            if failure:
+                raise DetailedError(
+                    ErrorDetail(
+                        message=failure.get("message")
+                        or "The AI provider could not complete the request.",
+                        code=failure.get("code") or EMPTY_RESPONSE,
+                        stage="generate",
+                        details=failure.get("details"),
+                        provider=failure.get("provider"),
+                        model=failure.get("model"),
+                    )
+                )
+            raise DetailedError(
+                ErrorDetail(
+                    message=(
+                        "The AI provider returned an empty response — it accepted "
+                        "the request but produced no text."
+                    ),
+                    code=EMPTY_RESPONSE,
+                    stage="generate",
+                )
             )
         return text
 
@@ -1008,6 +1133,7 @@ Only include items NOT already covered by the existing test file."""
         framework_info: dict[str, str],
         existing: str,
         max_tests_per_function: int,
+        libraries_section: str = "",
     ) -> str:
         language = framework_info["language"]
         framework = framework_info["test_framework"]
@@ -1022,18 +1148,18 @@ Only include items NOT already covered by the existing test file."""
             "python": f"tests/test_{stem}.py",
             "typescript": f"src/__tests__/{stem}.test.ts",
             "javascript": f"src/__tests__/{stem}.test.js",
-            "csharp": f"{stem}Tests.cs",
-            "java": f"{stem}Test.java",
+            "csharp": f"tests/{stem}Tests.cs",
+            "java": f"tests/{stem}Test.java",
             "go": f"{stem}_test.go",
             "ruby": f"spec/{stem}_spec.rb",
-            "kotlin": f"{stem}Test.kt",
+            "kotlin": f"tests/{stem}Test.kt",
         }.get(language, f"tests/{stem}_test")
 
         return f"""Generate a complete, production-quality test file for this {language} source file.
 
 Source file: {file_path}
 Test framework: {framework}
-Max tests per function: {max_tests_per_function}
+Max tests per function: {max_tests_per_function}{libraries_section}
 
 Source code:
 ```{language}
@@ -1067,6 +1193,7 @@ Return ONLY a raw JSON object (no markdown, no explanation) matching this schema
         user_story: str,
         target_module: str,
         framework_info: dict[str, str],
+        libraries_section: str = "",
     ) -> str:
         language = framework_info["language"]
         framework = framework_info["test_framework"]
@@ -1079,7 +1206,7 @@ User story:
 
 Target module/file: {target_module}
 Test framework: {framework}
-Language: {language}
+Language: {language}{libraries_section}
 
 Requirements:
 1. Map each acceptance criterion to one or more test scenarios.
@@ -1105,6 +1232,7 @@ Return ONLY a raw JSON object (no markdown) matching this schema:
         self,
         spec: dict[str, Any],
         framework_info: dict[str, str],
+        libraries_section: str = "",
     ) -> str:
         language = framework_info["language"]
         framework = framework_info["test_framework"]
@@ -1119,7 +1247,7 @@ What needs to be implemented:
 
 Snippet type: {snippet_type}
 Language: {language}
-Test framework: {framework}
+Test framework: {framework}{libraries_section}
 
 Requirements:
 1. Tests MUST FAIL until the implementation exists — this is the TDD red phase.
@@ -1380,36 +1508,32 @@ Return ONLY a raw JSON object (no markdown) matching this schema:
         # defaults, and ``_parse_gaps`` treats it as the cue to fall back to AST.
         return {}
 
-    def _compute_test_file_path(
-        self, source_path: str, framework_info: dict[str, str]
-    ) -> str:
-        language = framework_info.get("language", "python")
-        stem = Path(source_path).stem
-        if language == "python":
-            return f"tests/test_{stem}.py"
-        if language in ("typescript",):
-            return f"src/__tests__/{stem}.test.ts"
-        if language in ("javascript",):
-            return f"src/__tests__/{stem}.test.js"
-        if language == "csharp":
-            return f"{stem}Tests.cs"
-        if language == "java":
-            return f"{stem}Test.java"
-        if language == "go":
-            return f"{stem}_test.go"
-        if language == "ruby":
-            return f"spec/{stem}_spec.rb"
-        return f"tests/test_{stem}"
-
     # ── Utilities ────────────────────────────────────────────────────
 
     def _read_file(self, path: str) -> str:
+        """Read ``path``, or "" when it cannot be read."""
+        return self._read_file_or_reason(path)[0]
+
+    @staticmethod
+    def _read_file_or_reason(path: str) -> tuple[str, str | None]:
+        """Read ``path``; return ``(contents, reason)``.
+
+        ``reason`` is the exception that stopped the read, or ``None`` when the
+        file was read fine (an empty file reads fine and returns ``("", None)``).
+
+        Callers that report a failure to the user need this: the plain reader
+        swallows the OSError, and "cannot read" covers a missing file, a
+        permission denial and a binary that is not UTF-8 — three problems with
+        three different fixes. Probing the path a second time to tell them apart
+        would be both slower and a fresh filesystem call on caller-supplied
+        input; the exception already says which one it was.
+        """
         try:
             with open(path, encoding="utf-8") as f:
-                return f.read()
-        except Exception as exc:
+                return f.read(), None
+        except Exception as exc:  # noqa: BLE001 — the reason is the return value
             logger.warning("Could not read %s: %s", path, exc)
-            return ""
+            return "", f"{type(exc).__name__}: {exc}"
 
     def _slugify(self, text: str) -> str:
         """Convert text to valid Python identifier."""
@@ -1426,7 +1550,24 @@ Return ONLY a raw JSON object (no markdown) matching this schema:
     def _compute_test_file_path(
         self, source_path: str, framework_info: dict[str, str] | None = None
     ) -> str:
-        """Generate test file path from source path."""
+        """The conventional test path for *source_path*, relative to the project.
+
+        A fallback and a lookup key, not a decision: it answers "what would a
+        test file for this source be called, by convention?" — used when the
+        model returns no path, and to find an existing test file to extend.
+
+        Where the file is actually **written** is
+        ``test_generation.layout.resolve_test_destination``, which reads the
+        project's real layout and asks the user when it cannot justify an
+        answer. This method has no project root to read, so it can only state
+        the convention; two years of it stating it alone is how C# tests ended
+        up at the top of the repository.
+        """
+        from test_generation.layout import (
+            CO_LOCATED_LANGUAGES,
+            conventional_test_file_name,
+        )
+
         if framework_info:
             language = framework_info.get("language", "python")
         else:
@@ -1434,22 +1575,13 @@ Return ONLY a raw JSON object (no markdown) matching this schema:
             ext = Path(source_path).suffix.lower()
             language = self._project_analyzer.EXTENSION_TO_LANGUAGE.get(ext, "python")
 
-        stem = Path(source_path).stem
-        if language == "python":
-            return f"tests/test_{stem}.py"
-        if language in ("typescript",):
-            return f"src/__tests__/{stem}.test.ts"
-        if language in ("javascript",):
-            return f"src/__tests__/{stem}.test.js"
-        if language == "csharp":
-            return f"{stem}Tests.cs"
-        if language == "java":
-            return f"{stem}Test.java"
-        if language == "go":
-            return f"{stem}_test.go"
-        if language == "ruby":
-            return f"spec/{stem}_spec.rb"
-        return f"tests/test_{stem}"
+        name = conventional_test_file_name(source_path, language)
+        if language in CO_LOCATED_LANGUAGES:
+            # A Go test file belongs to the package it tests; a "tests/" prefix
+            # here would name a path that cannot compile.
+            return name
+        directory = "spec" if language == "ruby" else "tests"
+        return f"{directory}/{name}"
 
     def _path_to_module(self, path: str) -> str:
         """Convert file path to module string."""

@@ -1,3 +1,4 @@
+import { JevStatus } from "../../jev/JevStatus";
 import {
 	AlertCircle,
 	AlertTriangle,
@@ -665,7 +666,10 @@ export function PRDetail({
 					label: t("prReview.readyToMerge"),
 					description: t("prReview.nonBlockingSuggestions", {
 						resolved: resolvedCount,
-						suggestions: suggestionsCount,
+						// `count` et pas `suggestions` : c'est la variable sur laquelle
+						// i18next choisit entre `_one` et `_other`. Nommée autrement,
+						// elle s'interpolait mais la phrase restait au singulier.
+						count: suggestionsCount,
 					}),
 					icon: <CheckCheck className="h-5 w-5" />,
 					color: "bg-success/20 text-success border-success/50",
@@ -678,7 +682,7 @@ export function PRDetail({
 				label: t("prReview.blockingIssues"),
 				description: t("prReview.blockingIssuesDesc", {
 					resolved: resolvedCount,
-					unresolved: unresolvedCount,
+					count: unresolvedCount,
 				}),
 				icon: <AlertTriangle className="h-5 w-5" />,
 				color: "bg-warning/20 text-warning border-warning/50",
@@ -956,6 +960,11 @@ ${t("prReview.blockedStatusMessageFooter")}`;
 	return (
 		<ScrollArea className="flex-1">
 			<div className="p-6 max-w-5xl mx-auto space-y-6">
+				<JevStatus
+					projectId={projectId}
+					workflow="github-review"
+					observation={reviewResult?.jev}
+				/>
 				{/* Refactored Header */}
 				<PRHeader pr={pr} isLoadingFiles={isLoadingFiles} />
 

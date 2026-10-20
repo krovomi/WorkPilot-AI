@@ -13,6 +13,7 @@ import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { app } from "electron";
+import { isUnix, isWindows } from "./platform";
 import {
 	buildPowerShellKnownMsBuildArray,
 	LEGACY_MSBUILD_UNAVAILABLE_MESSAGE,
@@ -66,6 +67,39 @@ function readTextFileSafe(filePath: string): string {
 	} catch {
 		return "";
 	}
+}
+
+/**
+ * Parse the `launchUrl` a .NET launch profile declares — "swagger", "weatherforecast",
+ * or an absolute URL whose path is taken. Rendu `null` quand aucun profil n'en
+ * nomme un : un projet qui ne dit rien ne se voit rien inventer.
+ */
+export function parseDotnetLaunchPath(content: string): string | null {
+	let settings: unknown;
+	try {
+		settings = JSON.parse(content);
+	} catch {
+		return null;
+	}
+	const profiles = (settings as { profiles?: Record<string, unknown> })?.profiles;
+	if (!profiles || typeof profiles !== "object") return null;
+	for (const profile of Object.values(profiles)) {
+		const launchUrl = (profile as { launchUrl?: unknown })?.launchUrl;
+		if (typeof launchUrl !== "string" || !launchUrl.trim()) continue;
+		const raw = launchUrl.trim();
+		if (/^[a-z][a-z0-9+.-]*:\/\//i.test(raw)) {
+			try {
+				const { pathname, search } = new URL(raw);
+				const path = `${pathname}${search}`;
+				if (path && path !== "/") return path;
+				continue;
+			} catch {
+				continue;
+			}
+		}
+		return raw.startsWith("/") ? raw : `/${raw}`;
+	}
+	return null;
 }
 
 /** Default port assumed for Docker projects when none can be parsed. */
@@ -144,6 +178,13 @@ export interface AppEmulatorConfig {
 	port: number; // primary port — API/backend port used by API Studio
 	isWeb: boolean; // Whether the app can be previewed in an iframe
 	projectDir?: string; // Resolved project directory (primary service)
+	/**
+	 * Le chemin que le projet déclare vouloir ouvrir (`launchUrl` d'un profil
+	 * .NET). La racine d'une Web API répond 404 ; ce champ est ce que l'auteur du
+	 * projet a écrit à la place, et l'aperçu l'ouvre quand le diff de la tâche ne
+	 * dit rien de plus précis.
+	 */
+	launchPath?: string;
 	/** For fullstack projects: all services to launch (backend + frontend). */
 	services?: AppEmulatorServiceConfig[];
 }
@@ -980,7 +1021,7 @@ export class AppEmulatorService extends EventEmitter {
 	}
 
 	private buildIisExpressCommand(projectDir: string, port: number): string {
-		if (process.platform !== "win32") {
+		if (isUnix()) {
 			const shellQuote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
 			const root = shellQuote(projectDir);
 			const unavailable = shellQuote(IIS_EXPRESS_UNAVAILABLE_MESSAGE);
@@ -1539,7 +1580,7 @@ exit $launched.ExitCode
 				? [`/p:CustomBeforeMicrosoftCommonTargets=${referencesTarget}`]
 				: []),
 		];
-		if (process.platform !== "win32") {
+		if (isUnix()) {
 			const shellQuote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
 			const shBuildPath = shellQuote(csprojPath);
 			const shBuildArgs = buildArgs.map(shellQuote).join(" ");
@@ -1597,6 +1638,7 @@ exit $launched.ExitCode
 					port,
 					isWeb: true,
 					projectDir: dotnetDir,
+					launchPath: this.readDotnetLaunchPath(dotnetDir),
 				};
 			}
 			return {
@@ -1610,6 +1652,7 @@ exit $launched.ExitCode
 		}
 
 		const dotnetPort = this.readDotnetPort(dotnetDir) ?? 5000;
+		const launchPath = this.readDotnetLaunchPath(dotnetDir);
 		const frontendResult = this.findFrontendInSubdirs(rootDir, 3);
 
 		if (frontendResult) {
@@ -1637,6 +1680,7 @@ exit $launched.ExitCode
 			port: dotnetPort,
 			isWeb: true,
 			projectDir: dotnetDir,
+			launchPath,
 		};
 	}
 
@@ -1646,7 +1690,7 @@ exit $launched.ExitCode
 		shell?: boolean;
 	} {
 		const useShell =
-			process.platform === "win32" ||
+			isWindows() ||
 			/["'|&;<>()$]/.test(startCommand) ||
 			startCommand.startsWith("sh -lc ") ||
 			startCommand.startsWith("bash -lc ");
@@ -1798,6 +1842,29 @@ exit $launched.ExitCode
 		};
 
 		return scan(rootDir, maxDepth) ?? libraryFallback;
+	}
+
+	/**
+	 * Read the launch path declared by a .NET project, from the first profile
+	 * that names one. `dotnet run` prints a root URL and nothing else; the
+	 * project's own `launchUrl` is what Visual Studio and `dotnet watch` open,
+	 * so it is the project's answer to "where does this start?" rather than ours.
+	 */
+	private readDotnetLaunchPath(csprojDir: string): string | undefined {
+		const launchSettingsPath = path.join(
+			csprojDir,
+			"Properties",
+			"launchSettings.json",
+		);
+		if (!existsSync(launchSettingsPath)) return undefined;
+		try {
+			return (
+				parseDotnetLaunchPath(readFileSync(launchSettingsPath, "utf-8")) ??
+				undefined
+			);
+		} catch {
+			return undefined;
+		}
 	}
 
 	/**
@@ -2136,7 +2203,6 @@ exit $launched.ExitCode
 		if (existsSync(nodeModulesPath)) return Promise.resolve();
 
 		const pm = this.detectPackageManager(projectDir);
-		const isWindows = process.platform === "win32";
 
 		this.emit("status", `${prefix}Installing dependencies with ${pm}...`);
 		this.emit(
@@ -2148,7 +2214,7 @@ exit $launched.ExitCode
 			const proc = spawn(pm, ["install"], {
 				cwd: projectDir,
 				env: process.env as Record<string, string>,
-				shell: isWindows ? true : undefined,
+				shell: isWindows() ? true : undefined,
 				stdio: ["ignore", "pipe", "pipe"],
 			});
 			proc.stdout?.on("data", (data: Buffer) => {
@@ -2216,8 +2282,6 @@ exit $launched.ExitCode
 		else if (hasPyproject) installCmd = "pip install -e .";
 
 		if (!installCmd) return Promise.resolve();
-
-		const isWindows = process.platform === "win32";
 		this.emit("status", `${prefix}Installing Python dependencies...`);
 		this.emit(
 			"output",
@@ -2229,7 +2293,7 @@ exit $launched.ExitCode
 			const proc = spawn(cmd, args, {
 				cwd: projectDir,
 				env: process.env as Record<string, string>,
-				shell: isWindows ? true : undefined,
+				shell: isWindows() ? true : undefined,
 				stdio: ["ignore", "pipe", "pipe"],
 			});
 			proc.stdout?.on("data", (data: Buffer) => {
@@ -2536,11 +2600,8 @@ exit $launched.ExitCode
 						return;
 				}
 
-				// After TCP is up, wait for the server to actually serve HTTP (e.g. Angular
-				// dev-server binds the port immediately but compiles for 30-60 s before
-				// responding with 2xx).  We poll for up to 90 s; if still not 2xx we emit
-				// 'ready' anyway so the user at least sees the terminal output.
-				await this.waitForHttpSuccess(config.port, 90000);
+				// A listening process is not sufficient: require an HTTP response before ready.
+				if (!(await this.waitForHttpSuccess(config.port, 90000))) return;
 
 				if (this.activeServerProcess && !this.activeServerProcess.killed) {
 					this.serverUrl = `http://localhost:${config.port}`;
@@ -2758,9 +2819,9 @@ exit $launched.ExitCode
 			].includes(s.framework),
 		);
 		if (frontendSvc) {
-			await this.waitForHttpSuccess(frontendSvc.port, 120000);
+			if (!(await this.waitForHttpSuccess(frontendSvc.port, 120000))) return;
 		} else {
-			await this.waitForHttpSuccess(primary.port, 120000);
+			if (!(await this.waitForHttpSuccess(primary.port, 120000))) return;
 		}
 
 		if (this.activeServerProcess && !this.activeServerProcess.killed) {
@@ -2891,54 +2952,72 @@ exit $launched.ExitCode
 	}
 
 	/**
-	 * Poll the server with an HTTP GET until it responds with a 2xx status code
-	 * (meaning the app is compiled and actually serving content), or until
-	 * `timeout` ms elapses, whichever comes first.
+	 * Poll for a reachable HTTP response (including authentication/redirects).
+	 * Reject on timeout instead of presenting an unreachable server as ready.
 	 */
-	private waitForHttpSuccess(port: number, timeout: number): Promise<void> {
-		return new Promise((resolve) => {
-			const startTime = Date.now();
-
-			const tryGet = () => {
-				// Stop polling if the process died
-				if (!this.activeServerProcess || this.activeServerProcess.killed) {
-					resolve();
+	private waitForHttpSuccess(port: number, timeout: number): Promise<boolean> {
+		const process = this.activeServerProcess;
+		return new Promise((resolve, reject) => {
+			let settled = false;
+			let retryTimer: ReturnType<typeof setTimeout> | undefined;
+			let request: ReturnType<typeof http.get> | undefined;
+			const finish = (error?: Error) => {
+				if (settled) return;
+				settled = true;
+				clearTimeout(deadline);
+				clearTimeout(retryTimer);
+				request?.destroy();
+				if (!process || process.killed || this.activeServerProcess !== process)
+					resolve(false);
+				else if (error) reject(error);
+				else resolve(true);
+			};
+			const deadline = setTimeout(
+				() =>
+					finish(
+						new Error(
+							`HTTP server on port ${port} did not become ready before the timeout. Check the server output.`,
+						),
+					),
+				timeout,
+			);
+			const retry = () => {
+				if (!settled && !retryTimer)
+					retryTimer = setTimeout(() => {
+						retryTimer = undefined;
+						probe();
+					}, 1000);
+			};
+			const probe = () => {
+				if (settled) return;
+				if (
+					!process ||
+					process.killed ||
+					this.activeServerProcess !== process
+				) {
+					finish();
 					return;
 				}
-
-				if (Date.now() - startTime > timeout) {
-					// Timed out — emit ready anyway so the user can see what's happening
-					resolve();
-					return;
-				}
-
-				const req = http.get(
+				request = http.get(
 					{ hostname: "127.0.0.1", port, path: "/", timeout: 3000 },
-					(res) => {
-						res.resume(); // drain the response body
-						if (res.statusCode !== undefined && res.statusCode < 500) {
-							// Any non-5xx response (including 401/403) means the server is up and reachable
-							resolve();
-						} else {
-							// 5xx or no status — server not ready yet (e.g. still compiling)
-							setTimeout(tryGet, 2000);
-						}
+					(response) => {
+						response.resume();
+						if (response.statusCode !== undefined && response.statusCode < 500)
+							finish();
+						else retry();
 					},
 				);
-
-				req.on("error", () => setTimeout(tryGet, 1000));
-				req.on("timeout", () => {
-					req.destroy();
-					setTimeout(tryGet, 1000);
-				});
+				request.on("error", retry);
+				request.on("timeout", () =>
+					request?.destroy(new Error("HTTP request timed out")),
+				);
 			};
-
-			tryGet();
+			probe();
 		});
 	}
 
 	private killProcessOnPort(port: number): Promise<void> {
-		if (process.platform !== "win32") return Promise.resolve();
+		if (isUnix()) return Promise.resolve();
 		return new Promise<void>((resolve) => {
 			const ps = spawn(
 				"powershell",
@@ -2976,7 +3055,7 @@ exit $launched.ExitCode
 		const killProc = (proc: ChildProcess) => {
 			const pid = proc.pid;
 			try {
-				if (process.platform === "win32" && pid) {
+				if (isWindows() && pid) {
 					spawn("taskkill", ["/pid", String(pid), "/f", "/t"], {
 						stdio: "ignore",
 					});

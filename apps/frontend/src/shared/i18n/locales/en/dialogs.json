@@ -169,6 +169,8 @@
 		"description": "Choose how you'd like to add a project",
 		"openExisting": "Open Existing Folder",
 		"openExistingDescription": "Browse to an existing project on your computer",
+		"chooseHow": "Open a project that already exists, or create a new one.",
+		"orCreateNew": "Or create a new project",
 		"createNew": "Create New Project",
 		"createNewDescription": "Start fresh with a new project folder",
 		"createNewTitle": "Create New Project",
@@ -205,10 +207,17 @@
 		"organization": "Organization",
 		"pat": "PAT",
 		"fillRequiredFields": "Please fill all required fields",
+		"locationMustBeLocalPath": "The location must be a local path, not a repository URL. Click “Browse” to pick a folder.",
+		"willBeCreatedAt": "Will be created at",
 		"successTitle": "Project Created",
 		"successDescription": "The project has been successfully created and configured.",
 		"failedToCreateTitle": "Creation Error",
-		"next": "Next"
+		"next": "Next",
+		"orCreateNewHint": "Creating makes a new, empty folder at the location below and adds that. To work on code you already have, use “Open Existing Folder”.",
+		"targetAlreadyExists": "That folder already exists, so creating it will fail.",
+		"locationLooksLikeProject": "This location is already a project ({{markers}}). Creating would add an empty sub-folder inside it, and the empty folder is what gets added.",
+		"openThisFolderInstead": "Open this folder instead",
+		"locationInsideRepository": "This location is inside the repository at {{repository}}. Creating would add an empty sub-folder there, and the empty folder is what gets added."
 	},
 	"customModel": {
 		"title": "Custom Model Configuration",
@@ -224,23 +233,6 @@
 		"cancel": "Cancel",
 		"remove": "Remove",
 		"error": "Failed to remove project"
-	},
-	"appUpdate": {
-		"title": "App Update Available",
-		"description": "A new version of WorkPilot AI is ready to download",
-		"newVersion": "New Version",
-		"released": "Released",
-		"downloading": "Downloading...",
-		"downloadUpdate": "Download Update",
-		"installAndRestart": "Install and Restart",
-		"installLater": "Install Later",
-		"remindMeLater": "Remind Me Later",
-		"updateDownloaded": "Update downloaded successfully! Click Install to restart and apply the update.",
-		"downloadError": "Failed to download update",
-		"claudeCodeChangelog": "View Claude Code Changelog",
-		"claudeCodeChangelogAriaLabel": "View Claude Code Changelog (opens in new window)",
-		"readOnlyVolumeTitle": "Cannot install from disk image",
-		"readOnlyVolumeDescription": "Please move WorkPilot AI to your Applications folder before updating."
 	},
 	"versionWarning": {
 		"title": "Action Required",
@@ -293,7 +285,8 @@
 		"close": "Close"
 	},
 	"providerSelector": {
-		"label": "AI Provider",
+		"updateFailed": "Unable to change provider",
+		"label": "Default provider",
 		"placeholder": "-- Choose a provider --",
 		"status": {
 			"ok": "OK",
@@ -312,5 +305,28 @@
 		},
 		"loading": "Loading...",
 		"noProvidersAvailable": "No providers available"
+	},
+	"pageLlm": {
+		"title": "This page's engine",
+		"description": "Provider, model and effort for this page. Left on \"as in settings\", the page follows the AI Provider list at the top right and the models configured in Settings.",
+		"summary": "{{provider}} · {{model}} · {{effort}}",
+		"tooltip": "Choose the provider, model and effort for this page",
+		"pageBadge": "page",
+		"providerUnset": "Default provider",
+		"model": "Model",
+		"effortLabel": "Effort",
+		"inheritProvider": "As in settings ({{provider}})",
+		"inheritModel": "As in settings ({{model}})",
+		"inheritEffort": "As in settings ({{effort}})",
+		"originPage": "This page overrides the global choice.",
+		"originSettings": "This page follows the global choice.",
+		"reset": "Reset",
+		"effort": {
+			"none": "None",
+			"low": "Low",
+			"medium": "Medium",
+			"high": "High",
+			"ultrathink": "Ultra Think"
+		}
 	}
 }

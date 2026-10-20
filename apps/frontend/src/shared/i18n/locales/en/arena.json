@@ -18,7 +18,7 @@
 	"battle": {
 		"taskType": "Task Type",
 		"selectModels": "Select Models",
-		"selectModelHint": "2 to 4 models",
+		"selectModelHint": "2 to 4 models, across every provider",
 		"prompt": "Prompt",
 		"promptPlaceholder": "Describe the task you want all models to perform…",
 		"startBattle": "Start Battle",
@@ -32,14 +32,28 @@
 		"statusCompleted": "Completed",
 		"waitingForStart": "Waiting to start…",
 		"generating": "Generating…",
-		"noOutput": "No output"
+		"noOutput": "No output",
+		"rosterSummary": "{{models}} models · {{providers}} providers",
+		"refreshModels": "Refresh",
+		"detectingModels": "Detecting available models…",
+		"searchModels": "Search a model or a provider…",
+		"noModelMatch": "No model matches this search",
+		"noProviders": "No LLM provider configured",
+		"noProvidersHint": "Configure at least one provider in Settings → Providers (an API key, an OAuth sign-in or a local Ollama server is enough).",
+		"providersUnreachable": "No models available for: {{providers}}",
+		"maxModelsReached": "At most 4 models per battle",
+		"removeModel": "Remove this model",
+		"tokensEstimatedHint": "Estimated: this provider reported no usage",
+		"costUnknownHint": "This provider reported no cost — no amount is invented",
+		"providersDegrade": "No adapter of their own, so out of the Arena (another vendor's model would answer for them): {{providers}}"
 	},
 	"history": {
 		"loading": "Loading history…",
 		"empty": "No battles yet",
 		"battles": "battles",
 		"clearAll": "Clear All",
-		"awaitingVote": "Awaiting vote"
+		"awaitingVote": "Awaiting vote",
+		"hiddenUntilVote": "Identity hidden until the vote"
 	},
 	"analytics": {
 		"loading": "Computing analytics…",
@@ -51,7 +65,8 @@
 		"modelRankings": "Model Rankings",
 		"winRate": "Win Rate",
 		"winsTotal": "W/Total",
-		"avgCost": "Avg Cost"
+		"avgCost": "Avg Cost",
+		"avgCostUnknown": "No cost reported by the provider for these battles"
 	},
 	"routing": {
 		"autoRouting": "Auto-Routing",

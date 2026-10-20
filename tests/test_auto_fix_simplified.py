@@ -2,6 +2,7 @@
 """
 Tests simplifiés pour auto-fix loop - sans dépendances externes
 """
+
 import json
 import sys
 import tempfile
@@ -21,6 +22,7 @@ def test_basic_imports():
         AutoFixLoop,
         AutoFixTestResult,
     )
+
     assert DEFAULT_MAX_AUTO_FIX_ATTEMPTS > 0
 
 
@@ -35,13 +37,16 @@ def test_metrics_imports():
 
 def test_create_instance():
     from qa.auto_fix_loop import AutoFixLoop
+
     with tempfile.TemporaryDirectory() as tmpdir:
         project_dir = Path(tmpdir) / "project"
         project_dir.mkdir()
         spec_dir = Path(tmpdir) / "spec"
         spec_dir.mkdir()
         plan = {"spec_name": "test"}
-        (spec_dir / "implementation_plan.json").write_text(json.dumps(plan))
+        (spec_dir / "implementation_plan.json").write_text(
+            json.dumps(plan), encoding="utf-8"
+        )
         loop = AutoFixLoop(
             project_dir=project_dir,
             spec_dir=spec_dir,
@@ -55,6 +60,7 @@ def test_create_instance():
 
 def test_dataclasses():
     from qa.auto_fix_loop import AutoFixAttempt, AutoFixTestResult
+
     result = AutoFixTestResult(
         executed=True,
         passed=False,

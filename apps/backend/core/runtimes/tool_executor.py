@@ -6,8 +6,38 @@ Handles execution of tools during agent sessions.
 """
 
 import asyncio
+import fnmatch
+import hashlib
+import json
+import logging
+import math
+import os
+import re
+import signal
 from pathlib import Path
 from typing import Any
+
+from core.llm_optimization import tool_result_max_chars, truncate_tool_result
+from harness.domain.paging import (
+    FOOTER_RESERVE,
+    page_items,
+    page_lines,
+    render_page,
+    spill_excerpt,
+)
+from harness.domain.tools import canonical_tools
+from rtk import rewrite_command as rtk_rewrite
+from watermarks import clean_generated
+from watermarks import record as watermarks_record
+
+logger = logging.getLogger(__name__)
+
+#: Where a command output too long for one result is written, under the spec
+#: directory: ignored by git like the rest of it, and per task.
+SPILL_DIR = "tool-output"
+#: The most of one output kept on disk. Beyond it, the file keeps a head and a
+#: tail like a result would: a command that prints megabytes is not read whole.
+SPILL_MAX_CHARS = 2_000_000
 
 
 def _pick_arg(arguments: dict[str, Any], *names: str, default: Any = None) -> Any:
@@ -33,6 +63,26 @@ def _pick_arg(arguments: dict[str, Any], *names: str, default: Any = None) -> An
     return default
 
 
+def _as_int(value: Any) -> int | None:
+    """A tool-arg count or position as an int, or None when absent or unreadable.
+
+    Models send numbers as strings often enough (``"401"``) that a strict check
+    would turn a valid request into an error.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float) and math.isfinite(value):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value.strip())
+        except ValueError:
+            return None
+    return None
+
+
 def _as_bool(value: Any) -> bool:
     """Interpret a tool-arg flag as a bool.
 
@@ -48,24 +98,199 @@ def _as_bool(value: Any) -> bool:
     return bool(value)
 
 
+#: Executor tool -> the declarations (`AGENT_CONFIGS[...]["tools"]`) that
+#: grant it. A tool absent from this table is not gated: reading a file,
+#: listing a directory, and the verify tools, which decide their own audience.
+#: The brain and ui-ux tools go to every type that declares a tool at all;
+#: `search_code` is gated by `EXECUTOR_SERVER_GRANTS`.
+#:
+#: This is the non-Claude half of `undeclared_builtin_tools`. The executor used
+#: to offer `write_file` and `run_command` to every agent type and to run any
+#: name a model sent, so a `pr_reviewer` reading a hostile pull request on
+#: Copilot, OpenAI or a local model could write files and run commands.
+EXECUTOR_GRANTS: dict[str, tuple[str, ...]] = {
+    "write_file": ("Write", "Edit"),
+    "Write": ("Write", "Edit"),
+    "create_directory": ("Write", "Edit"),
+    "run_command": ("Bash",),
+    "search_files": ("Grep",),
+    "find_files": ("Glob",),
+}
+
+
+#: Executor tool -> the MCP server whose declaration
+#: (`AGENT_CONFIGS[...]["mcp_servers"]`) grants it: the tool a Claude session
+#: reaches over that server, run here for the other providers.
+EXECUTOR_SERVER_GRANTS: dict[str, str] = {
+    "search_code": "code",
+}
+
+
+def executor_may_use(agent_type: str | None, tool_name: str) -> bool:
+    """Whether `agent_type` may be offered — and may run — `tool_name`.
+
+    ``None``, or a type nobody registered, is permissive: that is a test or a
+    caller outside the product (every product agent_type is registered), and
+    the executor built from a bare project directory keeps working as before.
+    """
+    if agent_type is None:
+        return True
+    from agents.tools_pkg.permissions import declared_servers, declared_tools
+
+    server = EXECUTOR_SERVER_GRANTS.get(tool_name)
+    if server is not None:
+        servers = declared_servers(agent_type)
+        return servers is None or server in servers
+    declared = declared_tools(agent_type)
+    if declared is None:
+        return True
+    # The brain and ui-ux reach every type that has tools at all, as
+    # `get_required_mcp_servers` decides for the Claude SDK. A type that
+    # declares none (a commit message, a handoff summary) answers in text:
+    # their schemas would be paid on each of its calls for nothing.
+    if _is_brain_tool(tool_name) or _is_uiux_tool(tool_name):
+        return bool(declared)
+    grants = EXECUTOR_GRANTS.get(tool_name)
+    if grants is None:
+        return True
+    return any(grant in declared for grant in grants)
+
+
+#: Directories a search never descends into: dependencies, caches and VCS
+#: internals, where a match is noise and the walk is most of the cost.
+_SEARCH_SKIP_DIRS = frozenset(
+    {
+        ".git",
+        "node_modules",
+        "__pycache__",
+        ".venv",
+        "venv",
+        ".tox",
+        ".mypy_cache",
+        ".pytest_cache",
+        ".ruff_cache",
+    }
+)
+_SEARCH_MAX_FILE_BYTES = 1_000_000
+_SEARCH_MAX_RESULTS = 200
+_SEARCH_LINE_CHARS = 300
+
+
+_DEFAULT_COMMAND_TIMEOUT = 120.0
+#: Below this a shell command is killed before it can do anything.
+_MIN_COMMAND_TIMEOUT = 1.0
+
+
+def _command_timeout() -> float:
+    """Seconds a shell command may run (env: ``LOCAL_COMMAND_TIMEOUT``).
+
+    Never raises: the agent clients build the executor inside a ``try`` and
+    fall back to text-only mode on any error, so a typo here used to leave the
+    agent with no tools at all. Unset or empty is the default; anything that
+    is not a finite number is the default with a warning; a value below
+    ``_MIN_COMMAND_TIMEOUT`` (``0`` or negative included) is raised to it.
+    """
+    raw = os.environ.get("LOCAL_COMMAND_TIMEOUT")
+    if not raw or not raw.strip():
+        return _DEFAULT_COMMAND_TIMEOUT
+    try:
+        value = float(raw)
+    except ValueError:
+        value = math.nan
+    if not math.isfinite(value):
+        logger.warning(
+            "Invalid LOCAL_COMMAND_TIMEOUT=%r — using %gs",
+            raw,
+            _DEFAULT_COMMAND_TIMEOUT,
+        )
+        return _DEFAULT_COMMAND_TIMEOUT
+    if value < _MIN_COMMAND_TIMEOUT:
+        logger.warning(
+            "LOCAL_COMMAND_TIMEOUT=%r is below %gs — using %gs",
+            raw,
+            _MIN_COMMAND_TIMEOUT,
+            _MIN_COMMAND_TIMEOUT,
+        )
+        return _MIN_COMMAND_TIMEOUT
+    return value
+
+
+def _glob_matches(relative: str, pattern: str) -> bool:
+    """`fnmatch` on a posix relative path, where `**/x` also names a root `x`."""
+    name = relative.rsplit("/", 1)[-1]
+    bare = pattern[3:] if pattern.startswith("**/") else None
+    return (
+        fnmatch.fnmatch(relative, pattern)
+        or fnmatch.fnmatch(name, pattern)
+        or (bare is not None and fnmatch.fnmatch(relative, bare))
+    )
+
+
 class ToolExecutor:
     """Executes tools for agent sessions."""
 
-    def __init__(self, project_dir: str):
+    def __init__(
+        self,
+        project_dir: str,
+        working_directory: str | None = None,
+        spec_dir: str | Path | None = None,
+        agent_type: str | None = None,
+    ):
+        self.command_timeout = _command_timeout()
+        # Whose rights `execute` enforces. ``None`` keeps the executor
+        # permissive, which is what a bare `ToolExecutor(project_dir)` — the
+        # terminal, the tests — has always been.
+        self.agent_type = agent_type
         self.project_dir = Path(project_dir).resolve()
+        # Only for the watermark ledger, and optional because only a build has
+        # one: the terminal and the insights runtimes construct an executor from
+        # a project directory alone. Without it the content is still cleaned —
+        # what is lost is the record of it, not the cleaning.
+        self.spec_dir = Path(spec_dir) if spec_dir else None
+        # The longest tool result the client keeps for the model, which the
+        # paging tools fit under (truncation at source: a page and how to read
+        # on, rather than a head and a tail cut after the fact). None: the
+        # shared cap (``tool_result_max_chars``); a client with a small window
+        # sets its own.
+        self.result_max_chars: int | None = None
+        # A narrower set than the type's, in the executor's vocabulary: what a
+        # delegated child session may run (``harness.application.delegation``).
+        # ``None`` is the type's own set. Checked after the type's gate, never
+        # instead of it: a child cannot be granted what its parent's type lacks.
+        self.allowed_tools: frozenset[str] | None = None
+        self.working_directory = self.project_dir
+        if working_directory is not None:
+            self.working_directory = self._resolve_within_project(working_directory)
+            if not self.working_directory.is_dir():
+                raise ValueError("Tool working directory does not exist")
 
-    def _resolve_within_project(self, path: str) -> Path:
+    def _page_chars(self) -> int:
+        """Characters a page may hold, under the client's cap and its footer."""
+        cap = self.result_max_chars or tool_result_max_chars()
+        return max(500, cap - FOOTER_RESERVE)
+
+    def _resolve_within_project(self, path: str, *, for_write: bool = False) -> Path:
         """Resolve a user-supplied path and reject anything outside project_dir.
 
         Why: agent-supplied paths can be relative ('../etc/passwd') or absolute
         ('/etc/passwd'). Without this guard, Path / userpath happily escapes
         the sandbox, since Path('/safe') / Path('/etc/x') -> Path('/etc/x').
+
+        `for_write` also refuses the project's security configuration
+        (`security.path_guard.protected_config_refusal`) — the rule the SDK's
+        write-path hook applies, for the providers that never reach it.
+        Reading those files stays allowed: what they grant is no secret.
         """
-        candidate = (self.project_dir / path).resolve()
+        candidate = (self.working_directory / path).resolve()
         try:
             candidate.relative_to(self.project_dir)
         except ValueError:
             raise ValueError(f"Path '{path}' is outside the project directory")
+        if for_write:
+            from security.path_guard import protected_config_refusal
+
+            if refusal := protected_config_refusal(path, self.working_directory):
+                raise ValueError(refusal)
         return candidate
 
     async def execute(self, tool_name: str, arguments: dict[str, Any]) -> Any:
@@ -88,8 +313,35 @@ class ToolExecutor:
         cmd_aliases = ("command", "cmd", "shell_command", "script", "commandline")
         cwd_aliases = ("cwd", "working_directory", "directory", "dir")
 
+        # The gate sits here, not only in the definitions a client offers:
+        # native `tool_calls` are not filtered against what was offered, so a
+        # model that names `run_command` would otherwise get it run. Refused as
+        # a result, not an exception, so the model reads why and carries on.
+        if not executor_may_use(self.agent_type, tool_name):
+            logger.info(
+                "tool %s refused: agent type %s does not declare it",
+                tool_name,
+                self.agent_type,
+            )
+            return (
+                f"Tool '{tool_name}' is not available to this agent "
+                f"({self.agent_type}): its role does not include it. "
+                "Work with the tools you were given."
+            )
+
+        if self.allowed_tools is not None and tool_name not in self.allowed_tools:
+            logger.info("tool %s refused: outside the delegated scope", tool_name)
+            return (
+                f"Tool '{tool_name}' is not available to this sub-agent: its role "
+                "does not include it. Work with the tools you were given."
+            )
+
         if tool_name == "read_file":
-            return await self._read_file(_pick_arg(arguments, *path_aliases))
+            return await self._read_file(
+                _pick_arg(arguments, *path_aliases),
+                offset=_as_int(_pick_arg(arguments, "offset", "start_line", "line")),
+                limit=_as_int(_pick_arg(arguments, "limit", "lines", "max_lines")),
+            )
         elif tool_name in ("write_file", "Write"):  # "Write" = planner alias
             return await self._write_file(
                 _pick_arg(arguments, *path_aliases),
@@ -99,6 +351,19 @@ class ToolExecutor:
                         arguments, "EmptyFile", "empty_file", "empty", default=False
                     )
                 ),
+            )
+        elif tool_name == "search_files":
+            return await self._search_files(
+                _pick_arg(arguments, "pattern", "regex", "query"),
+                _pick_arg(arguments, *dir_aliases, default="."),
+                _pick_arg(arguments, "glob", "include", "file_pattern"),
+                offset=_as_int(_pick_arg(arguments, "offset", "skip")) or 0,
+            )
+        elif tool_name == "find_files":
+            return await self._find_files(
+                _pick_arg(arguments, "pattern", "glob", "name"),
+                _pick_arg(arguments, *dir_aliases, default="."),
+                offset=_as_int(_pick_arg(arguments, "offset", "skip")) or 0,
             )
         elif tool_name == "list_files":
             return await self._list_files(
@@ -111,11 +376,68 @@ class ToolExecutor:
             )
         elif tool_name == "create_directory":
             return await self._create_directory(_pick_arg(arguments, *dir_aliases))
+        elif _is_uiux_tool(tool_name):
+            # ui-ux-pro-max: the same tools the Claude SDK reaches over MCP,
+            # offered only on a task whose preflight said it is about the UI.
+            from uiux.integration import execute_tool as uiux_execute
+
+            return self._fit_output(
+                await uiux_execute(tool_name, arguments, self.project_dir)
+            )
+        elif _is_brain_tool(tool_name):
+            # The shared brain: the same tools the Claude SDK reaches over MCP,
+            # executed in-process for every other provider.
+            from brain.runtime import execute_tool, task_ref
+
+            return self._fit_output(
+                await execute_tool(
+                    tool_name,
+                    arguments,
+                    task=task_ref(self.project_dir, self.spec_dir),
+                    max_chars=self._page_chars(),
+                )
+            )
+        elif _is_code_search_tool(tool_name):
+            # Ranked code excerpts: the tool the Claude SDK reaches over the
+            # `workpilot-code` server, paged under this client's result cap and
+            # masked for secrets before they come back.
+            from harness.tools.code_search import execute_tool as search_code
+
+            return self._fit_output(
+                await search_code(
+                    tool_name,
+                    arguments,
+                    project_dir=self.project_dir,
+                    max_chars=self._page_chars(),
+                )
+            )
+        elif _is_verify_tool(tool_name):
+            # The verification loop's tools: the same ones the Claude SDK
+            # reaches over the `workpilot-verify` MCP server, executed here so
+            # Copilot, OpenAI, Gemini, Ollama… drive the app identically.
+            from verify.tools import execute_tool as execute_verify_tool
+
+            return self._fit_output(
+                await execute_verify_tool(
+                    tool_name,
+                    arguments,
+                    project_dir=self.project_dir,
+                    spec_dir=self.spec_dir,
+                )
+            )
         else:
             raise ValueError(f"Unknown tool: {tool_name}")
 
-    async def _read_file(self, path: str | None) -> str:
-        """Read a file and return its contents."""
+    async def _read_file(
+        self, path: str | None, *, offset: int | None = None, limit: int | None = None
+    ) -> str:
+        """A file's contents, a page at a time when it does not fit.
+
+        A file that fits under the result cap comes back whole, as it always
+        did. A longer one comes back as its first page (or the page at
+        ``offset``, ``limit`` lines at most) followed by the line range and the
+        offset that reads on: nothing is lost to a cut in the middle.
+        """
         if not path:
             raise ValueError("Path is required for read_file")
 
@@ -125,9 +447,14 @@ class ToolExecutor:
 
         try:
             with open(file_path, encoding="utf-8") as f:
-                return f.read()
+                text = f.read()
         except Exception as e:
             raise RuntimeError(f"Error reading file {path}: {e}")
+        return render_page(
+            page_lines(
+                text, offset=offset or 1, limit=limit, max_chars=self._page_chars()
+            )
+        )
 
     async def _write_file(
         self, path: str | None, content: str | None = None, empty_file: bool = False
@@ -136,7 +463,40 @@ class ToolExecutor:
         if not path:
             raise ValueError("Path is required for write_file")
 
-        file_path = self._resolve_within_project(path)
+        file_path = self._resolve_within_project(path, for_write=True)
+
+        # The user's guardrails, which the SDK applies to every write tool
+        # (`.workpilot/guardrails.yaml`: a path no agent may touch, content no
+        # file may hold). Judged on what the model sent, before the cleaning
+        # below — the SDK's order, where the watermark hook runs last.
+        from security.hooks import guardrail_refusal
+
+        if refusal := await guardrail_refusal(
+            "Write", {"file_path": path, "content": content or ""}, self.project_dir
+        ):
+            logger.info("write refused by a guardrail: %s", refusal)
+            return f"Write refused by the project's guardrails: {refusal}"
+
+        # The other half of the product. Providers that do not use the Claude
+        # SDK never reach `create_client`'s PreToolUse hooks, so the same
+        # cleaning is applied at the one place their writes go through —
+        # exactly as `rtk_rewrite` is applied to their shell commands a few
+        # lines below. Before the JSON branch, not after: an invisible
+        # character inside a string value survives `json.loads` and would be
+        # written straight back out by `write_json_atomic`.
+        if isinstance(content, str) and content:
+            cleaning = clean_generated(content)
+            if cleaning.changed:
+                content = cleaning.text
+                watermarks_record(
+                    self.spec_dir,
+                    file_path=path,
+                    tool="write_file",
+                    cleaning=cleaning,
+                )
+
+        if file_path.name == "implementation_plan.json":
+            return self._write_implementation_plan(file_path, path, content, empty_file)
         file_path.parent.mkdir(parents=True, exist_ok=True)
 
         try:
@@ -152,6 +512,77 @@ class ToolExecutor:
             return f"Successfully wrote to {path}"
         except Exception as e:
             raise RuntimeError(f"Error writing file {path}: {e}")
+
+    def _write_implementation_plan(
+        self,
+        file_path: Path,
+        path: str,
+        content: str | None,
+        empty_file: bool,
+    ) -> str:
+        """The plan, parsed before it replaces the one already there.
+
+        Parsed first because the write is destructive: the plan on disk may be a
+        good one from an earlier iteration, and letting an unparseable turn
+        overwrite it costs work no later step can get back.
+
+        **What it must not do is refuse the plan the model actually wrote.** A
+        local model hands back its JSON inside a ```json fence, or with "Here is
+        the plan:" in front of it, far more often than it gets the bare document
+        right — and `json.loads` refuses all of it. The content was then dropped
+        on the floor: the write never happened, so no file existed for
+        `auto_fix_plan` to repair, and the plan was in this tool call rather
+        than in the response text, so `recover_plan` had nothing to read either.
+        Planning failed three times over a plan WorkPilot had been handed and
+        thrown away, reporting "the model did not produce a valid
+        implementation_plan.json" — which was not true.
+
+        So the fence and the surrounding prose are stripped here, by the same
+        `extract_json_document` the file-repair path uses, and the document is
+        written. The shape is left to `normalize_plan_shape` downstream: this
+        answers "are these bytes a JSON document", never "is this a good plan".
+        Only when there is no document at all does the write fail, and the error
+        goes back to the model so it can correct itself in the same session.
+        """
+        from core.file_utils import write_json_atomic
+        from spec.plan_recovery import extract_json_document
+
+        if empty_file:
+            # Said plainly rather than through the JSON parser: blanking the
+            # plan is never what a planner means, and "expecting value at line
+            # 1" is a confusing way to be told so.
+            raise ValueError(
+                "implementation_plan.json cannot be written empty. The existing "
+                "file was not changed. Write the complete JSON plan as `content`."
+            )
+
+        raw = content or ""
+        salvaged = False
+        try:
+            plan = json.loads(raw)
+        except json.JSONDecodeError as error:
+            plan = extract_json_document(raw)
+            if plan is None:
+                raise ValueError(
+                    f"Invalid implementation_plan.json: {error}. "
+                    "The existing file was not changed. Write the JSON document "
+                    "alone — it must start with '{' and end with '}' — and "
+                    "escape quotes inside JSON strings."
+                ) from error
+            salvaged = True
+
+        # A document that is not an object still goes to disk: a bare `phases`
+        # array is a plan `normalize_plan_shape` reshapes, and the validator
+        # now reports a non-object rather than crashing on one. Refusing it here
+        # is the same mistake as refusing the fence — it loses the only copy.
+        write_json_atomic(file_path, plan)
+        if salvaged:
+            logger.info(
+                "implementation_plan.json arrived wrapped in text; wrote the "
+                "JSON document it contained (%s)",
+                path,
+            )
+        return f"Successfully wrote to {path}"
 
     async def _list_files(self, directory: str) -> list[str]:
         """List files in a directory."""
@@ -170,12 +601,110 @@ class ToolExecutor:
         except Exception as e:
             raise RuntimeError(f"Error listing files in {directory}: {e}")
 
+    def _walk_files(self, directory: str):
+        """(posix path relative to the project, absolute path) of every file
+        under `directory`, inside the project, links never followed."""
+        root = self._resolve_within_project(directory)
+        if not root.is_dir():
+            raise FileNotFoundError(f"Directory not found: {directory}")
+        for current, dirnames, filenames in os.walk(root, followlinks=False):
+            dirnames[:] = sorted(
+                d
+                for d in dirnames
+                if d not in _SEARCH_SKIP_DIRS
+                and not os.path.islink(os.path.join(current, d))
+            )
+            for filename in sorted(filenames):
+                full = Path(current) / filename
+                if full.is_symlink():
+                    continue
+                yield full.relative_to(self.project_dir).as_posix(), full
+
+    async def _search_files(
+        self,
+        pattern: str | None,
+        directory: str = ".",
+        glob: str | None = None,
+        *,
+        offset: int = 0,
+    ) -> str:
+        """Lines matching a regular expression — the executor's Grep.
+
+        Read-only by construction, so a reviewer that declares Grep and no
+        shell can still search the project it reviews: without it, taking
+        `run_command` away would have taken search with it. Paged: a page of
+        matches under the result cap, then the offset that reads on.
+        """
+        if not pattern:
+            raise ValueError("pattern is required for search_files")
+        try:
+            regex = re.compile(pattern)
+        except re.error as e:
+            raise ValueError(f"Invalid regular expression {pattern!r}: {e}")
+
+        def matches():
+            for relative, full in self._walk_files(directory):
+                if glob and not _glob_matches(relative, glob):
+                    continue
+                try:
+                    if full.stat().st_size > _SEARCH_MAX_FILE_BYTES:
+                        continue
+                    raw = full.read_bytes()
+                except OSError:
+                    continue
+                if b"\0" in raw[:8192]:
+                    continue  # binary
+                text = raw.decode("utf-8", errors="replace")
+                for number, line in enumerate(text.splitlines(), start=1):
+                    if regex.search(line):
+                        yield f"{relative}:{number}: {line[:_SEARCH_LINE_CHARS]}"
+
+        results, next_offset = page_items(
+            matches(),
+            offset=offset,
+            max_items=_SEARCH_MAX_RESULTS,
+            max_chars=self._page_chars(),
+        )
+        if not results:
+            return "(no matches found)" if not offset else "(no more matches)"
+        if next_offset is not None:
+            results.append(
+                f"(more matches: call search_files again with offset={next_offset}, "
+                "or narrow the pattern, the directory or the glob)"
+            )
+        return "\n".join(results)
+
+    async def _find_files(
+        self, pattern: str | None, directory: str = ".", *, offset: int = 0
+    ) -> str:
+        """Files whose project-relative path matches a glob — the executor's Glob. Paged."""
+        if not pattern:
+            raise ValueError("pattern is required for find_files")
+        found, next_offset = page_items(
+            (
+                relative
+                for relative, _full in self._walk_files(directory)
+                if _glob_matches(relative, pattern)
+            ),
+            offset=offset,
+            max_items=_SEARCH_MAX_RESULTS,
+            max_chars=self._page_chars(),
+        )
+        if not found:
+            return "(no files found)" if not offset else "(no more files)"
+        if next_offset is not None:
+            found.append(
+                f"(more files: call find_files again with offset={next_offset}, "
+                "or narrow the pattern)"
+            )
+        return "\n".join(found)
+
     async def _create_directory(self, path: str | None) -> str:
         """Create a directory (and parents)."""
         if not path:
             raise ValueError("Path is required for create_directory")
 
-        dir_path = self._resolve_within_project(path)
+        dir_path = self._resolve_within_project(path, for_write=True)
         try:
             dir_path.mkdir(parents=True, exist_ok=True)
             return f"Successfully created directory {path}"
@@ -187,24 +716,57 @@ class ToolExecutor:
 
         Note: uses subprocess shell mode intentionally so the agent can issue
         composite commands (pipes, redirections) needed by the prompt template.
-        The cwd is constrained to project_dir; the command itself is not
-        sanitized — callers must ensure the LLM is constrained by the system
-        prompt and untrusted output is not relayed back into tool args.
+        The cwd is constrained to project_dir, and the command must pass the
+        checks the SDK's `Bash` hooks apply (`security.hooks.command_refusal`).
         """
         if not command:
             raise ValueError("Command is required for run_command")
 
-        work_dir = self._resolve_within_project(cwd) if cwd else self.project_dir
+        # The project's allowlist and the user's guardrails, which the SDK
+        # applies in `bash_security_hook` and the guardrails hook. Every other
+        # provider runs its commands here, and until lot L16 they ran whatever
+        # the model wrote. Refused as a result, like an undeclared tool, so
+        # the model reads why and tries something the project allows.
+        from security.hooks import command_refusal
+
+        if refusal := await command_refusal(command, self.project_dir):
+            logger.info("command refused by the security policy: %s", refusal)
+            return f"Command refused by the project's security policy: {refusal}"
+
+        # rtk — the non-Claude half of the same optimisation the SDK gets from
+        # `rtk.hook`. Copilot, Windsurf, OpenAI and the local runtimes all
+        # execute their shell commands here, and they pay for the output the
+        # same way. The rewrite preserves behaviour and exit code; when rtk is
+        # absent or has no filter for this command, `command` comes back
+        # unchanged. After the validation, as on the SDK, where the rtk hook is
+        # registered behind the two that decide whether the command runs.
+        command = rtk_rewrite(command).command
+
+        work_dir = self._resolve_within_project(cwd) if cwd else self.working_directory
 
         try:
             process = await asyncio.create_subprocess_shell(
                 command,
                 cwd=str(work_dir),
+                stdin=asyncio.subprocess.DEVNULL,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                start_new_session=os.name != "nt",
             )
 
-            stdout_bytes, stderr_bytes = await process.communicate()
+            try:
+                stdout_bytes, stderr_bytes = await asyncio.wait_for(
+                    process.communicate(), timeout=self.command_timeout
+                )
+            except (TimeoutError, asyncio.CancelledError) as error:
+                await self._stop_command(process)
+                if isinstance(error, asyncio.CancelledError):
+                    raise
+                raise RuntimeError(
+                    f"Command exceeded {self.command_timeout:g}s and was terminated. "
+                    "Commands must be non-interactive; quote paths containing spaces "
+                    "or use read_file for file reads."
+                ) from error
             stdout = (
                 stdout_bytes.decode("utf-8", errors="replace") if stdout_bytes else ""
             )
@@ -228,20 +790,185 @@ class ToolExecutor:
                     return "(no matches found)"
 
                 raise RuntimeError(
-                    f"Command failed with code {process.returncode}: {combined}"
+                    f"Command failed with code {process.returncode}: "
+                    f"{self._fit_output(combined)}"
                 )
 
-            return stdout
+            return self._fit_output(stdout)
         except Exception as e:
             raise RuntimeError(f"Error running command {command}: {e}")
 
+    def _fit_output(self, output: Any) -> Any:
+        """A command's or an in-process tool's output as the model reads it.
 
-def get_tool_definitions(agent_type: str) -> list[dict[str, Any]]:
+        Whole when it fits under the result cap. Longer, it is written to a
+        file under the spec directory and the model reads its head, its tail
+        and the path to the rest (`spill_excerpt`) — the client's head-and-tail
+        cut afterwards lost the middle of a build log for good.
+
+        The file is a copy of what the model would have read, masked first by
+        the secret table the pre-commit scan uses (`docintel.redact`): a
+        secret a command printed is not left behind in the spec directory.
+        Without that table, or without a spec directory inside the project
+        (where `read_file` can reach it), nothing is written and the output
+        is returned as before.
+        """
+        max_chars = self._page_chars()
+        if not isinstance(output, str) or len(output) <= max_chars:
+            return output
+        directory = self._spill_dir()
+        if directory is None:
+            return output
+        try:
+            from docintel.redact import redact_text
+
+            masked, _kinds = redact_text(output)
+        except Exception:  # noqa: BLE001 - fail closed: write nothing unmasked
+            logger.warning(
+                "long command output not written to disk: the secret scan is unavailable"
+            )
+            return output
+        if output.endswith("\n") and not masked.endswith("\n"):
+            masked += "\n"
+        masked = truncate_tool_result(masked, SPILL_MAX_CHARS)
+        digest = hashlib.sha256(masked.encode("utf-8")).hexdigest()[:16]
+        target = directory / f"command-{digest}.txt"
+        try:
+            directory.mkdir(parents=True, exist_ok=True)
+            if target.resolve().parent != directory:
+                return output
+            target.write_text(masked, encoding="utf-8", newline="")
+        except OSError as error:
+            logger.warning("long command output not written to disk: %s", error)
+            return output
+        location = Path(os.path.relpath(target, self.working_directory)).as_posix()
+        return spill_excerpt(masked, max_chars=max_chars, location=location)
+
+    def _spill_dir(self) -> Path | None:
+        """The spill directory, resolved, when `read_file` can reach it."""
+        if self.spec_dir is None:
+            return None
+        directory = (self.spec_dir / SPILL_DIR).resolve()
+        try:
+            directory.relative_to(self.project_dir)
+        except ValueError:
+            return None
+        return directory
+
+    async def _stop_command(self, process) -> None:
+        """Reap the shell and its children when a command times out or is cancelled."""
+        if os.name == "nt":
+            killer = await asyncio.create_subprocess_exec(
+                "taskkill",
+                "/PID",
+                str(process.pid),
+                "/T",
+                "/F",
+                stdin=asyncio.subprocess.DEVNULL,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            await killer.wait()
+        else:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                # The command may have exited immediately before cleanup.
+                pass
+        await process.wait()
+
+
+def _is_brain_tool(name: str) -> bool:
+    try:
+        from brain.runtime import is_brain_tool
+
+        return is_brain_tool(name)
+    except Exception:  # noqa: BLE001 - an optional store never breaks dispatch
+        return False
+
+
+def _is_uiux_tool(name: str) -> bool:
+    try:
+        from uiux.integration import is_uiux_tool
+
+        return is_uiux_tool(name)
+    except Exception:  # noqa: BLE001 - optional design data never breaks dispatch
+        return False
+
+
+def _uiux_tool_definitions(spec_dir: str | Path | None) -> list[dict[str, Any]]:
+    """ui-ux-pro-max's tools, when this task's preflight said it is a UI task."""
+    try:
+        from uiux.integration import tool_definitions
+
+        return tool_definitions(spec_dir)
+    except Exception:  # noqa: BLE001 - optional design data never breaks a session
+        return []
+
+
+def _is_verify_tool(name: str) -> bool:
+    try:
+        from verify.tools import is_verify_tool
+
+        return is_verify_tool(name)
+    except Exception:  # noqa: BLE001 - an optional feature never breaks dispatch
+        return False
+
+
+def _is_code_search_tool(name: str) -> bool:
+    try:
+        from harness.tools.code_search import is_code_search_tool
+
+        return is_code_search_tool(name)
+    except Exception:  # noqa: BLE001 - an optional tool never breaks dispatch
+        return False
+
+
+def _code_search_tool_definitions() -> list[dict[str, Any]]:
+    """`search_code`; `get_tool_definitions` keeps it for the types that declare it."""
+    try:
+        from harness.tools.code_search import tool_definitions
+
+        return tool_definitions()
+    except Exception:  # noqa: BLE001 - an optional tool never breaks a session
+        return []
+
+
+#: The agent types that drive a verification and get the `verify_*` tools.
+VERIFY_AGENT_TYPES = frozenset({"verifier"})
+
+
+def _verify_tool_definitions(agent_type: str) -> list[dict[str, Any]]:
+    if agent_type not in VERIFY_AGENT_TYPES:
+        return []
+    try:
+        from verify.tools import tool_definitions
+
+        return tool_definitions()
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def _brain_tool_definitions() -> list[dict[str, Any]]:
+    """The shared brain's tools, when a brain exists on this machine."""
+    try:
+        from brain.runtime import tool_definitions
+
+        return tool_definitions()
+    except Exception:  # noqa: BLE001 - an optional store never breaks a session
+        return []
+
+
+def get_tool_definitions(
+    agent_type: str, spec_dir: str | Path | None = None
+) -> list[dict[str, Any]]:
     """
     Get tool definitions for a specific agent type.
 
     Args:
         agent_type: Type of agent (e.g., 'coder', 'planner')
+        spec_dir: The task's spec directory, when there is one — it decides
+            whether the ui-ux-pro-max tools are offered
 
     Returns:
         List of tool definitions
@@ -250,14 +977,26 @@ def get_tool_definitions(agent_type: str) -> list[dict[str, Any]]:
     base_tools = [
         {
             "name": "read_file",
-            "description": "Read the contents of a file",
+            "description": (
+                "Read a file directly, including paths with spaces. Prefer this "
+                "over shell cat. A long file comes back a page at a time, followed "
+                "by its line range and the offset that reads on."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "path": {
                         "type": "string",
                         "description": "Path to the file to read",
-                    }
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "description": "First line to read (1-based). Default 1.",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Most lines to return. Default: as many as fit.",
+                    },
                 },
                 "required": ["path"],
             },
@@ -295,8 +1034,55 @@ def get_tool_definitions(agent_type: str) -> list[dict[str, Any]]:
             },
         },
         {
+            "name": "search_files",
+            "description": "Search the project's text files for a regular expression. Returns path:line: text for each match. Read-only.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "pattern": {
+                        "type": "string",
+                        "description": "Regular expression to search for",
+                    },
+                    "directory": {
+                        "type": "string",
+                        "description": "Directory to search in",
+                        "default": ".",
+                    },
+                    "glob": {
+                        "type": "string",
+                        "description": "Only search files matching this glob, e.g. **/*.py",
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "description": "Matches to skip, to read the next page. Default 0.",
+                    },
+                },
+                "required": ["pattern"],
+            },
+        },
+        {
+            "name": "find_files",
+            "description": "Find files whose path matches a glob, e.g. **/*.cs or src/**/test_*.py. Read-only.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "pattern": {"type": "string", "description": "Glob pattern"},
+                    "directory": {
+                        "type": "string",
+                        "description": "Directory to search in",
+                        "default": ".",
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "description": "Files to skip, to read the next page. Default 0.",
+                    },
+                },
+                "required": ["pattern"],
+            },
+        },
+        {
             "name": "run_command",
-            "description": "Run a shell command",
+            "description": "Run a non-interactive shell command with a time limit. Quote paths containing spaces. Use read_file to read files.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -339,6 +1125,9 @@ def get_tool_definitions(agent_type: str) -> list[dict[str, Any]]:
         # non-Claude providers (Copilot, Windsurf, ...) only see write_file and
         # never call the tool the prompt asks for, so the plan file is never
         # written and the planning phase fails with "Did not create plan file".
+        # `analyze_project` sat next to it until lot 6 of the context harness:
+        # `execute` never had a branch for it, so it was paid in every prompt
+        # and answered "Unknown tool" to every call.
         base_tools.extend(
             [
                 {
@@ -364,12 +1153,22 @@ def get_tool_definitions(agent_type: str) -> list[dict[str, Any]]:
                         "required": ["file_path", "CodeContent", "EmptyFile"],
                     },
                 },
-                {
-                    "name": "analyze_project",
-                    "description": "Analyze the project structure",
-                    "parameters": {"type": "object", "properties": {}},
-                },
             ]
         )
 
-    return base_tools
+    # Every agent type that has tools at all, like `create_client` does for the
+    # Claude SDK (`executor_may_use` drops them for a type that declares none).
+    base_tools.extend(_brain_tool_definitions())
+    base_tools.extend(_uiux_tool_definitions(spec_dir))
+    # The verifier, like `create_client` gives it the `workpilot-verify` server.
+    base_tools.extend(_verify_tool_definitions(agent_type))
+    # Ranked code excerpts, for a type that declares them
+    # (`EXECUTOR_SERVER_GRANTS`), like `create_client` starts `workpilot-code`.
+    base_tools.extend(_code_search_tool_definitions())
+    # Only what the type declares (`EXECUTOR_GRANTS`): a reviewer is offered
+    # no `write_file` and no `run_command`, and `execute` refuses them too.
+    # Sorted and serialized one way (`harness.domain.tools`): the definitions
+    # sit in the cached prefix of every provider that caches one.
+    return canonical_tools(
+        tool for tool in base_tools if executor_may_use(agent_type, tool["name"])
+    )

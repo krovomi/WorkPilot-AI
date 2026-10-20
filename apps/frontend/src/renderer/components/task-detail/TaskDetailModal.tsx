@@ -36,6 +36,7 @@ import {
 import {
 	isSubtaskDone,
 	isTaskEffectivelyComplete,
+	resolveOverallProgress,
 } from "../../../shared/progress";
 import { needsExecutionFormula } from "../../../shared/utils/task-execution-config";
 import { useFormulaMatrixStore } from "../../stores/formula-matrix-store";
@@ -72,8 +73,6 @@ import {
 	useDialogMaximize,
 } from "../ui/dialog-maximize";
 import { Progress } from "../ui/progress";
-import { ScrollArea } from "../ui/scroll-area";
-import { Separator } from "../ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import {
 	Tooltip,
@@ -89,19 +88,32 @@ import { TaskStatusMoveBadge } from "./TaskStatusMoveBadge";
 import { TaskFiles } from "./TaskFiles";
 import { TaskLogs } from "./TaskLogs";
 import { TaskPauseControls } from "./TaskPauseControls";
+import { TaskFailureBanner } from "./TaskFailureBanner";
 import { TaskRunControls } from "./TaskRunControls";
 import { translateActivityMessage } from "./translateActivityMessage";
-import { pauseTask } from "../../stores/task-store";
-import { ExecutionFormulaBanner } from "./ExecutionFormulaBanner";
-import { WorkflowProfileCard } from "./WorkflowProfileCard";
-import { SpecInterviewBanner } from "./SpecInterviewDialog";
-import { TaskMetadata as TaskMetadataComponent } from "./TaskMetadata";
+import { pauseTask, resumeTask } from "../../stores/task-store";
+import {
+	shouldShowArchitectureDelta,
+	useArchitectureDelta,
+} from "../../stores/architecture-delta-store";
+import { TaskArchitectureDelta } from "./TaskArchitectureDelta";
+import { ContextGauge } from "./ContextGauge";
+import {
+	isContextActiveStatus,
+	useContextUsageStore,
+} from "../../stores/context-usage-store";
+import { TaskChangeGraph } from "./TaskChangeGraph";
+import { EditableTaskTitle } from "./EditableTaskTitle";
+import { TaskOverview } from "./TaskOverview";
 import { TaskReview } from "./TaskReview";
 import { TaskSubtasks } from "./TaskSubtasks";
 import { TaskVisualProof } from "./TaskVisualProof";
 import { TaskWarnings } from "./TaskWarnings";
 import { SyncFromBranchDialog } from "./task-review/SyncFromBranchDialog";
 import { TaskEmulator } from "./TaskEmulator";
+import { TaskMobilePreview } from "./TaskMobilePreview";
+import { TaskVerify } from "./TaskVerify";
+import { hasVerifyRecord, useVerifyStore } from "../../stores/verify-store";
 
 interface TaskDetailModalProps {
 	readonly open: boolean;
@@ -152,7 +164,6 @@ function preventCloseOnTaskNav(
 		event.preventDefault();
 	}
 }
-
 
 const renderTaskStatusBadges = (
 	task: Task,
@@ -235,6 +246,8 @@ const getReviewReasonBadgeText = (
 			return t("tasks:modal.badges.approvePlan");
 		case "stopped":
 			return t("tasks:modal.badges.stopped");
+		case "qa_unverified":
+			return t("tasks:modal.badges.qaUnverified");
 		default:
 			return t("tasks:modal.badges.qaIssues");
 	}
@@ -522,9 +535,10 @@ function TaskDetailModalContent({
 	readonly hasPrevious?: boolean;
 	readonly hasNext?: boolean;
 }) {
-	const { t } = useTranslation(["tasks"]);
+	const { t } = useTranslation(["tasks", "mobile"]);
 	const { toast } = useToast();
 	const state = useTaskDetail({ task });
+	const hasContextUsage = useContextUsageStore((s) => !!s.usage[task.id]);
 	const { maximized, toggle: toggleMaximized } = useDialogMaximize(
 		"workpilot:task-detail-maximized",
 	);
@@ -532,6 +546,26 @@ function TaskDetailModalContent({
 	const allProjects = useProjectStore((s) => s.projects);
 	const taskProject = allProjects.find((p) => p.id === task.projectId);
 	const showFilesTab = isFilesTabEnabled();
+
+	// Subscribed at the modal rather than the tab: a regeneration keeps running
+	// while the user switches tabs, and its result must still land.
+	// Loaded here for the same reason the trigger is gated here — the record is
+	// what decides the tab exists at all. A task whose change was not
+	// architectural, or whose comparison found nothing, gets no trigger.
+	const architectureDelta = useArchitectureDelta(task.id, task.specsPath);
+	const showArchitectureTab = shouldShowArchitectureDelta(architectureDelta);
+	// The verification record decides whether its tab exists, for the same
+	// reason: a task that was never verified gets no empty tab.
+	const verifyProjectPath = taskProject?.path ?? activeProject?.path;
+	const loadVerify = useVerifyStore((s) => s.load);
+	const clearVerify = useVerifyStore((s) => s.clear);
+	const verifyEntry = useVerifyStore((s) => s.byTask[task.id]);
+	const showVerifyTab = hasVerifyRecord(verifyEntry);
+	useEffect(() => {
+		if (!verifyProjectPath) return;
+		void loadVerify(task.id, { projectDir: verifyProjectPath, specId: task.specId });
+		return () => clearVerify(task.id);
+	}, [task.id, task.specId, verifyProjectPath, loadVerify, clearVerify]);
 	const progressPercent = calculateProgress(task.subtasks);
 	// "Done" = completed or blocked (a blocked subtask, e.g. a manual e2e test,
 	// is handled by the build and counts toward completion — matches the backend).
@@ -552,7 +586,7 @@ function TaskDetailModalContent({
 	// progression de phase.
 	const headerProgressPercent = getDisplayProgress(
 		progressPercent,
-		task.executionProgress?.overallProgress,
+		resolveOverallProgress(task.executionProgress),
 		!!state.hasActiveExecution,
 		totalSubtasks > 0,
 		isTaskEffectivelyComplete(task.status, task.reviewReason),
@@ -848,6 +882,32 @@ function TaskDetailModalContent({
 
 	// Render primary action button based on state
 	const renderPrimaryAction = () => {
+		// Pause / Reprendre / Arrêter belongs to the *run*, not to the column a
+		// run happens to have landed in. A cooperatively-paused task keeps the
+		// status it was paused in — often human_review, once a phase reported a
+		// failure — and every branch below is keyed on status, so the control the
+		// kanban card offers had no equivalent here: the panel that owns the
+		// provider/model/effort switch was the one place the task could not
+		// simply be resumed. Answered first, from the pause flag itself.
+		if (state.isPaused) {
+			return (
+				<div className="flex items-center gap-2">
+					{activeProject?.path && (
+						<StreamingSessionButton
+							taskId={task.id}
+							projectPath={activeProject.path}
+						/>
+					)}
+					<TaskRunControls
+						task={task}
+						isPaused={state.isPaused}
+						pauseProcessAlive={state.pauseProcessAlive}
+						onStop={handleStartStop}
+					/>
+				</div>
+			);
+		}
+
 		if (state.isStuck) {
 			return (
 				<Button
@@ -1009,9 +1069,13 @@ function TaskDetailModalContent({
 						<div className="p-5 pb-4 border-b border-border shrink-0">
 							<div className="flex items-start justify-between gap-4">
 								<div className="flex-1 min-w-0 overflow-hidden">
-									<DialogPrimitive.Title className="text-xl font-semibold leading-tight text-foreground truncate">
-										{cleanTitleForDisplay(task.title)}
-									</DialogPrimitive.Title>
+									<EditableTaskTitle
+										task={task}
+										displayTitle={cleanTitleForDisplay(task.title)}
+										editable={!(state.isRunning && !state.isStuck)}
+										as={DialogPrimitive.Title}
+										className="text-xl font-semibold leading-tight text-foreground"
+									/>
 									<DialogPrimitive.Description asChild>
 										<div className="mt-2.5 flex items-center gap-2 flex-wrap">
 											<Badge variant="outline" className="text-xs font-mono">
@@ -1154,19 +1218,28 @@ function TaskDetailModalContent({
 								</div>
 							</div>
 
-							{/* Progress bar - only show when running or has progress */}
+							{/* Progress bar - only show when running or has progress.
+							    The context gauge sits next to it; it renders nothing
+							    unless the task runs or reported its context usage. */}
 							{(state.isRunning || completedSubtasks > 0) &&
-								(totalSubtasks > 0 || state.hasActiveExecution) && (
-									<div className="mt-3 flex items-center gap-3">
-										<Progress
-											value={headerProgressPercent}
-											className="h-1.5 flex-1"
-										/>
-										<span className="text-xs text-muted-foreground tabular-nums w-10 text-right">
-											{headerProgressPercent}%
-										</span>
+							(totalSubtasks > 0 || state.hasActiveExecution) ? (
+								<div className="mt-3 flex items-center gap-3">
+									<Progress
+										value={headerProgressPercent}
+										className="h-1.5 flex-1"
+									/>
+									<span className="text-xs text-muted-foreground tabular-nums w-10 text-right">
+										{headerProgressPercent}%
+									</span>
+									<ContextGauge task={task} />
+								</div>
+							) : (
+								(isContextActiveStatus(task.status) || hasContextUsage) && (
+									<div className="mt-3 flex items-center justify-end">
+										<ContextGauge task={task} />
 									</div>
-								)}
+								)
+							)}
 
 							{/* Warnings - compact inline */}
 							{(state.isStuck || state.isIncomplete) && (
@@ -1182,6 +1255,12 @@ function TaskDetailModalContent({
 								</div>
 							)}
 						</div>
+
+						{/* Why the task failed — above the tabs, because a user who
+						    finds a card in review with a red badge is looking for
+						    this sentence before anything else. Renders nothing when
+						    the task did not fail. */}
+						<TaskFailureBanner task={task} />
 
 						{/* Body - Single Column with Tabs */}
 						<div className="flex-1 min-h-0 overflow-hidden">
@@ -1220,6 +1299,12 @@ function TaskDetailModalContent({
 										</TabsTrigger>
 									)}
 									<TabsTrigger
+										value="changeGraph"
+										className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 text-sm"
+									>
+										{t("tasks:changeGraph.tab")}
+									</TabsTrigger>
+									<TabsTrigger
 										value="visualProof"
 										className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 text-sm"
 									>
@@ -1231,6 +1316,28 @@ function TaskDetailModalContent({
 									>
 										{t("tasks:emulator.tab")}
 									</TabsTrigger>
+									<TabsTrigger
+										value="mobile"
+										className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 text-sm"
+									>
+										{t("mobile:preview.tab")}
+									</TabsTrigger>
+									{showVerifyTab && (
+										<TabsTrigger
+											value="verify"
+											className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 text-sm"
+										>
+											{t("tasks:verify.tab")}
+										</TabsTrigger>
+									)}
+									{showArchitectureTab && (
+										<TabsTrigger
+											value="architecture"
+											className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 text-sm"
+										>
+											{t("architectureVisualizer:delta.tab")}
+										</TabsTrigger>
+									)}
 								</TabsList>
 
 								{/* Overview Tab */}
@@ -1238,75 +1345,64 @@ function TaskDetailModalContent({
 									value="overview"
 									className="flex-1 min-h-0 overflow-hidden mt-0"
 								>
-									<ScrollArea className="h-full">
-										<div className="p-5 space-y-5 overflow-x-hidden max-w-full">
-											{/* Spec interview - clarify the spec before planning */}
-											<SpecInterviewBanner task={task} />
-
-											{/* Provider × LLM × Effort prerequisite for imported/duplicated tasks */}
-											<ExecutionFormulaBanner task={task} />
-
-											{/* What the chosen effort level actually runs, before it runs */}
-											<WorkflowProfileCard
+									{/* La vue d'ensemble possède sa zone de défilement : sa barre de
+									    raccourcis reste au-dessus, immobile. */}
+									{/* Rangée par la question que se pose la personne :
+									    à traiter, la tâche, le plan, la mémoire. */}
+									<TaskOverview
+										task={task}
+										projectPath={taskProject?.path ?? activeProject?.path}
+										onOpenVerify={
+											showVerifyTab ? () => state.setActiveTab("verify") : undefined
+										}
+										review={
+											state.needsReview ? (
+											<TaskReview
 												task={task}
-												projectPath={
-													taskProject?.path ?? activeProject?.path
+												feedback={state.feedback}
+												isSubmitting={state.isSubmitting}
+												worktreeStatus={state.worktreeStatus}
+												worktreeDiff={state.worktreeDiff}
+												isLoadingWorktree={state.isLoadingWorktree}
+												isMerging={state.isMerging}
+												isDiscarding={state.isDiscarding}
+												showDiscardDialog={state.showDiscardDialog}
+												showDiffDialog={state.showDiffDialog}
+												workspaceError={state.workspaceError}
+												stageOnly={state.stageOnly}
+												stagedSuccess={state.stagedSuccess}
+												stagedProjectPath={state.stagedProjectPath}
+												suggestedCommitMessage={
+													state.suggestedCommitMessage
 												}
+												mergePreview={state.mergePreview}
+												isLoadingPreview={state.isLoadingPreview}
+												showConflictDialog={state.showConflictDialog}
+												onFeedbackChange={state.setFeedback}
+												onReject={handleReject}
+												images={state.feedbackImages}
+												onImagesChange={state.setFeedbackImages}
+												onMerge={handleMerge}
+												onDiscard={handleDiscard}
+												onShowDiscardDialog={state.setShowDiscardDialog}
+												onShowDiffDialog={state.setShowDiffDialog}
+												onStageOnlyChange={state.setStageOnly}
+												onShowConflictDialog={state.setShowConflictDialog}
+												onLoadMergePreview={state.loadMergePreview}
+												onClose={handleClose}
+												onReviewAgain={state.handleReviewAgain}
+												showPRDialog={state.showPRDialog}
+												isCreatingPR={state.isCreatingPR}
+												onShowPRDialog={state.setShowPRDialog}
+												onCreatePR={handleCreatePR}
+												onRefreshDiff={state.refreshWorktreeDiff}
+												isCompleting={state.isCompleting}
+												onComplete={handleComplete}
 											/>
-
-											{/* Metadata */}
-											<TaskMetadataComponent task={task} />
-
-											{/* Human Review Section */}
-											{state.needsReview && (
-												<>
-													<Separator />
-													<TaskReview
-														task={task}
-														feedback={state.feedback}
-														isSubmitting={state.isSubmitting}
-														worktreeStatus={state.worktreeStatus}
-														worktreeDiff={state.worktreeDiff}
-														isLoadingWorktree={state.isLoadingWorktree}
-														isMerging={state.isMerging}
-														isDiscarding={state.isDiscarding}
-														showDiscardDialog={state.showDiscardDialog}
-														showDiffDialog={state.showDiffDialog}
-														workspaceError={state.workspaceError}
-														stageOnly={state.stageOnly}
-														stagedSuccess={state.stagedSuccess}
-														stagedProjectPath={state.stagedProjectPath}
-														suggestedCommitMessage={
-															state.suggestedCommitMessage
-														}
-														mergePreview={state.mergePreview}
-														isLoadingPreview={state.isLoadingPreview}
-														showConflictDialog={state.showConflictDialog}
-														onFeedbackChange={state.setFeedback}
-														onReject={handleReject}
-														images={state.feedbackImages}
-														onImagesChange={state.setFeedbackImages}
-														onMerge={handleMerge}
-														onDiscard={handleDiscard}
-														onShowDiscardDialog={state.setShowDiscardDialog}
-														onShowDiffDialog={state.setShowDiffDialog}
-														onStageOnlyChange={state.setStageOnly}
-														onShowConflictDialog={state.setShowConflictDialog}
-														onLoadMergePreview={state.loadMergePreview}
-														onClose={handleClose}
-														onReviewAgain={state.handleReviewAgain}
-														showPRDialog={state.showPRDialog}
-														isCreatingPR={state.isCreatingPR}
-														onShowPRDialog={state.setShowPRDialog}
-														onCreatePR={handleCreatePR}
-														onRefreshDiff={state.refreshWorktreeDiff}
-														isCompleting={state.isCompleting}
-														onComplete={handleComplete}
-													/>
-												</>
-											)}
-										</div>
-									</ScrollArea>
+											) : undefined
+										}
+										editable={!(state.isRunning && !state.isStuck)}
+									/>
 								</TabsContent>
 
 								{/* Subtasks Tab */}
@@ -1315,6 +1411,14 @@ function TaskDetailModalContent({
 									className="flex-1 min-h-0 overflow-hidden mt-0"
 								>
 									<TaskSubtasks task={task} onUpdatePlan={handleUpdatePlan} />
+								</TabsContent>
+
+								{/* Change graph Tab — the task's path, drawn from its diff */}
+								<TabsContent
+									value="changeGraph"
+									className="flex-1 min-h-0 overflow-hidden mt-0"
+								>
+									<TaskChangeGraph task={task} />
 								</TabsContent>
 
 								{/* Logs Tab */}
@@ -1366,8 +1470,54 @@ function TaskDetailModalContent({
 										taskId={task.id}
 										project={taskProject ?? activeProject}
 										worktreePath={state.worktreeStatus?.worktreePath}
+										specId={task.specId}
 									/>
 								</TabsContent>
+
+								{/* Mobile Tab — an Android emulator or an Apple simulator,
+								    which is what "preview" means for a phone application:
+								    there is no URL to put in a webview. */}
+								<TabsContent
+									value="mobile"
+									className="flex-1 min-h-0 overflow-hidden mt-0"
+								>
+									<TaskMobilePreview
+										taskId={task.id}
+										project={taskProject ?? activeProject}
+										worktreePath={state.worktreeStatus?.worktreePath}
+										specId={task.specId}
+									/>
+								</TabsContent>
+
+								{/* The verification loop: launch, fixes, confirmed state,
+								    endpoints, performance, screenshots. Hidden until a
+								    verification has run. */}
+								{showVerifyTab && (
+									<TabsContent
+										value="verify"
+										className="flex-1 min-h-0 overflow-y-auto mt-0"
+									>
+										<TaskVerify task={task} projectPath={verifyProjectPath} />
+									</TabsContent>
+								)}
+
+								{/* What this task changed in the system's topology. The
+								    trigger is hidden when the delta has nothing to say, so
+								    the panel is never an empty tab someone opened once. */}
+								{showArchitectureTab && (
+									<TabsContent
+										value="architecture"
+										className="flex-1 min-h-0 overflow-hidden mt-0"
+									>
+										<TaskArchitectureDelta
+											task={task}
+											entry={architectureDelta}
+											projectPath={
+												taskProject?.path ?? activeProject?.path
+											}
+										/>
+									</TabsContent>
+								)}
 							</Tabs>
 						</div>
 
@@ -1385,6 +1535,9 @@ function TaskDetailModalContent({
 										isRunning={state.pauseProcessAlive !== false}
 										onPause={async (subtaskId) => {
 											await pauseTask(task.id, subtaskId);
+										}}
+										onResumeSameProvider={async () => {
+											await resumeTask(task.id);
 										}}
 									/>
 								</div>

@@ -20,7 +20,10 @@ interface GitHubOAuthFlowProps {
 }
 
 // Debug logging — disabled (kept as a no-op so call sites stay valid).
-function debugLog(_message: string, _data?: unknown) {}
+function debugLog(_message: string, _data?: unknown) {
+	// Intentionally does nothing: the call sites are kept as breadcrumbs so the
+	// logging can be switched back on in one place.
+}
 
 // Authentication timeout in milliseconds (5 minutes)
 // GitHub device codes typically expire after 15 minutes, but 5 minutes is a reasonable UX timeout

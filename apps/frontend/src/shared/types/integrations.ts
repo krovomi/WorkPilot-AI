@@ -82,14 +82,6 @@ export interface AzureDevOpsWorkItem {
 	acceptanceCriteria?: string; // HTML from Microsoft.VSTS.Common.AcceptanceCriteria
 }
 
-export interface AzureDevOpsProject {
-	id: string;
-	name: string;
-	description?: string;
-	state: string; // e.g., 'wellFormed', 'createPending'
-	url?: string;
-}
-
 export interface AzureDevOpsImportResult {
 	success: boolean;
 	imported: number;
@@ -404,6 +396,7 @@ export interface GitLabMRReviewFinding {
 }
 
 export interface GitLabMRReviewResult {
+	jev?: import("./jev").JevObservation;
 	mrIid: number;
 	project: string;
 	success: boolean;

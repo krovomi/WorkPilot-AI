@@ -28,6 +28,7 @@ import {
 	initializeClaudeProfileManager,
 } from "../claude-profile-manager";
 import { loadProfilesFile } from "../services/profile";
+import { codexLimitsToSnapshot, fetchCodexRateLimits } from "./codex-usage";
 import {
 	clearKeychainCache,
 	getCredentialsFromKeychain,
@@ -3824,6 +3825,79 @@ export class UsageMonitor extends EventEmitter {
 	}
 
 	/**
+	 * The ChatGPT plan's rate limits, when OpenAI is billed through one.
+	 *
+	 * Asked when the OpenAI auth mode is `codex-cli`, or when no API key is
+	 * configured anywhere — `api-key` is the default mode, so a user who only
+	 * ever ran `codex login` has it without having chosen it. With an API key
+	 * in `api-key` mode the builds spend API credits, and the plan's windows
+	 * would describe a quota nothing is drawing from.
+	 */
+	private async getChatGPTSubscriptionUsage(): Promise<UsageSnapshot | null> {
+		let authMode: string | undefined;
+		let hasApiKey = !!process.env.OPENAI_API_KEY?.trim();
+		try {
+			const { readSettingsFile } = await import("../settings-utils");
+			const settings = readSettingsFile();
+			authMode = settings?.globalOpenAIAuthMode as string | undefined;
+			const globalKey = settings?.globalOpenAIApiKey;
+			if (typeof globalKey === "string" && globalKey.trim()) hasApiKey = true;
+		} catch {
+			// settings unreadable — decide from the other sources
+		}
+		if (!hasApiKey && authMode !== "codex-cli") {
+			try {
+				const profilesFile = await loadProfilesFile();
+				hasApiKey = profilesFile.profiles.some(
+					(p) => detectProvider(p.baseUrl) === "openai" && !!p.apiKey,
+				);
+			} catch {
+				// no profiles file
+			}
+		}
+		if (authMode !== "codex-cli" && hasApiKey) return null;
+
+		const cached = this.apiResultCache.get(UsageMonitor.CHATGPT_CACHE_KEY);
+		if (
+			cached &&
+			Date.now() - cached.fetchedAt < UsageMonitor.API_RESULT_CACHE_TTL_MS
+		) {
+			return cached.snapshot;
+		}
+
+		try {
+			const limits = await fetchCodexRateLimits();
+			if (!limits) {
+				this.debugLog(
+					"[UsageMonitor:ChatGPT] No ChatGPT login and no recorded rate limits",
+				);
+				return null;
+			}
+			const snapshot = codexLimitsToSnapshot(limits, {
+				profileId: "openai-chatgpt",
+				profileName: limits.planType
+					? `ChatGPT ${limits.planType.charAt(0).toUpperCase()}${limits.planType.slice(1)}`
+					: "ChatGPT",
+			});
+			this.debugLog("[UsageMonitor:ChatGPT] Rate limits:", {
+				source: limits.source,
+				sessionPercent: snapshot.sessionPercent,
+				weeklyPercent: snapshot.weeklyPercent,
+			});
+			this.apiResultCache.set(UsageMonitor.CHATGPT_CACHE_KEY, {
+				snapshot,
+				fetchedAt: Date.now(),
+			});
+			return snapshot;
+		} catch (error) {
+			this.debugLog("[UsageMonitor:ChatGPT] Rate limit lookup failed:", error);
+			return null;
+		}
+	}
+
+	private static readonly CHATGPT_CACHE_KEY = "openai-chatgpt";
+
+	/**
 	 * Get usage for a given provider name (ex: 'anthropic', 'openai', 'ollama', ...)
 	 *
 	 * Searches both API profiles (profiles.json) and OAuth profiles (ClaudeProfileManager)
@@ -4119,6 +4193,7 @@ export class UsageMonitor extends EventEmitter {
 						profileName: wsProfileName,
 						fetchedAt: new Date(),
 						providerName: "windsurf",
+						usageUnmeasured: true,
 					} as UsageSnapshot;
 				}
 
@@ -4289,6 +4364,7 @@ export class UsageMonitor extends EventEmitter {
 					profileName: displayName,
 					fetchedAt: new Date(),
 					providerName: "windsurf",
+					usageUnmeasured: true,
 				} as UsageSnapshot;
 			} catch (e) {
 				this.debugLog(
@@ -4297,6 +4373,14 @@ export class UsageMonitor extends EventEmitter {
 				);
 				return null;
 			}
+		}
+
+		// OpenAI through a ChatGPT plan (Codex CLI login): what runs out is the
+		// plan's 5-hour and weekly windows, not API credits. Asked before the
+		// API-key path below, which only knows a monthly cost.
+		if (providerName === "openai") {
+			const subscription = await this.getChatGPTSubscriptionUsage();
+			if (subscription) return subscription;
 		}
 
 		// Step 1: Search API profiles first (profiles.json) — these cover anthropic, openai, ollama API key profiles
@@ -4393,6 +4477,7 @@ export class UsageMonitor extends EventEmitter {
 						profileName: apiProfile.name,
 						providerName: providerName,
 						fetchedAt: new Date(),
+						usageUnmeasured: true,
 					} as UsageSnapshot;
 				}
 			} else {
@@ -4505,6 +4590,7 @@ export class UsageMonitor extends EventEmitter {
 			profileName: getProviderLabel(providerName as any),
 			providerName: providerName,
 			fetchedAt: new Date(),
+			usageUnmeasured: true,
 		} as UsageSnapshot;
 	}
 

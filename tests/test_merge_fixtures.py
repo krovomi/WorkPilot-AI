@@ -209,8 +209,12 @@ def temp_project(tmp_path: Path) -> Generator[Path, None, None]:
 
         # Create initial files
         (tmp_path / "src").mkdir()
-        (tmp_path / "src" / "App.tsx").write_text(SAMPLE_REACT_COMPONENT)
-        (tmp_path / "src" / "utils.py").write_text(SAMPLE_PYTHON_MODULE)
+        (tmp_path / "src" / "App.tsx").write_text(
+            SAMPLE_REACT_COMPONENT, encoding="utf-8"
+        )
+        (tmp_path / "src" / "utils.py").write_text(
+            SAMPLE_PYTHON_MODULE, encoding="utf-8"
+        )
 
         # Initial commit
         subprocess.run(["git", "add", "."], cwd=tmp_path, capture_output=True)

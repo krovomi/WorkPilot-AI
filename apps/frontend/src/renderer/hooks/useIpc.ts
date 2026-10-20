@@ -24,6 +24,8 @@ import { useTaskStore } from "../stores/task-store";
 interface BatchedUpdate {
 	status?: TaskStatus;
 	reviewReason?: import("../../shared/types").ReviewReason;
+	/** Why the task failed, when this status change is a failure. */
+	errorMessage?: string;
 	progress?: ExecutionProgress;
 	plan?: ImplementationPlan;
 	logs?: string[]; // Batched log lines
@@ -38,6 +40,7 @@ interface StoreActions {
 		taskId: string,
 		status: TaskStatus,
 		reviewReason?: import("../../shared/types").ReviewReason,
+		errorMessage?: string,
 	) => void;
 	updateExecutionProgress: (
 		taskId: string,
@@ -66,11 +69,6 @@ let storeActionsRef: StoreActions | null = null;
 function flushBatch(): void {
 	if (batchQueue.size === 0 || !storeActionsRef) return;
 
-	const flushStart = performance.now();
-	const updateCount = batchQueue.size;
-	let totalUpdates = 0;
-	let totalLogs = 0;
-
 	// Capture current actions reference to avoid stale closures during batch processing
 	const actions = storeActionsRef;
 
@@ -80,21 +78,21 @@ function flushBatch(): void {
 			// Apply updates in order: plan first (has most data), then status, then progress, then logs
 			if (updates.plan) {
 				actions.updateTaskFromPlan(taskId, updates.plan);
-				totalUpdates++;
 			}
 			if (updates.status) {
-				actions.updateTaskStatus(taskId, updates.status, updates.reviewReason);
-				totalUpdates++;
+				actions.updateTaskStatus(
+					taskId,
+					updates.status,
+					updates.reviewReason,
+					updates.errorMessage,
+				);
 			}
 			if (updates.progress) {
 				actions.updateExecutionProgress(taskId, updates.progress);
-				totalUpdates++;
 			}
 			// Batch append all logs at once (instead of one state update per log line)
 			if (updates.logs && updates.logs.length > 0) {
 				actions.batchAppendLogs(taskId, updates.logs);
-				totalLogs += updates.logs.length;
-				totalUpdates++;
 			}
 		});
 	});
@@ -228,10 +226,11 @@ export function useIpcListeners(): void {
 				status: TaskStatus,
 				projectId?: string,
 				reviewReason?: import("../../shared/types").ReviewReason,
+				errorMessage?: string,
 			) => {
 				// Filter by project to prevent multi-project interference
 				if (!isTaskForCurrentProject(projectId)) return;
-				queueUpdate(taskId, { status, reviewReason });
+				queueUpdate(taskId, { status, reviewReason, errorMessage });
 			},
 		);
 

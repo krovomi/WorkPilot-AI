@@ -1,13 +1,80 @@
 # Changelog
 
-All notable changes to WorkPilot AI are documented here. The full historical
-detail (including the complete 1.0.0 notes) lives in
-[docs/CHANGELOG.md](docs/CHANGELOG.md).
+All notable changes to WorkPilot AI are documented here. This is the only
+changelog: `scripts/bump-version.js` and the release workflow read it. The
+complete 1.0.0 notes and the upstream 2.x history lived in a second file,
+`docs/CHANGELOG.md`, removed in audit lot L9; it remains in the git history
+([last version](https://github.com/krovomi/WorkPilot-AI/blob/f385fe1/docs/CHANGELOG.md)).
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+### ✨ Nouveautés
+
+- **pi (pi.dev) est connu du dépôt et du cerveau** (lot 1 de
+  [`docs/architecture/pi.md`](docs/architecture/pi.md)). Comme harness, pi lit
+  `AGENTS.md` et `.agents/skills/` nativement, donc `capabilities/harnesses.yaml`
+  le liste avec son vocabulaire d'outils et n'émet rien — aucune sortie de
+  skills ne change. Comme agent du cerveau partagé, `brain/agents.py` sait où
+  pi garde ses instructions (`~/.pi/agent/AGENTS.md`, ou `PI_CODING_AGENT_DIR`)
+  et sa configuration MCP (`~/.pi/agent/mcp.json`) : `brain connect` et
+  `bridge` le branchent comme les autres, sur `--apply`, après sauvegarde.
+  La confiance qu'un projet demande à pi (`/trust`) reste une décision de la
+  personne ; rien ici ne l'accorde. Les fixtures `tests/fixtures/pi/` sont six
+  flux réels de pi 1.3.0 capturés sans secret (`capture.py`).
+- **pi pilote une tâche** (lot 2 de [`docs/architecture/pi.md`](docs/architecture/pi.md)).
+  Le provider **pi (CLI)** lance chaque phase dans `pi --mode json`, prompt sur
+  stdin, événements JSON en retour, comme OpenCode. Les droits sont une
+  allowlist réelle : la déclaration du type d'agent devient `--tools` dans les
+  mots de pi, et un relecteur qui tente d'écrire reçoit `Tool write not found`.
+  La session d'une tâche vit dans son dossier de spec et se reprend par id ;
+  les skills du projet passent par `--skill .agents/skills` ; la confiance que
+  pi demande pour `.pi/` (`/trust`) n'est jamais accordée à sa place, l'état
+  est dit dans le fil de la tâche. Usage de chaque message mesuré dans le
+  ledger du harness (`from_pi_usage`), `--thinking` depuis l'effort de la
+  phase, badge **pi** dans la barre latérale, guide
+  [`docs/integrations/pi.md`](docs/integrations/pi.md).
+- **pi en mode RPC, et deux garde-fous** (lots 3 et 4). `WORKPILOT_PI_MODE=rpc`
+  garde un processus pi par session : compaction à la demande, `abort` sur
+  annulation, fenêtre du modèle lue dans `get_state`, prompt système envoyé
+  une fois ; une question d'extension reçoit « annulé ». L'environnement de
+  pi est construit (sans `NODE_OPTIONS`, `LD_*`, `DYLD_*`, clé JEV ni jeton
+  OAuth de Claude Code), et un garde-fou d'écriture est chargé dans pi avec
+  la politique de `security/path_guard` : hors du worktree, de la spec et du
+  dossier temporaire, ou sur un fichier de garde-fous, un `write`/`edit` est
+  refusé dans le processus pi lui-même — prouvé contre pi 1.3.0
+  (`tests/fixtures/pi/guard-*.jsonl`). Un skill `tooling/pi` dit comment
+  piloter pi sans interface (lot 5).
+
+- **Les fichiers générés sortent propres.** Espaces de largeur nulle, espaces
+  exotiques, contrôles bidirectionnels, caractères de balise : c'est ainsi qu'une
+  marque de provenance voyage dans la sortie d'un modèle, et elle survit à chaque
+  copier-coller vers un dépôt. Dans de la prose, c'est invisible et sans
+  conséquence ; dans un fichier source, c'est une `SyntaxError` que personne ne
+  voit, un identifiant qui ne s'égale pas lui-même, un `grep` qui ne trouve rien.
+  La table de décision Unicode de
+  [watermarks-remover](https://github.com/guillaumemeyer/watermarks-remover)
+  (MIT) est vendorisée et épinglée, et chaque `Write`, `Edit`, `MultiEdit` et
+  `NotebookEdit` d'un agent y passe **avant** que les octets touchent le disque —
+  côté SDK Claude comme côté fournisseurs qui ne l'utilisent pas. Ce qui est
+  retiré est consigné dans `<spec_dir>/watermarks.jsonl` : c'est le seul endroit
+  du produit où WorkPilot modifie silencieusement ce qu'un modèle a écrit, et une
+  modification invisible se doit d'être traçable. Rien ne peut faire échouer une
+  build : le coût sur un fichier propre est un `str.isascii()`. Réglages :
+  `WATERMARKS_ENABLED`, `WATERMARKS_NORMALIZE_SPACES` (désactivé — l'espace
+  insécable est porteur de sens en typographie française), `WATERMARKS_STRIP_BIDI`
+  (durcissement Trojan Source), `WATERMARKS_MAX_BYTES`.
+
+### 🛠️ Qualité
+
+- **La CI nomme le test qui échoue.** Chaque ligne `FAILED` / `ERROR` du résumé
+  de pytest devient une annotation du job (`ci.yml`), lisible sans le journal
+  brut (#468). Première prise : le test du journal d'un RUN demandait au shell
+  d'étendre `$RUN_API_TOKEN`, ce que `cmd.exe` ne fait pas ; il parle désormais
+  la syntaxe du shell de la plateforme (`%VAR%` sous Windows), et le job Windows
+  repasse au vert.
 
 ---
 
@@ -191,5 +258,5 @@ autonomous agents and integrations. 150+ features and 150+ fixes since 1.0.0.
 
 ## 1.0.0 - Initial WorkPilot AI Release
 
-Initial public release. See [docs/CHANGELOG.md](docs/CHANGELOG.md) for the
-complete 1.0.0 feature list.
+Initial public release. The complete 1.0.0 feature list is in the
+[git history](https://github.com/krovomi/WorkPilot-AI/blob/f385fe1/docs/CHANGELOG.md).

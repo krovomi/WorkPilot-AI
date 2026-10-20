@@ -22,12 +22,10 @@ import { Separator } from "../../ui/separator";
 import { Switch } from "../../ui/switch";
 
 interface ChannelNotificationsIntegrationProps {
+	readonly projectId: string;
 	readonly envConfig: ProjectEnvConfig | null;
 	readonly updateEnvConfig: (updates: Partial<ProjectEnvConfig>) => void;
 }
-
-/** Backend API base (same one used by hooks-store). */
-const BACKEND_URL = "http://localhost:9000";
 
 type ChannelKey = "teams" | "slack" | "discord" | "googleChat" | "webhook";
 
@@ -95,10 +93,12 @@ const CHANNELS: ChannelDef[] = [
 type TestStatus = "idle" | "testing" | "success" | "error";
 
 function ChannelRow({
+	projectId,
 	def,
 	envConfig,
 	updateEnvConfig,
 }: {
+	readonly projectId: string;
 	readonly def: ChannelDef;
 	readonly envConfig: ProjectEnvConfig;
 	readonly updateEnvConfig: (updates: Partial<ProjectEnvConfig>) => void;
@@ -114,14 +114,15 @@ function ChannelRow({
 		if (!webhookUrl) return;
 		setTestStatus("testing");
 		try {
-			// Server-side test: browser fetch to webhook providers is blocked by CORS
-			const res = await fetch(`${BACKEND_URL}/api/notifications/test`, {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ channel: def.apiChannel, url: webhookUrl }),
-			});
-			const data = (await res.json()) as { success?: boolean };
-			setTestStatus(data.success ? "success" : "error");
+			// Through the main process: it holds the stored URL (this field only
+			// has its mask) and has the backend post it — a browser fetch to
+			// webhook providers is blocked by CORS.
+			const result = await globalThis.electronAPI.testNotificationWebhook(
+				projectId,
+				def.apiChannel,
+				webhookUrl,
+			);
+			setTestStatus(result.success ? "success" : "error");
 		} catch {
 			setTestStatus("error");
 		}
@@ -231,6 +232,7 @@ function ChannelRow({
  * - A PR is automatically created for human review
  */
 export function ChannelNotificationsIntegration({
+	projectId,
 	envConfig,
 	updateEnvConfig,
 }: ChannelNotificationsIntegrationProps) {
@@ -262,6 +264,7 @@ export function ChannelNotificationsIntegration({
 				{CHANNELS.map((def) => (
 					<ChannelRow
 						key={def.key}
+						projectId={projectId}
 						def={def}
 						envConfig={envConfig}
 						updateEnvConfig={updateEnvConfig}

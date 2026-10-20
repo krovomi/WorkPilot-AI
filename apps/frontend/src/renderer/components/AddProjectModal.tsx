@@ -1,6 +1,10 @@
 import type { Project } from "@shared/types/project";
+import {
+	joinProjectPath,
+	sanitizeProjectFolderName,
+} from "@shared/utils/project-folder-name";
 import { Radio } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/hooks/use-toast";
 import { Globe } from "@/lib/icons";
@@ -77,6 +81,14 @@ export function AddProjectModal({
 	const [pendingProjectPath, setPendingProjectPath] = useState<string | null>(
 		null,
 	);
+	// What "Create" would actually do here — see the effect below.
+	const [locationCheck, setLocationCheck] = useState<{
+		targetExists: boolean;
+		targetHasEntries: boolean;
+		locationIsProject: boolean;
+		insideRepository: string | null;
+		markers: string[];
+	} | null>(null);
 	const [detectedProvider, setDetectedProvider] = useState<
 		"github" | "azure_devops" | "unknown" | null
 	>(null);
@@ -213,10 +225,7 @@ export function AddProjectModal({
 		const gitConfigPath = `${projectPath}/.git/config`;
 
 		try {
-			const result = await globalThis.electronAPI.invoke(
-				"fileExplorer:read",
-				gitConfigPath,
-			);
+			const result = await globalThis.electronAPI.readFile(gitConfigPath);
 
 			if (result.success && result.data) {
 				const configContent = result.data;
@@ -279,11 +288,73 @@ export function AddProjectModal({
 		return "unknown";
 	}, []);
 
+	// The folder the main process will actually create. It kebab-cases the
+	// name and folds its accents, so the raw input pointed every git probe at
+	// a path that does not exist — "POC Dotnet New" is created as
+	// "poc-dotnet-new".
+	const targetProjectPath = useMemo(() => {
+		const folderName = sanitizeProjectFolderName(projectName);
+		if (!projectLocation || !folderName) return null;
+		return joinProjectPath(projectLocation, folderName);
+	}, [projectLocation, projectName]);
+
+	// "Create" and "Open existing folder" are two different acts, and the form
+	// cannot say which one the user meant without looking at the disk: pointing
+	// the location at a folder that already holds the code adds an empty sibling
+	// next to it. Asking here is what lets the wizard say so before it happens.
+	useEffect(() => {
+		if (step !== 0 || !projectLocation) {
+			setLocationCheck(null);
+			return;
+		}
+		let current = true;
+		const inspect = async () => {
+			const result = await globalThis.electronAPI.inspectProjectLocation(
+				projectLocation,
+				projectName,
+			);
+			if (!current) return;
+			setLocationCheck(
+				result.success && result.data
+					? {
+							targetExists: result.data.targetExists,
+							targetHasEntries: result.data.targetHasEntries,
+							locationIsProject: result.data.locationIsProject,
+							insideRepository: result.data.insideRepository,
+							markers: result.data.markers,
+						}
+					: null,
+			);
+		};
+		void inspect();
+		return () => {
+			current = false;
+		};
+	}, [projectLocation, projectName, step]);
+
+	/**
+	 * The folder the user probably meant to open rather than create under.
+	 *
+	 * Two cases, and they point at different folders: the target already exists
+	 * and holds something, or the location itself is the project — which is the
+	 * one that bites, because creating then succeeds and registers an empty
+	 * sibling that no scan will ever find endpoints in.
+	 */
+	const openSuggestion = useMemo(() => {
+		if (!locationCheck) return null;
+		if (locationCheck.targetExists) {
+			return locationCheck.targetHasEntries ? targetProjectPath : null;
+		}
+		return locationCheck.locationIsProject || locationCheck.insideRepository
+			? projectLocation
+			: null;
+	}, [locationCheck, targetProjectPath, projectLocation]);
+
 	// Auto-detect repository type when project path changes
 	useEffect(() => {
 		const autoDetectProvider = async () => {
-			if (projectLocation && projectName && step === 0) {
-				const projectPath = `${projectLocation}/${projectName.trim()}`;
+			if (targetProjectPath && step === 0) {
+				const projectPath = targetProjectPath;
 
 				// Check if it's an existing git repository
 				const gitStatus =
@@ -313,13 +384,7 @@ export function AddProjectModal({
 		};
 
 		autoDetectProvider();
-	}, [
-		projectLocation,
-		projectName,
-		step,
-		providerSelected,
-		detectRepositoryProvider,
-	]);
+	}, [targetProjectPath, step, providerSelected, detectRepositoryProvider]);
 
 	// Determine which provider options to show.
 	// Jira is always offered as an explicit option because it cannot be detected from a git remote.
@@ -345,11 +410,33 @@ export function AddProjectModal({
 	const renderStep0 = () => (
 		<>
 			<DialogHeader>
-				<DialogTitle>{t("addProject.createNewTitle")}</DialogTitle>
-				<DialogDescription>
-					{t("addProject.createNewSubtitle")}
-				</DialogDescription>
+				<DialogTitle>{t("addProject.title")}</DialogTitle>
+				<DialogDescription>{t("addProject.chooseHow")}</DialogDescription>
 			</DialogHeader>
+			<div className="pt-4">
+				<Button
+					type="button"
+					variant="outline"
+					className="w-full h-auto justify-start py-3"
+					aria-label={t("addProject.openExistingAriaLabel")}
+					onClick={handleOpenExisting}
+				>
+					<span className="flex flex-col items-start gap-0.5 text-left">
+						<span className="font-medium">{t("addProject.openExisting")}</span>
+						<span className="text-xs font-normal text-muted-foreground">
+							{t("addProject.openExistingDescription")}
+						</span>
+					</span>
+				</Button>
+			</div>
+			<div className="pt-4 space-y-1">
+				<div className="text-xs font-medium text-muted-foreground">
+					{t("addProject.orCreateNew")}
+				</div>
+				<p className="text-xs text-muted-foreground/80">
+					{t("addProject.orCreateNewHint")}
+				</p>
+			</div>
 			<div className="py-4 space-y-4">
 				<div className="space-y-2">
 					<Label htmlFor="project-name">{t("addProject.projectName")}</Label>
@@ -389,6 +476,40 @@ export function AddProjectModal({
 							{t("addProject.browse")}
 						</Button>
 					</div>
+					{targetProjectPath && (
+						<p className="text-xs text-muted-foreground">
+							{t("addProject.willBeCreatedAt")}{" "}
+							<span className="font-mono">{targetProjectPath}</span>
+						</p>
+					)}
+					{locationCheck &&
+						(locationCheck.targetExists ||
+							locationCheck.locationIsProject ||
+							locationCheck.insideRepository) && (
+							<div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 space-y-2">
+								<p className="text-xs text-amber-600 dark:text-amber-400">
+									{locationCheck.targetExists
+										? t("addProject.targetAlreadyExists")
+										: locationCheck.locationIsProject
+											? t("addProject.locationLooksLikeProject", {
+													markers: locationCheck.markers.join(", "),
+												})
+											: t("addProject.locationInsideRepository", {
+													repository: locationCheck.insideRepository,
+												})}
+								</p>
+								{openSuggestion && (
+									<Button
+										type="button"
+										size="sm"
+										variant="outline"
+										onClick={() => openFolder(openSuggestion)}
+									>
+										{t("addProject.openThisFolderInstead")}
+									</Button>
+								)}
+							</div>
+						)}
 				</div>
 				<div className="space-y-2">
 					<label className="flex items-center gap-2">
@@ -652,6 +773,45 @@ export function AddProjectModal({
 		</div>
 	);
 
+	// Ajout d'un projet déjà présent sur le disque. Rien n'est créé : le dossier
+	// est enregistré tel quel. C'était jusqu'ici accessible par le seul raccourci
+	// Ctrl/Cmd+T, sans bouton ni menu, et le modal ne savait que créer un dossier
+	// vide — d'où des projets ajoutés qui ne contenaient que `.git`.
+	const openFolder = async (path: string) => {
+		setError(null);
+		try {
+			const added = await addProject(path);
+			const project = added?.project ?? null;
+			if (!project) {
+				setError(t("addProject.failedToCreate"));
+				return;
+			}
+			if (added?.warning) {
+				toast({
+					title: t("addProject.gitRootWarningTitle"),
+					description: added.warning,
+					variant: "default",
+				});
+			}
+			toast({
+				title: t("addProject.successTitle"),
+				description: t("addProject.successDescription"),
+				variant: "default",
+			});
+			onProjectAdded?.(project, false);
+			onOpenChange(false);
+		} catch (err: unknown) {
+			setError(
+				err instanceof Error ? err.message : t("addProject.failedToCreate"),
+			);
+		}
+	};
+
+	const handleOpenExisting = async () => {
+		const path = await globalThis.electronAPI.selectDirectory();
+		if (path) await openFolder(path);
+	};
+
 	// Création effective du projet
 	const handleCreate = async () => {
 		if (!projectName || !projectLocation) {
@@ -661,9 +821,7 @@ export function AddProjectModal({
 
 		// Check if projectLocation is a repository URL instead of a local path
 		if (isRepositoryUrl(projectLocation)) {
-			setError(
-				"L'emplacement doit être un chemin local, pas une URL de repository. Cliquez sur 'Parcourir' pour sélectionner un dossier.",
-			);
+			setError(t("addProject.locationMustBeLocalPath"));
 			return;
 		}
 
@@ -821,9 +979,9 @@ export function AddProjectModal({
 										} else if (remoteType === "jira") {
 											// Jira has no git remote config — credentials are set later in settings.
 											setStep(1);
-										} else if (projectLocation && projectName) {
+										} else if (targetProjectPath) {
 											// Auto-detect repository type for existing git repositories
-											const projectPath = `${projectLocation}/${projectName.trim()}`;
+											const projectPath = targetProjectPath;
 
 											// Check if .git directory exists (indicating an existing repository)
 											try {
@@ -889,8 +1047,8 @@ export function AddProjectModal({
 						onSave={async (config: AzureDevOpsConfig) => {
 							setRemoteConfig(config);
 							setShowRemoteConfigModal(false);
-							if (projectLocation && projectName) {
-								const projectPath = `${projectLocation}/${projectName.trim()}`;
+							if (targetProjectPath) {
+								const projectPath = targetProjectPath;
 								const status =
 									await globalThis.electronAPI.checkGitStatus(projectPath);
 
@@ -922,8 +1080,8 @@ export function AddProjectModal({
 						onSave={async (config: GitHubConfig) => {
 							setRemoteConfig(config);
 							setShowRemoteConfigModal(false);
-							if (projectLocation && projectName) {
-								const projectPath = `${projectLocation}/${projectName.trim()}`;
+							if (targetProjectPath) {
+								const projectPath = targetProjectPath;
 								const status =
 									await globalThis.electronAPI.checkGitStatus(projectPath);
 								if (
@@ -962,7 +1120,6 @@ export function AddProjectModal({
 						autoBuildPath: "",
 						settings: {
 							model: "claude-3-5-sonnet-20241022",
-							memoryBackend: "file",
 							linearSync: false,
 							notifications: {
 								onTaskComplete: true,
@@ -970,7 +1127,6 @@ export function AddProjectModal({
 								onReviewNeeded: true,
 								sound: true,
 							},
-							graphitiMcpEnabled: false,
 						},
 						createdAt: new Date(),
 						updatedAt: new Date(),

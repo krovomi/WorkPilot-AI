@@ -21,9 +21,9 @@ export type ProjectSettingsSection =
 	| "gitlab"
 	| "azure-devops"
 	| "jira"
+	| "figma"
 	| "cicd"
-	| "teams"
-	| "memory";
+	| "teams";
 
 interface ProjectSettingsContentProps {
 	project: Project | undefined;
@@ -99,8 +99,6 @@ function ProjectSettingsContentInner({
 		updateEnvConfig,
 		showLinearKey,
 		setShowLinearKey,
-		showOpenAIKey,
-		setShowOpenAIKey,
 		showGitHubToken,
 		setShowGitHubToken,
 		expandedSections: _expandedSections,
@@ -121,7 +119,10 @@ function ProjectSettingsContentInner({
 		setShowAzureDevOpsImportModal,
 		azureDevOpsConnectionStatus,
 		isCheckingAzureDevOps,
+		initBlocker,
+		isRepairingGit,
 		handleInitialize,
+		handleRepairGit,
 		error,
 	} = hook;
 
@@ -153,8 +154,6 @@ function ProjectSettingsContentInner({
 				updateEnvConfig={updateEnvConfig}
 				showLinearKey={showLinearKey}
 				setShowLinearKey={setShowLinearKey}
-				showOpenAIKey={showOpenAIKey}
-				setShowOpenAIKey={setShowOpenAIKey}
 				showGitHubToken={showGitHubToken}
 				setShowGitHubToken={setShowGitHubToken}
 				gitHubConnectionStatus={gitHubConnectionStatus}
@@ -169,7 +168,10 @@ function ProjectSettingsContentInner({
 				setShowAzureDevOpsToken={setShowAzureDevOpsToken}
 				azureDevOpsConnectionStatus={azureDevOpsConnectionStatus}
 				isCheckingAzureDevOps={isCheckingAzureDevOps}
+				initBlocker={initBlocker}
+				isRepairingGit={isRepairingGit}
 				handleInitialize={handleInitialize}
+				handleRepairGit={handleRepairGit}
 				onOpenLinearImport={() => setShowLinearImportModal(true)}
 				onOpenAzureDevOpsImport={() => setShowAzureDevOpsImportModal(true)}
 			/>

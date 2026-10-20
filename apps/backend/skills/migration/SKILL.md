@@ -39,13 +39,13 @@ author: "WorkPilot AI Team"
 ### Basic Migration
 ```python
 # Analyze current stack
-analysis = skill.execute_script("analyze_stack.py", {"project_root": "/path/to/project"})
+analysis = skill.execute_script(
+    "analyze_stack.py", {"project_root": "/path/to/project"}
+)
 
 # Create migration plan
 plan = skill.create_migration_plan(
-    source_framework="react",
-    source_version="18.2", 
-    target_version="19.0"
+    source_framework="react", source_version="18.2", target_version="19.0"
 )
 
 # Execute migration

@@ -38,10 +38,13 @@ if "claude_agent_sdk" not in sys.modules:
 from core.agent_client import (
     AgentClient,
     ClaudeAgentClient,
+    CompatibleProviderAgentClient,
     CopilotAgentClient,
     LocalAgentClient,
+    OpenAIAgentClient,
 )
 from core.client import _get_active_provider
+from core.codex_cli_client import CodexCliAgentClient
 
 # =============================================================================
 # _get_active_provider() Tests
@@ -84,7 +87,7 @@ class TestGetActiveProvider:
         auto_claude_dir = tmp_path / ".workpilot"
         auto_claude_dir.mkdir()
         env_file = auto_claude_dir / ".env"
-        env_file.write_text("AI_PROVIDER=copilot\nSOME_OTHER=value\n")
+        env_file.write_text("AI_PROVIDER=copilot\nSOME_OTHER=value\n", encoding="utf-8")
 
         assert _get_active_provider(spec_dir=tmp_path) == "copilot"
 
@@ -94,7 +97,7 @@ class TestGetActiveProvider:
         auto_claude_dir = tmp_path / ".workpilot"
         auto_claude_dir.mkdir()
         env_file = auto_claude_dir / ".env"
-        env_file.write_text("AI_PROVIDER=claude\n")
+        env_file.write_text("AI_PROVIDER=claude\n", encoding="utf-8")
 
         assert _get_active_provider(spec_dir=tmp_path) == "claude"
 
@@ -105,7 +108,7 @@ class TestGetActiveProvider:
         auto_claude_dir = tmp_path / ".workpilot"
         auto_claude_dir.mkdir()
         env_file = auto_claude_dir / ".env"
-        env_file.write_text('AI_PROVIDER="copilot"\n')
+        env_file.write_text('AI_PROVIDER="copilot"\n', encoding="utf-8")
 
         assert _get_active_provider(spec_dir=tmp_path) == "copilot"
 
@@ -121,7 +124,7 @@ class TestGetActiveProvider:
         auto_claude_dir = tmp_path / ".workpilot"
         auto_claude_dir.mkdir()
         env_file = auto_claude_dir / ".env"
-        env_file.write_text("GITHUB_TOKEN=ghp_test\n")
+        env_file.write_text("GITHUB_TOKEN=ghp_test\n", encoding="utf-8")
 
         assert _get_active_provider(spec_dir=tmp_path) == "claude"
 
@@ -132,7 +135,7 @@ class TestGetActiveProvider:
         auto_claude_dir = tmp_path / ".workpilot"
         auto_claude_dir.mkdir()
         env_file = auto_claude_dir / ".env"
-        env_file.write_text("AI_PROVIDER=copilot\n")
+        env_file.write_text("AI_PROVIDER=copilot\n", encoding="utf-8")
 
         assert _get_active_provider(spec_dir=tmp_path) == "claude"
 
@@ -144,7 +147,7 @@ class TestGetActiveProvider:
         auto_claude_dir = tmp_path / ".workpilot"
         auto_claude_dir.mkdir()
         env_file = auto_claude_dir / ".env"
-        env_file.write_text("AI_PROVIDER=copilot\n")
+        env_file.write_text("AI_PROVIDER=copilot\n", encoding="utf-8")
 
         spec_dir = auto_claude_dir / "spec"
         spec_dir.mkdir()
@@ -183,6 +186,107 @@ class TestCreateAgentClient:
         assert client.inner is mock_sdk
         mock_create_client.assert_called_once()
 
+    def test_openai_codex_mode_creates_codex_cli_client(self, tmp_path, monkeypatch):
+        from core.client import create_agent_client
+
+        monkeypatch.setenv("OPENAI_AUTH_MODE", "codex-cli")
+
+        client = create_agent_client(
+            project_dir=tmp_path,
+            spec_dir=tmp_path,
+            model="gpt-5.6-sol",
+            provider="openai",
+            resume="thread-previous",
+        )
+
+        assert isinstance(client, CodexCliAgentClient)
+        assert client.provider_name() == "openai-codex-cli"
+        assert client.thread_id == "thread-previous"
+
+    def test_openai_api_mode_keeps_rest_client(self, tmp_path, monkeypatch):
+        from core.client import create_agent_client
+
+        monkeypatch.setenv("OPENAI_AUTH_MODE", "api-key")
+
+        client = create_agent_client(
+            project_dir=tmp_path,
+            spec_dir=tmp_path,
+            model="gpt-5.6-sol",
+            provider="openai",
+        )
+
+        assert isinstance(client, OpenAIAgentClient)
+
+    def test_openai_codex_mode_routes_api_only_model_to_api(
+        self, tmp_path, monkeypatch
+    ):
+        from core.client import create_agent_client
+
+        monkeypatch.setenv("OPENAI_AUTH_MODE", "codex-cli")
+        monkeypatch.setattr(
+            "core.codex_cli_client.openai_model_uses_api_key", lambda model: True
+        )
+        client = create_agent_client(
+            project_dir=tmp_path,
+            spec_dir=tmp_path,
+            model="gpt-4.1-mini",
+            provider="openai",
+        )
+        assert isinstance(client, OpenAIAgentClient)
+
+    @pytest.mark.parametrize(
+        ("provider", "model"),
+        [
+            ("mistral", "mistral-small-latest"),
+            ("deepseek", "deepseek-chat"),
+            ("grok", "grok-4-fast"),
+        ],
+    )
+    def test_openai_compatible_provider_uses_own_api_adapter(
+        self, provider, model, tmp_path, monkeypatch
+    ):
+        from core.client import create_agent_client
+
+        monkeypatch.setenv(f"{provider.upper()}_API_KEY", "provider-key")
+        client = create_agent_client(
+            project_dir=tmp_path,
+            spec_dir=tmp_path,
+            model=model,
+            provider=provider,
+        )
+        assert isinstance(client, CompatibleProviderAgentClient)
+        assert client.provider_name() == provider
+        assert client.model == model
+        assert client._api_key == "provider-key"
+
+    def test_gemini_alias_uses_google_agent_client(self, tmp_path, monkeypatch):
+        from core.agent_client import GoogleAgentClient
+        from core.client import create_agent_client
+
+        monkeypatch.setenv("GOOGLE_API_KEY", "google-key")
+        client = create_agent_client(
+            project_dir=tmp_path,
+            spec_dir=tmp_path,
+            model="gemini-3-flash",
+            provider="gemini",
+        )
+        assert isinstance(client, GoogleAgentClient)
+        assert client.provider_name() == "google"
+
+    @pytest.mark.parametrize("provider", ["google", "gemini"])
+    def test_gemini_runs_at_the_users_effort(self, tmp_path, monkeypatch, provider):
+        from core.client import create_agent_client
+
+        monkeypatch.setenv("GOOGLE_API_KEY", "google-key")
+        client = create_agent_client(
+            project_dir=tmp_path,
+            spec_dir=tmp_path,
+            model="gemini-3.1-pro-preview",
+            provider=provider,
+            max_thinking_tokens=1024,
+        )
+        assert client._reasoning_effort == "low"
+
     @patch("core.client._get_cached_project_data")
     @patch("core.client.load_project_mcp_config")
     @patch("core.client.get_allowed_tools")
@@ -198,9 +302,7 @@ class TestCreateAgentClient:
         mock_tools.return_value = ["Read", "Write"]
 
         # Mock is_linear_enabled
-        monkeypatch.setattr(
-            "core.client.is_linear_enabled", lambda: False
-        )
+        monkeypatch.setattr("core.client.is_linear_enabled", lambda: False)
 
         client = create_agent_client(
             project_dir=tmp_path,
@@ -214,6 +316,31 @@ class TestCreateAgentClient:
         assert isinstance(client, AgentClient)
         assert client.model == "gpt-4o"
         assert client.provider_name() == "copilot"
+
+    @patch("core.client._get_cached_project_data")
+    @patch("core.client.load_project_mcp_config")
+    @patch("core.client.get_allowed_tools")
+    def test_copilot_gets_the_users_thinking_budget(
+        self, mock_tools, mock_mcp, mock_cache, tmp_path, monkeypatch
+    ):
+        from core.client import create_agent_client
+
+        monkeypatch.setenv("GITHUB_TOKEN", "ghp_test_token")
+        mock_cache.return_value = ({}, {})
+        mock_mcp.return_value = {}
+        mock_tools.return_value = ["Read"]
+        monkeypatch.setattr("core.client.is_linear_enabled", lambda: False)
+
+        client = create_agent_client(
+            project_dir=tmp_path,
+            spec_dir=tmp_path,
+            model="claude-sonnet-4.5",
+            agent_type="coder",
+            provider="copilot",
+            max_thinking_tokens=16384,
+        )
+
+        assert client._thinking_budget == 16384
 
     @patch("core.client.create_client")
     def test_invalid_provider_falls_back_to_claude(self, mock_create_client, tmp_path):
@@ -284,15 +411,20 @@ class TestCreateAgentClient:
         assert isinstance(client, LocalAgentClient)
         mock_create_client.assert_not_called()
 
-    @patch("core.client._get_active_provider")
+    @patch("core.client._resolve_active_provider")
     @patch("core.client.create_client")
     def test_auto_detect_uses_get_active_provider(
         self, mock_create_client, mock_detect, tmp_path
     ):
-        """provider=None should auto-detect via _get_active_provider."""
+        """provider=None should auto-detect via the resolution chain.
+
+        It resolves through `_resolve_active_provider`, which also answers
+        *whether anybody chose* — the half `resolve_offline_route` needs to
+        know if it may re-route the task to a local model.
+        """
         from core.client import create_agent_client
 
-        mock_detect.return_value = "claude"
+        mock_detect.return_value = ("claude", True)
         mock_create_client.return_value = MagicMock()
 
         client = create_agent_client(
@@ -368,3 +500,102 @@ class TestCreateAgentClient:
         assert "security" in client.agents
         assert client.agents["security"].description == "Security checker"
         assert client.agents["security"].prompt == "Check for vulnerabilities"
+
+
+class TestRosterReachesEveryLoopClient:
+    """`create_agent_client` attaches the composed roster to every client
+    that runs the WorkPilot loop; the Claude branch composes its own inside
+    `create_client`, and the CLIs take none."""
+
+    @pytest.mark.parametrize(
+        ("provider", "env", "model"),
+        [
+            ("openai", "OPENAI_API_KEY", "gpt-4o"),
+            ("mistral", "MISTRAL_API_KEY", "mistral-small-latest"),
+            ("google", "GOOGLE_API_KEY", "gemini-3-flash"),
+        ],
+    )
+    def test_a_loop_client_gets_the_phase_roster(
+        self, provider, env, model, tmp_path, monkeypatch
+    ):
+        from core.agent_client import SubagentDefinition
+        from core.client import create_agent_client
+
+        monkeypatch.setenv(env, "key")
+        client = create_agent_client(
+            project_dir=tmp_path,
+            spec_dir=tmp_path,
+            model=model,
+            agent_type="coder",
+            provider=provider,
+        )
+        assert client.delegates()
+        # The Kanban roster, in the portable shape every loop client reads.
+        assert {"code-reviewer", "test-runner", "architecture-analyst"} <= set(
+            client.agents
+        )
+        assert all(isinstance(d, SubagentDefinition) for d in client.agents.values())
+
+    def test_the_callers_agents_win_and_tier_aliases_turn_portable(
+        self, tmp_path, monkeypatch
+    ):
+        from core.client import create_agent_client
+
+        monkeypatch.setenv("OPENAI_API_KEY", "key")
+        mine = MagicMock()
+        mine.description = "Mine"
+        mine.prompt = "p"
+        mine.tools = ["Read"]
+        mine.model = "sonnet"
+        client = create_agent_client(
+            project_dir=tmp_path,
+            spec_dir=tmp_path,
+            model="gpt-4o",
+            agent_type="coder",
+            provider="openai",
+            agents={"test-runner": mine},
+        )
+        assert client.agents["test-runner"].description == "Mine"
+        assert client.agents["test-runner"].model == "inherit"
+
+    def test_use_subagents_false_attaches_nothing(self, tmp_path, monkeypatch):
+        from core.client import create_agent_client
+
+        monkeypatch.setenv("OPENAI_API_KEY", "key")
+        client = create_agent_client(
+            project_dir=tmp_path,
+            spec_dir=tmp_path,
+            model="gpt-4o",
+            agent_type="coder",
+            provider="openai",
+            use_subagents=False,
+        )
+        assert not client.agents
+
+    def test_a_solo_type_gets_none(self, tmp_path, monkeypatch):
+        from core.client import create_agent_client
+
+        monkeypatch.setenv("OPENAI_API_KEY", "key")
+        client = create_agent_client(
+            project_dir=tmp_path,
+            spec_dir=tmp_path,
+            model="gpt-4o",
+            agent_type="commit_message",
+            provider="openai",
+        )
+        assert not client.agents
+
+    def test_a_cli_takes_no_roster(self, tmp_path, monkeypatch):
+        from core.client import create_agent_client
+
+        monkeypatch.setenv("OPENAI_AUTH_MODE", "codex-cli")
+        client = create_agent_client(
+            project_dir=tmp_path,
+            spec_dir=tmp_path,
+            model="gpt-5.6-sol",
+            agent_type="coder",
+            provider="openai",
+        )
+        assert isinstance(client, CodexCliAgentClient)
+        assert not client.delegates()
+        assert not getattr(client, "agents", None)

@@ -1,11 +1,10 @@
 """Executing the phases a resolved profile keeps.
 
-Until now the engine resolved a profile and executed three of its eleven
-phases: the deterministic gates, `observe`, and `qa` — which it could only
-*remove*. `planning` and `coding` were an internal sequence inside
-`run_autonomous_agent`, and the six skill-backed phases (`brainstorm`, `spec`,
-`review`, `adversarial-review`, `spec-conformance`, `verify`) were declared and
-never run at all. `workflow.yaml` was a plan the build did not follow.
+The engine used to resolve a profile and execute three of its phases: the
+deterministic gates, `observe`, and `qa` — which it could only *remove*.
+`planning` and `coding` were an internal sequence inside
+`run_autonomous_agent`, and the skill-backed phases were declared and never run
+at all. `workflow.yaml` was a plan the build did not follow.
 
 This module is the missing half. It runs a phase whose implementation is a
 skill rather than WorkPilot Python: it loads the skill's procedure, hands it to
@@ -47,10 +46,15 @@ not run says so, and `succeeded` is None rather than True.
 
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from datetime import datetime, timezone
 from pathlib import Path
+
+from .engine import BUILTIN_PACKS
 
 logger = logging.getLogger(__name__)
 
@@ -63,8 +67,14 @@ __all__ = [
     "PhaseRun",
     "BUILTIN_EXECUTORS",
     "CONFIG_PHASE",
+    "irreversible_gate",
+    "log_phase_for",
+    "execution_phase_for",
     "SKILL_PHASE_AGENTS",
     "find_skill_body",
+    "phase_provider",
+    "CUSTOM_EXECUTORS",
+    "skill_requires",
     "phases_between",
     "run_skill_phase",
     "run_skill_phases",
@@ -75,40 +85,126 @@ __all__ = [
 # Phases WorkPilot executes itself, by **phase id** rather than by `impl`.
 #
 # That distinction is the whole point of the file being declarative, and it is
-# easy to get backwards. `coding` names `superpowers/test-driven-development`:
+# easy to get backwards. `coding` names `tooling/tdd-cycle`:
 # the skill is the *methodology*, the coder loop is the *executor*. Keying this
 # set on the impl string would mean the day someone swaps TDD for another
 # methodology, the coding phase stops being recognised as built in and the
 # runner tries to execute it as a one-shot session — losing the entire coder
 # loop to a one-line edit in a YAML file.
 #
-# So: these three ids are executed by `run_autonomous_agent` and
-# `run_qa_validation_loop`, whatever methodology they name, and the methodology
-# they name is handed to that executor rather than replacing it.
-BUILTIN_EXECUTORS = frozenset({"planning", "coding", "qa"})
+# So: these ids are executed by WorkPilot's own Python — `planning` and
+# `coding` by `run_autonomous_agent`, `qa` by `run_qa_validation_loop`, `docs`
+# by `libdocs.run_preflight` — whatever methodology they name, and the
+# methodology they name is handed to that executor rather than replacing it.
+BUILTIN_EXECUTORS = frozenset({"docs", "planning", "coding", "qa"})
+# The same four in the order the build runs them. `phases_between` reads it to
+# close a window whose named boundary a workflow does not declare.
+_BUILTIN_ORDER = ("docs", "planning", "coding", "qa")
 
-# Packs whose phases are executed by another part of the engine: impeccable by
-# `gates.run_deterministic_gates`, task-observer by `learning_loop.observe`.
-_ELSEWHERE = frozenset({"impeccable", "task-observer"})
+# Phases executed by another part of the engine: `design-check` by
+# `gates.run_deterministic_gates`, `observe` by `learning_loop.observe`.
+#
+# Keyed by phase id, not by pack — the same correction as `DETERMINISTIC_PHASES`
+# in `engine.py`, and here it was the whole bug. A pack does not run elsewhere;
+# one of its phases does. While this read `{"impeccable", …}`, every phase that
+# pack implemented was stepped over, so `frontend-design` would have been
+# resolved, printed in the profile the user is shown, and run by nobody — the
+# exact failure `test_every_skill_phase_belongs_to_a_window` exists to catch,
+# reached through the one door that test does not watch.
+_ELSEWHERE = frozenset({"design-check", "observe"})
+
+# Phases that run in their window like a skill phase, but by WorkPilot's own
+# Python and with no session: `ui-design-system` settles the task's design
+# system with ui-ux-pro-max's local engine (`uiux.preflight`). Unlike the
+# gates above it belongs to a window — the coder reads what it wrote — so it is
+# returned by `phases_between` and dispatched by `run_skill_phase`.
+DETERMINISTIC_EXECUTORS = frozenset({"ui-design-system"})
 
 # A workflow phase id -> the phase_config vocabulary it resolves model and
-# effort under. `phase_config` knows four phases; the workflow declares eleven.
+# effort under. `phase_config` knows four phases; the workflow declares more.
 # Rather than invent a fifth config phase per new workflow phase — which would
 # mean a new column in every model selector in the UI — each phase says which
 # of the four it is *paid for as*. A reviewer is a QA cost; a brainstorm is a
 # spec cost.
 CONFIG_PHASE = {
     "brainstorm": "spec",
-    "spec": "spec",
     "planning": "planning",
+    "analyze": "planning",
+    # A design review before the code exists is a planning cost, not a QA one:
+    # nothing has been built yet for it to judge.
+    "mobile-design": "planning",
+    # No model runs in it; listed so its log entries land under planning.
+    "ui-design-system": "planning",
     "coding": "coding",
     "review": "qa",
     "qa": "qa",
-    "adversarial-review": "qa",
-    "spec-conformance": "qa",
     "verify": "qa",
+    "verify-replay": "qa",
+    # Architecture mapping runs after QA and describes the system topology changes.
+    "architecture-map": "qa",
+    # Phases of the per-kind workflows (`workflows/registry.py`). Before the
+    # code is written, they are planning costs; what reads the finished work
+    # is a QA cost.
+    # A product document before the spec is read: a spec cost.
+    "prd": "spec",
+    "reproduce": "planning",
+    "investigate": "planning",
+    "procedure": "planning",
+    "verdict": "qa",
+    "proofread": "qa",
+    # A RUN's execution is paid for as coding: no model runs in it, the
+    # label only says where its journal lands.
+    "execute": "coding",
 }
 _DEFAULT_CONFIG_PHASE = "coding"
+
+# The two vocabularies the rest of the application uses to say *where in the
+# build we are*, keyed off the config phase above so there is one table to
+# keep in step rather than three.
+#
+# `LogPhase` is what the task log viewer groups its entries by, and
+# `ExecutionPhase` is what the Kanban card's badge reads. Every skill phase
+# used to report `LogPhase.CODING` and to emit no execution phase at all, and
+# both halves of that were visible to the user: the `spec` phase — which runs
+# *before* planning — filed its output under "coding", and the card fell
+# through `buildSnapshotFromTask`'s default, which is also "coding". So a build
+# appeared to start by coding and to plan afterwards, in that order, in the
+# logs. The phases ran in the declared order the whole time; only their labels
+# were wrong.
+#
+# `LogPhase` has three values and `phase_config` four, so `spec` and `planning`
+# both land on PLANNING: a document written before any code exists is planning
+# work whichever budget pays for it.
+_LOG_PHASE_BY_CONFIG = {
+    "spec": "PLANNING",
+    "planning": "PLANNING",
+    "coding": "CODING",
+    "qa": "VALIDATION",
+}
+
+# Only the phases that run before the coder loop need to announce themselves:
+# after `coding` the card is already past the point this would describe, and
+# emitting a phase there would drag the badge backwards — which
+# `wouldPhaseRegress` would refuse anyway.
+_EXECUTION_PHASE_BY_CONFIG = {
+    "spec": "PLANNING",
+    "planning": "PLANNING",
+}
+
+
+def log_phase_for(phase_id: str) -> str:
+    """The `LogPhase` member name a phase's entries belong under."""
+    return _LOG_PHASE_BY_CONFIG.get(
+        CONFIG_PHASE.get(phase_id, _DEFAULT_CONFIG_PHASE), "CODING"
+    )
+
+
+def execution_phase_for(phase_id: str) -> str | None:
+    """The `ExecutionPhase` a phase announces to the Kanban, or None."""
+    return _EXECUTION_PHASE_BY_CONFIG.get(
+        CONFIG_PHASE.get(phase_id, _DEFAULT_CONFIG_PHASE)
+    )
+
 
 # The AGENT_CONFIGS entry a skill phase runs under, which decides its tool
 # allowlist and whether it is read-only. Reviewers get `pr_reviewer`, which
@@ -116,13 +212,94 @@ _DEFAULT_CONFIG_PHASE = "coding"
 # code it is reviewing is not reviewing it.
 SKILL_PHASE_AGENTS = {
     "brainstorm": "spec_critic",
-    "spec": "spec_writer",
+    "analyze": "spec_validation",
+    "mobile-design": "pr_reviewer",
     "review": "pr_reviewer",
-    "adversarial-review": "pr_reviewer",
-    "spec-conformance": "spec_validation",
-    "verify": "qa_reviewer",
+    # The verification loop drives the app and may fix it: `verifier` writes,
+    # like `qa_fixer`, and gets the `verify_*` tools on every provider.
+    "verify": "verifier",
+    "verify-replay": "verifier",
+    # Run by its own executor (`CUSTOM_EXECUTORS`), which authors under this
+    # agent. Listed anyway so that, were the phase ever to reach the one-shot
+    # path, it would run under the agent allowed to write the model rather
+    # than the read-only default.
+    "architecture-map": "architecture_visualizer",
+    # `reproduce` writes the failing test that proves the bug, so it runs
+    # under the coder; its roster is `verify` (a test runner, nothing else).
+    # Read-only like `brainstorm`: the PRD comes back as the session's
+    # answer and is written to `workflow/prd.md` for the planner, not into
+    # the project by the model.
+    "prd": "spec_critic",
+    "reproduce": "coder",
+    # Read-only by construction: an investigation that edits code is a fix
+    # nobody asked for, and a runbook is reviewed by a human before anything
+    # executes it (lot 3 adds the `operator` agent that plays it).
+    "investigate": "analyzer",
+    # The operator reads the project and may run allowlisted commands to
+    # check a precondition; it cannot write code (no Write, no Edit).
+    "procedure": "operator",
+    "verdict": "pr_reviewer",
+    "proofread": "pr_reviewer",
 }
 _DEFAULT_AGENT = "analyzer"
+
+# The lenses of the `review` phase, by effort (`skills/tooling/review-lenses`).
+# Decided here rather than by the model reading the effort line: what an effort
+# level buys is the engine's answer, it is printed and tested, and a reviewer
+# told "apply lenses 1, 2" does not have to work the table out first. The
+# lenses replace the review roster — a security-auditor subagent re-reading the
+# same diff to answer the security lens's question is the same question paid
+# twice (audit F11) — so the phase runs `roster: solo`.
+REVIEW_LENSES: dict[int, str] = {
+    1: "Correction et tests",
+    2: "Sécurité",
+    3: "Conformité à la demande",
+    4: "Adversariale",
+}
+# Lenses a phase declares under `lenses:` in the workflow, applied only when the
+# task touches their files: (number, title, the procedure the lens follows).
+# `store-readiness` was a phase of its own after QA — a fifth session reading
+# the diff on a phone app, whose report no agent read (F38). As a lens its
+# findings reach the QA reviewer with the rest of the review.
+CONDITIONAL_LENSES: dict[str, tuple[int, str, str]] = {
+    "store-readiness": (5, "Publication mobile", "mobile/mobile-store-readiness"),
+}
+# `none` and `low` name the smallest review there is, not an empty one: the
+# feature pipeline never opens `review` below medium (`min_effort`), but the
+# hotfix pipeline keeps it at every level, and a reviewer told to apply no
+# lens "and no other" would have nothing to do.
+REVIEW_LENSES_BY_EFFORT: dict[str, tuple[int, ...]] = {
+    "none": (1, 2),
+    "low": (1, 2),
+    "medium": (1, 2),
+    "high": (1, 2, 3),
+    "ultrathink": (1, 2, 3, 4),
+}
+
+
+def conditional_lenses(phase, ctx) -> list[tuple[str, int, str, str]]:
+    """The declared conditional lenses whose files this task touches.
+
+    An unknown change set applies them, as `when:` runs a phase it cannot rule
+    out: one more lens costs less than a store rejection that ships.
+    """
+    from .engine import _touched
+
+    applied = []
+    for name, globs in getattr(phase, "conditional_lenses", ()):
+        known = CONDITIONAL_LENSES.get(name)
+        if known is None:
+            logger.warning("phase %s: unknown lens %r ignored", phase.id, name)
+            continue
+        if _touched(globs, ctx.changed_files):
+            applied.append((name, *known))
+    return applied
+
+
+def review_lenses(effort: str) -> tuple[int, ...]:
+    """The lenses the `review` phase applies at ``effort``."""
+    return REVIEW_LENSES_BY_EFFORT.get(effort, REVIEW_LENSES_BY_EFFORT["medium"])
+
 
 # Where a phase's output lands, relative to the spec directory.
 OUTPUT_DIRNAME = "workflow"
@@ -132,10 +309,16 @@ OUTPUT_DIRNAME = "workflow"
 # concatenate silently, so a wrapped paragraph and a forgotten comma look
 # exactly alike to a reader and to CodeQL. Naming them removes the ambiguity
 # and keeps the prompt body a list of one element per line.
+#
+# Every skill phase runs under a read-only agent type, and `_write_output`
+# saves the answer to `workflow/<id>.md` itself. "Write the file" asked for a
+# tool the phase does not have, and a model told to write and unable to spends
+# its turns trying.
 _REPORTING = (
     "End your turn with a written result: what you did, what you found, and"
     " whether the phase's objective was met. If the procedure asks you to"
-    " produce a document, write the file and say where it is."
+    " produce a document, put it in your answer: the phase saves your answer"
+    " as its report."
 )
 
 # The hard gate reads this line out of the phase's report. Stating the exact
@@ -178,6 +361,15 @@ class PhaseContext:
     verbose: bool = False
     changed_files: list[str] | None = None
     task_logger: object | None = None
+    jev_run: object | None = None
+    # In an isolated build `project_dir` and `spec_dir` are the worktree and its
+    # copy of the spec. These are the main project and its spec directory; None
+    # means "the same as above" — a direct build, or a caller whose window has
+    # no phase that needs them. A phase needs them for what a worktree does not
+    # carry (`.workpilot/` is gitignored) and for what must outlive it: the
+    # Kanban reads the main spec directory, and the worktree is removed at merge.
+    source_project_dir: Path | None = None
+    source_spec_dir: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -233,42 +425,87 @@ def phases_between(profile, *, after: str | None, before: str | None) -> list:
     """
     declared = getattr(profile, "declared", ()) or tuple(r.id for r in profile.run)
 
-    def _at(phase_id: str | None, fallback: int) -> int:
-        if phase_id is None:
-            return fallback
+    def _index(phase_id: str) -> int | None:
         try:
             return declared.index(phase_id)
         except ValueError:
-            return fallback
+            return None
 
-    start = _at(after, -1)
-    stop = _at(before, len(declared))
+    def _start(phase_id: str | None) -> int | None:
+        if phase_id is None:
+            return -1
+        return _index(phase_id)
+
+    def _stop(phase_id: str | None) -> int:
+        if phase_id is None:
+            return len(declared)
+        # A boundary this workflow does not declare: the window runs up to the
+        # next built-in phase it does declare, or to the end. `before="qa"` on
+        # a workflow with no QA pass runs the phases that follow coding; it
+        # does not drop them.
+        order = _BUILTIN_ORDER
+        following = order[order.index(phase_id) :] if phase_id in order else ()
+        for candidate in (phase_id, *following):
+            position = _index(candidate)
+            if position is not None:
+                return position
+        return len(declared)
+
+    start = _start(after)
+    if start is None:
+        # The window opens after a phase this workflow never runs, so it
+        # never opens: whatever sits past the (absent) boundary was already
+        # the previous window's, which ran to the next declared boundary.
+        return []
+    stop = _stop(before)
     if start >= stop:
         return []
 
     out = []
     for resolved in profile.run:
-        position = _at(resolved.id, -1)
-        if not (start < position < stop):
+        position = _index(resolved.id)
+        if position is None or not (start < position < stop):
             continue
         if resolved.id in BUILTIN_EXECUTORS:
             continue
-        if resolved.phase.pack in _ELSEWHERE:
+        if resolved.id in _ELSEWHERE:
+            continue
+        if resolved.phase.pack in BUILTIN_PACKS:
+            # Played by WorkPilot's own Python, not by a skill session — or
+            # already done by it: a `prd` phase whose BMAD skill cannot start
+            # falls back to `workpilot/spec`, and the spec pipeline wrote
+            # `spec.md` before this file was read. Nothing to open.
             continue
         out.append(resolved)
     return out
 
 
-def find_skill_body(repo_root: Path, pack: str, skill: str) -> tuple[str, Path] | None:
-    """The procedure text of a skill, and where it was read from.
+def find_skill_body(
+    repo_root: Path, pack: str, skill: str, provider: str | None = None
+) -> tuple[str, Path, dict] | None:
+    """The procedure text of a skill, where it was read from, and its `requires`.
 
     The built output is preferred over the source. `.agents/skills/` is what
     `skills-cli build` emits after resolving variants and dropping skills whose
-    `requires` are not satisfied — so reading it means a phase never runs a
-    procedure the resolver already decided this checkout cannot support. The
-    source tree is the fallback for a checkout that has not been built.
+    `requires` are not satisfied. The source tree is the fallback for a
+    checkout that has not been built — and it is *not* gated, which is why the
+    `requires` block comes back with the body instead of being discarded here.
+
+    It has to come back, because the two trees answer different questions. The
+    build gated `.agents/skills/` against **this** repository; a phase runs
+    against the **project being built**, which is a different directory on a
+    different machine, and for BMAD the runtime it needs (`_bmad/`) is
+    installed per project. So `skills/bmad/…` — committed, therefore always
+    found by the fallback — handed the `spec` phase a procedure whose every
+    step reads a file under `_bmad/`, and the session spent itself searching
+    for a tree that was never there. `skill_requires` is what lets the caller
+    ask the question the build could not ask on its behalf.
+
+    ``provider`` selects the skill's provider overlays (`providers/*.md`, see
+    `skills_registry.overlays`): the body returned is the one *that* provider
+    should follow. A skill without overlays reads exactly as before.
     """
-    from skills_registry.frontmatter import parse_frontmatter
+    from skills_registry.overlays import resolve_skill_file
 
     candidates = [
         repo_root / ".agents" / "skills" / skill / "SKILL.md",
@@ -278,16 +515,122 @@ def find_skill_body(repo_root: Path, pack: str, skill: str) -> tuple[str, Path] 
         try:
             if not path.is_file():
                 continue
-            _meta, body = parse_frontmatter(path.read_text(encoding="utf-8"))
+            resolved = resolve_skill_file(path, provider)
         except (OSError, ValueError) as exc:
             logger.debug("could not read %s: %s", path, exc)
             continue
-        if body.strip():
-            return body, path
+        if resolved.body.strip():
+            if resolved.overlays:
+                logger.debug(
+                    "skill %s specialised for %s by %s",
+                    skill,
+                    provider,
+                    ", ".join(resolved.overlays),
+                )
+            return resolved.body, path, _requires_of(resolved.meta)
     return None
 
 
-def _build_prompt(resolved, body: str, ctx: PhaseContext) -> str:
+def _requires_of(meta: dict) -> dict:
+    """The `metadata.workpilot.requires` block, or an empty one.
+
+    Read defensively rather than with `packs.py`'s parser: a malformed block in
+    a vendored SKILL.md must cost the phase its runtime check, not the build.
+    """
+    try:
+        workpilot = (meta.get("metadata") or {}).get("workpilot") or {}
+        requires = workpilot.get("requires") or {}
+        return requires if isinstance(requires, dict) else {}
+    except AttributeError:
+        return {}
+
+
+def skill_requires(requires: dict, project_dir: Path) -> tuple[bool, str]:
+    """Whether this project satisfies a skill's runtime prerequisites.
+
+    Delegates to the resolver's `check_requires` so the gate a phase applies at
+    run time is the same one the build applies at emit time — two readings of
+    `requires` would eventually disagree, and the disagreement would show up as
+    a skill that builds and cannot run.
+
+    Unsatisfiable **here** means unsatisfiable, not unknown: an import failure
+    is reported as a reason rather than swallowed into a pass, because passing
+    on absent evidence is exactly how the BMAD wrappers reached a session.
+    """
+    if not requires:
+        return True, ""
+    try:
+        from skills_registry.resolver import check_requires
+    except ImportError as exc:  # pragma: no cover - import-time environment
+        return False, f"cannot verify the runtime requirement: {exc}"
+    # `accept_mock=False`: the build's reading counts WorkPilot's committed
+    # stand-in as present so the gated skills are *emitted*; a phase that
+    # *runs* one would hand a session a runtime that exits 2 on its first
+    # call. Same reading as the command palette.
+    return check_requires(requires, project_dir, accept_mock=False)
+
+
+def _constitution(project_dir: Path) -> str:
+    """`prompts.constitution_section`, deferred and never fatal.
+
+    Imported here rather than at module scope because this module is loaded by
+    the engine before the agent stack is on the path — `run_skill_phase` defers
+    its own imports for the same reason.
+    """
+    try:
+        from prompts_pkg.prompts import constitution_section
+
+        return constitution_section(project_dir)
+    except Exception:  # noqa: BLE001 - a missing section never stops a phase
+        return ""
+
+
+def _docintel(project_dir: Path, spec_dir: Path | None) -> str:
+    """`prompts.docintel_section`, deferred for the same reason as the above."""
+    try:
+        from prompts_pkg.prompts import docintel_section
+
+        return docintel_section(project_dir, spec_dir)
+    except Exception:  # noqa: BLE001 - a missing section never stops a phase
+        return ""
+
+
+def _mobile(project_dir: Path) -> str:
+    """`prompts.mobile_section`, deferred for the same reason as the above.
+
+    The mobile phases need it by definition, but so does every other phase on a
+    phone project: a reviewer that thinks it can open a URL, or an analyst that
+    plans an iOS verification on a Linux runner, is reasoning about a machine
+    that does not exist.
+    """
+    try:
+        from prompts_pkg.prompts import mobile_section
+
+        return mobile_section(project_dir)
+    except Exception:  # noqa: BLE001 - a missing section never stops a phase
+        return ""
+
+
+def _uiux(spec_dir: Path, phase_id: str) -> str:
+    """`prompts.uiux_section`, deferred for the same reason as the above.
+
+    The design system `ui-design-system` settled, for the phases that judge or
+    shape an interface: `mobile-design` reads it before coding, and a reviewer
+    holds the diff to it. Empty on every task that is not about the
+    interface.
+    """
+    role = "qa" if CONFIG_PHASE.get(phase_id) == "qa" else "phase"
+    try:
+        from prompts_pkg.prompts import uiux_section
+
+        return uiux_section(spec_dir, role=role)
+    except Exception:  # noqa: BLE001 - a missing section never stops a phase
+        return ""
+
+
+def _build_prompt(
+    resolved, body: str, ctx: PhaseContext, source: Path | None = None
+) -> str:
     """The procedure, plus the minimum context needed to apply it.
 
     The effort level is injected rather than branched on inside the skill. A
@@ -305,6 +648,22 @@ def _build_prompt(resolved, body: str, ctx: PhaseContext) -> str:
         f"EFFORT: {ctx.effort}",
         f"DISPATCH: {resolved.dispatch}",
     ]
+    if phase.id == "review":
+        titles = {n: REVIEW_LENSES[n] for n in review_lenses(ctx.effort)}
+        procedures: list[str] = []
+        for name, number, title, impl in conditional_lenses(phase, ctx):
+            titles[number] = title
+            located = _locate_skill(ctx.repo_root, impl)
+            procedures.append(
+                f"Lens {number} ({name}) follows `{located or impl}`: read it "
+                f"and apply its checklist to the files this task changed."
+            )
+        lines.append(
+            "LENSES: "
+            + ", ".join(f"{n}. {titles[n]}" for n in sorted(titles))
+            + " — apply these and no other."
+        )
+        lines += procedures
     if resolved.degraded_from:
         lines.append(
             f"NOTE: this phase asked for `{resolved.degraded_from}` and was "
@@ -314,6 +673,19 @@ def _build_prompt(resolved, body: str, ctx: PhaseContext) -> str:
         f"SPEC DIRECTORY: {ctx.spec_dir}",
         f"PROJECT DIRECTORY: {ctx.project_dir}",
     ]
+    if source is not None:
+        # Where the procedure's own files are. A vendored skill (BMAD) refers
+        # to `references/…`, `customize.toml`, `scripts/…` by bare path,
+        # resolved from the directory its SKILL.md lives in; without this
+        # line a model looks for them in the project and reports failure.
+        lines.append(
+            f"PROCEDURE SOURCE: {source} (bare paths resolve from {source.parent})"
+        )
+    lines.append(
+        "NON-INTERACTIVE: nobody answers during this phase. Where the procedure "
+        "asks the user to choose, take its autonomous or default option and say "
+        "which; write what the inputs cannot settle as [NEEDS CLARIFICATION]."
+    )
     if ctx.changed_files:
         shown = ctx.changed_files[:60]
         lines.append(f"FILES CHANGED BY THIS TASK ({len(ctx.changed_files)}):")
@@ -322,6 +694,30 @@ def _build_prompt(resolved, body: str, ctx: PhaseContext) -> str:
             lines.append(f"  … and {len(ctx.changed_files) - len(shown)} more")
     if phase.description:
         lines += ["", f"WHY THIS PHASE EXISTS: {phase.description.strip()}"]
+
+    # A spec-kit project's own binding rules, when the target project is one.
+    # Every skill phase reasons about the project — `analyze` is asked outright
+    # what the plan does that the project forbids — and inferring conventions
+    # from the codebase while the project has written its rules down is
+    # answering the wrong question. Empty for a project without `.specify/`.
+    if rules := _constitution(ctx.project_dir):
+        lines += ["", "---", "", rules]
+
+    # The stack, the commands and what this machine cannot build. Empty for
+    # every project that is not a phone application.
+    if mobile := _mobile(ctx.project_dir):
+        lines += ["", "---", "", mobile]
+
+    # The project's accepted ADRs and the task's attachments. `analyze` is
+    # asked what the plan does that the project forbids, and an ADR is where
+    # the project said so. Empty for most projects and most tasks.
+    if documents := _docintel(ctx.project_dir, ctx.spec_dir):
+        lines += ["", "---", "", documents]
+
+    # The design system of a UI task (ui-ux-pro-max). Empty off the interface.
+    if design := _uiux(ctx.spec_dir, phase.id):
+        lines += ["", "---", "", design]
+
     lines += [
         "",
         "---",
@@ -353,24 +749,255 @@ def _write_output(ctx: PhaseContext, phase_id: str, text: str) -> Path | None:
         return None
 
 
+def _announce(phase_id: str) -> None:
+    """Tell the Kanban which phase of the build this is, when it has a name.
+
+    Without this the pre-planning window was silent, and silence is not
+    neutral: `buildSnapshotFromTask` turns an `in_progress` task with no
+    reported phase into the *coding* column, so a build spent its `docs`,
+    `brainstorm` and `spec` phases displayed as coding and then moved back to
+    planning when the planner finally emitted one. The phases were in order;
+    the badge was reading a default.
+
+    Never raises. This describes a build, it is not part of one.
+    """
+    name = execution_phase_for(phase_id)
+    if name is None:
+        return
+    try:
+        from core.phase_event import ExecutionPhase, emit_phase
+
+        emit_phase(getattr(ExecutionPhase, name), f"Running the {phase_id} phase")
+    except Exception as exc:  # noqa: BLE001 - a badge never fails a phase
+        logger.debug("could not announce phase %s: %s", phase_id, exc)
+
+
+def _kept_frozen(ctx: PhaseContext, phase_id: str) -> bool:
+    try:
+        from .execute import is_frozen
+
+        return is_frozen(ctx.spec_dir, phase_id)
+    except Exception as exc:  # noqa: BLE001 - a marker never stops a phase
+        logger.debug("frozen check skipped for %s: %s", phase_id, exc)
+        return False
+
+
+#: Where the gate below records that it stopped, next to the phase's report.
+IRREVERSIBLE_MARKER = "{phase_id}.pause.json"
+
+
+def irreversible_gate(spec_dir: Path, phase_id: str) -> None:
+    """Stop before an irreversible phase; let it through on an explicit resume.
+
+    The first time the build reaches the phase, the gate writes a marker
+    (`workflow/<id>.pause.json`), marks the build paused in the one pause
+    store (`core.pause_state`, which the Kanban reads to show the Resume
+    control), prints what would run, and raises `BuildPaused` — the signal
+    that unwinds to the entry point without finalizing anything. Resuming
+    clears the pause flag and restarts the build; the window re-enters the
+    phase, finds the marker with the pause lifted, consumes it and proceeds.
+
+    The marker is consumed, not kept: a build re-run later on the same spec
+    stops again. An agent cannot pass this gate — it writes no file in the
+    spec's `workflow/` directory and does not touch the pause store (rule
+    S3: an agent never edits its own guard-rails).
+    """
+    from core.build_signals import BuildPaused
+    from core.pause_state import is_paused, write_pause_state
+
+    workflow = Path(spec_dir) / OUTPUT_DIRNAME
+    workflow.mkdir(parents=True, exist_ok=True)
+    marker = workflow / IRREVERSIBLE_MARKER.format(phase_id=phase_id)
+    if marker.is_file() and not is_paused(spec_dir):
+        try:
+            marker.unlink()
+        except OSError as exc:
+            logger.warning("could not consume %s: %s", marker, exc)
+        print(
+            f"\n▶ {phase_id}: resumed by the user — the irreversible phase starts now."
+        )
+        return
+
+    steps = _irreversible_preview(spec_dir)
+    marker.write_text(
+        json.dumps(
+            {
+                "phase": phase_id,
+                "status": "awaiting-resume",
+                "written": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    write_pause_state(spec_dir, phase=phase_id)
+    print("\n" + "=" * 70)
+    print(f"  ⏸  {phase_id.upper()} IS IRREVERSIBLE — PAUSED BEFORE IT STARTS")
+    print("=" * 70)
+    if steps:
+        print(steps)
+    print(
+        "\nNothing has been executed. Read the procedure, then resume the task "
+        "from the Kanban to play it; stop the task to abandon it."
+    )
+    raise BuildPaused(phase=phase_id)
+
+
+def _irreversible_preview(spec_dir: Path) -> str:
+    """What the paused phase would play, when a procedure exists."""
+    try:
+        from .runbook import load_runbook
+
+        return load_runbook(spec_dir).describe()
+    except Exception as exc:  # noqa: BLE001 - a preview is a courtesy
+        return f"(no readable procedure yet: {exc})"
+
+
+def _run_ui_design_system(resolved, ctx: PhaseContext) -> PhaseOutcome:
+    """`ui-design-system`: the design system the coder will build against.
+
+    No session: `uiux.preflight` asks ui-ux-pro-max's local engine, writes
+    `<spec_dir>/uiux/`, and — on a UI task of a project with no design system
+    yet — `design-system/<project>/MASTER.md` into the worktree.
+    """
+    phase = resolved.phase
+    try:
+        from uiux.preflight import run_preflight
+
+        result = run_preflight(
+            ctx.project_dir, ctx.spec_dir, planned_files=ctx.changed_files
+        )
+    except Exception as exc:  # noqa: BLE001 - a preflight never fails a build
+        return PhaseOutcome(phase.id, phase.impl, resolved.dispatch, None, str(exc))
+
+    relevance = result.relevance
+    if result.status == "skipped":
+        return PhaseOutcome(
+            phase.id,
+            phase.impl,
+            resolved.dispatch,
+            True,
+            detail=f"not a UI task ({relevance.reason})",
+        )
+    if result.status in ("not-installed", "failed"):
+        return PhaseOutcome(
+            phase.id,
+            phase.impl,
+            resolved.dispatch,
+            None,
+            detail="; ".join(result.reasons) or result.status,
+        )
+    parts = []
+    if result.source == "project":
+        parts.append(f"project's {result.master_path}")
+    elif result.master_written:
+        parts.append(f"generated -> {result.master_path}")
+    else:
+        parts.append("generated")
+    if result.guide:
+        parts.append(f"{result.guide} guidelines")
+    if result.status == "withheld":
+        parts.append("MASTER.md withheld by injection_guard")
+    output = Path(ctx.spec_dir) / "uiux" / "design-system.md"
+    return PhaseOutcome(
+        phase.id,
+        phase.impl,
+        resolved.dispatch,
+        True,
+        detail=", ".join(parts),
+        output_path=output if output.is_file() else None,
+    )
+
+
+_DETERMINISTIC_RUNNERS = {"ui-design-system": _run_ui_design_system}
+
+
+def phase_provider(spec_dir: Path, config_phase: str) -> tuple[str | None, str]:
+    """``(explicit, effective)`` provider for a phase.
+
+    ``explicit`` is what the task configured for this phase (or for the whole
+    task) — handed to `create_agent_client` so a per-phase choice is honoured,
+    the way `qa/loop.py` and the planner already honour it. Skill phases used
+    to pass nothing, so a review configured for Ollama ran on whatever the
+    project defaulted to. ``effective`` is what will actually run, read
+    without consuming the resume marker; it picks the skill's overlays.
+    """
+    explicit: str | None = None
+    try:
+        from phase_config import get_phase_provider
+
+        explicit = get_phase_provider(spec_dir, phase=config_phase)
+    except Exception as exc:  # noqa: BLE001 - absent config is not an error
+        logger.debug("no phase provider for %s: %s", config_phase, exc)
+    if explicit:
+        return explicit, explicit
+    try:
+        from core.client import peek_active_provider
+
+        return None, peek_active_provider(spec_dir)
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("could not peek the active provider: %s", exc)
+        return None, "claude"
+
+
 async def run_skill_phase(resolved, ctx: PhaseContext) -> PhaseOutcome:
     """Run one skill-backed phase. Never raises."""
     phase = resolved.phase
     impl = phase.impl
 
-    found = find_skill_body(ctx.repo_root, phase.pack, phase.skill)
-    if found is None:
+    if phase.pack in BUILTIN_PACKS:
         return PhaseOutcome(
             phase.id,
             impl,
             resolved.dispatch,
-            None,
-            detail=(
-                f"no SKILL.md for {impl} — run "
-                f"`pnpm run skills:bootstrap --pack {phase.pack}`"
-            ),
+            True,
+            detail="implemented by WorkPilot itself; no session to open",
         )
-    body, source = found
+
+    # A phase whose report is frozen — a RUN's procedure once its execution
+    # has started — is kept, not rewritten: a resumed build re-enters this
+    # window, and the person resumed on the text they read.
+    if _kept_frozen(ctx, phase.id):
+        report = ctx.spec_dir / OUTPUT_DIRNAME / f"{phase.id}.md"
+        return PhaseOutcome(
+            phase.id,
+            impl,
+            resolved.dispatch,
+            True,
+            detail="kept: execution has started on this report",
+            output_path=report,
+        )
+
+    # Declared irreversible: nothing starts until a person has resumed the
+    # build on purpose. Raises `BuildPaused` the first time through.
+    if phase.irreversible:
+        irreversible_gate(ctx.spec_dir, phase.id)
+
+    deterministic = _DETERMINISTIC_RUNNERS.get(phase.id)
+    if deterministic is not None:
+        # The engine is a subprocess; keep the event loop free while it runs.
+        return await asyncio.to_thread(deterministic, resolved, ctx)
+
+    if phase.id in CUSTOM_EXECUTORS:
+        return await CUSTOM_EXECUTORS[phase.id](resolved, ctx)
+
+    config_phase = CONFIG_PHASE.get(phase.id, _DEFAULT_CONFIG_PHASE)
+    explicit_provider, provider = phase_provider(ctx.spec_dir, config_phase)
+
+    procedure, why = _locate_procedure(phase, ctx, provider)
+    if procedure is None:
+        return PhaseOutcome(phase.id, impl, resolved.dispatch, None, detail=why)
+    body, source, played = procedure
+    if played != impl:
+        # The declared implementation cannot start here; the fallback can.
+        # Said once, in the outcome the user reads, and the phase goes on
+        # under the implementation that runs — `impl` from here on is the
+        # fallback, so the output and the handoff name what was played.
+        logger.info("phase %s: %s", phase.id, why)
+        print(f"  ↳ {phase.id}: {why}")
+        impl = played
+        phase = phase.with_impl(played)
+        resolved = replace(resolved, phase=phase)
     logger.debug("phase %s: procedure from %s", phase.id, source)
 
     try:
@@ -383,7 +1010,9 @@ async def run_skill_phase(resolved, ctx: PhaseContext) -> PhaseOutcome:
             phase.id, impl, resolved.dispatch, None, detail=f"unavailable: {exc}"
         )
 
-    config_phase = CONFIG_PHASE.get(phase.id, _DEFAULT_CONFIG_PHASE)
+    log_phase = getattr(LogPhase, log_phase_for(phase.id), LogPhase.CODING)
+    _announce(phase.id)
+
     agent_type = phase.agent or SKILL_PHASE_AGENTS.get(phase.id, _DEFAULT_AGENT)
 
     # `fresh-context` means exactly this: the session must not rehydrate a
@@ -391,6 +1020,14 @@ async def run_skill_phase(resolved, ctx: PhaseContext) -> PhaseOutcome:
     # create_client, so it is lifted for the duration of the call and put back
     # — the coder loop's own resume must survive a review pass running between
     # two of its iterations.
+    jev_advice = ""
+    if ctx.jev_run is not None and phase.id in ("review", "verify"):
+        from integrations.jev.adapters import assess_build
+        from integrations.jev.rubrics import advice_text
+
+        jev_advice = advice_text(
+            await assess_build(ctx.jev_run, "review", pass_id=phase.id)
+        )
     stashed = None
     if fresh_context(resolved.dispatch):
         stashed = os.environ.pop("AUTO_CLAUDE_RESUME_SESSION_ID", None)
@@ -403,15 +1040,19 @@ async def run_skill_phase(resolved, ctx: PhaseContext) -> PhaseOutcome:
             agent_type=agent_type,
             max_thinking_tokens=get_phase_thinking_budget(ctx.spec_dir, config_phase),
             use_subagents=subagents_allowed(resolved.dispatch),
+            roster=phase.roster,
+            provider=explicit_provider,
         )
-        prompt = _build_prompt(resolved, body, ctx)
+        prompt = _build_prompt(resolved, body, ctx, source)
+        if jev_advice:
+            prompt += "\n\n" + jev_advice
         async with client:
             status, response, _err = await run_agent_session(
                 client,
                 prompt,
                 ctx.spec_dir,
                 ctx.verbose,
-                phase=LogPhase.CODING,
+                phase=log_phase,
             )
     except Exception as exc:  # noqa: BLE001 - a phase reports, it does not abort
         logger.warning("phase %s failed to run: %s", phase.id, exc)
@@ -440,6 +1081,130 @@ async def run_skill_phase(resolved, ctx: PhaseContext) -> PhaseOutcome:
         detail=(f"→ {output_path.name}" if output_path else ""),
         output_path=output_path,
     )
+
+
+def _locate_procedure(
+    phase, ctx: PhaseContext, provider: str | None
+) -> tuple[tuple[str, Path, str] | None, str]:
+    """The procedure a phase runs here: its body, where it came from, and the
+    implementation it belongs to — the declared one, or the fallback when the
+    declared one cannot start.
+
+    "Cannot start" is two things, checked in this order for each candidate:
+    the skill is not on disk, or it is and its ``requires`` is not met in the
+    target project. A skill whose runtime is absent is not a skill that fails,
+    it is a skill that cannot start — and saying so costs nothing, where
+    starting it costs a full session that ends with the model reporting it
+    could not find the files it was told to read.
+
+    Returns ``(None, reason)`` when no candidate can start; the reason names
+    every one that was tried.
+    """
+    reasons: list[str] = []
+    candidates = [phase.impl] + ([phase.fallback] if phase.fallback else [])
+    for candidate in candidates:
+        pack, _, skill = candidate.partition("/")
+        found = find_skill_body(ctx.repo_root, pack, skill, provider)
+        if found is None:
+            reasons.append(
+                f"no SKILL.md for {candidate} — run "
+                f"`pnpm run skills:bootstrap --pack {pack}`"
+            )
+            continue
+        body, source, requires = found
+        satisfied, why = skill_requires(requires, ctx.project_dir)
+        if not satisfied:
+            reasons.append(
+                f"{why} — {candidate} needs it in {ctx.project_dir}; "
+                f"install it there (`skills:bootstrap --pack {pack}`) "
+                f"or point this phase at another implementation"
+            )
+            continue
+        if candidate != phase.impl:
+            return (body, source, candidate), (f"played by {candidate} — {reasons[0]}")
+        return (body, source, candidate), ""
+    return None, "; ".join(reasons)
+
+
+async def _run_verify_loop(resolved, ctx: PhaseContext) -> PhaseOutcome:
+    """The `verify` phase: `verify.phase`, imported when it runs."""
+    try:
+        from verify.phase import run_verify_phase
+    except ImportError as exc:  # pragma: no cover - import-time environment
+        return PhaseOutcome(
+            resolved.phase.id,
+            resolved.phase.impl,
+            resolved.dispatch,
+            None,
+            detail=f"unavailable: {exc}",
+        )
+    return await run_verify_phase(resolved, ctx)
+
+
+async def _run_verify_replay(resolved, ctx: PhaseContext) -> PhaseOutcome:
+    """The `verify-replay` phase: `verify.replay`, no model involved."""
+    try:
+        from verify.replay import run_replay_phase
+    except ImportError as exc:  # pragma: no cover - import-time environment
+        return PhaseOutcome(
+            resolved.phase.id,
+            resolved.phase.impl,
+            resolved.dispatch,
+            None,
+            detail=f"unavailable: {exc}",
+        )
+    return await run_replay_phase(resolved, ctx)
+
+
+async def _run_execute(resolved, ctx: PhaseContext) -> PhaseOutcome:
+    """The `execute` phase of a RUN: `workflows.execute`, no model at all."""
+    try:
+        from .execute import run_execute_phase
+    except ImportError as exc:  # pragma: no cover - import-time environment
+        return PhaseOutcome(
+            resolved.phase.id,
+            resolved.phase.impl,
+            resolved.dispatch,
+            None,
+            detail=f"unavailable: {exc}",
+        )
+    return await run_execute_phase(resolved, ctx)
+
+
+async def _run_architecture_map(resolved, ctx: PhaseContext) -> PhaseOutcome:
+    """The `architecture-map` phase: `archify.phase`, imported when it runs."""
+    try:
+        from architecture_visualizer.archify.phase import run_architecture_map_phase
+    except ImportError as exc:  # pragma: no cover - import-time environment
+        return PhaseOutcome(
+            resolved.phase.id,
+            resolved.phase.impl,
+            resolved.dispatch,
+            None,
+            detail=f"unavailable: {exc}",
+        )
+    return await run_architecture_map_phase(resolved, ctx)
+
+
+# Skill phases whose procedure is *driven* by WorkPilot's Python rather than
+# handed to a single one-shot session. `verify` names its skill like any other
+# phase — that is what the provider overlays and the slash command read — but
+# launching the application, reading its logs, looping a fixer while the error
+# count falls and tracing performance are deterministic steps every provider
+# must get identically, so the loop owns them and the skill drives only the
+# part a model is needed for. Keyed by phase id, for the reason
+# `BUILTIN_EXECUTORS` is.
+#
+# `architecture-map` is the same shape: the significance pass, archify's
+# validate/deliver/compare and the record the Delta tab reads are Python; only
+# authoring the head model needs a session. As a one-shot session it answered
+# in prose, mapped nothing, and left the tab empty.
+CUSTOM_EXECUTORS = {
+    "verify": _run_verify_loop,
+    "verify-replay": _run_verify_replay,
+    "architecture-map": _run_architecture_map,
+    "execute": _run_execute,
+}
 
 
 async def run_skill_phases(
@@ -492,9 +1257,9 @@ class BuiltinPlan:
     impls: dict[str, str] = field(default_factory=dict)
     """Phase id -> the ``<pack>/<skill>`` methodology it declares.
 
-    `coding` declares `superpowers/test-driven-development` and nothing ever
-    loaded it: the phase named a methodology, the coder loop ran the same way
-    regardless, and swapping the `impl:` line changed nothing at all. Carrying
+    `coding` declared a methodology and nothing ever loaded it: the phase named
+    it, the coder loop ran the same way regardless, and swapping the `impl:`
+    line changed nothing at all. Carrying
     it here is what makes "the methodologies become interchangeable phase
     implementations" true of the two phases that do the actual work.
     """

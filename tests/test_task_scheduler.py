@@ -353,7 +353,7 @@ class TestTaskScheduler:
     def test_remove_task(self):
         """Removing a task should reduce the count."""
         scheduler = TaskScheduler()
-        task = scheduler.add_task(ScheduledTask(task_id="rm", name="Remove"))
+        scheduler.add_task(ScheduledTask(task_id="rm", name="Remove"))
         assert scheduler.remove_task("rm")
         assert scheduler.get_task("rm") is None
 
@@ -430,7 +430,9 @@ class TestTaskScheduler:
 
         t1 = ScheduledTask(task_id="c1", name="Chain1", action="chain_action")
         t1.next_run = datetime.now(timezone.utc) - timedelta(minutes=1)
-        t2 = ScheduledTask(task_id="c2", name="Chain2", action="chain_action", enabled=False)
+        t2 = ScheduledTask(
+            task_id="c2", name="Chain2", action="chain_action", enabled=False
+        )
 
         scheduler.add_task(t1)
         scheduler.add_task(t2)

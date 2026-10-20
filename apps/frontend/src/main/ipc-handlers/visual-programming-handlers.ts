@@ -1,5 +1,6 @@
 import { ipcMain } from "electron";
 import {
+	type GeneratedFile,
 	type VisualProgrammingRequest,
 	visualProgrammingService,
 } from "../visual-programming-service";
@@ -61,6 +62,20 @@ export function setupVisualProgrammingEventForwarding(
 		const win = getMainWindow();
 		if (win && !win.isDestroyed()) {
 			win.webContents.send("visualProgramming:status", msg);
+		}
+	});
+
+	visualProgrammingService.on("file", (file: GeneratedFile) => {
+		const win = getMainWindow();
+		if (win && !win.isDestroyed()) {
+			win.webContents.send("visualProgramming:file", file);
+		}
+	});
+
+	visualProgrammingService.on("writing", (filename: string) => {
+		const win = getMainWindow();
+		if (win && !win.isDestroyed()) {
+			win.webContents.send("visualProgramming:writing", filename);
 		}
 	});
 

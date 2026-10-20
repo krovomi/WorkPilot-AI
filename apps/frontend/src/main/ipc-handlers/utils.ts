@@ -172,3 +172,74 @@ export function parseEnvFile(content: string): Record<string, string> {
 	}
 	return result;
 }
+
+/**
+ * What a reader of `.workpilot/.env` takes as the end of a line: `\n` and
+ * `\r` for parseEnvFile, and the rest of what Python's `str.splitlines()`
+ * splits on, since most backend readers use it.
+ */
+// biome-ignore lint/suspicious/noControlCharactersInRegex: matching these characters is the point
+const ENV_LINE_BREAK = /[\n\v\f\r\x1c-\x1e\x85\u2028\u2029]/;
+
+/**
+ * Where `value` holds a line break, in a string or in an object key, as a
+ * path such as `config.mcpServers.context7ApiKey`; null when it holds none.
+ * Written into a .env, such a string adds lines of its own. The path never
+ * includes the offending text.
+ */
+export function findEnvLineBreak(value: unknown): string | null {
+	// Structured clone carries cycles across IPC: each object is walked once.
+	const seen = new WeakSet<object>();
+	const walk = (node: unknown, at: string): string | null => {
+		if (typeof node === "string") {
+			return ENV_LINE_BREAK.test(node) ? at : null;
+		}
+		if (node === null || typeof node !== "object" || seen.has(node)) {
+			return null;
+		}
+		seen.add(node);
+		for (const [key, child] of Object.entries(node)) {
+			if (ENV_LINE_BREAK.test(key)) return `${at} (a key)`;
+			const found = walk(
+				child,
+				Array.isArray(node) ? `${at}[${key}]` : `${at}.${key}`,
+			);
+			if (found !== null) return found;
+		}
+		return null;
+	};
+	return walk(value, "config");
+}
+
+/**
+ * The keys a generated .env template prints, set (`KEY=value`) or offered
+ * commented out (`# KEY=default`). A prose comment does not count: the key
+ * must be an identifier directly followed by `=`.
+ */
+export function envTemplateKeys(template: string): Set<string> {
+	const keys = new Set<string>();
+	for (const line of template.split(/\r?\n/)) {
+		const match = /^(?:#\s*)?([A-Za-z_][A-Za-z0-9_]*)\s*=/.exec(line);
+		if (match) keys.add(match[1]);
+	}
+	return keys;
+}
+
+/**
+ * The `KEY=value` lines of `content` whose key is not owned, exactly as
+ * written (only the line ending is dropped). The key is read the way
+ * parseEnvFile reads it.
+ */
+export function unownedEnvLines(
+	content: string,
+	isOwned: (key: string) => boolean,
+): string[] {
+	return content.split(/\r?\n/).filter((line) => {
+		const trimmed = line.trim();
+		if (!trimmed || trimmed.startsWith("#")) return false;
+		const equalsIndex = trimmed.indexOf("=");
+		return (
+			equalsIndex > 0 && !isOwned(trimmed.substring(0, equalsIndex).trim())
+		);
+	});
+}

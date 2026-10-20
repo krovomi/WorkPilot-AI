@@ -51,7 +51,7 @@ The task is complete when:
 - [ ] Component renders without errors
 - [ ] All tests pass
 """
-    (spec_dir / "spec.md").write_text(spec_content)
+    (spec_dir / "spec.md").write_text(spec_content, encoding="utf-8")
 
     # Create implementation_plan.json
     plan = {
@@ -79,7 +79,9 @@ The task is complete when:
             "total_chunks": 1,
         },
     }
-    (spec_dir / "implementation_plan.json").write_text(json.dumps(plan, indent=2))
+    (spec_dir / "implementation_plan.json").write_text(
+        json.dumps(plan, indent=2), encoding="utf-8"
+    )
 
     return spec_dir
 
@@ -158,7 +160,7 @@ The task is complete when:
 - [ ] Unit tests pass with >80% coverage
 - [ ] Integration tests pass
 """
-    (spec_dir / "spec.md").write_text(spec_content)
+    (spec_dir / "spec.md").write_text(spec_content, encoding="utf-8")
 
     # Create a realistic implementation_plan.json
     plan = {
@@ -241,7 +243,9 @@ The task is complete when:
         "created_at": "2024-01-01T00:00:00",
         "updated_at": "2024-01-01T00:00:00",
     }
-    (spec_dir / "implementation_plan.json").write_text(json.dumps(plan, indent=2))
+    (spec_dir / "implementation_plan.json").write_text(
+        json.dumps(plan, indent=2), encoding="utf-8"
+    )
 
     return spec_dir
 

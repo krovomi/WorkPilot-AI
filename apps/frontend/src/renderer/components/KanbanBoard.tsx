@@ -2,54 +2,36 @@ import {
 	closestCorners,
 	DndContext,
 	type DragEndEvent,
-	type DraggableAttributes,
 	type DragOverEvent,
 	DragOverlay,
 	type DragStartEvent,
 	KeyboardSensor,
 	PointerSensor,
-	useDroppable,
 	useSensor,
 	useSensors,
 } from "@dnd-kit/core";
-import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import {
 	arrayMove,
 	horizontalListSortingStrategy,
 	SortableContext,
 	sortableKeyboardCoordinates,
-	useSortable,
-	verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import {
 	AlertTriangle,
-	Archive,
 	Ban,
-	Check,
 	CheckCheck,
-	CheckCircle2,
 	ChevronLeft,
 	ChevronRight,
 	ChevronsRight,
 	Coins,
-	Eye,
-	Gauge,
 	GitPullRequest,
-	GripVertical,
-	Inbox,
-	ListPlus,
 	Loader2,
-	Lock,
-	Plus,
 	RefreshCw,
-	Settings,
 	Timer,
 	Trash2,
-	Unlock,
 	X,
 } from "lucide-react";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
 	TASK_STATUS_COLUMNS,
@@ -67,7 +49,6 @@ import type {
 	JiraWorkItem,
 } from "../../shared/types/integrations";
 import { parseAcceptanceCriteriaText } from "../../shared/utils/acceptance-criteria";
-// Import logos
 import AzureDevOpsLogo from "../assets/logos/azure-devops.svg";
 import JiraLogo from "../assets/logos/jira.svg";
 import { useViewState } from "../contexts/ViewStateContext";
@@ -76,13 +57,18 @@ import { useToast } from "../hooks/use-toast";
 import { formatAgingDuration, listAgingTasks } from "../lib/kanban-aging";
 import { computeBoardCostForecast } from "../lib/kanban-cost";
 import {
+	indexTasksById,
+	isBlocked,
+	resolveBlockers,
+} from "../lib/kanban-dependencies";
+import {
 	compareTasksBySort,
 	taskMatchesFilters,
 } from "../lib/kanban-filter";
+import { orderQueue } from "../lib/kanban-queue";
 import { cn } from "../lib/utils";
 import { openAppEmulatorDialog } from "../stores/app-emulator-store";
 import {
-	COLLAPSED_COLUMN_WIDTH,
 	DEFAULT_COLUMN_WIDTH,
 	MAX_COLUMN_WIDTH,
 	MIN_COLUMN_WIDTH,
@@ -92,6 +78,10 @@ import { useKanbanFilterStore } from "../stores/kanban-filter-store";
 import {
 	useProjectEnvStore,
 } from "../stores/project-env-store";
+import {
+	type BoardBlockerInfo,
+	useKanbanBlockerStore,
+} from "../stores/kanban-blocker-store";
 import {
 	type BoardConflictInfo,
 	useKanbanConflictStore,
@@ -118,7 +108,6 @@ import { JiraSidePanel } from "./jira-import/JiraSidePanel";
 import { KanbanToolbar } from "./kanban/KanbanToolbar";
 import { PRFilesModal } from "./PRFilesModal";
 import { QueueSettingsModal } from "./QueueSettingsModal";
-import { SortableTaskCard } from "./SortableTaskCard";
 import { AppSettingsDialog } from "./settings/AppSettings";
 import { TaskCard } from "./TaskCard";
 import { TaskEditDialog } from "./TaskEditDialog";
@@ -135,12 +124,11 @@ import {
 	AlertDialogTitle,
 } from "./ui/alert-dialog";
 import { Button } from "./ui/button";
-import { Checkbox } from "./ui/checkbox";
-import { Input } from "./ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { ScrollArea } from "./ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { WorktreeCleanupDialog } from "./WorktreeCleanupDialog";
+import { SortableColumnWrapper } from "./kanban/KanbanColumn";
 
 // Type guard for valid drop column targets - preserves literal type from TASK_STATUS_COLUMNS
 const VALID_DROP_COLUMNS = new Set<string>(TASK_STATUS_COLUMNS);
@@ -161,13 +149,6 @@ const CONFLICT_RELEVANT_STATUSES = new Set<TaskStatus>([
 	"human_review",
 	"error",
 ]);
-
-// Max cards a single column renders before collapsing the tail behind a
-// "show more" toggle. Huge columns (e.g. a freshly bulk-imported backlog)
-// otherwise mount hundreds of cards and jank the board. Capping keeps the DOM
-// bounded while reusing the exact same (drag-enabled) render path for the
-// visible slice — no change to drag-and-drop behaviour.
-const COLUMN_RENDER_CAP = 60;
 
 // Columns where external work items (Azure DevOps / Jira) can be dropped
 const IMPORT_ALLOWED_COLUMNS = new Set<string>([
@@ -218,1025 +199,6 @@ interface KanbanBoardProps {
 	) => void;
 	readonly onOpenJiraSettings?: () => void;
 	readonly onOpenAzureDevOpsSettings?: () => void;
-}
-
-interface DroppableColumnProps {
-	status: TaskStatus;
-	tasks: Task[];
-	onTaskClick: (task: Task) => void;
-	onStatusChange: (taskId: string, newStatus: TaskStatus) => unknown;
-	isOver: boolean;
-	isImportForbidden?: boolean;
-	onAddClick?: () => void;
-	onArchiveAll?: () => void;
-	onQueueSettings?: () => void;
-	onQueueAll?: () => void;
-	maxParallelTasks?: number;
-	/** Soft WIP limit for this column (undefined = no limit). */
-	wipLimit?: number;
-	/** Set or clear (undefined) the soft WIP limit for this column. */
-	onSetWipLimit?: (limit: number | undefined) => void;
-	archivedCount?: number;
-	showArchived?: boolean;
-	onToggleArchived?: () => void;
-	// Selection props for human_review column
-	selectedTaskIds?: Set<string>;
-	onSelectAll?: () => void;
-	onDeselectAll?: () => void;
-	onToggleSelect?: (taskId: string) => void;
-	onDeleteTask?: (taskId: string) => void;
-	onDuplicateTask?: (taskId: string) => void;
-	onViewPRFiles?: (prUrl: string, taskId: string) => void;
-	onPreviewApp?: (taskId: string) => void;
-	// Collapse props
-	isCollapsed?: boolean;
-	onToggleCollapsed?: () => void;
-	// Resize props
-	columnWidth?: number;
-	isResizing?: boolean;
-	onResizeStart?: (startX: number) => void;
-	onResizeEnd?: () => void;
-	// Lock props
-	isLocked?: boolean;
-	onToggleLocked?: () => void;
-	// Column drag handle props (for column reordering)
-	dragHandleProps?: {
-		listeners: SyntheticListenerMap | undefined;
-		attributes: DraggableAttributes;
-	};
-}
-
-/**
- * Compare two tasks arrays for meaningful changes.
- * Returns true if tasks are equivalent (should skip re-render).
- */
-function tasksAreEquivalent(prevTasks: Task[], nextTasks: Task[]): boolean {
-	if (prevTasks.length !== nextTasks.length) return false;
-	if (prevTasks === nextTasks) return true;
-
-	// Compare by ID and fields that affect rendering
-	for (let i = 0; i < prevTasks.length; i++) {
-		const prev = prevTasks[i];
-		const next = nextTasks[i];
-		if (
-			prev.id !== next.id ||
-			prev.status !== next.status ||
-			prev.executionProgress?.phase !== next.executionProgress?.phase ||
-			prev.updatedAt !== next.updatedAt
-		) {
-			return false;
-		}
-	}
-	return true;
-}
-
-/**
- * Custom comparator for DroppableColumn memo.
- */
-function droppableColumnPropsAreEqual(
-	prevProps: DroppableColumnProps,
-	nextProps: DroppableColumnProps,
-): boolean {
-	// Quick checks first
-	if (prevProps.status !== nextProps.status) return false;
-	if (prevProps.isOver !== nextProps.isOver) return false;
-	if (prevProps.isImportForbidden !== nextProps.isImportForbidden) return false;
-	if (prevProps.onTaskClick !== nextProps.onTaskClick) return false;
-	if (prevProps.onStatusChange !== nextProps.onStatusChange) return false;
-	if (prevProps.onAddClick !== nextProps.onAddClick) return false;
-	if (prevProps.onArchiveAll !== nextProps.onArchiveAll) return false;
-	if (prevProps.onQueueSettings !== nextProps.onQueueSettings) return false;
-	if (prevProps.onQueueAll !== nextProps.onQueueAll) return false;
-	if (prevProps.maxParallelTasks !== nextProps.maxParallelTasks) return false;
-	if (prevProps.wipLimit !== nextProps.wipLimit) return false;
-	if (prevProps.onSetWipLimit !== nextProps.onSetWipLimit) return false;
-	if (prevProps.archivedCount !== nextProps.archivedCount) return false;
-	if (prevProps.showArchived !== nextProps.showArchived) return false;
-	if (prevProps.onToggleArchived !== nextProps.onToggleArchived) return false;
-	if (prevProps.onSelectAll !== nextProps.onSelectAll) return false;
-	if (prevProps.onDeselectAll !== nextProps.onDeselectAll) return false;
-	if (prevProps.onToggleSelect !== nextProps.onToggleSelect) return false;
-	if (prevProps.isCollapsed !== nextProps.isCollapsed) return false;
-	if (prevProps.columnWidth !== nextProps.columnWidth) return false;
-	if (prevProps.isResizing !== nextProps.isResizing) return false;
-	if (prevProps.onResizeStart !== nextProps.onResizeStart) return false;
-	if (prevProps.onResizeEnd !== nextProps.onResizeEnd) return false;
-	if (prevProps.isLocked !== nextProps.isLocked) return false;
-	if (prevProps.onToggleLocked !== nextProps.onToggleLocked) return false;
-	if (prevProps.onViewPRFiles !== nextProps.onViewPRFiles) return false;
-	if (prevProps.onPreviewApp !== nextProps.onPreviewApp) return false;
-	if (prevProps.dragHandleProps !== nextProps.dragHandleProps) return false;
-
-	// Compare selection props
-	const prevSelected = prevProps.selectedTaskIds;
-	const nextSelected = nextProps.selectedTaskIds;
-	if (prevSelected !== nextSelected) {
-		if (!prevSelected || !nextSelected) return false;
-		if (prevSelected.size !== nextSelected.size) return false;
-		for (const id of prevSelected) {
-			if (!nextSelected.has(id)) return false;
-		}
-	}
-
-	// Deep compare tasks
-	const tasksEqual = tasksAreEquivalent(prevProps.tasks, nextProps.tasks);
-
-	// Only log when re-rendering (reduces noise)
-	if (globalThis.DEBUG && !tasksEqual) {
-		// noop
-	}
-
-	return tasksEqual;
-}
-
-// Empty state content for each column
-const getEmptyStateContent = (
-	status: TaskStatus,
-	t: (key: string) => string,
-): { icon: React.ReactNode; message: string; subtext?: string } => {
-	switch (status) {
-		case "backlog":
-			return {
-				icon: <Inbox className="h-6 w-6 text-muted-foreground/50" />,
-				message: t("kanban.emptyBacklog"),
-				subtext: t("kanban.emptyBacklogHint"),
-			};
-		case "queue":
-			return {
-				icon: <Loader2 className="h-6 w-6 text-muted-foreground/50" />,
-				message: t("kanban.emptyQueue"),
-				subtext: t("kanban.emptyQueueHint"),
-			};
-		case "in_progress":
-			return {
-				icon: <Loader2 className="h-6 w-6 text-muted-foreground/50" />,
-				message: t("kanban.emptyInProgress"),
-				subtext: t("kanban.emptyInProgressHint"),
-			};
-		case "ai_review":
-			return {
-				icon: <Eye className="h-6 w-6 text-muted-foreground/50" />,
-				message: t("kanban.emptyAiReview"),
-				subtext: t("kanban.emptyAiReviewHint"),
-			};
-		case "human_review":
-			return {
-				icon: <Eye className="h-6 w-6 text-muted-foreground/50" />,
-				message: t("kanban.emptyHumanReview"),
-				subtext: t("kanban.emptyHumanReviewHint"),
-			};
-		case "build_failed":
-			return {
-				icon: <CheckCircle2 className="h-6 w-6 text-success/50" />,
-				message: t("kanban.emptyBuildFailed"),
-				subtext: t("kanban.emptyBuildFailedHint"),
-			};
-		case "done":
-			return {
-				icon: <CheckCircle2 className="h-6 w-6 text-muted-foreground/50" />,
-				message: t("kanban.emptyDone"),
-				subtext: t("kanban.emptyDoneHint"),
-			};
-		default:
-			return {
-				icon: <Inbox className="h-6 w-6 text-muted-foreground/50" />,
-				message: t("kanban.emptyDefault"),
-			};
-	}
-};
-
-interface WipLimitPopoverProps {
-	wipLimit?: number;
-	onSetWipLimit: (limit: number | undefined) => void;
-}
-
-/**
- * Small popover to set or clear a column's soft WIP limit. Kept self-contained
- * so the memoized DroppableColumn only re-renders on the `wipLimit` value.
- */
-function WipLimitPopover({ wipLimit, onSetWipLimit }: WipLimitPopoverProps) {
-	const { t } = useTranslation(["tasks"]);
-	const [open, setOpen] = useState(false);
-	const [draft, setDraft] = useState<string>(wipLimit ? String(wipLimit) : "");
-
-	// Re-sync the input whenever the popover opens or the stored value changes.
-	useEffect(() => {
-		if (open) setDraft(wipLimit ? String(wipLimit) : "");
-	}, [open, wipLimit]);
-
-	const commit = useCallback(() => {
-		const parsed = Number.parseInt(draft, 10);
-		onSetWipLimit(
-			Number.isFinite(parsed) && parsed >= 1 ? parsed : undefined,
-		);
-		setOpen(false);
-	}, [draft, onSetWipLimit]);
-
-	return (
-		<Popover open={open} onOpenChange={setOpen}>
-			<Tooltip delayDuration={200}>
-				<TooltipTrigger asChild>
-					<PopoverTrigger asChild>
-						<Button
-							variant="ghost"
-							size="icon"
-							className={cn(
-								"h-7 w-7 transition-colors",
-								wipLimit
-									? "text-primary bg-primary/10 hover:bg-primary/20"
-									: "hover:bg-muted-foreground/10 hover:text-muted-foreground",
-							)}
-							aria-label={t("kanban.wipLimit.set")}
-						>
-							<Gauge className="h-3.5 w-3.5" />
-						</Button>
-					</PopoverTrigger>
-				</TooltipTrigger>
-				<TooltipContent side="left">
-					{t("kanban.wipLimit.set")}
-				</TooltipContent>
-			</Tooltip>
-			<PopoverContent align="end" className="w-60 space-y-3 p-3">
-				<div className="space-y-1">
-					<span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-						{t("kanban.wipLimit.label")}
-					</span>
-					<p className="text-xs text-muted-foreground">
-						{t("kanban.wipLimit.description")}
-					</p>
-				</div>
-				<div className="flex items-center gap-2">
-					<Input
-						type="number"
-						min={1}
-						value={draft}
-						onChange={(e) => setDraft(e.target.value)}
-						onKeyDown={(e) => {
-							if (e.key === "Enter") commit();
-						}}
-						placeholder={t("kanban.wipLimit.placeholder")}
-						className="h-8"
-						autoFocus
-					/>
-					<Button
-						size="icon"
-						className="h-8 w-8 shrink-0"
-						onClick={commit}
-						aria-label={t("kanban.wipLimit.set")}
-					>
-						<Check className="h-4 w-4" />
-					</Button>
-				</div>
-				{wipLimit !== undefined && (
-					<Button
-						variant="ghost"
-						size="sm"
-						className="h-7 w-full text-xs text-muted-foreground hover:text-destructive"
-						onClick={() => {
-							onSetWipLimit(undefined);
-							setOpen(false);
-						}}
-					>
-						<X className="mr-1 h-3 w-3" />
-						{t("kanban.wipLimit.clear")}
-					</Button>
-				)}
-			</PopoverContent>
-		</Popover>
-	);
-}
-
-const DroppableColumn = memo(function DroppableColumn({
-	status,
-	tasks,
-	onTaskClick,
-	onStatusChange,
-	isOver,
-	isImportForbidden,
-	onAddClick,
-	onArchiveAll,
-	onQueueSettings,
-	onQueueAll,
-	maxParallelTasks,
-	wipLimit,
-	onSetWipLimit,
-	archivedCount,
-	showArchived,
-	onToggleArchived,
-	selectedTaskIds,
-	onSelectAll,
-	onDeselectAll,
-	onToggleSelect,
-	onDeleteTask,
-	onDuplicateTask,
-	onViewPRFiles,
-	onPreviewApp,
-	isCollapsed,
-	onToggleCollapsed,
-	columnWidth,
-	isResizing,
-	onResizeStart,
-	onResizeEnd,
-	isLocked,
-	onToggleLocked,
-	dragHandleProps,
-}: DroppableColumnProps) {
-	const { t } = useTranslation(["tasks", "common"]);
-	const { setNodeRef } = useDroppable({
-		id: status,
-	});
-
-	// Calculate selection state for this column
-	const taskCount = tasks.length;
-	const columnSelectedCount = tasks.filter((t) =>
-		selectedTaskIds?.has(t.id),
-	).length;
-	const isAllSelected = taskCount > 0 && columnSelectedCount === taskCount;
-	const isSomeSelected =
-		columnSelectedCount > 0 && columnSelectedCount < taskCount;
-
-	// Determine checkbox checked state: true (all), 'indeterminate' (some), false (none)
-	let selectAllCheckedState: boolean | "indeterminate";
-
-	if (isAllSelected) {
-		selectAllCheckedState = true;
-	} else if (isSomeSelected) {
-		selectAllCheckedState = "indeterminate";
-	} else {
-		selectAllCheckedState = false;
-	}
-
-	// Handle select all checkbox change
-	const handleSelectAllChange = useCallback(() => {
-		if (isAllSelected) {
-			onDeselectAll?.();
-		} else {
-			onSelectAll?.();
-		}
-	}, [isAllSelected, onSelectAll, onDeselectAll]);
-
-	// Render cap: a very large column only mounts its first COLUMN_RENDER_CAP
-	// cards until the user opts to reveal the rest. The common case (columns
-	// under the cap) is byte-for-byte the previous behaviour.
-	const [showAllCards, setShowAllCards] = useState(false);
-	const visibleTasks = useMemo(
-		() =>
-			showAllCards || tasks.length <= COLUMN_RENDER_CAP
-				? tasks
-				: tasks.slice(0, COLUMN_RENDER_CAP),
-		[tasks, showAllCards],
-	);
-	const hiddenCardCount = tasks.length - visibleTasks.length;
-
-	// Memoize taskIds to prevent SortableContext from re-rendering unnecessarily
-	const taskIds = useMemo(() => visibleTasks.map((t) => t.id), [visibleTasks]);
-
-	// Create stable onClick handlers for each task to prevent unnecessary re-renders
-	const onClickHandlers = useMemo(() => {
-		const handlers = new Map<string, () => void>();
-		tasks.forEach((task) => {
-			handlers.set(task.id, () => onTaskClick(task));
-		});
-		return handlers;
-	}, [tasks, onTaskClick]);
-
-	// Create stable onStatusChange handlers for each task
-	const onStatusChangeHandlers = useMemo(() => {
-		const handlers = new Map<string, (newStatus: TaskStatus) => unknown>();
-		tasks.forEach((task) => {
-			handlers.set(task.id, (newStatus: TaskStatus) =>
-				onStatusChange(task.id, newStatus),
-			);
-		});
-		return handlers;
-	}, [tasks, onStatusChange]);
-
-	// Create stable onToggleSelect handlers for each task (for bulk selection)
-	const onToggleSelectHandlers = useMemo(() => {
-		if (!onToggleSelect) return null;
-		const handlers = new Map<string, () => void>();
-		tasks.forEach((task) => {
-			handlers.set(task.id, () => onToggleSelect(task.id));
-		});
-		return handlers;
-	}, [tasks, onToggleSelect]);
-
-	// Create stable onDelete handlers for each task
-	const onDeleteHandlers = useMemo(() => {
-		const handlers = new Map<string, () => void>();
-		tasks.forEach((task) => {
-			handlers.set(task.id, () => onDeleteTask?.(task.id));
-		});
-		return handlers;
-	}, [tasks, onDeleteTask]);
-
-	// Create stable onDuplicate handlers for each task
-	const onDuplicateHandlers = useMemo(() => {
-		if (!onDuplicateTask) return null;
-		const handlers = new Map<string, () => void>();
-		tasks.forEach((task) => {
-			handlers.set(task.id, () => onDuplicateTask(task.id));
-		});
-		return handlers;
-	}, [tasks, onDuplicateTask]);
-
-	// Create stable onViewPRFiles handlers for each task
-	const onViewPRFilesHandlers = useMemo(() => {
-		if (!onViewPRFiles) return null;
-		const handlers = new Map<string, () => void>();
-		tasks.forEach((task) => {
-			handlers.set(task.id, () => {
-				if (task.metadata?.prUrl) {
-					onViewPRFiles(task.metadata.prUrl, task.id);
-				}
-			});
-		});
-		return handlers;
-	}, [tasks, onViewPRFiles]);
-
-	// Create stable onPreviewApp handlers for each task
-	const onPreviewAppHandlers = useMemo(() => {
-		if (!onPreviewApp) return null;
-		const handlers = new Map<string, () => void>();
-		tasks.forEach((task) => {
-			handlers.set(task.id, () => onPreviewApp(task.id));
-		});
-		return handlers;
-	}, [tasks, onPreviewApp]);
-
-	// Memoize task card elements to prevent recreation on every render
-	const taskCards = useMemo(() => {
-		if (tasks.length === 0) return null;
-		const isSelectable = !!onToggleSelectHandlers;
-		const cards: React.ReactNode[] = visibleTasks.map((task) => (
-			<SortableTaskCard
-				key={task.id}
-				task={task}
-				// biome-ignore lint/style/noNonNullAssertion: value is guaranteed by context
-				onClick={onClickHandlers.get(task.id)!}
-				onStatusChange={onStatusChangeHandlers.get(task.id)}
-				isSelectable={isSelectable}
-				isSelected={isSelectable ? selectedTaskIds?.has(task.id) : undefined}
-				onToggleSelect={onToggleSelectHandlers?.get(task.id)}
-				onDelete={onDeleteHandlers.get(task.id)}
-				onDuplicate={onDuplicateHandlers?.get(task.id)}
-				onViewPRFiles={onViewPRFilesHandlers?.get(task.id)}
-				onPreviewApp={onPreviewAppHandlers?.get(task.id)}
-			/>
-		));
-		// "Show more / less" toggle for capped columns (expanded columns only —
-		// the collapsed strip is a glance preview). It's not a sortable item, so
-		// it sits inside SortableContext harmlessly.
-		if (!isCollapsed && tasks.length > COLUMN_RENDER_CAP) {
-			cards.push(
-				<button
-					key="__show_more_toggle__"
-					type="button"
-					onClick={() => setShowAllCards((v) => !v)}
-					className="w-full rounded-md border border-dashed border-border/60 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
-				>
-					{showAllCards
-						? t("kanban.showLess")
-						: t("kanban.showMore", { count: hiddenCardCount })}
-				</button>,
-			);
-		}
-		return cards;
-	}, [
-		visibleTasks,
-		tasks.length,
-		isCollapsed,
-		showAllCards,
-		hiddenCardCount,
-		t,
-		onClickHandlers,
-		onStatusChangeHandlers,
-		onToggleSelectHandlers,
-		onDeleteHandlers,
-		onDuplicateHandlers,
-		onViewPRFilesHandlers,
-		onPreviewAppHandlers,
-		selectedTaskIds,
-	]);
-
-	const getColumnBorderColor = (): string => {
-		switch (status) {
-			case "backlog":
-				return "column-backlog";
-			case "queue":
-				return "column-queue";
-			case "in_progress":
-				return "column-in-progress";
-			case "ai_review":
-				return "column-ai-review";
-			case "human_review":
-				return "column-human-review";
-			case "done":
-				return "column-done";
-			default:
-				return "border-t-muted-foreground/30";
-		}
-	};
-
-	const emptyState = getEmptyStateContent(status, t);
-
-	// Collapsed state: show narrow vertical strip with rotated title and task count
-	if (isCollapsed) {
-		return (
-			<div
-				ref={setNodeRef}
-				className={cn(
-					"relative flex flex-col rounded-xl border border-white/5 bg-linear-to-b from-secondary/30 to-transparent backdrop-blur-sm transition-all duration-200",
-					getColumnBorderColor(),
-					"border-t-2",
-					isOver && "drop-zone-highlight",
-					isImportForbidden && "border-destructive/60",
-				)}
-				style={{
-					width: COLLAPSED_COLUMN_WIDTH,
-					minWidth: COLLAPSED_COLUMN_WIDTH,
-					maxWidth: COLLAPSED_COLUMN_WIDTH,
-				}}
-				data-column-status={status}
-			>
-				{isImportForbidden && (
-					<div className="absolute inset-0 rounded-xl bg-destructive/15 flex items-center justify-center z-10 pointer-events-none">
-						<Ban className="h-6 w-6 text-destructive/70" />
-					</div>
-				)}
-				{/* Expand button at top */}
-				<div className="flex justify-center p-2 border-b border-white/5">
-					<Tooltip delayDuration={200}>
-						<TooltipTrigger asChild>
-							<Button
-								variant="ghost"
-								size="icon"
-								className="h-7 w-7 hover:bg-primary/10 hover:text-primary transition-colors"
-								onClick={onToggleCollapsed}
-								aria-label={t("kanban.expandColumn")}
-							>
-								<ChevronRight className="h-4 w-4" />
-							</Button>
-						</TooltipTrigger>
-						<TooltipContent side="right">
-							{t("kanban.expandColumn")}
-						</TooltipContent>
-					</Tooltip>
-				</div>
-
-				{/* Rotated title and task count */}
-				<div className="flex-1 flex flex-col items-center justify-center">
-					<div
-						className="flex items-center gap-2 whitespace-nowrap"
-						style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
-					>
-						<span className="column-count-badge">{tasks.length}</span>
-						<h2 className="font-semibold text-sm text-foreground">
-							{t(TASK_STATUS_LABELS[status])}
-						</h2>
-					</div>
-				</div>
-
-				{/* Task list */}
-				<div className="flex-1 min-h-0">
-					<ScrollArea className="h-full px-3 pb-3 pt-2">
-						<SortableContext
-							items={taskIds}
-							strategy={verticalListSortingStrategy}
-						>
-							<div className="space-y-3 min-h-0">
-								{tasks.length === 0 ? (
-									<div
-										className={cn(
-											"empty-column-dropzone flex flex-col items-center justify-center py-6",
-											isOver && "active",
-										)}
-									>
-										{isOver ? (
-											<>
-												<div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center mb-2">
-													<Plus className="h-4 w-4 text-primary" />
-												</div>
-												<span className="text-sm font-medium text-primary">
-													{t("kanban.dropHere")}
-												</span>
-											</>
-										) : (
-											<>
-												{emptyState.icon}
-												<span className="mt-2 text-sm font-medium text-muted-foreground/70">
-													{emptyState.message}
-												</span>
-												{emptyState.subtext && (
-													<span className="mt-0.5 text-xs text-muted-foreground/50">
-														{emptyState.subtext}
-													</span>
-												)}
-											</>
-										)}
-									</div>
-								) : (
-									taskCards
-								)}
-							</div>
-						</SortableContext>
-					</ScrollArea>
-				</div>
-			</div>
-		);
-	}
-
-	return (
-		<div
-			className="relative flex shrink-0 h-full"
-			style={{
-				width: columnWidth || DEFAULT_COLUMN_WIDTH,
-				minWidth: MIN_COLUMN_WIDTH,
-				maxWidth: MAX_COLUMN_WIDTH,
-			}}
-		>
-			<div
-				ref={setNodeRef}
-				className={cn(
-					"relative flex flex-1 flex-col rounded-xl border border-white/5 bg-linear-to-b from-secondary/30 to-transparent backdrop-blur-sm transition-all duration-200",
-					getColumnBorderColor(),
-					"border-t-2",
-					isOver && "drop-zone-highlight",
-					isImportForbidden && "border-destructive/60",
-				)}
-				data-column-status={status}
-			>
-				{isImportForbidden && (
-					<div className="absolute inset-0 rounded-xl bg-destructive/15 flex items-center justify-center z-10 pointer-events-none">
-						<Ban className="h-10 w-10 text-destructive/70" />
-					</div>
-				)}
-				{/* Column header - enhanced styling */}
-				<div className="flex items-center justify-between p-4 border-b border-white/5">
-					<div className="flex items-center gap-2.5">
-						{/* Column drag handle for reordering */}
-						{dragHandleProps && (
-							<Tooltip delayDuration={400}>
-								<TooltipTrigger asChild>
-									<button
-										type="button"
-										className="h-6 w-5 flex items-center justify-center cursor-grab active:cursor-grabbing text-muted-foreground/30 hover:text-muted-foreground/70 transition-colors touch-none"
-										{...dragHandleProps.listeners}
-										{...dragHandleProps.attributes}
-										aria-label={t("kanban.dragColumn")}
-									>
-										<GripVertical className="h-4 w-4" />
-									</button>
-								</TooltipTrigger>
-								<TooltipContent>{t("kanban.dragColumn")}</TooltipContent>
-							</Tooltip>
-						)}
-						{/* Collapse button */}
-						{onToggleCollapsed && (
-							<Tooltip delayDuration={200}>
-								<TooltipTrigger asChild>
-									<Button
-										variant="ghost"
-										size="icon"
-										className="h-6 w-6 hover:bg-muted-foreground/10 hover:text-muted-foreground transition-colors"
-										onClick={onToggleCollapsed}
-										aria-label={t("kanban.collapseColumn")}
-									>
-										<ChevronLeft className="h-3.5 w-3.5" />
-									</Button>
-								</TooltipTrigger>
-								<TooltipContent>{t("kanban.collapseColumn")}</TooltipContent>
-							</Tooltip>
-						)}
-						{/* Select All checkbox for column */}
-						{onSelectAll && onDeselectAll && (
-							<Tooltip delayDuration={200}>
-								<TooltipTrigger asChild>
-									<div className="flex items-center">
-										<Checkbox
-											checked={selectAllCheckedState}
-											onCheckedChange={handleSelectAllChange}
-											disabled={taskCount === 0}
-											aria-label={
-												isAllSelected
-													? t("kanban.deselectAll")
-													: t("kanban.selectAll")
-											}
-											className="h-4 w-4"
-										/>
-									</div>
-								</TooltipTrigger>
-								<TooltipContent>
-									{isAllSelected
-										? t("kanban.deselectAll")
-										: t("kanban.selectAll")}
-								</TooltipContent>
-							</Tooltip>
-						)}
-						<h2 className="font-semibold text-sm text-foreground">
-							{t(TASK_STATUS_LABELS[status])}
-						</h2>
-						{status === "in_progress" && maxParallelTasks ? (
-							<span
-								className={cn(
-									"column-count-badge",
-									tasks.length >= maxParallelTasks &&
-										"bg-warning/20 text-warning border-warning/30",
-								)}
-							>
-								{tasks.length}/{maxParallelTasks}
-							</span>
-						) : wipLimit ? (
-							<Tooltip delayDuration={200}>
-								<TooltipTrigger asChild>
-									<span
-										className={cn(
-											"column-count-badge",
-											tasks.length > wipLimit &&
-												"bg-warning/20 text-warning border-warning/30",
-										)}
-									>
-										{tasks.length}/{wipLimit}
-									</span>
-								</TooltipTrigger>
-								{tasks.length > wipLimit && (
-									<TooltipContent>
-										{t("kanban.wipLimit.exceeded", {
-											count: tasks.length,
-											limit: wipLimit,
-										})}
-									</TooltipContent>
-								)}
-							</Tooltip>
-						) : (
-							<span className="column-count-badge">{tasks.length}</span>
-						)}
-					</div>
-					<div className="flex items-center gap-1">
-						{/* Lock toggle button - available for all columns */}
-						{onToggleLocked && (
-							<Tooltip delayDuration={200}>
-								<TooltipTrigger asChild>
-									<Button
-										variant="ghost"
-										size="icon"
-										className={cn(
-											"h-7 w-7 transition-colors",
-											isLocked
-												? "text-amber-500 bg-amber-500/10 hover:bg-amber-500/20"
-												: "hover:bg-muted-foreground/10 hover:text-muted-foreground",
-										)}
-										onClick={onToggleLocked}
-										aria-pressed={isLocked}
-										aria-label={
-											isLocked
-												? t("kanban.unlockColumn")
-												: t("kanban.lockColumn")
-										}
-									>
-										{isLocked ? (
-											<Lock className="h-3.5 w-3.5" />
-										) : (
-											<Unlock className="h-3.5 w-3.5" />
-										)}
-									</Button>
-								</TooltipTrigger>
-								<TooltipContent side="left">
-									{isLocked ? t("kanban.unlockColumn") : t("kanban.lockColumn")}
-								</TooltipContent>
-							</Tooltip>
-						)}
-						{/* Soft WIP limit setter (not shown on in_progress, which uses
-						    the hard parallel-task limit instead) */}
-						{onSetWipLimit && (
-							<WipLimitPopover
-								wipLimit={wipLimit}
-								onSetWipLimit={onSetWipLimit}
-							/>
-						)}
-						{status === "backlog" && (
-							<>
-								{onQueueAll && tasks.length > 0 && (
-									<Button
-										variant="ghost"
-										size="icon"
-										className="h-7 w-7 hover:bg-cyan-500/10 hover:text-cyan-400 transition-colors"
-										onClick={onQueueAll}
-										title={t("queue.queueAll")}
-									>
-										<ListPlus className="h-4 w-4" />
-									</Button>
-								)}
-								{onAddClick && (
-									<Tooltip delayDuration={200}>
-										<TooltipTrigger asChild>
-											<Button
-												variant="ghost"
-												size="icon"
-												className="h-7 w-7 hover:bg-primary/10 hover:text-primary transition-colors"
-												onClick={onAddClick}
-												aria-label={t("kanban.addTaskAriaLabel")}
-											>
-												<Plus className="h-4 w-4" />
-											</Button>
-										</TooltipTrigger>
-										<TooltipContent side="left">
-											{t("kanban.addTaskAriaLabel")}
-										</TooltipContent>
-									</Tooltip>
-								)}
-							</>
-						)}
-						{status === "queue" && onQueueSettings && (
-							<Button
-								variant="ghost"
-								size="icon"
-								className="h-7 w-7 hover:bg-cyan-500/10 hover:text-cyan-400 transition-colors"
-								onClick={onQueueSettings}
-								title={t("kanban.queueSettings")}
-							>
-								<Settings className="h-4 w-4" />
-							</Button>
-						)}
-						{status === "done" &&
-							onArchiveAll &&
-							tasks.length > 0 &&
-							!showArchived && (
-								<Button
-									variant="ghost"
-									size="icon"
-									className="h-7 w-7 hover:bg-muted-foreground/10 hover:text-muted-foreground transition-colors"
-									onClick={onArchiveAll}
-									aria-label={t("tooltips.archiveAllDone")}
-								>
-									<Archive className="h-4 w-4" />
-								</Button>
-							)}
-						{status === "done" &&
-							archivedCount !== undefined &&
-							archivedCount > 0 &&
-							onToggleArchived && (
-								<Tooltip delayDuration={200}>
-									<TooltipTrigger asChild>
-										<Button
-											variant="ghost"
-											size="icon"
-											className={cn(
-												"h-7 w-7 transition-colors relative",
-												showArchived
-													? "text-primary bg-primary/10 hover:bg-primary/20"
-													: "hover:bg-muted-foreground/10 hover:text-muted-foreground",
-											)}
-											onClick={onToggleArchived}
-											aria-pressed={showArchived}
-											aria-label={t(
-												"common:accessibility.toggleShowArchivedAriaLabel",
-											)}
-										>
-											<Archive className="h-4 w-4" />
-											<span className="absolute -top-1 -right-1 text-[10px] font-medium bg-muted rounded-full min-w-[14px] h-[14px] flex items-center justify-center">
-												{archivedCount}
-											</span>
-										</Button>
-									</TooltipTrigger>
-									<TooltipContent>
-										{showArchived
-											? t("common:projectTab.hideArchived")
-											: t("common:projectTab.showArchived")}
-									</TooltipContent>
-								</Tooltip>
-							)}
-					</div>
-				</div>
-
-				{/* Task list */}
-				<div className="flex-1 min-h-0">
-					<ScrollArea className="h-full px-3 pb-3 pt-2">
-						<SortableContext
-							items={taskIds}
-							strategy={verticalListSortingStrategy}
-						>
-							<div className="space-y-3 min-h-0">
-								{tasks.length === 0 ? (
-									<div
-										className={cn(
-											"empty-column-dropzone flex flex-col items-center justify-center py-6",
-											isOver && "active",
-										)}
-									>
-										{isOver ? (
-											<>
-												<div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center mb-2">
-													<Plus className="h-4 w-4 text-primary" />
-												</div>
-												<span className="text-sm font-medium text-primary">
-													{t("kanban.dropHere")}
-												</span>
-											</>
-										) : (
-											<>
-												{emptyState.icon}
-												<span className="mt-2 text-sm font-medium text-muted-foreground/70">
-													{emptyState.message}
-												</span>
-												{emptyState.subtext && (
-													<span className="mt-0.5 text-xs text-muted-foreground/50">
-														{emptyState.subtext}
-													</span>
-												)}
-											</>
-										)}
-									</div>
-								) : (
-									taskCards
-								)}
-							</div>
-						</SortableContext>
-					</ScrollArea>
-				</div>
-			</div>
-
-			{/* Resize handle on right edge */}
-			{onResizeStart && onResizeEnd && (
-				// biome-ignore lint/a11y/noStaticElementInteractions: interactive handler is intentional
-				// biome-ignore lint/a11y/noNoninteractiveElementInteractions: resize handle — drag interaction
-				<div
-					className={cn(
-						"absolute right-0 top-0 bottom-0 w-1 touch-none z-10",
-						"transition-colors duration-150",
-						isLocked
-							? "cursor-not-allowed bg-transparent"
-							: "cursor-col-resize hover:bg-primary/40",
-						isResizing && !isLocked && "bg-primary/60",
-					)}
-					onMouseDown={(e) => {
-						e.preventDefault();
-						// Don't start resize if column is locked
-						if (isLocked) return;
-						onResizeStart(e.clientX);
-					}}
-					onTouchStart={(e) => {
-						e.preventDefault();
-						// Don't start resize if column is locked
-						if (isLocked) return;
-						if (e.touches.length > 0) {
-							onResizeStart(e.touches[0].clientX);
-						}
-					}}
-					title={isLocked ? t("kanban.columnLocked") : undefined}
-				>
-					{/* Wider invisible hit area for easier grabbing */}
-					<div className="absolute inset-y-0 -left-1 -right-1" />
-				</div>
-			)}
-		</div>
-	);
-}, droppableColumnPropsAreEqual);
-
-// ============================================
-// SortableColumnWrapper — enables column drag-to-reorder
-// ============================================
-
-interface SortableColumnWrapperProps
-	extends Omit<
-		React.ComponentProps<typeof DroppableColumn>,
-		"dragHandleProps"
-	> {
-	sortableId: string;
-}
-
-function SortableColumnWrapper({
-	sortableId,
-	...columnProps
-}: SortableColumnWrapperProps) {
-	const {
-		attributes,
-		listeners,
-		setNodeRef,
-		transform,
-		transition,
-		isDragging,
-	} = useSortable({ id: sortableId });
-
-	const style: React.CSSProperties = {
-		transform: CSS.Transform.toString(transform),
-		transition,
-		zIndex: isDragging ? 50 : undefined,
-		position: "relative",
-	};
-
-	return (
-		<div
-			ref={setNodeRef}
-			style={style}
-			className={cn(isDragging && "opacity-50")}
-		>
-			<DroppableColumn
-				{...columnProps}
-				dragHandleProps={{ listeners, attributes }}
-			/>
-		</div>
-	);
 }
 
 export function KanbanBoard({
@@ -1593,6 +555,32 @@ export function KanbanBoard({
 			cancelled = true;
 		};
 	}, [conflictRelevantIds, setBoardConflicts]);
+
+	// Task-dependency surfacing: resolve every task's `metadata.blockedBy` in
+	// one pass and publish it to the store the cards subscribe to by id.
+	// Resolved against `tasks`, never `filteredTasks` — a blocker the user has
+	// filtered out of view still blocks the task that depends on it.
+	const setBoardBlockers = useKanbanBlockerStore((s) => s.setBlockers);
+	useEffect(() => {
+		const byId = indexTasksById(tasks);
+		const next: Record<string, BoardBlockerInfo> = {};
+		for (const task of tasks) {
+			const declared = task.metadata?.blockedBy;
+			if (!declared || declared.length === 0) continue;
+			const { pending, resolved, missing } = resolveBlockers(task, byId);
+			if (pending.length === 0 && missing.length === 0) continue;
+			next[task.id] = {
+				pending: pending.map((b) => ({
+					id: b.id,
+					title: b.title,
+					status: b.status,
+				})),
+				resolvedCount: resolved.length,
+				missing,
+			};
+		}
+		setBoardBlockers(next);
+	}, [tasks, setBoardBlockers]);
 
 	const sensors = useSensors(
 		useSensor(PointerSensor, {
@@ -2052,6 +1040,30 @@ export function KanbanBoard({
 						metadata.jiraType = jiraItem.workItemType;
 						metadata.importSource = "jira";
 
+						// The issue's screenshots and diagram exports become task
+						// attachments, which the build reads before planning. A
+						// failed download costs the images, not the import.
+						try {
+							const attachments =
+								await globalThis.electronAPI.getJiraAttachments?.(
+									projectId,
+									jiraItem.id,
+								);
+							if (attachments?.success && attachments.data?.length) {
+								metadata.attachedImages = attachments.data;
+							}
+						} catch (error) {
+							const sanitizedJiraItemId = String(jiraItem.id ?? "").replace(
+								/[\r\n]/g,
+								"",
+							);
+							console.warn(
+								"[Import] Jira attachments skipped:",
+								sanitizedJiraItemId,
+								error,
+							);
+						}
+
 						const jiraAc = parseAcceptanceCriteriaText(
 							jiraItem.acceptanceCriteria,
 						);
@@ -2387,12 +1399,16 @@ export function KanbanBoard({
 				const inProgressCount = currentTasks.filter(
 					(t) => t.status === "in_progress" && !t.metadata?.archivedAt,
 				).length;
+				// Resolved against the live list, not the filtered board: a blocker
+				// hidden by a filter still blocks.
+				const byId = indexTasksById(currentTasks);
 				const queuedTasks = currentTasks.filter(
 					(t) =>
 						t.status === "queue" &&
 						!t.metadata?.archivedAt &&
 						!attemptedTaskIds.has(t.id) &&
-						!manuallyQueuedTaskIdsRef.current.has(t.id),
+						!manuallyQueuedTaskIdsRef.current.has(t.id) &&
+						!isBlocked(t, byId),
 				);
 
 				// Stop if no capacity, no queued tasks, or too many consecutive failures
@@ -2407,12 +1423,8 @@ export function KanbanBoard({
 					break;
 				}
 
-				// Get the oldest task in queue (FIFO ordering)
-				const nextTask = [...queuedTasks].sort((a: Task, b: Task) => {
-					const dateA = new Date(a.createdAt).getTime();
-					const dateB = new Date(b.createdAt).getTime();
-					return dateA - dateB; // Ascending order (oldest first)
-				})[0];
+				// Most urgent task first, oldest first within a priority band.
+				const nextTask = orderQueue(queuedTasks)[0];
 				const result = await persistTaskStatus(nextTask.id, "in_progress");
 
 				if (result.success) {
@@ -3223,6 +2235,30 @@ export function KanbanBoard({
 				const inProgressCount = currentTasks.filter(
 					(t) => t.status === "in_progress" && !t.metadata?.archivedAt,
 				).length;
+
+				// Dependency gate: the queue refuses to auto-promote a blocked task,
+				// but a human dropping it here has decided otherwise — same as
+				// `manuallyQueuedTaskIdsRef` treating a manual move as authoritative.
+				// Start it, and say out loud that a prerequisite was overridden.
+				const pendingBlockers = resolveBlockers(
+					task,
+					indexTasksById(currentTasks),
+				).pending;
+				if (pendingBlockers.length > 0) {
+					toast({
+						title: t("kanban.blockers.overrideTitle"),
+						description: t("kanban.blockers.overrideDescription", {
+							count: pendingBlockers.length,
+							title: task.title,
+						}),
+					});
+					announce(
+						t("kanban.blockers.overrideAnnounce", {
+							count: pendingBlockers.length,
+							title: task.title,
+						}),
+					);
+				}
 
 				// If limit reached, move to queue instead
 				if (inProgressCount >= maxParallelTasks) {

@@ -101,8 +101,28 @@ def collect_registry_agents() -> list[EmittedAgent]:
     except Exception as exc:  # noqa: BLE001
         logger.debug("phase specs unavailable: %s", exc)
 
+    # The mobile specialists join a roster only on a phone project, so no
+    # phase roster lists them; the mobile pack carried its own copy of the
+    # store auditor (`mobile-release-manager`) because this one was not emitted.
     try:
-        from agents.subagents.pr_review import PR_REVIEW_SPECIALISTS
+        from agents.subagents.mobile import MOBILE_SPECS
+
+        found.extend(
+            EmittedAgent(
+                name=name,
+                description=spec.description,
+                prompt=spec.prompt,
+                tools=tuple(spec.tools),
+                model=spec.model,
+                origin="mobile",
+            )
+            for name, spec in MOBILE_SPECS.items()
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("mobile specs unavailable: %s", exc)
+
+    try:
+        from agents.subagents.pr_review import PR_ROSTERS, PR_SPECIALISTS
 
         found.extend(
             EmittedAgent(
@@ -119,15 +139,15 @@ def collect_registry_agents() -> list[EmittedAgent]:
                 ),
                 tools=tuple(spec.tools),
                 model="inherit",
-                origin="pr-review",
+                origin=roster,
             )
-            for spec in PR_REVIEW_SPECIALISTS
+            for roster, names in PR_ROSTERS.items()
+            for spec in (PR_SPECIALISTS[name] for name in names)
         )
     except Exception as exc:  # noqa: BLE001
         logger.debug("pr-review specs unavailable: %s", exc)
 
-    # Deduplicate by name, first roster wins, so a phase agent is not shadowed
-    # by a later one with the same name.
+    # Deduplicate by name, first roster wins
     seen: set[str] = set()
     unique: list[EmittedAgent] = []
     for agent in found:
@@ -136,6 +156,7 @@ def collect_registry_agents() -> list[EmittedAgent]:
             continue
         seen.add(agent.name)
         unique.append(agent)
+
     return sorted(unique, key=lambda a: a.name)
 
 

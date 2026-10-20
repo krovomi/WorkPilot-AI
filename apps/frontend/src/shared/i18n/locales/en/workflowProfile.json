@@ -18,18 +18,22 @@
 		"skipped": "skipped",
 		"skippedByEffort": "needs effort {{minEffort}} or above",
 		"skippedUntouched": "no matching files changed",
+		"skippedTask": "not this task — needs {{facts}}",
 		"hardGate": "Never skipped — {{gate}}",
 		"always": "Always runs",
 		"deterministic": "No API call",
 		"humanGate": "Stops for approval",
 		"conditional": "Only when {{globs}} change",
+		"conditionalTask": "Only on a task where {{facts}}",
 		"dispatch": {
 			"inline": "inline",
 			"fresh-context": "fresh context",
 			"subagent-per-task": "subagent per task",
 			"sequential-reset": "sequential, context reset"
 		},
-		"degraded": "Asked for {{from}}; {{reason}}"
+		"degraded": "Asked for {{from}}; {{reason}}",
+		"substituted": "Stands in for {{from}}: {{reason}}",
+		"irreversible": "Irreversible"
 	},
 	"levels": {
 		"title": "What each level buys",

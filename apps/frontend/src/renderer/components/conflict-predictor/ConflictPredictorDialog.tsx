@@ -16,7 +16,6 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-	setupConflictPredictorListeners,
 	startConflictPrediction,
 	useConflictPredictorStore,
 } from "../../stores/conflict-predictor-store";
@@ -69,12 +68,6 @@ export function ConflictPredictorDialog() {
 	} = useConflictPredictorStore();
 
 	const selectedProjectId = useProjectStore((s) => s.selectedProjectId);
-
-	// Setup IPC listeners once
-	useEffect(() => {
-		const cleanup = setupConflictPredictorListeners();
-		return cleanup;
-	}, []);
 
 	// Auto-scroll streaming output
 	useEffect(() => {
@@ -567,7 +560,7 @@ export function ConflictPredictorDialog() {
 					)}
 
 					{/* Streaming Output (for debugging) */}
-					{process.env.NODE_ENV === "development" && streamingOutput && (
+					{import.meta.env?.DEV && streamingOutput && (
 						<Card className="mt-4">
 							<CardHeader>
 								<CardTitle className="text-sm">

@@ -42,21 +42,51 @@ class TestMatrix:
         missing = configured - declared
         assert not missing, f"providers with no declared capabilities: {missing}"
 
-    @pytest.mark.parametrize("name", ["claude", "copilot"])
-    def test_only_claude_and_copilot_run_subagents(self, name):
-        assert get_provider_capabilities(name).supports_subagents
+    def test_only_claude_runs_subagents_natively(self):
+        caps = get_provider_capabilities("claude")
+        assert caps.supports_subagents
+        assert not caps.emulates_subagents
 
     @pytest.mark.parametrize(
-        "name", ["openai", "google", "ollama", "windsurf", "mistral", "deepseek"]
+        "name",
+        [
+            "copilot",
+            "openai",
+            "google",
+            "ollama",
+            "local",
+            "lmstudio",
+            "windsurf",
+            "mistral",
+            "deepseek",
+            "grok",
+        ],
     )
-    def test_everything_else_does_not(self, name):
+    def test_every_loop_provider_emulates_them(self, name):
+        # The WorkPilot loop offers the roster as `delegate` and runs a child
+        # session per delegation: a roster reaches the model on all of these.
+        caps = get_provider_capabilities(name)
+        assert caps.has_adapter
+        assert caps.supports_subagents
+        assert caps.emulates_subagents
+
+    @pytest.mark.parametrize("name", ["opencode", "antigravity", "pi", "meta", "aws"])
+    def test_the_clis_and_the_adapterless_do_not(self, name):
         assert not get_provider_capabilities(name).supports_subagents
 
-    @pytest.mark.parametrize("name", ["mistral", "deepseek", "grok", "meta"])
+    @pytest.mark.parametrize("name", ["meta", "aws", "cursor", "custom"])
     def test_adapterless_providers_declare_what_they_degrade_to(self, name):
         caps = get_provider_capabilities(name)
         assert not caps.has_adapter
         assert caps.degrades_to == "claude"
+
+    @pytest.mark.parametrize("name", ["mistral", "deepseek", "grok"])
+    def test_openai_compatible_providers_run_on_their_own_adapter(self, name):
+        # They used to degrade to Claude; they now have a client of their own,
+        # so there is nothing left to degrade to.
+        caps = get_provider_capabilities(name)
+        assert caps.has_adapter
+        assert caps.degrades_to is None
 
     def test_an_unlisted_provider_gets_the_conservative_answer(self):
         # Assuming a capability a provider lacks fails confusingly at run time;
@@ -68,14 +98,17 @@ class TestMatrix:
 
     def test_every_provider_with_an_adapter_names_a_real_class(self):
         """Guards against the matrix drifting away from core/client.py."""
-        source = (
-            REPO_ROOT / "apps" / "backend" / "core" / "agent_client.py"
-        ).read_text(encoding="utf-8")
+        source = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in sorted(
+                (REPO_ROOT / "apps" / "backend" / "core" / "agent_clients").glob("*.py")
+            )
+        )
         for name, caps in load_providers(REPO_ROOT).items():
             if caps.adapter:
                 assert f"class {caps.adapter}" in source, (
                     f"{name} declares adapter {caps.adapter}, "
-                    "which does not exist in core/agent_client.py"
+                    "which does not exist in core/agent_clients/"
                 )
 
 

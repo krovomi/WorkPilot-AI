@@ -60,6 +60,14 @@ BASE_COMMANDS: set[str] = {
     "which",
     "whereis",
     "type",
+    # cmd.exe's spellings of `ls`, `grep` and `which`. On Windows the tool
+    # executor of the providers outside the SDK runs commands through cmd.exe
+    # and, since lot L16, holds them to this list; refusing a model its `dir`
+    # would refuse the read it is allowed as `ls`. Read-only only: `del`,
+    # `copy` and `move` would walk around the validators on `rm`, `cp`, `mv`.
+    "dir",
+    "findstr",
+    "where",
     "command",
     "date",
     "time",
@@ -102,6 +110,12 @@ BASE_COMMANDS: set[str] = {
     # Git (always needed)
     "git",
     "gh",
+    # rtk — the output-condensing proxy. Only its own meta commands
+    # (`rtk gain`, `rtk discover`) ever reach the allowlist under this name:
+    # `security.parser` unwraps `rtk <command>` to `<command>` first, so a
+    # proxied command is judged as itself and this entry cannot become a way
+    # in for anything else. See docs/architecture/rtk.md.
+    "rtk",
     # Process management (with validation in security.py)
     "ps",
     "pgrep",

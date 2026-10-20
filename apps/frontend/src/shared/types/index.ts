@@ -10,11 +10,15 @@ export * from "./cli";
 export * from "./common";
 // Context Mesh types (Cross-Project Intelligence)
 export * from "./context-mesh";
+// Live context-window telemetry (CONTEXT_USAGE / CONTEXT_ACTION_APPLIED)
+export * from "./context-usage";
 export * from "./insights";
 export * from "./integrations";
 // IPC types (must be last to use types from other modules)
 export * from "./ipc";
 export * from "./kanban";
+// Visual-to-Code documents and their construction history
+export * from "./visual-to-code-history";
 // Live Companion types (Real-time pair programming)
 export * from "./live-companion";
 // MCP Marketplace types
@@ -25,7 +29,9 @@ export * from "./multi-repo";
 export * from "./project";
 export * from "./roadmap";
 export * from "./settings";
+export * from "./smart-estimation";
 export * from "./task";
+export * from "./test-generation";
 export * from "./terminal";
 // Time Travel types (Temporal debugger for AI agents)
 export * from "./time-travel";

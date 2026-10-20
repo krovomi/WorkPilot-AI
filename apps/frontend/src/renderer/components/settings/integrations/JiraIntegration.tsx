@@ -33,11 +33,14 @@ interface JiraSyncStatus {
  * Connects to the backend JIRA connector at src/connectors/jira/.
  */
 export function JiraIntegration({
+	projectId,
 	envConfig,
 	updateEnvConfig,
 	showJiraToken,
 	setShowJiraToken,
 }: {
+	/** Lets the main process test with the stored token: the field only holds its mask. */
+	readonly projectId?: string;
 	readonly envConfig: ProjectEnvConfig | null;
 	readonly updateEnvConfig: (updates: Partial<ProjectEnvConfig>) => void;
 	readonly showJiraToken: boolean;
@@ -65,32 +68,40 @@ export function JiraIntegration({
 		setConnectionStatus(null);
 
 		try {
-			// Test connection via IPC if available, otherwise show mock status
-			if (
-				globalThis.electronAPI &&
-				typeof globalThis.electronAPI.jiraTestConnection === "function"
-			) {
-				const result = await globalThis.electronAPI.jiraTestConnection({
-					instanceUrl: jiraInstanceUrl,
-					email: jiraEmail,
-					apiToken: jiraApiToken,
-				});
-				setConnectionStatus(
-					result.data || { connected: false, error: result.error },
-				);
-			} else if (jiraInstanceUrl && jiraEmail && jiraApiToken) {
-				// IPC not wired yet — provide feedback to user
-				setConnectionStatus({
-					connected: true,
-					instanceUrl: jiraInstanceUrl,
-					projectKey: jiraProjectKey || undefined,
-				});
-			} else {
+			if (!jiraInstanceUrl || !jiraEmail || !jiraApiToken) {
 				setConnectionStatus({
 					connected: false,
 					error: t("jira.fillAllFields", { ns: "settings" }),
 				});
+				return;
 			}
+
+			// The bridge is `testJiraConnection` (preload/api/modules/jira-api.ts).
+			// This used to call `jiraTestConnection` — a name only `window.d.ts`
+			// ever declared — so the guard never matched and the fallback branch
+			// reported `connected: true` on three filled fields, without once
+			// contacting Jira. Announcing a connection nobody tested is worse
+			// than announcing a failure.
+			const test = globalThis.electronAPI?.testJiraConnection;
+			if (typeof test !== "function") {
+				setConnectionStatus({
+					connected: false,
+					error: t("jira.bridgeUnavailable", { ns: "settings" }),
+				});
+				return;
+			}
+
+			// The token field holds the mask unless a new token was typed: the
+			// main process then tests with the project's stored token.
+			const result = await test({
+				projectId,
+				instanceUrl: jiraInstanceUrl,
+				email: jiraEmail,
+				apiToken: jiraApiToken,
+			});
+			setConnectionStatus(
+				result.data || { connected: false, error: result.error },
+			);
 		} catch (err) {
 			setConnectionStatus({
 				connected: false,

@@ -15,6 +15,7 @@ import {
 	formatServerExitError,
 	parseDockerComposePort,
 	parseDockerExposePort,
+	parseDotnetLaunchPath,
 } from "./app-emulator-service";
 
 vi.mock("electron", () => ({
@@ -346,5 +347,79 @@ describe("formatServerExitError", () => {
 		const message = formatServerExitError(1, output);
 		const occurrences = message.split("error: boom").length - 1;
 		expect(occurrences).toBe(1);
+	});
+});
+
+describe("parseDotnetLaunchPath", () => {
+	it("lit le launchUrl du premier profil qui en nomme un", () => {
+		const content = JSON.stringify({
+			profiles: {
+				"IIS Express": {},
+				http: { launchUrl: "swagger", applicationUrl: "http://localhost:5000" },
+			},
+		});
+		expect(parseDotnetLaunchPath(content)).toBe("/swagger");
+	});
+
+	it("garde le chemin d'un launchUrl absolu", () => {
+		const content = JSON.stringify({
+			profiles: { http: { launchUrl: "https://localhost:7001/swagger/index.html" } },
+		});
+		expect(parseDotnetLaunchPath(content)).toBe("/swagger/index.html");
+	});
+
+	it("n'invente rien quand aucun profil n'en déclare", () => {
+		expect(
+			parseDotnetLaunchPath(
+				JSON.stringify({ profiles: { http: { applicationUrl: "http://localhost:5000" } } }),
+			),
+		).toBeNull();
+		expect(parseDotnetLaunchPath("{ pas du json")).toBeNull();
+		expect(parseDotnetLaunchPath("{}")).toBeNull();
+	});
+});
+
+describe("AppEmulatorService launch path detection", () => {
+	let tempDir: string;
+
+	beforeEach(() => {
+		tempDir = mkdtempSync(path.join(tmpdir(), "workpilot-launch-"));
+	});
+
+	afterEach(() => {
+		rmSync(tempDir, { recursive: true, force: true });
+	});
+
+	it("porte le launchUrl du projet jusqu'à la configuration de l'aperçu", async () => {
+		const appDir = path.join(tempDir, "src", "Rag.Api");
+		mkdirSync(path.join(appDir, "Properties"), { recursive: true });
+		writeFileSync(
+			path.join(appDir, "Rag.Api.csproj"),
+			[
+				'<Project Sdk="Microsoft.NET.Sdk.Web">',
+				"  <PropertyGroup>",
+				"    <TargetFramework>net9.0</TargetFramework>",
+				"  </PropertyGroup>",
+				"</Project>",
+			].join("\n"),
+		);
+		writeFileSync(
+			path.join(appDir, "Properties", "launchSettings.json"),
+			JSON.stringify({
+				profiles: {
+					http: {
+						commandName: "Project",
+						launchUrl: "swagger",
+						applicationUrl: "http://localhost:5080",
+					},
+				},
+			}),
+		);
+
+		const config = await new AppEmulatorService().detectProject(tempDir);
+
+		expect(config.framework).toBe("dotnet");
+		expect(config.port).toBe(5080);
+		expect(config.launchPath).toBe("/swagger");
 	});
 });

@@ -9,8 +9,14 @@
  * étapes non démarrées se configurent via les sélecteurs LLM de chaque phase).
  */
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+	act,
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+} from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom";
 import "../../../shared/i18n";
 
@@ -28,6 +34,23 @@ import { TooltipProvider } from "../ui/tooltip";
 import { TaskPauseControls } from "./TaskPauseControls";
 
 const fakeStoreState = { settings: {}, profiles: [] };
+
+it("replaces a stale Claude model when the task provider is OpenAI", async () => {
+	const resume = vi.fn().mockResolvedValue({ success: true });
+	vi.stubGlobal("electronAPI", { resumeTaskWithProvider: resume });
+	vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+	const task = {
+		id: "stale-provider",
+		metadata: { provider: "openai", model: "opus" },
+	} as Task;
+	renderControls({ task, isPaused: true, isRunning: false });
+	const button = screen.getByRole("button", { name: /resume with this llm/i });
+	await waitFor(() => expect(button).toBeEnabled());
+	fireEvent.click(button);
+	await waitFor(() => expect(resume).toHaveBeenCalled());
+	expect(resume.mock.calls[0][1]).toBe("openai");
+	expect(resume.mock.calls[0][2]).toMatch(/^gpt-/);
+});
 
 function makeTask(): Task {
 	return {
@@ -54,7 +77,9 @@ beforeEach(() => {
 describe("TaskPauseControls", () => {
 	it("désactive le bouton de pause quand la tâche n'est pas en cours d'exécution", () => {
 		renderControls({ task: makeTask(), isPaused: false, isRunning: false });
-		const button = screen.getByRole("button", { name: /pause and switch llm/i });
+		const button = screen.getByRole("button", {
+			name: /pause and switch llm/i,
+		});
 		expect(button).toBeDisabled();
 	});
 
@@ -66,9 +91,148 @@ describe("TaskPauseControls", () => {
 			isRunning: true,
 			onPause,
 		});
-		const button = screen.getByRole("button", { name: /pause and switch llm/i });
+		const button = screen.getByRole("button", {
+			name: /pause and switch llm/i,
+		});
 		expect(button).toBeEnabled();
 		fireEvent.click(button);
 		await waitFor(() => expect(onPause).toHaveBeenCalledTimes(1));
 	});
+});
+
+vi.mock("../../../shared/utils/providers", () => ({
+	getStaticProviders: async () => ({
+		providers: [
+			{ name: "ollama", label: "Ollama" },
+			{ name: "openai", label: "OpenAI" },
+		],
+		status: { ollama: true, openai: true },
+	}),
+}));
+afterEach(() => {
+	vi.unstubAllGlobals();
+	vi.useRealTimers();
+});
+it("keeps the downloaded phase model and sends its exact ID when resuming", async () => {
+	const model = "gemma4:12b-it-q4_K_M";
+	vi.stubGlobal(
+		"fetch",
+		vi.fn().mockResolvedValue({
+			ok: true,
+			headers: new Headers({ "content-type": "application/json" }),
+			json: async () => ({
+				source: "live",
+				models: [{ value: model, label: model, supports_tools: true }],
+			}),
+		}),
+	);
+	const resume = vi.fn().mockResolvedValue({ success: true });
+	vi.stubGlobal("electronAPI", { resumeTaskWithProvider: resume });
+	const task = {
+		id: "task-local",
+		// The effort shown is the task's own; without one it would come from the
+		// provider's presets in Settings.
+		metadata: {
+			provider: "ollama",
+			phaseModels: { coding: model },
+			thinkingLevel: "medium",
+		},
+	} as unknown as Task;
+	renderControls({ task, isPaused: true, isRunning: false });
+	await waitFor(() => expect(screen.getByText(model)).toBeInTheDocument());
+	const button = screen.getByRole("button", { name: /resume with this llm/i });
+	await waitFor(() => expect(button).toBeEnabled());
+	fireEvent.click(button);
+	await waitFor(() =>
+		expect(resume).toHaveBeenCalledWith(
+			"task-local",
+			"ollama",
+			model,
+			"medium",
+			"remaining",
+		),
+	);
+});
+
+it("applies the change to the paused phase only when asked", async () => {
+	const resume = vi.fn().mockResolvedValue({ success: true });
+	vi.stubGlobal("electronAPI", { resumeTaskWithProvider: resume });
+	vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+	const task = {
+		id: "only-phase",
+		metadata: {
+			provider: "openai",
+			model: "gpt-5",
+			thinkingLevel: "high",
+			paused: { enabled: true, paused_phase: "coding" },
+		},
+	} as unknown as Task;
+	renderControls({ task, isPaused: true, isRunning: false });
+	const checkbox = await screen.findByRole("checkbox");
+	fireEvent.click(checkbox);
+	const button = screen.getByRole("button", { name: /resume with this llm/i });
+	await waitFor(() => expect(button).toBeEnabled());
+	fireEvent.click(button);
+	await waitFor(() => expect(resume).toHaveBeenCalled());
+	expect(resume.mock.calls[0][1]).toBe("openai");
+	expect(resume.mock.calls[0][3]).toBe("high");
+	expect(resume.mock.calls[0][4]).toBe("phase");
+});
+
+it("names the paused task and takes its model from the official library", async () => {
+	vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+	const resume = vi.fn().mockResolvedValue({ success: true });
+	vi.stubGlobal("electronAPI", { resumeTaskWithProvider: resume });
+	vi.stubGlobal(
+		"fetch",
+		vi.fn().mockResolvedValue({
+			ok: true,
+			json: async () => ({
+				models: [
+					{
+						value: "gemma4:12b",
+						source: "https://ollama.com/library/gemma4:12b",
+					},
+				],
+			}),
+		}),
+	);
+	const task = {
+		id: "custom-task",
+		title: "Repair checkout",
+		metadata: { provider: "ollama", model: "custom", thinkingLevel: "medium" },
+	} as Task;
+	renderControls({ task, isPaused: true, isRunning: false });
+	expect(screen.getByText("Repair checkout")).toBeInTheDocument();
+
+	// The sentinel is not a model, so resuming on it is refused — and the
+	// library search opens on its own rather than leaving the task stuck on a
+	// row it cannot resume from.
+	const button = screen.getByRole("button", { name: /resume with this llm/i });
+	expect(button).toBeDisabled();
+	// Nothing is typed: the id can only come from the library listing.
+	expect(screen.queryByRole("textbox", { name: "Model ID" })).toBeNull();
+
+	// Flush provider loading before advancing the library search debounce.
+	await act(async () => {
+		/* intentionally empty - act() flushes the pending provider promises */
+	});
+	await act(async () => {
+		await vi.advanceTimersByTimeAsync(250);
+	});
+	vi.useRealTimers();
+	const option = screen.getByRole("option", { name: "gemma4:12b" });
+	fireEvent.click(option);
+
+	await waitFor(() => expect(button).toBeEnabled());
+	fireEvent.click(button);
+	await waitFor(() =>
+		expect(resume).toHaveBeenCalledWith(
+			"custom-task",
+			"ollama",
+			"gemma4:12b",
+			"medium",
+			"remaining",
+		),
+	);
 });

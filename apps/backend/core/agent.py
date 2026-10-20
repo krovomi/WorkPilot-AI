@@ -11,7 +11,7 @@ Architecture:
 - Post-session processing updates memory automatically (100% reliable)
 
 Enhanced with status file updates for ccstatusline integration.
-Enhanced with Graphiti memory for cross-session context retrieval.
+Enhanced with the project's memory (the shared brain) for cross-session context.
 
 NOTE: This module is now a facade that imports from agents/ submodules.
 All logic has been refactored into focused modules for better maintainability.
@@ -27,9 +27,9 @@ from agents import (
     find_phase_for_subtask,
     find_subtask_in_plan,
     get_commit_count,
-    get_graphiti_context,
     # Utility functions
     get_latest_commit,
+    get_memory_context,
     load_implementation_plan,
     post_session_processing,
     # Session management
@@ -38,7 +38,6 @@ from agents import (
     run_autonomous_agent,
     run_followup_planner,
     save_session_memory,
-    save_session_to_graphiti,
     sync_spec_to_source,
 )
 
@@ -47,9 +46,8 @@ __all__ = [
     "run_autonomous_agent",
     "run_followup_planner",
     "debug_memory_system_status",
-    "get_graphiti_context",
+    "get_memory_context",
     "save_session_memory",
-    "save_session_to_graphiti",
     "run_agent_session",
     "post_session_processing",
     "get_latest_commit",

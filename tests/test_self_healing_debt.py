@@ -41,7 +41,7 @@ def test_debt_item_creation():
         effort="medium",
         created_at=datetime.now(),
     )
-    
+
     assert item.id == "test-1"
     assert item.category == DebtCategory.CODE_QUALITY
     assert item.severity == "high"
@@ -62,7 +62,7 @@ def test_debt_item_age_calculation():
         effort="low",
         created_at=past_date,
     )
-    
+
     age = item.calculate_age()
     assert age == 10
     assert item.age_days == 10
@@ -81,9 +81,9 @@ def test_debt_item_priority_calculation():
         created_at=datetime.now() - timedelta(days=30),
         auto_fixable=True,
     )
-    
+
     priority = item.calculate_priority()
-    
+
     # High severity + old + easy + auto-fixable = high priority
     assert priority > 70
     assert item.priority_score > 70
@@ -104,13 +104,13 @@ def test_debt_item_serialization():
         suggested_fix="Fix suggestion",
         auto_fixable=False,
     )
-    
+
     # Serialize
     data = item.to_dict()
     assert data["id"] == "test-1"
     assert data["category"] == "testing"
     assert data["line"] == 42
-    
+
     # Deserialize
     restored = DebtItem.from_dict(data)
     assert restored.id == item.id
@@ -130,9 +130,9 @@ def test_tracker_add_item(tracker):
         effort="low",
         created_at=datetime.now(),
     )
-    
+
     tracker.add_item(item)
-    
+
     assert "test-1" in tracker.debt_items
     assert tracker.debt_items["test-1"].id == "test-1"
 
@@ -149,10 +149,10 @@ def test_tracker_resolve_item(tracker):
         effort="medium",
         created_at=datetime.now(),
     )
-    
+
     tracker.add_item(item)
     tracker.resolve_item("test-1")
-    
+
     assert tracker.debt_items["test-1"].resolved_at is not None
 
 
@@ -170,7 +170,7 @@ def test_tracker_get_active_items(tracker):
         created_at=datetime.now(),
         resolved_at=datetime.now(),
     )
-    
+
     # Add active item
     item2 = DebtItem(
         id="test-2",
@@ -182,12 +182,12 @@ def test_tracker_get_active_items(tracker):
         effort="medium",
         created_at=datetime.now(),
     )
-    
+
     tracker.add_item(item1)
     tracker.add_item(item2)
-    
+
     active = tracker.get_active_items()
-    
+
     assert len(active) == 1
     assert active[0].id == "test-2"
 
@@ -208,12 +208,12 @@ def test_tracker_get_by_priority(tracker):
         )
         for i in range(5)
     ]
-    
+
     for item in items:
         tracker.add_item(item)
-    
+
     priority_items = tracker.get_by_priority(limit=3)
-    
+
     assert len(priority_items) == 3
     # Should be sorted by priority
     for i in range(len(priority_items) - 1):
@@ -227,7 +227,7 @@ def test_tracker_get_by_category(tracker):
         DebtCategory.PERFORMANCE,
         DebtCategory.SECURITY,
     ]
-    
+
     for i, cat in enumerate(categories):
         item = DebtItem(
             id=f"test-{i}",
@@ -240,9 +240,9 @@ def test_tracker_get_by_category(tracker):
             created_at=datetime.now(),
         )
         tracker.add_item(item)
-    
+
     security_items = tracker.get_by_category(DebtCategory.SECURITY)
-    
+
     assert len(security_items) == 2
     assert all(item.category == DebtCategory.SECURITY for item in security_items)
 
@@ -260,7 +260,7 @@ def test_tracker_get_old_items(tracker):
         effort="low",
         created_at=datetime.now() - timedelta(days=60),
     )
-    
+
     # Add new item
     new_item = DebtItem(
         id="test-new",
@@ -272,12 +272,12 @@ def test_tracker_get_old_items(tracker):
         effort="medium",
         created_at=datetime.now(),
     )
-    
+
     tracker.add_item(old_item)
     tracker.add_item(new_item)
-    
+
     old_items = tracker.get_old_items(max_age_days=30)
-    
+
     assert len(old_items) == 1
     assert old_items[0].id == "test-old"
 
@@ -308,12 +308,12 @@ def test_tracker_get_auto_fixable(tracker):
             auto_fixable=False,
         ),
     ]
-    
+
     for item in items:
         tracker.add_item(item)
-    
+
     auto_fixable = tracker.get_auto_fixable()
-    
+
     assert len(auto_fixable) == 1
     assert auto_fixable[0].id == "test-1"
 
@@ -356,12 +356,12 @@ def test_tracker_statistics(tracker):
             resolved_at=datetime.now(),
         ),
     ]
-    
+
     for item in items:
         tracker.add_item(item)
-    
+
     stats = tracker.get_statistics()
-    
+
     assert stats["total_active"] == 2
     assert stats["total_resolved"] == 1
     assert stats["auto_fixable"] == 1
@@ -384,10 +384,10 @@ def test_tracker_generate_report(tracker):
         auto_fixable=True,
         suggested_fix="Use environment variables",
     )
-    
+
     tracker.add_item(item)
     report = tracker.generate_report()
-    
+
     assert "Technical Debt Report" in report
     assert "Active Items" in report
     assert "Test Issue" in report
@@ -409,10 +409,10 @@ def test_tracker_persistence(temp_project):
         created_at=datetime.now(),
     )
     tracker1.add_item(item)
-    
+
     # Create new tracker (should load from file)
     tracker2 = TechnicalDebtTracker(temp_project)
-    
+
     assert "test-persist" in tracker2.debt_items
     assert tracker2.debt_items["test-persist"].title == "Persistence Test"
 

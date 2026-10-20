@@ -1,3 +1,4 @@
+import generatedModelCatalog from "./model-catalog.generated.json";
 /**
  * Model and agent profile constants
  * Claude models, thinking levels, memory backends, and agent profiles
@@ -22,526 +23,16 @@ export interface ProviderModel {
 }
 
 /** Models grouped by provider. Keys match provider names used in ProviderContext / provider_api.py */
-export const PROVIDER_MODELS_MAP: Record<string, ProviderModel[]> = {
-	// ---- Anthropic (Claude) ----
-	anthropic: [
-		{
-			value: "claude-fable-5",
-			label: "Claude Fable 5",
-			tier: "flagship",
-			supportsThinking: true,
-		},
-		{
-			value: "claude-opus-4-8",
-			label: "Claude Opus 4.8",
-			tier: "flagship",
-			supportsThinking: true,
-		},
-		{
-			value: "claude-opus-4-7",
-			label: "Claude Opus 4.7",
-			tier: "flagship",
-			supportsThinking: true,
-		},
-		{
-			value: "claude-opus-4-6",
-			label: "Claude Opus 4.6",
-			tier: "flagship",
-			supportsThinking: true,
-		},
-		{
-			value: "claude-sonnet-5",
-			label: "Claude Sonnet 5",
-			tier: "standard",
-			supportsThinking: true,
-		},
-		{
-			value: "claude-sonnet-4-6",
-			label: "Claude Sonnet 4.6",
-			tier: "standard",
-			supportsThinking: true,
-		},
-		// NB: there is no "Claude Haiku 4.6" — Anthropic only shipped 4.6 for
-		// Sonnet/Opus. It was a phantom catalog entry the API rejected
-		// ("model may not exist"); the latest Haiku is 4.5 (below).
-		{
-			value: "claude-opus-4-5-20251101",
-			label: "Claude Opus 4.5",
-			tier: "flagship",
-			supportsThinking: true,
-		},
-		{
-			value: "claude-sonnet-4-5-20250929",
-			label: "Claude Sonnet 4.5",
-			tier: "standard",
-			supportsThinking: true,
-		},
-		{
-			value: "claude-haiku-4-5",
-			label: "Claude Haiku 4.5",
-			tier: "fast",
-			supportsThinking: false,
-		},
-	],
-
-	// ---- GitHub Copilot ----
-	// Source: docs.github.com/en/copilot/reference/ai-models/supported-models
-	// Updated: May 2026 — includes Claude 4.x Opus/Sonnet, GPT-5.x, o3/o4 families
-	copilot: [
-		// ── Flagship ─────────────────────────────────────────────────────────
-		{
-			value: "claude-opus-4.8",
-			label: "Claude Opus 4.8 (Copilot)",
-			tier: "flagship",
-			supportsThinking: true,
-		},
-		{
-			value: "claude-opus-4.7",
-			label: "Claude Opus 4.7 (Copilot)",
-			tier: "flagship",
-			supportsThinking: true,
-		},
-		{
-			value: "claude-opus-4.6",
-			label: "Claude Opus 4.6 (Copilot)",
-			tier: "flagship",
-			supportsThinking: true,
-		},
-		{
-			value: "claude-opus-4.5",
-			label: "Claude Opus 4.5 (Copilot)",
-			tier: "flagship",
-			supportsThinking: true,
-		},
-		{
-			value: "gpt-5.5",
-			label: "GPT-5.5 (Copilot)",
-			tier: "flagship",
-			supportsThinking: true,
-		},
-		{
-			value: "gpt-5.4",
-			label: "GPT-5.4 (Copilot)",
-			tier: "flagship",
-			supportsThinking: true,
-		},
-		{ value: "gpt-4.1", label: "GPT-4.1 (Copilot)", tier: "flagship" },
-		{ value: "gpt-4o", label: "GPT-4o (Copilot)", tier: "flagship" },
-		// ── Standard ─────────────────────────────────────────────────────────
-		{
-			value: "claude-sonnet-4.6",
-			label: "Claude Sonnet 4.6 (Copilot)",
-			tier: "standard",
-			supportsThinking: true,
-		},
-		{
-			value: "claude-sonnet-4.5",
-			label: "Claude Sonnet 4.5 (Copilot)",
-			tier: "standard",
-			supportsThinking: true,
-		},
-		{
-			value: "o4-mini",
-			label: "o4-mini (Copilot)",
-			tier: "standard",
-			supportsThinking: true,
-		},
-		{
-			value: "o3",
-			label: "o3 (Copilot)",
-			tier: "standard",
-			supportsThinking: true,
-		},
-		{
-			value: "o3-mini",
-			label: "o3-mini (Copilot)",
-			tier: "standard",
-			supportsThinking: true,
-		},
-		{
-			value: "o1",
-			label: "o1 (Copilot)",
-			tier: "standard",
-			supportsThinking: true,
-		},
-		{
-			value: "claude-3.7-sonnet",
-			label: "Claude 3.7 Sonnet (Copilot)",
-			tier: "standard",
-			supportsThinking: true,
-		},
-		{
-			value: "gemini-2.5-pro",
-			label: "Gemini 2.5 Pro (Copilot)",
-			tier: "standard",
-			supportsThinking: true,
-		},
-		// ── Fast ─────────────────────────────────────────────────────────────
-		{
-			value: "claude-haiku-4.5",
-			label: "Claude Haiku 4.5 (Copilot)",
-			tier: "fast",
-		},
-		{
-			value: "gemini-2.0-flash",
-			label: "Gemini 2.0 Flash (Copilot)",
-			tier: "fast",
-		},
-		{
-			value: "gpt-4.1-mini",
-			label: "GPT-4.1 mini (Copilot)",
-			tier: "fast",
-		},
-		{
-			value: "o1-mini",
-			label: "o1-mini (Copilot)",
-			tier: "fast",
-			supportsThinking: true,
-		},
-		{ value: "gpt-4o-mini", label: "GPT-4o mini (Copilot)", tier: "fast" },
-	],
-
-	// ---- OpenAI ----
-	// Source: platform.openai.com/docs/models — GPT-5.5 family released April 2026
-	openai: [
-		{
-			value: "gpt-5.5-pro",
-			label: "GPT-5.5 Pro",
-			tier: "flagship",
-			supportsThinking: true,
-		},
-		{
-			value: "gpt-5.5",
-			label: "GPT-5.5",
-			tier: "flagship",
-			supportsThinking: true,
-		},
-		{
-			value: "gpt-5.5-mini",
-			label: "GPT-5.5 mini",
-			tier: "standard",
-			supportsThinking: true,
-		},
-		{
-			value: "gpt-5.2",
-			label: "GPT-5.2",
-			tier: "flagship",
-			supportsThinking: true,
-		},
-		{
-			value: "o4",
-			label: "o4",
-			tier: "flagship",
-			supportsThinking: true,
-		},
-		{
-			value: "o4-mini",
-			label: "o4-mini",
-			tier: "standard",
-			supportsThinking: true,
-		},
-		{ value: "gpt-4.1", label: "GPT-4.1", tier: "standard" },
-		{ value: "gpt-4.1-mini", label: "GPT-4.1 mini", tier: "fast" },
-	],
-
-	// ---- Google Gemini ----
-	google: [
-		{
-			value: "gemini-3.1-pro",
-			label: "Gemini 3.1 Pro",
-			tier: "flagship",
-			supportsThinking: true,
-		},
-		{ value: "gemini-3-flash", label: "Gemini 3 Flash", tier: "flagship" },
-		{
-			value: "gemini-3.1-flash-lite",
-			label: "Gemini 3.1 Flash-Lite",
-			tier: "standard",
-		},
-		{
-			value: "gemini-2.5-pro",
-			label: "Gemini 2.5 Pro",
-			tier: "flagship",
-			supportsThinking: true,
-		},
-		{ value: "gemini-2.5-flash", label: "Gemini 2.5 Flash", tier: "fast" },
-		{
-			value: "gemini-2.0-flash-thinking",
-			label: "Gemini 2.0 Flash Thinking",
-			tier: "standard",
-			supportsThinking: true,
-		},
-		{ value: "gemini-1.5-pro", label: "Gemini 1.5 Pro", tier: "standard" },
-		{ value: "gemini-1.5-flash", label: "Gemini 1.5 Flash", tier: "fast" },
-	],
-
-	// ---- Mistral AI ----
-	mistral: [
-		{ value: "mistral-large-3", label: "Mistral Large 3", tier: "flagship" },
-		{ value: "ministral-3-14b", label: "Ministral 3 14B", tier: "standard" },
-		{ value: "ministral-3-8b", label: "Ministral 3 8B", tier: "standard" },
-		{ value: "ministral-3-3b", label: "Ministral 3 3B", tier: "fast" },
-		{ value: "mistral-medium-3", label: "Mistral Medium 3", tier: "standard" },
-		{ value: "mistral-small-3", label: "Mistral Small 3", tier: "fast" },
-		{ value: "codestral", label: "Codestral", tier: "standard" },
-		{ value: "mistral-7b", label: "Mistral 7B", tier: "fast" },
-	],
-
-	// ---- DeepSeek ----
-	deepseek: [
-		{ value: "deepseek-v3.2", label: "DeepSeek V3.2", tier: "flagship" },
-		{
-			value: "deepseek-r2",
-			label: "DeepSeek R2",
-			tier: "flagship",
-			supportsThinking: true,
-		},
-		{ value: "deepseek-v3", label: "DeepSeek V3", tier: "standard" },
-		{
-			value: "deepseek-r1",
-			label: "DeepSeek R1",
-			tier: "standard",
-			supportsThinking: true,
-		},
-		{
-			value: "deepseek-coder-v2",
-			label: "DeepSeek Coder V2",
-			tier: "standard",
-		},
-	],
-
-	// ---- Grok (xAI) ----
-	// Source: docs.x.ai/developers/models — Grok 4.3 flagship as of April 30, 2026
-	grok: [
-		{
-			value: "grok-4.3",
-			label: "Grok 4.3",
-			tier: "flagship",
-			supportsThinking: true,
-		},
-		{
-			value: "grok-4.20-reasoning",
-			label: "Grok 4.20 Reasoning",
-			tier: "flagship",
-			supportsThinking: true,
-		},
-		{
-			value: "grok-4.1-fast",
-			label: "Grok 4.1 Fast",
-			tier: "fast",
-			supportsThinking: true,
-		},
-		{
-			value: "grok-4",
-			label: "Grok 4",
-			tier: "flagship",
-			supportsThinking: true,
-		},
-		{
-			value: "grok-3",
-			label: "Grok 3",
-			tier: "standard",
-			supportsThinking: true,
-		},
-	],
-
-	// ---- Meta (LLaMA) ----
-	meta: [
-		{
-			value: "meta-llama/llama-4-scout",
-			label: "Llama 4 Scout",
-			tier: "flagship",
-		},
-		{
-			value: "meta-llama/llama-3.3-70b",
-			label: "Llama 3.3 70B",
-			tier: "standard",
-		},
-		{
-			value: "meta-llama/llama-3.1-70b",
-			label: "Llama 3.1 70B",
-			tier: "standard",
-		},
-		{ value: "meta-llama/llama-3.1-8b", label: "Llama 3.1 8B", tier: "fast" },
-	],
-
-	// ---- AWS Bedrock ----
-	aws: [
-		{
-			value: "anthropic.claude-opus-4-8-v1",
-			label: "Claude Opus 4.8 (Bedrock)",
-			tier: "flagship",
-			supportsThinking: true,
-		},
-		{
-			value: "anthropic.claude-fable-5",
-			label: "Claude Fable 5 (Bedrock)",
-			tier: "flagship",
-			supportsThinking: true,
-		},
-		{
-			value: "anthropic.claude-opus-4-7-v1",
-			label: "Claude Opus 4.7 (Bedrock)",
-			tier: "flagship",
-			supportsThinking: true,
-		},
-		{
-			value: "anthropic.claude-opus-4-6-v1",
-			label: "Claude Opus 4.6 (Bedrock)",
-			tier: "flagship",
-			supportsThinking: true,
-		},
-		{
-			value: "anthropic.claude-sonnet-4-6-v1",
-			label: "Claude Sonnet 4.6 (Bedrock)",
-			tier: "standard",
-			supportsThinking: true,
-		},
-		{
-			value: "anthropic.claude-sonnet-4-5-v1",
-			label: "Claude Sonnet 4.5 (Bedrock)",
-			tier: "standard",
-			supportsThinking: true,
-		},
-		{
-			value: "amazon.titan-text-premier-v1",
-			label: "Amazon Titan Premier",
-			tier: "standard",
-		},
-		{
-			value: "meta.llama3-70b-instruct-v1",
-			label: "Llama 3 70B (Bedrock)",
-			tier: "standard",
-		},
-	],
-
-	// ---- Ollama / LLM local ----
-	ollama: [
-		{ value: "llama3.3", label: "Llama 3.3", tier: "local" },
-		{ value: "llama3.2", label: "Llama 3.2", tier: "local" },
-		{ value: "llama3.1", label: "Llama 3.1", tier: "local" },
-		{ value: "mistral-large-3", label: "Mistral Large 3", tier: "local" },
-		{ value: "mistral", label: "Mistral", tier: "local" },
-		{ value: "mistral-large", label: "Mistral Large", tier: "local" },
-		{ value: "deepseek-v3.2", label: "DeepSeek V3.2", tier: "local" },
-		{
-			value: "deepseek-r2",
-			label: "DeepSeek R2",
-			tier: "local",
-			supportsThinking: true,
-		},
-		{
-			value: "deepseek-r1",
-			label: "DeepSeek R1",
-			tier: "local",
-			supportsThinking: true,
-		},
-		{ value: "deepseek-coder-v2", label: "DeepSeek Coder V2", tier: "local" },
-		{ value: "qwen2.5-coder", label: "Qwen 2.5 Coder", tier: "local" },
-		{ value: "qwen2.5", label: "Qwen 2.5", tier: "local" },
-		{ value: "phi4", label: "Phi-4", tier: "local" },
-		{ value: "gemma3", label: "Gemma 3", tier: "local" },
-		{ value: "gemma2", label: "Gemma 2", tier: "local" },
-		{ value: "codellama", label: "CodeLlama", tier: "local" },
-		{ value: "yi", label: "Yi", tier: "local" },
-		{ value: "mixtral", label: "Mixtral", tier: "local" },
-		{ value: "vicuna", label: "Vicuna", tier: "local" },
-		{ value: "wizardlm", label: "WizardLM", tier: "local" },
-		{ value: "solar", label: "Solar Pro", tier: "local" },
-		{ value: "custom", label: "Autre (saisie libre)", tier: "local" },
-	],
-
-	// ---- Custom/Enterprise API ----
-	custom: [
-		{
-			value: "custom-model-1",
-			label: "Custom Model 1",
-			tier: "flagship",
-			supportsThinking: true,
-		},
-		{
-			value: "custom-model-2",
-			label: "Custom Model 2",
-			tier: "standard",
-			supportsThinking: true,
-		},
-		{ value: "custom-model-3", label: "Custom Model 3", tier: "fast" },
-		{
-			value: "custom",
-			label: "Autre (saisie libre)",
-			tier: "local",
-			supportsThinking: true,
-		},
-	],
-
-	// ---- Windsurf (Codeium) ----
-	// Source: docs.windsurf.com/windsurf/models
-	// Model IDs MUST be the friendly slugs resolved by the Windsurf proxy
-	// (apps/backend/integrations/windsurf_proxy/models.py → MODEL_NAME_TO_ENUM).
-	// Generic future IDs (claude-opus-4-8, gpt-5.5, gemini-3.1-pro) are NOT
-	// served by the Windsurf gRPC backend and must not be exposed here.
-	windsurf: [
-		{ value: "swe-1.6", label: "SWE-1.6", tier: "flagship" },
-		{ value: "swe-1.6-fast", label: "SWE-1.6 Fast", tier: "fast" },
-		{ value: "swe-1.5", label: "SWE-1.5", tier: "flagship" },
-		{
-			value: "swe-1.5-thinking",
-			label: "SWE-1.5 Thinking",
-			tier: "flagship",
-			supportsThinking: true,
-		},
-		{
-			value: "claude-opus-4",
-			label: "Claude Opus 4 (Windsurf)",
-			tier: "flagship",
-			supportsThinking: true,
-		},
-		{
-			value: "claude-sonnet-4",
-			label: "Claude Sonnet 4 (Windsurf)",
-			tier: "flagship",
-			supportsThinking: true,
-		},
-		{
-			value: "claude-3.7-sonnet",
-			label: "Claude 3.7 Sonnet (Windsurf)",
-			tier: "standard",
-			supportsThinking: true,
-		},
-		{ value: "gpt-4.1", label: "GPT-4.1 (Windsurf)", tier: "standard" },
-		{ value: "gpt-4o", label: "GPT-4o (Windsurf)", tier: "standard" },
-		{
-			value: "gemini-2.5-pro",
-			label: "Gemini 2.5 Pro (Windsurf)",
-			tier: "standard",
-			supportsThinking: true,
-		},
-		{
-			value: "deepseek-r1",
-			label: "DeepSeek R1 (Windsurf)",
-			tier: "standard",
-			supportsThinking: true,
-		},
-		{
-			value: "deepseek-v3",
-			label: "DeepSeek V3 (Windsurf)",
-			tier: "standard",
-		},
-		{
-			value: "gemini-2.0-flash",
-			label: "Gemini 2.0 Flash (Windsurf)",
-			tier: "fast",
-		},
-		{ value: "swe-1.5-fast", label: "SWE-1.5 Fast", tier: "fast" },
-	],
-};
+// Generated by scripts/generate_model_catalog.py from models_registry.py.
+export const PROVIDER_MODELS_MAP: Record<string, ProviderModel[]> =
+	generatedModelCatalog as Record<string, ProviderModel[]>;
 
 // Alias for legacy providers listed in provider_api.py
 PROVIDER_MODELS_MAP.claude = PROVIDER_MODELS_MAP.anthropic;
 
 /** Returns models for the currently selected provider, falling back to anthropic */
 export function getModelsForProvider(provider: string): ProviderModel[] {
-	return PROVIDER_MODELS_MAP[provider] ?? PROVIDER_MODELS_MAP.anthropic;
+	return PROVIDER_MODELS_MAP[provider || "anthropic"] ?? [];
 }
 
 /** Returns the default (flagship) model ID for a given provider */
@@ -660,11 +151,17 @@ export function providerSupportsThinking(provider: string): boolean {
 // ============================================
 
 export const AVAILABLE_MODELS = [
+	{ value: "opus-5", label: "Claude Opus 5" },
+	{ value: "fable-5", label: "Claude Fable 5" },
 	{ value: "opus-4-8", label: "Claude Opus 4.8" },
 	{ value: "opus-4-7", label: "Claude Opus 4.7" },
 	{ value: "opus", label: "Claude Opus 4.6" },
+	{ value: "sonnet-5", label: "Claude Sonnet 5" },
 	{ value: "sonnet", label: "Claude Sonnet 4.6" },
-	{ value: "haiku", label: "Claude Haiku 4.6" },
+	// `haiku` resolves to Claude Haiku 4.5 — see MODEL_ID_MAP. It was labelled
+	// "Claude Haiku 4.6" here, a version Anthropic never shipped, so the picker
+	// offered a model that does not exist under a value that silently ran 4.5.
+	{ value: "haiku", label: "Claude Haiku 4.5" },
 	{ value: "opus-4-5", label: "Claude Opus 4.5" },
 	{ value: "sonnet-4-5", label: "Claude Sonnet 4.5" },
 	{ value: "haiku-4-5", label: "Claude Haiku 4.5" },
@@ -675,6 +172,9 @@ export const AVAILABLE_MODELS = [
 // existing tasks persisted with these values keep working. Newer versions
 // are exposed under explicit version-suffixed keys (e.g. "opus-4-7").
 export const MODEL_ID_MAP: Record<string, string> = {
+	"opus-5": "claude-opus-5",
+	"fable-5": "claude-fable-5",
+	"sonnet-5": "claude-sonnet-5",
 	"opus-4-8": "claude-opus-4-8",
 	"opus-4-7": "claude-opus-4-7",
 	opus: "claude-opus-4-6",
@@ -781,9 +281,10 @@ const _CLAUDE_FAMILY_RANK: Record<string, number> = {
  * `minor` à un chiffre compte (`claude-opus-4-20250514` → 4.0, pas 4.20250514).
  */
 function claudeSortKey(value: string): { rank: number; version: number } {
-	const m = /^claude-(fable|mythos|opus|sonnet|haiku)-(\d+)(?:-(\d)(?!\d))?/.exec(
-		value,
-	);
+	const m =
+		/^claude-(fable|mythos|opus|sonnet|haiku)-(\d+)(?:-(\d)(?!\d))?/.exec(
+			value,
+		);
 	if (!m) return { rank: 99, version: 0 };
 	const rank = _CLAUDE_FAMILY_RANK[m[1]] ?? 90;
 	const version = Number(m[2]) + (m[3] ? Number(m[3]) / 10 : 0);
@@ -866,16 +367,28 @@ export function resolveModelForProviderCatalog(
 	provider: string,
 ): string {
 	if (!value) return value;
+	if (!liveCatalog.length) {
+		const fallback = getModelsForProvider(provider);
+		return fallback.length
+			? resolveModelForProviderCatalog(value, fallback, provider)
+			: value;
+	}
 	const valid = new Set(liveCatalog.map((m) => m.value));
 	if (valid.has(value)) return value;
+	// Older profiles mapped GPT-5.5 tasks to this API-only tier fallback.
+	if (provider === "openai" && value === "gpt-5.5-mini" && valid.has("gpt-5.5"))
+		return "gpt-5.5";
 	const canonical = resolveCatalogModelValue(value, liveCatalog);
 	if (valid.has(canonical)) return canonical;
 
 	// Not offered by this provider → map to an equivalent-tier model.
-	const staticCatalog = getModelsForProvider(provider);
+	const staticCatalog = getModelsForProvider(provider).filter((m) =>
+		valid.has(m.value),
+	);
 	const tier = getModelTier(value);
 	const sameTier = tier
-		? staticCatalog.find((m) => m.tier === tier)?.value
+		? (liveCatalog.find((m) => m.tier === tier)?.value ??
+			staticCatalog.find((m) => m.tier === tier)?.value)
 		: undefined;
 	const flagship =
 		liveCatalog.find((m) => m.tier === "flagship")?.value ??
@@ -887,6 +400,89 @@ export function resolveModelForProviderCatalog(
 		getDefaultModelForProvider(provider) ??
 		value
 	);
+}
+
+/**
+ * Un identifiant que le fournisseur Claude sait servir : un id `claude-*`
+ * (éventuellement préfixé Bedrock / Vertex, `us.anthropic.claude-…`) ou un
+ * alias de famille (`opus`, `sonnet[1m]`, `opusplan`…). Le catalogue live
+ * d'Anthropic ne garde que la première forme (`provider_models_catalog.py`).
+ */
+const CLAUDE_MODEL_ID =
+	/^(?:[a-z0-9-]+\.)*claude-|^(?:opus|sonnet|haiku|fable|mythos|opusplan|default)(?:$|[-[])/i;
+
+/**
+ * Vrai quand `model` appartient, sans doute possible, à un autre fournisseur
+ * que `provider`.
+ *
+ * Deux preuves seulement, toutes deux déjà établies ailleurs :
+ *  - Claude ne sert que des modèles Claude. Le CLI répond à `gemma4:12b` par
+ *    « There's an issue with the selected model », et rien d'autre.
+ *  - un identifiant Claude au format natif (tirets) n'est servi que par
+ *    Anthropic (`isAnthropicNativeVersionedModelId`, la même règle que
+ *    `phase_config._resolve_provider_model`).
+ *
+ * Un modèle que le catalogue statique ne connaît pas n'en est **pas** une : une
+ * sortie récente lue dans le catalogue live, un tag Ollama tiré à la main ou
+ * une passerelle (Copilot, Windsurf) qui propose les modèles d'autres éditeurs
+ * le proposent légitimement. Dans le doute, le choix de la personne tient.
+ */
+export function isModelForeignToProvider(
+	model: string,
+	provider: string,
+): boolean {
+	const id = model.trim();
+	const name = provider.trim().toLowerCase();
+	if (!id || !name) return false;
+
+	const key = getCanonicalModelKey(id);
+	if (getModelsForProvider(name).some((m) => getCanonicalModelKey(m.value) === key))
+		return false;
+
+	if (name === "claude" || name === "anthropic") return !CLAUDE_MODEL_ID.test(id);
+	return isAnthropicNativeVersionedModelId(id);
+}
+
+/**
+ * Le modèle hérité des réglages, sous la forme où `provider` le sert.
+ *
+ * Le catalogue statique est généré : il retarde sur ce que le catalogue live
+ * — donc la liste des réglages — propose déjà. Le traiter comme la liste de
+ * ce que le fournisseur sert remplaçait « Claude Sonnet 5.5 », choisi dans les
+ * réglages, par le modèle phare (`claude-fable-5-1`) au seul motif que le
+ * fichier généré ne le connaissait pas encore.
+ *
+ * Un modèle n'est donc ramené au catalogue (`resolveModelForProviderCatalog`)
+ * que sur une preuve qu'il n'est pas de ce fournisseur : il lui est étranger
+ * ({@link isModelForeignToProvider}), ou — hors Claude, dont la famille se
+ * reconnaît à son nom — un autre catalogue le propose et pas le sien. Un
+ * modèle que le catalogue connaît sous une autre graphie prend celle du
+ * fournisseur (`claude-sonnet-4-6` → `claude-sonnet-4.6` chez Copilot).
+ */
+export function adaptInheritedModelToProvider(
+	model: string,
+	provider: string,
+): string {
+	const name = provider.trim().toLowerCase();
+	const own = getModelsForProvider(name);
+	if (!model || !own.length) return model;
+
+	const spelled = resolveCatalogModelValue(model, own);
+	if (own.some((m) => m.value === spelled)) return spelled;
+
+	const isClaude = name === "claude" || name === "anthropic";
+	const key = getCanonicalModelKey(model);
+	const offeredElsewhere =
+		!isClaude &&
+		Object.values(PROVIDER_MODELS_MAP).some(
+			(list) =>
+				list !== own &&
+				list.some((m) => getCanonicalModelKey(m.value) === key),
+		);
+
+	return isModelForeignToProvider(model, name) || offeredElsewhere
+		? resolveModelForProviderCatalog(model, own, name)
+		: model;
 }
 
 // Maps thinking levels to budget tokens (null = no extended thinking)
@@ -1026,57 +622,6 @@ export const DEFAULT_FEATURE_THINKING: FeatureThinkingConfig = {
 	voiceControl: "low", // Fast thinking for voice control
 };
 
-// Feature labels for UI display
-export const FEATURE_LABELS: Record<
-	keyof FeatureModelConfig,
-	{ label: string; description: string }
-> = {
-	insights: {
-		label: "Insights Chat",
-		description: "Ask questions about your codebase",
-	},
-	ideation: {
-		label: "Ideation",
-		description: "Generate feature ideas and improvements",
-	},
-	roadmap: {
-		label: "Roadmap",
-		description: "Create strategic feature roadmaps",
-	},
-	"natural-language-git": {
-		label: "Natural Language Git",
-		description: "Execute Git commands using natural language",
-	},
-	githubIssues: {
-		label: "GitHub Issues",
-		description: "Automated issue triage and labeling",
-	},
-	githubPrs: {
-		label: "GitHub PR Review",
-		description: "AI-powered pull request reviews",
-	},
-	utility: {
-		label: "Utility",
-		description: "Commit messages and merge conflict resolution",
-	},
-	promptOptimizer: {
-		label: "Prompt Optimizer",
-		description: "AI-powered prompt enhancement with project context",
-	},
-	testGenerator: {
-		label: "Test Generation Agent",
-		description: "AI-powered test generation and coverage analysis",
-	},
-	codeReview: {
-		label: "Code Review Agent",
-		description: "AI-powered code review and quality analysis",
-	},
-	voiceControl: {
-		label: "Voice Control",
-		description: "Voice-activated development commands",
-	},
-};
-
 // Default agent profiles for preset model/thinking configurations
 // All profiles have per-phase configuration for full customization
 export const DEFAULT_AGENT_PROFILES: AgentProfile[] = [
@@ -1122,12 +667,3 @@ export const DEFAULT_AGENT_PROFILES: AgentProfile[] = [
 		phaseThinking: QUICK_PHASE_THINKING,
 	},
 ];
-
-// ============================================
-// Memory Backends
-// ============================================
-
-export const MEMORY_BACKENDS = [
-	{ value: "file", label: "File-based (default)" },
-	{ value: "graphiti", label: "Graphiti (LadybugDB)" },
-] as const;

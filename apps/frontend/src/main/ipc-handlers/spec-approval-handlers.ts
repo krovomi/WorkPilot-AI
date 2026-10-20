@@ -12,7 +12,6 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type { BrowserWindow } from "electron";
 import { ipcMain } from "electron";
 
 type ApprovalStatus = "pending" | "approved" | "rejected" | "changes_requested";
@@ -344,11 +343,4 @@ export function registerSpecApprovalHandlers(): void {
 			}
 		},
 	);
-}
-
-export function setupSpecApprovalEventForwarding(
-	_getMainWindow: () => BrowserWindow | null,
-): void {
-	// Spec approval is request-response. The agent marks specs by creating APPROVAL_PENDING files;
-	// the renderer polls via specApproval:getPendingSpecs.
 }

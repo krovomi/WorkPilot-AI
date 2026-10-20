@@ -22,6 +22,11 @@ from pathlib import Path
 from typing import Any, Optional
 
 from agents.test_generator import TestGenerationResult, TestGeneratorAgent
+from test_generation.layout import (
+    TestDestination,
+    resolve_test_destination,
+    sanitize_file_name,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -163,9 +168,14 @@ class TestGenerationService:
         """
         logger.debug(f"[TestGenerationService] Processing file: {relative_path}")
 
-        # Find existing test file
-        test_file_path = self.agent._compute_test_file_path(str(full_path))
-        existing_test_path = test_file_path if Path(test_file_path).exists() else None
+        # Where this file's tests belong in *this* project — the tests directory
+        # beside the source root, not a convention resolved against the CWD.
+        destination = resolve_test_destination(
+            str(full_path), project_root=str(self.project_path)
+        )
+        existing_test_path = (
+            destination.path if Path(destination.path).is_file() else None
+        )
 
         # Skip if existing tests and configured to skip
         if existing_test_path and self.skip_existing_tests:
@@ -186,8 +196,12 @@ class TestGenerationService:
                 )
                 return None
 
-            # Write test file to disk
-            self._write_test_file(result.test_file_path, result.test_file_content)
+            # Write test file to disk. The directory is the project's, the file
+            # name is the model's — nothing here trusts a model-invented path.
+            written_path = self._write_test_file(
+                result.test_file_path, result.test_file_content, destination
+            )
+            result.test_file_path = written_path
 
             logger.info(
                 f"[TestGenerationService] Generated {result.tests_generated} tests "
@@ -209,19 +223,26 @@ class TestGenerationService:
             )
             raise
 
-    def _write_test_file(self, test_file_path: str, content: str) -> None:
+    def _write_test_file(
+        self,
+        test_file_path: str,
+        content: str,
+        destination: TestDestination,
+    ) -> str:
         """
-        Write generated test file to disk.
+        Write generated test file to disk and return where it landed.
 
         Args:
-            test_file_path: Path where to write the test file
+            test_file_path: Path the model proposed. Only its file name is
+                used — the directory comes from *destination*, which read the
+                project's real layout. A model-relative path used to be
+                resolved against the project root, which is how C# tests ended
+                up beside the solution file.
             content: Test file content
+            destination: The resolved destination for this source file.
         """
-        # Convert relative path to absolute
-        if not os.path.isabs(test_file_path):
-            test_file_path = self.project_path / test_file_path
-
-        test_path = Path(test_file_path)
+        file_name = sanitize_file_name(test_file_path) or destination.file_name
+        test_path = Path(destination.directory) / file_name
 
         # Create directory if it doesn't exist
         test_path.parent.mkdir(parents=True, exist_ok=True)
@@ -231,6 +252,7 @@ class TestGenerationService:
             f.write(content)
 
         logger.debug(f"[TestGenerationService] Wrote test file: {test_path}")
+        return str(test_path)
 
     def analyze_coverage_only(self, file_path: str) -> dict[str, Any]:
         """
@@ -249,10 +271,12 @@ class TestGenerationService:
             if not full_path.exists():
                 raise FileNotFoundError(f"File not found: {file_path}")
 
-            # Find existing test file
-            test_file_path = self.agent._compute_test_file_path(str(full_path))
+            # Find existing test file where this project actually keeps them
+            destination = resolve_test_destination(
+                str(full_path), project_root=str(self.project_path)
+            )
             existing_test_path = (
-                test_file_path if Path(test_file_path).exists() else None
+                destination.path if Path(destination.path).is_file() else None
             )
 
             # Analyze coverage gaps

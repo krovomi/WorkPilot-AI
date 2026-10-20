@@ -9,6 +9,7 @@ import {
 import path from "node:path";
 import { promisify } from "node:util";
 import { getToolPath, getToolPathAsync } from "./cli-tool-manager";
+import { getIsolatedGitEnv } from "./utils/git-isolation";
 
 const execFileAsync = promisify(execFile);
 
@@ -402,6 +403,62 @@ function ensureGitignoreEntries(projectPath: string, entries: string[]): void {
 }
 
 /**
+ * Make sure git ignores a project's `<autoBuildPath>/.env`, which holds its
+ * tokens. `initializeProject` ignores the whole directory, but a `.env`
+ * written before initialization (settings saved from the add-project dialog)
+ * or a `.workpilot/` renamed from a legacy `.auto-claude/` never went through
+ * it.
+ *
+ * Git is asked rather than `.gitignore` read: a global exclude or a parent
+ * repository's rules count, and a team committing `.workpilot/specs/` through
+ * a negation keeps doing so, since only the file is added. Outside a git
+ * repository nothing is written. Never throws. Returns true when `.gitignore`
+ * changed.
+ */
+export async function ensureProjectEnvIgnored(
+	projectPath: string,
+	autoBuildPath: string,
+): Promise<boolean> {
+	const envFile = `${autoBuildPath.replace(/[\\/]+$/, "")}/.env`;
+	try {
+		const git = await getToolPathAsync("git");
+		await execFileAsync(git, ["check-ignore", "-q", "--", envFile], {
+			cwd: projectPath,
+			env: getIsolatedGitEnv(),
+			timeout: GIT_STATUS_TIMEOUT_MS,
+		});
+		return false; // Exit 0: already ignored.
+	} catch (error) {
+		// Exit 1 is "not ignored"; anything else (128 outside a repository,
+		// git missing, a timeout) leaves .gitignore alone.
+		if ((error as { code?: unknown }).code !== 1) return false;
+	}
+	try {
+		ensureGitignoreEntries(projectPath, [envFile]);
+		return true;
+	} catch (error) {
+		console.warn(
+			"[ProjectInitializer] Could not add the project .env to .gitignore:",
+			error instanceof Error ? error.message : error,
+		);
+		return false;
+	}
+}
+
+/** `ensureProjectEnvIgnored` for each project that has a `.env` on disk. */
+export async function ensureProjectEnvFilesIgnored(
+	projects: readonly { path: string; autoBuildPath?: string | null }[],
+): Promise<void> {
+	for (const project of projects) {
+		if (!project.autoBuildPath) continue;
+		if (!existsSync(path.join(project.path, project.autoBuildPath, ".env"))) {
+			continue;
+		}
+		await ensureProjectEnvIgnored(project.path, project.autoBuildPath);
+	}
+}
+
+/**
  * Data directories created in .workpilot for each project
  */
 const DATA_DIRECTORIES = ["specs", "ideation", "insights", "roadmap"];
@@ -409,9 +466,16 @@ const DATA_DIRECTORIES = ["specs", "ideation", "insights", "roadmap"];
 /**
  * Result of initialization operation
  */
+/**
+ * The blocker union lives in `shared/types` because the renderer branches on
+ * it; re-exported here so this module's own result type reads on its own.
+ */
+export type { InitializationBlocker } from "../shared/types";
+
 export interface InitializationResult {
 	success: boolean;
 	error?: string;
+	blocker?: import("../shared/types").InitializationBlocker;
 }
 
 /**
@@ -463,6 +527,7 @@ export function initializeProject(projectPath: string): InitializationResult {
 		return {
 			success: false,
 			error: `Project directory not found: ${projectPath}`,
+			blocker: "path-missing",
 		};
 	}
 
@@ -475,6 +540,7 @@ export function initializeProject(projectPath: string): InitializationResult {
 			error:
 				gitStatus.error ||
 				"Git repository required. WorkPilot AI uses git worktrees for isolated builds.",
+			blocker: gitStatus.isGitRepo ? "no-commits" : "not-a-git-repo",
 		};
 	}
 
@@ -486,6 +552,7 @@ export function initializeProject(projectPath: string): InitializationResult {
 		return {
 			success: false,
 			error: "Project already has auto-claude initialized (.workpilot exists)",
+			blocker: "already-initialized",
 		};
 	}
 

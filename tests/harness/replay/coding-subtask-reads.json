@@ -1,0 +1,400 @@
+{
+  "format": 1,
+  "id": "coding-subtask-reads",
+  "why_this_is_here": "Two subtasks of one coding task on a token-prefix provider: reads that page, a find, writes, short test runs. Guards the lot 2 order: the second subtask must send the system prompt, the tool definitions and the task block exactly as the first did, and every call must extend the previous one.",
+  "model": "gpt-5.4",
+  "agent_type": "coder",
+  "tool_use_hint": true,
+  "effort": "EFFORT: medium\nWORKFLOW PHASE: coding — implement the subtask, run its tests, commit.",
+  "files": {
+    ".specify/memory/constitution.md": [
+      "# Inventory Service Constitution\n",
+      "\n",
+      "## Core Principles\n",
+      "\n",
+      "### I. Money is integers\n",
+      "Every amount is an integer number of cents. No float ever holds money,\n",
+      "in code, in the database or on the wire.\n",
+      "\n",
+      "### II. Tests first\n",
+      "A behaviour change starts with a failing test in `tests/`. A subtask is done\n",
+      "when `pytest -q` passes, not before.\n",
+      "\n",
+      "### III. One way in\n",
+      "Stock moves only through `InventoryService`. Routes and jobs call the\n",
+      "service; nothing writes a `StockLevel` directly.\n",
+      "\n",
+      "### IV. Small modules\n",
+      "A module over 400 lines is split before it grows further.\n",
+      "\n",
+      "## Governance\n",
+      "This constitution supersedes local conventions. Amendments are made by pull\n",
+      "request, with the reason in the description.\n",
+      "\n",
+      "**Version**: 1.2.0 | **Ratified**: 2026-01-12 | **Last Amended**: 2026-04-03\n"
+    ],
+    "docs/adr/0001-money-in-integer-cents.md": [
+      "# 1. Money is stored in integer cents\n",
+      "\n",
+      "Date: 2026-03-02\n",
+      "\n",
+      "## Status\n",
+      "\n",
+      "Accepted\n",
+      "\n",
+      "## Context\n",
+      "\n",
+      "Prices were stored as floats in the first prototype. Sums of basket lines\n",
+      "drifted by a cent on large orders, and the accounting export disagreed with\n",
+      "the invoices.\n",
+      "\n",
+      "## Decision\n",
+      "\n",
+      "Every amount is stored, computed and sent as an integer number of cents.\n",
+      "Conversion to a decimal string happens only when rendering for a person.\n",
+      "\n",
+      "## Consequences\n",
+      "\n",
+      "Arithmetic is exact. Rounding happens once, where a percentage is applied,\n",
+      "with ROUND_HALF_EVEN, in `pricing.rules`.\n"
+    ],
+    "pyproject.toml": [
+      "[project]\n",
+      "name = \"inventory-service\"\n",
+      "version = \"0.4.0\"\n",
+      "requires-python = \">=3.12\"\n",
+      "dependencies = [\"fastapi>=0.115\", \"pydantic>=2.8\"]\n",
+      "\n",
+      "[tool.pytest.ini_options]\n",
+      "pythonpath = [\"src\"]\n",
+      "testpaths = [\"tests\"]\n"
+    ],
+    "src/inventory/__init__.py": [
+      "\"\"\"Inventory service.\"\"\"\n"
+    ],
+    "src/inventory/models.py": [
+      "\"\"\"Inventory models: products, stock levels and reservations.\"\"\"\n",
+      "\n",
+      "from __future__ import annotations\n",
+      "\n",
+      "from dataclasses import dataclass, field\n",
+      "from datetime import datetime, timezone\n",
+      "\n",
+      "\n",
+      "@dataclass(frozen=True)\n",
+      "class Product:\n",
+      "    sku: str\n",
+      "    name: str\n",
+      "    unit_price_cents: int\n",
+      "    weight_grams: int\n",
+      "\n",
+      "\n",
+      "@dataclass\n",
+      "class StockLevel:\n",
+      "    sku: str\n",
+      "    on_hand: int\n",
+      "    reserved: int = 0\n",
+      "\n",
+      "    @property\n",
+      "    def available(self) -> int:\n",
+      "        return self.on_hand - self.reserved\n",
+      "\n",
+      "\n",
+      "@dataclass\n",
+      "class Reservation:\n",
+      "    order_id: str\n",
+      "    sku: str\n",
+      "    quantity: int\n",
+      "    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))\n",
+      "\n",
+      "\n",
+      "CATALOGUE: tuple[Product, ...] = (\n",
+      {
+        "repeat": 220,
+        "line": "    Product(\"SKU-{n}\", \"Warehouse item {n}\", unit_price_cents={n}99, weight_grams={n}50),"
+      },
+      ")\n"
+    ],
+    "src/inventory/service.py": [
+      "\"\"\"Stock operations: receive, reserve, release.\"\"\"\n",
+      "\n",
+      "from __future__ import annotations\n",
+      "\n",
+      "from .models import StockLevel\n",
+      "from .repository import StockRepository\n",
+      "\n",
+      "\n",
+      "class OutOfStock(Exception):\n",
+      "    \"\"\"A reservation asked for more than is available.\"\"\"\n",
+      "\n",
+      "    def __init__(self, sku: str, wanted: int, available: int) -> None:\n",
+      "        super().__init__(f\"{sku}: {wanted} wanted, {available} available\")\n",
+      "        self.sku = sku\n",
+      "        self.wanted = wanted\n",
+      "        self.available = available\n",
+      "\n",
+      "\n",
+      "class InventoryService:\n",
+      "    \"\"\"The one way stock moves (constitution, principle III).\"\"\"\n",
+      "\n",
+      "    def __init__(self, repository: StockRepository) -> None:\n",
+      "        self._repository = repository\n",
+      "\n",
+      "    def level(self, sku: str) -> StockLevel:\n",
+      "        return self._repository.get(sku)\n",
+      "\n",
+      "    def receive(self, sku: str, quantity: int) -> StockLevel:\n",
+      "        if quantity <= 0:\n",
+      "            raise ValueError(\"a delivery adds at least one unit\")\n",
+      "        level = self._repository.get(sku)\n",
+      "        level.on_hand += quantity\n",
+      "        self._repository.save(level)\n",
+      "        return level\n"
+    ],
+    "src/inventory/api.py": [
+      "\"\"\"HTTP routes of the inventory service.\"\"\"\n",
+      "\n",
+      "from __future__ import annotations\n",
+      "\n",
+      "from fastapi import APIRouter, Depends, HTTPException\n",
+      "from pydantic import BaseModel, Field\n",
+      "\n",
+      "from .dependencies import inventory_service\n",
+      "from .service import InventoryService\n",
+      "\n",
+      "router = APIRouter(prefix=\"/v1/stock\", tags=[\"stock\"])\n",
+      "\n",
+      "\n",
+      "class StockOut(BaseModel):\n",
+      "    sku: str\n",
+      "    on_hand: int\n",
+      "    reserved: int\n",
+      "    available: int\n",
+      "\n",
+      "\n",
+      "class DeliveryIn(BaseModel):\n",
+      "    quantity: int = Field(gt=0)\n",
+      "\n",
+      "\n",
+      "@router.get(\"/{sku}\", response_model=StockOut)\n",
+      "def get_level(sku: str, service: InventoryService = Depends(inventory_service)):\n",
+      "    level = service.level(sku)\n",
+      "    return StockOut(\n",
+      "        sku=level.sku,\n",
+      "        on_hand=level.on_hand,\n",
+      "        reserved=level.reserved,\n",
+      "        available=level.available,\n",
+      "    )\n",
+      "\n",
+      "\n",
+      "@router.post(\"/{sku}/deliveries\", response_model=StockOut)\n",
+      "def receive(\n",
+      "    sku: str,\n",
+      "    delivery: DeliveryIn,\n",
+      "    service: InventoryService = Depends(inventory_service),\n",
+      "):\n",
+      "    level = service.receive(sku, delivery.quantity)\n",
+      "    return StockOut(\n",
+      "        sku=level.sku,\n",
+      "        on_hand=level.on_hand,\n",
+      "        reserved=level.reserved,\n",
+      "        available=level.available,\n",
+      "    )\n"
+    ],
+    "tests/test_service.py": [
+      "\"\"\"InventoryService: receiving and reserving stock.\"\"\"\n",
+      "\n",
+      "import pytest\n",
+      "\n",
+      "from inventory.repository import InMemoryStockRepository\n",
+      "from inventory.service import InventoryService, OutOfStock\n",
+      "\n",
+      "\n",
+      "@pytest.fixture\n",
+      "def service():\n",
+      "    repository = InMemoryStockRepository()\n",
+      "    repository.seed({\"SKU-1\": 10, \"SKU-2\": 0})\n",
+      "    return InventoryService(repository)\n",
+      "\n",
+      "\n",
+      "def test_receive_adds_to_what_is_on_hand(service):\n",
+      "    assert service.receive(\"SKU-1\", 5).on_hand == 15\n",
+      "\n",
+      "\n",
+      "def test_receive_refuses_an_empty_delivery(service):\n",
+      "    with pytest.raises(ValueError):\n",
+      "        service.receive(\"SKU-1\", 0)\n",
+      "\n",
+      "\n",
+      "def test_reserve_holds_units(service):\n",
+      "    service.reserve(\"order-7\", \"SKU-1\", 4)\n",
+      "    assert service.level(\"SKU-1\").available == 6\n",
+      "\n",
+      "\n",
+      "def test_reserve_refuses_more_than_available(service):\n",
+      "    with pytest.raises(OutOfStock) as caught:\n",
+      "        service.reserve(\"order-8\", \"SKU-2\", 1)\n",
+      "    assert caught.value.available == 0\n",
+      "\n",
+      "\n",
+      "def test_release_gives_back_what_an_order_held(service):\n",
+      "    service.reserve(\"order-9\", \"SKU-1\", 3)\n",
+      "    assert service.release(\"order-9\") == 3\n",
+      "    assert service.level(\"SKU-1\").available == 10\n"
+    ]
+  },
+  "sessions": [
+    {
+      "subtask": [
+        "# Subtask 1.1 — reserve and release stock\n",
+        "\n",
+        "Add `InventoryService.reserve(order_id, sku, quantity)` and `release(order_id)`. A reservation never takes more than what is available; it raises `OutOfStock` instead.\n",
+        "\n",
+        "Files to modify: src/inventory/service.py\n",
+        "Verification: pytest -q tests/test_service.py\n"
+      ],
+      "turns": [
+        {
+          "text": "I'll read the models and the service first.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "src/inventory/models.py"
+              }
+            },
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "src/inventory/service.py"
+              }
+            }
+          ]
+        },
+        {
+          "calls": [
+            {
+              "tool": "find_files",
+              "arguments": {
+                "pattern": "tests/*.py"
+              }
+            },
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "tests/test_service.py"
+              }
+            }
+          ]
+        },
+        {
+          "text": "The catalogue goes on; reading the rest of models.py.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "src/inventory/models.py",
+                "offset": 143
+              }
+            }
+          ]
+        },
+        {
+          "text": "Adding reserve and release to the service.",
+          "calls": [
+            {
+              "tool": "write_file",
+              "arguments": {
+                "path": "src/inventory/service.py",
+                "content": "\"\"\"Stock operations: receive, reserve, release.\"\"\"\n\nfrom __future__ import annotations\n\nfrom .models import Reservation, StockLevel\nfrom .repository import StockRepository\n\n\nclass OutOfStock(Exception):\n    \"\"\"A reservation asked for more than is available.\"\"\"\n\n    def __init__(self, sku: str, wanted: int, available: int) -> None:\n        super().__init__(f\"{sku}: {wanted} wanted, {available} available\")\n        self.sku = sku\n        self.wanted = wanted\n        self.available = available\n\n\nclass InventoryService:\n    \"\"\"The one way stock moves (constitution, principle III).\"\"\"\n\n    def __init__(self, repository: StockRepository) -> None:\n        self._repository = repository\n\n    def level(self, sku: str) -> StockLevel:\n        return self._repository.get(sku)\n\n    def receive(self, sku: str, quantity: int) -> StockLevel:\n        if quantity <= 0:\n            raise ValueError(\"a delivery adds at least one unit\")\n        level = self._repository.get(sku)\n        level.on_hand += quantity\n        self._repository.save(level)\n        return level\n\n    def reserve(self, order_id: str, sku: str, quantity: int) -> Reservation:\n        \"\"\"Hold ``quantity`` units of ``sku`` for ``order_id``, or raise OutOfStock.\"\"\"\n        if quantity <= 0:\n            raise ValueError(\"a reservation holds at least one unit\")\n        level = self._repository.get(sku)\n        if level.available < quantity:\n            raise OutOfStock(sku, quantity, level.available)\n        level.reserved += quantity\n        self._repository.save(level)\n        reservation = Reservation(order_id=order_id, sku=sku, quantity=quantity)\n        self._repository.add_reservation(reservation)\n        return reservation\n\n    def release(self, order_id: str) -> int:\n        \"\"\"Give back every unit held for ``order_id``; the number released.\"\"\"\n        released = 0\n        for reservation in self._repository.reservations_of(order_id):\n            level = self._repository.get(reservation.sku)\n            level.reserved -= reservation.quantity\n            self._repository.save(level)\n            released += reservation.quantity\n        self._repository.drop_reservations(order_id)\n        return released\n"
+              }
+            }
+          ]
+        },
+        {
+          "calls": [
+            {
+              "tool": "run_command",
+              "arguments": {
+                "command": "pytest -q tests/test_service.py"
+              },
+              "output": [
+                "........                                                                 [100%]\n",
+                "8 passed in 0.42s\n"
+              ]
+            }
+          ]
+        },
+        {
+          "text": "Done: `reserve` holds units or raises `OutOfStock`, `release` gives back what an order held. 8 tests pass."
+        }
+      ]
+    },
+    {
+      "subtask": [
+        "# Subtask 1.2 — expose reservations over HTTP\n",
+        "\n",
+        "Add `POST /v1/stock/{sku}/reservations` calling `InventoryService.reserve`; answer 409 on `OutOfStock`.\n",
+        "\n",
+        "Files to modify: src/inventory/api.py\n",
+        "Verification: pytest -q\n"
+      ],
+      "turns": [
+        {
+          "text": "Reading the routes and where reserve is used.",
+          "calls": [
+            {
+              "tool": "read_file",
+              "arguments": {
+                "path": "src/inventory/api.py"
+              }
+            },
+            {
+              "tool": "search_files",
+              "arguments": {
+                "pattern": "def reserve|OutOfStock",
+                "glob": "*.py"
+              }
+            }
+          ]
+        },
+        {
+          "calls": [
+            {
+              "tool": "write_file",
+              "arguments": {
+                "path": "src/inventory/api.py",
+                "content": "\"\"\"HTTP routes of the inventory service.\"\"\"\n\nfrom __future__ import annotations\n\nfrom fastapi import APIRouter, Depends, HTTPException\nfrom pydantic import BaseModel, Field\n\nfrom .dependencies import inventory_service\nfrom .service import InventoryService, OutOfStock\n\nrouter = APIRouter(prefix=\"/v1/stock\", tags=[\"stock\"])\n\n\nclass StockOut(BaseModel):\n    sku: str\n    on_hand: int\n    reserved: int\n    available: int\n\n\nclass DeliveryIn(BaseModel):\n    quantity: int = Field(gt=0)\n\n\n@router.get(\"/{sku}\", response_model=StockOut)\ndef get_level(sku: str, service: InventoryService = Depends(inventory_service)):\n    level = service.level(sku)\n    return StockOut(\n        sku=level.sku,\n        on_hand=level.on_hand,\n        reserved=level.reserved,\n        available=level.available,\n    )\n\n\n@router.post(\"/{sku}/deliveries\", response_model=StockOut)\ndef receive(\n    sku: str,\n    delivery: DeliveryIn,\n    service: InventoryService = Depends(inventory_service),\n):\n    level = service.receive(sku, delivery.quantity)\n    return StockOut(\n        sku=level.sku,\n        on_hand=level.on_hand,\n        reserved=level.reserved,\n        available=level.available,\n    )\n\n\nclass ReservationIn(BaseModel):\n    order_id: str = Field(min_length=1)\n    quantity: int = Field(gt=0)\n\n\n@router.post(\"/{sku}/reservations\", status_code=201)\ndef reserve(\n    sku: str,\n    body: ReservationIn,\n    service: InventoryService = Depends(inventory_service),\n):\n    try:\n        reservation = service.reserve(body.order_id, sku, body.quantity)\n    except OutOfStock as error:\n        raise HTTPException(status_code=409, detail=str(error)) from error\n    return {\"order_id\": reservation.order_id, \"quantity\": reservation.quantity}\n"
+              }
+            }
+          ]
+        },
+        {
+          "calls": [
+            {
+              "tool": "run_command",
+              "arguments": {
+                "command": "pytest -q"
+              },
+              "output": [
+                "============================= test session starts ==============================\n",
+                "platform linux -- Python 3.12.7, pytest-8.3.3, pluggy-1.5.0\n",
+                "rootdir: /workspace\n",
+                "configfile: pyproject.toml\n",
+                "collected 14 items\n",
+                "\n",
+                "tests/test_api.py ......                                                 [ 42%]\n",
+                "tests/test_service.py ........                                           [100%]\n",
+                "\n",
+                "============================== 14 passed in 0.88s ==============================\n"
+              ]
+            }
+          ]
+        },
+        {
+          "text": "Done: the route answers 201, or 409 when the stock is short. 14 tests pass."
+        }
+      ]
+    }
+  ]
+}

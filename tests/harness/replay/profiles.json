@@ -1,0 +1,20 @@
+{
+  "blocks": {
+    "cache": "blocks",
+    "min_tokens": 1024,
+    "usage_format": "split_cache",
+    "who": "Anthropic (Claude Agent SDK): whole blocks up to a breakpoint, reads and writes reported apart"
+  },
+  "token_prefix": {
+    "cache": "token_prefix",
+    "min_tokens": 1024,
+    "step_tokens": 128,
+    "usage_format": "chat_completion",
+    "who": "OpenAI and its compatibles, DeepSeek, Gemini (implicit cache); Codex CLI, OpenCode, Antigravity and pi send this system prompt first"
+  },
+  "unreported": {
+    "cache": "none",
+    "usage_format": "chat_completion",
+    "who": "Copilot, Windsurf, LM Studio, Ollama: no cache field in their usage"
+  }
+}

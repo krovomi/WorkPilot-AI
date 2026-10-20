@@ -1,4 +1,4 @@
-import { ipcMain } from "electron";
+import { type BrowserWindow, ipcMain } from "electron";
 import {
 	type AutoRefactorRequest,
 	autoRefactorService,
@@ -63,48 +63,46 @@ export function registerAutoRefactorHandlers(): void {
 	);
 }
 
+/** Set once the service's listeners are attached; see below. */
+let forwardingRegistered = false;
+
 /**
  * Setup event listeners for Auto-Refactor service events
  * These events are forwarded to the renderer process
+ *
+ * Attaching twice would send every event twice, so a second call is a no-op.
+ * The `"error"` listener also matters to the main process itself: the service
+ * emits it from child-process callbacks, and an `EventEmitter` with no
+ * `"error"` listener throws.
  */
-export function setupAutoRefactorEventForwarding(): void {
-	// Forward status updates
-	autoRefactorService.on("status", (status: string) => {
-		const mainWindow = global.mainWindow;
-		if (mainWindow && !mainWindow.isDestroyed()) {
-			mainWindow.webContents.send("auto-refactor:status", status);
-		}
-	});
+export function setupAutoRefactorEventForwarding(
+	getMainWindow: () => BrowserWindow | null,
+): void {
+	if (forwardingRegistered) return;
+	forwardingRegistered = true;
 
-	// Forward streaming output
-	autoRefactorService.on("stream-chunk", (chunk: string) => {
-		const mainWindow = global.mainWindow;
+	const send = (channel: string, payload: unknown): void => {
+		const mainWindow = getMainWindow();
 		if (mainWindow && !mainWindow.isDestroyed()) {
-			mainWindow.webContents.send("auto-refactor:stream-chunk", chunk);
+			mainWindow.webContents.send(channel, payload);
 		}
-	});
+	};
 
-	// Forward errors
-	autoRefactorService.on("error", (error: string) => {
-		const mainWindow = global.mainWindow;
-		if (mainWindow && !mainWindow.isDestroyed()) {
-			mainWindow.webContents.send("auto-refactor:error", error);
-		}
-	});
-
-	// Forward completion with analysis result
-	autoRefactorService.on("complete", (result) => {
-		const mainWindow = global.mainWindow;
-		if (mainWindow && !mainWindow.isDestroyed()) {
-			mainWindow.webContents.send("auto-refactor:complete", result);
-		}
-	});
-
-	// Forward execution completion (if auto-executed)
-	autoRefactorService.on("execution-complete", (result) => {
-		const mainWindow = global.mainWindow;
-		if (mainWindow && !mainWindow.isDestroyed()) {
-			mainWindow.webContents.send("auto-refactor:execution-complete", result);
-		}
-	});
+	autoRefactorService.on("status", (status: string) =>
+		send("auto-refactor:status", status),
+	);
+	autoRefactorService.on("stream-chunk", (chunk: string) =>
+		send("auto-refactor:stream-chunk", chunk),
+	);
+	autoRefactorService.on("error", (error: string) =>
+		send("auto-refactor:error", error),
+	);
+	// Completion with the analysis result
+	autoRefactorService.on("complete", (result) =>
+		send("auto-refactor:complete", result),
+	);
+	// Execution completion (if auto-executed)
+	autoRefactorService.on("execution-complete", (result) =>
+		send("auto-refactor:execution-complete", result),
+	);
 }

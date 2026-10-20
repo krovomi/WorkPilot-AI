@@ -7,29 +7,38 @@
 #   pnpm run skills:list      what resolves here, and why the rest does not
 
 [targets]
-# Toolchain versions this repo is on. Anything omitted is detected from the
-# files on disk (package.json engines, .nvmrc, pyproject, go.mod, Cargo.toml).
-# Declared explicitly here because detection only looks at the repo root, and
-# the Python side of this monorepo lives under apps/backend.
+# Toolchain versions this repo is on.
 node = "20.0.0"
 python = "3.13"
+# Ajout des versions cibles requises par les compétences dotnet et mobiles :
+dotnet = "10.0"
+android = "8.0"
+ios = "16.0"
 
 [packs]
-# A want-list, not a filter: a pack that is NOT listed here is not resolved at
-# all. Opt-in rather than opt-out, because `skills/` holds packs vendored on
-# demand whose content is gitignored — with opt-out the emitted set would
-# depend on whether you had run `skills:bootstrap`, and `skills:check` would
-# pass on a fresh clone and fail for anyone who had.
-#
-# The value is a semver range, or "latest" to take whatever is in `skills/`.
+# Utilisation de "latest" ou des bonnes plages de versions pour éviter le rejet SemVer
 comms = "^1"
 tooling = "^1"
-# Not listed, therefore not emitted here:
-#   dotnet       authored for consumer projects; this repo is Python + TS
-#   bmad         76 wrappers, needs `skills:bootstrap` and a _bmad/ runtime
-#   superpowers, mattpocock, impeccable, task-observer, claude-mem
-#                upstream packs, available to any project that lists them
+bmad = "^6"           # Mis à jour à ^6 pour accepter la version 6.12.0 détectée
+dotnet = "latest"
+mobile = "latest"
+superpowers = "latest"
+mattpocock = "latest"
+impeccable = "latest"
+hermes = "latest"
+ui-ux-pro-max = "latest"   # UI/UX design intelligence (Basic) — contextual: only UI tasks pay for it
+
 # Add one and run `pnpm run skills:build` to pull it into this repo's palette.
+#
+# Deliberately absent:
+#   hermes-learned -- the loop's own output (learning_loop/hermes_adopt.py).
+#     Leaving it out is the gate that keeps agent-authored prose away from
+#     every harness until a person lists it, with the pack in front of them
+#     (docs/architecture/hermes.md). tests/test_skills_toml_packs.py
+#     fails if it appears here.
+#   claude-mem -- an optional pack (skills/README.md): only its pack.json is
+#     committed and it emits nothing. `pnpm run skills:bootstrap --pack
+#     claude-mem`, then list it here, for the real thing.
 
 # Harnesses to materialise. Omit to use the defaults from
 # capabilities/harnesses.yaml (agnostic + gemini).

@@ -102,6 +102,24 @@
   animation: indeterminate 1.5s ease-in-out infinite;
 }
 
+/* Sidebar activity badge: a job just ended on a page the user is not looking
+ * at. Three pulses and it stops — the badge stays, the motion does not. The
+ * global prefers-reduced-motion block below caps this at a single tick. */
+@keyframes activity-attention {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 transparent;
+  }
+  50% {
+    transform: scale(1.4);
+    box-shadow: 0 0 0 3px color-mix(in oklab, currentColor 25%, transparent);
+  }
+}
+
+.animate-activity-attention {
+  animation: activity-attention 0.8s ease-in-out 3;
+}
+
 /* CSS variables for light mode (secondary consideration per design system) */
 :root {
   /* Light Mode - Warm off-white tones */

@@ -179,9 +179,9 @@ export function AgentProfileSelector({
 				activeProvider,
 			),
 		};
-		const changed = (
-			Object.keys(next) as Array<keyof PhaseModelConfig>
-		).some((phase) => next[phase] !== currentPhaseModels[phase]);
+		const changed = (Object.keys(next) as Array<keyof PhaseModelConfig>).some(
+			(phase) => next[phase] !== currentPhaseModels[phase],
+		);
 		if (!changed) return;
 		onPhaseModelsChange(next);
 	}, [
@@ -462,7 +462,7 @@ export function AgentProfileSelector({
 												<SelectTrigger className="h-8 text-xs">
 													<SelectValue />
 												</SelectTrigger>
-												<SelectContent>
+												<SelectContent searchable>
 													{providerModels.map((m) => (
 														<SelectItem key={m.value} value={m.value}>
 															{m.label}
@@ -524,7 +524,7 @@ export function AgentProfileSelector({
 							<SelectTrigger id="custom-model" className="h-9">
 								<SelectValue placeholder={t("agentProfile.selectModel")} />
 							</SelectTrigger>
-							<SelectContent>
+							<SelectContent searchable>
 								{providerModels.map((m) => (
 									<SelectItem key={m.value} value={m.value}>
 										{m.label}

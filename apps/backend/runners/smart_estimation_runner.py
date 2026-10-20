@@ -17,7 +17,6 @@ backend_path = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_path))
 
 try:
-    from core.context_manager import get_project_context
     from services.smart_estimation_service import get_smart_estimation_service
 
     _AVAILABLE = True
@@ -33,12 +32,14 @@ class SmartEstimationRunner:
     def __init__(self):
         self.estimation_service = get_smart_estimation_service()
 
-    def run_estimation(self, project_id: str, task_description: str) -> dict[str, Any]:
+    def run_estimation(
+        self, project_path: str, task_description: str
+    ) -> dict[str, Any]:
         """
         Run smart estimation analysis for a given task.
 
         Args:
-            project_id: ID of the project
+            project_path: Filesystem path of the project to analyse
             task_description: Natural language description of the task
 
         Returns:
@@ -48,15 +49,8 @@ class SmartEstimationRunner:
             # Emit start event
             self._emit_event("start", {"status": "Analyzing task description..."})
 
-            # Get project context
-            self._emit_event("progress", {"status": "Loading project context..."})
-            project_context = get_project_context(project_id)
-            project_path = project_context.get("project_path", "")
-
-            if not project_path:
-                raise ValueError(
-                    f"Project context not found for project ID: {project_id}"
-                )
+            if not project_path or not Path(project_path).is_dir():
+                raise ValueError(f"Project path not found: {project_path}")
 
             # Run the estimation analysis
             self._emit_event("progress", {"status": "Analyzing complexity factors..."})
@@ -64,14 +58,21 @@ class SmartEstimationRunner:
                 task_description, project_path
             )
 
-            # Prepare structured result
+            # Prepare structured result.
+            #
+            # Duration predictions are dropped here rather than hidden in the
+            # UI: the product rule is to never give one, and a field that never
+            # crosses the boundary cannot leak into a tooltip later. The service
+            # still computes it for its own scoring; nothing downstream sees it.
             structured_result = {
                 "complexity_score": result.complexity_score,
                 "confidence_level": result.confidence_level,
                 "reasoning": result.reasoning,
-                "similar_tasks": result.similar_tasks,
+                "similar_tasks": [
+                    {k: v for k, v in task.items() if k != "duration_hours"}
+                    for task in result.similar_tasks
+                ],
                 "risk_factors": result.risk_factors,
-                "estimated_duration_hours": result.estimated_duration_hours,
                 "estimated_qa_iterations": result.estimated_qa_iterations,
                 "token_cost_estimate": result.token_cost_estimate,
                 "recommendations": result.recommendations,
@@ -107,7 +108,9 @@ def _emit_error(message: str) -> None:
 def main():
     """Main entry point for the smart estimation runner"""
     parser = argparse.ArgumentParser(description="Smart Estimation Runner")
-    parser.add_argument("--project-id", required=True, help="Project ID")
+    parser.add_argument(
+        "--project-path", required=True, help="Path to the project directory"
+    )
     parser.add_argument(
         "--task-description", required=True, help="Task description to analyze"
     )
@@ -122,7 +125,7 @@ def main():
 
     try:
         runner = SmartEstimationRunner()
-        result = runner.run_estimation(args.project_id, args.task_description)
+        result = runner.run_estimation(args.project_path, args.task_description)
         # Result is already emitted via events, but we also return it for completeness
         print(f"SMART_ESTIMATION_RESULT:{json.dumps(result)}", flush=True)
 

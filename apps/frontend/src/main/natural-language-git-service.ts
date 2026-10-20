@@ -2,9 +2,15 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { app } from "electron";
 import { MODEL_ID_MAP } from "../shared/constants";
 import type { AppSettings } from "../shared/types";
+import { getPageProviderEnv } from "./services/page-llm-config";
+import { readSettingsFile } from "./settings-utils";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Result of natural language Git command execution
@@ -159,12 +165,9 @@ export class NaturalLanguageGitService extends EventEmitter {
 
 		// Read OAuth token from settings if available
 		try {
-			const settingsPath = path.join(app.getPath("userData"), "settings.json");
-			if (existsSync(settingsPath)) {
-				const { readFileSync } = require("node:fs");
-				const settings: AppSettings = JSON.parse(
-					readFileSync(settingsPath, "utf-8"),
-				);
+			// Through settings-utils: it decrypts the stored keys.
+			const settings = readSettingsFile() as Partial<AppSettings> | undefined;
+			if (settings) {
 				if (settings.globalClaudeOAuthToken) {
 					processEnv.CLAUDE_OAUTH_TOKEN = settings.globalClaudeOAuthToken;
 				}
@@ -175,6 +178,11 @@ export class NaturalLanguageGitService extends EventEmitter {
 		} catch {
 			// Ignore settings read errors
 		}
+
+		// Le fournisseur de la page (son choix propre, sinon celui de la liste
+		// « Fournisseur IA ») et la clé qui va avec : sans SELECTED_LLM_PROVIDER
+		// le runner repartait sur Claude quel que soit le choix affiché.
+		Object.assign(processEnv, getPageProviderEnv("natural-language-git"));
 
 		// Spawn Python process
 		const proc = spawn(this.pythonPath, args, {

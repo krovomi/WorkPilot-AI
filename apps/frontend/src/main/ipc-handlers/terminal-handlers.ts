@@ -403,11 +403,6 @@ export function registerTerminalHandlers(
 		},
 	);
 
-	// CLAUDE_PROFILE_INITIALIZE handler has been removed.
-	// Use CLAUDE_PROFILE_AUTHENTICATE (in claude-code-handlers.ts) instead,
-	// which opens a visible terminal for the user to run /login manually.
-	// Authentication status is checked via CLAUDE_PROFILE_VERIFY_AUTH with polling.
-
 	// Set OAuth token for a profile (used when capturing from terminal or manual input)
 	ipcMain.handle(
 		IPC_CHANNELS.CLAUDE_PROFILE_SET_TOKEN,
@@ -435,10 +430,6 @@ export function registerTerminalHandlers(
 			}
 		},
 	);
-
-	// TERMINAL_OAUTH_CODE_SUBMIT handler has been removed.
-	// The new authentication flow (CLAUDE_PROFILE_AUTHENTICATE) doesn't require
-	// manual code submission - the user completes OAuth directly in the browser.
 
 	// Get auto-switch settings
 	ipcMain.handle(

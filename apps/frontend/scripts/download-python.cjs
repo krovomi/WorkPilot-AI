@@ -23,7 +23,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { toNodePlatform } = require("../src/shared/platform.cjs");
 
-// Python version to bundle (must be 3.10+ for claude-agent-sdk, 3.12+ for full Graphiti support)
+// Python version to bundle (must be 3.10+ for claude-agent-sdk)
 const PYTHON_VERSION = "3.12.8";
 
 // Patterns for files/directories to strip from site-packages to reduce size
@@ -840,7 +840,7 @@ function installPackages(pythonBin, requirementsPath, targetSitePackages) {
 	// --target: Install to specific directory
 	// --only-binary: Force binary wheels for pydantic (prevents silent source build failures)
 	// Note: We intentionally DO use pip's cache to preserve built wheels for packages
-	// like real_ladybug that must be compiled from source on Intel Mac (no PyPI wheel)
+	// that must be compiled from source on some platforms (no PyPI wheel)
 	const pipArgs = [
 		"-m",
 		"pip",
@@ -995,6 +995,7 @@ async function downloadPython(targetPlatform, targetArch, options = {}) {
 				"claude_agent_sdk",
 				"dotenv",
 				"pydantic_core",
+				"faster_whisper",
 			].concat(PLATFORM_CRITICAL_PACKAGES[info.nodePlatform] || []);
 			const missingPackages = criticalPackages.filter((pkg) =>
 				isCriticalPackageMissing(sitePackagesDir, pkg),
@@ -1096,6 +1097,7 @@ async function downloadPython(targetPlatform, targetArch, options = {}) {
 				"claude_agent_sdk",
 				"dotenv",
 				"pydantic_core",
+				"faster_whisper",
 			].concat(PLATFORM_CRITICAL_PACKAGES[info.nodePlatform] || []);
 			const postInstallMissing = criticalPackages.filter((pkg) =>
 				isCriticalPackageMissing(sitePackagesDir, pkg),

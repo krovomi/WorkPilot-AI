@@ -229,10 +229,10 @@ d[key] = value
 key in d
 
 # C#
-items.Add(x);
-items.Remove(x);
-items.AddRange(other);
-d[key] = value;
+items.Add(x)
+items.Remove(x)
+items.AddRange(other)
+d[key] = value
 d.ContainsKey(key)
 ```
 

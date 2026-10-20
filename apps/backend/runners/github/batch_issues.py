@@ -19,11 +19,20 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from security.untrusted import clean_untrusted
+
 logger = logging.getLogger(__name__)
+
+# `phase_config` is a top-level backend module, importable the same way in
+# both modes. It used to sit in the relative block as `..phase_config`, which
+# names `runners.phase_config` — a module that does not exist — so imported as
+# `runners.github.batch_issues` the block always failed and fell back to the
+# sibling imports below, which only resolve when `runners/github` itself is on
+# `sys.path` (the `runner.py` entry point).
+from phase_config import resolve_model_id
 
 # Import validators
 try:
-    from ..phase_config import resolve_model_id
     from .batch_validator import BatchValidator
     from .duplicates import SIMILAR_THRESHOLD
     from .file_lock import locked_json_write
@@ -31,7 +40,6 @@ except (ImportError, ValueError, SystemError):
     from batch_validator import BatchValidator
     from duplicates import SIMILAR_THRESHOLD
     from file_lock import locked_json_write
-    from phase_config import resolve_model_id
 
 
 class ClaudeBatchAnalyzer:
@@ -265,6 +273,15 @@ class IssueBatchItem:
     body: str
     labels: list[str] = field(default_factory=list)
     similarity_to_primary: float = 1.0  # Primary issue has 1.0
+
+    def __post_init__(self) -> None:
+        # Every construction site funnels through here — the two clustering
+        # paths and `from_dict` — which is why the cleaning sits on the
+        # dataclass rather than on each caller. Idempotent, so the round trip
+        # is free.
+        source = f"github:issue#{self.issue_number}"
+        self.title = clean_untrusted(self.title, kind="comment", source=source).text
+        self.body = clean_untrusted(self.body, kind="issue_body", source=source).text
 
     def to_dict(self) -> dict[str, Any]:
         return {

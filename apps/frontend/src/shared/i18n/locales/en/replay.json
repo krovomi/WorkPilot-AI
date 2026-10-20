@@ -45,7 +45,6 @@
 	"tokenConsumption": "Token Consumption",
 	"total": "{{tokens}} total • {{cost}}",
 	"hitCount": "hit {{count}}x",
-
 	"timeTravel": "Time Travel",
 	"timeTravelDescription": "Rewind to any decision point, modify context, and re-execute with any LLM.",
 	"checkpoints": "Checkpoints",
@@ -65,7 +64,6 @@
 	"viewFileSnapshot": "View File Snapshot",
 	"filesAtCheckpoint": "{{count}} files at this checkpoint",
 	"tokensAtCheckpoint": "{{tokens}} tokens ({{cost}})",
-
 	"forkAndReExecute": "Fork & Re-execute",
 	"forkSession": "Fork Session",
 	"forkDescription": "Re-execute from this checkpoint with modified instructions, using any LLM provider.",
@@ -87,7 +85,6 @@
 	"viewForkContext": "View Fork Context",
 	"compareForkWithOriginal": "Compare with Original",
 	"forks": "Forks",
-
 	"decisionScoring": "Decision Scoring",
 	"scoreDecisions": "Score Decisions",
 	"scoringDecisions": "Scoring decisions...",
@@ -102,7 +99,52 @@
 	"avgConfidence": "Avg. Confidence",
 	"avgImpact": "Avg. Impact",
 	"criticalDecisions": "Critical Decisions",
-
 	"providerAgnostic": "Works with any LLM provider",
-	"anyProvider": "Any Provider"
+	"anyProvider": "Any Provider",
+	"timeTravelPanel": {
+		"checkpoints": "Checkpoints",
+		"generateCheckpoints": "Generate",
+		"noCheckpoints": "No checkpoint yet. Generate them to be able to fork this session from any step.",
+		"checkpointType": {
+			"auto_decision": "Decision",
+			"auto_file_change": "File change",
+			"auto_tool_call": "Tool call",
+			"manual": "Manual"
+		},
+		"tokensAtCheckpoint_one": "{{count}} token",
+		"tokensAtCheckpoint_other": "{{count}} tokens",
+		"filesCaptured_one": "{{count}} file captured",
+		"filesCaptured_other": "{{count}} files captured",
+		"fork": "Fork",
+		"forkForm": "Fork from this checkpoint",
+		"modifiedPrompt": "Modified prompt",
+		"modifiedPromptHint": "Leave empty to replay the original prompt.",
+		"additionalInstructions": "Additional instructions",
+		"provider": "Provider",
+		"providerHint": "Leave empty to use the app settings",
+		"model": "Model",
+		"modelHint": "Any model of that provider",
+		"createFork": "Create the fork",
+		"cancel": "Cancel",
+		"forks": "Forks",
+		"noForks": "No fork yet. Fork a checkpoint to see how another prompt or model would have continued.",
+		"defaultModel": "Model from settings",
+		"forkStatus": {
+			"pending": "Pending",
+			"running": "Running",
+			"completed": "Completed",
+			"failed": "Failed"
+		},
+		"decisions": "Decision scores",
+		"scoreDecisions": "Score",
+		"noDecisions": "No decision scored yet.",
+		"decisionCount": "Decisions",
+		"criticalDecisions": "Critical",
+		"avgConfidence": "Avg confidence",
+		"avgImpact": "Avg impact",
+		"critical": "Critical",
+		"confidence": "Confidence",
+		"impact": "Impact",
+		"fileImpact": "File impact"
+	}
 }

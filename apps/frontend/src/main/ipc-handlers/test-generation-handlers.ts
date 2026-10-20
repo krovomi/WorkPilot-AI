@@ -17,7 +17,9 @@ export function setupTestGenerationHandlers(
 		}
 	});
 
-	testGenerationService.on("error", (error: string) => {
+	// Forwarded as-is: the service already produced the structured payload the
+	// renderer renders (message, code, stage, redacted details).
+	testGenerationService.on("error", (error: unknown) => {
 		const mainWindow = getMainWindow();
 		if (mainWindow && !mainWindow.isDestroyed()) {
 			mainWindow.webContents.send("test-generation:error", error);
@@ -82,6 +84,96 @@ export function setupTestGenerationHandlers(
 		},
 	);
 
+	// Where would the generated tests be written? Answered before a generation
+	// starts, so the UI can ask the user when the project has no test directory
+	// instead of dropping the file next to the solution file.
+	ipcMain.handle(
+		"test-generation:resolve-destination",
+		async (
+			_,
+			params: {
+				filePath: string;
+				projectPath?: string;
+				existingTestPath?: string;
+			},
+		) => {
+			try {
+				const destination = await testGenerationService.resolveDestination(
+					params.filePath,
+					params.projectPath,
+					params.existingTestPath,
+				);
+				return { success: true, destination };
+			} catch (error) {
+				console.error("[TestGeneration] resolve-destination error:", error);
+				return {
+					success: false,
+					error: error instanceof Error ? error.message : "Unknown error",
+				};
+			}
+		},
+	);
+
+	// What will these tests be written against? Answered before a generation so
+	// the picker opens with the project's own stack ticked.
+	ipcMain.handle(
+		"test-generation:resolve-libraries",
+		async (
+			_,
+			params: {
+				filePath?: string;
+				projectPath?: string;
+				selected?: string[];
+			},
+		) => {
+			try {
+				const libraries = await testGenerationService.resolveLibraries(
+					params.filePath ?? "",
+					params.projectPath,
+					params.selected,
+				);
+				return { success: true, libraries };
+			} catch (error) {
+				console.error("[TestGeneration] resolve-libraries error:", error);
+				return {
+					success: false,
+					error: error instanceof Error ? error.message : "Unknown error",
+				};
+			}
+		},
+	);
+
+	// Add the chosen-but-absent packages to the project's test project. Only
+	// ever reached from an explicit user action — a generation installs nothing.
+	ipcMain.handle(
+		"test-generation:add-packages",
+		async (
+			_,
+			params: {
+				selected: string[];
+				projectPath: string;
+				testDir?: string;
+				filePath?: string;
+			},
+		) => {
+			try {
+				const report = await testGenerationService.addPackages(
+					params.selected,
+					params.projectPath,
+					params.testDir,
+					params.filePath,
+				);
+				return { success: true, report };
+			} catch (error) {
+				console.error("[TestGeneration] add-packages error:", error);
+				return {
+					success: false,
+					error: error instanceof Error ? error.message : "Unknown error",
+				};
+			}
+		},
+	);
+
 	// Generate unit tests
 	ipcMain.handle(
 		"test-generation:generate-unit",
@@ -92,6 +184,8 @@ export function setupTestGenerationHandlers(
 				existingTestPath?: string;
 				coverageTarget?: number;
 				projectPath?: string;
+				testDir?: string;
+				testLibraries?: string[];
 			},
 		) => {
 			try {
@@ -100,6 +194,8 @@ export function setupTestGenerationHandlers(
 					params.existingTestPath,
 					params.coverageTarget,
 					params.projectPath,
+					params.testDir,
+					params.testLibraries,
 				);
 				return { success: true };
 			} catch (error) {
@@ -117,13 +213,21 @@ export function setupTestGenerationHandlers(
 		"test-generation:generate-e2e",
 		async (
 			_,
-			params: { userStory: string; targetModule: string; projectPath?: string },
+			params: {
+				userStory: string;
+				targetModule: string;
+				projectPath?: string;
+				testDir?: string;
+				testLibraries?: string[];
+			},
 		) => {
 			try {
 				await testGenerationService.generateE2ETests(
 					params.userStory,
 					params.targetModule,
 					params.projectPath,
+					params.testDir,
+					params.testLibraries,
 				);
 				return { success: true };
 			} catch (error) {
@@ -146,6 +250,8 @@ export function setupTestGenerationHandlers(
 				language: string;
 				snippetType: string;
 				projectPath?: string;
+				testDir?: string;
+				testLibraries?: string[];
 			},
 		) => {
 			try {
@@ -154,6 +260,8 @@ export function setupTestGenerationHandlers(
 					params.language,
 					params.snippetType,
 					params.projectPath,
+					params.testDir,
+					params.testLibraries,
 				);
 				return { success: true };
 			} catch (error) {
@@ -187,6 +295,9 @@ export function setupTestGenerationHandlers(
  */
 export function cleanupTestGenerationHandlers(): void {
 	ipcMain.removeHandler("test-generation:analyze-coverage");
+	ipcMain.removeHandler("test-generation:resolve-destination");
+	ipcMain.removeHandler("test-generation:resolve-libraries");
+	ipcMain.removeHandler("test-generation:add-packages");
 	ipcMain.removeHandler("test-generation:generate-unit");
 	ipcMain.removeHandler("test-generation:generate-e2e");
 	ipcMain.removeHandler("test-generation:generate-tdd");

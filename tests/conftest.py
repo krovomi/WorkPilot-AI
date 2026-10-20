@@ -34,18 +34,28 @@ GIT_CONFIG_USER_EMAIL = "user.email"
 GIT_CONFIG_USER_NAME = "user.name"
 INITIAL_COMMIT_MESSAGE = "Initial commit"
 
-# Add the project root to the Python path
+# The project root must come before the backend root: `src.connectors.llm_config`
+# lives under the project root (apps/backend/src/ used to shadow it; it was
+# removed in audit lot L9) — azure_devops tests likewise rely on
+# ``from src.config.settings import Settings``. The backend root is on the path so `core`, `review`, etc. import
+# without an `apps.backend.` prefix.
+#
+# This used to be two `if <root> not in sys.path` inserts, which enforce
+# presence but not order. The CI job exports
+# `PYTHONPATH=<workspace>/apps/backend:<workspace>`, so both roots were already
+# present, both guards were false, neither insert ran, and the backend root
+# kept the precedence PYTHONPATH gave it — `src.connectors` then resolved to
+# `apps/backend/src`, which has no `llm_config`. Ordering is the invariant, so
+# set the order rather than test for membership.
 _PROJECT_ROOT = str(Path(__file__).parent.parent)
-if _PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, _PROJECT_ROOT)
-
-# Add the backend root to sys.path so that `core`, `review`, etc. can be
-# imported directly (without the `apps.backend.` prefix).
-# Insert at position 1 (not 0) so that project-root "src.*" imports keep
-# precedence — azure_devops tests rely on ``from src.config.settings import Settings``.
 _BACKEND_ROOT = str(Path(__file__).parent.parent / "apps" / "backend")
-if _BACKEND_ROOT not in sys.path:
-    sys.path.insert(1, _BACKEND_ROOT)
+
+for _root in (_BACKEND_ROOT, _PROJECT_ROOT):
+    while _root in sys.path:
+        sys.path.remove(_root)
+# Inserted last ends up first: [_PROJECT_ROOT, _BACKEND_ROOT, ...].
+sys.path.insert(0, _BACKEND_ROOT)
+sys.path.insert(0, _PROJECT_ROOT)
 
 # ---------------------------------------------------------------------------
 # Save real module objects BEFORE any test-file collection can pollute them.
@@ -68,8 +78,21 @@ _MODULES_TO_PRESERVE = [
     "core.agent_client",
     "core.platform",
     "core.auth",
+    # Four files mock core.workspace and core.workspace.models. Deleting the
+    # mock instead of restoring re-imported models (a new WorkspaceMode class)
+    # while core.workspace.workspace_setup kept the old one, so
+    # `mode == WorkspaceMode.DIRECT` was False in test_workspace.py.
+    "core.workspace",
+    "core.workspace.models",
     "review",
     "review.state",
+    # Three files mock the `agents` package. Deleting the mock re-imported a
+    # new `agents` object with no `coder` attribute while the real
+    # `agents.coder` stayed in sys.modules, so `monkeypatch.setattr(
+    # "agents.coder.X", ...)` raised "module 'agents' has no attribute
+    # 'coder'" (test_issue_884_plan_schema.py after test_cleanup_stray_plan.py
+    # and test_spec_pipeline.py).
+    "agents",
 ]
 _real_modules: dict[str, _types.ModuleType] = {}
 for _mod_name in _MODULES_TO_PRESERVE:
@@ -91,6 +114,8 @@ for _mod_name in _MODULES_TO_PRESERVE:
 # This list must cover EVERY top-level package name that any test file mocks via
 # sys.modules so the cleanup hook can restore real imports between test files.
 _PROTECTED_PACKAGES = [
+    # Package-qualified backend imports
+    "apps",
     # Core infrastructure
     "core",
     "client",
@@ -112,7 +137,6 @@ _PROTECTED_PACKAGES = [
     # Prompts
     "prompts",
     "prompts_pkg",
-    "prompt_generator",
     # Config & phases
     "phase_config",
     "phase_event",
@@ -120,19 +144,15 @@ _PROTECTED_PACKAGES = [
     "task_logger",
     "progress",
     "ui",
-    "linear_updater",
     # Memory & graph
     "memory",
-    "graphiti_config",
-    "graphiti_providers",
     # Recovery & analysis
-    "recovery",
+    "services.recovery",
     "insight_extractor",
     "review",
     "analysis",
     # QA system
     "qa",
-    "qa_loop",
     # Integrations
     "integrations",
     # Utilities
@@ -144,12 +164,11 @@ _PROTECTED_PACKAGES = [
 # Modules that must always be evicted (even if they're real ModuleType objects)
 # because they import from protected packages at module level and their bound
 # names become stale after a protected package mock is cleaned up.
-# For example, qa_loop.get_iteration_history was bound to mock_qa.get_iteration_history
-# when qa was a MagicMock; evicting qa_loop forces a fresh re-import with real bindings.
+# For example, qa.loop.get_iteration_history was bound to mock_qa.get_iteration_history
+# when qa was a MagicMock; evicting qa.loop forces a fresh re-import with real bindings.
 # qa.criteria imports from `progress` which is frequently mocked; evicting it lets
 # test files that mock progress get the correct is_build_complete binding.
 _DEPENDENT_EVICT = {
-    "qa_loop",
     "qa.criteria",
     "qa.report",
     "qa.loop",
@@ -316,7 +335,7 @@ def temp_git_repo(tmp_path):
 
         # Create an initial commit so HEAD exists
         readme = repo / "README.md"
-        readme.write_text("# Test repo\n")
+        readme.write_text("# Test repo\n", encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=repo, capture_output=True, check=True)
         subprocess.run(
             ["git", "commit", "-m", INITIAL_COMMIT_MESSAGE],
@@ -709,10 +728,17 @@ def mock_spec_validator():
 
         # Create mock validation results
         class MockValidationResult:
-            def __init__(self, valid, checkpoint, errors=None, fixes=None):
+            # Mirrors spec.validate_pkg.models.ValidationResult, `warnings`
+            # included: the phase prints them, and a stand-in missing a field
+            # of the type it stands in for fails on the caller rather than on
+            # the thing under test.
+            def __init__(
+                self, valid, checkpoint, errors=None, warnings=None, fixes=None
+            ):
                 self.valid = valid
                 self.checkpoint = checkpoint
                 self.errors = errors or []
+                self.warnings = warnings or []
                 self.fixes = fixes or []
 
         # Mock validate_all method
@@ -813,10 +839,12 @@ def temp_project(tmp_path):
     src.mkdir()
 
     (src / "App.tsx").write_text(
-        "import React from 'react';\n\nfunction App() {\n  return <div>Hello</div>;\n}\n\nexport default App;\n"
+        "import React from 'react';\n\nfunction App() {\n  return <div>Hello</div>;\n}\n\nexport default App;\n",
+        encoding="utf-8",
     )
     (src / "utils.py").write_text(
-        '"""Sample Python module."""\nimport os\nfrom pathlib import Path\n\ndef hello():\n    """Say hello."""\n    print("Hello")\n\ndef goodbye():\n    """Say goodbye."""\n    print("Goodbye")\n\nclass Greeter:\n    """A greeter class."""\n\n    def greet(self, name: str) -> str:\n        return f"Hello, {name}"\n'
+        '"""Sample Python module."""\nimport os\nfrom pathlib import Path\n\ndef hello():\n    """Say hello."""\n    print("Hello")\n\ndef goodbye():\n    """Say goodbye."""\n    print("Goodbye")\n\nclass Greeter:\n    """A greeter class."""\n\n    def greet(self, name: str) -> str:\n        return f"Hello, {name}"\n',
+        encoding="utf-8",
     )
 
     subprocess.run(["git", "add", "."], cwd=repo, capture_output=True, check=True)
@@ -934,10 +962,12 @@ def python_project(tmp_path):
     """Create a temporary Python project directory."""
     project = tmp_path / "python_project"
     project.mkdir()
-    (project / "requirements.txt").write_text("flask\nrequests\n")
-    (project / "app.py").write_text("from flask import Flask\napp = Flask(__name__)\n")
+    (project / "requirements.txt").write_text("flask\nrequests\n", encoding="utf-8")
+    (project / "app.py").write_text(
+        "from flask import Flask\napp = Flask(__name__)\n", encoding="utf-8"
+    )
     (project / "setup.py").write_text(
-        "from setuptools import setup\nsetup(name='test')\n"
+        "from setuptools import setup\nsetup(name='test')\n", encoding="utf-8"
     )
     return project
 
@@ -955,9 +985,11 @@ def node_project(tmp_path):
         "scripts": {"start": "node index.js", "test": "jest"},
         "dependencies": {"express": "^4.18.0"},
     }
-    (project / "package.json").write_text(json.dumps(pkg))
-    (project / "package-lock.json").write_text("{}")
-    (project / "index.js").write_text("const express = require('express');\n")
+    (project / "package.json").write_text(json.dumps(pkg), encoding="utf-8")
+    (project / "package-lock.json").write_text("{}", encoding="utf-8")
+    (project / "index.js").write_text(
+        "const express = require('express');\n", encoding="utf-8"
+    )
     return project
 
 
@@ -966,11 +998,13 @@ def docker_project(tmp_path):
     """Create a temporary Docker project directory."""
     project = tmp_path / "docker_project"
     project.mkdir()
-    (project / "Dockerfile").write_text("FROM python:3.11\nWORKDIR /app\n")
-    (project / "docker-compose.yml").write_text(
-        "version: '3'\nservices:\n  app:\n    build: .\n"
+    (project / "Dockerfile").write_text(
+        "FROM python:3.11\nWORKDIR /app\n", encoding="utf-8"
     )
-    (project / "requirements.txt").write_text("flask\n")
+    (project / "docker-compose.yml").write_text(
+        "version: '3'\nservices:\n  app:\n    build: .\n", encoding="utf-8"
+    )
+    (project / "requirements.txt").write_text("flask\n", encoding="utf-8")
     return project
 
 
@@ -990,7 +1024,7 @@ def stage_files(tmp_path, temp_git_repo):
         for name, content in files.items():
             file_path = temp_git_repo / name
             file_path.parent.mkdir(parents=True, exist_ok=True)
-            file_path.write_text(content)
+            file_path.write_text(content, encoding="utf-8")
         subprocess.run(
             ["git", "add", "."], cwd=temp_git_repo, capture_output=True, check=True
         )
@@ -1128,7 +1162,7 @@ def temp_project_dir(tmp_path):
 
         # Create initial commit
         readme = project / "README.md"
-        readme.write_text("# Test Project\n")
+        readme.write_text("# Test Project\n", encoding="utf-8")
         subprocess.run(
             ["git", "add", "."], cwd=project, capture_output=True, check=True
         )
@@ -1157,3 +1191,127 @@ def worktree_manager(temp_project_dir):
     from core.worktree import WorktreeManager
 
     return WorktreeManager(temp_project_dir, base_branch="main")
+
+
+# ── The shared brain is never the developer's ──────────────────────────
+#
+# Memory is the vault now (`brain/project_memory.py`), and the first memory
+# write on a machine without one creates it. A test that saves a session, a
+# gotcha or a review finding must do that in a temporary directory — never in
+# the ``~/.workpilot/brain`` of whoever runs the suite. Tests that want a brain
+# set ``WORKPILOT_BRAIN_DIR`` themselves; monkeypatch overrides this default.
+
+
+@pytest.fixture(autouse=True)
+def _isolated_brain(tmp_path_factory, monkeypatch):
+    base = tmp_path_factory.mktemp("brain-isolation")
+    monkeypatch.setenv("WORKPILOT_BRAIN_DIR", str(base / "brain"))
+    monkeypatch.setenv("WORKPILOT_BRAIN_CONFIG", str(base / "brain.json"))
+    monkeypatch.setenv("WORKPILOT_BRAIN_HOME", str(base / "home"))
+
+
+# ── Ambient state is not input ─────────────────────────────────────────
+#
+# These two lived in a repository-root `conftest.py` while some tests still
+# sat under `apps/backend/`. Every test now lives under `tests/`, so they
+# belong here.
+
+
+@pytest.fixture(autouse=True)
+def _isolate_ambient_provider_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep the caller's shell out of the provider-resolution path.
+
+    `core.auth` treats a non-empty `ANTHROPIC_BASE_URL` as "API profile mode"
+    and raises when `ANTHROPIC_AUTH_TOKEN` is missing. Both are ordinary
+    variables to export — WorkPilot's own API-profile mode sets them, and so
+    does the Claude Code CLI — so any test touching auth passed or failed
+    depending on whose shell ran it. Seven did, here.
+
+    A test that wants either variable sets it explicitly; ambient values are
+    not input. `monkeypatch` restores whatever was there afterwards.
+    """
+    monkeypatch.delenv("ANTHROPIC_BASE_URL", raising=False)
+    monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter_singleton() -> None:
+    """Hand every test a fresh `RateLimiter`.
+
+    `RateLimiter` is a process-wide singleton, so a test that configures it —
+    a zero refill rate, an exhausted budget, a mocked method — leaves that
+    configuration behind for everything that runs afterwards in the same
+    session. `gh_client` then unpacked `check_github_available()` into
+    `available, msg` and got an empty tuple. `test_rate_limiter.py` already
+    resets in its `setup_method`, which protected its own class and no one
+    else's.
+
+    Read from `sys.modules` rather than imported: importing the runner exits
+    the interpreter in an environment without its dependencies (the
+    skills-eval job installs three packages). A module nobody imported holds
+    no singleton to reset.
+    """
+    _reset_rate_limiter()
+    yield
+    _reset_rate_limiter()
+
+
+def _reset_rate_limiter() -> None:
+    module = sys.modules.get("runners.github.rate_limiter")
+    if module is not None:
+        module.RateLimiter.reset_instance()
+
+
+# ── No live model call ─────────────────────────────────────────────────
+#
+# `tests/test_sdk_structured_output.py` is the one test allowed to drive the
+# real Claude API, behind `WORKPILOT_RUN_LIVE_API_TESTS=1`.
+
+
+_LIVE_API_OPT_IN = {"1", "true", "yes", "on"}
+
+
+@pytest.fixture(autouse=True)
+def _no_live_claude_cli(monkeypatch: pytest.MonkeyPatch):
+    """Fail a test that starts the Claude Code CLI behind the Agent SDK.
+
+    Every model call goes through `core.client`, and on the Claude provider
+    that ends in `SubprocessCLITransport.connect`, which spawns the bundled
+    CLI and sends the prompt. Whether a test got that far used to depend on
+    the machine: `test_llm_transformer.py::test_error_handling` passed here
+    because authentication failed, and on a developer machine with a Claude
+    login it sent a real request (or hung until the network gave up).
+
+    The connect raises, and the test is failed at teardown as well, because
+    the code under test often catches the exception and records it (the
+    migration transformer turns it into `result.errors`), which would
+    otherwise pass silently. A test that needs a client uses a double.
+    Yields the list of refusals; only the guard's own test clears it.
+    """
+    if (
+        os.environ.get("WORKPILOT_RUN_LIVE_API_TESTS", "").strip().lower()
+        in _LIVE_API_OPT_IN
+    ):
+        yield
+        return
+    try:
+        from claude_agent_sdk._internal.transport import subprocess_cli
+    except ImportError:  # the skills-eval job installs three packages
+        yield
+        return
+
+    reached: list[str] = []
+    message = (
+        "This test started the Claude Code CLI (a real model call). "
+        "Replace the client with a double; live tests need "
+        "WORKPILOT_RUN_LIVE_API_TESTS=1."
+    )
+
+    async def _refuse(self) -> None:
+        reached.append(message)
+        raise RuntimeError(message)
+
+    monkeypatch.setattr(subprocess_cli.SubprocessCLITransport, "connect", _refuse)
+    yield reached
+    if reached:
+        pytest.fail(message, pytrace=False)

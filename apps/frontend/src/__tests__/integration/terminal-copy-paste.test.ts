@@ -672,7 +672,7 @@ describe("Terminal copy/paste integration", () => {
 			const consoleErrorSpy = vi
 				.spyOn(console, "error")
 				.mockImplementation((...args: unknown[]) => {
-					if (String(args[0]).includes("[useXterm]")) {
+					if (String(args[0]).includes("[terminal]")) {
 						errorLogged = true;
 					}
 				});

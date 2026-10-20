@@ -26,13 +26,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-# Make AgentDefinition optional — used for Claude SDK subagent definitions
-# but not required when running with Copilot provider
-try:
-    from claude_agent_sdk import AgentDefinition  # noqa: F401
-except ImportError:
-    AgentDefinition = None  # type: ignore[assignment,misc]
-
 try:
     from ...core.client import create_agent_client, create_client
     from ...phase_config import get_thinking_budget, resolve_model_id
@@ -270,38 +263,6 @@ class ParallelOrchestratorReviewer:
                 f"(orphaned={stats['orphaned']}, expired={stats['expired']}, excess={stats['excess']})"
             )
 
-    def _define_specialist_agents(
-        self, project_root: Path | None = None
-    ) -> dict[str, AgentDefinition]:
-        """
-        Define specialist agents for the SDK.
-
-        The roster itself lives in `agents/subagents/pr_review.py`, with the
-        other three. It used to be declared here, which made this the fourth
-        place in the repo where subagents were defined and the only one the
-        registry could not see.
-
-        What stays here is what depends on this review: which worktree the
-        agents read from. A subagent does not inherit the parent's cwd, so
-        every prompt is prefixed with the path explicitly.
-
-        Args:
-            project_root: Working directory for the agents (worktree path).
-                         If None, falls back to self.project_dir.
-
-        Returns AgentDefinition dataclass instances as required by the SDK.
-        """
-        # Imported here, not at module scope: the registry binds
-        # `claude_agent_sdk` when it loads, and this module is imported by
-        # callers that never build a roster. Pulling the SDK in for them makes
-        # the binding depend on import order rather than on need.
-        from agents.subagents.pr_review import pr_review_agents
-
-        working_dir = project_root or self.project_dir
-        with_working_dir = create_working_dir_injector(working_dir)
-
-        return pr_review_agents(self._load_prompt, with_working_dir)
-
     # =========================================================================
     # Parallel SDK Sessions Implementation
     # =========================================================================
@@ -411,6 +372,10 @@ Report findings with specific file paths, line numbers, and code evidence.
 
         # Build the specialist prompt with PR context
         prompt = self._build_specialist_prompt(config, context, project_root)
+        from integrations.jev.reviews import context_advice
+
+        if advice := context_advice(context):
+            prompt += "\n\n" + advice
 
         try:
             # Create provider-agnostic agent client for this specialist
@@ -428,6 +393,12 @@ Report findings with specific file paths, line numbers, and code evidence.
                     "schema": SpecialistResponse.model_json_schema(),
                 },
                 provider=provider,
+                # The specialist *is* the fan-out: SPECIALIST_CONFIGS run side
+                # by side. Under `pr_reviewer` each one also carried the review
+                # roster — a security reviewer handed its own security-auditor
+                # — a nested fan-out billed on every turn of every session.
+                # `pr_review.py` designed them as leaves.
+                roster="solo",
             )
 
             async with client:
@@ -600,176 +571,6 @@ Report findings with specific file paths, line numbers, and code evidence.
         )
 
         return (all_findings, agents_invoked)
-
-    def _build_orchestrator_prompt(self, context: PRContext) -> str:
-        """Build full prompt for orchestrator with PR context."""
-        # Load orchestrator prompt
-        base_prompt = self._load_prompt("pr_parallel_orchestrator.md")
-        if not base_prompt:
-            base_prompt = "You are a PR reviewer. Analyze and delegate to specialists."
-
-        # Build file list
-        files_list = []
-        for file in context.changed_files:
-            files_list.append(
-                f"- `{file.path}` (+{file.additions}/-{file.deletions}) - {file.status}"
-            )
-
-        # Build composite diff
-        patches = []
-        MAX_DIFF_CHARS = 200_000
-
-        for file in context.changed_files:
-            if file.patch:
-                patches.append(f"\n### File: {file.path}\n{file.patch}")
-
-        diff_content = "\n".join(patches)
-
-        if len(diff_content) > MAX_DIFF_CHARS:
-            diff_content = diff_content[:MAX_DIFF_CHARS] + "\n\n... (diff truncated)"
-
-        # Build AI comments context if present (with timestamps for timeline awareness)
-        ai_comments_section = ""
-        if context.ai_bot_comments:
-            ai_comments_list = []
-            for comment in context.ai_bot_comments[:20]:
-                ai_comments_list.append(
-                    f"- **{comment.tool_name}** ({comment.created_at}) on {comment.file or 'general'}: "
-                    f"{comment.body[:200]}..."
-                )
-            ai_comments_section = f"""
-### AI Review Comments (need triage)
-Found {len(context.ai_bot_comments)} comments from AI tools.
-**IMPORTANT: Check timestamps! If a later commit fixed an AI-flagged issue, use ADDRESSED verdict (not FALSE_POSITIVE).**
-
-{chr(10).join(ai_comments_list)}
-"""
-
-        # Build commits timeline section (important for AI triage)
-        commits_section = ""
-        if context.commits:
-            commits_list = []
-            for commit in context.commits:
-                sha = commit.get("oid", "")[:8]
-                message = commit.get("messageHeadline", "")
-                committed_at = commit.get("committedDate", "")
-                commits_list.append(f"- `{sha}` ({committed_at}): {message}")
-            commits_section = f"""
-### Commit Timeline
-{chr(10).join(commits_list)}
-"""
-
-        # Removed: Related files and import graph sections
-        # LLM agents now discover relevant files themselves via Read, Grep, Glob tools
-        related_files_section = ""
-        import_graph_section = ""
-
-        # Build deep context section if available
-        deep_context_section = ""
-        if context.deep_context:
-            try:
-                from .deep_context_provider import DeepContext
-
-                dc = DeepContext.from_dict(context.deep_context)
-                deep_context_section = dc.to_prompt_section()
-            except Exception:
-                pass
-
-        pr_context = f"""
----
-
-## PR Context for Review
-
-**PR Number:** {context.pr_number}
-**Title:** {context.title}
-**Author:** {context.author}
-**Base:** {context.base_branch} ← **Head:** {context.head_branch}
-**Files Changed:** {len(context.changed_files)} files
-**Total Changes:** +{context.total_additions}/-{context.total_deletions} lines
-
-### Description
-{context.description}
-
-### All Changed Files
-{chr(10).join(files_list)}
-{related_files_section}{import_graph_section}{commits_section}{ai_comments_section}{deep_context_section}
-### Code Changes
-```diff
-{diff_content}
-```
-
----
-
-Now analyze this PR and delegate to the appropriate specialist agents.
-Remember: YOU decide which agents to invoke based on YOUR analysis.
-The SDK will run invoked agents in parallel automatically.
-Use the Deep Codebase Context (if provided above) to review like a senior dev who knows the project.
-"""
-
-        return base_prompt + pr_context
-
-    def _create_sdk_client(
-        self,
-        project_root: Path,
-        model: str,
-        thinking_budget: int | None,
-        provider: str | None = None,
-    ):
-        """Create agent client with subagents and configuration.
-
-        Supports both Claude SDK and Copilot providers via create_agent_client().
-        Falls back to create_client() for raw SDK access when provider is None/claude
-        and AgentDefinition is available (backward compatible path).
-
-        Args:
-            project_root: Root directory of the project
-            model: Model to use for orchestrator
-            thinking_budget: Max thinking tokens budget
-            provider: Provider override ("claude" or "copilot"). None = auto-detect.
-
-        Returns:
-            Configured agent client instance (AgentClient or ClaudeSDKClient)
-        """
-        return create_agent_client(
-            project_dir=project_root,
-            spec_dir=self.github_dir,
-            model=model,
-            agent_type="pr_orchestrator_parallel",
-            max_thinking_tokens=thinking_budget,
-            agents=self._define_specialist_agents(project_root),
-            output_format={
-                "type": "json_schema",
-                "schema": ParallelOrchestratorResponse.model_json_schema(),
-            },
-            provider=provider,
-        )
-
-    def _extract_structured_output(
-        self, structured_output: dict[str, Any] | None, result_text: str
-    ) -> tuple[list[PRReviewFinding], list[str]]:
-        """Parse and extract findings from structured output or text fallback.
-
-        Args:
-            structured_output: Structured JSON output from agent
-            result_text: Raw text output as fallback
-
-        Returns:
-            Tuple of (findings list, agents_invoked list)
-        """
-        agents_from_structured: list[str] = []
-
-        if structured_output:
-            findings, agents_from_structured = self._parse_structured_output(
-                structured_output
-            )
-            if findings is None and result_text:
-                findings = self._parse_text_output(result_text)
-            elif findings is None:
-                findings = []
-        else:
-            findings = self._parse_text_output(result_text)
-
-        return findings, agents_from_structured
 
     def _log_agents_invoked(self, agents: list[str]) -> None:
         """Log invoked agents with clear formatting.
@@ -1378,12 +1179,6 @@ Use the Deep Codebase Context (if provided above) to review like a senior dev wh
             logger.error(f"[ParallelOrchestrator] Text parsing failed: {e}")
 
         return findings
-
-    def _normalize_confidence(self, value: int | float) -> float:
-        """Normalize confidence to 0.0-1.0 range."""
-        if value > 1:
-            return value / 100.0
-        return float(value)
 
     def _deduplicate_findings(
         self, findings: list[PRReviewFinding]

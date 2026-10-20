@@ -10,6 +10,7 @@ Tests the spec/pipeline.py module functionality including:
 - Specs directory path resolution
 """
 
+import importlib
 import json
 import sys
 import time
@@ -36,7 +37,6 @@ _mocked_module_names = [
     "core.simple_client",
     "core.task_event",
     "core.workspace",
-    "core.workspace.models",
     "core.file_utils",
     "core.plan_normalization",
     "core.platform",
@@ -44,14 +44,14 @@ _mocked_module_names = [
     "init",
     # Config & phases
     "phase_config",
-    "phase_event",
+    "core.phase_event",
     # Logging & UI
-    "debug",
+    "core.debug",
     "ui",
     "ui.capabilities",
     "task_logger",
-    "linear_updater",
-    "progress",
+    "integrations.linear.updater",
+    "core.progress",
     # Prompts
     "prompts_pkg",
     "prompts_pkg.project_context",
@@ -99,6 +99,25 @@ _mocked_module_names = [
     "integrations.linear.updater",
 ]
 
+# `core.build_signals` and `core.pause_state` have no dependencies, and the
+# code under test imports them (`qa/loop.py`, `spec/pipeline/orchestrator.py`,
+# since the pause/halt signals of #151). They are not mocked: a MagicMock
+# `BuildPaused` cannot be caught, and a MagicMock `is_paused()` is truthy.
+# Import them for real *before* `core` is replaced below; once it is, Python
+# cannot resolve a submodule of it ("'core' is not a package"). Without this
+# the file only collected when an earlier test file had imported them.
+importlib.import_module("core.build_signals")
+importlib.import_module("core.pause_state")
+
+# `SpecOrchestrator` numbers spec folders through `core.workspace.models.
+# SpecNumberLock`, and the numbering tests below assert real numbers. A
+# MagicMock lock hands `create_spec_dir` a MagicMock number, which cannot be
+# formatted as `{n:03d}`. In a full run the real lock was used anyway, because
+# an earlier file had already imported `spec.pipeline`; run alone, the file
+# failed 24 tests. The module holds only dataclasses and enums, and
+# `tests/conftest.py` already keeps it real (`_MODULES_TO_PRESERVE`).
+importlib.import_module("core.workspace.models")
+
 for name in _mocked_module_names:
     if name in sys.modules:
         _original_modules[name] = sys.modules[name]
@@ -108,7 +127,9 @@ for name in _mocked_module_names:
     sys.modules[name] = MagicMock()
 
 # Set specific return values needed by module-level code
-sys.modules["init"].init_workpilot_dir = MagicMock(return_value=(Path("/tmp/.workpilot"), False))
+sys.modules["init"].init_workpilot_dir = MagicMock(
+    return_value=(Path("/tmp/.workpilot"), False)
+)
 
 # Now import the module under test
 from spec.pipeline import SpecOrchestrator, get_specs_dir
@@ -157,7 +178,9 @@ class TestSpecOrchestratorInit:
         with patch("spec.pipeline.init_workpilot_dir") as mock_init:
             with patch("spec.pipeline.models") as mock_models:
                 mock_init.return_value = (temp_dir / ".workpilot", False)
-                mock_models.create_spec_dir.return_value = temp_dir / ".workpilot" / "specs" / "001-pending"
+                mock_models.create_spec_dir.return_value = (
+                    temp_dir / ".workpilot" / "specs" / "001-pending"
+                )
                 specs_dir = temp_dir / ".workpilot" / "specs"
                 specs_dir.mkdir(parents=True, exist_ok=True)
 
@@ -356,9 +379,7 @@ class TestGenerateSpecName:
 
         from spec.pipeline.models import generate_spec_name
 
-        name = generate_spec_name(
-            "Limitation du numéro de TVA intracommunautaire"
-        )
+        name = generate_spec_name("Limitation du numéro de TVA intracommunautaire")
 
         # No accented characters survive.
         assert "é" not in name
@@ -424,7 +445,7 @@ class TestCleanupOrphanedPendingFolders:
             # Create pending folder with requirements
             pending_with_req = specs_dir / "001-pending"
             pending_with_req.mkdir()
-            (pending_with_req / "requirements.json").write_text("{}")
+            (pending_with_req / "requirements.json").write_text("{}", encoding="utf-8")
 
             # Set modification time to 15 minutes ago
             old_time = time.time() - (15 * 60)
@@ -447,7 +468,7 @@ class TestCleanupOrphanedPendingFolders:
             # Create pending folder with spec
             pending_with_spec = specs_dir / "001-pending"
             pending_with_spec.mkdir()
-            (pending_with_spec / "spec.md").write_text("# Spec")
+            (pending_with_spec / "spec.md").write_text("# Spec", encoding="utf-8")
 
             # Set modification time to 15 minutes ago
             old_time = time.time() - (15 * 60)
@@ -495,7 +516,7 @@ class TestRenameSpecDirFromRequirements:
             # Write requirements
             requirements = {"task_description": "Add user authentication system"}
             (orchestrator.spec_dir / "requirements.json").write_text(
-                json.dumps(requirements)
+                json.dumps(requirements), encoding="utf-8"
             )
 
             # Rename
@@ -533,7 +554,7 @@ class TestRenameSpecDirFromRequirements:
             # Write requirements with empty task
             requirements = {"task_description": ""}
             (orchestrator.spec_dir / "requirements.json").write_text(
-                json.dumps(requirements)
+                json.dumps(requirements), encoding="utf-8"
             )
 
             result = orchestrator._rename_spec_dir_from_requirements()
@@ -559,7 +580,7 @@ class TestRenameSpecDirFromRequirements:
             # Write requirements
             requirements = {"task_description": "Different name task"}
             (orchestrator.spec_dir / "requirements.json").write_text(
-                json.dumps(requirements)
+                json.dumps(requirements), encoding="utf-8"
             )
 
             result = orchestrator._rename_spec_dir_from_requirements()

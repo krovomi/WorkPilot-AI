@@ -1,6 +1,6 @@
 {
 	"name": "hermes",
-	"version": "0.0.0",
+	"version": "0.0.1",
 	"description": "Nous Research's hermes-agent: debugging and investigation procedures (systematic-debugging, spike, python-debugpy, node-inspect-debugger), merge reconciliation, and procedures for driving other coding agents.",
 	"targets": {},
 	"source": "NousResearch/hermes-agent",

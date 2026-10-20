@@ -7,7 +7,7 @@ Thank you for your interest in contributing to WorkPilot AI! This document provi
 | What you want to do | Where to start |
 |----------------------|----------------|
 | Bug fixes & small improvements | Open a PR directly |
-| New features / architecture changes | Start a [GitHub Discussion](https://github.com/AndyMik90/Auto-Claude/discussions) or ask in [Discord](https://discord.com/channels/1448614759996854284/1451298184612548779) first |
+| New features / architecture changes | Start a [GitHub Discussion](https://github.com/krovomi/WorkPilot-AI/discussions) or ask in [Discord](https://discord.com/channels/1448614759996854284/1451298184612548779) first |
 | Questions & setup help | [Discord #setup-help](https://discord.com/channels/1448614759996854284/1451298184612548779) |
 
 ## AI-Assisted Contributions
@@ -31,7 +31,7 @@ AI-assisted PRs go through the same review process as any other contribution. Tr
 - [Prerequisites](#prerequisites)
 - [Quick Start](#quick-start)
 - [Development Setup](#development-setup)
-- [Pre-commit Hooks](#pre-commit-hooks)
+- [Git Hooks](#git-hooks)
 - [Code Style](#code-style)
 - [Testing](#testing)
 - [Continuous Integration](#continuous-integration)
@@ -77,7 +77,7 @@ Before contributing, ensure you have the following installed:
 - **Node.js 24+** - For the Electron frontend
 - **npm 10+** - Package manager for the frontend (comes with Node.js)
 - **uv** (recommended) or **pip** - Python package manager
-- **CMake** - Required for building native dependencies (e.g., LadybugDB)
+- **CMake** - Required for building some native dependencies
 - **Git** - Version control
 
 ### Installing Python 3.12
@@ -153,8 +153,8 @@ The fastest way to get started:
 
 ```bash
 # Clone the repository
-git clone https://github.com/AndyMik90/Auto-Claude.git
-cd Auto-Claude
+git clone https://github.com/krovomi/WorkPilot-AI.git
+cd WorkPilot-AI
 
 # Install all dependencies (cross-platform)
 npm run install:all
@@ -219,55 +219,31 @@ WorkPilot AI automatically downloads prebuilt binaries for Windows. If prebuilts
 
 </details>
 
-> **Note:** For regular usage, we recommend downloading the pre-built releases from [GitHub Releases](https://github.com/AndyMik90/Auto-Claude/releases). Running from source is primarily for contributors and those testing unreleased features.
+> **Note:** For regular usage, we recommend downloading the pre-built releases from [GitHub Releases](https://github.com/krovomi/WorkPilot-AI/releases). Running from source is primarily for contributors and those testing unreleased features.
 
-## Pre-commit Hooks
+## Git Hooks
 
-We use [pre-commit](https://pre-commit.com/) to run linting and formatting checks before each commit. This ensures code quality and consistency across the project.
+Hooks live in `.husky/` and are plain shell scripts — no `pre-commit` framework, no extra
+Python package. `pnpm install` at the root runs `prepare`, which points git at them
+(`git config core.hooksPath .husky`). Run it once after cloning if you installed otherwise.
 
-### Setup
+| Hook | What runs | Escape hatch |
+|------|-----------|--------------|
+| `pre-commit` | On **staged files only**: `ruff format` + `ruff check --fix` (Python), `biome check --write` (frontend), re-stage, secret scan (blocks the commit), then `scripts/staged-tests.js` | `PRE_COMMIT_SKIP_TESTS=1` skips the tests, not the formatters or the secret scan |
+| `commit-msg` | Conventional Commits: `type(scope)!?: description`, first line ≤ 100 characters | — |
+| `pre-push` | `scripts/pre-push.js`: ruff check + format check, `skills_cli build --check`, Biome lint | `PRE_PUSH_FULL=1` adds pytest, `tsc` and vitest; `PRE_PUSH_SKIP=1` skips everything |
 
-```bash
-# Install pre-commit
-pip install pre-commit
+The tool versions are pinned (ruff `0.15.7`, Biome `2.5.11`): any other version produces a diff
+CI rejects. `git commit --no-verify` exists, but CI runs the same checks — it only moves the
+failure later.
 
-# Install the git hooks (run once after cloning)
-pre-commit install
-```
-
-### What Runs on Commit
-
-When you commit, the following checks run automatically:
-
-| Check | Scope | Description |
-|-------|-------|-------------|
-| **ruff** | `apps/backend/` | Python linter with auto-fix |
-| **ruff-format** | `apps/backend/` | Python code formatter |
-| **eslint** | `apps/frontend/` | TypeScript/React linter |
-| **typecheck** | `apps/frontend/` | TypeScript type checking |
-| **trailing-whitespace** | All files | Removes trailing whitespace |
-| **end-of-file-fixer** | All files | Ensures files end with newline |
-| **check-yaml** | All files | Validates YAML syntax |
-| **check-added-large-files** | All files | Prevents large file commits |
-
-### Running Manually
-
-```bash
-# Run all checks on all files
-pre-commit run --all-files
-
-# Run a specific hook
-pre-commit run ruff --all-files
-
-# Skip hooks temporarily (not recommended)
-git commit --no-verify -m "message"
-```
-
-### If a Check Fails
-
-1. **Ruff auto-fixes**: Some issues are fixed automatically. Stage the changes and commit again.
-2. **ESLint errors**: Fix the reported issues in your code.
-3. **Type errors**: Resolve TypeScript type issues before committing.
+**`pre-commit` scans every staged file for secrets**, whatever its type
+(`apps/backend/security/scan_secrets.py --staged-only`, which reads the index), and blocks the
+commit on a match; without Python 3.10+ it warns and lets the commit through. CI does not repeat
+the scan, so `--no-verify` lets a secret in. A false positive takes `# pragma: allowlist secret`
+at the end of its line; `.secretsignore` (path regexes, at the root) only excludes tests. Keep
+credentials in `.env-files/*.env` (git-ignored) and read [docs/rules/security.md](rules/security.md)
+before touching anything that handles them.
 
 ## Code Style
 
@@ -293,9 +269,9 @@ def get_next_chunk(spec_dir: Path) -> dict | None:
     """
     ...
 
+
 # Avoid
-def gnc(sd):
-    ...
+def gnc(sd): ...
 ```
 
 ### TypeScript/React
@@ -348,11 +324,13 @@ with open(path, "w", encoding="utf-8") as f:
 
 # Path methods
 from pathlib import Path
+
 content = Path(file).read_text(encoding="utf-8")
 Path(file).write_text(content, encoding="utf-8")
 
 # JSON files - reading
 import json
+
 with open(path, encoding="utf-8") as f:
     data = json.load(f)
 
@@ -382,7 +360,7 @@ with open(path, "rb") as f:  # Correct
     data = f.read()
 ```
 
-Our pre-commit hooks automatically check for missing encoding parameters. See [PR #782](https://github.com/AndyMik90/Auto-Claude/pull/782) for the comprehensive encoding fix and [guides/windows-development.md](guides/windows-development.md) for Windows-specific development guidance.
+No hook checks this: run `python scripts/check_encoding.py` before pushing Python that opens files. See [docs/windows-development.md](windows-development.md) for the encoding rules and Windows-specific development guidance.
 
 ## Testing
 
@@ -496,58 +474,24 @@ When contributing to WorkPilot AI, you'll typically fork the repository first. P
 # 1. Fork on GitHub (click the Fork button on the repo page)
 
 # 2. Clone YOUR fork (not the original repo)
-git clone https://github.com/YOUR-USERNAME/Auto-Claude.git
-cd Auto-Claude
+git clone https://github.com/YOUR-USERNAME/WorkPilot-AI.git
+cd WorkPilot-AI
 
 # 3. Verify your remotes point to YOUR fork
 git remote -v
 # Should show:
-# origin  https://github.com/YOUR-USERNAME/Auto-Claude.git (fetch)
-# origin  https://github.com/YOUR-USERNAME/Auto-Claude.git (push)
+# origin  https://github.com/YOUR-USERNAME/WorkPilot-AI.git (fetch)
+# origin  https://github.com/YOUR-USERNAME/WorkPilot-AI.git (push)
 
 # 4. Add upstream remote to sync with the original repo
-git remote add upstream https://github.com/AndyMik90/Auto-Claude.git
+git remote add upstream https://github.com/krovomi/WorkPilot-AI.git
 ```
 
 #### Keeping Your Fork Updated
 
-You can sync with upstream using automated scripts or manual commands.
-
-**Option 1: Automated Scripts (Recommended)**
-
-The cross-platform entry point is the package script — it works the same on
-Windows, macOS and Linux:
-
-```bash
-pnpm merge-upstream
-
-# Review the merge before publishing it
-pnpm merge-upstream -- --skip-push
-
-# Sync a branch other than develop
-pnpm merge-upstream -- --branch main
-```
-
-Platform wrappers live in `utils/system/` if you prefer them:
-
-```powershell
-# Windows PowerShell
-.\utils\system\merge-upstream.ps1
-.\utils\system\merge-upstream.ps1 -SkipPush
-```
-
-```bash
-# Windows CMD
-utils\system\merge-upstream.bat
-
-# macOS / Linux
-./utils/system/merge-upstream.sh
-```
-
-Run `pnpm run validate:upstream` to check that the sync tooling is wired up
-correctly.
-
-**Option 2: Manual Git Commands**
+Sync your fork with this repository using plain git — the wrapper scripts that
+used to live in `utils/system/` were removed with the upstream tracking they
+belonged to, and they pointed at a repository this project no longer follows.
 
 ```bash
 # Fetch latest changes from upstream
@@ -915,10 +859,10 @@ WorkPilot AI consists of two main parts:
 The core autonomous coding framework:
 
 - **Entry Points**: `run.py` (build runner), `spec_runner.py` (spec creator)
-- **Agent System**: `agent.py`, `client.py`, `prompts/`
-- **Execution**: `coordinator.py` (parallel), `worktree.py` (isolation)
-- **Memory**: `memory.py` (file-based), `graphiti_memory.py` (graph-based)
-- **QA**: `qa_loop.py`, `prompts/qa_*.md`
+- **Agent System**: `core/agent.py`, `core/client.py`, `prompts/`
+- **Execution**: `coordinator.py` (parallel), `core/worktree.py` (isolation)
+- **Memory**: `brain/project_memory.py` (the shared brain), opened through `memory/store.py`
+- **QA**: `qa/loop.py`, `prompts/qa_*.md`
 
 ### Electron Frontend (`apps/frontend/`)
 
@@ -928,7 +872,7 @@ Desktop interface:
 - **Renderer**: `src/renderer/` - React UI components
 - **Shared**: `src/shared/` - Types and utilities
 
-For detailed architecture information, see [CLAUDE.md](CLAUDE.md).
+For the rules every change follows, see [CLAUDE.md](CLAUDE.md) and [rules/](rules/); for the documentation map, [README.md](README.md).
 
 ---
 

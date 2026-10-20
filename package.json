@@ -26,11 +26,7 @@
 		"package:mac": "cd apps/frontend && pnpm run package:mac",
 		"package:win": "cd apps/frontend && pnpm run package:win",
 		"package:linux": "cd apps/frontend && pnpm run package:linux",
-		"merge-upstream": "node scripts/merge-upstream.js",
-		"validate:upstream": "node scripts/validate-upstream-setup.js",
 		"validate:npm-scripts": "node scripts/validate-npm-scripts.js",
-		"generate:provider-types": "node scripts/generate-provider-types.js",
-		"validate:provider-types": "node scripts/generate-provider-types.js --check",
 		"skills:build": "python3 scripts/skills_cli.py build",
 		"skills:check": "python3 scripts/skills_cli.py build --check",
 		"skills:list": "python3 scripts/skills_cli.py list",
@@ -45,7 +41,7 @@
 		"node": ">=20.0.0",
 		"pnpm": ">=8.0.0"
 	},
-	"packageManager": "pnpm@10.27.0",
+	"packageManager": "pnpm@12.5.1",
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/krovomi/WorkPilot-AI.git"
@@ -59,13 +55,13 @@
 		"electron"
 	],
 	"devDependencies": {
-		"concurrently": "^8.2.2"
+		"concurrently": "^10.0.6"
 	},
 	"dependencies": {
 		"@lydell/node-pty": "1.1.0",
 		"@lydell/node-pty-darwin-arm64": "1.2.0-beta.15",
-		"lucide-react": "^1.33.0",
-		"unzipper": "^0.10.11",
-		"tar": "^7.5.19"
+		"lucide-react": "^1.55.0",
+		"tar": "^7.5.22",
+		"unzipper": "^0.12.5"
 	}
 }

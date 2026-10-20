@@ -7,8 +7,8 @@ Task context building for autonomous coding.
 
 from .builder import ContextBuilder
 from .categorizer import FileCategorizer
-from .graphiti_integration import fetch_graph_hints, is_graphiti_enabled
 from .keyword_extractor import KeywordExtractor
+from .memory_hints import fetch_graph_hints, is_memory_enabled
 from .models import FileMatch, TaskContext
 from .pattern_discovery import PatternDiscoverer
 from .search import CodeSearcher
@@ -27,9 +27,9 @@ __all__ = [
     "KeywordExtractor",
     "FileCategorizer",
     "PatternDiscoverer",
-    # Graphiti integration
+    # Hints from the shared brain
     "fetch_graph_hints",
-    "is_graphiti_enabled",
+    "is_memory_enabled",
     # Serialization
     "serialize_context",
     "save_context",

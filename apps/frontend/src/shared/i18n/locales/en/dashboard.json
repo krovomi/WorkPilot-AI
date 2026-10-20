@@ -4,7 +4,8 @@
 	"kpi": {
 		"totalTasks": {
 			"title": "Total Tasks",
-			"completed": "{{count}} completed"
+			"completed_one": "{{count}} completed",
+			"completed_other": "{{count}} completed"
 		},
 		"qaFirstPassRate": {
 			"title": "QA First-Pass Rate",

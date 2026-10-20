@@ -50,7 +50,7 @@ def main():
     output_data = result.to_dict()
 
     if args.output:
-        with open(args.output, "w") as f:
+        with open(args.output, "w", encoding="utf-8") as f:
             json.dump(output_data, f, indent=2)
     else:
         print(json.dumps(output_data, indent=2))

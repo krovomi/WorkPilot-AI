@@ -54,10 +54,6 @@
 			"label": "Linear",
 			"desc": "Importez vos issues Linear comme tâches et synchronisez l'état en temps réel."
 		},
-		"memory": {
-			"label": "Mémoire (Graphiti)",
-			"desc": "Activez la mémoire persistante pour que les agents conservent le contexte entre les sessions."
-		},
 		"cicd": {
 			"label": "Pipeline CI/CD",
 			"desc": "Surveillez vos pipelines et laissez WorkPilot corriger automatiquement les builds en échec."

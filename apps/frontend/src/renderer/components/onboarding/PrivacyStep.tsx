@@ -168,12 +168,12 @@ export function PrivacyStep({ onNext, onBack }: PrivacyStepProps) {
 				{/* Action Buttons */}
 				<div className="flex justify-between items-center mt-10 pt-6 border-t border-border">
 					<Button variant="ghost" onClick={onBack}>
-						{t("common:back", "Back")}
+						{t("common:buttons.back", "Back")}
 					</Button>
 					<Button onClick={handleSave} disabled={isSaving}>
 						{isSaving
-							? t("common:saving", "Saving...")
-							: t("common:continue", "Continue")}
+							? t("common:buttons.saving", "Saving...")
+							: t("common:buttons.continue", "Continue")}
 					</Button>
 				</div>
 			</div>

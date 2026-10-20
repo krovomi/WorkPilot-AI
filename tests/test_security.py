@@ -11,7 +11,7 @@ Tests the security.py module functionality including:
 """
 
 import pytest
-from project_analyzer import BASE_COMMANDS, SecurityProfile
+from project import SecurityProfile
 from security import (
     extract_commands,
     get_command_for_validation,
@@ -347,7 +347,7 @@ class TestSecurityProfileIntegration:
 
     def test_profile_detects_python_commands(self, python_project):
         """Profile includes Python commands for Python projects."""
-        from project_analyzer import get_or_create_profile
+        from project import get_or_create_profile
 
         reset_profile_cache()
 
@@ -358,7 +358,7 @@ class TestSecurityProfileIntegration:
 
     def test_profile_detects_node_commands(self, node_project):
         """Profile includes Node commands for Node projects."""
-        from project_analyzer import get_or_create_profile
+        from project import get_or_create_profile
 
         reset_profile_cache()
 
@@ -369,7 +369,7 @@ class TestSecurityProfileIntegration:
 
     def test_profile_detects_docker_commands(self, docker_project):
         """Profile includes Docker commands for Docker projects."""
-        from project_analyzer import get_or_create_profile
+        from project import get_or_create_profile
 
         reset_profile_cache()
 
@@ -380,7 +380,7 @@ class TestSecurityProfileIntegration:
 
     def test_profile_caching(self, python_project):
         """Profile is cached after first analysis."""
-        from project_analyzer import get_or_create_profile
+        from project import get_or_create_profile
         from security import get_security_profile, reset_profile_cache
 
         reset_profile_cache()
@@ -957,7 +957,9 @@ class TestShellCValidator:
             "created_at": "",
             "project_hash": actual_hash,
         }
-        (tmp_path / ".workpilot-security.json").write_text(json.dumps(profile_data))
+        (tmp_path / ".workpilot-security.json").write_text(
+            json.dumps(profile_data), encoding="utf-8"
+        )
 
         # Reset cache to pick up the new profile
         reset_profile_cache()
@@ -1006,7 +1008,9 @@ class TestShellCValidator:
             "created_at": "",
             "project_hash": actual_hash,
         }
-        (tmp_path / ".workpilot-security.json").write_text(json.dumps(profile_data))
+        (tmp_path / ".workpilot-security.json").write_text(
+            json.dumps(profile_data), encoding="utf-8"
+        )
 
         reset_profile_cache()
 
@@ -1053,7 +1057,9 @@ class TestShellCValidator:
             "created_at": "",
             "project_hash": actual_hash,
         }
-        (tmp_path / ".workpilot-security.json").write_text(json.dumps(profile_data))
+        (tmp_path / ".workpilot-security.json").write_text(
+            json.dumps(profile_data), encoding="utf-8"
+        )
 
         reset_profile_cache()
 
@@ -1098,7 +1104,9 @@ class TestShellCValidator:
             "created_at": "",
             "project_hash": actual_hash,
         }
-        (tmp_path / ".workpilot-security.json").write_text(json.dumps(profile_data))
+        (tmp_path / ".workpilot-security.json").write_text(
+            json.dumps(profile_data), encoding="utf-8"
+        )
 
         reset_profile_cache()
 
@@ -1148,7 +1156,9 @@ class TestShellCValidator:
             "created_at": "",
             "project_hash": actual_hash,
         }
-        (tmp_path / ".workpilot-security.json").write_text(json.dumps(profile_data))
+        (tmp_path / ".workpilot-security.json").write_text(
+            json.dumps(profile_data), encoding="utf-8"
+        )
 
         reset_profile_cache()
 
@@ -1193,7 +1203,9 @@ class TestShellCValidator:
             "created_at": "",
             "project_hash": actual_hash,
         }
-        (tmp_path / ".workpilot-security.json").write_text(json.dumps(profile_data))
+        (tmp_path / ".workpilot-security.json").write_text(
+            json.dumps(profile_data), encoding="utf-8"
+        )
 
         reset_profile_cache()
 
@@ -1238,7 +1250,9 @@ class TestShellCValidator:
             "created_at": "",
             "project_hash": actual_hash,
         }
-        (tmp_path / ".workpilot-security.json").write_text(json.dumps(profile_data))
+        (tmp_path / ".workpilot-security.json").write_text(
+            json.dumps(profile_data), encoding="utf-8"
+        )
 
         reset_profile_cache()
 
@@ -1283,7 +1297,9 @@ class TestShellCValidator:
             "created_at": "",
             "project_hash": actual_hash,
         }
-        (tmp_path / ".workpilot-security.json").write_text(json.dumps(profile_data))
+        (tmp_path / ".workpilot-security.json").write_text(
+            json.dumps(profile_data), encoding="utf-8"
+        )
 
         reset_profile_cache()
 
@@ -1327,7 +1343,9 @@ class TestShellCValidator:
             "created_at": "",
             "project_hash": actual_hash,
         }
-        (tmp_path / ".workpilot-security.json").write_text(json.dumps(profile_data))
+        (tmp_path / ".workpilot-security.json").write_text(
+            json.dumps(profile_data), encoding="utf-8"
+        )
 
         reset_profile_cache()
 
@@ -1374,7 +1392,9 @@ class TestShellCValidator:
             "created_at": "",
             "project_hash": actual_hash,
         }
-        (tmp_path / ".workpilot-security.json").write_text(json.dumps(profile_data))
+        (tmp_path / ".workpilot-security.json").write_text(
+            json.dumps(profile_data), encoding="utf-8"
+        )
 
         reset_profile_cache()
 
@@ -1482,7 +1502,7 @@ class TestInheritedSecurityProfile:
             "project_hash": "parent_hash",
         }
         (parent_dir / ".workpilot-security.json").write_text(
-            json.dumps(parent_profile_data)
+            json.dumps(parent_profile_data), encoding="utf-8"
         )
 
         # Create a profile with valid inherited_from pointing to actual parent
@@ -1552,7 +1572,7 @@ class TestInheritedSecurityProfile:
             "project_hash": "abc123",
         }
         (parent_dir / ".workpilot-security.json").write_text(
-            json.dumps(parent_profile_data)
+            json.dumps(parent_profile_data), encoding="utf-8"
         )
 
         # Create a profile with valid inherited_from (child -> parent)
@@ -1622,7 +1642,9 @@ class TestInheritedSecurityProfile:
             "created_at": "",
             "project_hash": "abc123",
         }
-        (dir_a / ".workpilot-security.json").write_text(json.dumps(profile_data))
+        (dir_a / ".workpilot-security.json").write_text(
+            json.dumps(profile_data), encoding="utf-8"
+        )
 
         # Create a profile pointing to dir_a from dir_b (not an ancestor)
         spoofed_profile = SecurityProfile(

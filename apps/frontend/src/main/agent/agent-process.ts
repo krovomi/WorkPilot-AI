@@ -1,5 +1,6 @@
+import { buildJevEnvironment } from "../jev/environment";
 import { spawn } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { app } from "electron";
@@ -11,7 +12,7 @@ const __dirname = path.dirname(__filename);
 import type { EventEmitter } from "node:events";
 import type { CompletablePhase } from "../../shared/constants/phase-protocol";
 import { isPausePhase } from "../../shared/constants/phase-protocol";
-import type { AppSettings } from "../../shared/types/settings";
+import { stripAnsiCodes } from "../../shared/utils/ansi-sanitizer";
 import { appLog } from "../app-logger";
 import { clearKeychainCache } from "../claude-profile/credential-utils";
 import { getProfileSelectionLock } from "../claude-profile/profile-selection-lock";
@@ -23,9 +24,10 @@ import {
 import { getClaudeProfileManager } from "../claude-profile-manager";
 import { getToolInfo } from "../cli-tool-manager";
 import { getAugmentedEnv } from "../env-utils";
-import { buildMemoryEnvVars } from "../memory-env-builder";
 import { isWindows, killProcessGracefully } from "../platform";
+import { readProjectEnv } from "../project-env-file";
 import { projectStore } from "../project-store";
+import { buildTaskProviderEnv, type TaskProviderPlan } from "./task-provider-env";
 import { parsePythonCommand, validatePythonPath } from "../python-detector";
 import {
 	getConfiguredPythonPath,
@@ -39,10 +41,11 @@ import {
 } from "../rate-limit-detector";
 import { credentialManager } from "../services/credential-manager";
 import { getAPIProfileEnv } from "../services/profile";
-import { readSettingsFile } from "../settings-utils";
+import { loadBackendEnv } from "../source-env";
 import type { AgentEvents } from "./agent-events";
 import type { AgentState } from "./agent-state";
 import { getOAuthModeClearVars } from "./env-utils";
+import { forwardTaskEventToHooks } from "./hook-bridge";
 import { parseTaskEvent } from "./task-event-parser";
 import type { ExecutionProgressData, ProcessType } from "./types";
 
@@ -231,6 +234,7 @@ export class AgentProcessManager {
 
 	private setupProcessEnvironment(
 		extraEnv: Record<string, string>,
+		taskProviders?: TaskProviderPlan,
 	): NodeJS.ProcessEnv {
 		// Get best available Claude profile environment (automatically handles rate limits)
 		const profileResult = getBestAvailableProfileEnv();
@@ -265,9 +269,13 @@ export class AgentProcessManager {
 		const ghCliEnv = this.detectAndSetCliPath("gh");
 		const glabCliEnv = this.detectAndSetCliPath("glab");
 
-		// Get active provider credentials (e.g., WINDSURF_API_KEY, SELECTED_LLM_PROVIDER)
-		// This ensures non-Claude providers get their credentials injected into the subprocess
-		const providerEnv = credentialManager.getEnvironmentVariables();
+		// Get provider credentials (e.g., WINDSURF_API_KEY, SELECTED_LLM_PROVIDER).
+		// A Kanban task names its own providers (task-engine.ts): the credentials
+		// of each of them, never those of the app's default provider. Any other
+		// process keeps the active provider's.
+		const providerEnv = taskProviders
+			? buildTaskProviderEnv(taskProviders)
+			: credentialManager.getEnvironmentVariables();
 		appLog.info("[AgentProcess] Provider env vars from CredentialManager:", {
 			SELECTED_LLM_PROVIDER: providerEnv.SELECTED_LLM_PROVIDER || "(not set)",
 			hasWindsurfApiKey: !!providerEnv.WINDSURF_API_KEY,
@@ -280,10 +288,13 @@ export class AgentProcessManager {
 		// When using a non-Claude provider (e.g., OpenAI, Mistral), clear Claude/Anthropic
 		// auth env vars so Claude Code CLI doesn't authenticate to Anthropic and then reject
 		// provider-specific model names (e.g., gpt-4o is unknown to Anthropic).
-		const nonClaudeProvider =
-			providerEnv.SELECTED_LLM_PROVIDER &&
-			!["claude", "anthropic"].includes(providerEnv.SELECTED_LLM_PROVIDER) &&
-			providerEnv.SELECTED_LLM_PROVIDER !== "copilot"; // copilot uses its own gh CLI auth
+		// A task keeps Claude's auth as soon as one of its phases runs on Claude.
+		const nonClaudeProvider = taskProviders
+			? !taskProviders.usesClaude &&
+				!taskProviders.providers.includes("copilot")
+			: providerEnv.SELECTED_LLM_PROVIDER &&
+				!["claude", "anthropic"].includes(providerEnv.SELECTED_LLM_PROVIDER) &&
+				providerEnv.SELECTED_LLM_PROVIDER !== "copilot"; // copilot uses its own gh CLI auth
 		const claudeAuthClearVars: Record<string, undefined> = nonClaudeProvider
 			? {
 					CLAUDE_CODE_OAUTH_TOKEN: undefined,
@@ -679,21 +690,20 @@ export class AgentProcessManager {
 		const project = projects.find((p) => p.path === projectPath);
 
 		if (project?.settings) {
-			// Graphiti MCP integration
-			if (project.settings.graphitiMcpEnabled) {
-				const graphitiUrl =
-					project.settings.graphitiMcpUrl || "http://localhost:8000/mcp/";
-				env.GRAPHITI_MCP_URL = graphitiUrl;
-			}
-
-			// CLAUDE.md integration (enabled by default)
-			if (project.settings.useClaudeMd !== false) {
-				env.USE_CLAUDE_MD = "true";
-			}
+			// CLAUDE.md integration (enabled by default). Sent either way: the
+			// backend reads an absent variable as on, so "off" must be said.
+			env.USE_CLAUDE_MD =
+				project.settings.useClaudeMd !== false ? "true" : "false";
 
 			// Strict TDD (Red-Green-Refactor) mode (opt-in)
 			if (project.settings.tddMode) {
 				env.TDD_MODE = "true";
+			}
+
+			// Verification loop (on by default): the project can turn it off;
+			// a card's own choice (WORKPILOT_VERIFY_LOOP) still wins.
+			if (project.settings.verifyLoop === false) {
+				env.VERIFY_ENABLED = "false";
 			}
 		}
 
@@ -701,55 +711,10 @@ export class AgentProcessManager {
 	}
 
 	/**
-	 * Parse environment variables from a .env file content.
-	 * Filters out empty values to prevent overriding valid tokens from profiles.
-	 */
-	private parseEnvFile(envPath: string): Record<string, string> {
-		if (!existsSync(envPath)) {
-			return {};
-		}
-
-		try {
-			const envContent = readFileSync(envPath, "utf-8");
-			const envVars: Record<string, string> = {};
-
-			// Handle both Unix (\n) and Windows (\r\n) line endings
-			for (const line of envContent.split(/\r?\n/)) {
-				const trimmed = line.trim();
-				// Skip comments and empty lines
-				if (!trimmed || trimmed.startsWith("#")) {
-					continue;
-				}
-
-				const eqIndex = trimmed.indexOf("=");
-				if (eqIndex > 0) {
-					const key = trimmed.substring(0, eqIndex).trim();
-					let value = trimmed.substring(eqIndex + 1).trim();
-
-					// Remove quotes if present
-					if (
-						(value.startsWith('"') && value.endsWith('"')) ||
-						(value.startsWith("'") && value.endsWith("'"))
-					) {
-						value = value.slice(1, -1);
-					}
-
-					// Skip empty values to prevent overriding valid values from other sources
-					if (value) {
-						envVars[key] = value;
-					}
-				}
-			}
-
-			return envVars;
-		} catch {
-			return {};
-		}
-	}
-
-	/**
 	 * Load environment variables from project's .workpilot/.env file
-	 * This contains frontend-configured settings like memory/Graphiti configuration
+	 * This contains frontend-configured settings (integrations, MCP toggles).
+	 * Its tokens are stored encrypted: this is where they become plaintext
+	 * again, in the subprocess environment, never on disk.
 	 */
 	private loadProjectEnv(projectPath: string): Record<string, string> {
 		// Find project by path to get autoBuildPath
@@ -760,12 +725,15 @@ export class AgentProcessManager {
 			return {};
 		}
 
-		const envPath = path.join(projectPath, project.autoBuildPath, ".env");
-		return this.parseEnvFile(envPath);
+		// Skip empty values to prevent overriding valid values from other sources
+		return Object.fromEntries(
+			Object.entries(readProjectEnv(project)).filter(([, value]) => value),
+		);
 	}
 
 	/**
-	 * Load environment variables from auto-claude .env file
+	 * Load environment variables from the backend's .env, plus the copy the UI
+	 * saves when packaged, secrets decrypted (../source-env.ts)
 	 */
 	loadAutoBuildEnv(): Record<string, string> {
 		const autoBuildSource = this.getAutoBuildSourcePath();
@@ -773,8 +741,7 @@ export class AgentProcessManager {
 			return {};
 		}
 
-		const envPath = path.join(autoBuildSource, ".env");
-		return this.parseEnvFile(envPath);
+		return loadBackendEnv(autoBuildSource);
 	}
 
 	/**
@@ -787,6 +754,7 @@ export class AgentProcessManager {
 		extraEnv: Record<string, string> = {},
 		processType: ProcessType = "task-execution",
 		projectId?: string,
+		taskProviders?: TaskProviderPlan,
 	): Promise<void> {
 		const isSpecRunner = processType === "spec-creation";
 		this.killProcess(taskId);
@@ -809,19 +777,26 @@ export class AgentProcessManager {
 		// (SSO token from state.vscdb or API key) and doesn't need Claude OAuth tokens.
 		// Use getEnvironmentVariables() as the source of truth since it handles all
 		// fallback paths (activeCredential, globalWindsurfApiKey in settings, etc.)
-		const providerCheckRaw = credentialManager.getEnvironmentVariables();
+		//
+		// A Kanban task answers from its own engine: the refresh is skipped only
+		// when none of its phases runs on Claude.
+		const providerCheckRaw = taskProviders
+			? buildTaskProviderEnv(taskProviders)
+			: credentialManager.getEnvironmentVariables();
 		// If Claude Code OAuth is active (agentConfigDir set) and windsurf is being injected
 		// only via the globalWindsurfApiKey fallback (no explicit windsurf activeCredential),
 		// treat it as a Claude provider so OAuth token refresh still happens.
 		const isWindsurfViaFallback =
+			!taskProviders &&
 			providerCheckRaw.SELECTED_LLM_PROVIDER === "windsurf" &&
 			credentialManager.getActiveCredential()?.provider !== "windsurf";
 		const providerCheck = isWindsurfViaFallback ? {} : providerCheckRaw;
 		const selectedLlmProvider =
 			providerCheck.SELECTED_LLM_PROVIDER?.toLowerCase();
-		const isNonClaudeProvider =
-			selectedLlmProvider &&
-			!["anthropic", "claude"].includes(selectedLlmProvider);
+		const isNonClaudeProvider = taskProviders
+			? !taskProviders.usesClaude
+			: selectedLlmProvider &&
+				!["anthropic", "claude"].includes(selectedLlmProvider);
 
 		if (isNonClaudeProvider) {
 			appLog.info(
@@ -893,7 +868,7 @@ export class AgentProcessManager {
 			}
 		}
 
-		const env = this.setupProcessEnvironment(extraEnv);
+		const env = this.setupProcessEnvironment(extraEnv, taskProviders);
 
 		// CRITICAL: Mark this profile's token as "in use" by an agent process.
 		// While marked, the UsageMonitor's ensureValidToken() will SKIP refresh for this
@@ -943,13 +918,16 @@ export class AgentProcessManager {
 		try {
 			childProcess = spawn(pythonCommand, [...pythonBaseArgs, ...args], {
 				cwd,
-				env: {
-					...env, // Already includes process.env, extraEnv, profileEnv, PYTHONUNBUFFERED, PYTHONUTF8
-					...pythonEnv, // Include Python environment (PYTHONPATH for bundled packages)
-					...oauthModeClearVars, // Clear stale ANTHROPIC_* vars when in OAuth mode
-					...apiProfileEnv, // Include active API profile config (highest priority for ANTHROPIC_* vars)
-					...providerSpecificEnv, // Include provider credentials (WINDSURF_API_KEY, SELECTED_LLM_PROVIDER)
-				},
+				env: buildJevEnvironment(
+					{
+						...env, // Already includes process.env, extraEnv, profileEnv, PYTHONUNBUFFERED, PYTHONUTF8
+						...pythonEnv, // Include Python environment (PYTHONPATH for bundled packages)
+						...oauthModeClearVars, // Clear stale ANTHROPIC_* vars when in OAuth mode
+						...apiProfileEnv, // Include active API profile config (highest priority for ANTHROPIC_* vars)
+						...providerSpecificEnv, // Include provider credentials (WINDSURF_API_KEY, SELECTED_LLM_PROVIDER)
+					},
+					processType === "task-execution" ? "feature-build" : undefined,
+				),
 			});
 		} catch (err) {
 			// spawn() failed synchronously (e.g., command not found, permission denied)
@@ -1054,6 +1032,10 @@ export class AgentProcessManager {
 					taskEvent,
 				);
 				this.emitter.emit("task-event", taskId, taskEvent, projectId);
+				// Same event, second consumer: the hooks bus, which can turn it
+				// into a spec, an agent run or a pipeline. Fire-and-forget —
+				// see hook-bridge.ts.
+				forwardTaskEventToHooks(taskEvent, projectId);
 			}
 
 			const phaseUpdate = this.events.parseExecutionPhase(
@@ -1150,7 +1132,19 @@ export class AgentProcessManager {
 			}
 		};
 
-		const processLine = (line: string): void => {
+		const processLine = (rawLine: string): void => {
+			// Strip the terminal colouring the backend writes for a TTY, once, at
+			// the boundary where raw output becomes a line. The log view is a DOM
+			// node, not a terminal: an unstripped `\x1b[1m` renders as an invisible
+			// control character followed by a literal "[1m", which is what users
+			// were reading in the task logs.
+			//
+			// The same stripped string feeds the parsers below. The protocol
+			// markers carry no colour so nothing changes for them, and the
+			// fallback text matching stops having to see through escape codes —
+			// a coloured line that should have matched previously did not.
+			const line = stripAnsiCodes(rawLine);
+
 			// Detect the start of a hook_0 Stream-closed error block and suppress it.
 			// Pattern: "Error in hook callback hook_0:" kicks off a multi-line Bun
 			// error dump (source snippet + "error: Stream closed" + stack frames).
@@ -1222,13 +1216,18 @@ export class AgentProcessManager {
 				);
 			}
 
+			// Same treatment for the unterminated tail flushed at exit — it is the
+			// last thing shown for a crashed run, so it is the line most worth
+			// being readable.
 			if (stdoutBuffer.trim()) {
-				this.emitter.emit("log", taskId, `${stdoutBuffer}\n`, projectId);
-				processLog(stdoutBuffer);
+				const tail = stripAnsiCodes(stdoutBuffer);
+				this.emitter.emit("log", taskId, `${tail}\n`, projectId);
+				processLog(tail);
 			}
 			if (stderrBuffer.trim()) {
-				this.emitter.emit("log", taskId, `${stderrBuffer}\n`, projectId);
-				processLog(stderrBuffer);
+				const tail = stripAnsiCodes(stderrBuffer);
+				this.emitter.emit("log", taskId, `${tail}\n`, projectId);
+				processLog(tail);
 			}
 
 			this.state.deleteProcess(taskId);
@@ -1384,26 +1383,18 @@ export class AgentProcessManager {
 	 * Get combined environment variables for a project
 	 *
 	 * Priority (later sources override earlier):
-	 * 1. App-wide memory settings from settings.json (NEW - enables memory from onboarding)
-	 * 2. Backend source .env (apps/backend/.env) - CLI defaults
-	 * 3. Project's .workpilot/.env - Frontend-configured settings (memory, integrations)
-	 * 4. Project settings (graphitiMcpUrl, useClaudeMd) - Runtime overrides
+	 * 1. Backend source .env (apps/backend/.env) - CLI defaults
+	 * 2. Project's .workpilot/.env - Frontend-configured settings (integrations)
+	 * 3. Project settings (useClaudeMd) - Runtime overrides
 	 */
 	getCombinedEnv(projectPath: string): Record<string, string> {
-		// Load app-wide memory settings from settings.json
-		// This bridges onboarding config to backend agents
-		const appSettings = (readSettingsFile() || {}) as Partial<AppSettings>;
-		const memoryEnv = buildMemoryEnvVars(appSettings as AppSettings);
-
-		// Existing env sources
 		const autoBuildEnv = this.loadAutoBuildEnv();
 		const projectFileEnv = this.loadProjectEnv(projectPath);
 		const projectSettingsEnv = this.getProjectEnvVars(projectPath);
 
-		// Priority: app-wide memory -> backend .env -> project .env -> project settings
+		// Priority: backend .env -> project .env -> project settings
 		// Later sources override earlier ones
 		return {
-			...memoryEnv,
 			...autoBuildEnv,
 			...projectFileEnv,
 			...projectSettingsEnv,

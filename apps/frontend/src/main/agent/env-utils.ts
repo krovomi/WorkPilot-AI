@@ -65,6 +65,50 @@ export function getOAuthModeClearVars(
  * @param tddMode - Per-task override flag (undefined to inherit)
  * @returns A new env map with the override applied
  */
+/**
+ * Apply a per-task mobile target choice onto a combined environment map.
+ *
+ * The backend reads `WORKPILOT_MOBILE_TARGETS` (see `mobile.prompt`) to decide
+ * which platforms a task is for: a Kanban card can say "Android only" about a
+ * repository that also ships an Apple head, and building both would be work
+ * nobody asked for.
+ *
+ * - a non-empty list -> `WORKPILOT_MOBILE_TARGETS=android,ios`
+ * - an empty list or `undefined` -> no variable, and the backend falls back to
+ *   every platform the project actually has. An empty list is *not* "target
+ *   nothing": a card that names no platform on a mobile repo means "the usual
+ *   ones", and reading it as "none" would silently disable the specialisation.
+ *
+ * The input map is never mutated; a new object is returned.
+ */
+export function applyMobileTargets(
+	env: Record<string, string>,
+	targets?: readonly string[],
+): Record<string, string> {
+	if (!targets || targets.length === 0) {
+		return env;
+	}
+	return { ...env, WORKPILOT_MOBILE_TARGETS: targets.join(",") };
+}
+
+/**
+ * Apply a per-task verification-loop choice onto a combined environment map.
+ *
+ * The backend reads `WORKPILOT_VERIFY_LOOP` (`verify/settings.py`) before the
+ * project's `VERIFY_ENABLED`: `true`/`false` from a card that said so, nothing
+ * when the card inherits the project default. The input map is never mutated.
+ */
+export function applyVerifyLoop(
+	env: Record<string, string>,
+	verifyLoop?: boolean,
+): Record<string, string> {
+	if (verifyLoop === undefined) {
+		const { WORKPILOT_VERIFY_LOOP: _omit, ...rest } = env;
+		return rest;
+	}
+	return { ...env, WORKPILOT_VERIFY_LOOP: verifyLoop ? "true" : "false" };
+}
+
 export function applyTddOverride(
 	env: Record<string, string>,
 	tddMode?: boolean,

@@ -5,12 +5,23 @@
  * organized by domain into separate handler modules.
  */
 
-import type { BrowserWindow } from "electron";
+import path from "node:path";
+import { registerDictationHandlers } from "./dictation-handlers";
+import { app, type BrowserWindow } from "electron";
 import type { AgentManager } from "../agent";
+import { getClaudeProfileManager } from "../claude-profile-manager";
 import { notificationService } from "../notification-service";
 import type { PythonEnvManager } from "../python-env-manager";
 import type { TerminalManager } from "../terminal-manager";
 import { registerAccessibilityHandlers } from "./accessibility-handlers";
+import {
+	registerAutoRefactorHandlers,
+	setupAutoRefactorEventForwarding,
+} from "./auto-refactor-handlers";
+import { registerContinuousAIHandlers } from "./continuous-ai-handlers";
+import { getAutoBuildSourcePath } from "./context/utils";
+import { registerQueueRoutingHandlers } from "./queue-routing-handlers";
+import { registerSwarmHandlers } from "./swarm-handlers";
 import { registerAgentDebuggerHandlers } from "./agent-debugger-handlers";
 import { registerAgenteventsHandlers } from "./agent-events-handlers";
 import { registerBlastRadiusHandlers } from "./blast-radius-handlers";
@@ -20,6 +31,7 @@ import { registerTeamBotHandlers } from "./team-bot-handlers";
 import { registerApiExplorerHandlers } from "./api-explorer-handlers";
 import { registerApiWatcherHandlers } from "./api-watcher-handlers";
 import { registerAppEmulatorHandlers } from "./app-emulator-handlers";
+import { registerMobileHandlers } from "./mobile-handlers";
 import { registerAppUpdateHandlers } from "./app-update-handlers";
 import {
 	registerArchitectureVisualizerHandlers,
@@ -30,10 +42,7 @@ import { registerAzureDevOpsHandlers } from "./azure-devops-handlers";
 import { registerBrowserAgentHandlers } from "./browser-agent-handlers";
 import { registerCarbonProfilerHandlers } from "./carbon-profiler-handlers";
 import { registerChangelogHandlers } from "./changelog-handlers";
-import {
-	registerCICDTriggersHandlers,
-	setupCICDTriggersEventForwarding,
-} from "./cicd-triggers-handlers";
+import { registerCICDTriggersHandlers } from "./cicd-triggers-handlers";
 import { registerClaudeCodeHandlers } from "./claude-code-handlers";
 import { registerComplianceHandlers } from "./compliance-handlers";
 import {
@@ -45,8 +54,10 @@ import {
 	setupCodePlaygroundEventForwarding,
 } from "./code-playground-handlers";
 import { setupConflictPredictorHandlers } from "./conflict-predictor-handlers";
+import { registerContextAwareSnippetsHandlers } from "./context-aware-snippets-handlers";
 import { registerContextHandlers } from "./context-handlers";
 import { registerContextMeshHandlers } from "./context-mesh-handlers";
+import { registerAgentCliHandlers } from "./agent-cli-handlers";
 import { registerCopilotCliHandlers } from "./copilot-cli-handlers";
 import { registerCopilotOAuthHandlers } from "./copilot-oauth-handlers";
 import { registerCostHandlers } from "./cost-handlers";
@@ -74,20 +85,17 @@ import { registerGuardrailsHandlers } from "./guardrails-handlers";
 import { registerI18nAgentHandlers } from "./i18n-agent-handlers";
 import { registerIdeationHandlers } from "./ideation-handlers";
 import { registerInsightsHandlers } from "./insights-handlers";
+import { registerFigmaHandlers } from "./figma-handlers";
 import { registerJiraHandlers } from "./jira-handlers";
 import { registerLearningLoopHandlers } from "./learning-loop-handlers";
 import { registerLinearHandlers } from "./linear-handlers";
 import { registerLiveCompanionHandlers } from "./live-companion-handlers";
 import { registerMcpHandlers } from "./mcp-handlers";
 import { registerMcpMarketplaceHandlers } from "./mcp-marketplace-handlers";
-import { registerMemoryHandlers } from "./memory-handlers";
-import {
-	registerMemoryLifecycleHandlers,
-	setupMemoryLifecycleEventForwarding,
-} from "./memory-lifecycle-handlers";
 import { registerMultiRepoHandlers } from "./multi-repo-handlers";
 import { setupNaturalLanguageGitHandlers } from "./natural-language-git-handlers";
 import { registerNotebookAgentHandlers } from "./notebook-agent-handlers";
+import { registerOllamaHandlers } from "./ollama-handlers";
 import { registerPairProgrammingHandlers } from "./pair-programming-handlers";
 import {
 	registerPerformanceProfilerHandlers,
@@ -108,7 +116,10 @@ import { setupQualityHandlers } from "./quality-handlers";
 import { registerRoadmapHandlers } from "./roadmap-handlers";
 import { registerScreenshotHandlers } from "./screenshot-handlers";
 import { registerSelfHealingHandlers } from "./self-healing-handlers";
+import { registerServerAdminHandlers } from "./server-admin-handlers";
 import { registerServerAuthHandlers } from "./server-auth-handlers";
+import { registerJevHandlers } from "./jev-handlers";
+import { registerSecureStorageHandlers } from "./secure-storage-handlers";
 import { registerSettingsHandlers } from "./settings-handlers";
 import { setupSmartEstimationHandlers } from "./smart-estimation-handlers";
 import { registerAgentCoachHandlers } from "./agent-coach-handlers";
@@ -122,7 +133,6 @@ import { registerSpecRefinementHandlers } from "./spec-refinement-handlers";
 import { registerPhase35FeatureHandlers } from "./phase35-features-handlers";
 import { registerPipelineHandlers } from "./pipeline-handlers";
 import { registerTaskHandlers } from "./task-handlers";
-import { registerTeamSyncHandlers } from "./team-sync-handlers";
 import { registerTerminalWorktreeIpcHandlers } from "./terminal";
 import { registerTerminalHandlers } from "./terminal-handlers";
 import { registerDesignToCodeHandlers } from "./design-to-code-handlers";
@@ -132,6 +142,7 @@ import {
 	registerVisualProgrammingHandlers,
 	setupVisualProgrammingEventForwarding,
 } from "./visual-programming-handlers";
+import { registerVisualToCodeHistoryHandlers } from "./visual-to-code-history-handlers";
 import {
 	registerVoiceControlHandlers,
 	setupVoiceControlEvents,
@@ -142,6 +153,7 @@ export { registerAgenteventsHandlers } from "./agent-events-handlers";
 export { registerApiExplorerHandlers } from "./api-explorer-handlers";
 export { registerApiWatcherHandlers } from "./api-watcher-handlers";
 export { registerAppEmulatorHandlers } from "./app-emulator-handlers";
+export { registerMobileHandlers } from "./mobile-handlers";
 export { registerAppUpdateHandlers } from "./app-update-handlers";
 export {
 	registerArchitectureVisualizerHandlers,
@@ -152,10 +164,7 @@ export { registerAzureDevOpsHandlers } from "./azure-devops-handlers";
 export { registerBrowserAgentHandlers } from "./browser-agent-handlers";
 export { registerCarbonProfilerHandlers } from "./carbon-profiler-handlers";
 export { registerChangelogHandlers } from "./changelog-handlers";
-export {
-	registerCICDTriggersHandlers,
-	setupCICDTriggersEventForwarding,
-} from "./cicd-triggers-handlers";
+export { registerCICDTriggersHandlers } from "./cicd-triggers-handlers";
 export { registerClaudeCodeHandlers } from "./claude-code-handlers";
 export { registerComplianceHandlers } from "./compliance-handlers";
 export {
@@ -167,8 +176,10 @@ export {
 	setupCodePlaygroundEventForwarding,
 } from "./code-playground-handlers";
 export { setupConflictPredictorHandlers } from "./conflict-predictor-handlers";
+export { registerContextAwareSnippetsHandlers } from "./context-aware-snippets-handlers";
 export { registerContextHandlers } from "./context-handlers";
 export { registerContextMeshHandlers } from "./context-mesh-handlers";
+export { registerAgentCliHandlers } from "./agent-cli-handlers";
 export { registerCopilotCliHandlers } from "./copilot-cli-handlers";
 export { registerCopilotOAuthHandlers } from "./copilot-oauth-handlers";
 export { registerCostHandlers } from "./cost-handlers";
@@ -201,14 +212,10 @@ export { registerLinearHandlers } from "./linear-handlers";
 export { registerLiveCompanionHandlers } from "./live-companion-handlers";
 export { registerMcpHandlers } from "./mcp-handlers";
 export { registerMcpMarketplaceHandlers } from "./mcp-marketplace-handlers";
-export { registerMemoryHandlers } from "./memory-handlers";
-export {
-	registerMemoryLifecycleHandlers,
-	setupMemoryLifecycleEventForwarding,
-} from "./memory-lifecycle-handlers";
 export { registerMultiRepoHandlers } from "./multi-repo-handlers";
 export { setupNaturalLanguageGitHandlers } from "./natural-language-git-handlers";
 export { registerNotebookAgentHandlers } from "./notebook-agent-handlers";
+export { registerOllamaHandlers } from "./ollama-handlers";
 export { registerPairProgrammingHandlers } from "./pair-programming-handlers";
 export {
 	registerPerformanceProfilerHandlers,
@@ -240,7 +247,6 @@ export { registerInjectionGuardHandlers } from "./injection-guard-handlers";
 export { registerSpecApprovalHandlers } from "./spec-approval-handlers";
 export { registerSpecRefinementHandlers } from "./spec-refinement-handlers";
 export { registerTaskHandlers } from "./task-handlers";
-export { registerTeamSyncHandlers } from "./team-sync-handlers";
 export { registerTerminalWorktreeIpcHandlers } from "./terminal";
 export { registerTerminalHandlers } from "./terminal-handlers";
 export { setupTestGenerationHandlers } from "./test-generation-handlers";
@@ -249,6 +255,7 @@ export {
 	registerVisualProgrammingHandlers,
 	setupVisualProgrammingEventForwarding,
 } from "./visual-programming-handlers";
+export { registerVisualToCodeHistoryHandlers } from "./visual-to-code-history-handlers";
 export { registerVoiceControlHandlers } from "./voice-control-handlers";
 
 /**
@@ -259,6 +266,19 @@ export { registerVoiceControlHandlers } from "./voice-control-handlers";
  * @param getMainWindow - Function to get the main BrowserWindow
  * @param pythonEnvManager - The Python environment manager instance
  */
+/**
+ * Where the Python backend lives: the path the user configured, and otherwise
+ * the same packaged/dev resolution every runner-spawning handler performs.
+ */
+function getBackendSourcePath(): string {
+	return (
+		getAutoBuildSourcePath() ??
+		(app.isPackaged
+			? path.resolve(process.resourcesPath, "backend")
+			: path.resolve(app.getAppPath(), "..", "backend"))
+	);
+}
+
 export function setupIpcHandlers(
 	agentManager: AgentManager,
 	terminalManager: TerminalManager,
@@ -288,9 +308,13 @@ export function setupIpcHandlers(
 
 	// Settings and dialog handlers
 	registerSettingsHandlers(agentManager, getMainWindow);
+	registerJevHandlers();
+	registerSecureStorageHandlers();
 
 	// Multi-user server mode: connection + login (local / Entra ID)
 	registerServerAuthHandlers(getMainWindow);
+	// Multi-tenant administration console (orgs, roles, members, quotas, audit)
+	registerServerAdminHandlers();
 
 	// File explorer handlers
 	registerFileHandlers();
@@ -315,6 +339,7 @@ export function setupIpcHandlers(
 
 	// Jira integration handlers
 	registerJiraHandlers(agentManager, getMainWindow);
+	registerFigmaHandlers();
 
 	// GitHub integration handlers
 	registerGithubHandlers(agentManager, getMainWindow);
@@ -331,8 +356,8 @@ export function setupIpcHandlers(
 	// Insights handlers
 	registerInsightsHandlers(getMainWindow);
 
-	// Memory & infrastructure handlers (for Graphiti/LadybugDB)
-	registerMemoryHandlers();
+	// Ollama handlers (detection, installation, model downloads)
+	registerOllamaHandlers();
 
 	// App auto-update handlers
 	registerAppUpdateHandlers();
@@ -364,8 +389,14 @@ export function setupIpcHandlers(
 	// Prompt Optimizer handlers
 	registerPromptOptimizerHandlers(getMainWindow);
 
+	// Context-Aware Snippets handlers
+	registerContextAwareSnippetsHandlers(getMainWindow);
+
 	// Credential Manager handlers (centralized auth and usage management)
 	registerCredentialHandlers();
+
+	// Agent CLIs driven as providers (OpenCode, Google Antigravity): installed?
+	registerAgentCliHandlers();
 
 	// GitHub Copilot CLI handlers (CLI-based authentication)
 	registerGitHubCopilotHandlers();
@@ -381,10 +412,17 @@ export function setupIpcHandlers(
 
 	// Voice Control handlers
 	registerVoiceControlHandlers();
+	registerDictationHandlers(
+		() => pythonEnvManager.getPythonPath(),
+		getBackendSourcePath,
+		getMainWindow,
+		() => pythonEnvManager.getPythonEnv(),
+	);
 	setupVoiceControlEvents();
 
 	// App Emulator handlers
 	registerAppEmulatorHandlers(getMainWindow);
+	registerMobileHandlers(getMainWindow);
 
 	// Learning Loop handlers (Autonomous Agent Learning Loop)
 	registerLearningLoopHandlers(getMainWindow);
@@ -403,19 +441,19 @@ export function setupIpcHandlers(
 
 	// Architecture Visualizer handlers
 	registerArchitectureVisualizerHandlers();
-	setupArchitectureVisualizerEventForwarding();
+	setupArchitectureVisualizerEventForwarding(getMainWindow);
 
 	// Code Migration Agent handlers
 	registerCodeMigrationHandlers();
-	setupCodeMigrationEventForwarding();
+	setupCodeMigrationEventForwarding(getMainWindow);
 
 	// Performance Profiler Agent handlers
 	registerPerformanceProfilerHandlers();
-	setupPerformanceProfilerEventForwarding();
+	setupPerformanceProfilerEventForwarding(getMainWindow);
 
 	// Documentation Agent handlers
 	registerDocumentationAgentHandlers();
-	setupDocumentationAgentEventForwarding();
+	setupDocumentationAgentEventForwarding(getMainWindow);
 
 	// Agent Decision Logger handlers (Feature 30)
 	registerDecisionLoggerHandlers();
@@ -427,22 +465,14 @@ export function setupIpcHandlers(
 	registerPipelineGeneratorHandlers();
 	setupPipelineGeneratorEventForwarding(getMainWindow);
 
-	// Team Knowledge Sync handlers (Feature 31)
-	registerTeamSyncHandlers();
-
 	// Plugin Marketplace handlers (Feature 37)
 	registerPluginMarketplaceHandlers();
 
 	// Arena Mode handlers (Feature 9) — Blind A/B model comparison
 	registerArenaHandlers(getMainWindow);
 
-	// Memory Lifecycle Manager handlers (Feature 43)
-	registerMemoryLifecycleHandlers();
-	setupMemoryLifecycleEventForwarding(getMainWindow);
-
 	// CI/CD Deployment Triggers handlers (Feature 44)
 	registerCICDTriggersHandlers();
-	setupCICDTriggersEventForwarding(getMainWindow);
 
 	// Cross-Language Translation Agent handlers (Feature 41)
 	registerCrossLanguageTranslationHandlers();
@@ -462,13 +492,14 @@ export function setupIpcHandlers(
 	// Visual Programming handlers (diagram → code, code → diagram)
 	registerVisualProgrammingHandlers(getMainWindow);
 	setupVisualProgrammingEventForwarding(getMainWindow);
+	registerVisualToCodeHistoryHandlers();
 
 	// Design-to-Code handlers (design image → generated code)
 	registerDesignToCodeHandlers();
 
 	// Code Playground handlers (AI sandbox code generation)
 	registerCodePlaygroundHandlers();
-	setupCodePlaygroundEventForwarding();
+	setupCodePlaygroundEventForwarding(getMainWindow);
 
 	// Context Mesh handlers (Cross-Project Intelligence)
 	registerContextMeshHandlers(getMainWindow);
@@ -562,6 +593,33 @@ export function setupIpcHandlers(
 
 	// Offline Mode handlers (Feature 12 — local model routing + confidentiality)
 	registerOfflineModeHandlers();
+
+	// Auto-Refactor handlers (analysis → plan → optional execution)
+	registerAutoRefactorHandlers();
+	setupAutoRefactorEventForwarding(getMainWindow);
+
+	// Swarm handlers (parallel subtask execution in dependency waves)
+	registerSwarmHandlers(
+		() => pythonEnvManager.getPythonPath(),
+		getBackendSourcePath,
+		getMainWindow,
+	);
+
+	// Continuous AI handlers (CI/CD watcher, dependency sentinel, PR reviewer)
+	registerContinuousAIHandlers(
+		() => pythonEnvManager.getPythonPath(),
+		getMainWindow,
+	);
+
+	// Queue routing handlers (profile swapping on rate limit). The preload
+	// `queue` bridge invokes these five channels; unregistered, every call
+	// rejected with "No handler registered". The profile manager is the lazy
+	// singleton the rest of the app initializes — same instance, later filled.
+	registerQueueRoutingHandlers(
+		agentManager,
+		getMainWindow,
+		getClaudeProfileManager(),
+	);
 
 	console.warn("[IPC] All handler modules registered successfully");
 }

@@ -3,16 +3,18 @@ import { IPC_CHANNELS } from "../../shared/constants";
 import type {
 	AutoBuildVersionInfo,
 	ClaudeAuthResult,
+	ContextSearchResult,
 	GitBranchDetail,
 	GitStatus,
-	GraphitiConnectionTestResult,
-	GraphitiValidationResult,
-	InfrastructureStatus,
+	MemoryStatus,
+	MemoryEpisode,
+	ProjectIndex,
 	InitializationResult,
 	IPCResult,
 	KanbanBoardState,
 	KanbanPreferences,
 	Project,
+	ProjectContextData,
 	ProjectEnvConfig,
 	ProjectSettings,
 	RepoProviderDetectionResult,
@@ -85,17 +87,21 @@ export interface ProjectAPI {
 	) => Promise<IPCResult>;
 
 	// Context Operations
-	getProjectContext: (projectId: string) => Promise<IPCResult<unknown>>;
-	refreshProjectIndex: (projectId: string) => Promise<IPCResult<unknown>>;
-	getMemoryStatus: (projectId: string) => Promise<IPCResult<unknown>>;
+	getProjectContext: (
+		projectId: string,
+	) => Promise<IPCResult<ProjectContextData>>;
+	refreshProjectIndex: (projectId: string) => Promise<IPCResult<ProjectIndex>>;
+	getMemoryStatus: (
+		projectId: string,
+	) => Promise<IPCResult<MemoryStatus>>;
 	searchMemories: (
 		projectId: string,
 		query: string,
-	) => Promise<IPCResult<unknown>>;
+	) => Promise<IPCResult<ContextSearchResult[]>>;
 	getRecentMemories: (
 		projectId: string,
 		limit?: number,
-	) => Promise<IPCResult<unknown>>;
+	) => Promise<IPCResult<MemoryEpisode[]>>;
 
 	// Environment Configuration
 	getProjectEnv: (projectId: string) => Promise<IPCResult<ProjectEnvConfig>>;
@@ -103,13 +109,26 @@ export interface ProjectAPI {
 		projectId: string,
 		config: Partial<ProjectEnvConfig>,
 	) => Promise<IPCResult>;
+	/**
+	 * Send a test message to a notification channel. The main process uses the
+	 * URL stored for the project unless `url` is a new one (not the mask).
+	 */
+	testNotificationWebhook: (
+		projectId: string,
+		channel: string,
+		url?: string,
+	) => Promise<IPCResult<{ delivered: boolean }>>;
 	checkClaudeAuth: (projectId: string) => Promise<IPCResult<ClaudeAuthResult>>;
 	invokeClaudeSetup: (
 		projectId: string,
 	) => Promise<IPCResult<ClaudeAuthResult>>;
 
 	// Dialog Operations
-	selectDirectory: () => Promise<string | null>;
+	/** `defaultPath` is where the dialog opens — under WSL, a Windows drive the Linux home does not list. */
+	selectDirectory: (options?: {
+		title?: string;
+		defaultPath?: string;
+	}) => Promise<string | null>;
 	selectFiles: (options?: {
 		title?: string;
 		defaultPath?: string;
@@ -123,45 +142,26 @@ export interface ProjectAPI {
 	) => Promise<
 		IPCResult<import("../../shared/types").CreateProjectFolderResult>
 	>;
-	getDefaultProjectLocation: () => Promise<string | null>;
-
-	// Memory Infrastructure Operations (LadybugDB - no Docker required)
-	getMemoryInfrastructureStatus: (
-		dbPath?: string,
-	) => Promise<IPCResult<InfrastructureStatus>>;
-	listMemoryDatabases: (dbPath?: string) => Promise<IPCResult<string[]>>;
-	testMemoryConnection: (
-		dbPath?: string,
-		database?: string,
-	) => Promise<IPCResult<GraphitiValidationResult>>;
-
-	// Graphiti Validation Operations
-	validateLLMApiKey: (
-		provider: string,
-		apiKey: string,
-	) => Promise<IPCResult<GraphitiValidationResult>>;
-	testGraphitiConnection: (config: {
-		dbPath?: string;
-		database?: string;
-		llmProvider: string;
-		apiKey: string;
-	}) => Promise<IPCResult<GraphitiConnectionTestResult>>;
-
-	// Ollama Model Management
-	scanOllamaModels: (baseUrl: string) => Promise<
+	/**
+	 * What "Create" would do at this location: the folder it would make, and
+	 * whether the location is itself a project that ought to be opened instead.
+	 */
+	inspectProjectLocation: (
+		location: string,
+		name: string,
+	) => Promise<
 		IPCResult<{
-			models: Array<{
-				name: string;
-				size: number;
-				modified_at: string;
-				digest: string;
-			}>;
+			targetPath: string | null;
+			targetExists: boolean;
+			targetHasEntries: boolean;
+			locationIsProject: boolean;
+			insideRepository: string | null;
+			markers: string[];
 		}>
 	>;
-	downloadOllamaModel: (
-		baseUrl: string,
-		modelName: string,
-	) => Promise<IPCResult<{ message: string }>>;
+	getDefaultProjectLocation: () => Promise<string | null>;
+
+	// Ollama Model Management
 	onDownloadProgress: (
 		callback: (data: {
 			modelName: string;
@@ -169,6 +169,8 @@ export interface ProjectAPI {
 			completed: number;
 			total: number;
 			percentage: number;
+			/** Set on the terminal event when the pull failed. */
+			error?: string;
 		}) => void,
 	) => () => void;
 
@@ -191,6 +193,23 @@ export interface ProjectAPI {
 		projectPath: string,
 		remoteConfig?: { url?: string; name?: string },
 	) => Promise<IPCResult<InitializationResult>>;
+	/**
+	 * Add, repoint or remove the project's git remote. An empty `remoteUrl`
+	 * removes it — the only way back out of a URL typed by mistake.
+	 */
+	setGitRemote: (
+		projectPath: string,
+		remoteName: string,
+		remoteUrl: string,
+		/** The name this remote had before the edit, so a renamed one is renamed
+		 * rather than duplicated. */
+		previousName?: string,
+	) => Promise<IPCResult<RepoProviderDetectionResult>>;
+	/** Switch the checkout to another branch; resolves to the new current one. */
+	checkoutGitBranch: (
+		projectPath: string,
+		branch: string,
+	) => Promise<IPCResult<string | null>>;
 
 	// Ollama Model Detection
 	checkOllamaStatus: (baseUrl?: string) => Promise<
@@ -263,6 +282,20 @@ export interface ProjectAPI {
 			output: string[];
 		}>
 	>;
+	/**
+	 * Abort an in-flight model download. The pending `pullOllamaModel` promise
+	 * resolves with `error: "PULL_CANCELLED"`, which callers treat as "the user
+	 * stopped it", not as a failure worth reporting.
+	 */
+	cancelOllamaPull: (
+		modelName: string,
+	) => Promise<IPCResult<{ cancelled: boolean }>>;
+	/**
+	 * Models currently downloading in the main process. A pull outlives the view
+	 * that started it, so a freshly mounted view asks for this instead of
+	 * showing a model as "to download" while it is already at 60%.
+	 */
+	getActiveOllamaPulls: () => Promise<IPCResult<{ models: string[] }>>;
 	/** Delete a pulled model to free disk space. */
 	deleteOllamaModel: (
 		modelName: string,
@@ -372,6 +405,18 @@ export const createProjectAPI = (): ProjectAPI => ({
 	): Promise<IPCResult> =>
 		ipcRenderer.invoke(IPC_CHANNELS.ENV_UPDATE, projectId, config),
 
+	testNotificationWebhook: (
+		projectId: string,
+		channel: string,
+		url?: string,
+	): Promise<IPCResult<{ delivered: boolean }>> =>
+		ipcRenderer.invoke(
+			IPC_CHANNELS.ENV_TEST_NOTIFICATION_WEBHOOK,
+			projectId,
+			channel,
+			url,
+		),
+
 	checkClaudeAuth: (projectId: string): Promise<IPCResult<ClaudeAuthResult>> =>
 		ipcRenderer.invoke(IPC_CHANNELS.ENV_CHECK_CLAUDE_AUTH, projectId),
 
@@ -381,8 +426,13 @@ export const createProjectAPI = (): ProjectAPI => ({
 		ipcRenderer.invoke(IPC_CHANNELS.ENV_INVOKE_CLAUDE_SETUP, projectId),
 
 	// Dialog Operations
-	selectDirectory: (): Promise<string | null> =>
-		ipcRenderer.invoke(IPC_CHANNELS.DIALOG_SELECT_DIRECTORY),
+	selectDirectory: (options?: {
+		title?: string;
+		defaultPath?: string;
+	}): Promise<string | null> =>
+		options
+			? ipcRenderer.invoke(IPC_CHANNELS.DIALOG_SELECT_DIRECTORY, options)
+			: ipcRenderer.invoke(IPC_CHANNELS.DIALOG_SELECT_DIRECTORY),
 
 	selectFiles: (options?: {
 		title?: string;
@@ -406,59 +456,33 @@ export const createProjectAPI = (): ProjectAPI => ({
 			initGit,
 		),
 
+	/**
+	 * What "Create" would do at this location: the folder it would make, and
+	 * whether the location is itself a project that ought to be opened instead.
+	 */
+	inspectProjectLocation: (
+		location: string,
+		name: string,
+	): Promise<
+		IPCResult<{
+			targetPath: string | null;
+			targetExists: boolean;
+			targetHasEntries: boolean;
+			locationIsProject: boolean;
+			insideRepository: string | null;
+			markers: string[];
+		}>
+	> =>
+		ipcRenderer.invoke(
+			IPC_CHANNELS.DIALOG_INSPECT_PROJECT_LOCATION,
+			location,
+			name,
+		),
+
 	getDefaultProjectLocation: (): Promise<string | null> =>
 		ipcRenderer.invoke(IPC_CHANNELS.DIALOG_GET_DEFAULT_PROJECT_LOCATION),
 
-	// Memory Infrastructure Operations (LadybugDB - no Docker required)
-	getMemoryInfrastructureStatus: (
-		dbPath?: string,
-	): Promise<IPCResult<InfrastructureStatus>> =>
-		ipcRenderer.invoke(IPC_CHANNELS.MEMORY_STATUS, dbPath),
-
-	listMemoryDatabases: (dbPath?: string): Promise<IPCResult<string[]>> =>
-		ipcRenderer.invoke(IPC_CHANNELS.MEMORY_LIST_DATABASES, dbPath),
-
-	testMemoryConnection: (
-		dbPath?: string,
-		database?: string,
-	): Promise<IPCResult<GraphitiValidationResult>> =>
-		ipcRenderer.invoke(IPC_CHANNELS.MEMORY_TEST_CONNECTION, dbPath, database),
-
-	// Graphiti Validation Operations
-	validateLLMApiKey: (
-		provider: string,
-		apiKey: string,
-	): Promise<IPCResult<GraphitiValidationResult>> =>
-		ipcRenderer.invoke(IPC_CHANNELS.GRAPHITI_VALIDATE_LLM, provider, apiKey),
-
-	testGraphitiConnection: (config: {
-		dbPath?: string;
-		database?: string;
-		llmProvider: string;
-		apiKey: string;
-	}): Promise<IPCResult<GraphitiConnectionTestResult>> =>
-		ipcRenderer.invoke(IPC_CHANNELS.GRAPHITI_TEST_CONNECTION, config),
-
 	// Ollama Model Management
-	scanOllamaModels: (
-		baseUrl: string,
-	): Promise<
-		IPCResult<{
-			models: Array<{
-				name: string;
-				size: number;
-				modified_at: string;
-				digest: string;
-			}>;
-		}>
-	> => ipcRenderer.invoke("scan-ollama-models", baseUrl),
-
-	downloadOllamaModel: (
-		baseUrl: string,
-		modelName: string,
-	): Promise<IPCResult<{ message: string }>> =>
-		ipcRenderer.invoke("download-ollama-model", baseUrl, modelName),
-
 	onDownloadProgress: (
 		callback: (data: {
 			modelName: string;
@@ -466,6 +490,7 @@ export const createProjectAPI = (): ProjectAPI => ({
 			completed: number;
 			total: number;
 			percentage: number;
+			error?: string;
 		}) => void,
 	) => {
 		type ProgressPayload = Parameters<typeof callback>[0];
@@ -506,6 +531,26 @@ export const createProjectAPI = (): ProjectAPI => ({
 	): Promise<IPCResult<InitializationResult>> =>
 		ipcRenderer.invoke(IPC_CHANNELS.GIT_INITIALIZE, projectPath, remoteConfig),
 
+	setGitRemote: (
+		projectPath: string,
+		remoteName: string,
+		remoteUrl: string,
+		previousName?: string,
+	): Promise<IPCResult<RepoProviderDetectionResult>> =>
+		ipcRenderer.invoke(
+			IPC_CHANNELS.GIT_SET_REMOTE,
+			projectPath,
+			remoteName,
+			remoteUrl,
+			previousName,
+		),
+
+	checkoutGitBranch: (
+		projectPath: string,
+		branch: string,
+	): Promise<IPCResult<string | null>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.GIT_CHECKOUT_BRANCH, projectPath, branch),
+
 	// Ollama Model Detection
 	checkOllamaStatus: (baseUrl?: string) =>
 		ipcRenderer.invoke(IPC_CHANNELS.OLLAMA_CHECK_STATUS, baseUrl),
@@ -542,6 +587,12 @@ export const createProjectAPI = (): ProjectAPI => ({
 
 	pullOllamaModel: (modelName: string, baseUrl?: string) =>
 		ipcRenderer.invoke(IPC_CHANNELS.OLLAMA_PULL_MODEL, modelName, baseUrl),
+
+	cancelOllamaPull: (modelName: string) =>
+		ipcRenderer.invoke(IPC_CHANNELS.OLLAMA_CANCEL_PULL, modelName),
+
+	getActiveOllamaPulls: () =>
+		ipcRenderer.invoke(IPC_CHANNELS.OLLAMA_ACTIVE_PULLS),
 
 	deleteOllamaModel: (modelName: string, baseUrl?: string) =>
 		ipcRenderer.invoke(IPC_CHANNELS.OLLAMA_DELETE_MODEL, modelName, baseUrl),

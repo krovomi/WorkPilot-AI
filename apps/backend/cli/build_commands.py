@@ -16,7 +16,17 @@ if str(_PARENT_DIR) not in sys.path:
 
 # Import only what we need at module level
 # Heavy imports are lazy-loaded in functions to avoid import errors
-from progress import print_paused_banner
+from core.build_signals import BuildHalted, BuildPaused
+from core.progress import print_paused_banner
+from core.workspace import (
+    WorkspaceMode,
+    check_existing_build,
+    choose_workspace,
+    finalize_workspace,
+    get_existing_build_worktree,
+    handle_workspace_choice,
+    setup_workspace,
+)
 from review import ReviewState
 from ui import (
     BuildState,
@@ -33,20 +43,63 @@ from ui import (
     success,
     warning,
 )
-from workspace import (
-    WorkspaceMode,
-    check_existing_build,
-    choose_workspace,
-    finalize_workspace,
-    get_existing_build_worktree,
-    handle_workspace_choice,
-    setup_workspace,
-)
 
 from .input_handlers import (
     read_from_file,
     read_multiline_input,
 )
+
+
+def _emit_startup_failure(spec_dir: Path, problems: list[str]) -> None:
+    """Name a prerequisite the build could not satisfy.
+
+    Emitted as PLANNING_FAILED: a build stopped at its own front door never
+    reached a phase, and planning is the first one the user is watching for.
+    Best-effort, like every other emitter here — a build that cannot start is
+    not made worse by an unwritable event stream.
+    """
+    if not problems:
+        return
+    message = "Le build n'a pas pu démarrer :\n" + "\n".join(
+        f"- {problem}" for problem in problems
+    )
+    try:
+        from core.task_event import TaskEventEmitter
+
+        TaskEventEmitter.from_spec_dir(spec_dir).emit(
+            "PLANNING_FAILED",
+            {"error": message, "recoverable": True},
+        )
+    except Exception:
+        # Même raison que ci-dessous : le build est déjà perdu, un flux
+        # d'événements illisible n'est pas une seconde panne à remonter.
+        pass
+
+
+def _emit_fatal_error(spec_dir: Path, error: BaseException) -> None:
+    """Name an unhandled crash on the card instead of only in the traceback.
+
+    Without this the process exits non-zero, the frontend synthesises
+    PROCESS_EXITED, and the task lands in review labelled "Has Errors" with the
+    one useful sentence — the exception — left in a terminal the user never
+    opened. Best-effort by construction: this runs on a build that has already
+    crashed.
+    """
+    try:
+        from core.task_event import TaskEventEmitter
+
+        TaskEventEmitter.from_spec_dir(spec_dir).emit(
+            "CODING_FAILED",
+            {
+                "subtaskId": "",
+                "attemptCount": 0,
+                "error": f"{type(error).__name__}: {error}",
+            },
+        )
+    except Exception:
+        # Le build a déjà planté : un flux d'événements inutilisable n'est pas
+        # un second échec à signaler, et lever ici masquerait le premier.
+        pass
 
 
 def _changed_files(worktree_manager, spec_name: str) -> list[str] | None:
@@ -61,7 +114,7 @@ def _changed_files(worktree_manager, spec_name: str) -> list[str] | None:
     try:
         return [path for _status, path in worktree_manager.get_changed_files(spec_name)]
     except Exception as exc:  # noqa: BLE001 - advisory input, never fatal
-        from debug import debug_warning
+        from core.debug import debug_warning
 
         debug_warning("run.py", f"Could not list changed files: {exc}")
         return None
@@ -72,6 +125,7 @@ def _resolve_workflow_profile(
     changed_files: list[str] | None = None,
     *,
     announce: bool = True,
+    project_dir: Path | None = None,
 ):
     """Resolve the declarative workflow for this build, or None when disabled.
 
@@ -86,7 +140,7 @@ def _resolve_workflow_profile(
 
     On by default; set WORKPILOT_WORKFLOW_ENGINE=0 to run the pre-engine
     pipeline. The flag flipped once the engine executed the phases it declares
-    rather than only pruning them: while eight of eleven phases were played by
+    rather than only pruning them: while most of its phases were played by
     a hard-coded sequence the engine did not drive, switching it on bought the
     printed profile and little else, and the honest default for that is off.
     Now the declared workflow is the pipeline, so the honest default is on.
@@ -102,13 +156,36 @@ def _resolve_workflow_profile(
     try:
         from core.client import peek_active_provider
         from phase_config import get_phase_thinking
+        from workflows.registry import load_workflow_for_spec
 
-        from workflows import load_workflow, resolve_profile
+        from workflows import resolve_profile
 
         repo_root = Path(__file__).resolve().parents[3]
-        workflow_path = repo_root / "workflows" / "feature-build" / "workflow.yaml"
-        workflow = load_workflow(workflow_path)
+        # The workflow is the card's kind's (`workflows/registry.py`): a bug
+        # reproduces before it fixes, an investigation writes a report and no
+        # code, a RUN plays a procedure. A card with no recorded kind gets
+        # `feature-build`, the pipeline every card used to get.
+        workflow = load_workflow_for_spec(spec_dir, repo_root)
         effort = get_phase_thinking(spec_dir, "coding")
+
+        # What is installed, so a phase whose `impl` is missing and whose
+        # `fallback` is not runs the fallback — recorded in the profile, not
+        # discovered mid-build. Advisory: without it nothing is substituted
+        # here and the runner decides at run time.
+        inventory = None
+        try:
+            from skills_registry.packs import load_packs
+
+            from workflows import pack_inventory
+
+            inventory = pack_inventory(load_packs(repo_root / "skills"))
+        except Exception as exc:  # noqa: BLE001 - advisory only
+            if announce:
+                print(f"  (could not read the installed packs: {exc})")
+
+        from workflows.engine import ProjectCheck
+        from workflows.task_facts import task_facts
+
         profile = resolve_profile(
             workflow,
             effort,
@@ -120,33 +197,96 @@ def _resolve_workflow_profile(
             # anything.
             provider=peek_active_provider(spec_dir),
             changed_files=changed_files,
+            inventory=inventory,
+            # "Installed" for a skill with a runtime requirement (BMAD's
+            # `_bmad/`) is a question about the project being built, so the
+            # profile answers it there and substitutes the fallback up front.
+            project=(ProjectCheck(repo_root, project_dir) if project_dir else None),
+            task=task_facts(spec_dir),
         )
         if not announce:
             return profile
         print("\n" + profile.describe())
 
         # Naming an uninstalled implementation up front beats discovering it
-        # halfway through a build.
-        try:
-            from skills_registry.packs import load_packs
+        # halfway through a build. A phase played by its fallback is not
+        # missing — the profile above already says what it runs.
+        if inventory is not None:
+            try:
+                from workflows import validate_impls
 
-            from workflows import validate_impls
-
-            available = {
-                p.name: {s.name for s in p.skills()}
-                for p in load_packs(repo_root / "skills")
-            }
-            for miss in validate_impls(workflow, available):
-                if profile.will_run(miss.phase_id):
-                    print(f"  ⚠ {miss.phase_id}: {miss.reason}")
-        except Exception as exc:  # noqa: BLE001 - advisory only
-            print(f"  (could not check phase implementations: {exc})")
+                available, gated = inventory
+                for miss in validate_impls(workflow, available, gated=gated):
+                    if profile.will_run(miss.phase_id):
+                        print(f"  ⚠ {miss.phase_id}: {miss.reason}")
+            except Exception as exc:  # noqa: BLE001 - advisory only
+                print(f"  (could not check phase implementations: {exc})")
 
         return profile
     except Exception as exc:  # noqa: BLE001 - never block a build
         if announce:
             print(f"⚠ Workflow engine disabled for this run: {exc}")
         return None
+
+
+def _workflow_writes_code(profile) -> bool:
+    """Whether the coder loop has anything to do under this workflow.
+
+    `run_autonomous_agent` owns `planning` and `coding`; a workflow that
+    declares neither has no plan to write and no subtask to implement, so
+    starting the loop would plan a feature nobody asked for. No profile (the
+    engine is off) means the pipeline it always ran: the loop runs.
+    """
+    if profile is None:
+        return True
+    declared = set(getattr(profile, "declared", ()) or ())
+    return bool(declared & {"planning", "coding"})
+
+
+def _conclude_without_coder(profile, run, spec_dir: Path, source_spec_dir) -> None:
+    """Settle the card after a build in which no coder ran.
+
+    The spec pipeline moved the card to *planning*; nothing else would move it
+    on. When every phase produced its output the card goes to human review,
+    which is where a report or a procedure is read. When one could not, the
+    card carries the reason rather than a bare error badge. Never raises.
+    """
+    outcomes = list(getattr(run, "outcomes", None) or [])
+    failed = [o for o in outcomes if getattr(o, "succeeded", True) is not True]
+    try:
+        from core.agent import sync_spec_to_source
+
+        sync_spec_to_source(spec_dir, source_spec_dir)
+    except Exception as exc:  # noqa: BLE001 - a sync never fails a build
+        from core.debug import debug_warning
+
+        debug_warning("run.py", f"Spec sync skipped: {exc}")
+    try:
+        from core.task_event import TaskEventEmitter
+
+        emitter = TaskEventEmitter.from_spec_dir(spec_dir)
+        name = getattr(profile, "workflow", "workflow")
+        if failed:
+            detail = "; ".join(
+                f"{o.phase_id}: {o.detail}" for o in failed if getattr(o, "detail", "")
+            )
+            emitter.emit(
+                "PLANNING_FAILED",
+                {
+                    "error": f"workflow {name!r}: {detail or 'a phase did not run'}",
+                    "recoverable": True,
+                },
+            )
+        else:
+            emitter.emit("QA_PASSED", {"iteration": 0, "testsRun": {}})
+    except Exception as exc:  # noqa: BLE001 - best-effort
+        from core.debug import debug_warning
+
+        debug_warning("run.py", f"Could not settle the card: {exc}")
+    print(
+        f"\nWorkflow '{getattr(profile, 'workflow', '?')}' writes no code: "
+        + ("the phases above are the build." if not failed else "a phase did not run.")
+    )
 
 
 def _run_deterministic_gates(profile, working_dir: Path, spec_dir: Path):
@@ -170,10 +310,64 @@ def _run_deterministic_gates(profile, working_dir: Path, spec_dir: Path):
             print("\n" + summary)
         return run
     except Exception as exc:  # noqa: BLE001 - gates never fail a build
-        from debug import debug_warning
+        from core.debug import debug_warning
 
         debug_warning("run.py", f"Deterministic gates skipped: {exc}")
         return None
+
+
+def _run_docs_preflight(
+    working_dir: Path, spec_dir: Path, source_project_dir: Path
+) -> None:
+    """Download the documentation of libraries this task has no example of.
+
+    Runs before planning, so the plan is written against the API that exists
+    rather than the one the model remembers, and so the coder finds the page
+    already staged next to the spec. The cache lives in the *source* project:
+    a worktree is thrown away on merge and the download should not go with it.
+
+    Never raises. No network, no API key, quota spent — the build proceeds, and
+    the Context7 MCP tools the agents already hold cover the rest in-session.
+    """
+    try:
+        from libdocs import run_preflight
+    except Exception as exc:  # noqa: BLE001 - the package is optional at runtime
+        from core.debug import debug_warning
+
+        debug_warning("run.py", f"Documentation preflight unavailable: {exc}")
+        return
+
+    try:
+        result = run_preflight(working_dir, spec_dir, cache_dir=source_project_dir)
+    except Exception as exc:  # noqa: BLE001 - documentation never fails a build
+        from core.debug import debug_warning
+
+        debug_warning("run.py", f"Documentation preflight skipped: {exc}")
+        return
+
+    if summary := result.describe():
+        print("\n" + summary)
+
+
+def _run_attachments_preflight(spec_dir: Path, source_project_dir: Path) -> None:
+    """Read the task's attachments into `<spec_dir>/docintel/` before planning.
+
+    The settings come from the *source* project's `.workpilot/.env`, which is
+    what the settings screen writes; a worktree does not carry it.
+
+    Never raises, like the documentation preflight: an attachment nobody could
+    read is a line in the record, not a failed build.
+    """
+    try:
+        from docintel import run_preflight
+
+        result = run_preflight(spec_dir, source_project_dir)
+        if summary := result.describe():
+            print("\n" + summary)
+    except Exception as exc:  # noqa: BLE001 - attachments never fail a build
+        from core.debug import debug_warning
+
+        debug_warning("run.py", f"Attachments preflight skipped: {exc}")
 
 
 def _phase_context(
@@ -183,8 +377,18 @@ def _phase_context(
     model: str,
     verbose: bool,
     changed_files: list[str] | None,
+    *,
+    source_project_dir: Path | None = None,
+    source_spec_dir: Path | None = None,
 ):
-    """Assemble what a skill phase needs, or None when the engine is off."""
+    """Assemble what a skill phase needs, or None when the engine is off.
+
+    ``project_dir`` / ``spec_dir`` are where the phase works — the worktree in
+    an isolated build. ``source_project_dir`` / ``source_spec_dir`` are the
+    main project and the spec directory the Kanban reads: `architecture-map`
+    finds the baseline under the first (`.workpilot/` is gitignored, so no
+    worktree has one) and records its answer in the second.
+    """
     if profile is None:
         return None
     try:
@@ -198,9 +402,11 @@ def _phase_context(
             effort=profile.effort,
             verbose=verbose,
             changed_files=changed_files,
+            source_project_dir=source_project_dir,
+            source_spec_dir=source_spec_dir,
         )
     except Exception as exc:  # noqa: BLE001 - never block a build
-        from debug import debug_warning
+        from core.debug import debug_warning
 
         debug_warning("run.py", f"Workflow phase context unavailable: {exc}")
         return None
@@ -209,9 +415,9 @@ def _phase_context(
 def _run_workflow_phases(profile, ctx, *, after: str | None, before: str | None):
     """Execute the skill-backed phases in one window of the declared order.
 
-    This is what "the workflow is the pipeline" finally means: `brainstorm`,
-    `spec`, `review`, `adversarial-review`, `spec-conformance` and `verify`
-    were declared in `workflow.yaml` from the start and executed by nothing.
+    This is what "the workflow is the pipeline" finally means: the
+    skill-backed phases were declared in `workflow.yaml` from the start and
+    executed by nothing.
     The window is expressed by phase id, so inserting a phase into the YAML
     between two existing ones is picked up here with no change to this file.
 
@@ -227,11 +433,108 @@ def _run_workflow_phases(profile, ctx, *, after: str | None, before: str | None)
         if summary := run.describe():
             print("\n" + summary)
         return run
+    except (BuildPaused, BuildHalted):
+        raise
     except Exception as exc:  # noqa: BLE001 - phases report, they do not fail builds
-        from debug import debug_warning
+        from core.debug import debug_warning
 
         debug_warning("run.py", f"Workflow phases skipped: {exc}")
         return None
+
+
+def _sync_spec_back(spec_dir: Path, source_spec_dir: Path | None, moment: str) -> None:
+    """Copy the worktree's spec directory back to the main one. Never raises.
+
+    The phases after `qa` write into the worktree's copy of the spec —
+    `workflow/*.md`, `verify/`, `architecture/` — and the only sync used to
+    run *before* them, at the end of QA. What they wrote stayed in a directory
+    the Kanban does not read and the merge deletes. `sync_spec_to_source`
+    copies subdirectories too, and does nothing in a direct build, where the
+    two directories are one.
+    """
+    if source_spec_dir is None:
+        return
+    try:
+        from agents.utils import sync_spec_to_source
+        from core.debug import debug_info
+
+        if sync_spec_to_source(spec_dir, source_spec_dir):
+            debug_info("run.py", f"Spec directory synced to main project {moment}")
+    except Exception as exc:  # noqa: BLE001 - a copy never fails a build
+        from core.debug import debug_warning
+
+        debug_warning("run.py", f"Spec sync {moment} skipped: {exc}")
+
+
+def _project_dir(spec_dir: Path) -> Path:
+    """The project root, from a spec directory.
+
+    `spec_dir` is `<project>/.workpilot/specs/<spec-id>`, so the root is three
+    levels up. Worth a named helper: the call below used to climb only two,
+    and `PatternStorage` appends `.workpilot` itself — so the observe phase
+    read `<project>/.workpilot/.workpilot/learning_loop/patterns.json`, found
+    nothing every time, and recorded no outcome for any build.
+    """
+    return spec_dir.parent.parent.parent
+
+
+def _primary_language(spec_dir: Path) -> str:
+    """The project's dominant language, or "" when it cannot be determined.
+
+    Reuses the stack detection the subagent registry already performs, rather
+    than adding another detector. Empty on any failure: an unkeyed ledger is a
+    coarser lesson, a raised exception is a failed build.
+    """
+    try:
+        from agents.subagents import detect_languages
+
+        languages = detect_languages(_project_dir(spec_dir))
+        return languages[0] if languages else ""
+    except Exception:  # noqa: BLE001 - observation must not break a build
+        return ""
+
+
+def _record_build_in_brain(
+    spec_dir: Path,
+    *,
+    qa_approved: bool | None,
+    tests_passed: bool | None,
+    changed_files: list[str] | None,
+) -> None:
+    """File the finished build in the shared brain (`brain/learn.py`).
+
+    A no-op without a brain on this machine, and never raises: the build is
+    done, and losing the note is cheaper than losing the run.
+    """
+    try:
+        from brain.learn import record_build
+
+        rel = record_build(
+            spec_dir,
+            _project_dir(spec_dir),
+            qa_approved=qa_approved,
+            tests_passed=tests_passed,
+            changed_files=changed_files,
+            language=_primary_language(spec_dir),
+        )
+        if rel:
+            print(f"  brain: build recorded in {rel}")
+    except Exception as exc:  # noqa: BLE001 - learning never fails a build
+        from core.debug import debug_warning
+
+        debug_warning("run.py", f"Brain record skipped: {exc}")
+
+
+def _app_verified(spec_dir: Path) -> bool | None:
+    """The verification record's verdict, as the learning loop reads it."""
+    try:
+        from verify.record import load_record
+
+        record = load_record(spec_dir / "verify")
+    except Exception:  # noqa: BLE001 - absent evidence is None, never False
+        return None
+    status = (record or {}).get("status")
+    return True if status == "pass" else False if status == "fail" else None
 
 
 def _run_observe_phase(
@@ -242,6 +545,7 @@ def _run_observe_phase(
     ran_qa: bool,
     detector_clean: bool | None = None,
     tests_passed: bool | None = None,
+    changed_files: list[str] | None = None,
 ) -> None:
     """Turn what this build externally verified into learning-loop candidates.
 
@@ -271,19 +575,73 @@ def _run_observe_phase(
             # gate that did not execute as clean would manufacture exactly the
             # corroboration the promotion rules refuse to invent.
             detector_clean=detector_clean,
+            # The verification loop's measured verdict — None when it did not
+            # run, could not launch anything, or the environment blocked it.
+            app_verified=_app_verified(spec_dir),
             workflow=profile.workflow,
+            # Left empty until now, which quietly defeated the point of
+            # keying ledgers by language: every project's lessons landed in
+            # the same bucket, so a Rust build corroborated a pattern mined
+            # from a TypeScript one.
+            language=_primary_language(spec_dir),
         )
-        patterns = PatternStorage(spec_dir.parent.parent).load_patterns()
+        patterns = PatternStorage(_project_dir(spec_dir)).load_patterns()
         report = run_observe(repo_root, outcome, patterns)
         if summary := report.describe():
             print("\n" + summary)
+
+        # The deterministic half of the loop: what the code this build touched
+        # says about the project's own conventions. Costs no API call, so it
+        # runs at every effort level, and it is graded by the same external
+        # signals as everything else above.
+        _run_convention_pass(spec_dir, outcome, changed_files)
     except Exception as exc:  # noqa: BLE001 - observation never fails a build
-        from debug import debug_warning
+        from core.debug import debug_warning
 
         debug_warning("run.py", f"Observe phase skipped: {exc}")
 
 
-def _report_hard_gates(profile, spec_dir: Path, tests_passed: bool | None) -> None:
+def _run_convention_pass(
+    spec_dir: Path, outcome, changed_files: list[str] | None
+) -> None:
+    """Learn the project's naming and layout rules from what the build wrote.
+
+    Ported from `core/learning_loop.py`, which had this and could not run it.
+    The difference that matters is the promotion rule: that version proposed a
+    convention on a confidence score it computed about itself, this one waits
+    for the same external corroboration the skill proposer requires.
+    """
+    try:
+        from learning_loop.conventions import run_convention_pass
+        from learning_loop.observe import signals_from_outcome
+
+        if not changed_files:
+            # None means the change set could not be determined, [] means the
+            # build touched nothing. Neither is evidence about conventions.
+            return
+
+        recorded, proposals = run_convention_pass(
+            _project_dir(spec_dir),
+            changed_files,
+            signals_from_outcome(outcome),
+            outcome.spec_id,
+        )
+        if recorded:
+            print(f"  conventions: {recorded} observation(s) recorded")
+        for path in proposals:
+            print(f"  proposed  conventions/_proposed/{path.name}")
+    except Exception as exc:  # noqa: BLE001 - observation never fails a build
+        from core.debug import debug_warning
+
+        debug_warning("run.py", f"Convention pass skipped: {exc}")
+
+
+def _report_hard_gates(
+    profile,
+    spec_dir: Path,
+    tests_passed: bool | None,
+    changed_files: list[str] | None = None,
+) -> None:
     """Say whether the workflow's non-negotiable gates actually held.
 
     Reports; does not abort. The build has already produced a worktree and a
@@ -296,13 +654,15 @@ def _report_hard_gates(profile, spec_dir: Path, tests_passed: bool | None) -> No
     try:
         from workflows import evaluate_hard_gates
 
-        report = evaluate_hard_gates(profile, spec_dir, tests_passed=tests_passed)
+        report = evaluate_hard_gates(
+            profile, spec_dir, tests_passed=tests_passed, changed_files=changed_files
+        )
         if summary := report.describe():
             print("\n" + summary)
         if report.blocking:
             print("  → the branch is not ready to merge on this evidence.")
     except Exception as exc:  # noqa: BLE001 - a gate reports, never fails a build
-        from debug import debug_warning
+        from core.debug import debug_warning
 
         debug_warning("run.py", f"Hard gate check skipped: {exc}")
 
@@ -361,6 +721,7 @@ def handle_build_command(
     base_branch: str | None = None,
     enable_streaming: bool = False,
     streaming_session_id: str | None = None,
+    jev_run=None,
 ) -> None:
     """
     Handle the main build command.
@@ -381,8 +742,14 @@ def handle_build_command(
         streaming_session_id: Streaming session ID for live coding
     """
     # Lazy imports to avoid loading heavy modules
-    from agent import run_autonomous_agent, sync_spec_to_source
-    from debug import (
+    from integrations.jev.models import JevContext
+    from integrations.jev.runtime import JevRun
+
+    jev_run = jev_run or JevRun.from_env(
+        JevContext("feature-build", project_dir, spec_dir)
+    )
+    from core.agent import run_autonomous_agent, sync_spec_to_source
+    from core.debug import (
         debug,
         debug_info,
         debug_section,
@@ -394,7 +761,7 @@ def handle_build_command(
         get_base_branch_from_metadata,
         get_use_local_branch_from_metadata,
     )
-    from qa_loop import is_qa_approved, run_qa_validation_loop, should_run_qa
+    from qa import is_qa_approved, run_qa_validation_loop, should_run_qa
 
     from .utils import print_banner, validate_environment
 
@@ -409,7 +776,7 @@ def handle_build_command(
     # sequence below stays the execution path. Opt-in until the golden profiles
     # have run against real builds — this function is the entry point of every
     # build in the product.
-    _profile = _resolve_workflow_profile(spec_dir)
+    _profile = _resolve_workflow_profile(spec_dir, project_dir=project_dir)
 
     print_banner()
     print(f"\nProject directory: {project_dir}")
@@ -431,8 +798,14 @@ def handle_build_command(
 
     print()
 
-    # Validate environment
-    if not validate_environment(spec_dir):
+    # Validate environment. A build that cannot start is a build that failed,
+    # and it has to say why: `sys.exit(1)` raises SystemExit, which the
+    # `except Exception` further down never sees, so nothing emitted an event
+    # and the card showed "exited unexpectedly with code 1" over a cause that
+    # was known in full one line earlier.
+    startup_problems: list[str] = []
+    if not validate_environment(spec_dir, problems=startup_problems):
+        _emit_startup_failure(spec_dir, startup_problems)
         sys.exit(1)
 
     # Check human review approval
@@ -535,6 +908,20 @@ def handle_build_command(
         if localized_spec_dir:
             spec_dir = localized_spec_dir
 
+    from dataclasses import replace
+
+    from integrations.jev.adapters import capture_base
+
+    jev_run.context = replace(
+        jev_run.context,
+        workflow=getattr(_profile, "workflow", "feature-build"),
+        project_dir=working_dir,
+        spec_dir=spec_dir,
+    )
+    capture_base(
+        jev_run,
+        base_branch or (worktree_manager.base_branch if worktree_manager else "HEAD"),
+    )
     # Run the autonomous agent
     debug_section("run.py", "Starting Build Execution")
     debug(
@@ -549,32 +936,60 @@ def handle_build_command(
     try:
         debug("run.py", "Starting agent execution")
 
+        # The `docs` phase. Everything below reasons about library APIs, so
+        # the reference they reason about is fetched first.
+        _run_docs_preflight(working_dir, spec_dir, project_dir)
+
+        # What the person attached to the task — screenshots, mockups, draw.io
+        # and Excalidraw diagrams — read once, before the plan is written.
+        _run_attachments_preflight(spec_dir, project_dir)
+
         # Phases the workflow declares before `planning`. At low and medium
         # effort the profile has already dropped them, so this is a no-op there
         # — which is the point: what the effort level buys is now the phases
         # that actually run, not a line in a printed plan.
         _pre_ctx = _phase_context(
-            _profile, working_dir, spec_dir, model, verbose, changed_files=None
+            _profile,
+            working_dir,
+            spec_dir,
+            model,
+            verbose,
+            changed_files=None,
+            source_project_dir=project_dir,
+            source_spec_dir=source_spec_dir,
         )
-        _run_workflow_phases(_profile, _pre_ctx, after=None, before="planning")
+        if _pre_ctx is not None:
+            _pre_ctx.jev_run = jev_run
+        _pre_run = _run_workflow_phases(
+            _profile, _pre_ctx, after=None, before="planning"
+        )
 
-        asyncio.run(
-            run_autonomous_agent(
-                project_dir=working_dir,  # Use worktree if isolated
-                spec_dir=spec_dir,
-                model=model,
-                max_iterations=max_iterations,
-                verbose=verbose,
-                source_spec_dir=source_spec_dir,  # For syncing progress back to main project
-                streaming_session_id=streaming_session_id,
-                # B.6: the two phases this call owns — `planning` and `coding` —
-                # stop being an opaque internal sequence. The profile decides
-                # whether planning is bought at this effort and whether coding
-                # may dispatch to subagents.
-                profile=_profile,
+        # A workflow that declares neither `planning` nor `coding` — an
+        # investigation, a RUN — asks for no code: the coder loop is not
+        # started, and the skill phases above *are* the build. Everything
+        # below still runs on what they wrote (gates, hard gates, observe),
+        # and the card is moved on by `_conclude_without_coder`.
+        if _workflow_writes_code(_profile):
+            asyncio.run(
+                run_autonomous_agent(
+                    project_dir=working_dir,  # Use worktree if isolated
+                    spec_dir=spec_dir,
+                    model=model,
+                    max_iterations=max_iterations,
+                    verbose=verbose,
+                    source_spec_dir=source_spec_dir,  # For syncing progress back to main project
+                    streaming_session_id=streaming_session_id,
+                    # B.6: the two phases this call owns — `planning` and `coding` —
+                    # stop being an opaque internal sequence. The profile decides
+                    # whether planning is bought at this effort and whether coding
+                    # may dispatch to subagents.
+                    profile=_profile,
+                    jev_run=jev_run,
+                )
             )
-        )
-        debug_success("run.py", "Agent execution completed")
+            debug_success("run.py", "Agent execution completed")
+        else:
+            _conclude_without_coder(_profile, _pre_run, spec_dir, source_spec_dir)
 
         # Encoding-safety pass: editing UTF-8 files (notably .resx with a BOM)
         # can mangle accented characters into the Unicode replacement char "�".
@@ -609,12 +1024,21 @@ def handle_build_command(
         # build starting.
         _changed = _changed_files(worktree_manager, spec_dir.name)
         _post_profile = (
-            _resolve_workflow_profile(spec_dir, _changed, announce=False)
+            _resolve_workflow_profile(
+                spec_dir, _changed, announce=False, project_dir=working_dir
+            )
             if _profile is not None
             else None
         )
         _post_ctx = _phase_context(
-            _post_profile, working_dir, spec_dir, model, verbose, _changed
+            _post_profile,
+            working_dir,
+            spec_dir,
+            model,
+            verbose,
+            _changed,
+            source_project_dir=project_dir,
+            source_spec_dir=source_spec_dir,
         )
 
         # `design-check`. The workflow declares it immediately after `coding`
@@ -623,6 +1047,8 @@ def handle_build_command(
         # call, so it is not pruned by effort, and its verdict is an *external*
         # signal, which is what makes it usable as corroboration by the
         # learning loop below.
+        if _post_ctx is not None:
+            _post_ctx.jev_run = jev_run
         gate_run = _run_deterministic_gates(_post_profile, working_dir, spec_dir)
 
         # `review` — declared between `coding` and `qa`, dispatched in a fresh
@@ -657,6 +1083,7 @@ def handle_build_command(
                         model=model,
                         verbose=verbose,
                         source_spec_dir=source_spec_dir,
+                        jev_run=jev_run,
                     )
                 )
 
@@ -691,9 +1118,17 @@ def handle_build_command(
             # QA skipped — if the build is complete but QA was already approved,
             # emit QA_PASSED so that frontend XState transitions from qa_review →
             # human_review instead of leaving the kanban card stuck.
-            from progress import is_build_complete
+            from core.progress import is_build_complete
 
-            if is_build_complete(spec_dir) and is_qa_approved(spec_dir):
+            # A workflow that declares no `qa` (docs, spike) ends the build
+            # here; the card would otherwise wait in qa_review for a verdict
+            # nothing will give. Human review is the next step either way.
+            _no_qa_declared = _profile is not None and "qa" not in (
+                getattr(_profile, "declared", ()) or ()
+            )
+            if is_build_complete(spec_dir) and (
+                is_qa_approved(spec_dir) or _no_qa_declared
+            ):
                 try:
                     from core.task_event import TaskEventEmitter
 
@@ -705,13 +1140,18 @@ def handle_build_command(
                 except Exception:
                     pass  # Best-effort
 
-        # Everything the workflow declares after `qa`: the two ultrathink
-        # readings and `verify`. They run here rather than earlier because
-        # each is a question about the finished branch — `adversarial-review`
-        # attacks the code, `spec-conformance` asks whether it is the thing
-        # that was asked for, and `verify` checks the work before the build
-        # claims to be done.
+        # Everything the workflow declares after `qa`: `architecture-map` and
+        # `verify-replay`. Each is a question about the
+        # finished branch, so it runs once QA has corrected it. Nothing after
+        # this point feeds a fixer, which is why the reviews that should change
+        # the build (`review`, `verify`) are declared before `qa`.
         _run_workflow_phases(_post_profile, _post_ctx, after="qa", before=None)
+
+        # Those phases wrote into the worktree's copy of the spec, after the
+        # QA sync above. Without this second copy their reports — and the
+        # architecture delta's head model — never reach the spec directory the
+        # Kanban reads, and are deleted with the worktree at merge.
+        _sync_spec_back(spec_dir, source_spec_dir, "after the post-QA phases")
 
         # Hard gates. `verify` declares `hard_gate: tests-pass`, which until
         # now only kept the phase out of the effort pruner — nothing checked
@@ -719,7 +1159,7 @@ def handle_build_command(
         # with a red suite. Evaluated here, from the same test evidence the
         # observe phase records, so the two cannot disagree.
         _tests_green = _tests_went_green(spec_dir)
-        _report_hard_gates(_post_profile or _profile, spec_dir, _tests_green)
+        _report_hard_gates(_post_profile or _profile, spec_dir, _tests_green, _changed)
 
         # The `observe` phase. Marked `always: true` in the workflow, so it
         # runs at every effort level — it costs no API call, it only reads what
@@ -732,6 +1172,20 @@ def handle_build_command(
             ran_qa=qa_should_run,
             detector_clean=gate_run.all_clean if gate_run else None,
             tests_passed=_tests_green,
+            # The real git diff, already computed above for the conditional
+            # phases. Reused rather than re-derived from the plan: the plan
+            # says what was intended, the diff says what happened.
+            changed_files=_changed,
+        )
+
+        # The shared brain keeps what this build was and how it ended, for
+        # every agent on every machine — whatever the effort level and whether
+        # or not the workflow engine ran the observe phase above.
+        _record_build_in_brain(
+            spec_dir,
+            qa_approved=qa_approved if qa_should_run else None,
+            tests_passed=_tests_green,
+            changed_files=_changed,
         )
 
         # Post-build finalization (only for isolated sequential mode)
@@ -747,6 +1201,38 @@ def handle_build_command(
                 choice, project_dir, spec_dir.name, worktree_manager
             )
 
+    except BuildPaused as paused:
+        # The user pressed Pause. Everything below the raise — QA, the hard
+        # gates, the observe phase, `finalize_workspace` — is deliberately not
+        # run: a paused build has not finished, and finalizing one would merge
+        # or discard a worktree the user just asked to stop touching. The pause
+        # flag stays on disk, so `TASK_RESUME` picks the build back up from the
+        # phase named here.
+        print()
+        print_paused_banner(
+            spec_dir, spec_dir.name, has_worktree=bool(worktree_manager)
+        )
+        print(f"Paused during: {paused.phase}")
+        if paused.subtask_id:
+            print(f"Paused on subtask: {paused.subtask_id}")
+        print(
+            "\nNothing was finalized. Resume from the Kanban, or:\n"
+            f"  python workpilot/run.py --spec {spec_dir.name}\n"
+        )
+        StatusManager(project_dir).update(state=BuildState.PAUSED)
+        return
+    except BuildHalted as halted:
+        # A phase established it cannot produce its output. The frontend has
+        # already been told which one and why (the phase emitted
+        # PLANNING_FAILED / CODING_FAILED before raising), so the card carries
+        # the reason rather than a bare "Has Errors" badge. Exiting non-zero
+        # here only makes the CLI honest — the kanban state is already settled.
+        print()
+        print("=" * 70)
+        print(f"  ✗ BUILD HALTED — phase: {halted.phase}")
+        print("=" * 70)
+        print(f"\n{halted.message}\n")
+        sys.exit(1)
     except KeyboardInterrupt:
         _handle_build_interrupt(
             spec_dir=spec_dir,
@@ -757,12 +1243,14 @@ def handle_build_command(
             max_iterations=max_iterations,
             verbose=verbose,
             profile=_profile,
+            jev_run=jev_run,
         )
     except Exception as e:
         import traceback
 
         print(f"\nFatal error: {e}")
         traceback.print_exc()
+        _emit_fatal_error(spec_dir, e)
         sys.exit(1)
 
 
@@ -775,6 +1263,7 @@ def _handle_build_interrupt(
     max_iterations: int | None,
     verbose: bool,
     profile=None,
+    jev_run=None,
 ) -> None:
     """
     Handle keyboard interrupt during build.
@@ -793,7 +1282,7 @@ def _handle_build_interrupt(
             one that was announced is the kind of surprise this whole refactor
             exists to remove.
     """
-    from agent import run_autonomous_agent
+    from core.agent import run_autonomous_agent
 
     # Print paused banner
     print_paused_banner(spec_dir, spec_dir.name, has_worktree=bool(worktree_manager))
@@ -900,6 +1389,7 @@ def _handle_build_interrupt(
                     verbose=verbose,
                     streaming_session_id=streaming_session_id,  # noqa: F821
                     profile=profile,
+                    jev_run=jev_run,
                 )
             )
             # Build completed or was interrupted again - exit

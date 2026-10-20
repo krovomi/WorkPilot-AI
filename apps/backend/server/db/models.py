@@ -21,6 +21,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    Integer,
     String,
     Text,
     UniqueConstraint,
@@ -41,6 +42,17 @@ class Base(DeclarativeBase):
 
 
 class GlobalRole(str, enum.Enum):
+    """Platform-level role, stored on ``users.role``.
+
+    Since multi-tenancy, this says what a user is to the *deployment*, not to
+    an organization: ``ADMIN`` is the super-admin who operates the server
+    across tenants. Business roles live in ``org_members.role_id``.
+
+    The values are deliberately unchanged — they are baked into access-token
+    claims and read by the desktop app — so an existing deployment keeps
+    working across the upgrade.
+    """
+
     ADMIN = "admin"
     MEMBER = "member"
     VIEWER = "viewer"
@@ -55,6 +67,121 @@ class ProjectRole(str, enum.Enum):
 class IdentityProvider(str, enum.Enum):
     LOCAL = "local"
     ENTRA = "entra"
+
+
+class RoleScope(str, enum.Enum):
+    ORG = "org"
+    PROJECT = "project"
+
+
+class Organization(Base):
+    """A tenant.
+
+    Everything a tenant owns hangs off this row: its members, its projects and
+    therefore its specs, runs and audit entries. Isolation is enforced by
+    scoping every query on ``org_id``, never by the filesystem — server-side
+    clones live under ``REPOS_ROOT/{project_id}`` and a project id alone says
+    nothing about who may read it.
+    """
+
+    __tablename__ = "organizations"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    name: Mapped[str] = mapped_column(String(200))
+    slug: Mapped[str] = mapped_column(String(100), unique=True, index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Free-form org settings. ``disabled_permissions`` (a list of catalog keys)
+    # is subtracted from every member's effective set — a licence tier or a
+    # deployment-wide feature switch, expressed in the same vocabulary as roles.
+    settings: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+
+    members: Mapped[list[OrgMember]] = relationship(
+        back_populates="organization", cascade="all, delete-orphan"
+    )
+
+
+class Role(Base):
+    """A named bundle of permission keys.
+
+    ``org_id IS NULL`` marks a built-in role: shared by every organization,
+    seeded from :mod:`server.authz.roles`, and read-only in the console. A
+    custom role belongs to exactly one organization.
+
+    ``permissions`` holds catalog keys, validated against
+    :mod:`server.authz.catalog` on write. The catalog itself is not a table:
+    a permission the code does not implement cannot gate anything, so a second
+    copy in the database could only ever drift.
+    """
+
+    __tablename__ = "roles"
+    __table_args__ = (
+        UniqueConstraint("org_id", "slug", name="uq_role_org_slug"),
+        Index("ix_roles_org", "org_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    org_id: Mapped[str | None] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True
+    )
+    slug: Mapped[str] = mapped_column(String(60))
+    name: Mapped[str] = mapped_column(String(120))
+    description: Mapped[str] = mapped_column(Text, default="")
+    is_system: Mapped[bool] = mapped_column(Boolean, default=False)
+    scope: Mapped[str] = mapped_column(String(20), default=RoleScope.ORG.value)
+    permissions: Mapped[list] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+
+
+class OrgMember(Base):
+    """A user's membership of, and role in, one organization."""
+
+    __tablename__ = "org_members"
+    __table_args__ = (UniqueConstraint("org_id", "user_id", name="uq_org_member"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    role_id: Mapped[str] = mapped_column(ForeignKey("roles.id", ondelete="RESTRICT"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+
+    organization: Mapped[Organization] = relationship(back_populates="members")
+
+
+class OrgQuota(Base):
+    """Per-tenant limits.
+
+    A shared deployment needs a ceiling per tenant or one organization's runs
+    starve every other: ``max_concurrent_runs`` becomes a per-org semaphore in
+    ``services.run_manager`` instead of the single global one.
+
+    ``NULL`` means unlimited for that dimension.
+    """
+
+    __tablename__ = "org_quotas"
+
+    org_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), primary_key=True
+    )
+    max_users: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    max_projects: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    max_concurrent_runs: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    monthly_token_budget: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # When False a budget overrun warns; when True it refuses to start runs.
+    enforce_hard_stop: Mapped[bool] = mapped_column(Boolean, default=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )
 
 
 class User(Base):
@@ -129,6 +256,10 @@ class Project(Base):
     __tablename__ = "projects"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    # The owning tenant. Every project query is scoped on this.
+    org_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
     name: Mapped[str] = mapped_column(String(200))
     repo_url: Mapped[str] = mapped_column(String(2000))
     default_branch: Mapped[str] = mapped_column(String(200), default="main")
@@ -159,7 +290,14 @@ class ProjectMember(Base):
     user_id: Mapped[str] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
+    # Kept and still written alongside ``role_id``: ``require_project_role`` and
+    # its tests rank these three values, and a project-scoped custom role is an
+    # addition to that ladder rather than a replacement for it.
     role: Mapped[str] = mapped_column(String(20), default=ProjectRole.MEMBER.value)
+    # Optional project-scoped role granting permissions on top of the org role.
+    role_id: Mapped[str | None] = mapped_column(
+        ForeignKey("roles.id", ondelete="SET NULL"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow
     )
@@ -263,6 +401,14 @@ class Invitation(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     email: Mapped[str] = mapped_column(String(320))
     role: Mapped[str] = mapped_column(String(20), default=GlobalRole.MEMBER.value)
+    # The organization the invitee joins, and with which role. Both nullable so
+    # a platform admin can still invite a user who belongs to no tenant yet.
+    org_id: Mapped[str | None] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    org_role_id: Mapped[str | None] = mapped_column(
+        ForeignKey("roles.id", ondelete="SET NULL"), nullable=True
+    )
     token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     invited_by: Mapped[str | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
@@ -284,16 +430,31 @@ class Invitation(Base):
 
 
 class AuditLog(Base):
+    """Administrative and security events.
+
+    Distinct from ``audit_trail/`` on the filesystem, which is the
+    tamper-evident hash-chained log of *agent* activity. This table answers the
+    other question — who changed a role, revoked a session or deleted a project
+    — and is scoped per organization so a tenant admin can read their own
+    history without seeing anyone else's.
+    """
+
     __tablename__ = "audit_log"
-    __table_args__ = (Index("ix_audit_project_time", "project_id", "created_at"),)
+    __table_args__ = (
+        Index("ix_audit_project_time", "project_id", "created_at"),
+        Index("ix_audit_org_time", "org_id", "created_at"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     user_id: Mapped[str | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
+    org_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     project_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     action: Mapped[str] = mapped_column(String(80))
     payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(String(400), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow
     )

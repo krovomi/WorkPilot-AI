@@ -12,7 +12,7 @@ The CI discovery results are used by:
 - Planner: To align verification with CI
 
 Usage:
-    from ci_discovery import CIDiscovery
+    from analysis.ci_discovery import CIDiscovery
 
     discovery = CIDiscovery()
     result = discovery.discover(project_dir)
@@ -394,16 +394,10 @@ class CIDiscovery:
             matches = sh_pattern.findall(content)
 
             steps = []
-            test_related = False
 
             for cmd in matches:
                 steps.append(cmd)
                 self._extract_test_commands(cmd, result)
-
-                if any(
-                    kw in cmd.lower() for kw in ["test", "pytest", "jest", "coverage"]
-                ):
-                    test_related = True
 
             # Extract stage names
             stage_pattern = re.compile(r'stage\s*\([\'"]([^\'"]+)[\'"]\)')

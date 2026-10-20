@@ -10,6 +10,7 @@ Tests the qa_loop.py module functionality including:
 - Loop control flow
 """
 
+import importlib
 import json
 import sys
 from pathlib import Path
@@ -47,14 +48,14 @@ _mocked_module_names = [
     "security.qa_scanner",
     # Config & phases
     "phase_config",
-    "phase_event",
+    "core.phase_event",
     # Logging & UI
-    "debug",
+    "core.debug",
     "ui",
     "ui.capabilities",
     "task_logger",
-    "linear_updater",
-    "progress",
+    "integrations.linear.updater",
+    "core.progress",
     # Prompts
     "prompts_pkg",
     "prompts_pkg.project_context",
@@ -71,8 +72,17 @@ _mocked_module_names = [
     # Integrations
     "integrations",
     "integrations.linear",
-    "integrations.linear.updater",
 ]
+
+# `core.build_signals` and `core.pause_state` have no dependencies, and the
+# code under test imports them (`qa/loop.py`, `spec/pipeline/orchestrator.py`,
+# since the pause/halt signals of #151). They are not mocked: a MagicMock
+# `BuildPaused` cannot be caught, and a MagicMock `is_paused()` is truthy.
+# Import them for real *before* `core` is replaced below; once it is, Python
+# cannot resolve a submodule of it ("'core' is not a package"). Without this
+# the file only collected when an earlier test file had imported them.
+importlib.import_module("core.build_signals")
+importlib.import_module("core.pause_state")
 
 for name in _mocked_module_names:
     if name in sys.modules:
@@ -86,7 +96,8 @@ for name in _mocked_module_names:
         sys.modules[name] = MagicMock()
 
 # Set up specific mock attributes needed by tests
-mock_progress = sys.modules["progress"]
+mock_progress = sys.modules["core.progress"]
+
 
 # Configure the progress module mock to properly handle is_build_complete
 def mock_is_build_complete(spec_dir: Path) -> bool:
@@ -94,24 +105,25 @@ def mock_is_build_complete(spec_dir: Path) -> bool:
     plan_file = spec_dir / "implementation_plan.json"
     if not plan_file.exists():
         return False
-    
+
     try:
-        with open(plan_file) as f:
+        with open(plan_file, encoding="utf-8") as f:
             plan = json.load(f)
     except (json.JSONDecodeError, OSError):
         return False
-    
+
     # Count completed vs total subtasks
     total = 0
     completed = 0
-    
+
     for phase in plan.get("phases", []):
         for subtask in phase.get("subtasks", []):
             total += 1
             if subtask.get("status") == "completed":
                 completed += 1
-    
+
     return total > 0 and completed == total
+
 
 mock_progress.is_build_complete = mock_is_build_complete
 
@@ -155,7 +167,7 @@ class TestImplementationPlanIO:
     ):
         """Loads implementation plan from JSON."""
         plan_file = spec_dir / "implementation_plan.json"
-        plan_file.write_text(json.dumps(sample_implementation_plan))
+        plan_file.write_text(json.dumps(sample_implementation_plan), encoding="utf-8")
 
         plan = load_implementation_plan(spec_dir)
 
@@ -170,7 +182,7 @@ class TestImplementationPlanIO:
     def test_load_invalid_json_returns_none(self, spec_dir: Path):
         """Returns None for invalid JSON."""
         plan_file = spec_dir / "implementation_plan.json"
-        plan_file.write_text("{ invalid json }")
+        plan_file.write_text("{ invalid json }", encoding="utf-8")
 
         plan = load_implementation_plan(spec_dir)
         assert plan is None
@@ -184,7 +196,9 @@ class TestImplementationPlanIO:
         assert result is True
         assert (spec_dir / "implementation_plan.json").exists()
 
-        loaded = json.loads((spec_dir / "implementation_plan.json").read_text())
+        loaded = json.loads(
+            (spec_dir / "implementation_plan.json").read_text(encoding="utf-8")
+        )
         assert loaded["feature"] == "Test"
 
 

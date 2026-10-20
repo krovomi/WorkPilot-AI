@@ -62,8 +62,14 @@ class StackProfile:
     python_api_framework: str | None = None  # FastAPI | Flask | Django
 
 
-def _iter_project_files(project_dir: Path, patterns: tuple[str, ...]) -> list[Path]:
-    """Walk the project for manifest files, skipping vendored/build dirs."""
+def iter_project_files(project_dir: Path, patterns: tuple[str, ...]) -> list[Path]:
+    """Walk the project for manifest files, skipping vendored/build dirs.
+
+    Public because ``libraries.py`` asks the same question of the same files —
+    which packages does this project declare? Two walkers over csproj and
+    package.json would be two answers to that, and the skip list is the part
+    that is easy to get subtly different.
+    """
     found: list[Path] = []
     stack = [project_dir]
     while stack and len(found) < _MAX_PROJECT_FILES:
@@ -85,7 +91,7 @@ def _iter_project_files(project_dir: Path, patterns: tuple[str, ...]) -> list[Pa
     return found
 
 
-def _read(path: Path) -> str:
+def read_manifest(path: Path) -> str:
     try:
         return path.read_text(encoding="utf-8", errors="replace")
     except OSError:
@@ -93,11 +99,11 @@ def _read(path: Path) -> str:
 
 
 def _detect_dotnet(project_dir: Path, profile: StackProfile) -> None:
-    manifests = _iter_project_files(project_dir, ("*.csproj", "packages.config"))
+    manifests = iter_project_files(project_dir, ("*.csproj", "packages.config"))
     if not manifests:
         return
     profile.dotnet = True
-    blob = "\n".join(_read(m) for m in manifests)
+    blob = "\n".join(read_manifest(m) for m in manifests)
     lower = blob.lower()
 
     if "<usewindowsforms>true" in lower or "system.windows.forms" in lower:
@@ -143,7 +149,7 @@ def _detect_node(project_dir: Path, profile: StackProfile) -> None:
         if not candidate.is_file():
             continue
         try:
-            data = json.loads(_read(candidate) or "{}")
+            data = json.loads(read_manifest(candidate) or "{}")
         except json.JSONDecodeError:
             continue
         for key in ("dependencies", "devDependencies"):
@@ -196,7 +202,7 @@ def _detect_python(project_dir: Path, profile: StackProfile) -> None:
     ):
         candidate = project_dir / name
         if candidate.is_file():
-            blob += "\n" + _read(candidate)
+            blob += "\n" + read_manifest(candidate)
     if not blob.strip():
         return
     lower = blob.lower()

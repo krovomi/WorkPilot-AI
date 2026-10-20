@@ -1,12 +1,8 @@
 import type React from "react";
-import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useCurrency } from "../../hooks/useCurrency";
 import { formatCurrency } from "../../lib/currency";
-import {
-	setupAgentCoachListeners,
-	useAgentCoachStore,
-} from "../../stores/agent-coach-store";
+import { useAgentCoachStore } from "../../stores/agent-coach-store";
 import type { CoachReport, TipPriority } from "../../../shared/types/agent-coach";
 
 const PRIORITY_STYLES: Record<TipPriority, string> = {
@@ -130,11 +126,6 @@ export function CoachReportView({
 
 	const formatCost = (usd: number, decimals: number): string =>
 		formatCurrency(usd, i18n.language, rate, decimals);
-
-	useEffect(() => {
-		const cleanup = setupAgentCoachListeners();
-		return cleanup;
-	}, []);
 
 	const phase = useAgentCoachStore((s) => s.phase);
 	const status = useAgentCoachStore((s) => s.status);

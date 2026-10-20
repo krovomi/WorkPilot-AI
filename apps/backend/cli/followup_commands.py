@@ -15,7 +15,7 @@ _PARENT_DIR = Path(__file__).parent.parent
 if str(_PARENT_DIR) not in sys.path:
     sys.path.insert(0, str(_PARENT_DIR))
 
-from progress import count_subtasks, is_build_complete
+from core.progress import count_subtasks, is_build_complete
 from ui import (
     Icons,
     MenuOption,
@@ -221,6 +221,7 @@ def handle_followup_command(
     spec_dir: Path,
     model: str,
     verbose: bool = False,
+    jev_run=None,
 ) -> None:
     """
     Handle the --followup command.
@@ -232,7 +233,7 @@ def handle_followup_command(
         verbose: Enable verbose output
     """
     # Lazy imports to avoid loading heavy modules
-    from agent import run_followup_planner
+    from core.agent import run_followup_planner
 
     from .utils import print_banner, validate_environment
 
@@ -331,6 +332,7 @@ def handle_followup_command(
     try:
         success_result = asyncio.run(
             run_followup_planner(
+                jev_run=jev_run,
                 project_dir=project_dir,
                 spec_dir=spec_dir,
                 model=model,

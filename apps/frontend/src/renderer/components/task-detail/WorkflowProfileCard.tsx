@@ -14,7 +14,10 @@ import type {
 	WorkflowLevelPayload,
 	WorkflowPhasePayload,
 } from "../../lib/agent-tools-api";
-import { useWorkflowProfileStore } from "../../stores/workflow-profile-store";
+import {
+	workflowProfileKey,
+	useWorkflowProfileStore,
+} from "../../stores/workflow-profile-store";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 
@@ -55,7 +58,13 @@ export function WorkflowProfileCard({
 
 	const load = useWorkflowProfileStore((s) => s.load);
 	const clear = useWorkflowProfileStore((s) => s.clear);
-	const entry = useWorkflowProfileStore((s) => s.byTask[task.id]);
+	const profileKey = workflowProfileKey({
+		taskId: task.id,
+		projectDir: projectPath,
+		specDir: task.specsPath,
+		specId: task.specId,
+	});
+	const entry = useWorkflowProfileStore((s) => s.byTask[profileKey]);
 
 	const profile = entry?.profile ?? null;
 	const previewEffort = entry?.previewEffort ?? null;
@@ -69,13 +78,14 @@ export function WorkflowProfileCard({
 			specId: task.specId,
 			provider: task.metadata?.provider,
 		});
-		return () => clear(task.id);
+		return () => clear(profileKey);
 	}, [
 		task.id,
 		task.specId,
 		task.specsPath,
 		task.metadata?.provider,
 		projectPath,
+		profileKey,
 		load,
 		clear,
 	]);
@@ -135,8 +145,7 @@ export function WorkflowProfileCard({
 						<span>
 							{t("workflowProfile:summary.provider")}:{" "}
 							<span className="font-medium text-foreground">
-								{profile.provider ??
-									t("workflowProfile:summary.providerUnset")}
+								{profile.provider ?? t("workflowProfile:summary.providerUnset")}
 							</span>
 						</span>
 						<span>
@@ -233,7 +242,11 @@ function PhaseRow({ phase }: { readonly phase: WorkflowPhasePayload }) {
 				})
 			: phase.skipReason === "untouched"
 				? t("workflowProfile:phase.skippedUntouched")
-				: null;
+				: phase.skipReason === "task"
+					? t("workflowProfile:phase.skippedTask", {
+							facts: (phase.whenTask ?? []).join(", "),
+						})
+					: null;
 
 	const dispatchLabel = t(
 		`workflowProfile:phase.dispatch.${phase.dispatch}`,
@@ -281,6 +294,11 @@ function PhaseRow({ phase }: { readonly phase: WorkflowPhasePayload }) {
 							{t("workflowProfile:phase.humanGate")}
 						</Badge>
 					)}
+					{phase.irreversible && (
+						<Badge variant="destructive" className="text-[10px]">
+							{t("workflowProfile:phase.irreversible")}
+						</Badge>
+					)}
 				</div>
 				{phase.degradedFrom && (
 					<div className="mt-0.5 text-amber-600 dark:text-amber-400">
@@ -290,13 +308,28 @@ function PhaseRow({ phase }: { readonly phase: WorkflowPhasePayload }) {
 						})}
 					</div>
 				)}
+				{phase.substitutedFrom && (
+					<div className="mt-0.5 text-amber-600 dark:text-amber-400">
+						{t("workflowProfile:phase.substituted", {
+							from: phase.substitutedFrom,
+							reason: phase.substitutionReason,
+						})}
+					</div>
+				)}
 				{skipDetail && (
 					<div className="mt-0.5 text-muted-foreground">{skipDetail}</div>
 				)}
-				{phase.runs && phase.conditional && (
+				{phase.runs && phase.whenGlobs.length > 0 && (
 					<div className="mt-0.5 text-muted-foreground">
 						{t("workflowProfile:phase.conditional", {
 							globs: phase.whenGlobs.join(", "),
+						})}
+					</div>
+				)}
+				{phase.runs && (phase.whenTask?.length ?? 0) > 0 && (
+					<div className="mt-0.5 text-muted-foreground">
+						{t("workflowProfile:phase.conditionalTask", {
+							facts: (phase.whenTask ?? []).join(", "),
 						})}
 					</div>
 				)}

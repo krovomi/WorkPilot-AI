@@ -23,6 +23,13 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+	buildEngineMetadata,
+	defaultEngineProvider,
+	seedEngine,
+	type TaskEngine,
+} from "../../shared/utils/task-engine";
+import { TaskEngineEditor } from "./task-engine/TaskEngineEditor";
+import {
 	DEFAULT_AGENT_PROFILES,
 	DEFAULT_PHASE_MODELS,
 	DEFAULT_PHASE_THINKING,
@@ -35,10 +42,17 @@ import type {
 	TaskComplexity,
 	TaskDraft,
 	TaskImpact,
+	ContextPolicy,
 	TaskMetadata,
 	TaskPriority,
 	ThinkingLevel,
 } from "../../shared/types";
+import type { MobilePlatform } from "../../shared/types/mobile";
+import {
+	DEFAULT_CONTEXT_POLICY,
+	isDefaultContextPolicy,
+	normalizeContextPolicy,
+} from "../../shared/utils/context-policy";
 import type {
 	PhaseModelConfig,
 	PhaseThinkingConfig,
@@ -55,8 +69,14 @@ import {
 	saveDraft,
 } from "../stores/task-store";
 import { FileAutocomplete } from "./FileAutocomplete";
-import { useProviderContext } from "./ProviderContext";
 import { TaskFileExplorerDrawer } from "./TaskFileExplorerDrawer";
+import {
+	type CriterionDraft,
+	ensureAtLeastOne,
+	toCriteria,
+	toDrafts,
+} from "./task-detail/acceptance-criteria-draft";
+import { TaskCreationExtras } from "./task-form/TaskCreationExtras";
 import { TaskFormFields } from "./task-form/TaskFormFields";
 import { TaskModalLayout } from "./task-form/TaskModalLayout";
 import type { FileReferenceData } from "./task-form/useImageUpload";
@@ -80,7 +100,6 @@ export function TaskCreationWizard({
 }: TaskCreationWizardProps) {
 	const { t } = useTranslation(["tasks", "common"]);
 	const { settings } = useSettingsStore();
-	const { selectedProvider } = useProviderContext();
 	const selectedProfile =
 		DEFAULT_AGENT_PROFILES.find(
 			(p) => p.id === settings.selectedAgentProfile,
@@ -90,6 +109,7 @@ export function TaskCreationWizard({
 	// Form state
 	const [title, setTitle] = useState("");
 	const [description, setDescription] = useState("");
+	const [dictationPending, setDictationPending] = useState(false);
 	const [isCreating, setIsCreating] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [showClassification, setShowClassification] = useState(false);
@@ -110,6 +130,23 @@ export function TaskCreationWizard({
 		const project = projects.find((p) => p.id === projectId);
 		return project?.path ?? null;
 	}, [projects, projectId]);
+	const projectProvider = useMemo(
+		() => projects.find((p) => p.id === projectId)?.settings?.provider,
+		[projects, projectId],
+	);
+	// The engine this task will own: provider × model × effort per phase.
+	// Seeded from the project's provider, else the default provider in
+	// Settings; once created, nothing global changes it.
+	const seedTaskEngine = useCallback(
+		(): TaskEngine =>
+			seedEngine(settings, defaultEngineProvider(settings, projectProvider)),
+		[settings, projectProvider],
+	);
+	const [engine, setEngine] = useState<TaskEngine>(seedTaskEngine);
+	// Read through a ref by the open/reset effect below: a Settings change
+	// while the dialog is open must not reset the form the person is filling.
+	const seedTaskEngineRef = useRef(seedTaskEngine);
+	seedTaskEngineRef.current = seedTaskEngine;
 
 	// Build branch options using shared utility - groups by local/remote with type indicators
 	const branchOptions = useMemo(() => {
@@ -169,6 +206,20 @@ export function TaskCreationWizard({
 
 	// TDD override (per-task) - default false (inherit project setting)
 	const [tddMode, setTddMode] = useState(false);
+	const [verifyLoop, setVerifyLoop] = useState(true);
+	// Context-window management (compact / new thread at a threshold).
+	const [contextPolicy, setContextPolicy] = useState<ContextPolicy>(() => ({
+		...DEFAULT_CONTEXT_POLICY,
+	}));
+	// Empty is the default and means "every platform the project has":
+	// a card that names none on a mobile repo is not asking for none.
+	const [mobileTargets, setMobileTargets] = useState<MobilePlatform[]>([]);
+	// Critères d'acceptation et note supplémentaire : les mêmes champs que le
+	// panneau d'une tâche créée, remplis avant qu'elle ne parte.
+	const [acceptanceCriteria, setAcceptanceCriteria] = useState<
+		CriterionDraft[]
+	>(() => ensureAtLeastOne([]));
+	const [extraNote, setExtraNote] = useState("");
 
 	// Draft state
 	const [isDraftRestored, setIsDraftRestored] = useState(false);
@@ -217,10 +268,18 @@ export function TaskCreationWizard({
 						selectedProfile.phaseThinking ||
 						DEFAULT_PHASE_THINKING,
 				);
+				setEngine(draft.engine ?? seedTaskEngineRef.current());
 				setImages(draft.images);
 				setReferencedFiles(draft.referencedFiles ?? []);
 				setRequireReviewBeforeCoding(draft.requireReviewBeforeCoding ?? false);
 				setTddMode(draft.tddMode ?? false);
+				setVerifyLoop(draft.verifyLoop ?? true);
+				setContextPolicy(normalizeContextPolicy(draft.contextPolicy));
+				setMobileTargets(draft.mobileTargets ?? []);
+				setAcceptanceCriteria(
+					ensureAtLeastOne(toDrafts(draft.acceptanceCriteria ?? [])),
+				);
+				setExtraNote(draft.extraNote ?? "");
 				setIsDraftRestored(true);
 
 				if (
@@ -253,9 +312,13 @@ export function TaskCreationWizard({
 						selectedProfile.phaseThinking ||
 						DEFAULT_PHASE_THINKING,
 				);
+				setEngine(seedTaskEngineRef.current());
 				setImages([]);
 				setReferencedFiles([]);
 				setRequireReviewBeforeCoding(false);
+				setContextPolicy({ ...DEFAULT_CONTEXT_POLICY });
+				setAcceptanceCriteria(ensureAtLeastOne([]));
+				setExtraNote("");
 				setBaseBranch(PROJECT_DEFAULT_BRANCH);
 				setUseWorktree(true);
 				setIsDraftRestored(false);
@@ -342,10 +405,16 @@ export function TaskCreationWizard({
 			thinkingLevel,
 			phaseModels,
 			phaseThinking,
+			engine,
 			images,
 			referencedFiles,
 			requireReviewBeforeCoding,
 			tddMode,
+			verifyLoop,
+			contextPolicy,
+			mobileTargets,
+			acceptanceCriteria: toCriteria(acceptanceCriteria),
+			extraNote,
 			savedAt: new Date(),
 		}),
 		[
@@ -361,10 +430,16 @@ export function TaskCreationWizard({
 			thinkingLevel,
 			phaseModels,
 			phaseThinking,
+			engine,
 			images,
 			referencedFiles,
 			requireReviewBeforeCoding,
 			tddMode,
+			verifyLoop,
+			contextPolicy,
+			mobileTargets,
+			acceptanceCriteria,
+			extraNote,
 		],
 	);
 
@@ -426,7 +501,9 @@ export function TaskCreationWizard({
 	 * Handle autocomplete selection
 	 */
 	const handleAutocompleteSelect = useCallback(
-		(filename: string, _fullPath?: string) => {
+		// The project-relative path, not the bare name: two `index.ts` are the
+		// norm once the whole tree is searchable, and the agent has to know which.
+		(filename: string) => {
 			if (!autocomplete) return;
 			const textarea = descriptionRef.current;
 			if (!textarea) return;
@@ -531,6 +608,7 @@ export function TaskCreationWizard({
 	);
 
 	const handleCreate = async () => {
+		if (dictationPending) { setError(t("tasks:dictation.pending")); return; }
 		if (!description.trim()) {
 			setError(t("tasks:form.errors.descriptionRequired"));
 			return;
@@ -550,22 +628,25 @@ export function TaskCreationWizard({
 			if (priority) metadata.priority = priority;
 			if (complexity) metadata.complexity = complexity;
 			if (impact) metadata.impact = impact;
-			// Always include the active LLM provider so the backend knows which provider to use
-			const activeProvider =
-				selectedProvider || settings.selectedProvider || "anthropic";
-			metadata.provider = activeProvider;
-			if (model) metadata.model = model;
-			if (thinkingLevel) metadata.thinkingLevel = thinkingLevel;
-			if (phaseModels && phaseThinking) {
-				metadata.isAutoProfile = profileId === "auto";
-				metadata.phaseModels = phaseModels;
-				metadata.phaseThinking = phaseThinking;
-			}
+			// The task owns its engine from the start: every phase's provider,
+			// model and effort, locked so nothing global replaces them later.
+			Object.assign(metadata, buildEngineMetadata(engine));
 			if (images.length > 0) metadata.attachedImages = images;
 			if (allReferencedFiles.length > 0)
 				metadata.referencedFiles = allReferencedFiles;
 			if (requireReviewBeforeCoding) metadata.requireReviewBeforeCoding = true;
 			if (tddMode) metadata.tddMode = true;
+			// Only an explicit "off" is stored: absent means the project default.
+			if (!verifyLoop) metadata.verifyLoop = false;
+			// Absent means the defaults (auto, 50%, handoff prepared): only a
+			// policy that differs is written.
+			if (!isDefaultContextPolicy(contextPolicy)) {
+				metadata.contextPolicy = { ...contextPolicy };
+			}
+			if (mobileTargets.length > 0) metadata.mobileTargets = mobileTargets;
+			const criteria = toCriteria(acceptanceCriteria);
+			if (criteria.length > 0) metadata.acceptanceCriteria = criteria;
+			if (extraNote.trim()) metadata.extraNote = extraNote.trim();
 			// Always include baseBranch - resolve PROJECT_DEFAULT_BRANCH to actual branch name
 			// This ensures the backend always knows which branch to use for worktree creation
 			if (baseBranch === PROJECT_DEFAULT_BRANCH) {
@@ -622,9 +703,13 @@ export function TaskCreationWizard({
 				selectedProfile.phaseThinking ||
 				DEFAULT_PHASE_THINKING,
 		);
+		setEngine(seedTaskEngine());
 		setImages([]);
 		setReferencedFiles([]);
 		setRequireReviewBeforeCoding(false);
+		setContextPolicy({ ...DEFAULT_CONTEXT_POLICY });
+		setAcceptanceCriteria(ensureAtLeastOne([]));
+		setExtraNote("");
 		setBaseBranch(PROJECT_DEFAULT_BRANCH);
 		setUseWorktree(true);
 		setError(null);
@@ -635,6 +720,7 @@ export function TaskCreationWizard({
 	};
 
 	const handleClose = () => {
+		if (dictationPending) { setError(t("tasks:dictation.pending")); return; }
 		if (isCreating) return;
 
 		const draft = getCurrentDraft();
@@ -752,7 +838,7 @@ export function TaskCreationWizard({
 						</Button>
 						<Button
 							onClick={handleCreate}
-							disabled={isCreating || !description.trim()}
+							disabled={isCreating || dictationPending || !description.trim()}
 						>
 							{isCreating ? (
 								<>
@@ -783,6 +869,11 @@ export function TaskCreationWizard({
 
 				{/* Main form fields */}
 				<TaskFormFields
+					onDictationPendingChange={setDictationPending}
+					// The dictation runner reads the project's airgap policy before it
+					// downloads the speech model; without a project the download button
+					// stays disabled, which is exactly what creation used to show.
+					projectPath={projectPath ?? undefined}
 					description={description}
 					onDescriptionChange={handleDescriptionChange}
 					descriptionPlaceholder={t("tasks:wizard.descriptionPlaceholder")}
@@ -790,6 +881,14 @@ export function TaskCreationWizard({
 					descriptionRef={descriptionRef}
 					title={title}
 					onTitleChange={setTitle}
+					engineSlot={
+						<TaskEngineEditor
+							engine={engine}
+							onChange={setEngine}
+							idPrefix="new-task-engine"
+							disabled={isCreating}
+						/>
+					}
 					profileId={profileId}
 					model={model}
 					thinkingLevel={thinkingLevel}
@@ -820,6 +919,13 @@ export function TaskCreationWizard({
 					onRequireReviewChange={setRequireReviewBeforeCoding}
 					tddMode={tddMode}
 					onTddModeChange={setTddMode}
+					verifyLoop={verifyLoop}
+					onVerifyLoopChange={setVerifyLoop}
+					contextPolicy={contextPolicy}
+					onContextPolicyChange={setContextPolicy}
+					contextProvider={engine.coding?.provider}
+					mobileTargets={mobileTargets}
+					onMobileTargetsChange={setMobileTargets}
 					disabled={isCreating}
 					error={error}
 					onError={setError}
@@ -837,6 +943,14 @@ export function TaskCreationWizard({
 						/>
 					)}
 				</TaskFormFields>
+
+				<TaskCreationExtras
+					criteria={acceptanceCriteria}
+					onCriteriaChange={setAcceptanceCriteria}
+					extraNote={extraNote}
+					onExtraNoteChange={setExtraNote}
+					disabled={isCreating}
+				/>
 
 				{/* Git Options Toggle - unique to creation */}
 				<button

@@ -20,11 +20,13 @@ import pytest
 def import_module_direct(module_name, file_path):
     """Import a module directly from file path, bypassing package __init__.py"""
     import importlib.util
+
     spec = importlib.util.spec_from_file_location(module_name, file_path)
     module = importlib.util.module_from_spec(spec)
     sys.modules[module_name] = module
     spec.loader.exec_module(module)
     return module
+
 
 # Import modules directly to avoid circular import issues in __init__.py
 project_root = Path(__file__).parent.parent.parent.parent
@@ -33,16 +35,23 @@ project_root = Path(__file__).parent.parent.parent.parent
 connector_path = project_root / "src" / "connectors" / "sonarqube" / "connector.py"
 
 # Import dependencies first
-exceptions_module = import_module_direct("sonarqube_exceptions", project_root / "src" / "connectors" / "sonarqube" / "exceptions.py")
-models_module = import_module_direct("sonarqube_models", project_root / "src" / "connectors" / "sonarqube" / "models.py")
-client_module = import_module_direct("sonarqube_client", project_root / "src" / "connectors" / "sonarqube" / "client.py")
+exceptions_module = import_module_direct(
+    "sonarqube_exceptions",
+    project_root / "src" / "connectors" / "sonarqube" / "exceptions.py",
+)
+models_module = import_module_direct(
+    "sonarqube_models", project_root / "src" / "connectors" / "sonarqube" / "models.py"
+)
+client_module = import_module_direct(
+    "sonarqube_client", project_root / "src" / "connectors" / "sonarqube" / "client.py"
+)
 
 # Make modules available in sys.modules so connector can import them
-sonarqube_package = type('Package', (), {
-    'exceptions': exceptions_module,
-    'models': models_module,
-    'client': client_module
-})()
+sonarqube_package = type(
+    "Package",
+    (),
+    {"exceptions": exceptions_module, "models": models_module, "client": client_module},
+)()
 sys.modules["src.connectors.sonarqube.exceptions"] = exceptions_module
 sys.modules["src.connectors.sonarqube.models"] = models_module
 sys.modules["src.connectors.sonarqube.client"] = client_module
@@ -50,13 +59,15 @@ sys.modules["src.connectors.sonarqube"] = sonarqube_package
 
 # Create parent package structure
 if "src.connectors" not in sys.modules:
-    sys.modules["src.connectors"] = type('Package', (), {})()
+    sys.modules["src.connectors"] = type("Package", (), {})()
 connectors_package = sys.modules["src.connectors"]
-if not hasattr(connectors_package, 'sonarqube'):
+if not hasattr(connectors_package, "sonarqube"):
     connectors_package.sonarqube = sonarqube_package
 
 # Now import connector
-SonarQubeConnector = import_module_direct("SonarQubeConnector", str(connector_path)).SonarQubeConnector
+SonarQubeConnector = import_module_direct(
+    "SonarQubeConnector", str(connector_path)
+).SonarQubeConnector
 
 QualityGateCondition = models_module.QualityGateCondition
 QualityGateStatus = models_module.QualityGateStatus
@@ -64,20 +75,21 @@ SonarIssue = models_module.SonarIssue
 SonarMeasure = models_module.SonarMeasure
 SonarProject = models_module.SonarProject
 
+
 # Helper function to check object attributes instead of exact type
 def check_sonar_object(obj, expected_type, required_attrs=None):
     """Check if an object has the expected attributes for a SonarQube model."""
     if required_attrs is None:
         # Map expected types to their required attributes
         attr_map = {
-            'SonarProject': ['key', 'name'],
-            'SonarMeasure': ['metric'],
-            'QualityGateStatus': ['project_key', 'status'],
-            'SonarIssue': ['key', 'rule'],
-            'QualityGateCondition': ['metric_key', 'status'],
+            "SonarProject": ["key", "name"],
+            "SonarMeasure": ["metric"],
+            "QualityGateStatus": ["project_key", "status"],
+            "SonarIssue": ["key", "rule"],
+            "QualityGateCondition": ["metric_key", "status"],
         }
         required_attrs = attr_map.get(expected_type.__name__, [])
-    
+
     return all(hasattr(obj, attr) for attr in required_attrs)
 
 
@@ -189,6 +201,7 @@ class TestGetMeasures:
         assert result[0].metric == "bugs"
         assert result[0].value == "3"
         import math
+
         assert math.isclose(result[1].numeric_value, 82.5, rel_tol=1e-9)
 
     def test_uses_default_metrics(self, connector, mock_sonar_client):
@@ -400,6 +413,7 @@ class TestSonarModels:
         """SonarMeasure.numeric_value parses float values."""
         m = SonarMeasure(metric="coverage", value="82.5")
         import math
+
         assert math.isclose(m.numeric_value, 82.5, rel_tol=1e-9)
 
     def test_sonar_measure_non_numeric_value(self):
@@ -419,28 +433,32 @@ class TestSonarModels:
 
     def test_sonar_project_from_api_with_date(self):
         """SonarProject parses lastAnalysisDate correctly."""
-        p = SonarProject.from_api_response({
-            "key": "proj",
-            "name": "Project",
-            "lastAnalysisDate": "2026-01-15T10:30:00+0000",
-        })
+        p = SonarProject.from_api_response(
+            {
+                "key": "proj",
+                "name": "Project",
+                "lastAnalysisDate": "2026-01-15T10:30:00+0000",
+            }
+        )
         assert p.last_analysis_date is not None
 
     def test_sonar_issue_from_api(self):
         """SonarIssue.from_api_response maps all fields."""
-        issue = SonarIssue.from_api_response({
-            "key": "k1",
-            "rule": "python:S1066",
-            "severity": "CRITICAL",
-            "component": "proj:src/main.py",
-            "project": "proj",
-            "line": 10,
-            "message": "Fix this",
-            "status": "OPEN",
-            "type": "BUG",
-            "effort": "15min",
-            "tags": ["security"],
-        })
+        issue = SonarIssue.from_api_response(
+            {
+                "key": "k1",
+                "rule": "python:S1066",
+                "severity": "CRITICAL",
+                "component": "proj:src/main.py",
+                "project": "proj",
+                "line": 10,
+                "message": "Fix this",
+                "status": "OPEN",
+                "type": "BUG",
+                "effort": "15min",
+                "tags": ["security"],
+            }
+        )
         assert issue.key == "k1"
         assert issue.issue_type == "BUG"
         assert issue.effort == "15min"

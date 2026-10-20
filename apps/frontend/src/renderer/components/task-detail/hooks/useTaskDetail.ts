@@ -9,6 +9,7 @@ import type {
 	TaskLogPhase,
 	TaskLogs,
 	WorktreeDiff,
+	WorktreeMergeResult,
 	WorktreeStatus,
 } from "../../../../shared/types";
 import { getActiveLogPhase } from "../../../../shared/utils/task-logs";
@@ -86,6 +87,28 @@ export interface UseTaskDetailOptions {
 	task: Task;
 }
 
+// Process a single API result and collect errors. It closes over nothing, so it
+// lives at module scope: re-created inside the component it became a dependency
+// of `loadMergePreview` that changed on every render.
+function processAPIResult<T>(
+	result: PromiseSettledResult<IPCResult<T>>,
+	label: string,
+	onSuccess: (data: T) => void,
+	errors: string[],
+): void {
+	if (result.status === "fulfilled") {
+		const res = result.value;
+		if (res.success && res.data) {
+			onSuccess(res.data);
+		} else if (!res.success && res.error) {
+			errors.push(`${label}: ${res.error}`);
+		}
+	} else {
+		console.error(`[useTaskDetail] Failed to load ${label}:`, result.reason);
+		errors.push(`Failed to load ${label}`);
+	}
+}
+
 export function useTaskDetail({ task }: UseTaskDetailOptions) {
 	const [feedback, setFeedback] = useState("");
 	const [feedbackImages, setFeedbackImages] = useState<ImageAttachment[]>([]);
@@ -138,10 +161,6 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 	const logsEndRef = useRef<HTMLDivElement>(null);
 	const logsContainerRef = useRef<HTMLDivElement>(null);
 	const prevStatusRef = useRef<string | undefined>(task.status);
-	// Last phase we auto-focused, so a phase *change* (esp. a regression like
-	// validation → planning) can pull the viewport onto the now-active phase
-	// even if the user had scrolled away — distinct from the per-entry follow.
-	const prevActivePhaseRef = useRef<TaskLogPhase | null>(null);
 
 	// Merge preview state
 	const [mergePreview, setMergePreview] = useState<{
@@ -292,59 +311,7 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 		setIsUserScrolledUp(!isAtAnchor);
 	};
 
-	// Auto-scroll logs to the running phase. Anchors on the ACTIVE phase section
-	// (not the document end) so that when a task regresses to an earlier phase
-	// — e.g. validation → planning — the viewport jumps to the now-active phase
-	// instead of staying on the stale logs of a later, already-finished phase.
-	//
-	// Two modes share this effect:
-	//   • Phase change → FORCE focus on the new phase (block:"start"), even if
-	//     the user had scrolled away. This is the user-visible "refocus on the
-	//     current phase" behavior.
-	//   • Same phase, new entries → only FOLLOW (track the phase tail) when the
-	//     user is still anchored.
-	useEffect(() => {
-		if (activeTab !== "logs") return;
-		const isReverseOrder = logOrder === "reverse-chronological";
-
-		const active = getActiveLogPhase(phaseLogs);
-		const phaseChanged = active !== null && active !== prevActivePhaseRef.current;
-		if (active !== null) prevActivePhaseRef.current = active;
-
-		// Without a phase change, respect a user who scrolled away from the tail.
-		if (!phaseChanged && isUserScrolledUp) return;
-
-		// Small timeout to ensure the DOM has rendered (tab switch or new entry).
-		const timer = setTimeout(() => {
-			const container = logsContainerRef.current;
-			if (!container) return;
-			const anchorEl = active
-				? container.querySelector<HTMLElement>(
-						`[data-phase-section="${active}"]`,
-					)
-				: null;
-
-			if (anchorEl) {
-				// On a transition, show the phase from its start so the user sees
-				// "we're now in <phase>"; otherwise track its newest entries.
-				const block: ScrollLogicalPosition = phaseChanged
-					? "start"
-					: isReverseOrder
-						? "start"
-						: "end";
-				anchorEl.scrollIntoView({ behavior: "smooth", block });
-			} else if (isReverseOrder) {
-				container.scrollTo({ top: 0, behavior: "smooth" });
-			} else if (logsEndRef.current) {
-				logsEndRef.current.scrollIntoView({ behavior: "smooth" });
-			}
-
-			// A forced focus re-anchors the user on the new phase.
-			if (phaseChanged) setIsUserScrolledUp(false);
-		}, 60);
-
-		return () => clearTimeout(timer);
-	}, [activeTab, isUserScrolledUp, logOrder, phaseLogs]);
+	// TaskLogs owns scroll following and pauses it during reader navigation.
 
 	// Reset scroll state when switching to logs tab
 	useEffect(() => {
@@ -531,26 +498,6 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 		}
 	}, [task.id]);
 
-	// Helper to process a single API result and collect errors
-	const processAPIResult = <T,>(
-		result: PromiseSettledResult<IPCResult<T>>,
-		label: string,
-		onSuccess: (data: T) => void,
-		errors: string[],
-	) => {
-		if (result.status === "fulfilled") {
-			const res = result.value;
-			if (res.success && res.data) {
-				onSuccess(res.data);
-			} else if (!res.success && res.error) {
-				errors.push(`${label}: ${res.error}`);
-			}
-		} else {
-			console.error(`[useTaskDetail] Failed to load ${label}:`, result.reason);
-			errors.push(`Failed to load ${label}`);
-		}
-	};
-
 	// Load merge preview (conflict detection) and refresh worktree status
 	const loadMergePreview = useCallback(async () => {
 		setIsLoadingPreview(true);
@@ -574,8 +521,8 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 			processAPIResult(
 				previewResult,
 				"Merge preview",
-				(data: any) => {
-					setMergePreview(data?.preview);
+				(data: WorktreeMergeResult) => {
+					setMergePreview(data?.preview ?? null);
 				},
 				errors,
 			);
@@ -583,8 +530,12 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 			// Collect errors for status/diff (side-effect only); the actual
 			// values are extracted directly from the settled results below so
 			// TS control-flow analysis can narrow them correctly.
-			processAPIResult(statusResult, "Worktree status", () => {}, errors);
-			processAPIResult(diffResult, "Worktree diff", () => {}, errors);
+			const collectErrorsOnly = () => {
+				// The values are read from the settled results below; this call is
+				// only here to push any error message into `errors`.
+			};
+			processAPIResult(statusResult, "Worktree status", collectErrorsOnly, errors);
+			processAPIResult(diffResult, "Worktree diff", collectErrorsOnly, errors);
 
 			const latestStatus: WorktreeStatus | null =
 				statusResult.status === "fulfilled" &&

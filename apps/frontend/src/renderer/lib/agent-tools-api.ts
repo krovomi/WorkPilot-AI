@@ -14,10 +14,10 @@
 
 export type ApiResult<T> =
 	| { ok: true; data: T }
-	| { ok: false; error: string };
+	/** `detail`: the backend's own words, when it has any worth showing. */
+	| { ok: false; error: string; detail?: string };
 
-const backendUrl = (): string =>
-	(import.meta.env?.VITE_BACKEND_URL) ?? "";
+const backendUrl = (): string => import.meta.env?.VITE_BACKEND_URL ?? "";
 
 async function _post<T>(
 	path: string,
@@ -41,6 +41,7 @@ async function _post<T>(
 				typeof json.error === "string"
 					? json.error
 					: `request failed with HTTP ${res.status}`,
+			...(typeof json.detail === "string" ? { detail: json.detail } : {}),
 		};
 	} catch (err) {
 		if ((err as { name?: string })?.name === "AbortError") {
@@ -249,13 +250,7 @@ export async function fetchTimeline(
 export interface ProgressIndicatorPayload {
 	spec_id: string;
 	label: string;
-	phase:
-		| "planning"
-		| "coding"
-		| "qa"
-		| "idle"
-		| "completed"
-		| "unknown";
+	phase: "planning" | "coding" | "qa" | "idle" | "completed" | "unknown";
 	sub_phase: string | null;
 	subtasks_completed: number;
 	subtasks_total: number;
@@ -421,6 +416,8 @@ export interface WorkflowPhasePayload {
 	gate: string | null;
 	conditional: boolean;
 	whenGlobs: string[];
+	/** `kind == feature`, `complexity == complex`: the task facts the phase needs. */
+	whenTask?: string[];
 	/** False for a phase this effort level or change set dropped. */
 	runs: boolean;
 	dispatch: string;
@@ -430,6 +427,13 @@ export interface WorkflowPhasePayload {
 	/** "effort" | "untouched" — why it was dropped, when it was. */
 	skipReason: string | null;
 	deterministic: boolean;
+	/** The `<pack>/<skill>` played when `impl` is not installed, if declared. */
+	fallback: string | null;
+	/** The phase changes something a discarded branch cannot undo. */
+	irreversible: boolean;
+	/** Set when `impl` is the fallback: the implementation the workflow declared. */
+	substitutedFrom: string | null;
+	substitutionReason: string;
 }
 
 export interface WorkflowLevelPayload {
@@ -439,6 +443,10 @@ export interface WorkflowLevelPayload {
 }
 
 export interface WorkflowProfilePayload {
+	jev?: {
+		observation: import("../../shared/types/jev").JevObservation | null;
+		airgapStrict: boolean;
+	};
 	workflow: string;
 	description: string;
 	effort: string;
@@ -469,6 +477,588 @@ export interface WorkflowProfileQuery {
 	includeLevels?: boolean;
 }
 
+// ---------------------------------------------------------------------------
+// Spec traceability — what the spec left open, and what the plan will not build
+//
+// The backend recomputes this rather than reading back the `traceability.json`
+// a build wrote, so the answer is right for a task that has not been planned
+// yet — which is most of the tasks someone opens this panel on.
+
+export interface TraceabilityRequirement {
+	id: string;
+	title: string;
+	line: number;
+}
+
+export interface TraceabilityOpenQuestion {
+	question: string;
+	section: string;
+	line: number;
+}
+
+export interface TraceabilityCoverage {
+	/** False when the question cannot be asked — see `reason`. */
+	applicable: boolean;
+	reason: string;
+	/** Null when not applicable: a spec with no ids is not a spec at 0%. */
+	percent: number | null;
+	covered: Record<string, string[]>;
+	uncovered: string[];
+	/** A subtask citing a requirement `spec.md` does not declare. */
+	unknownRefs: Record<string, string[]>;
+	summary: string;
+}
+
+export interface TraceabilityPayload {
+	spec: string;
+	requirements: TraceabilityRequirement[];
+	openQuestions: TraceabilityOpenQuestion[];
+	coverage: TraceabilityCoverage;
+}
+
+export interface SpecTraceabilityQuery {
+	specDir?: string;
+	projectDir?: string;
+	specId?: string;
+}
+
+/** The backend speaks snake_case; the renderer speaks camelCase. */
+interface RawTraceability {
+	spec: string;
+	requirements: TraceabilityRequirement[];
+	open_questions: TraceabilityOpenQuestion[];
+	coverage: Omit<TraceabilityCoverage, "unknownRefs"> & {
+		unknown_refs: Record<string, string[]>;
+	};
+}
+
+export async function fetchSpecTraceability(
+	query: SpecTraceabilityQuery,
+	signal?: AbortSignal,
+): Promise<ApiResult<TraceabilityPayload>> {
+	const params: Record<string, string> = {};
+	if (query.specDir) params.spec_dir = query.specDir;
+	if (query.projectDir) params.project_dir = query.projectDir;
+	if (query.specId) params.spec_id = query.specId;
+
+	const res = await _get<{ traceability: RawTraceability }>(
+		"/api/spec-traceability/",
+		params,
+		signal,
+	);
+	if (!res.ok) return res;
+
+	const raw = res.data.traceability;
+	const { unknown_refs, ...coverage } = raw.coverage;
+	return {
+		ok: true,
+		data: {
+			spec: raw.spec,
+			requirements: raw.requirements,
+			openQuestions: raw.open_questions,
+			coverage: { ...coverage, unknownRefs: unknown_refs },
+		},
+	};
+}
+
+/* -------------------------------------------------------------------------
+ * Docintel — task attachments and ADRs, as the agents will read them
+ *
+ *   GET /api/docintel/?project_dir=…&spec_id=…
+ *
+ * Recomputed on every call, nothing written; refused in server mode by the
+ * same addressing rules as the traceability endpoint.
+ * ---------------------------------------------------------------------- */
+
+/** See `STATUSES` in docintel/models.py. */
+export type DocintelStatus =
+	| "diagram"
+	| "text"
+	| "image"
+	| "document"
+	| "skipped"
+	| "redacted"
+	| "withheld";
+
+export interface DocintelDocument {
+	path: string;
+	status: DocintelStatus;
+	engine: string;
+	/** Why nothing (or less than everything) was read: a reason code. */
+	reason: string;
+	/** `safe` | `suspect` | `blocked` — from injection_guard. */
+	threat: string;
+	/** Kinds of secret found (never a value), from security/scan_secrets.py. */
+	secrets: string[];
+	/** True when a local vision model described the image. */
+	described: boolean;
+	nodeCount: number;
+	edgeCount: number;
+	/** A crash or a failed build found in the text, located in the repository. */
+	diagnosis: DocintelDiagnosis | null;
+	/** A PDF's pages, and how many were rendered for OCR (0 otherwise). */
+	pagesTotal: number;
+	pagesRead: number;
+}
+
+/** See `summary` in docintel/diagnostics.py. */
+export interface DocintelDiagnosis {
+	trace?: {
+		exception: string;
+		language: string;
+		projectFrames: number;
+		frameworkFrames: number;
+		/** `path:line` of the innermost frame the project owns. */
+		top: string | null;
+	};
+	ci?: {
+		errors: number;
+		/** First codes, e.g. `CS0103`, `NU1101`, `TS2345`. */
+		codes: string[];
+		failingTests: number;
+	};
+}
+
+export interface DocintelAdr {
+	id: string;
+	title: string;
+	status: string;
+	path: string;
+	decision: string;
+	binding: boolean;
+}
+
+/** See `_code_checks` in docintel/api.py. */
+export interface DocintelErdSummary {
+	diagrams: { path: string; origin: "attachment" | "repository" }[];
+	findings: number;
+	kinds: string[];
+	ambiguous: number;
+}
+
+export interface DocintelSequenceSummary {
+	path: string;
+	origin: "attachment" | "repository";
+	verified: number;
+	checkable: number;
+}
+
+export interface DocintelApiTestSummary {
+	method: string;
+	path: string;
+	status: number | null;
+	origin: string;
+	/** Where the drafted test goes, relative to the project; "" when undecided. */
+	destination: string;
+	stack: string;
+}
+
+export interface DocintelPayload {
+	documents: DocintelDocument[];
+	adrs: DocintelAdr[];
+	/** A stack trace or build log pasted into the task description. */
+	descriptionDiagnosis: DocintelDiagnosis | null;
+	/** ERD vs. ORM mapping, when an ERD exists. */
+	erd: DocintelErdSummary | null;
+	/** Sequence diagrams whose calls were looked up in the code. */
+	sequences: DocintelSequenceSummary[];
+	/** HTTP captures of the task, each drafted as an integration test. */
+	apiTests: DocintelApiTestSummary[];
+	/** Whether a Figma mockup can be linked: a boolean, never the token. */
+	figma: { configured: boolean };
+}
+
+interface RawDocintelDocument {
+	path: string;
+	status: DocintelStatus;
+	engine: string;
+	reason: string;
+	threat: string;
+	secrets?: string[];
+	described?: boolean;
+	diagram: { nodes?: unknown[]; edges?: unknown[] } | null;
+	diagnosis_summary?: DocintelDiagnosis | null;
+	pages_total?: number;
+	pages_read?: number;
+}
+
+export async function fetchDocintel(
+	query: SpecTraceabilityQuery,
+	signal?: AbortSignal,
+): Promise<ApiResult<DocintelPayload>> {
+	const params: Record<string, string> = {};
+	if (query.specDir) params.spec_dir = query.specDir;
+	if (query.projectDir) params.project_dir = query.projectDir;
+	if (query.specId) params.spec_id = query.specId;
+
+	const res = await _get<{
+		documents: RawDocintelDocument[];
+		adrs: DocintelAdr[];
+		description_diagnosis?: DocintelDiagnosis | null;
+		erd?: DocintelErdSummary | null;
+		sequences?: DocintelSequenceSummary[];
+		apiTests?: DocintelApiTestSummary[];
+		figma?: { configured?: boolean };
+	}>("/api/docintel/", params, signal);
+	if (!res.ok) return res;
+
+	return {
+		ok: true,
+		data: {
+			documents: (res.data.documents ?? []).map((doc) => ({
+				path: doc.path,
+				status: doc.status,
+				engine: doc.engine,
+				reason: doc.reason,
+				threat: doc.threat,
+				secrets: doc.secrets ?? [],
+				described: doc.described ?? false,
+				nodeCount: doc.diagram?.nodes?.length ?? 0,
+				edgeCount: doc.diagram?.edges?.length ?? 0,
+				diagnosis: doc.diagnosis_summary ?? null,
+				pagesTotal: doc.pages_total ?? 0,
+				pagesRead: doc.pages_read ?? 0,
+			})),
+			adrs: res.data.adrs ?? [],
+			descriptionDiagnosis: res.data.description_diagnosis ?? null,
+			erd: res.data.erd ?? null,
+			sequences: res.data.sequences ?? [],
+			apiTests: res.data.apiTests ?? [],
+			figma: { configured: res.data.figma?.configured === true },
+		},
+	};
+}
+
+/* -------------------------------------------------------------------------
+ * Docintel drafts — requirements, criteria and rule tables proposed from the
+ * attachments, and a whiteboard photo turned into a diagram
+ *
+ *   GET  /api/docintel/drafts
+ *   POST /api/docintel/drafts/extract   read the attachments now (OCR included)
+ *   POST /api/docintel/drafts/decide    accept / reject; accepted go to spec.md
+ *   POST /api/docintel/whiteboard       photo -> attachments/<name>.whiteboard.drawio
+ * ---------------------------------------------------------------------- */
+
+export type DraftStatus = "proposed" | "accepted" | "rejected";
+
+export interface RequirementDraft {
+	key: string;
+	/** Provisional until accepted: the next free id in spec.md at that moment. */
+	id: string;
+	kind: "FR" | "NFR";
+	text: string;
+	source: string;
+	page: number;
+	/** The document's own reference (`REQ-12`, `EF-03`). */
+	ref: string;
+	status: DraftStatus;
+}
+
+export interface CriterionDraft {
+	key: string;
+	text: string;
+	source: string;
+	page: number;
+	status: DraftStatus;
+}
+
+export interface RuleTestDraft {
+	language: string;
+	framework: string;
+	code: string;
+	notes: string[];
+}
+
+export interface RuleTableDraft {
+	key: string;
+	table: {
+		headers: string[];
+		rows: string[][];
+		caption: string;
+		source: string;
+		page: number;
+	};
+	source: string;
+	tests: RuleTestDraft[];
+	status: "proposed" | "rejected";
+}
+
+export interface DocintelDrafts {
+	requirements: RequirementDraft[];
+	criteria: CriterionDraft[];
+	tables: RuleTableDraft[];
+	sources: string[];
+	generated_at: string;
+}
+
+export interface DocintelVision {
+	images: string[];
+	available: boolean;
+	/** Why a photo cannot be converted here: `model-not-installed`… */
+	reason: string;
+	model?: string;
+}
+
+export interface DocintelDraftsPayload {
+	drafts: DocintelDrafts | null;
+	pending: number;
+	/** Attachments a proposal can be read from (prose, PDF, images). */
+	readable: string[];
+	pdfBackends: string[];
+	vision: DocintelVision;
+}
+
+export interface DraftDecisionResult {
+	requirements: { id: string; text: string; key: string }[];
+	criteria: string[];
+	spec_updated: boolean;
+	description_section: string;
+	traceability: string;
+}
+
+export interface DraftDecision {
+	acceptRequirements?: Record<string, string>;
+	rejectRequirements?: string[];
+	acceptCriteria?: Record<string, string>;
+	rejectCriteria?: string[];
+	rejectTables?: string[];
+}
+
+export interface WhiteboardResult {
+	/** `converted`, or why not: `no-vision-model`, `injection`, `exists`… */
+	status: string;
+	reason: string;
+	path: string;
+	nodes: number;
+	edges: number;
+	secrets: string[];
+	conformance: {
+		status: string;
+		findings: number;
+		inverted: number;
+	} | null;
+}
+
+function specAddress(query: SpecTraceabilityQuery): Record<string, string> {
+	const address: Record<string, string> = {};
+	if (query.specDir) address.spec_dir = query.specDir;
+	if (query.projectDir) address.project_dir = query.projectDir;
+	if (query.specId) address.spec_id = query.specId;
+	return address;
+}
+
+export function fetchDocintelDrafts(
+	query: SpecTraceabilityQuery,
+	signal?: AbortSignal,
+): Promise<ApiResult<DocintelDraftsPayload>> {
+	return _get<DocintelDraftsPayload>(
+		"/api/docintel/drafts",
+		specAddress(query),
+		signal,
+	);
+}
+
+export function extractDocintelDrafts(
+	query: SpecTraceabilityQuery,
+	signal?: AbortSignal,
+): Promise<ApiResult<DocintelDraftsPayload>> {
+	return _post<DocintelDraftsPayload>(
+		"/api/docintel/drafts/extract",
+		specAddress(query),
+		signal,
+	);
+}
+
+export function decideDocintelDrafts(
+	query: SpecTraceabilityQuery,
+	decision: DraftDecision,
+	signal?: AbortSignal,
+): Promise<ApiResult<DocintelDraftsPayload & { decision: DraftDecisionResult }>> {
+	return _post<DocintelDraftsPayload & { decision: DraftDecisionResult }>(
+		"/api/docintel/drafts/decide",
+		{
+			...specAddress(query),
+			accept_requirements: decision.acceptRequirements ?? {},
+			reject_requirements: decision.rejectRequirements ?? [],
+			accept_criteria: decision.acceptCriteria ?? {},
+			reject_criteria: decision.rejectCriteria ?? [],
+			reject_tables: decision.rejectTables ?? [],
+		},
+		signal,
+	);
+}
+
+export function convertWhiteboard(
+	query: SpecTraceabilityQuery,
+	path: string,
+	signal?: AbortSignal,
+): Promise<ApiResult<{ result: WhiteboardResult }>> {
+	return _post<{ result: WhiteboardResult }>(
+		"/api/docintel/whiteboard",
+		{ ...specAddress(query), path },
+		signal,
+	);
+}
+
+/** See `FigmaImport` in docintel/figma.py. */
+export interface FigmaImportResult {
+	/** `imported`, or why not: `invalid-url`, `no-token`, `airgap`, `http-403`… */
+	status: string;
+	path: string;
+	file_key: string;
+	frames: number;
+	texts: number;
+	withheld: number;
+	secrets: string[];
+}
+
+/** A Figma link -> `attachments/<name>.figma.json`, read by the backend. */
+export function linkFigmaMockup(
+	query: SpecTraceabilityQuery,
+	url: string,
+	signal?: AbortSignal,
+): Promise<ApiResult<{ result: FigmaImportResult }>> {
+	return _post<{ result: FigmaImportResult }>(
+		"/api/docintel/figma",
+		{ ...specAddress(query), url },
+		signal,
+	);
+}
+
+/* -------------------------------------------------------------------------
+ * Docintel visual QA — the captures of the running app, read by OCR
+ *
+ *   GET  /api/docintel/visual        the persisted record + the captures now
+ *   POST /api/docintel/visual/run    read the captures now (what QA does)
+ *   POST /api/docintel/captures      keep a frame as a capture of the task
+ *
+ * See `docintel/visual_qa.py`. Every text in the record is screen text read
+ * by OCR — shown, never interpreted.
+ * ---------------------------------------------------------------------- */
+
+export type VisualSeverity = "high" | "medium" | "low";
+export type CaptureSide = "base" | "task" | "store";
+export type CapturePlatform = "web" | "android" | "ios" | "desktop";
+
+export interface VisualFinding {
+	kind: string;
+	severity: VisualSeverity;
+	text: string;
+	detail: string;
+	capture: string;
+}
+
+export interface VisualCapture {
+	path: string;
+	origin: "spec" | "visual-proof" | "store";
+	side: CaptureSide;
+	platform: CapturePlatform;
+	route: string;
+	locale: string;
+	source: string;
+	label: string;
+	key: string;
+	reading?: { status: string; reason: string; labels: string[] };
+	screen?: { language: string; kind: string; locale: string };
+}
+
+export interface VisualDiff {
+	key: string;
+	route: string;
+	locale: string;
+	platform: CapturePlatform;
+	base: string;
+	task: string;
+	changed: { before: string; after: string; similarity: number }[];
+	added: string[];
+	removed: string[];
+	unchanged: number;
+}
+
+export interface VisualMockup {
+	source: string;
+	kind: "figma" | "image";
+	status: string;
+	reason?: string;
+	frame?: string;
+	capture?: string;
+	coverage?: number;
+	matched?: number;
+	total?: number;
+	missing?: string[];
+	near?: { expected: string; rendered: string; similarity: number }[];
+	frames?: number;
+}
+
+export interface VisualQaRecord {
+	captures: VisualCapture[];
+	findings: VisualFinding[];
+	diffs: VisualDiff[];
+	mockups: VisualMockup[];
+	skipped: string;
+	generated_at: string;
+}
+
+export interface VisualQaPayload {
+	record: VisualQaRecord | null;
+	counts: Record<VisualSeverity, number> | null;
+	/** Captures a run would read now (a directory listing, no OCR). */
+	captures: VisualCapture[];
+	/** Captures not in the record yet: a run would read them. */
+	pending: number;
+	saved?: string;
+}
+
+export interface CaptureInput {
+	side: "base" | "task";
+	/** `data:image/png;base64,…` */
+	image: string;
+	platform?: CapturePlatform;
+	source?: "emulator" | "device-runner" | "manual";
+	url?: string;
+	locale?: string;
+	label?: string;
+}
+
+export function fetchVisualQa(
+	query: SpecTraceabilityQuery,
+	signal?: AbortSignal,
+): Promise<ApiResult<VisualQaPayload>> {
+	return _get<VisualQaPayload>("/api/docintel/visual", specAddress(query), signal);
+}
+
+export function runVisualQa(
+	query: SpecTraceabilityQuery,
+	signal?: AbortSignal,
+): Promise<ApiResult<VisualQaPayload>> {
+	return _post<VisualQaPayload>(
+		"/api/docintel/visual/run",
+		specAddress(query),
+		signal,
+	);
+}
+
+export function saveCapture(
+	query: SpecTraceabilityQuery,
+	input: CaptureInput,
+	signal?: AbortSignal,
+): Promise<ApiResult<VisualQaPayload>> {
+	return _post<VisualQaPayload>(
+		"/api/docintel/captures",
+		{
+			...specAddress(query),
+			side: input.side,
+			image: input.image,
+			platform: input.platform ?? "web",
+			source: input.source ?? "manual",
+			url: input.url ?? "",
+			locale: input.locale ?? "",
+			label: input.label ?? "",
+		},
+		signal,
+	);
+}
+
 export async function fetchWorkflowProfile(
 	query: WorkflowProfileQuery,
 	signal?: AbortSignal,
@@ -487,4 +1077,615 @@ export async function fetchWorkflowProfile(
 		params,
 		signal,
 	);
+}
+
+/* -------------------------------------------------------------------------
+ * Hermes — readiness, persona, and the learning cycle
+ *
+ *   GET  /api/hermes/status
+ *   POST /api/hermes/cycle
+ *   POST /api/hermes/review
+ *   POST /api/hermes/soul/install
+ *
+ * All four are refused in server mode: every answer is about $HERMES_HOME on
+ * the machine running the backend, which on a shared deployment belongs to the
+ * server and not to the tenant asking. The caller renders `reason === "server-mode"`
+ * as "not available here" rather than as a failure.
+ * ---------------------------------------------------------------------- */
+
+export interface HermesCheck {
+	readonly name: string;
+	readonly ok: boolean;
+	readonly detail: string;
+	readonly remedy: string;
+	readonly required: boolean;
+}
+
+export interface HermesReadiness {
+	readonly state: "absent" | "ready" | "degraded";
+	readonly installed: boolean;
+	readonly ready: boolean;
+	readonly degraded: boolean;
+	readonly home: string;
+	readonly checks: readonly HermesCheck[];
+}
+
+export interface HermesSoul {
+	readonly state: "installed" | "diverged" | "not-installed" | "unavailable";
+	readonly offered: boolean;
+	readonly installed: boolean;
+	readonly matches: boolean;
+	readonly installedPath: string;
+	readonly repoPath: string;
+}
+
+/** Un candidat de la file de revue, avec ce qu'il faut pour trancher. */
+export interface HermesCandidate {
+	/** Nom du fichier dans `skills/_proposed/` — la clé d'une décision. */
+	readonly file: string;
+	readonly name: string;
+	readonly description: string;
+	/** Catégorie du catalogue hermes, vide pour un skill appris « à plat ». */
+	readonly category: string;
+	/** Encore en attente d'approbation dans hermes lui-même. */
+	readonly pendingInHermes: boolean;
+	/** La surface qui l'a proposé la première (`build`, `kanban`…). */
+	readonly surface: string;
+	/** Les outils propres à hermes qu'il nomme — à réécrire avant usage ailleurs. */
+	readonly tools: readonly string[];
+	/** Les premières lignes de la procédure. */
+	readonly excerpt: string;
+	readonly lines: number;
+}
+
+/** Le couplage avec le cerveau partagé (`hermes/brain_link.py`). */
+export interface HermesBrainLink {
+	/** Un cerveau existe et est allumé : chaque skill gardé y est versé. */
+	readonly active: boolean;
+	readonly root: string;
+	/** Notes `knowledge/hermes/` déjà dans le cerveau. */
+	readonly notes: number;
+	/** hermes a le serveur MCP `workpilot-brain` : il relit ce qu'on y verse. */
+	readonly hermesConnected: boolean;
+}
+
+export interface HermesStatus {
+	readonly readiness: HermesReadiness;
+	readonly soul: HermesSoul;
+	readonly pending: readonly string[];
+	/** Les mêmes candidats que `pending`, détaillés. Absent d'un backend ancien. */
+	readonly candidates?: readonly HermesCandidate[];
+	/** Noms refusés depuis le panneau — jamais reproposés. */
+	readonly declined?: number;
+	/** `HERMES_AUTO_ADOPT` : la boucle garde seule ce qui passe le triage. */
+	readonly autoAdopt?: boolean;
+	readonly brain?: HermesBrainLink;
+	/**
+	 * Candidats encore dans la file mais que ce dépôt a déjà écartés — filés
+	 * avant que le triage existe. Un nombre, pas une liste : ce n'est plus du
+	 * travail pour personne, le prochain cycle les retire.
+	 */
+	readonly stale: number;
+	/** Skills adoptés dans `skills/<adoptedPack>/`, encore présents. */
+	readonly adopted: readonly string[];
+	/** Le pack d'adoption — non listé dans `.workpilot/skills.toml`, donc émis nulle part. */
+	readonly adoptedPack: string;
+	readonly surfaces: readonly {
+		readonly id: string;
+		readonly description: string;
+	}[];
+}
+
+export interface HermesCycle {
+	readonly surface: string;
+	readonly surfaceDescription: string;
+	readonly readiness: HermesReadiness;
+	readonly ran: boolean;
+	readonly proposed: number;
+	readonly pending: readonly string[];
+	readonly stale: number;
+	readonly ingest: {
+		readonly found: number;
+		readonly proposed: number;
+		readonly files: readonly string[];
+		readonly unchanged: number;
+		readonly deferred: number;
+		/** Ce que le triage a écarté à l'entrée, par motif (`hermes_triage`). */
+		readonly dropped: Readonly<Record<string, number>>;
+		readonly droppedTotal: number;
+		/** Candidats déjà en file que ce cycle a retirés. */
+		readonly pruned: number;
+		/** Ce que ce cycle a adopté, par nom de skill. */
+		readonly adopted: readonly string[];
+		/** Noms que le registre d'adoption avait déjà tranchés. */
+		readonly alreadyAdopted: number;
+		readonly reason: string;
+	} | null;
+}
+
+export async function fetchHermesStatus(
+	signal?: AbortSignal,
+): Promise<ApiResult<{ status: HermesStatus }>> {
+	return _get<{ status: HermesStatus }>("/api/hermes/status", {}, signal);
+}
+
+export async function runHermesCycle(
+	surface: string,
+	signal?: AbortSignal,
+): Promise<ApiResult<{ cycle: HermesCycle; status?: HermesStatus }>> {
+	return _post<{ cycle: HermesCycle; status?: HermesStatus }>(
+		"/api/hermes/cycle",
+		{ surface, dryRun: false },
+		signal,
+	);
+}
+
+export type HermesDecision = "adopt" | "decline";
+
+export interface HermesReviewOutcome {
+	readonly adopted: readonly string[];
+	readonly declined: readonly string[];
+	readonly skipped: readonly { readonly file: string; readonly reason: string }[];
+	/** Notes écrites dans le cerveau partagé pour les skills gardés. */
+	readonly brainNotes: readonly string[];
+}
+
+export async function reviewHermesCandidates(
+	files: readonly string[],
+	decision: HermesDecision,
+	task?: { projectDir?: string; specId?: string },
+	signal?: AbortSignal,
+): Promise<ApiResult<{ review: HermesReviewOutcome; status: HermesStatus }>> {
+	return _post<{ review: HermesReviewOutcome; status: HermesStatus }>(
+		"/api/hermes/review",
+		{
+			files,
+			decision,
+			projectDir: task?.projectDir ?? null,
+			specId: task?.specId ?? null,
+		},
+		signal,
+	);
+}
+
+export async function installHermesSoul(
+	overwrite: boolean,
+	signal?: AbortSignal,
+): Promise<ApiResult<{ changed: boolean; message: string; soul: HermesSoul }>> {
+	return _post<{ changed: boolean; message: string; soul: HermesSoul }>(
+		"/api/hermes/soul/install",
+		{ overwrite },
+		signal,
+	);
+}
+
+/* ------------------------------------------------------------------ */
+/* rtk — command output condensed before an agent reads it            */
+/*                                                                    */
+/* GET /api/rtk/status                                                */
+/*                                                                    */
+/* Read-only, and there is no companion action on purpose: the one    */
+/* command a user might want a button for is `rtk init -g`, which     */
+/* writes a hook into their own Claude Code settings for every        */
+/* session on the machine — not only the ones WorkPilot drives. The   */
+/* panel prints the command; the person types it.                     */
+/* ------------------------------------------------------------------ */
+
+export interface RtkCheck {
+	readonly name: string;
+	readonly ok: boolean;
+	readonly detail: string;
+	readonly remedy: string;
+}
+
+export interface RtkReadiness {
+	readonly installed: boolean;
+	readonly enabled: boolean;
+	readonly version: string;
+	readonly binary: string;
+	/** "absent" | "disabled" | "degraded" | "active" */
+	readonly state: string;
+	readonly checks: readonly RtkCheck[];
+}
+
+export interface RtkSavings {
+	readonly available: boolean;
+	readonly commands: number;
+	readonly inputBytes: number;
+	readonly outputBytes: number;
+	readonly savedBytes: number;
+	/** rtk's own estimate: bytes / 4. Neither side ships a tokenizer. */
+	readonly savedTokens: number;
+	readonly averagePct: number;
+	readonly reason: string;
+}
+
+export interface RtkStatus {
+	readonly readiness: RtkReadiness;
+	readonly savings: RtkSavings;
+}
+
+export async function fetchRtkStatus(
+	projectDir?: string,
+	signal?: AbortSignal,
+): Promise<ApiResult<{ status: RtkStatus }>> {
+	// `_get` builds the query string itself — a `?` in the path would give
+	// the request two of them.
+	return _get<{ status: RtkStatus }>(
+		"/api/rtk/status",
+		projectDir ? { project_dir: projectDir } : {},
+		signal,
+	);
+}
+
+/* ------------------------------------------------------------------ */
+/* Brain — the shared brain every agent reads and writes              */
+/*                                                                    */
+/* GET  /api/brain/settings     where it is, its remote, its vault    */
+/* POST /api/brain/settings     plug a folder and/or a git remote     */
+/* GET  /api/brain/task         what one Kanban task taught it        */
+/* POST /api/brain/instruction  activate / turn down a proposed rule  */
+/* POST /api/brain/sync         commit, pull, push now                */
+/*                                                                    */
+/* Refused in server mode, like hermes: the brain lives in the home   */
+/* directory of the machine running the backend.                      */
+/* ------------------------------------------------------------------ */
+
+export interface BrainSettings {
+	readonly path: string;
+	readonly defaultPath: string;
+	/** Who chose the folder: the environment, Settings, or nobody. */
+	readonly source: "env" | "config" | "default";
+	readonly envVariable: string;
+	readonly configPath: string;
+	readonly enabled: boolean;
+	/** Enabled and a brain exists: every feature is plugged into it. */
+	readonly active: boolean;
+	readonly exists: boolean;
+	readonly folderExists: boolean;
+	readonly git: boolean;
+	readonly gitAvailable: boolean;
+	readonly remote: string | null;
+	readonly obsidianVault: boolean;
+	readonly notes: number;
+	readonly proposals: number;
+	/** The backend runs under WSL: a Windows path is accepted and converted. */
+	readonly wsl?: boolean;
+	/** The folders a brain may live under (the Windows profile too, under WSL). */
+	readonly homeRoots?: readonly string[];
+	/** Where the folder picker opens under WSL: the Windows profile, else drive C. */
+	readonly browseRoot?: string | null;
+}
+
+export interface BrainSettingsUpdate {
+	/** A folder under the home directory; "" goes back to the default. */
+	path?: string;
+	/** A git remote, or GitHub's `owner/repo`. */
+	remote?: string;
+	enabled?: boolean;
+	/** Create, clone or adopt the brain now. */
+	connect?: boolean;
+}
+
+export interface BrainNoteSummary {
+	readonly path: string;
+	readonly absPath: string;
+	readonly title: string;
+	readonly kind: string;
+	readonly status: string | null;
+	readonly agents: readonly string[];
+	readonly updated: string | null;
+}
+
+export interface BrainBuildNote extends BrainNoteSummary {
+	readonly qa: boolean | null;
+	readonly tests: boolean | null;
+	readonly merged: string | null;
+}
+
+export interface BrainTaskLearning {
+	readonly active: boolean;
+	readonly task: string;
+	readonly root?: string;
+	readonly build: BrainBuildNote | null;
+	readonly notes: readonly BrainNoteSummary[];
+	readonly proposals: readonly BrainNoteSummary[];
+}
+
+export interface BrainSyncResult {
+	readonly committed: boolean;
+	readonly pulled: boolean;
+	readonly pushed: boolean;
+	readonly remote: string | null;
+	readonly conflicts: readonly string[];
+	readonly skipped: string | null;
+	readonly error: string | null;
+	/** Where it failed: `commit`, `fetch`, `pull`, `push` or `git`. */
+	readonly step?: string | null;
+	/** git's own message, credentials removed. */
+	readonly detail?: string | null;
+}
+
+export async function fetchBrainSettings(
+	signal?: AbortSignal,
+): Promise<ApiResult<{ settings: BrainSettings }>> {
+	return _get<{ settings: BrainSettings }>("/api/brain/settings", {}, signal);
+}
+
+export async function saveBrainSettings(
+	update: BrainSettingsUpdate,
+	signal?: AbortSignal,
+): Promise<ApiResult<{ settings: BrainSettings }>> {
+	return _post<{ settings: BrainSettings }>(
+		"/api/brain/settings",
+		update,
+		signal,
+	);
+}
+
+export async function fetchBrainTask(
+	projectDir: string,
+	specId: string,
+	signal?: AbortSignal,
+): Promise<ApiResult<{ learning: BrainTaskLearning }>> {
+	return _get<{ learning: BrainTaskLearning }>(
+		"/api/brain/task",
+		{ project_dir: projectDir, spec_id: specId },
+		signal,
+	);
+}
+
+export async function setBrainInstructionStatus(
+	path: string,
+	status: "active" | "retired",
+	signal?: AbortSignal,
+): Promise<ApiResult<{ path: string; status: string }>> {
+	return _post<{ path: string; status: string }>(
+		"/api/brain/instruction",
+		{ path, status },
+		signal,
+	);
+}
+
+export async function syncBrain(
+	signal?: AbortSignal,
+): Promise<ApiResult<BrainSyncResult>> {
+	return _post<BrainSyncResult>(
+		"/api/brain/sync",
+		{ message: "brain: sync from WorkPilot" },
+		signal,
+	);
+}
+
+/** Opens a note in Obsidian — the vault must be one Obsidian knows. */
+export function obsidianUri(absPath: string): string {
+	return `obsidian://open?path=${encodeURIComponent(absPath)}`;
+}
+
+/* -------------------------------------------------------------------------
+ * UI/UX — ui-ux-pro-max: is this task about the interface, which design system
+ * ---------------------------------------------------------------------- */
+
+export type UiUxVerdict = "ui" | "not-ui" | "unknown";
+export type UiUxOverride = "auto" | "force" | "skip";
+
+export interface UiUxRelevance {
+	verdict: UiUxVerdict;
+	/** Stable code: planned-ui-files, description, no-ui-stack, override-force… */
+	reason: string;
+	detail: string;
+	plannedFiles: string[] | null;
+	uiFiles: string[];
+	override: UiUxOverride;
+}
+
+export interface UiUxRecord {
+	/** ready | skipped | not-installed | failed | withheld */
+	status: string;
+	relevance: UiUxRelevance;
+	source: "project" | "generated" | null;
+	masterPath: string | null;
+	masterWritten: boolean;
+	guide: string | null;
+	toolkit: string | null;
+	reasons: string[];
+}
+
+export interface UiUxDesign {
+	colors: { role: string; hex: string }[];
+	heading?: string;
+	body?: string;
+	style?: string;
+	pattern?: string;
+}
+
+export interface UiUxTaskPayload {
+	installed: boolean;
+	reason: string | null;
+	/** What the build's preflight wrote; null before the first build. */
+	record: UiUxRecord | null;
+	/** Before a build: the verdict the next build would reach, recomputed. */
+	forecast: UiUxRelevance | null;
+	design: UiUxDesign | null;
+}
+
+function specParams(query: SpecTraceabilityQuery): Record<string, string> {
+	const params: Record<string, string> = {};
+	if (query.specDir) params.spec_dir = query.specDir;
+	if (query.projectDir) params.project_dir = query.projectDir;
+	if (query.specId) params.spec_id = query.specId;
+	return params;
+}
+
+export async function fetchUiUxTask(
+	query: SpecTraceabilityQuery,
+	signal?: AbortSignal,
+): Promise<ApiResult<UiUxTaskPayload>> {
+	return _get<UiUxTaskPayload>("/api/uiux/task", specParams(query), signal);
+}
+
+export async function setUiUxOverride(
+	query: SpecTraceabilityQuery,
+	mode: UiUxOverride,
+): Promise<ApiResult<UiUxTaskPayload>> {
+	return _post<UiUxTaskPayload>("/api/uiux/override", {
+		...specParams(query),
+		mode,
+	});
+}
+
+// ─── Verification loop (`apps/backend/verify/api.py`) ─────────────────────────
+//
+// The record keeps the backend's snake_case: it is a measured document read
+// as-is by the card and the tab, and renaming forty fields one way here and
+// the other way in Python is how two shapes of one record start.
+
+export type VerifyStatus =
+	| "pass"
+	| "fail"
+	| "unknown"
+	| "not-applicable"
+	| "disabled"
+	| "running";
+
+export interface VerifyError {
+	kind: string;
+	message: string;
+	file?: string;
+	line?: number | null;
+	source?: string;
+}
+
+export interface VerifyTarget {
+	name: string;
+	kind: "web-frontend" | "desktop" | "mobile" | "backend-api" | string;
+	framework?: string;
+	root?: string;
+	url?: string;
+	touched?: boolean;
+	origin?: string;
+	launch?: {
+		status?: string;
+		command?: string;
+		url?: string;
+		seconds?: number;
+		detail?: string;
+		exit_code?: number | null;
+	};
+	errors: VerifyError[];
+}
+
+export interface VerifyRound {
+	round: number;
+	target: string;
+	errors_before: number;
+	errors_after: number | null;
+	fixed: boolean;
+	note?: string;
+}
+
+export interface VerifyEndpoint {
+	method: string;
+	path: string;
+	status: number | null;
+	expected: number[];
+	ok: boolean;
+	latency_ms: number | null;
+	schema_ok: boolean | null;
+	problems: string[];
+	outcome: string;
+	note?: string;
+	response_excerpt?: string;
+}
+
+export interface VerifyPerf {
+	url: string;
+	lcp_ms: number | null;
+	cls: number | null;
+	fcp_ms: number | null;
+	tbt_ms: number | null;
+	inp_ms: number | null;
+	score: number | null;
+	scored_on: string[];
+	engine: string;
+	measured: boolean;
+	reason?: string;
+}
+
+export interface VerifyMobile {
+	platform: string;
+	status: string;
+	device?: string;
+	startup_ms?: number | null;
+	jank?: Record<string, number>;
+	detail?: string;
+	errors: VerifyError[];
+}
+
+export interface VerifyRecord {
+	status: VerifyStatus;
+	reason: string;
+	score: number | null;
+	started_at?: number;
+	finished_at?: number | null;
+	provider?: string;
+	effort?: string;
+	targets: VerifyTarget[];
+	rounds: VerifyRound[];
+	scenario: Array<{ action: string; url?: string; text?: string; value?: string; note?: string }>;
+	confirmations: Array<{ state?: string; evidence?: string; url?: string }>;
+	endpoints: VerifyEndpoint[];
+	perf: VerifyPerf[];
+	lighthouse: Record<string, number>;
+	latency: { count?: number; p50_ms?: number; p95_ms?: number; max_ms?: number };
+	mobile: VerifyMobile[];
+	screenshots: Array<{ index: number; label: string; platform: string; url: string }>;
+	findings: Array<{ severity: string; kind?: string; message: string }>;
+	browser?: { engine: string; reasons: string[] };
+	replay?: { status: string; problems?: string[]; reason?: string };
+}
+
+export interface VerifySettings {
+	enabled: boolean;
+	maxRounds: number;
+	perfTrace: boolean;
+	allowMutations: boolean;
+	browser: string;
+	decidedBy: string;
+}
+
+export interface VerifyPayload {
+	record: VerifyRecord | null;
+	settings?: VerifySettings;
+}
+
+export function fetchVerify(
+	query: SpecTraceabilityQuery,
+	signal?: AbortSignal,
+): Promise<ApiResult<VerifyPayload>> {
+	return _get<VerifyPayload>("/api/verify/", specAddress(query), signal);
+}
+
+export function runVerify(
+	query: SpecTraceabilityQuery,
+	options: { effort?: string } = {},
+	signal?: AbortSignal,
+): Promise<ApiResult<VerifyPayload>> {
+	return _post<VerifyPayload>(
+		"/api/verify/run",
+		{ ...specAddress(query), ...(options.effort ? { effort: options.effort } : {}) },
+		signal,
+	);
+}
+
+/** The URL of one screenshot the record names — by index, never by path. */
+export function verifyScreenshotUrl(
+	query: SpecTraceabilityQuery,
+	index: number,
+): string {
+	const qs = new URLSearchParams({
+		...specAddress(query),
+		index: String(index),
+	}).toString();
+	return `${backendUrl()}/api/verify/screenshot?${qs}`;
 }

@@ -1,0 +1,453 @@
+"""Tests for the LLM token-optimization common trunk (core/llm_optimization.py)."""
+
+import json
+from pathlib import Path
+
+import pytest
+from core.llm_optimization import (
+    _ELIDED_PLACEHOLDER,
+    _TOOL_USE_HINT,
+    _message_len,
+    build_base_system_prompt,
+    claude_effort,
+    compact_messages,
+    copilot_thinking_budget,
+    gemini_reasoning_effort,
+    openai_prompt_cache_key,
+    openai_reasoning_effort,
+    should_inline_file_context,
+    truncate_tool_result,
+)
+
+# ---------------------------------------------------------------------------
+# System prompt builder
+# ---------------------------------------------------------------------------
+
+
+class TestBuildBaseSystemPrompt:
+    def test_contains_working_directory(self, tmp_path: Path):
+        prompt = build_base_system_prompt(tmp_path)
+        assert str(tmp_path.resolve()) in prompt
+        assert "expert full-stack developer" in prompt
+
+    def test_byte_stable_for_same_inputs(self, tmp_path: Path):
+        # Prompt caching is a prefix match — the builder must be deterministic.
+        assert build_base_system_prompt(tmp_path) == build_base_system_prompt(tmp_path)
+
+    def test_tool_use_hint_added_before_the_working_directory(self, tmp_path: Path):
+        without = build_base_system_prompt(tmp_path)
+        with_hint = build_base_system_prompt(tmp_path, tool_use_hint=True)
+        assert "You MUST use the provided tools" not in without
+        assert "You MUST use the provided tools" in with_hint
+        # The hint adds itself and nothing else. It is the same for every task
+        # of a provider, so it sits with the shared rules, before the worktree's
+        # path (cache-friendly ordering, tests/harness/test_stable_prefix.py).
+        assert with_hint.replace(_TOOL_USE_HINT, "", 1) == without
+        assert with_hint.index("You MUST use the provided tools") < with_hint.index(
+            "Your working directory is"
+        )
+
+    def test_accepts_string_path(self, tmp_path: Path):
+        assert build_base_system_prompt(str(tmp_path)) == build_base_system_prompt(
+            tmp_path
+        )
+
+
+# ---------------------------------------------------------------------------
+# OpenAI effort mapping
+# ---------------------------------------------------------------------------
+
+
+class TestOpenAIReasoningEffort:
+    @pytest.mark.parametrize(
+        ("budget", "expected"),
+        [
+            (None, None),  # thinking "none" → omit the parameter
+            (1024, "low"),
+            (4096, "medium"),
+            (16384, "high"),
+            (63999, "high"),  # ultrathink capped at "high" (xhigh not universal)
+        ],
+    )
+    def test_budget_mapping_on_reasoning_models(self, budget, expected):
+        assert openai_reasoning_effort("gpt-5.5", budget) == expected
+        assert openai_reasoning_effort("o3", budget) == expected
+
+    def test_non_reasoning_models_get_no_effort(self):
+        # gpt-4o / gpt-4.1 reject reasoning_effort — must be omitted
+        assert openai_reasoning_effort("gpt-4o", 16384) is None
+        assert openai_reasoning_effort("gpt-4.1-mini", 16384) is None
+
+    def test_unknown_budget_falls_back_to_medium(self):
+        assert openai_reasoning_effort("gpt-5.5", 12345) == "medium"
+
+    def test_empty_model(self):
+        assert openai_reasoning_effort("", 16384) is None
+
+
+# ---------------------------------------------------------------------------
+# Claude effort mapping
+# ---------------------------------------------------------------------------
+
+
+class TestClaudeEffort:
+    @pytest.mark.parametrize(
+        ("level", "expected"),
+        [
+            ("none", "low"),  # Opus 5.5 cannot turn thinking off
+            ("low", "low"),
+            ("medium", "medium"),
+            ("high", "high"),
+            ("ultrathink", "xhigh"),  # the deepest level every Opus takes
+        ],
+    )
+    def test_each_level_of_the_selector(self, level, expected):
+        from phase_config import THINKING_BUDGET_MAP
+
+        assert claude_effort(THINKING_BUDGET_MAP[level]) == expected
+
+    def test_a_zero_budget_is_no_thinking(self):
+        assert claude_effort(0) == "low"
+
+    def test_unknown_budget_falls_back_to_medium(self):
+        assert claude_effort(12345) == "medium"
+
+
+class TestGeminiReasoningEffort:
+    @pytest.mark.parametrize(
+        ("level", "expected"),
+        [
+            ("none", "low"),  # "none" is refused by 2.5 Pro and every 3.x model
+            ("low", "low"),
+            ("medium", "medium"),
+            ("high", "high"),
+            ("ultrathink", "high"),
+        ],
+    )
+    def test_each_level_of_the_selector(self, level, expected):
+        from phase_config import THINKING_BUDGET_MAP
+
+        for model in ("gemini-3.1-pro-preview", "gemini-2.5-flash", "gemini-4-argon"):
+            assert (
+                gemini_reasoning_effort(model, THINKING_BUDGET_MAP[level]) == expected
+            )
+
+    @pytest.mark.parametrize("model", ["gemini-2.0-flash", "gemini-1.5-pro", ""])
+    def test_a_model_without_thinking_gets_none(self, model):
+        assert gemini_reasoning_effort(model, 16384) is None
+
+
+class TestCopilotThinkingBudget:
+    SUPPORTS = {"min_thinking_budget": 1024, "max_thinking_budget": 32000}
+
+    @pytest.mark.parametrize(
+        ("budget", "expected"),
+        [(1024, 1024), (16384, 16384), (63999, 32000), (500, 1024)],
+    )
+    def test_the_budget_is_kept_inside_the_models_bounds(self, budget, expected):
+        assert copilot_thinking_budget(budget, {"supports": self.SUPPORTS}) == expected
+
+    def test_the_answer_keeps_room_under_the_output_limit(self):
+        capabilities = {
+            "supports": self.SUPPORTS,
+            "limits": {"max_output_tokens": 16000},
+        }
+        assert copilot_thinking_budget(63999, capabilities) == 15999
+
+    @pytest.mark.parametrize(
+        "capabilities",
+        [
+            None,
+            {},
+            {"supports": {}},
+            {"supports": {"max_thinking_budget": 0}},
+            {"supports": {"max_thinking_budget": True}},
+            {"supports": {"max_thinking_budget": "32000"}},
+            # bounds that leave no room: min above what the output allows
+            {"supports": SUPPORTS, "limits": {"max_output_tokens": 512}},
+        ],
+    )
+    def test_no_budget_for_a_model_that_takes_none(self, capabilities):
+        assert copilot_thinking_budget(16384, capabilities) is None
+
+    @pytest.mark.parametrize("budget", [None, 0])
+    def test_no_budget_when_the_user_asked_for_none(self, budget):
+        assert copilot_thinking_budget(budget, {"supports": self.SUPPORTS}) is None
+
+
+# ---------------------------------------------------------------------------
+# OpenAI prompt cache key
+# ---------------------------------------------------------------------------
+
+
+class TestOpenAIPromptCacheKey:
+    def test_stable_per_task_and_phase(self, tmp_path: Path):
+        spec = tmp_path / "001-my-task"
+        key1 = openai_prompt_cache_key(spec, "coder")
+        key2 = openai_prompt_cache_key(spec, "coder")
+        assert key1 == key2 == "workpilot/001-my-task/coder"
+
+    def test_differs_per_agent_type(self, tmp_path: Path):
+        spec = tmp_path / "001-my-task"
+        assert openai_prompt_cache_key(spec, "coder") != openai_prompt_cache_key(
+            spec, "qa_reviewer"
+        )
+
+    def test_none_spec_dir(self):
+        assert openai_prompt_cache_key(None, "coder") is None
+
+
+# ---------------------------------------------------------------------------
+# Tool-result truncation
+# ---------------------------------------------------------------------------
+
+
+class TestTruncateToolResult:
+    def test_short_text_unchanged(self):
+        assert truncate_tool_result("hello", limit=100) == "hello"
+
+    def test_none_returns_empty(self):
+        assert truncate_tool_result(None) == ""
+
+    def test_keeps_head_and_tail(self):
+        # Build/test verdicts sit at the END — both ends must survive.
+        text = "HEAD-" + ("x" * 50_000) + "-TAIL"
+        out = truncate_tool_result(text, limit=1000)
+        assert out.startswith("HEAD-")
+        assert out.endswith("-TAIL")
+        assert "omitted" in out
+        # Stays within the cap + marker overhead
+        assert len(out) < 1200
+
+    def test_default_limit_from_env(self, monkeypatch):
+        monkeypatch.setenv("LLM_TOOL_RESULT_MAX_CHARS", "2000")
+        out = truncate_tool_result("y" * 10_000)
+        assert len(out) < 2300
+
+    def test_invalid_env_falls_back(self, monkeypatch):
+        monkeypatch.setenv("LLM_TOOL_RESULT_MAX_CHARS", "not-a-number")
+        assert truncate_tool_result("z" * 5000) == "z" * 5000  # under 10k default
+
+
+# ---------------------------------------------------------------------------
+# File-context inlining policy
+# ---------------------------------------------------------------------------
+
+
+class TestShouldInlineFileContext:
+    def test_claude_never_inlines(self):
+        # The Claude Agent SDK coder re-reads files via its Read tool — inline
+        # content would be duplicated input paid on every turn.
+        assert should_inline_file_context("claude", None) is False
+        assert should_inline_file_context("anthropic", 16384) is False
+
+    def test_unresolved_provider_defaults_to_claude_behavior(self):
+        assert should_inline_file_context(None, 1024) is False
+
+    @pytest.mark.parametrize("budget", [None, 1024, 4096])  # none/low/medium
+    def test_generic_providers_inline_at_low_effort(self, budget):
+        assert should_inline_file_context("copilot", budget) is True
+        assert should_inline_file_context("openai", budget) is True
+        assert should_inline_file_context("windsurf", budget) is True
+
+    @pytest.mark.parametrize("budget", [16384, 63999])  # high/ultrathink
+    def test_generic_providers_skip_at_high_effort(self, budget):
+        assert should_inline_file_context("copilot", budget) is False
+        assert should_inline_file_context("openai", budget) is False
+
+    def test_env_override_always(self, monkeypatch):
+        monkeypatch.setenv("LLM_INLINE_FILE_CONTEXT", "always")
+        assert should_inline_file_context("claude", 63999) is True
+
+    def test_env_override_never(self, monkeypatch):
+        monkeypatch.setenv("LLM_INLINE_FILE_CONTEXT", "never")
+        assert should_inline_file_context("copilot", None) is False
+
+    def test_invalid_env_falls_back_to_auto(self, monkeypatch):
+        monkeypatch.setenv("LLM_INLINE_FILE_CONTEXT", "whatever")
+        assert should_inline_file_context("copilot", 1024) is True
+        assert should_inline_file_context("claude", 1024) is False
+
+
+# ---------------------------------------------------------------------------
+# History compaction
+# ---------------------------------------------------------------------------
+
+
+def _conversation(n_tool_results: int, result_size: int = 5000) -> list[dict]:
+    """Build an OpenAI-style conversation with n tool results."""
+    messages: list[dict] = [
+        {"role": "system", "content": "system prompt"},
+        {"role": "user", "content": "task prompt — implement the feature"},
+    ]
+    for i in range(n_tool_results):
+        messages.append({"role": "assistant", "content": f"calling tool {i}"})
+        messages.append(
+            {"role": "tool", "tool_call_id": f"call_{i}", "content": "r" * result_size}
+        )
+    return messages
+
+
+def _write_call(i: int, body: str) -> dict:
+    arguments = json.dumps({"file_path": f"src/module_{i}.py", "content": body})
+    return {
+        "id": f"call_{i}",
+        "type": "function",
+        "function": {"name": "write_file", "arguments": arguments},
+    }
+
+
+def _writes(n: int, file_chars: int) -> list[dict]:
+    """A conversation of n writes, each handing a whole file to write_file."""
+    messages: list[dict] = [
+        {"role": "system", "content": "system prompt"},
+        {"role": "user", "content": "task prompt — implement the feature"},
+    ]
+    for i in range(n):
+        messages.append(
+            {
+                "role": "assistant",
+                "content": f"writing {i}",
+                "tool_calls": [_write_call(i, "x" * file_chars)],
+            }
+        )
+        messages.append({"role": "tool", "tool_call_id": f"call_{i}", "content": "ok"})
+    return messages
+
+
+class TestCompactMessages:
+    def test_noop_under_budget(self):
+        messages = _conversation(3)
+        before = [dict(m) for m in messages]
+        assert compact_messages(messages, char_budget=1_000_000) == 0
+        assert messages == before  # prefix untouched → provider cache preserved
+
+    def test_elides_oldest_tool_results_first(self):
+        messages = _conversation(20, result_size=10_000)
+        elided = compact_messages(messages, char_budget=100_000, keep_recent=4)
+        assert elided > 0
+        # The OLDEST tool result was elided
+        assert messages[3]["content"] == _ELIDED_PLACEHOLDER
+        # tool_call_id structure preserved (API requires it)
+        assert messages[3]["tool_call_id"] == "call_0"
+        # The most recent tool result is intact
+        assert messages[-1]["content"] == "r" * 10_000
+
+    def test_protects_system_and_first_user_message(self):
+        messages = _conversation(20, result_size=10_000)
+        compact_messages(messages, char_budget=1, keep_recent=2)
+        assert messages[0]["content"] == "system prompt"
+        assert messages[1]["content"] == "task prompt — implement the feature"
+
+    def test_protects_recent_messages(self):
+        messages = _conversation(10, result_size=10_000)
+        compact_messages(messages, char_budget=1, keep_recent=4)
+        for msg in messages[-4:]:
+            assert msg["content"] != _ELIDED_PLACEHOLDER
+
+    def test_assistant_messages_never_elided(self):
+        messages = _conversation(10, result_size=10_000)
+        compact_messages(messages, char_budget=1, keep_recent=2)
+        for msg in messages:
+            if msg["role"] == "assistant":
+                assert msg["content"].startswith("calling tool")
+
+    def test_windsurf_text_mode_tool_results(self):
+        # Windsurf gRPC text mode embeds results in user messages
+        messages = [
+            {"role": "system", "content": "system prompt"},
+            {"role": "user", "content": "task prompt"},
+            {"role": "assistant", "content": "doing work"},
+            {"role": "user", "content": "<tool_result name='run'>" + "x" * 50_000},
+            {"role": "assistant", "content": "more work"},
+            {"role": "user", "content": "<tool_result name='run2'>recent result"},
+        ]
+        elided = compact_messages(messages, char_budget=10_000, keep_recent=2)
+        assert elided == 1
+        assert messages[3]["content"] == _ELIDED_PLACEHOLDER
+        # Recent text-mode result protected
+        assert "recent result" in messages[5]["content"]
+
+    def test_clears_in_one_batch_down_to_well_under_the_budget(self):
+        # Every elision rewrites the cached prefix from that point: one batch
+        # down to 60 % of the budget, not one result per turn at the edge.
+        messages = _conversation(20, result_size=10_000)
+        compact_messages(messages, char_budget=190_000, keep_recent=2)
+        total = sum(len(m["content"]) for m in messages)
+        assert total <= 114_000
+        assert total > 100_000  # and no further than it needs to
+
+    def test_the_turns_after_a_batch_clear_nothing(self):
+        messages = _conversation(20, result_size=10_000)
+        assert compact_messages(messages, char_budget=190_000, keep_recent=2) > 0
+        for i in range(20, 27):  # seven more results: still under the budget
+            messages.append({"role": "assistant", "content": f"calling tool {i}"})
+            messages.append(
+                {"role": "tool", "tool_call_id": f"call_{i}", "content": "r" * 10_000}
+            )
+            assert compact_messages(messages, char_budget=190_000, keep_recent=2) == 0
+
+    def test_tool_call_arguments_count_and_old_ones_go(self):
+        # Ten writes of a whole file: the history is the files they carried. A
+        # budget that counted only `content` saw 4 k of 400 k and cleared nothing.
+        messages = _writes(10, file_chars=40_000)
+        assert compact_messages(messages, char_budget=300_000, keep_recent=4) > 0
+        total = sum(_message_len(m) for m in messages)
+        assert total <= 180_000  # down to 60 % of the budget, in one batch
+        first_call = messages[2]["tool_calls"][0]
+        arguments = json.loads(first_call["function"]["arguments"])
+        # The call stays: its id, its name and its path; only the file went.
+        assert first_call["id"] == "call_0"
+        assert first_call["function"]["name"] == "write_file"
+        assert arguments["file_path"] == "src/module_0.py"
+        assert arguments["content"].startswith("[argument elided to save context")
+        assert messages[2]["content"] == "writing 0"
+        # The latest write is whole.
+        latest = json.loads(messages[-2]["tool_calls"][0]["function"]["arguments"])
+        assert latest["content"] == "x" * 40_000
+
+    def test_arguments_sent_as_an_object_stay_an_object(self):
+        # Ollama sends a tool call's arguments as an object, not a JSON string.
+        messages = _writes(10, file_chars=40_000)
+        for message in messages:
+            for call in message.get("tool_calls", []):
+                function = call["function"]
+                function["arguments"] = json.loads(function["arguments"])
+        compact_messages(messages, char_budget=300_000, keep_recent=4)
+        arguments = messages[2]["tool_calls"][0]["function"]["arguments"]
+        assert isinstance(arguments, dict)
+        assert arguments["file_path"] == "src/module_0.py"
+        assert arguments["content"].startswith("[argument elided to save context")
+
+    def test_arguments_that_are_not_an_object_are_left_as_sent(self):
+        messages = _writes(10, file_chars=40_000)
+        for message in messages[:6]:
+            for call in message.get("tool_calls", []):
+                call["function"]["arguments"] = "not json " + "y" * 40_000
+        before = [dict(m) for m in messages[:6]]
+        compact_messages(messages, char_budget=300_000, keep_recent=4)
+        for kept, original in zip(messages[:6], before, strict=True):
+            assert kept.get("tool_calls") == original.get("tool_calls")
+
+    def test_short_arguments_are_not_worth_a_rewrite(self):
+        # Only long arguments go: a call whose arguments are all short is
+        # not a candidate, however old it is.
+        messages = _conversation(20, result_size=10_000)
+        for i, message in enumerate(messages):
+            if message["role"] == "assistant":
+                message["tool_calls"] = [_write_call(i, "short body")]
+        compact_messages(messages, char_budget=190_000, keep_recent=2)
+        for message in messages:
+            for call in message.get("tool_calls", []):
+                body = json.loads(call["function"]["arguments"])["content"]
+                assert body == "short body"
+
+    def test_a_batch_that_frees_little_is_not_worth_a_rewrite(self):
+        # Over the budget, but almost all of it is recent or protected: eliding
+        # the one old result would rewrite the prefix to save 2 % of it.
+        messages = _conversation(1, result_size=2_000)
+        messages.append({"role": "assistant", "content": "a" * 120_000})
+        messages.append({"role": "tool", "tool_call_id": "x", "content": "r" * 10})
+        before = [dict(m) for m in messages]
+        assert compact_messages(messages, char_budget=100_000, keep_recent=2) == 0
+        assert messages == before

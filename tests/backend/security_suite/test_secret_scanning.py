@@ -118,12 +118,7 @@ def test_whitespace_content_returns_no_matches() -> None:
 
 
 def test_scan_returns_line_number_for_match() -> None:
-    content = (
-        "x = 1\n"
-        "y = 2\n"
-        'sk_key = "sk-ant-api03-' + "A" * 40 + '"\n'
-        "z = 3\n"
-    )
+    content = 'x = 1\ny = 2\nsk_key = "sk-ant-api03-' + "A" * 40 + '"\nz = 3\n'
     matches = scan_content(content, "file.py")
     assert matches, "expected a match"
     assert matches[0].line_number == 3

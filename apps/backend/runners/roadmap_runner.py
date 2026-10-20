@@ -22,7 +22,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Validate platform-specific dependencies BEFORE any imports that might
-# trigger graphiti_core -> real_ladybug -> pywintypes import chain (ACS-253)
+# trigger a pywintypes import (the MCP library imports win32api; ACS-253)
 from core.dependency_validator import validate_platform_dependencies
 
 validate_platform_dependencies()
@@ -36,7 +36,7 @@ env_file = Path(__file__).parent.parent.parent.parent / ".env-files" / ".env"
 if env_file.exists():
     load_dotenv(env_file)
 
-from debug import debug, debug_error, debug_warning
+from core.debug import debug, debug_error, debug_warning
 
 # Import from refactored roadmap package (now a subpackage of runners)
 from runners.roadmap import RoadmapOrchestrator

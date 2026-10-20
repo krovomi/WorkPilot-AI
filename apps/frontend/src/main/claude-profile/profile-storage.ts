@@ -3,7 +3,13 @@
  * Handles persistence of profile data to disk
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+	chmodSync,
+	existsSync,
+	mkdirSync,
+	readFileSync,
+	writeFileSync,
+} from "node:fs";
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -264,15 +270,26 @@ export async function loadProfileStoreAsync(
 }
 
 /**
- * Save profiles to disk
+ * Save profiles to disk, owner read/write only: OAuth tokens are encrypted
+ * there, or in clear when the OS has no keyring (see ../secret-storage).
  */
 export function saveProfileStore(
 	storePath: string,
 	data: ProfileStoreData,
 ): void {
 	try {
-		writeFileSync(storePath, JSON.stringify(data, null, 2), "utf-8");
+		writeFileSync(storePath, JSON.stringify(data, null, 2), {
+			encoding: "utf-8",
+			mode: 0o600,
+		});
 	} catch (error) {
 		console.error("[ProfileStorage] Error saving profiles:", error);
+		return;
+	}
+	try {
+		// `mode` only applies when the file is created.
+		chmodSync(storePath, 0o600);
+	} catch {
+		// Best effort: Windows ignores POSIX modes.
 	}
 }

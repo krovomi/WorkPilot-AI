@@ -11,7 +11,8 @@
 		"gitIntegrations": "Git & Integrations",
 		"planning": "Planning",
 		"toolbox": "Toolbox",
-		"favorites": "Favorites"
+		"favorites": "Favorites",
+		"administration": "Administration"
 	},
 	"favorites": {
 		"dropHint": "Drop here to pin"
@@ -33,13 +34,14 @@
 		"ideation": "Ideation",
 		"changelog": "Changelog",
 		"context": "Context",
+		"architectureVisualizer": "Architecture Visualizer",
 		"githubIssues": "GitHub Issues",
 		"githubPRs": "GitHub PRs",
 		"gitlabIssues": "GitLab Issues",
 		"gitlabMRs": "GitLab MRs",
 		"worktrees": "Worktrees",
 		"agentTools": "MCP Overview",
-		"migration": "Migration Wizard",
+		"migration": "Code Migration",
 		"visualProgramming": "Visual Programming",
 		"dashboard": "Dashboard",
 		"analytics": "Analytics",
@@ -84,6 +86,12 @@
 		"i18nAgent": "i18n Agent",
 		"onboardingAgent": "Onboarding Agent",
 		"flakyTests": "Flaky Test Detective",
+		"performanceProfiler": "Performance Profiler",
+		"cicdTriggers": "CI/CD Triggers",
+		"crossLanguageTranslation": "Cross-Language Translation",
+		"specApproval": "Spec Approval",
+		"liveCompanion": "Live Companion",
+		"contextMesh": "Context Mesh",
 		"docDrift": "Documentation Drift Detector",
 		"compliance": "Compliance Evidence Collector",
 		"gitSurgeon": "Git History Surgeon",
@@ -98,7 +106,8 @@
 		"blastRadius": "Impact Blast Radius",
 		"guardrails": "Agent Guardrails",
 		"envSnapshot": "Environment Snapshots",
-		"offlineMode": "Offline Mode"
+		"offlineMode": "Offline Mode",
+		"administration": "Administration"
 	},
 	"search": {
 		"placeholder": "Search...",
@@ -134,6 +143,14 @@
 		"dismiss": "Dismiss",
 		"downloadError": "Failed to download update",
 		"readOnlyVolumeWarning": "Move to Applications folder to update"
+	},
+	"secureStorageBanner": {
+		"title": "API keys stored without encryption",
+		"description": "No system keyring is available, so your API keys and tokens are kept on this device without OS encryption, in files only your user account can read.",
+		"action": "Install or unlock a keyring (GNOME Keyring, KWallet…) and restart WorkPilot AI: your keys will then be encrypted.",
+		"readableDescription": "The backend reads these keys straight from your projects' .workpilot/.env (or, when WorkPilot AI runs from source, from its own .env), so they stay unencrypted there, in a file only your user account can read: {{keys}}.",
+		"readableAction": "Remove from the project settings any key you no longer use. Running from source, configure Claude in Settings, where credentials are encrypted, and remove its token from the backend's .env.",
+		"dismiss": "Dismiss"
 	},
 	"claudeCode": {
 		"checking": "Checking Claude Code...",
@@ -179,6 +196,20 @@
 		"versionSwitchFailed": "Failed to switch version",
 		"terminalUnavailable": "Could not open a terminal. Update Claude Code from a terminal manually."
 	},
+	"agentCli": {
+		"checking": "Checking {{name}}...",
+		"installed": "{{name}} installed",
+		"installedWithVersion": "{{name}} ({{version}})",
+		"notFound": "{{name}} not found",
+		"error": "Could not check {{name}}",
+		"installedShort": "Installed",
+		"notInstalledShort": "Not installed",
+		"checkingShort": "Checking...",
+		"version": "Version",
+		"notInstalledDescription": "{{name}} is not on your PATH. Install it, sign in once in a terminal, then refresh.",
+		"signInHint": "WorkPilot uses the CLI's own sign-in and never reads its credentials.",
+		"viewDocs": "View {{name}} documentation"
+	},
 	"codex": {
 		"checking": "Checking Codex CLI...",
 		"installed": "Codex CLI installed",
@@ -196,5 +227,24 @@
 		"notInstalledDescription": "Codex CLI is not installed. Click \"Install\" to install it in the background:",
 		"installing": "Installing, please wait...",
 		"viewDocs": "View Codex CLI documentation"
+	},
+	"activity": {
+		"badge": {
+			"running_one": "{{count}} job running",
+			"running_other": "{{count}} jobs running",
+			"success_one": "{{count}} job finished",
+			"success_other": "{{count}} jobs finished",
+			"error_one": "{{count}} job failed",
+			"error_other": "{{count}} jobs failed"
+		},
+		"kinds": {
+			"scanning": "Scan",
+			"analyzing": "Analysis",
+			"generating": "Generation",
+			"optimizing": "Optimisation",
+			"discovering": "Discovery",
+			"build": "Build",
+			"ideation": "Ideation"
+		}
 	}
 }

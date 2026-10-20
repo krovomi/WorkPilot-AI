@@ -25,7 +25,7 @@ from .layers import (
     TimelineEntry,
     estimate_tokens,
 )
-from .sources import PatternSource, TaskLogSource, default_sources
+from .sources import BrainSource, PatternSource, TaskLogSource, default_sources
 
 __all__ = [
     "MemorySearch",
@@ -34,6 +34,7 @@ __all__ = [
     "MemoryRecord",
     "TimelineEntry",
     "IndexResult",
+    "BrainSource",
     "PatternSource",
     "TaskLogSource",
     "default_sources",

@@ -1,4 +1,8 @@
-"""Tests for skill resolution: the three gates, and the non-regression promise.
+"""Tests for skill resolution: the gates, and the non-regression promise.
+
+Gate 4, prompt injection, has its own file
+(`test_skills_registry_injection_gate.py`): it is the only gate that reads a
+body, and the false-positive half of its promise needs the real `skills/`.
 
 The promise this file pins down: **a project targeting an older toolchain keeps
 resolving to the skills written for it, no matter what newer variants ship.**
@@ -160,7 +164,7 @@ class TestRequiresGate:
 
     def test_command_accepts_alternatives(self, tmp_path):
         ok, _ = check_requires(
-            {"command": ["definitely-not-a-real-binary", "sh"]}, tmp_path
+            {"command": ["definitely-not-a-real-binary", sys.executable]}, tmp_path
         )
         assert ok
         ok, reason = check_requires(
@@ -179,7 +183,9 @@ class TestPackLoading:
         root = tmp_path / "skills"
         d = root / "demo"
         d.mkdir(parents=True)
-        (d / "pack.json").write_text(json.dumps({"name": "other", "version": "1.0.0"}))
+        (d / "pack.json").write_text(
+            json.dumps({"name": "other", "version": "1.0.0"}), encoding="utf-8"
+        )
         with pytest.raises(PackError, match="does not match its directory"):
             load_packs(root)
 
@@ -194,7 +200,7 @@ class TestPackLoading:
         root = tmp_path / "skills"
         d = root / "demo"
         d.mkdir(parents=True)
-        (d / "pack.json").write_text(json.dumps({"name": "demo"}))
+        (d / "pack.json").write_text(json.dumps({"name": "demo"}), encoding="utf-8")
         with pytest.raises(PackError, match="version"):
             load_packs(root)
 
@@ -202,17 +208,19 @@ class TestPackLoading:
 class TestProjectConfig:
     def test_declared_target_beats_detection(self, tmp_path):
         (tmp_path / "package.json").write_text(
-            json.dumps({"engines": {"node": ">=18"}})
+            json.dumps({"engines": {"node": ">=18"}}), encoding="utf-8"
         )
         (tmp_path / ".workpilot").mkdir()
-        (tmp_path / ".workpilot" / "skills.toml").write_text('[targets]\nnode = "22"\n')
+        (tmp_path / ".workpilot" / "skills.toml").write_text(
+            '[targets]\nnode = "22"\n', encoding="utf-8"
+        )
         config = load_project_config(tmp_path)
         assert config.targets["node"] == "22"
         assert config.detected["node"] == "18"
         assert config.target_source("node") == "skills.toml"
 
     def test_detection_fills_what_the_file_omits(self, tmp_path):
-        (tmp_path / "go.mod").write_text("module x\n\ngo 1.23\n")
+        (tmp_path / "go.mod").write_text("module x\n\ngo 1.23\n", encoding="utf-8")
         config = load_project_config(tmp_path)
         assert config.targets["go"] == "1.23"
         assert config.target_source("go") == "detected"
@@ -220,20 +228,24 @@ class TestProjectConfig:
     def test_dotnet_target_framework_moniker_is_decoded(self, tmp_path):
         (tmp_path / "app.csproj").write_text(
             "<Project><PropertyGroup><TargetFramework>net48</TargetFramework>"
-            "</PropertyGroup></Project>"
+            "</PropertyGroup></Project>",
+            encoding="utf-8",
         )
         assert load_project_config(tmp_path).targets["dotnet"] == "4.8"
 
     def test_multi_targeting_picks_the_newest_runtime(self, tmp_path):
         (tmp_path / "app.csproj").write_text(
             "<Project><PropertyGroup><TargetFrameworks>net48;net10.0</TargetFrameworks>"
-            "</PropertyGroup></Project>"
+            "</PropertyGroup></Project>",
+            encoding="utf-8",
         )
         assert load_project_config(tmp_path).targets["dotnet"] == "10.0"
 
     def test_invalid_toml_is_reported_not_ignored(self, tmp_path):
         (tmp_path / ".workpilot").mkdir()
-        (tmp_path / ".workpilot" / "skills.toml").write_text("[targets\nbroken")
+        (tmp_path / ".workpilot" / "skills.toml").write_text(
+            "[targets\nbroken", encoding="utf-8"
+        )
         with pytest.raises(ValueError, match="invalid TOML"):
             load_project_config(tmp_path)
 

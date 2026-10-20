@@ -187,7 +187,7 @@ from anthropic import Anthropic
 client = Anthropic()
 
 # Load the prompt
-with open('apps/backend/migration/prompts/react_to_vue.md', 'r') as f:
+with open("apps/backend/migration/prompts/react_to_vue.md", "r") as f:
     system_prompt = f.read()
 
 # Send code for transformation
@@ -198,9 +198,9 @@ response = client.messages.create(
     messages=[
         {
             "role": "user",
-            "content": f"Please transform this React component:\n\n{jsx_code}"
+            "content": f"Please transform this React component:\n\n{jsx_code}",
         }
-    ]
+    ],
 )
 
 print(response.content[0].text)
@@ -214,9 +214,7 @@ from apps.backend.migration.transformer import TransformationEngine
 
 # Prompts are automatically used during transformation
 engine = TransformationEngine(
-    project_dir="./src",
-    source_framework="react",
-    target_framework="vue"
+    project_dir="./src", source_framework="react", target_framework="vue"
 )
 
 # Loads react_to_vue.md prompt automatically

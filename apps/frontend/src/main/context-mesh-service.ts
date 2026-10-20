@@ -2,9 +2,14 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { app } from "electron";
 import { MODEL_ID_MAP } from "../shared/constants";
 import type { AppSettings } from "../shared/types";
+import { readSettingsFile } from "./settings-utils";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Request configuration for a context mesh operation
@@ -154,12 +159,9 @@ export class ContextMeshService extends EventEmitter {
 		};
 
 		try {
-			const settingsPath = path.join(app.getPath("userData"), "settings.json");
-			if (existsSync(settingsPath)) {
-				const { readFileSync } = require("node:fs");
-				const settings: AppSettings = JSON.parse(
-					readFileSync(settingsPath, "utf-8"),
-				);
+			// Through settings-utils: it decrypts the stored keys.
+			const settings = readSettingsFile() as Partial<AppSettings> | undefined;
+			if (settings) {
 				if (settings.globalClaudeOAuthToken) {
 					processEnv.CLAUDE_OAUTH_TOKEN = settings.globalClaudeOAuthToken;
 				}

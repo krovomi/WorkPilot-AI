@@ -2,7 +2,6 @@ import {
 	existsSync,
 	mkdirSync,
 	readdirSync,
-	readFileSync,
 	writeFileSync,
 } from "node:fs";
 import path from "node:path";
@@ -25,9 +24,9 @@ import type {
 } from "../../shared/types";
 import { slugifySpecTitle } from "../../shared/utils/spec-slug";
 import type { AgentManager } from "../agent";
+import { readProjectEnv } from "../project-env-file";
 import { projectStore } from "../project-store";
 import { sanitizeText, sanitizeUrl } from "./shared/sanitize";
-import { parseEnvFile } from "./utils";
 
 /**
  * Register all linear-related IPC handlers
@@ -44,17 +43,7 @@ export function registerLinearHandlers(
 	 * Helper to get Linear API key from project env
 	 */
 	const getLinearApiKey = (project: Project): string | null => {
-		if (!project.autoBuildPath) return null;
-		const envPath = path.join(project.path, project.autoBuildPath, ".env");
-		if (!existsSync(envPath)) return null;
-
-		try {
-			const content = readFileSync(envPath, "utf-8");
-			const vars = parseEnvFile(content);
-			return vars.LINEAR_API_KEY || null;
-		} catch {
-			return null;
-		}
+		return readProjectEnv(project).LINEAR_API_KEY || null;
 	};
 
 	/**

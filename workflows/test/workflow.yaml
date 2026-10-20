@@ -1,0 +1,64 @@
+name: test
+description: >-
+  Tests that pass on the existing code and would fail if the target broke.
+  A short pipeline: plan which behaviours to pin, write the tests, read
+  them, run them. Chosen by `workflows/registry.py` for cards of kind
+  `test`. The deterministic mutation check that proves the second half —
+  break the target, see the tests go red — is a later lot; until then the
+  independent review asks that question.
+
+phases:
+  - id: docs
+    impl: workpilot/libdocs
+    always: true
+    description: >-
+      The test library's documentation when the repository shows no example
+      of it, decided without a model.
+
+  - id: planning
+    impl: workpilot/planner
+    gate: human
+    description: >-
+      The existing planner: which behaviours to pin, in which test files,
+      with the project's own test library and layout
+      (`test_generation/layout.py` decides where generated tests go).
+
+  - id: coding
+    impl: tooling/tdd-cycle
+    dispatch: subagent-per-task
+    description: >-
+      Each test written is run: green on the existing code, and — the half
+      TDD adds — red when the assertion is inverted, so it tests something.
+
+  - id: review
+    impl: tooling/review-lenses
+    min_effort: medium
+    dispatch: fresh-context
+    roster: solo
+    description: >-
+      A reader that did not write the tests: does each one fail when the
+      target breaks, does any depend on order or time, does any test the
+      mock rather than the code.
+
+  - id: verify
+    impl: tooling/verify
+    agent: verifier
+    roster: verify
+    dispatch: fresh-context
+    hard_gate: tests-pass
+    description: >-
+      The suite, run. `tests-pass` is the one gate a test task has;
+      `app-verified` is not asked, nothing in the application changed.
+
+  - id: qa
+    impl: workpilot/qa-loop
+    always: true
+    description: >-
+      The QA loop on the acceptance criteria: the named behaviours are
+      covered and the suite is green.
+
+  - id: observe
+    impl: workpilot/observe
+    always: true
+    description: >-
+      What writing these tests taught about the project.

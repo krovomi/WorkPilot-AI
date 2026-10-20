@@ -2,9 +2,10 @@
 
 Nothing here stores anything. Each adapter exposes an existing store through
 the `MemorySource` staircase, which is the whole reason this is a query layer
-rather than a fourth memory: `task_logger/` keeps the traces, `learning_loop/`
-keeps the distilled patterns, `integrations/graphiti/` keeps the graph, and
-they go on doing exactly that.
+rather than another memory: `task_logger/` keeps the traces, `learning_loop/`
+keeps the distilled patterns, and the shared brain (the Obsidian vault,
+`brain/project_memory.py`) keeps what the builds learned about the project —
+the one store of knowledge. They go on doing exactly that.
 
 The rule every adapter follows: **`refs()` must not read a body.** A spec's
 task log is a single JSON file that can run to megabytes, so the index is built
@@ -23,6 +24,7 @@ from .layers import MemoryRecord, MemoryRef, TimelineEntry
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "BrainSource",
     "TaskLogSource",
     "PatternSource",
     "default_sources",
@@ -40,10 +42,9 @@ def _terms(query: str) -> list[str]:
 def _score(text: str, terms: list[str]) -> float:
     """Fraction of the query's terms present. No terms means everything ties.
 
-    A lexical score, deliberately. The semantic layer is graphiti's job and it
-    is a separate source; making the cheap index depend on an embedding call
-    would put a network round trip in front of the question "is there anything
-    here at all?".
+    A lexical score, deliberately: making the cheap index depend on an
+    embedding call would put a network round trip in front of the question "is
+    there anything here at all?".
     """
     if not terms:
         return 0.5
@@ -143,9 +144,9 @@ class TaskLogSource:
 
 
 class PatternSource:
-    """Distilled patterns, from `learning_loop`'s store.
+    """Distilled patterns, from `learning_loop`'s store (notes in the vault).
 
-    Patterns are already short, so all three layers come from the same file.
+    Patterns are already short, so all three layers come from the same record.
     The staircase still holds: the index shows the description, the timeline
     adds the evidence, and only the detail carries the full instruction.
     """
@@ -153,19 +154,21 @@ class PatternSource:
     name = "pattern"
 
     def __init__(self, project_dir: Path):
-        self.path = Path(project_dir) / ".workpilot" / "learning_loop" / "patterns.json"
+        self.project_dir = Path(project_dir)
         self._cache: list[dict] | None = None
 
     def _all(self) -> list[dict]:
         if self._cache is not None:
             return self._cache
         self._cache = []
-        if self.path.is_file():
-            try:
-                raw = json.loads(self.path.read_text(encoding="utf-8"))
-                self._cache = [p for p in raw if isinstance(p, dict)]
-            except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
-                logger.debug("could not read %s: %s", self.path, exc)
+        try:
+            from learning_loop.pattern_storage import PatternStorage
+
+            self._cache = [
+                p.to_dict() for p in PatternStorage(self.project_dir).load_patterns()
+            ]
+        except Exception as exc:  # noqa: BLE001 - no patterns is an empty source
+            logger.debug("could not read the learning patterns: %s", exc)
         return self._cache
 
     def _find(self, ref_id: str) -> dict | None:
@@ -227,6 +230,139 @@ class PatternSource:
         )
 
 
+class BrainSource:
+    """The project's memory in the shared brain (``knowledge/projects/<p>/``).
+
+    The index is built from the vault's ``graph.json`` — a node's label, tags and
+    frontmatter — so no note body is read until its detail is asked for. Build
+    notes, memory notes (gotchas, patterns, codebase, sessions, outcomes) and
+    whatever else the project's agents filed there are all one source.
+    """
+
+    name = "brain"
+
+    def __init__(self, project_dir: Path):
+        from brain.tasks import project_name, project_rel
+
+        self.project = project_name(Path(project_dir))
+        self.prefix = project_rel(self.project).parent.as_posix() + "/"
+        self._brain = None
+        self._nodes: list[dict] | None = None
+
+    def _vault(self):
+        if self._brain is None:
+            try:
+                from brain import Brain
+                from brain.runtime import active
+
+                brain = Brain()
+                self._brain = brain if active(brain.root) else False
+            except Exception as exc:  # noqa: BLE001 - no brain is an empty source
+                logger.debug("brain unavailable: %s", exc)
+                self._brain = False
+        return self._brain or None
+
+    def _all(self) -> list[dict]:
+        if self._nodes is not None:
+            return self._nodes
+        self._nodes = []
+        brain = self._vault()
+        if brain is None:
+            return self._nodes
+        try:
+            if brain.graph_is_stale():
+                brain._refresh()
+            # The learning loop's patterns are `PatternSource`'s, with their
+            # evidence; listing them here too would show each one twice.
+            self._nodes = [
+                node
+                for node in brain.graph().nodes.values()
+                if str(node.get("source_file") or "").startswith(self.prefix)
+                and str(node.get("source_file")).endswith(".md")
+                and "learning-loop"
+                not in ((node.get("metadata") or {}).get("tags") or [])
+            ]
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("could not read the brain graph: %s", exc)
+        return self._nodes
+
+    @staticmethod
+    def _kind(node: dict) -> str:
+        tags = (node.get("metadata") or {}).get("tags") or []
+        for kind in ("gotcha", "pattern", "codebase", "outcome", "session", "build"):
+            if kind in tags:
+                return kind
+        return "insight"
+
+    def _find(self, ref_id: str) -> dict | None:
+        if not ref_id.startswith("brain:"):
+            return None
+        wanted = ref_id.split(":", 1)[1]
+        return next((n for n in self._all() if n.get("source_file") == wanted), None)
+
+    def refs(self, query: str, limit: int) -> list[MemoryRef]:
+        terms = _terms(query)
+        found: list[MemoryRef] = []
+        for node in self._all():
+            meta = node.get("metadata") or {}
+            text = (
+                f"{node.get('label', '')} {' '.join(map(str, meta.get('tags') or []))}"
+            )
+            score = _score(text, terms)
+            if terms and score == 0:
+                continue
+            found.append(
+                MemoryRef(
+                    id=f"brain:{node.get('source_file')}",
+                    kind=self._kind(node),
+                    label=str(node.get("label", "")),
+                    when=_date_of(
+                        str(meta.get("updated") or meta.get("created") or "")
+                    ),
+                    score=score,
+                )
+            )
+        found.sort(key=lambda r: -r.score)
+        return found[:limit]
+
+    def summarise(self, ref_id: str) -> TimelineEntry | None:
+        node = self._find(ref_id)
+        brain = self._vault()
+        if node is None or brain is None:
+            return None
+        meta = node.get("metadata") or {}
+        return TimelineEntry(
+            id=ref_id,
+            kind=self._kind(node),
+            label=str(node.get("label", "")),
+            when=_date_of(str(meta.get("updated") or meta.get("created") or "")),
+            summary=str(meta.get("description") or node.get("source_file")),
+            related=tuple(n["id"] for n in brain.graph().neighbors(node["id"], 5)),
+        )
+
+    def load(self, ref_id: str) -> MemoryRecord | None:
+        node = self._find(ref_id)
+        brain = self._vault()
+        if node is None or brain is None:
+            return None
+        from brain.notes import read_note
+
+        note = read_note(brain.root, str(node["source_file"]))
+        meta = dict(note.meta)
+        return MemoryRecord(
+            id=ref_id,
+            kind=self._kind(node),
+            label=str(node.get("label", "")),
+            when=_date_of(str(meta.get("updated") or meta.get("created") or "")),
+            body=note.body,
+            meta={
+                k: v
+                for k, v in meta.items()
+                if isinstance(v, (str, int, float, bool, list))
+            },
+        )
+
+
 def _mtime_date(path: Path) -> str:
     from datetime import datetime, timezone
 
@@ -241,7 +377,12 @@ def default_sources(project_dir: Path) -> list:
     """The stores a project has, in the order the index should prefer them.
 
     Patterns first: they are already distilled, so a hit there answers the
-    question outright, while a task log hit is a pointer to somewhere the
-    answer might be.
+    question outright. The brain next — what the builds learned, in the vault
+    every agent shares. A task log hit is a pointer to somewhere the answer
+    might be.
     """
-    return [PatternSource(project_dir), TaskLogSource(project_dir)]
+    return [
+        PatternSource(project_dir),
+        BrainSource(project_dir),
+        TaskLogSource(project_dir),
+    ]

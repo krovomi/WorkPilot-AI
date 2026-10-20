@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type {
 	AutoBuildVersionInfo,
 	AzureDevOpsSyncStatus,
+	InitializationBlocker,
 	GitHubSyncStatus,
 	GitLabSyncStatus,
 	LinearSyncStatus,
@@ -9,11 +10,13 @@ import type {
 	ProjectEnvConfig,
 	ProjectSettings as ProjectSettingsType,
 } from "../../../../shared/types";
+import type { LoadedProjectEnv } from "../../../hooks";
 import { checkGitHubConnection as checkGitHubConnectionGlobal } from "../../../stores/github";
 import { setProjectEnvConfig } from "../../../stores/project-env-store";
 import {
 	checkProjectVersion,
 	initializeProject,
+	refreshProjects,
 	updateProjectSettings,
 } from "../../../stores/project-store";
 
@@ -43,8 +46,6 @@ export interface UseProjectSettingsReturn {
 	setShowClaudeToken: React.Dispatch<React.SetStateAction<boolean>>;
 	showLinearKey: boolean;
 	setShowLinearKey: React.Dispatch<React.SetStateAction<boolean>>;
-	showOpenAIKey: boolean;
-	setShowOpenAIKey: React.Dispatch<React.SetStateAction<boolean>>;
 	showGitHubToken: boolean;
 	setShowGitHubToken: React.Dispatch<React.SetStateAction<boolean>>;
 
@@ -89,8 +90,14 @@ export interface UseProjectSettingsReturn {
 	azureDevOpsConnectionStatus: AzureDevOpsSyncStatus | null;
 	isCheckingAzureDevOps: boolean;
 
+	// Why the last initialization attempt could not proceed, when the reason is
+	// one the settings screen can act on rather than only report.
+	initBlocker: InitializationBlocker | null;
+	isRepairingGit: boolean;
+
 	// Actions
 	handleInitialize: () => Promise<void>;
+	handleRepairGit: () => Promise<void>;
 	handleClaudeSetup: () => Promise<void>;
 	handleSave: (onClose: () => void) => Promise<void>;
 }
@@ -109,6 +116,10 @@ export function useProjectSettings(
 	);
 	const [isCheckingVersion, setIsCheckingVersion] = useState(false);
 	const [isUpdating, setIsUpdating] = useState(false);
+	const [initBlocker, setInitBlocker] = useState<InitializationBlocker | null>(
+		null,
+	);
+	const [isRepairingGit, setIsRepairingGit] = useState(false);
 
 	// Environment configuration state
 	// NOTE: We maintain local envConfig state AND update the global project-env-store.
@@ -120,13 +131,16 @@ export function useProjectSettings(
 	const [isLoadingEnv, setIsLoadingEnv] = useState(false);
 	const [envError, setEnvError] = useState<string | null>(null);
 	// Ref to track the latest committed config - used to handle concurrent updateEnvConfig calls
-	// This ensures rapid updates don't lose changes due to stale state reads
-	const committedEnvConfigRef = useRef<ProjectEnvConfig | null>(null);
+	// This ensures rapid updates don't lose changes due to stale state reads.
+	// It carries the project it was read for: a save sends the whole
+	// configuration, so one built on another project's base would write that
+	// project's settings — its repository, its tokens — into this one's file.
+	// See hooks/useProjectEnvConfig, which binds the same way for the MCP page.
+	const committedEnvConfigRef = useRef<LoadedProjectEnv | null>(null);
 
 	// Password visibility toggles
 	const [showClaudeToken, setShowClaudeToken] = useState(false);
 	const [showLinearKey, setShowLinearKey] = useState(false);
-	const [showOpenAIKey, setShowOpenAIKey] = useState(false);
 
 	// Collapsible sections
 	const [expandedSections, setExpandedSections] = useState<
@@ -135,7 +149,6 @@ export function useProjectSettings(
 		claude: true,
 		linear: false,
 		github: false,
-		graphiti: false,
 	});
 
 	// GitHub state
@@ -202,7 +215,10 @@ export function useProjectSettings(
 					const result = await window.electronAPI.getProjectEnv(project.id);
 					if (result.success && result.data) {
 						setEnvConfig(result.data);
-						committedEnvConfigRef.current = result.data;
+						committedEnvConfigRef.current = {
+							projectId: project.id,
+							config: result.data,
+						};
 						// Update the shared store so other components (like Sidebar) can react
 						setProjectEnvConfig(project.id, result.data);
 					} else {
@@ -413,9 +429,16 @@ export function useProjectSettings(
 	const handleInitialize = async () => {
 		setIsUpdating(true);
 		setError(null);
+		setInitBlocker(null);
 		try {
 			const result = await initializeProject(project.id);
 			if (result?.success) {
+				// The main process wrote `.workpilot/` and stamped `autoBuildPath`
+				// on the stored record; the renderer still holds the pre-init copy.
+				// Without this the pane keeps claiming "Not Initialized" — and every
+				// section gated on `autoBuildPath` stays hidden — until the dialog is
+				// closed and reopened.
+				await refreshProjects();
 				const versionResult = await checkProjectVersion(project.id);
 				if (versionResult.success && versionResult.data) {
 					setVersionInfo(versionResult.data);
@@ -425,17 +448,54 @@ export function useProjectSettings(
 				const envResult = await window.electronAPI.getProjectEnv(project.id);
 				if (envResult.success && envResult.data) {
 					setEnvConfig(envResult.data);
-					committedEnvConfigRef.current = envResult.data;
+					committedEnvConfigRef.current = {
+						projectId: project.id,
+						config: envResult.data,
+					};
 					// Update global store so Sidebar reflects correct GitHub/GitLab enabled state
 					setProjectEnvConfig(project.id, envResult.data);
 				}
 			} else {
-				setError(result?.error || "Failed to initialize");
+				// A blocker the screen knows how to walk the user out of is shown
+				// as a recovery card, not as a raw error line — so it is recorded
+				// instead of the message, and only the rest falls through to the
+				// generic error display.
+				const blocker = result?.data?.blocker ?? null;
+				setInitBlocker(blocker);
+				if (!blocker) {
+					setError(result?.error || "Failed to initialize");
+				}
 			}
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Unknown error");
 		} finally {
 			setIsUpdating(false);
+		}
+	};
+
+	/**
+	 * Make the repository buildable, then finish what the user asked for.
+	 *
+	 * `initializeGit` creates the repository and/or the first commit — the two
+	 * blockers that stopped initialization — and the WorkPilot AI initialization
+	 * is retried straight away, because "prepare git" was never the goal: the
+	 * user clicked a button that said initialize.
+	 */
+	const handleRepairGit = async () => {
+		setIsRepairingGit(true);
+		setError(null);
+		try {
+			const result = await window.electronAPI.initializeGit(project.path);
+			if (!result?.success) {
+				setError(result?.error || "Failed to prepare the git repository");
+				return;
+			}
+			setInitBlocker(null);
+			await handleInitialize();
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Unknown error");
+		} finally {
+			setIsRepairingGit(false);
 		}
 	};
 
@@ -448,7 +508,10 @@ export function useProjectSettings(
 				const envResult = await window.electronAPI.getProjectEnv(project.id);
 				if (envResult.success && envResult.data) {
 					setEnvConfig(envResult.data);
-					committedEnvConfigRef.current = envResult.data;
+					committedEnvConfigRef.current = {
+						projectId: project.id,
+						config: envResult.data,
+					};
 					// Update global store so Sidebar and other components reflect changes
 					setProjectEnvConfig(project.id, envResult.data);
 				}
@@ -493,7 +556,18 @@ export function useProjectSettings(
 	const updateEnvConfig = async (updates: Partial<ProjectEnvConfig>) => {
 		// Use the committed ref as base to handle concurrent calls correctly
 		// This ensures rapid updates don't lose changes due to stale state reads
-		const baseConfig = committedEnvConfigRef.current || envConfig;
+		const loaded = committedEnvConfigRef.current;
+		if (loaded && loaded.projectId !== project.id) {
+			// The dialog moved to another project while this field was losing
+			// focus. Saving would write the previous project's whole
+			// configuration here; the reload that is already running is what
+			// provides a base for this project.
+			console.warn(
+				"[useProjectSettings] the loaded configuration belongs to another project — skipping save.",
+			);
+			return;
+		}
+		const baseConfig = loaded?.config || envConfig;
 		if (!baseConfig) {
 			console.warn(
 				"[useProjectSettings] updateEnvConfig called but baseConfig is null — skipping save. Updates:",
@@ -518,7 +592,7 @@ export function useProjectSettings(
 
 		// Update the ref BEFORE the await (optimistically) to prevent race conditions
 		// If two calls happen rapidly, the second will see the first's changes in the ref
-		committedEnvConfigRef.current = newConfig;
+		committedEnvConfigRef.current = { projectId: project.id, config: newConfig };
 
 		// Update the shared store so other components (like Sidebar) can react immediately
 		setProjectEnvConfig(project.id, newConfig);
@@ -576,8 +650,6 @@ export function useProjectSettings(
 		setShowClaudeToken,
 		showLinearKey,
 		setShowLinearKey,
-		showOpenAIKey,
-		setShowOpenAIKey,
 		showGitHubToken,
 		setShowGitHubToken,
 		expandedSections,
@@ -601,7 +673,10 @@ export function useProjectSettings(
 		setShowAzureDevOpsImportModal,
 		azureDevOpsConnectionStatus,
 		isCheckingAzureDevOps,
+		initBlocker,
+		isRepairingGit,
 		handleInitialize,
+		handleRepairGit,
 		handleClaudeSetup,
 		handleSave,
 	};

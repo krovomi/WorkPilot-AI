@@ -9,11 +9,12 @@ the Claude Agent SDK client. Tool lists are organized by category:
 
 - Base tools: Core file operations (Read, Write, Edit, etc.)
 - Web tools: Documentation and research (WebFetch, WebSearch)
-- MCP tools: External integrations (Context7, Linear, Graphiti, etc.)
+- MCP tools: External integrations (Context7, Linear, etc.)
 - WorkPilot AI tools: Custom build management tools
 """
 
 import os
+from pathlib import Path
 
 # =============================================================================
 # Base Tools (Built-in Claude Code tools)
@@ -44,39 +45,44 @@ TOOL_UPDATE_QA_STATUS = "mcp__workpilot__update_qa_status"
 # =============================================================================
 
 # Context7 MCP tools for documentation lookup (always enabled)
+#
+# Both spellings of the fetch tool are listed on purpose. `@upstash/context7-mcp`
+# renamed `get-library-docs` to `query-docs` and changed its parameters, and the
+# server is started with `npx -y` — unpinned — so the tool a given checkout gets
+# depends on when npx last resolved the package. An allowlist entry for a tool
+# the running server does not expose is inert; a missing entry for the tool it
+# does expose silently costs the whole documentation lookup.
 CONTEXT7_TOOLS = [
     "mcp__context7__resolve-library-id",
+    "mcp__context7__query-docs",
     "mcp__context7__get-library-docs",
 ]
 
 # Linear MCP tools for project management (when LINEAR_API_KEY is set)
+#
+# The prefix is the key the server is registered under, and every
+# registration (`create_client`, the Linear updater) names it "linear". The
+# list used to say `mcp__linear-server__…`, the name from Linear's own setup
+# guide: none of the sixteen entries matched a tool the session had, so none
+# was approved, and in a session with no one to ask every Linear call was
+# refused.
 LINEAR_TOOLS = [
-    "mcp__linear-server__list_teams",
-    "mcp__linear-server__get_team",
-    "mcp__linear-server__list_projects",
-    "mcp__linear-server__get_project",
-    "mcp__linear-server__create_project",
-    "mcp__linear-server__update_project",
-    "mcp__linear-server__list_issues",
-    "mcp__linear-server__get_issue",
-    "mcp__linear-server__create_issue",
-    "mcp__linear-server__update_issue",
-    "mcp__linear-server__list_comments",
-    "mcp__linear-server__create_comment",
-    "mcp__linear-server__list_issue_statuses",
-    "mcp__linear-server__list_issue_labels",
-    "mcp__linear-server__list_users",
-    "mcp__linear-server__get_user",
-]
-
-# Graphiti MCP tools for knowledge graph memory (when GRAPHITI_MCP_URL is set)
-# See: https://github.com/getzep/graphiti
-GRAPHITI_MCP_TOOLS = [
-    "mcp__graphiti-memory__search_nodes",  # Search entity summaries
-    "mcp__graphiti-memory__search_facts",  # Search relationships between entities
-    "mcp__graphiti-memory__add_episode",  # Add data to knowledge graph
-    "mcp__graphiti-memory__get_episodes",  # Retrieve recent episodes
-    "mcp__graphiti-memory__get_entity_edge",  # Get specific entity/relationship
+    "mcp__linear__list_teams",
+    "mcp__linear__get_team",
+    "mcp__linear__list_projects",
+    "mcp__linear__get_project",
+    "mcp__linear__create_project",
+    "mcp__linear__update_project",
+    "mcp__linear__list_issues",
+    "mcp__linear__get_issue",
+    "mcp__linear__create_issue",
+    "mcp__linear__update_issue",
+    "mcp__linear__list_comments",
+    "mcp__linear__create_comment",
+    "mcp__linear__list_issue_statuses",
+    "mcp__linear__list_issue_labels",
+    "mcp__linear__list_users",
+    "mcp__linear__get_user",
 ]
 
 # =============================================================================
@@ -144,6 +150,31 @@ CHROME_DEVTOOLS_TOOLS = [
     # Network
     "mcp__chrome-devtools__list_network_requests",  # List network requests
     "mcp__chrome-devtools__get_network_request",  # Get specific network request
+    # Performance — the trace the verification loop keeps as evidence
+    "mcp__chrome-devtools__performance_start_trace",  # Record a trace (reload + auto-stop)
+    "mcp__chrome-devtools__performance_stop_trace",  # Stop a running trace, summary of LCP/CLS
+    "mcp__chrome-devtools__performance_analyze_insight",  # Detail of one trace insight
+    "mcp__chrome-devtools__lighthouse_audit",  # Accessibility / best-practices / SEO scores
+]
+
+# The verification loop's own server (`verify/mcp_server.py`, `workpilot-verify`):
+# launch the app, drive it, call its endpoints, trace it, record the evidence.
+# The same tools reach the providers without MCP in-process (`verify.tools`).
+VERIFY_TOOLS = [
+    f"mcp__workpilot-verify__{name}"
+    for name in (
+        "verify_detect",
+        "verify_launch",
+        "verify_logs",
+        "verify_stop",
+        "verify_browser",
+        "verify_screenshot",
+        "verify_perf_trace",
+        "verify_endpoints",
+        "verify_call_endpoint",
+        "verify_device",
+        "verify_record",
+    )
 ]
 
 # =============================================================================
@@ -167,19 +198,24 @@ def is_electron_mcp_enabled() -> bool:
 # =============================================================================
 # Single source of truth for phase → tools → MCP servers mapping.
 # This enables phase-aware tool control and context window optimization.
+#
+# "code" is `search_code` (`harness/tools/code_search.py`): ranked excerpts of
+# the project's code, a right like any tool. The types that explore the code to
+# find where to act or what to check declare it (build, review, analysis,
+# discovery); those whose whole input is in their prompt do not. The Claude SDK
+# reaches it over the `workpilot-code` server, every other provider through
+# `tool_executor`, which reads this same declaration.
 
 AGENT_CONFIGS = {
     # ═══════════════════════════════════════════════════════════════════════
     # SPEC CREATION PHASES (Minimal tools, fast startup)
     # ═══════════════════════════════════════════════════════════════════════
-    "spec_gatherer": {
-        "tools": BASE_READ_TOOLS + WEB_TOOLS,
-        "mcp_servers": [],  # No MCP needed - just reads project
-        "auto_claude_tools": [],
-        "thinking_default": "medium",
-    },
     "spec_researcher": {
-        "tools": BASE_READ_TOOLS + WEB_TOOLS,
+        # spec_researcher.md checks each integration against Context7 and the
+        # web, then writes research.json with a heredoc — so Bash and Write
+        # too. Without them the phase does not fail: a placeholder file stands
+        # in for the research and the phase reports success.
+        "tools": BASE_READ_TOOLS + WEB_TOOLS + BASE_WRITE_TOOLS,
         "mcp_servers": ["context7"],  # Needs docs lookup
         "auto_claude_tools": [],
         "thinking_default": "medium",
@@ -191,22 +227,25 @@ AGENT_CONFIGS = {
         "thinking_default": "high",
     },
     "spec_critic": {
+        # Read-only on purpose: the workflow's `brainstorm` phase runs under it
+        # (workflows/runner.py), and a reviewer who can rewrite the document
+        # ends up reviewing their own. The spec pipeline's self-critique, which
+        # does rewrite spec.md, runs under `spec_self_critique`.
         "tools": BASE_READ_TOOLS,
-        "mcp_servers": [],  # Self-critique, no external tools
+        # Code search only: the brainstorm compares approaches with how the
+        # project already solves neighbouring problems.
+        "mcp_servers": ["code"],
         "auto_claude_tools": [],
         "thinking_default": "ultrathink",
     },
-    "spec_discovery": {
-        "tools": BASE_READ_TOOLS + WEB_TOOLS,
-        "mcp_servers": [],
+    "spec_self_critique": {
+        # spec_critic.md: find the spec's issues *and fix them* — spec.md is
+        # rewritten in place and critique_report.json written with a heredoc —
+        # checking each library claim against Context7 on the way.
+        "tools": BASE_READ_TOOLS + BASE_WRITE_TOOLS,
+        "mcp_servers": ["context7"],
         "auto_claude_tools": [],
-        "thinking_default": "medium",
-    },
-    "spec_context": {
-        "tools": BASE_READ_TOOLS,
-        "mcp_servers": [],
-        "auto_claude_tools": [],
-        "thinking_default": "medium",
+        "thinking_default": "high",
     },
     "spec_validation": {
         "tools": BASE_READ_TOOLS,
@@ -215,18 +254,21 @@ AGENT_CONFIGS = {
         "thinking_default": "high",
     },
     "spec_compaction": {
-        "tools": BASE_READ_TOOLS + BASE_WRITE_TOOLS,
+        # spec/compaction.py — one phase output in the prompt, a summary out as
+        # text, in one turn. It declared Write, Edit and Bash it never used,
+        # through `create_simple_client`, which installs no hook.
+        "tools": [],
         "mcp_servers": [],
         "auto_claude_tools": [],
         "thinking_default": "medium",
     },
     # ═══════════════════════════════════════════════════════════════════════
-    # BUILD PHASES (Full tools + Graphiti memory)
+    # BUILD PHASES (Full tools; memory is the shared brain, added to every agent)
     # Note: "linear" is conditional on project setting "update_linear_with_tasks"
     # ═══════════════════════════════════════════════════════════════════════
     "planner": {
         "tools": BASE_READ_TOOLS + BASE_WRITE_TOOLS + WEB_TOOLS,
-        "mcp_servers": ["context7", "graphiti", "workpilot"],
+        "mcp_servers": ["context7", "workpilot", "code"],
         "mcp_servers_optional": ["linear"],  # Only if project setting enabled
         "auto_claude_tools": [
             TOOL_GET_BUILD_PROGRESS,
@@ -237,7 +279,7 @@ AGENT_CONFIGS = {
     },
     "coder": {
         "tools": BASE_READ_TOOLS + BASE_WRITE_TOOLS + WEB_TOOLS,
-        "mcp_servers": ["context7", "graphiti", "workpilot", "chrome-devtools"],
+        "mcp_servers": ["context7", "workpilot", "chrome-devtools", "code"],
         "mcp_servers_optional": ["linear"],
         "auto_claude_tools": [
             TOOL_UPDATE_SUBTASK_STATUS,
@@ -249,7 +291,7 @@ AGENT_CONFIGS = {
         "thinking_default": "none",  # Coding doesn't use extended thinking
     },
     # ═══════════════════════════════════════════════════════════════════════
-    # QA PHASES (Read + test + browser + Graphiti memory)
+    # QA PHASES (Read + test + browser)
     # ═══════════════════════════════════════════════════════════════════════
     "qa_reviewer": {
         # Read + Write/Edit (for QA reports and plan updates) + Bash (for tests)
@@ -257,10 +299,10 @@ AGENT_CONFIGS = {
         "tools": BASE_READ_TOOLS + BASE_WRITE_TOOLS + WEB_TOOLS,
         "mcp_servers": [
             "context7",
-            "graphiti",
             "workpilot",
             "browser",
             "chrome-devtools",
+            "code",
         ],
         "mcp_servers_optional": ["linear"],  # For updating issue status
         "auto_claude_tools": [
@@ -274,10 +316,10 @@ AGENT_CONFIGS = {
         "tools": BASE_READ_TOOLS + BASE_WRITE_TOOLS + WEB_TOOLS,
         "mcp_servers": [
             "context7",
-            "graphiti",
             "workpilot",
             "browser",
             "chrome-devtools",
+            "code",
         ],
         "mcp_servers_optional": ["linear"],
         "auto_claude_tools": [
@@ -285,6 +327,29 @@ AGENT_CONFIGS = {
             TOOL_GET_BUILD_PROGRESS,
             TOOL_UPDATE_QA_STATUS,
             TOOL_RECORD_GOTCHA,
+        ],
+        "thinking_default": "medium",
+    },
+    # The verification loop's driver (`verify/loop.py`): runs the app the task
+    # changed, drives it to the new state, calls the changed endpoints, and may
+    # fix what it finds — so it writes, like `qa_fixer`, and is not one of the
+    # read-only phases. `verify` is its own server; `browser` and
+    # `chrome-devtools` stay available for a session that prefers them.
+    "verifier": {
+        "tools": BASE_READ_TOOLS + BASE_WRITE_TOOLS + WEB_TOOLS,
+        "mcp_servers": [
+            "context7",
+            "workpilot",
+            "verify",
+            "browser",
+            "chrome-devtools",
+            "code",
+        ],
+        "mcp_servers_optional": [],
+        "auto_claude_tools": [
+            TOOL_GET_BUILD_PROGRESS,
+            TOOL_RECORD_GOTCHA,
+            TOOL_GET_SESSION_CONTEXT,
         ],
         "thinking_default": "medium",
     },
@@ -300,12 +365,35 @@ AGENT_CONFIGS = {
         "thinking_default": "none",
     },
     # AI Analyzer (runners/ai_analyzer) — project-wide read-only inspection.
-    # No MCP servers: it's a pure code-walk that writes nothing.
+    # A pure code-walk that writes nothing: code search is its only server.
     "analyzer": {
         "tools": BASE_READ_TOOLS,
-        "mcp_servers": [],
+        "mcp_servers": ["code"],
         "auto_claude_tools": [],
         "thinking_default": "low",
+    },
+    # Writes the procedure of a RUN task (`procedure` phase, `tooling/runbook`)
+    # and may run an allowlisted command to check a precondition — a health
+    # endpoint, a `git status`. No `Write`, no `Edit`: an operation on a
+    # running system is not a code change, and the procedure comes back as
+    # the session's answer, written by the runner. Bash goes through the
+    # same allowlist and validators as every agent's.
+    "operator": {
+        "tools": BASE_READ_TOOLS + ["Bash"],
+        "mcp_servers": ["code"],
+        "auto_claude_tools": [],
+        "thinking_default": "medium",
+    },
+    # Authors the archify JSON model of a project's architecture. Reads the
+    # codebase and writes one JSON file; the renderer, the validator and the
+    # comparator are run by Python around the session, not by the agent, so it
+    # gets `Write` without `Bash`. A model that could shell out would be one
+    # `deliver` away from reporting an artifact nobody validated.
+    "architecture_visualizer": {
+        "tools": BASE_READ_TOOLS + ["Write"],
+        "mcp_servers": ["code"],
+        "auto_claude_tools": [],
+        "thinking_default": "high",
     },
     "merge_resolver": {
         "tools": [],  # Text-only analysis
@@ -327,7 +415,7 @@ AGENT_CONFIGS = {
     },
     "pr_reviewer": {
         "tools": BASE_READ_TOOLS + WEB_TOOLS,  # Read-only
-        "mcp_servers": ["context7"],
+        "mcp_servers": ["context7", "code"],
         "auto_claude_tools": [],
         "thinking_default": "high",
     },
@@ -336,7 +424,7 @@ AGENT_CONFIGS = {
         # NOTE: Do NOT add "Task" here - the SDK auto-allows Task when agents are defined
         # via the --agents flag. Explicitly adding it interferes with agent registration.
         "tools": BASE_READ_TOOLS + WEB_TOOLS,
-        "mcp_servers": ["context7"],
+        "mcp_servers": ["context7", "code"],
         "auto_claude_tools": [],
         "thinking_default": "high",
     },
@@ -344,27 +432,32 @@ AGENT_CONFIGS = {
         # Read-only for parallel followup reviewer
         # NOTE: Do NOT add "Task" here - same reason as pr_orchestrator_parallel
         "tools": BASE_READ_TOOLS + WEB_TOOLS,
-        "mcp_servers": ["context7"],
+        "mcp_servers": ["context7", "code"],
         "auto_claude_tools": [],
         "thinking_default": "high",
+    },
+    "pr_followup_reviewer": {
+        # runners/github/services/followup_reviewer.py — the commits, comments
+        # and reviews since the last pass are in the prompt; the verdict comes
+        # back as structured output in two turns. All of it is text other
+        # people wrote, so the session gets no tool to act on it with.
+        "tools": [],
+        "mcp_servers": [],
+        "auto_claude_tools": [],
+        # The caller passes the thinking level the user picked.
+        "thinking_default": "none",
     },
     "pr_finding_validator": {
         # Standalone validator for re-checking findings against actual code
         # Called separately from orchestrator to validate findings with fresh context
         "tools": BASE_READ_TOOLS,
-        "mcp_servers": [],
+        "mcp_servers": ["code"],
         "auto_claude_tools": [],
         "thinking_default": "medium",
     },
     # ═══════════════════════════════════════════════════════════════════════
     # ANALYSIS PHASES
     # ═══════════════════════════════════════════════════════════════════════
-    "analysis": {
-        "tools": BASE_READ_TOOLS + WEB_TOOLS,
-        "mcp_servers": ["context7"],
-        "auto_claude_tools": [],
-        "thinking_default": "medium",
-    },
     "batch_analysis": {
         "tools": BASE_READ_TOOLS + WEB_TOOLS,
         "mcp_servers": [],
@@ -377,24 +470,128 @@ AGENT_CONFIGS = {
         "auto_claude_tools": [],
         "thinking_default": "low",
     },
+    # The analysers below were passed to the factory under these names but had
+    # no entry here, so `get_agent_config` raised, every caller caught it, and
+    # the feature logged a warning and produced nothing — the insight extractor
+    # among them, the one writer of patterns/, codebase/ and outcomes/ in the
+    # project memory. Each one reads what it is given and answers in text the
+    # caller parses, so read-only is the whole permission.
+    "impact_analyzer": {
+        # agents/impact_analyzer.py — blast radius of a finished change.
+        "tools": BASE_READ_TOOLS,
+        "mcp_servers": ["code"],
+        "auto_claude_tools": [],
+        "thinking_default": "medium",
+    },
+    "architecture_reviewer": {
+        # architecture/ai_reviewer.py — the prompt runs `git diff` and the
+        # caller reads the verdict back from `<spec_dir>/architecture_report.json`,
+        # so it needs Bash and Write. Not Edit: a reviewer does not touch code.
+        "tools": BASE_READ_TOOLS + ["Write", "Bash"],
+        "mcp_servers": ["code"],
+        "auto_claude_tools": [],
+        "thinking_default": "high",
+    },
+    "insight_extractor": {
+        # analysis/insight_extractor.py — runs after every coding session on a
+        # fast model, everything it needs is in the prompt, output is one JSON
+        # object. Haiku does not take extended thinking.
+        "tools": BASE_READ_TOOLS,
+        "mcp_servers": [],
+        "auto_claude_tools": [],
+        "thinking_default": "none",
+    },
+    "learning_analyzer": {
+        # learning_loop/service.py — build records in, JSON patterns out.
+        "tools": BASE_READ_TOOLS,
+        "mcp_servers": [],
+        "auto_claude_tools": [],
+        "thinking_default": "medium",
+    },
+    "context_mesh_analyzer": {
+        # context_mesh/mesh_service.py — cross-project summaries in, findings out.
+        "tools": BASE_READ_TOOLS,
+        "mcp_servers": [],
+        "auto_claude_tools": [],
+        "thinking_default": "medium",
+    },
+    "live_companion_analyzer": {
+        # live_companion/analyzer.py — one changed file in, suggestions out;
+        # fires on file events, so it stays cheap.
+        "tools": BASE_READ_TOOLS,
+        "mcp_servers": [],
+        "auto_claude_tools": [],
+        "thinking_default": "low",
+    },
+    "migration": {
+        # migration/llm_transformer.py — before/after code in, improved code
+        # out as text; the transformer writes the file, not the model.
+        "tools": BASE_READ_TOOLS,
+        "mcp_servers": [],
+        "auto_claude_tools": [],
+        "thinking_default": "medium",
+    },
+    # ═══════════════════════════════════════════════════════════════════════
+    # ONE-SHOT FEATURES
+    # ═══════════════════════════════════════════════════════════════════════
+    # Each built its own ClaudeAgentOptions until lot L16: no denial, so the
+    # user's and the project's settings files decided what they could do.
+    # They answer in text the runner parses; none of them needs a tool.
+    "git_command": {
+        # runners/natural_language_git_runner.py — a sentence and the
+        # repository's status in the prompt, one git command out. The runner
+        # executes it, without a shell and only if it starts with `git`; the
+        # model runs nothing.
+        "tools": [],
+        "mcp_servers": [],
+        "auto_claude_tools": [],
+        "thinking_default": "none",
+    },
+    "code_playground": {
+        # runners/code_playground_runner.py — an idea in, one JSON object with
+        # the playground's files out, which the runner hands to the UI as
+        # they are. The caller passes the thinking level the user picked.
+        "tools": [],
+        "mcp_servers": [],
+        "auto_claude_tools": [],
+        "thinking_default": "none",
+    },
+    "linear_updater": {
+        # integrations/linear/updater.py — a focused Linear operation through
+        # Linear's MCP server, and nothing else. The server is declared rather
+        # than optional: the updater only runs once LINEAR_API_KEY is set.
+        "tools": [],
+        "mcp_servers": ["linear"],
+        "auto_claude_tools": [],
+        "thinking_default": "none",
+    },
     # ═══════════════════════════════════════════════════════════════════════
     # ROADMAP & IDEATION
     # ═══════════════════════════════════════════════════════════════════════
+    # The roadmap prompts end with "create <file>.json in the Output Directory"
+    # — with the Write tool or a `cat > … << 'EOF'` heredoc — and the phase
+    # checks the file exists afterwards. So both need Write and Bash; neither
+    # needs Edit. Until the executor named them, the roadmap ran as `coder`.
     "roadmap_discovery": {
-        "tools": BASE_READ_TOOLS + WEB_TOOLS,
-        "mcp_servers": ["context7"],
+        "tools": BASE_READ_TOOLS + WEB_TOOLS + ["Write", "Bash"],
+        "mcp_servers": ["context7", "code"],
         "auto_claude_tools": [],
         "thinking_default": "high",
     },
     "competitor_analysis": {
-        "tools": BASE_READ_TOOLS + WEB_TOOLS,
+        "tools": BASE_READ_TOOLS + WEB_TOOLS + ["Write", "Bash"],
         "mcp_servers": ["context7"],  # WebSearch for competitor research
         "auto_claude_tools": [],
         "thinking_default": "high",
     },
     "ideation": {
-        "tools": BASE_READ_TOOLS + WEB_TOOLS,
-        "mcp_servers": [],
+        # Every ideation prompt writes its `<type>_ideas.json` to disk (the
+        # phase executor validates the file), and three of them explore and
+        # write with shell heredocs. It ran on the `Bash(*)` / `Write(./**)`
+        # grants of the settings file; those no longer decide what a type
+        # may do (see `undeclared_builtin_tools`), so the config says it.
+        "tools": BASE_READ_TOOLS + WEB_TOOLS + ["Write", "Bash"],
+        "mcp_servers": ["code"],
         "auto_claude_tools": [],
         "thinking_default": "high",
     },
@@ -444,13 +641,21 @@ def _map_mcp_server_name(
     if not name:
         return None
     mappings = {
+        "brain": "brain",
+        "workpilot-brain": "brain",
+        "uiux": "uiux",
+        "workpilot-uiux": "uiux",
+        "ui-ux-pro-max": "uiux",
         "context7": "context7",
-        "graphiti-memory": "graphiti",
-        "graphiti": "graphiti",
         "linear": "linear",
         "electron": "electron",
         "puppeteer": "puppeteer",
         "chrome-devtools": "chrome-devtools",
+        "verify": "verify",
+        "workpilot-verify": "verify",
+        "code": "code",
+        "workpilot-code": "code",
+        "search_code": "code",
         "workpilot": "workpilot",
         "github": "github",
         "brave-search": "brave-search",
@@ -476,6 +681,7 @@ def get_required_mcp_servers(
     project_capabilities: dict | None = None,
     linear_enabled: bool = False,
     mcp_config: dict | None = None,
+    spec_dir: Path | str | None = None,
 ) -> list[str]:
     """
     Get MCP servers required for this agent type.
@@ -483,7 +689,6 @@ def get_required_mcp_servers(
     Handles dynamic server selection:
     - "browser" → electron (if is_electron) or puppeteer (if is_web_frontend)
     - "linear" → only if in mcp_servers_optional AND linear_enabled is True
-    - "graphiti" → only if GRAPHITI_MCP_URL is set
     - Respects per-project MCP config overrides from .workpilot/.env
     - Applies per-agent ADD/REMOVE overrides from AGENT_MCP_<agent>_ADD/REMOVE
 
@@ -541,9 +746,37 @@ def get_required_mcp_servers(
                 if str(puppeteer_enabled).lower() == "true":
                     servers.append("puppeteer")
 
-    # Filter graphiti if not enabled
-    if "graphiti" in servers and not os.environ.get("GRAPHITI_MCP_URL"):
-        servers = [s for s in servers if s != "graphiti"]
+    # The shared brain reaches every agent that has tools at all, in every
+    # feature, the moment a brain exists on this machine (`brain/runtime.py`).
+    # Not declared per agent in AGENT_CONFIGS: a list to keep in step with
+    # every new agent type is how the next feature ends up unplugged. Added
+    # before the per-agent overrides, so AGENT_MCP_<agent>_REMOVE=brain works.
+    if config.get("tools") and "brain" not in servers:
+        try:
+            from brain.runtime import active as brain_active
+
+            if brain_active():
+                servers.append("brain")
+        except Exception as exc:  # noqa: BLE001 - an optional store never blocks an agent
+            import logging
+
+            logging.getLogger(__name__).debug("shared brain not offered: %s", exc)
+
+    # ui-ux-pro-max (`uiux/integration.py`): the same "every agent with tools"
+    # rule as the brain, narrowed to the task — offered only when the build's
+    # preflight said this task touches the interface. A backend task declares
+    # no server and pays for no tool definition. Before the overrides, so
+    # AGENT_MCP_<agent>_REMOVE=uiux works.
+    if config.get("tools") and "uiux" not in servers:
+        try:
+            from uiux.integration import active_for as uiux_active
+
+            if uiux_active(spec_dir):
+                servers.append("uiux")
+        except Exception as exc:  # noqa: BLE001 - optional design data never blocks an agent
+            import logging
+
+            logging.getLogger(__name__).debug("ui-ux-pro-max not offered: %s", exc)
 
     # Filter chrome-devtools if not enabled (default: disabled)
     if "chrome-devtools" in servers:

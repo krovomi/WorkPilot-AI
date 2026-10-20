@@ -1,3 +1,6 @@
+import { projectStore } from "../project-store";
+import { listReviewFiles, readReviewFile } from "../code-review-service";
+import type { ReviewScope } from "../../shared/types/code-review";
 import { readdirSync, statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import os from "node:os";
@@ -103,6 +106,39 @@ function validateFileName(
  * Register all file-related IPC handlers
  */
 export function registerFileHandlers(): void {
+	ipcMain.handle(
+		IPC_CHANNELS.CODE_REVIEW_FILES,
+		async (_, projectId: string) => {
+			try {
+				const project = projectStore.getProject(projectId);
+				if (!project) throw new Error("Project not found");
+				return { success: true, data: await listReviewFiles(project.path) };
+			} catch (error) {
+				return {
+					success: false,
+					error: error instanceof Error ? error.message : String(error),
+				};
+			}
+		},
+	);
+	ipcMain.handle(
+		IPC_CHANNELS.CODE_REVIEW_FILE,
+		async (_, projectId: string, file: string, scope: ReviewScope) => {
+			try {
+				const project = projectStore.getProject(projectId);
+				if (!project) throw new Error("Project not found");
+				return {
+					success: true,
+					data: await readReviewFile(project.path, file, scope),
+				};
+			} catch (error) {
+				return {
+					success: false,
+					error: error instanceof Error ? error.message : String(error),
+				};
+			}
+		},
+	);
 	// ============================================
 	// File Explorer Operations
 	// ============================================

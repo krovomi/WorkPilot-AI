@@ -330,6 +330,7 @@ PASSWORD = "admin123"
 
 # MEDIUM: Weak hash
 import md5
+
 hash = md5.md5(password).hexdigest()
 ```
 

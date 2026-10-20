@@ -1,3 +1,4 @@
+import { buildJevEnvironment } from "../jev/environment";
 import { spawn } from "node:child_process";
 import {
 	existsSync,
@@ -25,6 +26,7 @@ import type {
 } from "../../shared/types";
 import { slugifySpecTitle } from "../../shared/utils/spec-slug";
 import type { AgentManager } from "../agent";
+import { readProjectEnv } from "../project-env-file";
 import { projectStore } from "../project-store";
 import {
 	parseAcceptanceCriteriaText,
@@ -32,6 +34,7 @@ import {
 } from "../../shared/utils/acceptance-criteria";
 import {
 	inlineAzureDevOpsImages,
+	saveInlinedImagesAsAttachments,
 	stripAzureAttachmentImages,
 } from "./shared/azure-attachments";
 import {
@@ -40,7 +43,6 @@ import {
 	stripControlChars,
 	stripHtml,
 } from "./shared/sanitize";
-import { parseEnvFile } from "./utils";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -71,14 +73,8 @@ export function registerAzureDevOpsHandlers(
 		if (!project.autoBuildPath) {
 			return { pat: null, orgUrl: null, projectName: null };
 		}
-		const envPath = path.join(project.path, project.autoBuildPath, ".env");
-		if (!existsSync(envPath)) {
-			return { pat: null, orgUrl: null, projectName: null };
-		}
-
 		try {
-			const content = readFileSync(envPath, "utf-8");
-			const vars = parseEnvFile(content);
+			const vars = readProjectEnv(project);
 			return {
 				pat: vars.AZURE_DEVOPS_PAT || null,
 				orgUrl: vars.AZURE_DEVOPS_ORG_URL || null,
@@ -737,6 +733,14 @@ except Exception as e:
 						const specDir = path.join(specsDir, specId);
 						mkdirSync(specDir, { recursive: true });
 
+						// Les captures du ticket, inlinées pour l'affichage, sont aussi
+						// écrites en pièces jointes : c'est là que les agents les lisent.
+						saveInlinedImagesAsAttachments(
+							displayDescription,
+							specDir,
+							`ado-${item.id}`,
+						);
+
 						// Map work item type to task category
 						let category: string;
 						switch (item.workItemType.toLowerCase()) {
@@ -1102,7 +1106,10 @@ except Exception as e:
 		): Promise<IPCResult<{ acceptanceCriteria: string[] }>> => {
 			const project = projectStore.getProject(projectId);
 			if (!project?.autoBuildPath) {
-				return { success: false, error: "Project not found or not initialized" };
+				return {
+					success: false,
+					error: "Project not found or not initialized",
+				};
 			}
 
 			const config = getAzureDevOpsConfig(project);
@@ -1110,13 +1117,17 @@ except Exception as e:
 			if (config.pat) envOverrides.AZURE_DEVOPS_PAT = config.pat;
 			if (config.orgUrl) envOverrides.AZURE_DEVOPS_ORG_URL = config.orgUrl;
 			const normalizedProject = normalizeProjectName(config.projectName);
-			if (normalizedProject) envOverrides.AZURE_DEVOPS_PROJECT = normalizedProject;
+			if (normalizedProject)
+				envOverrides.AZURE_DEVOPS_PROJECT = normalizedProject;
 			if (!config.pat || !config.orgUrl) {
 				return { success: false, error: "Azure DevOps not configured" };
 			}
 
 			try {
-				const projectPath = path.join(project.path, project.autoBuildPath || "");
+				const projectPath = path.join(
+					project.path,
+					project.autoBuildPath || "",
+				);
 
 				const rawItem = (await callAzureDevOpsPython(
 					projectPath,
@@ -1130,7 +1141,9 @@ except Exception as e:
 				);
 
 				// Persist to disk via TASK_UPDATE path (task_metadata.json + requirements.json)
-				const task = projectStore.getTasks(projectId).find((t) => t.id === taskId);
+				const task = projectStore
+					.getTasks(projectId)
+					.find((t) => t.id === taskId);
 				if (task?.specsPath) {
 					const specDir = task.specsPath;
 					const metadataPath = path.join(specDir, "task_metadata.json");
@@ -1155,7 +1168,10 @@ except Exception as e:
 					projectStore.invalidateTasksCache(projectId);
 				}
 
-				return { success: true, data: { acceptanceCriteria: acceptanceCriteriaList } };
+				return {
+					success: true,
+					data: { acceptanceCriteria: acceptanceCriteriaList },
+				};
 			} catch (error: unknown) {
 				const errorMessage =
 					error instanceof Error ? error.message : String(error);
@@ -1224,7 +1240,7 @@ except Exception as e:
 
 					const child = spawn("python", pythonArgs, {
 						cwd: backendPath,
-						env,
+						env: buildJevEnvironment(env, "azure-devops-review"),
 						stdio: ["pipe", "pipe", "pipe"],
 					});
 

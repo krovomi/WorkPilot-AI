@@ -19,7 +19,7 @@ from pathlib import Path
 # Add parent directory to path to import analyzer
 sys.path.insert(0, str(Path(__file__).parent.parent / "apps" / "backend"))
 
-from analyzer import ServiceAnalyzer
+from analysis.analyzer import ServiceAnalyzer
 
 
 def create_test_project(tmp_dir: Path, files: dict[str, str]) -> Path:
@@ -36,7 +36,7 @@ def create_test_project(tmp_dir: Path, files: dict[str, str]) -> Path:
     for filepath, content in files.items():
         full_path = tmp_dir / filepath
         full_path.parent.mkdir(parents=True, exist_ok=True)
-        full_path.write_text(content)
+        full_path.write_text(content, encoding="utf-8")
     return tmp_dir
 
 

@@ -6,10 +6,13 @@ Main orchestration logic for spec creation with dynamic complexity adaptation.
 """
 
 import json
+import logging
 from collections.abc import Callable
 from pathlib import Path
 
 from analysis.analyzers import analyze_project
+from core.build_signals import BuildPaused
+from core.pause_state import is_paused
 from core.task_event import TaskEventEmitter
 from core.workspace.models import SpecNumberLock
 from phase_config import get_thinking_budget
@@ -61,7 +64,8 @@ class SpecOrchestrator:
         model: str = "sonnet",  # Shorthand - resolved via API Profile if configured
         thinking_level: str = "medium",  # Thinking level for extended thinking
         complexity_override: str | None = None,  # Force a specific complexity
-        use_ai_assessment: bool = True,  # Use AI for complexity assessment (vs heuristics)
+        use_ai_assessment: bool = True,  # Ask the AI when the heuristic is unsure
+        jev_run=None,
     ):
         """Initialize the spec orchestrator.
 
@@ -73,9 +77,17 @@ class SpecOrchestrator:
             model: The model to use for agent execution
             thinking_level: Thinking level (none, low, medium, high, ultrathink)
             complexity_override: Force a specific complexity level
-            use_ai_assessment: Whether to use AI for complexity assessment
+            use_ai_assessment: Whether the AI may be asked when the heuristic
+                is unsure (False: the heuristic always decides)
         """
         self.project_dir = Path(project_dir)
+        from integrations.jev.models import JevContext
+        from integrations.jev.runtime import JevRun
+
+        self.jev_run = jev_run or JevRun.from_env(
+            JevContext("feature-build", self.project_dir)
+        )
+
         self.task_description = task_description
         self.model = model
         self.thinking_level = thinking_level
@@ -105,6 +117,11 @@ class SpecOrchestrator:
                 self.spec_dir = create_spec_dir(self.specs_dir, lock)
                 # Create directory inside lock to ensure atomicity
                 self.spec_dir.mkdir(parents=True, exist_ok=True)
+        from dataclasses import replace
+
+        self.jev_run.context = replace(
+            self.jev_run.context, project_dir=self.project_dir, spec_dir=self.spec_dir
+        )
         self.validator = SpecValidator(self.spec_dir)
 
         # Agent runner (initialized when needed)
@@ -202,6 +219,23 @@ class SpecOrchestrator:
                 # — surface the original error to the caller.
                 return False, response
             # Pause-and-resume succeeded — loop to retry the same phase.
+
+    @staticmethod
+    def _report_phase_warnings(phase_name: str, result, task_logger) -> None:
+        """What a successful phase stood in for, where a person reads it.
+
+        A phase that wrote a placeholder because its agent produced nothing,
+        or that succeeded after failed attempts, reported exactly what a phase
+        that did its job reports: `result.errors` of a successful result were
+        dropped, and nothing reached the task log. Each one is now a warning
+        entry in the planning log (the Logs tab renders it), and on the
+        console.
+        """
+        from ..phases.models import phase_notes
+
+        for message in phase_notes(phase_name, result):
+            print_status(message, "warning")
+            task_logger.log(message, LogEntryType.WARNING, LogPhase.PLANNING)
 
     async def _store_phase_summary(self, phase_name: str) -> None:
         """Summarize and store phase output for subsequent phases.
@@ -301,6 +335,7 @@ class SpecOrchestrator:
             run_agent_fn=self._run_agent,
             task_logger=task_logger,
             ui_module=ui,
+            jev_run=self.jev_run,
         )
 
         results = []
@@ -365,6 +400,11 @@ class SpecOrchestrator:
             # Update phase executor's task description
             phase_executor.task_description = self.task_description
 
+        # The card's kind, from what is already known (category, imported
+        # type, the words of the task): no model, written to task_metadata.json
+        # for the UI and the lots that follow (kanban-task-types.md, lot 0).
+        self._record_task_kind()
+
         # === CREATE LINEAR TASK (if enabled) ===
         await self._create_linear_task_if_enabled()
 
@@ -412,12 +452,21 @@ class SpecOrchestrator:
                 print_status(f"Unknown phase: {phase_name}, skipping", "warning")
                 continue
 
+            # Cooperative pause, between phases. Spec creation is the phase a
+            # user is most likely to interrupt — it runs before any code exists
+            # — and it was the one phase with no checkpoint at all.
+            if is_paused(self.spec_dir):
+                print()
+                print_status("SPEC CREATION PAUSED", "warning")
+                raise BuildPaused("spec")
+
             result = await run_phase(phase_name, all_phases[phase_name])
             results.append(result)
             phases_executed.append(phase_name)
 
             # Store summary for subsequent phases (compaction)
             if result.success:
+                self._report_phase_warnings(phase_name, result, task_logger)
                 await self._store_phase_summary(phase_name)
 
             if not result.success:
@@ -442,6 +491,10 @@ class SpecOrchestrator:
                     success=False,
                     message=f"Phase {phase_name} failed",
                 )
+                # Say which phase failed and what it reported. Returning False
+                # alone left the frontend to infer a failure from the exit code
+                # and label the card "Has Errors" with nothing behind it.
+                self._emit_planning_failed(phase_name, result.errors)
                 return False
 
         # Summary
@@ -477,9 +530,29 @@ class SpecOrchestrator:
         # === HUMAN REVIEW CHECKPOINT ===
         return self._run_review_checkpoint(auto_approve)
 
+    def _emit_planning_failed(self, phase_name: str, errors: list[str]) -> None:
+        """Report a failed spec phase to the frontend, with its own errors.
+
+        Best-effort: the pipeline has already failed, and an unwritable event
+        stream is not a second failure to report.
+        """
+        detail = "\n".join(f"- {err}" for err in (errors or [])[:5])
+        message = f"La phase « {phase_name} » de la création du spec a échoué."
+        if detail:
+            message = f"{message}\n{detail}"
+        try:
+            TaskEventEmitter.from_spec_dir(self.spec_dir).emit(
+                "PLANNING_FAILED",
+                {"error": message, "recoverable": True},
+            )
+        except Exception:
+            # Le pipeline a déjà échoué ; un flux d'événements inutilisable
+            # n'est pas une seconde panne à remonter.
+            pass
+
     async def _create_linear_task_if_enabled(self) -> None:
         """Create a Linear task if Linear integration is enabled."""
-        from linear_updater import create_linear_task, is_linear_enabled
+        from integrations.linear.updater import create_linear_task, is_linear_enabled
 
         if not is_linear_enabled():
             return
@@ -494,6 +567,22 @@ class SpecOrchestrator:
             print_status(f"Linear task created: {linear_state.task_id}", "success")
         else:
             print_status("Linear task creation failed (continuing without)", "warning")
+
+    def _record_task_kind(self) -> None:
+        """Classify the card and record the verdict; never fails the spec."""
+        try:
+            from tasks import classify_spec
+
+            text = self.task_description or ""
+            title, _, rest = text.partition("\n")
+            verdict = classify_spec(self.spec_dir, title, rest)
+            print_status(
+                f"Task kind: {verdict.kind.value} "
+                f"({verdict.source}, {verdict.confidence:.0%})",
+                "info",
+            )
+        except Exception as exc:  # noqa: BLE001 — context, not a condition
+            logging.getLogger(__name__).warning("task kind not recorded: %s", exc)
 
     async def _phase_complexity_assessment_with_requirements(
         self,
@@ -515,8 +604,30 @@ class SpecOrchestrator:
             # Manual override
             self.assessment = self._create_override_assessment()
         elif self.use_ai_assessment:
-            # Run AI assessment
-            self.assessment = await self._run_ai_assessment(task_logger)
+            # The heuristic is free; the complexity_assessor session is not.
+            # Ask the model only when the heuristic cannot tell.
+            heuristic = self._heuristic_assessment()
+            threshold = complexity.AI_ASSESSMENT_CONFIDENCE_THRESHOLD
+            if complexity.needs_ai_assessment(heuristic, threshold):
+                task_logger.log(
+                    f"Complexity heuristic unsure ({heuristic.confidence:.0%} < "
+                    f"{threshold:.0%}): asking the complexity assessor.",
+                    LogEntryType.INFO,
+                    LogPhase.PLANNING,
+                )
+                self.assessment = await self._run_ai_assessment(
+                    task_logger, fallback=heuristic
+                )
+            else:
+                task_logger.log(
+                    f"Complexity heuristic confident ({heuristic.confidence:.0%} >= "
+                    f"{threshold:.0%}): {heuristic.complexity.value}, "
+                    "complexity assessor skipped.",
+                    LogEntryType.INFO,
+                    LogPhase.PLANNING,
+                )
+                self.assessment = heuristic
+                self._print_assessment_info()
         else:
             # Use heuristic assessment
             self.assessment = self._heuristic_assessment()
@@ -577,15 +688,21 @@ class SpecOrchestrator:
             complexity=comp,
             confidence=1.0,
             reasoning=f"Manual override: {self.complexity_override}",
+            assessed_by="override",
         )
         print_status(f"Complexity override: {comp.value.upper()}", "success")
         return assessment
 
-    async def _run_ai_assessment(self, task_logger) -> complexity.ComplexityAssessment:
+    async def _run_ai_assessment(
+        self,
+        task_logger,
+        fallback: complexity.ComplexityAssessment | None = None,
+    ) -> complexity.ComplexityAssessment:
         """Run AI-based complexity assessment.
 
         Args:
             task_logger: The task logger instance
+            fallback: The heuristic verdict to keep if the session fails
 
         Returns:
             The complexity assessment
@@ -610,7 +727,7 @@ class SpecOrchestrator:
             print_status(
                 "AI assessment failed, falling back to heuristics...", "warning"
             )
-            return self._heuristic_assessment()
+            return fallback or self._heuristic_assessment()
 
     def _print_assessment_info(
         self, assessment: complexity.ComplexityAssessment | None = None
@@ -623,8 +740,9 @@ class SpecOrchestrator:
         if assessment is None:
             assessment = self.assessment
 
+        who = "AI" if assessment.assessed_by == "complexity_assessor" else "Heuristic"
         print_status(
-            f"AI assessed complexity: {highlight(assessment.complexity.value.upper())}",
+            f"{who} assessed complexity: {highlight(assessment.complexity.value.upper())}",
             "success",
         )
         print_key_value("Confidence", f"{assessment.confidence:.0%}")
@@ -657,8 +775,17 @@ class SpecOrchestrator:
             with open(auto_build_index, encoding="utf-8") as f:
                 project_index = json.load(f)
 
+        requirements = None
+        requirements_file = self.spec_dir / "requirements.json"
+        if requirements_file.exists():
+            try:
+                with open(requirements_file, encoding="utf-8") as f:
+                    requirements = json.load(f)
+            except (OSError, json.JSONDecodeError):
+                requirements = None
+
         analyzer = complexity.ComplexityAnalyzer(project_index)
-        return analyzer.analyze(self.task_description or "")
+        return analyzer.analyze(self.task_description or "", requirements)
 
     def _print_completion_summary(
         self, results: list[phases.PhaseResult], phases_executed: list[str]

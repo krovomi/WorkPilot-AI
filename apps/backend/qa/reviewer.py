@@ -15,7 +15,7 @@ from typing import Any, Union
 
 # Memory integration for cross-session learning
 from agents.agent_audit import audit_event
-from agents.memory_manager import get_graphiti_context, save_session_memory
+from agents.memory_manager import get_memory_context, save_session_memory
 from core.agent_client import AgentClient, ContentBlockType
 
 try:
@@ -28,7 +28,7 @@ try:
 except ImportError:
     ResultMessage = None  # type: ignore[assignment,misc]
 
-from debug import (
+from core.debug import (
     debug,
     debug_detailed,
     debug_error,
@@ -49,6 +49,7 @@ from .criteria import (
     load_implementation_plan,
     save_implementation_plan,
 )
+from .report import render_qa_report
 
 try:
     from core.usage_tracker import record_qa_result as _ut_record_qa
@@ -63,8 +64,42 @@ except ImportError:
     _REPLAY_AVAILABLE = False
     _get_replay_recorder = None  # type: ignore[assignment]
 
+import json
 import re
+import time
 from datetime import datetime, timezone
+
+# How a failed pass reads. The loop classifies the message (`classify_qa_error`)
+# to tell the next pass what actually went wrong: every error used to be
+# reported back as "you did NOT update implementation_plan.json", including the
+# ones where the agent had updated it and broken the JSON, or where the session
+# itself had failed — so the retry fixed nothing and the third pass failed the
+# same way.
+QA_ERROR_NO_SIGNOFF = "QA agent did not update implementation_plan.json"
+QA_ERROR_INVALID_PLAN = "QA agent left implementation_plan.json as invalid JSON"
+QA_ERROR_SIGNOFF_WRITE = "Failed to write qa_signoff"
+
+# `SIGN-OFF: APPROVED`, `Status: REJECTED`, `Verdict: APPROVED`. Matched after
+# markdown emphasis is stripped: the prompt's own templates bold the label
+# (`**SIGN-OFF**: APPROVED`, `**Status**: REJECTED`), and the `**` between the
+# label and the colon defeated every pattern.
+_VERDICT_RE = re.compile(
+    r"\b(?:SIGN[\-\s]*OFF|STATUS|VERDICT)\s*:\s*(APPROVED|REJECTED)\b"
+)
+_MARKDOWN_EMPHASIS_RE = re.compile(r"[*_`]")
+
+# The files the reviewer writes its verdict into besides the plan, in the order
+# they are trusted.
+_SESSION_REPORT_FILES = ("qa_report.md", "QA_FIX_REQUEST.md")
+
+
+def classify_qa_error(message: str) -> str:
+    """The kind of a QA error message, for the next pass's self-correction."""
+    if message.startswith(QA_ERROR_INVALID_PLAN):
+        return "invalid_implementation_plan_json"
+    if message.startswith((QA_ERROR_NO_SIGNOFF, QA_ERROR_SIGNOFF_WRITE)):
+        return "missing_implementation_plan_update"
+    return "session_error"
 
 
 def _extract_verdict_from_response(response_text: str) -> str | None:
@@ -80,24 +115,13 @@ def _extract_verdict_from_response(response_text: str) -> str | None:
     if not response_text:
         return None
 
-    text_upper = response_text.upper()
+    text_upper = _MARKDOWN_EMPHASIS_RE.sub("", response_text).upper()
 
-    # Look for explicit sign-off patterns
-    # Pattern: "SIGN-OFF: APPROVED" or "Sign-off: REJECTED"
-    signoff_match = re.search(
-        r"SIGN[\-\s]*OFF\s*:\s*(APPROVED|REJECTED)",
-        text_upper,
-    )
-    if signoff_match:
-        return signoff_match.group(1).lower()
-
-    # Pattern: "Status: APPROVED" or "Status: REJECTED"
-    status_match = re.search(
-        r"STATUS\s*:\s*(APPROVED|REJECTED)",
-        text_upper,
-    )
-    if status_match:
-        return status_match.group(1).lower()
+    # The last explicit verdict wins: the agent states its own at the end, and
+    # may quote the previous pass's ("the last status: REJECTED") on the way.
+    verdicts = _VERDICT_RE.findall(text_upper)
+    if verdicts:
+        return verdicts[-1].lower()
 
     # Pattern: "QA VALIDATION COMPLETE" + "APPROVED ✓" or "REJECTED ✗"
     if "QA VALIDATION COMPLETE" in text_upper:
@@ -107,6 +131,69 @@ def _extract_verdict_from_response(response_text: str) -> str | None:
             return "rejected"
 
     return None
+
+
+def _verdict_from_session_reports(spec_dir: Path, since: float) -> str | None:
+    """The verdict in a report the reviewer wrote during this session.
+
+    The prompt has the reviewer write `qa_report.md` (and `QA_FIX_REQUEST.md`
+    when it rejects) before it updates the plan, and the session can end
+    between the two. A file older than `since` belongs to a previous pass.
+    """
+    for name in _SESSION_REPORT_FILES:
+        path = spec_dir / name
+        try:
+            if path.stat().st_mtime < since:
+                continue
+            verdict = _extract_verdict_from_response(
+                path.read_text(encoding="utf-8", errors="replace")
+            )
+        except OSError:
+            continue
+        if verdict:
+            return verdict
+    return None
+
+
+def _read_plan_text(spec_dir: Path) -> str | None:
+    """implementation_plan.json as it is on disk, or None when unreadable."""
+    try:
+        return (spec_dir / "implementation_plan.json").read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+
+
+def _plan_json_error(spec_dir: Path) -> str | None:
+    """Why implementation_plan.json does not parse; None when it does or is absent.
+
+    `load_implementation_plan` answers None for both a missing file and a
+    broken one, which made a plan the reviewer had edited into invalid JSON
+    read as a plan it had never touched.
+    """
+    plan_file = spec_dir / "implementation_plan.json"
+    if not plan_file.exists():
+        return None
+    try:
+        json.loads(plan_file.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        return f"{e.msg} at line {e.lineno} column {e.colno}"
+    except (OSError, UnicodeDecodeError) as e:
+        return str(e)
+    return None
+
+
+def _restore_plan(spec_dir: Path, plan_before: str | None) -> bool:
+    """Put back the plan as it was before the session, if that copy parses."""
+    if plan_before is None:
+        return False
+    try:
+        json.loads(plan_before)
+        (spec_dir / "implementation_plan.json").write_text(
+            plan_before, encoding="utf-8"
+        )
+    except (json.JSONDecodeError, OSError):
+        return False
+    return True
 
 
 def _programmatic_qa_signoff(
@@ -151,6 +238,27 @@ def _programmatic_qa_signoff(
     return save_implementation_plan(spec_dir, plan)
 
 
+def _what_went_wrong(error_type: str | None) -> str:
+    """The self-correction paragraph for the kind of error the last pass hit."""
+    if error_type == "invalid_implementation_plan_json":
+        return (
+            "You edited `implementation_plan.json` but left it as invalid JSON, so "
+            "the framework could not read your `qa_signoff`. The copy from before "
+            "your session has been restored. Read the file again and edit only the "
+            "`qa_signoff` field; do not rewrite the rest of the plan."
+        )
+    if error_type == "session_error":
+        return (
+            "The session ended on an error before any verdict was recorded. This "
+            "is not a mistake in the file: run the review again and record your "
+            "verdict as soon as you have it."
+        )
+    return (
+        "You did NOT update the `implementation_plan.json` file with the required "
+        "`qa_signoff` object."
+    )
+
+
 # =============================================================================
 # QA REVIEWER SESSION
 # =============================================================================
@@ -164,6 +272,7 @@ async def run_qa_agent_session(
     max_iterations: int,
     verbose: bool = False,
     previous_error: dict | None = None,
+    jev_advice: str = "",
 ) -> tuple[str, str]:
     """
     Run a QA reviewer agent session.
@@ -243,6 +352,8 @@ async def run_qa_agent_session(
     # Load QA prompt with dynamically-injected project-specific MCP tools
     # This includes Electron validation for Electron apps, Puppeteer for web, etc.
     prompt = get_qa_reviewer_prompt(spec_dir, project_dir)
+    if jev_advice:
+        prompt += "\n\n" + jev_advice
     debug_detailed(
         "qa_reviewer",
         "Loaded QA reviewer prompt with project-specific tools",
@@ -251,7 +362,7 @@ async def run_qa_agent_session(
     )
 
     # Retrieve memory context for QA (past patterns, gotchas, validation insights)
-    qa_memory_context = await get_graphiti_context(
+    qa_memory_context = await get_memory_context(
         spec_dir,
         project_dir,
         {
@@ -262,7 +373,7 @@ async def run_qa_agent_session(
     if qa_memory_context:
         prompt += "\n\n" + qa_memory_context
         print("✓ Memory context loaded for QA reviewer")
-        debug_success("qa_reviewer", "Graphiti memory context loaded for QA")
+        debug_success("qa_reviewer", "Project memory loaded for QA")
 
     # Learning Loop: inject patterns learned from previous builds (qa_review phase)
     try:
@@ -273,6 +384,7 @@ async def run_qa_agent_session(
             prompt += "\n\n" + learning_context
             debug_success("qa_reviewer", "Learning loop patterns injected for QA")
     except Exception:
+        # L'injection de patterns est un bonus : sans elle le prompt reste valide.
         pass
 
     # Add session context
@@ -287,6 +399,7 @@ async def run_qa_agent_session(
             error_type=previous_error.get("error_type"),
             consecutive_errors=previous_error.get("consecutive_errors"),
         )
+        what_went_wrong = _what_went_wrong(previous_error.get("error_type"))
         prompt += f"""
 
 ---
@@ -300,7 +413,7 @@ The previous QA session failed with the following error:
 
 ### What Went Wrong
 
-You did NOT update the `implementation_plan.json` file with the required `qa_signoff` object.
+{what_went_wrong}
 
 ### Required Action
 
@@ -345,6 +458,8 @@ After completing your QA review, you MUST:
 
 3. **Use the Edit tool or Write tool** to update the file. The file path is:
    `{spec_dir}/implementation_plan.json`
+   Change only the `qa_signoff` field and keep the file valid JSON: no comments,
+   no trailing commas, every other field left exactly as it is.
 
 ### FAILURE TO DO THIS WILL CAUSE ANOTHER ERROR
 
@@ -356,6 +471,11 @@ This is attempt {previous_error.get("consecutive_errors", 1) + 1}. If you fail t
         print(
             f"\n⚠️  Retry with self-correction context (attempt {previous_error.get('consecutive_errors', 1) + 1})"
         )
+
+    # What the plan held before the reviewer touched it, so an edit that
+    # breaks its JSON can be undone instead of failing every following pass.
+    plan_before = _read_plan_text(spec_dir)
+    session_started_at = time.time()
 
     # ── Provider-agnostic path (OpenAI, Windsurf, Copilot, Google, etc.) ──
     if isinstance(client, AgentClient):
@@ -371,6 +491,8 @@ This is attempt {previous_error.get("consecutive_errors", 1) + 1}. If you fail t
             tool_count,
             _rr,
             _rs_id,
+            plan_before=plan_before,
+            session_started_at=session_started_at,
         )
 
     # ── Claude SDK path (backward compatible) ──
@@ -431,6 +553,7 @@ This is attempt {previous_error.get("consecutive_errors", 1) + 1}. If you fail t
                                 cost_usd=msg.total_cost_usd or 0.0,
                             )
                         except Exception:
+                            # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                             pass
                 continue
 
@@ -454,6 +577,7 @@ This is attempt {previous_error.get("consecutive_errors", 1) + 1}. If you fail t
                             try:
                                 _rr.record_response(_rs_id, block.text)
                             except Exception:
+                                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                                 pass
                     elif block_type == "ToolUseBlock" and hasattr(block, "name"):
                         tool_name = block.name
@@ -525,6 +649,7 @@ This is attempt {previous_error.get("consecutive_errors", 1) + 1}. If you fail t
                                         _rs_id, tool_name, tool_input_dict=inp or {}
                                     )
                             except Exception:
+                                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                                 pass
 
             elif msg_type == "UserMessage" and hasattr(msg, "content"):
@@ -599,6 +724,7 @@ This is attempt {previous_error.get("consecutive_errors", 1) + 1}. If you fail t
                                         success=not is_error,
                                     )
                             except Exception:
+                                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                                 pass
 
                         current_tool = None
@@ -614,12 +740,15 @@ This is attempt {previous_error.get("consecutive_errors", 1) + 1}. If you fail t
             message_count,
             tool_count,
             result_error=result_error,
+            plan_before=plan_before,
+            session_started_at=session_started_at,
         )
 
         if _rr and _rs_id:
             try:
                 _rr.end_session(_rs_id)
             except Exception:
+                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                 pass
         return _qa_result
 
@@ -636,6 +765,7 @@ This is attempt {previous_error.get("consecutive_errors", 1) + 1}. If you fail t
             try:
                 _rr.end_session(_rs_id, status="failed")
             except Exception:
+                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                 pass
         return "error", str(e)
 
@@ -657,6 +787,8 @@ async def _run_qa_agent_client_session(
     tool_count: int,
     _rr: Any,
     _rs_id: Any,
+    plan_before: str | None = None,
+    session_started_at: float | None = None,
 ) -> tuple[str, str]:
     """
     Provider-agnostic QA reviewer session using normalized AgentMessage stream.
@@ -677,6 +809,22 @@ async def _run_qa_agent_client_session(
 
     current_tool = None
 
+    # The context gauge follows QA too. Each pass already starts on a fresh
+    # thread (nothing is replayed), so the guard only measures here.
+    from agents.session import _make_context_guard
+
+    context_guard = _make_context_guard(
+        client,
+        spec_dir,
+        "validation",
+        None,
+        provider,
+        str(getattr(client, "model", "") or ""),
+    )
+    if context_guard is not None:
+        context_guard.monitor_only = True
+        context_guard.base_chars = len(prompt)
+
     try:
         debug("qa_reviewer", f"Sending query to {provider}...")
         await client.query(prompt)
@@ -692,6 +840,11 @@ async def _run_qa_agent_client_session(
                 f"Received message #{message_count}",
                 msg_type=agent_msg.type_name,
             )
+            if context_guard is not None:
+                try:
+                    context_guard.observe(agent_msg)
+                except Exception:  # noqa: BLE001 - the gauge is a mirror
+                    pass
 
             for block in agent_msg.content:
                 if block.type == ContentBlockType.TEXT and block.text:
@@ -709,6 +862,7 @@ async def _run_qa_agent_client_session(
                         try:
                             _rr.record_response(_rs_id, block.text)
                         except Exception:
+                            # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                             pass
 
                 elif block.type == ContentBlockType.TOOL_USE:
@@ -780,6 +934,7 @@ async def _run_qa_agent_client_session(
                                     _rs_id, tool_name, tool_input_dict=inp or {}
                                 )
                         except Exception:
+                            # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                             pass
 
                 elif block.type == ContentBlockType.TOOL_RESULT:
@@ -848,11 +1003,16 @@ async def _run_qa_agent_client_session(
                                     success=not is_error,
                                 )
                         except Exception:
+                            # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                             pass
 
                     current_tool = None
 
         print("\n" + "-" * 70 + "\n")
+
+        from agents.session import record_client_usage
+
+        record_client_usage(client, spec_dir, "validation", agent_type="qa_reviewer")
 
         # Shared post-processing: check QA result, save memory, extract verdict
         _qa_result = await _process_qa_result(
@@ -863,12 +1023,15 @@ async def _run_qa_agent_client_session(
             message_count,
             tool_count,
             result_error=None,
+            plan_before=plan_before,
+            session_started_at=session_started_at,
         )
 
         if _rr and _rs_id:
             try:
                 _rr.end_session(_rs_id)
             except Exception:
+                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                 pass
         return _qa_result
 
@@ -885,6 +1048,7 @@ async def _run_qa_agent_client_session(
             try:
                 _rr.end_session(_rs_id, status="failed")
             except Exception:
+                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                 pass
         return "error", str(e)
 
@@ -902,6 +1066,8 @@ async def _process_qa_result(
     message_count: int,
     tool_count: int,
     result_error: str | None = None,
+    plan_before: str | None = None,
+    session_started_at: float | None = None,
 ) -> tuple[str, str]:
     """
     Shared post-processing logic for QA reviewer sessions.
@@ -911,7 +1077,29 @@ async def _process_qa_result(
 
     Used by both the Claude SDK path and the AgentClient path.
     """
-    status = get_qa_signoff_status(spec_dir)
+    plan_error = _plan_json_error(spec_dir)
+    if plan_error:
+        # The reviewer's edit broke the plan. Left as is, every later pass
+        # reads nothing, and so does the rest of the pipeline: put the copy
+        # from before the session back, and take the verdict from the
+        # reviewer's text or reports below. Whatever qa_signoff the restored
+        # copy holds is the previous pass's, never this one's.
+        restored = _restore_plan(spec_dir, plan_before)
+        debug_error(
+            "qa_reviewer",
+            f"implementation_plan.json is invalid JSON after the session: {plan_error}",
+            restored=restored,
+        )
+        print(
+            f"\n⚠️  implementation_plan.json is invalid JSON ({plan_error})"
+            + ("; restored the copy from before the session." if restored else ".")
+        )
+        status = None
+    else:
+        status = get_qa_signoff_status(spec_dir)
+        # qa_report.md is rendered from the sign-off rather than written by the
+        # reviewer: one copy of the issues in output tokens, not five.
+        render_qa_report(spec_dir, status)
     debug(
         "qa_reviewer",
         "QA session completed",
@@ -946,6 +1134,7 @@ async def _process_qa_result(
             try:
                 _ut_record_qa(project_dir, spec_dir.name, passed=True, score=100.0)
             except Exception:
+                # Le suivi d'usage est de la telemetrie : jamais au prix du build.
                 pass
         qa_discoveries["patterns_found"].append(
             f"QA session {qa_session}: All acceptance criteria validated successfully"
@@ -967,6 +1156,7 @@ async def _process_qa_result(
             try:
                 _ut_record_qa(project_dir, spec_dir.name, passed=False, score=0.0)
             except Exception:
+                # Le suivi d'usage est de la telemetrie : jamais au prix du build.
                 pass
         issues = status.get("issues_found", [])
         for issue in issues:
@@ -994,8 +1184,11 @@ async def _process_qa_result(
         print("Treating as human escalation (manual verification required).")
         return ("human_escalation", response_text)
 
-    # Agent didn't update the file — try to extract verdict from response
+    # Agent didn't update the file — try to extract verdict from response,
+    # then from the reports it wrote during this session
     extracted_verdict = _extract_verdict_from_response(response_text)
+    if not extracted_verdict and session_started_at is not None:
+        extracted_verdict = _verdict_from_session_reports(spec_dir, session_started_at)
 
     if extracted_verdict:
         debug(
@@ -1010,6 +1203,7 @@ async def _process_qa_result(
         )
 
         if _programmatic_qa_signoff(spec_dir, extracted_verdict, qa_session):
+            render_qa_report(spec_dir, get_qa_signoff_status(spec_dir))
             debug_success(
                 "qa_reviewer",
                 f"Programmatically wrote qa_signoff: {extracted_verdict}",
@@ -1024,7 +1218,9 @@ async def _process_qa_result(
             "qa_reviewer",
             "Failed to programmatically write qa_signoff",
         )
-        return ("error", "Failed to write qa_signoff")
+        if plan_error:
+            return ("error", f"{QA_ERROR_INVALID_PLAN} ({plan_error})")
+        return ("error", QA_ERROR_SIGNOFF_WRITE)
 
     # Agent didn't update the status and no clear verdict in response
     debug_error(
@@ -1038,6 +1234,9 @@ async def _process_qa_result(
     if result_error:
         return ("error", f"Agent session error: {result_error}")
 
+    if plan_error:
+        return ("error", f"{QA_ERROR_INVALID_PLAN} ({plan_error})")
+
     error_details = []
     if message_count == 0:
         error_details.append("No messages received from agent")
@@ -1046,7 +1245,7 @@ async def _process_qa_result(
     if not response_text:
         error_details.append("Agent produced no output")
 
-    error_msg = "QA agent did not update implementation_plan.json"
+    error_msg = QA_ERROR_NO_SIGNOFF
     if error_details:
         error_msg += f" ({'; '.join(error_details)})"
 

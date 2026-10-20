@@ -3,7 +3,6 @@
 **Autonomous multi-agent coding framework that plans, builds, and validates software for you.**
 
 ![WorkPilot AI Kanban Board](.github/assets/WorkPilot-AI-Kanban.png)
-
 [![License](https://img.shields.io/badge/license-AGPL--3.0-green?style=flat-square)](./LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-Join%20Community-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/KCXaPBr4Dj)
 [![YouTube](https://img.shields.io/badge/YouTube-Subscribe-FF0000?style=flat-square&logo=youtube&logoColor=white)](https://www.youtube.com/@AndreMikalsen)
@@ -16,18 +15,18 @@
 ### Stable Release
 
 <!-- STABLE_VERSION_BADGE -->
-[![Stable](https://img.shields.io/badge/stable-1.2.1-blue?style=flat-square)](https://github.com/krovomi/WorkPilot-AI/releases/tag/v1.2.1)
+[![Stable](https://img.shields.io/badge/stable-1.3.0-blue?style=flat-square)](https://github.com/krovomi/WorkPilot-AI/releases/tag/v1.3.0)
 <!-- STABLE_VERSION_BADGE_END -->
 
 <!-- STABLE_DOWNLOADS -->
 | Platform | Download |
 |----------|----------|
-| **Windows** | [WorkPilot-AI-1.2.1-win32-x64.exe](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.2.1/WorkPilot-AI-1.2.1-win32-x64.exe) |
-| **macOS (Apple Silicon)** | [WorkPilot-AI-1.2.1-darwin-arm64.dmg](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.2.1/WorkPilot-AI-1.2.1-darwin-arm64.dmg) |
-| **macOS (Intel)** | [WorkPilot-AI-1.2.1-darwin-x64.dmg](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.2.1/WorkPilot-AI-1.2.1-darwin-x64.dmg) |
-| **Linux** | [WorkPilot-AI-1.2.1-linux-x86_64.AppImage](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.2.1/WorkPilot-AI-1.2.1-linux-x86_64.AppImage) |
-| **Linux (Debian)** | [WorkPilot-AI-1.2.1-linux-amd64.deb](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.2.1/WorkPilot-AI-1.2.1-linux-amd64.deb) |
-| **Linux (Flatpak)** | [WorkPilot-AI-1.2.1-linux-x86_64.flatpak](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.2.1/WorkPilot-AI-1.2.1-linux-x86_64.flatpak) |
+| **Windows** | [WorkPilot-AI-1.2.1-win32-x64.exe](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.3.0/WorkPilot-AI-1.3.0-win32-x64.exe) |
+| **macOS (Apple Silicon)** | [WorkPilot-AI-1.2.1-darwin-arm64.dmg](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.3.0/WorkPilot-AI-1.3.0-darwin-arm64.dmg) |
+| **macOS (Intel)** | [WorkPilot-AI-1.2.1-darwin-x64.dmg](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.3.0/WorkPilot-AI-1.3.0-darwin-x64.dmg) |
+| **Linux** | [WorkPilot-AI-1.2.1-linux-x86_64.AppImage](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.3.0/WorkPilot-AI-1.3.0-linux-x86_64.AppImage) |
+| **Linux (Debian)** | [WorkPilot-AI-1.2.1-linux-amd64.deb](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.3.0/WorkPilot-AI-1.3.0-linux-amd64.deb) |
+| **Linux (Flatpak)** | [WorkPilot-AI-1.2.1-linux-x86_64.flatpak](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.3.0/WorkPilot-AI-1.3.0-linux-x86_64.flatpak) |
 <!-- STABLE_DOWNLOADS_END -->
 
 ### Beta Release
@@ -82,7 +81,9 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 | **Pause & Resume** | Suspend a running task and resume later with full context preserved, optionally on a different provider |
 | **Per-Phase Re-run** | Redo any phase (planning, coding, validation) on demand without restarting the whole task |
 | **PR-First Review Flow** | Guided human-review with a DoD checklist, "approve & close", and reversible task abandon |
-| **Declarative Workflows** | A build is described as phases in `workflows/<name>/workflow.yaml`; the engine resolves them against your effort level, the provider's capabilities, and the files the task touches. On by default |
+| **Declarative Workflows** | A build is described as phases in `workflows/<name>/workflow.yaml`; the engine resolves them against your effort level, the provider's capabilities, the files the task touches and the task itself (`when: kind == … and complexity == …`). On by default |
+| **One Workflow per Task Kind** | A card's kind (`feature`, `bug_fix`, `hotfix`, `investigation`, `run`, `refactoring`, `test`, `docs`, `spike`) is decided without a model from its category, imported item type or wording, shown and editable on the card, and picks the workflow that runs: a bug is reproduced before it is fixed, an investigation writes a report and no code, a RUN writes a procedure a person reads first, then plays it with Python behind the command allowlist, pausing before anything irreversible. Every implementation a workflow names resolves on a fresh clone, on every provider |
+| **Optional Methodologies by `fallback:`** | A phase may name a methodology that needs a runtime in the target project (BMAD's `_bmad/`) and a WorkPilot fallback; the engine substitutes the fallback when the runtime is absent and shows it in the profile. Nothing is skipped in silence |
 | **Resolved Profile Preview** | See which phases your effort setting bought — and what the next level up would add — in the task detail modal, *before* the build starts |
 
 ### Multi-Agent Orchestration
@@ -110,7 +111,7 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 | **Documenter** | README, API docs, and architecture documentation generation |
 | **Migration Agent** | Framework and library migration with breaking change detection |
 | **Release Coordinator** | Orchestrates release readiness, changelog, and version bumps |
-| **Memory Manager** | Graphiti-based knowledge graph management across sessions |
+| **Memory Manager** | The shared brain: one Obsidian vault every agent reads and writes, across sessions |
 
 ### Integrations
 
@@ -118,7 +119,7 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 |----------|-------------|
 | **GitHub** | Import issues, AI investigation, PR review, batch review wizard, auto-PR creation |
 | **GitLab** | Issues and merge request management with AI severity categorization |
-| **Azure DevOps** | Work item import, PR review, batch operations — _experimental: backend still returns mock data for several endpoints, see [shared_docs/CONFIGURATION.md](shared_docs/CONFIGURATION.md)_ |
+| **Azure DevOps** | Work item import, PR review, batch operations — _experimental: the PR details view (file list, diff stats) falls back to placeholder data when the Azure DevOps call fails, see [docs/CONFIGURATION.md](docs/CONFIGURATION.md#mock--stub-behaviors-to-be-aware-of)_ |
 | **Linear** | Bulk issue import with team/project filtering |
 | **Jira** | Issue management integration |
 | **MCP Marketplace** | Browse, install, and configure Model Context Protocol servers |
@@ -176,10 +177,11 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 
 | Feature | Description |
 |---------|-------------|
-| **Memory System (Graphiti)** | Graph-based semantic memory — agents retain insights across sessions |
-| **Skills System** | Provider-agnostic [Agent Skills](https://agentskills.io) packs under `.agents/skills/`, served to the Kanban command bar and mirrored per harness (Claude Code, Copilot, Codex, Cursor, Gemini) |
+| **Memory System (shared brain)** | One Obsidian vault + `graph.json`, served over MCP — agents retain insights across sessions |
+| **Skills System** | Provider-agnostic [Agent Skills](https://agentskills.io) packs under `.agents/skills/`, served to the Kanban command bar and mirrored per harness (Claude Code, Copilot, Codex, Cursor, Gemini); read natively by hermes and [pi](https://pi.dev) |
 | **Memory Search** | Three-layer progressive retrieval over past builds — an index costs ~100 tokens, timelines and full records are fetched only on demand |
 | **hermes-agent** | [hermes-agent](https://github.com/NousResearch/hermes-agent) skills are read from the same `.agents/skills/`; skills it authors arrive as *candidates* for review, never auto-adopted |
+| **pi** | [pi](https://pi.dev) reads `AGENTS.md` and `.agents/skills/` natively and joins the shared brain (`~/.pi/agent/mcp.json`); project resources stay behind its own `/trust`, which WorkPilot never grants — see [docs/architecture/pi.md](docs/architecture/pi.md) |
 | **Context Management** | Intelligent context building with file relevance ranking and dependency graph analysis |
 | **Session History** | Browse and replay past agent sessions with full statistics |
 
@@ -245,6 +247,11 @@ AI-assisted feature planning with competitor analysis and audience targeting.
 
 ## Architecture Détaillée
 
+> Pour une lecture guidée — y compris sans prérequis technique — ouvrez l'atlas
+> [`docs/audit/WorkPilot-architecture.html`](docs/audit/WorkPilot-architecture.html) (vue « Pour tous »,
+> schémas cliquables, constats, feuille de route). Les justifications de conception sont dans
+> [`docs/architecture/`](docs/architecture/).
+
 ### Vue d'Ensemble
 
 WorkPilot AI est une application de bureau autonome basée sur une architecture multi-agents qui orchestre le cycle de vie complet du développement logiciel. Le système combine un backend Python puissant avec une interface utilisateur Electron moderne pour offrir une expérience de développement transparente.
@@ -257,12 +264,70 @@ WorkPilot AI est une application de bureau autonome basée sur une architecture 
 3. **Agent QA Reviewer** - Valide les implémentations selon les critères d'acceptation
 4. **Agent QA Fixer** - Résout automatiquement les problèmes identifiés
 
+C'est le parcours d'une **fonctionnalité** (`workflows/feature-build/workflow.yaml`). Le **type de la
+carte** — décidé sans modèle à la création de la spec (`apps/backend/tasks/classify.py`), affiché et
+modifiable sur la carte — choisit le workflow réellement joué (`apps/backend/workflows/registry.py`) :
+
+| Type | Workflow | Ce qui change |
+|---|---|---|
+| `feature` (ou type inconnu) | `feature-build` | le parcours ci-dessus ; `prd` BMAD sur une feature complexe à `ultrathink` |
+| `bug_fix` | `bug-fix` | `reproduce` d'abord (le test rouge, la cause probable), pas de brainstorm ni de carte d'architecture |
+| `hotfix` | `hotfix` | `reproduce`, revue indépendante à tout effort, pas de préflight de docs |
+| `investigation` | `investigation` | un rapport (`investigate`, lecture seule) et **aucun code** ; le coder n'est pas lancé |
+| `run` | `run` | la procédure écrite (`runbook`), relue par une personne, puis jouée par Python derrière l'allowlist après une pause avant l'irréversible ; journal `workflow/run.md`, environnements déclarés dans `.workpilot/environments.toml` |
+| `refactoring` | `refactoring` | gate `tests-unchanged` : le diff ne touche aucun test |
+| `test` | `test` | plan, tests écrits en TDD, revue, suite verte |
+| `docs` | `docs` | le document, relu contre le code (`proofread`), sans boucle QA |
+| `spike` | `spike` | approches comparées, prototype jetable, `verdict` |
+
+Détail et plan par lots : [`docs/architecture/kanban-task-types.md`](docs/architecture/kanban-task-types.md).
+
 #### Agents Spécialisés
 - **Test Generator** - Génération de tests unitaires et d'intégration
 - **Refactorer** - Refactoring sécurisé du code avec détection de patterns
 - **Documenter** - Génération automatique de documentation
 - **Migration Agent** - Migration de frameworks et bibliothèques
-- **Memory Manager** - Gestion de la base de connaissances Graphiti
+- **Memory Manager** - Le cerveau partagé : un vault Obsidian lu et écrit par tous les agents
+
+#### Sous-agents spécialisés
+Les sous-agents ne sont pas déclarés par chaque agent : ils vivent dans **un seul registre**,
+[`apps/backend/agents/subagents/`](apps/backend/agents/subagents/), et chaque session reçoit un
+*roster* composé par `agents.subagents.resolve()` depuis `core/client.py` :
+
+1. **Défauts de phase** (`phases.py`) — p. ex. coder : `code-reviewer`, `test-runner`,
+   `architecture-analyst` ; planner : `architecture-analyst`, `dependency-tracer` ;
+   QA : `qa-acceptance-checker`, `test-runner` ; revue : `security-auditor`, `regression-hunter`,
+   `test-coverage-auditor` ; les appels d'une seule réponse (message de commit…) n'en ont aucun.
+2. **Overlays de langage** (`languages/` : .NET, Python, TypeScript, Java, Go, Rust) — la pile
+   détectée injecte ses commandes (`dotnet test --nologo`…) dans le prompt du `test-runner`.
+3. **Overlay mobile** — ajoute `device-runner` et `store-readiness-auditor` sur une app mobile.
+4. **Agents fournis par l'appelant** — gagnent toujours (relecteurs de PR de `pr_review.py`).
+5. **Plafond** de 7 sous-agents.
+
+Le roster atteint le modèle sur tout provider (`capabilities/providers.yaml`) :
+- `native` — Claude : `agents=` du SDK et son outil `Agent` ;
+- `emulated` — Copilot, OpenAI, Gemini, Ollama / LM Studio, Mistral, DeepSeek, Grok, Windsurf :
+  un outil `delegate` dont la description liste les spécialistes, et une **session enfant** du même
+  client par délégation, avec les seuls outils du spécialiste et un résultat borné
+  ([`docs/architecture/delegation.md`](docs/architecture/delegation.md)) ;
+- `none` — les CLI (Codex, OpenCode, Antigravity, pi) apportent leurs outils et ne reçoivent pas de roster.
+
+Ce que rend un sous-agent est borné et traité comme une donnée non fiable
+(`harness/application/subagents.py`). Le même registre, plus les personas des packs
+(`skills/dotnet/agents/net-architect.md`, `skills/mobile/agents/…`), est émis dans
+`.agents/agents/` pour les IDE (Copilot, Codex, Claude Code) ; ces personas de pack ne font pas
+partie des rosters du pipeline. Détail : [`apps/backend/agents/README.md`](apps/backend/agents/README.md#subagents).
+
+#### Méthode BMAD
+BMAD est une **capacité à la demande**, jamais une étape obligatoire : 50 skills BMAD v6.12.0
+vendorisés dans [`skills/bmad/`](skills/bmad/) par `scripts/vendor_bmad.py`. Ils ont besoin du
+runtime `_bmad/` que l'installeur BMAD écrit **dans le projet cible** (`pnpm run skills:bootstrap
+--pack bmad`) ; sans lui, ils sont masqués de la barre de commandes. Dans les workflows, BMAD
+n'entre que là où sa valeur est documentaire — `brainstorm` (`bmad-brainstorming`), le `prd` d'une
+feature complexe à `ultrathink` (`bmad-prd`), la recherche d'un spike (`bmad-deep-recon`) — et
+toujours avec un `fallback:` WorkPilot que le moteur substitue quand le projet n'a pas le runtime,
+en l'écrivant dans le profil. Voir [`skills/README.md`](skills/README.md#runtime-gates) et
+[`docs/architecture/kanban-task-types.md`](docs/architecture/kanban-task-types.md).
 
 ### Architecture Technique
 
@@ -273,11 +338,15 @@ apps/backend/
 │   ├── client.py        # Client Claude Agent SDK
 │   ├── auth.py          # Gestion multi-profils OAuth
 │   ├── worktree.py      # Isolation des espaces de travail Git
-│   └── platform.py      # Abstraction cross-plateforme
+│   └── platform/        # Abstraction cross-plateforme
 ├── agents/              # Logique d'exécution des agents
 │   ├── planner.py       # Agent de planification
 │   ├── coder.py         # Agent de développement
-│   └── session.py       # Gestion des sessions
+│   ├── session.py       # Gestion des sessions
+│   └── subagents/       # Registre des sous-agents (phases, langages, mobile, revue de PR)
+├── harness/             # Harness de contexte : budgets, pagination, résultats des sous-agents
+├── skills_registry/     # Build des skills et émission des agents vers les harnesses
+├── workflows/           # Moteur des workflows déclaratifs (workflows/*/workflow.yaml)
 ├── qa/                  # Pipeline de validation QA
 │   ├── reviewer.py      # Validation des critères
 │   ├── fixer.py         # Résolution automatique
@@ -300,7 +369,7 @@ apps/backend/
 ├── flaky_test_detective/# Détection des tests instables
 ├── streaming/           # Diffusion temps réel des sessions d'agents
 ├── server/              # Mode serveur multi-utilisateurs (auth, claims)
-└── prompts/             # Prompts des agents (60+ agents spécialisés)
+└── prompts/             # Prompts système réels des agents (~50, dont github/)
 ```
 
 > Le backend s'est étoffé en **90+ modules spécialisés** (accessibilité, dérive d'architecture, gouvernance de licences, orchestration multi-repo, etc.). Voir [apps/backend/README.md](apps/backend/README.md) et la [table des modules du wiki](https://github.com/krovomi/WorkPilot-AI/wiki) pour l'inventaire complet auto-généré.
@@ -400,13 +469,13 @@ apps/frontend/src/
 #### Option 1 : Application Bureau (Recommandé)
 
 1. **Téléchargement**
-   - Visitez [GitHub Releases](https://github.com/krovomi/WorkPilot-AI/releases)
-   - Téléchargez la version stable pour votre plateforme
+   - Prenez le fichier de votre plateforme dans le tableau [Download](#download) en haut de
+     cette page (tenu à jour à chaque release), ou sur [GitHub Releases](https://github.com/krovomi/WorkPilot-AI/releases)
 
 2. **Installation**
-   - **Windows** : Exécutez `WorkPilot-AI-1.0.0-win32-x64.exe`
-   - **macOS** : Ouvrez `WorkPilot-AI-1.0.0-darwin-arm64.dmg`
-   - **Linux** : Lancez `WorkPilot-AI-1.0.0-linux-x86_64.AppImage`
+   - **Windows** : exécutez `WorkPilot-AI-<version>-win32-x64.exe`
+   - **macOS** : ouvrez `WorkPilot-AI-<version>-darwin-arm64.dmg` (Apple Silicon) ou `-darwin-x64.dmg` (Intel)
+   - **Linux** : lancez `WorkPilot-AI-<version>-linux-x86_64.AppImage` (ou le `.deb` / `.flatpak`)
 
 3. **Premier Lancement**
    - Lancez l'application
@@ -589,7 +658,7 @@ claude
 AUTO_BUILD_MODEL=claude-opus-5
 DEBUG=true
 LINEAR_API_KEY=votre_clé_linear
-GRAPHITI_ENABLED=true
+BRAIN_ENABLED=true
 ```
 
 ### Configuration du Projet
@@ -643,7 +712,7 @@ Les hooks sont volontairement **rapides**. La CI (`ci.yml`, `lint.yml`) rejoue l
 
 | Étage | Ce qui tourne | Budget |
 |-------|---------------|--------|
-| `pre-commit` | ruff + biome **sur les fichiers stagés uniquement**, puis les tests liés à ces fichiers | quelques secondes |
+| `pre-commit` | ruff + biome **sur les fichiers stagés uniquement**, scan des secrets (bloquant), puis les tests liés à ces fichiers | quelques secondes |
 | `pre-push` | ruff check, ruff format --check, biome lint | < 30 s |
 | CI | pytest, typecheck, vitest, build — sur 3 OS | — |
 
@@ -719,8 +788,7 @@ WorkPilot-AI/
 │   └── frontend/    # Electron desktop application (React + TypeScript)
 ├── src/             # Shared Python connectors (provider config, LLM discovery)
 ├── config/          # Provider registry and shared configuration
-├── docs/            # Documentation and guides
-├── shared_docs/     # Long-form reference docs (configuration, architecture)
+├── docs/            # Documentation: rules, architecture rationale, guides (see docs/README.md)
 ├── tests/           # Python test suite
 └── scripts/         # Build, release, and maintenance utilities
 ```
@@ -753,6 +821,9 @@ WorkPilot AI uses a three-layer security model:
 
 All releases include SHA256 checksums and VirusTotal scans.
 
+To report a vulnerability, follow [docs/SECURITY.md](docs/SECURITY.md) — never a public issue.
+The security rules contributors and coding agents follow are in [docs/rules/security.md](docs/rules/security.md).
+
 ---
 
 ## Documentation
@@ -761,7 +832,8 @@ All releases include SHA256 checksums and VirusTotal scans.
 |----------|-------------|
 | [Installation et Configuration](#installation-et-configuration) | Requirements, install methods, provider setup |
 | [Dépannage Courant](#dépannage-courant) | Common issues and fixes |
-| [Configuration Reference](shared_docs/CONFIGURATION.md) | Provider registry, credential resolution, env vars |
+| [Documentation map](docs/README.md) | Where every document lives and what it is for |
+| [Configuration Reference](docs/CONFIGURATION.md) | Provider registry, credential resolution, env vars |
 | [CLI Usage](docs/CLI-USAGE.md) | Headless / CI usage |
 | [Contributing](docs/CONTRIBUTING.md) | Code style, testing, PR process |
 | [Linux Guide](docs/linux.md) | Flatpak, AppImage builds |
@@ -774,18 +846,6 @@ All releases include SHA256 checksums and VirusTotal scans.
 ## Contributing
 
 We welcome contributions! Please read [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for development setup, code style, testing requirements, and PR process.
-
-### Syncing with Upstream
-
-WorkPilot AI tracks the upstream [Auto-Claude](https://github.com/AndyMik90/Auto-Claude) project. To pull upstream changes into your fork:
-
-```bash
-pnpm merge-upstream                 # merge upstream/develop and push
-pnpm merge-upstream -- --skip-push  # review before publishing
-pnpm run validate:upstream          # check the sync tooling is wired up
-```
-
-Platform wrappers are in `utils/system/`, and `.github/workflows/sync-upstream.yml` runs the same merge on a schedule. See [Keeping Your Fork Updated](docs/CONTRIBUTING.md#keeping-your-fork-updated) for details.
 
 ---
 

@@ -207,7 +207,11 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
 			id: uuid(),
 			title: `Terminal ${state.terminals.length + 1}`,
 			status: "idle",
-			cwd: cwd || process.env.HOME || "~",
+			// The renderer has no `process`: reading process.env.HOME here threw a
+			// ReferenceError and killed the click. An empty cwd is not a missing one —
+			// pty-manager resolves it with os.homedir() in the main process, which is
+			// the only side that can answer the question.
+			cwd: cwd || "",
 			createdAt: new Date(),
 			isClaudeMode: false,
 			// outputBuffer removed - managed by terminalBufferManager
@@ -342,7 +346,8 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
 			id,
 			title,
 			status: "running", // External terminals are already running
-			cwd: cwd || process.env.HOME || "~",
+			// No `process` in the renderer — see addTerminal above.
+			cwd: cwd || "",
 			createdAt: new Date(),
 			isClaudeMode: false,
 			projectPath,

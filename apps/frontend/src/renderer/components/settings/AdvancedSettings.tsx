@@ -585,7 +585,7 @@ export function AdvancedSettings({
 									)}
 								</Button>
 								<Button variant="ghost" onClick={dismissStableDowngrade}>
-									{t("common:actions.dismiss")}
+									{t("common:labels.dismiss")}
 								</Button>
 							</div>
 						</div>

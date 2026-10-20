@@ -13,6 +13,7 @@ Note: This test module mocks all dependencies to avoid importing
 the Claude SDK which is not available in the test environment.
 """
 
+import importlib
 import json
 import sys
 import tempfile
@@ -40,13 +41,13 @@ _mocked_module_names = [
     "client",
     # Config & phases
     "phase_config",
-    "phase_event",
+    "core.phase_event",
     # Logging & utilities
-    "debug",
+    "core.debug",
     "ui",
-    "progress",
+    "core.progress",
     "task_logger",
-    "linear_updater",
+    "integrations.linear.updater",
     "prompts_pkg",
     # Security
     "security",
@@ -59,6 +60,16 @@ _mocked_module_names = [
     "agents.memory_manager",
 ]
 
+# `core.build_signals` and `core.pause_state` have no dependencies, and the
+# code under test imports them (`qa/loop.py`, `spec/pipeline/orchestrator.py`,
+# since the pause/halt signals of #151). They are not mocked: a MagicMock
+# `BuildPaused` cannot be caught, and a MagicMock `is_paused()` is truthy.
+# Import them for real *before* `core` is replaced below; once it is, Python
+# cannot resolve a submodule of it ("'core' is not a package"). Without this
+# the file only collected when an earlier test file had imported them.
+importlib.import_module("core.build_signals")
+importlib.import_module("core.pause_state")
+
 for name in _mocked_module_names:
     if name in sys.modules:
         _original_modules[name] = sys.modules[name]
@@ -68,7 +79,7 @@ for name in _mocked_module_names:
     sys.modules[name] = MagicMock()
 
 # Keep references to mocks used by tests
-mock_progress = sys.modules["progress"]
+mock_progress = sys.modules["core.progress"]
 
 # Now we can safely add the auto-claude path and import
 sys.path.insert(0, str(Path(__file__).parent.parent / "apps" / "backend"))
@@ -187,7 +198,7 @@ class TestImplementationPlanIO:
     ):
         """Loads implementation plan from JSON."""
         plan_file = spec_dir / "implementation_plan.json"
-        plan_file.write_text(json.dumps(sample_implementation_plan))
+        plan_file.write_text(json.dumps(sample_implementation_plan), encoding="utf-8")
 
         plan = load_implementation_plan(spec_dir)
 
@@ -202,7 +213,7 @@ class TestImplementationPlanIO:
     def test_load_invalid_json_returns_none(self, spec_dir: Path):
         """Returns None for invalid JSON."""
         plan_file = spec_dir / "implementation_plan.json"
-        plan_file.write_text("{ invalid json }")
+        plan_file.write_text("{ invalid json }", encoding="utf-8")
 
         plan = load_implementation_plan(spec_dir)
         assert plan is None
@@ -210,7 +221,7 @@ class TestImplementationPlanIO:
     def test_load_empty_file_returns_none(self, spec_dir: Path):
         """Returns None for empty file."""
         plan_file = spec_dir / "implementation_plan.json"
-        plan_file.write_text("")
+        plan_file.write_text("", encoding="utf-8")
 
         plan = load_implementation_plan(spec_dir)
         assert plan is None
@@ -224,7 +235,9 @@ class TestImplementationPlanIO:
         assert result is True
         assert (spec_dir / "implementation_plan.json").exists()
 
-        loaded = json.loads((spec_dir / "implementation_plan.json").read_text())
+        loaded = json.loads(
+            (spec_dir / "implementation_plan.json").read_text(encoding="utf-8")
+        )
         assert loaded["feature"] == "Test"
 
     def test_save_implementation_plan_creates_file(self, spec_dir: Path):
@@ -239,12 +252,12 @@ class TestImplementationPlanIO:
     def test_save_implementation_plan_overwrites(self, spec_dir: Path):
         """Overwrites existing plan file."""
         plan_file = spec_dir / "implementation_plan.json"
-        plan_file.write_text('{"feature": "Old"}')
+        plan_file.write_text('{"feature": "Old"}', encoding="utf-8")
 
         new_plan = {"feature": "New", "phases": []}
         save_implementation_plan(spec_dir, new_plan)
 
-        loaded = json.loads(plan_file.read_text())
+        loaded = json.loads(plan_file.read_text(encoding="utf-8"))
         assert loaded["feature"] == "New"
 
     def test_save_implementation_plan_with_indentation(self, spec_dir: Path):
@@ -253,7 +266,7 @@ class TestImplementationPlanIO:
 
         save_implementation_plan(spec_dir, plan)
 
-        content = (spec_dir / "implementation_plan.json").read_text()
+        content = (spec_dir / "implementation_plan.json").read_text(encoding="utf-8")
         # Check for indentation (2 spaces as per json.dump with indent=2)
         assert "  " in content
 

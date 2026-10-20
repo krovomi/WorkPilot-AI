@@ -6,7 +6,7 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { app, ipcMain } from "electron";
+import { app, ipcMain, shell } from "electron";
 import type {
 	InstalledPlugin,
 	MarketplacePlugin,
@@ -24,6 +24,28 @@ function getPluginDataDir(): string {
 		fs.mkdirSync(dir, { recursive: true });
 	}
 	return dir;
+}
+
+/**
+ * The directory `folderPath` names, when it is an existing folder strictly under
+ * the creator's `local/` directory — symlinks resolved — and `null` otherwise.
+ */
+export function resolveLocalPluginFolder(
+	folderPath: unknown,
+	localRoot: string = path.join(getPluginDataDir(), "local"),
+): string | null {
+	if (typeof folderPath !== "string" || !folderPath) return null;
+	try {
+		const root = fs.realpathSync(localRoot);
+		const target = fs.realpathSync(path.resolve(folderPath));
+		const relative = path.relative(root, target);
+		if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
+			return null;
+		}
+		return fs.statSync(target).isDirectory() ? target : null;
+	} catch {
+		return null;
+	}
 }
 
 function getInstalledPluginsPath(): string {
@@ -604,6 +626,22 @@ export function registerPluginMarketplaceHandlers(): void {
 					error: error instanceof Error ? error.message : "Toggle failed",
 				};
 			}
+		},
+	);
+
+	// Open the folder of a plugin the creator scaffolded. Only a directory under
+	// `<userData>/plugin-marketplace/local/` is opened: the renderer hands back the
+	// path `pluginMarketplace:create` returned, and a path from the renderer is
+	// never trusted to stay where it came from.
+	ipcMain.handle(
+		"pluginMarketplace:openLocalFolder",
+		async (_event, folderPath: unknown) => {
+			const target = resolveLocalPluginFolder(folderPath);
+			if (!target) {
+				return { success: false, error: "Not a local plugin folder" };
+			}
+			const failure = await shell.openPath(target);
+			return failure ? { success: false, error: failure } : { success: true };
 		},
 	);
 

@@ -11,11 +11,29 @@
 #   adapter     the client class that drives this provider agentically.
 #               `null` means there is none — see `degrades_to`.
 #   subagents   native   the provider runs real subagents in their own context
+#                        (the Claude Agent SDK: `agents=` and its Agent tool)
+#               emulated WorkPilot runs them: the roster is offered to the model
+#                        as the `delegate` tool, and each delegation is a child
+#                        session of the same client with the specialist's tools
+#                        (harness/application/delegation.py). Every provider
+#                        driven by the WorkPilot loop is in this state.
 #               none     it cannot; the workflow runs phases sequentially with
-#                        a context reset instead of dispatching in parallel
+#                        a context reset instead of dispatching in parallel.
+#                        The CLIs (Codex, OpenCode, Antigravity) bring their
+#                        own tools and take no roster at run time; the registry
+#                        reaches them as files (`.codex/agents/`, …).
 #   effort      how reasoning depth is expressed, so phase_config can map onto it
 #   degrades_to what actually runs when `adapter` is null. Surfaced in the task
 #               feed, never silent.
+#   context     how a session's context window is managed (context_mgmt/):
+#                 compact  native    the provider summarises its own history
+#                                    (Claude `/compact`, Codex auto-compaction)
+#                          emulated  WorkPilot summarises the conversation log
+#                                    and the next session replays the summary
+#                 usage    exact     the provider reports the window fill
+#                          reported  per-turn prompt tokens are reported
+#                          estimated only characters can be counted
+#               "clear" (a fresh thread seeded with a handoff) works everywhere.
 #
 # Adding a real adapter for a provider is a strictly better outcome than
 # listing it here with `adapter: null`. This file records the current truth,
@@ -26,50 +44,171 @@ claude:
   subagents: native
   effort: thinking_budget
   degrades_to: null
+  context:
+    compact: native
+    usage: exact
 
 copilot:
   adapter: CopilotAgentClient
-  subagents: native
+  subagents: emulated
   effort: thinking_budget
   degrades_to: null
-  note: Converts AgentDefinition to its own SubagentDefinition.
+  context:
+    compact: emulated
+    usage: reported
+  note: Was declared native while nothing reached the model; see `emulated`.
 
 windsurf:
   adapter: WindsurfAgentClient
-  subagents: none
+  subagents: emulated
   effort: none
   degrades_to: null
+  context:
+    compact: emulated
+    usage: reported
   note: >-
     Dual-mode (gRPC to the local IDE language server, or REST with
-    OpenAI-compatible function calling). Neither mode carries subagents.
+    OpenAI-compatible function calling). Sub-agents are emulated in both: a
+    child session of this client per delegation.
 
 openai:
   adapter: OpenAIAgentClient
-  subagents: none
+  subagents: emulated
   effort: reasoning_effort
   degrades_to: null
+  context:
+    compact: emulated
+    usage: reported
+  note: >-
+    With OPENAI_AUTH_MODE=codex-cli the task runs on CodexCliAgentClient, whose
+    threads compact natively (model_auto_compact_token_limit); context_mgmt
+    resolves that from the client, not from this entry.
 
 google:
   adapter: GoogleAgentClient
-  subagents: none
-  effort: thinking_budget
+  subagents: emulated
+  effort: reasoning_effort
   degrades_to: null
+  context:
+    compact: emulated
+    usage: reported
 
 ollama:
   adapter: LocalAgentClient
-  subagents: none
+  subagents: emulated
   effort: none
   degrades_to: null
+  context:
+    compact: emulated
+    usage: reported
 local:
   adapter: LocalAgentClient
-  subagents: none
+  subagents: emulated
   effort: none
   degrades_to: null
+  context:
+    compact: emulated
+    usage: reported
 lmstudio:
   adapter: LocalAgentClient
+  subagents: emulated
+  effort: none
+  degrades_to: null
+  context:
+    compact: emulated
+    usage: reported
+
+# ---------------------------------------------------------------------------
+# OpenAI-compatible endpoints, driven by CompatibleProviderAgentClient.
+# ---------------------------------------------------------------------------
+
+mistral:
+  adapter: CompatibleProviderAgentClient
+  subagents: emulated
+  effort: none
+  degrades_to: null
+  context:
+    compact: emulated
+    usage: reported
+
+deepseek:
+  adapter: CompatibleProviderAgentClient
+  subagents: emulated
+  effort: none
+  degrades_to: null
+  context:
+    compact: emulated
+    usage: reported
+
+grok:
+  adapter: CompatibleProviderAgentClient
+  subagents: emulated
+  effort: none
+  degrades_to: null
+  context:
+    compact: emulated
+    usage: reported
+
+# ---------------------------------------------------------------------------
+# Coding-agent CLIs driven as subprocesses (core/agent_clients/cli_subprocess.py).
+# They bring their own tools, sessions and login; WorkPilot hands the prompt
+# on stdin and reads JSON events back, as with the Codex CLI.
+# ---------------------------------------------------------------------------
+
+opencode:
+  adapter: OpenCodeCliAgentClient
   subagents: none
   effort: none
   degrades_to: null
+  context:
+    compact: emulated
+    usage: reported
+  note: >-
+    `opencode run --format json`. A type declaring none of Write/Edit/Bash runs
+    the built-in `plan` agent. OpenCode also compacts a session on its own when
+    the window fills (compaction.auto, on by default), but `run` has no command
+    to compact on demand, hence `emulated`. step_finish events report tokens.
+
+antigravity:
+  adapter: AntigravityCliAgentClient
+  subagents: none
+  effort: reasoning_effort
+  degrades_to: null
+  context:
+    compact: emulated
+    usage: reported
+  note: >-
+    Google Antigravity CLI (`agy`) in stream-json print mode; --effort
+    low|medium|high. It cannot be restricted to read-only, so a type declaring
+    none of Write/Edit/Bash is refused. `/compact` exists interactively but is
+    not documented in print mode. Alias: agy.
+
+pi:
+  adapter: PiCliAgentClient
+  subagents: none
+  effort: reasoning_effort
+  degrades_to: null
+  context:
+    compact: emulated
+    usage: reported
+  note: >-
+    `pi --mode json` (pi.dev) with the prompt on stdin. Rights are an
+    allowlist: the agent type's declaration, translated through
+    capabilities/harnesses.yaml `pi.tools` and pi's MCP names, becomes
+    `--tools`; a type declaring none of Write/Edit/Bash runs with
+    `read,grep,find,ls` and a write call is answered "Tool write not found"
+    (tests/fixtures/pi/readonly-write-refused.jsonl). Sessions live in the
+    task's spec directory (PI_CODING_AGENT_SESSION_DIR) and are resumed by id.
+    The project's skills reach pi explicitly (`--skill .agents/skills`); its
+    `.pi/` resources load only once a person trusted the checkout in pi, and
+    the adapter reports that state in the task feed rather than approving.
+    `--thinking` takes the phase's effort level. pi compacts on its own when
+    the window fills, and json mode has no compact-on-demand, hence
+    `emulated`; with WORKPILOT_PI_MODE=rpc the client reports itself as
+    `pi-rpc` and context_mgmt/capabilities.py declares it native, as for
+    Codex. The usage of every assistant message is reported. A write guard
+    (core/agent_clients/pi_guard/) runs inside pi with path_guard's policy.
+    Design: docs/architecture/pi.md.
 
 # ---------------------------------------------------------------------------
 # No agentic adapter yet. Selecting one of these runs the task on the Claude
@@ -77,35 +216,23 @@ lmstudio:
 # here and traced into the task feed at run time.
 # ---------------------------------------------------------------------------
 
-mistral:
-  adapter: null
-  subagents: none
-  effort: none
-  degrades_to: claude
-
-deepseek:
-  adapter: null
-  subagents: none
-  effort: none
-  degrades_to: claude
-
-grok:
-  adapter: null
-  subagents: none
-  effort: none
-  degrades_to: claude
-
 meta:
   adapter: null
   subagents: none
   effort: none
   degrades_to: claude
+  context:
+    compact: native
+    usage: exact
 
 aws:
   adapter: null
   subagents: none
   effort: thinking_budget
   degrades_to: claude
+  context:
+    compact: native
+    usage: exact
   note: Bedrock-hosted Anthropic models; the degradation is closer than it looks.
 
 cursor:
@@ -113,12 +240,18 @@ cursor:
   subagents: none
   effort: none
   degrades_to: claude
+  context:
+    compact: native
+    usage: exact
 
 custom:
   adapter: null
   subagents: none
   effort: none
   degrades_to: claude
+  context:
+    compact: native
+    usage: exact
   note: >-
     An Anthropic-compatible gateway configured through ANTHROPIC_BASE_URL. The
     degradation is intentional here: routing through the Claude SDK is exactly

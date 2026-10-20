@@ -1,6 +1,6 @@
 """Deciding which skills a project actually gets.
 
-Three gates, in order. A skill has to clear all three:
+Four gates, in order. A skill has to clear all four:
 
 1. **Pack selection and pin** — ``skills.toml``'s ``[packs]`` table is a
    *want-list*: a pack it does not name is not resolved at all, and a pack it
@@ -25,6 +25,12 @@ Three gates, in order. A skill has to clear all three:
    is on. This is the axis that keeps .NET 10 guidance away from a .NET
    Framework 4.8 codebase.
 3. **Runtime prerequisites** — ``requires`` must be satisfiable *right now*.
+4. **Prompt injection** — the body must not read as an instruction addressed to
+   the agent that will follow it. Last because it is the only gate that reads
+   content, so it only ever looks at what the first three kept, and a refusal
+   here leaves a clean duplicate of the same name free to win the collision
+   below. Why it exists, and why it refuses rather than cleans:
+   ``injection_gate``.
 
 Gate 3 is what fixes the failure this whole registry was built for: 76 BMAD
 skills were committed pointing at ``_bmad/core/tasks/workflow.xml``, a path that
@@ -43,11 +49,34 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from security.untrusted import GUARD_MODE_ENV_VAR
+
+from .injection_gate import GATE as INJECTION_GATE
+from .injection_gate import scan_skill_body
 from .packs import Pack, SkillSource
 from .project import ProjectConfig
 from .targets import satisfies, targets_match
 
-__all__ = ["Resolution", "Rejection", "resolve", "check_requires"]
+__all__ = ["Resolution", "Rejection", "resolve", "check_requires", "is_mock_runtime"]
+
+#: The first-line marker of a runtime file this repository commits in place of
+#: a real one, so a build can emit the gated skills. A mock satisfies the build
+#: gate (the file exists) and nothing else: the palette and `skills:bootstrap`
+#: ask `is_mock_runtime` and treat it as absent.
+MOCK_RUNTIME_MARKER = "workpilot-mock"
+
+
+def is_mock_runtime(path: Path) -> bool:
+    """Whether ``path`` is a committed stand-in rather than the real runtime.
+
+    Reads the first three lines only; an unreadable file is not a mock.
+    """
+    try:
+        with path.open(encoding="utf-8", errors="replace") as fh:
+            head = "".join(fh.readline() for _ in range(3))
+    except OSError:
+        return False
+    return MOCK_RUNTIME_MARKER in head
 
 
 @dataclass(frozen=True)
@@ -58,7 +87,7 @@ class Rejection:
     kind: str
     pack: str
     gate: str
-    """``pack-pin`` | ``targets`` | ``requires`` | ``name-collision``"""
+    """``pack-pin`` | ``targets`` | ``requires`` | ``injection`` | ``name-collision``"""
     reason: str
 
 
@@ -76,7 +105,9 @@ class Resolution:
         return [r for r in self.rejected if r.name == name]
 
 
-def check_requires(requires: dict[str, Any], project_dir: Path) -> tuple[bool, str]:
+def check_requires(
+    requires: dict[str, Any], project_dir: Path, *, accept_mock: bool = True
+) -> tuple[bool, str]:
     """Verify a skill's runtime prerequisites.
 
     Supported keys:
@@ -95,6 +126,12 @@ def check_requires(requires: dict[str, Any], project_dir: Path) -> tuple[bool, s
     third-party content: without the check, `runtime: "../../.ssh/id_rsa"`
     would turn this gate into a filesystem probe, reporting through the
     command palette whether a file exists anywhere the backend can reach.
+
+    ``accept_mock`` is the build's reading: a committed stand-in
+    (``is_mock_runtime``) counts as present so the gated skills are emitted.
+    The palette and the bootstrap pass ``False``: a command whose runtime is
+    a mock fails on invocation, and a bootstrap that sees one has nothing to
+    skip.
     """
     for key, value in requires.items():
         if key == "runtime":
@@ -103,6 +140,8 @@ def check_requires(requires: dict[str, Any], project_dir: Path) -> tuple[bool, s
                 return False, f"runtime escapes the project directory: {value}"
             if not target.exists():
                 return False, f"runtime not present: {value}"
+            if not accept_mock and is_mock_runtime(target):
+                return False, f"runtime is WorkPilot's mock, not the real one: {value}"
         elif key == "command":
             # A list means alternatives: `python3` on Unix, `python` on
             # Windows. Any one of them being present satisfies the gate.
@@ -227,6 +266,25 @@ def resolve(
                         Rejection(src.name, src.kind, pack.name, "requires", reason)
                     )
                     continue
+
+            verdict = scan_skill_body(src.body, source=f"{pack.name}/{src.name}")
+            if verdict.refused:
+                result.rejected.append(
+                    Rejection(
+                        src.name,
+                        src.kind,
+                        pack.name,
+                        INJECTION_GATE,
+                        f"the body of {src.path.name} reads as a prompt "
+                        f"injection, which a {src.kind} every agent follows may "
+                        f"not: {verdict.summary}. It is refused rather than "
+                        f"cleaned — read the file, and remove the passage or "
+                        f"stop vendoring the pack. "
+                        f"{GUARD_MODE_ENV_VAR}=report downgrades this to a "
+                        f"warning.",
+                    )
+                )
+                continue
 
             owner = claimed.get((src.kind, src.name))
             if owner is not None:

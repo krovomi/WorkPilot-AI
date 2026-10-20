@@ -184,6 +184,8 @@ vi.mock("electron", () => {
 
 	return {
 		app: {
+			// IPC registration subscribes to Electron lifecycle events for cleanup.
+			on: vi.fn().mockReturnThis(),
 			getPath: vi.fn((name: string) => {
 				if (name === "userData") return path.join(TEST_DIR, "userData");
 				return TEST_DIR;
@@ -193,6 +195,11 @@ vi.mock("electron", () => {
 			isPackaged: false,
 		},
 		ipcMain: mockIpcMain,
+		safeStorage: {
+			isEncryptionAvailable: vi.fn(() => true),
+			encryptString: vi.fn((value: string) => Buffer.from(value)),
+			decryptString: vi.fn((value: Buffer) => value.toString()),
+		},
 		dialog: {
 			showOpenDialog: vi.fn(() =>
 				Promise.resolve({ canceled: false, filePaths: [TEST_PROJECT_PATH] }),
@@ -1004,12 +1011,17 @@ describe("IPC Handlers", { timeout: 30000 }, () => {
 				// Now emit exit event - this should trigger transition to error state
 				mockAgentManager.emit("exit", task.id, 1, "task-execution", projectId);
 
+				// The status change now carries WHY the task failed. A card that
+				// says "Has Errors" with nothing behind it is the defect this
+				// argument exists to close: the backend had already exited, so the
+				// exit code is the last thing anyone can be told.
 				expect(mockMainWindow.webContents.send).toHaveBeenCalledWith(
 					"task:statusChange",
 					task.id,
 					"human_review",
 					projectId,
 					"errors",
+					expect.stringContaining("exited unexpectedly with code 1"),
 				);
 			}
 		});

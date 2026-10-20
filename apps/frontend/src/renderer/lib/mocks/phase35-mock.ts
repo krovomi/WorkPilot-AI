@@ -48,6 +48,10 @@ export const phase35Mock: Phase35FeaturesAPI = {
 	diffI18n: () => browserUnavailable("i18n auto-scaling"),
 	skeletonI18n: () => browserUnavailable("i18n auto-scaling"),
 	reportI18nFromDir: () => browserUnavailable("i18n auto-scaling"),
+	detectI18nRoots: () => browserUnavailable("i18n editor"),
+	listI18nNamespaces: () => browserUnavailable("i18n editor"),
+	loadI18nNamespace: () => browserUnavailable("i18n editor"),
+	mutateI18n: () => browserUnavailable("i18n editor"),
 
 	optimizeContext: () => browserUnavailable("Cognitive context"),
 

@@ -154,7 +154,7 @@ class SessionRecorder:
 
     def load_recording(self, filepath: Path) -> SessionRecording:
         """Load a recording from disk."""
-        with open(filepath) as f:
+        with open(filepath, encoding="utf-8") as f:
             data = json.load(f)
 
         return SessionRecording.from_dict(data)
@@ -165,7 +165,7 @@ class SessionRecorder:
 
         for filepath in self._recordings_dir.glob("*.json"):
             try:
-                with open(filepath) as f:
+                with open(filepath, encoding="utf-8") as f:
                     data = json.load(f)
 
                 recordings.append(

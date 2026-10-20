@@ -14,20 +14,17 @@ export interface Project {
 
 export interface ProjectSettings {
 	model: string;
-	memoryBackend: "graphiti" | "file";
 	linearSync: boolean;
 	linearTeamId?: string;
 	notifications: NotificationSettings;
-	/** Enable Graphiti MCP server for agent-accessible knowledge graph */
-	graphitiMcpEnabled: boolean;
-	/** Graphiti MCP server URL (default: http://localhost:8000/mcp/) */
-	graphitiMcpUrl?: string;
 	/** Main branch name for worktree creation (default: auto-detected or 'main') */
 	mainBranch?: string;
 	/** Include CLAUDE.md instructions in agent system prompt (default: true) */
 	useClaudeMd?: boolean;
 	/** Enforce strict TDD (Red-Green-Refactor) when the agent implements tasks (default: false) */
 	tddMode?: boolean;
+	/** Run the verification loop after coding (launch, fix, drive, measure) (default: true) */
+	verifyLoop?: boolean;
 	/** Maximum parallel tasks allowed (default: 3) */
 	maxParallelTasks?: number;
 	/** Description utilisateur du projet (optionnel) */
@@ -164,7 +161,7 @@ export interface ConventionsInfo {
 	git_hooks?: string;
 }
 
-export interface GraphitiMemoryStatus {
+export interface MemoryStatus {
 	enabled: boolean;
 	available: boolean;
 	database?: string;
@@ -172,109 +169,7 @@ export interface GraphitiMemoryStatus {
 	reason?: string;
 }
 
-// Memory Infrastructure Types
-export interface MemoryDatabaseStatus {
-	kuzuInstalled: boolean;
-	databasePath: string;
-	databaseExists: boolean;
-	databases: string[];
-	error?: string;
-}
-
-export interface InfrastructureStatus {
-	memory: MemoryDatabaseStatus;
-	ready: boolean; // True if memory database is available
-}
-
-// Graphiti Validation Types
-export interface GraphitiValidationResult {
-	success: boolean;
-	message: string;
-	details?: {
-		provider?: string;
-		model?: string;
-		latencyMs?: number;
-	};
-}
-
-export interface GraphitiConnectionTestResult {
-	database: GraphitiValidationResult;
-	llmProvider: GraphitiValidationResult;
-	ready: boolean;
-}
-
-// Memory Provider Types
-// Embedding Providers: OpenAI, Voyage AI, Azure OpenAI, Ollama (local), Google, OpenRouter
-// Note: LLM provider removed - Claude SDK handles RAG queries
-export type GraphitiEmbeddingProvider =
-	| "openai"
-	| "voyage"
-	| "azure_openai"
-	| "ollama"
-	| "google"
-	| "openrouter";
-
-// Legacy type aliases for backward compatibility
-export type GraphitiLLMProvider =
-	| "openai"
-	| "anthropic"
-	| "azure_openai"
-	| "ollama"
-	| "google"
-	| "groq"
-	| "openrouter";
-
-export interface GraphitiProviderConfig {
-	// Embedding Provider. A small LLM is still required for episode ingestion
-	// (entity extraction in graphiti-core); it is derived from the embedding
-	// provider, or runs locally via Ollama (ollamaLlmModel).
-	embeddingProvider: GraphitiEmbeddingProvider;
-	embeddingModel?: string; // Embedding model, uses provider default if not specified
-
-	// OpenAI Embeddings
-	openaiApiKey?: string;
-	openaiEmbeddingModel?: string;
-
-	// Azure OpenAI Embeddings
-	azureOpenaiApiKey?: string;
-	azureOpenaiBaseUrl?: string;
-	azureOpenaiEmbeddingDeployment?: string;
-
-	// Voyage AI Embeddings
-	voyageApiKey?: string;
-	voyageEmbeddingModel?: string;
-
-	// Google AI Embeddings
-	googleApiKey?: string;
-	googleEmbeddingModel?: string;
-
-	// OpenRouter (multi-provider aggregator)
-	openrouterApiKey?: string;
-	openrouterBaseUrl?: string; // Default: https://openrouter.ai/api/v1
-	openrouterLlmModel?: string; // LLM model selection (e.g., 'anthropic/claude-sonnet-4')
-	openrouterEmbeddingModel?: string;
-
-	// Ollama Embeddings (local, no API key required)
-	ollamaBaseUrl?: string; // Default: http://localhost:11434
-	ollamaEmbeddingModel?: string;
-	ollamaEmbeddingDim?: number;
-	ollamaLlmModel?: string; // Local LLM used by graphiti-core for episode ingestion
-
-	// LadybugDB settings (embedded database - no Docker required)
-	database?: string; // Database name (default: auto_claude_memory)
-	dbPath?: string; // Database storage path (default: ~/.workpilot/memories)
-}
-
-export interface GraphitiProviderInfo {
-	id: GraphitiLLMProvider;
-	name: string;
-	description: string;
-	requiresApiKey: boolean;
-	defaultModel: string;
-	supportedModels: string[];
-}
-
-export interface GraphitiMemoryState {
+export interface MemoryState {
 	initialized: boolean;
 	database?: string;
 	indices_built: boolean;
@@ -317,8 +212,8 @@ export interface ContextSearchResult {
 
 export interface ProjectContextData {
 	projectIndex: ProjectIndex | null;
-	memoryStatus: GraphitiMemoryStatus | null;
-	memoryState: GraphitiMemoryState | null;
+	memoryStatus: MemoryStatus | null;
+	memoryState: MemoryState | null;
 	recentMemories: MemoryEpisode[];
 	isLoading: boolean;
 	error?: string;
@@ -386,16 +281,9 @@ export interface ProjectEnvConfig {
 	// Git/Worktree Settings
 	defaultBranch?: string; // Base branch for worktree creation (e.g., 'main', 'develop')
 
-	// Graphiti Memory Integration (V2 - Multi-provider support)
-	// Uses LadybugDB embedded database (no Docker required, Python 3.12+)
-	graphitiEnabled: boolean;
-	graphitiProviderConfig?: GraphitiProviderConfig; // Provider configuration
-	// Legacy fields (still supported for backward compatibility)
 	openaiApiKey?: string;
 	// Indicates if the OpenAI key is from global settings (not project-specific)
 	openaiKeyIsGlobal?: boolean;
-	graphitiDatabase?: string;
-	graphitiDbPath?: string;
 
 	// UI Settings
 	enableFancyUi: boolean;
@@ -404,8 +292,8 @@ export interface ProjectEnvConfig {
 	mcpServers?: {
 		/** Context7 documentation lookup - default: true */
 		context7Enabled?: boolean;
-		/** Graphiti knowledge graph - default: true (if graphitiProviderConfig set) */
-		graphitiEnabled?: boolean;
+		/** Context7 API key - optional, raises the quota above anonymous */
+		context7ApiKey?: string;
 		/** Linear MCP integration - default: follows linearEnabled */
 		linearMcpEnabled?: boolean;
 		/** Electron desktop automation (QA only) - default: false */
@@ -414,6 +302,35 @@ export interface ProjectEnvConfig {
 		puppeteerEnabled?: boolean;
 		/** Chrome DevTools MCP for browser automation (coder + QA) - default: false */
 		chromeDevtoolsEnabled?: boolean;
+	};
+
+	// Token savings (rtk) — the CLI proxy that condenses command output before
+	// an agent reads it. Not an MCP server: it is a binary on the machine, and
+	// a project that does not have it simply behaves as it always did.
+	tokenSavings?: {
+		/**
+		 * Route agent shell commands through rtk - default: true.
+		 * Costs nothing when rtk is not installed.
+		 */
+		rtkEnabled?: boolean;
+		/**
+		 * Also condense the captures WorkPilot itself puts in a prompt
+		 * (a diff handed to a reviewer, for instance) - default: true.
+		 * Separate from the switch above because it changes what a WorkPilot
+		 * code path receives, not only what a model reads.
+		 */
+		rtkModelFacing?: boolean;
+	};
+
+	// UI/UX design intelligence (ui-ux-pro-max). Not an MCP toggle either: the
+	// server it offers is decided per task, by whether the task touches the
+	// interface. These two switches decide whether it may run at all, and
+	// whether a generated design system is written into the worktree.
+	uiux?: {
+		/** Use ui-ux-pro-max on UI tasks - default: true. Backend tasks never pay for it. */
+		enabled?: boolean;
+		/** Write `design-system/<project>/MASTER.md` when the project has none - default: true. */
+		persistMaster?: boolean;
 	};
 
 	// Channel Notifications (task done → PR ready announcement)
@@ -534,9 +451,24 @@ export interface AutoBuildVersionInfo {
 	updateAvailable: boolean; // Always false - .workpilot only contains data, no code to update
 }
 
+/**
+ * Why an initialization could not proceed, as a value the UI can branch on.
+ *
+ * The message alone was not enough: two of these — a folder that is not a git
+ * repository, and one with no commit yet — are one click away from being
+ * fixed, and the settings screen was reduced to printing an English sentence
+ * because it could not tell them from the reasons it cannot fix.
+ */
+export type InitializationBlocker =
+	| "path-missing"
+	| "not-a-git-repo"
+	| "no-commits"
+	| "already-initialized";
+
 export interface InitializationResult {
 	success: boolean;
 	error?: string;
+	blocker?: InitializationBlocker;
 }
 
 export interface GitStatus {

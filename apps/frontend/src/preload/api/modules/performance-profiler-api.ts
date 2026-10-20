@@ -2,6 +2,9 @@
  * Performance Profiler Agent API module
  */
 
+import { IPC_CHANNELS } from "../../../shared/constants";
+import { createIpcListener, invokeIpc } from "./ipc-utils";
+
 export interface PerformanceProfilerRequest {
 	projectDir: string;
 	autoImplement?: boolean;
@@ -9,24 +12,18 @@ export interface PerformanceProfilerRequest {
 	thinkingLevel?: string;
 }
 
-export interface PerformanceProfilerResult {
-	bottlenecks: Array<{
-		description: string;
-		severity: string;
-		bottleneck_type: string;
-		file_path?: string;
-		line_number?: number;
-	}>;
-	benchmarks: Array<{ name: string; duration_ms?: number; error?: string }>;
-	suggestions: Array<{
-		title: string;
-		description: string;
-		effort: string;
-		estimated_improvement?: string;
-		implementation?: string;
-	}>;
-	summary: { total_bottlenecks: number; suggestions_count: number };
-}
+/**
+ * Re-exporte le type du service qui produit reellement ce resultat.
+ *
+ * Le handler transmet tel quel ce que le service emet
+ * (`service.on("complete", (result) => webContents.send(..., result))`), donc
+ * c'est ce type-la qui traverse le pont. Ce module en declarait un autre, de
+ * forme differente, qu'aucun code ne produisait ; le store du renderer, lui,
+ * importait deja le bon depuis le service. L'index signature d'`ElectronAPI`
+ * rendait les deux interchangeables aux yeux du compilateur.
+ */
+import type { PerformanceProfilerResult } from "../../../main/performance-profiler-service";
+export type { PerformanceProfilerResult };
 
 export interface PerformanceProfilerAPI {
 	startPerformanceProfiling: (
@@ -58,22 +55,25 @@ export interface PerformanceProfilerAPI {
 export function createPerformanceProfilerAPI(): PerformanceProfilerAPI {
 	return {
 		startPerformanceProfiling: (request) =>
-			globalThis.electronAPI.invoke("performanceProfiler:start", request),
+			invokeIpc("performanceProfiler:start", request),
 		cancelPerformanceProfiling: () =>
-			globalThis.electronAPI.invoke("performanceProfiler:cancel"),
+			invokeIpc("performanceProfiler:cancel"),
 		configurePerformanceProfiler: (config) =>
-			globalThis.electronAPI.invoke("performanceProfiler:configure", config),
+			invokeIpc("performanceProfiler:configure", config),
 		onPerformanceProfilerStatus: (callback) =>
-			globalThis.electronAPI.on("performanceProfiler:status", callback),
+			createIpcListener(IPC_CHANNELS.PERFORMANCE_PROFILER_STATUS, callback),
 		onPerformanceProfilerStreamChunk: (callback) =>
-			globalThis.electronAPI.on("performanceProfiler:streamChunk", callback),
+			createIpcListener(
+				IPC_CHANNELS.PERFORMANCE_PROFILER_STREAM_CHUNK,
+				callback,
+			),
 		onPerformanceProfilerError: (callback) =>
-			globalThis.electronAPI.on("performanceProfiler:error", callback),
+			createIpcListener(IPC_CHANNELS.PERFORMANCE_PROFILER_ERROR, callback),
 		onPerformanceProfilerComplete: (callback) =>
-			globalThis.electronAPI.on("performanceProfiler:complete", callback),
+			createIpcListener(IPC_CHANNELS.PERFORMANCE_PROFILER_COMPLETE, callback),
 		onPerformanceProfilerImplementationComplete: (callback) =>
-			globalThis.electronAPI.on(
-				"performanceProfiler:implementationComplete",
+			createIpcListener(
+				IPC_CHANNELS.PERFORMANCE_PROFILER_IMPLEMENTATION_COMPLETE,
 				callback,
 			),
 	};

@@ -29,14 +29,12 @@ import {
 	type BountyBoardAPI,
 	createBountyBoardAPI,
 } from "./modules/bounty-board-api";
+import { type TechDebtAPI, createTechDebtAPI } from "./modules/tech-debt-api";
 import {
-	type TechDebtAPI,
-	createTechDebtAPI,
-} from "./modules/tech-debt-api";
-import {
-	type TeamBotAPI,
-	createTeamBotAPI,
-} from "./modules/team-bot-api";
+	type TimeTravelAPI,
+	createTimeTravelAPI,
+} from "./modules/time-travel-api";
+import { type TeamBotAPI, createTeamBotAPI } from "./modules/team-bot-api";
 import {
 	type ApiExplorerAPI,
 	createApiExplorerAPI,
@@ -45,10 +43,7 @@ import {
 	type ApiWatcherAPI,
 	createApiWatcherAPI,
 } from "./modules/api-watcher-api";
-import {
-	type DocDriftAPI,
-	createDocDriftAPI,
-} from "./modules/doc-drift-api";
+import { type DocDriftAPI, createDocDriftAPI } from "./modules/doc-drift-api";
 import {
 	type CarbonProfilerAPI,
 	createCarbonProfilerAPI,
@@ -103,7 +98,9 @@ import {
 	createI18nAgentAPI,
 } from "./modules/i18n-agent-api";
 import type { AppEmulatorAPI } from "./modules/app-emulator-api";
+import type { MobileAPI } from "./modules/mobile-api";
 import { createAppEmulatorAPI } from "./modules/app-emulator-api";
+import { createMobileAPI } from "./modules/mobile-api";
 import type { ArchitectureVisualizerAPI } from "./modules/architecture-visualizer-api";
 import { createArchitectureVisualizerAPI } from "./modules/architecture-visualizer-api";
 import type { ArenaAPI } from "./modules/arena-api";
@@ -120,6 +117,20 @@ import type { ConflictPredictorAPI } from "./modules/conflict-predictor-api";
 import { createConflictPredictorAPI } from "./modules/conflict-predictor-api";
 import type { ContextAwareSnippetsAPI } from "./modules/context-aware-snippets-api";
 import { createContextAwareSnippetsAPI } from "./modules/context-aware-snippets-api";
+import {
+	type ContinuousAIAPI,
+	createContinuousAIAPI,
+} from "./modules/continuous-ai-api";
+import { createSwarmAPI, type SwarmAPI } from "./modules/swarm-api";
+import {
+	createGenericIpcAPI,
+	type GenericIpcAPI,
+} from "./modules/generic-ipc-api";
+import {
+	type AutoRefactorAPI,
+	createAutoRefactorAPI,
+} from "./modules/auto-refactor-api";
+import { type AgentCliAPI, createAgentCliAPI } from "./modules/agent-cli-api";
 import {
 	type CopilotCliAPI,
 	createCopilotCliAPI,
@@ -176,14 +187,14 @@ import {
 	createSmartEstimationAPI,
 	type SmartEstimationAPI,
 } from "./modules/smart-estimation-api";
-import type { TeamSyncAPI } from "./modules/team-sync-api";
-import { createTeamSyncAPI } from "./modules/team-sync-api";
 import type { TestGenerationAPI } from "./modules/test-generation-api";
 import { createTestGenerationAPI } from "./modules/test-generation-api";
 import type { DesignToCodeAPI } from "./modules/design-to-code-api";
 import { createDesignToCodeAPI } from "./modules/design-to-code-api";
 import type { VisualProgrammingAPI } from "./modules/visual-programming-api";
 import { createVisualProgrammingAPI } from "./modules/visual-programming-api";
+import type { VisualToCodeHistoryAPI } from "./modules/visual-to-code-history-api";
+import { createVisualToCodeHistoryAPI } from "./modules/visual-to-code-history-api";
 import {
 	createVoiceControlAPI,
 	type VoiceControlAPI,
@@ -197,9 +208,18 @@ import { createProjectAPI, type ProjectAPI } from "./project-api";
 import { createQueueAPI, type QueueAPI } from "./queue-api";
 import { createScreenshotAPI, type ScreenshotAPI } from "./screenshot-api";
 import {
+	createServerAdminAPI,
+	type ServerAdminAPI,
+} from "./modules/server-admin-api";
+import {
 	createServerAuthAPI,
 	type ServerAuthAPI,
 } from "./modules/server-auth-api";
+import { createJevAPI, type JevAPI } from "./jev-api";
+import {
+	createSecureStorageAPI,
+	type SecureStorageAPI,
+} from "./secure-storage-api";
 import { createSettingsAPI, type SettingsAPI } from "./settings-api";
 import { createTaskAPI, type TaskAPI } from "./task-api";
 import { createTerminalAPI, type TerminalAPI } from "./terminal-api";
@@ -210,6 +230,8 @@ export interface ElectronAPI
 		TerminalAPI,
 		TaskAPI,
 		SettingsAPI,
+		JevAPI,
+		SecureStorageAPI,
 		FileAPI,
 		AgentAPI,
 		IdeationAPI,
@@ -220,6 +242,7 @@ export interface ElectronAPI
 		DebugAPI,
 		ClaudeCodeAPI,
 		CopilotCliAPI,
+		AgentCliAPI,
 		CopilotOAuthAPI,
 		McpAPI,
 		ProfileAPI,
@@ -232,6 +255,7 @@ export interface ElectronAPI
 		SmartEstimationAPI,
 		ContextAwareSnippetsAPI,
 		AppEmulatorAPI,
+		MobileAPI,
 		LearningLoopAPI,
 		MultiRepoAPI,
 		ArchitectureVisualizerAPI,
@@ -241,7 +265,6 @@ export interface ElectronAPI
 		DecisionLoggerAPI,
 		PairProgrammingAPI,
 		PipelineGeneratorAPI,
-		TeamSyncAPI,
 		ArenaAPI,
 		TestGenerationAPI,
 		CostAPI,
@@ -271,13 +294,22 @@ export interface ElectronAPI
 		BountyBoardAPI,
 		TechDebtAPI,
 		TeamBotAPI,
+		TimeTravelAPI,
 		EnvSnapshotAPI,
 		OfflineModeAPI,
 		VisualProgrammingAPI,
+		VisualToCodeHistoryAPI,
+		AutoRefactorAPI,
+		GenericIpcAPI,
 		DesignToCodeAPI {
 	github: GitHubAPI;
+	/** Parallel subtask execution (dependency waves) */
+	swarm: SwarmAPI;
+	/** Continuous AI daemon (CI/CD watcher, dependency sentinel, PR reviewer) */
+	continuousAI: ContinuousAIAPI;
 	/** Multi-user server mode: connection + login (local / Entra ID) */
 	serverAuth: ServerAuthAPI;
+	serverAdmin: ServerAdminAPI;
 	/** Queue routing API for rate limit recovery */
 	queue: QueueAPI;
 	/** Code quality analysis API */
@@ -346,12 +378,15 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createTerminalAPI(),
 		...createTaskAPI(),
 		...createSettingsAPI(),
+		...createJevAPI(),
+		...createSecureStorageAPI(),
 		...createFileAPI(),
 		...createAgentAPI(),
 		...createAppUpdateAPI(),
 		...createDebugAPI(),
 		...createClaudeCodeAPI(),
 		...createCopilotCliAPI(),
+		...createAgentCliAPI(),
 		...createCopilotOAuthAPI(),
 		...createMcpAPI(),
 		...createProfileAPI(),
@@ -364,6 +399,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createSmartEstimationAPI(),
 		...createContextAwareSnippetsAPI(),
 		...createAppEmulatorAPI(),
+		...createMobileAPI(),
 		...createLearningLoopAPI(),
 		...createMultiRepoAPI(),
 		...createArchitectureVisualizerAPI(),
@@ -373,7 +409,6 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createDecisionLoggerAPI(),
 		...createPairProgrammingAPI(),
 		...createPipelineGeneratorAPI(),
-		...createTeamSyncAPI(),
 		...createArenaAPI(),
 		...createTestGenerationAPI(),
 		...createCostAPI(),
@@ -403,12 +438,19 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createBountyBoardAPI(),
 		...createTechDebtAPI(),
 		...createTeamBotAPI(),
+		...createTimeTravelAPI(),
 		...createEnvSnapshotAPI(),
 		...createOfflineModeAPI(),
 		...createVisualProgrammingAPI(),
+		...createVisualToCodeHistoryAPI(),
 		...createDesignToCodeAPI(),
+		...createAutoRefactorAPI(),
+		...createGenericIpcAPI(),
 		github: createGitHubAPI(),
+		swarm: createSwarmAPI(),
+		continuousAI: createContinuousAIAPI(),
 		serverAuth: createServerAuthAPI(), // Multi-user server mode
+		serverAdmin: createServerAdminAPI(), // Multi-tenant administration
 		queue: createQueueAPI(), // Queue routing for rate limit recovery
 		quality: createQualityAPI(), // Code quality analysis
 		selfHealing: createSelfHealingAPI(),
@@ -480,12 +522,18 @@ export { createFileAPI } from "./file-api";
 export type { ApiExplorerAPI } from "./modules/api-explorer-api";
 export { createApiExplorerAPI } from "./modules/api-explorer-api";
 export type { AppEmulatorAPI } from "./modules/app-emulator-api";
+export type { MobileAPI } from "./modules/mobile-api";
 export { createAppEmulatorAPI } from "./modules/app-emulator-api";
+export { createMobileAPI } from "./modules/mobile-api";
 export type { ArchitectureVisualizerAPI } from "./modules/architecture-visualizer-api";
 export { createArchitectureVisualizerAPI } from "./modules/architecture-visualizer-api";
 export type { ArenaAPI } from "./modules/arena-api";
 export { createArenaAPI } from "./modules/arena-api";
 export { createAutoRefactorAPI } from "./modules/auto-refactor-api";
+export type { ContinuousAIAPI } from "./modules/continuous-ai-api";
+export { createContinuousAIAPI } from "./modules/continuous-ai-api";
+export type { SwarmAPI } from "./modules/swarm-api";
+export { createSwarmAPI } from "./modules/swarm-api";
 export type { ClaudeCodeAPI } from "./modules/claude-code-api";
 export { createClaudeCodeAPI } from "./modules/claude-code-api";
 export type { CodeMigrationAPI } from "./modules/code-migration-api";
@@ -494,6 +542,8 @@ export { createCodePlaygroundAPI } from "./modules/code-playground-api";
 export { createConflictPredictorAPI } from "./modules/conflict-predictor-api";
 export type { ContextAwareSnippetsAPI } from "./modules/context-aware-snippets-api";
 export { createContextAwareSnippetsAPI } from "./modules/context-aware-snippets-api";
+export type { AgentCliAPI } from "./modules/agent-cli-api";
+export { createAgentCliAPI } from "./modules/agent-cli-api";
 export type { CopilotCliAPI } from "./modules/copilot-cli-api";
 export { createCopilotCliAPI } from "./modules/copilot-cli-api";
 export type { DebugAPI } from "./modules/debug-api";
@@ -519,10 +569,14 @@ export type { SmartEstimationAPI } from "./modules/smart-estimation-api";
 export { createSmartEstimationAPI } from "./modules/smart-estimation-api";
 export type { TestGenerationAPI } from "./modules/test-generation-api";
 export { createTestGenerationAPI } from "./modules/test-generation-api";
+export type { TimeTravelAPI } from "./modules/time-travel-api";
+export { createTimeTravelAPI } from "./modules/time-travel-api";
 export type { DesignToCodeAPI } from "./modules/design-to-code-api";
 export { createDesignToCodeAPI } from "./modules/design-to-code-api";
 export type { VisualProgrammingAPI } from "./modules/visual-programming-api";
 export { createVisualProgrammingAPI } from "./modules/visual-programming-api";
+export type { VisualToCodeHistoryAPI } from "./modules/visual-to-code-history-api";
+export { createVisualToCodeHistoryAPI } from "./modules/visual-to-code-history-api";
 export type { VoiceControlAPI } from "./modules/voice-control-api";
 export { createVoiceControlAPI } from "./modules/voice-control-api";
 export type { NaturalLanguageGitAPI } from "./natural-language-git-api";

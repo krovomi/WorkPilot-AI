@@ -10,7 +10,8 @@ Design (matches industry guidance from Anthropic / OpenAI / Google docs):
 1. **Stable prefix** — every provider with prompt caching (Anthropic explicit,
    OpenAI automatic >= 1024 tokens, Gemini implicit) caches on an exact prefix
    match. The shared system prompt is built once here so all providers send the
-   same byte-stable text, and volatile data never leads the prompt.
+   same byte-stable text, assembled by `harness.domain.layout` from the most
+   stable segment to the least: the worktree's path comes last.
 
 2. **Single system prompt source** — `build_base_system_prompt()` replaces the
    four copies that used to live inline in `core/client.py` (Claude / Copilot /
@@ -33,10 +34,9 @@ Design (matches industry guidance from Anthropic / OpenAI / Google docs):
 6. **History compaction** — the generic multi-turn loops (OpenAI-style message
    lists used by Copilot / OpenAI / Windsurf) grow unbounded: old tool results
    are re-sent at full price on every turn. `compact_messages()` elides stale
-   tool results once the conversation exceeds a char budget. It only triggers
-   ABOVE the budget so the cacheable prefix stays byte-stable for normal-sized
-   sessions (compacting early would invalidate the automatic prefix cache every
-   turn, costing more than it saves).
+   tool results once the conversation exceeds a char budget, in one batch down
+   to well under it (`harness.domain.policies`): every elision rewrites the
+   cached prefix from that point, so it happens rarely and frees a lot.
 
 The Claude path is intentionally untouched beyond the shared system prompt:
 the Claude Agent SDK already performs prompt caching (1h TTL is enabled in
@@ -45,38 +45,65 @@ core/client.py), context management and dynamic tool loading.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 from pathlib import Path
+from typing import Any
+
+from harness.domain.layout import Segment, Stability, assemble
+from harness.domain.policies import ClearingPolicy, Entry, plan_clearing
 
 # ---------------------------------------------------------------------------
 # 1+2. Shared system prompt (single source of truth, byte-stable)
 # ---------------------------------------------------------------------------
 
-# Static instructions first (cache-friendly ordering); the working directory is
-# appended after — it is stable for the lifetime of a task/worktree, so the
-# whole prompt remains a stable prefix within a task.
+# Every artifact an agent writes is paid for in output tokens, and most of the
+# prose they used to write was read by nobody: the orchestrator parses the plan's
+# subtask fields and `qa_signoff`, and renders the QA reports itself. These rules
+# sit in the shared system prompt (a cached prefix) so every phase and provider
+# gets them once, instead of each prompt repeating its own variant.
+ARTIFACT_RULES = (
+    "\n\nArtifact rules (files you write under the spec directory):\n"
+    "- Write only the fields the template asks for; omit optional ones you have "
+    "nothing to say in.\n"
+    "- One fact, one place: never restate in one artifact what another already "
+    "holds (plan, spec, sign-off, commit).\n"
+    "- No banners, recaps, completion summaries or decorative tables.\n"
+    "- Bullets of 25 words at most; free-text fields of 2 lines at most."
+)
+
+# The role and the rules: the same text for every task, on every provider. The
+# working directory is not in it: it differs from one worktree to the next, so
+# it comes last (`system_prompt_segments`), after everything tasks share.
 _BASE_PROMPT_STATIC = (
     "You are an expert full-stack developer building production-quality software. "
 )
 
 _BASE_PROMPT_RULES = (
-    "Your filesystem access is RESTRICTED to this directory only. "
+    "Your filesystem access is RESTRICTED to your working directory, given at the "
+    "end of this prompt. "
     "Use relative paths (starting with ./) for all file operations. "
     "Never use absolute paths or try to access files outside your working directory.\n\n"
     "You follow existing code patterns, write clean maintainable code, and verify "
     "your work through thorough testing. You communicate progress through Git commits "
-    "and build-progress.txt updates."
+    "and the status fields of implementation_plan.json."
+    f"{ARTIFACT_RULES}"
 )
 
 # Extra paragraph for providers whose tool calling needs an explicit nudge
-# (Windsurf text-based tool calling, OpenAI REST loop).
+# (Windsurf text-based tool calling, OpenAI REST loop). It names no tool: what
+# an agent is offered depends on its type (`get_tool_definitions`), and a
+# read-only reviewer told to use `write_file` spends its turns on a tool it
+# was never given.
 _TOOL_USE_HINT = (
     "\n\n"
-    "You MUST use the provided tools (read_file, write_file, list_files, run_command) "
-    "to interact with the filesystem and execute commands. Do not just describe what to do — "
+    "You MUST use the provided tools to read the project and, when you are given "
+    "them, to write files and run commands. Do not just describe what to do — "
     "actually do it by calling the tools."
 )
+
+_DOCUMENT_SKILL = "convert-documents-to-markdown"
 
 
 def build_base_system_prompt(
@@ -88,7 +115,7 @@ def build_base_system_prompt(
 
     Args:
         project_dir: Working directory of the agent (resolved to absolute).
-        tool_use_hint: Append the explicit "use the tools" paragraph required
+        tool_use_hint: Add the explicit "use the tools" paragraph required
             by providers without native agentic tool training (Windsurf gRPC
             text-mode, OpenAI generic loop).
 
@@ -97,15 +124,104 @@ def build_base_system_prompt(
         tool_use_hint) pair — never embed timestamps or per-request data here,
         it would invalidate provider-side prompt caches on every call.
     """
+    return assemble(system_prompt_segments(project_dir, tool_use_hint=tool_use_hint))
+
+
+def system_prompt_segments(
+    project_dir: Path | str, *, tool_use_hint: bool = False
+) -> list[Segment]:
+    """The shared system prompt as segments, from the most stable to the least.
+
+    What every task shares (role, rules, the tool hint of a provider, rtk, the
+    brain's instructions) comes first, then the project's document skill, then
+    the worktree's absolute path. A provider that caches on the first tokens of
+    a prompt (OpenAI and its compatibles, DeepSeek, Gemini) can then reuse the
+    shared part from one task to the next; with the path second, as it used to
+    be, every task started a prefix of its own after one sentence.
+    """
     resolved = Path(project_dir).resolve()
-    prompt = (
-        f"{_BASE_PROMPT_STATIC}"
-        f"Your working directory is: {resolved}\n"
-        f"{_BASE_PROMPT_RULES}"
+    return [
+        Segment("rules", _BASE_PROMPT_STATIC + _BASE_PROMPT_RULES, Stability.STATIC),
+        Segment(
+            "tool_use_hint", _TOOL_USE_HINT if tool_use_hint else "", Stability.STATIC
+        ),
+        Segment("rtk", _rtk_awareness(), Stability.STATIC),
+        Segment("brain", _brain_awareness(), Stability.STATIC),
+        Segment("document_skill", _document_skill_section(resolved), Stability.PROJECT),
+        Segment(
+            "working_directory",
+            f"\n\nYour working directory is: {resolved}",
+            Stability.TASK,
+        ),
+    ]
+
+
+def _document_skill_section(resolved: Path) -> str:
+    """How to read document inputs: the project's skill when it has one."""
+    # Bundled instructions also reach consumer worktrees without .agents/skills.
+    from skills_registry.bundled import load_bundled_skill
+
+    project_skill_paths = (
+        f".agents/skills/{_DOCUMENT_SKILL}/SKILL.md",
+        f".claude/commands/{_DOCUMENT_SKILL}.md",
     )
-    if tool_use_hint:
-        prompt += _TOOL_USE_HINT
-    return prompt
+    project_skill = next(
+        (path for path in project_skill_paths if (resolved / path).is_file()), None
+    )
+    if project_skill:
+        return (
+            f"\n\nFor document inputs, first read ./{project_skill} and follow "
+            "the project's document skill, within the task's permissions and network policy."
+        )
+    document_skill = load_bundled_skill(_DOCUMENT_SKILL)
+    if document_skill is None:
+        return ""
+    return (
+        "\n\nDefault document handling follows. If the user invokes a project "
+        "or user command overriding this skill, follow that command's instructions "
+        "instead, within the task's permissions and network policy.\n\n"
+        + document_skill[1]
+    )
+
+
+def _brain_awareness() -> str:
+    """How to use the shared brain, and the instructions it carries.
+
+    Here rather than in `create_client` for the reason `_rtk_awareness` is:
+    every provider branch builds its prompt through this function, and the
+    instructions have to apply to an Ollama build as much as to a Claude one.
+    Read from the notes on disk, never pulled: building a prompt costs no
+    network call, and the text changes only when an instruction does.
+    """
+    try:
+        from brain.runtime import awareness_section
+
+        return awareness_section()
+    except Exception:  # noqa: BLE001 - an optional store never breaks a prompt
+        return ""
+
+
+def _rtk_awareness() -> str:
+    """The "your command output is condensed" paragraph, when rtk is in play.
+
+    It belongs in the shared prompt rather than in one provider branch because
+    both places a command can be run from — the Claude SDK's Bash tool and the
+    generic tool executor every other provider uses — rewrite through rtk. A
+    model told about it on one path and not the other would doubt perfectly
+    good output on the other.
+
+    It is byte-stable in the sense this function's caller requires: the text
+    carries no version, path or count, so the prefix is identical on every
+    build of a machine that has rtk, and identical on every build of one that
+    does not. It changes once, when the user installs or removes rtk — which
+    costs exactly one cache miss.
+    """
+    try:
+        from rtk import awareness_section
+
+        return awareness_section()
+    except Exception:  # noqa: BLE001 - an optional binary never breaks a prompt
+        return ""
 
 
 # ---------------------------------------------------------------------------
@@ -153,6 +269,97 @@ def openai_reasoning_effort(
         return None
     level = _thinking_level_from_budget(thinking_budget)
     return _OPENAI_EFFORT_BY_LEVEL.get(level)
+
+
+# Claude's `effort` has no "off": Opus 5.5 rejects disabled thinking at every
+# effort, so "none" is the lowest effort. "xhigh" is the deepest level every
+# Opus takes (the SDK falls back to "high" where it does not exist); "max"
+# stays reachable through AUTO_CLAUDE_EFFORT.
+_CLAUDE_EFFORT_BY_LEVEL: dict[str, str] = {
+    "none": "low",
+    "low": "low",
+    "medium": "medium",
+    "high": "high",
+    "ultrathink": "xhigh",
+}
+
+
+def claude_effort(thinking_budget: int | None) -> str:
+    """Translate the Kanban thinking budget to the Claude Agent SDK's `effort`.
+
+    The budget is the user's level for the phase, resolved by the caller; no
+    budget (or 0) is the level "none".
+    """
+    if not thinking_budget:
+        return _CLAUDE_EFFORT_BY_LEVEL["none"]
+    return _CLAUDE_EFFORT_BY_LEVEL[_thinking_level_from_budget(thinking_budget)]
+
+
+# Gemini's OpenAI-compatible endpoint takes `reasoning_effort` on its thinking
+# models (ai.google.dev/gemini-api/docs/openai). "none" turns thinking off on
+# 2.5 Flash only and is refused by 2.5 Pro and the 3.x models, so the level
+# "none" asks for the lowest effort every model takes; "high" is the ceiling.
+_GEMINI_EFFORT_BY_LEVEL: dict[str, str] = {
+    "none": "low",
+    "low": "low",
+    "medium": "medium",
+    "high": "high",
+    "ultrathink": "high",
+}
+
+# Gemini 2.5 and later think; earlier models have no reasoning setting.
+_GEMINI_THINKING_MODEL_RE = re.compile(r"^(models/)?gemini-(2\.5|[3-9])")
+
+
+def gemini_reasoning_effort(model: str, thinking_budget: int | None) -> str | None:
+    """Translate the Kanban thinking budget to Gemini's `reasoning_effort`.
+
+    None when the model has no thinking to set.
+    """
+    if not model or not _GEMINI_THINKING_MODEL_RE.match(model):
+        return None
+    if not thinking_budget:
+        return _GEMINI_EFFORT_BY_LEVEL["none"]
+    return _GEMINI_EFFORT_BY_LEVEL[_thinking_level_from_budget(thinking_budget)]
+
+
+def _positive_int(value: Any) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        return None
+    return value
+
+
+def copilot_thinking_budget(
+    thinking_budget: int | None, capabilities: Any
+) -> int | None:
+    """The `thinking_budget` Copilot's chat completions take, or None to omit it.
+
+    `capabilities` is a model's entry from Copilot's `/models`: `supports`
+    gives `min_thinking_budget` and `max_thinking_budget`, and a model without
+    a maximum takes no budget. The user's budget is kept inside those bounds,
+    and below the model's `limits.max_output_tokens`, since a thinking budget
+    must leave room for the answer.
+    """
+    if not thinking_budget or not isinstance(capabilities, dict):
+        return None
+    supports = capabilities.get("supports")
+    if not isinstance(supports, dict):
+        return None
+    highest = _positive_int(supports.get("max_thinking_budget"))
+    if highest is None:
+        return None
+    limits = capabilities.get("limits")
+    output = (
+        _positive_int(limits.get("max_output_tokens"))
+        if isinstance(limits, dict)
+        else None
+    )
+    if output is not None:
+        highest = min(highest, output - 1)
+    lowest = _positive_int(supports.get("min_thinking_budget")) or 0
+    if highest < lowest:
+        return None
+    return max(lowest, min(thinking_budget, highest))
 
 
 # ---------------------------------------------------------------------------
@@ -230,6 +437,12 @@ _KEEP_RECENT_MESSAGES = 8
 
 _ELIDED_PLACEHOLDER = "[tool result elided to save context — re-run the tool if needed]"
 
+# A past tool call's argument longer than this (a whole file handed to
+# write_file) is elided with the old results; the call, its name and its short
+# arguments (the path) stay, so the model knows what it did and can read it back.
+_LONG_ARGUMENT_CHARS = 1_000
+_ELIDED_ARGUMENT = "[argument elided to save context — {chars} chars, already used]"
+
 # Windsurf text-mode embeds tool results in user messages with this prefix.
 _TEXT_TOOL_RESULT_RE = re.compile(r"^<tool_result\b")
 
@@ -243,8 +456,85 @@ def history_char_budget() -> int:
 
 
 def _message_len(message: dict) -> int:
+    """What a message weighs in the request: its text and its tool calls' arguments.
+
+    The arguments are counted too: a history of writes is mostly the files they
+    carried, and a budget that saw only ``content`` never saw them.
+    """
     content = message.get("content")
-    return len(content) if isinstance(content, str) else 0
+    size = len(content) if isinstance(content, str) else 0
+    for call in _tool_calls(message):
+        size += _arguments_len(_call_arguments(call))
+    return size
+
+
+def _tool_calls(message: dict) -> list[dict]:
+    calls = message.get("tool_calls")
+    if not isinstance(calls, list):
+        return []
+    return [call for call in calls if isinstance(call, dict)]
+
+
+def _call_arguments(call: dict) -> Any:
+    function = call.get("function")
+    return function.get("arguments") if isinstance(function, dict) else None
+
+
+def _arguments_len(arguments: Any) -> int:
+    """Arguments as sent: a JSON string (OpenAI and alike) or an object (Ollama)."""
+    if isinstance(arguments, str):
+        return len(arguments)
+    if isinstance(arguments, (dict, list)):
+        return len(json.dumps(arguments, ensure_ascii=False))
+    return 0
+
+
+def _elided_arguments(arguments: Any) -> Any:
+    """The arguments with each long string value elided, in the shape they came.
+
+    Arguments that are not a JSON object are left as they are.
+    """
+    parsed = arguments
+    if isinstance(arguments, str):
+        try:
+            parsed = json.loads(arguments)
+        except ValueError:
+            return arguments
+    if not isinstance(parsed, dict):
+        return arguments
+    elided = {
+        key: (
+            _ELIDED_ARGUMENT.format(chars=len(value))
+            if isinstance(value, str) and len(value) > _LONG_ARGUMENT_CHARS
+            else value
+        )
+        for key, value in parsed.items()
+    }
+    if elided == parsed:
+        return arguments
+    if isinstance(arguments, str):
+        return json.dumps(elided, ensure_ascii=False)
+    return elided
+
+
+def _elided_call_message(message: dict) -> dict | None:
+    """A past tool call with its long arguments elided, or ``None`` if none are."""
+    calls = message.get("tool_calls")
+    if message.get("role") != "assistant" or not isinstance(calls, list):
+        return None
+    new_calls: list[Any] = []
+    changed = False
+    for call in calls:
+        arguments = _call_arguments(call) if isinstance(call, dict) else None
+        elided = _elided_arguments(arguments)
+        if elided is arguments:
+            new_calls.append(call)
+            continue
+        changed = True
+        new_calls.append(
+            {**call, "function": {**call["function"], "arguments": elided}}
+        )
+    return {**message, "tool_calls": new_calls} if changed else None
 
 
 def should_inline_file_context(
@@ -293,45 +583,59 @@ def compact_messages(
     char_budget: int | None = None,
     keep_recent: int = _KEEP_RECENT_MESSAGES,
 ) -> int:
-    """Elide stale tool results in an OpenAI-style message list (in place).
+    """Elide stale tool results and long past arguments, in place.
 
-    Only triggers when the total content size exceeds `char_budget`. Never
-    touches: the system message(s), the first user message (the task prompt),
-    assistant messages (they carry tool_calls structure), or the `keep_recent`
-    most recent messages. Eligible messages are elided oldest-first until the
-    conversation fits the budget.
+    The message list is OpenAI-style, as every WorkPilot loop keeps it.
 
-    Returns the number of messages elided (0 when under budget).
+    Only triggers when the total content size exceeds `char_budget`, and then
+    elides oldest-first, in one batch, down to 60 % of it
+    (`ClearingPolicy.for_budget`): the next turns fit without another rewrite
+    of the cached prefix. A batch that would free less than a tenth of the
+    budget is not worth that rewrite and is skipped. The size counts the
+    arguments of tool calls; a past call keeps its name and short arguments,
+    and only its long ones go (a whole file handed to a write), so the model
+    still sees what it did, and where, and can read it back. Never touches: the system
+    message(s), the first user message (the task prompt), an assistant's text,
+    or the `keep_recent` most recent messages.
+
+    Returns the number of messages elided (0 when nothing was).
     """
     budget = char_budget if char_budget is not None else history_char_budget()
-    total = sum(_message_len(m) for m in messages)
-    if total <= budget:
-        return 0
-
-    # Locate the first user message (task prompt) — protected.
     first_user_idx = next(
         (i for i, m in enumerate(messages) if m.get("role") == "user"), None
     )
-    cutoff = max(0, len(messages) - keep_recent)
-
-    elided = 0
+    entries: list[Entry] = []
+    lighter: dict[int, dict] = {}
     for idx, msg in enumerate(messages):
-        if total <= budget:
-            break
-        if idx >= cutoff or idx == first_user_idx:
+        size = _message_len(msg)
+        if idx != first_user_idx and _is_tool_result(msg):
+            entries.append(Entry(size, clearable=True))
             continue
-        role = msg.get("role")
-        content = msg.get("content")
-        if not isinstance(content, str) or len(content) <= len(_ELIDED_PLACEHOLDER):
+        elided = _elided_call_message(msg)
+        if elided is None:
+            entries.append(Entry(size, clearable=False))
             continue
+        lighter[idx] = elided
+        entries.append(Entry(size, clearable=True, cleared_chars=_message_len(elided)))
+    chosen = plan_clearing(
+        entries,
+        ClearingPolicy.for_budget(budget, keep_recent=keep_recent),
+        marker_chars=len(_ELIDED_PLACEHOLDER),
+    )
+    for idx in chosen:
+        if idx in lighter:
+            messages[idx]["tool_calls"] = lighter[idx]["tool_calls"]
+        else:
+            messages[idx]["content"] = _ELIDED_PLACEHOLDER
+    return len(chosen)
 
-        is_tool_message = role == "tool"
-        is_text_tool_result = role == "user" and _TEXT_TOOL_RESULT_RE.match(content)
-        if not (is_tool_message or is_text_tool_result):
-            continue
 
-        total -= len(content) - len(_ELIDED_PLACEHOLDER)
-        msg["content"] = _ELIDED_PLACEHOLDER
-        elided += 1
-
-    return elided
+def _is_tool_result(message: dict) -> bool:
+    """A tool's answer: a ``tool`` message, or Windsurf's text-mode result."""
+    content = message.get("content")
+    if not isinstance(content, str):
+        return False
+    role = message.get("role")
+    return role == "tool" or (
+        role == "user" and bool(_TEXT_TOOL_RESULT_RE.match(content))
+    )

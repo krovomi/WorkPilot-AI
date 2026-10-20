@@ -56,7 +56,8 @@ export interface Incident {
 
 export interface HealingStep {
 	name: string;
-	status: "pending" | "running" | "completed" | "failed";
+	/** `skipped`: the pipeline names the step but did not run it; `detail` says why. */
+	status: "pending" | "running" | "completed" | "failed" | "skipped";
 	detail?: string;
 	started_at?: string;
 	completed_at?: string;

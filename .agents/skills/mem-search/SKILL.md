@@ -10,13 +10,14 @@ metadata:
       - python
     pack: tooling
     version: 1.0.0
-    content_sha256: c3ac1b28906d63849cb56be3eaedc231642287913ec4cdcc6349b6016cf0318c
+    content_sha256: 6ecbd17c44f471bdc8581d25149aff6bc700a9b7e25ba6adcb8611d41d9bfde1
 ---
 
 # mem-search — remonter la mémoire sans y noyer le contexte
 
-WorkPilot garde trois mémoires : les traces de builds (`task_logger`), le graphe
-de connaissances (graphiti) et les patterns distillés (`learning_loop`). Les
+WorkPilot garde trois sources : les traces de builds (`task_logger`), le cerveau
+partagé (le vault et son `graph.json`) et les patterns distillés (`learning_loop`,
+des notes de ce même vault, avec leurs preuves). Les
 lire directement rend des enregistrements entiers — c'est-à-dire qu'il faut
 payer chaque candidat pour en écarter la plupart.
 

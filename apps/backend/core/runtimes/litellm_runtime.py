@@ -55,8 +55,10 @@ class LiteLLMRuntime(AgentRuntime):
         self.config = config
         self.cli_thinking = cli_thinking
         self.llm_client = ConcreteLLMClient.from_provider_config(config)
-        self.tool_executor = ToolExecutor(project_dir)
-        self.tool_definitions = get_tool_definitions(agent_type)
+        self.tool_executor = ToolExecutor(
+            project_dir, spec_dir=spec_dir, agent_type=agent_type
+        )
+        self.tool_definitions = get_tool_definitions(agent_type, spec_dir)
         self.max_turns = 10
 
     async def __aenter__(self):

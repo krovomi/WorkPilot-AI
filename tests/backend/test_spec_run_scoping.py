@@ -38,6 +38,22 @@ def _clean_settings(monkeypatch, tmp_path):
     server_config.reset_settings_cache()
 
 
+async def _default_org_id() -> str:
+    """The organization every project now belongs to.
+
+    ``init_db`` seeds it, so this just reads it back. A project without a tenant
+    is no longer representable, which is the point of multi-tenancy.
+    """
+    from server.db.engine import get_session_factory
+    from server.db.models import Organization
+    from sqlalchemy import select
+
+    async with get_session_factory()() as db:
+        return await db.scalar(
+            select(Organization.id).where(Organization.slug == "default")
+        )
+
+
 async def _fresh_db():
     from server.db import engine as db_engine
 
@@ -65,9 +81,15 @@ async def test_cancel_rejects_a_run_belonging_to_another_spec(monkeypatch):
     monkeypatch.setattr(run_manager_module, "get_run_manager", lambda: _SpyManager())
 
     async with await _fresh_db() as db:
-        mine = Project(name="Mine", repo_url="https://x/a.git", server_path="/tmp/a")
+        org_id = await _default_org_id()
+        mine = Project(
+            org_id=org_id, name="Mine", repo_url="https://x/a.git", server_path="/tmp/a"
+        )
         theirs = Project(
-            name="Theirs", repo_url="https://x/b.git", server_path="/tmp/b"
+            org_id=org_id,
+            name="Theirs",
+            repo_url="https://x/b.git",
+            server_path="/tmp/b",
         )
         db.add_all([mine, theirs])
         await db.flush()
@@ -117,7 +139,12 @@ async def test_cancel_accepts_a_run_of_the_addressed_spec(monkeypatch):
     monkeypatch.setattr(run_manager_module, "get_run_manager", lambda: _SpyManager())
 
     async with await _fresh_db() as db:
-        project = Project(name="P", repo_url="https://x/a.git", server_path="/tmp/a")
+        project = Project(
+            org_id=await _default_org_id(),
+            name="P",
+            repo_url="https://x/a.git",
+            server_path="/tmp/a",
+        )
         db.add(project)
         await db.flush()
         spec = SpecIndex(project_id=project.id, spec_name="s", status="backlog")

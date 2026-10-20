@@ -307,7 +307,9 @@ def test_promotion_writes_only_under_proposed(tmp_path: Path):
     pack.mkdir(parents=True)
     skill = pack / "mcp-builder"
     skill.mkdir()
-    (skill / "SKILL.md").write_text("---\nname: mcp-builder\n---\nbody\n", "utf-8")
+    (skill / "SKILL.md").write_text(
+        "---\nname: mcp-builder\n---\nbody\n", encoding="utf-8"
+    )
     before = (skill / "SKILL.md").read_text(encoding="utf-8")
 
     evidence = Evidence(signals=[ExternalSignal.TESTS_PASSED, ExternalSignal.PR_MERGED])

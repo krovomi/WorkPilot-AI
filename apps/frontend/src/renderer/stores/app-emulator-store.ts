@@ -14,6 +14,19 @@ interface AppEmulatorState {
 	phase: AppEmulatorPhase;
 	config: AppEmulatorConfig | null;
 	url: string | null;
+	/**
+	 * L'adresse que chaque aperçu affiche réellement — celle qu'« Ouvrir dans le
+	 * navigateur » doit ouvrir, et celle qu'on retrouve en revenant sur l'onglet.
+	 *
+	 * Elle vit ici plutôt que dans `ResponsivePreview` parce que l'onglet
+	 * Émulateur est démonté dès qu'on en regarde un autre : une adresse gardée
+	 * dans le composant est une adresse perdue au changement d'onglet.
+	 *
+	 * Indexée par aperçu — la tâche pour l'onglet du Kanban — parce que le
+	 * serveur est unique mais les pages qu'on y regarde ne le sont pas : une
+	 * seule adresse ferait s'ouvrir la tâche B sur la page de la tâche A.
+	 */
+	previewUrls: Record<string, string>;
 	output: string;
 	error: string | null;
 	status: string;
@@ -25,6 +38,7 @@ interface AppEmulatorState {
 	setPhase: (phase: AppEmulatorPhase) => void;
 	setConfig: (config: AppEmulatorConfig) => void;
 	setUrl: (url: string) => void;
+	setPreviewUrl: (scope: string, url: string | null) => void;
 	appendOutput: (line: string) => void;
 	setError: (error: string) => void;
 	setStatus: (status: string) => void;
@@ -36,6 +50,7 @@ const initialState = {
 	phase: "idle" as AppEmulatorPhase,
 	config: null as AppEmulatorConfig | null,
 	url: null as string | null,
+	previewUrls: {} as Record<string, string>,
 	output: "",
 	error: null as string | null,
 	status: "",
@@ -60,6 +75,7 @@ export const useAppEmulatorStore = create<AppEmulatorState>((set) => ({
 				phase: "idle",
 				config: null,
 				url: null,
+				previewUrls: {},
 				output: "",
 				error: null,
 				status: "",
@@ -80,7 +96,20 @@ export const useAppEmulatorStore = create<AppEmulatorState>((set) => ({
 
 	setPhase: (phase) => set({ phase }),
 	setConfig: (config) => set({ config }),
-	setUrl: (url) => set({ url }),
+	// Un autre serveur est une autre application : les pages qu'on regardait n'y
+	// existent plus, et les restaurer ouvrirait des adresses d'un run précédent.
+	setUrl: (url) =>
+		set((state) => (state.url === url ? { url } : { url, previewUrls: {} })),
+	setPreviewUrl: (scope, url) =>
+		set((state) => {
+			if (!url) {
+				if (!(scope in state.previewUrls)) return {};
+				const { [scope]: _dropped, ...rest } = state.previewUrls;
+				return { previewUrls: rest };
+			}
+			if (state.previewUrls[scope] === url) return {};
+			return { previewUrls: { ...state.previewUrls, [scope]: url } };
+		}),
 	appendOutput: (line) =>
 		set((state) => ({
 			output: `${state.output + line}\n`.slice(-50000),

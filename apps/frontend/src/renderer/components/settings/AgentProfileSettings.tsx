@@ -1,3 +1,4 @@
+import { resolveCatalogModelValue } from "../../../shared/constants/models";
 import {
 	Brain,
 	Check,
@@ -291,10 +292,10 @@ export function AgentProfileSettings() {
 		return model?.label || modelValue;
 	};
 
-	const getThinkingLabel = (thinkingValue: string): string => {
-		const level = THINKING_LEVELS.find((l) => l.value === thinkingValue);
-		return level?.label || thinkingValue;
-	};
+	const getThinkingLabel = (thinkingValue: string): string =>
+		THINKING_LEVELS.some((l) => l.value === thinkingValue)
+			? t(`general.thinkingLevels.${thinkingValue}`)
+			: thinkingValue;
 
 	/**
 	 * Render a single profile card (Claude only)
@@ -480,7 +481,10 @@ export function AgentProfileSettings() {
 												</Label>
 												{isClaude ? (
 													<Select
-														value={currentPhaseModels[phase]}
+														value={resolveCatalogModelValue(
+															currentPhaseModels[phase],
+															providerModels,
+														)}
 														onValueChange={(value) =>
 															handlePhaseModelChange(phase, value as string)
 														}
@@ -488,8 +492,8 @@ export function AgentProfileSettings() {
 														<SelectTrigger className="h-9">
 															<SelectValue />
 														</SelectTrigger>
-														<SelectContent>
-															{AVAILABLE_MODELS.map((m) => (
+														<SelectContent searchable>
+															{providerModels.map((m) => (
 																<SelectItem key={m.value} value={m.value}>
 																	{m.label}
 																</SelectItem>
@@ -520,7 +524,7 @@ export function AgentProfileSettings() {
 																placeholder={t("agentProfile.selectModel")}
 															/>
 														</SelectTrigger>
-														<SelectContent>
+														<SelectContent searchable>
 															{providerModels.map((m) => (
 																<SelectItem key={m.value} value={m.value}>
 																	<span className="flex items-center gap-2">
@@ -587,7 +591,7 @@ export function AgentProfileSettings() {
 																	key={level.value}
 																	value={level.value}
 																>
-																	{level.label}
+																	{t(`general.thinkingLevels.${level.value}`)}
 																</SelectItem>
 															))}
 														</SelectContent>

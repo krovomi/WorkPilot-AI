@@ -145,7 +145,7 @@ class TestSingleTaskMerge:
             capture_output=True,
         )
         utils_file = temp_project / "src" / "utils.py"
-        utils_file.write_text(SAMPLE_PYTHON_WITH_NEW_FUNCTION)
+        utils_file.write_text(SAMPLE_PYTHON_WITH_NEW_FUNCTION, encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=temp_project, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Add new function"],

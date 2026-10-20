@@ -1,0 +1,1057 @@
+/**
+ * Ollama IPC Handlers
+ *
+ * Detection, installation, start-up and model management for the local Ollama
+ * server: status, installed models, downloads with progress, deletion. Ollama
+ * serves the local LLM providers and the OCR vision engine; it has nothing to
+ * do with any one memory store, which is why these channels live here rather
+ * than beside the memory handlers they were born next to.
+ */
+
+import { execFileSync, spawn } from "node:child_process";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { fileURLToPath } from "node:url";
+import { app, BrowserWindow, ipcMain } from "electron";
+import {
+	getOllamaExecutablePaths,
+	getOllamaInstallCommand as getPlatformOllamaInstallCommand,
+	getWhichCommand,
+} from "../platform";
+
+// ESM-compatible __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+import { IPC_CHANNELS } from "../../shared/constants";
+import type { IPCResult } from "../../shared/types";
+import { parsePythonCommand } from "../python-detector";
+import {
+	getConfiguredPythonPath,
+	pythonEnvManager,
+} from "../python-env-manager";
+import {
+	deleteModel as deleteOllamaModelFromServer,
+	type EnsureProgress,
+	ensureOllamaReady,
+	resolveOllamaBinary,
+} from "../services/ollama-portable";
+import { openTerminalWithCommand } from "./claude-code-handlers";
+
+
+/**
+ * A model download running in the main process.
+ *
+ * Downloads live here rather than in a renderer on purpose: a model is
+ * gigabytes, and the user is expected to close the task panel and do something
+ * else while it lands. `promise` is what a second request for the same model
+ * attaches to; `cancel` kills the underlying process.
+ */
+interface ActivePull {
+	promise: Promise<IPCResult<OllamaPullResult>>;
+	cancel: () => void;
+}
+
+const activePulls = new Map<string, ActivePull>();
+
+/**
+ * How long a pull may go without a single byte of progress before we call it
+ * stalled. Generous, because Ollama is silent while it verifies a freshly
+ * downloaded layer on a slow disk — but bounded, so a dead server does not
+ * leave a spinner running forever.
+ */
+const PULL_STALL_TIMEOUT_MS = 10 * 60 * 1000;
+
+/**
+ * Send pull progress to every open window.
+ *
+ * The download belongs to the app, not to the view that happened to start it:
+ * the global indicator, the phase selector and the settings page all render
+ * the same download, and the task panel that started it may well be closed by
+ * the time it finishes.
+ */
+function broadcastPullProgress(payload: {
+	modelName: string;
+	status: string;
+	completed: number;
+	total: number;
+	percentage: number;
+	error?: string;
+}): void {
+	for (const win of BrowserWindow.getAllWindows()) {
+		if (!win.isDestroyed()) {
+			win.webContents.send(IPC_CHANNELS.OLLAMA_PULL_PROGRESS, payload);
+		}
+	}
+}
+
+/**
+ * Ollama Service Status
+ * Contains information about Ollama service availability and configuration
+ */
+interface OllamaStatus {
+	running: boolean; // Whether Ollama service is currently running
+	url: string; // Base URL of the Ollama API
+	version?: string; // Ollama version (if available)
+	message?: string; // Additional status message
+}
+
+/**
+ * Ollama Model Information
+ * Metadata about a model available in Ollama
+ */
+interface OllamaModel {
+	name: string; // Model identifier (e.g., 'embeddinggemma', 'llama2')
+	size_bytes: number; // Model size in bytes
+	size_gb: number; // Model size in gigabytes (formatted)
+	modified_at: string; // Last modified timestamp
+	is_embedding: boolean; // Whether this is an embedding model
+	embedding_dim?: number | null; // Embedding dimension (only for embedding models)
+	description?: string; // Model description
+}
+
+/**
+ * Ollama Embedding Model Information
+ * Specialized model info for semantic search models
+ */
+interface OllamaEmbeddingModel {
+	name: string; // Model name
+	embedding_dim: number | null; // Embedding vector dimension
+	description: string; // Model description
+	size_bytes: number;
+	size_gb: number;
+}
+
+/**
+ * Recommended Embedding Model Card
+ * Pre-curated models suitable for WorkPilot AI memory system
+ */
+// biome-ignore lint/correctness/noUnusedVariables: variable kept for clarity
+interface OllamaRecommendedModel {
+	name: string; // Model identifier
+	description: string; // Human-readable description
+	size_estimate: string; // Estimated download size (e.g., '621 MB')
+	dim: number; // Embedding vector dimension
+	installed: boolean; // Whether model is currently installed
+}
+
+/**
+ * Result of ollama pull command
+ * Contains the final status after model download completes
+ */
+interface OllamaPullResult {
+	model: string; // Model name that was pulled
+	status: "completed" | "failed"; // Final status
+	output: string[]; // Log messages from pull operation
+}
+
+/**
+ * Ollama Installation Status
+ * Information about whether Ollama is installed on the system
+ */
+interface OllamaInstallStatus {
+	installed: boolean; // Whether Ollama binary is found on the system
+	path?: string; // Path to Ollama binary (if found)
+	version?: string; // Installed version (if available)
+}
+
+/**
+ * Check if Ollama is installed on the system by looking for the binary.
+ * Checks common installation paths and PATH environment variable.
+ *
+ * @returns {OllamaInstallStatus} Installation status with path if found
+ */
+function checkOllamaInstalled(): OllamaInstallStatus {
+	// Get platform-specific paths from the platform module
+	const pathsToCheck = getOllamaExecutablePaths();
+
+	// Check each path
+	// SECURITY NOTE: ollamaPath values come from the platform module's hardcoded paths,
+	// not from user input or environment variables. These are known system installation paths.
+	for (const ollamaPath of pathsToCheck) {
+		if (fs.existsSync(ollamaPath)) {
+			// Try to get version - use execFileSync to avoid shell injection
+			let version: string | undefined;
+			try {
+				const versionOutput = execFileSync(ollamaPath, ["--version"], {
+					encoding: "utf-8",
+					timeout: 5000,
+					windowsHide: true,
+				})
+					.toString()
+					.trim();
+				// Parse version from output like "ollama version 0.1.23"
+				const match = versionOutput.match(/(\d+\.\d+\.\d+)/);
+				if (match) {
+					version = match[1];
+				}
+			} catch {
+				// Couldn't get version, but binary exists
+			}
+
+			return {
+				installed: true,
+				path: ollamaPath,
+				version,
+			};
+		}
+	}
+
+	// Also check if ollama is in PATH using where/which command
+	// Use execFileSync with explicit command to avoid shell injection
+	try {
+		const whichCmd = getWhichCommand();
+		const ollamaPath = execFileSync(whichCmd, ["ollama"], {
+			encoding: "utf-8",
+			timeout: 5000,
+			windowsHide: true,
+		})
+			.toString()
+			.trim()
+			.split("\n")[0]; // Get first result on Windows
+
+		if (ollamaPath && fs.existsSync(ollamaPath)) {
+			let version: string | undefined;
+			try {
+				// Use the discovered path directly with execFileSync
+				const versionOutput = execFileSync(ollamaPath, ["--version"], {
+					encoding: "utf-8",
+					timeout: 5000,
+					windowsHide: true,
+				})
+					.toString()
+					.trim();
+				const match = versionOutput.match(/(\d+\.\d+\.\d+)/);
+				if (match) {
+					version = match[1];
+				}
+			} catch {
+				// Couldn't get version
+			}
+
+			return {
+				installed: true,
+				path: ollamaPath,
+				version,
+			};
+		}
+	} catch {
+		// Not in PATH
+	}
+
+	// Finally, count the app-managed portable binary as "installed" so the
+	// portable auto-install path is reflected in every status check.
+	const portable = resolveOllamaBinary();
+	if (portable?.managed) {
+		let version: string | undefined;
+		try {
+			const versionOutput = execFileSync(portable.path, ["--version"], {
+				encoding: "utf-8",
+				timeout: 5000,
+				windowsHide: true,
+			})
+				.toString()
+				.trim();
+			const match = versionOutput.match(/(\d+\.\d+\.\d+)/);
+			if (match) version = match[1];
+		} catch {
+			// binary exists but version probe failed — still installed
+		}
+		return { installed: true, path: portable.path, version };
+	}
+
+	return { installed: false };
+}
+
+/**
+ * Get the platform-specific install command for Ollama
+ * Uses the official Ollama installation methods from the platform module.
+ *
+ * Windows: Uses winget (Windows Package Manager)
+ * macOS: Uses Homebrew
+ * Linux: Uses official install script from https://ollama.com/download
+ *
+ * @returns {string} The install command to run in terminal
+ */
+function getOllamaInstallCommand(): string {
+	return getPlatformOllamaInstallCommand();
+}
+
+/**
+ * Execute the ollama_model_detector.py Python script.
+ * Spawns a subprocess to run Ollama detection/management commands with a 10-second timeout.
+ * Used to check Ollama status, list models, and manage downloads.
+ *
+ * Includes deduplication: identical command+baseUrl requests within 2s return the cached
+ * result/promise instead of spawning a new subprocess. This prevents runaway subprocess
+ * spawning from React re-render loops.
+ *
+ * Supported commands:
+ * - 'check-status': Verify Ollama service is running
+ * - 'list-models': Get all available models
+ * - 'list-embedding-models': Get only embedding models
+ * - 'pull-model': Download a specific model (see OLLAMA_PULL_MODEL handler for full implementation)
+ *
+ * @async
+ * @param {string} command - The command to execute (check-status, list-models, list-embedding-models, pull-model)
+ * @param {string} [baseUrl] - Optional Ollama API base URL (defaults to http://localhost:11434)
+ * @returns {Promise<{success, data?, error?}>} Result object with success flag and data/error
+ */
+// Deduplication cache to prevent rapid-fire subprocess spawning (e.g., from React re-render loops)
+const ollamaDetectorCache = new Map<
+	string,
+	{
+		promise: Promise<{ success: boolean; data?: unknown; error?: string }>;
+		timestamp: number;
+	}
+>();
+const OLLAMA_CACHE_TTL_MS = 2000; // Cache results for 2 seconds
+
+async function executeOllamaDetector(
+	command: string,
+	baseUrl?: string,
+): Promise<{ success: boolean; data?: unknown; error?: string }> {
+	// Deduplication: return cached promise for identical requests within TTL
+	const cacheKey = `${command}:${baseUrl || "default"}`;
+	const cached = ollamaDetectorCache.get(cacheKey);
+	if (cached && Date.now() - cached.timestamp < OLLAMA_CACHE_TTL_MS) {
+		if (process.env.DEBUG) {
+			// noop
+		}
+		return cached.promise;
+	}
+
+	const promise = executeOllamaDetectorImpl(command, baseUrl);
+	ollamaDetectorCache.set(cacheKey, { promise, timestamp: Date.now() });
+
+	// Clean up cache entry after TTL
+	promise.finally(() => {
+		setTimeout(() => {
+			const entry = ollamaDetectorCache.get(cacheKey);
+			if (entry && entry.promise === promise) {
+				ollamaDetectorCache.delete(cacheKey);
+			}
+		}, OLLAMA_CACHE_TTL_MS);
+	});
+
+	return promise;
+}
+
+async function executeOllamaDetectorImpl(
+	command: string,
+	baseUrl?: string,
+): Promise<{ success: boolean; data?: unknown; error?: string }> {
+	// Use configured Python path (venv if ready, otherwise bundled/system)
+	// Note: ollama_model_detector.py doesn't require dotenv, but using venv is safer
+	const pythonCmd = getConfiguredPythonPath();
+
+	// Find the ollama_model_detector.py script
+	const possiblePaths = [
+		// Packaged app paths (check FIRST for packaged builds)
+		...(app.isPackaged
+			? [
+					path.join(
+						process.resourcesPath,
+						"backend",
+						"ollama_model_detector.py",
+					),
+				]
+			: []),
+		// Development paths
+		path.resolve(
+			__dirname,
+			"..",
+			"..",
+			"..",
+			"backend",
+			"ollama_model_detector.py",
+		),
+		path.resolve(process.cwd(), "apps", "backend", "ollama_model_detector.py"),
+	];
+
+	let scriptPath: string | null = null;
+	for (const p of possiblePaths) {
+		if (fs.existsSync(p)) {
+			scriptPath = p;
+			break;
+		}
+	}
+
+	if (!scriptPath) {
+		if (process.env.DEBUG) {
+			console.error(
+				"[OllamaDetector] Python script not found. Searched paths:",
+				possiblePaths,
+			);
+		}
+		return {
+			success: false,
+			error: "ollama_model_detector.py script not found",
+		};
+	}
+
+	if (process.env.DEBUG) {
+		// noop
+	}
+
+	const [pythonExe, baseArgs] = parsePythonCommand(pythonCmd);
+	const args = [...baseArgs, scriptPath, command];
+	if (baseUrl) {
+		args.push("--base-url", baseUrl);
+	}
+
+	return new Promise((resolve) => {
+		let resolved = false;
+		const proc = spawn(pythonExe, args, {
+			stdio: ["ignore", "pipe", "pipe"],
+			// Use sanitized Python environment to prevent PYTHONHOME contamination
+			// Fixes "Could not find platform independent libraries" error on Windows
+			env: pythonEnvManager.getPythonEnv(),
+		});
+
+		let stdout = "";
+		let stderr = "";
+
+		proc.stdout.on("data", (data) => {
+			stdout += data.toString("utf-8");
+		});
+
+		proc.stderr.on("data", (data) => {
+			stderr += data.toString("utf-8");
+		});
+
+		// Single timeout mechanism to avoid race condition
+		const timeoutId = setTimeout(() => {
+			if (!resolved) {
+				resolved = true;
+				proc.kill();
+				resolve({ success: false, error: "Timeout" });
+			}
+		}, 10000);
+
+		proc.on("close", (code) => {
+			if (resolved) return;
+			resolved = true;
+			clearTimeout(timeoutId);
+			if (code === 0 && stdout) {
+				try {
+					resolve(JSON.parse(stdout));
+				} catch {
+					resolve({ success: false, error: `Invalid JSON: ${stdout}` });
+				}
+			} else {
+				resolve({ success: false, error: stderr || `Exit code ${code}` });
+			}
+		});
+
+		proc.on("error", (err) => {
+			if (resolved) return;
+			resolved = true;
+			clearTimeout(timeoutId);
+			resolve({ success: false, error: err.message });
+		});
+	});
+}
+
+/**
+ * Register the Ollama IPC handlers: status, installation, server start-up,
+ * model listing, downloads with real-time progress, cancellation and deletion.
+ *
+ * @returns {void}
+ */
+export function registerOllamaHandlers(): void {
+	// Check if Ollama is running
+	ipcMain.handle(
+		IPC_CHANNELS.OLLAMA_CHECK_STATUS,
+		async (_, baseUrl?: string): Promise<IPCResult<OllamaStatus>> => {
+			try {
+				const result = await executeOllamaDetector("check-status", baseUrl);
+
+				if (!result.success) {
+					return {
+						success: false,
+						error: result.error || "Failed to check Ollama status",
+					};
+				}
+
+				return {
+					success: true,
+					data: result.data as OllamaStatus,
+				};
+			} catch (error) {
+				return {
+					success: false,
+					error:
+						error instanceof Error
+							? error.message
+							: "Failed to check Ollama status",
+				};
+			}
+		},
+	);
+
+	// Check if Ollama is installed (binary exists on system)
+	ipcMain.handle(
+		IPC_CHANNELS.OLLAMA_CHECK_INSTALLED,
+		async (): Promise<IPCResult<OllamaInstallStatus>> => {
+			try {
+				const installStatus = checkOllamaInstalled();
+				return {
+					success: true,
+					data: installStatus,
+				};
+			} catch (error) {
+				return {
+					success: false,
+					error:
+						error instanceof Error
+							? error.message
+							: "Failed to check Ollama installation",
+				};
+			}
+		},
+	);
+
+	// Install Ollama (opens terminal with official install command)
+	ipcMain.handle(
+		IPC_CHANNELS.OLLAMA_INSTALL,
+		async (): Promise<IPCResult<{ command: string }>> => {
+			try {
+				const command = getOllamaInstallCommand();
+
+				await openTerminalWithCommand(command);
+
+				return {
+					success: true,
+					data: { command },
+				};
+			} catch (error) {
+				const errorMsg =
+					error instanceof Error ? error.message : "Unknown error";
+				const errorStack = error instanceof Error ? error.stack : "";
+				console.error("[Ollama] Install failed:", errorMsg);
+				console.error("[Ollama] Error stack:", errorStack);
+				return {
+					success: false,
+					error: `Failed to open terminal for installation: ${errorMsg}`,
+				};
+			}
+		},
+	);
+
+	// Ensure Ollama is ready end-to-end: download+extract the portable binary if
+	// neither a system nor a previous portable install exists, then start the
+	// daemon on the configured host/port — no admin, no terminal, all OSes.
+	// Streams OLLAMA_INSTALL_PROGRESS so the UI can show download/start status.
+	ipcMain.handle(
+		IPC_CHANNELS.OLLAMA_ENSURE,
+		async (
+			event,
+			baseUrl?: string,
+		): Promise<IPCResult<{ running: boolean; url: string; managed: boolean }>> => {
+			const onProgress = (p: EnsureProgress) => {
+				event.sender.send(IPC_CHANNELS.OLLAMA_INSTALL_PROGRESS, p);
+			};
+			const res = await ensureOllamaReady(
+				baseUrl?.trim() || "http://localhost:11434",
+				onProgress,
+				// Restart our managed server so it picks up OLLAMA_CONTEXT_LENGTH —
+				// a daemon already running from a previous launch keeps its small
+				// default context (the "exceeds context size 4096" failure).
+				{ forceRestart: true },
+			);
+			if (res.success) {
+				return {
+					success: true,
+					data: { running: res.running, url: res.url, managed: res.managed },
+				};
+			}
+			return { success: false, error: res.error || "Échec de la préparation d'Ollama." };
+		},
+	);
+
+	// Back-compat alias: start the server (auto-installing the portable build if
+	// needed). Delegates to the same portable manager, without progress events.
+	ipcMain.handle(
+		IPC_CHANNELS.OLLAMA_START_SERVER,
+		async (
+			_,
+			baseUrl?: string,
+		): Promise<IPCResult<{ running: boolean; url: string }>> => {
+			const res = await ensureOllamaReady(
+				baseUrl?.trim() || "http://localhost:11434",
+				() => {
+					/* back-compat alias: no progress stream */
+				},
+			);
+			if (res.success) {
+				return { success: true, data: { running: res.running, url: res.url } };
+			}
+			return { success: false, error: res.error || "Échec du démarrage d'Ollama." };
+		},
+	);
+
+	// Delete a pulled model to reclaim disk space (Ollama API: DELETE /api/delete).
+	ipcMain.handle(
+		IPC_CHANNELS.OLLAMA_DELETE_MODEL,
+		async (
+			_,
+			modelName: string,
+			baseUrl?: string,
+		): Promise<IPCResult<{ deleted: string }>> => {
+			if (!modelName?.trim()) {
+				return { success: false, error: "Nom de modèle manquant." };
+			}
+			const res = await deleteOllamaModelFromServer(
+				baseUrl?.trim() || "http://localhost:11434",
+				modelName.trim(),
+			);
+			if (res.success) {
+				return { success: true, data: { deleted: modelName.trim() } };
+			}
+			return {
+				success: false,
+				error: res.error || `Échec de la suppression de ${modelName}.`,
+			};
+		},
+	);
+
+	// ============================================
+	// Ollama Model Discovery & Management
+	// ============================================
+
+	/**
+	 * List all available Ollama models (LLMs and embeddings).
+	 * Queries Ollama API to get model names, sizes, and metadata.
+	 *
+	 * @async
+	 * @param {string} [baseUrl] - Optional custom Ollama base URL
+	 * @returns {Promise<IPCResult<{ models, count }>>} Array of models with metadata
+	 */
+	ipcMain.handle(
+		IPC_CHANNELS.OLLAMA_LIST_MODELS,
+		async (
+			_,
+			baseUrl?: string,
+		): Promise<IPCResult<{ models: OllamaModel[]; count: number }>> => {
+			try {
+				const result = await executeOllamaDetector("list-models", baseUrl);
+
+				if (!result.success) {
+					return {
+						success: false,
+						error: result.error || "Failed to list Ollama models",
+					};
+				}
+
+				const data = result.data as {
+					models: OllamaModel[];
+					count: number;
+					url: string;
+				};
+				return {
+					success: true,
+					data: {
+						models: data.models,
+						count: data.count,
+					},
+				};
+			} catch (error) {
+				return {
+					success: false,
+					error:
+						error instanceof Error
+							? error.message
+							: "Failed to list Ollama models",
+				};
+			}
+		},
+	);
+
+	/**
+	 * List only embedding models from Ollama.
+	 * Filters the model list to show only models suitable for semantic search.
+	 * Includes dimension info for model compatibility verification.
+	 *
+	 * @async
+	 * @param {string} [baseUrl] - Optional custom Ollama base URL
+	 * @returns {Promise<IPCResult<{ embedding_models, count }>>} Filtered embedding models
+	 */
+	ipcMain.handle(
+		IPC_CHANNELS.OLLAMA_LIST_EMBEDDING_MODELS,
+		async (
+			_,
+			baseUrl?: string,
+		): Promise<
+			IPCResult<{ embedding_models: OllamaEmbeddingModel[]; count: number }>
+		> => {
+			try {
+				const result = await executeOllamaDetector(
+					"list-embedding-models",
+					baseUrl,
+				);
+
+				if (!result.success) {
+					return {
+						success: false,
+						error: result.error || "Failed to list Ollama embedding models",
+					};
+				}
+
+				const data = result.data as {
+					embedding_models: OllamaEmbeddingModel[];
+					count: number;
+					url: string;
+				};
+				return {
+					success: true,
+					data: {
+						embedding_models: data.embedding_models,
+						count: data.count,
+					},
+				};
+			} catch (error) {
+				return {
+					success: false,
+					error:
+						error instanceof Error
+							? error.message
+							: "Failed to list embedding models",
+				};
+			}
+		},
+	);
+
+	/**
+	 * Download (pull) an Ollama model from the Ollama registry.
+	 * Spawns a Python subprocess to execute ollama pull command with real-time progress tracking.
+	 * Emits OLLAMA_PULL_PROGRESS events to renderer with percentage, speed, and ETA.
+	 *
+	 * Progress events include:
+	 * - modelName: The model being downloaded
+	 * - status: Current status (downloading, extracting, etc.)
+	 * - completed: Bytes downloaded so far
+	 * - total: Total bytes to download
+	 * - percentage: Completion percentage (0-100)
+	 *
+	 * @async
+	 * @param {Electron.IpcMainInvokeEvent} event - IPC event object for sending progress updates
+	 * @param {string} modelName - Name of the model to download (e.g., 'embeddinggemma')
+	 * @param {string} [baseUrl] - Optional custom Ollama base URL
+	 * @returns {Promise<IPCResult<OllamaPullResult>>} Result with status and output messages
+	 */
+	ipcMain.handle(
+		IPC_CHANNELS.OLLAMA_PULL_MODEL,
+		// Progress is broadcast to every window rather than replied to the sender,
+		// so the invoking event is not needed here.
+		async (
+			_event,
+			modelName: string,
+			baseUrl?: string,
+		): Promise<IPCResult<OllamaPullResult>> => {
+			const model = (modelName || "").trim();
+			if (!model) {
+				return { success: false, error: "Nom de modèle manquant." };
+			}
+
+			// One pull per model, app-wide. The same model can be requested from
+			// the phase selector, the onboarding picker and the settings page at
+			// once; starting three `ollama pull` processes for it would triple the
+			// bandwidth to land the same bytes. Late callers await the running one.
+			const inFlight = activePulls.get(model);
+			if (inFlight) {
+				return inFlight.promise;
+			}
+
+			try {
+				// Use configured Python path (venv if ready, otherwise bundled/system)
+				const pythonCmd = getConfiguredPythonPath();
+
+				// Find the ollama_model_detector.py script
+				const possiblePaths = [
+					// Packaged app paths (check FIRST for packaged builds)
+					...(app.isPackaged
+						? [
+								path.join(
+									process.resourcesPath,
+									"backend",
+									"ollama_model_detector.py",
+								),
+							]
+						: []),
+					// Development paths
+					path.resolve(
+						__dirname,
+						"..",
+						"..",
+						"..",
+						"backend",
+						"ollama_model_detector.py",
+					),
+					path.resolve(
+						process.cwd(),
+						"apps",
+						"backend",
+						"ollama_model_detector.py",
+					),
+				];
+
+				let scriptPath: string | null = null;
+				for (const p of possiblePaths) {
+					if (fs.existsSync(p)) {
+						scriptPath = p;
+						break;
+					}
+				}
+
+				if (!scriptPath) {
+					return {
+						success: false,
+						error: "ollama_model_detector.py script not found",
+					};
+				}
+
+				const [pythonExe, baseArgs] = parsePythonCommand(pythonCmd);
+				const args = [...baseArgs, scriptPath, "pull-model", model];
+				// Pull against the configured server so a custom host/port (or a
+				// non-default Ollama instance) actually receives the download.
+				if (baseUrl?.trim()) {
+					args.push("--base-url", baseUrl.trim());
+				}
+
+				// `cancel` is captured out of the executor rather than registered
+				// inside it: a Promise executor runs SYNCHRONOUSLY, during the
+				// `new Promise(...)` call, so the `promise` binding below is still
+				// in its temporal dead zone at that point. Registering the entry
+				// from in there threw "Cannot access 'promise' before
+				// initialization" on every single pull — the handler's own body,
+				// which the hook's unit tests never execute because they mock the
+				// preload bridge. Registration therefore happens after the
+				// constructor returns; every path that settles the promise is
+				// event-driven and so cannot run before that.
+				let killPull: () => void = () => {
+					/* replaced synchronously by the executor below */
+				};
+
+				const promise = new Promise<IPCResult<OllamaPullResult>>((resolve) => {
+					const proc = spawn(pythonExe, args, {
+						stdio: ["ignore", "pipe", "pipe"],
+						// Deliberately NO `timeout`. This used to be 600 000 ms, which
+						// killed the process at ten minutes — so every model that does
+						// not fit in ten minutes of bandwidth (llama3.3 is ~43 GB) was
+						// structurally impossible to download, and reported as a
+						// failure rather than as the deadline it was. What we actually
+						// need to detect is a STALLED pull, which the inactivity
+						// watchdog below does without capping the total duration.
+						// Use sanitized Python environment to prevent PYTHONHOME contamination
+						// Fixes "Could not find platform independent libraries" error on Windows
+						env: pythonEnvManager.getPythonEnv(),
+					});
+
+					let stdout = "";
+					let stderr = "";
+					let stderrBuffer = ""; // Buffer for NDJSON parsing
+					let cancelled = false;
+					let stalled = false;
+
+					// Watchdog: Ollama streams progress continuously while a pull is
+					// live, so silence — not elapsed time — is the signal that
+					// something is wrong (server gone, network dead, disk full).
+					let watchdog: NodeJS.Timeout | undefined;
+					const armWatchdog = () => {
+						if (watchdog) clearTimeout(watchdog);
+						watchdog = setTimeout(() => {
+							stalled = true;
+							proc.kill();
+						}, PULL_STALL_TIMEOUT_MS);
+					};
+					armWatchdog();
+
+					killPull = () => {
+						cancelled = true;
+						proc.kill();
+					};
+
+					proc.stdout.on("data", (data) => {
+						stdout += data.toString("utf-8");
+					});
+
+					proc.stderr.on("data", (data) => {
+						const chunk = data.toString("utf-8");
+						stderr += chunk;
+						stderrBuffer += chunk;
+						armWatchdog();
+
+						// Parse NDJSON (newline-delimited JSON) from stderr
+						// Ollama sends progress data as: {"status":"downloading","completed":X,"total":Y}
+						const lines = stderrBuffer.split("\n");
+						// Keep the last incomplete line in the buffer
+						stderrBuffer = lines.pop() || "";
+
+						lines.forEach((line) => {
+							if (line.trim()) {
+								try {
+									const progressData = JSON.parse(line);
+
+									// Extract progress information
+									if (
+										progressData.completed !== undefined &&
+										progressData.total !== undefined
+									) {
+										const percentage =
+											progressData.total > 0
+												? Math.round(
+														(progressData.completed / progressData.total) * 100,
+													)
+												: 0;
+
+										broadcastPullProgress({
+											modelName: model,
+											status: progressData.status || "downloading",
+											completed: progressData.completed,
+											total: progressData.total,
+											percentage,
+										});
+									}
+								} catch {
+									// Skip lines that aren't valid JSON
+								}
+							}
+						});
+					});
+
+					const settle = (result: IPCResult<OllamaPullResult>) => {
+						if (watchdog) clearTimeout(watchdog);
+						activePulls.delete(model);
+						// Always emit a terminal event. Every renderer view tracks this
+						// download in the shared store, but only the one that started it
+						// holds the invoke promise — without this the others would keep
+						// showing a spinner for a pull that finished minutes ago.
+						broadcastPullProgress({
+							modelName: model,
+							status: result.success ? "completed" : "failed",
+							completed: 0,
+							total: 0,
+							percentage: result.success ? 100 : 0,
+							error: result.success ? undefined : result.error,
+						});
+						resolve(result);
+					};
+
+					proc.on("close", (code) => {
+						if (cancelled) {
+							settle({
+								success: false,
+								error: "PULL_CANCELLED",
+							});
+							return;
+						}
+						if (stalled) {
+							settle({
+								success: false,
+								error:
+									"Le téléchargement ne progresse plus. Vérifiez que le " +
+									"serveur Ollama tourne, votre connexion et l'espace disque " +
+									"disponible, puis relancez.",
+							});
+							return;
+						}
+						// The detector writes a structured {success,error} JSON to
+						// stdout even on FAILURE (then exits 1), so always try to parse
+						// stdout first — otherwise a real, actionable error (e.g. "no
+						// GGUF file in this repo") was being hidden behind "Exit code 1".
+						// Context sizing is handled at request time (native /api/chat
+						// num_ctx), so no model re-creation is needed after a pull.
+						if (stdout.trim()) {
+							try {
+								const result = JSON.parse(stdout);
+								if (result.success) {
+									settle({
+										success: true,
+										data: result.data as OllamaPullResult,
+									});
+								} else {
+									settle({
+										success: false,
+										error:
+											result.error ||
+											stderr.trim() ||
+											`Échec du téléchargement (code ${code})`,
+									});
+								}
+								return;
+							} catch {
+								// stdout wasn't JSON — fall through to the generic handling.
+							}
+						}
+						if (code === 0) {
+							settle({ success: false, error: `Invalid JSON: ${stdout}` });
+						} else {
+							settle({
+								success: false,
+								error: stderr.trim() || `Échec du téléchargement (code ${code})`,
+							});
+						}
+					});
+
+					proc.on("error", (err) => {
+						settle({ success: false, error: err.message });
+					});
+				});
+
+				const entry: ActivePull = { promise, cancel: () => killPull() };
+				activePulls.set(model, entry);
+				// `settle` clears the registry on every path that RESOLVES. A
+				// rejected promise — a synchronous `spawn` throw, say — reaches
+				// none of them, and an entry nobody removes silently blocks every
+				// later retry of that model. The identity check keeps this from
+				// evicting a newer pull that has since taken the slot.
+				void promise.catch(() => undefined).then(() => {
+					if (activePulls.get(model) === entry) activePulls.delete(model);
+				});
+
+				return promise;
+			} catch (error) {
+				activePulls.delete(model);
+				return {
+					success: false,
+					error:
+						error instanceof Error ? error.message : "Failed to pull model",
+				};
+			}
+		},
+	);
+
+	/**
+	 * Cancel an in-flight model download. Resolves the original pull promise
+	 * with `PULL_CANCELLED` so the caller can tell a cancellation apart from a
+	 * failure and stay quiet about it.
+	 */
+	ipcMain.handle(
+		IPC_CHANNELS.OLLAMA_CANCEL_PULL,
+		async (_, modelName: string): Promise<IPCResult<{ cancelled: boolean }>> => {
+			const entry = activePulls.get((modelName || "").trim());
+			if (!entry) {
+				return { success: true, data: { cancelled: false } };
+			}
+			entry.cancel();
+			return { success: true, data: { cancelled: true } };
+		},
+	);
+
+	/**
+	 * List the downloads currently running in the main process.
+	 *
+	 * A pull outlives the view that started it — that is the whole point of
+	 * running it here — so a renderer that mounts later (reopened task panel,
+	 * reloaded window) needs a way to learn about a download already in flight
+	 * instead of showing the model as "to download" while it is at 60%.
+	 */
+	ipcMain.handle(
+		IPC_CHANNELS.OLLAMA_ACTIVE_PULLS,
+		async (): Promise<IPCResult<{ models: string[] }>> => ({
+			success: true,
+			data: { models: [...activePulls.keys()] },
+		}),
+	);
+}

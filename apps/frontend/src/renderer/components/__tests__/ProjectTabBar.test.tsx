@@ -17,7 +17,6 @@ function createTestProject(overrides: Partial<Project> = {}): Project {
 		autoBuildPath: "/path/to/test-project/.workpilot",
 		settings: {
 			model: "claude-3-haiku-20240307",
-			memoryBackend: "file",
 			linearSync: false,
 			notifications: {
 				onTaskComplete: true,
@@ -25,7 +24,6 @@ function createTestProject(overrides: Partial<Project> = {}): Project {
 				onReviewNeeded: true,
 				sound: false,
 			},
-			graphitiMcpEnabled: false,
 		},
 		createdAt: new Date(),
 		updatedAt: new Date(),

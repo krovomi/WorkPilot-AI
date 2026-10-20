@@ -8,6 +8,8 @@ Unified coordinator for all three self-healing modes:
 - Proactive Mode: Fragility analysis and preventive testing
 
 Manages the healing lifecycle: detection -> analysis -> fix -> QA -> PR.
+Only detection, analysis and the runtime verification run today: fix, QA and
+PR are reported `skipped` and the incident is escalated to a person (F48).
 Persists incidents and operations to JSON for dashboard display.
 """
 
@@ -35,12 +37,49 @@ from .production_mode import ProductionMode
 
 logger = logging.getLogger(__name__)
 
+# The steps the pipeline names but does not run yet (F48). They used to read
+# `completed` — "QA validation passed", "PR created" — with no agent, no QA and
+# no PR behind them, and the incident came out healed. Until a fixer session
+# (`core.client.create_agent_client` in a worktree), the QA loop and the
+# worktree manager's PR creation are wired here, each is reported `skipped`
+# with its reason, and the incident goes to a person: a step that did nothing
+# never reads `completed`.
+FIX_NOT_RUN = "not run: no fixer session is wired to the healing pipeline yet"
+QA_NOT_RUN = "not run: there is no fix to validate"
+PR_NOT_RUN = "not run: there is no fix to propose"
+NEEDS_A_PERSON = (
+    "No fix was generated: the healing pipeline analyses an incident but does "
+    "not run a fixer yet, so a person has to take it from here."
+)
+
+# The statuses the placeholder pipeline left behind on an incident it claimed
+# to have healed: `pr_created`, or `qa_running` when PR creation was off.
+_CLAIMED_HEALED = (HealingStatus.PR_CREATED, HealingStatus.QA_RUNNING)
+
+
+def _reopen_claimed_heal(incident: Incident) -> None:
+    """Undo what the placeholder pipeline claimed on an incident stored before F48.
+
+    It named a branch, ``self-healing/<id>``, that nothing ever created, and
+    marked the incident healed. Nothing has ever set ``fix_pr_url``, so that
+    branch name without a PR is its signature. The branch name goes; a claimed
+    heal becomes an escalation. An incident a person dismissed stays resolved,
+    and one that failed stays failed: those verdicts were not the placeholder's.
+    """
+    if incident.fix_pr_url or incident.fix_branch != f"self-healing/{incident.id}":
+        return
+    incident.fix_branch = None
+    if incident.status in _CLAIMED_HEALED:
+        incident.status = HealingStatus.ESCALATED
+        incident.resolved_at = None
+        incident.error_message = NEEDS_A_PERSON
+
 
 class IncidentResponderOrchestrator:
     """Unified orchestrator for the Self-Healing Codebase + Incident Responder system.
 
-    Coordinates all three modes and manages the complete healing lifecycle
-    from incident detection through to PR creation.
+    Coordinates all three modes and manages the healing lifecycle from
+    incident detection to escalation; fix, QA and PR are not wired yet (F48).
     """
 
     def __init__(
@@ -290,12 +329,13 @@ class IncidentResponderOrchestrator:
     async def _run_healing_pipeline(
         self, operation: HealingOperation, incident: Incident
     ) -> None:
-        """Run the full healing pipeline for an incident.
+        """Run the healing pipeline for an incident.
 
-        Steps: analyze -> fix -> QA -> PR
+        Steps: analyze -> fix -> QA -> verify -> PR
 
-        The actual agent execution is delegated to the mode-specific
-        build_agent_prompt() + the runtime system.
+        Analysis builds the mode-specific prompt and the runtime verification
+        launches the app; fix, QA and PR are not wired, so they are reported
+        `skipped` and the incident ends `escalated`, never resolved (F48).
         """
         try:
             # Step 1: Analyze
@@ -319,40 +359,130 @@ class IncidentResponderOrchestrator:
                 step, "completed", f"Prompt built ({len(prompt)} chars)"
             )
 
-            # Step 2: Create worktree and apply fix
-            step = operation.add_step("Generating fix in isolated worktree")
-            incident.status = HealingStatus.FIXING
-
-            # The actual fix generation happens via the agent runtime.
-            # The orchestrator prepares the context and delegates to the
-            # agent session system (create_agent_runtime + run_agent_session).
-            # This is a placeholder for the pipeline integration point.
-            incident.fix_branch = f"self-healing/{incident.id}"
-            operation.complete_step(
-                step, "completed", f"Fix branch: {incident.fix_branch}"
+            # Steps 2 and 3: fix and QA. Nothing runs the prompt yet, so
+            # there is no branch to name and no result to validate.
+            self._skip_step(
+                operation, "Generating fix in isolated worktree", FIX_NOT_RUN
             )
+            self._skip_step(operation, "Running QA validation", QA_NOT_RUN)
 
-            # Step 3: QA validation
-            step = operation.add_step("Running QA validation")
-            incident.status = HealingStatus.QA_RUNNING
-            operation.complete_step(step, "completed", "QA validation passed")
+            # Step 3b: the app, launched — the verification loop's
+            # deterministic half (no fixer, no driving session). With no fix
+            # applied it checks the checkout as it stands: an app that no
+            # longer starts is the first thing the person taking the incident
+            # needs to know.
+            verdict = await self._verify_runtime(operation)
+            if verdict == "fail":
+                incident.status = HealingStatus.FAILED
+                incident.error_message = "the app failed its runtime verification"
+                operation.finalize(success=False)
+                return
 
-            # Step 4: Create PR
+            # Step 4: PR. Shown only when the user asked for one, so the
+            # timeline says why there is none.
             if self.auto_create_pr:
-                step = operation.add_step("Creating pull request")
-                incident.status = HealingStatus.PR_CREATED
-                operation.complete_step(step, "completed", "PR created")
+                self._skip_step(operation, "Creating pull request", PR_NOT_RUN)
 
-            # Finalize
-            incident.resolved_at = _now_iso()
-            operation.finalize(success=True)
-            logger.info(f"Healing pipeline completed for incident {incident.id}")
+            # Nothing was fixed, so nothing is resolved.
+            incident.status = HealingStatus.ESCALATED
+            incident.error_message = NEEDS_A_PERSON
+            operation.finalize(success=False)
+            logger.info(
+                f"Incident {incident.id} analysed; no fixer is wired, escalated"
+            )
 
         except Exception as e:
             logger.error(f"Healing pipeline failed for incident {incident.id}: {e}")
             incident.status = HealingStatus.FAILED
             incident.error_message = str(e)
             operation.finalize(success=False)
+        finally:
+            # An incident cycle has ended, whichever way it ended. That is the
+            # same kind of moment the build pipeline's `observe` phase marks,
+            # so the hermes learning cycle turns here too — under its own
+            # surface, so a reviewer reading `skills/_proposed/` can tell an
+            # incident's candidate from a build's.
+            #
+            # In `finally` rather than on the success path: a pipeline that
+            # failed is not a reason to skip it. What hermes authored, it
+            # authored on Telegram or a cron job somewhere WorkPilot was not
+            # watching, and this incident's outcome says nothing about it.
+            self._observe_with_hermes(operation)
+
+    @staticmethod
+    def _skip_step(operation: HealingOperation, name: str, reason: str) -> None:
+        """Record a step the pipeline names but did not run, with why."""
+        step = operation.add_step(name)
+        operation.complete_step(step, "skipped", reason)
+
+    async def _verify_runtime(self, operation: HealingOperation) -> str:
+        """Launch the project's app and read the verdict (`verify.loop`).
+
+        Returns the record's status. Never raises: a verification that cannot
+        run is ``unknown`` and blocks nothing; only a measured failure does.
+        """
+        try:
+            from verify.loop import LoopOptions, run_verify_loop
+        except ImportError as exc:
+            logger.debug("verification unavailable: %s", exc)
+            return "unknown"
+        step = operation.add_step("Verifying the app runs")
+        try:
+            record = await run_verify_loop(
+                self.project_dir,
+                None,
+                None,
+                LoopOptions(effort="low", drive=False, mobile_build=False),
+            )
+        except Exception as exc:  # noqa: BLE001 - a verification reports
+            operation.complete_step(step, "skipped", f"could not verify: {exc}")
+            return "unknown"
+        status = str(record.get("status") or "unknown")
+        reason = str(record.get("reason") or "")
+        score = record.get("score")
+        if status == "pass":
+            detail = "app launched clean" + (
+                f", score {score}/100" if score is not None else ""
+            )
+            operation.complete_step(step, "completed", detail)
+        elif status == "fail":
+            operation.complete_step(
+                step, "failed", reason or "the app failed its verification"
+            )
+        else:
+            operation.complete_step(
+                step, "skipped", f"{status}" + (f" — {reason}" if reason else "")
+            )
+        return status
+
+    def _observe_with_hermes(self, operation: HealingOperation) -> None:
+        """Turn the hermes learning cycle, and record what it filed.
+
+        Never raises and never changes the operation's verdict — the healing
+        result was decided before this ran. A missing hermes is not a failure
+        and not a warning: it is "this feature is not in use on this machine",
+        and it costs one `is_dir()` to find out.
+        """
+        try:
+            from hermes.loop import run_cycle
+
+            result = run_cycle(self.project_dir, surface="self-healing")
+        except Exception as exc:  # noqa: BLE001 - observation never fails healing
+            logger.debug("hermes cycle unavailable: %s", exc)
+            return
+
+        if not result.ran:
+            return
+        # A step only when there is something to report. A "0 proposed" row on
+        # every incident is a row nobody reads, and the dashboard renders every
+        # step it is given.
+        if result.proposed:
+            step = operation.add_step("Filing what hermes learned")
+            operation.complete_step(
+                step,
+                "completed",
+                f"{result.proposed} candidate(s) in skills/_proposed/ for review",
+            )
 
     def _create_operation(self, incident: Incident) -> HealingOperation:
         """Create a new healing operation for an incident."""
@@ -411,6 +541,8 @@ class IncidentResponderOrchestrator:
             try:
                 data = json.loads(incidents_file.read_text(encoding="utf-8"))
                 self._incidents = [Incident.from_dict(d) for d in data]
+                for incident in self._incidents:
+                    _reopen_claimed_heal(incident)
             except (json.JSONDecodeError, KeyError) as e:
                 logger.warning(f"Failed to load incidents: {e}")
 

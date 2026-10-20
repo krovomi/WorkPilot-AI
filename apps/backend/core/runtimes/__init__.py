@@ -8,11 +8,8 @@ from pathlib import Path
 from core.runtimes.claude_sdk_runtime import ClaudeSDKRuntime
 from core.runtimes.copilot_runtime import CopilotRuntime
 
-# Ajouter le répertoire racine du projet au chemin pour pouvoir importer src.
-# NOTE: Import ProviderConfig lazily inside the factory function to avoid a
-# sys.path ordering issue: apps/backend/src/__init__.py makes `src` a regular
-# package rooted at apps/backend/src/ when apps/backend is already on sys.path,
-# which shadows the project-root src/connectors/llm_config.py.
+# ProviderConfig is imported lazily inside the factory: `src.connectors` lives
+# under the project root, which the factory puts on sys.path first.
 from core.runtimes.litellm_runtime import LiteLLMRuntime
 
 
@@ -32,7 +29,7 @@ def create_agent_runtime(
     ClaudeSDKRuntime si provider = 'anthropic-sdk', sinon LiteLLMRuntime.
     """
     if config is None:
-        # Lazy import to avoid sys.path shadowing by apps/backend/src/__init__.py
+        # Lazy import: the project root may not be on sys.path yet.
         project_root = Path(__file__).parent.parent.parent.parent.parent
         if str(project_root) not in sys.path:
             sys.path.insert(0, str(project_root))

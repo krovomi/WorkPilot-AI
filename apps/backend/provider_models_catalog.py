@@ -5,14 +5,17 @@ using the API key stored in `~/.work_pilot_ai_llm_providers.json`, applies a
 strict filter to keep only chat/reasoning models relevant to phase
 configuration, and caches the result on disk for 6 hours.
 
-On any failure (no key, network down, malformed response, unsupported
-provider) the module falls back to a small static catalog so the UI never
-sees an empty dropdown.
+Without a key — a Claude Code subscription, a Copilot login, Bedrock — the
+provider cannot be asked, so the releases come from the public model registry
+(`public_model_registry`, models.dev), filtered by the same allow-lists. Only
+when neither answers does the module fall back to the static catalog compiled
+from `models_registry.py`, so the UI never sees an empty dropdown — and a model
+released after that file was last edited still reaches it.
 
 Supported providers (with live fetching):
-    anthropic, openai, google, mistral, deepseek, grok, ollama, windsurf
+    anthropic, openai, google, mistral, deepseek, grok, ollama, lm-studio, llama-cpp
 
-Other providers (copilot, aws, meta, custom, claude, …) get the static
+Other providers (copilot, aws, meta, custom, windsurf, …) get the static
 catalog without a live fetch.
 """
 
@@ -29,11 +32,13 @@ from typing import Any
 import httpx
 
 try:
-    from .models_registry import ModelEntry, list_provider
+    from . import public_model_registry
+    from .models_registry import provider_catalog
 except ImportError:
     # Module is imported as a top-level "provider_models_catalog" (no package
     # context), e.g. by provider_api.py when apps/backend is on sys.path.
-    from models_registry import ModelEntry, list_provider  # type: ignore[no-redef]
+    import public_model_registry  # type: ignore[no-redef]
+    from models_registry import provider_catalog  # type: ignore[no-redef]
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +47,9 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 CACHE_PATH = Path.home() / ".work_pilot_ai_model_cache.json"
-CACHE_TTL_SECONDS = 24 * 60 * 60  # 24 hours — refresh manually for sooner updates
+CACHE_TTL_SECONDS = (
+    6 * 60 * 60
+)  # Automatic release discovery; manual refresh bypasses this.
 HTTP_TIMEOUT = httpx.Timeout(8.0, connect=4.0)
 
 
@@ -51,55 +58,19 @@ HTTP_TIMEOUT = httpx.Timeout(8.0, connect=4.0)
 # ---------------------------------------------------------------------------
 
 
-def _to_catalog_entry(entry: ModelEntry) -> dict[str, Any]:
-    """Convert a ModelEntry to catalog dict format."""
-    result: dict[str, Any] = {
-        "value": entry.model_id,
-        "label": entry.label,
-        "tier": entry.tier,
-    }
-    if entry.supports_thinking:
-        result["supportsThinking"] = True
-    return result
-
-
-def _build_static_fallback() -> dict[str, list[dict[str, Any]]]:
-    """Generate STATIC_FALLBACK from registry."""
-    result: dict[str, list[dict[str, Any]]] = {}
-    for provider in [
-        "anthropic",
-        "openai",
-        "google",
-        "mistral",
-        "deepseek",
-        "grok",
-        "meta",
-        "ollama",
-        "windsurf",
-        "aws",
-        "copilot",
-        "cursor",
-    ]:
-        entries = list_provider(provider)
-        result[provider] = [_to_catalog_entry(e) for e in entries]
-    return result
-
-
-STATIC_FALLBACK: dict[str, list[dict[str, Any]]] = _build_static_fallback()
-
-# Aliases — providers that share a catalog
-STATIC_FALLBACK["claude"] = STATIC_FALLBACK.get("anthropic", [])
+STATIC_FALLBACK: dict[str, list[dict[str, Any]]] = provider_catalog()
 
 
 # ---------------------------------------------------------------------------
 # Filtering rules — strict allow-list per provider
 # ---------------------------------------------------------------------------
 
-# OpenAI: modern chat / reasoning families (May 2026: GPT-5.5, GPT-5.2, GPT-5,
+# OpenAI: modern chat / reasoning families (GPT-4.1 small variants, GPT-5+,
 # o-series). Excludes embeddings, TTS, Whisper, image, moderations, gpt-3.5,
 # gpt-4-turbo, search/transcribe/realtime variants.
 _OPENAI_KEEP = re.compile(
-    r"^(gpt-5(\.\d)?|gpt-4\.1|o[34]|chatgpt-4o)(-|$)", re.IGNORECASE
+    r"^(gpt-(?:[5-9]|\d{2,})(?:\.\d+)?|gpt-4\.1|gpt-4o-mini|o\d+|chatgpt-4o)(-|$)",
+    re.IGNORECASE,
 )
 _OPENAI_DROP = re.compile(
     r"(embedding|whisper|tts|dall-?e|moderation|audio|realtime|transcribe|search|image"
@@ -110,8 +81,10 @@ _OPENAI_DROP = re.compile(
     re.IGNORECASE,
 )
 
-# Anthropic: only Claude 4.x and 3.7 (reasoning-capable lineage)
-_ANTHROPIC_KEEP = re.compile(r"^claude-(opus-4|sonnet-4|haiku-4|3-7)", re.IGNORECASE)
+# Version-independent families: the provider API establishes which releases exist.
+_ANTHROPIC_KEEP = re.compile(
+    r"^claude-(?:(?:opus|sonnet|haiku|fable)-\d+|3-7)(?:[-.]|$)", re.IGNORECASE
+)
 
 # Mistral: large/medium/small + magistral (reasoning) + devstral (coding) + pixtral-large.
 # Exclude embed/moderation/OCR/audio (voxtral)/edge variants.
@@ -136,17 +109,27 @@ _GROK_DROP = re.compile(
 # Gemini: 2.5+ pro/flash/flash-lite (covers 3.x). Allow trailing -preview /
 # -latest / dated suffixes, drop image/audio/embedding/vision-only variants.
 _GEMINI_KEEP = re.compile(
-    r"^models/gemini-(2\.5|3\.\d|[4-9])[\w.-]*$",
+    r"^models/gemini-(2\.5|[3-9]|\d{2,})[\w.-]*$",
     re.IGNORECASE,
 )
 _GEMINI_DROP = re.compile(
-    r"(image|tts|embedding|audio|nano-banana|live|vision-only)",
+    r"(image|tts|embedding|audio|nano-banana|live|vision-only|computer-use|customtools)",
+    re.IGNORECASE,
+)
+
+# Bedrock: the model ids WorkPilot sends as-is. Regional inference profiles
+# (`us.`, `eu.`, `global.` …) repeat every model five times over and are a
+# deployment choice, not a model.
+_AWS_KEEP = re.compile(
+    r"^(anthropic\.claude|meta\.llama|amazon\.nova|mistral\.|deepseek\.|openai\.)",
     re.IGNORECASE,
 )
 
 
 def _tier_for_label(label: str) -> str:
-    low = label.lower()
+    # "gemini" contains "mini": without this every Gemini, Pro included, was
+    # filed as a fast model.
+    low = label.lower().replace("gemini", "")
     if any(
         k in low
         for k in ("nano", "haiku", "flash-lite", "small", "mini", "fast", "lite")
@@ -156,6 +139,8 @@ def _tier_for_label(label: str) -> str:
         k in low
         for k in (
             "opus",
+            "fable",
+            "mythos",
             "ultra",
             "pro",
             "large",
@@ -179,9 +164,12 @@ def _tier_for_label(label: str) -> str:
 def _supports_thinking(provider: str, value: str) -> bool:
     v = value.lower()
     if provider in ("anthropic", "claude"):
-        return "opus-4" in v or "sonnet-4" in v or "3-7" in v
+        return (
+            bool(re.match(r"^claude-(?:opus|sonnet|fable)-(?:[4-9]|\d{2,})", v))
+            or "3-7" in v
+        )
     if provider == "openai":
-        return v.startswith(("o3", "o4", "gpt-5"))
+        return bool(re.match(r"^(?:o\d+|gpt-(?:[5-9]|\d{2,}))", v))
     if provider in ("google", "gemini"):
         # Gemini 2.5+ all support extended thinking ("Deep Think")
         return "2.5" in v or "3." in v or v.startswith("models/gemini-3")
@@ -249,7 +237,25 @@ def _api_key_for(provider: str) -> str | None:
         logger.debug("llm_config unavailable: %s", e)
         return None
     cfg = load_provider_config(provider) or {}
+    aliases = {
+        "claude": ("anthropic",),
+        "anthropic": ("claude",),
+        "gemini": ("google",),
+        "google": ("gemini",),
+    }
     key = cfg.get("api_key") or os.environ.get(f"{provider.upper()}_API_KEY")
+    for alias in aliases.get(provider, ()):
+        if not key:
+            key = (load_provider_config(alias) or {}).get("api_key")
+    if not key and provider in aliases:
+        key = next(
+            (
+                os.environ.get(f"{alias.upper()}_API_KEY")
+                for alias in aliases[provider]
+                if os.environ.get(f"{alias.upper()}_API_KEY")
+            ),
+            None,
+        )
     return key.strip() if isinstance(key, str) and key.strip() else None
 
 
@@ -258,10 +264,24 @@ def _fetch_anthropic() -> list[dict[str, Any]]:
     if not key:
         return []
     headers = {"x-api-key": key, "anthropic-version": "2023-06-01"}
+    items: list[dict[str, Any]] = []
     with httpx.Client(timeout=HTTP_TIMEOUT) as client:
-        resp = client.get("https://api.anthropic.com/v1/models", headers=headers)
-    resp.raise_for_status()
-    items = resp.json().get("data", [])
+        cursor = None
+        seen: set[str] = set()
+        while True:
+            params = {"after_id": cursor} if cursor else {}
+            resp = client.get(
+                "https://api.anthropic.com/v1/models", headers=headers, params=params
+            )
+            resp.raise_for_status()
+            page = resp.json()
+            items.extend(page.get("data", []))
+            if not page.get("has_more"):
+                break
+            cursor = page.get("last_id")
+            if not cursor or cursor in seen or len(seen) >= 20:
+                raise ValueError("Invalid model catalog pagination")
+            seen.add(cursor)
     out: list[dict[str, Any]] = []
     for it in items:
         mid = it.get("id", "")
@@ -331,9 +351,7 @@ def _humanize_openai(mid: str) -> str:
         if "-" in rest:
             version, suffix = rest.split("-", 1)
             suffix_pretty = (
-                suffix.replace("pro", "Pro")
-                .replace("mini", "mini")
-                .replace("nano", "nano")
+                suffix.title().replace("mini", "mini").replace("nano", "nano")
             )
             return f"GPT-{version} {suffix_pretty}"
         return f"GPT-{rest}"
@@ -342,33 +360,36 @@ def _humanize_openai(mid: str) -> str:
     return mid
 
 
-def _openai_sort_key(mid: str) -> tuple[int, str]:
-    """Order so the most capable / most recent appears first."""
-    # Higher GPT version → smaller sort index
-    if mid.startswith("gpt-5.5"):
-        return (0, mid)
-    if mid.startswith("gpt-5.2"):
-        return (1, mid)
-    if mid.startswith("gpt-5"):
-        return (2, mid)
-    family_order = {"o4": 3, "o3": 4, "gpt-4.1": 5, "chatgpt-4o": 6}
-    for prefix, order in family_order.items():
-        if mid.startswith(prefix):
-            return (order, mid)
-    return (99, mid)
+def _openai_sort_key(mid: str) -> tuple[int, int, int, str]:
+    """Sort versions numerically so future releases need no code update."""
+    version = re.match(r"gpt-(\d+)(?:\.(\d+))?", mid)
+    if version:
+        return (0, -int(version[1]), -int(version[2] or 0), mid)
+    return (1, 0, 0, mid)
 
 
 def _fetch_google() -> list[dict[str, Any]]:
     key = _api_key_for("google") or _api_key_for("gemini")
     if not key:
         return []
+    items: list[dict[str, Any]] = []
     with httpx.Client(timeout=HTTP_TIMEOUT) as client:
-        resp = client.get(
-            "https://generativelanguage.googleapis.com/v1beta/models",
-            params={"key": key},
-        )
-    resp.raise_for_status()
-    items = resp.json().get("models", [])
+        params = {"key": key}
+        seen: set[str] = set()
+        while True:
+            resp = client.get(
+                "https://generativelanguage.googleapis.com/v1beta/models", params=params
+            )
+            resp.raise_for_status()
+            page = resp.json()
+            items.extend(page.get("models", []))
+            token = page.get("nextPageToken")
+            if not token:
+                break
+            if token in seen or len(seen) >= 20:
+                raise ValueError("Invalid model catalog pagination")
+            seen.add(token)
+            params["pageToken"] = token
     out: list[dict[str, Any]] = []
     for it in items:
         name = it.get("name", "")  # "models/gemini-3.1-pro"
@@ -402,9 +423,24 @@ def _fetch_openai_compatible(
     key = _api_key_for(provider)
     if not key:
         return []
+    configured = {}
+    try:
+        from src.connectors.llm_config import load_provider_config
+
+        configured = load_provider_config(provider) or {}
+    except Exception:  # noqa: BLE001 - optional custom API base
+        pass
+    if configured.get("base_url"):
+        base_url = str(configured["base_url"]).rstrip("/")
+    if base_url.endswith("/v1"):
+        models_url = f"{base_url}/models"
+    elif base_url.endswith("/v1/models"):
+        models_url = base_url
+    else:
+        models_url = f"{base_url.rstrip('/')}/v1/models"
     with httpx.Client(timeout=HTTP_TIMEOUT) as client:
         resp = client.get(
-            f"{base_url.rstrip('/')}/v1/models",
+            models_url,
             headers={"Authorization": f"Bearer {key}"},
         )
     resp.raise_for_status()
@@ -429,40 +465,60 @@ def _fetch_openai_compatible(
 
 def _fetch_mistral() -> list[dict[str, Any]]:
     return _fetch_openai_compatible(
-        "mistral", "https://api.mistral.ai", _MISTRAL_KEEP, _MISTRAL_DROP
+        "mistral",
+        os.environ.get("MISTRAL_BASE_URL", "https://api.mistral.ai"),
+        _MISTRAL_KEEP,
+        _MISTRAL_DROP,
     )
 
 
 def _fetch_deepseek() -> list[dict[str, Any]]:
     return _fetch_openai_compatible(
-        "deepseek", "https://api.deepseek.com", _DEEPSEEK_KEEP
+        "deepseek",
+        os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
+        _DEEPSEEK_KEEP,
     )
 
 
 def _fetch_grok() -> list[dict[str, Any]]:
-    return _fetch_openai_compatible("grok", "https://api.x.ai", _GROK_KEEP, _GROK_DROP)
+    return _fetch_openai_compatible(
+        "grok",
+        os.environ.get("GROK_BASE_URL", "https://api.x.ai"),
+        _GROK_KEEP,
+        _GROK_DROP,
+    )
 
 
-def _local_llm_root() -> str:
+def _local_llm_root(provider: str = "ollama") -> str:
     """Resolve the local LLM server root (no path), honouring env + saved config.
 
     Covers any OpenAI-compatible local server: Ollama (11434), LM Studio (1234),
     llama.cpp, vLLM, LocalAI. Falls back to the Ollama default.
     """
-    root = (
-        os.environ.get("OLLAMA_BASE_URL")
-        or os.environ.get("LOCAL_LLM_BASE_URL")
-        or os.environ.get("LMSTUDIO_BASE_URL")
-    )
+    provider = {
+        "lmstudio": "lm-studio",
+        "local": "ollama",
+        "llamacpp": "llama-cpp",
+    }.get(provider, provider)
+    env_name, default = {
+        "ollama": ("OLLAMA_BASE_URL", "http://localhost:11434"),
+        "lm-studio": ("LMSTUDIO_BASE_URL", "http://localhost:1234"),
+        "llama-cpp": ("LLAMA_CPP_BASE_URL", "http://localhost:8080"),
+    }[provider]
+    root = os.environ.get(env_name)
+    if not root and provider == "ollama":
+        root = os.environ.get("LOCAL_LLM_BASE_URL")
     if not root:
         try:
             from src.connectors.llm_config import load_provider_config
 
-            cfg = load_provider_config("ollama") or load_provider_config("local") or {}
+            cfg = load_provider_config(provider) or {}
+            if not cfg and provider == "ollama":
+                cfg = load_provider_config("local") or {}
             root = cfg.get("base_url")
         except Exception:  # noqa: BLE001
             root = None
-    root = (root or "http://localhost:11434").strip().rstrip("/")
+    root = (root or default).strip().rstrip("/")
     # Strip an OpenAI-style suffix so we have the bare server root.
     if root.endswith("/chat/completions"):
         root = root[: -len("/chat/completions")].rstrip("/")
@@ -471,17 +527,17 @@ def _local_llm_root() -> str:
     return root
 
 
-def _fetch_ollama() -> list[dict[str, Any]]:
+def _fetch_ollama(provider: str = "ollama") -> list[dict[str, Any]]:
     """List models from any OpenAI-compatible local server.
 
     Tries the OpenAI-compatible ``/v1/models`` endpoint first (works for LM
     Studio *and* Ollama), then falls back to Ollama's native ``/api/tags``.
     """
-    root = _local_llm_root()
+    root = _local_llm_root(provider)
 
     # Tag each model with tool-calling support (hide non-tool models) and its
     # parameter size (warn that a small model is weak for planning).
-    from ollama_model_detector import model_meta
+    from ollama_model_detector import is_embedding_model, model_meta
 
     def _entry(name: str) -> dict[str, Any]:
         meta = model_meta(root, name)
@@ -489,7 +545,11 @@ def _fetch_ollama() -> list[dict[str, Any]]:
             "value": name,
             "label": name,
             "tier": "local",
-            "supports_tools": meta["supports_tools"],
+            **(
+                {"supports_tools": meta["supports_tools"]}
+                if meta.get("tools_known", True)
+                else {}
+            ),
             "param_b": meta["param_b"],
         }
 
@@ -500,22 +560,25 @@ def _fetch_ollama() -> list[dict[str, Any]]:
         resp.raise_for_status()
         items = resp.json().get("data", [])
         out: list[dict[str, Any]] = [
-            _entry(it.get("id", "")) for it in items if it.get("id")
+            _entry(it.get("id", ""))
+            for it in items
+            if it.get("id") and not is_embedding_model(it["id"])
         ]
-        if out:
+        if out or provider != "ollama":
             return out
     except (httpx.HTTPError, OSError, ValueError, KeyError):
         pass
 
     # 2) Ollama-native endpoint
-    try:
-        with httpx.Client(timeout=HTTP_TIMEOUT) as client:
-            resp = client.get(f"{root}/api/tags")
-        resp.raise_for_status()
-    except (httpx.HTTPError, OSError):
-        return []
+    with httpx.Client(timeout=HTTP_TIMEOUT) as client:
+        resp = client.get(f"{root}/api/tags")
+    resp.raise_for_status()
     items = resp.json().get("models", [])
-    return [_entry(it.get("name", "")) for it in items if it.get("name")]
+    return [
+        _entry(it["name"])
+        for it in items
+        if it.get("name") and not is_embedding_model(it["name"])
+    ]
 
 
 def _fetch_windsurf() -> list[dict[str, Any]]:
@@ -537,7 +600,97 @@ _FETCHERS = {
     "grok": _fetch_grok,
     "ollama": _fetch_ollama,
     "windsurf": _fetch_windsurf,
+    "local": _fetch_ollama,
+    "lmstudio": lambda: _fetch_ollama("lm-studio"),
+    "lm-studio": lambda: _fetch_ollama("lm-studio"),
+    "llama-cpp": lambda: _fetch_ollama("llama-cpp"),
 }
+
+
+# ---------------------------------------------------------------------------
+# Public registry (no key): the same allow-lists as the live fetchers
+# ---------------------------------------------------------------------------
+
+
+def _registry_allows(provider: str, mid: str) -> bool:
+    """Whether a registry id would survive the provider's own live filter.
+
+    One filter for both sources on purpose: the registry lists embeddings,
+    image and speech models too, and a second, looser rule here would put in
+    the dropdown exactly what the live path was written to keep out of it.
+    """
+    if provider == "anthropic":
+        return bool(_ANTHROPIC_KEEP.search(mid))
+    if provider == "openai":
+        return bool(_OPENAI_KEEP.match(mid)) and not _OPENAI_DROP.search(mid)
+    if provider == "google":
+        name = f"models/{mid}"
+        return bool(_GEMINI_KEEP.match(name)) and not _GEMINI_DROP.search(name)
+    if provider == "mistral":
+        return bool(_MISTRAL_KEEP.search(mid)) and not _MISTRAL_DROP.search(mid)
+    if provider == "deepseek":
+        return bool(_DEEPSEEK_KEEP.search(mid))
+    if provider == "grok":
+        return bool(_GROK_KEEP.search(mid)) and not _GROK_DROP.search(mid)
+    if provider == "aws":
+        return bool(_AWS_KEEP.match(mid))
+    # Copilot has no live fetcher to mirror; the registry's own "calls tools,
+    # reads and writes text, not deprecated" rule is the filter.
+    return True
+
+
+def _registry_label(name: str) -> str:
+    # "Claude Haiku 4.5 (latest)" — the id already says it is the alias.
+    return re.sub(r"\s*\(latest\)$", "", name).strip()
+
+
+def _registry_entry(provider: str, record: dict[str, Any]) -> dict[str, Any] | None:
+    """One registry record as a catalogue entry, or ``None`` if it is filtered out."""
+    mid = record["id"]
+    if not _registry_allows(provider, mid):
+        return None
+    name = record.get("name")
+    label = _registry_label(name if isinstance(name, str) else "") or mid
+    return {
+        "value": mid,
+        "label": label,
+        "tier": _tier_for_label(label if provider != "openai" else mid),
+        # The registry records whether the model reasons; the id heuristic
+        # only covers the families that existed when it was written.
+        "supportsThinking": record.get("reasoning") is True
+        or _supports_thinking(provider, mid),
+    }
+
+
+def _with_static(provider: str, found: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The registry adds, it never removes.
+
+    A model the static catalogue knows and the registry does not list (it is
+    community-maintained, and lags on some providers) stays offered. Where both
+    know an id, the curated tier wins — it was decided, the keyword heuristic
+    only guessed.
+    """
+    static = {m["value"]: m for m in STATIC_FALLBACK.get(provider, [])}
+    for entry in found:
+        known = static.pop(entry["value"], None)
+        if known and known.get("tier"):
+            entry["tier"] = known["tier"]
+    return found + list(static.values())
+
+
+def _fetch_registry(
+    provider: str, *, force_refresh: bool = False
+) -> tuple[list[dict[str, Any]], float] | None:
+    found = public_model_registry.models_for(provider, force_refresh=force_refresh)
+    if not found:
+        return None
+    records, fetched_at = found
+    out = [e for e in (_registry_entry(provider, r) for r in records) if e]
+    if not out:
+        return None
+    if provider == "openai":
+        out.sort(key=lambda m: _openai_sort_key(m["value"]))
+    return _with_static(provider, out), fetched_at
 
 
 # ---------------------------------------------------------------------------
@@ -553,18 +706,49 @@ def list_models(provider: str, *, force_refresh: bool = False) -> dict[str, Any]
         {
             "provider": str,
             "models": [{"value", "label", "tier", "supportsThinking"?}, …],
-            "source": "live" | "cache" | "static",
-            "fetchedAt": float | None,    # epoch seconds when source=cache/live
+            "source": "live" | "cache" | "registry" | "static",
+            "fetchedAt": float | None,    # epoch seconds, except for static
             "error": str | None,          # populated when fetch failed
         }
     """
-    provider = (provider or "").lower()
+    provider = (provider or "").strip().lower()
+    if provider == "openai-codex":
+        from codex_models import codex_model_catalog
+
+        codex_catalog = codex_model_catalog(force_refresh=force_refresh)
+        if not _api_key_for("openai"):
+            return codex_catalog
+
+        # Keep Codex account IDs first and authoritative. API-only models can
+        # be displayed alongside them when an API key exists; the client
+        # factory routes those IDs to the API client.
+        api_catalog = list_models("openai", force_refresh=force_refresh)
+        if api_catalog.get("source") not in {"live", "cache"}:
+            return codex_catalog
+        seen = {m.get("value") for m in codex_catalog.get("models", [])}
+        combined = list(codex_catalog.get("models", []))
+        combined.extend(
+            model
+            for model in api_catalog.get("models", [])
+            if model.get("value") not in seen
+        )
+        return {**codex_catalog, "models": combined}
+    if provider in {"anthropic", "claude"}:
+        provider = "anthropic"
+    elif provider in {"google", "gemini"}:
+        provider = "google"
+    provider = {
+        "claude": "anthropic",
+        "gemini": "google",
+        "lmstudio": "lm-studio",
+        "llamacpp": "llama-cpp",
+    }.get(provider, provider)
 
     # Local servers (Ollama / LM Studio / …) change their installed-model list
     # frequently and answer instantly, so a 24h-cached list goes stale and shows
     # the wrong "installed" set. Always fetch them live and never fall back to a
     # stale cache for them.
-    is_local = provider in {"ollama", "local", "lmstudio"}
+    is_local = provider in {"ollama", "local", "lm-studio", "llama-cpp"}
     if is_local:
         force_refresh = True
 
@@ -586,8 +770,9 @@ def list_models(provider: str, *, force_refresh: bool = False) -> dict[str, Any]
     if fetcher is not None:
         try:
             models = fetcher()
-            if models:
-                _store_cache_entry(provider, models)
+            if models or is_local:
+                if not is_local:
+                    _store_cache_entry(provider, models)
                 return {
                     "provider": provider,
                     "models": models,
@@ -598,11 +783,37 @@ def list_models(provider: str, *, force_refresh: bool = False) -> dict[str, Any]
         except httpx.HTTPStatusError as e:
             error = f"HTTP {e.response.status_code}"
             logger.warning("Live model fetch failed for %s: %s", provider, error)
-        except (httpx.HTTPError, ValueError, KeyError) as e:
+        except (httpx.HTTPError, OSError, ValueError, KeyError) as e:
             error = type(e).__name__
             logger.warning("Live model fetch failed for %s: %s", provider, e)
 
-    # 3) Stale cache (better than nothing) — but never for local providers, where
+    # 3) The public registry: what the provider has released, without its key.
+    # Before the stale cache, because a cache that failed to refresh is older
+    # knowledge of the same thing — and after the live fetch, because only the
+    # provider can say what this account may call. Never for local runtimes,
+    # whose list is what is installed on this machine.
+    registry = None
+    if not is_local:
+        try:
+            registry = _fetch_registry(provider, force_refresh=force_refresh)
+        except Exception as e:  # noqa: BLE001 — a best-effort source never fails a dropdown
+            # `provider` is the URL path segment: no line breaks into the log.
+            safe = provider.replace("\r", "").replace("\n", "")
+            logger.warning(
+                "Public model registry unusable for %s: %s", safe, type(e).__name__
+            )
+            error = error or type(e).__name__
+    if registry:
+        models, fetched_at = registry
+        return {
+            "provider": provider,
+            "models": models,
+            "source": "registry",
+            "fetchedAt": fetched_at,
+            "error": error,
+        }
+
+    # 4) Stale cache (better than nothing) — but never for local providers, where
     # a stale list would falsely mark uninstalled models as installed.
     cache = None if is_local else _read_cache().get(provider)
     if cache and cache.get("models"):
@@ -614,7 +825,7 @@ def list_models(provider: str, *, force_refresh: bool = False) -> dict[str, Any]
             "error": error,
         }
 
-    # 4) Static fallback
+    # 5) Static fallback
     return {
         "provider": provider,
         "models": STATIC_FALLBACK.get(provider, []),

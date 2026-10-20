@@ -212,8 +212,7 @@ Your spec file is located at: `{spec_dir}/spec.md`
 
 You MUST use the Write tool to create these files in the spec directory:
 - `{spec_dir}/implementation_plan.json` - Subtask-based implementation plan (USE WRITE TOOL!)
-- `{spec_dir}/build-progress.txt` - Progress notes (USE WRITE TOOL!)
-- `{spec_dir}/init.sh` - Environment setup script (USE WRITE TOOL!)
+- `{spec_dir}/init.sh` - Environment setup script, only if missing (USE WRITE TOOL!)
 
 DO NOT just describe what these files should contain. You MUST actually call the Write tool
 with the file path and complete content to create them.
@@ -224,136 +223,6 @@ The project root is the parent of auto-claude/. Implement code in the project ro
 
 """
     return spec_context + prompt
-
-
-def get_coding_prompt(spec_dir: Path) -> str:
-    """
-    Load the coding agent prompt with spec path injected.
-
-    Args:
-        spec_dir: Directory containing the spec.md and implementation_plan.json
-
-    Returns:
-        The coding agent prompt content with spec path
-    """
-    prompt_file = PROMPTS_DIR / "coder.md"
-
-    if not prompt_file.exists():
-        raise FileNotFoundError(
-            f"Coding prompt not found at {prompt_file}\n"
-            "Make sure the auto-claude/prompts/coder.md file exists."
-        )
-
-    prompt = prompt_file.read_text(encoding="utf-8")
-
-    # Keep the coder prompt in sync with the Coverage Enforcement Gate threshold.
-    prompt = prompt.replace("{{MIN_COVERAGE}}", str(_min_coverage()))
-
-    spec_context = f"""## SPEC LOCATION
-
-Your spec and progress files are located at:
-- Spec: `{spec_dir}/spec.md`
-- Implementation plan: `{spec_dir}/implementation_plan.json`
-- Progress notes: `{spec_dir}/build-progress.txt`
-- Recovery context: `{spec_dir}/memory/attempt_history.json`
-
-The project root is the parent of auto-claude/. All code goes in the project root, not in the spec directory.
-
----
-
-"""
-
-    # Check for recovery context (stuck subtasks, retry hints)
-    recovery_context = _get_recovery_context(spec_dir)
-    if recovery_context:
-        spec_context += recovery_context
-
-    # Check for human input file
-    human_input_file = spec_dir / "HUMAN_INPUT.md"
-    if human_input_file.exists():
-        human_input = human_input_file.read_text(encoding="utf-8").strip()
-        if human_input:
-            spec_context += f"""## HUMAN INPUT (READ THIS FIRST!)
-
-The human has left you instructions. READ AND FOLLOW THESE CAREFULLY:
-
-{human_input}
-
-After addressing this input, you may delete or clear the HUMAN_INPUT.md file.
-
----
-
-"""
-
-    return spec_context + prompt
-
-
-def _get_recovery_context(spec_dir: Path) -> str:
-    """
-    Get recovery context if there are failed attempts or stuck subtasks.
-
-    Args:
-        spec_dir: Spec directory containing memory/
-
-    Returns:
-        Recovery context string or empty string
-    """
-    import json
-
-    attempt_history_file = spec_dir / "memory" / "attempt_history.json"
-
-    if not attempt_history_file.exists():
-        return ""
-
-    try:
-        with open(attempt_history_file, encoding="utf-8") as f:
-            history = json.load(f)
-
-        # Check for stuck subtasks
-        stuck_subtasks = history.get("stuck_subtasks", [])
-        if stuck_subtasks:
-            context = """## ⚠️ RECOVERY ALERT - STUCK SUBTASKS DETECTED
-
-Some subtasks have been attempted multiple times without success. These subtasks need:
-- A COMPLETELY DIFFERENT approach
-- Possibly simpler implementation
-- Or escalation to human if infeasible
-
-Stuck subtasks:
-"""
-            for stuck in stuck_subtasks:
-                context += f"- {stuck['subtask_id']}: {stuck['reason']} ({stuck['attempt_count']} attempts)\n"
-
-            context += "\nBefore working on any subtask, check memory/attempt_history.json for previous attempts!\n\n---\n\n"
-            return context
-
-        # Check for subtasks with multiple attempts
-        subtasks_with_retries = []
-        for subtask_id, subtask_data in history.get("subtasks", {}).items():
-            attempts = subtask_data.get("attempts", [])
-            if len(attempts) > 1 and subtask_data.get("status") != "completed":
-                subtasks_with_retries.append((subtask_id, len(attempts)))
-
-        if subtasks_with_retries:
-            context = """## ⚠️ RECOVERY CONTEXT - RETRY AWARENESS
-
-Some subtasks have been attempted before. When working on these:
-1. READ memory/attempt_history.json for the specific subtask
-2. See what approaches were tried
-3. Use a DIFFERENT approach
-
-Subtasks with previous attempts:
-"""
-            for subtask_id, attempt_count in subtasks_with_retries:
-                context += f"- {subtask_id}: {attempt_count} attempts\n"
-
-            context += "\n---\n\n"
-            return context
-
-        return ""
-
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
-        return ""
 
 
 def get_followup_planner_prompt(spec_dir: Path) -> str:
@@ -470,6 +339,107 @@ def _load_prompt_file(filename: str) -> str:
     return prompt_file.read_text(encoding="utf-8")
 
 
+def constitution_section(project_dir: Path) -> str:
+    """The house rules of a spec-kit project, when the target project is one.
+
+    One `is_file()` for every other project, and "" for it. See
+    `project.spec_kit` for why only the constitution is read and not the rest
+    of spec-kit's artifacts.
+
+    Public and single: the planner, every coding subtask, the QA reviewer and
+    the workflow's skill phases all need the same section, and four copies of
+    a three-line wrapper is four places to forget the guard.
+    """
+    try:
+        from project.spec_kit import format_constitution_for_prompt
+
+        return format_constitution_for_prompt(project_dir)
+    except Exception:  # noqa: BLE001 - a missing section never stops a phase
+        return ""
+
+
+def mobile_section(project_dir: Path) -> str:
+    """What a phone application adds to a phase's prompt, when it is one.
+
+    Public and single for the same reason `constitution_section` is: the
+    planner, every coding subtask and the QA reviewer need the identical
+    section, and a phase that gets it wrong plans against commands that do not
+    build. One `detect_stack` for every other project, and "" for it.
+    """
+    try:
+        from mobile import mobile_section as _section
+
+        return _section(project_dir)
+    except Exception:  # noqa: BLE001 - a missing section never stops a phase
+        return ""
+
+
+def docintel_section(project_dir: Path, spec_dir: Path | None = None) -> str:
+    """The project's accepted ADRs, and what the task's attachments say.
+
+    Public and single for the same reason as the two above: the planner, every
+    coding subtask, the QA reviewer and the workflow's skill phases need the
+    identical section. Empty for a project with no ADRs and a task with no
+    attachments, which is most of them.
+    """
+    try:
+        from docintel import docintel_section as _section
+
+        return _section(project_dir, spec_dir)
+    except Exception:  # noqa: BLE001 - a missing section never stops a phase
+        return ""
+
+
+def uiux_section(
+    spec_dir: Path | None, subtask: dict | None = None, *, role: str = "coder"
+) -> str:
+    """The design system of a UI task (ui-ux-pro-max), or nothing.
+
+    Public and single like the three above: the coder (per subtask), the QA
+    reviewer and the workflow's skill phases read the identical section. Empty
+    on a task — or a subtask — that does not touch the interface, which is what
+    keeps a backend task from paying for it.
+    """
+    try:
+        from uiux import uiux_section as _section
+
+        return _section(spec_dir, subtask, role=role)
+    except Exception:  # noqa: BLE001 - a missing section never stops a phase
+        return ""
+
+
+def verify_section(spec_dir: Path | None) -> str:
+    """The runtime verification's record (`verify.prompt`), for QA.
+
+    Empty when no verification ran. Never raises: a missing section never stops
+    a phase.
+    """
+    try:
+        from verify.prompt import verify_section as _section
+
+        return _section(spec_dir)
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def workflow_reports_section(
+    spec_dir: Path | None, consumer: str, *, inline: bool = True
+) -> str:
+    """What the skill phases before `consumer` reported (`workflows.handoff`).
+
+    `consumer` is `planning`, `coding` or `qa`. Public and single like the
+    sections above: the planner, every coder subtask and the QA reviewer read
+    it, and each skill phase's report is otherwise read by nobody. Empty when
+    no such phase ran. Never raises.
+    """
+    try:
+        from workflows.handoff import handoff_section
+
+        return handoff_section(spec_dir, consumer, inline=inline)
+    except Exception:  # noqa: BLE001 - a missing section never stops a phase
+        return ""
+
+
 def get_qa_reviewer_prompt(spec_dir: Path, project_dir: Path) -> str:
     """
     Load the QA reviewer prompt with project-specific MCP tools dynamically injected.
@@ -571,6 +541,45 @@ This shows only changes made in the spec branch since it diverged from `{base_br
 
     spec_context += "---\n\n"
 
+    # A spec-kit project's own binding rules. The planner and the coder already
+    # get them; QA is the phase that decides whether the result is acceptable,
+    # and a reviewer judging against conventions it inferred from the codebase
+    # while the project has written its rules down is judging the wrong thing.
+    # Empty for every project without `.specify/`.
+    if constitution := constitution_section(project_dir):
+        spec_context += constitution + "\n\n---\n\n"
+
+    # A phone application is not validated the way a web app is: there is no
+    # URL to open, the evidence is a screenshot from a device, and one of the
+    # two platforms may not be buildable on this machine at all. A reviewer
+    # that does not know which is which reports "could not verify" as a defect.
+    if mobile := mobile_section(project_dir):
+        spec_context += mobile + "\n\n---\n\n"
+
+    # The decisions the project wrote down, and the mockup or diagram the
+    # person attached to the task: the two things a reviewer judging only the
+    # diff against the spec text cannot see.
+    if documents := docintel_section(project_dir, spec_dir):
+        spec_context += documents + "\n\n---\n\n"
+
+    # The design system the coder was told to build against, and upstream's
+    # pre-delivery checklist, so the UI files of the diff are judged against
+    # the same palette and rules. Empty when the task is not about the UI.
+    if design := uiux_section(spec_dir, role="qa"):
+        spec_context += design + "\n\n---\n\n"
+
+    # What the review phase found, from a reader that did not write the code.
+    # Claims to verify, not verdicts: this reviewer still decides. Without it,
+    # the review session was paid for and its report read by nobody.
+    if reports := workflow_reports_section(spec_dir, "qa"):
+        spec_context += reports + "\n\n---\n\n"
+
+    # The app this task changed, launched and driven before review: what it
+    # printed, the state it reached, the endpoints it answered. Evidence the
+    # reviewer can cite instead of redoing — and a failure it must report.
+    if verification := verify_section(spec_dir):
+        spec_context += verification + "\n\n---\n\n"
+
     # Find injection point in base prompt (after PHASE 4, before PHASE 5)
     injection_marker = (
         "<!-- PROJECT-SPECIFIC VALIDATION TOOLS WILL BE INJECTED HERE -->"
@@ -626,7 +635,62 @@ The project root is: `{project_dir}`
 ---
 
 """
+    if verification := verify_section(spec_dir):
+        spec_context += verification + "\n\n---\n\n"
     return spec_context + base_prompt
+
+
+def get_architecture_map_prompt(
+    archify_root: Path,
+    output_path: Path,
+    evidence_section: str,
+    baseline_section: str = "",
+) -> str:
+    """The prompt that authors an archify architecture model.
+
+    `baseline_section` is empty for a project's first model and carries the
+    delta contract — the base model plus the keep-every-id rule — when the model
+    being written is the "after" side of a comparison. Two prompts would drift;
+    one prompt with a section that is sometimes empty cannot.
+    """
+    prompt = _load_prompt_file("architecture_visualizer.md")
+    prompt = prompt.replace("{{ARCHIFY_ROOT}}", str(archify_root))
+    prompt = prompt.replace("{{OUTPUT_PATH}}", str(output_path))
+    prompt = prompt.replace("{{EVIDENCE}}", evidence_section)
+    prompt = prompt.replace("{{BASELINE}}", baseline_section)
+    return prompt
+
+
+def get_architecture_delta_section(
+    baseline_json: str,
+    task_summary: str,
+    changed_files: list[str],
+) -> str:
+    """The "you are updating an existing model" half of the authoring prompt."""
+    listing = (
+        "\n".join(f"- `{path}`" for path in changed_files[:200])
+        or "_The set of changed files could not be determined._"
+    )
+    section = _load_prompt_file("architecture_map_delta.md")
+    section = section.replace("{{BASELINE_JSON}}", baseline_json)
+    section = section.replace(
+        "{{TASK_SUMMARY}}", task_summary.strip() or "_No summary available._"
+    )
+    section = section.replace("{{CHANGED_FILES}}", listing)
+    return section
+
+
+def get_architecture_repair_prompt(
+    output_path: Path,
+    diagnostics: list[dict],
+) -> str:
+    """The follow-up pass after `archify validate` refused a candidate."""
+    prompt = _load_prompt_file("architecture_map_repair.md")
+    prompt = prompt.replace("{{OUTPUT_PATH}}", str(output_path))
+    prompt = prompt.replace(
+        "{{DIAGNOSTICS}}", json.dumps(diagnostics, indent=2, default=str)
+    )
+    return prompt
 
 
 def get_architecture_reviewer_prompt(

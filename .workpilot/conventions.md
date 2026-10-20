@@ -122,7 +122,7 @@ This file defines project-specific conventions and patterns that all AI agents m
 
 ### External Services
 - grepai for semantic search (localhost:9000)
-- Graphiti for memory system
+- The shared brain (`brain/project_memory.py`) for the memory system
 - GitHub/GitLab for issue tracking
 
 ### Internal APIs

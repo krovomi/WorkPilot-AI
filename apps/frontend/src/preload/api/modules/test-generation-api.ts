@@ -1,4 +1,11 @@
 import { type IpcRendererEvent, ipcRenderer } from "electron";
+import type {
+	PackageInstallReport,
+	TestDestination,
+	TestGenerationError,
+	TestGenStageEvent,
+	TestLibrarySelection,
+} from "../../../shared/types/test-generation";
 
 /**
  * Test Generation API
@@ -6,17 +13,13 @@ import { type IpcRendererEvent, ipcRenderer } from "electron";
  * Provides access to test generation functionality from the renderer process.
  */
 
-/** A live pipeline-stage event streamed during generation. */
-export interface TestGenStageEvent {
-	type: "stage";
-	stage: "detect" | "read" | "generate" | "write" | "done";
-	status?: "done";
-	detail?: string;
-	language?: string;
-	framework?: string;
-	path?: string;
-	tests?: number;
-}
+export type {
+	PackageInstallReport,
+	TestDestination,
+	TestGenerationError,
+	TestGenStageEvent,
+	TestLibrarySelection,
+};
 
 export interface TestGenerationAPI {
 	analyzeTestCoverage: (
@@ -24,22 +27,70 @@ export interface TestGenerationAPI {
 		existingTestPath?: string,
 		projectPath?: string,
 	) => Promise<{ success: boolean; error?: string }>;
+	/**
+	 * Where the tests for `filePath` would be written, resolved from the
+	 * project's layout before a generation starts. `destination.status ===
+	 * "needs_choice"` means the project has no test directory and the user
+	 * should be asked; the answer goes back as the `testDir` argument below.
+	 */
+	resolveTestDestination: (
+		filePath: string,
+		projectPath?: string,
+		existingTestPath?: string,
+	) => Promise<{
+		success: boolean;
+		destination?: TestDestination | null;
+		error?: string;
+	}>;
+	/**
+	 * What the tests would be written against: the catalogue, what the project
+	 * already references, and the resulting selection. Filesystem only.
+	 */
+	resolveTestLibraries: (
+		filePath?: string,
+		projectPath?: string,
+		selected?: string[],
+	) => Promise<{
+		success: boolean;
+		libraries?: TestLibrarySelection | null;
+		error?: string;
+	}>;
+	/**
+	 * Add the chosen-but-absent packages to the project's test project. Never
+	 * called by a generation — only from an explicit user action.
+	 */
+	addTestPackages: (
+		selected: string[],
+		projectPath: string,
+		testDir?: string,
+		filePath?: string,
+	) => Promise<{
+		success: boolean;
+		report?: PackageInstallReport | null;
+		error?: string;
+	}>;
 	generateUnitTests: (
 		filePath: string,
 		existingTestPath?: string,
 		coverageTarget?: number,
 		projectPath?: string,
+		testDir?: string,
+		testLibraries?: string[],
 	) => Promise<{ success: boolean; error?: string }>;
 	generateE2ETests: (
 		userStory: string,
 		targetModule: string,
 		projectPath?: string,
+		testDir?: string,
+		testLibraries?: string[],
 	) => Promise<{ success: boolean; error?: string }>;
 	generateTDDTests: (
 		description: string,
 		language: string,
 		snippetType: string,
 		projectPath?: string,
+		testDir?: string,
+		testLibraries?: string[],
 	) => Promise<{ success: boolean; error?: string }>;
 	cancelTestGeneration: () => Promise<{
 		success: boolean;
@@ -47,7 +98,14 @@ export interface TestGenerationAPI {
 		error?: string;
 	}>;
 	onTestGenerationStatus: (callback: (status: string) => void) => void;
-	onTestGenerationError: (callback: (error: string) => void) => void;
+	/**
+	 * Failures, as a structured payload (message + code + stage + details).
+	 * Older main processes send a bare string; consumers normalise with
+	 * ``normalizeTestGenerationError`` rather than assuming either shape.
+	 */
+	onTestGenerationError: (
+		callback: (error: TestGenerationError | string) => void,
+	) => void;
 	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 	onTestGenerationResult: (callback: (result: any) => void) => void;
 	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
@@ -62,7 +120,7 @@ export interface TestGenerationAPI {
 		callback: (status: string) => void,
 	) => void;
 	removeTestGenerationErrorListener: (
-		callback: (error: string) => void,
+		callback: (error: TestGenerationError | string) => void,
 	) => void;
 	removeTestGenerationResultListener: (callback: (result: unknown) => void) => void;
 	removeTestGenerationCompleteListener: (
@@ -76,7 +134,7 @@ export interface TestGenerationAPI {
 
 // Type aliases for different callback signatures
 type StatusListenerFn = (status: string) => void;
-type ErrorListenerFn = (error: string) => void;
+type ErrorListenerFn = (error: TestGenerationError | string) => void;
 type ResultListenerFn = (result: unknown) => void;
 type CompleteListenerFn = (result: unknown) => void;
 type ProgressListenerFn = (event: TestGenStageEvent) => void;
@@ -89,7 +147,7 @@ const statusListeners = new Map<
 >();
 const errorListeners = new Map<
 	ErrorListenerFn,
-	(event: IpcRendererEvent, error: string) => void
+	(event: IpcRendererEvent, error: TestGenerationError | string) => void
 >();
 const resultListeners = new Map<
 	ResultListenerFn,
@@ -121,17 +179,71 @@ export const createTestGenerationAPI = (): TestGenerationAPI => ({
 		});
 	},
 
+	resolveTestDestination: async (
+		filePath: string,
+		projectPath?: string,
+		existingTestPath?: string,
+	): Promise<{
+		success: boolean;
+		destination?: TestDestination | null;
+		error?: string;
+	}> => {
+		return await ipcRenderer.invoke("test-generation:resolve-destination", {
+			filePath,
+			projectPath,
+			existingTestPath,
+		});
+	},
+
+	resolveTestLibraries: async (
+		filePath?: string,
+		projectPath?: string,
+		selected?: string[],
+	): Promise<{
+		success: boolean;
+		libraries?: TestLibrarySelection | null;
+		error?: string;
+	}> => {
+		return await ipcRenderer.invoke("test-generation:resolve-libraries", {
+			filePath,
+			projectPath,
+			selected,
+		});
+	},
+
+	addTestPackages: async (
+		selected: string[],
+		projectPath: string,
+		testDir?: string,
+		filePath?: string,
+	): Promise<{
+		success: boolean;
+		report?: PackageInstallReport | null;
+		error?: string;
+	}> => {
+		return await ipcRenderer.invoke("test-generation:add-packages", {
+			selected,
+			projectPath,
+			testDir,
+			filePath,
+		});
+	},
+
 	generateUnitTests: async (
 		filePath: string,
 		existingTestPath?: string,
 		coverageTarget?: number,
 		projectPath?: string,
+		testDir?: string,
+		testLibraries?: string[],
 	): Promise<{ success: boolean; error?: string }> => {
 		return await ipcRenderer.invoke("test-generation:generate-unit", {
 			filePath,
 			existingTestPath,
 			coverageTarget,
 			projectPath,
+			testDir,
+			testLibraries,
 		});
 	},
 
@@ -139,11 +251,15 @@ export const createTestGenerationAPI = (): TestGenerationAPI => ({
 		userStory: string,
 		targetModule: string,
 		projectPath?: string,
+		testDir?: string,
+		testLibraries?: string[],
 	): Promise<{ success: boolean; error?: string }> => {
 		return await ipcRenderer.invoke("test-generation:generate-e2e", {
 			userStory,
 			targetModule,
 			projectPath,
+			testDir,
+			testLibraries,
 		});
 	},
 
@@ -152,12 +268,16 @@ export const createTestGenerationAPI = (): TestGenerationAPI => ({
 		language: string,
 		snippetType: string,
 		projectPath?: string,
+		testDir?: string,
+		testLibraries?: string[],
 	): Promise<{ success: boolean; error?: string }> => {
 		return await ipcRenderer.invoke("test-generation:generate-tdd", {
 			description,
 			language,
 			snippetType,
 			projectPath,
+			testDir,
+			testLibraries,
 		});
 	},
 
@@ -181,13 +301,15 @@ export const createTestGenerationAPI = (): TestGenerationAPI => ({
 		ipcRenderer.on("test-generation:status", listener);
 	},
 
-	onTestGenerationError: (callback: (error: string) => void) => {
+	onTestGenerationError: (callback: ErrorListenerFn) => {
 		const existing = errorListeners.get(callback);
 		if (existing) {
 			ipcRenderer.removeListener("test-generation:error", existing);
 		}
-		const listener = (_event: IpcRendererEvent, error: string) =>
-			callback(error);
+		const listener = (
+			_event: IpcRendererEvent,
+			error: TestGenerationError | string,
+		) => callback(error);
 		errorListeners.set(callback, listener);
 		ipcRenderer.on("test-generation:error", listener);
 	},
@@ -266,7 +388,7 @@ export const createTestGenerationAPI = (): TestGenerationAPI => ({
 		}
 	},
 
-	removeTestGenerationErrorListener: (callback: (error: string) => void) => {
+	removeTestGenerationErrorListener: (callback: ErrorListenerFn) => {
 		const listener = errorListeners.get(callback);
 		if (listener) {
 			ipcRenderer.removeListener("test-generation:error", listener);

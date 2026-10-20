@@ -101,14 +101,49 @@ const AgentTools = lazy(() =>
 const Worktrees = lazy(() =>
 	import("./components/Worktrees").then((m) => ({ default: m.Worktrees })),
 );
-const MigrationWizard = lazy(() =>
-	import("./components/MigrationWizard").then((m) => ({
-		default: m.MigrationWizard,
+const CodeMigrationDashboard = lazy(() =>
+	import("./components/code-migration/CodeMigrationDashboard").then((m) => ({
+		default: m.CodeMigrationDashboard,
 	})),
+);
+const ArchitectureVisualizer = lazy(() =>
+	import("./components/architecture-visualizer/ArchitectureVisualizer").then(
+		(m) => ({ default: m.ArchitectureVisualizer }),
+	),
+);
+const PerformanceProfilerDashboard = lazy(() =>
+	import("./components/performance-profiler/PerformanceProfilerDashboard").then(
+		(m) => ({ default: m.PerformanceProfilerDashboard }),
+	),
 );
 const VisualToCodeHub = lazy(() =>
 	import("./components/visual-to-code/VisualToCodeHub").then((m) => ({
 		default: m.VisualToCodeHub,
+	})),
+);
+const CICDTriggersDashboard = lazy(() =>
+	import("./components/cicd-triggers/CICDTriggersDashboard").then((m) => ({
+		default: m.CICDTriggersDashboard,
+	})),
+);
+const CrossLanguageTranslationDashboard = lazy(() =>
+	import(
+		"./components/cross-language-translation/CrossLanguageTranslationDashboard"
+	).then((m) => ({ default: m.CrossLanguageTranslationDashboard })),
+);
+const SpecApprovalDashboard = lazy(() =>
+	import("./components/spec-approval/SpecApprovalDashboard").then((m) => ({
+		default: m.SpecApprovalDashboard,
+	})),
+);
+const LiveCompanionDashboard = lazy(() =>
+	import("./components/live-companion/LiveCompanionDashboard").then((m) => ({
+		default: m.LiveCompanionDashboard,
+	})),
+);
+const ContextMeshDashboard = lazy(() =>
+	import("./components/context-mesh/ContextMeshDashboard").then((m) => ({
+		default: m.ContextMeshDashboard,
 	})),
 );
 const DashboardMetrics = lazy(() =>
@@ -192,6 +227,11 @@ const PluginMarketplace = lazy(() =>
 		default: m.PluginMarketplace,
 	})),
 );
+const AdministrationView = lazy(() =>
+	import("./components/administration/AdministrationView").then((m) => ({
+		default: m.AdministrationView,
+	})),
+);
 const ApiExplorer = lazy(() =>
 	import("./components/api-explorer").then((m) => ({ default: m.ApiExplorer })),
 );
@@ -201,12 +241,16 @@ const SimulationReport = lazy(() =>
 	})),
 );
 const _DiffPreview = lazy(() =>
-	import("./components/sandbox/DiffPreview").then((m) => ({ default: m.DiffPreview })),
+	import("./components/sandbox/DiffPreview").then((m) => ({
+		default: m.DiffPreview,
+	})),
 );
 const RegressionGuardianDashboard = lazy(() =>
-	import("./components/regression-guardian/RegressionGuardianDashboard").then((m) => ({
-		default: m.RegressionGuardianDashboard,
-	})),
+	import("./components/regression-guardian/RegressionGuardianDashboard").then(
+		(m) => ({
+			default: m.RegressionGuardianDashboard,
+		}),
+	),
 );
 const InjectionGuardView = lazy(() =>
 	import("./components/injection-guard/InjectionGuardView").then((m) => ({
@@ -335,6 +379,7 @@ import {
 	UI_SCALE_MAX,
 	UI_SCALE_MIN,
 } from "@shared/constants";
+import { resolveInterfaceLanguage } from "@shared/constants/i18n";
 import type { ColorTheme, Project, Task } from "@shared/types";
 import { AlertCircle } from "lucide-react";
 import {
@@ -349,19 +394,26 @@ import { GitHubSetupModal } from "./components/GitHubSetupModal";
 import { GlobalDownloadIndicator } from "./components/GlobalDownloadIndicator";
 import { FormulaLab } from "./components/formula-lab/FormulaLab";
 import { KeyboardShortcutsOverlay } from "./components/KeyboardShortcutsOverlay";
+import { ActivityCentre } from "./components/ActivityCentre";
 import { NavigationConfirmDialog } from "./components/NavigationConfirmDialog";
 import { NoProjectPage } from "./components/NoProjectPage";
 import { OnboardingWizard } from "./components/onboarding";
 import { ProjectTabBar } from "./components/ProjectTabBar";
 import { ProviderContextProvider } from "./components/ProviderContext";
-import { ProviderSelector } from "./components/ProviderSelector";
+import { PageLlmSelector } from "./components/PageLlmSelector";
 import { VersionWarningModal } from "./components/VersionWarningModal";
 import { VoiceControlDialog } from "./components/voice-control";
 import { ViewStateProvider } from "./contexts/ViewStateContext";
 import { useGlobalTerminalListeners } from "./hooks/useGlobalTerminalListeners";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useReauthNotifications } from "./hooks/use-reauth-notifications";
+import { useActivityNotifications } from "./hooks/useActivityNotifications";
+import { useTaskActivityBridge } from "./hooks/useTaskActivityBridge";
 import { useTaskNotifications } from "./hooks/useTaskNotifications";
+import type { Activity } from "./stores/activity-store";
+import { setActivityActiveView } from "./stores/activity-store";
+import { recordViewVisit } from "./stores/view-usage-store";
+import { setupGlobalListeners } from "./stores/global-listeners";
 import {
 	loadClaudeProfiles,
 	useClaudeProfileStore,
@@ -375,7 +427,10 @@ import {
 	renameProject,
 	useProjectStore,
 } from "./stores/project-store";
-import { loadProjectEnvConfig, useProjectEnvStore } from "./stores/project-env-store";
+import {
+	loadProjectEnvConfig,
+	useProjectEnvStore,
+} from "./stores/project-env-store";
 import {
 	loadProfiles,
 	loadSettings,
@@ -384,7 +439,12 @@ import {
 	useSettingsStore,
 } from "./stores/settings-store";
 import { useServerSessionStore } from "./stores/server-session-store";
-import { loadTasks, stopTask, useTaskStore } from "./stores/task-store";
+import {
+	loadTasks,
+	pauseTask,
+	stopTask,
+	useTaskStore,
+} from "./stores/task-store";
 import { useKanbanSettingsStore } from "./stores/kanban-settings-store";
 import {
 	getKanbanOrderedTasks,
@@ -407,7 +467,7 @@ interface ProjectTabBarWithContextProps {
 	readonly onProjectClose: (projectId: string) => void;
 	readonly onAddProject: () => void;
 	readonly onProjectRename: (projectId: string, name: string) => void;
-	readonly onSettingsClick: () => void;
+	readonly onSettingsClick: (projectId: string) => void;
 }
 
 function ProjectTabBarWithContext({
@@ -439,9 +499,7 @@ export function App() {
 
 	// Multi-user server mode: sync session state and gate the UI behind
 	// the login screen while a configured server session is unauthenticated.
-	const initServerSession = useServerSessionStore(
-		(state) => state.initialize,
-	);
+	const initServerSession = useServerSessionStore((state) => state.initialize);
 	const serverMode = useServerSessionStore((state) => state.mode);
 	const serverAuthenticated = useServerSessionStore(
 		(state) => state.isAuthenticated,
@@ -453,8 +511,7 @@ export function App() {
 		void initServerSession();
 	}, [initServerSession]);
 	useEffect(() => {
-		const open = () =>
-			useServerSessionStore.getState().openLoginScreen();
+		const open = () => useServerSessionStore.getState().openLoginScreen();
 		window.addEventListener("workpilot:open-server-login", open);
 		return () =>
 			window.removeEventListener("workpilot:open-server-login", open);
@@ -465,6 +522,11 @@ export function App() {
 	// Load global terminal output listeners to buffer output across project switches
 	// This ensures terminal output is captured even when the terminal component is not rendered
 	useGlobalTerminalListeners();
+
+	// Same reasoning, for every other feature: the IPC listeners of a page must
+	// outlive the page, or work that finishes while the user is elsewhere is
+	// never heard of again.
+	useEffect(() => setupGlobalListeners(), []);
 
 	// Handle terminal profile change events (recreate terminals on profile switch)
 	useTerminalProfileChange();
@@ -534,12 +596,24 @@ export function App() {
 	>(undefined);
 	const [settingsInitialProjectSection, setSettingsInitialProjectSection] =
 		useState<ProjectSettingsSection | undefined>(undefined);
+	// Project whose settings the dialog must show, when it was opened from a
+	// project tab. Null means "no explicit target" and the dialog falls back to
+	// the active/selected project.
+	const [settingsProjectId, setSettingsProjectId] = useState<string | null>(
+		null,
+	);
 	const [activeView, setActiveView] = useState<SidebarView>("kanban");
 	const [hasRestoredView, setHasRestoredView] = useState(false);
 	const isRestoringView = useRef(false);
 	const [pendingNavView, setPendingNavView] = useState<SidebarView | null>(
 		null,
 	);
+	// Set once the user picks "keep running in the background": the prompt then
+	// stops interrupting every navigation for the rest of the session. Session
+	// scoped on purpose — a persisted setting would silently swallow the choice
+	// on the day the user wants to stop a task instead.
+	const [skipNavPrompt, setSkipNavPrompt] = useState(false);
+	const [dontAskNavAgain, setDontAskNavAgain] = useState(false);
 	const [isOnboardingWizardOpen, setIsOnboardingWizardOpen] = useState(false);
 	const isSetupHubOpen = useSetupHubStore((s) => s.isOpen);
 	const setSetupHubOpen = useSetupHubStore((s) => s.setSetupHubOpen);
@@ -583,13 +657,26 @@ export function App() {
 	// Task completion toast notifications (human_review, done, pr_created, error)
 	useTaskNotifications({ onNavigate: (view) => setActiveView(view) });
 
+	// The Kanban's running builds, mirrored into the activity registry that
+	// feeds the sidebar badges.
+	useTaskActivityBridge();
+
+	// Everything else that ends while the user is on another page. Kanban
+	// builds are excluded there: useTaskNotifications already speaks for them.
+	useActivityNotifications({ onNavigate: (view) => setActiveView(view) });
+
+	// Which page is on screen decides whether a result needs a badge at all.
+	useEffect(() => {
+		setActivityActiveView(activeView);
+		recordViewVisit(activeView);
+	}, [activeView]);
+
 	// Programmatic main-view navigation (e.g. the visual canvas jumps to the
 	// Kanban after queuing a scaffold task).
 	useEffect(() => {
 		const handler = (e: Event) => {
-			const detail = (
-				e as CustomEvent<{ view?: SidebarView; taskId?: string }>
-			).detail;
+			const detail = (e as CustomEvent<{ view?: SidebarView; taskId?: string }>)
+				.detail;
 			const view = detail?.view;
 			if (view) setActiveView(view);
 			// Optionally open a specific task once we land on the Kanban (e.g. the
@@ -609,37 +696,67 @@ export function App() {
 	const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
 	const [isShortcutsOverlayOpen, setIsShortcutsOverlayOpen] = useState(false);
 
+	// A paused task is still `in_progress`, but nothing is running: it must not
+	// raise the prompt, and it must not be counted as working in the background.
+	const backgroundTasks = getTasksByStatus("in_progress").filter(
+		(t) => !t.metadata?.paused?.enabled,
+	);
+
 	// Navigation guard: intercept view changes when a task is in progress
 	// force=true bypasses the guard (used by CLI badges that create a terminal and navigate)
 	const handleViewChange = (view: SidebarView, force?: boolean) => {
-		if (view === "kanban" || force) {
+		if (view === "kanban" || force || skipNavPrompt) {
 			setActiveView(view);
 			return;
 		}
-		const runningTasks = getTasksByStatus("in_progress");
-		if (runningTasks.length > 0) {
+		if (backgroundTasks.length > 0) {
 			setPendingNavView(view);
 		} else {
 			setActiveView(view);
 		}
 	};
 
-	const pendingNavTask = pendingNavView
-		? (getTasksByStatus("in_progress")[0] ?? null)
-		: null;
+	const pendingNavTask = pendingNavView ? (backgroundTasks[0] ?? null) : null;
 
 	const handleNavContinue = () => setPendingNavView(null);
 
 	const handleNavStop = () => {
-		const runningTasks = getTasksByStatus("in_progress");
-		for (const t of runningTasks) stopTask(t.id);
+		for (const t of backgroundTasks) stopTask(t.id);
 		if (pendingNavView) setActiveView(pendingNavView);
 		setPendingNavView(null);
 	};
 
-	const handleNavPause = () => {
+	// The agents live in the main process, so leaving the Kanban never
+	// interrupted them — this option makes that explicit and drops the prompt
+	// for the rest of the session when the user asks for it.
+	const handleNavBackground = () => {
+		if (dontAskNavAgain) setSkipNavPrompt(true);
 		if (pendingNavView) setActiveView(pendingNavView);
 		setPendingNavView(null);
+	};
+
+	// "Pause" used to only navigate, which is what "background" now means. Ask
+	// the backend to actually suspend the run so the label tells the truth.
+	const handleNavPause = () => {
+		for (const t of backgroundTasks) {
+			void pauseTask(t.id);
+		}
+		if (pendingNavView) setActiveView(pendingNavView);
+		setPendingNavView(null);
+	};
+
+	// Go to wherever an activity is happening, and spotlight it when the page
+	// knows how to (only the Kanban does, today).
+	const handleOpenActivity = (activity: Activity) => {
+		setActiveView(activity.view);
+
+		const taskId = activity.id.startsWith("task:")
+			? activity.id.slice("task:".length)
+			: null;
+		if (!taskId) return;
+
+		const task = useTaskStore.getState().tasks.find((t) => t.id === taskId);
+		if (task) setSelectedTask(task);
 	};
 
 	// Global keyboard shortcuts (Feature 9.4)
@@ -699,10 +816,6 @@ export function App() {
 	);
 
 	// State global pour provider LLM actif et modèles associés
-	const [_providers, setProviders] = useState<string[]>([]);
-	const [selectedProvider, setSelectedProvider] = useState<string>("");
-	const [_providerModels, setProviderModels] = useState<string[]>([]);
-	const [_providerModelsError, setProviderModelsError] = useState<string>("");
 
 	// Initial load
 	useEffect(() => {
@@ -929,6 +1042,20 @@ export function App() {
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps -- Only run when settings.language changes, not on every i18n object change
 	}, [settings.language, i18n.language, i18n.changeLanguage]);
+
+	// First run: nobody has chosen a language yet, so take the one the desktop
+	// is already set to. It is written to the settings rather than only applied,
+	// so Settings → Language shows the language the app is actually speaking —
+	// and the moment the user picks one, this never fires again.
+	useEffect(() => {
+		if (settingsLoading || settings.language) return;
+		const resolved = resolveInterfaceLanguage([
+			...(globalThis.navigator?.languages ?? []),
+			globalThis.navigator?.language ?? "",
+		]);
+		saveSettings({ language: resolved });
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- Runs once, when settings have loaded without a language
+	}, [settingsLoading, settings.language]);
 
 	// Sync spell check language with i18n language
 	useEffect(() => {
@@ -1362,6 +1489,16 @@ export function App() {
 		renameProject(projectId, name);
 	};
 
+	// The gear on a project tab opens *that project's* settings — the "Projet"
+	// pane of the settings dialog, scoped to the tab's own project — not the
+	// global WorkPilot preferences the sidebar gear opens.
+	const handleProjectTabSettingsClick = (projectId: string) => {
+		setSettingsProjectId(projectId);
+		setSettingsInitialSection(undefined);
+		setSettingsInitialProjectSection("general");
+		setIsSettingsDialogOpen(true);
+	};
+
 	// Handle confirm remove project
 	const handleConfirmRemoveProject = () => {
 		if (projectToRemove) {
@@ -1490,101 +1627,6 @@ export function App() {
 		}
 	};
 
-	// Récupère la liste des providers au chargement
-	useEffect(() => {
-		const controller = new AbortController();
-		const backendUrl = import.meta.env?.VITE_BACKEND_URL || "";
-		fetch(`${backendUrl}/providers`, { signal: controller.signal })
-			.then((res) => {
-				if (!res.ok) {
-					throw new Error(`HTTP ${res.status}`);
-				}
-				// Check if response is actually JSON
-				const contentType = res.headers.get("content-type");
-				if (!contentType?.includes("application/json")) {
-					throw new Error("Response is not JSON");
-				}
-				return res.json();
-			})
-			.then((data) => {
-				// data.providers is an array of objects {name, label, description}
-				const providerNames: string[] = (data.providers || []).map(
-					(p: unknown) =>
-						typeof p === "object" && p !== null && "name" in p
-							? (p as { name: string }).name
-							: String(p),
-				);
-				setProviders(providerNames);
-				// Sélectionne automatiquement 'claude' si présent
-				if (!selectedProvider && providerNames.includes("claude")) {
-					setSelectedProvider("claude");
-				} else if (!selectedProvider && providerNames.length > 0) {
-					setSelectedProvider(providerNames[0]);
-				}
-			})
-			.catch((err) => {
-				if (err?.name === "AbortError") return;
-				// Don't log loudly if backend is not available - this is expected in some setups
-				if (err.message === "Response is not JSON") {
-					console.info(
-						"[App] Backend providers API not available - running without provider management",
-					);
-				} else {
-					console.error("Failed to fetch providers:", err);
-				}
-				setProviders([]);
-			});
-		return () => controller.abort();
-	}, [selectedProvider]);
-
-	// Récupère les modèles du provider sélectionné
-	useEffect(() => {
-		if (!selectedProvider) {
-			setProviderModels([]);
-			setProviderModelsError("");
-			return;
-		}
-		const controller = new AbortController();
-		const backendUrl = import.meta.env?.VITE_BACKEND_URL || "";
-		fetch(`${backendUrl}/providers/models/${selectedProvider}`, {
-			signal: controller.signal,
-		})
-			.then((res) => {
-				if (!res.ok) {
-					throw new Error(`HTTP ${res.status}`);
-				}
-				// Check if response is actually JSON
-				const contentType = res.headers.get("content-type");
-				if (!contentType?.includes("application/json")) {
-					throw new Error("Response is not JSON");
-				}
-				return res.json();
-			})
-			.then((data) => {
-				setProviderModels(data.models || []);
-				setProviderModelsError(data.error || "");
-			})
-			.catch((err) => {
-				if (err?.name === "AbortError") return;
-				// Don't log loudly if backend is not available - this is expected in some setups
-				if (err.message === "Response is not JSON") {
-					console.info(
-						"[App] Backend providers API not available - running without provider models",
-					);
-				} else {
-					console.error(
-						`Failed to fetch models for provider ${selectedProvider}:`,
-						err,
-					);
-				}
-				setProviderModels([]);
-				setProviderModelsError(
-					`Erreur lors de la récupération des modèles pour le provider «${selectedProvider}».`,
-				);
-			});
-		return () => controller.abort();
-	}, [selectedProvider]);
-
 	const getKanbanContent = () => {
 		if (isLoadingTasks && tasks.length === 0) {
 			return <KanbanSkeleton />;
@@ -1631,20 +1673,16 @@ export function App() {
 
 							{/* Main content */}
 							<div className="flex flex-1 flex-col overflow-hidden">
-								{/* Ligne sticky avec ProviderSelector et bouton "Claude Code" placée juste sous les tabs projets */}
+								{/* Ligne sticky placée juste sous les tabs projets. Il n'y a plus
+								    de fournisseur global ici : chaque tâche du Kanban possède son
+								    moteur, le fournisseur par défaut vit dans Paramètres → Agent,
+								    et les badges de consommation ont leur propre sélecteur. */}
 								<div className="flex items-center justify-between gap-3 px-2.5 py-2 border-b border-border bg-background sticky top-0 z-30">
 									<div className="flex items-center flex-1 min-w-0">
-										{/* Espace réservé pour alignement, ou autre contenu si besoin */}
-									</div>
-									<div className="shrink-0">
-										<ProviderSelector
-											selected={selectedProvider}
-											setSelected={setSelectedProvider}
-											onOpenAccountsSettings={() => {
-												setSettingsInitialSection("accounts");
-												setIsSettingsDialogOpen(true);
-											}}
-										/>
+										{/* Le choix propre à la page : il prime sur le fournisseur
+										    par défaut, et n'apparaît que sur une page qui sait
+										    l'exécuter. */}
+										<PageLlmSelector page={activeView} />
 									</div>
 								</div>
 
@@ -1667,7 +1705,7 @@ export function App() {
 												onProjectClose={handleProjectTabClose}
 												onAddProject={handleAddProject}
 												onProjectRename={handleProjectRename}
-												onSettingsClick={() => setIsSettingsDialogOpen(true)}
+												onSettingsClick={handleProjectTabSettingsClick}
 											/>
 										</SortableContext>
 
@@ -1694,15 +1732,14 @@ export function App() {
 										}
 									>
 										{activeView === "phase35-hub" && (
-											<Phase35Hub
-												projectPath={selectedProject?.path || ""}
-											/>
+											<Phase35Hub projectPath={selectedProject?.path || ""} />
 										)}
 										{activeView === "mcp-marketplace" && <McpMarketplace />}
 										{activeView === "plugin-marketplace" && (
 											<PluginMarketplace />
 										)}
 										{activeView === "api-explorer" && <ApiExplorer />}
+										{activeView === "administration" && <AdministrationView />}
 										{activeView === "mission-control" && (
 											<MissionControlDashboard />
 										)}
@@ -1840,8 +1877,31 @@ export function App() {
 															}
 														/>
 													)}
-												{activeView === "migration" && <MigrationWizard />}
+												{activeView === "migration" && (
+													<CodeMigrationDashboard />
+												)}
+												{activeView === "architecture-visualizer" && (
+													<ArchitectureVisualizer />
+												)}
+												{activeView === "performance-profiler" && (
+													<PerformanceProfilerDashboard />
+												)}
 												{activeView === "visual-to-code" && <VisualToCodeHub />}
+												{activeView === "cicd-triggers" && (
+													<CICDTriggersDashboard />
+												)}
+												{activeView === "cross-language-translation" && (
+													<CrossLanguageTranslationDashboard />
+												)}
+												{activeView === "spec-approval" && (
+													<SpecApprovalDashboard />
+												)}
+												{activeView === "live-companion" && (
+													<LiveCompanionDashboard />
+												)}
+												{activeView === "context-mesh" && (
+													<ContextMeshDashboard />
+												)}
 												{activeView === "dashboard" &&
 													selectedProject?.path && (
 														<DashboardMetrics
@@ -1902,139 +1962,261 @@ export function App() {
 														<PipelineGeneratorView />
 													)}
 												{activeView === "sandbox" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<SimulationReport projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<SimulationReport
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "regression-guardian" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<RegressionGuardianDashboard projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<RegressionGuardianDashboard
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "injection-guard" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<InjectionGuardView projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<InjectionGuardView
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "api-watcher" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<ApiWatcherDashboard projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<ApiWatcherDashboard
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "accessibility-agent" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<A11yReportView projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<A11yReportView
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "i18n-agent" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<I18nReportView projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<I18nReportView
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "onboarding-agent" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<OnboardingPackageView projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<OnboardingPackageView
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "onboarding-guide" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<OnboardingGuideView projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<OnboardingGuideView
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "flaky-tests" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<FlakyTestReport projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<FlakyTestReport
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "doc-drift" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<DocDriftReport projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<DocDriftReport
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "compliance" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<ComplianceReportView projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<ComplianceReportView
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "git-surgeon" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<GitSurgeonDashboard projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<GitSurgeonDashboard
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "release-coordinator" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<ReleasePlanView projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<ReleasePlanView
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "carbon-profiler" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<CarbonReportView projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<CarbonReportView
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "consensus-arbiter" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<ConsensusView projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<ConsensusView
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "notebook-agent" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
 														<NotebookView projectPath={selectedProject?.path} />
 													</div>
 												)}
 												{activeView === "spec-refinement" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<RefinementHistoryView projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<RefinementHistoryView
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "agent-coach" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<CoachReportView projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<CoachReportView
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "bounty-board" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<BountyBoardView projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<BountyBoardView
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "tech-debt" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<TechDebtDashboard projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<TechDebtDashboard
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "agent-debugger" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
 														<AgentDebuggerPanel />
 													</div>
 												)}
 												{activeView === "blast-radius" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<BlastRadiusView projectRoot={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<BlastRadiusView
+															projectRoot={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "team-bot" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
 														<TeamBotSettings />
 													</div>
 												)}
 												{activeView === "guardrails" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
 														<GuardrailsSettings />
 													</div>
 												)}
 												{activeView === "env-snapshot" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<EnvSnapshotView projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<EnvSnapshotView
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "offline-mode" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<OfflineModeSettings projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<OfflineModeSettings
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 											</>
 										) : (
 											<div className="flex items-center justify-center h-full text-muted">
-												{t("common:noProjectSelected")}
+												{t("common:common.noProjectSelected")}
 											</div>
 										)}
 									</Suspense>
@@ -2069,6 +2251,7 @@ export function App() {
 									// Reset initial sections when the dialog closes
 									setSettingsInitialSection(undefined);
 									setSettingsInitialProjectSection(undefined);
+									setSettingsProjectId(null);
 								}
 							}}
 							initialSection={settingsInitialSection}
@@ -2081,7 +2264,13 @@ export function App() {
 							// since the tour's anchors never mount without a resolved
 							// project, it also auto-skipped every project step with no
 							// element to wait for.
-							initialProjectId={(activeProjectId || selectedProjectId) ?? undefined}
+							// A tab's settings icon names its own project, which wins over
+							// the ambient active/selected one.
+							initialProjectId={
+								settingsProjectId ??
+								(activeProjectId || selectedProjectId) ??
+								undefined
+							}
 							onOpenSetupHub={() => {
 								setIsSettingsDialogOpen(false);
 								setSetupHubOpen(true);
@@ -2229,10 +2418,17 @@ export function App() {
 					<NavigationConfirmDialog
 						open={pendingNavView !== null}
 						runningTask={pendingNavTask}
+						runningCount={backgroundTasks.length}
+						onBackground={handleNavBackground}
 						onContinue={handleNavContinue}
 						onStop={handleNavStop}
 						onPause={handleNavPause}
+						dontAskAgain={dontAskNavAgain}
+						onDontAskAgainChange={setDontAskNavAgain}
 					/>
+
+					{/* What is still working, wherever the user happens to be */}
+					<ActivityCentre activeView={activeView} onOpen={handleOpenActivity} />
 				</CliStatusProvider>
 			</ViewStateProvider>
 		</ProviderContextProvider>

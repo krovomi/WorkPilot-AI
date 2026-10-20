@@ -1,6 +1,7 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import enAccessibility from "./locales/en/accessibility.json";
+import enAdministration from "./locales/en/administration.json";
 import enAgentCoach from "./locales/en/agentCoach.json";
 import enAgentDebugger from "./locales/en/agentDebugger.json";
 import enBlastRadius from "./locales/en/blastRadius.json";
@@ -28,9 +29,14 @@ import enInjectionGuard from "./locales/en/injectionGuard.json";
 import enApiWatcher from "./locales/en/api-watcher.json";
 import enAgentTools from "./locales/en/agentTools.json";
 import enWorkflowProfile from "./locales/en/workflowProfile.json";
+import enHermes from "./locales/en/hermes.json";
+import enRtk from "./locales/en/rtk.json";
+import enTraceability from "./locales/en/traceability.json";
+import enBrain from "./locales/en/brain.json";
 
 // Import English translation resources
 import enAppEmulator from "./locales/en/appEmulator.json";
+import enMobile from "./locales/en/mobile.json";
 import enPhase35 from "./locales/en/phase35.json";
 import enArena from "./locales/en/arena.json";
 import enBrowserAgent from "./locales/en/browserAgent.json";
@@ -56,7 +62,14 @@ import enIdeation from "./locales/en/ideation.json";
 import enInitDialog from "./locales/en/initDialog.json";
 import enInsights from "./locales/en/insights.json";
 import enLearningLoop from "./locales/en/learningLoop.json";
-import enMigrationWizard from "./locales/en/migration-wizard.json";
+import enArchitectureVisualizer from "./locales/en/architectureVisualizer.json";
+import enPerformanceProfiler from "./locales/en/performanceProfiler.json";
+import enCodeMigration from "./locales/en/codeMigration.json";
+import enCicdTriggers from "./locales/en/cicdTriggers.json";
+import enCrossLanguageTranslation from "./locales/en/crossLanguageTranslation.json";
+import enSpecApproval from "./locales/en/specApproval.json";
+import enLiveCompanion from "./locales/en/liveCompanion.json";
+import enContextMesh from "./locales/en/contextMesh.json";
 import enMissionControl from "./locales/en/missionControl.json";
 import enMultiRepo from "./locales/en/multiRepo.json";
 import enNaturalLanguageGit from "./locales/en/naturalLanguageGit.json";
@@ -65,7 +78,6 @@ import enOnboarding from "./locales/en/onboarding.json";
 import enPairProgramming from "./locales/en/pairProgramming.json";
 import enPipelineGenerator from "./locales/en/pipelineGenerator.json";
 import enPixelOffice from "./locales/en/pixelOffice.json";
-import enProjectInitModal from "./locales/en/projectInitModal.json";
 import enPromptOptimizer from "./locales/en/promptOptimizer.json";
 import enQualityScore from "./locales/en/qualityScore.json";
 import enRefactoring from "./locales/en/refactoring.json";
@@ -86,6 +98,7 @@ import enVisualToCode from "./locales/en/visualToCode.json";
 import enVoiceControl from "./locales/en/voiceContol.json";
 import enWelcome from "./locales/en/welcome.json";
 import frAccessibility from "./locales/fr/accessibility.json";
+import frAdministration from "./locales/fr/administration.json";
 import frAgentCoach from "./locales/fr/agentCoach.json";
 import frAgentDebugger from "./locales/fr/agentDebugger.json";
 import frBlastRadius from "./locales/fr/blastRadius.json";
@@ -113,9 +126,14 @@ import frInjectionGuard from "./locales/fr/injectionGuard.json";
 import frApiWatcher from "./locales/fr/api-watcher.json";
 import frAgentTools from "./locales/fr/agentTools.json";
 import frWorkflowProfile from "./locales/fr/workflowProfile.json";
+import frHermes from "./locales/fr/hermes.json";
+import frRtk from "./locales/fr/rtk.json";
+import frTraceability from "./locales/fr/traceability.json";
+import frBrain from "./locales/fr/brain.json";
 
 // Import French translation resources
 import frAppEmulator from "./locales/fr/appEmulator.json";
+import frMobile from "./locales/fr/mobile.json";
 import frPhase35 from "./locales/fr/phase35.json";
 import frArena from "./locales/fr/arena.json";
 import frBrowserAgent from "./locales/fr/browserAgent.json";
@@ -141,7 +159,14 @@ import frIdeation from "./locales/fr/ideation.json";
 import frInitDialog from "./locales/fr/initDialog.json";
 import frInsights from "./locales/fr/insights.json";
 import frLearningLoop from "./locales/fr/learningLoop.json";
-import frMigrationWizard from "./locales/fr/migration-wizard.json";
+import frArchitectureVisualizer from "./locales/fr/architectureVisualizer.json";
+import frPerformanceProfiler from "./locales/fr/performanceProfiler.json";
+import frCodeMigration from "./locales/fr/codeMigration.json";
+import frCicdTriggers from "./locales/fr/cicdTriggers.json";
+import frCrossLanguageTranslation from "./locales/fr/crossLanguageTranslation.json";
+import frSpecApproval from "./locales/fr/specApproval.json";
+import frLiveCompanion from "./locales/fr/liveCompanion.json";
+import frContextMesh from "./locales/fr/contextMesh.json";
 import frMissionControl from "./locales/fr/missionControl.json";
 import frMultiRepo from "./locales/fr/multiRepo.json";
 import frNaturalLanguageGit from "./locales/fr/naturalLanguageGit.json";
@@ -150,7 +175,6 @@ import frOnboarding from "./locales/fr/onboarding.json";
 import frPairProgramming from "./locales/fr/pairProgramming.json";
 import frPipelineGenerator from "./locales/fr/pipelineGenerator.json";
 import frPixelOffice from "./locales/fr/pixelOffice.json";
-import frProjectInitModal from "./locales/fr/projectInitModal.json";
 import frPromptOptimizer from "./locales/fr/promptOptimizer.json";
 import frQualityScore from "./locales/fr/qualityScore.json";
 import frRefactoring from "./locales/fr/refactoring.json";
@@ -176,6 +200,7 @@ export const defaultNS = "common";
 export const resources = {
 	en: {
 		accessibility: enAccessibility,
+		administration: enAdministration,
 		agentCoach: enAgentCoach,
 		agentDebugger: enAgentDebugger,
 		blastRadius: enBlastRadius,
@@ -188,6 +213,7 @@ export const resources = {
 		i18nAgent: enI18nAgent,
 		onboardingAgent: enOnboardingAgent,
 		appEmulator: enAppEmulator,
+		mobile: enMobile,
 		phase35: enPhase35,
 		analytics: enAnalytics,
 		browserAgent: enBrowserAgent,
@@ -205,6 +231,10 @@ export const resources = {
 		apiWatcher: enApiWatcher,
 		agentTools: enAgentTools,
 		workflowProfile: enWorkflowProfile,
+		hermes: enHermes,
+		rtk: enRtk,
+		traceability: enTraceability,
+		brain: enBrain,
 		changelog: enChangelog,
 		codePlayground: enCodePlayground,
 		codeReview: enCodeReview,
@@ -223,7 +253,14 @@ export const resources = {
 		insights: enInsights,
 		learningLoop: enLearningLoop,
 		multiRepo: enMultiRepo,
-		migrationWizard: enMigrationWizard,
+		architectureVisualizer: enArchitectureVisualizer,
+		performanceProfiler: enPerformanceProfiler,
+		codeMigration: enCodeMigration,
+		cicdTriggers: enCicdTriggers,
+		crossLanguageTranslation: enCrossLanguageTranslation,
+		specApproval: enSpecApproval,
+		liveCompanion: enLiveCompanion,
+		contextMesh: enContextMesh,
 		missionControl: enMissionControl,
 		pixelOffice: enPixelOffice,
 		selfHealing: enSelfHealing,
@@ -237,7 +274,6 @@ export const resources = {
 		navigation: enNavigation,
 		onboarding: enOnboarding,
 		promptOptimizer: enPromptOptimizer,
-		projectInitModal: enProjectInitModal,
 		replay: enReplay,
 		refactoring: enRefactoring,
 		roadmap: enRoadmap,
@@ -261,6 +297,7 @@ export const resources = {
 	},
 	fr: {
 		accessibility: frAccessibility,
+		administration: frAdministration,
 		agentCoach: frAgentCoach,
 		agentDebugger: frAgentDebugger,
 		blastRadius: frBlastRadius,
@@ -273,6 +310,7 @@ export const resources = {
 		i18nAgent: frI18nAgent,
 		onboardingAgent: frOnboardingAgent,
 		appEmulator: frAppEmulator,
+		mobile: frMobile,
 		phase35: frPhase35,
 		analytics: frAnalytics,
 		browserAgent: frBrowserAgent,
@@ -290,6 +328,10 @@ export const resources = {
 		apiWatcher: frApiWatcher,
 		agentTools: frAgentTools,
 		workflowProfile: frWorkflowProfile,
+		hermes: frHermes,
+		rtk: frRtk,
+		traceability: frTraceability,
+		brain: frBrain,
 		changelog: frChangelog,
 		codePlayground: frCodePlayground,
 		codeReview: frCodeReview,
@@ -308,7 +350,14 @@ export const resources = {
 		insights: frInsights,
 		learningLoop: frLearningLoop,
 		multiRepo: frMultiRepo,
-		migrationWizard: frMigrationWizard,
+		architectureVisualizer: frArchitectureVisualizer,
+		performanceProfiler: frPerformanceProfiler,
+		codeMigration: frCodeMigration,
+		cicdTriggers: frCicdTriggers,
+		crossLanguageTranslation: frCrossLanguageTranslation,
+		specApproval: frSpecApproval,
+		liveCompanion: frLiveCompanion,
+		contextMesh: frContextMesh,
 		missionControl: frMissionControl,
 		pixelOffice: frPixelOffice,
 		selfHealing: frSelfHealing,
@@ -322,7 +371,6 @@ export const resources = {
 		navigation: frNavigation,
 		onboarding: frOnboarding,
 		promptOptimizer: frPromptOptimizer,
-		projectInitModal: frProjectInitModal,
 		replay: frReplay,
 		refactoring: frRefactoring,
 		roadmap: frRoadmap,
@@ -353,6 +401,7 @@ i18n.use(initReactI18next).init({
 	defaultNS,
 	ns: [
 		"accessibility",
+		"administration",
 		"agentCoach",
 		"agentDebugger",
 		"blastRadius",
@@ -365,6 +414,7 @@ i18n.use(initReactI18next).init({
 		"i18nAgent",
 		"onboardingAgent",
 		"appEmulator",
+		"mobile",
 		"phase35",
 		"analytics",
 		"browserAgent",
@@ -382,6 +432,10 @@ i18n.use(initReactI18next).init({
 		"apiWatcher",
 		"agentTools",
 		"workflowProfile",
+		"hermes",
+		"rtk",
+		"traceability",
+		"brain",
 		"changelog",
 		"codePlayground",
 		"codeReview",
@@ -400,7 +454,14 @@ i18n.use(initReactI18next).init({
 		"insights",
 		"learningLoop",
 		"multiRepo",
-		"migrationWizard",
+		"architectureVisualizer",
+		"performanceProfiler",
+		"codeMigration",
+		"cicdTriggers",
+		"crossLanguageTranslation",
+		"specApproval",
+		"liveCompanion",
+		"contextMesh",
 		"missionControl",
 		"pixelOffice",
 		"selfHealing",
@@ -414,7 +475,6 @@ i18n.use(initReactI18next).init({
 		"navigation",
 		"onboarding",
 		"promptOptimizer",
-		"projectInitModal",
 		"replay",
 		"refactoring",
 		"roadmap",

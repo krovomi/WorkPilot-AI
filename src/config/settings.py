@@ -12,7 +12,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Charge le .env depuis le dossier centralisé .env-files
-load_dotenv(dotenv_path=Path(__file__).parent.parent.parent / '.env-files' / '.env')
+load_dotenv(dotenv_path=Path(__file__).parent.parent.parent / ".env-files" / ".env")
 
 
 @dataclass

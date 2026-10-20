@@ -16,28 +16,27 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Validate platform-specific dependencies BEFORE any imports that might
-# trigger graphiti_core -> real_ladybug -> pywintypes import chain (ACS-253)
+# trigger a pywintypes import (the MCP library imports win32api; ACS-253)
 from cli.utils import import_dotenv
 from core.auth import ensure_claude_code_oauth_token, get_auth_token
-from core.dependency_validator import validate_platform_dependencies
-from debug import (
+from core.debug import (
     debug,
     debug_detailed,
     debug_error,
     debug_section,
     debug_success,
 )
+from core.dependency_validator import validate_platform_dependencies
 from learning import ExplanationLevel, LearningMode, LearningModeConfig
 from phase_config import get_thinking_budget, resolve_model_id
 
 try:
-    from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient
+    # Availability only: the client itself comes from `create_simple_client`.
+    import claude_agent_sdk  # noqa: F401
 
     SDK_AVAILABLE = True
 except ImportError:
     SDK_AVAILABLE = False
-    ClaudeAgentOptions = None
-    ClaudeSDKClient = None
 
 validate_platform_dependencies()
 
@@ -259,17 +258,17 @@ async def run_with_agent_client(
                                 expected_outcome="Find relevant information",
                             )
                             if explanation:
+                                # Correction : On pré-calcule le JSON pour éviter le saut de ligne interdit dans la f-string
+                                explanation_json = json.dumps(
+                                    {
+                                        "category": explanation.category,
+                                        "title": explanation.title,
+                                        "explanation": explanation.explanation,
+                                        "difficulty": explanation.difficulty.value,
+                                    }
+                                )
                                 print(
-                                    f"__EXPLANATION__:{
-                                        json.dumps(
-                                            {
-                                                'category': explanation.category,
-                                                'title': explanation.title,
-                                                'explanation': explanation.explanation,
-                                                'difficulty': explanation.difficulty.value,
-                                            }
-                                        )
-                                    }",
+                                    f"__EXPLANATION__:{explanation_json}",
                                     flush=True,
                                 )
                         except Exception as e:
@@ -326,9 +325,10 @@ async def run_with_sdk(
     fallback (used for Claude, and if the provider-agnostic path fails).
     """
     try:
-        from core.client import _get_active_provider
+        from core.client import peek_active_provider
 
-        active_provider = _get_active_provider(Path(project_dir).resolve())
+        # Peeked: a chat turn is not the session a "resume with X" was for.
+        active_provider = peek_active_provider(Path(project_dir).resolve())
     except Exception:
         active_provider = "claude"
 
@@ -419,21 +419,21 @@ Current question: {message}"""
     )
 
     try:
-        # Build options dict - only include max_thinking_tokens if not None
-        options_kwargs = {
-            "model": resolve_model_id(model),  # Resolve via API Profile if configured
-            "system_prompt": system_prompt,
-            "allowed_tools": ["Read", "Glob", "Grep"],
-            "max_turns": 30,  # Allow sufficient turns for codebase exploration
-            "cwd": str(project_path),
-        }
+        from core.simple_client import create_simple_client
 
-        # Only add thinking tokens if the thinking level is not "none"
-        if max_thinking_tokens is not None:
-            options_kwargs["max_thinking_tokens"] = max_thinking_tokens
-
-        # Create Claude SDK client with appropriate settings for insights
-        client = ClaudeSDKClient(options=ClaudeAgentOptions(**options_kwargs))
+        # The same `insights` declaration the other providers run under
+        # (`run_with_agent_client`). These options used to be built here, with
+        # nothing denied: the user's and the project's settings files decided
+        # what an insights chat could run. A `None` budget is the "none" level,
+        # which is also the type's default.
+        client = create_simple_client(
+            agent_type="insights",
+            model=resolve_model_id(model),  # Resolve via API Profile if configured
+            system_prompt=system_prompt,
+            cwd=project_path,
+            max_turns=30,  # Allow sufficient turns for codebase exploration
+            max_thinking_tokens=max_thinking_tokens,
+        )
 
         # Use async context manager pattern
         async with client:
@@ -504,19 +504,20 @@ Current question: {message}"""
                                         expected_outcome="Find relevant information",
                                     )
                                     if explanation:
+                                        # Extrayez le JSON dans une variable dédiée
+                                        explanation_json = json.dumps(
+                                            {
+                                                "category": explanation.category,
+                                                "title": explanation.title,
+                                                "explanation": explanation.explanation,
+                                                "difficulty": explanation.difficulty.value,
+                                            }
+                                        )
                                         print(
-                                            f"__EXPLANATION__:{
-                                                json.dumps(
-                                                    {
-                                                        'category': explanation.category,
-                                                        'title': explanation.title,
-                                                        'explanation': explanation.explanation,
-                                                        'difficulty': explanation.difficulty.value,
-                                                    }
-                                                )
-                                            }",
+                                            f"__EXPLANATION__:{explanation_json}",
                                             flush=True,
                                         )
+
                                 except Exception as e:
                                     debug_error(
                                         "insights_runner",

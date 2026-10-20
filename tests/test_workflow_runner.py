@@ -27,12 +27,16 @@ sys.path.insert(0, str(REPO_ROOT / "apps" / "backend"))
 
 from workflows.runner import (  # noqa: E402
     BUILTIN_EXECUTORS,
+    CONFIG_PHASE,
+    SKILL_PHASE_AGENTS,
     PhaseContext,
     PhaseOutcome,
     builtin_plan,
     effort_preamble,
+    execution_phase_for,
     find_skill_body,
     fresh_context,
+    log_phase_for,
     phases_between,
     run_skill_phase,
     subagents_allowed,
@@ -48,6 +52,10 @@ def workflow():
     return load_workflow(WORKFLOW_PATH)
 
 
+def workflow_phase_ids(workflow):
+    return [p.id for p in workflow.phases]
+
+
 def profile_at(workflow, effort: str, **kwargs):
     return resolve_profile(workflow, effort, **kwargs)
 
@@ -58,16 +66,83 @@ class TestPhaseWindows:
     def test_the_windows_partition_the_skill_phases(self, workflow):
         profile = profile_at(workflow, "ultrathink")
         pre = phases_between(profile, after=None, before="planning")
+        planned = phases_between(profile, after="planning", before="coding")
         mid = phases_between(profile, after="coding", before="qa")
         post = phases_between(profile, after="qa", before=None)
 
-        assert [r.id for r in pre] == ["brainstorm", "spec"]
-        assert [r.id for r in mid] == ["review"]
-        assert [r.id for r in post] == [
-            "adversarial-review",
-            "spec-conformance",
-            "verify",
+        # `mobile-design` is conditional on its files
+        # being touched, and an unknown change set runs a conditional phase —
+        # erring towards running is the safe direction the engine documents.
+        assert [r.id for r in pre] == ["prd", "brainstorm"]
+        assert [r.id for r in planned] == [
+            "analyze",
+            "ui-design-system",
+            "mobile-design",
         ]
+        # `design-check` sits between `coding` and `qa` in the file and is
+        # absent here on purpose: `gates.run_deterministic_gates` runs it.
+        assert [r.id for r in mid] == ["review", "verify"]
+        assert [r.id for r in post] == [
+            "architecture-map",
+            "verify-replay",
+        ]
+
+    def test_the_detector_is_run_by_the_gates_not_by_a_window(self, workflow):
+        """impeccable's detector runs through its pack's `gate` command.
+
+        `_ELSEWHERE` used to hold pack names, so marking the detector as
+        "executed by the gate runner" silently marked every other phase the
+        same pack implements. Keyed by phase id, only the detector is stepped
+        over — and it is the only impeccable phase left.
+        """
+        profile = profile_at(workflow, "ultrathink")
+        impeccable = [r.id for r in profile.run if r.phase.pack == "impeccable"]
+        assert impeccable == ["design-check"]
+
+        everywhere = [
+            r.id
+            for window in (
+                phases_between(profile, after=None, before="planning"),
+                phases_between(profile, after="planning", before="coding"),
+                phases_between(profile, after="coding", before="qa"),
+                phases_between(profile, after="qa", before=None),
+            )
+            for r in window
+        ]
+        assert "design-check" not in everywhere
+
+    def test_the_design_guidance_runs_before_the_code_it_judges(self, workflow):
+        """A detector that only grades finished code cannot shape it.
+
+        What to aim for is `ui-design-system`'s answer, settled before coding.
+        """
+        declared = list(workflow_phase_ids(workflow))
+        assert declared.index("ui-design-system") < declared.index("coding")
+        assert declared.index("coding") < declared.index("design-check")
+
+    def test_every_skill_phase_belongs_to_a_window(self, workflow):
+        """No phase is declared, resolved, printed — and then run by nobody.
+
+        `analyze` sits between `planning` and `coding`, two phases the coder
+        loop owns, and there was no window between them: adding the phase
+        without opening one would have resolved it into the profile the user
+        is shown and executed it never.
+        """
+        profile = profile_at(workflow, "ultrathink")
+        windows = [
+            phases_between(profile, after=None, before="planning"),
+            phases_between(profile, after="planning", before="coding"),
+            phases_between(profile, after="coding", before="qa"),
+            phases_between(profile, after="qa", before=None),
+        ]
+        covered = {r.id for window in windows for r in window}
+        elsewhere = {"design-check", "observe"}  # gates, observer
+        expected = {
+            r.id
+            for r in profile.run
+            if r.id not in BUILTIN_EXECUTORS and r.id not in elsewhere
+        }
+        assert covered == expected
 
     def test_no_phase_is_run_by_two_windows(self, workflow):
         profile = profile_at(workflow, "ultrathink")
@@ -75,6 +150,7 @@ class TestPhaseWindows:
             r.id
             for window in (
                 phases_between(profile, after=None, before="planning"),
+                phases_between(profile, after="planning", before="coding"),
                 phases_between(profile, after="coding", before="qa"),
                 phases_between(profile, after="qa", before=None),
             )
@@ -87,8 +163,8 @@ class TestPhaseWindows:
 
         `qa` is prunable. Looking the boundary up in what survived resolution
         would make `before="qa"` mean "to the end of the list" on a build with
-        no QA pass, so `review` and the two ultrathink readings would all run
-        in the pre-QA window — and then again in the post-QA one.
+        no QA pass, so `review` and every post-QA phase would all run in the
+        pre-QA window — and then again in the post-QA one.
         """
         profile = profile_at(workflow, "ultrathink")
         profile.run = [r for r in profile.run if r.id != "qa"]
@@ -97,11 +173,10 @@ class TestPhaseWindows:
 
         mid = phases_between(profile, after="coding", before="qa")
         post = phases_between(profile, after="qa", before=None)
-        assert [r.id for r in mid] == ["review"]
+        assert [r.id for r in mid] == ["review", "verify"]
         assert [r.id for r in post] == [
-            "adversarial-review",
-            "spec-conformance",
-            "verify",
+            "architecture-map",
+            "verify-replay",
         ]
 
     def test_phases_owned_by_another_executor_are_stepped_over(self, workflow):
@@ -110,6 +185,7 @@ class TestPhaseWindows:
             r.id
             for window in (
                 phases_between(profile, after=None, before="planning"),
+                phases_between(profile, after="planning", before="coding"),
                 phases_between(profile, after="coding", before="qa"),
                 phases_between(profile, after="qa", before=None),
             )
@@ -126,12 +202,18 @@ class TestPhaseWindows:
     def test_low_effort_leaves_the_windows_empty_except_what_it_bought(self, workflow):
         profile = profile_at(workflow, "low")
         pre = phases_between(profile, after=None, before="planning")
+        planned = phases_between(profile, after="planning", before="coding")
         mid = phases_between(profile, after="coding", before="qa")
         post = phases_between(profile, after="qa", before=None)
         assert pre == []
-        assert mid == []
-        # `verify` is a hard gate: never pruned, at any level.
-        assert [r.id for r in post] == ["verify"]
+        # `analyze` is bought at medium; `ui-design-system` runs no model, so
+        # no effort level has anything to save by dropping it.
+        assert [r.id for r in planned] == ["ui-design-system"]
+        # `verify` is a hard gate: never pruned, at any level. It runs before
+        # QA so the reviewer judges code already seen running.
+        assert [r.id for r in mid] == ["verify"]
+        # Its replay costs no token, so no level drops it either.
+        assert [r.id for r in post] == ["verify-replay"]
 
     def test_every_builtin_phase_named_here_exists_in_the_workflow(self, workflow):
         declared = {p.id for p in workflow.phases}
@@ -139,14 +221,14 @@ class TestPhaseWindows:
             assert phase_id in declared, f"{phase_id} is not a phase of the workflow"
 
     def test_builtins_are_recognised_by_id_not_by_implementation(self, workflow):
-        """`coding` names a superpowers skill and is run by the coder loop.
+        """`coding` names a methodology skill and is run by the coder loop.
 
         Keying the builtin set on the impl string would mean swapping the
         methodology in the YAML silently demotes `coding` to a one-shot skill
         session — losing the entire coder loop to a one-line edit.
         """
         coding = workflow.phase("coding")
-        assert coding.impl == "superpowers/test-driven-development"
+        assert coding.impl == "tooling/tdd-cycle"
         assert "coding" in BUILTIN_EXECUTORS
         assert coding.impl not in BUILTIN_EXECUTORS
 
@@ -231,7 +313,7 @@ class TestMethodologyReachesTheBuiltins:
 
     def test_the_declared_methodology_is_named(self, workflow):
         plan = builtin_plan(profile_at(workflow, "high"))
-        assert "superpowers/test-driven-development" in effort_preamble(plan, "coding")
+        assert "tooling/tdd-cycle" in effort_preamble(plan, "coding")
 
     def test_workpilots_own_implementation_is_not_announced_as_a_methodology(
         self, workflow
@@ -243,10 +325,10 @@ class TestMethodologyReachesTheBuiltins:
         self, workflow, tmp_path
     ):
         body = "Red, green, refactor. " * 500
-        _write_skill(tmp_path, "test-driven-development", body)
+        _write_skill(tmp_path, "tdd-cycle", body)
         plan = builtin_plan(profile_at(workflow, "high"))
         text = effort_preamble(plan, "coding", tmp_path)
-        assert ".agents/skills/test-driven-development/SKILL.md" in text
+        assert ".agents/skills/tdd-cycle/SKILL.md" in text
         # A ten-kilobyte procedure pasted into every subtask prompt is a
         # four-figure token bill per build to say what one line can.
         assert body not in text
@@ -258,7 +340,7 @@ class TestMethodologyReachesTheBuiltins:
         plan = builtin_plan(profile_at(workflow, "high"))
         text = effort_preamble(plan, "coding", tmp_path)
         assert "SKILL.md" not in text
-        assert "superpowers/test-driven-development" in text
+        assert "tooling/tdd-cycle" in text
 
 
 class TestSkillLookup:
@@ -272,13 +354,13 @@ class TestSkillLookup:
     def test_the_built_output_wins_over_the_source(self, tmp_path):
         self._write(tmp_path / ".agents" / "skills" / "s" / "SKILL.md", "built")
         self._write(tmp_path / "skills" / "p" / "s" / "SKILL.md", "source")
-        body, path = find_skill_body(tmp_path, "p", "s")
+        body, path, _requires = find_skill_body(tmp_path, "p", "s")
         assert "built" in body
         assert ".agents" in str(path)
 
     def test_the_source_is_the_fallback_for_an_unbuilt_checkout(self, tmp_path):
         self._write(tmp_path / "skills" / "p" / "s" / "SKILL.md", "source")
-        body, _path = find_skill_body(tmp_path, "p", "s")
+        body, _path, _requires = find_skill_body(tmp_path, "p", "s")
         assert "source" in body
 
     def test_a_missing_skill_is_reported_not_invented(self, tmp_path):
@@ -322,7 +404,7 @@ class TestRunSkillPhase:
         """
         seen = {}
         _install_fake_agent_stack(monkeypatch, seen)
-        _write_skill(tmp_path, "code-review", "Read the diff.")
+        _write_skill(tmp_path, "review-lenses", "Read the diff.")
 
         monkeypatch.setenv("AUTO_CLAUDE_RESUME_SESSION_ID", "sess-42")
         profile = profile_at(workflow, "high")
@@ -339,7 +421,7 @@ class TestRunSkillPhase:
     ):
         seen = {}
         _install_fake_agent_stack(monkeypatch, seen)
-        _write_skill(tmp_path, "code-review", "Look for defects, not for style.")
+        _write_skill(tmp_path, "review-lenses", "Look for defects, not for style.")
 
         profile = profile_at(workflow, "high")
         review = next(r for r in profile.run if r.id == "review")
@@ -362,7 +444,7 @@ class TestRunSkillPhase:
         )
         seen = {}
         _install_fake_agent_stack(monkeypatch, seen)
-        _write_skill(tmp_path, "test-driven-development", "Red, green, refactor.")
+        _write_skill(tmp_path, "tdd-cycle", "Red, green, refactor.")
 
         profile = profile_at(workflow, "high", provider="mistral")
         coding = next(r for r in profile.run if r.id == "coding")
@@ -376,7 +458,7 @@ class TestRunSkillPhase:
     ):
         seen = {}
         _install_fake_agent_stack(monkeypatch, seen, status="error")
-        _write_skill(tmp_path, "code-review", "Read the diff.")
+        _write_skill(tmp_path, "review-lenses", "Read the diff.")
 
         profile = profile_at(workflow, "high")
         review = next(r for r in profile.run if r.id == "review")
@@ -388,14 +470,17 @@ class TestRunSkillPhase:
     ):
         seen = {}
         _install_fake_agent_stack(monkeypatch, seen, response="Tests: pass")
-        _write_skill(tmp_path, "verification-before-completion", "Run the suite.")
+        _write_skill(tmp_path, "review-lenses", "Read the diff.")
 
+        # `verify` is driven by the verification loop (`CUSTOM_EXECUTORS`);
+        # an ordinary skill phase is what this pins: its report is kept where
+        # the next reader (`workflows.handoff`) looks.
         profile = profile_at(workflow, "high")
-        verify = next(r for r in profile.run if r.id == "verify")
-        outcome = asyncio.run(run_skill_phase(verify, self._ctx(tmp_path)))
+        phase = next(r for r in profile.run if r.id == "review")
+        outcome = asyncio.run(run_skill_phase(phase, self._ctx(tmp_path)))
 
         assert outcome.output_path is not None
-        assert outcome.output_path.name == "verify.md"
+        assert outcome.output_path.name == "review.md"
         assert "Tests: pass" in outcome.output_path.read_text(encoding="utf-8")
 
 
@@ -418,18 +503,32 @@ class TestOutcomeReporting:
 # ---------------------------------------------------------------------------
 
 
-def _write_skill(root: Path, name: str, body: str) -> None:
+def _write_skill(
+    root: Path, name: str, body: str, *, runtime: str | None = None
+) -> None:
     path = root / ".agents" / "skills" / name / "SKILL.md"
     path.parent.mkdir(parents=True, exist_ok=True)
+    gate = (
+        ""
+        if runtime is None
+        else (f'metadata:\n  workpilot:\n    requires: {{ runtime: "{runtime}" }}\n')
+    )
     path.write_text(
-        f"---\nname: {name}\ndescription: d\n---\n\n{body}\n", encoding="utf-8"
+        f"---\nname: {name}\ndescription: d\n{gate}---\n\n{body}\n",
+        encoding="utf-8",
     )
 
 
 def _install_fake_agent_stack(
     monkeypatch, seen: dict, *, status="complete", response="done"
 ):
-    import core.client as core_client
+    import importlib
+
+    # The module `from core.client import …` resolves, i.e. `sys.modules`. A
+    # test elsewhere that swaps that entry leaves the `core.client` package
+    # attribute on the old module, and `import core.client as x` returns the
+    # attribute: patching it would leave the runner on the real client.
+    core_client = importlib.import_module("core.client")
 
     class _FakeClient:
         async def __aenter__(self):
@@ -447,10 +546,255 @@ def _install_fake_agent_stack(
 
     async def _fake_session(client, message, spec_dir, verbose, phase=None, **_kw):
         seen["prompt"] = message
+        seen["logged_phase"] = phase
         return status, response, {}
 
     monkeypatch.setattr(core_client, "create_agent_client", _fake_create)
 
-    import agents.session as agent_session
-
+    agent_session = importlib.import_module("agents.session")
     monkeypatch.setattr(agent_session, "run_agent_session", _fake_session)
+
+
+class TestAnalyzePhase:
+    """The pass that reads `spec.md` and the plan together, before any code.
+
+    Everything here is about *when* and *how* it runs. What it looks for is in
+    the skill body; what a parser can already answer is in
+    `spec.traceability`, and the skill is told to read that rather than
+    recompute it.
+    """
+
+    def test_it_runs_between_planning_and_coding(self, workflow):
+        # A change set that touches no mobile file, so the window holds `analyze`
+        # alone: this test is about where `analyze` runs, not about which
+        # conditional phases share the window with it.
+        profile = profile_at(
+            workflow, "medium", changed_files=["apps/backend/api/routes.py"]
+        )
+        window = phases_between(profile, after="planning", before="coding")
+        assert [r.id for r in window] == ["analyze"]
+
+    def test_the_reader_is_not_the_planner(self, workflow):
+        """`fresh-context`, for the same reason `review` has it.
+
+        A pass that inherits the planner's transcript inherits its reasoning,
+        and a reader who already agrees is not a second opinion.
+        """
+        profile = profile_at(workflow, "medium")
+        (analyze,) = [r for r in profile.run if r.id == "analyze"]
+        assert analyze.dispatch == "fresh-context"
+        assert fresh_context(analyze.dispatch)
+
+    def test_it_is_paid_for_as_planning_not_as_coding(self):
+        """It reviews the plan, so it is a planning cost.
+
+        The default for an unmapped phase is `coding` — which would bill a
+        read-only pass at the model and budget the user picked for writing
+        code.
+        """
+        assert CONFIG_PHASE["analyze"] == "planning"
+
+    def test_it_cannot_edit_what_it_reviews(self):
+        from agents.tools_pkg.models import AGENT_CONFIGS
+
+        agent = SKILL_PHASE_AGENTS["analyze"]
+        tools = set(AGENT_CONFIGS[agent]["tools"])
+        assert not tools & {"Write", "Edit", "MultiEdit", "NotebookEdit"}
+
+    def test_the_procedure_exists_and_defers_to_the_computed_record(self):
+        found = find_skill_body(REPO_ROOT, "tooling", "spec-analyze")
+        assert found is not None, "run `pnpm run skills:build`"
+        body, _path, _requires = found
+        # The mechanical half is already answered; asking the model to redo it
+        # buys a second number that can only disagree with the first.
+        assert "traceability.json" in body
+
+    def test_low_effort_does_not_buy_it(self, workflow):
+        profile = profile_at(workflow, "low")
+        assert "analyze" not in [r.id for r in profile.run]
+        assert "analyze" in profile.declared
+
+
+class TestRuntimeGateAtRunTime:
+    """The BMAD failure, from the other end.
+
+    `skills-cli build` already refuses to emit a skill whose `requires` this
+    checkout cannot satisfy, and a test pins that. It is not enough, and the
+    gap is not an oversight in either place: the build answers the question for
+    **this repository**, and a phase runs against the **project being built**.
+    BMAD's runtime is installed per project, so the only machine that can
+    answer "is `_bmad/` here?" is the one about to start the session.
+
+    What that cost, before this: `skills/bmad/…` is committed, so
+    `find_skill_body`'s source fallback always found the procedure, and the
+    `spec` phase of a task in a project with no BMAD installation opened a
+    session whose every step was "read this file under `_bmad/`". The model
+    searched, reported it could not find the tree, and the phase was billed in
+    full for a procedure that never had a chance to run.
+    """
+
+    def _ctx(self, tmp_path: Path) -> PhaseContext:
+        spec = tmp_path / "spec"
+        spec.mkdir(parents=True, exist_ok=True)
+        return PhaseContext(
+            project_dir=tmp_path / "project",
+            spec_dir=spec,
+            model="claude-sonnet-4-5",
+            repo_root=tmp_path,
+            effort="high",
+        )
+
+    def test_the_requires_block_travels_with_the_body(self, tmp_path):
+        _write_skill(tmp_path, "review-lenses", "Read it.", runtime="_rt/engine.py")
+        _body, _path, requires = find_skill_body(tmp_path, "tooling", "review-lenses")
+        assert requires == {"runtime": "_rt/engine.py"}
+
+    def test_a_skill_with_no_gate_reports_an_empty_one(self, tmp_path):
+        _write_skill(tmp_path, "review-lenses", "Read it.")
+        _body, _path, requires = find_skill_body(tmp_path, "tooling", "review-lenses")
+        assert requires == {}
+
+    def test_an_absent_runtime_stops_the_phase_before_the_session(
+        self, workflow, tmp_path, monkeypatch
+    ):
+        seen = {}
+        _install_fake_agent_stack(monkeypatch, seen)
+        _write_skill(tmp_path, "review-lenses", "Read it.", runtime="_rt/engine.py")
+        ctx = self._ctx(tmp_path)
+        ctx.project_dir.mkdir(parents=True, exist_ok=True)
+
+        profile = profile_at(workflow, "high")
+        review = next(r for r in profile.run if r.id == "review")
+        outcome = asyncio.run(run_skill_phase(review, ctx))
+
+        assert outcome.succeeded is None
+        assert "runtime not present" in outcome.detail
+        # Not merely reported as unknown — never started. The whole point is
+        # that the session is the thing being saved.
+        assert "prompt" not in seen
+
+    def test_the_gate_is_read_against_the_project_not_the_checkout(
+        self, workflow, tmp_path, monkeypatch
+    ):
+        """The distinction the build could not make.
+
+        The runtime exists in the repository and not in the project. A gate
+        read against `repo_root` would let this through — and then the session
+        would run in a directory where the files it is told to open are not.
+        """
+        seen = {}
+        _install_fake_agent_stack(monkeypatch, seen)
+        _write_skill(tmp_path, "review-lenses", "Read it.", runtime="_rt/engine.py")
+        (tmp_path / "_rt").mkdir(parents=True, exist_ok=True)
+        (tmp_path / "_rt" / "engine.py").write_text("pass\n", encoding="utf-8")
+        ctx = self._ctx(tmp_path)
+        ctx.project_dir.mkdir(parents=True, exist_ok=True)
+
+        profile = profile_at(workflow, "high")
+        review = next(r for r in profile.run if r.id == "review")
+        outcome = asyncio.run(run_skill_phase(review, ctx))
+
+        assert outcome.succeeded is None
+
+    def test_a_satisfied_runtime_runs_normally(self, workflow, tmp_path, monkeypatch):
+        seen = {}
+        _install_fake_agent_stack(monkeypatch, seen)
+        _write_skill(tmp_path, "review-lenses", "Read it.", runtime="_rt/engine.py")
+        ctx = self._ctx(tmp_path)
+        (ctx.project_dir / "_rt").mkdir(parents=True, exist_ok=True)
+        (ctx.project_dir / "_rt" / "engine.py").write_text("pass\n", encoding="utf-8")
+
+        profile = profile_at(workflow, "high")
+        review = next(r for r in profile.run if r.id == "review")
+        outcome = asyncio.run(run_skill_phase(review, ctx))
+
+        assert outcome.succeeded is True
+
+    def test_no_phase_of_the_default_workflow_needs_a_per_project_runtime(
+        self, workflow
+    ):
+        """A skill gated on a runtime the project must install rarely runs.
+
+        The three BMAD phases this workflow declared needed `_bmad/` in the
+        project being built. Almost no project has it, so each was resolved,
+        printed in the profile, and stopped before its session on every build.
+        A methodology that needs a runtime is declarable only with a fallback
+        that needs none: the projects that have the runtime get it, the others
+        get the fallback, and nobody gets a phase that stops before its
+        session.
+        """
+        for phase in workflow.phases:
+            found = find_skill_body(REPO_ROOT, phase.pack, phase.skill)
+            if found is None:
+                continue
+            _body, _path, requires = found
+            if not requires.get("runtime"):
+                continue
+            # Lot 2: a runtime-gated methodology may be declared, on the
+            # condition that a fallback with no such gate stands in for it
+            # — the engine substitutes it and the profile says so.
+            assert phase.fallback, (
+                f"{phase.id} names {phase.impl}, which needs "
+                f"{requires['runtime']}, and declares no fallback"
+            )
+            pack, _, skill = phase.fallback.partition("/")
+            if pack == "workpilot":
+                continue
+            fallback = find_skill_body(REPO_ROOT, pack, skill)
+            assert fallback is not None, (phase.id, phase.fallback)
+            assert not fallback[2].get("runtime"), (phase.id, phase.fallback)
+
+
+class TestPhaseLabels:
+    """Which phase of the build a skill phase says it is.
+
+    Every one of them reported `LogPhase.CODING` and emitted no execution
+    phase, so a build that ran `docs` and `brainstorm` before planning
+    filed both under "coding" in the log viewer — and the Kanban card,
+    which turns an in-progress task with no reported phase into the coding
+    column, agreed. The phases ran in the declared order throughout; the two
+    labels were both defaults.
+    """
+
+    def test_a_phase_paid_for_as_spec_is_logged_as_planning(self):
+        assert log_phase_for("brainstorm") == "PLANNING"
+        assert log_phase_for("analyze") == "PLANNING"
+
+    def test_a_review_is_logged_as_validation_not_as_coding(self):
+        assert log_phase_for("review") == "VALIDATION"
+        assert log_phase_for("verify") == "VALIDATION"
+
+    def test_an_unknown_phase_falls_back_rather_than_raising(self):
+        assert log_phase_for("a-phase-nobody-declared") == "CODING"
+
+    def test_only_the_phases_before_the_coder_loop_announce_themselves(self):
+        assert execution_phase_for("brainstorm") == "PLANNING"
+        assert execution_phase_for("analyze") == "PLANNING"
+        # After coding the card is already past what this would describe, and
+        # `wouldPhaseRegress` would refuse it anyway.
+        assert execution_phase_for("review") is None
+        assert execution_phase_for("architecture-map") is None
+
+    def test_the_brainstorm_phase_logs_under_planning_end_to_end(
+        self, workflow, tmp_path, monkeypatch
+    ):
+        seen = {}
+        _install_fake_agent_stack(monkeypatch, seen)
+        _write_skill(tmp_path, "brainstorm-approaches", "Compare approaches.")
+
+        spec_dir = tmp_path / "spec"
+        spec_dir.mkdir(parents=True, exist_ok=True)
+        ctx = PhaseContext(
+            project_dir=tmp_path,
+            spec_dir=spec_dir,
+            model="claude-sonnet-4-5",
+            repo_root=tmp_path,
+            effort="high",
+        )
+        profile = profile_at(workflow, "high")
+        brainstorm = next(r for r in profile.run if r.id == "brainstorm")
+        asyncio.run(run_skill_phase(brainstorm, ctx))
+
+        from task_logger import LogPhase
+
+        assert seen["logged_phase"] is LogPhase.PLANNING

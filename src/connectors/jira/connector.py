@@ -443,8 +443,7 @@ class JiraConnector:
 
         data = self._client.get(f"/rest/api/3/issue/{issue_key}/transitions")
         transitions = [
-            JiraTransition.from_api_response(t)
-            for t in data.get("transitions", [])
+            JiraTransition.from_api_response(t) for t in data.get("transitions", [])
         ]
 
         logger.info("Found %d transitions for '%s'.", len(transitions), issue_key)
@@ -488,9 +487,7 @@ class JiraConnector:
                                 "content": [
                                     {
                                         "type": "paragraph",
-                                        "content": [
-                                            {"type": "text", "text": comment}
-                                        ],
+                                        "content": [{"type": "text", "text": comment}],
                                     }
                                 ],
                             }
@@ -693,19 +690,21 @@ class JiraConnector:
             status_category = issue.status.category
             workpilot_status = self.map_jira_status_to_workpilot(status_category)
 
-            kanban_items.append({
-                "id": issue.key,
-                "title": issue.summary,
-                "description": issue.description,
-                "status": workpilot_status,
-                "priority": issue.priority.lower(),
-                "labels": issue.labels,
-                "source": "jira",
-                "source_key": issue.key,
-                "assignee": (
-                    issue.assignee.display_name if issue.assignee else None
-                ),
-            })
+            kanban_items.append(
+                {
+                    "id": issue.key,
+                    "title": issue.summary,
+                    "description": issue.description,
+                    "status": workpilot_status,
+                    "priority": issue.priority.lower(),
+                    "labels": issue.labels,
+                    "source": "jira",
+                    "source_key": issue.key,
+                    "assignee": (
+                        issue.assignee.display_name if issue.assignee else None
+                    ),
+                }
+            )
 
         logger.info("Imported %d issues for Kanban.", len(kanban_items))
         return kanban_items

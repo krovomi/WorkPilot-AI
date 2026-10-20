@@ -61,6 +61,12 @@ export function IncidentCard({
 					<p className="text-xs text-[var(--text-secondary)] mt-1 line-clamp-2">
 						{incident.description}
 					</p>
+					{incident.status === "escalated" && (
+						<p className="text-xs text-amber-400 mt-1">
+							{t("selfHealing:needsReview")}
+							{incident.error_message && ` — ${incident.error_message}`}
+						</p>
+					)}
 					{incident.affected_files.length > 0 && (
 						<div className="mt-2 flex flex-wrap gap-1">
 							{incident.affected_files.slice(0, 3).map((file) => (

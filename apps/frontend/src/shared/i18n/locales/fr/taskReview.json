@@ -20,11 +20,6 @@
 			"createPrCta": "Créer la PR pour la revue"
 		}
 	},
-	"terminal": {
-		"openTerminal": "Ouvrir le terminal",
-		"openInbuilt": "Ouvrir dans le terminal intégré",
-		"openExternal": "Ouvrir dans le terminal externe"
-	},
 	"merge": {
 		"buildReadyForReview": "Build prêt pour révision",
 		"view": "Voir",
@@ -121,7 +116,8 @@
 			"sourceBranch": "Branche source",
 			"targetBranch": "Branche cible",
 			"state": "État",
-			"description": "Description"
+			"description": "Description",
+			"changedFiles": "fichiers modifiés"
 		},
 		"errors": {
 			"unknown": "Une erreur inconnue s'est produite lors de la création de la pull request",
@@ -178,6 +174,9 @@
 			"featuresLabel": "Fonctionnalité(s) impactée(s)",
 			"featuresPlaceholder": "Ex : Fiche véhicule, doc de vente, ...",
 			"featuresHint": "Liste courte, séparée par des virgules"
+		},
+		"warnings": {
+			"emptyBranch": "Aucun commit à pousser : la branche est identique à « {{base}} ». La PR serait vide. Vérifiez que l'agent a bien commité ses changements ou qu'il ne s'agit pas d'une tâche dupliquée déjà fusionnée."
 		}
 	},
 	"mergeProgress": {

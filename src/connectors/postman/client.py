@@ -114,11 +114,13 @@ class PostmanClient:
         logger.info("Connecting to Postman API.")
 
         self._session = requests.Session()
-        self._session.headers.update({
-            "X-Api-Key": self._api_key,
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-        })
+        self._session.headers.update(
+            {
+                "X-Api-Key": self._api_key,
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            }
+        )
 
         try:
             response = self._session.get(
@@ -134,13 +136,9 @@ class PostmanClient:
         except PostmanError:
             raise
         except requests.exceptions.ConnectionError as exc:
-            raise PostmanAPIError(
-                f"Cannot connect to Postman API: {exc}"
-            ) from exc
+            raise PostmanAPIError(f"Cannot connect to Postman API: {exc}") from exc
         except requests.exceptions.RequestException as exc:
-            raise PostmanAPIError(
-                f"Failed to connect to Postman API: {exc}"
-            ) from exc
+            raise PostmanAPIError(f"Failed to connect to Postman API: {exc}") from exc
 
         self._connected = True
         logger.info("Successfully connected to Postman API.")
@@ -191,17 +189,13 @@ class PostmanClient:
             if "/environments/" in endpoint:
                 eid = endpoint.split("/environments/")[-1].split("/")[0].split("?")[0]
                 raise PostmanEnvironmentNotFoundError(eid)
-            raise PostmanAPIError(
-                f"Resource not found: {endpoint}", status_code=404
-            )
+            raise PostmanAPIError(f"Resource not found: {endpoint}", status_code=404)
 
         if response.status_code >= 400:
             error_body = ""
             try:
                 error_data = response.json()
-                error_body = error_data.get("error", {}).get(
-                    "message", str(error_data)
-                )
+                error_body = error_data.get("error", {}).get("message", str(error_data))
             except Exception:
                 error_body = response.text[:500]
 
@@ -243,9 +237,7 @@ class PostmanClient:
                 timeout=timeout,
             )
         except requests.exceptions.RequestException as exc:
-            raise PostmanAPIError(
-                f"Request to {endpoint} failed: {exc}"
-            ) from exc
+            raise PostmanAPIError(f"Request to {endpoint} failed: {exc}") from exc
 
         self._handle_error_response(response, endpoint)
 
@@ -287,9 +279,7 @@ class PostmanClient:
                 timeout=timeout,
             )
         except requests.exceptions.RequestException as exc:
-            raise PostmanAPIError(
-                f"Request to {endpoint} failed: {exc}"
-            ) from exc
+            raise PostmanAPIError(f"Request to {endpoint} failed: {exc}") from exc
 
         self._handle_error_response(response, endpoint)
 
@@ -331,9 +321,7 @@ class PostmanClient:
                 timeout=timeout,
             )
         except requests.exceptions.RequestException as exc:
-            raise PostmanAPIError(
-                f"Request to {endpoint} failed: {exc}"
-            ) from exc
+            raise PostmanAPIError(f"Request to {endpoint} failed: {exc}") from exc
 
         self._handle_error_response(response, endpoint)
 
@@ -372,9 +360,7 @@ class PostmanClient:
                 timeout=timeout,
             )
         except requests.exceptions.RequestException as exc:
-            raise PostmanAPIError(
-                f"Request to {endpoint} failed: {exc}"
-            ) from exc
+            raise PostmanAPIError(f"Request to {endpoint} failed: {exc}") from exc
 
         self._handle_error_response(response, endpoint)
 

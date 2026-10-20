@@ -66,7 +66,9 @@ def test_written_file_is_owner_only(_isolated_config):
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits only")
 def test_existing_world_readable_file_is_tightened_on_read(_isolated_config):
-    _isolated_config.write_text(json.dumps({"openai": {"api_key": "x"}}), "utf-8")
+    _isolated_config.write_text(
+        json.dumps({"openai": {"api_key": "x"}}), encoding="utf-8"
+    )
     os.chmod(_isolated_config, 0o644)
     llm_config.load_all_provider_configs()
     assert os.stat(_isolated_config).st_mode & 0o777 == 0o600
@@ -79,7 +81,7 @@ def test_no_temp_files_left_behind(_isolated_config):
 
 
 def test_corrupt_file_is_moved_aside_rather_than_raising(_isolated_config):
-    _isolated_config.write_text("{ this is not json", "utf-8")
+    _isolated_config.write_text("{ this is not json", encoding="utf-8")
 
     # Used to raise JSONDecodeError out of every endpoint touching provider
     # config, leaving the app permanently stuck.
@@ -91,7 +93,7 @@ def test_corrupt_file_is_moved_aside_rather_than_raising(_isolated_config):
 
 
 def test_non_object_json_is_ignored(_isolated_config):
-    _isolated_config.write_text(json.dumps(["not", "an", "object"]), "utf-8")
+    _isolated_config.write_text(json.dumps(["not", "an", "object"]), encoding="utf-8")
     assert llm_config.load_all_provider_configs() == {}
 
 

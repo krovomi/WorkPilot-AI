@@ -8,27 +8,16 @@ import {
 } from "../../stores/code-migration-store";
 import { useProjectStore } from "../../stores/project-store";
 
-const PHASE_LABELS: Record<CodeMigrationPhase, string> = {
-	idle: "Ready",
-	analyzing: "Analyzing codebase...",
-	planning: "Planning migration...",
-	executing: "Executing migration...",
-	validating: "Validating changes...",
-	complete: "Complete",
-	error: "Error",
-};
-
-const EXAMPLE_MIGRATIONS = [
-	"Migrate React Class Components to Hooks",
-	"Convert JavaScript files to TypeScript",
-	"Upgrade Python 3.9 deprecated patterns to 3.12",
-	"Replace callbacks with async/await",
-	"Migrate from Moment.js to date-fns",
-];
+const EXAMPLE_KEYS = [
+	"reactHooks",
+	"jsToTs",
+	"python312",
+	"asyncAwait",
+	"dateFns",
+] as const;
 
 export function CodeMigrationDashboard(): React.ReactElement {
-	// biome-ignore lint/correctness/noUnusedVariables: variable kept for clarity
-	const { t } = useTranslation(["common"]);
+	const { t } = useTranslation(["codeMigration"]);
 	const activeProject = useProjectStore((s) => s.getActiveProject());
 	const {
 		phase,
@@ -50,6 +39,7 @@ export function CodeMigrationDashboard(): React.ReactElement {
 		"validating",
 	].includes(phase);
 	const isComplete = phase === "complete";
+	const phaseLabel = (p: CodeMigrationPhase) => t(`codeMigration:phases.${p}`);
 
 	function handleStart() {
 		if (!activeProject?.path || !migrationDescription.trim()) return;
@@ -64,9 +54,9 @@ export function CodeMigrationDashboard(): React.ReactElement {
 		<div className="flex flex-col h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
 			{/* Header */}
 			<div className="px-6 py-4 border-b border-[var(--border-color)]">
-				<h1 className="text-xl font-semibold">Code Migration Agent</h1>
+				<h1 className="text-xl font-semibold">{t("codeMigration:title")}</h1>
 				<p className="text-sm text-[var(--text-secondary)] mt-0.5">
-					Automated framework, version, and language migrations
+					{t("codeMigration:subtitle")}
 				</p>
 			</div>
 
@@ -76,13 +66,13 @@ export function CodeMigrationDashboard(): React.ReactElement {
 					<div>
 						{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
 						<label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
-							Migration Description
+							{t("codeMigration:config.descriptionLabel")}
 						</label>
 						<textarea
 							value={migrationDescription}
 							onChange={(e) => setMigrationDescription(e.target.value)}
 							disabled={isRunning}
-							placeholder="Describe the migration you want to perform..."
+							placeholder={t("codeMigration:config.descriptionPlaceholder")}
 							rows={4}
 							className="w-full rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] px-3 py-2 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-[var(--accent)] disabled:opacity-50"
 						/>
@@ -91,18 +81,18 @@ export function CodeMigrationDashboard(): React.ReactElement {
 					{/* Example migrations */}
 					<div>
 						<p className="text-xs text-[var(--text-secondary)] mb-2">
-							Examples:
+							{t("codeMigration:config.examplesLabel")}
 						</p>
 						<div className="flex flex-col gap-1">
-							{EXAMPLE_MIGRATIONS.map((ex) => (
+							{EXAMPLE_KEYS.map((key) => (
 								<button
 									type="button"
-									key={ex}
-									onClick={() => handleExample(ex)}
+									key={key}
+									onClick={() => handleExample(t(`codeMigration:examples.${key}`))}
 									disabled={isRunning}
 									className="text-left text-xs px-2 py-1.5 rounded-md bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-50"
 								>
-									{ex}
+									{t(`codeMigration:examples.${key}`)}
 								</button>
 							))}
 						</div>
@@ -119,9 +109,11 @@ export function CodeMigrationDashboard(): React.ReactElement {
 								className="rounded accent-[var(--accent)]"
 							/>
 							<div>
-								<div className="text-sm font-medium">Dry Run</div>
+								<div className="text-sm font-medium">
+									{t("codeMigration:config.dryRun")}
+								</div>
 								<div className="text-xs text-[var(--text-secondary)]">
-									Analyze only, no file changes
+									{t("codeMigration:config.dryRunHint")}
 								</div>
 							</div>
 						</label>
@@ -135,7 +127,7 @@ export function CodeMigrationDashboard(): React.ReactElement {
 								onClick={cancelCodeMigration}
 								className="w-full px-4 py-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors text-sm font-medium"
 							>
-								Cancel Migration
+								{t("codeMigration:actions.cancel")}
 							</button>
 						) : (
 							<button
@@ -144,7 +136,9 @@ export function CodeMigrationDashboard(): React.ReactElement {
 								disabled={!activeProject || !migrationDescription.trim()}
 								className="w-full px-4 py-2 rounded-lg bg-[var(--accent)] text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity text-sm font-medium"
 							>
-								{dryRun ? "Analyze Migration" : "Start Migration"}
+								{dryRun
+									? t("codeMigration:actions.analyze")
+									: t("codeMigration:actions.start")}
 							</button>
 						)}
 					</div>
@@ -178,9 +172,9 @@ export function CodeMigrationDashboard(): React.ReactElement {
 								</svg>
 							)}
 							<span className="text-sm text-[var(--text-secondary)]">
-								{PHASE_LABELS[phase]}
+								{phaseLabel(phase)}
 							</span>
-							{status && status !== PHASE_LABELS[phase] && (
+							{status && status !== phaseLabel(phase) && (
 								<span className="text-sm text-[var(--text-secondary)] ml-1">
 									— {status}
 								</span>
@@ -219,8 +213,8 @@ export function CodeMigrationDashboard(): React.ReactElement {
 								<div>
 									<h3 className="font-medium">
 										{result.dry_run
-											? "Dry Run Analysis Complete"
-											: "Migration Complete"}
+											? t("codeMigration:results.dryRunComplete")
+											: t("codeMigration:results.migrationComplete")}
 									</h3>
 									<p className="text-sm text-[var(--text-secondary)]">
 										{result.migration_description}
@@ -233,7 +227,7 @@ export function CodeMigrationDashboard(): React.ReactElement {
 										{result.summary.files_modified}
 									</div>
 									<div className="text-xs text-[var(--text-secondary)]">
-										Files Modified
+										{t("codeMigration:results.filesModified")}
 									</div>
 								</div>
 								<div className="bg-[var(--bg-secondary)] rounded-lg p-3 text-center">
@@ -241,7 +235,7 @@ export function CodeMigrationDashboard(): React.ReactElement {
 										{result.summary.plan_status}
 									</div>
 									<div className="text-xs text-[var(--text-secondary)]">
-										Plan Status
+										{t("codeMigration:results.planStatus")}
 									</div>
 								</div>
 								<div className="bg-[var(--bg-secondary)] rounded-lg p-3 text-center">
@@ -249,7 +243,7 @@ export function CodeMigrationDashboard(): React.ReactElement {
 										{result.summary.execution_status}
 									</div>
 									<div className="text-xs text-[var(--text-secondary)]">
-										Execution
+										{t("codeMigration:results.execution")}
 									</div>
 								</div>
 							</div>
@@ -267,11 +261,10 @@ export function CodeMigrationDashboard(): React.ReactElement {
 								<div>
 									<div className="text-5xl mb-4">🔄</div>
 									<h3 className="text-lg font-medium mb-2">
-										Code Migration Agent
+										{t("codeMigration:empty.title")}
 									</h3>
 									<p className="text-sm text-[var(--text-secondary)] max-w-sm">
-										Describe the migration you want to perform and click Start.
-										Use Dry Run first to preview changes before applying them.
+										{t("codeMigration:empty.body")}
 									</p>
 								</div>
 							</div>

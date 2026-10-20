@@ -20,7 +20,7 @@ backend_path = Path(__file__).parent.parent / "apps" / "backend"
 sys.path.insert(0, str(backend_path))
 
 from core.progress import get_next_subtask
-from prompt_generator import generate_planner_prompt
+from prompts_pkg.prompt_generator import generate_planner_prompt
 from spec.validate_pkg import SpecValidator, auto_fix_plan
 
 
@@ -301,7 +301,7 @@ async def test_planner_session_does_not_trigger_post_session_processing_on_retry
     def fake_create_client(*_args, **_kwargs):
         return DummyClient()
 
-    async def fake_get_graphiti_context(*_args, **_kwargs):
+    async def fake_get_memory_context(*_args, **_kwargs):
         await asyncio.sleep(0)  # Make it properly async
         return None
 
@@ -327,7 +327,7 @@ async def test_planner_session_does_not_trigger_post_session_processing_on_retry
         return "error", "planner failed", {}
 
     monkeypatch.setattr("agents.coder.create_agent_client", fake_create_client)
-    monkeypatch.setattr("agents.coder.get_graphiti_context", fake_get_graphiti_context)
+    monkeypatch.setattr("agents.coder.get_memory_context", fake_get_memory_context)
     monkeypatch.setattr("agents.coder.get_next_subtask", fake_get_next_subtask)
     monkeypatch.setattr(
         "agents.coder.post_session_processing", fake_post_session_processing
@@ -336,13 +336,16 @@ async def test_planner_session_does_not_trigger_post_session_processing_on_retry
     monkeypatch.setattr("agents.coder.AUTO_CONTINUE_DELAY_SECONDS", 0)
     monkeypatch.setattr("agents.coder.load_subtask_context", lambda *_a, **_k: {})
 
-    await run_autonomous_agent(
-        project_dir=temp_git_repo,
-        spec_dir=spec_dir,
-        model="test-model",
-        max_iterations=1,
-        verbose=False,
-    )
+    from core.build_signals import BuildHalted
+
+    with pytest.raises(BuildHalted, match="Planning stopped"):
+        await run_autonomous_agent(
+            project_dir=temp_git_repo,
+            spec_dir=spec_dir,
+            model="test-model",
+            max_iterations=1,
+            verbose=False,
+        )
 
 
 @pytest.mark.asyncio
@@ -373,7 +376,7 @@ async def test_worktree_planning_to_coding_sync_updates_source_phase_status(
     def fake_create_client(*_args, **_kwargs):
         return DummyClient()
 
-    async def fake_get_graphiti_context(*_args, **_kwargs):
+    async def fake_get_memory_context(*_args, **_kwargs):
         await asyncio.sleep(0)  # Make it properly async
         return None
 
@@ -421,10 +424,14 @@ async def test_worktree_planning_to_coding_sync_updates_source_phase_status(
         )
         assert logs["phases"]["planning"]["status"] == "completed"
         assert logs["phases"]["coding"]["status"] == "active"
+        plan_path = spec_dir / "implementation_plan.json"
+        plan = json.loads(plan_path.read_text(encoding="utf-8"))
+        plan["phases"][0]["subtasks"][0]["status"] = "completed"
+        _write_plan(plan_path, plan)
         return "complete", "done", {}
 
     monkeypatch.setattr("agents.coder.create_agent_client", fake_create_client)
-    monkeypatch.setattr("agents.coder.get_graphiti_context", fake_get_graphiti_context)
+    monkeypatch.setattr("agents.coder.get_memory_context", fake_get_memory_context)
     monkeypatch.setattr(
         "agents.coder.post_session_processing", fake_post_session_processing
     )

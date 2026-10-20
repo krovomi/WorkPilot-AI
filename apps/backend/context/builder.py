@@ -12,8 +12,8 @@ from pathlib import Path
 
 from .categorizer import FileCategorizer
 from .dependency_graph import DependencyAnalyzer, DependencyGraphCache
-from .graphiti_integration import fetch_graph_hints, is_graphiti_enabled
 from .keyword_extractor import KeywordExtractor
+from .memory_hints import fetch_graph_hints, is_memory_enabled
 from .models import FileMatch, TaskContext
 from .pattern_discovery import PatternDiscoverer
 from .search import CodeSearcher
@@ -47,7 +47,7 @@ class ContextBuilder:
                 pass
 
         # Try to create one
-        from analyzer import analyze_project
+        from analysis.analyzer import analyze_project
 
         return analyze_project(self.project_dir)
 
@@ -65,7 +65,7 @@ class ContextBuilder:
             task: Description of the task
             services: List of service names to search (None = auto-detect)
             keywords: Additional keywords to search for
-            include_graph_hints: Whether to include historical hints from Graphiti
+            include_graph_hints: Whether to include historical hints from the shared brain
 
         Returns:
             TaskContext with relevant files and patterns
@@ -112,11 +112,11 @@ class ContextBuilder:
 
         # Get graph hints (synchronously wrap async call)
         graph_hints = []
-        if include_graph_hints and is_graphiti_enabled():
+        if include_graph_hints and is_memory_enabled():
             try:
                 # Run the async function in a new event loop if necessary
                 try:
-                    loop = asyncio.get_running_loop()
+                    asyncio.get_running_loop()
                     # We're already in an async context - this shouldn't happen in CLI
                     # but handle it gracefully
                     graph_hints = []
@@ -126,7 +126,7 @@ class ContextBuilder:
                         fetch_graph_hints(task, str(self.project_dir))
                     )
             except Exception:
-                # Graphiti is optional - fail gracefully
+                # Hints are optional - fail gracefully
                 graph_hints = []
 
         # Enrich context with structural dependency graph (Feature 28)
@@ -169,7 +169,7 @@ class ContextBuilder:
             task: Description of the task
             services: List of service names to search (None = auto-detect)
             keywords: Additional keywords to search for
-            include_graph_hints: Whether to include historical hints from Graphiti
+            include_graph_hints: Whether to include historical hints from the shared brain
 
         Returns:
             TaskContext with relevant files and patterns

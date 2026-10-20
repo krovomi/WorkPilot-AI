@@ -65,7 +65,7 @@ Optional `.env-files/.env` settings:
 | `AUTO_BUILD_MODEL` | Override Claude model |
 | `DEBUG=true` | Enable debug logging |
 | `LINEAR_API_KEY` | Enable Linear integration |
-| `GRAPHITI_ENABLED=true` | Enable memory system |
+| `BRAIN_ENABLED=false` | Turn memory (the shared brain) off |
 
 ## Troubleshooting
 
@@ -85,13 +85,13 @@ The backend has grown to **90+ specialized modules**. The core pipeline lives in
 
 ```
 backend/
-├── agents/              # AI agent execution (planner, coder, session)
+├── agents/              # AI agent execution (planner, coder, session) + subagents/ registry
 ├── qa/                  # QA reviewer / fixer validation loop
 ├── spec/                # Spec creation and management
-├── core/                # Client, auth, worktree, platform abstraction
-├── prompts/             # Prompt templates (60+ specialized agents)
+├── core/                # Client factory, auth, worktree, platform/ abstraction
+├── prompts/             # Agent system prompts (~50, incl. github/)
 ├── skills/              # Token-optimized dynamic skill execution
-├── integrations/        # External services (GitHub, GitLab, Azure, Linear, Jira, Graphiti)
+├── integrations/        # External services (GitHub, GitLab, Azure, Linear, Jira)
 ├── merge/               # Semantic git merge handling
 ├── project/             # Project / stack detection
 ├── context/             # Task context building
@@ -114,7 +114,7 @@ backend/
 
 - **SOLID** - Single responsibility, clean interfaces
 - **DRY** - Shared utilities in `core/`
-- **KISS** - Simple flat imports via facade modules
+- **KISS** - Flat imports from the backend root (`from agents.coder import …`); compatibility shims have been removed
 
 ### Import Convention
 

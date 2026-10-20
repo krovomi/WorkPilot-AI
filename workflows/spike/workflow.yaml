@@ -1,0 +1,55 @@
+name: spike
+description: >-
+  A throwaway branch and a verdict. The approaches are compared before any
+  code, the prototype is built on the cheapest path, and the phase that
+  matters is the last one: what was learned, what is decided, what a real
+  development would still need. No QA loop, no verification gate, no merge
+  — the code of a spike is not the deliverable. Chosen by
+  `workflows/registry.py` for cards of kind `spike`.
+
+phases:
+  - id: brainstorm
+    impl: bmad/bmad-deep-recon
+    fallback: tooling/brainstorm-approaches
+    always: true
+    description: >-
+      Two or three ways to answer the spike's question, side by side, before
+      the planner commits to one. On a feature this is bought from `high`;
+      on a spike it is the point, so it runs at every effort level. BMAD's
+      technical research (`deep-recon`) when the project has installed its
+      runtime — a spike that compares libraries or approaches is what it is
+      for; WorkPilot's own approach comparison otherwise, substituted by the
+      engine and printed in the profile.
+
+  - id: planning
+    impl: workpilot/planner
+    description: >-
+      The existing planner, fed the approaches. A spike's plan is short and
+      names what it will *not* do: tests, error handling, security — the
+      verdict lists those as the path to a real development.
+
+  - id: coding
+    impl: workpilot/coder
+    dispatch: subagent-per-task
+    description: >-
+      The prototype, on the recommended approach. No TDD cycle: the code is
+      not kept. Degrades to sequential execution on providers without
+      subagents.
+
+  - id: verdict
+    impl: tooling/spike-verdict
+    dispatch: fresh-context
+    roster: solo
+    always: true
+    description: >-
+      The question, what was tried, what was measured, adopt / discard /
+      dig further, and what a real development would need. Under the
+      read-only `pr_reviewer` agent, by a reader that did not build the
+      prototype. Never pruned: it is the deliverable.
+
+  - id: observe
+    impl: workpilot/observe
+    always: true
+    description: >-
+      What the spike taught, filed where the feature that follows it will
+      read it.

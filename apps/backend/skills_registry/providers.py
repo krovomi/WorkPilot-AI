@@ -38,10 +38,25 @@ class ProviderCapabilities:
     effort: str
     degrades_to: str | None
     note: str = ""
+    # How the context window is managed (see the `context` field documented at
+    # the top of providers.yaml). Unknown providers get the conservative
+    # answer: WorkPilot emulates compaction and can only estimate the fill.
+    context_compact: str = "emulated"
+    context_usage: str = "estimated"
 
     @property
     def supports_subagents(self) -> bool:
-        return self.subagents == "native"
+        """Whether a roster reaches the model on this provider, by any route.
+
+        ``native`` (the Claude SDK) and ``emulated`` (the ``delegate`` tool
+        and a child session per delegation) both do; ``none`` is the CLIs and
+        the providers without an adapter.
+        """
+        return self.subagents in ("native", "emulated")
+
+    @property
+    def emulates_subagents(self) -> bool:
+        return self.subagents == "emulated"
 
     @property
     def has_adapter(self) -> bool:
@@ -67,6 +82,7 @@ def load_providers(repo_root: Path | None = None) -> dict[str, ProviderCapabilit
     out: dict[str, ProviderCapabilities] = {}
     for name, cfg in raw.items():
         cfg = cfg or {}
+        context = cfg.get("context") or {}
         out[name] = ProviderCapabilities(
             name=name,
             adapter=cfg.get("adapter"),
@@ -74,6 +90,8 @@ def load_providers(repo_root: Path | None = None) -> dict[str, ProviderCapabilit
             effort=str(cfg.get("effort", "none")),
             degrades_to=cfg.get("degrades_to"),
             note=str(cfg.get("note", "") or ""),
+            context_compact=str(context.get("compact", "emulated")),
+            context_usage=str(context.get("usage", "estimated")),
         )
     return out
 
@@ -81,6 +99,20 @@ def load_providers(repo_root: Path | None = None) -> dict[str, ProviderCapabilit
 @lru_cache(maxsize=1)
 def _cached() -> dict[str, ProviderCapabilities]:
     return load_providers()
+
+
+# Les orthographes qui désignent le même fournisseur que la matrice. Elles
+# existent parce que l'UI dit « anthropic » là où `providers.yaml` dit
+# « claude », et que les runtimes locaux sont écrits avec ou sans tiret selon
+# l'appelant. Sans elles, la réponse prudente ci-dessous — « pas d'adaptateur »
+# — est rendue pour un fournisseur qui en a un, ce qui est le seul sens où se
+# tromper coûte cher : un appelant qui refuse ce qu'il sait faire tourner.
+_PROVIDER_ALIASES = {
+    "anthropic": "claude",
+    "lm-studio": "lmstudio",
+    "llama-cpp": "local",
+    "agy": "antigravity",
+}
 
 
 def get_provider_capabilities(provider: str) -> ProviderCapabilities:
@@ -91,6 +123,7 @@ def get_provider_capabilities(provider: str) -> ProviderCapabilities:
     does not have fails at run time in a confusing way; assuming the opposite
     only costs some parallelism.
     """
+    provider = _PROVIDER_ALIASES.get(provider, provider)
     caps = _cached().get(provider)
     if caps is None:
         logger.debug("provider %r not in the capability matrix", provider)

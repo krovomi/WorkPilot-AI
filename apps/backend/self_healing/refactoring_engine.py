@@ -32,7 +32,7 @@ except ImportError:
 
 
 try:
-    from debug import debug, debug_error, debug_section, debug_success
+    from core.debug import debug, debug_error, debug_section, debug_success
 except ImportError:
 
     def debug(module: str, message: str, **kwargs):
@@ -190,10 +190,17 @@ OLD_CODE: Original code snippet
 NEW_CODE: Refactored code snippet
 """
 
+            # `agent_type` was left to its default, so a refactoring session
+            # was given the coder roster and the coder tool permissions by
+            # accident rather than by choice. The effort budget is resolved by
+            # `create_agent_client` now, from the same setting as every other
+            # coding session.
+            _rf_dir = Path.cwd()
             client = create_agent_client(
-                project_dir=Path.cwd(),  # Use current directory as project_dir
-                spec_dir=Path.cwd(),  # Use current directory as spec_dir
+                project_dir=_rf_dir,
+                spec_dir=_rf_dir,
                 model=self.model,
+                agent_type="coder",
             )
             if not client:
                 return self._create_simple_action(file_path, issues)

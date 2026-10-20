@@ -570,8 +570,11 @@ class PRReviewResult:
     )  # IDs of posted findings
     posted_at: str | None = None  # Timestamp when findings were posted
 
+    jev: dict | None = None
+
     def to_dict(self) -> dict:
         return {
+            "jev": self.jev,
             "pr_number": self.pr_number,
             "repo": self.repo,
             "success": self.success,
@@ -607,6 +610,7 @@ class PRReviewResult:
     @classmethod
     def from_dict(cls, data: dict) -> PRReviewResult:
         return cls(
+            jev=data.get("jev"),
             pr_number=data["pr_number"],
             repo=data["repo"],
             success=data["success"],
@@ -727,6 +731,7 @@ class FollowupReviewContext:
     commits_since_review: list[dict] = field(default_factory=list)
     files_changed_since_review: list[str] = field(default_factory=list)
     diff_since_review: str = ""
+    jev_outcome: object | None = None
 
     # Comments since last review
     contributor_comments_since_review: list[dict] = field(default_factory=list)

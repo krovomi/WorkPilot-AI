@@ -37,15 +37,20 @@ from apps.backend.agents.migration_agent import (
 # DetectedDependency tests
 # ---------------------------------------------------------------------------
 
+
 class TestDetectedDependency:
     def test_create(self):
-        dep = DetectedDependency(name="react", current_version="^18.2.0", ecosystem="npm")
+        dep = DetectedDependency(
+            name="react", current_version="^18.2.0", ecosystem="npm"
+        )
         assert dep.name == "react"
         assert dep.current_version == "^18.2.0"
         assert dep.dep_type == "production"
 
     def test_to_dict(self):
-        dep = DetectedDependency(name="express", current_version="^4.18.0", dep_type="production")
+        dep = DetectedDependency(
+            name="express", current_version="^4.18.0", dep_type="production"
+        )
         d = dep.to_dict()
         assert d["name"] == "express"
         assert d["dep_type"] == "production"
@@ -54,6 +59,7 @@ class TestDetectedDependency:
 # ---------------------------------------------------------------------------
 # BreakingChange tests
 # ---------------------------------------------------------------------------
+
 
 class TestBreakingChange:
     def test_create(self):
@@ -83,6 +89,7 @@ class TestBreakingChange:
 # MigrationStep tests
 # ---------------------------------------------------------------------------
 
+
 class TestMigrationStep:
     def test_create(self):
         step = MigrationStep(
@@ -98,16 +105,20 @@ class TestMigrationStep:
 
     def test_to_dict(self):
         step = MigrationStep(
-            step_id="step-001", order=1,
-            title="Test", description="Test step",
+            step_id="step-001",
+            order=1,
+            title="Test",
+            description="Test step",
         )
         d = step.to_dict()
         assert d["step_id"] == "step-001"
 
     def test_defaults(self):
         step = MigrationStep(
-            step_id="step-001", order=1,
-            title="Test", description="desc",
+            step_id="step-001",
+            order=1,
+            title="Test",
+            description="desc",
         )
         assert step.risk == "low"
         assert step.step_type == "code_change"
@@ -117,6 +128,7 @@ class TestMigrationStep:
 # ---------------------------------------------------------------------------
 # MigrationPlan tests
 # ---------------------------------------------------------------------------
+
 
 class TestMigrationPlan:
     def test_create(self):
@@ -140,8 +152,16 @@ class TestMigrationPlan:
             target_framework="react",
             target_version="19",
             steps=[
-                MigrationStep(step_id="s1", order=1, title="A", description="A", status="completed"),
-                MigrationStep(step_id="s2", order=2, title="B", description="B", status="planned"),
+                MigrationStep(
+                    step_id="s1",
+                    order=1,
+                    title="A",
+                    description="A",
+                    status="completed",
+                ),
+                MigrationStep(
+                    step_id="s2", order=2, title="B", description="B", status="planned"
+                ),
             ],
         )
         assert plan.progress_pct == 50.0
@@ -165,6 +185,7 @@ class TestMigrationPlan:
 # ---------------------------------------------------------------------------
 # StackAnalyzer tests
 # ---------------------------------------------------------------------------
+
 
 class TestStackAnalyzer:
     def test_analyze_from_data(self):
@@ -202,6 +223,7 @@ class TestStackAnalyzer:
 # Plan creation tests
 # ---------------------------------------------------------------------------
 
+
 class TestPlanCreation:
     def test_react_upgrade(self):
         agent = MigrationAgent()
@@ -220,7 +242,9 @@ class TestPlanCreation:
     def test_js_to_typescript(self):
         agent = MigrationAgent()
         plan = agent.create_migration_plan(
-            "javascript", "es5", "typescript",
+            "javascript",
+            "es5",
+            "typescript",
             target_framework="typescript",
             migration_type="language_migration",
         )
@@ -231,10 +255,16 @@ class TestPlanCreation:
     def test_custom_steps(self):
         agent = MigrationAgent()
         plan = agent.create_migration_plan(
-            "react", "18", "19",
+            "react",
+            "18",
+            "19",
             custom_steps=[
-                {"title": "Update SSR config", "description": "Update server rendering", "risk": "high"},
-            ]
+                {
+                    "title": "Update SSR config",
+                    "description": "Update server rendering",
+                    "risk": "high",
+                },
+            ],
         )
         titles = [s.title for s in plan.steps]
         assert any("SSR" in t for t in titles)
@@ -250,7 +280,9 @@ class TestPlanCreation:
     def test_framework_switch(self):
         agent = MigrationAgent()
         plan = agent.create_migration_plan(
-            "express", "4", "1",
+            "express",
+            "4",
+            "1",
             target_framework="fastify",
             migration_type="framework_switch",
         )
@@ -261,6 +293,7 @@ class TestPlanCreation:
 # ---------------------------------------------------------------------------
 # Plan management tests
 # ---------------------------------------------------------------------------
+
 
 class TestPlanManagement:
     def test_get_plan(self):
@@ -297,6 +330,7 @@ class TestPlanManagement:
 # ---------------------------------------------------------------------------
 # Execution tests
 # ---------------------------------------------------------------------------
+
 
 class TestExecution:
     def test_execute_success(self):
@@ -347,6 +381,7 @@ class TestExecution:
 # Test generation tests
 # ---------------------------------------------------------------------------
 
+
 class TestTestGeneration:
     def test_generates_test_code(self):
         agent = MigrationAgent()
@@ -360,7 +395,10 @@ class TestTestGeneration:
         agent = MigrationAgent()
         plan = agent.create_migration_plan("react", "18", "19")
         result = agent.execute_migration(plan.plan_id)
-        assert "breaking_change" in result.test_code.lower() or "migration" in result.test_code.lower()
+        assert (
+            "breaking_change" in result.test_code.lower()
+            or "migration" in result.test_code.lower()
+        )
 
     def test_empty_plan(self):
         agent = MigrationAgent()
@@ -372,6 +410,7 @@ class TestTestGeneration:
 # ---------------------------------------------------------------------------
 # Results & Stats tests
 # ---------------------------------------------------------------------------
+
 
 class TestResultsAndStats:
     def test_get_results(self):
@@ -408,12 +447,15 @@ class TestResultsAndStats:
 # Edge cases tests
 # ---------------------------------------------------------------------------
 
+
 class TestEdgeCases:
     def test_multiple_plans(self):
         agent = MigrationAgent()
         p1 = agent.create_migration_plan("react", "18", "19")
         p2 = agent.create_migration_plan("express", "4", "5")
-        p3 = agent.create_migration_plan("javascript", "es5", "typescript", target_framework="typescript")
+        p3 = agent.create_migration_plan(
+            "javascript", "es5", "typescript", target_framework="typescript"
+        )
         assert len(agent.list_plans()) == 3
         assert p1.plan_id != p2.plan_id != p3.plan_id
 

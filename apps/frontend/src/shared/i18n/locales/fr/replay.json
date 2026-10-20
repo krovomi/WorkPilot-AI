@@ -45,7 +45,6 @@
 	"tokenConsumption": "Consommation de tokens",
 	"total": "{{tokens}} au total • {{cost}}",
 	"hitCount": "atteint {{count}}x",
-
 	"timeTravel": "Voyage Temporel",
 	"timeTravelDescription": "Rembobinez jusqu'a n'importe quel point de decision, modifiez le contexte et relancez avec n'importe quel LLM.",
 	"checkpoints": "Points de controle",
@@ -65,7 +64,6 @@
 	"viewFileSnapshot": "Voir l'etat des fichiers",
 	"filesAtCheckpoint": "{{count}} fichiers a ce checkpoint",
 	"tokensAtCheckpoint": "{{tokens}} tokens ({{cost}})",
-
 	"forkAndReExecute": "Fork et re-execution",
 	"forkSession": "Forker la session",
 	"forkDescription": "Re-executez a partir de ce checkpoint avec des instructions modifiees, en utilisant n'importe quel fournisseur LLM.",
@@ -87,7 +85,6 @@
 	"viewForkContext": "Voir le contexte du fork",
 	"compareForkWithOriginal": "Comparer avec l'original",
 	"forks": "Forks",
-
 	"decisionScoring": "Scoring des decisions",
 	"scoreDecisions": "Scorer les decisions",
 	"scoringDecisions": "Scoring des decisions en cours...",
@@ -102,7 +99,52 @@
 	"avgConfidence": "Confiance moy.",
 	"avgImpact": "Impact moy.",
 	"criticalDecisions": "Decisions critiques",
-
 	"providerAgnostic": "Fonctionne avec n'importe quel fournisseur LLM",
-	"anyProvider": "Tout fournisseur"
+	"anyProvider": "Tout fournisseur",
+	"timeTravelPanel": {
+		"checkpoints": "Points de reprise",
+		"generateCheckpoints": "Generer",
+		"noCheckpoints": "Aucun point de reprise. Generez-les pour pouvoir bifurquer cette session depuis n'importe quelle etape.",
+		"checkpointType": {
+			"auto_decision": "Decision",
+			"auto_file_change": "Modification de fichier",
+			"auto_tool_call": "Appel d'outil",
+			"manual": "Manuel"
+		},
+		"tokensAtCheckpoint_one": "{{count}} token",
+		"tokensAtCheckpoint_other": "{{count}} tokens",
+		"filesCaptured_one": "{{count}} fichier capture",
+		"filesCaptured_other": "{{count}} fichiers captures",
+		"fork": "Bifurquer",
+		"forkForm": "Bifurquer depuis ce point de reprise",
+		"modifiedPrompt": "Prompt modifie",
+		"modifiedPromptHint": "Laissez vide pour rejouer le prompt d'origine.",
+		"additionalInstructions": "Instructions supplementaires",
+		"provider": "Fournisseur",
+		"providerHint": "Laissez vide pour utiliser les parametres de l'app",
+		"model": "Modele",
+		"modelHint": "N'importe quel modele de ce fournisseur",
+		"createFork": "Creer la bifurcation",
+		"cancel": "Annuler",
+		"forks": "Bifurcations",
+		"noForks": "Aucune bifurcation. Bifurquez depuis un point de reprise pour voir comment un autre prompt ou un autre modele aurait poursuivi.",
+		"defaultModel": "Modele des parametres",
+		"forkStatus": {
+			"pending": "En attente",
+			"running": "En cours",
+			"completed": "Terminee",
+			"failed": "Echouee"
+		},
+		"decisions": "Scores de decision",
+		"scoreDecisions": "Noter",
+		"noDecisions": "Aucune decision notee.",
+		"decisionCount": "Decisions",
+		"criticalDecisions": "Critiques",
+		"avgConfidence": "Confiance moy.",
+		"avgImpact": "Impact moy.",
+		"critical": "Critique",
+		"confidence": "Confiance",
+		"impact": "Impact",
+		"fileImpact": "Impact par fichier"
+	}
 }

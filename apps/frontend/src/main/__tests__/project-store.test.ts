@@ -901,7 +901,6 @@ describe("ProjectStore", () => {
 							autoBuildPath: "",
 							settings: {
 								model: "sonnet",
-								memoryBackend: "file",
 								linearSync: false,
 								notifications: {
 									onTaskComplete: true,
@@ -909,8 +908,6 @@ describe("ProjectStore", () => {
 									onReviewNeeded: true,
 									sound: false,
 								},
-								graphitiMcpEnabled: true,
-								graphitiMcpUrl: "http://localhost:8000/mcp/",
 							},
 							createdAt: "2024-01-01T00:00:00Z",
 							updatedAt: "2024-01-01T00:00:00Z",

@@ -4,6 +4,15 @@
  */
 
 export const IPC_CHANNELS = {
+	DICTATION_START: "dictation:start",
+	DICTATION_TRANSCRIBE: "dictation:transcribe",
+	DICTATION_CANCEL: "dictation:cancel",
+	JEV_STATUS: "jev:status",
+	JEV_SAVE_KEY: "jev:saveKey",
+	JEV_CLEAR_KEY: "jev:clearKey",
+	// Secrets at rest: is the OS keyring protecting stored API keys / tokens?
+	SECURE_STORAGE_STATUS: "secureStorage:status",
+	SECURE_STORAGE_STATUS_CHANGED: "secureStorage:statusChanged", // main → renderer
 	// Project operations
 	PROJECT_ADD: "project:add",
 	PROJECT_REMOVE: "project:remove",
@@ -46,6 +55,9 @@ export const IPC_CHANNELS = {
 	TASK_RESET: "task:reset", // Full reset: discard plan/subtasks, worktree and runtime artifacts; keep the spec and go back to backlog
 	TASK_RERUN_PHASE: "task:rerunPhase", // Re-run one execution phase on demand (planning/coding/validation); cascade-invalidates downstream phases and restarts
 	TASK_HOT_SWAP: "task:hotSwap", // Live provider/model/effort change during a running phase (applied at the next turn, context replayed)
+	TASK_CONTEXT_ACTION: "task:contextAction", // One-shot compact/clear of the running session's context (writes CONTEXT_ACTION.json in every spec dir copy)
+	TASK_CONTEXT_POLICY_UPDATE: "task:contextPolicyUpdate", // Merge `contextPolicy` into task_metadata.json of every spec dir copy (main + worktree) — read live by the backend
+	TASK_CONTEXT_USAGE: "task:contextUsage", // Event (main -> renderer): CONTEXT_USAGE / CONTEXT_ACTION_APPLIED task events, forwarded untouched
 	TASK_CHECK_PLAN_CONFLICTS: "task:checkPlanConflicts", // Detect file overlaps between this task's plan and other active tasks (parallel worktrees)
 
 	// CI/CD pipeline loop (« Build rouge » column) — provider-agnostic (Azure DevOps, GitHub Actions, GitLab CI, Jenkins)
@@ -142,7 +154,6 @@ export const IPC_CHANNELS = {
 	TERMINAL_OAUTH_TOKEN: "terminal:oauthToken", // OAuth token captured from setup-token output
 	TERMINAL_AUTH_CREATED: "terminal:authCreated", // Auth terminal created for OAuth flow
 	TERMINAL_OAUTH_CODE_NEEDED: "terminal:oauthCodeNeeded", // Request user to paste OAuth code from browser
-	TERMINAL_OAUTH_CODE_SUBMIT: "terminal:oauthCodeSubmit", // User submitted OAuth code to send to terminal
 	TERMINAL_CLAUDE_BUSY: "terminal:claudeBusy", // Claude Code busy state (for visual indicator)
 	TERMINAL_CLAUDE_EXIT: "terminal:claudeExit", // Claude Code exited (returned to shell)
 	TERMINAL_ONBOARDING_COMPLETE: "terminal:onboardingComplete", // Claude onboarding complete (ready for input after login)
@@ -155,7 +166,6 @@ export const IPC_CHANNELS = {
 	CLAUDE_PROFILE_RENAME: "claude:profileRename",
 	CLAUDE_PROFILE_SET_ACTIVE: "claude:profileSetActive",
 	CLAUDE_PROFILE_SWITCH: "claude:profileSwitch",
-	CLAUDE_PROFILE_INITIALIZE: "claude:profileInitialize",
 	CLAUDE_PROFILE_SET_TOKEN: "claude:profileSetToken", // Set OAuth token for a profile
 	CLAUDE_PROFILE_AUTHENTICATE: "claude:profileAuthenticate", // Open visible terminal for OAuth login
 	CLAUDE_PROFILE_VERIFY_AUTH: "claude:profileVerifyAuth", // Check if profile has been authenticated
@@ -206,6 +216,7 @@ export const IPC_CHANNELS = {
 	DIALOG_SELECT_DIRECTORY: "dialog:selectDirectory",
 	DIALOG_SELECT_FILES: "dialog:selectFiles",
 	DIALOG_CREATE_PROJECT_FOLDER: "dialog:createProjectFolder",
+	DIALOG_INSPECT_PROJECT_LOCATION: "dialog:inspectProjectLocation",
 	DIALOG_GET_DEFAULT_PROJECT_LOCATION: "dialog:getDefaultProjectLocation",
 
 	// App info
@@ -250,6 +261,7 @@ export const IPC_CHANNELS = {
 	ENV_UPDATE: "env:update",
 	ENV_CHECK_CLAUDE_AUTH: "env:checkClaudeAuth",
 	ENV_INVOKE_CLAUDE_SETUP: "env:invokeClaudeSetup",
+	ENV_TEST_NOTIFICATION_WEBHOOK: "env:testNotificationWebhook",
 
 	// Ideation operations
 	IDEATION_GET: "ideation:get",
@@ -281,7 +293,6 @@ export const IPC_CHANNELS = {
 	LINEAR_CHECK_CONNECTION: "linear:checkConnection",
 
 	// Azure DevOps integration
-	AZURE_DEVOPS_GET_PROJECTS: "azureDevOps:getProjects",
 	AZURE_DEVOPS_GET_WORK_ITEMS: "azureDevOps:getWorkItems",
 	AZURE_DEVOPS_GET_WORK_ITEM: "azureDevOps:getWorkItem",
 	AZURE_DEVOPS_IMPORT_WORK_ITEMS: "azureDevOps:importWorkItems",
@@ -302,6 +313,11 @@ export const IPC_CHANNELS = {
 	JIRA_GET_ISSUE: "jira:getIssue",
 	JIRA_CHECK_CONNECTION: "jira:checkConnection",
 	JIRA_TEST_CONNECTION: "jira:testConnection",
+	JIRA_GET_ATTACHMENTS: "jira:getAttachments",
+
+	// Figma: the token is written, never read back
+	FIGMA_TOKEN_STATUS: "figma:tokenStatus",
+	FIGMA_SET_TOKEN: "figma:setToken",
 
 	// GitHub integration
 	GITHUB_GET_REPOSITORIES: "github:getRepositories",
@@ -508,15 +524,6 @@ export const IPC_CHANNELS = {
 	GITHUB_TRIAGE_COMPLETE: "github:triage:complete",
 	GITHUB_TRIAGE_ERROR: "github:triage:error",
 
-	// Memory Infrastructure status (LadybugDB - no Docker required)
-	MEMORY_STATUS: "memory:status",
-	MEMORY_LIST_DATABASES: "memory:listDatabases",
-	MEMORY_TEST_CONNECTION: "memory:testConnection",
-
-	// Graphiti validation
-	GRAPHITI_VALIDATE_LLM: "graphiti:validateLlm",
-	GRAPHITI_TEST_CONNECTION: "graphiti:testConnection",
-
 	// Ollama model detection and management
 	OLLAMA_CHECK_STATUS: "ollama:checkStatus",
 	OLLAMA_CHECK_INSTALLED: "ollama:checkInstalled",
@@ -528,6 +535,8 @@ export const IPC_CHANNELS = {
 	OLLAMA_LIST_EMBEDDING_MODELS: "ollama:listEmbeddingModels",
 	OLLAMA_PULL_MODEL: "ollama:pullModel",
 	OLLAMA_PULL_PROGRESS: "ollama:pullProgress",
+	OLLAMA_CANCEL_PULL: "ollama:cancelPull",
+	OLLAMA_ACTIVE_PULLS: "ollama:activePulls",
 	OLLAMA_DELETE_MODEL: "ollama:deleteModel",
 
 	// WorkPilot AI source environment configuration
@@ -575,6 +584,8 @@ export const IPC_CHANNELS = {
 	INSIGHTS_SESSION_UPDATED: "insights:sessionUpdated", // Event: session updated (main -> renderer)
 
 	// File explorer operations
+	CODE_REVIEW_FILES: "codeReview:files",
+	CODE_REVIEW_FILE: "codeReview:file",
 	FILE_EXPLORER_LIST: "fileExplorer:list",
 	FILE_EXPLORER_READ: "fileExplorer:read",
 	FILE_EXPLORER_SAVE: "fileExplorer:save", // Save JSON files
@@ -585,6 +596,9 @@ export const IPC_CHANNELS = {
 	API_EXPLORER_SCAN_ROUTES: "apiExplorer:scanRoutes",
 	// API Explorer — HTTP proxy (bypasses renderer CSP)
 	API_EXPLORER_PROXY_REQUEST: "apiExplorer:proxyRequest",
+	API_EXPLORER_PROBE_LIVE_SPEC: "apiExplorer:probeLiveSpec",
+	API_EXPLORER_LOAD_SECRETS: "apiExplorer:loadSecrets",
+	API_EXPLORER_SAVE_SECRETS: "apiExplorer:saveSecrets",
 
 	// Git operations
 	GIT_GET_BRANCHES: "git:getBranches",
@@ -594,6 +608,8 @@ export const IPC_CHANNELS = {
 	GIT_CHECK_STATUS: "git:checkStatus",
 	GIT_DETECT_PROVIDER: "git:detectProvider",
 	GIT_INITIALIZE: "git:initialize",
+	GIT_SET_REMOTE: "git:setRemote",
+	GIT_CHECKOUT_BRANCH: "git:checkoutBranch",
 
 	// LLM Provider operations
 	PROVIDER_SELECT: "provider:select",
@@ -705,10 +721,19 @@ export const IPC_CHANNELS = {
 
 	// Prompt Optimizer operations
 	PROMPT_OPTIMIZER_OPTIMIZE: "promptOptimizer:optimize", // Request prompt optimization
+	PROMPT_OPTIMIZER_CANCEL: "promptOptimizer:cancel", // Cancel the running optimization
 	PROMPT_OPTIMIZER_STREAM_CHUNK: "promptOptimizer:streamChunk", // Streaming text chunk (main -> renderer)
 	PROMPT_OPTIMIZER_STATUS: "promptOptimizer:status", // Status update (main -> renderer)
 	PROMPT_OPTIMIZER_ERROR: "promptOptimizer:error", // Error event (main -> renderer)
 	PROMPT_OPTIMIZER_COMPLETE: "promptOptimizer:complete", // Optimization complete (main -> renderer)
+
+	// Context-Aware Snippets operations
+	CONTEXT_AWARE_SNIPPETS_GENERATE: "context-aware-snippets:generate", // Start a generation (invoke: started, or why not)
+	CONTEXT_AWARE_SNIPPETS_CANCEL: "context-aware-snippets:cancel", // Cancel the running generation
+	CONTEXT_AWARE_SNIPPETS_STREAM_CHUNK: "context-aware-snippets:stream-chunk", // Streaming model text (main -> renderer)
+	CONTEXT_AWARE_SNIPPETS_STATUS: "context-aware-snippets:status", // Status code (main -> renderer)
+	CONTEXT_AWARE_SNIPPETS_ERROR: "context-aware-snippets:error", // Coded error (main -> renderer)
+	CONTEXT_AWARE_SNIPPETS_COMPLETE: "context-aware-snippets:complete", // Structured result (main -> renderer)
 
 	// Learning Loop operations
 	LEARNING_LOOP_GET_PATTERNS: "learningLoop:getPatterns",
@@ -782,11 +807,17 @@ export const IPC_CHANNELS = {
 	ARCHITECTURE_VISUALIZER_GENERATE: "architectureVisualizer:generate",
 	ARCHITECTURE_VISUALIZER_CANCEL: "architectureVisualizer:cancel",
 	ARCHITECTURE_VISUALIZER_CONFIGURE: "architectureVisualizer:configure",
+	ARCHITECTURE_VISUALIZER_DOCTOR: "architectureVisualizer:doctor",
+	// Per-task architecture delta
+	ARCHITECTURE_DELTA_READ: "architectureVisualizer:delta",
+	ARCHITECTURE_DELTA_REGENERATE: "architectureVisualizer:regenerateDelta",
+	ARCHITECTURE_ARTIFACT_READ: "architectureVisualizer:readArtifact",
 	// Architecture Visualizer events (main -> renderer)
 	ARCHITECTURE_VISUALIZER_STATUS: "architectureVisualizer:status",
 	ARCHITECTURE_VISUALIZER_STREAM_CHUNK: "architectureVisualizer:streamChunk",
 	ARCHITECTURE_VISUALIZER_ERROR: "architectureVisualizer:error",
 	ARCHITECTURE_VISUALIZER_COMPLETE: "architectureVisualizer:complete",
+	ARCHITECTURE_DELTA_STATUS: "architectureVisualizer:deltaStatus",
 
 	// Code Migration Agent
 	CODE_MIGRATION_START: "codeMigration:start",
@@ -866,19 +897,6 @@ export const IPC_CHANNELS = {
 	CONTEXT_MESH_COMPLETE: "contextMesh:complete",
 	CONTEXT_MESH_ERROR: "contextMesh:error",
 
-	// Team Knowledge Sync (Feature 31) — Shared Graphiti memory across team members
-	TEAM_SYNC_GET_STATUS: "teamSync:getStatus",
-	TEAM_SYNC_PUSH: "teamSync:push",
-	TEAM_SYNC_PULL: "teamSync:pull",
-	TEAM_SYNC_LIST_PEERS: "teamSync:listPeers",
-	TEAM_SYNC_GET_PEER_EPISODES: "teamSync:getPeerEpisodes",
-	TEAM_SYNC_CONFIGURE: "teamSync:configure",
-	TEAM_SYNC_START_SERVER: "teamSync:startServer",
-	TEAM_SYNC_STOP_SERVER: "teamSync:stopServer",
-	// Team Sync events (main -> renderer)
-	TEAM_SYNC_SERVER_STATUS: "teamSync:serverStatus",
-	TEAM_SYNC_SYNC_PROGRESS: "teamSync:syncProgress",
-
 	// Live Development Companion — Real-time pair programming
 	LIVE_COMPANION_START: "liveCompanion:start",
 	LIVE_COMPANION_STOP: "liveCompanion:stop",
@@ -953,6 +971,10 @@ export const IPC_CHANNELS = {
 	I18N_SCALER_DIFF: "i18nScaler:diff",
 	I18N_SCALER_SKELETON: "i18nScaler:skeleton",
 	I18N_SCALER_REPORT_FROM_DIR: "i18nScaler:reportFromDir",
+	I18N_EDITOR_DETECT: "i18nEditor:detect",
+	I18N_EDITOR_NAMESPACES: "i18nEditor:namespaces",
+	I18N_EDITOR_NAMESPACE: "i18nEditor:namespace",
+	I18N_EDITOR_MUTATE: "i18nEditor:mutate",
 	// Cognitive Context Optimizer (#3.2)
 	COGNITIVE_CONTEXT_OPTIMIZE: "cognitiveContext:optimize",
 	// Audit Trail (#3.3)
@@ -979,4 +1001,23 @@ export const IPC_CHANNELS = {
 	// Pair Programming SSE event (main -> renderer)
 	PAIR_RT_OP_EVENT: "pairRT:opEvent",
 	PAIR_RT_STREAM_ERROR: "pairRT:streamError",
+
+	// Mobile applications (Android / Apple). Distinct from the App Emulator's
+	// channels rather than folded into them: the two answer different questions
+	// ("what URL" vs "which device"), and a `start` meaning one thing for a web
+	// project and another for a phone one is a channel nobody can reason about.
+	MOBILE_DETECT: "mobile:detect",
+	MOBILE_DEVICES: "mobile:devices",
+	MOBILE_LAUNCH: "mobile:launch",
+	MOBILE_SCREENSHOT: "mobile:screenshot",
+	MOBILE_STOP: "mobile:stop",
+	MOBILE_STATUS: "mobile:status",
+	// Mobile events (main -> renderer)
+	MOBILE_PLAN_EVENT: "mobile:plan",
+	MOBILE_PHASE_EVENT: "mobile:phase",
+	MOBILE_STATUS_EVENT: "mobile:status-update",
+	MOBILE_OUTPUT_EVENT: "mobile:output",
+	MOBILE_SCREENSHOT_EVENT: "mobile:screenshot-update",
+	MOBILE_ERROR_EVENT: "mobile:error",
+	MOBILE_STOPPED_EVENT: "mobile:stopped",
 } as const;

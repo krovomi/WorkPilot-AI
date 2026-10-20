@@ -25,6 +25,7 @@ import logging
 import os
 import threading
 import time
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -136,13 +137,13 @@ def invalidate_project_cache(project_dir: Path | None = None) -> None:
 from agents.tools_pkg import (
     CONTEXT7_TOOLS,
     ELECTRON_TOOLS,
-    GRAPHITI_MCP_TOOLS,
     LINEAR_TOOLS,
     PUPPETEER_TOOLS,
     create_auto_claude_mcp_server,
     get_allowed_tools,
     get_required_mcp_servers,
     is_tools_available,
+    undeclared_builtin_tools,
 )
 from skills_registry.providers import get_provider_capabilities
 
@@ -185,6 +186,21 @@ def _claude_options_supports(field_name: str) -> bool:
             return True
         return field_name in params
     except (TypeError, ValueError):
+        return False
+
+
+def _is_anthropic_api(base_url: str | None) -> bool:
+    """True when the CLI talks to Anthropic's own API: no base URL, or its host.
+
+    The same test the bundled CLI makes before it turns tool search on.
+    """
+    if not (base_url or "").strip():
+        return True
+    from urllib.parse import urlsplit
+
+    try:
+        return urlsplit(base_url.strip()).hostname == "api.anthropic.com"
+    except ValueError:
         return False
 
 
@@ -239,10 +255,23 @@ except ImportError:
         return {}
 
 
-from linear_updater import is_linear_enabled
+from docintel.read_guard import make_read_guard_hook
+from harness.application.budget import session_budget_usd
+from harness.application.subagents import (
+    SUBAGENT_TOOLS,
+    bind_contract,
+    make_subagent_result_hook,
+)
+from integrations.linear.updater import is_linear_enabled
 from prompts_pkg.project_context import detect_project_capabilities, load_project_index
+from rtk import rtk_rewrite_hook
+from rtk import settings as rtk_settings
 from security import bash_security_hook
 from security.guardrails import guardrails_hook as _raw_guardrails_hook
+from security.path_guard import GUARDED_WRITE_TOOLS, make_write_path_hook
+from watermarks import CLEANED_TOOLS as WATERMARK_CLEANED_TOOLS
+from watermarks import make_watermarks_hook
+from watermarks import settings as watermarks_settings
 
 
 def _make_guardrails_hook(project_dir: Path):
@@ -495,6 +524,7 @@ def load_project_mcp_config(project_dir: Path) -> dict:
 
     Returns a dict of MCP-related env vars:
     - CONTEXT7_ENABLED (default: true)
+    - CONTEXT7_API_KEY (optional: raises the Context7 quota above anonymous)
     - LINEAR_MCP_ENABLED (default: true)
     - ELECTRON_MCP_ENABLED (default: false)
     - PUPPETEER_MCP_ENABLED (default: false)
@@ -515,6 +545,7 @@ def load_project_mcp_config(project_dir: Path) -> dict:
     config = {}
     mcp_keys = {
         "CONTEXT7_ENABLED",
+        "CONTEXT7_API_KEY",
         "LINEAR_MCP_ENABLED",
         "ELECTRON_MCP_ENABLED",
         "PUPPETEER_MCP_ENABLED",
@@ -567,21 +598,6 @@ def load_project_mcp_config(project_dir: Path) -> dict:
     return config
 
 
-def is_graphiti_mcp_enabled() -> bool:
-    """
-    Check if Graphiti MCP server integration is enabled.
-
-    Requires GRAPHITI_MCP_URL to be set (e.g., http://localhost:9000/mcp/)
-    This is separate from GRAPHITI_ENABLED which controls the Python library integration.
-    """
-    return bool(os.environ.get("GRAPHITI_MCP_URL"))
-
-
-def get_graphiti_mcp_url() -> str:
-    """Get the Graphiti MCP server URL."""
-    return os.environ.get("GRAPHITI_MCP_URL", "http://localhost:9000/mcp/")
-
-
 def is_electron_mcp_enabled() -> bool:
     """
     Check if Electron MCP server integration is enabled.
@@ -599,13 +615,48 @@ def get_electron_debug_port() -> int:
 
 
 def should_use_claude_md() -> bool:
-    """Check if CLAUDE.md instructions should be included in system prompt."""
-    return os.environ.get("USE_CLAUDE_MD", "").lower() == "true"
+    """Check if CLAUDE.md instructions should be included in the agent's context.
+
+    On unless USE_CLAUDE_MD says no. The frontend sends "false" for a project
+    that turned `useClaudeMd` off; many runners, the FastAPI server and the CLI
+    never receive the variable, and the setting's default is on.
+    """
+    value = os.environ.get("USE_CLAUDE_MD", "").strip().lower()
+    return value not in ("0", "false", "no", "off")
+
+
+#: Claude Code's own switch for memory files. Set to "1", the CLI loads no
+#: CLAUDE.md at all: user, project, `.claude/CLAUDE.md`, `CLAUDE.local.md`,
+#: `.claude/rules/`, nor the nested CLAUDE.md of a folder the agent reads.
+#: See code.claude.com/docs/en/env-vars.
+DISABLE_CLAUDE_MD_ENV = "CLAUDE_CODE_DISABLE_CLAUDE_MDS"
+
+
+def apply_claude_md_setting(sdk_env: dict[str, str]) -> bool:
+    """Let the project's `useClaudeMd` setting decide whether CLAUDE.md loads.
+
+    The SDK, not WorkPilot, reads CLAUDE.md: the "project" setting source
+    makes Claude Code put it in the session's user context, which a custom
+    system prompt does not replace. Turning the source off would also drop the
+    project's skills and hooks, so the setting answers with the CLI's memory
+    switch instead. Off, the switch is assigned rather than defaulted: the
+    project said no. `create_simple_client` applies it too.
+
+    Returns:
+        True when CLAUDE.md stays on, False when the switch was set.
+    """
+    if should_use_claude_md():
+        return True
+    sdk_env[DISABLE_CLAUDE_MD_ENV] = "1"
+    return False
 
 
 def load_claude_md(project_dir: Path) -> str | None:
     """
     Load CLAUDE.md content from project root if it exists.
+
+    The prompt preview reads it to show the file; a session never injects it,
+    Claude Code loads it (see `apply_claude_md_setting`).
 
     Args:
         project_dir: Root directory of the project
@@ -630,6 +681,7 @@ _DOMAIN_ROLE_BY_AGENT_TYPE = {
     "planner": "planner",
     "qa_reviewer": "reviewer",
     "qa_fixer": "reviewer",
+    "verifier": "reviewer",
     "documenter": "documenter",
 }
 
@@ -673,6 +725,64 @@ class _NoSubagents(Exception):
     """
 
 
+def _uiux_mcp_tools() -> tuple[str, ...]:
+    """ui-ux-pro-max's MCP tool names, for the permission allowlist."""
+    from uiux.integration import MCP_TOOL_NAMES
+
+    return MCP_TOOL_NAMES
+
+
+def _brain_mcp_tools() -> tuple[str, ...]:
+    """The shared brain's MCP tool names, for the permission allowlist."""
+    from brain.runtime import MCP_TOOL_NAMES
+
+    return MCP_TOOL_NAMES
+
+
+def _code_search_mcp_tools() -> tuple[str, ...]:
+    """`search_code`'s MCP tool names, for the permission allowlist."""
+    from harness.tools.code_search import MCP_TOOL_NAMES
+
+    return MCP_TOOL_NAMES
+
+
+def _claude_transcript_exists(session_id: str, config_dir: str | None) -> bool:
+    """Whether the Claude SDK has an on-disk transcript for ``session_id``.
+
+    The SDK keeps one JSONL per session under
+    ``<CLAUDE_CONFIG_DIR or ~/.claude>/projects/<encoded cwd>/``. The cwd
+    encoding is the SDK's own business, so every project directory is looked
+    at: a session id is a UUID, it names one file.
+    """
+    if not session_id or any(sep in session_id for sep in ("/", "\\", "..")):
+        return False
+    base = Path(config_dir).expanduser() if config_dir else Path.home() / ".claude"
+    try:
+        return any((base / "projects").glob(f"*/{session_id}.jsonl"))
+    except OSError:
+        return False
+
+
+# Permission mode hardening for read-only phases. "plan" lets Claude explore and
+# reason but refuses every write/exec tool call — a strong defense-in-depth
+# complement to the tools allowlist. Only for agent types that have no business
+# modifying files; a prompt that has to write its output (the spec researcher,
+# the spec self-critique) must never be mapped onto one of these, or its phase
+# reports success over a placeholder file. Module-level so tests read the set
+# the client applies instead of a copy of it.
+# See: code.claude.com/docs/en/agent-sdk/permissions
+READ_ONLY_AGENT_TYPES = frozenset(
+    {
+        "analyzer",
+        "spec_critic",
+        "spec_validation",
+        "pr_reviewer",
+        "pr_orchestrator_parallel",
+        "insights",
+    }
+)
+
+
 def create_client(
     project_dir: Path,
     spec_dir: Path,
@@ -683,6 +793,7 @@ def create_client(
     agents: dict | None = None,
     resume: str | None = None,
     use_subagents: bool = True,
+    roster: str | None = None,
 ) -> ClaudeSDKClient:
     """
     Create a Claude Agent SDK client with multi-layered security.
@@ -698,7 +809,7 @@ def create_client(
         spec_dir: Directory containing the spec (for settings file)
         model: Claude model to use
         agent_type: Agent type identifier from AGENT_CONFIGS
-                   (e.g., 'coder', 'planner', 'qa_reviewer', 'spec_gatherer')
+                   (e.g., 'coder', 'planner', 'qa_reviewer', 'spec_writer')
         max_thinking_tokens: Token budget for extended thinking (None = disabled)
                             - ultrathink: 16000 (spec creation)
                             - high: 10000 (QA review)
@@ -708,6 +819,9 @@ def create_client(
                       Use {"type": "json_schema", "schema": Model.model_json_schema()}
                       See: https://platform.claude.com/docs/en/agent-sdk/structured-outputs
         use_subagents: Whether this call may compose a subagent roster at all.
+        roster: Which subagent roster to compose, when it is not the one
+            agent_type implies. A workflow phase sets this; see
+            `agents.subagents.phases.phase_specs`.
                       False is the workflow engine's `sequential-reset`: same
                       isolation, no parallel dispatch. Defaults to True, which
                       is the behaviour every existing caller already had.
@@ -735,6 +849,22 @@ def create_client(
     if isinstance(spec_dir, str):
         spec_dir = Path(spec_dir)
 
+    from core.offline_policy import guard_cloud_client
+
+    guard_cloud_client(project_dir, spec_dir)
+
+    # rtk settings a project carries in `.workpilot/.env` — the file the
+    # Electron settings screen writes. Applied here rather than read at each
+    # call site so the hook, the awareness paragraph and WorkPilot's own
+    # captures all answer from the same switch. An exported variable wins: a
+    # CLI user who said something on the command line said it later than a file.
+    rtk_settings.apply_project_env(project_dir)
+
+    # The same treatment for the watermark switches, and for the same
+    # reason: the hook below, the tool executor the other providers run on
+    # and the status endpoint must all read one answer about this project.
+    watermarks_settings.apply_project_env(project_dir)
+
     # Collect env vars to pass to SDK (ANTHROPIC_BASE_URL, CLAUDE_CONFIG_DIR, etc.)
     sdk_env = get_sdk_env_vars()
 
@@ -745,9 +875,23 @@ def create_client(
     #   cards instead of paying full input price every 5 minutes.
     # - tool-search auto:5: defers MCP tool schemas when their combined size
     #   exceeds 5% of the context window. Activates only when there are enough
-    #   MCP servers to make deferral worthwhile.
+    #   MCP servers to make deferral worthwhile. Only on Anthropic's own API:
+    #   behind another base URL the CLI leaves tool search off, because a
+    #   proxy that does not forward `tool_reference` blocks loses every
+    #   deferred tool, and a value here would override that guard. A value the
+    #   user exported reaches the CLI untouched (the SDK passes the process
+    #   environment, then this dict on top of it).
     sdk_env.setdefault("ENABLE_PROMPT_CACHING_1H", "1")
-    sdk_env.setdefault("ENABLE_TOOL_SEARCH", "auto:5")
+    if "ENABLE_TOOL_SEARCH" not in os.environ and _is_anthropic_api(
+        sdk_env.get("ANTHROPIC_BASE_URL")
+    ):
+        sdk_env.setdefault("ENABLE_TOOL_SEARCH", "auto:5")
+    # Native compaction at the task's context threshold (context_mgmt): the CLI
+    # summarises in place, mid-turn, instead of WorkPilot restarting the thread.
+    from context_mgmt import native_auto_compact_env
+
+    for _key, _value in native_auto_compact_env(spec_dir, model).items():
+        sdk_env.setdefault(_key, _value)
 
     # OpenTelemetry observability (opt-in). When AUTO_CLAUDE_OTEL_ENDPOINT is
     # set (e.g. `http://localhost:4318` for a local OTLP collector / Jaeger),
@@ -820,6 +964,7 @@ def create_client(
         project_capabilities,
         linear_enabled,
         mcp_config,
+        spec_dir=spec_dir,
     )
 
     # Get required MCP servers for this agent type
@@ -830,10 +975,8 @@ def create_client(
         project_capabilities,
         linear_enabled,
         mcp_config,
+        spec_dir=spec_dir,
     )
-
-    # Check if Graphiti MCP is enabled (already filtered by get_required_mcp_servers)
-    graphiti_mcp_enabled = "graphiti" in required_servers
 
     # Determine browser tools for permissions (already in allowed_tools_list)
     browser_tools_permissions = []
@@ -933,8 +1076,18 @@ def create_client(
                     else []
                 ),
                 *(
-                    [f"{tool}(*)" for tool in GRAPHITI_MCP_TOOLS]
-                    if graphiti_mcp_enabled
+                    [f"{tool}(*)" for tool in _brain_mcp_tools()]
+                    if "brain" in required_servers
+                    else []
+                ),
+                *(
+                    [f"{tool}(*)" for tool in _uiux_mcp_tools()]
+                    if "uiux" in required_servers
+                    else []
+                ),
+                *(
+                    [f"{tool}(*)" for tool in _code_search_mcp_tools()]
+                    if "code" in required_servers
                     else []
                 ),
                 *[f"{tool}(*)" for tool in browser_tools_permissions],
@@ -970,8 +1123,12 @@ def create_client(
         mcp_servers_list.append("puppeteer (browser automation)")
     if "linear" in required_servers:
         mcp_servers_list.append("linear (project management)")
-    if graphiti_mcp_enabled:
-        mcp_servers_list.append("graphiti-memory (knowledge graph)")
+    if "brain" in required_servers:
+        mcp_servers_list.append("workpilot-brain (shared brain)")
+    if "uiux" in required_servers:
+        mcp_servers_list.append("workpilot-uiux (ui-ux-pro-max design data)")
+    if "code" in required_servers:
+        mcp_servers_list.append("workpilot-code (ranked code excerpts)")
     if "workpilot" in required_servers and auto_claude_tools_enabled:
         mcp_servers_list.append(f"workpilot ({agent_type} tools)")
     if mcp_servers_list:
@@ -994,10 +1151,20 @@ def create_client(
     mcp_servers = {}
 
     if "context7" in required_servers:
+        # The key is passed through the environment rather than `--api-key`:
+        # the server reads CONTEXT7_API_KEY itself, and an argument would put
+        # the secret in every `ps` listing on the machine. Anonymous access
+        # still works — rate limited per IP, which is fine for one developer
+        # and hopeless for a machine running builds all day.
+        context7_api_key = mcp_config.get(
+            "CONTEXT7_API_KEY", os.environ.get("CONTEXT7_API_KEY", "")
+        )
         mcp_servers["context7"] = {
             "command": "npx",
             "args": ["-y", "@upstash/context7-mcp"],
         }
+        if context7_api_key:
+            mcp_servers["context7"]["env"] = {"CONTEXT7_API_KEY": context7_api_key}
 
     if "electron" in required_servers:
         # Electron MCP for desktop apps
@@ -1017,7 +1184,14 @@ def create_client(
     if "chrome-devtools" in required_servers:
         # Chrome DevTools MCP for browser automation via Chrome DevTools Protocol
         # Connects to a running Chrome instance or launches a new one
-        chrome_devtools_args = ["-y", "chrome-devtools-mcp@latest"]
+        # A developer's local pages have no business reaching Google's CrUX API
+        # or its usage statistics: both are on by default upstream.
+        chrome_devtools_args = [
+            "-y",
+            "chrome-devtools-mcp@latest",
+            "--no-usage-statistics",
+            "--no-performance-crux",
+        ]
         # Check if we should connect to an existing browser (e.g., app emulator)
         chrome_devtools_port = mcp_config.get(
             "CHROME_DEVTOOLS_PORT",
@@ -1040,13 +1214,6 @@ def create_client(
             "type": "http",
             "url": "https://mcp.linear.app/mcp",
             "headers": {"Authorization": f"Bearer {linear_api_key}"},
-        }
-
-    # Graphiti MCP server for knowledge graph memory
-    if graphiti_mcp_enabled:
-        mcp_servers["graphiti-memory"] = {
-            "type": "http",
-            "url": get_graphiti_mcp_url(),
         }
 
     if "github" in required_servers:
@@ -1131,6 +1298,45 @@ def create_client(
                 "env": {"TEAMS_WEBHOOK_URL": teams_webhook_url},
             }
 
+    # The shared brain (`brain/runtime.py`): offered to every agent with tools
+    # once a brain exists on this machine, whatever the feature.
+    if "brain" in required_servers:
+        from brain.runtime import SERVER_KEY, mcp_server_config, task_ref
+
+        # The task, when there is one, so what the agent learns shows up on
+        # its Kanban card.
+        mcp_servers[SERVER_KEY] = mcp_server_config(
+            task=task_ref(project_dir, spec_dir)
+        )
+
+    # ui-ux-pro-max (`uiux/integration.py`): offered only on a task whose
+    # preflight said it touches the interface.
+    if "uiux" in required_servers:
+        from uiux.integration import SERVER_KEY as UIUX_SERVER_KEY
+        from uiux.integration import mcp_server_config as uiux_server_config
+
+        mcp_servers[UIUX_SERVER_KEY] = uiux_server_config(project_dir)
+
+    # The verification loop's tools (`verify/mcp_server.py`) for the session
+    # that drives the app: the same `verify_*` tools the other providers get
+    # in-process from `tool_executor`. The build owns the apps it launched, so
+    # the server is told to leave them running when the session ends.
+    if "verify" in required_servers:
+        from verify import mcp_server_config as verify_server_config
+
+        mcp_servers["workpilot-verify"] = verify_server_config(
+            project_dir, spec_dir, keep_apps=True
+        )
+
+    # Ranked code excerpts (`harness/tools/code_search.py`) for a type that
+    # declares them: the same `search_code` the other providers get in-process
+    # from `tool_executor`, over the session's project only.
+    if "code" in required_servers:
+        from harness.tools.code_search import SERVER_KEY as CODE_SERVER_KEY
+        from harness.tools.code_search import mcp_server_config as code_server_config
+
+        mcp_servers[CODE_SERVER_KEY] = code_server_config(project_dir)
+
     # Add custom workpilot MCP server if required and available
     if "workpilot" in required_servers and auto_claude_tools_enabled:
         auto_claude_mcp_server = create_auto_claude_mcp_server(spec_dir, project_dir)
@@ -1168,35 +1374,11 @@ def create_client(
 
     base_prompt = build_base_system_prompt(project_dir)
 
-    # CLAUDE.md loading strategy: hybrid (setting_sources + manual fallback).
-    #
-    # Primary path: `setting_sources=["project","user","local"]` (added below to
-    # ClaudeAgentOptions) lets the SDK natively load <cwd>/CLAUDE.md,
-    # <cwd>/.claude/CLAUDE.md, project rules, and skills with proper prompt-cache
-    # prefix handling — no manual concatenation needed.
-    #
-    # Fallback: if the SDK can't find a CLAUDE.md (e.g. user disabled the
-    # "project" setting source, or CLAUDE.md lives at an unusual path), we
-    # still inject it manually into the system prompt when USE_CLAUDE_MD=true.
-    # This preserves the historical behavior for projects that rely on it.
-    if should_use_claude_md():
-        # SDK-native loading path expects CLAUDE.md at <cwd>/CLAUDE.md or
-        # <cwd>/.claude/CLAUDE.md. If found there, skip manual injection so
-        # the SDK can cache the prefix once across cards.
-        sdk_native_paths = [
-            project_dir / "CLAUDE.md",
-            project_dir / ".claude" / "CLAUDE.md",
-        ]
-        sdk_will_load = any(p.exists() for p in sdk_native_paths)
-        if sdk_will_load:
-            print("   - CLAUDE.md: loaded via setting_sources (SDK-native, cached)")
-        else:
-            claude_md_content = load_claude_md(project_dir)
-            if claude_md_content:
-                base_prompt = f"{base_prompt}\n\n# Project Instructions (from CLAUDE.md)\n\n{claude_md_content}"
-                print("   - CLAUDE.md: injected manually (fallback)")
-            else:
-                print("   - CLAUDE.md: not found in project root")
+    # CLAUDE.md is Claude Code's to load, through the "project" setting source
+    # below; this prompt never carries it. The project setting `useClaudeMd`
+    # (USE_CLAUDE_MD) switches it off in the CLI's environment.
+    if apply_claude_md_setting(sdk_env):
+        print("   - CLAUDE.md: loaded by Claude Code (setting_sources)")
     else:
         print("   - CLAUDE.md: disabled by project settings")
 
@@ -1243,6 +1425,25 @@ def create_client(
     except Exception:
         logger.debug("Agent debugger wiring skipped", exc_info=True)
 
+    # One hook instance for the four write tools rather than four: the
+    # factory closes over the spec directory so the ledger has somewhere to
+    # go, and nothing else about it varies per tool.
+    _watermarks_hook = make_watermarks_hook(spec_dir)
+
+    # Same factory shape, and resolved once: the roots cannot change during a
+    # session and the hook runs on every write.
+    _write_path_hook = make_write_path_hook(project_dir, spec_dir)
+    # docintel — an attachment the preflight withheld or redacted (a secret on
+    # screen, text aimed at the agent) is refused to `Read`, the one tool that
+    # hands pixels to the model. The prompt already says so; this is the
+    # backstop. It answers only for files the record names.
+    _read_guard_hook = make_read_guard_hook(spec_dir)
+    # What a sub-agent brings back is cut to the contract's cap, marked when
+    # cut, and delimited as data before the parent reads it (harness lot 5).
+    # The CLI runs the sub-agent; its tool's PostToolUse is where WorkPilot
+    # sees the result first.
+    _subagent_result_hook = make_subagent_result_hook(spec_dir)
+
     # Build options dict, conditionally including output_format
     options_kwargs: dict[str, Any] = {
         "model": model,
@@ -1256,31 +1457,78 @@ def create_client(
                     matcher="Bash",
                     hooks=[_make_guardrails_hook(project_dir)],
                 ),
-                HookMatcher(
-                    matcher="Write",
-                    hooks=[_make_guardrails_hook(project_dir)],
+                # rtk — condense what the command prints before the model reads
+                # it. Registered after the two hooks that decide whether the
+                # command may run at all, and returning only `updatedInput`:
+                # this one changes the output, never the permission. A machine
+                # without rtk answers in a cached `shutil.which` and the
+                # command runs exactly as written.
+                HookMatcher(matcher="Bash", hooks=[rtk_rewrite_hook]),
+                # Where a write may land. Registered before the guardrails
+                # hook because it answers the same question the guardrails
+                # answer — may this write happen — from a rule the project does
+                # not have to have written down. `guardrails.evaluate` returns
+                # "no opinion" with no `.workpilot/guardrails.yaml`, which is
+                # the default, so until this hook existed nothing held an agent
+                # to the worktree it was given.
+                *(
+                    HookMatcher(
+                        matcher=tool,
+                        hooks=[_write_path_hook],
+                    )
+                    for tool in GUARDED_WRITE_TOOLS
                 ),
-                HookMatcher(
-                    matcher="Edit",
-                    hooks=[_make_guardrails_hook(project_dir)],
+                HookMatcher(matcher="Read", hooks=[_read_guard_hook]),
+                # The user's own policies, on every tool that writes. This used
+                # to name `Write` and `Edit` only; `MultiEdit` and
+                # `NotebookEdit` write too, and a rule a team wrote about a
+                # path was not being applied to two of the four tools that can
+                # reach it.
+                *(
+                    HookMatcher(
+                        matcher=tool,
+                        hooks=[_make_guardrails_hook(project_dir)],
+                    )
+                    for tool in GUARDED_WRITE_TOOLS
+                ),
+                # watermarks — strip the invisible codepoints a model leaves in
+                # what it writes, before the bytes reach the disk. Registered
+                # after the guardrails hook for the same reason rtk is
+                # registered after bash_security_hook: that one decides whether
+                # the write happens, this one only decides what it contains.
+                # `Pre`, not `Post`, so the dirty bytes never exist on disk and
+                # no file watcher sees two writes. A checkout without the
+                # vendored table answers in one `str.isascii()` and the content
+                # is written exactly as the model produced it.
+                *(
+                    HookMatcher(matcher=tool, hooks=[_watermarks_hook])
+                    for tool in WATERMARK_CLEANED_TOOLS
                 ),
                 # Debugger breakpoints (any tool). Empty unless this run opted in.
                 *_debugger_hooks,
+            ],
+            "PostToolUse": [
+                HookMatcher(matcher=tool, hooks=[_subagent_result_hook])
+                for tool in SUBAGENT_TOOLS
             ],
             "PreCompact": [HookMatcher(hooks=[_make_pre_compact_hook(spec_dir)])],
             "Stop": [HookMatcher(hooks=[_make_stop_hook(spec_dir)])],
         },
         "max_turns": int(os.environ.get("AUTO_CLAUDE_MAX_TURNS", "1000")),
-        # Budget cap as a meaningful runaway guard. The error path
-        # (`error_max_budget_usd`) is already handled in agents/session.py.
-        # Default tuned for typical Kanban cards; users can raise via env.
-        "max_budget_usd": float(os.environ.get("AUTO_CLAUDE_MAX_BUDGET_USD", "5.0")),
+        # Budget cap as a meaningful runaway guard, the same per-session cap
+        # every other client gets from the session runner
+        # (harness.application.budget). The error path (`error_max_budget_usd`)
+        # is already handled in agents/session.py. Users can raise it via env;
+        # 0 or less removes it.
+        "max_budget_usd": session_budget_usd(),
         "cwd": str(project_dir.resolve()),
         "settings": str(settings_file.resolve()),
         # setting_sources auto-loads CLAUDE.md, project rules, skills, and
         # filesystem-defined hooks from ~/.claude (user), <cwd>/.claude (project),
         # and .claude/settings.local.json (local). The SDK handles prompt-cache
-        # prefixing automatically for these sources.
+        # prefixing automatically for these sources. CLAUDE.md and the rules
+        # files follow the project's `useClaudeMd` setting; skills and hooks
+        # do not (`apply_claude_md_setting`).
         # See: code.claude.com/docs/en/agent-sdk/claude-code-features
         "setting_sources": ["project", "user", "local"],
         "env": sdk_env,  # Pass ANTHROPIC_BASE_URL etc. to subprocess
@@ -1333,6 +1581,7 @@ def create_client(
             project_dir=project_dir,
             user_agents=agents,
             provider=_get_active_provider(spec_dir),
+            roster_name=roster,
         )
     except _NoSubagents:
         logger.debug(
@@ -1346,7 +1595,10 @@ def create_client(
         logger.debug("subagent resolution failed, using caller agents: %s", exc)
         _merged_agents = agents
     if _merged_agents:
-        options_kwargs["agents"] = _merged_agents
+        # Each sub-agent is told what it may bring back; the hook above holds
+        # it to that. Added here, not in the registry, whose prompts are also
+        # emitted to harnesses that WorkPilot does not receive results from.
+        options_kwargs["agents"] = bind_contract(_merged_agents)
         # Subagents are invoked via the built-in "Agent" tool — it must be
         # allowlisted, otherwise the SDK rejects the invocation. We mutate the
         # allowed_tools list in-place because it's already inside options_kwargs.
@@ -1367,59 +1619,62 @@ def create_client(
     # "Continuing implementation… / Prompt is too long" cascade once the
     # transcript grew past the model's context window.
     # See: code.claude.com/docs/en/agent-sdk/sessions
-    _resume_id = resume or os.environ.get("AUTO_CLAUDE_RESUME_SESSION_ID")
-    if _resume_id:
-        options_kwargs["resume"] = _resume_id
-        logger.info(f"Resuming Claude SDK session: {_resume_id}")
+    _env_resume_id = os.environ.get("AUTO_CLAUDE_RESUME_SESSION_ID")
+    _resume_id = resume or _env_resume_id
+    if _env_resume_id:
         # Pop the env var so the NEXT iteration creates a fresh session instead
         # of re-replaying the same transcript. Explicit `resume=` kwargs still
         # work — they're per-call, not process-wide.
         os.environ.pop("AUTO_CLAUDE_RESUME_SESSION_ID", None)
+    if (
+        _resume_id
+        and not resume
+        and not _claude_transcript_exists(_resume_id, config_dir)
+    ):
+        # A pointer the SDK cannot open fails the session outright ("No
+        # conversation found"). The id handed down on a resume can come from
+        # another profile's CLAUDE_CONFIG_DIR, another machine, or a session
+        # killed before its transcript was written — in all of those the
+        # conversation log replay (every provider) is what carries the
+        # context, and it only runs when the SDK is NOT resuming.
+        logger.info(
+            "Claude SDK transcript for session %s not found — resuming from the "
+            "conversation log instead",
+            _resume_id,
+        )
+        _resume_id = None
+    if _resume_id:
+        options_kwargs["resume"] = _resume_id
+        logger.info(f"Resuming Claude SDK session: {_resume_id}")
 
-    # Permission mode hardening for read-only phases. "plan" lets Claude
-    # explore and reason but refuses every write/exec tool call — a strong
-    # defense-in-depth complement to the tools allowlist. We only enable it
-    # for phases that have no business modifying files anyway.
-    # See: code.claude.com/docs/en/agent-sdk/permissions
-    _readonly_phases = {
-        "analyzer",
-        "spec_critic",
-        "spec_validation",
-        "spec_context",
-        "spec_discovery",
-        "pr_reviewer",
-        "pr_orchestrator_parallel",
-        "insights",
-    }
-    if agent_type in _readonly_phases and "permission_mode" not in options_kwargs:
+    # Read-only phases run in permission mode "plan" (READ_ONLY_AGENT_TYPES).
+    if agent_type in READ_ONLY_AGENT_TYPES and "permission_mode" not in options_kwargs:
         options_kwargs["permission_mode"] = "plan"
 
-    # Reasoning effort, gated on Opus 4.x (only Opus models support this param).
-    # Docs recommend "xhigh" on Opus 4.7 for coding/agentic tasks; cheaper
-    # phases get "low" to save tokens. Env var override wins so a user can
-    # force a level for debugging.
+    # What a type does not declare, it does not have. `allowed_tools` only
+    # auto-approves, and the settings file above allows Write, Edit and
+    # `Bash(*)` to every type, so until this line a declaration was a wish:
+    # a `pr_reviewer` reading a hostile diff could write and run commands.
+    # `disallowed_tools` removes the tool from the model's context and wins
+    # over allow rules, which is why the settings file can stay shared.
+    if denied := undeclared_builtin_tools(agent_type):
+        options_kwargs["disallowed_tools"] = denied
+
+    # Reasoning effort, on Opus only. It follows the user's thinking level for
+    # the phase, which the caller resolved into `max_thinking_tokens`: on Opus
+    # 5.5 a thinking budget is not accepted and effort is the only control, so
+    # a fixed table here would silently overrule the selector. The env var
+    # still wins, to force a level for debugging.
     # See: code.claude.com/docs/en/agent-sdk/agent-loop#effort-level
     #
     # Only emit the kwarg when the installed SDK actually supports it: older
     # ``claude_agent_sdk`` builds lack the ``effort`` field and would otherwise
     # raise "unexpected keyword argument 'effort'", aborting the agent run.
     if "opus" in (model or "").lower():
-        _effort_map = {
-            "explorer": "low",
-            "spec_gatherer": "low",
-            "lint": "low",
-            "status": "low",
-            "documenter": "medium",
-            "qa_reviewer": "high",
-            "qa_fixer": "high",
-            "validation": "high",
-            "planner": "xhigh",
-            "architect": "xhigh",
-            "coder": "xhigh",
-            "dev": "xhigh",
-        }
-        _effort = os.environ.get("AUTO_CLAUDE_EFFORT") or _effort_map.get(
-            agent_type, "high"
+        from core.llm_optimization import claude_effort
+
+        _effort = os.environ.get("AUTO_CLAUDE_EFFORT") or claude_effort(
+            max_thinking_tokens
         )
         if _claude_options_supports("effort"):
             options_kwargs["effort"] = _effort
@@ -1444,10 +1699,21 @@ def create_client(
 # =============================================================================
 
 
-# Filename for the single-shot "resume task X under provider Y" marker. The
-# frontend writes this when the user picks a different provider from the
-# paused-task modal. _get_active_provider() consumes it on the very next
-# session start and deletes the file so it doesn't keep overriding.
+# Filename for the single-shot "resume task X under provider Y" marker.
+# _get_active_provider() consumes it on the very next session start and
+# deletes the file so it doesn't keep overriding.
+#
+# TO REMOVE after the first release that follows 1.2.1 (audit F25, lot L9).
+# Nothing writes the marker since #290: TASK_RESUME_WITH_PROVIDER records the
+# engine in task_metadata.json and deletes the marker. The read stays for one
+# version so a task paused under 1.2.1, whose marker is still on disk, resumes
+# with the provider the user picked. No release has shipped since #290 (the
+# last is v1.2.1, 2026-08-27). Remove then: this constant,
+# _consume_resume_with_provider_marker, the `consume` parameter of
+# _get_active_provider and the comments that cite the marker (agents/coder.py,
+# workflows/api.py, cli/build_commands.py, cli/utils.py), and adapt
+# core/test_resume_with_provider.py and test_e2e_provider_switch_resume.py;
+# peek_active_provider can then become an alias of _get_active_provider.
 RESUME_WITH_PROVIDER_FILE = "RESUME_WITH_PROVIDER"
 
 
@@ -1510,13 +1776,137 @@ def peek_active_provider(spec_dir: Path | None = None) -> str:
     return _get_active_provider(spec_dir, consume=False)
 
 
+# Le fournisseur retenu quand personne n'en nomme un. C'est un defaut, pas un
+# choix, et `_resolve_active_provider` le dit — voir la regle de routage dans
+# `core.offline_policy.resolve_offline_route`.
+_DEFAULT_PROVIDER = "claude"
+
+
 def _get_active_provider(spec_dir: Path | None = None, *, consume: bool = True) -> str:
+    """The active provider, without saying where it came from.
+
+    Thin wrapper over `_resolve_active_provider` — see there for the
+    resolution order. Callers that must tell a *choice* from the fallback
+    default use that one instead.
+    """
+    return _resolve_active_provider(spec_dir, consume=consume)[0]
+
+
+# Every spelling a provider arrives under, mapped to the name the client
+# factory branches on. Shared by `_resolve_active_provider` and
+# `create_agent_client`, so "anthropic" written by the frontend reaches the
+# Claude branch instead of the degraded fallback.
+_PROVIDER_ALIASES: dict[str, str] = {
+    "anthropic": "claude",
+    "claude": "claude",
+    "copilot": "copilot",
+    "openai": "openai",
+    "google": "google",
+    "gemini": "google",
+    "ollama": "ollama",
+    "meta": "meta",
+    "mistral": "mistral",
+    "deepseek": "deepseek",
+    "grok": "grok",
+    "aws": "aws",
+    "windsurf": "windsurf",
+    "cursor": "cursor",
+    "custom": "custom",
+    "opencode": "opencode",
+    "antigravity": "antigravity",
+    "agy": "antigravity",
+    "pi": "pi",
+}
+
+
+def _trace_pi_trust(spec_dir: Path | None, trust: str) -> None:
+    """Say in the task feed that pi skipped the project's `.pi/` resources.
+
+    `undecided` is the silent failure the trust gate produces in a run without
+    a UI; `untrusted` is a decision the person took. Both are reported, neither
+    is overridden: the fix is one `/trust` in pi, run by a person in the checkout.
+    """
+    if trust == "untrusted":
+        message = (
+            "pi: this project's .pi/ resources (extensions, mcp.json, prompts) "
+            "are not loaded — the checkout is marked untrusted in pi's trust.json."
+        )
+    else:
+        message = (
+            "pi: this project's .pi/ resources (extensions, mcp.json, prompts) "
+            "are not loaded — the checkout is not trusted in pi yet. To load "
+            "them, run `pi` in the project directory and `/trust`."
+        )
+    logger.warning("[pi-trust] %s", message)
+    if spec_dir is None:
+        return
+    try:
+        from task_logger import get_task_logger
+
+        tl = get_task_logger()
+        if tl is not None and Path(tl.spec_dir) == Path(spec_dir):
+            tl.log_info(f"⚠️ {message}")
+    except Exception as exc:  # pragma: no cover - tracing must not break a run
+        logger.debug("could not surface the pi trust state in the feed: %s", exc)
+
+
+def _locked_task_provider(spec_dir: Path) -> str | None:
+    """The task-wide provider of a task whose engine is locked, else None.
+
+    Never raises: an unreadable file is an unlocked task, and the usual
+    resolution order answers.
+    """
+    try:
+        import json as _json
+
+        metadata_path = spec_dir / "task_metadata.json"
+        if not metadata_path.exists():
+            return None
+        with open(metadata_path, encoding="utf-8") as f:
+            meta = _json.load(f)
+        if not isinstance(meta, dict) or not meta.get("engineLocked"):
+            return None
+        provider = str(meta.get("provider") or "").lower().strip()
+        return provider or None
+    except Exception:
+        logger.debug("Could not read the task engine lock", exc_info=True)
+        return None
+
+
+def _normalize_provider_name(provider: str) -> str:
+    """Lower-case a provider name and fold "anthropic" into "claude".
+
+    "agy" is folded into "antigravity" as well. Only those aliases are folded here: "gemini" keeps its own branch in
+    `create_agent_client`, and an unknown name must reach the degraded path
+    unchanged so its log line names it.
+    """
+    name = provider.lower().strip()
+    if name == "agy":
+        # The Antigravity binary's name, as a user may well type it.
+        return "antigravity"
+    return "claude" if name == "anthropic" else name
+
+
+def _resolve_active_provider(
+    spec_dir: Path | None = None, *, consume: bool = True
+) -> tuple[str, bool]:
     """
     Determine the active AI provider from IPC selection, environment or project settings.
 
+    Returns `(provider, chosen)`. `chosen` is False only in the last case
+    below — nobody named a provider anywhere and "claude" is a fallback.
+    The difference matters exactly once, and it is where it used to be
+    invisible: `core.offline_policy.resolve_offline_route` may re-route a
+    task to a local model, and it must know whether it is overriding a
+    decision somebody took or filling a blank nobody filled.
+
     Resolution order:
+    -1. task_metadata.json `provider` when the task's engine is locked
+        (`engineLocked`): the task owns its provider, nothing global wins
     0. RESUME_WITH_PROVIDER marker file (single-shot, "Reprendre avec X")
     1. Provider selected via IPC (from frontend UI selection)
+    1.5. SELECTED_LLM_PROVIDER environment variable
+    1.7. task_metadata.json `provider` (unlocked, legacy tasks)
     2. AUTO_CLAUDE_PROVIDER environment variable
     3. Project-level _AUTO_CLAUDE_DIR/.env → AI_PROVIDER key
     4. Default: "claude"
@@ -1525,25 +1915,29 @@ def _get_active_provider(spec_dir: Path | None = None, *, consume: bool = True) 
         spec_dir: Optional spec directory to check for project-level settings.
 
     Returns:
-        Provider identifier string: "claude", "copilot", "openai", etc.
+        `(provider, chosen)` — the identifier ("claude", "copilot", "openai",
+        …) and whether any source actually named it.
     """
     # Provider name mapping (shared across all resolution strategies)
-    provider_mapping = {
-        "anthropic": "claude",
-        "claude": "claude",
-        "copilot": "copilot",
-        "openai": "openai",
-        "google": "google",
-        "ollama": "ollama",
-        "meta": "meta",
-        "mistral": "mistral",
-        "deepseek": "deepseek",
-        "grok": "grok",
-        "aws": "aws",
-        "windsurf": "windsurf",
-        "cursor": "cursor",
-        "custom": "custom",
-    }
+    provider_mapping = _PROVIDER_ALIASES
+
+    # A task that owns its engine answers before anything else: the provider
+    # was chosen for this task, at creation or on a resume, and neither the
+    # default provider (SELECTED_LLM_PROVIDER, inherited from the app) nor a
+    # leftover marker from an older resume path may replace it.
+    if spec_dir:
+        locked = _locked_task_provider(Path(spec_dir))
+        if locked:
+            if consume:
+                (Path(spec_dir) / RESUME_WITH_PROVIDER_FILE).unlink(missing_ok=True)
+            mapped_locked = provider_mapping.get(locked, locked)
+            logger.info(
+                "[_get_active_provider] Resolved from the task's own engine: "
+                "'%s' -> '%s'",
+                locked,
+                mapped_locked,
+            )
+            return mapped_locked, True
 
     # 0. Highest priority: explicit "resume with X" marker written by the
     # frontend when the user picked a different provider from the paused-task
@@ -1559,7 +1953,7 @@ def _get_active_provider(spec_dir: Path | None = None, *, consume: bool = True) 
                 override,
                 mapped_override,
             )
-            return mapped_override
+            return mapped_override, True
 
     # 1. Check provider selected via IPC (from frontend UI)
     try:
@@ -1571,7 +1965,7 @@ def _get_active_provider(spec_dir: Path | None = None, *, consume: bool = True) 
                 selected_provider.lower(), selected_provider.lower()
             )
             if mapped_provider:
-                return mapped_provider
+                return mapped_provider, True
     except Exception:
         # Fallback to other methods if IPC provider check fails
         pass
@@ -1583,7 +1977,7 @@ def _get_active_provider(spec_dir: Path | None = None, *, consume: bool = True) 
         logger.info(
             f"[_get_active_provider] Resolved provider from SELECTED_LLM_PROVIDER env var: '{selected_env}' -> '{resolved}'"
         )
-        return resolved
+        return resolved, True
 
     # 1.7. Check task_metadata.json for provider.
     # This handles the case where the frontend has a non-Claude provider stored in the
@@ -1612,7 +2006,7 @@ def _get_active_provider(spec_dir: Path | None = None, *, consume: bool = True) 
                         f"[_get_active_provider] Resolved from task_metadata.json: "
                         f"'{_meta_provider}' -> '{_mapped}'"
                     )
-                    return _mapped
+                    return _mapped, True
         except Exception:
             logger.debug(
                 "Could not read provider from task_metadata.json", exc_info=True
@@ -1625,6 +2019,7 @@ def _get_active_provider(spec_dir: Path | None = None, *, consume: bool = True) 
         "copilot",
         "openai",
         "google",
+        "gemini",
         "ollama",
         "meta",
         "mistral",
@@ -1634,8 +2029,12 @@ def _get_active_provider(spec_dir: Path | None = None, *, consume: bool = True) 
         "windsurf",
         "cursor",
         "custom",
+        "opencode",
+        "antigravity",
+        "agy",
+        "pi",
     ):
-        return env_provider
+        return _normalize_provider_name(env_provider), True
 
     # 3. Project-level setting from spec's parent project
     if spec_dir:
@@ -1669,13 +2068,18 @@ def _get_active_provider(spec_dir: Path | None = None, *, consume: bool = True) 
                                 "windsurf",
                                 "cursor",
                                 "custom",
+                                "opencode",
+                                "antigravity",
+                                "agy",
+                                "pi",
                             ):
-                                return value
+                                return _normalize_provider_name(value), True
             except Exception:
+                # Une source de provider illisible : on passe a la suivante, c'est le but de la chaine.
                 pass
 
     # 4. Default
-    return "claude"
+    return _DEFAULT_PROVIDER, False
 
 
 # Per-spec record of the last (provider, model, effort) an agent client was
@@ -1785,6 +2189,7 @@ def _log_llm_context_switch(
             if tl is not None and Path(tl.spec_dir) == Path(spec_dir):
                 tl.log_info(message)
         except Exception:
+            # Le task logger est optionnel : le message part deja sur stdout.
             pass
 
         try:
@@ -1796,9 +2201,127 @@ def _log_llm_context_switch(
                 encoding="utf-8",
             )
         except OSError:
+            # Le marqueur est un cache : le lecteur gere deja son absence.
             pass
     except Exception as e:  # pragma: no cover - defensive guard
         logger.debug("Could not record LLM context switch: %s", e)
+
+
+class _Unset:
+    """Distinguishes "the caller said nothing" from "the caller said None".
+
+    `max_thinking_tokens=None` is a real instruction — disable extended
+    thinking — so it cannot double as "resolve it for me".
+    """
+
+    __slots__ = ()
+
+    def __repr__(self) -> str:  # pragma: no cover - debugging aid
+        return "<unset>"
+
+
+_UNSET = _Unset()
+
+# agent_type -> the phase whose effort setting governs it. `phase_config`
+# speaks four phases, so anything outside the build pipeline maps onto the
+# nearest one; "coding" is the general case for an agent doing substantive
+# work on a codebase.
+_EFFORT_PHASE: dict[str, str] = {
+    "planner": "planning",
+    "architect": "planning",
+    "impact_analyzer": "planning",
+    "qa": "qa",
+    "qa_reviewer": "qa",
+    "qa_fixer": "qa",
+    "verifier": "qa",
+    "spec_writer": "spec",
+    "spec_researcher": "spec",
+    "spec_self_critique": "spec",
+}
+_DEFAULT_EFFORT_PHASE = "coding"
+
+# Single-purpose calls that stay on the provider default. Spending an
+# ultrathink budget on a one-line commit message is not what the user asked
+# for when they raised the effort on their build — the same reasoning that
+# gives these agent_types an empty subagent roster.
+_NO_EFFORT = frozenset({"commit_message", "pr_template_filler", "spec_compaction"})
+
+
+def _effort_for(spec_dir: Path | None, agent_type: str) -> int | None:
+    """The thinking budget this agent should run with, or None.
+
+    Never raises and never blocks a run: an unresolvable effort is the
+    provider default, which is exactly the behaviour every one of these call
+    sites had before.
+    """
+    if agent_type in _NO_EFFORT or spec_dir is None:
+        return None
+    try:
+        from phase_config import get_phase_thinking_budget
+
+        phase = _EFFORT_PHASE.get(agent_type, _DEFAULT_EFFORT_PHASE)
+        budget = get_phase_thinking_budget(Path(spec_dir), phase)
+        return budget if isinstance(budget, int) else None
+    except Exception as exc:  # noqa: BLE001 - effort is an optimisation
+        logger.debug("could not resolve effort for %s: %s", agent_type, exc)
+        return None
+
+
+# The tier aliases the SDK understands. On Anthropic they are a deliberate
+# cost choice — run the cheap read-only specialists on Sonnet even when the
+# parent is on Opus. Anywhere else they are just an unknown model id.
+_ANTHROPIC_TIER_ALIASES = frozenset({"sonnet", "opus", "haiku"})
+
+
+def _portable_subagent_model(model: str | None) -> str:
+    """Translate a roster's model hint for a non-Anthropic provider.
+
+    The registry in `agents/subagents/` is provider-agnostic by design, but its
+    specs name a tier the way the Claude SDK does. Handing "sonnet" to Copilot
+    costs a `400 model_not_supported` round-trip per subagent before the
+    fallback rescues it, so the alias is resolved to "inherit" here: the
+    specialist runs on whatever model the user actually chose.
+    """
+    if not model:
+        return "inherit"
+    return "inherit" if model.lower() in _ANTHROPIC_TIER_ALIASES else model
+
+
+def _portable_roster(agents: Mapping[str, Any] | None) -> dict[str, Any]:
+    """The roster as ``SubagentDefinition``s, models made portable.
+
+    `resolve()` hands back the SDK's ``AgentDefinition``s when the SDK is
+    importable, plain dicts otherwise; a client that runs the roster itself
+    reads one shape. A definition with no description is dropped: it is what
+    the model picks on, and a nameless specialist is never chosen.
+    """
+    from core.agent_client import SubagentDefinition
+
+    roster: dict[str, Any] = {}
+    for name, defn in (agents or {}).items():
+        if isinstance(defn, SubagentDefinition):
+            roster[name] = defn
+            continue
+        if isinstance(defn, Mapping):
+            fields = dict(defn)
+        elif hasattr(defn, "description"):
+            fields = {
+                "description": getattr(defn, "description", ""),
+                "prompt": getattr(defn, "prompt", ""),
+                "tools": getattr(defn, "tools", None) or [],
+                "model": getattr(defn, "model", "inherit"),
+            }
+        else:
+            continue
+        if not str(fields.get("description") or "").strip():
+            continue
+        roster[name] = SubagentDefinition(
+            description=str(fields.get("description") or ""),
+            prompt=str(fields.get("prompt") or ""),
+            tools=list(fields.get("tools") or []),
+            model=_portable_subagent_model(fields.get("model") or "inherit"),
+        )
+    return roster
 
 
 def create_agent_client(
@@ -1806,13 +2329,84 @@ def create_agent_client(
     spec_dir: Path,
     model: str,
     agent_type: str = "coder",
-    max_thinking_tokens: int | None = None,
+    max_thinking_tokens: int | None | _Unset = _UNSET,
     output_format: dict | None = None,
     agents: dict | None = None,
     provider: str | None = None,
     resume: str | None = None,
     system_prompt: str | None = None,
     use_subagents: bool = True,
+    roster: str | None = None,
+) -> "AgentClient":  # noqa: F821
+    """A provider-agnostic agent client, with its sub-agent roster attached.
+
+    The client comes from ``_build_agent_client`` (one branch per provider).
+    The roster is the same for every provider — ``agents.subagents.resolve``:
+    phase defaults, the detected stack's overlays, the caller's ``agents``
+    winning, capped — and it is attached here, once, rather than in each
+    branch: the Copilot branch used to convert the caller's dict and nobody
+    else did, so every provider but Claude ran every phase alone while the
+    workflow profile announced ``subagent-per-task``.
+
+    The Claude branch composes it inside ``create_client`` (the SDK runs it
+    natively). Every client that ``delegates()`` gets it here and offers it
+    to the model as the ``delegate`` tool (``harness.application.delegation``).
+    The CLIs bring their own tools and take no roster: the engine already
+    degrades their dispatch to ``sequential-reset``.
+    """
+    client = _build_agent_client(
+        project_dir,
+        spec_dir,
+        model,
+        agent_type=agent_type,
+        max_thinking_tokens=max_thinking_tokens,
+        output_format=output_format,
+        agents=agents,
+        provider=provider,
+        resume=resume,
+        system_prompt=system_prompt,
+        use_subagents=use_subagents,
+        roster=roster,
+    )
+    if not use_subagents or not client.delegates():
+        return client
+    try:
+        from agents.subagents import resolve as _resolve_subagents
+
+        composed = _resolve_subagents(
+            agent_type,
+            project_dir=project_dir,
+            user_agents=agents,
+            provider=client.provider_name(),
+            roster_name=roster,
+        )
+    except Exception as exc:  # roster composition never breaks client creation
+        logger.debug("subagent resolution failed for %s: %s", agent_type, exc)
+        composed = agents
+    client.agents = _portable_roster(composed)
+    if client.agents:
+        logger.info(
+            "[create_agent_client] %s delegates to %d specialist(s): %s",
+            client.provider_name(),
+            len(client.agents),
+            ", ".join(sorted(client.agents)),
+        )
+    return client
+
+
+def _build_agent_client(
+    project_dir: Path,
+    spec_dir: Path,
+    model: str,
+    agent_type: str = "coder",
+    max_thinking_tokens: int | None | _Unset = _UNSET,
+    output_format: dict | None = None,
+    agents: dict | None = None,
+    provider: str | None = None,
+    resume: str | None = None,
+    system_prompt: str | None = None,
+    use_subagents: bool = True,
+    roster: str | None = None,
 ) -> "AgentClient":  # noqa: F821
     """
     Create a provider-agnostic agent client for Kanban task execution.
@@ -1826,7 +2420,9 @@ def create_agent_client(
         spec_dir: Directory containing the spec (for settings file)
         model: Model identifier (e.g., "claude-sonnet-4-5-20250929" or "gpt-4o")
         agent_type: Agent type from AGENT_CONFIGS
-        max_thinking_tokens: Token budget for extended thinking
+        max_thinking_tokens: Token budget for extended thinking. Omit it to
+            use the effort level the user chose for this phase; pass None to
+            disable extended thinking regardless of that setting.
         output_format: Optional structured output format
         agents: Optional dict of subagent definitions.
                For Claude: passed as claude_agent_sdk.AgentDefinition objects
@@ -1836,6 +2432,11 @@ def create_agent_client(
         use_subagents: Whether this call may compose a subagent roster at all.
                  False suppresses it entirely — the workflow engine's
                  `sequential-reset` dispatch. Defaults to True.
+        roster: Which roster to compose, when it is not the one agent_type
+                 implies. Separate from `agent_type` on purpose: that decides
+                 the tool allowlist and whether the phase may write, this
+                 decides which specialists it may dispatch to. See
+                 `agents.subagents.phases.phase_specs`.
         system_prompt: Optional system-prompt override. When provided, it
                  replaces the default coding base prompt for the
                  copilot/openai/windsurf clients (used by utilities that need
@@ -1848,11 +2449,7 @@ def create_agent_client(
     Raises:
         ValueError: If agent_type is unknown or provider is unsupported
     """
-    from core.agent_client import (
-        ClaudeAgentClient,
-        CopilotAgentClient,
-        SubagentDefinition,
-    )
+    from core.agent_client import ClaudeAgentClient, CopilotAgentClient
 
     # Normalize to Path objects in case strings are passed
     if isinstance(project_dir, str):
@@ -1860,9 +2457,30 @@ def create_agent_client(
     if isinstance(spec_dir, str):
         spec_dir = Path(spec_dir)
 
-    # Resolve provider
+    # The user's effort setting, unless this caller stated its own. Omitting
+    # the argument used to mean "no extended thinking at all", so fifteen call
+    # sites across PR review, triage, arena, the spec pipeline and the slash
+    # commands silently ignored the effort selector: a user on ultrathink got
+    # a reviewer with no thinking budget and no way to tell.
+    if max_thinking_tokens is _UNSET:
+        max_thinking_tokens = _effort_for(spec_dir, agent_type)
+
+    # Resolve provider. `provider_chosen` says whether this pair is a decision
+    # somebody took for this run — an explicit argument (the Bounty Board names
+    # one per contestant), the "Fournisseur IA" list, a per-task metadata entry —
+    # or the fallback nobody asked for. Only `resolve_offline_route` reads it,
+    # and only to decide whether an offline route may overrule it.
+    provider_chosen = provider is not None
     if provider is None:
-        provider = _get_active_provider(spec_dir)
+        provider, provider_chosen = _resolve_active_provider(spec_dir)
+    else:
+        provider = _normalize_provider_name(provider)
+
+    from core.offline_policy import local_endpoint, resolve_offline_route
+
+    provider, model, offline_base_url = resolve_offline_route(
+        project_dir, spec_dir, agent_type, provider, model, chosen=provider_chosen
+    )
 
     # Anthropic rejects dotted Copilot-style ids (e.g. "claude-opus-4.8"); rewrite
     # to the dashed native form before it reaches the SDK or the context trace.
@@ -1874,6 +2492,7 @@ def create_agent_client(
 
             model = normalize_anthropic_model_id(model)
         except Exception:
+            # La normalisation est un filet : un id non normalise reste utilisable.
             pass
 
     logger.info(
@@ -1902,38 +2521,27 @@ def create_agent_client(
             base_prompt = build_base_system_prompt(project_dir)
             base_prompt = _inject_domain_addendum(base_prompt, agent_type, spec_dir)
 
-        # Convert agents dict to SubagentDefinition if provided
-        copilot_agents: dict[str, SubagentDefinition] | None = None
-        if agents and use_subagents:
-            copilot_agents = {}
-            for name, defn in agents.items():
-                # Handle both AgentDefinition (Claude SDK) and dict formats
-                if hasattr(defn, "description"):
-                    copilot_agents[name] = SubagentDefinition(
-                        description=getattr(defn, "description", ""),
-                        prompt=getattr(defn, "prompt", ""),
-                        tools=getattr(defn, "tools", []),
-                        model=getattr(defn, "model", "inherit"),
-                    )
-                elif isinstance(defn, dict):
-                    copilot_agents[name] = SubagentDefinition(**defn)
-
         # Get allowed tools for the agent type
         _, project_capabilities = _get_cached_project_data(project_dir)
-        from linear_updater import is_linear_enabled as _is_linear_enabled
+        from integrations.linear.updater import is_linear_enabled as _is_linear_enabled
 
         mcp_config = load_project_mcp_config(project_dir)
         allowed_tools_list = get_allowed_tools(
-            agent_type, project_capabilities, _is_linear_enabled(), mcp_config
+            agent_type,
+            project_capabilities,
+            _is_linear_enabled(),
+            mcp_config,
+            spec_dir=spec_dir,
         )
 
         return CopilotAgentClient(
             model=model,
             system_prompt=base_prompt,
             allowed_tools=allowed_tools_list,
-            agents=copilot_agents,
             cwd=str(project_dir.resolve()),
             agent_type=agent_type,
+            spec_dir=str(spec_dir),
+            thinking_budget=max_thinking_tokens,
         )
 
     elif provider == "claude":
@@ -1948,6 +2556,7 @@ def create_agent_client(
             agents=agents,
             resume=resume,
             use_subagents=use_subagents,
+            roster=roster,
         )
         return ClaudeAgentClient(sdk_client)
 
@@ -1988,10 +2597,16 @@ def create_agent_client(
             max_turns=50,
             project_dir=str(project_dir),
             agent_type=agent_type,
+            spec_dir=str(spec_dir),
         )
 
     elif provider == "openai":
         from core.agent_client import OpenAIAgentClient
+        from core.codex_cli_client import (
+            CodexCliAgentClient,
+            openai_model_uses_api_key,
+            openai_uses_codex_cli,
+        )
         from core.llm_optimization import (
             build_base_system_prompt,
             openai_prompt_cache_key,
@@ -2019,6 +2634,37 @@ def create_agent_client(
         )
         prompt_cache_key = openai_prompt_cache_key(spec_dir, agent_type)
 
+        if openai_uses_codex_cli() and not openai_model_uses_api_key(
+            resolved_openai_model
+        ):
+            logger.info(
+                "[create_agent_client] Using CodexCliAgentClient "
+                "(model=%s, agent_type=%s, reasoning_effort=%s)",
+                resolved_openai_model,
+                agent_type,
+                reasoning_effort,
+            )
+            from context_mgmt import codex_auto_compact_limit
+            from context_mgmt.windows import resolve_context_window
+
+            return CodexCliAgentClient(
+                model=model or None,
+                system_prompt=openai_system_prompt,
+                project_dir=str(project_dir),
+                agent_type=agent_type,
+                reasoning_effort=reasoning_effort,
+                thread_id=resume,
+                auto_compact_token_limit=codex_auto_compact_limit(
+                    spec_dir, resolve_context_window(model or "codex"), model
+                ),
+            )
+
+        if openai_uses_codex_cli():
+            logger.info(
+                "[create_agent_client] Routing API-only model through OpenAI API (model=%s)",
+                resolved_openai_model,
+            )
+
         logger.info(
             "[create_agent_client] Using OpenAIAgentClient (model=%s, agent_type=%s, "
             "reasoning_effort=%s)",
@@ -2034,13 +2680,17 @@ def create_agent_client(
             agent_type=agent_type,
             reasoning_effort=reasoning_effort,
             prompt_cache_key=prompt_cache_key,
+            spec_dir=str(spec_dir),
         )
 
     elif provider == "google":
         # Google Gemini via its OpenAI-compatible endpoint — reuses the proven
         # OpenAI tool-use loop (GoogleAgentClient subclasses OpenAIAgentClient).
         from core.agent_client import GoogleAgentClient
-        from core.llm_optimization import build_base_system_prompt
+        from core.llm_optimization import (
+            build_base_system_prompt,
+            gemini_reasoning_effort,
+        )
 
         if system_prompt:
             gemini_system_prompt = system_prompt
@@ -2053,10 +2703,15 @@ def create_agent_client(
             )
 
         resolved_gemini_model = model or "gemini-2.5-pro"
+        gemini_effort = gemini_reasoning_effort(
+            resolved_gemini_model, max_thinking_tokens
+        )
         logger.info(
-            "[create_agent_client] Using GoogleAgentClient (model=%s, agent_type=%s)",
+            "[create_agent_client] Using GoogleAgentClient "
+            "(model=%s, agent_type=%s, reasoning_effort=%s)",
             resolved_gemini_model,
             agent_type,
+            gemini_effort,
         )
         return GoogleAgentClient(
             model=resolved_gemini_model,
@@ -2064,9 +2719,34 @@ def create_agent_client(
             max_turns=50,
             project_dir=str(project_dir),
             agent_type=agent_type,
+            reasoning_effort=gemini_effort,
+            spec_dir=str(spec_dir),
         )
 
-    elif provider in ("ollama", "local", "lmstudio"):
+    elif provider == "gemini":
+        from core.agent_client import GoogleAgentClient
+        from core.llm_optimization import (
+            build_base_system_prompt,
+            gemini_reasoning_effort,
+        )
+
+        gemini_prompt = system_prompt or build_base_system_prompt(
+            project_dir, tool_use_hint=True
+        )
+        if not system_prompt:
+            gemini_prompt = _inject_domain_addendum(gemini_prompt, agent_type, spec_dir)
+        gemini_model = model or "gemini-2.5-pro"
+        return GoogleAgentClient(
+            model=gemini_model,
+            system_prompt=gemini_prompt,
+            max_turns=50,
+            project_dir=str(project_dir),
+            agent_type=agent_type,
+            reasoning_effort=gemini_reasoning_effort(gemini_model, max_thinking_tokens),
+            spec_dir=str(spec_dir),
+        )
+
+    elif provider in ("ollama", "local", "lmstudio", "lm-studio", "llama-cpp"):
         # Local LLM via any OpenAI-compatible server (Ollama, LM Studio,
         # llama.cpp, vLLM, LocalAI). Reuses the proven OpenAI tool-use loop
         # (LocalAgentClient subclasses OpenAIAgentClient) and only swaps the
@@ -2084,7 +2764,30 @@ def create_agent_client(
                 local_system_prompt, agent_type, spec_dir
             )
 
-        resolved_local_model = model or "llama3.3"
+        # Last line of defence on the model id. A local server can only answer
+        # for what is pulled on the machine, so a hosted-only id arriving here
+        # (a task whose saved model is still `claude-…`/`gpt-…` after switching
+        # to Ollama) is a guaranteed 404 followed by a doomed registry pull.
+        # Coerce it to the configured local model and say so where the user
+        # looks — silently running a different model than the one displayed is
+        # worse than the 404 it replaces.
+        from phase_config import coerce_local_model, is_hosted_only_model
+
+        resolved_local_model = model if offline_base_url else coerce_local_model(model)
+        if not offline_base_url and model and is_hosted_only_model(model):
+            logger.warning(
+                "[create_agent_client] %r cannot run on a local server "
+                "(provider=%s) — using %r instead.",
+                model,
+                provider,
+                resolved_local_model,
+            )
+            print(
+                f"⚠️  « {model} » n'est pas un modèle local — "
+                f"exécution avec « {resolved_local_model} » "
+                f"(modèle configuré pour {provider}).",
+                flush=True,
+            )
         logger.info(
             "[create_agent_client] Using LocalAgentClient (model=%s, agent_type=%s)",
             resolved_local_model,
@@ -2092,15 +2795,159 @@ def create_agent_client(
         )
         return LocalAgentClient(
             model=resolved_local_model,
+            base_url=offline_base_url
+            or (
+                local_endpoint(provider)
+                if provider in ("lmstudio", "lm-studio", "llama-cpp")
+                else None
+            ),
+            api_format="openai"
+            if provider in ("lmstudio", "lm-studio", "llama-cpp")
+            else "ollama",
+            offline_only=offline_base_url is not None,
             system_prompt=local_system_prompt,
             max_turns=50,
             project_dir=str(project_dir),
             agent_type=agent_type,
+            spec_dir=str(spec_dir),
+        )
+
+    elif provider in ("mistral", "deepseek", "grok"):
+        from core.agent_client import CompatibleProviderAgentClient
+        from core.llm_optimization import build_base_system_prompt
+        from provider_models_catalog import _api_key_for
+
+        config = {}
+        try:
+            from src.connectors.llm_config import load_provider_config
+
+            config = load_provider_config(provider) or {}
+        except Exception:  # noqa: BLE001 - environment credentials still work
+            pass
+        api_key = _api_key_for(provider)
+        if not api_key:
+            raise ValueError(f"No API key configured for {provider}")
+        base_urls = {
+            "mistral": "https://api.mistral.ai",
+            "deepseek": "https://api.deepseek.com",
+            "grok": "https://api.x.ai",
+        }
+        base_url = (
+            os.environ.get(f"{provider.upper()}_BASE_URL")
+            or config.get("base_url")
+            or base_urls[provider]
+        )
+        provider_prompt = system_prompt or build_base_system_prompt(
+            project_dir, tool_use_hint=True
+        )
+        if not system_prompt:
+            provider_prompt = _inject_domain_addendum(
+                provider_prompt, agent_type, spec_dir
+            )
+        return CompatibleProviderAgentClient(
+            provider=provider,
+            model=model,
+            api_key=api_key,
+            base_url=base_url,
+            system_prompt=provider_prompt,
+            project_dir=str(project_dir),
+            agent_type=agent_type,
+            spec_dir=str(spec_dir),
+        )
+
+    elif provider in ("opencode", "antigravity", "pi"):
+        # Coding-agent CLIs that bring their own tools, sessions and context
+        # management (core/agent_clients/cli_subprocess.py). Each CLI owns its
+        # login; the agent type's declaration picks its rights (OpenCode's
+        # `plan` agent for a read-only type; Antigravity refuses one; pi gets
+        # the declaration as its `--tools` allowlist).
+        from core.llm_optimization import build_base_system_prompt
+
+        cli_prompt = system_prompt or build_base_system_prompt(project_dir)
+        if not system_prompt:
+            cli_prompt = _inject_domain_addendum(cli_prompt, agent_type, spec_dir)
+
+        if provider == "pi":
+            from core.agent_client import PiCliAgentClient
+
+            try:
+                from phase_config import thinking_level_from_budget
+
+                pi_level = thinking_level_from_budget(max_thinking_tokens)
+            except Exception:  # noqa: BLE001 - effort is optional on this CLI
+                pi_level = None
+            client = PiCliAgentClient(
+                model=model or None,
+                system_prompt=cli_prompt,
+                project_dir=str(project_dir),
+                agent_type=agent_type,
+                session_id=resume,
+                thinking_level=pi_level,
+                spec_dir=spec_dir,
+            )
+            trust = client.trust_state()
+            logger.info(
+                "[create_agent_client] Using PiCliAgentClient "
+                "(model=%s, agent_type=%s, tools=%s, resume=%s, project .pi trust=%s)",
+                model,
+                agent_type,
+                client.tools,
+                bool(resume),
+                trust,
+            )
+            if trust in ("undecided", "untrusted"):
+                # pi loads nothing from `<project>/.pi` without a decision, and
+                # says nothing about it in json mode. The skills are already
+                # passed explicitly; the rest is the person's call.
+                _trace_pi_trust(spec_dir, trust)
+            return client
+
+        if provider == "opencode":
+            from core.agent_client import OpenCodeCliAgentClient
+
+            logger.info(
+                "[create_agent_client] Using OpenCodeCliAgentClient "
+                "(model=%s, agent_type=%s, resume=%s)",
+                model,
+                agent_type,
+                bool(resume),
+            )
+            return OpenCodeCliAgentClient(
+                model=model or None,
+                system_prompt=cli_prompt,
+                project_dir=str(project_dir),
+                agent_type=agent_type,
+                session_id=resume,
+            )
+
+        from core.agent_client import AntigravityCliAgentClient
+
+        try:
+            from phase_config import thinking_level_from_budget
+
+            thinking_level = thinking_level_from_budget(max_thinking_tokens)
+        except Exception:  # noqa: BLE001 - effort is optional on this CLI
+            thinking_level = None
+        logger.info(
+            "[create_agent_client] Using AntigravityCliAgentClient "
+            "(model=%s, agent_type=%s, effort=%s, resume=%s)",
+            model,
+            agent_type,
+            thinking_level,
+            bool(resume),
+        )
+        return AntigravityCliAgentClient(
+            model=model or None,
+            system_prompt=cli_prompt,
+            project_dir=str(project_dir),
+            agent_type=agent_type,
+            thinking_level=thinking_level,
+            conversation_id=resume,
         )
 
     else:
-        # No agentic adapter for this provider (mistral, deepseek, grok, meta,
-        # aws, cursor, custom). The task still runs — on the Claude SDK — but
+        # No agentic adapter for this provider (meta, aws, cursor, custom). The
+        # task still runs — on the Claude SDK — but
         # that is a real limitation, not a detail, so say so where the user can
         # see it instead of in a log line nobody reads. capabilities/providers.yaml
         # is the record of which providers are in this state.

@@ -12,8 +12,8 @@ Thank you for your interest in contributing! This document provides guidelines f
 
 ```bash
 # Clone the repository
-git clone https://github.com/AndyMik90/Auto-Claude.git
-cd Auto-Claude/apps/frontend
+git clone https://github.com/krovomi/WorkPilot-AI.git
+cd WorkPilot-AI/apps/frontend
 
 # Install dependencies
 npm install

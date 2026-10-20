@@ -2,6 +2,9 @@
  * Documentation Agent API module
  */
 
+import { IPC_CHANNELS } from "../../../shared/constants";
+import { createIpcListener, invokeIpc } from "./ipc-utils";
+
 export interface DocumentationAgentRequest {
 	projectDir: string;
 	docTypes?: string[];
@@ -11,13 +14,18 @@ export interface DocumentationAgentRequest {
 	thinkingLevel?: string;
 }
 
-export interface DocumentationAgentResult {
-	doc_types_generated: string[];
-	files_created: string[];
-	outdated_docs_updated?: string[];
-	coverage_before?: { overall_coverage: number };
-	coverage_after?: { overall_coverage: number };
-}
+/**
+ * Re-exporte le type du service qui produit reellement ce resultat.
+ *
+ * Le handler transmet tel quel ce que le service emet
+ * (`service.on("complete", (result) => webContents.send(..., result))`), donc
+ * c'est ce type-la qui traverse le pont. Ce module en declarait un autre, de
+ * forme differente, qu'aucun code ne produisait ; le store du renderer, lui,
+ * importait deja le bon depuis le service. L'index signature d'`ElectronAPI`
+ * rendait les deux interchangeables aux yeux du compilateur.
+ */
+import type { DocumentationAgentResult } from "../../../main/documentation-agent-service";
+export type { DocumentationAgentResult };
 
 export interface DocumentationAgentAPI {
 	generateDocumentation: (
@@ -46,18 +54,21 @@ export interface DocumentationAgentAPI {
 export function createDocumentationAgentAPI(): DocumentationAgentAPI {
 	return {
 		generateDocumentation: (request) =>
-			globalThis.electronAPI.invoke("documentationAgent:generate", request),
+			invokeIpc("documentationAgent:generate", request),
 		cancelDocumentation: () =>
-			globalThis.electronAPI.invoke("documentationAgent:cancel"),
+			invokeIpc("documentationAgent:cancel"),
 		configureDocumentationAgent: (config) =>
-			globalThis.electronAPI.invoke("documentationAgent:configure", config),
+			invokeIpc("documentationAgent:configure", config),
 		onDocumentationAgentStatus: (callback) =>
-			globalThis.electronAPI.on("documentationAgent:status", callback),
+			createIpcListener(IPC_CHANNELS.DOCUMENTATION_AGENT_STATUS, callback),
 		onDocumentationAgentStreamChunk: (callback) =>
-			globalThis.electronAPI.on("documentationAgent:streamChunk", callback),
+			createIpcListener(
+				IPC_CHANNELS.DOCUMENTATION_AGENT_STREAM_CHUNK,
+				callback,
+			),
 		onDocumentationAgentError: (callback) =>
-			globalThis.electronAPI.on("documentationAgent:error", callback),
+			createIpcListener(IPC_CHANNELS.DOCUMENTATION_AGENT_ERROR, callback),
 		onDocumentationAgentComplete: (callback) =>
-			globalThis.electronAPI.on("documentationAgent:complete", callback),
+			createIpcListener(IPC_CHANNELS.DOCUMENTATION_AGENT_COMPLETE, callback),
 	};
 }

@@ -236,6 +236,10 @@ Provide your review in the following JSON format:
         if deep_context_section:
             prompt += deep_context_section + "\n\n---\n\n"
         prompt += mr_context
+        from integrations.jev.reviews import context_advice
+
+        if advice := context_advice(context):
+            prompt += "\n\n" + advice
 
         # Determine project root
         project_root = self.project_dir

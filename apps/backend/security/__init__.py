@@ -1,5 +1,5 @@
 """
-Security Module for Auto-Build Framework
+Security Module for WorkPilot AI Framework
 =========================================
 
 Provides comprehensive security features for the WorkPilot AI framework:
@@ -59,7 +59,7 @@ Validators:
 """
 
 # Import from parent modules
-from project_analyzer import (
+from project import (
     BASE_COMMANDS,
     SecurityProfile,
     is_command_allowed,
@@ -201,14 +201,12 @@ __all__ = [
     "SubprocessResult",
     "SubprocessSecurityError",
     "check_tool_available",
-    # Prompt Injection Guard
+    # Prompt Injection Guard — re-exported from `injection_guard`, which is
+    # the one implementation. See the import block below.
     "InjectionScanner",
-    "ScanResult",
+    "InjectionScanResult",
     "ThreatLevel",
     "ScanFinding",
-    "InjectionClassifier",
-    "ClassificationResult",
-    "injection_patterns",
     # Guardrails
     "guardrails_hook",
     "load_guardrails",
@@ -218,17 +216,29 @@ __all__ = [
     "GuardrailDecision",
 ]
 
-# Prompt Injection Guard imports
-from . import injection_patterns  # noqa: E402
-from .injection_classifier import (  # noqa: E402
-    ClassificationResult,
-    InjectionClassifier,
-)
-from .injection_scanner import (
+# Prompt Injection Guard.
+#
+# `security/injection_scanner.py` used to live here, with its own
+# `injection_classifier` and `injection_patterns` — a second scanner that no
+# production code called, re-exported from this file and tested by
+# `tests/backend/security_suite/test_injection_scanner.py`. The two were not
+# redundant: each caught what the other missed, which is why neither could
+# simply be deleted. Their catalogues are merged into `injection_guard`, the
+# one every caller already reaches (`security.untrusted`, `agents.base_agent`,
+# `runners/injection_guard_runner.py`), and these names re-export it so an
+# existing `from security import InjectionScanner` keeps working.
+#
+# One behaviour changed with the merge: the old module called its clean state
+# `ThreatLevel.CLEAN` and this one calls it `SAFE`. Nothing compared against
+# `CLEAN` outside that module's own tests.
+# Imported under the alias, not as `ScanResult`: `vulnerability_scanner`
+# already exports that name from this package and means something else by it.
+# That is why the module this replaces did the same.
+from injection_guard import (  # noqa: E402
     InjectionScanner,
     ScanFinding,
     ThreatLevel,
-)  # noqa: E402
-from .injection_scanner import (
+)
+from injection_guard import (  # noqa: E402
     ScanResult as InjectionScanResult,
 )

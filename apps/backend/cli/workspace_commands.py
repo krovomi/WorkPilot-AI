@@ -15,6 +15,15 @@ _PARENT_DIR = Path(__file__).parent.parent
 if str(_PARENT_DIR) not in sys.path:
     sys.path.insert(0, str(_PARENT_DIR))
 
+from core.debug import debug_warning
+from core.workspace import (
+    cleanup_all_worktrees,
+    discard_existing_build,
+    get_existing_build_worktree,
+    list_all_worktrees,
+    merge_existing_build,
+    review_existing_build,
+)
 from core.workspace.git_utils import (
     _is_workpilot_file,
     apply_path_mapping,
@@ -25,26 +34,12 @@ from core.workspace.git_utils import (
 )
 from core.worktree import PushAndCreatePRResult as CreatePRResult
 from core.worktree import WorktreeManager
-from debug import debug_warning
 from ui import (
     Icons,
     icon,
 )
-from workspace import (
-    cleanup_all_worktrees,
-    discard_existing_build,
-    get_existing_build_worktree,
-    list_all_worktrees,
-    merge_existing_build,
-    review_existing_build,
-)
 
 from .utils import print_banner
-
-try:
-    from core.usage_tracker import record_merge as _ut_record_merge
-except ImportError:
-    _ut_record_merge = None  # type: ignore[assignment]
 
 
 def _detect_default_branch(project_dir: Path) -> str:
@@ -328,7 +323,7 @@ def _detect_parallel_task_conflicts(
 
 # Import debug utilities
 try:
-    from debug import (
+    from core.debug import (
         debug,
         debug_detailed,
         debug_error,
@@ -393,11 +388,12 @@ def handle_merge_command(
         project_dir, spec_name, no_commit=no_commit, base_branch=base_branch
     )
 
-    if success and _ut_record_merge is not None:
-        try:
-            _ut_record_merge(project_dir, automatic=False)
-        except Exception:
-            pass
+    if success:
+        # One event; the usage counters, the learning loop, the brain and the
+        # design-system knowledge each subscribe to it (`core.merge_event`).
+        from core.merge_event import MergeEvent, publish
+
+        publish(MergeEvent(project_dir, spec_name, automatic=False))
 
     # Generate commit message suggestion if staging succeeded (no_commit mode)
     if success and no_commit:
@@ -911,7 +907,7 @@ def handle_merge_preview_command(
         spec_name=spec_name,
     )
 
-    from workspace import get_existing_build_worktree
+    from core.workspace import get_existing_build_worktree
 
     worktree_path = get_existing_build_worktree(project_dir, spec_name)
     debug(
@@ -983,7 +979,7 @@ def handle_merge_preview_command(
         )
         if discard_list_path.exists():
             try:
-                with open(discard_list_path) as f:
+                with open(discard_list_path, encoding="utf-8") as f:
                     discarded_files = [
                         line.strip()
                         for line in f.readlines()

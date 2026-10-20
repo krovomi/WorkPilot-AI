@@ -1,15 +1,16 @@
+import { parseJevSettings } from "../../shared/utils/jev-settings";
 import { execFileSync } from "node:child_process";
 import {
 	existsSync,
 	mkdirSync,
+	readdirSync,
 	readFileSync,
 	statSync,
-	writeFileSync,
 } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { is } from "@electron-toolkit/utils";
-import { app, dialog, ipcMain, session, shell } from "electron";
+import { app, dialog, ipcMain, session } from "electron";
 
 // ESM-compatible __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -23,6 +24,7 @@ import {
 	IPC_CHANNELS,
 	SPELL_CHECK_LANGUAGE_MAP,
 } from "../../shared/constants";
+import { sanitizeProjectFolderName } from "../../shared/utils/project-folder-name";
 import type {
 	AppSettings,
 	IPCResult,
@@ -45,11 +47,18 @@ import {
 	preWarmToolCache,
 } from "../cli-tool-manager";
 import { credentialManager } from "../services/credential-manager";
-import { getSettingsPath, readSettingsFile } from "../settings-utils";
+import { openExternalUrl } from "../open-external";
+import { decryptSecret } from "../secret-storage";
+import { readSettingsFile, writeSettingsFile } from "../settings-utils";
+import {
+	getPackagedSourceEnvPath,
+	SOURCE_ENV_TOKEN_KEY,
+	writeSourceEnvFile,
+} from "../source-env";
 import { testGenerationService } from "../test-generation-service";
-import { parseEnvFile } from "./utils";
+import { findEnvLineBreak, parseEnvFile } from "./utils";
+import { getCurrentOS } from "../platform";
 
-const settingsPath = getSettingsPath();
 
 /**
  * Get fallback spell check languages when preferred languages are not available
@@ -94,7 +103,7 @@ function openLinuxTerminal(resolvedPath: string): IPCResult<void> {
  * Opens terminal based on platform
  */
 function openTerminalForPlatform(resolvedPath: string): IPCResult<void> {
-	const platform = process.platform;
+	const platform = getCurrentOS();
 
 	if (platform === "darwin") {
 		// macOS: Use execFileSync with argument array to prevent injection
@@ -415,6 +424,61 @@ const detectAutoBuildSourcePath = (): string | null => {
 };
 
 /**
+ * Where the backend's own .env lives (../source-env.ts writes it).
+ *
+ * In production, the .env file is NOT bundled (excluded in electron-builder config).
+ * We store the source .env in app userData directory instead, which is writable.
+ * The sourcePath points to the bundled backend for reference, but envPath is in userData.
+ *
+ * `readByBackend`: in development the file is `<backend>/.env`, which the Python
+ * runners load themselves, so it cannot hold `enc:` values. No Python code knows
+ * the userData copy: the main process layers it, decrypted, into the backend's
+ * subprocess environments (loadBackendEnv).
+ */
+export const getSourceEnvPath = (): {
+	sourcePath: string | null;
+	envPath: string | null;
+	isProduction: boolean;
+	readByBackend: boolean;
+} => {
+	const savedSettings = readSettingsFile();
+	const settings = { ...DEFAULT_APP_SETTINGS, ...savedSettings };
+
+	// Get autoBuildPath from settings or try to auto-detect
+	let sourcePath: string | null = settings.autoBuildPath || null;
+	if (!sourcePath) {
+		sourcePath = detectAutoBuildSourcePath();
+	}
+
+	if (!sourcePath) {
+		return {
+			sourcePath: null,
+			envPath: null,
+			isProduction: !is.dev,
+			readByBackend: is.dev,
+		};
+	}
+
+	// In production, use userData directory for .env since resources may be read-only
+	// In development, use the actual source path
+	let envPath: string;
+	if (is.dev) {
+		envPath = path.join(sourcePath, ".env");
+	} else {
+		// Production: store .env in userData/backend/.env, where loadBackendEnv reads it
+		envPath = getPackagedSourceEnvPath();
+		mkdirSync(path.dirname(envPath), { recursive: true });
+	}
+
+	return {
+		sourcePath,
+		envPath,
+		isProduction: !is.dev,
+		readByBackend: is.dev,
+	};
+};
+
+/**
  * Helper function to make HTTP requests to backend with retry logic
  */
 async function makeBackendRequest<T>(
@@ -556,11 +620,7 @@ export function registerSettingsHandlers(
 			// Persist migration changes
 			if (needsSave) {
 				try {
-					writeFileSync(
-						settingsPath,
-						JSON.stringify(settings, null, 2),
-						"utf-8",
-					);
+					writeSettingsFile(settings);
 				} catch (error) {
 					console.error("[SETTINGS_GET] Failed to persist migration:", error);
 					// Continue anyway - settings will be migrated in-memory for this session
@@ -593,6 +653,8 @@ export function registerSettingsHandlers(
 				const savedSettings = readSettingsFile();
 				const currentSettings = { ...DEFAULT_APP_SETTINGS, ...savedSettings };
 				const newSettings = { ...currentSettings, ...settings };
+				if (settings.jev !== undefined)
+					newSettings.jev = parseJevSettings(settings.jev);
 
 				// Sync defaultModel when agent profile changes (#414)
 				if (settings.selectedAgentProfile) {
@@ -604,11 +666,7 @@ export function registerSettingsHandlers(
 					}
 				}
 
-				writeFileSync(
-					settingsPath,
-					JSON.stringify(newSettings, null, 2),
-					"utf-8",
-				);
+				writeSettingsFile(newSettings);
 
 				// Apply Python path if changed
 				if (settings.pythonPath || settings.autoBuildPath) {
@@ -758,13 +816,22 @@ export function registerSettingsHandlers(
 
 	ipcMain.handle(
 		IPC_CHANNELS.DIALOG_SELECT_DIRECTORY,
-		async (): Promise<string | null> => {
+		async (
+			_,
+			options?: { title?: string; defaultPath?: string },
+		): Promise<string | null> => {
 			const mainWindow = getMainWindow();
 			if (!mainWindow) return null;
 
 			const result = await dialog.showOpenDialog(mainWindow, {
 				properties: ["openDirectory"],
-				title: "Select Project Directory",
+				title:
+					typeof options?.title === "string" && options.title
+						? options.title
+						: "Select Project Directory",
+				...(typeof options?.defaultPath === "string" && options.defaultPath
+					? { defaultPath: options.defaultPath }
+					: {}),
 			});
 
 			if (result.canceled || result.filePaths.length === 0) {
@@ -804,6 +871,125 @@ export function registerSettingsHandlers(
 		},
 	);
 
+	/**
+	 * What the wizard would be creating, and what is already there.
+	 *
+	 * "Create" and "Open existing folder" are not the same act: the first makes
+	 * `<location>/<name>` and registers *that*, so pointing it at a folder that
+	 * already holds the code adds an empty sibling instead. The form cannot say
+	 * so without looking at the disk, and this is that look.
+	 */
+	ipcMain.handle(
+		IPC_CHANNELS.DIALOG_INSPECT_PROJECT_LOCATION,
+		async (
+			_,
+			location: string,
+			name: string,
+		): Promise<
+			IPCResult<{
+				targetPath: string | null;
+				targetExists: boolean;
+				targetHasEntries: boolean;
+				locationIsProject: boolean;
+				insideRepository: string | null;
+				markers: string[];
+			}>
+		> => {
+			try {
+				const empty = {
+					targetPath: null,
+					targetExists: false,
+					targetHasEntries: false,
+					locationIsProject: false,
+					insideRepository: null,
+					markers: [] as string[],
+				};
+				if (!location || !existsSync(location)) {
+					return { success: true, data: empty };
+				}
+
+				let entries: string[];
+				try {
+					entries = readdirSync(location);
+				} catch {
+					return { success: true, data: empty };
+				}
+
+				// Files a project root carries and an ordinary parent folder does
+				// not. A folder that merely *contains* projects — `~/repositories`
+				// — has none of them, which is what keeps the warning quiet where
+				// creating really is what the user meant.
+				const markers = entries.filter(
+					(entry) =>
+						entry === ".git" ||
+						/\.(sln|slnx|csproj|fsproj)$/i.test(entry) ||
+						[
+							"package.json",
+							"pnpm-workspace.yaml",
+							"Cargo.toml",
+							"go.mod",
+							"pom.xml",
+							"build.gradle",
+							"build.gradle.kts",
+							"pyproject.toml",
+							"requirements.txt",
+							"Gemfile",
+							"composer.json",
+						].includes(entry),
+				);
+
+				// A marker at the top level only catches a location that *is* the
+				// project root. `…/dotnet` with the solution one level down has
+				// none — but it is inside a checkout, and creating a project
+				// inside a repository someone already cloned is nearly always the
+				// mistake this warning exists for.
+				let insideRepository: string | null = null;
+				let ancestor = path.dirname(location);
+				for (let depth = 0; depth < 12; depth++) {
+					if (existsSync(path.join(ancestor, ".git"))) {
+						insideRepository = ancestor;
+						break;
+					}
+					const parent = path.dirname(ancestor);
+					if (parent === ancestor) break;
+					ancestor = parent;
+				}
+
+				const sanitized = sanitizeProjectFolderName(name);
+				const targetPath = sanitized ? path.join(location, sanitized) : null;
+				const targetExists = targetPath !== null && existsSync(targetPath);
+				let targetHasEntries = false;
+				if (targetExists && targetPath) {
+					try {
+						targetHasEntries = readdirSync(targetPath).length > 0;
+					} catch {
+						targetHasEntries = false;
+					}
+				}
+
+				return {
+					success: true,
+					data: {
+						targetPath,
+						targetExists,
+						targetHasEntries,
+						locationIsProject: markers.length > 0,
+						insideRepository,
+						markers: markers.slice(0, 4),
+					},
+				};
+			} catch (error) {
+				return {
+					success: false,
+					error:
+						error instanceof Error
+							? error.message
+							: "Failed to inspect project location",
+				};
+			}
+		},
+	);
+
 	ipcMain.handle(
 		IPC_CHANNELS.DIALOG_CREATE_PROJECT_FOLDER,
 		async (
@@ -820,13 +1006,8 @@ export function registerSettingsHandlers(
 					return { success: false, error: "Location and name are required" };
 				}
 
-				// Sanitize project name (convert to kebab-case, remove invalid chars)
-				const sanitizedName = name
-					.toLowerCase()
-					.replaceAll(/\s+/g, "-")
-					.replaceAll(/[^a-z0-9-_]/g, "")
-					.replaceAll(/-+/g, "-")
-					.replaceAll(/^-|-$/g, "");
+				// Kebab-case the name, folding accents rather than deleting them.
+				const sanitizedName = sanitizeProjectFolderName(name);
 
 				if (!sanitizedName) {
 					return { success: false, error: "Invalid project name" };
@@ -924,23 +1105,15 @@ export function registerSettingsHandlers(
 	ipcMain.handle(
 		IPC_CHANNELS.SHELL_OPEN_EXTERNAL,
 		async (_, url: string): Promise<void> => {
-			// Validate URL scheme to prevent opening dangerous protocols
+			// La validation du schéma et les replis Linux vivent dans open-external :
+			// le rejet remonte jusqu'au renderer, qui l'affiche. Avaler l'erreur ici
+			// est ce qui rendait le bouton silencieux quand rien ne s'ouvrait.
 			try {
-				const parsedUrl = new URL(url);
-				if (!["http:", "https:"].includes(parsedUrl.protocol)) {
-					console.warn(
-						`[SHELL_OPEN_EXTERNAL] Blocked URL with unsafe protocol: ${parsedUrl.protocol}`,
-					);
-					throw new Error(`Unsafe URL protocol: ${parsedUrl.protocol}`);
-				}
-				await shell.openExternal(url);
+				await openExternalUrl(url);
 			} catch (error) {
-				if (error instanceof TypeError) {
-					// Invalid URL format
-					console.warn(`[SHELL_OPEN_EXTERNAL] Invalid URL format: ${url}`);
-					throw new Error("Invalid URL format");
-				}
-				throw error;
+				const reason = error instanceof Error ? error.message : String(error);
+				console.warn(`[SHELL_OPEN_EXTERNAL] ${reason}`);
+				throw error instanceof Error ? error : new Error(reason);
 			}
 		},
 	);
@@ -993,54 +1166,8 @@ export function registerSettingsHandlers(
 	);
 
 	// ============================================
-	// Auto-Build Source Environment Operations
+	// WorkPilot AI Source Environment Operations
 	// ============================================
-
-	/**
-	 * Helper to get source .env path from settings
-	 *
-	 * In production mode, the .env file is NOT bundled (excluded in electron-builder config).
-	 * We store the source .env in app userData directory instead, which is writable.
-	 * The sourcePath points to the bundled backend for reference, but envPath is in userData.
-	 */
-	const getSourceEnvPath = (): {
-		sourcePath: string | null;
-		envPath: string | null;
-		isProduction: boolean;
-	} => {
-		const savedSettings = readSettingsFile();
-		const settings = { ...DEFAULT_APP_SETTINGS, ...savedSettings };
-
-		// Get autoBuildPath from settings or try to auto-detect
-		let sourcePath: string | null = settings.autoBuildPath || null;
-		if (!sourcePath) {
-			sourcePath = detectAutoBuildSourcePath();
-		}
-
-		if (!sourcePath) {
-			return { sourcePath: null, envPath: null, isProduction: !is.dev };
-		}
-
-		// In production, use userData directory for .env since resources may be read-only
-		// In development, use the actual source path
-		let envPath: string;
-		if (is.dev) {
-			envPath = path.join(sourcePath, ".env");
-		} else {
-			// Production: store .env in userData/backend/.env
-			const userDataBackendDir = path.join(app.getPath("userData"), "backend");
-			if (!existsSync(userDataBackendDir)) {
-				mkdirSync(userDataBackendDir, { recursive: true });
-			}
-			envPath = path.join(userDataBackendDir, ".env");
-		}
-
-		return {
-			sourcePath,
-			envPath,
-			isProduction: !is.dev,
-		};
-	};
 
 	ipcMain.handle(
 		IPC_CHANNELS.AUTOBUILD_SOURCE_ENV_GET,
@@ -1072,8 +1199,9 @@ export function registerSettingsHandlers(
 				// First, check source .env file
 				if (envExists && envPath) {
 					const content = readFileSync(envPath, "utf-8");
-					const vars = parseEnvFile(content);
-					claudeOAuthToken = vars.CLAUDE_CODE_OAUTH_TOKEN;
+					const stored = parseEnvFile(content)[SOURCE_ENV_TOKEN_KEY];
+					// Undefined while the keyring cannot decrypt it: the global token stands in
+					claudeOAuthToken = stored ? decryptSecret(stored) : undefined;
 					hasClaudeToken = !!claudeOAuthToken && claudeOAuthToken.length > 0;
 				}
 
@@ -1108,7 +1236,18 @@ export function registerSettingsHandlers(
 		IPC_CHANNELS.AUTOBUILD_SOURCE_ENV_UPDATE,
 		async (_, config: { claudeOAuthToken?: string }): Promise<IPCResult> => {
 			try {
-				const { sourcePath, envPath } = getSourceEnvPath();
+				const token = config?.claudeOAuthToken;
+				// Revalidated here (rule S6): the file holds one variable per line.
+				if (
+					token !== undefined &&
+					(typeof token !== "string" ||
+						token.includes("\0") ||
+						findEnvLineBreak(token) !== null)
+				) {
+					return { success: false, error: "Invalid Claude OAuth token" };
+				}
+
+				const { sourcePath, envPath, readByBackend } = getSourceEnvPath();
 
 				if (!sourcePath || !envPath) {
 					return {
@@ -1141,28 +1280,12 @@ export function registerSettingsHandlers(
 				}
 
 				// Update with new values
-				if (config.claudeOAuthToken !== undefined) {
-					existingVars.CLAUDE_CODE_OAUTH_TOKEN = config.claudeOAuthToken;
+				if (token !== undefined) {
+					existingVars[SOURCE_ENV_TOKEN_KEY] = token;
 				}
 
-				// Generate content
-				const lines: string[] = [
-					"# WorkPilot AI Framework Environment Variables",
-					"# Managed by WorkPilot AI UI",
-					"",
-					"# Claude Code OAuth Token (REQUIRED)",
-					`CLAUDE_CODE_OAUTH_TOKEN=${existingVars.CLAUDE_CODE_OAUTH_TOKEN || ""}`,
-					"",
-				];
-
-				// Preserve other existing variables
-				for (const [key, value] of Object.entries(existingVars)) {
-					if (key !== "CLAUDE_CODE_OAUTH_TOKEN") {
-						lines.push(`${key}=${value}`);
-					}
-				}
-
-				writeFileSync(envPath, lines.join("\n"), "utf-8");
+				// Encrypted unless Python reads the file; 0600 and a warning otherwise
+				writeSourceEnvFile({ envPath, readByBackend }, existingVars);
 
 				return { success: true };
 			} catch (error) {

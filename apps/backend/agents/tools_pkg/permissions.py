@@ -19,9 +19,9 @@ from .models import (
     CHROME_DEVTOOLS_TOOLS,
     CONTEXT7_TOOLS,
     ELECTRON_TOOLS,
-    GRAPHITI_MCP_TOOLS,
     LINEAR_TOOLS,
     PUPPETEER_TOOLS,
+    VERIFY_TOOLS,
     get_agent_config,
     get_required_mcp_servers,
 )
@@ -33,6 +33,7 @@ def get_allowed_tools(
     project_capabilities: dict | None = None,
     linear_enabled: bool = False,
     mcp_config: dict | None = None,
+    spec_dir=None,
 ) -> list[str]:
     """
     Get the list of allowed tools for a specific agent type.
@@ -68,6 +69,7 @@ def get_allowed_tools(
         project_capabilities,
         linear_enabled,
         mcp_config,
+        spec_dir=spec_dir,
     )
 
     # Add workpilot tools ONLY if the MCP server is available
@@ -76,12 +78,12 @@ def get_allowed_tools(
         tools.extend(config.get("auto_claude_tools", []))
 
     # Add MCP tool names based on required servers
-    tools.extend(_get_mcp_tools_for_servers(required_servers))
+    tools.extend(mcp_tools_for_servers(required_servers))
 
     return tools
 
 
-def _get_mcp_tools_for_servers(servers: list[str]) -> list[str]:
+def mcp_tools_for_servers(servers: list[str]) -> list[str]:
     """
     Get the list of MCP tools for a list of required servers.
 
@@ -100,17 +102,109 @@ def _get_mcp_tools_for_servers(servers: list[str]) -> list[str]:
             tools.extend(CONTEXT7_TOOLS)
         elif server == "linear":
             tools.extend(LINEAR_TOOLS)
-        elif server == "graphiti":
-            tools.extend(GRAPHITI_MCP_TOOLS)
         elif server == "electron":
             tools.extend(ELECTRON_TOOLS)
         elif server == "puppeteer":
             tools.extend(PUPPETEER_TOOLS)
         elif server == "chrome-devtools":
             tools.extend(CHROME_DEVTOOLS_TOOLS)
+        elif server == "verify":
+            tools.extend(VERIFY_TOOLS)
+        elif server == "brain":
+            from brain.runtime import MCP_TOOL_NAMES
+
+            tools.extend(MCP_TOOL_NAMES)
+        elif server == "uiux":
+            from uiux.integration import MCP_TOOL_NAMES as UIUX_TOOL_NAMES
+
+            tools.extend(UIUX_TOOL_NAMES)
+        elif server == "code":
+            from harness.tools.code_search import MCP_TOOL_NAMES as CODE_TOOL_NAMES
+
+            tools.extend(CODE_TOOL_NAMES)
         # workpilot tools are already added via config["auto_claude_tools"]
 
     return tools
+
+
+#: The built-in tools whose use is a capability an agent type must declare —
+#: changing files, running commands, reaching the network — each with the
+#: declaration that grants it. `MultiEdit` and `NotebookEdit` ride on `Edit`.
+#: Reading (Read, Glob, Grep) is not guarded: every type with tools reads.
+GUARDED_TOOLS: dict[str, str] = {
+    "Write": "Write",
+    "Edit": "Edit",
+    "MultiEdit": "Edit",
+    "NotebookEdit": "Edit",
+    "Bash": "Bash",
+    "WebFetch": "WebFetch",
+    "WebSearch": "WebSearch",
+}
+
+
+def declared_tools(agent_type: str) -> frozenset[str] | None:
+    """What an agent type declares, or ``None`` for a type nobody registered.
+
+    ``None`` is permissive on purpose: every `agent_type` the product passes is
+    registered (`test_every_literal_agent_type_is_registered` walks the AST for them),
+    so an unknown one is a test or a caller outside the product, and refusing
+    it everything would break those rather than protect anything.
+    """
+    config = AGENT_CONFIGS.get(agent_type)
+    if config is None:
+        return None
+    return frozenset(config.get("tools", []))
+
+
+def declared_servers(agent_type: str) -> frozenset[str] | None:
+    """The MCP servers an agent type declares, or ``None`` for a type nobody registered.
+
+    A WorkPilot server is a right like a tool: `tool_executor` offers its
+    tools to the other providers only when the type declares it, as
+    `create_client` starts it only then.
+    """
+    config = AGENT_CONFIGS.get(agent_type)
+    if config is None:
+        return None
+    return frozenset(config.get("mcp_servers", []))
+
+
+def undeclared_builtin_tools(agent_type: str) -> list[str]:
+    """The guarded built-in tools `agent_type` does not declare.
+
+    This is what makes a declaration a right rather than a wish. The SDK's
+    `allowed_tools` only auto-approves: a tool missing from it stays callable,
+    and the settings file `create_client` writes grants Write, Edit and
+    `Bash(*)` to every type. `disallowed_tools` removes a tool from the model's
+    context and wins over those allow rules, so it is the list `create_client`
+    passes; the non-Claude tool executor derives its own gate from the same
+    declaration (`declared_tools`).
+    """
+    declared = declared_tools(agent_type)
+    if declared is None:
+        return []
+    return [tool for tool, grant in GUARDED_TOOLS.items() if grant not in declared]
+
+
+#: The declarations whose tools `create_client` puts behind a hook: a command
+#: goes through `bash_security_hook` and the guardrails, a write through the
+#: write-path guard, the guardrails and the watermark cleaner. A factory that
+#: installs none of them cannot serve a type that declares one of these.
+HOOKED_GRANTS: frozenset[str] = frozenset({"Write", "Edit", "Bash"})
+
+
+def hooked_grants(agent_type: str) -> list[str]:
+    """What `agent_type` declares that only `create_client` may hand over.
+
+    `create_simple_client` installs no hook, so a type it serves runs every
+    command and every write it declares unchecked. It refuses a type for which
+    this list is not empty. An unknown type answers ``[]``, like
+    `undeclared_builtin_tools`: the simple client refuses those on its own.
+    """
+    declared = declared_tools(agent_type)
+    if declared is None:
+        return []
+    return sorted(declared & HOOKED_GRANTS)
 
 
 def get_all_agent_types() -> list[str]:

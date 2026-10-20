@@ -51,11 +51,22 @@ if (staged.length === 0) {
 
 function run(name, cmd, args, cwd, env) {
 	console.log(`[staged-tests] ${name}: ${cmd} ${args.join(" ")}`);
+	const testEnv = { ...process.env, ...(env || {}) };
+	// Git exports these while running hooks. Tests create their own temporary
+	// repositories: inheriting the hook's index/worktree would make their
+	// commits mutate the real checkout instead of those fixtures.
+	for (const key of [
+		"GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE",
+		"GIT_PREFIX", "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+		"GIT_IMPLICIT_WORK_TREE",
+	]) {
+		delete testEnv[key];
+	}
 	const res = spawnSync(cmd, args, {
 		cwd,
 		stdio: "inherit",
 		shell: IS_WINDOWS,
-		env: { ...process.env, ...(env || {}) },
+		env: testEnv,
 	});
 	return res.status === 0;
 }
@@ -71,16 +82,10 @@ const pytestTargets = selectPytestTargets(ROOT, staged, {
 if (pytestTargets.length > 0) {
 	const pytest = findVenvBin(ROOT, "pytest");
 	if (pytest) {
-		// pytest runs from apps/backend (same cwd as CI) with repo-root-relative
-		// targets rewritten to ../../
-		const backendCwd = path.join(ROOT, "apps", "backend");
-		const args = [
-			...pytestTargets.map((t) => path.join("..", "..", t)),
-			"-q",
-			"--tb=short",
-			"-x",
-		];
-		if (!run("backend pytest (staged)", pytest, args, backendCwd)) {
+		// pytest runs from the repository root, like CI: the root pytest.ini is
+		// the only configuration (audit lot L11, F31).
+		const args = [...pytestTargets, "-q", "--tb=short", "-x"];
+		if (!run("backend pytest (staged)", pytest, args, ROOT)) {
 			failed = true;
 		}
 	} else {

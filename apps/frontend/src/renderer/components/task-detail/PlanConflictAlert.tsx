@@ -1,5 +1,11 @@
-import { AlertTriangle, FileWarning, Loader2, ShieldCheck } from "lucide-react";
-import { useEffect, useState } from "react";
+import {
+	AlertTriangle,
+	FileWarning,
+	Loader2,
+	Lock,
+	ShieldCheck,
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { TASK_STATUS_LABELS } from "../../../shared/constants/task";
 import type {
@@ -7,6 +13,12 @@ import type {
 	PlanConflictReport,
 	Task,
 } from "../../../shared/types";
+import { useToast } from "../../hooks/use-toast";
+import {
+	indexTasksById,
+	wouldCreateCycle,
+} from "../../lib/kanban-dependencies";
+import { persistUpdateTask, useTaskStore } from "../../stores/task-store";
 
 interface PlanConflictAlertProps {
 	readonly task: Task;
@@ -22,8 +34,38 @@ const MAX_FILES_SHOWN = 6;
  */
 export function PlanConflictAlert({ task }: PlanConflictAlertProps) {
 	const { t } = useTranslation(["tasks"]);
+	const { toast } = useToast();
 	const [report, setReport] = useState<PlanConflictReport | null>(null);
 	const [isChecking, setIsChecking] = useState(true);
+	const [savingId, setSavingId] = useState<string | null>(null);
+	const tasks = useTaskStore((s) => s.tasks);
+	const byId = useMemo(() => indexTasksById(tasks), [tasks]);
+	const blockedBy = task.metadata?.blockedBy ?? [];
+
+	/**
+	 * Turn the warning into an ordering decision: declaring the rival task as a
+	 * prerequisite is exactly what stops the two worktrees from running at once.
+	 */
+	async function dependOn(blockerId: string, blockerTitle: string) {
+		setSavingId(blockerId);
+		const ok = await persistUpdateTask(task.id, {
+			metadata: { blockedBy: [...blockedBy, blockerId] },
+		});
+		setSavingId(null);
+		toast(
+			ok
+				? {
+						title: t("tasks:modal.plan.conflictsDependencyAdded", {
+							title: blockerTitle,
+						}),
+					}
+				: {
+						title: t("tasks:metadata.blockedBy.saveErrorTitle"),
+						description: t("tasks:metadata.blockedBy.saveErrorDesc"),
+						variant: "destructive",
+					},
+		);
+	}
 
 	useEffect(() => {
 		let cancelled = false;
@@ -117,6 +159,36 @@ export function PlanConflictAlert({ task }: PlanConflictAlertProps) {
 								})}
 							</span>
 						)}
+						{(() => {
+							const already = blockedBy.includes(conflict.taskId);
+							const cycles = wouldCreateCycle(
+								task.id,
+								conflict.taskId,
+								byId,
+							);
+							if (already || cycles) {
+								return (
+									<p className="mt-1.5 text-[10px] text-muted-foreground">
+										{already
+											? t("tasks:modal.plan.conflictsDependencyExists")
+											: t("tasks:modal.plan.conflictsDependencyCycle")}
+									</p>
+								);
+							}
+							return (
+								<button
+									type="button"
+									onClick={() =>
+										void dependOn(conflict.taskId, conflict.taskTitle)
+									}
+									disabled={savingId !== null}
+									className="mt-1.5 flex items-center gap-1 text-[10px] font-medium text-foreground/80 hover:text-foreground underline underline-offset-2 disabled:opacity-50"
+								>
+									<Lock className="h-2.5 w-2.5" />
+									{t("tasks:modal.plan.conflictsMakeDependency")}
+								</button>
+							);
+						})()}
 					</div>
 				))}
 			</div>

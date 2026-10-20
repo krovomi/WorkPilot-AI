@@ -38,21 +38,12 @@ AGENT_CATEGORIES = {
     "spec_creator": "Pipeline",
     "architecture_reviewer": "Analysis",
     "architecture_visualizer": "Analysis",
-    "performance_profiler": "Analysis",
     "insight_extractor": "Analysis",
     "learning_analyzer": "Analysis",
-    "browser_agent": "Browser",
-    "documentation_agent": "Documentation",
-    "code_migration": "Migration",
-    "breaking_change_detector": "Migration",
-    "environment_cloner": "Migration",
     "followup_planner": "Followup",
-    "intent_templates": "Followup",
-    "multi_repo_planner": "Multi-repo",
     "incident_cicd_analyzer": "Self-Healing",
     "incident_proactive_analyzer": "Self-Healing",
     "incident_production_responder": "Self-Healing",
-    "coder_recovery": "Self-Healing",
     "roadmap_discovery": "Roadmap",
     "roadmap_features": "Roadmap",
     "competitor_analysis": "Roadmap",
@@ -84,11 +75,15 @@ def render_agents(repo: Path, lang: str) -> str:
     if lang == "fr":
         header = "| Agent | Fichier prompt | Catégorie |\n|-------|----------------|-----------|"
     else:
-        header = "| Agent | Prompt file | Category |\n|-------|-------------|----------|"
+        header = (
+            "| Agent | Prompt file | Category |\n|-------|-------------|----------|"
+        )
     lines = [header]
     for name, rel, cat in rows:
         lines.append(f"| `{name}` | [{rel}]({_source_link(rel)}) | {cat} |")
-    lines.append(f"\n_Auto-generated from `apps/backend/prompts/` · {len(rows)} agents._")
+    lines.append(
+        f"\n_Auto-generated from `apps/backend/prompts/` · {len(rows)} agents._"
+    )
     return "\n".join(lines)
 
 
@@ -113,7 +108,9 @@ def render_integrations(repo: Path, lang: str) -> str:
     lines = [header]
     for name, path in items:
         lines.append(f"| **{name}** | [{path}]({_source_link(path)}) |")
-    lines.append(f"\n_Auto-generated from `apps/backend/integrations/` · {len(items)} integrations._")
+    lines.append(
+        f"\n_Auto-generated from `apps/backend/integrations/` · {len(items)} integrations._"
+    )
     return "\n".join(lines)
 
 
@@ -148,7 +145,9 @@ def _collect_module_rows(apps: Path, repo: Path) -> list[tuple[str, str]]:
     for app in sorted(apps.iterdir()):
         if app.is_dir() and not app.name.startswith("."):
             for sub in sorted(app.iterdir()):
-                if sub.is_dir() and not sub.name.startswith((".", "_", "node_modules", "dist")):
+                if sub.is_dir() and not sub.name.startswith(
+                    (".", "_", "node_modules", "dist")
+                ):
                     rel = sub.relative_to(repo).as_posix()
                     rows.append((f"{app.name}/{sub.name}", rel))
     return rows
@@ -189,7 +188,11 @@ def render_cli(repo: Path, lang: str) -> str:
     if not help_output:
         cli_doc = repo / "docs" / "CLI-USAGE.md"
         if cli_doc.is_file():
-            note = "Source: `docs/CLI-USAGE.md`" if lang == "en" else "Source : `docs/CLI-USAGE.md`"
+            note = (
+                "Source: `docs/CLI-USAGE.md`"
+                if lang == "en"
+                else "Source : `docs/CLI-USAGE.md`"
+            )
             return f"```\n{note}\n```"
         return _placeholder("CLI help unavailable", lang)
 
@@ -258,7 +261,9 @@ def process_wiki(repo: Path, wiki: Path, dry_run: bool = False) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--repo", type=Path, default=Path.cwd(), help="Source repo root")
+    parser.add_argument(
+        "--repo", type=Path, default=Path.cwd(), help="Source repo root"
+    )
     parser.add_argument("--wiki", type=Path, required=True, help="Wiki repo root")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()

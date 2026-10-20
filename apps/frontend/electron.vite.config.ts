@@ -57,6 +57,8 @@ export default defineConfig({
 					"minimatch",
 					// XState for task state machine
 					"xstate",
+					// YAML, for the OpenAPI documents the API Explorer reads
+					"yaml",
 				],
 			},
 			rollupOptions: {
@@ -66,7 +68,15 @@ export default defineConfig({
 				// Native modules that must be external (rebuilt by electron-builder)
 				// electron itself must be external so its path.txt lookup resolves
 				// against node_modules/electron rather than out/main/chunks.
-				external: ["electron", "@lydell/node-pty", "better-sqlite3"],
+				external: [
+					"electron",
+					"@lydell/node-pty",
+					"better-sqlite3",
+					// unzipper (bundled) requires the AWS SDK lazily, only inside
+					// Open.s3_v3, which we never call. It is not installed, so
+					// leave the require unresolved instead of failing the build.
+					"@aws-sdk/client-s3",
+				],
 			},
 		},
 	},
@@ -105,9 +115,6 @@ export default defineConfig({
 			alias: {
 				"@": resolve(__dirname, "src/renderer"),
 				"@shared": resolve(__dirname, "src/shared"),
-				"@features": resolve(__dirname, "src/renderer/features"),
-				"@components": resolve(__dirname, "src/renderer/shared/components"),
-				"@hooks": resolve(__dirname, "src/renderer/shared/hooks"),
 				"@lib": resolve(__dirname, "src/renderer/shared/lib"),
 			},
 		},

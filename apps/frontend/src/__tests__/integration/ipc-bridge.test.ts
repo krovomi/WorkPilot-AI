@@ -325,6 +325,17 @@ describe("IPC Bridge Integration", () => {
 
 			expect(ipcRenderer.invoke).toHaveBeenCalledWith("dialog:selectDirectory");
 		});
+
+		it("should pass where the directory dialog opens", async () => {
+			const selectDirectory = electronAPI.selectDirectory as (options?: {
+				defaultPath?: string;
+			}) => Promise<unknown>;
+			await selectDirectory({ defaultPath: "/mnt/c" });
+
+			expect(ipcRenderer.invoke).toHaveBeenCalledWith("dialog:selectDirectory", {
+				defaultPath: "/mnt/c",
+			});
+		});
 	});
 
 	describe("App info", () => {

@@ -39,6 +39,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .packs import Pack, PackVariant, load_pack
+from .resolver import is_mock_runtime
 from .upstream import LOCKFILE_NAME, SourceSpec, forget_pack, parse_source
 
 logger = logging.getLogger(__name__)
@@ -201,7 +202,7 @@ def plan_add(
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
     # Never for a pack that is already declared: `skills/bmad/` is committed on
-    # purpose (76 wrappers live there), and an ignore block would untrack them.
+    # purpose (the vendored BMAD skills live there), and an ignore block would untrack them.
     ignored = already or f"skills/{pack}/*" in _gitignore_text(repo_root)
     return AddPlan(
         pack=pack,
@@ -302,7 +303,10 @@ def bootstrap_satisfied(project_dir: Path, pack: Pack) -> bool:
     """
     produces = pack.bootstrap.get("produces")
     if produces:
-        return (project_dir / produces).exists()
+        target = project_dir / produces
+        # The stand-in this repository commits for its build is not the
+        # runtime: a bootstrap that saw it skipped the installer for nothing.
+        return target.exists() and not is_mock_runtime(target)
     return vendored_skill_count(pack.path) > 0
 
 

@@ -41,6 +41,8 @@ IMPLEMENTATION_PLAN_SCHEMA = {
             "description",
             "phase",
             "id",
+            # Requirement ids (FR-###) every subtask of this phase inherits.
+            "requirements",
         ],
         "phase_types": [
             "setup",
@@ -65,6 +67,10 @@ IMPLEMENTATION_PLAN_SCHEMA = {
             "completed_at",
             "session_id",
             "critique_result",
+            # Requirement ids (FR-###) from spec.md this subtask implements.
+            # Optional: specs written before identifiers existed have none to
+            # reference, and a plan without them still builds.
+            "requirements",
         ],
         "status_values": ["pending", "in_progress", "completed", "blocked", "failed"],
     },

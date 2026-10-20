@@ -4,19 +4,20 @@ import type {
 	AzureDevOpsSyncStatus,
 	GitHubSyncStatus,
 	GitLabSyncStatus,
+	InitializationBlocker,
 	LinearSyncStatus,
 	Project,
 	ProjectEnvConfig,
 	ProjectSettings as ProjectSettingsType,
 } from "../../../../shared/types";
 import { GeneralSettings } from "../../project-settings/GeneralSettings";
-import { SecuritySettings } from "../../project-settings/SecuritySettings";
 import { InitializationGuard } from "../common/InitializationGuard";
 import { AzureDevOpsIntegration } from "../integrations/AzureDevOpsIntegration";
 import { ChannelNotificationsIntegration } from "../integrations/ChannelNotificationsIntegration";
 import { CICDPipelineIntegration } from "../integrations/CICDPipelineIntegration";
 import { GitHubIntegration } from "../integrations/GitHubIntegration";
 import { GitLabIntegration } from "../integrations/GitLabIntegration";
+import { FigmaIntegration } from "../integrations/FigmaIntegration";
 import { JiraIntegration } from "../integrations/JiraIntegration";
 import { LinearIntegration } from "../integrations/LinearIntegration";
 import type { ProjectSettingsSection } from "../ProjectSettingsContent";
@@ -36,8 +37,6 @@ interface SectionRouterProps {
 	updateEnvConfig: (updates: Partial<ProjectEnvConfig>) => void;
 	showLinearKey: boolean;
 	setShowLinearKey: React.Dispatch<React.SetStateAction<boolean>>;
-	showOpenAIKey: boolean;
-	setShowOpenAIKey: React.Dispatch<React.SetStateAction<boolean>>;
 	showGitHubToken: boolean;
 	setShowGitHubToken: React.Dispatch<React.SetStateAction<boolean>>;
 	gitHubConnectionStatus: GitHubSyncStatus | null;
@@ -52,7 +51,10 @@ interface SectionRouterProps {
 	setShowAzureDevOpsToken: React.Dispatch<React.SetStateAction<boolean>>;
 	azureDevOpsConnectionStatus: AzureDevOpsSyncStatus | null;
 	isCheckingAzureDevOps: boolean;
+	initBlocker: InitializationBlocker | null;
+	isRepairingGit: boolean;
 	handleInitialize: () => Promise<void>;
+	handleRepairGit: () => Promise<void>;
 	onOpenLinearImport: () => void;
 	onOpenAzureDevOpsImport: () => void;
 }
@@ -77,8 +79,6 @@ export function SectionRouter({
 	updateEnvConfig,
 	showLinearKey,
 	setShowLinearKey,
-	showOpenAIKey,
-	setShowOpenAIKey,
 	showGitHubToken,
 	setShowGitHubToken,
 	gitHubConnectionStatus,
@@ -93,7 +93,10 @@ export function SectionRouter({
 	setShowAzureDevOpsToken,
 	azureDevOpsConnectionStatus,
 	isCheckingAzureDevOps,
+	initBlocker,
+	isRepairingGit,
 	handleInitialize,
+	handleRepairGit,
 	onOpenLinearImport,
 	onOpenAzureDevOpsImport,
 }: SectionRouterProps) {
@@ -115,7 +118,10 @@ export function SectionRouter({
 						versionInfo={versionInfo}
 						isCheckingVersion={isCheckingVersion}
 						isUpdating={isUpdating}
+						initBlocker={initBlocker}
+						isRepairingGit={isRepairingGit}
 						handleInitialize={handleInitialize}
+						handleRepairGit={handleRepairGit}
 					/>
 				</SettingsSection>
 			);
@@ -252,11 +258,28 @@ export function SectionRouter({
 						description="Enable Jira integration to sync issues with your backlog"
 					>
 						<JiraIntegration
+							projectId={project.id}
 							envConfig={envConfig}
 							updateEnvConfig={updateEnvConfig}
 							showJiraToken={showAzureDevOpsToken}
 							setShowJiraToken={setShowAzureDevOpsToken}
 						/>
+					</InitializationGuard>
+				</SettingsSection>
+			);
+
+		case "figma":
+			return (
+				<SettingsSection
+					title={t("integrations.figma.title")}
+					description={t("integrations.figma.subtitle")}
+				>
+					<InitializationGuard
+						initialized={!!project.autoBuildPath}
+						title={t("integrations.figma.title")}
+						description={t("integrations.figma.subtitle")}
+					>
+						<FigmaIntegration projectId={project.id} />
 					</InitializationGuard>
 				</SettingsSection>
 			);
@@ -273,36 +296,9 @@ export function SectionRouter({
 						description={t("settings:channelNotifications.initGuardDescription")}
 					>
 						<ChannelNotificationsIntegration
+							projectId={project.id}
 							envConfig={envConfig}
 							updateEnvConfig={updateEnvConfig}
-						/>
-					</InitializationGuard>
-				</SettingsSection>
-			);
-
-		case "memory":
-			return (
-				<SettingsSection
-					title={t("projectSections.memory.integrationTitle")}
-					description={t("projectSections.memory.integrationDescription")}
-				>
-					<InitializationGuard
-						initialized={!!project.autoBuildPath}
-						title={t("projectSections.memory.integrationTitle")}
-						description={t("projectSections.memory.syncDescription")}
-					>
-						<SecuritySettings
-							envConfig={envConfig}
-							settings={settings}
-							setSettings={setSettings}
-							updateEnvConfig={updateEnvConfig}
-							projectPath={project.path}
-							showOpenAIKey={showOpenAIKey}
-							setShowOpenAIKey={setShowOpenAIKey}
-							expanded={true}
-							onToggle={() => {
-								/* noop */
-							}}
 						/>
 					</InitializationGuard>
 				</SettingsSection>

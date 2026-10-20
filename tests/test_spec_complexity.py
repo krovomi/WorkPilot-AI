@@ -601,7 +601,7 @@ class TestSaveAssessment:
         assert result_path.exists()
         assert result_path.name == "complexity_assessment.json"
 
-        data = json.loads(result_path.read_text())
+        data = json.loads(result_path.read_text(encoding="utf-8"))
         assert data["complexity"] == "standard"
         assert data["confidence"] == 0.85
         assert data["reasoning"] == "Test reasoning"
@@ -614,7 +614,7 @@ class TestSaveAssessment:
         )
 
         result_path = save_assessment(spec_dir, assessment)
-        data = json.loads(result_path.read_text())
+        data = json.loads(result_path.read_text(encoding="utf-8"))
 
         assert "phases_to_run" in data
         assert "discovery" in data["phases_to_run"]
@@ -627,7 +627,9 @@ class TestSaveAssessment:
         )
 
         save_assessment(spec_dir, assessment)
-        data = json.loads((spec_dir / "complexity_assessment.json").read_text())
+        data = json.loads(
+            (spec_dir / "complexity_assessment.json").read_text(encoding="utf-8")
+        )
 
         assert "created_at" in data
         assert "T" in data["created_at"]  # ISO format
@@ -693,7 +695,7 @@ class TestRunAIComplexityAssessment:
             },
         }
         (spec_dir / "complexity_assessment.json").write_text(
-            json.dumps(assessment_data)
+            json.dumps(assessment_data), encoding="utf-8"
         )
 
         async def mock_agent(prompt_file, additional_context=None):
@@ -724,7 +726,9 @@ class TestRunAIComplexityAssessment:
             "acceptance_criteria": ["crit1"],
             "constraints": ["const1"],
         }
-        (spec_dir / "requirements.json").write_text(json.dumps(requirements))
+        (spec_dir / "requirements.json").write_text(
+            json.dumps(requirements), encoding="utf-8"
+        )
 
         context_received = []
 

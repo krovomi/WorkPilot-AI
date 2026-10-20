@@ -1,4 +1,4 @@
-# Test dependencies for the Auto-Build Framework
+# Test dependencies for the WorkPilot AI Framework
 # Install with: pip install -r tests/requirements-test.txt
 
 # Testing framework
@@ -19,6 +19,17 @@ anyio>=4.0.0
 # must be importable in the test environment even though it is an optional
 # runtime dependency loaded lazily in production.
 aiohttp>=3.9.0
+
+# docintel paints secrets out of screenshots with Pillow when it is installed,
+# and withholds the image when it is not. Both paths are tested; this makes
+# the first one run in CI rather than skip.
+Pillow>=10.0.0
+
+# docintel reads a PDF's text layer and renders a scanned one's pages with
+# pypdfium2 when it is installed (a wheel on every platform, no system
+# dependency), and says `no-pdf-backend` when it is not. Installed here so the
+# real text layer and the real rendering are what the tests exercise.
+pypdfium2>=4.30.0
 
 # For testing validation models (required by backend code)
 pydantic>=2.0.0

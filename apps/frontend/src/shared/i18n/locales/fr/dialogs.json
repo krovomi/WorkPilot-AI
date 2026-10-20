@@ -169,6 +169,8 @@
 		"description": "Choisissez comment vous souhaitez ajouter un projet",
 		"openExisting": "Ouvrir un dossier existant",
 		"openExistingDescription": "Parcourir vers un projet existant sur votre ordinateur",
+		"chooseHow": "Ouvrez un projet déjà présent sur votre disque, ou créez-en un nouveau.",
+		"orCreateNew": "Ou créer un nouveau projet",
 		"createNew": "Créer un nouveau projet",
 		"createNewDescription": "Commencer avec un nouveau dossier de projet",
 		"createNewTitle": "Créer un nouveau projet",
@@ -205,10 +207,17 @@
 		"organization": "Organisation",
 		"pat": "PAT",
 		"fillRequiredFields": "Veuillez remplir tous les champs obligatoires",
+		"locationMustBeLocalPath": "L’emplacement doit être un chemin local, pas une URL de dépôt. Cliquez sur « Parcourir » pour choisir un dossier.",
+		"willBeCreatedAt": "Sera créé dans",
 		"successTitle": "Projet créé",
 		"successDescription": "Le projet a bien été créé et configuré.",
 		"failedToCreateTitle": "Erreur lors de la création",
-		"next": "Suivant"
+		"next": "Suivant",
+		"orCreateNewHint": "« Créer » fabrique un nouveau dossier vide à l’emplacement ci-dessous et ajoute celui-là. Pour travailler sur du code que vous avez déjà, utilisez « Ouvrir un dossier existant ».",
+		"targetAlreadyExists": "Ce dossier existe déjà : la création échouera.",
+		"locationLooksLikeProject": "Cet emplacement est déjà un projet ({{markers}}). « Créer » y ajouterait un sous-dossier vide, et c’est ce dossier vide qui serait ajouté.",
+		"openThisFolderInstead": "Ouvrir plutôt ce dossier",
+		"locationInsideRepository": "Cet emplacement est à l’intérieur du dépôt {{repository}}. « Créer » y ajouterait un sous-dossier vide, et c’est ce dossier vide qui serait ajouté."
 	},
 	"customModel": {
 		"title": "Configuration du modèle personnalisé",
@@ -224,23 +233,6 @@
 		"cancel": "Annuler",
 		"remove": "Retirer",
 		"error": "Échec de la suppression du projet"
-	},
-	"appUpdate": {
-		"title": "Mise à jour de l'application disponible",
-		"description": "Une nouvelle version d'WorkPilot AI est prête à être téléchargée",
-		"newVersion": "Nouvelle version",
-		"released": "Publiée",
-		"downloading": "Téléchargement...",
-		"downloadUpdate": "Télécharger la mise à jour",
-		"installAndRestart": "Installer et redémarrer",
-		"installLater": "Installer plus tard",
-		"remindMeLater": "Me rappeler plus tard",
-		"updateDownloaded": "Mise à jour téléchargée avec succès ! Cliquez sur Installer pour redémarrer et appliquer la mise à jour.",
-		"downloadError": "Échec du téléchargement de la mise à jour",
-		"cliChangelog": "Voir le journal des modifications du CLI IA",
-		"cliChangelogAriaLabel": "Voir le journal des modifications du CLI IA (s'ouvre dans une nouvelle fenêtre)",
-		"readOnlyVolumeTitle": "Impossible d'installer depuis une image disque",
-		"readOnlyVolumeDescription": "Veuillez déplacer WorkPilot AI dans votre dossier Applications avant de mettre à jour."
 	},
 	"versionWarning": {
 		"title": "Action requise",
@@ -293,7 +285,8 @@
 		"close": "Fermer"
 	},
 	"providerSelector": {
-		"label": "Fournisseur IA",
+		"updateFailed": "Impossible de changer de fournisseur",
+		"label": "Fournisseur par défaut",
 		"placeholder": "-- Choisir un fournisseur --",
 		"status": {
 			"ok": "OK",
@@ -312,5 +305,28 @@
 		},
 		"loading": "Chargement...",
 		"noProvidersAvailable": "Aucun provider disponible"
+	},
+	"pageLlm": {
+		"title": "Le moteur de cette page",
+		"description": "Fournisseur, modèle et effort pour cette page. Laissés sur « comme les réglages », la page suit la liste « Fournisseur IA » en haut à droite et les modèles définis dans les réglages.",
+		"summary": "{{provider}} · {{model}} · {{effort}}",
+		"tooltip": "Choisir le fournisseur, le modèle et l'effort de cette page",
+		"pageBadge": "page",
+		"providerUnset": "Fournisseur par défaut",
+		"model": "Modèle",
+		"effortLabel": "Effort",
+		"inheritProvider": "Comme les réglages ({{provider}})",
+		"inheritModel": "Comme les réglages ({{model}})",
+		"inheritEffort": "Comme les réglages ({{effort}})",
+		"originPage": "Cette page surcharge le choix global.",
+		"originSettings": "Cette page suit le choix global.",
+		"reset": "Réinitialiser",
+		"effort": {
+			"none": "Aucun",
+			"low": "Faible",
+			"medium": "Moyen",
+			"high": "Élevé",
+			"ultrathink": "Ultra Think"
+		}
 	}
 }

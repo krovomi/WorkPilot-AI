@@ -1,0 +1,153 @@
+description = "Boucle de vérification d'une modification dans l'application qui tourne — lancer l'app, constater qu'aucune erreur n'apparaît, corriger et relancer sinon, amener l'app jusqu'à l'état modifié (clics, ou appels des endpoints créés/modifiés avec leurs payloads) et le confirmer, tracer la performance via Chrome DevTools MCP, et garder une capture d'écran ou un score comme preuve. Frontend web/desktop, application mobile (émulateur Android / simulateur iOS) et backend d'API. À utiliser après une implémentation, avant de dire « c'est fait »."
+prompt = """
+# Vérifier dans l'application qui tourne
+
+Un test vert et un build réussi ne prouvent pas qu'une fonctionnalité marche. La
+preuve, c'est l'application lancée, montrée dans l'état que la tâche devait
+produire, sans erreur, avec une mesure. Cette procédure est une **boucle** : on
+ne la quitte que sur une preuve, ou sur un blocage dit en toutes lettres.
+
+> Fournisseur : si un fichier `providers/<ton-fournisseur>.md` (ou `_sdk.md` /
+> `_executor.md`) se trouve à côté de ce fichier et que personne ne l'a déjà
+> fusionné dans ce texte, lis-le : il dit quels outils utiliser pour chaque
+> étape. Dans WorkPilot, la fusion est déjà faite.
+
+## Outils
+
+Ceux dont dispose la session : un shell pour lancer l'application, un
+navigateur piloté (idéalement Chrome DevTools MCP, pour la trace de
+performance), et de quoi capturer l'écran. La surcharge du fournisseur, quand
+elle existe, remplace ce paragraphe par la table exacte.
+
+## Detect
+
+Établir ce qu'il y a à lancer **avant** de lancer quoi que ce soit. Une même
+tâche peut toucher plusieurs cibles (une API et le front qui l'appelle).
+
+| Cible | Signe | Ce qui sert de preuve |
+|---|---|---|
+| `web-frontend` | `package.json` avec Vite, Next, Angular, Nuxt, SvelteKit… | capture de l'état modifié + score de performance |
+| `desktop` | Electron (`electron` dans les dépendances) | idem, l'app ouverte en `--remote-debugging-port` |
+| `mobile` | Android (Gradle), iOS (Xcode), Flutter, React Native/Expo, MAUI, KMP, Capacitor | capture de l'émulateur/simulateur + temps de démarrage |
+| `backend-api` | ASP.NET Core, FastAPI/Flask/Django, Express/Nest, Spring, Go… | réponses des endpoints (codes + payloads) + latence |
+
+Pas de cible (bibliothèque, CLI sans serveur) : dire « non applicable » et
+s'arrêter. Ce n'est ni un succès ni un échec.
+
+Les fichiers modifiés par la tâche disent **où regarder** : la route, la page,
+le contrôleur, l'écran. Partir d'eux, pas de la page d'accueil.
+
+## Launch & errors
+
+1. Lancer l'application avec la commande du projet (la recette apprise lors
+   d'une vérification précédente, sinon celle détectée). Une commande inventée
+   est le dernier recours, et elle se dit.
+2. Attendre qu'elle réponde (port ouvert, URL de santé, premier écran).
+3. Lire **tout** ce qui s'est affiché : journal du processus, console du
+   navigateur, requêtes réseau en échec (4xx inattendus, 5xx), crash mobile.
+4. Zéro erreur est la seule sortie de cette étape. Un avertissement n'est pas
+   une erreur ; une exception attrapée et journalisée en est une.
+
+## Fix & retry
+
+Une erreur trouvée se corrige **maintenant**, dans le code de la tâche :
+
+1. Remonter l'erreur jusqu'au fichier:ligne du dépôt (la trace de pile le dit
+   souvent — partir de la frame la plus profonde qui appartient au projet).
+2. Corriger la cause, pas le symptôme. Ne jamais désactiver un test, masquer
+   une erreur ou élargir un `catch` pour faire disparaître le message.
+3. Relancer l'application et reprendre à *Launch & errors*.
+
+La boucle s'arrête quand le nombre d'erreurs ne baisse plus deux tours de
+suite : à ce stade, dire ce qui bloque (erreur exacte, fichier, hypothèse) au
+lieu d'essayer une troisième fois la même chose. Une erreur d'environnement
+(base absente, variable manquante, port pris) se note comme telle — c'est une
+leçon pour la prochaine vérification, pas un défaut du code.
+
+## Frontend
+
+1. Lancer l'application (cf. *Launch & errors*) — aucune erreur console.
+2. Ouvrir la page que la tâche a touchée. Prendre un instantané (snapshot) de
+   la page pour lire ses éléments plutôt que de deviner des sélecteurs.
+3. **Cliquer jusqu'au changement** : enchaîner navigation, clics, saisies,
+   jusqu'à l'état que la tâche devait produire.
+4. **Confirmer le nouvel état** : relire la page et citer ce qui le prouve
+   (le texte, l'élément, la valeur attendus). « La page s'affiche » ne
+   confirme rien.
+5. Vérifier à nouveau la console et le réseau après les interactions.
+6. **Trace de performance** via Chrome DevTools MCP sur la page de l'état
+   modifié (`performance_start_trace` avec rechargement, puis
+   `performance_stop_trace`) : LCP, CLS, TBT/INP, et le score qui en découle.
+7. **Capture d'écran** de l'état confirmé (et une en vue mobile si la page est
+   responsive).
+
+Enregistrer chaque étape du parcours : il sera rejoué sans modèle après la QA.
+
+## Mobile
+
+Même procédure que *Frontend*, sur l'appareil adéquat :
+
+1. Choisir la plateforme visée par la tâche (Android et/ou iOS). iOS ne se
+   construit que sur macOS : hors macOS, le dire une fois et ne vérifier que
+   ce qui peut l'être.
+2. Démarrer l'émulateur Android ou le simulateur iOS, construire, installer,
+   lancer.
+3. Lire le journal **de l'app seule** (logcat filtré sur le processus,
+   `simctl spawn … log stream` filtré sur le bundle) : aucun crash, aucune
+   exception.
+4. Naviguer jusqu'à l'écran modifié et confirmer l'état attendu sur une
+   capture.
+5. Performance : temps de démarrage (`am start -W` / lancement mesuré) et
+   images saccadées (`dumpsys gfxinfo`). Pour une vue web embarquée
+   (Capacitor, WebView), la trace Chrome DevTools s'applique aussi.
+6. Capture d'écran de l'état confirmé.
+
+## Backend
+
+1. Lancer l'application (cf. *Launch & errors*) — aucune erreur au démarrage.
+2. Lister les endpoints **créés ou modifiés** : ceux dont le handler est dans
+   les fichiers de la tâche. L'OpenAPI de l'app lancée
+   (`/swagger/v1/swagger.json`, `/openapi.json`, `/v3/api-docs`) donne les
+   schémas ; sinon, lire le contrôleur.
+3. Appeler chacun avec un **payload valide** (construit depuis le schéma, puis
+   ajusté au cas métier de la tâche), et au moins un cas d'erreur pertinent
+   (payload invalide → 400/422, ressource absente → 404).
+4. Vérifier pour chaque appel :
+   - le **code de retour** attendu ;
+   - le **payload de retour** : forme conforme au schéma, valeurs cohérentes
+     avec la requête (l'objet créé est relu tel qu'envoyé) ;
+   - le journal du serveur : aucune exception pendant l'appel.
+5. Un 401/403 sur un endpoint protégé n'est pas un échec du code : le signaler
+   comme « non vérifié — authentification requise ».
+6. **Trace de performance** via Chrome DevTools MCP sur la page de
+   documentation de l'API (Swagger UI, ReDoc) quand elle existe, et la latence
+   p50/p95 des endpoints appelés comme score.
+7. **Capture d'écran** de la documentation ou du rapport des appels.
+
+Seule l'application lancée par cette vérification, en local, est appelée.
+Jamais un serveur partagé ou de production.
+
+## Evidence
+
+La preuve est un fichier, pas une phrase :
+
+- une capture par état confirmé (et par plateforme pour le mobile) ;
+- les métriques de performance mesurées, ou « non mesuré » avec la raison —
+  jamais un zéro inventé ;
+- pour le backend, chaque appel : méthode, route, code attendu/obtenu,
+  validité du payload, latence.
+
+## Report
+
+Terminer par :
+
+- ce qui a été lancé, et comment ;
+- les erreurs trouvées, corrigées, et le nombre de tours ;
+- l'état confirmé, avec ce qui le prouve ;
+- la performance (métriques + score) ;
+- les chemins des captures ;
+- ce qui n'a pas pu être vérifié, et pourquoi.
+
+Puis, sur une ligne seule, exactement `Verify: pass`, `Verify: fail` ou
+`Verify: unknown` (rien n'était vérifiable ici).
+"""

@@ -56,8 +56,10 @@ vi.mock("../../../project-store", () => ({
 	},
 }));
 
-// biome-ignore lint/complexity/noBannedTypes: test helper invokes captured IPC handlers
-type Handler = Function;
+// The captured IPC handlers differ in arity and payload shape, so the test
+// helper deliberately keeps a loose signature.
+// biome-ignore lint/suspicious/noExplicitAny: varied IPC handler shapes in a test helper
+type Handler = (...args: any[]) => any;
 
 function createProject(rootPath: string): Project {
 	return {

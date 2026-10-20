@@ -30,12 +30,33 @@
 		"readmeFailed": "README generation failed",
 		"networkError": "Network error"
 	},
-	"symbols": { "title": "Symbols" },
-	"docstrings": { "title": "Generated Docstrings ({{count}})" },
+	"symbols": {
+		"title": "Symbols"
+	},
+	"docstrings": {
+		"title": "Generated Docstrings ({{count}})"
+	},
 	"autocomplete": {
 		"searching": "Searching…",
 		"noResults": "No matching files",
 		"noResultsDir": "No matching directories",
 		"noProject": "Select a project first"
+	},
+	"agent": {
+		"phase": {
+			"idle": "Ready",
+			"analyzing": "Analyzing documentation coverage…",
+			"generating": "Generating documentation…",
+			"updating": "Updating outdated docs…",
+			"complete": "Complete",
+			"error": "Error"
+		},
+		"docType": {
+			"readme": "README",
+			"api": "API docs",
+			"contribution": "Contribution guide",
+			"docstrings": "Docstrings / JSDoc",
+			"diagrams": "Sequence diagrams"
+		}
 	}
 }

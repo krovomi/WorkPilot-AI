@@ -6,10 +6,10 @@ on:
     paths:
       - 'apps/**'
       - 'tests/**'
+      - 'src/**'
       - '.github/workflows/lint.yml'
       - '.github/actions/**'
       - 'apps/frontend/biome.jsonc'
-      - '.pre-commit-config.yaml'
       - 'skills/**'
       - 'capabilities/**'
       - '.agents/**'
@@ -26,10 +26,10 @@ on:
     paths:
       - 'apps/**'
       - 'tests/**'
+      - 'src/**'
       - '.github/workflows/lint.yml'
       - '.github/actions/**'
       - 'apps/frontend/biome.jsonc'
-      - '.pre-commit-config.yaml'
       - 'skills/**'
       - 'capabilities/**'
       - '.agents/**'
@@ -56,10 +56,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       - name: Set up Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@v7.0.0
         with:
           python-version: '3.12'
 
@@ -68,11 +68,18 @@ jobs:
       - name: Install ruff
         run: pip install ruff==0.15.7
 
+      # `tests/` and `src/` (and `utils/`, removed in audit lot L9) were outside
+      # the gate until then, which is why they had drifted to 11 lint errors
+      # and 169 unformatted files while apps/backend/ stayed clean: nothing
+      # was checking them. `tests/` is the
+      # second-largest body of Python here and the one every contributor
+      # touches, so leaving it ungated meant the suite that guards the product
+      # was the least guarded thing in the repo.
       - name: Run ruff check
-        run: ruff check apps/backend/ --output-format=github
+        run: ruff check apps/backend/ tests/ src/ --output-format=github
 
       - name: Run ruff format check
-        run: ruff format apps/backend/ --check --diff
+        run: ruff format apps/backend/ tests/ src/ --check --diff
 
       # `scripts/` as a whole is not linted here: three unrelated merge scripts
       # carry pre-existing violations, and fixing them belongs to whoever owns
@@ -81,8 +88,36 @@ jobs:
       # as the code they generate from.
       - name: Run ruff on the skills scripts
         run: |
-          ruff check scripts/skills_cli.py scripts/skills_sync.py scripts/vendor_pack.py --output-format=github
-          ruff format scripts/skills_cli.py scripts/skills_sync.py scripts/vendor_pack.py --check --diff
+          ruff check scripts/skills_cli.py scripts/skills_sync.py scripts/vendor_pack.py scripts/vendor_archify.py scripts/vendor_bmad.py scripts/vendor_watermarks.py scripts/sync_surface_globs.py --output-format=github
+          ruff format scripts/skills_cli.py scripts/skills_sync.py scripts/vendor_pack.py scripts/vendor_archify.py scripts/vendor_bmad.py scripts/vendor_watermarks.py scripts/sync_surface_globs.py --check --diff
+
+      # `apps/backend/vendor/archify` is a pinned copy of third-party code, and
+      # a pin nobody verifies is a comment. This compares the bytes on disk to
+      # the digest `VENDOR.json` records, and fails naming the files that moved.
+      #
+      # It exists because three files in that tree were once edited in place by
+      # an autofix bot: the receipt still said v2.16.0, because the only thing
+      # anyone checked was that string. Re-running the vendoring script then
+      # reverted the edits without saying so. Reads the disk, hits no network.
+      - name: Check the vendored archify tree matches its pin
+        run: python3 scripts/vendor_archify.py --check
+
+      # The same guarantee for the Layer A cleaner, and it needs it more: that
+      # tree is one Python file, so it is the one a formatter or an autofix bot
+      # would happily "improve" on its way past. Reads the disk, hits no
+      # network. `__pycache__` is excluded from the digest — it is a property
+      # of whichever interpreter imported the module, not of the pin.
+      - name: Check the vendored watermarks tree matches its pin
+        run: python3 scripts/vendor_watermarks.py --check
+
+      # `skills/bmad` is the same guarantee for the BMAD pack, and the reason
+      # it is worth a second step rather than a footnote: CodeQL and ruff are
+      # both told to leave that tree alone, so this is the only thing standing
+      # between "vendored at 6.12.0" and whatever the tree actually holds.
+      # Unlike the archify check it re-downloads the pinned npm release, so it
+      # needs the network — a registry outage fails this step and nothing else.
+      - name: Check the vendored BMAD tree matches its pin
+        run: python3 scripts/vendor_bmad.py --check
 
   # TypeScript/JavaScript linting (Biome) - 15-25x faster than ESLint
   typescript:
@@ -90,7 +125,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       # MUST match @biomejs/biome in apps/frontend/package.json — version
       # drift here means "passes locally, fails in CI" (e.g. 2.3.11 flagged
@@ -98,7 +133,7 @@ jobs:
       - name: Setup Biome
         uses: biomejs/setup-biome@4c91541eaada48f67d7dbd7833600ce162b68f51 # v2
         with:
-          version: 2.4.10
+          version: 2.5.11
 
       - name: Run Biome
         working-directory: apps/frontend
@@ -114,10 +149,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       - name: Set up Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@v7.0.0
         with:
           python-version: '3.12'
 
@@ -127,6 +162,21 @@ jobs:
       # fails at collection without it.
       - name: Install the skills toolchain
         run: pip install "PyYAML>=6.0" pytest pytest-asyncio
+
+      # Le mock de runtime BMAD est versionné (_bmad/scripts/resolve_customization.py,
+      # ré-inclus par .gitignore) : il satisfait la gate [requires] du build et échoue
+      # à l'appel (code 2) pour laisser aux skills leur plan B. Rien à générer ici ;
+      # on vérifie seulement qu'il est bien un mock et qu'il échoue.
+      - name: Check the committed BMAD mock runtime fails on invocation
+        run: |
+          head -3 _bmad/scripts/resolve_customization.py | grep -q workpilot-mock
+          if python3 _bmad/scripts/resolve_customization.py --skill x --project-root . --key workflow; then
+            echo "the mock must exit non-zero"; exit 1
+          fi
+
+      # Aligne les fichiers de build volatils directement sur la plateforme de la CI
+      - name: Materialise skills on CI runner
+        run: python3 scripts/skills_cli.py build
 
       - name: Check materialised skills are up to date
         run: python3 scripts/skills_cli.py build --check

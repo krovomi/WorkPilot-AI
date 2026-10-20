@@ -14,10 +14,10 @@ from typing import Any, Union
 
 # Memory integration for cross-session learning
 try:
-    from agents.memory_manager import get_graphiti_context, save_session_memory
+    from agents.memory_manager import get_memory_context, save_session_memory
 except ImportError:
 
-    def get_graphiti_context(*args, **kwargs):
+    async def get_memory_context(*args, **kwargs):
         return ""
 
     def save_session_memory(*args, **kwargs):
@@ -38,7 +38,13 @@ except ImportError:
     ContentBlockType = None  # type: ignore[assignment,misc]
 
 try:
-    from debug import debug, debug_detailed, debug_error, debug_section, debug_success
+    from core.debug import (
+        debug,
+        debug_detailed,
+        debug_error,
+        debug_section,
+        debug_success,
+    )
 except ImportError:
 
     def debug(*args, **kwargs):
@@ -212,12 +218,16 @@ async def run_qa_fixer_session(
         debug_error("qa_fixer", "QA_FIX_REQUEST.md not found")
         return "error", "QA_FIX_REQUEST.md not found"
 
-    # Load fixer prompt
-    prompt = load_qa_fixer_prompt()
+    # Load fixer prompt through its builder: {{SPEC_DIR}} / {{MIN_COVERAGE}}
+    # filled in and the verify section attached. The raw file used to be sent
+    # as is, placeholders and all.
+    from prompts_pkg import get_qa_fixer_prompt
+
+    prompt = get_qa_fixer_prompt(spec_dir, project_dir)
     debug_detailed("qa_fixer", "Loaded QA fixer prompt", prompt_length=len(prompt))
 
     # Retrieve memory context for fixer (past fixes, patterns, gotchas)
-    fixer_memory_context = await get_graphiti_context(
+    fixer_memory_context = await get_memory_context(
         spec_dir,
         project_dir,
         {
@@ -228,7 +238,7 @@ async def run_qa_fixer_session(
     if fixer_memory_context:
         prompt += "\n\n" + fixer_memory_context
         print("✓ Memory context loaded for QA fixer")
-        debug_success("qa_fixer", "Graphiti memory context loaded for fixer")
+        debug_success("qa_fixer", "Memory context loaded for fixer")
 
     # Learning Loop: inject patterns learned from previous builds (qa_fixing phase)
     try:
@@ -239,6 +249,7 @@ async def run_qa_fixer_session(
             prompt += "\n\n" + learning_context
             debug_success("qa_fixer", "Learning loop patterns injected for fixer")
     except Exception:
+        # L'injection de patterns est un bonus : sans elle le prompt reste valide.
         pass
 
     # Add session context - use full path so agent can find files
@@ -304,6 +315,7 @@ async def run_qa_fixer_session(
                             cost_usd=_cost,
                         )
                     except Exception:
+                        # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                         pass
                 continue
 
@@ -327,6 +339,7 @@ async def run_qa_fixer_session(
                             try:
                                 _rr.record_response(_rs_id, block.text)
                             except Exception:
+                                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                                 pass
                     elif block_type == "ToolUseBlock" and hasattr(block, "name"):
                         tool_name = block.name
@@ -400,6 +413,7 @@ async def run_qa_fixer_session(
                                         _rs_id, tool_name, tool_input_dict=inp or {}
                                     )
                             except Exception:
+                                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                                 pass
 
             elif msg_type == "UserMessage" and hasattr(msg, "content"):
@@ -474,6 +488,7 @@ async def run_qa_fixer_session(
                                         success=not is_error,
                                     )
                             except Exception:
+                                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                                 pass
 
                         current_tool = None
@@ -494,6 +509,7 @@ async def run_qa_fixer_session(
             try:
                 _rr.end_session(_rs_id)
             except Exception:
+                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                 pass
         return _fix_result
 
@@ -510,6 +526,7 @@ async def run_qa_fixer_session(
             try:
                 _rr.end_session(_rs_id, status="failed")
             except Exception:
+                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                 pass
         return "error", str(e)
 
@@ -551,6 +568,22 @@ async def _run_qa_fixer_agent_client_session(
 
     current_tool = None
 
+    # The context gauge follows QA too. Each pass already starts on a fresh
+    # thread (nothing is replayed), so the guard only measures here.
+    from agents.session import _make_context_guard
+
+    context_guard = _make_context_guard(
+        client,
+        spec_dir,
+        "validation",
+        None,
+        provider,
+        str(getattr(client, "model", "") or ""),
+    )
+    if context_guard is not None:
+        context_guard.monitor_only = True
+        context_guard.base_chars = len(prompt)
+
     try:
         debug("qa_fixer", f"Sending query to {provider}...")
         await client.query(prompt)
@@ -566,6 +599,11 @@ async def _run_qa_fixer_agent_client_session(
                 f"Received message #{message_count}",
                 msg_type=agent_msg.type_name,
             )
+            if context_guard is not None:
+                try:
+                    context_guard.observe(agent_msg)
+                except Exception:  # noqa: BLE001 - the gauge is a mirror
+                    pass
 
             for block in agent_msg.content:
                 if block.type == ContentBlockType.TEXT and block.text:
@@ -583,6 +621,7 @@ async def _run_qa_fixer_agent_client_session(
                         try:
                             _rr.record_response(_rs_id, block.text)
                         except Exception:
+                            # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                             pass
 
                 elif block.type == ContentBlockType.TOOL_USE:
@@ -654,6 +693,7 @@ async def _run_qa_fixer_agent_client_session(
                                     _rs_id, tool_name, tool_input_dict=inp or {}
                                 )
                         except Exception:
+                            # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                             pass
 
                 elif block.type == ContentBlockType.TOOL_RESULT:
@@ -722,11 +762,16 @@ async def _run_qa_fixer_agent_client_session(
                                     success=not is_error,
                                 )
                         except Exception:
+                            # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                             pass
 
                     current_tool = None
 
         print("\n" + "-" * 70 + "\n")
+
+        from agents.session import record_client_usage
+
+        record_client_usage(client, spec_dir, "validation", agent_type="qa_fixer")
 
         # Shared post-processing: check fix status, save memory
         _fix_result = await _process_fixer_result(
@@ -742,6 +787,7 @@ async def _run_qa_fixer_agent_client_session(
             try:
                 _rr.end_session(_rs_id)
             except Exception:
+                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                 pass
         return _fix_result
 
@@ -758,6 +804,7 @@ async def _run_qa_fixer_agent_client_session(
             try:
                 _rr.end_session(_rs_id, status="failed")
             except Exception:
+                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                 pass
         return "error", str(e)
 
@@ -806,9 +853,9 @@ async def _process_fixer_result(
 
     fixer_discoveries = {
         "files_understood": {},
-        "patterns_found": [
-            f"QA fixer session {fix_session}: Applied fixes from QA_FIX_REQUEST.md"
-        ],
+        # A session log line is not a pattern: filed as one, it was recalled
+        # as a "learned pattern" by every later session of the project.
+        "patterns_found": [],
         "gotchas_encountered": [],
     }
 

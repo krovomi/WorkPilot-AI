@@ -7,6 +7,7 @@ Exposes two endpoints used by the Kanban Quick-Command bar:
        - <project_dir>/.agents/skills/*/SKILL.md  (agnostic, primary source)
        - <project_dir>/.claude/commands/*.md       (Claude mirror, fallback)
        - ~/.claude/commands/*.md                   (user-scoped fallback)
+       - bundled product skills                   (last fallback)
        Commands already covered by the agnostic source are not duplicated.
        Each entry carries the parsed YAML frontmatter so the UI can render
        a description tooltip without an extra round-trip.
@@ -34,6 +35,7 @@ Security:
 from __future__ import annotations
 
 import logging
+import os
 import re
 import sys
 from pathlib import Path
@@ -41,6 +43,7 @@ from typing import Annotated, Any
 
 from core.api_safety import validated_dir
 from fastapi import APIRouter, Body, HTTPException, Query
+from skills_registry.bundled import BUNDLED_SKILLS, load_bundled_skill
 from skills_registry.frontmatter import parse_frontmatter, workpilot_meta
 from skills_registry.resolver import check_requires
 
@@ -52,6 +55,14 @@ router = APIRouter()
 # Matches both built-in commands like "compact" / "clear" and filesystem
 # commands like "bmad-agent-bmm-dev".
 _COMMAND_NAME_RE = re.compile(r"^[a-zA-Z0-9_./:-]{1,128}$")
+
+
+def _valid_command_name(command: str) -> bool:
+    """A command name, never a path: ``ns/cmd`` and ``ns:cmd`` are names,
+    ``../x`` and ``/etc/x`` would be joined to a directory and leave it."""
+    if not isinstance(command, str) or not _COMMAND_NAME_RE.match(command):
+        return False
+    return not command.startswith("/") and ".." not in command.split("/")
 
 
 def _safe_project_dir(raw: str) -> Path:
@@ -151,14 +162,16 @@ def _runtime_is_present(meta: dict[str, Any], project_dir: Path) -> bool:
     The build already refuses to emit a skill whose runtime is missing, so on a
     freshly generated tree this changes nothing. It matters because
     `.agents/skills/` is **committed**: a developer who bootstrapped BMAD
-    locally emits its 76 wrappers and commits them, and the next clone has the
+    locally emits its skills and commits them, and the next clone has the
     files without `_bmad/`. That is exactly the original failure — a palette
     listing 76 commands that all fail on invocation — arriving by a different
     route, so the gate is enforced at read time too.
 
     A malformed or unrecognised `requires` hides the command rather than
     showing it. A command that cannot run is worse than one that is missing:
-    the user picks it, waits, and gets an error.
+    the user picks it, waits, and gets an error. The mock runtime this
+    repository commits for its own build counts as missing here, for the
+    same reason.
     """
     requires = workpilot_meta(meta).get("requires")
     if not requires:
@@ -167,13 +180,36 @@ def _runtime_is_present(meta: dict[str, Any], project_dir: Path) -> bool:
         logger.debug("skill has a non-mapping `requires`, hidden from the palette")
         return False
     try:
-        ok, reason = check_requires(requires, project_dir)
+        ok, reason = check_requires(requires, project_dir, accept_mock=False)
     except Exception as exc:  # noqa: BLE001 - a bad gate hides, never crashes
         logger.debug("requires check failed, hiding command: %s", exc)
         return False
     if not ok:
         logger.debug("command hidden: %s", reason)
     return ok
+
+
+def _skill_body_for_provider(proj: Path, skill_md: Path) -> str:
+    """The SKILL.md body specialised for the project's active provider.
+
+    Read through `skills_registry.overlays`, so `/verify` fired from the
+    Kanban on Ollama reads the Ollama overlay and on Claude the SDK one. The
+    provider is *peeked*, never consumed: resolving a body is not starting a
+    run.
+    """
+    from skills_registry.overlays import resolve_skill_file
+
+    root = os.path.realpath(proj / _AGNOSTIC_SKILLS_SUBDIR)
+    real = os.path.realpath(skill_md)
+    if not real.startswith(root + os.sep):
+        raise ValueError("skill outside the project's skills directory")
+    try:
+        from core.client import peek_active_provider
+
+        provider = peek_active_provider(proj)
+    except Exception:  # noqa: BLE001 - no provider config means the default
+        provider = None
+    return resolve_skill_file(Path(real), provider).body
 
 
 def _resolve_command_body(proj: Path, command: str) -> str | None:
@@ -183,28 +219,39 @@ def _resolve_command_body(proj: Path, command: str) -> str | None:
       1. <proj>/.agents/skills/<command>/SKILL.md   (agnostic, preferred)
       2. <proj>/.claude/commands/<command>.md       (Claude mirror, fallback)
       3. ~/.claude/commands/<command>.md            (user-scoped fallback)
+      4. bundled product skills                    (consumer projects)
 
     The frontmatter is stripped so the returned text is the raw instructions
     any provider can execute. Returns None when no definition is found (the
     caller then degrades to the SDK slash-command resolver).
     """
+    if not _valid_command_name(command):
+        return None
     candidates = [
         proj / _AGNOSTIC_SKILLS_SUBDIR / command / "SKILL.md",
         proj / ".claude" / "commands" / f"{command}.md",
         Path.home() / ".claude" / "commands" / f"{command}.md",
     ]
-    for path in candidates:
+    for index, path in enumerate(candidates):
         try:
-            if path.is_file():
+            if not path.is_file():
+                continue
+            if index == 0:
+                # An agnostic skill may carry provider overlays
+                # (`providers/*.md`): the body is the one the provider that
+                # will execute it should follow.
+                body = _skill_body_for_provider(proj, path)
+            else:
                 _, body = _parse_frontmatter(
                     path.read_text(encoding="utf-8", errors="replace")
                 )
-                body = body.strip()
-                if body:
-                    return body
-        except OSError:
+            body = body.strip()
+            if body:
+                return body
+        except (OSError, ValueError):
             continue
-    return None
+    bundled = load_bundled_skill(command)
+    return bundled[1] if bundled is not None else None
 
 
 # Built-in slash commands the SDK / CLI recognises AND that make sense in
@@ -230,7 +277,7 @@ def list_slash_commands(project_dir: Annotated[str, Query()]):
     """List discovered slash commands for a project.
 
     Order: agnostic project skills first, then any Claude-only mirror commands,
-    then user commands, then built-ins. Commands already provided by the
+    then user commands, then bundled skills and built-ins. Commands provided by the
     agnostic `.agents/skills/` source are not repeated from `.claude/commands`
     (the Claude mirror is a fallback for non-skill commands only).
     """
@@ -252,13 +299,28 @@ def list_slash_commands(project_dir: Annotated[str, Query()]):
         for c in _scan_commands_dir(Path.home() / ".claude" / "commands", "user")
         if c["name"] not in seen
     ]
+    seen.update(c["name"] for c in user_cmds)
+    bundled_cmds = []
+    for name in BUNDLED_SKILLS:
+        if name in seen:
+            continue
+        skill = load_bundled_skill(name)
+        if skill is not None:
+            bundled_cmds.append(
+                {
+                    "name": name,
+                    "description": skill[0].get("description", ""),
+                    "source": "built-in",
+                    "path": "",
+                }
+            )
     built_ins = [
         {**cmd, "source": "built-in", "path": ""} for cmd in _BUILT_IN_COMMANDS
     ]
 
     return {
         "success": True,
-        "commands": skill_cmds + project_cmds + user_cmds + built_ins,
+        "commands": skill_cmds + project_cmds + user_cmds + bundled_cmds + built_ins,
     }
 
 
@@ -274,7 +336,7 @@ def get_slash_command_body(
     command flows through the normal task pipeline (planning, plan-approval,
     conversation). Resolution mirrors `_resolve_command_body`.
     """
-    if not _COMMAND_NAME_RE.match(command):
+    if not _valid_command_name(command):
         raise HTTPException(
             status_code=400, detail=f"invalid command name: {command!r}"
         )
@@ -348,13 +410,15 @@ async def _agent_workflow_call(proj: Path, prompt: str) -> tuple[bool, str]:
     when the client could not be built, so the caller degrades to `_agnostic_call`.
     """
     try:
-        from core.client import _get_active_provider, create_agent_client
+        from core.client import create_agent_client, peek_active_provider
         from core.oneshot import _extract_text, _resolve_model
     except ImportError as exc:
         return False, f"agent runner not available: {exc}"
 
     try:
-        provider = _get_active_provider(proj)
+        # Peeked, like `_skill_body_for_provider`: a palette command is not the
+        # session a "resume with X" choice was made for, and must not eat it.
+        provider = peek_active_provider(proj)
         model = _resolve_model(provider, None, proj)
         # spec_dir == project_dir: the Quick-Command bar is project-scoped (no
         # per-task spec). agent_type="coder" carries the read+write+web tool set
@@ -470,7 +534,7 @@ async def run_slash_command(payload: Annotated[dict, Body()]):
             status_code=400,
             detail="project_dir and command are required",
         )
-    if not _COMMAND_NAME_RE.match(command):
+    if not _valid_command_name(command):
         raise HTTPException(
             status_code=400, detail=f"invalid command name: {command!r}"
         )

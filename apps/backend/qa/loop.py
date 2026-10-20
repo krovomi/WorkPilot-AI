@@ -11,10 +11,14 @@ import subprocess
 import time as time_module
 from pathlib import Path
 
+from core.build_signals import BuildPaused
 from core.client import create_agent_client
+from core.debug import debug, debug_error, debug_section, debug_success, debug_warning
+from core.pause_state import is_paused, read_pause_state
+from core.phase_event import ExecutionPhase, emit_phase
+from core.progress import count_subtasks, is_build_complete
 from core.task_event import TaskEventEmitter
-from debug import debug, debug_error, debug_section, debug_success, debug_warning
-from linear_updater import (
+from integrations.linear.updater import (
     LinearTaskState,
     is_linear_enabled,
     linear_qa_approved,
@@ -27,15 +31,18 @@ from phase_config import (
     get_phase_provider,
     get_phase_thinking_budget,
 )
-from phase_event import ExecutionPhase, emit_phase
-from progress import count_subtasks, is_build_complete
 from security.constants import PROJECT_DIR_ENV_VAR
 from security.qa_scanner import run_qa_security_scan
 from task_logger import (
+    LogEntryType,
     LogPhase,
     get_task_logger,
 )
 
+from .budget import (
+    qa_iteration_cap,
+    recurring_issue_threshold,
+)
 from .criteria import (
     get_qa_iteration_count,
     get_qa_signoff_status,
@@ -50,103 +57,48 @@ from .report import (
     has_recurring_issues,
     is_no_test_project,
     record_iteration,
+    render_fix_request,
+    run_visual_qa,
+    write_visual_qa_report,
 )
-from .reviewer import run_qa_agent_session
+from .reviewer import classify_qa_error, run_qa_agent_session
 
 
 def _ensure_fix_request_file(
     spec_dir: Path, issues: list[dict], qa_iteration: int
 ) -> bool:
     """
-    Garantit qu'un ``QA_FIX_REQUEST.md`` existe avant de lancer le fixer.
+    Garantit qu'un ``QA_FIX_REQUEST.md`` à jour existe avant de lancer le fixer.
 
-    Le QA reviewer est censé écrire ce fichier via le prompt
-    ``qa_reviewer.md`` (commande ``cat > QA_FIX_REQUEST.md << EOF``). En
-    pratique, certains modèles (ou des sessions interrompues) oublient
-    cette étape et la boucle échoue ensuite avec
-    ``Fixer error: QA_FIX_REQUEST.md not found``.
-
-    Pour rendre la boucle robuste, on synthétise le fichier à partir des
-    issues déjà connues (``issues_found`` du sign-off) avant d'invoquer le
-    fixer si aucun fichier n'a été produit.
-
-    Args:
-        spec_dir: Dossier du spec courant.
-        issues: Liste des issues remontées par le reviewer.
-        qa_iteration: Itération QA en cours, pour traçabilité.
+    Le fichier est rendu par Python depuis ``issues_found`` (le reviewer ne le
+    rédige plus : c'était une quatrième copie des mêmes issues, en tokens de
+    sortie). Il est réécrit à chaque passe qui a des issues, sinon une version
+    d'une passe précédente enverrait le fixer sur des problèmes déjà corrigés.
+    Sans issues, un fichier existant (retour humain) est conservé.
 
     Returns:
-        ``True`` si le fichier existe à la sortie (déjà présent ou
-        synthétisé), ``False`` si on n'a pas pu le créer (issues vides).
+        ``True`` si le fichier existe à la sortie, ``False`` sinon.
     """
     fix_request_file = spec_dir / "QA_FIX_REQUEST.md"
-    if fix_request_file.exists():
-        return True
-
-    if not issues:
-        debug_warning(
+    if issues and render_fix_request(spec_dir, issues, qa_iteration):
+        debug(
             "qa_loop",
-            "Cannot synthesize QA_FIX_REQUEST.md: reviewer reported no issues",
-            iteration=qa_iteration,
-        )
-        return False
-
-    lines: list[str] = [
-        "# QA Fix Request",
-        "",
-        f"_Auto-généré par la boucle QA (itération {qa_iteration}) car le "
-        "reviewer n'a pas produit de fichier explicite._",
-        "",
-        "## Issues à corriger",
-        "",
-    ]
-    for idx, issue in enumerate(issues, start=1):
-        title = issue.get("title") or issue.get("summary") or f"Issue {idx}"
-        description = (
-            issue.get("description")
-            or issue.get("details")
-            or issue.get("message")
-            or ""
-        )
-        severity = issue.get("severity") or issue.get("priority") or "unknown"
-        lines.append(f"### {idx}. {title}")
-        lines.append("")
-        lines.append(f"- **Sévérité** : {severity}")
-        if description:
-            lines.append("")
-            lines.append(description.strip())
-        lines.append("")
-
-    lines.append("## Verification")
-    lines.append("")
-    lines.append(
-        "Après application des correctifs, mettre à jour "
-        "`implementation_plan.json` avec `ready_for_qa_revalidation: true`."
-    )
-    lines.append("")
-
-    try:
-        fix_request_file.write_text("\n".join(lines), encoding="utf-8")
-        debug_warning(
-            "qa_loop",
-            "Synthesized QA_FIX_REQUEST.md from issues_found "
-            "(reviewer did not produce one)",
+            "Rendered QA_FIX_REQUEST.md from issues_found",
             iteration=qa_iteration,
             issue_count=len(issues),
-            path=str(fix_request_file),
         )
         return True
-    except OSError as exc:
-        debug_error(
-            "qa_loop",
-            f"Failed to synthesize QA_FIX_REQUEST.md: {exc}",
-            iteration=qa_iteration,
-        )
-        return False
+    if fix_request_file.exists():
+        return True
+    debug_warning(
+        "qa_loop",
+        "Cannot write QA_FIX_REQUEST.md: reviewer reported no issues",
+        iteration=qa_iteration,
+    )
+    return False
 
 
 # Configuration
-MAX_QA_ITERATIONS = 50
 MAX_CONSECUTIVE_ERRORS = 3  # Stop after 3 consecutive errors without progress
 
 
@@ -243,6 +195,7 @@ async def run_qa_validation_loop(
     model: str,
     verbose: bool = False,
     source_spec_dir: Path | None = None,
+    jev_run=None,
 ) -> bool:
     """
     Run the full QA validation loop.
@@ -284,6 +237,8 @@ async def run_qa_validation_loop(
         except OSError:
             pass
 
+    qa_cap = qa_iteration_cap(spec_dir)
+
     debug_section("qa_loop", "QA Validation Loop")
     debug(
         "qa_loop",
@@ -291,7 +246,7 @@ async def run_qa_validation_loop(
         project_dir=str(project_dir),
         spec_dir=str(spec_dir),
         model=model,
-        max_iterations=MAX_QA_ITERATIONS,
+        max_iterations=qa_cap,
     )
 
     print("\n" + "=" * 70)
@@ -315,7 +270,7 @@ async def run_qa_validation_loop(
     emit_phase(ExecutionPhase.QA_REVIEW, "Starting QA validation")
     task_event_emitter.emit(
         "QA_STARTED",
-        {"iteration": 1, "maxIterations": MAX_QA_ITERATIONS},
+        {"iteration": 1, "maxIterations": qa_cap},
     )
 
     # Check if there's pending human feedback that needs to be processed
@@ -365,7 +320,7 @@ async def run_qa_validation_loop(
             print(f"\n❌ Failed to create fixer client: {e}")
             task_event_emitter.emit(
                 "QA_AGENT_ERROR",
-                {"iteration": 0, "consecutiveErrors": 1},
+                {"iteration": 0, "consecutiveErrors": 1, "error": str(e)[:500]},
             )
             return False
 
@@ -489,29 +444,55 @@ async def run_qa_validation_loop(
             print("Linear task moved to 'In Review'")
 
     qa_iteration = get_qa_iteration_count(spec_dir)
+    # The budget is the task's, not the run's: a build paused and resumed in
+    # the middle of QA continues the count rather than starting a new one. A
+    # person's feedback is what opens a new budget — they have read the
+    # result and asked for more.
+    max_iterations = qa_iteration + qa_cap if has_human_feedback else qa_cap
+    recurring_threshold = recurring_issue_threshold(qa_cap)
+    if task_logger:
+        task_logger.log(
+            f"QA budget: {max_iterations - qa_iteration} review pass(es) "
+            f"(effort-based cap {qa_cap}); an issue seen {recurring_threshold} "
+            "times escalates to a human.",
+            LogEntryType.INFO,
+            LogPhase.VALIDATION,
+        )
     consecutive_errors = 0
     last_error_context = None  # Track error for self-correction feedback
     max_iterations_emitted = False
 
-    while qa_iteration < MAX_QA_ITERATIONS:
+    while qa_iteration < max_iterations:
+        # Cooperative pause, checked between passes. QA is a loop of long
+        # sessions, so "pause" without a checkpoint here meant the user waited
+        # for the current pass to end and then watched the next one start.
+        if is_paused(spec_dir):
+            pause_state = read_pause_state(spec_dir)
+            print("\n⏸  QA PAUSED — reprise possible à tout moment")
+            print(f"   Paused at: {pause_state.get('paused_at')}")
+            raise BuildPaused(
+                pause_state.get("paused_phase") or "qa_review",
+                pause_state.get("paused_subtask_id"),
+            )
+
         qa_iteration += 1
         iteration_start = time_module.time()
 
         debug_section("qa_loop", f"QA Iteration {qa_iteration}")
         debug(
             "qa_loop",
-            f"Starting iteration {qa_iteration}/{MAX_QA_ITERATIONS}",
+            f"Starting iteration {qa_iteration}/{max_iterations}",
             iteration=qa_iteration,
-            max_iterations=MAX_QA_ITERATIONS,
+            max_iterations=max_iterations,
         )
 
-        print(f"\n--- QA Iteration {qa_iteration}/{MAX_QA_ITERATIONS} ---")
+        print(f"\n--- QA Iteration {qa_iteration}/{max_iterations} ---")
         emit_phase(
             ExecutionPhase.QA_REVIEW, f"Running QA review iteration {qa_iteration}"
         )
         # Sous-étape de la phase de validation, affichée dans la barre de phase
         # de l'UI (équivalent des « phase N: NOM » de la planification).
-        # On n'affiche PAS "/{MAX_QA_ITERATIONS}" : ce max est un garde-fou, pas
+        # On n'affiche PAS "/{max_iterations}" : ce max est un garde-fou, pas
         # un objectif — la QA s'arrête dès qu'elle approuve. Le montrer comme
         # "PASS 2/50" se lisait à tort comme "2 sur 50 faites" (~4%) alors que la
         # phase était terminée. Le frontend reformate en "QA — vérification N".
@@ -540,10 +521,39 @@ async def run_qa_validation_loop(
         except Exception:  # noqa: BLE001 - never break QA on a hot-swap hiccup
             pass
 
+        # What the captures of the running app show — OCR'd before the
+        # reviewer's prompt is built, so the section it reads is current.
+        if (visual := run_visual_qa(spec_dir, project_dir)) is not None:
+            print(
+                "🖼  Visual QA: "
+                f"{visual['high']} high, {visual['medium']} medium, "
+                f"{visual['low']} low finding(s) read from the captures"
+            )
+
         # Run QA reviewer with phase-specific model and thinking budget
         qa_model = get_phase_model(spec_dir, "qa", model)
         qa_thinking_budget = get_phase_thinking_budget(spec_dir, "qa")
         qa_provider = get_phase_provider(spec_dir, phase="qa")
+        from integrations.jev.adapters import assess_build
+        from integrations.jev.models import JevContext
+        from integrations.jev.rubrics import advice_text
+        from integrations.jev.runtime import JevRun
+
+        if jev_run is None:
+            jev_run = JevRun.from_env(
+                JevContext("feature-build", project_dir, spec_dir)
+            )
+        if not hasattr(jev_run, "base_revision") and not jev_run.eligibility():
+            from integrations.jev.adapters import capture_base
+            from prompts_pkg.prompts import _detect_base_branch
+
+            try:
+                capture_base(jev_run, _detect_base_branch(spec_dir, project_dir))
+            except (OSError, ValueError):
+                jev_run.base_revision = None
+        jev_advice = advice_text(
+            await assess_build(jev_run, "review", pass_id=f"qa-{qa_iteration}")
+        )
         debug(
             "qa_loop",
             "Creating client for QA reviewer session...",
@@ -567,6 +577,7 @@ async def run_qa_validation_loop(
                 {
                     "iteration": qa_iteration,
                     "consecutiveErrors": 1,
+                    "error": str(e)[:500],
                 },
             )
             return False
@@ -579,8 +590,9 @@ async def run_qa_validation_loop(
                     project_dir,  # Pass project_dir for capability-based tool injection
                     spec_dir,
                     qa_iteration,
-                    MAX_QA_ITERATIONS,
+                    max_iterations,
                     verbose,
+                    jev_advice=jev_advice,
                     previous_error=last_error_context,  # Pass error context for self-correction
                 )
         except Exception as e:
@@ -615,6 +627,7 @@ async def run_qa_validation_loop(
             response = str(e)
 
         iteration_duration = time_module.time() - iteration_start
+        write_visual_qa_report(spec_dir)
         debug(
             "qa_loop",
             "QA reviewer session completed",
@@ -664,6 +677,7 @@ async def run_qa_validation_loop(
                     "iteration": qa_iteration,
                     "consecutiveErrors": 1,
                     "reason": "local_model_no_tools",
+                    "error": halt_msg,
                 },
             )
             if task_logger:
@@ -674,6 +688,12 @@ async def run_qa_validation_loop(
                 )
             emit_phase(ExecutionPhase.FAILED, "QA halted: local model can't call tools")
             return False
+
+        # A gate that overturns the reviewer's approval leaves its issues and
+        # its verdict here; the rejection handler below logs, records and fixes
+        # them like any other rejection.
+        gate_issues: list[dict] | None = None
+        gate_verdict = ""
 
         if status == "approved":
             # Reset error tracking on success
@@ -731,28 +751,13 @@ async def run_qa_validation_loop(
                         f"\n🏗️  Architecture enforcement found {len(arch_violations)} violation(s)"
                     )
 
-                    emit_phase(
-                        ExecutionPhase.QA_FIXING,
-                        "Fixing architecture violations",
-                    )
-                    task_event_emitter.emit(
-                        "QA_FAILED",
-                        {
-                            "iteration": qa_iteration,
-                            "issueCount": len(arch_violations),
-                            "issues": [
-                                v.get("description", "") for v in arch_violations[:5]
-                            ],
-                        },
-                    )
-
                     # Write architecture fix request for the fixer agent
                     write_architecture_fix_request(spec_dir, arch_report)
 
-                    # Override status to rejected so the fixer loop handles it
+                    # Override status to rejected: the rejection handler below
+                    # logs, records and runs the fixer on these issues.
                     status = "rejected"
-                    # Record this as a rejection due to architecture
-                    arch_issues = [
+                    gate_issues = [
                         {
                             "title": f"Architecture: {v.get('type', 'violation')}",
                             "description": v.get("description", ""),
@@ -760,24 +765,10 @@ async def run_qa_validation_loop(
                         }
                         for v in arch_violations
                     ]
-                    record_iteration(
-                        spec_dir,
-                        qa_iteration,
-                        "rejected",
-                        arch_issues,
-                        iteration_duration,
+                    gate_verdict = (
+                        f"QA pass #{qa_iteration} rejected: "
+                        f"{len(arch_violations)} architecture violation(s)"
                     )
-                    if task_logger:
-                        task_logger.log_error(
-                            f"QA pass #{qa_iteration} rejected: "
-                            f"{len(arch_violations)} architecture violation(s); "
-                            f"applying a fix, then re-reviewing "
-                            f"(pass #{qa_iteration + 1}).",
-                            LogPhase.VALIDATION,
-                        )
-
-                    # Fall through to the rejected handler below
-                    # (which will run the fixer)
 
             except ImportError:
                 # architecture package not available — skip gracefully
@@ -834,23 +825,6 @@ async def run_qa_validation_loop(
                             f"below {coverage_report['min_coverage']}% threshold"
                         )
 
-                        emit_phase(
-                            ExecutionPhase.QA_FIXING,
-                            "Fixing insufficient test coverage",
-                        )
-
-                        coverage_issues = build_coverage_issues(coverage_report)
-                        task_event_emitter.emit(
-                            "QA_FAILED",
-                            {
-                                "iteration": qa_iteration,
-                                "issueCount": len(coverage_issues),
-                                "issues": [
-                                    i["description"] for i in coverage_issues[:5]
-                                ],
-                            },
-                        )
-
                         # Write a coverage-specific fix request for the fixer agent
                         write_coverage_fix_request(spec_dir, coverage_report)
 
@@ -859,25 +833,13 @@ async def run_qa_validation_loop(
                         # "approved" qa_signoff written by the reviewer.
                         mark_signoff_rejected(spec_dir, coverage_report)
 
-                        # Override status so the fixer loop handles it
+                        # Override status to rejected: the rejection handler
+                        # below logs, records and runs the fixer on these issues.
                         status = "rejected"
-                        record_iteration(
-                            spec_dir,
-                            qa_iteration,
-                            "rejected",
-                            coverage_issues,
-                            iteration_duration,
+                        gate_issues = build_coverage_issues(coverage_report)
+                        gate_verdict = (
+                            f"QA pass #{qa_iteration} rejected by the coverage gate"
                         )
-                        # Trace explicite du verdict de CETTE passe, pour que
-                        # l'utilisateur comprenne pourquoi une nouvelle passe suit.
-                        if task_logger:
-                            task_logger.log_error(
-                                f"QA pass #{qa_iteration} rejected by the coverage "
-                                f"gate; applying a fix, then re-reviewing "
-                                f"(pass #{qa_iteration + 1}).",
-                                LogPhase.VALIDATION,
-                            )
-                        # Fall through to the rejected handler below
 
                 except ImportError:
                     debug_warning(
@@ -991,7 +953,11 @@ async def run_qa_validation_loop(
 
             return True
 
-        elif status == "rejected":
+        # Not an `elif`: a gate above can turn the reviewer's approval into a
+        # rejection, and an `elif` chained to `if status == "approved"` never
+        # ran for it — the fixer was skipped and the next pass re-reviewed the
+        # same code, until the budget ran out.
+        if status == "rejected":
             # Reset error tracking on valid response (rejected is a valid response)
             consecutive_errors = 0
             last_error_context = None
@@ -1002,31 +968,34 @@ async def run_qa_validation_loop(
                 iteration=qa_iteration,
                 duration=f"{iteration_duration:.1f}s",
             )
-            print(f"\n❌ QA found issues. Iteration {qa_iteration}/{MAX_QA_ITERATIONS}")
+            print(f"\n❌ QA found issues. Iteration {qa_iteration}/{max_iterations}")
 
-            # Get issues from QA report
-            qa_status = get_qa_signoff_status(spec_dir)
-            current_issues = qa_status.get("issues_found", []) if qa_status else []
+            if gate_issues is not None:
+                current_issues = gate_issues
+                verdict = gate_verdict
+            else:
+                # Get issues from QA report
+                qa_status = get_qa_signoff_status(spec_dir)
+                current_issues = qa_status.get("issues_found", []) if qa_status else []
+                verdict = (
+                    f"QA pass #{qa_iteration} rejected: {len(current_issues)} "
+                    "issue(s) found"
+                )
             debug(
                 "qa_loop",
                 "Issues found by QA",
                 issue_count=len(current_issues),
                 issues=current_issues[:3] if current_issues else [],  # Show first 3
             )
-            if task_logger:
-                task_logger.log_error(
-                    f"QA pass #{qa_iteration} rejected: {len(current_issues)} "
-                    f"issue(s) found; applying a fix, then re-reviewing "
-                    f"(pass #{qa_iteration + 1}).",
-                    LogPhase.VALIDATION,
-                )
+            # A gate's issues share one title; their description says what failed.
+            issue_label = "description" if gate_issues is not None else "title"
             task_event_emitter.emit(
                 "QA_FAILED",
                 {
                     "iteration": qa_iteration,
                     "issueCount": len(current_issues),
                     "issues": [
-                        issue.get("title", "")
+                        issue.get(issue_label, "")
                         for issue in (current_issues[:5] if current_issues else [])
                     ],
                 },
@@ -1036,7 +1005,7 @@ async def run_qa_validation_loop(
             # This prevents the current issues from matching themselves in history
             history = get_iteration_history(spec_dir)
             has_recurring, recurring_issues = has_recurring_issues(
-                current_issues, history
+                current_issues, history, threshold=recurring_threshold
             )
 
             # Record rejected iteration AFTER checking for recurring issues
@@ -1044,22 +1013,37 @@ async def run_qa_validation_loop(
                 spec_dir, qa_iteration, "rejected", current_issues, iteration_duration
             )
 
-            if has_recurring:
-                from .report import RECURRING_ISSUE_THRESHOLD
+            # The verdict says what comes next: it used to promise a fix and
+            # another pass even on the last pass, right before the hand-over.
+            if task_logger:
+                if has_recurring or qa_iteration >= max_iterations:
+                    outcome = "handing over to human review."
+                else:
+                    outcome = (
+                        f"applying a fix, then re-reviewing (pass #{qa_iteration + 1})."
+                    )
+                task_logger.log_error(f"{verdict}; {outcome}", LogPhase.VALIDATION)
 
+            if has_recurring:
                 debug_error(
                     "qa_loop",
                     "Recurring issues detected - escalating to human",
                     recurring_count=len(recurring_issues),
-                    threshold=RECURRING_ISSUE_THRESHOLD,
+                    threshold=recurring_threshold,
                 )
                 print(
-                    f"\n⚠️  Recurring issues detected ({len(recurring_issues)} issue(s) appeared {RECURRING_ISSUE_THRESHOLD}+ times)"
+                    f"\n⚠️  Recurring issues detected ({len(recurring_issues)} issue(s) appeared {recurring_threshold}+ times)"
                 )
                 print("Escalating to human review due to recurring issues...")
 
                 # Create escalation file
-                await escalate_to_human(spec_dir, recurring_issues, qa_iteration)
+                await escalate_to_human(
+                    spec_dir,
+                    recurring_issues,
+                    qa_iteration,
+                    max_iterations=max_iterations,
+                    threshold=recurring_threshold,
+                )
 
                 # End validation phase
                 if task_logger:
@@ -1077,7 +1061,7 @@ async def run_qa_validation_loop(
                     )
                 task_event_emitter.emit(
                     "QA_MAX_ITERATIONS",
-                    {"iteration": qa_iteration, "maxIterations": MAX_QA_ITERATIONS},
+                    {"iteration": qa_iteration, "maxIterations": max_iterations},
                 )
                 max_iterations_emitted = True
 
@@ -1088,7 +1072,7 @@ async def run_qa_validation_loop(
                 issues_count = len(current_issues)
                 await linear_qa_rejected(spec_dir, issues_count, qa_iteration)
 
-            if qa_iteration >= MAX_QA_ITERATIONS:
+            if qa_iteration >= max_iterations:
                 print("\n⚠️  Maximum QA iterations reached.")
                 print("Escalating to human review.")
                 if not max_iterations_emitted:
@@ -1096,7 +1080,7 @@ async def run_qa_validation_loop(
                         "QA_MAX_ITERATIONS",
                         {
                             "iteration": qa_iteration,
-                            "maxIterations": MAX_QA_ITERATIONS,
+                            "maxIterations": max_iterations,
                         },
                     )
                     max_iterations_emitted = True
@@ -1123,14 +1107,11 @@ async def run_qa_validation_loop(
             )
             print("\nRunning QA Fixer Agent...")
 
-            # Garde-fou : le reviewer DOIT avoir écrit QA_FIX_REQUEST.md, mais
-            # certaines sessions (modèles trop concis, interruption réseau)
-            # produisent qa_report.md sans rejouer le `cat > QA_FIX_REQUEST.md`
-            # final. Sans ce fichier le fixer renvoie immédiatement "error" et
-            # la boucle échoue avec "Fixer error: QA_FIX_REQUEST.md not found".
-            # On le synthétise depuis les issues déjà connues pour permettre
-            # au fixer de travailler.
-            _ensure_fix_request_file(spec_dir, current_issues, qa_iteration)
+            # QA_FIX_REQUEST.md est rendu depuis issues_found : le fixer lit
+            # les issues de cette passe, jamais celles d'une passe précédente.
+            # Un gate a déjà écrit le sien, plus précis : on le garde.
+            if gate_issues is None:
+                _ensure_fix_request_file(spec_dir, current_issues, qa_iteration)
 
             try:
                 fix_client = create_agent_client(
@@ -1225,8 +1206,9 @@ async def run_qa_validation_loop(
             )
 
             # Build error context for self-correction in next iteration
+            error_type = classify_qa_error(response)
             last_error_context = {
-                "error_type": "missing_implementation_plan_update",
+                "error_type": error_type,
                 "error_message": response,
                 "consecutive_errors": consecutive_errors,
                 "expected_action": "You MUST update implementation_plan.json with a qa_signoff object containing 'status': 'approved' or 'status': 'rejected'",
@@ -1242,15 +1224,17 @@ async def run_qa_validation_loop(
                 print(
                     f"\n⚠️  {MAX_CONSECUTIVE_ERRORS} consecutive errors without progress."
                 )
-                print(
-                    "The QA agent is unable to properly update implementation_plan.json."
-                )
+                print(f"Last error: {response}")
                 print("Escalating to human review.")
+                # The last pass's own error travels with the event: the card
+                # used to say only "failed 3 time(s) in a row", and the reason
+                # was in the task logs alone.
                 task_event_emitter.emit(
                     "QA_AGENT_ERROR",
                     {
                         "iteration": qa_iteration,
                         "consecutiveErrors": consecutive_errors,
+                        "error": response[:500],
                     },
                 )
 
@@ -1260,8 +1244,12 @@ async def run_qa_validation_loop(
                 # message name the likely cause so the user knows to switch model
                 # instead of assuming a code bug.
                 fail_message = (
-                    f"QA agent failed {MAX_CONSECUTIVE_ERRORS} consecutive times "
-                    "- unable to update implementation_plan.json"
+                    f"QA agent failed {MAX_CONSECUTIVE_ERRORS} consecutive times"
+                    + (
+                        f" - the session itself failed: {response[:300]}"
+                        if error_type == "session_error"
+                        else " - unable to update implementation_plan.json"
+                    )
                 )
                 try:
                     provider = client.provider_name()
@@ -1290,18 +1278,18 @@ async def run_qa_validation_loop(
     if not max_iterations_emitted:
         task_event_emitter.emit(
             "QA_MAX_ITERATIONS",
-            {"iteration": qa_iteration, "maxIterations": MAX_QA_ITERATIONS},
+            {"iteration": qa_iteration, "maxIterations": max_iterations},
         )
     debug_error(
         "qa_loop",
         "QA VALIDATION INCOMPLETE - max iterations reached",
         iterations=qa_iteration,
-        max_iterations=MAX_QA_ITERATIONS,
+        max_iterations=max_iterations,
     )
     print("\n" + "=" * 70)
     print("  ⚠️  QA VALIDATION INCOMPLETE")
     print("=" * 70)
-    print(f"\nReached maximum iterations ({MAX_QA_ITERATIONS}) without approval.")
+    print(f"\nReached maximum iterations ({max_iterations}) without approval.")
     print("\nRemaining issues require human review:")
 
     # Show iteration summary

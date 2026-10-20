@@ -30,6 +30,7 @@ from apps.backend.ui.keyboard_shortcuts import (
 # KeyboardShortcut tests (3)
 # ---------------------------------------------------------------------------
 
+
 class TestKeyboardShortcut:
     def test_creation(self):
         s = KeyboardShortcut(keys="Ctrl+N", action_id="create_task")
@@ -52,13 +53,16 @@ class TestKeyboardShortcut:
 # ShortcutConflict tests (2)
 # ---------------------------------------------------------------------------
 
+
 class TestShortcutConflict:
     def test_creation(self):
         c = ShortcutConflict(keys="Ctrl+N", existing_action="a", new_action="b")
         assert c.existing_action == "a"
 
     def test_to_dict(self):
-        c = ShortcutConflict(keys="Ctrl+K", existing_action="x", new_action="y", scope="global")
+        c = ShortcutConflict(
+            keys="Ctrl+K", existing_action="x", new_action="y", scope="global"
+        )
         d = c.to_dict()
         assert d["scope"] == "global"
 
@@ -66,6 +70,7 @@ class TestShortcutConflict:
 # ---------------------------------------------------------------------------
 # Key normalization tests (5)
 # ---------------------------------------------------------------------------
+
 
 class TestNormalizeKeys:
     def test_basic(self):
@@ -90,6 +95,7 @@ class TestNormalizeKeys:
 # Default shortcuts (3)
 # ---------------------------------------------------------------------------
 
+
 class TestDefaultShortcuts:
     def test_defaults_loaded(self):
         mgr = ShortcutManager()
@@ -112,6 +118,7 @@ class TestDefaultShortcuts:
 # ---------------------------------------------------------------------------
 # Registration (4)
 # ---------------------------------------------------------------------------
+
 
 class TestRegistration:
     def test_register_new(self):
@@ -144,6 +151,7 @@ class TestRegistration:
 # ---------------------------------------------------------------------------
 # Resolution (5)
 # ---------------------------------------------------------------------------
+
 
 class TestResolution:
     def test_resolve_global(self):
@@ -179,6 +187,7 @@ class TestResolution:
 # Execution (3)
 # ---------------------------------------------------------------------------
 
+
 class TestExecution:
     def test_execute_with_handler(self):
         mgr = ShortcutManager(load_defaults=False)
@@ -201,6 +210,7 @@ class TestExecution:
 # ---------------------------------------------------------------------------
 # Customization — remap (4)
 # ---------------------------------------------------------------------------
+
 
 class TestRemap:
     def test_remap_action(self):
@@ -230,6 +240,7 @@ class TestRemap:
 # Reset (3)
 # ---------------------------------------------------------------------------
 
+
 class TestReset:
     def test_reset_single(self):
         mgr = ShortcutManager()
@@ -256,6 +267,7 @@ class TestReset:
 # Cheat sheet (2)
 # ---------------------------------------------------------------------------
 
+
 class TestCheatSheet:
     def test_cheat_sheet_structure(self):
         mgr = ShortcutManager()
@@ -279,6 +291,7 @@ class TestCheatSheet:
 # Conflict detection (2)
 # ---------------------------------------------------------------------------
 
+
 class TestConflictDetection:
     def test_no_conflicts_in_defaults(self):
         mgr = ShortcutManager()
@@ -292,6 +305,7 @@ class TestConflictDetection:
         mgr.register("Ctrl+N", "action_a", scope="global")
         # Manually add a second shortcut with same keys (bypassing check)
         from apps.backend.ui.keyboard_shortcuts import KeyboardShortcut
+
         dup = KeyboardShortcut(keys="Ctrl+N", action_id="action_b", scope="global")
         mgr._shortcuts[dup.shortcut_id] = dup
         conflicts = mgr.detect_conflicts()
@@ -301,6 +315,7 @@ class TestConflictDetection:
 # ---------------------------------------------------------------------------
 # Export / Import (2)
 # ---------------------------------------------------------------------------
+
 
 class TestExportImport:
     def test_export_config(self):
@@ -322,6 +337,7 @@ class TestExportImport:
 # ---------------------------------------------------------------------------
 # Stats (2)
 # ---------------------------------------------------------------------------
+
 
 class TestStats:
     def test_basic_stats(self):

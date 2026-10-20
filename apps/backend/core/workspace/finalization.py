@@ -9,6 +9,7 @@ Functions for finalizing workspaces and handling user choices after build comple
 import sys
 from pathlib import Path
 
+from core.worktree import WorktreeInfo, WorktreeManager
 from ui import (
     Icons,
     MenuOption,
@@ -23,7 +24,6 @@ from ui import (
     success,
     warning,
 )
-from worktree import WorktreeInfo, WorktreeManager
 
 from .display import show_build_summary, show_changed_files
 from .git_utils import get_existing_build_worktree
@@ -88,7 +88,6 @@ def finalize_workspace(
 
     # Get the worktree path for test instructions
     worktree_info = manager.get_worktree_info(spec_name)
-    staging_path = worktree_info.path if worktree_info else None
 
     # Enhanced menu for post-build options
     options = [
@@ -427,8 +426,8 @@ def check_existing_build(project_dir: Path, spec_name: str) -> bool:
         sys.exit(0)
 
     # Import merge function only when needed to avoid circular imports
-    # merge_existing_build is in the parent workspace.py module
-    import workspace as ws
+    # merge_existing_build lives in core/workspace.py, re-exported by the package
+    import core.workspace as ws
 
     if choice == "continue":
         return True  # Continue with existing
@@ -438,7 +437,12 @@ def check_existing_build(project_dir: Path, spec_name: str) -> bool:
         input("Press Enter to continue building...")
         return True
     elif choice == "merge":
-        ws.merge_existing_build(project_dir, spec_name)
+        if ws.merge_existing_build(project_dir, spec_name):
+            # The same merge as `run.py --merge`: the usage counters, the
+            # learning loop, the brain and the design-system knowledge hear it.
+            from core.merge_event import MergeEvent, publish
+
+            publish(MergeEvent(project_dir, spec_name, automatic=False))
         return False  # Start fresh after merge
     elif choice == "fresh":
         discarded = discard_existing_build(project_dir, spec_name)

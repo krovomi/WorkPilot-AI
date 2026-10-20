@@ -8,9 +8,9 @@
  *   - Validation runs when subtasks are done and qa_signoff is not "approved"
  *     (qa.criteria.should_run_qa)
  *
- * So re-running a phase just means rewinding the plan to the state *before* that
- * phase and restarting the task — the backend then naturally re-enters at the
- * right phase. Re-running an earlier phase cascade-invalidates the later ones
+ * Re-running a phase rewinds the plan to the state *before* that phase.
+ * Planning first re-enters spec creation so failed document validation is repaired;
+ * coding and QA restart execution from the rewound plan. Re-running an earlier phase cascade-invalidates the later ones
  * (planning ⊃ coding ⊃ validation), matching the product decision.
  *
  * This module is pure (no fs / no Electron) so the cascade logic is unit-tested
@@ -103,13 +103,20 @@ export function buildPhaseRerunPlanUpdate(plan: Plan, phase: RerunPhase): Plan {
 	}
 	// validation: nothing else — subtasks remain completed, only qa_signoff reset.
 
-	// Clear any cooperative-pause so the restarted backend doesn't immediately
-	// re-pause, and mark the plan in-progress again.
+	// Clear the legacy in-plan pause flag so a task paused before
+	// `pause_state.json` existed does not re-pause on the restart. The live
+	// store is cleared by the handler through `clearPauseState`; this stays
+	// because the rewound plan is written wholesale and would otherwise carry
+	// the old block forward.
 	plan.paused = {
 		enabled: false,
 		paused_at: null,
 		paused_subtask_id: null,
 	};
+	// A re-run starts a phase again; it does not inherit the previous run's
+	// failure. Leaving it set would show the old error beside a task that is
+	// visibly running.
+	plan.errorMessage = undefined;
 	plan.status = "in_progress";
 	plan.planStatus = "in_progress";
 	plan.executionPhase = phase;
@@ -117,4 +124,22 @@ export function buildPhaseRerunPlanUpdate(plan: Plan, phase: RerunPhase): Plan {
 	plan.rerunNote = `Phase "${phase}" re-run requested at ${plan.updated_at}`;
 
 	return plan;
+}
+
+/** Planning must revalidate an existing spec before execution can resume. */
+export async function startPhaseRerun(
+	phase: RerunPhase,
+	launch: {
+		spec: () => Promise<void>;
+		execution: () => Promise<void>;
+		isRunning: () => boolean;
+	},
+): Promise<void> {
+	if (phase === "planning") await launch.spec();
+	else await launch.execution();
+	if (!launch.isRunning()) {
+		throw new Error(
+			"The task process did not start. Check the task error and application logs.",
+		);
+	}
 }

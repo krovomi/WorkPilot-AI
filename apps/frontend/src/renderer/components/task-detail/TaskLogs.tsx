@@ -1,3 +1,4 @@
+import { followLogViewport } from "../../lib/follow-log-viewport";
 import {
 	AlertTriangle,
 	ArrowDown,
@@ -14,6 +15,8 @@ import {
 	FlaskConical,
 	FolderSearch,
 	Info,
+	Hourglass,
+	Ruler,
 	Loader2,
 	Pencil,
 	RotateCcw,
@@ -24,7 +27,14 @@ import {
 	X,
 	XCircle,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+	useCallback,
+	useEffect,
+	useLayoutEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import type {
 	Task,
@@ -48,11 +58,17 @@ import {
 	buildModelMetadataUpdate,
 	buildModelSelectOptions,
 	buildProviderMetadataUpdate,
+	buildGlobalProviderMetadataUpdate,
 	buildThinkingMetadataUpdate,
 	LOG_PHASE_TO_CONFIG_PHASE,
 	type PhaseDefaults,
 	resolvePhaseDefaults,
 } from "../../../shared/utils/task-thinking";
+import {
+	isCustomModelSentinel,
+	isLocalProvider,
+	resolveLocalModel,
+} from "../../../shared/utils/local-models";
 import { getStaticProviders } from "../../../shared/utils/providers";
 import { entryMatchesQuery } from "../../../shared/utils/task-logs-search";
 import {
@@ -62,8 +78,10 @@ import {
 } from "../../../shared/utils/task-logs-by-model";
 import { debugError } from "../../../shared/utils/debug-logger";
 import { useProviderModelCatalog } from "../../hooks/useProviderModelCatalog";
+import { useOllamaModelDownload } from "../../hooks/useOllamaModelDownload";
 import { useDownloadStore } from "../../stores/download-store";
 import { Badge } from "../ui/badge";
+import { OfficialModelSearch } from "./OfficialModelSearch";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -86,6 +104,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "../ui/select";
+import { ModelDownloadChip } from "./ModelDownloadChip";
 import { TaskPhaseBar } from "./TaskPhaseBar";
 import { buildPhaseSubSteps } from "./task-log-substep";
 import { translateLogMessage } from "./translateLogMessage";
@@ -224,16 +243,18 @@ function getPhaseConfig(
 		metadata.phaseModels?.[configPhase] ||
 		metadata.model ||
 		defaults.phaseModels[configPhase];
-	// A local server runs ONE configured model for every phase (the backend
-	// forces OLLAMA_MODEL), so a stale per-phase value (e.g. an old
-	// "qwen2.5-coder") would mislabel the dropdown while runs are tagged with the
-	// REAL model — breaking the per-LLM Logs filter/compare. Show the real model
-	// so the labels match the entry tags.
-	if (
-		/^(ollama|local|lmstudio)$/i.test(provider) &&
-		settings?.globalOllamaModel?.trim()
-	) {
-		modelValue = settings.globalOllamaModel.trim();
+	// Show the model the run will REALLY use, so the header and the log entry
+	// tags agree (they feed the per-LLM Logs filter and the compare view).
+	//
+	// The rule matches `phase_config._resolve_provider_model` exactly: a stored
+	// id a local server cannot serve — a Claude/GPT id left over from before the
+	// task was switched to Ollama — resolves to the configured local model,
+	// while an id it CAN serve is kept. This used to override unconditionally,
+	// which flattened a deliberate per-phase pick onto the global default and,
+	// worse, displayed that default while the run still went out with the
+	// hosted id underneath it.
+	if (isLocalProvider(provider)) {
+		modelValue = resolveLocalModel(modelValue, settings?.globalOllamaModel);
 	}
 	const thinkingValue =
 		metadata.phaseThinking?.[configPhase] ||
@@ -291,7 +312,8 @@ export function TaskLogs({
 		return PHASE_ORDER.reduce((acc, phase) => {
 			const entries = phaseLogs.phases[phase]?.entries ?? [];
 			return (
-				acc + entries.filter((e) => entryMatchesQuery(e, normalizedQuery)).length
+				acc +
+				entries.filter((e) => entryMatchesQuery(e, normalizedQuery)).length
 			);
 		}, 0);
 	}, [isSearching, phaseLogs, normalizedQuery]);
@@ -314,7 +336,9 @@ export function TaskLogs({
 	// hidden in that case anyway).
 	const handleCompare = useCallback(
 		(phase: TaskLogPhase) => {
-			const models = mergeGroupsByModel(phaseLogs?.phases[phase]?.entries ?? []);
+			const models = mergeGroupsByModel(
+				phaseLogs?.phases[phase]?.entries ?? [],
+			);
 			if (models.length < 2) return;
 			setCompare({ phase, leftKey: models[0].key, rightKey: models[1].key });
 		},
@@ -330,10 +354,7 @@ export function TaskLogs({
 
 	useEffect(() => {
 		let cancelled = false;
-		getStaticProviders(
-			profiles,
-			settings as unknown as Record<string, unknown>,
-		)
+		getStaticProviders(profiles, settings as unknown as Record<string, unknown>)
 			.then((res) => {
 				if (cancelled) return;
 				setProviders(
@@ -377,7 +398,10 @@ export function TaskLogs({
 				toast({ title: updatedTitle, description: updatedDesc });
 			} catch (error) {
 				toast({
-					title: t("tasks:logs.thinking.updateFailed", "Échec de la mise à jour"),
+					title: t(
+						"tasks:logs.thinking.updateFailed",
+						"Échec de la mise à jour",
+					),
 					description: error instanceof Error ? error.message : String(error),
 					variant: "destructive",
 				});
@@ -392,7 +416,12 @@ export function TaskLogs({
 		(logPhase: TaskLogPhase, level: ThinkingLevel) =>
 			persistPhaseMetadata(
 				logPhase,
-				buildThinkingMetadataUpdate(task.metadata, logPhase, level, phaseDefaults),
+				buildThinkingMetadataUpdate(
+					task.metadata,
+					logPhase,
+					level,
+					phaseDefaults,
+				),
 				t("tasks:logs.thinking.updatedTitle", "Réflexion mise à jour"),
 				t(
 					"tasks:logs.thinking.updatedDesc",
@@ -422,12 +451,11 @@ export function TaskLogs({
 				logPhase,
 				// Resolve defaults for the NEW provider so the phase's model is reset
 				// to a model that provider can actually run (prevents `ollama:opus`).
-				buildProviderMetadataUpdate(
-					task.metadata,
-					logPhase,
-					provider,
-					resolvePhaseDefaults(settings, provider),
-				),
+				buildProviderMetadataUpdate(task.metadata, logPhase, provider, {
+					...resolvePhaseDefaults(settings, provider),
+					phaseModels: buildGlobalProviderMetadataUpdate(provider, settings)
+						.phaseModels,
+				}),
 				t("tasks:logs.provider.updatedTitle", "Fournisseur mis à jour"),
 				t(
 					"tasks:logs.provider.updatedDesc",
@@ -545,9 +573,9 @@ export function TaskLogs({
 
 	// Refs to each rendered phase section so we can detect which phase is
 	// currently scrolled to the top of the viewport.
-	const phaseRefs = useRef<Partial<Record<TaskLogPhase, HTMLDivElement | null>>>(
-		{},
-	);
+	const phaseRefs = useRef<
+		Partial<Record<TaskLogPhase, HTMLDivElement | null>>
+	>({});
 
 	// Affiche les boutons flottants « remonter au début » / « descendre en bas »
 	// selon la position de défilement dans le conteneur de logs.
@@ -562,6 +590,17 @@ export function TaskLogs({
 	// défilement (dernière borne « phase N: NOM » passée sous le haut du
 	// viewport). Mise à jour par computeVisiblePhase.
 	const [visibleSubStep, setVisibleSubStep] = useState<string | null>(null);
+
+	// Own following here, where the actual viewport is mounted (including
+	// Radix's deferred tab mount). ResizeObserver catches later layout changes.
+	useLayoutEffect(() => {
+		const container = logsContainerRef.current;
+		if (!container) return;
+		return followLogViewport(
+			container,
+			settings.logOrder === "reverse-chronological",
+		);
+	}, [logsContainerRef, settings.logOrder]);
 
 	const scrollToTop = useCallback(() => {
 		logsContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
@@ -654,7 +693,8 @@ export function TaskLogs({
 		// validation : passe QA). Les bornes proviennent des entrées marquées
 		// `data-substep` (cf. getSubStepLabel).
 		const activePhase =
-			PHASE_ORDER.find((p) => phaseLogs?.phases[p]?.status === "active") ?? null;
+			PHASE_ORDER.find((p) => phaseLogs?.phases[p]?.status === "active") ??
+			null;
 		const displayPhase = current ?? activePhase;
 		let subStep: string | null = null;
 		if (displayPhase) {
@@ -683,8 +723,7 @@ export function TaskLogs({
 	const updateScrollButtons = useCallback(() => {
 		const el = logsContainerRef.current;
 		if (!el) return;
-		const distanceFromBottom =
-			el.scrollHeight - el.scrollTop - el.clientHeight;
+		const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
 		const isScrollable = el.scrollHeight - el.clientHeight > 16;
 		setShowScrollTop(el.scrollTop > 240);
 		setShowScrollBottom(isScrollable && distanceFromBottom > 240);
@@ -733,10 +772,17 @@ export function TaskLogs({
 	}
 
 	return (
+		// The scroll buttons only appear while the pointer is over the log; the
+		// focus handlers give a keyboard the same reveal when a control inside
+		// takes focus.
+		// biome-ignore lint/a11y/noStaticElementInteractions: reveals a hover affordance, carries no action of its own
+		// biome-ignore lint/a11y/noNoninteractiveElementInteractions: reveals a hover affordance, carries no action of its own
 		<div
 			className="relative flex h-full flex-col"
 			onMouseEnter={() => setIsHoveringLogs(true)}
 			onMouseLeave={() => setIsHoveringLogs(false)}
+			onFocus={() => setIsHoveringLogs(true)}
+			onBlur={() => setIsHoveringLogs(false)}
 		>
 			{/* Search bar — filters log entries across all phases */}
 			{!isLoadingLogs && hasAnyLogs && (
@@ -767,7 +813,10 @@ export function TaskLogs({
 								<button
 									type="button"
 									onClick={() => setSearchQuery("")}
-									aria-label={t("tasks:logs.search.clear", "Effacer la recherche")}
+									aria-label={t(
+										"tasks:logs.search.clear",
+										"Effacer la recherche",
+									)}
 									className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-secondary/60 hover:text-foreground"
 								>
 									<X className="h-3.5 w-3.5" />
@@ -836,9 +885,7 @@ export function TaskLogs({
 							{isSearching && matchCount === 0 && (
 								<div className="py-8 text-center text-sm text-muted-foreground">
 									<Search className="mx-auto mb-2 h-8 w-8 opacity-50" />
-									<p>
-										{t("tasks:logs.search.noResults", "Aucun résultat")}
-									</p>
+									<p>{t("tasks:logs.search.noResults", "Aucun résultat")}</p>
 									<p className="mt-1 text-xs">
 										{t(
 											"tasks:logs.search.noResultsHint",
@@ -852,9 +899,18 @@ export function TaskLogs({
 						</>
 					) : task.logs && task.logs.length > 0 ? (
 						// Fallback to legacy raw logs if no phase logs exist. When a search is
-							// active, keep only the matching lines.
+						// active, keep only the matching lines.
 						<pre className="text-xs font-mono text-muted-foreground whitespace-pre-wrap break-all">
-							{isSearching ? task.logs.join("").split("\n").filter((line) => line.toLowerCase().includes(normalizedQuery)).join("\n") || t("tasks:logs.search.noResults", "Aucun résultat") : task.logs.join("")}
+							{isSearching
+								? task.logs
+										.join("")
+										.split("\n")
+										.filter((line) =>
+											line.toLowerCase().includes(normalizedQuery),
+										)
+										.join("\n") ||
+									t("tasks:logs.search.noResults", "Aucun résultat")
+								: task.logs.join("")}
 							<div ref={logsEndRef} />
 						</pre>
 					) : (
@@ -1034,10 +1090,6 @@ function PhaseLogSection({
 	isHotSwapPending,
 }: PhaseLogSectionProps) {
 	const { t } = useTranslation(["tasks"]);
-	const { toast } = useToast();
-	const startDownload = useDownloadStore((s) => s.startDownload);
-	const completeDownload = useDownloadStore((s) => s.completeDownload);
-	const failDownload = useDownloadStore((s) => s.failDownload);
 	const Icon = PHASE_ICONS[phase];
 	const logOrder = useSettingsStore((s) => s.settings.logOrder);
 
@@ -1045,6 +1097,8 @@ function PhaseLogSection({
 	// that file's entries — no other models, no untagged/legacy noise. Match by
 	// provider + canonical model id; fall back to the shared phaseLog otherwise.
 	const effectivePhaseLog = useMemo(() => {
+		// Keep the running feed visible when the configured model changes.
+		if (phaseLog?.status === "active") return phaseLog;
 		const selProvider = phaseConfig?.provider;
 		const selKey = phaseConfig?.modelValue
 			? getCanonicalModelKey(phaseConfig.modelValue)
@@ -1052,8 +1106,7 @@ function PhaseLogSection({
 		if (!selProvider || !selKey) return phaseLog;
 		const file = (perLlmLogs ?? []).find(
 			(f) =>
-				f.provider === selProvider &&
-				getCanonicalModelKey(f.model) === selKey,
+				f.provider === selProvider && getCanonicalModelKey(f.model) === selKey,
 		);
 		return file ? (file.logs.phases[phase] ?? null) : phaseLog;
 	}, [
@@ -1065,14 +1118,19 @@ function PhaseLogSection({
 	]);
 
 	const status = effectivePhaseLog?.status || "pending";
+	const runningModel = [...(phaseLog?.entries ?? [])]
+		.reverse()
+		.find((entry) => entry.model)?.model;
 	const isSearching = searchQuery.length > 0;
 
 	// Live model catalog for the phase's currently-selected provider. The hook
 	// is always called (provider may be "") so it complies with the rules of
 	// hooks; an empty provider just yields the static fallback list.
-	const { models: catalogModels } = useProviderModelCatalog(
-		phaseConfig?.provider ?? "",
-	);
+	const {
+		models: catalogModels,
+		loading: catalogLoading,
+		refresh: refreshCatalog,
+	} = useProviderModelCatalog(phaseConfig?.provider ?? "");
 
 	// Provider options: the configured providers, augmented with the current
 	// one so a previously-saved (now unconfigured) provider stays visible.
@@ -1091,14 +1149,28 @@ function PhaseLogSection({
 	// persisted under an alternate spelling (e.g. dotted "claude-opus-4.8" left
 	// over from another provider) collapses onto its single canonical catalog
 	// entry instead of appearing twice.
+	// Local providers use Ollama's own identity (the bare name IS the `:latest`
+	// tag) rather than the Anthropic-shaped one, which read `llama3.3` and
+	// `llama3.3:latest` as two different models and listed both.
+	const isLocal = isLocalProvider(phaseConfig?.provider);
+
+	// Free-text model entry, behind the "Autre (saisie libre)" row. Opens on
+	// demand — and on its own for a phase already saved with the sentinel, which
+	// is the state the earlier bug left behind and the only way out of it.
+	const [editingCustomModel, setEditingCustomModel] = useState(false);
+	const stuckOnSentinel = isCustomModelSentinel(phaseConfig?.modelValue);
+	useEffect(() => {
+		if (stuckOnSentinel) setEditingCustomModel(true);
+	}, [stuckOnSentinel]);
 	const { options: modelOptions, value: modelSelectValue } = useMemo(
 		() =>
 			buildModelSelectOptions(
 				catalogModels,
 				phaseConfig?.modelValue,
 				MODEL_SHORT_LABELS,
+				isLocal,
 			),
-		[catalogModels, phaseConfig?.modelValue],
+		[catalogModels, phaseConfig?.modelValue, isLocal],
 	);
 
 	// Filtered entries in chronological order (oldest first from append()); when
@@ -1170,54 +1242,67 @@ function PhaseLogSection({
 		[phaseLog?.entries],
 	);
 
-	// Local providers expose a static catalog of pullable models; flag it so the
-	// model dropdown can mark which entries are actually installed vs downloadable.
-	const isLocalProvider = ((phaseConfig?.provider ?? "") as string)
-		.toLowerCase()
-		.match(/^(ollama|local|lmstudio)$/) != null;
-
 	// For local providers, surface installed models first so the user's actual
 	// (downloaded) models sit at the top, above look-alike catalog suggestions.
 	// Array.sort is stable, so the original order is preserved within each group.
-	const sortedModelOptions = isLocalProvider
+	const sortedModelOptions = isLocal
 		? [...modelOptions].sort(
 				(a, b) => Number(b.installed ?? false) - Number(a.installed ?? false),
 			)
 		: modelOptions;
 
+	// Downloads are owned by `useOllamaModelDownload`: it runs the pull in the
+	// main process, reports it in the global indicator, and refreshes this
+	// catalog when the model lands so the entry flips from "à télécharger" to
+	// "✓ installé" without a manual reload.
+	const { download: downloadModel, cancel: cancelModelDownload } =
+		useOllamaModelDownload({ onDownloaded: () => refreshCatalog() });
+
+	// This phase's model in the shared download store, if it is being pulled.
+	// Keyed on the value the `<Select>` shows, so the chip and the dropdown
+	// always talk about the same model even when the persisted id is an
+	// alternate spelling the catalog collapsed.
+	const downloads = useDownloadStore((s) => s.downloads);
+	const selectedModelDownload = downloads[modelSelectValue.trim()];
+	const clearDownload = useDownloadStore((s) => s.clearDownload);
+
+	// Is the phase's model actually on the local server? `undefined` while the
+	// catalog is still loading — the chip stays silent rather than flashing
+	// "Télécharger" at a model that turns out to be installed.
+	const selectedModelInstalled = useMemo(() => {
+		if (!isLocal) return true;
+		if (catalogLoading) return undefined;
+		return (
+			modelOptions.find((o) => o.value === modelSelectValue)?.installed === true
+		);
+	}, [isLocal, catalogLoading, modelOptions, modelSelectValue]);
+
 	// Persist the chosen model; if it's a local model that isn't installed yet,
-	// start pulling it now (progress surfaces in the global download indicator)
-	// so it's ready by the time the phase runs — instead of silently 404-ing.
+	// start pulling it now (progress surfaces in the chip beside the selector and
+	// in the global download indicator) so it's ready by the time the phase runs
+	// — instead of silently 404-ing.
 	// When this phase is actively running, a dropdown change is a LIVE swap:
 	// besides persisting to metadata, drop a HOT_SWAP marker (applied next turn).
 	// The parent gates on `status` via buildHotSwapRequest.
 	const handleModelChange = (value: string) => {
+		// "Autre (saisie libre)" is a placeholder row, not a model. Persisting it
+		// set the phase's model to the literal string "custom", and downloading it
+		// asked Ollama to pull an image by that name — "pull model manifest: file
+		// does not exist". Open the field the label promises instead.
+		if (isCustomModelSentinel(value)) {
+			setEditingCustomModel(true);
+			return;
+		}
 		onModelChange?.(phase, value);
 		onHotSwap?.(phase, status, { model: value });
-		if (!isLocalProvider) return;
+		if (!isLocal) return;
 		const opt = modelOptions.find((o) => o.value === value);
-		if (!opt || opt.installed) return;
-		const api = globalThis.electronAPI;
-		if (!api?.pullOllamaModel) return;
-		startDownload(value);
-		toast({
-			title: t("tasks:logs.model.downloadStartedTitle", "Downloading model"),
-			description: t(
-				"tasks:logs.model.downloadStartedDesc",
-				"{{model}} is downloading in the background.",
-				{ model: value },
-			),
-		});
-		void (async () => {
-			try {
-				await api.ensureOllama?.();
-				const res = await api.pullOllamaModel(value);
-				if (res?.success) completeDownload(value);
-				else failDownload(value, res?.error || "");
-			} catch (e) {
-				failDownload(value, e instanceof Error ? e.message : String(e));
-			}
-		})();
+		// `installed === true` is the only proof the model is there. An option the
+		// catalog never flagged (server not started yet, so nothing listed) is
+		// treated as missing and downloaded — `download()` starts the server
+		// first, which is exactly what that case needs.
+		if (opt?.installed === true) return;
+		void downloadModel(value);
 	};
 
 	// Table « entrée → libellé de sous-étape » pour cette phase : bornes
@@ -1295,7 +1380,7 @@ function PhaseLogSection({
 		<Collapsible open={isSearching || isExpanded} onOpenChange={onToggle}>
 			<div
 				className={cn(
-					"w-full flex items-center justify-between p-3 rounded-lg border transition-colors",
+					"w-full flex flex-wrap items-center justify-between gap-x-3 gap-y-2 p-3 rounded-lg border transition-colors",
 					status === "active" && !isInterrupted && PHASE_COLORS[phase],
 					isInterrupted && "border-warning/30 bg-warning/5",
 					status === "completed" && "border-success/30 bg-success/5",
@@ -1306,7 +1391,7 @@ function PhaseLogSection({
 				<CollapsibleTrigger asChild>
 					<button
 						type="button"
-						className="flex items-center gap-2 flex-1 min-w-0 text-left rounded hover:bg-secondary/50 transition-colors"
+						className="flex items-center gap-2 shrink-0 text-left whitespace-nowrap rounded hover:bg-secondary/50 transition-colors"
 					>
 						{isExpanded ? (
 							<ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -1339,10 +1424,10 @@ function PhaseLogSection({
 						)}
 					</button>
 				</CollapsibleTrigger>
-				<div className="flex items-center gap-2">
+				<div className="flex flex-wrap min-w-0 max-w-full items-center gap-2">
 					{/* Provider / model / thinking selectors (per phase) */}
 					{phaseConfig && (
-						<div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+						<div className="contents text-[10px] text-muted-foreground">
 							{/* Provider selector */}
 							{onProviderChange ? (
 								<Select
@@ -1354,7 +1439,7 @@ function PhaseLogSection({
 									disabled={isSavingPhase}
 								>
 									<SelectTrigger
-										className="h-6 w-auto shrink-0 gap-1 whitespace-nowrap border-0 bg-transparent px-1.5 py-0 text-[11px] text-muted-foreground hover:text-foreground focus:ring-0 focus:ring-offset-0 [&>span]:line-clamp-none [&>span]:whitespace-nowrap [&>svg]:h-3.5 [&>svg]:w-3.5"
+										className="h-6 w-auto max-w-[min(20rem,100%)] min-w-0 shrink gap-1 whitespace-nowrap border-0 bg-transparent px-1.5 py-0 text-[11px] text-muted-foreground hover:text-foreground focus:ring-0 focus:ring-offset-0 [&>span]:min-w-0 [&>span]:truncate [&>span]:whitespace-nowrap [&>svg]:h-3.5 [&>svg]:w-3.5"
 										aria-label={t(
 											"tasks:logs.provider.selectAria",
 											"Fournisseur pour cette phase",
@@ -1367,7 +1452,7 @@ function PhaseLogSection({
 										<Server className="h-3 w-3" />
 										<SelectValue />
 									</SelectTrigger>
-									<SelectContent>
+									<SelectContent searchable>
 										{providerOptions.map((p) => (
 											<SelectItem key={p.name} value={p.name}>
 												{p.label}
@@ -1393,7 +1478,7 @@ function PhaseLogSection({
 									disabled={isSavingPhase}
 								>
 									<SelectTrigger
-										className="h-6 w-auto shrink-0 gap-1 whitespace-nowrap border-0 bg-transparent px-1.5 py-0 text-[11px] text-muted-foreground hover:text-foreground focus:ring-0 focus:ring-offset-0 [&>span]:line-clamp-none [&>span]:whitespace-nowrap [&>svg]:h-3.5 [&>svg]:w-3.5"
+										className="h-6 w-auto max-w-[min(20rem,100%)] min-w-0 shrink gap-1 whitespace-nowrap border-0 bg-transparent px-1.5 py-0 text-[11px] text-muted-foreground hover:text-foreground focus:ring-0 focus:ring-offset-0 [&>span]:min-w-0 [&>span]:truncate [&>span]:whitespace-nowrap [&>svg]:h-3.5 [&>svg]:w-3.5"
 										aria-label={t(
 											"tasks:logs.model.selectAria",
 											"Modèle pour cette phase",
@@ -1404,20 +1489,99 @@ function PhaseLogSection({
 										)}
 									>
 										<Cpu className="h-3 w-3" />
-										<SelectValue />
+										<SelectValue>
+											{modelOptions.find(
+												(option) => option.value === modelSelectValue,
+											)?.label ??
+												(modelSelectValue
+													? phaseConfig.model
+													: t("tasks:logs.model.selectAria"))}
+										</SelectValue>
 									</SelectTrigger>
-									<SelectContent>
+									<SelectContent
+										searchable
+										onCloseAutoFocus={(event) => {
+											if (editingCustomModel) {
+												event.preventDefault();
+											}
+										}}
+									>
 										{sortedModelOptions.map((m) => (
-											<SelectItem key={m.value} value={m.value}>
+											<SelectItem
+												key={m.value}
+												value={m.value}
+												// Clicking a model that is not on the local server
+												// downloads it — whether or not it is already the
+												// selected one. `onValueChange` alone could not do
+												// this: re-picking the value a <Select> already holds
+												// fires no change event, so the model a user is most
+												// likely to click (the one the phase is stuck on) had
+												// no way to be downloaded at all. `download()` is
+												// idempotent, so the pair never starts two pulls.
+												onPointerUp={() => {
+													if (
+														isLocal &&
+														m.installed !== true &&
+														!isCustomModelSentinel(m.value)
+													) {
+														void downloadModel(m.value);
+													}
+												}}
+												onKeyDown={(e) => {
+													if (
+														(e.key === "Enter" || e.key === " ") &&
+														isLocal &&
+														m.installed !== true &&
+														!isCustomModelSentinel(m.value)
+													) {
+														void downloadModel(m.value);
+													}
+												}}
+											>
 												<span className="flex items-center gap-1.5">
-													<span>{m.label}</span>
+													<span>
+														{isCustomModelSentinel(m.value)
+															? t("tasks:logs.model.customOption")
+															: m.label}
+													</span>
 													{m.installed ? (
 														<span className="text-[10px] text-success">
 															{t("tasks:logs.model.installed", "✓ installed")}
 														</span>
-													) : isLocalProvider ? (
-														<span className="text-[10px] text-muted-foreground">
-															{t("tasks:logs.model.downloadable", "to download")}
+													) : isLocal && !isCustomModelSentinel(m.value) ? (
+														// Reads as the action it is. Selecting this row
+														// starts the download (see the item handlers
+														// above), and the live percentage replaces the
+														// label so the list itself shows what is landing.
+														<span
+															className={cn(
+																"text-[10px]",
+																downloads[m.value]?.status === "starting" ||
+																	downloads[m.value]?.status === "downloading"
+																	? "text-primary"
+																	: "text-amber-500",
+															)}
+															title={t(
+																"tasks:logs.model.downloadTip",
+																"« {{model}} » n'est pas installé sur le serveur local. Le téléchargement se fait en arrière-plan : vous pouvez continuer à travailler.",
+																{ model: m.value },
+															)}
+														>
+															{(() => {
+																const d = downloads[m.value];
+																if (
+																	d?.status === "starting" ||
+																	d?.status === "downloading"
+																) {
+																	return d.percentage > 0
+																		? `↓ ${Math.round(d.percentage)}%`
+																		: t("tasks:logs.model.downloadQueued", "…");
+																}
+																if (d?.status === "completed") {
+																	return t("tasks:logs.model.ready", "Prêt");
+																}
+																return `↓ ${t("tasks:logs.model.download", "Télécharger")}`;
+															})()}
 														</span>
 													) : null}
 													{typeof m.param_b === "number" && m.param_b < 24 ? (
@@ -1449,6 +1613,27 @@ function PhaseLogSection({
 									<span>{phaseConfig.model}</span>
 								</div>
 							)}
+							{editingCustomModel && (
+								<OfficialModelSearch
+									onClose={() => setEditingCustomModel(false)}
+									onSelect={(value) => {
+										setEditingCustomModel(false);
+										handleModelChange(value);
+									}}
+								/>
+							)}
+							{/* Download state of the selected local model. Renders nothing
+							    when the model is installed or the provider is not local. */}
+							{isLocal && !isCustomModelSentinel(modelSelectValue) && (
+								<ModelDownloadChip
+									model={modelSelectValue}
+									installed={selectedModelInstalled}
+									download={selectedModelDownload}
+									onDownload={() => void downloadModel(modelSelectValue)}
+									onCancel={() => cancelModelDownload(modelSelectValue)}
+									onDismiss={() => clearDownload(modelSelectValue)}
+								/>
+							)}
 							<span className="text-muted-foreground/50">|</span>
 							{/* Thinking-effort selector */}
 							{onThinkingChange ? (
@@ -1461,7 +1646,7 @@ function PhaseLogSection({
 									disabled={isSavingPhase}
 								>
 									<SelectTrigger
-										className="h-6 w-auto shrink-0 gap-1 whitespace-nowrap border-0 bg-transparent px-1.5 py-0 text-[11px] text-muted-foreground hover:text-foreground focus:ring-0 focus:ring-offset-0 [&>span]:line-clamp-none [&>span]:whitespace-nowrap [&>svg]:h-3.5 [&>svg]:w-3.5"
+										className="h-6 w-auto max-w-[min(20rem,100%)] min-w-0 shrink gap-1 whitespace-nowrap border-0 bg-transparent px-1.5 py-0 text-[11px] text-muted-foreground hover:text-foreground focus:ring-0 focus:ring-offset-0 [&>span]:min-w-0 [&>span]:truncate [&>span]:whitespace-nowrap [&>svg]:h-3.5 [&>svg]:w-3.5"
 										aria-label={t(
 											"tasks:logs.thinking.selectAria",
 											"Niveau de réflexion pour cette phase",
@@ -1502,7 +1687,10 @@ function PhaseLogSection({
 						<button
 							type="button"
 							onClick={() => onCompare(phase)}
-							aria-label={t("tasks:logs.compare.openAria", "Comparer les modèles")}
+							aria-label={t(
+								"tasks:logs.compare.openAria",
+								"Comparer les modèles",
+							)}
 							title={t(
 								"tasks:logs.compare.openTooltip",
 								"Comparer les plans des modèles côte à côte",
@@ -1521,7 +1709,10 @@ function PhaseLogSection({
 							type="button"
 							onClick={() => onRerunPhase(phase)}
 							disabled={isRerunning}
-							aria-label={t("tasks:logs.rerun.buttonAria", "Refaire cette étape")}
+							aria-label={t(
+								"tasks:logs.rerun.buttonAria",
+								"Refaire cette étape",
+							)}
 							title={t(
 								"tasks:logs.rerun.buttonTooltip",
 								"Relancer cette étape (les étapes suivantes seront refaites)",
@@ -1554,6 +1745,13 @@ function PhaseLogSection({
 					{getStatusBadge()}
 				</div>
 			</div>
+			{status === "active" && (
+				<p className="px-4 pb-2 text-xs text-muted-foreground">
+					{t("tasks:logs.model.runningNotice", {
+						model: runningModel || t("tasks:logs.model.runtimeUnknown"),
+					})}
+				</p>
+			)}
 			<CollapsibleContent>
 				<div className="mt-1 ml-6 border-l-2 border-border pl-4 py-2 space-y-1">
 					{!hasEntries ? (
@@ -1561,10 +1759,14 @@ function PhaseLogSection({
 							{t("tasks:logs.phaseEmpty")}
 						</p>
 					) : (
-						modelGroups.map((group, groupIdx) =>
+						// `group.key` is the (provider, model) pair, which repeats when a
+						// run switches model A -> B -> A. The first entry's timestamp
+						// distinguishes those runs and, unlike the array index, follows
+						// the group when the list is reversed.
+						modelGroups.map((group) =>
 							group.provider || group.model ? (
 								<ModelLogGroupView
-									key={`${group.key}-${groupIdx}`}
+									key={`${group.key}-${group.entries[0]?.timestamp}`}
 									group={group}
 									phase={phase}
 									searchQuery={searchQuery}
@@ -1573,7 +1775,7 @@ function PhaseLogSection({
 								/>
 							) : (
 								<PhaseEntryList
-									key={`flat-${groupIdx}`}
+									key={`flat-${group.entries[0]?.timestamp}`}
 									entries={group.entries}
 									phase={phase}
 									searchQuery={searchQuery}
@@ -1958,11 +2160,33 @@ function LogEntry({ entry, query = "" }: LogEntryProps) {
 	// per-type render branches below. Known backend status lines (QA verdicts,
 	// hot-swap, context switch…) are emitted in stable English and localised here
 	// for display; anything else is shown as-is.
+	const translatedContent = translateLogMessage(t, entry.content);
+	const marker = /^(⏳|🧠|⚠️?|📊|📐)\s*/u.exec(translatedContent);
+	const StatusIcon =
+		marker?.[1] === "⏳"
+			? Hourglass
+			: marker?.[1] === "🧠"
+				? Brain
+				: marker?.[1] === "📐"
+					? Ruler
+					: marker?.[1] === "📊"
+						? Info
+						: AlertTriangle;
 	const content = (
-		<HighlightedText
-			text={translateLogMessage(t, entry.content)}
-			query={query}
-		/>
+		<>
+			{marker && (
+				<StatusIcon
+					aria-hidden="true"
+					className="inline-block h-3.5 w-3.5 mr-1 align-text-bottom"
+				/>
+			)}
+			<HighlightedText
+				text={
+					marker ? translatedContent.slice(marker[0].length) : translatedContent
+				}
+				query={query}
+			/>
+		</>
 	);
 	const detail = entry.detail ? (
 		<HighlightedText text={entry.detail} query={query} />
@@ -2157,6 +2381,16 @@ function LogEntry({ entry, query = "" }: LogEntryProps) {
 		return (
 			<div className="flex items-start gap-2 text-xs text-success bg-success/10 rounded-md px-2 py-1">
 				<CheckCircle2 className="h-3 w-3 mt-0.5 shrink-0" />
+				<span className="break-words flex-1">{content}</span>
+				<SubphaseBadge />
+			</div>
+		);
+	}
+
+	if (entry.type === "warning") {
+		return (
+			<div className="flex items-start gap-2 text-xs text-warning bg-warning/10 rounded-md px-2 py-1">
+				<AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
 				<span className="break-words flex-1">{content}</span>
 				<SubphaseBadge />
 			</div>

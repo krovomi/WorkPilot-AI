@@ -2,64 +2,18 @@
  * Ideation generation handlers (start/stop generation)
  */
 
-import { existsSync, readFileSync } from "node:fs";
-import path from "node:path";
 import type { BrowserWindow, IpcMainEvent, IpcMainInvokeEvent } from "electron";
-import { app } from "electron";
-import {
-	DEFAULT_APP_SETTINGS,
-	DEFAULT_FEATURE_MODELS,
-	DEFAULT_FEATURE_THINKING,
-	IPC_CHANNELS,
-} from "../../../shared/constants";
+import { IPC_CHANNELS } from "../../../shared/constants";
 import type {
-	AppSettings,
 	IdeationConfig,
 	IdeationGenerationStatus,
 	IPCResult,
 } from "../../../shared/types";
-import { debugError, debugLog } from "../../../shared/utils/debug-logger";
+import { debugLog } from "../../../shared/utils/debug-logger";
 import type { AgentManager } from "../../agent";
 import { projectStore } from "../../project-store";
+import { getPageFeatureSettings } from "../../services/page-llm-config";
 import { safeSendToRenderer } from "../utils";
-
-/**
- * Read ideation feature settings from the settings file
- */
-function getIdeationFeatureSettings(): {
-	model?: string;
-	thinkingLevel?: string;
-} {
-	const settingsPath = path.join(app.getPath("userData"), "settings.json");
-
-	try {
-		if (existsSync(settingsPath)) {
-			const content = readFileSync(settingsPath, "utf-8");
-			const settings: AppSettings = {
-				...DEFAULT_APP_SETTINGS,
-				...JSON.parse(content),
-			};
-
-			// Get ideation-specific settings
-			const featureModels = settings.featureModels || DEFAULT_FEATURE_MODELS;
-			const featureThinking =
-				settings.featureThinking || DEFAULT_FEATURE_THINKING;
-
-			return {
-				model: featureModels.ideation,
-				thinkingLevel: featureThinking.ideation,
-			};
-		}
-	} catch (error) {
-		debugError("[Ideation Handler] Failed to read feature settings:", error);
-	}
-
-	// Return defaults if settings file doesn't exist or fails to parse
-	return {
-		model: DEFAULT_FEATURE_MODELS.ideation,
-		thinkingLevel: DEFAULT_FEATURE_THINKING.ideation,
-	};
-}
 
 /**
  * Start ideation generation for a project
@@ -72,7 +26,7 @@ export function startIdeationGeneration(
 	mainWindow: BrowserWindow | null,
 ): void {
 	// Get feature settings and merge with config
-	const featureSettings = getIdeationFeatureSettings();
+	const featureSettings = getPageFeatureSettings("ideation");
 	const configWithSettings: IdeationConfig = {
 		...config,
 		model: config.model || featureSettings.model,
@@ -135,7 +89,7 @@ export function refreshIdeationSession(
 	mainWindow: BrowserWindow | null,
 ): void {
 	// Get feature settings and merge with config
-	const featureSettings = getIdeationFeatureSettings();
+	const featureSettings = getPageFeatureSettings("ideation");
 	const configWithSettings: IdeationConfig = {
 		...config,
 		model: config.model || featureSettings.model,

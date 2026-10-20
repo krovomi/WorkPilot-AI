@@ -7,9 +7,10 @@ Dynamic spec creation with complexity-based phase selection.
 The orchestrator uses AI to evaluate task complexity and adapts its process accordingly.
 
 Complexity Assessment:
-- By default, uses AI (complexity_assessor.md prompt) to analyze the task
-- AI considers: scope, integrations, infrastructure, knowledge requirements, risk
-- Falls back to heuristic analysis if AI assessment fails
+- The heuristic (spec/complexity.py) decides alone when it is confident
+  (AI_ASSESSMENT_CONFIDENCE_THRESHOLD); otherwise the AI (complexity_assessor.md)
+  settles it, considering scope, integrations, infrastructure, knowledge and risk
+- Falls back to the heuristic verdict if AI assessment fails
 - Use --no-ai-assessment to skip AI and use heuristics only
 
 Complexity Tiers:
@@ -84,7 +85,7 @@ if sys.platform == "win32":
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Validate platform-specific dependencies BEFORE any imports that might
-# trigger graphiti_core -> real_ladybug -> pywintypes import chain (ACS-253)
+# trigger a pywintypes import (the MCP library imports win32api; ACS-253)
 from core.dependency_validator import validate_platform_dependencies
 
 validate_platform_dependencies()
@@ -106,8 +107,9 @@ from core.sentry import capture_exception, init_sentry
 
 init_sentry(component="spec-runner")
 
+from core.build_signals import BuildPaused
+from core.debug import debug, debug_error, debug_section, debug_success
 from core.platform import is_windows
-from debug import debug, debug_error, debug_section, debug_success
 from phase_config import resolve_model_id
 from review import ReviewState
 from spec import SpecOrchestrator
@@ -116,6 +118,10 @@ from ui import Icons, highlight, muted, print_section, print_status
 
 def main():
     """CLI entry point."""
+    from integrations.jev.models import JevContext
+    from integrations.jev.runtime import JevRun
+
+    jev_run = JevRun.from_env(JevContext("feature-build", Path.cwd()))
     debug_section("spec_runner", "Spec Runner CLI")
     import argparse
 
@@ -136,7 +142,7 @@ Examples:
   python spec_runner.py --task "Update text" --complexity simple
 
   # Complex integration (auto-detected)
-  python spec_runner.py --task "Add Graphiti memory integration with FalkorDB"
+  python spec_runner.py --task "Add Redis caching to the user service"
 
   # Interactive mode
   python spec_runner.py --interactive
@@ -283,32 +289,48 @@ Examples:
     # _get_active_provider() picks it up throughout the entire spec creation pipeline
     # (AgentRunner, SpecOrchestrator, etc.) even when the frontend credential manager
     # did not inject it (e.g. settings.json.selectedProvider is null).
-    if args.provider and args.provider not in ("anthropic", "claude"):
+    # Anthropic is propagated too, as "claude": the task named it, and leaving
+    # the variable alone would let the app's default provider — inherited from
+    # Electron — run a spec the task asked Claude to write.
+    if args.provider:
         import os as _os
 
-        _os.environ["SELECTED_LLM_PROVIDER"] = args.provider
+        _os.environ["SELECTED_LLM_PROVIDER"] = (
+            "claude"
+            if args.provider.lower() in ("anthropic", "claude")
+            else args.provider
+        )
         debug(
             "spec_runner",
             f"Injected SELECTED_LLM_PROVIDER={args.provider} into environment from --provider arg",
         )
 
-    # Resolve model: if provider is non-Anthropic and model is the default "sonnet",
-    # use the provider-specific default model instead of the Claude shorthand.
-    from phase_config import PROVIDER_DEFAULT_MODELS
+    # Resolve the model the way every other phase does — provider-aware.
+    #
+    # This used to substitute the provider default ONLY when args.model was
+    # still argparse's "sonnet", which meant any explicitly-passed model went
+    # through untouched. The frontend always passes one (metadata.phaseModels.spec,
+    # or metadata.model), so a task switched to Ollama while its saved spec model
+    # was still a Claude id ran the whole spec pipeline as
+    # `provider=ollama, model=claude-opus-4-5-…`: seven phases each asking the
+    # local server for a model it cannot have, each falling back to pulling a
+    # Claude manifest from the Ollama registry, each failing with
+    # "pull model manifest: file does not exist".
+    #
+    # `_resolve_provider_model` is the shared resolver used by get_phase_model
+    # for planning/coding/QA; routing the spec phase through it too means the
+    # four phases finally agree on what "this provider's model" is.
+    from phase_config import _resolve_provider_model
 
-    if (
-        args.provider
-        and args.provider not in ("anthropic", "claude")
-        and args.model
-        == "sonnet"  # argparse default — user didn't explicitly set a model
-    ):
-        provider_defaults = PROVIDER_DEFAULT_MODELS.get(args.provider, {})
-        resolved_model = provider_defaults.get("spec", args.model)
-        debug(
-            "spec_runner",
-            f"Using provider-specific default model for '{args.provider}'",
-            resolved_model=resolved_model,
-        )
+    if args.provider and args.provider not in ("anthropic", "claude"):
+        resolved_model = _resolve_provider_model(args.model, args.provider)
+        if resolved_model != args.model:
+            debug(
+                "spec_runner",
+                f"Model '{args.model}' is not valid for provider "
+                f"'{args.provider}' — using the provider's model instead",
+                resolved_model=resolved_model,
+            )
     else:
         resolved_model = resolve_model_id(args.model)
 
@@ -327,6 +349,7 @@ Examples:
     )
 
     orchestrator = SpecOrchestrator(
+        jev_run=jev_run,
         project_dir=project_dir,
         task_description=task_description,
         spec_name=args.continue_spec,
@@ -447,6 +470,14 @@ Examples:
             print(f"  {muted('Running:')} {' '.join(run_cmd)}")
             print()
 
+            # Keep JEV credentials in the private runtime; never put them back
+            # into an environment inherited by SDK tools or background servers.
+            if jev_run.has_credential:
+                from run import main as build_main
+
+                build_main(argv=run_cmd[2:], jev_run=jev_run)
+                sys.exit(0)
+
             # Execute run.py - use subprocess on Windows to maintain connection with Electron
             # Fix for issue #609: os.execv() breaks connection on Windows
             if is_windows():
@@ -476,6 +507,16 @@ Examples:
 
         sys.exit(0)
 
+    except BuildPaused:
+        # The user paused during spec creation. Nothing failed, so this must not
+        # exit non-zero: the frontend reads a non-zero exit as an unexpected
+        # crash and moves the card out of its column, which is exactly what a
+        # pause has to avoid. The pause flag stays on disk for the resume.
+        print("\n\n⏸  Spec creation paused — resume from the Kanban, or:")
+        print(
+            f"   python auto-claude/spec_runner.py --continue {orchestrator.spec_dir.name}"
+        )
+        sys.exit(0)
     except KeyboardInterrupt:
         debug_error("spec_runner", "Spec creation interrupted by user")
         print("\n\nSpec creation interrupted.")

@@ -12,7 +12,7 @@ from ui.capabilities import configure_safe_encoding
 
 configure_safe_encoding()
 
-from debug import debug, debug_detailed, debug_error, debug_section, debug_success
+from core.debug import debug, debug_detailed, debug_error, debug_section, debug_success
 from security.tool_input_validator import get_safe_tool_input
 from task_logger import (
     LogEntryType,
@@ -23,6 +23,28 @@ from task_logger import (
 # Lazy import create_client to avoid circular import with core.client
 # The import chain: spec.pipeline -> agent_runner -> core.client -> agents.tools_pkg -> spec.validate_pkg
 # By deferring the import, we break the circular dependency.
+
+#: The prompts that need tools `spec_writer` does not grant. Both call
+#: Context7 and the web to check what the spec claims about a library, and both
+#: write their own file (`research.json`, and `spec.md` rewritten plus
+#: `critique_report.json`), so their configs grant writing too: a config
+#: without it does not stop the phase, it makes `create_minimal_*` stand in for
+#: the file and the phase report success over nothing.
+#:
+#: Every other prompt run here — `complexity_assessor.md`, `spec_quick.md`,
+#: `spec_writer.md`, `planner.md`, `validation_fixer.md` — writes files and needs
+#: nothing more, and `planner.md` and `spec_quick.md` ask for the `Write` tool
+#: that `core/runtimes/tool_executor.py` exposes to non-Claude providers only
+#: under `planner` and `spec_writer`. So `spec_writer` stays their answer.
+PROMPT_AGENT_TYPES = {
+    "spec_researcher.md": "spec_researcher",
+    "spec_critic.md": "spec_self_critique",
+}
+
+
+def agent_type_for(prompt_file: str) -> str:
+    """The `AGENT_CONFIGS` entry a spec prompt runs under."""
+    return PROMPT_AGENT_TYPES.get(prompt_file, "spec_writer")
 
 
 class AgentRunner:
@@ -125,11 +147,33 @@ class AgentRunner:
                 context_length=len(additional_context),
             )
 
+        # Determine which provider to use
+        from core.client import _get_active_provider, _normalize_provider_name
+        from phase_config import get_phase_provider, is_engine_locked
+
+        # A task that owns its engine names the spec phase's provider itself;
+        # the task-wide provider `_get_active_provider` returns may belong to
+        # another phase.
+        locked_provider = (
+            get_phase_provider(self.spec_dir, phase="spec")
+            if is_engine_locked(self.spec_dir)
+            else None
+        )
+        active_provider = (
+            _normalize_provider_name(locked_provider)
+            if locked_provider
+            else _get_active_provider(self.spec_dir)
+        )
+        debug("agent_runner", f"Active provider resolved: {active_provider}")
+
+        agent_type = agent_type_for(prompt_file)
+
         # Create client with thinking budget
         # Log model/CWD prominently so issues are visible in task console
         debug(
             "agent_runner",
             "Creating agent client",
+            agent_type=agent_type,
             model=self.model,
             thinking_budget=thinking_budget,
             project_dir=str(self.project_dir),
@@ -137,20 +181,6 @@ class AgentRunner:
             spec_dir=str(self.spec_dir),
             spec_dir_exists=self.spec_dir.exists(),
         )
-        if self.task_logger:
-            self.task_logger.log(
-                f"Agent config: model={self.model}, thinking={thinking_budget}, "
-                f"CWD exists={self.project_dir.exists()}",
-                LogEntryType.TEXT,
-                LogPhase.PLANNING,
-                print_to_console=True,
-            )
-
-        # Determine which provider to use
-        from core.client import _get_active_provider
-
-        active_provider = _get_active_provider(self.spec_dir)
-        debug("agent_runner", f"Active provider resolved: {active_provider}")
 
         if active_provider not in ("claude", "anthropic"):
             # Non-Claude providers (openai, windsurf, copilot, google, mistral,
@@ -168,9 +198,33 @@ class AgentRunner:
                 project_dir=self.project_dir,
                 spec_dir=self.spec_dir,
                 model=self.model,
-                agent_type="spec_writer",
+                agent_type=agent_type,
+                provider=active_provider,
+                max_thinking_tokens=thinking_budget,
             )
-            return await self._run_with_agent_client(client, prompt)
+            self._log_client_configuration(
+                client.provider_name(),
+                getattr(client, "model", self.model),
+                thinking_budget,
+            )
+            from core.agent_client import OpenAIAgentClient
+
+            working_directory = (
+                self.spec_dir
+                if prompt_file == "validation_fixer.md"
+                and isinstance(client, OpenAIAgentClient)
+                else None
+            )
+            if working_directory is not None:
+                prompt += (
+                    f"\nTool working directory: {working_directory.resolve()}\n"
+                    "Relative file paths and shell commands run in this spec directory. "
+                    "Use absolute paths for project source files. Modify the failed files "
+                    "with tools; describing commands does not execute them.\n"
+                )
+            return await self._run_with_agent_client(
+                client, prompt, working_directory=working_directory
+            )
 
         # Claude/Anthropic provider: use raw SDK client (create_client) for full
         # SDK message type compatibility (AssistantMessage, ToolUseBlock, etc.)
@@ -180,9 +234,11 @@ class AgentRunner:
             project_dir=self.project_dir,
             spec_dir=self.spec_dir,
             model=self.model,
-            agent_type="spec_writer",  # Use spec_writer type for spec creation
+            agent_type=agent_type,
             max_thinking_tokens=thinking_budget,
         )
+
+        self._log_client_configuration(active_provider, self.model, thinking_budget)
 
         # Debug: Check if input files exist for spec_writer
         if prompt_file == "spec_writer.md":
@@ -199,6 +255,13 @@ class AgentRunner:
         message_count = 0
         tool_count = 0
 
+        from context_mgmt.sdk_usage import SdkUsageProbe
+
+        usage_probe = SdkUsageProbe()
+        context_gauge = self._context_gauge(
+            usage_probe, active_provider, self.model, prompt
+        )
+
         try:
             async with client:
                 debug("agent_runner", "Sending query to Claude SDK...")
@@ -210,6 +273,8 @@ class AgentRunner:
                 async for msg in client.receive_response():
                     msg_type = type(msg).__name__
                     message_count += 1
+                    usage_probe.update(msg)
+                    self._observe(context_gauge, msg)
                     debug_detailed(
                         "agent_runner",
                         f"Received message #{message_count}",
@@ -411,7 +476,51 @@ class AgentRunner:
                 self.task_logger.log_error(f"Agent error: {e}", LogPhase.PLANNING)
             return False, str(e)
 
-    async def _run_with_agent_client(self, client, prompt: str) -> tuple[bool, str]:
+    def _context_gauge(self, usage_source, provider: str, model: str, prompt: str):
+        """A measure-only context guard for this spec session, or None.
+
+        Spec sessions are never compacted or cleared (nothing is replayed, and
+        the pipeline has no loop to rebuild a client in): the guard only feeds
+        the task's gauge, starting with a reading before anything is sent.
+        ``usage_source`` is the AgentClient, or an ``SdkUsageProbe`` for the
+        raw Claude SDK stream.
+        """
+        try:
+            from agents.session import _make_context_guard
+
+            guard = _make_context_guard(
+                usage_source, self.spec_dir, "spec", None, provider, model
+            )
+            if guard is not None:
+                guard.monitor_only = True
+                guard.report_start(prompt)
+            return guard
+        except Exception:  # noqa: BLE001 - the gauge is a mirror
+            return None
+
+    @staticmethod
+    def _observe(guard, message) -> None:
+        if guard is None:
+            return
+        try:
+            guard.observe(message)
+        except Exception:  # noqa: BLE001 - the gauge is a mirror
+            pass
+
+    def _log_client_configuration(self, provider, model, thinking_budget):
+        if self.task_logger:
+            self.task_logger.set_llm(provider, model)
+            self.task_logger.log(
+                f"Agent config: model={model}, thinking={thinking_budget}, "
+                f"CWD exists={self.project_dir.exists()}",
+                LogEntryType.TEXT,
+                LogPhase.PLANNING,
+                print_to_console=True,
+            )
+
+    async def _run_with_agent_client(
+        self, client, prompt: str, working_directory: Path | None = None
+    ) -> tuple[bool, str]:
         """Run a spec creation agent session using an AgentClient (Windsurf/Copilot).
 
         This processes AgentMessage objects from create_agent_client() instead of
@@ -424,15 +533,27 @@ class AgentRunner:
         Returns:
             (success, response_text) tuple
         """
-        from core.agent_client import ContentBlockType
+        from core.agent_client import (
+            ContentBlockType,
+            LocalModelRuntimeError,
+            OpenAIAgentClient,
+        )
 
         current_tool = None
         message_count = 0
         tool_count = 0
 
         try:
+            if working_directory is not None and isinstance(client, OpenAIAgentClient):
+                client.set_tool_working_directory(str(working_directory.resolve()))
             async with client:
                 provider = client.provider_name()
+                context_gauge = self._context_gauge(
+                    client,
+                    provider,
+                    str(getattr(client, "model", "") or ""),
+                    prompt,
+                )
                 debug("agent_runner", f"Sending query to {provider} agent client...")
                 await client.query(prompt)
                 debug_success("agent_runner", f"Query sent to {provider}")
@@ -442,6 +563,7 @@ class AgentRunner:
 
                 async for msg in client.receive_response():
                     message_count += 1
+                    self._observe(context_gauge, msg)
 
                     for block in msg.content:
                         if block.type == ContentBlockType.TEXT and block.text:
@@ -533,6 +655,11 @@ class AgentRunner:
                     response_length=len(response_text),
                 )
                 return True, response_text
+
+        except LocalModelRuntimeError as e:
+            if self.task_logger:
+                self.task_logger.log_error(str(e), LogPhase.PLANNING)
+            raise
 
         except Exception as e:
             debug_error(

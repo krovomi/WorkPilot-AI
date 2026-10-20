@@ -11,7 +11,6 @@ import {
 	changelogMock,
 	claudeProfileMock,
 	contextMock,
-	infrastructureMock,
 	insightsMock,
 	integrationMock,
 	phase35Mock,
@@ -30,7 +29,17 @@ const isElectron =
  * Create mock electronAPI for browser
  * Aggregates all mock implementations from separate modules
  */
-const browserMockAPI: ElectronAPI = {
+/**
+ * `Partial`, parce que c'est la verite : la previsualisation navigateur couvre
+ * les chemins lus au demarrage et ceux qu'on veut pouvoir explorer, pas les
+ * ~660 methodes que le preload compose. Le type le disait autrefois par
+ * accident — `ElectronAPI` ne declarait que 356 membres et portait un index
+ * signature qui absorbait le reste.
+ *
+ * Les stores gardent leurs appels depuis #72 : une methode absente degrade avec
+ * un message, elle ne jette pas.
+ */
+const browserMockAPI: Partial<ElectronAPI> = {
 	// Project Operations
 	...projectMock,
 
@@ -137,7 +146,6 @@ const browserMockAPI: ElectronAPI = {
 	...insightsMock,
 
 	// Infrastructure & Docker Operations
-	...infrastructureMock,
 
 	// API Profile Management (custom Anthropic-compatible endpoints)
 	getAPIProfiles: async () => ({
@@ -503,10 +511,6 @@ const browserMockAPI: ElectronAPI = {
 	listLogFiles: async () => [],
 
 	// Azure DevOps Operations
-	getAzureDevOpsProjects: async () => ({
-		success: true,
-		data: [],
-	}),
 	listAzureDevOpsRepositories: async () => ({
 		success: true,
 		data: [],
@@ -542,6 +546,15 @@ const browserMockAPI: ElectronAPI = {
 		success: true,
 		data: [],
 	}),
+	getJiraAttachments: async () => ({
+		success: true,
+		data: [],
+	}),
+	getFigmaTokenStatus: async () => ({
+		success: true,
+		data: { configured: false, fromEnvironment: false },
+	}),
+	setFigmaToken: async () => ({ success: true, data: false }),
 	checkJiraConnection: async () => ({
 		success: true,
 		data: { connected: false, siteUrl: null, error: undefined },
@@ -644,6 +657,7 @@ const browserMockAPI: ElectronAPI = {
 	}),
 	checkClaudeOAuth: async () => ({ isAuthenticated: false }),
 	checkOpenAICodexOAuth: async () => ({ isAuthenticated: false }),
+	checkAgentCli: async (tool) => ({ tool, installed: false }),
 	updateCodexCli: async () => ({
 		success: false,
 		error: "Not available in browser mode",
@@ -653,6 +667,15 @@ const browserMockAPI: ElectronAPI = {
 	invoke: async (channel: string, ...args: unknown[]) => {
 		console.warn(`[Browser Mock] invoke called for channel: ${channel}`, args);
 		return { success: false, error: "Not available in browser mode" };
+	},
+
+	// Generic listeners: the bridge defines them, so the preview must too —
+	// a caller subscribing at startup would otherwise take it down.
+	on: () => () => {
+		/* noop */
+	},
+	onIpcEvent: () => () => {
+		/* noop */
 	},
 
 	// Prompt Optimizer API
@@ -669,29 +692,17 @@ const browserMockAPI: ElectronAPI = {
 		/* noop */
 	},
 
-	// Context-Aware Snippets API
-	onSnippetStreamChunk: () => {
+	// Context-Aware Snippets API — chaque abonnement rend son desabonnement
+	onSnippetStreamChunk: () => () => {
 		/* noop */
 	},
-	onSnippetStatus: () => {
+	onSnippetStatus: () => () => {
 		/* noop */
 	},
-	onSnippetError: () => {
+	onSnippetError: () => () => {
 		/* noop */
 	},
-	onSnippetComplete: () => {
-		/* noop */
-	},
-	removeSnippetStreamChunkListener: () => {
-		/* noop */
-	},
-	removeSnippetStatusListener: () => {
-		/* noop */
-	},
-	removeSnippetErrorListener: () => {
-		/* noop */
-	},
-	removeSnippetCompleteListener: () => {
+	onSnippetComplete: () => () => {
 		/* noop */
 	},
 
@@ -734,6 +745,98 @@ const browserMockAPI: ElectronAPI = {
 	onAppEmulatorConfig: () => () => {
 		/* noop */
 	},
+
+	// Smart Estimation API. The dialog is mounted for the whole session, so
+	// these are read at startup even when nobody opens it.
+	// Le handler resout avec une estimation reelle. En previsualisation il n'y a
+	// pas de backend : echouer, plutot que rendre une estimation inventee que le
+	// dialogue afficherait comme un resultat.
+	runSmartEstimation: async () => {
+		throw new Error("Smart estimation is unavailable in the browser preview");
+	},
+	cancelSmartEstimation: async () => false,
+	onSmartEstimationEvent: () => () => {
+		/* noop */
+	},
+	onSmartEstimationError: () => () => {
+		/* noop */
+	},
+	onSmartEstimationComplete: () => () => {
+		/* noop */
+	},
+
+	// Read at startup by useContextUsage and useIpc — both crashed the browser
+	// preview outright when the key was missing.
+	onCostsUpdated: () => () => {
+		/* noop */
+	},
+	onPipelineStatus: () => () => {
+		/* noop */
+	},
+	// Context-window management: registered at startup by global-listeners.
+	// No backend in the preview, so the commands report unavailable.
+	onTaskContextUsage: () => () => {
+		/* noop */
+	},
+	requestContextAction: async () => ({
+		success: false,
+		error: "browser preview",
+	}),
+	updateContextPolicy: async () => ({
+		success: false,
+		error: "browser preview",
+	}),
+
+	// Auto-Refactor API
+	startAutoRefactor: async () => ({ success: false, error: "browser preview" }),
+	cancelAutoRefactor: async () => ({ success: false, cancelled: false }),
+	configureAutoRefactor: async () => ({ success: true }),
+	onAutoRefactorStatus: () => () => {
+		/* noop */
+	},
+	onAutoRefactorStreamChunk: () => () => {
+		/* noop */
+	},
+	onAutoRefactorError: () => () => {
+		/* noop */
+	},
+	onAutoRefactorComplete: () => () => {
+		/* noop */
+	},
+	onAutoRefactorExecutionComplete: () => () => {
+		/* noop */
+	},
+
+	// Swarm API — the store degrades on a missing bridge, but a preview without
+	// these entries would silently have no listeners at all.
+	swarm: {
+		analyze: async () => {
+			throw new Error("Swarm is unavailable in the browser preview");
+		},
+		start: async () => ({ success: false, error: "browser preview" }),
+		cancel: async () => ({ success: false, cancelled: false }),
+		status: async () => null,
+		onEvent: () => () => {
+			/* noop */
+		},
+		onLog: () => () => {
+			/* noop */
+		},
+	},
+
+	// Continuous AI API
+	continuousAI: {
+		start: async () => ({ success: false, error: "browser preview" }),
+		stop: async () => ({ success: true }),
+		getStatus: async () => null,
+		updateConfig: async () => ({ success: true }),
+		approveAction: async () => ({ success: true }),
+		rejectAction: async () => ({ success: true }),
+		isRunning: async () => false,
+		onEvent: () => () => {
+			/* noop */
+		},
+	},
 };
 
 /**
@@ -745,8 +848,12 @@ export function initBrowserMock(): void {
 			"%c[Browser Mock] Initializing mock electronAPI for browser preview",
 			"color: #f0ad4e; font-weight: bold;",
 		);
+		// Le mock est partiel par nature (voir `browserMockAPI`). La conversion
+		// est le seul endroit qui l'assume, et elle est sûre : les appelants
+		// gardent leurs accès depuis #72, et une méthode absente y dégrade avec
+		// un message au lieu de jeter.
 		(window as Window & { electronAPI: ElectronAPI }).electronAPI =
-			browserMockAPI;
+			browserMockAPI as ElectronAPI;
 	}
 }
 

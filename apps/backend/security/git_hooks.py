@@ -83,7 +83,7 @@ class GitHookManager:
             hook_path = self.hooks_dir / hook_name
             if hook_path.exists():
                 # Check if it's our hook
-                content = hook_path.read_text()
+                content = hook_path.read_text(encoding="utf-8")
                 if "WorkPilot AI Security Scanner" in content:
                     hook_path.unlink()
                     print(f"✅ Removed {hook_name} hook")
@@ -167,7 +167,7 @@ if __name__ == "__main__":
 """
 
         try:
-            hook_path.write_text(hook_script)
+            hook_path.write_text(hook_script, encoding="utf-8")
             hook_path.chmod(0o755)  # Make executable
             print(f"✅ Installed pre-commit hook at {hook_path}")
             return True
@@ -238,7 +238,7 @@ if __name__ == "__main__":
 """
 
         try:
-            hook_path.write_text(hook_script)
+            hook_path.write_text(hook_script, encoding="utf-8")
             hook_path.chmod(0o755)  # Make executable
             print(f"✅ Installed pre-push hook at {hook_path}")
             return True
@@ -365,12 +365,10 @@ def main():
     )
 
     # CI scan command
-    ci_parser = subparsers.add_parser("ci-scan", help="Run CI/CD security scan")
+    subparsers.add_parser("ci-scan", help="Run CI/CD security scan")
 
     # GitHub Action command
-    github_parser = subparsers.add_parser(
-        "github-action", help="Run security scan for GitHub Actions"
-    )
+    subparsers.add_parser("github-action", help="Run security scan for GitHub Actions")
 
     args = parser.parse_args()
 

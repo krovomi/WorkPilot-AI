@@ -160,44 +160,7 @@ class LearningLoopService:
 
     def get_summary(self) -> dict[str, Any]:
         """Get a summary of all learning data for the dashboard."""
-        patterns = self.storage.load_patterns()
-        if not patterns:
-            return {
-                "total_patterns": 0,
-                "by_category": {},
-                "by_phase": {},
-                "by_type": {},
-                "average_confidence": 0.0,
-                "total_builds_analyzed": 0,
-                "last_analyzed_at": None,
-                "improvement_metrics": None,
-                "enabled_count": 0,
-                "disabled_count": 0,
-            }
-
-        by_category = Counter(p.category.value for p in patterns)
-        by_phase = Counter(p.agent_phase for p in patterns)
-        by_type = Counter(p.pattern_type.value for p in patterns)
-        avg_confidence = sum(p.confidence for p in patterns) / len(patterns)
-        all_build_ids = set()
-        for p in patterns:
-            all_build_ids.update(p.source_build_ids)
-        last_seen = max(p.last_seen for p in patterns) if patterns else None
-
-        metrics = self._compute_improvement_metrics()
-
-        return {
-            "total_patterns": len(patterns),
-            "by_category": dict(by_category),
-            "by_phase": dict(by_phase),
-            "by_type": dict(by_type),
-            "average_confidence": round(avg_confidence, 3),
-            "total_builds_analyzed": len(all_build_ids),
-            "last_analyzed_at": last_seen,
-            "improvement_metrics": metrics.to_dict() if metrics else None,
-            "enabled_count": sum(1 for p in patterns if p.enabled),
-            "disabled_count": sum(1 for p in patterns if not p.enabled),
-        }
+        return summarise(self.storage.load_patterns())
 
     def get_patterns(self, filters: dict | None = None) -> list[dict[str, Any]]:
         """Get all patterns, optionally filtered."""
@@ -243,22 +206,7 @@ class LearningLoopService:
 
     def _compute_improvement_metrics(self) -> ImprovementMetrics | None:
         """Compute before/after metrics based on pattern application data."""
-        patterns = self.storage.load_patterns()
-        applied = [p for p in patterns if p.applied_count > 0]
-        if not applied:
-            return None
-
-        total_applied = sum(p.applied_count for p in applied)
-        total_success = sum(p.success_after_apply for p in applied)
-        if total_applied == 0:
-            return None
-
-        success_rate = total_success / total_applied
-        return ImprovementMetrics(
-            qa_first_pass_rate={"before": 0.0, "after": round(success_rate, 3)},
-            avg_qa_iterations={"before": 0.0, "after": 0.0},
-            error_rate={"before": 0.0, "after": 0.0},
-        )
+        return improvement_metrics(self.storage.load_patterns())
 
     def _heuristic_extract(
         self, builds_data: list[dict[str, Any]]
@@ -316,3 +264,62 @@ class LearningLoopService:
             )
 
         return patterns
+
+
+def improvement_metrics(patterns: list[LearningPattern]) -> ImprovementMetrics | None:
+    """Before/after metrics from the patterns' application data."""
+    applied = [p for p in patterns if p.applied_count > 0]
+    if not applied:
+        return None
+
+    total_applied = sum(p.applied_count for p in applied)
+    total_success = sum(p.success_after_apply for p in applied)
+    if total_applied == 0:
+        return None
+
+    success_rate = total_success / total_applied
+    return ImprovementMetrics(
+        qa_first_pass_rate={"before": 0.0, "after": round(success_rate, 3)},
+        avg_qa_iterations={"before": 0.0, "after": 0.0},
+        error_rate={"before": 0.0, "after": 0.0},
+    )
+
+
+def summarise(patterns: list[LearningPattern]) -> dict[str, Any]:
+    """The dashboard's summary of a project's patterns."""
+    if not patterns:
+        return {
+            "total_patterns": 0,
+            "by_category": {},
+            "by_phase": {},
+            "by_type": {},
+            "average_confidence": 0.0,
+            "total_builds_analyzed": 0,
+            "last_analyzed_at": None,
+            "improvement_metrics": None,
+            "enabled_count": 0,
+            "disabled_count": 0,
+        }
+
+    by_category = Counter(p.category.value for p in patterns)
+    by_phase = Counter(p.agent_phase for p in patterns)
+    by_type = Counter(p.pattern_type.value for p in patterns)
+    avg_confidence = sum(p.confidence for p in patterns) / len(patterns)
+    all_build_ids = set()
+    for p in patterns:
+        all_build_ids.update(p.source_build_ids)
+    last_seen = max(p.last_seen for p in patterns)
+    metrics = improvement_metrics(patterns)
+
+    return {
+        "total_patterns": len(patterns),
+        "by_category": dict(by_category),
+        "by_phase": dict(by_phase),
+        "by_type": dict(by_type),
+        "average_confidence": round(avg_confidence, 3),
+        "total_builds_analyzed": len(all_build_ids),
+        "last_analyzed_at": last_seen,
+        "improvement_metrics": metrics.to_dict() if metrics else None,
+        "enabled_count": sum(1 for p in patterns if p.enabled),
+        "disabled_count": sum(1 for p in patterns if not p.enabled),
+    }

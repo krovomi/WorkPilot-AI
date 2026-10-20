@@ -1,19 +1,20 @@
 import { spawn } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { BrowserWindow } from "electron";
 import { ipcMain } from "electron";
-import { IPC_CHANNELS } from "../../shared/constants";
+import { IPC_CHANNELS, MASKED_SECRET_CHAR } from "../../shared/constants";
 import type {
+	ImageAttachment,
 	IPCResult,
 	JiraSyncStatus,
 	JiraWorkItem,
 	Project,
 } from "../../shared/types";
 import type { AgentManager } from "../agent";
+import { readProjectEnv } from "../project-env-file";
 import { projectStore } from "../project-store";
-import { parseEnvFile } from "./utils";
+import { downloadJiraImageAttachments } from "./shared/jira-attachments";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -45,19 +46,8 @@ export function registerJiraHandlers(
 				projectKey: null,
 			};
 		}
-		const envPath = path.join(project.path, project.autoBuildPath, ".env");
-		if (!existsSync(envPath)) {
-			return {
-				instanceUrl: null,
-				email: null,
-				apiToken: null,
-				projectKey: null,
-			};
-		}
-
 		try {
-			const content = readFileSync(envPath, "utf-8");
-			const vars = parseEnvFile(content);
+			const vars = readProjectEnv(project);
 			return {
 				instanceUrl: vars.JIRA_INSTANCE_URL || null,
 				email: vars.JIRA_EMAIL || null,
@@ -372,12 +362,62 @@ except Exception as e:
 		},
 	);
 
+	// The issue's image attachments, downloaded in the main process with the
+	// project's credentials so the renderer never holds the token. Returned as
+	// task attachments: TASK_CREATE writes them to attachments/, where the
+	// attachments preflight reads them before planning.
+	ipcMain.handle(
+		IPC_CHANNELS.JIRA_GET_ATTACHMENTS,
+		async (
+			_,
+			projectId: string,
+			issueKey: string,
+		): Promise<IPCResult<ImageAttachment[]>> => {
+			const project = projectStore.getProject(projectId);
+			if (!project) {
+				return { success: false, error: "Project not found" };
+			}
+			const config = getJiraConfig(project);
+			if (!config.instanceUrl || !config.email || !config.apiToken) {
+				return { success: false, error: "Jira not configured for this project" };
+			}
+			const images = await downloadJiraImageAttachments(
+				{
+					instanceUrl: config.instanceUrl,
+					email: config.email,
+					apiToken: config.apiToken,
+				},
+				issueKey,
+			);
+			return { success: true, data: images };
+		},
+	);
+
 	ipcMain.handle(
 		IPC_CHANNELS.JIRA_TEST_CONNECTION,
 		async (
 			_,
-			config: { instanceUrl: string; email: string; apiToken: string },
+			input: {
+				projectId?: string;
+				instanceUrl: string;
+				email: string;
+				apiToken: string;
+			},
 		): Promise<IPCResult<JiraSyncStatus>> => {
+			// The settings screen holds the mask ENV_GET handed it, never the
+			// token: a masked or empty token is the project's stored one.
+			const typed = String(input?.apiToken ?? "").replaceAll(
+				MASKED_SECRET_CHAR,
+				"",
+			);
+			const project = input?.projectId
+				? projectStore.getProject(input.projectId)
+				: undefined;
+			const config = {
+				instanceUrl: input?.instanceUrl,
+				email: input?.email,
+				apiToken: typed || (project ? getJiraConfig(project).apiToken : null),
+			};
 			if (!config.instanceUrl || !config.email || !config.apiToken) {
 				return {
 					success: false,

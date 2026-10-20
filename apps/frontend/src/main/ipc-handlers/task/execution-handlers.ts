@@ -5,6 +5,7 @@ import {
 	readdirSync,
 	readFileSync,
 	renameSync,
+	rmSync,
 	unlinkSync,
 	writeFileSync,
 } from "node:fs";
@@ -23,6 +24,19 @@ import {
 	IPC_CHANNELS,
 } from "../../../shared/constants";
 import { isAnthropicNativeVersionedModelId } from "../../../shared/constants/models";
+import {
+	applyEngineChange,
+	buildEngineMetadata,
+	ENGINE_PHASES,
+	type EngineChangeScope,
+	type EngineSeedSettings,
+	engineUsesClaude,
+	enginePhaseForPause,
+	isClaudeProvider,
+	sameTrio,
+	seedEngine,
+} from "../../../shared/utils/task-engine";
+import { taskEngineFromMetadata } from "../../agent/task-provider-env";
 import type { TaskEvent } from "../../../shared/state-machines/task-machine";
 import type {
 	ImageAttachment,
@@ -33,8 +47,6 @@ import type {
 	TaskStatus,
 } from "../../../shared/types";
 import type {
-	PhaseModelConfig,
-	PhaseThinkingConfig,
 	ThinkingLevel,
 } from "../../../shared/types/settings";
 import type { AgentManager } from "../../agent";
@@ -63,21 +75,47 @@ import {
 	buildChangeRequestSubtask,
 	addChangeRequestSubtaskToPlan,
 } from "./plan-file-utils";
+import {
+	clearPauseState,
+	type PauseStateRecord,
+	writePauseState,
+} from "./pause-state-utils";
 import { findTaskAndProject } from "./shared";
+import {
+	allSpecDirs,
+	convertTaskMetadataToSpecCreation,
+	currentPausePhase,
+	getSpecPaths,
+	readPersistedSessionId,
+	resumePausedTask,
+} from "./resume-task";
 import { extractPrCreationError } from "./pr-error-utils";
 import { stripHtml } from "../shared/sanitize";
 import {
 	buildPhaseRerunPlanUpdate,
 	downstreamLogPhases,
+	startPhaseRerun,
 	type RerunPhase,
 } from "./plan-rerun-utils";
 
 /**
- * Returns true if the currently active provider requires Claude OAuth authentication.
- * Non-Claude providers (Windsurf, OpenAI, Google, etc.) handle their own auth
- * and should not be blocked by the Claude profile auth check.
+ * Whether starting `task` needs Claude OAuth authentication.
+ *
+ * A Kanban task answers from its own engine (shared/utils/task-engine.ts):
+ * Claude is required as soon as one of its phases runs on Claude. Without a
+ * task, the default provider from Settings decides. Non-Claude providers
+ * (Windsurf, OpenAI, Google, etc.) handle their own auth.
  */
-function requiresClaudeAuth(): boolean {
+function requiresClaudeAuth(task?: Task, project?: Project): boolean {
+	if (task?.metadata) {
+		return engineUsesClaude(
+			taskEngineFromMetadata(
+				task.metadata,
+				undefined,
+				project?.settings?.provider,
+			),
+		);
+	}
 	const settings = readSettingsFile();
 	const selectedProvider = (
 		settings?.selectedProvider as string | undefined
@@ -129,242 +167,74 @@ function recordReviewVerdictForLearning(
 			);
 		}
 	} catch (err) {
-		console.warn("[TASK_UPDATE_STATUS] Learning outcome recording failed:", err);
-	}
-}
-
-/**
- * Convert TaskMetadata to SpecCreationMetadata for spec creation
- * This handles the type incompatibility between the two metadata types
- */
-// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-function convertTaskMetadataToSpecCreation(metadata?: any): any {
-	if (!metadata) return undefined;
-
-	return {
-		requireReviewBeforeCoding: metadata.requireReviewBeforeCoding,
-		provider: metadata.provider,
-		isAutoProfile: metadata.isAutoProfile,
-		phaseModels: convertPhaseModelConfig(metadata.phaseModels),
-		phaseThinking: convertPhaseThinkingConfig(metadata.phaseThinking),
-		model: metadata.model,
-		thinkingLevel: metadata.thinkingLevel,
-		useWorktree: metadata.useWorktree,
-		useLocalBranch: metadata.useLocalBranch,
-		tddMode: metadata.tddMode,
-	};
-}
-
-/**
- * Convert PhaseModelConfig (string-based) to SpecCreationMetadata format (literal union)
- */
-// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-function convertPhaseModelConfig(phaseModels?: any): any {
-	if (!phaseModels) return undefined;
-
-	return {
-		spec: phaseModels.spec || "sonnet",
-		planning: phaseModels.planning || "sonnet",
-		coding: phaseModels.coding || "sonnet",
-		qa: phaseModels.qa || "sonnet",
-	};
-}
-
-/**
- * Convert PhaseThinkingConfig to SpecCreationMetadata format
- */
-// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-function convertPhaseThinkingConfig(phaseThinking?: any): any {
-	if (!phaseThinking) return undefined;
-
-	return {
-		spec: phaseThinking.spec || "medium",
-		planning: phaseThinking.planning || "medium",
-		coding: phaseThinking.coding || "medium",
-		qa: phaseThinking.qa || "medium",
-	};
-}
-
-/**
- * Synchronise le provider de la tâche avec le provider actuel du projet.
- * Appelé à chaque démarrage/redémarrage pour permettre le changement de provider à la volée.
- *
- * @returns L'ancien provider si un changement a eu lieu, null sinon.
- */
-function syncTaskProvider(
-	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-	task: any,
-	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-	project: any,
-	specDir: string,
-): string | null {
-	if (!task.metadata) return null;
-
-	// Use project-level provider if set, otherwise fall back to the global
-	// selectedProvider from settings.json (set by the UI provider selector).
-	// Without this fallback, selecting a provider globally in the UI has no effect
-	// on task execution — the task silently falls back to Anthropic.
-	const projectProvider =
-		project.settings?.provider ??
-		(readSettingsFile()?.selectedProvider as string | undefined);
-	const taskProvider = task.metadata.provider;
-
-	// No change needed
-	if (!projectProvider || projectProvider === taskProvider) {
-		handleInitialProviderInjection(task, projectProvider, specDir);
-		return null;
-	}
-
-	// Provider changed - update task and persist changes
-	return handleProviderChange(task, projectProvider, specDir);
-}
-
-/**
- * Handle initial provider injection when task has no provider set
- */
-function handleInitialProviderInjection(
-	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-	task: any,
-	projectProvider: string | undefined,
-	specDir: string,
-): void {
-	if (!task.metadata.provider && projectProvider) {
-		task.metadata.provider = projectProvider;
-		persistProviderToMetadata(
-			specDir,
-			projectProvider,
-			{},
-			{},
-			"initial provider injection",
+		console.warn(
+			"[TASK_UPDATE_STATUS] Learning outcome recording failed:",
+			err,
 		);
 	}
 }
 
 /**
- * Handle provider change and update task metadata
+ * Make sure `task` owns its engine before it runs.
+ *
+ * This used to be `syncTaskProvider`, which replaced the task's provider —
+ * and its phase models — with the project's or the header's on every start,
+ * QA run and resume: a task created for Ollama ran on whatever the header
+ * said that morning. A task now owns its engine (`engineLocked`), and nothing
+ * here touches one that does.
+ *
+ * A task written before that rule is migrated once: each phase keeps what the
+ * task named (`phaseProviders`, then `provider`), the rest comes from the
+ * Settings presets of that provider, and the result is written locked into
+ * every copy of task_metadata.json. A dash-versioned Anthropic model left on a
+ * phase that now runs elsewhere is replaced by that provider's preset, as the
+ * old sync did.
+ *
+ * @returns true when the task was migrated.
  */
-function handleProviderChange(
-	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-	task: any,
-	projectProvider: string,
-	specDir: string,
-): string | null {
-	const previousProvider = task.metadata.provider;
+function ensureTaskEngine(task: Task, project: Project, specDir: string): boolean {
+	if (!task.metadata || task.metadata.engineLocked) return false;
 
-	// Get provider-specific configurations
-	const { providerPhaseModels, providerPhaseThinking } =
-		getProviderConfigurations(projectProvider);
-
-	// Update task metadata
-	updateTaskProviderMetadata(
-		task,
-		projectProvider,
-		providerPhaseModels,
-		providerPhaseThinking,
+	const settings = readSettingsFile() as EngineSeedSettings | undefined;
+	const engine = taskEngineFromMetadata(
+		task.metadata,
+		settings,
+		project.settings?.provider,
 	);
-
-	// Log the change
-	console.warn(
-		`[Provider Switch] ${previousProvider} -> ${projectProvider} for task ${task.id}`,
-	);
-
-	// Persist changes to disk
-	persistProviderToMetadata(
-		specDir,
-		projectProvider,
-		providerPhaseModels,
-		providerPhaseThinking,
-		"provider switch",
-	);
-
-	return previousProvider;
-}
-
-/**
- * Get provider-specific configurations from global settings
- */
-function getProviderConfigurations(projectProvider: string): {
-	providerPhaseModels: unknown;
-	providerPhaseThinking: unknown;
-} {
-	const globalSettings = readSettingsFile() ?? {};
-	const providerPhaseModels = (
-		globalSettings.providerPhaseModels as Record<string, unknown> | undefined
-	)?.[projectProvider];
-	const providerPhaseThinking = (
-		globalSettings.providerPhaseThinking as Record<string, unknown> | undefined
-	)?.[projectProvider];
-
-	return { providerPhaseModels, providerPhaseThinking };
-}
-
-/**
- * Update task metadata with new provider information
- */
-function updateTaskProviderMetadata(
-	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-	task: any,
-	projectProvider: string,
-	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-	providerPhaseModels: any,
-	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-	providerPhaseThinking: any,
-): void {
-	task.metadata.provider = projectProvider;
-	if (providerPhaseModels) task.metadata.phaseModels = providerPhaseModels;
-	if (providerPhaseThinking)
-		task.metadata.phaseThinking = providerPhaseThinking;
-}
-
-/**
- * Persist provider changes to metadata file
- */
-function persistProviderToMetadata(
-	specDir: string,
-	projectProvider: string,
-	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-	providerPhaseModels: any,
-	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-	providerPhaseThinking: any,
-	context: string,
-): void {
-	try {
-		const metadataPath = path.join(specDir, "task_metadata.json");
-		if (!existsSync(metadataPath)) return;
-
-		const content = safeReadFileSync(metadataPath);
-		if (!content) return;
-
-		const meta = JSON.parse(content);
-		meta.provider = projectProvider;
-		if (providerPhaseModels) meta.phaseModels = providerPhaseModels;
-		if (providerPhaseThinking) meta.phaseThinking = providerPhaseThinking;
-
-		// When switching to a non-Anthropic provider, clear any Anthropic-specific
-		// versioned model ID (e.g. "claude-sonnet-4-5-20250929") from the single
-		// model field so the backend falls back to PROVIDER_DEFAULT_MODELS for the
-		// new provider instead of sending an invalid model ID to the API.
-		//
-		// IMPORTANT: Copilot exposes Claude models in dot notation (e.g.
-		// "claude-opus-4.8", "claude-sonnet-4.6") which ARE valid and must be
-		// preserved. Only dash-versioned Anthropic-native IDs are cleared — see
-		// isAnthropicNativeVersionedModelId.
-		const isNonAnthropicProvider =
-			projectProvider &&
-			projectProvider !== "anthropic" &&
-			projectProvider !== "claude";
-		const hasAnthropicVersionedModel =
-			typeof meta.model === "string" &&
-			isAnthropicNativeVersionedModelId(meta.model);
-		if (isNonAnthropicProvider && hasAnthropicVersionedModel) {
-			delete meta.model;
+	for (const phase of ENGINE_PHASES) {
+		const trio = engine[phase];
+		if (
+			!isClaudeProvider(trio.provider) &&
+			isAnthropicNativeVersionedModelId(trio.model)
+		) {
+			trio.model = seedEngine(settings, trio.provider)[phase].model;
 		}
-
-		atomicWriteFileSync(metadataPath, JSON.stringify(meta, null, 2));
-		console.warn(`[Provider Sync] Persisted ${context} to task_metadata.json`);
-	} catch (err) {
-		console.warn(`[Provider Sync] Failed to persist ${context}:`, err);
 	}
+	const update = buildEngineMetadata(engine);
+	Object.assign(task.metadata, update);
+
+	const dirs = new Set([specDir, ...allSpecDirs(getSpecPaths(task, project))]);
+	for (const dir of dirs) {
+		try {
+			const metadataPath = path.join(dir, "task_metadata.json");
+			if (!existsSync(metadataPath)) continue;
+			const content = safeReadFileSync(metadataPath);
+			if (!content) continue;
+			atomicWriteFileSync(
+				metadataPath,
+				JSON.stringify({ ...JSON.parse(content), ...update }, null, 2),
+			);
+		} catch (err) {
+			console.warn(`[TaskEngine] Failed to migrate ${dir}:`, err);
+		}
+	}
+	console.warn(
+		`[TaskEngine] Task ${task.id} now owns its engine:`,
+		ENGINE_PHASES.map((phase) => `${phase}=${engine[phase].provider}`).join(
+			" ",
+		),
+	);
+	return true;
 }
 
 /**
@@ -566,7 +436,7 @@ async function validateTaskPrerequisites(
 	}
 
 	// Check authentication for Claude
-	if (requiresClaudeAuth() && !initResult.profileManager.hasValidAuth()) {
+	if (requiresClaudeAuth(task, project) && !initResult.profileManager.hasValidAuth()) {
 		return {
 			success: false,
 			error:
@@ -661,6 +531,8 @@ export function registerTaskExecutionHandlers(
 			useWorktree: task.metadata?.useWorktree,
 			useLocalBranch: task.metadata?.useLocalBranch,
 			tddMode: task.metadata?.tddMode,
+			verifyLoop: task.metadata?.verifyLoop,
+			mobileTargets: task.metadata?.mobileTargets,
 			enableStreaming: options?.enableStreaming ?? true,
 			streamingSessionId: options?.streamingSessionId ?? taskId,
 		};
@@ -763,18 +635,12 @@ export function registerTaskExecutionHandlers(
 				needsImplementation,
 			);
 
-			// Sync provider
-			const previousProvider = syncTaskProvider(task, project, specDir);
-			if (previousProvider) {
-				console.warn(
-					`[TASK_START] Provider switched: ${previousProvider} -> ${task.metadata?.provider}`,
-				);
-			} else {
-				console.warn(
-					"[TASK_START] Provider:",
-					task.metadata?.provider ?? "none",
-				);
-			}
+			// The task runs on its own engine, never the default provider's.
+			ensureTaskEngine(task, project, specDir);
+			console.warn(
+				"[TASK_START] Provider:",
+				task.metadata?.provider ?? "none",
+			);
 
 			// Start execution
 			startTaskExecution(
@@ -815,7 +681,8 @@ export function registerTaskExecutionHandlers(
 			if (!existsSync(sessionFile)) {
 				return {
 					success: false,
-					error: "No persisted SDK session found for this task — run it once first.",
+					error:
+						"No persisted SDK session found for this task — run it once first.",
 				};
 			}
 
@@ -883,20 +750,11 @@ export function registerTaskExecutionHandlers(
 		// Clear any cooperative-pause flag so a stopped task isn't left looking
 		// "paused" after it transitions out (e.g. to human_review).
 		try {
-			const planPaths = getPlanPaths(getSpecPaths(task, project), project);
-			for (const planFile of planPaths.all) {
-				if (!existsSync(planFile)) continue;
-				const plan = JSON.parse(readFileSync(planFile, "utf-8"));
-				if (plan.paused?.enabled) {
-					plan.paused = {
-						...plan.paused,
-						enabled: false,
-						paused_at: null,
-						paused_subtask_id: null,
-					};
-					writeFileSync(planFile, JSON.stringify(plan, null, 2));
-				}
-			}
+			const specPaths = getSpecPaths(task, project);
+			clearPauseState(
+				allSpecDirs(specPaths),
+				getPlanPaths(specPaths, project).all,
+			);
 		} catch (err) {
 			appLog.warn(`[TASK_STOP] Could not clear pause flag for ${taskId}:`, err);
 		}
@@ -1322,8 +1180,7 @@ export function registerTaskExecutionHandlers(
 			if (status === "done") {
 				// If a PR already exists for this task, skip PR creation
 				// (e.g. task moved out of "done" column and back in)
-				const existingPrUrl =
-					task.prUrl || task.metadata?.prUrl;
+				const existingPrUrl = task.prUrl || task.metadata?.prUrl;
 				if (existingPrUrl) {
 					console.warn(
 						`[TASK_UPDATE_STATUS] PR already exists for task ${taskId}: ${existingPrUrl} — skipping creation`,
@@ -1646,7 +1503,10 @@ print(json.dumps(result))
 
 					// Check git status before auto-starting
 					const gitStatusCheckForQa = checkGitStatus(project.path);
-					if (!gitStatusCheckForQa.isGitRepo || !gitStatusCheckForQa.hasCommits) {
+					if (
+						!gitStatusCheckForQa.isGitRepo ||
+						!gitStatusCheckForQa.hasCommits
+					) {
 						console.warn(
 							"[TASK_UPDATE_STATUS] Git check failed, cannot start QA validation",
 						);
@@ -1677,7 +1537,7 @@ print(json.dumps(result))
 						return { success: false, error: initResultForQa.error };
 					}
 					if (
-						requiresClaudeAuth() &&
+						requiresClaudeAuth(task, project) &&
 						!initResultForQa.profileManager.hasValidAuth()
 					) {
 						console.warn(
@@ -1701,13 +1561,8 @@ print(json.dumps(result))
 					// Start file watcher for this task
 					fileWatcher.watch(taskId, specDir);
 
-					// Synchronise le provider avec le projet (permet le switch de provider entre deux runs)
-					const prevProviderForQa = syncTaskProvider(task, project, specDir);
-					if (prevProviderForQa) {
-						console.warn(
-							`[TASK_UPDATE_STATUS] Provider switched: ${prevProviderForQa} -> ${task.metadata?.provider}`,
-						);
-					}
+					// The task runs on its own engine, never the default provider's.
+					ensureTaskEngine(task, project, specDir);
 
 					await agentManager.startQAProcess(
 						taskId,
@@ -1765,7 +1620,7 @@ print(json.dumps(result))
 						return { success: false, error: initResult.error };
 					}
 					const profileManager = initResult.profileManager;
-					if (requiresClaudeAuth() && !profileManager.hasValidAuth()) {
+					if (requiresClaudeAuth(task, project) && !profileManager.hasValidAuth()) {
 						console.warn(
 							"[TASK_UPDATE_STATUS] No valid authentication for active profile",
 						);
@@ -1799,17 +1654,8 @@ print(json.dumps(result))
 						needsImplementation,
 					);
 
-					// Synchronise le provider avec le projet (permet le switch de provider entre deux runs)
-					const prevProviderForUpdate = syncTaskProvider(
-						task,
-						project,
-						specDir,
-					);
-					if (prevProviderForUpdate) {
-						console.warn(
-							`[TASK_UPDATE_STATUS] Provider switched: ${prevProviderForUpdate} -> ${task.metadata?.provider}`,
-						);
-					}
+					// The task runs on its own engine, never the default provider's.
+					ensureTaskEngine(task, project, specDir);
 
 					// Get base branch: task-level override takes precedence over project settings
 					const baseBranchForUpdate =
@@ -1911,11 +1757,9 @@ print(json.dumps(result))
 	/**
 	 * Resume a paused task (rate limited or auth failure paused).
 	 *
-	 * Two paths:
-	 * 1. Provider UNCHANGED — write a RESUME file to signal the existing subprocess to continue.
-	 * 2. Provider CHANGED   — update task_metadata.json with the new provider/models,
-	 *                         kill the paused subprocess, spawn a fresh one that picks up
-	 *                         from the last incomplete subtask (run.py reads the plan file).
+	 * Writes a RESUME file to signal the existing subprocess to continue. The
+	 * default provider in Settings is not consulted: the task owns its engine,
+	 * and changing it is TASK_RESUME_WITH_PROVIDER's job, asked on the task.
 	 */
 	ipcMain.handle(
 		IPC_CHANNELS.TASK_RESUME_PAUSED,
@@ -1932,37 +1776,26 @@ print(json.dumps(result))
 			const specDir =
 				task.specsPath || path.join(project.path, specsBaseDir, task.specId);
 
-			// Check if provider changed and handle accordingly
-			const providerChanged = await handleProviderSwitch(
-				task,
-				project,
-				specDir,
-			);
-			if (providerChanged.changed) {
-				return await restartTaskWithNewProvider(
-					task,
-					project,
-					specDir,
-					providerChanged.currentProvider,
-				);
-			}
-
-			// Same provider — write RESUME file to signal existing subprocess
 			return await writeResumeFile(task, project, specDir, specsBaseDir);
 		},
 	);
 
 	/**
-	 * Resume a paused task under a different LLM provider (Niveau 3b).
+	 * Resume a paused task on another engine (Fournisseur × LLM × Effort).
 	 *
-	 * Writes a RESUME_WITH_PROVIDER marker file in the task's spec dir,
-	 * then triggers the same restart flow as a provider-change resume. The
-	 * Python backend reads the marker on the next session start via
-	 * core.client._consume_resume_with_provider_marker() and switches the
-	 * active provider for that one session (the marker is single-shot).
+	 * The trio applies to the phase the task was paused in and, with
+	 * `scope: "remaining"` (the default), to every phase after it; `"phase"`
+	 * limits it to the resumed phase. Phases already behind the task keep what
+	 * they ran on. The result is written into every copy of task_metadata.json
+	 * with `engineLocked`, which is what the backend reads — no marker, no
+	 * single-shot override that a second session would lose.
 	 *
-	 * The persisted conversation log (conversation.jsonl) is replayed into
-	 * the new provider's client so context is preserved across the switch.
+	 * The relaunch then goes through `resumePausedTask`, the Reprendre button's
+	 * own path, so TDD mode, mobile targets, the worktree and the return to the
+	 * spec pipeline for a task paused before its spec exists are all kept. The
+	 * Claude SDK session is rehydrated only when the resumed phase stays on
+	 * Claude; any other switch carries its context through the conversation
+	 * log, which the backend hands to the new model of the same phase.
 	 */
 	ipcMain.handle(
 		IPC_CHANNELS.TASK_RESUME_WITH_PROVIDER,
@@ -1972,6 +1805,7 @@ print(json.dumps(result))
 			providerName: string,
 			model?: string,
 			effort?: string,
+			scope?: EngineChangeScope,
 		): Promise<IPCResult> => {
 			const { task, project } = findTaskAndProject(taskId);
 			if (!task || !project) {
@@ -1991,107 +1825,70 @@ print(json.dumps(result))
 			const VALID_EFFORTS = ["none", "low", "medium", "high", "ultrathink"];
 			const chosenEffort =
 				effort && VALID_EFFORTS.includes(effort.trim())
-					? effort.trim()
+					? (effort.trim() as ThinkingLevel)
 					: undefined;
+			const changeScope: EngineChangeScope =
+				scope === "phase" ? "phase" : "remaining";
 			const specPaths = getSpecPaths(task, project);
+			const specDirs = allSpecDirs(specPaths);
 
-			// Distinct spec dirs (worktree + main) that may hold a backend copy.
-			const specDirs = [
-				specPaths.specDir,
-				specPaths.mainSpecDir,
-				specPaths.worktreeSpecDir,
-			].filter(
-				(d, i, arr): d is string =>
-					!!d && existsSync(d) && arr.indexOf(d) === i,
-			);
-
+			let keepSession: boolean;
 			try {
-				// 1. Clear the pause flag on every plan copy so the restarted
-				//    backend doesn't immediately re-pause at the next iteration.
-				const planPaths = getPlanPaths(specPaths, project);
-				for (const planFile of planPaths.all) {
-					if (!existsSync(planFile)) continue;
-					try {
-						const plan = JSON.parse(readFileSync(planFile, "utf-8"));
-						plan.paused = {
-							enabled: false,
-							paused_at: null,
-							paused_subtask_id: null,
-							provider,
-							...(chosenModel ? { model: chosenModel } : {}),
-						};
-						writeFileSync(planFile, JSON.stringify(plan, null, 2));
-					} catch (err) {
-						appLog.warn(
-							`[TASK_RESUME_WITH_PROVIDER] Could not clear pause in ${planFile}:`,
-							err,
-						);
-					}
-				}
+				const settings = readSettingsFile() as EngineSeedSettings | undefined;
+				const current = taskEngineFromMetadata(
+					task.metadata,
+					settings,
+					project.settings?.provider,
+				);
+				const fromPhase = enginePhaseForPause(
+					task.metadata?.paused?.paused_phase ??
+						currentPausePhase(task, specPaths),
+				);
+				const before = current[fromPhase];
+				const sameProvider =
+					before.provider.toLowerCase() === provider.toLowerCase();
+				const trio = {
+					provider,
+					model:
+						chosenModel ||
+						(sameProvider
+							? before.model
+							: seedEngine(settings, provider)[fromPhase].model),
+					effort: chosenEffort || before.effort,
+				};
+				const next = applyEngineChange(current, trio, fromPhase, changeScope);
+				const update = buildEngineMetadata(next);
+				// The Claude transcript only fits a resumed phase that stays on Claude.
+				keepSession = isClaudeProvider(provider) && isClaudeProvider(before.provider);
 
-				// 2. Persist provider + model to task_metadata.json so the backend
-				//    resolves the chosen model (phase_config._resolve_single_model
-				//    reads metadata.model). isAutoProfile:false forces the single
-				//    model to win over any leftover phase-model config.
-				//
-				//    A hot switch moves the WHOLE task to the new provider, so the
-				//    per-phase config (phaseProviders/phaseModels) and the cached
-				//    formula MUST be realigned too. Leaving them stale was the
-				//    "logs switched providers but planning still ran on Ollama" bug:
-				//    `get_phase_provider`/`_resolve_auto_profile_model` honour the
-				//    per-phase keys first (phase_config.py), so a planning phase
-				//    still pointing at `ollama`/`llama3.1` kept running on Ollama
-				//    even though the global provider now said `anthropic`.
+				// A formula describes one engine for the whole task; it no longer
+				// does once a phase runs on something else.
+				const formula = task.metadata?.appliedFormula;
+				const formulaStillTrue =
+					formula &&
+					ENGINE_PHASES.every((phase) =>
+						sameTrio(next[phase], {
+							provider: formula.provider,
+							model: formula.model,
+							effort: formula.effort as ThinkingLevel,
+						}),
+					);
+
 				for (const dir of specDirs) {
 					const metadataPath = path.join(dir, "task_metadata.json");
 					try {
 						const existing = existsSync(metadataPath)
 							? JSON.parse(safeReadFileSync(metadataPath) || "{}")
 							: {};
-						existing.provider = provider;
-						// Realign EVERY phase's provider to the new one. We point all
-						// four phases at `provider` rather than deleting the object so
-						// the frontend's per-phase dropdowns immediately reflect the
-						// switch (getPhaseModelInfo reads phaseProviders[phase] first).
-						if (
-							existing.phaseProviders &&
-							typeof existing.phaseProviders === "object"
-						) {
-							for (const phase of Object.keys(existing.phaseProviders)) {
-								existing.phaseProviders[phase] = provider;
-							}
-						}
-						// Drop per-phase models + the cached formula. Keeping the old
-						// provider's model ids here (e.g. "llama3.1:latest") would make
-						// the backend run the wrong model or silently fall back. With
-						// them gone, every phase resolves to `chosenModel` when one was
-						// picked (metadata.model, via _resolve_single_model), else to the
-						// NEW provider's default (_resolve_provider_default). The
-						// frontend dropdowns mirror this same order in getPhaseConfig.
-						delete existing.phaseModels;
-						delete existing.appliedFormula;
-						existing.model = chosenModel ?? undefined;
-						// Single-model switch: force the global model to win. With no
-						// explicit model, clear isAutoProfile too so the provider
-						// defaults (not a stale auto-profile spread) resolve each phase.
-						existing.isAutoProfile = false;
-						if (existing.model === undefined) {
-							delete existing.model;
-						}
-						if (chosenEffort) {
-							// Apply the chosen effort to the whole resumed run. The backend
-							// (phase_config.get_phase_thinking) honours a per-phase
-							// `phaseThinking[phase]` over the single `thinkingLevel`, so we
-							// must drop the stale per-phase config for the single effort to
-							// actually win — mirroring how a chosen model sets
-							// isAutoProfile:false to force the single model.
-							existing.thinkingLevel = chosenEffort;
-							delete existing.phaseThinking;
-						}
+						Object.assign(existing, update);
+						if (!formulaStillTrue) delete existing.appliedFormula;
 						atomicWriteFileSync(
 							metadataPath,
 							JSON.stringify(existing, null, 2),
 						);
+						// An older resume path left a single-shot marker here; the
+						// locked engine above is the answer now.
+						rmSync(path.join(dir, "RESUME_WITH_PROVIDER"), { force: true });
 					} catch (err) {
 						appLog.warn(
 							`[TASK_RESUME_WITH_PROVIDER] Could not update ${metadataPath}:`,
@@ -2100,48 +1897,15 @@ print(json.dumps(result))
 					}
 				}
 
-				// 3. Write the single-shot provider marker the backend consumes on
-				//    the next session start (core.client._consume_resume_with_provider_marker).
-				const markerPayload = JSON.stringify({
-					provider,
-					...(chosenModel ? { model: chosenModel } : {}),
-					...(chosenEffort ? { effort: chosenEffort } : {}),
-				});
-				for (const dir of specDirs) {
-					writeFileSync(
-						path.join(dir, "RESUME_WITH_PROVIDER"),
-						markerPayload,
-						"utf-8",
-					);
-				}
-
-				// Keep in-memory metadata + cache in sync for the UI. Mirror the
-				// on-disk realignment so the per-phase dropdowns and the active
-				// provider/model update without a reload.
+				// Keep in-memory metadata in sync for the UI.
 				if (!task.metadata) task.metadata = {};
-				task.metadata.provider = provider;
-				if (task.metadata.phaseProviders) {
-					const pp = task.metadata.phaseProviders;
-					for (const phase of Object.keys(pp) as (keyof typeof pp)[]) {
-						pp[phase] = provider;
-					}
-				}
-				task.metadata.phaseModels = undefined;
-				task.metadata.appliedFormula = undefined;
-				task.metadata.isAutoProfile = false;
-				task.metadata.model = chosenModel || undefined;
-				if (chosenEffort) {
-					task.metadata.thinkingLevel = chosenEffort as ThinkingLevel;
-					task.metadata.phaseThinking = undefined;
-				}
-				if (task.metadata.paused) task.metadata.paused.enabled = false;
-				projectStore.invalidateTasksCache(project.id);
+				Object.assign(task.metadata, update);
+				if (!formulaStillTrue) task.metadata.appliedFormula = undefined;
 
 				appLog.info(
-					`[TASK_RESUME_WITH_PROVIDER] Resuming task ${taskId} with ` +
-						`provider=${provider}${chosenModel ? `, model=${chosenModel}` : ""}` +
-						`${chosenEffort ? `, effort=${chosenEffort}` : ""} ` +
-						`(${specDirs.length} spec dir(s)). Conversation log will be replayed.`,
+					`[TASK_RESUME_WITH_PROVIDER] Resuming task ${taskId} from ${fromPhase} ` +
+						`(${changeScope}) on provider=${trio.provider}, model=${trio.model}, ` +
+						`effort=${trio.effort} (${specDirs.length} spec dir(s)).`,
 				);
 			} catch (err) {
 				appLog.error(
@@ -2151,20 +1915,19 @@ print(json.dumps(result))
 				return {
 					success: false,
 					error:
-						err instanceof Error
-							? err.message
-							: "Failed to write provider override marker",
+						err instanceof Error ? err.message : "Failed to update the task engine",
 				};
 			}
 
-			// Restart the subprocess so the next session boots with the new
-			// provider/model (and replays the conversation log).
-			return await restartTaskWithNewProvider(
-				task,
-				project,
-				specPaths.specDir,
-				provider,
-			);
+			// A paused task has no process; a task still finishing its step does.
+			if (agentManager.isRunning(taskId)) {
+				agentManager.killTask(taskId);
+				await new Promise<void>((resolve) => setTimeout(resolve, 500));
+			}
+
+			return await resumePausedTask(agentManager, taskId, project.id, {
+				keepSession,
+			});
 		},
 	);
 
@@ -2200,14 +1963,7 @@ print(json.dumps(result))
 				await new Promise<void>((resolve) => setTimeout(resolve, 500));
 
 				const specPaths = getSpecPaths(task, project);
-				const specDirs = [
-					specPaths.specDir,
-					specPaths.mainSpecDir,
-					specPaths.worktreeSpecDir,
-				].filter(
-					(d, i, arr): d is string =>
-						!!d && existsSync(d) && arr.indexOf(d) === i,
-				);
+				const specDirs = allSpecDirs(specPaths);
 
 				// 2. Rewind the plan (every copy) to before `phase`.
 				const planPaths = getPlanPaths(specPaths, project);
@@ -2225,7 +1981,7 @@ print(json.dumps(result))
 					atomicWriteFileSync(planFile, JSON.stringify(plan, null, 2));
 					planWritten = true;
 				}
-				if (!planWritten) {
+				if (!planWritten && phase !== "planning") {
 					return {
 						success: false,
 						error:
@@ -2247,6 +2003,7 @@ print(json.dumps(result))
 					"LOCAL_MODEL_NO_TOOLS_HALT",
 					"PAUSE",
 					"RESUME_WITH_PROVIDER",
+					"HOT_SWAP.json",
 				];
 				for (const dir of specDirs) {
 					for (const name of markerNames) {
@@ -2258,6 +2015,15 @@ print(json.dumps(result))
 					}
 				}
 
+				// The cooperative pause lives in pause_state.json, not in the plan,
+				// so rewinding the plan does not lift it. Left set, the restarted
+				// build stops again at its first checkpoint and the re-run looks
+				// like it did nothing.
+				clearPauseState(specDirs, planPaths.all, {
+					provider: task.metadata?.provider ?? null,
+					model: task.metadata?.model ?? null,
+				});
+
 				projectStore.invalidateTasksCache(project.id);
 				if (task.metadata?.paused) task.metadata.paused.enabled = false;
 
@@ -2265,16 +2031,34 @@ print(json.dumps(result))
 				//    worktree if it was cleaned up.
 				const baseBranch =
 					task.metadata?.baseBranch || project.settings?.mainBranch;
-				await agentManager.startTaskExecution(
-					taskId,
-					project.path,
-					task.specId,
-					{
-						useWorktree: task.metadata?.useWorktree !== false,
-						baseBranch,
+				const specDir = specPaths.specDir;
+				await startPhaseRerun(phase, {
+					spec: async () => {
+						fileWatcher.watch(taskId, specDir);
+						await agentManager.startSpecCreation(
+							taskId,
+							project.path,
+							task.description || task.title,
+							specDir,
+							convertTaskMetadataToSpecCreation(task.metadata),
+							baseBranch,
+							project.id,
+						);
 					},
-					project.id,
-				);
+					execution: async () => {
+						await agentManager.startTaskExecution(
+							taskId,
+							project.path,
+							task.specId,
+							{
+								useWorktree: task.metadata?.useWorktree !== false,
+								baseBranch,
+							},
+							project.id,
+						);
+					},
+					isRunning: () => agentManager.isRunning(taskId),
+				});
 
 				appLog.info(
 					`[TASK_RERUN_PHASE] task=${taskId} phase=${phase} ` +
@@ -2282,14 +2066,24 @@ print(json.dumps(result))
 				);
 				return { success: true };
 			} catch (err) {
+				fileWatcher.unwatch(taskId);
+				const failedPaths = getPlanPaths(getSpecPaths(task, project), project);
+				for (const planFile of failedPaths.all) {
+					await persistPlanStatus(planFile, "human_review", project.id);
+				}
+				getMainWindow()?.webContents.send(
+					IPC_CHANNELS.TASK_STATUS_CHANGE,
+					taskId,
+					"human_review",
+					project.id,
+				);
 				appLog.error(
 					`[TASK_RERUN_PHASE] Failed for task ${taskId} phase ${phase}:`,
 					err,
 				);
 				return {
 					success: false,
-					error:
-						err instanceof Error ? err.message : "Failed to re-run phase",
+					error: err instanceof Error ? err.message : "Failed to re-run phase",
 				};
 			}
 		},
@@ -2346,7 +2140,10 @@ print(json.dumps(result))
 						atomicWriteFileSync(path.join(dir, "HOT_SWAP.json"), payload);
 						wrote = true;
 					} catch (err) {
-						appLog.warn(`[TASK_HOT_SWAP] Could not write marker in ${dir}:`, err);
+						appLog.warn(
+							`[TASK_HOT_SWAP] Could not write marker in ${dir}:`,
+							err,
+						);
 					}
 				}
 				if (!wrote) {
@@ -2449,7 +2246,11 @@ print(json.dumps(result))
 					"LOCAL_MODEL_NO_TOOLS_HALT",
 				);
 				let removed = 0;
-				for (const target of [conversationLog, haltMarker, localNoToolsMarker]) {
+				for (const target of [
+					conversationLog,
+					haltMarker,
+					localNoToolsMarker,
+				]) {
 					if (existsSync(target)) {
 						unlinkSync(target);
 						removed++;
@@ -2491,124 +2292,6 @@ print(json.dumps(result))
 			}
 		},
 	);
-
-	/**
-	 * Update task metadata with new provider configuration
-	 */
-	async function updateTaskMetadata(
-		task: Task,
-		specDir: string,
-		currentProvider: string,
-		globalSettings: Record<string, unknown>,
-	): Promise<void> {
-		appLog.info(
-			`[TASK_RESUME_PAUSED] Provider changed. ` +
-				`Restarting subprocess with new provider instead of writing RESUME file.`,
-		);
-
-		const metadataPath = path.join(specDir, "task_metadata.json");
-		try {
-			const providerPhaseModels = (
-				globalSettings.providerPhaseModels as
-					| Record<string, PhaseModelConfig>
-					| undefined
-			)?.[currentProvider];
-			const providerPhaseThinking = (
-				globalSettings.providerPhaseThinking as
-					| Record<string, PhaseThinkingConfig>
-					| undefined
-			)?.[currentProvider];
-
-			if (existsSync(metadataPath)) {
-				const content = safeReadFileSync(metadataPath);
-				if (content) {
-					const meta = JSON.parse(content);
-					meta.provider = currentProvider;
-					if (providerPhaseModels) meta.phaseModels = providerPhaseModels;
-					if (providerPhaseThinking) meta.phaseThinking = providerPhaseThinking;
-					atomicWriteFileSync(metadataPath, JSON.stringify(meta, null, 2));
-					appLog.info(
-						`[TASK_RESUME_PAUSED] Updated task_metadata.json → provider: ${currentProvider}`,
-						providerPhaseModels
-							? `| phaseModels: ${JSON.stringify(providerPhaseModels)}`
-							: "",
-					);
-				}
-			}
-
-			// Keep in-memory task metadata in sync
-			if (task.metadata) {
-				task.metadata.provider = currentProvider;
-				if (providerPhaseModels)
-					task.metadata.phaseModels = providerPhaseModels;
-				if (providerPhaseThinking)
-					task.metadata.phaseThinking = providerPhaseThinking;
-			}
-		} catch (err) {
-			console.warn(
-				"[TASK_RESUME_PAUSED] Failed to update task_metadata.json (non-fatal):",
-				err,
-			);
-		}
-	}
-
-	/**
-	 * Check if provider changed and update metadata if needed
-	 */
-	async function handleProviderSwitch(
-		task: Task,
-		_project: Project,
-		specDir: string,
-	): Promise<{ changed: boolean; currentProvider: string }> {
-		// Normalize 'anthropic' -> 'claude' for comparison purposes.
-		const normalizeProvider = (p: string) =>
-			p === "anthropic" ? "claude" : p.toLowerCase();
-		const globalSettings = readSettingsFile() ?? {};
-		const currentProvider = normalizeProvider(
-			(globalSettings.selectedProvider as string | undefined) || "claude",
-		);
-		const taskProvider = normalizeProvider(task.metadata?.provider || "claude");
-		const providerChanged = currentProvider !== taskProvider;
-
-		if (providerChanged) {
-			await updateTaskMetadata(task, specDir, currentProvider, globalSettings);
-		}
-
-		return { changed: providerChanged, currentProvider };
-	}
-
-	/**
-	 * Restart task with new provider
-	 */
-	async function restartTaskWithNewProvider(
-		task: Task,
-		project: Project,
-		_specDir: string,
-		_currentProvider: string,
-	): Promise<IPCResult> {
-		// Kill paused subprocess, then restart with new provider credentials.
-		// agentManager.startTaskExecution() will call credentialManager.getEnvironmentVariables()
-		// at spawn time, picking up the currently active provider credentials.
-		agentManager.killTask(task.id);
-
-		// Brief delay for process cleanup before respawning
-		await new Promise<void>((resolve) => setTimeout(resolve, 500));
-
-		const baseBranch =
-			task.metadata?.baseBranch || project.settings?.mainBranch;
-		await agentManager.startTaskExecution(
-			task.id,
-			project.path,
-			task.specId,
-			{
-				useWorktree: task.metadata?.useWorktree !== false,
-				baseBranch,
-			},
-			project.id,
-		);
-
-		return { success: true };
-	}
 
 	/**
 	 * Handle writing RESUME file to worktree if it exists
@@ -2812,24 +2495,6 @@ print(json.dumps(result))
 	}
 
 	/**
-	 * Get spec directory paths
-	 */
-	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-	function getSpecPaths(task: any, project: any) {
-		const specsBaseDir = getSpecsDir(project.autoBuildPath);
-		const specDir =
-			task.specsPath || path.join(project.path, specsBaseDir, task.specId);
-
-		const mainSpecDir = path.join(project.path, specsBaseDir, task.specId);
-		const worktreePath = findTaskWorktree(project.path, task.specId);
-		const worktreeSpecDir = worktreePath
-			? path.join(worktreePath, specsBaseDir, task.specId)
-			: null;
-
-		return { specDir, mainSpecDir, worktreeSpecDir, specsBaseDir };
-	}
-
-	/**
 	 * Get all plan file paths that need updating
 	 */
 	function getPlanPaths(
@@ -3024,10 +2689,10 @@ print(json.dumps(result))
 			}>) {
 				if (phase.subtasks && Array.isArray(phase.subtasks)) {
 					for (const subtask of phase.subtasks) {
-						// Reset in_progress subtasks to pending
-						if (subtask.status === "in_progress") {
-							resetSubtask(subtask, "in_progress");
-						}
+						// An in_progress subtask is left alone: it is the one the
+						// dead process was on, and the backend reopens it at start
+						// (reopen_interrupted_subtasks) keeping what it recorded, so
+						// the next session continues it instead of starting it over.
 						// Reset failed subtasks to pending
 						if (subtask.status === "failed") {
 							resetSubtask(subtask, "failed");
@@ -3126,7 +2791,7 @@ print(json.dumps(result))
 		}
 
 		const profileManager = initResult.profileManager;
-		if (requiresClaudeAuth() && !profileManager.hasValidAuth()) {
+		if (requiresClaudeAuth(task, project) && !profileManager.hasValidAuth()) {
 			console.warn("[Recovery] Auth check failed, cannot auto-restart task");
 			return false;
 		}
@@ -3192,13 +2857,8 @@ print(json.dumps(result))
 			const hasSpec = existsSync(specFilePath);
 			const needsSpecCreation = !hasSpec;
 
-			// Sync provider
-			const prevProvider = syncTaskProvider(task, project, specDirForWatcher);
-			if (prevProvider) {
-				console.warn(
-					`[Recovery] Provider switched: ${prevProvider} -> ${task.metadata?.provider}`,
-				);
-			}
+			// The task runs on its own engine, never the default provider's.
+			ensureTaskEngine(task, project, specDirForWatcher);
 
 			const baseBranch =
 				task.metadata?.baseBranch || project.settings?.mainBranch;
@@ -3228,6 +2888,12 @@ print(json.dumps(result))
 						baseBranch,
 						useWorktree: task.metadata?.useWorktree,
 						useLocalBranch: task.metadata?.useLocalBranch,
+						tddMode: task.metadata?.tddMode,
+						verifyLoop: task.metadata?.verifyLoop,
+						mobileTargets: task.metadata?.mobileTargets,
+						// A stuck task is one whose process died mid-session: pick
+						// that session back up, as a resume does.
+						resumeSessionId: readPersistedSessionId(specDirForWatcher),
 					},
 					project.id,
 				);
@@ -3314,90 +2980,77 @@ print(json.dumps(result))
 			if (!updatedPlan) {
 				return {
 					success: false,
-					error:
-						"Failed to update plan - file may not exist or be corrupted",
+					error: "Failed to update plan - file may not exist or be corrupted",
 				};
 			}
 
-			appLog.info(`[TASK_UPDATE_PLAN] Successfully updated plan for task ${taskId}`);
+			appLog.info(
+				`[TASK_UPDATE_PLAN] Successfully updated plan for task ${taskId}`,
+			);
 			return { success: true };
 		},
 	);
 
 	/**
-	 * Pause task execution
-	 * Saves current state so execution can resume later
+	 * Pause task execution, at whatever phase it is in.
+	 *
+	 * The flag goes to `pause_state.json`, not into `implementation_plan.json`:
+	 * that file does not exist during spec creation or planning, so the previous
+	 * version answered "Implementation plan not found" for a task the user could
+	 * see running. The backend reads the same file from its coder loop, its QA
+	 * loop and its spec pipeline, so one Pause click stops all three.
 	 */
 	ipcMain.handle(
 		"TASK_PAUSE",
-		async (
-			_,
-			taskId: string,
-			subtaskId?: string,
-		): Promise<IPCResult> => {
+		async (_, taskId: string, subtaskId?: string): Promise<IPCResult> => {
 			try {
 				const { task, project } = findTaskAndProject(taskId);
 				if (!task || !project) {
 					return { success: false, error: "Task not found" };
 				}
 
-				// The running backend reads the pause flag from its own plan copy.
-				// For worktree tasks that's the worktree's implementation_plan.json,
-				// NOT the main repo's — so we must write the flag to every existing
-				// copy or the cooperative stop in the coder loop never fires.
 				const specPaths = getSpecPaths(task, project);
-				const planPaths = getPlanPaths(specPaths, project);
+				const specDirs = allSpecDirs(specPaths);
+				if (specDirs.length === 0) {
+					return { success: false, error: "Spec directory not found" };
+				}
 
-				const pausedState = {
+				const phase = currentPausePhase(task, specPaths);
+				const pausedState: PauseStateRecord = {
 					enabled: true,
 					paused_at: new Date().toISOString(),
-					paused_subtask_id: subtaskId || null,
-					provider: task.metadata?.provider || "anthropic",
-					model: task.metadata?.model || "claude-opus-4-7",
+					paused_phase: phase,
+					paused_subtask_id:
+						subtaskId ?? task.executionProgress?.currentSubtask ?? null,
+					provider: task.metadata?.provider ?? null,
+					model: task.metadata?.model ?? null,
 				};
 
-				let written = 0;
-				for (const planFile of planPaths.all) {
-					if (!existsSync(planFile)) continue;
-					try {
-						const plan = JSON.parse(readFileSync(planFile, "utf-8"));
-						plan.paused = pausedState;
-						writeFileSync(planFile, JSON.stringify(plan, null, 2));
-						written++;
-					} catch (err) {
-						appLog.warn(
-							`[TASK_PAUSE] Could not update plan copy ${planFile}:`,
-							err,
-						);
-					}
-				}
+				const written = writePauseState(specDirs, pausedState);
 
 				if (written === 0) {
-					return {
-						success: false,
-						error: "Implementation plan not found",
-					};
+					return { success: false, error: "Could not write pause state" };
 				}
 
-				// Re-scan so the scanner surfaces plan.paused on task.metadata; the
+				// Re-scan so the scanner surfaces the pause on task.metadata; the
 				// UI uses that to switch the controls into the paused state.
 				projectStore.invalidateTasksCache(project.id);
 
-				// Immediate pause: stop the running subprocess NOW rather than waiting
-				// for the backend to reach the next cooperative checkpoint (end of the
-				// current step). haltTask marks the spawn as killed (its exit handler
-				// returns early WITHOUT emitting "exit" — no PROCESS_EXITED/USER_STOPPED,
-				// so the card keeps its current column) AND unregisters the task from the
-				// OperationRegistry so the proactive profile-swap / usage monitor can't
-				// resurrect the paused process when a token limit is hit. The paused flag
-				// written above drives the UI and a clean resume (the in-flight step
-				// re-runs, re-registering the task).
+				// Immediate pause: stop the running subprocess NOW rather than
+				// waiting for the backend to reach its next cooperative checkpoint
+				// (which, mid-session, can be a long way off). haltTask marks the
+				// spawn as killed (its exit handler returns early WITHOUT emitting
+				// "exit" — no PROCESS_EXITED/USER_STOPPED, so the card keeps its
+				// current column) AND unregisters the task from the
+				// OperationRegistry so the proactive profile-swap / usage monitor
+				// cannot resurrect the paused process when a token limit is hit.
+				// The flag written above drives the UI and a clean resume.
 				const wasRunning = agentManager.haltTask(taskId);
 
 				appLog.info(
-					`[TASK_PAUSE] Task ${taskId} paused immediately at subtask ` +
-						`${subtaskId || "none"} (${written} plan cop[y/ies]); ` +
-						`subprocess ${wasRunning ? "killed" : "was not running"}.`,
+					`[TASK_PAUSE] Task ${taskId} paused during ${phase} at subtask ` +
+						`${pausedState.paused_subtask_id ?? "none"} (${written} spec ` +
+						`dir(s)); subprocess ${wasRunning ? "killed" : "was not running"}.`,
 				);
 
 				return {
@@ -3406,7 +3059,8 @@ print(json.dumps(result))
 						taskId,
 						paused: true,
 						pausedAt: pausedState.paused_at,
-						planCopies: written,
+						pausedPhase: phase,
+						specDirs: written,
 					},
 				};
 			} catch (error) {
@@ -3417,65 +3071,18 @@ print(json.dumps(result))
 	);
 
 	/**
-	 * Resume task execution
-	 * Continues from the paused checkpoint
+	 * Resume a paused task from where it stopped. See `resumePausedTask`, which
+	 * is also what resumes, at launch, the tasks WorkPilot was running when it
+	 * was closed.
 	 */
-	ipcMain.handle(
-		"TASK_RESUME",
-		async (_, taskId: string): Promise<IPCResult> => {
-			try {
-				const { task, project } = findTaskAndProject(taskId);
-				if (!task || !project) {
-					return { success: false, error: "Task not found" };
-				}
-
-				const planPath = getPlanPath(project, task);
-				if (!existsSync(planPath)) {
-					return { success: false, error: "Implementation plan not found" };
-				}
-
-				const planContent = readFileSync(planPath, "utf-8");
-				const plan = JSON.parse(planContent);
-
-				// Clear pause state
-				plan.paused = {
-					enabled: false,
-					paused_at: null,
-					paused_subtask_id: null,
-					provider: plan.paused?.provider || "anthropic",
-					model: plan.paused?.model || "claude-opus-4-7",
-				};
-
-				writeFileSync(planPath, JSON.stringify(plan, null, 2));
-				appLog.info(`[TASK_RESUME] Task ${taskId} resumed`);
-
-				// Start execution from pause checkpoint
-				const baseBranch = task.metadata?.baseBranch || project.settings?.mainBranch;
-
-				agentManager.startTaskExecution(
-					taskId,
-					project.path,
-					task.specId,
-					{
-						parallel: false,
-						workers: 1,
-						baseBranch,
-						useWorktree: task.metadata?.useWorktree,
-						useLocalBranch: task.metadata?.useLocalBranch,
-					},
-					project.id,
-				);
-
-				return {
-					success: true,
-					data: { taskId, resumed: true },
-				};
-			} catch (error) {
-				appLog.error("[TASK_RESUME] Error:", error);
-				return { success: false, error: String(error) };
-			}
-		},
-	);
+	ipcMain.handle("TASK_RESUME", async (_, taskId: string): Promise<IPCResult> => {
+		try {
+			return await resumePausedTask(agentManager, taskId);
+		} catch (error) {
+			appLog.error("[TASK_RESUME] Error:", error);
+			return { success: false, error: String(error) };
+		}
+	});
 
 	// Provider switching mid-task is handled by TASK_RESUME_WITH_PROVIDER
 	// (marker + conversation replay). The former TASK_SWITCH_PROVIDER handler

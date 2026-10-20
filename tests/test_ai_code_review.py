@@ -86,10 +86,12 @@ diff --git a/utils.py b/utils.py
 # ReviewComment
 # -----------------------------------------------------------------------
 
+
 class TestReviewComment:
     def test_create_comment(self):
         comment = ReviewComment(
-            file_path="test.py", line=10,
+            file_path="test.py",
+            line=10,
             severity=ReviewSeverity.WARNING,
             category=ReviewCategory.BUG_RISK,
             message="Potential bug",
@@ -99,10 +101,12 @@ class TestReviewComment:
 
     def test_comment_to_dict(self):
         comment = ReviewComment(
-            file_path="x.py", line=5,
+            file_path="x.py",
+            line=5,
             severity=ReviewSeverity.ERROR,
             category=ReviewCategory.SECURITY,
-            message="Issue found", suggestion="Fix it",
+            message="Issue found",
+            suggestion="Fix it",
             rule_id="SEC001",
         )
         d = comment.to_dict()
@@ -114,6 +118,7 @@ class TestReviewComment:
 # -----------------------------------------------------------------------
 # DiffFile
 # -----------------------------------------------------------------------
+
 
 class TestDiffFile:
     def test_create_diff_file(self):
@@ -140,6 +145,7 @@ class TestDiffFile:
 # ReviewResult
 # -----------------------------------------------------------------------
 
+
 class TestReviewResult:
     def test_empty_result(self):
         result = ReviewResult()
@@ -150,7 +156,9 @@ class TestReviewResult:
     def test_result_with_critical_issues(self):
         result = ReviewResult(
             comments=[
-                ReviewComment("x.py", 1, ReviewSeverity.CRITICAL, ReviewCategory.SECURITY, "bad"),
+                ReviewComment(
+                    "x.py", 1, ReviewSeverity.CRITICAL, ReviewCategory.SECURITY, "bad"
+                ),
             ],
         )
         assert result.has_critical_issues is True
@@ -159,9 +167,15 @@ class TestReviewResult:
     def test_result_warning_count(self):
         result = ReviewResult(
             comments=[
-                ReviewComment("x.py", 1, ReviewSeverity.WARNING, ReviewCategory.STYLE, "w1"),
-                ReviewComment("x.py", 2, ReviewSeverity.WARNING, ReviewCategory.STYLE, "w2"),
-                ReviewComment("x.py", 3, ReviewSeverity.INFO, ReviewCategory.STYLE, "info"),
+                ReviewComment(
+                    "x.py", 1, ReviewSeverity.WARNING, ReviewCategory.STYLE, "w1"
+                ),
+                ReviewComment(
+                    "x.py", 2, ReviewSeverity.WARNING, ReviewCategory.STYLE, "w2"
+                ),
+                ReviewComment(
+                    "x.py", 3, ReviewSeverity.INFO, ReviewCategory.STYLE, "info"
+                ),
             ],
         )
         assert result.warning_count == 2
@@ -178,19 +192,26 @@ class TestReviewResult:
 # ReviewRule
 # -----------------------------------------------------------------------
 
+
 class TestReviewRule:
     def test_rule_applies_to_all(self):
         rule = ReviewRule(
-            rule_id="X", pattern="test", message="msg",
-            severity=ReviewSeverity.INFO, category=ReviewCategory.STYLE,
+            rule_id="X",
+            pattern="test",
+            message="msg",
+            severity=ReviewSeverity.INFO,
+            category=ReviewCategory.STYLE,
         )
         assert rule.applies_to("python") is True
         assert rule.applies_to("javascript") is True
 
     def test_rule_applies_to_specific(self):
         rule = ReviewRule(
-            rule_id="X", pattern="test", message="msg",
-            severity=ReviewSeverity.INFO, category=ReviewCategory.STYLE,
+            rule_id="X",
+            pattern="test",
+            message="msg",
+            severity=ReviewSeverity.INFO,
+            category=ReviewCategory.STYLE,
             languages=["python"],
         )
         assert rule.applies_to("python") is True
@@ -207,6 +228,7 @@ class TestReviewRule:
 # -----------------------------------------------------------------------
 # parse_unified_diff
 # -----------------------------------------------------------------------
+
 
 class TestParseUnifiedDiff:
     def test_parse_python_diff(self):
@@ -240,6 +262,7 @@ class TestParseUnifiedDiff:
 # AICodeReviewer — Rules
 # -----------------------------------------------------------------------
 
+
 class TestReviewerRules:
     def test_get_all_rules(self):
         reviewer = AICodeReviewer()
@@ -257,17 +280,22 @@ class TestReviewerRules:
     def test_add_custom_rule(self):
         reviewer = AICodeReviewer()
         initial_count = len(reviewer.get_rules())
-        reviewer.add_rule(ReviewRule(
-            rule_id="CUSTOM001", pattern=r"debug_mode\s*=\s*True",
-            message="Debug mode enabled", severity=ReviewSeverity.WARNING,
-            category=ReviewCategory.BEST_PRACTICE,
-        ))
+        reviewer.add_rule(
+            ReviewRule(
+                rule_id="CUSTOM001",
+                pattern=r"debug_mode\s*=\s*True",
+                message="Debug mode enabled",
+                severity=ReviewSeverity.WARNING,
+                category=ReviewCategory.BEST_PRACTICE,
+            )
+        )
         assert len(reviewer.get_rules()) == initial_count + 1
 
 
 # -----------------------------------------------------------------------
 # AICodeReviewer — review_diff
 # -----------------------------------------------------------------------
+
 
 class TestReviewerDiff:
     def test_review_diff_detects_eval(self):
@@ -321,6 +349,7 @@ class TestReviewerDiff:
 # AICodeReviewer — review_file_content
 # -----------------------------------------------------------------------
 
+
 class TestReviewerFileContent:
     def test_review_python_file(self):
         code = """
@@ -332,7 +361,9 @@ def MyBadFunction():
         pass
 """
         reviewer = AICodeReviewer()
-        result = reviewer.review_file_content(code, file_path="bad.py", language="python")
+        result = reviewer.review_file_content(
+            code, file_path="bad.py", language="python"
+        )
         assert len(result.comments) > 0
         assert result.files_reviewed == 1
 
@@ -343,9 +374,15 @@ def add(a: int, b: int) -> int:
     return a + b
 """
         reviewer = AICodeReviewer()
-        result = reviewer.review_file_content(code, file_path="clean.py", language="python")
+        result = reviewer.review_file_content(
+            code, file_path="clean.py", language="python"
+        )
         # Should have very few or no issues
-        error_comments = [c for c in result.comments if c.severity in (ReviewSeverity.ERROR, ReviewSeverity.CRITICAL)]
+        error_comments = [
+            c
+            for c in result.comments
+            if c.severity in (ReviewSeverity.ERROR, ReviewSeverity.CRITICAL)
+        ]
         assert len(error_comments) == 0
 
     def test_review_file_detects_language_from_path(self):
@@ -360,6 +397,7 @@ def add(a: int, b: int) -> int:
 # -----------------------------------------------------------------------
 # AICodeReviewer — Scoring
 # -----------------------------------------------------------------------
+
 
 class TestReviewerScoring:
     def test_perfect_score_no_issues(self):
@@ -384,6 +422,7 @@ class TestReviewerScoring:
 # -----------------------------------------------------------------------
 # AICodeReviewer — LLM integration
 # -----------------------------------------------------------------------
+
 
 class TestReviewerLLM:
     def test_review_without_llm(self):
@@ -419,6 +458,7 @@ class TestReviewerLLM:
 # -----------------------------------------------------------------------
 # AICodeReviewer — Stats & History
 # -----------------------------------------------------------------------
+
 
 class TestReviewerStats:
     def test_review_history(self):

@@ -5,11 +5,47 @@
  * Fournit une interface unifiée pour le frontend via IPC
  */
 
+import { execFile } from "node:child_process";
 import { EventEmitter } from "node:events";
+import { promisify } from "node:util";
 import type { ProfilesFile } from "../../shared/types/profile";
 import { detectProvider } from "../../shared/utils/provider-detection";
 import { readSettingsFile, writeSettingsFile } from "../settings-utils";
+import { findExecutable } from "../env-utils";
+import { isWindows } from "../platform";
 import { loadProfilesFile, saveProfilesFile } from "../utils/profile-manager";
+
+const execFileAsync = promisify(execFile);
+
+export async function checkCodexCliLoginStatus(): Promise<boolean> {
+	const codexPath = findExecutable("codex");
+	if (!codexPath) return false;
+
+	try {
+		const options = {
+			encoding: "utf-8" as const,
+			timeout: 5000,
+			windowsHide: true,
+		};
+		if (isWindows() && /\.(cmd|bat)$/i.test(codexPath)) {
+			// Windows file names cannot contain a quote, but guard explicitly
+			// before placing the discovered launcher path inside cmd.exe quotes.
+			if (/["\r\n]/.test(codexPath)) return false;
+			const cmdExe =
+				process.env.ComSpec || String.raw`C:\Windows\System32\cmd.exe`;
+			await execFileAsync(
+				cmdExe,
+				["/d", "/s", "/c", `""${codexPath}" login status"`],
+				options,
+			);
+		} else {
+			await execFileAsync(codexPath, ["login", "status"], options);
+		}
+		return true;
+	} catch {
+		return false;
+	}
+}
 
 export interface CredentialConfig {
 	provider: string;
@@ -77,6 +113,13 @@ export class CredentialManager extends EventEmitter {
 	private profiles: ProfilesFile | null = null;
 	private activeCredential: CredentialConfig | null = null;
 	private readonly usageData: Map<string, UsageData> = new Map();
+
+	constructor(
+		private readonly codexLoginStatusChecker: () => Promise<boolean> =
+			checkCodexCliLoginStatus,
+	) {
+		super();
+	}
 
 	/**
 	 * Initialisation du service
@@ -1060,148 +1103,10 @@ export class CredentialManager extends EventEmitter {
 		isAuthenticated: boolean;
 		profileName?: string;
 	}> {
-		try {
-			const fs = require("node:fs").promises;
-			const path = require("node:path");
-			const os = require("node:os");
-
-			// Source 1: Check Codex CLI config files
-			const candidatePaths = [
-				// Windows: %APPDATA%\codex\auth.json
-				process.env.APPDATA
-					? path.join(process.env.APPDATA, "codex", "auth.json")
-					: null,
-				// Unix/macOS: ~/.config/codex/auth.json
-				path.join(os.homedir(), ".config", "codex", "auth.json"),
-				// Also check ~/.codex/auth.json (alternative location)
-				path.join(os.homedir(), ".codex", "auth.json"),
-				// OpenAI CLI config: ~/.openai/auth.json
-				process.env.APPDATA
-					? path.join(process.env.APPDATA, "openai", "auth.json")
-					: null,
-				path.join(os.homedir(), ".config", "openai", "auth.json"),
-				path.join(os.homedir(), ".openai", "auth.json"),
-			].filter(Boolean) as string[];
-
-			for (const configPath of candidatePaths) {
-				try {
-					const authData = await fs.readFile(configPath, "utf-8");
-					const auth = JSON.parse(authData);
-
-					// Codex CLI stores tokens in a nested `tokens` object:
-					//   { auth_mode, OPENAI_API_KEY, tokens: { id_token, access_token, refresh_token, account_id }, last_refresh }
-					const tokens = auth.tokens || {};
-					const hasAccessToken = !!(tokens.access_token || auth.access_token);
-					const hasRefreshToken = !!(
-						tokens.refresh_token || auth.refresh_token
-					);
-					const hasApiKey = !!(
-						auth.OPENAI_API_KEY?.trim() || auth.api_key?.trim()
-					);
-					const hasAnyAuth = hasAccessToken || hasRefreshToken || hasApiKey;
-
-					if (hasAnyAuth) {
-						// Try to extract email from id_token JWT payload
-						let profileName = auth.email || auth.user || "OpenAI Codex CLI";
-						try {
-							const idToken = tokens.id_token || auth.id_token;
-							if (idToken) {
-								const parts = idToken.split(".");
-								if (parts.length >= 2) {
-									// Base64url decode the payload
-									let payload = parts[1]
-										.replaceAll("-", "+")
-										.replaceAll("_", "/");
-									while (payload.length % 4) payload += "=";
-									const decoded = Buffer.from(payload, "base64").toString(
-										"utf-8",
-									);
-									const claims = JSON.parse(decoded);
-									if (claims.email) {
-										profileName = claims.email;
-									}
-								}
-							}
-						} catch {
-							// JWT decode failed, use fallback name
-						}
-						return {
-							isAuthenticated: true,
-							profileName,
-						};
-					}
-				} catch (error) {
-					// This path doesn't exist, try next
-					// Silently ignore ENOENT errors - missing config files are expected
-					if (
-						error instanceof Error &&
-						"code" in error &&
-						error.code !== "ENOENT"
-					) {
-						// Non-ENOENT errors are intentionally ignored here
-						// as we fall back to other credential sources
-					}
-				}
-			} // Added missing closing brace here
-
-			// Source 2: Check app's own profiles.json for OpenAI API profile
-			try {
-				const profilesFile = await loadProfilesFile();
-				const openaiProfile = profilesFile.profiles.find((p) => {
-					const detected = detectProvider(p.baseUrl);
-					return detected === "openai";
-				});
-				if (
-					openaiProfile?.apiKey &&
-					!isPlaceholderApiKey(openaiProfile.apiKey)
-				) {
-					return {
-						isAuthenticated: true,
-						profileName: openaiProfile.name || "OpenAI (API Key)",
-					};
-				}
-			} catch (error) {
-				console.warn(
-					"[CredentialManager] Failed to check profiles.json:",
-					error,
-				);
-			}
-
-			// Source 3: Check global settings for globalOpenAIApiKey
-			try {
-				const settings = readSettingsFile();
-				// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-				const openaiKey = (settings as any)?.globalOpenAIApiKey as
-					| string
-					| undefined;
-				if (openaiKey?.trim()) {
-					return {
-						isAuthenticated: true,
-						profileName: "OpenAI (API Key)",
-					};
-				}
-
-				// Source 4: Also check for Codex OAuth token in settings
-				// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-				const codexOAuthToken = (settings as any)
-					?.globalOpenAICodexOAuthToken as string | undefined;
-				if (codexOAuthToken?.trim()) {
-					return {
-						isAuthenticated: true,
-						profileName: codexOAuthToken,
-					};
-				}
-			} catch (error) {
-				console.warn("[CredentialManager] Failed to check settings:", error);
-			}
-			return { isAuthenticated: false };
-		} catch (error) {
-			console.warn(
-				"[CredentialManager] Failed to check OpenAI Codex OAuth status:",
-				error,
-			);
-			return { isAuthenticated: false };
-		}
+		const isAuthenticated = await this.codexLoginStatusChecker();
+		return isAuthenticated
+			? { isAuthenticated: true, profileName: "OpenAI Codex CLI" }
+			: { isAuthenticated: false };
 	}
 
 	/**
@@ -1547,9 +1452,53 @@ export class CredentialManager extends EventEmitter {
 	}
 
 	/**
-	 * Obtenir les variables d'environnement pour le processus Python
+	 * Obtenir les variables d'environnement pour le processus Python.
+	 *
+	 * @param providerOverride fournisseur choisi *sur la page* qui lance le
+	 *   processus (cf. `shared/utils/page-llm.ts`). Il prime sur
+	 *   `settings.selectedProvider` et sur le credential actif : une page qui
+	 *   nomme son fournisseur ne doit pas se retrouver routée vers celui du
+	 *   dernier profil chargé. Absent, le comportement est inchangé.
 	 */
-	getEnvironmentVariables(): Record<string, string> {
+	getEnvironmentVariables(providerOverride?: string): Record<string, string> {
+		const env = this.buildEnvironmentVariables(providerOverride);
+
+		const requested = (providerOverride ?? "").trim().toLowerCase();
+		if (!requested) return env;
+
+		// `anthropic` et `claude` sont le même fournisseur pour le backend.
+		const canonical = requested === "anthropic" ? "claude" : requested;
+
+		// Le choix de la page est la réponse. La construction ci-dessus a pu
+		// retomber sur le credential actif (un profil OpenAI, un SSO Windsurf…)
+		// dont le nom n'a rien à voir avec ce qui a été demandé.
+		env.SELECTED_LLM_PROVIDER = canonical;
+
+		// Windsurf sans credential actif : la clé globale existe peut-être dans
+		// les réglages, et sans elle le backend n'a rien à présenter.
+		if (canonical === "windsurf" && !env.WINDSURF_API_KEY) {
+			try {
+				const settings = readSettingsFile();
+				const key = settings?.globalWindsurfApiKey as string | undefined;
+				if (key?.trim()) env.WINDSURF_API_KEY = key.trim();
+			} catch {
+				/* settings file not available */
+			}
+		}
+
+		return Object.fromEntries(
+			Object.entries(env).filter(([_, value]) => value.trim() !== ""),
+		);
+	}
+
+	/**
+	 * La construction proprement dite. `selectedProviderOverride` remplace la
+	 * valeur lue dans `settings.json` : tout le reste de la chaîne (clés,
+	 * base URLs, modes d'auth) est déjà écrit en fonction de ce nom.
+	 */
+	private buildEnvironmentVariables(
+		selectedProviderOverride?: string,
+	): Record<string, string> {
 		const env: Record<string, string> = {};
 
 		// Priority check: if the user explicitly selected a non-Claude provider in settings,
@@ -1560,7 +1509,8 @@ export class CredentialManager extends EventEmitter {
 		try {
 			const settings = readSettingsFile();
 			const selectedProvider = (
-				settings?.selectedProvider as string | undefined
+				selectedProviderOverride ??
+				(settings?.selectedProvider as string | undefined)
 			)?.toLowerCase();
 			const nonClaudeProviders = [
 				"copilot",
@@ -1578,6 +1528,14 @@ export class CredentialManager extends EventEmitter {
 				// The active credential from profiles.json may be a Claude profile —
 				// still force SELECTED_LLM_PROVIDER so the backend routes to the right client.
 				env.SELECTED_LLM_PROVIDER = selectedProvider;
+				const openAIAuthMode =
+					selectedProvider === "openai" &&
+					settings?.globalOpenAIAuthMode === "codex-cli"
+						? "codex-cli"
+						: "api-key";
+				if (selectedProvider === "openai") {
+					env.OPENAI_AUTH_MODE = openAIAuthMode;
+				}
 
 				// For Copilot: auth is via `gh auth token` CLI — no extra env vars needed.
 				if (selectedProvider === "copilot") {
@@ -1599,6 +1557,7 @@ export class CredentialManager extends EventEmitter {
 					grok: ["globalGrokApiKey"],
 					meta: ["globalMetaApiKey"],
 					aws: ["globalAWSApiKey"],
+					windsurf: ["globalWindsurfApiKey"],
 				};
 				const envVarMap: Record<string, string> = {
 					openai: "OPENAI_API_KEY",
@@ -1609,11 +1568,13 @@ export class CredentialManager extends EventEmitter {
 					grok: "GROK_API_KEY",
 					meta: "META_API_KEY",
 					aws: "AWS_ACCESS_KEY_ID",
+					windsurf: "WINDSURF_API_KEY",
 				};
 				const baseUrlMap: Record<string, string> = {
 					openai: "OPENAI_BASE_URL",
 					mistral: "MISTRAL_BASE_URL",
 					deepseek: "DEEPSEEK_BASE_URL",
+					grok: "GROK_BASE_URL",
 					meta: "META_BASE_URL",
 					aws: "AWS_BEDROCK_ENDPOINT",
 				};
@@ -1658,7 +1619,13 @@ export class CredentialManager extends EventEmitter {
 				// Users must provide a real API key (sk-...) from platform.openai.com.
 
 				const envVar = envVarMap[selectedProvider];
-				if (envVar && apiKey) env[envVar] = apiKey;
+				if (
+					envVar &&
+					apiKey &&
+					!(selectedProvider === "openai" && openAIAuthMode === "codex-cli")
+				) {
+					env[envVar] = apiKey;
+				}
 				const baseUrlVar = baseUrlMap[selectedProvider];
 				if (baseUrlVar && baseUrl) env[baseUrlVar] = baseUrl;
 
@@ -1746,9 +1713,8 @@ export class CredentialManager extends EventEmitter {
 				const windsurfKey = settings?.globalWindsurfApiKey as
 					| string
 					| undefined;
-				const explicitProvider = settings?.selectedProvider as
-					| string
-					| undefined;
+				const explicitProvider = (selectedProviderOverride ??
+					settings?.selectedProvider) as string | undefined;
 				// Do NOT inject windsurf if the user explicitly chose Claude Code or Anthropic.
 				// The globalWindsurfApiKey may exist from a previous configuration but should
 				// not override the user's current provider choice.
@@ -1800,6 +1766,7 @@ export class CredentialManager extends EventEmitter {
 
 			case "grok":
 				env.GROK_API_KEY = apiKey;
+				if (baseUrl) env.GROK_BASE_URL = baseUrl;
 				break;
 
 			case "meta":

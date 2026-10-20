@@ -12,6 +12,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "apps" / "backend"))
 
 import core.worktree as worktree  # noqa: E402
+import core.worktree_pr as worktree_pr  # noqa: E402  # the PR half (lot L11, F36)
 
 WorktreeManager = worktree.WorktreeManager
 
@@ -30,7 +31,7 @@ def _expected_header(pat: str) -> str:
 
 def test_injects_pat_header_for_azure(monkeypatch):
     mgr = _make_manager()
-    monkeypatch.setattr(worktree, "detect_git_provider", lambda _dir: "azure_devops")
+    monkeypatch.setattr(worktree_pr, "detect_git_provider", lambda _dir: "azure_devops")
     monkeypatch.setattr(mgr, "_get_azure_devops_credentials", lambda: ("", "MYPAT"))
 
     env = mgr._inject_azure_push_auth({"PATH": "/usr/bin"})
@@ -44,11 +45,15 @@ def test_injects_pat_header_for_azure(monkeypatch):
 
 def test_chains_onto_existing_git_config(monkeypatch):
     mgr = _make_manager()
-    monkeypatch.setattr(worktree, "detect_git_provider", lambda _dir: "azure_devops")
+    monkeypatch.setattr(worktree_pr, "detect_git_provider", lambda _dir: "azure_devops")
     monkeypatch.setattr(mgr, "_get_azure_devops_credentials", lambda: ("", "TOK"))
 
     env = mgr._inject_azure_push_auth(
-        {"GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "core.x", "GIT_CONFIG_VALUE_0": "y"}
+        {
+            "GIT_CONFIG_COUNT": "1",
+            "GIT_CONFIG_KEY_0": "core.x",
+            "GIT_CONFIG_VALUE_0": "y",
+        }
     )
 
     # Appends at index 1 without clobbering the pre-existing entry 0.
@@ -60,7 +65,7 @@ def test_chains_onto_existing_git_config(monkeypatch):
 
 def test_noop_for_non_azure_provider(monkeypatch):
     mgr = _make_manager()
-    monkeypatch.setattr(worktree, "detect_git_provider", lambda _dir: "github")
+    monkeypatch.setattr(worktree_pr, "detect_git_provider", lambda _dir: "github")
     # Should not even ask for credentials.
     monkeypatch.setattr(
         mgr,
@@ -74,7 +79,7 @@ def test_noop_for_non_azure_provider(monkeypatch):
 
 def test_noop_when_no_pat(monkeypatch):
     mgr = _make_manager()
-    monkeypatch.setattr(worktree, "detect_git_provider", lambda _dir: "azure_devops")
+    monkeypatch.setattr(worktree_pr, "detect_git_provider", lambda _dir: "azure_devops")
     monkeypatch.setattr(mgr, "_get_azure_devops_credentials", lambda: None)
 
     base = {"PATH": "/x"}
@@ -89,6 +94,6 @@ def test_noop_when_provider_detection_raises(monkeypatch):
     def _boom(_dir):
         raise RuntimeError("no remote")
 
-    monkeypatch.setattr(worktree, "detect_git_provider", _boom)
+    monkeypatch.setattr(worktree_pr, "detect_git_provider", _boom)
     base = {"PATH": "/x"}
     assert mgr._inject_azure_push_auth(base) == base

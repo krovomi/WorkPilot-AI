@@ -132,8 +132,11 @@ class MRReviewResult:
     # Deep codebase context metadata
     deep_context: dict = field(default_factory=dict)
 
+    jev: dict | None = None
+
     def to_dict(self) -> dict:
         return {
+            "jev": self.jev,
             "mr_iid": self.mr_iid,
             "project": self.project,
             "success": self.success,
@@ -159,6 +162,7 @@ class MRReviewResult:
     @classmethod
     def from_dict(cls, data: dict) -> MRReviewResult:
         return cls(
+            jev=data.get("jev"),
             mr_iid=data["mr_iid"],
             project=data["project"],
             success=data["success"],
@@ -246,6 +250,7 @@ class MRContext:
 
     # Deep codebase context (architecture, patterns, memory)
     deep_context: dict = field(default_factory=dict)
+    jev_outcome: object | None = None
 
 
 @dataclass

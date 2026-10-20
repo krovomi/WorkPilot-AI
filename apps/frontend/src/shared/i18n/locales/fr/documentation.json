@@ -30,12 +30,33 @@
 		"readmeFailed": "La génération de README a échoué",
 		"networkError": "Erreur réseau"
 	},
-	"symbols": { "title": "Symboles" },
-	"docstrings": { "title": "Docstrings générés ({{count}})" },
+	"symbols": {
+		"title": "Symboles"
+	},
+	"docstrings": {
+		"title": "Docstrings générés ({{count}})"
+	},
 	"autocomplete": {
 		"searching": "Recherche…",
 		"noResults": "Aucun fichier correspondant",
 		"noResultsDir": "Aucun répertoire correspondant",
 		"noProject": "Sélectionnez d'abord un projet"
+	},
+	"agent": {
+		"phase": {
+			"idle": "Prêt",
+			"analyzing": "Analyse de la couverture documentaire…",
+			"generating": "Génération de la documentation…",
+			"updating": "Mise à jour de la documentation périmée…",
+			"complete": "Terminé",
+			"error": "Erreur"
+		},
+		"docType": {
+			"readme": "README",
+			"api": "Documentation d'API",
+			"contribution": "Guide de contribution",
+			"docstrings": "Docstrings / JSDoc",
+			"diagrams": "Diagrammes de séquence"
+		}
 	}
 }

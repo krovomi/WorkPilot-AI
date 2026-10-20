@@ -6,7 +6,6 @@ Command-line interface for the WorkPilot AI autonomous coding framework.
 """
 
 import argparse
-import json
 import os
 import sys
 from pathlib import Path
@@ -71,7 +70,7 @@ if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv=None) -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
         description="WorkPilot AI Framework - Autonomous multi-session coding agent",
@@ -97,6 +96,7 @@ Examples:
   # Status checks
   python workpilot/run.py --spec 001 --review-status  # Check human review status
   python workpilot/run.py --spec 001 --qa-status      # Check QA validation status
+  python workpilot/run.py --spec 001 --verify         # Launch the app and prove the change works
 
 Prerequisites:
   1. Authenticate: Run 'claude' and type '/login'
@@ -251,6 +251,11 @@ Environment Variables:
         help="Run QA validation loop on a completed build",
     )
     parser.add_argument(
+        "--verify",
+        action="store_true",
+        help="Launch the task's app, fix what breaks, drive it to the change and measure it (verification loop)",
+    )
+    parser.add_argument(
         "--qa-status",
         action="store_true",
         help="Show QA validation status for a spec",
@@ -386,25 +391,6 @@ Environment Variables:
         help="Streaming session ID for live coding (connects to existing session)",
     )
 
-    # Provider management commands
-    provider_group = parser.add_argument_group("Provider management")
-    provider_group.add_argument(
-        "--provider-action",
-        type=str,
-        choices=["list", "select", "add", "delete", "test"],
-        help="Action to perform on LLM providers",
-    )
-    provider_group.add_argument(
-        "--provider",
-        type=str,
-        help="Name of the provider",
-    )
-    provider_group.add_argument(
-        "--config",
-        type=str,
-        help="JSON config for adding a new provider",
-    )
-
     # Cost Intelligence Engine commands
     cost_group = parser.add_argument_group("Cost Intelligence")
     cost_group.add_argument(
@@ -534,59 +520,7 @@ Environment Variables:
         help="Screenshot/baseline name (for browser-agent screenshot/compare)",
     )
 
-    return parser.parse_args()
-
-
-def handle_provider_command(args):
-    from src.connectors.llm_config import (
-        delete_provider_config,
-        get_active_provider,
-        list_provider_configs,
-        load_provider_config,
-        save_provider_config,
-        set_active_provider,
-    )
-    from src.connectors.llm_discovery import discover_llm_providers
-
-    if args.action == "list":
-        active = get_active_provider()
-        print("Providers disponibles:")
-        for cls in discover_llm_providers():
-            name = cls().get_name()
-            marker = " (actif)" if name == active else ""
-            print(f"- {name}{marker}")
-        print("Configurations enregistrées:")
-        for name in list_provider_configs():
-            marker = " (actif)" if name == active else ""
-            print(f"- {name}{marker}")
-    elif args.action == "select":
-        set_active_provider(args.provider)
-        print(f"Provider sélectionné et persisté: {args.provider}")
-    elif args.action == "add":
-        config = json.loads(args.config)
-        save_provider_config(args.provider, config)
-        print(f"Config enregistrée pour {args.provider}")
-    elif args.action == "delete":
-        delete_provider_config(args.provider)
-        print(f"Config supprimée pour {args.provider}")
-    elif args.action == "test":
-        config = load_provider_config(args.provider)
-        if not config:
-            print("Aucune config trouvée pour ce provider.")
-            return
-        for cls in discover_llm_providers():
-            if cls().get_name() == args.provider:
-                try:
-                    instance = cls(**config)
-                    instance.connect()
-                    if not instance.validate():
-                        print("Validation échouée.")
-                        return
-                    print("Provider OK.")
-                except Exception as e:
-                    print(f"Erreur: {e}")
-                return
-        print("Provider non trouvé.")
+    return parser.parse_args(argv)
 
 
 def handle_doctor_command() -> None:
@@ -609,7 +543,6 @@ def handle_doctor_command() -> None:
 
     optional_deps = [
         ("secretstorage", "Linux Secret Service (credential storage)"),
-        ("graphiti_core", "Graph-based memory (Graphiti)"),
         ("google.generativeai", "Google Gemini provider"),
         ("openai", "OpenAI / Azure OpenAI provider"),
         ("anthropic", "Anthropic SDK"),
@@ -641,10 +574,17 @@ def handle_doctor_command() -> None:
         print(f"  {var:<38} {present}")
 
 
-def main() -> None:
+def main(argv=None, jev_run=None) -> None:
     """Main CLI entry point."""
     # Set up environment first
     setup_environment()
+    from integrations.jev.models import JevContext
+    from integrations.jev.runtime import JevRun
+
+    if jev_run is None:
+        jev_run = JevRun.from_env(JevContext("feature-build", Path.cwd()))
+    elif not jev_run.context.server_mode:
+        os.environ.pop("TYPESAFE_API_KEY", None)
 
     # Initialize Sentry early to capture any startup errors
     from core.sentry import capture_exception, init_sentry
@@ -652,7 +592,7 @@ def main() -> None:
     init_sentry(component="cli")
 
     try:
-        _run_cli()
+        _run_cli(argv=argv, jev_run=jev_run)
     except KeyboardInterrupt:
         # Clean exit on Ctrl+C
         sys.exit(130)
@@ -663,18 +603,18 @@ def main() -> None:
         sys.exit(1)
 
 
-def _run_cli() -> None:
+def _run_cli(argv=None, jev_run=None) -> None:
     """Run the CLI logic (extracted for error handling)."""
     # Import here to avoid import errors during startup
     from core.sentry import set_context
 
     # Parse arguments
-    args = parse_args()
+    args = parse_args(argv) if argv is not None else parse_args()
 
     # Import debug functions after environment setup
-    from debug import debug, debug_error, debug_section, debug_success
+    from core.debug import debug, debug_error, debug_section, debug_success
 
-    debug_section("run.py", "Starting Auto-Build Framework")
+    debug_section("run.py", "Starting WorkPilot AI Framework")
     debug("run.py", "Arguments parsed", args=vars(args))
 
     # Determine project directory
@@ -806,6 +746,12 @@ def _run_cli() -> None:
     # Find the spec
     debug("run.py", "Finding spec", spec_identifier=args.spec)
     spec_dir = find_spec(project_dir, args.spec)
+    if jev_run is not None:
+        from dataclasses import replace
+
+        jev_run.context = replace(
+            jev_run.context, project_dir=project_dir, spec_dir=spec_dir
+        )
     if not spec_dir:
         debug_error("run.py", "Spec not found", spec=args.spec)
         print_banner()
@@ -928,6 +874,18 @@ def _run_cli() -> None:
 
     if args.qa:
         handle_qa_command(
+            jev_run=jev_run,
+            project_dir=project_dir,
+            spec_dir=spec_dir,
+            model=model,
+            verbose=args.verbose,
+        )
+        return
+
+    if args.verify:
+        from .verify_commands import handle_verify_command
+
+        handle_verify_command(
             project_dir=project_dir,
             spec_dir=spec_dir,
             model=model,
@@ -948,6 +906,7 @@ def _run_cli() -> None:
     # Handle --followup command
     if args.followup:
         handle_followup_command(
+            jev_run=jev_run,
             project_dir=project_dir,
             spec_dir=spec_dir,
             model=model,
@@ -970,6 +929,7 @@ def _run_cli() -> None:
         base_branch=args.base_branch,
         enable_streaming=args.enable_streaming,
         streaming_session_id=args.streaming_session_id,
+        jev_run=jev_run,
     )
 
 

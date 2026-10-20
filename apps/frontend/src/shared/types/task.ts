@@ -12,6 +12,18 @@ import type {
 	PhaseThinkingConfig,
 	ThinkingLevel,
 } from "./settings";
+import type { MobilePlatform } from "./mobile";
+import type { TaskSmartEstimate } from "./smart-estimation";
+
+/** One phase's engine: provider × model × effort (see shared/utils/task-engine.ts). */
+export interface EngineTrio {
+	provider: string;
+	model: string;
+	effort: ThinkingLevel;
+}
+
+/** A task's engine, phase by phase. */
+export type TaskEngine = Record<"spec" | "planning" | "coding" | "qa", EngineTrio>;
 
 export type TaskStatus =
 	| "backlog"
@@ -36,10 +48,15 @@ export type TaskOrderState = Record<TaskStatus, string[]>;
 //                     limit; retrying with the same context will never succeed.
 //                     User should reset the conversation or switch to a provider
 //                     with a larger context window.
+// - 'qa_unverified': The build completed but the QA agent could not reach a
+//                    verdict (it crashed, or never recorded its sign-off). The
+//                    code is there; only the automatic validation is missing.
+//                    A warning to review by hand, not a failure.
 export type ReviewReason =
 	| "completed"
 	| "errors"
 	| "qa_rejected"
+	| "qa_unverified"
 	| "plan_review"
 	| "stopped"
 	| "prompt_too_long";
@@ -138,7 +155,10 @@ export type TaskLogEntryType =
 	| "phase_end"
 	| "error"
 	| "success"
-	| "info";
+	| "info"
+	// The step went on with something missing (a placeholder file, a
+	// fallback): neither an error nor a success.
+	| "warning";
 
 export interface TaskLogEntry {
 	timestamp: string;
@@ -234,11 +254,42 @@ export interface TaskDraft {
 	// Auto profile - per-phase configuration
 	phaseModels?: PhaseModelConfig;
 	phaseThinking?: PhaseThinkingConfig;
+	// The task's engine as chosen in the wizard (shared/utils/task-engine.ts).
+	engine?: TaskEngine;
 	images: ImageAttachment[];
 	referencedFiles: ReferencedFile[];
 	requireReviewBeforeCoding?: boolean;
 	tddMode?: boolean;
+	verifyLoop?: boolean;
+	/** Context-window policy chosen in the wizard (absent = defaults). */
+	contextPolicy?: ContextPolicy;
+	mobileTargets?: MobilePlatform[];
+	acceptanceCriteria?: string[];
+	extraNote?: string;
 	savedAt: Date;
+}
+
+/**
+ * What the backend does when the agent session's context window fills up.
+ *  - "compact": summarise the history and keep going in the same thread;
+ *  - "clear": start a fresh thread seeded with the handoff summary;
+ *  - "auto": the backend picks one of the two from context;
+ *  - "off": nothing automatic (the manual buttons still work).
+ */
+export type ContextPolicyMode = "auto" | "compact" | "clear" | "off";
+
+/**
+ * Per-task context-window policy, persisted as `contextPolicy` in
+ * `task_metadata.json`. The backend re-reads the file during the run, so an
+ * edit takes effect live. Absent means DEFAULT_CONTEXT_POLICY
+ * (shared/utils/context-policy.ts).
+ */
+export interface ContextPolicy {
+	mode: ContextPolicyMode;
+	/** Percentage of the window at which to act: 30..90, step 5. */
+	thresholdPct: number;
+	/** Prepare the handoff summary in the background before the threshold. */
+	prepareHandoff: boolean;
 }
 
 // Task metadata from ideation or manual entry
@@ -277,6 +328,44 @@ export type TaskCategory =
 	| "ui_ux"
 	| "infrastructure"
 	| "testing";
+
+/**
+ * The kind of work a card asks for — decided without a model from the
+ * category, the imported item's type or the words of the title
+ * (`apps/backend/tasks/classify.py`), and overridable in the task detail.
+ * Lot 0 of docs/architecture/kanban-task-types.md: today it is data; later
+ * lots pick a workflow from it.
+ */
+export type TaskKind =
+	| "feature"
+	| "bug_fix"
+	| "hotfix"
+	| "investigation"
+	| "run"
+	| "refactoring"
+	| "test"
+	| "docs"
+	| "spike";
+
+export const TASK_KINDS: readonly TaskKind[] = [
+	"feature",
+	"bug_fix",
+	"hotfix",
+	"investigation",
+	"run",
+	"refactoring",
+	"test",
+	"docs",
+	"spike",
+];
+
+/** Who decided the kind. `user` is never overwritten by the backend. */
+export type TaskKindSource =
+	| "user"
+	| "category"
+	| "import"
+	| "keywords"
+	| "default";
 
 export interface TaskMetadata {
 	// Origin tracking
@@ -324,11 +413,23 @@ export interface TaskMetadata {
 	// Provider × LLM × Effort prerequisite before it runs).
 	duplicatedFrom?: string;
 
+	// Which smartphone platforms this task targets. Empty or absent means every
+	// platform the project has — a card that names none on a mobile repo means
+	// "the usual ones", not "none". Reaches the agents as
+	// WORKPILOT_MOBILE_TARGETS, which narrows the platform rules the planner,
+	// the coder and QA are given.
+	mobileTargets?: MobilePlatform[];
+
 	// Classification
 	category?: TaskCategory;
 	complexity?: TaskComplexity;
 	impact?: TaskImpact;
 	priority?: TaskPriority;
+	// The kind of work (see TaskKind). Written by the spec pipeline, or by the
+	// user from the task detail (kindSource "user"), which the backend keeps.
+	kind?: TaskKind;
+	kindConfidence?: number; // 0-1; below 0.6 the kind is a proposal
+	kindSource?: TaskKindSource;
 
 	// Context
 	rationale?: string; // Why this task matters
@@ -337,13 +438,38 @@ export interface TaskMetadata {
 
 	// Technical details
 	affectedFiles?: string[]; // Files likely to be modified
-	dependencies?: string[]; // Other features/tasks this depends on
+	dependencies?: string[]; // Other features/tasks this depends on (free text)
+	/**
+	 * Spec ids (= task ids, see project-store `id: dir.name`) of the tasks that
+	 * must reach `done` before the queue may promote this one. Distinct from
+	 * `dependencies` above, which stays the free-text list written by ideation
+	 * and roadmap conversion and never gated anything.
+	 *
+	 * An id with no matching task on the board does NOT block: deleting a task
+	 * would otherwise deadlock every ticket that referenced it.
+	 */
+	blockedBy?: string[];
 	acceptanceCriteria?: string[]; // What defines "done"
+	/**
+	 * Set when the user emptied the criteria list while the description states
+	 * some: without it the section would read them back from the description on
+	 * the next render, and "delete them all" would silently undo itself. `[]`
+	 * alone cannot say it — roadmap and tracker imports write `[]` by default.
+	 */
+	ignoreDescriptionCriteria?: boolean;
 	extraNote?: string; // Free-form note added on the Kanban card; injected
 	// into requirements.json as additional_context for every pipeline phase.
 
 	// Effort estimation
 	estimatedEffort?: TaskComplexity;
+
+	/**
+	 * Last Smart Estimation run for this task: a 1-13 complexity score with the
+	 * confidence and risk factors behind it. Informational — the queue orders
+	 * by `priority` alone, because a complexity score is not an urgency score.
+	 * Carries no duration: see `shared/types/smart-estimation.ts`.
+	 */
+	smartEstimate?: TaskSmartEstimate;
 
 	// Type-specific metadata (from different idea types)
 	securitySeverity?: "low" | "medium" | "high" | "critical";
@@ -364,6 +490,15 @@ export interface TaskMetadata {
 	// true -> force strict TDD, false -> force disabled, undefined -> inherit project default.
 	tddMode?: boolean;
 
+	// Verification loop override (per-task). false -> skip the `verify` phase,
+	// true -> force it, undefined -> inherit the project default. Injected as
+	// WORKPILOT_VERIFY_LOOP at spawn time.
+	verifyLoop?: boolean;
+
+	// Context-window management (compact / clear at a threshold). Read live by
+	// the backend; absent = defaults (auto, 50%, handoff prepared in parallel).
+	contextPolicy?: ContextPolicy;
+
 	// Agent configuration (from agent profile or manual selection)
 	provider?: string; // Active LLM provider (e.g. 'anthropic', 'openai', 'google', 'ollama', ...)
 	model?: string; // Model ID to use (supports multi-provider) - used when not auto profile
@@ -373,6 +508,10 @@ export interface TaskMetadata {
 	phaseModels?: PhaseModelConfig; // Per-phase model configuration
 	phaseThinking?: PhaseThinkingConfig; // Per-phase thinking configuration
 	phaseProviders?: PhaseProviderConfig; // Per-phase LLM provider configuration
+	// The task owns its engine (see shared/utils/task-engine.ts): the fields
+	// above were chosen for this task, and nothing global — the default
+	// provider in Settings — replaces them at start, resume or QA.
+	engineLocked?: boolean;
 
 	// Formula Lab — the Provider × LLM × Effort "formula" the user picked for
 	// this ticket before development. Drives the compact kanban badge and seeds
@@ -390,9 +529,22 @@ export interface TaskMetadata {
 	paused?: {
 		enabled: boolean;
 		paused_at: string | null;
+		/**
+		 * Where the build stopped: "spec" | "planning" | "coding" | "qa_review"
+		 * | "qa_fixing". Recorded so the UI can say what a resume will pick back
+		 * up, instead of assuming coding — which is all the pause could do when
+		 * its flag lived inside the implementation plan.
+		 */
+		paused_phase?: string | null;
 		paused_subtask_id: string | null;
-		provider?: string;
-		model?: string;
+		provider?: string | null;
+		model?: string | null;
+		/**
+		 * Why the build is paused. Absent for the Pause button; "app_shutdown"
+		 * when WorkPilot was closed while it ran — the next launch resumes those
+		 * on its own, and only those.
+		 */
+		reason?: string | null;
 	};
 
 	// Abandon status — the task was set aside (e.g. the product owner no longer
@@ -416,6 +568,19 @@ export interface Task {
 	description: string;
 	status: TaskStatus;
 	reviewReason?: ReviewReason; // Why task needs human review (only set when status is 'human_review')
+	/**
+	 * What actually went wrong, when the task landed in review because it
+	 * failed. `reviewReason: "errors"` says a failure happened; this says which
+	 * one — the phase that gave up and the message it reported. Without it the
+	 * board shows a red badge and the explanation stays in a log file, which is
+	 * the state the user has to open a terminal to get out of.
+	 */
+	errorMessage?: string;
+	/**
+	 * The verification loop's verdict (`apps/backend/verify/`), persisted in
+	 * the plan so the card can show it without a request per card.
+	 */
+	verification?: TaskVerificationSummary;
 	subtasks: Subtask[];
 	qaReport?: QAReport;
 	logs: string[];
@@ -429,6 +594,14 @@ export interface Task {
 	prUrl?: string; // URL of the PR created automatically when task is completed
 	createdAt: Date;
 	updatedAt: Date;
+}
+
+/** What the card needs to know about the task's last verification. */
+export interface TaskVerificationSummary {
+	status: "pass" | "fail" | "unknown" | "not-applicable" | "disabled" | "running";
+	score?: number | null;
+	reason?: string;
+	at?: number | null;
 }
 
 // Implementation Plan (from auto-claude)
@@ -446,6 +619,10 @@ export interface ImplementationPlan {
 	status?: TaskStatus;
 	planStatus?: string;
 	reviewReason?: ReviewReason;
+	/** Failure detail persisted alongside the status that needs explaining. */
+	errorMessage?: string;
+	/** Written by the verification loop (`verify/record.py::persist_plan_summary`). */
+	verification?: TaskVerificationSummary;
 	xstateState?: string; // Persisted XState machine state for restoration (e.g., 'planning', 'coding')
 	lastEvent?: {
 		eventId: string;
@@ -455,15 +632,31 @@ export interface ImplementationPlan {
 	};
 	recoveryNote?: string;
 	description?: string;
-	// Pause/Resume state. Written by the TASK_PAUSE handler and read back by the
-	// backend coder loop (cooperative stop) and the task scanner (so the UI's
-	// paused controls survive task-list reloads).
+	// Pause/Resume state, LEGACY. The live store is `pause_state.json` (see
+	// AUTO_BUILD_PATHS.PAUSE_STATE and core/pause_state.py): it lives beside the
+	// spec, which exists from the moment the task does, so a pause also works
+	// during spec creation and planning — the phases where this file does not
+	// exist yet. This block is still read so a task paused before the move does
+	// not silently un-pause on upgrade; nothing writes it any more.
 	paused?: {
 		enabled: boolean;
 		paused_at: string | null;
+		/**
+		 * Where the build stopped: "spec" | "planning" | "coding" | "qa_review"
+		 * | "qa_fixing". Recorded so the UI can say what a resume will pick back
+		 * up, instead of assuming coding — which is all the pause could do when
+		 * its flag lived inside the implementation plan.
+		 */
+		paused_phase?: string | null;
 		paused_subtask_id: string | null;
-		provider?: string;
-		model?: string;
+		provider?: string | null;
+		model?: string | null;
+		/**
+		 * Why the build is paused. Absent for the Pause button; "app_shutdown"
+		 * when WorkPilot was closed while it ran — the next launch resumes those
+		 * on its own, and only those.
+		 */
+		reason?: string | null;
 	};
 }
 
@@ -849,6 +1042,13 @@ export interface VisualProofRun {
 	artifactDir?: string;
 	commentUrl?: string;
 	commitSha?: string;
+	/**
+	 * Why the captures could not be pushed to the task branch, when that step
+	 * failed. Distinct from `error`: the run itself succeeded and the images are
+	 * on disk — only their publication to the PR is missing, so the tab shows
+	 * them with a warning rather than a failure.
+	 */
+	publishError?: string;
 	screenshots: VisualProofScreenshot[];
 	/** API smoke proof, present when an OpenAPI document was discovered. */
 	apiSmoke?: VisualProofApiSmoke;

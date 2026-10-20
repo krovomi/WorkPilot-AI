@@ -1,0 +1,28 @@
+{
+	"source": "https://github.com/guillaumemeyer/watermarks-remover",
+	"ref": "v0.7.0",
+	"commit": "321d93d2efd6a8b26915c5eb5193d9d1701e2c4b",
+	"license": "MIT",
+	"tree_sha256": "4f513c872975597f60b0adbda7f0c4e207e17f3857e8a316d4b9c373d9e27ef7",
+	"files": {
+		"LICENSE": "7b238ac3774945dae85fad6e83819b43f7d5f48c181ecb4d005e5e91fe7e0ec1",
+		"text_unicode.py": "ed86ed9715f40e306371731f97bf6f2a63f6a7719674630afac89eb3741bc6fd"
+	},
+	"paths": {
+		"service/scripts/text_unicode.py": "text_unicode.py",
+		"LICENSE": "LICENSE"
+	},
+	"vendored_at": "2026-09-14T06:38:19Z",
+	"vendored_by": "scripts/vendor_watermarks.py",
+	"excluded": [
+		"service/ (everything but text_unicode.py)",
+		"skills/",
+		"compose.yaml, Dockerfile*, Makefile",
+		"tests/, docs/"
+	],
+	"absent_upstream": [
+		"NOTICE",
+		"THIRD_PARTY_NOTICES.md"
+	],
+	"note": "Layer A only: the Unicode decision table, which every generated file passes through. Committed rather than fetched on demand because a build that produces clean files only on machines where somebody ran an install command is a build whose output nobody can rely on. Re-run the script to move the pin; never hand-edit this tree."
+}

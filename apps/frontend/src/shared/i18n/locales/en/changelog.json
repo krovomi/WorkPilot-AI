@@ -59,8 +59,8 @@
 		"loadingTags": "Loading tags...",
 		"loadingCommits": "Loading commits...",
 		"noCommits": "No commits found",
-		"commitsFound": "{{count}} commit found",
-		"commitsFound_plural": "{{count}} commits found"
+		"commitsFound_one": "{{count}} commit found",
+		"commitsFound_other": "{{count}} commits found"
 	},
 	"branchDiff": {
 		"title": "Branch Comparison Options",
@@ -76,10 +76,6 @@
 	"configuration": {
 		"title": "Configuration",
 		"summary": "Summary",
-		"summaryTasks": "{{count}} task selected",
-		"summaryTasks_plural": "{{count}} tasks selected",
-		"summaryCommits": "{{count}} commit selected",
-		"summaryCommits_plural": "{{count}} commits selected",
 		"tasksSelectedCount": "{{selected}} of {{total}} tasks selected",
 		"backToSelection": "Back to Selection",
 		"including": "Including",
@@ -154,8 +150,6 @@
 		"title": "Release Complete",
 		"success": "Your changelog has been generated and saved!",
 		"archiveTitle": "Archive Completed Tasks",
-		"archiveDescription": "Would you like to archive the {{count}} completed task used in this changelog?",
-		"archiveDescription_plural": "Would you like to archive the {{count}} completed tasks used in this changelog?",
 		"archiveNote": "Archived tasks will be moved to version {{version}} and won't appear in future changelog selections.",
 		"archiveYes": "Yes, Archive Tasks",
 		"archiveNo": "No, Keep Tasks",

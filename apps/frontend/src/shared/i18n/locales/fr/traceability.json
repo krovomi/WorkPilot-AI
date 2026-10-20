@@ -1,0 +1,27 @@
+{
+	"title": "Questions ouvertes et couverture",
+	"subtitle": "Ce que le spec a dû supposer, et ce que le plan ne construit pas",
+	"expand": "Détails",
+	"collapse": "Masquer",
+	"badge": {
+		"questions": "{{count}} question ouverte",
+		"questions_other": "{{count}} questions ouvertes",
+		"uncovered": "{{count}} exigence non réclamée",
+		"uncovered_other": "{{count}} exigences non réclamées"
+	},
+	"coverage": {
+		"summary": "{{covered}} exigences sur {{total}} réclamées par une subtask ({{percent}} %)"
+	},
+	"questions": {
+		"title": "Marquées [NEEDS CLARIFICATION]",
+		"unspecified": "non précisée"
+	},
+	"uncovered": {
+		"title": "Aucune subtask ne les réclame",
+		"body": "Soit le plan oublie du travail, soit l'exigence est hors périmètre volontairement. Les deux sont des décisions — c'est seulement le moment de la prendre."
+	},
+	"unknown": {
+		"title": "Référencées mais non déclarées",
+		"body": "Une subtask cite une exigence que spec.md ne déclare pas : les deux documents ont divergé."
+	}
+}

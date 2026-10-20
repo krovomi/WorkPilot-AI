@@ -1,27 +1,23 @@
 import { Info, Loader2, Pause, Play, RotateCcw } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { THINKING_LEVELS } from "../../../shared/constants/models";
-import { getModelsForProvider } from "../../../shared/services/providerRegistry";
 import type { Task } from "../../../shared/types";
-import type { ThinkingLevel } from "../../../shared/types/settings";
-import { getStaticProviders } from "../../../shared/utils/providers";
 import { debugError } from "../../../shared/utils/debug-logger";
+import {
+	defaultEngineProvider,
+	type EngineChangeScope,
+	type EngineTrio,
+	enginePhaseForPause,
+	resolveTaskEngine,
+	seedEngine,
+} from "../../../shared/utils/task-engine";
 import { useToast } from "../../hooks/use-toast";
+import { useConfiguredProviders } from "../../hooks/useConfiguredProviders";
 import { useSettingsStore } from "../../stores/settings-store";
+import { EngineTrioPicker } from "../task-engine/EngineTrioPicker";
 import { Button } from "../ui/button";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "../ui/select";
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipTrigger,
-} from "../ui/tooltip";
+import { Checkbox } from "../ui/checkbox";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 
 interface TaskPauseControlsProps {
 	task: Task;
@@ -34,11 +30,6 @@ interface TaskPauseControlsProps {
 	onResumeSameProvider?: () => Promise<void>;
 }
 
-interface ProviderOption {
-	name: string;
-	label: string;
-}
-
 export function TaskPauseControls({
 	task,
 	isPaused = false,
@@ -46,83 +37,48 @@ export function TaskPauseControls({
 	onPause,
 	onResumeSameProvider,
 }: TaskPauseControlsProps) {
-	const { t } = useTranslation(["tasks"]);
+	const { t } = useTranslation(["tasks", "settings"]);
 	const { toast } = useToast();
 	const settings = useSettingsStore((s) => s.settings);
-	const profiles = useSettingsStore((s) => s.profiles);
 
 	const [isLoading, setIsLoading] = useState(false);
 	const [isResuming, setIsResuming] = useState(false);
-	const [providers, setProviders] = useState<ProviderOption[]>([]);
-	const [selectedProvider, setSelectedProvider] = useState(
-		task.metadata?.paused?.provider || task.metadata?.provider || "anthropic",
+	// The phase the task stopped in, as the engine names it: the change
+	// applies from there on, the phases already behind it keep their history.
+	const resumePhase = enginePhaseForPause(
+		task.metadata?.paused?.paused_phase || task.executionProgress?.phase,
 	);
-	const [selectedModel, setSelectedModel] = useState(
-		task.metadata?.paused?.model || task.metadata?.model || "",
-	);
-	// Reasoning "effort" applied to the resumed run. Seed it from the task's
-	// current single thinking level, falling back to the coding phase's per-phase
-	// level, then a sensible default.
-	const [selectedEffort, setSelectedEffort] = useState<ThinkingLevel>(
-		task.metadata?.thinkingLevel ||
-			task.metadata?.phaseThinking?.coding ||
-			"medium",
-	);
+	const initialTrio = useMemo((): EngineTrio => {
+		const engine = resolveTaskEngine(
+			task.metadata,
+			seedEngine(
+				settings,
+				task.metadata?.provider || defaultEngineProvider(settings),
+			),
+		);
+		return engine[resumePhase];
+	}, [task.metadata, settings, resumePhase]);
+	const [trio, setTrio] = useState<EngineTrio>(initialTrio);
+	const [onlyThisPhase, setOnlyThisPhase] = useState(false);
+	const [modelReady, setModelReady] = useState(false);
 
 	// The task has finished its current step and the process exited — only then
 	// can the user actually switch and resume. While it is still running, the
 	// pause is "in flight" (finishing the current step).
 	const isFullyPaused = isPaused && !isRunning;
-
-	// Build the list of configured providers (same detection as the rest of the
-	// app) once the user reaches the paused-and-stopped state.
+	const { providers, loading: providersLoading } =
+		useConfiguredProviders(isFullyPaused);
+	const selectionKey = `${task.id}:${isFullyPaused}`;
+	const previousSelectionKey = useRef(selectionKey);
 	useEffect(() => {
-		if (!isFullyPaused) return;
-		let cancelled = false;
-		setIsLoading(true);
-		getStaticProviders(profiles, settings as unknown as Record<string, unknown>)
-			.then((res) => {
-				if (cancelled) return;
-				const configured = res.providers
-					.filter((p) => res.status[p.name] === true)
-					.map((p) => ({ name: p.name, label: p.label }));
-				setProviders(configured);
-				// If the current selection isn't configured, fall back to the first.
-				// Functional update so the effect doesn't depend on selectedProvider.
-				setSelectedProvider((prev) =>
-					configured.length > 0 && !configured.some((p) => p.name === prev)
-						? configured[0].name
-						: prev,
-				);
-			})
-			.catch((err) => {
-				debugError("[TaskPauseControls] getStaticProviders failed", err);
-				if (!cancelled) setProviders([]);
-			})
-			.finally(() => {
-				if (!cancelled) setIsLoading(false);
-			});
-		return () => {
-			cancelled = true;
-		};
-	}, [isFullyPaused, profiles, settings]);
+		if (previousSelectionKey.current !== selectionKey) {
+			previousSelectionKey.current = selectionKey;
+			setTrio(initialTrio);
+			setOnlyThisPhase(false);
+		}
+	}, [selectionKey, initialTrio]);
 
-	const models = useMemo(
-		() => getModelsForProvider(selectedProvider),
-		[selectedProvider],
-	);
-
-	// Keep the model selection valid whenever the provider changes. Recompute the
-	// model list locally and use a functional update so the only dependency is
-	// the provider itself.
-	useEffect(() => {
-		const available = getModelsForProvider(selectedProvider);
-		setSelectedModel((prev) =>
-			available.some((m) => m.value === prev)
-				? prev
-				: (available[0]?.value ?? ""),
-		);
-	}, [selectedProvider]);
+	const onTrioChange = useCallback((next: EngineTrio) => setTrio(next), []);
 
 	const handlePause = useCallback(async () => {
 		setIsLoading(true);
@@ -137,7 +93,10 @@ export function TaskPauseControls({
 			});
 		} catch (error) {
 			toast({
-				title: t("tasks:modal.actions.pauseFailed", "Échec de la mise en pause"),
+				title: t(
+					"tasks:modal.actions.pauseFailed",
+					"Échec de la mise en pause",
+				),
 				description: String(error),
 				variant: "destructive",
 			});
@@ -147,32 +106,27 @@ export function TaskPauseControls({
 	}, [onPause, toast, t]);
 
 	const handleResumeWithProvider = useCallback(async () => {
+		if (!modelReady) return;
 		setIsResuming(true);
+		const scope: EngineChangeScope = onlyThisPhase ? "phase" : "remaining";
 		try {
 			const res = await globalThis.electronAPI?.resumeTaskWithProvider?.(
 				task.id,
-				selectedProvider,
-				selectedModel || undefined,
-				selectedEffort,
+				trio.provider,
+				trio.model,
+				trio.effort,
+				scope,
 			);
 			if (res?.success) {
 				toast({
-					title: t(
-						"tasks:modal.actions.resumeWithProviderSuccessTitle",
-						"Reprise avec {{provider}}",
-						{ provider: selectedProvider },
-					),
-					description: t(
-						"tasks:modal.actions.resumeWithProviderSuccessDesc",
-						"La conversation précédente sera rejouée vers le nouveau provider.",
-					),
+					title: t("tasks:modal.actions.resumeWithProviderSuccessTitle", {
+						provider: trio.provider,
+					}),
+					description: t("tasks:modal.actions.resumeWithProviderSuccessDesc"),
 				});
 			} else {
 				toast({
-					title: t(
-						"tasks:modal.actions.resumeWithProviderErrorTitle",
-						"Échec de la reprise",
-					),
+					title: t("tasks:modal.actions.resumeWithProviderErrorTitle"),
 					description: res?.error || "Unknown error",
 					variant: "destructive",
 				});
@@ -180,17 +134,14 @@ export function TaskPauseControls({
 		} catch (error) {
 			debugError("[TaskPauseControls] resumeTaskWithProvider failed", error);
 			toast({
-				title: t(
-					"tasks:modal.actions.resumeWithProviderErrorTitle",
-					"Échec de la reprise",
-				),
+				title: t("tasks:modal.actions.resumeWithProviderErrorTitle"),
 				description: error instanceof Error ? error.message : String(error),
 				variant: "destructive",
 			});
 		} finally {
 			setIsResuming(false);
 		}
-	}, [task.id, selectedProvider, selectedModel, selectedEffort, toast, t]);
+	}, [task.id, trio, onlyThisPhase, modelReady, toast, t]);
 
 	return (
 		<div className="overflow-hidden rounded-lg border bg-muted/20">
@@ -237,7 +188,10 @@ export function TaskPauseControls({
 									) : (
 										<RotateCcw className="mr-1.5 h-3.5 w-3.5" />
 									)}
-									{t("tasks:modal.actions.pauseToSwitchShort", "Mettre en pause")}
+									{t(
+										"tasks:modal.actions.pauseToSwitchShort",
+										"Mettre en pause",
+									)}
 								</Button>
 							</span>
 						</TooltipTrigger>
@@ -280,6 +234,9 @@ export function TaskPauseControls({
 						<div className="min-w-0 flex-1">
 							<div className="text-sm font-medium">
 								{t("tasks:modal.actions.providerSwitchPaused")}
+								<div className="break-words text-sm" title={task.title}>
+									{task.title || task.id}
+								</div>
 							</div>
 							<div className="text-xs text-muted-foreground">
 								{t("tasks:modal.actions.providerSwitchPausedDesc")}
@@ -287,92 +244,44 @@ export function TaskPauseControls({
 						</div>
 					</div>
 
-					{isLoading ? (
+					{providersLoading && providers.length === 0 ? (
 						<div className="flex items-center gap-2 text-sm text-muted-foreground">
 							<Loader2 className="h-4 w-4 animate-spin" />
-							<span>
-								{t("tasks:modal.actions.loadingProviders", "Chargement…")}
-							</span>
+							<span>{t("tasks:modal.actions.loadingProviders")}</span>
 						</div>
 					) : providers.length === 0 ? (
 						<div className="text-xs text-muted-foreground">
-							{t(
-								"tasks:modal.actions.noConfiguredProviders",
-								"Aucun provider configuré. Ajoutez une clé API dans les Paramètres.",
-							)}
+							{t("tasks:modal.actions.noConfiguredProviders")}
 						</div>
 					) : (
-						<div
-							className={`grid gap-2 ${
-								models.length > 0 ? "grid-cols-3" : "grid-cols-2"
-							}`}
-						>
-							<div className="space-y-1">
-								<div className="text-xs font-medium text-muted-foreground">
-									{t("tasks:modal.actions.chooseProvider", "Provider")}
-								</div>
-								<Select
-									value={selectedProvider}
-									onValueChange={setSelectedProvider}
-								>
-									<SelectTrigger className="h-8">
-										<SelectValue />
-									</SelectTrigger>
-									<SelectContent>
-										{providers.map((p) => (
-											<SelectItem key={p.name} value={p.name}>
-												{p.label}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
-							</div>
-
-							{models.length > 0 && (
-								<div className="space-y-1">
-									<div className="text-xs font-medium text-muted-foreground">
-										{t("tasks:modal.actions.chooseModel", "Modèle")}
-									</div>
-									<Select
-										value={selectedModel}
-										onValueChange={setSelectedModel}
-									>
-										<SelectTrigger className="h-8">
-											<SelectValue />
-										</SelectTrigger>
-										<SelectContent>
-											{models.map((m) => (
-												<SelectItem key={m.value} value={m.value}>
-													{m.label}
-												</SelectItem>
-											))}
-										</SelectContent>
-									</Select>
-								</div>
-							)}
-
-							<div className="space-y-1">
-								<div className="text-xs font-medium text-muted-foreground">
-									{t("tasks:modal.actions.chooseEffort", "Effort")}
-								</div>
-								<Select
-									value={selectedEffort}
-									onValueChange={(value) =>
-										setSelectedEffort(value as ThinkingLevel)
+						<div className="space-y-2">
+							<EngineTrioPicker
+								value={trio}
+								onChange={onTrioChange}
+								providers={providers}
+								idPrefix={`resume-${task.id}`}
+								onReadyChange={setModelReady}
+							/>
+							<label
+								htmlFor={`resume-${task.id}-only-phase`}
+								className="flex cursor-pointer items-start gap-2 text-xs text-muted-foreground"
+							>
+								<Checkbox
+									id={`resume-${task.id}-only-phase`}
+									checked={onlyThisPhase}
+									onCheckedChange={(checked) =>
+										setOnlyThisPhase(checked === true)
 									}
-								>
-									<SelectTrigger className="h-8">
-										<SelectValue />
-									</SelectTrigger>
-									<SelectContent>
-										{THINKING_LEVELS.map((level) => (
-											<SelectItem key={level.value} value={level.value}>
-												{level.label}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
-							</div>
+									className="mt-0.5"
+								/>
+								<span>
+									{t("tasks:engine.onlyResumedPhase", {
+										phase: t(
+											`settings:agentProfile.phases.${resumePhase}.label`,
+										),
+									})}
+								</span>
+							</label>
 						</div>
 					)}
 
@@ -398,7 +307,11 @@ export function TaskPauseControls({
 							variant="default"
 							size="sm"
 							onClick={handleResumeWithProvider}
-							disabled={isResuming || isLoading || providers.length === 0}
+							disabled={
+								isResuming ||
+								!modelReady ||
+								!providers.some((p) => p.name === trio.provider)
+							}
 							className="flex-1"
 						>
 							{isResuming ? (
@@ -406,7 +319,10 @@ export function TaskPauseControls({
 							) : (
 								<Play className="mr-2 h-4 w-4" />
 							)}
-							{t("tasks:modal.actions.resumeWithChosenLlm", "Reprendre avec ce LLM")}
+							{t(
+								"tasks:modal.actions.resumeWithChosenLlm",
+								"Reprendre avec ce LLM",
+							)}
 						</Button>
 					</div>
 				</div>

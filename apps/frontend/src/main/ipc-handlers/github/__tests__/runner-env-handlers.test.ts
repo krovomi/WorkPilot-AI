@@ -139,7 +139,6 @@ function createProject(): Project {
 		autoBuildPath: ".workpilot",
 		settings: {
 			model: "default",
-			memoryBackend: "file",
 			linearSync: false,
 			notifications: {
 				onTaskComplete: false,
@@ -147,7 +146,6 @@ function createProject(): Project {
 				onReviewNeeded: false,
 				sound: false,
 			},
-			graphitiMcpEnabled: false,
 			useClaudeMd: true,
 		},
 		createdAt: new Date(),
@@ -207,7 +205,12 @@ describe("GitHub runner env usage", () => {
 			123,
 		);
 
-		expect(mockGetRunnerEnv).toHaveBeenCalledWith({ USE_CLAUDE_MD: "true" });
+		// Le second argument nomme la page : c'est lui qui fait suivre à la revue
+		// le fournisseur choisi pour « GitHub PRs » plutôt que Claude par défaut.
+		expect(mockGetRunnerEnv).toHaveBeenCalledWith(
+			{ USE_CLAUDE_MD: "true" },
+			{ jevWorkflow: "github-review", page: "github-prs" },
+		);
 		expect(mockRunPythonSubprocess).toHaveBeenCalledWith(
 			expect.objectContaining({
 				env: { ANTHROPIC_AUTH_TOKEN: "token" },
@@ -249,10 +252,54 @@ describe("GitHub runner env usage", () => {
 			124,
 		);
 
-		expect(mockGetRunnerEnv).toHaveBeenCalledWith({
-			USE_CLAUDE_MD: "true",
-			TDD_MODE: "true",
+		expect(mockGetRunnerEnv).toHaveBeenCalledWith(
+			{
+				USE_CLAUDE_MD: "true",
+				TDD_MODE: "true",
+			},
+			{ jevWorkflow: "github-review", page: "github-prs" },
+		);
+	});
+
+	it("says USE_CLAUDE_MD=false when useClaudeMd is off", async () => {
+		// The backend reads an absent variable as on: "off" has to be sent.
+		const project = projectRef.current;
+		if (project) {
+			project.settings.useClaudeMd = false;
+		}
+
+		const { registerPRHandlers } = await import("../pr-handlers");
+
+		mockRunPythonSubprocess.mockReturnValue({
+			process: { pid: 125 },
+			promise: Promise.resolve({
+				success: true,
+				exitCode: 0,
+				stdout: "",
+				stderr: "",
+				data: {
+					prNumber: 125,
+					repo: "test/repo",
+					success: true,
+					findings: [],
+					summary: "",
+					overallStatus: "comment",
+					reviewedAt: new Date().toISOString(),
+				},
+			}),
 		});
+
+		registerPRHandlers(() => createMockWindow());
+		await mockIpcMain.emit(
+			IPC_CHANNELS.GITHUB_PR_REVIEW,
+			projectRef.current?.id,
+			125,
+		);
+
+		expect(mockGetRunnerEnv).toHaveBeenCalledWith(
+			{ USE_CLAUDE_MD: "false" },
+			{ jevWorkflow: "github-review", page: "github-prs" },
+		);
 	});
 
 	it("passes runner env to triage subprocess", async () => {
@@ -275,7 +322,9 @@ describe("GitHub runner env usage", () => {
 			projectRef.current?.id,
 		);
 
-		expect(mockGetRunnerEnv).toHaveBeenCalledWith();
+		expect(mockGetRunnerEnv).toHaveBeenCalledWith(undefined, {
+			page: "github-issues",
+		});
 		expect(mockRunPythonSubprocess).toHaveBeenCalledWith(
 			expect.objectContaining({
 				env: { ANTHROPIC_AUTH_TOKEN: "token" },

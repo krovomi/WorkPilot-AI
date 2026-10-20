@@ -8,8 +8,8 @@ performance scoring.
 Feature 6.1 — Routing intelligent multi-provider.
 
 Extends the existing multi-provider infrastructure:
-- ``src/connectors/llm_base.py`` — BaseLLMProvider interface
-- ``src/connectors/llm_discovery.py`` — Dynamic provider discovery
+- ``capabilities/providers.yaml`` — provider capabilities
+- ``apps/backend/models_registry.py`` — model catalogue
 - ``apps/backend/phase_config.py`` — Phase-specific model configuration
 - ``apps/backend/scheduling/cost_estimator.py`` — Cost tracking
 
@@ -533,7 +533,6 @@ class IntelligentRouter:
             RoutingDecision with the selected provider, or None if no provider available.
         """
         strat = RoutingStrategy(strategy) if strategy else self.default_strategy
-        ctx = context or {}
 
         # Pipeline override
         if pipeline_id and pipeline_id in self._pipelines:

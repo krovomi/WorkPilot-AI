@@ -45,7 +45,6 @@ class TestAgentConfigs:
 
         expected_types = [
             # Spec phases
-            "spec_gatherer",
             "spec_researcher",
             "spec_writer",
             "spec_critic",
@@ -66,6 +65,29 @@ class TestAgentConfigs:
             assert agent_type in AGENT_CONFIGS, (
                 f"Expected agent type '{agent_type}' not found"
             )
+
+    def test_the_spec_prompts_that_write_and_look_up_docs_have_both(self):
+        """spec_researcher.md and spec_critic.md ask Context7 and write their
+        own file; spec_writer has neither Context7 nor the web, which is the
+        config both ran under before."""
+        from agents.tools_pkg.models import AGENT_CONFIGS
+
+        researcher = AGENT_CONFIGS["spec_researcher"]
+        assert {"Write", "Bash", "WebFetch", "WebSearch"} <= set(researcher["tools"])
+        assert "context7" in researcher["mcp_servers"]
+
+        critique = AGENT_CONFIGS["spec_self_critique"]
+        assert {"Write", "Edit", "Bash"} <= set(critique["tools"])
+        assert "context7" in critique["mcp_servers"]
+
+        # `spec_critic` stays the read-only reviewer `brainstorm` runs under.
+        assert set(AGENT_CONFIGS["spec_critic"]["tools"]) == {"Read", "Glob", "Grep"}
+
+    def test_spec_types_nothing_creates_are_gone(self):
+        from agents.tools_pkg.models import AGENT_CONFIGS
+
+        assert "spec_discovery" not in AGENT_CONFIGS
+        assert "spec_context" not in AGENT_CONFIGS
 
     def test_thinking_defaults_are_valid(self):
         """All thinking_default values should be valid levels."""
@@ -122,11 +144,11 @@ class TestGetAgentConfig:
 class TestGetRequiredMcpServers:
     """Tests for get_required_mcp_servers() function."""
 
-    def test_spec_gatherer_has_no_mcp_servers(self):
-        """spec_gatherer should not require any MCP servers."""
+    def test_spec_writer_has_no_mcp_servers(self):
+        """spec_writer should not require any MCP servers."""
         from agents.tools_pkg.models import get_required_mcp_servers
 
-        servers = get_required_mcp_servers("spec_gatherer")
+        servers = get_required_mcp_servers("spec_writer")
         assert servers == []
 
     def test_spec_researcher_has_context7(self):
@@ -143,6 +165,21 @@ class TestGetRequiredMcpServers:
         servers = get_required_mcp_servers("coder")
         assert "context7" in servers
         assert "workpilot" in servers
+
+    def test_the_context7_allowlist_covers_the_tool_the_server_exposes(self):
+        """`@upstash/context7-mcp` renamed get-library-docs to query-docs.
+
+        The server is started with `npx -y` — unpinned — so which of the two a
+        checkout gets depends on when npx last resolved the package. Listing
+        only the old name meant the coder was told to fetch documentation with
+        a tool its own allowlist forbade, on every current install.
+        """
+        from agents.tools_pkg.models import CONTEXT7_TOOLS
+        from agents.tools_pkg.permissions import get_allowed_tools
+
+        assert "mcp__context7__query-docs" in CONTEXT7_TOOLS
+        assert "mcp__context7__get-library-docs" in CONTEXT7_TOOLS
+        assert "mcp__context7__query-docs" in get_allowed_tools("coder")
 
     def test_linear_optional_not_included_by_default(self):
         """Linear should not be included unless linear_enabled=True."""

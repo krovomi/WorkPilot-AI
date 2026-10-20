@@ -12,6 +12,7 @@ Two things B.8 changes and one it exposes:
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -27,6 +28,35 @@ from cli.build_commands import (  # noqa: E402
 
 
 class TestTheEngineIsOnByDefault:
+    def test_no_reasoning_task_still_runs_validation(self, tmp_path, monkeypatch):
+        """The UI's per-phase `none` setting must not remove QA after coding."""
+        monkeypatch.delenv("WORKPILOT_WORKFLOW_ENGINE", raising=False)
+        spec = tmp_path / "002-namespace"
+        spec.mkdir()
+        (spec / "task_metadata.json").write_text(
+            json.dumps(
+                {
+                    "provider": "openai",
+                    "thinkingLevel": "ultrathink",
+                    "phaseThinking": dict.fromkeys(
+                        ("spec", "planning", "coding", "qa"), "none"
+                    ),
+                }
+            ),
+            encoding="utf-8",
+        )
+        for changed_files in (None, ["src/Rag.Api/Program.cs"]):
+            profile = _resolve_workflow_profile(spec, changed_files, announce=False)
+            assert profile.effort == "none"
+            assert profile.will_run("qa")
+            assert profile.phase_ids.index("coding") < profile.phase_ids.index("qa")
+            # The verification runs before QA (the reviewer gets its evidence)
+            # and is replayed after it, without a model.
+            assert profile.phase_ids.index("verify") < profile.phase_ids.index("qa")
+            assert profile.phase_ids.index("qa") < profile.phase_ids.index(
+                "verify-replay"
+            )
+
     def test_an_unset_flag_resolves_a_profile(self, tmp_path, monkeypatch):
         monkeypatch.delenv("WORKPILOT_WORKFLOW_ENGINE", raising=False)
         spec = tmp_path / "001-x"
@@ -54,9 +84,26 @@ class TestTheEngineIsOnByDefault:
         spec = tmp_path / "001-x"
         spec.mkdir()
         profile = _resolve_workflow_profile(spec, announce=False)
-        assert profile.declared[0] == "brainstorm"
+        assert profile.declared[0] == "docs"
         assert profile.declared[-1] == "observe"
         assert "qa" in profile.declared
+
+    def test_the_documentation_phase_survives_the_weakest_effort(
+        self, tmp_path, monkeypatch
+    ):
+        """`docs` costs no API call, so no effort level may drop it.
+
+        The phase reads manifests and counts imports; pruning it saves nothing
+        and buys a coder writing against remembered API signatures.
+        """
+        monkeypatch.delenv("WORKPILOT_WORKFLOW_ENGINE", raising=False)
+        spec = tmp_path / "001-x"
+        spec.mkdir()
+        (spec / "task_metadata.json").write_text(
+            '{"phase_thinking": {"coding": "low"}}', encoding="utf-8"
+        )
+        profile = _resolve_workflow_profile(spec, announce=False)
+        assert profile.will_run("docs")
 
 
 class TestTestEvidence:

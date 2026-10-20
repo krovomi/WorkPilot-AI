@@ -3,6 +3,7 @@ import { EventEmitter } from "node:events";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { app } from "electron";
 import type { AppSettings } from "../shared/types";
 import type {
@@ -12,6 +13,10 @@ import type {
 	LiveSuggestion,
 	TakeoverProposal,
 } from "../shared/types/live-companion";
+import { readSettingsFile } from "./settings-utils";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const CONFIG_DIR = path.join(os.homedir(), ".workpilot", "live_companion");
 const CONFIG_FILE = path.join(CONFIG_DIR, "config.json");
@@ -611,11 +616,9 @@ export class LiveCompanionService extends EventEmitter {
 		};
 
 		try {
-			const settingsPath = path.join(app.getPath("userData"), "settings.json");
-			if (existsSync(settingsPath)) {
-				const settings: AppSettings = JSON.parse(
-					readFileSync(settingsPath, "utf-8"),
-				);
+			// Through settings-utils: it decrypts the stored keys.
+			const settings = readSettingsFile() as Partial<AppSettings> | undefined;
+			if (settings) {
 				if (settings.globalClaudeOAuthToken)
 					processEnv.CLAUDE_OAUTH_TOKEN = settings.globalClaudeOAuthToken;
 				if (settings.globalAnthropicApiKey)

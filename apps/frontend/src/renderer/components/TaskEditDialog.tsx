@@ -44,6 +44,12 @@ import type {
 	TaskPriority,
 	ThinkingLevel,
 } from "../../shared/types";
+import type { ContextPolicy } from "../../shared/types/task";
+import type { MobilePlatform } from "../../shared/types/mobile";
+import {
+	resolveContextPolicy,
+	sameContextPolicy,
+} from "../../shared/utils/context-policy";
 import type {
 	PhaseModelConfig,
 	PhaseThinkingConfig,
@@ -52,7 +58,14 @@ import { cn } from "../lib/utils";
 import { useProjectStore } from "../stores/project-store";
 import { useSettingsStore } from "../stores/settings-store";
 import { duplicateTask, persistUpdateTask } from "../stores/task-store";
-import { useProviderContext } from "./ProviderContext";
+import {
+	buildEngineMetadata,
+	defaultEngineProvider,
+	resolveTaskEngine,
+	seedEngine,
+	type TaskEngine,
+} from "../../shared/utils/task-engine";
+import { TaskEngineEditor } from "./task-engine/TaskEngineEditor";
 import { TaskFormFields } from "./task-form/TaskFormFields";
 import { TaskModalLayout } from "./task-form/TaskModalLayout";
 import type { FileReferenceData } from "./task-form/useImageUpload";
@@ -83,6 +96,24 @@ interface TaskEditDialogProps {
 	readonly onCreated?: (newTaskId: string) => void;
 }
 
+/**
+ * Whether two target lists mean the same thing.
+ *
+ * Order does not: `["ios", "android"]` and `["android", "ios"]` are one choice,
+ * and comparing them by identity would mark the dialog dirty for a user who
+ * only unchecked and rechecked a box.
+ */
+function sameTargets(
+	current: MobilePlatform[],
+	saved: MobilePlatform[] | undefined,
+): boolean {
+	const previous = saved ?? [];
+	return (
+		current.length === previous.length &&
+		current.every((platform) => previous.includes(platform))
+	);
+}
+
 export function TaskEditDialog({
 	task,
 	open,
@@ -100,8 +131,6 @@ export function TaskEditDialog({
 		: task.title;
 	// Get selected agent profile from settings for defaults
 	const { settings } = useSettingsStore();
-	// Global provider, used as the per-task default when the task has none yet.
-	const { selectedProvider } = useProviderContext();
 	const selectedProfile =
 		DEFAULT_AGENT_PROFILES.find(
 			(p) => p.id === settings.selectedAgentProfile,
@@ -118,6 +147,7 @@ export function TaskEditDialog({
 	// Form state
 	const [title, setTitle] = useState(initialTitle);
 	const [description, setDescription] = useState(task.description);
+	const [dictationPending, setDictationPending] = useState(false);
 	const [isSaving, setIsSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [showClassification, setShowClassification] = useState(false);
@@ -139,13 +169,28 @@ export function TaskEditDialog({
 		task.metadata?.impact || "",
 	);
 
-	// Per-task LLM provider. Defaults to the task's own provider, else the global
-	// selection. `initialProviderRef` lets edit mode tell "untouched" from an
-	// explicit change so we don't silently pin a provider the user didn't pick.
-	const defaultProvider =
-		task.metadata?.provider || selectedProvider || "anthropic";
-	const [provider, setProvider] = useState<string>(defaultProvider);
-	const initialProviderRef = useRef<string>(defaultProvider);
+	// The task's engine (provider × model × effort per phase). It opens on what
+	// the task already has, completed from the project's provider or the
+	// default provider in Settings. `initialEngineRef` lets edit mode tell
+	// "untouched" from a change, so a plain edit of the title rewrites nothing.
+	const projectProvider = useMemo(
+		() => projects.find((p) => p.id === task.projectId)?.settings?.provider,
+		[projects, task.projectId],
+	);
+	const engineForTask = useCallback(
+		(): TaskEngine =>
+			resolveTaskEngine(
+				task.metadata,
+				seedEngine(
+					settings,
+					task.metadata?.provider ||
+						defaultEngineProvider(settings, projectProvider),
+				),
+			),
+		[task.metadata, settings, projectProvider],
+	);
+	const [engine, setEngine] = useState<TaskEngine>(engineForTask);
+	const initialEngineRef = useRef<string>(JSON.stringify(engine));
 
 	// Agent profile / model configuration
 	const [profileId, setProfileId] = useState<string>(() => {
@@ -196,6 +241,13 @@ export function TaskEditDialog({
 
 	// TDD override (per-task)
 	const [tddMode, setTddMode] = useState(task.metadata?.tddMode ?? false);
+	const [verifyLoop, setVerifyLoop] = useState(task.metadata?.verifyLoop ?? true);
+	const [contextPolicy, setContextPolicy] = useState<ContextPolicy>(() =>
+		resolveContextPolicy(task.metadata),
+	);
+	const [mobileTargets, setMobileTargets] = useState<MobilePlatform[]>(
+		task.metadata?.mobileTargets ?? [],
+	);
 
 	// Reset form when task changes or dialog opens
 	useEffect(() => {
@@ -249,10 +301,12 @@ export function TaskEditDialog({
 				task.metadata?.requireReviewBeforeCoding ?? false,
 			);
 			setTddMode(task.metadata?.tddMode ?? false);
-			const resolvedProvider =
-				task.metadata?.provider || selectedProvider || "anthropic";
-			setProvider(resolvedProvider);
-			initialProviderRef.current = resolvedProvider;
+			setVerifyLoop(task.metadata?.verifyLoop ?? true);
+			setContextPolicy(resolveContextPolicy(task.metadata));
+			setMobileTargets(task.metadata?.mobileTargets ?? []);
+			const openedEngine = engineForTask();
+			setEngine(openedEngine);
+			initialEngineRef.current = JSON.stringify(openedEngine);
 			setError(null);
 			setStep(1);
 
@@ -277,7 +331,7 @@ export function TaskEditDialog({
 		selectedProfile.thinkingLevel,
 		selectedProfile.phaseModels,
 		selectedProfile.phaseThinking,
-		selectedProvider,
+		engineForTask,
 	]);
 
 	// Resolve Azure DevOps attachment images (PAT-protected URLs the renderer
@@ -328,6 +382,7 @@ export function TaskEditDialog({
 	);
 
 	const handleSave = async () => {
+		if (dictationPending) { setError(t("tasks:dictation.pending")); return; }
 		// Validate input
 		if (!description.trim()) {
 			setError(t("tasks:form.errors.descriptionRequired"));
@@ -336,9 +391,13 @@ export function TaskEditDialog({
 
 		const trimmedTitle = title.trim();
 		const trimmedDescription = description.trim();
-		// Provider is "changed" only when the user picked a different one than the
-		// value the dialog opened with (so plain edits don't pin a provider).
-		const providerChanged = provider !== initialProviderRef.current;
+		// The engine is "changed" only when it differs from what the dialog
+		// opened with, so plain edits rewrite none of it.
+		const engineChanged = JSON.stringify(engine) !== initialEngineRef.current;
+		const contextPolicyChanged = !sameContextPolicy(
+			contextPolicy,
+			resolveContextPolicy(task.metadata),
+		);
 
 		// Edit mode short-circuits when nothing changed. Duplicate always creates.
 		if (!isDuplicate) {
@@ -349,20 +408,15 @@ export function TaskEditDialog({
 				priority !== (task.metadata?.priority || "") ||
 				complexity !== (task.metadata?.complexity || "") ||
 				impact !== (task.metadata?.impact || "") ||
-				providerChanged ||
-				model !== (task.metadata?.model || "") ||
-				thinkingLevel !== (task.metadata?.thinkingLevel || "") ||
+				engineChanged ||
 				requireReviewBeforeCoding !==
 					(task.metadata?.requireReviewBeforeCoding ?? false) ||
 				tddMode !== (task.metadata?.tddMode ?? false) ||
+				verifyLoop !== (task.metadata?.verifyLoop ?? true) ||
+				contextPolicyChanged ||
+				!sameTargets(mobileTargets, task.metadata?.mobileTargets) ||
 				JSON.stringify(images) !==
-					JSON.stringify(task.metadata?.attachedImages || []) ||
-				JSON.stringify(phaseModels) !==
-					JSON.stringify(task.metadata?.phaseModels || DEFAULT_PHASE_MODELS) ||
-				JSON.stringify(phaseThinking) !==
-					JSON.stringify(
-						task.metadata?.phaseThinking || DEFAULT_PHASE_THINKING,
-					);
+					JSON.stringify(task.metadata?.attachedImages || []);
 
 			if (!hasChanges) {
 				onOpenChange(false);
@@ -379,32 +433,27 @@ export function TaskEditDialog({
 		if (priority) metadataUpdates.priority = priority;
 		if (complexity) metadataUpdates.complexity = complexity;
 		if (impact) metadataUpdates.impact = impact;
-		if (model) metadataUpdates.model = model;
-		if (thinkingLevel) metadataUpdates.thinkingLevel = thinkingLevel;
-		if (phaseModels && phaseThinking) {
-			metadataUpdates.isAutoProfile = profileId === "auto";
-			metadataUpdates.phaseModels = phaseModels;
-			metadataUpdates.phaseThinking = phaseThinking;
-		}
-		// Pin the provider on this task (uniformly across phases) when it was
-		// chosen for a clone or explicitly changed, so the task runs with the
-		// selected provider regardless of the global selection.
-		if ((isDuplicate || providerChanged) && provider) {
-			metadataUpdates.provider = provider;
-			metadataUpdates.phaseProviders = {
-				spec: provider,
-				planning: provider,
-				coding: provider,
-				qa: provider,
-			};
+		// The engine belongs to the task: a clone takes the one shown, an edit
+		// writes it only when it was changed here.
+		if (isDuplicate || engineChanged) {
+			Object.assign(metadataUpdates, buildEngineMetadata(engine));
 		}
 		// Always set attachedImages to persist removal when all images are deleted
 		metadataUpdates.attachedImages = images.length > 0 ? images : [];
 		metadataUpdates.requireReviewBeforeCoding = requireReviewBeforeCoding;
 		// Only persist tddMode when it diverges from the current value, so that
 		// "inherit project default" (undefined) is preserved unless explicitly changed.
+		if (!sameTargets(mobileTargets, task.metadata?.mobileTargets)) {
+			metadataUpdates.mobileTargets = mobileTargets;
+		}
 		if (tddMode !== (task.metadata?.tddMode ?? false)) {
 			metadataUpdates.tddMode = tddMode;
+		}
+		if (verifyLoop !== (task.metadata?.verifyLoop ?? true)) {
+			metadataUpdates.verifyLoop = verifyLoop;
+		}
+		if (contextPolicyChanged) {
+			metadataUpdates.contextPolicy = { ...contextPolicy };
 		}
 
 		if (isDuplicate) {
@@ -433,6 +482,14 @@ export function TaskEditDialog({
 			metadata: metadataUpdates,
 		});
 
+		if (success && contextPolicyChanged) {
+			// TASK_UPDATE rewrites only the main copy of task_metadata.json; a
+			// worktree copy the backend will resume from must get it too.
+			void globalThis.electronAPI
+				?.updateContextPolicy?.(task.id, contextPolicy)
+				.catch(() => undefined);
+		}
+
 		if (success) {
 			onOpenChange(false);
 			onSaved?.();
@@ -443,11 +500,12 @@ export function TaskEditDialog({
 		setIsSaving(false);
 	};
 
-	const isValid = description.trim().length > 0;
+	const isValid = description.trim().length > 0 && !dictationPending;
 
 	// Advance to the engine step, enforcing the only hard requirement (description)
 	// before leaving the details page.
 	const goToEngineStep = () => {
+		if (dictationPending) { setError(t("tasks:dictation.pending")); return; }
 		if (!description.trim()) {
 			setError(t("tasks:form.errors.descriptionRequired"));
 			return;
@@ -459,7 +517,7 @@ export function TaskEditDialog({
 	return (
 		<TaskModalLayout
 			open={open}
-			onOpenChange={onOpenChange}
+			onOpenChange={(next) => { if (!next && dictationPending) { setError(t("tasks:dictation.pending")); return; } onOpenChange(next); }}
 			title={isDuplicate ? t("tasks:duplicate.title") : t("tasks:edit.title")}
 			description={
 				isDuplicate
@@ -485,7 +543,7 @@ export function TaskEditDialog({
 							<>
 								<Button
 									variant="outline"
-									onClick={() => onOpenChange(false)}
+									onClick={() => { if (dictationPending) { setError(t("tasks:dictation.pending")); return; } onOpenChange(false); }}
 									disabled={isSaving}
 								>
 									{t("common:buttons.cancel")}
@@ -526,6 +584,7 @@ export function TaskEditDialog({
 			}
 		>
 			<TaskFormFields
+				onDictationPendingChange={setDictationPending}
 				section={step === 1 ? "content" : "engine"}
 				projectPath={projectPath}
 				specId={task.specId}
@@ -537,8 +596,14 @@ export function TaskEditDialog({
 				profileId={profileId}
 				model={model}
 				thinkingLevel={thinkingLevel}
-				provider={provider}
-				onProviderChange={setProvider}
+				engineSlot={
+					<TaskEngineEditor
+						engine={engine}
+						onChange={setEngine}
+						idPrefix={`task-engine-${task.id}`}
+						disabled={isSaving}
+					/>
+				}
 				phaseModels={phaseModels}
 				phaseThinking={phaseThinking}
 				onProfileChange={(newProfileId, newModel, newThinkingLevel) => {
@@ -564,8 +629,15 @@ export function TaskEditDialog({
 				onImagesChange={setImages}
 				requireReviewBeforeCoding={requireReviewBeforeCoding}
 				onRequireReviewChange={setRequireReviewBeforeCoding}
+				mobileTargets={mobileTargets}
+				onMobileTargetsChange={setMobileTargets}
 				tddMode={tddMode}
 				onTddModeChange={setTddMode}
+				verifyLoop={verifyLoop}
+				onVerifyLoopChange={setVerifyLoop}
+				contextPolicy={contextPolicy}
+				onContextPolicyChange={setContextPolicy}
+				contextProvider={engine.coding?.provider}
 				disabled={isSaving}
 				error={error}
 				onError={setError}

@@ -65,7 +65,7 @@ class VisualRegressionEngine:
             "height": h,
         }
         meta_path = self.baselines_dir / f"{safe_name}.json"
-        meta_path.write_text(json.dumps(meta, indent=2))
+        meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
 
         return BaselineInfo(
             name=name,
@@ -171,7 +171,7 @@ class VisualRegressionEngine:
 
         for meta_file in sorted(self.baselines_dir.glob("*.json")):
             try:
-                meta = json.loads(meta_file.read_text())
+                meta = json.loads(meta_file.read_text(encoding="utf-8"))
                 png_path = meta_file.with_suffix(".png")
                 if png_path.exists():
                     baselines.append(

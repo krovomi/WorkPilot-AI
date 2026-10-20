@@ -15,15 +15,11 @@
 		"jsx": "react-jsx",
 		"lib": ["ES2022", "DOM", "DOM.Iterable"],
 		"types": ["vitest/globals", "vitest"],
-		"baseUrl": ".",
 		"paths": {
-			"@/*": ["src/renderer/*"],
-			"@shared/*": ["src/shared/*"],
-			"@preload/*": ["src/preload/*"],
-			"@features/*": ["src/renderer/features/*"],
-			"@components/*": ["src/renderer/shared/components/*"],
-			"@hooks/*": ["src/renderer/shared/hooks/*"],
-			"@lib/*": ["src/renderer/lib/*"]
+			"@/*": ["./src/renderer/*"],
+			"@shared/*": ["./src/shared/*"],
+			"@preload/*": ["./src/preload/*"],
+			"@lib/*": ["./src/renderer/lib/*"]
 		}
 	},
 	"include": ["src/**/*"],

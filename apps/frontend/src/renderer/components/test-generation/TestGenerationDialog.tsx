@@ -10,6 +10,9 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useTestDestinationPrompt } from "../../hooks/use-test-destination-prompt";
+import { useTestLibraries } from "../../hooks/use-test-libraries";
+import { useProjectStore } from "../../stores/project-store";
 import {
 	type CoverageGap,
 	type GeneratedTest,
@@ -37,13 +40,16 @@ import {
 } from "../ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { Textarea } from "../ui/textarea";
+import { GenerationErrorPanel } from "./GenerationErrorPanel";
 import { LiveGenerationSurface } from "./LiveGenerationSurface";
 import { SmartFilePicker } from "./SmartFilePicker";
+import { TestDestinationDialog } from "./TestDestinationDialog";
+import { TestLibrariesPicker } from "./TestLibrariesPicker";
 
 const PRIORITY_COLORS = {
-	high: "bg-red-100 text-red-800",
-	medium: "bg-yellow-100 text-yellow-800",
-	low: "bg-green-100 text-green-800",
+	high: "bg-destructive/15 text-destructive",
+	medium: "bg-warning/15 text-warning",
+	low: "bg-success/15 text-success",
 };
 
 /** Count assertion-like calls in a test body, for the per-test summary chip. */
@@ -82,6 +88,10 @@ export function TestGenerationDialog({
 	const [userStory, setUserStory] = useState("");
 	const [targetModule, setTargetModule] = useState("");
 	const [tddDescription, setTddDescription] = useState("");
+	// Where the tests go is settled before the run starts: asking after a
+	// generation would mean holding a finished file hostage to a question.
+	const destinationPrompt = useTestDestinationPrompt();
+	const projectPath = useProjectStore((state) => state.getActiveProject()?.path);
 
 	const {
 		isOpen,
@@ -90,7 +100,6 @@ export function TestGenerationDialog({
 		isLiveRun,
 		status,
 		result,
-		error,
 		selectedFile,
 		existingTestPath,
 		coverageTarget,
@@ -106,6 +115,11 @@ export function TestGenerationDialog({
 		generateE2ETests,
 		generateTDDTests,
 	} = useTestGenerationStore();
+
+	// What the tests are written against — the project's own stack, unless the
+	// user says otherwise. Resolved from the manifests, so the common case
+	// needs no interaction.
+	const libraries = useTestLibraries(selectedFile, projectPath);
 
 	// Reset state when dialog closes
 	useEffect(() => {
@@ -130,38 +144,64 @@ export function TestGenerationDialog({
 
 	const handleGenerateUnitTests = useCallback(async () => {
 		if (!selectedFile) return;
+		const choice = await destinationPrompt.prompt(selectedFile, projectPath, {
+			existingTestPath: existingTestPath || undefined,
+		});
+		if (choice.cancelled) return;
 		try {
 			await generateUnitTests(
 				selectedFile,
 				existingTestPath || undefined,
 				coverageTarget,
+				choice.directory,
+				libraries.chosen,
 			);
 		} catch {
 			// Error is surfaced via the store's error state (rendered in the UI).
 		}
-	}, [selectedFile, existingTestPath, coverageTarget, generateUnitTests]);
+	}, [
+		selectedFile,
+		existingTestPath,
+		coverageTarget,
+		generateUnitTests,
+		destinationPrompt,
+		projectPath,
+		libraries.chosen,
+	]);
 
 	const handleGenerateE2ETests = useCallback(async () => {
 		if (!userStory.trim() || !targetModule.trim()) return;
 		try {
-			await generateE2ETests(userStory, targetModule);
+			await generateE2ETests(userStory, targetModule, undefined, libraries.chosen);
 		} catch {
 			// Error is surfaced via the store's error state (rendered in the UI).
 		}
-	}, [userStory, targetModule, generateE2ETests]);
+	}, [userStory, targetModule, generateE2ETests, libraries.chosen]);
 
 	const handleGenerateTDDTests = useCallback(async () => {
 		if (!tddDescription.trim()) return;
 		try {
-			await generateTDDTests({
-				description: tddDescription,
-				language: tddLanguage,
-				snippet_type: tddSnippetType,
-			});
+			await generateTDDTests(
+				{
+					description: tddDescription,
+					language: tddLanguage,
+					snippet_type: tddSnippetType,
+				},
+				undefined,
+				libraries.chosen,
+			);
 		} catch {
 			// Error is surfaced via the store's error state (rendered in the UI).
 		}
-	}, [tddDescription, tddLanguage, tddSnippetType, generateTDDTests]);
+	}, [
+		tddDescription,
+		tddLanguage,
+		tddSnippetType,
+		generateTDDTests,
+		libraries.chosen,
+	]);
+	// TDD has no source file to resolve a layout from, so there is nothing to
+	// ask about: the backend falls back to the project's own test directory.
 
 	const handleCopyToClipboard = useCallback((content: string) => {
 		navigator.clipboard.writeText(content);
@@ -187,8 +227,8 @@ export function TestGenerationDialog({
 								{gap.priority} priority
 							</Badge>
 						</div>
-						<p className="text-sm text-gray-600 mb-2">{gap.reason}</p>
-						<div className="text-xs text-gray-500">
+						<p className="mb-2 text-sm text-muted-foreground">{gap.reason}</p>
+						<div className="text-xs text-muted-foreground">
 							Line: {gap.function.line_number} | Complexity:{" "}
 							{gap.function.complexity} | Tests needed:{" "}
 							{gap.suggested_test_count}
@@ -255,6 +295,12 @@ export function TestGenerationDialog({
 	);
 
 	return (
+		<>
+		<TestDestinationDialog
+			destination={destinationPrompt.pending}
+			onConfirm={destinationPrompt.confirm}
+			onCancel={destinationPrompt.cancel}
+		/>
 		<Dialog open={isOpen} onOpenChange={closeDialog}>
 			<DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
 				<DialogHeader>
@@ -346,7 +392,7 @@ export function TestGenerationDialog({
 							</div>
 
 							{status && (
-								<div className="text-sm text-gray-600">
+								<div className="flex items-center text-sm text-muted-foreground">
 									{phase === "analyzing" && (
 										<Loader2 className="w-3 h-3 inline mr-2 animate-spin" />
 									)}
@@ -354,12 +400,6 @@ export function TestGenerationDialog({
 										<Loader2 className="w-3 h-3 inline mr-2 animate-spin" />
 									)}
 									{status}
-								</div>
-							)}
-
-							{error && (
-								<div className="text-sm text-red-600 bg-red-50 p-2 rounded">
-									{error}
 								</div>
 							)}
 
@@ -424,6 +464,20 @@ export function TestGenerationDialog({
 								/>
 							</div>
 
+							<TestLibrariesPicker
+								selection={libraries.selection}
+								chosen={libraries.chosen}
+								missing={libraries.missing}
+								loading={libraries.loading}
+								installing={libraries.installing}
+								report={libraries.report}
+								error={libraries.error}
+								onToggle={libraries.toggle}
+								onReset={libraries.resetToProject}
+								onAddPackages={() => void libraries.addMissingPackages()}
+								canInstall={Boolean(projectPath)}
+							/>
+
 							<Button
 								onClick={handleGenerateUnitTests}
 								disabled={phase === "generating" || !selectedFile}
@@ -434,7 +488,7 @@ export function TestGenerationDialog({
 								) : (
 									<Play className="w-4 h-4 mr-2" />
 								)}
-								Generate Unit Tests
+								{t("testGeneration:actions.generateUnitTests")}
 							</Button>
 
 							{result && result.generated_tests.length > 0 && (
@@ -532,7 +586,7 @@ export function TestGenerationDialog({
 								) : (
 									<Play className="w-4 h-4 mr-2" />
 								)}
-								Generate E2E Tests
+								{t("testGeneration:actions.generateE2ETests")}
 							</Button>
 
 							{result && result.generated_tests.length > 0 && (
@@ -723,6 +777,15 @@ export function TestGenerationDialog({
 						</div>
 					)}
 
+				{/* Coverage analysis has no live surface to host the failure, so the
+				    panel stands on its own — the tab it was launched from does not
+				    matter, and a failure must never be silent. */}
+				{!isLiveRun && phase === "error" && (
+					<div className="mt-4">
+						<GenerationErrorPanel />
+					</div>
+				)}
+
 				<DialogFooter>
 					<Button variant="outline" onClick={closeDialog}>
 						{t("common:buttons:close", { defaultValue: "Close" })}
@@ -730,5 +793,6 @@ export function TestGenerationDialog({
 				</DialogFooter>
 			</DialogContent>
 		</Dialog>
+		</>
 	);
 }

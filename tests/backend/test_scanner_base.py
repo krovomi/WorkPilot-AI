@@ -47,11 +47,13 @@ class _Scanner(BaseScanner[_Finding, _Report]):
 
 def test_scan_files_aggregates_across_files() -> None:
     scanner = _Scanner()
-    report = scanner.scan_files({
-        "a.py": "BAD code",
-        "b.py": "WARN something",
-        "c.py": "nothing wrong here",
-    })
+    report = scanner.scan_files(
+        {
+            "a.py": "BAD code",
+            "b.py": "WARN something",
+            "c.py": "nothing wrong here",
+        }
+    )
     assert report.files_scanned == 3
     assert len(report.findings) == 2
     assert report.count_by_severity == {"critical": 1, "medium": 1}
@@ -95,11 +97,13 @@ def test_scan_files_swallows_per_file_errors() -> None:
                 report.findings.append(_Finding(severity="critical", file=file_path))
             return report
 
-    report = _ExplodingScanner().scan_files({
-        "ok.py": "BAD",
-        "broken.py": "EXPLODE",
-        "also_ok.py": "",
-    })
+    report = _ExplodingScanner().scan_files(
+        {
+            "ok.py": "BAD",
+            "broken.py": "EXPLODE",
+            "also_ok.py": "",
+        }
+    )
     # Broken file is not counted; the other two still contribute.
     assert report.files_scanned == 2
     assert len(report.findings) == 1

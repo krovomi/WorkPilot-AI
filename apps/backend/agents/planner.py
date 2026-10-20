@@ -8,9 +8,15 @@ Handles follow-up planner sessions for adding new subtasks to completed specs.
 import logging
 from pathlib import Path
 
-from core.runtimes import create_agent_runtime
-from phase_config import get_phase_model, get_phase_provider, get_phase_thinking_budget
-from phase_event import ExecutionPhase, emit_phase
+from context_mgmt.reset_limit import ResetLimit
+from core.client import create_agent_client
+from core.phase_event import ExecutionPhase, emit_phase
+from phase_config import (
+    get_phase_model,
+    get_phase_provider,
+    get_phase_thinking_budget,
+    load_task_metadata,
+)
 from task_logger import (
     LogPhase,
     get_task_logger,
@@ -38,11 +44,42 @@ from .session import run_agent_session
 logger = logging.getLogger(__name__)
 
 
+def _create_planning_client(project_dir: Path, spec_dir: Path, model: str):
+    """The planning session's client, built the way the first planning is.
+
+    This used to be `core.runtimes.create_agent_runtime`, whose runtimes have no
+    `query` / `receive_response`: `run_agent_session` failed on its first call,
+    on every provider. On Claude the runtime also built a `create_simple_client`
+    for `planner`, which declares Write, Edit and Bash, so the commands and
+    writes it never got to run had no security hook in front of them.
+    `create_agent_client` is what `agents/coder.py` plans with: the hooks and
+    the denials of `create_client` on Claude, `ToolExecutor`'s gate elsewhere.
+    """
+    # As in `agents/coder.py`: the phase's provider only when the task names
+    # one, otherwise `create_agent_client` resolves it (IPC marker, env,
+    # task-wide metadata).
+    metadata = load_task_metadata(spec_dir)
+    provider = (
+        get_phase_provider(spec_dir, phase="planning")
+        if metadata and (metadata.get("phaseProviders") or metadata.get("engineLocked"))
+        else None
+    )
+    return create_agent_client(
+        project_dir=project_dir,
+        spec_dir=spec_dir,
+        model=get_phase_model(spec_dir, "planning", model),
+        agent_type="planner",
+        max_thinking_tokens=get_phase_thinking_budget(spec_dir, "planning"),
+        provider=provider,
+    )
+
+
 async def run_followup_planner(
     project_dir: Path,
     spec_dir: Path,
     model: str,
     verbose: bool = False,
+    jev_run=None,
 ) -> bool:
     """
     Run the follow-up planner to add new subtasks to a completed spec.
@@ -69,8 +106,19 @@ async def run_followup_planner(
         bool: True if planning completed successfully
     """
     from implementation_plan import ImplementationPlan
-    from prompts import get_followup_planner_prompt
+    from integrations.jev.adapters import _read, assess_planning
+    from integrations.jev.models import JevContext
+    from integrations.jev.rubrics import advice_text, classification_hint
+    from integrations.jev.runtime import JevRun
+    from prompts_pkg.prompts import get_followup_planner_prompt
 
+    jev_run = jev_run or JevRun.from_env(
+        JevContext("feature-build", project_dir, spec_dir)
+    )
+    jev_outcome = await assess_planning(
+        jev_run, _read(spec_dir / "FOLLOWUP_REQUEST.md")
+    )
+    jev_hint = classification_hint(jev_outcome)
     # Initialize status manager for ccstatusline
     status_manager = StatusManager(project_dir)
     status_manager.set_active(spec_dir.name, BuildState.PLANNING)
@@ -91,6 +139,7 @@ async def run_followup_planner(
             model,
             spec_dir=spec_dir,
             phase="planning",
+            task_hint=jev_hint,
             prompt_hint=f"follow-up planning for spec {spec_dir.name}",
         )
         if override_info is not None:
@@ -112,7 +161,7 @@ async def run_followup_planner(
         else:
             suggestion = suggest_routed_model(
                 prompt=f"follow-up planning for spec {spec_dir.name}",
-                task_hint="planning",
+                task_hint=jev_hint or "planning",
             )
             if suggestion and suggestion["model"] != model:
                 audit_decision(
@@ -166,24 +215,10 @@ async def run_followup_planner(
         task_logger.start_phase(LogPhase.PLANNING, "Starting follow-up planning...")
         task_logger.set_session(1)
 
-    # Migration vers runtime provider-agnostique
-    phase_provider = get_phase_provider(spec_dir, phase="planning")
-    phase_model = get_phase_model(spec_dir, "planning", model)
-    phase_thinking_budget = get_phase_thinking_budget(spec_dir, "planning")
-    config = None
-    runtime = create_agent_runtime(
-        spec_dir=spec_dir,
-        phase="planning",
-        project_dir=project_dir,
-        agent_type="planner",
-        cli_provider=phase_provider,
-        cli_model=phase_model,
-        cli_thinking=phase_thinking_budget,
-        config=config,
-    )
-
     # Generate follow-up planner prompt
     prompt = get_followup_planner_prompt(spec_dir)
+    if advice := advice_text(jev_outcome):
+        prompt += "\n\n" + advice
 
     print_status("Running follow-up planner...", "progress")
     print()
@@ -196,14 +231,38 @@ async def run_followup_planner(
             handle_rate_limit_pause,
         )
 
+        # Same cap on resets in a row as the coder loop (`ResetLimit`).
+        context_resets = ResetLimit()
         while True:
-            async with runtime:
+            # One client per attempt: a retry after a rate-limit pause or a hot
+            # swap opens a session of its own, under whatever the task's
+            # metadata says now.
+            client = _create_planning_client(project_dir, spec_dir, model)
+            context_unit = ("planning", getattr(client, "model", None))
+            async with client:
                 status, response, error_info = await run_agent_session(
-                    runtime, prompt, spec_dir, verbose, phase=LogPhase.PLANNING
+                    client,
+                    prompt,
+                    spec_dir,
+                    verbose,
+                    phase=LogPhase.PLANNING,
+                    context_managed=True,
+                    context_monitor_only=context_resets.monitor_only(context_unit),
                 )
+            if context_resets.record(context_unit, status):
+                notice = context_resets.notice("the follow-up planning")
+                if task_logger:
+                    task_logger.log_warning(notice, LogPhase.PLANNING)
+                else:
+                    print_status(notice, "warning")
 
-            # Hot LLM swap requested mid-session: rebuild the runtime with the new
-            # provider/model/effort for planning and retry. The conversation log is
+            # The context guard compacted or cleared the thread: run the
+            # planning session again on what it left to replay.
+            if status == "context_reset":
+                continue
+
+            # Hot LLM swap requested mid-session: retry under the new
+            # provider/model/effort for planning. The conversation log is
             # replayed by the session so context carries over. No marker → this
             # branch is never taken.
             if status == "hot_swap":
@@ -219,16 +278,6 @@ async def run_followup_planner(
                         apply_hot_swap_to_metadata(spec_dir, _req)
                         if task_logger:
                             task_logger.log_info(describe_hot_swap(_req))
-                    runtime = create_agent_runtime(
-                        spec_dir=spec_dir,
-                        phase="planning",
-                        project_dir=project_dir,
-                        agent_type="planner",
-                        cli_provider=get_phase_provider(spec_dir, phase="planning"),
-                        cli_model=get_phase_model(spec_dir, "planning", model),
-                        cli_thinking=get_phase_thinking_budget(spec_dir, "planning"),
-                        config=None,
-                    )
                     continue
                 except Exception:  # noqa: BLE001 - fall through to normal handling
                     pass

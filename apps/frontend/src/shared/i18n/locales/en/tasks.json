@@ -1,4 +1,36 @@
 {
+	"dictation": {
+		"pending": "Add or discard the voice draft before continuing.",
+		"start": "Dictate",
+		"resume": "Resume dictation",
+		"stop": "Stop",
+		"language": "Spoken language",
+		"auto": "Detect language",
+		"level": "Microphone level",
+		"preparing": "Preparing microphone and model…",
+		"recording": "Listening",
+		"finishing": "Finishing transcription…",
+		"downloading": "Downloading the local speech model…",
+		"help": "Local transcription. Choose the language you speak; regional accents are supported, but recognition quality can vary.",
+		"draft": "Editable voice draft",
+		"placeholder": "Your words will appear here after each pause…",
+		"editHelp": "Correct words here while speaking. New phrases are appended without replacing your corrections. Your task stays unchanged until you add this draft.",
+		"insert": "Add to description",
+		"cancel": "Discard voice draft",
+		"undo": "Undo insertion",
+		"download": "Download multilingual model (about 150 MB)",
+		"errors": {
+			"model": "The local speech model is not installed. Download it once to use dictation offline.",
+			"dependency": "The speech engine is unavailable. Install the backend dependencies (faster-whisper), then restart WorkPilot.",
+			"offline": "Strict offline mode prevents downloading a model. Prepare the model before enabling this mode.",
+			"download": "The model download failed. Check your connection and available disk space, then try dictation again.",
+			"busy": "Another dictation session is active. Stop it before starting this one.",
+			"timeout": "The speech engine took too long. Your text has been preserved.",
+			"microphone": "Unable to open the microphone. Check the device and system microphone permissions, then try again.",
+			"transcription": "Transcription stopped unexpectedly. Your existing text is preserved; the last audio portion may need to be dictated again.",
+			"backlog": "Transcription is catching up. Recording has stopped; wait for the remaining phrases before resuming."
+		}
+	},
 	"refreshTasks": "Refresh Tasks",
 	"status": {
 		"backlog": "Backlog",
@@ -41,7 +73,8 @@
 		"preview": "Preview",
 		"syncFromBranch": "Sync from branch",
 		"duplicate": "Duplicate",
-		"duplicateSuffix": "(copy)"
+		"duplicateSuffix": "(copy)",
+		"estimate": "Estimate complexity"
 	},
 	"confirmDelete": {
 		"title": "Delete Task",
@@ -92,7 +125,8 @@
 		"qaIssues": "QA Issues",
 		"approvePlan": "Approve Plan",
 		"plan_review": "Approve Plan",
-		"stopped": "Stopped"
+		"stopped": "Stopped",
+		"qaUnverified": "QA not verified"
 	},
 	"tooltips": {
 		"archiveTask": "Archive task",
@@ -128,6 +162,9 @@
 		},
 		"error": {
 			"title": "Task Failed"
+		},
+		"qa_unverified": {
+			"title": "Ready for review — QA could not verify"
 		}
 	},
 	"columns": {
@@ -322,6 +359,30 @@
 			"runAsTaskLabel": "Run as task",
 			"runAsTaskHint": "Run as an interactive Kanban task (planning, review, conversation) instead of a one-shot.",
 			"taskCreated": "Task created: {{name}}"
+		},
+		"blockers": {
+			"label_one": "1 blocker",
+			"label_other": "{{count}} blockers",
+			"label_zero": "Blockers",
+			"title": "Dependencies",
+			"description": "This task declares prerequisites that are not finished.",
+			"gatedDescription": "The queue will not start it until these prerequisites are done.",
+			"resolved_one": "1 prerequisite already done.",
+			"resolved_other": "{{count}} prerequisites already done.",
+			"missing_one": "1 prerequisite not found (task deleted) — it does not block.",
+			"missing_other": "{{count}} prerequisites not found (tasks deleted) — they do not block.",
+			"overrideTitle": "Started despite its prerequisites",
+			"overrideDescription_one": "“{{title}}” starts while 1 prerequisite is unfinished.",
+			"overrideDescription_other": "“{{title}}” starts while {{count}} prerequisites are unfinished.",
+			"overrideAnnounce_one": "{{title}} moved to in progress despite 1 unfinished prerequisite.",
+			"overrideAnnounce_other": "{{title}} moved to in progress despite {{count}} unfinished prerequisites."
+		},
+		"smartEstimate": {
+			"label": "Complexity {{score}}",
+			"title": "Complexity estimate",
+			"confidence": "Confidence: {{percent}}%",
+			"qaIterations_one": "1 QA pass expected.",
+			"qaIterations_other": "{{count}} QA passes expected."
 		}
 	},
 	"queue": {
@@ -392,6 +453,9 @@
 			"qaCoverageRejected": "QA pass #{{n}} rejected by the coverage gate; applying a fix, then re-reviewing (pass #{{next}}).",
 			"qaArchRejected": "QA pass #{{n}} rejected: {{count}} architecture violation(s); applying a fix, then re-reviewing (pass #{{next}}).",
 			"qaRejected": "QA pass #{{n}} rejected: {{count}} issue(s) found; applying a fix, then re-reviewing (pass #{{next}}).",
+			"qaCoverageRejectedHandover": "QA pass #{{n}} rejected by the coverage gate; handing over to human review.",
+			"qaArchRejectedHandover": "QA pass #{{n}} rejected: {{count}} architecture violation(s); handing over to human review.",
+			"qaRejectedHandover": "QA pass #{{n}} rejected: {{count}} issue(s) found; handing over to human review.",
 			"qaApproved": "QA pass #{{n}} approved: all criteria met, architecture clean. Validation complete.",
 			"qaManualVerification": "QA pass #{{n}}: code validated by review; manual verification required. Validation complete.",
 			"qaManualVerificationSandbox": "QA pass #{{n}}: code validated by review; manual verification required (environment limitation: tests can't run here). Validation complete.",
@@ -432,6 +496,7 @@
 		"run": "Run visual proof",
 		"retry": "Retry",
 		"runFailed": "Failed to run visual proof",
+		"publishFailed": "Screenshots were captured but could not be pushed to the task branch, so the PR cannot link to them: {{error}}",
 		"openComment": "Open comment",
 		"openPr": "Open PR",
 		"openCapturedUrl": "Open captured URL",
@@ -484,6 +549,15 @@
 		"acSaved": "Saved.",
 		"acCancel": "Cancel",
 		"acHelp": "One criterion per line. Saved in task_metadata.json.",
+		"acAdd": "Add a criterion",
+		"acRemove": "Remove criterion {{index}}",
+		"acItemLabel": "Criterion {{index}}",
+		"acItemPlaceholder": "Describe a criterion…",
+		"acListLabel": "Acceptance criteria",
+		"acListHelp": "Enter for a new bullet, Alt+↑/↓ to reorder. Saved in task_metadata.json.",
+		"acModeLabel": "Editing mode",
+		"acModeList": "Bullets",
+		"acModeText": "Text",
 		"acSaveErrorTitle": "Save failed",
 		"acSaveErrorDesc": "Could not save the acceptance criteria. See the console for details.",
 		"affectedFiles": "Affected files",
@@ -496,7 +570,66 @@
 		"extraNoteHelp": "Saved into requirements.json as additional_context.",
 		"extraNoteSaved": "Saved.",
 		"extraNoteSave": "Save note",
-		"extraNoteSaving": "Saving…"
+		"extraNoteSaving": "Saving…",
+		"blockedBy": {
+			"title": "Blocked by",
+			"empty": "No prerequisites.",
+			"add": "Add a prerequisite",
+			"search": "Search a task…",
+			"noCandidate": "No eligible task (cycles are excluded).",
+			"remove": "Remove {{title}}",
+			"goToTask": "Go to this task",
+			"missingChip": "{{id}} (not found)",
+			"missingHint": "That task no longer exists; the prerequisite is ignored.",
+			"saveErrorTitle": "Could not save",
+			"saveErrorDesc": "The prerequisites could not be saved."
+		},
+		"description": "Description",
+		"descriptionEdit": "Edit",
+		"descriptionClickHint": "Click to edit the description",
+		"descriptionAdd": "Add a description",
+		"descriptionEmpty": "No description.",
+		"descriptionPlaceholder": "Describe what is expected — Markdown supported.",
+		"acFromDescription": "read from the description",
+		"acFromDescriptionHint": "These criteria come from the description's \"Acceptance criteria\" section. Save them to pin them in task_metadata.json.",
+		"acAdopt": "Save as criteria",
+		"source": {
+			"ideation": "Ideation",
+			"manual": "Manual",
+			"imported": "Imported",
+			"insights": "Insights",
+			"roadmap": "Roadmap",
+			"linear": "Linear",
+			"github": "GitHub",
+			"gitlab": "GitLab",
+			"visual-canvas": "Visual canvas",
+			"tech-debt": "Tech debt"
+		}
+	},
+	"kind": {
+		"label": "Kind",
+		"proposed": "proposed",
+		"chosen": "chosen by you",
+		"change": "Change the kind of this task",
+		"values": {
+			"feature": "Feature",
+			"bug_fix": "Bug fix",
+			"hotfix": "Hotfix",
+			"investigation": "Investigation",
+			"run": "Operations (RUN)",
+			"refactoring": "Refactoring",
+			"test": "Tests",
+			"docs": "Documentation",
+			"spike": "Spike / study"
+		},
+		"source": {
+			"user": "chosen by you",
+			"category": "from the category",
+			"import": "from the imported item",
+			"keywords": "from the title",
+			"default": "default"
+		},
+		"help": "Decided without AI from the category, the imported item or the words of the title. Change it if it is wrong: later versions will pick the workflow from it."
 	},
 	"images": {
 		"removeImageAriaLabel": "Remove image {{filename}}",
@@ -513,7 +646,17 @@
 		"backgroundTaskTitle": "Task continues in background",
 		"backgroundTaskDescription": "The task is still running. You can reopen this dialog to monitor progress."
 	},
+	"fileAutocomplete": {
+		"searching": "Searching the project…",
+		"empty": "No files found",
+		"hint": "↑↓ navigate · Enter select · Esc close"
+	},
 	"wizard": {
+		"extras": {
+			"acListHelp": "Enter for a new bullet, Alt+↑/↓ to reorder. Passed to the planner, the coder and QA.",
+			"acTextHelp": "One criterion per line. Passed to the planner, the coder and QA.",
+			"noteHelp": "Saved in requirements.json as additional_context."
+		},
 		"createTitle": "Create New Task",
 		"createDescription": "Describe what you want to build. The AI will analyze your request and create a detailed specification.",
 		"descriptionPlaceholder": "Describe the feature, bug fix, or improvement you want to implement. Be as specific as possible about requirements, constraints, and expected behavior. Type @ to reference files.",
@@ -687,7 +830,9 @@
 		"emptyResult": "The generator produced no tests.",
 		"doneTitle": "Tests generated",
 		"doneDescription_one": "{{count}} test file written into the worktree.",
-		"doneDescription_other": "{{count}} test files written into the worktree."
+		"doneDescription_other": "{{count}} test files written into the worktree.",
+		"destinationAppliesToBatch": "This directory is used for every file in this run.",
+		"outsideWorktree": "The tests were written to {{path}}, outside this task's worktree, so they are not part of its diff."
 	},
 	"interview": {
 		"banner": "Clarify the spec before starting: the agent asks you 3-5 targeted questions.",
@@ -850,7 +995,35 @@
 			"installed": "✓ installed",
 			"downloadable": "to download",
 			"downloadStartedTitle": "Downloading model",
-			"downloadStartedDesc": "{{model}} is downloading in the background."
+			"downloadStartedDesc": "{{model}} is downloading in the background.",
+			"smallWarn": "⚠ small — not advised for planning",
+			"smallWarnTip": "Small model ({{n}}B) — not advised for planning (prefer ≥24B or Claude); limited on complex tasks.",
+			"download": "Download",
+			"runningNotice": "Running model: {{model}}. Selecting a model does not replace the current request. Use Rerun to restart with the new settings.",
+			"runtimeUnknown": "not reported yet",
+			"customOption": "Other (official catalog)",
+			"searchTitle": "Find an Ollama model",
+			"searchSource": "Source: official catalog at ollama.com/library",
+			"searchPlaceholder": "Search for a model or variant…",
+			"searchHint": "Example: qwen3, then qwen3: for its variants. Select a result to confirm.",
+			"searchLoading": "Searching the official catalog…",
+			"searchError": "Official catalog unavailable. Edit the search to retry. Unverified names will not be used.",
+			"searchEmpty": "No matching model in the official catalog.",
+			"customConfirm": "Confirm model",
+			"customPlaceholder": "Model name (e.g. qwen2.5-coder:7b)",
+			"customAria": "Enter the model name",
+			"downloadTip": "“{{model}}” is not installed on the local server. The download runs in the background — you can keep working and come back later.",
+			"downloadingTip": "Downloading “{{model}}”",
+			"downloadQueued": "queued…",
+			"cancelDownload": "Cancel download",
+			"retryDownload": "Retry download",
+			"ready": "Ready",
+			"downloadDoneTitle": "Model ready",
+			"downloadDoneDesc": "{{model}} is installed and ready to use.",
+			"downloadFailedTitle": "Download failed",
+			"downloadFailedDesc": "{{model}} could not be downloaded.",
+			"downloadUnavailable": "Model downloads are only available in the desktop app.",
+			"serverUnavailable": "The local Ollama server could not be started."
 		},
 		"modelGroup": {
 			"toggleAria": "Show or hide logs from model {{model}}",
@@ -880,9 +1053,9 @@
 		},
 		"hotSwap": {
 			"title": "Hot swap requested",
-			"desc": "The change will apply on the next turn, keeping the context.",
+			"desc": "Change requested. The current request may continue; use Rerun to restart immediately.",
 			"pending": "Swapping…",
-			"pendingTip": "The LLM change will apply on the next turn."
+			"pendingTip": "Change requested. The current request may continue; use Rerun to restart immediately."
 		}
 	},
 	"modal": {
@@ -898,9 +1071,6 @@
 			"resumeTask": "Resume Task",
 			"resumeSession": "Resume Session",
 			"resumeWithProvider": "Resume with…",
-			"resumingWithProvider": "Resuming…",
-			"resumeWithProviderTooltip": "Resume this task with a different LLM provider",
-			"resumeWithProviderMenuLabel": "Pick a provider",
 			"resumeWithProviderSuccessTitle": "Resuming with {{provider}}",
 			"resumeWithProviderSuccessDesc": "The previous conversation will be replayed into the new provider.",
 			"resumeWithProviderErrorTitle": "Resume failed",
@@ -955,7 +1125,8 @@
 			"hasErrors": "Has Errors",
 			"approvePlan": "Approve Plan",
 			"stopped": "Stopped",
-			"qaIssues": "QA Issues"
+			"qaIssues": "QA Issues",
+			"qaUnverified": "QA not verified"
 		},
 		"move": {
 			"trigger": "Move task to another column",
@@ -1019,7 +1190,763 @@
 			"conflictsNone": "No file overlap with other active tasks",
 			"conflictsTitle": "Potential conflicts with parallel tasks",
 			"conflictsDescription": "{{count}} file(s) in this plan are also touched by other active tasks. Merging both worktrees will likely conflict — consider finishing one task first or re-scoping the plan.",
-			"conflictsMoreFiles": "+{{count}} more file(s)"
+			"conflictsMoreFiles": "+{{count}} more file(s)",
+			"conflictsMakeDependency": "Depend on this one",
+			"conflictsDependencyAdded": "Prerequisite added: “{{title}}”",
+			"conflictsDependencyExists": "Already a prerequisite",
+			"conflictsDependencyCycle": "Not possible: would create a cycle"
+		}
+	},
+	"untitled": "Untitled task",
+	"plan": {
+		"changesSaved": "Plan saved",
+		"saveError": "Could not save the plan"
+	},
+	"codeEditor": {
+		"deleteFile": "Delete file",
+		"contentPlaceholder": "File content...",
+		"selectFile": "Select a file to edit"
+	},
+	"failure": {
+		"title": "This task failed",
+		"unknown": "The build stopped without reporting a reason. Open the Logs tab for the last output.",
+		"hint": "Fix the cause, then relaunch the task. Planning failures on a local model usually mean switching that phase to a more capable model.",
+		"copy": "Copy",
+		"copied": "Copied"
+	},
+	"pauseState": {
+		"pausedDuring": "Paused during {{phase}}",
+		"resumesFrom": "Resumes from {{phase}}",
+		"phase": {
+			"spec": "spec creation",
+			"planning": "planning",
+			"coding": "coding",
+			"qa_review": "QA review",
+			"qa_fixing": "QA fixes",
+			"unknown": "the last checkpoint"
+		}
+	},
+	"docintel": {
+		"title": "Attachments and ADRs",
+		"subtitle": "What the agents will read from this task's attachments, and which architecture decisions bind the build",
+		"expand": "Details",
+		"collapse": "Hide",
+		"badge": {
+			"attachments": "{{count}} attachment",
+			"attachments_other": "{{count}} attachments",
+			"adrs": "{{count}} accepted ADR",
+			"adrs_other": "{{count}} accepted ADRs",
+			"flagged": "{{count}} flagged",
+			"flagged_other": "{{count}} flagged",
+			"secrets": "{{count}} secret masked",
+			"secrets_other": "{{count}} secrets masked",
+			"diagnosed": "{{count}} failure located",
+			"diagnosed_other": "{{count}} failures located",
+			"codeChecks": "{{count}} diagram or call checked against the code",
+			"codeChecks_other": "{{count}} diagrams or calls checked against the code"
+		},
+		"attachments": {
+			"title": "Attachments"
+		},
+		"adrs": {
+			"title": "Architecture Decision Records",
+			"body": "Accepted records are given to the planner, the coder and QA as binding rules.",
+			"proposed": "proposed"
+		},
+		"status": {
+			"diagram": "diagram",
+			"text": "text",
+			"image": "image",
+			"document": "document",
+			"skipped": "skipped",
+			"redacted": "masked",
+			"withheld": "withheld"
+		},
+		"detail": {
+			"diagram": "{{engine}} diagram read from its source: {{nodes}} elements, {{edges}} arrows",
+			"text": "text read as is",
+			"ocr": "transcribed by OCR ({{engine}})",
+			"image": "handed to the agents as an image ({{reason}})",
+			"document": "converted by the agents with the document skill",
+			"skipped": "not read ({{reason}})",
+			"flagged": "text withheld from the prompt: it looks like an instruction aimed at the agent",
+			"described": "described by a local vision model ({{engine}})",
+			"redacted": "secret on screen ({{kinds}}): agents get a copy with it painted out",
+			"withheld": "not given to the agents: it shows a secret that could not be masked ({{kinds}})",
+			"withheldInjection": "not given to the agents: text in the image looks like an instruction aimed at them",
+			"secretsInText": "secrets masked in the text ({{kinds}})",
+			"whiteboardDiagram": "drawn by the local vision model from a photo — a model's reading to verify: {{nodes}} elements, {{edges}} arrows",
+			"pages": "{{read}} of {{total}} pages",
+			"scannedPdf": "scanned PDF ({{count}} page): read by OCR at build time, or now from the proposals below",
+			"scannedPdf_other": "scanned PDF ({{count}} pages): read by OCR at build time, or now from the proposals below",
+			"scannedPdfUnread": "scanned PDF ({{count}} page) not transcribed ({{reason}})",
+			"scannedPdfUnread_other": "scanned PDF ({{count}} pages) not transcribed ({{reason}})",
+			"noPdfBackend": "PDF: install pypdfium2 to read its text layer or OCR its scanned pages"
+		},
+		"reason": {
+			"disabled": "local OCR turned off",
+			"no-engine": "no OCR engine installed (Tesseract by default)",
+			"timeout": "OCR timed out",
+			"failed": "OCR failed",
+			"empty": "no text found",
+			"too-large": "file too large",
+			"unreadable": "file unreadable",
+			"no-diagram": "no embedded diagram",
+			"unsupported": "unsupported format",
+			"unknown": "unknown reason",
+			"airgap": "cloud OCR refused: the project is in strict offline mode",
+			"no-project": "cloud OCR refused: no project policy to check",
+			"deferred": "read by the vision or cloud engine at build time",
+			"not-installed": "OCR engine not installed",
+			"not-configured": "OCR engine not configured",
+			"unknown-engine": "unknown OCR engine name",
+			"remote-host": "the vision model runs on another machine",
+			"model-not-installed": "vision model not pulled in Ollama",
+			"server-unreachable": "Ollama is not running",
+			"secret-no-boxes": "the engine gave no positions to mask",
+			"secret-no-pillow": "Pillow is not installed to mask it",
+			"redaction-failed": "the masked copy could not be written",
+			"secret-scan-unavailable": "secrets could not be checked",
+			"secret-in-scan": "a secret appears in the scan; agents get the masked text only",
+			"no-pages": "no page could be rendered",
+			"no-image": "no photo attached"
+		},
+		"diagnosis": {
+			"fromDescription": "From the task description",
+			"trace": "Stack trace",
+			"located": "{{exception}}: {{count}} frame in this repository, starting at {{top}}",
+			"located_other": "{{exception}}: {{count}} frames in this repository, starting at {{top}}",
+			"notLocated": "{{exception}}: no frame found in this repository ({{framework}} framework frames)",
+			"buildErrors": "{{count}} build error ({{codes}})",
+			"buildErrors_other": "{{count}} build errors ({{codes}})",
+			"failingTests": "{{count}} failing test",
+			"failingTests_other": "{{count}} failing tests"
+		},
+		"code": {
+			"title": "Diagrams and API calls vs. code",
+			"erdFindings": "{{diagram}}: {{count}} difference with the ORM mapping",
+			"erdFindings_other": "{{diagram}}: {{count}} differences with the ORM mapping",
+			"erdClean": "{{diagram}}: matches the ORM mapping",
+			"erdAmbiguous": "{{count}} relation the diagram leaves ambiguous",
+			"erdAmbiguous_other": "{{count}} relations the diagram leaves ambiguous",
+			"sequence": "{{diagram}}: {{verified}} of {{total}} calls found in the code",
+			"apiTest": "integration test drafted for {{destination}}",
+			"apiTestNoStack": "no HTTP API stack recognised: the test is left to the agents"
+		},
+		"drafts": {
+			"page": "p. {{page}}",
+			"offer": "The attachments may state the requirements. Read them now to propose requirements, acceptance criteria and rule tables — nothing is added without your approval.",
+			"extract": "Read the attachments",
+			"extracting": "Reading…",
+			"title": "{{count}} proposal from the attachments",
+			"title_other": "{{count}} proposals from the attachments",
+			"body": "Tick what the document really requires, edit the wording if needed, then add it: requirements go into the spec with the next free id, criteria into the acceptance criteria.",
+			"selectAll": "Select all",
+			"selectNone": "Select none",
+			"requirements": "Proposed requirements",
+			"select": "Select {{id}}",
+			"edit": "Wording of {{id}}",
+			"criteria": "Proposed acceptance criteria",
+			"selectCriterion": "Select this criterion",
+			"editCriterion": "Wording of this criterion",
+			"accept": "Add {{count}} to the spec",
+			"accept_other": "Add {{count}} to the spec",
+			"reject": "Reject {{count}}",
+			"reject_other": "Reject {{count}}",
+			"acceptedTitle": "Proposals added",
+			"saveErrorTitle": "The task could not be updated",
+			"acceptedInSpec": "{{requirements}} requirement(s) added to spec.md, {{criteria}} criterion(s) added to the acceptance criteria.",
+			"acceptedInDescription": "{{requirements}} requirement(s) added to the task description (the spec writer keeps their ids), {{criteria}} criterion(s) added to the acceptance criteria.",
+			"error": "Could not read the proposals: {{error}}"
+		},
+		"rules": {
+			"title": "{{count}} business rule table",
+			"title_other": "{{count}} business rule tables",
+			"body": "Each row is an example the implementation must satisfy. The coder receives the table and this parametrised test, written in the project's own test framework.",
+			"untitled": "Rule table",
+			"dismiss": "Not a rule table",
+			"moreRows": "{{count}} more row",
+			"moreRows_other": "{{count}} more rows",
+			"framework": "{{language}} · {{framework}}",
+			"copy": "Copy",
+			"copied": "Copied",
+			"noLanguage": "No test idiom for this project's languages."
+		},
+		"whiteboard": {
+			"title": "Whiteboard photo",
+			"body": "The local vision model redraws the photo as an editable draw.io diagram in the attachments, then it is read and checked against the code like any diagram.",
+			"convert": "Convert to a diagram",
+			"converted": "{{path}}: {{nodes}} elements, {{edges}} arrows — open it in draw.io to correct it",
+			"conformance": "{{count}} dependency the drawing does not allow",
+			"conformance_other": "{{count}} dependencies the drawing does not allow",
+			"unavailable": "A whiteboard photo can be turned into a diagram by a local vision model; none is available here ({{reason}}).",
+			"status": {
+				"no-vision-model": "no local vision model",
+				"disabled": "local OCR turned off",
+				"unreadable": "photo unreadable",
+				"not-a-diagram": "the model found no diagram in this photo",
+				"unparseable": "the model's answer could not be read",
+				"injection": "text in the photo looks like an instruction aimed at the agent: nothing written",
+				"exists": "a diagram edited by a person already exists; it was not overwritten",
+				"write-failed": "the diagram could not be written",
+				"not-an-image": "not an image"
+			}
+		},
+		"figma": {
+			"label": "Figma link",
+			"placeholder": "Paste a Figma link to attach its frames and labels",
+			"link": "Link",
+			"imported": "{{frames}} frame(s), {{texts}} label(s) attached as {{path}}.",
+			"withheld_one": "{{count}} frame left out: its labels read like instructions.",
+			"withheld_other": "{{count}} frames left out: their labels read like instructions.",
+			"secrets": "Masked: {{kinds}}.",
+			"status": {
+				"invalid-url": "This is not a Figma file link.",
+				"no-token": "No Figma token for this project (Settings → Figma).",
+				"airgap": "This project is under strict offline mode: Figma was not called.",
+				"network": "Figma could not be reached.",
+				"http": "Figma refused the request: check the token and the file's access.",
+				"too-large": "This file is too large to read; link a frame (node-id) instead.",
+				"empty": "No frame with text was found at this link.",
+				"injection": "Every frame's labels read like instructions: nothing was attached.",
+				"unwritable": "The attachment could not be written.",
+				"secret-scan-unavailable": "Secrets could not be checked: nothing was attached.",
+				"failed": "The mockup could not be linked."
+			}
+		}
+	},
+	"changeGraph": {
+		"tab": "Change graph",
+		"title": "The path of this task",
+		"description": "Each node is something the task created, modified or deleted, placed in its layer; each edge is a link read in the code. Click a node or an edge to read what it does.",
+		"loading": "Reading the task diff…",
+		"empty": "Nothing to draw yet: the task has not written anything in its worktree.",
+		"noDiff": "This task's diff is not available (no worktree, or already merged).",
+		"error": "Could not read the diff: {{error}}",
+		"actions": {
+			"refresh": "Re-read the diff",
+			"export": "Export graph.json (Graphify)",
+			"exportHint": "In Graphify's node-link format: readable by Graphify, its MCP server and the graph-first-recall skill."
+		},
+		"legend": {
+			"added": "Created",
+			"modified": "Modified",
+			"deleted": "Deleted"
+		},
+		"memberChange": {
+			"added": "added",
+			"deleted": "removed",
+			"modified": "changed"
+		},
+		"relations": {
+			"inherits": "inherits",
+			"implements": "implements",
+			"tests": "tests",
+			"maps": "carries",
+			"uses": "uses",
+			"handles": "handles"
+		},
+		"story": {
+			"title": "What the task did",
+			"hint": "Click a sentence to find it in the graph."
+		},
+		"panel": {
+			"placeholder": "Click a node or an edge of the graph to learn what it stands for.",
+			"file": "File",
+			"layer": "Layer",
+			"lines": "+{{additions}} / −{{deletions}} lines",
+			"members": "Members touched",
+			"subtasks": "Plan subtasks",
+			"outgoing": "What it uses",
+			"incoming": "What uses it",
+			"evidence": "Line of code carrying the link",
+			"noEvidence": "Link inferred from members added on both sides.",
+			"from": "From",
+			"to": "To",
+			"close": "Close details"
+		},
+		"skipped_one": "{{count}} generated file ignored (lockfile, snapshot…)",
+		"skipped_other": "{{count}} generated files ignored (lockfiles, snapshots…)",
+		"truncated_one": "{{count}} more file is not drawn, to keep the graph readable",
+		"truncated_other": "{{count}} more files are not drawn, to keep the graph readable",
+		"layers": {
+			"domain": {
+				"name": "Domain",
+				"in": "in the Domain layer"
+			},
+			"application": {
+				"name": "Application",
+				"in": "in the Application layer"
+			},
+			"infrastructure": {
+				"name": "Infrastructure",
+				"in": "in the Infrastructure layer"
+			},
+			"presentation": {
+				"name": "Presentation",
+				"in": "in the Presentation layer (API / UI)"
+			},
+			"tests": {
+				"name": "Tests",
+				"in": "in the tests"
+			},
+			"config": {
+				"name": "Configuration",
+				"in": "in the configuration"
+			},
+			"docs": {
+				"name": "Documentation",
+				"in": "in the documentation"
+			},
+			"other": {
+				"name": "Other",
+				"in": "in the project"
+			}
+		},
+		"nouns": {
+			"class": "the class {{name}}",
+			"interface": "the interface {{name}}",
+			"record": "the record {{name}}",
+			"struct": "the struct {{name}}",
+			"enum": "the enum {{name}}",
+			"function": "the function {{name}}",
+			"component": "the component {{name}}",
+			"hook": "the hook {{name}}",
+			"module": "the module {{name}}",
+			"file": "the file {{name}}",
+			"dto": "the DTO {{name}}",
+			"request": "the request {{name}}",
+			"response": "the response {{name}}",
+			"viewModel": "the view model {{name}}",
+			"command": "the command {{name}}",
+			"query": "the query {{name}}",
+			"handler": "the handler {{name}}",
+			"controller": "the controller {{name}}",
+			"repository": "the repository {{name}}",
+			"service": "the service {{name}}",
+			"validator": "the validator {{name}}",
+			"mapper": "the mapper {{name}}",
+			"migration": "the migration {{name}}",
+			"test": "the test file {{name}}",
+			"testClass": "the test class {{name}}",
+			"config": "the configuration file {{name}}",
+			"docs": "the documentation {{name}}",
+			"style": "the stylesheet {{name}}",
+			"translations": "the translations {{name}}",
+			"type": "the type {{name}}"
+		},
+		"nounsOf": {
+			"class": "of the class {{name}}",
+			"interface": "of the interface {{name}}",
+			"record": "of the record {{name}}",
+			"struct": "of the struct {{name}}",
+			"enum": "of the enum {{name}}",
+			"function": "of the function {{name}}",
+			"component": "of the component {{name}}",
+			"hook": "of the hook {{name}}",
+			"module": "of the module {{name}}",
+			"file": "of the file {{name}}",
+			"dto": "of the DTO {{name}}",
+			"request": "of the request {{name}}",
+			"response": "of the response {{name}}",
+			"viewModel": "of the view model {{name}}",
+			"command": "of the command {{name}}",
+			"query": "of the query {{name}}",
+			"handler": "of the handler {{name}}",
+			"controller": "of the controller {{name}}",
+			"repository": "of the repository {{name}}",
+			"service": "of the service {{name}}",
+			"validator": "of the validator {{name}}",
+			"mapper": "of the mapper {{name}}",
+			"migration": "of the migration {{name}}",
+			"test": "of the test file {{name}}",
+			"testClass": "of the test class {{name}}",
+			"config": "of the configuration file {{name}}",
+			"docs": "of the documentation {{name}}",
+			"style": "of the stylesheet {{name}}",
+			"translations": "of the translations {{name}}",
+			"type": "of the type {{name}}"
+		},
+		"members": {
+			"property": "the property {{name}}",
+			"method": "the method {{name}}()",
+			"field": "the field {{name}}",
+			"constructor": "the constructor",
+			"function": "the function {{name}}()",
+			"value": "the value {{name}}",
+			"more_one": "{{count}} other member",
+			"more_other": "{{count}} other members",
+			"propertyPlural": "the properties {{names}}",
+			"methodPlural": "the methods {{names}}",
+			"fieldPlural": "the fields {{names}}",
+			"functionPlural": "the functions {{names}}",
+			"valuePlural": "the values {{names}}"
+		},
+		"join": "{{head}} and {{last}}",
+		"sentences": {
+			"added": "I created {{subject}} {{where}}",
+			"modified": "I modified {{subject}} {{where}}",
+			"deleted": "I deleted {{subject}} {{where}}",
+			"createdWith": "{{base}}, with {{items}}",
+			"modifiedWith": "{{base}} and {{changes}}",
+			"modifiedLines": "{{base}} (+{{additions}} / −{{deletions}} lines)"
+		},
+		"clauses": {
+			"added": "added {{items}} to it",
+			"removed": "removed {{items}} from it",
+			"modified": "changed {{items}}"
+		},
+		"edges": {
+			"inherits": "{{from}} inherits from {{to}}.",
+			"implements": "{{from}} implements {{to}}.",
+			"tests": "{{from}} checks the behaviour {{toOf}}.",
+			"maps": "{{from}} carries the data {{toOf}}.",
+			"mapsCross": "{{from}} carries the data {{toOf}} ({{toLayer}} layer) over to the {{fromLayer}} layer.",
+			"uses": "{{from}} uses {{to}}.",
+			"usesCross": "{{from}}, in the {{fromLayer}} layer, relies on {{to}}, in the {{toLayer}} layer.",
+			"shared": "Added on both sides: {{items}}.",
+			"handles": "{{from}} handles {{to}}."
+		}
+	},
+	"overview": {
+		"nav": "Overview sections",
+		"sections": {
+			"review": {
+				"title": "To do",
+				"hint": "The task is waiting for your review: read, test, then merge or request changes."
+			},
+			"task": {
+				"title": "The task",
+				"hint": "What is asked: description, acceptance criteria, context."
+			},
+			"plan": {
+				"title": "Execution plan",
+				"hint": "What the agents will do, at which effort, and what they will read."
+			},
+			"learning": {
+				"title": "Memory & learning",
+				"hint": "What the system remembers — and what is waiting for your decision."
+			}
+		}
+	},
+	"inlineEdit": {
+		"save": "Save",
+		"saving": "Saving…",
+		"cancel": "Cancel",
+		"saveErrorTitle": "Save failed",
+		"titleSaveError": "The title could not be saved.",
+		"descriptionSaveError": "The description could not be saved.",
+		"titleLabel": "Task title",
+		"titleHint": "Click to edit the title",
+		"descriptionHelp": "Ctrl+Enter to save · Esc to cancel",
+		"descriptionRequired": "The description cannot be empty."
+	},
+	"visualReview": {
+		"title": "Visual review",
+		"subtitle": "What the captures of the running app show, read by OCR before the QA review",
+		"notRead": "Captures are waiting: read them to check keys, languages, cut labels and the mockup",
+		"pending_one": "{{count}} capture not read yet",
+		"pending_other": "{{count}} captures not read yet",
+		"read": "Read the captures",
+		"expand": "Details",
+		"collapse": "Hide",
+		"error": "Visual review unavailable: {{error}}",
+		"findings": "Findings",
+		"diffs": "Changed on screen (base → task)",
+		"mockups": "Mockup against the render",
+		"more_one": "… and {{count}} more finding",
+		"more_other": "… and {{count}} more findings",
+		"diffSummary": "{{changed}} changed, {{added}} added, {{removed}} removed",
+		"changed": "Changed",
+		"added": "Added",
+		"removed": "Removed",
+		"missing": "Missing on the render:",
+		"coverage": "— {{percent}}% of its labels found ({{matched}}/{{total}})",
+		"ocrCaveat": "Read by OCR, which can misread: check each finding on the capture. The texts shown are what the screens displayed.",
+		"mockupKind": {
+			"figma": "Figma frame",
+			"image": "Mockup image"
+		},
+		"severity": {
+			"high": "High",
+			"medium": "Medium",
+			"low": "Low"
+		},
+		"badge": {
+			"captures_one": "{{count}} capture",
+			"captures_other": "{{count}} captures",
+			"high_one": "{{count}} high",
+			"high_other": "{{count}} high",
+			"medium_one": "{{count}} medium",
+			"medium_other": "{{count}} medium",
+			"low_one": "{{count}} low",
+			"low_other": "{{count}} low",
+			"diffs_one": "{{count}} screen changed",
+			"diffs_other": "{{count}} screens changed"
+		},
+		"kind": {
+			"untranslated-key": "Translation key shown",
+			"interpolation": "Unresolved placeholder",
+			"language": "Screen in another language",
+			"foreign-label": "Label in another language",
+			"truncated": "Truncated label",
+			"ellipsis": "Possibly truncated",
+			"clipped": "Cut at the edge",
+			"overflow": "Layout overflow",
+			"crash": "Crash screen",
+			"error-page": "Error page",
+			"login": "Sign-in screen instead of the feature",
+			"blank": "Blank screen",
+			"expected-screen": "Expected screen not shown",
+			"mockup-missing": "Mockup label missing",
+			"mockup-near": "Differs from the mockup",
+			"placeholder": "Placeholder text"
+		}
+	},
+	"uiux": {
+		"title": "UI/UX design system",
+		"guide": "{{guide}} guidelines",
+		"state": {
+			"planned": "Next build",
+			"ready": "Ready",
+			"withheld": "Withheld",
+			"skipped": "Set aside",
+			"failed": "Could not run",
+			"notInstalled": "Not installed"
+		},
+		"reason": {
+			"planned-ui-files": "The plan touches the interface: {{detail}}",
+			"planned-no-ui-files": "The plan touches no interface file.",
+			"description": "The description talks about the interface ({{detail}}); the plan will confirm it.",
+			"description-not-ui": "The description does not talk about the interface.",
+			"no-ui-stack": "This project has no UI toolkit.",
+			"override-force": "Applied to this task by you.",
+			"override-skip": "Set aside for this task by you: no design system, no UI tools.",
+			"disabled": "Turned off in Settings → Agent Tools.",
+			"no-signal": "Nothing to decide from yet.",
+			"unknown": "Decided from the task's files."
+		},
+		"master": {
+			"project": "The project's own design system is used as is: {{path}}",
+			"generated": "Generated for this task and written to {{path}} — it is part of the diff to review."
+		},
+		"withheld": "The project's MASTER.md was withheld: a security scan flagged its content.",
+		"style": "Style: {{style}}",
+		"fonts": "Fonts: {{heading}} / {{body}}",
+		"actions": {
+			"skip": "Skip for this task",
+			"auto": "Decide automatically"
+		}
+	},
+	"engine": {
+		"taskWide": "Engine for the whole task",
+		"ownedByTask": "Saved on this task only. Changing the default provider in Settings, or another task's engine, never changes it.",
+		"perPhase": "Advanced: one engine per phase",
+		"mixed": "Mixed",
+		"loadingModels": "Loading models…",
+		"notConfiguredOption": "{{provider}} (not configured)",
+		"notConfiguredWarning": "{{provider}} is not configured on this machine. Add its account in Settings → AI Accounts, or pick another provider.",
+		"chipMixed": "{{provider}} · mixed",
+		"chipAria": "Task engine: {{engine}}",
+		"onlyResumedPhase": "Only for the resumed phase ({{phase}}) — the following phases keep their engine"
+	},
+	"verify": {
+		"title": "Verification loop",
+		"status": {
+			"pass": "Verified",
+			"fail": "Failed",
+			"unknown": "Not verified",
+			"not-applicable": "Not applicable",
+			"disabled": "Off",
+			"running": "Running"
+		},
+		"subtitle": {
+			"pass": "The app was launched, showed no error and reached the changed state.",
+			"fail": "The app was launched and something is still broken.",
+			"unknown": "The change could not be verified on a running app.",
+			"not-applicable": "Nothing to launch in this project.",
+			"disabled": "The verification loop is turned off for this task.",
+			"running": "Verification in progress…"
+		},
+		"badge": {
+			"score": "score {{score}}/100",
+			"rounds_one": "{{count}} fix round ({{fixed}} effective)",
+			"rounds_other": "{{count}} fix rounds ({{fixed}} effective)",
+			"endpoints": "{{ok}}/{{count}} endpoints OK",
+			"errors_one": "{{count}} error left",
+			"errors_other": "{{count}} errors left"
+		},
+		"replayFailed": "The replay after QA found a regression.",
+		"error": "Verification unavailable: {{error}}",
+		"rerun": "Run verification",
+		"rerunQuick": "Quick run (no agent)",
+		"running": "Verifying…",
+		"details": "Details",
+		"tab": "Verification",
+		"empty": "No verification has run for this task yet.",
+		"noErrors": "No error left.",
+		"learnedRecipe": "learned launch",
+		"round": "Round {{round}}",
+		"roundErrors": "{{before}} → {{after}} error(s)",
+		"evidence": "evidence: {{evidence}}",
+		"notMeasured": "not measured",
+		"schemaOk": "valid",
+		"schemaKo": "invalid",
+		"ms": "{{value}} ms",
+		"latency": "API latency: p50 {{p50}} ms, p95 {{p95}} ms over {{count}} call(s)",
+		"scoredOn": "Score based on: {{metrics}}",
+		"startup": "cold start {{value}} ms",
+		"screenshotAlt": "Verification screenshot",
+		"noBrowser": "No browser could be used: {{reasons}}",
+		"sections": {
+			"launch": "Launch & errors",
+			"rounds": "Fix rounds",
+			"confirmed": "Confirmed state",
+			"endpoints": "Endpoints",
+			"performance": "Performance (Chrome DevTools)",
+			"mobile": "Devices",
+			"screenshots": "Screenshots",
+			"scenario": "Scenario (replayed after QA)",
+			"findings": "Findings"
+		},
+		"kind": {
+			"web-frontend": "web front end",
+			"desktop": "desktop",
+			"mobile": "mobile",
+			"backend-api": "API"
+		},
+		"launch": {
+			"ready": "running",
+			"reused": "running",
+			"exited": "crashed",
+			"timeout": "timed out",
+			"refused": "not launched",
+			"unknown": "unknown"
+		},
+		"table": {
+			"call": "Call",
+			"expected": "Expected",
+			"got": "Got",
+			"schema": "Payload",
+			"latency": "Latency"
+		},
+		"outcome": {
+			"called": "called",
+			"auth": "auth required",
+			"skipped-mutation": "skipped (mutation)",
+			"refused": "refused",
+			"unreachable": "unreachable"
+		},
+		"metrics": {
+			"score": "Score"
+		},
+		"lighthouse": {
+			"accessibility": "Accessibility",
+			"best-practices": "Best practices",
+			"seo": "SEO"
+		},
+		"mobileStatus": {
+			"verified": "verified",
+			"failed": "failed",
+			"blocked": "cannot be built here",
+			"no-device": "no device"
+		},
+		"form": {
+			"label": "Verification loop",
+			"inherit": "Project default",
+			"on": "On",
+			"off": "Off",
+			"hint": "Launch the app after coding, fix what breaks, drive it to the change and measure it (Chrome DevTools trace, screenshots)."
+		},
+		"cardBadge": {
+			"pass": "Verified",
+			"fail": "Verify failed"
+		}
+	},
+	"qaUnverified": {
+		"title": "QA could not verify this task",
+		"unknown": "The QA agent stopped without reporting why. Open the Logs tab for the last output.",
+		"hint": "The work is complete; only the automatic check is missing. Review the changes yourself before merging, or relaunch the task to run QA again."
+	},
+	"contextManagement": {
+		"title": "Context memory",
+		"description": "When the agent's context window fills up, summarise it or hand off to a fresh thread.",
+		"summary": "{{mode}} · threshold {{threshold}}%",
+		"summaryOff": "Off — manual only",
+		"toggle": "Show context settings",
+		"modeLabel": "When the threshold is reached",
+		"modes": {
+			"auto": "Auto",
+			"compact": "Compact",
+			"clear": "New thread",
+			"off": "Off"
+		},
+		"modeHints": {
+			"auto": "Picks compaction or a new thread from the situation (provider, phase, handoff ready).",
+			"compact": "Summarises the history and keeps going in the same thread.",
+			"clear": "Starts a fresh thread seeded with the handoff summary.",
+			"off": "Nothing automatic. You can still compact or start a new thread by hand."
+		},
+		"threshold": {
+			"label": "Threshold",
+			"value": "{{value}}%",
+			"hint": "Act when the context window reaches this level."
+		},
+		"prepareHandoff": {
+			"label": "Prepare the handoff in parallel",
+			"hint": "Writes the handoff summary in the background once the threshold is reached, while the agent keeps working, so the switch is instant."
+		},
+		"provider": {
+			"native": "{{provider}}: native compaction",
+			"emulated": "{{provider}}: compaction emulated by summary"
+		},
+		"source": {
+			"exact": "exact",
+			"reported": "reported",
+			"estimated": "estimated"
+		},
+		"gauge": {
+			"ariaLabel": "Context window {{percent}}% full",
+			"tooltip": "{{used}} / {{window}} tokens · {{source}}",
+			"thresholdTooltip": "Threshold {{value}}% · mode {{mode}}",
+			"phase": "Phase: {{phase}}",
+			"open": "Context memory settings",
+			"notMeasured": "Not measured yet: the gauge fills as soon as the first agent session starts.",
+			"cache": "Cache: {{ratio}}% of the prompt read back",
+			"cacheRewrites": "Cache: {{ratio}}% of the prompt read back · prefix rewritten {{count}}×",
+			"cacheNotReported": "Cache: not reported by this provider"
+		},
+		"handoff": {
+			"preparing": "Handoff…",
+			"ready": "Handoff ready",
+			"preparingTooltip": "The handoff summary is being prepared in the background.",
+			"readyTooltip": "The handoff summary is ready: the switch will be instant."
+		},
+		"actions": {
+			"compactNow": "Compact now",
+			"newThread": "New thread",
+			"recommended": "Recommended",
+			"compactTooltip": "Summarise the history and continue in the same thread. The agent keeps its momentum; older details are condensed.",
+			"newThreadTooltip": "Start a fresh thread seeded with the handoff summary. The cleanest context, but the verbatim history is left behind.",
+			"requested": "Requested — applied at the next safe point.",
+			"failed": "Could not send the request: {{error}}",
+			"notRunning": "Available while the task is running."
+		},
+		"history": {
+			"title": "Recent actions",
+			"empty": "No compaction or new thread yet.",
+			"compact": "Compacted {{before}}% → {{after}}%",
+			"compactNoAfter": "Compacted at {{before}}%",
+			"clear": "New thread from {{before}}%",
+			"auto": "auto",
+			"manual": "manual",
+			"native": "native"
+		},
+		"toast": {
+			"compacted": "Context compacted: {{before}}% → {{after}}%",
+			"compactedNoAfter": "Context compacted (from {{before}}%)",
+			"cleared": "New thread started (handoff from {{before}}%)",
+			"saveFailed": "Could not save the context settings"
 		}
 	}
 }

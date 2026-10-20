@@ -2,6 +2,7 @@
 """
 Test de la commande CLI --auto-fix
 """
+
 import subprocess
 import sys
 from pathlib import Path
@@ -17,24 +18,24 @@ try:
         [sys.executable, "apps/backend/cli/main.py", "--help"],
         capture_output=True,
         text=True,
-        timeout=10
+        timeout=10,
     )
-    
+
     if "--auto-fix" in result.stdout:
         print("  ✓ --auto-fix trouvé dans --help")
-        
+
         if "--auto-fix-max-attempts" in result.stdout:
             print("  ✓ --auto-fix-max-attempts trouvé dans --help")
         else:
             print("  ⚠️  --auto-fix-max-attempts non trouvé (mais pas critique)")
-        
+
         print("  ✅ CLI options présentes")
     else:
         print("  ❌ --auto-fix NON trouvé dans --help")
         print("\nOutput:")
         print(result.stdout[:500])
         sys.exit(1)
-        
+
 except subprocess.TimeoutExpired:
     print("  ❌ Timeout lors de l'exécution de --help")
     sys.exit(1)
@@ -47,27 +48,29 @@ print("\n[2/2] 📦 Test import handle_auto_fix_command...")
 try:
     backend_dir = Path(__file__).parent / "apps" / "backend"
     sys.path.insert(0, str(backend_dir))
-    
+
     # Vérifier la signature
     import inspect
 
     from cli.qa_commands import handle_auto_fix_command
+
     sig = inspect.signature(handle_auto_fix_command)
     params = list(sig.parameters.keys())
-    
-    expected_params = ['project_dir', 'spec_dir', 'model', 'max_attempts', 'verbose']
-    
+
+    expected_params = ["project_dir", "spec_dir", "model", "max_attempts", "verbose"]
+
     for param in expected_params:
         if param in params:
             print(f"  ✓ Paramètre '{param}' présent")
         else:
             print(f"  ⚠️  Paramètre '{param}' manquant (peut être OK)")
-    
+
     print("  ✅ Fonction handle_auto_fix_command OK")
-    
+
 except ImportError as e:
     print(f"  ❌ Erreur d'import: {e}")
     import traceback
+
     traceback.print_exc()
     sys.exit(1)
 
@@ -78,7 +81,9 @@ print("=" * 70)
 print("\n✓ La commande CLI --auto-fix est fonctionnelle")
 print("\nUtilisation:")
 print("  python apps/backend/cli/main.py --spec 001 --auto-fix")
-print("  python apps/backend/cli/main.py --spec 001 --auto-fix --auto-fix-max-attempts 10")
+print(
+    "  python apps/backend/cli/main.py --spec 001 --auto-fix --auto-fix-max-attempts 10"
+)
 print()
 
 sys.exit(0)

@@ -169,6 +169,25 @@ export const projectMock = {
 		data: "main",
 	}),
 
+	setGitRemote: async (
+		_projectPath: string,
+		remoteName: string,
+		remoteUrl: string,
+		_previousName?: string,
+	) => ({
+		success: true,
+		data: {
+			provider: "unknown" as const,
+			remoteName: remoteName || "origin",
+			remoteUrl: remoteUrl || undefined,
+		},
+	}),
+
+	checkoutGitBranch: async (_projectPath: string, branch: string) => ({
+		success: true,
+		data: branch,
+	}),
+
 	checkGitStatus: async () => ({
 		success: true,
 		data: {

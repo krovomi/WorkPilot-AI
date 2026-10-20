@@ -72,7 +72,14 @@ import logging
 from collections.abc import Iterable, Sequence
 from pathlib import Path
 
-__all__ = ["MAX_PATH_LEN", "safe_error", "validated_dir"]
+__all__ = [
+    "MAX_PATH_LEN",
+    "SPEC_ADDRESS_REASONS",
+    "SpecAddressError",
+    "resolve_spec_dir",
+    "safe_error",
+    "validated_dir",
+]
 
 # Longest caller-supplied path we will even look at. Matches the ceiling
 # `slash_commands.api` already used.
@@ -122,6 +129,35 @@ def safe_error(
     return _FALLBACK
 
 
+def server_mode_roots() -> list[Path] | None:
+    """The only directories a request may reach in multi-user server mode.
+
+    ``None`` in local mode, where there is no privilege boundary to draw: the
+    backend runs as the person who chose the directory in their own desktop app.
+
+    In server mode there very much is one. Every project the server knows about
+    is cloned under ``REPOS_ROOT``, so confining resolution to that subtree
+    turns "read any path on the host" into "read a checkout", and the per-tenant
+    half of the check is done by ``server.authz.scope`` on top.
+
+    Import-guarded so ``core`` keeps no hard dependency on ``server``: the
+    desktop app ships without a database, and this must not change that.
+    """
+    try:
+        from server.config import get_settings
+    except ImportError:  # pragma: no cover - local mode without server extras
+        return None
+
+    try:
+        settings = get_settings()
+    except Exception:  # pragma: no cover - misconfiguration surfaces at boot
+        return None
+
+    if not settings.server_mode:
+        return None
+    return [Path(settings.repos_root)]
+
+
 def validated_dir(
     raw: str,
     label: str = "path",
@@ -134,6 +170,13 @@ def validated_dir(
     Raises `ValueError` with a message naming only `label` and the rule that
     was broken — never the resolved path, which is the caller-visible half of
     the stack-trace-exposure problem.
+
+    **In server mode the confinement is not optional.** When no ``allowed_roots``
+    is supplied the repository root is imposed, so the ~60 call sites written
+    for the single-user desktop app cannot resolve a path outside the server's
+    own checkouts — including the ones that read ``project_dir`` out of a JSON
+    body, which the middleware's query-string check never sees. A caller that
+    genuinely needs a different root passes one explicitly.
     """
     if not raw or not raw.strip() or raw.strip().startswith("-"):
         raise ValueError(f"{label} must be a non-empty path not starting with '-'")
@@ -146,6 +189,9 @@ def validated_dir(
 
     resolved = candidate.resolve()
 
+    if allowed_roots is None:
+        allowed_roots = server_mode_roots()
+
     if allowed_roots is not None:
         roots = [Path(r).expanduser().resolve() for r in allowed_roots]
         if not any(resolved == root or resolved.is_relative_to(root) for root in roots):
@@ -155,3 +201,80 @@ def validated_dir(
         raise ValueError(f"{label} does not exist or is not a directory")
 
     return resolved
+
+
+# ---------------------------------------------------------------------------
+# Addressing a spec directory
+# ---------------------------------------------------------------------------
+
+# What a caller may be told when their addressing is rejected. Keys, not free
+# text: what reaches a response is always a literal written here, never a
+# message built from the caller's own input or from an exception carrying a
+# resolved filesystem path.
+SPEC_ADDRESS_REASONS = {
+    "addressing": "pass spec_dir, or both project_dir and spec_id",
+    "spec_id": "spec_id must be a plain directory name",
+    "escapes": "spec_id escapes the project directory",
+    "empty": "the path must be non-empty and must not start with '-'",
+    "missing": "no such directory",
+    "traversal": "the path must not contain '..'",
+}
+
+
+class SpecAddressError(ValueError):
+    """A rejected spec address, named by a key into `SPEC_ADDRESS_REASONS`."""
+
+    def __init__(self, reason: str, detail: str = "") -> None:
+        self.reason = reason
+        super().__init__(detail or reason)
+
+
+def resolve_spec_dir(
+    spec_dir: str | None,
+    project_dir: str | None = None,
+    spec_id: str | None = None,
+) -> Path:
+    """The spec directory, given either the path or the pair that names it.
+
+    The renderer knows a task by its project and its spec id, not by an
+    absolute path — so accepting the pair keeps the `.workpilot/specs/` layout
+    written down once, here, rather than once per endpoint and once again in
+    TypeScript.
+
+    **The project directory is not confined to this repository, and must not
+    be.** WorkPilot builds other people's projects: the checkout the user
+    opened in the desktop app is outside this repository by definition, and
+    confining it once made `workflows/api.py` answer only for people building
+    WorkPilot itself. What guards traversal instead, and is kept: ``spec_id``
+    must be a bare directory name, and the derived directory must sit under
+    the project directory the caller gave.
+
+    Lived in `workflows/api.py` until a second endpoint needed the same
+    addressing. Two copies of a path rule is how two rules start.
+    """
+    if spec_dir:
+        return _validated_spec_path(spec_dir, "spec_dir")
+    if not (project_dir and spec_id):
+        raise SpecAddressError("addressing")
+    if "/" in spec_id or "\\" in spec_id or spec_id in ("", ".", ".."):
+        raise SpecAddressError(
+            "spec_id", f"spec_id is not a directory name: {spec_id!r}"
+        )
+    root = _validated_spec_path(project_dir, "project_dir")
+    candidate = (root / ".workpilot" / "specs" / spec_id).resolve()
+    if not candidate.is_relative_to(root):
+        raise SpecAddressError("escapes")
+    return _validated_spec_path(str(candidate), "spec_dir")
+
+
+def _validated_spec_path(raw: str, label: str) -> Path:
+    """`validated_dir`, with its ValueError translated to a reason key."""
+    try:
+        return validated_dir(raw, label)
+    except ValueError as exc:
+        text = str(exc)
+        if "'..'" in text:
+            raise SpecAddressError("traversal", text) from None
+        if "does not exist" in text:
+            raise SpecAddressError("missing", text) from None
+        raise SpecAddressError("empty", text) from None

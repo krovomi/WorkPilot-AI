@@ -12,7 +12,23 @@ import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { PanelShell } from "./_panel-shell";
 
-export function AuditTrailPanel() {
+interface AuditTrailPanelProps {
+	/** The open project. Its trail directory is what this panel is for. */
+	projectPath?: string;
+}
+
+/**
+ * Where `agents/agent_audit.py` writes every trail. Derived rather than
+ * typed: the panel used to open on an empty field, so reading the trails the
+ * app had just written meant knowing this convention by heart.
+ */
+function defaultStorageDir(projectPath: string): string {
+	if (!projectPath) return "";
+	const sep = projectPath.includes("\\") && !projectPath.includes("/") ? "\\" : "/";
+	return `${projectPath.replace(/[/\\]+$/, "")}${sep}.workpilot${sep}audit-trail`;
+}
+
+export function AuditTrailPanel({ projectPath = "" }: AuditTrailPanelProps) {
 	const { t } = useTranslation("phase35");
 	const {
 		phase,
@@ -24,7 +40,7 @@ export function AuditTrailPanel() {
 		replay,
 		verify,
 	} = useAuditTrailStore();
-	const [storageDir, setStorageDir] = useState("");
+	const [storageDir, setStorageDir] = useState(() => defaultStorageDir(projectPath));
 	const [trailName, setTrailName] = useState("default");
 	const [correlationId, setCorrelationId] = useState("");
 

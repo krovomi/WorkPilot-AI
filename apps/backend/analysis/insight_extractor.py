@@ -3,7 +3,7 @@ Insight Extractor
 =================
 
 Automatically extracts structured insights from completed coding sessions.
-Runs after each session to capture rich, actionable knowledge for Graphiti memory.
+Runs after each session to capture rich, actionable knowledge for the project's memory (the shared brain).
 
 Uses the Claude Agent SDK (same as the rest of the system) for extraction.
 Falls back to generic insights if extraction fails (never blocks the build).
@@ -37,6 +37,23 @@ from core.runtimes import create_agent_runtime
 # Note: Using Haiku 4.5 for fast, cheap extraction. Haiku does not support
 # extended thinking, so thinking_default is set to "none" in models.py
 DEFAULT_EXTRACTION_MODEL = "claude-haiku-4-5-20251001"
+
+# The prompt lives with the other agent prompts, in apps/backend/prompts/. It
+# used to be looked up next to this module, which was right while the module sat
+# at the backend root and wrong once it moved into analysis/: the file was never
+# found, and the model got a one-line fallback without the JSON schema, so the
+# keys record_structured reads ("path", "pattern", "approach_outcome"…) were
+# whatever the model guessed.
+PROMPT_FILE = (
+    Path(__file__).resolve().parent.parent / "prompts" / "insight_extractor.md"
+)
+
+# The extractor runs on Claude: its default model is Haiku and it is gated on
+# the Claude Code OAuth token. "claude" is the provider name ProviderConfig maps
+# to the Claude Agent SDK runtime; left unset, the factory resolved "anthropic",
+# which is not an SDK provider, and the session went to LiteLLM with the OAuth
+# token as an API key — rejected, caught, and replaced by generic insights.
+EXTRACTION_PROVIDER = "claude"
 
 # Maximum diff size to send to the LLM (avoid context limits)
 MAX_DIFF_CHARS = 15000
@@ -278,7 +295,7 @@ def _get_attempt_history(recovery_manager: Any, subtask_id: str) -> list[dict]:
 
 def _build_extraction_prompt(inputs: dict) -> str:
     """Build the prompt for insight extraction."""
-    prompt_file = Path(__file__).parent / "prompts" / "insight_extractor.md"
+    prompt_file = PROMPT_FILE
 
     if prompt_file.exists():
         base_prompt = prompt_file.read_text(encoding="utf-8")
@@ -362,34 +379,50 @@ async def run_insight_extraction(
     # Ensure SDK can find the token
     ensure_claude_code_oauth_token()
 
-    model = get_extraction_model()
     prompt = _build_extraction_prompt(inputs)
 
-    # Use current directory if project_dir not specified
-    cwd = str(project_dir.resolve()) if project_dir else os.getcwd()
-
     try:
-        # Migration vers runtime provider-agnostique
-        phase_model = get_extraction_model()
-        phase_thinking_budget = None  # À adapter si besoin
-        config = None
         runtime = create_agent_runtime(
-            spec_dir=None,  # À adapter selon le contexte réel
+            spec_dir=None,
             phase="insight_extraction",
             project_dir=project_dir,
             agent_type="insight_extractor",
-            cli_provider=None,
-            cli_model=phase_model,
-            cli_thinking=phase_thinking_budget,
-            config=config,
+            cli_provider=EXTRACTION_PROVIDER,
+            cli_model=get_extraction_model(),
+            cli_thinking=None,
+            config=None,
         )
-
-        # Utilisation : await runtime.run_session(prompt)
-        await runtime.run_session(prompt)
-
+        result = await runtime.run_session(prompt)
     except Exception as e:
         logger.warning(f"Insight extraction failed: {e}")
         return None
+
+    # The session ran and its answer used to be dropped here: the function fell
+    # off the end, every caller saw None, and the project memory only ever got
+    # the generic insights. The prompt asks for one JSON object; models wrap it
+    # in a fence or a sentence often enough that the plan recovery's extractor
+    # is the right reader.
+    output = getattr(result, "output", None)
+    if not output:
+        logger.warning(
+            "Insight extraction returned no output: %s",
+            getattr(result, "error", None) or "empty response",
+        )
+        return None
+
+    # Parsing stays inside the "None if failed" contract: json.loads raises
+    # RecursionError on a deeply nested answer, which ValueError does not cover.
+    try:
+        from spec.plan_recovery import extract_json_document
+
+        extracted = extract_json_document(output)
+    except Exception as e:
+        logger.warning(f"Insight extraction output could not be parsed: {e}")
+        return None
+    if not isinstance(extracted, dict):
+        logger.warning("Insight extraction did not return a JSON object")
+        return None
+    return extracted
 
 
 # =============================================================================

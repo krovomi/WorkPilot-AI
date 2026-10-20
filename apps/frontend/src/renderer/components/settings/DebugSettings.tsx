@@ -13,6 +13,10 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { notifySentryStateChanged } from "../../lib/sentry";
 import { useSettingsStore } from "../../stores/settings-store";
+import {
+	rankViewUsage,
+	useViewUsageStore,
+} from "../../stores/view-usage-store";
 import { Button } from "../ui/button";
 import { Label } from "../ui/label";
 import { Switch } from "../ui/switch";
@@ -35,6 +39,8 @@ export function DebugSettings() {
 	const [isLoading, setIsLoading] = useState(false);
 	const [copySuccess, setCopySuccess] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const viewUsage = useViewUsageStore((state) => state.usage);
+	const resetViewUsage = useViewUsageStore((state) => state.reset);
 
 	// Handle Sentry toggle
 	const handleSentryToggle = async (checked: boolean) => {
@@ -197,6 +203,38 @@ export function DebugSettings() {
 						{error}
 					</div>
 				)}
+
+				{/* Usage per page (audit F19: no page is removed without data) */}
+				<div className="rounded-lg border border-border p-4">
+					<div className="flex items-center justify-between mb-2">
+						<h4 className="font-medium text-sm">
+							{t("debug.viewUsage.title", "Page usage")}
+						</h4>
+						<Button variant="outline" size="sm" onClick={resetViewUsage}>
+							{t("debug.viewUsage.reset", "Reset")}
+						</Button>
+					</div>
+					<p className="text-xs text-muted-foreground mb-3">
+						{t(
+							"debug.viewUsage.description",
+							"Visits and time spent per page, kept on this machine only.",
+						)}
+					</p>
+					<div className="space-y-1 text-xs">
+						{rankViewUsage(viewUsage).map((row) => (
+							<div key={row.view} className="flex justify-between gap-2">
+								<span className="font-mono">{row.view}</span>
+								<span className="text-muted-foreground">
+									{t("debug.viewUsage.row", {
+										visits: row.visits,
+										minutes: Math.round(row.dwellMs / 60000),
+										defaultValue: "{{visits}} visits · {{minutes}} min",
+									})}
+								</span>
+							</div>
+						))}
+					</div>
+				</div>
 
 				{/* Debug Info Display */}
 				{debugInfo && (

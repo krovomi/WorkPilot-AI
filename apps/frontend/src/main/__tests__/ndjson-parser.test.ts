@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 /**
  * NDJSON (Newline Delimited JSON) Parser Tests
- * Tests the parser used in memory-handlers.ts for parsing Ollama's streaming progress data
+ * Tests the parser used in ollama-handlers.ts for parsing Ollama's streaming progress data
  */
 
 /**
@@ -16,7 +16,7 @@ interface ProgressData {
 }
 
 /**
- * Simulate the NDJSON parser from memory-handlers.ts.
+ * Simulate the NDJSON parser from ollama-handlers.ts.
  * Parses newline-delimited JSON from Ollama's stderr stream.
  * Handles partial lines by maintaining a buffer between calls.
  *

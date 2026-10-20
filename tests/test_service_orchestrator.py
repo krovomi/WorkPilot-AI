@@ -107,7 +107,9 @@ class TestDockerComposeDetection:
     def test_detect_docker_compose_yml(self, temp_dir):
         """Test detecting docker-compose.yml."""
         compose = temp_dir / "docker-compose.yml"
-        compose.write_text("version: '3'\nservices:\n  api:\n    image: nginx\n")
+        compose.write_text(
+            "version: '3'\nservices:\n  api:\n    image: nginx\n", encoding="utf-8"
+        )
 
         orchestrator = ServiceOrchestrator(temp_dir)
 
@@ -116,7 +118,9 @@ class TestDockerComposeDetection:
     def test_detect_docker_compose_yaml(self, temp_dir):
         """Test detecting docker-compose.yaml."""
         compose = temp_dir / "docker-compose.yaml"
-        compose.write_text("version: '3'\nservices:\n  api:\n    image: nginx\n")
+        compose.write_text(
+            "version: '3'\nservices:\n  api:\n    image: nginx\n", encoding="utf-8"
+        )
 
         orchestrator = ServiceOrchestrator(temp_dir)
 
@@ -125,7 +129,7 @@ class TestDockerComposeDetection:
     def test_detect_compose_yml(self, temp_dir):
         """Test detecting compose.yml (Docker Compose v2)."""
         compose = temp_dir / "compose.yml"
-        compose.write_text("services:\n  api:\n    image: nginx\n")
+        compose.write_text("services:\n  api:\n    image: nginx\n", encoding="utf-8")
 
         orchestrator = ServiceOrchestrator(temp_dir)
 
@@ -134,7 +138,7 @@ class TestDockerComposeDetection:
     def test_detect_dev_compose(self, temp_dir):
         """Test detecting docker-compose.dev.yml."""
         compose = temp_dir / "docker-compose.dev.yml"
-        compose.write_text("services:\n  api:\n    image: nginx\n")
+        compose.write_text("services:\n  api:\n    image: nginx\n", encoding="utf-8")
 
         orchestrator = ServiceOrchestrator(temp_dir)
 
@@ -158,13 +162,16 @@ class TestServiceParsing:
     def test_parse_simple_services(self, temp_dir):
         """Test parsing simple service list."""
         compose = temp_dir / "docker-compose.yml"
-        compose.write_text("""
+        compose.write_text(
+            """
 services:
   api:
     image: nginx
   worker:
     image: python
-""")
+""",
+            encoding="utf-8",
+        )
 
         orchestrator = ServiceOrchestrator(temp_dir)
         services = orchestrator.get_services()
@@ -176,13 +183,16 @@ services:
     def test_is_multi_service_with_compose(self, temp_dir):
         """Test multi-service detection with compose."""
         compose = temp_dir / "docker-compose.yml"
-        compose.write_text("""
+        compose.write_text(
+            """
 services:
   api:
     image: nginx
   db:
     image: postgres
-""")
+""",
+            encoding="utf-8",
+        )
 
         orchestrator = ServiceOrchestrator(temp_dir)
 
@@ -205,11 +215,11 @@ class TestMonorepoDetection:
         # Create service directories
         api_service = services_dir / "api"
         api_service.mkdir()
-        (api_service / "package.json").write_text("{}")
+        (api_service / "package.json").write_text("{}", encoding="utf-8")
 
         worker_service = services_dir / "worker"
         worker_service.mkdir()
-        (worker_service / "requirements.txt").write_text("celery")
+        (worker_service / "requirements.txt").write_text("celery", encoding="utf-8")
 
         orchestrator = ServiceOrchestrator(temp_dir)
         services = orchestrator.get_services()
@@ -225,7 +235,7 @@ class TestMonorepoDetection:
 
         frontend = packages_dir / "frontend"
         frontend.mkdir()
-        (frontend / "package.json").write_text("{}")
+        (frontend / "package.json").write_text("{}", encoding="utf-8")
 
         orchestrator = ServiceOrchestrator(temp_dir)
         services = orchestrator.get_services()
@@ -240,7 +250,7 @@ class TestMonorepoDetection:
 
         web = apps_dir / "web"
         web.mkdir()
-        (web / "package.json").write_text("{}")
+        (web / "package.json").write_text("{}", encoding="utf-8")
 
         orchestrator = ServiceOrchestrator(temp_dir)
         services = orchestrator.get_services()
@@ -265,7 +275,7 @@ class TestMonorepoDetection:
         for dir_name, indicator in indicators:
             service_dir = services_dir / dir_name
             service_dir.mkdir()
-            (service_dir / indicator).write_text("")
+            (service_dir / indicator).write_text("", encoding="utf-8")
 
         orchestrator = ServiceOrchestrator(temp_dir)
         services = orchestrator.get_services()
@@ -284,7 +294,7 @@ class TestMonorepoDetection:
         # Create a service directory
         api_service = services_dir / "api"
         api_service.mkdir()
-        (api_service / "package.json").write_text("{}")
+        (api_service / "package.json").write_text("{}", encoding="utf-8")
 
         orchestrator = ServiceOrchestrator(temp_dir)
         services = orchestrator.get_services()
@@ -304,7 +314,7 @@ class TestMultiServiceDetection:
 
     def test_single_service_not_multi(self, temp_dir):
         """Test that single service is not multi-service."""
-        (temp_dir / "package.json").write_text("{}")
+        (temp_dir / "package.json").write_text("{}", encoding="utf-8")
 
         orchestrator = ServiceOrchestrator(temp_dir)
 
@@ -313,7 +323,7 @@ class TestMultiServiceDetection:
     def test_compose_always_multi(self, temp_dir):
         """Test that docker-compose is always multi-service."""
         compose = temp_dir / "docker-compose.yml"
-        compose.write_text("services:\n  api:\n    image: nginx\n")
+        compose.write_text("services:\n  api:\n    image: nginx\n", encoding="utf-8")
 
         orchestrator = ServiceOrchestrator(temp_dir)
 
@@ -328,7 +338,7 @@ class TestMultiServiceDetection:
         for name in ["api", "worker"]:
             service_dir = services_dir / name
             service_dir.mkdir()
-            (service_dir / "package.json").write_text("{}")
+            (service_dir / "package.json").write_text("{}", encoding="utf-8")
 
         orchestrator = ServiceOrchestrator(temp_dir)
 
@@ -346,7 +356,7 @@ class TestSerialization:
     def test_to_dict(self, temp_dir):
         """Test converting config to dictionary."""
         compose = temp_dir / "docker-compose.yml"
-        compose.write_text("services:\n  api:\n    image: nginx\n")
+        compose.write_text("services:\n  api:\n    image: nginx\n", encoding="utf-8")
 
         orchestrator = ServiceOrchestrator(temp_dir)
         config = orchestrator.to_dict()
@@ -359,7 +369,7 @@ class TestSerialization:
     def test_json_serializable(self, temp_dir):
         """Test that config is JSON serializable."""
         compose = temp_dir / "docker-compose.yml"
-        compose.write_text("services:\n  api:\n    image: nginx\n")
+        compose.write_text("services:\n  api:\n    image: nginx\n", encoding="utf-8")
 
         orchestrator = ServiceOrchestrator(temp_dir)
         config = orchestrator.to_dict()
@@ -380,7 +390,7 @@ class TestConvenienceFunctions:
     def test_is_multi_service_project(self, temp_dir):
         """Test is_multi_service_project function."""
         compose = temp_dir / "docker-compose.yml"
-        compose.write_text("services:\n  api:\n    image: nginx\n")
+        compose.write_text("services:\n  api:\n    image: nginx\n", encoding="utf-8")
 
         result = is_multi_service_project(temp_dir)
 
@@ -388,7 +398,7 @@ class TestConvenienceFunctions:
 
     def test_is_multi_service_project_false(self, temp_dir):
         """Test is_multi_service_project returns false."""
-        (temp_dir / "package.json").write_text("{}")
+        (temp_dir / "package.json").write_text("{}", encoding="utf-8")
 
         result = is_multi_service_project(temp_dir)
 
@@ -397,7 +407,7 @@ class TestConvenienceFunctions:
     def test_get_service_config(self, temp_dir):
         """Test get_service_config function."""
         compose = temp_dir / "docker-compose.yml"
-        compose.write_text("services:\n  api:\n    image: nginx\n")
+        compose.write_text("services:\n  api:\n    image: nginx\n", encoding="utf-8")
 
         config = get_service_config(temp_dir)
 
@@ -415,7 +425,7 @@ class TestServiceContext:
 
     def test_context_manager_no_services(self, temp_dir):
         """Test context manager with no services."""
-        (temp_dir / "package.json").write_text("{}")
+        (temp_dir / "package.json").write_text("{}", encoding="utf-8")
 
         with ServiceContext(temp_dir) as ctx:
             assert ctx.success is True  # No services to start
@@ -446,7 +456,7 @@ class TestEdgeCases:
     def test_empty_compose_file(self, temp_dir):
         """Test handling of empty compose file."""
         compose = temp_dir / "docker-compose.yml"
-        compose.write_text("")
+        compose.write_text("", encoding="utf-8")
 
         # Should not crash
         orchestrator = ServiceOrchestrator(temp_dir)
@@ -455,7 +465,7 @@ class TestEdgeCases:
     def test_invalid_compose_yaml(self, temp_dir):
         """Test handling of invalid YAML in compose file."""
         compose = temp_dir / "docker-compose.yml"
-        compose.write_text("invalid: yaml: [")
+        compose.write_text("invalid: yaml: [", encoding="utf-8")
 
         # Should not crash
         orchestrator = ServiceOrchestrator(temp_dir)
@@ -468,7 +478,7 @@ class TestEdgeCases:
 
         api_service = services_dir / "api"
         api_service.mkdir()
-        (api_service / "package.json").write_text("{}")
+        (api_service / "package.json").write_text("{}", encoding="utf-8")
 
         orchestrator = ServiceOrchestrator(temp_dir)
         services = orchestrator.get_services()

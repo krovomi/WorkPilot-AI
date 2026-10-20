@@ -1,4 +1,11 @@
 version: 2
+
+# Grouping: minor and patch updates of one ecosystem arrive as a single pull
+# request, so a quiet week is one PR to review instead of five. Major updates
+# match no group and keep their own pull request each: they are the ones that
+# break, and one breaking bump hidden in a batch would block the rest.
+# Dependabot puts a dependency in the FIRST group whose rules it matches, so a
+# group that must win (react, below) is listed before the catch-all.
 updates:
   # Python dependencies
   - package-ecosystem: pip
@@ -11,6 +18,13 @@ updates:
       - python
     commit-message:
       prefix: "chore(deps)"
+    groups:
+      pip-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
 
   # npm dependencies.
   # Root, not /apps/frontend: this is a pnpm workspace, and pnpm-lock.yaml +
@@ -28,6 +42,29 @@ updates:
       - javascript
     commit-message:
       prefix: "chore(deps)"
+    # react and react-dom are one package in two tarballs: react-dom asserts at
+    # runtime that both carry the *exact* same version and throws
+    # "Incompatible React versions" otherwise. Ungrouped, the updater bumped
+    # react-dom to 19.3.0 and left react at 19.2.4, and every one of the ~290
+    # renderer test files failed to load — on a pull request that looked like a
+    # routine patch bump. The types travel with them: @types/react-dom declares
+    # a dependency on @types/react, so a lone bump pins the pair to a stale
+    # resolution of the other.
+    groups:
+      react:
+        patterns:
+          - react
+          - react-dom
+          - "@types/react"
+          - "@types/react-dom"
+      # After react on purpose: those four must stay together whatever the
+      # update type, and the first matching group wins.
+      npm-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
 
   # GitHub Actions
   - package-ecosystem: github-actions
@@ -40,3 +77,10 @@ updates:
       - ci
     commit-message:
       prefix: "ci(deps)"
+    groups:
+      github-actions-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch

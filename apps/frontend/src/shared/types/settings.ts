@@ -8,10 +8,7 @@ import type {
 	ChangelogEmojiLevel,
 	ChangelogFormat,
 } from "./changelog";
-import type {
-	GraphitiEmbeddingProvider,
-	NotificationSettings,
-} from "./project";
+import type { NotificationSettings } from "./project";
 
 // Color theme types for multi-theme support
 export type ColorTheme =
@@ -269,7 +266,10 @@ export const DEFAULT_SIDEBAR_PREFS: SidebarPrefs = {
 	favoritesExpanded: true,
 };
 
+export type OpenAIAuthMode = "api-key" | "codex-cli";
+
 export interface AppSettings {
+	jev?: import("./jev").JevSettings;
 	theme: "light" | "dark" | "system";
 	colorTheme?: ColorTheme;
 	defaultModel: string;
@@ -286,6 +286,7 @@ export interface AppSettings {
 	// Global API keys (used as defaults for all projects)
 	globalClaudeOAuthToken?: string;
 	globalOpenAICodexOAuthToken?: string;
+	globalOpenAIAuthMode?: OpenAIAuthMode;
 	globalOpenAIApiKey?: string;
 	globalAnthropicApiKey?: string;
 	globalGoogleApiKey?: string;
@@ -301,23 +302,6 @@ export interface AppSettings {
 	// Ollama / local LLM provider config (set in the provider page).
 	globalOllamaApiUrl?: string;
 	globalOllamaModel?: string;
-	// Graphiti LLM provider settings (legacy)
-	graphitiLlmProvider?: "openai" | "anthropic" | "google" | "groq" | "ollama";
-	ollamaBaseUrl?: string;
-	// Memory/Graphiti configuration (app-wide, set during onboarding)
-	memoryEnabled?: boolean;
-	memoryEmbeddingProvider?: GraphitiEmbeddingProvider;
-	memoryOllamaEmbeddingModel?: string;
-	memoryOllamaEmbeddingDim?: number;
-	memoryOllamaLlmModel?: string;
-	memoryVoyageApiKey?: string;
-	memoryVoyageEmbeddingModel?: string;
-	memoryAzureApiKey?: string;
-	memoryAzureBaseUrl?: string;
-	memoryAzureEmbeddingDeployment?: string;
-	// Agent Memory Access (MCP) - app-wide defaults
-	graphitiMcpEnabled?: boolean;
-	graphitiMcpUrl?: string;
 	// Onboarding wizard completion state
 	onboardingCompleted?: boolean;
 	// Setup Hub home-screen banner dismissed by the user
@@ -336,6 +320,14 @@ export interface AppSettings {
 	// Feature-specific configuration (insights, ideation, roadmap)
 	featureModels?: FeatureModelConfig;
 	featureThinking?: FeatureThinkingConfig;
+	// Per-page override of « provider × LLM × effort ».
+	// Keyed by page id (a SidebarView, see shared/utils/page-llm.ts). A page
+	// names only what it overrides: an absent field falls back to
+	// selectedProvider / featureModels / featureThinking, in that order.
+	pageLlmOverrides?: Record<
+		string,
+		import("../utils/page-llm").PageLlmOverride
+	>;
 	// Changelog preferences
 	changelogFormat?: ChangelogFormat;
 	changelogAudience?: ChangelogAudience;

@@ -401,7 +401,7 @@ export function DependencySentinelDialog() {
 
 				<DialogFooter>
 					<Button variant="outline" onClick={closeDialog}>
-						{t("common:close", "Close")}
+						{t("common:buttons.close", "Close")}
 					</Button>
 				</DialogFooter>
 			</DialogContent>

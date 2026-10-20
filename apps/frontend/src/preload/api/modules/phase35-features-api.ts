@@ -167,6 +167,78 @@ export interface LocaleDiffData {
 	placeholder_mismatches: string[];
 	totals: { missing: number; obsolete: number; placeholder_mismatches: number };
 }
+// --- #3.12 i18n editor -------------------------------------------------
+
+/** One namespace, and how much of it is done in each locale. */
+export interface I18nNamespaceSummary {
+	namespace: string;
+	total_keys: number;
+	/** locale → keys present and not a placeholder */
+	translated: Record<string, number>;
+	/** locale → keys the namespace has that this locale does not */
+	missing: Record<string, number>;
+}
+
+/**
+ * One key across the locales.
+ *
+ * `null` is not `""`: a key absent from a locale is untranslated, a key
+ * present and empty is a deliberate blank. The editor draws them differently
+ * and the writer keeps them apart.
+ */
+export interface I18nEntry {
+	key: string;
+	values: Record<string, string | null>;
+	placeholder_mismatch: boolean;
+}
+
+export interface I18nNamespaceView {
+	namespace: string;
+	locales: string[];
+	entries: I18nEntry[];
+	/** Per-locale file fingerprints. A save hands them back to prove it is current. */
+	fingerprints: Record<string, string>;
+	root: string;
+}
+
+/**
+ * A save's own result type, not `Phase35Result`.
+ *
+ * `stale` belongs to the *failure*, and the shared union has no room on that
+ * arm. Widening it would put an optional `stale` on every failure in this
+ * file to describe one endpoint's recoverable case.
+ */
+export type I18nMutateResult =
+	| {
+			success: true;
+			namespace: string;
+			/** Files the save actually rewrote. Empty when nothing differed. */
+			written: string[];
+			fingerprints: Record<string, string>;
+	  }
+	| {
+			success: false;
+			error: string;
+			/** The files moved under us. Reload and replay rather than retype. */
+			stale?: boolean;
+	  };
+
+/** A translation directory found inside a project. */
+export interface I18nLocaleRoot {
+	path: string;
+	/** Relative to the project, which is what the UI shows. */
+	relative: string;
+	locales: string[];
+	layout: "nested" | "flat" | "none";
+	namespaces: number;
+}
+
+export type I18nOperation =
+	| { op: "set"; key: string; values: Record<string, string | null> }
+	| { op: "add"; key: string; values: Record<string, string | null> }
+	| { op: "rename"; key: string; new_key: string }
+	| { op: "delete"; key: string };
+
 export interface I18nScalingReport {
 	source_locale: string;
 	diffs: LocaleDiffData[];
@@ -348,7 +420,53 @@ export interface Phase35FeaturesAPI {
 		localesDir: string,
 		sourceLocale?: string,
 		strategy?: string,
-	) => Promise<Phase35Result<{ report: I18nScalingReport }>>;
+	) => Promise<
+		Phase35Result<{
+			report: I18nScalingReport;
+			/** The directory the locales were actually read from. */
+			locales_dir: string;
+			locales_found: string[];
+			layout: "nested" | "flat" | "none";
+			/**
+			 * Set when the picked directory was one language rather than the
+			 * root of all of them, and the search moved up to its parent.
+			 */
+			redirected_from: string | null;
+		}>
+	>;
+
+	/** The translation directories this project has, best first. */
+	detectI18nRoots: (
+		projectPath: string,
+	) => Promise<Phase35Result<{ roots: I18nLocaleRoot[] }>>;
+	/** Every namespace under the directory, with per-locale completeness. */
+	listI18nNamespaces: (
+		localesDir: string,
+	) => Promise<
+		Phase35Result<{
+			locales_dir: string;
+			locales: string[];
+			layout: "nested" | "flat" | "none";
+			redirected_from: string | null;
+			namespaces: I18nNamespaceSummary[];
+		}>
+	>;
+	/** One namespace across every locale, editable, with its fingerprints. */
+	loadI18nNamespace: (
+		localesDir: string,
+		namespace: string,
+		referenceLocale?: string,
+	) => Promise<Phase35Result<{ view: I18nNamespaceView }>>;
+	/**
+	 * Apply a batch of edits to the JSON files — all of them or none.
+	 * `stale` marks the one failure the UI can recover from on its own.
+	 */
+	mutateI18n: (
+		localesDir: string,
+		namespace: string,
+		operations: I18nOperation[],
+		fingerprints: Record<string, string>,
+	) => Promise<I18nMutateResult>;
 
 	// #3.2 Cognitive Context
 	optimizeContext: (
@@ -570,6 +688,24 @@ export const createPhase35FeaturesAPI = (): Phase35FeaturesAPI => ({
 			localesDir,
 			sourceLocale,
 			strategy,
+		}),
+
+	detectI18nRoots: (projectPath) =>
+		ipcRenderer.invoke(IPC_CHANNELS.I18N_EDITOR_DETECT, { projectPath }),
+	listI18nNamespaces: (localesDir) =>
+		ipcRenderer.invoke(IPC_CHANNELS.I18N_EDITOR_NAMESPACES, { localesDir }),
+	loadI18nNamespace: (localesDir, namespace, referenceLocale) =>
+		ipcRenderer.invoke(IPC_CHANNELS.I18N_EDITOR_NAMESPACE, {
+			localesDir,
+			namespace,
+			referenceLocale,
+		}),
+	mutateI18n: (localesDir, namespace, operations, fingerprints) =>
+		ipcRenderer.invoke(IPC_CHANNELS.I18N_EDITOR_MUTATE, {
+			localesDir,
+			namespace,
+			operations,
+			fingerprints,
 		}),
 
 	// #3.2

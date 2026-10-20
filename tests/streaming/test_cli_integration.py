@@ -1,0 +1,467 @@
+"""
+CLI Streaming Integration Tests
+==============================
+
+Integration tests for CLI streaming functionality.
+"""
+
+import asyncio
+import json
+import subprocess
+import sys
+import time
+from contextlib import nullcontext
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+import websockets
+from cli.build_commands import handle_build_command
+from cli.main import parse_args
+from core.build_signals import BuildHalted
+from websockets.client import WebSocketClientProtocol
+
+
+class TestCLIStreamingIntegration:
+    """Integration tests for CLI streaming functionality."""
+
+    @pytest.fixture(autouse=True)
+    def _skip_credential_validation(self):
+        """These tests are about streaming options, not about credentials.
+
+        `handle_build_command` lazily imports `validate_environment` from `cli.utils`
+        and calls it before it reaches
+        the mocked `run_autonomous_agent`, and that call resolves real auth —
+        so the assertions below could only ever run on a machine already logged
+        in. Patching the gate keeps the test on the parameter propagation it
+        actually asserts.
+        """
+        with (
+            patch("cli.utils.validate_environment", return_value=True),
+            patch("cli.build_commands._run_docs_preflight"),
+            patch("cli.build_commands._run_deterministic_gates"),
+            patch("cli.build_commands._run_workflow_phases"),
+            patch(
+                "agents.coder.get_memory_context",
+                new_callable=AsyncMock,
+                return_value=None,
+            ),
+            patch("agents.coder.AUTO_CONTINUE_DELAY_SECONDS", 0),
+        ):
+            yield
+
+    @pytest.fixture
+    def temp_project_dir(self, tmp_path: Path):
+        """Create a project whose cleanup is owned by pytest.
+
+        ``run_autonomous_agent`` can finish asynchronous finalizers after this
+        fixture yields.  An inline ``TemporaryDirectory`` removed the tree at
+        fixture teardown and sporadically raced with those finalizers in the
+        full suite (``OSError: Directory not empty``).  ``tmp_path`` keeps the
+        directory alive until pytest's session-level cleanup, after the event
+        loop has been drained.
+        """
+        project_path = tmp_path / "project"
+        project_path.mkdir()
+
+        # Create basic project structure
+        (project_path / ".workpilot").mkdir()
+        (project_path / ".workpilot" / "specs").mkdir()
+
+        # Create a test spec
+        spec_dir = project_path / ".workpilot" / "specs" / "001-test-streaming"
+        spec_dir.mkdir()
+
+        # Create basic spec files
+        (spec_dir / "spec.md").write_text(
+            """
+# Test Streaming Spec
+
+## Feature
+Test streaming functionality
+
+## Requirements
+- Should emit streaming events
+- Should connect to WebSocket server
+""",
+            encoding="utf-8",
+        )
+
+        (spec_dir / "task_metadata.json").write_text(
+            json.dumps(
+                {
+                    "title": "Test Streaming",
+                    "description": "Test streaming functionality",
+                    "phaseModels": {
+                        "spec": "sonnet",
+                        "planning": "sonnet",
+                        "coding": "sonnet",
+                        "qa": "sonnet",
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        return project_path
+
+    def test_parse_args_with_streaming_options(self):
+        """Test CLI argument parsing with streaming options."""
+        # Test with streaming enabled
+        with patch.object(
+            sys,
+            "argv",
+            [
+                "workpilot",
+                "--spec",
+                "001-test",
+                "--enable-streaming",
+                "--streaming-session-id",
+                "test-session-123",
+            ],
+        ):
+            args = parse_args()
+
+        assert args.enable_streaming is True
+        assert args.streaming_session_id == "test-session-123"
+        assert args.spec == "001-test"
+
+    def test_parse_args_without_streaming(self):
+        """Test CLI argument parsing without streaming options."""
+        with patch.object(sys, "argv", ["workpilot", "--spec", "001-test"]):
+            args = parse_args()
+
+        assert args.enable_streaming is False
+        assert args.streaming_session_id is None
+        assert args.spec == "001-test"
+
+    def test_handle_build_command_with_streaming(self, temp_project_dir):
+        """Test build command with streaming options."""
+        spec_dir = temp_project_dir / ".workpilot" / "specs" / "001-test-streaming"
+
+        # Mock the agent execution to avoid actually running it.
+        # handle_build_command does a lazy import: from core.agent import run_autonomous_agent
+        # and wraps it in asyncio.run(), so we patch at "core.agent" module level with a
+        # regular (non-async) mock to avoid the "asyncio.run() in running event loop" error.
+        with patch("core.agent.run_autonomous_agent") as mock_run:
+            mock_run.return_value = None
+
+            # Call build command with streaming options
+            handle_build_command(
+                project_dir=temp_project_dir,
+                spec_dir=spec_dir,
+                model="sonnet",
+                max_iterations=None,
+                verbose=False,
+                force_isolated=False,
+                force_direct=True,  # Use direct mode for testing
+                auto_continue=True,
+                skip_qa=True,
+                force_bypass_approval=True,
+                base_branch=None,
+                enable_streaming=True,
+                streaming_session_id="test-session-123",
+            )
+
+            # Verify run_autonomous_agent was called with streaming parameters
+            mock_run.assert_called_once()
+            call_args = mock_run.call_args[1]  # kwargs
+            assert call_args["streaming_session_id"] == "test-session-123"
+
+    def test_handle_build_command_without_streaming(self, temp_project_dir):
+        """Test build command without streaming options."""
+        spec_dir = temp_project_dir / ".workpilot" / "specs" / "001-test-streaming"
+
+        with patch("core.agent.run_autonomous_agent") as mock_run:
+            mock_run.return_value = None
+
+            handle_build_command(
+                project_dir=temp_project_dir,
+                spec_dir=spec_dir,
+                model="sonnet",
+                max_iterations=None,
+                verbose=False,
+                force_isolated=False,
+                force_direct=True,
+                auto_continue=True,
+                skip_qa=True,
+                force_bypass_approval=True,
+                base_branch=None,
+                enable_streaming=False,
+                streaming_session_id=None,
+            )
+
+            mock_run.assert_called_once()
+            call_args = mock_run.call_args[1]
+            assert call_args["streaming_session_id"] is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("completed", [False, True], ids=["halted", "completed"])
+    async def test_streaming_wrapper_integration(self, temp_project_dir, completed):
+        """Test streaming wrapper integration with agent execution."""
+        spec_dir = temp_project_dir / ".workpilot" / "specs" / "001-test-streaming"
+
+        plan_path = spec_dir / "implementation_plan.json"
+        plan = {
+            "feature": "Streaming lifecycle",
+            "workflow_type": "feature",
+            "phases": [
+                {
+                    "id": "1",
+                    "name": "Implementation",
+                    "subtasks": [
+                        {
+                            "id": "1.1",
+                            "description": "Implement streaming",
+                            "status": "pending",
+                        }
+                    ],
+                }
+            ],
+        }
+        if completed:
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+
+        # Mock streaming components. `create_agent_client` is mocked too: it
+        # resolves real credentials, and this test is about the streaming
+        # wrapper's lifecycle, not about being logged in.
+        with (
+            patch("agents.coder.create_streaming_wrapper") as mock_create_wrapper,
+            patch("agents.coder.run_agent_session") as mock_run_session,
+            patch("agents.coder.create_agent_client") as mock_create_client,
+        ):
+            # `handle_local_model_no_tools` reads `tool_calling_unsupported`
+            # off the client and halts the phase when it is truthy — which a
+            # bare MagicMock always is. Saying so explicitly keeps the mock
+            # from impersonating a failure it is not meant to represent.
+            mock_create_client.return_value = MagicMock(tool_calling_unsupported=False)
+            # Setup mocks
+            mock_wrapper = MagicMock()
+            mock_wrapper.start_session = AsyncMock()
+            mock_wrapper.end_session = AsyncMock()
+            mock_wrapper.emit_agent_thinking = AsyncMock()
+            mock_wrapper.emit_agent_response = AsyncMock()
+            mock_create_wrapper.return_value = mock_wrapper
+
+            async def run_session(*args, **kwargs):
+                if completed:
+                    plan["phases"][0]["subtasks"][0]["status"] = "completed"
+                    plan_path.write_text(json.dumps(plan), encoding="utf-8")
+                    return "complete", "Test response", {}
+                return "continue", "Test response", {}
+
+            mock_run_session.side_effect = run_session
+
+            from agents.coder import run_autonomous_agent
+
+            # A session without a plan must halt, but still close its stream.
+            expected = (
+                nullcontext()
+                if completed
+                else pytest.raises(BuildHalted, match="Planning stopped")
+            )
+            with expected:
+                await run_autonomous_agent(
+                    project_dir=temp_project_dir,
+                    spec_dir=spec_dir,
+                    model="sonnet",
+                    max_iterations=1,
+                    verbose=False,
+                    streaming_session_id="integration-test-session",
+                )
+
+            # Verify streaming wrapper was created and used
+            mock_create_wrapper.assert_called_once_with(
+                "integration-test-session", enable_recording=True
+            )
+            mock_wrapper.start_session.assert_called_once()
+
+            # Verify streaming events were emitted
+            mock_wrapper.emit_agent_thinking.assert_called()
+            mock_wrapper.emit_agent_response.assert_called()
+
+            # Verify cleanup
+            mock_wrapper.end_session.assert_called_once()
+
+    @pytest.mark.asyncio
+    @pytest.mark.skip(
+        reason="Requires real WebSocket network connection between processes"
+    )
+    async def test_websocket_server_integration(self):
+        """Test WebSocket server integration with streaming."""
+        from streaming.streaming_manager import StreamingManager
+        from streaming.websocket_server import StreamingWebSocketServer
+
+        # Create server on test port
+        server = StreamingWebSocketServer(host="localhost", port=8767)
+        await server.start()
+
+        try:
+            # Create streaming wrapper
+            from streaming.agent_wrapper import create_streaming_wrapper
+
+            wrapper = create_streaming_wrapper("websocket-test-session")
+
+            # Start session
+            await wrapper.start_session(
+                {
+                    "session_id": "websocket-test-session",
+                    "task": "websocket-test",
+                    "project_path": "/test",
+                    "agent_type": "coder",
+                }
+            )
+
+            # Emit events
+            await wrapper.emit_agent_thinking("WebSocket integration test")
+            await wrapper.emit_agent_response("Response from WebSocket test")
+            await wrapper.emit_file_change(
+                "/test/file.ts", content="console.log('test');"
+            )
+
+            # End session
+            await wrapper.end_session()
+
+            # Verify session was created and cleaned up
+            mock_manager = server.streaming_manager
+            assert "websocket-test-session" not in mock_manager.sessions
+
+        finally:
+            await server.stop()
+
+    def test_full_streaming_pipeline(self, temp_project_dir):
+        """Test complete streaming pipeline from CLI to WebSocket."""
+        spec_dir = temp_project_dir / ".workpilot" / "specs" / "001-test-streaming"
+
+        # Mock all components for full pipeline test.
+        # handle_build_command does lazy import: from core.agent import run_autonomous_agent
+        # and wraps it in asyncio.run(), so use a regular mock (not AsyncMock).
+        # StreamingManager lives in streaming.streaming_manager, not websocket_server.
+        with (
+            patch("core.agent.run_autonomous_agent") as mock_run_agent,
+        ):
+            mock_run_agent.return_value = None
+
+            # Execute full pipeline
+            handle_build_command(
+                project_dir=temp_project_dir,
+                spec_dir=spec_dir,
+                model="sonnet",
+                max_iterations=1,
+                verbose=False,
+                force_isolated=False,
+                force_direct=True,
+                auto_continue=True,
+                skip_qa=True,
+                force_bypass_approval=True,
+                base_branch=None,
+                enable_streaming=True,
+                streaming_session_id="full-pipeline-test",
+            )
+
+            # Verify the agent was called with the correct streaming session ID
+            mock_run_agent.assert_called_once()
+            call_args = mock_run_agent.call_args[1]
+            assert call_args["streaming_session_id"] == "full-pipeline-test"
+
+    def test_cli_help_includes_streaming_options(self):
+        """Test that CLI help includes streaming options."""
+        import sys
+        from io import StringIO
+
+        # Capture help output
+        old_stdout = sys.stdout
+        sys.stdout = StringIO()
+
+        try:
+            # This should print help and exit
+            with patch.object(sys, "argv", ["workpilot", "--help"]):
+                with pytest.raises(SystemExit):
+                    parse_args()
+        finally:
+            help_output = sys.stdout.getvalue()
+            sys.stdout = old_stdout
+
+        # Verify streaming options are documented
+        assert "--enable-streaming" in help_output
+        assert "--streaming-session-id" in help_output
+        assert "streaming" in help_output.lower()
+
+    @pytest.mark.asyncio
+    async def test_error_handling_streaming_unavailable(self, temp_project_dir):
+        """Test error handling when streaming is unavailable."""
+        spec_dir = temp_project_dir / ".workpilot" / "specs" / "001-test-streaming"
+
+        # Mock streaming import failure
+        with (
+            patch("agents.coder.STREAMING_AVAILABLE", False),
+            patch("agents.coder.run_agent_session") as mock_run_session,
+            patch("agents.coder.create_agent_client") as mock_create_client,
+        ):
+            mock_run_session.return_value = ("continue", "Test response", None)
+            mock_create_client.return_value = MagicMock(tool_calling_unsupported=False)
+
+            from agents.coder import run_autonomous_agent
+
+            # Streaming availability does not turn an unfinished plan into success.
+            with pytest.raises(BuildHalted, match="Planning stopped"):
+                await run_autonomous_agent(
+                    project_dir=temp_project_dir,
+                    spec_dir=spec_dir,
+                    model="sonnet",
+                    max_iterations=1,
+                    verbose=False,
+                    streaming_session_id="unavailable-test",
+                )
+
+            # Agent session should still run
+            mock_run_session.assert_called()
+
+            # But no streaming wrapper should be created
+            assert mock_run_session.call_count == 1
+
+
+class TestStreamingCLICommands:
+    """Test streaming-specific CLI commands."""
+
+    def test_streaming_server_command_parsing(self):
+        """Test streaming server command parsing."""
+        with patch.object(
+            sys,
+            "argv",
+            ["workpilot", "--streaming-server", "--streaming-port", "9999"],
+        ):
+            args = parse_args()
+
+        assert args.streaming_server is True
+        assert args.streaming_port == 9999
+
+    def test_list_recordings_command_parsing(self):
+        """Test list recordings command parsing."""
+        with patch.object(sys, "argv", ["workpilot", "--list-recordings"]):
+            args = parse_args()
+
+        assert args.list_recordings is True
+
+    def test_replay_recording_command_parsing(self):
+        """Test replay recording command parsing."""
+        with patch.object(
+            sys,
+            "argv",
+            [
+                "workpilot",
+                "--replay-recording",
+                "test-recording.json",
+                "--speed",
+                "2.0",
+            ],
+        ):
+            args = parse_args()
+
+        assert args.replay_recording == "test-recording.json"
+        assert args.speed == 2
+
+
+if __name__ == "__main__":
+    # Run tests
+    pytest.main([__file__, "-v"])

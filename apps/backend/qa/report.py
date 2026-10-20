@@ -7,38 +7,16 @@ and report generation.
 """
 
 import json
-import os
 from collections import Counter
 from datetime import datetime, timezone
 from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any
 
+from .budget import RECURRING_ISSUE_THRESHOLD, qa_iteration_cap
 from .criteria import load_implementation_plan, save_implementation_plan
 
-
-def _read_int_env(name: str, default: int, *, minimum: int = 1) -> int:
-    """Lit une variable d'env entière, retombe sur ``default`` si invalide."""
-    raw = os.environ.get(name)
-    if not raw:
-        return default
-    try:
-        value = int(raw)
-    except (TypeError, ValueError):
-        return default
-    return value if value >= minimum else default
-
-
 # Configuration
-# Seuil par défaut : 8 occurrences avant escalade humaine. L'ancien seuil de 3
-# faisait escalader la boucle dès la 3ᵉ itération sur 50, dès qu'une issue
-# persistait — y compris des faux positifs non-actionables comme « Cannot
-# verify without runtime ». 8 laisse au fixer une vraie chance de converger
-# tout en gardant un garde-fou contre les boucles infinies. Surchargeable via
-# ``WORKPILOT_QA_RECURRING_THRESHOLD``.
-RECURRING_ISSUE_THRESHOLD = _read_int_env(
-    "WORKPILOT_QA_RECURRING_THRESHOLD", default=8, minimum=2
-)
 ISSUE_SIMILARITY_THRESHOLD = 0.8  # Consider issues "same" if similarity >= this
 
 
@@ -306,6 +284,9 @@ async def escalate_to_human(
     spec_dir: Path,
     recurring_issues: list[dict[str, Any]],
     iteration: int,
+    *,
+    max_iterations: int | None = None,
+    threshold: int = RECURRING_ISSUE_THRESHOLD,
 ) -> None:
     """
     Create human escalation file for recurring issues.
@@ -314,8 +295,11 @@ async def escalate_to_human(
         spec_dir: Spec directory
         recurring_issues: Issues that have recurred
         iteration: Current iteration number
+        max_iterations: The run's pass budget (defaults to the task's cap)
+        threshold: The occurrence count that made these issues recurring
     """
-    from .loop import MAX_QA_ITERATIONS
+    if max_iterations is None:
+        max_iterations = qa_iteration_cap(spec_dir)
 
     history = get_iteration_history(spec_dir)
     summary = get_recurring_issue_summary(history)
@@ -325,8 +309,8 @@ async def escalate_to_human(
     content = f"""# QA Escalation - Human Intervention Required
 
 **Generated**: {datetime.now(timezone.utc).isoformat()}
-**Iteration**: {iteration}/{MAX_QA_ITERATIONS}
-**Reason**: Recurring issues detected ({RECURRING_ISSUE_THRESHOLD}+ occurrences)
+**Iteration**: {iteration}/{max_iterations}
+**Reason**: Recurring issues detected ({threshold}+ occurrences)
 
 ## Summary
 
@@ -337,7 +321,7 @@ async def escalate_to_human(
 
 ## Recurring Issues
 
-These issues have appeared {RECURRING_ISSUE_THRESHOLD}+ times without being resolved:
+These issues have appeared {threshold}+ times without being resolved:
 
 """
 
@@ -594,3 +578,210 @@ def is_no_test_project(spec_dir: Path, project_dir: Path) -> bool:
         return False
 
     return True
+
+
+# =============================================================================
+# REPORTS RENDERED FROM THE SIGN-OFF
+# =============================================================================
+#
+# The reviewer used to write the same issues up to five times: qa_report.md,
+# QA_FIX_REQUEST.md, `issues_found`, a completion banner and its final message.
+# Every one of those was output tokens, and only `issues_found` was read by
+# code. The sign-off is now the single source and both files are rendered from
+# it here, in a fixed short shape that costs nothing to produce.
+
+
+def _issue_field(issue: dict[str, Any], *keys: str) -> str:
+    for key in keys:
+        value = issue.get(key)
+        if isinstance(value, str) and value.strip():
+            return " ".join(value.split())
+    return ""
+
+
+def _issue_lines(issues: list[dict[str, Any]]) -> list[str]:
+    lines: list[str] = []
+    for idx, issue in enumerate(issues, start=1):
+        if not isinstance(issue, dict):
+            continue
+        title = _issue_field(issue, "title", "summary") or f"Issue {idx}"
+        severity = _issue_field(issue, "severity", "type", "priority") or "issue"
+        location = _issue_field(issue, "location", "file")
+        fix = _issue_field(
+            issue, "fix", "fix_required", "description", "details", "message"
+        )
+        head = f"{idx}. [{severity}] {title}"
+        if location:
+            head += f" — `{location}`"
+        lines.append(head)
+        if fix:
+            lines.append(f"   Fix: {fix}")
+    return lines
+
+
+def _tests_verdict(tests_passed: Any) -> str | None:
+    """`pass`, `fail` or None, from the sign-off's `tests_passed` values.
+
+    `cli/build_commands._verdict_in` reads `Tests: pass|fail` out of the report
+    for the tests-pass hard gate, so the rendered report states it whenever the
+    sign-off lets us tell.
+    """
+    if not isinstance(tests_passed, dict) or not tests_passed:
+        return None
+    seen = False
+    for value in tests_passed.values():
+        text = str(value).strip().lower()
+        if not text:
+            continue
+        if "fail" in text:
+            return "fail"
+        if "/" in text:
+            done, _, total = text.partition("/")
+            try:
+                if int(done.split()[0]) < int(total.split()[0]):
+                    return "fail"
+            except (ValueError, IndexError):
+                continue
+            seen = True
+        elif text.startswith("pass"):
+            seen = True
+    return "pass" if seen else None
+
+
+def render_qa_report(spec_dir: Path, signoff: dict[str, Any] | None) -> bool:
+    """Write `qa_report.md` from the reviewer's `qa_signoff`. Never raises.
+
+    The visual QA section is put back afterwards, between its markers, so the
+    file keeps describing the captures as `write_visual_qa_report` left them.
+    """
+    if not isinstance(signoff, dict) or not signoff.get("status"):
+        return False
+    status = str(signoff.get("status"))
+    verdict = {"approved": "APPROVED", "rejected": "REJECTED"}.get(status, status)
+    lines = ["# QA Report", "", f"**SIGN-OFF**: {verdict}"]
+    session = signoff.get("qa_session")
+    if session is not None:
+        lines.append(f"Session: {session}")
+    tests = signoff.get("tests_passed")
+    if isinstance(tests, dict) and tests:
+        lines.append(
+            "Results: " + " · ".join(f"{k} {v}" for k, v in tests.items() if v)
+        )
+    tests_verdict = _tests_verdict(tests)
+    if tests_verdict:
+        lines.append(f"Tests: {tests_verdict}")
+    coverage = signoff.get("coverage")
+    if isinstance(coverage, dict):
+        parts = [
+            f"{k} {v}%"
+            for k, v in coverage.items()
+            if k != "measured" and isinstance(v, (int, float))
+        ]
+        if parts:
+            lines.append("Coverage: " + " · ".join(parts))
+    issues = signoff.get("issues_found") or []
+    if isinstance(issues, list) and issues:
+        lines += ["", f"## Issues ({len(issues)})", "", *_issue_lines(issues)]
+    next_steps = signoff.get("next_steps")
+    if isinstance(next_steps, list) and next_steps:
+        lines += ["", "## Next steps", ""]
+        lines += [f"- {' '.join(str(step).split())}" for step in next_steps]
+    report = spec_dir / "qa_report.md"
+    try:
+        if report.is_symlink():
+            return False
+        report.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    except OSError:
+        return False
+    write_visual_qa_report(spec_dir)
+    return True
+
+
+def render_fix_request(
+    spec_dir: Path, issues: list[dict[str, Any]], qa_iteration: int
+) -> bool:
+    """Write `QA_FIX_REQUEST.md` from `issues_found`. Never raises.
+
+    Always rewritten when there are issues: a file left by an earlier pass
+    would otherwise send the fixer after problems that are already gone.
+    """
+    body = _issue_lines([i for i in issues if isinstance(i, dict)])
+    if not body:
+        return False
+    closing = (
+        "When done: set `qa_signoff.status` to `fixes_applied` and "
+        "`ready_for_qa_revalidation: true` in implementation_plan.json."
+    )
+    lines = [f"# QA Fix Request (pass {qa_iteration})", "", *body, "", closing]
+    try:
+        (spec_dir / "QA_FIX_REQUEST.md").write_text(
+            "\n".join(lines) + "\n", encoding="utf-8"
+        )
+    except OSError:
+        return False
+    return True
+
+
+# =============================================================================
+# VISUAL QA (docintel lot E)
+# =============================================================================
+
+
+def run_visual_qa(spec_dir: Path, project_dir: Path) -> dict[str, int] | None:
+    """OCR the task's captures before the reviewer reads them. Never raises.
+
+    The record lands in `<spec_dir>/docintel/visual_qa.json`, which is what
+    the reviewer's prompt (`docintel_section`) and `write_visual_qa_report`
+    read. A capture whose file did not change is not read again, so running
+    this before every QA pass costs one `stat` per capture after the first.
+    Returns the finding counts, or None when there was nothing to review.
+    """
+    try:
+        from docintel.visual_qa import run_visual_qa as _run
+
+        record = _run(spec_dir, project_dir)
+    except Exception:  # noqa: BLE001 - visual QA never stops a review
+        return None
+    if record.skipped:
+        return None
+    return record.counts()
+
+
+def write_visual_qa_report(spec_dir: Path) -> bool:
+    """Put the visual QA findings into `qa_report.md`, between their markers.
+
+    The reviewer writes the report and may or may not quote the OCR evidence;
+    this makes it part of the report either way, replaced in place on every
+    pass so the section describes the captures as they are now. Never raises.
+    """
+    try:
+        from docintel.visual_qa import (
+            REPORT_END,
+            REPORT_START,
+            load_visual_qa,
+            report_markdown,
+        )
+
+        record = load_visual_qa(spec_dir)
+        section = report_markdown(record) if record is not None else ""
+        report = spec_dir / "qa_report.md"
+        if report.is_symlink():
+            return False
+        try:
+            current = report.read_text(encoding="utf-8")
+        except OSError:
+            current = ""
+        if REPORT_START in current and REPORT_END in current:
+            head, rest = current.split(REPORT_START, 1)
+            tail = rest.split(REPORT_END, 1)[1]
+            updated = head.rstrip() + ("\n\n" + section if section else "") + tail
+        elif section:
+            updated = (current.rstrip() + "\n\n" if current.strip() else "") + section
+        else:
+            return False
+        if updated == current:
+            return False
+        report.write_text(updated.rstrip() + "\n", encoding="utf-8")
+        return True
+    except Exception:  # noqa: BLE001 - the report is the reviewer's first
+        return False

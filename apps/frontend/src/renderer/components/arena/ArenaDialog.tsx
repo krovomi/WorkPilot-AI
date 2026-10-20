@@ -1,9 +1,11 @@
 import type {
 	ArenaBattle,
+	ArenaContender,
 	ArenaLabel,
 	ArenaParticipant,
 	ArenaTaskType,
 } from "@shared/types/arena";
+import { filterContenders, pickDefaultContenders } from "@shared/utils/arena-contenders";
 import {
 	AlertCircle,
 	BarChart3,
@@ -11,14 +13,17 @@ import {
 	ChevronRight,
 	History,
 	Loader2,
+	RefreshCw,
 	Route,
+	Search,
+	ServerOff,
 	Swords,
 	Trash2,
 	TrendingUp,
 	Trophy,
 	X,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ScrollArea } from "@/components/ui";
 import { Badge } from "@/components/ui/badge";
@@ -30,7 +35,9 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useArenaContenders } from "@/hooks/useArenaContenders";
 import { cn } from "@/lib/utils";
 import { useArenaStore } from "@/stores/arena-store";
 import { useProjectStore } from "@/stores/project-store";
@@ -53,20 +60,9 @@ const LABEL_COLORS: Record<ArenaLabel, string> = {
 	D: "bg-orange-500/20 text-orange-400 border-orange-500/40",
 };
 
-const DEMO_PROFILES = [
-	{
-		id: "claude-sonnet",
-		name: "Claude Sonnet 4.6",
-		model: "claude-sonnet-4-6",
-	},
-	{
-		id: "claude-haiku",
-		name: "Claude Haiku 4.5",
-		model: "claude-haiku-4-5-20251001",
-	},
-	{ id: "gpt-4.1", name: "GPT-4.1", model: "gpt-4.1" },
-	{ id: "gpt-4.1-mini", name: "GPT-4.1 Mini", model: "gpt-4.1-mini" },
-];
+/** How many models may enter one battle — one per anonymous label. */
+const MAX_CONTENDERS = 4;
+const MIN_CONTENDERS = 2;
 
 const CONFIDENCE_COLOR: Record<string, string> = {
 	low: "text-orange-400 bg-orange-500/10 border-orange-500/30",
@@ -156,6 +152,10 @@ function ParticipantCard({
 						{isRevealed && (
 							<span className="text-xs text-muted-foreground">
 								{participant.modelName}
+								<span className="opacity-60">
+									{" · "}
+									{participant.providerLabel}
+								</span>
 							</span>
 						)}
 					</div>
@@ -191,15 +191,29 @@ function ParticipantCard({
 
 				{/* Footer stats */}
 				<div className="flex items-center justify-between px-3 py-2 border-t border-border text-xs text-muted-foreground">
-					<span>
+					<span
+						title={
+							participant.usageEstimated
+								? t("battle.tokensEstimatedHint")
+								: undefined
+						}
+					>
 						{participant.tokensUsed > 0
-							? `${participant.tokensUsed.toLocaleString()} tokens`
+							? `${participant.usageEstimated ? "~" : ""}${participant.tokensUsed.toLocaleString()} tokens`
 							: "—"}
 					</span>
-					<span>
-						{participant.costUsd > 0
-							? `$${participant.costUsd.toFixed(5)}`
-							: "—"}
+					{/* A cost the provider did not report is shown as unknown, never
+					    as $0 — the arena ranks on these numbers. */}
+					<span
+						title={
+							participant.costUsd === undefined
+								? t("battle.costUnknownHint")
+								: undefined
+						}
+					>
+						{participant.costUsd === undefined
+							? "—"
+							: `$${participant.costUsd.toFixed(5)}`}
 					</span>
 					<span>
 						{participant.durationMs > 0
@@ -230,6 +244,204 @@ function ParticipantCard({
 	);
 }
 
+// ─── Contender Picker ─────────────────────────────────────────────────────────
+
+/**
+ * Who may enter the battle: every model of every configured provider, as
+ * `useArenaContenders` detects them. Grouped by provider and searchable,
+ * because the roster is whatever the machine has — one local Ollama install is
+ * thirty entries on its own, and a flat row of buttons stopped scaling at four.
+ */
+function ContenderPicker({
+	roster,
+	selected,
+	onToggle,
+}: {
+	readonly roster: ReturnType<typeof useArenaContenders>;
+	readonly selected: readonly string[];
+	readonly onToggle: (id: string) => void;
+}) {
+	const { t } = useTranslation("arena");
+	const [query, setQuery] = useState("");
+
+	const visible = useMemo(
+		() => filterContenders(roster.contenders, query),
+		[roster.contenders, query],
+	);
+	const grouped = useMemo(() => {
+		const groups = new Map<string, { label: string; models: ArenaContender[] }>();
+		for (const contender of visible) {
+			const group = groups.get(contender.provider) ?? {
+				label: contender.providerLabel,
+				models: [],
+			};
+			group.models.push(contender);
+			groups.set(contender.provider, group);
+		}
+		return [...groups.entries()];
+	}, [visible]);
+
+	const selectedContenders = selected
+		.map((id) => roster.contenders.find((c) => c.id === id))
+		.filter((c): c is ArenaContender => Boolean(c));
+
+	return (
+		<div>
+			<div className="flex items-center justify-between mb-2">
+				{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
+				<label className="text-sm font-medium text-foreground">
+					{t("battle.selectModels")}
+					<span className="ml-1.5 text-xs text-muted-foreground">
+						({t("battle.selectModelHint")})
+					</span>
+				</label>
+				<div className="flex items-center gap-2">
+					{roster.loaded && roster.contenders.length > 0 && (
+						<span className="text-xs text-muted-foreground">
+							{t("battle.rosterSummary", {
+								models: roster.contenders.length,
+								providers: roster.providers.length,
+							})}
+						</span>
+					)}
+					<Button
+						variant="ghost"
+						size="sm"
+						onClick={roster.refresh}
+						disabled={roster.loading}
+						className="h-7 gap-1.5 text-xs text-muted-foreground"
+					>
+						<RefreshCw
+							className={cn("h-3 w-3", roster.loading && "animate-spin")}
+						/>
+						{t("battle.refreshModels")}
+					</Button>
+				</div>
+			</div>
+
+			{roster.loading && !roster.loaded && (
+				<div className="flex items-center gap-2 text-sm text-muted-foreground p-3 rounded-xl border border-border bg-card">
+					<Loader2 className="h-4 w-4 animate-spin" />
+					{t("battle.detectingModels")}
+				</div>
+			)}
+
+			{roster.loaded && roster.contenders.length === 0 && (
+				<div className="flex flex-col items-center justify-center gap-1.5 p-5 rounded-xl border border-dashed border-border text-center">
+					<ServerOff className="h-6 w-6 text-muted-foreground opacity-50" />
+					<p className="text-sm text-foreground">{t("battle.noProviders")}</p>
+					<p className="text-xs text-muted-foreground">
+						{t("battle.noProvidersHint")}
+					</p>
+				</div>
+			)}
+
+			{roster.contenders.length > 0 && (
+				<div className="flex flex-col gap-2">
+					{selectedContenders.length > 0 && (
+						<div className="flex flex-wrap gap-1.5">
+							{selectedContenders.map((contender) => (
+								<button
+									type="button"
+									key={contender.id}
+									onClick={() => onToggle(contender.id)}
+									className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs border border-primary bg-primary/10 text-primary transition-all hover:bg-primary/20"
+									title={t("battle.removeModel")}
+								>
+									<CheckCircle2 className="h-3 w-3" />
+									<span>{contender.modelLabel}</span>
+									<span className="opacity-60">{contender.providerLabel}</span>
+									<X className="h-3 w-3" />
+								</button>
+							))}
+						</div>
+					)}
+
+					<div className="relative">
+						<Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+						<Input
+							value={query}
+							onChange={(e) => setQuery(e.target.value)}
+							placeholder={t("battle.searchModels")}
+							className="pl-8 h-8 text-sm"
+						/>
+					</div>
+
+					<ScrollArea className="max-h-56 rounded-xl border border-border">
+						<div className="flex flex-col gap-3 p-2.5">
+							{grouped.length === 0 && (
+								<p className="text-xs text-muted-foreground px-1 py-2">
+									{t("battle.noModelMatch")}
+								</p>
+							)}
+							{grouped.map(([provider, group]) => (
+								<div key={provider}>
+									<p className="text-xs font-medium text-muted-foreground mb-1.5 px-0.5">
+										{group.label}
+										<span className="ml-1 opacity-60">
+											({group.models.length})
+										</span>
+									</p>
+									<div className="flex flex-wrap gap-1.5">
+										{group.models.map((contender) => {
+											const isSelected = selected.includes(contender.id);
+											const isFull =
+												!isSelected && selected.length >= MAX_CONTENDERS;
+											return (
+												<button
+													type="button"
+													key={contender.id}
+													onClick={() => onToggle(contender.id)}
+													disabled={isFull}
+													title={
+														isFull ? t("battle.maxModelsReached") : contender.model
+													}
+													className={cn(
+														"flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs border transition-all",
+														isSelected
+															? "border-primary bg-primary/10 text-primary"
+															: "border-border hover:border-primary/50 hover:bg-accent/50",
+														isFull && "opacity-40 cursor-not-allowed",
+													)}
+												>
+													{isSelected && <CheckCircle2 className="h-3 w-3" />}
+													{contender.modelLabel}
+												</button>
+											);
+										})}
+									</div>
+								</div>
+							))}
+						</div>
+					</ScrollArea>
+
+					{roster.unreachable.length > 0 && (
+						<p className="text-xs text-muted-foreground flex items-start gap-1.5">
+							<AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+							{t("battle.providersUnreachable", {
+								providers: roster.unreachable.map((p) => p.label).join(", "),
+							})}
+						</p>
+					)}
+
+					{/* Said here rather than discovered one battle later: these
+					    providers would be answered by another vendor's model. */}
+					{roster.degrading.length > 0 && (
+						<p className="text-xs text-muted-foreground flex items-start gap-1.5">
+							<AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+							{t("battle.providersDegrade", {
+								providers: roster.degrading
+									.map((p) => `${p.label} → ${p.degradesTo}`)
+									.join(", "),
+							})}
+						</p>
+					)}
+				</div>
+			)}
+		</div>
+	);
+}
+
 // ─── Battle Tab ───────────────────────────────────────────────────────────────
 
 function BattleTab() {
@@ -252,43 +464,30 @@ function BattleTab() {
 
 	const [taskType, setTaskType] = useState<ArenaTaskType>("coding");
 	const [prompt, setPrompt] = useState("");
-	const [selectedProfiles, setSelectedProfiles] = useState<string[]>([
-		"profile-1",
-		"profile-2",
-	]);
-	const [profiles, setProfiles] = useState<
-		Array<{ id: string; name: string; model: string }>
-	>([]);
+	const roster = useArenaContenders();
+	const [selectedIds, setSelectedIds] = useState<string[]>([]);
+	/** True until the roster has picked the opening pair for the user. */
+	const [seeded, setSeeded] = useState(false);
 
-	// Load profiles on mount
+	// Open on a sensible pair once the roster is known, then never again: a
+	// second seeding would overwrite a choice the user has made.
 	useEffect(() => {
-		const loadProfiles = async () => {
-			try {
-				if (typeof globalThis.electronAPI?.arenaGetProfiles !== "function") {
-					// Preload not yet reloaded — use demo profiles
-					setProfiles(DEMO_PROFILES);
-					setSelectedProfiles([DEMO_PROFILES[0].id, DEMO_PROFILES[1].id]);
-					return;
-				}
-				const res = await globalThis.electronAPI.arenaGetProfiles();
-				if (res.success && Array.isArray(res.data) && res.data.length > 0) {
-					setProfiles(
-						res.data as Array<{ id: string; name: string; model: string }>,
-					);
-					setSelectedProfiles(
-						(res.data as Array<{ id: string }>).slice(0, 2).map((p) => p.id),
-					);
-				} else {
-					setProfiles(DEMO_PROFILES);
-					setSelectedProfiles([DEMO_PROFILES[0].id, DEMO_PROFILES[1].id]);
-				}
-			} catch {
-				setProfiles(DEMO_PROFILES);
-				setSelectedProfiles([DEMO_PROFILES[0].id, DEMO_PROFILES[1].id]);
-			}
-		};
-		loadProfiles();
-	}, []);
+		if (seeded || !roster.loaded || roster.contenders.length === 0) return;
+		setSelectedIds(pickDefaultContenders(roster.contenders, MIN_CONTENDERS));
+		setSeeded(true);
+	}, [roster.loaded, roster.contenders, seeded]);
+
+	// A model that left the roster (provider disconnected, Ollama model
+	// removed) cannot enter a battle, so it cannot stay selected either.
+	useEffect(() => {
+		if (!roster.loaded) return;
+		setSelectedIds((prev) => {
+			const kept = prev.filter((id) =>
+				roster.contenders.some((c) => c.id === id),
+			);
+			return kept.length === prev.length ? prev : kept;
+		});
+	}, [roster.loaded, roster.contenders]);
 
 	// Subscribe to battle events (only when API is available)
 	useEffect(() => {
@@ -316,8 +515,16 @@ function BattleTab() {
 		setError,
 	]);
 
+	const selectedContenders = useMemo(
+		() =>
+			selectedIds
+				.map((id) => roster.contenders.find((c) => c.id === id))
+				.filter((c): c is ArenaContender => Boolean(c)),
+		[selectedIds, roster.contenders],
+	);
+
 	const handleStartBattle = useCallback(async () => {
-		if (!prompt.trim() || selectedProfiles.length < 2) return;
+		if (!prompt.trim() || selectedContenders.length < MIN_CONTENDERS) return;
 
 		setIsStartingBattle(true);
 		setError(null);
@@ -330,7 +537,13 @@ function BattleTab() {
 			const result = await globalThis.electronAPI.arenaStartBattle({
 				taskType,
 				prompt: prompt.trim(),
-				profileIds: selectedProfiles,
+				contenders: selectedContenders.map((contender) => ({
+					id: contender.id,
+					provider: contender.provider,
+					providerLabel: contender.providerLabel,
+					model: contender.model,
+					modelLabel: contender.modelLabel,
+				})),
 				projectPath: selectedProject?.path,
 			});
 
@@ -344,7 +557,7 @@ function BattleTab() {
 		}
 	}, [
 		prompt,
-		selectedProfiles,
+		selectedContenders,
 		taskType,
 		selectedProject,
 		setIsStartingBattle,
@@ -353,16 +566,13 @@ function BattleTab() {
 		t,
 	]);
 
-	const toggleProfile = (id: string) => {
-		setSelectedProfiles((prev) => {
-			if (prev.includes(id)) {
-				if (prev.length <= 2) return prev;
-				return prev.filter((p) => p !== id);
-			}
-			if (prev.length >= 4) return prev;
+	const toggleContender = useCallback((id: string) => {
+		setSelectedIds((prev) => {
+			if (prev.includes(id)) return prev.filter((entry) => entry !== id);
+			if (prev.length >= MAX_CONTENDERS) return prev;
 			return [...prev, id];
 		});
-	};
+	}, []);
 
 	const canVote = activeBattle?.status === "voting";
 	const isRunning = activeBattle?.status === "running";
@@ -398,36 +608,12 @@ function BattleTab() {
 						</div>
 					</div>
 
-					{/* Model selection */}
-					<div>
-						{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-						<label className="text-sm font-medium mb-2 block text-foreground">
-							{t("battle.selectModels")}
-							<span className="ml-1.5 text-xs text-muted-foreground">
-								({t("battle.selectModelHint")})
-							</span>
-						</label>
-						<div className="flex flex-wrap gap-2">
-							{profiles.map((p) => (
-								<button
-									type="button"
-									key={p.id}
-									onClick={() => toggleProfile(p.id)}
-									className={cn(
-										"flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border transition-all",
-										selectedProfiles.includes(p.id)
-											? "border-primary bg-primary/10 text-primary"
-											: "border-border hover:border-primary/50 hover:bg-accent/50",
-									)}
-								>
-									{selectedProfiles.includes(p.id) && (
-										<CheckCircle2 className="h-3.5 w-3.5" />
-									)}
-									{p.name}
-								</button>
-							))}
-						</div>
-					</div>
+					{/* Model selection — the machine's real roster, all providers */}
+					<ContenderPicker
+						roster={roster}
+						selected={selectedIds}
+						onToggle={toggleContender}
+					/>
 
 					{/* Prompt */}
 					<div>
@@ -453,7 +639,9 @@ function BattleTab() {
 					<Button
 						onClick={handleStartBattle}
 						disabled={
-							!prompt.trim() || selectedProfiles.length < 2 || isStartingBattle
+							!prompt.trim() ||
+							selectedContenders.length < MIN_CONTENDERS ||
+							isStartingBattle
 						}
 						className="gap-2"
 					>
@@ -548,6 +736,14 @@ function BattleTab() {
 											(p) => p.label === activeBattle.winnerLabel,
 										)?.modelName ?? `Model ${activeBattle.winnerLabel}`}
 									</strong>
+									<span className="opacity-70">
+										{" · "}
+										{
+											activeBattle.participants.find(
+												(p) => p.label === activeBattle.winnerLabel,
+											)?.providerLabel
+										}
+									</span>
 								</span>
 							</div>
 						)}
@@ -707,9 +903,19 @@ function BattleHistoryRow({ battle }: { readonly battle: ArenaBattle }) {
 									<Trophy className="h-3.5 w-3.5 text-yellow-500" />
 								)}
 							</div>
-							<p className="text-muted-foreground">{p.modelName}</p>
+							{/* A battle still awaiting its vote is still blind: the
+							    history must not reveal what the battle tab hides. */}
+							<p className="text-muted-foreground">
+								{battle.revealed
+									? `${p.modelName} · ${p.providerLabel}`
+									: t("history.hiddenUntilVote")}
+							</p>
 							<p className="font-mono text-muted-foreground/70 mt-0.5">
-								{p.tokensUsed.toLocaleString()} tokens · ${p.costUsd.toFixed(5)}
+								{p.usageEstimated ? "~" : ""}
+								{p.tokensUsed.toLocaleString()} tokens
+								{p.costUsd === undefined
+									? ""
+									: ` · $${p.costUsd.toFixed(5)}`}
 							</p>
 						</div>
 					))}
@@ -796,7 +1002,7 @@ function AnalyticsTab() {
 				<div className="flex flex-col gap-2">
 					{analytics.byModel.map((model, i) => (
 						<div
-							key={model.profileId}
+							key={model.contenderId}
 							className="flex items-center gap-3 p-3 rounded-xl border border-border bg-card"
 						>
 							<span
@@ -812,7 +1018,7 @@ function AnalyticsTab() {
 									{model.modelName}
 								</p>
 								<p className="text-xs text-muted-foreground">
-									{model.provider}
+									{model.providerLabel}
 								</p>
 							</div>
 							<div className="flex items-center gap-4 text-xs text-muted-foreground shrink-0">
@@ -828,9 +1034,18 @@ function AnalyticsTab() {
 									</p>
 									<p>{t("analytics.winsTotal")}</p>
 								</div>
-								<div className="text-center">
+								<div
+									className="text-center"
+									title={
+										model.avgCostPerBattle === undefined
+											? t("analytics.avgCostUnknown")
+											: undefined
+									}
+								>
 									<p className="text-sm font-semibold text-foreground">
-										${model.avgCostPerBattle.toFixed(4)}
+										{model.avgCostPerBattle === undefined
+											? "—"
+											: `$${model.avgCostPerBattle.toFixed(4)}`}
 									</p>
 									<p>{t("analytics.avgCost")}</p>
 								</div>
@@ -923,7 +1138,12 @@ function RoutingTab() {
 									<span className="text-sm">{t(`taskTypes.${tt.value}`)}</span>
 								</div>
 								<div className="flex items-center gap-3">
-									<span className="text-sm font-medium">{rec.modelName}</span>
+									<span className="text-sm font-medium">
+										{rec.modelName}
+										<span className="ml-1.5 text-xs text-muted-foreground">
+											{rec.providerLabel}
+										</span>
+									</span>
 									<Badge
 										variant="outline"
 										className={cn("text-xs", CONFIDENCE_COLOR[rec.confidence])}

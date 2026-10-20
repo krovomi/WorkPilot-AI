@@ -4,6 +4,8 @@
  * Provides API methods for interacting with the Auto-Refactor Agent functionality
  */
 
+import { createIpcListener, invokeIpc } from "./ipc-utils";
+
 export interface AutoRefactorRequest {
 	projectDir: string;
 	model?: string;
@@ -70,30 +72,30 @@ export function createAutoRefactorAPI(): AutoRefactorAPI {
 	return {
 		// Methods
 		startAutoRefactor: (request: AutoRefactorRequest) =>
-			window.electronAPI.invoke("auto-refactor:start", request),
+			invokeIpc("auto-refactor:start", request),
 
-		cancelAutoRefactor: () => window.electronAPI.invoke("auto-refactor:cancel"),
+		cancelAutoRefactor: () => invokeIpc("auto-refactor:cancel"),
 
 		configureAutoRefactor: (config: {
 			pythonPath?: string;
 			autoBuildSourcePath?: string;
-		}) => window.electronAPI.invoke("auto-refactor:configure", config),
+		}) => invokeIpc("auto-refactor:configure", config),
 
 		// Event listeners
 		onAutoRefactorStatus: (callback: (status: string) => void) =>
-			window.electronAPI.on("auto-refactor:status", callback),
+			createIpcListener("auto-refactor:status", callback),
 
 		onAutoRefactorStreamChunk: (callback: (chunk: string) => void) =>
-			window.electronAPI.on("auto-refactor:stream-chunk", callback),
+			createIpcListener("auto-refactor:stream-chunk", callback),
 
 		onAutoRefactorError: (callback: (error: string) => void) =>
-			window.electronAPI.on("auto-refactor:error", callback),
+			createIpcListener("auto-refactor:error", callback),
 
 		onAutoRefactorComplete: (callback: (result: AutoRefactorResult) => void) =>
-			window.electronAPI.on("auto-refactor:complete", callback),
+			createIpcListener("auto-refactor:complete", callback),
 
 		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 		onAutoRefactorExecutionComplete: (callback: (result: any) => void) =>
-			window.electronAPI.on("auto-refactor:execution-complete", callback),
+			createIpcListener("auto-refactor:execution-complete", callback),
 	};
 }

@@ -78,7 +78,7 @@ class JSToCSharpTransformer:
                 if not (file_path.endswith(".js") or file_path.endswith(".ts")):
                     continue
 
-                content = full_path.read_text()
+                content = full_path.read_text(encoding="utf-8")
 
                 # Transform to C#
                 transformed = self._transform_to_csharp(content, file_path)

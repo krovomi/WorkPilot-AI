@@ -221,13 +221,13 @@ relative to this location. Do NOT use absolute paths.
 
 **⚠️ CRITICAL:** Before ANY git command or file operation, run `pwd` to verify your current
 directory. If you've used `cd` to change directories, you MUST use paths relative to your
-NEW location, not the working directory. See the PATH CONFUSION PREVENTION section in the
-coder prompt for detailed examples.
+NEW location, not the working directory: after `cd apps/frontend`, it is `git add src/file.ts`,
+not `git add apps/frontend/src/file.ts`. Prefer staying at the working directory root.
 
 **Important Files:**
 - Spec: `{relative_spec}/spec.md`
 - Plan: `{relative_spec}/implementation_plan.json`
-- Progress: `{relative_spec}/build-progress.txt`
+- Progress (blockers only, one line each): `{relative_spec}/build-progress.txt`
 - Context: `{relative_spec}/context.json`
 
 ---
@@ -281,7 +281,7 @@ def generate_subtask_prompt(
     tdd_active = is_tdd_enabled() and subtask_is_tdd_eligible(subtask, phase)
 
     # Get relative spec path
-    relative_spec = get_relative_spec_path(spec_dir, project_dir)
+    get_relative_spec_path(spec_dir, project_dir)
 
     # Build the prompt
     sections = []
@@ -466,7 +466,9 @@ Before marking complete, verify:
 - Focus ONLY on this subtask - don't modify unrelated code
 - NEVER write production code without a failing test that requires it
 - If the test fails after implementation, FIX IT before committing
-- If you encounter a blocker, document it in build-progress.txt
+- If you hit a blocker, append ONE line to build-progress.txt (`[subtask-id] blocker: ...`)
+- Never `git push`: the build is reviewed and merged by WorkPilot, not by you
+- Never change git configuration (`git config`, `git -c`)
 """)
     else:
         sections.append(f"""## Instructions
@@ -495,7 +497,9 @@ Before marking complete, verify:
 
 - Focus ONLY on this subtask - don't modify unrelated code
 - If verification fails, FIX IT before committing
-- If you encounter a blocker, document it in build-progress.txt
+- If you hit a blocker, append ONE line to build-progress.txt (`[subtask-id] blocker: ...`)
+- Never `git push`: the build is reviewed and merged by WorkPilot, not by you
+- Never change git configuration (`git config`, `git -c`)
 """)
 
     # Note: Linear updates are now handled by Python orchestrator via linear_updater.py
@@ -565,8 +569,7 @@ Your spec file is located at: `{relative_spec}/spec.md`
 
 Store all build artifacts in this spec directory:
 - `{relative_spec}/implementation_plan.json` - Subtask-based implementation plan
-- `{relative_spec}/build-progress.txt` - Progress notes
-- `{relative_spec}/init.sh` - Environment setup script
+- `{relative_spec}/init.sh` - Environment setup script (only if missing)
 
 The project root is your current working directory. Implement code in the project root,
 not in the spec directory.

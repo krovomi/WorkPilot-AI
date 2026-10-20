@@ -11,6 +11,7 @@ through it:
 
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -36,10 +37,11 @@ class TestPhaseDefaults:
     """The generic roster must be exactly what the three old modules returned."""
 
     def test_coder_roster_unchanged(self):
+        # `spec-explorer` folded into `architecture-analyst` (lot L11).
         assert set(phase_defaults("coder")) == {
             "code-reviewer",
             "test-runner",
-            "spec-explorer",
+            "architecture-analyst",
         }
 
     def test_planner_roster_unchanged(self):
@@ -50,9 +52,10 @@ class TestPhaseDefaults:
 
     @pytest.mark.parametrize("agent_type", ["qa", "qa_reviewer", "qa_fixer"])
     def test_qa_roster_unchanged(self, agent_type):
+        # `qa-test-evidence` was the board's `test-runner` under another prompt.
         assert set(phase_defaults(agent_type)) == {
             "qa-acceptance-checker",
-            "qa-test-evidence",
+            "test-runner",
         }
 
     def test_unknown_agent_type_falls_through_to_the_board_roster(self):
@@ -60,6 +63,15 @@ class TestPhaseDefaults:
 
     def test_planner_does_not_carry_qa_subagents(self):
         assert not set(phase_defaults("planner")) & set(phase_defaults("qa"))
+
+    def test_a_role_shared_by_two_rosters_is_one_definition(self):
+        """Rosters list names; the definition behind a name is the same object."""
+        from agents.subagents.phases import ROSTERS, SPECS, all_specs
+
+        named = {name for roster in ROSTERS.values() for name in roster}
+        assert named == set(SPECS), "a spec no roster names, or a name with no spec"
+        rosters = all_specs()
+        assert rosters["kanban"]["test-runner"] is rosters["qa"]["test-runner"]
 
 
 class TestLanguageMatching:
@@ -103,7 +115,9 @@ class TestSpecialisation:
         return prompt[prompt.index(marker) :] if marker in prompt else ""
 
     def test_test_runner_learns_the_stack_commands(self, tmp_path):
-        (tmp_path / "pyproject.toml").write_text("[project]\nname='x'\n")
+        (tmp_path / "pyproject.toml").write_text(
+            "[project]\nname='x'\n", encoding="utf-8"
+        )
         section = self._overlay_section(
             resolve("coder", project_dir=tmp_path)["test-runner"].prompt
         )
@@ -114,12 +128,15 @@ class TestSpecialisation:
     def test_a_rust_card_and_a_dotnet_card_get_different_prompts(self, tmp_path):
         rust = tmp_path / "rust"
         rust.mkdir()
-        (rust / "Cargo.toml").write_text("[package]\nname='x'\nversion='0.1.0'\n")
+        (rust / "Cargo.toml").write_text(
+            "[package]\nname='x'\nversion='0.1.0'\n", encoding="utf-8"
+        )
         dotnet = tmp_path / "dotnet"
         dotnet.mkdir()
         (dotnet / "app.csproj").write_text(
             "<Project><PropertyGroup><TargetFramework>net10.0</TargetFramework>"
-            "</PropertyGroup></Project>"
+            "</PropertyGroup></Project>",
+            encoding="utf-8",
         )
         # detect_project_stack keys off Cargo.toml / *.csproj presence
         rust_section = self._overlay_section(
@@ -137,9 +154,30 @@ class TestSpecialisation:
         assert resolve("coder", project_dir=tmp_path)["test-runner"].prompt == generic
 
     def test_other_roles_are_not_touched_by_overlays(self, tmp_path):
-        (tmp_path / "pyproject.toml").write_text("[project]\nname='x'\n")
+        (tmp_path / "pyproject.toml").write_text(
+            "[project]\nname='x'\n", encoding="utf-8"
+        )
         before = phase_defaults("coder")["code-reviewer"].prompt
         assert resolve("coder", project_dir=tmp_path)["code-reviewer"].prompt == before
+
+    @pytest.mark.parametrize("agent_type", ["qa_reviewer", "qa_fixer", "verifier"])
+    def test_the_qa_test_collector_learns_the_stack_too(self, tmp_path, agent_type):
+        """It runs the same suite the build's test-runner was told about, and
+        used to rediscover the framework on every QA pass."""
+        (tmp_path / "pyproject.toml").write_text(
+            "[project]\nname='x'\n", encoding="utf-8"
+        )
+        roster = resolve(agent_type, project_dir=tmp_path)
+        section = self._overlay_section(roster["test-runner"].prompt)
+        assert "pytest -x" in section and "### python" in section
+        defaults = phase_defaults(agent_type)
+        if "qa-acceptance-checker" in defaults:
+            # The verifier's roster has none since lot L10 (`roster: verify`).
+            before = defaults["qa-acceptance-checker"].prompt
+            assert roster["qa-acceptance-checker"].prompt == before
+        else:
+            assert agent_type == "verifier"
+            assert "qa-acceptance-checker" not in roster
 
 
 class TestCallerPrecedence:
@@ -159,29 +197,67 @@ class TestCallerPrecedence:
         roster = resolve("coder", project_dir=tmp_path, user_agents={"bespoke": extra})
         assert "bespoke" in roster and "code-reviewer" in roster
 
+    def test_the_cap_counts_the_callers_agents(self, tmp_path):
+        """Applied before the merge, the cap let six caller agents sit on top
+        of a full roster. The generic defaults go; nothing the caller named."""
+        from claude_agent_sdk import AgentDefinition
+
+        mine = {
+            f"mine-{i}": AgentDefinition(description="x", prompt="x", tools=["Read"])
+            for i in range(6)
+        }
+        roster = resolve("coder", project_dir=tmp_path, user_agents=mine)
+        assert len(roster) == MAX_ROSTER
+        assert set(mine) <= set(roster)
+        assert "test-runner" in roster, "the specialised role is never shed"
+
+    def test_a_roster_of_caller_agents_only_is_kept_whole(self, tmp_path):
+        """Above the cap only because the caller named every entry."""
+        from claude_agent_sdk import AgentDefinition
+
+        mine = {
+            f"mine-{i}": AgentDefinition(description="x", prompt="x", tools=["Read"])
+            for i in range(MAX_ROSTER + 1)
+        }
+        assert resolve("commit_message", project_dir=tmp_path, user_agents=mine) == mine
+
     def test_no_defaults_and_no_caller_agents_yields_none(self, tmp_path, monkeypatch):
         import agents.subagents as mod
 
-        monkeypatch.setattr(mod, "phase_defaults", lambda _t: {})
+        # Two parameters: `resolve` passes the roster override through, so a
+        # stub that takes only the agent_type stops matching the function it
+        # replaces and fails with a TypeError that says nothing about rosters.
+        monkeypatch.setattr(mod, "phase_defaults", lambda _t, _roster=None: {})
         assert resolve("coder", project_dir=tmp_path) is None
 
 
 class TestProviderGating:
     def test_provider_without_subagents_gets_no_roster(self, tmp_path):
-        assert resolve("coder", project_dir=tmp_path, provider="mistral") is None
-        assert resolve("coder", project_dir=tmp_path, provider="openai") is None
+        # The CLIs bring their own tools; a roster would be composed for nobody.
+        assert resolve("coder", project_dir=tmp_path, provider="opencode") is None
+        assert resolve("coder", project_dir=tmp_path, provider="antigravity") is None
 
     def test_provider_with_native_subagents_gets_one(self, tmp_path):
         assert resolve("coder", project_dir=tmp_path, provider="claude")
+
+    @pytest.mark.parametrize("provider", ["mistral", "openai", "copilot", "ollama"])
+    def test_provider_with_emulated_subagents_gets_one_too(self, tmp_path, provider):
+        # The WorkPilot loop runs the roster itself (`delegate`): the same
+        # specialists as Claude's, composed the same way.
+        assert resolve("coder", project_dir=tmp_path, provider=provider)
         assert resolve("coder", project_dir=tmp_path, provider="copilot")
 
 
 class TestRobustness:
     def test_roster_stays_within_the_cap(self, tmp_path):
-        (tmp_path / "pyproject.toml").write_text("[project]\nname='x'\n")
-        (tmp_path / "package.json").write_text('{"name":"x"}')
-        (tmp_path / "Cargo.toml").write_text("[package]\nname='x'\nversion='0.1.0'\n")
-        (tmp_path / "go.mod").write_text("module x\n\ngo 1.23\n")
+        (tmp_path / "pyproject.toml").write_text(
+            "[project]\nname='x'\n", encoding="utf-8"
+        )
+        (tmp_path / "package.json").write_text('{"name":"x"}', encoding="utf-8")
+        (tmp_path / "Cargo.toml").write_text(
+            "[package]\nname='x'\nversion='0.1.0'\n", encoding="utf-8"
+        )
+        (tmp_path / "go.mod").write_text("module x\n\ngo 1.23\n", encoding="utf-8")
         assert len(resolve("coder", project_dir=tmp_path)) <= MAX_ROSTER
 
     def test_broken_stack_detection_does_not_raise(self, tmp_path, monkeypatch):
@@ -198,7 +274,7 @@ class TestRobustness:
         assert detect_languages("/nonexistent/path/xyz") == []
 
     def test_detection_is_cached_per_project(self, tmp_path):
-        (tmp_path / "go.mod").write_text("module x\n\ngo 1.23\n")
+        (tmp_path / "go.mod").write_text("module x\n\ngo 1.23\n", encoding="utf-8")
         first = detect_languages(tmp_path)
         (tmp_path / "go.mod").unlink()
         assert detect_languages(tmp_path) == first, "expected a cached answer"
@@ -213,7 +289,9 @@ class TestDotnetDetection:
     and the whole dotnet skill pack -- could never fire on a real project."""
 
     def test_solution_at_the_root_is_detected(self, tmp_path):
-        (tmp_path / "App.sln").write_text("Microsoft Visual Studio Solution File")
+        (tmp_path / "App.sln").write_text(
+            "Microsoft Visual Studio Solution File", encoding="utf-8"
+        )
         assert "dotnet" in {
             o.language for o in overlays_for(detect_languages(tmp_path))
         }
@@ -221,7 +299,9 @@ class TestDotnetDetection:
     def test_project_file_in_a_subdirectory_is_detected(self, tmp_path):
         # The usual layout: solution at the root, .csproj one level down.
         (tmp_path / "src").mkdir()
-        (tmp_path / "src" / "App.csproj").write_text("<Project></Project>")
+        (tmp_path / "src" / "App.csproj").write_text(
+            "<Project></Project>", encoding="utf-8"
+        )
         assert "dotnet" in {
             o.language for o in overlays_for(detect_languages(tmp_path))
         }
@@ -282,15 +362,19 @@ class TestPRReviewRoster:
             "You are a security expert. Find vulnerabilities."
         )
 
-    def test_the_runner_builds_the_same_roster(self):
-        """The move must be behaviour-preserving: same names, same tools."""
+    def test_the_runner_declares_no_roster_inline(self):
+        """The roster lives in the registry, never inline in the runner.
+
+        The runner used to hand `pr_review_agents(...)` to an SDK client in
+        `_create_sdk_client`; nothing called it (lot L9), the live path runs
+        each specialist as its own `pr_reviewer` session.
+        """
         from agents.subagents.pr_review import PR_REVIEW_SPECIALISTS
 
         source = (
             REPO_ROOT
             / "apps/backend/runners/github/services/parallel_orchestrator_reviewer.py"
         ).read_text(encoding="utf-8")
-        assert "pr_review_agents(" in source
         assert "AgentDefinition(" not in source, (
             "a definition is being declared inline again"
         )
@@ -307,6 +391,78 @@ class TestPRReviewRoster:
             if not (prompts / s.prompt_file).is_file()
         ]
         assert not missing, f"specs name prompt files that do not exist: {missing}"
+
+    def test_the_orchestrator_carries_its_specialists_and_nothing_else(self, tmp_path):
+        """It fell through to the Kanban roster: nine entries, three of them
+        a code-reviewer, a test-runner and a spec-explorer on top of six
+        reviewers."""
+        roster = resolve(
+            "pr_orchestrator_parallel", project_dir=tmp_path, user_agents=self._build()
+        )
+        assert set(roster) == set(self._build())
+
+    def test_the_follow_up_specialists_live_in_the_registry(self):
+        """They were declared inline in the runner, `finding-validator` a second
+        time with its own wording."""
+        from agents.subagents.pr_review import PR_FOLLOWUP_SPECIALISTS, pr_review_agents
+
+        assert [s.name for s in PR_FOLLOWUP_SPECIALISTS] == [
+            "resolution-verifier",
+            "new-code-reviewer",
+            "comment-analyzer",
+            "finding-validator",
+        ]
+        roster = pr_review_agents(
+            lambda name: f"PROMPT BODY for {name}",
+            lambda prompt, fallback: f"[wd] {prompt or fallback}",
+            roster="pr-followup",
+        )
+        assert roster["finding-validator"].description == (
+            self._build()["finding-validator"].description
+        )
+        source = (
+            REPO_ROOT
+            / "apps/backend/runners/github/services/parallel_followup_reviewer.py"
+        ).read_text(encoding="utf-8")
+        assert 'roster="pr-followup"' in source
+        assert "AgentDefinition(" not in source, (
+            "a definition is being declared inline again"
+        )
+
+    def test_every_followup_prompt_file_exists(self):
+        from agents.subagents.pr_review import PR_FOLLOWUP_SPECIALISTS
+
+        prompts = REPO_ROOT / "apps/backend/prompts/github"
+        assert all((prompts / s.prompt_file).is_file() for s in PR_FOLLOWUP_SPECIALISTS)
+
+    def test_the_follow_up_carries_its_four_and_nothing_else(self, tmp_path):
+        from claude_agent_sdk import AgentDefinition
+
+        four = {
+            name: AgentDefinition(description=name, prompt=name, tools=["Read"])
+            for name in (
+                "resolution-verifier",
+                "new-code-reviewer",
+                "comment-analyzer",
+                "finding-validator",
+            )
+        }
+        roster = resolve("pr_followup_parallel", project_dir=tmp_path, user_agents=four)
+        assert set(roster) == set(four)
+
+    def test_each_live_specialist_session_is_a_leaf(self):
+        """The live path runs the specialists as sessions of their own, under
+        `pr_reviewer`; without `roster="solo"` each one carried the review
+        roster beside the other specialists — a fan-out inside a fan-out."""
+        source = (
+            REPO_ROOT
+            / "apps/backend/runners/github/services/parallel_orchestrator_reviewer.py"
+        ).read_text(encoding="utf-8")
+        start = source.index("async def _run_specialist_session")
+        end = re.compile(r"\n    (async )?def ").search(source, start + 1).start()
+        body = source[start:end]
+        assert 'agent_type="pr_reviewer"' in body
+        assert 'roster="solo"' in body
 
 
 class TestProviderDegradationReachesTheClient:
@@ -329,6 +485,8 @@ class TestProviderDegradationReachesTheClient:
 
     def test_a_provider_without_subagents_still_yields_none(self, tmp_path):
         """Guards the other half: `resolve` must keep honouring the argument."""
-        (tmp_path / "pyproject.toml").write_text("[project]\nname='x'\n")
-        assert resolve("coder", project_dir=tmp_path, provider="mistral") is None
+        (tmp_path / "pyproject.toml").write_text(
+            "[project]\nname='x'\n", encoding="utf-8"
+        )
+        assert resolve("coder", project_dir=tmp_path, provider="opencode") is None
         assert resolve("coder", project_dir=tmp_path, provider="claude") is not None

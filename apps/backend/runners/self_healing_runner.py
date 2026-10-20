@@ -36,6 +36,12 @@ backend_path = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_path))
 
 
+def _print_reason(operation) -> None:
+    """Say why an operation produced no fix, as the incident records it."""
+    if operation.incident and operation.incident.error_message:
+        print(f"   {operation.incident.error_message}")
+
+
 class SelfHealingRunner:
     """Runner for the Self-Healing Codebase + Incident Responder."""
 
@@ -99,9 +105,9 @@ class SelfHealingRunner:
             if operation.incident.fix_pr_url:
                 print(f"   PR: {operation.incident.fix_pr_url}")
             return True
-        else:
-            print("❌ Healing failed. Incident escalated for manual review.")
-            return False
+        print("❌ No fix applied. The incident needs manual review.")
+        _print_reason(operation)
+        return False
 
     async def run_production(
         self,
@@ -139,9 +145,9 @@ class SelfHealingRunner:
                 f"✅ Incident resolved! Fix in branch: {operation.incident.fix_branch}"
             )
             return True
-        else:
-            print("❌ Incident requires manual review.")
-            return False
+        print("❌ No fix applied. The incident needs manual review.")
+        _print_reason(operation)
+        return False
 
     async def run_proactive(
         self, risk_threshold: float = 40.0, top_n: int = 10, json_output: bool = False
@@ -534,6 +540,11 @@ def main():
         "--test-output", help="Raw test output (reads stdin if omitted)"
     )
     cicd_parser.add_argument("--ci-log-url", help="URL to CI pipeline logs")
+    cicd_parser.add_argument(
+        "--capture",
+        help="Screenshot or saved log of the failed pipeline, read by local OCR "
+        "(secrets masked, prompt injections refused) instead of --test-output",
+    )
 
     # Production subcommand
     prod_parser = subparsers.add_parser("production", help="Handle production incident")
@@ -661,6 +672,15 @@ def _dispatch(
 
     if cmd == "cicd":
         test_output = args.test_output
+        if args.capture and not test_output:
+            from self_healing.incident_responder.cicd_mode import CICDMode
+
+            test_output, problem = CICDMode(runner.project_dir).read_capture(
+                args.capture
+            )
+            if problem:
+                print(f"❌ Capture not used: {problem}")
+                return False
         if not test_output and not sys.stdin.isatty():
             test_output = sys.stdin.read()
         return asyncio.run(

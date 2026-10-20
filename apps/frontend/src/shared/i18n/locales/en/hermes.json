@@ -1,0 +1,109 @@
+{
+	"title": "Hermes learning loop",
+	"subtitle": "hermes learns outside WorkPilot (Telegram, cron, terminal). You decide what enters this project.",
+	"state": {
+		"ready": "ready",
+		"degraded": "partly configured",
+		"absent": "not installed"
+	},
+	"auto": {
+		"badge": "automatic",
+		"tooltip": "The loop runs on its own at the end of every build and when this panel opens (at most once every fifteen minutes). This button forces a pass now."
+	},
+	"cycle": {
+		"run": "Refresh",
+		"running": "Checking…"
+	},
+	"pipeline": {
+		"learn": "hermes learned",
+		"learnHint": "Skills hermes wrote from its own experience, seen on the last pass.",
+		"triage": "Filtered out",
+		"triageHint": "Out of this repository's scope or already provided: turned away without you, by rules the repository already wrote down.",
+		"decide": "To decide",
+		"decideHint": "What is waiting for your decision: keep or turn down.",
+		"brain": "In the brain",
+		"brainHint": "hermes skills filed in the shared brain, which every agent can recall.",
+		"brainOff": "No shared brain is set up on this machine."
+	},
+	"next": {
+		"decide_one": "{{count}} skill is waiting for your decision",
+		"decide_other": "{{count}} skills are waiting for your decision",
+		"decideHint": "Keep what this project will use, turn down the rest. Keeping adds it to skills/hermes-learned/ and to the shared brain; turning down is final — it will never be proposed again.",
+		"setup": "hermes is not ready on this machine",
+		"setupHint": "Run the command shown below, then refresh.",
+		"nothing": "Nothing to decide",
+		"nothingHint": "The loop runs on its own at the end of every build and when this panel opens. What it keeps is filed in the shared brain."
+	},
+	"review": {
+		"keep": "Keep",
+		"decline": "Turn down",
+		"keepTooltip": "Adopt into skills/hermes-learned/ — a versioned draft no agent loads until the pack is listed.",
+		"keepTooltipBrain": "Adopt into skills/hermes-learned/ and file it in the shared brain, linked to this task.",
+		"declineTooltip": "Never propose or adopt it again.",
+		"select": "Select {{name}}",
+		"selectAll": "Select all",
+		"selected_one": "{{count}} selected",
+		"selected_other": "{{count}} selected",
+		"keepSelected": "Keep",
+		"declineSelected": "Turn down",
+		"showMore_one": "Show {{count}} more",
+		"showMore_other": "Show {{count}} more",
+		"showLess": "Show less",
+		"preview_one": "Preview ({{count}} line)",
+		"preview_other": "Preview ({{count}} lines)",
+		"tools": "hermes-only tools, to rewrite before use elsewhere:",
+		"pendingInHermes": "pending in hermes",
+		"adopted_one": "{{count}} skill kept in skills/{{pack}}/.",
+		"adopted_other": "{{count}} skills kept in skills/{{pack}}/.",
+		"adoptedToBrain_one": "{{count}} skill kept and filed in the shared brain.",
+		"adoptedToBrain_other": "{{count}} skills kept and filed in the shared brain.",
+		"declined_one": "{{count}} skill turned down — it will not be proposed again.",
+		"declined_other": "{{count}} skills turned down — they will not be proposed again."
+	},
+	"details": {
+		"toggle": "How it works",
+		"checks": "Conditions {{ok}}/{{total}}",
+		"kept_one": "{{count}} kept",
+		"kept_other": "{{count}} kept",
+		"declined_one": "{{count}} turned-down skill will never be proposed again.",
+		"declined_other": "{{count}} turned-down skills will never be proposed again."
+	},
+	"brain": {
+		"title": "Link with the shared brain",
+		"description": "Every kept skill — by you or by the loop — becomes a knowledge/hermes/ note in the brain: Claude Code, Codex, Gemini… can recall it. It is knowledge, not a rule: no agent applies it by default.",
+		"feeding_one": "Brain active · {{count}} hermes skill filed",
+		"feeding_other": "Brain active · {{count}} hermes skills filed",
+		"off": "No shared brain: kept skills stay in the repository only.",
+		"readsBack": "hermes reads the brain back (workpilot-brain MCP server connected).",
+		"notReadingBack": "hermes does not read the brain back yet: connect it from Settings.",
+		"openSettings": "Open brain settings"
+	},
+	"checks": {
+		"title": "Conditions",
+		"install": "Install",
+		"soul": "Persona",
+		"trust": "Trust",
+		"skills": "Skills",
+		"agents": "Project context"
+	},
+	"soul": {
+		"title": "Persona (SOUL.md)",
+		"description": "Hermes reads SOUL.md from its own home and injects it as the identity of every session. This repository offers one; installing it is a copy you can undo — the persona it replaces is kept with a timestamp.",
+		"install": "Install SOUL.md",
+		"replace": "Replace the installed persona"
+	},
+	"triage": {
+		"title": "Decided without you",
+		"description": "Hermes ships a catalogue of hundreds. What this repository already decided about it — the categories the hermes pack tracks, the names it excluded, the skills the packs provide — is applied here, so those candidates are never filed and the ones an older rule filed are withdrawn.",
+		"reason": {
+			"already-provided": "already provided here",
+			"declined-here": "excluded by the hermes pack",
+			"out-of-scope": "hermes category this repository does not track",
+			"upstream-catalogue": "shipped with hermes, not learned"
+		}
+	},
+	"adopted": {
+		"title": "Kept skills",
+		"description": "Written to skills/{{pack}}/, a pack not listed in .workpilot/skills.toml: no agent loads them yet. Listing that pack is the decision that activates them — and the moment to rewrite hermes-only tool names. Deleting a folder turns it down."
+	}
+}

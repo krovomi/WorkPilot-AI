@@ -1,9 +1,14 @@
 /**
  * Tests pour le helper d'inlining des pièces jointes Azure DevOps.
  */
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+	extractInlinedImages,
 	inlineAzureDevOpsImages,
+	saveInlinedImagesAsAttachments,
 	isAzureDevOpsAttachmentUrl,
 	stripAzureAttachmentImages,
 } from "../azure-attachments";
@@ -133,5 +138,55 @@ describe("stripAzureAttachmentImages", () => {
 	it("ne touche pas un HTML sans image", () => {
 		const html = "<p>Pas d'image ici</p>";
 		expect(stripAzureAttachmentImages(html)).toBe(html);
+	});
+});
+
+describe("extractInlinedImages", () => {
+	const png = Buffer.from("fake-png-bytes").toString("base64");
+
+	it("décode chaque image une seule fois", () => {
+		const html = `<p><img src="data:image/png;base64,${png}"><img src="data:image/png;base64,${png}"></p>`;
+		const images = extractInlinedImages(html);
+		expect(images).toHaveLength(1);
+		expect(images[0].extension).toBe("png");
+		expect(images[0].data.toString()).toBe("fake-png-bytes");
+	});
+
+	it("ignore le SVG et le HTML sans data URI", () => {
+		const svg = Buffer.from("<svg/>").toString("base64");
+		expect(
+			extractInlinedImages(`<img src="data:image/svg+xml;base64,${svg}">`),
+		).toEqual([]);
+		expect(extractInlinedImages("<p>rien</p>")).toEqual([]);
+	});
+});
+
+describe("saveInlinedImagesAsAttachments", () => {
+	let dir = "";
+
+	afterEach(() => {
+		if (dir) rmSync(dir, { recursive: true, force: true });
+		dir = "";
+	});
+
+	it("écrit les captures dans attachments/, là où les agents les lisent", () => {
+		dir = mkdtempSync(path.join(tmpdir(), "ado-attachments-"));
+		const jpeg = Buffer.from("jpeg").toString("base64");
+		const png = Buffer.from("png").toString("base64");
+		const html = `<img src="data:image/jpeg;base64,${jpeg}"><img src="data:image/png;base64,${png}">`;
+
+		const written = saveInlinedImagesAsAttachments(html, dir, "ado-42");
+
+		expect(written).toEqual(["ado-42-image-1.jpg", "ado-42-image-2.png"]);
+		expect(readdirSync(path.join(dir, "attachments")).sort()).toEqual(written);
+		expect(
+			readFileSync(path.join(dir, "attachments", "ado-42-image-2.png")).toString(),
+		).toBe("png");
+	});
+
+	it("n'écrit rien quand il n'y a pas d'image", () => {
+		dir = mkdtempSync(path.join(tmpdir(), "ado-attachments-"));
+		expect(saveInlinedImagesAsAttachments("<p>x</p>", dir, "ado-1")).toEqual([]);
+		expect(readdirSync(dir)).toEqual([]);
 	});
 });

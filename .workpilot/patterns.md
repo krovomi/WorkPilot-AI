@@ -14,6 +14,7 @@ This file defines reusable patterns and best practices discovered through projec
 from core.client import create_client
 from core.workflow_logger import workflow_logger
 
+
 class StandardAgent:
     def __init__(self, project_dir, spec_dir, model=None):
         self.client = create_client(
@@ -23,7 +24,7 @@ class StandardAgent:
             agent_type="standard",
         )
         self.logger = workflow_logger
-    
+
     async def execute(self, task_context):
         trace_id = self.logger.log_agent_start("StandardAgent", "execute", task_context)
         try:
@@ -32,7 +33,9 @@ class StandardAgent:
             self.logger.log_agent_end("StandardAgent", "success", result, trace_id)
             return result
         except Exception as e:
-            self.logger.log_agent_end("StandardAgent", "error", {"error": str(e)}, trace_id)
+            self.logger.log_agent_end(
+                "StandardAgent", "error", {"error": str(e)}, trace_id
+            )
             raise
 ```
 
@@ -95,11 +98,11 @@ export const useStore = create<StoreState>()(
 ```python
 def build_task_context(project_dir, task_description):
     context = {
-        'project_structure': analyze_project_structure(project_dir),
-        'existing_patterns': extract_patterns(project_dir),
-        'conventions': load_conventions(),
-        'architecture': load_architecture(),
-        'task_requirements': analyze_requirements(task_description),
+        "project_structure": analyze_project_structure(project_dir),
+        "existing_patterns": extract_patterns(project_dir),
+        "conventions": load_conventions(),
+        "architecture": load_architecture(),
+        "task_requirements": analyze_requirements(task_description),
     }
     return optimize_context(context)
 ```
@@ -185,9 +188,9 @@ test('component behavior', async () => {
 def optimize_context(context: dict, max_tokens: int) -> dict:
     if count_tokens(context) > max_tokens:
         return {
-            'essential': keep_essential_info(context),
-            'compressed': compress_metadata(context),
-            'cached': use_cached_data(context),
+            "essential": keep_essential_info(context),
+            "compressed": compress_metadata(context),
+            "cached": use_cached_data(context),
         }
     return context
 ```
@@ -222,14 +225,16 @@ def validate_file_path(file_path: str, allowed_dirs: List[str]) -> str:
 ### Command Allowlist Pattern
 ```python
 ALLOWED_COMMANDS = {
-    'git': ['status', 'add', 'commit', 'push'],
-    'npm': ['install', 'test', 'build'],
-    'python': ['-m', 'pytest'],
+    "git": ["status", "add", "commit", "push"],
+    "npm": ["install", "test", "build"],
+    "python": ["-m", "pytest"],
 }
 
+
 def validate_command(command: List[str]) -> bool:
-    return command[0] in ALLOWED_COMMANDS and \
-           all(arg in ALLOWED_COMMANDS[command[0]] for arg in command[1:])
+    return command[0] in ALLOWED_COMMANDS and all(
+        arg in ALLOWED_COMMANDS[command[0]] for arg in command[1:]
+    )
 ```
 
 ## UI/UX Patterns
@@ -267,10 +272,10 @@ function ErrorBoundary({ children }: { children: React.ReactNode }) {
 # Hierarchical configuration
 def load_config():
     return {
-        'base': load_base_config(),
-        'environment': load_env_config(),
-        'user': load_user_config(),
-        'project': load_project_config(),
+        "base": load_base_config(),
+        "environment": load_env_config(),
+        "user": load_user_config(),
+        "project": load_project_config(),
     }
 ```
 
@@ -278,6 +283,7 @@ def load_config():
 ```python
 # Structured logging
 logger = workflow_logger
+
 
 def log_operation(operation: str, context: dict, result: any = None):
     trace_id = logger.log_agent_start("Agent", operation, context)

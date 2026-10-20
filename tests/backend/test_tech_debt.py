@@ -23,15 +23,11 @@ def sample_project(tmp_path: Path) -> Path:
     src.mkdir()
     (src / "a.py").write_text(
         "# TODO: refactor this monster\n"
-        "def big():\n"
-        + "    x = 1\n" * 70
-        + "    return x\n",
+        "def big():\n" + "    x = 1\n" * 70 + "    return x\n",
         encoding="utf-8",
     )
     (src / "b.py").write_text(
-        "# FIXME: race condition suspected\n"
-        "def ok():\n"
-        "    return 42\n",
+        "# FIXME: race condition suspected\ndef ok():\n    return 42\n",
         encoding="utf-8",
     )
     # Duplicated block across two files

@@ -19,6 +19,10 @@ export interface SettingsAPI {
 			python: ToolDetectionResult;
 			git: ToolDetectionResult;
 			gh: ToolDetectionResult;
+			// `settings-handlers` detecte aussi glab et le renvoie ; seul ce type
+			// l'omettait, et l'index signature d'`ElectronAPI` cachait l'ecart a
+			// `GeneralSettings`, qui l'affiche.
+			glab: ToolDetectionResult;
 			claude: ToolDetectionResult;
 		}>
 	>;
@@ -31,7 +35,7 @@ export interface SettingsAPI {
 	// App Info
 	getAppVersion: () => Promise<string>;
 
-	// Auto-Build Source Environment
+	// WorkPilot AI Source Environment
 	getSourceEnv: () => Promise<IPCResult<SourceEnvConfig>>;
 	updateSourceEnv: (config: {
 		claudeOAuthToken?: string;
@@ -71,6 +75,10 @@ export const createSettingsAPI = (): SettingsAPI => ({
 			python: ToolDetectionResult;
 			git: ToolDetectionResult;
 			gh: ToolDetectionResult;
+			// `settings-handlers` detecte aussi glab et le renvoie ; seul ce type
+			// l'omettait, et l'index signature d'`ElectronAPI` cachait l'ecart a
+			// `GeneralSettings`, qui l'affiche.
+			glab: ToolDetectionResult;
 			claude: ToolDetectionResult;
 		}>
 	> => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET_CLI_TOOLS_INFO),
@@ -85,7 +93,7 @@ export const createSettingsAPI = (): SettingsAPI => ({
 	getAppVersion: (): Promise<string> =>
 		ipcRenderer.invoke(IPC_CHANNELS.APP_VERSION),
 
-	// Auto-Build Source Environment
+	// WorkPilot AI Source Environment
 	getSourceEnv: (): Promise<IPCResult<SourceEnvConfig>> =>
 		ipcRenderer.invoke(IPC_CHANNELS.AUTOBUILD_SOURCE_ENV_GET),
 

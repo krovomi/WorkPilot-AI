@@ -187,55 +187,10 @@ def sync_plan_to_source(spec_dir: Path, source_spec_dir: Path | None) -> bool:
     return sync_spec_to_source(spec_dir, source_spec_dir)
 
 
-def set_pause_state(
-    plan: dict,
-    paused: bool,
-    subtask_id: str | None = None,
-    provider: str = "anthropic",
-    model: str = "claude-opus-4-7",
-) -> dict:
-    """
-    Set or update pause state in the plan.
-
-    Args:
-        plan: Implementation plan dict
-        paused: Whether to pause execution
-        subtask_id: Current subtask ID when pausing
-        provider: LLM provider name
-        model: LLM model name
-
-    Returns:
-        Updated plan dict
-    """
-    if "paused" not in plan:
-        plan["paused"] = {}
-
-    plan["paused"] = {
-        "enabled": paused,
-        "paused_at": None,
-        "paused_subtask_id": subtask_id if paused else None,
-        "provider": provider,
-        "model": model,
-    }
-
-    if paused:
-        from datetime import datetime, timezone
-
-        plan["paused"]["paused_at"] = datetime.now(timezone.utc).isoformat()
-
-    return plan
-
-
-def get_pause_state(plan: dict) -> dict:
-    """
-    Get pause state from plan.
-
-    Returns:
-        Dict with keys: enabled, paused_at, paused_subtask_id, provider, model
-    """
-    return plan.get("paused", {})
-
-
-def is_paused(plan: dict) -> bool:
-    """Check if execution is paused."""
-    return plan.get("paused", {}).get("enabled", False)
+# The pause flag used to live in `implementation_plan.json`, read and written
+# through three helpers here. It now lives in `core.pause_state`, whose store is
+# `pause_state.json` — a file that exists from the moment the spec does, so the
+# pause also works during planning, the one phase where there is no plan yet.
+# Keeping these as a second writer would have meant two answers to "is this task
+# paused?", which is how the UI ended up able to pause a task the backend never
+# noticed.

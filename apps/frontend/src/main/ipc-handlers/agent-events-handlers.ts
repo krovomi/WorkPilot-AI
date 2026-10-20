@@ -18,6 +18,7 @@ import type {
 } from "../../shared/types";
 import type { Project } from "../../shared/types/project";
 import type { Task } from "../../shared/types/task";
+import { isContextEventType } from "../../shared/utils/context-policy";
 import type {
 	AgentManager,
 	ExecutionProgressData,
@@ -109,6 +110,26 @@ function isCooperativelyPaused(
 					paused?: { enabled?: boolean };
 				};
 				if (plan?.paused?.enabled) return true;
+			}
+		}
+	} catch {
+		// fall through to the pause store
+	}
+	try {
+		// The one pause store (`pause_state.json`), read from disk: the backend
+		// itself writes it when a workflow phase declared `irreversible: true`
+		// stops before starting (a RUN task's `execute`), and the scanned
+		// `task.metadata` below may predate that write.
+		if (task && project) {
+			const statePath = path.join(
+				path.dirname(getPlanPath(project, task)),
+				AUTO_BUILD_PATHS.PAUSE_STATE,
+			);
+			if (existsSync(statePath)) {
+				const state = JSON.parse(readFileSync(statePath, "utf-8")) as {
+					enabled?: boolean;
+				};
+				if (state?.enabled) return true;
 			}
 		}
 	} catch {
@@ -450,6 +471,22 @@ export function registerAgenteventsHandlers(
 	);
 
 	agentManager.on("task-event", (taskId: string, event, projectId?: string) => {
+		// Context-window telemetry (CONTEXT_USAGE / CONTEXT_ACTION_APPLIED) is
+		// forwarded untouched: it describes how full the session is, not a state
+		// the task reached, so it must never reach XState, the plan files or the
+		// sequence bookkeeping — at ~one event every 2 points it would also
+		// advance the sequence past real lifecycle events.
+		if (isContextEventType(event.type)) {
+			safeSendToRenderer(
+				getMainWindow,
+				IPC_CHANNELS.TASK_CONTEXT_USAGE,
+				taskId,
+				event,
+				projectId,
+			);
+			return;
+		}
+
 		// Forward decision log entries directly to renderer without going through XState (Feature 30)
 		if (event.type === "DECISION_LOG_ENTRY") {
 			safeSendToRenderer(

@@ -50,18 +50,39 @@ def _packs(command, name="impeccable"):
     return {name: FakePack(name, {"command": command} if command else {})}
 
 
+def _exit_command(code: int) -> list[str]:
+    """Return a deterministic command available on every supported platform."""
+    return [sys.executable, "-c", f"raise SystemExit({code})"]
+
+
 # ── what runs ─────────────────────────────────────────────────────────────────
 
 
 def test_a_frontend_change_runs_the_gate(tmp_path: Path):
-    run = run_deterministic_gates(_profile(["src/App.tsx"]), tmp_path, _packs(["true"]))
+    run = run_deterministic_gates(
+        _profile(["src/App.tsx"]), tmp_path, _packs(_exit_command(0))
+    )
     assert [v.phase_id for v in run.verdicts] == ["design-check"]
     assert run.all_clean is True
 
 
+def test_only_the_detector_is_a_gate(tmp_path: Path):
+    """Two deterministic phases run on a frontend change; one of them is a gate.
+
+    `ui-design-system` is a preflight its own executor runs, and its pack
+    declares no `gate`: the gate runner steps over it rather than reporting a
+    verdict for a phase that never ran a check.
+    """
+    profile = _profile(["src/App.tsx"], effort="ultrathink")
+    assert profile.will_run("ui-design-system"), "fixture no longer covers the case"
+
+    run = run_deterministic_gates(profile, tmp_path, _packs(_exit_command(0)))
+    assert [v.phase_id for v in run.verdicts] == ["design-check"]
+
+
 def test_a_backend_change_runs_no_frontend_gate(tmp_path: Path):
     run = run_deterministic_gates(
-        _profile(["apps/backend/core/client.py"]), tmp_path, _packs(["true"])
+        _profile(["apps/backend/core/client.py"]), tmp_path, _packs(_exit_command(0))
     )
     assert run.verdicts == []
     assert run.all_clean is None
@@ -69,7 +90,7 @@ def test_a_backend_change_runs_no_frontend_gate(tmp_path: Path):
 
 def test_an_unknown_change_set_runs_the_gate(tmp_path: Path):
     """One extra local check beats skipping a design review that applied."""
-    run = run_deterministic_gates(_profile(None), tmp_path, _packs(["true"]))
+    run = run_deterministic_gates(_profile(None), tmp_path, _packs(_exit_command(0)))
     assert [v.phase_id for v in run.verdicts] == ["design-check"]
 
 
@@ -77,7 +98,7 @@ def test_an_unknown_change_set_runs_the_gate(tmp_path: Path):
 def test_the_gate_runs_at_every_effort_level(tmp_path: Path, effort: str):
     """It costs no tokens, so there is no level at which skipping it saves."""
     run = run_deterministic_gates(
-        _profile(["src/App.tsx"], effort), tmp_path, _packs(["true"])
+        _profile(["src/App.tsx"], effort), tmp_path, _packs(_exit_command(0))
     )
     assert [v.phase_id for v in run.verdicts] == ["design-check"], effort
 
@@ -98,7 +119,7 @@ def test_a_missing_pack_is_skipped(tmp_path: Path):
 
 def test_a_non_zero_exit_is_a_finding(tmp_path: Path):
     run = run_deterministic_gates(
-        _profile(["src/App.tsx"]), tmp_path, _packs(["false"])
+        _profile(["src/App.tsx"]), tmp_path, _packs(_exit_command(1))
     )
     assert run.all_clean is False
     assert run.verdicts[0].clean is False
@@ -179,7 +200,7 @@ def test_only_a_clean_verdict_becomes_an_external_signal(all_clean, expects_sign
 
 def test_the_report_says_which_gate_and_what_it_found(tmp_path: Path):
     run = run_deterministic_gates(
-        _profile(["src/App.tsx"]), tmp_path, _packs(["false"])
+        _profile(["src/App.tsx"]), tmp_path, _packs(_exit_command(1))
     )
     summary = run.describe()
     assert "design-check" in summary

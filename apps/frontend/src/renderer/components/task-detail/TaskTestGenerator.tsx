@@ -7,13 +7,19 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Task, WorktreeDiff } from "../../../shared/types";
+import type { TestGenerationError } from "../../../shared/types/test-generation";
+import { normalizeTestGenerationError } from "../../../shared/types/test-generation";
 import {
 	classifyTestStrategy,
 	isGeneratableStrategy,
 	type TestStrategy,
 } from "../../../shared/utils/test-strategy";
 import { cn } from "../../lib/utils";
+import { useTestDestinationPrompt } from "../../hooks/use-test-destination-prompt";
+import { useTestLibraries } from "../../hooks/use-test-libraries";
 import { useToast } from "../../hooks/use-toast";
+import { TestDestinationDialog } from "../test-generation/TestDestinationDialog";
+import { TestLibrariesPicker } from "../test-generation/TestLibrariesPicker";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
@@ -49,11 +55,20 @@ const STRATEGY_BADGE_CLASSES: Record<Exclude<TestStrategy, "skip">, string> = {
 	"desktop-ui": "bg-purple-500/10 text-purple-400",
 };
 
-/** Make the suggested test path relative to the worktree, normalized to "/". */
+/**
+ * Make the suggested test path relative to the worktree, normalized to "/".
+ *
+ * Returns null for a path outside the worktree. That is not hypothetical since
+ * the destination can be chosen: joining `/home/me/elsewhere/X.cs` onto the
+ * worktree passes the main process's traversal check and quietly creates
+ * `<worktree>/home/me/elsewhere/X.cs`, a junk tree in the diff. The caller
+ * reports it instead — the generator has already written the real file where
+ * the user asked.
+ */
 export function toWorktreeRelativePath(
 	suggestedPath: string,
 	worktreePath: string,
-): string {
+): string | null {
 	const normalizedSuggested = suggestedPath.replaceAll("\\", "/");
 	const normalizedWorktree = worktreePath.replaceAll("\\", "/").replace(/\/$/, "");
 	if (
@@ -63,7 +78,8 @@ export function toWorktreeRelativePath(
 	) {
 		return normalizedSuggested.slice(normalizedWorktree.length + 1);
 	}
-	return normalizedSuggested.replace(/^\//, "");
+	// A relative path is already worktree-relative; an absolute one is not ours.
+	return normalizedSuggested.startsWith("/") ? null : normalizedSuggested;
 }
 
 /**
@@ -83,6 +99,7 @@ export function TaskTestGenerator({
 	const [plans, setPlans] = useState<FilePlan[]>([]);
 	const [isGenerating, setIsGenerating] = useState(false);
 	const isMountedRef = useRef(true);
+	const destinationPrompt = useTestDestinationPrompt();
 
 	useEffect(() => {
 		isMountedRef.current = true;
@@ -120,6 +137,16 @@ export function TaskTestGenerator({
 	);
 	const selectedPlans = generatablePlans.filter((plan) => plan.selected);
 
+	// The library choice is a property of the project, so one file is enough to
+	// detect its language — the answer is the same for the whole batch.
+	const languageProbe = generatablePlans[0]?.path ?? "";
+	const libraries = useTestLibraries(
+		languageProbe && worktreePath
+			? `${worktreePath.replaceAll("\\", "/")}/${languageProbe.replaceAll("\\", "/")}`
+			: "",
+		worktreePath,
+	);
+
 	if (!worktreePath || generatablePlans.length === 0) {
 		return null;
 	}
@@ -137,7 +164,10 @@ export function TaskTestGenerator({
 	 * One-shot wrapper around the global test-generation events. The main
 	 * service runs a single generation at a time, so calls are sequential.
 	 */
-	const generateOne = (plan: FilePlan): Promise<GenerationOutput> => {
+	const generateOne = (
+		plan: FilePlan,
+		testDir?: string,
+	): Promise<GenerationOutput> => {
 		return new Promise<GenerationOutput>((resolve, reject) => {
 			const api = globalThis.electronAPI;
 			const cleanup = () => {
@@ -153,9 +183,16 @@ export function TaskTestGenerator({
 					reject(new Error(t("tasks:testGen.emptyResult")));
 				}
 			};
-			const onError = (error: string) => {
+			// The main process now sends a structured failure; normalising here
+			// keeps the per-file error chip readable instead of "[object Object]".
+			const onError = (error: TestGenerationError | string) => {
 				cleanup();
-				reject(new Error(error));
+				reject(
+					new Error(
+						normalizeTestGenerationError(error, t("tasks:testGen.emptyResult"))
+							.message,
+					),
+				);
 			};
 			api.onTestGenerationComplete(onComplete);
 			api.onTestGenerationError(onError);
@@ -166,9 +203,22 @@ export function TaskTestGenerator({
 				const userStory = [task.title, task.description?.slice(0, 1500)]
 					.filter(Boolean)
 					.join("\n\n");
-				api.generateE2ETests(userStory, absolutePath, worktreePath);
+				api.generateE2ETests(
+					userStory,
+					absolutePath,
+					worktreePath,
+					testDir,
+					libraries.chosen,
+				);
 			} else {
-				api.generateUnitTests(absolutePath, undefined, undefined, worktreePath);
+				api.generateUnitTests(
+					absolutePath,
+					undefined,
+					undefined,
+					worktreePath,
+					testDir,
+					libraries.chosen,
+				);
 			}
 		});
 	};
@@ -177,15 +227,35 @@ export function TaskTestGenerator({
 		if (selectedPlans.length === 0 || isGenerating) return;
 		setIsGenerating(true);
 		let written = 0;
+		// Asked at most once for the whole batch: the answer is a property of
+		// the project, not of each file, and twenty modals for twenty changed
+		// files is not a question, it is a wall.
+		let chosenDir: string | undefined;
 		try {
 			for (const plan of selectedPlans) {
+				const absolutePath = `${worktreePath.replaceAll("\\", "/")}/${plan.path.replaceAll("\\", "/")}`;
+				const choice = await destinationPrompt.prompt(
+					absolutePath,
+					worktreePath,
+					{ remembered: chosenDir },
+				);
+				if (choice.cancelled) break;
+				chosenDir = choice.directory ?? chosenDir;
+
 				updatePlan(plan.path, { state: "generating", error: undefined });
 				try {
-					const result = await generateOne(plan);
+					const result = await generateOne(plan, choice.directory);
 					const relativeTestPath = toWorktreeRelativePath(
 						result.test_file_path,
 						worktreePath,
 					);
+					if (!relativeTestPath) {
+						throw new Error(
+							t("tasks:testGen.outsideWorktree", {
+								path: result.test_file_path,
+							}),
+						);
+					}
 					const writeResult = await globalThis.electronAPI.worktreeWriteFile(
 						worktreePath,
 						relativeTestPath,
@@ -220,6 +290,12 @@ export function TaskTestGenerator({
 
 	return (
 		<div className="rounded-lg border border-border bg-secondary/20 p-4 space-y-3">
+			<TestDestinationDialog
+				destination={destinationPrompt.pending}
+				onConfirm={destinationPrompt.confirm}
+				onCancel={destinationPrompt.cancel}
+				note={t("tasks:testGen.destinationAppliesToBatch")}
+			/>
 			<div className="flex items-center justify-between gap-3">
 				<div className="flex items-center gap-2 min-w-0">
 					<FlaskConical className="h-4 w-4 shrink-0 text-primary" />
@@ -243,6 +319,20 @@ export function TaskTestGenerator({
 					{t("tasks:testGen.generate", { count: selectedPlans.length })}
 				</Button>
 			</div>
+
+			<TestLibrariesPicker
+				selection={libraries.selection}
+				chosen={libraries.chosen}
+				missing={libraries.missing}
+				loading={libraries.loading}
+				installing={libraries.installing}
+				report={libraries.report}
+				error={libraries.error}
+				onToggle={libraries.toggle}
+				onReset={libraries.resetToProject}
+				onAddPackages={() => void libraries.addMissingPackages()}
+				canInstall={Boolean(worktreePath)}
+			/>
 
 			<div className="space-y-1">
 				{generatablePlans.map((plan) => (

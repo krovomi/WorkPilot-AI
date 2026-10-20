@@ -25,18 +25,19 @@ from core.agent_client import (
     MessageRole,
 )
 from core.conversation_log import append_message as _log_append_message
-from debug import debug, debug_detailed, debug_error, debug_section, debug_success
-from insight_extractor import extract_session_insights
-from linear_updater import (
-    linear_subtask_completed,
-    linear_subtask_failed,
-)
-from progress import (
+from core.debug import debug, debug_detailed, debug_error, debug_section, debug_success
+from core.progress import (
     count_subtasks_detailed,
     is_build_complete,
 )
-from recovery import RecoveryManager
+from harness.application.budget import BUDGET_ENV
+from insight_extractor import extract_session_insights
+from integrations.linear.updater import (
+    linear_subtask_completed,
+    linear_subtask_failed,
+)
 from security.tool_input_validator import get_safe_tool_input
+from services.recovery import RecoveryManager
 from task_logger import (
     LogEntryType,
     LogPhase,
@@ -217,6 +218,62 @@ def _read_current_subtask_id(spec_dir: Path) -> str | None:
         return None
 
 
+def _session_id_of(raw_msg: Any) -> str | None:
+    """The SDK session id a raw Claude SDK message carries, if any.
+
+    The init ``SystemMessage`` carries it in ``data``; ``ResultMessage`` (and
+    stream events) carry it as an attribute.
+    """
+    sid = getattr(raw_msg, "session_id", None)
+    if not sid:
+        data = getattr(raw_msg, "data", None)
+        if isinstance(data, dict):
+            sid = data.get("session_id")
+    return sid if isinstance(sid, str) and sid else None
+
+
+def _persist_session_marker(
+    spec_dir: Path,
+    session_id: str,
+    *,
+    provider: str,
+    model: str | None,
+    phase: str,
+    subtype: str | None = None,
+) -> None:
+    """Write ``.session.json`` — the pointer the Kanban hands back on resume.
+
+    Written as soon as the session id is known, then again when the session
+    ends. It used to be written only at the end, so an application closed in
+    the middle of a session left a pointer to the *previous* session: the
+    resume rehydrated a transcript that was not the one interrupted, often one
+    from another phase. ``provider`` is recorded because only a Claude SDK
+    session id can be rehydrated by the SDK; the frontend ignores the others.
+    Best-effort: a marker that cannot be written never fails a session.
+    """
+    try:
+        import json as _json
+
+        state = {
+            "session_id": session_id,
+            "subtype": subtype,
+            "model": model,
+            "phase": phase,
+            "provider": provider,
+        }
+        (spec_dir / ".session.json").write_text(
+            _json.dumps(state, indent=2), encoding="utf-8"
+        )
+        logger.debug(
+            "[session] Persisted session_id=%s (%s, subtype=%s)",
+            session_id,
+            provider,
+            subtype,
+        )
+    except Exception as e:
+        logger.debug("[session] Could not persist session_id: %s", e)
+
+
 # Cap on how many historical messages we re-inject into a new session.
 # Above this the resume preamble dominates the prompt and the very next query
 # trips "Prompt is too long" — replaying 1000+ turns is also useless context-
@@ -304,6 +361,10 @@ async def _maybe_replay_conversation(
     spec_dir: Path,
     provider: str,
     model: str,
+    phase: str | None = None,
+    *,
+    guard: Any = None,
+    message: str = "",
 ) -> None:
     """If a prior conversation log exists for this spec, deserialize it and
     hand it to ``client.resume()`` so the new provider picks up the context.
@@ -323,15 +384,20 @@ async def _maybe_replay_conversation(
         from core.conversation_log import (
             conversation_log_path,
             deserialize_message,
-            read_log,
+            read_log_for_phase_resume,
         )
 
         # Per-model log: each (provider, model) keeps its own history so
-        # switching a phase's LLM resumes that model's own context. read_log
-        # migrates any legacy single-file log first.
-        entries = read_log(spec_dir, provider, model)
+        # switching a phase's LLM resumes that model's own context. A model
+        # that has never run THIS phase inherits the phase from the model that
+        # did, so "pause, switch LLM, resume" continues the work instead of
+        # re-deriving it. Migrates any legacy single-file log first.
+        entries = read_log_for_phase_resume(spec_dir, provider, model, phase)
         log_file = conversation_log_path(spec_dir, provider, model)
         if not entries:
+            if guard is not None:
+                # Nothing to replay, but a manual request may still be pending.
+                await guard.pre_session([], message)
             return
 
         # First pass: drop entries that have no business being re-injected
@@ -415,6 +481,13 @@ async def _maybe_replay_conversation(
                 running // 1024,
             )
         entries = sized
+
+        if guard is not None:
+            # Before anything is sent: a replay already past the threshold is
+            # cleared (finished subtask) or compacted (same one) here, for free.
+            entries = await guard.pre_session(entries, message)
+            if not entries:
+                return
 
         history = [deserialize_message(e) for e in entries]
         debug(
@@ -554,6 +627,23 @@ def _response_text_indicates_prompt_too_long(response_text: str) -> bool:
     return is_prompt_too_long_error(RuntimeError(stripped))
 
 
+def _status_text_indicates_prompt_too_long(status_text: str) -> bool:
+    """Same question as ``_response_text_indicates_prompt_too_long``, asked of
+    the client's own status lines instead of the model's prose.
+
+    The response-text check is deliberately capped at 80 characters so a long
+    assistant turn that merely *mentions* the phrase never fires. A provider
+    status line is not prose — we wrote it, and it carries the raw API body
+    (``Ollama API error (400): {"error":"... exceeds the available context size
+    (4096 tokens)"}``), which is always longer than that gate. Applying the
+    gate to it meant the one signal that reliably identifies the failure was
+    the one signal we threw away.
+    """
+    if not status_text or not status_text.strip():
+        return False
+    return is_prompt_too_long_error(RuntimeError(status_text))
+
+
 def _response_text_indicates_model_unavailable(response_text: str) -> bool:
     """Return True when the LLM's response text signals the selected model is
     invalid or inaccessible.
@@ -608,6 +698,13 @@ def is_prompt_too_long_error(error: Exception) -> bool:
         "input too long",
         "request too large",
         "token limit",
+        # Ollama / llama.cpp wording. Ollama returns HTTP 400 with
+        # "request exceeds the available context size (4096 tokens)" — none of
+        # the patterns above match it, so a local build that overflowed num_ctx
+        # was classified as a normal turn and the phase retried the same
+        # oversized prompt until the user killed it.
+        "available context size",
+        "exceeds context",
     ]
     return any(p in error_str for p in patterns)
 
@@ -881,7 +978,7 @@ async def post_session_processing(
             logger.warning(f"Insight extraction failed: {e}")
             extracted_insights = None
 
-        # Save session memory (Graphiti=primary, file-based=fallback)
+        # Save session memory to the shared brain (the one store)
         try:
             save_success, storage_type = await save_session_memory(
                 spec_dir=spec_dir,
@@ -893,14 +990,13 @@ async def post_session_processing(
                 discoveries=extracted_insights,
             )
             if save_success:
-                if storage_type == "graphiti":
-                    print_status("Session saved to Graphiti memory", "success")
-                else:
-                    print_status(
-                        "Session saved to file-based memory (fallback)", "info"
-                    )
-            else:
-                print_status("Failed to save session memory", "warning")
+                print_status(
+                    f"Session saved to the shared brain ({storage_type})", "success"
+                )
+            elif storage_type == "none":
+                print_status(
+                    "Session memory not saved (memory is off or failed)", "warning"
+                )
         except Exception as e:
             logger.warning(f"Error saving session memory: {e}")
             print_status("Memory save failed", "warning")
@@ -1068,6 +1164,8 @@ async def run_agent_session(
     verbose: bool = False,
     phase: LogPhase = LogPhase.CODING,
     streaming_wrapper: Any = None,
+    context_managed: bool = False,
+    context_monitor_only: bool = False,
 ) -> tuple[str, str, dict]:
     """
     Run a single agent session using Claude Agent SDK or any AgentClient provider.
@@ -1083,10 +1181,16 @@ async def run_agent_session(
         spec_dir: Spec directory path
         verbose: Whether to show detailed output
         phase: Current execution phase for logging
+        context_managed: Let the context guard (context_mgmt) compact or clear
+            the thread. Only for callers that handle the "context_reset" status
+            by rebuilding their client and running the session again.
+        context_monitor_only: With ``context_managed``, the guard measures and
+            feeds the gauge but never compacts or clears: for a caller whose
+            resets stopped helping (``context_mgmt.reset_limit``).
 
     Returns:
         (status, response_text, error_info) where:
-        - status: "continue", "complete", or "error"
+        - status: "continue", "complete", "error", "hot_swap" or "context_reset"
         - response_text: Agent's response text
         - error_info: Dict with error details (empty if no error):
             - "type": "tool_concurrency" or "other"
@@ -1102,6 +1206,8 @@ async def run_agent_session(
             verbose,
             phase,
             streaming_wrapper=streaming_wrapper,
+            context_managed=context_managed,
+            context_monitor_only=context_monitor_only,
         )
 
     debug_section("session", f"Agent Session - {phase.value}")
@@ -1187,9 +1293,26 @@ async def run_agent_session(
         response_text = ""
         _sdk_result_msg = None  # Captures ResultMessage (cost/usage) when emitted
         debug("session", "Starting to receive response stream...")
+        _session_marker_written = False
         async for msg in client.receive_response():
             msg_type = type(msg).__name__
             message_count += 1
+
+            # Point the resume marker at THIS session as soon as it has an id,
+            # so an application closed mid-session resumes it and not the
+            # previous one.
+            if not _session_marker_written:
+                _early_sid = _session_id_of(msg)
+                if _early_sid:
+                    _persist_session_marker(
+                        spec_dir,
+                        _early_sid,
+                        provider="claude",
+                        model=getattr(getattr(client, "options", None), "model", None),
+                        phase=phase.value,
+                        subtype="running",
+                    )
+                    _session_marker_written = True
             debug_detailed(
                 "session",
                 f"Received message #{message_count}",
@@ -1224,12 +1347,14 @@ async def run_agent_session(
                                     block.text[:300]
                                 )
                             except Exception:
+                                # La vue live est un miroir : son echec ne doit pas arreter l'agent.
                                 pass
                         # Record agent response in replay
                         if _rr and _rs_id and block.text.strip():
                             try:
                                 _rr.record_response(_rs_id, block.text)
                             except Exception:
+                                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                                 pass
                     elif block_type == "ToolUseBlock" and hasattr(block, "name"):
                         tool_name = block.name
@@ -1295,6 +1420,7 @@ async def run_agent_session(
                                         _rs_id, tool_name, tool_input_dict=inp or {}
                                     )
                             except Exception:
+                                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                                 pass
 
                         # Record tool call in decision log (non-blocking)
@@ -1302,6 +1428,7 @@ async def run_agent_session(
                             try:
                                 _decision_logger.log_tool_call(tool_name, inp)
                             except Exception:
+                                # Le journal de decisions est annexe : il n'interrompt pas l'agent.
                                 pass
 
                         # Stream tool use events to live view
@@ -1324,6 +1451,7 @@ async def run_agent_session(
                                 elif command:
                                     await streaming_wrapper.emit_command(command[:500])
                             except Exception:
+                                # La vue live est un miroir : son echec ne doit pas arreter l'agent.
                                 pass
 
             # Handle UserMessage (tool results)
@@ -1414,6 +1542,7 @@ async def run_agent_session(
                                         str(result_content)[:1000], is_error=is_error
                                     )
                             except Exception:
+                                # La vue live est un miroir : son echec ne doit pas arreter l'agent.
                                 pass
 
                         # Record tool result in replay
@@ -1432,6 +1561,7 @@ async def run_agent_session(
                                         success=not is_error,
                                     )
                             except Exception:
+                                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                                 pass
 
                         current_tool = None
@@ -1442,31 +1572,16 @@ async def run_agent_session(
         # cards that hit max_turns/max_budget_usd. Best-effort: never fail
         # the session just because we couldn't write the marker file.
         if _sdk_result_msg is not None:
-            try:
-                _sid = getattr(_sdk_result_msg, "session_id", None)
-                if _sid:
-                    import json as _json
-
-                    _state_path = spec_dir / ".session.json"
-                    _state = {
-                        "session_id": _sid,
-                        "subtype": getattr(_sdk_result_msg, "subtype", None),
-                        "model": getattr(
-                            getattr(client, "options", None), "model", None
-                        ),
-                        "phase": phase.value,
-                    }
-                    _state_path.write_text(
-                        _json.dumps(_state, indent=2), encoding="utf-8"
-                    )
-                    logger.debug(
-                        "[session] Persisted session_id=%s subtype=%s to %s",
-                        _sid,
-                        _state["subtype"],
-                        _state_path,
-                    )
-            except Exception as _se:
-                logger.debug("[session] Could not persist session_id: %s", _se)
+            _sid = _session_id_of(_sdk_result_msg)
+            if _sid:
+                _persist_session_marker(
+                    spec_dir,
+                    _sid,
+                    provider="claude",
+                    model=getattr(getattr(client, "options", None), "model", None),
+                    phase=phase.value,
+                    subtype=getattr(_sdk_result_msg, "subtype", None),
+                )
 
         # Record token usage from the SDK ResultMessage (best-effort)
         if _sdk_result_msg is not None and _record_usage is not None:
@@ -1508,6 +1623,7 @@ async def run_agent_session(
                         "anthropic" if _active in ("claude", "anthropic") else _active
                     )
                 except Exception:
+                    # Le provider actif n'est qu'une etiquette de journal : sans lui on continue.
                     pass
                 _record_usage(
                     spec_dir=spec_dir,
@@ -1544,6 +1660,7 @@ async def run_agent_session(
                     cost_usd=_cost,
                 )
             except Exception:
+                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                 pass
 
         # Check if build is complete
@@ -1559,6 +1676,7 @@ async def run_agent_session(
                 try:
                     _rr.end_session(_rs_id)
                 except Exception:
+                    # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                     pass
             return "complete", response_text, {}
 
@@ -1612,11 +1730,13 @@ async def run_agent_session(
                     )
                 _os.environ.pop("AUTO_CLAUDE_RESUME_SESSION_ID", None)
             except OSError:
+                # L'archivage des logs est du menage : il ne doit pas masquer la vraie cause.
                 pass
             if _rr and _rs_id:
                 try:
                     _rr.end_session(_rs_id, status="failed")
                 except Exception:
+                    # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                     pass
             return "error", response_text, error_info
 
@@ -1631,6 +1751,7 @@ async def run_agent_session(
             try:
                 _rr.end_session(_rs_id)
             except Exception:
+                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                 pass
         return "continue", response_text, {}
 
@@ -1740,6 +1861,7 @@ async def run_agent_session(
             try:
                 _rr.end_session(_rs_id, status="failed")
             except Exception:
+                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                 pass
         return "error", sanitized_error, error_info
 
@@ -1749,6 +1871,125 @@ async def run_agent_session(
 # =============================================================================
 
 
+def _make_context_guard(
+    client: AgentClient,
+    spec_dir: Path,
+    phase: str,
+    subtask_id: str | None,
+    provider: str,
+    model: str,
+):
+    """The session's context guard, or None if it cannot be built."""
+    try:
+        from context_mgmt import ContextGuard
+        from core.task_event import TaskEventEmitter
+
+        return ContextGuard(
+            spec_dir=spec_dir,
+            project_dir=spec_dir.parent.parent.parent,
+            phase=phase,
+            subtask_id=subtask_id,
+            client=client,
+            provider=provider,
+            model=model,
+            emitter=TaskEventEmitter.from_spec_dir(spec_dir),
+        )
+    except Exception as exc:  # noqa: BLE001 - no guard, same session as before
+        logger.debug("[context] guard unavailable: %s", exc)
+        return None
+
+
+# (provider, model) pairs whose missing price was already reported.
+_UNPRICED_REPORTED: set[tuple[str, str]] = set()
+
+
+def _session_budget(client):
+    """The spending cap the runner enforces for ``client``, or None. Never raises.
+
+    When the cap cannot be measured (no known price for the model), the task
+    log says so once, and the session runs uncapped as before.
+    """
+    try:
+        from harness.application.budget import budget_for
+
+        budget = budget_for(client)
+    except Exception as _be:  # noqa: BLE001 - a missing cap never stops a build
+        logger.debug("[budget] unavailable: %s", _be)
+        return None
+    if budget is not None and not budget.measurable:
+        unpriced = (client.provider_name(), getattr(client, "model", "?"))
+        if unpriced not in _UNPRICED_REPORTED:
+            _UNPRICED_REPORTED.add(unpriced)
+            print(
+                f"No price known for {unpriced[0]} / {unpriced[1]}: the "
+                f"${budget.cap_usd:.2f} session budget cannot be measured and is "
+                "not enforced.",
+                flush=True,
+            )
+        return None
+    return budget
+
+
+def session_usage_fields(client) -> dict[str, int] | None:
+    """A session's tokens in the usage tracker's sense, whatever the provider.
+
+    ``core.usage_tracker`` takes ``input_tokens`` as the uncached part, beside
+    the two cache fields. Clients' ``last_usage`` did not agree on that (the
+    whole prompt on OpenCode, Codex and the OpenAI-style loops), so the input
+    side comes from the client's ``usage_ledger``, already read into one unit
+    (``harness.domain``). Output tokens mean the same everywhere and the
+    session total is the more complete count (a streamed call's own usage may
+    predate its last tokens), so ``last_usage`` keeps them when it has them.
+    ``None`` when the client reported nothing.
+    """
+    usage = getattr(client, "last_usage", None)
+    usage = usage if isinstance(usage, dict) else None
+    ledger = getattr(client, "usage_ledger", None)
+    if ledger is not None and getattr(ledger, "calls", None):
+        fields = ledger.tracker_fields()
+        if usage is not None and usage.get("output_tokens"):
+            fields["output_tokens"] = int(usage["output_tokens"])
+        return fields
+    if usage is None:
+        return None
+    return {
+        "input_tokens": usage.get("input_tokens", 0),
+        "output_tokens": usage.get("output_tokens", 0),
+        "cache_creation_input_tokens": usage.get("cache_creation_input_tokens", 0),
+        "cache_read_input_tokens": usage.get("cache_read_input_tokens", 0),
+    }
+
+
+def record_client_usage(
+    client, spec_dir: Path, phase: str, agent_type: str | None = None
+) -> None:
+    """Record an AgentClient's ``last_usage`` in the usage tracker. Never raises.
+
+    Shared by the build sessions and the QA reviewer/fixer, which run their own
+    loops and used to report usage to the replay recorder only — their output
+    tokens never reached the cost data.
+    """
+    if _record_usage is None:
+        return
+    try:
+        _usage = getattr(client, "last_usage", None)
+        tokens = session_usage_fields(client)
+        if tokens is None:
+            return
+        _record_usage(
+            spec_dir=spec_dir,
+            project_dir=spec_dir.parent.parent.parent,
+            phase=phase,
+            agent_type=agent_type or phase,
+            model=getattr(client, "model", "unknown"),
+            provider=client.provider_name(),
+            cost_usd=(_usage.get("cost_usd", 0.0) if isinstance(_usage, dict) else 0.0),
+            **tokens,
+        )
+    except Exception as _ute:  # noqa: BLE001 - telemetry never stops a build
+        logger.debug("[usage_tracker] AgentClient usage recording failed: %s", _ute)
+
+
 async def _run_agent_client_session(
     client: AgentClient,
     message: str,
@@ -1756,6 +1997,8 @@ async def _run_agent_client_session(
     verbose: bool = False,
     phase: LogPhase = LogPhase.CODING,
     streaming_wrapper: Any = None,
+    context_managed: bool = False,
+    context_monitor_only: bool = False,
 ) -> tuple[str, str, dict]:
     """
     Run a single agent session using any AgentClient provider.
@@ -1801,15 +2044,56 @@ async def _run_agent_client_session(
     if task_logger:
         task_logger.set_llm(provider, log_model)
 
+    context_guard = (
+        _make_context_guard(
+            client, spec_dir, phase.value, log_subtask_id, provider, log_model
+        )
+        if context_managed
+        else None
+    )
+    if context_guard is not None and context_monitor_only:
+        context_guard.monitor_only = True
+
     # If a prior session for this spec left a conversation log, replay it into
     # the client so the LLM has the same context — even when this run uses a
     # different provider than the one that originally produced the transcript.
     # If the last assistant message ended on an un-dispatched tool_use, append
     # a directive nudging the LLM to redo it.
-    await _maybe_replay_conversation(client, spec_dir, provider, log_model)
-    message = _maybe_inject_pending_tool_use_note(
-        message, spec_dir, provider, log_model
-    )
+    #
+    # Not when the Claude SDK is rehydrating the interrupted session itself: it
+    # already holds those turns, and the log replayed on top would repeat them.
+    _native_resume = False
+    try:
+        _native_resume = bool(client.resumes_native_session())
+    except Exception:
+        _native_resume = False
+    if _native_resume:
+        debug(
+            "session",
+            "Claude SDK resumes the interrupted session natively — "
+            "conversation log replay skipped",
+        )
+    else:
+        await _maybe_replay_conversation(
+            client,
+            spec_dir,
+            provider,
+            log_model,
+            phase.value,
+            guard=context_guard,
+            message=message,
+        )
+        message = _maybe_inject_pending_tool_use_note(
+            message, spec_dir, provider, log_model
+        )
+    if context_guard is not None:
+        # A thread closed by "clear" left a handoff note: the new thread starts
+        # from it. Consumed once.
+        from context_mgmt.handoff import consume_pending_handoff
+
+        message = consume_pending_handoff(spec_dir) + message
+        if not context_guard.base_chars:
+            context_guard.base_chars = len(message)
 
     try:
         # Persist the initial user message before the network call so a process
@@ -1832,19 +2116,64 @@ async def _run_agent_client_session(
         debug_success("session", "Query sent successfully")
 
         response_text = ""
+        # Status lines the CLIENT emits about itself — generation heartbeats,
+        # model-pull progress, provider errors — never model output. Every
+        # `MessageRole.SYSTEM` message in every AgentClient is one of these
+        # (see the yields in core/agent_client.py), so they are kept OUT of
+        # `response_text` and out of the conversation log: mixing them in made
+        # a slow local turn look like an assistant reply, defeated the short-
+        # response error classifiers below, and got replayed as context on the
+        # next session — where a local model's 8k window has no room for it.
+        status_text = ""
         _hot_swap_pending = False  # set when a live provider/model swap is detected
+        _context_decision = None  # set when the context guard closes the session
         debug("session", "Starting to receive response stream...")
 
+        _session_marker_written = False
+        # One spending cap per session for every client the SDK does not
+        # already cap (harness.application.budget), measured from the client's
+        # usage ledger after each message.
+        _budget = _session_budget(client)
+        _budget_spent: float | None = None
         async for agent_msg in client.receive_response():  # noqa: SIM113 — result msg needs post-loop handling
             message_count += 1
+
+            # Same as the raw SDK path: the marker names this session from its
+            # first message, not from its last.
+            if not _session_marker_written:
+                _early_sid = getattr(client, "last_session_id", None)
+                if isinstance(_early_sid, str) and _early_sid:
+                    _persist_session_marker(
+                        spec_dir,
+                        _early_sid,
+                        provider=provider,
+                        model=log_model,
+                        phase=phase.value,
+                        subtype="running",
+                    )
+                    _session_marker_written = True
             debug_detailed(
                 "session",
                 f"Received message #{message_count}",
                 msg_type=agent_msg.type_name,
             )
+            is_status_msg = agent_msg.role == MessageRole.SYSTEM
 
             for block in agent_msg.content:
                 if block.type == ContentBlockType.TEXT and block.text:
+                    if is_status_msg:
+                        # Shown in the task log as an INFO line (its own badge in
+                        # the Kanban), not as agent prose.
+                        status_text += block.text + "\n"
+                        print(block.text, flush=True)
+                        if task_logger and block.text.strip():
+                            task_logger.log(
+                                block.text,
+                                LogEntryType.INFO,
+                                phase,
+                                print_to_console=False,
+                            )
+                        continue
                     response_text += block.text
                     print(block.text, end="", flush=True)
                     if task_logger and block.text.strip():
@@ -1861,6 +2190,7 @@ async def _run_agent_client_session(
                                 block.text[:300]
                             )
                         except Exception:
+                            # La vue live est un miroir : son echec ne doit pas arreter l'agent.
                             pass
 
                 elif block.type == ContentBlockType.TOOL_USE:
@@ -1911,6 +2241,7 @@ async def _run_agent_client_session(
                             elif command:
                                 await streaming_wrapper.emit_command(command[:500])
                         except Exception:
+                            # La vue live est un miroir : son echec ne doit pas arreter l'agent.
                             pass
 
                 elif block.type == ContentBlockType.TOOL_RESULT:
@@ -1986,6 +2317,7 @@ async def _run_agent_client_session(
                                     str(result_content)[:1000], is_error=is_error
                                 )
                         except Exception:
+                            # La vue live est un miroir : son echec ne doit pas arreter l'agent.
                             pass
 
                     current_tool = None
@@ -1994,14 +2326,19 @@ async def _run_agent_client_session(
             # its blocks have been processed. This way the log mirrors what the
             # agent actually emitted (text + tool_use + tool_result), making it
             # safe to replay against a different provider after a pause.
-            _log_append_message(
-                spec_dir,
-                agent_msg,
-                phase=phase.value,
-                provider=provider,
-                model=log_model,
-                subtask_id=log_subtask_id,
-            )
+            # Client status lines are excluded: the log exists to be replayed as
+            # context, and "generating for 30 s…" is not context. Worse, replay
+            # keeps the NEWEST messages, so on a slow local model the heartbeats
+            # were exactly what survived truncation.
+            if not is_status_msg:
+                _log_append_message(
+                    spec_dir,
+                    agent_msg,
+                    phase=phase.value,
+                    provider=provider,
+                    model=log_model,
+                    subtask_id=log_subtask_id,
+                )
 
             # Hot LLM swap: if the user changed this phase's provider/model while
             # the session is streaming, stop cleanly at this message boundary so
@@ -2027,7 +2364,45 @@ async def _run_agent_client_session(
             except Exception:  # noqa: BLE001 - never break the agent loop on this
                 pass
 
+            # Context guard: measure the window fill, prepare the handoff in the
+            # background past the threshold, and stop at a safe point (no tool
+            # call in flight) when the policy or the task panel asks for it.
+            if context_guard is not None:
+                try:
+                    context_guard.observe(agent_msg)
+                    _context_decision = context_guard.decision_at_safe_point()
+                except Exception as _cg_err:  # noqa: BLE001
+                    logger.debug("[context] guard failed: %s", _cg_err)
+                    _context_decision = None
+                if _context_decision is not None:
+                    debug(
+                        "session",
+                        f"Context {_context_decision.action} — ending for client rebuild",
+                    )
+                    break
+
+            if _budget is not None and _budget.exceeded(
+                getattr(client, "usage_ledger", None)
+            ):
+                _budget_spent = _budget.spent(getattr(client, "usage_ledger", None))
+                print(
+                    f"\nSession budget reached: about ${_budget_spent:.2f} spent of "
+                    f"${_budget.cap_usd:.2f} — ending this session. Raise "
+                    f"{BUDGET_ENV} to allow more.",
+                    flush=True,
+                )
+                break
+
         print("\n" + "-" * 70 + "\n")
+
+        if _context_decision is not None:
+            await context_guard.apply(_context_decision)
+            record_client_usage(client, spec_dir, phase.value)
+            return (
+                "context_reset",
+                response_text,
+                {"context_reset": True, "action": _context_decision.action},
+            )
 
         if _hot_swap_pending:
             # Signal the caller to rebuild the client (new provider/model) and
@@ -2040,56 +2415,19 @@ async def _run_agent_client_session(
         # the provider-agnostic factory (i.e. nearly every flow today).
         _agent_session_id = getattr(client, "last_session_id", None)
         if _agent_session_id:
-            try:
-                import json as _json_session
-
-                _state_path = spec_dir / ".session.json"
-                _state = {
-                    "session_id": _agent_session_id,
-                    "subtype": getattr(
-                        getattr(client, "last_result_msg", None), "subtype", None
-                    ),
-                    "model": getattr(client, "model", None),
-                    "phase": phase.value,
-                }
-                _state_path.write_text(
-                    _json_session.dumps(_state, indent=2), encoding="utf-8"
-                )
-                logger.debug(
-                    "[session] Persisted session_id=%s (AgentClient) to %s",
-                    _agent_session_id,
-                    _state_path,
-                )
-            except Exception as _se:
-                logger.debug("[session] AgentClient session_id persist failed: %s", _se)
+            _persist_session_marker(
+                spec_dir,
+                _agent_session_id,
+                provider=provider,
+                model=getattr(client, "model", None),
+                phase=phase.value,
+                subtype="error_max_budget_usd"
+                if _budget_spent is not None
+                else getattr(getattr(client, "last_result_msg", None), "subtype", None),
+            )
 
         # Record token usage from AgentClient (best-effort via duck typing)
-        if _record_usage is not None:
-            try:
-                _usage = getattr(client, "last_usage", None)
-                if _usage is not None:
-                    _project_dir = spec_dir.parent.parent.parent
-                    _record_usage(
-                        spec_dir=spec_dir,
-                        project_dir=_project_dir,
-                        phase=phase.value,
-                        agent_type=phase.value,
-                        model=getattr(client, "model", "unknown"),
-                        provider=client.provider_name(),
-                        input_tokens=_usage.get("input_tokens", 0),
-                        output_tokens=_usage.get("output_tokens", 0),
-                        cost_usd=_usage.get("cost_usd", 0.0),
-                        cache_creation_input_tokens=_usage.get(
-                            "cache_creation_input_tokens", 0
-                        ),
-                        cache_read_input_tokens=_usage.get(
-                            "cache_read_input_tokens", 0
-                        ),
-                    )
-            except Exception as _ute:
-                logger.debug(
-                    "[usage_tracker] AgentClient usage recording failed: %s", _ute
-                )
+        record_client_usage(client, spec_dir, phase.value)
 
         if is_build_complete(spec_dir):
             debug_success(
@@ -2105,22 +2443,36 @@ async def _run_agent_client_session(
         # account can't use): the CLI returns it as a short text response, not an
         # error, so without this the coder loops forever and then advances the
         # phase with nothing done. Reclassify as a halting error.
-        if _response_text_indicates_model_unavailable(response_text):
+        if _response_text_indicates_model_unavailable(
+            response_text
+        ) or _response_text_indicates_model_unavailable(status_text):
+            _unavailable_text = (
+                response_text
+                if _response_text_indicates_model_unavailable(response_text)
+                else status_text
+            )
             debug_error(
                 "session",
                 "Reclassifying 'selected model unavailable' response as error (AgentClient)",
-                response_preview=response_text[:160],
+                response_preview=_unavailable_text[:160],
             )
             return (
                 "error",
-                response_text,
-                {"type": "model_unavailable", "message": response_text.strip()},
+                _unavailable_text,
+                {"type": "model_unavailable", "message": _unavailable_text.strip()},
             )
 
         # Same reclassification as in the SDK-direct runner — providers can
         # surface "Prompt is too long" as a plain text response. See the
         # corresponding block in run_agent_session() for the full rationale.
-        if _response_text_indicates_prompt_too_long(response_text):
+        # The status-line variant covers the providers that report it as an API
+        # error instead (Ollama's blown num_ctx, Copilot's
+        # context_length_exceeded), which used to end the stream as an ordinary
+        # "continue" and send the caller round the same oversized prompt again.
+        if _response_text_indicates_prompt_too_long(
+            response_text
+        ) or _status_text_indicates_prompt_too_long(status_text):
+            response_text = response_text or status_text.strip()
             debug_error(
                 "session",
                 "Reclassifying short prompt-too-long response as error (AgentClient)",
@@ -2141,6 +2493,7 @@ async def _run_agent_client_session(
                     )
                 _os.environ.pop("AUTO_CLAUDE_RESUME_SESSION_ID", None)
             except OSError:
+                # L'archivage des logs est du menage : il ne doit pas masquer la vraie cause.
                 pass
             return (
                 "error",
@@ -2159,7 +2512,18 @@ async def _run_agent_client_session(
             tool_count=tool_count,
             response_length=len(response_text),
         )
-        return "continue", response_text, {}
+        # A turn that produced nothing but status lines (a provider error the
+        # classifiers above did not recognise) still has to tell the caller
+        # what happened — returning "" would look like a silent, successful turn.
+        # A session stopped at its budget continues like one the SDK stopped
+        # at max_budget_usd: the caller decides, as it does there.
+        return (
+            "continue",
+            response_text or status_text.strip(),
+            {"budget_exceeded": True, "spent_usd": round(_budget_spent, 4)}
+            if _budget_spent is not None
+            else {},
+        )
 
     except Exception as e:
         is_concurrency = is_tool_concurrency_error(e)

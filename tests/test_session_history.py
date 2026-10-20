@@ -41,10 +41,12 @@ from apps.backend.agents.session_history import (
 # SessionAction
 # -----------------------------------------------------------------------
 
+
 class TestSessionAction:
     def test_create_action(self):
         action = SessionAction(
-            action_id="act_1", action_type=ActionType.PROMPT,
+            action_id="act_1",
+            action_type=ActionType.PROMPT,
             content="Write login code",
         )
         assert action.action_id == "act_1"
@@ -54,8 +56,10 @@ class TestSessionAction:
 
     def test_action_to_dict(self):
         action = SessionAction(
-            action_id="act_1", action_type=ActionType.TOOL_CALL,
-            content="read_file", metadata={"tool_name": "Read"},
+            action_id="act_1",
+            action_type=ActionType.TOOL_CALL,
+            content="read_file",
+            metadata={"tool_name": "Read"},
         )
         d = action.to_dict()
         assert d["action_type"] == "tool_call"
@@ -63,9 +67,12 @@ class TestSessionAction:
 
     def test_action_from_dict(self):
         d = {
-            "action_id": "act_1", "action_type": "response",
-            "content": "Here is code", "timestamp": "2026-01-01T00:00:00",
-            "metadata": {}, "duration_ms": 150.0,
+            "action_id": "act_1",
+            "action_type": "response",
+            "content": "Here is code",
+            "timestamp": "2026-01-01T00:00:00",
+            "metadata": {},
+            "duration_ms": 150.0,
         }
         action = SessionAction.from_dict(d)
         assert action.action_type == ActionType.RESPONSE
@@ -76,6 +83,7 @@ class TestSessionAction:
 # FileChange
 # -----------------------------------------------------------------------
 
+
 class TestFileChange:
     def test_create_file_change(self):
         fc = FileChange(file_path="src/login.py", before="", after="def login(): pass")
@@ -83,11 +91,15 @@ class TestFileChange:
         assert fc.change_type == "modify"
 
     def test_diff_summary_new_file(self):
-        fc = FileChange(file_path="f.py", before="", after="line1\nline2", change_type="create")
+        fc = FileChange(
+            file_path="f.py", before="", after="line1\nline2", change_type="create"
+        )
         assert "+2 lines" in fc.diff_summary
 
     def test_diff_summary_delete(self):
-        fc = FileChange(file_path="f.py", before="line1\nline2", after="", change_type="delete")
+        fc = FileChange(
+            file_path="f.py", before="line1\nline2", after="", change_type="delete"
+        )
         assert "-2 lines" in fc.diff_summary
 
     def test_file_change_to_dict(self):
@@ -101,10 +113,13 @@ class TestFileChange:
 # AgentSession
 # -----------------------------------------------------------------------
 
+
 class TestAgentSession:
     def test_create_session(self):
         session = AgentSession(
-            session_id="s1", project_id="p", task_id="t1",
+            session_id="s1",
+            project_id="p",
+            task_id="t1",
             agent_type="coder",
         )
         assert session.session_id == "s1"
@@ -113,7 +128,9 @@ class TestAgentSession:
 
     def test_session_duration(self):
         session = AgentSession(
-            session_id="s1", project_id="p", task_id="t1",
+            session_id="s1",
+            project_id="p",
+            task_id="t1",
             started_at="2026-01-01T00:00:00+00:00",
             ended_at="2026-01-01T00:05:00+00:00",
         )
@@ -121,9 +138,13 @@ class TestAgentSession:
 
     def test_session_to_dict(self):
         session = AgentSession(session_id="s1", project_id="p", task_id="t1")
-        session.actions.append(SessionAction(
-            action_id="a1", action_type=ActionType.PROMPT, content="hello",
-        ))
+        session.actions.append(
+            SessionAction(
+                action_id="a1",
+                action_type=ActionType.PROMPT,
+                content="hello",
+            )
+        )
         d = session.to_dict()
         assert d["session_id"] == "s1"
         assert len(d["actions"]) == 1
@@ -131,14 +152,26 @@ class TestAgentSession:
 
     def test_session_from_dict(self):
         d = {
-            "session_id": "s1", "project_id": "p", "task_id": "t1",
-            "agent_type": "coder", "status": "completed",
-            "actions": [{"action_id": "a1", "action_type": "prompt",
-                         "content": "x", "timestamp": "", "metadata": {},
-                         "duration_ms": 0}],
+            "session_id": "s1",
+            "project_id": "p",
+            "task_id": "t1",
+            "agent_type": "coder",
+            "status": "completed",
+            "actions": [
+                {
+                    "action_id": "a1",
+                    "action_type": "prompt",
+                    "content": "x",
+                    "timestamp": "",
+                    "metadata": {},
+                    "duration_ms": 0,
+                }
+            ],
             "file_changes": [],
-            "started_at": "2026-01-01T00:00:00", "ended_at": None,
-            "total_tokens_in": 100, "total_tokens_out": 50,
+            "started_at": "2026-01-01T00:00:00",
+            "ended_at": None,
+            "total_tokens_in": 100,
+            "total_tokens_out": 50,
             "metadata": {},
         }
         session = AgentSession.from_dict(d)
@@ -149,6 +182,7 @@ class TestAgentSession:
 # -----------------------------------------------------------------------
 # SessionRecorder — lifecycle
 # -----------------------------------------------------------------------
+
 
 class TestSessionRecorderLifecycle:
     def setup_method(self):
@@ -189,6 +223,7 @@ class TestSessionRecorderLifecycle:
 # SessionRecorder — recording
 # -----------------------------------------------------------------------
 
+
 class TestSessionRecorderRecording:
     def setup_method(self):
         self.recorder = SessionRecorder(project_id="proj-1")
@@ -196,14 +231,18 @@ class TestSessionRecorderRecording:
 
     def test_record_action(self):
         action = self.recorder.record_action(
-            self.session.session_id, "prompt", "Hello world",
+            self.session.session_id,
+            "prompt",
+            "Hello world",
         )
         assert action is not None
         assert action.action_type == ActionType.PROMPT
 
     def test_record_action_with_metadata(self):
         self.recorder.record_action(
-            self.session.session_id, "response", "Code here",
+            self.session.session_id,
+            "response",
+            "Code here",
             metadata={"input_tokens": 100, "output_tokens": 50},
         )
         assert self.session.total_tokens_in == 100
@@ -220,14 +259,20 @@ class TestSessionRecorderRecording:
 
     def test_record_file_change_create(self):
         fc = self.recorder.record_file_change(
-            self.session.session_id, "new.py", "", "def hello(): pass",
+            self.session.session_id,
+            "new.py",
+            "",
+            "def hello(): pass",
         )
         assert fc is not None
         assert fc.change_type == "create"
 
     def test_record_file_change_modify(self):
         fc = self.recorder.record_file_change(
-            self.session.session_id, "f.py", "old", "new",
+            self.session.session_id,
+            "f.py",
+            "old",
+            "new",
         )
         assert fc.change_type == "modify"
 
@@ -235,6 +280,7 @@ class TestSessionRecorderRecording:
 # -----------------------------------------------------------------------
 # SessionRecorder — queries
 # -----------------------------------------------------------------------
+
 
 class TestSessionRecorderQueries:
     def setup_method(self):
@@ -272,6 +318,7 @@ class TestSessionRecorderQueries:
 # SessionRecorder — export/import
 # -----------------------------------------------------------------------
 
+
 class TestSessionRecorderExport:
     def setup_method(self):
         self.recorder = SessionRecorder(project_id="proj-1")
@@ -305,13 +352,18 @@ class TestSessionRecorderExport:
 # SessionReplayer
 # -----------------------------------------------------------------------
 
+
 class TestSessionReplayer:
     def setup_method(self):
         self.recorder = SessionRecorder(project_id="proj-1")
         self.session = self.recorder.start_session("task-1")
-        self.recorder.record_action(self.session.session_id, "prompt", "Original prompt 1")
+        self.recorder.record_action(
+            self.session.session_id, "prompt", "Original prompt 1"
+        )
         self.recorder.record_action(self.session.session_id, "response", "Response 1")
-        self.recorder.record_action(self.session.session_id, "prompt", "Original prompt 2")
+        self.recorder.record_action(
+            self.session.session_id, "prompt", "Original prompt 2"
+        )
         self.recorder.record_file_change(self.session.session_id, "f.py", "", "code")
         self.recorder.end_session(self.session.session_id)
         self.replayer = SessionReplayer()
@@ -323,7 +375,8 @@ class TestSessionReplayer:
 
     def test_prepare_replay_with_modified_prompt(self):
         replay = self.replayer.prepare_replay(
-            self.session, modified_prompts={0: "Modified prompt 1"},
+            self.session,
+            modified_prompts={0: "Modified prompt 1"},
         )
         assert replay.actions[0].content == "Modified prompt 1"
         assert replay.actions[2].content == "Original prompt 2"
@@ -348,6 +401,7 @@ class TestSessionReplayer:
 # -----------------------------------------------------------------------
 # SessionRecorder — stats
 # -----------------------------------------------------------------------
+
 
 class TestSessionRecorderStats:
     def test_stats_empty(self):

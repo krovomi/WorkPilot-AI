@@ -36,8 +36,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .hermes_ingest import HermesIngestReport, ingest_hermes_skills
-from .replay import ReplayResult, load_episodes
+from .hermes_ingest import HermesIngestReport
+from .replay import (
+    DISCRIMINATOR,
+    ReplayResult,
+    discriminator_grader,
+    load_episodes,
+    replay_ab,
+)
 from .skill_proposer import (
     Evidence,
     ExternalSignal,
@@ -47,6 +53,7 @@ from .skill_proposer import (
     evaluate,
     ledger_path,
     record_outcome,
+    record_signal_for_build,
     write_proposal,
 )
 
@@ -58,6 +65,8 @@ __all__ = [
     "ObserveReport",
     "signals_from_outcome",
     "run_observe",
+    "baseline_instruction",
+    "record_merge_outcome",
     "GOLDEN_RELPATH",
 ]
 
@@ -79,6 +88,9 @@ class BuildOutcome:
     tests_passed: bool | None = None
     detector_clean: bool | None = None
     pr_merged: bool | None = None
+    app_verified: bool | None = None
+    """The verification loop's verdict: True on ``pass``, False on ``fail``,
+    None when it did not run or could not decide."""
     language: str = ""
     workflow: str = ""
 
@@ -93,8 +105,13 @@ class ObserveReport:
     proposals_written: list[Path] = field(default_factory=list)
     rejected: list[tuple[str, RejectionReason]] = field(default_factory=list)
     replay: ReplayResult | None = None
-    hermes: HermesIngestReport | None = None
-    """What hermes-agent had authored since the last look, if it is installed."""
+    hermes: Any = None
+    """One turn of the hermes cycle (`hermes.loop.CycleReport`), if it ran.
+
+    Typed loosely rather than imported: `hermes.loop` reads
+    `learning_loop.hermes_ingest`, so naming `CycleReport` here would close the
+    cycle between the two modules. Both sides import the other lazily, inside
+    the one function that needs it."""
 
     def describe(self) -> str:
         hermes_summary = self.hermes.describe() if self.hermes else ""
@@ -134,6 +151,8 @@ def signals_from_outcome(outcome: BuildOutcome) -> list[ExternalSignal]:
         signals.append(ExternalSignal.DETECTOR_CLEAN)
     if outcome.pr_merged:
         signals.append(ExternalSignal.PR_MERGED)
+    if outcome.app_verified:
+        signals.append(ExternalSignal.RUNTIME_VERIFIED)
     return signals
 
 
@@ -144,13 +163,33 @@ def _agents_for(pattern: Any) -> list[str]:
     extractor records. A pattern with no phase is not filed anywhere: a lesson
     attributed to every agent is a lesson attributed to none.
     """
+    # Keyed on `AGENT_PHASES`, which is the set the extractor can actually
+    # emit. Rows were once added here for "review", "research" and "spec" to
+    # match the subagent rosters; nothing writes those phases, so the rows
+    # could never fire and only made the table look more complete than it was.
     phase_agents = {
+        "planning": ["architecture-analyst", "dependency-tracer"],
         "coding": ["code-reviewer", "test-runner"],
         "qa_review": ["qa-acceptance-checker", "test-runner"],
         "qa_fixing": ["test-runner"],
-        "planning": ["spec-explorer"],
     }
     return phase_agents.get(getattr(pattern, "agent_phase", ""), [])
+
+
+def _hermes_cycle(repo_root: Path, *, write: bool):
+    """One turn of the hermes learning cycle, or None. Never raises.
+
+    Imported lazily: `hermes` is an optional capability, and a learning loop
+    that refused to run because an optional package moved would fail the one
+    thing it exists to protect against.
+    """
+    try:
+        from hermes.loop import run_cycle
+
+        return run_cycle(repo_root, surface="build", write=write)
+    except Exception as exc:  # noqa: BLE001 - observation never fails a build
+        logger.warning("hermes cycle unavailable: %s", exc)
+        return None
 
 
 def run_observe(
@@ -174,13 +213,19 @@ def run_observe(
     """
     report = ObserveReport(spec_id=outcome.spec_id)
     try:
-        # Hermes-authored skills, if hermes is installed on this machine. Read
-        # before the early return below, because it does not depend on what
-        # *this* build verified: hermes learned it somewhere WorkPilot was not
-        # watching, and a build with no external signals of its own is not a
-        # reason to ignore that. It arrives as a candidate with no
-        # corroboration and is promoted by nothing — see hermes_ingest.
-        report.hermes = ingest_hermes_skills(repo_root, write=write)
+        # One turn of the hermes cycle, if hermes is installed on this
+        # machine. Run before the early return below, because it does not
+        # depend on what *this* build verified: hermes learned it somewhere
+        # WorkPilot was not watching, and a build with no external signals of
+        # its own is not a reason to ignore that. It arrives as a candidate
+        # with no corroboration and is promoted by nothing — see hermes_ingest.
+        #
+        # Through `hermes.loop` rather than the ingest directly, so the build
+        # log reports an unmet condition (an untrusted checkout, a missing
+        # persona) instead of an empty result that reads like "nothing to
+        # learn". That is the same cycle the Kanban opens, with a different
+        # surface name.
+        report.hermes = _hermes_cycle(repo_root, write=write)
 
         report.signals = signals_from_outcome(outcome)
         report.replay = replay
@@ -211,6 +256,22 @@ def run_observe(
                     if reason is not None:
                         report.rejected.append((pattern.pattern_id, reason))
                     continue
+
+                # The candidate has cleared frequency and corroboration, so it
+                # is now worth measuring. Until this call the replay gate was
+                # written, tested and never reached: `run_observe` was only
+                # ever invoked with `replay=None`, so `RejectionReason.
+                # REPLAY_REGRESSION` could not occur.
+                if replay is None:
+                    measured = _replay_candidate(repo_root, agent_id, pattern)
+                    if measured is not None:
+                        report.replay = measured
+                        measured.apply_to(evidence)
+                        promote, reason, why = evaluate(pattern, evidence)
+                        if not promote:
+                            if reason is not None:
+                                report.rejected.append((pattern.pattern_id, reason))
+                            continue
                 if not write:
                     continue
                 path = write_proposal(
@@ -232,6 +293,27 @@ def run_observe(
     except Exception as exc:  # noqa: BLE001 - observation must not break a build
         logger.warning("observe phase failed, build unaffected: %s", exc)
     return report
+
+
+def record_merge_outcome(repo_root: Path, spec_id: str) -> int:
+    """Credit a build with the one verdict the observe phase cannot see.
+
+    `run_observe` fires when the build ends, and at that moment nobody has
+    merged anything — which is why `ExternalSignal.PR_MERGED` was declared,
+    handled by `signals_from_outcome`, and never once recorded.
+
+    A merge is the most expensive signal in the set and the hardest to fake: a
+    person read the diff and accepted it. Counting it requires no new
+    machinery, only calling this when the merge actually happens.
+
+    Returns the number of ledger entries credited — 0 when the build taught
+    nothing, which is the ordinary case and not an error.
+    """
+    try:
+        return record_signal_for_build(repo_root, spec_id, ExternalSignal.PR_MERGED)
+    except Exception as exc:  # noqa: BLE001 - never propagate into a merge
+        logger.warning("could not record merge outcome for %s: %s", spec_id, exc)
+        return 0
 
 
 def _evidence_for(
@@ -268,6 +350,79 @@ def _evidence_for(
     return evidence
 
 
+def baseline_instruction(agent_id: str) -> str:
+    """The instruction a candidate would be replacing, as the product ships it.
+
+    Every language overlay is folded in rather than the one matching the build
+    that produced the pattern. A skill proposal edits the agent's prompt for
+    every project, so grading it against only the current project's language
+    would let a candidate break the dotnet cases while a Python build measured
+    it clean — and the replay exists to veto exactly that.
+    """
+    try:
+        from agents.subagents.languages import overlays_for
+        from agents.subagents.phases import all_specs
+
+        prompt = ""
+        for roster in all_specs().values():
+            if agent_id in roster:
+                prompt = roster[agent_id].prompt
+                break
+        if not prompt:
+            return ""
+        parts = [prompt]
+        for overlay in overlays_for(
+            ["python", "dotnet", "rust", "typescript", "go", "java"]
+        ):
+            parts.extend(overlay.test_commands)
+            if overlay.notes:
+                parts.append(overlay.notes)
+        return "\n".join(parts)
+    except Exception as exc:  # noqa: BLE001 - a missing baseline skips the replay
+        logger.debug("could not resolve baseline instruction for %s: %s", agent_id, exc)
+        return ""
+
+
+def _replay_candidate(
+    repo_root: Path, agent_id: str, pattern: Any
+) -> ReplayResult | None:
+    """Measure a candidate against the golden corpus, or None when it cannot be.
+
+    Called only once a candidate has already cleared the cheap gates. Running
+    it for every pattern would grade thousands of lessons that occurrence and
+    corroboration counts were going to reject anyway; running it here measures
+    exactly the ones about to become a proposal.
+    """
+    try:
+        episodes = golden_corpus(repo_root, agent_id)
+        if not episodes:
+            return None
+        baseline = baseline_instruction(agent_id)
+        candidate = str(getattr(pattern, "actionable_instruction", "") or "")
+        if not baseline or not candidate:
+            return None
+        result = replay_ab(
+            episodes,
+            agent_id=agent_id,
+            baseline_instruction=baseline,
+            candidate_instruction=candidate,
+            grader=discriminator_grader(),
+        )
+        result.method = DISCRIMINATOR
+        return result
+    except Exception as exc:  # noqa: BLE001 - a failed replay must not fail a build
+        logger.warning("replay skipped for %s: %s", agent_id, exc)
+        return None
+
+
 def golden_corpus(repo_root: Path, agent_id: str = ""):
     """The archived episodes available to grade a candidate against."""
     return load_episodes(repo_root / GOLDEN_RELPATH, agent_id=agent_id)
+
+
+def on_merge(event) -> None:
+    """`core.merge_event` subscriber: credit the merge to the build's ledger."""
+    repo_root = Path(__file__).resolve().parents[3]
+    credited = record_merge_outcome(repo_root, event.spec_name)
+    if credited:
+        print(f"  learning: merge credited to {credited} ledger entrie(s)")

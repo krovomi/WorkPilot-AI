@@ -11,6 +11,7 @@ import { findExecutable, getAugmentedEnv } from "../../env-utils";
 import { getIsolatedGitEnv } from "../../utils/git-isolation";
 import { openTerminalWithCommand } from "../claude-code-handlers";
 import type { GitLabAuthStartResult } from "./types";
+import { getCurrentOS } from "../../platform";
 
 const DEFAULT_GITLAB_URL = "https://gitlab.com";
 
@@ -138,7 +139,7 @@ export function registerInstallGlabCli(): void {
 		async (): Promise<IPCResult<{ command: string }>> => {
 			debugLog("installGitLabCli handler called");
 			try {
-				const platform = process.platform;
+				const platform = getCurrentOS();
 				let command: string;
 
 				if (platform === "darwin") {

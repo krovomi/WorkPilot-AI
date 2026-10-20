@@ -69,9 +69,7 @@ class PostmanCollection:
         parsed_created = None
         if created:
             try:
-                parsed_created = datetime.fromisoformat(
-                    created.replace("Z", "+00:00")
-                )
+                parsed_created = datetime.fromisoformat(created.replace("Z", "+00:00"))
             except (ValueError, TypeError):
                 parsed_created = None
 
@@ -79,9 +77,7 @@ class PostmanCollection:
         parsed_updated = None
         if updated:
             try:
-                parsed_updated = datetime.fromisoformat(
-                    updated.replace("Z", "+00:00")
-                )
+                parsed_updated = datetime.fromisoformat(updated.replace("Z", "+00:00"))
             except (ValueError, TypeError):
                 parsed_updated = None
 
