@@ -2184,11 +2184,12 @@ retirées. `node-pty` est retiré ensuite, l'installation Windows vérifiée par
 
 ### Lot M10 — Casser le cycle `core ⇄ agents`, découper les fonctions géantes (P3)
 
-**En cours.** Première partie : le plus grand cycle d'imports passe de 81 à 26 unités. Les
-utilitaires sortent de `core` vers `foundation/`, `offline_policy/` et `app_detection.py`, et quatre
-imports vers le haut sont retirés. Deuxième partie : la boucle du coder, figée par des tests de
-caractérisation puis découpée (F103), puis la boucle QA (F104) et `create_client` (F105) de la
-même façon ; reste `_build_agent_client`.
+**Fait**, sauf le cycle du moteur d'agents (26 unités, plafonné). Première partie : le plus grand
+cycle d'imports passe de 81 à 26 unités. Les utilitaires sortent de `core` vers `foundation/`,
+`offline_policy/` et `app_detection.py`, et quatre imports vers le haut sont retirés. Deuxième
+partie : les quatre fonctions géantes relevées par l'audit, chacune figée par des tests de
+caractérisation puis découpée : la boucle du coder (F103), la boucle QA (F104), `create_client`
+(F105) et `_build_agent_client` (F106).
 
 #### F101 · `core` était à la fois la boîte à outils et la racine de composition
 
@@ -2301,8 +2302,32 @@ même façon ; reste `_build_agent_client`.
   serveurs qui attendent tous leurs identifiants, serveurs du projet, ordre des hooks, options
   par défaut, environnement du CLI, surcharge du CLI, mode plan, outils refusés, roster et outil
   `Agent`, reprise explicite, variable de reprise consommée une fois, reprise sans transcript).
-- **Reste** : `_build_agent_client` (583 lignes, même fichier), la quatrième fonction géante
-  relevée par l'audit.
+- **Reste** : `_build_agent_client` (F106).
+
+#### F106 · `_build_agent_client` tenait en une fonction de 583 lignes
+
+- **Sévérité** moyenne · **connu** (audit du 17 octobre) · **corrigé par le lot M10** (deuxième partie, la fabrique multi-provider)
+- **Preuve** (avant) : `_build_agent_client` (`core/client.py`) résolvait le provider, la route
+  hors-ligne et l'effort, puis enchaînait onze branches `elif`, une par provider, chacune avec sa
+  copie du même prompt (« celui de l'appelant, sinon le prompt commun et l'addendum du
+  domaine »). Windsurf, Grok, llama.cpp et le repli sur le SDK d'un provider sans adaptateur
+  n'avaient aucun test.
+- **Correction** (choix du mainteneur, comme pour F103) : 38 tests de caractérisation d'abord,
+  verts sur le code d'avant, puis la découpe : la requête résolue dans `_ClientRequest`, dont
+  `prompt()` remplace les onze copies ; un constructeur par provider (`_copilot_client`,
+  `_claude_client`, `_windsurf_client`, `_openai_client`, `_google_client`, `_local_client`,
+  `_compatible_client`, `_pi_client`, `_opencode_client`, `_antigravity_client`,
+  `_degraded_client`), choisi dans la table `_CLIENT_BUILDERS` ; un provider absent de la table
+  se replie sur le SDK comme avant. La fonction passe à 132 lignes, sans changement de
+  comportement.
+- **Garde-fou** : `tests/core/test_build_agent_client_characterization.py` (38 tests : la classe
+  construite et chacun de ses arguments pour chaque provider et alias, l'effort de l'utilisateur
+  sauf choix de l'appelant, l'identifiant Claude pointé réécrit, la route hors-ligne qui
+  l'emporte, le modèle hébergé remplacé sur un serveur local, l'URL d'un provider compatible,
+  la clé manquante refusée, la confiance pi tracée, le prompt de l'appelant, le repli sans
+  sous-agents).
+- **Reste** : rien pour les fonctions géantes. Le cycle du moteur d'agents (F101) demande une
+  interface entre la fabrique et les agents ; il reste plafonné par `MAX_CYCLE = 26`.
 
 ---
 
@@ -2458,7 +2483,7 @@ planchers `pnpm.overrides` relevés (`pnpm-workspace.yaml`), `dompurify` ^3.4.17
 
 Statut des constats de l'audit précédent : F1, F3, F4, F5, F7, F8, F9, F10, F12, F16, F17, F19 **ouverts** ;
 F2, F13 **partiels** ; F6, F11, F14, F18 **aggravés** ; F15 **atténué**. Nouveaux : F20 à F36.
-Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F57 à F62 par M2, F63 à F68 par M3, F69 à F71 par M4, F78 à F84 par M5, F85 à F90 par M6, F91 à F94 par M7, F95 à F100 par M8, F72 à F77 par M9, F101 à F105 par M10 (annexe F).
+Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F57 à F62 par M2, F63 à F68 par M3, F69 à F71 par M4, F78 à F84 par M5, F85 à F90 par M6, F91 à F94 par M7, F95 à F100 par M8, F72 à F77 par M9, F101 à F106 par M10 (annexe F).
 
 ## Annexe C — Ce qui a changé le 15 octobre 2026 (`7ef6fca` → `e3e468f` + PR #454)
 
@@ -2525,7 +2550,7 @@ détaillés ici qu'une fois corrigés ([`SECURITY.md`](../SECURITY.md)).
 | M7 | Contrats d'architecture (`import-linter`, canaux IPC, Sidebar ↔ `product-overview.md`) | **fait** (F91 à F94 ; contrats d'imports en test AST, sans `import-linter`) |
 | M8 | Code mort, `scripts/`, vues sans test | **fait** (F95 à F100 ; vues sans conception ni test marquées « Expérimental » ; `node-pty` retiré ensuite, F75) |
 | M9 | Doc ↔ code, i18n de la palette, jsdom, dépendances | **fait** (F72 à F77) |
-| M10 | Casser le cycle `core ⇄ agents`, découper les fonctions géantes | **en cours** (F101, F102 : cycle de 81 à 26 unités ; F103 à F105 : boucles du coder et de la QA, `create_client` découpés ; reste `_build_agent_client`) |
+| M10 | Casser le cycle `core ⇄ agents`, découper les fonctions géantes | **fait** (F101, F102 : cycle de 81 à 26 unités, plafonné ; F103 à F106 : les quatre fonctions géantes découpées ; reste le cycle du moteur d'agents, qui demande une interface) |
 
 Vérification du lot M1 : `cd apps/frontend && pnpm run typecheck && pnpm test -- release-handlers
 no-renderer-command worktree-open-launchers pr-details-azure-script`.
@@ -2565,3 +2590,7 @@ tests/test_qa_loop_fix_request.py tests/test_qa_dotnet_tests.py -q`.
 Vérification du lot M10 (`create_client`) : `pytest tests/core/test_create_client_characterization.py
 tests/test_client.py tests/test_sdk_options_factories.py tests/test_agent_tool_rights.py
 tests/harness/test_subagent_results.py tests/harness/test_code_search_serving.py -q`.
+
+Vérification du lot M10 (`_build_agent_client`) : `pytest
+tests/core/test_build_agent_client_characterization.py tests/test_agent_client_factory.py
+tests/test_offline_mode.py tests/test_local_model_coercion.py -q`.
