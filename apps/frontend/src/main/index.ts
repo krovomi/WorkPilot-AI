@@ -14,6 +14,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 // Load .env file FIRST before any other imports that might use process.env
 import { config } from "dotenv";
+import { app } from "electron";
 import { devEnvFilePaths } from "./dev-env-files";
 
 // ESM-compatible __dirname
@@ -42,7 +43,6 @@ import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import http from "node:http";
 import { electronApp, is, optimizer } from "@electron-toolkit/utils";
 import {
-	app,
 	BrowserWindow,
 	Menu,
 	MenuItem,
