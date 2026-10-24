@@ -1693,6 +1693,50 @@ un succès affiché est un succès produit ; un échec se voit.
   (le second n'avait pas non plus la redaction, S1) ; le main transmet `WORKPILOT_PACKAGED_APP=1`
   au backend qu'il lance. `tests/test_backend_entrypoints_observability.py`,
   `main/__tests__/sentry-subprocess-env.test.ts`.
+### Lot M4 — Mode hors-ligne strict et mode serveur (P1)
+
+**Fait.** Quatrième lot de l'audit du 17 octobre (annexe F). Règles tenues : S7 de
+[`security.md`](../rules/security.md#s7--hors-ligne-strict) (`airgapStrict` est une barrière) et S5
+(chaque route porte une permission). Chemins relatifs à `apps/backend/`.
+
+#### F69 · libdocs interrogeait Context7 sous `airgapStrict`
+
+- **Sévérité** haute · **nouveau** (audit du 17 oct.) · **corrigé par le lot M4**
+- **Preuve** (avant correction) : `libdocs/preflight.py`, `run_preflight` ne consultait pas
+  `core/offline_policy.py` ; la requête porte le texte de la tâche.
+- **Correction** : `_airgap_policy` lit `airgap_status` (projet, spec, réglages) juste après
+  `is_enabled` ; strict ou politique illisible, le préflight n'envoie rien et persiste une erreur
+  qui nomme la politique (échec fermé).
+- **Garde-fou** : `tests/test_libdocs.py`, `test_airgap_strict_sends_nothing` et
+  `test_an_unreadable_policy_counts_as_strict` (aucun appel au client).
+
+#### F70 · Les routes providers étaient déclarées sur `app`, hors `_mount`
+
+- **Sévérité** haute · **nouveau** · **corrigé par le lot M4**
+- **Preuve** (avant correction) : `provider_api.py` déclarait seize routes par `@app.<verbe>` ;
+  `test_feature_router_authz.py` ne vérifiait que les routeurs montés par `_mount`, si bien qu'en
+  mode serveur ces routes ne portaient aucune permission. `/providers/select` modifie un état
+  global au processus.
+- **Correction** : `providers_router`, monté par `_mount(providers_router, "providers")` (domaine
+  `settings`) avant les routeurs de feature ; `/providers/select` refusé en mode serveur
+  (`deny_in_server_mode`), comme l'écriture des configurations.
+- **Garde-fou** : `tests/backend/test_feature_router_authz.py`,
+  `test_no_route_is_declared_on_the_app_itself` (AST : seule `GET /health` reste sur `app`) et
+  `test_the_provider_router_is_mounted_with_a_permission`.
+
+#### F71 · `/health` détaillait l'état du backend sans authentification
+
+- **Sévérité** basse · **nouveau** · **corrigé par le lot M4**
+- **Preuve** (avant correction) : en mode serveur, la seule route publique renvoyait plus que son
+  verdict.
+- **Correction** : en mode serveur, `health_check` ne renvoie que `{"status": …}` ; le détail reste
+  en mode bureau (127.0.0.1).
+- **Garde-fou** : `tests/backend/test_server_mode_fail_closed.py`, `TestPublicHealth`.
+
+**Reste hors lot** : les autres modules réseau du backend ne consultent pas encore tous
+`airgap_status` ; la racine d'écriture partagée `<tmp>/workpilot` de `security/path_guard.py` ;
+la limite de débit derrière un proxy (`--forwarded-allow-ips` d'uvicorn).
+
 ### Lot M9 — Doc ↔ code, i18n de la palette, jsdom, dépendances (P2)
 
 **Fait.** Neuvième lot de l'audit du 17 octobre (annexe F). Règles tenues : i18n obligatoire
@@ -1975,7 +2019,7 @@ planchers `pnpm.overrides` relevés (`pnpm-workspace.yaml`), `dompurify` ^3.4.17
 
 Statut des constats de l'audit précédent : F1, F3, F4, F5, F7, F8, F9, F10, F12, F16, F17, F19 **ouverts** ;
 F2, F13 **partiels** ; F6, F11, F14, F18 **aggravés** ; F15 **atténué**. Nouveaux : F20 à F36.
-Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F57 à F62 par M2, F63 à F68 par M3, F81 à F84 par M5, F72 à F77 par M9 (annexe F).
+Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F57 à F62 par M2, F63 à F68 par M3, F69 à F71 par M4, F81 à F84 par M5, F72 à F77 par M9 (annexe F).
 
 ## Annexe C — Ce qui a changé le 15 octobre 2026 (`7ef6fca` → `e3e468f` + PR #454)
 
@@ -2036,7 +2080,7 @@ détaillés ici qu'une fois corrigés ([`SECURITY.md`](../SECURITY.md)).
 | M1 | Aucune commande construite depuis le renderer ou un texte externe ; app Windows sans élévation | **fait** (F52 à F56) |
 | M2 | Une CI qui garde : filtres `paths:`, version de Biome, Python 3.12, lockfile Python, image serveur construite et migrée | **fait** (F57 à F62) |
 | M3 | Des features qui ne disent que ce qu'elles font (PR Azure DevOps factice, triage `continuous_ai`, verdict QA .NET, workflows de release jamais déclenchés, Skills Sync, Sentry) | **fait** (F63 à F68) |
-| M4 | Mode hors-ligne strict et mode serveur | à faire |
+| M4 | Mode hors-ligne strict et mode serveur | **fait** (F69 à F71) |
 | M5 | Secrets et environnement des processus enfants | en cours (F81 à F84 : aucun identifiant stocké dans le renderer ; journaux et processus enfants dans la PR #491) |
 | M6 | Frontière renderer → main, avec tests de refus | à faire (après M5) |
 | M7 | Contrats d'architecture (`import-linter`, canaux IPC, Sidebar ↔ `product-overview.md`) | à faire (après M6) |
@@ -2050,6 +2094,9 @@ no-renderer-command worktree-open-launchers pr-details-azure-script`.
 Vérification du lot M2 : `pytest tests/test_ci_triggers.py tests/test_tool_pins.py
 tests/backend/test_alembic_migrations.py` ; `docker build -f deploy/Dockerfile.server .` ; le job
 `server-image` de `ci.yml`.
+
+Vérification du lot M4 : `pytest tests/test_libdocs.py tests/backend/test_feature_router_authz.py
+tests/backend/test_server_mode_fail_closed.py -q`.
 
 Vérification du lot M9 : `pytest tests/test_docs_context.py tests/test_python_floor.py
 tests/test_test_generation_post_build_scope.py -q` et `cd apps/frontend && pnpm test`.
