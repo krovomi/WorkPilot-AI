@@ -52,7 +52,7 @@ import logging
 import re
 from collections import OrderedDict
 from dataclasses import asdict, is_dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -188,7 +188,7 @@ def append_message(
         log_file = conversation_log_path(spec_dir, provider, model)
         entry = {
             "v": SCHEMA_VERSION,
-            "ts": datetime.now(timezone.utc)
+            "ts": datetime.now(UTC)
             .isoformat(timespec="milliseconds")
             .replace("+00:00", "Z"),
             "phase": phase,
@@ -525,7 +525,7 @@ def replace_with_summary(
             log_file.rename(spec_dir / f"{log_file.stem}.{timestamp}.compacted.jsonl")
         summary_entry: dict[str, Any] = {
             "v": SCHEMA_VERSION,
-            "ts": datetime.now(timezone.utc)
+            "ts": datetime.now(UTC)
             .isoformat(timespec="milliseconds")
             .replace("+00:00", "Z"),
             "phase": phase,

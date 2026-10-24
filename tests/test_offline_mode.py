@@ -8,6 +8,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "backend"))
+from datetime import UTC
+
 from core import offline_policy
 from runners import offline_mode_runner as runner
 
@@ -201,7 +203,7 @@ class OfflineModeTests(unittest.TestCase):
             cache.write_text(
                 json.dumps(
                     {
-                        "cachedAt": datetime.now(timezone.utc).isoformat(),
+                        "cachedAt": datetime.now(UTC).isoformat(),
                         "providers": {"anthropic": ["claude"]},
                     }
                 ),

@@ -22,7 +22,7 @@ Example:
 import logging
 import time
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -102,7 +102,7 @@ class UserComment:
 
     def __post_init__(self):
         if not self.timestamp:
-            self.timestamp = datetime.now(timezone.utc).isoformat()
+            self.timestamp = datetime.now(UTC).isoformat()
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -226,7 +226,7 @@ class PairProgrammingPlan:
 
     def __post_init__(self):
         if not self.created_at:
-            self.created_at = datetime.now(timezone.utc).isoformat()
+            self.created_at = datetime.now(UTC).isoformat()
 
     @property
     def total_steps(self) -> int:
@@ -290,7 +290,7 @@ class PairProgrammingSession:
         self._suggestion_counter = 0
         self._event_log: list[dict[str, Any]] = []
 
-        self.started_at = datetime.now(timezone.utc).isoformat()
+        self.started_at = datetime.now(UTC).isoformat()
         self.ended_at: str | None = None
 
         self._log_event("session_started", {"task": task, "mode": self.mode.value})
@@ -655,7 +655,7 @@ class PairProgrammingSession:
         Returns:
             Summary of the session.
         """
-        self.ended_at = datetime.now(timezone.utc).isoformat()
+        self.ended_at = datetime.now(UTC).isoformat()
         self._log_event("session_ended", {})
         return {
             "session_id": self.session_id,
@@ -761,7 +761,7 @@ class PairProgrammingSession:
         self._event_log.append(
             {
                 "event": event_type,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 **data,
             }
         )

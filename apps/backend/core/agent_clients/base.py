@@ -15,6 +15,7 @@ import os
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Iterable, Mapping
 from dataclasses import dataclass, field
+from datetime import UTC
 from enum import Enum
 from typing import Any
 
@@ -103,9 +104,9 @@ def _parse_retry_after(headers: object, cap_seconds: float) -> float | None:
         reset_dt = parsedate_to_datetime(raw)
         if reset_dt is None:
             return None
-        from datetime import datetime, timezone
+        from datetime import datetime
 
-        now = datetime.now(reset_dt.tzinfo or timezone.utc)
+        now = datetime.now(reset_dt.tzinfo or UTC)
         seconds = (reset_dt - now).total_seconds()
         return max(0.0, min(seconds, cap_seconds))
     except (TypeError, ValueError, OverflowError):

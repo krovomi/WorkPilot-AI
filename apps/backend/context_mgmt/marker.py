@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 CONTEXT_ACTION_FILE = "CONTEXT_ACTION.json"
@@ -42,7 +42,7 @@ def write_context_action(
         "action": action,
         "phase": phase,
         "subtaskId": subtask_id,
-        "requestedAt": datetime.now(timezone.utc).isoformat(),
+        "requestedAt": datetime.now(UTC).isoformat(),
     }
     try:
         _path(spec_dir).write_text(json.dumps(payload), encoding="utf-8")

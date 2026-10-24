@@ -514,7 +514,7 @@ apps/frontend/src/
    # "Notes Spécifiques Windows" ci-dessous, il a besoin du même traitement pywin32
    cd apps\backend
    python -m venv .venv
-   .venv\Scripts\python.exe -m pip install -r requirements.txt
+   .venv\Scripts\python.exe -m pip install -r requirements.lock
    cd ..\..
 
    # Frontend
@@ -542,6 +542,12 @@ apps/frontend/src/
 
    pnpm run dev
    ```
+
+   > Versions Python : `requirements.txt` donne des plages ; `apps/backend/requirements.lock` fige
+   > les versions exactes (avec empreintes, toutes plateformes) que la CI teste et que l'image
+   > serveur embarque. `pnpm run install:backend` installe le lock ; à la main :
+   > `pip install -r apps/backend/requirements.lock`. Après avoir modifié une plage :
+   > `pnpm run lock:python`.
 
 4. **Vérifier que le backend répond**
    ```bash

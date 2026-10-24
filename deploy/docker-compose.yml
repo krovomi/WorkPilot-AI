@@ -42,7 +42,8 @@ services:
     volumes:
       - repos:/data/repos
       # SSH deploy key / git credentials for cloning private repos:
-      # - ./git-ssh:/root/.ssh:ro
+      # (the image runs as the unprivileged user `workpilot`)
+      # - ./git-ssh:/home/workpilot/.ssh:ro
     ports:
       - "9000:9000"   # REST API
       - "8765:8765"   # Streaming WebSocket

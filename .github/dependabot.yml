@@ -65,6 +65,23 @@ updates:
         update-types:
           - minor
           - patch
+    # Biome is pinned by the rules (docs/rules/workflow.md), not by the
+    # registry: a routine group bump took it to 2.5.15 while CI and the rules
+    # said 2.5.11. Moving it is a decision — rules, package.json and the
+    # formatted tree change together, by hand.
+    ignore:
+      - dependency-name: "@biomejs/biome"
+
+  # The server image's base (deploy/Dockerfile.server), pinned by digest.
+  - package-ecosystem: docker
+    directory: /deploy
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies
+      - docker
+    commit-message:
+      prefix: "chore(deps)"
 
   # GitHub Actions
   - package-ecosystem: github-actions

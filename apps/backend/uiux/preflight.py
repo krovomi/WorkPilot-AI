@@ -31,7 +31,7 @@ import json
 import logging
 import re
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -85,7 +85,7 @@ class PreflightResult:
             "toolkit": self.toolkit,
             "query": self.query,
             "reasons": self.reasons,
-            "updatedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "updatedAt": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         }
 
 

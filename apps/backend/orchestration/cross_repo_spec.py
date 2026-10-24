@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -81,8 +81,8 @@ class MultiRepoManifest:
 
     def __post_init__(self):
         if not self.created_at:
-            self.created_at = datetime.now(timezone.utc).isoformat()
-        self.updated_at = datetime.now(timezone.utc).isoformat()
+            self.created_at = datetime.now(UTC).isoformat()
+        self.updated_at = datetime.now(UTC).isoformat()
 
     def get_sub_spec(self, repo: str) -> RepoSubSpec | None:
         """Get sub-spec for a repository."""
@@ -99,7 +99,7 @@ class MultiRepoManifest:
             for key, value in kwargs.items():
                 if hasattr(sub, key):
                     setattr(sub, key, value)
-            self.updated_at = datetime.now(timezone.utc).isoformat()
+            self.updated_at = datetime.now(UTC).isoformat()
 
     def get_completed_repos(self) -> list[str]:
         """Get list of repos that have completed successfully."""
@@ -298,7 +298,7 @@ class CrossRepoSpecManager:
 
     def save_manifest(self, manifest: MultiRepoManifest) -> None:
         """Save manifest to disk."""
-        manifest.updated_at = datetime.now(timezone.utc).isoformat()
+        manifest.updated_at = datetime.now(UTC).isoformat()
         manifest_path = self.master_spec_dir / self.MANIFEST_FILE
         with open(manifest_path, "w", encoding="utf-8") as f:
             json.dump(manifest.to_dict(), f, indent=2)

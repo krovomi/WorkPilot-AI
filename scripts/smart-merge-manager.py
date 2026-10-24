@@ -9,13 +9,12 @@ Preserves local modifications during merge/rebase operations by:
 4. Restoring/merging files after the operation
 """
 
-import sys
 import json
 import shutil
 import subprocess
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+import sys
 from datetime import datetime
+from pathlib import Path
 
 __all__ = ["SmartMergeManager"]
 
@@ -38,13 +37,13 @@ class SmartMergeManager:
 
         self.backup_dir.mkdir(parents=True, exist_ok=True)
 
-    def run_git_command(self, *args) -> Tuple[int, str, str]:
+    def run_git_command(self, *args) -> tuple[int, str, str]:
         """Execute git command and return exit code, stdout, stderr."""
         cmd = ["git", "-C", str(self.repo_path)] + list(args)
         result = subprocess.run(cmd, capture_output=True, text=True)
         return result.returncode, result.stdout, result.stderr
 
-    def get_git_status(self) -> Dict:
+    def get_git_status(self) -> dict:
         """Get current git status."""
         code, stdout, stderr = self.run_git_command("status", "--porcelain")
         if code != 0:
@@ -75,14 +74,14 @@ class SmartMergeManager:
 
         return str(backup_path)
 
-    def get_merge_base(self, branch1: str, branch2: str) -> Optional[str]:
+    def get_merge_base(self, branch1: str, branch2: str) -> str | None:
         """Get common ancestor of two branches."""
         code, stdout, stderr = self.run_git_command("merge-base", branch1, branch2)
         if code == 0:
             return stdout.strip()
         return None
 
-    def merge_json_files(self, local_file: Path, remote_file: Path) -> Dict:
+    def merge_json_files(self, local_file: Path, remote_file: Path) -> dict:
         """Intelligently merge JSON files."""
         try:
             local_data = (
@@ -118,7 +117,7 @@ class SmartMergeManager:
 
     def merge_jsonl_files(
         self, base_file: Path, local_file: Path, remote_file: Path
-    ) -> Tuple[List, str]:
+    ) -> tuple[list, str]:
         """Merge JSONL files (line-delimited JSON) by deduplicating entries."""
         try:
             base_lines = set()
@@ -160,7 +159,7 @@ class SmartMergeManager:
         except Exception as e:
             return [], f"error: {e}"
 
-    def prepare_merge(self, target_branch: str) -> Dict:
+    def prepare_merge(self, target_branch: str) -> dict:
         """Prepare for merge/rebase operation."""
         print(f"[Smart Merge] Preparing merge from {target_branch}...")
 
@@ -200,7 +199,7 @@ class SmartMergeManager:
         self.merge_state_file.write_text(json.dumps(merge_state, indent=2))
         return merge_state
 
-    def complete_merge(self, source_branch: Optional[str] = None) -> Dict:
+    def complete_merge(self, source_branch: str | None = None) -> dict:
         """Complete merge/rebase operation and restore/merge files."""
         if not self.merge_state_file.exists():
             print("[Smart Merge] No merge state found, skipping completion.")
@@ -289,7 +288,7 @@ class SmartMergeManager:
             "conflicts": conflicts,
         }
 
-    def show_backup_list(self) -> List[Dict]:
+    def show_backup_list(self) -> list[dict]:
         """List available backups."""
         backups = []
         if self.backup_dir.exists():
@@ -309,7 +308,7 @@ class SmartMergeManager:
                     )
         return backups
 
-    def restore_from_backup(self, backup_name: str) -> Dict:
+    def restore_from_backup(self, backup_name: str) -> dict:
         """Restore .workpilot from a specific backup."""
         backup_path = self.backup_dir / backup_name
         if not backup_path.exists():

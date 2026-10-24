@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -31,7 +31,7 @@ class IntentFeedback:
     detected_confidence: float
     actual_category: IntentCategory  # User correction
     feedback_timestamp: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+        default_factory=lambda: datetime.now(UTC).isoformat()
     )
     user_notes: str = ""
     project_id: str = ""
@@ -72,9 +72,7 @@ class ProjectPatterns:
     common_intents: dict[str, int] = field(default_factory=dict)
     accuracy_by_category: dict[str, float] = field(default_factory=dict)
     common_keywords: dict[str, list[str]] = field(default_factory=dict)
-    last_updated: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    last_updated: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
@@ -310,7 +308,7 @@ class IntentLearner:
                 patterns.accuracy_by_category.get(actual, 0.0) + 1.0
             )
 
-        patterns.last_updated = datetime.now(timezone.utc).isoformat()
+        patterns.last_updated = datetime.now(UTC).isoformat()
 
         # Cache and save
         self._patterns_cache[project_id] = patterns

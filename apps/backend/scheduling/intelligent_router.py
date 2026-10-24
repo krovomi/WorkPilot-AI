@@ -25,7 +25,7 @@ Example:
 import logging
 import statistics
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -133,7 +133,7 @@ class PerformanceRecord:
 
     def __post_init__(self):
         if not self.timestamp:
-            self.timestamp = datetime.now(timezone.utc).isoformat()
+            self.timestamp = datetime.now(UTC).isoformat()
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -154,7 +154,7 @@ class RoutingDecision:
 
     def __post_init__(self):
         if not self.timestamp:
-            self.timestamp = datetime.now(timezone.utc).isoformat()
+            self.timestamp = datetime.now(UTC).isoformat()
         if isinstance(self.strategy, str):
             self.strategy = RoutingStrategy(self.strategy)
 
@@ -202,7 +202,7 @@ class ABTest:
 
     def __post_init__(self):
         if not self.created_at:
-            self.created_at = datetime.now(timezone.utc).isoformat()
+            self.created_at = datetime.now(UTC).isoformat()
         if isinstance(self.status, str):
             self.status = ABTestStatus(self.status)
 
@@ -897,7 +897,7 @@ class IntelligentRouter:
             "quality_score": quality_score,
             "latency_ms": latency_ms,
             "cost": cost,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         if variant.lower() == "a":
             test.results_a.append(result)

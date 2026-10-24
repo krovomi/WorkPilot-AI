@@ -18,7 +18,7 @@ import logging
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -88,7 +88,7 @@ class DetectionFinding:
     description: str = ""
     source: str = ""
     metadata: dict[str, Any] = field(default_factory=dict)
-    detected_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    detected_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     auto_create_task: bool = True
     suggested_action: str = ""
     suggested_tags: list[str] = field(default_factory=list)

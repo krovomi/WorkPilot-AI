@@ -27,8 +27,10 @@ env_url = os.environ.get("WORKPILOT_DATABASE_URL")
 if env_url:
     config.set_main_option("sqlalchemy.url", env_url)
 
+# disable_existing_loggers=False: migrations also run inside a live process
+# (tests, the server's own startup), whose loggers must keep working after.
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata
 

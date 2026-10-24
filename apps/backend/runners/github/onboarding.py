@@ -34,7 +34,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -347,7 +347,7 @@ class OnboardingManager:
             if self.gh_provider:
                 await self.gh_provider.get_repository_info()
                 auth_item.completed = True
-                auth_item.completed_at = datetime.now(timezone.utc)
+                auth_item.completed_at = datetime.now(UTC)
             elif not dry_run:
                 errors.append("No GitHub provider configured")
         except Exception as e:
@@ -368,7 +368,7 @@ class OnboardingManager:
                 permissions = repo_info.get("permissions", {})
                 if permissions.get("push"):
                     perms_item.completed = True
-                    perms_item.completed_at = datetime.now(timezone.utc)
+                    perms_item.completed_at = datetime.now(UTC)
                 else:
                     perms_item.error = "Missing push permission"
                     warnings.append("Write access recommended for full functionality")
@@ -401,7 +401,7 @@ class OnboardingManager:
                         except Exception:
                             pass  # Label might already exist
                     labels_item.completed = True
-                    labels_item.completed_at = datetime.now(timezone.utc)
+                    labels_item.completed_at = datetime.now(UTC)
                     labels_item.description = f"Created/verified {created} labels"
             except Exception as e:
                 labels_item.error = str(e)
@@ -425,7 +425,7 @@ class OnboardingManager:
                 (self.state_dir / "autofix").mkdir(exist_ok=True)
                 (self.state_dir / "audit").mkdir(exist_ok=True)
                 state_item.completed = True
-                state_item.completed_at = datetime.now(timezone.utc)
+                state_item.completed_at = datetime.now(UTC)
             except Exception as e:
                 state_item.error = str(e)
                 errors.append(f"State directory creation failed: {e}")
@@ -448,8 +448,8 @@ class OnboardingManager:
         if success and not dry_run:
             state = self.get_state()
             state.phase = OnboardingPhase.TEST_MODE
-            state.started_at = datetime.now(timezone.utc)
-            state.test_mode_ends_at = datetime.now(timezone.utc) + timedelta(days=7)
+            state.started_at = datetime.now(UTC)
+            state.test_mode_ends_at = datetime.now(UTC) + timedelta(days=7)
             state.enablement_level = EnablementLevel.COMMENT_ONLY
             state.completed_items = [item.id for item in checklist if item.completed]
             self.save_state()
@@ -470,10 +470,7 @@ class OnboardingManager:
         state = self.get_state()
 
         if state.phase == OnboardingPhase.TEST_MODE:
-            if (
-                state.test_mode_ends_at
-                and datetime.now(timezone.utc) < state.test_mode_ends_at
-            ):
+            if state.test_mode_ends_at and datetime.now(UTC) < state.test_mode_ends_at:
                 return True
 
         return state.enablement_level == EnablementLevel.COMMENT_ONLY
@@ -561,7 +558,7 @@ class OnboardingManager:
         if not state.auto_upgrade_enabled:
             return False, "Auto-upgrade disabled"
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Test mode -> Triage
         if state.phase == OnboardingPhase.TEST_MODE:

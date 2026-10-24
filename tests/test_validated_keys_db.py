@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import os
 import sqlite3
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -63,7 +63,7 @@ class TestTtl:
         validated_keys_db.set_validated("a", "k1", True)
 
         # Backdate the row by 5 days directly in SQL.
-        old = (datetime.now(timezone.utc) - timedelta(days=5)).isoformat()
+        old = (datetime.now(UTC) - timedelta(days=5)).isoformat()
         conn = sqlite3.connect(validated_keys_db.DB_PATH)
         conn.execute(
             "UPDATE validated_keys SET validated_at=? WHERE provider='a'", (old,)
@@ -81,7 +81,7 @@ class TestTtl:
         validated_keys_db.set_validated("a", "k2", True)
 
         # Backdate one row.
-        old = (datetime.now(timezone.utc) - timedelta(days=10)).isoformat()
+        old = (datetime.now(UTC) - timedelta(days=10)).isoformat()
         conn = sqlite3.connect(validated_keys_db.DB_PATH)
         conn.execute(
             "UPDATE validated_keys SET validated_at=? WHERE provider='a' "
@@ -130,7 +130,7 @@ class TestMigration:
         )
         conn.execute(
             "INSERT INTO validated_keys VALUES (?, ?, ?, ?)",
-            ("openai", legacy, 1, datetime.now(timezone.utc).isoformat()),
+            ("openai", legacy, 1, datetime.now(UTC).isoformat()),
         )
         conn.commit()
         conn.close()
