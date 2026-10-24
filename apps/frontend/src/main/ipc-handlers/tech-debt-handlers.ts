@@ -16,6 +16,7 @@ import { spawn } from "node:child_process";
 import { app, ipcMain } from "electron";
 import { pythonEnvManager } from "../python-env-manager.js";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
+import { pythonRunnerEnv } from "../utils/python-runner-env";
 
 interface ScanRequest {
 	projectPath: string;
@@ -42,15 +43,16 @@ function resolveBackendPaths(): { backendPath: string; runnerPath: string } {
 	return { backendPath, runnerPath };
 }
 
-function runRunner(args: string[]): Promise<unknown> {
+async function runRunner(args: string[]): Promise<unknown> {
 	const { backendPath, runnerPath } = resolveBackendPaths();
 	const pythonExe = pythonEnvManager.getPythonPath();
 	if (!pythonExe) return Promise.reject(new Error("Python environment not ready"));
 
+	const env = await pythonRunnerEnv(backendPath);
 	return new Promise((resolve, reject) => {
 		const child = spawn(pythonExe, [runnerPath, ...args], {
 			cwd: backendPath,
-			env: { ...process.env, PYTHONPATH: backendPath },
+			env,
 		} as Parameters<typeof spawn>[2]);
 
 		let stdout = "";

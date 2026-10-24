@@ -1781,8 +1781,21 @@ Règles tenues : S1 et S4 de [`security.md`](../rules/security.md#s1--un-secret-
   s'ajoutent.
 - **Garde-fou** : `main/utils/__tests__/child-env.test.ts`.
 
-**Reste** : les runners Python des vues héritent toujours de `process.env` (ils ont besoin des
-identifiants du provider, à construire comme `agent-process.ts`).
+**Suite** (PR « runners Python des vues ») : les runners Python lancés par les vues (dette
+technique, dérive de doc, swarm, auto-réparation, programmation en binôme, revue de PR Azure
+DevOps…) recevaient `{ ...process.env, PYTHONPATH }` : tous les identifiants du main, et aucun
+de ceux que l'utilisateur a configurés dans l'app, si bien qu'une vue réglée sur OpenAI partait
+sur ce que `process.env` contenait. `main/utils/python-runner-env.ts` (`pythonRunnerEnv`) les
+construit comme `agent-process.ts` et `oneshot-llm.ts` : l'env du main sans identifiant, le `.env`
+du backend déchiffré, le jeton du profil Claude ou le profil d'API (aucun des deux quand le
+provider n'est ni Claude ni Copilot), le provider de la page ou le global avec sa clé, le backend
+en tête de `PYTHONPATH`, puis les variables propres à l'appel. Les scripts de connecteur Jira et
+Azure DevOps, sans LLM, reçoivent `envWithoutCredentials` et leurs seuls réglages. Garde-fous :
+`main/utils/__tests__/python-runner-env.test.ts` et
+`main/ipc-handlers/__tests__/runner-env-inheritance.test.ts`, qui refuse tout `...process.env`
+dans un handler IPC hors des deux qui installent la CLI de l'utilisateur. Les runners de forge
+(`getRunnerEnv`, GitHub et GitLab) gardent leur base héritée : le jeton GitLab y arrive encore
+par l'environnement.
 
 ### Lot M5 (suite) — Aucun identifiant stocké dans le renderer (P0)
 
@@ -2410,7 +2423,7 @@ détaillés ici qu'une fois corrigés ([`SECURITY.md`](../SECURITY.md)).
 | M2 | Une CI qui garde : filtres `paths:`, version de Biome, Python 3.12, lockfile Python, image serveur construite et migrée | **fait** (F57 à F62) |
 | M3 | Des features qui ne disent que ce qu'elles font (PR Azure DevOps factice, triage `continuous_ai`, verdict QA .NET, workflows de release jamais déclenchés, Skills Sync, Sentry) | **fait** (F63 à F68) |
 | M4 | Mode hors-ligne strict et mode serveur | **fait** (F69 à F71) |
-| M5 | Secrets et environnement des processus enfants | **fait** (F78 à F84 : journaux et processus enfants, aucun identifiant stocké dans le renderer ; reste l'environnement des runners Python des vues) |
+| M5 | Secrets et environnement des processus enfants | **fait** (F78 à F84 : journaux et processus enfants, aucun identifiant stocké dans le renderer, environnement construit pour les runners Python des vues ; reste la base héritée des runners de forge) |
 | M6 | Frontière renderer → main, avec tests de refus | **fait** (F85 à F90 ; reste `senderFrame` et les chemins d'outils des réglages) |
 | M7 | Contrats d'architecture (`import-linter`, canaux IPC, Sidebar ↔ `product-overview.md`) | **fait** (F91 à F94 ; contrats d'imports en test AST, sans `import-linter`) |
 | M8 | Code mort, `scripts/`, vues sans test | **fait** (F95 à F100 ; vues sans conception ni test marquées « Expérimental » ; `node-pty` attend un essai sous Windows) |

@@ -119,8 +119,9 @@ l'UI n'existe pas.
   détail dans son [`SECURITY.md`](../../apps/frontend/src/main/claude-code-settings/SECURITY.md)).
   Un secret ne va qu'au processus qui en a besoin : un processus qui exécute le code d'un autre
   (serveur de dev de l'émulateur, commande mobile, Ollama) reçoit `envWithoutCredentials`
-  (`main/utils/child-env.ts`). L'app packagée ne lit aucun `.env-files/.env`, et jamais celui du
-  dossier d'où elle est lancée (`main/dev-env-files.ts`).
+  (`main/utils/child-env.ts`) ; un runner Python lancé par une vue reçoit `pythonRunnerEnv`
+  (`main/utils/python-runner-env.ts`), jamais `...process.env`. L'app packagée ne lit aucun
+  `.env-files/.env`, et jamais celui du dossier d'où elle est lancée (`main/dev-env-files.ts`).
 
 ## S5 — Mode serveur : authentification, autorisation, tenant
 

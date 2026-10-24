@@ -18,6 +18,7 @@ import { ipcMain } from "electron";
 import type { ContinuousAIConfig } from "../../shared/types/continuous-ai";
 import { appLog } from "../app-logger";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
+import { pythonRunnerEnv } from "../utils/python-runner-env";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -141,13 +142,7 @@ export function registerContinuousAIHandlers(
 						JSON.stringify(config),
 					],
 					{
-						env: {
-							...process.env,
-							PYTHONPATH: backendDir,
-							PYTHONUNBUFFERED: "1",
-							PYTHONIOENCODING: "utf-8",
-							PYTHONUTF8: "1",
-						},
+						env: await pythonRunnerEnv(backendDir),
 						stdio: ["pipe", "pipe", "pipe"],
 					},
 				);

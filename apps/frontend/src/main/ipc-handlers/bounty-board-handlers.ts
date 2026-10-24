@@ -164,12 +164,11 @@ export function registerBountyBoardHandlers(): void {
 				args.push("--prompt-overrides", overridesArg);
 			}
 
-			const child_env = {
-				...process.env,
-				...(await buildContestantEnv(req.contestants, {
-					PYTHONPATH: backendPath,
-				})),
-			};
+			// getRunnerEnv already starts from the main env, git variables
+			// isolated: spreading process.env again would bring them back.
+			const child_env = await buildContestantEnv(req.contestants, {
+				PYTHONPATH: backendPath,
+			});
 
 			return await new Promise<StartResponse>((resolve, reject) => {
 				const child = spawn(pythonExe, args, {

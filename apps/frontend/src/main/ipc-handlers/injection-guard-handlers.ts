@@ -20,6 +20,7 @@ import path from "node:path";
 import { app, BrowserWindow, ipcMain } from "electron";
 import { pythonEnvManager } from "../python-env-manager.js";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
+import { pythonRunnerEnv } from "../utils/python-runner-env";
 
 interface RunRequest {
 	projectPath: string;
@@ -110,7 +111,7 @@ export function registerInjectionGuardHandlers(): void {
 				[runnerPath, "--project-path", safeProjectPath],
 				{
 					cwd: backendPath,
-					env: { ...process.env, PYTHONPATH: backendPath },
+					env: await pythonRunnerEnv(backendPath),
 				} as Parameters<typeof spawn>[2],
 			);
 			currentProcess = child;
