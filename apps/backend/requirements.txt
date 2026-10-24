@@ -2,7 +2,7 @@
 # SDK 0.1.25+ required for improved tool use concurrency handling
 # Earlier versions had 400 errors when tool_use blocks had partial failures
 # Utiliser le nom correct du package (tiret) pour l'installation via pip
-claude-agent-sdk>=0.2.165
+claude-agent-sdk>=0.2.168
 python-dotenv>=1.2.4
 
 # Local multilingual Kanban dictation (explicit model download from the UI).
@@ -40,7 +40,7 @@ pydantic>=2.14.1
 rich>=15.0.0
 
 # Error tracking (optional - requires SENTRY_DSN environment variable)
-sentry-sdk>=2.71.0
+sentry-sdk>=2.72.0
 
 # Security-First Features
 # Basic secret scanning is built-in, these enhance capabilities
@@ -51,7 +51,7 @@ bandit>=1.9.4
 # pip-audit for dependency vulnerability scanning (optional but recommended)
 # Install separately: pip install pip-audit
 
-fastapi>=0.143.0
+fastapi>=0.146.0
 uvicorn[standard]>=0.54.0
 slowapi>=0.1.10
 
@@ -83,12 +83,12 @@ msrest>=0.7.1           # Required by azure-devops SDK
 defusedxml>=0.7.1
 
 # Anthropic SDK for Claude API integration
-anthropic>=1.13.0
+anthropic>=1.15.0
 
 # Browser Agent (Feature #20) — headless Chromium for screenshots/E2E.
 # After install, the Chromium binary must be fetched once:
 #   playwright install chromium
-playwright>=1.63.0
+playwright>=1.64.0
 
 # Ajout d'une note pour l'installation automatique de uvicorn si absent
 # Pour garantir l'automatisation, il est recommandé d'ajouter uvicorn dans requirements.txt racine ou de documenter l'installation automatique.
