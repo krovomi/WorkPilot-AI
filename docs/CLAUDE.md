@@ -64,7 +64,7 @@ fichier-ci reste l'autorité sur les règles.
 | Pipeline de spec | [spec-pipeline.md](architecture/spec-pipeline.md) | Reprise de plan, traçabilité `FR-###`, `[NEEDS CLARIFICATION]`, constitutions spec-kit. |
 | Skills | [skills.md](architecture/skills.md) | `skills/` est la source, `scripts/skills_cli.py` le seul écrivain ; frontmatter lu par `parse_frontmatter` ; gate 4 : un corps qui s'adresse à l'agent n'est pas émis. |
 | hermes-agent | [hermes.md](architecture/hermes.md) | Ingestion, tri et adoption des skills d'hermes, et `SOUL.md`. Rien n'accorde la confiance à la place de quelqu'un. |
-| pi (pi.dev) | [pi.md](architecture/pi.md) | Plan par lots, rien de livré : harness qui n'émet rien (pi lit `AGENTS.md` et `.agents/skills/`), provider `PiCliAgentClient` en `--mode json` puis RPC, droits par `--tools` depuis `harnesses.yaml`, confiance (`/trust`) jamais accordée à la place d'une personne, agent du cerveau. |
+| pi (pi.dev) | [pi.md](architecture/pi.md) | Plan par lots, lots 0 à 5 livrés (le 5 en partie) : harness qui n'émet rien (pi lit `AGENTS.md` et `.agents/skills/`), provider `PiCliAgentClient` en `--mode json` puis RPC, droits par `--tools` depuis `harnesses.yaml`, confiance (`/trust`) jamais accordée à la place d'une personne, agent du cerveau. |
 | Cerveau partagé et mémoire | [brain.md](architecture/brain.md) | La seule mémoire : vault Obsidian, `graph.json`, serveur MCP, mémoire des builds, `mem-search`. |
 | Génération de tests | [test-generation.md](architecture/test-generation.md) | Où les tests générés sont écrits (`test_generation/layout.py`) et avec quelles bibliothèques. |
 | libdocs | [libdocs.md](architecture/libdocs.md) | Pages Context7 des bibliothèques sans exemple dans le dépôt, avant le build. |

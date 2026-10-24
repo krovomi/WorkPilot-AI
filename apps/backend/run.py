@@ -51,10 +51,10 @@ _PROJECT_ROOT = _BACKEND_DIR.parent.parent.resolve()
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-# Python version check - must be before any imports using 3.10+ syntax
-if sys.version_info < (3, 10):  # noqa: UP036
+# Python version check - must be before any imports using 3.12+ syntax
+if sys.version_info < (3, 12):  # noqa: UP036
     sys.exit(
-        f"Error: WorkPilot AI requires Python 3.10 or higher.\n"
+        f"Error: WorkPilot AI requires Python 3.12 or higher.\n"
         f"You are running Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}\n"
         f"\n"
         f"Please upgrade Python: https://www.python.org/downloads/"

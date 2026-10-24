@@ -509,7 +509,7 @@ ol.prio,ul.plain{margin:0;padding-left:20px;display:flex;flex-direction:column;g
 <section class="view" id="v-audit" hidden>
   <div class="eyebrow">06 · Constats et plan d'optimisation</div>
   <h1>Ce qu'il faut corriger, supprimer ou fusionner</h1>
-  <p class="lede">Chaque constat cite son fichier et sa ligne. « Vérifié » signifie reproduit en exécutant le code du dépôt ; « lu » signifie établi par lecture et recherche. Le statut compare au commit <code>b46a031</code> et tient compte des lots L1 à L17 et L13, puis des lots M1, M2, M3, M4 et M5 (audit du 17 octobre). Le plan est ordonné par priorité, sans estimation de durée.</p>
+  <p class="lede">Chaque constat cite son fichier et sa ligne. « Vérifié » signifie reproduit en exécutant le code du dépôt ; « lu » signifie établi par lecture et recherche. Le statut compare au commit <code>b46a031</code> et tient compte des lots L1 à L17 et L13, puis des lots M1, M2, M3, M4, M5 et M9 (audit du 17 octobre). Le plan est ordonné par priorité, sans estimation de durée.</p>
   <div class="controls">
     <div class="ctl"><span class="lbl">Sévérité</span><div class="chips" id="f-sev"></div></div>
     <div class="ctl"><span class="lbl">Statut</span><div class="chips" id="f-st"></div></div>
@@ -716,7 +716,7 @@ nodes:[
  {id:"p_compat",x:884,y:268,w:272,h:46,label:"Mistral · DeepSeek · Grok",sub:"CompatibleProviderAgentClient · émulés",f:["F18","F49"]},
  {id:"p_deg",x:884,y:324,w:272,h:46,label:"Meta · AWS · Cursor · Custom",sub:"pas d'adaptateur → SDK Claude"},
  {id:"mcp",x:884,y:400,w:272,h:56,label:"Serveurs MCP",sub:"workpilot · brain · uiux · verify · docintel…",info:"Pour le SDK Claude : serveurs stdio. Pour les autres providers, brain, uiux et verify sont exécutés en processus par <code>tool_executor</code>."},
- {id:"ext",x:884,y:472,w:272,h:46,label:"Agents externes",sub:"Claude Code · Codex · hermes · pi · Gemini…",info:"Lisent <code>.agents/skills</code>, se branchent sur les serveurs MCP. Claude Code charge aussi <code>CLAUDE.md</code> → <code>docs/CLAUDE.md</code> (21 Ko, ramené aux règles par le lot L4) à chaque session.",f:["F23"]}
+ {id:"ext",x:884,y:472,w:272,h:46,label:"Agents externes",sub:"Claude Code · Codex · hermes · pi · Gemini…",info:"Lisent <code>.agents/skills</code>, se branchent sur les serveurs MCP. pi est aussi un provider : <code>core/agent_clients/pi_cli.py</code> (<code>PiCliAgentClient</code>, <code>--mode json</code> puis RPC, droits par <code>--tools</code>, confiance jamais accordée à la place d'une personne). Claude Code charge aussi <code>CLAUDE.md</code> → <code>docs/CLAUDE.md</code> (21 Ko, ramené aux règles par le lot L4) à chaque session.",f:["F23"]}
 ],
 edges:[["ui","main"],["kanban","main"],["kanban","engine"],["engine","main"],["pagellm","main"],["main","run"],["main","specrun"],["main","runners"],["main","api"],["run","preflight"],["run","wf"],["wf","verifyb"],["verifyb","factory"],["specrun","factory"],["runners","factory"],["api","factory"],["wf","factory"],["factory","roster","read"],["factory","prompts","read"],["wf","skills","read"],["factory","hooks"],["wf","uiux"],["factory","uiux","read"],["factory","p_claude"],["factory","p_copilot"],["factory","p_api"],["factory","p_local"],["factory","p_compat"],["factory","p_deg"],["factory","mcp"],["mcp","brain"],["factory","brain","read"],["factory","ll","read"],["ext","mcp"]]};
 
@@ -1516,6 +1516,30 @@ const FINDINGS=[
   c:"<b>Corrigé par le lot M5</b>. Serveurs de dev de l'émulateur, commandes mobiles et Ollama reçoivent un environnement sans identifiants (<code>envWithoutCredentials</code>).",
   p:"apps/frontend/src/main/utils/child-env.ts · app-emulator-service.ts · mobile-service.ts · services/ollama-portable.ts",
   r:"Fait. Les runners Python des vues restent à construire.",g:"Un secret ne va qu'au processus qui en a besoin.",k:"L'émulateur d'app, les sessions mobiles, Ollama portable."},
+ {id:"F72",sev:"basse",cat:"doc",st:"résolu",v:"vérifié",t:"La documentation disait autre chose que le code",
+  c:"Relevé par l'audit du 17 octobre, <b>corrigé par le lot M9</b>. Statut de pi, version de pnpm, liens vers <code>CONTRIBUTING.md</code>, ancres des pages providers, CLA sans document ni bot (l'exigence reste, la procédure le dit), <code>core/workspace.py</code> reporté à M10. Le test des liens balaie désormais toute la doc et les trois README.",
+  p:"docs/CLAUDE.md · README.md · docs/CONTRIBUTING.md · docs/windows-development.md · docs/providers/ · tests/test_docs_context.py",
+  r:"Fait.",g:"Ce que la doc annonce, le code le fait.",k:"Toute la documentation de navigation."},
+ {id:"F73",sev:"moy",cat:"i18n",st:"résolu",v:"vérifié",t:"La palette de commandes était en anglais dur",
+  c:"<b>Corrigé par le lot M9</b>. 32 commandes, catégories, placeholder, pied et compteur passent par <code>common:commandPalette</code> en anglais et en français ; la recherche porte sur le libellé traduit.",
+  p:"renderer/components/CommandPalette.tsx · shared/i18n/locales/{en,fr}/common.json · components/__tests__/CommandPalette.i18n.test.tsx",
+  r:"Fait.",g:"L'app parle la langue de l'utilisateur.",k:"Ctrl+K, recherche floue, raccourcis."},
+ {id:"F74",sev:"basse",cat:"qualité",st:"résolu",v:"vérifié",t:"Chaque fichier de test Vitest construisait un DOM",
+  c:"<b>Corrigé par le lot M9</b>. Deux projets Vitest : jsdom pour les <code>.tsx</code>, node pour les <code>.ts</code> ; 19 fichiers le demandent explicitement. 243 s → 169 s en local.",
+  p:"apps/frontend/vitest.config.ts",
+  r:"Fait.",g:"Une suite plus rapide, donc lancée plus souvent.",k:"Tous les tests existants, même nombre."},
+ {id:"F75",sev:"basse",cat:"qualité",st:"résolu",v:"vérifié",t:"Dépendances déclarées sans usage, et une utilisée sans déclaration",
+  c:"<b>Corrigé par le lot M9</b>. Retirés : <code>@radix-ui/react-scroll-area</code>, <code>@xterm/addon-webgl</code>, trois <code>@types</code> redondants ; <code>@vitest/coverage-v8</code> déclaré. <code>node-pty</code> reste, reconstruit par <code>postinstall.cjs</code> : lot M8.",
+  p:"apps/frontend/package.json · pnpm-lock.yaml",
+  r:"Fait, sauf node-pty (M8).",g:"Moins de surface d'approvisionnement.",k:"Terminaux (@lydell/node-pty), couverture."},
+ {id:"F76",sev:"moy",cat:"fiabilité",st:"résolu",v:"vérifié",t:"Le détecteur acceptait un Python que le backend ne peut pas importer",
+  c:"<b>Corrigé par le lot M9</b>. Un seul plancher, <code>MINIMUM_PYTHON_VERSION = \"3.12.0\"</code>, lu par les cinq vérifications Electron ; <code>run.py</code> et <code>spec_runner.py</code> refusent sous 3.12, comme la doc.",
+  p:"shared/constants/python.ts · main/python-detector.ts · main/cli-tool-manager.ts · apps/backend/run.py · tests/test_python_floor.py",
+  r:"Fait.",g:"Un Python trop vieux est refusé avant de casser à l'import.",k:"Détection du Python système, Homebrew, embarqué."},
+ {id:"F77",sev:"moy",cat:"sécurité",st:"résolu",v:"vérifié",t:"La génération de tests post-build comparait des chemins par préfixe",
+  c:"<b>Corrigé par le lot M9</b>. Un fichier est gardé si son chemin résolu est sous le projet (<code>os.path.commonpath</code>), plus seulement s'il en partage le préfixe ; un fichier de test se juge sur son chemin relatif au projet.",
+  p:"apps/backend/test_generation/api.py (_is_within) · tests/test_test_generation_post_build_scope.py",
+  r:"Fait.",g:"Un chemin reste dans son projet.",k:"La génération de tests après un build."},
  {id:"F81",sev:"haute",cat:"sécurité",st:"résolu",v:"vérifié",t:"Les clés des réglages de l'app arrivaient en clair dans le renderer",
   c:"<b>Corrigé par le lot M5</b>. <code>SETTINGS_GET</code> rendait les réglages déchiffrés. Désormais chaque clé définie se lit <code>MASKED_SECRET</code>, le masque qui revient garde la valeur stockée, et la clé du provider personnalisé tombe si son URL change ; la découverte de ses modèles se fait dans le main.",
   p:"main/settings-secrets.ts · main/utils/masked-secret.ts · main/ipc-handlers/settings-handlers.ts",
@@ -1537,6 +1561,7 @@ const PLAN=[
  ["P1","Secrets et processus enfants (audit du 17 oct.)","Fait (lot M5) : journaux masqués dans tous les runners, .env de dev jamais lu par l'app packagée, environnement sans identifiants pour le code d'un autre ; restent les runners Python des vues","F78, F79, F80","Un secret ne va qu'au processus qui en a besoin"],
  ["P1","Features honnêtes (audit du 17 oct.)","Fait (lot M3) : plus de PR Azure DevOps inventée, triage continuous_ai réparé, verdict dotnet test pris en compte, workflows d'après-release déclenchés, Skills Sync qui prévient, Sentry branché","F63, F64, F65, F66, F67, F68","Un succès affiché est un succès produit"],
  ["P1","Hors-ligne strict et mode serveur (audit du 17 oct.)","Fait (lot M4) : libdocs derrière airgapStrict, routes providers montées avec permission, /health sans détail en mode serveur","F69, F70, F71","Rien ne sort en hors-ligne strict, aucune route sans permission"],
+ ["P2","Doc ↔ code, i18n, tests (audit du 17 oct.)","Fait (lot M9) : doc alignée et liens vérifiés partout, palette traduite, jsdom à la demande, dépendances nettoyées, plancher Python 3.12, chemins de la génération post-build","F72, F73, F74, F75, F76, F77","Ce que la doc annonce, le code le fait"],
  ["P0","Commandes et shell (audit du 17 oct.)","Fait (lot M1) : release sans shell, canal de commande libre retiré, ouverture IDE/terminal rattachée à un projet, script Azure DevOps statique, app Windows sans élévation","F52, F53, F54, F55, F56","Aucun texte externe ne devient une commande"],
  ["P1","Une CI qui garde (audit du 17 oct.)","Fait (lot M2) : déclencheurs sans liste blanche, une version de Biome, Python 3.12 testé, lockfile Python, image serveur construite et migrée en CI, ruff sur scripts/","F57, F58, F59, F60, F61, F62","Un contrôle qui tourne sur ce qu'on livre"],
  ['P5','Types de tâche Kanban (feuille de route, vue 09)','Lots 0 à 3 livrés (#460, #461, #462, lot 3) : type comme donnée, un workflow par type, BMAD par impl + fallback, RUN sûr. Restent les lots 4 à 6 : rosters par type, origine → type, mesure','F50, F51','Moins de jetons par bug, tickets RUN traitables, BMAD à la demande'],
@@ -1674,6 +1699,7 @@ const PRS=[
  ["M1 · #483","Aucune commande venue du renderer","Release gh sans shell, canal de commande libre retiré, IDE et terminal ouverts sur un dossier d'un projet connu, script Azure DevOps statique, app Windows sans élévation.","F52 à F56"],
  ["M4 · #489","Hors-ligne strict et mode serveur","libdocs consulte airgapStrict, routes providers montées par _mount, /providers/select refusé en mode serveur, /health réduit à son verdict.","F69 à F71"],
  ["M5 (1/2) · cette PR","Secrets et processus enfants","Redaction dans run.py et les runners, à la création des enregistrements ; .env-files de dev seulement ; envWithoutCredentials pour l'émulateur, le mobile et Ollama.","F78 à F80"],
+ ["M9 · #490","Doc ↔ code, i18n, jsdom, dépendances","Doc et liens alignés, palette en/fr, Vitest node par défaut, 5 dépendances retirées, plancher Python 3.12 unique, génération post-build bornée au projet.","F72 à F77"],
  ["L17 · #316","Self-healing honnête","fix, QA et PR marqués sautés avec leur raison ; incident escaladé plutôt que déclaré réparé.","F48"],
  ["L12 · #320","Gouvernance","hermes-learned hors de [packs] ; la barre de commandes lit le provider sans le consommer.","F12, F13"],
  ["L11 · #322 / #327","Consolidation","Sous-agents dans un seul registre, façade project/stack.py, globs de surface en alias, tests sous tests/ avec une seule configuration pytest, fichiers géants découpés (core/agent_clients/<provider>.py).","F8, F26, F27, F31, F36"],
