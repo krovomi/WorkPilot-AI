@@ -15,7 +15,7 @@ import logging
 import re
 import subprocess
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -136,7 +136,7 @@ class EnvironmentCapturer:
             return EnvironmentCapture(
                 project_name=self.project_dir.name,
                 source="compose_file",
-                captured_at=datetime.now(timezone.utc).isoformat(),
+                captured_at=datetime.now(UTC).isoformat(),
             )
 
         services: list[ServiceCapture] = []
@@ -170,7 +170,7 @@ class EnvironmentCapturer:
             networks=networks,
             volumes=volumes,
             source="compose_file",
-            captured_at=datetime.now(timezone.utc).isoformat(),
+            captured_at=datetime.now(UTC).isoformat(),
         )
 
     def capture_from_running_containers(self, prefix: str = "") -> EnvironmentCapture:
@@ -196,7 +196,7 @@ class EnvironmentCapturer:
                 return EnvironmentCapture(
                     project_name=self.project_dir.name,
                     source="running_containers",
-                    captured_at=datetime.now(timezone.utc).isoformat(),
+                    captured_at=datetime.now(UTC).isoformat(),
                 )
 
             for line in result.stdout.strip().splitlines():
@@ -220,7 +220,7 @@ class EnvironmentCapturer:
             services=services,
             env_vars=env_vars,
             source="running_containers",
-            captured_at=datetime.now(timezone.utc).isoformat(),
+            captured_at=datetime.now(UTC).isoformat(),
         )
 
     def capture_env_files(self, patterns: list[str] | None = None) -> dict[str, str]:

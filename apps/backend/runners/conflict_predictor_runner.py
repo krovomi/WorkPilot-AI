@@ -16,6 +16,8 @@ from typing import Any
 backend_path = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_path))
 
+from datetime import UTC
+
 from services.conflict_predictor_service import get_conflict_predictor_service
 
 
@@ -280,9 +282,9 @@ class ConflictPredictorRunner:
         deprecated since Python 3.12 but the consumers of this string
         expected the naive ISO form.
         """
-        from datetime import datetime, timezone
+        from datetime import datetime
 
-        return datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
+        return datetime.now(UTC).replace(tzinfo=None).isoformat()
 
 
 def main():

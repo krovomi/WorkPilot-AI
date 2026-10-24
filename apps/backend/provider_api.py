@@ -1059,7 +1059,7 @@ async def test_provider_api_key(request: Request, provider: str, payload: dict):
             )
             try:
                 stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=5)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 proc.kill()
                 try:
                     await proc.wait()

@@ -14,7 +14,7 @@ Provides:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
@@ -126,7 +126,7 @@ class MockGitHubClient:
         self.call_log.append(
             {
                 "method": method,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 **kwargs,
             }
         )
@@ -183,7 +183,7 @@ class MockGitHubClient:
             "state": state,
             "author": {"login": author},
             "labels": [{"name": label} for label in (labels or [])],
-            "createdAt": created_at or datetime.now(timezone.utc).isoformat(),
+            "createdAt": created_at or datetime.now(UTC).isoformat(),
         }
 
     def set_api_response(self, endpoint: str, response: Any) -> None:

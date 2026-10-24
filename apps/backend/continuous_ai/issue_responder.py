@@ -305,7 +305,7 @@ class IssueResponder:
                     _, stderr = await asyncio.wait_for(
                         process.communicate(), timeout=15
                     )
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     process.kill()
                     try:
                         await process.wait()
@@ -318,7 +318,7 @@ class IssueResponder:
                 else:
                     logger.warning("Failed to add label: %s", stderr)
 
-            except (FileNotFoundError, asyncio.TimeoutError):
+            except (TimeoutError, FileNotFoundError):
                 pass
             except Exception as e:
                 logger.error("Error adding label: %s", e)

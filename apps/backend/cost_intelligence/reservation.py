@@ -12,7 +12,7 @@ import logging
 import threading
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 
 logger = logging.getLogger(__name__)
@@ -35,9 +35,7 @@ class BudgetReservation:
     reserved_usd: float = 0.0
     actual_usd: float = 0.0
     status: ReservationStatus = ReservationStatus.ACTIVE
-    created_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     released_at: str | None = None
 
 
@@ -110,7 +108,7 @@ class ReservationManager:
                 )
             res.actual_usd = actual_cost
             res.status = ReservationStatus.RELEASED
-            res.released_at = datetime.now(timezone.utc).isoformat()
+            res.released_at = datetime.now(UTC).isoformat()
             logger.info(
                 "Released reservation %s: estimated=$%.2f actual=$%.2f",
                 reservation_id,

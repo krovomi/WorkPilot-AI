@@ -57,7 +57,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -187,7 +187,7 @@ def record_untrusted(
         directory = Path(spec_dir)
         directory.mkdir(parents=True, exist_ok=True)
         entry = {
-            "at": datetime.now(timezone.utc).isoformat(),
+            "at": datetime.now(UTC).isoformat(),
             "kind": cleaned.kind,
             "source": source,
             "removed": cleaned.removed,

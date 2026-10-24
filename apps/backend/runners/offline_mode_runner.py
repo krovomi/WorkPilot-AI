@@ -30,7 +30,7 @@ import json
 import os
 import sys
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -164,7 +164,7 @@ def _cache_path(project_path: Path) -> Path:
 
 def _scan_models(project_path: Path, force: bool = False) -> dict:
     cache_file = _cache_path(project_path)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if not force and cache_file.exists():
         try:
             cached = json.loads(cache_file.read_text(encoding="utf-8"))
@@ -268,7 +268,7 @@ def _status(project_path: Path) -> dict:
     # pendant que le backend refusait chaque appel cloud.
     airgap = airgap_status(project_path)
     return {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "runtimes": {
             "ollama": ollama,
             "llamaCpp": llama_cpp,

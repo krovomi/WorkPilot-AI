@@ -1,19 +1,40 @@
 # WorkPilot AI — multi-user server image
 # Build from the repo root:  docker build -f deploy/Dockerfile.server .
-FROM python:3.12-slim
+#
+# The base is pinned by digest (Dependabot's docker ecosystem moves it), the
+# Python dependencies by apps/backend/requirements.lock (exact versions and
+# hashes), and CI builds this image and migrates a database with it on every
+# pull request (ci.yml, server-image).
+FROM python:3.12-slim@sha256:a0f57064cbdcd6285fa45f51237ab0b35ea8ebaed06a1f5973e89e19dfb86704
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends git curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
+# The server clones and builds other people's repositories: it does not need
+# root for that, and should not have it.
+RUN useradd --create-home --uid 10001 workpilot \
+    && mkdir -p /data/repos /app/data \
+    && chown workpilot:workpilot /data/repos /app/data
+
 WORKDIR /app
 
-COPY apps/backend/requirements.txt /app/apps/backend/requirements.txt
-RUN pip install --no-cache-dir -r /app/apps/backend/requirements.txt
+COPY apps/backend/requirements.lock /app/apps/backend/requirements.lock
+RUN pip install --no-cache-dir --require-hashes -r /app/apps/backend/requirements.lock
 
 COPY apps/backend /app/apps/backend
-COPY configured_providers.json /app/configured_providers.json
+# Read from the repository root by the backend (`Path(__file__).parents[3]`):
+# the provider registry, the declarative workflows, the harness catalogue,
+# the skills and their emitted output, and SOUL.md.
+COPY config /app/config
+COPY workflows /app/workflows
+COPY capabilities /app/capabilities
+COPY skills /app/skills
+COPY .agents /app/.agents
+COPY SOUL.md /app/SOUL.md
+COPY --chmod=755 deploy/server-entrypoint.sh /usr/local/bin/workpilot-server
 
+USER workpilot
 WORKDIR /app/apps/backend
 
 # Git identity for server-side merges/commits (override via env)
@@ -22,5 +43,4 @@ RUN git config --global user.name "WorkPilot Server" \
 
 EXPOSE 9000 8765
 
-# Migrations first, then API + streaming WS side by side.
-CMD ["sh", "-c", "alembic -c server/db/alembic.ini upgrade head && python websocket_server.py & exec python -m uvicorn provider_api:app --host 0.0.0.0 --port 9000"]
+CMD ["workpilot-server"]

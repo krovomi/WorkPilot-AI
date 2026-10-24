@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import UTC
 from pathlib import Path
 
 from .layers import MemoryRecord, MemoryRef, TimelineEntry
@@ -364,13 +365,13 @@ class BrainSource:
 
 
 def _mtime_date(path: Path) -> str:
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     try:
         stamp = path.stat().st_mtime
     except OSError:
         return ""
-    return datetime.fromtimestamp(stamp, tz=timezone.utc).date().isoformat()
+    return datetime.fromtimestamp(stamp, tz=UTC).date().isoformat()
 
 
 def default_sources(project_dir: Path) -> list:

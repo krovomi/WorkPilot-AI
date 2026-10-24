@@ -16,7 +16,7 @@ import json
 import logging
 import threading
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -69,7 +69,7 @@ def start_build(
         "project_dir": str(project_dir),
         "model": model,
         "provider": provider,
-        "started_at": datetime.now(timezone.utc).isoformat(),
+        "started_at": datetime.now(UTC).isoformat(),
         "total_input_tokens": 0,
         "total_output_tokens": 0,
         "total_cache_creation_tokens": 0,
@@ -87,7 +87,7 @@ def finish_build(spec_dir: Path, status: str = "complete") -> None:
     if not info:
         return
 
-    info["completed_at"] = datetime.now(timezone.utc).isoformat()
+    info["completed_at"] = datetime.now(UTC).isoformat()
     info["status"] = status
 
     # Persist to analytics DB
@@ -255,7 +255,7 @@ def _append_cost_data(
                 "agent_type": agent_type,
                 "phase": phase,
                 "spec_id": spec_id,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
         )
 
@@ -310,7 +310,7 @@ def _append_token_usage_to_db(
                 if build_info
                 else spec_id,
                 project_path=build_info.get("project_dir") if build_info else None,
-                started_at=datetime.now(timezone.utc),
+                started_at=datetime.now(UTC),
                 status=BuildStatus.CODING,
                 llm_provider=provider,
                 llm_model=model,
@@ -334,7 +334,7 @@ def _append_token_usage_to_db(
             operation_type=phase,
             llm_provider=provider,
             llm_model=model,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
         db.add(token_row)
         db.commit()
@@ -357,7 +357,7 @@ def _write_build_to_analytics_db(info: dict) -> None:
 
         build = db.query(Build).filter(Build.build_id == info["build_id"]).first()
         if build:
-            build.completed_at = datetime.now(timezone.utc)
+            build.completed_at = datetime.now(UTC)
             build.status = (
                 BuildStatus.COMPLETE
                 if info["status"] == "complete"
@@ -365,7 +365,7 @@ def _write_build_to_analytics_db(info: dict) -> None:
             )
             if build.started_at:
                 build.total_duration_seconds = (
-                    datetime.now(timezone.utc).replace(tzinfo=None)
+                    datetime.now(UTC).replace(tzinfo=None)
                     - build.started_at.replace(tzinfo=None)
                 ).total_seconds()
             db.commit()
@@ -436,7 +436,7 @@ def _update_dashboard_snapshot(
         snap["cost_by_model"][model_key] = (
             snap["cost_by_model"].get(model_key) or 0.0
         ) + cost_usd
-        snap["last_updated"] = datetime.now(timezone.utc).isoformat()
+        snap["last_updated"] = datetime.now(UTC).isoformat()
 
         _atomic_write(snap_path, json.dumps(snap, indent=2))
 
@@ -534,7 +534,7 @@ def _append_carbon_ledger(
                 output_tokens,
                 cache_creation_input_tokens,
                 cache_read_input_tokens,
-                datetime.now(timezone.utc).isoformat(),
+                datetime.now(UTC).isoformat(),
             )
         )
         _atomic_write(ledger_path, json.dumps(ledger, indent=2))
@@ -641,7 +641,7 @@ def record_task_status(
                     existing = [completion_seconds]
                 snap["avg_completion_by_complexity"][complexity] = existing
 
-            snap["last_updated"] = datetime.now(timezone.utc).isoformat()
+            snap["last_updated"] = datetime.now(UTC).isoformat()
             _atomic_write(snap_path, json.dumps(snap, indent=2))
     except Exception as exc:
         logger.warning("[usage_tracker] record_task_status failed: %s", exc)
@@ -678,7 +678,7 @@ def record_qa_result(
 
             snap["qa_first_pass_rate"] = snap["_qa_passed"] / snap["_qa_total"] * 100
             snap["qa_avg_score"] = snap["_qa_score_sum"] / snap["_qa_total"]
-            snap["last_updated"] = datetime.now(timezone.utc).isoformat()
+            snap["last_updated"] = datetime.now(UTC).isoformat()
             _atomic_write(snap_path, json.dumps(snap, indent=2))
     except Exception as exc:
         logger.warning("[usage_tracker] record_qa_result failed: %s", exc)
@@ -706,7 +706,7 @@ def record_merge(project_dir: Path, automatic: bool) -> None:
                 snap["merge_auto_count"] += 1
             else:
                 snap["merge_manual_count"] += 1
-            snap["last_updated"] = datetime.now(timezone.utc).isoformat()
+            snap["last_updated"] = datetime.now(UTC).isoformat()
             _atomic_write(snap_path, json.dumps(snap, indent=2))
     except Exception as exc:
         logger.warning("[usage_tracker] record_merge failed: %s", exc)

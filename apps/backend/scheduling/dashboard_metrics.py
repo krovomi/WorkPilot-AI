@@ -20,7 +20,7 @@ import io
 import json
 import logging
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -96,7 +96,7 @@ class TaskRecord:
 
     def __post_init__(self):
         if not self.created_at:
-            self.created_at = datetime.now(timezone.utc).isoformat()
+            self.created_at = datetime.now(UTC).isoformat()
 
     def to_dict(self) -> dict:
         return {
@@ -137,7 +137,7 @@ class QARecord:
 
     def __post_init__(self):
         if not self.timestamp:
-            self.timestamp = datetime.now(timezone.utc).isoformat()
+            self.timestamp = datetime.now(UTC).isoformat()
 
     def to_dict(self) -> dict:
         return {
@@ -174,7 +174,7 @@ class TokenRecord:
 
     def __post_init__(self):
         if not self.timestamp:
-            self.timestamp = datetime.now(timezone.utc).isoformat()
+            self.timestamp = datetime.now(UTC).isoformat()
 
     def to_dict(self) -> dict:
         return {
@@ -208,7 +208,7 @@ class MergeRecord:
 
     def __post_init__(self):
         if not self.timestamp:
-            self.timestamp = datetime.now(timezone.utc).isoformat()
+            self.timestamp = datetime.now(UTC).isoformat()
 
     def to_dict(self) -> dict:
         return {
@@ -258,7 +258,7 @@ class DashboardSnapshot:
 
     def __post_init__(self):
         if not self.generated_at:
-            self.generated_at = datetime.now(timezone.utc).isoformat()
+            self.generated_at = datetime.now(UTC).isoformat()
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -324,7 +324,7 @@ class DashboardMetrics:
                     task_status == TaskStatus.COMPLETED
                     and existing.completed_at is None
                 ):
-                    existing.completed_at = datetime.now(timezone.utc).isoformat()
+                    existing.completed_at = datetime.now(UTC).isoformat()
                 return existing
 
         record = TaskRecord(
@@ -336,7 +336,7 @@ class DashboardMetrics:
             completion_seconds=completion_seconds,
         )
         if task_status == TaskStatus.COMPLETED:
-            record.completed_at = datetime.now(timezone.utc).isoformat()
+            record.completed_at = datetime.now(UTC).isoformat()
         self._tasks.append(record)
         return record
 

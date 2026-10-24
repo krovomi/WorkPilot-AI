@@ -27,6 +27,7 @@
 		"package:win": "cd apps/frontend && pnpm run package:win",
 		"package:linux": "cd apps/frontend && pnpm run package:linux",
 		"validate:npm-scripts": "node scripts/validate-npm-scripts.js",
+		"lock:python": "cd apps/backend && uv pip compile requirements.txt --universal --python-version 3.12 --generate-hashes -o requirements.lock",
 		"skills:build": "python3 scripts/skills_cli.py build",
 		"skills:check": "python3 scripts/skills_cli.py build --check",
 		"skills:list": "python3 scripts/skills_cli.py list",

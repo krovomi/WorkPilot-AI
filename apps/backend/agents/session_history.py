@@ -20,7 +20,7 @@ import json
 import logging
 import time
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -85,7 +85,7 @@ class SessionAction:
 
     def __post_init__(self):
         if not self.timestamp:
-            self.timestamp = datetime.now(timezone.utc).isoformat()
+            self.timestamp = datetime.now(UTC).isoformat()
 
     def to_dict(self) -> dict:
         data = asdict(self)
@@ -122,7 +122,7 @@ class FileChange:
 
     def __post_init__(self):
         if not self.timestamp:
-            self.timestamp = datetime.now(timezone.utc).isoformat()
+            self.timestamp = datetime.now(UTC).isoformat()
 
     @property
     def diff_summary(self) -> str:
@@ -190,7 +190,7 @@ class AgentSession:
 
     def __post_init__(self):
         if not self.started_at:
-            self.started_at = datetime.now(timezone.utc).isoformat()
+            self.started_at = datetime.now(UTC).isoformat()
 
     @property
     def duration_seconds(self) -> float:
@@ -433,7 +433,7 @@ class SessionRecorder:
             if status in [s.value for s in SessionStatus]
             else SessionStatus.COMPLETED
         )
-        session.ended_at = datetime.now(timezone.utc).isoformat()
+        session.ended_at = datetime.now(UTC).isoformat()
         logger.info("Ended session %s with status %s", session_id, status)
         return session
 

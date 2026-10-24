@@ -7,7 +7,7 @@ Feature 4.3 — Intégration Slack / Microsoft Teams.
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -68,7 +68,7 @@ class NotificationEvent:
     task_id: str = ""
     metadata: dict[str, Any] = field(default_factory=dict)
     channels: list[NotificationChannel] = field(default_factory=list)
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to a dictionary."""
@@ -206,7 +206,7 @@ class NotificationResult:
     event_type: EventType
     status_code: int = 0
     error: str | None = None
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to a dictionary."""

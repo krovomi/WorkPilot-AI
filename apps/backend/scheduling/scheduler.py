@@ -25,7 +25,7 @@ import time
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from typing import Any
 
@@ -196,7 +196,7 @@ class CronExpression:
             The next matching datetime (minute precision).
         """
         if after is None:
-            after = datetime.now(timezone.utc)
+            after = datetime.now(UTC)
 
         # Start from the next minute
         candidate = after.replace(second=0, microsecond=0) + timedelta(minutes=1)
@@ -275,7 +275,7 @@ class ScheduledTask:
     status: TaskStatus = TaskStatus.PENDING
     last_run: datetime | None = None
     next_run: datetime | None = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     chain_after: str | None = None
     tags: list[str] = field(default_factory=list)
 
@@ -295,7 +295,7 @@ class ScheduledTask:
                     "Invalid cron '%s' for task '%s': %s", self.cron, self.task_id, e
                 )
                 self.next_run = None
-        elif self.run_at and self.run_at > datetime.now(timezone.utc):
+        elif self.run_at and self.run_at > datetime.now(UTC):
             self.next_run = self.run_at
 
     @property
@@ -313,13 +313,13 @@ class ScheduledTask:
             return False
         if self.next_run is None:
             return False
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         return now >= self.next_run
 
     def mark_running(self) -> None:
         """Mark the task as currently running."""
         self.status = TaskStatus.RUNNING
-        self.last_run = datetime.now(timezone.utc)
+        self.last_run = datetime.now(UTC)
 
     def mark_completed(self) -> None:
         """Mark the task as completed and schedule next run if recurring."""
@@ -340,7 +340,7 @@ class ScheduledTask:
             self.status = TaskStatus.PENDING
             # Exponential backoff: 2^retry minutes
             backoff = timedelta(minutes=2**self.retry_count)
-            self.next_run = datetime.now(timezone.utc) + backoff
+            self.next_run = datetime.now(UTC) + backoff
             logger.info(
                 "Task '%s' failed (attempt %d/%d), retrying at %s: %s",
                 self.task_id,
@@ -577,7 +577,7 @@ class TaskQueue:
         self._tasks.sort(
             key=lambda t: (
                 t.priority,
-                t.next_run or datetime.max.replace(tzinfo=timezone.utc),
+                t.next_run or datetime.max.replace(tzinfo=UTC),
             )
         )
 
@@ -762,7 +762,7 @@ class TaskScheduler:
                     next_task = self._queue.get(next_id)
                     if next_task:
                         next_task.enabled = True
-                        next_task.next_run = datetime.now(timezone.utc)
+                        next_task.next_run = datetime.now(UTC)
                         logger.info(
                             "Chain '%s': advancing to task '%s'.",
                             chain.chain_id,
@@ -798,7 +798,7 @@ class TaskScheduler:
         result: dict[str, Any] = {
             "task_id": task.task_id,
             "action": task.action,
-            "started_at": datetime.now(timezone.utc).isoformat(),
+            "started_at": datetime.now(UTC).isoformat(),
             "success": False,
         }
 
@@ -816,7 +816,7 @@ class TaskScheduler:
             task.mark_completed()
             result["success"] = True
             result["output"] = output
-            result["completed_at"] = datetime.now(timezone.utc).isoformat()
+            result["completed_at"] = datetime.now(UTC).isoformat()
 
             # Handle chain progression
             self._handle_chain_progression(task.task_id)

@@ -9,7 +9,7 @@ Data structures for intent recognition and analysis.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -87,9 +87,7 @@ class IntentAnalysis:
     primary_intent: Intent
     alternative_intents: list[Intent] = field(default_factory=list)
     task_description: str = ""
-    analyzed_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    analyzed_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     model_used: str = "claude-3-5-sonnet-20241022"
     requires_clarification: bool = False
     clarification_questions: list[str] = field(default_factory=list)

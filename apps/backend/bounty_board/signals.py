@@ -312,7 +312,7 @@ async def run_tests(
         stdout, stderr = await asyncio.wait_for(
             process.communicate(), timeout=timeout_s
         )
-    except (TimeoutError, asyncio.TimeoutError):
+    except TimeoutError:
         _terminate_process_tree(process)
         with contextlib.suppress(Exception):
             await process.wait()

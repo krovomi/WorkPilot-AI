@@ -18,7 +18,7 @@ Example:
 import logging
 import re
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -154,7 +154,7 @@ class ReviewResult:
     total_deletions: int = 0
     summary: str = ""
     potential_regressions: list[str] = field(default_factory=list)
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     @property
     def has_critical_issues(self) -> bool:
