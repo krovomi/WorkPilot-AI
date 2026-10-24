@@ -9,7 +9,7 @@ python-dotenv>=1.2.4
 faster-whisper>=1.2.1
 
 # WebSocket support for streaming development mode
-websockets>=17.1
+websockets>=17.3
 
 # YAML parsing. Imported behind try/except by api_watcher/contract_parser.py,
 # analysis/ci_discovery.py, environment/capturer.py and
@@ -67,7 +67,7 @@ aiohttp>=3.14.5
 h2>=4.4.1  # HTTP/2 support for Windsurf gRPC proxy
 # [asyncio] brings greenlet, without which every async engine (the server
 # database, its Alembic migrations) fails at its first query.
-sqlalchemy[asyncio]>=2.1.1
+sqlalchemy[asyncio]>=2.1.5
 psutil>=7.2.2
 azure-devops>=7.1.0b4  # Azure DevOps SDK for src/connectors/azure_devops
 msrest>=0.7.1           # Required by azure-devops SDK
