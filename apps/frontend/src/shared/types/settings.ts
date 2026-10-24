@@ -400,8 +400,8 @@ export interface AppSettings {
 // WorkPilot AI Source Environment Configuration
 export interface SourceEnvConfig {
 	// Claude Authentication (required for ideation, roadmap generation, etc.)
+	// Whether a token is set; the token itself never reaches the renderer
 	hasClaudeToken: boolean;
-	claudeOAuthToken?: string;
 
 	// Source path info
 	sourcePath?: string;

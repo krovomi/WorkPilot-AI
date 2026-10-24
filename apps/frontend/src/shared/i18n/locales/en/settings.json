@@ -496,6 +496,7 @@
 			"baseUrlRequired": "Base URL is required",
 			"baseUrlInvalid": "Invalid URL format (must be http:// or https://)",
 			"apiKeyRequired": "API Key is required",
+			"apiKeyForNewUrl": "Enter the API key again to use it with this base URL",
 			"apiKeyInvalid": "Invalid API Key format"
 		},
 		"actions": {

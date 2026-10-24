@@ -504,6 +504,7 @@ describe("ProfileEditDialog - Test Connection Feature", () => {
 				"https://api.example.com",
 				"sk-ant-test12345678",
 				expect.any(AbortSignal),
+				mockProfile.id,
 			);
 		});
 	});
@@ -651,6 +652,39 @@ describe("ProfileEditDialog - Test Connection Feature", () => {
 		expect(testConnectionFn).not.toHaveBeenCalled();
 	});
 
+	it("asks for the key again before testing a stored key against another URL", async () => {
+		const testConnectionFn = vi.fn();
+		(useSettingsStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+			updateProfile: vi.fn().mockResolvedValue(true),
+			testConnection: testConnectionFn,
+			profilesLoading: false,
+			profilesError: null,
+			isTestingConnection: false,
+			testConnectionResult: null,
+		});
+
+		render(
+			<ProfileEditDialog
+				open={true}
+				onOpenChange={mockOnOpenChange}
+				profile={mockProfile}
+			/>,
+		);
+
+		const urlInput = await screen.findByDisplayValue(mockProfile.baseUrl);
+		fireEvent.change(urlInput, {
+			target: { value: "https://elsewhere.example.test" },
+		});
+		fireEvent.click(await screen.findByText("Test Connection"));
+
+		await waitFor(() => {
+			expect(
+				screen.getByText("Enter the API key again to use it with this base URL"),
+			).toBeInTheDocument();
+		});
+		expect(testConnectionFn).not.toHaveBeenCalled();
+	});
+
 	it("should use profile.apiKey when testing in edit mode without changing key", async () => {
 		const testConnectionFn = vi.fn();
 		(useSettingsStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
@@ -678,6 +712,7 @@ describe("ProfileEditDialog - Test Connection Feature", () => {
 				"https://api.example.com",
 				"sk-ant-test12345678",
 				expect.any(AbortSignal),
+				mockProfile.id,
 			);
 		});
 	});

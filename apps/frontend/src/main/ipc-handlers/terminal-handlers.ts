@@ -11,6 +11,11 @@ import type {
 } from "../../shared/types";
 import { debugLog } from "../../shared/utils/debug-logger";
 import { createProfileDirectory } from "../claude-profile/profile-utils";
+import {
+	maskClaudeProfile,
+	maskClaudeProfileSettings,
+	unmaskClaudeProfile,
+} from "../claude-profile/renderer-view";
 import { migrateSession } from "../claude-profile/session-utils";
 import { getUsageMonitor } from "../claude-profile/usage-monitor";
 import { getClaudeProfileManager } from "../claude-profile-manager";
@@ -145,7 +150,8 @@ export function registerTerminalHandlers(
 			try {
 				const profileManager = getClaudeProfileManager();
 				const settings = profileManager.getSettings();
-				return { success: true, data: settings };
+				// Which profiles have a token, never the token (S6)
+				return { success: true, data: maskClaudeProfileSettings(settings) };
 			} catch (error) {
 				return {
 					success: false,
@@ -160,9 +166,17 @@ export function registerTerminalHandlers(
 
 	ipcMain.handle(
 		IPC_CHANNELS.CLAUDE_PROFILE_SAVE,
-		async (_, profile: ClaudeProfile): Promise<IPCResult<ClaudeProfile>> => {
+		async (
+			_,
+			received: ClaudeProfile,
+		): Promise<IPCResult<ClaudeProfile>> => {
 			try {
 				const profileManager = getClaudeProfileManager();
+				// The renderer sends back the mask it was handed: keep the stored token
+				const profile = unmaskClaudeProfile(
+					received,
+					received?.id ? profileManager.getProfile(received.id) : undefined,
+				);
 
 				// If this is a new profile without an ID, generate one
 				if (!profile.id) {
@@ -198,7 +212,7 @@ export function registerTerminalHandlers(
 				}
 
 				const savedProfile = profileManager.saveProfile(profile);
-				return { success: true, data: savedProfile };
+				return { success: true, data: maskClaudeProfile(savedProfile) };
 			} catch (error) {
 				return {
 					success: false,
@@ -551,7 +565,7 @@ export function registerTerminalHandlers(
 				const profileManager = getClaudeProfileManager();
 				const bestProfile =
 					profileManager.getBestAvailableProfile(excludeProfileId);
-				return { success: true, data: bestProfile };
+				return { success: true, data: maskClaudeProfile(bestProfile) };
 			} catch (error) {
 				return {
 					success: false,

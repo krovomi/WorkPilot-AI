@@ -25,11 +25,13 @@ export interface ProfileAPI {
 	// Set active profile (null to switch to OAuth)
 	setActiveAPIProfile: (profileId: string | null) => Promise<IPCResult>;
 
-	// Test API profile connection
+	// Test API profile connection. A masked key (the one PROFILES_GET hands out)
+	// needs profileId: main uses that profile's stored key, for its own URL only.
 	testConnection: (
 		baseUrl: string,
 		apiKey: string,
 		signal?: AbortSignal,
+		profileId?: string,
 	) => Promise<IPCResult<TestConnectionResult>>;
 
 	// Discover available models from API
@@ -37,6 +39,7 @@ export interface ProfileAPI {
 		baseUrl: string,
 		apiKey: string,
 		signal?: AbortSignal,
+		profileId?: string,
 	) => Promise<IPCResult<DiscoverModelsResult>>;
 }
 
@@ -69,6 +72,7 @@ export const createProfileAPI = (): ProfileAPI => ({
 		baseUrl: string,
 		apiKey: string,
 		signal?: AbortSignal,
+		profileId?: string,
 	): Promise<IPCResult<TestConnectionResult>> => {
 		const requestId = ++testConnectionRequestId;
 
@@ -109,6 +113,7 @@ export const createProfileAPI = (): ProfileAPI => ({
 			baseUrl,
 			apiKey,
 			requestId,
+			profileId,
 		);
 	},
 
@@ -117,6 +122,7 @@ export const createProfileAPI = (): ProfileAPI => ({
 		baseUrl: string,
 		apiKey: string,
 		signal?: AbortSignal,
+		profileId?: string,
 	): Promise<IPCResult<DiscoverModelsResult>> => {
 		const requestId = ++discoverModelsRequestId;
 
@@ -152,8 +158,12 @@ export const createProfileAPI = (): ProfileAPI => ({
 			);
 		}
 
-		const channel = "profiles:discover-models";
-		const promise = ipcRenderer.invoke(channel, baseUrl, apiKey, requestId);
-		return promise;
+		return ipcRenderer.invoke(
+			IPC_CHANNELS.PROFILES_DISCOVER_MODELS,
+			baseUrl,
+			apiKey,
+			requestId,
+			profileId,
+		);
 	},
 });
