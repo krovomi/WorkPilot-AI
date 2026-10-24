@@ -138,6 +138,9 @@ l'UI n'existe pas.
   `invoke(channel, …)` : un canal = une constante (`shared/constants/ipc*.ts`) + un handler + un type.
 - Main : chaque handler IPC revalide ses arguments (type, chemin résolu et contenu, URL) ; un
   handler sensible vérifie l'expéditeur (`event.senderFrame`).
+- Le renderer ne fournit jamais une commande à exécuter ni un exécutable à lancer : le main
+  construit la commande, lit un lanceur personnalisé dans les réglages et rattache un dossier
+  reçu à un projet connu (`resolveOpenableDir`).
 - URL externe : `openExternalUrl` (`open-external.ts`, protocoles en liste fermée), jamais
   `shell.openExternal` sur une chaîne reçue.
 - CSP (`src/renderer/index.html`) : pas d'`unsafe-eval`, pas de nouvel hôte sans raison écrite.

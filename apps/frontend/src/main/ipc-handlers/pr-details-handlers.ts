@@ -5,10 +5,11 @@
  * Routes to appropriate handlers based on URL detection
  */
 
-import type { ChildProcess } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
 import type { IPCResult, PRDetailsResult, Project } from "../../shared/types";
+import { readProjectEnv } from "../project-env-file";
 import { getGitHubConfig, githubFetch } from "./github/utils";
 import { findTaskAndProject } from "./task/shared";
 
@@ -248,10 +249,7 @@ async function getAzureDevOpsPRDetails(
 			};
 		}
 
-		// Parse Azure DevOps URL to extract organization and project
-		const azureDevOpsUrlRegex =
-			/https:\/\/dev\.azure\.com\/([^/]+)\/([^/]+)\/_git\/([^/]+)\/pullrequest\/(\d+)/;
-		const urlMatch = azureDevOpsUrlRegex.exec(prUrl);
+		const urlMatch = AZURE_DEVOPS_PR_URL_REGEX.exec(prUrl);
 		if (!urlMatch) {
 			return {
 				success: false,
@@ -259,7 +257,7 @@ async function getAzureDevOpsPRDetails(
 			};
 		}
 
-		const [, _organization, _projectName, repository, prNumFromUrl] = urlMatch;
+		const [, , , , prNumFromUrl] = urlMatch;
 
 		// Validate PR number matches URL
 		if (Number.parseInt(prNumFromUrl, 10) !== prNumber) {
@@ -272,8 +270,7 @@ async function getAzureDevOpsPRDetails(
 		// Try to call Azure DevOps Python connector using existing project configuration
 		try {
 			const result = await callAzureDevOpsPythonWithExistingConfig(
-				project.path,
-				repository,
+				project,
 				prNumber,
 				prUrl,
 			);
@@ -408,26 +405,73 @@ function setupPythonProcessHandlers(
 }
 
 /**
- * Call Azure DevOps Python connector using existing project configuration
+ * An Azure DevOps PR URL, whole: `https://dev.azure.com/{org}/{project}/_git/{repo}/pullrequest/{id}`.
+ * The URL is read from task metadata, in a spec folder an agent writes to.
+ */
+export const AZURE_DEVOPS_PR_URL_REGEX =
+	/^https:\/\/dev\.azure\.com\/([^/?#\s]+)\/([^/?#\s]+)\/_git\/([^/?#\s]+)\/pullrequest\/(\d+)\/?$/;
+
+/**
+ * Arguments of the PR details script. Every value reaches Python as an argv
+ * entry: none is ever part of the script's source.
+ */
+export function buildAzureDevOpsPRScriptArgs(
+	prUrl: string,
+	prNumber: number,
+): string[] | null {
+	const match = AZURE_DEVOPS_PR_URL_REGEX.exec(prUrl);
+	if (!match || !Number.isSafeInteger(prNumber) || prNumber <= 0) return null;
+	const [, , projectName, repoName] = match;
+	try {
+		return [
+			"-c",
+			AZURE_DEVOPS_PR_DETAILS_SCRIPT,
+			decodeURIComponent(projectName),
+			decodeURIComponent(repoName),
+			String(prNumber),
+		];
+	} catch {
+		return null; // malformed percent-encoding
+	}
+}
+
+/**
+ * Call the Azure DevOps API for a PR's details. The credentials come from the
+ * project's `.workpilot/.env` through `readProjectEnv` (decrypted in main),
+ * passed in the child's environment; nothing is read from the project folder.
  */
 async function callAzureDevOpsPythonWithExistingConfig(
-	projectPath: string,
-	_repository: string,
+	project: Project,
 	prNumber: number,
 	prUrl: string,
 	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 ): Promise<any> {
+	const args = buildAzureDevOpsPRScriptArgs(prUrl, prNumber);
+	if (!args) {
+		throw new Error("Invalid Azure DevOps PR URL format");
+	}
+	const projectEnv = readProjectEnv(project);
 	return new Promise((resolve, reject) => {
-		// Debug: Check Python executable and project path
-		const { exec } = require("node:child_process");
-		exec(
-			"python --version",
-			(_error: Error | null, _stdout: string, _stderr: string) => {
-				/* intentionally empty */
+		const pythonProcess = spawn("python", args, {
+			cwd: project.path,
+			env: {
+				...process.env,
+				PYTHONIOENCODING: "utf-8",
+				AZURE_DEVOPS_PAT: projectEnv.AZURE_DEVOPS_PAT ?? "",
+				AZURE_DEVOPS_ORG_URL: projectEnv.AZURE_DEVOPS_ORG_URL ?? "",
 			},
-		);
+		});
 
-		const pythonScript = `
+		setupPythonProcessHandlers(pythonProcess, resolve, reject);
+	});
+}
+
+/**
+ * Fetches a PR's details from Azure DevOps and prints them as one JSON line.
+ * argv: project name, repository name, PR number. Environment:
+ * AZURE_DEVOPS_PAT, AZURE_DEVOPS_ORG_URL. A static script: no interpolation.
+ */
+const AZURE_DEVOPS_PR_DETAILS_SCRIPT = String.raw`
 import sys
 import json
 import os
@@ -435,29 +479,11 @@ import urllib.request
 import urllib.error
 import base64
 import ssl
+import urllib.parse
 
 # All debug output goes to stderr so stdout is clean JSON only
 def debug(msg):
     print(msg, file=sys.stderr)
-
-# Load environment variables from .env file
-try:
-    from dotenv import load_dotenv
-    # Try loading .env from project path first, then common locations
-    env_locations = [
-        os.path.join(r'${projectPath.split("\\\\").join("\\\\")}', '.env'),
-        os.path.join(r'${projectPath.split("\\\\").join("\\\\")}', 'apps', 'backend', '.env'),
-    ]
-    for env_path in env_locations:
-        if os.path.exists(env_path):
-            load_dotenv(env_path)
-            debug(f"[OK] Loaded .env from {env_path}")
-            break
-    else:
-        load_dotenv()
-        debug("[OK] Loaded default .env")
-except ImportError:
-    debug("[WARN] python-dotenv not available, using system environment only")
 
 # Get Azure DevOps credentials from environment
 pat = os.getenv('AZURE_DEVOPS_PAT', '')
@@ -474,14 +500,10 @@ if not org_url:
     print(json.dumps({'error': 'AZURE_DEVOPS_ORG_URL not set'}))
     sys.exit(1)
 
-# Extract project and repo from the PR URL
-pr_url = '${prUrl}'
-pr_number = ${prNumber}
-
-# Parse: https://dev.azure.com/{org}/{project}/_git/{repo}/pullrequest/{id}
-url_parts = pr_url.split('/')
-project_name = url_parts[4] if len(url_parts) > 4 else ''
-repo_name = url_parts[6] if len(url_parts) > 6 else ''
+# Project, repository and PR number are arguments, never script source
+project_name = urllib.parse.quote(sys.argv[1], safe='')
+repo_name = urllib.parse.quote(sys.argv[2], safe='')
+pr_number = int(sys.argv[3])
 
 debug(f"Project: {project_name}, Repo: {repo_name}, PR: {pr_number}")
 
@@ -492,10 +514,8 @@ headers = {
     'Content-Type': 'application/json',
 }
 
-# Allow self-signed certs if needed
+# The PAT goes to dev.azure.com only: the certificate is always verified
 ctx = ssl.create_default_context()
-ctx.check_hostname = False
-ctx.verify_mode = ssl.CERT_NONE
 
 import difflib
 
@@ -557,7 +577,6 @@ def compute_diff(old_content, new_content, old_path='a', new_path='b'):
 try:
     base = org_url.rstrip('/')
     api_ver = 'api-version=7.1'
-    import urllib.parse
 
     # 1) Get PR details
     pr_api_url = f"{base}/{project_name}/_apis/git/repositories/{repo_name}/pullrequests/{pr_number}?{api_ver}"
@@ -663,7 +682,7 @@ try:
         debug(f"[OK] Computed diff stats: +{total_additions} -{total_deletions} across {len(files)} files")
 
     # Build combined diff from all file patches
-    combined_diff = '\\n'.join(f.get('patch', '') for f in files if f.get('patch'))
+    combined_diff = '\n'.join(f.get('patch', '') for f in files if f.get('patch'))
 
     # Build the result
     result = {
@@ -709,19 +728,6 @@ except Exception as e:
     print(json.dumps(error_result))
     sys.exit(1)
 `;
-
-		const { spawn } = require("node:child_process");
-		const pythonProcess = spawn("python", ["-c", pythonScript], {
-			cwd: projectPath,
-			env: {
-				...process.env,
-				PYTHONIOENCODING: "utf-8",
-			},
-		});
-
-		setupPythonProcessHandlers(pythonProcess, resolve, reject);
-	});
-}
 
 /**
  * Transform Azure DevOps data to PRDetailsResult format
