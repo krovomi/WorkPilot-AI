@@ -709,7 +709,7 @@ function collectThroughForwarders(
 			known.add(id);
 			forwarders.push(forwarder);
 			const call = new RegExp(
-				`(?<![\\w$.])(?<!function\\s+)${forwarder.name.replace(/\$/g, "\\$")}\\b`,
+				`(?<![\\w$.])(?<!function\\s+)${forwarder.name.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&")}\\b`,
 				"g",
 			);
 			for (const target of forwarder.exported ? sources.keys() : [file]) {
