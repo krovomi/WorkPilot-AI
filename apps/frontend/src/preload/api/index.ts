@@ -38,6 +38,10 @@ import {
 	type ContextMeshAPI,
 	createContextMeshAPI,
 } from "./modules/context-mesh-api";
+import {
+	createLiveCompanionAPI,
+	type LiveCompanionAPI,
+} from "./modules/live-companion-api";
 import { type TeamBotAPI, createTeamBotAPI } from "./modules/team-bot-api";
 import {
 	type ApiExplorerAPI,
@@ -301,6 +305,7 @@ export interface ElectronAPI
 		TeamBotAPI,
 		TimeTravelAPI,
 		ContextMeshAPI,
+		LiveCompanionAPI,
 		EnvSnapshotAPI,
 		OfflineModeAPI,
 		VisualProgrammingAPI,
@@ -446,6 +451,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createTeamBotAPI(),
 		...createTimeTravelAPI(),
 		...createContextMeshAPI(),
+		...createLiveCompanionAPI(),
 		...createEnvSnapshotAPI(),
 		...createOfflineModeAPI(),
 		...createVisualProgrammingAPI(),
@@ -580,6 +586,8 @@ export type { TimeTravelAPI } from "./modules/time-travel-api";
 export { createTimeTravelAPI } from "./modules/time-travel-api";
 export type { ContextMeshAPI } from "./modules/context-mesh-api";
 export { createContextMeshAPI } from "./modules/context-mesh-api";
+export type { LiveCompanionAPI } from "./modules/live-companion-api";
+export { createLiveCompanionAPI } from "./modules/live-companion-api";
 export type { DesignToCodeAPI } from "./modules/design-to-code-api";
 export { createDesignToCodeAPI } from "./modules/design-to-code-api";
 export type { VisualProgrammingAPI } from "./modules/visual-programming-api";

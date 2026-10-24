@@ -255,6 +255,8 @@ export interface SidebarPrefs {
 	itemOrder: Record<string, string[]>;
 	expandedGroups: string[];
 	favoritesExpanded: boolean;
+	// Hides the views EXPERIMENTAL_VIEWS lists (renderer/components/sidebar).
+	hideExperimental?: boolean;
 }
 
 export const DEFAULT_SIDEBAR_PREFS: SidebarPrefs = {
@@ -264,6 +266,7 @@ export const DEFAULT_SIDEBAR_PREFS: SidebarPrefs = {
 	itemOrder: {},
 	expandedGroups: ["workspace"],
 	favoritesExpanded: true,
+	hideExperimental: false,
 };
 
 export type OpenAIAuthMode = "api-key" | "codex-cli";

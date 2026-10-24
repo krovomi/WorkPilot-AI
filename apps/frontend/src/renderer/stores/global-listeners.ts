@@ -19,6 +19,7 @@ import {
 	setupContextAwareSnippetsListeners,
 } from "./context-aware-snippets-store";
 import { setupContextMeshListeners } from "./context-mesh-store";
+import { setupLiveCompanionListeners } from "./live-companion-store";
 import { setupContextUsageListeners } from "./context-usage-store";
 import { setupDocDriftListeners } from "./doc-drift-store";
 import { setupFlakyTestsListeners } from "./flaky-tests-store";
@@ -84,6 +85,7 @@ const SETUPS: ReadonlyArray<readonly [string, ListenerSetup]> = [
 	["ConsensusArbiter", setupConsensusArbiterListeners],
 	["ContextAwareSnippets", setupContextAwareSnippetsListeners],
 	["ContextMesh", setupContextMeshListeners],
+	["LiveCompanion", setupLiveCompanionListeners],
 	// Context-window telemetry of running tasks: the gauge in the task modal
 	// and the mini ring on the card read it whether or not they are mounted.
 	["ContextUsage", setupContextUsageListeners],

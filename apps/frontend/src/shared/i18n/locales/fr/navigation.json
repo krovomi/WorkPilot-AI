@@ -246,5 +246,11 @@
 			"build": "Build",
 			"ideation": "Idéation"
 		}
+	},
+	"experimental": {
+		"badge": "Expérimental",
+		"tooltip": "Ni document de conception ni test pour l'instant : cette vue peut changer ou disparaître.",
+		"hide": "Masquer les vues expérimentales",
+		"show": "Afficher les vues expérimentales ({{count}})"
 	}
 }

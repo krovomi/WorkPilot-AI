@@ -388,6 +388,7 @@ import {
 	useTerminalProfileChange,
 } from "@/hooks";
 import { AddProjectModal } from "./components/AddProjectModal";
+import { AuthFailureModal } from "./components/AuthFailureModal";
 import { AzureDevOpsSetupModal } from "./components/AzureDevOpsSetupModal";
 import { CommandPalette } from "./components/CommandPalette";
 import { GitHubSetupModal } from "./components/GitHubSetupModal";
@@ -401,6 +402,8 @@ import { OnboardingWizard } from "./components/onboarding";
 import { ProjectTabBar } from "./components/ProjectTabBar";
 import { ProviderContextProvider } from "./components/ProviderContext";
 import { PageLlmSelector } from "./components/PageLlmSelector";
+import { RateLimitModal } from "./components/RateLimitModal";
+import { SDKRateLimitModal } from "./components/SDKRateLimitModal";
 import { VersionWarningModal } from "./components/VersionWarningModal";
 import { VoiceControlDialog } from "./components/voice-control";
 import { ViewStateProvider } from "./contexts/ViewStateContext";
@@ -2343,6 +2346,17 @@ export function App() {
 
 					{/* Guided tour overlay (spotlight + step-by-step coachmarks) */}
 					<GuidedTourOverlay />
+
+					{/* Opened by useIpc on a rate limit or a 401, and reopened by
+					    RateLimitIndicator: mounted nowhere until lot M8, so neither
+					    event showed anything. */}
+					<RateLimitModal />
+					<SDKRateLimitModal />
+					<AuthFailureModal
+						onOpenSettings={() =>
+							navigateToSettingsSection({ kind: "app", section: "accounts" })
+						}
+					/>
 
 					{/* Version warning modal - shown once for reauthentication notice */}
 					<VersionWarningModal

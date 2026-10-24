@@ -174,15 +174,10 @@ export function registerLiveCompanionHandlers(
 		);
 	};
 
-	const handleError = (error: string): void => {
-		safeSendToRenderer(getMainWindow, IPC_CHANNELS.LIVE_COMPANION_ERROR, error);
-	};
-
 	liveCompanionService.on("state-changed", handleStateChanged);
 	liveCompanionService.on("suggestion", handleSuggestion);
 	liveCompanionService.on("takeover-proposal", handleTakeoverProposal);
 	liveCompanionService.on("file-change", handleFileChange);
-	liveCompanionService.on("error", handleError);
 
 	// Return cleanup function
 	return (): void => {
@@ -190,6 +185,5 @@ export function registerLiveCompanionHandlers(
 		liveCompanionService.off("suggestion", handleSuggestion);
 		liveCompanionService.off("takeover-proposal", handleTakeoverProposal);
 		liveCompanionService.off("file-change", handleFileChange);
-		liveCompanionService.off("error", handleError);
 	};
 }

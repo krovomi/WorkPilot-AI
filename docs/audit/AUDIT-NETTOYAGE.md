@@ -2060,6 +2060,94 @@ Règles : [`frontend.md`](../rules/frontend.md) (un canal = une constante), [`ba
   doublon).
 - **Reste** (lot M8) : les vues sans fichier de conception ni test.
 
+### Lot M8 — Code mort, `scripts/`, vues sans test (P2)
+
+**Fait.** Le code que rien n'appelle est retiré (≈ 30 k lignes, tests compris, accord du mainteneur
+le 24 octobre), les événements et modales qu'on croyait morts sont câblés, `scripts/` est décrit
+ligne à ligne, et les vues sans conception ni test sont marquées « Expérimental » au lieu d'être
+retirées. `node-pty` reste : son retrait attend un essai d'installation sous Windows.
+
+#### F95 · 17,8 k lignes backend qu'aucun module n'importait
+
+- **Sévérité** moyenne · **nouveau** (le lot L9 en avait retiré 6,7 k ; ceux-ci étaient restés ou
+  revenus) · **corrigé par le lot M8**
+- **Preuve** (avant) : graphe `ast` de `apps/backend` (imports paresseux, `import_module` et
+  `__import__` compris), chemins de runners cherchés dans le TS, le YAML et le JSON, itéré jusqu'à
+  ce que la liste ne bouge plus : `adversarial_qa/`, `database_agent/`, `design_to_code/`, `teams/`,
+  `intent/`, `api/cache_api.py`, la famille de cache de `services/` (`intelligent_context_cache`,
+  `context_cache_integration`, `cache_freshness_system`, `git_cache_invalidation`),
+  `services/test_generation_service.py`, `scheduling/{dashboard_metrics,task_dependency_graph}.py`,
+  `spec/validation_strategy.py`, `agents/migration_agent.py` et son wrapper,
+  `ui/{command_palette,desktop_notifications,keyboard_shortcuts,theme_manager}.py`,
+  `streaming/demo.py`, `runners/github/{example_usage,output_validator}.py`.
+- **Correction** : supprimés, avec les tests qui ne couvraient qu'eux et les passages de doc qui les
+  décrivaient (`docs/providers/`, `migration/README.md`, `streaming/README.md`,
+  `kanban-task-types.md`).
+- **Gardés** : les outils qu'une personne lance (`task_logger/reimport.py`,
+  `runners/github/cleanup_pr_worktrees.py`, `security/verify_security_feature.py`) et les scripts
+  des skills, lus par les agents.
+- **Trouvé** : en mode serveur, le middleware refuse tout chemin fourni par le client, mais aucune
+  route n'appelle encore `server.authz.scope.resolve_project_scope` ; une route qui travaille sur
+  un projet ne sait donc pas encore servir un `project_id`. Échec fermé : rien ne fuit, la route
+  ne sert rien. À brancher route par route avec le mode serveur.
+
+#### F96 · Live Companion : quatre événements envoyés, aucun écouté
+
+- **Sévérité** basse · **nouveau** (laissé par M7 dans `UNHEARD_ALLOWLIST`) · **corrigé par le lot M8**
+- **Preuve** (avant) : `live-companion-handlers.ts` relayait l'état, chaque suggestion, chaque
+  proposition de reprise et chaque changement de fichier ; aucune méthode du preload ne les
+  écoutait. Le tableau de bord ne voyait que ce que son polling allait chercher, et sa liste
+  « changements récents », alimentée par aucun appel, restait vide. `liveCompanion:error` avait un
+  relais, mais le service n'émet jamais `error`.
+- **Correction** : `preload/api/modules/live-companion-api.ts`, `setupLiveCompanionListeners`
+  enregistré dans `global-listeners.ts` ; le relais d'erreur et sa constante retirés.
+- **Garde-fou** : `stores/__tests__/live-companion-events.test.ts`.
+
+#### F97 · Les modales de limite de débit et d'échec d'authentification n'étaient montées nulle part
+
+- **Sévérité** moyenne · **connu** (question du lot L8) · **corrigé par le lot M8**
+- **Preuve** (avant) : `useIpc.ts` ouvre `RateLimitModal`, `SDKRateLimitModal` et
+  `AuthFailureModal` dans leurs stores, et `RateLimitIndicator` les rouvre au clic, mais aucun
+  composant ne les rendait : une limite atteinte ou un jeton expiré (401) n'affichait rien.
+- **Correction** : `App.tsx` monte les trois ; celle du 401 mène à Réglages → Comptes.
+- **Garde-fou** : `components/__tests__/AuthFailureModal.test.tsx` (ouverture, renvoi vers les
+  réglages, montage dans `App.tsx`).
+
+#### F98 · `scripts/` : 9 scripts décrits sur 53, et des ponctuels que plus rien n'appelait
+
+- **Sévérité** basse · **connu** (audit du 17 octobre) · **corrigé par le lot M8**
+- **Preuve** (avant) : le README citait 9 scripts ; 18 n'étaient cités par aucun fichier suivi.
+- **Correction** : supprimés, les ponctuels : correctif d'encodage de `quality_scorer.py` et ses
+  deux vérifications, l'évaluation « Phase 2 » (trois scripts, et
+  `core/optimization/phase2_evaluation.py` qu'eux seuls lisaient), `run_backend_tests.py`
+  (`test-backend.js` le fait), la démo d'`intent/`. Les autres sont des outils lancés à la main,
+  désormais décrits.
+- **Garde-fou** : `tests/test_scripts_readme.py` (un script sans ligne, une ligne sans script).
+
+#### F99 · Handlers de triage GitHub sans appelant, `config-paths.ts` sans importeur
+
+- **Sévérité** basse · **nouveau** (laissé par M7 dans `UNHEARD_ALLOWLIST`) · **corrigé par le lot M8**
+- **Preuve** (avant) : `ipc-handlers/github/triage-handlers.ts` (531 lignes) n'avait aucune méthode
+  preload ni aucune vue ; le triage reste en CLI (`runners/github/runner.py triage`).
+  `main/config-paths.ts` n'avait aucun importeur.
+- **Correction** : retirés, avec les huit canaux du triage ; `UNHEARD_ALLOWLIST` est vide.
+
+#### F100 · 20 vues sans fichier de conception ni test
+
+- **Sévérité** basse · **connu** (F19, L13) · **traité par le lot M8**, décision du mainteneur
+- **Preuve** : 20 des 78 vues n'ont ni fichier dans `docs/architecture/` ni test qui nomme leur
+  composant (recherche dans les tests Vitest et pytest). L'audit en comptait 26 ; Context Mesh et
+  Live Companion ont reçu un test (M7, M8), Pixel Office et Visual-to-code ont un fichier de
+  conception, et les vues GitHub et GitLab, conditionnelles, sont couvertes par les tests de leurs
+  handlers.
+- **Correction** : la barre latérale marque ces vues « Expérimental » et propose de les masquer
+  toutes (`SidebarPrefs.hideExperimental`) ; aucune n'est retirée tant que les données d'usage
+  (L13) ne disent pas lesquelles garder. Liste : `sidebar/experimental-views.ts` ; dernière
+  colonne de `product-overview.md`.
+- **Garde-fou** : `tests/test_product_overview_views.py` (la colonne et la liste concordent, aucune
+  vue expérimentale n'a de fichier de conception) ; `sidebar/__tests__/use-sidebar-prefs.test.ts`.
+- **Reste** : une vue sort de la liste quand elle reçoit un fichier de conception ou un test.
+
 ---
 
 ## Annexe A — Inventaire des fichiers candidats
@@ -2214,7 +2302,7 @@ planchers `pnpm.overrides` relevés (`pnpm-workspace.yaml`), `dompurify` ^3.4.17
 
 Statut des constats de l'audit précédent : F1, F3, F4, F5, F7, F8, F9, F10, F12, F16, F17, F19 **ouverts** ;
 F2, F13 **partiels** ; F6, F11, F14, F18 **aggravés** ; F15 **atténué**. Nouveaux : F20 à F36.
-Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F57 à F62 par M2, F63 à F68 par M3, F69 à F71 par M4, F78 à F84 par M5, F85 à F90 par M6, F91 à F94 par M7, F72 à F77 par M9 (annexe F).
+Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F57 à F62 par M2, F63 à F68 par M3, F69 à F71 par M4, F78 à F84 par M5, F85 à F90 par M6, F91 à F94 par M7, F95 à F100 par M8, F72 à F77 par M9 (annexe F).
 
 ## Annexe C — Ce qui a changé le 15 octobre 2026 (`7ef6fca` → `e3e468f` + PR #454)
 
@@ -2279,7 +2367,7 @@ détaillés ici qu'une fois corrigés ([`SECURITY.md`](../SECURITY.md)).
 | M5 | Secrets et environnement des processus enfants | **fait** (F78 à F84 : journaux et processus enfants, aucun identifiant stocké dans le renderer ; reste l'environnement des runners Python des vues) |
 | M6 | Frontière renderer → main, avec tests de refus | **fait** (F85 à F90 ; reste `senderFrame` et les chemins d'outils des réglages) |
 | M7 | Contrats d'architecture (`import-linter`, canaux IPC, Sidebar ↔ `product-overview.md`) | **fait** (F91 à F94 ; contrats d'imports en test AST, sans `import-linter`) |
-| M8 | Code mort, `scripts/`, vues sans test | à faire (après M7) |
+| M8 | Code mort, `scripts/`, vues sans test | **fait** (F95 à F100 ; vues sans conception ni test marquées « Expérimental » ; `node-pty` attend un essai sous Windows) |
 | M9 | Doc ↔ code, i18n de la palette, jsdom, dépendances | **fait** (F72 à F77) |
 | M10 | Casser le cycle `core ⇄ agents`, découper les fonctions géantes | à faire (après M7) |
 
@@ -2301,6 +2389,10 @@ renderer-path-refusals no-renderer-interpreter python-feature-services`.
 
 Vérification du lot M7 : `pytest tests/test_import_contracts.py tests/test_product_overview_views.py -q`
 et `cd apps/frontend && pnpm test -- ipc-channel-parity useIpc-task-updated context-mesh-events`.
+
+Vérification du lot M8 : `pytest tests/test_product_overview_views.py tests/test_scripts_readme.py
+tests/test_import_contracts.py -q` et `cd apps/frontend && pnpm test -- ipc-channel-parity
+live-companion-events AuthFailureModal use-sidebar-prefs`.
 
 Vérification du lot M9 : `pytest tests/test_docs_context.py tests/test_python_floor.py
 tests/test_test_generation_post_build_scope.py -q` et `cd apps/frontend && pnpm test`.

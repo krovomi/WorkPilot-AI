@@ -150,12 +150,10 @@ def test_the_old_import_paths_still_answer():
     from agents.subagents import detect_languages
     from docintel.api_tests import detect_api_stack
     from runners.pipeline_generator_runner import detect_project_stack
-    from spec.validation_strategy import detect_project_type
 
     assert detect_languages is stack.detect_languages
     assert detect_api_stack is stack.detect_api_stack
     assert detect_project_stack is stack.detect_project_stack
-    assert detect_project_type is stack.detect_project_type
 
 
 def test_marker_rules_keep_their_order_and_skip_ignored_dirs(tmp_path):

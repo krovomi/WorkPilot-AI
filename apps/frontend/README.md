@@ -158,6 +158,7 @@ src/
 - **Validate IPC data**: Always validate data coming through IPC. A path from the renderer is resolved with `src/main/security/renderer-path.ts` and must sit in a registered project or a folder the user picked in a native dialog; a new handler parameter named like a directory (`projectPath`, `worktreePath`, `specDir`…) goes in `DIRECTORY_ARGS` (`src/main/security/ipc-path-policy.ts`), which its test enforces. The renderer never names an executable to run.
 - **Use contextBridge**: Never expose Node.js APIs directly to renderer
 - **Name channels by constant**: a channel is written once, in `IPC_CHANNELS` (`src/shared/constants/ipc.ts`), and every handler, call, send and listener names it from there. `src/main/ipc-handlers/__tests__/ipc-channel-parity.test.ts` checks both directions (an event main sends has a preload listener, and the reverse), refuses a literal channel and an unused constant. Listeners of main events are registered in `src/renderer/stores/global-listeners.ts`.
+- **Experimental views**: a view with neither a design file in `docs/architecture/` nor a test is listed in `src/renderer/components/sidebar/experimental-views.ts`. The sidebar badges it and can hide all of them (`SidebarPrefs.hideExperimental`). Give the view a design file or a test, then remove it from that list and from the last column of `docs/architecture/product-overview.md`.
 
 ## Troubleshooting
 

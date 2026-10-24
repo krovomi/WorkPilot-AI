@@ -504,17 +504,6 @@ export const IPC_CHANNELS = {
 	GITHUB_WORKFLOWS_AWAITING_APPROVAL: "github:workflows:awaitingApproval",
 	GITHUB_WORKFLOW_APPROVE: "github:workflow:approve",
 
-	// GitHub Issue Triage operations
-	GITHUB_TRIAGE_RUN: "github:triage:run",
-	GITHUB_TRIAGE_GET_RESULTS: "github:triage:getResults",
-	GITHUB_TRIAGE_APPLY_LABELS: "github:triage:applyLabels",
-	GITHUB_TRIAGE_GET_CONFIG: "github:triage:getConfig",
-	GITHUB_TRIAGE_SAVE_CONFIG: "github:triage:saveConfig",
-
-	// GitHub Issue Triage events (main -> renderer)
-	GITHUB_TRIAGE_PROGRESS: "github:triage:progress",
-	GITHUB_TRIAGE_COMPLETE: "github:triage:complete",
-	GITHUB_TRIAGE_ERROR: "github:triage:error",
 
 	// Ollama model detection and management
 	OLLAMA_CHECK_STATUS: "ollama:checkStatus",
@@ -888,7 +877,6 @@ export const IPC_CHANNELS = {
 	LIVE_COMPANION_SUGGESTION: "liveCompanion:suggestion",
 	LIVE_COMPANION_TAKEOVER_PROPOSAL: "liveCompanion:takeoverProposal",
 	LIVE_COMPANION_FILE_CHANGE: "liveCompanion:fileChange",
-	LIVE_COMPANION_ERROR: "liveCompanion:error",
 
 	// Agent Time Travel — Temporal debugger for AI agents
 	TIME_TRAVEL_GENERATE_CHECKPOINTS: "timeTravel:generateCheckpoints",

@@ -225,30 +225,7 @@ sequenceDiagram
     AA-->>U: Final result
 ```
 
-### 2. Migration Agent
-**Fichier** : `apps/backend/agents/migration_agent.py`
-
-#### Workflow d'Appel
-
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant MA as MigrationAgent
-    participant SMW as SkillWrapper
-    participant MS as Migration Skill
-    participant CR as CopilotRuntime
-    
-    U->>MA: analyze_stack()
-    MA->>SMW: load_skill('framework-migration')
-    SMW->>MS: execute_script('analyze_stack.py')
-    MS-->>SMW: Stack analysis
-    SMW-->>MA: Formatted result
-    MA->>CR: run_session(migration_prompt)
-    CR-->>MA: Migration plan
-    MA-->>U: Complete analysis
-```
-
-### 3. Documenter Agent
+### 2. Documenter Agent
 **Fichier** : `apps/backend/agents/documenter.py`
 
 #### Workflow d'Appel
@@ -269,7 +246,7 @@ sequenceDiagram
     DA-->>U: Documentation result
 ```
 
-### 4. Refactoring Agent
+### 3. Refactoring Agent
 **Fichier** : `apps/backend/agents/refactorer.py`
 
 #### Workflow d'Appel
@@ -291,7 +268,7 @@ sequenceDiagram
     RA-->>U: Refactored code
 ```
 
-### 5. Test Generator Agent
+### 4. Test Generator Agent
 **Fichier** : `apps/backend/agents/test_generator.py`
 
 #### Workflow d'Appel

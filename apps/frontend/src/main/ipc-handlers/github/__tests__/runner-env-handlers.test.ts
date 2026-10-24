@@ -302,36 +302,6 @@ describe("GitHub runner env usage", () => {
 		);
 	});
 
-	it("passes runner env to triage subprocess", async () => {
-		const { registerTriageHandlers } = await import("../triage-handlers");
-
-		mockRunPythonSubprocess.mockReturnValue({
-			process: { pid: 124 },
-			promise: Promise.resolve({
-				success: true,
-				exitCode: 0,
-				stdout: "",
-				stderr: "",
-				data: [],
-			}),
-		});
-
-		registerTriageHandlers(() => createMockWindow());
-		await mockIpcMain.emit(
-			IPC_CHANNELS.GITHUB_TRIAGE_RUN,
-			projectRef.current?.id,
-		);
-
-		expect(mockGetRunnerEnv).toHaveBeenCalledWith(undefined, {
-			page: "github-issues",
-		});
-		expect(mockRunPythonSubprocess).toHaveBeenCalledWith(
-			expect.objectContaining({
-				env: { ANTHROPIC_AUTH_TOKEN: "token" },
-			}),
-		);
-	});
-
 	it("passes runner env to autofix analyze preview subprocess", async () => {
 		const { registerAutoFixHandlers } = await import("../autofix-handlers");
 		const { AgentManager: MockedAgentManager } = await import(

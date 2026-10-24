@@ -36,10 +36,6 @@ _AGENT_MODULES = [
     "agents.feedback_learning",
     "agents.memory",
     "agents.memory_manager",
-    "agents.migration_agent",
-    # NOTE: agents.migration_agent_skill_wrapper is intentionally excluded —
-    # it has a broken top-level `from migration_agent import …` (missing the
-    # `agents.` prefix) that pre-dates this test file. Tracked separately.
     "agents.pair_programming",
     "agents.planner",
     "agents.pr_template_filler",
@@ -102,11 +98,6 @@ _DATACLASS_TARGETS = [
         },
     ),
     (
-        "agents.migration_agent",
-        "DetectedDependency",
-        {"name": "react", "current_version": "18.0.0"},
-    ),
-    (
         "agents.refactorer",
         "CodeSmell",
         {
@@ -160,10 +151,6 @@ _ENUM_TARGETS = [
     ("agents.feedback_learning", "FeedbackCategory"),
     ("agents.feedback_learning", "AgentPhase"),
     ("agents.feedback_learning", "PatternType"),
-    ("agents.migration_agent", "MigrationType"),
-    ("agents.migration_agent", "MigrationStatus"),
-    ("agents.migration_agent", "StepRisk"),
-    ("agents.migration_agent", "BreakingChangeType"),
     ("agents.refactorer", "SmellType"),
     ("agents.refactorer", "SmellSeverity"),
     ("agents.refactorer", "RefactoringPattern"),

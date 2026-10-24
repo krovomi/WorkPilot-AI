@@ -509,7 +509,7 @@ ol.prio,ul.plain{margin:0;padding-left:20px;display:flex;flex-direction:column;g
 <section class="view" id="v-audit" hidden>
   <div class="eyebrow">06 · Constats et plan d'optimisation</div>
   <h1>Ce qu'il faut corriger, supprimer ou fusionner</h1>
-  <p class="lede">Chaque constat cite son fichier et sa ligne. « Vérifié » signifie reproduit en exécutant le code du dépôt ; « lu » signifie établi par lecture et recherche. Le statut compare au commit <code>b46a031</code> et tient compte des lots L1 à L17 et L13, puis des lots M1, M2, M3, M4, M5, M6, M7 et M9 (audit du 17 octobre). Le plan est ordonné par priorité, sans estimation de durée.</p>
+  <p class="lede">Chaque constat cite son fichier et sa ligne. « Vérifié » signifie reproduit en exécutant le code du dépôt ; « lu » signifie établi par lecture et recherche. Le statut compare au commit <code>b46a031</code> et tient compte des lots L1 à L17 et L13, puis des lots M1, M2, M3, M4, M5, M6, M7, M8 et M9 (audit du 17 octobre). Le plan est ordonné par priorité, sans estimation de durée.</p>
   <div class="controls">
     <div class="ctl"><span class="lbl">Sévérité</span><div class="chips" id="f-sev"></div></div>
     <div class="ctl"><span class="lbl">Statut</span><div class="chips" id="f-st"></div></div>
@@ -1595,9 +1595,34 @@ const FINDINGS=[
  {id:"F94",sev:"basse",cat:"doc",st:"résolu",v:"vérifié",t:"La liste des vues ne couvrait qu'un tiers de l'app",
   c:"<b>Corrigé par le lot M7</b>. <code>product-overview.md</code> citait 26 vues sur 78 ; une ligne par vue désormais, vérifiée contre <code>SidebarView</code>.",
   p:"docs/architecture/product-overview.md · tests/test_product_overview_views.py",
-  r:"Fait.",g:"Chaque vue est listée.",k:"Barre latérale."}];
+  r:"Fait.",g:"Chaque vue est listée.",k:"Barre latérale."},
+ {id:"F95",sev:"moy",cat:"dette",st:"résolu",v:"vérifié",t:"17,8 k lignes backend qu'aucun module n'importait",
+  c:"<b>Corrigé par le lot M8</b>. Graphe <code>ast</code> itéré jusqu'à stabilité : <code>adversarial_qa/</code>, <code>database_agent/</code>, <code>design_to_code/</code>, <code>teams/</code>, <code>intent/</code>, <code>api/cache_api.py</code>, la famille de cache de <code>services/</code>, l'agent de migration, quatre modules <code>ui/</code>… supprimés avec leurs tests. Trouvé : <code>resolve_project_scope</code> n'est encore appelé par aucune route (échec fermé).",
+  p:"apps/backend/ · tests/",
+  r:"Fait.",g:"Rien de mort à maintenir.",k:"Backend."},
+ {id:"F96",sev:"basse",cat:"bug",st:"résolu",v:"vérifié",t:"Live Companion : quatre événements envoyés, aucun écouté",
+  c:"<b>Corrigé par le lot M8</b>. API preload dédiée et écouteur global ; la liste « changements récents » est enfin alimentée ; le relais d'erreur, jamais émis, retiré.",
+  p:"preload/api/modules/live-companion-api.ts · stores/live-companion-store.ts",
+  r:"Fait.",g:"Le tableau de bord suit le compagnon.",k:"Live Companion."},
+ {id:"F97",sev:"moy",cat:"bug",st:"résolu",v:"vérifié",t:"Modales de limite de débit et de 401 montées nulle part",
+  c:"<b>Corrigé par le lot M8</b>. <code>useIpc</code> les ouvrait, aucun composant ne les rendait ; <code>App.tsx</code> monte les trois.",
+  p:"renderer/App.tsx · components/__tests__/AuthFailureModal.test.tsx",
+  r:"Fait.",g:"Un jeton expiré se voit.",k:"Authentification."},
+ {id:"F98",sev:"basse",cat:"doc",st:"résolu",v:"vérifié",t:"scripts/ : 9 scripts décrits sur 53",
+  c:"<b>Corrigé par le lot M8</b>. Ponctuels supprimés (encodage de quality_scorer, évaluation Phase 2, ancien lanceur de tests) ; une ligne par script dans le README, gardée par un test.",
+  p:"scripts/README.md · tests/test_scripts_readme.py",
+  r:"Fait.",g:"Chaque script dit qui le lance.",k:"Outillage."},
+ {id:"F99",sev:"basse",cat:"dette",st:"résolu",v:"vérifié",t:"Triage GitHub côté main sans appelant",
+  c:"<b>Corrigé par le lot M8</b>. <code>github/triage-handlers.ts</code> et ses huit canaux retirés (le triage reste en CLI), <code>config-paths.ts</code> aussi ; <code>UNHEARD_ALLOWLIST</code> est vide.",
+  p:"main/ipc-handlers/github/",
+  r:"Fait.",g:"Chaque canal envoyé est écouté.",k:"IPC."},
+ {id:"F100",sev:"basse",cat:"surface",st:"résolu",v:"vérifié",t:"20 vues sans fichier de conception ni test",
+  c:"<b>Traité par le lot M8</b>, décision du mainteneur : badge « Expérimental » et réglage pour les masquer ; aucune vue retirée sans données d'usage.",
+  p:"sidebar/experimental-views.ts · docs/architecture/product-overview.md",
+  r:"Une vue sort de la liste avec un fichier de conception ou un test.",g:"L'état réel des vues est visible.",k:"Barre latérale."}];
 const PLAN=[
- ["P1","Contrats d'architecture (audit du 17 oct.)","Fait (lot M7) : IPC vérifié dans les deux sens, canaux nommés par constante, contrats d'imports et cycle plafonné, une ligne par vue dans product-overview.md ; restent Live Companion, triage GitHub et vues sans test (M8), le cycle (M10)","F91, F92, F93, F94","Ce qui relie deux couches est vérifié par un test"],
+ ["P2","Code mort et surface produit (audit du 17 oct.)","Fait (lot M8) : ≈ 30 k lignes que rien n'appelait retirées, Live Companion et modales d'authentification câblés, scripts/ décrit ligne à ligne, 20 vues marquées « Expérimental » ; reste node-pty (essai Windows)","F95, F96, F97, F98, F99, F100","Ce qui est livré est appelé, et ce qui est expérimental le dit"],
+ ["P1","Contrats d'architecture (audit du 17 oct.)","Fait (lot M7) : IPC vérifié dans les deux sens, canaux nommés par constante, contrats d'imports et cycle plafonné, une ligne par vue dans product-overview.md ; reste le cycle (M10)","F91, F92, F93, F94","Ce qui relie deux couches est vérifié par un test"],
  ["P1","Frontière renderer → main (audit du 17 oct.)","Fait (lot M6) : plus d'interpréteur choisi par le renderer, chemins résolus et rattachés à un projet ou à un dossier choisi, contrôle central des dossiers de projet, ajout de projet par le sélecteur ; restent senderFrame et les chemins d'outils des réglages","F85, F86, F87, F88, F89, F90","Un renderer compromis n'atteint rien hors d'un projet"],
  ["P0","Secrets hors du renderer (audit du 17 oct.)","Fait (lot M5) : réglages, profils API et Claude, .env du backend masqués ; une clé masquée ne sert qu'à son URL ; tests de connexion dans le main","F81, F82, F83, F84","Un renderer compromis ne lit aucun identifiant"],
  ["P1","Secrets et processus enfants (audit du 17 oct.)","Fait (lot M5) : journaux masqués dans tous les runners, .env de dev jamais lu par l'app packagée, environnement sans identifiants pour le code d'un autre ; restent les runners Python des vues","F78, F79, F80","Un secret ne va qu'au processus qui en a besoin"],
@@ -1742,7 +1767,8 @@ const PRS=[
  ["M4 · #489","Hors-ligne strict et mode serveur","libdocs consulte airgapStrict, routes providers montées par _mount, /providers/select refusé en mode serveur, /health réduit à son verdict.","F69 à F71"],
  ["M5 (1/2) · #491","Secrets et processus enfants","Redaction dans run.py et les runners, à la création des enregistrements ; .env-files de dev seulement ; envWithoutCredentials pour l'émulateur, le mobile et Ollama.","F78 à F80"],
  ["M6 · #500","Frontière renderer → main","Canaux :configure retirés, renderer-path.ts (realpath + racine), ipc-path-policy.ts devant chaque handler, project:add par le sélecteur, CLI parmi les installations détectées, export sans dossier personnel.","F85 à F90"],
- ["M7 · cette PR","Contrats d'architecture","Parité IPC main → renderer, task:updated et écouteurs Context Mesh, 321 constantes de canal et aucun littéral, contrats d'imports et cycle plafonné, product-overview.md complet.","F91 à F94"],
+ ["M8 · cette PR","Code mort, scripts, vues sans test","Code backend sans importeur, scripts ponctuels et triage GitHub retirés, événements Live Companion écoutés, modales de 401 et de limite montées, README de scripts/ complet, vues expérimentales badgées et masquables.","F95 à F100"],
+ ["M7 · #501","Contrats d'architecture","Parité IPC main → renderer, task:updated et écouteurs Context Mesh, 321 constantes de canal et aucun littéral, contrats d'imports et cycle plafonné, product-overview.md complet.","F91 à F94"],
  ["M9 · #490","Doc ↔ code, i18n, jsdom, dépendances","Doc et liens alignés, palette en/fr, Vitest node par défaut, 5 dépendances retirées, plancher Python 3.12 unique, génération post-build bornée au projet.","F72 à F77"],
  ["L17 · #316","Self-healing honnête","fix, QA et PR marqués sautés avec leur raison ; incident escaladé plutôt que déclaré réparé.","F48"],
  ["L12 · #320","Gouvernance","hermes-learned hors de [packs] ; la barre de commandes lit le provider sans le consommer.","F12, F13"],
