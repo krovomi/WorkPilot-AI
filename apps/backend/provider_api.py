@@ -40,7 +40,7 @@ from typing import Annotated, Any
 from urllib.parse import urlparse
 
 import httpx
-from fastapi import Body, Depends, FastAPI, HTTPException, Query, Request
+from fastapi import APIRouter, Body, Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -232,6 +232,13 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+# The provider surface defined in this file. A route declared on `app` itself
+# carries no permission in server mode; these are mounted through `_mount`
+# like every feature router (below, before the feature routers, so route
+# precedence is what it was). Only liveness (`/health`) stays on `app`, and
+# tests/backend/test_feature_router_authz.py holds it to that.
+providers_router = APIRouter()
 
 # --- Multi-user server mode (no-op unless WORKPILOT_SERVER_MODE is enabled) ---
 # SECURITY: this must FAIL CLOSED. `mount_server_mode` is what installs the
@@ -513,7 +520,7 @@ def get_env_provider_config(name: str) -> dict | None:
 
 
 # Correction de la détection dynamique : n'afficher que les providers réellement implémentés
-@app.get("/providers/{provider}/status")
+@providers_router.get("/providers/{provider}/status")
 def get_provider_status(provider: str):
     """Get the status of a specific provider."""
     try:
@@ -542,7 +549,7 @@ def get_provider_status(provider: str):
         }
 
 
-@app.get("/providers")
+@providers_router.get("/providers")
 def get_providers():
     config_path = os.path.abspath(
         os.path.join(
@@ -665,12 +672,12 @@ def get_providers():
     return {"providers": providers, "status": status}
 
 
-@app.get("/providers/configs", dependencies=[Depends(deny_in_server_mode)])
+@providers_router.get("/providers/configs", dependencies=[Depends(deny_in_server_mode)])
 def get_provider_configs():
     return {"configs": list_provider_configs()}
 
 
-@app.get(
+@providers_router.get(
     "/providers/config/{provider}",
     responses={404: {"description": PROVIDER_CONFIG_NOT_FOUND}},
     dependencies=[Depends(deny_in_server_mode)],
@@ -682,19 +689,25 @@ def get_provider_config(provider: str):
     return config
 
 
-@app.post("/providers/config/{provider}", dependencies=[Depends(deny_in_server_mode)])
+@providers_router.post(
+    "/providers/config/{provider}", dependencies=[Depends(deny_in_server_mode)]
+)
 def set_provider_config(provider: str, config: dict[str, Any]):
     save_provider_config(provider, config)
     return {"status": "ok"}
 
 
-@app.delete("/providers/config/{provider}", dependencies=[Depends(deny_in_server_mode)])
+@providers_router.delete(
+    "/providers/config/{provider}", dependencies=[Depends(deny_in_server_mode)]
+)
 def delete_provider_config_api(provider: str):
     delete_provider_config(provider)
     return {"status": "deleted"}
 
 
-@app.post("/providers/select")
+# Process-wide: core/client.py and phase_config.py read it for every build,
+# whoever asked. One user's choice on a shared server is everyone's.
+@providers_router.post("/providers/select", dependencies=[Depends(deny_in_server_mode)])
 def select_provider(provider: Annotated[str, Query(...)]):
     global _selected_provider
     with _provider_lock:
@@ -702,7 +715,7 @@ def select_provider(provider: Annotated[str, Query(...)]):
     return {"selected": provider}
 
 
-@app.get("/providers/selected")
+@providers_router.get("/providers/selected")
 def get_selected_provider_endpoint():
     """Get the currently selected provider."""
     return {"selected": get_selected_provider()}
@@ -887,7 +900,7 @@ def _validate_openai_base_url(base_url: str | None) -> str:
         raise ValueError(f"Invalid OpenAI base URL: {e}")
 
 
-@app.post("/providers/test-key/{provider}")
+@providers_router.post("/providers/test-key/{provider}")
 @limiter.limit("5/minute")
 async def test_provider_api_key(request: Request, provider: str, payload: dict):
     """Test an API key for any supported provider."""
@@ -1149,7 +1162,7 @@ async def test_provider_api_key(request: Request, provider: str, payload: dict):
     }
 
 
-@app.get("/providers/models/{provider}")
+@providers_router.get("/providers/models/{provider}")
 def get_provider_models(provider: str, refresh: bool = False):
     """Returns a list of known model IDs for the given provider.
 
@@ -1168,7 +1181,7 @@ def get_provider_models(provider: str, refresh: bool = False):
     }
 
 
-@app.get("/providers/ollama/library/search")
+@providers_router.get("/providers/ollama/library/search")
 def search_official_ollama_library(q: str = ""):
     """Autocomplete only names and tags listed by the official Ollama library."""
     import httpx
@@ -1184,7 +1197,7 @@ def search_official_ollama_library(q: str = ""):
         ) from exc
 
 
-@app.get("/providers/models/{provider}/catalog")
+@providers_router.get("/providers/models/{provider}/catalog")
 def get_provider_models_catalog(provider: str, refresh: bool = False):
     """Returns the full model catalog for `provider` with provenance.
 
@@ -1203,7 +1216,7 @@ def get_provider_models_catalog(provider: str, refresh: bool = False):
     return list_models(provider, force_refresh=refresh)
 
 
-@app.get("/providers/agentic-capabilities")
+@providers_router.get("/providers/agentic-capabilities")
 def get_agentic_capabilities():
     """What each provider can drive, from `capabilities/providers.yaml`.
 
@@ -1334,7 +1347,7 @@ async def _validate_key_http(provider: str, api_key: str, spec: dict[str, Any]) 
         )
 
 
-@app.post(
+@providers_router.post(
     "/providers/validate/{provider}",
     responses={400: {"description": "API key validation failed"}},
 )
@@ -1360,7 +1373,7 @@ async def validate_provider_key(
     return {"status": "validated"}
 
 
-@app.get("/db/health")
+@providers_router.get("/db/health")
 def db_health():
     try:
         from validated_keys_db import get_db
@@ -1439,14 +1452,20 @@ def health_check():
         if isinstance(s, dict) and "status" in s
     )
 
+    status = "healthy" if all_ok else "degraded"
+    # This route answers without a token (an orchestrator probes it). On a
+    # shared server that makes the detail public: which providers hold keys,
+    # the Python and OS versions, the PID. The verdict is all a probe needs.
+    if _server_mode_active():
+        return {"status": status}
     return {
-        "status": "healthy" if all_ok else "degraded",
+        "status": status,
         "response_time_ms": elapsed_ms,
         "subsystems": subsystems,
     }
 
 
-@app.get("/providers/usage/{provider}")
+@providers_router.get("/providers/usage/{provider}")
 async def get_provider_usage(provider: str):
     """
     Récupère l'usage et le crédit restant pour le provider OpenAI, Copilot ou autre si implémenté.
@@ -1705,6 +1724,10 @@ async def get_provider_usage(provider: str):
 
 
 # Event-Driven Hooks System API moved to event_hooks/api.py
+
+
+# Every route of `providers_router` is declared above this line.
+_mount(providers_router, "providers")
 
 
 # --- Analytics API (prefer real DB implementation, fall back to minimal stub) ---

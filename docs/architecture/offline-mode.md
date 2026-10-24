@@ -127,3 +127,11 @@ politiques trouvées l'est. Un bouton y créerait une seconde politique sans rie
 débloquer, ce qui est pire que pas de bouton ; `_status` répond donc
 `policyIsProjectOwn`, en comparant des chemins **résolus** plutôt que des
 chaînes.
+
+### Ce qui consulte la barrière
+
+Tout appel réseau du backend passe par `core/offline_policy.py` (règle S7). La préparation de
+documentation `libdocs` envoyait 180 caractères de la spec à Context7 sans la lire : elle la lit
+désormais avant toute détection, et une politique illisible vaut un mode strict (lot M4). Il
+reste des modules réseau qui ne la consultent pas encore ; chacun se corrige de la même façon,
+un appel à `airgap_status` qui échoue fermé.

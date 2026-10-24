@@ -119,7 +119,9 @@ l'UI n'existe pas.
 ## S5 — Mode serveur : authentification, autorisation, tenant
 
 - Chaque route porte une permission (`server/authz/` : `require_permission`, `mount_guarded`) ;
-  `tests/backend/test_feature_router_authz.py` échoue sinon. Masquer un bouton n'est pas un contrôle.
+  `tests/backend/test_feature_router_authz.py` échoue sinon, y compris pour une route déclarée sur
+  `app` hors de `_mount` (seule `/health` l'est, et n'y répond que son verdict). Masquer un bouton
+  n'est pas un contrôle.
 - Un client ne fournit jamais de chemin (`project_dir`, `spec_dir`, `file_path`…), ni en query ni
   dans le corps JSON : il donne un `project_id` et le serveur résout son checkout
   (`server/authz/scope.py`). Le middleware refuse ces clés (`CLIENT_PATH_PARAMS`) en query et dans

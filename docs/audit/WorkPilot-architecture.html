@@ -509,7 +509,7 @@ ol.prio,ul.plain{margin:0;padding-left:20px;display:flex;flex-direction:column;g
 <section class="view" id="v-audit" hidden>
   <div class="eyebrow">06 · Constats et plan d'optimisation</div>
   <h1>Ce qu'il faut corriger, supprimer ou fusionner</h1>
-  <p class="lede">Chaque constat cite son fichier et sa ligne. « Vérifié » signifie reproduit en exécutant le code du dépôt ; « lu » signifie établi par lecture et recherche. Le statut compare au commit <code>b46a031</code> et tient compte des lots L1 à L17 et L13, puis du lot M1 (audit du 17 octobre). Le plan est ordonné par priorité, sans estimation de durée.</p>
+  <p class="lede">Chaque constat cite son fichier et sa ligne. « Vérifié » signifie reproduit en exécutant le code du dépôt ; « lu » signifie établi par lecture et recherche. Le statut compare au commit <code>b46a031</code> et tient compte des lots L1 à L17 et L13, puis des lots M1 et M4 (audit du 17 octobre). Le plan est ordonné par priorité, sans estimation de durée.</p>
   <div class="controls">
     <div class="ctl"><span class="lbl">Sévérité</span><div class="chips" id="f-sev"></div></div>
     <div class="ctl"><span class="lbl">Statut</span><div class="chips" id="f-st"></div></div>
@@ -1443,8 +1443,21 @@ const FINDINGS=[
  {id:"F56",sev:"moy",cat:"sécurité",st:"résolu",v:"lu",t:"L'app Windows packagée demandait l'élévation à chaque lancement",
   c:"<b>Corrigé par le lot M1</b> (choix du mainteneur). <code>requireAdministrator</code> servait la seule preuve visuelle d'une app desktop élevée, et tout ce que WorkPilot lançait héritait des droits administrateur. L'app démarre en <code>asInvoker</code> ; pour piloter une app élevée, on lance WorkPilot en administrateur, et l'app le dit déjà quand ce n'est pas le cas.",
   p:"apps/frontend/package.json (build.win) · main/visual-proof-service.ts (isCurrentProcessElevated) · README.md",
-  r:"Fait.",g:"Les agents n'ont que les droits de l'utilisateur.",k:"La capture d'écran d'une app élevée, son pilotage quand WorkPilot est lancé en administrateur, le lanceur de dev élevé."}];
+  r:"Fait.",g:"Les agents n'ont que les droits de l'utilisateur.",k:"La capture d'écran d'une app élevée, son pilotage quand WorkPilot est lancé en administrateur, le lanceur de dev élevé."},
+ {id:"F69",sev:"haute",cat:"sécurité",st:"résolu",v:"vérifié",t:"libdocs interrogeait Context7 sous airgapStrict",
+  c:"Relevé par l'audit du 17 octobre, <b>corrigé par le lot M4</b>. Le préflight libdocs envoyait le texte de la tâche sans consulter <code>core/offline_policy.py</code>. Il lit désormais <code>airgap_status</code> ; strict ou politique illisible, il n'envoie rien et le dit (échec fermé).",
+  p:"apps/backend/libdocs/preflight.py (_airgap_policy, run_preflight) · tests/test_libdocs.py",
+  r:"Fait. Les autres modules réseau du backend restent à faire passer par la même barrière.",g:"Un projet hors-ligne strict ne laisse rien sortir.",k:"Les pages Context7 avant le build quand le réseau est permis."},
+ {id:"F70",sev:"haute",cat:"sécurité",st:"résolu",v:"vérifié",t:"Les routes providers étaient déclarées sur app, hors _mount",
+  c:"<b>Corrigé par le lot M4</b>. Seize routes de <code>provider_api.py</code> échappaient au contrôle de permission du mode serveur. Elles vivent dans <code>providers_router</code>, monté par <code>_mount</code> ; <code>/providers/select</code>, qui change un état global, est refusé en mode serveur. Un test AST interdit toute autre route sur <code>app</code> que <code>/health</code>.",
+  p:"apps/backend/provider_api.py (providers_router) · tests/backend/test_feature_router_authz.py",
+  r:"Fait.",g:"Chaque route porte une permission.",k:"Le sélecteur de provider et la configuration en mode bureau."},
+ {id:"F71",sev:"basse",cat:"sécurité",st:"résolu",v:"vérifié",t:"/health détaillait l'état du backend sans authentification",
+  c:"<b>Corrigé par le lot M4</b>. En mode serveur, la seule route publique ne renvoie que son verdict ; le détail reste en mode bureau.",
+  p:"apps/backend/provider_api.py (health_check) · tests/backend/test_server_mode_fail_closed.py (TestPublicHealth)",
+  r:"Fait.",g:"Une sonde publique ne dit que vivant ou non.",k:"La sonde de santé du conteneur et de l'app."}];
 const PLAN=[
+ ["P1","Hors-ligne strict et mode serveur (audit du 17 oct.)","Fait (lot M4) : libdocs derrière airgapStrict, routes providers montées avec permission, /health sans détail en mode serveur","F69, F70, F71","Rien ne sort en hors-ligne strict, aucune route sans permission"],
  ["P0","Commandes et shell (audit du 17 oct.)","Fait (lot M1) : release sans shell, canal de commande libre retiré, ouverture IDE/terminal rattachée à un projet, script Azure DevOps statique, app Windows sans élévation","F52, F53, F54, F55, F56","Aucun texte externe ne devient une commande"],
  ['P5','Types de tâche Kanban (feuille de route, vue 09)','Lots 0 à 3 livrés (#460, #461, #462, lot 3) : type comme donnée, un workflow par type, BMAD par impl + fallback, RUN sûr. Restent les lots 4 à 6 : rosters par type, origine → type, mesure','F50, F51','Moins de jetons par bug, tickets RUN traitables, BMAD à la demande'],
  ["P0","Features cassées (fait)","Fait : F1 et F24 (lot L1), F20 (lot L2), F21 câblé et F22 (lot L3)","F1, F24, F20, F21, F22","Features restaurées, mémoire alimentée"],
@@ -1576,6 +1589,7 @@ const PRS=[
  ["L15 · #310","Droits effectifs, succès silencieux","disallowed_tools dérivé de la déclaration, mêmes droits dans tool_executor et Codex ; une phase de spec qui n'a rien écrit le dit et se rejoue.","F39, F40"],
  ["L16 · #317","Droits hors de create_client","Une fabrique d'options SDK, pont MCP filtré par type, validateur de run_command hors SDK, sandbox à la reprise Codex.","F41 à F47"],
  ["M1 · #483","Aucune commande venue du renderer","Release gh sans shell, canal de commande libre retiré, IDE et terminal ouverts sur un dossier d'un projet connu, script Azure DevOps statique, app Windows sans élévation.","F52 à F56"],
+ ["M4","Hors-ligne strict et mode serveur","libdocs consulte airgapStrict, routes providers montées par _mount, /providers/select refusé en mode serveur, /health réduit à son verdict.","F69 à F71"],
  ["L17 · #316","Self-healing honnête","fix, QA et PR marqués sautés avec leur raison ; incident escaladé plutôt que déclaré réparé.","F48"],
  ["L12 · #320","Gouvernance","hermes-learned hors de [packs] ; la barre de commandes lit le provider sans le consommer.","F12, F13"],
  ["L11 · #322 / #327","Consolidation","Sous-agents dans un seul registre, façade project/stack.py, globs de surface en alias, tests sous tests/ avec une seule configuration pytest, fichiers géants découpés (core/agent_clients/<provider>.py).","F8, F26, F27, F31, F36"],
