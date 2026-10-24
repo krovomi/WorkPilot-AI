@@ -794,6 +794,7 @@
 		},
 		"validation": {
 			"apiKeyInvalid": "Format de clé API invalide",
+			"apiKeyForNewUrl": "Saisissez à nouveau la clé API pour l'utiliser avec cette URL de base",
 			"apiKeyRequired": "La clé API est requise",
 			"baseUrlInvalid": "Format d'URL invalide (doit commencer par http:// ou https://)",
 			"baseUrlRequired": "L'URL de base est requise",

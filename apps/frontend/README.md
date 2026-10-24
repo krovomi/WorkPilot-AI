@@ -154,7 +154,7 @@ src/
 
 ### Security Guidelines
 
-- **Never expose secrets**: API keys, tokens should stay in main process
+- **Never expose secrets**: API keys and tokens stay in the main process. A handler hands the renderer `MASKED_SECRET` for a stored credential and reads the mask coming back as "keep the stored value" (`src/main/utils/masked-secret.ts`). A masked key is only used with the URL it was saved for. Calls to a provider with a key are made in main.
 - **Validate IPC data**: Always validate data coming through IPC
 - **Use contextBridge**: Never expose Node.js APIs directly to renderer
 

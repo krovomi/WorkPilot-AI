@@ -48,11 +48,15 @@ interface SettingsState {
 		baseUrl: string,
 		apiKey: string,
 		signal?: AbortSignal,
+		/** Needed when apiKey is the mask: main uses this profile's stored key */
+		profileId?: string,
 	) => Promise<TestConnectionResult | null>;
 	discoverModels: (
 		baseUrl: string,
 		apiKey: string,
 		signal?: AbortSignal,
+		/** Needed when apiKey is the mask: main uses this profile's stored key */
+		profileId?: string,
 	) => Promise<ModelInfo[] | null>;
 	setProviderPriorityOrder: (
 		order: import("../components/settings/multiconnector/types").LLMProvider[],
@@ -232,6 +236,7 @@ export const useSettingsStore = create<SettingsState>((set, _get) => ({
 		baseUrl: string,
 		apiKey: string,
 		signal?: AbortSignal,
+		profileId?: string,
 	): Promise<TestConnectionResult | null> => {
 		set({ isTestingConnection: true, testConnectionResult: null });
 		try {
@@ -239,6 +244,7 @@ export const useSettingsStore = create<SettingsState>((set, _get) => ({
 				baseUrl,
 				apiKey,
 				signal,
+				profileId,
 			);
 
 			// Type narrowing pattern
@@ -293,9 +299,10 @@ export const useSettingsStore = create<SettingsState>((set, _get) => ({
 		baseUrl: string,
 		apiKey: string,
 		signal?: AbortSignal,
+		profileId?: string,
 	): Promise<ModelInfo[] | null> => {
-		// Generate cache key from baseUrl and apiKey (last 4 chars)
-		const cacheKey = `${baseUrl}::${apiKey.slice(-4)}`;
+		// Cache key from baseUrl and the key: a masked one stands for its profile
+		const cacheKey = `${baseUrl}::${profileId ?? ""}::${apiKey.slice(-4)}`;
 
 		// Check cache first
 		const state = useSettingsStore.getState();
@@ -311,6 +318,7 @@ export const useSettingsStore = create<SettingsState>((set, _get) => ({
 				baseUrl,
 				apiKey,
 				signal,
+				profileId,
 			);
 
 			if (result.success && result.data) {

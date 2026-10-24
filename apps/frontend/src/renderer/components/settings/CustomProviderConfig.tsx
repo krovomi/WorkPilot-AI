@@ -58,17 +58,14 @@ export function CustomProviderConfig() {
 
 		setIsDiscovering(true);
 		try {
-			const response = await fetch(`${settings.customProviderUrl}/models`, {
-				headers: settings.customProviderApiKey
-					? { Authorization: `Bearer ${settings.customProviderApiKey}` }
-					: undefined,
-			});
-
-			if (!response.ok) {
-				throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+			// Main calls the provider with the stored key: the renderer only holds its mask
+			const result = await window.electronAPI.discoverCustomProviderModels();
+			if (!result.success) {
+				throw new Error(result.error);
 			}
 
-			const data = await response.json();
+			// biome-ignore lint/suspicious/noExplicitAny: provider responses vary (OpenAI, HuggingFace…)
+			const data = result.data as any;
 			const discoveredModels: ProviderModel[] = [];
 
 			// Handle different API formats (OpenAI, HuggingFace, etc.)

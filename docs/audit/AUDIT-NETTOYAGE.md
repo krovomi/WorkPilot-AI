@@ -1620,6 +1620,56 @@ un succès affiché est un succès produit ; un échec se voit.
   au backend qu'il lance. `tests/test_backend_entrypoints_observability.py`,
   `main/__tests__/sentry-subprocess-env.test.ts`.
 
+### Lot M5 (suite) — Aucun identifiant stocké dans le renderer (P0)
+
+**Fait** pour cette partie. Elle suit les journaux et les processus enfants (PR #491). Règle tenue
+(S6) : le renderer apprend qu'un identifiant est défini, jamais sa valeur ; une clé masquée ne sert
+qu'à l'URL pour laquelle elle a été enregistrée. Détail :
+[`architecture/secrets-at-rest.md`](../architecture/secrets-at-rest.md#app-settings-and-profiles-as-the-renderer-sees-them).
+
+#### F81 · Les clés des réglages de l'app arrivaient en clair dans le renderer
+
+- **Sévérité** haute · **nouveau** · **corrigé par le lot M5**
+- **Preuve** (avant) : `SETTINGS_GET` rendait les réglages déchiffrés, dont toutes les clés de
+  `isSecretSettingsKey` (clés des providers, jetons, `customProviderApiKey`).
+- **Correction** : `main/settings-secrets.ts`. `maskSettingsSecrets` remplace chaque clé définie par
+  `MASKED_SECRET` ; à la sauvegarde, `unmaskSettingsUpdate` garde la valeur stockée quand le masque
+  revient. La clé du provider personnalisé tombe si son URL change. La découverte de ses modèles
+  passe par `SETTINGS_CUSTOM_PROVIDER_DISCOVER_MODELS`, sans argument : le main lit l'URL et la clé.
+  Test : `source-env-handlers.test.ts`.
+
+#### F82 · Les clés des profils API arrivaient dans le renderer
+
+- **Sévérité** haute · **nouveau** · **corrigé par le lot M5**
+- **Preuve** (avant) : `PROFILES_GET` et les réponses de sauvegarde rendaient `apiKey` en clair ; le
+  test de connexion et la liste des modèles recevaient la clé du renderer.
+- **Correction** : `apiKey` masquée dans chaque réponse. Une clé masquée désigne celle du profil
+  `profileId`, et seulement à son `baseUrl` enregistré (`resolveProfileKey`, `sameEndpoint`). À une
+  autre URL, la clé se saisit à nouveau, et la boîte d'édition la redemande avant tout envoi
+  (clé i18n `apiProfiles.validation.apiKeyForNewUrl`). Test : `profile-handlers.test.ts`,
+  `ProfileEditDialog.test.tsx`.
+
+#### F83 · Le jeton OAuth des profils Claude passait par le renderer
+
+- **Sévérité** haute · **nouveau** · **corrigé par le lot M5**
+- **Preuve** (avant) : `CLAUDE_PROFILES_GET` et le meilleur profil rendaient `oauthToken` ;
+  `AUTOBUILD_SOURCE_ENV_GET` rendait le jeton du `.env` du backend. `EnvConfigModal` recopiait
+  `oauthToken` dans ce `.env`, alors que ce jeton est chiffré en mémoire : le fichier recevait du
+  chiffré.
+- **Correction** : `main/claude-profile/renderer-view.ts` masque le jeton, et une sauvegarde qui le
+  renvoie masqué garde le jeton stocké. `AUTOBUILD_SOURCE_ENV_GET` ne rend plus que `hasClaudeToken`.
+  `AUTOBUILD_SOURCE_ENV_UPDATE` accepte `claudeProfileId` : le main copie le jeton déchiffré
+  (`getProfileToken`). Test : `renderer-view.test.ts`, `source-env-handlers.test.ts`.
+
+#### F84 · Des tests de connexion appelaient les providers depuis le renderer
+
+- **Sévérité** moyenne · **nouveau** · **corrigé par le lot M5**
+- **Preuve** (avant) : `shared/services/providerService.ts` appelait OpenAI, Google, Mistral,
+  Ollama ou un `/health` générique avec la clé lue dans les profils et les réglages, chaque fois
+  que `credential:testProvider` échouait. Google recevait la clé dans l'URL.
+- **Correction** : `testProvider` ne fait plus que demander au main, qui teste déjà chaque provider.
+  Test : `shared/services/__tests__/providerService.test.ts`.
+
 ---
 
 ## Annexe A — Inventaire des fichiers candidats
@@ -1774,7 +1824,7 @@ planchers `pnpm.overrides` relevés (`pnpm-workspace.yaml`), `dompurify` ^3.4.17
 
 Statut des constats de l'audit précédent : F1, F3, F4, F5, F7, F8, F9, F10, F12, F16, F17, F19 **ouverts** ;
 F2, F13 **partiels** ; F6, F11, F14, F18 **aggravés** ; F15 **atténué**. Nouveaux : F20 à F36.
-Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F63 à F68 par M3 (annexe F).
+Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F63 à F68 par M3, F81 à F84 par M5 (annexe F).
 
 ## Annexe C — Ce qui a changé le 15 octobre 2026 (`7ef6fca` → `e3e468f` + PR #454)
 
@@ -1836,7 +1886,7 @@ détaillés ici qu'une fois corrigés ([`SECURITY.md`](../SECURITY.md)).
 | M2 | Une CI qui garde : filtres `paths:`, version de Biome, Python 3.12, lockfile Python, image serveur construite et migrée | à faire |
 | M3 | Des features qui ne disent que ce qu'elles font (PR Azure DevOps factice, triage `continuous_ai`, verdict QA .NET, workflows de release jamais déclenchés, Skills Sync, Sentry) | **fait** (F63 à F68) |
 | M4 | Mode hors-ligne strict et mode serveur | à faire |
-| M5 | Secrets et environnement des processus enfants | à faire (après M1) |
+| M5 | Secrets et environnement des processus enfants | en cours (F81 à F84 : aucun identifiant stocké dans le renderer ; journaux et processus enfants dans la PR #491) |
 | M6 | Frontière renderer → main, avec tests de refus | à faire (après M5) |
 | M7 | Contrats d'architecture (`import-linter`, canaux IPC, Sidebar ↔ `product-overview.md`) | à faire (après M6) |
 | M8 | Code mort, `scripts/`, vues sans test | à faire (après M7) |

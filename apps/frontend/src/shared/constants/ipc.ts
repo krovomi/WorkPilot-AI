@@ -197,6 +197,8 @@ export const IPC_CHANNELS = {
 	// Settings
 	SETTINGS_GET: "settings:get",
 	SETTINGS_SAVE: "settings:save",
+	// Lists the custom provider's models with its stored key (main holds the key)
+	SETTINGS_CUSTOM_PROVIDER_DISCOVER_MODELS: "settings:customProviderDiscoverModels",
 	SETTINGS_GET_CLI_TOOLS_INFO: "settings:getCliToolsInfo",
 	SETTINGS_CLAUDE_CODE_GET_ONBOARDING_STATUS:
 		"settings:claudeCode:getOnboardingStatus", // Check hasCompletedOnboarding from ~/.claude.json
