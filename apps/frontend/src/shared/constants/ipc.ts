@@ -888,7 +888,6 @@ export const IPC_CHANNELS = {
 	LIVE_COMPANION_SUGGESTION: "liveCompanion:suggestion",
 	LIVE_COMPANION_TAKEOVER_PROPOSAL: "liveCompanion:takeoverProposal",
 	LIVE_COMPANION_FILE_CHANGE: "liveCompanion:fileChange",
-	LIVE_COMPANION_ERROR: "liveCompanion:error",
 
 	// Agent Time Travel — Temporal debugger for AI agents
 	TIME_TRAVEL_GENERATE_CHECKPOINTS: "timeTravel:generateCheckpoints",

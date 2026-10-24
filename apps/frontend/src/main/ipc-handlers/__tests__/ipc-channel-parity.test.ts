@@ -529,14 +529,6 @@ describe("IPC channel parity (preload and renderer → main)", () => {
  * heard, or no longer sent, is reported as stale: the list only shrinks.
  */
 const UNHEARD_ALLOWLIST: Record<string, string> = {
-	"liveCompanion:stateChanged":
-		"live-companion-store reads state by invoke; listen, or drop the send (M8)",
-	"liveCompanion:suggestion":
-		"live-companion-store polls getSuggestions; listen, or drop the send (M8)",
-	"liveCompanion:takeoverProposal":
-		"live-companion-store polls getTakeovers; listen, or drop the send (M8)",
-	"liveCompanion:fileChange": "no view shows file changes; drop the send (M8)",
-	"liveCompanion:error": "live-companion-store shows invoke errors only (M8)",
 	"github:triage:progress":
 		"the GitHub triage handlers have no preload caller at all (M8)",
 	"github:triage:complete":

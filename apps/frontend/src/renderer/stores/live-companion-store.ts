@@ -100,6 +100,21 @@ export const useLiveCompanionStore = create<LiveCompanionStoreState>((set) => ({
 	reset: () => set(initialState),
 }));
 
+/** Keeps the store in step with what the companion pushes from main. */
+export function setupLiveCompanionListeners(): () => void {
+	const api = window.electronAPI;
+	const store = () => useLiveCompanionStore.getState();
+	const cleanups = [
+		api.onLiveCompanionStateChanged((state) => store().setCompanionState(state)),
+		api.onLiveCompanionSuggestion((suggestion) => store().addSuggestion(suggestion)),
+		api.onLiveCompanionTakeoverProposal((proposal) => store().addTakeover(proposal)),
+		api.onLiveCompanionFileChange((event) => store().addFileChange(event)),
+	];
+	return () => {
+		for (const cleanup of cleanups) cleanup();
+	};
+}
+
 // ── Async helper functions ──────────────────────────────────────
 
 export async function startCompanion(projectDir: string): Promise<boolean> {
