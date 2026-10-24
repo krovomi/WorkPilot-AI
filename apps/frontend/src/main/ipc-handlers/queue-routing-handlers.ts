@@ -13,6 +13,7 @@ import type {
 	RunningTasksByProfile,
 } from "../../shared/types";
 import type { AgentManager } from "../agent/agent-manager";
+import { maskClaudeProfile } from "../claude-profile/renderer-view";
 import type { ClaudeProfileManager } from "../claude-profile-manager";
 
 /**
@@ -85,7 +86,7 @@ export function registerQueueRoutingHandlers(
 					options?.excludeProfileId,
 				);
 
-				return { success: true, data: bestProfile };
+				return { success: true, data: maskClaudeProfile(bestProfile) };
 			} catch (error) {
 				console.error(
 					"[QueueRouting] Failed to get best profile for task:",

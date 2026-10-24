@@ -39,6 +39,8 @@ export interface SettingsAPI {
 	getSourceEnv: () => Promise<IPCResult<SourceEnvConfig>>;
 	updateSourceEnv: (config: {
 		claudeOAuthToken?: string;
+		/** A Claude profile whose token main copies (the renderer never holds it) */
+		claudeProfileId?: string;
 	}) => Promise<IPCResult>;
 	checkSourceToken: () => Promise<IPCResult<SourceEnvCheckResult>>;
 
@@ -56,6 +58,9 @@ export interface SettingsAPI {
 		language: string,
 	) => Promise<IPCResult<{ success: boolean }>>;
 
+	// The custom provider's `/models` response, fetched by main with the stored key
+	discoverCustomProviderModels: () => Promise<IPCResult<unknown>>;
+
 	// LLM Provider operations
 	selectProvider: (provider: string) => Promise<IPCResult<string>>;
 	getSelectedProvider: () => Promise<IPCResult<string | null>>;
@@ -68,6 +73,9 @@ export const createSettingsAPI = (): SettingsAPI => ({
 
 	saveSettings: (settings: Partial<AppSettings>): Promise<IPCResult> =>
 		ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_SAVE, settings),
+
+	discoverCustomProviderModels: (): Promise<IPCResult<unknown>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_CUSTOM_PROVIDER_DISCOVER_MODELS),
 
 	// CLI Tools Detection
 	getCliToolsInfo: (): Promise<
@@ -99,6 +107,7 @@ export const createSettingsAPI = (): SettingsAPI => ({
 
 	updateSourceEnv: (config: {
 		claudeOAuthToken?: string;
+		claudeProfileId?: string;
 	}): Promise<IPCResult> =>
 		ipcRenderer.invoke(IPC_CHANNELS.AUTOBUILD_SOURCE_ENV_UPDATE, config),
 

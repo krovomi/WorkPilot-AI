@@ -13,6 +13,8 @@ export const settingsMock = {
 
 	saveSettings: async () => ({ success: true }),
 
+	discoverCustomProviderModels: async () => ({ success: true, data: [] }),
+
 	// Sentry error reporting
 	notifySentryStateChanged: (_enabled: boolean) => {
 		console.warn("[browser-mock] notifySentryStateChanged called");

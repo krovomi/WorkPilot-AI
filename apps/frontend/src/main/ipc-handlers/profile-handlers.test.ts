@@ -359,3 +359,112 @@ describe("profile-handlers - testConnection", () => {
 		});
 	});
 });
+
+describe("profile-handlers - keys stay in main (rule S6)", () => {
+	const KEY = "sk-ant-test-0000"; // pragma: allowlist secret
+	const MASK = "••••••••";
+	const stored: ProfilesFile = {
+		profiles: [
+			{
+				id: "profile-1",
+				name: "Work",
+				baseUrl: "https://api.anthropic.com",
+				apiKey: KEY,
+				createdAt: 0,
+				updatedAt: 0,
+			},
+		],
+		activeProfileId: "profile-1",
+		version: 1,
+	};
+
+	function handler(channel: string) {
+		const calls = (ipcMain.handle as unknown as ReturnType<typeof vi.fn>).mock
+			.calls;
+		return calls.find((call) => call[0] === channel)?.[1];
+	}
+
+	beforeEach(() => {
+		vi.clearAllMocks();
+		vi.mocked(loadProfilesFile).mockResolvedValue(structuredClone(stored));
+		vi.mocked(validateFilePermissions).mockResolvedValue(true);
+		vi.mocked(testConnection).mockResolvedValue({
+			success: true,
+			message: "ok",
+		});
+		registerProfileHandlers();
+	});
+
+	it("hands the renderer profiles with their key masked", async () => {
+		const result = await handler(IPC_CHANNELS.PROFILES_GET)({});
+		expect(result.data.profiles[0]).toMatchObject({ id: "profile-1", apiKey: MASK });
+		expect(JSON.stringify(result)).not.toContain(KEY);
+	});
+
+	it("keeps the stored key when the mask comes back on update", async () => {
+		const { updateProfile } = await import("../services/profile");
+		vi.mocked(updateProfile).mockImplementation(async (input) => ({
+			...stored.profiles[0],
+			...input,
+			models: undefined,
+		}));
+
+		const result = await handler(IPC_CHANNELS.PROFILES_UPDATE)(
+			{},
+			{ ...stored.profiles[0], name: "Renamed", apiKey: MASK },
+		);
+
+		expect(updateProfile).toHaveBeenCalledWith(
+			expect.objectContaining({ name: "Renamed", apiKey: KEY }),
+		);
+		expect(JSON.stringify(result)).not.toContain(KEY);
+	});
+
+	it("refuses to keep a stored key for another base URL", async () => {
+		const { updateProfile } = await import("../services/profile");
+		const result = await handler(IPC_CHANNELS.PROFILES_UPDATE)(
+			{},
+			{ ...stored.profiles[0], baseUrl: "https://attacker.example.test", apiKey: MASK },
+		);
+		expect(result.success).toBe(false);
+		expect(updateProfile).not.toHaveBeenCalled();
+	});
+
+	it("tests a masked key with the stored one, for the profile's own URL only", async () => {
+		const test = handler(IPC_CHANNELS.PROFILES_TEST_CONNECTION);
+
+		await test({}, "https://api.anthropic.com/", MASK, 1, "profile-1");
+		expect(testConnection).toHaveBeenLastCalledWith(
+			"https://api.anthropic.com/",
+			KEY,
+			expect.anything(),
+		);
+
+		vi.mocked(testConnection).mockClear();
+		const elsewhere = await test(
+			{},
+			"https://attacker.example.test",
+			MASK,
+			2,
+			"profile-1",
+		);
+		expect(elsewhere.success).toBe(false);
+		const noProfile = await test({}, "https://api.anthropic.com", MASK, 3);
+		expect(noProfile.success).toBe(false);
+		expect(testConnection).not.toHaveBeenCalled();
+	});
+
+	it("uses a typed key as is", async () => {
+		await handler(IPC_CHANNELS.PROFILES_TEST_CONNECTION)(
+			{},
+			"https://other.example.test",
+			"sk-typed-0000",
+			4,
+		);
+		expect(testConnection).toHaveBeenLastCalledWith(
+			"https://other.example.test",
+			"sk-typed-0000",
+			expect.anything(),
+		);
+	});
+});

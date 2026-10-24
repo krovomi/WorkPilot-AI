@@ -273,3 +273,38 @@ reads it instead:
   takes the URL stored for that channel (closed list) unless a new one was
   typed, and has the backend post it. Before, the renderer did that fetch
   itself.
+
+## App settings and profiles as the renderer sees them
+
+The same rule covers every other credential the main process stores. The
+renderer learns that one is set, never its value. `main/utils/masked-secret.ts`
+holds both directions: `maskSecret` hands out `MASKED_SECRET`, and
+`unmaskSecret` reads it coming back.
+
+| Store | Read by the renderer | Written back |
+|---|---|---|
+| App settings (`isSecretSettingsKey`: the global provider keys and tokens, `customProviderApiKey`) | `SETTINGS_GET` → `maskSettingsSecrets` | `SETTINGS_SAVE` → `unmaskSettingsUpdate`: the mask keeps the stored value, text typed around it replaces it |
+| API profiles (`profiles.json`) | `PROFILES_GET`, and the replies to save and update: `apiKey` masked | `PROFILES_UPDATE`: the mask keeps the stored key |
+| Claude profiles | `CLAUDE_PROFILES_GET`, the reply to a save, best profile: `oauthToken` masked | `CLAUDE_PROFILE_SAVE`: the mask keeps the stored token |
+| The backend's `.env` | `AUTOBUILD_SOURCE_ENV_GET`: only `hasClaudeToken` | `AUTOBUILD_SOURCE_ENV_UPDATE` takes `claudeProfileId`: the main process copies that profile's token, decrypted |
+
+**A stored key never goes to a host the renderer names.** A masked key stands
+for a stored one only at the URL it was saved for:
+
+- An API profile is tested, has its models listed, or is updated with its
+  masked key only at its stored `baseUrl`, for the profile named by
+  `profileId`. At another URL the key must be typed again (`sameEndpoint`).
+  The edit dialog asks for it before sending anything.
+- The custom provider key is dropped when `customProviderUrl` changes while
+  the key stays masked. Model discovery
+  (`SETTINGS_CUSTOM_PROVIDER_DISCOVER_MODELS`) takes no argument: the main
+  process reads both the URL and the key from the settings.
+
+Provider connection tests run only in the main process
+(`credential:testProvider`). `ProviderService` used to call the providers
+itself from the renderer, with the keys, when that IPC call failed. It no
+longer does.
+
+Before this, the renderer copied a Claude profile's `oauthToken` into the
+backend's `.env`. That token is encrypted in memory, so the `.env` received
+ciphertext. The main process now uses `getProfileToken`.

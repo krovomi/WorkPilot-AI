@@ -87,6 +87,14 @@ export function ProfileEditDialog({
 	// API key change state (for edit mode)
 	const [isChangingApiKey, setIsChangingApiKey] = useState(false);
 
+	// Edit mode without a new key: main keeps the stored one (the renderer only
+	// holds its mask), and only for the URL the profile was saved with.
+	const keepsStoredKey = isEditMode && !isChangingApiKey && !!profile;
+	const storedKeyUrlChanged =
+		keepsStoredKey &&
+		baseUrl.trim().replace(/\/+$/, "").toLowerCase() !==
+			(profile?.baseUrl ?? "").trim().replace(/\/+$/, "").toLowerCase();
+
 	// Validation errors
 	const [nameError, setNameError] = useState<string | null>(null);
 	const [urlError, setUrlError] = useState<string | null>(null);
@@ -200,6 +208,9 @@ export function ProfileEditDialog({
 			} else {
 				setKeyError(null);
 			}
+		} else if (storedKeyUrlChanged) {
+			setKeyError(t("settings:apiProfiles.validation.apiKeyForNewUrl"));
+			isValid = false;
 		} else {
 			setKeyError(null);
 		}
@@ -209,9 +220,12 @@ export function ProfileEditDialog({
 
 	// Handle test connection
 	const handleTestConnection = async () => {
-		// Determine API key to use for testing
-		const apiKeyForTest =
-			isEditMode && !isChangingApiKey && profile ? profile.apiKey : apiKey;
+		// Determine API key to use for testing: the stored one stays in main
+		const apiKeyForTest = keepsStoredKey && profile ? profile.apiKey : apiKey;
+		if (storedKeyUrlChanged) {
+			setKeyError(t("settings:apiProfiles.validation.apiKeyForNewUrl"));
+			return;
+		}
 
 		// Basic validation before testing
 		if (!baseUrl.trim()) {
@@ -230,6 +244,7 @@ export function ProfileEditDialog({
 			baseUrl.trim(),
 			apiKeyForTest.trim(),
 			abortControllerRef.current.signal,
+			keepsStoredKey ? profile?.id : undefined,
 		);
 	};
 
@@ -546,10 +561,9 @@ export function ProfileEditDialog({
 									)}
 									baseUrl={baseUrl}
 									apiKey={
-										isEditMode && !isChangingApiKey && profile
-											? profile.apiKey
-											: apiKey
+										keepsStoredKey && profile ? profile.apiKey : apiKey
 									}
+									profileId={keepsStoredKey ? profile?.id : undefined}
 								/>
 							</div>
 
@@ -568,10 +582,9 @@ export function ProfileEditDialog({
 									)}
 									baseUrl={baseUrl}
 									apiKey={
-										isEditMode && !isChangingApiKey && profile
-											? profile.apiKey
-											: apiKey
+										keepsStoredKey && profile ? profile.apiKey : apiKey
 									}
+									profileId={keepsStoredKey ? profile?.id : undefined}
 								/>
 							</div>
 
@@ -590,10 +603,9 @@ export function ProfileEditDialog({
 									)}
 									baseUrl={baseUrl}
 									apiKey={
-										isEditMode && !isChangingApiKey && profile
-											? profile.apiKey
-											: apiKey
+										keepsStoredKey && profile ? profile.apiKey : apiKey
 									}
+									profileId={keepsStoredKey ? profile?.id : undefined}
 								/>
 							</div>
 
@@ -610,10 +622,9 @@ export function ProfileEditDialog({
 									placeholder={t("settings:apiProfiles.models.opusPlaceholder")}
 									baseUrl={baseUrl}
 									apiKey={
-										isEditMode && !isChangingApiKey && profile
-											? profile.apiKey
-											: apiKey
+										keepsStoredKey && profile ? profile.apiKey : apiKey
 									}
+									profileId={keepsStoredKey ? profile?.id : undefined}
 								/>
 							</div>
 						</div>

@@ -5,7 +5,6 @@ import {
 	DEFAULT_APP_SETTINGS,
 	IPC_CHANNELS,
 	MASKED_SECRET,
-	MASKED_SECRET_CHAR,
 } from "../../shared/constants";
 import type {
 	AppSettings,
@@ -14,6 +13,7 @@ import type {
 	ProjectEnvConfig,
 } from "../../shared/types";
 import { debugError } from "../../shared/utils/debug-logger";
+import { unmaskSecret } from "../utils/masked-secret";
 import {
 	getClaudeCliInvocation,
 	getClaudeCliInvocationAsync,
@@ -143,18 +143,6 @@ export function maskProjectEnvSecrets(
 		};
 	}
 	return masked;
-}
-
-/**
- * What a secret sent back by the renderer means: undefined (keep the stored
- * value) for the mask, or the text typed after or around it.
- */
-function unmaskSecret(value: string | undefined): string | undefined {
-	if (typeof value !== "string" || !value.includes(MASKED_SECRET_CHAR)) {
-		return value;
-	}
-	const typed = value.replaceAll(MASKED_SECRET_CHAR, "");
-	return typed === "" ? undefined : typed;
 }
 
 /** `config` from the renderer with masked secrets dropped, so they keep their stored value. */
