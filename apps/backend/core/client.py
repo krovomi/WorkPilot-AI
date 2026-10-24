@@ -1957,7 +1957,7 @@ def _resolve_active_provider(
 
     # 1. Check provider selected via IPC (from frontend UI)
     try:
-        from provider_api import get_selected_provider
+        from provider_selection import get_selected_provider
 
         selected_provider = get_selected_provider()
         if selected_provider:

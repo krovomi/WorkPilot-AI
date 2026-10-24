@@ -44,7 +44,6 @@ import ipaddress
 import json
 import os
 import socket
-import threading
 from typing import Annotated, Any
 from urllib.parse import urlparse
 
@@ -195,6 +194,7 @@ def force_claude_provider_config(*args, **kwargs):
     return _get_llm_config()["force_claude_provider_config"](*args, **kwargs)
 
 
+import provider_selection
 from validated_keys_db import is_validated, set_validated
 
 
@@ -356,10 +356,6 @@ app.add_middleware(
         "X-Provider",
     ],
 )
-
-# Global variable to store selected provider (ContextVar doesn't work across HTTP requests)
-_selected_provider: str | None = None
-_provider_lock = threading.Lock()
 
 
 def _get_anthropic_token() -> str | None:
@@ -714,13 +710,11 @@ def delete_provider_config_api(provider: str):
     return {"status": "deleted"}
 
 
-# Process-wide: core/client.py and phase_config.py read it for every build,
-# whoever asked. One user's choice on a shared server is everyone's.
+# Process-wide (provider_selection.py): every build reads it, whoever asked.
+# One user's choice on a shared server is everyone's.
 @providers_router.post("/providers/select", dependencies=[Depends(deny_in_server_mode)])
 def select_provider(provider: Annotated[str, Query(...)]):
-    global _selected_provider
-    with _provider_lock:
-        _selected_provider = provider
+    provider_selection.select_provider(provider)
     return {"selected": provider}
 
 
@@ -731,8 +725,7 @@ def get_selected_provider_endpoint():
 
 
 def get_selected_provider() -> str | None:
-    with _provider_lock:
-        return _selected_provider
+    return provider_selection.get_selected_provider()
 
 
 def validate_url_ssrf(provider: str, url: str) -> str:

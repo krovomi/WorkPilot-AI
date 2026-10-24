@@ -8,7 +8,6 @@ Similar to frontend functionality but adapted for backend architecture.
 """
 
 import os
-import sys
 
 
 def get_current_model_info() -> dict[str, str]:
@@ -19,27 +18,13 @@ def get_current_model_info() -> dict[str, str]:
         Dictionary containing provider, model, and model_label information
     """
     try:
-        # Try to read the selected provider from the running server's global
-        # state (provider_api.py). CRITICAL: only read it if provider_api is
-        # ALREADY imported — never trigger a fresh import here.
-        #
-        # This runs on the debug-logging hot path (every backend log line when
-        # DEBUG=true). Importing provider_api pulls in the entire FastAPI app;
-        # when a log happens *during* the import of a core module — e.g.
-        # core.worktree -> debug -> colored_logs -> model_info — that fresh
-        # import closes a circular loop that leaves core.worktree
-        # half-initialized, so `from core.worktree import WorktreeManager`
-        # later fails in PR-creation subprocesses. Reading from sys.modules
-        # avoids the import entirely; outside the server we fall back to the
-        # env-based detection below.
-        try:
-            provider_api_module = sys.modules.get("provider_api")
-            if provider_api_module is not None:
-                selected_provider = provider_api_module.get_selected_provider()
-            else:
-                selected_provider = None
-        except Exception:
-            selected_provider = None
+        # The provider chosen in the UI, when this process serves it.
+        # provider_selection imports nothing of the backend, so reading it on
+        # the debug-logging hot path cannot close an import cycle (importing
+        # provider_api here once left core.worktree half-initialised).
+        from provider_selection import get_selected_provider
+
+        selected_provider = get_selected_provider()
 
         # If no selected provider, try to detect from environment
         if not selected_provider:
