@@ -7,7 +7,7 @@ Tools for managing QA status and sign-off in implementation_plan.json.
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -56,7 +56,7 @@ def _apply_qa_update(
         "issues_found": issues,
         "tests_passed": tests_passed,
         "coverage": coverage or {},
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "ready_for_qa_revalidation": status == "fixes_applied",
     }
 
@@ -65,7 +65,7 @@ def _apply_qa_update(
     # Writing status here races with XState's persistPlanStatusAndReasonSync()
     # and can clobber the reviewReason field, causing tasks to appear "incomplete".
 
-    plan["last_updated"] = datetime.now(timezone.utc).isoformat()
+    plan["last_updated"] = datetime.now(UTC).isoformat()
 
     return qa_session
 

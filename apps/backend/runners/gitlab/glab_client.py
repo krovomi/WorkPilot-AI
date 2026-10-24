@@ -13,7 +13,7 @@ import time
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any
@@ -152,7 +152,7 @@ class GitLabClient:
                             # Try parsing as HTTP-date (e.g., "Wed, 21 Oct 2015 07:28:00 GMT")
                             try:
                                 retry_date = parsedate_to_datetime(retry_after)
-                                now = datetime.now(timezone.utc)
+                                now = datetime.now(UTC)
                                 delta = (retry_date - now).total_seconds()
                                 wait_time = max(1, int(delta))  # At least 1 second
                             except (ValueError, TypeError):

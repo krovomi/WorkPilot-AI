@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -316,12 +316,8 @@ class IssueBatch:
     spec_id: str | None = None
     pr_number: int | None = None
     error: str | None = None
-    created_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
-    updated_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
+    updated_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     # AI validation results
     validated: bool = False
     validation_confidence: float = 0.0
@@ -359,8 +355,8 @@ class IssueBatch:
             spec_id=data.get("spec_id"),
             pr_number=data.get("pr_number"),
             error=data.get("error"),
-            created_at=data.get("created_at", datetime.now(timezone.utc).isoformat()),
-            updated_at=data.get("updated_at", datetime.now(timezone.utc).isoformat()),
+            created_at=data.get("created_at", datetime.now(UTC).isoformat()),
+            updated_at=data.get("updated_at", datetime.now(UTC).isoformat()),
             validated=data.get("validated", False),
             validation_confidence=data.get("validation_confidence", 0.0),
             validation_reasoning=data.get("validation_reasoning", ""),
@@ -373,7 +369,7 @@ class IssueBatch:
         batches_dir.mkdir(parents=True, exist_ok=True)
 
         # Update timestamp BEFORE serializing to dict
-        self.updated_at = datetime.now(timezone.utc).isoformat()
+        self.updated_at = datetime.now(UTC).isoformat()
 
         batch_file = batches_dir / f"batch_{self.batch_id}.json"
         await locked_json_write(batch_file, self.to_dict(), timeout=5.0)
@@ -398,7 +394,7 @@ class IssueBatch:
         self.status = status
         if error:
             self.error = error
-        self.updated_at = datetime.now(timezone.utc).isoformat()
+        self.updated_at = datetime.now(UTC).isoformat()
 
 
 class IssueBatcher:
@@ -481,7 +477,7 @@ class IssueBatcher:
             json.dump(
                 {
                     "issue_to_batch": self._batch_index,
-                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                    "updated_at": datetime.now(UTC).isoformat(),
                 },
                 f,
                 indent=2,
@@ -489,7 +485,7 @@ class IssueBatcher:
 
     def _generate_batch_id(self, primary_issue: int) -> str:
         """Generate unique batch ID."""
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+        timestamp = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
         return f"{primary_issue}_{timestamp}"
 
     def _pre_group_by_labels_and_keywords(

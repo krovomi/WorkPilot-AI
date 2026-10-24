@@ -509,7 +509,7 @@ ol.prio,ul.plain{margin:0;padding-left:20px;display:flex;flex-direction:column;g
 <section class="view" id="v-audit" hidden>
   <div class="eyebrow">06 · Constats et plan d'optimisation</div>
   <h1>Ce qu'il faut corriger, supprimer ou fusionner</h1>
-  <p class="lede">Chaque constat cite son fichier et sa ligne. « Vérifié » signifie reproduit en exécutant le code du dépôt ; « lu » signifie établi par lecture et recherche. Le statut compare au commit <code>b46a031</code> et tient compte des lots L1 à L17 et L13, puis des lots M1, M3 et M5 (audit du 17 octobre). Le plan est ordonné par priorité, sans estimation de durée.</p>
+  <p class="lede">Chaque constat cite son fichier et sa ligne. « Vérifié » signifie reproduit en exécutant le code du dépôt ; « lu » signifie établi par lecture et recherche. Le statut compare au commit <code>b46a031</code> et tient compte des lots L1 à L17 et L13, puis des lots M1, M2, M3 et M5 (audit du 17 octobre). Le plan est ordonné par priorité, sans estimation de durée.</p>
   <div class="controls">
     <div class="ctl"><span class="lbl">Sévérité</span><div class="chips" id="f-sev"></div></div>
     <div class="ctl"><span class="lbl">Statut</span><div class="chips" id="f-st"></div></div>
@@ -1444,6 +1444,30 @@ const FINDINGS=[
   c:"<b>Corrigé par le lot M1</b> (choix du mainteneur). <code>requireAdministrator</code> servait la seule preuve visuelle d'une app desktop élevée, et tout ce que WorkPilot lançait héritait des droits administrateur. L'app démarre en <code>asInvoker</code> ; pour piloter une app élevée, on lance WorkPilot en administrateur, et l'app le dit déjà quand ce n'est pas le cas.",
   p:"apps/frontend/package.json (build.win) · main/visual-proof-service.ts (isCurrentProcessElevated) · README.md",
   r:"Fait.",g:"Les agents n'ont que les droits de l'utilisateur.",k:"La capture d'écran d'une app élevée, son pilotage quand WorkPilot est lancé en administrateur, le lanceur de dev élevé."},
+ {id:"F57",sev:"haute",cat:"qualité",st:"résolu",v:"vérifié",t:"CI et Lint ne se déclenchaient que sur une liste blanche de chemins",
+  c:"<b>Corrigé par le lot M2</b>. La liste oubliait <code>pnpm-lock.yaml</code>, <code>pytest.ini</code>, <code>workflows/</code>, <code>capabilities/</code>, <code>config/</code>, <code>skills/</code>, que 23 fichiers de tests lisent. Les deux workflows tournent désormais sur tout sauf les fichiers inertes, et un test garde la liste.",
+  p:".github/workflows/ci.yml · .github/workflows/lint.yml · tests/test_ci_triggers.py",
+  r:"Fait.",g:"Un changement lu par un test fait tourner ce test.",k:"Toute PR : tests Python, frontend, lint."},
+ {id:"F58",sev:"moy",cat:"qualité",st:"résolu",v:"vérifié",t:"Deux versions de Biome",
+  c:"<b>Corrigé par le lot M2</b>. 2.5.15 en local, 2.5.11 en CI et dans les règles. Une seule version, celle des règles, écrite dans <code>package.json</code>, lue par la CI, ignorée par Dependabot ; deux configurations orphelines supprimées.",
+  p:"apps/frontend/package.json · .github/workflows/lint.yml · .github/dependabot.yml · tests/test_tool_pins.py",
+  r:"Fait.",g:"Ce qui passe en local passe en CI.",k:"Le lint et le formatage du frontend."},
+ {id:"F59",sev:"haute",cat:"qualité",st:"résolu",v:"vérifié",t:"Aucun lockfile Python",
+  c:"<b>Corrigé par le lot M2</b>. 92 plages <code>&gt;=</code>, rien de figé ; <code>greenlet</code> absent alors que tout moteur SQLAlchemy asynchrone en a besoin ; deux SDK jamais importés. <code>requirements.lock</code> (uv, toutes plateformes, empreintes) est installé par la CI, l'image et l'installeur, et la CI vérifie qu'il est à jour.",
+  p:"apps/backend/requirements.txt · apps/backend/requirements.lock · .github/actions/setup-python-backend · scripts/install-backend.js",
+  r:"Fait.",g:"On teste ce qu'on livre.",k:"L'installation du backend, la CI, l'image serveur."},
+ {id:"F60",sev:"moy",cat:"qualité",st:"résolu",v:"vérifié",t:"Python 3.12, le plancher, jamais testé",
+  c:"<b>Corrigé par le lot M2</b>. Matrice en 3.13 seulement, ruff sans <code>target-version</code>. Jambe 3.12 sur Linux, <code>py312</code>, réécritures sûres appliquées ; 12 919 tests verts sous 3.12.",
+  p:".github/workflows/ci.yml · ruff.toml · docs/rules/backend.md",
+  r:"Fait.",g:"Le Python embarqué est un Python testé.",k:"Le backend sur le Python embarqué et dans l'image."},
+ {id:"F61",sev:"haute",cat:"qualité",st:"résolu",v:"vérifié",t:"L'image serveur ne se construisait pas et ne migrait pas",
+  c:"<b>Corrigé par le lot M2</b>. <code>COPY</code> d'un fichier absent, <code>alembic upgrade head</code> en échec sur une base neuve, uvicorn lancé même après l'échec, image root sans digest ni <code>.dockerignore</code>, fichiers de la racine manquants. Migrations réparées et testées, image non root sur digest et lock, démarrage qui s'arrête si la migration échoue, job CI qui construit, migre un Postgres 16 et attend <code>/health</code>.",
+  p:"deploy/Dockerfile.server · deploy/server-entrypoint.sh · .dockerignore · server/db/alembic/ · tests/backend/test_alembic_migrations.py",
+  r:"Fait.",g:"Le mode serveur démarre comme la doc le dit.",k:"Le déploiement multi-utilisateur (docker compose)."},
+ {id:"F62",sev:"basse",cat:"qualité",st:"résolu",v:"lu",t:"scripts/ hors du lint",
+  c:"<b>Corrigé par le lot M2</b>. Sept scripts sur 58 passaient par ruff. Tout <code>scripts/</code> est vérifié.",
+  p:".github/workflows/lint.yml · scripts/",
+  r:"Fait.",g:"Les hooks et outils du dépôt ont la même garde que le produit.",k:"Les hooks git, la vendorisation, la génération des skills."},
  {id:"F63",sev:"haute",cat:"bug",st:"résolu",v:"vérifié",t:"Une PR Azure DevOps inventée, rendue en succès",
   c:"<b>Corrigé par le lot M3</b>. Sur tout échec du connecteur, PAT absent compris, la revue montrait un auteur, des fichiers et des labels fixes. L'échec remonte désormais avec sa cause.",
   p:"main/ipc-handlers/pr-details-handlers.ts · __tests__/pr-details-azure-failure.test.ts",
@@ -1484,6 +1508,7 @@ const PLAN=[
  ["P1","Secrets et processus enfants (audit du 17 oct.)","En cours (lot M5) : journaux masqués dans tous les runners, .env de dev jamais lu par l'app packagée, environnement sans identifiants pour le code d'un autre ; secrets hors du renderer à suivre","F78, F79, F80","Un secret ne va qu'au processus qui en a besoin"],
  ["P1","Features honnêtes (audit du 17 oct.)","Fait (lot M3) : plus de PR Azure DevOps inventée, triage continuous_ai réparé, verdict dotnet test pris en compte, workflows d'après-release déclenchés, Skills Sync qui prévient, Sentry branché","F63, F64, F65, F66, F67, F68","Un succès affiché est un succès produit"],
  ["P0","Commandes et shell (audit du 17 oct.)","Fait (lot M1) : release sans shell, canal de commande libre retiré, ouverture IDE/terminal rattachée à un projet, script Azure DevOps statique, app Windows sans élévation","F52, F53, F54, F55, F56","Aucun texte externe ne devient une commande"],
+ ["P1","Une CI qui garde (audit du 17 oct.)","Fait (lot M2) : déclencheurs sans liste blanche, une version de Biome, Python 3.12 testé, lockfile Python, image serveur construite et migrée en CI, ruff sur scripts/","F57, F58, F59, F60, F61, F62","Un contrôle qui tourne sur ce qu'on livre"],
  ['P5','Types de tâche Kanban (feuille de route, vue 09)','Lots 0 à 3 livrés (#460, #461, #462, lot 3) : type comme donnée, un workflow par type, BMAD par impl + fallback, RUN sûr. Restent les lots 4 à 6 : rosters par type, origine → type, mesure','F50, F51','Moins de jetons par bug, tickets RUN traitables, BMAD à la demande'],
  ["P0","Features cassées (fait)","Fait : F1 et F24 (lot L1), F20 (lot L2), F21 câblé et F22 (lot L3)","F1, F24, F20, F21, F22","Features restaurées, mémoire alimentée"],
  ["P0","Self-healing","Fait (lot L17) : câbler correctif, QA et PR, ou ne plus les déclarer faits (lot L17)","F48","Un incident résolu l'est vraiment"],
@@ -1613,7 +1638,8 @@ const PRS=[
  ["L4 · #313","Contexte de développement","docs/CLAUDE.md de 268 Ko à 21 Ko ; justifications dans shared_docs/architecture/ (une feature par fichier) ; index d'agents corrigés.","F18, F23"],
  ["L15 · #310","Droits effectifs, succès silencieux","disallowed_tools dérivé de la déclaration, mêmes droits dans tool_executor et Codex ; une phase de spec qui n'a rien écrit le dit et se rejoue.","F39, F40"],
  ["L16 · #317","Droits hors de create_client","Une fabrique d'options SDK, pont MCP filtré par type, validateur de run_command hors SDK, sandbox à la reprise Codex.","F41 à F47"],
- ["M3","Des features qui ne disent que ce qu'elles font","PR Azure DevOps en erreur plutôt qu'inventée, triage gh réparé, dotnet test asynchrone et compté, VirusTotal et Discord déclenchés, Skills Sync en issue, Sentry sur l'API et le WebSocket.","F63 à F68"],
+ ["M2","Une CI qui garde","Déclencheurs en paths-ignore, Biome lu depuis package.json, jambe 3.12, requirements.lock vérifié, image serveur non root qui migre ou s'arrête, job server-image, ruff sur scripts/.","F57 à F62"],
+ ["M3 · #488","Des features qui ne disent que ce qu'elles font","PR Azure DevOps en erreur plutôt qu'inventée, triage gh réparé, dotnet test asynchrone et compté, VirusTotal et Discord déclenchés, Skills Sync en issue, Sentry sur l'API et le WebSocket.","F63 à F68"],
  ["M1 · #483","Aucune commande venue du renderer","Release gh sans shell, canal de commande libre retiré, IDE et terminal ouverts sur un dossier d'un projet connu, script Azure DevOps statique, app Windows sans élévation.","F52 à F56"],
  ["M5 (1/2)","Secrets et processus enfants","Redaction dans run.py et les runners, à la création des enregistrements ; .env-files de dev seulement ; envWithoutCredentials pour l'émulateur, le mobile et Ollama.","F78 à F80"],
  ["L17 · #316","Self-healing honnête","fix, QA et PR marqués sautés avec leur raison ; incident escaladé plutôt que déclaré réparé.","F48"],

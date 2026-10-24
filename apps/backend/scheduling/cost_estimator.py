@@ -22,7 +22,7 @@ Example:
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -83,7 +83,7 @@ class TokenUsage:
     agent_type: str = ""
     phase: str = ""
     spec_id: str = ""
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to a dictionary."""
@@ -122,7 +122,7 @@ class BudgetAlert:
     current_spend: float
     budget_limit: float
     percentage: float
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to a dictionary."""
@@ -466,10 +466,10 @@ class CostEstimator:
             Start datetime for the period, or None for ``'total'``.
         """
         if budget.period == "monthly":
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         elif budget.period == "weekly":
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             start = now - timedelta(days=now.weekday())
             return start.replace(hour=0, minute=0, second=0, microsecond=0)
         return None
@@ -797,7 +797,7 @@ class CostEstimator:
         Returns:
             A cost report dict for the last 7 days.
         """
-        since = datetime.now(timezone.utc) - timedelta(days=7)
+        since = datetime.now(UTC) - timedelta(days=7)
         return self.get_project_report(project_id, since=since)
 
     def get_monthly_report(self, project_id: str) -> dict[str, Any]:
@@ -809,7 +809,7 @@ class CostEstimator:
         Returns:
             A cost report dict for the last 30 days.
         """
-        since = datetime.now(timezone.utc) - timedelta(days=30)
+        since = datetime.now(UTC) - timedelta(days=30)
         return self.get_project_report(project_id, since=since)
 
     def get_stats(self) -> dict[str, Any]:
@@ -880,7 +880,7 @@ class CostEstimator:
             try:
                 timestamp = datetime.fromisoformat(ts)
             except (ValueError, TypeError):
-                timestamp = datetime.now(timezone.utc)
+                timestamp = datetime.now(UTC)
             self._usages.append(
                 TokenUsage(
                     project_id=u.get("project_id", ""),

@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -230,12 +230,8 @@ class IssueLifecycle:
     transitions: list[StateTransition] = field(default_factory=list)
     locked_by: str | None = None  # Component holding lock
     locked_at: str | None = None
-    created_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
-    updated_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
+    updated_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
     def can_transition_to(self, new_state: IssueLifecycleState) -> bool:
         """Check if transition is valid."""
@@ -267,14 +263,14 @@ class IssueLifecycle:
         transition = StateTransition(
             from_state=self.current_state,
             to_state=new_state,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             actor=actor,
             reason=reason,
             metadata=metadata or {},
         )
         self.transitions.append(transition)
         self.current_state = new_state
-        self.updated_at = datetime.now(timezone.utc).isoformat()
+        self.updated_at = datetime.now(UTC).isoformat()
 
         return ConflictResult(has_conflict=False)
 
@@ -320,7 +316,7 @@ class IssueLifecycle:
         if self.locked_by is not None:
             return False
         self.locked_by = component
-        self.locked_at = datetime.now(timezone.utc).isoformat()
+        self.locked_at = datetime.now(UTC).isoformat()
         return True
 
     def release_lock(self, component: str) -> bool:
@@ -364,8 +360,8 @@ class IssueLifecycle:
             ],
             locked_by=data.get("locked_by"),
             locked_at=data.get("locked_at"),
-            created_at=data.get("created_at", datetime.now(timezone.utc).isoformat()),
-            updated_at=data.get("updated_at", datetime.now(timezone.utc).isoformat()),
+            created_at=data.get("created_at", datetime.now(UTC).isoformat()),
+            updated_at=data.get("updated_at", datetime.now(UTC).isoformat()),
         )
 
 

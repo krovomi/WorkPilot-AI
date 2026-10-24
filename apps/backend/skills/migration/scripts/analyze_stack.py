@@ -19,7 +19,7 @@ import json
 import logging
 import re
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 logging.basicConfig(level=logging.INFO)
@@ -90,7 +90,7 @@ class StackAnalyzer:
         """Perform a full stack analysis."""
         analysis = StackAnalysis(
             project_root=self.project_root,
-            analysis_timestamp=datetime.now(timezone.utc).isoformat(),
+            analysis_timestamp=datetime.now(UTC).isoformat(),
         )
 
         root = Path(self.project_root)
@@ -236,7 +236,7 @@ class StackAnalyzer:
         """Create a stack analysis from provided data (for testing or when filesystem is unavailable)."""
         analysis = StackAnalysis(
             project_root=self.project_root,
-            analysis_timestamp=datetime.now(timezone.utc).isoformat(),
+            analysis_timestamp=datetime.now(UTC).isoformat(),
             detected_languages=languages or [],
             detected_frameworks=frameworks or [],
         )

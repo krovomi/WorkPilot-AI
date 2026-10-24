@@ -110,10 +110,12 @@ async function main() {
 		process.exit(1);
 	}
 
-	// Install dependencies
+	// Install dependencies: the lock (exact versions, hashes), the same set
+	// CI tests and the server image ships. requirements.txt keeps the ranges
+	// the lock is compiled from (`pnpm run lock:python`).
 	console.log("\nInstalling dependencies...");
 	const pip = getPipPath();
-	if (!run(`"${pip}" install -r requirements.txt`)) {
+	if (!run(`"${pip}" install -r requirements.lock`)) {
 		console.error("Failed to install dependencies");
 		process.exit(1);
 	}

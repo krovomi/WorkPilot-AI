@@ -21,7 +21,7 @@ import subprocess
 import sys
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -145,7 +145,7 @@ def run_scan(project_path: Path, spec_id: str) -> dict[str, Any]:
         "successCount": 0,
         "warningCount": 0,
         "errorCount": 0,
-        "createdAt": datetime.now(tz=timezone.utc).isoformat(),
+        "createdAt": datetime.now(tz=UTC).isoformat(),
     }
 
     _emit_event(

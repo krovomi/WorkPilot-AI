@@ -30,7 +30,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from .models import HookEvent, TriggerType
@@ -96,7 +96,7 @@ class HookScheduler:
         Separated from the loop so a test can drive one minute at a time
         without waiting for a real one.
         """
-        moment = now or datetime.now(timezone.utc)
+        moment = now or datetime.now(UTC)
         stamp = moment.strftime("%Y-%m-%dT%H:%M")
         fired = 0
 

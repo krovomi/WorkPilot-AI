@@ -514,10 +514,7 @@ class _CopilotAdapter(ChatCompletionsAdapter):
                         data = await resp.json()
                         measured = self._measure(data)
                 break  # request succeeded — leave the retry loop
-            except (
-                _asyncio.TimeoutError,
-                aiohttp.ClientError,
-            ) as e:
+            except (TimeoutError, aiohttp.ClientError) as e:
                 # A hung/stalled or transient connection error. Retry before
                 # failing so a single bad response no longer freezes the whole
                 # phase. A full-duration TIMEOUT gets a tighter retry budget

@@ -18,7 +18,7 @@ version stays paused across the upgrade) and never written.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -76,7 +76,7 @@ def write_pause_state(
     """Mark the build paused, recording where it stopped."""
     state = {
         "enabled": True,
-        "paused_at": datetime.now(timezone.utc).isoformat(),
+        "paused_at": datetime.now(UTC).isoformat(),
         "paused_phase": phase if phase in PAUSE_PHASES else "coding",
         "paused_subtask_id": subtask_id,
         "provider": provider,

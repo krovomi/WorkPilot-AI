@@ -52,7 +52,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 SOURCE = "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill"
@@ -268,7 +268,7 @@ def _receipt(
         "tree_sha256": tree_digest(staging),
         "files": file_digests(staging),
         "upstream_path": UPSTREAM_SKILL.as_posix(),
-        "vendored_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "vendored_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "vendored_by": "scripts/vendor_ui_ux_pro_max.py",
         "rewritten": ["SKILL.md (plugin path -> <skill-dir>, Portability section)"],
         "excluded": list(EXCLUDED_NOTE),

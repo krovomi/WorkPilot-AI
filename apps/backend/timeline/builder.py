@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -34,7 +34,7 @@ PHASE_ORDER: tuple[str, ...] = (
 
 def _isoformat(unix_ts: float) -> str:
     return (
-        datetime.fromtimestamp(unix_ts, tz=timezone.utc)
+        datetime.fromtimestamp(unix_ts, tz=UTC)
         .isoformat(timespec="seconds")
         .replace("+00:00", "Z")
     )

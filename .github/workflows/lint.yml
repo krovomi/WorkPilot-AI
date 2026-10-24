@@ -3,44 +3,26 @@ name: Lint
 on:
   push:
     branches: [main, develop]
-    paths:
-      - 'apps/**'
-      - 'tests/**'
-      - 'src/**'
-      - '.github/workflows/lint.yml'
-      - '.github/actions/**'
-      - 'apps/frontend/biome.jsonc'
-      - 'skills/**'
-      - 'capabilities/**'
-      - '.agents/**'
-      - '.gemini/**'
-      - '.claude-plugin/**'
-      - 'skills-lock.json'
-      - 'scripts/skills_cli.py'
-      - 'scripts/skills_sync.py'
-      - '.workpilot/skills.toml'
-      - '.codex/**'
-      - '.github/agents/**'
+    # Not a whitelist: a whitelist forgets whatever a test starts reading
+    # (pnpm-lock.yaml, pytest.ini, workflows/, capabilities/, config/,
+    # skills/ were all read by tests and all missing). Only files nothing
+    # builds, lints or reads are skipped; tests/test_ci_triggers.py holds
+    # this list to that.
+    paths-ignore:
+      - 'CHANGELOG.md'
+      - 'LICENSE'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/FUNDING.yml'
+      - '.github/PULL_REQUEST_TEMPLATE.md'
   pull_request:
     branches: [main, develop]
-    paths:
-      - 'apps/**'
-      - 'tests/**'
-      - 'src/**'
-      - '.github/workflows/lint.yml'
-      - '.github/actions/**'
-      - 'apps/frontend/biome.jsonc'
-      - 'skills/**'
-      - 'capabilities/**'
-      - '.agents/**'
-      - '.gemini/**'
-      - '.claude-plugin/**'
-      - 'skills-lock.json'
-      - 'scripts/skills_cli.py'
-      - 'scripts/skills_sync.py'
-      - '.workpilot/skills.toml'
-      - '.codex/**'
-      - '.github/agents/**'
+    # Same list as push.
+    paths-ignore:
+      - 'CHANGELOG.md'
+      - 'LICENSE'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/FUNDING.yml'
+      - '.github/PULL_REQUEST_TEMPLATE.md'
 
 permissions:
   contents: read
@@ -75,21 +57,31 @@ jobs:
       # second-largest body of Python here and the one every contributor
       # touches, so leaving it ungated meant the suite that guards the product
       # was the least guarded thing in the repo.
+      # `scripts/` joined the gate in audit lot M2: it builds the skills
+      # output, vendors third-party trees and runs on contributors' machines
+      # as git hooks, so it gets the same guarantee as the code it serves.
       - name: Run ruff check
-        run: ruff check apps/backend/ tests/ src/ --output-format=github
+        run: ruff check apps/backend/ tests/ src/ scripts/ --output-format=github
 
       - name: Run ruff format check
-        run: ruff format apps/backend/ tests/ src/ --check --diff
+        run: ruff format apps/backend/ tests/ src/ scripts/ --check --diff
 
-      # `scripts/` as a whole is not linted here: three unrelated merge scripts
-      # carry pre-existing violations, and fixing them belongs to whoever owns
-      # them. These three are the registry's own, and they write the generated
-      # output the `skills` job then verifies — so they get the same guarantee
-      # as the code they generate from.
-      - name: Run ruff on the skills scripts
+      # `requirements.txt` holds the ranges, `requirements.lock` the exact
+      # versions (with hashes) that CI and the server image install. This
+      # regenerates the lock beside a copy of both and fails on any
+      # difference: a range edited without `uv pip compile` re-run, or a lock
+      # edited by hand. uv keeps the pins already in the lock when they still
+      # satisfy the ranges, so an unchanged requirements.txt gives the same
+      # bytes. Needs PyPI.
+      - name: Install uv
+        run: pip install uv==0.11.32
+
+      - name: Check the Python lockfile matches requirements.txt
         run: |
-          ruff check scripts/skills_cli.py scripts/skills_sync.py scripts/vendor_pack.py scripts/vendor_archify.py scripts/vendor_bmad.py scripts/vendor_watermarks.py scripts/sync_surface_globs.py --output-format=github
-          ruff format scripts/skills_cli.py scripts/skills_sync.py scripts/vendor_pack.py scripts/vendor_archify.py scripts/vendor_bmad.py scripts/vendor_watermarks.py scripts/sync_surface_globs.py --check --diff
+          tmp="$(mktemp -d)"
+          cp apps/backend/requirements.txt apps/backend/requirements.lock "$tmp/"
+          (cd "$tmp" && uv pip compile requirements.txt --universal --python-version 3.12 --generate-hashes -o requirements.lock --quiet)
+          diff -u apps/backend/requirements.lock "$tmp/requirements.lock"
 
       # `apps/backend/vendor/archify` is a pinned copy of third-party code, and
       # a pin nobody verifies is a comment. This compares the bytes on disk to
@@ -127,13 +119,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7.0.1
 
-      # MUST match @biomejs/biome in apps/frontend/package.json — version
-      # drift here means "passes locally, fails in CI" (e.g. 2.3.11 flagged
-      # useHookAtTopLevel cases that 2.4.10 accepts).
+      # One version, read from apps/frontend/package.json: a number written
+      # here as well drifted (2.5.15 locally, 2.5.11 in CI), and drift means
+      # "passes locally, fails in CI". tests/test_tool_pins.py holds the
+      # package.json pin to the one the rules name.
+      - name: Read the Biome version
+        id: biome
+        run: echo "version=$(jq -r '.devDependencies["@biomejs/biome"]' apps/frontend/package.json)" >> "$GITHUB_OUTPUT"
+
       - name: Setup Biome
         uses: biomejs/setup-biome@4c91541eaada48f67d7dbd7833600ce162b68f51 # v2
         with:
-          version: 2.5.11
+          version: ${{ steps.biome.outputs.version }}
 
       - name: Run Biome
         working-directory: apps/frontend

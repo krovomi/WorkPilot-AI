@@ -34,7 +34,7 @@ import logging
 import os
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -64,7 +64,7 @@ def emit_action(action_type: str, description: str, file_path: str = "") -> None
             "action_type": action_type,
             "description": description,
             "file_path": file_path,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
     )
 

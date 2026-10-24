@@ -16,7 +16,7 @@ import argparse
 import json
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -209,9 +209,7 @@ def run_scan(project_path: Path, framework_ui: str) -> dict[str, Any]:
         "coveragePercent": round(report.coverage * 100, 1),
         "missingControls": report.missing_controls,
         "collectedCount": report.collected_count,
-        "generatedAt": datetime.fromtimestamp(
-            report.generated_at, tz=timezone.utc
-        ).isoformat(),
+        "generatedAt": datetime.fromtimestamp(report.generated_at, tz=UTC).isoformat(),
         "summary": report.summary,
     }
     _emit_event(

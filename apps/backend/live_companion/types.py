@@ -4,7 +4,7 @@ Data models for the Live Development Companion.
 
 import uuid
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -58,7 +58,7 @@ class FileChangeEvent:
 
     def __post_init__(self):
         if not self.timestamp:
-            self.timestamp = datetime.now(timezone.utc).isoformat()
+            self.timestamp = datetime.now(UTC).isoformat()
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -88,7 +88,7 @@ class LiveSuggestion:
 
     def __post_init__(self):
         if not self.created_at:
-            self.created_at = datetime.now(timezone.utc).isoformat()
+            self.created_at = datetime.now(UTC).isoformat()
         if isinstance(self.suggestion_type, str):
             self.suggestion_type = SuggestionType(self.suggestion_type)
         if isinstance(self.priority, str):
@@ -126,7 +126,7 @@ class TakeoverProposal:
 
     def __post_init__(self):
         if not self.created_at:
-            self.created_at = datetime.now(timezone.utc).isoformat()
+            self.created_at = datetime.now(UTC).isoformat()
         if isinstance(self.status, str):
             self.status = TakeoverStatus(self.status)
 

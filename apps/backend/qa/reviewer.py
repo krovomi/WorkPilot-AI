@@ -67,7 +67,7 @@ except ImportError:
 import json
 import re
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 # How a failed pass reads. The loop classifies the message (`classify_qa_error`)
 # to tell the next pass what actually went wrong: every error used to be
@@ -213,7 +213,7 @@ def _programmatic_qa_signoff(
     if not plan:
         return False
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     if verdict == "approved":
         plan["qa_signoff"] = {

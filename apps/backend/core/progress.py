@@ -15,6 +15,8 @@ from pathlib import Path
 from core.plan_normalization import normalize_subtask_aliases
 
 logger = logging.getLogger(__name__)
+from datetime import UTC
+
 from ui import (
     Icons,
     bold,
@@ -516,9 +518,9 @@ def reopen_interrupted_subtasks(spec_dir: Path) -> list[str]:
     if not isinstance(plan, dict):
         return []
 
-    from datetime import datetime, timezone
+    from datetime import datetime
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     reopened: list[str] = []
     for phase in plan.get("phases") or []:
         if not isinstance(phase, dict):

@@ -76,7 +76,8 @@ coder, la QA et la spec. Voir [`architecture/pause-resume.md`](../architecture/p
 
 ## Code Python
 
-- **Python 3.12+** (le Python embarqué par l'app est 3.12 ; la CI teste aussi 3.13).
+- **Python 3.12+** : le plancher (Python embarqué, image serveur, `target-version` de ruff) ; la CI
+  teste 3.12 sur Linux et 3.13 sur les trois OS.
 - Annotations de type sur toute signature publique ; **ruff `0.15.7`** exactement
   (`ruff check apps/backend tests src`, `ruff format --check …`).
 - **Encodage explicite** : `open(..., encoding="utf-8")`, `Path.read_text(encoding="utf-8")`,

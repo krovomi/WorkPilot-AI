@@ -5,6 +5,11 @@
 # it byte for byte — so anything the formatter "improves" here is reported as
 # drift on the next check, on every machine. These files are evidence of what
 # upstream published, not code this repository maintains.
+# The floor of every supported interpreter: the bundled runtime and the CI
+# matrix's lowest leg are 3.12. Ruff reads the syntax and the rewrites it may
+# suggest from this, and reports syntax a 3.12 interpreter would refuse.
+target-version = "py312"
+
 extend-exclude = [
     "skills/bmad",
     "apps/backend/vendor",
@@ -32,6 +37,9 @@ ignore = [
     "E402",   # module level import not at top of file
     "W293",   # blank line contains whitespace
     "B007",   # loop control variable not used
+    "UP042",  # (str, Enum) -> StrEnum changes str() and format() of members
+    "UP046",  # PEP 695 generic classes: syntax churn, no behaviour gained
+    "UP047",  # PEP 695 generic functions: same
 ]
 
 [lint.per-file-ignores]

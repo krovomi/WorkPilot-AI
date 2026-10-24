@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from .migration_planner import MigrationPlan
 
@@ -27,9 +27,7 @@ class RollbackScript:
     steps: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     is_fully_reversible: bool = True
-    generated_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    generated_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
     def to_sql(self) -> str:
         """Generate the full rollback SQL script."""

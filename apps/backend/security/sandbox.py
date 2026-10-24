@@ -25,7 +25,7 @@ import os
 import time
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -163,7 +163,7 @@ class SecurityViolation:
 
     def __post_init__(self):
         if not self.timestamp:
-            self.timestamp = datetime.now(timezone.utc).isoformat()
+            self.timestamp = datetime.now(UTC).isoformat()
         if isinstance(self.violation_type, str):
             self.violation_type = ViolationType(self.violation_type)
 
@@ -204,7 +204,7 @@ class Snapshot:
 
     def __post_init__(self):
         if not self.created_at:
-            self.created_at = datetime.now(timezone.utc).isoformat()
+            self.created_at = datetime.now(UTC).isoformat()
 
     @property
     def file_count(self) -> int:
@@ -262,7 +262,7 @@ class SandboxConfig:
 
     def __post_init__(self):
         if not self.created_at:
-            self.created_at = datetime.now(timezone.utc).isoformat()
+            self.created_at = datetime.now(UTC).isoformat()
         if isinstance(self.mode, str):
             self.mode = SandboxMode(self.mode)
         if isinstance(self.status, str):
@@ -771,7 +771,7 @@ class SandboxManager:
 
         # Execute
         sandbox.status = SandboxStatus.RUNNING
-        sandbox.started_at = datetime.now(timezone.utc).isoformat()
+        sandbox.started_at = datetime.now(UTC).isoformat()
         start_time = time.monotonic()
 
         try:
@@ -791,7 +791,7 @@ class SandboxManager:
                 )
 
             sandbox.status = SandboxStatus.COMPLETED
-            sandbox.completed_at = datetime.now(timezone.utc).isoformat()
+            sandbox.completed_at = datetime.now(UTC).isoformat()
 
             result = ExecutionResult(
                 sandbox_id=sandbox_id,
@@ -808,7 +808,7 @@ class SandboxManager:
         except Exception as e:
             duration = time.monotonic() - start_time
             sandbox.status = SandboxStatus.FAILED
-            sandbox.completed_at = datetime.now(timezone.utc).isoformat()
+            sandbox.completed_at = datetime.now(UTC).isoformat()
 
             result = ExecutionResult(
                 sandbox_id=sandbox_id,

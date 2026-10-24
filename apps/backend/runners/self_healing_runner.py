@@ -25,7 +25,7 @@ import argparse
 import asyncio
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 AUTO_CLAUDE_DIR = ".workpilot"
@@ -404,7 +404,7 @@ class SelfHealingRunner:
 
         # Mark operation as cancelled
         operation["success"] = False
-        operation["completed_at"] = datetime.now(timezone.utc).isoformat()
+        operation["completed_at"] = datetime.now(UTC).isoformat()
         ops_file.write_text(
             json.dumps(operations, indent=2, default=str), encoding="utf-8"
         )

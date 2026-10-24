@@ -20,7 +20,7 @@ import json
 import logging
 import re
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 
 logger = logging.getLogger(__name__)
@@ -369,7 +369,7 @@ class ThemeManager:
         """
         self._counter += 1
         theme_id = f"custom-{self._counter:04d}"
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         theme_colors = ThemeColors()
         if colors:
@@ -437,7 +437,7 @@ class ThemeManager:
                 raise ValueError(f"Invalid theme colors: {'; '.join(errors)}")
             theme.colors = new_colors
 
-        theme.updated_at = datetime.now(timezone.utc).isoformat()
+        theme.updated_at = datetime.now(UTC).isoformat()
         return theme
 
     def delete_custom_theme(self, theme_id: str) -> bool:
@@ -498,7 +498,7 @@ class ThemeManager:
             project_id=project_id,
             theme_id=theme_id,
             mode=mode,
-            bound_at=datetime.now(timezone.utc).isoformat(),
+            bound_at=datetime.now(UTC).isoformat(),
         )
         self._project_bindings[project_id] = binding
         logger.info("Bound theme %s to project %s", theme_id, project_id)
@@ -532,7 +532,7 @@ class ThemeManager:
         if custom:
             export_data = custom.to_dict()
             export_data["_export_version"] = "1.0"
-            export_data["_exported_at"] = datetime.now(timezone.utc).isoformat()
+            export_data["_exported_at"] = datetime.now(UTC).isoformat()
             return json.dumps(export_data, indent=2)
 
         # Check builtin
@@ -540,7 +540,7 @@ class ThemeManager:
         if builtin:
             export_data = dict(builtin)
             export_data["_export_version"] = "1.0"
-            export_data["_exported_at"] = datetime.now(timezone.utc).isoformat()
+            export_data["_exported_at"] = datetime.now(UTC).isoformat()
             return json.dumps(export_data, indent=2)
 
         return None
@@ -570,7 +570,7 @@ class ThemeManager:
 
         self._counter += 1
         theme_id = f"imported-{self._counter:04d}"
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         theme_colors = (
             ThemeColors.from_dict(colors_data)

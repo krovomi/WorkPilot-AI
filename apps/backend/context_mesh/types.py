@@ -4,7 +4,7 @@ Data models for the Context Mesh cross-project intelligence system.
 
 import uuid
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -72,7 +72,7 @@ class ProjectSummary:
 
     def __post_init__(self):
         if not self.registered_at:
-            self.registered_at = datetime.now(timezone.utc).isoformat()
+            self.registered_at = datetime.now(UTC).isoformat()
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -106,7 +106,7 @@ class CrossProjectPattern:
     dismissed_count: int = 0
 
     def __post_init__(self):
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         if not self.first_seen:
             self.first_seen = now
         if not self.last_seen:
@@ -157,7 +157,7 @@ class HandbookEntry:
     version: int = 1
 
     def __post_init__(self):
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         if not self.created_at:
             self.created_at = now
         if not self.updated_at:
@@ -197,7 +197,7 @@ class SkillTransfer:
 
     def __post_init__(self):
         if not self.created_at:
-            self.created_at = datetime.now(timezone.utc).isoformat()
+            self.created_at = datetime.now(UTC).isoformat()
         if isinstance(self.category, str):
             self.category = PatternCategory(self.category)
 
@@ -234,7 +234,7 @@ class ContextualRecommendation:
 
     def __post_init__(self):
         if not self.created_at:
-            self.created_at = datetime.now(timezone.utc).isoformat()
+            self.created_at = datetime.now(UTC).isoformat()
         if isinstance(self.recommendation_type, str):
             self.recommendation_type = RecommendationType(self.recommendation_type)
 
@@ -287,7 +287,7 @@ class MeshAnalysisReport:
 
     def __post_init__(self):
         if not self.generated_at:
-            self.generated_at = datetime.now(timezone.utc).isoformat()
+            self.generated_at = datetime.now(UTC).isoformat()
 
     def to_dict(self) -> dict[str, Any]:
         return {

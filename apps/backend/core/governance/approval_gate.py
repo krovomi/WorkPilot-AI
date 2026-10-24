@@ -18,7 +18,7 @@ import json
 import logging
 import uuid
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -44,9 +44,7 @@ class ApprovalRequest:
     file_path: str | None = None
     approvers: list[str] = field(default_factory=list)
     status: ApprovalStatus = ApprovalStatus.PENDING
-    created_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     resolved_at: str | None = None
     resolved_by: str | None = None
     denial_reason: str | None = None
@@ -118,7 +116,7 @@ class ApprovalGate:
                 f"Request {request_id} is already {req.status.value}, cannot approve."
             )
         req.status = ApprovalStatus.APPROVED
-        req.resolved_at = datetime.now(timezone.utc).isoformat()
+        req.resolved_at = datetime.now(UTC).isoformat()
         req.resolved_by = approved_by
         self._persist()
         logger.info("Approval request approved: %s by %s", request_id, approved_by)
@@ -134,7 +132,7 @@ class ApprovalGate:
                 f"Request {request_id} is already {req.status.value}, cannot deny."
             )
         req.status = ApprovalStatus.DENIED
-        req.resolved_at = datetime.now(timezone.utc).isoformat()
+        req.resolved_at = datetime.now(UTC).isoformat()
         req.resolved_by = denied_by
         req.denial_reason = reason
         self._persist()

@@ -69,7 +69,7 @@ import logging
 import os
 import re
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -210,7 +210,7 @@ def _record(
             data = {}
     except (OSError, ValueError):
         data = {}
-    stamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    stamp = datetime.now(UTC).isoformat(timespec="seconds")
     data[name] = {
         "skill": candidate.name,
         "digest": candidate.digest,
