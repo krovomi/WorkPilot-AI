@@ -31,6 +31,7 @@ import {
 } from "../project-initializer";
 import { projectStore } from "../project-store";
 import { configurePythonFeatureServices } from "../python-feature-services";
+import { isAddableProject, resolveUserChosen } from "../security/renderer-path";
 import type { PythonEnvManager, PythonEnvStatus } from "../python-env-manager";
 import { testGenerationService } from "../test-generation-service";
 import { titleGenerator } from "../title-generator";
@@ -740,11 +741,18 @@ export function registerProjectHandlers(
 
 	ipcMain.handle(
 		IPC_CHANNELS.PROJECT_ADD,
-		async (_, projectPath: string): Promise<IPCResult<Project>> => {
+		async (_, requestedPath: string): Promise<IPCResult<Project>> => {
 			try {
-				// Validate path exists
-				if (!existsSync(projectPath)) {
+				if (typeof requestedPath !== "string" || !existsSync(requestedPath)) {
 					return { success: false, error: "Directory does not exist" };
+				}
+				// Stored as given (not resolved), as before.
+				const projectPath = requestedPath;
+				if (!isAddableProject(projectPath)) {
+					return {
+						success: false,
+						error: "Choose the project folder in the folder picker",
+					};
 				}
 
 				// Migrate legacy .auto-claude/ to .workpilot/ if needed
@@ -891,12 +899,12 @@ export function registerProjectHandlers(
 			projectId: string,
 			newPath: string,
 		): Promise<IPCResult<Project>> => {
-			const trimmed = (newPath ?? "").trim();
-			if (!trimmed) {
-				return { success: false, error: "Path cannot be empty" };
-			}
-			if (!existsSync(trimmed)) {
-				return { success: false, error: "Path does not exist" };
+			const trimmed = typeof newPath === "string" ? newPath.trim() : "";
+			if (!resolveUserChosen(trimmed, "directory")) {
+				return {
+					success: false,
+					error: "Choose the new location in the folder picker",
+				};
 			}
 			const project = projectStore.repathProject(projectId, trimmed);
 			if (project) {

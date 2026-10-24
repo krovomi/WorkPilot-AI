@@ -25,6 +25,20 @@ type MockedFs = {
 const TEST_DIR = path.join("..", "..", "tmp", "ipc-handlers-test");
 const TEST_PROJECT_PATH = path.join(TEST_DIR, "test-project");
 
+// The folder picker is not part of these tests: every existing path counts as
+// one the user picked (renderer-path.test.ts covers the refusals).
+vi.mock("../security/renderer-path", async () => {
+	const fs = await import("node:fs");
+	const chosen = (target: unknown) =>
+		typeof target === "string" && fs.existsSync(target) ? target : null;
+	return {
+		resolveUserChosen: chosen,
+		resolveInProject: chosen,
+		isAddableProject: (target: unknown) => chosen(target) !== null,
+		rememberUserChosenPath: vi.fn(),
+	};
+});
+
 // Mock electron-updater before importing
 vi.mock("electron-updater", () => ({
 	autoUpdater: {

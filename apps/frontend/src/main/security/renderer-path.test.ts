@@ -19,7 +19,10 @@ vi.mock("../project-store", () => ({
 }));
 
 import {
+	forgetUserChosenPaths,
+	isAddableProject,
 	isWithinRoot,
+	rememberUserChosenPath,
 	resolveInProject,
 	resolveKnownProject,
 	resolveUnder,
@@ -131,5 +134,18 @@ describe("resolveWithinRoots", () => {
 		expect(resolveWithinRoots(path.join(outside, "id_rsa"), [outside])).toBe(
 			path.join(outside, "id_rsa"),
 		);
+	});
+});
+
+describe("isAddableProject", () => {
+	it("accepts a registered project or a folder picked in the dialog only", () => {
+		forgetUserChosenPaths();
+		expect(isAddableProject(project)).toBe(true);
+		expect(isAddableProject(outside)).toBe(false);
+		expect(isAddableProject("/")).toBe(false);
+		rememberUserChosenPath(outside);
+		expect(isAddableProject(outside)).toBe(true);
+		expect(isAddableProject(path.join(outside, "id_rsa"))).toBe(false);
+		forgetUserChosenPaths();
 	});
 });

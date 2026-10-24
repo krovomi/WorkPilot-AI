@@ -83,17 +83,50 @@ export function resolveUnder(
 	return resolveWithinRoots(path.join(base, relative), [base], kind);
 }
 
-/** The paths of the registered projects: the default roots. */
+/**
+ * What the user picked in a native dialog (or what the main process created
+ * at their request) during this session. The renderer cannot add to it: only
+ * the dialog and folder-creation handlers call `rememberUserChosenPath`.
+ */
+const userChosenPaths = new Set<string>();
+
+export function rememberUserChosenPath(chosen: string): void {
+	const resolved = realpathOrNull(chosen);
+	if (resolved) userChosenPaths.add(resolved);
+}
+
+/** For tests: forget every choice. */
+export function forgetUserChosenPaths(): void {
+	userChosenPaths.clear();
+}
+
+/** `target` resolved inside something the user picked in a dialog, or `null`. */
+export function resolveUserChosen(
+	target: unknown,
+	kind: PathKind = "any",
+): string | null {
+	return resolveWithinRoots(target, [...userChosenPaths], kind);
+}
+
+/** The paths of the registered projects. */
 export function knownProjectRoots(): string[] {
 	return projectStore.getProjects().map((project) => project.path);
 }
 
-/** `target` resolved inside a registered project, or `null`. */
+/**
+ * `target` resolved inside a registered project or inside a folder the user
+ * picked in a dialog (a project being added is not registered yet), or
+ * `null`.
+ */
 export function resolveInProject(
 	target: unknown,
 	kind: PathKind = "any",
 ): string | null {
-	return resolveWithinRoots(target, knownProjectRoots(), kind);
+	return resolveWithinRoots(
+		target,
+		[...knownProjectRoots(), ...userChosenPaths],
+		kind,
+	);
 }
 
 /**
@@ -114,4 +147,16 @@ export function resolveKnownProject(projectPath: unknown): string | null {
 		);
 	});
 	return known ? resolved : null;
+}
+
+/**
+ * Whether `target` may become a project: a folder the user picked (or had
+ * the app create) this session, or one already registered. Registering any
+ * path the renderer names would make every other check here moot.
+ */
+export function isAddableProject(target: unknown): boolean {
+	return (
+		resolveUserChosen(target, "directory") !== null ||
+		resolveInProject(target, "directory") !== null
+	);
 }
