@@ -58,6 +58,7 @@ c'est une discipline, pas un garde-fou.
 | `.env` du backend : jeton `enc:` une fois packagé, lisible par Python depuis les sources (0600, signalé) | `src/main/source-env.ts` (`writeSourceEnvFile`, `loadBackendEnv`) | `source-env.test.ts`, `source-env-handlers.test.ts` |
 | Aucun identifiant stocké ne parvient au renderer : réglages, profils API et Claude, `.env` du backend masqués (`MASKED_SECRET`) ; une clé masquée ne sert qu'à son URL enregistrée ; tests de connexion dans le main | `src/main/utils/masked-secret.ts`, `src/main/settings-secrets.ts`, `src/main/claude-profile/renderer-view.ts`, `ipc-handlers/profile-handlers.ts` | `source-env-handlers.test.ts`, `profile-handlers.test.ts`, `renderer-view.test.ts`, `providerService.test.ts` |
 | Redaction des logs (fichier, console, rapports de debug) | `src/main/app-logger.ts`, `src/shared/utils/secret-redaction.ts` | `secret-redaction.test.ts`, `app-logger-redaction.test.ts` |
+| Environnement sans identifiants pour le code d'un autre (serveur de dev, mobile, Ollama) | `src/main/utils/child-env.ts` | `utils/__tests__/child-env.test.ts` |
 | Identifiants (trousseau, fichiers restreints) | `src/main/claude-profile/credential-utils.ts` | `credential-utils.test.ts` |
 | Assainissement texte / URL | `src/main/ipc-handlers/shared/sanitize.ts` | `sanitize.test.ts` |
 | Échappement shell | `src/shared/utils/shell-escape.ts` | — |

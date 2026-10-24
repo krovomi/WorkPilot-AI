@@ -18,6 +18,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from verify.mcp_server import resolve_root, serve  # noqa: E402
 
 if __name__ == "__main__":
+    from core.log_redaction import install_global_redaction
+
+    install_global_redaction()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-dir", default=None)
     parser.add_argument("--spec-dir", default=None)

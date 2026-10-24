@@ -45,7 +45,10 @@ l'UI n'existe pas.
   message d'erreur renvoyé à l'UI, un prompt, une URL, un artefact de spec (`.workpilot/specs/`),
   un rapport de QA, un commentaire de PR.
 - **Logs** : l'API backend installe `core/log_redaction.py` (`install_global_redaction`) au
-  démarrage de `provider_api.py` ; un nouveau point d'entrée (runner, CLI) l'installe aussi. Côté
+  démarrage de `provider_api.py` ; `run.py` et chaque runner l'installent en tête de leur bloc
+  `__main__` (`tests/test_entrypoints_redaction.py`), un nouveau point d'entrée aussi. Le masque
+  s'applique à la création de chaque enregistrement, donc aussi aux handlers posés après ;
+  `core/debug.py`, qui écrit hors `logging`, passe par `redact_text`. Côté
   Electron, `app-logger.ts` expurge chaque message avant écriture (hook electron-log,
   `shared/utils/secret-redaction.ts`). Côté UI, une clé s'affiche masquée (`maskApiKey`). Ne jamais logger un en-tête `Authorization`, un
   jeton, ni le corps d'une requête d'authentification.
@@ -114,7 +117,10 @@ l'UI n'existe pas.
 - Environnement d'un processus enfant : construit, pas hérité en bloc. Les variables d'un dépôt
   passent par `claude-code-settings/env-sanitizer.ts` (refus de `LD_PRELOAD`, `NODE_OPTIONS`…,
   détail dans son [`SECURITY.md`](../../apps/frontend/src/main/claude-code-settings/SECURITY.md)).
-  Un secret ne va qu'au processus qui en a besoin.
+  Un secret ne va qu'au processus qui en a besoin : un processus qui exécute le code d'un autre
+  (serveur de dev de l'émulateur, commande mobile, Ollama) reçoit `envWithoutCredentials`
+  (`main/utils/child-env.ts`). L'app packagée ne lit aucun `.env-files/.env`, et jamais celui du
+  dossier d'où elle est lancée (`main/dev-env-files.ts`).
 
 ## S5 — Mode serveur : authentification, autorisation, tenant
 

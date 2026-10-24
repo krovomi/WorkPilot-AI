@@ -212,8 +212,30 @@ def install_global_redaction(
         if not any(isinstance(f, RedactingFilter) for f in handler.filters):
             handler.addFilter(new_filter)
 
+    # A handler added after this call (a runner's `basicConfig`, a library
+    # configuring its own logger) carries no filter. Masking at record
+    # creation covers it: every record passes through the factory.
+    _install_record_factory(new_filter)
+
     _INSTALLED = True
     return new_filter
+
+
+_ORIGINAL_FACTORY = None
+
+
+def _install_record_factory(redacting: RedactingFilter) -> None:
+    global _ORIGINAL_FACTORY
+    if _ORIGINAL_FACTORY is None:
+        _ORIGINAL_FACTORY = logging.getLogRecordFactory()
+    base = _ORIGINAL_FACTORY
+
+    def factory(*args, **kwargs):
+        record = base(*args, **kwargs)
+        redacting.filter(record)
+        return record
+
+    logging.setLogRecordFactory(factory)
 
 
 def _all_handlers() -> list[logging.Handler]:
@@ -249,4 +271,8 @@ def reset_for_tests() -> None:
         for f in list(handler.filters):
             if isinstance(f, RedactingFilter):
                 handler.removeFilter(f)
+    global _ORIGINAL_FACTORY
+    if _ORIGINAL_FACTORY is not None:
+        logging.setLogRecordFactory(_ORIGINAL_FACTORY)
+        _ORIGINAL_FACTORY = None
     _INSTALLED = False
