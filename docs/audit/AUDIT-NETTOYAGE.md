@@ -1620,6 +1620,53 @@ un succès affiché est un succès produit ; un échec se voit.
   au backend qu'il lance. `tests/test_backend_entrypoints_observability.py`,
   `main/__tests__/sentry-subprocess-env.test.ts`.
 
+### Lot M5 — Secrets et environnement des processus enfants (P1)
+
+**En cours.** Cinquième lot de l'audit du 17 octobre (annexe F), en deux PR : celle-ci traite les
+journaux et l'environnement des processus enfants ; la seconde retire les secrets du renderer.
+Règles tenues : S1 et S4 de [`security.md`](../rules/security.md#s1--un-secret-ne-quitte-jamais-son-coffre)
+(un secret ne quitte pas son coffre, il ne va qu'au processus qui en a besoin).
+
+#### F78 · Les runners écrivaient leurs journaux sans masque
+
+- **Sévérité** haute · **nouveau** (audit du 17 oct.) · **corrigé par le lot M5**
+- **Preuve** (avant correction) : seul `provider_api.py` (et, depuis M3, `websocket_server.py`)
+  installait `core/log_redaction.py` ; ni `run.py` ni les 75 runners qu'Electron lance, dont la
+  sortie d'erreur finit dans le journal de l'app. Le filtre ne couvrait que les handlers présents
+  à l'installation, et `core/debug.py` écrivait hors `logging`.
+- **Correction** : chaque bloc `__main__` (run.py, runners, serveurs MCP) appelle
+  `install_global_redaction()` en premier ; l'installation pose aussi une fabrique
+  d'enregistrements qui masque à la création (handlers ajoutés après compris) ; `_write_log` de
+  `core/debug.py` passe par `redact_text`. Les neuf runners lancés sans `PYTHONPATH` mettent le
+  backend sur le chemin avant.
+- **Garde-fou** : `tests/test_entrypoints_redaction.py` (tout point d'entrée sous `runners/`),
+  `tests/core/test_log_redaction.py` (`TestLateHandlers`, sortie de debug).
+
+#### F79 · L'app packagée chargeait un `.env-files/.env` du dossier de lancement
+
+- **Sévérité** haute · **nouveau** · **corrigé par le lot M5**
+- **Preuve** (avant correction) : `apps/frontend/src/main/index.ts` essayait
+  `resolve(process.cwd(), ".env-files/.env")` quel que soit le mode ; les variables chargées
+  passent à chaque processus enfant.
+- **Correction** : `main/dev-env-files.ts` (`devEnvFilePaths`), vide pour une app packagée.
+- **Garde-fou** : `main/__tests__/dev-env-files.test.ts`.
+
+#### F80 · Le code d'un autre recevait les identifiants de WorkPilot
+
+- **Sévérité** moyenne · **nouveau** · **corrigé par le lot M5**
+- **Preuve** (avant correction) : le serveur de dev d'un projet (`app-emulator-service.ts`, trois
+  lancements), la commande d'une session mobile (`mobile-service.ts`) et Ollama
+  (`services/ollama-portable.ts`) héritaient de `{...process.env}`, jetons et clés compris.
+- **Correction** : `main/utils/child-env.ts`, `envWithoutCredentials` retire toute variable nommée
+  comme un identifiant (liste de `project-env-secrets.json`, jetons Claude, motif
+  `*_API_KEY` / `*_TOKEN` / `*_SECRET` / `*_PASSWORD`…) ; seules les variables du lanceur
+  s'ajoutent.
+- **Garde-fou** : `main/utils/__tests__/child-env.test.ts`.
+
+**Reste** : les runners Python des vues héritent toujours de `process.env` (ils ont besoin des
+identifiants du provider, à construire comme `agent-process.ts`) ; clés et jetons déchiffrés
+envoyés au renderer (seconde PR de ce lot).
+
 ---
 
 ## Annexe A — Inventaire des fichiers candidats
@@ -1774,7 +1821,7 @@ planchers `pnpm.overrides` relevés (`pnpm-workspace.yaml`), `dompurify` ^3.4.17
 
 Statut des constats de l'audit précédent : F1, F3, F4, F5, F7, F8, F9, F10, F12, F16, F17, F19 **ouverts** ;
 F2, F13 **partiels** ; F6, F11, F14, F18 **aggravés** ; F15 **atténué**. Nouveaux : F20 à F36.
-Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F63 à F68 par M3 (annexe F).
+Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F63 à F68 par M3, F78 à F80 par M5 (annexe F).
 
 ## Annexe C — Ce qui a changé le 15 octobre 2026 (`7ef6fca` → `e3e468f` + PR #454)
 
@@ -1836,7 +1883,7 @@ détaillés ici qu'une fois corrigés ([`SECURITY.md`](../SECURITY.md)).
 | M2 | Une CI qui garde : filtres `paths:`, version de Biome, Python 3.12, lockfile Python, image serveur construite et migrée | à faire |
 | M3 | Des features qui ne disent que ce qu'elles font (PR Azure DevOps factice, triage `continuous_ai`, verdict QA .NET, workflows de release jamais déclenchés, Skills Sync, Sentry) | **fait** (F63 à F68) |
 | M4 | Mode hors-ligne strict et mode serveur | à faire |
-| M5 | Secrets et environnement des processus enfants | à faire (après M1) |
+| M5 | Secrets et environnement des processus enfants | en cours (F78 à F80 ; secrets hors du renderer à suivre) |
 | M6 | Frontière renderer → main, avec tests de refus | à faire (après M5) |
 | M7 | Contrats d'architecture (`import-linter`, canaux IPC, Sidebar ↔ `product-overview.md`) | à faire (après M6) |
 | M8 | Code mort, `scripts/`, vues sans test | à faire (après M7) |
@@ -1845,3 +1892,6 @@ détaillés ici qu'une fois corrigés ([`SECURITY.md`](../SECURITY.md)).
 
 Vérification du lot M1 : `cd apps/frontend && pnpm run typecheck && pnpm test -- release-handlers
 no-renderer-command worktree-open-launchers pr-details-azure-script`.
+
+Vérification du lot M5 : `pytest tests/test_entrypoints_redaction.py tests/core/test_log_redaction.py -q`
+et `cd apps/frontend && pnpm test -- child-env dev-env-files`.

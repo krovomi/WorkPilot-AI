@@ -101,7 +101,13 @@ def _format_value(value: Any, max_length: int = 200) -> str:
 
 
 def _write_log(message: str, to_file: bool = True) -> None:
-    """Write log message to stdout and optionally to file."""
+    """Write log message to stderr and optionally to file, secrets masked.
+
+    These lines bypass `logging`, so the global filter never sees them.
+    """
+    from .log_redaction import redact_text
+
+    message = redact_text(message)
     print(message, file=sys.stderr)
 
     if to_file:

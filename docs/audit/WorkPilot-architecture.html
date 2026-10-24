@@ -509,7 +509,7 @@ ol.prio,ul.plain{margin:0;padding-left:20px;display:flex;flex-direction:column;g
 <section class="view" id="v-audit" hidden>
   <div class="eyebrow">06 · Constats et plan d'optimisation</div>
   <h1>Ce qu'il faut corriger, supprimer ou fusionner</h1>
-  <p class="lede">Chaque constat cite son fichier et sa ligne. « Vérifié » signifie reproduit en exécutant le code du dépôt ; « lu » signifie établi par lecture et recherche. Le statut compare au commit <code>b46a031</code> et tient compte des lots L1 à L17 et L13, puis des lots M1 et M3 (audit du 17 octobre). Le plan est ordonné par priorité, sans estimation de durée.</p>
+  <p class="lede">Chaque constat cite son fichier et sa ligne. « Vérifié » signifie reproduit en exécutant le code du dépôt ; « lu » signifie établi par lecture et recherche. Le statut compare au commit <code>b46a031</code> et tient compte des lots L1 à L17 et L13, puis des lots M1, M3 et M5 (audit du 17 octobre). Le plan est ordonné par priorité, sans estimation de durée.</p>
   <div class="controls">
     <div class="ctl"><span class="lbl">Sévérité</span><div class="chips" id="f-sev"></div></div>
     <div class="ctl"><span class="lbl">Statut</span><div class="chips" id="f-st"></div></div>
@@ -1467,8 +1467,21 @@ const FINDINGS=[
  {id:"F68",sev:"moy",cat:"qualité",st:"résolu",v:"vérifié",t:"Sentry absent de l'API et du WebSocket, éteint dans l'app packagée",
   c:"<b>Corrigé par le lot M3</b>. Initialisé par trois runners seulement, et jamais actif dans le Python de l'app packagée (pas de <code>sys.frozen</code>). Les deux points d'entrée l'installent après la redaction, le main signale l'app packagée.",
   p:"provider_api.py · websocket_server.py · core/sentry.py · main/sentry.ts",
-  r:"Fait.",g:"Les erreurs des utilisateurs arrivent à quelqu'un.",k:"Le rapport d'erreurs du backend."}];
+  r:"Fait.",g:"Les erreurs des utilisateurs arrivent à quelqu'un.",k:"Le rapport d'erreurs du backend."},
+ {id:"F78",sev:"haute",cat:"sécurité",st:"résolu",v:"vérifié",t:"Les runners écrivaient leurs journaux sans masque",
+  c:"Relevé par l'audit du 17 octobre, <b>corrigé par le lot M5</b>. <code>run.py</code> et les 75 runners lancés par Electron installent la redaction en tête de leur bloc <code>__main__</code> ; le masque s'applique à la création de chaque enregistrement, et <code>core/debug.py</code> passe par <code>redact_text</code>.",
+  p:"apps/backend/core/log_redaction.py · core/debug.py · run.py · runners/ · tests/test_entrypoints_redaction.py",
+  r:"Fait.",g:"Un jeton loggé par un runner n'arrive pas dans le journal.",k:"Les journaux et la sortie de debug des runners."},
+ {id:"F79",sev:"haute",cat:"sécurité",st:"résolu",v:"vérifié",t:"L'app packagée chargeait un .env-files/.env du dossier de lancement",
+  c:"<b>Corrigé par le lot M5</b>. Le <code>.env</code> de développement n'est lu que depuis les sources, jamais par l'app packagée ni depuis le dossier courant.",
+  p:"apps/frontend/src/main/dev-env-files.ts · main/index.ts",
+  r:"Fait.",g:"Lancer l'app depuis un dossier ne lui donne pas de variables.",k:"pnpm run dev et son .env-files/.env."},
+ {id:"F80",sev:"moy",cat:"sécurité",st:"résolu",v:"vérifié",t:"Le code d'un autre recevait les identifiants de WorkPilot",
+  c:"<b>Corrigé par le lot M5</b>. Serveurs de dev de l'émulateur, commandes mobiles et Ollama reçoivent un environnement sans identifiants (<code>envWithoutCredentials</code>).",
+  p:"apps/frontend/src/main/utils/child-env.ts · app-emulator-service.ts · mobile-service.ts · services/ollama-portable.ts",
+  r:"Fait. Les runners Python des vues restent à construire.",g:"Un secret ne va qu'au processus qui en a besoin.",k:"L'émulateur d'app, les sessions mobiles, Ollama portable."}];
 const PLAN=[
+ ["P1","Secrets et processus enfants (audit du 17 oct.)","En cours (lot M5) : journaux masqués dans tous les runners, .env de dev jamais lu par l'app packagée, environnement sans identifiants pour le code d'un autre ; secrets hors du renderer à suivre","F78, F79, F80","Un secret ne va qu'au processus qui en a besoin"],
  ["P1","Features honnêtes (audit du 17 oct.)","Fait (lot M3) : plus de PR Azure DevOps inventée, triage continuous_ai réparé, verdict dotnet test pris en compte, workflows d'après-release déclenchés, Skills Sync qui prévient, Sentry branché","F63, F64, F65, F66, F67, F68","Un succès affiché est un succès produit"],
  ["P0","Commandes et shell (audit du 17 oct.)","Fait (lot M1) : release sans shell, canal de commande libre retiré, ouverture IDE/terminal rattachée à un projet, script Azure DevOps statique, app Windows sans élévation","F52, F53, F54, F55, F56","Aucun texte externe ne devient une commande"],
  ['P5','Types de tâche Kanban (feuille de route, vue 09)','Lots 0 à 3 livrés (#460, #461, #462, lot 3) : type comme donnée, un workflow par type, BMAD par impl + fallback, RUN sûr. Restent les lots 4 à 6 : rosters par type, origine → type, mesure','F50, F51','Moins de jetons par bug, tickets RUN traitables, BMAD à la demande'],
@@ -1602,6 +1615,7 @@ const PRS=[
  ["L16 · #317","Droits hors de create_client","Une fabrique d'options SDK, pont MCP filtré par type, validateur de run_command hors SDK, sandbox à la reprise Codex.","F41 à F47"],
  ["M3","Des features qui ne disent que ce qu'elles font","PR Azure DevOps en erreur plutôt qu'inventée, triage gh réparé, dotnet test asynchrone et compté, VirusTotal et Discord déclenchés, Skills Sync en issue, Sentry sur l'API et le WebSocket.","F63 à F68"],
  ["M1 · #483","Aucune commande venue du renderer","Release gh sans shell, canal de commande libre retiré, IDE et terminal ouverts sur un dossier d'un projet connu, script Azure DevOps statique, app Windows sans élévation.","F52 à F56"],
+ ["M5 (1/2)","Secrets et processus enfants","Redaction dans run.py et les runners, à la création des enregistrements ; .env-files de dev seulement ; envWithoutCredentials pour l'émulateur, le mobile et Ollama.","F78 à F80"],
  ["L17 · #316","Self-healing honnête","fix, QA et PR marqués sautés avec leur raison ; incident escaladé plutôt que déclaré réparé.","F48"],
  ["L12 · #320","Gouvernance","hermes-learned hors de [packs] ; la barre de commandes lit le provider sans le consommer.","F12, F13"],
  ["L11 · #322 / #327","Consolidation","Sous-agents dans un seul registre, façade project/stack.py, globs de surface en alias, tests sous tests/ avec une seule configuration pytest, fichiers géants découpés (core/agent_clients/<provider>.py).","F8, F26, F27, F31, F36"],

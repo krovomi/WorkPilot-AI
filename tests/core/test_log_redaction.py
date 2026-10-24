@@ -201,3 +201,44 @@ class TestExtraPatterns:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+class TestLateHandlers:
+    """A handler added after install — a runner's `basicConfig` — is covered."""
+
+    def test_a_handler_added_after_install_gets_masked_records(self) -> None:
+        install_global_redaction()
+        stream = io.StringIO()
+        logger = logging.getLogger("late.child")
+        handler = logging.StreamHandler(stream)
+        logger.addHandler(handler)
+        logger.propagate = False
+        try:
+            logger.warning(
+                "key=%s",
+                "sk-ant-api03-" + "A" * 40,  # pragma: allowlist secret
+            )
+        finally:
+            logger.removeHandler(handler)
+            logger.propagate = True
+        assert "AAAAAAAAAAAAAAAAAAAA" not in stream.getvalue()
+        assert "[REDACTED]" in stream.getvalue()
+
+    def test_reset_restores_the_record_factory(self) -> None:
+        before = logging.getLogRecordFactory()
+        install_global_redaction()
+        assert logging.getLogRecordFactory() is not before
+        reset_for_tests()
+        assert logging.getLogRecordFactory() is before
+
+
+def test_debug_output_is_masked(monkeypatch, capsys) -> None:
+    from core import debug
+
+    monkeypatch.setattr(debug, "_get_log_file", lambda: None)
+    debug._write_log(
+        "token sk-ant-api03-" + "B" * 40,
+        to_file=False,  # pragma: allowlist secret
+    )
+    err = capsys.readouterr().err
+    assert "BBBBBBBBBBBBBBBBBBBB" not in err

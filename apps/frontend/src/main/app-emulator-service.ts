@@ -25,6 +25,7 @@ import {
 	ensureLegacyWorktreeBuildAssets,
 	LEGACY_RESOURCE_PROPERTY,
 } from "./legacy-dotnet-build";
+import { envWithoutCredentials } from "./utils/child-env";
 
 // ESM-compatible __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -2534,11 +2535,10 @@ exit $launched.ExitCode
 
 			const proc = spawn(cmd, args, {
 				cwd: projectDir,
-				env: {
-					...process.env,
+				env: envWithoutCredentials(process.env, {
 					BROWSER: "none",
 					PORT: String(config.port),
-				} as Record<string, string>,
+				}),
 				shell,
 				stdio: ["ignore", "pipe", "pipe"],
 			});
@@ -2696,11 +2696,10 @@ exit $launched.ExitCode
 			}
 			const proc = spawn(cmd, args, {
 				cwd: svc.projectDir,
-				env: {
-					...process.env,
+				env: envWithoutCredentials(process.env, {
 					BROWSER: "none",
 					PORT: String(svc.port),
-				} as Record<string, string>,
+				}),
 				shell,
 				stdio: ["ignore", "pipe", "pipe"],
 			});
@@ -2751,11 +2750,10 @@ exit $launched.ExitCode
 		}
 		const primaryProc = spawn(primaryCmd, primaryArgs, {
 			cwd: primary.projectDir,
-			env: {
-				...process.env,
+			env: envWithoutCredentials(process.env, {
 				BROWSER: "none",
 				PORT: String(primary.port),
-			} as Record<string, string>,
+			}),
 			shell,
 			stdio: ["ignore", "pipe", "pipe"],
 		});
