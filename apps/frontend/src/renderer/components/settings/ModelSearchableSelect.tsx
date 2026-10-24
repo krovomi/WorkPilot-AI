@@ -34,8 +34,10 @@ interface ModelSearchableSelectProps {
 	placeholder?: string;
 	/** Base URL for API (used for caching key) */
 	baseUrl: string;
-	/** API key for authentication (used for caching key) */
+	/** API key for authentication (used for caching key); may be the mask main hands out */
 	apiKey: string;
+	/** The profile a masked apiKey belongs to: main uses its stored key */
+	profileId?: string;
 	/** Disabled state */
 	disabled?: boolean;
 	/** Additional CSS classes */
@@ -62,6 +64,7 @@ export function ModelSearchableSelect({
 	placeholder,
 	baseUrl,
 	apiKey,
+	profileId,
 	disabled = false,
 	className,
 }: ModelSearchableSelectProps) {
@@ -107,6 +110,7 @@ export function ModelSearchableSelect({
 				baseUrl,
 				apiKey,
 				abortControllerRef.current.signal,
+				profileId,
 			);
 
 			if (result && Array.isArray(result)) {

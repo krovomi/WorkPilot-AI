@@ -39,6 +39,7 @@ import {
 	setUpdateChannelWithDowngradeCheck,
 } from "../app-updater";
 import { getUsageMonitor } from "../claude-profile/usage-monitor";
+import { getClaudeProfileManager } from "../claude-profile-manager";
 import {
 	configureTools,
 	getToolInfo,
@@ -49,6 +50,10 @@ import {
 import { credentialManager } from "../services/credential-manager";
 import { openExternalUrl } from "../open-external";
 import { decryptSecret } from "../secret-storage";
+import {
+	maskSettingsSecrets,
+	unmaskSettingsUpdate,
+} from "../settings-secrets";
 import { readSettingsFile, writeSettingsFile } from "../settings-utils";
 import {
 	getPackagedSourceEnvPath,
@@ -648,17 +653,62 @@ export function registerSettingsHandlers(
 				console.warn("[SETTINGS_GET] Failed to re-warm CLI cache:", error);
 			});
 
-			return { success: true, data: settings };
+			// The renderer learns which credentials are set, never their value (S6)
+			return { success: true, data: maskSettingsSecrets(settings) };
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.SETTINGS_CUSTOM_PROVIDER_DISCOVER_MODELS,
+		async (): Promise<IPCResult<unknown>> => {
+			// URL and key both come from the stored settings, never from the
+			// renderer: the key only goes to the URL it was saved with (S6)
+			const saved = (readSettingsFile() ?? {}) as Partial<AppSettings>;
+			const baseUrl = (saved.customProviderUrl ?? "").trim().replace(/\/+$/, "");
+			let url: URL;
+			try {
+				url = new URL(`${baseUrl}/models`);
+			} catch {
+				return { success: false, error: "Custom provider URL is invalid" };
+			}
+			if (url.protocol !== "https:" && url.protocol !== "http:") {
+				return { success: false, error: "Custom provider URL is invalid" };
+			}
+			const key = saved.customProviderApiKey;
+			try {
+				const response = await fetch(url, {
+					headers: key ? { Authorization: `Bearer ${key}` } : undefined,
+					signal: AbortSignal.timeout(15000),
+				});
+				if (!response.ok) {
+					return {
+						success: false,
+						error: `HTTP ${response.status}: ${response.statusText}`,
+					};
+				}
+				return { success: true, data: await response.json() };
+			} catch (error) {
+				return {
+					success: false,
+					error:
+						error instanceof Error ? error.message : "Failed to discover models",
+				};
+			}
 		},
 	);
 
 	ipcMain.handle(
 		IPC_CHANNELS.SETTINGS_SAVE,
-		async (_, settings: Partial<AppSettings>): Promise<IPCResult> => {
+		async (_, update: Partial<AppSettings>): Promise<IPCResult> => {
 			try {
 				// Load current settings using shared helper
 				const savedSettings = readSettingsFile();
 				const currentSettings = { ...DEFAULT_APP_SETTINGS, ...savedSettings };
+				// A masked secret coming back keeps its stored value
+				const settings = unmaskSettingsUpdate<AppSettings>(
+					update ?? {},
+					currentSettings,
+				);
 				const newSettings = { ...currentSettings, ...settings };
 				if (settings.jev !== undefined)
 					newSettings.jev = parseJevSettings(settings.jev);
@@ -1172,7 +1222,6 @@ export function registerSettingsHandlers(
 						success: true,
 						data: {
 							hasClaudeToken: !!globalToken && globalToken.length > 0,
-							claudeOAuthToken: globalToken,
 							envExists: false,
 						},
 					};
@@ -1180,28 +1229,26 @@ export function registerSettingsHandlers(
 
 				const envExists = envPath ? existsSync(envPath) : false;
 				let hasClaudeToken = false;
-				let claudeOAuthToken: string | undefined;
 
 				// First, check source .env file
 				if (envExists && envPath) {
 					const content = readFileSync(envPath, "utf-8");
 					const stored = parseEnvFile(content)[SOURCE_ENV_TOKEN_KEY];
 					// Undefined while the keyring cannot decrypt it: the global token stands in
-					claudeOAuthToken = stored ? decryptSecret(stored) : undefined;
-					hasClaudeToken = !!claudeOAuthToken && claudeOAuthToken.length > 0;
+					const token = stored ? decryptSecret(stored) : undefined;
+					hasClaudeToken = !!token && token.length > 0;
 				}
 
 				// Fallback to global settings if no token in source .env
 				if (!hasClaudeToken && globalSettings.globalClaudeOAuthToken) {
-					claudeOAuthToken = globalSettings.globalClaudeOAuthToken;
 					hasClaudeToken = true;
 				}
 
 				return {
 					success: true,
+					// Whether a token is set, never the token itself (S6)
 					data: {
 						hasClaudeToken,
-						claudeOAuthToken,
 						sourcePath,
 						envExists,
 					},
@@ -1220,9 +1267,28 @@ export function registerSettingsHandlers(
 
 	ipcMain.handle(
 		IPC_CHANNELS.AUTOBUILD_SOURCE_ENV_UPDATE,
-		async (_, config: { claudeOAuthToken?: string }): Promise<IPCResult> => {
+		async (
+			_,
+			config: { claudeOAuthToken?: string; claudeProfileId?: string },
+		): Promise<IPCResult> => {
 			try {
-				const token = config?.claudeOAuthToken;
+				// A Claude profile's token is read here: the renderer only sees it masked
+				const profileId = config?.claudeProfileId;
+				let token = config?.claudeOAuthToken;
+				if (profileId !== undefined) {
+					// Decrypted here: the profile keeps it encrypted at rest
+					const profileToken =
+						typeof profileId === "string"
+							? getClaudeProfileManager().getProfileToken(profileId)
+							: undefined;
+					if (!profileToken) {
+						return {
+							success: false,
+							error: "Selected profile does not have a valid token",
+						};
+					}
+					token = profileToken;
+				}
 				// Revalidated here (rule S6): the file holds one variable per line.
 				if (
 					token !== undefined &&

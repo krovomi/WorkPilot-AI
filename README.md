@@ -134,6 +134,8 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 
 **Multi-account switching** — Register multiple profiles per provider. WorkPilot AI automatically switches to an available account when one hits a rate limit.
 
+**Keys stay out of the interface** — Once saved, a key or token shows up masked in every screen. Connection tests run in the app's main process. If you change a profile's base URL, you are asked for its key again: a saved key is only sent to the URL it was saved for.
+
 ### Code Intelligence
 
 | Feature | Description |
