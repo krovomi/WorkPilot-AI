@@ -344,8 +344,6 @@ export function CleanProviderSection({
 		);
 		for (const provider of untested) {
 			try {
-				const currentProfiles = useSettingsStore.getState().profiles;
-				ProviderService.setProfiles(currentProfiles);
 				const result = await ProviderService.testProvider(provider.id);
 				const testResult = {
 					date: new Date().toISOString(),
@@ -726,8 +724,6 @@ export function CleanProviderSection({
 
 	// Extracted helper functions to reduce nesting
 	const testProvider = async (providerId: string) => {
-		const currentProfiles = getCurrentProfiles();
-		ProviderService.setProfiles(currentProfiles);
 		return await ProviderService.testProvider(providerId);
 	};
 
@@ -804,12 +800,6 @@ export function CleanProviderSection({
 				error: t("sections.accounts.providerCard.errors.unknownError"),
 			}),
 		});
-	};
-
-	// Récupérer les profiles actuels pour le test
-	const getCurrentProfiles = () => {
-		const { profiles } = useSettingsStore.getState();
-		return profiles;
 	};
 
 	const handleToggle = async (providerId: string, enabled: boolean) => {

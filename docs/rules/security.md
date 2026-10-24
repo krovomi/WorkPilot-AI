@@ -143,6 +143,10 @@ l'UI n'existe pas.
 - Le renderer ne fournit jamais une commande à exécuter ni un exécutable à lancer : le main
   construit la commande, lit un lanceur personnalisé dans les réglages et rattache un dossier
   reçu à un projet connu (`resolveOpenableDir`).
+- Le renderer ne reçoit jamais un identifiant stocké, seulement qu'il est défini : `MASKED_SECRET`
+  (`main/utils/masked-secret.ts`), relu au retour comme « garder la valeur ». Une clé masquée ne sert
+  qu'à l'URL pour laquelle elle a été enregistrée ; un appel à un provider avec une clé se fait
+  dans le main. → [`architecture/secrets-at-rest.md`](../architecture/secrets-at-rest.md)
 - URL externe : `openExternalUrl` (`open-external.ts`, protocoles en liste fermée), jamais
   `shell.openExternal` sur une chaîne reçue.
 - CSP (`src/renderer/index.html`) : pas d'`unsafe-eval`, pas de nouvel hôte sans raison écrite.
