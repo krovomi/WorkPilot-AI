@@ -53,7 +53,7 @@
 │  └───────────────────────────────────────────────────────────┘    │
 │                                                                     │
 │  ┌───────────────────────────────────────────────────────────┐    │
-│  │ release-handlers.ts (126 lines)                           │    │
+│  │ release-handlers.ts                                       │    │
 │  │ • Create GitHub releases                                  │    │
 │  │ • Validate gh CLI availability                            │    │
 │  │ • Check authentication status                             │    │
@@ -326,6 +326,6 @@ export function registerGithubHandlers(...) {
 
 1. **Token Storage**: Tokens stored in project .env (not version controlled)
 2. **Input Validation**: All user inputs validated before use
-3. **Command Injection**: Release handler carefully escapes shell arguments
+3. **Command Injection**: Release handler runs `gh` without a shell, notes on stdin
 4. **API Errors**: GitHub API errors don't leak sensitive information
 5. **File Operations**: All file ops restricted to project directory

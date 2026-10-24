@@ -2,7 +2,7 @@
  * GitHub release creation IPC handlers
  */
 
-import { execFileSync, execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { ipcMain } from "electron";
@@ -17,6 +17,9 @@ import { getToolPath } from "../../cli-tool-manager";
 import { getWhichCommand } from "../../platform";
 import { projectStore } from "../../project-store";
 import type { ReleaseOptions } from "./types";
+
+/** `1.2.3`, `v1.2.3`, `1.2.3-beta.1+build.5` : a tag, never an option. */
+const RELEASE_VERSION_REGEX = /^v?\d+\.\d+\.\d+[0-9A-Za-z.+-]*$/;
 
 /**
  * Check if gh CLI is installed
@@ -61,11 +64,13 @@ function checkGhAuth(projectPath: string): {
 }
 
 /**
- * Build gh release command arguments
+ * Build gh release command arguments.
+ *
+ * The notes are not in argv: `--notes-file -` makes gh read them from stdin,
+ * so a long changelog never hits the Windows command-line limit.
  */
-function buildReleaseArgs(
+export function buildReleaseArgs(
 	version: string,
-	releaseNotes: string,
 	options?: ReleaseOptions,
 ): string[] {
 	const tag = version.startsWith("v") ? version : `v${version}`;
@@ -75,8 +80,8 @@ function buildReleaseArgs(
 		tag,
 		"--title",
 		tag,
-		"--notes",
-		releaseNotes,
+		"--notes-file",
+		"-",
 	];
 
 	if (options?.draft) {
@@ -106,6 +111,12 @@ export function registerCreateRelease(): void {
 			if (!project) {
 				return { success: false, error: "Project not found" };
 			}
+			if (typeof version !== "string" || !RELEASE_VERSION_REGEX.test(version)) {
+				return { success: false, error: "Invalid release version" };
+			}
+			if (typeof releaseNotes !== "string") {
+				return { success: false, error: "Invalid release notes" };
+			}
 
 			// Check if gh CLI is available
 			const cliCheck = checkGhCli();
@@ -120,15 +131,18 @@ export function registerCreateRelease(): void {
 			}
 
 			try {
-				// Build and execute release command
-				const args = buildReleaseArgs(version, releaseNotes, options);
-				const command = `gh ${args.map((a) => `"${a.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`).join(" ")}`;
-
-				const output = execSync(command, {
-					cwd: project.path,
-					encoding: "utf-8",
-					stdio: "pipe",
-				}).trim();
+				// No shell: the notes are LLM output built from the target repo's
+				// commits (external content), so they only ever reach gh as data.
+				const output = execFileSync(
+					getToolPath("gh"),
+					buildReleaseArgs(version, options),
+					{
+						cwd: project.path,
+						encoding: "utf-8",
+						input: releaseNotes,
+						stdio: "pipe",
+					},
+				).trim();
 
 				// Output is typically the release URL
 				const tag = version.startsWith("v") ? version : `v${version}`;
