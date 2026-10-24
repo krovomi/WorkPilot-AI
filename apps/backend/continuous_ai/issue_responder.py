@@ -298,7 +298,6 @@ class IssueResponder:
                     cwd=str(self.project_dir),
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
-                    text=True,
                 )
 
                 try:
@@ -316,12 +315,20 @@ class IssueResponder:
                 if process.returncode == 0:
                     results.append(f"Added label: {label}")
                 else:
-                    logger.warning("Failed to add label: %s", stderr)
+                    failure = stderr.decode("utf-8", errors="replace").strip()
+                    logger.warning("Failed to add label: %s", failure)
+                    return {
+                        "success": False,
+                        "error": f"Could not add label {label}: {failure}",
+                    }
 
-            except (TimeoutError, FileNotFoundError):
-                pass
+            except FileNotFoundError:
+                return {"success": False, "error": "gh CLI not found"}
+            except TimeoutError:
+                return {"success": False, "error": "gh issue edit timed out"}
             except Exception as e:
                 logger.error("Error adding label: %s", e)
+                return {"success": False, "error": f"Could not add label: {e}"}
 
         return {
             "success": True,
@@ -333,10 +340,11 @@ class IssueResponder:
         Investigate a bug report by analyzing the issue description
         and searching the codebase for relevant context.
         """
-        # This would invoke the existing issue_analyzer runner
+        # Nothing investigates yet: saying "initiated" marked the action
+        # completed while no work happened.
         return {
-            "success": True,
-            "message": f"Bug investigation initiated for #{issue_number}",
+            "success": False,
+            "error": f"Bug investigation is not available yet (issue #{issue_number})",
         }
 
     def _build_description(self, issue: dict[str, Any], classification: str) -> str:

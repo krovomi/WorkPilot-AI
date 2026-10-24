@@ -34,7 +34,7 @@ _No binaries are attached to this release yet. See [the release page](https://gi
 _No beta build is currently published. The table above is the latest stable release._
 <!-- BETA_DOWNLOADS_END -->
 
-> All releases include SHA256 checksums and VirusTotal scan results for security verification.
+> All releases include SHA256 checksums; VirusTotal scan results are added to the release notes when the scan is configured.
 
 ---
 
@@ -825,7 +825,7 @@ WorkPilot AI uses a three-layer security model:
 2. **Filesystem Restrictions** — Operations limited to project directory
 3. **Dynamic Command Allowlist** — Only approved commands based on detected project stack
 
-All releases include SHA256 checksums and VirusTotal scans.
+All releases include SHA256 checksums, and VirusTotal scan results once the scan is configured for the repository.
 
 To report a vulnerability, follow [docs/SECURITY.md](docs/SECURITY.md) — never a public issue.
 The security rules contributors and coding agents follow are in [docs/rules/security.md](docs/rules/security.md).

@@ -236,7 +236,7 @@ async function getGitHubPRDetails(
 /**
  * Get Azure DevOps PR details
  */
-async function getAzureDevOpsPRDetails(
+export async function getAzureDevOpsPRDetails(
 	prNumber: number,
 	prUrl: string,
 	project: Project | null,
@@ -267,7 +267,9 @@ async function getAzureDevOpsPRDetails(
 			};
 		}
 
-		// Try to call Azure DevOps Python connector using existing project configuration
+		// No fallback: a PR the connector could not read is an error the user
+		// sees, never invented details (author, files, labels) shown as real.
+		let failure = "Azure DevOps did not return this pull request";
 		try {
 			const result = await callAzureDevOpsPythonWithExistingConfig(
 				project,
@@ -277,30 +279,28 @@ async function getAzureDevOpsPRDetails(
 
 			if (result && !result.error) {
 				return transformAzureDevOpsData(result.data, prUrl);
-			} else {
-				console.warn("[PR_DETAILS] Python call returned error:", result?.error);
-				if (result?.traceback) {
-					console.error("[PR_DETAILS] Python traceback:", result.traceback);
-				}
+			}
+			console.warn("[PR_DETAILS] Python call returned error:", result?.error);
+			if (result?.traceback) {
+				console.error("[PR_DETAILS] Python traceback:", result.traceback);
+			}
+			if (typeof result?.error === "string" && result.error) {
+				failure = result.error;
 			}
 		} catch (error) {
-			console.error(
-				"[PR_DETAILS] Azure DevOps API call failed, using mock data:",
-				error,
-			);
-			console.error(
-				"[PR_DETAILS] Error details:",
-				error instanceof Error ? error.message : error,
-			);
+			console.error("[PR_DETAILS] Azure DevOps API call failed:", error);
+			if (error instanceof Error && error.message) failure = error.message;
 		}
-
-		// Fallback to mock data
-		console.warn("[PR_DETAILS] Using enhanced mock data for Azure DevOps PR");
-		return getMockAzureDevOpsPRDetails(prNumber, prUrl);
+		return { success: false, error: failure };
 	} catch (error) {
 		console.error("[PR_DETAILS] Azure DevOps error:", error);
-		// Fallback to mock data
-		return getMockAzureDevOpsPRDetails(prNumber, prUrl);
+		return {
+			success: false,
+			error:
+				error instanceof Error
+					? error.message
+					: "Failed to fetch Azure DevOps PR details",
+		};
 	}
 }
 
@@ -799,78 +799,6 @@ function transformAzureDevOpsData(
 					: "Failed to transform Azure DevOps data",
 		};
 	}
-}
-
-/**
- * Mock Azure DevOps PR details for fallback
- */
-async function getMockAzureDevOpsPRDetails(
-	prNumber: number,
-	prUrl: string,
-): Promise<IPCResult<PRDetailsResult>> {
-	// Extract real info from URL for more realistic mock data
-	const urlRegex =
-		/https:\/\/dev\.azure\.com\/([^/]+)\/([^/]+)\/_git\/([^/]+)\/pullrequest\/(\d+)/;
-	const urlMatch = urlRegex.exec(prUrl);
-	const [, organization, projectName, repository] = urlMatch || [
-		undefined,
-		"Unknown Org",
-		"Unknown Project",
-		"Unknown Repo",
-	];
-
-	return {
-		success: true,
-		data: {
-			success: true,
-			data: {
-				number: prNumber,
-				title: `Planning atelier sécuriser l'accès au dossier d'un [PR #${prNumber}]`,
-				body: `This is a mock representation of Azure DevOps PR #${prNumber} from the ${repository} repository.\n\nThe actual PR details would be fetched from Azure DevOps API when a PAT is configured.\n\n**Organization**: ${organization}\n**Project**: ${projectName}\n**Repository**: ${repository}`,
-				state: "open",
-				url: prUrl,
-				additions: 25,
-				deletions: 12,
-				changed_files: 3,
-				source_branch: "feature/planning-atelier-securiser-acces",
-				target_branch: "main",
-				author: "Thomas Leberre",
-				created_at: "2025-02-22T10:30:00Z",
-				updated_at: "2025-02-22T14:15:00Z",
-				mergeable: true,
-				labels: ["planning", "security", "access-control"],
-				reviewers: ["Reviewer1", "Reviewer2"],
-				is_draft: false,
-				diff: "",
-				files: [
-					{
-						filename: "src/components/access-control/AccessManager.ts",
-						status: "modified" as const,
-						additions: 15,
-						deletions: 8,
-						changes: 23,
-						patch: "",
-					},
-					{
-						filename: "src/components/access-control/types.ts",
-						status: "added" as const,
-						additions: 8,
-						deletions: 0,
-						changes: 8,
-						patch: "",
-					},
-					{
-						filename: "src/utils/security-helpers.ts",
-						status: "modified" as const,
-						additions: 2,
-						deletions: 4,
-						changes: 6,
-						patch: "",
-					},
-				],
-			},
-		},
-	};
 }
 
 function mapAzureDevOpsChangeType(
