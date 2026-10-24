@@ -22,7 +22,10 @@ WORKDIR /app
 COPY apps/backend/requirements.lock /app/apps/backend/requirements.lock
 RUN pip install --no-cache-dir --require-hashes -r /app/apps/backend/requirements.lock
 
-COPY apps/backend /app/apps/backend
+# Owned by the server user: the backend writes beside its code at runtime
+# (websocket_server.log, the SQLite fallback, caches), and a read-only tree
+# would stop it at startup.
+COPY --chown=workpilot:workpilot apps/backend /app/apps/backend
 # Read from the repository root by the backend (`Path(__file__).parents[3]`):
 # the provider registry, the declarative workflows, the harness catalogue,
 # the skills and their emitted output, and SOUL.md.
