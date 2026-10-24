@@ -175,7 +175,7 @@ If `npm` command is not recognized after installing Node.js:
 
 ### Native module errors
 
-If you get errors about native modules (node-pty, etc.):
+If you get errors about native modules (`@lydell/node-pty`, `better-sqlite3`):
 
 ```bash
 pnpm run rebuild

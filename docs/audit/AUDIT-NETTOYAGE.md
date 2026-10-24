@@ -1900,9 +1900,14 @@ qu'à l'URL pour laquelle elle a été enregistrée. Détail :
   paquets livrent ; `test:coverage` demandait `@vitest/coverage-v8`, non déclaré.
 - **Correction** : les cinq retirés ; `@vitest/coverage-v8` épinglé sur la version de Vitest ;
   lockfile régénéré par pnpm.
-- **Reste** : `node-pty` n'est importé par rien (le code charge `@lydell/node-pty`), mais
-  `scripts/postinstall.cjs` et `download-prebuilds.cjs` le reconstruisent encore ; à retirer avec
-  `scripts/` (lot M8), après un essai d'installation Windows.
+- **Suite** (après M8) : `node-pty` retiré à son tour. Rien ne l'importait (le code charge
+  `@lydell/node-pty`, que `package-with-python.cjs` embarque), `apps/frontend/scripts/postinstall.cjs`
+  et `download-prebuilds.cjs` n'étaient appelés par aucun script de `package.json` (le
+  `postinstall` déclaré lance `install-electron` puis `electron-rebuild`), et les quatre étapes
+  « Install node-pty in frontend » de `beta-release.yml` ajoutaient au paquet une dépendance que
+  l'app ne charge pas. Les deux scripts, l'entrée `allowBuilds` et ces étapes sont retirés ;
+  lockfile régénéré par pnpm. L'essai d'installation sous Windows est le job
+  `test-frontend (windows-latest)` de la CI, qui installe depuis ce lockfile.
 
 #### F76 · Le détecteur acceptait un Python que le backend ne peut pas importer
 
@@ -2080,7 +2085,7 @@ Règles : [`frontend.md`](../rules/frontend.md) (un canal = une constante), [`ba
 **Fait.** Le code que rien n'appelle est retiré (≈ 30 k lignes, tests compris, accord du mainteneur
 le 24 octobre), les événements et modales qu'on croyait morts sont câblés, `scripts/` est décrit
 ligne à ligne, et les vues sans conception ni test sont marquées « Expérimental » au lieu d'être
-retirées. `node-pty` reste : son retrait attend un essai d'installation sous Windows.
+retirées. `node-pty` est retiré ensuite, l'installation Windows vérifiée par la CI (F75).
 
 #### F95 · 17,8 k lignes backend qu'aucun module n'importait
 
@@ -2504,7 +2509,7 @@ détaillés ici qu'une fois corrigés ([`SECURITY.md`](../SECURITY.md)).
 | M5 | Secrets et environnement des processus enfants | **fait** (F78 à F84 : journaux et processus enfants, aucun identifiant stocké dans le renderer, environnement construit pour les runners Python des vues et de forge) |
 | M6 | Frontière renderer → main, avec tests de refus | **fait** (F85 à F90 ; reste `senderFrame` et les chemins d'outils des réglages) |
 | M7 | Contrats d'architecture (`import-linter`, canaux IPC, Sidebar ↔ `product-overview.md`) | **fait** (F91 à F94 ; contrats d'imports en test AST, sans `import-linter`) |
-| M8 | Code mort, `scripts/`, vues sans test | **fait** (F95 à F100 ; vues sans conception ni test marquées « Expérimental » ; `node-pty` attend un essai sous Windows) |
+| M8 | Code mort, `scripts/`, vues sans test | **fait** (F95 à F100 ; vues sans conception ni test marquées « Expérimental » ; `node-pty` retiré ensuite, F75) |
 | M9 | Doc ↔ code, i18n de la palette, jsdom, dépendances | **fait** (F72 à F77) |
 | M10 | Casser le cycle `core ⇄ agents`, découper les fonctions géantes | **en cours** (F101, F102 : cycle de 81 à 26 unités ; F103 à F105 : boucles du coder et de la QA, `create_client` découpés ; reste `_build_agent_client`) |
 
