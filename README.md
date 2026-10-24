@@ -251,6 +251,10 @@ AI-assisted feature planning with competitor analysis and audience targeting.
 > sens et canaux nommés par constante (`ipc-channel-parity.test.ts`), imports entre unités du
 > backend et plafond du cycle principal (`tests/test_import_contracts.py`), une ligne par vue dans
 > [`product-overview.md`](docs/architecture/product-overview.md) (`tests/test_product_overview_views.py`).
+>
+> Une vue qui n'a encore ni document de conception ni test porte le badge « Expérimental » dans la
+> barre latérale. Un bouton en bas de la barre les masque toutes. Chaque script de
+> [`scripts/`](scripts/README.md) a sa ligne dans le README du dossier.
 
 ### Vue d'Ensemble
 
