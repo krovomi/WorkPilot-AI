@@ -209,5 +209,9 @@ export function getSentryEnvForSubprocess(): Record<string, string> {
 		SENTRY_PROFILES_SAMPLE_RATE: String(getProfilesSampleRate()),
 		// Pass SENTRY_DEV so Python backend also enables Sentry in dev mode
 		...(process.env.SENTRY_DEV ? { SENTRY_DEV: process.env.SENTRY_DEV } : {}),
+		// The packaged app runs plain Python scripts, which cannot tell they
+		// are packaged (no `sys.frozen`): the main process says so, and the
+		// backend reports errors on the same condition as the main process.
+		...(app.isPackaged ? { WORKPILOT_PACKAGED_APP: "1" } : {}),
 	};
 }

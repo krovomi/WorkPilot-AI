@@ -6,9 +6,10 @@ Main QA loop that coordinates reviewer and fixer sessions until
 approval or max iterations.
 """
 
+import asyncio
 import os
-import subprocess
 import time as time_module
+from dataclasses import dataclass
 from pathlib import Path
 
 from core.build_signals import BuildPaused
@@ -102,70 +103,111 @@ def _ensure_fix_request_file(
 MAX_CONSECUTIVE_ERRORS = 3  # Stop after 3 consecutive errors without progress
 
 
-async def _run_dotnet_tests(project_dir: Path) -> bool:
+@dataclass(frozen=True)
+class DotnetTestRun:
+    """What `dotnet test` said, for the QA verdict.
+
+    ``status`` is ``passed`` (every test project ran green), ``failed`` (at
+    least one returned non-zero or timed out) or ``unavailable`` (no test
+    project, no dotnet CLI): only the last one calls for a manual plan.
     """
-    Attempt to run dotnet test on the project.
 
-    Returns:
-        True if tests were found and executed, False otherwise.
+    status: str
+    detail: str = ""
+
+
+DOTNET_TEST_TIMEOUT_SECONDS = 300
+_DOTNET_OUTPUT_TAIL = 4000
+
+
+async def _run_dotnet_tests(project_dir: Path) -> DotnetTestRun:
+    """Run ``dotnet test`` on every test project, without blocking the loop."""
+    test_projects = []
+    for csproj in project_dir.glob("**/*.csproj"):
+        try:
+            content = csproj.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        if any(
+            fw in content
+            for fw in ["NUnit", "xunit", "MSTest", "Microsoft.NET.Test.Sdk"]
+        ):
+            test_projects.append(csproj)
+
+    if not test_projects:
+        return DotnetTestRun("unavailable", "no .NET test project found")
+
+    debug("qa_loop", f"Found {len(test_projects)} test project(s)")
+    print(f"   Found {len(test_projects)} test project(s)")
+
+    failures: list[str] = []
+    for test_project in test_projects:
+        name = str(test_project.relative_to(project_dir))
+        print(f"   Running tests in: {name}")
+        try:
+            process = await asyncio.create_subprocess_exec(
+                "dotnet",
+                "test",
+                str(test_project),
+                "-c",
+                "Debug",
+                cwd=str(project_dir),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+            )
+        except FileNotFoundError:
+            debug_error("qa_loop", "dotnet CLI not found on PATH")
+            return DotnetTestRun("unavailable", "dotnet CLI not found on PATH")
+        try:
+            output, _ = await asyncio.wait_for(
+                process.communicate(), timeout=DOTNET_TEST_TIMEOUT_SECONDS
+            )
+        except TimeoutError:
+            process.kill()
+            await process.wait()
+            print("      ❌ Tests timed out")
+            failures.append(
+                f"{name}: timed out after {DOTNET_TEST_TIMEOUT_SECONDS} seconds"
+            )
+            continue
+        text = output.decode("utf-8", errors="replace")
+        if process.returncode == 0:
+            print("      ✅ Tests passed")
+            debug("qa_loop", f"dotnet test passed for {test_project.name}")
+        else:
+            print("      ❌ Tests failed")
+            debug_warning(
+                "qa_loop",
+                f"dotnet test returned {process.returncode} for {test_project.name}",
+            )
+            failures.append(
+                f"{name}: exit code {process.returncode}\n{text[-_DOTNET_OUTPUT_TAIL:]}"
+            )
+
+    if failures:
+        return DotnetTestRun("failed", "\n\n".join(failures))
+    return DotnetTestRun("passed", f"{len(test_projects)} test project(s) passed")
+
+
+def dotnet_test_advice(run: DotnetTestRun, spec_dir: Path) -> str:
+    """The reviewer's note on a failed ``dotnet test``; empty otherwise.
+
+    The output comes from the project under review, so it enters the prompt
+    fenced as data (docs/rules/security.md, S2).
     """
-    try:
-        # Search for test projects (*.csproj files with test frameworks)
-        test_projects = []
-        for csproj in project_dir.glob("**/*.csproj"):
-            try:
-                content = csproj.read_text(encoding="utf-8", errors="ignore")
-                if any(
-                    fw in content
-                    for fw in ["NUnit", "xunit", "MSTest", "Microsoft.NET.Test.Sdk"]
-                ):
-                    test_projects.append(csproj)
-            except OSError:
-                pass
+    if run.status != "failed":
+        return ""
+    from security.untrusted import quote_untrusted
 
-        if not test_projects:
-            return False
-
-        debug("qa_loop", f"Found {len(test_projects)} test project(s)")
-        print(f"   Found {len(test_projects)} test project(s)")
-
-        # Run dotnet test on each test project
-        for test_project in test_projects:
-            print(f"   Running tests in: {test_project.relative_to(project_dir)}")
-            try:
-                result = subprocess.run(
-                    ["dotnet", "test", str(test_project), "-c", "Debug"],
-                    capture_output=True,
-                    text=True,
-                    timeout=300,
-                    cwd=str(project_dir),
-                )
-                if result.returncode == 0:
-                    print("      ✅ Tests passed")
-                    debug("qa_loop", f"dotnet test passed for {test_project.name}")
-                else:
-                    print("      ⚠️  Tests failed or no tests found")
-                    debug_warning(
-                        "qa_loop",
-                        f"dotnet test returned {result.returncode} for {test_project.name}",
-                    )
-                    if result.stdout:
-                        debug("qa_loop", f"stdout: {result.stdout[:500]}")
-                    if result.stderr:
-                        debug_error("qa_loop", f"stderr: {result.stderr[:500]}")
-            except FileNotFoundError:
-                debug_error("qa_loop", "dotnet CLI not found on PATH")
-                return False
-            except subprocess.TimeoutExpired:
-                debug_error("qa_loop", "dotnet test timed out after 300 seconds")
-                print("      ❌ Tests timed out")
-                return False
-
-        return True
-
-    except Exception as e:
-        debug_error("qa_loop", f"Error running dotnet tests: {e}")
-        return False
+    return (
+        "## dotnet test failed\n\n"
+        "WorkPilot ran `dotnet test` before this review and it failed. A failing "
+        "test suite is a rejection unless the failure is shown to predate this "
+        "build. Output:\n\n"
+        + quote_untrusted(
+            run.detail, kind="tool_output", source="dotnet test", spec_dir=spec_dir
+        )
+    )
 
 
 async def _handle_rate_limit_in_qa(
@@ -399,6 +441,7 @@ async def run_qa_validation_loop(
     # ── End Security Scan ─────────────────────────────────────────────────────
 
     # Check for no-test projects and attempt .NET test execution
+    dotnet_advice = ""
     if is_no_test_project(spec_dir, project_dir):
         print("\n⚠️  No test framework detected in project.")
 
@@ -407,21 +450,17 @@ async def run_qa_validation_loop(
 
         if detect_dotnet_project(project_dir):
             print("Detected .NET project — attempting to run dotnet test...")
-            try:
-                result = await _run_dotnet_tests(project_dir)
-                if result:
-                    print("✅ dotnet test executed successfully")
-                else:
-                    print("⚠️  dotnet test found no test projects")
-                    print("Creating manual test plan as fallback...")
-                    manual_plan = create_manual_test_plan(spec_dir, spec_dir.name)
-                    print(f"📝 Manual test plan created: {manual_plan}")
-            except Exception as e:
-                debug_error("qa_loop", f"dotnet test failed: {e}")
-                print(f"⚠️  dotnet test execution failed: {e}")
+            dotnet_run = await _run_dotnet_tests(project_dir)
+            if dotnet_run.status == "passed":
+                print(f"✅ dotnet test passed ({dotnet_run.detail})")
+            elif dotnet_run.status == "failed":
+                print("❌ dotnet test failed: the QA reviewer is told so")
+            else:
+                print(f"⚠️  dotnet test unavailable: {dotnet_run.detail}")
                 print("Creating manual test plan as fallback...")
                 manual_plan = create_manual_test_plan(spec_dir, spec_dir.name)
                 print(f"📝 Manual test plan created: {manual_plan}")
+            dotnet_advice = dotnet_test_advice(dotnet_run, spec_dir)
         else:
             print("Creating manual test plan...")
             manual_plan = create_manual_test_plan(spec_dir, spec_dir.name)
@@ -592,7 +631,9 @@ async def run_qa_validation_loop(
                     qa_iteration,
                     max_iterations,
                     verbose,
-                    jev_advice=jev_advice,
+                    jev_advice="\n\n".join(
+                        part for part in (dotnet_advice, jev_advice) if part
+                    ),
                     previous_error=last_error_context,  # Pass error context for self-correction
                 )
         except Exception as e:
