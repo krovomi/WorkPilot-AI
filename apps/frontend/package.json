@@ -239,7 +239,7 @@
 		},
 		"win": {
 			"icon": "resources/icon.ico",
-			"requestedExecutionLevel": "requireAdministrator",
+			"requestedExecutionLevel": "asInvoker",
 			"target": [
 				"nsis",
 				"zip",
