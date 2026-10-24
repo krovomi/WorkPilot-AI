@@ -101,6 +101,9 @@ ici. Six modules de production portent seulement le préfixe `test_` (`agents/te
 `analysis/test_discovery.py`…) : `apps/backend` reste dans `testpaths` pour eux seuls, car
 `tests/test_test_discovery.py` exige que tout `test_*.py` soit collecté ; ils ne produisent aucun test.
 
-À la racine du backend restent des modules propres (`phase_config.py`, `models_registry.py`) et des
+À la racine du backend restent des modules propres (`phase_config.py`, `models_registry.py`,
+`provider_selection.py`, le provider choisi dans l'UI, lu sans importer l'API) et des
 points d'entrée lancés par chemin ou par uvicorn (`run.py`, `start_backend.py`, `provider_api.py`,
 `analyzer.py`, `commit_message.py`) ; `insight_extractor.py` est un réexport en sursis.
+Les dépendances entre unités de premier niveau sont gardées par `tests/test_import_contracts.py`
+(règle dans [`backend.md`](../../docs/rules/backend.md#code-python)).

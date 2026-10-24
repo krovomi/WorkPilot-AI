@@ -157,6 +157,7 @@ src/
 - **Never expose secrets**: API keys and tokens stay in the main process. A handler hands the renderer `MASKED_SECRET` for a stored credential and reads the mask coming back as "keep the stored value" (`src/main/utils/masked-secret.ts`). A masked key is only used with the URL it was saved for. Calls to a provider with a key are made in main.
 - **Validate IPC data**: Always validate data coming through IPC. A path from the renderer is resolved with `src/main/security/renderer-path.ts` and must sit in a registered project or a folder the user picked in a native dialog; a new handler parameter named like a directory (`projectPath`, `worktreePath`, `specDir`…) goes in `DIRECTORY_ARGS` (`src/main/security/ipc-path-policy.ts`), which its test enforces. The renderer never names an executable to run.
 - **Use contextBridge**: Never expose Node.js APIs directly to renderer
+- **Name channels by constant**: a channel is written once, in `IPC_CHANNELS` (`src/shared/constants/ipc.ts`), and every handler, call, send and listener names it from there. `src/main/ipc-handlers/__tests__/ipc-channel-parity.test.ts` checks both directions (an event main sends has a preload listener, and the reverse), refuses a literal channel and an unused constant. Listeners of main events are registered in `src/renderer/stores/global-listeners.ts`.
 
 ## Troubleshooting
 

@@ -88,6 +88,11 @@ coder, la QA et la spec. Voir [`architecture/pause-resume.md`](../architecture/p
 - **Importer le module réel**, jamais un fichier de la racine qui le réexporte : `core.debug`,
   `core.worktree`, `qa`. Les cales de compatibilité ont été retirées.
 - Un sous-processus prend une liste d'arguments, sans shell (règle S4 de [`security.md`](security.md)).
+- **Contrats d'imports** entre unités de premier niveau (`tests/test_import_contracts.py`) :
+  `security`, `server`, `phase_config`, `harness` et `provider_selection` n'importent que ce que
+  `ALLOWED_IMPORTS` leur accorde, et le plus grand cycle d'imports (`MAX_CYCLE`) ne grandit pas.
+  Un import paresseux dans une fonction compte. Élargir un contrat se justifie dans la PR ; casser
+  une partie du cycle fait baisser `MAX_CYCLE`.
 
 ## Tests
 
