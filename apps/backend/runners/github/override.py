@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -69,9 +69,7 @@ class OverrideRecord:
     reason: str | None
     original_state: str | None
     new_state: str | None
-    created_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -101,7 +99,7 @@ class OverrideRecord:
             reason=data.get("reason"),
             original_state=data.get("original_state"),
             new_state=data.get("new_state"),
-            created_at=data.get("created_at", datetime.now(timezone.utc).isoformat()),
+            created_at=data.get("created_at", datetime.now(UTC).isoformat()),
             metadata=data.get("metadata", {}),
         )
 
@@ -149,12 +147,12 @@ class GracePeriodEntry:
         if self.cancelled:
             return False
         expires = datetime.fromisoformat(self.expires_at)
-        return datetime.now(timezone.utc) < expires
+        return datetime.now(UTC) < expires
 
     def time_remaining(self) -> timedelta:
         """Get remaining time in grace period."""
         expires = datetime.fromisoformat(self.expires_at)
-        remaining = expires - datetime.now(timezone.utc)
+        remaining = expires - datetime.now(UTC)
         return max(remaining, timedelta(0))
 
 
@@ -266,7 +264,7 @@ class OverrideManager:
             GracePeriodEntry tracking the grace period
         """
         minutes = grace_minutes or self.grace_period_minutes
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         entry = GracePeriodEntry(
             issue_number=issue_number,
@@ -287,7 +285,7 @@ class OverrideManager:
             if data is None:
                 data = {"entries": {}}
             data["entries"][str(entry.issue_number)] = entry.to_dict()
-            data["last_updated"] = datetime.now(timezone.utc).isoformat()
+            data["last_updated"] = datetime.now(UTC).isoformat()
             return data
 
         import asyncio
@@ -336,7 +334,7 @@ class OverrideManager:
 
         entry.cancelled = True
         entry.cancelled_by = cancelled_by
-        entry.cancelled_at = datetime.now(timezone.utc).isoformat()
+        entry.cancelled_at = datetime.now(UTC).isoformat()
 
         self._save_grace_entry(entry)
         return True
@@ -748,7 +746,7 @@ class OverrideManager:
             data["records"].insert(0, record.to_dict())
             # Keep last 1000 records
             data["records"] = data["records"][:1000]
-            data["last_updated"] = datetime.now(timezone.utc).isoformat()
+            data["last_updated"] = datetime.now(UTC).isoformat()
             return data
 
         import asyncio

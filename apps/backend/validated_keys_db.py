@@ -32,7 +32,7 @@ import logging
 import os
 import secrets
 import sqlite3
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -212,7 +212,7 @@ def set_validated(provider: str, api_key: str, validated: bool):
                 provider,
                 _maybe_encrypt(h),
                 int(validated),
-                datetime.now(timezone.utc).isoformat(),
+                datetime.now(UTC).isoformat(),
             ),
         )
         conn.commit()
@@ -231,7 +231,7 @@ def is_validated(provider: str, api_key: str) -> bool:
     finally:
         conn.close()
 
-    cutoff = datetime.now(timezone.utc) - timedelta(days=_ttl_days())
+    cutoff = datetime.now(UTC) - timedelta(days=_ttl_days())
 
     for stored_hash, validated_flag, validated_at in rows:
         if not validated_flag:
@@ -259,7 +259,7 @@ def _within_ttl(validated_at: str | None, cutoff: datetime) -> bool:
     except ValueError:
         return False
     if ts.tzinfo is None:
-        ts = ts.replace(tzinfo=timezone.utc)
+        ts = ts.replace(tzinfo=UTC)
     return ts >= cutoff
 
 
@@ -279,7 +279,7 @@ def _migrate_legacy_row(provider: str, old_stored_hash: str, api_key: str) -> No
                 provider,
                 _maybe_encrypt(new_hash),
                 1,
-                datetime.now(timezone.utc).isoformat(),
+                datetime.now(UTC).isoformat(),
             ),
         )
         conn.commit()
@@ -289,7 +289,7 @@ def _migrate_legacy_row(provider: str, old_stored_hash: str, api_key: str) -> No
 
 def _prune_expired(conn: sqlite3.Connection) -> int:
     """Delete rows older than the TTL. Returns the number of rows removed."""
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=_ttl_days())).isoformat()
+    cutoff = (datetime.now(UTC) - timedelta(days=_ttl_days())).isoformat()
     cur = conn.execute("DELETE FROM validated_keys WHERE validated_at < ?", (cutoff,))
     removed = cur.rowcount or 0
     if removed:

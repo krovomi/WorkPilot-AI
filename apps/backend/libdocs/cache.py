@@ -21,7 +21,7 @@ import os
 import re
 import tempfile
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 __all__ = [
@@ -204,7 +204,7 @@ class DocsCache:
             # costs one call, serving documentation of unknown age costs a
             # coder writing against an API that may no longer exist.
             return True
-        return stamp < datetime.now(timezone.utc) - timedelta(days=self.ttl_days)
+        return stamp < datetime.now(UTC) - timedelta(days=self.ttl_days)
 
 
 def _ttl_from_env() -> int:
@@ -227,7 +227,7 @@ def _key(library_id: str, query: str) -> str:
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 def _parse(raw: str) -> datetime | None:
@@ -236,7 +236,7 @@ def _parse(raw: str) -> datetime | None:
     except (TypeError, ValueError):
         return None
     if stamp.tzinfo is None:
-        stamp = stamp.replace(tzinfo=timezone.utc)
+        stamp = stamp.replace(tzinfo=UTC)
     return stamp
 
 

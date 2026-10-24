@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -157,7 +158,7 @@ class TestAnalyticsIngest:
         # Build fake BuildPhase objects.
         from datetime import datetime, timedelta, timezone
 
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        now = datetime.now(UTC).replace(tzinfo=None)
 
         def _phase(phase_type, *, success=True, duration=1.5, started_at=None):
             p = MagicMock()

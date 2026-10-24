@@ -8,7 +8,7 @@ entry point to enable progressive loading and token optimization.
 import json
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,7 @@ class StackAnalyzerCore:
         """Create analysis from provided data (for testing)."""
         analysis = StackAnalysis(
             project_root="test",
-            analysis_timestamp=datetime.now(timezone.utc).isoformat(),
+            analysis_timestamp=datetime.now(UTC).isoformat(),
             detected_languages=languages or [],
             detected_frameworks=frameworks or [],
         )
@@ -56,7 +56,7 @@ class StackAnalyzerCore:
         """Perform the actual analysis logic."""
         analysis = StackAnalysis(
             project_root=project_root,
-            analysis_timestamp=datetime.now(timezone.utc).isoformat(),
+            analysis_timestamp=datetime.now(UTC).isoformat(),
         )
 
         root = Path(project_root)

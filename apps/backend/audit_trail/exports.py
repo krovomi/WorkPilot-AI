@@ -21,7 +21,7 @@ import io
 import json
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -43,7 +43,7 @@ SOC2_COLUMNS = (
 
 def _isoformat(unix_ts: float) -> str:
     return (
-        datetime.fromtimestamp(unix_ts, tz=timezone.utc)
+        datetime.fromtimestamp(unix_ts, tz=UTC)
         .isoformat(timespec="seconds")
         .replace("+00:00", "Z")
     )
@@ -164,7 +164,7 @@ def build_dsar_bundle(
     return DSARBundle(
         subject=subject,
         subject_kind=subject_kind,
-        generated_at_iso=_isoformat(datetime.now(tz=timezone.utc).timestamp()),
+        generated_at_iso=_isoformat(datetime.now(tz=UTC).timestamp()),
         events=[evt.to_dict() for evt in events],
         integrity_intact=integrity.is_intact,
         integrity_reason=integrity.breakage_reason,

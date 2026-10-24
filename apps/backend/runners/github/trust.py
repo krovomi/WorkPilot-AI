@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import IntEnum
 from pathlib import Path
 from typing import Any
@@ -165,7 +165,7 @@ class AccuracyMetrics:
         if not self.first_action_at:
             return 0
         first = datetime.fromisoformat(self.first_action_at)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         return (now - first).days
 
     def record_action(
@@ -175,7 +175,7 @@ class AccuracyMetrics:
         overridden: bool = False,
     ) -> None:
         """Record an action outcome."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         self.total_actions += 1
         if correct:
@@ -313,7 +313,7 @@ class TrustState:
         if new_level <= self.current_level:
             return
 
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         self.level_history.append(
             {
                 "from_level": self.current_level.value,
@@ -332,7 +332,7 @@ class TrustState:
             return
 
         new_level = TrustLevel(self.current_level - 1)
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         self.level_history.append(
             {
                 "from_level": self.current_level.value,
@@ -348,7 +348,7 @@ class TrustState:
         """Set or clear manual trust level override."""
         self.manual_override = level
         if level is not None:
-            now = datetime.now(timezone.utc).isoformat()
+            now = datetime.now(UTC).isoformat()
             self.level_history.append(
                 {
                     "from_level": self.current_level.value,

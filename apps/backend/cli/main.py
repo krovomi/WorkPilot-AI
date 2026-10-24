@@ -543,9 +543,7 @@ def handle_doctor_command() -> None:
 
     optional_deps = [
         ("secretstorage", "Linux Secret Service (credential storage)"),
-        ("google.generativeai", "Google Gemini provider"),
         ("openai", "OpenAI / Azure OpenAI provider"),
-        ("anthropic", "Anthropic SDK"),
         ("httpx", "HTTP client (required)"),
         ("pydantic", "Validation (required)"),
     ]

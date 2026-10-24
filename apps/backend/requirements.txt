@@ -11,9 +11,6 @@ faster-whisper>=1.2.1
 # WebSocket support for streaming development mode
 websockets>=17.1
 
-# TOML parsing fallback for Python < 3.11
-tomli>=2.5.0; python_version < "3.11"
-
 # YAML parsing. Imported behind try/except by api_watcher/contract_parser.py,
 # analysis/ci_discovery.py, environment/capturer.py and
 # scheduling/task_templates.py, and required outright by
@@ -29,9 +26,6 @@ secretstorage>=3.5.0; sys_platform == "linux"
 # Windows-specific dependency
 # Required on all Python versions on Windows (ACS-306) - MCP library unconditionally imports win32api
 pywin32>=312; sys_platform == "win32"
-
-# Google AI (optional - for Gemini LLM and embeddings)
-google-generativeai>=0.8.6
 
 # Pydantic for structured output schemas
 pydantic>=2.14.1
@@ -71,7 +65,9 @@ httpx[http2]>=0.28.1
 # any environment that did not happen to pull aiohttp in transitively.
 aiohttp>=3.14.5
 h2>=4.4.1  # HTTP/2 support for Windsurf gRPC proxy
-sqlalchemy>=2.1.1
+# [asyncio] brings greenlet, without which every async engine (the server
+# database, its Alembic migrations) fails at its first query.
+sqlalchemy[asyncio]>=2.1.1
 psutil>=7.2.2
 azure-devops>=7.1.0b4  # Azure DevOps SDK for src/connectors/azure_devops
 msrest>=0.7.1           # Required by azure-devops SDK
@@ -81,9 +77,6 @@ msrest>=0.7.1           # Required by azure-devops SDK
 # in exactly the way stdlib xml.etree is not built for (entity expansion —
 # CodeQL py/xml-bomb).
 defusedxml>=0.7.1
-
-# Anthropic SDK for Claude API integration
-anthropic>=1.15.0
 
 # Browser Agent (Feature #20) — headless Chromium for screenshots/E2E.
 # After install, the Chromium binary must be fetched once:

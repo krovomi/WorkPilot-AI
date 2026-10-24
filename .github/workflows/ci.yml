@@ -4,37 +4,33 @@
 # platform-specific bugs before they merge. ALL platforms must pass.
 #
 # Optimized: Reduced matrix (4 jobs vs 6), merged integration tests,
-# coverage on Linux only, path filters to skip on docs-only changes.
+# coverage on Linux only; only files nothing reads skip it (paths-ignore).
 
 name: CI
 
 on:
   push:
     branches: [main, develop]
-    paths:
-      - 'apps/**'
-      - 'tests/**'
-      - 'src/**'
-      - 'package*.json'
-      - 'requirements*.txt'
-      - 'pyproject.toml'
-      - 'tsconfig*.json'
-      - 'biome.jsonc'
-      - '.github/workflows/ci.yml'
-      - '.github/actions/**'
+    # Not a whitelist: a whitelist forgets whatever a test starts reading
+    # (pnpm-lock.yaml, pytest.ini, workflows/, capabilities/, config/,
+    # skills/ were all read by tests and all missing). Only files nothing
+    # builds, lints or reads are skipped; tests/test_ci_triggers.py holds
+    # this list to that.
+    paths-ignore:
+      - 'CHANGELOG.md'
+      - 'LICENSE'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/FUNDING.yml'
+      - '.github/PULL_REQUEST_TEMPLATE.md'
   pull_request:
     branches: [main, develop]
-    paths:
-      - 'apps/**'
-      - 'tests/**'
-      - 'src/**'
-      - 'package*.json'
-      - 'requirements*.txt'
-      - 'pyproject.toml'
-      - 'tsconfig*.json'
-      - 'biome.jsonc'
-      - '.github/workflows/ci.yml'
-      - '.github/actions/**'
+    # Same list as push.
+    paths-ignore:
+      - 'CHANGELOG.md'
+      - 'LICENSE'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/FUNDING.yml'
+      - '.github/PULL_REQUEST_TEMPLATE.md'
 
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
@@ -46,7 +42,7 @@ permissions:
 
 jobs:
   # --------------------------------------------------------------------------
-  # Python Backend Tests - Python 3.13 version on all platforms
+  # Python Backend Tests - 3.13 on all platforms, 3.12 on Linux
   # --------------------------------------------------------------------------
   test-python:
     name: test-python (${{ matrix.python-version }}, ${{ matrix.os }})
@@ -55,8 +51,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 3.13 on all OS for latest version coverage
+        # 3.13 on all OS for latest version coverage, and 3.12 (the floor:
+        # the bundled runtime, the server image, ruff's target-version) on
+        # Linux, so code that needs 3.13 cannot merge unnoticed.
         include:
+          - os: ubuntu-latest
+            python-version: '3.12'
           - os: ubuntu-latest
             python-version: '3.13'
           - os: windows-latest
@@ -145,12 +145,71 @@ jobs:
         run: pnpm run build
 
   # --------------------------------------------------------------------------
+  # Server image - build it, migrate a real database with it, serve /health
+  # --------------------------------------------------------------------------
+  # The image had shipped a COPY of a file that did not exist and a first
+  # migration that failed on a fresh database, and nothing built it. This job
+  # does what `docker compose up` does, against the same Postgres major.
+  server-image:
+    name: server-image
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: workpilot
+          POSTGRES_USER: workpilot
+          POSTGRES_PASSWORD: workpilot-ci  # pragma: allowlist secret
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U workpilot"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Build the server image
+        run: docker build -f deploy/Dockerfile.server -t workpilot-server:ci .
+
+      - name: Migrate, start, and answer /health
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Throwaway values for a throwaway database, made here and gone with
+          # the runner: the server refuses to start in server mode without them.
+          jwt="$(openssl rand -hex 32)"
+          master="$(python3 -c 'import base64, os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())')"
+          docker run -d --name server --network host \
+            -e WORKPILOT_SERVER_MODE=true \
+            -e WORKPILOT_DATABASE_URL=postgresql+asyncpg://workpilot:workpilot-ci@127.0.0.1:5432/workpilot \
+            -e WORKPILOT_JWT_SECRET="$jwt" \
+            -e WORKPILOT_SECRETS_MASTER_KEY="$master" \
+            -e WORKPILOT_REPOS_ROOT=/data/repos \
+            workpilot-server:ci
+          for _ in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:9000/health; then
+              echo
+              docker exec server alembic -c server/db/alembic.ini current | grep '(head)'
+              exit 0
+            fi
+            if [ "$(docker inspect -f '{{.State.Running}}' server)" != "true" ]; then
+              break
+            fi
+            sleep 2
+          done
+          docker logs server
+          exit 1
+
+  # --------------------------------------------------------------------------
   # Gate Job - Single check for branch protection
   # --------------------------------------------------------------------------
   ci-complete:
     name: CI Complete
     runs-on: ubuntu-latest
-    needs: [test-python, test-frontend]
+    needs: [test-python, test-frontend, server-image]
     if: always()
     steps:
       - name: Check all CI jobs passed
@@ -158,10 +217,12 @@ jobs:
           echo "CI Job Results:"
           echo "  test-python:   ${{ needs.test-python.result }}"
           echo "  test-frontend: ${{ needs.test-frontend.result }}"
+          echo "  server-image:  ${{ needs.server-image.result }}"
           echo ""
 
           if [[ "${{ needs.test-python.result }}" != "success" ]] || \
-             [[ "${{ needs.test-frontend.result }}" != "success" ]]; then
+             [[ "${{ needs.test-frontend.result }}" != "success" ]] || \
+             [[ "${{ needs.server-image.result }}" != "success" ]]; then
             echo "❌ One or more CI jobs failed"
             exit 1
           fi

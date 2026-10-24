@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from .scanner import (
@@ -73,7 +73,7 @@ def render_attribution(
         category = classify_license(dep.declared_license)
         by_category[category][dep.ecosystem].append(dep)
 
-    when = (opts.timestamp or datetime.now(timezone.utc)).strftime("%Y-%m-%d")
+    when = (opts.timestamp or datetime.now(UTC)).strftime("%Y-%m-%d")
 
     lines: list[str] = [
         f"# Third-party attributions for {opts.project_name}",

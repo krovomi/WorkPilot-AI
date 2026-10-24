@@ -304,7 +304,7 @@ class IssueResponder:
                     _, stderr = await asyncio.wait_for(
                         process.communicate(), timeout=15
                     )
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     process.kill()
                     try:
                         await process.wait()

@@ -21,7 +21,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from .clean import Cleaning
@@ -53,7 +53,7 @@ def record(
         if target.is_file() and target.stat().st_size >= _MAX_LEDGER_BYTES:
             return False
         entry = {
-            "at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "tool": tool,
             "file": file_path,
             "removed": cleaning.removed,

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import ast
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from .models import DependencyGraph, DependencyNode
@@ -64,7 +64,7 @@ class DependencyGraphBuilder:
         Imported-by edges are computed as a reverse index after initial parsing.
         """
         graph = DependencyGraph()
-        graph.build_timestamp = datetime.now(timezone.utc).isoformat()
+        graph.build_timestamp = datetime.now(UTC).isoformat()
 
         files_indexed = 0
         for source_file in self._iter_source_files():

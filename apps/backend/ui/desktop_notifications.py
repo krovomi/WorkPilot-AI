@@ -19,7 +19,7 @@ import logging
 import uuid
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -101,9 +101,7 @@ class DesktopNotification:
     actions: list[NotificationAction] = field(default_factory=list)
     task_id: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
-    timestamp: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     read: bool = False
     clicked: bool = False
 
@@ -145,9 +143,7 @@ class PeriodicSummary:
     total_tokens: int = 0
     total_cost: float = 0.0
     highlights: list[str] = field(default_factory=list)
-    timestamp: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

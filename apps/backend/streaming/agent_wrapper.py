@@ -113,7 +113,7 @@ class StreamingAgentWrapper:
                 self._connected = True
                 self._connected_url = url
                 return True
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # Log at debug — silently dropping made misconfigured ports
                 # invisible to operators ("agents start successfully but
                 # emit zero events" was unsolvable without raising log
