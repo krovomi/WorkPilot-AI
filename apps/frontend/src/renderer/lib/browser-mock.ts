@@ -578,7 +578,6 @@ const browserMockAPI: Partial<ElectronAPI> = {
 	}),
 
 	// User directory operations
-	getUserHome: async () => "/mock/user/home",
 
 	// Learning Loop Operations
 	getLearningPatterns: async () => ({ success: true, data: [] }),

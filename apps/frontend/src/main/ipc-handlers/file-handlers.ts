@@ -9,6 +9,8 @@ import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
 import type { FileNode, FileSearchResult, IPCResult } from "../../shared/types";
 import { IGNORED_DIRS, searchProjectPaths } from "./path-search";
+import { PATH_REFUSED } from "../security/ipc-path-policy";
+import { resolveInProject } from "../security/renderer-path";
 
 // Maximum file size to read (1MB)
 const MAX_FILE_SIZE = 1024 * 1024;
@@ -206,7 +208,11 @@ export function registerFileHandlers(): void {
 				if (!validation.valid) {
 					return { success: false, error: validation.error };
 				}
-				const safePath = validation.path;
+				// Resolved (links included) inside a project or a picked folder.
+				const safePath = resolveInProject(validation.path, "file");
+				if (!safePath) {
+					return { success: false, error: PATH_REFUSED };
+				}
 
 				// Check file size before reading
 				const stats = statSync(safePath);
@@ -260,11 +266,6 @@ export function registerFileHandlers(): void {
 				};
 			}
 		},
-	);
-
-	ipcMain.handle(
-		IPC_CHANNELS.FILE_EXPLORER_GET_USER_HOME,
-		async (): Promise<string> => os.homedir(),
 	);
 
 	ipcMain.handle(

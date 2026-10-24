@@ -221,7 +221,6 @@ describe("CanvasPanel", () => {
 			onVisualProgrammingComplete: vi.fn(() => vi.fn()),
 			runVisualProgramming: vi.fn().mockResolvedValue({ success: true }),
 			saveJsonFile: vi.fn().mockResolvedValue({ success: true }),
-			getUserHome: vi.fn().mockResolvedValue("/home/user"),
 		};
 		// biome-ignore lint/suspicious/noExplicitAny: test double for the platform bridge
 		(globalThis as any).platform = { isWindows: false };

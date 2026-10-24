@@ -113,7 +113,7 @@
 	"customBlock": "Custom block",
 	"customBlockDesc": "Free block for any specific use",
 	"explorerRoot": "Explorer root:",
-	"selectFolder": "Select",
+	"chooseFolder": "Choose a folder…",
 	"fileNameLabel": "File name:",
 	"export": "Export JSON",
 	"saveAs": "Save as…",

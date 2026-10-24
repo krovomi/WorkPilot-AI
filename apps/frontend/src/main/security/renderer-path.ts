@@ -108,6 +108,33 @@ export function resolveUserChosen(
 	return resolveWithinRoots(target, [...userChosenPaths], kind);
 }
 
+/**
+ * Where `relative` would be written under `base`: the joined path, when it
+ * stays inside `base` and its closest existing ancestor (links resolved) does
+ * too. The file itself need not exist. `null` otherwise.
+ */
+export function resolveWritableUnder(
+	base: string,
+	relative: unknown,
+): string | null {
+	if (typeof relative !== "string" || !relative || path.isAbsolute(relative)) {
+		return null;
+	}
+	const root = realpathOrNull(base);
+	if (!root) return null;
+	const target = path.resolve(root, relative);
+	if (target === root || !isWithinRoot(target, root)) return null;
+	let ancestor = target;
+	while (!realpathOrNull(ancestor)) {
+		const parent = path.dirname(ancestor);
+		if (parent === ancestor) return null;
+		ancestor = parent;
+	}
+	const resolvedAncestor = realpathOrNull(ancestor);
+	if (!resolvedAncestor || !isWithinRoot(resolvedAncestor, root)) return null;
+	return path.join(resolvedAncestor, path.relative(ancestor, target));
+}
+
 /** The paths of the registered projects. */
 export function knownProjectRoots(): string[] {
 	return projectStore.getProjects().map((project) => project.path);

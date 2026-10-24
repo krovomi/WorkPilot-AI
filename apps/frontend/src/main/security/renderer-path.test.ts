@@ -27,6 +27,7 @@ import {
 	resolveKnownProject,
 	resolveUnder,
 	resolveWithinRoots,
+	resolveWritableUnder,
 } from "./renderer-path";
 
 let base: string;
@@ -147,5 +148,25 @@ describe("isAddableProject", () => {
 		expect(isAddableProject(outside)).toBe(true);
 		expect(isAddableProject(path.join(outside, "id_rsa"))).toBe(false);
 		forgetUserChosenPaths();
+	});
+});
+
+describe("resolveWritableUnder", () => {
+	it("allows a new file in an existing or a new subfolder", () => {
+		expect(resolveWritableUnder(project, "sub/new.txt")).toBe(
+			path.join(project, "sub", "new.txt"),
+		);
+		expect(resolveWritableUnder(project, "a/b/c.txt")).toBe(
+			path.join(project, "a", "b", "c.txt"),
+		);
+	});
+
+	it("refuses a write through a link, a climb, an absolute path or the root", () => {
+		expect(resolveWritableUnder(project, "link/planted.txt")).toBeNull();
+		expect(resolveWritableUnder(project, "link/deeper/planted.txt")).toBeNull();
+		expect(resolveWritableUnder(project, "../outside/x.txt")).toBeNull();
+		expect(resolveWritableUnder(project, path.join(outside, "x"))).toBeNull();
+		expect(resolveWritableUnder(project, ".")).toBeNull();
+		expect(resolveWritableUnder(project, "")).toBeNull();
 	});
 });

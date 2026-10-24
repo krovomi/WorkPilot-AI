@@ -135,7 +135,16 @@ export function registerBrowserAgentHandlers(
 			try {
 				const args = ["baseline", "set", "--name", name];
 				if (screenshotPath) {
-					args.push("--screenshot", screenshotPath);
+					// The runner copies this file into the baselines: it must be
+					// a screenshot in the project, not any file the renderer names.
+					const screenshot = resolveInProject(screenshotPath, "file");
+					if (!screenshot) {
+						return {
+							success: false,
+							error: "Screenshot not found in a known project",
+						};
+					}
+					args.push("--screenshot", screenshot);
 				}
 				const result = await runBrowserAgentCommand(projectPath, args);
 				return JSON.parse(result);

@@ -2331,6 +2331,16 @@ export function registerClaudeCodeHandlers(): void {
 					throw new Error("Claude CLI not found at specified path");
 				}
 
+				// Only an installation the main process found itself: the
+				// renderer picks from that list, it never names an executable
+				// (security.md, S6), and validating runs the file.
+				const detected = await scanClaudeInstallations(
+					(readSettingsFile()?.claudePath as string | undefined) ?? null,
+				);
+				if (!detected.some((found) => path.resolve(found.path) === normalizedPath)) {
+					throw new Error("Claude CLI not among the detected installations");
+				}
+
 				const [isValid, _version] =
 					await validateClaudeCliAsync(normalizedPath);
 

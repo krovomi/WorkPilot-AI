@@ -788,6 +788,16 @@ export function registerCopilotCliHandlers(): void {
 					throw new Error("gh CLI not found at specified path");
 				}
 
+				// Only an installation the main process found itself: the
+				// renderer picks from that list, it never names an executable
+				// (security.md, S6), and validating runs the file.
+				const detected = await scanCopilotInstallations(
+					(readSettingsFile()?.copilotPath as string | undefined) ?? null,
+				);
+				if (!detected.some((found) => path.resolve(found.path) === normalizedPath)) {
+					throw new Error("gh CLI not among the detected installations");
+				}
+
 				const [isValid] = await validateCopilotCliAsync(normalizedPath);
 				if (!isValid) {
 					throw new Error(

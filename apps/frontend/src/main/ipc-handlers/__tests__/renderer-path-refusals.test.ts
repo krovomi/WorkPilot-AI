@@ -85,6 +85,8 @@ beforeAll(async () => {
 		"../architecture-visualizer-handlers"
 	);
 	registerArchitectureVisualizerHandlers();
+	const { registerFileHandlers } = await import("../file-handlers");
+	registerFileHandlers();
 });
 
 afterAll(() => {
@@ -183,5 +185,25 @@ describe("architecture artifacts", () => {
 	it("reads no delta record outside the project", async () => {
 		const result = await call(IPC_CHANNELS.ARCHITECTURE_DELTA_READ, outside);
 		expect(result).toEqual({ success: true, data: null });
+	});
+});
+
+describe("file explorer", () => {
+	it("reads a file inside the project", async () => {
+		const result = await call(
+			IPC_CHANNELS.FILE_EXPLORER_READ,
+			path.join(state.project, "shots", "home.png"),
+		);
+		expect(result.success).toBe(true);
+	});
+
+	it("refuses a file outside it, directly or through a link", async () => {
+		for (const target of [
+			path.join(outside, "secret.png"),
+			path.join(state.project, "link", "secret.png"),
+		]) {
+			const result = await call(IPC_CHANNELS.FILE_EXPLORER_READ, target);
+			expect(result.success, target).toBe(false);
+		}
 	});
 });

@@ -86,6 +86,10 @@ import {
 	initializePythonEnvForPR,
 	withRetry,
 } from "./worktree-pr-helpers";
+import {
+	resolveUnder,
+	resolveWritableUnder,
+} from "../../security/renderer-path";
 // Moved to ./worktree-git-refs.ts (audit lot L11, F36); re-exported for existing importers.
 export { GIT_BRANCH_REGEX, validateWorktreeBranch } from "./worktree-git-refs";
 
@@ -2391,12 +2395,9 @@ export function registerWorktreeHandlers(
 			relativePath: string,
 		): Promise<IPCResult<string>> => {
 			try {
-				const fullPath = path.join(worktreePath, relativePath);
-				const resolved = path.resolve(fullPath);
-				const resolvedWorktree = path.resolve(worktreePath);
-
-				// Security: ensure the resolved path is still inside the worktree
-				if (!resolved.startsWith(resolvedWorktree)) {
+				// Resolved, links included, and still inside the worktree.
+				const resolved = resolveUnder(worktreePath, relativePath, "file");
+				if (!resolved) {
 					return { success: false, error: "Path traversal not allowed" };
 				}
 
@@ -2424,12 +2425,10 @@ export function registerWorktreeHandlers(
 			content: string,
 		): Promise<IPCResult<{ written: boolean }>> => {
 			try {
-				const fullPath = path.join(worktreePath, relativePath);
-				const resolved = path.resolve(fullPath);
-				const resolvedWorktree = path.resolve(worktreePath);
-
-				// Security: ensure the resolved path is still inside the worktree
-				if (!resolved.startsWith(resolvedWorktree)) {
+				// Inside the worktree once its existing part is resolved: a link
+				// in the worktree does not carry the write elsewhere.
+				const resolved = resolveWritableUnder(worktreePath, relativePath);
+				if (!resolved) {
 					return { success: false, error: "Path traversal not allowed" };
 				}
 
@@ -2460,6 +2459,9 @@ export function registerWorktreeHandlers(
 		): Promise<IPCResult<{ deleted: string[]; failed: string[] }>> => {
 			const deleted: string[] = [];
 			const failed: string[] = [];
+			if (!Array.isArray(relativePaths)) {
+				return { success: false, error: "Expected a list of paths" };
+			}
 			const resolvedWorktree = path.resolve(worktreePath);
 			// Discarding means "restore this file to the base branch's version".
 			// Which branch that is depends on the project — never assume one.
@@ -2485,10 +2487,8 @@ export function registerWorktreeHandlers(
 			for (const relativePath of relativePaths) {
 				try {
 					// Security: validate path stays within worktree
-					const fullPath = path.join(resolvedWorktree, relativePath);
-					const resolved = path.resolve(fullPath);
-					const relative = path.relative(resolvedWorktree, resolved);
-					if (relative.startsWith("..")) {
+					const resolved = resolveWritableUnder(resolvedWorktree, relativePath);
+					if (!resolved) {
 						failed.push(relativePath);
 						continue;
 					}

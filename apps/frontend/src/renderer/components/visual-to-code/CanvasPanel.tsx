@@ -1230,36 +1230,23 @@ export const CanvasPanel: React.FC = () => {
 		t,
 	]);
 
-	const getFallbackExplorerRoot = useCallback(() => {
-		// biome-ignore lint/suspicious/noExplicitAny: injected by the preload bridge
-		if ((globalThis as any).platform?.isWindows) return "C:\\";
-		return "/";
-	}, []);
-	const [explorerRoot, setExplorerRoot] = useState(getFallbackExplorerRoot());
-	const [explorerRootInput, setExplorerRootInput] = useState(explorerRoot);
+	// The export folder starts in the active project. Elsewhere, the user picks
+	// it in the native folder picker: the main process lists and writes only
+	// inside a project or a folder chosen there.
+	const [explorerRoot, setExplorerRoot] = useState(() => {
+		const { projects, activeProjectId } = useProjectStore.getState();
+		return projects.find((p) => p.id === activeProjectId)?.path ?? "";
+	});
 
-	useEffect(() => {
-		let cancelled = false;
-		const api = globalThis.electronAPI?.getUserHome;
-		if (!api) return;
-		(async () => {
-			try {
-				const home = await api();
-				if (cancelled || !home) return;
-				setExplorerRoot((prev) =>
-					prev === getFallbackExplorerRoot() ? home : prev,
-				);
-				setExplorerRootInput((prev) =>
-					prev === getFallbackExplorerRoot() ? home : prev,
-				);
-			} catch {
-				// keep fallback
-			}
-		})();
-		return () => {
-			cancelled = true;
-		};
-	}, [getFallbackExplorerRoot]);
+	const handleChooseExplorerRoot = async () => {
+		const dir = await globalThis.electronAPI?.selectDirectory?.(
+			explorerRoot ? { defaultPath: explorerRoot } : undefined,
+		);
+		if (dir) {
+			setExplorerRoot(dir);
+			setSelectedFolder(dir);
+		}
+	};
 
 	const frameworkOptions = pendingNode
 		? (FRAMEWORKS_BY_TYPE[pendingNode.type] ?? [])
@@ -1858,17 +1845,12 @@ export const CanvasPanel: React.FC = () => {
 							<input
 								id="explorer-root-input"
 								type="text"
-								value={explorerRootInput}
-								onChange={(e) => setExplorerRootInput(e.target.value)}
+								value={explorerRoot}
+								readOnly
 								className="w-full p-2 border rounded"
-								placeholder="C:\\ ou /"
 							/>
-							<Button
-								variant="secondary"
-								onClick={() => setExplorerRoot(explorerRootInput)}
-								disabled={explorerRootInput.length === 0}
-							>
-								{t("selectFolder", "Sélectionner")}
+							<Button variant="secondary" onClick={handleChooseExplorerRoot}>
+								{t("chooseFolder")}
 							</Button>
 						</div>
 					</div>
