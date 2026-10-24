@@ -16,7 +16,7 @@ import pytest
 BACKEND = Path(__file__).resolve().parents[1] / "apps" / "backend"
 
 # Modules with a `__main__` block that is a demo, not something the app runs.
-NOT_ENTRY_POINTS = {"runners/github/example_usage.py", "runners/github/rate_limiter.py"}
+NOT_ENTRY_POINTS = {"runners/github/rate_limiter.py"}
 
 
 def _entry_points() -> list[Path]:

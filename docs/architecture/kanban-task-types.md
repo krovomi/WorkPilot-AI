@@ -18,7 +18,7 @@ Ce qui existe déjà et n'est pas branché :
 | Pièce | Où | État |
 |---|---|---|
 | Catégorie de tâche (`feature`, `bug_fix`, `refactoring`, `security`, `performance`, `infrastructure`, `testing`…) | `apps/frontend/src/shared/types/task.ts` (`TaskCategory`), `task_metadata.json` | saisie dans l'UI, lue par `commit_message.py` et le validateur de spec ; **n'influence aucune phase** |
-| Classifieur d'intention (`bug_fix`, `hotfix`, `investigation`, `spike`, `deployment`, `monitoring`…) | `apps/backend/intent/` | prompt et modèles écrits, CLI de feedback ; **importé nulle part** |
+| Classifieur d'intention (`bug_fix`, `hotfix`, `investigation`, `spike`, `deployment`, `monitoring`…) | `apps/backend/intent/` | importé nulle part ; **supprimé au lot M8**, les règles vivent dans `tasks/classify.py` |
 | Type d'item importé (`azureDevOpsType`, `jiraType` : Bug, Story, Task) | `TaskMetadata` | stocké, jamais interprété |
 | Complexité (`simple` / `standard` / `complex`) | `spec/complexity.py` | adapte les phases de **spec** seulement ; le build ne la voit pas |
 | Prompts d'incident (`incident_production_responder.md`, `incident_cicd_analyzer.md`, `incident_proactive_analyzer.md`) | `prompts/` | un runner chacun, hors Kanban |
@@ -36,7 +36,7 @@ Le plan branche ces pièces. Il n'ajoute un module que là où rien n'existe.
    (`workflows/<type>/workflow.yaml`), relue par `validate_impls` sur un clone frais.
 2. **Classer avant de payer.** Le type est décidé par le moins cher qui sait répondre :
    la catégorie saisie ou importée (0 token) → les mots du titre (0 token,
-   `intent/` en mode règles) → un appel `complexity_assessor`-like à `low` (quelques
+   `tasks/classify.py`) → un appel `complexity_assessor`-like à `low` (quelques
    centaines de tokens) seulement en cas de doute. Le type est écrit dans
    `task_metadata.json` et affiché dans le modal avant le build ; l'utilisateur peut le changer.
 3. **BMAD est une capacité, pas une phase par défaut.** Un skill BMAD n'entre dans un workflow
@@ -77,8 +77,8 @@ imposé : le modal le montre, le build attend la confirmation si `gate: human` e
   (`kindSource == "user"`, jamais écrasé) → `metadata.category` → type importé (`jiraType`,
   `azureDevOpsType`, labels reconnus) → mots du titre et de la description (FR + EN, accents
   ignorés) → `feature` à faible confiance. Un `bug_fix` avec urgence (priorité `urgent` /
-  `critical`, mots *prod*, *incident*, *hotfix*…) est un `hotfix`. `intent/` n'avait pas de
-  règles réutilisables (classifieur LLM seul) : les règles sont ici.
+  `critical`, mots *prod*, *incident*, *hotfix*…) est un `hotfix`. `intent/` (supprimé au lot M8)
+  n'avait pas de règles réutilisables (classifieur LLM seul) : les règles sont ici.
 - `apps/backend/tasks/metadata.py` : `classify_spec` écrit `kind`, `kindConfidence`,
   `kindSource` dans `task_metadata.json` sans toucher au reste ; `spec/pipeline/orchestrator.py`
   l'appelle avant `complexity_assessment`. Aucun appel modèle ; l'appel `low` en cas de doute

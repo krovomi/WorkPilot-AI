@@ -316,7 +316,6 @@ apps/backend/migration/
 
 - Max 3 attempts per failure
 - 300s timeout per attempt
-- Escalate to Teams if all attempts fail
 - Run before validation to catch early errors
 
 ## Advanced Usage
@@ -345,29 +344,6 @@ orchestrator = MigrationOrchestrator("./project")
 context = orchestrator.start_migration("custom_target", "custom_lang")
 
 # Transform, validate, report...
-```
-
-### Teams Collaboration
-
-Migrations use Teams for:
-- **Analyst**: Evaluates migration complexity
-- **Architect**: Reviews migration plan
-- **QA**: Oversees validation
-- **Developer**: Executes transformations
-- **Security**: Reviews for data safety
-
-Example (auto-collaboration):
-
-```python
-from apps.backend.teams import ClaudeTeam, TeamMode
-
-team = ClaudeTeam(mode=TeamMode.COLLABORATIVE)
-debate_result = team.orchestrate(
-    {
-        "task": f"Plan migration from {source.framework} to {target.framework}",
-        "context": context.to_dict(),
-    }
-)
 ```
 
 ### Integration with Auto-Fix Loop
@@ -537,7 +513,6 @@ git reset --hard <commit-hash>
 - 🔐 No credentials stored in migration files
 - 🔐 Sensitive data excluded from reports
 - 🔐 Rollback capability for safety net
-- 🔐 Security review in Teams approval
 
 ## Contributing
 

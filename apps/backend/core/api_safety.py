@@ -6,8 +6,8 @@ its own way:
 * turn an exception into something a caller may read;
 * turn a caller-supplied string into a directory it will actually touch.
 
-Both were copy-pasted. `_safe_error_message` existed twice (`provider_api`,
-`api/cache_api`) and `_validate_dir` seven times, with divergent rules — one
+Both were copy-pasted. `_safe_error_message` existed twice (`provider_api`
+and a cache API since removed) and `_validate_dir` seven times, with divergent rules — one
 allowlisted roots, one confined to the repository, most did neither. That
 spread is what `py/stack-trace-exposure` (100 alerts) and `py/path-injection`
 (32) were counting: the same two mistakes, once per module.
