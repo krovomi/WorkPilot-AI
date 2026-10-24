@@ -1321,7 +1321,7 @@ print(json.dumps(result))
 							const mainWindow = getMainWindow();
 							if (mainWindow && prResult.pr_url) {
 								mainWindow.webContents.send(
-									IPC_CHANNELS.TASK_UPDATE,
+									IPC_CHANNELS.TASK_UPDATED_EVENT,
 									taskId,
 									{ prUrl: prResult.pr_url },
 									project.id,

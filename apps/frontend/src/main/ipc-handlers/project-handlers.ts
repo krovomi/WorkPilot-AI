@@ -2,7 +2,6 @@ import { execFile, execFileSync } from "node:child_process";
 import { existsSync, renameSync } from "node:fs";
 import * as path from "node:path";
 import { promisify } from "node:util";
-import type { BrowserWindow } from "electron";
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
 import type {
@@ -733,7 +732,6 @@ const initializePythonEnvironment = async (
 export function registerProjectHandlers(
 	pythonEnvManager: PythonEnvManager,
 	agentManager: AgentManager,
-	getMainWindow: () => BrowserWindow | null,
 ): void {
 	// ============================================
 	// Project Operations
@@ -1058,28 +1056,6 @@ export function registerProjectHandlers(
 	// ============================================
 	// Project Initialization Operations
 	// ============================================
-
-	// Set up Python environment status events
-	pythonEnvManager.on("status", (message: string) => {
-		const mainWindow = getMainWindow();
-		if (mainWindow) {
-			mainWindow.webContents.send("python-env:status", message);
-		}
-	});
-
-	pythonEnvManager.on("error", (error: string) => {
-		const mainWindow = getMainWindow();
-		if (mainWindow) {
-			mainWindow.webContents.send("python-env:error", error);
-		}
-	});
-
-	pythonEnvManager.on("ready", (pythonPath: string) => {
-		const mainWindow = getMainWindow();
-		if (mainWindow) {
-			mainWindow.webContents.send("python-env:ready", pythonPath);
-		}
-	});
 
 	// Initialize Python environment on startup (non-blocking)
 	initializePythonEnvironment(pythonEnvManager, agentManager).then((status) => {

@@ -237,7 +237,6 @@ export function registerCrossLanguageTranslationHandlers(): void {
 				);
 			}
 
-			event.sender.send("crossLangTranslation:complete", result);
 			return result;
 		},
 	);

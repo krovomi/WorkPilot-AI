@@ -8,6 +8,7 @@ import type {
 	Roadmap,
 	RoadmapGenerationStatus,
 	SDKRateLimitInfo,
+	Task,
 	TaskStatus,
 } from "../../shared/types";
 import { useAuthFailureStore } from "../stores/auth-failure-store";
@@ -234,6 +235,26 @@ export function useIpcListeners(): void {
 			},
 		);
 
+		// Fields main changed after the work's own call returned (PR URL, visual
+		// proof). Applied at once: they are rare, and `metadata` is merged so
+		// that one key does not erase the others.
+		const cleanupTaskUpdated = window.electronAPI.onTaskUpdated(
+			(taskId: string, updates: Partial<Task>, projectId?: string) => {
+				if (!isTaskForCurrentProject(projectId)) return;
+				const store = useTaskStore.getState();
+				const task = store.tasks.find(
+					(t) => t.id === taskId || t.specId === taskId,
+				);
+				if (!task) return;
+				store.updateTask(task.id, {
+					...updates,
+					...(updates.metadata
+						? { metadata: { ...task.metadata, ...updates.metadata } }
+						: {}),
+				});
+			},
+		);
+
 		const cleanupExecutionProgress = window.electronAPI.onTaskExecutionProgress(
 			(taskId: string, progress: ExecutionProgress, projectId?: string) => {
 				// Filter by project to prevent multi-project interference
@@ -402,6 +423,7 @@ export function useIpcListeners(): void {
 			cleanupError();
 			cleanupLog();
 			cleanupStatus();
+			cleanupTaskUpdated();
 			cleanupExecutionProgress();
 			cleanupPipelineStatus();
 			cleanupRoadmapProgress();

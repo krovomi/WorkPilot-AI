@@ -229,11 +229,15 @@ function lineAt(source: string, offset: number): number {
 }
 
 /**
- * The first argument of the call whose callee ends at `from`, or `null` when
- * what follows is not a call (an import list, a re-export). Type arguments are
- * skipped, nested and with `=>` in them.
+ * The argument at `index` of the call whose callee ends at `from`, or `null`
+ * when what follows is not a call (an import list, a re-export) or has fewer
+ * arguments. Type arguments are skipped, nested and with `=>` in them.
  */
-function firstArgument(source: string, from: number): string | null {
+function nthArgument(
+	source: string,
+	from: number,
+	index: number,
+): string | null {
 	let i = from;
 	while (/\s/.test(source[i] ?? "")) i++;
 	if (source[i] === "<") {
@@ -254,8 +258,9 @@ function firstArgument(source: string, from: number): string | null {
 	}
 	if (source[i] !== "(") return null;
 	i++;
-	const start = i;
+	let start = i;
 	let depth = 0;
+	let seen = 0;
 	for (; i < source.length; i++) {
 		const c = source[i];
 		if (c === '"' || c === "'" || c === "`") {
@@ -266,9 +271,13 @@ function firstArgument(source: string, from: number): string | null {
 		else if (c === ")" || c === "]" || c === "}") {
 			if (depth === 0) break;
 			depth--;
-		} else if (c === "," && depth === 0) break;
+		} else if (c === "," && depth === 0) {
+			if (seen === index) break;
+			seen++;
+			start = i + 1;
+		}
 	}
-	return source.slice(start, i).trim();
+	return seen === index ? source.slice(start, i).trim() : null;
 }
 
 /**
@@ -331,6 +340,7 @@ function collect(
 	files: string[],
 	pattern: RegExp,
 	constants: Map<string, string>,
+	argumentIndex: (callee: string) => number = () => 0,
 ): { uses: ChannelUse[]; unresolved: Unresolved[] } {
 	const uses: ChannelUse[] = [];
 	const unresolved: Unresolved[] = [];
@@ -340,7 +350,11 @@ function collect(
 		const locals = localConstants(source);
 		for (const m of source.matchAll(pattern)) {
 			const offset = m.index ?? 0;
-			const argument = firstArgument(source, offset + m[0].length);
+			const argument = nthArgument(
+				source,
+				offset + m[0].length,
+				argumentIndex(m[0]),
+			);
 			if (argument === null) continue;
 			const line = lineAt(source, offset);
 			const channel = resolveChannel(argument, locals, constants);
@@ -484,6 +498,302 @@ describe("IPC channel parity (preload and renderer → main)", () => {
 			.sort();
 
 		expect(stale, "registered now — remove from UNREGISTERED_ALLOWLIST").toEqual(
+			[],
+		);
+	});
+});
+
+
+/**
+ * Main → renderer, the other way round. A channel the main process sends on
+ * with nobody listening in the preload is an event the renderer never sees,
+ * and a listener with no sender waits forever. Neither fails anywhere else.
+ *
+ * Sends are read from `webContents.send` and `event.sender.send`; listeners
+ * from `ipcRenderer.on/once` and `createIpcListener`. Most sends go through a
+ * small helper that takes the channel as a parameter (`broadcast`,
+ * `safeSendToRenderer`, `createProgressSender`…): such a helper is found from
+ * the send it wraps, and its own calls are read in its place, in its file or,
+ * when it is exported, in every file of the same side.
+ */
+/**
+ * Channels main sends on that nothing hears yet, each with the decision that
+ * removes it (lot M8, which settles the views without tests). An entry that is
+ * heard, or no longer sent, is reported as stale: the list only shrinks.
+ */
+const UNHEARD_ALLOWLIST: Record<string, string> = {
+	"liveCompanion:stateChanged":
+		"live-companion-store reads state by invoke; listen, or drop the send (M8)",
+	"liveCompanion:suggestion":
+		"live-companion-store polls getSuggestions; listen, or drop the send (M8)",
+	"liveCompanion:takeoverProposal":
+		"live-companion-store polls getTakeovers; listen, or drop the send (M8)",
+	"liveCompanion:fileChange": "no view shows file changes; drop the send (M8)",
+	"liveCompanion:error": "live-companion-store shows invoke errors only (M8)",
+	"github:triage:progress":
+		"the GitHub triage handlers have no preload caller at all (M8)",
+	"github:triage:complete":
+		"the GitHub triage handlers have no preload caller at all (M8)",
+	"github:triage:error":
+		"the GitHub triage handlers have no preload caller at all (M8)",
+};
+
+const MAIN_SEND = /(?<![\w$])(?:webContents|sender)\s*\.\s*send\b/g;
+const PRELOAD_LISTEN =
+	/(?<![\w$])(?:ipcRenderer\s*\.\s*(?:on|once)|createIpcListener)\b/g;
+
+interface Forwarder {
+	name: string;
+	index: number;
+	/** When the channel is a property of that parameter: its name. */
+	key?: string;
+	file: string;
+	exported: boolean;
+}
+
+/** The text between the parenthesis at `open` and its match. */
+function balancedParens(source: string, open: number): string {
+	let depth = 0;
+	for (let i = open; i < source.length; i++) {
+		const c = source[i];
+		if (c === "(") depth++;
+		else if (c === ")") {
+			depth--;
+			if (depth === 0) return source.slice(open + 1, i);
+		}
+	}
+	return "";
+}
+
+/** Parameter names of a parameter list, rest parameters included. */
+function parameterNames(list: string): string[] {
+	const names: string[] = [];
+	let depth = 0;
+	let start = 0;
+	for (let i = 0; i <= list.length; i++) {
+		const c = list[i];
+		if (c === "(" || c === "[" || c === "{" || c === "<") depth++;
+		else if (c === ")" || c === "]" || c === "}") depth--;
+		else if (c === ">" && list[i - 1] !== "=") depth--;
+		else if ((c === "," && depth === 0) || i === list.length) {
+			const name = /^\s*(?:\.\.\.)?([A-Za-z_$][\w$]*)/.exec(
+				list.slice(start, i),
+			);
+			if (name) names.push(name[1]);
+			start = i + 1;
+		}
+	}
+	return names;
+}
+
+/**
+ * The closest function before `offset` that has the parameter `argument`
+ * names (`channel`, or `channels` for `channels.progress`): the helper whose
+ * caller names the channel.
+ */
+function enclosingForwarder(
+	source: string,
+	offset: number,
+	argument: string,
+	file: string,
+): Forwarder | null {
+	const parts = /^([A-Za-z_$][\w$]*)(?:\.([A-Za-z_$][\w$]*))?$/.exec(argument);
+	if (!parts) return null;
+	const [, param, key] = parts;
+	const definitions = [
+		...source
+			.slice(0, offset)
+			.matchAll(
+				/(export\s+)?(?:(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*(?:<[^(]*>)?\s*|(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?(?:<[^(]*>)?)\(/g,
+			),
+	];
+	for (let k = definitions.length - 1; k >= 0; k--) {
+		const m = definitions[k];
+		const open = (m.index ?? 0) + m[0].length - 1;
+		const index = parameterNames(balancedParens(source, open)).indexOf(param);
+		if (index !== -1) {
+			return {
+				name: m[2] ?? m[3],
+				index,
+				key,
+				file,
+				exported: Boolean(m[1]),
+			};
+		}
+	}
+	return null;
+}
+
+/** The value of the closest `const name = "…"` before `offset`. */
+function closestConstant(
+	source: string,
+	offset: number,
+	name: string,
+): string | null {
+	const found = [
+		...source
+			.slice(0, offset)
+			.matchAll(
+				new RegExp(`\\bconst\\s+${name}\\s*(?::\\s*string\\s*)?=\\s*(["'])([^"'\\n]*)\\1`, "g"),
+			),
+	];
+	return found.length > 0 ? found[found.length - 1][2] : null;
+}
+
+/** The value written for `key` in the object literal `text`, or `null`. */
+function propertyOf(text: string, key: string): string | null {
+	if (!text.startsWith("{")) return null;
+	const m = new RegExp(`(?:^|[{,\\s])${key}\\s*:\\s*([^,}\\s]+)`).exec(text);
+	return m ? m[1] : null;
+}
+
+/**
+ * Channel uses of the calls `pattern` finds in `files`, then of the calls to
+ * every helper that forwards its channel parameter to one of them.
+ */
+function collectThroughForwarders(
+	files: string[],
+	pattern: RegExp,
+	constants: Map<string, string>,
+): { uses: ChannelUse[]; unresolved: Unresolved[]; forwarders: Forwarder[] } {
+	const sources = new Map(
+		files.map((full) => [
+			path.relative(SRC, full).split(path.sep).join("/"),
+			blankComments(readFileSync(full, "utf-8")),
+		]),
+	);
+	const uses: ChannelUse[] = [];
+	const unresolved: Unresolved[] = [];
+	const forwarders: Forwarder[] = [];
+	const known = new Set<string>();
+
+	const scan = (
+		file: string,
+		callee: RegExp,
+		index: number,
+		key?: string,
+	): void => {
+		const source = sources.get(file) as string;
+		const locals = localConstants(source);
+		for (const m of source.matchAll(callee)) {
+			const offset = m.index ?? 0;
+			const raw = nthArgument(source, offset + m[0].length, index);
+			const argument =
+				raw !== null && key !== undefined ? propertyOf(raw, key) : raw;
+			if (argument === null) continue;
+			const line = lineAt(source, offset);
+			const channel =
+				resolveChannel(argument, locals, constants) ??
+				(/^[A-Za-z_$][\w$]*$/.test(argument)
+					? closestConstant(source, offset, argument)
+					: null);
+			if (channel !== null) {
+				uses.push({ channel, file, line });
+				continue;
+			}
+			if (DYNAMIC_FORWARDERS.has(file)) continue;
+			const forwarder = enclosingForwarder(source, offset, argument, file);
+			if (!forwarder) {
+				unresolved.push({ argument, file, line });
+				continue;
+			}
+			const id = `${forwarder.file}#${forwarder.name}#${forwarder.index}#${forwarder.key}`;
+			if (known.has(id)) continue;
+			known.add(id);
+			forwarders.push(forwarder);
+			const call = new RegExp(
+				`(?<![\\w$.])(?<!function\\s+)${forwarder.name.replace(/\$/g, "\\$")}\\b`,
+				"g",
+			);
+			for (const target of forwarder.exported ? sources.keys() : [file]) {
+				scan(target, call, forwarder.index, forwarder.key);
+			}
+		}
+	};
+
+	for (const file of sources.keys()) scan(file, pattern, 0);
+	return { uses, unresolved, forwarders };
+}
+
+/** The channels `GENERIC_LISTEN_CHANNELS` lets the renderer subscribe to. */
+function genericListenChannels(constants: Map<string, string>): string[] {
+	const source = blankComments(
+		readFileSync(
+			path.join(PRELOAD_DIR, "api", "modules", "generic-ipc-api.ts"),
+			"utf-8",
+		),
+	);
+	const start = source.indexOf("export const GENERIC_LISTEN_CHANNELS = [");
+	const body = source.slice(start, source.indexOf("] as const", start));
+	return [
+		...body.matchAll(/IPC_CHANNELS\.([A-Z][A-Z0-9_]*)|"([^"]+)"/g),
+	].flatMap((m) => {
+		const channel = m[1] ? constants.get(m[1]) : m[2];
+		return channel ? [channel] : [];
+	});
+}
+
+describe("IPC channel parity (main → renderer)", () => {
+	const constants = ipcChannelConstants();
+	const sends = collectThroughForwarders(
+		sourceFiles(MAIN_DIR),
+		MAIN_SEND,
+		constants,
+	);
+	const listens = collectThroughForwarders(
+		sourceFiles(PRELOAD_DIR),
+		PRELOAD_LISTEN,
+		constants,
+	);
+	const heard = new Set([
+		...listens.uses.map((u) => u.channel),
+		...genericListenChannels(constants),
+	]);
+	const sent = new Set(sends.uses.map((u) => u.channel));
+	const byChannel = (list: ChannelUse[]) => {
+		const out = new Map<string, ChannelUse[]>();
+		for (const use of list) out.set(use.channel, [...(out.get(use.channel) ?? []), use]);
+		return out;
+	};
+
+	it("finds the channels on both sides", () => {
+		expect(sent.size).toBeGreaterThan(200);
+		expect(heard.size).toBeGreaterThan(200);
+		expect(sends.forwarders.length).toBeGreaterThan(20);
+	});
+
+	it("resolves the channel of every send and every listener", () => {
+		const report = (u: Unresolved) => `${where(u)}  ${u.argument}`;
+		expect(sends.unresolved.map(report), "main sends").toEqual([]);
+		expect(listens.unresolved.map(report), "preload listeners").toEqual([]);
+	});
+
+	it("has a preload listener for every channel the main process sends on", () => {
+		const missing = [...byChannel(sends.uses)]
+			.filter(([channel]) => !heard.has(channel))
+			.filter(([channel]) => !(channel in UNHEARD_ALLOWLIST))
+			.map(([channel, uses]) => `${channel}  (${uses.map(where).join(", ")})`)
+			.sort();
+		expect(missing, "sent by src/main, heard by nothing in src/preload").toEqual(
+			[],
+		);
+	});
+
+	it("keeps the unheard allowlist down to channels that still need it", () => {
+		const stale = Object.keys(UNHEARD_ALLOWLIST)
+			.filter((channel) => heard.has(channel) || !sent.has(channel))
+			.sort();
+		expect(stale, "heard or no longer sent — remove from UNHEARD_ALLOWLIST").toEqual(
+			[],
+		);
+	});
+
+	it("has a main-process sender for every channel the preload listens to", () => {
+		const missing = [...byChannel(listens.uses)]
+			.filter(([channel]) => !sent.has(channel))
+			.map(([channel, uses]) => `${channel}  (${uses.map(where).join(", ")})`)
+			.sort();
+		expect(missing, "heard by src/preload, sent by nothing in src/main").toEqual(
 			[],
 		);
 	});

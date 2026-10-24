@@ -87,33 +87,4 @@ export function registerGitHubCopilotHandlers(): void {
 	ipcMain.handle("github-copilot:getEnv", (): Record<string, string> => {
 		return gitHubCopilotService.getEnvironmentVariables();
 	});
-
-	/**
-	 * S'abonner aux événements de statut
-	 */
-	ipcMain.on("github-copilot:subscribe", (event) => {
-		const statusChannel = "github-copilot:status-updated";
-		const configChannel = "github-copilot:config-updated";
-
-		const onStatusUpdated = (status: CopilotStatus) => {
-			event.sender.send(statusChannel, status);
-		};
-
-		const onConfigUpdated = (config: CopilotConfig) => {
-			event.sender.send(configChannel, config);
-		};
-
-		gitHubCopilotService.on("status-updated", onStatusUpdated);
-		gitHubCopilotService.on("config-updated", onConfigUpdated);
-
-		// Envoyer le statut actuel immédiatement
-		event.sender.send(statusChannel, gitHubCopilotService.getStatus());
-		event.sender.send(configChannel, gitHubCopilotService.getConfig());
-
-		// Nettoyage quand la fenêtre est fermée
-		event.sender.on("destroyed", () => {
-			gitHubCopilotService.off("status-updated", onStatusUpdated);
-			gitHubCopilotService.off("config-updated", onConfigUpdated);
-		});
-	});
 }

@@ -64,6 +64,7 @@ export const IPC_CHANNELS = {
 	TASK_PIPELINE_STATUS_GET: "task:pipelineStatusGet", // On-demand fetch of the latest build for a task's branch
 	TASK_PIPELINE_FIX: "task:pipelineFix", // Launch the agent to repair a red build (writes BUILD_FAILURE.md + fix subtask)
 	TASK_PIPELINE_STATUS_EVENT: "task:pipelineStatus", // Event (main -> renderer): pipeline status changed for a task
+	TASK_UPDATED_EVENT: "task:updated", // Event (main -> renderer): fields of a task changed in main (PR URL, visual proof)
 	TASK_SPEC_INTERVIEW: "task:specInterview", // Generate 3-5 clarifying questions about the spec before planning (answers are appended to the description)
 	TASK_LOAD_IMAGE_THUMBNAIL: "task:loadImageThumbnail",
 

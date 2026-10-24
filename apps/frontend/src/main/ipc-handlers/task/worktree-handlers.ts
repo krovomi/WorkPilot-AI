@@ -3036,7 +3036,7 @@ export function registerWorktreeHandlers(
 										const mainWindow = getMainWindow();
 										if (mainWindow) {
 											mainWindow.webContents.send(
-												IPC_CHANNELS.TASK_UPDATE,
+												IPC_CHANNELS.TASK_UPDATED_EVENT,
 												task.id,
 												{ metadata: { visualProof } },
 												project.id,
@@ -3170,7 +3170,7 @@ export function registerWorktreeHandlers(
 				const mainWindow = getMainWindow();
 				if (mainWindow) {
 					mainWindow.webContents.send(
-						IPC_CHANNELS.TASK_UPDATE,
+						IPC_CHANNELS.TASK_UPDATED_EVENT,
 						task.id,
 						{ metadata: { visualProof } },
 						project.id,

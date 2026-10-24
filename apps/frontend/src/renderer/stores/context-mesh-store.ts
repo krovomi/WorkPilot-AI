@@ -359,6 +359,27 @@ export function startContextMeshAnalysis(
 	window.electronAPI.send("contextMesh:runAnalysis", model, thinkingLevel);
 }
 
+/**
+ * Follow a running analysis: status, streamed output, error and end of run.
+ * Returns the function that stops listening.
+ */
+export function subscribeContextMeshEvents(): () => void {
+	const api = window.electronAPI;
+	const store = () => useContextMeshStore.getState();
+	const cleanups = [
+		api.onContextMeshStatus((status) => store().setStatus(status)),
+		api.onContextMeshStreamChunk((chunk) => store().appendStreamingOutput(chunk)),
+		api.onContextMeshError((error) => store().setError(error)),
+		api.onContextMeshComplete(() => {
+			store().setPhase("complete");
+			void loadAllContextMeshData();
+		}),
+	];
+	return () => {
+		for (const cleanup of cleanups) cleanup();
+	};
+}
+
 export async function stopContextMeshAnalysis(): Promise<void> {
 	await window.electronAPI.invoke("contextMesh:stopAnalysis");
 	useContextMeshStore.getState().setPhase("idle");

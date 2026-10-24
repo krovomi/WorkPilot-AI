@@ -502,63 +502,6 @@ export function registerCredentialHandlers(): void {
 	// directly when building Python subprocess envs.
 
 	/**
-	 * S'abonner aux événements de credentials
-	 */
-	ipcMain.on("credential:subscribe", (event) => {
-		const channel = "credential:updated";
-
-		const onUpdate = (credential: CredentialConfig | null) => {
-			event.sender.send(channel, credential);
-		};
-
-		credentialManager.on("credential:updated", onUpdate);
-
-		// Nettoyage quand la fenêtre est fermée
-		event.sender.on("destroyed", () => {
-			credentialManager.off("credential:updated", onUpdate);
-		});
-	});
-
-	/**
-	 * S'abonner aux événements d'usage
-	 */
-	ipcMain.on("usage:subscribe", (event) => {
-		const channel = "usage:changed";
-
-		const onUpdate = (data: UsageData) => {
-			event.sender.send(channel, data);
-		};
-
-		credentialManager.on("usage:changed", onUpdate);
-
-		// Nettoyage quand la fenêtre est fermée
-		event.sender.on("destroyed", () => {
-			credentialManager.off("usage:changed", onUpdate);
-		});
-	});
-
-	/**
-	 * S'abonner aux événements de switch de provider
-	 */
-	ipcMain.on("provider:subscribe", (event) => {
-		const channel = "provider:switched";
-
-		const onSwitch = (data: {
-			provider: string;
-			type: "oauth" | "api_key";
-		}) => {
-			event.sender.send(channel, data);
-		};
-
-		credentialManager.on("provider:switched", onSwitch);
-
-		// Nettoyage quand la fenêtre est fermée
-		event.sender.on("destroyed", () => {
-			credentialManager.off("provider:switched", onSwitch);
-		});
-	});
-
-	/**
 	 * Détecter le token Windsurf depuis l'installation IDE locale
 	 * Lit le state.vscdb de Windsurf pour extraire la clé API sk-ws-...
 	 * Enrichit la réponse avec les infos du plan (planName, usage) si disponibles.

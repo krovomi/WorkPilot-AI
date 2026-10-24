@@ -6,10 +6,8 @@
  * and decision scoring. Works with any LLM provider.
  */
 
-import type { BrowserWindow } from "electron";
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
-import { safeSendToRenderer } from "./utils";
 
 const getBackendUrl = (): string => {
 	return process.env.VITE_BACKEND_URL || "http://127.0.0.1:8321";
@@ -34,9 +32,7 @@ async function timeTravelFetch<T = Record<string, unknown>>(
 /**
  * Register all time-travel-related IPC handlers
  */
-export function registerTimeTravelHandlers(
-	getMainWindow: () => BrowserWindow | null,
-): void {
+export function registerTimeTravelHandlers(): void {
 	// ============================================
 	// Checkpoint operations
 	// ============================================
@@ -51,15 +47,9 @@ export function registerTimeTravelHandlers(
 						method: "POST",
 					},
 				);
-				safeSendToRenderer(
-					getMainWindow,
-					IPC_CHANNELS.TIME_TRAVEL_CHECKPOINTS_READY,
-					result,
-				);
 				return result;
 			} catch (error: unknown) {
 				const msg = (error as Error).message;
-				safeSendToRenderer(getMainWindow, IPC_CHANNELS.TIME_TRAVEL_ERROR, msg);
 				return { success: false, error: msg };
 			}
 		},
@@ -153,15 +143,9 @@ export function registerTimeTravelHandlers(
 					method: "POST",
 					body: JSON.stringify(forkRequest),
 				});
-				safeSendToRenderer(
-					getMainWindow,
-					IPC_CHANNELS.TIME_TRAVEL_FORK_STATUS_CHANGED,
-					result,
-				);
 				return result;
 			} catch (error: unknown) {
 				const msg = (error as Error).message;
-				safeSendToRenderer(getMainWindow, IPC_CHANNELS.TIME_TRAVEL_ERROR, msg);
 				return { success: false, error: msg };
 			}
 		},

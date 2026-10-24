@@ -122,6 +122,9 @@ export const taskMock = {
 	onTaskStatusChange: () => () => {
 		/* noop */
 	},
+	onTaskUpdated: () => () => {
+		/* noop */
+	},
 	onTaskExecutionProgress: () => () => {
 		/* noop */
 	},

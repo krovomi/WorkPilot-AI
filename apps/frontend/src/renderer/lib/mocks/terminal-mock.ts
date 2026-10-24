@@ -113,9 +113,6 @@ export const terminalMock = {
 	onTerminalOAuthToken: () => () => {
 		/* noop */
 	},
-	onTerminalAuthCreated: () => () => {
-		/* noop */
-	},
 	onTerminalClaudeBusy: () => () => {
 		/* noop */
 	},
@@ -129,9 +126,6 @@ export const terminalMock = {
 		/* noop */
 	},
 	onTerminalProfileChanged: () => () => {
-		/* noop */
-	},
-	onTerminalOAuthCodeNeeded: () => () => {
 		/* noop */
 	},
 };

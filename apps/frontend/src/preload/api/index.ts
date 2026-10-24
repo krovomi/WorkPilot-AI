@@ -34,6 +34,10 @@ import {
 	type TimeTravelAPI,
 	createTimeTravelAPI,
 } from "./modules/time-travel-api";
+import {
+	type ContextMeshAPI,
+	createContextMeshAPI,
+} from "./modules/context-mesh-api";
 import { type TeamBotAPI, createTeamBotAPI } from "./modules/team-bot-api";
 import {
 	type ApiExplorerAPI,
@@ -295,6 +299,7 @@ export interface ElectronAPI
 		TechDebtAPI,
 		TeamBotAPI,
 		TimeTravelAPI,
+		ContextMeshAPI,
 		EnvSnapshotAPI,
 		OfflineModeAPI,
 		VisualProgrammingAPI,
@@ -439,6 +444,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createTechDebtAPI(),
 		...createTeamBotAPI(),
 		...createTimeTravelAPI(),
+		...createContextMeshAPI(),
 		...createEnvSnapshotAPI(),
 		...createOfflineModeAPI(),
 		...createVisualProgrammingAPI(),
@@ -571,6 +577,8 @@ export type { TestGenerationAPI } from "./modules/test-generation-api";
 export { createTestGenerationAPI } from "./modules/test-generation-api";
 export type { TimeTravelAPI } from "./modules/time-travel-api";
 export { createTimeTravelAPI } from "./modules/time-travel-api";
+export type { ContextMeshAPI } from "./modules/context-mesh-api";
+export { createContextMeshAPI } from "./modules/context-mesh-api";
 export type { DesignToCodeAPI } from "./modules/design-to-code-api";
 export { createDesignToCodeAPI } from "./modules/design-to-code-api";
 export type { VisualProgrammingAPI } from "./modules/visual-programming-api";

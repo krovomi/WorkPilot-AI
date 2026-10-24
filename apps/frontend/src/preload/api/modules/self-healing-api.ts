@@ -23,7 +23,6 @@ const CH = {
 	CANCEL_OP: "selfHealing:cancelOperation",
 	DISMISS: "selfHealing:dismissIncident",
 	RETRY: "selfHealing:retryIncident",
-	EVT_INCIDENT: "selfHealing:incidentDetected",
 	EVT_PROGRESS: "selfHealing:operationProgress",
 	EVT_COMPLETE: "selfHealing:operationComplete",
 } as const;
@@ -92,7 +91,6 @@ export interface SelfHealingAPIObject {
 		incidentId: string,
 	): Promise<{ success: boolean; error?: string }>;
 
-	onIncidentDetected(callback: (data: unknown) => void): () => void;
 	onOperationProgress(callback: (data: unknown) => void): () => void;
 	onOperationComplete(callback: (data: unknown) => void): () => void;
 }
@@ -132,12 +130,6 @@ export const createSelfHealingAPI = (): SelfHealingAPIObject => ({
 	retryIncident: (projectPath, incidentId) =>
 		ipcRenderer.invoke(CH.RETRY, projectPath, incidentId),
 
-	onIncidentDetected: (callback) => {
-		const handler = (_event: Electron.IpcRendererEvent, data: unknown) =>
-			callback(data);
-		ipcRenderer.on(CH.EVT_INCIDENT, handler);
-		return () => ipcRenderer.removeListener(CH.EVT_INCIDENT, handler);
-	},
 	onOperationProgress: (callback) => {
 		const handler = (_event: Electron.IpcRendererEvent, data: unknown) =>
 			callback(data);
