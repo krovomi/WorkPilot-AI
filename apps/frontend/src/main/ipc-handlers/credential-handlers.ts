@@ -22,6 +22,7 @@ import {
 	detectWindsurfLocalToken,
 	readWindsurfCachedPlanInfo,
 } from "../services/credential-manager";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
 
 /**
  * Extract version from command output using regex
@@ -406,7 +407,7 @@ export function registerCredentialHandlers(): void {
 	/**
 	 * Obtenir le credential actif
 	 */
-	ipcMain.handle("credential:getActive", (): CredentialConfig | null => {
+	ipcMain.handle(IPC_CHANNELS.CREDENTIAL_GET_ACTIVE, (): CredentialConfig | null => {
 		return credentialManager.getActiveCredential();
 	});
 
@@ -414,7 +415,7 @@ export function registerCredentialHandlers(): void {
 	 * Définir le provider actif
 	 */
 	ipcMain.handle(
-		"credential:setActive",
+		IPC_CHANNELS.CREDENTIAL_SET_ACTIVE,
 		async (
 			_event,
 			provider: string,
@@ -431,7 +432,7 @@ export function registerCredentialHandlers(): void {
 	 * Local cache is only used as fallback if API is unavailable
 	 */
 	ipcMain.handle(
-		"usage:getData",
+		IPC_CHANNELS.USAGE_GET_DATA,
 		async (_event, provider: string): Promise<UsageData | null> => {
 			const cached = credentialManager.getUsageData(provider);
 
@@ -458,7 +459,7 @@ export function registerCredentialHandlers(): void {
 	/**
 	 * Obtenir toutes les données d'usage
 	 */
-	ipcMain.handle("usage:getAllData", (): Record<string, UsageData> => {
+	ipcMain.handle(IPC_CHANNELS.USAGE_GET_ALL_DATA, (): Record<string, UsageData> => {
 		const allData = credentialManager.getAllUsageData();
 		// Convertir Map en objet pour la sérialisation JSON
 		return Object.fromEntries(allData.entries());
@@ -468,7 +469,7 @@ export function registerCredentialHandlers(): void {
 	 * Mettre à jour les données d'usage (appelé par les services d'usage)
 	 */
 	ipcMain.handle(
-		"usage:updateData",
+		IPC_CHANNELS.USAGE_UPDATE_DATA,
 		(_event, provider: string, usageData: Partial<UsageData>): void => {
 			credentialManager.updateUsageData(provider, usageData);
 		},
@@ -477,7 +478,7 @@ export function registerCredentialHandlers(): void {
 	/**
 	 * Valider les credentials actifs
 	 */
-	ipcMain.handle("credential:validate", async (): Promise<boolean> => {
+	ipcMain.handle(IPC_CHANNELS.CREDENTIAL_VALIDATE, async (): Promise<boolean> => {
 		return await credentialManager.validateActiveCredentials();
 	});
 
@@ -485,7 +486,7 @@ export function registerCredentialHandlers(): void {
 	 * Tester un provider (incluant les cas spéciaux)
 	 */
 	ipcMain.handle(
-		"credential:testProvider",
+		IPC_CHANNELS.CREDENTIAL_TEST_PROVIDER,
 		async (
 			_event,
 			provider: string,
@@ -502,69 +503,12 @@ export function registerCredentialHandlers(): void {
 	// directly when building Python subprocess envs.
 
 	/**
-	 * S'abonner aux événements de credentials
-	 */
-	ipcMain.on("credential:subscribe", (event) => {
-		const channel = "credential:updated";
-
-		const onUpdate = (credential: CredentialConfig | null) => {
-			event.sender.send(channel, credential);
-		};
-
-		credentialManager.on("credential:updated", onUpdate);
-
-		// Nettoyage quand la fenêtre est fermée
-		event.sender.on("destroyed", () => {
-			credentialManager.off("credential:updated", onUpdate);
-		});
-	});
-
-	/**
-	 * S'abonner aux événements d'usage
-	 */
-	ipcMain.on("usage:subscribe", (event) => {
-		const channel = "usage:changed";
-
-		const onUpdate = (data: UsageData) => {
-			event.sender.send(channel, data);
-		};
-
-		credentialManager.on("usage:changed", onUpdate);
-
-		// Nettoyage quand la fenêtre est fermée
-		event.sender.on("destroyed", () => {
-			credentialManager.off("usage:changed", onUpdate);
-		});
-	});
-
-	/**
-	 * S'abonner aux événements de switch de provider
-	 */
-	ipcMain.on("provider:subscribe", (event) => {
-		const channel = "provider:switched";
-
-		const onSwitch = (data: {
-			provider: string;
-			type: "oauth" | "api_key";
-		}) => {
-			event.sender.send(channel, data);
-		};
-
-		credentialManager.on("provider:switched", onSwitch);
-
-		// Nettoyage quand la fenêtre est fermée
-		event.sender.on("destroyed", () => {
-			credentialManager.off("provider:switched", onSwitch);
-		});
-	});
-
-	/**
 	 * Détecter le token Windsurf depuis l'installation IDE locale
 	 * Lit le state.vscdb de Windsurf pour extraire la clé API sk-ws-...
 	 * Enrichit la réponse avec les infos du plan (planName, usage) si disponibles.
 	 */
 	ipcMain.handle(
-		"credential:detectWindsurfToken",
+		IPC_CHANNELS.CREDENTIAL_DETECT_WINDSURF_TOKEN,
 		async (): Promise<{
 			success: boolean;
 			apiKey?: string;
@@ -613,7 +557,7 @@ export function registerCredentialHandlers(): void {
 	 * Retourne si l'utilisateur est authentifié via OAuth Claude Code
 	 */
 	ipcMain.handle(
-		"credential:checkClaudeOAuth",
+		IPC_CHANNELS.CREDENTIAL_CHECK_CLAUDE_OAUTH,
 		async (): Promise<{ isAuthenticated: boolean; profileName?: string }> => {
 			return await credentialManager.checkClaudeOAuthStatusPublic();
 		},
@@ -624,7 +568,7 @@ export function registerCredentialHandlers(): void {
 	 * Retourne si l'utilisateur est authentifié via OpenAI Codex CLI, avec la version CLI
 	 */
 	ipcMain.handle(
-		"credential:checkOpenAICodexOAuth",
+		IPC_CHANNELS.CREDENTIAL_CHECK_OPENAI_CODEX_OAUTH,
 		async (): Promise<{
 			isAuthenticated: boolean;
 			profileName?: string;
@@ -649,7 +593,7 @@ export function registerCredentialHandlers(): void {
 	 * Pas de terminal visible : on exécute directement `pnpm install -g @openai/codex@latest`.
 	 */
 	ipcMain.handle(
-		"credential:updateCodexCli",
+		IPC_CHANNELS.CREDENTIAL_UPDATE_CODEX_CLI,
 		async (): Promise<{
 			success: boolean;
 			version?: string;
@@ -709,7 +653,7 @@ export function registerCredentialHandlers(): void {
 	 * Ce fichier est maintenant à la racine du projet dans le dossier config/
 	 */
 	ipcMain.handle(
-		"providers:getConfiguredProviders",
+		IPC_CHANNELS.PROVIDERS_GET_CONFIGURED_PROVIDERS,
 		async (): Promise<{ providers?: unknown } | null> => {
 			try {
 				const appPath = app.getAppPath();

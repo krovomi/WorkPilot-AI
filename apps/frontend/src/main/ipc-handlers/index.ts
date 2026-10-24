@@ -289,7 +289,7 @@ export function setupIpcHandlers(
 	notificationService.initialize(getMainWindow);
 
 	// Project handlers (including Python environment setup)
-	registerProjectHandlers(pythonEnvManager, agentManager, getMainWindow);
+	registerProjectHandlers(pythonEnvManager, agentManager);
 
 	// Task handlers
 	registerTaskHandlers(agentManager, pythonEnvManager, getMainWindow);
@@ -437,7 +437,7 @@ export function setupIpcHandlers(
 	registerSelfHealingHandlers(getMainWindow);
 
 	// Browser Agent handlers (built-in browser for testing and visual validation)
-	registerBrowserAgentHandlers(getMainWindow);
+	registerBrowserAgentHandlers();
 
 	// Architecture Visualizer handlers
 	registerArchitectureVisualizerHandlers();
@@ -508,7 +508,7 @@ export function setupIpcHandlers(
 	registerLiveCompanionHandlers(getMainWindow);
 
 	// Agent Time Travel handlers (Temporal debugger for AI agents)
-	registerTimeTravelHandlers(getMainWindow);
+	registerTimeTravelHandlers();
 
 	// Phase 3-5 backend feature modules (#3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 3.10, 3.11, 3.12)
 	registerPhase35FeatureHandlers(getMainWindow);

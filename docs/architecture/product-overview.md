@@ -43,3 +43,97 @@ WorkPilot AI is a desktop application (+ CLI) where users describe a goal and AI
 - **Flexible Authentication** — Use a Claude Code subscription (OAuth) or API profiles with any Anthropic-compatible endpoint (e.g., Anthropic API, z.ai for GLM models)
 - **Multi-Account Swapping** — Register multiple Claude accounts; when one hits a rate limit, WorkPilot AI automatically switches to an available account
 - **Cross-Platform** — Native desktop app for Windows, macOS, and Linux with auto-updates
+
+## Views
+
+Every view the app can show, one row each: the `SidebarView` identifier
+(`apps/frontend/src/renderer/components/Sidebar.tsx`), the English label, the
+sidebar group, and the file of this folder that explains its design when one
+exists. `tests/test_product_overview_views.py` fails on a view without a row
+and on a row without a view. The last five rows are added to the sidebar only
+when their integration is enabled, or, for the administration console, in
+server mode for someone allowed to administer.
+
+A view without a design file and without a test is one lot M8 decides on:
+document and test it, put it behind the experimental flag, or remove it.
+
+| View | Label | Group | Design |
+|---|---|---|---|
+| `dashboard` | Dashboard | Workspace | — |
+| `kanban` | Kanban Board | Workspace | [kanban-task-types.md](kanban-task-types.md), [frontend-task-panel.md](frontend-task-panel.md) |
+| `mission-control` | Mission Control | Workspace | — |
+| `phase35-hub` | Advanced Features | Workspace | — |
+| `session-history` | Session History | Workspace | — |
+| `agent-coach` | Personal Agent Coach | Agents | — |
+| `agent-debugger` | Agent Debugger | Agents | — |
+| `agent-replay` | Agent Replay | Agents | — |
+| `arena-mode` | Arena Mode | Agents | [arena.md](arena.md) |
+| `bounty-board` | Bounty Board | Agents | [bounty-board.md](bounty-board.md) |
+| `consensus-arbiter` | Cross-Agent Consensus Arbiter | Agents | — |
+| `live-companion` | Live Companion | Agents | — |
+| `pixel-office` | Pixel Office | Agents | [frontend-architecture.md](frontend-architecture.md) |
+| `self-healing` | Self-Healing | Agents | — |
+| `terminals` | Agent Terminals | Agents | [frontend-architecture.md](frontend-architecture.md) |
+| `code-playground` | Code Playground | Development | — |
+| `code-review` | Code Review | Development | — |
+| `cross-language-translation` | Cross-Language Translation | Development | — |
+| `documentation` | Documentation | Development | — |
+| `flaky-tests` | Flaky Test Detective | Development | — |
+| `onboarding-guide` | Onboarding Guide | Development | — |
+| `pair-programming` | Pair Programming | Development | — |
+| `performance-profiler` | Performance Profiler | Development | — |
+| `refactoring` | Refactoring | Development | — |
+| `test-generation` | Test Generation | Development | [test-generation.md](test-generation.md) |
+| `visual-to-code` | Visual to Code | Development | [visual-to-code.md](visual-to-code.md) |
+| `architecture-visualizer` | Architecture Visualizer | Explore | [archify.md](archify.md) |
+| `context-mesh` | Context Mesh | Explore | — |
+| `context` | Context | Explore | — |
+| `ideation` | Ideation | Explore | [agent-prompts.md](agent-prompts.md) |
+| `insights` | Insights | Explore | [agent-prompts.md](agent-prompts.md) |
+| `learning-loop` | Learning Loop | Explore | — |
+| `cicd-triggers` | CI/CD Triggers | Git & Integrations | — |
+| `conflict-predictor` | Conflict Predictor | Git & Integrations | — |
+| `git-surgeon` | Git History Surgeon | Git & Integrations | — |
+| `natural-language-git` | Natural Language Git | Git & Integrations | — |
+| `worktrees` | Worktrees | Git & Integrations | — |
+| `analytics` | Analytics | Planning | — |
+| `carbon-profiler` | Carbon / Energy Profiler | Planning | — |
+| `changelog` | Changelog | Planning | — |
+| `cost-estimator` | Cost Estimator | Planning | — |
+| `env-snapshot` | Environment Snapshots | Planning | — |
+| `release-coordinator` | Release Train Coordinator | Planning | — |
+| `roadmap` | Roadmap | Planning | [agent-prompts.md](agent-prompts.md) |
+| `spec-approval` | Spec Approval | Planning | — |
+| `tech-debt` | Tech Debt Dashboard | Planning | — |
+| `accessibility-agent` | Accessibility Agent | Toolbox | — |
+| `agent-tools` | MCP Overview | Toolbox | — |
+| `api-explorer` | API Studio | Toolbox | — |
+| `api-watcher` | API Contract Watcher | Toolbox | — |
+| `app-emulator` | App Emulator | Toolbox | [app-emulator.md](app-emulator.md) |
+| `blast-radius` | Impact Blast Radius | Toolbox | — |
+| `browser-agent` | Browser Agent | Toolbox | — |
+| `compliance` | Compliance Evidence Collector | Toolbox | — |
+| `context-aware-snippets` | Context-Aware Snippets | Toolbox | — |
+| `dependency-sentinel` | Dependency Sentinel | Toolbox | — |
+| `doc-drift` | Documentation Drift Detector | Toolbox | — |
+| `guardrails` | Agent Guardrails | Toolbox | — |
+| `i18n-agent` | i18n Agent | Toolbox | — |
+| `injection-guard` | Injection Guard | Toolbox | — |
+| `mcp-marketplace` | MCP Marketplace | Toolbox | — |
+| `migration` | Code Migration | Toolbox | — |
+| `notebook-agent` | Notebook Agent | Toolbox | — |
+| `offline-mode` | Offline Mode | Toolbox | [offline-mode.md](offline-mode.md) |
+| `onboarding-agent` | Onboarding Agent | Toolbox | — |
+| `pipeline-generator` | Pipeline Generator | Toolbox | — |
+| `plugin-marketplace` | Plugin Marketplace | Toolbox | — |
+| `prompt-optimizer` | Prompt Optimizer | Toolbox | — |
+| `regression-guardian` | Regression Guardian | Toolbox | — |
+| `sandbox` | Agent Simulation Sandbox | Toolbox | — |
+| `spec-refinement` | Incremental Spec Refinement | Toolbox | — |
+| `team-bot` | Team Bot (Slack/Teams) | Toolbox | — |
+| `voice-control` | Voice Control | Toolbox | — |
+| `administration` | Administration | Administration, in server mode for an administrator | — |
+| `github-issues` | GitHub Issues | Git & Integrations, when GitHub is enabled | — |
+| `github-prs` | GitHub Pull Requests | Git & Integrations, when GitHub is enabled | — |
+| `gitlab-issues` | GitLab Issues | Git & Integrations, when GitLab is enabled | — |
+| `gitlab-merge-requests` | GitLab Merge Requests | Git & Integrations, when GitLab is enabled | — |

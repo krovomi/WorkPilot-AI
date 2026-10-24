@@ -4,6 +4,7 @@
  */
 
 import { ipcRenderer } from "electron";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export interface QualityIssue {
 	category: "bugs" | "security" | "maintainability" | "complexity";
@@ -49,14 +50,14 @@ export interface QualityAPI {
 
 export const createQualityAPI = (): QualityAPI => ({
 	analyzeQuality: (files: string[], projectDir?: string) =>
-		ipcRenderer.invoke("quality:analyze", { files, projectDir }),
+		ipcRenderer.invoke(IPC_CHANNELS.QUALITY_ANALYZE, { files, projectDir }),
 
 	analyzePRQuality: (
 		prNumber: number,
 		changedFiles: string[],
 		projectDir?: string,
 	) =>
-		ipcRenderer.invoke("quality:analyze-pr", {
+		ipcRenderer.invoke(IPC_CHANNELS.QUALITY_ANALYZE_PR, {
 			prNumber,
 			changedFiles,
 			projectDir,

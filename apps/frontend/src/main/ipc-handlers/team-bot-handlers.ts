@@ -12,6 +12,7 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import { app, ipcMain } from "electron";
 import { pythonEnvManager } from "../python-env-manager.js";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
 
 function runRunner(
 	action: "send" | "test",
@@ -77,7 +78,7 @@ function runRunner(
 
 export function registerTeamBotHandlers(): void {
 	ipcMain.handle(
-		"teamBot:send",
+		IPC_CHANNELS.TEAM_BOT_SEND,
 		async (
 			_e,
 			{
@@ -87,7 +88,7 @@ export function registerTeamBotHandlers(): void {
 		) => runRunner("send", { config, payload }),
 	);
 	ipcMain.handle(
-		"teamBot:test",
+		IPC_CHANNELS.TEAM_BOT_TEST,
 		async (_e, { config }: { config: Record<string, unknown> }) =>
 			runRunner("test", { config }),
 	);

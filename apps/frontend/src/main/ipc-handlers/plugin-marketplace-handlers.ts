@@ -12,6 +12,7 @@ import type {
 	MarketplacePlugin,
 } from "../../shared/types/plugin-marketplace";
 import { appLog } from "../app-logger";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
 
 // ============================================
 // Storage paths
@@ -509,7 +510,7 @@ function buildPluginCatalog(): MarketplacePlugin[] {
 
 export function registerPluginMarketplaceHandlers(): void {
 	// Get full plugin catalog
-	ipcMain.handle("pluginMarketplace:getCatalog", async () => {
+	ipcMain.handle(IPC_CHANNELS.PLUGIN_MARKETPLACE_GET_CATALOG, async () => {
 		try {
 			const catalog = buildPluginCatalog();
 			return { success: true, data: catalog };
@@ -523,7 +524,7 @@ export function registerPluginMarketplaceHandlers(): void {
 	});
 
 	// Get installed plugins
-	ipcMain.handle("pluginMarketplace:getInstalled", async () => {
+	ipcMain.handle(IPC_CHANNELS.PLUGIN_MARKETPLACE_GET_INSTALLED, async () => {
 		try {
 			const installed = readInstalledPlugins();
 			return { success: true, data: installed };
@@ -537,7 +538,7 @@ export function registerPluginMarketplaceHandlers(): void {
 
 	// Install a plugin
 	ipcMain.handle(
-		"pluginMarketplace:install",
+		IPC_CHANNELS.PLUGIN_MARKETPLACE_INSTALL,
 		async (
 			_event,
 			{
@@ -587,7 +588,7 @@ export function registerPluginMarketplaceHandlers(): void {
 
 	// Uninstall a plugin
 	ipcMain.handle(
-		"pluginMarketplace:uninstall",
+		IPC_CHANNELS.PLUGIN_MARKETPLACE_UNINSTALL,
 		async (_event, { pluginId }: { pluginId: string }) => {
 			try {
 				const installed = readInstalledPlugins();
@@ -606,7 +607,7 @@ export function registerPluginMarketplaceHandlers(): void {
 
 	// Toggle plugin enabled/disabled
 	ipcMain.handle(
-		"pluginMarketplace:toggle",
+		IPC_CHANNELS.PLUGIN_MARKETPLACE_TOGGLE,
 		async (
 			_event,
 			{ pluginId, enabled }: { pluginId: string; enabled: boolean },
@@ -634,7 +635,7 @@ export function registerPluginMarketplaceHandlers(): void {
 	// path `pluginMarketplace:create` returned, and a path from the renderer is
 	// never trusted to stay where it came from.
 	ipcMain.handle(
-		"pluginMarketplace:openLocalFolder",
+		IPC_CHANNELS.PLUGIN_MARKETPLACE_OPEN_LOCAL_FOLDER,
 		async (_event, folderPath: unknown) => {
 			const target = resolveLocalPluginFolder(folderPath);
 			if (!target) {
@@ -647,7 +648,7 @@ export function registerPluginMarketplaceHandlers(): void {
 
 	// Scaffold a new plugin on disk
 	ipcMain.handle(
-		"pluginMarketplace:create",
+		IPC_CHANNELS.PLUGIN_MARKETPLACE_CREATE,
 		async (
 			_event,
 			data: {

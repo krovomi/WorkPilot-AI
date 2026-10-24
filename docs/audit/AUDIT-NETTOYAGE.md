@@ -1994,6 +1994,72 @@ Code : `main/security/renderer-path.ts` (résolution) et `main/security/ipc-path
   objet ne sont couverts que par le contrôle des clés ; aucun handler ne vérifie encore
   `event.senderFrame`.
 
+### Lot M7 — Contrats d'architecture (P1)
+
+**Fait.** Septième lot de l'audit du 17 octobre (annexe F). Chaque contrat est un test qui lit les
+sources, sans dépendance nouvelle : les deux sens de l'IPC, le nommage des canaux, les imports
+entre unités du backend, les vues de l'app. Le test AST des routes `@app.` hors `_mount` demandé
+par l'audit est livré depuis M4 (`test_no_route_is_declared_on_the_app_itself`).
+Règles : [`frontend.md`](../rules/frontend.md) (un canal = une constante), [`backend.md`](../rules/backend.md#code-python)
+(contrats d'imports).
+
+#### F91 · Des événements du main ne trouvaient personne, et des écouteurs aucun émetteur
+
+- **Sévérité** haute · **nouveau** · **corrigé par le lot M7**
+- **Preuve** (avant) : le test de parité ne lisait que le sens renderer → main. Dans l'autre sens,
+  28 canaux envoyés par le main n'avaient pas d'écouteur dans le preload, et 3 écouteurs n'avaient
+  pas d'émetteur. L'URL de PR et la preuve visuelle d'une tâche partaient sur `task:update`, un
+  canal d'appel où rien n'écoutait : elles n'apparaissaient qu'au rechargement. Les quatre
+  événements de Context Mesh n'étaient pas écoutés : l'analyse restait sur « Starting analysis... ».
+- **Correction** : événement `task:updated` (`TASK_UPDATED_EVENT`), `onTaskUpdated`, fusion de
+  `metadata` dans `useIpc.ts` ; `preload/api/modules/context-mesh-api.ts` et
+  `setupContextMeshListeners` dans `global-listeners.ts`. Retirés : les envois qui répétaient la
+  réponse de l'appel (time travel, browser agent, `crossLangTranslation:complete`), les
+  événements `python-env:*`, quatre handlers `*:subscribe` qu'aucun preload n'appelait, trois
+  écouteurs sans appelant (`onTerminalAuthCreated`, `onTerminalOAuthCodeNeeded`,
+  `onIncidentDetected`).
+- **Garde-fou** : `ipc-channel-parity.test.ts`, bloc « main → renderer » (envois lus à travers les
+  fonctions qui relaient un canal), `useIpc-task-updated.test.tsx`, `context-mesh-events.test.ts`.
+- **Reste** (lot M8) : Live Companion (5 événements, la vue interroge par appel) et le triage
+  GitHub (aucun appelant dans le preload), dans `UNHEARD_ALLOWLIST`, qui ne fait que rétrécir.
+
+#### F92 · Les canaux étaient nommés par leur chaîne
+
+- **Sévérité** moyenne · **nouveau** · **corrigé par le lot M7**
+- **Preuve** (avant) : 706 appels IPC du main et du preload écrivaient la chaîne du canal ou une
+  copie locale (`self-healing-api.ts`, objet `CH`) ; 321 de ces canaux n'avaient pas de constante.
+  22 constantes ne servaient à aucun appel. `shared/constants/ipc-namespaces.ts` (441 lignes) était
+  une deuxième carte des canaux qu'aucun module n'importait.
+- **Correction** : 321 constantes ajoutées à `IPC_CHANNELS`, chaque appel réécrit ; les 22
+  constantes et `ipc-namespaces.ts` retirés.
+- **Garde-fou** : `ipc-channel-parity.test.ts`, bloc « IPC channels are named through
+  IPC_CHANNELS » (aucun canal littéral, aucune constante orpheline).
+
+#### F93 · Aucun contrat d'imports, et le cycle principal avait grandi
+
+- **Sévérité** moyenne · **nouveau** · **corrigé par le lot M7**
+- **Preuve** (avant) : ni `import-linter` ni test. Le plus grand cycle comptait 60 unités sur 126
+  à l'audit, 81 sur 126 à `develop` le 24 octobre. `phase_config`, `core/client.py` et
+  `core/model_info.py` importaient `provider_api` (l'app FastAPI) pour lire le provider choisi ;
+  `model_info` devait lire `sys.modules` pour ne pas refermer un cycle pendant un log.
+- **Correction** : `provider_selection.py`, une feuille, porte ce choix. `tests/test_import_contracts.py`
+  lit le graphe avec `ast` (imports paresseux compris) et tient `security`, `server`,
+  `phase_config`, `harness` et `provider_selection` à leur liste ; le plus grand cycle ne dépasse
+  pas `MAX_CYCLE = 81` et le test demande de baisser la limite quand il rétrécit. Un test plutôt
+  qu'`import-linter` : même garde sans dépendance, et import-linter n'exprime pas ce cliquet.
+- **Reste** : casser le cycle, c'est le lot M10.
+
+#### F94 · La liste des vues ne couvrait qu'un tiers de l'app
+
+- **Sévérité** basse · **nouveau** · **corrigé par le lot M7**
+- **Preuve** (avant) : `docs/CLAUDE.md` présentait `product-overview.md` comme la liste complète ;
+  elle citait 26 des 78 vues de `SidebarView`.
+- **Correction** : section « Views », une ligne par vue (libellé, groupe, fichier de conception
+  quand il existe).
+- **Garde-fou** : `tests/test_product_overview_views.py` (vue sans ligne, ligne sans vue,
+  doublon).
+- **Reste** (lot M8) : les vues sans fichier de conception ni test.
+
 ---
 
 ## Annexe A — Inventaire des fichiers candidats
@@ -2148,7 +2214,7 @@ planchers `pnpm.overrides` relevés (`pnpm-workspace.yaml`), `dompurify` ^3.4.17
 
 Statut des constats de l'audit précédent : F1, F3, F4, F5, F7, F8, F9, F10, F12, F16, F17, F19 **ouverts** ;
 F2, F13 **partiels** ; F6, F11, F14, F18 **aggravés** ; F15 **atténué**. Nouveaux : F20 à F36.
-Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F57 à F62 par M2, F63 à F68 par M3, F69 à F71 par M4, F78 à F84 par M5, F85 à F90 par M6, F72 à F77 par M9 (annexe F).
+Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F57 à F62 par M2, F63 à F68 par M3, F69 à F71 par M4, F78 à F84 par M5, F85 à F90 par M6, F91 à F94 par M7, F72 à F77 par M9 (annexe F).
 
 ## Annexe C — Ce qui a changé le 15 octobre 2026 (`7ef6fca` → `e3e468f` + PR #454)
 
@@ -2212,7 +2278,7 @@ détaillés ici qu'une fois corrigés ([`SECURITY.md`](../SECURITY.md)).
 | M4 | Mode hors-ligne strict et mode serveur | **fait** (F69 à F71) |
 | M5 | Secrets et environnement des processus enfants | **fait** (F78 à F84 : journaux et processus enfants, aucun identifiant stocké dans le renderer ; reste l'environnement des runners Python des vues) |
 | M6 | Frontière renderer → main, avec tests de refus | **fait** (F85 à F90 ; reste `senderFrame` et les chemins d'outils des réglages) |
-| M7 | Contrats d'architecture (`import-linter`, canaux IPC, Sidebar ↔ `product-overview.md`) | à faire (après M6) |
+| M7 | Contrats d'architecture (`import-linter`, canaux IPC, Sidebar ↔ `product-overview.md`) | **fait** (F91 à F94 ; contrats d'imports en test AST, sans `import-linter`) |
 | M8 | Code mort, `scripts/`, vues sans test | à faire (après M7) |
 | M9 | Doc ↔ code, i18n de la palette, jsdom, dépendances | **fait** (F72 à F77) |
 | M10 | Casser le cycle `core ⇄ agents`, découper les fonctions géantes | à faire (après M7) |
@@ -2232,6 +2298,9 @@ et `cd apps/frontend && pnpm test -- child-env dev-env-files`.
 
 Vérification du lot M6 : `cd apps/frontend && pnpm test -- renderer-path ipc-path-policy
 renderer-path-refusals no-renderer-interpreter python-feature-services`.
+
+Vérification du lot M7 : `pytest tests/test_import_contracts.py tests/test_product_overview_views.py -q`
+et `cd apps/frontend && pnpm test -- ipc-channel-parity useIpc-task-updated context-mesh-events`.
 
 Vérification du lot M9 : `pytest tests/test_docs_context.py tests/test_python_floor.py
 tests/test_test_generation_post_build_scope.py -q` et `cd apps/frontend && pnpm test`.

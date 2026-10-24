@@ -17,6 +17,7 @@ import { type ChildProcess, spawn } from "node:child_process";
 import path from "node:path";
 import { app, BrowserWindow, ipcMain } from "electron";
 import { pythonEnvManager } from "../python-env-manager.js";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
 
 interface RunRequest {
 	projectPath: string;
@@ -43,13 +44,13 @@ export function registerFlakyTestsHandlers(): void {
 	};
 
 	ipcMain.handle(
-		"flakyTests:run",
+		IPC_CHANNELS.FLAKY_TESTS_RUN,
 		async (_event, { projectPath }: RunRequest) => {
 			killExisting();
 
 			if (!projectPath) {
 				const message = "projectPath is required";
-				broadcast("flaky-tests-error", message);
+				broadcast(IPC_CHANNELS.FLAKY_TESTS_ERROR, message);
 				throw new Error(message);
 			}
 
@@ -93,7 +94,7 @@ export function registerFlakyTestsHandlers(): void {
 					if (line.startsWith(EVENT_PREFIX)) {
 						try {
 							const payload = JSON.parse(line.slice(EVENT_PREFIX.length));
-							broadcast("flaky-tests-event", payload);
+							broadcast(IPC_CHANNELS.FLAKY_TESTS_EVENT, payload);
 						} catch (err) {
 							console.error("[FlakyTests] Bad event line:", err);
 						}
@@ -117,12 +118,12 @@ export function registerFlakyTestsHandlers(): void {
 				child.on("close", (code) => {
 					currentProcess = null;
 					if (code === 0 && result) {
-						broadcast("flaky-tests-result", result);
+						broadcast(IPC_CHANNELS.FLAKY_TESTS_RESULT, result);
 						resolve(result);
 					} else {
 						const message =
 							errorMessage ?? `flaky tests runner exited with code ${code}`;
-						broadcast("flaky-tests-error", message);
+						broadcast(IPC_CHANNELS.FLAKY_TESTS_ERROR, message);
 						reject(new Error(message));
 					}
 				});
@@ -130,14 +131,14 @@ export function registerFlakyTestsHandlers(): void {
 				child.on("error", (err) => {
 					currentProcess = null;
 					const message = `Failed to start flaky tests runner: ${err.message}`;
-					broadcast("flaky-tests-error", message);
+					broadcast(IPC_CHANNELS.FLAKY_TESTS_ERROR, message);
 					reject(new Error(message));
 				});
 			});
 		},
 	);
 
-	ipcMain.handle("flakyTests:cancel", () => {
+	ipcMain.handle(IPC_CHANNELS.FLAKY_TESTS_CANCEL, () => {
 		killExisting();
 		return true;
 	});

@@ -12,6 +12,7 @@ import path from "node:path";
 import { app, ipcMain } from "electron";
 import { getPathDelimiter } from "../platform/index.js";
 import { pythonEnvManager } from "../python-env-manager.js";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
 
 function runAnalysis(
 	projectRoot: string,
@@ -148,7 +149,7 @@ function runAnalysis(
 
 export function registerBlastRadiusHandlers(): void {
 	ipcMain.handle(
-		"blastRadius:analyze",
+		IPC_CHANNELS.BLAST_RADIUS_ANALYZE,
 		async (
 			_e,
 			{

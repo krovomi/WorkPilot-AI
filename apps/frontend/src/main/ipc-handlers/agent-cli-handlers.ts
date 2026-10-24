@@ -12,6 +12,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { ipcMain } from "electron";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import {
 	AGENT_CLI_EXECUTABLES,
 	type AgentCliStatus,
@@ -27,7 +28,6 @@ import {
 
 const execFileAsync = promisify(execFile);
 
-export const AGENT_CLI_CHECK_CHANNEL = "agentCli:check";
 
 const VERSION_PATTERN = /\d+\.\d+(?:\.\d+)?(?:[-+][0-9A-Za-z.-]+)?/;
 
@@ -83,7 +83,7 @@ export async function checkAgentCli(tool: unknown): Promise<AgentCliStatus> {
 }
 
 export function registerAgentCliHandlers(): void {
-	ipcMain.handle(AGENT_CLI_CHECK_CHANNEL, (_event, tool: unknown) =>
+	ipcMain.handle(IPC_CHANNELS.AGENT_CLI_CHECK, (_event, tool: unknown) =>
 		checkAgentCli(tool),
 	);
 }

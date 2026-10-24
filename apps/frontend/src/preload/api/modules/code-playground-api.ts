@@ -1,5 +1,6 @@
 import { ipcRenderer } from "electron";
 import type { PlaygroundResult } from "../../../main/code-playground-service";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export interface CodePlaygroundAPI {
 	/**
@@ -50,7 +51,7 @@ export function createCodePlaygroundAPI(): CodePlaygroundAPI {
 			playgroundType: string,
 			sandboxType: string,
 		) => {
-			ipcRenderer.send("code-playground:start", {
+			ipcRenderer.send(IPC_CHANNELS.CODE_PLAYGROUND_START, {
 				projectId,
 				idea,
 				playgroundType,
@@ -60,7 +61,7 @@ export function createCodePlaygroundAPI(): CodePlaygroundAPI {
 
 		onCodePlaygroundStreamChunk: (callback: (chunk: string) => void) => {
 			const subscription = ipcRenderer.on(
-				"code-playground:stream-chunk",
+				IPC_CHANNELS.CODE_PLAYGROUND_STREAM_CHUNK,
 				(_, chunk) => callback(chunk),
 			);
 			return () => subscription.removeAllListeners();
@@ -68,14 +69,14 @@ export function createCodePlaygroundAPI(): CodePlaygroundAPI {
 
 		onCodePlaygroundStatus: (callback: (status: string) => void) => {
 			const subscription = ipcRenderer.on(
-				"code-playground:status",
+				IPC_CHANNELS.CODE_PLAYGROUND_STATUS,
 				(_, status) => callback(status),
 			);
 			return () => subscription.removeAllListeners();
 		},
 
 		onCodePlaygroundError: (callback: (error: string) => void) => {
-			const subscription = ipcRenderer.on("code-playground:error", (_, error) =>
+			const subscription = ipcRenderer.on(IPC_CHANNELS.CODE_PLAYGROUND_ERROR, (_, error) =>
 				callback(error),
 			);
 			return () => subscription.removeAllListeners();
@@ -85,14 +86,14 @@ export function createCodePlaygroundAPI(): CodePlaygroundAPI {
 			callback: (result: PlaygroundResult) => void,
 		) => {
 			const subscription = ipcRenderer.on(
-				"code-playground:complete",
+				IPC_CHANNELS.CODE_PLAYGROUND_COMPLETE,
 				(_, result) => callback(result),
 			);
 			return () => subscription.removeAllListeners();
 		},
 
 		cancelCodePlayground: () => {
-			ipcRenderer.send("code-playground:cancel");
+			ipcRenderer.send(IPC_CHANNELS.CODE_PLAYGROUND_CANCEL);
 		},
 	};
 }

@@ -2,7 +2,6 @@ import { execFile, execFileSync } from "node:child_process";
 import { existsSync, renameSync } from "node:fs";
 import * as path from "node:path";
 import { promisify } from "node:util";
-import type { BrowserWindow } from "electron";
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
 import type {
@@ -733,7 +732,6 @@ const initializePythonEnvironment = async (
 export function registerProjectHandlers(
 	pythonEnvManager: PythonEnvManager,
 	agentManager: AgentManager,
-	getMainWindow: () => BrowserWindow | null,
 ): void {
 	// ============================================
 	// Project Operations
@@ -1059,28 +1057,6 @@ export function registerProjectHandlers(
 	// Project Initialization Operations
 	// ============================================
 
-	// Set up Python environment status events
-	pythonEnvManager.on("status", (message: string) => {
-		const mainWindow = getMainWindow();
-		if (mainWindow) {
-			mainWindow.webContents.send("python-env:status", message);
-		}
-	});
-
-	pythonEnvManager.on("error", (error: string) => {
-		const mainWindow = getMainWindow();
-		if (mainWindow) {
-			mainWindow.webContents.send("python-env:error", error);
-		}
-	});
-
-	pythonEnvManager.on("ready", (pythonPath: string) => {
-		const mainWindow = getMainWindow();
-		if (mainWindow) {
-			mainWindow.webContents.send("python-env:ready", pythonPath);
-		}
-	});
-
 	// Initialize Python environment on startup (non-blocking)
 	initializePythonEnvironment(pythonEnvManager, agentManager).then((status) => {
 		console.warn("[IPC] Python environment initialized:", status);
@@ -1088,7 +1064,7 @@ export function registerProjectHandlers(
 
 	// IPC handler to get Python environment status
 	ipcMain.handle(
-		"python-env:get-status",
+		IPC_CHANNELS.PYTHON_ENV_GET_STATUS,
 		async (): Promise<IPCResult<PythonEnvStatus>> => {
 			const status = await pythonEnvManager.getStatus();
 			return { success: true, data: status };
@@ -1097,7 +1073,7 @@ export function registerProjectHandlers(
 
 	// IPC handler to reinitialize Python environment
 	ipcMain.handle(
-		"python-env:reinitialize",
+		IPC_CHANNELS.PYTHON_ENV_REINITIALIZE,
 		async (): Promise<IPCResult<PythonEnvStatus>> => {
 			const status = await initializePythonEnvironment(
 				pythonEnvManager,
@@ -1176,7 +1152,7 @@ export function registerProjectHandlers(
 
 	// Check if project has local auto-claude source (is dev project)
 	ipcMain.handle(
-		"project:has-local-source",
+		IPC_CHANNELS.PROJECT_HAS_LOCAL_SOURCE,
 		async (_, projectId: string): Promise<IPCResult<boolean>> => {
 			try {
 				const project = projectStore.getProject(projectId);

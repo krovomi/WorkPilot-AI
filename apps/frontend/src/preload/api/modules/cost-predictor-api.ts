@@ -3,6 +3,7 @@
  */
 
 import { invokeIpc } from "./ipc-utils";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export interface SpecFootprint {
 	subtasks: number;
@@ -50,5 +51,5 @@ export interface CostPredictorAPI {
 
 export const createCostPredictorAPI = (): CostPredictorAPI => ({
 	runCostPrediction: (options) =>
-		invokeIpc<{ report: PredictionReport }>("costPredictor:run", options),
+		invokeIpc<{ report: PredictionReport }>(IPC_CHANNELS.COST_PREDICTOR_RUN, options),
 });

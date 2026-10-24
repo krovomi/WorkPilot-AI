@@ -246,6 +246,11 @@ AI-assisted feature planning with competitor analysis and audience targeting.
 > [`docs/audit/WorkPilot-architecture.html`](docs/audit/WorkPilot-architecture.html) (vue « Pour tous »,
 > schémas cliquables, constats, feuille de route). Les justifications de conception sont dans
 > [`docs/architecture/`](docs/architecture/).
+>
+> Les liens entre couches sont vérifiés par des tests qui lisent les sources : IPC dans les deux
+> sens et canaux nommés par constante (`ipc-channel-parity.test.ts`), imports entre unités du
+> backend et plafond du cycle principal (`tests/test_import_contracts.py`), une ligne par vue dans
+> [`product-overview.md`](docs/architecture/product-overview.md) (`tests/test_product_overview_views.py`).
 
 ### Vue d'Ensemble
 

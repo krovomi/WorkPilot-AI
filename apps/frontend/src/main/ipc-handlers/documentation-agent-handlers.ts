@@ -7,7 +7,7 @@ import { IPC_CHANNELS } from "../../shared/constants";
 
 export function registerDocumentationAgentHandlers(): void {
 	ipcMain.handle(
-		"documentationAgent:generate",
+		IPC_CHANNELS.DOCUMENTATION_AGENT_GENERATE,
 		async (_event, request: DocumentationAgentRequest) => {
 			try {
 				await documentationAgentService.generateDocs(request);
@@ -22,7 +22,7 @@ export function registerDocumentationAgentHandlers(): void {
 		},
 	);
 
-	ipcMain.handle("documentationAgent:cancel", async () => {
+	ipcMain.handle(IPC_CHANNELS.DOCUMENTATION_AGENT_CANCEL, async () => {
 		try {
 			const cancelled = documentationAgentService.cancel();
 			return { success: true, cancelled };

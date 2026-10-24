@@ -57,7 +57,7 @@ fichier-ci reste l'autorité sur les règles.
 
 | Feature | Fichier | Contenu |
 |---|---|---|
-| Vue produit | [product-overview.md](architecture/product-overview.md) | La liste complète des features. |
+| Vue produit | [product-overview.md](architecture/product-overview.md) | Les features, et une ligne par vue de l'app (`SidebarView`), vérifiée par `tests/test_product_overview_views.py`. |
 | Prompts d'agents | [agent-prompts.md](architecture/agent-prompts.md) | Quel prompt de `apps/backend/prompts/` sert quel agent. |
 | Droits d'outils | [agent-tool-rights.md](architecture/agent-tool-rights.md) | Une liste d'outils déclarée est un droit des deux côtés : `disallowed_tools` du SDK, garde de l'exécuteur, sandbox Codex. |
 | Secrets au repos | [secrets-at-rest.md](architecture/secrets-at-rest.md) | Clés et jetons de l'app chiffrés par `safeStorage`, trousseau Linux sans bureau déclaré (WSL), avertissement sans trousseau, migration, redaction des logs Electron ; le `.env` de projet et celui du backend : jetons chiffrés, clés lues par le backend nommées. |

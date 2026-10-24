@@ -15,6 +15,7 @@ import type {
 	SmartEstimationResult,
 } from "../../../shared/types/smart-estimation";
 import { createIpcListener, invokeIpc } from "./ipc-utils";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export interface SmartEstimationAPI {
 	runSmartEstimation: (
@@ -33,22 +34,22 @@ export interface SmartEstimationAPI {
 
 export const createSmartEstimationAPI = (): SmartEstimationAPI => ({
 	runSmartEstimation: (projectId: string, taskDescription: string) =>
-		invokeIpc("run-smart-estimation", { projectId, taskDescription }),
+		invokeIpc(IPC_CHANNELS.RUN_SMART_ESTIMATION, { projectId, taskDescription }),
 
-	cancelSmartEstimation: () => invokeIpc("cancel-smart-estimation"),
+	cancelSmartEstimation: () => invokeIpc(IPC_CHANNELS.CANCEL_SMART_ESTIMATION),
 
 	onSmartEstimationEvent: (callback) =>
 		createIpcListener<[SmartEstimationEvent]>(
-			"smart-estimation-event",
+			IPC_CHANNELS.SMART_ESTIMATION_EVENT,
 			callback,
 		),
 
 	onSmartEstimationError: (callback) =>
-		createIpcListener<[string]>("smart-estimation-error", callback),
+		createIpcListener<[string]>(IPC_CHANNELS.SMART_ESTIMATION_ERROR, callback),
 
 	onSmartEstimationComplete: (callback) =>
 		createIpcListener<[SmartEstimationResult]>(
-			"smart-estimation-complete",
+			IPC_CHANNELS.SMART_ESTIMATION_COMPLETE,
 			callback,
 		),
 });

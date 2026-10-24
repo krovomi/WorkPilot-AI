@@ -34,6 +34,10 @@ import {
 	type TimeTravelAPI,
 	createTimeTravelAPI,
 } from "./modules/time-travel-api";
+import {
+	type ContextMeshAPI,
+	createContextMeshAPI,
+} from "./modules/context-mesh-api";
 import { type TeamBotAPI, createTeamBotAPI } from "./modules/team-bot-api";
 import {
 	type ApiExplorerAPI,
@@ -223,6 +227,7 @@ import {
 import { createSettingsAPI, type SettingsAPI } from "./settings-api";
 import { createTaskAPI, type TaskAPI } from "./task-api";
 import { createTerminalAPI, type TerminalAPI } from "./terminal-api";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
 
 export interface ElectronAPI
 	extends ProjectAPI,
@@ -295,6 +300,7 @@ export interface ElectronAPI
 		TechDebtAPI,
 		TeamBotAPI,
 		TimeTravelAPI,
+		ContextMeshAPI,
 		EnvSnapshotAPI,
 		OfflineModeAPI,
 		VisualProgrammingAPI,
@@ -439,6 +445,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createTechDebtAPI(),
 		...createTeamBotAPI(),
 		...createTimeTravelAPI(),
+		...createContextMeshAPI(),
 		...createEnvSnapshotAPI(),
 		...createOfflineModeAPI(),
 		...createVisualProgrammingAPI(),
@@ -456,25 +463,25 @@ export const createElectronAPI = (): ElectronAPI => {
 		selfHealing: createSelfHealingAPI(),
 		createClaudeProfileDirectory: (profileName: string) =>
 			invokeIpc<{ success: boolean; data?: string; error?: string }>(
-				"claude:profileCreateDir",
+				IPC_CHANNELS.CLAUDE_PROFILE_CREATE_DIR,
 				profileName,
 			),
 		requestUsageUpdate: (providerName?: string) =>
 			invokeIpc<IPCResult<UsageSnapshot | null>>(
-				"claude:usageRequest",
+				IPC_CHANNELS.USAGE_REQUEST,
 				providerName,
 			),
 		getGithubCliStatus: () =>
 			invokeIpc<
 				IPCResult<{ available: boolean; isAuth?: boolean; username?: string }>
-			>("copilotCli:getStatus"),
+			>(IPC_CHANNELS.COPILOT_CLI_GET_STATUS),
 		selectProvider: (provider: string) =>
-			invokeIpc<IPCResult<string>>("provider:select", provider),
+			invokeIpc<IPCResult<string>>(IPC_CHANNELS.PROVIDER_SELECT, provider),
 		getSelectedProvider: () =>
-			invokeIpc<IPCResult<string | null>>("provider:getSelected"),
+			invokeIpc<IPCResult<string | null>>(IPC_CHANNELS.PROVIDER_GET_SELECTED),
 		testGitHubConnection: (config: { repo: string; token: string }) =>
 			invokeIpc<{ success: boolean; status?: number; error?: string }>(
-				"github:testConnection",
+				IPC_CHANNELS.GITHUB_TEST_CONNECTION,
 				config,
 			),
 		detectWindsurfToken: () =>
@@ -483,10 +490,10 @@ export const createElectronAPI = (): ElectronAPI => {
 				apiKey?: string;
 				userName?: string;
 				error?: string;
-			}>("credential:detectWindsurfToken"),
+			}>(IPC_CHANNELS.CREDENTIAL_DETECT_WINDSURF_TOKEN),
 		checkClaudeOAuth: () =>
 			invokeIpc<{ isAuthenticated: boolean; profileName?: string }>(
-				"credential:checkClaudeOAuth",
+				IPC_CHANNELS.CREDENTIAL_CHECK_CLAUDE_OAUTH,
 			),
 		checkOpenAICodexOAuth: () =>
 			invokeIpc<{
@@ -495,7 +502,7 @@ export const createElectronAPI = (): ElectronAPI => {
 				version?: string;
 				latest?: string;
 				isOutdated?: boolean;
-			}>("credential:checkOpenAICodexOAuth"),
+			}>(IPC_CHANNELS.CREDENTIAL_CHECK_OPENAI_CODEX_OAUTH),
 		updateCodexCli: () =>
 			invokeIpc<{
 				success: boolean;
@@ -503,7 +510,7 @@ export const createElectronAPI = (): ElectronAPI => {
 				latest?: string;
 				isOutdated?: boolean;
 				error?: string;
-			}>("credential:updateCodexCli"),
+			}>(IPC_CHANNELS.CREDENTIAL_UPDATE_CODEX_CLI),
 	};
 };
 
@@ -571,6 +578,8 @@ export type { TestGenerationAPI } from "./modules/test-generation-api";
 export { createTestGenerationAPI } from "./modules/test-generation-api";
 export type { TimeTravelAPI } from "./modules/time-travel-api";
 export { createTimeTravelAPI } from "./modules/time-travel-api";
+export type { ContextMeshAPI } from "./modules/context-mesh-api";
+export { createContextMeshAPI } from "./modules/context-mesh-api";
 export type { DesignToCodeAPI } from "./modules/design-to-code-api";
 export { createDesignToCodeAPI } from "./modules/design-to-code-api";
 export type { VisualProgrammingAPI } from "./modules/visual-programming-api";

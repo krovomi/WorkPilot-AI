@@ -7,7 +7,7 @@ import { IPC_CHANNELS } from "../../shared/constants";
 
 export function registerPerformanceProfilerHandlers(): void {
 	ipcMain.handle(
-		"performanceProfiler:start",
+		IPC_CHANNELS.PERFORMANCE_PROFILER_START,
 		async (_event, request: PerformanceProfilerRequest) => {
 			try {
 				await performanceProfilerService.startProfiling(request);
@@ -22,7 +22,7 @@ export function registerPerformanceProfilerHandlers(): void {
 		},
 	);
 
-	ipcMain.handle("performanceProfiler:cancel", async () => {
+	ipcMain.handle(IPC_CHANNELS.PERFORMANCE_PROFILER_CANCEL, async () => {
 		try {
 			const cancelled = performanceProfilerService.cancel();
 			return { success: true, cancelled };

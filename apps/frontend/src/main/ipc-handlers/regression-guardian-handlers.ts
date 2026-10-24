@@ -18,6 +18,7 @@ import { type ChildProcess, spawn } from "node:child_process";
 import path from "node:path";
 import { app, BrowserWindow, ipcMain } from "electron";
 import { pythonEnvManager } from "../python-env-manager.js";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
 
 interface RunRequest {
 	projectPath: string;
@@ -44,13 +45,13 @@ export function registerRegressionGuardianHandlers(): void {
 	};
 
 	ipcMain.handle(
-		"regressionGuardian:run",
+		IPC_CHANNELS.REGRESSION_GUARDIAN_RUN,
 		async (_event, { projectPath }: RunRequest) => {
 			killExisting();
 
 			if (!projectPath) {
 				const message = "projectPath is required";
-				broadcast("regression-guardian-error", message);
+				broadcast(IPC_CHANNELS.REGRESSION_GUARDIAN_ERROR, message);
 				throw new Error(message);
 			}
 
@@ -94,7 +95,7 @@ export function registerRegressionGuardianHandlers(): void {
 					if (line.startsWith(EVENT_PREFIX)) {
 						try {
 							const payload = JSON.parse(line.slice(EVENT_PREFIX.length));
-							broadcast("regression-guardian-event", payload);
+							broadcast(IPC_CHANNELS.REGRESSION_GUARDIAN_EVENT, payload);
 						} catch (err) {
 							console.error("[RegressionGuardian] Bad event line:", err);
 						}
@@ -118,13 +119,13 @@ export function registerRegressionGuardianHandlers(): void {
 				child.on("close", (code) => {
 					currentProcess = null;
 					if (code === 0 && result) {
-						broadcast("regression-guardian-result", result);
+						broadcast(IPC_CHANNELS.REGRESSION_GUARDIAN_RESULT, result);
 						resolve(result);
 					} else {
 						const message =
 							errorMessage ??
 							`regression guardian runner exited with code ${code}`;
-						broadcast("regression-guardian-error", message);
+						broadcast(IPC_CHANNELS.REGRESSION_GUARDIAN_ERROR, message);
 						reject(new Error(message));
 					}
 				});
@@ -132,14 +133,14 @@ export function registerRegressionGuardianHandlers(): void {
 				child.on("error", (err) => {
 					currentProcess = null;
 					const message = `Failed to start regression guardian runner: ${err.message}`;
-					broadcast("regression-guardian-error", message);
+					broadcast(IPC_CHANNELS.REGRESSION_GUARDIAN_ERROR, message);
 					reject(new Error(message));
 				});
 			});
 		},
 	);
 
-	ipcMain.handle("regressionGuardian:cancel", () => {
+	ipcMain.handle(IPC_CHANNELS.REGRESSION_GUARDIAN_CANCEL, () => {
 		killExisting();
 		return true;
 	});

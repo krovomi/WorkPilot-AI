@@ -4,29 +4,8 @@
  */
 
 import { ipcRenderer } from "electron";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
-// Use string literals to avoid import issues in preload context
-const CH = {
-	DASHBOARD: "selfHealing:getDashboard",
-	INCIDENTS: "selfHealing:getIncidents",
-	OPERATIONS: "selfHealing:getOperations",
-	FRAGILITY: "selfHealing:getFragility",
-	CICD_ENABLE: "selfHealing:cicd:enable",
-	CICD_DISABLE: "selfHealing:cicd:disable",
-	CICD_CONFIG: "selfHealing:cicd:config",
-	PROD_CONNECT: "selfHealing:production:connect",
-	PROD_DISCONNECT: "selfHealing:production:disconnect",
-	PROD_CONFIG: "selfHealing:production:config",
-	PROACTIVE_SCAN: "selfHealing:proactive:scan",
-	PROACTIVE_CONFIG: "selfHealing:proactive:config",
-	TRIGGER_FIX: "selfHealing:triggerFix",
-	CANCEL_OP: "selfHealing:cancelOperation",
-	DISMISS: "selfHealing:dismissIncident",
-	RETRY: "selfHealing:retryIncident",
-	EVT_INCIDENT: "selfHealing:incidentDetected",
-	EVT_PROGRESS: "selfHealing:operationProgress",
-	EVT_COMPLETE: "selfHealing:operationComplete",
-} as const;
 
 export interface SelfHealingAPIObject {
 	getDashboard(
@@ -92,62 +71,55 @@ export interface SelfHealingAPIObject {
 		incidentId: string,
 	): Promise<{ success: boolean; error?: string }>;
 
-	onIncidentDetected(callback: (data: unknown) => void): () => void;
 	onOperationProgress(callback: (data: unknown) => void): () => void;
 	onOperationComplete(callback: (data: unknown) => void): () => void;
 }
 
 export const createSelfHealingAPI = (): SelfHealingAPIObject => ({
-	getDashboard: (projectPath) => ipcRenderer.invoke(CH.DASHBOARD, projectPath),
+	getDashboard: (projectPath) => ipcRenderer.invoke(IPC_CHANNELS.SELF_HEALING_GET_DASHBOARD, projectPath),
 	getIncidents: (projectPath, mode?) =>
-		ipcRenderer.invoke(CH.INCIDENTS, projectPath, mode),
+		ipcRenderer.invoke(IPC_CHANNELS.SELF_HEALING_GET_INCIDENTS, projectPath, mode),
 	getOperations: (projectPath) =>
-		ipcRenderer.invoke(CH.OPERATIONS, projectPath),
-	getFragility: (projectPath) => ipcRenderer.invoke(CH.FRAGILITY, projectPath),
+		ipcRenderer.invoke(IPC_CHANNELS.SELF_HEALING_GET_OPERATIONS, projectPath),
+	getFragility: (projectPath) => ipcRenderer.invoke(IPC_CHANNELS.SELF_HEALING_GET_FRAGILITY, projectPath),
 
-	cicdEnable: (projectPath) => ipcRenderer.invoke(CH.CICD_ENABLE, projectPath),
+	cicdEnable: (projectPath) => ipcRenderer.invoke(IPC_CHANNELS.SELF_HEALING_CICD_ENABLE, projectPath),
 	cicdDisable: (projectPath) =>
-		ipcRenderer.invoke(CH.CICD_DISABLE, projectPath),
+		ipcRenderer.invoke(IPC_CHANNELS.SELF_HEALING_CICD_DISABLE, projectPath),
 	cicdConfig: (projectPath, config) =>
-		ipcRenderer.invoke(CH.CICD_CONFIG, projectPath, config),
+		ipcRenderer.invoke(IPC_CHANNELS.SELF_HEALING_CICD_CONFIG, projectPath, config),
 
 	productionConnect: (projectPath, sourceConfig) =>
-		ipcRenderer.invoke(CH.PROD_CONNECT, projectPath, sourceConfig),
+		ipcRenderer.invoke(IPC_CHANNELS.SELF_HEALING_PRODUCTION_CONNECT, projectPath, sourceConfig),
 	productionDisconnect: (projectPath, source) =>
-		ipcRenderer.invoke(CH.PROD_DISCONNECT, projectPath, source),
+		ipcRenderer.invoke(IPC_CHANNELS.SELF_HEALING_PRODUCTION_DISCONNECT, projectPath, source),
 	productionConfig: (projectPath, config) =>
-		ipcRenderer.invoke(CH.PROD_CONFIG, projectPath, config),
+		ipcRenderer.invoke(IPC_CHANNELS.SELF_HEALING_PRODUCTION_CONFIG, projectPath, config),
 
 	proactiveScan: (projectPath) =>
-		ipcRenderer.invoke(CH.PROACTIVE_SCAN, projectPath),
+		ipcRenderer.invoke(IPC_CHANNELS.SELF_HEALING_PROACTIVE_SCAN, projectPath),
 	proactiveConfig: (projectPath, config) =>
-		ipcRenderer.invoke(CH.PROACTIVE_CONFIG, projectPath, config),
+		ipcRenderer.invoke(IPC_CHANNELS.SELF_HEALING_PROACTIVE_CONFIG, projectPath, config),
 
 	triggerFix: (projectPath, incidentId) =>
-		ipcRenderer.invoke(CH.TRIGGER_FIX, projectPath, incidentId),
+		ipcRenderer.invoke(IPC_CHANNELS.SELF_HEALING_TRIGGER_FIX, projectPath, incidentId),
 	cancelOperation: (projectPath, operationId) =>
-		ipcRenderer.invoke(CH.CANCEL_OP, projectPath, operationId),
+		ipcRenderer.invoke(IPC_CHANNELS.SELF_HEALING_CANCEL_OPERATION, projectPath, operationId),
 	dismissIncident: (projectPath, incidentId) =>
-		ipcRenderer.invoke(CH.DISMISS, projectPath, incidentId),
+		ipcRenderer.invoke(IPC_CHANNELS.SELF_HEALING_DISMISS_INCIDENT, projectPath, incidentId),
 	retryIncident: (projectPath, incidentId) =>
-		ipcRenderer.invoke(CH.RETRY, projectPath, incidentId),
+		ipcRenderer.invoke(IPC_CHANNELS.SELF_HEALING_RETRY_INCIDENT, projectPath, incidentId),
 
-	onIncidentDetected: (callback) => {
-		const handler = (_event: Electron.IpcRendererEvent, data: unknown) =>
-			callback(data);
-		ipcRenderer.on(CH.EVT_INCIDENT, handler);
-		return () => ipcRenderer.removeListener(CH.EVT_INCIDENT, handler);
-	},
 	onOperationProgress: (callback) => {
 		const handler = (_event: Electron.IpcRendererEvent, data: unknown) =>
 			callback(data);
-		ipcRenderer.on(CH.EVT_PROGRESS, handler);
-		return () => ipcRenderer.removeListener(CH.EVT_PROGRESS, handler);
+		ipcRenderer.on(IPC_CHANNELS.SELF_HEALING_OPERATION_PROGRESS, handler);
+		return () => ipcRenderer.removeListener(IPC_CHANNELS.SELF_HEALING_OPERATION_PROGRESS, handler);
 	},
 	onOperationComplete: (callback) => {
 		const handler = (_event: Electron.IpcRendererEvent, data: unknown) =>
 			callback(data);
-		ipcRenderer.on(CH.EVT_COMPLETE, handler);
-		return () => ipcRenderer.removeListener(CH.EVT_COMPLETE, handler);
+		ipcRenderer.on(IPC_CHANNELS.SELF_HEALING_OPERATION_COMPLETE, handler);
+		return () => ipcRenderer.removeListener(IPC_CHANNELS.SELF_HEALING_OPERATION_COMPLETE, handler);
 	},
 });

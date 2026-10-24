@@ -12,6 +12,7 @@ import type {
 	ArenaTaskType,
 } from "../../../shared/types/arena";
 import { createIpcListener, invokeIpc } from "./ipc-utils";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 /**
  * A contestant, as the renderer names it: a (provider, model) pair taken from
@@ -76,19 +77,19 @@ export interface ArenaAPI {
 
 export function createArenaAPI(): ArenaAPI {
 	return {
-		arenaStartBattle: (request) => invokeIpc("arena:startBattle", request),
-		arenaVote: (vote) => invokeIpc("arena:vote", vote),
-		arenaGetBattles: () => invokeIpc("arena:getBattles"),
-		arenaGetAnalytics: () => invokeIpc("arena:getAnalytics"),
-		arenaClearHistory: () => invokeIpc("arena:clearHistory"),
+		arenaStartBattle: (request) => invokeIpc(IPC_CHANNELS.ARENA_START_BATTLE, request),
+		arenaVote: (vote) => invokeIpc(IPC_CHANNELS.ARENA_VOTE, vote),
+		arenaGetBattles: () => invokeIpc(IPC_CHANNELS.ARENA_GET_BATTLES),
+		arenaGetAnalytics: () => invokeIpc(IPC_CHANNELS.ARENA_GET_ANALYTICS),
+		arenaClearHistory: () => invokeIpc(IPC_CHANNELS.ARENA_CLEAR_HISTORY),
 
 		onArenaBattleProgress: (callback) =>
-			createIpcListener("arena:battleProgress", callback),
+			createIpcListener(IPC_CHANNELS.ARENA_BATTLE_PROGRESS, callback),
 		onArenaBattleResult: (callback) =>
-			createIpcListener("arena:battleResult", callback),
+			createIpcListener(IPC_CHANNELS.ARENA_BATTLE_RESULT, callback),
 		onArenaBattleComplete: (callback) =>
-			createIpcListener("arena:battleComplete", callback),
+			createIpcListener(IPC_CHANNELS.ARENA_BATTLE_COMPLETE, callback),
 		onArenaBattleError: (callback) =>
-			createIpcListener("arena:battleError", callback),
+			createIpcListener(IPC_CHANNELS.ARENA_BATTLE_ERROR, callback),
 	};
 }

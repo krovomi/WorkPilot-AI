@@ -6,6 +6,7 @@
 
 import type { FlakyReport } from "../../../shared/types/flaky-tests";
 import { createIpcListener, invokeIpc } from "./ipc-utils";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export interface FlakyTestsRunOptions {
 	projectPath: string;
@@ -30,22 +31,22 @@ export interface FlakyTestsAPI {
 
 export const createFlakyTestsAPI = (): FlakyTestsAPI => ({
 	runFlakyTestsScan: (options: FlakyTestsRunOptions) =>
-		invokeIpc<FlakyReport>("flakyTests:run", options),
+		invokeIpc<FlakyReport>(IPC_CHANNELS.FLAKY_TESTS_RUN, options),
 
-	cancelFlakyTestsScan: () => invokeIpc<boolean>("flakyTests:cancel"),
+	cancelFlakyTestsScan: () => invokeIpc<boolean>(IPC_CHANNELS.FLAKY_TESTS_CANCEL),
 
 	onFlakyTestsEvent: (callback) =>
-		createIpcListener<[FlakyTestsEvent]>("flaky-tests-event", (payload) =>
+		createIpcListener<[FlakyTestsEvent]>(IPC_CHANNELS.FLAKY_TESTS_EVENT, (payload) =>
 			callback(payload),
 		),
 
 	onFlakyTestsResult: (callback) =>
-		createIpcListener<[FlakyReport]>("flaky-tests-result", (payload) =>
+		createIpcListener<[FlakyReport]>(IPC_CHANNELS.FLAKY_TESTS_RESULT, (payload) =>
 			callback(payload),
 		),
 
 	onFlakyTestsError: (callback) =>
-		createIpcListener<[string]>("flaky-tests-error", (payload) =>
+		createIpcListener<[string]>(IPC_CHANNELS.FLAKY_TESTS_ERROR, (payload) =>
 			callback(payload),
 		),
 });

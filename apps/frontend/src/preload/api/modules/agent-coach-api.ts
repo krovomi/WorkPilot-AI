@@ -7,6 +7,7 @@
 
 import type { CoachReport } from "../../../shared/types/agent-coach";
 import { createIpcListener, invokeIpc } from "./ipc-utils";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export interface AgentCoachRunOptions {
 	projectPath: string;
@@ -37,22 +38,22 @@ export interface AgentCoachAPI {
 
 export const createAgentCoachAPI = (): AgentCoachAPI => ({
 	runAgentCoachScan: (options: AgentCoachRunOptions) =>
-		invokeIpc<AgentCoachResult>("agentCoach:run", options),
+		invokeIpc<AgentCoachResult>(IPC_CHANNELS.AGENT_COACH_RUN, options),
 
-	cancelAgentCoachScan: () => invokeIpc<boolean>("agentCoach:cancel"),
+	cancelAgentCoachScan: () => invokeIpc<boolean>(IPC_CHANNELS.AGENT_COACH_CANCEL),
 
 	onAgentCoachEvent: (callback) =>
-		createIpcListener<[AgentCoachEvent]>("agent-coach-event", (payload) =>
+		createIpcListener<[AgentCoachEvent]>(IPC_CHANNELS.AGENT_COACH_EVENT, (payload) =>
 			callback(payload),
 		),
 
 	onAgentCoachResult: (callback) =>
-		createIpcListener<[AgentCoachResult]>("agent-coach-result", (payload) =>
+		createIpcListener<[AgentCoachResult]>(IPC_CHANNELS.AGENT_COACH_RESULT, (payload) =>
 			callback(payload),
 		),
 
 	onAgentCoachError: (callback) =>
-		createIpcListener<[string]>("agent-coach-error", (payload) =>
+		createIpcListener<[string]>(IPC_CHANNELS.AGENT_COACH_ERROR, (payload) =>
 			callback(payload),
 		),
 });

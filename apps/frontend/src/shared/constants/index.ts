@@ -16,7 +16,6 @@ export * from "./ideation";
 // IPC Channel constants
 export * from "./ipc";
 // IPC Namespace helpers (typed grouped view of IPC channels)
-export * from "./ipc-namespaces";
 
 // Model and agent profile constants
 export * from "./models";

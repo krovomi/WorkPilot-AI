@@ -5,6 +5,7 @@
  */
 
 import { invokeIpc } from "./ipc-utils";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export interface BlastRadiusDependent {
 	source: string;
@@ -31,5 +32,5 @@ export interface BlastRadiusAPI {
 
 export const createBlastRadiusAPI = (): BlastRadiusAPI => ({
 	analyzeBlastRadius: (projectRoot, targets) =>
-		invokeIpc("blastRadius:analyze", { projectRoot, targets }),
+		invokeIpc(IPC_CHANNELS.BLAST_RADIUS_ANALYZE, { projectRoot, targets }),
 });

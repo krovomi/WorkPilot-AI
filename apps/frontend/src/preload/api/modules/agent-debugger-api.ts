@@ -7,6 +7,7 @@
  */
 
 import { invokeIpc } from "./ipc-utils";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export interface BreakpointSpec {
 	id: string;
@@ -79,23 +80,23 @@ export interface AgentDebuggerAPI {
 }
 
 export const createAgentDebuggerAPI = (): AgentDebuggerAPI => ({
-	listDebugSessions: () => invokeIpc("agentDebugger:listSessions", {}),
+	listDebugSessions: () => invokeIpc(IPC_CHANNELS.AGENT_DEBUGGER_LIST_SESSIONS, {}),
 	getDebugState: (sessionId) =>
-		invokeIpc("agentDebugger:getState", { sessionId }),
+		invokeIpc(IPC_CHANNELS.AGENT_DEBUGGER_GET_STATE, { sessionId }),
 	attachDebugger: (sessionId) =>
-		invokeIpc("agentDebugger:attach", { sessionId }),
+		invokeIpc(IPC_CHANNELS.AGENT_DEBUGGER_ATTACH, { sessionId }),
 	detachDebugger: (sessionId) =>
-		invokeIpc("agentDebugger:detach", { sessionId }),
+		invokeIpc(IPC_CHANNELS.AGENT_DEBUGGER_DETACH, { sessionId }),
 	listBreakpoints: (sessionId) =>
-		invokeIpc("agentDebugger:listBreakpoints", { sessionId }),
+		invokeIpc(IPC_CHANNELS.AGENT_DEBUGGER_LIST_BREAKPOINTS, { sessionId }),
 	setBreakpoint: (sessionId, breakpoint) =>
-		invokeIpc("agentDebugger:setBreakpoint", { sessionId, breakpoint }),
+		invokeIpc(IPC_CHANNELS.AGENT_DEBUGGER_SET_BREAKPOINT, { sessionId, breakpoint }),
 	removeBreakpoint: (sessionId, id) =>
-		invokeIpc("agentDebugger:removeBreakpoint", { sessionId, id }),
+		invokeIpc(IPC_CHANNELS.AGENT_DEBUGGER_REMOVE_BREAKPOINT, { sessionId, id }),
 	listDebugFrames: (sessionId) =>
-		invokeIpc("agentDebugger:listFrames", { sessionId }),
+		invokeIpc(IPC_CHANNELS.AGENT_DEBUGGER_LIST_FRAMES, { sessionId }),
 	resumeFrame: (sessionId, frameId, action, options) =>
-		invokeIpc("agentDebugger:resume", {
+		invokeIpc(IPC_CHANNELS.AGENT_DEBUGGER_RESUME, {
 			sessionId,
 			frameId,
 			action,

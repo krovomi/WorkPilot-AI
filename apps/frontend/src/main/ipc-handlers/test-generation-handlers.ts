@@ -1,6 +1,7 @@
 import type { BrowserWindow } from "electron";
 import { ipcMain } from "electron";
 import { testGenerationService } from "../test-generation-service";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
 
 /**
  * Setup IPC handlers for test generation functionality.
@@ -13,7 +14,7 @@ export function setupTestGenerationHandlers(
 	testGenerationService.on("status", (status: string) => {
 		const mainWindow = getMainWindow();
 		if (mainWindow && !mainWindow.isDestroyed()) {
-			mainWindow.webContents.send("test-generation:status", status);
+			mainWindow.webContents.send(IPC_CHANNELS.TEST_GENERATION_STATUS, status);
 		}
 	});
 
@@ -22,21 +23,21 @@ export function setupTestGenerationHandlers(
 	testGenerationService.on("error", (error: unknown) => {
 		const mainWindow = getMainWindow();
 		if (mainWindow && !mainWindow.isDestroyed()) {
-			mainWindow.webContents.send("test-generation:error", error);
+			mainWindow.webContents.send(IPC_CHANNELS.TEST_GENERATION_ERROR, error);
 		}
 	});
 
 	testGenerationService.on("result", (result: unknown) => {
 		const mainWindow = getMainWindow();
 		if (mainWindow && !mainWindow.isDestroyed()) {
-			mainWindow.webContents.send("test-generation:result", result);
+			mainWindow.webContents.send(IPC_CHANNELS.TEST_GENERATION_RESULT, result);
 		}
 	});
 
 	testGenerationService.on("complete", (result: unknown) => {
 		const mainWindow = getMainWindow();
 		if (mainWindow && !mainWindow.isDestroyed()) {
-			mainWindow.webContents.send("test-generation:complete", result);
+			mainWindow.webContents.send(IPC_CHANNELS.TEST_GENERATION_COMPLETE, result);
 		}
 	});
 
@@ -44,7 +45,7 @@ export function setupTestGenerationHandlers(
 	testGenerationService.on("progress", (event: unknown) => {
 		const mainWindow = getMainWindow();
 		if (mainWindow && !mainWindow.isDestroyed()) {
-			mainWindow.webContents.send("test-generation:progress", event);
+			mainWindow.webContents.send(IPC_CHANNELS.TEST_GENERATION_PROGRESS, event);
 		}
 	});
 
@@ -52,13 +53,13 @@ export function setupTestGenerationHandlers(
 	testGenerationService.on("code", (delta: string) => {
 		const mainWindow = getMainWindow();
 		if (mainWindow && !mainWindow.isDestroyed()) {
-			mainWindow.webContents.send("test-generation:code", delta);
+			mainWindow.webContents.send(IPC_CHANNELS.TEST_GENERATION_CODE, delta);
 		}
 	});
 
 	// Analyze test coverage
 	ipcMain.handle(
-		"test-generation:analyze-coverage",
+		IPC_CHANNELS.TEST_GENERATION_ANALYZE_COVERAGE,
 		async (
 			_,
 			params: {
@@ -88,7 +89,7 @@ export function setupTestGenerationHandlers(
 	// starts, so the UI can ask the user when the project has no test directory
 	// instead of dropping the file next to the solution file.
 	ipcMain.handle(
-		"test-generation:resolve-destination",
+		IPC_CHANNELS.TEST_GENERATION_RESOLVE_DESTINATION,
 		async (
 			_,
 			params: {
@@ -117,7 +118,7 @@ export function setupTestGenerationHandlers(
 	// What will these tests be written against? Answered before a generation so
 	// the picker opens with the project's own stack ticked.
 	ipcMain.handle(
-		"test-generation:resolve-libraries",
+		IPC_CHANNELS.TEST_GENERATION_RESOLVE_LIBRARIES,
 		async (
 			_,
 			params: {
@@ -146,7 +147,7 @@ export function setupTestGenerationHandlers(
 	// Add the chosen-but-absent packages to the project's test project. Only
 	// ever reached from an explicit user action — a generation installs nothing.
 	ipcMain.handle(
-		"test-generation:add-packages",
+		IPC_CHANNELS.TEST_GENERATION_ADD_PACKAGES,
 		async (
 			_,
 			params: {
@@ -176,7 +177,7 @@ export function setupTestGenerationHandlers(
 
 	// Generate unit tests
 	ipcMain.handle(
-		"test-generation:generate-unit",
+		IPC_CHANNELS.TEST_GENERATION_GENERATE_UNIT,
 		async (
 			_,
 			params: {
@@ -210,7 +211,7 @@ export function setupTestGenerationHandlers(
 
 	// Generate E2E tests
 	ipcMain.handle(
-		"test-generation:generate-e2e",
+		IPC_CHANNELS.TEST_GENERATION_GENERATE_E2E,
 		async (
 			_,
 			params: {
@@ -242,7 +243,7 @@ export function setupTestGenerationHandlers(
 
 	// Generate TDD tests
 	ipcMain.handle(
-		"test-generation:generate-tdd",
+		IPC_CHANNELS.TEST_GENERATION_GENERATE_TDD,
 		async (
 			_,
 			params: {
@@ -275,7 +276,7 @@ export function setupTestGenerationHandlers(
 	);
 
 	// Cancel active generation
-	ipcMain.handle("test-generation:cancel", async () => {
+	ipcMain.handle(IPC_CHANNELS.TEST_GENERATION_CANCEL, async () => {
 		try {
 			const cancelled = testGenerationService.cancel();
 			return { success: true, cancelled };

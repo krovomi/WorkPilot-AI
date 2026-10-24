@@ -1,5 +1,6 @@
 import { ipcRenderer } from "electron";
 import type { AppEmulatorConfig } from "../../../main/app-emulator-service";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export interface AppEmulatorAPI {
 	/**
@@ -65,25 +66,25 @@ export interface AppEmulatorAPI {
 export function createAppEmulatorAPI(): AppEmulatorAPI {
 	return {
 		detectAppProject: (projectDir: string) => {
-			return ipcRenderer.invoke("app-emulator:detect", { projectDir });
+			return ipcRenderer.invoke(IPC_CHANNELS.APP_EMULATOR_DETECT, { projectDir });
 		},
 
 		startAppEmulator: (config: AppEmulatorConfig) => {
-			return ipcRenderer.invoke("app-emulator:start", { config });
+			return ipcRenderer.invoke(IPC_CHANNELS.APP_EMULATOR_START, { config });
 		},
 
 		stopAppEmulator: () => {
-			return ipcRenderer.invoke("app-emulator:stop");
+			return ipcRenderer.invoke(IPC_CHANNELS.APP_EMULATOR_STOP);
 		},
 
 		getAppEmulatorStatus: () => {
-			return ipcRenderer.invoke("app-emulator:status");
+			return ipcRenderer.invoke(IPC_CHANNELS.APP_EMULATOR_STATUS);
 		},
 
 		onAppEmulatorStatus: (callback: (status: string) => void) => {
 			const handler = (_event: Electron.IpcRendererEvent, status: string) =>
 				callback(status);
-			ipcRenderer.on("app-emulator:status-update", handler);
+			ipcRenderer.on(IPC_CHANNELS.APP_EMULATOR_STATUS_UPDATE, handler);
 			return () =>
 				ipcRenderer.removeListener("app-emulator:status-update", handler);
 		},
@@ -91,27 +92,27 @@ export function createAppEmulatorAPI(): AppEmulatorAPI {
 		onAppEmulatorReady: (callback: (url: string) => void) => {
 			const handler = (_event: Electron.IpcRendererEvent, url: string) =>
 				callback(url);
-			ipcRenderer.on("app-emulator:ready", handler);
+			ipcRenderer.on(IPC_CHANNELS.APP_EMULATOR_READY, handler);
 			return () => ipcRenderer.removeListener("app-emulator:ready", handler);
 		},
 
 		onAppEmulatorOutput: (callback: (line: string) => void) => {
 			const handler = (_event: Electron.IpcRendererEvent, line: string) =>
 				callback(line);
-			ipcRenderer.on("app-emulator:output", handler);
+			ipcRenderer.on(IPC_CHANNELS.APP_EMULATOR_OUTPUT, handler);
 			return () => ipcRenderer.removeListener("app-emulator:output", handler);
 		},
 
 		onAppEmulatorError: (callback: (error: string) => void) => {
 			const handler = (_event: Electron.IpcRendererEvent, error: string) =>
 				callback(error);
-			ipcRenderer.on("app-emulator:error", handler);
+			ipcRenderer.on(IPC_CHANNELS.APP_EMULATOR_ERROR, handler);
 			return () => ipcRenderer.removeListener("app-emulator:error", handler);
 		},
 
 		onAppEmulatorStopped: (callback: () => void) => {
 			const handler = () => callback();
-			ipcRenderer.on("app-emulator:stopped", handler);
+			ipcRenderer.on(IPC_CHANNELS.APP_EMULATOR_STOPPED, handler);
 			return () => ipcRenderer.removeListener("app-emulator:stopped", handler);
 		},
 
@@ -120,7 +121,7 @@ export function createAppEmulatorAPI(): AppEmulatorAPI {
 				_event: Electron.IpcRendererEvent,
 				config: AppEmulatorConfig,
 			) => callback(config);
-			ipcRenderer.on("app-emulator:config", handler);
+			ipcRenderer.on(IPC_CHANNELS.APP_EMULATOR_CONFIG, handler);
 			return () => ipcRenderer.removeListener("app-emulator:config", handler);
 		},
 	};

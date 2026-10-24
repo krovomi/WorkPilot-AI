@@ -4,6 +4,7 @@
  */
 
 import { createIpcListener, invokeIpc } from "./ipc-utils";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export interface ServerUser {
 	id: string;
@@ -97,28 +98,28 @@ export interface ServerAuthAPI {
 }
 
 export const createServerAuthAPI = (): ServerAuthAPI => ({
-	getState: () => invokeIpc<ServerAuthState>("server-auth:get-state"),
-	getConfig: (serverUrl) => invokeIpc("server-auth:get-config", serverUrl),
+	getState: () => invokeIpc<ServerAuthState>(IPC_CHANNELS.SERVER_AUTH_GET_STATE),
+	getConfig: (serverUrl) => invokeIpc(IPC_CHANNELS.SERVER_AUTH_GET_CONFIG, serverUrl),
 	setMode: (mode, serverUrl) =>
-		invokeIpc<ServerAuthState>("server-auth:set-mode", mode, serverUrl),
+		invokeIpc<ServerAuthState>(IPC_CHANNELS.SERVER_AUTH_SET_MODE, mode, serverUrl),
 	loginLocal: (serverUrl, email, password) =>
 		invokeIpc<ServerAuthResult>(
-			"server-auth:login-local",
+			IPC_CHANNELS.SERVER_AUTH_LOGIN_LOCAL,
 			serverUrl,
 			email,
 			password,
 		),
 	loginEntra: (serverUrl) =>
-		invokeIpc<ServerAuthResult>("server-auth:login-entra", serverUrl),
+		invokeIpc<ServerAuthResult>(IPC_CHANNELS.SERVER_AUTH_LOGIN_ENTRA, serverUrl),
 	lookupInvite: (serverUrl, token) =>
 		invokeIpc<DataResult<InviteLookup>>(
-			"server-auth:lookup-invite",
+			IPC_CHANNELS.SERVER_AUTH_LOOKUP_INVITE,
 			serverUrl,
 			token,
 		),
 	acceptInvite: (serverUrl, token, displayName, password) =>
 		invokeIpc<ServerAuthResult>(
-			"server-auth:accept-invite",
+			IPC_CHANNELS.SERVER_AUTH_ACCEPT_INVITE,
 			serverUrl,
 			token,
 			displayName,
@@ -126,20 +127,20 @@ export const createServerAuthAPI = (): ServerAuthAPI => ({
 		),
 	createInvite: (payload) =>
 		invokeIpc<DataResult<CreateInvitationResult>>(
-			"server-auth:create-invite",
+			IPC_CHANNELS.SERVER_AUTH_CREATE_INVITE,
 			payload,
 		),
 	listInvites: () =>
-		invokeIpc<DataResult<InvitationPublic[]>>("server-auth:list-invites"),
+		invokeIpc<DataResult<InvitationPublic[]>>(IPC_CHANNELS.SERVER_AUTH_LIST_INVITES),
 	revokeInvite: (invitationId) =>
 		invokeIpc<DataResult<{ revoked: boolean }>>(
-			"server-auth:revoke-invite",
+			IPC_CHANNELS.SERVER_AUTH_REVOKE_INVITE,
 			invitationId,
 		),
-	logout: () => invokeIpc<ServerAuthState>("server-auth:logout"),
-	restore: () => invokeIpc<ServerAuthState>("server-auth:restore"),
+	logout: () => invokeIpc<ServerAuthState>(IPC_CHANNELS.SERVER_AUTH_LOGOUT),
+	restore: () => invokeIpc<ServerAuthState>(IPC_CHANNELS.SERVER_AUTH_RESTORE),
 	onStateChanged: (callback) =>
-		createIpcListener<[ServerAuthState]>("server-auth:state-changed", (state) =>
+		createIpcListener<[ServerAuthState]>(IPC_CHANNELS.SERVER_AUTH_STATE_CHANGED, (state) =>
 			callback(state),
 		),
 });

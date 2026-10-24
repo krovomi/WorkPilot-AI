@@ -54,9 +54,9 @@ export interface CodeMigrationAPI {
 export function createCodeMigrationAPI(): CodeMigrationAPI {
 	return {
 		startCodeMigration: (request) =>
-			invokeIpc("codeMigration:start", request),
+			invokeIpc(IPC_CHANNELS.CODE_MIGRATION_START, request),
 		cancelCodeMigration: () =>
-			invokeIpc("codeMigration:cancel"),
+			invokeIpc(IPC_CHANNELS.CODE_MIGRATION_CANCEL),
 		onCodeMigrationStatus: (callback) =>
 			createIpcListener(IPC_CHANNELS.CODE_MIGRATION_STATUS, callback),
 		onCodeMigrationStreamChunk: (callback) =>

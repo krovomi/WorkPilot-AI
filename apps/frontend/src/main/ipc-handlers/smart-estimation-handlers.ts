@@ -12,6 +12,7 @@ import { app, ipcMain } from "electron";
 import { projectStore } from "../project-store";
 import { parsePythonCommand } from "../python-detector";
 import { getConfiguredPythonPath } from "../python-env-manager";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -50,7 +51,7 @@ export function setupSmartEstimationHandlers() {
 
 	// Handle smart estimation request
 	ipcMain.handle(
-		"run-smart-estimation",
+		IPC_CHANNELS.RUN_SMART_ESTIMATION,
 		async (event, { projectId, taskDescription }: SmartEstimationRequest) => {
 			return new Promise((resolve, reject) => {
 				killExistingProcess();
@@ -60,7 +61,7 @@ export function setupSmartEstimationHandlers() {
 				const project = projectStore.getProject(projectId);
 				if (!project) {
 					const errorMessage = `Project not found: ${projectId}`;
-					event.sender.send("smart-estimation-error", errorMessage);
+					event.sender.send(IPC_CHANNELS.SMART_ESTIMATION_ERROR, errorMessage);
 					reject(new Error(errorMessage));
 					return;
 				}
@@ -112,7 +113,7 @@ export function setupSmartEstimationHandlers() {
 								const eventData = JSON.parse(
 									line.substring("SMART_ESTIMATION_EVENT:".length),
 								);
-								event.sender.send("smart-estimation-event", eventData);
+								event.sender.send(IPC_CHANNELS.SMART_ESTIMATION_EVENT, eventData);
 							} catch (e) {
 								console.error("Failed to parse smart estimation event:", e);
 							}
@@ -146,14 +147,14 @@ export function setupSmartEstimationHandlers() {
 					currentProcess = null;
 
 					if (code === 0 && result) {
-						event.sender.send("smart-estimation-complete", result);
+						event.sender.send(IPC_CHANNELS.SMART_ESTIMATION_COMPLETE, result);
 						resolve(result);
 					} else {
 						const errorMessage =
 							error ||
 							stderrBuffer.trim() ||
 							`Process exited with code ${code}`;
-						event.sender.send("smart-estimation-error", errorMessage);
+						event.sender.send(IPC_CHANNELS.SMART_ESTIMATION_ERROR, errorMessage);
 						reject(new Error(errorMessage));
 					}
 				});
@@ -162,7 +163,7 @@ export function setupSmartEstimationHandlers() {
 				spawnedProcess.on("error", (err: Error) => {
 					currentProcess = null;
 					const errorMessage = `Failed to start smart estimation process: ${err.message}`;
-					event.sender.send("smart-estimation-error", errorMessage);
+					event.sender.send(IPC_CHANNELS.SMART_ESTIMATION_ERROR, errorMessage);
 					reject(new Error(errorMessage));
 				});
 			});
@@ -170,7 +171,7 @@ export function setupSmartEstimationHandlers() {
 	);
 
 	// Handle process cancellation
-	ipcMain.handle("cancel-smart-estimation", () => {
+	ipcMain.handle(IPC_CHANNELS.CANCEL_SMART_ESTIMATION, () => {
 		killExistingProcess();
 		return true;
 	});

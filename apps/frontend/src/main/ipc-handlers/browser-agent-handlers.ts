@@ -9,7 +9,7 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { type BrowserWindow, ipcMain } from "electron";
+import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { parsePythonCommand } from "../python-detector";
 import { resolveInProject } from "../security/renderer-path";
@@ -25,9 +25,7 @@ const __dirname = path.dirname(__filename);
 /**
  * Register all browser agent IPC handlers.
  */
-export function registerBrowserAgentHandlers(
-	getMainWindow: () => BrowserWindow | null,
-): void {
+export function registerBrowserAgentHandlers(): void {
 	// ── Dashboard data ────────────────────────────────────────
 
 	ipcMain.handle(
@@ -53,14 +51,6 @@ export function registerBrowserAgentHandlers(
 		IPC_CHANNELS.BROWSER_AGENT_CAPTURE_SCREENSHOT,
 		async (_, projectPath: string, name: string, url: string) => {
 			try {
-				const mainWindow = getMainWindow();
-				if (mainWindow) {
-					mainWindow.webContents.send(IPC_CHANNELS.BROWSER_AGENT_PROGRESS, {
-						step: "capturing",
-						message: `Capturing screenshot of ${url}...`,
-					});
-				}
-
 				const result = await runBrowserAgentCommand(projectPath, [
 					"screenshot",
 					"--url",
@@ -69,13 +59,6 @@ export function registerBrowserAgentHandlers(
 					name,
 				]);
 				const data = JSON.parse(result);
-
-				if (mainWindow) {
-					mainWindow.webContents.send(
-						IPC_CHANNELS.BROWSER_AGENT_SCREENSHOT_READY,
-						data,
-					);
-				}
 
 				return data;
 			} catch (error) {
@@ -192,14 +175,6 @@ export function registerBrowserAgentHandlers(
 		IPC_CHANNELS.BROWSER_AGENT_COMPARE,
 		async (_, projectPath: string, name: string, url?: string) => {
 			try {
-				const mainWindow = getMainWindow();
-				if (mainWindow) {
-					mainWindow.webContents.send(IPC_CHANNELS.BROWSER_AGENT_PROGRESS, {
-						step: "comparing",
-						message: `Comparing '${name}' against baseline...`,
-					});
-				}
-
 				const args = ["compare", "--name", name];
 				if (url) {
 					args.push("--url", url);
@@ -218,27 +193,12 @@ export function registerBrowserAgentHandlers(
 		IPC_CHANNELS.BROWSER_AGENT_RUN_TESTS,
 		async (_, projectPath: string) => {
 			try {
-				const mainWindow = getMainWindow();
-				if (mainWindow) {
-					mainWindow.webContents.send(IPC_CHANNELS.BROWSER_AGENT_PROGRESS, {
-						step: "testing",
-						message: "Running E2E tests...",
-					});
-				}
-
 				const result = await runBrowserAgentCommand(
 					projectPath,
 					["tests"],
 					300000,
 				);
 				const data = JSON.parse(result);
-
-				if (mainWindow) {
-					mainWindow.webContents.send(
-						IPC_CHANNELS.BROWSER_AGENT_TEST_COMPLETE,
-						data,
-					);
-				}
 
 				return data;
 			} catch (error) {

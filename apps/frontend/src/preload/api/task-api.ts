@@ -272,6 +272,14 @@ export interface TaskAPI {
 			reviewReason?: ReviewReason,
 		) => void,
 	) => () => void;
+	/**
+	 * Fields of a task the main process changed after the call that started
+	 * the work returned (PR URL, visual proof). `metadata` holds only the keys
+	 * that changed.
+	 */
+	onTaskUpdated: (
+		callback: (taskId: string, updates: Partial<Task>, projectId?: string) => void,
+	) => () => void;
 	onTaskExecutionProgress: (
 		callback: (
 			taskId: string,
@@ -783,6 +791,23 @@ export const createTaskAPI = (): TaskAPI => ({
 		ipcRenderer.on(IPC_CHANNELS.TASK_STATUS_CHANGE, handler);
 		return () => {
 			ipcRenderer.removeListener(IPC_CHANNELS.TASK_STATUS_CHANGE, handler);
+		};
+	},
+
+	onTaskUpdated: (
+		callback: (taskId: string, updates: Partial<Task>, projectId?: string) => void,
+	): (() => void) => {
+		const handler = (
+			_event: Electron.IpcRendererEvent,
+			taskId: string,
+			updates: Partial<Task>,
+			projectId?: string,
+		): void => {
+			callback(taskId, updates, projectId);
+		};
+		ipcRenderer.on(IPC_CHANNELS.TASK_UPDATED_EVENT, handler);
+		return () => {
+			ipcRenderer.removeListener(IPC_CHANNELS.TASK_UPDATED_EVENT, handler);
 		};
 	},
 

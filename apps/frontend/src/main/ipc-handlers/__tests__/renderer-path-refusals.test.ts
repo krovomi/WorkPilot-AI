@@ -80,7 +80,7 @@ beforeAll(async () => {
 	const { registerBrowserAgentHandlers } = await import(
 		"../browser-agent-handlers"
 	);
-	registerBrowserAgentHandlers(() => null);
+	registerBrowserAgentHandlers();
 	const { registerArchitectureVisualizerHandlers } = await import(
 		"../architecture-visualizer-handlers"
 	);

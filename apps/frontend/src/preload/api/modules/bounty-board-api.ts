@@ -6,6 +6,7 @@
  */
 
 import { invokeIpc } from "./ipc-utils";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export interface BountyContestantInput {
 	provider: string;
@@ -114,10 +115,10 @@ export interface BountyBoardAPI {
 
 export const createBountyBoardAPI = (): BountyBoardAPI => ({
 	startBounty: (options) =>
-		invokeIpc<{ result: BountyResult }>("bountyBoard:start", options),
+		invokeIpc<{ result: BountyResult }>(IPC_CHANNELS.BOUNTY_BOARD_START, options),
 	listBountyArchives: (options) =>
 		invokeIpc<{ archives: BountyResult[] }>(
-			"bountyBoard:listArchives",
+			IPC_CHANNELS.BOUNTY_BOARD_LIST_ARCHIVES,
 			options,
 		),
 });

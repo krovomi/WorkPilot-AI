@@ -18,6 +18,7 @@ import type {
 	DaemonEvent,
 } from "../../../shared/types/continuous-ai";
 import { createIpcListener, invokeIpc } from "./ipc-utils";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 /** Shared shape of the daemon's imperative replies. */
 export interface ContinuousAIResult {
@@ -45,31 +46,31 @@ export interface ContinuousAIAPI {
 
 export const createContinuousAIAPI = (): ContinuousAIAPI => ({
 	start: (config, projectPath) =>
-		invokeIpc<ContinuousAIResult>("continuousAI:start", config, projectPath),
+		invokeIpc<ContinuousAIResult>(IPC_CHANNELS.CONTINUOUS_AI_START, config, projectPath),
 
-	stop: () => invokeIpc<ContinuousAIResult>("continuousAI:stop"),
+	stop: () => invokeIpc<ContinuousAIResult>(IPC_CHANNELS.CONTINUOUS_AI_STOP),
 
 	// The store asks for `getStatus`; the channel is named `continuousAI:status`.
 	getStatus: (projectPath) =>
-		invokeIpc<ContinuousAIStatus | null>("continuousAI:status", projectPath),
+		invokeIpc<ContinuousAIStatus | null>(IPC_CHANNELS.CONTINUOUS_AI_STATUS, projectPath),
 
 	updateConfig: (config, projectPath) =>
 		invokeIpc<ContinuousAIResult>(
-			"continuousAI:updateConfig",
+			IPC_CHANNELS.CONTINUOUS_AI_UPDATE_CONFIG,
 			config,
 			projectPath,
 		),
 
 	approveAction: (actionId) =>
-		invokeIpc<ContinuousAIResult>("continuousAI:approveAction", actionId),
+		invokeIpc<ContinuousAIResult>(IPC_CHANNELS.CONTINUOUS_AI_APPROVE_ACTION, actionId),
 
 	rejectAction: (actionId) =>
-		invokeIpc<ContinuousAIResult>("continuousAI:rejectAction", actionId),
+		invokeIpc<ContinuousAIResult>(IPC_CHANNELS.CONTINUOUS_AI_REJECT_ACTION, actionId),
 
-	isRunning: () => invokeIpc<boolean>("continuousAI:isRunning"),
+	isRunning: () => invokeIpc<boolean>(IPC_CHANNELS.CONTINUOUS_AI_IS_RUNNING),
 
 	onEvent: (callback) =>
-		createIpcListener<[DaemonEvent]>("continuousAI:event", (payload) =>
+		createIpcListener<[DaemonEvent]>(IPC_CHANNELS.CONTINUOUS_AI_EVENT, (payload) =>
 			callback(payload),
 		),
 });

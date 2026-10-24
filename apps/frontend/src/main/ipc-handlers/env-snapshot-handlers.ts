@@ -16,6 +16,7 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import { app, ipcMain } from "electron";
 import { pythonEnvManager } from "../python-env-manager.js";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
 
 type ExportFormat = "dockerfile" | "nix" | "script";
 
@@ -82,7 +83,7 @@ function runRunner(args: string[]): Promise<unknown> {
 
 export function registerEnvSnapshotHandlers(): void {
 	ipcMain.handle(
-		"envSnapshot:capture",
+		IPC_CHANNELS.ENV_SNAPSHOT_CAPTURE,
 		async (
 			_evt,
 			{
@@ -100,7 +101,7 @@ export function registerEnvSnapshotHandlers(): void {
 	);
 
 	ipcMain.handle(
-		"envSnapshot:list",
+		IPC_CHANNELS.ENV_SNAPSHOT_LIST,
 		async (_evt, { projectPath }: { projectPath: string }) => {
 			if (!projectPath) throw new Error("projectPath is required");
 			return runRunner(["--command", "list", "--project-path", projectPath]);
@@ -108,7 +109,7 @@ export function registerEnvSnapshotHandlers(): void {
 	);
 
 	ipcMain.handle(
-		"envSnapshot:get",
+		IPC_CHANNELS.ENV_SNAPSHOT_GET,
 		async (
 			_evt,
 			{ projectPath, snapId }: { projectPath: string; snapId: string },
@@ -127,7 +128,7 @@ export function registerEnvSnapshotHandlers(): void {
 	);
 
 	ipcMain.handle(
-		"envSnapshot:replay",
+		IPC_CHANNELS.ENV_SNAPSHOT_REPLAY,
 		async (
 			_evt,
 			{
@@ -152,7 +153,7 @@ export function registerEnvSnapshotHandlers(): void {
 	);
 
 	ipcMain.handle(
-		"envSnapshot:export",
+		IPC_CHANNELS.ENV_SNAPSHOT_EXPORT,
 		async (
 			_evt,
 			{

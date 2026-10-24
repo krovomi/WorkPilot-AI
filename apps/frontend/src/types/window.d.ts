@@ -94,7 +94,6 @@ declare global {
 					projectPath: string,
 					incidentId: string,
 				): Promise<{ success: boolean; error?: string }>;
-				onIncidentDetected(callback: (data: unknown) => void): () => void;
 				onOperationProgress(callback: (data: unknown) => void): () => void;
 				onOperationComplete(callback: (data: unknown) => void): () => void;
 			};

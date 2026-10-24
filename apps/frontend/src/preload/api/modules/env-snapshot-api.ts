@@ -3,6 +3,7 @@
  */
 
 import { invokeIpc } from "./ipc-utils";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export type EnvSnapshotFormat = "dockerfile" | "nix" | "script";
 
@@ -59,13 +60,13 @@ export interface EnvSnapshotAPI {
 }
 
 export const createEnvSnapshotAPI = (): EnvSnapshotAPI => ({
-	captureEnvSnapshot: (args) => invokeIpc("envSnapshot:capture", args),
+	captureEnvSnapshot: (args) => invokeIpc(IPC_CHANNELS.ENV_SNAPSHOT_CAPTURE, args),
 	listEnvSnapshots: (projectPath) =>
-		invokeIpc("envSnapshot:list", { projectPath }),
+		invokeIpc(IPC_CHANNELS.ENV_SNAPSHOT_LIST, { projectPath }),
 	getEnvSnapshot: (projectPath, snapId) =>
-		invokeIpc("envSnapshot:get", { projectPath, snapId }),
+		invokeIpc(IPC_CHANNELS.ENV_SNAPSHOT_GET, { projectPath, snapId }),
 	replayEnvSnapshot: (projectPath, snapId, format) =>
-		invokeIpc("envSnapshot:replay", { projectPath, snapId, format }),
+		invokeIpc(IPC_CHANNELS.ENV_SNAPSHOT_REPLAY, { projectPath, snapId, format }),
 	exportEnvSnapshot: (projectPath, snapId, format) =>
-		invokeIpc("envSnapshot:export", { projectPath, snapId, format }),
+		invokeIpc(IPC_CHANNELS.ENV_SNAPSHOT_EXPORT, { projectPath, snapId, format }),
 });

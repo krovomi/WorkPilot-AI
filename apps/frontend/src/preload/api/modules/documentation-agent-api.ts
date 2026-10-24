@@ -51,9 +51,9 @@ export interface DocumentationAgentAPI {
 export function createDocumentationAgentAPI(): DocumentationAgentAPI {
 	return {
 		generateDocumentation: (request) =>
-			invokeIpc("documentationAgent:generate", request),
+			invokeIpc(IPC_CHANNELS.DOCUMENTATION_AGENT_GENERATE, request),
 		cancelDocumentation: () =>
-			invokeIpc("documentationAgent:cancel"),
+			invokeIpc(IPC_CHANNELS.DOCUMENTATION_AGENT_CANCEL),
 		onDocumentationAgentStatus: (callback) =>
 			createIpcListener(IPC_CHANNELS.DOCUMENTATION_AGENT_STATUS, callback),
 		onDocumentationAgentStreamChunk: (callback) =>
