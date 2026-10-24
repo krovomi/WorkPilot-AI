@@ -253,7 +253,7 @@ export class PythonEnvManager extends EventEmitter {
 	}
 
 	/**
-	 * Find Python 3.10+ (bundled or system).
+	 * Find Python 3.12+ (bundled or system).
 	 * Uses the shared python-detector logic which validates version requirements.
 	 * Priority: bundled Python (packaged apps) > system Python
 	 */
@@ -301,9 +301,9 @@ export class PythonEnvManager extends EventEmitter {
 			const isPackaged = app.isPackaged;
 			const errorMsg = isPackaged
 				? "Python not found. The bundled Python may be corrupted.\n\n" +
-					"Please try reinstalling the application, or install Python 3.10+ manually:\n" +
+					"Please try reinstalling the application, or install Python 3.12+ manually:\n" +
 					"https://www.python.org/downloads/"
-				: "Python 3.10+ not found. Please install Python 3.10 or higher.\n\n" +
+				: "Python 3.12+ not found. Please install Python 3.12 or higher.\n\n" +
 					"This is required for development mode. Download from:\n" +
 					"https://www.python.org/downloads/";
 			this.emit("error", errorMsg);

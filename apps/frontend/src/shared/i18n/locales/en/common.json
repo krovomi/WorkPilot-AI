@@ -1143,5 +1143,155 @@
 		"daysAgo": "{{count}} d ago",
 		"refresh": "Refresh the model list",
 		"registryHint": "Releases read from models.dev, because no API key is configured for this provider. Add a key to see exactly what your account can call."
+	},
+	"commandPalette": {
+		"placeholder": "Type a command or search...",
+		"noResults": "No commands found for \"{{query}}\"",
+		"count_one": "{{count}} command",
+		"count_other": "{{count}} commands",
+		"footer": {
+			"navigate": "navigate",
+			"select": "select",
+			"close": "close"
+		},
+		"categories": {
+			"tasks": "Tasks",
+			"navigation": "Navigation",
+			"agents": "Agents",
+			"settings": "Settings",
+			"providers": "Providers",
+			"terminal": "Terminal",
+			"help": "Help"
+		},
+		"commands": {
+			"create_task": {
+				"label": "Create Task",
+				"description": "Create a new task in the Kanban board"
+			},
+			"search_tasks": {
+				"label": "Search Tasks",
+				"description": "Search and filter tasks"
+			},
+			"go_kanban": {
+				"label": "Go to Kanban",
+				"description": "Navigate to the Kanban board"
+			},
+			"go_terminals": {
+				"label": "Go to Terminals",
+				"description": "Navigate to the terminal view"
+			},
+			"go_insights": {
+				"label": "Go to Insights",
+				"description": "Navigate to the AI Insights chat"
+			},
+			"go_roadmap": {
+				"label": "Go to Roadmap",
+				"description": "Navigate to the project roadmap"
+			},
+			"go_ideation": {
+				"label": "Go to Ideation",
+				"description": "Navigate to the ideation view"
+			},
+			"go_context": {
+				"label": "Go to Context",
+				"description": "Navigate to the context view"
+			},
+			"go_agent_tools": {
+				"label": "Go to Agent Tools",
+				"description": "Navigate to agent tools configuration"
+			},
+			"go_changelog": {
+				"label": "Go to Changelog",
+				"description": "Navigate to the changelog"
+			},
+			"go_worktrees": {
+				"label": "Go to Worktrees",
+				"description": "Navigate to Git worktrees"
+			},
+			"go_dashboard": {
+				"label": "Go to Dashboard",
+				"description": "View project metrics, KPIs, and analytics"
+			},
+			"go_code_review": {
+				"label": "Go to Code Review",
+				"description": "AI-powered code review with quality scoring"
+			},
+			"go_refactoring": {
+				"label": "Go to Refactoring",
+				"description": "Detect code smells and get refactoring proposals"
+			},
+			"go_documentation": {
+				"label": "Go to Documentation",
+				"description": "Check coverage and generate docstrings"
+			},
+			"go_cost_estimator": {
+				"label": "Go to Cost Estimator",
+				"description": "View LLM usage costs and budgets"
+			},
+			"go_session_history": {
+				"label": "Go to Session History",
+				"description": "Track agent session performance and costs"
+			},
+			"go_migration": {
+				"label": "Go to Migration",
+				"description": "Framework migration wizard"
+			},
+			"go_visual_programming": {
+				"label": "Go to Visual Programming",
+				"description": "Visual node-based programming interface"
+			},
+			"go_github_issues": {
+				"label": "Go to GitHub Issues",
+				"description": "View and manage GitHub issues"
+			},
+			"go_github_prs": {
+				"label": "Go to GitHub PRs",
+				"description": "View and review GitHub pull requests"
+			},
+			"go_gitlab_issues": {
+				"label": "Go to GitLab Issues",
+				"description": "View and manage GitLab issues"
+			},
+			"go_gitlab_merge_requests": {
+				"label": "Go to GitLab Merge Requests",
+				"description": "View and review GitLab merge requests"
+			},
+			"go_settings": {
+				"label": "Open Settings",
+				"description": "Open application settings"
+			},
+			"open_sandbox_settings": {
+				"label": "Open Sandbox Settings",
+				"description": "Agent execution isolation, file whitelist, resource limits"
+			},
+			"open_anomaly_settings": {
+				"label": "Open Anomaly Detection Settings",
+				"description": "Agent behavior monitoring, trust scores, alerts"
+			},
+			"open_router_settings": {
+				"label": "Open LLM Router Settings",
+				"description": "Provider routing strategy, fallback chains, A/B testing"
+			},
+			"open_scheduler_settings": {
+				"label": "Open Scheduler Settings",
+				"description": "Cron-like task scheduling, chains, priority queues"
+			},
+			"toggle_theme": {
+				"label": "Toggle Theme",
+				"description": "Switch between light and dark theme"
+			},
+			"new_terminal": {
+				"label": "New Terminal",
+				"description": "Open a new terminal tab"
+			},
+			"keyboard_shortcuts": {
+				"label": "Keyboard Shortcuts",
+				"description": "Show all keyboard shortcuts"
+			},
+			"export_report": {
+				"label": "Export Report",
+				"description": "Export project report as JSON or CSV"
+			}
+		}
 	}
 }

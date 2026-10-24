@@ -1,3 +1,4 @@
+/** @vitest-environment jsdom */
 /**
  * Tests du lecteur d'état airgap.
  *

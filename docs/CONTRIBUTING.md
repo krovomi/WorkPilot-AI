@@ -62,12 +62,9 @@ You retain full copyright ownership of your contributions.
 
 ### How to Sign
 
-1. Open a Pull Request
-2. The CLA bot will automatically comment with instructions
-3. Comment on the PR with: `I have read the CLA Document and I hereby sign the CLA`
-4. Done - you only need to sign once, and it applies to all future contributions
-
-Read the full CLA here: [CLA.md](CLA.md)
+The CLA document and the bot that collects signatures are not set up in this repository yet.
+Until they are, say in your pull request that you agree to the CLA, and a maintainer will tell you
+what to sign.
 
 ## Prerequisites
 

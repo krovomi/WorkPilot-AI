@@ -15,7 +15,7 @@
  * Features:
  * - Session-based caching (no TTL - cache persists until app restart or settings
  *   change)
- * - Version validation (Python 3.10+ required for claude-agent-sdk)
+ * - Version validation (Python 3.12+ required by the backend)
  * - Platform-aware detection (macOS, Windows, Linux)
  * - Graceful fallbacks when tools not found
  */
@@ -32,6 +32,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { app } from "electron";
 import type { ToolDetectionResult } from "../shared/types";
+import { MINIMUM_PYTHON_VERSION } from "../shared/constants/python";
 import {
 	existsAsync,
 	findExecutable,
@@ -435,12 +436,12 @@ class CLIToolManager {
 	 * 3. Homebrew Python (macOS)
 	 * 4. System PATH (py -3, python3, python)
 	 *
-	 * Validates Python version >= 3.10.0 (required by claude-agent-sdk)
+	 * Validates Python version >= MINIMUM_PYTHON_VERSION (required by the backend)
 	 *
 	 * @returns Detection result for Python
 	 */
 	private detectPython(): ToolDetectionResult {
-		const MINIMUM_VERSION = "3.10.0";
+		const MINIMUM_VERSION = MINIMUM_PYTHON_VERSION;
 
 		// 1. User configuration
 		if (this.userConfig.pythonPath) {
@@ -955,13 +956,13 @@ class CLIToolManager {
 	 * Validate Python version and availability
 	 *
 	 * Checks that Python executable exists and meets minimum version requirement
-	 * (3.10.0+) for claude-agent-sdk compatibility.
+	 * (MINIMUM_PYTHON_VERSION) required by the backend.
 	 *
 	 * @param pythonCmd - The Python command to validate
 	 * @returns Validation result with version information
 	 */
 	private validatePython(pythonCmd: string): ToolValidation {
-		const MINIMUM_VERSION = "3.10.0";
+		const MINIMUM_VERSION = MINIMUM_PYTHON_VERSION;
 
 		try {
 			// Parse command to handle cases like 'py -3' on Windows
@@ -1579,7 +1580,7 @@ class CLIToolManager {
 	private async validatePythonAsync(
 		pythonCmd: string,
 	): Promise<ToolValidation> {
-		const MINIMUM_VERSION = "3.10.0";
+		const MINIMUM_VERSION = MINIMUM_PYTHON_VERSION;
 
 		try {
 			const parts = pythonCmd.split(" ");
@@ -2155,7 +2156,7 @@ class CLIToolManager {
 	 * @returns Promise resolving to detection result
 	 */
 	private async detectPythonAsync(): Promise<ToolDetectionResult> {
-		const MINIMUM_VERSION = "3.10.0";
+		const MINIMUM_VERSION = MINIMUM_PYTHON_VERSION;
 
 		// 1. User configuration
 		if (this.userConfig.pythonPath) {
@@ -2203,9 +2204,9 @@ class CLIToolManager {
 		if (isMacOS()) {
 			const homebrewPaths = [
 				"/opt/homebrew/bin/python3",
+				"/opt/homebrew/bin/python3.14",
+				"/opt/homebrew/bin/python3.13",
 				"/opt/homebrew/bin/python3.12",
-				"/opt/homebrew/bin/python3.11",
-				"/opt/homebrew/bin/python3.10",
 				"/usr/local/bin/python3",
 			];
 			for (const pythonPath of homebrewPaths) {

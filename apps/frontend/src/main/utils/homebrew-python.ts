@@ -21,7 +21,7 @@ export interface PythonValidation {
 /**
  * Find the first valid Homebrew Python installation.
  * Checks common Homebrew paths for Python 3, including versioned installations.
- * Prioritizes newer Python versions (3.14, 3.13, 3.12, 3.11, 3.10).
+ * Prioritizes newer Python versions (3.14, 3.13, 3.12); older ones fail validation anyway.
  *
  * Note: This list should be updated when new Python versions are released.
  * Check for specific versions first to ensure we find the latest available version.
@@ -45,8 +45,6 @@ export function findHomebrewPython(
 		"python3.14",
 		"python3.13",
 		"python3.12",
-		"python3.11",
-		"python3.10",
 		"python3",
 	];
 

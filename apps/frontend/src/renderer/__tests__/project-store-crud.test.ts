@@ -1,3 +1,4 @@
+/** @vitest-environment jsdom */
 /**
  * Unit tests for Project Store — Core CRUD Operations
  * Tests project creation, removal, update, selection, and loading
