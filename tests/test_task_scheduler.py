@@ -4,7 +4,7 @@ Tests for CronExpression, ScheduledTask, TaskChain, TaskQueue, and TaskScheduler
 """
 
 import time
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
