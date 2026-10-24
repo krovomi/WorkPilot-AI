@@ -349,7 +349,6 @@ async def test_a_complete_session_announces_all_subtasks_done(loop, monkeypatch)
     assert "ALL_SUBTASKS_DONE" in events
 
 
-
 @pytest.mark.asyncio
 async def test_a_concurrency_error_while_planning_plans_again(loop):
     coder, project, spec, run = loop
