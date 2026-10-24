@@ -13,8 +13,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-from core.git_executable import run_git
 from core.worktree import WorktreeManager
+from foundation.git_executable import run_git
 from merge import FileTimelineTracker
 from security.constants import ALLOWLIST_FILENAME, PROFILE_FILENAME
 from ui import (

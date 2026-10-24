@@ -163,7 +163,7 @@ class TestItRefusesToWander:
         An earlier version of this docstring claimed the check kept
         `py/path-injection` off the file. It does not — a full scan still
         reports it, because an unconstrained project path is the feature. See
-        `core.api_safety` for where that judgement is now recorded.
+        `foundation.api_safety` for where that judgement is now recorded.
         """
         res = get(project_dir=f"{project}/../..", spec_id="001-x")
         assert res["success"] is False

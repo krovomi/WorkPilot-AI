@@ -13,7 +13,7 @@ One rule, and it is the whole design:
 `git diff --numstat` feeds a counter, `git status --porcelain` feeds a parser,
 `git rev-parse HEAD` feeds a string comparison. Condensing any of those does
 not save tokens — nothing about them is ever sent to a model — and it silently
-breaks the caller. So there is no global switch here and `core.git_executable.
+breaks the caller. So there is no global switch here and `foundation.git_executable.
 run_git` is deliberately left alone: a call site opts in by using this
 function, which is a statement that its output is going to a model.
 

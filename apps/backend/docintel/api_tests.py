@@ -3,7 +3,7 @@
 `api_capture.py` reads the call; this module writes the test a person would
 have written by hand, deterministically, from two facts the repository states:
 
-* **the stack** — `test_generation.stack_aware.detect_stack` for .NET, Node and
+* **the stack** — `project.test_stack.detect_stack` for .NET, Node and
   Python, `pom.xml` / `build.gradle` for Spring, `go.mod` for Go;
 * **the test libraries it already references** —
   `test_generation.libraries.resolve_selection`, the same answer the test
@@ -567,7 +567,7 @@ def draft_test(project_dir: Path, exchange: ApiExchange) -> ApiTestDraft | None:
     except Exception:  # noqa: BLE001 - a draft with bare asserts beats no draft
         libraries = []
     try:
-        from test_generation.stack_aware import iter_project_files
+        from project.test_stack import iter_project_files
 
         manifests = " ".join(
             _read(m) for m in iter_project_files(project_dir, ("package.json",))

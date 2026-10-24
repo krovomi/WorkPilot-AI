@@ -16,9 +16,9 @@ from core.build_signals import BuildPaused
 from core.client import create_agent_client
 from core.debug import debug, debug_error, debug_section, debug_success, debug_warning
 from core.pause_state import is_paused, read_pause_state
-from core.phase_event import ExecutionPhase, emit_phase
 from core.progress import count_subtasks, is_build_complete
 from core.task_event import TaskEventEmitter
+from foundation.phase_event import ExecutionPhase, emit_phase
 from integrations.linear.updater import (
     LinearTaskState,
     is_linear_enabled,
@@ -446,7 +446,7 @@ async def run_qa_validation_loop(
         print("\n⚠️  No test framework detected in project.")
 
         # Check if this is a .NET project with test projects available
-        from core.dotnet_tools import detect_dotnet_project
+        from foundation.dotnet_tools import detect_dotnet_project
 
         if detect_dotnet_project(project_dir):
             print("Detected .NET project — attempting to run dotnet test...")

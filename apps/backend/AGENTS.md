@@ -22,6 +22,16 @@ Toute interaction LLM passe par ces fichiers ; les modifier touche tout le produ
 | `qa/loop.py` | ~1 350 | boucle de validation QA |
 | `provider_api.py` | ~2 050 | point d'entrée FastAPI : monte les routeurs, CORS, redaction des logs |
 
+## Couches
+
+`foundation/` est la couche la plus basse et n'importe rien du backend : `platform/`,
+`api_safety.py`, `file_utils.py`, `git_executable.py`, `phase_event.py`, `dotnet_tools.py`,
+`codex_catalog_rpc.py`, `vendor_manifest.py`, `workpilot_layout.py`. `core/` est la racine de
+composition, qui importe les agents. Les autres modules sortis de `core` par le lot M10 :
+`offline_policy/` (avec `local_model_catalog.py`), `app_detection.py` (détecteur de l'aperçu),
+`project/ui_stack.py` et `project/test_stack.py` (les piles UI et de test, venues de `uiux` et de
+`test_generation`). `tests/test_import_contracts.py` tient ces frontières.
+
 ## Modèle, effort, routage
 
 | Fichier | Contenu |
@@ -29,7 +39,7 @@ Toute interaction LLM passe par ces fichiers ; les modifier touche tout le produ
 | `phase_config.py` | `MODEL_ID_MAP`, `THINKING_BUDGET_MAP`, `DEFAULT_PHASE_MODELS`, `PROVIDER_DEFAULT_MODELS`, `get_phase_model()`, `get_phase_thinking_budget()` |
 | `models_registry.py` | catalogue livré des modèles et de leurs capacités |
 | `model_router/router.py` | `TaskClass` × `QualityTier` (budget / balanced / premium) → modèle |
-| `core/phase_event.py` | événements de phase vers l'UI |
+| `foundation/phase_event.py` | événements de phase vers l'UI |
 | `core/pause_state.py`, `core/build_signals.py` | pause coopérative ; `BuildPaused` / `BuildHalted` |
 | `context_mgmt/` | fenêtre de contexte par session : jauge, compact / clear au seuil |
 | `harness/` | harness de contexte ([plan](../../docs/architecture/context-harness.md)) : `harness/domain/` mesure chaque appel dans une unité commune à tous les providers et le chiffre (`harness/domain/usage.py`, `harness/domain/ledger.py`, `harness/domain/cost.py`), ordonne un prompt du segment le plus stable au plus volatil (`harness/domain/layout.py`), pagine ce que lisent les outils ou déverse ce qui ne se relit pas (`harness/domain/paging.py`), purge les vieux résultats d'outils par lots (`harness/domain/policies.py`), arrête un modèle qui se répète (`harness/domain/progress.py`), borne et marque ce que rend un sous-agent (`harness/domain/subagents.py`) et fige un jeu d'outils trié par session, qu'il pèse (`harness/domain/tools.py`) ; `harness/application/budget.py` plafonne chaque session, `harness/application/subagents.py` délimite ce résultat comme une donnée et lance les sous-agents en échelon, `harness/domain/delegation.py` et `harness/application/delegation.py` donnent un roster à tout provider de la boucle (outil `delegate`, session enfant du même client, [justification](../../docs/architecture/delegation.md)), `harness/application/tools.py` pose le jeu d'outils sur chaque client WorkPilot et pèse chaque type d'agent ; `harness/domain/evals.py` juge une session rejouée (cache par capacité, régressions contre une base) et `harness/application/replay.py` la rejoue dans le code de production (fixtures : `tests/harness/replay/`) ; `harness/application/loop.py` est la seule boucle WorkPilot, derrière `harness/ports.py` (`ModelPort`), et `harness/domain/stop.py` dit quand elle s'arrête ; ses adaptateurs restent dans `core/agent_clients/` (`LoopAdapter`) ; `harness/domain/code_chunks.py` et `harness/domain/code_ranking.py` découpent le code par symbole et le classent (BM25 + RRF), `harness/application/code_search.py` l'indexe et répond à `search_code`, que `harness/tools/` sert en MCP (`workpilot-code`) et à `ToolExecutor` |
@@ -58,8 +68,8 @@ Toute interaction LLM passe par ces fichiers ; les modifier touche tout le produ
 | `security/` | allowlist de commandes, écritures confinées, contenu non fiable ([index](security/AGENTS.md)) |
 | `injection_guard/` | scanner d'injection de prompt |
 | `server/auth/`, `server/authz/` | authentification (JWT, OIDC) ; permissions, rôles, tenants, portée de projet |
-| `core/api_safety.py` | chemins acceptés par l'API locale |
-| `core/offline_policy.py` | hors-ligne strict (`airgapStrict`) |
+| `foundation/api_safety.py` | chemins acceptés par l'API locale |
+| `offline_policy/` | hors-ligne strict (`airgapStrict`) |
 | `core/log_redaction.py` | filtre de redaction des logs |
 
 ## Mémoire, apprentissage, autonomie
@@ -72,7 +82,7 @@ Toute interaction LLM passe par ces fichiers ; les modifier touche tout le produ
 | `learning_loop/` | patterns des builds, phase `observe` (`skills/_proposed/`), replay A/B |
 | `hermes/` | hermes-agent : doctor, persona `SOUL.md`, cycle d'apprentissage |
 | `core/merge_event.py` | un merge publié une fois ; mémoire, apprentissage et `uiux` s'y abonnent |
-| `core/workpilot_layout.py` | un dossier par feature sous `.workpilot/` |
+| `foundation/workpilot_layout.py` | un dossier par feature sous `.workpilot/` |
 | `continuous_ai/daemon.py`, `self_healing/` | boucles autonomes avec plafond de coût ; surveillance et remédiation |
 
 ## Préparer et vérifier un build

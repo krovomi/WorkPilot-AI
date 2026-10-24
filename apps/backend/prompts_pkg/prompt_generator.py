@@ -17,13 +17,13 @@ import os
 import re
 from pathlib import Path
 
-from core.dotnet_tools import generate_dotnet_env_section
+from foundation.dotnet_tools import generate_dotnet_env_section
 
 # Stack-aware automatic test planning (API contract / WinForms UI / web E2E
 # tests derived from the touched files + installed libraries). Optional: the
 # prompt builder must keep working if the module is unavailable.
 try:
-    from test_generation.stack_aware import build_auto_test_instructions
+    from project.test_stack import build_auto_test_instructions
 except ImportError:  # pragma: no cover - packaging edge case
     build_auto_test_instructions = None
 

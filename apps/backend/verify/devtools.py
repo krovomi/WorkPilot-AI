@@ -86,7 +86,7 @@ def _strict_airgap(project_dir: Path | None) -> bool:
     if project_dir is None:
         return False
     try:
-        from core.offline_policy import airgap_status
+        from offline_policy import airgap_status
 
         return bool(airgap_status(project_dir).get("airgapStrict"))
     except Exception:  # noqa: BLE001 - an unreadable policy is not a reason to fail

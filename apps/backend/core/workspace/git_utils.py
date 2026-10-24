@@ -10,7 +10,7 @@ import json
 import subprocess
 from pathlib import Path
 
-from core.git_executable import get_git_executable, run_git
+from foundation.git_executable import get_git_executable, run_git
 
 __all__ = [
     # Exported helpers

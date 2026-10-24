@@ -166,7 +166,7 @@ l'UI n'existe pas.
 ## S7 — Hors-ligne strict
 
 `airgapStrict` (`.workpilot/offline-mode.json`) est une barrière, pas une préférence : tout nouvel
-appel réseau du backend passe par `core/offline_policy.py`. Voir
+appel réseau du backend passe par `offline_policy/`. Voir
 [`architecture/offline-mode.md`](../architecture/offline-mode.md).
 
 ## S8 — Chaîne d'approvisionnement

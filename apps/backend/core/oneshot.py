@@ -250,7 +250,7 @@ def _build_client(
     thinking_level: str | None = None,
 ):
     cwd = str(Path(project_dir).resolve()) if project_dir else None
-    from core.offline_policy import local_endpoint, resolve_offline_route
+    from offline_policy import local_endpoint, resolve_offline_route
 
     # `chosen` says whether this pair is a decision taken for this call — the
     # Arena names one provider per contestant — or the fallback nobody asked

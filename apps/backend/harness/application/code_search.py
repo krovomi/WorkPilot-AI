@@ -208,7 +208,7 @@ def _indexable(relative: str) -> bool:
 def _git_files(root: Path) -> list[str] | None:
     """Tracked and new files, ignored ones left out; None when git does not answer."""
     try:
-        from core.git_executable import run_git
+        from foundation.git_executable import run_git
 
         result = run_git(
             ["ls-files", "-z", "--cached", "--others", "--exclude-standard"],

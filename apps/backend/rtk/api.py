@@ -21,8 +21,8 @@ import logging
 import os
 from pathlib import Path
 
-from core.api_safety import safe_error, server_mode_roots, validated_dir
 from fastapi import APIRouter
+from foundation.api_safety import safe_error, server_mode_roots, validated_dir
 
 from .runtime import doctor
 from .settings import project_env

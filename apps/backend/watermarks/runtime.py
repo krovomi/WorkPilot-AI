@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from types import ModuleType
 
-from core.vendor_manifest import RECEIPT_NAME, tree_digest
+from foundation.vendor_manifest import RECEIPT_NAME, tree_digest
 
 logger = logging.getLogger(__name__)
 

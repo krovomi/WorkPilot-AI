@@ -42,7 +42,6 @@ try:
     )
 except ImportError:
     _ut_start_build = _ut_finish_build = _ut_record_task = None  # type: ignore[assignment]
-from core.phase_event import ExecutionPhase, emit_phase
 from core.progress import (
     count_subtasks,
     count_subtasks_detailed,
@@ -53,6 +52,7 @@ from core.progress import (
     print_progress_summary,
     print_session_header,
 )
+from foundation.phase_event import ExecutionPhase, emit_phase
 from harness.domain.layout import Segment, Stability, assemble
 from integrations.linear.updater import (
     LinearTaskState,

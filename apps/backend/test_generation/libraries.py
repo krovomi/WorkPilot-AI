@@ -31,7 +31,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from test_generation.stack_aware import iter_project_files, read_manifest
+from project.test_stack import iter_project_files, read_manifest
 
 # Package ecosystems, which decide how a package is installed and named.
 NUGET = "nuget"

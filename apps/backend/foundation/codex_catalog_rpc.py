@@ -10,7 +10,7 @@ import time
 from contextlib import suppress
 from typing import Any
 
-from core.platform import build_windows_command, find_executable, is_windows
+from foundation.platform import build_windows_command, find_executable, is_windows
 
 TIMEOUT_SECONDS = 10
 MAX_LINE_BYTES = 1024 * 1024

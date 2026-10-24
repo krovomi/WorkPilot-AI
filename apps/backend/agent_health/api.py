@@ -15,8 +15,8 @@ from __future__ import annotations
 import logging
 import threading
 
-from core.api_safety import safe_error
 from fastapi import APIRouter, HTTPException, Path
+from foundation.api_safety import safe_error
 from pydantic import BaseModel, Field
 
 from .monitor import AgentRun, HealthMonitor

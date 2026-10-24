@@ -8,7 +8,7 @@ by a standard-library BM25 with no network and no model. This package decides
 | Module | Answers |
 |---|---|
 | `surface` | is this file part of an interface? (the one glob list) |
-| `stack` | which UI toolkits the project uses, and which upstream guide fits |
+| `project.ui_stack` | which UI toolkits the project uses, and which upstream guide fits (lives in `project`, which every stack question reads) |
 | `relevance` | does this task touch the interface? override → plan → description |
 | `runtime` | where the vendored skill is, and the doctor |
 | `engine` | runs `search.py` with the backend's own interpreter, arguments checked |

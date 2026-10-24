@@ -2,9 +2,13 @@
 
 A unit is a package or a module directly under ``apps/backend``. The audit of
 17 October found no import contract at all, and one cycle holding 60 of the
-126 units: ``core`` imported fifteen packages, eight of which imported it back.
-Lot M10 breaks that cycle. Until then this test keeps it from growing, and
-keeps the few units that are still nearly independent that way.
+126 units (81 by the time lot M10 started): ``core`` was both the low-level
+toolbox every unit reads and the composition root that imports the agents, so
+any unit wanting ``safe_error`` sat in the agents' cycle. Lot M10 took the
+toolbox out (``foundation``, ``offline_policy``, ``app_detection``, the stack
+detectors into ``project``) and the cycle down to 26 units: the agent runtime
+itself (``core.client`` and ``agents.session`` with the phases built on them).
+This test keeps it from growing back, and the units taken out of it that way.
 
 The graph is read from the source with ``ast``, every ``import`` of the file
 counted, including the ones inside a function: a lazy import is still a
@@ -29,6 +33,20 @@ SKIPPED_DIRS = {"__pycache__", "tests", "node_modules"}
 # What each unit may import from the rest of the backend, and nothing more.
 # Widening an entry is a design change: say why in the PR.
 ALLOWED_IMPORTS: dict[str, set[str]] = {
+    # The lowest layer. api_safety reads the server settings when server mode
+    # is installed, and server imports nothing back.
+    "foundation": {"server"},
+    # airgapStrict: the phase's model and the local runtimes, nothing above.
+    "offline_policy": {"ollama_model_detector", "phase_config"},
+    # The preview's project detector, read by verify and the Kanban runner.
+    "app_detection": set(),
+    # Stack detection, including the UI and test stacks moved here in M10.
+    "project": {"mobile"},
+    "mobile": {"foundation"},
+    "rtk": {"foundation"},
+    # Read by the scheduler and the phase config: its LLM refine takes the
+    # client factory from its runner instead of importing core.
+    "cost_intelligence": {"foundation", "models_registry", "phase_config"},
     # The security layer reads the project's stack (allowlist per stack), the
     # injection scanner, and rtk to see the command behind the proxy
     # (docs/architecture/rtk.md).
@@ -44,6 +62,7 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
         "core",
         "cost_intelligence",
         "docintel",
+        "foundation",
         "security",
     },
     # Read by core, phase_config and provider_api: a leaf, or the cycle it
@@ -52,8 +71,8 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
 }
 
 # The largest set of units that all import one another, directly or not. It
-# may only shrink: lower the number when a change breaks a part of it (M10).
-MAX_CYCLE = 81
+# may only shrink: lower the number when a change breaks a part of it.
+MAX_CYCLE = 26
 
 
 def _units() -> dict[str, Path]:

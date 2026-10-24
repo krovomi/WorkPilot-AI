@@ -9,7 +9,7 @@ Uses temp file + os.replace() pattern which is atomic on POSIX systems
 and atomic on Windows when source and destination are on the same volume.
 
 Usage:
-    from core.file_utils import write_json_atomic
+    from foundation.file_utils import write_json_atomic
 
     write_json_atomic("/path/to/file.json", {"key": "value"})
 """

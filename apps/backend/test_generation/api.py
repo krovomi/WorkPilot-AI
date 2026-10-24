@@ -6,20 +6,22 @@ domain. Mounted by provider_api via app.include_router(router).
 
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Body
+from foundation.api_safety import safe_error
 
-try:
-    from provider_api import _safe_error_message
-except ImportError:
-    # Module loaded via the apps.backend.* package path (no top-level
-    # provider_api on sys.path). Fall back to the package-qualified import.
-    from apps.backend.provider_api import _safe_error_message  # type: ignore[no-redef]
-
+logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def _safe_error_message(e: Exception) -> str:
+    # The mounting app is not imported back: provider_api mounts this router,
+    # so reading its helper from here closed an import cycle (lot M10).
+    return safe_error(e, logger, "test generation")
 
 
 @router.post("/api/test-generation/analyze-coverage")

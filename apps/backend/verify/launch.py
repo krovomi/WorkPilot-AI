@@ -29,7 +29,7 @@ import urllib.request
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from core.platform import is_windows, split_command
+from foundation.platform import is_windows, split_command
 
 from .detect import Target, free_port
 from .errors import VerifyError, collect_errors

@@ -17,7 +17,7 @@ import logging
 import subprocess
 from pathlib import Path
 
-from core.git_executable import get_isolated_git_env
+from foundation.git_executable import get_isolated_git_env
 
 logger = logging.getLogger(__name__)
 

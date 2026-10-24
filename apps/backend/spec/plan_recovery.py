@@ -649,7 +649,7 @@ def write_recovered_plan(spec_dir: Path, recovered: RecoveredPlan) -> bool:
     `_cleanup_stray_root_plan` exists to prevent, and a copy of the real plan is
     worse than a truncated one: it is the file a later read could pick up.
     """
-    from core.file_utils import write_json_atomic
+    from foundation.file_utils import write_json_atomic
 
     spec_dir = Path(spec_dir)
     plan_path = spec_dir / "implementation_plan.json"

@@ -65,7 +65,7 @@ class PlatformReport:
 
 def _is_macos() -> bool:
     try:
-        from core.platform import is_macos
+        from foundation.platform import is_macos
 
         return bool(is_macos())
     except Exception:  # noqa: BLE001

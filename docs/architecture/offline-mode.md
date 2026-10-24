@@ -130,7 +130,7 @@ chaînes.
 
 ### Ce qui consulte la barrière
 
-Tout appel réseau du backend passe par `core/offline_policy.py` (règle S7). La préparation de
+Tout appel réseau du backend passe par `offline_policy/` (règle S7). La préparation de
 documentation `libdocs` envoyait 180 caractères de la spec à Context7 sans la lire : elle la lit
 désormais avant toute détection, et une politique illisible vaut un mode strict (lot M4). Il
 reste des modules réseau qui ne la consultent pas encore ; chacun se corrige de la même façon,

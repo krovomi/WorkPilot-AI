@@ -16,7 +16,7 @@ python -c "from main.claude_profile.token_refresh import refresh_all_tokens; ref
 **Build Issues Cross-Platform:**
 ```bash
 # Use platform abstraction functions
-from core.platform import isWindows, findExecutable, joinPaths
+from foundation.platform import isWindows, findExecutable, joinPaths
 
 # Never hardcode paths
 exe_path = findExecutable("node")  # Works on Win/Mac/Linux

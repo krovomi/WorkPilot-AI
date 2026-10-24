@@ -1,8 +1,8 @@
-"""Tests for stack-aware automatic test planning (stack_aware.py)."""
+"""Tests for stack-aware automatic test planning (project/test_stack.py)."""
 
 import json
 
-from test_generation.stack_aware import (
+from project.test_stack import (
     KIND_API,
     KIND_UNIT,
     KIND_WEB,

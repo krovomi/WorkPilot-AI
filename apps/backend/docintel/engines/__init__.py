@@ -60,7 +60,7 @@ def cloud_refusal(policy_paths: tuple[Path, ...]) -> tuple[str, str] | None:
             "given to read the offline policy from.",
         )
     try:
-        from core.offline_policy import STRICT_EXIT_HINT, airgap_status
+        from offline_policy import STRICT_EXIT_HINT, airgap_status
 
         status = airgap_status(*policy_paths)
     except Exception:  # noqa: BLE001 - unreadable policy: fail closed

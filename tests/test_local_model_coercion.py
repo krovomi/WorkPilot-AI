@@ -211,7 +211,7 @@ class TestClientFactoryGuard:
 
         import core.agent_client
         import core.client
-        import core.local_model_catalog
+        import offline_policy.local_model_catalog
 
         model = "claude-local-alias"
         policy_path = tmp_path / ".workpilot" / "offline-mode.json"
@@ -232,7 +232,7 @@ class TestClientFactoryGuard:
         monkeypatch.setattr(core.agent_client, "LocalAgentClient", factory)
         monkeypatch.setattr(core.client, "_log_llm_context_switch", Mock())
         monkeypatch.setattr(
-            core.local_model_catalog,
+            offline_policy.local_model_catalog,
             "detect_runtime",
             lambda _: {
                 "available": True,

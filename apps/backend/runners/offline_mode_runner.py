@@ -34,8 +34,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from core.local_model_catalog import detect_runtime
-from core.offline_policy import LOCAL_PROVIDERS, airgap_status
+from offline_policy import LOCAL_PROVIDERS, airgap_status
+from offline_policy.local_model_catalog import detect_runtime
 from ollama_model_detector import is_embedding_model
 
 SCAN_CACHE_TTL_SECONDS = 900  # 15 minutes

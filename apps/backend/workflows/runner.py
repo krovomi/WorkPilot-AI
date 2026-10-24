@@ -765,7 +765,7 @@ def _announce(phase_id: str) -> None:
     if name is None:
         return
     try:
-        from core.phase_event import ExecutionPhase, emit_phase
+        from foundation.phase_event import ExecutionPhase, emit_phase
 
         emit_phase(getattr(ExecutionPhase, name), f"Running the {phase_id} phase")
     except Exception as exc:  # noqa: BLE001 - a badge never fails a phase

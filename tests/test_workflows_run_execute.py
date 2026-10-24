@@ -36,7 +36,7 @@ from core.pause_state import (  # noqa: E402
     is_paused,
     read_pause_state,
 )
-from core.platform import is_windows  # noqa: E402
+from foundation.platform import is_windows  # noqa: E402
 from workflows.engine import DETERMINISTIC_PHASES, ResolvedPhase  # noqa: E402
 from workflows.environments import (  # noqa: E402
     EnvironmentsError,

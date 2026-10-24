@@ -41,6 +41,8 @@ from cost_intelligence.formula_refine import refine_formulas_sync  # noqa: E402
 
 def main() -> None:
     try:
+        from core.simple_client import create_simple_client
+
         raw = sys.stdin.read()
         payload = json.loads(raw) if raw.strip() else {}
         description = str(payload.get("description", ""))
@@ -48,7 +50,9 @@ def main() -> None:
         if not isinstance(candidates, list):
             raise ValueError("candidates must be a list")
 
-        refined = refine_formulas_sync(description, candidates)
+        refined = refine_formulas_sync(
+            description, candidates, client_factory=create_simple_client
+        )
         print(
             json.dumps({"refined": [r.to_dict() for r in refined]}, default=str),
             flush=True,

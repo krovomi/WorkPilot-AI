@@ -12,7 +12,7 @@ They used to live in ``.workpilot/learning_loop/patterns.json``, a second
 pattern store beside the vault, injected into the same prompts. That file is
 imported on first use and moved aside, never deleted — into
 ``.workpilot/learning/`` (``patterns.json.migrated-to-brain``), the one folder
-the learning loop keeps under ``.workpilot/`` (`core.workpilot_layout`).
+the learning loop keeps under ``.workpilot/`` (`foundation.workpilot_layout`).
 
 Handles deduplication by merging similar patterns and increasing confidence.
 When memory is off (``BRAIN_ENABLED=false``) there is nowhere to remember:
@@ -137,7 +137,7 @@ class PatternStorage:
         if not self._write(memory, list(known.values())):
             logger.warning("Learning patterns not migrated: the vault write failed")
             return
-        from core.workpilot_layout import move_aside
+        from foundation.workpilot_layout import move_aside
 
         target = move_aside(
             self.legacy_file, self.project_dir / LEARNING_DIR, LEGACY_MIGRATED_SUFFIX

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping, MutableMapping
 
-from core.offline_policy import airgap_status
+from offline_policy import airgap_status
 
 from .models import BypassReason, JevContext, JevSettings, JevSettingsError
 

@@ -27,7 +27,7 @@ What is behind the door:
     The HTTP framework (ASP.NET Core, Spring, FastAPI…), for API test drafts
     and the verify loop's endpoints.
 ``ui_stack`` / ``mobile_stack`` / ``test_profile``
-    `uiux.stack`, `mobile.stacks` and `test_generation.stack_aware`, imported
+    `project.ui_stack`, `mobile.stacks` and `project.test_stack`, imported
     lazily: they are packages of their own with readers inside them, and
     importing them here must not drag them into every import of this module.
 
@@ -115,8 +115,8 @@ def frameworks(project_dir: Path | str) -> list[str]:
 
 
 def ui_stack(project_dir: Path | str | None) -> Any:
-    """The UI toolkits and their design guides (`uiux.stack.UiStack`)."""
-    from uiux.stack import detect_ui_stack
+    """The UI toolkits and their design guides (`project.ui_stack.UiStack`)."""
+    from project.ui_stack import detect_ui_stack
 
     return detect_ui_stack(project_dir)
 
@@ -130,7 +130,7 @@ def mobile_stack(project_dir: Path | str | None) -> Any:
 
 def test_profile(project_dir: Path | str) -> Any:
     """Test frameworks and API frameworks per language (`StackProfile`)."""
-    from test_generation.stack_aware import detect_stack
+    from project.test_stack import detect_stack
 
     return detect_stack(project_dir)
 
@@ -310,7 +310,7 @@ def detect_project_type(project_dir: Path) -> str:
 
 def detect_api_stack(project_dir: Path) -> tuple[str, str]:
     """(stack, language) of the project's HTTP API, or ("", "")."""
-    from test_generation.stack_aware import detect_stack, iter_project_files
+    from project.test_stack import detect_stack, iter_project_files
 
     profile = detect_stack(project_dir)
     if profile.aspnet:

@@ -1,6 +1,6 @@
 """Finding the mobile toolchains, without hard-coding anyone's install path.
 
-`core.platform.find_executable` already searches PATH and the usual per-OS
+`foundation.platform.find_executable` already searches PATH and the usual per-OS
 locations. What it does not know is that the Android tools are not on PATH on a
 default install — they live under the SDK root, which is named by `ANDROID_HOME`
 or `ANDROID_SDK_ROOT` and otherwise sits in a different place on each OS. This
@@ -28,7 +28,7 @@ _SDK_BIN_DIRS = ("platform-tools", "emulator", "cmdline-tools/latest/bin", "tool
 
 def _current_os() -> str:
     try:
-        from core.platform import get_current_os
+        from foundation.platform import get_current_os
 
         return str(get_current_os())
     except Exception:  # noqa: BLE001 - detection must never be fatal
@@ -66,7 +66,7 @@ def find_tool(name: str) -> str:
         sdk_paths = [str(Path(root) / sub) for sub in _SDK_BIN_DIRS]
 
     try:
-        from core.platform import find_executable
+        from foundation.platform import find_executable
 
         found = find_executable(name, sdk_paths or None)
         if found:

@@ -9,7 +9,7 @@ import os
 import subprocess
 from pathlib import Path
 
-from core.git_executable import get_git_executable
+from foundation.git_executable import get_git_executable
 
 logger = logging.getLogger(__name__)
 

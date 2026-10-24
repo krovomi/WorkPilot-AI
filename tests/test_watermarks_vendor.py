@@ -34,7 +34,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "apps" / "backend"))
 
-from core.vendor_manifest import RECEIPT_NAME, tree_digest  # noqa: E402
+from foundation.vendor_manifest import RECEIPT_NAME, tree_digest  # noqa: E402
 from watermarks import runtime as wm_runtime  # noqa: E402
 
 VENDORED = wm_runtime.vendored_root()

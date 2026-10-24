@@ -544,7 +544,7 @@ class ToolExecutor:
         Only when there is no document at all does the write fail, and the error
         goes back to the model so it can correct itself in the same session.
         """
-        from core.file_utils import write_json_atomic
+        from foundation.file_utils import write_json_atomic
         from spec.plan_recovery import extract_json_document
 
         if empty_file:

@@ -92,7 +92,9 @@ backend/
 ├── agents/              # AI agent execution (planner, coder, session) + subagents/ registry
 ├── qa/                  # QA reviewer / fixer validation loop
 ├── spec/                # Spec creation and management
-├── core/                # Client factory, auth, worktree, platform/ abstraction
+├── core/                # Composition root: client factory, provider clients, auth, worktree
+├── foundation/          # Lowest layer, imports nothing back: platform/, api_safety, git, phase events
+├── offline_policy/      # airgapStrict: every backend network call asks it first
 ├── prompts/             # Agent system prompts (~50, incl. github/)
 ├── skills/              # Token-optimized dynamic skill execution
 ├── integrations/        # External services (GitHub, GitLab, Azure, Linear, Jira)
@@ -117,23 +119,27 @@ backend/
 ### Design Principles
 
 - **SOLID** - Single responsibility, clean interfaces
-- **DRY** - Shared utilities in `core/`
+- **DRY** - Shared utilities in `foundation/`, which imports nothing of the backend; `core/` composes the agents on top of it
 - **KISS** - Flat imports from the backend root (`from agents.coder import …`); compatibility shims have been removed
 
 ### Import Convention
 
 ```python
-# Use facade modules for clean imports
-from debug import debug, debug_error
-from progress import count_subtasks
-from workspace import setup_workspace
+# Import the real module; the root-level facades are gone
+from core.debug import debug, debug_error
+from core.progress import count_subtasks
+from foundation.platform import is_windows
 ```
+
+`tests/test_import_contracts.py` holds the layers: `foundation`, `security`, `project`,
+`offline_policy` and a few more import only what their contract lists, and the largest import
+cycle (`MAX_CYCLE`) may only shrink.
 
 ### Adding Features
 
 1. Create module in appropriate folder
 2. Export API in `__init__.py`
-3. Add facade module at root if commonly imported
+3. A helper that imports nothing of the backend goes in `foundation/`, not `core/`
 
 ## Multi-Provider LLM Support
 

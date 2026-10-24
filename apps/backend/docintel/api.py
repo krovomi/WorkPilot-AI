@@ -7,7 +7,7 @@ whether the diagram they attached will be understood. So the answer is
 its record when a build starts, not when a panel opens.
 
 Refused in server mode by the same addressing rules as every spec endpoint
-(`core.api_safety.resolve_spec_dir`): a client naming a directory on a shared
+(`foundation.api_safety.resolve_spec_dir`): a client naming a directory on a shared
 server is a cross-tenant read.
 """
 
@@ -16,8 +16,12 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from core.api_safety import SPEC_ADDRESS_REASONS, SpecAddressError, resolve_spec_dir
 from fastapi import APIRouter, Query
+from foundation.api_safety import (
+    SPEC_ADDRESS_REASONS,
+    SpecAddressError,
+    resolve_spec_dir,
+)
 from pydantic import BaseModel, Field
 
 from . import figma, settings

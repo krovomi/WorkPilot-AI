@@ -287,7 +287,7 @@ def _node_target(directory: Path, project_dir: Path) -> Target | None:
     if not is_frontend:
         return None
     try:
-        from runners.app_emulator_runner import AppEmulatorRunner
+        from app_detection import AppEmulatorRunner
 
         found = AppEmulatorRunner(str(directory)).detect_project_type()
     except Exception as exc:  # noqa: BLE001 - the preview's detector is optional
@@ -355,7 +355,7 @@ def _dotnet_targets(project_dir: Path) -> list[Target]:
 
 def _python_target(directory: Path, project_dir: Path) -> Target | None:
     try:
-        from runners.app_emulator_runner import AppEmulatorRunner
+        from app_detection import AppEmulatorRunner
 
         found = AppEmulatorRunner(str(directory))._detect_from_python()  # noqa: SLF001
     except Exception:  # noqa: BLE001

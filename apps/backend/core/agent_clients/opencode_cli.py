@@ -36,7 +36,7 @@ from collections.abc import AsyncIterator
 from contextlib import aclosing
 from typing import Any
 
-from core.platform import build_windows_command, find_executable
+from foundation.platform import build_windows_command, find_executable
 from harness.domain import from_step_tokens
 
 from .base import AgentMessage, MessageRole

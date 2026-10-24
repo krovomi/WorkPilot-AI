@@ -19,9 +19,10 @@ Public API is exported via workspace/__init__.py for backward compatibility.
 
 from pathlib import Path
 
-# Import git command helper for centralized logging and allowlist compliance
-from core.git_executable import run_git
 from core.worktree import WorktreeManager
+
+# Import git command helper for centralized logging and allowlist compliance
+from foundation.git_executable import run_git
 from ui import (
     Icons,
     bold,

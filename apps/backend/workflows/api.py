@@ -30,12 +30,12 @@ import logging
 import os
 from pathlib import Path
 
-from core.api_safety import (
+from fastapi import APIRouter, Query
+from foundation.api_safety import (
     SPEC_ADDRESS_REASONS,
     SpecAddressError,
     resolve_spec_dir,
 )
-from fastapi import APIRouter, Query
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ class _BadRequest(SpecAddressError):
 
     The reason is a key into `_REASONS`, not free text, so what reaches the
     response is always a literal written here. Subclasses `SpecAddressError`
-    so the addressing rules — which now live in `core.api_safety` alongside
+    so the addressing rules — which now live in `foundation.api_safety` alongside
     every other endpoint's — are caught by the same `except`.
     """
 
@@ -277,8 +277,8 @@ def workflow_profile(
         }
         profile = resolve_profile(loaded, level, provider=resolved_provider, **context)
         payload = _serialise(loaded, profile, missing=_missing_impls(loaded, profile))
-        from core.offline_policy import airgap_status
         from integrations.jev.observations import read_observations
+        from offline_policy import airgap_status
 
         payload["jev"] = {
             "observation": read_observations(sd),

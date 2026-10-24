@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import logging
 
-from core.api_safety import safe_error
 from fastapi import APIRouter
+from foundation.api_safety import safe_error
 from pydantic import BaseModel, Field
 
 from .detective import AnomalyDetective
