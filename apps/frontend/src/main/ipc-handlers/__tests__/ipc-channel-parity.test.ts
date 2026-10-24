@@ -525,17 +525,10 @@ describe("IPC channel parity (preload and renderer → main)", () => {
  */
 /**
  * Channels main sends on that nothing hears yet, each with the decision that
- * removes it (lot M8, which settles the views without tests). An entry that is
- * heard, or no longer sent, is reported as stale: the list only shrinks.
+ * removes it. Empty since lot M8: a new entry needs a reason written here. An
+ * entry that is heard, or no longer sent, is reported as stale.
  */
-const UNHEARD_ALLOWLIST: Record<string, string> = {
-	"github:triage:progress":
-		"the GitHub triage handlers have no preload caller at all (M8)",
-	"github:triage:complete":
-		"the GitHub triage handlers have no preload caller at all (M8)",
-	"github:triage:error":
-		"the GitHub triage handlers have no preload caller at all (M8)",
-};
+const UNHEARD_ALLOWLIST: Record<string, string> = {};
 
 const MAIN_SEND = /(?<![\w$])(?:webContents|sender)\s*\.\s*send\b/g;
 const PRELOAD_LISTEN =

@@ -23,6 +23,7 @@ function failAuth() {
 			profileName: "Work",
 			failureType: "expired",
 			message: "token expired",
+			detectedAt: new Date(0),
 		}),
 	);
 }

@@ -19,7 +19,6 @@ Une ligne par fichier et par dossier de `scripts/`, et rien d'autre :
 | `sync-backend-port-to-frontend-env.cjs` | Recopie le port du backend dans le `.env` du frontend. | `dev:vite` et `build` du frontend |
 | `setup_windows_git_hooks.bat` | Active les hooks Husky sous Windows. | à la main |
 | `kill_port_8765.py`, `kill_port_8765.sh`, `kill_port_8765.bat` | Libèrent le port du WebSocket (8765) quand un ancien backend le tient. | à la main |
-| `run_backend_tests.py` | Ancien lanceur de pytest, remplacé par `test-backend.js`. | personne |
 
 ## Skills, vendorisation, catalogues générés
 
@@ -70,14 +69,3 @@ Une ligne par fichier et par dossier de `scripts/`, et rien d'autre :
 | `quality_cli.py` | Lance le Quality Scorer de la revue de code sur des fichiers. | `quality-handlers.ts` (main) |
 | `audit-large-files.js` | Liste les fichiers source de plus de 500 lignes. | à la main |
 | `ai-pr-reviewer.md` | Prompt de revue de PR à coller dans un assistant. | à la main |
-
-## Ponctuels, à supprimer (lot M8)
-
-Écrits pour un correctif ou une expérience qui est terminé ; plus rien ne les appelle.
-
-| Script | Rôle | Appelé par |
-|---|---|---|
-| `fix_quality_scorer_encoding.py` | Réécrivait `quality_scorer.py` après un problème d'encodage. | personne |
-| `verify_no_null_bytes.py`, `verify_quality_scorer.py` | Vérifiaient ce correctif. | personne |
-| `phase2_evaluation.py`, `analyze_phase2_results.py`, `monitor_phase2_evaluation.py` | Évaluation « Phase 2 » de l'optimisation Copilot. | personne |
-| `demo_intent_recognition.py` | Démo du paquet `intent/`, que rien n'importe. | personne |
