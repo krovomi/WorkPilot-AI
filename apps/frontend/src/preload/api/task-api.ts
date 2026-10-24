@@ -184,12 +184,10 @@ export interface TaskAPI {
 	worktreeOpenInIDE: (
 		worktreePath: string,
 		ide: SupportedIDE,
-		customPath?: string,
 	) => Promise<IPCResult<{ opened: boolean }>>;
 	worktreeOpenInTerminal: (
 		worktreePath: string,
 		terminal: SupportedTerminal,
-		customPath?: string,
 	) => Promise<IPCResult<{ opened: boolean }>>;
 	worktreeDetectTools: () => Promise<
 		IPCResult<{
@@ -603,25 +601,17 @@ export const createTaskAPI = (): TaskAPI => ({
 	worktreeOpenInIDE: (
 		worktreePath: string,
 		ide: SupportedIDE,
-		customPath?: string,
 	): Promise<IPCResult<{ opened: boolean }>> =>
-		ipcRenderer.invoke(
-			IPC_CHANNELS.TASK_WORKTREE_OPEN_IN_IDE,
-			worktreePath,
-			ide,
-			customPath,
-		),
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_WORKTREE_OPEN_IN_IDE, worktreePath, ide),
 
 	worktreeOpenInTerminal: (
 		worktreePath: string,
 		terminal: SupportedTerminal,
-		customPath?: string,
 	): Promise<IPCResult<{ opened: boolean }>> =>
 		ipcRenderer.invoke(
 			IPC_CHANNELS.TASK_WORKTREE_OPEN_IN_TERMINAL,
 			worktreePath,
 			terminal,
-			customPath,
 		),
 
 	worktreeDetectTools: (): Promise<
