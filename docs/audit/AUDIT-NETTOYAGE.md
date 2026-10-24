@@ -1552,6 +1552,79 @@ Chemins relatifs à `apps/frontend/src/`.
   développement (`scripts/dev-elevated.cjs`, `dev:noadmin`) ne change pas.
 - **Doc** : README racine, section « `pnpm run dev` ouvre une seconde console élevée ».
 
+### Lot M2 — Une CI qui garde (P1)
+
+**Fait.** Deuxième lot de l'audit du 17 octobre (annexe F, constats I1 à I4 et R3). Règle tenue :
+n°12 du noyau ([`docs/CLAUDE.md`](../CLAUDE.md)), un contrôle qui ne tourne pas n'en est pas un.
+
+#### F57 · CI et Lint ne se déclenchaient que sur une liste blanche de chemins
+
+- **Sévérité** haute · **nouveau** (audit du 17 oct., I1) · **corrigé par le lot M2**
+- **Preuve** (avant) : `ci.yml` et `lint.yml`, `paths:` sans `pnpm-lock.yaml`, `pnpm-workspace.yaml`,
+  `pytest.ini`, `workflows/**`, `capabilities/**`, `config/**`, `skills/**` (23 fichiers de tests
+  les lisent), avec trois entrées mortes (`biome.jsonc` et `tsconfig*.json` à la racine,
+  `pyproject.toml`) ; `ruff.toml` absent de `lint.yml`.
+- **Correction** : `paths-ignore` sur les seuls fichiers inertes (`CHANGELOG.md`, `LICENSE`,
+  gabarits d'issue et de PR, `FUNDING.yml`). `tests/test_ci_triggers.py` refuse un retour à la liste
+  blanche et un fichier ignoré qu'un test lit.
+
+#### F58 · Deux versions de Biome
+
+- **Sévérité** moyenne · **nouveau** (I2) · **corrigé par le lot M2**
+- **Preuve** (avant) : `apps/frontend/package.json` en `2.5.15` (montée Dependabot groupée),
+  `lint.yml` et cinq documents normatifs en `2.5.11` ; `config/.biome.json` et `config/.biomeignore`
+  lus par rien.
+- **Correction** : `2.5.11` dans `package.json` (la règle), lu par `lint.yml` au lieu d'être répété,
+  ignoré par Dependabot ; les deux fichiers orphelins supprimés. `tests/test_tool_pins.py` tient
+  `package.json`, `lint.yml` (ruff, uv) et `docs/rules/workflow.md` d'accord.
+
+#### F59 · Aucun lockfile Python
+
+- **Sévérité** haute · **nouveau** (I3) · **corrigé par le lot M2**
+- **Preuve** (avant) : `apps/backend/requirements.txt`, 92 `>=` pour 2 `==`, rien de figé ; la CI,
+  l'image et les contributeurs installaient ce que PyPI publiait le jour même. `greenlet`, sans
+  lequel tout moteur SQLAlchemy asynchrone échoue (base serveur, migrations), n'arrivait que par
+  `playwright` ; `anthropic` et `google-generativeai` déclarés, jamais importés ; `tomli` pour un
+  Python < 3.11 non supporté.
+- **Correction** : `apps/backend/requirements.lock` (`uv pip compile --universal --generate-hashes`,
+  toutes plateformes) installé par la CI, l'image et `install:backend` ; `lint.yml` le régénère et
+  échoue sur toute différence ; `pnpm run lock:python`. `sqlalchemy[asyncio]` ; `anthropic`,
+  `google-generativeai`, `tomli` retirés (et du `doctor`).
+
+#### F60 · Python 3.12, le plancher, jamais testé
+
+- **Sévérité** moyenne · **nouveau** (I4) · **corrigé par le lot M2**
+- **Preuve** (avant) : matrice pytest 3.13 seulement ; `backend.md:79` disait l'inverse ; ruff sans
+  `target-version`.
+- **Correction** : jambe 3.12 sur Linux ; `target-version = "py312"` ; 566 réécritures sûres
+  appliquées (`datetime.UTC`, `TimeoutError`, ordre des imports), `UP042` (StrEnum change `str()`)
+  et `UP046`/`UP047` écartés et justifiés dans `ruff.toml` ; le repli `tomli` de
+  `project/config_parser.py` retiré. 12 919 tests verts sous 3.12.
+
+#### F61 · L'image serveur ne se construisait pas et ne migrait pas
+
+- **Sévérité** haute · **nouveau** (R3) · **corrigé par le lot M2**
+- **Preuve** (avant) : `deploy/Dockerfile.server` copiait `configured_providers.json`, absent de la
+  racine ; `alembic upgrade head` échouait sur une base neuve (`0001` crée toutes les tables du
+  modèle, `0002` recréait `invitations`) ; le `CMD` lançait uvicorn même après l'échec de la
+  migration ; image root, base sans digest, sans `.dockerignore` (tout le dépôt, `.env-files/`
+  compris, partait au démon) ; `config/`, `workflows/`, `capabilities/`, `skills/`, `.agents/`,
+  `SOUL.md`, lus par le backend à la racine, absents de l'image ; aucun job ne la construisait.
+  Trouvé en corrigeant : la descente `0003` échouait sous SQLite, et `env.py` désactivait tous les
+  loggers du processus qui migre (`fileConfig`).
+- **Correction** : `0002` inspecte avant d'agir, `0003` descend en mode batch, `env.py` garde les
+  loggers ; image sur digest (Dependabot `docker`), installée depuis le lock avec
+  `--require-hashes`, utilisateur `workpilot` (uid 10001), `.dockerignore` en liste blanche, fichiers
+  de la racine copiés, `deploy/server-entrypoint.sh` (`set -eu` : migration ratée = conteneur
+  arrêté ; un des deux processus qui meurt arrête le conteneur). Job `server-image` dans `ci.yml` :
+  build, Postgres 16, `/health`, révision `head`. `tests/backend/test_alembic_migrations.py` monte,
+  descend et remonte.
+
+#### F62 · `scripts/` hors du lint
+
+- **Sévérité** basse · **nouveau** · **corrigé par le lot M2**
+- **Preuve** (avant) : `lint.yml` ne passait ruff que sur sept scripts ; 28 erreurs dans le reste.
+- **Correction** : ruff (check + format) sur tout `scripts/`, erreurs corrigées.
 ### Lot M3 — Des features qui ne disent que ce qu'elles font (P1)
 
 **Fait.** Troisième lot de l'audit du 17 octobre (annexe F, constats R1, R2, R4 à R7). Règle tenue :
@@ -1852,7 +1925,7 @@ planchers `pnpm.overrides` relevés (`pnpm-workspace.yaml`), `dompurify` ^3.4.17
 
 Statut des constats de l'audit précédent : F1, F3, F4, F5, F7, F8, F9, F10, F12, F16, F17, F19 **ouverts** ;
 F2, F13 **partiels** ; F6, F11, F14, F18 **aggravés** ; F15 **atténué**. Nouveaux : F20 à F36.
-Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F63 à F68 par M3, F72 à F77 par M9 (annexe F).
+Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F57 à F62 par M2, F63 à F68 par M3, F72 à F77 par M9 (annexe F).
 
 ## Annexe C — Ce qui a changé le 15 octobre 2026 (`7ef6fca` → `e3e468f` + PR #454)
 
@@ -1911,7 +1984,7 @@ détaillés ici qu'une fois corrigés ([`SECURITY.md`](../SECURITY.md)).
 | Lot | Thème | Statut |
 |---|---|---|
 | M1 | Aucune commande construite depuis le renderer ou un texte externe ; app Windows sans élévation | **fait** (F52 à F56) |
-| M2 | Une CI qui garde : filtres `paths:`, version de Biome, Python 3.12, lockfile Python, image serveur construite et migrée | à faire |
+| M2 | Une CI qui garde : filtres `paths:`, version de Biome, Python 3.12, lockfile Python, image serveur construite et migrée | **fait** (F57 à F62) |
 | M3 | Des features qui ne disent que ce qu'elles font (PR Azure DevOps factice, triage `continuous_ai`, verdict QA .NET, workflows de release jamais déclenchés, Skills Sync, Sentry) | **fait** (F63 à F68) |
 | M4 | Mode hors-ligne strict et mode serveur | à faire |
 | M5 | Secrets et environnement des processus enfants | à faire (après M1) |
@@ -1923,6 +1996,10 @@ détaillés ici qu'une fois corrigés ([`SECURITY.md`](../SECURITY.md)).
 
 Vérification du lot M1 : `cd apps/frontend && pnpm run typecheck && pnpm test -- release-handlers
 no-renderer-command worktree-open-launchers pr-details-azure-script`.
+
+Vérification du lot M2 : `pytest tests/test_ci_triggers.py tests/test_tool_pins.py
+tests/backend/test_alembic_migrations.py` ; `docker build -f deploy/Dockerfile.server .` ; le job
+`server-image` de `ci.yml`.
 
 Vérification du lot M9 : `pytest tests/test_docs_context.py tests/test_python_floor.py
 tests/test_test_generation_post_build_scope.py -q` et `cd apps/frontend && pnpm test`.

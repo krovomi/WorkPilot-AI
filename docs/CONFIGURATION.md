@@ -188,6 +188,11 @@ refuses to start rather than booting unauthenticated. See
 environment file and [deploy/docker-compose.yml](../deploy/docker-compose.yml)
 for a PostgreSQL-backed deployment.
 
+The image (`deploy/Dockerfile.server`) installs `apps/backend/requirements.lock`, runs as the
+unprivileged user `workpilot` (uid 10001: mount SSH keys under `/home/workpilot/.ssh`), and starts
+through `deploy/server-entrypoint.sh`: `alembic upgrade head` first, and a failed migration stops
+the container instead of serving. CI builds it and migrates a PostgreSQL 16 with it on every PR.
+
 | Variable | Default | What it does |
 |---|---|---|
 | `WORKPILOT_SERVER_MODE` | `false` | Master switch. Everything in this section is inert without it. |

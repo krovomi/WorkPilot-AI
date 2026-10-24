@@ -44,7 +44,7 @@ import os
 import re
 import struct
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from urllib.parse import urlsplit
 
@@ -859,7 +859,7 @@ def _policy(spec_dir: Path, project_dir: Path | None) -> tuple[Path, ...]:
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 def _persist(spec_dir: Path, record: VisualQaRecord) -> None:

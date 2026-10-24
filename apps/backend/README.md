@@ -8,8 +8,12 @@ Autonomous coding framework. Builds software features through coordinated multi-
 
 ```bash
 cd apps/backend
-python -m pip install -r requirements.txt
+python -m pip install -r requirements.lock
 ```
+
+`requirements.lock` holds the exact versions (with hashes, for every platform) that CI tests and the
+server image ships; `requirements.txt` holds the ranges it is compiled from. After editing a range,
+run `pnpm run lock:python` from the repository root.
 
 ### 2. Configure
 

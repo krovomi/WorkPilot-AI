@@ -423,23 +423,24 @@ Before submitting a PR:
 
 ## Continuous Integration
 
-All pull requests and pushes to `main` trigger automated CI checks via GitHub Actions.
+All pull requests and pushes to `develop` and `main` trigger automated CI checks via GitHub Actions,
+whatever they touch: only `CHANGELOG.md`, `LICENSE` and the issue/PR templates are skipped.
 
 ### Workflows
 
 | Workflow | Trigger | What it checks |
 |----------|---------|----------------|
-| **CI** | Push to `main`, PRs | Python tests (3.11 & 3.12), Frontend tests |
-| **Lint** | Push to `main`, PRs | Ruff (Python), ESLint + TypeScript (Frontend) |
+| **CI** | Push to `develop`/`main`, PRs | Python tests (3.13 on Linux, Windows, macOS; 3.12 on Linux), frontend typecheck, tests and build, server image build + migration |
+| **Lint** | Push to `develop`/`main`, PRs | Ruff (Python, `scripts/` included), Biome (frontend), Python lockfile freshness, vendored trees, skills |
 
 ### PR Requirements
 
 Before a PR can be merged:
 
 1. All CI checks must pass (green checkmarks)
-2. Python tests pass on both Python 3.11 and 3.12
+2. Python tests pass on Python 3.12 and 3.13
 3. Frontend tests pass
-4. Linting passes (no ruff or eslint errors)
+4. Linting passes (no ruff or Biome errors)
 5. TypeScript type checking passes
 
 ### Running CI Checks Locally

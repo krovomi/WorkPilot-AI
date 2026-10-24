@@ -893,7 +893,7 @@ class TestCopilotRequestRetry:
         if exc is None:
 
             def exc():
-                return asyncio.TimeoutError("simulated stalled response")
+                return TimeoutError("simulated stalled response")
 
         class _Resp:
             def __init__(self, data):

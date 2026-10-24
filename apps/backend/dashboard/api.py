@@ -12,7 +12,7 @@ from __future__ import annotations
 import csv
 import io
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import APIRouter
@@ -112,7 +112,7 @@ def _epoch_to_iso(ts: float | int | None) -> str | None:
     if ts is None:
         return None
     try:
-        return datetime.fromtimestamp(float(ts), tz=timezone.utc).isoformat()
+        return datetime.fromtimestamp(float(ts), tz=UTC).isoformat()
     except (ValueError, OSError, TypeError, OverflowError):
         return None
 

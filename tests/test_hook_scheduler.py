@@ -9,7 +9,7 @@ one malformed expression does not take the others down with it.
 from __future__ import annotations
 
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -66,7 +66,7 @@ def patched(monkeypatch):
 
 
 # 09:00 UTC on a Wednesday.
-NINE_AM = datetime(2026, 8, 26, 9, 0, tzinfo=timezone.utc)
+NINE_AM = datetime(2026, 8, 26, 9, 0, tzinfo=UTC)
 
 
 class TestDueSelection:

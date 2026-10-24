@@ -64,7 +64,7 @@ class CopilotRuntime(AgentRuntime):
         )
         try:
             stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=60)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             # Without this, asyncio.wait_for cancels the future but the gh
             # subprocess keeps running, holding stdout/stderr file
             # descriptors. Repeated timeouts exhaust fds and leave zombie

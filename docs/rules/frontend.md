@@ -8,7 +8,7 @@
 ## Pile
 
 React 19, TypeScript 7 (strict), Electron 44, Zustand 5, Tailwind CSS 4, Radix UI, xterm.js 6,
-Vite 8 (electron-vite), Vitest 4, Playwright, Biome **2.5.11** exactement, Motion.
+Vite 8 (electron-vite), Vitest 5, Playwright, Biome **2.5.11** exactement, Motion.
 
 ## Trois processus, une seule porte
 

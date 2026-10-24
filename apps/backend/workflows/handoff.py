@@ -34,7 +34,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -149,9 +149,9 @@ def reports_for(
         path = Path(spec_dir) / "workflow" / f"{phase_id}.md"
         try:
             raw = path.read_text(encoding="utf-8", errors="replace")
-            written = datetime.fromtimestamp(
-                path.stat().st_mtime, tz=timezone.utc
-            ).strftime("%Y-%m-%d %H:%M UTC")
+            written = datetime.fromtimestamp(path.stat().st_mtime, tz=UTC).strftime(
+                "%Y-%m-%d %H:%M UTC"
+            )
         except OSError:
             continue
         text = _clean(raw).strip()

@@ -1,0 +1,23 @@
+# Build context of deploy/Dockerfile.server. An allowlist: everything else
+# (.git, node_modules, the frontend, .env-files/ and every other local
+# secret) never reaches the Docker daemon, let alone a layer.
+*
+!apps/backend/
+!config/
+!workflows/
+!capabilities/
+!skills/
+!.agents/
+!SOUL.md
+!deploy/server-entrypoint.sh
+
+# Inside the allowed trees: local state, caches and secrets.
+**/.venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.env
+**/.env.*
+**/*.sqlite3
+**/*.db
+apps/backend/data/

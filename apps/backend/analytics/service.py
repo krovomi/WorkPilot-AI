@@ -6,7 +6,7 @@ from the existing agent execution flow.
 """
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -19,7 +19,7 @@ def _utcnow_naive() -> datetime:
     would break the comparison with stored columns. We compute the same
     instant using the non-deprecated API and strip tzinfo at the end.
     """
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 from .collector import get_analytics_collector

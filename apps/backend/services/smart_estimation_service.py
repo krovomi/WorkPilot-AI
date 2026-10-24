@@ -8,7 +8,7 @@ Uses historical data to estimate relative complexity similar to story points.
 import logging
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -288,8 +288,7 @@ class SmartEstimationService:
                 db.query(Build)
                 .filter(
                     Build.started_at
-                    >= datetime.now(timezone.utc).replace(tzinfo=None)
-                    - timedelta(days=90)
+                    >= datetime.now(UTC).replace(tzinfo=None) - timedelta(days=90)
                 )
                 .order_by(desc(Build.started_at))
                 .limit(50)

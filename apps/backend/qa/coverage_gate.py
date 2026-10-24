@@ -33,7 +33,7 @@ repasse en ``rejected`` et la boucle fixer reprend jusqu'à atteindre le seuil.
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, TypedDict
 
@@ -186,7 +186,7 @@ def evaluate_coverage(
             coverage={},
             failures=[],
             warnings=[],
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
         )
 
     # Indicateur explicite « la couverture n'a pas pu être mesurée ».
@@ -240,7 +240,7 @@ def evaluate_coverage(
         coverage=parsed,
         failures=failures,
         warnings=warnings,
-        timestamp=datetime.now(timezone.utc).isoformat(),
+        timestamp=datetime.now(UTC).isoformat(),
     )
 
 

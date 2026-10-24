@@ -17,7 +17,7 @@ import json
 import logging
 import re
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -109,7 +109,7 @@ class CachedEmbedding:
 
     def is_expired(self) -> bool:
         expires = datetime.fromisoformat(self.expires_at)
-        return datetime.now(timezone.utc) > expires
+        return datetime.now(UTC) > expires
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -363,7 +363,7 @@ class DuplicateDetector:
         cache_file = self._get_cache_file(repo)
         data = {
             "embeddings": [e.to_dict() for e in cache.values()],
-            "last_updated": datetime.now(timezone.utc).isoformat(),
+            "last_updated": datetime.now(UTC).isoformat(),
         }
         with open(cache_file, "w", encoding="utf-8") as f:
             json.dump(data, f)
@@ -390,7 +390,7 @@ class DuplicateDetector:
         embedding = await self.embedding_provider.get_embedding(content)
 
         # Cache it
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         cache[issue_number] = CachedEmbedding(
             issue_number=issue_number,
             content_hash=content_hash,

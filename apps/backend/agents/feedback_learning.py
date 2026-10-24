@@ -20,7 +20,7 @@ import json
 import logging
 import statistics
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -103,7 +103,7 @@ class FeedbackEntry:
 
     def __post_init__(self):
         if not self.timestamp:
-            self.timestamp = datetime.now(timezone.utc).isoformat()
+            self.timestamp = datetime.now(UTC).isoformat()
         if isinstance(self.rating, str):
             self.rating = FeedbackRating(self.rating)
 
@@ -169,7 +169,7 @@ class PromptAdjustment:
 
     def __post_init__(self):
         if not self.timestamp:
-            self.timestamp = datetime.now(timezone.utc).isoformat()
+            self.timestamp = datetime.now(UTC).isoformat()
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -507,7 +507,7 @@ class FeedbackCollector:
         data = {
             "project_id": self.project_id,
             "feedback": [fb.to_dict() for fb in self._feedback],
-            "exported_at": datetime.now(timezone.utc).isoformat(),
+            "exported_at": datetime.now(UTC).isoformat(),
         }
         return json.dumps(data, indent=2)
 

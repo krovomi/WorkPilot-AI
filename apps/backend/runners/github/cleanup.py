@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -110,7 +110,7 @@ class CleanupResult:
     pruned_index_entries: int = 0
     freed_bytes: int = 0
     errors: list[str] = field(default_factory=list)
-    started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     completed_at: datetime | None = None
     dry_run: bool = False
 
@@ -206,7 +206,7 @@ class DataCleaner:
             CleanupResult with statistics
         """
         result = CleanupResult(dry_run=dry_run)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Directories to clean
         directories = [
@@ -235,7 +235,7 @@ class DataCleaner:
         # Clean up audit logs
         await self._clean_audit_logs(now, older_than_days, dry_run, result)
 
-        result.completed_at = datetime.now(timezone.utc)
+        result.completed_at = datetime.now(UTC)
         return result
 
     async def _process_file(
@@ -324,7 +324,7 @@ class DataCleaner:
         archive_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Add archive metadata
-        data["_archived_at"] = datetime.now(timezone.utc).isoformat()
+        data["_archived_at"] = datetime.now(UTC).isoformat()
         data["_original_path"] = str(file_path)
 
         with open(archive_path, "w", encoding="utf-8") as f:
@@ -402,9 +402,7 @@ class DataCleaner:
         for log_file in audit_dir.glob("*.log"):
             try:
                 # Check file modification time
-                mtime = datetime.fromtimestamp(
-                    log_file.stat().st_mtime, tz=timezone.utc
-                )
+                mtime = datetime.fromtimestamp(log_file.stat().st_mtime, tz=UTC)
                 if mtime < cutoff:
                     file_size = log_file.stat().st_size
                     if not dry_run:

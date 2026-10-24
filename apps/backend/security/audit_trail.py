@@ -19,7 +19,7 @@ import hashlib
 import json
 import logging
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 
 logger = logging.getLogger(__name__)
@@ -208,7 +208,7 @@ class AuditTrail:
         """
         self._counter += 1
         entry_id = f"audit-{self.project_id}-{self._counter:06d}"
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         entry = AuditEntry(
             entry_id=entry_id,
@@ -461,7 +461,7 @@ class AuditTrail:
 
         return {
             "standard": standard,
-            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
             "project_id": self.project_id,
             "total_entries": summary.total_entries,
             "integrity_valid": valid,

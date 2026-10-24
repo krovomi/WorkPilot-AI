@@ -200,7 +200,7 @@ class TestAutoFixLoop:
             "apps.backend.qa.auto_fix_loop.asyncio.create_subprocess_shell"
         ) as mock_subprocess:
             mock_proc = AsyncMock()
-            mock_proc.communicate.side_effect = asyncio.TimeoutError()
+            mock_proc.communicate.side_effect = TimeoutError()
             mock_proc.kill = MagicMock()
             mock_subprocess.return_value = mock_proc
 

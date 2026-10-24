@@ -22,7 +22,7 @@ import posixpath
 import statistics
 import uuid
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -122,9 +122,7 @@ class AgentEvent:
 
     event_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     event_type: str = ""
-    timestamp: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     metadata: dict[str, Any] = field(default_factory=dict)
     session_id: str = ""
 
@@ -141,9 +139,7 @@ class Anomaly:
     severity: str = "medium"
     description: str = ""
     session_id: str = ""
-    timestamp: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     evidence: dict[str, Any] = field(default_factory=dict)
     score_impact: float = 0.0
 
@@ -160,9 +156,7 @@ class MonitoredSession:
     agent_type: str = ""
     status: str = "active"
     trust_score: float = 100.0
-    started_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    started_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     ended_at: str | None = None
     events: list[AgentEvent] = field(default_factory=list)
     anomalies: list[Anomaly] = field(default_factory=list)
@@ -220,9 +214,7 @@ class AnomalyAlert:
     trust_score: float = 0.0
     anomalies: list[dict[str, Any]] = field(default_factory=list)
     action_taken: str = ""
-    timestamp: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -348,7 +340,7 @@ class AnomalyDetector:
         """End monitoring of a session."""
         session = self._get_session(session_id)
         session.status = status
-        session.ended_at = datetime.now(timezone.utc).isoformat()
+        session.ended_at = datetime.now(UTC).isoformat()
         self._completed_sessions.append(session)
         self._update_baseline(session)
         return session

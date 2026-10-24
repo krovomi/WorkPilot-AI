@@ -3,6 +3,10 @@
 Revision ID: 0002_invitations
 Revises: 0001_initial
 Create Date: 2026-06-11
+
+Revision ``0001`` creates every table the ORM declares *today*, invitations
+included, so on a fresh database this table already exists when this revision
+runs. It therefore inspects before it acts, like ``0003``.
 """
 
 import sqlalchemy as sa
@@ -14,7 +18,23 @@ branch_labels = None
 depends_on = None
 
 
+def _has_table(name: str) -> bool:
+    return name in sa.inspect(op.get_bind()).get_table_names()
+
+
+def _has_index(table: str, index: str) -> bool:
+    return index in {i["name"] for i in sa.inspect(op.get_bind()).get_indexes(table)}
+
+
 def upgrade() -> None:
+    if _has_table("invitations"):
+        for name, columns in (
+            ("ix_invitations_email", ["email"]),
+            ("ix_invitations_token_hash", ["token_hash"]),
+        ):
+            if not _has_index("invitations", name):
+                op.create_index(name, "invitations", columns)
+        return
     op.create_table(
         "invitations",
         sa.Column("id", sa.String(length=36), nullable=False),
