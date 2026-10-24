@@ -102,13 +102,14 @@ def _claude_files() -> list[Path]:
 
 
 def _documents() -> list[Path]:
+    """Every tracked page under `docs/`, the READMEs a reader starts from, and the indexes."""
+    tracked = _tracked_files()
     return sorted(
         {
-            CLAUDE_MD,
-            DOCS / "README.md",
-            DOCS / "SECURITY.md",
-            *RULES.glob("*.md"),
-            *ARCHITECTURE.glob("*.md"),
+            *(ROOT / p for p in tracked if p.startswith("docs/") and p.endswith(".md")),
+            ROOT / "README.md",
+            ROOT / "apps" / "backend" / "README.md",
+            ROOT / "apps" / "frontend" / "README.md",
             *_agents_indexes(),
             *_claude_files(),
         }

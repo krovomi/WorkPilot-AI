@@ -14,7 +14,7 @@ Ce document décrit l'architecture complète du système Claude Code dans la ges
 8. [Merge System](#merge-system)
 9. [Runners Externes](#runners-externes)
 10. [Optimisation et Performance](#optimisation-et-performance)
-11. [Workflows d'Appel](#workflows-dappel)
+11. [Workflows d'Appel](#workflows-dappel-complets)
 
 ---
 

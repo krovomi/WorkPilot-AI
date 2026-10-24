@@ -205,7 +205,7 @@ pytest tests/test_streaming.py -v
 ## Dependencies
 
 - `websockets>=12.0` - WebSocket server/client
-- Python 3.10+ - Async/await support
+- Python 3.12+ (the backend floor)
 
 ## Performance
 

@@ -2,6 +2,7 @@ import { execFileSync, execSync } from "node:child_process";
 import { accessSync, constants, existsSync } from "node:fs";
 import path from "node:path";
 import { app } from "electron";
+import { MINIMUM_PYTHON_VERSION } from "../shared/constants/python";
 import { isWindows } from "./platform";
 import { findHomebrewPython as findHomebrewPythonUtil } from "./utils/homebrew-python";
 
@@ -79,7 +80,7 @@ export function findPythonCommand(): string | null {
 
 	for (const cmd of candidates) {
 		try {
-			// Validate version meets minimum requirement (Python 3.10+)
+			// Validate version meets minimum requirement (MINIMUM_PYTHON_VERSION)
 			const validation = validatePythonVersion(cmd);
 			if (validation.valid) {
 				return cmd;
@@ -134,7 +135,7 @@ function validatePythonVersion(pythonCmd: string): {
 	version?: string;
 	message: string;
 } {
-	const MINIMUM_VERSION = "3.10.0";
+	const MINIMUM_VERSION = MINIMUM_PYTHON_VERSION;
 
 	const versionStr = getPythonVersion(pythonCmd);
 	if (!versionStr) {

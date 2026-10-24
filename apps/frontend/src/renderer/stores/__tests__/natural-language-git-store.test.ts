@@ -1,3 +1,4 @@
+/** @vitest-environment jsdom */
 import type { Project } from "@shared/types";
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

@@ -1,3 +1,4 @@
+/** @vitest-environment jsdom */
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { useProviderModelCatalog } from "./useProviderModelCatalog";
