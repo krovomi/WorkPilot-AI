@@ -283,7 +283,7 @@ class DeepContextProvider:
 
             context.context_available = True
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             safe_print(
                 f"[Deep Context] Timed out after {timeout}s, using partial results",
                 flush=True,

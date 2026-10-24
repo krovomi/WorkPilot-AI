@@ -30,7 +30,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from .home import hermes_home
@@ -136,7 +136,7 @@ def install_soul(
     try:
         status.installed_path.parent.mkdir(parents=True, exist_ok=True)
         if status.installed:
-            stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+            stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
             backup = status.installed_path.with_name(f"SOUL.{stamp}.bak.md")
             backup.write_text(_read(status.installed_path) + "\n", encoding="utf-8")
         status.installed_path.write_text(body + "\n", encoding="utf-8")

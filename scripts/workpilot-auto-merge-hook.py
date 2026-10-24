@@ -16,13 +16,13 @@ Environment Variables (set by WorkPilot):
     WORKPILOT_AUTO_MERGE: true if this is an automatic merge
 """
 
-import os
-import sys
-import subprocess
 import json
 import logging
-from pathlib import Path
+import os
+import subprocess
+import sys
 from datetime import datetime
+from pathlib import Path
 
 logging.basicConfig(
     level=logging.INFO, format="[WorkPilot Auto-Merge] %(levelname)s: %(message)s"
@@ -136,7 +136,7 @@ class WorkPilotAutoMergeHook:
     def run(self) -> int:
         """Execute the auto-merge hook."""
         logger.info("=" * 60)
-        logger.info(f"WorkPilot Auto-Merge Hook")
+        logger.info("WorkPilot Auto-Merge Hook")
         logger.info(f"Operation: {self.operation}")
         logger.info(f"Target: {self.target_branch}")
         logger.info(f"Repository: {self.repo_path}")
@@ -157,7 +157,7 @@ class WorkPilotAutoMergeHook:
 
         if exit_code == 0:
             logger.info(f"✓ {self.operation.capitalize()} completed successfully")
-            logger.info(f"✓ .workpilot files preserved and merged")
+            logger.info("✓ .workpilot files preserved and merged")
             self.log_status("success")
         else:
             logger.error(

@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 HOT_SWAP_FILE = "HOT_SWAP.json"
@@ -64,7 +64,7 @@ def write_hot_swap_marker(
         "provider": (provider or None),
         "model": (model or None),
         "effort": effort if effort in _VALID_EFFORTS else None,
-        "requested_at": datetime.now(timezone.utc).isoformat(),
+        "requested_at": datetime.now(UTC).isoformat(),
     }
     try:
         _marker_path(spec_dir).write_text(

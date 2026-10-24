@@ -129,7 +129,7 @@ class DebuggerSession:
         self.frames.append(frame)
         try:
             await asyncio.wait_for(event.wait(), timeout=timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning(
                 "Debugger resume timeout for frame %s — auto-continuing.",
                 frame.frame_id,

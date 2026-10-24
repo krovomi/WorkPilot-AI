@@ -36,7 +36,7 @@ import logging
 import re
 import unicodedata
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from .files import writable
@@ -516,7 +516,7 @@ def refresh(
         criteria=_dedupe(_merge(previous.criteria, criteria)),
         tables=_dedupe(_merge(previous.tables, tables)),
         sources=[s.source for s in sources],
-        generated_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        generated_at=datetime.now(UTC).isoformat(timespec="seconds"),
     )
     if not (drafts.requirements or drafts.criteria or drafts.tables):
         if drafts_path(spec_dir).is_file():

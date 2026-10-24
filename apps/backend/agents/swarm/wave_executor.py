@@ -330,7 +330,7 @@ class WaveExecutor:
                 await asyncio.wait_for(
                     process.wait(), timeout=self.config.subtask_timeout_seconds
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 process.kill()
                 await process.wait()
                 stderr_task.cancel()

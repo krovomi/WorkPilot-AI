@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -20,7 +20,7 @@ def _make_report(*deps: DependencyRecord) -> LicenseReport:
     return LicenseReport(dependencies=list(deps))
 
 
-_FIXED_TIMESTAMP = datetime(2026, 4, 28, tzinfo=timezone.utc)
+_FIXED_TIMESTAMP = datetime(2026, 4, 28, tzinfo=UTC)
 
 
 def _opts(**overrides) -> AttributionOptions:

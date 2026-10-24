@@ -27,7 +27,9 @@ runs:
     - name: Install uv package manager
       uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4
       with:
-        version: "latest"
+        # Pinned: the lockfile check in lint.yml regenerates the lock with
+        # the same uv, and a resolver change must not show up as drift.
+        version: "0.11.32"
 
     - name: Cache uv dependencies
       id: cache
@@ -37,7 +39,7 @@ runs:
           ~/.cache/uv
           ~/AppData/Local/uv/cache
           ~/Library/Caches/uv
-        key: uv-${{ runner.os }}-${{ runner.arch }}-${{ inputs.python-version }}-${{ hashFiles('apps/backend/requirements.txt', 'requirements.txt', 'tests/requirements-test.txt') }}
+        key: uv-${{ runner.os }}-${{ runner.arch }}-${{ inputs.python-version }}-${{ hashFiles('apps/backend/requirements.lock', 'tests/requirements-test.txt') }}
         restore-keys: |
           uv-${{ runner.os }}-${{ runner.arch }}-${{ inputs.python-version }}-
 
@@ -46,11 +48,10 @@ runs:
       shell: bash
       run: |
         uv venv
-        uv pip install -r requirements.txt
-        # Install root-level connector dependencies (azure-devops, etc.)
-        if [ -f ../../requirements.txt ]; then
-          uv pip install -r ../../requirements.txt
-        fi
+        # The lock, not the ranges: CI tests the versions the server image
+        # and contributors install, not whatever PyPI published this morning.
+        # The root requirements.txt only includes this file's ranges.
+        uv pip install -r requirements.lock
         if [ "${{ inputs.install-test-deps }}" == "true" ]; then
           uv pip install -r ../../tests/requirements-test.txt
         fi

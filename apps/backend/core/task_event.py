@@ -10,7 +10,7 @@ import json
 import os
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
@@ -82,7 +82,7 @@ class TaskEventEmitter:
             "taskId": self._context.task_id,
             "specId": self._context.spec_id,
             "projectId": self._context.project_id,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "eventId": str(uuid4()),
             "sequence": self._sequence,
         }

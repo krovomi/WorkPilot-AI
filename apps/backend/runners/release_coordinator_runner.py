@@ -18,7 +18,7 @@ import json
 import re
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -221,9 +221,7 @@ def _plan_to_dict(plan: ReleaseTrainPlan) -> dict[str, Any]:
         "status": plan.status.value,
         "allGatesPassed": plan.all_gates_passed,
         "summary": plan.summary,
-        "createdAt": datetime.fromtimestamp(
-            plan.created_at, tz=timezone.utc
-        ).isoformat(),
+        "createdAt": datetime.fromtimestamp(plan.created_at, tz=UTC).isoformat(),
         "services": [
             {
                 "name": svc.name,

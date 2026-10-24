@@ -6,7 +6,7 @@ Defines patterns, reports, and enums used throughout the learning loop system.
 
 import uuid
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -71,7 +71,7 @@ class LearningPattern:
     enabled: bool = True
 
     def __post_init__(self):
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         if not self.first_seen:
             self.first_seen = now
         if not self.last_seen:
@@ -144,7 +144,7 @@ class LearningReport:
 
     def __post_init__(self):
         if not self.generated_at:
-            self.generated_at = datetime.now(timezone.utc).isoformat()
+            self.generated_at = datetime.now(UTC).isoformat()
 
     def to_dict(self) -> dict[str, Any]:
         return {

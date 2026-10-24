@@ -18,7 +18,7 @@ detect the fallback from probes without needing special error handling.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -103,5 +103,5 @@ async def health_check():
         "status": "degraded",
         "mode": "fallback",
         "reason": _FALLBACK_REASON,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }

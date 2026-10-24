@@ -1086,7 +1086,7 @@ class WorktreePRMixin:
                     ),
                     timeout=30.0,
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning("PR template filler timed out after 30s")
                 return None
 

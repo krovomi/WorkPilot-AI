@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -38,7 +38,7 @@ class PurgeResult:
     deleted_count: int = 0
     freed_bytes: int = 0
     errors: list[str] = field(default_factory=list)
-    started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     completed_at: datetime | None = None
 
     @property
@@ -155,7 +155,7 @@ class PurgeStrategy:
             for file_path in self.archive_dir.rglob(file_pattern):
                 self._try_delete_file_simple(file_path, result)
 
-        result.completed_at = datetime.now(timezone.utc)
+        result.completed_at = datetime.now(UTC)
         return result
 
     async def purge_repository(self, repo: str) -> PurgeResult:
@@ -202,7 +202,7 @@ class PurgeStrategy:
             except OSError as e:
                 result.errors.append(f"Error deleting repo directory {repo_dir}: {e}")
 
-        result.completed_at = datetime.now(timezone.utc)
+        result.completed_at = datetime.now(UTC)
         return result
 
     def _try_delete_file(

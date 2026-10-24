@@ -175,30 +175,33 @@ def upgrade() -> None:
         batch.alter_column("org_id", existing_type=sa.String(length=36), nullable=False)
 
 
+def _drop_columns(table: str, *columns: str) -> None:
+    # Batch mode: SQLite cannot drop a column a foreign key names, so Alembic
+    # rebuilds the table there; elsewhere it emits plain ALTER TABLE.
+    present = [c for c in columns if _has_column(table, c)]
+    if present:
+        with op.batch_alter_table(table) as batch:
+            for column in present:
+                batch.drop_column(column)
+
+
 def downgrade() -> None:
     with op.batch_alter_table("projects") as batch:
         batch.alter_column("org_id", existing_type=sa.String(length=36), nullable=True)
 
     if _has_index("audit_log", "ix_audit_org_time"):
         op.drop_index("ix_audit_org_time", table_name="audit_log")
-    for column in ("user_agent", "ip", "org_id"):
-        if _has_column("audit_log", column):
-            op.drop_column("audit_log", column)
+    _drop_columns("audit_log", "user_agent", "ip", "org_id")
 
-    if _has_column("invitations", "org_role_id"):
-        op.drop_column("invitations", "org_role_id")
     if _has_index("invitations", "ix_invitations_org_id"):
         op.drop_index("ix_invitations_org_id", table_name="invitations")
-    if _has_column("invitations", "org_id"):
-        op.drop_column("invitations", "org_id")
+    _drop_columns("invitations", "org_role_id", "org_id")
 
-    if _has_column("project_members", "role_id"):
-        op.drop_column("project_members", "role_id")
+    _drop_columns("project_members", "role_id")
 
     if _has_index("projects", "ix_projects_org_id"):
         op.drop_index("ix_projects_org_id", table_name="projects")
-    if _has_column("projects", "org_id"):
-        op.drop_column("projects", "org_id")
+    _drop_columns("projects", "org_id")
 
     for table in ("org_quotas", "org_members", "roles", "organizations"):
         if _has_table(table):

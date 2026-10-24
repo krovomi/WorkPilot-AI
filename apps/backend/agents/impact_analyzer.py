@@ -362,7 +362,7 @@ def run_impact_analyzer_sync(
                 ),
                 timeout=timeout_s,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning(f"Impact analyzer timed out after {timeout_s}s")
             return None
 

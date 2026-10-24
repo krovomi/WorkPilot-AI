@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -83,7 +83,7 @@ class ReviewOutcome:
     prediction: PredictionType
     findings_count: int
     high_severity_count: int
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     # Outcome data (filled in later)
     actual_outcome: OutcomeType | None = None
@@ -239,8 +239,8 @@ class LearningPattern:
     sample_size: int
     accuracy: float
     confidence: float  # Based on sample size
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -316,7 +316,7 @@ class LearningTracker:
 
         data = {
             "repo": repo,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(UTC).isoformat(),
             "outcomes": [o.to_dict() for o in repo_outcomes],
         }
 
@@ -399,7 +399,7 @@ class LearningTracker:
         review_outcome.actual_outcome = outcome
         review_outcome.time_to_outcome = time_to_outcome
         review_outcome.author_response = author_response
-        review_outcome.outcome_recorded_at = datetime.now(timezone.utc)
+        review_outcome.outcome_recorded_at = datetime.now(UTC)
 
         self._save_outcomes(repo)
 
@@ -608,7 +608,7 @@ class LearningTracker:
 
         Returns summary suitable for UI display.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         week_ago = now - timedelta(days=7)
         month_ago = now - timedelta(days=30)
 

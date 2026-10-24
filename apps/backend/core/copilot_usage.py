@@ -10,7 +10,7 @@ import json
 import logging
 import socket
 import subprocess
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlparse
 
@@ -466,7 +466,7 @@ class CopilotUsageConnector:
             },
             "quota_reset_date": data.get("quota_reset_date")
             or data.get("quota_reset_date_utc"),
-            "fetched_at": datetime.now(timezone.utc).isoformat(),
+            "fetched_at": datetime.now(UTC).isoformat(),
         }
 
     def get_copilot_usage_summary(self) -> dict[str, Any]:
@@ -605,7 +605,7 @@ class CopilotUsageConnector:
             "acceptance_rate_percent": round(acceptance_rate, 2),
             "line_acceptance_rate_percent": round(line_acceptance_rate, 2),
             "total_tokens": total_suggestions + total_acceptances,  # Approximation
-            "fetched_at": datetime.now(timezone.utc).isoformat(),
+            "fetched_at": datetime.now(UTC).isoformat(),
             "raw_data": raw_data,  # Conserver les données brutes pour le débogage
         }
 
