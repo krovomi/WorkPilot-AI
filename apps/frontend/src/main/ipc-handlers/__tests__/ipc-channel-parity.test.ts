@@ -575,21 +575,23 @@ function balancedParens(source: string, open: number): string {
 /** Parameter names of a parameter list, rest parameters included. */
 function parameterNames(list: string): string[] {
 	const names: string[] = [];
+	const push = (parameter: string) => {
+		const name = /^\s*(?:\.\.\.)?([A-Za-z_$][\w$]*)/.exec(parameter);
+		if (name) names.push(name[1]);
+	};
 	let depth = 0;
 	let start = 0;
-	for (let i = 0; i <= list.length; i++) {
+	for (let i = 0; i < list.length; i++) {
 		const c = list[i];
 		if (c === "(" || c === "[" || c === "{" || c === "<") depth++;
 		else if (c === ")" || c === "]" || c === "}") depth--;
 		else if (c === ">" && list[i - 1] !== "=") depth--;
-		else if ((c === "," && depth === 0) || i === list.length) {
-			const name = /^\s*(?:\.\.\.)?([A-Za-z_$][\w$]*)/.exec(
-				list.slice(start, i),
-			);
-			if (name) names.push(name[1]);
+		else if (c === "," && depth === 0) {
+			push(list.slice(start, i));
 			start = i + 1;
 		}
 	}
+	push(list.slice(start));
 	return names;
 }
 
