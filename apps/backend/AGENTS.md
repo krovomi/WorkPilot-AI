@@ -19,7 +19,7 @@ Toute interaction LLM passe par ces fichiers ; les modifier touche tout le produ
 | `agents/session.py` | ~2 500 | boucle de session : streaming, reprise, erreurs, rate limits |
 | `agents/coder.py` | ~2 950 | l'agent d'implémentation : `run_autonomous_agent` (la boucle, ~1 150 lignes), les prompts de planification et de sous-tâche (`_planning_prompt`, `_coding_prompt`), l'issue d'une session (`_on_session_error` et un `_on_*` par type d'erreur, `_RetryState`), le plan invalide, le bilan de fin |
 | `cli/build_commands.py` | ~1 300 | enchaîne les phases d'un build : planning → coding → QA |
-| `qa/loop.py` | ~1 350 | boucle de validation QA |
+| `qa/loop.py` | ~1 600 | boucle de validation QA : `run_qa_validation_loop` et une fonction par session, gate et verdict |
 | `provider_api.py` | ~2 050 | point d'entrée FastAPI : monte les routeurs, CORS, redaction des logs |
 
 ## Couches

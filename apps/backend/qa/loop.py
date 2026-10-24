@@ -10,7 +10,9 @@ import asyncio
 import os
 import time as time_module
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
+from typing import Any
 
 from core.build_signals import BuildPaused
 from core.client import create_agent_client
@@ -231,6 +233,50 @@ async def _handle_rate_limit_in_qa(
 # =============================================================================
 
 
+class _Next(Enum):
+    """What the loop does after a handler: its exits, and the two ways on."""
+
+    APPROVED = "approved"  # return True
+    FAILED = "failed"  # return False
+    EXHAUSTED = "exhausted"  # leave the loop for the hand-over summary
+    RETRY = "retry"  # same pass again: the iteration was given back
+    NEXT = "next"  # next pass
+
+
+@dataclass(frozen=True)
+class _QaScope:
+    """What every pass of one loop run shares and never changes."""
+
+    project_dir: Path
+    spec_dir: Path
+    source_spec_dir: Path | None
+    verbose: bool
+    task_logger: Any
+    emitter: Any
+    linear_task: Any
+    max_iterations: int
+    recurring_threshold: int
+
+    @property
+    def has_linear_task(self) -> bool:
+        return bool(self.linear_task and self.linear_task.task_id)
+
+
+@dataclass
+class _QaState:
+    """What the passes carry from one to the next."""
+
+    qa_iteration: int
+    consecutive_errors: int = 0
+    # The last reviewer error, fed back to the next pass for self-correction.
+    last_error_context: dict | None = None
+    max_iterations_emitted: bool = False
+
+    def reset_errors(self) -> None:
+        self.consecutive_errors = 0
+        self.last_error_context = None
+
+
 async def run_qa_validation_loop(
     project_dir: Path,
     spec_dir: Path,
@@ -330,77 +376,228 @@ async def run_qa_validation_loop(
         return True
 
     # If there's human feedback, we need to run the fixer first before re-validating
-    if has_human_feedback:
+    if has_human_feedback and not await _apply_human_feedback(
+        project_dir, spec_dir, model, task_event_emitter
+    ):
+        return False
+
+    await _run_security_scan(project_dir, spec_dir, task_event_emitter)
+    dotnet_advice = await _prepare_no_test_project(project_dir, spec_dir)
+
+    # Start validation phase in task logger
+    if task_logger:
+        task_logger.start_phase(LogPhase.VALIDATION, "Starting QA validation...")
+
+    linear_task = await _start_linear_review(spec_dir)
+
+    qa_iteration = get_qa_iteration_count(spec_dir)
+    # The budget is the task's, not the run's: a build paused and resumed in
+    # the middle of QA continues the count rather than starting a new one. A
+    # person's feedback is what opens a new budget — they have read the
+    # result and asked for more.
+    max_iterations = qa_iteration + qa_cap if has_human_feedback else qa_cap
+    recurring_threshold = recurring_issue_threshold(qa_cap)
+    if task_logger:
+        task_logger.log(
+            f"QA budget: {max_iterations - qa_iteration} review pass(es) "
+            f"(effort-based cap {qa_cap}); an issue seen {recurring_threshold} "
+            "times escalates to a human.",
+            LogEntryType.INFO,
+            LogPhase.VALIDATION,
+        )
+    scope = _QaScope(
+        project_dir=project_dir,
+        spec_dir=spec_dir,
+        source_spec_dir=source_spec_dir,
+        verbose=verbose,
+        task_logger=task_logger,
+        emitter=task_event_emitter,
+        linear_task=linear_task,
+        max_iterations=max_iterations,
+        recurring_threshold=recurring_threshold,
+    )
+    state = _QaState(qa_iteration=qa_iteration)
+
+    while state.qa_iteration < max_iterations:
+        _raise_if_paused(spec_dir)
+
+        state.qa_iteration += 1
+        iteration_start = time_module.time()
+        _announce_pass(scope, state.qa_iteration)
+        _apply_qa_hot_swap(spec_dir, task_logger)
+
+        # What the captures of the running app show — OCR'd before the
+        # reviewer's prompt is built, so the section it reads is current.
+        if (visual := run_visual_qa(spec_dir, project_dir)) is not None:
+            print(
+                "🖼  Visual QA: "
+                f"{visual['high']} high, {visual['medium']} medium, "
+                f"{visual['low']} low finding(s) read from the captures"
+            )
+
+        # Run QA reviewer with phase-specific model and thinking budget
+        qa_model = get_phase_model(spec_dir, "qa", model)
+        jev_run, jev_advice = await _jev_review_advice(
+            jev_run, project_dir, spec_dir, state.qa_iteration
+        )
+        review = await _run_reviewer(
+            scope,
+            state,
+            qa_model,
+            "\n\n".join(part for part in (dotnet_advice, jev_advice) if part),
+        )
+        if review is _Next.FAILED:
+            return False
+        if review is _Next.RETRY:
+            continue
+        status, response, client = review
+
+        iteration_duration = time_module.time() - iteration_start
+        write_visual_qa_report(spec_dir)
         debug(
             "qa_loop",
-            "Human feedback detected - will run fixer first",
-            fix_request_file=str(fix_request_file),
+            "QA reviewer session completed",
+            status=status,
+            duration_seconds=f"{iteration_duration:.1f}",
+            response_length=len(response),
         )
-        emit_phase(ExecutionPhase.QA_FIXING, "Processing human feedback")
-        task_event_emitter.emit(
-            "QA_FIXING_STARTED",
-            {"iteration": 0},
-        )
-        print("\n📝 Human feedback detected. Running QA Fixer first...")
+        _record_reviewer_opinion(project_dir, spec_dir, status)
 
-        # Get model and thinking budget for fixer (uses QA phase config)
-        qa_model = get_phase_model(spec_dir, "qa", model)
-        fixer_thinking_budget = get_phase_thinking_budget(spec_dir, "qa")
-
-        try:
-            fix_client = create_agent_client(
-                project_dir=project_dir,
-                spec_dir=spec_dir,
-                model=qa_model,
-                agent_type="qa_fixer",
-                max_thinking_tokens=fixer_thinking_budget,
-            )
-        except Exception as e:
-            debug_error(
-                "qa_loop", f"Failed to create fixer client for human feedback: {e}"
-            )
-            print(f"\n❌ Failed to create fixer client: {e}")
-            task_event_emitter.emit(
-                "QA_AGENT_ERROR",
-                {"iteration": 0, "consecutiveErrors": 1, "error": str(e)[:500]},
-            )
+        if _halted_on_local_model_without_tools(scope, state, client, qa_model):
             return False
 
-        try:
-            async with fix_client:
-                fix_status, fix_response = await run_qa_fixer_session(
-                    fix_client,
-                    spec_dir,
-                    0,
-                    False,  # iteration 0 for human feedback
-                )
-        except Exception as e:
-            debug_error("qa_loop", f"Fixer session crashed during human feedback: {e}")
-            fix_status = "error"
-            fix_response = str(e)
+        # A gate that overturns the reviewer's approval leaves its issues and
+        # its verdict here; the rejection handler below logs, records and fixes
+        # them like any other rejection.
+        gate: tuple[list[dict], str] | None = None
 
-        if fix_status == "error":
-            debug_error("qa_loop", f"Fixer error: {fix_response[:200]}")
-            print(f"\n❌ Fixer encountered error: {fix_response}")
+        if status == "approved":
+            # Reset error tracking on success
+            state.reset_errors()
+            debug_success(
+                "qa_loop",
+                "QA APPROVED",
+                iteration=state.qa_iteration,
+                duration=f"{iteration_duration:.1f}s",
+            )
+            record_iteration(
+                spec_dir, state.qa_iteration, "approved", [], iteration_duration
+            )
+            gate = await _architecture_gate(
+                scope, state.qa_iteration, qa_model
+            ) or _coverage_gate(spec_dir, state.qa_iteration)
+            if gate is None:
+                await _on_approved(scope, state.qa_iteration)
+                return True
+            status = "rejected"
+
+        elif status == "human_escalation":
+            await _on_human_escalation(scope, state.qa_iteration, iteration_duration)
+            return True
+
+        # Not an `elif`: a gate above can turn the reviewer's approval into a
+        # rejection, and an `elif` chained to `if status == "approved"` never
+        # ran for it — the fixer was skipped and the next pass re-reviewed the
+        # same code, until the budget ran out.
+        nxt = _Next.NEXT
+        if status == "rejected":
+            nxt = await _on_rejected(scope, state, qa_model, gate, iteration_duration)
+        elif status == "error":
+            nxt = _on_reviewer_error(scope, state, response, client, qa_model)
+
+        if nxt is _Next.FAILED:
             return False
+        if nxt is _Next.EXHAUSTED:
+            break
 
-        debug_success("qa_loop", "Human feedback fixes applied")
-        task_event_emitter.emit(
-            "QA_FIXING_COMPLETE",
-            {"iteration": 0},
+    return await _report_exhausted(scope, state)
+
+
+# -----------------------------------------------------------------------------
+# Before the passes
+# -----------------------------------------------------------------------------
+
+
+async def _apply_human_feedback(
+    project_dir: Path, spec_dir: Path, model: str, task_event_emitter
+) -> bool:
+    """Run the fixer on a person's QA_FIX_REQUEST.md; False stops the loop."""
+    fix_request_file = spec_dir / "QA_FIX_REQUEST.md"
+    debug(
+        "qa_loop",
+        "Human feedback detected - will run fixer first",
+        fix_request_file=str(fix_request_file),
+    )
+    emit_phase(ExecutionPhase.QA_FIXING, "Processing human feedback")
+    task_event_emitter.emit(
+        "QA_FIXING_STARTED",
+        {"iteration": 0},
+    )
+    print("\n📝 Human feedback detected. Running QA Fixer first...")
+
+    # Get model and thinking budget for fixer (uses QA phase config)
+    qa_model = get_phase_model(spec_dir, "qa", model)
+    fixer_thinking_budget = get_phase_thinking_budget(spec_dir, "qa")
+
+    try:
+        fix_client = create_agent_client(
+            project_dir=project_dir,
+            spec_dir=spec_dir,
+            model=qa_model,
+            agent_type="qa_fixer",
+            max_thinking_tokens=fixer_thinking_budget,
         )
-        print("\n✅ Fixes applied based on human feedback. Running QA validation...")
+    except Exception as e:
+        debug_error("qa_loop", f"Failed to create fixer client for human feedback: {e}")
+        print(f"\n❌ Failed to create fixer client: {e}")
+        task_event_emitter.emit(
+            "QA_AGENT_ERROR",
+            {"iteration": 0, "consecutiveErrors": 1, "error": str(e)[:500]},
+        )
+        return False
 
-        # Remove the fix request file after processing
-        try:
-            fix_request_file.unlink()
-            debug("qa_loop", "Removed processed QA_FIX_REQUEST.md")
-        except OSError:
-            pass  # Ignore if file removal fails
+    try:
+        async with fix_client:
+            fix_status, fix_response = await run_qa_fixer_session(
+                fix_client,
+                spec_dir,
+                0,
+                False,  # iteration 0 for human feedback
+            )
+    except Exception as e:
+        debug_error("qa_loop", f"Fixer session crashed during human feedback: {e}")
+        fix_status = "error"
+        fix_response = str(e)
 
-    # ── Security Scan (Feature 29: QA Security Scanner) ──────────────────────
-    # Run before the QA review loop so findings are already in qa_report.md
-    # when the QA reviewer agent reads it.
+    if fix_status == "error":
+        debug_error("qa_loop", f"Fixer error: {fix_response[:200]}")
+        print(f"\n❌ Fixer encountered error: {fix_response}")
+        return False
+
+    debug_success("qa_loop", "Human feedback fixes applied")
+    task_event_emitter.emit(
+        "QA_FIXING_COMPLETE",
+        {"iteration": 0},
+    )
+    print("\n✅ Fixes applied based on human feedback. Running QA validation...")
+
+    # Remove the fix request file after processing
+    try:
+        fix_request_file.unlink()
+        debug("qa_loop", "Removed processed QA_FIX_REQUEST.md")
+    except OSError:
+        pass  # Ignore if file removal fails
+    return True
+
+
+async def _run_security_scan(
+    project_dir: Path, spec_dir: Path, task_event_emitter
+) -> None:
+    """Feature 29 (QA Security Scanner), never blocking.
+
+    Runs before the review passes so its findings are already in qa_report.md
+    when the reviewer reads it.
+    """
     print("\n🔐 Running security scan...")
     try:
         sec_passed, _, sec_issues = await run_qa_security_scan(project_dir, spec_dir)
@@ -438,889 +635,918 @@ async def run_qa_validation_loop(
     except Exception as _sec_err:
         debug_warning("qa_loop", f"Security scan skipped (non-blocking): {_sec_err}")
         print(f"   ℹ️  Security scan skipped: {_sec_err}")
-    # ── End Security Scan ─────────────────────────────────────────────────────
 
-    # Check for no-test projects and attempt .NET test execution
+
+async def _prepare_no_test_project(project_dir: Path, spec_dir: Path) -> str:
+    """For a project without tests: run `dotnet test` or write a manual plan.
+
+    Returns what the reviewer is told about it, or "" for a project with tests.
+    """
+    if not is_no_test_project(spec_dir, project_dir):
+        return ""
+    print("\n⚠️  No test framework detected in project.")
     dotnet_advice = ""
-    if is_no_test_project(spec_dir, project_dir):
-        print("\n⚠️  No test framework detected in project.")
 
-        # Check if this is a .NET project with test projects available
-        from foundation.dotnet_tools import detect_dotnet_project
+    # Check if this is a .NET project with test projects available
+    from foundation.dotnet_tools import detect_dotnet_project
 
-        if detect_dotnet_project(project_dir):
-            print("Detected .NET project — attempting to run dotnet test...")
-            dotnet_run = await _run_dotnet_tests(project_dir)
-            if dotnet_run.status == "passed":
-                print(f"✅ dotnet test passed ({dotnet_run.detail})")
-            elif dotnet_run.status == "failed":
-                print("❌ dotnet test failed: the QA reviewer is told so")
-            else:
-                print(f"⚠️  dotnet test unavailable: {dotnet_run.detail}")
-                print("Creating manual test plan as fallback...")
-                manual_plan = create_manual_test_plan(spec_dir, spec_dir.name)
-                print(f"📝 Manual test plan created: {manual_plan}")
-            dotnet_advice = dotnet_test_advice(dotnet_run, spec_dir)
+    if detect_dotnet_project(project_dir):
+        print("Detected .NET project — attempting to run dotnet test...")
+        dotnet_run = await _run_dotnet_tests(project_dir)
+        if dotnet_run.status == "passed":
+            print(f"✅ dotnet test passed ({dotnet_run.detail})")
+        elif dotnet_run.status == "failed":
+            print("❌ dotnet test failed: the QA reviewer is told so")
         else:
-            print("Creating manual test plan...")
+            print(f"⚠️  dotnet test unavailable: {dotnet_run.detail}")
+            print("Creating manual test plan as fallback...")
             manual_plan = create_manual_test_plan(spec_dir, spec_dir.name)
             print(f"📝 Manual test plan created: {manual_plan}")
+        dotnet_advice = dotnet_test_advice(dotnet_run, spec_dir)
+    else:
+        print("Creating manual test plan...")
+        manual_plan = create_manual_test_plan(spec_dir, spec_dir.name)
+        print(f"📝 Manual test plan created: {manual_plan}")
 
-        print("\nNote: Automated testing will be limited for this project.")
+    print("\nNote: Automated testing will be limited for this project.")
+    return dotnet_advice
 
-    # Start validation phase in task logger
-    if task_logger:
-        task_logger.start_phase(LogPhase.VALIDATION, "Starting QA validation...")
 
-    # Check Linear integration status
-    linear_task = None
-    if is_linear_enabled():
-        linear_task = LinearTaskState.load(spec_dir)
-        if linear_task and linear_task.task_id:
-            print(f"Linear task: {linear_task.task_id}")
-            # Update Linear to "In Review" when QA starts
-            await linear_qa_started(spec_dir)
-            print("Linear task moved to 'In Review'")
+async def _start_linear_review(spec_dir: Path):
+    """Move the Linear task to "In Review"; returns it, or None without Linear."""
+    if not is_linear_enabled():
+        return None
+    linear_task = LinearTaskState.load(spec_dir)
+    if linear_task and linear_task.task_id:
+        print(f"Linear task: {linear_task.task_id}")
+        # Update Linear to "In Review" when QA starts
+        await linear_qa_started(spec_dir)
+        print("Linear task moved to 'In Review'")
+    return linear_task
 
-    qa_iteration = get_qa_iteration_count(spec_dir)
-    # The budget is the task's, not the run's: a build paused and resumed in
-    # the middle of QA continues the count rather than starting a new one. A
-    # person's feedback is what opens a new budget — they have read the
-    # result and asked for more.
-    max_iterations = qa_iteration + qa_cap if has_human_feedback else qa_cap
-    recurring_threshold = recurring_issue_threshold(qa_cap)
-    if task_logger:
-        task_logger.log(
-            f"QA budget: {max_iterations - qa_iteration} review pass(es) "
-            f"(effort-based cap {qa_cap}); an issue seen {recurring_threshold} "
-            "times escalates to a human.",
-            LogEntryType.INFO,
+
+# -----------------------------------------------------------------------------
+# One review pass
+# -----------------------------------------------------------------------------
+
+
+def _raise_if_paused(spec_dir: Path) -> None:
+    """Cooperative pause, checked between passes.
+
+    QA is a loop of long sessions, so "pause" without a checkpoint here meant
+    the user waited for the current pass to end and then watched the next one
+    start.
+    """
+    if is_paused(spec_dir):
+        pause_state = read_pause_state(spec_dir)
+        print("\n⏸  QA PAUSED — reprise possible à tout moment")
+        print(f"   Paused at: {pause_state.get('paused_at')}")
+        raise BuildPaused(
+            pause_state.get("paused_phase") or "qa_review",
+            pause_state.get("paused_subtask_id"),
+        )
+
+
+def _announce_pass(scope: _QaScope, qa_iteration: int) -> None:
+    debug_section("qa_loop", f"QA Iteration {qa_iteration}")
+    debug(
+        "qa_loop",
+        f"Starting iteration {qa_iteration}/{scope.max_iterations}",
+        iteration=qa_iteration,
+        max_iterations=scope.max_iterations,
+    )
+
+    print(f"\n--- QA Iteration {qa_iteration}/{scope.max_iterations} ---")
+    emit_phase(ExecutionPhase.QA_REVIEW, f"Running QA review iteration {qa_iteration}")
+    # Sous-étape de la phase de validation, affichée dans la barre de phase
+    # de l'UI (équivalent des « phase N: NOM » de la planification).
+    # On n'affiche PAS "/{max_iterations}" : ce max est un garde-fou, pas
+    # un objectif — la QA s'arrête dès qu'elle approuve. Le montrer comme
+    # "PASS 2/50" se lisait à tort comme "2 sur 50 faites" (~4%) alors que la
+    # phase était terminée. Le frontend reformate en "QA — vérification N".
+    if scope.task_logger:
+        scope.task_logger.start_subphase(
+            f"QA REVIEW — PASS {qa_iteration}",
+            phase=LogPhase.VALIDATION,
+            print_to_console=False,
+        )
+
+
+def _apply_qa_hot_swap(spec_dir: Path, task_logger) -> None:
+    """Hot LLM swap: apply a pending provider/model/effort change for QA.
+
+    Applied before the reviewer client is built, so the next QA pass ("next
+    turn") uses it. No marker → no-op.
+    """
+    try:
+        from agents.hot_swap import (
+            apply_hot_swap_to_metadata,
+            consume_hot_swap_for_phase,
+            describe_hot_swap,
+        )
+
+        _hot_req = consume_hot_swap_for_phase(spec_dir, "qa")
+        if _hot_req is not None:
+            apply_hot_swap_to_metadata(spec_dir, _hot_req)
+            if task_logger:
+                task_logger.log_info(describe_hot_swap(_hot_req))
+    except Exception:  # noqa: BLE001 - never break QA on a hot-swap hiccup
+        pass
+
+
+async def _jev_review_advice(
+    jev_run, project_dir: Path, spec_dir: Path, qa_iteration: int
+):
+    """The jev assessment of this pass; returns the run (built once) and its text."""
+    from integrations.jev.adapters import assess_build
+    from integrations.jev.models import JevContext
+    from integrations.jev.rubrics import advice_text
+    from integrations.jev.runtime import JevRun
+
+    if jev_run is None:
+        jev_run = JevRun.from_env(JevContext("feature-build", project_dir, spec_dir))
+    if not hasattr(jev_run, "base_revision") and not jev_run.eligibility():
+        from integrations.jev.adapters import capture_base
+        from prompts_pkg.prompts import _detect_base_branch
+
+        try:
+            capture_base(jev_run, _detect_base_branch(spec_dir, project_dir))
+        except (OSError, ValueError):
+            jev_run.base_revision = None
+    jev_advice = advice_text(
+        await assess_build(jev_run, "review", pass_id=f"qa-{qa_iteration}")
+    )
+    return jev_run, jev_advice
+
+
+async def _run_reviewer(
+    scope: _QaScope, state: _QaState, qa_model: str, advice: str
+) -> tuple[str, str, Any] | _Next:
+    """One reviewer session: (status, response, client), FAILED or RETRY."""
+    spec_dir = scope.spec_dir
+    qa_thinking_budget = get_phase_thinking_budget(spec_dir, "qa")
+    qa_provider = get_phase_provider(spec_dir, phase="qa")
+    debug(
+        "qa_loop",
+        "Creating client for QA reviewer session...",
+        model=qa_model,
+        thinking_budget=qa_thinking_budget,
+    )
+    try:
+        client = create_agent_client(
+            project_dir=scope.project_dir,
+            spec_dir=spec_dir,
+            model=qa_model,
+            agent_type="qa_reviewer",
+            max_thinking_tokens=qa_thinking_budget,
+            provider=qa_provider,
+        )
+    except Exception as e:
+        debug_error("qa_loop", f"Failed to create QA reviewer client: {e}")
+        print(f"\n❌ Failed to create QA reviewer client: {e}")
+        scope.emitter.emit(
+            "QA_AGENT_ERROR",
+            {
+                "iteration": state.qa_iteration,
+                "consecutiveErrors": 1,
+                "error": str(e)[:500],
+            },
+        )
+        return _Next.FAILED
+
+    try:
+        async with client:
+            debug("qa_loop", "Running QA reviewer agent session...")
+            status, response = await run_qa_agent_session(
+                client,
+                scope.project_dir,  # Pass project_dir for capability-based tool injection
+                spec_dir,
+                state.qa_iteration,
+                scope.max_iterations,
+                scope.verbose,
+                jev_advice=advice,
+                previous_error=state.last_error_context,  # Pass error context for self-correction
+            )
+    except Exception as e:
+        # Prompt-too-long errors are not retryable — the conversation
+        # is already too big for the model's context window, so the next
+        # attempt would fail identically. Halt the loop and let the UI
+        # surface "reset conversation / switch provider" actions.
+        if _halted_on_prompt_too_long(
+            scope,
+            e,
+            "QA halted: prompt too long",
+            "QA halted: prompt too long for the LLM context window",
+        ):
+            return _Next.FAILED
+
+        # Rate-limit errors must not count toward MAX_CONSECUTIVE_ERRORS or
+        # we escalate to human after 3 limit-hits in a row instead of waiting
+        # for the quota window to reset (the same iteration would have succeeded).
+        if await _handle_rate_limit_in_qa(e, spec_dir, scope.source_spec_dir):
+            state.qa_iteration -= (
+                1  # don't burn an iteration on a paused-then-resumed attempt
+            )
+            return _Next.RETRY
+        debug_error("qa_loop", f"QA reviewer session crashed: {e}")
+        print(f"\n❌ QA reviewer session error: {e}")
+        status = "error"
+        response = str(e)
+    return status, response, client
+
+
+def _halted_on_prompt_too_long(
+    scope: _QaScope, error: Exception, headline: str, phase_message: str
+) -> bool:
+    """A prompt-too-long session halts QA: retrying would fail the same way."""
+    from services.rate_limit_shield import handle_prompt_too_long
+
+    if not handle_prompt_too_long(error, scope.spec_dir, "qa"):
+        return False
+    debug_error("qa_loop", headline)
+    print(f"\n⛔ {headline}. See task detail.")
+    if scope.task_logger:
+        scope.task_logger.end_phase(
+            LogPhase.VALIDATION,
+            success=False,
+            message=phase_message,
+        )
+    return True
+
+
+def _record_reviewer_opinion(project_dir: Path, spec_dir: Path, status: str) -> None:
+    """Feed the Consensus Arbiter the reviewer's verdict, never blocking.
+
+    The verdict becomes a qa-domain opinion over the files this task changed.
+    When the security scanner flagged one of those files but QA approved it,
+    the arbiter surfaces the disagreement for a human to settle.
+    """
+    try:
+        from consensus_arbiter.opinion_writer import (
+            get_task_changed_files,
+            record_qa_reviewer_opinion,
+        )
+
+        _qa_signoff = get_qa_signoff_status(spec_dir) or {}
+        record_qa_reviewer_opinion(
+            project_dir,
+            status,
+            get_task_changed_files(project_dir, spec_dir),
+            issues=_qa_signoff.get("issues_found"),
+        )
+    except Exception as _op_err:  # never let the producer break QA
+        debug_warning("qa_loop", f"QA opinion producer skipped: {_op_err}")
+
+
+def _halted_on_local_model_without_tools(
+    scope: _QaScope, state: _QaState, client, qa_model: str
+) -> bool:
+    """Halt when a local model never emitted a real tool call.
+
+    It cannot drive agentic QA — it can only hallucinate (e.g. a fabricated
+    "spec file not found" tool result). Retrying with the same model is futile,
+    so halt now with one clear, actionable message instead of burning
+    MAX_CONSECUTIVE_ERRORS passes. (feat/local-llm-agnostic hardening)
+    """
+    from services.rate_limit_shield import handle_local_model_no_tools
+
+    if not handle_local_model_no_tools(client, scope.spec_dir, "qa", qa_model):
+        return False
+    halt_msg = (
+        f"QA halted: the local model « {qa_model} » did not call any "
+        "tool, so it cannot validate the implementation. Switch the "
+        "Validation phase to a more capable model (a larger local "
+        "model, or a cloud provider like Anthropic/Claude) and re-run."
+    )
+    print(f"\n⛔ {halt_msg}")
+    scope.emitter.emit(
+        "QA_AGENT_ERROR",
+        {
+            "iteration": state.qa_iteration,
+            "consecutiveErrors": 1,
+            "reason": "local_model_no_tools",
+            "error": halt_msg,
+        },
+    )
+    if scope.task_logger:
+        scope.task_logger.end_phase(
+            LogPhase.VALIDATION,
+            success=False,
+            message=halt_msg,
+        )
+    emit_phase(ExecutionPhase.FAILED, "QA halted: local model can't call tools")
+    return True
+
+
+# -----------------------------------------------------------------------------
+# The gates that can overturn an approval
+# -----------------------------------------------------------------------------
+
+
+async def _architecture_gate(
+    scope: _QaScope, qa_iteration: int, qa_model: str
+) -> tuple[list[dict], str] | None:
+    """Architecture Enforcement Gate, run once the reviewer has approved.
+
+    Deterministic analysis first (fast), AI review second (optional). Returns
+    the issues and the verdict of a rejection, or None when it passes, is not
+    installed or fails (it never blocks the pipeline).
+    """
+    try:
+        from architecture.validator import (
+            run_architecture_validation,
+            write_architecture_fix_request,
+        )
+
+        debug_section("qa_loop", "Running Architecture Enforcement Gate")
+        emit_phase(
+            ExecutionPhase.QA_REVIEW,
+            "Architecture validation",
+        )
+
+        arch_passed, arch_report = await run_architecture_validation(
+            project_dir=scope.project_dir,
+            spec_dir=scope.spec_dir,
+            model=qa_model,
+            verbose=scope.verbose,
+        )
+
+        # Save architecture report to implementation_plan
+        from .criteria import load_implementation_plan, save_implementation_plan
+
+        plan = load_implementation_plan(scope.spec_dir)
+        if plan:
+            plan["architecture_enforcement"] = arch_report
+            save_implementation_plan(scope.spec_dir, plan)
+
+        if arch_passed:
+            return None
+        # Architecture violations found — treat like a QA rejection
+        arch_violations = arch_report.get("violations", [])
+        debug_warning(
+            "qa_loop",
+            "Architecture violations found",
+            violation_count=len(arch_violations),
+        )
+        print(
+            f"\n🏗️  Architecture enforcement found {len(arch_violations)} violation(s)"
+        )
+
+        # Write architecture fix request for the fixer agent
+        write_architecture_fix_request(scope.spec_dir, arch_report)
+
+        issues = [
+            {
+                "title": f"Architecture: {v.get('type', 'violation')}",
+                "description": v.get("description", ""),
+                "type": "architecture_violation",
+            }
+            for v in arch_violations
+        ]
+        return issues, (
+            f"QA pass #{qa_iteration} rejected: "
+            f"{len(arch_violations)} architecture violation(s)"
+        )
+
+    except ImportError:
+        # architecture package not available — skip gracefully
+        debug_warning(
+            "qa_loop",
+            "Architecture enforcement package not available, skipping",
+        )
+    except Exception as e:
+        # Architecture validation should not block the QA pipeline
+        debug_warning(
+            "qa_loop",
+            f"Architecture validation error (non-blocking): {e}",
+        )
+    return None
+
+
+def _coverage_gate(spec_dir: Path, qa_iteration: int) -> tuple[list[dict], str] | None:
+    """Coverage Enforcement Gate, run once QA and architecture approve.
+
+    Enforces the minimum test coverage threshold (default 100% for unit +
+    integration, e2e best-effort). Language-agnostic: validates the coverage
+    numbers recorded by the QA reviewer in qa_signoff.coverage. Controlled by
+    WORKPILOT_QA_MIN_COVERAGE (0 = disabled). Returns the issues and the
+    verdict of a rejection, or None.
+    """
+    try:
+        from .coverage_gate import (
+            build_coverage_issues,
+            mark_signoff_rejected,
+            run_coverage_gate,
+            write_coverage_fix_request,
+        )
+
+        coverage_report = run_coverage_gate(spec_dir)
+
+        if not coverage_report["enabled"]:
+            debug(
+                "qa_loop",
+                "Coverage enforcement gate disabled (WORKPILOT_QA_MIN_COVERAGE=0)",
+            )
+        elif coverage_report["warnings"]:
+            for warning in coverage_report["warnings"]:
+                debug_warning("qa_loop", f"Coverage: {warning}")
+
+        if not coverage_report["enabled"] or coverage_report["passed"]:
+            return None
+        debug_warning(
+            "qa_loop",
+            "Coverage gate failed",
+            min_coverage=coverage_report["min_coverage"],
+            failures=len(coverage_report["failures"]),
+        )
+        print(
+            "\n📊 Coverage enforcement: "
+            f"{len(coverage_report['failures'])} requirement(s) "
+            f"below {coverage_report['min_coverage']}% threshold"
+        )
+
+        # Write a coverage-specific fix request for the fixer agent
+        write_coverage_fix_request(spec_dir, coverage_report)
+
+        # Make the gate authoritative: persist rejected status so a
+        # later loop invocation cannot short-circuit on a stale
+        # "approved" qa_signoff written by the reviewer.
+        mark_signoff_rejected(spec_dir, coverage_report)
+
+        return (
+            build_coverage_issues(coverage_report),
+            f"QA pass #{qa_iteration} rejected by the coverage gate",
+        )
+
+    except ImportError:
+        debug_warning(
+            "qa_loop",
+            "Coverage gate package not available, skipping",
+        )
+    except Exception as e:
+        # Coverage gate must not crash the QA pipeline.
+        debug_warning(
+            "qa_loop",
+            f"Coverage gate error (non-blocking): {e}",
+        )
+    return None
+
+
+# -----------------------------------------------------------------------------
+# The verdicts
+# -----------------------------------------------------------------------------
+
+
+async def _on_approved(scope: _QaScope, qa_iteration: int) -> None:
+    """The reviewer and both gates approved: validation is complete."""
+    emit_phase(ExecutionPhase.COMPLETE, "QA validation passed")
+
+    qa_status = get_qa_signoff_status(scope.spec_dir) or {}
+    scope.emitter.emit(
+        "QA_PASSED",
+        {
+            "iteration": qa_iteration,
+            "testsRun": qa_status.get("tests_passed", {}),
+        },
+    )
+
+    print("\n" + "=" * 70)
+    print("  ✅ QA APPROVED + ARCHITECTURE CLEAN")
+    print("=" * 70)
+    print("\nAll acceptance criteria verified.")
+    print("Architecture validation passed.")
+    print("The implementation is production-ready.")
+    print("\nNext steps:")
+    print("  1. Review the auto-claude/* branch")
+    print("  2. Create a PR and merge to main")
+
+    # End validation phase successfully
+    if scope.task_logger:
+        scope.task_logger.log_success(
+            f"QA pass #{qa_iteration} approved: all criteria met, "
+            f"architecture clean. Validation complete.",
             LogPhase.VALIDATION,
         )
-    consecutive_errors = 0
-    last_error_context = None  # Track error for self-correction feedback
-    max_iterations_emitted = False
-
-    while qa_iteration < max_iterations:
-        # Cooperative pause, checked between passes. QA is a loop of long
-        # sessions, so "pause" without a checkpoint here meant the user waited
-        # for the current pass to end and then watched the next one start.
-        if is_paused(spec_dir):
-            pause_state = read_pause_state(spec_dir)
-            print("\n⏸  QA PAUSED — reprise possible à tout moment")
-            print(f"   Paused at: {pause_state.get('paused_at')}")
-            raise BuildPaused(
-                pause_state.get("paused_phase") or "qa_review",
-                pause_state.get("paused_subtask_id"),
-            )
-
-        qa_iteration += 1
-        iteration_start = time_module.time()
-
-        debug_section("qa_loop", f"QA Iteration {qa_iteration}")
-        debug(
-            "qa_loop",
-            f"Starting iteration {qa_iteration}/{max_iterations}",
-            iteration=qa_iteration,
-            max_iterations=max_iterations,
+        scope.task_logger.end_phase(
+            LogPhase.VALIDATION,
+            success=True,
+            message="QA validation passed - all criteria met, architecture clean",
         )
 
-        print(f"\n--- QA Iteration {qa_iteration}/{max_iterations} ---")
-        emit_phase(
-            ExecutionPhase.QA_REVIEW, f"Running QA review iteration {qa_iteration}"
+    # Update Linear: QA approved, awaiting human review
+    if scope.has_linear_task:
+        await linear_qa_approved(scope.spec_dir)
+        print("\nLinear: Task marked as QA approved, awaiting human review")
+
+
+async def _on_human_escalation(
+    scope: _QaScope, qa_iteration: int, iteration_duration: float
+) -> None:
+    """The reviewer could not verify here (e.g. sandbox, no CLI): a person will."""
+    debug(
+        "qa_loop",
+        "QA requires human verification",
+        iteration=qa_iteration,
+        duration=f"{iteration_duration:.1f}s",
+    )
+    qa_status = get_qa_signoff_status(scope.spec_dir) or {}
+    notes = qa_status.get("next_steps", [])
+    if scope.task_logger:
+        _reason = (
+            " (environment limitation: tests can't run here)"
+            if qa_status.get("sandbox_limitation")
+            else ""
         )
-        # Sous-étape de la phase de validation, affichée dans la barre de phase
-        # de l'UI (équivalent des « phase N: NOM » de la planification).
-        # On n'affiche PAS "/{max_iterations}" : ce max est un garde-fou, pas
-        # un objectif — la QA s'arrête dès qu'elle approuve. Le montrer comme
-        # "PASS 2/50" se lisait à tort comme "2 sur 50 faites" (~4%) alors que la
-        # phase était terminée. Le frontend reformate en "QA — vérification N".
-        if task_logger:
-            task_logger.start_subphase(
-                f"QA REVIEW — PASS {qa_iteration}",
-                phase=LogPhase.VALIDATION,
-                print_to_console=False,
-            )
-
-        # Hot LLM swap: apply any pending live provider/model/effort change for
-        # the QA phase before building the reviewer client, so the next QA pass
-        # ("next turn") uses it. No marker → no-op.
-        try:
-            from agents.hot_swap import (
-                apply_hot_swap_to_metadata,
-                consume_hot_swap_for_phase,
-                describe_hot_swap,
-            )
-
-            _hot_req = consume_hot_swap_for_phase(spec_dir, "qa")
-            if _hot_req is not None:
-                apply_hot_swap_to_metadata(spec_dir, _hot_req)
-                if task_logger:
-                    task_logger.log_info(describe_hot_swap(_hot_req))
-        except Exception:  # noqa: BLE001 - never break QA on a hot-swap hiccup
-            pass
-
-        # What the captures of the running app show — OCR'd before the
-        # reviewer's prompt is built, so the section it reads is current.
-        if (visual := run_visual_qa(spec_dir, project_dir)) is not None:
-            print(
-                "🖼  Visual QA: "
-                f"{visual['high']} high, {visual['medium']} medium, "
-                f"{visual['low']} low finding(s) read from the captures"
-            )
-
-        # Run QA reviewer with phase-specific model and thinking budget
-        qa_model = get_phase_model(spec_dir, "qa", model)
-        qa_thinking_budget = get_phase_thinking_budget(spec_dir, "qa")
-        qa_provider = get_phase_provider(spec_dir, phase="qa")
-        from integrations.jev.adapters import assess_build
-        from integrations.jev.models import JevContext
-        from integrations.jev.rubrics import advice_text
-        from integrations.jev.runtime import JevRun
-
-        if jev_run is None:
-            jev_run = JevRun.from_env(
-                JevContext("feature-build", project_dir, spec_dir)
-            )
-        if not hasattr(jev_run, "base_revision") and not jev_run.eligibility():
-            from integrations.jev.adapters import capture_base
-            from prompts_pkg.prompts import _detect_base_branch
-
-            try:
-                capture_base(jev_run, _detect_base_branch(spec_dir, project_dir))
-            except (OSError, ValueError):
-                jev_run.base_revision = None
-        jev_advice = advice_text(
-            await assess_build(jev_run, "review", pass_id=f"qa-{qa_iteration}")
+        scope.task_logger.log_info(
+            f"QA pass #{qa_iteration}: code validated by review; manual "
+            f"verification required{_reason}. Validation complete.",
+            LogPhase.VALIDATION,
         )
-        debug(
-            "qa_loop",
-            "Creating client for QA reviewer session...",
+
+    emit_phase(ExecutionPhase.COMPLETE, "QA requires manual verification")
+    scope.emitter.emit(
+        "QA_PASSED",
+        {
+            "iteration": qa_iteration,
+            "testsRun": qa_status.get("tests_passed", {}),
+            "manualVerificationRequired": True,
+        },
+    )
+
+    print("\n" + "=" * 70)
+    print("  ⚠️  QA REQUIRES MANUAL VERIFICATION")
+    print("=" * 70)
+    print("\nCode quality passed automated review.")
+    print("Manual verification required (e.g. run tests outside sandbox).")
+    if notes:
+        print("\nNext steps:")
+        for step in notes[:5]:
+            print(f"  - {step}")
+
+    if scope.task_logger:
+        scope.task_logger.end_phase(
+            LogPhase.VALIDATION,
+            success=True,
+            message="QA validation passed — manual verification required",
+        )
+
+    if scope.has_linear_task:
+        await linear_qa_approved(scope.spec_dir)
+        print("\nLinear: Task marked as QA approved, awaiting human review")
+
+
+async def _on_rejected(
+    scope: _QaScope,
+    state: _QaState,
+    qa_model: str,
+    gate: tuple[list[dict], str] | None,
+    iteration_duration: float,
+) -> _Next:
+    """A rejection, by the reviewer or a gate: escalate, hand over, or fix."""
+    spec_dir = scope.spec_dir
+    qa_iteration = state.qa_iteration
+    max_iterations = scope.max_iterations
+    # Reset error tracking on valid response (rejected is a valid response)
+    state.reset_errors()
+
+    debug_warning(
+        "qa_loop",
+        "QA REJECTED",
+        iteration=qa_iteration,
+        duration=f"{iteration_duration:.1f}s",
+    )
+    print(f"\n❌ QA found issues. Iteration {qa_iteration}/{max_iterations}")
+
+    if gate is not None:
+        current_issues, verdict = gate
+    else:
+        # Get issues from QA report
+        qa_status = get_qa_signoff_status(spec_dir)
+        current_issues = qa_status.get("issues_found", []) if qa_status else []
+        verdict = (
+            f"QA pass #{qa_iteration} rejected: {len(current_issues)} issue(s) found"
+        )
+    debug(
+        "qa_loop",
+        "Issues found by QA",
+        issue_count=len(current_issues),
+        issues=current_issues[:3] if current_issues else [],  # Show first 3
+    )
+    # A gate's issues share one title; their description says what failed.
+    issue_label = "description" if gate is not None else "title"
+    scope.emitter.emit(
+        "QA_FAILED",
+        {
+            "iteration": qa_iteration,
+            "issueCount": len(current_issues),
+            "issues": [
+                issue.get(issue_label, "")
+                for issue in (current_issues[:5] if current_issues else [])
+            ],
+        },
+    )
+
+    # Check for recurring issues BEFORE recording current iteration
+    # This prevents the current issues from matching themselves in history
+    history = get_iteration_history(spec_dir)
+    has_recurring, recurring_issues = has_recurring_issues(
+        current_issues, history, threshold=scope.recurring_threshold
+    )
+
+    # Record rejected iteration AFTER checking for recurring issues
+    record_iteration(
+        spec_dir, qa_iteration, "rejected", current_issues, iteration_duration
+    )
+
+    # The verdict says what comes next: it used to promise a fix and
+    # another pass even on the last pass, right before the hand-over.
+    if scope.task_logger:
+        if has_recurring or qa_iteration >= max_iterations:
+            outcome = "handing over to human review."
+        else:
+            outcome = f"applying a fix, then re-reviewing (pass #{qa_iteration + 1})."
+        scope.task_logger.log_error(f"{verdict}; {outcome}", LogPhase.VALIDATION)
+
+    if has_recurring:
+        await _escalate_recurring(scope, state, recurring_issues)
+        return _Next.FAILED
+
+    # Record rejection in Linear
+    if scope.has_linear_task:
+        issues_count = len(current_issues)
+        await linear_qa_rejected(spec_dir, issues_count, qa_iteration)
+
+    if qa_iteration >= max_iterations:
+        print("\n⚠️  Maximum QA iterations reached.")
+        print("Escalating to human review.")
+        _emit_max_iterations(scope, state)
+        return _Next.EXHAUSTED
+
+    # QA_FIX_REQUEST.md est rendu depuis issues_found : le fixer lit
+    # les issues de cette passe, jamais celles d'une passe précédente.
+    # Un gate a déjà écrit le sien, plus précis : on le garde.
+    return await _run_fixer(
+        scope, state, qa_model, current_issues if gate is None else None
+    )
+
+
+async def _escalate_recurring(
+    scope: _QaScope, state: _QaState, recurring_issues: list[dict]
+) -> None:
+    """An issue seen `recurring_threshold` times goes to a person."""
+    qa_iteration = state.qa_iteration
+    debug_error(
+        "qa_loop",
+        "Recurring issues detected - escalating to human",
+        recurring_count=len(recurring_issues),
+        threshold=scope.recurring_threshold,
+    )
+    print(
+        f"\n⚠️  Recurring issues detected ({len(recurring_issues)} issue(s) appeared {scope.recurring_threshold}+ times)"
+    )
+    print("Escalating to human review due to recurring issues...")
+
+    # Create escalation file
+    await escalate_to_human(
+        scope.spec_dir,
+        recurring_issues,
+        qa_iteration,
+        max_iterations=scope.max_iterations,
+        threshold=scope.recurring_threshold,
+    )
+
+    # End validation phase
+    if scope.task_logger:
+        scope.task_logger.end_phase(
+            LogPhase.VALIDATION,
+            success=False,
+            message=f"QA escalated to human after {qa_iteration} iterations due to recurring issues",
+        )
+
+    # Update Linear
+    if scope.has_linear_task:
+        await linear_qa_max_iterations(scope.spec_dir, qa_iteration)
+        print("\nLinear: Task marked as needing human intervention (recurring issues)")
+    _emit_max_iterations(scope, state)
+
+
+def _emit_max_iterations(scope: _QaScope, state: _QaState) -> None:
+    """QA_MAX_ITERATIONS, once per run: the card moves to human review on it."""
+    if state.max_iterations_emitted:
+        return
+    scope.emitter.emit(
+        "QA_MAX_ITERATIONS",
+        {"iteration": state.qa_iteration, "maxIterations": scope.max_iterations},
+    )
+    state.max_iterations_emitted = True
+
+
+async def _run_fixer(
+    scope: _QaScope,
+    state: _QaState,
+    qa_model: str,
+    issues_to_render: list[dict] | None,
+) -> _Next:
+    """One fixer session after a rejection: NEXT pass, RETRY, FAILED or EXHAUSTED.
+
+    `issues_to_render` are the reviewer's issues, rendered into
+    QA_FIX_REQUEST.md; None keeps the request a gate already wrote.
+    """
+    spec_dir = scope.spec_dir
+    qa_iteration = state.qa_iteration
+    # Run fixer with phase-specific thinking budget
+    fixer_thinking_budget = get_phase_thinking_budget(spec_dir, "qa")
+    debug(
+        "qa_loop",
+        "Starting QA fixer session...",
+        model=qa_model,
+        thinking_budget=fixer_thinking_budget,
+    )
+    emit_phase(ExecutionPhase.QA_FIXING, "Fixing QA issues")
+    if scope.task_logger:
+        scope.task_logger.start_subphase(
+            f"QA FIX — PASS {qa_iteration}",
+            phase=LogPhase.VALIDATION,
+            print_to_console=False,
+        )
+    scope.emitter.emit(
+        "QA_FIXING_STARTED",
+        {"iteration": qa_iteration},
+    )
+    print("\nRunning QA Fixer Agent...")
+
+    if issues_to_render is not None:
+        _ensure_fix_request_file(spec_dir, issues_to_render, qa_iteration)
+
+    try:
+        fix_client = create_agent_client(
+            project_dir=scope.project_dir,
+            spec_dir=spec_dir,
             model=qa_model,
-            thinking_budget=qa_thinking_budget,
+            agent_type="qa_fixer",
+            max_thinking_tokens=fixer_thinking_budget,
         )
-        try:
-            client = create_agent_client(
-                project_dir=project_dir,
-                spec_dir=spec_dir,
-                model=qa_model,
-                agent_type="qa_reviewer",
-                max_thinking_tokens=qa_thinking_budget,
-                provider=qa_provider,
+    except Exception as e:
+        debug_error("qa_loop", f"Failed to create QA fixer client: {e}")
+        print(f"\n❌ Failed to create QA fixer client: {e}")
+        record_iteration(
+            spec_dir,
+            qa_iteration,
+            "error",
+            [{"title": "Fixer client error", "description": str(e)}],
+        )
+        return _Next.EXHAUSTED
+
+    try:
+        async with fix_client:
+            fix_status, fix_response = await run_qa_fixer_session(
+                fix_client, spec_dir, qa_iteration, scope.verbose
             )
-        except Exception as e:
-            debug_error("qa_loop", f"Failed to create QA reviewer client: {e}")
-            print(f"\n❌ Failed to create QA reviewer client: {e}")
-            task_event_emitter.emit(
-                "QA_AGENT_ERROR",
-                {
-                    "iteration": qa_iteration,
-                    "consecutiveErrors": 1,
-                    "error": str(e)[:500],
-                },
-            )
-            return False
+    except Exception as e:
+        # Prompt-too-long is permanent — see the reviewer session.
+        if _halted_on_prompt_too_long(
+            scope,
+            e,
+            "QA fixer halted: prompt too long",
+            "QA fixer halted: prompt too long for the LLM context window",
+        ):
+            return _Next.FAILED
 
-        try:
-            async with client:
-                debug("qa_loop", "Running QA reviewer agent session...")
-                status, response = await run_qa_agent_session(
-                    client,
-                    project_dir,  # Pass project_dir for capability-based tool injection
-                    spec_dir,
-                    qa_iteration,
-                    max_iterations,
-                    verbose,
-                    jev_advice="\n\n".join(
-                        part for part in (dotnet_advice, jev_advice) if part
-                    ),
-                    previous_error=last_error_context,  # Pass error context for self-correction
-                )
-        except Exception as e:
-            # Prompt-too-long errors are not retryable — the conversation
-            # is already too big for the model's context window, so the next
-            # attempt would fail identically. Halt the loop and let the UI
-            # surface "reset conversation / switch provider" actions.
-            from services.rate_limit_shield import handle_prompt_too_long
+        # Same rate-limit shield as the reviewer: pause-and-resume
+        # instead of counting toward consecutive errors.
+        if await _handle_rate_limit_in_qa(e, spec_dir, scope.source_spec_dir):
+            state.qa_iteration -= 1
+            return _Next.RETRY
+        debug_error("qa_loop", f"QA fixer session crashed: {e}")
+        fix_status = "error"
+        fix_response = str(e)
 
-            if handle_prompt_too_long(e, spec_dir, "qa"):
-                debug_error("qa_loop", "QA halted: prompt too long")
-                print("\n⛔ QA halted: prompt too long. See task detail.")
-                if task_logger:
-                    task_logger.end_phase(
-                        LogPhase.VALIDATION,
-                        success=False,
-                        message="QA halted: prompt too long for the LLM context window",
-                    )
-                return False
+    debug(
+        "qa_loop",
+        "QA fixer session completed",
+        fix_status=fix_status,
+        response_length=len(fix_response),
+    )
 
-            # Rate-limit errors must not count toward MAX_CONSECUTIVE_ERRORS or
-            # we escalate to human after 3 limit-hits in a row instead of waiting
-            # for the quota window to reset (the same iteration would have succeeded).
-            if await _handle_rate_limit_in_qa(e, spec_dir, source_spec_dir):
-                qa_iteration -= (
-                    1  # don't burn an iteration on a paused-then-resumed attempt
-                )
-                continue
-            debug_error("qa_loop", f"QA reviewer session crashed: {e}")
-            print(f"\n❌ QA reviewer session error: {e}")
-            status = "error"
-            response = str(e)
+    if fix_status == "error":
+        debug_error("qa_loop", f"Fixer error: {fix_response[:200]}")
+        print(f"\n❌ Fixer encountered error: {fix_response}")
+        record_iteration(
+            spec_dir,
+            qa_iteration,
+            "error",
+            [{"title": "Fixer error", "description": fix_response}],
+        )
+        return _Next.EXHAUSTED
 
-        iteration_duration = time_module.time() - iteration_start
-        write_visual_qa_report(spec_dir)
-        debug(
-            "qa_loop",
-            "QA reviewer session completed",
-            status=status,
-            duration_seconds=f"{iteration_duration:.1f}",
-            response_length=len(response),
+    debug_success("qa_loop", "Fixes applied, re-running QA validation")
+    scope.emitter.emit(
+        "QA_FIXING_COMPLETE",
+        {"iteration": qa_iteration},
+    )
+    print("\n✅ Fixes applied. Re-running QA validation...")
+    return _Next.NEXT
+
+
+def _on_reviewer_error(
+    scope: _QaScope, state: _QaState, response: str, client, qa_model: str
+) -> _Next:
+    """A pass without a verdict: feed the error back, or stop after three."""
+    spec_dir = scope.spec_dir
+    qa_iteration = state.qa_iteration
+    state.consecutive_errors += 1
+    consecutive_errors = state.consecutive_errors
+    debug_error(
+        "qa_loop",
+        f"QA session error: {response[:200]}",
+        consecutive_errors=consecutive_errors,
+        max_consecutive=MAX_CONSECUTIVE_ERRORS,
+    )
+    print(f"\n❌ QA error: {response}")
+    print(f"   Consecutive errors: {consecutive_errors}/{MAX_CONSECUTIVE_ERRORS}")
+    record_iteration(
+        spec_dir,
+        qa_iteration,
+        "error",
+        [{"title": "QA error", "description": response}],
+    )
+
+    # Build error context for self-correction in next iteration
+    error_type = classify_qa_error(response)
+    state.last_error_context = {
+        "error_type": error_type,
+        "error_message": response,
+        "consecutive_errors": consecutive_errors,
+        "expected_action": "You MUST update implementation_plan.json with a qa_signoff object containing 'status': 'approved' or 'status': 'rejected'",
+        "file_path": str(spec_dir / "implementation_plan.json"),
+    }
+
+    if consecutive_errors < MAX_CONSECUTIVE_ERRORS:
+        print("Retrying with error feedback...")
+        return _Next.NEXT
+
+    debug_error(
+        "qa_loop",
+        f"Max consecutive errors ({MAX_CONSECUTIVE_ERRORS}) reached - escalating to human",
+    )
+    print(f"\n⚠️  {MAX_CONSECUTIVE_ERRORS} consecutive errors without progress.")
+    print(f"Last error: {response}")
+    print("Escalating to human review.")
+    # The last pass's own error travels with the event: the card
+    # used to say only "failed 3 time(s) in a row", and the reason
+    # was in the task logs alone.
+    scope.emitter.emit(
+        "QA_AGENT_ERROR",
+        {
+            "iteration": qa_iteration,
+            "consecutiveErrors": consecutive_errors,
+            "error": response[:500],
+        },
+    )
+
+    # A local model often emits *some* recoverable tool calls (so the
+    # fast-halt above doesn't fire) yet never writes a valid
+    # qa_signoff — it stalls here after 3 errors. Make the escalation
+    # message name the likely cause so the user knows to switch model
+    # instead of assuming a code bug.
+    fail_message = f"QA agent failed {MAX_CONSECUTIVE_ERRORS} consecutive times" + (
+        f" - the session itself failed: {response[:300]}"
+        if error_type == "session_error"
+        else " - unable to update implementation_plan.json"
+    )
+    try:
+        provider = client.provider_name()
+    except Exception:
+        provider = ""
+    if provider in ("ollama", "local", "lmstudio"):
+        fail_message += (
+            f". The local model « {qa_model} » likely can't complete "
+            "tool-based QA — switch the Validation phase to a more "
+            "capable model (a larger local model, or a cloud provider)."
         )
 
-        # Feed the Consensus Arbiter: persist the QA reviewer's verdict as a
-        # qa-domain opinion over the files this task changed. When the security
-        # scanner flagged one of those files but QA approved it, the arbiter
-        # surfaces the disagreement for a human to settle.
-        try:
-            from consensus_arbiter.opinion_writer import (
-                get_task_changed_files,
-                record_qa_reviewer_opinion,
-            )
-
-            _qa_signoff = get_qa_signoff_status(spec_dir) or {}
-            record_qa_reviewer_opinion(
-                project_dir,
-                status,
-                get_task_changed_files(project_dir, spec_dir),
-                issues=_qa_signoff.get("issues_found"),
-            )
-        except Exception as _op_err:  # never let the producer break QA
-            debug_warning("qa_loop", f"QA opinion producer skipped: {_op_err}")
-
-        # A local model that never emits a real tool call cannot drive agentic
-        # QA — it can only hallucinate (e.g. a fabricated "spec file not found"
-        # tool result). Retrying with the same model is futile, so halt now with
-        # one clear, actionable message instead of burning MAX_CONSECUTIVE_ERRORS
-        # passes. (feat/local-llm-agnostic hardening)
-        from services.rate_limit_shield import handle_local_model_no_tools
-
-        if handle_local_model_no_tools(client, spec_dir, "qa", qa_model):
-            halt_msg = (
-                f"QA halted: the local model « {qa_model} » did not call any "
-                "tool, so it cannot validate the implementation. Switch the "
-                "Validation phase to a more capable model (a larger local "
-                "model, or a cloud provider like Anthropic/Claude) and re-run."
-            )
-            print(f"\n⛔ {halt_msg}")
-            task_event_emitter.emit(
-                "QA_AGENT_ERROR",
-                {
-                    "iteration": qa_iteration,
-                    "consecutiveErrors": 1,
-                    "reason": "local_model_no_tools",
-                    "error": halt_msg,
-                },
-            )
-            if task_logger:
-                task_logger.end_phase(
-                    LogPhase.VALIDATION,
-                    success=False,
-                    message=halt_msg,
-                )
-            emit_phase(ExecutionPhase.FAILED, "QA halted: local model can't call tools")
-            return False
-
-        # A gate that overturns the reviewer's approval leaves its issues and
-        # its verdict here; the rejection handler below logs, records and fixes
-        # them like any other rejection.
-        gate_issues: list[dict] | None = None
-        gate_verdict = ""
-
-        if status == "approved":
-            # Reset error tracking on success
-            consecutive_errors = 0
-            last_error_context = None
-
-            # Record successful iteration
-            debug_success(
-                "qa_loop",
-                "QA APPROVED",
-                iteration=qa_iteration,
-                duration=f"{iteration_duration:.1f}s",
-            )
-            record_iteration(spec_dir, qa_iteration, "approved", [], iteration_duration)
-
-            # === Architecture Enforcement Gate ===
-            # After QA reviewer approves, run architecture validation
-            # Deterministic analysis first (fast), AI review second (optional)
-            try:
-                from architecture.validator import (
-                    run_architecture_validation,
-                    write_architecture_fix_request,
-                )
-
-                debug_section("qa_loop", "Running Architecture Enforcement Gate")
-                emit_phase(
-                    ExecutionPhase.QA_REVIEW,
-                    "Architecture validation",
-                )
-
-                arch_passed, arch_report = await run_architecture_validation(
-                    project_dir=project_dir,
-                    spec_dir=spec_dir,
-                    model=qa_model,
-                    verbose=verbose,
-                )
-
-                # Save architecture report to implementation_plan
-                from .criteria import load_implementation_plan, save_implementation_plan
-
-                plan = load_implementation_plan(spec_dir)
-                if plan:
-                    plan["architecture_enforcement"] = arch_report
-                    save_implementation_plan(spec_dir, plan)
-
-                if not arch_passed:
-                    # Architecture violations found — treat like a QA rejection
-                    arch_violations = arch_report.get("violations", [])
-                    debug_warning(
-                        "qa_loop",
-                        "Architecture violations found",
-                        violation_count=len(arch_violations),
-                    )
-                    print(
-                        f"\n🏗️  Architecture enforcement found {len(arch_violations)} violation(s)"
-                    )
-
-                    # Write architecture fix request for the fixer agent
-                    write_architecture_fix_request(spec_dir, arch_report)
-
-                    # Override status to rejected: the rejection handler below
-                    # logs, records and runs the fixer on these issues.
-                    status = "rejected"
-                    gate_issues = [
-                        {
-                            "title": f"Architecture: {v.get('type', 'violation')}",
-                            "description": v.get("description", ""),
-                            "type": "architecture_violation",
-                        }
-                        for v in arch_violations
-                    ]
-                    gate_verdict = (
-                        f"QA pass #{qa_iteration} rejected: "
-                        f"{len(arch_violations)} architecture violation(s)"
-                    )
-
-            except ImportError:
-                # architecture package not available — skip gracefully
-                debug_warning(
-                    "qa_loop",
-                    "Architecture enforcement package not available, skipping",
-                )
-            except Exception as e:
-                # Architecture validation should not block the QA pipeline
-                debug_warning(
-                    "qa_loop",
-                    f"Architecture validation error (non-blocking): {e}",
-                )
-
-            # === End Architecture Enforcement Gate ===
-
-            # === Coverage Enforcement Gate ===
-            # After QA + architecture approve, enforce the minimum test coverage
-            # threshold (default 100% for unit + integration, e2e best-effort).
-            # Language-agnostic: validates the coverage numbers recorded by the
-            # QA reviewer in qa_signoff.coverage. Controlled by
-            # WORKPILOT_QA_MIN_COVERAGE (0 = disabled).
-            if status == "approved":
-                try:
-                    from .coverage_gate import (
-                        build_coverage_issues,
-                        mark_signoff_rejected,
-                        run_coverage_gate,
-                        write_coverage_fix_request,
-                    )
-
-                    coverage_report = run_coverage_gate(spec_dir)
-
-                    if not coverage_report["enabled"]:
-                        debug(
-                            "qa_loop",
-                            "Coverage enforcement gate disabled "
-                            "(WORKPILOT_QA_MIN_COVERAGE=0)",
-                        )
-                    elif coverage_report["warnings"]:
-                        for warning in coverage_report["warnings"]:
-                            debug_warning("qa_loop", f"Coverage: {warning}")
-
-                    if coverage_report["enabled"] and not coverage_report["passed"]:
-                        debug_warning(
-                            "qa_loop",
-                            "Coverage gate failed",
-                            min_coverage=coverage_report["min_coverage"],
-                            failures=len(coverage_report["failures"]),
-                        )
-                        print(
-                            "\n📊 Coverage enforcement: "
-                            f"{len(coverage_report['failures'])} requirement(s) "
-                            f"below {coverage_report['min_coverage']}% threshold"
-                        )
-
-                        # Write a coverage-specific fix request for the fixer agent
-                        write_coverage_fix_request(spec_dir, coverage_report)
-
-                        # Make the gate authoritative: persist rejected status so a
-                        # later loop invocation cannot short-circuit on a stale
-                        # "approved" qa_signoff written by the reviewer.
-                        mark_signoff_rejected(spec_dir, coverage_report)
-
-                        # Override status to rejected: the rejection handler
-                        # below logs, records and runs the fixer on these issues.
-                        status = "rejected"
-                        gate_issues = build_coverage_issues(coverage_report)
-                        gate_verdict = (
-                            f"QA pass #{qa_iteration} rejected by the coverage gate"
-                        )
-
-                except ImportError:
-                    debug_warning(
-                        "qa_loop",
-                        "Coverage gate package not available, skipping",
-                    )
-                except Exception as e:
-                    # Coverage gate must not crash the QA pipeline.
-                    debug_warning(
-                        "qa_loop",
-                        f"Coverage gate error (non-blocking): {e}",
-                    )
-
-            # === End Coverage Enforcement Gate ===
-
-            # Only proceed to final approval if architecture passed (status still "approved")
-            if status == "approved":
-                emit_phase(ExecutionPhase.COMPLETE, "QA validation passed")
-
-                qa_status = get_qa_signoff_status(spec_dir) or {}
-                task_event_emitter.emit(
-                    "QA_PASSED",
-                    {
-                        "iteration": qa_iteration,
-                        "testsRun": qa_status.get("tests_passed", {}),
-                    },
-                )
-
-                print("\n" + "=" * 70)
-                print("  ✅ QA APPROVED + ARCHITECTURE CLEAN")
-                print("=" * 70)
-                print("\nAll acceptance criteria verified.")
-                print("Architecture validation passed.")
-                print("The implementation is production-ready.")
-                print("\nNext steps:")
-                print("  1. Review the auto-claude/* branch")
-                print("  2. Create a PR and merge to main")
-
-                # End validation phase successfully
-                if task_logger:
-                    task_logger.log_success(
-                        f"QA pass #{qa_iteration} approved: all criteria met, "
-                        f"architecture clean. Validation complete.",
-                        LogPhase.VALIDATION,
-                    )
-                    task_logger.end_phase(
-                        LogPhase.VALIDATION,
-                        success=True,
-                        message="QA validation passed - all criteria met, architecture clean",
-                    )
-
-                # Update Linear: QA approved, awaiting human review
-                if linear_task and linear_task.task_id:
-                    await linear_qa_approved(spec_dir)
-                    print("\nLinear: Task marked as QA approved, awaiting human review")
-
-                return True
-
-        elif status == "human_escalation":
-            # QA agent could not auto-verify (e.g. sandbox/no CLI) — escalate to human review
-            debug(
-                "qa_loop",
-                "QA requires human verification",
-                iteration=qa_iteration,
-                duration=f"{iteration_duration:.1f}s",
-            )
-            qa_status = get_qa_signoff_status(spec_dir) or {}
-            notes = qa_status.get("next_steps", [])
-            if task_logger:
-                _reason = (
-                    " (environment limitation: tests can't run here)"
-                    if qa_status.get("sandbox_limitation")
-                    else ""
-                )
-                task_logger.log_info(
-                    f"QA pass #{qa_iteration}: code validated by review; manual "
-                    f"verification required{_reason}. Validation complete.",
-                    LogPhase.VALIDATION,
-                )
-
-            emit_phase(ExecutionPhase.COMPLETE, "QA requires manual verification")
-            task_event_emitter.emit(
-                "QA_PASSED",
-                {
-                    "iteration": qa_iteration,
-                    "testsRun": qa_status.get("tests_passed", {}),
-                    "manualVerificationRequired": True,
-                },
-            )
-
-            print("\n" + "=" * 70)
-            print("  ⚠️  QA REQUIRES MANUAL VERIFICATION")
-            print("=" * 70)
-            print("\nCode quality passed automated review.")
-            print("Manual verification required (e.g. run tests outside sandbox).")
-            if notes:
-                print("\nNext steps:")
-                for step in notes[:5]:
-                    print(f"  - {step}")
-
-            if task_logger:
-                task_logger.end_phase(
-                    LogPhase.VALIDATION,
-                    success=True,
-                    message="QA validation passed — manual verification required",
-                )
-
-            if linear_task and linear_task.task_id:
-                await linear_qa_approved(spec_dir)
-                print("\nLinear: Task marked as QA approved, awaiting human review")
-
-            return True
-
-        # Not an `elif`: a gate above can turn the reviewer's approval into a
-        # rejection, and an `elif` chained to `if status == "approved"` never
-        # ran for it — the fixer was skipped and the next pass re-reviewed the
-        # same code, until the budget ran out.
-        if status == "rejected":
-            # Reset error tracking on valid response (rejected is a valid response)
-            consecutive_errors = 0
-            last_error_context = None
-
-            debug_warning(
-                "qa_loop",
-                "QA REJECTED",
-                iteration=qa_iteration,
-                duration=f"{iteration_duration:.1f}s",
-            )
-            print(f"\n❌ QA found issues. Iteration {qa_iteration}/{max_iterations}")
-
-            if gate_issues is not None:
-                current_issues = gate_issues
-                verdict = gate_verdict
-            else:
-                # Get issues from QA report
-                qa_status = get_qa_signoff_status(spec_dir)
-                current_issues = qa_status.get("issues_found", []) if qa_status else []
-                verdict = (
-                    f"QA pass #{qa_iteration} rejected: {len(current_issues)} "
-                    "issue(s) found"
-                )
-            debug(
-                "qa_loop",
-                "Issues found by QA",
-                issue_count=len(current_issues),
-                issues=current_issues[:3] if current_issues else [],  # Show first 3
-            )
-            # A gate's issues share one title; their description says what failed.
-            issue_label = "description" if gate_issues is not None else "title"
-            task_event_emitter.emit(
-                "QA_FAILED",
-                {
-                    "iteration": qa_iteration,
-                    "issueCount": len(current_issues),
-                    "issues": [
-                        issue.get(issue_label, "")
-                        for issue in (current_issues[:5] if current_issues else [])
-                    ],
-                },
-            )
-
-            # Check for recurring issues BEFORE recording current iteration
-            # This prevents the current issues from matching themselves in history
-            history = get_iteration_history(spec_dir)
-            has_recurring, recurring_issues = has_recurring_issues(
-                current_issues, history, threshold=recurring_threshold
-            )
-
-            # Record rejected iteration AFTER checking for recurring issues
-            record_iteration(
-                spec_dir, qa_iteration, "rejected", current_issues, iteration_duration
-            )
-
-            # The verdict says what comes next: it used to promise a fix and
-            # another pass even on the last pass, right before the hand-over.
-            if task_logger:
-                if has_recurring or qa_iteration >= max_iterations:
-                    outcome = "handing over to human review."
-                else:
-                    outcome = (
-                        f"applying a fix, then re-reviewing (pass #{qa_iteration + 1})."
-                    )
-                task_logger.log_error(f"{verdict}; {outcome}", LogPhase.VALIDATION)
-
-            if has_recurring:
-                debug_error(
-                    "qa_loop",
-                    "Recurring issues detected - escalating to human",
-                    recurring_count=len(recurring_issues),
-                    threshold=recurring_threshold,
-                )
-                print(
-                    f"\n⚠️  Recurring issues detected ({len(recurring_issues)} issue(s) appeared {recurring_threshold}+ times)"
-                )
-                print("Escalating to human review due to recurring issues...")
-
-                # Create escalation file
-                await escalate_to_human(
-                    spec_dir,
-                    recurring_issues,
-                    qa_iteration,
-                    max_iterations=max_iterations,
-                    threshold=recurring_threshold,
-                )
-
-                # End validation phase
-                if task_logger:
-                    task_logger.end_phase(
-                        LogPhase.VALIDATION,
-                        success=False,
-                        message=f"QA escalated to human after {qa_iteration} iterations due to recurring issues",
-                    )
-
-                # Update Linear
-                if linear_task and linear_task.task_id:
-                    await linear_qa_max_iterations(spec_dir, qa_iteration)
-                    print(
-                        "\nLinear: Task marked as needing human intervention (recurring issues)"
-                    )
-                task_event_emitter.emit(
-                    "QA_MAX_ITERATIONS",
-                    {"iteration": qa_iteration, "maxIterations": max_iterations},
-                )
-                max_iterations_emitted = True
-
-                return False
-
-            # Record rejection in Linear
-            if linear_task and linear_task.task_id:
-                issues_count = len(current_issues)
-                await linear_qa_rejected(spec_dir, issues_count, qa_iteration)
-
-            if qa_iteration >= max_iterations:
-                print("\n⚠️  Maximum QA iterations reached.")
-                print("Escalating to human review.")
-                if not max_iterations_emitted:
-                    task_event_emitter.emit(
-                        "QA_MAX_ITERATIONS",
-                        {
-                            "iteration": qa_iteration,
-                            "maxIterations": max_iterations,
-                        },
-                    )
-                    max_iterations_emitted = True
-                break
-
-            # Run fixer with phase-specific thinking budget
-            fixer_thinking_budget = get_phase_thinking_budget(spec_dir, "qa")
-            debug(
-                "qa_loop",
-                "Starting QA fixer session...",
-                model=qa_model,
-                thinking_budget=fixer_thinking_budget,
-            )
-            emit_phase(ExecutionPhase.QA_FIXING, "Fixing QA issues")
-            if task_logger:
-                task_logger.start_subphase(
-                    f"QA FIX — PASS {qa_iteration}",
-                    phase=LogPhase.VALIDATION,
-                    print_to_console=False,
-                )
-            task_event_emitter.emit(
-                "QA_FIXING_STARTED",
-                {"iteration": qa_iteration},
-            )
-            print("\nRunning QA Fixer Agent...")
-
-            # QA_FIX_REQUEST.md est rendu depuis issues_found : le fixer lit
-            # les issues de cette passe, jamais celles d'une passe précédente.
-            # Un gate a déjà écrit le sien, plus précis : on le garde.
-            if gate_issues is None:
-                _ensure_fix_request_file(spec_dir, current_issues, qa_iteration)
-
-            try:
-                fix_client = create_agent_client(
-                    project_dir=project_dir,
-                    spec_dir=spec_dir,
-                    model=qa_model,
-                    agent_type="qa_fixer",
-                    max_thinking_tokens=fixer_thinking_budget,
-                )
-            except Exception as e:
-                debug_error("qa_loop", f"Failed to create QA fixer client: {e}")
-                print(f"\n❌ Failed to create QA fixer client: {e}")
-                record_iteration(
-                    spec_dir,
-                    qa_iteration,
-                    "error",
-                    [{"title": "Fixer client error", "description": str(e)}],
-                )
-                break
-
-            try:
-                async with fix_client:
-                    fix_status, fix_response = await run_qa_fixer_session(
-                        fix_client, spec_dir, qa_iteration, verbose
-                    )
-            except Exception as e:
-                # Prompt-too-long is permanent — see the reviewer block above.
-                from services.rate_limit_shield import handle_prompt_too_long
-
-                if handle_prompt_too_long(e, spec_dir, "qa"):
-                    debug_error("qa_loop", "QA fixer halted: prompt too long")
-                    print("\n⛔ QA fixer halted: prompt too long. See task detail.")
-                    if task_logger:
-                        task_logger.end_phase(
-                            LogPhase.VALIDATION,
-                            success=False,
-                            message="QA fixer halted: prompt too long for the LLM context window",
-                        )
-                    return False
-
-                # Same rate-limit shield as the reviewer above: pause-and-resume
-                # instead of counting toward consecutive errors.
-                if await _handle_rate_limit_in_qa(e, spec_dir, source_spec_dir):
-                    qa_iteration -= 1
-                    continue
-                debug_error("qa_loop", f"QA fixer session crashed: {e}")
-                fix_status = "error"
-                fix_response = str(e)
-
-            debug(
-                "qa_loop",
-                "QA fixer session completed",
-                fix_status=fix_status,
-                response_length=len(fix_response),
-            )
-
-            if fix_status == "error":
-                debug_error("qa_loop", f"Fixer error: {fix_response[:200]}")
-                print(f"\n❌ Fixer encountered error: {fix_response}")
-                record_iteration(
-                    spec_dir,
-                    qa_iteration,
-                    "error",
-                    [{"title": "Fixer error", "description": fix_response}],
-                )
-                break
-
-            debug_success("qa_loop", "Fixes applied, re-running QA validation")
-            task_event_emitter.emit(
-                "QA_FIXING_COMPLETE",
-                {"iteration": qa_iteration},
-            )
-            print("\n✅ Fixes applied. Re-running QA validation...")
-
-        elif status == "error":
-            consecutive_errors += 1
-            debug_error(
-                "qa_loop",
-                f"QA session error: {response[:200]}",
-                consecutive_errors=consecutive_errors,
-                max_consecutive=MAX_CONSECUTIVE_ERRORS,
-            )
-            print(f"\n❌ QA error: {response}")
-            print(
-                f"   Consecutive errors: {consecutive_errors}/{MAX_CONSECUTIVE_ERRORS}"
-            )
-            record_iteration(
-                spec_dir,
-                qa_iteration,
-                "error",
-                [{"title": "QA error", "description": response}],
-            )
-
-            # Build error context for self-correction in next iteration
-            error_type = classify_qa_error(response)
-            last_error_context = {
-                "error_type": error_type,
-                "error_message": response,
-                "consecutive_errors": consecutive_errors,
-                "expected_action": "You MUST update implementation_plan.json with a qa_signoff object containing 'status': 'approved' or 'status': 'rejected'",
-                "file_path": str(spec_dir / "implementation_plan.json"),
-            }
-
-            # Check if we've hit max consecutive errors
-            if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
-                debug_error(
-                    "qa_loop",
-                    f"Max consecutive errors ({MAX_CONSECUTIVE_ERRORS}) reached - escalating to human",
-                )
-                print(
-                    f"\n⚠️  {MAX_CONSECUTIVE_ERRORS} consecutive errors without progress."
-                )
-                print(f"Last error: {response}")
-                print("Escalating to human review.")
-                # The last pass's own error travels with the event: the card
-                # used to say only "failed 3 time(s) in a row", and the reason
-                # was in the task logs alone.
-                task_event_emitter.emit(
-                    "QA_AGENT_ERROR",
-                    {
-                        "iteration": qa_iteration,
-                        "consecutiveErrors": consecutive_errors,
-                        "error": response[:500],
-                    },
-                )
-
-                # A local model often emits *some* recoverable tool calls (so the
-                # fast-halt above doesn't fire) yet never writes a valid
-                # qa_signoff — it stalls here after 3 errors. Make the escalation
-                # message name the likely cause so the user knows to switch model
-                # instead of assuming a code bug.
-                fail_message = (
-                    f"QA agent failed {MAX_CONSECUTIVE_ERRORS} consecutive times"
-                    + (
-                        f" - the session itself failed: {response[:300]}"
-                        if error_type == "session_error"
-                        else " - unable to update implementation_plan.json"
-                    )
-                )
-                try:
-                    provider = client.provider_name()
-                except Exception:
-                    provider = ""
-                if provider in ("ollama", "local", "lmstudio"):
-                    fail_message += (
-                        f". The local model « {qa_model} » likely can't complete "
-                        "tool-based QA — switch the Validation phase to a more "
-                        "capable model (a larger local model, or a cloud provider)."
-                    )
-
-                # End validation phase as failed
-                if task_logger:
-                    task_logger.end_phase(
-                        LogPhase.VALIDATION,
-                        success=False,
-                        message=fail_message,
-                    )
-                return False
-
-            print("Retrying with error feedback...")
-
-    # Max iterations reached without approval
+    # End validation phase as failed
+    if scope.task_logger:
+        scope.task_logger.end_phase(
+            LogPhase.VALIDATION,
+            success=False,
+            message=fail_message,
+        )
+    return _Next.FAILED
+
+
+# -----------------------------------------------------------------------------
+# After the passes
+# -----------------------------------------------------------------------------
+
+
+async def _report_exhausted(scope: _QaScope, state: _QaState) -> bool:
+    """The budget ran out without approval: hand over to a person."""
+    spec_dir = scope.spec_dir
+    qa_iteration = state.qa_iteration
+    max_iterations = scope.max_iterations
     emit_phase(ExecutionPhase.FAILED, "QA validation incomplete")
-    if not max_iterations_emitted:
-        task_event_emitter.emit(
-            "QA_MAX_ITERATIONS",
-            {"iteration": qa_iteration, "maxIterations": max_iterations},
-        )
+    _emit_max_iterations(scope, state)
     debug_error(
         "qa_loop",
         "QA VALIDATION INCOMPLETE - max iterations reached",
@@ -1354,8 +1580,8 @@ async def run_qa_validation_loop(
                 print(f"     - {issue['title']} ({issue['occurrences']} occurrences)")
 
     # End validation phase as failed
-    if task_logger:
-        task_logger.end_phase(
+    if scope.task_logger:
+        scope.task_logger.end_phase(
             LogPhase.VALIDATION,
             success=False,
             message=f"QA validation incomplete after {qa_iteration} iterations",
@@ -1371,7 +1597,7 @@ async def run_qa_validation_loop(
         print(f"See: {qa_report_file}")
 
     # Update Linear: max iterations reached, needs human intervention
-    if linear_task and linear_task.task_id:
+    if scope.has_linear_task:
         await linear_qa_max_iterations(spec_dir, qa_iteration)
         print("\nLinear: Task marked as needing human intervention")
 
