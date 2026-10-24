@@ -9,7 +9,7 @@ python-dotenv>=1.2.4
 faster-whisper>=1.2.1
 
 # WebSocket support for streaming development mode
-websockets>=17.1
+websockets>=17.3
 
 # YAML parsing. Imported behind try/except by api_watcher/contract_parser.py,
 # analysis/ci_discovery.py, environment/capturer.py and
