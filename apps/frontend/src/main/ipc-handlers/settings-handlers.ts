@@ -50,6 +50,7 @@ import {
 import { credentialManager } from "../services/credential-manager";
 import { openExternalUrl } from "../open-external";
 import { decryptSecret } from "../secret-storage";
+import { configurePythonFeatureServices } from "../python-feature-services";
 import {
 	maskSettingsSecrets,
 	unmaskSettingsUpdate,
@@ -734,6 +735,10 @@ export function registerSettingsHandlers(
 					);
 					if (settings.pythonPath) {
 						testGenerationService.configure(settings.pythonPath);
+						configurePythonFeatureServices(
+							settings.pythonPath,
+							settings.autoBuildPath,
+						);
 					}
 				}
 

@@ -64,29 +64,6 @@ export function registerVoiceControlHandlers(): void {
 			};
 		}
 	});
-
-	// Configure voice control service
-	ipcMain.handle(
-		"voice-control:configure",
-		async (
-			_event,
-			config: { pythonPath?: string; autoBuildSourcePath?: string },
-		) => {
-			try {
-				voiceControlService.configure(
-					config.pythonPath,
-					config.autoBuildSourcePath,
-				);
-				return { success: true };
-			} catch (error) {
-				console.error("[VoiceControl] Failed to configure:", error);
-				return {
-					success: false,
-					error: error instanceof Error ? error.message : "Unknown error",
-				};
-			}
-		},
-	);
 }
 
 /**

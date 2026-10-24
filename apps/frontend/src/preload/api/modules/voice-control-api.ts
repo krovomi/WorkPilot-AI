@@ -30,12 +30,6 @@ export interface VoiceControlAPI extends DictationAPI {
 		error?: string;
 	}>;
 
-	// Configuration
-	configureVoiceControl: (config: {
-		pythonPath?: string;
-		autoBuildSourcePath?: string;
-	}) => Promise<{ success: boolean; error?: string }>;
-
 	// Event listeners
 	onVoiceControlStatus: (callback: (status: string) => void) => () => void;
 	onVoiceControlStreamChunk: (callback: (chunk: string) => void) => () => void;
@@ -74,11 +68,6 @@ export function createVoiceControlAPI(): VoiceControlAPI {
 
 		isVoiceControlActive: async () => {
 			return await invokeIpc("voice-control:isActive");
-		},
-
-		// Configuration
-		configureVoiceControl: async (config) => {
-			return await invokeIpc("voice-control:configure", config);
 		},
 
 		// Event listeners

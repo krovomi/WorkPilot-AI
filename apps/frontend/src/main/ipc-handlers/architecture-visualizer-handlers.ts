@@ -125,24 +125,6 @@ export function registerArchitectureVisualizerHandlers(): void {
 			return failure(error);
 		}
 	});
-
-	ipcMain.handle(
-		IPC_CHANNELS.ARCHITECTURE_VISUALIZER_CONFIGURE,
-		async (
-			_event,
-			config: { pythonPath?: string; autoBuildSourcePath?: string },
-		) => {
-			try {
-				architectureVisualizerService.configure(
-					config.pythonPath,
-					config.autoBuildSourcePath,
-				);
-				return { success: true };
-			} catch (error) {
-				return failure(error);
-			}
-		},
-	);
 }
 
 /**

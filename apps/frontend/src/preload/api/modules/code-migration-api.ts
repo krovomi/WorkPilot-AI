@@ -36,9 +36,6 @@ export interface CodeMigrationAPI {
 		cancelled: boolean;
 		error?: string;
 	}>;
-	configureCodeMigration: (config: {
-		pythonPath?: string;
-	}) => Promise<{ success: boolean; error?: string }>;
 	onCodeMigrationStatus: (callback: (status: string) => void) => () => void;
 	onCodeMigrationStreamChunk: (callback: (chunk: string) => void) => () => void;
 	onCodeMigrationError: (callback: (error: string) => void) => () => void;
@@ -60,8 +57,6 @@ export function createCodeMigrationAPI(): CodeMigrationAPI {
 			invokeIpc("codeMigration:start", request),
 		cancelCodeMigration: () =>
 			invokeIpc("codeMigration:cancel"),
-		configureCodeMigration: (config) =>
-			invokeIpc("codeMigration:configure", config),
 		onCodeMigrationStatus: (callback) =>
 			createIpcListener(IPC_CHANNELS.CODE_MIGRATION_STATUS, callback),
 		onCodeMigrationStreamChunk: (callback) =>

@@ -790,7 +790,6 @@ const browserMockAPI: Partial<ElectronAPI> = {
 	// Auto-Refactor API
 	startAutoRefactor: async () => ({ success: false, error: "browser preview" }),
 	cancelAutoRefactor: async () => ({ success: false, cancelled: false }),
-	configureAutoRefactor: async () => ({ success: true }),
 	onAutoRefactorStatus: () => () => {
 		/* noop */
 	},

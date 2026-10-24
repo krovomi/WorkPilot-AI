@@ -24,10 +24,6 @@ export interface PipelineGeneratorAPI {
 		cancelled: boolean;
 		error?: string;
 	}>;
-	configurePipelineGenerator: (config: {
-		pythonPath?: string;
-		autoBuildSourcePath?: string;
-	}) => Promise<{ success: boolean; error?: string }>;
 	onPipelineGeneratorStatus: (
 		callback: (status: string) => void,
 	) => IpcListenerCleanup;
@@ -52,11 +48,6 @@ export function createPipelineGeneratorAPI(): PipelineGeneratorAPI {
 		cancelPipelineGeneration: () =>
 			invokeIpc<{ success: boolean; cancelled: boolean; error?: string }>(
 				"pipelineGenerator:cancel",
-			),
-		configurePipelineGenerator: (config) =>
-			invokeIpc<{ success: boolean; error?: string }>(
-				"pipelineGenerator:configure",
-				config,
 			),
 		onPipelineGeneratorStatus: (callback) =>
 			createIpcListener<[string]>("pipelineGenerator:status", callback),

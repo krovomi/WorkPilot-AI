@@ -30,6 +30,7 @@ import {
 	isInitialized,
 } from "../project-initializer";
 import { projectStore } from "../project-store";
+import { configurePythonFeatureServices } from "../python-feature-services";
 import type { PythonEnvManager, PythonEnvStatus } from "../python-env-manager";
 import { testGenerationService } from "../test-generation-service";
 import { titleGenerator } from "../title-generator";
@@ -684,6 +685,7 @@ const configureServicesWithPython = (
 	changelogService.configure(pythonPath, autoBuildPath);
 	insightsService.configure(pythonPath, autoBuildPath);
 	titleGenerator.configure(pythonPath, autoBuildPath);
+	configurePythonFeatureServices(pythonPath, autoBuildPath);
 	// Only the managed Python path matters here; the backend directory is
 	// auto-detected by the service (dev + packaged), so we don't pass autoBuildPath.
 	testGenerationService.configure(pythonPath);

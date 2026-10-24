@@ -35,24 +35,6 @@ export function registerVisualProgrammingHandlers(
 			};
 		}
 	});
-
-	ipcMain.handle(
-		"visualProgramming:configure",
-		async (_event, config: { pythonPath?: string; sourcePath?: string }) => {
-			try {
-				visualProgrammingService.configure(
-					config.pythonPath,
-					config.sourcePath,
-				);
-				return { success: true };
-			} catch (error) {
-				return {
-					success: false,
-					error: error instanceof Error ? error.message : "Unknown error",
-				};
-			}
-		},
-	);
 }
 
 export function setupVisualProgrammingEventForwarding(

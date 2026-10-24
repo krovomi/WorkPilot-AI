@@ -48,10 +48,6 @@ export interface AutoRefactorAPI {
 		cancelled: boolean;
 		error?: string;
 	}>;
-	configureAutoRefactor: (config: {
-		pythonPath?: string;
-		autoBuildSourcePath?: string;
-	}) => Promise<{ success: boolean; error?: string }>;
 
 	// Event listeners
 	onAutoRefactorStatus: (callback: (status: string) => void) => () => void;
@@ -75,11 +71,6 @@ export function createAutoRefactorAPI(): AutoRefactorAPI {
 			invokeIpc("auto-refactor:start", request),
 
 		cancelAutoRefactor: () => invokeIpc("auto-refactor:cancel"),
-
-		configureAutoRefactor: (config: {
-			pythonPath?: string;
-			autoBuildSourcePath?: string;
-		}) => invokeIpc("auto-refactor:configure", config),
 
 		// Event listeners
 		onAutoRefactorStatus: (callback: (status: string) => void) =>

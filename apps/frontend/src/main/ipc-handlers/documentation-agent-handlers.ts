@@ -33,27 +33,6 @@ export function registerDocumentationAgentHandlers(): void {
 			};
 		}
 	});
-
-	ipcMain.handle(
-		"documentationAgent:configure",
-		async (
-			_event,
-			config: { pythonPath?: string; autoBuildSourcePath?: string },
-		) => {
-			try {
-				documentationAgentService.configure(
-					config.pythonPath,
-					config.autoBuildSourcePath,
-				);
-				return { success: true };
-			} catch (error) {
-				return {
-					success: false,
-					error: error instanceof Error ? error.message : "Unknown error",
-				};
-			}
-		},
-	);
 }
 
 /**
