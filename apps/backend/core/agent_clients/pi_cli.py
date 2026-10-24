@@ -55,7 +55,7 @@ from contextlib import aclosing
 from pathlib import Path
 from typing import Any
 
-from core.platform import build_windows_command, find_executable, is_windows
+from foundation.platform import build_windows_command, find_executable, is_windows
 from harness.domain import from_pi_usage
 
 from .base import AgentMessage, MessageRole

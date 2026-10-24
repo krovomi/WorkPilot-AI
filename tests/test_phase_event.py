@@ -21,7 +21,7 @@ import pytest
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "apps" / "backend"))
 
-from core.phase_event import (
+from foundation.phase_event import (
     PHASE_MARKER_PREFIX,
     ExecutionPhase,
     emit_phase,
@@ -341,7 +341,7 @@ class TestErrorHandling:
 
         import importlib
 
-        from core import phase_event
+        from foundation import phase_event
 
         importlib.reload(phase_event)
 
@@ -356,7 +356,7 @@ class TestErrorHandling:
 
         monkeypatch.setattr("builtins.print", raise_oserror_once)
 
-        from core.phase_event import emit_phase as emit_phase_reloaded
+        from foundation.phase_event import emit_phase as emit_phase_reloaded
 
         emit_phase_reloaded(ExecutionPhase.CODING, "Test")
 

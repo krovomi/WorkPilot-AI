@@ -261,7 +261,7 @@ def resolve_offline_route(
         endpoint = local_endpoint(provider)
     except ValueError as exc:
         return _decline(str(exc))
-    from core.local_model_catalog import detect_runtime
+    from offline_policy.local_model_catalog import detect_runtime
 
     runtime = detect_runtime(provider)
     if not runtime.get("available"):

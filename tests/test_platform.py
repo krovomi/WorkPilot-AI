@@ -13,7 +13,7 @@ from unittest.mock import patch
 # Add backend to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "apps", "backend"))
 
-from core.platform import (
+from foundation.platform import (
     OS,
     build_windows_command,
     find_executable,
@@ -45,7 +45,7 @@ from core.platform import (
 class TestPlatformDetection:
     """Tests for platform detection functions."""
 
-    @patch("core.platform.platform.system", return_value="Windows")
+    @patch("foundation.platform.platform.system", return_value="Windows")
     def test_detects_windows(self, mock_system):
         assert get_current_os() == OS.WINDOWS
         assert is_windows() is True
@@ -53,7 +53,7 @@ class TestPlatformDetection:
         assert is_linux() is False
         assert is_unix() is False
 
-    @patch("core.platform.platform.system", return_value="Darwin")
+    @patch("foundation.platform.platform.system", return_value="Darwin")
     def test_detects_macos(self, mock_system):
         assert get_current_os() == OS.MACOS
         assert is_windows() is False
@@ -61,7 +61,7 @@ class TestPlatformDetection:
         assert is_linux() is False
         assert is_unix() is True
 
-    @patch("core.platform.platform.system", return_value="Linux")
+    @patch("foundation.platform.platform.system", return_value="Linux")
     def test_detects_linux(self, mock_system):
         assert get_current_os() == OS.LINUX
         assert is_windows() is False
@@ -78,19 +78,19 @@ class TestPlatformDetection:
 class TestPathConfiguration:
     """Tests for path-related configuration."""
 
-    @patch("core.platform.is_windows", return_value=True)
+    @patch("foundation.platform.is_windows", return_value=True)
     def test_windows_path_delimiter(self, mock_is_windows):
         assert get_path_delimiter() == ";"
 
-    @patch("core.platform.is_windows", return_value=False)
+    @patch("foundation.platform.is_windows", return_value=False)
     def test_unix_path_delimiter(self, mock_is_windows):
         assert get_path_delimiter() == ":"
 
-    @patch("core.platform.is_windows", return_value=True)
+    @patch("foundation.platform.is_windows", return_value=True)
     def test_windows_executable_extension(self, mock_is_windows):
         assert get_executable_extension() == ".exe"
 
-    @patch("core.platform.is_windows", return_value=False)
+    @patch("foundation.platform.is_windows", return_value=False)
     def test_unix_executable_extension(self, mock_is_windows):
         assert get_executable_extension() == ""
 
@@ -98,17 +98,17 @@ class TestPathConfiguration:
 class TestWithExecutableExtension:
     """Tests for adding executable extensions."""
 
-    @patch("core.platform.is_windows", return_value=True)
+    @patch("foundation.platform.is_windows", return_value=True)
     def test_adds_extension_on_windows(self, mock_is_windows):
         assert with_executable_extension("claude") == "claude.exe"
         assert with_executable_extension("node") == "node.exe"
 
-    @patch("core.platform.is_windows", return_value=True)
+    @patch("foundation.platform.is_windows", return_value=True)
     def test_preserves_existing_extension(self, mock_is_windows):
         assert with_executable_extension("claude.exe") == "claude.exe"
         assert with_executable_extension("npm.cmd") == "npm.cmd"
 
-    @patch("core.platform.is_windows", return_value=False)
+    @patch("foundation.platform.is_windows", return_value=False)
     def test_no_extension_on_unix(self, mock_is_windows):
         assert with_executable_extension("claude") == "claude"
         assert with_executable_extension("node") == "node"
@@ -122,7 +122,7 @@ class TestWithExecutableExtension:
 class TestBinaryDirectories:
     """Tests for binary directory detection."""
 
-    @patch("core.platform.is_windows", return_value=True)
+    @patch("foundation.platform.is_windows", return_value=True)
     @patch("pathlib.Path.home", return_value=Path("/home/user"))
     @patch.dict(os.environ, {"ProgramFiles": "C:\\Program Files"})
     def test_windows_binary_directories(self, mock_home, mock_is_windows):
@@ -133,16 +133,16 @@ class TestBinaryDirectories:
         assert any("AppData" in d for d in dirs["user"])
         assert any("Program Files" in d for d in dirs["system"])
 
-    @patch("core.platform.is_windows", return_value=False)
-    @patch("core.platform.is_macos", return_value=True)
+    @patch("foundation.platform.is_windows", return_value=False)
+    @patch("foundation.platform.is_macos", return_value=True)
     def test_macos_binary_directories(self, mock_is_macos, mock_is_windows):
         dirs = get_binary_directories()
 
         assert "/opt/homebrew/bin" in dirs["system"]
         assert "/usr/local/bin" in dirs["system"]
 
-    @patch("core.platform.is_windows", return_value=False)
-    @patch("core.platform.is_macos", return_value=False)
+    @patch("foundation.platform.is_windows", return_value=False)
+    @patch("foundation.platform.is_macos", return_value=False)
     def test_linux_binary_directories(self, mock_is_macos, mock_is_windows):
         dirs = get_binary_directories()
 
@@ -158,11 +158,11 @@ class TestBinaryDirectories:
 class TestHomebrewPath:
     """Tests for Homebrew path detection."""
 
-    @patch("core.platform.is_macos", return_value=False)
+    @patch("foundation.platform.is_macos", return_value=False)
     def test_returns_null_on_non_macos(self, mock_is_macos):
         assert get_homebrew_path() is None
 
-    @patch("core.platform.is_macos", return_value=True)
+    @patch("foundation.platform.is_macos", return_value=True)
     @patch("os.path.exists", return_value=False)
     def test_returns_default_on_macos(self, mock_exists, mock_is_macos):
         # Should return default Apple Silicon path
@@ -178,8 +178,8 @@ class TestHomebrewPath:
 class TestClaudeDetectionPaths:
     """Tests for Claude CLI path detection."""
 
-    @patch("core.platform.is_macos", return_value=False)
-    @patch("core.platform.is_windows", return_value=True)
+    @patch("foundation.platform.is_macos", return_value=False)
+    @patch("foundation.platform.is_windows", return_value=True)
     @patch("pathlib.Path.home", return_value=Path("/home/user"))
     def test_windows_claude_paths(self, mock_home, mock_is_windows, mock_is_macos):
         paths = get_claude_detection_paths()
@@ -188,8 +188,8 @@ class TestClaudeDetectionPaths:
         assert any("Program Files" in p for p in paths)
         assert any(p.endswith(".exe") for p in paths)
 
-    @patch("core.platform.is_macos", return_value=False)
-    @patch("core.platform.is_windows", return_value=False)
+    @patch("foundation.platform.is_macos", return_value=False)
+    @patch("foundation.platform.is_windows", return_value=False)
     @patch("pathlib.Path.home", return_value=Path("/home/user"))
     def test_unix_claude_paths(self, mock_home, mock_is_windows, mock_is_macos):
         paths = get_claude_detection_paths()
@@ -197,9 +197,9 @@ class TestClaudeDetectionPaths:
         assert any(".local" in p for p in paths)
         assert not any(p.endswith(".exe") for p in paths)
 
-    @patch("core.platform.is_macos", return_value=True)
-    @patch("core.platform.is_windows", return_value=False)
-    @patch("core.platform.get_homebrew_path", return_value="/opt/homebrew/bin")
+    @patch("foundation.platform.is_macos", return_value=True)
+    @patch("foundation.platform.is_windows", return_value=False)
+    @patch("foundation.platform.get_homebrew_path", return_value="/opt/homebrew/bin")
     @patch("pathlib.Path.home", return_value=Path("/Users/testuser"))
     def test_macos_claude_detection_paths_include_homebrew(
         self, mock_home, mock_brew, mock_is_windows, mock_is_macos
@@ -213,8 +213,8 @@ class TestClaudeDetectionPaths:
         assert any(".local" in p for p in normalized_paths)
         assert not any(p.endswith(".exe") for p in paths)
 
-    @patch("core.platform.is_macos", return_value=False)
-    @patch("core.platform.is_windows", return_value=False)
+    @patch("foundation.platform.is_macos", return_value=False)
+    @patch("foundation.platform.is_windows", return_value=False)
     @patch("pathlib.Path.home", return_value=Path("/home/linuxuser"))
     def test_linux_claude_detection_paths(
         self, mock_home, mock_is_windows, mock_is_macos
@@ -233,14 +233,14 @@ class TestClaudeDetectionPaths:
 class TestPythonCommands:
     """Tests for Python command variations."""
 
-    @patch("core.platform.is_windows", return_value=True)
+    @patch("foundation.platform.is_windows", return_value=True)
     def test_windows_python_commands(self, mock_is_windows):
         commands = get_python_commands()
         # Commands are now returned as argument sequences
         assert ["py", "-3"] in commands
         assert ["python"] in commands
 
-    @patch("core.platform.is_windows", return_value=False)
+    @patch("foundation.platform.is_windows", return_value=False)
     def test_unix_python_commands(self, mock_is_windows):
         commands = get_python_commands()
         # Commands are now returned as argument sequences
@@ -255,7 +255,7 @@ class TestPythonCommands:
 class TestClaudeDetectionPathsStructured:
     """Tests for structured Claude CLI path detection."""
 
-    @patch("core.platform.is_windows", return_value=True)
+    @patch("foundation.platform.is_windows", return_value=True)
     @patch("pathlib.Path.home", return_value=Path("/home/user"))
     def test_windows_structured_claude_detection(self, mock_home, mock_is_windows):
         """Windows should return .exe paths in platform key."""
@@ -270,7 +270,7 @@ class TestClaudeDetectionPathsStructured:
         assert any("AppData" in p for p in platform_paths)
         assert any(".exe" in p for p in platform_paths)
 
-    @patch("core.platform.is_windows", return_value=False)
+    @patch("foundation.platform.is_windows", return_value=False)
     @patch("pathlib.Path.home", return_value=Path("/home/user"))
     def test_unix_structured_claude_detection(self, mock_home, mock_is_windows):
         """Unix should return non-.exe paths and Homebrew paths."""
@@ -289,7 +289,7 @@ class TestClaudeDetectionPathsStructured:
         platform_paths = result["platform"]
         assert not any(".exe" in p for p in platform_paths)
 
-    @patch("core.platform.is_windows", return_value=False)
+    @patch("foundation.platform.is_windows", return_value=False)
     @patch("pathlib.Path.home", return_value=Path("/home/testuser"))
     def test_nvm_versions_directory_path(self, mock_home, mock_is_windows):
         """NVM versions directory should be in user home."""
@@ -305,7 +305,7 @@ class TestClaudeDetectionPathsStructured:
 class TestFindExecutableCli:
     """Tests for find_executable function across platforms."""
 
-    @patch("core.platform.is_windows", return_value=True)
+    @patch("foundation.platform.is_windows", return_value=True)
     @patch("shutil.which", return_value=None)
     @patch("os.path.isdir", return_value=True)
     @patch("os.path.isfile")
@@ -326,7 +326,7 @@ class TestFindExecutableCli:
         # Should have tried to find with extension
         assert mock_isfile.called
 
-    @patch("core.platform.is_windows", return_value=False)
+    @patch("foundation.platform.is_windows", return_value=False)
     @patch("shutil.which", return_value="/usr/bin/node")
     def test_unix_cli_detection_uses_which(self, mock_which, mock_is_windows):
         """Unix should use shutil.which first."""
@@ -335,9 +335,9 @@ class TestFindExecutableCli:
         assert result == "/usr/bin/node"
         mock_which.assert_called_with("node")
 
-    @patch("core.platform.is_windows", return_value=False)
+    @patch("foundation.platform.is_windows", return_value=False)
     @patch("shutil.which", return_value=None)
-    @patch("core.platform.is_macos", return_value=True)
+    @patch("foundation.platform.is_macos", return_value=True)
     @patch("os.path.isdir", return_value=True)
     @patch("os.path.isfile")
     @patch("pathlib.Path.home", return_value=Path("/Users/testuser"))
@@ -365,9 +365,9 @@ class TestFindExecutableCli:
         assert result is not None
         assert result.replace("\\", "/") == "/opt/homebrew/bin/python3"
 
-    @patch("core.platform.is_windows", return_value=False)
+    @patch("foundation.platform.is_windows", return_value=False)
     @patch("shutil.which", return_value=None)
-    @patch("core.platform.is_macos", return_value=False)
+    @patch("foundation.platform.is_macos", return_value=False)
     @patch("os.path.isdir", return_value=True)
     @patch("os.path.isfile")
     @patch("pathlib.Path.home", return_value=Path("/home/testuser"))
@@ -395,9 +395,9 @@ class TestFindExecutableCli:
         assert result is not None
         assert result.replace("\\", "/") == "/usr/bin/python3"
 
-    @patch("core.platform.is_windows", return_value=False)
+    @patch("foundation.platform.is_windows", return_value=False)
     @patch("shutil.which", return_value=None)
-    @patch("core.platform.is_macos", return_value=False)
+    @patch("foundation.platform.is_macos", return_value=False)
     @patch("os.path.isdir", return_value=False)
     @patch("os.path.isfile", return_value=False)
     @patch("pathlib.Path.home", return_value=Path("/home/testuser"))
@@ -415,9 +415,9 @@ class TestFindExecutableCli:
 
         assert result is None
 
-    @patch("core.platform.is_windows", return_value=False)
+    @patch("foundation.platform.is_windows", return_value=False)
     @patch("shutil.which", return_value=None)
-    @patch("core.platform.is_macos", return_value=False)
+    @patch("foundation.platform.is_macos", return_value=False)
     @patch("os.path.isdir", return_value=True)
     @patch("os.path.isfile")
     @patch("pathlib.Path.home", return_value=Path("/home/testuser"))
@@ -449,7 +449,7 @@ class TestFindExecutableCli:
 class TestNodeCliDetection:
     """Tests for Node.js CLI detection patterns across platforms."""
 
-    @patch("core.platform.is_windows", return_value=True)
+    @patch("foundation.platform.is_windows", return_value=True)
     @patch("shutil.which", return_value="C:\\Program Files\\nodejs\\node.exe")
     def test_windows_node_detection_via_which(self, mock_which, mock_is_windows):
         """Windows Node detection should work via PATH."""
@@ -457,7 +457,7 @@ class TestNodeCliDetection:
 
         assert result == "C:\\Program Files\\nodejs\\node.exe"
 
-    @patch("core.platform.is_windows", return_value=False)
+    @patch("foundation.platform.is_windows", return_value=False)
     @patch("shutil.which", return_value="/usr/local/bin/node")
     def test_macos_node_detection_via_which(self, mock_which, mock_is_windows):
         """macOS Node detection should work via PATH."""
@@ -465,7 +465,7 @@ class TestNodeCliDetection:
 
         assert result == "/usr/local/bin/node"
 
-    @patch("core.platform.is_windows", return_value=False)
+    @patch("foundation.platform.is_windows", return_value=False)
     @patch("shutil.which", return_value="/usr/bin/node")
     def test_linux_node_detection_via_which(self, mock_which, mock_is_windows):
         """Linux Node detection should work via PATH."""
@@ -477,7 +477,7 @@ class TestNodeCliDetection:
 class TestPythonCliDetection:
     """Tests for Python CLI detection patterns across platforms."""
 
-    @patch("core.platform.is_windows", return_value=True)
+    @patch("foundation.platform.is_windows", return_value=True)
     def test_windows_python_detection_prefers_py_launcher(self, mock_is_windows):
         """Windows should prefer py launcher."""
         commands = get_python_commands()
@@ -485,7 +485,7 @@ class TestPythonCliDetection:
         # First command should be py launcher
         assert commands[0] == ["py", "-3"]
 
-    @patch("core.platform.is_windows", return_value=False)
+    @patch("foundation.platform.is_windows", return_value=False)
     def test_unix_python_detection_prefers_python3(self, mock_is_windows):
         """Unix should prefer python3."""
         commands = get_python_commands()
@@ -493,7 +493,7 @@ class TestPythonCliDetection:
         assert commands[0] == ["python3"]
         assert ["python"] in commands
 
-    @patch("core.platform.is_windows", return_value=True)
+    @patch("foundation.platform.is_windows", return_value=True)
     def test_windows_python_detection_includes_fallbacks(self, mock_is_windows):
         """Windows should have fallback commands."""
         commands = get_python_commands()
@@ -507,8 +507,8 @@ class TestPythonCliDetection:
 class TestClaudeCliDetectionCrossPlatform:
     """Tests for Claude CLI detection specifically across all platforms."""
 
-    @patch("core.platform.is_macos", return_value=False)
-    @patch("core.platform.is_windows", return_value=True)
+    @patch("foundation.platform.is_macos", return_value=False)
+    @patch("foundation.platform.is_windows", return_value=True)
     @patch("pathlib.Path.home", return_value=Path("C:/Users/testuser"))
     def test_windows_claude_cli_detection_paths(
         self, mock_home, mock_is_windows, mock_is_macos
@@ -530,9 +530,9 @@ class TestClaudeCliDetectionCrossPlatform:
             p.endswith(".exe") or p.endswith(".cmd") for p in windows_executables if p
         )
 
-    @patch("core.platform.is_macos", return_value=True)
-    @patch("core.platform.is_windows", return_value=False)
-    @patch("core.platform.get_homebrew_path", return_value="/opt/homebrew/bin")
+    @patch("foundation.platform.is_macos", return_value=True)
+    @patch("foundation.platform.is_windows", return_value=False)
+    @patch("foundation.platform.get_homebrew_path", return_value="/opt/homebrew/bin")
     @patch("pathlib.Path.home", return_value=Path("/Users/testuser"))
     def test_macos_claude_cli_detection_paths(
         self, mock_home, mock_brew, mock_is_windows, mock_is_macos
@@ -549,8 +549,8 @@ class TestClaudeCliDetectionCrossPlatform:
         # No .exe extensions
         assert not any(p.endswith(".exe") for p in paths)
 
-    @patch("core.platform.is_macos", return_value=False)
-    @patch("core.platform.is_windows", return_value=False)
+    @patch("foundation.platform.is_macos", return_value=False)
+    @patch("foundation.platform.is_windows", return_value=False)
     @patch("pathlib.Path.home", return_value=Path("/home/testuser"))
     def test_linux_claude_cli_detection_paths(
         self, mock_home, mock_is_windows, mock_is_macos
@@ -607,14 +607,14 @@ class TestPathValidation:
         assert validate_cli_path("cmd\n/bin/sh") is False
         assert validate_cli_path("cmd\r\n/bin/sh") is False
 
-    @patch("core.platform.is_windows", return_value=True)
+    @patch("foundation.platform.is_windows", return_value=True)
     def test_validates_windows_names(self, mock_is_windows):
         assert validate_cli_path("claude.exe") is True
         assert validate_cli_path("my-script.cmd") is True
         assert validate_cli_path("dangerous;command.exe") is False
 
-    @patch("core.platform.os.path.isfile", return_value=True)
-    @patch("core.platform.is_windows", return_value=False)
+    @patch("foundation.platform.os.path.isfile", return_value=True)
+    @patch("foundation.platform.is_windows", return_value=False)
     def test_allows_unix_paths(self, mock_is_windows, mock_isfile):
         assert validate_cli_path("/usr/bin/node") is True
         assert validate_cli_path("/opt/homebrew/bin/python3") is True
@@ -628,13 +628,13 @@ class TestPathValidation:
 class TestShellExecution:
     """Tests for shell execution requirements."""
 
-    @patch("core.platform.is_windows", return_value=True)
+    @patch("foundation.platform.is_windows", return_value=True)
     def test_requires_shell_for_cmd_files(self, mock_is_windows):
         assert requires_shell("npm.cmd") is True
         assert requires_shell("script.bat") is True
         assert requires_shell("node.exe") is False
 
-    @patch("core.platform.is_windows", return_value=False)
+    @patch("foundation.platform.is_windows", return_value=False)
     def test_never_requires_shell_on_unix(self, mock_is_windows):
         assert requires_shell("npm") is False
         assert requires_shell("node") is False
@@ -643,7 +643,7 @@ class TestShellExecution:
 class TestWindowsCommandBuilder:
     """Tests for Windows command array building."""
 
-    @patch("core.platform.is_windows", return_value=True)
+    @patch("foundation.platform.is_windows", return_value=True)
     @patch.dict(
         os.environ,
         {"SystemRoot": "C:\\Windows", "ComSpec": "C:\\Windows\\System32\\cmd.exe"},
@@ -657,14 +657,14 @@ class TestWindowsCommandBuilder:
         assert "/c" in result
         assert any("npm.cmd" in arg for arg in result)
 
-    @patch("core.platform.is_windows", return_value=True)
+    @patch("foundation.platform.is_windows", return_value=True)
     def test_passes_exe_directly(self, mock_is_windows):
         result = build_windows_command("node.exe", ["script.js"])
 
         assert result[0] == "node.exe"
         assert result[1] == "script.js"
 
-    @patch("core.platform.is_windows", return_value=False)
+    @patch("foundation.platform.is_windows", return_value=False)
     def test_unix_command_simple(self, mock_is_windows):
         result = build_windows_command("/usr/bin/node", ["script.js"])
 
@@ -680,12 +680,12 @@ class TestEnvironmentVariables:
     """Tests for environment variable access."""
 
     @patch.dict(os.environ, {"TEST_VAR": "value"})
-    @patch("core.platform.is_windows", return_value=False)
+    @patch("foundation.platform.is_windows", return_value=False)
     def test_gets_env_var_on_unix(self, mock_is_windows):
         assert get_env_var("TEST_VAR") == "value"
         assert get_env_var("NONEXISTENT", "default") == "default"
 
-    @patch("core.platform.is_windows", return_value=True)
+    @patch("foundation.platform.is_windows", return_value=True)
     @patch.dict(os.environ, {"TEST_VAR": "value", "test_var": "other"})
     def test_case_insensitive_on_windows(self, mock_is_windows):
         # Windows should be case-insensitive
@@ -708,7 +708,7 @@ class TestPlatformDescription:
         assert "Windows" in desc
         assert "AMD64" in desc
 
-    @patch("core.platform.platform.system", return_value="Darwin")
+    @patch("foundation.platform.platform.system", return_value="Darwin")
     @patch("platform.machine", return_value="arm64")
     def test_macos_description(self, mock_machine, mock_system):
         desc = get_platform_description()
@@ -724,7 +724,7 @@ class TestPlatformDescription:
 class TestPathSeparatorEdgeCases:
     """Tests for path separator handling across platforms."""
 
-    @patch("core.platform.is_windows", return_value=True)
+    @patch("foundation.platform.is_windows", return_value=True)
     def test_windows_path_delimiter_semicolon(self, mock_is_windows):
         """Windows PATH delimiter must be semicolon."""
         delimiter = get_path_delimiter()
@@ -732,7 +732,7 @@ class TestPathSeparatorEdgeCases:
         # Verify it's not the Unix colon
         assert delimiter != ":"
 
-    @patch("core.platform.is_windows", return_value=False)
+    @patch("foundation.platform.is_windows", return_value=False)
     def test_unix_path_delimiter_colon(self, mock_is_windows):
         """Unix PATH delimiter must be colon."""
         delimiter = get_path_delimiter()
@@ -740,7 +740,7 @@ class TestPathSeparatorEdgeCases:
         # Verify it's not the Windows semicolon
         assert delimiter != ";"
 
-    @patch("core.platform.is_windows", return_value=True)
+    @patch("foundation.platform.is_windows", return_value=True)
     def test_windows_backslash_paths_validated(self, mock_is_windows):
         """Windows backslash paths with valid executable names should pass validation.
 
@@ -753,7 +753,7 @@ class TestPathSeparatorEdgeCases:
         assert validate_cli_path("my-tool.exe") is True
         assert validate_cli_path("tool_v2.exe") is True
 
-    @patch("core.platform.is_windows", return_value=True)
+    @patch("foundation.platform.is_windows", return_value=True)
     @patch("os.path.basename")
     @patch("os.path.isabs", return_value=True)
     @patch("os.path.isfile", return_value=True)
@@ -771,7 +771,7 @@ class TestPathSeparatorEdgeCases:
         mock_basename.return_value = "tool.exe"
         assert validate_cli_path(r"C:\Users\test\AppData\Local\bin\tool.exe") is True
 
-    @patch("core.platform.is_windows", return_value=False)
+    @patch("foundation.platform.is_windows", return_value=False)
     @patch("os.path.isfile", return_value=True)
     def test_unix_forward_slash_paths_validated(self, mock_isfile, mock_is_windows):
         """Unix forward slash paths should be validated correctly."""
@@ -780,14 +780,14 @@ class TestPathSeparatorEdgeCases:
         assert validate_cli_path("/home/user/.local/bin/claude") is True
         assert validate_cli_path("/opt/homebrew/bin/node") is True
 
-    @patch("core.platform.is_windows", return_value=True)
+    @patch("foundation.platform.is_windows", return_value=True)
     @patch("os.path.isfile", return_value=True)
     def test_windows_mixed_separators_handled(self, mock_isfile, mock_is_windows):
         """Windows should handle mixed path separators."""
         # Windows can accept forward slashes in many contexts
         assert validate_cli_path("C:/Program Files/app.exe") is True
 
-    @patch("core.platform.is_windows", return_value=False)
+    @patch("foundation.platform.is_windows", return_value=False)
     @patch("os.path.isfile", return_value=True)
     def test_path_with_multiple_consecutive_separators(
         self, mock_isfile, mock_is_windows
@@ -852,14 +852,14 @@ class TestPathTraversalEdgeCases:
         assert validate_cli_path(".local") is True
         assert validate_cli_path(".config") is True
 
-    @patch("core.platform.is_windows", return_value=True)
+    @patch("foundation.platform.is_windows", return_value=True)
     @patch("os.path.isfile", return_value=True)
     def test_allows_legitimate_dotted_paths_windows(self, mock_isfile, mock_is_windows):
         """Windows paths with legitimate dots should be allowed."""
         assert validate_cli_path("my.application.exe") is True
         assert validate_cli_path("tool.v2.exe") is True
 
-    @patch("core.platform.is_windows", return_value=False)
+    @patch("foundation.platform.is_windows", return_value=False)
     @patch("os.path.isfile", return_value=True)
     def test_allows_legitimate_dotted_paths_unix(self, mock_isfile, mock_is_windows):
         """Unix paths with legitimate dots should be allowed."""
@@ -958,7 +958,7 @@ class TestWindowsEnvExpansionEdgeCases:
         assert validate_cli_path("%PATH%") is False
         assert validate_cli_path("prefix%VAR%suffix") is False
 
-    @patch("core.platform.is_windows", return_value=False)
+    @patch("foundation.platform.is_windows", return_value=False)
     def test_allows_literal_percent_in_valid_context_unix(self, mock_is_windows):
         """Single percent signs (not env vars) should be allowed on Unix."""
         # Our pattern is r"%[^%]+%" which requires %...% format
@@ -967,7 +967,7 @@ class TestWindowsEnvExpansionEdgeCases:
         assert validate_cli_path("100%done") is True  # Trailing percent
         assert validate_cli_path("%file.txt") is True  # Leading single percent
 
-    @patch("core.platform.is_windows", return_value=True)
+    @patch("foundation.platform.is_windows", return_value=True)
     def test_rejects_percent_in_executable_name_windows(self, mock_is_windows):
         """Windows rejects percent signs in executable names for security."""
         # Windows has stricter executable name validation that rejects %
@@ -1029,7 +1029,7 @@ class TestSpecialPathEdgeCases:
         assert validate_cli_path("\n") is False  # Also rejected by newline pattern
         assert validate_cli_path(" \t ") is False
 
-    @patch("core.platform.is_windows", return_value=True)
+    @patch("foundation.platform.is_windows", return_value=True)
     def test_windows_rejects_spaces_in_executable_name(self, mock_is_windows):
         """Windows executable names with spaces should be rejected for security."""
         # Spaces in executable NAMES are rejected (security: prevent injection)
@@ -1037,7 +1037,7 @@ class TestSpecialPathEdgeCases:
         # But hyphens are allowed
         assert validate_cli_path("my-tool.exe") is True
 
-    @patch("core.platform.is_windows", return_value=True)
+    @patch("foundation.platform.is_windows", return_value=True)
     def test_windows_validates_executable_names(self, mock_is_windows):
         """Windows executable name validation should work."""
         # Valid names
@@ -1050,7 +1050,7 @@ class TestSpecialPathEdgeCases:
         assert validate_cli_path("app;evil.exe") is False
         assert validate_cli_path("tool|bad.exe") is False
 
-    @patch("core.platform.is_windows", return_value=False)
+    @patch("foundation.platform.is_windows", return_value=False)
     @patch("os.path.isfile", return_value=True)
     def test_unix_allows_hyphens_and_underscores(self, mock_isfile, mock_is_windows):
         """Unix paths with hyphens and underscores should be allowed."""
@@ -1066,7 +1066,7 @@ class TestSpecialPathEdgeCases:
         # But traversal is not
         assert validate_cli_path("../bin/tool") is False
 
-    @patch("core.platform.is_windows", return_value=True)
+    @patch("foundation.platform.is_windows", return_value=True)
     def test_windows_unc_paths_rejected_for_security(self, mock_is_windows):
         """Windows UNC paths are rejected for security - not needed for CLI validation."""
         # UNC paths start with \\ and are intentionally rejected
@@ -1091,51 +1091,51 @@ class TestSpecialPathEdgeCases:
 class TestExecutableExtensionEdgeCases:
     """Tests for executable extension handling edge cases."""
 
-    @patch("core.platform.is_windows", return_value=True)
+    @patch("foundation.platform.is_windows", return_value=True)
     def test_windows_adds_exe_to_bare_name(self, mock_is_windows):
         """Windows should add .exe to bare executable names."""
         assert with_executable_extension("python") == "python.exe"
         assert with_executable_extension("node") == "node.exe"
         assert with_executable_extension("claude") == "claude.exe"
 
-    @patch("core.platform.is_windows", return_value=True)
+    @patch("foundation.platform.is_windows", return_value=True)
     def test_windows_preserves_existing_exe(self, mock_is_windows):
         """Windows should not double-add .exe extension."""
         assert with_executable_extension("python.exe") == "python.exe"
         assert with_executable_extension("node.exe") == "node.exe"
 
-    @patch("core.platform.is_windows", return_value=True)
+    @patch("foundation.platform.is_windows", return_value=True)
     def test_windows_preserves_cmd_extension(self, mock_is_windows):
         """Windows should preserve .cmd extension."""
         assert with_executable_extension("npm.cmd") == "npm.cmd"
         assert with_executable_extension("npx.cmd") == "npx.cmd"
 
-    @patch("core.platform.is_windows", return_value=True)
+    @patch("foundation.platform.is_windows", return_value=True)
     def test_windows_preserves_bat_extension(self, mock_is_windows):
         """Windows should preserve .bat extension."""
         assert with_executable_extension("setup.bat") == "setup.bat"
         assert with_executable_extension("run.bat") == "run.bat"
 
-    @patch("core.platform.is_windows", return_value=False)
+    @patch("foundation.platform.is_windows", return_value=False)
     def test_unix_no_extension_added(self, mock_is_windows):
         """Unix should not add any extension."""
         assert with_executable_extension("python") == "python"
         assert with_executable_extension("python3") == "python3"
         assert with_executable_extension("node") == "node"
 
-    @patch("core.platform.is_windows", return_value=False)
+    @patch("foundation.platform.is_windows", return_value=False)
     def test_unix_preserves_any_extension(self, mock_is_windows):
         """Unix should preserve any existing extension."""
         assert with_executable_extension("script.py") == "script.py"
         assert with_executable_extension("app.sh") == "app.sh"
 
-    @patch("core.platform.is_windows", return_value=True)
+    @patch("foundation.platform.is_windows", return_value=True)
     def test_handles_empty_input(self, mock_is_windows):
         """Empty input should return empty."""
         assert with_executable_extension("") == ""
         assert with_executable_extension(None) is None
 
-    @patch("core.platform.is_windows", return_value=True)
+    @patch("foundation.platform.is_windows", return_value=True)
     def test_handles_dotted_names_without_extension(self, mock_is_windows):
         """Names with dots but no extension should get .exe."""
         # python3.11 has a dot but no recognized extension
@@ -1153,7 +1153,7 @@ class TestExecutableExtensionEdgeCases:
 class TestSplitCommand:
     """`verify` and `mobile` launch detected commands without ``shell=True``."""
 
-    @patch("core.platform.is_windows", return_value=False)
+    @patch("foundation.platform.is_windows", return_value=False)
     def test_posix_split_keeps_quoted_paths(self, _):
         assert split_command('dotnet run --project "src/My Api/Api.csproj"') == [
             "dotnet",
@@ -1162,7 +1162,7 @@ class TestSplitCommand:
             "src/My Api/Api.csproj",
         ]
 
-    @patch("core.platform.is_windows", return_value=False)
+    @patch("foundation.platform.is_windows", return_value=False)
     def test_posix_shell_syntax_is_not_interpreted(self, _):
         # `;` is an argument, not a second command.
         assert split_command("npm run dev; rm -rf /") == [
@@ -1174,16 +1174,16 @@ class TestSplitCommand:
             "/",
         ]
 
-    @patch("core.platform.get_comspec_path", return_value="cmd.exe")
-    @patch("core.platform.is_windows", return_value=True)
+    @patch("foundation.platform.get_comspec_path", return_value="cmd.exe")
+    @patch("foundation.platform.is_windows", return_value=True)
     def test_windows_wrapper_in_cwd_runs_through_cmd(self, _win, _comspec, tmp_path):
         (tmp_path / "gradlew.bat").write_text("@echo off\n", encoding="utf-8")
         argv = split_command("./gradlew installDebug", tmp_path)
         assert argv[:4] == ["cmd.exe", "/d", "/s", "/c"]
         assert "gradlew.bat" in argv[4] and argv[4].endswith(" installDebug")
 
-    @patch("core.platform.shutil.which", return_value=None)
-    @patch("core.platform.is_windows", return_value=True)
+    @patch("foundation.platform.shutil.which", return_value=None)
+    @patch("foundation.platform.is_windows", return_value=True)
     def test_windows_unresolved_program_is_left_as_named(self, _win, _which, tmp_path):
         assert split_command('dotnet build "src/My App/App.csproj"', tmp_path) == [
             "dotnet",

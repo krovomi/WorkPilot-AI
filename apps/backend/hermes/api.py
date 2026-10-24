@@ -47,8 +47,8 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from core.api_safety import server_mode_roots
 from fastapi import APIRouter
+from foundation.api_safety import server_mode_roots
 from pydantic import BaseModel, Field
 
 from .loop import SURFACES, run_cycle

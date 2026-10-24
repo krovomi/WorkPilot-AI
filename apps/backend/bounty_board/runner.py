@@ -140,7 +140,7 @@ async def default_contestant_runner(
     # coute un `exists()` et remplace un verdict faux par un refus lisible ;
     # un concours entre modeles *locaux* reste parfaitement legitime.
     try:
-        from core.offline_policy import (
+        from offline_policy import (
             STRICT_EXIT_HINT,
             airgap_status,
             is_local_provider,

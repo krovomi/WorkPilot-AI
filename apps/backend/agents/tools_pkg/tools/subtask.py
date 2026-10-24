@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from core.file_utils import write_json_atomic
+from foundation.file_utils import write_json_atomic
 from spec.validate_pkg.auto_fix import auto_fix_plan
 
 try:

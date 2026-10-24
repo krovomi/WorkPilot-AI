@@ -534,7 +534,7 @@ def reopen_interrupted_subtasks(spec_dir: Path) -> list[str]:
     if not reopened:
         return []
     try:
-        from core.file_utils import write_json_atomic
+        from foundation.file_utils import write_json_atomic
 
         write_json_atomic(plan_file, plan)
     except OSError as e:

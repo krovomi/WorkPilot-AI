@@ -22,9 +22,13 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from core.api_safety import SPEC_ADDRESS_REASONS, SpecAddressError, resolve_spec_dir
 from fastapi import APIRouter, Query
 from fastapi.responses import FileResponse, JSONResponse
+from foundation.api_safety import (
+    SPEC_ADDRESS_REASONS,
+    SpecAddressError,
+    resolve_spec_dir,
+)
 from pydantic import BaseModel
 
 from .record import load_record

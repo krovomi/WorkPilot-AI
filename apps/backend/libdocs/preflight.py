@@ -284,7 +284,7 @@ def _airgap_policy(*paths: Path) -> str | None:
     text out of a project that asked for nothing to leave it.
     """
     try:
-        from core.offline_policy import airgap_status
+        from offline_policy import airgap_status
 
         status = airgap_status(*paths)
     except Exception as exc:  # noqa: BLE001 - fail closed

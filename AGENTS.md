@@ -45,6 +45,7 @@ Une vulnérabilité se signale par [`docs/SECURITY.md`](docs/SECURITY.md), jamai
 ```
 apps/backend/        Python : agents, pipeline, API FastAPI (127.0.0.1:9000), WebSocket (:8765)
   core/client.py     LA fabrique de clients LLM — tout passe par là
+  foundation/        la couche la plus basse : plateforme, sûreté des routes, git ; n'importe rien
   agents/            planner, coder, sessions ; agents/subagents/ = registre des sous-agents
   security/          allowlist de commandes, écritures confinées, contenu non fiable
   server/            mode serveur : auth/, authz/ (permissions, tenants)

@@ -20,7 +20,7 @@ def _utcnow_naive() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
 
 
-from core.phase_event import ExecutionPhase, emit_phase
+from foundation.phase_event import ExecutionPhase, emit_phase
 from sqlalchemy.orm import Session
 
 from .database import get_db

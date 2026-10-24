@@ -16,8 +16,8 @@ from typing import Any
 from architecture.config import infer_architecture_config, load_architecture_config
 from architecture.models import ArchitectureReport
 from architecture.rules_engine import ArchitectureRulesEngine
-from core.api_safety import safe_error, validated_dir
 from fastapi import APIRouter
+from foundation.api_safety import safe_error, validated_dir
 from pydantic import BaseModel, Field
 
 from .detector import DriftDetector

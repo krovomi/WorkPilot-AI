@@ -26,8 +26,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from core.api_safety import safe_error, server_mode_roots, validated_dir
 from fastapi import APIRouter
+from foundation.api_safety import safe_error, server_mode_roots, validated_dir
 from pydantic import BaseModel, Field
 
 from .editor import (

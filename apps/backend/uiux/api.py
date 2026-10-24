@@ -10,7 +10,7 @@ deliberately no "generate now": the design system is written into a worktree a
 person reviews, and the panel has no worktree.
 
 Refused in server mode by the same addressing rules as every spec endpoint
-(`core.api_safety.resolve_spec_dir`).
+(`foundation.api_safety.resolve_spec_dir`).
 """
 
 from __future__ import annotations
@@ -19,8 +19,12 @@ import logging
 import re
 from pathlib import Path
 
-from core.api_safety import SPEC_ADDRESS_REASONS, SpecAddressError, resolve_spec_dir
 from fastapi import APIRouter, Query
+from foundation.api_safety import (
+    SPEC_ADDRESS_REASONS,
+    SpecAddressError,
+    resolve_spec_dir,
+)
 from pydantic import BaseModel
 
 from .preflight import DESIGN_FILE, read_result

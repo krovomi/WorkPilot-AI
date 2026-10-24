@@ -72,7 +72,7 @@ class EditorError(ValueError):
     it — a key the caller sent, a locale code, a file's basename — and never a
     resolved path or another exception's text. `api.py` renders the sentence
     from a literal table keyed on `reason`, the shape `workflows/api.py` uses
-    and that `core.api_safety` recommends "when the set of rejections is small
+    and that `foundation.api_safety` recommends "when the set of rejections is small
     and known".
 
     Rendering there rather than here is what keeps the message out of the

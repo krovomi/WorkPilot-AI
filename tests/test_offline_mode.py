@@ -10,7 +10,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "backend"))
 from datetime import UTC
 
-from core import offline_policy
+import offline_policy
 from runners import offline_mode_runner as runner
 
 
@@ -57,7 +57,7 @@ class OfflineModeTests(unittest.TestCase):
                 encoding="utf-8",
             )
             with patch(
-                "core.local_model_catalog.detect_runtime",
+                "offline_policy.local_model_catalog.detect_runtime",
                 return_value={"available": True, "models": []},
             ):
                 with self.assertRaises(ValueError):
@@ -88,7 +88,7 @@ class OfflineModeTests(unittest.TestCase):
             )
             with (
                 patch(
-                    "core.local_model_catalog.detect_runtime",
+                    "offline_policy.local_model_catalog.detect_runtime",
                     return_value={
                         "available": True,
                         "models": [{"name": "my-model"}],
@@ -124,7 +124,7 @@ class OfflineModeTests(unittest.TestCase):
             )
             with (
                 patch(
-                    "core.local_model_catalog.detect_runtime",
+                    "offline_policy.local_model_catalog.detect_runtime",
                     return_value={
                         "available": True,
                         "models": [{"name": "qwen:7b"}],
@@ -168,7 +168,7 @@ class OfflineModeTests(unittest.TestCase):
         import io
         from unittest.mock import MagicMock
 
-        from core.local_model_catalog import detect_runtime
+        from offline_policy.local_model_catalog import detect_runtime
 
         opener = MagicMock()
         opener.open.return_value = io.BytesIO(
@@ -184,7 +184,9 @@ class OfflineModeTests(unittest.TestCase):
             ).encode()
         )
         with (
-            patch("core.local_model_catalog.build_opener", return_value=opener),
+            patch(
+                "offline_policy.local_model_catalog.build_opener", return_value=opener
+            ),
             patch.dict("os.environ", {"OLLAMA_BASE_URL": "http://127.0.0.1:11434"}),
         ):
             runtime = detect_runtime("ollama")
@@ -396,7 +398,7 @@ class HybridRoutingIsADefaultTests(unittest.TestCase):
     @staticmethod
     def _installed(*names):
         return patch(
-            "core.local_model_catalog.detect_runtime",
+            "offline_policy.local_model_catalog.detect_runtime",
             return_value={
                 "available": True,
                 "models": [{"name": name} for name in names],
@@ -503,7 +505,7 @@ class ProviderChoiceTests(unittest.TestCase):
                 )
 
     def test_create_agent_client_tells_the_route_it_was_chosen(self):
-        import core.offline_policy as policy_module
+        import offline_policy as policy_module
         from core.client import create_agent_client
 
         seen = {}

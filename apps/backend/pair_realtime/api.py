@@ -22,9 +22,9 @@ import asyncio
 import json
 import logging
 
-from core.api_safety import safe_error
 from fastapi import APIRouter, Path, Query
 from fastapi.responses import StreamingResponse
+from foundation.api_safety import safe_error
 from pydantic import BaseModel, Field
 
 from .session import PairSessionManager, Role

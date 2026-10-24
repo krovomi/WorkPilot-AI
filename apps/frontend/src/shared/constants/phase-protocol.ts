@@ -4,7 +4,7 @@
  * Single source of truth for execution phase communication between
  * Python backend and TypeScript frontend.
  *
- * SYNC REQUIREMENT: Phase values must match apps/backend/core/phase_event.py
+ * SYNC REQUIREMENT: Phase values must match apps/backend/foundation/phase_event.py
  *
  * Protocol: __EXEC_PHASE__:{"phase":"coding","message":"Starting"}
  */

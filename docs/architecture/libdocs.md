@@ -55,7 +55,7 @@ unpinned, so both names are allowlisted — an entry for a tool the running serv
 not expose is inert, a missing entry for the one it does expose is silent failure.
 
 **Strict offline.** The preflight sends the task's own words to Context7, so it reads
-`airgapStrict` (`core/offline_policy.airgap_status`, project, spec and cache directories)
+`airgapStrict` (`offline_policy.airgap_status`, project, spec and cache directories)
 before detecting anything, and fetches nothing when it is set: the result names the policy
 file in `errors`. An unreadable policy counts as strict. `tests/test_libdocs.py`
 (`test_airgap_strict_sends_nothing`) checks that no request leaves.

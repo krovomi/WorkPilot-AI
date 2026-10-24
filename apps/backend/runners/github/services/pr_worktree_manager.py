@@ -21,7 +21,7 @@ import time
 from pathlib import Path
 from typing import NamedTuple
 
-from core.git_executable import get_isolated_git_env
+from foundation.git_executable import get_isolated_git_env
 
 logger = logging.getLogger(__name__)
 

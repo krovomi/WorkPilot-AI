@@ -6,7 +6,7 @@
 ## New models without a pull request
 
 ChatGPT-authenticated Codex is separate from the OpenAI API registry.
-`codex_models.py` queries `codex app-server` through `core/codex_catalog_rpc.py`
+`codex_models.py` queries `codex app-server` through `foundation/codex_catalog_rpc.py`
 using the backend's PATH and CODEX_HOME, then caches discovery for 15 minutes.
 Explicit refresh bypasses that cache; the Codex sidebar refresh/update actions
 also refresh model selectors. Discovery never starts an agent turn or reads

@@ -37,14 +37,14 @@ _mocked_module_names = [
     "core.simple_client",
     "core.task_event",
     "core.workspace",
-    "core.file_utils",
+    "foundation.file_utils",
     "core.plan_normalization",
-    "core.platform",
+    "foundation.platform",
     "client",
     "init",
     # Config & phases
     "phase_config",
-    "core.phase_event",
+    "foundation.phase_event",
     # Logging & UI
     "core.debug",
     "ui",

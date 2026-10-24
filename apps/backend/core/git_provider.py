@@ -10,7 +10,7 @@ Supports both SSH and HTTPS remote formats, and self-hosted GitLab instances.
 import re
 from pathlib import Path
 
-from .git_executable import run_git
+from foundation.git_executable import run_git
 
 
 def detect_git_provider(project_dir: str | Path, remote_name: str | None = None) -> str:

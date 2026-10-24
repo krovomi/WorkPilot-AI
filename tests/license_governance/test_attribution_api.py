@@ -75,7 +75,7 @@ class TestAttributionEndpoint:
         """The caller gets a generic message; the field name goes to the log.
 
         This asserted `"project_path" in body["error"]`.
-        `core.api_safety.safe_error` maps by exception *type* so that nothing
+        `foundation.api_safety.safe_error` maps by exception *type* so that nothing
         derived from the exception text reaches the response — naming the
         rejected field to an unauthenticated caller is what it exists to
         prevent.

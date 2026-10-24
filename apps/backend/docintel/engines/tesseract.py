@@ -25,7 +25,7 @@ def tesseract_path(env: dict[str, str]) -> str | None:
     if explicit:
         return explicit if Path(explicit).is_file() else None
     try:
-        from core.platform import find_executable
+        from foundation.platform import find_executable
 
         return find_executable("tesseract")
     except Exception:  # noqa: BLE001 - the platform layer is optional in tests

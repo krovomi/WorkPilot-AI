@@ -7,7 +7,7 @@ import pytest
 
 @pytest.fixture
 def local_policy(tmp_path, monkeypatch):
-    from core import local_model_catalog
+    from offline_policy import local_model_catalog
 
     monkeypatch.setenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
     monkeypatch.setattr(
@@ -46,7 +46,7 @@ def local_policy(tmp_path, monkeypatch):
 def test_selected_local_model_wins_over_offline_route(
     local_policy, strict, route_phase
 ):
-    from core.offline_policy import resolve_offline_route
+    from offline_policy import resolve_offline_route
 
     root = local_policy(strict, route_phase)
     assert resolve_offline_route(
@@ -60,7 +60,7 @@ def test_selected_local_model_wins_over_offline_route(
 
 @pytest.mark.parametrize("model", ["missing:30b", "qwen3-embedding:8b"])
 def test_invalid_selection_fails_instead_of_switching_models(local_policy, model):
-    from core.offline_policy import resolve_offline_route
+    from offline_policy import resolve_offline_route
 
     root = local_policy(True, "spec_writer")
     with pytest.raises(ValueError):

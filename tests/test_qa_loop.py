@@ -39,16 +39,16 @@ _mocked_module_names = [
     "core.task_event",
     "core.workspace",
     "core.workspace.models",
-    "core.file_utils",
+    "foundation.file_utils",
     "core.plan_normalization",
-    "core.platform",
+    "foundation.platform",
     "client",
     # Security modules
     "security",
     "security.qa_scanner",
     # Config & phases
     "phase_config",
-    "core.phase_event",
+    "foundation.phase_event",
     # Logging & UI
     "core.debug",
     "ui",

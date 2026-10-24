@@ -17,9 +17,9 @@ from typing import TYPE_CHECKING
 # Re-export the canonical platform predicates so existing local callers
 # in this module keep working unchanged. Previously these were duplicated
 # wrappers (is_linux/is_macos/is_windows redefined here) — the
-# duplication drifted from `core.platform` and forced us to keep two
+# duplication drifted from `foundation.platform` and forced us to keep two
 # implementations in sync.
-from .platform import is_linux, is_macos, is_windows  # noqa: F401
+from foundation.platform import is_linux, is_macos, is_windows  # noqa: F401
 
 logger = logging.getLogger(__name__)
 

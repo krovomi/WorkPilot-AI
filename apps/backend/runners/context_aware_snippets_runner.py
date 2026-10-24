@@ -264,7 +264,7 @@ def list_project_files(project_dir: Path) -> list[str]:
     leaves out what the project ignores. A bounded walk otherwise.
     """
     try:
-        from core.git_executable import run_git
+        from foundation.git_executable import run_git
 
         result = run_git(["ls-files", "-z"], cwd=project_dir, timeout=GIT_TIMEOUT)
         if result.returncode == 0 and result.stdout:

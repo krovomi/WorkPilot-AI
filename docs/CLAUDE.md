@@ -41,7 +41,7 @@ regarder, pas ce qui est permis. En cas de désaccord, la règle gagne et l'inde
 7. **i18n obligatoire.** Tout texte visible passe par une clé `react-i18next`, en `en` **et** `fr`.
    → [frontend](rules/frontend.md#i18n-obligatoire)
 8. **Abstraction plateforme.** Jamais `process.platform` ni `sys.platform` en direct :
-   `apps/frontend/src/main/platform/`, `apps/backend/core/platform/`. La CI teste Windows, macOS, Linux.
+   `apps/frontend/src/main/platform/`, `apps/backend/foundation/platform/`. La CI teste Windows, macOS, Linux.
 9. **PR vers `develop`**, jamais `main` (branche de release). Versions d'outils épinglées : ruff
    `0.15.7`, Biome `2.5.11`. → [workflow](rules/workflow.md#branches-commits-pr)
 10. **iOS ne se construit que sur macOS** : le signaler comme non vérifiable, ne jamais réessayer

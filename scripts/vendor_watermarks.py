@@ -61,7 +61,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 # The manifest format is shared with `vendor/archify`; one definition of
 # "is this tree the one it claims to be" for both trees.
 sys.path.insert(0, str(REPO_ROOT / "apps" / "backend"))
-from core.vendor_manifest import (  # noqa: E402
+from foundation.vendor_manifest import (  # noqa: E402
     RECEIPT_NAME,
     file_digests,
     tree_digest,

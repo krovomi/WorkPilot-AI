@@ -10,7 +10,7 @@ two agree during a build; they diverge in the two cases that matter, and the
 live answer is the right one in both: a spec edited by hand after the build,
 and a task that has not been planned yet.
 
-Addressing goes through `core.api_safety.resolve_spec_dir`, the same rules as
+Addressing goes through `foundation.api_safety.resolve_spec_dir`, the same rules as
 every other endpoint: a bare `spec_id` under a project directory the user
 chose in their own desktop app, or an explicit `spec_dir`.
 
@@ -26,8 +26,12 @@ from __future__ import annotations
 
 import logging
 
-from core.api_safety import SPEC_ADDRESS_REASONS, SpecAddressError, resolve_spec_dir
 from fastapi import APIRouter, Query
+from foundation.api_safety import (
+    SPEC_ADDRESS_REASONS,
+    SpecAddressError,
+    resolve_spec_dir,
+)
 
 from .traceability import collect
 

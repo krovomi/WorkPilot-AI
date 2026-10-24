@@ -27,8 +27,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from project.ui_stack import UiStack, detect_ui_stack
+
 from .settings import is_enabled
-from .stack import UiStack, detect_ui_stack
 from .surface import ui_paths
 
 __all__ = [

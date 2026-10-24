@@ -249,7 +249,8 @@ AI-assisted feature planning with competitor analysis and audience targeting.
 >
 > Les liens entre couches sont vérifiés par des tests qui lisent les sources : IPC dans les deux
 > sens et canaux nommés par constante (`ipc-channel-parity.test.ts`), imports entre unités du
-> backend et plafond du cycle principal (`tests/test_import_contracts.py`), une ligne par vue dans
+> backend et plafond du cycle principal, ramené de 81 à 26 unités par la couche `foundation/`
+> (`tests/test_import_contracts.py`), une ligne par vue dans
 > [`product-overview.md`](docs/architecture/product-overview.md) (`tests/test_product_overview_views.py`).
 >
 > Une vue qui n'a encore ni document de conception ni test porte le badge « Expérimental » dans la

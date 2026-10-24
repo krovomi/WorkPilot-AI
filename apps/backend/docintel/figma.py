@@ -209,7 +209,7 @@ def protect(frames: list[dict]) -> tuple[list[dict], int, list[str]]:
 
 def _airgapped(policy_paths: tuple[Path, ...]) -> bool:
     try:
-        from core.offline_policy import airgap_status
+        from offline_policy import airgap_status
 
         return bool(airgap_status(*policy_paths).get("airgapStrict"))
     except Exception:  # noqa: BLE001 - unreadable policy: fail closed

@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 try:
-    from core.platform import is_windows as _is_windows
+    from foundation.platform import is_windows as _is_windows
 except ImportError:
 
     def _is_windows() -> bool:  # type: ignore[misc]

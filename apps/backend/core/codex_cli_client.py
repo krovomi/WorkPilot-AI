@@ -24,7 +24,7 @@ from core.agent_client import (
     ContentBlockType,
     MessageRole,
 )
-from core.platform import build_windows_command, find_executable
+from foundation.platform import build_windows_command, find_executable
 from harness.domain import from_flat_cached_input
 
 logger = logging.getLogger(__name__)

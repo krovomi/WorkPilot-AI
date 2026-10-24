@@ -41,8 +41,8 @@ import sys
 from pathlib import Path
 from typing import Annotated, Any
 
-from core.api_safety import validated_dir
 from fastapi import APIRouter, Body, HTTPException, Query
+from foundation.api_safety import validated_dir
 from skills_registry.bundled import BUNDLED_SKILLS, load_bundled_skill
 from skills_registry.frontmatter import parse_frontmatter, workpilot_meta
 from skills_registry.resolver import check_requires

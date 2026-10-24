@@ -10,8 +10,8 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from core.api_safety import safe_error, validated_dir
 from fastapi import APIRouter
+from foundation.api_safety import safe_error, validated_dir
 from pydantic import BaseModel, Field
 
 from .optimizer import CognitiveContextOptimizer

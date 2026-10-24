@@ -2148,6 +2148,52 @@ retirées. `node-pty` reste : son retrait attend un essai d'installation sous Wi
   vue expérimentale n'a de fichier de conception) ; `sidebar/__tests__/use-sidebar-prefs.test.ts`.
 - **Reste** : une vue sort de la liste quand elle reçoit un fichier de conception ou un test.
 
+### Lot M10 — Casser le cycle `core ⇄ agents`, découper les fonctions géantes (P3)
+
+**En cours.** Première partie : le plus grand cycle d'imports passe de 81 à 26 unités. Les
+utilitaires sortent de `core` vers `foundation/`, `offline_policy/` et `app_detection.py`, et quatre
+imports vers le haut sont retirés. Reste le découpage des fonctions géantes.
+
+#### F101 · `core` était à la fois la boîte à outils et la racine de composition
+
+- **Sévérité** moyenne · **connu** (F93, M7) · **corrigé par le lot M10** (première partie)
+- **Preuve** (avant) : 81 des 126 unités du backend s'importaient l'une l'autre. `core` importait
+  `agents`, `security`, `harness` et douze autres (`client.py`, `agent_clients/`, `worktree.py`) ;
+  dans le même paquet vivaient les utilitaires que tout le monde lit : `api_safety` (31 unités),
+  `platform`, `file_utils`, `phase_event`… Une unité qui ne voulait que `safe_error` entrait donc
+  dans le cycle des agents.
+- **Correction** : `foundation/`, une couche qui n'importe rien du backend (sauf la lecture
+  facultative des réglages du mode serveur par `api_safety`, et `server` n'importe rien) :
+  `platform/`, `api_safety`, `file_utils`, `git_executable`, `phase_event`, `dotnet_tools`,
+  `codex_catalog_rpc`, `vendor_manifest`, `workpilot_layout`. `offline_policy/` (avec
+  `local_model_catalog`) devient une unité qui ne lit que `phase_config` et
+  `ollama_model_detector`. Les imports sont réécrits, sans cale de compatibilité ; les règles
+  (`docs/CLAUDE.md` règle 8, `rules/backend.md`, `rules/security.md` S7) nomment les nouveaux
+  chemins.
+- **Garde-fou** : `tests/test_import_contracts.py` tient `foundation`, `offline_policy`,
+  `app_detection`, `project`, `mobile`, `rtk` et `cost_intelligence` à leur liste, et
+  `MAX_CYCLE = 26`.
+- **Reste** : les 26 unités sont le moteur d'agents lui-même : `core.client` et `agents.session`,
+  les phases qui s'en servent (`spec`, `qa`, `workflows`, `verify`, `services`), et ce que
+  `core` compose (`merge`, `integrations`, `brain`, `skills_registry`, `docintel`, `uiux`). Les
+  séparer demande une interface entre la fabrique et les agents, pas un déplacement de fichiers.
+
+#### F102 · Quatre imports vers le haut depuis des unités de bas niveau
+
+- **Sévérité** basse · **nouveau** · **corrigé par le lot M10**
+- **Preuve** (avant) : `test_generation/api.py` importait `provider_api` (l'app qui le monte) pour
+  un message d'erreur ; `verify/detect.py` importait `runners` pour le détecteur de l'aperçu, et
+  `runners` importe presque toutes les features ; `project/stack.py` lisait `uiux.stack` et
+  `test_generation.stack_aware`, ce qui mettait `project`, puis `security`, dans le cycle ;
+  `cost_intelligence.formula_refine` importait `core.simple_client`, et `phase_config` lit
+  `cost_intelligence` par le planificateur.
+- **Correction** : `safe_error` de `foundation.api_safety` ; le détecteur dans `app_detection.py`,
+  que le runner de l'aperçu importe ; `project/ui_stack.py` et `project/test_stack.py` ;
+  `refine_formulas(..., client_factory=...)`, la fabrique passée par
+  `runners/formula_refine_runner.py`.
+- **Garde-fou** : les contrats ci-dessus ; `tests/cost_intelligence/test_formula_refine.py`
+  vérifie que la fabrique n'est pas appelée sans candidat.
+
 ---
 
 ## Annexe A — Inventaire des fichiers candidats
@@ -2302,7 +2348,7 @@ planchers `pnpm.overrides` relevés (`pnpm-workspace.yaml`), `dompurify` ^3.4.17
 
 Statut des constats de l'audit précédent : F1, F3, F4, F5, F7, F8, F9, F10, F12, F16, F17, F19 **ouverts** ;
 F2, F13 **partiels** ; F6, F11, F14, F18 **aggravés** ; F15 **atténué**. Nouveaux : F20 à F36.
-Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F57 à F62 par M2, F63 à F68 par M3, F69 à F71 par M4, F78 à F84 par M5, F85 à F90 par M6, F91 à F94 par M7, F95 à F100 par M8, F72 à F77 par M9 (annexe F).
+Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F57 à F62 par M2, F63 à F68 par M3, F69 à F71 par M4, F78 à F84 par M5, F85 à F90 par M6, F91 à F94 par M7, F95 à F100 par M8, F72 à F77 par M9, F101 et F102 par M10 (annexe F).
 
 ## Annexe C — Ce qui a changé le 15 octobre 2026 (`7ef6fca` → `e3e468f` + PR #454)
 
@@ -2369,7 +2415,7 @@ détaillés ici qu'une fois corrigés ([`SECURITY.md`](../SECURITY.md)).
 | M7 | Contrats d'architecture (`import-linter`, canaux IPC, Sidebar ↔ `product-overview.md`) | **fait** (F91 à F94 ; contrats d'imports en test AST, sans `import-linter`) |
 | M8 | Code mort, `scripts/`, vues sans test | **fait** (F95 à F100 ; vues sans conception ni test marquées « Expérimental » ; `node-pty` attend un essai sous Windows) |
 | M9 | Doc ↔ code, i18n de la palette, jsdom, dépendances | **fait** (F72 à F77) |
-| M10 | Casser le cycle `core ⇄ agents`, découper les fonctions géantes | à faire (après M7) |
+| M10 | Casser le cycle `core ⇄ agents`, découper les fonctions géantes | **en cours** (F101, F102 : cycle de 81 à 26 unités ; reste le découpage des fonctions géantes) |
 
 Vérification du lot M1 : `cd apps/frontend && pnpm run typecheck && pnpm test -- release-handlers
 no-renderer-command worktree-open-launchers pr-details-azure-script`.
@@ -2396,3 +2442,6 @@ live-companion-events AuthFailureModal use-sidebar-prefs`.
 
 Vérification du lot M9 : `pytest tests/test_docs_context.py tests/test_python_floor.py
 tests/test_test_generation_post_build_scope.py -q` et `cd apps/frontend && pnpm test`.
+
+Vérification du lot M10 (cycle) : `pytest tests/test_import_contracts.py
+tests/cost_intelligence/test_formula_refine.py tests/test_offline_mode.py tests/test_platform.py -q`.

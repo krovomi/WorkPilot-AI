@@ -435,7 +435,7 @@ lisaient.
   Mémoires et `brain_recall` les voient comme les autres.
 - **Migration.** L'ancien `.workpilot/learning_loop/patterns.json` est importé
   au premier usage puis rangé dans
-  `.workpilot/learning/patterns.json.migrated-to-brain` (`core/workpilot_layout.py`).
+  `.workpilot/learning/patterns.json.migrated-to-brain` (`foundation/workpilot_layout.py`).
 - **Le desktop passe par le backend** : `GET /api/brain/learning-patterns`,
   `POST …/toggle`, `POST …/delete`, par nom de projet.
 - Mémoire coupée (`BRAIN_ENABLED=false`) : lectures vides, écritures ignorées.

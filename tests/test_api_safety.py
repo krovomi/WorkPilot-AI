@@ -20,7 +20,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "apps" / "backend"))
 
-from core.api_safety import MAX_PATH_LEN, safe_error, validated_dir  # noqa: E402
+from foundation.api_safety import MAX_PATH_LEN, safe_error, validated_dir  # noqa: E402
 
 
 class TestSafeError:

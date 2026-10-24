@@ -9,9 +9,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from core.codex_catalog_rpc import discover_models as _discover_models
-from core.offline_policy import airgap_status
-from core.platform import find_executable
+from foundation.codex_catalog_rpc import discover_models as _discover_models
+from foundation.platform import find_executable
+from offline_policy import airgap_status
 
 _catalog_lock = threading.Lock()
 _catalogs: dict[tuple[str, str, str, int, int], tuple[float, dict[str, Any]]] = {}

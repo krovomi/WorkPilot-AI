@@ -18,8 +18,8 @@ import logging
 from pathlib import Path
 from xml.etree import ElementTree as ET  # noqa: S405 - ParseError type only
 
-from core.api_safety import validated_dir
 from defusedxml.ElementTree import parse as defused_parse
+from foundation.api_safety import validated_dir
 
 logger = logging.getLogger(__name__)
 

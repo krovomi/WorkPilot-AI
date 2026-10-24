@@ -62,7 +62,7 @@ DEFAULT_REF = "v2.15.0"
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 sys.path.insert(0, str(REPO_ROOT / "apps" / "backend"))
-from core.vendor_manifest import (  # noqa: E402
+from foundation.vendor_manifest import (  # noqa: E402
     RECEIPT_NAME,
     file_digests,
     tree_digest,

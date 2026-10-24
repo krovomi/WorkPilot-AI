@@ -29,7 +29,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from core.platform import (
+from foundation.platform import (
     is_windows,
     validate_cli_path,
 )
@@ -849,7 +849,7 @@ def create_client(
     if isinstance(spec_dir, str):
         spec_dir = Path(spec_dir)
 
-    from core.offline_policy import guard_cloud_client
+    from offline_policy import guard_cloud_client
 
     guard_cloud_client(project_dir, spec_dir)
 
@@ -1778,7 +1778,7 @@ def peek_active_provider(spec_dir: Path | None = None) -> str:
 
 # Le fournisseur retenu quand personne n'en nomme un. C'est un defaut, pas un
 # choix, et `_resolve_active_provider` le dit — voir la regle de routage dans
-# `core.offline_policy.resolve_offline_route`.
+# `offline_policy.resolve_offline_route`.
 _DEFAULT_PROVIDER = "claude"
 
 
@@ -1896,7 +1896,7 @@ def _resolve_active_provider(
     Returns `(provider, chosen)`. `chosen` is False only in the last case
     below — nobody named a provider anywhere and "claude" is a fallback.
     The difference matters exactly once, and it is where it used to be
-    invisible: `core.offline_policy.resolve_offline_route` may re-route a
+    invisible: `offline_policy.resolve_offline_route` may re-route a
     task to a local model, and it must know whether it is overriding a
     decision somebody took or filling a blank nobody filled.
 
@@ -2476,7 +2476,7 @@ def _build_agent_client(
     else:
         provider = _normalize_provider_name(provider)
 
-    from core.offline_policy import local_endpoint, resolve_offline_route
+    from offline_policy import local_endpoint, resolve_offline_route
 
     provider, model, offline_base_url = resolve_offline_route(
         project_dir, spec_dir, agent_type, provider, model, chosen=provider_chosen

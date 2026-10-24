@@ -3,7 +3,7 @@
 import json
 from urllib.request import HTTPRedirectHandler, ProxyHandler, build_opener
 
-from core.offline_policy import local_endpoint
+from offline_policy import local_endpoint
 from ollama_model_detector import is_embedding_model
 
 
