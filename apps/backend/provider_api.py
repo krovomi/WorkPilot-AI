@@ -31,6 +31,15 @@ try:
 except Exception as _e:  # noqa: BLE001 — never block boot on this
     logging.getLogger(__name__).warning("Could not install log redaction: %s", _e)
 
+# Error reporting, after redaction so a captured log line is already masked.
+# Inert without SENTRY_DSN, and in development unless SENTRY_DEV is set.
+try:
+    from core.sentry import init_sentry
+
+    init_sentry(component="api")
+except Exception as _e:  # noqa: BLE001 — never block boot on this
+    logging.getLogger(__name__).warning("Could not initialise Sentry: %s", _e)
+
 import ipaddress
 import json
 import os

@@ -25,6 +25,8 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  # For the fallback below: an issue when the pull request cannot be opened.
+  issues: write
 
 concurrency:
   group: skills-sync
@@ -88,6 +90,29 @@ jobs:
             printf 'prompts agents will follow on real code. A body change is reported as\n'
             printf 'potentially breaking for that reason and is not forked automatically.\n'
           } > /tmp/body
-          gh pr create --base develop \
-            --title "chore(skills): sync upstream packs" \
-            --body-file /tmp/body
+          # The repository may forbid Actions from opening pull requests
+          # (Settings → Actions → General → "Allow GitHub Actions to create and
+          # approve pull requests"): every run from 31 August failed there,
+          # silently, with the branch pushed and nobody told. The branch is
+          # still the deliverable, so say where it is, in an issue a person
+          # gets notified of, and fail loudly only if that fails too.
+          if ! gh pr create --base develop \
+                 --title "chore(skills): sync upstream packs" \
+                 --body-file /tmp/body 2> /tmp/pr-error; then
+            reason="$(cat /tmp/pr-error)"
+            compare="https://github.com/${GITHUB_REPOSITORY}/compare/develop...${branch}?expand=1"
+            echo "::warning::Could not open the pull request: ${reason}"
+            {
+              printf 'The weekly skills sync pushed `%s` but could not open its pull request:\n\n' "$branch"
+              printf '```\n%s\n```\n\n' "$reason"
+              printf 'Open it from %s, or allow GitHub Actions to create pull requests\n' "$compare"
+              printf '(Settings → Actions → General) so the next run opens it itself.\n\n'
+              cat /tmp/body
+            } > /tmp/issue
+            {
+              printf '\n## Pull request not opened\n\n%s\n\nBranch: `%s`, compare: %s\n' "$reason" "$branch" "$compare"
+            } >> "$GITHUB_STEP_SUMMARY"
+            gh issue create \
+              --title "Skills sync: upstream packs moved (${branch})" \
+              --body-file /tmp/issue
+          fi

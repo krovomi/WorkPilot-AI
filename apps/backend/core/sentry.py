@@ -217,7 +217,13 @@ def init_sentry(
     # - Running from packaged app (detected by __compiled__ or frozen)
     # - SENTRY_DEV=true is set
     # - force_enable is True
-    is_packaged = getattr(sys, "frozen", False) or hasattr(sys, "__compiled__")
+    # The packaged Electron app runs plain scripts (no `sys.frozen`): its main
+    # process sets WORKPILOT_PACKAGED_APP for the backend it starts.
+    is_packaged = (
+        getattr(sys, "frozen", False)
+        or hasattr(sys, "__compiled__")
+        or os.environ.get("WORKPILOT_PACKAGED_APP") == "1"
+    )
     sentry_dev = os.environ.get("SENTRY_DEV", "").lower() in ("true", "1", "yes")
     should_enable = is_packaged or sentry_dev or force_enable
 

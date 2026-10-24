@@ -381,19 +381,6 @@ is taken so the user knows the output is not live data:
 - **Analytics API** ([apps/backend/analytics/api_minimal.py](../apps/backend/analytics/api_minimal.py))
   currently returns empty/mock payloads for every endpoint. Treat it as a
   scaffold until a real database-backed implementation lands.
-- **Azure DevOps PR details** ([apps/frontend/src/main/ipc-handlers/pr-details-handlers.ts](../apps/frontend/src/main/ipc-handlers/pr-details-handlers.ts),
-  `getAzureDevOpsPRDetails` → `getMockAzureDevOpsPRDetails`) — the `pr:details`
-  IPC handler, which feeds the PR files modal and the PR stats of a task whose
-  PR is on Azure DevOps, returns a fixed placeholder (title, author, dates,
-  diff stats and three file names; only the PR number, organization, project
-  and repository come from the URL) whenever the Azure DevOps call fails —
-  including when `AZURE_DEVOPS_PAT` or `AZURE_DEVOPS_ORG_URL` is not set. The
-  result is reported as a success; the only signal is a `console.warn` in the
-  Electron main-process log. The other Azure DevOps paths (connection check,
-  repositories, work items, import, PR review, PR comments) call the real
-  connector in [src/connectors/azure_devops/](../src/connectors/azure_devops/)
-  or the runner in [apps/backend/runners/azure_devops/](../apps/backend/runners/azure_devops/)
-  and return an error rather than stub data.
 
 ## QA validation loop
 
