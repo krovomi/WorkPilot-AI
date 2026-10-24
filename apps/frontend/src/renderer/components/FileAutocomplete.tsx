@@ -1,5 +1,11 @@
 import { ChevronRight, File } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+	useCallback,
+	useEffect,
+	useLayoutEffect,
+	useRef,
+	useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import type { FileSearchResult } from "../../shared/types";
 import { cn } from "../lib/utils";
@@ -120,8 +126,9 @@ export function FileAutocomplete({
 		[results, selectedIndex, loading, onSelect, onClose],
 	);
 
-	// Attach keyboard listener
-	useEffect(() => {
+	// Keyboard listener, attached at commit, not after paint: once the new results show, Enter
+	// must already reach the handler that knows them.
+	useLayoutEffect(() => {
 		document.addEventListener("keydown", handleKeyDown);
 		return () => document.removeEventListener("keydown", handleKeyDown);
 	}, [handleKeyDown]);
