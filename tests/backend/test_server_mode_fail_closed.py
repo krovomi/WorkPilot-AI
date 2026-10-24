@@ -138,3 +138,27 @@ class TestProviderCredentialGuard:
         with pytest.raises(HTTPException) as excinfo:
             self._guard()()
         assert excinfo.value.status_code == 403
+
+
+class TestPublicHealth:
+    """``/health`` answers without a token; on a shared server it says only
+    healthy or degraded, not which providers hold keys or which OS runs it."""
+
+    def test_server_mode_returns_the_verdict_only(self, monkeypatch):
+        from provider_api import health_check
+
+        monkeypatch.setenv("WORKPILOT_SERVER_MODE", "1")
+        monkeypatch.setenv("WORKPILOT_JWT_SECRET", _VALID_SECRET)
+        server_config.reset_settings_cache()
+        try:
+            assert set(health_check()) == {"status"}
+        finally:
+            monkeypatch.setenv("WORKPILOT_SERVER_MODE", "0")
+            server_config.reset_settings_cache()
+
+    def test_local_mode_keeps_the_detail(self, monkeypatch):
+        from provider_api import health_check
+
+        monkeypatch.setenv("WORKPILOT_SERVER_MODE", "0")
+        server_config.reset_settings_cache()
+        assert "subsystems" in health_check()

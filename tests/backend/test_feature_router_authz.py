@@ -58,6 +58,40 @@ class TestEveryRouterIsGuarded:
             + "; ".join(f"line {n}: {t}" for n, t in raw)
         )
 
+    def test_no_route_is_declared_on_the_app_itself(self):
+        """A route on ``app`` skips ``_mount`` and so carries no permission.
+
+        Thirteen provider routes once did, ``POST /providers/select`` among
+        them, which writes a process-wide choice every build reads. Liveness
+        is the one exception: an orchestrator probes it without a token.
+        """
+        public = {("get", "/health")}
+        tree = ast.parse(_SOURCE)
+        bare = []
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            for deco in node.decorator_list:
+                if not (
+                    isinstance(deco, ast.Call)
+                    and isinstance(deco.func, ast.Attribute)
+                    and isinstance(deco.func.value, ast.Name)
+                    and deco.func.value.id == "app"
+                ):
+                    continue
+                verb = deco.func.attr
+                if verb not in {"get", "post", "put", "patch", "delete", "websocket"}:
+                    continue
+                path = deco.args[0].value if deco.args else None
+                if (verb, path) not in public:
+                    bare.append(f"{verb.upper()} {path} ({node.name})")
+        assert not bare, (
+            "Declare these on a router mounted with `_mount`: " + ", ".join(bare)
+        )
+
+    def test_the_provider_router_is_mounted_with_a_permission(self):
+        assert ("providers_router", "providers") in _mount_calls()
+
     def test_all_thirty_four_routers_are_mounted_through_the_helper(self):
         calls = _mount_calls()
         assert len(calls) >= 34, (
