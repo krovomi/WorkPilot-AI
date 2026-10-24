@@ -1552,6 +1552,74 @@ Chemins relatifs à `apps/frontend/src/`.
   développement (`scripts/dev-elevated.cjs`, `dev:noadmin`) ne change pas.
 - **Doc** : README racine, section « `pnpm run dev` ouvre une seconde console élevée ».
 
+### Lot M3 — Des features qui ne disent que ce qu'elles font (P1)
+
+**Fait.** Troisième lot de l'audit du 17 octobre (annexe F, constats R1, R2, R4 à R7). Règle tenue :
+un succès affiché est un succès produit ; un échec se voit.
+
+#### F63 · Une PR Azure DevOps inventée, rendue en succès
+
+- **Sévérité** haute · **nouveau** (R1) · **corrigé par le lot M3**
+- **Preuve** (avant) : `apps/frontend/src/main/ipc-handlers/pr-details-handlers.ts`,
+  `getMockAzureDevOpsPRDetails` : sur tout échec du connecteur (PAT absent compris), un titre, un
+  auteur, des dates, `additions: 25`, des labels et trois fichiers fixes, avec `success: true`.
+- **Correction** : le repli est supprimé ; l'échec remonte avec sa cause (`success: false`).
+  `ipc-handlers/__tests__/pr-details-azure-failure.test.ts`. La section correspondante de
+  `docs/CONFIGURATION.md` est retirée.
+
+#### F64 · Le triage `continuous_ai` échouait avant de lancer `gh`
+
+- **Sévérité** moyenne · **nouveau** (R2) · **corrigé par le lot M3**
+- **Preuve** (avant) : `continuous_ai/issue_responder.py`, `create_subprocess_exec(..., text=True)`
+  lève `ValueError` ; l'exception était avalée et l'action marquée réussie. Un label refusé par `gh`
+  rendait aussi un succès, et `_investigate_bug` répondait « investigation initiated » sans rien
+  lancer.
+- **Correction** : sortie en octets décodée, échec de `gh` (code, absence, délai) rendu comme tel,
+  enquête déclarée indisponible. `tests/test_continuous_ai_issue_responder.py`. Le budget en dollars
+  du démon reste à zéro : aucun module n'appelle de modèle.
+
+#### F65 · `dotnet test` bloquait la boucle QA et son échec ne comptait pas
+
+- **Sévérité** moyenne · **nouveau** (R4) · **corrigé par le lot M3**
+- **Preuve** (avant) : `qa/loop.py`, `subprocess.run` (300 s) dans une coroutine ; un code de
+  retour non nul rendait `True`, affiché « dotnet test executed successfully ».
+- **Correction** : `asyncio.create_subprocess_exec`, résultat `passed` / `failed` / `unavailable`
+  (`DotnetTestRun`) ; une suite rouge arrive au relecteur QA, sortie citée comme donnée
+  (`quote_untrusted`, S2) ; seul `unavailable` produit un plan de test manuel.
+  `tests/test_qa_dotnet_tests.py`.
+
+#### F66 · Les workflows d'après-release ne tournaient jamais
+
+- **Sévérité** moyenne · **nouveau** (R5) · **corrigé par le lot M3**
+- **Preuve** (avant) : `discord-release.yml`, `virustotal-scan.yml`, `build-prebuilds.yml`
+  n'écoutaient que `release: published`, que la release publiée par `GITHUB_TOKEN` ne déclenche
+  pas ; chaque release promettait pourtant un scan VirusTotal. `build-prebuilds.yml`, lancé une fois
+  à la main, échouait (`npm ci` dans un espace pnpm, ABI d'Electron 40 pour une app en 44).
+- **Correction** : `release.yml` les déclenche par nom avec le tag, comme le wiki ;
+  `discord-release.yml` accepte un tag ; `build-prebuilds.yml` supprimé (aucune release ne portait
+  de prebuild, `download-prebuilds.cjs` retombe déjà sur la compilation) ; `docs/RELEASE.md` et la
+  note de release ne promettent plus le scan sans clé.
+
+#### F67 · Skills Sync échouait chaque semaine sans prévenir
+
+- **Sévérité** basse · **nouveau** (R6) · **corrigé par le lot M3**
+- **Preuve** (journal du 19 octobre) : branche poussée, puis `GitHub Actions is not permitted to
+  create or approve pull requests` ; 7 runs, 7 échecs, aucune notification.
+- **Correction** : si la PR ne peut pas être ouverte, le workflow ouvre une issue avec la cause, le
+  lien de comparaison et le résumé. Réglage à activer par le mainteneur pour que la PR s'ouvre
+  seule : Settings → Actions → General → « Allow GitHub Actions to create and approve pull
+  requests ».
+
+#### F68 · Sentry absent de l'API et du WebSocket, éteint dans l'app packagée
+
+- **Sévérité** moyenne · **nouveau** (R7) · **corrigé par le lot M3**
+- **Preuve** (avant) : `init_sentry` appelé par trois runners et la CLI seulement ; et même là,
+  `core/sentry.py` ne s'activait que sur `sys.frozen`, que le Python de l'app packagée (des scripts)
+  n'a jamais.
+- **Correction** : `provider_api.py` et `websocket_server.py` installent la redaction puis Sentry
+  (le second n'avait pas non plus la redaction, S1) ; le main transmet `WORKPILOT_PACKAGED_APP=1`
+  au backend qu'il lance. `tests/test_backend_entrypoints_observability.py`,
+  `main/__tests__/sentry-subprocess-env.test.ts`.
 ### Lot M9 — Doc ↔ code, i18n de la palette, jsdom, dépendances (P2)
 
 **Fait.** Neuvième lot de l'audit du 17 octobre (annexe F). Règles tenues : i18n obligatoire
@@ -1784,7 +1852,7 @@ planchers `pnpm.overrides` relevés (`pnpm-workspace.yaml`), `dompurify` ^3.4.17
 
 Statut des constats de l'audit précédent : F1, F3, F4, F5, F7, F8, F9, F10, F12, F16, F17, F19 **ouverts** ;
 F2, F13 **partiels** ; F6, F11, F14, F18 **aggravés** ; F15 **atténué**. Nouveaux : F20 à F36.
-Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F72 à F77 par M9 (annexe F).
+Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F63 à F68 par M3, F72 à F77 par M9 (annexe F).
 
 ## Annexe C — Ce qui a changé le 15 octobre 2026 (`7ef6fca` → `e3e468f` + PR #454)
 
@@ -1844,7 +1912,7 @@ détaillés ici qu'une fois corrigés ([`SECURITY.md`](../SECURITY.md)).
 |---|---|---|
 | M1 | Aucune commande construite depuis le renderer ou un texte externe ; app Windows sans élévation | **fait** (F52 à F56) |
 | M2 | Une CI qui garde : filtres `paths:`, version de Biome, Python 3.12, lockfile Python, image serveur construite et migrée | à faire |
-| M3 | Des features qui ne disent que ce qu'elles font (PR Azure DevOps factice, triage `continuous_ai`, verdict QA .NET, workflows de release jamais déclenchés, Skills Sync, Sentry) | à faire |
+| M3 | Des features qui ne disent que ce qu'elles font (PR Azure DevOps factice, triage `continuous_ai`, verdict QA .NET, workflows de release jamais déclenchés, Skills Sync, Sentry) | **fait** (F63 à F68) |
 | M4 | Mode hors-ligne strict et mode serveur | à faire |
 | M5 | Secrets et environnement des processus enfants | à faire (après M1) |
 | M6 | Frontière renderer → main, avec tests de refus | à faire (après M5) |

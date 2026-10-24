@@ -26,6 +26,21 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+# A second entry point, so the same start as provider_api: redaction first
+# (docs/rules/security.md, S1), then error reporting. Neither blocks boot.
+try:
+    from core.log_redaction import install_global_redaction
+
+    install_global_redaction()
+except Exception as _e:  # noqa: BLE001
+    logger.warning("Could not install log redaction: %s", _e)
+try:
+    from core.sentry import init_sentry
+
+    init_sentry(component="websocket")
+except Exception as _e:  # noqa: BLE001
+    logger.warning("Could not initialise Sentry: %s", _e)
+
 
 async def main():
     """Main entry point for standalone WebSocket server."""

@@ -2,17 +2,26 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("electron", () => ({ ipcMain: { handle: vi.fn() } }));
-vi.mock("../platform", async (importOriginal) => ({
-	...(await importOriginal<typeof import("../platform")>()),
-	findExecutable: vi.fn(() => null),
-}));
+vi.mock("../platform", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("../platform")>();
+	return {
+		...actual,
+		findExecutable: vi.fn(() => null),
+		requiresShell: vi.fn(actual.requiresShell),
+	};
+});
+// Answers at once, so a call the code should not make fails the assertion
+// below instead of hanging the test until its timeout.
 vi.mock("node:child_process", async (importOriginal) => ({
 	...(await importOriginal<typeof import("node:child_process")>()),
-	execFile: vi.fn(),
+	execFile: vi.fn((...args: unknown[]) => {
+		const callback = args.at(-1);
+		if (typeof callback === "function") callback(null, "", "");
+	}),
 }));
 
 import { execFile } from "node:child_process";
-import { findExecutable } from "../platform";
+import { findExecutable, requiresShell } from "../platform";
 import { checkAgentCli, extractAgentCliVersion } from "./agent-cli-handlers";
 
 describe("agent CLI handlers", () => {
@@ -45,6 +54,9 @@ describe("agent CLI handlers", () => {
 		vi.mocked(findExecutable).mockReturnValueOnce(
 			"C:\\Users\\me\\AppData\\Roaming\\npm\\opencode.cmd",
 		);
+		// What `requiresShell` answers for a `.cmd` on Windows, on every OS:
+		// the refusal under test is the Windows one.
+		vi.mocked(requiresShell).mockReturnValueOnce(true);
 		const result = await checkAgentCli("opencode");
 		expect(result).toEqual({
 			tool: "opencode",

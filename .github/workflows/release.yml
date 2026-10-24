@@ -699,7 +699,7 @@ jobs:
 
             **Full Changelog**: https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md
 
-            _VirusTotal scan results will be added automatically after release._
+            _VirusTotal scan results are added to these notes after release when the scan is configured._
           files: release-assets/*
           draft: false
           prerelease: ${{ contains(steps.changelog.outputs.version, 'beta') || contains(steps.changelog.outputs.version, 'alpha') }}
@@ -724,6 +724,23 @@ jobs:
             echo "::warning::Could not dispatch the wiki refresh. Run it by hand:"
             echo "::warning::  gh workflow run wiki-narrative.yml --ref main -f mode=full"
           fi
+
+      # Same rule as the wiki above: the release just published raised its
+      # event with GITHUB_TOKEN, so nothing listening on `release: published`
+      # runs. Dispatched by name, with the tag, instead.
+      - name: Scan and announce the release
+        if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.dry_run != true) }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: v${{ steps.changelog.outputs.version }}
+        run: |
+          for workflow in virustotal-scan.yml discord-release.yml; do
+            if ! gh workflow run "$workflow" --repo "$GITHUB_REPOSITORY" --ref main -f tag="$TAG"; then
+              echo "::warning::Could not dispatch $workflow. Run it by hand:"
+              echo "::warning::  gh workflow run $workflow --ref main -f tag=$TAG"
+            fi
+          done
 
   # Update README with new version after successful release
   update-readme:
