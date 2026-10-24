@@ -19,8 +19,11 @@ RUN useradd --create-home --uid 10001 workpilot \
 
 WORKDIR /app
 
-COPY apps/backend/requirements.lock /app/apps/backend/requirements.lock
-RUN pip install --no-cache-dir --require-hashes -r /app/apps/backend/requirements.lock
+# Outside /app/apps/backend: a COPY into it would create that directory as
+# root, and the server user could not write beside its code (below).
+COPY apps/backend/requirements.lock /tmp/requirements.lock
+RUN pip install --no-cache-dir --require-hashes -r /tmp/requirements.lock \
+    && rm /tmp/requirements.lock
 
 # Owned by the server user: the backend writes beside its code at runtime
 # (websocket_server.log, the SQLite fallback, caches), and a read-only tree
