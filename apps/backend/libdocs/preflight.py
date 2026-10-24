@@ -277,6 +277,24 @@ def _ttl_from(env: dict) -> int | None:
         return None
 
 
+def _airgap_policy(*paths: Path) -> str | None:
+    """The policy file that forbids the network here, or None.
+
+    An unreadable policy counts as strict: failing open would send the task
+    text out of a project that asked for nothing to leave it.
+    """
+    try:
+        from core.offline_policy import airgap_status
+
+        status = airgap_status(*paths)
+    except Exception as exc:  # noqa: BLE001 - fail closed
+        logger.debug("libdocs: offline policy unreadable: %s", exc)
+        return "unreadable offline policy"
+    if status.get("airgapStrict"):
+        return str(status.get("policyPath") or "offline policy")
+    return None
+
+
 def run_preflight(
     project_dir: Path,
     spec_dir: Path,
@@ -301,6 +319,17 @@ def run_preflight(
     # the coder read a section listing what the *last* task needed.
     if not is_enabled(env):
         return _persist(spec_dir, PreflightResult(enabled=False))
+
+    # Strict offline is a barrier, not a default (docs/rules/security.md, S7):
+    # the query below carries the task's own words to Context7.
+    airgap = _airgap_policy(project_dir, spec_dir, settings_dir)
+    if airgap is not None:
+        return _persist(
+            spec_dir,
+            PreflightResult(
+                errors=[f"airgapStrict ({airgap}): library documentation not fetched"]
+            ),
+        )
 
     text = read_task_text(spec_dir) if task_text is None else task_text
     budget = _limit_from_env(limit, env)

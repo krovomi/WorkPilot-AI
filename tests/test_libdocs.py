@@ -472,6 +472,37 @@ class TestPreflight:
         assert sum(1 for url, _ in session.calls if "/v2/context" in url) == fetches
         assert run_preflight(project, spec, client=client).entries[0].from_cache
 
+    def _airgap(self, project, body='{"airgapStrict": true}'):
+        policy = project / ".workpilot" / "offline-mode.json"
+        policy.parent.mkdir(parents=True, exist_ok=True)
+        policy.write_text(body, encoding="utf-8")
+
+    def _spying_client(self):
+        session = FakeSession(search=ONE_RESULT, docs=FakeResponse("# Stripe"))
+        return Context7Client("k", session=session), session.calls
+
+    def test_airgap_strict_sends_nothing(self, tmp_path):
+        project = self._project(tmp_path)
+        self._airgap(project)
+        spec = a_spec(tmp_path, "Add `stripe` checkout to the billing page")
+        client, calls = self._spying_client()
+
+        result = run_preflight(project, spec, client=client)
+
+        assert calls == []
+        assert result.entries == []
+        assert result.errors and "airgapStrict" in result.errors[0]
+
+    def test_an_unreadable_policy_counts_as_strict(self, tmp_path):
+        project = self._project(tmp_path)
+        self._airgap(project, body="{not json")
+        spec = a_spec(tmp_path, "Add `stripe` checkout")
+        client, calls = self._spying_client()
+
+        run_preflight(project, spec, client=client)
+
+        assert calls == []
+
     def test_a_dead_network_does_not_fail_the_build(self, tmp_path):
         project = self._project(tmp_path)
         spec = a_spec(tmp_path, "Add `stripe` checkout")
