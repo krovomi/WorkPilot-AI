@@ -10,6 +10,7 @@ import type {
 	MobilePlatform,
 	MobileSessionPhase,
 } from "../shared/types/mobile";
+import { envWithoutCredentials } from "./utils/child-env";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -393,7 +394,7 @@ export class MobileService extends EventEmitter {
 			const proc = spawn(command, {
 				cwd,
 				shell: true,
-				env: { ...process.env, ...env } as Record<string, string>,
+				env: envWithoutCredentials(process.env, env),
 			});
 			this.sessionProcess = proc;
 			this.pushOutput(`$ ${command}`);

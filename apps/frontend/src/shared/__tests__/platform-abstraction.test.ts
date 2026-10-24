@@ -38,11 +38,11 @@ const ALLOWED = new Map<string, string>([
 		"console.warn de diagnostic",
 	],
 	[
-		"main/services/ollama-portable.ts:59",
+		"main/services/ollama-portable.ts:60",
 		"valeur par défaut d'une fonction pure, testée avec d'autres plateformes",
 	],
 	[
-		"main/services/ollama-portable.ts:333",
+		"main/services/ollama-portable.ts:336",
 		"message d'erreur : nomme la plateforme réellement rencontrée",
 	],
 	["main/app-logger.ts:187", "métadonnée de log"],

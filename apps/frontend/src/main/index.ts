@@ -14,19 +14,23 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 // Load .env file FIRST before any other imports that might use process.env
 import { config } from "dotenv";
+import { app } from "electron";
+import { devEnvFilePaths } from "./dev-env-files";
 
 // ESM-compatible __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Load .env from centralized .env-files directory at project root
-// In development: __dirname is out/main (compiled), so go up 4 levels to reach project root
-// In production: app resources directory
-const possibleEnvPaths = [
-	resolve(__dirname, "../../../../.env-files/.env"), // Development: out/main -> root/.env-files/.env
-	resolve(__dirname, "../../../.env-files/.env"), // Alternative depth
-	resolve(process.cwd(), ".env-files/.env"), // Fallback: from workspace root
-];
+// Load .env from centralized .env-files directory at project root, in
+// development only: __dirname is out/main (compiled), so go up 4 levels to
+// reach the checkout. A packaged app has no checkout, and the directory it
+// was launched from (process.cwd()) is anybody's: a `.env-files/.env` there
+// would set variables every child process inherits.
+const possibleEnvPaths = devEnvFilePaths(
+	__dirname,
+	process.cwd(),
+	app.isPackaged,
+);
 
 for (const envPath of possibleEnvPaths) {
 	if (existsSync(envPath)) {
@@ -39,7 +43,6 @@ import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import http from "node:http";
 import { electronApp, is, optimizer } from "@electron-toolkit/utils";
 import {
-	app,
 	BrowserWindow,
 	Menu,
 	MenuItem,

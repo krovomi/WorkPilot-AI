@@ -28,6 +28,7 @@ import { promisify } from "node:util";
 import { app, net } from "electron";
 import unzipper from "unzipper";
 import { getOllamaExecutablePaths, isUnix, isWindows } from "../platform";
+import { envWithoutCredentials } from "../utils/child-env";
 
 const execFileAsync = promisify(execFile);
 
@@ -241,7 +242,9 @@ export async function applyModelContext(
 		const modelfile = path.join(dir, "Modelfile");
 		fs.writeFileSync(modelfile, `FROM ${name}\nPARAMETER num_ctx ${numCtx}\n`);
 		await execFileAsync(resolved.path, ["create", name, "-f", modelfile], {
-			env: { ...process.env, OLLAMA_HOST: ollamaHostFromUrl(baseUrl) },
+			env: envWithoutCredentials(process.env, {
+				OLLAMA_HOST: ollamaHostFromUrl(baseUrl),
+			}),
 			timeout: 120_000,
 			windowsHide: true,
 		});
@@ -392,7 +395,7 @@ function startServer(
 	managed: boolean,
 ): void {
 	const env: NodeJS.ProcessEnv = {
-		...process.env,
+		...envWithoutCredentials(),
 		OLLAMA_HOST: ollamaHostFromUrl(baseUrl),
 		// Ollama defaults served models to a 4096-token context, far too small for
 		// an agent prompt (system + tools + history) — requests fail with
