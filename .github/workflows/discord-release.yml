@@ -1,8 +1,17 @@
 name: Discord Release Notification
 
+# release.yml dispatches this after it publishes: its release is published
+# with GITHUB_TOKEN, and events raised by that token start no other workflow,
+# so `release: published` only fires for a release a person publishes.
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to announce (e.g., v1.2.1)'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -11,13 +20,28 @@ jobs:
   discord-notification:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7.0.1
+      - name: Read the release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.event.release.tag_name }}
+        run: |
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json name,body,url > release.json
+          {
+            echo "name=$(jq -r .name release.json)"
+            echo "url=$(jq -r .url release.json)"
+            echo 'body<<RELEASE_BODY_EOF'
+            jq -r .body release.json
+            echo 'RELEASE_BODY_EOF'
+          } >> "$GITHUB_OUTPUT"
 
       - name: Send to Discord
         uses: SethCohen/github-releases-to-discord@24d166886aee4646d448c8a389ff9e1ebcab3682 # v1.20.0
         with:
           webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          release_name: ${{ steps.release.outputs.name }}
+          release_body: ${{ steps.release.outputs.body }}
+          release_html_url: ${{ steps.release.outputs.url }}
           color: "5793266"
           username: "WorkPilot AI Releases"
           avatar_url: "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png"
