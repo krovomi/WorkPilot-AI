@@ -452,7 +452,7 @@ apps/frontend/src/
 
 #### Dépendances Logicielles
 - **Node.js ≥ 20** (la CI construit sur Node 22)
-- **pnpm ≥ 8** (le dépôt est épinglé sur pnpm 10 via `packageManager`)
+- **pnpm ≥ 8** (le dépôt est épinglé sur pnpm 12.5.1 via `packageManager` ; Corepack le fournit)
 - **Python 3.12+** (Pour le backend)
 - **Git** (Dépôt initialisé obligatoire)
 - **Claude Code CLI** : `pnpm add -g @anthropic-ai/claude-code`

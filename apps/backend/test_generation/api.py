@@ -7,6 +7,7 @@ domain. Mounted by provider_api via app.include_router(router).
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Body
@@ -187,6 +188,14 @@ def generate_tdd_tests(spec: Annotated[dict, Body(...)]):
         return {"success": False, "error": _safe_error_message(e)}
 
 
+def _is_within(path: str, root: str) -> bool:
+    """`path` is `root` or below it. A shared prefix (`/repo-evil`) is not."""
+    try:
+        return os.path.commonpath([path, root]) == root
+    except ValueError:  # different drives on Windows
+        return False
+
+
 @router.post("/api/test-generation/run-post-build")
 def run_post_build_test_generation(
     project_path: Annotated[str, Body(...)],
@@ -203,11 +212,13 @@ def run_post_build_test_generation(
         for file_path in modified_files:
             # Validate file path stays within project directory
             real_file = os.path.realpath(file_path)
-            if not real_file.startswith(project_dir):
+            if not _is_within(real_file, project_dir):
                 continue
             if file_path.endswith(".py") and os.path.exists(real_file):
-                # Skip test files themselves
-                if "test_" in file_path or "/tests/" in file_path:
+                # Skip test files themselves, judged inside the project: a
+                # checkout under `/home/me/test_repos/` is not a test file.
+                relative = Path(os.path.relpath(real_file, project_dir))
+                if relative.name.startswith("test_") or "tests" in relative.parts:
                     continue
 
                 # Find existing test file

@@ -15,7 +15,7 @@ Ce document décrit l'architecture complète du provider GitHub Copilot dans la 
 9. [Hooks et Intégrations](#hooks-et-intégrations)
 10. [Outils et Utilitaires](#outils-et-utilitaires)
 11. [Frontend Integration](#frontend-integration)
-12. [Workflows d'Appel](#workflows-dappel)
+12. [Workflows d'Appel](#workflows-dappel-complets)
 
 ---
 

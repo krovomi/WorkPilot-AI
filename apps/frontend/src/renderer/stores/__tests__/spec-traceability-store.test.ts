@@ -1,3 +1,4 @@
+/** @vitest-environment jsdom */
 /**
  * Tests for the Spec Traceability store.
  *

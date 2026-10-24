@@ -783,7 +783,8 @@ avant/après, recherche stricte des `import`, `pnpm run typecheck`, suite vitest
 > - Le runner vocal exige toujours le SDK Claude et un jeton OAuth (`setup_client`) alors qu'il ne
 >   parle plus à aucun modèle — même défaut que la règle « Auth belongs to the provider ».
 > - `core/workspace.py` (2 248 l.) est masqué par le paquet `core/workspace/`, qui le charge par
->   `importlib` : vivant, mais à résorber avec le découpage du lot L11.
+>   `importlib` : vivant. Le lot L11 l'a laissé en place ; l'audit du 17 octobre le reporte au lot
+>   M10 (annexe F).
 > - Isolément, `tests/test_qa_criteria.py`, `test_qa_loop.py` et `test_spec_pipeline.py` échouent
 >   à la collecte (`core.build_signals` sous un `core` mocké) ; ils ne passent que grâce à l'ordre
 >   de la suite complète. `tests/conftest.py` restaure désormais `core.workspace` et
@@ -1551,6 +1552,84 @@ Chemins relatifs à `apps/frontend/src/`.
   développement (`scripts/dev-elevated.cjs`, `dev:noadmin`) ne change pas.
 - **Doc** : README racine, section « `pnpm run dev` ouvre une seconde console élevée ».
 
+### Lot M9 — Doc ↔ code, i18n de la palette, jsdom, dépendances (P2)
+
+**Fait.** Neuvième lot de l'audit du 17 octobre (annexe F). Règles tenues : i18n obligatoire
+([`frontend.md`](../rules/frontend.md#i18n-obligatoire)), la règle gagne et l'index se corrige
+([`CLAUDE.md`](../CLAUDE.md)), S4 de [`security.md`](../rules/security.md#s4--chemins-résolus-processus-sans-shell)
+(un chemin est résolu puis rattaché à sa racine).
+
+#### F72 · La documentation disait autre chose que le code
+
+- **Sévérité** basse · **nouveau** (audit du 17 oct.) · **corrigé par le lot M9**
+- **Preuve** (avant correction) : `docs/CLAUDE.md` annonçait pi « rien de livré » (lots 0 à 5
+  livrés) ; l'atlas ignorait `PiCliAgentClient` ; `README.md` et `apps/frontend/README.md`
+  citaient pnpm 10 (épinglé : 12.5.1) ; `docs/windows-development.md` pointait trois fois vers
+  `../CONTRIBUTING.md`, `docs/providers/claude-code.md` et `github-copilot.md` vers une ancre
+  absente, `docs/CONTRIBUTING.md` vers un `CLA.md` et un bot de signature qui n'ont jamais existé ;
+  une note avant F29 promettait `core/workspace.py` au lot L11, qui l'a laissé. `tests/test_docs_context.py`
+  ne lisait ni `CONTRIBUTING.md`, ni `providers/`, ni `windows-development.md`.
+- **Correction** : textes alignés ; liens et ancres réparés ; procédure de CLA dite telle qu'elle
+  est (choix du mainteneur : l'exigence reste, un mainteneur indique quoi signer) ;
+  `core/workspace.py` reporté au lot M10.
+- **Garde-fou** : `test_relative_links_resolve` balaie toute page suivie sous `docs/` et les trois
+  README (racine, backend, frontend).
+
+#### F73 · La palette de commandes était en anglais dur
+
+- **Sévérité** moyenne · **nouveau** · **corrigé par le lot M9**
+- **Preuve** (avant correction) : `renderer/components/CommandPalette.tsx`, 32 commandes, leurs
+  catégories, le placeholder, le pied et le compteur écrits en anglais ; `t` importé et ignoré
+  (`biome-ignore noUnusedVariables`).
+- **Correction** : `common:commandPalette.*` en `en` et `fr` (compteur au pluriel i18next) ; la
+  recherche floue porte sur le libellé traduit.
+- **Garde-fou** : `renderer/components/__tests__/CommandPalette.i18n.test.tsx` (mêmes clés dans les
+  deux langues, rendu et recherche en français).
+
+#### F74 · Chaque fichier de test Vitest construisait un DOM
+
+- **Sévérité** basse · **nouveau** · **corrigé par le lot M9**
+- **Preuve** (avant correction) : `apps/frontend/vitest.config.ts`, `environment: "jsdom"` pour
+  les 386 fichiers ; Vitest mesurait jsdom à 45 % du temps suivi.
+- **Correction** : deux projets, `dom` (`*.test.tsx`, jsdom) et `node` (`*.test.ts`) ; les 19
+  fichiers `.ts` qui touchent `window` le disent par `@vitest-environment jsdom`. Suite complète :
+  243 s → 169 s en local, même nombre de tests.
+
+#### F75 · Dépendances déclarées sans usage, et une dépendance utilisée sans déclaration
+
+- **Sévérité** basse · **nouveau** · **corrigé par le lot M9**
+- **Preuve** (avant correction) : `@radix-ui/react-scroll-area` et `@xterm/addon-webgl` sans
+  importeur ; `@types/dompurify`, `@types/minimatch`, `@types/uuid` doublaient les types que ces
+  paquets livrent ; `test:coverage` demandait `@vitest/coverage-v8`, non déclaré.
+- **Correction** : les cinq retirés ; `@vitest/coverage-v8` épinglé sur la version de Vitest ;
+  lockfile régénéré par pnpm.
+- **Reste** : `node-pty` n'est importé par rien (le code charge `@lydell/node-pty`), mais
+  `scripts/postinstall.cjs` et `download-prebuilds.cjs` le reconstruisent encore ; à retirer avec
+  `scripts/` (lot M8), après un essai d'installation Windows.
+
+#### F76 · Le détecteur acceptait un Python que le backend ne peut pas importer
+
+- **Sévérité** moyenne · **nouveau** · **corrigé par le lot M9**
+- **Preuve** (avant correction) : `main/python-detector.ts` et quatre méthodes de
+  `cli-tool-manager.ts` exigeaient 3.10, `run.py` et `runners/spec_runner.py` aussi, alors que le
+  backend utilise la syntaxe 3.12 (`src/connectors/jira/work_items.py`, f-string imbriquée) et que
+  la documentation dit 3.12.
+- **Correction** : `shared/constants/python.ts` (`MINIMUM_PYTHON_VERSION = "3.12.0"`) lu par les
+  cinq vérifications ; les deux points d'entrée refusent sous 3.12 ; messages et chemins Homebrew
+  alignés.
+- **Garde-fou** : `tests/test_python_floor.py` (même plancher partout, aucun littéral restant).
+
+#### F77 · La génération de tests post-build comparait des chemins par préfixe
+
+- **Sévérité** moyenne · **nouveau** · **corrigé par le lot M9**
+- **Preuve** (avant correction) : `test_generation/api.py`, `run_post_build_test_generation`
+  gardait un fichier si son chemin résolu commençait par celui du projet (`/repo-other` passait
+  pour `/repo`), et prenait pour un test tout fichier dont le chemin absolu contenait `test_`.
+- **Correction** : `_is_within` (`os.path.commonpath`) ; le test se juge sur le chemin relatif au
+  projet.
+- **Garde-fou** : `tests/test_test_generation_post_build_scope.py` (voisin au même préfixe, lien
+  sortant, projet sous un dossier `test_…`).
+
 ---
 
 ## Annexe A — Inventaire des fichiers candidats
@@ -1705,7 +1784,7 @@ planchers `pnpm.overrides` relevés (`pnpm-workspace.yaml`), `dompurify` ^3.4.17
 
 Statut des constats de l'audit précédent : F1, F3, F4, F5, F7, F8, F9, F10, F12, F16, F17, F19 **ouverts** ;
 F2, F13 **partiels** ; F6, F11, F14, F18 **aggravés** ; F15 **atténué**. Nouveaux : F20 à F36.
-Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1 (annexe F).
+Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F72 à F77 par M9 (annexe F).
 
 ## Annexe C — Ce qui a changé le 15 octobre 2026 (`7ef6fca` → `e3e468f` + PR #454)
 
@@ -1771,8 +1850,11 @@ détaillés ici qu'une fois corrigés ([`SECURITY.md`](../SECURITY.md)).
 | M6 | Frontière renderer → main, avec tests de refus | à faire (après M5) |
 | M7 | Contrats d'architecture (`import-linter`, canaux IPC, Sidebar ↔ `product-overview.md`) | à faire (après M6) |
 | M8 | Code mort, `scripts/`, vues sans test | à faire (après M7) |
-| M9 | Doc ↔ code, i18n de la palette, dépendances | à faire |
+| M9 | Doc ↔ code, i18n de la palette, jsdom, dépendances | **fait** (F72 à F77) |
 | M10 | Casser le cycle `core ⇄ agents`, découper les fonctions géantes | à faire (après M7) |
 
 Vérification du lot M1 : `cd apps/frontend && pnpm run typecheck && pnpm test -- release-handlers
 no-renderer-command worktree-open-launchers pr-details-azure-script`.
+
+Vérification du lot M9 : `pytest tests/test_docs_context.py tests/test_python_floor.py
+tests/test_test_generation_post_build_scope.py -q` et `cd apps/frontend && pnpm test`.

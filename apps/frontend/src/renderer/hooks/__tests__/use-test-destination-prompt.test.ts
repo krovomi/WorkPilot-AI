@@ -1,3 +1,4 @@
+/** @vitest-environment jsdom */
 /**
  * Tests for the "where do these tests go?" prompt.
  *

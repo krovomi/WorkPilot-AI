@@ -232,7 +232,7 @@ git commit -m "chore: update dependencies"
 
 ## Package Manager
 
-This project uses **pnpm** (`pnpm@10.27.0`, pinned in the root `package.json`). Install dependencies with `pnpm install` and run scripts with `pnpm run <script>`. Lock files for other package managers are ignored.
+This project uses **pnpm** (`pnpm@12.5.1`, pinned by `packageManager` in the root `package.json`). Install dependencies with `pnpm install` and run scripts with `pnpm run <script>`. Lock files for other package managers are ignored.
 
 ## License
 
