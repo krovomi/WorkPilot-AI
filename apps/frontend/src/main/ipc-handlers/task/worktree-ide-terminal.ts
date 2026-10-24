@@ -4,13 +4,25 @@
  */
 
 import { exec, execFile, spawn } from "node:child_process";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import {
+	existsSync,
+	readdirSync,
+	readFileSync,
+	realpathSync,
+	statSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { shell } from "electron";
 import type { SupportedIDE, SupportedTerminal } from "../../../shared/types";
 import { getCurrentOS } from "../../platform";
+import { isPathWithinBase } from "../../worktree-paths";
+import {
+	buildBatchLaunchArgs,
+	buildCmdConsoleArgs,
+	buildMacTerminalScript,
+} from "./launch-args";
 
 export const execAsync = promisify(exec);
 
@@ -819,33 +831,67 @@ export const TERMINAL_DETECTION: Partial<
 };
 
 /**
- * Security helper functions for safe path handling
+ * Security helpers: the directory and the launcher both come from outside the
+ * main process, so each is resolved before anything runs.
  */
 
-/**
- * Escape single quotes in a path for safe use in single-quoted shell/script strings.
- * Works for both AppleScript and shell (bash/sh) contexts.
- * This prevents command injection via malicious directory names.
- */
-export function escapeSingleQuotedPath(dirPath: string): string {
-	// Single quotes are escaped by ending the string, adding an escaped quote,
-	// and starting a new string: ' -> '\''
-	// This pattern works in both AppleScript and POSIX shells (bash, sh, zsh)
-	return dirPath.replace(/'/g, "'\\''");
+function realpathOrNull(target: string): string | null {
+	try {
+		return realpathSync(target);
+	} catch {
+		return null;
+	}
 }
 
 /**
- * Validate a path doesn't contain path traversal attempts after variable expansion
+ * The directory the renderer asks to open, resolved (symlinks included) and
+ * accepted only if it is a directory inside one of the known projects
+ * (worktrees and specs live under the project). `null` otherwise.
+ */
+export function resolveOpenableDir(
+	dirPath: unknown,
+	projectPaths: string[],
+): string | null {
+	if (typeof dirPath !== "string" || !path.isAbsolute(dirPath)) return null;
+	const resolved = realpathOrNull(dirPath);
+	if (!resolved) return null;
+	try {
+		if (!statSync(resolved).isDirectory()) return null;
+	} catch {
+		return null;
+	}
+	const inProject = projectPaths.some((projectPath) => {
+		const base = realpathOrNull(projectPath);
+		return base !== null && isPathWithinBase(resolved, base);
+	});
+	return inProject ? resolved : null;
+}
+
+/**
+ * A custom IDE or terminal from the user's settings: an absolute path to an
+ * existing file (or a macOS `.app` bundle), resolved. `null` otherwise.
+ */
+export function resolveCustomLauncher(customPath: unknown): string | null {
+	if (typeof customPath !== "string" || !path.isAbsolute(customPath)) {
+		return null;
+	}
+	const resolved = realpathOrNull(customPath);
+	if (!resolved) return null;
+	try {
+		const stats = statSync(resolved);
+		return stats.isFile() || resolved.endsWith(".app") ? resolved : null;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Validate a detection path doesn't contain traversal after variable expansion
  */
 export function isPathSafe(expandedPath: string): boolean {
-	// Normalize and check for path traversal
-	const normalized = path.normalize(expandedPath);
-	// Check for explicit traversal patterns
-	if (normalized.includes("..")) {
-		return false;
-	}
-	return true;
+	return !path.normalize(expandedPath).includes("..");
 }
+
 
 /**
  * Smart app detection using native OS APIs for faster, more comprehensive discovery
@@ -1157,13 +1203,12 @@ export async function openInIDE(
 	const platform = getCurrentOS();
 
 	try {
-		if (ide === "custom" && customPath) {
-			// Use custom IDE path with execFileAsync to prevent shell injection
-			// Validate the custom path is a valid executable path
-			if (!isPathSafe(customPath)) {
+		if (ide === "custom") {
+			const launcher = resolveCustomLauncher(customPath);
+			if (!launcher) {
 				return { success: false, error: "Invalid custom IDE path" };
 			}
-			await execFileAsync(customPath, [dirPath]);
+			await execFileAsync(launcher, [dirPath]);
 			return { success: true };
 		}
 
@@ -1194,21 +1239,25 @@ export async function openInIDE(
 			}
 		}
 
-		// Special handling for Windows batch files (.cmd, .bat)
-		// execFile doesn't search PATH, so we need shell: true for batch files
+		// Windows batch launchers (.cmd, .bat) only run through cmd.exe
 		if (
 			platform === "win32" &&
 			(command.endsWith(".cmd") || command.endsWith(".bat"))
 		) {
-			return new Promise((resolve) => {
-				const child = spawn(command, [dirPath], {
-					shell: true,
-					detached: true,
-					stdio: "ignore",
-				});
-				child.unref();
-				resolve({ success: true });
-			});
+			const args = buildBatchLaunchArgs(command, dirPath);
+			if (!args) {
+				return {
+					success: false,
+					error: `This folder path cannot be opened with ${config.name}`,
+				};
+			}
+			spawn("cmd.exe", args, {
+				detached: true,
+				stdio: "ignore",
+				windowsHide: true,
+				windowsVerbatimArguments: true,
+			}).unref();
+			return { success: true };
 		}
 
 		// Use command line tool with execFileAsync
@@ -1234,12 +1283,12 @@ export async function openInTerminal(
 	const platform = getCurrentOS();
 
 	try {
-		if (terminal === "custom" && customPath) {
-			// Use custom terminal path with execFileAsync to prevent shell injection
-			if (!isPathSafe(customPath)) {
+		if (terminal === "custom") {
+			const launcher = resolveCustomLauncher(customPath);
+			if (!launcher) {
 				return { success: false, error: "Invalid custom terminal path" };
 			}
-			await execFileAsync(customPath, [dirPath]);
+			await execFileAsync(launcher, [dirPath]);
 			return { success: true };
 		}
 
@@ -1256,23 +1305,13 @@ export async function openInTerminal(
 		}
 
 		if (platform === "darwin") {
-			// macOS: Use open command with the directory
-			// Escape single quotes in dirPath to prevent script injection
-			const escapedPath = escapeSingleQuotedPath(dirPath);
-
-			if (terminal === "system") {
-				// Use AppleScript to open Terminal.app at the directory
-				const script = `tell application "Terminal" to do script "cd '${escapedPath}'"`;
-				await execFileAsync("osascript", ["-e", script]);
-			} else if (terminal === "iterm2") {
-				// Use AppleScript to open iTerm2 at the directory
-				const script = `tell application "iTerm"
-          create window with default profile
-          tell current session of current window
-            write text "cd '${escapedPath}'"
-          end tell
-        end tell`;
-				await execFileAsync("osascript", ["-e", script]);
+			if (terminal === "system" || terminal === "iterm2") {
+				// The directory is an osascript argument, never script source
+				await execFileAsync("osascript", [
+					"-e",
+					buildMacTerminalScript(terminal),
+					dirPath,
+				]);
 			} else if (terminal === "warp") {
 				// Warp can be opened with just the directory using execFileAsync
 				await execFileAsync("open", ["-a", "Warp", dirPath]);
@@ -1283,10 +1322,17 @@ export async function openInTerminal(
 		} else if (platform === "win32") {
 			// Windows: Start terminal at directory using spawn to avoid shell injection
 			if (terminal === "system") {
-				// Use spawn with proper argument separation
-				spawn("cmd.exe", ["/K", "cd", "/d", dirPath], {
+				const args = buildCmdConsoleArgs(dirPath);
+				if (!args) {
+					return {
+						success: false,
+						error: "This folder path cannot be opened in cmd.exe",
+					};
+				}
+				spawn("cmd.exe", args, {
 					detached: true,
 					stdio: "ignore",
+					windowsVerbatimArguments: true,
 				}).unref();
 			} else if (commands.length > 0) {
 				spawn(commands[0], [...commands.slice(1), dirPath], {
@@ -1312,10 +1358,8 @@ export async function openInTerminal(
 							dirPath,
 						]);
 					} catch {
-						// xterm doesn't have --working-directory, use -e with a script
-						// Escape the path for shell use within the xterm command
-						const escapedPath = escapeSingleQuotedPath(dirPath);
-						await execFileAsync("xterm", ["-e", `cd '${escapedPath}' && bash`]);
+						// xterm has no --working-directory: start it in the directory
+						await execFileAsync("xterm", ["-e", "bash"], { cwd: dirPath });
 					}
 				}
 			} else {

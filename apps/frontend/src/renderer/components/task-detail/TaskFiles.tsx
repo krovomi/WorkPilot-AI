@@ -135,12 +135,11 @@ export function TaskFiles({ task }: TaskFilesProps) {
 			await window.electronAPI.worktreeOpenInIDE(
 				task.specsPath,
 				settings.preferredIDE,
-				settings.customIDEPath,
 			);
 		} catch (err) {
 			console.error("Failed to open in IDE:", err);
 		}
-	}, [settings.preferredIDE, settings.customIDEPath, task.specsPath]);
+	}, [settings.preferredIDE, task.specsPath]);
 
 	// Keyboard navigation for file list
 	const handleKeyDown = useCallback(

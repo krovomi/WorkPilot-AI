@@ -1,5 +1,5 @@
 import { parseJevSettings } from "../../shared/utils/jev-settings";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import {
 	existsSync,
 	mkdirSync,
@@ -58,6 +58,7 @@ import {
 import { testGenerationService } from "../test-generation-service";
 import { findEnvLineBreak, parseEnvFile } from "./utils";
 import { getCurrentOS } from "../platform";
+import { buildCmdConsoleArgs } from "./task/launch-args";
 
 
 /**
@@ -112,14 +113,20 @@ function openTerminalForPlatform(resolvedPath: string): IPCResult<void> {
 	}
 
 	if (platform === "win32") {
-		// Windows: Use cmd.exe directly with argument array
-		// /C tells cmd to execute the command and terminate
-		// /K keeps the window open after executing cd
-		execFileSync("cmd.exe", ["/K", "cd", "/d", resolvedPath], {
+		// cmd.exe parses its own command line: the path is quoted, not split
+		const args = buildCmdConsoleArgs(resolvedPath);
+		if (!args) {
+			return {
+				success: false,
+				error: "This folder path cannot be opened in cmd.exe",
+			};
+		}
+		spawn("cmd.exe", args, {
+			detached: true,
 			stdio: "ignore",
 			windowsHide: false,
-			shell: false, // Explicitly disable shell to prevent injection
-		});
+			windowsVerbatimArguments: true,
+		}).unref();
 		return { success: true };
 	}
 
@@ -1139,27 +1146,6 @@ export function registerSettingsHandlers(
 				return {
 					success: false,
 					error: `Failed to open terminal: ${errorMsg}`,
-				};
-			}
-		},
-	);
-
-	ipcMain.handle(
-		IPC_CHANNELS.SHELL_OPEN_TERMINAL_WITH_COMMAND,
-		async (_, command: string): Promise<IPCResult<void>> => {
-			try {
-				// Import the function from claude-code-handlers
-				const { openTerminalWithCommand } = await import(
-					"./claude-code-handlers"
-				);
-				await openTerminalWithCommand(command);
-				return { success: true };
-			} catch (error) {
-				const errorMsg =
-					error instanceof Error ? error.message : "Unknown error";
-				return {
-					success: false,
-					error: `Failed to open terminal with command: ${errorMsg}`,
 				};
 			}
 		},
