@@ -425,6 +425,7 @@ apps/frontend/src/
 - **Stockage Secure** → Keychain OS / Credential Manager
 - **Rotation Automatique** → Cycle de vie des tokens OAuth
 - **Validation Input** → Chemins et commandes sanitizées
+- **Frontière renderer → main** → Un chemin reçu de l'interface est résolu (liens compris) et doit être dans un projet enregistré ou un dossier choisi dans une boîte de dialogue ; l'interface ne choisit jamais l'exécutable lancé
 
 ### Performance et Scalabilité
 

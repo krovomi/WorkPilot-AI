@@ -1912,6 +1912,88 @@ qu'à l'URL pour laquelle elle a été enregistrée. Détail :
 - **Garde-fou** : `tests/test_test_generation_post_build_scope.py` (voisin au même préfixe, lien
   sortant, projet sous un dossier `test_…`).
 
+### Lot M6 — Frontière renderer → main (P1)
+
+**Fait.** Sixième lot de l'audit du 17 octobre (annexe F). Règle tenue : S6 de
+[`security.md`](../rules/security.md#s6--electron--le-renderer-nest-pas-fiable) (le main revalide
+chaque argument, chemin résolu compris) et S4 (un chemin est résolu, liens compris, puis rattaché
+à sa racine). Le renderer ne peut plus nommer que deux sortes de dossiers : un projet enregistré
+et ce que l'utilisateur a choisi dans une boîte de dialogue native pendant la session.
+Code : `main/security/renderer-path.ts` (résolution) et `main/security/ipc-path-policy.ts`
+(contrôle posé avant chaque handler par `ipc-setup.ts`).
+
+#### F85 · Le renderer choisissait l'interpréteur Python de huit features
+
+- **Sévérité** haute · **nouveau** · **corrigé par le lot M6**
+- **Preuve** (avant) : huit canaux `<feature>:configure` (voice-control, performance-profiler,
+  code-migration, auto-refactor, pipeline-generator, documentation-agent, visual-programming,
+  architecture-visualizer) prenaient `pythonPath` et `autoBuildPath` du renderer, puis lançaient
+  cet exécutable.
+- **Correction** : canaux, méthodes du preload, types et constantes retirés.
+  `main/python-feature-services.ts` configure les huit services depuis les réglages, au démarrage
+  d'un projet et à chaque sauvegarde de `pythonPath`.
+- **Garde-fou** : `preload/api/__tests__/no-renderer-interpreter.test.ts` (aucun canal
+  `:configure`, aucune méthode `configureX`), `main/__tests__/python-feature-services.test.ts`.
+
+#### F86 · Des handlers lisaient ou écrivaient le fichier que le renderer nommait
+
+- **Sévérité** haute · **nouveau** · **corrigé par le lot M6**
+- **Preuve** (avant) : `changelog:readLocalImage` et `changelog:saveImage` (nom de fichier
+  libre), `browserAgent:getScreenshotImage` et `setBaseline`, `architectureVisualizer:readArtifact`
+  et la lecture des deltas, `fileExplorer:read`, la lecture, l'écriture et la suppression de
+  fichiers d'un worktree, les miniatures d'images d'une tâche : le chemin reçu était lu ou écrit
+  tel quel, ou comparé par préfixe sans résoudre les liens.
+- **Correction** : chaque handler passe par `resolveInProject`, `resolveUnder` ou
+  `resolveWritableUnder` (pour un fichier à créer, le plus proche ancêtre existant est résolu) ;
+  une image enregistrée a un nom simple et une extension d'image.
+- **Garde-fou** : `main/security/renderer-path.test.ts` (lien sortant, voisin au même préfixe,
+  `..`, chemin relatif) et `main/ipc-handlers/__tests__/renderer-path-refusals.test.ts`, qui
+  échoue sur l'ancien code.
+
+#### F87 · Un dossier de projet reçu du renderer n'était vérifié nulle part
+
+- **Sévérité** haute · **nouveau** · **corrigé par le lot M6**
+- **Preuve** (avant) : 94 canaux prenaient un `projectPath`, `projectDir`, `worktreePath`,
+  `specDir`… et y lançaient git, une analyse ou une écriture, sans rattacher ce dossier à un projet.
+- **Correction** : `DIRECTORY_ARGS` liste la position de chacun de ces arguments ;
+  `installIpcPathPolicy` refuse l'appel avant le handler quand l'argument n'est ni dans un projet
+  enregistré ni dans un dossier choisi (`{ success: false, error: PATH_REFUSED }`). Les clés
+  `projectPath`, `projectDir`, `project_path`, `project_dir` d'un objet sont vérifiées sur tous
+  les canaux.
+- **Garde-fou** : `main/security/ipc-path-policy.test.ts` lit chaque `ipcMain.handle/on` du main
+  et échoue sur un paramètre nommé comme un dossier absent de la liste, ou sur un canal listé sans
+  handler.
+
+#### F88 · `project:add` enregistrait n'importe quel chemin
+
+- **Sévérité** moyenne · **nouveau** · **corrigé par le lot M6**
+- **Preuve** (avant) : un projet ajouté devenait une racine de confiance, et `project:add` comme
+  `project:repath` acceptaient tout dossier existant, ce qui rendait le contrôle de F87 inutile.
+- **Correction** : le dossier doit venir du sélecteur de dossier ou de la création de dossier
+  (`rememberUserChosenPath`, appelé par les seuls handlers de dialogue), ou être déjà enregistré.
+  Message : « Choose the project folder in the folder picker ».
+
+#### F89 · Le chemin actif des CLI Claude et Copilot était libre
+
+- **Sévérité** moyenne · **nouveau** · **corrigé par le lot M6**
+- **Preuve** (avant) : `SET_ACTIVE_PATH` acceptait tout exécutable qui passait le validateur, donc
+  lancé ensuite comme CLI.
+- **Correction** : le chemin doit être une des installations détectées
+  (`scanClaudeInstallations`, `scanCopilotInstallations`).
+
+#### F90 · L'export de la programmation visuelle parcourait le dossier personnel
+
+- **Sévérité** basse · **nouveau** · **corrigé par le lot M6**
+- **Preuve** (avant) : `CanvasPanel` ouvrait son explorateur sur `getUserHome()` et laissait
+  saisir une racine.
+- **Correction** : racine = projet actif, ou un dossier choisi dans la boîte native
+  (clé i18n `visualProgramming:chooseFolder`, `en` et `fr`) ; le canal `fileExplorer:getUserHome`
+  est retiré.
+- **Reste** (lot M6) : les chemins d'outils saisis dans les réglages (`claudePath`, `pythonPath`,
+  `gitPath`) restent acceptés, c'est un choix de l'utilisateur ; les handlers qui déstructurent un
+  objet ne sont couverts que par le contrôle des clés ; aucun handler ne vérifie encore
+  `event.senderFrame`.
+
 ---
 
 ## Annexe A — Inventaire des fichiers candidats
@@ -2066,7 +2148,7 @@ planchers `pnpm.overrides` relevés (`pnpm-workspace.yaml`), `dompurify` ^3.4.17
 
 Statut des constats de l'audit précédent : F1, F3, F4, F5, F7, F8, F9, F10, F12, F16, F17, F19 **ouverts** ;
 F2, F13 **partiels** ; F6, F11, F14, F18 **aggravés** ; F15 **atténué**. Nouveaux : F20 à F36.
-Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F57 à F62 par M2, F63 à F68 par M3, F69 à F71 par M4, F78 à F84 par M5, F72 à F77 par M9 (annexe F).
+Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F57 à F62 par M2, F63 à F68 par M3, F69 à F71 par M4, F78 à F84 par M5, F85 à F90 par M6, F72 à F77 par M9 (annexe F).
 
 ## Annexe C — Ce qui a changé le 15 octobre 2026 (`7ef6fca` → `e3e468f` + PR #454)
 
@@ -2129,7 +2211,7 @@ détaillés ici qu'une fois corrigés ([`SECURITY.md`](../SECURITY.md)).
 | M3 | Des features qui ne disent que ce qu'elles font (PR Azure DevOps factice, triage `continuous_ai`, verdict QA .NET, workflows de release jamais déclenchés, Skills Sync, Sentry) | **fait** (F63 à F68) |
 | M4 | Mode hors-ligne strict et mode serveur | **fait** (F69 à F71) |
 | M5 | Secrets et environnement des processus enfants | **fait** (F78 à F84 : journaux et processus enfants, aucun identifiant stocké dans le renderer ; reste l'environnement des runners Python des vues) |
-| M6 | Frontière renderer → main, avec tests de refus | à faire (après M5) |
+| M6 | Frontière renderer → main, avec tests de refus | **fait** (F85 à F90 ; reste `senderFrame` et les chemins d'outils des réglages) |
 | M7 | Contrats d'architecture (`import-linter`, canaux IPC, Sidebar ↔ `product-overview.md`) | à faire (après M6) |
 | M8 | Code mort, `scripts/`, vues sans test | à faire (après M7) |
 | M9 | Doc ↔ code, i18n de la palette, jsdom, dépendances | **fait** (F72 à F77) |
@@ -2147,6 +2229,9 @@ tests/backend/test_server_mode_fail_closed.py -q`.
 
 Vérification du lot M5 : `pytest tests/test_entrypoints_redaction.py tests/core/test_log_redaction.py -q`
 et `cd apps/frontend && pnpm test -- child-env dev-env-files`.
+
+Vérification du lot M6 : `cd apps/frontend && pnpm test -- renderer-path ipc-path-policy
+renderer-path-refusals no-renderer-interpreter python-feature-services`.
 
 Vérification du lot M9 : `pytest tests/test_docs_context.py tests/test_python_floor.py
 tests/test_test_generation_post_build_scope.py -q` et `cd apps/frontend && pnpm test`.
