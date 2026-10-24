@@ -2203,7 +2203,7 @@ caractérisation puis découpée (F103) ; restent la boucle QA et `create_client
   variables partagées avec la boucle (compteurs d'erreurs, délai de reprise, pause). Les
   branches d'erreur (concurrence d'outils, modèle indisponible, prompt trop long, limite de
   débit, authentification, erreur répétée) n'avaient aucun test.
-- **Correction** : des tests de caractérisation d'abord, verts sur le code d'avant, puis la
+- **Correction** (choix du mainteneur) : des tests de caractérisation d'abord, verts sur le code d'avant, puis la
   découpe : `_on_build_complete`, `_on_session_continue`,
   `_on_session_error` et un `_on_*` par type d'erreur, qui rendent `_Next` (`STOP`, `RETRY`,
   `NEXT`) ; l'état d'une session à l'autre dans `_RetryState` ; les prompts dans
