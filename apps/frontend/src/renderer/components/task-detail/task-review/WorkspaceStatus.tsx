@@ -270,7 +270,6 @@ export function WorkspaceStatus({
 			await globalThis.electronAPI.worktreeOpenInIDE(
 				worktreeStatus.worktreePath,
 				preferredIDE,
-				settings.customIDEPath,
 			);
 		} catch (err) {
 			console.error("Failed to open in IDE:", err);
@@ -283,7 +282,6 @@ export function WorkspaceStatus({
 			await globalThis.electronAPI.worktreeOpenInTerminal(
 				worktreeStatus.worktreePath,
 				preferredTerminal,
-				settings.customTerminalPath,
 			);
 		} catch (err) {
 			console.error("Failed to open in terminal:", err);

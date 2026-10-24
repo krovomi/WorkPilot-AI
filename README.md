@@ -596,6 +596,13 @@ Si vous avez déjà lancé l'app une fois **avec** élévation avant de désacti
 Remove-Item "apps\frontend\.env-files\.env" -Force
 ```
 
+L'app **packagée** (installeur, portable) démarre sans élévation (`asInvoker`) : les agents, terminaux
+et processus qu'elle lance n'ont que vos droits. Pour qu'une preuve visuelle pilote une application
+desktop elle-même élevée, lancez WorkPilot AI par clic droit → **Exécuter en tant qu'administrateur** ;
+sans cela, la capture d'écran reste possible et l'app indique que le pilotage demande cette élévation.
+Une version précédente demandait l'élévation à chaque lancement : si des réglages ne s'enregistrent plus
+après la mise à jour, un fichier créé par le processus administrateur est en cause, comme ci-dessus.
+
 #### 3. Smart App Control / Application Control bloque les binaires natifs npm
 
 Si `pnpm run dev` plante sur `electron-vite dev` avec une erreur du type `Error: An Application Control policy has blocked this file` (souvent sur un fichier `.node` dans `node_modules`, par exemple un binding natif de `rolldown` ou un autre paquet compilé), c'est **Smart App Control** (Windows 11) ou une politique **WDAC** qui bloque le chargement d'un binaire natif fraîchement installé et non reconnu.

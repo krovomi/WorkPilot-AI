@@ -16,7 +16,7 @@ modules/
 ├── linear-api.ts         # Linear issue tracking integration
 ├── github-api.ts         # GitHub integration (issues, releases)
 ├── autobuild-api.ts      # Auto-build source update management
-├── shell-api.ts          # Shell operations (e.g., opening URLs)
+├── shell-api.ts          # Shell operations: open a URL or a folder, never a command
 └── index.ts              # Barrel export for easy imports
 ```
 
