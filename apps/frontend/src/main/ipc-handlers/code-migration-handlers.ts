@@ -33,27 +33,6 @@ export function registerCodeMigrationHandlers(): void {
 			};
 		}
 	});
-
-	ipcMain.handle(
-		"codeMigration:configure",
-		async (
-			_event,
-			config: { pythonPath?: string; autoBuildSourcePath?: string },
-		) => {
-			try {
-				codeMigrationService.configure(
-					config.pythonPath,
-					config.autoBuildSourcePath,
-				);
-				return { success: true };
-			} catch (error) {
-				return {
-					success: false,
-					error: error instanceof Error ? error.message : "Unknown error",
-				};
-			}
-		},
-	);
 }
 
 /**

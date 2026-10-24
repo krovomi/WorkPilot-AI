@@ -50,6 +50,8 @@ import {
 import { credentialManager } from "../services/credential-manager";
 import { openExternalUrl } from "../open-external";
 import { decryptSecret } from "../secret-storage";
+import { configurePythonFeatureServices } from "../python-feature-services";
+import { rememberUserChosenPath } from "../security/renderer-path";
 import {
 	maskSettingsSecrets,
 	unmaskSettingsUpdate,
@@ -734,6 +736,10 @@ export function registerSettingsHandlers(
 					);
 					if (settings.pythonPath) {
 						testGenerationService.configure(settings.pythonPath);
+						configurePythonFeatureServices(
+							settings.pythonPath,
+							settings.autoBuildPath,
+						);
 					}
 				}
 
@@ -895,6 +901,9 @@ export function registerSettingsHandlers(
 				return null;
 			}
 
+			// The user picked it: handlers may now act on it before it is a
+			// registered project (adding one, checking its git status).
+			rememberUserChosenPath(result.filePaths[0]);
 			return result.filePaths[0];
 		},
 	);
@@ -924,6 +933,7 @@ export function registerSettingsHandlers(
 			});
 
 			if (result.canceled) return [];
+			for (const filePath of result.filePaths) rememberUserChosenPath(filePath);
 			return result.filePaths;
 		},
 	);
@@ -1082,6 +1092,8 @@ export function registerSettingsHandlers(
 
 				// Create the directory
 				mkdirSync(projectPath, { recursive: true });
+				// Created at the user's request: it may be added as a project.
+				rememberUserChosenPath(projectPath);
 
 				// Initialize git if requested
 				let gitInitialized = false;

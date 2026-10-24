@@ -578,7 +578,6 @@ const browserMockAPI: Partial<ElectronAPI> = {
 	}),
 
 	// User directory operations
-	getUserHome: async () => "/mock/user/home",
 
 	// Learning Loop Operations
 	getLearningPatterns: async () => ({ success: true, data: [] }),
@@ -790,7 +789,6 @@ const browserMockAPI: Partial<ElectronAPI> = {
 	// Auto-Refactor API
 	startAutoRefactor: async () => ({ success: false, error: "browser preview" }),
 	cancelAutoRefactor: async () => ({ success: false, cancelled: false }),
-	configureAutoRefactor: async () => ({ success: true }),
 	onAutoRefactorStatus: () => () => {
 		/* noop */
 	},

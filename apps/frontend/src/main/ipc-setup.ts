@@ -5,10 +5,11 @@
  * All IPC handlers have been organized into domain-specific modules in ./ipc-handlers/
  */
 
-import type { BrowserWindow } from "electron";
+import { type BrowserWindow, ipcMain } from "electron";
 import type { AgentManager } from "./agent";
 import { setupIpcHandlers as setupModularHandlers } from "./ipc-handlers";
 import type { PythonEnvManager } from "./python-env-manager";
+import { installIpcPathPolicy } from "./security/ipc-path-policy";
 import type { TerminalManager } from "./terminal-manager";
 
 /**
@@ -44,6 +45,10 @@ export function setupIpcHandlers(
 	getMainWindow: () => BrowserWindow | null,
 	pythonEnvManager: PythonEnvManager,
 ): void {
+	// Before any handler exists: a directory argument from the renderer is
+	// checked against the registered projects on every channel.
+	installIpcPathPolicy(ipcMain);
+
 	// Delegate to modular handler setup
 	setupModularHandlers(
 		agentManager,

@@ -33,27 +33,6 @@ export function registerPerformanceProfilerHandlers(): void {
 			};
 		}
 	});
-
-	ipcMain.handle(
-		"performanceProfiler:configure",
-		async (
-			_event,
-			config: { pythonPath?: string; autoBuildSourcePath?: string },
-		) => {
-			try {
-				performanceProfilerService.configure(
-					config.pythonPath,
-					config.autoBuildSourcePath,
-				);
-				return { success: true };
-			} catch (error) {
-				return {
-					success: false,
-					error: error instanceof Error ? error.message : "Unknown error",
-				};
-			}
-		},
-	);
 }
 
 /**

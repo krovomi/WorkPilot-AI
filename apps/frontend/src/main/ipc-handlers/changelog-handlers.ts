@@ -20,6 +20,17 @@ import type {
 } from "../../shared/types";
 import { changelogService } from "../changelog-service";
 import { projectStore } from "../project-store";
+import { resolveKnownProject, resolveUnder } from "../security/renderer-path";
+
+/** The images the changelog view may read back, by extension. */
+const IMAGE_MIME_TYPES: Record<string, string> = {
+	".png": "image/png",
+	".jpg": "image/jpeg",
+	".jpeg": "image/jpeg",
+	".gif": "image/gif",
+	".webp": "image/webp",
+	".svg": "image/svg+xml",
+};
 
 /**
  * Register all changelog-related IPC handlers
@@ -447,6 +458,17 @@ export function registerChangelogHandlers(
 				return { success: false, error: "Project not found" };
 			}
 
+			// A bare file name with an image extension: nothing that climbs out
+			// of the assets folder or lands as something else.
+			if (
+				typeof filename !== "string" ||
+				filename !== path.basename(filename) ||
+				filename.startsWith(".") ||
+				!IMAGE_MIME_TYPES[path.extname(filename).toLowerCase()]
+			) {
+				return { success: false, error: "Invalid image file name" };
+			}
+
 			try {
 				// Create .github/assets directory if it doesn't exist
 				const assetsDir = path.join(project.path, ".github", "assets");
@@ -488,29 +510,20 @@ export function registerChangelogHandlers(
 			relativePath: string,
 		): Promise<IPCResult<string>> => {
 			try {
-				// Construct full path from project path and relative path
-				const fullPath = path.join(projectPath, relativePath);
-
-				// Verify the file exists
-				if (!existsSync(fullPath)) {
-					return { success: false, error: `Image not found: ${relativePath}` };
+				// The project must be one the user added, and the image a file
+				// inside it once resolved: the renderer names, the main decides.
+				const projectDir = resolveKnownProject(projectPath);
+				const fullPath =
+					projectDir && resolveUnder(projectDir, relativePath, "file");
+				const mimeType =
+					typeof relativePath === "string"
+						? IMAGE_MIME_TYPES[path.extname(relativePath).toLowerCase()]
+						: undefined;
+				if (!fullPath || !mimeType) {
+					return { success: false, error: "Image not found in this project" };
 				}
 
-				// Read the file and convert to base64
-				const buffer = readFileSync(fullPath);
-				const base64 = buffer.toString("base64");
-
-				// Determine MIME type from extension
-				const ext = path.extname(relativePath).toLowerCase();
-				const mimeTypes: Record<string, string> = {
-					".png": "image/png",
-					".jpg": "image/jpeg",
-					".jpeg": "image/jpeg",
-					".gif": "image/gif",
-					".webp": "image/webp",
-					".svg": "image/svg+xml",
-				};
-				const mimeType = mimeTypes[ext] || "image/png";
+				const base64 = readFileSync(fullPath).toString("base64");
 
 				// Return as data URL
 				const dataUrl = `data:${mimeType};base64,${base64}`;

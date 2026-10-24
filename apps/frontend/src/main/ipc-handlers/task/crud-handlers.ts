@@ -37,6 +37,7 @@ import { findTaskWorktree, isPathWithinBase } from "../../worktree-paths";
 import { inlineAzureDevOpsImages } from "../shared/azure-attachments";
 import { stripHtml } from "../shared/sanitize";
 import { findTaskAndProject } from "./shared";
+import { resolveUnder } from "../../security/renderer-path";
 
 /** Charge le PAT et l'URL d'organisation Azure DevOps depuis le `.env` projet. */
 function loadAzureDevOpsConfig(
@@ -1328,9 +1329,15 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 				if (!existsSync(fullImagePath)) {
 					return { success: false, error: `Image not found: ${imagePath}` };
 				}
+				// And once links are resolved: an attachment that is a link
+				// pointing out of the spec folder is not read.
+				const realImagePath = resolveUnder(expectedBase, imagePath, "file");
+				if (!realImagePath) {
+					return { success: false, error: "Invalid image path" };
+				}
 
 				// Load image using nativeImage
-				const image = nativeImage.createFromPath(fullImagePath);
+				const image = nativeImage.createFromPath(realImagePath);
 				if (image.isEmpty()) {
 					return { success: false, error: "Failed to load image" };
 				}

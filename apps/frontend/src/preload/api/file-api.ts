@@ -24,7 +24,6 @@ export interface FileAPI {
 		fileName: string,
 		data: unknown,
 	) => Promise<IPCResult<boolean>>;
-	getUserHome: () => Promise<string>;
 	searchProjectFiles: (
 		rootPath: string,
 		query: string,
@@ -55,8 +54,6 @@ export const createFileAPI = (): FileAPI => ({
 			fileName,
 			data,
 		),
-	getUserHome: (): Promise<string> =>
-		ipcRenderer.invoke(IPC_CHANNELS.FILE_EXPLORER_GET_USER_HOME),
 	searchProjectFiles: (
 		rootPath: string,
 		query: string,

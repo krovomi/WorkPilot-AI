@@ -38,29 +38,6 @@ export function registerAutoRefactorHandlers(): void {
 			};
 		}
 	});
-
-	// Configure service paths
-	ipcMain.handle(
-		"auto-refactor:configure",
-		async (
-			_event,
-			config: { pythonPath?: string; autoBuildSourcePath?: string },
-		) => {
-			try {
-				autoRefactorService.configure(
-					config.pythonPath,
-					config.autoBuildSourcePath,
-				);
-				return { success: true };
-			} catch (error) {
-				console.error("[AutoRefactor] Configure error:", error);
-				return {
-					success: false,
-					error: error instanceof Error ? error.message : "Unknown error",
-				};
-			}
-		},
-	);
 }
 
 /** Set once the service's listeners are attached; see below. */

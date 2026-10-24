@@ -590,7 +590,6 @@ export const IPC_CHANNELS = {
 	FILE_EXPLORER_LIST: "fileExplorer:list",
 	FILE_EXPLORER_READ: "fileExplorer:read",
 	FILE_EXPLORER_SAVE: "fileExplorer:save", // Save JSON files
-	FILE_EXPLORER_GET_USER_HOME: "fileExplorer:getUserHome",
 	FILE_EXPLORER_SEARCH: "fileExplorer:search", // Recursive path search for autocomplete
 
 	// API Explorer — project route scanning
@@ -807,7 +806,6 @@ export const IPC_CHANNELS = {
 	// Architecture Visualizer
 	ARCHITECTURE_VISUALIZER_GENERATE: "architectureVisualizer:generate",
 	ARCHITECTURE_VISUALIZER_CANCEL: "architectureVisualizer:cancel",
-	ARCHITECTURE_VISUALIZER_CONFIGURE: "architectureVisualizer:configure",
 	ARCHITECTURE_VISUALIZER_DOCTOR: "architectureVisualizer:doctor",
 	// Per-task architecture delta
 	ARCHITECTURE_DELTA_READ: "architectureVisualizer:delta",
@@ -823,7 +821,6 @@ export const IPC_CHANNELS = {
 	// Code Migration Agent
 	CODE_MIGRATION_START: "codeMigration:start",
 	CODE_MIGRATION_CANCEL: "codeMigration:cancel",
-	CODE_MIGRATION_CONFIGURE: "codeMigration:configure",
 	// Code Migration events (main -> renderer)
 	CODE_MIGRATION_STATUS: "codeMigration:status",
 	CODE_MIGRATION_STREAM_CHUNK: "codeMigration:streamChunk",
@@ -834,7 +831,6 @@ export const IPC_CHANNELS = {
 	// Performance Profiler Agent
 	PERFORMANCE_PROFILER_START: "performanceProfiler:start",
 	PERFORMANCE_PROFILER_CANCEL: "performanceProfiler:cancel",
-	PERFORMANCE_PROFILER_CONFIGURE: "performanceProfiler:configure",
 	// Performance Profiler events (main -> renderer)
 	PERFORMANCE_PROFILER_STATUS: "performanceProfiler:status",
 	PERFORMANCE_PROFILER_STREAM_CHUNK: "performanceProfiler:streamChunk",
@@ -846,7 +842,6 @@ export const IPC_CHANNELS = {
 	// Documentation Agent
 	DOCUMENTATION_AGENT_GENERATE: "documentationAgent:generate",
 	DOCUMENTATION_AGENT_CANCEL: "documentationAgent:cancel",
-	DOCUMENTATION_AGENT_CONFIGURE: "documentationAgent:configure",
 	// Documentation Agent events (main -> renderer)
 	DOCUMENTATION_AGENT_STATUS: "documentationAgent:status",
 	DOCUMENTATION_AGENT_STREAM_CHUNK: "documentationAgent:streamChunk",
@@ -856,7 +851,6 @@ export const IPC_CHANNELS = {
 	// Pipeline Generator (Feature 23) — AI-powered CI/CD pipeline generation
 	PIPELINE_GENERATOR_GENERATE: "pipelineGenerator:generate",
 	PIPELINE_GENERATOR_CANCEL: "pipelineGenerator:cancel",
-	PIPELINE_GENERATOR_CONFIGURE: "pipelineGenerator:configure",
 	// Pipeline Generator events (main -> renderer)
 	PIPELINE_GENERATOR_STATUS: "pipelineGenerator:status",
 	PIPELINE_GENERATOR_STREAM_CHUNK: "pipelineGenerator:streamChunk",

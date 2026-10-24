@@ -149,6 +149,12 @@ l'UI n'existe pas.
 - Le renderer ne fournit jamais une commande à exécuter ni un exécutable à lancer : le main
   construit la commande, lit un lanceur personnalisé dans les réglages et rattache un dossier
   reçu à un projet connu (`resolveOpenableDir`).
+- Un chemin reçu du renderer est résolu puis rattaché à un projet enregistré ou à un dossier que
+  l'utilisateur a choisi dans une boîte native (`main/security/renderer-path.ts`) ; seuls les
+  handlers de dialogue appellent `rememberUserChosenPath`. Un paramètre de handler nommé comme un
+  dossier (`projectPath`, `worktreePath`, `specDir`…) va dans `DIRECTORY_ARGS`
+  (`main/security/ipc-path-policy.ts`), contrôlé avant le handler ; `ipc-path-policy.test.ts`
+  échoue sinon.
 - Le renderer ne reçoit jamais un identifiant stocké, seulement qu'il est défini : `MASKED_SECRET`
   (`main/utils/masked-secret.ts`), relu au retour comme « garder la valeur ». Une clé masquée ne sert
   qu'à l'URL pour laquelle elle a été enregistrée ; un appel à un provider avec une clé se fait

@@ -509,7 +509,7 @@ ol.prio,ul.plain{margin:0;padding-left:20px;display:flex;flex-direction:column;g
 <section class="view" id="v-audit" hidden>
   <div class="eyebrow">06 · Constats et plan d'optimisation</div>
   <h1>Ce qu'il faut corriger, supprimer ou fusionner</h1>
-  <p class="lede">Chaque constat cite son fichier et sa ligne. « Vérifié » signifie reproduit en exécutant le code du dépôt ; « lu » signifie établi par lecture et recherche. Le statut compare au commit <code>b46a031</code> et tient compte des lots L1 à L17 et L13, puis des lots M1, M2, M3, M4, M5 et M9 (audit du 17 octobre). Le plan est ordonné par priorité, sans estimation de durée.</p>
+  <p class="lede">Chaque constat cite son fichier et sa ligne. « Vérifié » signifie reproduit en exécutant le code du dépôt ; « lu » signifie établi par lecture et recherche. Le statut compare au commit <code>b46a031</code> et tient compte des lots L1 à L17 et L13, puis des lots M1, M2, M3, M4, M5, M6 et M9 (audit du 17 octobre). Le plan est ordonné par priorité, sans estimation de durée.</p>
   <div class="controls">
     <div class="ctl"><span class="lbl">Sévérité</span><div class="chips" id="f-sev"></div></div>
     <div class="ctl"><span class="lbl">Statut</span><div class="chips" id="f-st"></div></div>
@@ -1555,8 +1555,33 @@ const FINDINGS=[
  {id:"F84",sev:"moy",cat:"sécurité",st:"résolu",v:"vérifié",t:"Des tests de connexion appelaient les providers depuis le renderer",
   c:"<b>Corrigé par le lot M5</b>. <code>ProviderService</code> appelait OpenAI, Google, Mistral ou Ollama avec la clé quand l'IPC échouait. Il ne fait plus que demander au main.",
   p:"shared/services/providerService.ts · main/services/credential-manager.ts",
-  r:"Fait.",g:"Les appels avec clé partent du main seulement.",k:"Test d'un provider dans Réglages → Comptes."}];
+  r:"Fait.",g:"Les appels avec clé partent du main seulement.",k:"Test d'un provider dans Réglages → Comptes."},
+ {id:"F85",sev:"haute",cat:"sécurité",st:"résolu",v:"vérifié",t:"Le renderer choisissait l'interpréteur Python de huit features",
+  c:"Relevé par l'audit du 17 octobre, <b>corrigé par le lot M6</b>. Huit canaux <code>&lt;feature&gt;:configure</code> lançaient le <code>pythonPath</code> reçu du renderer. Ils sont retirés ; <code>python-feature-services.ts</code> configure les services depuis les réglages.",
+  p:"main/python-feature-services.ts · main/ipc-handlers/project-handlers.ts · main/ipc-handlers/settings-handlers.ts",
+  r:"Fait.",g:"Seul le main choisit l'exécutable qu'il lance.",k:"Voix, profilage, migration, refactor, pipelines, documentation, programmation visuelle, carte d'architecture."},
+ {id:"F86",sev:"haute",cat:"sécurité",st:"résolu",v:"vérifié",t:"Des handlers lisaient ou écrivaient le fichier que le renderer nommait",
+  c:"<b>Corrigé par le lot M6</b>. Images du changelog, captures et référence du browser agent, artefacts d'architecture, explorateur, fichiers d'un worktree, miniatures : chaque chemin est résolu, liens compris, puis rattaché au projet (<code>renderer-path.ts</code>).",
+  p:"main/security/renderer-path.ts · main/ipc-handlers/changelog-handlers.ts · main/ipc-handlers/task/worktree-handlers.ts · main/ipc-handlers/file-handlers.ts",
+  r:"Fait.",g:"Un renderer compromis ne lit ni n'écrit hors d'un projet.",k:"Changelog, browser agent, carte d'architecture, explorateur de fichiers, revue de worktree."},
+ {id:"F87",sev:"haute",cat:"sécurité",st:"résolu",v:"vérifié",t:"Un dossier de projet reçu du renderer n'était vérifié nulle part",
+  c:"<b>Corrigé par le lot M6</b>. 94 canaux prenaient un <code>projectPath</code>, <code>worktreePath</code> ou <code>specDir</code> sans le rattacher à un projet. <code>ipc-path-policy.ts</code> refuse l'appel avant le handler ; un test lit chaque handler du main et échoue sur un paramètre de dossier non listé.",
+  p:"main/security/ipc-path-policy.ts · main/ipc-setup.ts",
+  r:"Fait.",g:"Seuls un projet enregistré ou un dossier choisi passent.",k:"Toutes les vues qui agissent dans un projet."},
+ {id:"F88",sev:"moy",cat:"sécurité",st:"résolu",v:"vérifié",t:"project:add enregistrait n'importe quel chemin",
+  c:"<b>Corrigé par le lot M6</b>. Un projet devient une racine de confiance ; il doit désormais venir du sélecteur de dossier (ou être déjà enregistré). <code>project:repath</code> aussi.",
+  p:"main/ipc-handlers/project-handlers.ts · main/ipc-handlers/settings-handlers.ts",
+  r:"Fait.",g:"Le renderer ne s'ouvre pas de racine lui-même.",k:"Ajout et déplacement d'un projet."},
+ {id:"F89",sev:"moy",cat:"sécurité",st:"résolu",v:"vérifié",t:"Le chemin actif des CLI Claude et Copilot était libre",
+  c:"<b>Corrigé par le lot M6</b>. Le chemin choisi doit être une des installations détectées.",
+  p:"main/ipc-handlers/claude-code-handlers.ts · main/ipc-handlers/copilot-cli-handlers.ts",
+  r:"Fait.",g:"La CLI lancée est une CLI trouvée par le main.",k:"Réglages → CLI."},
+ {id:"F90",sev:"basse",cat:"sécurité",st:"résolu",v:"vérifié",t:"L'export de la programmation visuelle parcourait le dossier personnel",
+  c:"<b>Corrigé par le lot M6</b>. La racine est le projet actif ou un dossier choisi dans la boîte native ; <code>fileExplorer:getUserHome</code> est retiré. Restent les chemins d'outils des réglages et <code>senderFrame</code>.",
+  p:"renderer/components/visual-to-code/CanvasPanel.tsx",
+  r:"Fait.",g:"Aucune vue ne parcourt le dossier personnel.",k:"Programmation visuelle → Export."}];
 const PLAN=[
+ ["P1","Frontière renderer → main (audit du 17 oct.)","Fait (lot M6) : plus d'interpréteur choisi par le renderer, chemins résolus et rattachés à un projet ou à un dossier choisi, contrôle central des dossiers de projet, ajout de projet par le sélecteur ; restent senderFrame et les chemins d'outils des réglages","F85, F86, F87, F88, F89, F90","Un renderer compromis n'atteint rien hors d'un projet"],
  ["P0","Secrets hors du renderer (audit du 17 oct.)","Fait (lot M5) : réglages, profils API et Claude, .env du backend masqués ; une clé masquée ne sert qu'à son URL ; tests de connexion dans le main","F81, F82, F83, F84","Un renderer compromis ne lit aucun identifiant"],
  ["P1","Secrets et processus enfants (audit du 17 oct.)","Fait (lot M5) : journaux masqués dans tous les runners, .env de dev jamais lu par l'app packagée, environnement sans identifiants pour le code d'un autre ; restent les runners Python des vues","F78, F79, F80","Un secret ne va qu'au processus qui en a besoin"],
  ["P1","Features honnêtes (audit du 17 oct.)","Fait (lot M3) : plus de PR Azure DevOps inventée, triage continuous_ai réparé, verdict dotnet test pris en compte, workflows d'après-release déclenchés, Skills Sync qui prévient, Sentry branché","F63, F64, F65, F66, F67, F68","Un succès affiché est un succès produit"],
@@ -1698,7 +1723,8 @@ const PRS=[
  ["M3 · #488","Des features qui ne disent que ce qu'elles font","PR Azure DevOps en erreur plutôt qu'inventée, triage gh réparé, dotnet test asynchrone et compté, VirusTotal et Discord déclenchés, Skills Sync en issue, Sentry sur l'API et le WebSocket.","F63 à F68"],
  ["M1 · #483","Aucune commande venue du renderer","Release gh sans shell, canal de commande libre retiré, IDE et terminal ouverts sur un dossier d'un projet connu, script Azure DevOps statique, app Windows sans élévation.","F52 à F56"],
  ["M4 · #489","Hors-ligne strict et mode serveur","libdocs consulte airgapStrict, routes providers montées par _mount, /providers/select refusé en mode serveur, /health réduit à son verdict.","F69 à F71"],
- ["M5 (1/2) · cette PR","Secrets et processus enfants","Redaction dans run.py et les runners, à la création des enregistrements ; .env-files de dev seulement ; envWithoutCredentials pour l'émulateur, le mobile et Ollama.","F78 à F80"],
+ ["M5 (1/2) · #491","Secrets et processus enfants","Redaction dans run.py et les runners, à la création des enregistrements ; .env-files de dev seulement ; envWithoutCredentials pour l'émulateur, le mobile et Ollama.","F78 à F80"],
+ ["M6 · cette PR","Frontière renderer → main","Canaux :configure retirés, renderer-path.ts (realpath + racine), ipc-path-policy.ts devant chaque handler, project:add par le sélecteur, CLI parmi les installations détectées, export sans dossier personnel.","F85 à F90"],
  ["M9 · #490","Doc ↔ code, i18n, jsdom, dépendances","Doc et liens alignés, palette en/fr, Vitest node par défaut, 5 dépendances retirées, plancher Python 3.12 unique, génération post-build bornée au projet.","F72 à F77"],
  ["L17 · #316","Self-healing honnête","fix, QA et PR marqués sautés avec leur raison ; incident escaladé plutôt que déclaré réparé.","F48"],
  ["L12 · #320","Gouvernance","hermes-learned hors de [packs] ; la barre de commandes lit le provider sans le consommer.","F12, F13"],

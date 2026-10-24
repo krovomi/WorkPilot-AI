@@ -34,27 +34,6 @@ export function registerPipelineGeneratorHandlers(): void {
 			};
 		}
 	});
-
-	ipcMain.handle(
-		"pipelineGenerator:configure",
-		async (
-			_event,
-			config: { pythonPath?: string; autoBuildSourcePath?: string },
-		) => {
-			try {
-				pipelineGeneratorService.configure(
-					config.pythonPath,
-					config.autoBuildSourcePath,
-				);
-				return { success: true };
-			} catch (error) {
-				return {
-					success: false,
-					error: error instanceof Error ? error.message : "Unknown error",
-				};
-			}
-		},
-	);
 }
 
 export function setupPipelineGeneratorEventForwarding(

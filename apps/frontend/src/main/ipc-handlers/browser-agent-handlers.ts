@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 import { type BrowserWindow, ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { parsePythonCommand } from "../python-detector";
+import { resolveInProject } from "../security/renderer-path";
 import {
 	getConfiguredPythonPath,
 	pythonEnvManager,
@@ -89,8 +90,16 @@ export function registerBrowserAgentHandlers(
 		IPC_CHANNELS.BROWSER_AGENT_GET_SCREENSHOT_IMAGE,
 		async (_, screenshotPath: string) => {
 			try {
-				const buffer = fs.readFileSync(screenshotPath);
-				const base64 = buffer.toString("base64");
+				// Screenshots are written inside the project (its
+				// .workpilot folder, a spec or a worktree): nothing else is read.
+				const resolved = resolveInProject(screenshotPath, "file");
+				if (!resolved || path.extname(resolved).toLowerCase() !== ".png") {
+					return {
+						success: false,
+						error: "Screenshot not found in a known project",
+					};
+				}
+				const base64 = fs.readFileSync(resolved).toString("base64");
 				return { success: true, data: { base64, mimeType: "image/png" } };
 			} catch (error) {
 				return { success: false, error: String(error) };
@@ -126,7 +135,16 @@ export function registerBrowserAgentHandlers(
 			try {
 				const args = ["baseline", "set", "--name", name];
 				if (screenshotPath) {
-					args.push("--screenshot", screenshotPath);
+					// The runner copies this file into the baselines: it must be
+					// a screenshot in the project, not any file the renderer names.
+					const screenshot = resolveInProject(screenshotPath, "file");
+					if (!screenshot) {
+						return {
+							success: false,
+							error: "Screenshot not found in a known project",
+						};
+					}
+					args.push("--screenshot", screenshot);
 				}
 				const result = await runBrowserAgentCommand(projectPath, args);
 				return JSON.parse(result);
