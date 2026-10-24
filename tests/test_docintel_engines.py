@@ -802,7 +802,9 @@ class TestReadGuard:
 
         from core import client
 
-        source = inspect.getsource(client.create_client)
+        # create_client takes its hooks from _session_hooks, and only there.
+        assert "_session_hooks(" in inspect.getsource(client.create_client)
+        source = inspect.getsource(client._session_hooks)
         assert 'HookMatcher(matcher="Read", hooks=[_read_guard_hook])' in source
 
 

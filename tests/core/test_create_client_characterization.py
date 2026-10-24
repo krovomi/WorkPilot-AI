@@ -16,6 +16,7 @@ from __future__ import annotations
 import importlib
 import json
 import os
+from dataclasses import dataclass
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -38,6 +39,14 @@ _ENV_TO_CLEAR = (
     "JIRA_API_TOKEN",
     "LINEAR_API_KEY",
 )
+
+
+@dataclass
+class _Matcher:
+    """HookMatcher's shape: other tests replace the SDK module with a mock."""
+
+    matcher: str | None = None
+    hooks: list | None = None
 
 
 class _Harness:
@@ -92,6 +101,7 @@ def harness(tmp_path: Path, monkeypatch):
     patches = {
         "ClaudeAgentOptions": CapturingOptions,
         "ClaudeSDKClient": MagicMock(),
+        "HookMatcher": _Matcher,
         "configure_sdk_authentication": lambda *_args: None,
         "get_sdk_env_vars": lambda: dict(state.sdk_env),
         "is_linear_enabled": lambda: False,
@@ -434,7 +444,9 @@ def test_an_explicit_resume_is_passed_as_given(harness):
 def test_the_resume_variable_is_consumed_once(harness, monkeypatch):
     profile = harness.project_dir / "profile"
     (profile / "projects" / "encoded").mkdir(parents=True)
-    (profile / "projects" / "encoded" / "abc-123.jsonl").write_text("{}")
+    (profile / "projects" / "encoded" / "abc-123.jsonl").write_text(
+        "{}", encoding="utf-8"
+    )
     harness.sdk_env = {"CLAUDE_CONFIG_DIR": str(profile)}
     monkeypatch.setenv("AUTO_CLAUDE_RESUME_SESSION_ID", "abc-123")
 
