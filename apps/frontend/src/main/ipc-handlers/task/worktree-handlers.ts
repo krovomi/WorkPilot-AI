@@ -46,6 +46,7 @@ import { getAppLanguage } from "../../app-language";
 import { getToolPath } from "../../cli-tool-manager";
 import { killProcessGracefully } from "../../platform";
 import { projectStore } from "../../project-store";
+import { readSettingsFile } from "../../settings-utils";
 import { parsePythonCommand } from "../../python-detector";
 import {
 	getConfiguredPythonPath,
@@ -64,6 +65,7 @@ import {
 	detectInstalledTools,
 	openInIDE,
 	openInTerminal,
+	resolveOpenableDir,
 } from "./worktree-ide-terminal";
 import type { DetectedTools } from "./worktree-ide-terminal";
 import {
@@ -2572,14 +2574,22 @@ export function registerWorktreeHandlers(
 			_,
 			worktreePath: string,
 			ide: SupportedIDE,
-			customPath?: string,
 		): Promise<IPCResult<{ opened: boolean }>> => {
 			try {
-				if (!existsSync(worktreePath)) {
-					return { success: false, error: "Worktree path does not exist" };
+				const dirPath = resolveOpenableDir(
+					worktreePath,
+					projectStore.getProjects().map((project) => project.path),
+				);
+				if (!dirPath) {
+					return {
+						success: false,
+						error: "Path is not a folder of a known project",
+					};
 				}
 
-				const result = await openInIDE(worktreePath, ide, customPath);
+				// The custom launcher is the user's setting, never a renderer value
+				const customPath = readSettingsFile()?.customIDEPath;
+				const result = await openInIDE(dirPath, ide, customPath as string);
 				if (!result.success) {
 					return { success: false, error: result.error };
 				}
@@ -2605,14 +2615,26 @@ export function registerWorktreeHandlers(
 			_,
 			worktreePath: string,
 			terminal: SupportedTerminal,
-			customPath?: string,
 		): Promise<IPCResult<{ opened: boolean }>> => {
 			try {
-				if (!existsSync(worktreePath)) {
-					return { success: false, error: "Worktree path does not exist" };
+				const dirPath = resolveOpenableDir(
+					worktreePath,
+					projectStore.getProjects().map((project) => project.path),
+				);
+				if (!dirPath) {
+					return {
+						success: false,
+						error: "Path is not a folder of a known project",
+					};
 				}
 
-				const result = await openInTerminal(worktreePath, terminal, customPath);
+				// The custom launcher is the user's setting, never a renderer value
+				const customPath = readSettingsFile()?.customTerminalPath;
+				const result = await openInTerminal(
+					dirPath,
+					terminal,
+					customPath as string,
+				);
 				if (!result.success) {
 					return { success: false, error: result.error };
 				}

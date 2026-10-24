@@ -1463,6 +1463,94 @@ le câblage étant un chantier à part (décrit ci-dessous).
   stockés avant la correction rouverts ; hermes toujours observé) et
   `renderer/components/self-healing/HealingTimeline.test.tsx`.
 
+### Lot M1 — Aucune commande construite depuis le renderer ou un texte externe (P0)
+
+**Fait.** Premier lot de l'audit du 17 octobre (annexe F). Règle tenue : S4 de
+[`security.md`](../rules/security.md#s4--chemins-résolus-processus-sans-shell) (processus sans
+shell, chemin résolu puis rattaché) et S2 (un texte externe ne devient jamais une commande).
+Chemins relatifs à `apps/frontend/src/`.
+
+#### F52 · Les notes de release atteignaient `gh` par un shell
+
+- **Sévérité** critique · **nouveau** (audit du 17 oct.) · **corrigé par le lot M1**
+- **Preuve** (avant correction) : `main/ipc-handlers/github/release-handlers.ts`,
+  `registerCreateRelease` recollait les arguments de `buildReleaseArgs` en une chaîne passée à
+  `execSync`. Les notes viennent du changelog généré par un LLM à partir des commits du dépôt cible.
+- **Correction** : `execFileSync(getToolPath("gh"), buildReleaseArgs(version, options), { input })` ;
+  les notes passent par `--notes-file -` (stdin), jamais par argv (ni shell, ni limite de longueur
+  de ligne Windows). La version doit être un tag (`v?X.Y.Z…`), les notes une chaîne.
+- **Garde-fou** : `main/ipc-handlers/github/__tests__/release-handlers.test.ts` (notes contenant
+  `$(id)`, backticks et `&` : aucun `execSync`, notes absentes d'argv et reçues sur stdin ; versions
+  `--repo=…`, `1.2.0; id`, `$(id)` refusées avant tout lancement).
+
+#### F53 · Un canal IPC ouvrait un terminal sur une commande choisie par le renderer
+
+- **Sévérité** haute · **nouveau** · **corrigé par le lot M1**
+- **Preuve** (avant correction) : `shell:openTerminalWithCommand` (`shared/constants/ipc.ts`,
+  `preload/api/modules/shell-api.ts`, handler dans `settings-handlers.ts`) transmettait la chaîne
+  reçue à `openTerminalWithCommand`. Aucun composant ne l'appelait : `CopilotCliStatusBadge` a sa
+  propre fonction homonyme, qui passe par un PTY interne.
+- **Correction** : canal, constante, entrée `ipc-namespaces`, méthode preload et handler retirés.
+  Les appels restants d'`openTerminalWithCommand` (installation, mise à jour, authentification de
+  Claude Code, Ollama, GitLab, Copilot) construisent leur commande dans le main.
+- **Garde-fou** : `preload/api/__tests__/no-renderer-command.test.ts`.
+
+#### F54 · Ouvrir un dossier dans un IDE ou un terminal
+
+- **Sévérité** haute · **nouveau** · **corrigé par le lot M1**
+- **Preuve** (avant correction) : `main/ipc-handlers/task/worktree-ide-terminal.ts` et les handlers
+  `TASK_WORKTREE_OPEN_IN_IDE` / `_TERMINAL` de `worktree-handlers.ts`. Le dossier reçu n'était
+  vérifié que par `existsSync` ; le lanceur personnalisé venait du renderer et n'était refusé que
+  s'il contenait `..` ; sous macOS, le dossier entrait dans le source AppleScript, sous Linux dans
+  la commande `xterm -e` ; sous Windows, un lanceur `.cmd` partait en `shell: true` avec le dossier
+  non cité, et la console `cmd.exe /K cd /d <dossier>` laissait cmd.exe réinterpréter un chemin sans
+  espace (même motif dans `settings-handlers.ts`, `openTerminalForPlatform`).
+- **Correction** :
+  - `resolveOpenableDir` : chemin absolu, résolu par `realpathSync` (liens compris), dossier, et
+    dans un projet connu (`projectStore.getProjects()`, `isPathWithinBase`) ; sinon refus.
+  - Le lanceur personnalisé est lu dans les réglages (`customIDEPath`, `customTerminalPath` par
+    `readSettingsFile`) : les méthodes preload `worktreeOpenInIDE` / `worktreeOpenInTerminal` ne
+    prennent plus de `customPath`. `resolveCustomLauncher` exige un fichier absolu existant.
+  - `main/ipc-handlers/task/launch-args.ts` (sans effet de bord, importable par tout handler) :
+    les lignes de commande ci-dessous.
+  - macOS : `buildMacTerminalScript`, le dossier est un argument d'`osascript` lu par
+    `quoted form of (item 1 of argv)`. Linux : `xterm -e bash` lancé avec `cwd`.
+  - Windows : `buildBatchLaunchArgs` et `buildCmdConsoleArgs` citent le dossier
+    (`/d /s /c|/k "…"`, `windowsVerbatimArguments`) et refusent ce que des guillemets ne protègent
+    pas (`"`, `%`, retours à la ligne). La console de `settings-handlers.ts` les réutilise et ne
+    bloque plus le main process (`spawn` détaché au lieu d'`execFileSync`).
+- **Garde-fou** : `main/ipc-handlers/task/__tests__/worktree-open-launchers.test.ts` (dossier hors
+  projet, traversée, lien sortant, fichier, chemin relatif ; lanceur nu ou absent ; `&`, `"`, `%`).
+
+#### F55 · Le script Python des détails de PR Azure DevOps était construit par interpolation
+
+- **Sévérité** haute · **nouveau** · **corrigé par le lot M1**
+- **Preuve** (avant correction) : `main/ipc-handlers/pr-details-handlers.ts`,
+  `callAzureDevOpsPythonWithExistingConfig` interpolait `projectPath` et `prUrl` (lu dans
+  `task.metadata`, dans un dossier de spec où un agent écrit) dans le source passé à `python -c` ;
+  le script chargeait un `.env` à la racine du projet cible et désactivait la vérification TLS.
+- **Correction** : `AZURE_DEVOPS_PR_DETAILS_SCRIPT` est statique (`String.raw`, aucune
+  interpolation) ; `buildAzureDevOpsPRScriptArgs` valide l'URL entière
+  (`AZURE_DEVOPS_PR_URL_REGEX`, ancrée, `https://dev.azure.com/…`) et passe projet, dépôt et
+  numéro en argv. Le PAT et l'URL d'organisation viennent de `readProjectEnv` (le `.workpilot/.env`
+  déchiffré par le main) dans l'environnement de l'enfant ; aucun `.env` n'est lu dans le dossier
+  du projet ; le certificat est vérifié.
+- **Hors lot** : la PR factice renvoyée quand l'appel échoue reste (lot M3).
+- **Garde-fou** : `main/ipc-handlers/__tests__/pr-details-azure-script.test.ts`.
+
+#### F56 · L'app Windows packagée demandait l'élévation à chaque lancement
+
+- **Sévérité** moyenne · **nouveau** · **corrigé par le lot M1**
+- **Preuve** (avant correction) : `apps/frontend/package.json`, `build.win.requestedExecutionLevel:
+  "requireAdministrator"`, pour la seule preuve visuelle d'une app desktop élevée (Windows UIPI).
+  Tout ce que WorkPilot lance (agents, terminaux, commandes choisies par un LLM) héritait des droits
+  administrateur.
+- **Correction** (choix du mainteneur) : `asInvoker`. Pour piloter une app élevée, l'utilisateur
+  lance WorkPilot en administrateur ; non élevé, `visual-proof-service.ts` garde la capture et le dit
+  déjà (`isCurrentProcessElevated`, message « Relaunch WorkPilot as administrator »). Le lanceur de
+  développement (`scripts/dev-elevated.cjs`, `dev:noadmin`) ne change pas.
+- **Doc** : README racine, section « `pnpm run dev` ouvre une seconde console élevée ».
+
 ---
 
 ## Annexe A — Inventaire des fichiers candidats
@@ -1597,6 +1685,15 @@ le câblage étant un chantier à part (décrit ci-dessous).
 
 ---
 
+## Annexe A bis — Avis de sécurité des dépendances (24 octobre 2026)
+
+`Dependency Audit` (`quality-security.yml`) rougit sans changement de code quand un avis sort.
+Le 24 octobre : `dompurify` ≤ 3.4.16 (critique), `electron` < 44.9.1, `body-parser` < 2.4.0 (par
+`@modelcontextprotocol/sdk`), `undici` < 7.30.1 (par `jsdom`, `@electron/get`). Correction :
+planchers `pnpm.overrides` relevés (`pnpm-workspace.yaml`), `dompurify` ^3.4.17 et Electron 44.9.3
+(`apps/frontend/package.json`), lockfile régénéré par `pnpm install`. Vérification :
+`pnpm audit --audit-level high` sans avis haut ni critique.
+
 ## Annexe B — Ce qui a changé depuis l'audit précédent (`7057b28` → `b46a031`)
 
 | PR | Changement | Effet sur les constats |
@@ -1608,7 +1705,7 @@ le câblage étant un chantier à part (décrit ci-dessous).
 
 Statut des constats de l'audit précédent : F1, F3, F4, F5, F7, F8, F9, F10, F12, F16, F17, F19 **ouverts** ;
 F2, F13 **partiels** ; F6, F11, F14, F18 **aggravés** ; F15 **atténué**. Nouveaux : F20 à F36.
-Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16.
+Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1 (annexe F).
 
 ## Annexe C — Ce qui a changé le 15 octobre 2026 (`7ef6fca` → `e3e468f` + PR #454)
 
@@ -1657,3 +1754,25 @@ tests/test_workflows_run_execute.py tests/test_workflow_engine.py tests/test_wor
 tests/test_workflow_handoff.py -q` ;
 `python scripts/skills_cli.py build --check` ; l'atlas (vue 04) simule chaque type de carte avec ou
 sans BMAD installé.
+
+## Annexe F — Audit du 17 octobre 2026 (`473bbf1`)
+
+Audit de `develop` après les lots L1 à L17 ; tout ce qu'il relève est nouveau ou une régression
+prouvée. Il ordonne dix lots, un lot = une PR vers `develop`. Les constats de sécurité ne sont
+détaillés ici qu'une fois corrigés ([`SECURITY.md`](../SECURITY.md)).
+
+| Lot | Thème | Statut |
+|---|---|---|
+| M1 | Aucune commande construite depuis le renderer ou un texte externe ; app Windows sans élévation | **fait** (F52 à F56) |
+| M2 | Une CI qui garde : filtres `paths:`, version de Biome, Python 3.12, lockfile Python, image serveur construite et migrée | à faire |
+| M3 | Des features qui ne disent que ce qu'elles font (PR Azure DevOps factice, triage `continuous_ai`, verdict QA .NET, workflows de release jamais déclenchés, Skills Sync, Sentry) | à faire |
+| M4 | Mode hors-ligne strict et mode serveur | à faire |
+| M5 | Secrets et environnement des processus enfants | à faire (après M1) |
+| M6 | Frontière renderer → main, avec tests de refus | à faire (après M5) |
+| M7 | Contrats d'architecture (`import-linter`, canaux IPC, Sidebar ↔ `product-overview.md`) | à faire (après M6) |
+| M8 | Code mort, `scripts/`, vues sans test | à faire (après M7) |
+| M9 | Doc ↔ code, i18n de la palette, dépendances | à faire |
+| M10 | Casser le cycle `core ⇄ agents`, découper les fonctions géantes | à faire (après M7) |
+
+Vérification du lot M1 : `cd apps/frontend && pnpm run typecheck && pnpm test -- release-handlers
+no-renderer-command worktree-open-launchers pr-details-azure-script`.

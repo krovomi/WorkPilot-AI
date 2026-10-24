@@ -895,7 +895,6 @@ Please confirm you're ready by saying: I'm ready to work on ${selectedTask.title
 				await globalThis.electronAPI.worktreeOpenInIDE(
 					worktreePath,
 					preferredIDE,
-					settings.customIDEPath,
 				);
 			} catch (err) {
 				console.error("Failed to open in IDE:", err);
@@ -909,7 +908,6 @@ Please confirm you're ready by saying: I'm ready to work on ${selectedTask.title
 		}, [
 			terminal?.worktreeConfig?.worktreePath,
 			settings.preferredIDE,
-			settings.customIDEPath,
 			toast,
 		]);
 
