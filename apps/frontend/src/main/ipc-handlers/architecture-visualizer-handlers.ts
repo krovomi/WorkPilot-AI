@@ -8,6 +8,7 @@ import {
 	type ArchitectureMapRequest,
 	architectureVisualizerService,
 } from "../architecture-visualizer-service";
+import { resolveInProject } from "../security/renderer-path";
 import { IPC_CHANNELS } from "../../shared/constants";
 
 /**
@@ -62,8 +63,10 @@ export function registerArchitectureVisualizerHandlers(): void {
 		IPC_CHANNELS.ARCHITECTURE_DELTA_READ,
 		async (_event, specDir: string) => {
 			try {
+				const dir = resolveInProject(specDir, "directory");
+				if (!dir) return { success: true, data: null };
 				const raw = await readFile(
-					path.join(specDir, "architecture", "delta.status.json"),
+					path.join(dir, "architecture", "delta.status.json"),
 					"utf-8",
 				);
 				return {
@@ -98,7 +101,12 @@ export function registerArchitectureVisualizerHandlers(): void {
 		IPC_CHANNELS.ARCHITECTURE_ARTIFACT_READ,
 		async (_event, artifactPath: string) => {
 			try {
-				const { size } = await stat(artifactPath);
+				// The map is written in the project: a path elsewhere is not one.
+				const resolved = resolveInProject(artifactPath, "file");
+				if (!resolved) {
+					return { success: false, error: "the artifact is no longer on disk" };
+				}
+				const { size } = await stat(resolved);
 				if (size > MAX_ARTIFACT_BYTES) {
 					return {
 						success: false,
@@ -107,7 +115,7 @@ export function registerArchitectureVisualizerHandlers(): void {
 				}
 				return {
 					success: true,
-					data: { url: pathToFileURL(artifactPath).toString() },
+					data: { url: pathToFileURL(resolved).toString() },
 				};
 			} catch (error) {
 				if ((error as NodeJS.ErrnoException)?.code === "ENOENT") {

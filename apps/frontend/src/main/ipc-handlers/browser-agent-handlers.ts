@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 import { type BrowserWindow, ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { parsePythonCommand } from "../python-detector";
+import { resolveInProject } from "../security/renderer-path";
 import {
 	getConfiguredPythonPath,
 	pythonEnvManager,
@@ -89,8 +90,16 @@ export function registerBrowserAgentHandlers(
 		IPC_CHANNELS.BROWSER_AGENT_GET_SCREENSHOT_IMAGE,
 		async (_, screenshotPath: string) => {
 			try {
-				const buffer = fs.readFileSync(screenshotPath);
-				const base64 = buffer.toString("base64");
+				// Screenshots are written inside the project (its
+				// .workpilot folder, a spec or a worktree): nothing else is read.
+				const resolved = resolveInProject(screenshotPath, "file");
+				if (!resolved || path.extname(resolved).toLowerCase() !== ".png") {
+					return {
+						success: false,
+						error: "Screenshot not found in a known project",
+					};
+				}
+				const base64 = fs.readFileSync(resolved).toString("base64");
 				return { success: true, data: { base64, mimeType: "image/png" } };
 			} catch (error) {
 				return { success: false, error: String(error) };
