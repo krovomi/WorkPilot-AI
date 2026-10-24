@@ -2,6 +2,7 @@ import { BrowserWindow, ipcMain } from "electron";
 import type { NaturalLanguageGitRequest } from "../natural-language-git-service";
 import { naturalLanguageGitService } from "../natural-language-git-service";
 import { getPageFeatureSettings } from "../services/page-llm-config";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
 
 /**
  * Set up IPC handlers for natural language Git functionality
@@ -9,7 +10,7 @@ import { getPageFeatureSettings } from "../services/page-llm-config";
 export function setupNaturalLanguageGitHandlers(): void {
 	// Execute natural language Git command
 	ipcMain.handle(
-		"execute-natural-language-git",
+		IPC_CHANNELS.EXECUTE_NATURAL_LANGUAGE_GIT,
 		async (event, request: NaturalLanguageGitRequest) => {
 			try {
 				// Le renderer peut ne rien imposer : la page décide, sinon les
@@ -25,7 +26,7 @@ export function setupNaturalLanguageGitHandlers(): void {
 				const win = BrowserWindow.fromWebContents(event.sender);
 				if (win) {
 					win.webContents.send(
-						"natural-language-git-error",
+						IPC_CHANNELS.NATURAL_LANGUAGE_GIT_ERROR,
 						error instanceof Error ? error.message : "Unknown error",
 					);
 				}
@@ -34,7 +35,7 @@ export function setupNaturalLanguageGitHandlers(): void {
 	);
 
 	// Cancel natural language Git command
-	ipcMain.handle("cancel-natural-language-git", () => {
+	ipcMain.handle(IPC_CHANNELS.CANCEL_NATURAL_LANGUAGE_GIT, () => {
 		return naturalLanguageGitService.cancel();
 	});
 
@@ -42,28 +43,28 @@ export function setupNaturalLanguageGitHandlers(): void {
 	naturalLanguageGitService.on("status", (status: string) => {
 		const windows = BrowserWindow.getAllWindows();
 		windows.forEach((win) => {
-			win.webContents.send("natural-language-git-status", status);
+			win.webContents.send(IPC_CHANNELS.NATURAL_LANGUAGE_GIT_STATUS, status);
 		});
 	});
 
 	naturalLanguageGitService.on("stream-chunk", (chunk: string) => {
 		const windows = BrowserWindow.getAllWindows();
 		windows.forEach((win) => {
-			win.webContents.send("natural-language-git-stream-chunk", chunk);
+			win.webContents.send(IPC_CHANNELS.NATURAL_LANGUAGE_GIT_STREAM_CHUNK, chunk);
 		});
 	});
 
 	naturalLanguageGitService.on("error", (error: string) => {
 		const windows = BrowserWindow.getAllWindows();
 		windows.forEach((win) => {
-			win.webContents.send("natural-language-git-error", error);
+			win.webContents.send(IPC_CHANNELS.NATURAL_LANGUAGE_GIT_ERROR, error);
 		});
 	});
 
 	naturalLanguageGitService.on("complete", (result) => {
 		const windows = BrowserWindow.getAllWindows();
 		windows.forEach((win) => {
-			win.webContents.send("natural-language-git-complete", result);
+			win.webContents.send(IPC_CHANNELS.NATURAL_LANGUAGE_GIT_COMPLETE, result);
 		});
 	});
 }

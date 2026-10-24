@@ -15,6 +15,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { app, ipcMain } from "electron";
 import { pythonEnvManager } from "../python-env-manager.js";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
 
 interface ScanRequest {
 	projectPath: string;
@@ -85,7 +86,7 @@ function runRunner(args: string[]): Promise<unknown> {
 }
 
 export function registerTechDebtHandlers(): void {
-	ipcMain.handle("techDebt:scan", async (_e, req: ScanRequest) => {
+	ipcMain.handle(IPC_CHANNELS.TECH_DEBT_SCAN, async (_e, req: ScanRequest) => {
 		if (!req.projectPath) throw new Error("projectPath is required");
 		const result = await runRunner([
 			"--project-path",
@@ -96,7 +97,7 @@ export function registerTechDebtHandlers(): void {
 		return { result };
 	});
 
-	ipcMain.handle("techDebt:listItems", async (_e, req: ListRequest) => {
+	ipcMain.handle(IPC_CHANNELS.TECH_DEBT_LIST_ITEMS, async (_e, req: ListRequest) => {
 		if (!req.projectPath) throw new Error("projectPath is required");
 		const args = [
 			"--project-path",
@@ -111,7 +112,7 @@ export function registerTechDebtHandlers(): void {
 		return { result };
 	});
 
-	ipcMain.handle("techDebt:getTrend", async (_e, req: ScanRequest) => {
+	ipcMain.handle(IPC_CHANNELS.TECH_DEBT_GET_TREND, async (_e, req: ScanRequest) => {
 		if (!req.projectPath) throw new Error("projectPath is required");
 		const result = await runRunner([
 			"--project-path",
@@ -122,7 +123,7 @@ export function registerTechDebtHandlers(): void {
 		return { result };
 	});
 
-	ipcMain.handle("techDebt:generateSpec", async (_e, req: SpecRequest) => {
+	ipcMain.handle(IPC_CHANNELS.TECH_DEBT_GENERATE_SPEC, async (_e, req: SpecRequest) => {
 		if (!req.projectPath || !req.itemId) {
 			throw new Error("projectPath and itemId are required");
 		}

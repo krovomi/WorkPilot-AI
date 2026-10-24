@@ -9,6 +9,7 @@ import type {
 	ComplianceReport,
 } from "../../../shared/types/compliance";
 import { createIpcListener, invokeIpc } from "./ipc-utils";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export interface ComplianceRunOptions {
 	projectPath: string;
@@ -34,22 +35,22 @@ export interface ComplianceAPI {
 
 export const createComplianceAPI = (): ComplianceAPI => ({
 	runComplianceScan: (options: ComplianceRunOptions) =>
-		invokeIpc<ComplianceReport>("compliance:run", options),
+		invokeIpc<ComplianceReport>(IPC_CHANNELS.COMPLIANCE_RUN, options),
 
-	cancelComplianceScan: () => invokeIpc<boolean>("compliance:cancel"),
+	cancelComplianceScan: () => invokeIpc<boolean>(IPC_CHANNELS.COMPLIANCE_CANCEL),
 
 	onComplianceEvent: (callback) =>
-		createIpcListener<[ComplianceEvent]>("compliance-event", (payload) =>
+		createIpcListener<[ComplianceEvent]>(IPC_CHANNELS.COMPLIANCE_EVENT, (payload) =>
 			callback(payload),
 		),
 
 	onComplianceResult: (callback) =>
-		createIpcListener<[ComplianceReport]>("compliance-result", (payload) =>
+		createIpcListener<[ComplianceReport]>(IPC_CHANNELS.COMPLIANCE_RESULT, (payload) =>
 			callback(payload),
 		),
 
 	onComplianceError: (callback) =>
-		createIpcListener<[string]>("compliance-error", (payload) =>
+		createIpcListener<[string]>(IPC_CHANNELS.COMPLIANCE_ERROR, (payload) =>
 			callback(payload),
 		),
 });

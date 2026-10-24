@@ -17,6 +17,7 @@ import { type ChildProcess, spawn } from "node:child_process";
 import path from "node:path";
 import { app, BrowserWindow, ipcMain } from "electron";
 import { pythonEnvManager } from "../python-env-manager.js";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
 
 interface RunRequest {
 	projectPath: string;
@@ -44,13 +45,13 @@ export function registerReleaseCoordinatorHandlers(): void {
 	};
 
 	ipcMain.handle(
-		"releaseCoordinator:run",
+		IPC_CHANNELS.RELEASE_COORDINATOR_RUN,
 		async (_event, { projectPath, maxCommits = 100 }: RunRequest) => {
 			killExisting();
 
 			if (!projectPath) {
 				const message = "projectPath is required";
-				broadcast("release-coordinator-error", message);
+				broadcast(IPC_CHANNELS.RELEASE_COORDINATOR_ERROR, message);
 				throw new Error(message);
 			}
 
@@ -100,7 +101,7 @@ export function registerReleaseCoordinatorHandlers(): void {
 					if (line.startsWith(EVENT_PREFIX)) {
 						try {
 							const payload = JSON.parse(line.slice(EVENT_PREFIX.length));
-							broadcast("release-coordinator-event", payload);
+							broadcast(IPC_CHANNELS.RELEASE_COORDINATOR_EVENT, payload);
 						} catch (err) {
 							console.error("[ReleaseCoordinator] Bad event line:", err);
 						}
@@ -124,13 +125,13 @@ export function registerReleaseCoordinatorHandlers(): void {
 				child.on("close", (code) => {
 					currentProcess = null;
 					if (code === 0 && result) {
-						broadcast("release-coordinator-result", result);
+						broadcast(IPC_CHANNELS.RELEASE_COORDINATOR_RESULT, result);
 						resolve(result);
 					} else {
 						const message =
 							errorMessage ??
 							`release coordinator runner exited with code ${code}`;
-						broadcast("release-coordinator-error", message);
+						broadcast(IPC_CHANNELS.RELEASE_COORDINATOR_ERROR, message);
 						reject(new Error(message));
 					}
 				});
@@ -138,14 +139,14 @@ export function registerReleaseCoordinatorHandlers(): void {
 				child.on("error", (err) => {
 					currentProcess = null;
 					const message = `Failed to start release coordinator runner: ${err.message}`;
-					broadcast("release-coordinator-error", message);
+					broadcast(IPC_CHANNELS.RELEASE_COORDINATOR_ERROR, message);
 					reject(new Error(message));
 				});
 			});
 		},
 	);
 
-	ipcMain.handle("releaseCoordinator:cancel", () => {
+	ipcMain.handle(IPC_CHANNELS.RELEASE_COORDINATOR_CANCEL, () => {
 		killExisting();
 		return true;
 	});

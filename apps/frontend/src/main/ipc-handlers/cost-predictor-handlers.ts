@@ -13,6 +13,7 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import { app, ipcMain } from "electron";
 import { pythonEnvManager } from "../python-env-manager.js";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
 
 interface PredictRequest {
 	projectPath: string;
@@ -29,7 +30,7 @@ interface PredictResponse {
 
 export function registerCostPredictorHandlers(): void {
 	ipcMain.handle(
-		"costPredictor:run",
+		IPC_CHANNELS.COST_PREDICTOR_RUN,
 		async (_event, req: PredictRequest): Promise<PredictResponse> => {
 			if (!req.projectPath || !req.specId) {
 				throw new Error("projectPath and specId are required");

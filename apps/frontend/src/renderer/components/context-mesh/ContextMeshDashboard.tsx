@@ -9,7 +9,6 @@ import {
 	registerProject,
 	startContextMeshAnalysis,
 	stopContextMeshAnalysis,
-	subscribeContextMeshEvents,
 	unregisterProject,
 	updateRecommendationStatus,
 	updateSkillTransferStatus,
@@ -57,8 +56,6 @@ export function ContextMeshDashboard(): React.ReactElement {
 	useEffect(() => {
 		loadAllContextMeshData();
 	}, []);
-
-	useEffect(() => subscribeContextMeshEvents(), []);
 
 	const isAnalyzing = phase === "analyzing";
 	const isRegistered = projects.some((p) => p.project_path === projectPath);

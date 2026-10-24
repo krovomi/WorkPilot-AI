@@ -17,6 +17,7 @@ import type { BrowserWindow } from "electron";
 import { ipcMain } from "electron";
 import type { ContinuousAIConfig } from "../../shared/types/continuous-ai";
 import { appLog } from "../app-logger";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -109,7 +110,7 @@ export function registerContinuousAIHandlers(
 	 * Start the daemon process.
 	 */
 	ipcMain.handle(
-		"continuousAI:start",
+		IPC_CHANNELS.CONTINUOUS_AI_START,
 		async (_event, config: ContinuousAIConfig, projectPath?: string) => {
 			try {
 				killDaemon();
@@ -164,7 +165,7 @@ export function registerContinuousAIHandlers(
 					for (const line of lines) {
 						const event = parseDaemonEvent(line);
 						if (event && win && !win.isDestroyed()) {
-							win.webContents.send("continuousAI:event", event);
+							win.webContents.send(IPC_CHANNELS.CONTINUOUS_AI_EVENT, event);
 						}
 					}
 				});
@@ -179,7 +180,7 @@ export function registerContinuousAIHandlers(
 					appLog.info(`[ContinuousAI] Daemon exited with code ${code}`);
 					activeDaemonProcess = null;
 					if (win && !win.isDestroyed()) {
-						win.webContents.send("continuousAI:event", {
+						win.webContents.send(IPC_CHANNELS.CONTINUOUS_AI_EVENT, {
 							type: "daemon_stopped",
 							exitCode: code,
 						});
@@ -205,7 +206,7 @@ export function registerContinuousAIHandlers(
 	/**
 	 * Stop the daemon.
 	 */
-	ipcMain.handle("continuousAI:stop", async () => {
+	ipcMain.handle(IPC_CHANNELS.CONTINUOUS_AI_STOP, async () => {
 		if (!activeDaemonProcess) {
 			return { success: false, error: "No active daemon" };
 		}
@@ -217,7 +218,7 @@ export function registerContinuousAIHandlers(
 	 * Get daemon status.
 	 */
 	ipcMain.handle(
-		"continuousAI:status",
+		IPC_CHANNELS.CONTINUOUS_AI_STATUS,
 		async (_event, projectPath?: string) => {
 			const resolvedProject = projectPath || process.cwd();
 			const statusFile = path.join(
@@ -245,7 +246,7 @@ export function registerContinuousAIHandlers(
 	 * Update config (persists to disk).
 	 */
 	ipcMain.handle(
-		"continuousAI:updateConfig",
+		IPC_CHANNELS.CONTINUOUS_AI_UPDATE_CONFIG,
 		async (_event, config: ContinuousAIConfig, projectPath?: string) => {
 			const resolvedProject = projectPath || process.cwd();
 			saveConfig(resolvedProject, config);
@@ -257,7 +258,7 @@ export function registerContinuousAIHandlers(
 	 * Approve a pending action.
 	 */
 	ipcMain.handle(
-		"continuousAI:approveAction",
+		IPC_CHANNELS.CONTINUOUS_AI_APPROVE_ACTION,
 		async (_event, actionId: string) => {
 			// Send approval to the running daemon via stdin
 			if (activeDaemonProcess?.stdin) {
@@ -278,7 +279,7 @@ export function registerContinuousAIHandlers(
 	 * Reject a pending action.
 	 */
 	ipcMain.handle(
-		"continuousAI:rejectAction",
+		IPC_CHANNELS.CONTINUOUS_AI_REJECT_ACTION,
 		async (_event, actionId: string) => {
 			if (activeDaemonProcess?.stdin) {
 				try {
@@ -297,7 +298,7 @@ export function registerContinuousAIHandlers(
 	/**
 	 * Check if daemon is running.
 	 */
-	ipcMain.handle("continuousAI:isRunning", async () => {
+	ipcMain.handle(IPC_CHANNELS.CONTINUOUS_AI_IS_RUNNING, async () => {
 		return {
 			running: activeDaemonProcess !== null,
 			pid: activeDaemonProcess?.pid ?? null,

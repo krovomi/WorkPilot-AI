@@ -7,6 +7,7 @@
 
 import type * as LearningLoopTypes from "../../../shared/types/learning-loop";
 import { createIpcListener, invokeIpc, sendIpc } from "./ipc-utils";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export interface LearningLoopAPI {
 	// Operations
@@ -51,37 +52,37 @@ export function createLearningLoopAPI(): LearningLoopAPI {
 	return {
 		// Operations
 		getLearningPatterns: (projectId: string) =>
-			invokeIpc("learningLoop:getPatterns", projectId),
+			invokeIpc(IPC_CHANNELS.LEARNING_LOOP_GET_PATTERNS, projectId),
 
 		getLearningSummary: (projectId: string) =>
-			invokeIpc("learningLoop:getSummary", projectId),
+			invokeIpc(IPC_CHANNELS.LEARNING_LOOP_GET_SUMMARY, projectId),
 
 		runLearningAnalysis: (projectId: string, specId?: string) =>
-			sendIpc("learningLoop:runAnalysis", projectId, specId),
+			sendIpc(IPC_CHANNELS.LEARNING_LOOP_RUN_ANALYSIS, projectId, specId),
 
-		stopLearningAnalysis: () => invokeIpc("learningLoop:stopAnalysis"),
+		stopLearningAnalysis: () => invokeIpc(IPC_CHANNELS.LEARNING_LOOP_STOP_ANALYSIS),
 
 		deleteLearningPattern: (projectId: string, patternId: string) =>
-			invokeIpc("learningLoop:deletePattern", projectId, patternId),
+			invokeIpc(IPC_CHANNELS.LEARNING_LOOP_DELETE_PATTERN, projectId, patternId),
 
 		toggleLearningPattern: (projectId: string, patternId: string) =>
-			invokeIpc("learningLoop:togglePattern", projectId, patternId),
+			invokeIpc(IPC_CHANNELS.LEARNING_LOOP_TOGGLE_PATTERN, projectId, patternId),
 
 		// Event listeners
 		onLearningLoopStatus: (callback: (status: string) => void) =>
-			createIpcListener<[string]>("learningLoop:status", callback),
+			createIpcListener<[string]>(IPC_CHANNELS.LEARNING_LOOP_STATUS, callback),
 
 		onLearningLoopStreamChunk: (callback: (chunk: string) => void) =>
-			createIpcListener<[string]>("learningLoop:streamChunk", callback),
+			createIpcListener<[string]>(IPC_CHANNELS.LEARNING_LOOP_STREAM_CHUNK, callback),
 
 		onLearningLoopError: (callback: (error: string) => void) =>
-			createIpcListener<[string]>("learningLoop:error", callback),
+			createIpcListener<[string]>(IPC_CHANNELS.LEARNING_LOOP_ERROR, callback),
 
 		onLearningLoopComplete: (
 			callback: (result: LearningLoopTypes.LearningLoopCompleteResult) => void,
 		) =>
 			createIpcListener<[LearningLoopTypes.LearningLoopCompleteResult]>(
-				"learningLoop:complete",
+				IPC_CHANNELS.LEARNING_LOOP_COMPLETE,
 				callback,
 			),
 	};

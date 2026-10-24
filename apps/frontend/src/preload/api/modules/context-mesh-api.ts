@@ -1,7 +1,7 @@
 /**
  * Context Mesh events
  *
- * The analysis runs in main after `contextMesh:runAnalysis` and reports
+ * The analysis runs in main once the renderer starts it, and reports
  * through these four events. Nothing in the preload listened to them, so the
  * dashboard stayed on "Starting analysis..." until it was closed: the status,
  * the streamed output, the error and the end of the run never arrived.

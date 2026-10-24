@@ -7,7 +7,7 @@ import { IPC_CHANNELS } from "../../shared/constants";
 
 export function registerCodeMigrationHandlers(): void {
 	ipcMain.handle(
-		"codeMigration:start",
+		IPC_CHANNELS.CODE_MIGRATION_START,
 		async (_event, request: CodeMigrationRequest) => {
 			try {
 				await codeMigrationService.startMigration(request);
@@ -22,7 +22,7 @@ export function registerCodeMigrationHandlers(): void {
 		},
 	);
 
-	ipcMain.handle("codeMigration:cancel", async () => {
+	ipcMain.handle(IPC_CHANNELS.CODE_MIGRATION_CANCEL, async () => {
 		try {
 			const cancelled = codeMigrationService.cancel();
 			return { success: true, cancelled };

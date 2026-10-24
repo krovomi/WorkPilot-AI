@@ -4,12 +4,13 @@ import {
 	type VisualProgrammingRequest,
 	visualProgrammingService,
 } from "../visual-programming-service";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
 
 export function registerVisualProgrammingHandlers(
 	_getMainWindow: () => import("electron").BrowserWindow | null,
 ): void {
 	ipcMain.handle(
-		"visualProgramming:run",
+		IPC_CHANNELS.VISUAL_PROGRAMMING_RUN,
 		async (_event, request: VisualProgrammingRequest) => {
 			try {
 				await visualProgrammingService.run(request);
@@ -24,7 +25,7 @@ export function registerVisualProgrammingHandlers(
 		},
 	);
 
-	ipcMain.handle("visualProgramming:cancel", async () => {
+	ipcMain.handle(IPC_CHANNELS.VISUAL_PROGRAMMING_CANCEL, async () => {
 		try {
 			const cancelled = visualProgrammingService.cancel();
 			return { success: true, cancelled };
@@ -43,35 +44,35 @@ export function setupVisualProgrammingEventForwarding(
 	visualProgrammingService.on("status", (msg: string) => {
 		const win = getMainWindow();
 		if (win && !win.isDestroyed()) {
-			win.webContents.send("visualProgramming:status", msg);
+			win.webContents.send(IPC_CHANNELS.VISUAL_PROGRAMMING_STATUS, msg);
 		}
 	});
 
 	visualProgrammingService.on("file", (file: GeneratedFile) => {
 		const win = getMainWindow();
 		if (win && !win.isDestroyed()) {
-			win.webContents.send("visualProgramming:file", file);
+			win.webContents.send(IPC_CHANNELS.VISUAL_PROGRAMMING_FILE, file);
 		}
 	});
 
 	visualProgrammingService.on("writing", (filename: string) => {
 		const win = getMainWindow();
 		if (win && !win.isDestroyed()) {
-			win.webContents.send("visualProgramming:writing", filename);
+			win.webContents.send(IPC_CHANNELS.VISUAL_PROGRAMMING_WRITING, filename);
 		}
 	});
 
 	visualProgrammingService.on("error", (err: string) => {
 		const win = getMainWindow();
 		if (win && !win.isDestroyed()) {
-			win.webContents.send("visualProgramming:error", err);
+			win.webContents.send(IPC_CHANNELS.VISUAL_PROGRAMMING_ERROR, err);
 		}
 	});
 
 	visualProgrammingService.on("complete", (result: unknown) => {
 		const win = getMainWindow();
 		if (win && !win.isDestroyed()) {
-			win.webContents.send("visualProgramming:complete", result);
+			win.webContents.send(IPC_CHANNELS.VISUAL_PROGRAMMING_COMPLETE, result);
 		}
 	});
 }

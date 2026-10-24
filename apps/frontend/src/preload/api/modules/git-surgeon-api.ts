@@ -6,6 +6,7 @@
 
 import type { SurgeryPlan } from "../../../shared/types/git-surgeon";
 import { createIpcListener, invokeIpc } from "./ipc-utils";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export interface GitSurgeonRunOptions {
 	projectPath: string;
@@ -31,22 +32,22 @@ export interface GitSurgeonAPI {
 
 export const createGitSurgeonAPI = (): GitSurgeonAPI => ({
 	runGitSurgeonScan: (options: GitSurgeonRunOptions) =>
-		invokeIpc<SurgeryPlan>("gitSurgeon:run", options),
+		invokeIpc<SurgeryPlan>(IPC_CHANNELS.GIT_SURGEON_RUN, options),
 
-	cancelGitSurgeonScan: () => invokeIpc<boolean>("gitSurgeon:cancel"),
+	cancelGitSurgeonScan: () => invokeIpc<boolean>(IPC_CHANNELS.GIT_SURGEON_CANCEL),
 
 	onGitSurgeonEvent: (callback) =>
-		createIpcListener<[GitSurgeonEvent]>("git-surgeon-event", (payload) =>
+		createIpcListener<[GitSurgeonEvent]>(IPC_CHANNELS.GIT_SURGEON_EVENT, (payload) =>
 			callback(payload),
 		),
 
 	onGitSurgeonResult: (callback) =>
-		createIpcListener<[SurgeryPlan]>("git-surgeon-result", (payload) =>
+		createIpcListener<[SurgeryPlan]>(IPC_CHANNELS.GIT_SURGEON_RESULT, (payload) =>
 			callback(payload),
 		),
 
 	onGitSurgeonError: (callback) =>
-		createIpcListener<[string]>("git-surgeon-error", (payload) =>
+		createIpcListener<[string]>(IPC_CHANNELS.GIT_SURGEON_ERROR, (payload) =>
 			callback(payload),
 		),
 });

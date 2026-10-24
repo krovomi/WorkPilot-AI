@@ -52,9 +52,9 @@ export interface PerformanceProfilerAPI {
 export function createPerformanceProfilerAPI(): PerformanceProfilerAPI {
 	return {
 		startPerformanceProfiling: (request) =>
-			invokeIpc("performanceProfiler:start", request),
+			invokeIpc(IPC_CHANNELS.PERFORMANCE_PROFILER_START, request),
 		cancelPerformanceProfiling: () =>
-			invokeIpc("performanceProfiler:cancel"),
+			invokeIpc(IPC_CHANNELS.PERFORMANCE_PROFILER_CANCEL),
 		onPerformanceProfilerStatus: (callback) =>
 			createIpcListener(IPC_CHANNELS.PERFORMANCE_PROFILER_STATUS, callback),
 		onPerformanceProfilerStreamChunk: (callback) =>

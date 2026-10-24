@@ -18,6 +18,7 @@ import { type ChildProcess, spawn } from "node:child_process";
 import path from "node:path";
 import { app, BrowserWindow, ipcMain } from "electron";
 import { pythonEnvManager } from "../python-env-manager.js";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
 
 interface RunRequest {
 	projectPath: string;
@@ -45,13 +46,13 @@ export function registerAccessibilityHandlers(): void {
 	};
 
 	ipcMain.handle(
-		"accessibility:run",
+		IPC_CHANNELS.ACCESSIBILITY_RUN,
 		async (_event, { projectPath, targetLevel = "AA" }: RunRequest) => {
 			killExisting();
 
 			if (!projectPath) {
 				const message = "projectPath is required";
-				broadcast("accessibility-error", message);
+				broadcast(IPC_CHANNELS.ACCESSIBILITY_ERROR, message);
 				throw new Error(message);
 			}
 
@@ -97,7 +98,7 @@ export function registerAccessibilityHandlers(): void {
 					if (line.startsWith(EVENT_PREFIX)) {
 						try {
 							const payload = JSON.parse(line.slice(EVENT_PREFIX.length));
-							broadcast("accessibility-event", payload);
+							broadcast(IPC_CHANNELS.ACCESSIBILITY_EVENT, payload);
 						} catch (err) {
 							console.error("[Accessibility] Bad event line:", err);
 						}
@@ -121,12 +122,12 @@ export function registerAccessibilityHandlers(): void {
 				child.on("close", (code) => {
 					currentProcess = null;
 					if (code === 0 && result) {
-						broadcast("accessibility-result", result);
+						broadcast(IPC_CHANNELS.ACCESSIBILITY_RESULT, result);
 						resolve(result);
 					} else {
 						const message =
 							errorMessage ?? `accessibility runner exited with code ${code}`;
-						broadcast("accessibility-error", message);
+						broadcast(IPC_CHANNELS.ACCESSIBILITY_ERROR, message);
 						reject(new Error(message));
 					}
 				});
@@ -134,14 +135,14 @@ export function registerAccessibilityHandlers(): void {
 				child.on("error", (err) => {
 					currentProcess = null;
 					const message = `Failed to start accessibility runner: ${err.message}`;
-					broadcast("accessibility-error", message);
+					broadcast(IPC_CHANNELS.ACCESSIBILITY_ERROR, message);
 					reject(new Error(message));
 				});
 			});
 		},
 	);
 
-	ipcMain.handle("accessibility:cancel", () => {
+	ipcMain.handle(IPC_CHANNELS.ACCESSIBILITY_CANCEL, () => {
 		killExisting();
 		return true;
 	});

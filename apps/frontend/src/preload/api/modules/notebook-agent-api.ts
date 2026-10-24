@@ -6,6 +6,7 @@
 
 import type { ParsedNotebook } from "../../../shared/types/notebook-agent";
 import { createIpcListener, invokeIpc } from "./ipc-utils";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export interface NotebookAgentRunOptions {
 	projectPath: string;
@@ -36,22 +37,22 @@ export interface NotebookAgentAPI {
 
 export const createNotebookAgentAPI = (): NotebookAgentAPI => ({
 	runNotebookAgentScan: (options: NotebookAgentRunOptions) =>
-		invokeIpc<NotebookAgentResult>("notebookAgent:run", options),
+		invokeIpc<NotebookAgentResult>(IPC_CHANNELS.NOTEBOOK_AGENT_RUN, options),
 
-	cancelNotebookAgentScan: () => invokeIpc<boolean>("notebookAgent:cancel"),
+	cancelNotebookAgentScan: () => invokeIpc<boolean>(IPC_CHANNELS.NOTEBOOK_AGENT_CANCEL),
 
 	onNotebookAgentEvent: (callback) =>
-		createIpcListener<[NotebookAgentEvent]>("notebook-event", (payload) =>
+		createIpcListener<[NotebookAgentEvent]>(IPC_CHANNELS.NOTEBOOK_EVENT, (payload) =>
 			callback(payload),
 		),
 
 	onNotebookAgentResult: (callback) =>
-		createIpcListener<[NotebookAgentResult]>("notebook-result", (payload) =>
+		createIpcListener<[NotebookAgentResult]>(IPC_CHANNELS.NOTEBOOK_RESULT, (payload) =>
 			callback(payload),
 		),
 
 	onNotebookAgentError: (callback) =>
-		createIpcListener<[string]>("notebook-error", (payload) =>
+		createIpcListener<[string]>(IPC_CHANNELS.NOTEBOOK_ERROR, (payload) =>
 			callback(payload),
 		),
 });

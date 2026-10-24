@@ -19,6 +19,7 @@ import { realpathSync, statSync } from "node:fs";
 import path from "node:path";
 import { app, BrowserWindow, ipcMain } from "electron";
 import { pythonEnvManager } from "../python-env-manager.js";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
 
 interface RunRequest {
 	projectPath: string;
@@ -77,7 +78,7 @@ export function registerInjectionGuardHandlers(): void {
 	};
 
 	ipcMain.handle(
-		"injectionGuard:run",
+		IPC_CHANNELS.INJECTION_GUARD_RUN,
 		async (_event, { projectPath }: RunRequest) => {
 			killExisting();
 
@@ -86,7 +87,7 @@ export function registerInjectionGuardHandlers(): void {
 				safeProjectPath = normalizeProjectPath(projectPath);
 			} catch (err) {
 				const message = err instanceof Error ? err.message : String(err);
-				broadcast("injection-guard-error", message);
+				broadcast(IPC_CHANNELS.INJECTION_GUARD_ERROR, message);
 				throw new Error(message);
 			}
 
@@ -130,7 +131,7 @@ export function registerInjectionGuardHandlers(): void {
 					if (line.startsWith(EVENT_PREFIX)) {
 						try {
 							const payload = JSON.parse(line.slice(EVENT_PREFIX.length));
-							broadcast("injection-guard-event", payload);
+							broadcast(IPC_CHANNELS.INJECTION_GUARD_EVENT, payload);
 						} catch (err) {
 							console.error("[InjectionGuard] Bad event line:", err);
 						}
@@ -154,13 +155,13 @@ export function registerInjectionGuardHandlers(): void {
 				child.on("close", (code) => {
 					currentProcess = null;
 					if (code === 0 && result) {
-						broadcast("injection-guard-result", result);
+						broadcast(IPC_CHANNELS.INJECTION_GUARD_RESULT, result);
 						resolve(result);
 					} else {
 						const message =
 							errorMessage ??
 							`injection guard runner exited with code ${code}`;
-						broadcast("injection-guard-error", message);
+						broadcast(IPC_CHANNELS.INJECTION_GUARD_ERROR, message);
 						reject(new Error(message));
 					}
 				});
@@ -168,14 +169,14 @@ export function registerInjectionGuardHandlers(): void {
 				child.on("error", (err) => {
 					currentProcess = null;
 					const message = `Failed to start injection guard runner: ${err.message}`;
-					broadcast("injection-guard-error", message);
+					broadcast(IPC_CHANNELS.INJECTION_GUARD_ERROR, message);
 					reject(new Error(message));
 				});
 			});
 		},
 	);
 
-	ipcMain.handle("injectionGuard:cancel", () => {
+	ipcMain.handle(IPC_CHANNELS.INJECTION_GUARD_CANCEL, () => {
 		killExisting();
 		return true;
 	});

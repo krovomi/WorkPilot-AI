@@ -7,7 +7,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-	subscribeContextMeshEvents,
+	setupContextMeshListeners,
 	useContextMeshStore,
 } from "../context-mesh-store";
 
@@ -33,9 +33,9 @@ beforeEach(() => {
 	useContextMeshStore.getState().setPhase("analyzing");
 });
 
-describe("subscribeContextMeshEvents", () => {
+describe("setupContextMeshListeners", () => {
 	it("follows the status and the streamed output", () => {
-		subscribeContextMeshEvents();
+		setupContextMeshListeners();
 		listeners.get("status")?.("Comparing projects");
 		listeners.get("chunk")?.("first ");
 		listeners.get("chunk")?.("second");
@@ -45,14 +45,14 @@ describe("subscribeContextMeshEvents", () => {
 	});
 
 	it("ends the run and reloads the mesh on completion", () => {
-		subscribeContextMeshEvents();
+		setupContextMeshListeners();
 		listeners.get("complete")?.({});
 		expect(useContextMeshStore.getState().phase).toBe("complete");
 		expect(invoke).toHaveBeenCalled();
 	});
 
 	it("shows the error", () => {
-		subscribeContextMeshEvents();
+		setupContextMeshListeners();
 		listeners.get("error")?.("backend unreachable");
 		const state = useContextMeshStore.getState();
 		expect(state.phase).toBe("error");
@@ -60,7 +60,7 @@ describe("subscribeContextMeshEvents", () => {
 	});
 
 	it("stops listening when cleaned up", () => {
-		const cleanup = subscribeContextMeshEvents();
+		const cleanup = setupContextMeshListeners();
 		cleanup();
 		expect(listeners.size).toBe(0);
 	});

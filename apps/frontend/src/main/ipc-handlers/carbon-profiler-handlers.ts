@@ -17,6 +17,7 @@ import { type ChildProcess, spawn } from "node:child_process";
 import path from "node:path";
 import { app, BrowserWindow, ipcMain } from "electron";
 import { pythonEnvManager } from "../python-env-manager.js";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
 
 interface RunRequest {
 	projectPath: string;
@@ -44,13 +45,13 @@ export function registerCarbonProfilerHandlers(): void {
 	};
 
 	ipcMain.handle(
-		"carbonProfiler:run",
+		IPC_CHANNELS.CARBON_PROFILER_RUN,
 		async (_event, { projectPath, region = "global_avg" }: RunRequest) => {
 			killExisting();
 
 			if (!projectPath) {
 				const message = "projectPath is required";
-				broadcast("carbon-profiler-error", message);
+				broadcast(IPC_CHANNELS.CARBON_PROFILER_ERROR, message);
 				throw new Error(message);
 			}
 
@@ -94,7 +95,7 @@ export function registerCarbonProfilerHandlers(): void {
 					if (line.startsWith(EVENT_PREFIX)) {
 						try {
 							const payload = JSON.parse(line.slice(EVENT_PREFIX.length));
-							broadcast("carbon-profiler-event", payload);
+							broadcast(IPC_CHANNELS.CARBON_PROFILER_EVENT, payload);
 						} catch (err) {
 							console.error("[CarbonProfiler] Bad event line:", err);
 						}
@@ -118,12 +119,12 @@ export function registerCarbonProfilerHandlers(): void {
 				child.on("close", (code) => {
 					currentProcess = null;
 					if (code === 0 && result) {
-						broadcast("carbon-profiler-result", result);
+						broadcast(IPC_CHANNELS.CARBON_PROFILER_RESULT, result);
 						resolve(result);
 					} else {
 						const message =
 							errorMessage ?? `carbon profiler runner exited with code ${code}`;
-						broadcast("carbon-profiler-error", message);
+						broadcast(IPC_CHANNELS.CARBON_PROFILER_ERROR, message);
 						reject(new Error(message));
 					}
 				});
@@ -131,14 +132,14 @@ export function registerCarbonProfilerHandlers(): void {
 				child.on("error", (err) => {
 					currentProcess = null;
 					const message = `Failed to start carbon profiler runner: ${err.message}`;
-					broadcast("carbon-profiler-error", message);
+					broadcast(IPC_CHANNELS.CARBON_PROFILER_ERROR, message);
 					reject(new Error(message));
 				});
 			});
 		},
 	);
 
-	ipcMain.handle("carbonProfiler:cancel", () => {
+	ipcMain.handle(IPC_CHANNELS.CARBON_PROFILER_CANCEL, () => {
 		killExisting();
 		return true;
 	});

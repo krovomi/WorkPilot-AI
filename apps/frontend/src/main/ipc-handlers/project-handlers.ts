@@ -1064,7 +1064,7 @@ export function registerProjectHandlers(
 
 	// IPC handler to get Python environment status
 	ipcMain.handle(
-		"python-env:get-status",
+		IPC_CHANNELS.PYTHON_ENV_GET_STATUS,
 		async (): Promise<IPCResult<PythonEnvStatus>> => {
 			const status = await pythonEnvManager.getStatus();
 			return { success: true, data: status };
@@ -1073,7 +1073,7 @@ export function registerProjectHandlers(
 
 	// IPC handler to reinitialize Python environment
 	ipcMain.handle(
-		"python-env:reinitialize",
+		IPC_CHANNELS.PYTHON_ENV_REINITIALIZE,
 		async (): Promise<IPCResult<PythonEnvStatus>> => {
 			const status = await initializePythonEnvironment(
 				pythonEnvManager,
@@ -1152,7 +1152,7 @@ export function registerProjectHandlers(
 
 	// Check if project has local auto-claude source (is dev project)
 	ipcMain.handle(
-		"project:has-local-source",
+		IPC_CHANNELS.PROJECT_HAS_LOCAL_SOURCE,
 		async (_, projectId: string): Promise<IPCResult<boolean>> => {
 			try {
 				const project = projectStore.getProject(projectId);

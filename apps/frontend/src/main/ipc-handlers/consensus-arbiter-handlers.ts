@@ -19,6 +19,7 @@ import { type ChildProcess, spawn } from "node:child_process";
 import path from "node:path";
 import { app, BrowserWindow, ipcMain } from "electron";
 import { pythonEnvManager } from "../python-env-manager.js";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
 
 interface RunRequest {
 	projectPath: string;
@@ -45,13 +46,13 @@ export function registerConsensusArbiterHandlers(): void {
 	};
 
 	ipcMain.handle(
-		"consensusArbiter:run",
+		IPC_CHANNELS.CONSENSUS_ARBITER_RUN,
 		async (_event, { projectPath }: RunRequest) => {
 			killExisting();
 
 			if (!projectPath) {
 				const message = "projectPath is required";
-				broadcast("consensus-arbiter-error", message);
+				broadcast(IPC_CHANNELS.CONSENSUS_ARBITER_ERROR, message);
 				throw new Error(message);
 			}
 
@@ -95,7 +96,7 @@ export function registerConsensusArbiterHandlers(): void {
 					if (line.startsWith(EVENT_PREFIX)) {
 						try {
 							const payload = JSON.parse(line.slice(EVENT_PREFIX.length));
-							broadcast("consensus-arbiter-event", payload);
+							broadcast(IPC_CHANNELS.CONSENSUS_ARBITER_EVENT, payload);
 						} catch (err) {
 							console.error("[ConsensusArbiter] Bad event line:", err);
 						}
@@ -119,13 +120,13 @@ export function registerConsensusArbiterHandlers(): void {
 				child.on("close", (code) => {
 					currentProcess = null;
 					if (code === 0 && result) {
-						broadcast("consensus-arbiter-result", result);
+						broadcast(IPC_CHANNELS.CONSENSUS_ARBITER_RESULT, result);
 						resolve(result);
 					} else {
 						const message =
 							errorMessage ??
 							`consensus arbiter runner exited with code ${code}`;
-						broadcast("consensus-arbiter-error", message);
+						broadcast(IPC_CHANNELS.CONSENSUS_ARBITER_ERROR, message);
 						reject(new Error(message));
 					}
 				});
@@ -133,14 +134,14 @@ export function registerConsensusArbiterHandlers(): void {
 				child.on("error", (err) => {
 					currentProcess = null;
 					const message = `Failed to start consensus arbiter runner: ${err.message}`;
-					broadcast("consensus-arbiter-error", message);
+					broadcast(IPC_CHANNELS.CONSENSUS_ARBITER_ERROR, message);
 					reject(new Error(message));
 				});
 			});
 		},
 	);
 
-	ipcMain.handle("consensusArbiter:cancel", () => {
+	ipcMain.handle(IPC_CHANNELS.CONSENSUS_ARBITER_CANCEL, () => {
 		killExisting();
 		return true;
 	});

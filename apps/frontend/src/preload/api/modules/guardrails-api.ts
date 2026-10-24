@@ -3,6 +3,7 @@
  */
 
 import { invokeIpc } from "./ipc-utils";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export type GuardrailAction = "allow" | "warn" | "deny" | "require_approval";
 
@@ -45,11 +46,11 @@ export interface GuardrailsAPI {
 
 export const createGuardrailsAPI = (): GuardrailsAPI => ({
 	loadGuardrails: (projectPath) =>
-		invokeIpc<GuardrailsDoc>("guardrails:load", { projectPath }),
+		invokeIpc<GuardrailsDoc>(IPC_CHANNELS.GUARDRAILS_LOAD, { projectPath }),
 	saveGuardrails: (projectPath, doc) =>
-		invokeIpc<boolean>("guardrails:save", { projectPath, doc }),
+		invokeIpc<boolean>(IPC_CHANNELS.GUARDRAILS_SAVE, { projectPath, doc }),
 	testGuardrails: (projectPath, toolName, toolInput) =>
-		invokeIpc<GuardrailTestResult>("guardrails:test", {
+		invokeIpc<GuardrailTestResult>(IPC_CHANNELS.GUARDRAILS_TEST, {
 			projectPath,
 			toolName,
 			toolInput,

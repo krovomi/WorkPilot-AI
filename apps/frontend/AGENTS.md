@@ -35,7 +35,7 @@ c'est une discipline, pas un garde-fou.
 
 | Je veux… | Je touche |
 |---|---|
-| un canal IPC | `src/shared/constants/ipc.ts` (ou `ipc-namespaces.ts`), `src/shared/types/ipc.ts`, `src/preload/api/`, `src/main/ipc-handlers/` |
+| un canal IPC | `src/shared/constants/ipc.ts`, `src/shared/types/ipc.ts`, `src/preload/api/`, `src/main/ipc-handlers/` (contrat : `ipc-channel-parity.test.ts`) |
 | un écouteur d'événements du main | `src/renderer/stores/global-listeners.ts` — jamais un `useEffect` de page |
 | un texte visible | une clé dans `src/shared/i18n/locales/en/` **et** `fr/` |
 | une détection d'OS ou d'exécutable | `src/main/platform/` |

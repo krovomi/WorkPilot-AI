@@ -361,9 +361,10 @@ export function startContextMeshAnalysis(
 
 /**
  * Follow a running analysis: status, streamed output, error and end of run.
- * Returns the function that stops listening.
+ * Registered once for the window by `global-listeners.ts`. Returns the
+ * function that stops listening.
  */
-export function subscribeContextMeshEvents(): () => void {
+export function setupContextMeshListeners(): () => void {
 	const api = window.electronAPI;
 	const store = () => useContextMeshStore.getState();
 	const cleanups = [

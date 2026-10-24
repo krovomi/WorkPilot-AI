@@ -452,7 +452,7 @@ export function registerProfileHandlers(): void {
 	 * - Returns the created directory path or an error
 	 */
 	ipcMain.handle(
-		"claude:profileCreateDir",
+		IPC_CHANNELS.CLAUDE_PROFILE_CREATE_DIR,
 		async (_event, profileName: string) => {
 			try {
 				const dir = await createProfileDirectoryImpl(profileName);

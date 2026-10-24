@@ -3,6 +3,7 @@
  */
 
 import { invokeIpc } from "./ipc-utils";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export type DebtKind =
 	| "todo_fixme"
@@ -74,17 +75,17 @@ export interface TechDebtAPI {
 
 export const createTechDebtAPI = (): TechDebtAPI => ({
 	scanTechDebt: (options) =>
-		invokeIpc<{ result: DebtReport }>("techDebt:scan", options),
+		invokeIpc<{ result: DebtReport }>(IPC_CHANNELS.TECH_DEBT_SCAN, options),
 	listDebtItems: (options) =>
-		invokeIpc<{ result: DebtListResult }>("techDebt:listItems", options),
+		invokeIpc<{ result: DebtListResult }>(IPC_CHANNELS.TECH_DEBT_LIST_ITEMS, options),
 	getDebtTrend: (options) =>
 		invokeIpc<{ result: { trend: DebtTrendPoint[] } }>(
-			"techDebt:getTrend",
+			IPC_CHANNELS.TECH_DEBT_GET_TREND,
 			options,
 		),
 	generateDebtSpec: (options) =>
 		invokeIpc<{ result: { spec_dir: string } }>(
-			"techDebt:generateSpec",
+			IPC_CHANNELS.TECH_DEBT_GENERATE_SPEC,
 			options,
 		),
 });

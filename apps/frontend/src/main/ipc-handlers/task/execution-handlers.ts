@@ -3001,7 +3001,7 @@ print(json.dumps(result))
 	 * loop and its spec pipeline, so one Pause click stops all three.
 	 */
 	ipcMain.handle(
-		"TASK_PAUSE",
+		IPC_CHANNELS.TASK_PAUSE,
 		async (_, taskId: string, subtaskId?: string): Promise<IPCResult> => {
 			try {
 				const { task, project } = findTaskAndProject(taskId);
@@ -3075,7 +3075,7 @@ print(json.dumps(result))
 	 * is also what resumes, at launch, the tasks WorkPilot was running when it
 	 * was closed.
 	 */
-	ipcMain.handle("TASK_RESUME", async (_, taskId: string): Promise<IPCResult> => {
+	ipcMain.handle(IPC_CHANNELS.TASK_RESUME, async (_, taskId: string): Promise<IPCResult> => {
 		try {
 			return await resumePausedTask(agentManager, taskId);
 		} catch (error) {

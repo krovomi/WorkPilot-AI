@@ -6,6 +6,7 @@
 
 import type { DriftReport } from "../../../shared/types/doc-drift";
 import { createIpcListener, invokeIpc } from "./ipc-utils";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export interface DocDriftRunOptions {
 	projectPath: string;
@@ -26,22 +27,22 @@ export interface DocDriftAPI {
 
 export const createDocDriftAPI = (): DocDriftAPI => ({
 	runDocDriftScan: (options: DocDriftRunOptions) =>
-		invokeIpc<DriftReport>("docDrift:run", options),
+		invokeIpc<DriftReport>(IPC_CHANNELS.DOC_DRIFT_RUN, options),
 
-	cancelDocDriftScan: () => invokeIpc<boolean>("docDrift:cancel"),
+	cancelDocDriftScan: () => invokeIpc<boolean>(IPC_CHANNELS.DOC_DRIFT_CANCEL),
 
 	onDocDriftEvent: (callback) =>
-		createIpcListener<[DocDriftEvent]>("doc-drift-event", (payload) =>
+		createIpcListener<[DocDriftEvent]>(IPC_CHANNELS.DOC_DRIFT_EVENT, (payload) =>
 			callback(payload),
 		),
 
 	onDocDriftResult: (callback) =>
-		createIpcListener<[DriftReport]>("doc-drift-result", (payload) =>
+		createIpcListener<[DriftReport]>(IPC_CHANNELS.DOC_DRIFT_RESULT, (payload) =>
 			callback(payload),
 		),
 
 	onDocDriftError: (callback) =>
-		createIpcListener<[string]>("doc-drift-error", (payload) =>
+		createIpcListener<[string]>(IPC_CHANNELS.DOC_DRIFT_ERROR, (payload) =>
 			callback(payload),
 		),
 });

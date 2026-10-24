@@ -55,25 +55,25 @@ export function createVoiceControlAPI(): VoiceControlAPI {
 		dictationCancel: id => invokeIpc(IPC_CHANNELS.DICTATION_CANCEL, id),
 		// Voice recording control
 		startVoiceRecording: async (request) => {
-			return await invokeIpc("voice-control:startRecording", request);
+			return await invokeIpc(IPC_CHANNELS.VOICE_CONTROL_START_RECORDING, request);
 		},
 
 		stopVoiceRecording: async () => {
-			return await invokeIpc("voice-control:stopRecording");
+			return await invokeIpc(IPC_CHANNELS.VOICE_CONTROL_STOP_RECORDING);
 		},
 
 		cancelVoiceControl: async () => {
-			return await invokeIpc("voice-control:cancel");
+			return await invokeIpc(IPC_CHANNELS.VOICE_CONTROL_CANCEL);
 		},
 
 		isVoiceControlActive: async () => {
-			return await invokeIpc("voice-control:isActive");
+			return await invokeIpc(IPC_CHANNELS.VOICE_CONTROL_IS_ACTIVE);
 		},
 
 		// Event listeners
 		onVoiceControlStatus: (callback) => {
 			ipcRenderer.on(
-				"voice-control:status",
+				IPC_CHANNELS.VOICE_CONTROL_STATUS,
 				(_event: IpcRendererEvent, status: string) => callback(status),
 			);
 			return () => {
@@ -83,7 +83,7 @@ export function createVoiceControlAPI(): VoiceControlAPI {
 
 		onVoiceControlStreamChunk: (callback) => {
 			ipcRenderer.on(
-				"voice-control:stream-chunk",
+				IPC_CHANNELS.VOICE_CONTROL_STREAM_CHUNK,
 				(_event: IpcRendererEvent, chunk: string) => callback(chunk),
 			);
 			return () => {
@@ -93,7 +93,7 @@ export function createVoiceControlAPI(): VoiceControlAPI {
 
 		onVoiceControlError: (callback) => {
 			ipcRenderer.on(
-				"voice-control:error",
+				IPC_CHANNELS.VOICE_CONTROL_ERROR,
 				(_event: IpcRendererEvent, error: string) => callback(error),
 			);
 			return () => {
@@ -103,7 +103,7 @@ export function createVoiceControlAPI(): VoiceControlAPI {
 
 		onVoiceControlComplete: (callback) => {
 			ipcRenderer.on(
-				"voice-control:complete",
+				IPC_CHANNELS.VOICE_CONTROL_COMPLETE,
 				(
 					_event: IpcRendererEvent,
 					result: {
@@ -123,7 +123,7 @@ export function createVoiceControlAPI(): VoiceControlAPI {
 
 		onVoiceControlAudioLevel: (callback) => {
 			ipcRenderer.on(
-				"voice-control:audio-level",
+				IPC_CHANNELS.VOICE_CONTROL_AUDIO_LEVEL,
 				(_event: IpcRendererEvent, level: number) => callback(level),
 			);
 			return () => {
@@ -133,7 +133,7 @@ export function createVoiceControlAPI(): VoiceControlAPI {
 
 		onVoiceControlDuration: (callback) => {
 			ipcRenderer.on(
-				"voice-control:duration",
+				IPC_CHANNELS.VOICE_CONTROL_DURATION,
 				(_event: IpcRendererEvent, duration: number) => callback(duration),
 			);
 			return () => {

@@ -6,6 +6,7 @@
 
 import type { OnboardingGuide } from "../../../shared/types/onboarding";
 import { createIpcListener, invokeIpc } from "./ipc-utils";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export interface OnboardingAgentRunOptions {
 	projectPath: string;
@@ -172,23 +173,23 @@ export interface OnboardingAgentAPI {
 
 export const createOnboardingAgentAPI = (): OnboardingAgentAPI => ({
 	runOnboardingAgentScan: (options: OnboardingAgentRunOptions) =>
-		invokeIpc<OnboardingAgentResult>("onboardingAgent:run", options),
+		invokeIpc<OnboardingAgentResult>(IPC_CHANNELS.ONBOARDING_AGENT_RUN, options),
 
 	cancelOnboardingAgentScan: () =>
-		invokeIpc<boolean>("onboardingAgent:cancel"),
+		invokeIpc<boolean>(IPC_CHANNELS.ONBOARDING_AGENT_CANCEL),
 
 	onOnboardingAgentEvent: (callback) =>
-		createIpcListener<[OnboardingAgentEvent]>("onboarding-event", (payload) =>
+		createIpcListener<[OnboardingAgentEvent]>(IPC_CHANNELS.ONBOARDING_EVENT, (payload) =>
 			callback(payload),
 		),
 
 	onOnboardingAgentResult: (callback) =>
-		createIpcListener<[OnboardingAgentResult]>("onboarding-result", (payload) =>
+		createIpcListener<[OnboardingAgentResult]>(IPC_CHANNELS.ONBOARDING_RESULT, (payload) =>
 			callback(payload),
 		),
 
 	onOnboardingAgentError: (callback) =>
-		createIpcListener<[string]>("onboarding-error", (payload) =>
+		createIpcListener<[string]>(IPC_CHANNELS.ONBOARDING_ERROR, (payload) =>
 			callback(payload),
 		),
 });

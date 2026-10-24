@@ -10,6 +10,7 @@ import {
 	labelVersion,
 	listVersions,
 } from "../visual-to-code-history";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
 
 /**
  * The construction history of the Visual-to-Code architectures.
@@ -20,7 +21,7 @@ import {
  */
 export function registerVisualToCodeHistoryHandlers(): void {
 	ipcMain.handle(
-		"visualToCodeHistory:list",
+		IPC_CHANNELS.VISUAL_TO_CODE_HISTORY_LIST,
 		async (_event, architectureId: string) => {
 			try {
 				return { success: true, data: listVersions(architectureId) };
@@ -34,7 +35,7 @@ export function registerVisualToCodeHistoryHandlers(): void {
 	);
 
 	ipcMain.handle(
-		"visualToCodeHistory:get",
+		IPC_CHANNELS.VISUAL_TO_CODE_HISTORY_GET,
 		async (_event, architectureId: string, versionId: string) => {
 			try {
 				return { success: true, data: getVersion(architectureId, versionId) };
@@ -48,7 +49,7 @@ export function registerVisualToCodeHistoryHandlers(): void {
 	);
 
 	ipcMain.handle(
-		"visualToCodeHistory:append",
+		IPC_CHANNELS.VISUAL_TO_CODE_HISTORY_APPEND,
 		async (
 			_event,
 			architectureId: string,
@@ -66,7 +67,7 @@ export function registerVisualToCodeHistoryHandlers(): void {
 	);
 
 	ipcMain.handle(
-		"visualToCodeHistory:label",
+		IPC_CHANNELS.VISUAL_TO_CODE_HISTORY_LABEL,
 		async (
 			_event,
 			architectureId: string,
@@ -88,7 +89,7 @@ export function registerVisualToCodeHistoryHandlers(): void {
 	);
 
 	ipcMain.handle(
-		"visualToCodeHistory:deleteVersion",
+		IPC_CHANNELS.VISUAL_TO_CODE_HISTORY_DELETE_VERSION,
 		async (_event, architectureId: string, versionId: string) => {
 			try {
 				return {
@@ -105,7 +106,7 @@ export function registerVisualToCodeHistoryHandlers(): void {
 	);
 
 	ipcMain.handle(
-		"visualToCodeHistory:deleteAll",
+		IPC_CHANNELS.VISUAL_TO_CODE_HISTORY_DELETE_ALL,
 		async (_event, architectureId: string) => {
 			try {
 				deleteHistory(architectureId);

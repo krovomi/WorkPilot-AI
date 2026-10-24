@@ -16,6 +16,7 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import { app, ipcMain } from "electron";
 import { pythonEnvManager } from "../python-env-manager.js";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
 
 function resolveBackendPath(): string {
 	return app.isPackaged
@@ -80,7 +81,7 @@ function runRunner(args: string[]): Promise<unknown> {
 
 export function registerOfflineModeHandlers(): void {
 	ipcMain.handle(
-		"offlineMode:status",
+		IPC_CHANNELS.OFFLINE_MODE_STATUS,
 		async (_evt, { projectPath }: { projectPath: string }) => {
 			if (!projectPath) throw new Error("projectPath is required");
 			return runRunner(["--command", "status", "--project-path", projectPath]);
@@ -88,7 +89,7 @@ export function registerOfflineModeHandlers(): void {
 	);
 
 	ipcMain.handle(
-		"offlineMode:listModels",
+		IPC_CHANNELS.OFFLINE_MODE_LIST_MODELS,
 		async (_evt, { projectPath }: { projectPath: string }) => {
 			if (!projectPath) throw new Error("projectPath is required");
 			return runRunner([
@@ -101,7 +102,7 @@ export function registerOfflineModeHandlers(): void {
 	);
 
 	ipcMain.handle(
-		"offlineMode:scanModels",
+		IPC_CHANNELS.OFFLINE_MODE_SCAN_MODELS,
 		async (
 			_evt,
 			{
@@ -117,7 +118,7 @@ export function registerOfflineModeHandlers(): void {
 	);
 
 	ipcMain.handle(
-		"offlineMode:getPolicy",
+		IPC_CHANNELS.OFFLINE_MODE_GET_POLICY,
 		async (_evt, { projectPath }: { projectPath: string }) => {
 			if (!projectPath) throw new Error("projectPath is required");
 			return runRunner([
@@ -130,7 +131,7 @@ export function registerOfflineModeHandlers(): void {
 	);
 
 	ipcMain.handle(
-		"offlineMode:setPolicy",
+		IPC_CHANNELS.OFFLINE_MODE_SET_POLICY,
 		async (
 			_evt,
 			{
@@ -151,7 +152,7 @@ export function registerOfflineModeHandlers(): void {
 	);
 
 	ipcMain.handle(
-		"offlineMode:report",
+		IPC_CHANNELS.OFFLINE_MODE_REPORT,
 		async (_evt, { projectPath }: { projectPath: string }) => {
 			if (!projectPath) throw new Error("projectPath is required");
 			return runRunner(["--command", "report", "--project-path", projectPath]);

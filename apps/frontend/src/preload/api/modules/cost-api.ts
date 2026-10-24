@@ -82,19 +82,19 @@ export interface CostAPI {
 
 export const createCostAPI = (): CostAPI => ({
 	getCostSummary: (projectPath: string) =>
-		ipcRenderer.invoke("costs:getSummary", projectPath),
+		ipcRenderer.invoke(IPC_CHANNELS.COSTS_GET_SUMMARY, projectPath),
 
 	getContextUsage: (projectPath: string, provider: string) =>
-		ipcRenderer.invoke("costs:getContextUsage", projectPath, provider),
+		ipcRenderer.invoke(IPC_CHANNELS.COSTS_GET_CONTEXT_USAGE, projectPath, provider),
 
 	getCostBudget: (projectPath: string) =>
-		ipcRenderer.invoke("costs:getBudget", projectPath),
+		ipcRenderer.invoke(IPC_CHANNELS.COSTS_GET_BUDGET, projectPath),
 
 	setCostBudget: (projectPath: string, limit: number, period = "monthly") =>
-		ipcRenderer.invoke("costs:setBudget", projectPath, limit, period),
+		ipcRenderer.invoke(IPC_CHANNELS.COSTS_SET_BUDGET, projectPath, limit, period),
 
 	getDashboardSnapshot: (projectPath: string) =>
-		ipcRenderer.invoke("dashboard:getSnapshot", projectPath),
+		ipcRenderer.invoke(IPC_CHANNELS.DASHBOARD_GET_SNAPSHOT, projectPath),
 
 	onCostsUpdated: (callback: (projectPath: string) => void) => {
 		const handler = (_event: Electron.IpcRendererEvent, projectPath: string) =>

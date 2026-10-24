@@ -2727,7 +2727,7 @@ export function registerClaudeCodeHandlers(): void {
 
 	// Get usage for a specific provider (or active profile if no provider specified)
 
-	ipcMain.handle("usage:get", async (_event, providerName?: string) => {
+	ipcMain.handle(IPC_CHANNELS.USAGE_GET, async (_event, providerName?: string) => {
 		const usageMonitor = getUsageMonitor();
 
 		try {

@@ -232,7 +232,7 @@ export function registerCostHandlers(): void {
 	/**
 	 * costs:getSummary — returns cost summary for the last 30 days
 	 */
-	ipcMain.handle("costs:getSummary", async (_, projectPath: string) => {
+	ipcMain.handle(IPC_CHANNELS.COSTS_GET_SUMMARY, async (_, projectPath: string) => {
 		try {
 			watchCostData(projectPath); // Start watching on first access
 			const data = loadCostData(projectPath);
@@ -308,7 +308,7 @@ export function registerCostHandlers(): void {
 	 * Sert à afficher un « % de contexte consommé » façon Claude Code.
 	 */
 	ipcMain.handle(
-		"costs:getContextUsage",
+		IPC_CHANNELS.COSTS_GET_CONTEXT_USAGE,
 		async (_, projectPath: string, provider: string) => {
 			try {
 				watchCostData(projectPath);
@@ -349,7 +349,7 @@ export function registerCostHandlers(): void {
 	/**
 	 * costs:getBudget — returns budget info for the current period
 	 */
-	ipcMain.handle("costs:getBudget", async (_, projectPath: string) => {
+	ipcMain.handle(IPC_CHANNELS.COSTS_GET_BUDGET, async (_, projectPath: string) => {
 		try {
 			const data = loadCostData(projectPath);
 			// Use project path as key (same convention as Python CostEstimator)
@@ -419,7 +419,7 @@ export function registerCostHandlers(): void {
 	/**
 	 * dashboard:getSnapshot — reads {projectPath}/.workpilot/dashboard_snapshot.json
 	 */
-	ipcMain.handle("dashboard:getSnapshot", async (_, projectPath: string) => {
+	ipcMain.handle(IPC_CHANNELS.DASHBOARD_GET_SNAPSHOT, async (_, projectPath: string) => {
 		try {
 			watchDashboardSnapshot(projectPath); // Start watching on first access
 			const snapPath = path.join(
@@ -486,7 +486,7 @@ export function registerCostHandlers(): void {
 	 * costs:setBudget — create/update budget for a project
 	 */
 	ipcMain.handle(
-		"costs:setBudget",
+		IPC_CHANNELS.COSTS_SET_BUDGET,
 		async (
 			_,
 			projectPath: string,

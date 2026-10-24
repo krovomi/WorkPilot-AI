@@ -27,6 +27,7 @@ import { ensureProjectEnvIgnored } from "../project-initializer";
 import { projectStore } from "../project-store";
 import { parsePythonCommand } from "../python-detector";
 import { getConfiguredPythonPath } from "../python-env-manager";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -221,7 +222,7 @@ function saveRun(projectDir: string, run: object): void {
 }
 
 export function registerCICDTriggersHandlers(): void {
-	ipcMain.handle("cicdTriggers:getConfig", (_event, projectDir: unknown) => {
+	ipcMain.handle(IPC_CHANNELS.CICD_TRIGGERS_GET_CONFIG, (_event, projectDir: unknown) => {
 		const project = findKnownProject(projectDir);
 		if (!project) return UNKNOWN_PROJECT;
 		try {
@@ -258,7 +259,7 @@ export function registerCICDTriggersHandlers(): void {
 	});
 
 	ipcMain.handle(
-		"cicdTriggers:setConfig",
+		IPC_CHANNELS.CICD_TRIGGERS_SET_CONFIG,
 		async (_event, projectDir: unknown, config: unknown) => {
 			const project = findKnownProject(projectDir);
 			if (!project) return UNKNOWN_PROJECT;
@@ -275,7 +276,7 @@ export function registerCICDTriggersHandlers(): void {
 	);
 
 	ipcMain.handle(
-		"cicdTriggers:listRuns",
+		IPC_CHANNELS.CICD_TRIGGERS_LIST_RUNS,
 		(_event, projectDir: unknown, limit: number = 50) => {
 			const project = findKnownProject(projectDir);
 			if (!project) return UNKNOWN_PROJECT;
@@ -289,7 +290,7 @@ export function registerCICDTriggersHandlers(): void {
 	);
 
 	ipcMain.handle(
-		"cicdTriggers:trigger",
+		IPC_CHANNELS.CICD_TRIGGERS_TRIGGER,
 		async (
 			_event,
 			projectDir: unknown,
@@ -351,7 +352,7 @@ export function registerCICDTriggersHandlers(): void {
 	);
 
 	ipcMain.handle(
-		"cicdTriggers:getRunStatus",
+		IPC_CHANNELS.CICD_TRIGGERS_GET_RUN_STATUS,
 		async (_event, projectDir: unknown, runId: string) => {
 			const project = findKnownProject(projectDir);
 			if (!project) return UNKNOWN_PROJECT;
@@ -368,7 +369,7 @@ export function registerCICDTriggersHandlers(): void {
 	);
 
 	ipcMain.handle(
-		"cicdTriggers:cancelRun",
+		IPC_CHANNELS.CICD_TRIGGERS_CANCEL_RUN,
 		async (_event, projectDir: unknown, runId: string) => {
 			const project = findKnownProject(projectDir);
 			if (!project) return UNKNOWN_PROJECT;

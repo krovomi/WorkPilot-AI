@@ -7,6 +7,7 @@
 
 import type { InjectionScanResult } from "../../../shared/types/injection-guard";
 import { createIpcListener, invokeIpc } from "./ipc-utils";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export interface InjectionGuardRunOptions {
 	projectPath: string;
@@ -39,24 +40,24 @@ export interface InjectionGuardAPI {
 
 export const createInjectionGuardAPI = (): InjectionGuardAPI => ({
 	runInjectionGuardScan: (options: InjectionGuardRunOptions) =>
-		invokeIpc<InjectionGuardScanResult>("injectionGuard:run", options),
+		invokeIpc<InjectionGuardScanResult>(IPC_CHANNELS.INJECTION_GUARD_RUN, options),
 
-	cancelInjectionGuardScan: () => invokeIpc<boolean>("injectionGuard:cancel"),
+	cancelInjectionGuardScan: () => invokeIpc<boolean>(IPC_CHANNELS.INJECTION_GUARD_CANCEL),
 
 	onInjectionGuardEvent: (callback) =>
 		createIpcListener<[InjectionGuardEvent]>(
-			"injection-guard-event",
+			IPC_CHANNELS.INJECTION_GUARD_EVENT,
 			(payload) => callback(payload),
 		),
 
 	onInjectionGuardResult: (callback) =>
 		createIpcListener<[InjectionGuardScanResult]>(
-			"injection-guard-result",
+			IPC_CHANNELS.INJECTION_GUARD_RESULT,
 			(payload) => callback(payload),
 		),
 
 	onInjectionGuardError: (callback) =>
-		createIpcListener<[string]>("injection-guard-error", (payload) =>
+		createIpcListener<[string]>(IPC_CHANNELS.INJECTION_GUARD_ERROR, (payload) =>
 			callback(payload),
 		),
 });

@@ -77,6 +77,8 @@ interface ChannelUse {
 	channel: string;
 	file: string;
 	line: number;
+	/** The call names the channel as `IPC_CHANNELS.X`, not by its string. */
+	named: boolean;
 }
 
 interface Unresolved {
@@ -324,6 +326,9 @@ function ipcChannelConstants(): Map<string, string> {
 	return out;
 }
 
+const isNamed = (argument: string) =>
+	/^IPC_CHANNELS\.[A-Z][A-Z0-9_]*$/.test(argument);
+
 function resolveChannel(
 	argument: string,
 	locals: Map<string, string>,
@@ -358,7 +363,9 @@ function collect(
 			if (argument === null) continue;
 			const line = lineAt(source, offset);
 			const channel = resolveChannel(argument, locals, constants);
-			if (channel !== null) uses.push({ channel, file, line });
+			if (channel !== null) {
+				uses.push({ channel, file, line, named: isNamed(argument) });
+			}
 			else if (!DYNAMIC_FORWARDERS.has(file)) {
 				unresolved.push({ argument, file, line });
 			}
@@ -688,7 +695,7 @@ function collectThroughForwarders(
 					? closestConstant(source, offset, argument)
 					: null);
 			if (channel !== null) {
-				uses.push({ channel, file, line });
+				uses.push({ channel, file, line, named: isNamed(argument) });
 				continue;
 			}
 			if (DYNAMIC_FORWARDERS.has(file)) continue;
@@ -794,6 +801,50 @@ describe("IPC channel parity (main → renderer)", () => {
 			.map(([channel, uses]) => `${channel}  (${uses.map(where).join(", ")})`)
 			.sort();
 		expect(missing, "heard by src/preload, sent by nothing in src/main").toEqual(
+			[],
+		);
+	});
+});
+
+/**
+ * A channel is written once, in `IPC_CHANNELS`, and named from there on both
+ * sides. A string repeated in main and preload drifts without anyone noticing:
+ * a typo on either side is a call that never arrives.
+ */
+describe("IPC channels are named through IPC_CHANNELS", () => {
+	const constants = ipcChannelConstants();
+	const uses = [
+		...collect(sourceFiles(PRELOAD_DIR), PRELOAD_CALL, constants).uses,
+		...collect(sourceFiles(MAIN_DIR), MAIN_REGISTRATION, constants).uses,
+		...collectThroughForwarders(sourceFiles(MAIN_DIR), MAIN_SEND, constants)
+			.uses,
+		...collectThroughForwarders(
+			sourceFiles(PRELOAD_DIR),
+			PRELOAD_LISTEN,
+			constants,
+		).uses,
+	];
+
+	it("keeps no constant that no IPC call uses", () => {
+		const used = new Set([
+			...uses.map((use) => use.channel),
+			...collect(sourceFiles(RENDERER_DIR, true), RENDERER_CALL, constants)
+				.uses.map((use) => use.channel),
+			...genericListenChannels(constants),
+		]);
+		const orphans = [...constants]
+			.filter(([, channel]) => !used.has(channel))
+			.map(([key, channel]) => `${key}  ${channel}`)
+			.sort();
+		expect(orphans, "used by no handler, call, send or listener").toEqual([]);
+	});
+
+	it("names every channel of main and preload by its constant", () => {
+		const literal = uses
+			.filter((use) => !use.named)
+			.map((use) => `${where(use)}  ${use.channel}`)
+			.sort();
+		expect(literal, "write it in IPC_CHANNELS and use the constant").toEqual(
 			[],
 		);
 	});
