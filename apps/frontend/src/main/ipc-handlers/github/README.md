@@ -63,10 +63,12 @@ github/
 - Error handling and progress tracking
 - Task creation for each imported issue
 
-**release-handlers.ts** (126 lines)
+**release-handlers.ts**
 - `GITHUB_CREATE_RELEASE` - Create GitHub releases via gh CLI
 - CLI availability and authentication checks
 - Support for draft and prerelease options
+- `gh` runs without a shell (`execFileSync`); the notes, an LLM changelog built from the
+  target repo's commits, reach it on stdin (`--notes-file -`), and the version must be a tag
 
 ## Benefits of This Structure
 
