@@ -190,10 +190,13 @@ def generate_tdd_tests(spec: Annotated[dict, Body(...)]):
 
 def _is_within(path: str, root: str) -> bool:
     """`path` is `root` or below it. A shared prefix (`/repo-evil`) is not."""
+    # commonpath normalises separators (and Windows compares case-insensitively),
+    # so the root is normalised the same way before comparing.
     try:
-        return os.path.commonpath([path, root]) == root
+        common = os.path.commonpath([path, root])
     except ValueError:  # different drives on Windows
         return False
+    return os.path.normcase(common) == os.path.normcase(os.path.normpath(root))
 
 
 @router.post("/api/test-generation/run-post-build")

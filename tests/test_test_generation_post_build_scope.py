@@ -73,6 +73,17 @@ def test_is_within():
     assert not api._is_within("/a/bc/c.py", "/a/b")
 
 
+def test_is_within_with_windows_paths(monkeypatch):
+    # commonpath answers with backslashes there: the root must be compared alike
+    import ntpath
+
+    monkeypatch.setattr(api.os, "path", ntpath)
+    assert api._is_within("/a/b", "/a/b")
+    assert api._is_within("C:\\Repo\\src\\m.py", "c:/repo")
+    assert not api._is_within("C:\\repo-evil\\m.py", "C:\\repo")
+    assert not api._is_within("D:\\repo\\m.py", "C:\\repo")
+
+
 def test_test_files_are_judged_inside_the_project(tmp_path, monkeypatch):
     project = tmp_path / "test_checkouts" / "repo"
     (project / "tests").mkdir(parents=True)
