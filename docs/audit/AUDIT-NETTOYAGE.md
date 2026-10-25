@@ -2167,7 +2167,8 @@ retirées. `node-pty` reste : son retrait attend un essai d'installation sous Wi
 
 **En cours.** Première partie : le plus grand cycle d'imports passe de 81 à 26 unités. Les
 utilitaires sortent de `core` vers `foundation/`, `offline_policy/` et `app_detection.py`, et quatre
-imports vers le haut sont retirés. Reste le découpage des fonctions géantes.
+imports vers le haut sont retirés. Deuxième partie : la boucle du coder, figée par des tests de
+caractérisation puis découpée (F103) ; restent la boucle QA et `create_client`.
 
 #### F101 · `core` était à la fois la boîte à outils et la racine de composition
 
@@ -2208,6 +2209,27 @@ imports vers le haut sont retirés. Reste le découpage des fonctions géantes.
   `runners/formula_refine_runner.py`.
 - **Garde-fou** : les contrats ci-dessus ; `tests/cost_intelligence/test_formula_refine.py`
   vérifie que la fabrique n'est pas appelée sans candidat.
+
+#### F103 · La boucle du coder tenait en une fonction de 2 090 lignes
+
+- **Sévérité** moyenne · **connu** (audit du 17 octobre) · **corrigé par le lot M10** (deuxième partie, le coder)
+- **Preuve** (avant) : `run_autonomous_agent` (`agents/coder.py`) faisait 2 090 lignes, dont une
+  branche de 460 lignes pour l'issue d'une session : dix `break` / `continue` et une trentaine de
+  variables partagées avec la boucle (compteurs d'erreurs, délai de reprise, pause). Les
+  branches d'erreur (concurrence d'outils, modèle indisponible, prompt trop long, limite de
+  débit, authentification, erreur répétée) n'avaient aucun test.
+- **Correction** (choix du mainteneur) : des tests de caractérisation d'abord, verts sur le code d'avant, puis la
+  découpe : `_on_build_complete`, `_on_session_continue`,
+  `_on_session_error` et un `_on_*` par type d'erreur, qui rendent `_Next` (`STOP`, `RETRY`,
+  `NEXT`) ; l'état d'une session à l'autre dans `_RetryState` ; les prompts dans
+  `_planning_prompt` et `_coding_prompt` ; le plan invalide dans `_on_invalid_plan` ; le bilan
+  dans `_report_run_end` ; les quatre fonctions imbriquées remontées au niveau du module. La
+  fonction passe à 1 158 lignes, sans changement de comportement.
+- **Garde-fou** : `tests/agents/test_coder_error_branches.py` (15 tests : délais de reprise,
+  message à la session suivante, sous-tâche bloquée, fichiers de pause, secret masqué, arrêt
+  sur erreur répétée, replanification après une erreur de concurrence).
+- **Reste** : `run_qa_validation_loop` (1 146 lignes) et `create_client` (909), une PR chacune,
+  avec leurs propres tests de caractérisation.
 
 ---
 
@@ -2363,7 +2385,7 @@ planchers `pnpm.overrides` relevés (`pnpm-workspace.yaml`), `dompurify` ^3.4.17
 
 Statut des constats de l'audit précédent : F1, F3, F4, F5, F7, F8, F9, F10, F12, F16, F17, F19 **ouverts** ;
 F2, F13 **partiels** ; F6, F11, F14, F18 **aggravés** ; F15 **atténué**. Nouveaux : F20 à F36.
-Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F57 à F62 par M2, F63 à F68 par M3, F69 à F71 par M4, F78 à F84 par M5, F85 à F90 par M6, F91 à F94 par M7, F95 à F100 par M8, F72 à F77 par M9, F101 et F102 par M10 (annexe F).
+Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F57 à F62 par M2, F63 à F68 par M3, F69 à F71 par M4, F78 à F84 par M5, F85 à F90 par M6, F91 à F94 par M7, F95 à F100 par M8, F72 à F77 par M9, F101 à F103 par M10 (annexe F).
 
 ## Annexe C — Ce qui a changé le 15 octobre 2026 (`7ef6fca` → `e3e468f` + PR #454)
 
@@ -2430,7 +2452,7 @@ détaillés ici qu'une fois corrigés ([`SECURITY.md`](../SECURITY.md)).
 | M7 | Contrats d'architecture (`import-linter`, canaux IPC, Sidebar ↔ `product-overview.md`) | **fait** (F91 à F94 ; contrats d'imports en test AST, sans `import-linter`) |
 | M8 | Code mort, `scripts/`, vues sans test | **fait** (F95 à F100 ; vues sans conception ni test marquées « Expérimental » ; `node-pty` attend un essai sous Windows) |
 | M9 | Doc ↔ code, i18n de la palette, jsdom, dépendances | **fait** (F72 à F77) |
-| M10 | Casser le cycle `core ⇄ agents`, découper les fonctions géantes | **en cours** (F101, F102 : cycle de 81 à 26 unités ; reste le découpage des fonctions géantes) |
+| M10 | Casser le cycle `core ⇄ agents`, découper les fonctions géantes | **en cours** (F101, F102 : cycle de 81 à 26 unités ; F103 : boucle du coder découpée ; restent la boucle QA et `create_client`) |
 
 Vérification du lot M1 : `cd apps/frontend && pnpm run typecheck && pnpm test -- release-handlers
 no-renderer-command worktree-open-launchers pr-details-azure-script`.
@@ -2460,3 +2482,5 @@ tests/test_test_generation_post_build_scope.py -q` et `cd apps/frontend && pnpm 
 
 Vérification du lot M10 (cycle) : `pytest tests/test_import_contracts.py
 tests/cost_intelligence/test_formula_refine.py tests/test_offline_mode.py tests/test_platform.py -q`.
+
+Vérification du lot M10 (coder) : `pytest tests/agents/ tests/test_pipeline_phase_recovery.py -q`.
