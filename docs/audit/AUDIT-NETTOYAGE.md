@@ -2168,7 +2168,8 @@ retirées. `node-pty` reste : son retrait attend un essai d'installation sous Wi
 **En cours.** Première partie : le plus grand cycle d'imports passe de 81 à 26 unités. Les
 utilitaires sortent de `core` vers `foundation/`, `offline_policy/` et `app_detection.py`, et quatre
 imports vers le haut sont retirés. Deuxième partie : la boucle du coder, figée par des tests de
-caractérisation puis découpée (F103) ; restent la boucle QA et `create_client`.
+caractérisation puis découpée (F103), puis la boucle QA (F104) et `create_client` (F105) de la
+même façon ; reste `_build_agent_client`.
 
 #### F101 · `core` était à la fois la boîte à outils et la racine de composition
 
@@ -2228,8 +2229,61 @@ caractérisation puis découpée (F103) ; restent la boucle QA et `create_client
 - **Garde-fou** : `tests/agents/test_coder_error_branches.py` (15 tests : délais de reprise,
   message à la session suivante, sous-tâche bloquée, fichiers de pause, secret masqué, arrêt
   sur erreur répétée, replanification après une erreur de concurrence).
-- **Reste** : `run_qa_validation_loop` (1 146 lignes) et `create_client` (909), une PR chacune,
+- **Reste** : `run_qa_validation_loop` (F104) puis `create_client` (909 lignes), une PR chacune,
   avec leurs propres tests de caractérisation.
+
+#### F104 · La boucle QA tenait en une fonction de 1 146 lignes
+
+- **Sévérité** moyenne · **connu** (audit du 17 octobre) · **corrigé par le lot M10** (deuxième partie, la boucle QA)
+- **Preuve** (avant) : `run_qa_validation_loop` (`qa/loop.py`) faisait 1 146 lignes : le retour
+  humain, le scan de sécurité, la passe du reviewer, deux gates qui renversent son approbation,
+  le fixer, et les branches d'erreur, de limite de débit et d'escalade, avec quatre variables
+  partagées d'un tour à l'autre. Seul `tests/test_qa_loop_gate_rejection.py` faisait tourner la
+  vraie boucle, sur les deux gates.
+- **Correction** (choix du mainteneur, comme pour F103) : 21 tests de caractérisation d'abord,
+  verts sur le code d'avant, puis la découpe : `_run_reviewer` et `_run_fixer` pour les
+  sessions, `_architecture_gate` et `_coverage_gate` qui rendent les issues d'un rejet ou
+  `None`, `_on_approved`, `_on_human_escalation`, `_on_rejected` et `_on_reviewer_error` pour
+  les verdicts, qui rendent `_Next` (`APPROVED`, `FAILED`, `EXHAUSTED`, `RETRY`, `NEXT`) ;
+  l'état d'une passe à l'autre dans `_QaState`, ce qui ne change pas dans `_QaScope` ; le
+  retour humain, le scan, le projet sans tests et le bilan final dans leurs fonctions. La
+  fonction passe à 234 lignes, sans changement de comportement.
+- **Garde-fou** : `tests/test_qa_loop_characterization.py` (21 tests : build incomplet, déjà
+  approuvé, approbation, rejet puis fixer, dernière passe sans fix, issue récurrente, escalade
+  humaine, erreur du reviewer renvoyée à la passe suivante, trois erreurs de suite, compteur
+  remis à zéro par un rejet, limite de débit rejouée sur la même passe, prompt trop long,
+  clients impossibles à construire, erreur du fixer, retour humain et son nouveau budget,
+  pause).
+- **Reste** : `create_client` (F105).
+
+#### F105 · `create_client` tenait en une fonction de 909 lignes
+
+- **Sévérité** moyenne · **connu** (audit du 17 octobre) · **corrigé par le lot M10** (deuxième partie, `create_client`)
+- **Preuve** (avant) : `create_client` (`core/client.py`) faisait 909 lignes, dans cet ordre :
+  l'environnement du CLI, le fichier de permissions et ses règles de worktree, l'affichage, une
+  trentaine de serveurs MCP, le prompt système, le débogueur, les hooks, le roster de
+  sous-agents, la reprise de session, le mode plan, les outils refusés et l'effort. Les tests
+  existants couvraient l'authentification, l'effort, la recherche d'outils, les droits par type
+  et deux serveurs, mais ni le fichier de permissions, ni les serveurs qui attendent un
+  identifiant, ni les serveurs du projet, ni l'ordre des hooks, ni la reprise.
+- **Correction** (choix du mainteneur, comme pour F103) : 23 tests de caractérisation d'abord,
+  verts sur le code d'avant, puis une fonction par sujet : `_cli_environment` (et
+  `_add_otel_env`), `_worktree_permissions`, `_write_security_settings`,
+  `_print_session_summary`, `_mcp_servers` (`_third_party_servers`, `_workpilot_servers`,
+  `_custom_servers`), `_system_prompt`, `_debugger_hooks`, `_session_hooks`, `_add_subagents`,
+  `_resume_session_id` et `_add_effort`. Les huit serveurs lancés par `npx -y` qui attendent
+  leurs variables sont une table (`_CREDENTIALED_NPX_SERVERS`) au lieu de huit blocs copiés. La
+  fonction passe à 212 lignes. Les options rendues sont identiques avant et après sur neuf
+  configurations (tous les serveurs, aucun, deux ; codeur sur Opus, type en lecture seule,
+  relecteur QA), comparées par un script hors du dépôt.
+- **Garde-fou** : `tests/core/test_create_client_characterization.py` (23 tests : règles du
+  fichier de permissions et du worktree, outils MCP approuvés seulement avec leur serveur, clé
+  Context7 dans l'environnement et jamais dans les arguments, Chrome DevTools sans navigateur,
+  serveurs qui attendent tous leurs identifiants, serveurs du projet, ordre des hooks, options
+  par défaut, environnement du CLI, surcharge du CLI, mode plan, outils refusés, roster et outil
+  `Agent`, reprise explicite, variable de reprise consommée une fois, reprise sans transcript).
+- **Reste** : `_build_agent_client` (583 lignes, même fichier), la quatrième fonction géante
+  relevée par l'audit.
 
 ---
 
@@ -2385,7 +2439,7 @@ planchers `pnpm.overrides` relevés (`pnpm-workspace.yaml`), `dompurify` ^3.4.17
 
 Statut des constats de l'audit précédent : F1, F3, F4, F5, F7, F8, F9, F10, F12, F16, F17, F19 **ouverts** ;
 F2, F13 **partiels** ; F6, F11, F14, F18 **aggravés** ; F15 **atténué**. Nouveaux : F20 à F36.
-Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F57 à F62 par M2, F63 à F68 par M3, F69 à F71 par M4, F78 à F84 par M5, F85 à F90 par M6, F91 à F94 par M7, F95 à F100 par M8, F72 à F77 par M9, F101 à F103 par M10 (annexe F).
+Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F57 à F62 par M2, F63 à F68 par M3, F69 à F71 par M4, F78 à F84 par M5, F85 à F90 par M6, F91 à F94 par M7, F95 à F100 par M8, F72 à F77 par M9, F101 à F105 par M10 (annexe F).
 
 ## Annexe C — Ce qui a changé le 15 octobre 2026 (`7ef6fca` → `e3e468f` + PR #454)
 
@@ -2452,7 +2506,7 @@ détaillés ici qu'une fois corrigés ([`SECURITY.md`](../SECURITY.md)).
 | M7 | Contrats d'architecture (`import-linter`, canaux IPC, Sidebar ↔ `product-overview.md`) | **fait** (F91 à F94 ; contrats d'imports en test AST, sans `import-linter`) |
 | M8 | Code mort, `scripts/`, vues sans test | **fait** (F95 à F100 ; vues sans conception ni test marquées « Expérimental » ; `node-pty` attend un essai sous Windows) |
 | M9 | Doc ↔ code, i18n de la palette, jsdom, dépendances | **fait** (F72 à F77) |
-| M10 | Casser le cycle `core ⇄ agents`, découper les fonctions géantes | **en cours** (F101, F102 : cycle de 81 à 26 unités ; F103 : boucle du coder découpée ; restent la boucle QA et `create_client`) |
+| M10 | Casser le cycle `core ⇄ agents`, découper les fonctions géantes | **en cours** (F101, F102 : cycle de 81 à 26 unités ; F103 à F105 : boucles du coder et de la QA, `create_client` découpés ; reste `_build_agent_client`) |
 
 Vérification du lot M1 : `cd apps/frontend && pnpm run typecheck && pnpm test -- release-handlers
 no-renderer-command worktree-open-launchers pr-details-azure-script`.
@@ -2484,3 +2538,11 @@ Vérification du lot M10 (cycle) : `pytest tests/test_import_contracts.py
 tests/cost_intelligence/test_formula_refine.py tests/test_offline_mode.py tests/test_platform.py -q`.
 
 Vérification du lot M10 (coder) : `pytest tests/agents/ tests/test_pipeline_phase_recovery.py -q`.
+
+Vérification du lot M10 (boucle QA) : `pytest tests/test_qa_loop_characterization.py
+tests/test_qa_loop_gate_rejection.py tests/test_qa_loop.py tests/test_qa_loop_enhancements.py
+tests/test_qa_loop_fix_request.py tests/test_qa_dotnet_tests.py -q`.
+
+Vérification du lot M10 (`create_client`) : `pytest tests/core/test_create_client_characterization.py
+tests/test_client.py tests/test_sdk_options_factories.py tests/test_agent_tool_rights.py
+tests/harness/test_subagent_results.py tests/harness/test_code_search_serving.py -q`.

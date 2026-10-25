@@ -12,14 +12,14 @@ Toute interaction LLM passe par ces fichiers ; les modifier touche tout le produ
 
 | Fichier | Lignes | Rôle |
 |---|---|---|
-| `core/client.py` | ~2 750 | **la fabrique** : `create_client()` (SDK Claude), `create_agent_client()` (multi-provider) ; modèle, outils, MCP, sous-agents, hooks de sécurité |
+| `core/client.py` | ~3 100 | **la fabrique** : `create_client()` (SDK Claude), `create_agent_client()` (multi-provider) ; modèle, outils, MCP, sous-agents, hooks de sécurité, une fonction par sujet sous `create_client` |
 | `core/simple_client.py` | — | client sans hooks, refusé aux types qui écrivent ou exécutent |
 | `core/agent_clients/` | ~6 800 | un module par provider (`claude`, `copilot`, `openai`, `google`, `compatible`, `local`, `windsurf`, les CLI `opencode_cli`, `antigravity_cli`, `pi_cli` sur `cli_subprocess`, `pi_guard/` le garde-fou chargé dans pi…) ; `core/agent_client.py` les réexporte |
 | `core/worktree.py` + `worktree_pr.py` + `worktree_common.py` | ~3 450 | worktrees par spec ; la création de PR/MR est le mixin `WorktreePRMixin` |
 | `agents/session.py` | ~2 500 | boucle de session : streaming, reprise, erreurs, rate limits |
 | `agents/coder.py` | ~2 950 | l'agent d'implémentation : `run_autonomous_agent` (la boucle, ~1 150 lignes), les prompts de planification et de sous-tâche (`_planning_prompt`, `_coding_prompt`), l'issue d'une session (`_on_session_error` et un `_on_*` par type d'erreur, `_RetryState`), le plan invalide, le bilan de fin |
 | `cli/build_commands.py` | ~1 300 | enchaîne les phases d'un build : planning → coding → QA |
-| `qa/loop.py` | ~1 350 | boucle de validation QA |
+| `qa/loop.py` | ~1 600 | boucle de validation QA : `run_qa_validation_loop` et une fonction par session, gate et verdict |
 | `provider_api.py` | ~2 050 | point d'entrée FastAPI : monte les routeurs, CORS, redaction des logs |
 
 ## Couches
