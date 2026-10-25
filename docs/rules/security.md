@@ -145,10 +145,8 @@ l'UI n'existe pas.
   par `security/webview-policy.ts` ; une nouvelle fenêtre reçoit les gardes de navigation.
 - Preload : des fonctions typées, une par canal. Aucun nouvel appel au passthrough générique
   `invoke(channel, …)` : un canal = une constante (`shared/constants/ipc*.ts`) + un handler + un type.
-- Main : chaque handler IPC revalide ses arguments (type, chemin résolu et contenu, URL). Seule la
-  page de l'app, dans le cadre principal de la fenêtre principale, atteint un handler :
-  `main/security/ipc-sender-policy.ts` vérifie `event.sender` et `event.senderFrame` sur chaque
-  canal, posé par `ipc-setup.ts` avant tout handler.
+- Main : chaque handler IPC revalide ses arguments (type, chemin résolu et contenu, URL) ; seule la
+  page de l'app, cadre principal de la fenêtre, atteint un handler (`main/security/ipc-sender-policy.ts`).
 - Le renderer ne fournit jamais une commande à exécuter ni un exécutable à lancer : le main
   construit la commande, lit un lanceur personnalisé dans les réglages et rattache un dossier
   reçu à un projet connu (`resolveOpenableDir`).
