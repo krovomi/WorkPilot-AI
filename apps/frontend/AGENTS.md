@@ -60,6 +60,7 @@ c'est une discipline, pas un garde-fou.
 | Chemins reçus du renderer : résolus (liens compris) puis rattachés à un projet enregistré ou à un dossier choisi dans une boîte native ; dossiers de projet contrôlés avant chaque handler (`DIRECTORY_ARGS`) ; aucun exécutable choisi par le renderer | `src/main/security/renderer-path.ts`, `src/main/security/ipc-path-policy.ts` (posé par `ipc-setup.ts`), `src/main/python-feature-services.ts` | `renderer-path.test.ts`, `ipc-path-policy.test.ts`, `renderer-path-refusals.test.ts`, `no-renderer-interpreter.test.ts` |
 | Redaction des logs (fichier, console, rapports de debug) | `src/main/app-logger.ts`, `src/shared/utils/secret-redaction.ts` | `secret-redaction.test.ts`, `app-logger-redaction.test.ts` |
 | Environnement sans identifiants pour le code d'un autre (serveur de dev, mobile, Ollama) | `src/main/utils/child-env.ts` | `utils/__tests__/child-env.test.ts` |
+| Environnement d'un runner Python lancé par une vue (provider choisi, aucun identifiant hérité) | `src/main/utils/python-runner-env.ts` | `utils/__tests__/python-runner-env.test.ts`, `ipc-handlers/__tests__/runner-env-inheritance.test.ts` |
 | Identifiants (trousseau, fichiers restreints) | `src/main/claude-profile/credential-utils.ts` | `credential-utils.test.ts` |
 | Assainissement texte / URL | `src/main/ipc-handlers/shared/sanitize.ts` | `sanitize.test.ts` |
 | Échappement shell | `src/shared/utils/shell-escape.ts` | — |

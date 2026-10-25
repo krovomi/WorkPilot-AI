@@ -17,6 +17,7 @@ import path from "node:path";
 import { app, ipcMain } from "electron";
 import { pythonEnvManager } from "../python-env-manager.js";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
+import { pythonRunnerEnv } from "../utils/python-runner-env";
 
 function resolveBackendPath(): string {
 	return app.isPackaged
@@ -24,7 +25,7 @@ function resolveBackendPath(): string {
 		: path.resolve(app.getAppPath(), "..", "backend");
 }
 
-function runRunner(args: string[]): Promise<unknown> {
+async function runRunner(args: string[]): Promise<unknown> {
 	const pythonExe = pythonEnvManager.getPythonPath();
 	if (!pythonExe) throw new Error("Python environment not ready");
 
@@ -35,10 +36,11 @@ function runRunner(args: string[]): Promise<unknown> {
 		"offline_mode_runner.py",
 	);
 
+	const env = await pythonRunnerEnv(backendPath);
 	return new Promise((resolve, reject) => {
 		const child = spawn(pythonExe, [runnerPath, ...args], {
 			cwd: backendPath,
-			env: { ...process.env, PYTHONPATH: backendPath },
+			env,
 		} as Parameters<typeof spawn>[2]);
 
 		let stdout = "";

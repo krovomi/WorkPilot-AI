@@ -36,6 +36,20 @@ import type {
 import { encodeProjectPath, getGitLabConfig, gitlabFetch } from "./utils";
 
 /**
+ * The project's GitLab token and instance, from its settings (or glab), for
+ * the review runner: the runner env carries no credential the main process
+ * env happens to hold (github/utils/runner-env.ts).
+ */
+async function gitlabRunnerEnv(
+	project: Project,
+): Promise<Record<string, string>> {
+	const config = await getGitLabConfig(project);
+	return config
+		? { GITLAB_TOKEN: config.token, GITLAB_INSTANCE_URL: config.instanceUrl }
+		: {};
+}
+
+/**
  * Get the GitLab runner path
  */
 function getGitLabRunnerPath(backendPath: string): string {
@@ -241,7 +255,7 @@ async function runMRReview(
 	debugLog("Spawning MR review process", { args, model, thinkingLevel });
 
 	// Get runner environment with PYTHONPATH for bundled packages (fixes #139)
-	const subprocessEnv = await getRunnerEnv(undefined, {
+	const subprocessEnv = await getRunnerEnv(await gitlabRunnerEnv(project), {
 		jevWorkflow: "gitlab-review",
 		page: "gitlab-merge-requests",
 	});
@@ -1001,10 +1015,13 @@ export function registerMRReviewHandlers(
 					});
 
 					// Get runner environment with PYTHONPATH for bundled packages (fixes #139)
-					const followupSubprocessEnv = await getRunnerEnv(undefined, {
-						jevWorkflow: "gitlab-review",
-						page: "gitlab-merge-requests",
-					});
+					const followupSubprocessEnv = await getRunnerEnv(
+						await gitlabRunnerEnv(project),
+						{
+							jevWorkflow: "gitlab-review",
+							page: "gitlab-merge-requests",
+						},
+					);
 
 					const { process: childProcess, promise } =
 						runPythonSubprocess<MRReviewResult>({

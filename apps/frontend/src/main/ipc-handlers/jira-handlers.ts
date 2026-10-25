@@ -15,6 +15,7 @@ import type { AgentManager } from "../agent";
 import { readProjectEnv } from "../project-env-file";
 import { projectStore } from "../project-store";
 import { downloadJiraImageAttachments } from "./shared/jira-attachments";
+import { envWithoutCredentials } from "../utils/child-env";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -166,7 +167,7 @@ except Exception as e:
 
 			const proc = spawn("python", ["-c", pythonScript], {
 				cwd: projectPath,
-				env: { ...process.env, ...envOverrides },
+				env: envWithoutCredentials(process.env, envOverrides),
 			});
 
 			let stdout = "";

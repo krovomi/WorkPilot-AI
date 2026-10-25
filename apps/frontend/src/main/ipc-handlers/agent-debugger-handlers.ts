@@ -23,6 +23,7 @@ import path from "node:path";
 import { app, ipcMain } from "electron";
 import { pythonEnvManager } from "../python-env-manager.js";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
+import { pythonRunnerEnv } from "../utils/python-runner-env";
 
 interface RunnerArgs {
 	action: string;
@@ -30,7 +31,7 @@ interface RunnerArgs {
 	payload?: Record<string, unknown>;
 }
 
-function runRunner(req: RunnerArgs): Promise<unknown> {
+async function runRunner(req: RunnerArgs): Promise<unknown> {
 	const backendPath = app.isPackaged
 		? path.resolve(process.resourcesPath, "backend")
 		: path.resolve(app.getAppPath(), "..", "backend");
@@ -52,10 +53,11 @@ function runRunner(req: RunnerArgs): Promise<unknown> {
 		JSON.stringify(req.payload ?? {}),
 	];
 
+	const env = await pythonRunnerEnv(backendPath);
 	return new Promise((resolve, reject) => {
 		const child = spawn(pythonExe, args, {
 			cwd: backendPath,
-			env: { ...process.env, PYTHONPATH: backendPath },
+			env,
 		} as Parameters<typeof spawn>[2]);
 
 		let stdout = "";

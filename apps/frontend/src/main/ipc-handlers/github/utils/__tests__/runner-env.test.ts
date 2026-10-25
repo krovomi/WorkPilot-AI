@@ -87,6 +87,30 @@ describe("getRunnerEnv", () => {
 		});
 	});
 
+	it("drops the credentials of the main env and keeps the ones its layers bring", async () => {
+		mockGetPythonEnv.mockReturnValue({
+			PATH: "/usr/bin",
+			PYTHONPATH: "/bundled/site-packages",
+			GITLAB_TOKEN: "test-gitlab-0000",
+			OPENAI_API_KEY: "sk-test-0000",
+			CLAUDE_CODE_OAUTH_TOKEN: "test-oauth-shell-0000",
+		});
+		mockGetAPIProfileEnv.mockResolvedValue({});
+		mockGetOAuthModeClearVars.mockReturnValue({});
+		mockGetBestAvailableProfileEnv.mockReturnValue({
+			env: { CLAUDE_CODE_OAUTH_TOKEN: "test-oauth-profile-0000" },
+		});
+		mockGetGitHubTokenForSubprocess.mockResolvedValue("test-gh-0000");
+
+		const result = await getRunnerEnv({ GITLAB_TOKEN: "test-gitlab-1111" });
+
+		expect(result.PATH).toBe("/usr/bin");
+		expect(result.OPENAI_API_KEY).toBeUndefined();
+		expect(result.CLAUDE_CODE_OAUTH_TOKEN).toBe("test-oauth-profile-0000");
+		expect(result.GITHUB_TOKEN).toBe("test-gh-0000");
+		expect(result.GITLAB_TOKEN).toBe("test-gitlab-1111");
+	});
+
 	it("includes extra env values with highest precedence", async () => {
 		mockGetAPIProfileEnv.mockResolvedValue({
 			ANTHROPIC_AUTH_TOKEN: "token",

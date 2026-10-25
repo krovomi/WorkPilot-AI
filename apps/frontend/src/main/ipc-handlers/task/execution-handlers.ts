@@ -12,6 +12,7 @@ import {
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { type BrowserWindow, ipcMain } from "electron";
+import { pythonRunnerEnv } from "../../utils/python-runner-env";
 
 // ESM doesn't expose __dirname out of the box. The main process is bundled
 // as ESM (apps/frontend/package.json sets "type": "module"), so we have to
@@ -1293,13 +1294,11 @@ print(json.dumps(result))
 							timeout: 60000, // 60 seconds timeout for PR creation
 							input: Buffer.from(prParams, "utf-8"),
 							maxBuffer: 10 * 1024 * 1024, // PR output can be sizable
-							env: {
-								...process.env,
-								APP_LANGUAGE: getAppLanguage(),
-								PYTHONPATH: backendPath,
-								PYTHONUTF8: "1",
-								PYTHONIOENCODING: "utf-8",
-							},
+							env: await pythonRunnerEnv(backendPath, {
+								extra: {
+									APP_LANGUAGE: getAppLanguage(),
+								},
+							}),
 						});
 
 						// Clean up temporary script

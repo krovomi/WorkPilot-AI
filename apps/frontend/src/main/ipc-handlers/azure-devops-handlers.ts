@@ -43,6 +43,8 @@ import {
 	stripControlChars,
 	stripHtml,
 } from "./shared/sanitize";
+import { envWithoutCredentials } from "../utils/child-env";
+import { pythonRunnerEnv } from "../utils/python-runner-env";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -259,7 +261,7 @@ except Exception as e:
 
 			const proc = spawn("python", ["-c", pythonScript], {
 				cwd: projectPath,
-				env: { ...process.env, ...envOverrides },
+				env: envWithoutCredentials(process.env, envOverrides),
 			});
 
 			let stdout = "";
@@ -1226,13 +1228,13 @@ except Exception as e:
 					project.path,
 				];
 
-				const env = {
-					...process.env,
-					AZURE_DEVOPS_PAT: azConfig.pat,
-					AZURE_DEVOPS_ORG_URL: azConfig.orgUrl,
-					AZURE_DEVOPS_PROJECT: azConfig.projectName,
-					PYTHONPATH: backendPath,
-				};
+				const env = await pythonRunnerEnv(backendPath, {
+					extra: {
+						AZURE_DEVOPS_PAT: azConfig.pat,
+						AZURE_DEVOPS_ORG_URL: azConfig.orgUrl,
+						AZURE_DEVOPS_PROJECT: azConfig.projectName,
+					},
+				});
 
 				return new Promise<IPCResult>((resolve) => {
 					let stdout = "";
@@ -1415,12 +1417,11 @@ print(json.dumps({'success': True}))
 				return new Promise<IPCResult>((resolve) => {
 					const child = spawn("python", ["-c", pythonScript], {
 						cwd: backendPath,
-						env: {
-							...process.env,
+						env: envWithoutCredentials(process.env, {
 							AZURE_DEVOPS_PAT: azConfig.pat || "",
 							AZURE_DEVOPS_ORG_URL: azConfig.orgUrl || "",
 							PYTHONPATH: backendPath,
-						},
+						}),
 					});
 
 					let _stdout = "";

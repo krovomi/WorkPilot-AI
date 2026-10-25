@@ -28,6 +28,7 @@ import { projectStore } from "../project-store";
 import { parsePythonCommand } from "../python-detector";
 import { getConfiguredPythonPath } from "../python-env-manager";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
+import { envWithoutCredentials } from "../utils/child-env";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -167,10 +168,7 @@ async function runRunner(
 	return new Promise((resolve) => {
 		// Only the CI/CD settings, decrypted: the project's files are never
 		// spread whole into the child's environment.
-		const env = {
-			...process.env,
-			...readCicdConfig(project),
-		} as Record<string, string>;
+		const env = envWithoutCredentials(process.env, readCicdConfig(project));
 
 		const proc = spawn(cmd, cmdArgs, { env, cwd: project.path });
 		const stdout: string[] = [];
