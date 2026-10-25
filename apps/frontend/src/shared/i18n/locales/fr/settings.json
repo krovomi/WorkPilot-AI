@@ -1014,6 +1014,7 @@
 		"claudePath": "Chemin Claude CLI",
 		"claudePathDescription": "Chemin vers l'exécutable Claude CLI (laisser vide pour la détection automatique)",
 		"claudePathPlaceholder": "claude (par défaut)",
+		"toolPathRefused": "{{field}} : indiquez le nom de l'outil (par exemple git) ou le chemin absolu de son exécutable. Un fichier situé dans un projet ou dans le dossier temporaire est refusé.",
 		"detectedPath": "Détecté automatiquement",
 		"detectedSource": "Source",
 		"detectedVersion": "Version",

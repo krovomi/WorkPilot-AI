@@ -36,6 +36,9 @@ vi.mock("../security/renderer-path", async () => {
 		resolveInProject: chosen,
 		isAddableProject: (target: unknown) => chosen(target) !== null,
 		rememberUserChosenPath: vi.fn(),
+		// tool-path-policy.ts: no registered project to keep a tool path out of
+		knownProjectRoots: () => [],
+		isWithinRoot: () => false,
 	};
 });
 

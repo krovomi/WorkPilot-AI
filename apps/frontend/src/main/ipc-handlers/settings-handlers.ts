@@ -66,6 +66,10 @@ import { testGenerationService } from "../test-generation-service";
 import { findEnvLineBreak, parseEnvFile } from "./utils";
 import { getCurrentOS } from "../platform";
 import { buildCmdConsoleArgs } from "./task/launch-args";
+import {
+	refusedToolPath,
+	TOOL_PATH_REFUSED,
+} from "../security/tool-path-policy";
 
 
 /**
@@ -711,6 +715,15 @@ export function registerSettingsHandlers(
 					update ?? {},
 					currentSettings,
 				);
+				// A tool path the main process would run must be one it can trust.
+				const refusedField = refusedToolPath(settings, currentSettings);
+				if (refusedField) {
+					return {
+						success: false,
+						error: TOOL_PATH_REFUSED,
+						data: { field: refusedField },
+					};
+				}
 				const newSettings = { ...currentSettings, ...settings };
 				if (settings.jev !== undefined)
 					newSettings.jev = parseJevSettings(settings.jev);
