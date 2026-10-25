@@ -26,6 +26,7 @@ import os
 import threading
 import time
 from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -2569,8 +2570,6 @@ def _build_agent_client(
     Raises:
         ValueError: If agent_type is unknown or provider is unsupported
     """
-    from core.agent_client import ClaudeAgentClient, CopilotAgentClient
-
     # Normalize to Path objects in case strings are passed
     if isinstance(project_dir, str):
         project_dir = Path(project_dir)
@@ -2596,7 +2595,7 @@ def _build_agent_client(
     else:
         provider = _normalize_provider_name(provider)
 
-    from offline_policy import local_endpoint, resolve_offline_route
+    from offline_policy import resolve_offline_route
 
     provider, model, offline_base_url = resolve_offline_route(
         project_dir, spec_dir, agent_type, provider, model, chosen=provider_chosen
@@ -2631,469 +2630,504 @@ def _build_agent_client(
         )
     _log_llm_context_switch(spec_dir, provider, model, effort)
 
-    if provider == "copilot":
-        # Shared system prompt (single source — core/llm_optimization.py)
+    request = _ClientRequest(
+        project_dir=project_dir,
+        spec_dir=spec_dir,
+        model=model,
+        agent_type=agent_type,
+        max_thinking_tokens=max_thinking_tokens,
+        output_format=output_format,
+        agents=agents,
+        provider=provider,
+        resume=resume,
+        system_prompt=system_prompt,
+        use_subagents=use_subagents,
+        roster=roster,
+        offline_base_url=offline_base_url,
+    )
+    # A provider without an agentic adapter runs on the SDK it degrades to.
+    return _CLIENT_BUILDERS.get(provider, _degraded_client)(request)
+
+
+# -----------------------------------------------------------------------------
+# _build_agent_client, one builder per provider
+# -----------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class _ClientRequest:
+    """One resolved client request: the provider, model and effort are final."""
+
+    project_dir: Path
+    spec_dir: Path
+    model: str
+    agent_type: str
+    max_thinking_tokens: int | None
+    output_format: dict | None
+    agents: dict | None
+    provider: str
+    resume: str | None
+    system_prompt: str | None
+    use_subagents: bool
+    roster: str | None
+    # Set when the offline route chose a local server for this run.
+    offline_base_url: str | None
+
+    def prompt(self, *, tool_use_hint: bool) -> str:
+        """The caller's prompt, or the shared one with the domain addendum.
+
+        Shared system prompt (single source — core/llm_optimization.py). The
+        hint is for clients that run WorkPilot's tool loop; a CLI or the
+        Copilot SDK brings its own.
+        """
+        if self.system_prompt:
+            return self.system_prompt
         from core.llm_optimization import build_base_system_prompt
 
-        if system_prompt:
-            base_prompt = system_prompt
+        if tool_use_hint:
+            base_prompt = build_base_system_prompt(self.project_dir, tool_use_hint=True)
         else:
-            base_prompt = build_base_system_prompt(project_dir)
-            base_prompt = _inject_domain_addendum(base_prompt, agent_type, spec_dir)
+            base_prompt = build_base_system_prompt(self.project_dir)
+        return _inject_domain_addendum(base_prompt, self.agent_type, self.spec_dir)
 
-        # Get allowed tools for the agent type
-        _, project_capabilities = _get_cached_project_data(project_dir)
-        from integrations.linear.updater import is_linear_enabled as _is_linear_enabled
 
-        mcp_config = load_project_mcp_config(project_dir)
-        allowed_tools_list = get_allowed_tools(
-            agent_type,
-            project_capabilities,
-            _is_linear_enabled(),
-            mcp_config,
-            spec_dir=spec_dir,
-        )
+def _thinking_level(max_thinking_tokens: int | None) -> str | None:
+    """The effort level a CLI reads by name; effort is optional on these CLIs."""
+    try:
+        from phase_config import thinking_level_from_budget
 
-        return CopilotAgentClient(
-            model=model,
-            system_prompt=base_prompt,
-            allowed_tools=allowed_tools_list,
-            cwd=str(project_dir.resolve()),
-            agent_type=agent_type,
-            spec_dir=str(spec_dir),
-            thinking_budget=max_thinking_tokens,
-        )
+        return thinking_level_from_budget(max_thinking_tokens)
+    except Exception:  # noqa: BLE001 - effort is optional on this CLI
+        return None
 
-    elif provider == "claude":
-        # Default: use existing create_client() and wrap in ClaudeAgentClient
-        sdk_client = create_client(
-            project_dir=project_dir,
-            spec_dir=spec_dir,
-            model=model,
-            agent_type=agent_type,
-            max_thinking_tokens=max_thinking_tokens,
-            output_format=output_format,
-            agents=agents,
-            resume=resume,
-            use_subagents=use_subagents,
-            roster=roster,
-        )
-        return ClaudeAgentClient(sdk_client)
 
-    elif provider == "windsurf":
-        # Windsurf (Codeium) — dual-mode:
-        # Mode 1: gRPC to local Windsurf IDE language server (tool execution
-        #         via text-based tool calling — consumes Windsurf credits)
-        # Mode 2: REST API with OpenAI-compatible function calling
-        #
-        # sk-ws-* keys are IDE session keys that work through the local
-        # Windsurf language server (gRPC).  WindsurfAgentClient automatically
-        # detects these keys and routes to gRPC mode with text-based tool
-        # execution so that Windsurf credits are consumed.
-        from core.agent_client import WindsurfAgentClient
+def _copilot_client(req: _ClientRequest):
+    from core.agent_client import CopilotAgentClient
 
-        # Shared system prompt (single source — core/llm_optimization.py)
-        from core.llm_optimization import build_base_system_prompt
+    base_prompt = req.prompt(tool_use_hint=False)
 
-        if system_prompt:
-            windsurf_system_prompt = system_prompt
-        else:
-            windsurf_system_prompt = build_base_system_prompt(
-                project_dir, tool_use_hint=True
-            )
-            windsurf_system_prompt = _inject_domain_addendum(
-                windsurf_system_prompt, agent_type, spec_dir
-            )
+    # Get allowed tools for the agent type
+    _, project_capabilities = _get_cached_project_data(req.project_dir)
+    from integrations.linear.updater import is_linear_enabled as _is_linear_enabled
 
+    mcp_config = load_project_mcp_config(req.project_dir)
+    allowed_tools_list = get_allowed_tools(
+        req.agent_type,
+        project_capabilities,
+        _is_linear_enabled(),
+        mcp_config,
+        spec_dir=req.spec_dir,
+    )
+
+    return CopilotAgentClient(
+        model=req.model,
+        system_prompt=base_prompt,
+        allowed_tools=allowed_tools_list,
+        cwd=str(req.project_dir.resolve()),
+        agent_type=req.agent_type,
+        spec_dir=str(req.spec_dir),
+        thinking_budget=req.max_thinking_tokens,
+    )
+
+
+def _claude_client(req: _ClientRequest):
+    """The existing create_client(), wrapped in ClaudeAgentClient."""
+    from core.agent_client import ClaudeAgentClient
+
+    sdk_client = create_client(
+        project_dir=req.project_dir,
+        spec_dir=req.spec_dir,
+        model=req.model,
+        agent_type=req.agent_type,
+        max_thinking_tokens=req.max_thinking_tokens,
+        output_format=req.output_format,
+        agents=req.agents,
+        resume=req.resume,
+        use_subagents=req.use_subagents,
+        roster=req.roster,
+    )
+    return ClaudeAgentClient(sdk_client)
+
+
+def _windsurf_client(req: _ClientRequest):
+    """Windsurf (Codeium) — dual-mode.
+
+    Mode 1: gRPC to local Windsurf IDE language server (tool execution
+            via text-based tool calling — consumes Windsurf credits)
+    Mode 2: REST API with OpenAI-compatible function calling
+
+    sk-ws-* keys are IDE session keys that work through the local
+    Windsurf language server (gRPC).  WindsurfAgentClient automatically
+    detects these keys and routes to gRPC mode with text-based tool
+    execution so that Windsurf credits are consumed.
+    """
+    from core.agent_client import WindsurfAgentClient
+
+    windsurf_system_prompt = req.prompt(tool_use_hint=True)
+
+    logger.info(
+        "[create_agent_client] Using WindsurfAgentClient "
+        "(gRPC for sk-ws-* keys / REST for SSO keys, model=%s, agent_type=%s)",
+        req.model,
+        req.agent_type,
+    )
+    return WindsurfAgentClient(
+        model=req.model,
+        system_prompt=windsurf_system_prompt,
+        max_turns=50,
+        project_dir=str(req.project_dir),
+        agent_type=req.agent_type,
+        spec_dir=str(req.spec_dir),
+    )
+
+
+def _openai_client(req: _ClientRequest):
+    from core.agent_client import OpenAIAgentClient
+    from core.codex_cli_client import (
+        CodexCliAgentClient,
+        openai_model_uses_api_key,
+        openai_uses_codex_cli,
+    )
+    from core.llm_optimization import (
+        openai_prompt_cache_key,
+        openai_reasoning_effort,
+    )
+
+    model = req.model
+    agent_type = req.agent_type
+    openai_system_prompt = req.prompt(tool_use_hint=True)
+
+    # Provider-specific token optimizations layered on the common trunk:
+    # - reasoning_effort: maps the Kanban thinking level to OpenAI's native
+    #   effort control (reasoning models only — omitted otherwise)
+    # - prompt_cache_key: routes consecutive sessions of the same task/phase
+    #   to the same automatic-prompt-cache shard
+    resolved_openai_model = model or "gpt-4o"
+    reasoning_effort = openai_reasoning_effort(
+        resolved_openai_model, req.max_thinking_tokens
+    )
+    prompt_cache_key = openai_prompt_cache_key(req.spec_dir, agent_type)
+
+    if openai_uses_codex_cli() and not openai_model_uses_api_key(resolved_openai_model):
         logger.info(
-            "[create_agent_client] Using WindsurfAgentClient "
-            "(gRPC for sk-ws-* keys / REST for SSO keys, model=%s, agent_type=%s)",
-            model,
-            agent_type,
-        )
-        return WindsurfAgentClient(
-            model=model,
-            system_prompt=windsurf_system_prompt,
-            max_turns=50,
-            project_dir=str(project_dir),
-            agent_type=agent_type,
-            spec_dir=str(spec_dir),
-        )
-
-    elif provider == "openai":
-        from core.agent_client import OpenAIAgentClient
-        from core.codex_cli_client import (
-            CodexCliAgentClient,
-            openai_model_uses_api_key,
-            openai_uses_codex_cli,
-        )
-        from core.llm_optimization import (
-            build_base_system_prompt,
-            openai_prompt_cache_key,
-            openai_reasoning_effort,
-        )
-
-        if system_prompt:
-            openai_system_prompt = system_prompt
-        else:
-            openai_system_prompt = build_base_system_prompt(
-                project_dir, tool_use_hint=True
-            )
-            openai_system_prompt = _inject_domain_addendum(
-                openai_system_prompt, agent_type, spec_dir
-            )
-
-        # Provider-specific token optimizations layered on the common trunk:
-        # - reasoning_effort: maps the Kanban thinking level to OpenAI's native
-        #   effort control (reasoning models only — omitted otherwise)
-        # - prompt_cache_key: routes consecutive sessions of the same task/phase
-        #   to the same automatic-prompt-cache shard
-        resolved_openai_model = model or "gpt-4o"
-        reasoning_effort = openai_reasoning_effort(
-            resolved_openai_model, max_thinking_tokens
-        )
-        prompt_cache_key = openai_prompt_cache_key(spec_dir, agent_type)
-
-        if openai_uses_codex_cli() and not openai_model_uses_api_key(
-            resolved_openai_model
-        ):
-            logger.info(
-                "[create_agent_client] Using CodexCliAgentClient "
-                "(model=%s, agent_type=%s, reasoning_effort=%s)",
-                resolved_openai_model,
-                agent_type,
-                reasoning_effort,
-            )
-            from context_mgmt import codex_auto_compact_limit
-            from context_mgmt.windows import resolve_context_window
-
-            return CodexCliAgentClient(
-                model=model or None,
-                system_prompt=openai_system_prompt,
-                project_dir=str(project_dir),
-                agent_type=agent_type,
-                reasoning_effort=reasoning_effort,
-                thread_id=resume,
-                auto_compact_token_limit=codex_auto_compact_limit(
-                    spec_dir, resolve_context_window(model or "codex"), model
-                ),
-            )
-
-        if openai_uses_codex_cli():
-            logger.info(
-                "[create_agent_client] Routing API-only model through OpenAI API (model=%s)",
-                resolved_openai_model,
-            )
-
-        logger.info(
-            "[create_agent_client] Using OpenAIAgentClient (model=%s, agent_type=%s, "
-            "reasoning_effort=%s)",
-            model,
+            "[create_agent_client] Using CodexCliAgentClient "
+            "(model=%s, agent_type=%s, reasoning_effort=%s)",
+            resolved_openai_model,
             agent_type,
             reasoning_effort,
         )
-        return OpenAIAgentClient(
-            model=resolved_openai_model,
+        from context_mgmt import codex_auto_compact_limit
+        from context_mgmt.windows import resolve_context_window
+
+        return CodexCliAgentClient(
+            model=model or None,
             system_prompt=openai_system_prompt,
-            max_turns=50,
-            project_dir=str(project_dir),
+            project_dir=str(req.project_dir),
             agent_type=agent_type,
             reasoning_effort=reasoning_effort,
-            prompt_cache_key=prompt_cache_key,
-            spec_dir=str(spec_dir),
+            thread_id=req.resume,
+            auto_compact_token_limit=codex_auto_compact_limit(
+                req.spec_dir, resolve_context_window(model or "codex"), model
+            ),
         )
 
-    elif provider == "google":
-        # Google Gemini via its OpenAI-compatible endpoint — reuses the proven
-        # OpenAI tool-use loop (GoogleAgentClient subclasses OpenAIAgentClient).
-        from core.agent_client import GoogleAgentClient
-        from core.llm_optimization import (
-            build_base_system_prompt,
-            gemini_reasoning_effort,
+    if openai_uses_codex_cli():
+        logger.info(
+            "[create_agent_client] Routing API-only model through OpenAI API (model=%s)",
+            resolved_openai_model,
         )
 
-        if system_prompt:
-            gemini_system_prompt = system_prompt
-        else:
-            gemini_system_prompt = build_base_system_prompt(
-                project_dir, tool_use_hint=True
-            )
-            gemini_system_prompt = _inject_domain_addendum(
-                gemini_system_prompt, agent_type, spec_dir
-            )
+    logger.info(
+        "[create_agent_client] Using OpenAIAgentClient (model=%s, agent_type=%s, "
+        "reasoning_effort=%s)",
+        model,
+        agent_type,
+        reasoning_effort,
+    )
+    return OpenAIAgentClient(
+        model=resolved_openai_model,
+        system_prompt=openai_system_prompt,
+        max_turns=50,
+        project_dir=str(req.project_dir),
+        agent_type=agent_type,
+        reasoning_effort=reasoning_effort,
+        prompt_cache_key=prompt_cache_key,
+        spec_dir=str(req.spec_dir),
+    )
 
-        resolved_gemini_model = model or "gemini-2.5-pro"
-        gemini_effort = gemini_reasoning_effort(
-            resolved_gemini_model, max_thinking_tokens
-        )
+
+def _google_client(req: _ClientRequest, *, announce: bool = True):
+    """Google Gemini via its OpenAI-compatible endpoint.
+
+    Reuses the proven OpenAI tool-use loop (GoogleAgentClient subclasses
+    OpenAIAgentClient). `gemini`, the older provider name, builds the same
+    client without the log line.
+    """
+    from core.agent_client import GoogleAgentClient
+    from core.llm_optimization import gemini_reasoning_effort
+
+    gemini_system_prompt = req.prompt(tool_use_hint=True)
+    resolved_gemini_model = req.model or "gemini-2.5-pro"
+    gemini_effort = gemini_reasoning_effort(
+        resolved_gemini_model, req.max_thinking_tokens
+    )
+    if announce:
         logger.info(
             "[create_agent_client] Using GoogleAgentClient "
             "(model=%s, agent_type=%s, reasoning_effort=%s)",
             resolved_gemini_model,
-            agent_type,
+            req.agent_type,
             gemini_effort,
         )
-        return GoogleAgentClient(
-            model=resolved_gemini_model,
-            system_prompt=gemini_system_prompt,
-            max_turns=50,
-            project_dir=str(project_dir),
-            agent_type=agent_type,
-            reasoning_effort=gemini_effort,
-            spec_dir=str(spec_dir),
-        )
+    return GoogleAgentClient(
+        model=resolved_gemini_model,
+        system_prompt=gemini_system_prompt,
+        max_turns=50,
+        project_dir=str(req.project_dir),
+        agent_type=req.agent_type,
+        reasoning_effort=gemini_effort,
+        spec_dir=str(req.spec_dir),
+    )
 
-    elif provider == "gemini":
-        from core.agent_client import GoogleAgentClient
-        from core.llm_optimization import (
-            build_base_system_prompt,
-            gemini_reasoning_effort,
-        )
 
-        gemini_prompt = system_prompt or build_base_system_prompt(
-            project_dir, tool_use_hint=True
-        )
-        if not system_prompt:
-            gemini_prompt = _inject_domain_addendum(gemini_prompt, agent_type, spec_dir)
-        gemini_model = model or "gemini-2.5-pro"
-        return GoogleAgentClient(
-            model=gemini_model,
-            system_prompt=gemini_prompt,
-            max_turns=50,
-            project_dir=str(project_dir),
-            agent_type=agent_type,
-            reasoning_effort=gemini_reasoning_effort(gemini_model, max_thinking_tokens),
-            spec_dir=str(spec_dir),
-        )
+def _gemini_client(req: _ClientRequest):
+    return _google_client(req, announce=False)
 
-    elif provider in ("ollama", "local", "lmstudio", "lm-studio", "llama-cpp"):
-        # Local LLM via any OpenAI-compatible server (Ollama, LM Studio,
-        # llama.cpp, vLLM, LocalAI). Reuses the proven OpenAI tool-use loop
-        # (LocalAgentClient subclasses OpenAIAgentClient) and only swaps the
-        # base URL (from OLLAMA_BASE_URL / saved config) and the key (optional).
-        from core.agent_client import LocalAgentClient
-        from core.llm_optimization import build_base_system_prompt
 
-        if system_prompt:
-            local_system_prompt = system_prompt
-        else:
-            local_system_prompt = build_base_system_prompt(
-                project_dir, tool_use_hint=True
-            )
-            local_system_prompt = _inject_domain_addendum(
-                local_system_prompt, agent_type, spec_dir
-            )
+# The local servers that speak the OpenAI API rather than Ollama's.
+_OPENAI_FORMAT_LOCAL_PROVIDERS = ("lmstudio", "lm-studio", "llama-cpp")
 
-        # Last line of defence on the model id. A local server can only answer
-        # for what is pulled on the machine, so a hosted-only id arriving here
-        # (a task whose saved model is still `claude-…`/`gpt-…` after switching
-        # to Ollama) is a guaranteed 404 followed by a doomed registry pull.
-        # Coerce it to the configured local model and say so where the user
-        # looks — silently running a different model than the one displayed is
-        # worse than the 404 it replaces.
-        from phase_config import coerce_local_model, is_hosted_only_model
 
-        resolved_local_model = model if offline_base_url else coerce_local_model(model)
-        if not offline_base_url and model and is_hosted_only_model(model):
-            logger.warning(
-                "[create_agent_client] %r cannot run on a local server "
-                "(provider=%s) — using %r instead.",
-                model,
-                provider,
-                resolved_local_model,
-            )
-            print(
-                f"⚠️  « {model} » n'est pas un modèle local — "
-                f"exécution avec « {resolved_local_model} » "
-                f"(modèle configuré pour {provider}).",
-                flush=True,
-            )
-        logger.info(
-            "[create_agent_client] Using LocalAgentClient (model=%s, agent_type=%s)",
-            resolved_local_model,
-            agent_type,
-        )
-        return LocalAgentClient(
-            model=resolved_local_model,
-            base_url=offline_base_url
-            or (
-                local_endpoint(provider)
-                if provider in ("lmstudio", "lm-studio", "llama-cpp")
-                else None
-            ),
-            api_format="openai"
-            if provider in ("lmstudio", "lm-studio", "llama-cpp")
-            else "ollama",
-            offline_only=offline_base_url is not None,
-            system_prompt=local_system_prompt,
-            max_turns=50,
-            project_dir=str(project_dir),
-            agent_type=agent_type,
-            spec_dir=str(spec_dir),
-        )
+def _local_client(req: _ClientRequest):
+    """Local LLM via any OpenAI-compatible server.
 
-    elif provider in ("mistral", "deepseek", "grok"):
-        from core.agent_client import CompatibleProviderAgentClient
-        from core.llm_optimization import build_base_system_prompt
-        from provider_models_catalog import _api_key_for
+    Ollama, LM Studio, llama.cpp, vLLM, LocalAI. Reuses the proven OpenAI
+    tool-use loop (LocalAgentClient subclasses OpenAIAgentClient) and only
+    swaps the base URL (from OLLAMA_BASE_URL / saved config) and the key
+    (optional).
+    """
+    from core.agent_client import LocalAgentClient
+    from offline_policy import local_endpoint
 
-        config = {}
-        try:
-            from src.connectors.llm_config import load_provider_config
+    model = req.model
+    provider = req.provider
+    offline_base_url = req.offline_base_url
+    local_system_prompt = req.prompt(tool_use_hint=True)
 
-            config = load_provider_config(provider) or {}
-        except Exception:  # noqa: BLE001 - environment credentials still work
-            pass
-        api_key = _api_key_for(provider)
-        if not api_key:
-            raise ValueError(f"No API key configured for {provider}")
-        base_urls = {
-            "mistral": "https://api.mistral.ai",
-            "deepseek": "https://api.deepseek.com",
-            "grok": "https://api.x.ai",
-        }
-        base_url = (
-            os.environ.get(f"{provider.upper()}_BASE_URL")
-            or config.get("base_url")
-            or base_urls[provider]
-        )
-        provider_prompt = system_prompt or build_base_system_prompt(
-            project_dir, tool_use_hint=True
-        )
-        if not system_prompt:
-            provider_prompt = _inject_domain_addendum(
-                provider_prompt, agent_type, spec_dir
-            )
-        return CompatibleProviderAgentClient(
-            provider=provider,
-            model=model,
-            api_key=api_key,
-            base_url=base_url,
-            system_prompt=provider_prompt,
-            project_dir=str(project_dir),
-            agent_type=agent_type,
-            spec_dir=str(spec_dir),
-        )
+    # Last line of defence on the model id. A local server can only answer
+    # for what is pulled on the machine, so a hosted-only id arriving here
+    # (a task whose saved model is still `claude-…`/`gpt-…` after switching
+    # to Ollama) is a guaranteed 404 followed by a doomed registry pull.
+    # Coerce it to the configured local model and say so where the user
+    # looks — silently running a different model than the one displayed is
+    # worse than the 404 it replaces.
+    from phase_config import coerce_local_model, is_hosted_only_model
 
-    elif provider in ("opencode", "antigravity", "pi"):
-        # Coding-agent CLIs that bring their own tools, sessions and context
-        # management (core/agent_clients/cli_subprocess.py). Each CLI owns its
-        # login; the agent type's declaration picks its rights (OpenCode's
-        # `plan` agent for a read-only type; Antigravity refuses one; pi gets
-        # the declaration as its `--tools` allowlist).
-        from core.llm_optimization import build_base_system_prompt
-
-        cli_prompt = system_prompt or build_base_system_prompt(project_dir)
-        if not system_prompt:
-            cli_prompt = _inject_domain_addendum(cli_prompt, agent_type, spec_dir)
-
-        if provider == "pi":
-            from core.agent_client import PiCliAgentClient
-
-            try:
-                from phase_config import thinking_level_from_budget
-
-                pi_level = thinking_level_from_budget(max_thinking_tokens)
-            except Exception:  # noqa: BLE001 - effort is optional on this CLI
-                pi_level = None
-            client = PiCliAgentClient(
-                model=model or None,
-                system_prompt=cli_prompt,
-                project_dir=str(project_dir),
-                agent_type=agent_type,
-                session_id=resume,
-                thinking_level=pi_level,
-                spec_dir=spec_dir,
-            )
-            trust = client.trust_state()
-            logger.info(
-                "[create_agent_client] Using PiCliAgentClient "
-                "(model=%s, agent_type=%s, tools=%s, resume=%s, project .pi trust=%s)",
-                model,
-                agent_type,
-                client.tools,
-                bool(resume),
-                trust,
-            )
-            if trust in ("undecided", "untrusted"):
-                # pi loads nothing from `<project>/.pi` without a decision, and
-                # says nothing about it in json mode. The skills are already
-                # passed explicitly; the rest is the person's call.
-                _trace_pi_trust(spec_dir, trust)
-            return client
-
-        if provider == "opencode":
-            from core.agent_client import OpenCodeCliAgentClient
-
-            logger.info(
-                "[create_agent_client] Using OpenCodeCliAgentClient "
-                "(model=%s, agent_type=%s, resume=%s)",
-                model,
-                agent_type,
-                bool(resume),
-            )
-            return OpenCodeCliAgentClient(
-                model=model or None,
-                system_prompt=cli_prompt,
-                project_dir=str(project_dir),
-                agent_type=agent_type,
-                session_id=resume,
-            )
-
-        from core.agent_client import AntigravityCliAgentClient
-
-        try:
-            from phase_config import thinking_level_from_budget
-
-            thinking_level = thinking_level_from_budget(max_thinking_tokens)
-        except Exception:  # noqa: BLE001 - effort is optional on this CLI
-            thinking_level = None
-        logger.info(
-            "[create_agent_client] Using AntigravityCliAgentClient "
-            "(model=%s, agent_type=%s, effort=%s, resume=%s)",
-            model,
-            agent_type,
-            thinking_level,
-            bool(resume),
-        )
-        return AntigravityCliAgentClient(
-            model=model or None,
-            system_prompt=cli_prompt,
-            project_dir=str(project_dir),
-            agent_type=agent_type,
-            thinking_level=thinking_level,
-            conversation_id=resume,
-        )
-
-    else:
-        # No agentic adapter for this provider (meta, aws, cursor, custom). The
-        # task still runs — on the Claude SDK — but
-        # that is a real limitation, not a detail, so say so where the user can
-        # see it instead of in a log line nobody reads. capabilities/providers.yaml
-        # is the record of which providers are in this state.
-        #
-        # `create_client` takes no provider argument: the previous comment here
-        # claimed "with provider selection", which was never true.
-        caps = get_provider_capabilities(provider)
-        target = caps.degrades_to or "claude"
-        _log_provider_degradation(spec_dir, provider, target)
+    resolved_local_model = model if offline_base_url else coerce_local_model(model)
+    if not offline_base_url and model and is_hosted_only_model(model):
         logger.warning(
-            "Provider %r has no agentic adapter; running on the %s SDK instead. "
-            "Subagents are disabled for this run.",
+            "[create_agent_client] %r cannot run on a local server "
+            "(provider=%s) — using %r instead.",
+            model,
             provider,
-            target,
+            resolved_local_model,
         )
-        sdk_client = create_client(
-            project_dir=project_dir,
-            spec_dir=spec_dir,
-            model=model,
-            agent_type=agent_type,
-            max_thinking_tokens=max_thinking_tokens,
-            output_format=output_format,
-            # Deliberately dropped: this provider does not run subagents, and
-            # passing a dict nobody reads makes the roster look active when it
-            # is not.
-            agents=None,
-            resume=resume,
+        print(
+            f"⚠️  « {model} » n'est pas un modèle local — "
+            f"exécution avec « {resolved_local_model} » "
+            f"(modèle configuré pour {provider}).",
+            flush=True,
         )
-        return ClaudeAgentClient(sdk_client)
+    logger.info(
+        "[create_agent_client] Using LocalAgentClient (model=%s, agent_type=%s)",
+        resolved_local_model,
+        req.agent_type,
+    )
+    openai_format = provider in _OPENAI_FORMAT_LOCAL_PROVIDERS
+    return LocalAgentClient(
+        model=resolved_local_model,
+        base_url=offline_base_url
+        or (local_endpoint(provider) if openai_format else None),
+        api_format="openai" if openai_format else "ollama",
+        offline_only=offline_base_url is not None,
+        system_prompt=local_system_prompt,
+        max_turns=50,
+        project_dir=str(req.project_dir),
+        agent_type=req.agent_type,
+        spec_dir=str(req.spec_dir),
+    )
+
+
+_COMPATIBLE_PROVIDER_URLS = {
+    "mistral": "https://api.mistral.ai",
+    "deepseek": "https://api.deepseek.com",
+    "grok": "https://api.x.ai",
+}
+
+
+def _compatible_client(req: _ClientRequest):
+    """Mistral, DeepSeek and Grok: OpenAI-compatible APIs with their own key."""
+    from core.agent_client import CompatibleProviderAgentClient
+    from provider_models_catalog import _api_key_for
+
+    provider = req.provider
+    config = {}
+    try:
+        from src.connectors.llm_config import load_provider_config
+
+        config = load_provider_config(provider) or {}
+    except Exception:  # noqa: BLE001 - environment credentials still work
+        pass
+    api_key = _api_key_for(provider)
+    if not api_key:
+        raise ValueError(f"No API key configured for {provider}")
+    base_url = (
+        os.environ.get(f"{provider.upper()}_BASE_URL")
+        or config.get("base_url")
+        or _COMPATIBLE_PROVIDER_URLS[provider]
+    )
+    return CompatibleProviderAgentClient(
+        provider=provider,
+        model=req.model,
+        api_key=api_key,
+        base_url=base_url,
+        system_prompt=req.prompt(tool_use_hint=True),
+        project_dir=str(req.project_dir),
+        agent_type=req.agent_type,
+        spec_dir=str(req.spec_dir),
+    )
+
+
+# Coding-agent CLIs that bring their own tools, sessions and context management
+# (core/agent_clients/cli_subprocess.py). Each CLI owns its login; the agent
+# type's declaration picks its rights (OpenCode's `plan` agent for a read-only
+# type; Antigravity refuses one; pi gets the declaration as its `--tools`
+# allowlist).
+
+
+def _pi_client(req: _ClientRequest):
+    from core.agent_client import PiCliAgentClient
+
+    client = PiCliAgentClient(
+        model=req.model or None,
+        system_prompt=req.prompt(tool_use_hint=False),
+        project_dir=str(req.project_dir),
+        agent_type=req.agent_type,
+        session_id=req.resume,
+        thinking_level=_thinking_level(req.max_thinking_tokens),
+        spec_dir=req.spec_dir,
+    )
+    trust = client.trust_state()
+    logger.info(
+        "[create_agent_client] Using PiCliAgentClient "
+        "(model=%s, agent_type=%s, tools=%s, resume=%s, project .pi trust=%s)",
+        req.model,
+        req.agent_type,
+        client.tools,
+        bool(req.resume),
+        trust,
+    )
+    if trust in ("undecided", "untrusted"):
+        # pi loads nothing from `<project>/.pi` without a decision, and
+        # says nothing about it in json mode. The skills are already
+        # passed explicitly; the rest is the person's call.
+        _trace_pi_trust(req.spec_dir, trust)
+    return client
+
+
+def _opencode_client(req: _ClientRequest):
+    from core.agent_client import OpenCodeCliAgentClient
+
+    cli_prompt = req.prompt(tool_use_hint=False)
+    logger.info(
+        "[create_agent_client] Using OpenCodeCliAgentClient "
+        "(model=%s, agent_type=%s, resume=%s)",
+        req.model,
+        req.agent_type,
+        bool(req.resume),
+    )
+    return OpenCodeCliAgentClient(
+        model=req.model or None,
+        system_prompt=cli_prompt,
+        project_dir=str(req.project_dir),
+        agent_type=req.agent_type,
+        session_id=req.resume,
+    )
+
+
+def _antigravity_client(req: _ClientRequest):
+    from core.agent_client import AntigravityCliAgentClient
+
+    cli_prompt = req.prompt(tool_use_hint=False)
+    thinking_level = _thinking_level(req.max_thinking_tokens)
+    logger.info(
+        "[create_agent_client] Using AntigravityCliAgentClient "
+        "(model=%s, agent_type=%s, effort=%s, resume=%s)",
+        req.model,
+        req.agent_type,
+        thinking_level,
+        bool(req.resume),
+    )
+    return AntigravityCliAgentClient(
+        model=req.model or None,
+        system_prompt=cli_prompt,
+        project_dir=str(req.project_dir),
+        agent_type=req.agent_type,
+        thinking_level=thinking_level,
+        conversation_id=req.resume,
+    )
+
+
+def _degraded_client(req: _ClientRequest):
+    """A provider with no agentic adapter (meta, aws, cursor, custom).
+
+    The task still runs — on the Claude SDK — but that is a real limitation,
+    not a detail, so say so where the user can see it instead of in a log line
+    nobody reads. capabilities/providers.yaml is the record of which providers
+    are in this state.
+
+    `create_client` takes no provider argument: the previous comment here
+    claimed "with provider selection", which was never true.
+    """
+    from core.agent_client import ClaudeAgentClient
+
+    caps = get_provider_capabilities(req.provider)
+    target = caps.degrades_to or "claude"
+    _log_provider_degradation(req.spec_dir, req.provider, target)
+    logger.warning(
+        "Provider %r has no agentic adapter; running on the %s SDK instead. "
+        "Subagents are disabled for this run.",
+        req.provider,
+        target,
+    )
+    sdk_client = create_client(
+        project_dir=req.project_dir,
+        spec_dir=req.spec_dir,
+        model=req.model,
+        agent_type=req.agent_type,
+        max_thinking_tokens=req.max_thinking_tokens,
+        output_format=req.output_format,
+        # Deliberately dropped: this provider does not run subagents, and
+        # passing a dict nobody reads makes the roster look active when it
+        # is not.
+        agents=None,
+        resume=req.resume,
+    )
+    return ClaudeAgentClient(sdk_client)
+
+
+_CLIENT_BUILDERS = {
+    "copilot": _copilot_client,
+    "claude": _claude_client,
+    "windsurf": _windsurf_client,
+    "openai": _openai_client,
+    "google": _google_client,
+    "gemini": _gemini_client,
+    **dict.fromkeys(
+        ("ollama", "local", *_OPENAI_FORMAT_LOCAL_PROVIDERS), _local_client
+    ),
+    **dict.fromkeys(_COMPATIBLE_PROVIDER_URLS, _compatible_client),
+    "pi": _pi_client,
+    "opencode": _opencode_client,
+    "antigravity": _antigravity_client,
+}
