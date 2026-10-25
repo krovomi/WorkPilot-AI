@@ -2006,8 +2006,14 @@ Code : `main/security/renderer-path.ts` (résolution) et `main/security/ipc-path
   est retiré.
 - **Reste** (lot M6) : les chemins d'outils saisis dans les réglages (`claudePath`, `pythonPath`,
   `gitPath`) restent acceptés, c'est un choix de l'utilisateur ; les handlers qui déstructurent un
-  objet ne sont couverts que par le contrôle des clés ; aucun handler ne vérifie encore
-  `event.senderFrame`.
+  objet ne sont couverts que par le contrôle des clés.
+- **Suite** (PR « expéditeur IPC ») : aucun handler ne vérifiait `event.senderFrame`, sauf la
+  dictée. `main/security/ipc-sender-policy.ts` (`installIpcSenderPolicy`, posé par `ipc-setup.ts`
+  avant le contrôle des dossiers) n'entend plus que la page de l'app, dans le cadre principal de
+  la fenêtre principale : une autre `webContents`, un sous-cadre, un cadre déjà détruit ou une page
+  qui n'est ni `file://` (app packagée) ni l'origine du serveur de dev reçoit
+  `ipc-sender-refused`, et un message `ipcMain.on` est ignoré. Garde-fou :
+  `main/security/ipc-sender-policy.test.ts`.
 
 ### Lot M7 — Contrats d'architecture (P1)
 
@@ -2502,7 +2508,7 @@ détaillés ici qu'une fois corrigés ([`SECURITY.md`](../SECURITY.md)).
 | M3 | Des features qui ne disent que ce qu'elles font (PR Azure DevOps factice, triage `continuous_ai`, verdict QA .NET, workflows de release jamais déclenchés, Skills Sync, Sentry) | **fait** (F63 à F68) |
 | M4 | Mode hors-ligne strict et mode serveur | **fait** (F69 à F71) |
 | M5 | Secrets et environnement des processus enfants | **fait** (F78 à F84 : journaux et processus enfants, aucun identifiant stocké dans le renderer, environnement construit pour les runners Python des vues et de forge) |
-| M6 | Frontière renderer → main, avec tests de refus | **fait** (F85 à F90 ; reste `senderFrame` et les chemins d'outils des réglages) |
+| M6 | Frontière renderer → main, avec tests de refus | **fait** (F85 à F90, expéditeur vérifié sur chaque canal ; restent les chemins d'outils des réglages) |
 | M7 | Contrats d'architecture (`import-linter`, canaux IPC, Sidebar ↔ `product-overview.md`) | **fait** (F91 à F94 ; contrats d'imports en test AST, sans `import-linter`) |
 | M8 | Code mort, `scripts/`, vues sans test | **fait** (F95 à F100 ; vues sans conception ni test marquées « Expérimental » ; `node-pty` attend un essai sous Windows) |
 | M9 | Doc ↔ code, i18n de la palette, jsdom, dépendances | **fait** (F72 à F77) |
