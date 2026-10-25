@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 import { type BrowserWindow, ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { getConfiguredPythonPath } from "../python-env-manager";
+import { pythonRunnerEnv } from "../utils/python-runner-env";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -650,10 +651,11 @@ function getRunnerPath(): string {
 	return path.join(getBackendDir(), "runners", "self_healing_runner.py");
 }
 
-function runSelfHealingCommand(
+async function runSelfHealingCommand(
 	projectPath: string,
 	args: string[],
 ): Promise<string> {
+	const env = await pythonRunnerEnv(getBackendDir());
 	return new Promise((resolve, reject) => {
 		const backendDir = getBackendDir();
 		const pythonPath = getConfiguredPythonPath() || "python3";
@@ -664,13 +666,7 @@ function runSelfHealingCommand(
 				cwd: backendDir,
 				stdio: ["ignore", "pipe", "pipe"],
 				timeout: 120000,
-				env: {
-					...process.env,
-					PYTHONPATH: backendDir,
-					PYTHONUNBUFFERED: "1",
-					PYTHONIOENCODING: "utf-8",
-					PYTHONUTF8: "1",
-				},
+				env,
 			},
 		);
 
@@ -705,12 +701,13 @@ function runSelfHealingCommand(
  * printed to stdout. Registers the process in `activeFixProcesses` under `trackKey`
  * so it can be killed by the cancel handler.
  */
-function runSelfHealingCommandStreaming(
+async function runSelfHealingCommandStreaming(
 	projectPath: string,
 	args: string[],
 	onProgress: (data: Record<string, unknown>) => void,
 	trackKey: string,
 ): Promise<string> {
+	const env = await pythonRunnerEnv(getBackendDir());
 	return new Promise((resolve, reject) => {
 		const backendDir = getBackendDir();
 		const pythonPath = getConfiguredPythonPath() || "python3";
@@ -721,13 +718,7 @@ function runSelfHealingCommandStreaming(
 				cwd: backendDir,
 				stdio: ["ignore", "pipe", "pipe"],
 				timeout: 300000,
-				env: {
-					...process.env,
-					PYTHONPATH: backendDir,
-					PYTHONUNBUFFERED: "1",
-					PYTHONIOENCODING: "utf-8",
-					PYTHONUTF8: "1",
-				},
+				env,
 			},
 		);
 

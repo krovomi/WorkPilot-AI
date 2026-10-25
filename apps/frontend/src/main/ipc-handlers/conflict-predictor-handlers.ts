@@ -13,6 +13,7 @@ import { projectStore } from "../project-store";
 import { parsePythonCommand } from "../python-detector";
 import { getConfiguredPythonPath } from "../python-env-manager";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
+import { pythonRunnerEnv } from "../utils/python-runner-env";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -51,6 +52,7 @@ export function setupConflictPredictorHandlers() {
 	ipcMain.handle(
 		IPC_CHANNELS.RUN_CONFLICT_PREDICTION,
 		async (event, { projectId }: ConflictPredictorRequest) => {
+			const env = await pythonRunnerEnv(getBackendPath());
 			return new Promise((resolve, reject) => {
 				killExistingProcess();
 
@@ -77,10 +79,7 @@ export function setupConflictPredictorHandlers() {
 					[...pythonBaseArgs, runnerPath, "--project-path", project.path],
 					{
 						cwd: backendPath,
-						env: {
-							...process.env,
-							PYTHONPATH: backendPath,
-						},
+						env,
 					},
 				);
 

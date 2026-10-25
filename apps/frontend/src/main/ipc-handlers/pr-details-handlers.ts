@@ -12,6 +12,7 @@ import type { IPCResult, PRDetailsResult, Project } from "../../shared/types";
 import { readProjectEnv } from "../project-env-file";
 import { getGitHubConfig, githubFetch } from "./github/utils";
 import { findTaskAndProject } from "./task/shared";
+import { envWithoutCredentials } from "../utils/child-env";
 
 /**
  * Register universal PR details handler
@@ -454,12 +455,11 @@ async function callAzureDevOpsPythonWithExistingConfig(
 	return new Promise((resolve, reject) => {
 		const pythonProcess = spawn("python", args, {
 			cwd: project.path,
-			env: {
-				...process.env,
+			env: envWithoutCredentials(process.env, {
 				PYTHONIOENCODING: "utf-8",
 				AZURE_DEVOPS_PAT: projectEnv.AZURE_DEVOPS_PAT ?? "",
 				AZURE_DEVOPS_ORG_URL: projectEnv.AZURE_DEVOPS_ORG_URL ?? "",
-			},
+			}),
 		});
 
 		setupPythonProcessHandlers(pythonProcess, resolve, reject);

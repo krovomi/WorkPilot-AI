@@ -16,6 +16,7 @@ import { ipcMain } from "electron";
 import type { SwarmConfig } from "../../shared/types/swarm";
 import { appLog } from "../app-logger";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
+import { pythonRunnerEnv } from "../utils/python-runner-env";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -82,6 +83,7 @@ export function registerSwarmHandlers(
 				const sourcePath = getAutoBuildSourcePath();
 				const runnerPath = path.join(sourcePath, "runners", "swarm_runner.py");
 
+				const env = await pythonRunnerEnv(sourcePath);
 				return await new Promise<Record<string, unknown>>((resolve, reject) => {
 					const args = [
 						runnerPath,
@@ -93,7 +95,7 @@ export function registerSwarmHandlers(
 					];
 
 					const proc = spawn(pythonPath, args, {
-						env: { ...process.env, PYTHONPATH: sourcePath },
+						env,
 					});
 
 					let stdout = "";
@@ -175,7 +177,7 @@ export function registerSwarmHandlers(
 				if (config.dryRun) args.push("--dry-run");
 
 				const proc = spawn(pythonPath, args, {
-					env: { ...process.env, PYTHONPATH: sourcePath },
+					env: await pythonRunnerEnv(sourcePath),
 				});
 
 				activeSwarmProcess = proc;

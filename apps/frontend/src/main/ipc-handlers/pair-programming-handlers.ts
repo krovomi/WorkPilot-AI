@@ -17,7 +17,7 @@ import { IPC_CHANNELS } from "../../shared/constants";
 import type { IPCResult } from "../../shared/types";
 import { projectStore } from "../project-store";
 import { getConfiguredPythonPath } from "../python-env-manager";
-import { credentialManager } from "../services/credential-manager";
+import { pythonRunnerEnv } from "../utils/python-runner-env";
 import { safeSendToRenderer } from "./utils";
 
 // ESM-compatible __dirname
@@ -175,22 +175,9 @@ export function registerPairProgrammingHandlers(
 
 			const backendDir = getBackendDir();
 
-			// Get provider credentials (SELECTED_LLM_PROVIDER, API keys, etc.)
-			// so the Python runner uses the user-selected provider instead of defaulting to Claude
-			const providerEnv = credentialManager.getEnvironmentVariables();
-			const nonClaudeProvider =
-				providerEnv.SELECTED_LLM_PROVIDER &&
-				!["claude", "anthropic"].includes(providerEnv.SELECTED_LLM_PROVIDER) &&
-				providerEnv.SELECTED_LLM_PROVIDER !== "copilot";
-			const claudeAuthClearVars: Record<string, string | undefined> =
-				nonClaudeProvider
-					? {
-							CLAUDE_CODE_OAUTH_TOKEN: undefined,
-							CLAUDE_CONFIG_DIR: undefined,
-							ANTHROPIC_API_KEY: undefined,
-							ANTHROPIC_AUTH_TOKEN: undefined,
-						}
-					: {};
+			// The user-selected provider and its key, not whatever the main
+			// process env holds (utils/python-runner-env.ts).
+			const env = await pythonRunnerEnv(backendDir);
 
 			const proc = spawn(
 				pythonPath,
@@ -213,15 +200,7 @@ export function registerPairProgrammingHandlers(
 				],
 				{
 					cwd: backendDir,
-					env: {
-						...process.env,
-						...claudeAuthClearVars,
-						...providerEnv,
-						PYTHONPATH: backendDir,
-						PYTHONUNBUFFERED: "1",
-						PYTHONIOENCODING: "utf-8",
-						PYTHONUTF8: "1",
-					} as NodeJS.ProcessEnv,
+					env,
 				},
 			);
 

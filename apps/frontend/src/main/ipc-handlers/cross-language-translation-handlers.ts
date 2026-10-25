@@ -19,6 +19,7 @@ import { ipcMain } from "electron";
 import { parsePythonCommand } from "../python-detector";
 import { getConfiguredPythonPath } from "../python-env-manager";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
+import { pythonRunnerEnv } from "../utils/python-runner-env";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -54,8 +55,10 @@ async function runRunner(
 	const [cmd, pythonBaseArgs] = parsePythonCommand(pythonPath);
 	const cmdArgs = [...pythonBaseArgs, getRunnerPath(), ...args];
 
+	// The runner's own backend (…/apps/backend/runners/<runner>.py), then the
+	// variables of the project's `.env`, which the translation may need.
+	const env = await pythonRunnerEnv(path.dirname(path.dirname(getRunnerPath())));
 	return new Promise((resolve) => {
-		const env = { ...process.env } as Record<string, string>;
 		const envFilePath = path.join(projectDir, ".env");
 		if (fs.existsSync(envFilePath)) {
 			try {

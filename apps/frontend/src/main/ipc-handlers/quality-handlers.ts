@@ -8,6 +8,7 @@ import path from "node:path";
 import { app, ipcMain } from "electron";
 import { logger } from "../app-logger";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
+import { pythonRunnerEnv } from "../utils/python-runner-env";
 
 interface QualityAnalyzeParams {
 	files: string[];
@@ -85,15 +86,10 @@ async function runQualityAnalysis(
 	backendPath: string,
 	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 ): Promise<any> {
+	const env = await pythonRunnerEnv(backendPath);
 	return new Promise((resolve, reject) => {
 		// Build command to run quality_cli.py
 		const scriptPath = path.join(backendPath, "..", "..", "quality_cli.py");
-
-		// Add backend to PYTHONPATH
-		const env = {
-			...process.env,
-			PYTHONPATH: backendPath,
-		};
 
 		const args = [
 			scriptPath,

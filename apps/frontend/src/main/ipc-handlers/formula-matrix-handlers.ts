@@ -17,6 +17,7 @@ import path from "node:path";
 import { app, ipcMain } from "electron";
 import { pythonEnvManager } from "../python-env-manager.js";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
+import { pythonRunnerEnv } from "../utils/python-runner-env";
 
 interface FormulaMatrixRequest {
 	ticketId: string;
@@ -91,10 +92,11 @@ export function registerFormulaMatrixHandlers(): void {
 				args.push("--complexity", String(req.complexity));
 			}
 
+			const env = await pythonRunnerEnv(backendPath);
 			return await new Promise<FormulaMatrixResponse>((resolve, reject) => {
 				const child = spawn(pythonExe, args, {
 					cwd: backendPath,
-					env: { ...process.env, PYTHONPATH: backendPath },
+					env,
 				} as Parameters<typeof spawn>[2]);
 
 				let stdout = "";
@@ -166,10 +168,11 @@ export function registerFormulaMatrixHandlers(): void {
 				candidates: req.candidates,
 			});
 
+			const env = await pythonRunnerEnv(backendPath);
 			return await new Promise<FormulaRefineResponse>((resolve, reject) => {
 				const child = spawn(pythonExe, [runnerPath], {
 					cwd: backendPath,
-					env: { ...process.env, PYTHONPATH: backendPath },
+					env,
 				} as Parameters<typeof spawn>[2]);
 
 				let stdout = "";
