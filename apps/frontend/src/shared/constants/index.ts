@@ -31,3 +31,5 @@ export * from "./spellcheck";
 export * from "./task";
 // Theme constants
 export * from "./themes";
+// Tool paths typed in the settings
+export * from "./tool-paths";

@@ -36,6 +36,9 @@ vi.mock("../security/renderer-path", async () => {
 		resolveInProject: chosen,
 		isAddableProject: (target: unknown) => chosen(target) !== null,
 		rememberUserChosenPath: vi.fn(),
+		// tool-path-policy.ts: no registered project to keep a tool path out of
+		knownProjectRoots: () => [],
+		isWithinRoot: () => false,
 	};
 });
 
@@ -876,14 +879,16 @@ describe("IPC Handlers", { timeout: 30000 }, () => {
 				mockPythonEnvManager as never,
 			);
 
+			// A bare name: the tool path policy accepts it on every platform,
+			// whereas /usr/bin/python3 does not exist on Windows.
 			await ipcMain.invokeHandler(
 				"settings:save",
 				{},
-				{ pythonPath: "/usr/bin/python3" },
+				{ pythonPath: "python3" },
 			);
 
 			expect(mockAgentManager.configure).toHaveBeenCalledWith(
-				"/usr/bin/python3",
+				"python3",
 				undefined,
 			);
 		});

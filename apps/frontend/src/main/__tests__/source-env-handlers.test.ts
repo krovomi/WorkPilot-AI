@@ -299,4 +299,20 @@ describe("AUTOBUILD_SOURCE_ENV handlers", () => {
 		}
 		expect(existsSync(envFile)).toBe(false);
 	});
+
+	it("refuses a new tool path it would not run, and writes nothing", async () => {
+		const { saveSettings } = await register();
+		const settingsFile = path.join(env.userData, "settings.json");
+		const before = readFileSync(settingsFile, "utf-8");
+
+		const result = await saveSettings({ gitPath: "sh", theme: "dark" });
+
+		expect(result).toEqual({
+			success: false,
+			error: "tool-path-refused",
+			data: { field: "gitPath" },
+		});
+		expect(readFileSync(settingsFile, "utf-8")).toBe(before);
+		expect((await saveSettings({ gitPath: "git" })).success).toBe(true);
+	});
 });

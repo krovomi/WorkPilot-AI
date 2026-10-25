@@ -650,6 +650,7 @@
 		"claudePath": "Claude CLI Path",
 		"claudePathDescription": "Path to Claude CLI executable (leave empty for auto-detection)",
 		"claudePathPlaceholder": "claude (default)",
+		"toolPathRefused": "{{field}}: enter the tool's name (for example git) or the absolute path to its executable. A file inside a project or in the temporary folder is refused.",
 		"detectedPath": "Auto-detected",
 		"detectedVersion": "Version",
 		"detectedSource": "Source",

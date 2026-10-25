@@ -6,7 +6,7 @@ import type {
 } from "@shared/types/profile";
 import { create } from "zustand";
 import { DEFAULT_APP_SETTINGS } from "../../shared/constants";
-import type { AppSettings } from "../../shared/types";
+import type { AppSettings, IPCResult } from "../../shared/types";
 import { toast } from "../hooks/use-toast";
 import { markSettingsLoaded } from "../lib/sentry";
 
@@ -455,23 +455,30 @@ export async function loadSettings(): Promise<void> {
 }
 
 /**
+ * Save settings to main process, and say why when it refuses them
+ */
+export async function saveSettingsResult(
+	updates: Partial<AppSettings>,
+): Promise<IPCResult> {
+	try {
+		const result = await window.electronAPI.saveSettings(updates);
+		if (result.success) useSettingsStore.getState().updateSettings(updates);
+		return result;
+	} catch (error) {
+		return {
+			success: false,
+			error: error instanceof Error ? error.message : String(error),
+		};
+	}
+}
+
+/**
  * Save settings to main process
  */
 export async function saveSettings(
 	updates: Partial<AppSettings>,
 ): Promise<boolean> {
-	const store = useSettingsStore.getState();
-
-	try {
-		const result = await window.electronAPI.saveSettings(updates);
-		if (result.success) {
-			store.updateSettings(updates);
-			return true;
-		}
-		return false;
-	} catch {
-		return false;
-	}
+	return (await saveSettingsResult(updates)).success;
 }
 
 /**
