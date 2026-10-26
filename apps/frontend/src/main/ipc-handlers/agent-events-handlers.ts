@@ -38,6 +38,7 @@ import {
 } from "./task/plan-file-utils";
 import { handleSandboxTaskEvent } from "./task-sandbox-handlers";
 import { parseMcpAppViewEvent } from "./task/mcp-app-handlers";
+import { isBestOfNVariant } from "./task/best-of-n-handlers";
 import { findTaskAndProject } from "./task/shared";
 import {
 	clearTaskPermissions,
@@ -413,6 +414,8 @@ export function registerAgenteventsHandlers(
 		) => {
 			// Nobody is left to answer an ACP agent's questions.
 			clearTaskPermissions(taskId, getMainWindow);
+			// A best-of-N variant is not on the board: its handler reads its exit.
+			if (isBestOfNVariant(taskId)) return;
 
 			// Use projectId from event to scope the lookup (prevents cross-project contamination)
 			const { task: exitTask, project: exitProject } = findTaskAndProject(

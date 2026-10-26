@@ -747,6 +747,9 @@ export class ProjectStore {
 
 			const description = this.extractDescription(specPath, plan, hasJsonError);
 			const loadedMetadata = this.loadTaskMetadata(specPath);
+			// A best-of-N variant is one build of another task, shown on that
+			// task's card, not a task of its own.
+			if (loadedMetadata?.bestOfN) return null;
 			// The pause flag lives in pause_state.json, which exists as soon as
 			// the spec does — the implementation plan does not, which is why
 			// pausing used to be impossible during planning. Surfaced on
@@ -802,6 +805,11 @@ export class ProjectStore {
 				...(plan?.verification &&
 					typeof plan.verification.status === "string" && {
 						verification: plan.verification,
+					}),
+				// The goal gate's last verdict (goal mode), for the card.
+				...(plan?.goal &&
+					typeof plan.goal.status === "string" && {
+						goal: plan.goal,
 					}),
 				...(executionProgress && { executionProgress }),
 				stagedInMainProject,

@@ -33,6 +33,9 @@ export const taskMock = {
 
 	deleteTask: async () => ({ success: true }),
 
+	getTaskGoal: async () => ({ success: true as const, data: { goal: null } }),
+	setTaskGoal: async () => ({ success: true as const, data: { goal: null } }),
+
 	updateTask: async (
 		_taskId: string,
 		updates: { title?: string; description?: string },
@@ -179,6 +182,29 @@ export const taskMock = {
 	}),
 	closeMcpAppView: async () => ({ success: true as const }),
 	onMcpAppView: () => () => {
+		/* noop */
+	},
+	startBestOfN: async () => ({
+		success: false as const,
+		error: "Best-of-N is not available in the browser preview",
+	}),
+	getBestOfNStatus: async () => ({
+		success: true as const,
+		data: { state: null, running: [] },
+	}),
+	rankBestOfN: async () => ({
+		success: true as const,
+		data: { state: null, running: [] },
+	}),
+	adoptBestOfN: async () => ({
+		success: true as const,
+		data: { state: null, running: [] },
+	}),
+	discardBestOfN: async () => ({
+		success: true as const,
+		data: { state: null, running: [] },
+	}),
+	onBestOfNEvent: () => () => {
 		/* noop */
 	},
 };

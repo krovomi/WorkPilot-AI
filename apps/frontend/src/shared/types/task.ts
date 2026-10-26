@@ -12,6 +12,7 @@ import type {
 	PhaseThinkingConfig,
 	ThinkingLevel,
 } from "./settings";
+import type { TaskGoalSummary } from "./goal";
 import type { MobilePlatform } from "./mobile";
 import type { TaskSmartEstimate } from "./smart-estimation";
 
@@ -539,6 +540,11 @@ export interface TaskMetadata {
 	// Git/Worktree configuration
 	baseBranch?: string; // Override base branch for this task's worktree
 	prUrl?: string; // GitHub PR URL if task has been submitted as a PR
+	/**
+	 * Set on a best-of-N variant: the task it is a build of. A variant is kept
+	 * off the board; its card is the parent's (best-of-n-handlers.ts).
+	 */
+	bestOfN?: { parent: string; index: number };
 	visualProof?: VisualProofRun; // Latest automated emulator/screenshots proof for the PR
 	useWorktree?: boolean; // If false, use direct mode (no worktree isolation) - default is true for safety
 	useLocalBranch?: boolean; // If true, use the local branch directly instead of preferring origin/branch (preserves gitignored files)
@@ -599,6 +605,8 @@ export interface Task {
 	 * the plan so the card can show it without a request per card.
 	 */
 	verification?: TaskVerificationSummary;
+	/** The goal gate's last verdict (`apps/backend/goal/`), from the plan. */
+	goal?: TaskGoalSummary;
 	subtasks: Subtask[];
 	qaReport?: QAReport;
 	logs: string[];
@@ -641,6 +649,8 @@ export interface ImplementationPlan {
 	errorMessage?: string;
 	/** Written by the verification loop (`verify/record.py::persist_plan_summary`). */
 	verification?: TaskVerificationSummary;
+	/** Written by the goal gate (`goal/gate.py::record_verdict`). */
+	goal?: TaskGoalSummary;
 	xstateState?: string; // Persisted XState machine state for restoration (e.g., 'planning', 'coding')
 	lastEvent?: {
 		eventId: string;

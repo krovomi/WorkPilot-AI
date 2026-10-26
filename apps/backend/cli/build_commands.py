@@ -289,6 +289,27 @@ def _conclude_without_coder(profile, run, spec_dir: Path, source_spec_dir) -> No
     )
 
 
+def _goal_allows_done(
+    working_dir: Path, spec_dir: Path, source_spec_dir: Path | None
+) -> bool:
+    """Whether the task's goal (goal/) is met, for a build that skipped QA.
+
+    True when the task has no goal. An unreadable goal, or one that cannot be
+    checked, is not met: the user asked for the check.
+    """
+    from goal import evaluate_goal, read_goal, record_verdict
+
+    goal, invalid = read_goal(spec_dir, source_spec_dir)
+    verdict = invalid
+    if goal is not None:
+        verdict = evaluate_goal(goal, working_dir, spec_dir, source_spec_dir)
+    if verdict is None:
+        return True
+    record_verdict(verdict, spec_dir)
+    print(f"\n🎯 Goal {'met' if verdict.met else 'not met'}: {verdict.reason}")
+    return verdict.met
+
+
 def _run_deterministic_gates(profile, working_dir: Path, spec_dir: Path):
     """Execute the no-token checks the resolved profile keeps.
 
@@ -1129,14 +1150,24 @@ def handle_build_command(
             if is_build_complete(spec_dir) and (
                 is_qa_approved(spec_dir) or _no_qa_declared
             ):
+                # Without QA, the goal still decides "done": a skipped review
+                # is not a met goal.
+                goal_met = _goal_allows_done(working_dir, spec_dir, source_spec_dir)
+                qa_approved = qa_approved and goal_met
                 try:
                     from core.task_event import TaskEventEmitter
 
                     task_event_emitter = TaskEventEmitter.from_spec_dir(spec_dir)
-                    task_event_emitter.emit(
-                        "QA_PASSED",
-                        {"iteration": 0, "testsRun": {}},
-                    )
+                    if goal_met:
+                        task_event_emitter.emit(
+                            "QA_PASSED",
+                            {"iteration": 0, "testsRun": {}},
+                        )
+                    else:
+                        task_event_emitter.emit(
+                            "QA_MAX_ITERATIONS",
+                            {"iteration": 0, "maxIterations": 0},
+                        )
                 except Exception:
                     pass  # Best-effort
 

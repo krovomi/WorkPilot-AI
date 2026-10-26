@@ -110,6 +110,9 @@ PROTECTED_CONFIG_NAMES: tuple[str, ...] = (
     ".workpilot-allowlist",
     ".workpilot-security.json",
     ".claude_settings.json",
+    # The task's definition of done (`goal/spec.py`): an agent that could
+    # rewrite it would make `true` its goal.
+    ".workpilot-goal.json",
 )
 
 #: Security configuration recognised by its directory *and* its name:

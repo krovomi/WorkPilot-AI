@@ -21,6 +21,15 @@ from core.pause_state import is_paused, read_pause_state
 from core.progress import count_subtasks, is_build_complete
 from core.task_event import TaskEventEmitter
 from foundation.phase_event import ExecutionPhase, emit_phase
+from goal import (
+    GoalSpec,
+    GoalVerdict,
+    budget_exceeded,
+    evaluate_goal,
+    fix_request,
+    read_goal,
+    record_verdict,
+)
 from integrations.linear.updater import (
     LinearTaskState,
     is_linear_enabled,
@@ -43,6 +52,7 @@ from task_logger import (
 )
 
 from .budget import (
+    MAX_QA_ITERATIONS,
     qa_iteration_cap,
     recurring_issue_threshold,
 )
@@ -326,6 +336,11 @@ async def run_qa_validation_loop(
             pass
 
     qa_cap = qa_iteration_cap(spec_dir)
+    # Goal mode (goal/): a command decides "done", not the reviewer, and the
+    # goal may buy its own number of passes.
+    goal, goal_invalid = read_goal(spec_dir, source_spec_dir)
+    if goal is not None and goal.max_rounds is not None:
+        qa_cap = min(goal.max_rounds, MAX_QA_ITERATIONS)
 
     debug_section("qa_loop", "QA Validation Loop")
     debug(
@@ -366,7 +381,12 @@ async def run_qa_validation_loop(
     has_human_feedback = fix_request_file.exists()
 
     # Check if already approved - but if there's human feedback, we need to process it first
-    if is_qa_approved(spec_dir) and not has_human_feedback:
+    if (
+        is_qa_approved(spec_dir)
+        and not has_human_feedback
+        and goal_invalid is None
+        and _goal_still_met(goal, project_dir, spec_dir, source_spec_dir)
+    ):
         debug_success("qa_loop", "Build already approved by QA")
         print("\n✅ Build already approved by QA.")
         task_event_emitter.emit(
@@ -417,9 +437,17 @@ async def run_qa_validation_loop(
         recurring_threshold=recurring_threshold,
     )
     state = _QaState(qa_iteration=qa_iteration)
+    if goal_invalid is not None:
+        return _stop_on_goal(scope, state, goal_invalid)
 
     while state.qa_iteration < max_iterations:
         _raise_if_paused(spec_dir)
+        # The goal's spending cap is read before a pass, never after: a pass
+        # begun past the cap is spent before anything can stop it.
+        if goal is not None and (
+            over := budget_exceeded(goal, spec_dir, source_spec_dir)
+        ):
+            return _stop_on_goal(scope, state, over)
 
         state.qa_iteration += 1
         iteration_start = time_module.time()
@@ -486,12 +514,23 @@ async def run_qa_validation_loop(
             gate = await _architecture_gate(
                 scope, state.qa_iteration, qa_model
             ) or _coverage_gate(spec_dir, state.qa_iteration)
+            if gate is None and goal is not None:
+                goal_gate = _goal_gate(scope, state, goal)
+                if goal_gate is _Next.FAILED:
+                    return False
+                gate = goal_gate
             if gate is None:
                 await _on_approved(scope, state.qa_iteration)
                 return True
             status = "rejected"
 
         elif status == "human_escalation":
+            if goal is not None:
+                # The card says where the goal stands when the person opens it.
+                record_verdict(
+                    evaluate_goal(goal, project_dir, spec_dir, source_spec_dir),
+                    spec_dir,
+                )
             await _on_human_escalation(scope, state.qa_iteration, iteration_duration)
             return True
 
@@ -1090,6 +1129,98 @@ def _coverage_gate(spec_dir: Path, qa_iteration: int) -> tuple[list[dict], str] 
             f"Coverage gate error (non-blocking): {e}",
         )
     return None
+
+
+def _goal_still_met(
+    goal: GoalSpec | None,
+    project_dir: Path,
+    spec_dir: Path,
+    source_spec_dir: Path | None,
+) -> bool:
+    """Whether an earlier approval still stands against the goal.
+
+    A goal added, or code changed, after QA approved: the approval says what
+    a reviewer thought, the command says whether the task is done.
+    """
+    if goal is None:
+        return True
+    verdict = evaluate_goal(goal, project_dir, spec_dir, source_spec_dir)
+    record_verdict(verdict, spec_dir)
+    if not verdict.met:
+        print(f"\n🎯 QA had approved, but the goal is not met: {verdict.reason}")
+    return verdict.met
+
+
+def _reject_signoff_for_goal(spec_dir: Path, issues: list[dict]) -> None:
+    """``qa_signoff.status = rejected``: a later run must not read the
+    reviewer's approval as the task's."""
+    from .criteria import load_implementation_plan, save_implementation_plan
+
+    plan = load_implementation_plan(spec_dir)
+    if not plan:
+        return
+    signoff = plan.get("qa_signoff")
+    signoff = signoff if isinstance(signoff, dict) else {}
+    kept = [
+        issue
+        for issue in signoff.get("issues_found") or []
+        if not (isinstance(issue, dict) and issue.get("type") == "goal")
+    ]
+    signoff.update(
+        status="rejected", ready_for_qa_revalidation=False, issues_found=kept + issues
+    )
+    plan["qa_signoff"] = signoff
+    save_implementation_plan(spec_dir, plan)
+
+
+def _goal_gate(
+    scope: _QaScope, state: _QaState, goal: GoalSpec
+) -> tuple[list[dict], str] | _Next | None:
+    """The goal gate, run once the reviewer and the other gates approve.
+
+    None when the goal is met; the issues and the verdict of a rejection when
+    it is not; ``_Next.FAILED`` when it cannot be checked, which no fix can
+    answer.
+    """
+    verdict = evaluate_goal(
+        goal, scope.project_dir, scope.spec_dir, scope.source_spec_dir
+    )
+    if verdict.met:
+        record_verdict(verdict, scope.spec_dir)
+        print(f"\n🎯 Goal met: {verdict.reason}")
+        return None
+    if not verdict.fixable:
+        _stop_on_goal(scope, state, verdict)
+        return _Next.FAILED
+    print(f"\n🎯 Goal not met: {verdict.reason}")
+    issues = verdict.issues()
+    try:
+        (scope.spec_dir / "QA_FIX_REQUEST.md").write_text(
+            fix_request(verdict, scope.spec_dir), encoding="utf-8"
+        )
+    except OSError as exc:
+        debug_warning("qa_loop", f"Could not write the goal's fix request: {exc}")
+    _reject_signoff_for_goal(scope.spec_dir, issues)
+    record_verdict(verdict, scope.spec_dir)
+    return issues, f"QA pass #{state.qa_iteration} rejected by the goal gate"
+
+
+def _stop_on_goal(scope: _QaScope, state: _QaState, verdict: GoalVerdict) -> bool:
+    """The goal cannot go on (cap reached, unreadable, uncheckable): a person decides."""
+    record_verdict(verdict, scope.spec_dir)
+    print(f"\n🎯 Goal: {verdict.reason}")
+    print("Handing over to human review.")
+    if scope.task_logger:
+        scope.task_logger.log_error(
+            f"Goal: {verdict.reason}; handing over to human review.",
+            LogPhase.VALIDATION,
+        )
+        scope.task_logger.end_phase(
+            LogPhase.VALIDATION, success=False, message=f"Goal: {verdict.reason}"
+        )
+    emit_phase(ExecutionPhase.FAILED, "QA validation incomplete")
+    _emit_max_iterations(scope, state)
+    return False
 
 
 # -----------------------------------------------------------------------------

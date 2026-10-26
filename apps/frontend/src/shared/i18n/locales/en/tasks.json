@@ -2015,5 +2015,98 @@
 		"loading": "Loading the view…",
 		"unavailable": "This view can no longer be shown.",
 		"frameTitle": "MCP App view: {{server}} · {{tool}}"
+	},
+	"goal": {
+		"title": "Goal",
+		"description": "Done when a command says so, not when a reviewer thinks so: QA keeps going while the command fails, within a number of passes and a spending cap.",
+		"set": "Set a goal",
+		"edit": "Edit",
+		"save": "Save",
+		"cancel": "Cancel",
+		"remove": "Remove the goal",
+		"summary": "Expected exit code {{exit}} · passes: {{rounds}} · spending cap: {{cost}}",
+		"effortCap": "from the QA effort",
+		"noCap": "none",
+		"protectedList": "Protected: {{list}}",
+		"spent": "Spent so far: ${{amount}}",
+		"spentFloor": "Spent so far: at least ${{amount}} (some sessions have no known price)",
+		"unreadable": "The goal file cannot be read: {{error}}. QA stops until it is fixed.",
+		"status": {
+			"met": "Goal met",
+			"unmet": "Goal not met",
+			"error": "Cannot be checked",
+			"invalid": "Invalid goal",
+			"budget": "Cap reached"
+		},
+		"fields": {
+			"command": "Command",
+			"commandHint": "One command, run in the task's worktree without a shell. For several steps, call a script of the repository: it is protected automatically.",
+			"expectedExit": "Exit code",
+			"maxRounds": "Max passes",
+			"maxCostUsd": "Cap (USD)",
+			"timeoutSeconds": "Timeout (s)",
+			"protected": "Paths the task may not change",
+			"protectedHint": "One per line, e.g. tests/** — a change there is refused, so the goal is met by the code, not by its checks."
+		}
+	},
+	"bestOfN": {
+		"title": "Best-of-N",
+		"description": "Build this task 2 to 4 times, each in its own worktree with its own provider, model and effort, then pick the build you keep.",
+		"configure": "Set up",
+		"addVariant": "Add a variant",
+		"removeVariant": "Remove this variant",
+		"start_one": "Build {{count}} variant",
+		"start_other": "Build {{count}} variants",
+		"costHint": "Each variant is a full build: the task costs about as many times as there are variants.",
+		"phase": {
+			"running": "Building",
+			"ranked": "Ranked",
+			"adopted": "Adopted",
+			"discarded": "Discarded"
+		},
+		"busy": {
+			"preparing": "Setting up the worktrees…",
+			"ranking": "Measuring the variants…",
+			"adopting": "Adopting…",
+			"discarding": "Removing the variants…"
+		},
+		"variant": {
+			"starting": "Starting",
+			"running": "Running",
+			"ended": "Ended (exit {{code}})",
+			"interrupted": "Interrupted: the app closed while it ran"
+		},
+		"columns": {
+			"rank": "Rank",
+			"engine": "Engine",
+			"build": "Build",
+			"tests": "Tests (QA)",
+			"goal": "Goal",
+			"diff": "Diff",
+			"cost": "Cost"
+		},
+		"qa": {
+			"approved": "Approved",
+			"rejected": "Rejected",
+			"other": "Not signed off"
+		},
+		"diffValue": "{{lines}} lines, {{files}} files",
+		"recommended": "Ranks first alone",
+		"criteriaUsed": "Ranked on: {{list}}",
+		"skipped": {
+			"no_goal": "No goal on this task: the goal criterion is not used.",
+			"goal_unchecked": "The goal could not be checked for every variant: it ranks nobody.",
+			"diff_unknown": "A variant's change set could not be read: the diff ranks nobody.",
+			"cost_partial": "A variant used a provider with no known price: the cost ranks nobody."
+		},
+		"noRecommendation": "No variant ranks first alone with a finished build: compare them yourself.",
+		"adopt": "Keep this one",
+		"rank": "Rank the variants",
+		"rerank": "Measure again",
+		"discard": "Discard all",
+		"confirmTitle": "Keep this build?",
+		"confirmBody": "The build on {{engine}} becomes the task's build. The {{others}} other variants, their worktrees and their branches are deleted. Nothing is merged.",
+		"adoptedLine": "Kept: {{variant}}",
+		"discardedLine": "Every variant was discarded."
 	}
 }

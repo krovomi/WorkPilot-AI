@@ -77,6 +77,7 @@ c'est une discipline, pas un garde-fou.
 | Aucune commande venue du renderer : la release passe ses notes à `gh` sur stdin, aucun canal n'ouvre un terminal sur une commande reçue | `src/main/ipc-handlers/github/release-handlers.ts`, `src/preload/api/modules/shell-api.ts` | `release-handlers.test.ts`, `no-renderer-command.test.ts` |
 | Ouvrir un dossier dans l'IDE ou le terminal : dossier résolu et rattaché à un projet, lanceur lu dans les réglages, AppleScript par argv, `cmd.exe` cité | `src/main/ipc-handlers/task/worktree-ide-terminal.ts`, `src/main/ipc-handlers/task/launch-args.ts` | `worktree-open-launchers.test.ts` |
 | Détails de PR Azure DevOps : script statique, URL validée passée en argv, PAT du `.workpilot/.env` | `src/main/ipc-handlers/pr-details-handlers.ts` | `pr-details-azure-script.test.ts` |
+| Best-of-N : le renderer nomme la tâche et des moteurs, validés ici puis par le runner ; les noms de variante sont dérivés du nom de la tâche et revérifiés avant de devenir un chemin ou une branche ; rien n'est adopté ni supprimé sans confirmation | `src/main/ipc-handlers/task/best-of-n-handlers.ts`, `apps/backend/best_of_n/` ([best-of-n.md](../../docs/architecture/best-of-n.md)) | `best-of-n-handlers.test.ts`, `tests/best_of_n/` |
 
 Le passthrough générique (`invoke` / `send` / `on`) ne transmet que les canaux de ses listes et
 refuse les autres. Historique : une feature migrée vers un module typé retire ses entrées ; un
