@@ -30,6 +30,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from bench import history_samples as bench_history_samples
+
 from .catalog import ModelPricing, PricingCatalog
 from .cost_predictor import (
     DEFAULT_INPUT_TOKENS_PER_SUBTASK,
@@ -147,6 +149,9 @@ class FormulaMatrix:
     # Distinct completed tasks found in the project's real usage history. When
     # > 0 the cost figures are calibrated on measured runs, not pure heuristics.
     history_tasks: int = 0
+    # Builds judged by the repo bench (``bench/``): success samples measured
+    # against a card's own tests, added to the per-model history.
+    bench_samples: int = 0
     formulas: list[Formula] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
@@ -159,6 +164,7 @@ class FormulaMatrix:
             "footprint": asdict(self.footprint),
             "history_samples": self.history_samples,
             "history_tasks": self.history_tasks,
+            "bench_samples": self.bench_samples,
             "formulas": [f.to_dict() for f in self.formulas],
             "warnings": list(self.warnings),
         }
@@ -488,7 +494,13 @@ def compute_formula_matrix(
         avg_in = DEFAULT_INPUT_TOKENS_PER_SUBTASK
     if not avg_out:
         avg_out = DEFAULT_OUTPUT_TOKENS_PER_SUBTASK
-    per_model_hist = _per_model_history(samples)
+    bench_samples: list[dict[str, Any]] = []
+    if project_root is not None:
+        try:
+            bench_samples = bench_history_samples(Path(project_root))
+        except Exception as exc:  # noqa: BLE001
+            warnings.append(f"could not load the bench table: {exc}")
+    per_model_hist = _per_model_history(samples + bench_samples)
     # Real per-task token/cost aggregates — when present, cost figures are
     # calibrated on measured runs rather than synthetic per-subtask volumes.
     history = _aggregate_history_by_task(samples)
@@ -535,6 +547,7 @@ def compute_formula_matrix(
         footprint=footprint,
         history_samples=len(samples),
         history_tasks=history.task_count if history else 0,
+        bench_samples=len(bench_samples),
         formulas=formulas,
         warnings=warnings,
     )

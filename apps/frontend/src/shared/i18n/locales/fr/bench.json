@@ -1,0 +1,93 @@
+{
+	"title": "Banc de rejeu",
+	"description": "Des cartes terminées de ce projet, reconstruites depuis le commit d'avant avec chaque moteur choisi, et jugées par les tests avec lesquels elles ont été livrées. L'agent qui rejoue ne voit jamais ces tests.",
+	"noProject": "Ouvrez un projet pour le passer au banc.",
+	"table": {
+		"title": "Ce qui réussit le travail de ce projet",
+		"empty": "Aucun rejeu jugé pour l'instant.",
+		"engine": "Moteur",
+		"resolved": "Réussis",
+		"ofJudged": "{{resolved}} sur {{judged}}",
+		"f2p": "Tests de carte réussis",
+		"cost": "Coût moyen",
+		"duration": "Durée moyenne",
+		"cards": "Cartes",
+		"readers": "Formula Lab compte ces rejeux dans ses estimations de réussite, et le routeur de modèles écarte un modèle qui a réussi moins de la moitié d'au moins trois cartes."
+	},
+	"new": {
+		"title": "Nouveau passage",
+		"refresh": "Actualiser",
+		"loading": "Recherche des cartes terminées…",
+		"none": "Aucune carte terminée dans ce projet pour l'instant.",
+		"cardsHelp": "Choisissez jusqu'à {{max}} cartes terminées. Une carte peut être rejouée quand le commit sous lequel elle a été livrée est retrouvé et qu'elle a modifié des tests qu'un runner sait lancer.",
+		"found": "{{tests}} fichier(s) de test, trouvé par {{source}}",
+		"commitPlaceholder": "Commit de livraison",
+		"engines": "Moteurs (jusqu'à {{max}})",
+		"addEngine": "Ajouter un moteur",
+		"removeEngine": "Retirer ce moteur",
+		"summary": "{{cards}} carte(s) × {{engines}} moteur(s) = {{builds}} build(s) complet(s)",
+		"start": "Lancer le passage",
+		"oneAtATime": "Un passage est en cours pour ce projet : un seul à la fois.",
+		"costWarning": "Chaque build est une tâche complète (plan, code, QA) facturée par son provider. Le juge lance d'abord trois fois les tests de chaque carte, pour ne garder que ceux qui distinguent le travail de la carte de son absence."
+	},
+	"source": {
+		"merge": "son merge",
+		"pr": "sa pull request",
+		"given": "le commit donné"
+	},
+	"caseStatus": {
+		"candidate": "rejouable",
+		"refused": "non rejouable",
+		"calibrating": "calibrage du juge",
+		"excluded": "écartée",
+		"ready": "jugée par ses tests"
+	},
+	"phase": {
+		"calibrating": "calibrage",
+		"running": "builds en cours",
+		"done": "terminé",
+		"discarded": "abandonné"
+	},
+	"suites": {
+		"pytest": "pytest",
+		"vitest": "Vitest",
+		"jest": "Jest",
+		"go": "go test",
+		"dotnet": "dotnet test",
+		"custom": "votre juge (bench.json)"
+	},
+	"reasons": {
+		"no-card": "La spec de la carte est introuvable.",
+		"commit-unknown": "Ce commit n'est pas dans le dépôt.",
+		"no-target": "Aucun merge de sa branche trouvé : donnez le commit sous lequel elle a été livrée.",
+		"no-parent": "Le commit de livraison n'a pas de parent.",
+		"no-judge": "Elle n'a modifié aucun test qu'un runner sait lancer : rien ne peut la juger.",
+		"never-passes": "Ses tests ne passent pas au commit de livraison.",
+		"already-passes": "Ses tests passent déjà sans elle : ils ne peuvent pas la juger.",
+		"judge-error": "Le juge n'a pas pu tourner.",
+		"copy-failed": "La copie isolée n'a pas pu être créée.",
+		"not-started": "Le build n'a pas démarré : non compté.",
+		"interrupted": "Le build a été interrompu (arrêt, limite de débit ou connexion) : non compté.",
+		"discarded": "Le passage a été abandonné.",
+		"saw-answer": "La copie contenait le commit de la réponse : non compté."
+	},
+	"run": {
+		"title": "Passages",
+		"stale": "arrêté avec l'application",
+		"preparing": "Calibrage du juge et création des copies…",
+		"progress": "{{running}} en build, {{queued}} en attente",
+		"discard": "Abandonner",
+		"card": "Carte",
+		"tests": "{{f2p}} test(s) que la carte fait passer, {{p2p}} qu'elle garde verts",
+		"resolved": "réussi",
+		"notResolved": "échoué",
+		"notCounted": "non compté",
+		"building": "build en cours…",
+		"waiting": "en attente"
+	},
+	"errors": {
+		"candidates": "Impossible de lister les cartes terminées.",
+		"start": "Le passage n'a pas pu démarrer.",
+		"discard": "Le passage n'a pas pu être abandonné."
+	}
+}

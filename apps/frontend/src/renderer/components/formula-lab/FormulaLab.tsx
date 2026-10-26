@@ -4,6 +4,7 @@ import {
 	ChevronUp,
 	Database,
 	Download,
+	FlaskConical,
 	HardDriveDownload,
 	Info,
 	Loader2,
@@ -304,6 +305,14 @@ export function FormulaLab() {
 											})
 										: t("formulaLab:costBasis.heuristic")}
 								</p>
+								{(matrix.bench_samples ?? 0) > 0 && (
+									<p className="mt-1 flex items-center gap-1.5 text-[11px] text-emerald-600 dark:text-emerald-400">
+										<FlaskConical className="h-3 w-3 shrink-0" />
+										{t("formulaLab:costBasis.bench", {
+											count: matrix.bench_samples,
+										})}
+									</p>
+								)}
 								{refineError && (
 									<p className="mt-1.5 text-[11px] text-amber-600 dark:text-amber-400">
 										{t("formulaLab:refine.error")}

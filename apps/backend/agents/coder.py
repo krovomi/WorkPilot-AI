@@ -1893,6 +1893,7 @@ async def run_autonomous_agent(
             suggestion = suggest_routed_model(
                 prompt=f"coder run on spec {spec_dir.name}",
                 task_hint=jev_hint or "coding",
+                project_dir=project_dir,
             )
             if suggestion and suggestion["model"] != model:
                 audit_decision(

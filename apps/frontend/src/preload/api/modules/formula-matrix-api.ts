@@ -66,6 +66,11 @@ export interface FormulaMatrix {
 	 * > 0 the cost figures are calibrated on measured runs, not pure heuristics.
 	 */
 	history_tasks?: number;
+	/**
+	 * Builds the repo bench judged against a card's own tests, counted in the
+	 * success estimates next to the run history.
+	 */
+	bench_samples?: number;
 	formulas: Formula[];
 	warnings: string[];
 }

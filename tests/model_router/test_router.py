@@ -130,3 +130,92 @@ class TestPolicy:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+class TestBenchEvidence:
+    """A model the repo bench saw fail is passed over (bench/results.py)."""
+
+    def test_a_model_failing_three_cards_is_passed_over(self) -> None:
+        router = ModelRouter(
+            available=["anthropic", "openai"],
+            bench_scores={
+                ("anthropic", "claude-haiku-4-5"): {
+                    "resolved": 1,
+                    "judged": 4,
+                    "cases": 3,
+                }
+            },
+        )
+        choice = router.route(prompt="fix typo", hint="trivial")
+        assert choice.model != "claude-haiku-4-5"
+        assert (
+            "passed over on bench evidence: anthropic/claude-haiku-4-5 (1/4 on 3 cards)"
+            in (choice.reason)
+        )
+
+    def test_too_little_evidence_changes_nothing(self) -> None:
+        router = ModelRouter(
+            available=["anthropic"],
+            bench_scores={
+                ("anthropic", "claude-haiku-4-5"): {
+                    "resolved": 0,
+                    "judged": 5,
+                    "cases": 2,
+                }
+            },
+        )
+        choice = router.route(prompt="fix typo", hint="trivial")
+        assert choice.model == "claude-haiku-4-5"
+        assert choice.reason.endswith("bench 0/5 resolved")
+
+    def test_a_good_score_is_cited(self) -> None:
+        router = ModelRouter(
+            available=["anthropic"],
+            bench_scores={
+                ("anthropic", "claude-haiku-4-5"): {
+                    "resolved": 4,
+                    "judged": 5,
+                    "cases": 5,
+                }
+            },
+        )
+        choice = router.route(prompt="fix typo", hint="trivial")
+        assert choice.model == "claude-haiku-4-5"
+        assert "bench 4/5 resolved" in choice.reason
+        assert "passed over" not in choice.reason
+
+    def test_suggestion_reads_the_projects_bench(self, tmp_path, monkeypatch) -> None:
+        import json
+
+        from agents.feature_wiring import suggest_routed_model
+
+        bench = tmp_path / ".workpilot" / "bench"
+        bench.mkdir(parents=True)
+        records = [
+            {
+                "runId": "r",
+                "buildId": f"b{i}",
+                "caseId": f"c{i}",
+                "provider": "anthropic",
+                "model": "claude-haiku-4-5",
+                "resolved": False,
+            }
+            for i in range(3)
+        ]
+        (bench / "results.json").write_text(
+            json.dumps({"records": records}), encoding="utf-8"
+        )
+        with_bench = suggest_routed_model(
+            prompt="fix typo",
+            task_hint="trivial",
+            available_providers=["anthropic", "openai"],
+            project_dir=tmp_path / ".workpilot" / "worktrees" / "tasks" / "001-x",
+        )
+        without = suggest_routed_model(
+            prompt="fix typo",
+            task_hint="trivial",
+            available_providers=["anthropic", "openai"],
+        )
+        assert without["model"] == "claude-haiku-4-5"
+        assert with_bench["model"] != "claude-haiku-4-5"
+        assert "bench" in with_bench["reason"]

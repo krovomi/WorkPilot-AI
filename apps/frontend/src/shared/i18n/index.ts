@@ -50,6 +50,7 @@ import enContext from "./locales/en/context.json";
 import enContextAwareSnippets from "./locales/en/contextAwareSnippets.json";
 import enCostEstimator from "./locales/en/costEstimator.json";
 import enFormulaLab from "./locales/en/formulaLab.json";
+import enBench from "./locales/en/bench.json";
 import enDashboard from "./locales/en/dashboard.json";
 import enDesignToCode from "./locales/en/designToCode.json";
 import enDialogs from "./locales/en/dialogs.json";
@@ -146,6 +147,7 @@ import frContext from "./locales/fr/context.json";
 import frContextAwareSnippets from "./locales/fr/contextAwareSnippets.json";
 import frCostEstimator from "./locales/fr/costEstimator.json";
 import frFormulaLab from "./locales/fr/formulaLab.json";
+import frBench from "./locales/fr/bench.json";
 import frDashboard from "./locales/fr/dashboard.json";
 import frDesignToCode from "./locales/fr/designToCode.json";
 import frDialogs from "./locales/fr/dialogs.json";
@@ -267,6 +269,7 @@ export const resources = {
 		ideation: enIdeation,
 		costEstimator: enCostEstimator,
 		formulaLab: enFormulaLab,
+		bench: enBench,
 		dashboard: enDashboard,
 		naturalLanguageGit: enNaturalLanguageGit,
 		navigation: enNavigation,
@@ -363,6 +366,7 @@ export const resources = {
 		ideation: frIdeation,
 		costEstimator: frCostEstimator,
 		formulaLab: frFormulaLab,
+		bench: frBench,
 		dashboard: frDashboard,
 		naturalLanguageGit: frNaturalLanguageGit,
 		navigation: frNavigation,
@@ -466,6 +470,7 @@ i18n.use(initReactI18next).init({
 		"ideation",
 		"costEstimator",
 		"formulaLab",
+		"bench",
 		"dashboard",
 		"naturalLanguageGit",
 		"navigation",

@@ -10,6 +10,7 @@ import { setupAutomationsListeners } from "./automations-store";
 import {
 	setupArchitectureVisualizerListeners,
 } from "./architecture-visualizer-store";
+import { setupBenchListeners } from "./bench-store";
 import { setupCarbonProfilerListeners } from "./carbon-profiler-store";
 import { setupCodeMigrationListeners } from "./code-migration-store";
 import { setupCodePlaygroundListeners } from "./code-playground-store";
@@ -82,6 +83,7 @@ const SETUPS: ReadonlyArray<readonly [string, ListenerSetup]> = [
 	["ArchitectureVisualizer", setupArchitectureVisualizerListeners],
 	// Cards an automation rule created appear on the board without a reload.
 	["Automations", setupAutomationsListeners],
+	["Bench", setupBenchListeners],
 	["CarbonProfiler", setupCarbonProfilerListeners],
 	["CodeMigration", setupCodeMigrationListeners],
 	["CodePlayground", setupCodePlaygroundListeners],

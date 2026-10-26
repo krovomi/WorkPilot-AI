@@ -85,6 +85,10 @@ export interface TaskExecutionOptions {
 	// planner's, the coder's and QA's platform rules to the ones asked for.
 	// Empty or undefined means every platform the project actually has.
 	mobileTargets?: MobilePlatform[];
+	// The project whose environment (backend .env, project .env, project
+	// settings) the build gets, when it runs in another folder: a repo bench
+	// copy is outside the project and has no settings of its own.
+	envProjectPath?: string;
 }
 
 export interface SpecCreationMetadata {
