@@ -10,6 +10,7 @@ const state = vi.hoisted(() => ({
 	globalProviderEnv: {} as Record<string, string>,
 	pageProviderEnv: {} as Record<string, string>,
 	pages: [] as string[],
+	taskProviderEnv: {} as Record<string, string>,
 }));
 
 vi.mock("../../env-utils", () => ({
@@ -44,6 +45,10 @@ vi.mock("../../agent/env-utils", () => ({
 			: { ANTHROPIC_API_KEY: "", ANTHROPIC_AUTH_TOKEN: "" },
 }));
 
+vi.mock("../../agent/task-provider-env", () => ({
+	buildTaskProviderEnv: () => ({ ...state.taskProviderEnv }),
+}));
+
 import { pythonRunnerEnv } from "../python-runner-env";
 
 const BACKEND = path.join(path.sep, "app", "backend");
@@ -64,6 +69,7 @@ describe("pythonRunnerEnv", () => {
 		state.globalProviderEnv = {};
 		state.pageProviderEnv = {};
 		state.pages = [];
+		state.taskProviderEnv = {};
 	});
 
 	it("keeps what Python needs to run and none of the main env's credentials", async () => {
@@ -160,5 +166,36 @@ describe("pythonRunnerEnv", () => {
 		expect(env.AZURE_DEVOPS_PAT).toBe("test-pat-0000");
 		expect(env.PYTHONUNBUFFERED).toBe("0");
 		expect("UNSET" in env).toBe(false);
+	});
+
+	it("uses the task's providers, not the global one, for a task's runner", async () => {
+		state.globalProviderEnv = { SELECTED_LLM_PROVIDER: "claude" };
+		state.taskProviderEnv = {
+			SELECTED_LLM_PROVIDER: "openai",
+			OPENAI_API_KEY: "sk-test-2222",
+		};
+		const env = await pythonRunnerEnv(BACKEND, {
+			taskProviders: {
+				providers: ["openai"],
+				startProvider: "openai",
+				usesClaude: false,
+			},
+		});
+		expect(env.SELECTED_LLM_PROVIDER).toBe("openai");
+		expect(env.OPENAI_API_KEY).toBe("sk-test-2222");
+		expect(env.CLAUDE_CODE_OAUTH_TOKEN).toBeUndefined();
+	});
+
+	it("signs a task that runs a phase on Claude in, whatever the global provider", async () => {
+		state.globalProviderEnv = { SELECTED_LLM_PROVIDER: "openai" };
+		state.taskProviderEnv = { SELECTED_LLM_PROVIDER: "claude" };
+		const env = await pythonRunnerEnv(BACKEND, {
+			taskProviders: {
+				providers: ["claude", "openai"],
+				startProvider: "claude",
+				usesClaude: true,
+			},
+		});
+		expect(env.CLAUDE_CODE_OAUTH_TOKEN).toBe("test-oauth-profile-0000");
 	});
 });

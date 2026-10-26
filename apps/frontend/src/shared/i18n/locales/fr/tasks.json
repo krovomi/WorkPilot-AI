@@ -1949,6 +1949,38 @@
 			"saveFailed": "Impossible d'enregistrer les réglages de contexte"
 		}
 	},
+	"prFollowup": {
+		"title": "Suivi de la PR",
+		"description": "Continue de faire avancer la pull request : un check rouge ou un fil de revue non résolu part au QA fixer, le correctif est vérifié puis poussé. Jamais de push forcé, jamais de merge.",
+		"start": "Suivre la PR",
+		"stop": "Arrêter",
+		"running": "Suivi en cours",
+		"pushed": "Correctif poussé : {{sha}}",
+		"failing": "En échec : {{names}}",
+		"baseFailing": "Rouge aussi sur la branche de base : {{names}}",
+		"threads": "{{count}} fil(s) de revue confié(s) au fixer",
+		"violations": "Annulé avant le push : {{list}}",
+		"decision": {
+			"unknown": "Inconnu",
+			"merged": "Mergée",
+			"closed": "Fermée",
+			"pending": "CI en cours",
+			"no_checks": "Pas de CI",
+			"green": "Prête à merger",
+			"base_red": "Base rouge",
+			"stuck": "À voir par une personne",
+			"exhausted": "Tours épuisés",
+			"fix": "Correction en cours"
+		},
+		"action": {
+			"fixed": "Correctif poussé",
+			"no_change": "Le fixer n'a fait aucun commit",
+			"reverted": "Correctif annulé : il affaiblissait un test ou la CI",
+			"push_failed": "Le push a échoué",
+			"fixer_error": "Le fixer a échoué",
+			"diverged": "Le worktree a des commits que la PR n'a pas"
+		}
+	},
 	"goal": {
 		"title": "Objectif",
 		"description": "Fini quand une commande le dit, pas quand le relecteur le pense : la QA continue tant que la commande échoue, dans un nombre de passes et un plafond de dépense.",

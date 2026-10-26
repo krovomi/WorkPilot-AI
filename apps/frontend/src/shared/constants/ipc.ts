@@ -85,6 +85,9 @@ export const IPC_CHANNELS = {
 	TASK_VISUAL_PROOF_RUN: "task:visualProofRun", // Run emulator + screenshot proof (PR optional)
 	TASK_VISUAL_PROOF_SYNC: "task:visualProofSync", // Detect a PR on the branch and publish stored captures to it
 	TASK_VISUAL_PROOF_STATUS: "task:visualProofStatus", // Query whether a visual proof run is in progress for a task
+	TASK_PR_FOLLOWUP_START: "task:prFollowupStart", // Drive the task's PR to merge: fix red checks and review threads
+	TASK_PR_FOLLOWUP_STOP: "task:prFollowupStop",
+	TASK_PR_FOLLOWUP_STATUS: "task:prFollowupStatus", // Running or not, and the last look at the PR
 	TASK_WORKTREE_OPEN_IN_IDE: "task:worktreeOpenInIDE",
 	TASK_WORKTREE_OPEN_IN_TERMINAL: "task:worktreeOpenInTerminal",
 	TASK_WORKTREE_DETECT_TOOLS: "task:worktreeDetectTools", // Detect installed IDEs/terminals
@@ -103,6 +106,7 @@ export const IPC_CHANNELS = {
 	TASK_STATUS_CHANGE: "task:statusChange",
 	TASK_EXECUTION_PROGRESS: "task:executionProgress",
 	TASK_VISUAL_PROOF_RUNNING: "task:visualProofRunning", // Event: visual proof run started/finished (main -> renderer)
+	TASK_PR_FOLLOWUP_EVENT: "task:prFollowupEvent", // Event: a look at the PR, or the follow-through stopped (main -> renderer)
 
 	// Task phase logs (persistent, collapsible logs by phase)
 	TASK_LOGS_GET: "task:logsGet", // Load logs from spec dir

@@ -26,6 +26,7 @@ import { VisualReviewCard } from "./VisualReviewCard";
 import { ExecutionFormulaBanner } from "./ExecutionFormulaBanner";
 import { GoalCard } from "./GoalCard";
 import { HermesLearningCard } from "./HermesLearningCard";
+import { PrFollowupCard } from "./PrFollowupCard";
 import { RtkSavingsCard } from "./RtkSavingsCard";
 import { SpecInterviewBanner } from "./SpecInterviewDialog";
 import { SpecTraceabilityCard } from "./SpecTraceabilityCard";
@@ -58,7 +59,7 @@ export interface TaskOverviewProps {
  *
  * | Section | Répond à | Contient |
  * |---|---|---|
- * | **À traiter** | que dois-je faire, là, maintenant ? | la revue humaine (quand la tâche l'attend) |
+ * | **À traiter** | que dois-je faire, là, maintenant ? | la revue humaine (quand la tâche l'attend), le suivi de la PR (quand elle en a une) |
  * | **La tâche** | de quoi parle-t-on ? | description, critères d'acceptation, métadonnées |
  * | **Plan d'exécution** | que vont faire les agents, et sur quoi ? | objectif (la commande qui dit « fini »), profil d'effort, second avis JEV, traçabilité, pièces jointes et ADR |
  * | **Mémoire & apprentissage** | qu'est-ce que le système retient ? | cerveau partagé, boucle hermes, économies rtk |
@@ -92,8 +93,11 @@ export function TaskOverview({
 	onOpenVerify,
 }: TaskOverviewProps) {
 	const { t } = useTranslation(["tasks"]);
+	// Une PR ouverte est quelque chose à faire avancer : sa carte de suivi
+	// tient la section « À traiter » même quand aucune revue n'attend.
+	const hasPr = Boolean(task.prUrl ?? task.metadata?.prUrl);
 	const [present, setPresent] = useState<Record<OverviewSectionId, boolean>>({
-		review: Boolean(review),
+		review: Boolean(review) || hasPr,
 		task: true,
 		plan: false,
 		learning: false,
@@ -210,9 +214,10 @@ export function TaskOverview({
 						<ExecutionFormulaBanner task={task} />
 					</div>
 
-					{review && (
+					{(review || hasPr) && (
 						<OverviewSection taskId={task.id} id="review" icon={ClipboardCheck} tone="warning" onPresence={report}>
 							{review}
+							<PrFollowupCard task={task} />
 						</OverviewSection>
 					)}
 

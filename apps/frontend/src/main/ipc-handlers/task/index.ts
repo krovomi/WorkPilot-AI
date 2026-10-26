@@ -17,6 +17,7 @@ import { registerTaskCRUDHandlers } from "./crud-handlers";
 import { registerTaskExecutionHandlers } from "./execution-handlers";
 import { registerGoalHandlers } from "./goal-handlers";
 import { registerTaskLogsHandlers } from "./logs-handlers";
+import { registerPrFollowupHandlers } from "./pr-followup-handlers";
 import { registerWorktreeHandlers } from "./worktree-handlers";
 
 /**
@@ -47,6 +48,9 @@ export function registerTaskHandlers(
 
 	// Register archive handlers (archive, unarchive)
 	registerTaskArchiveHandlers();
+
+	// Register PR follow-through handlers (drive the task's PR to merge)
+	registerPrFollowupHandlers(getMainWindow);
 }
 
 // Export shared utilities for use by other modules if needed

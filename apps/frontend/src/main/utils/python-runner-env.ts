@@ -18,12 +18,18 @@
  *    stale `ANTHROPIC_*` variables in OAuth mode; none of them when the
  *    provider is neither Claude nor Copilot, as in `agent-process.ts`, so the
  *    Claude CLI does not sign in to Anthropic with another provider's models;
- * 4. the provider of the calling page, or the global one, and its key;
+ * 4. the provider of the calling page, or the global one, and its key; for a
+ *    runner that works on a Kanban task, the task's own providers instead
+ *    (`taskProviders`, as `agent-process.ts` does for the build);
  * 5. `PYTHONPATH` with the backend first, the UTF-8 switches, then `extra`
  *    (a connector's own credentials, read by the caller from its settings).
  */
 import path from "node:path";
 import type { PageLlmPage } from "../../shared/utils/page-llm";
+import {
+	buildTaskProviderEnv,
+	type TaskProviderPlan,
+} from "../agent/task-provider-env";
 import { getOAuthModeClearVars } from "../agent/env-utils";
 import { getAugmentedEnv } from "../env-utils";
 import { pythonEnvManager } from "../python-env-manager";
@@ -39,6 +45,11 @@ import { envWithoutCredentials } from "./child-env";
 export interface PythonRunnerEnvOptions {
 	/** The page whose provider the runner uses; the global provider otherwise. */
 	page?: PageLlmPage;
+	/**
+	 * The providers of the Kanban task the runner works on. When set, they
+	 * replace the page's or the global provider: a task owns its engine.
+	 */
+	taskProviders?: TaskProviderPlan;
 	/** Variables of this launch, applied last. */
 	extra?: Record<string, string | undefined>;
 }
@@ -89,13 +100,17 @@ export async function pythonRunnerEnv(
 	options: PythonRunnerEnvOptions = {},
 ): Promise<Record<string, string>> {
 	const pythonEnv = pythonEnvManager.getPythonEnv();
-	const providerEnv = options.page
-		? getPageProviderEnv(options.page)
-		: getGlobalProviderEnv();
+	const plan = options.taskProviders;
+	const providerEnv = plan
+		? buildTaskProviderEnv(plan)
+		: options.page
+			? getPageProviderEnv(options.page)
+			: getGlobalProviderEnv();
 	const provider = (providerEnv.SELECTED_LLM_PROVIDER ?? "").toLowerCase();
-	const authEnv = CLAUDE_AUTH_PROVIDERS.has(provider)
-		? await claudeAuthEnv()
-		: {};
+	const needsClaudeAuth = plan
+		? plan.usesClaude || plan.providers.includes("copilot")
+		: CLAUDE_AUTH_PROVIDERS.has(provider);
+	const authEnv = needsClaudeAuth ? await claudeAuthEnv() : {};
 
 	return envWithoutCredentials(
 		{ ...getAugmentedEnv(), ...pythonEnv },

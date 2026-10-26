@@ -27,6 +27,8 @@ export * from "./mcp-marketplace";
 export * from "./multi-repo";
 // Domain-specific types
 export * from "./project";
+// PR follow-through (the card drives its PR to merge)
+export * from "./pr-followup";
 export * from "./roadmap";
 export * from "./settings";
 export * from "./smart-estimation";
