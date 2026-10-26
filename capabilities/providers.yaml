@@ -22,7 +22,9 @@
 #                        The CLIs (Codex, OpenCode, Antigravity) bring their
 #                        own tools and take no roster at run time; the registry
 #                        reaches them as files (`.codex/agents/`, …).
-#   effort      how reasoning depth is expressed, so phase_config can map onto it
+#   effort      how reasoning depth is expressed, so phase_config can map onto it.
+#               What each level becomes per model is core/effort_plan.py, served
+#               to the picker by GET /providers/effort.
 #   degrades_to what actually runs when `adapter` is null. Surfaced in the task
 #               feed, never silent.
 #   context     how a session's context window is managed (context_mgmt/):
@@ -96,7 +98,7 @@ google:
 ollama:
   adapter: LocalAgentClient
   subagents: emulated
-  effort: none
+  effort: think
   degrades_to: null
   context:
     compact: emulated
@@ -104,7 +106,7 @@ ollama:
 local:
   adapter: LocalAgentClient
   subagents: emulated
-  effort: none
+  effort: think
   degrades_to: null
   context:
     compact: emulated
@@ -125,7 +127,7 @@ lmstudio:
 mistral:
   adapter: CompatibleProviderAgentClient
   subagents: emulated
-  effort: none
+  effort: reasoning_effort
   degrades_to: null
   context:
     compact: emulated
@@ -134,7 +136,7 @@ mistral:
 deepseek:
   adapter: CompatibleProviderAgentClient
   subagents: emulated
-  effort: none
+  effort: reasoning_effort
   degrades_to: null
   context:
     compact: emulated
@@ -143,7 +145,7 @@ deepseek:
 grok:
   adapter: CompatibleProviderAgentClient
   subagents: emulated
-  effort: none
+  effort: reasoning_effort
   degrades_to: null
   context:
     compact: emulated

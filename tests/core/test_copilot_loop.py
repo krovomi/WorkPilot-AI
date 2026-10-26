@@ -447,3 +447,23 @@ async def test_a_null_tool_calls_field_ends_the_turn():
     messages = await _collect(client)
 
     assert _shape(messages) == [("assistant", "text", "hi")]
+
+
+@pytest.mark.asyncio
+async def test_a_refused_thinking_budget_is_retried_without_it():
+    client, session = _client(
+        [
+            _Response(400, body='{"error": "thinking_budget is not supported"}'),
+            _choice("Done."),
+        ]
+    )
+    client._thinking_budget = 4096
+    client._resolve_thinking_budget = AsyncMock(return_value=4096)
+
+    messages = await _collect(client)
+
+    assert session.payloads[0]["thinking_budget"] == 4096
+    assert "thinking_budget" not in session.payloads[1]
+    shape = _shape(messages)
+    assert "refused the effort setting (thinking_budget)" in shape[0][2]
+    assert shape[-1] == ("assistant", "text", "Done.")

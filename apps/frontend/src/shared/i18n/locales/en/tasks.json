@@ -466,7 +466,9 @@
 			"ctxInitialLabel": "Initial LLM context",
 			"provider": "Provider",
 			"model": "Model",
-			"effort": "Effort"
+			"effort": "Effort",
+			"effortNotApplied": "not applied by this model",
+			"effortSentAs": "sent as"
 		}
 	},
 	"files": {
@@ -1748,7 +1750,10 @@
 		"notConfiguredWarning": "{{provider}} is not configured on this machine. Add its account in Settings → AI Accounts, or pick another provider.",
 		"chipMixed": "{{provider}} · mixed",
 		"chipAria": "Task engine: {{engine}}",
-		"onlyResumedPhase": "Only for the resumed phase ({{phase}}) — the following phases keep their engine"
+		"onlyResumedPhase": "Only for the resumed phase ({{phase}}) — the following phases keep their engine",
+		"effortNotApplied": "This model has no effort setting WorkPilot can reach: the level you pick has no effect on it.",
+		"effortSentAs": "Sent to the provider as “{{value}}”, the closest level this model takes.",
+		"effortRuntime": "Applied at launch if the model takes it; the task log says what was sent."
 	},
 	"verify": {
 		"title": "Verification loop",

@@ -610,6 +610,12 @@ class LocalModelRuntimeError(RuntimeError):
     """Terminal local generation failure: changing configuration is required."""
 
 
+def canonical_local_family(model: str | None) -> str:
+    """A local model's family: ``gpt-oss:20b`` → ``gpt-oss``."""
+    name = (model or "").strip().lower().rsplit("/", 1)[-1]
+    return name.split(":", 1)[0]
+
+
 class LocalAgentClient(OpenAIAgentClient):
     """Agent client for any OpenAI-compatible **local** LLM server.
 
@@ -637,6 +643,7 @@ class LocalAgentClient(OpenAIAgentClient):
         reasoning_effort: str | None = None,  # accepted for parity; unused locally
         prompt_cache_key: str | None = None,  # accepted for parity; unused locally
         spec_dir: str | None = None,
+        thinking_level: str | None = None,
     ):
         import os as _os
 
@@ -684,6 +691,10 @@ class LocalAgentClient(OpenAIAgentClient):
         # whenever num_ctx changes, so varying it per turn costs a full reload.
         self._resolved_num_ctx: int | None = None
         self._model_max_ctx: Any = _UNSET
+        self._model_show: Any = _UNSET
+        # The phase's Kanban level, sent as Ollama's `think` to a model whose
+        # `/api/show` lists the "thinking" capability (`_ollama_think`).
+        self._thinking_level = thinking_level
         # Set True by receive_response() when the model is offered tools but
         # emits none on the first turn (not even as recoverable inline JSON) —
         # the tell-tale of a model without Ollama tool-calling support. Agentic
@@ -902,19 +913,18 @@ class LocalAgentClient(OpenAIAgentClient):
         root = self._api_base.split("/v1/")[0] or self._api_base
         return root.rstrip("/")
 
-    def _model_max_context(self) -> int | None:
-        """The context length the model itself advertises, via ``/api/show``.
+    def _show_model(self) -> dict[str, Any]:
+        """The server's ``/api/show`` answer for this model, or ``{}``.
 
         Best-effort and cached: no server, an older Ollama, or LM Studio (which
-        has no ``/api/show``) all return ``None`` and the caller falls back to
-        the default cap. Synchronous on purpose — it runs once, before the first
-        request, and a blocking 3-second call to localhost costs less than the
-        machinery to make it async.
+        has no ``/api/show``) all return ``{}``. Synchronous on purpose — it runs
+        once, before the first request, and a blocking 3-second call to
+        localhost costs less than the machinery to make it async.
         """
-        if self._model_max_ctx is not _UNSET:
-            return self._model_max_ctx
+        if self._model_show is not _UNSET:
+            return self._model_show
 
-        self._model_max_ctx = None
+        self._model_show = {}
         try:
             import json as _json
             import urllib.request as _req
@@ -927,17 +937,58 @@ class LocalAgentClient(OpenAIAgentClient):
             )
             with _req.urlopen(request, timeout=3) as response:  # noqa: S310
                 info = _json.loads(response.read().decode("utf-8"))
-            model_info = info.get("model_info") or {}
-            # The key is architecture-prefixed: "llama.context_length",
-            # "qwen2.context_length"… Take whichever one is there rather than
-            # guessing the architecture.
-            for key, value in model_info.items():
-                if key.endswith(".context_length") and isinstance(value, int):
-                    self._model_max_ctx = value
-                    break
+            if isinstance(info, dict):
+                self._model_show = info
         except Exception as exc:  # noqa: BLE001 - advisory only
             logger.debug("[LocalAgentClient] /api/show unavailable: %s", exc)
+        return self._model_show
+
+    def _model_max_context(self) -> int | None:
+        """The context length the model itself advertises, via ``/api/show``.
+
+        ``None`` when the server does not say; the caller falls back to the
+        default cap.
+        """
+        if self._model_max_ctx is not _UNSET:
+            return self._model_max_ctx
+
+        self._model_max_ctx = None
+        model_info = self._show_model().get("model_info") or {}
+        # The key is architecture-prefixed: "llama.context_length",
+        # "qwen2.context_length"… Take whichever one is there rather than
+        # guessing the architecture.
+        for key, value in model_info.items():
+            if key.endswith(".context_length") and isinstance(value, int):
+                self._model_max_ctx = value
+                break
         return self._model_max_ctx
+
+    def _ollama_think(self) -> bool | str | None:
+        """Ollama's ``think`` for this phase's level, or None to send nothing.
+
+        Ollama takes ``think`` on a model whose ``/api/show`` lists the
+        "thinking" capability, and refuses it on any other: the field is only
+        sent when the server says the model thinks. ``false`` for "none" (a
+        thinking model otherwise thinks by default); gpt-oss reads a level
+        (low|medium|high), every other thinking model a boolean.
+        """
+        level = (self._thinking_level or "").strip().lower()
+        if self._api_format != "ollama" or level not in (
+            "none",
+            "low",
+            "medium",
+            "high",
+            "ultrathink",
+        ):
+            return None
+        capabilities = self._show_model().get("capabilities") or []
+        if "thinking" not in capabilities:
+            return None
+        if level == "none":
+            return False
+        if canonical_local_family(self.model) == "gpt-oss":
+            return "high" if level == "ultrathink" else level
+        return True
 
     # Roughly how many characters one token of mixed code + prose costs. Used
     # to express the token-denominated context window in the character budgets
@@ -1368,6 +1419,9 @@ class _OllamaAdapter(LoopAdapter):
         }
         if self.tools:
             payload["tools"] = self.tools
+        think = self.client._ollama_think()
+        if think is not None:
+            payload["think"] = think
         return payload
 
     async def call(self, payload: dict[str, Any], turn: int) -> AsyncIterator[Any]:

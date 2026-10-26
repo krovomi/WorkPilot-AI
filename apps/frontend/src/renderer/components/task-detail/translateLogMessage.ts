@@ -40,6 +40,10 @@ function tokenReplacements(t: TFunction): Array<[RegExp, string]> {
 		[/\bProvider(?=[ ]*[→:])/g, L("provider")],
 		[/\bModel(?=[ ]*[→:])/g, L("model")],
 		[/\bEffort(?=[ ]*[→:])/g, L("effort")],
+		// What the model received, when it is not the level asked for
+		// (`core/effort_plan.effort_trace_label`).
+		[/\(not applied by this model\)/g, `(${L("effortNotApplied")})`],
+		[/\(sent as /g, `(${L("effortSentAs")} `],
 	];
 }
 

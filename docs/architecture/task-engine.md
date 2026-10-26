@@ -60,6 +60,35 @@ phases en cours, ou la personne en choisit un — ce qui ne change que ce que le
 badges affichent. `ProviderContext` porte les deux réponses, `selectedProvider`
 (le défaut) et `usageProvider` (l'objectif des badges).
 
+## Ce que le modèle reçoit pour un effort (`core/effort_plan.py`)
+
+Le trio offre cinq niveaux sur tous les fournisseurs, et chacun a son échelle,
+ou n'en a pas. Changer de fournisseur ou de modèle sur une tâche ne doit donc
+jamais laisser la carte annoncer un effort que le modèle ne reçoit pas.
+`effort_plan(provider, model, level)` est la seule réponse, lue trois fois :
+les clients envoient ce qu'il dit, `_log_llm_context_switch` trace
+« (not applied by this model) » ou « (sent as low) » quand le niveau n'est pas
+ce que le modèle reçoit, et `GET /providers/effort` le sert à
+`EngineTrioPicker` (`useEffortPlan`), qui le dit sous l'effort.
+
+| Fournisseur | Ce qui est envoyé |
+|---|---|
+| Claude (et tout fournisseur sans adaptateur) | `effort` du SDK : « aucun » → `low`, Ultra Think → `xhigh` |
+| OpenAI, Codex | `reasoning_effort` : « aucun » → l'effort le plus bas du modèle (`none` dès gpt-5.1, `minimal` sur gpt-5, `low` sur o-series et Codex, `medium` sur les `-pro`), Ultra Think → `xhigh` dès gpt-5.2 ; rien sur gpt-4o, gpt-4.1, `-chat` |
+| Gemini | `reasoning_effort` sur 2.5+ ; `none` seulement sur 2.5 Flash |
+| Grok | `reasoning_effort` sur grok-4.5+ (`xhigh` dès 4.6), `low`/`high` sur grok-3-mini ; jamais sur `-multi-agent`, où le champ fixe le nombre d'agents |
+| DeepSeek | `deepseek-flash`, V4 : `reasoning_effort` low/high/max, « aucun » → `thinking: disabled` |
+| Mistral | Small 4, Medium 3.5, Large 4 : `reasoning_effort` `none` ou `high` |
+| Copilot | `thinking_budget` borné par `/models`, décidé au lancement |
+| Ollama | `think` si `/api/show` liste `thinking` : `false` pour « aucun », le niveau sur gpt-oss |
+| pi, Antigravity | `--thinking`, `--effort` |
+| Windsurf, OpenCode | rien : le sélecteur dit que le niveau est sans effet |
+
+Un effort reste une optimisation : un modèle qui le refuse (400 qui nomme
+`reasoning_effort`, `thinking`…, `effort_was_rejected`) voit le tour relancé
+une fois sans lui, et le fil de la tâche le dit. Il ne fait jamais échouer une
+phase.
+
 ## Provider × LLM × effort, par page (`shared/utils/page-llm.ts`)
 
 Une page qui lance un agent posait la question deux fois et n'en gardait qu'une
