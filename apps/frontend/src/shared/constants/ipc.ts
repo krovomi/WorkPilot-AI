@@ -59,6 +59,8 @@ export const IPC_CHANNELS = {
 	TASK_CONTEXT_POLICY_UPDATE: "task:contextPolicyUpdate", // Merge `contextPolicy` into task_metadata.json of every spec dir copy (main + worktree) — read live by the backend
 	TASK_SANDBOX_STATUS: "task:sandboxStatus", // Event (main -> renderer): whether a task's commands run in the OS sandbox (SANDBOX_STATUS)
 	TASK_SANDBOX_LIST: "task:sandboxList", // The sandbox statuses main holds, for a reloaded renderer
+	TASK_GOAL_GET: "task:goalGet", // The task's goal (goal mode), read from <spec>/.workpilot-goal.json
+	TASK_GOAL_SET: "task:goalSet", // Write or remove the goal in every spec dir copy; agents cannot write that file
 	TASK_CONTEXT_USAGE: "task:contextUsage", // Event (main -> renderer): CONTEXT_USAGE / CONTEXT_ACTION_APPLIED task events, forwarded untouched
 	TASK_PERMISSION_REQUEST: "task:permissionRequest", // Event (main -> renderer): an ACP agent asks before it acts (PERMISSION_REQUESTED, validated)
 	TASK_PERMISSION_CLEARED: "task:permissionCleared", // Event (main -> renderer): that question is answered, timed out or its process is gone
@@ -95,6 +97,11 @@ export const IPC_CHANNELS = {
 	TASK_MCP_APPS_LIST: "task:mcpAppsList", // The MCP App views a build kept for the task
 	TASK_MCP_APP_OPEN: "task:mcpAppOpen", // Serve one view on its own scheme, for one frame
 	TASK_MCP_APP_CLOSE: "task:mcpAppClose", // The frame closed: stop serving the view
+	TASK_BEST_OF_N_START: "task:bestOfNStart", // Build the task N ways, one worktree and engine each (best-of-N)
+	TASK_BEST_OF_N_STATUS: "task:bestOfNStatus", // <spec>/best_of_n.json and the variants running now
+	TASK_BEST_OF_N_RANK: "task:bestOfNRank", // Measure and rank the variants again
+	TASK_BEST_OF_N_ADOPT: "task:bestOfNAdopt", // Make the chosen variant the task's build, remove the others
+	TASK_BEST_OF_N_DISCARD: "task:bestOfNDiscard", // Stop and remove every variant
 	TASK_WORKTREE_OPEN_IN_IDE: "task:worktreeOpenInIDE",
 	TASK_WORKTREE_OPEN_IN_TERMINAL: "task:worktreeOpenInTerminal",
 	TASK_WORKTREE_DETECT_TOOLS: "task:worktreeDetectTools", // Detect installed IDEs/terminals
@@ -115,6 +122,7 @@ export const IPC_CHANNELS = {
 	TASK_VISUAL_PROOF_RUNNING: "task:visualProofRunning", // Event: visual proof run started/finished (main -> renderer)
 	TASK_PR_FOLLOWUP_EVENT: "task:prFollowupEvent", // Event: a look at the PR, or the follow-through stopped (main -> renderer)
 	TASK_MCP_APP_VIEW: "task:mcpAppView", // Event: a build kept a new MCP App view (main -> renderer)
+	TASK_BEST_OF_N_EVENT: "task:bestOfNEvent", // Event: a variant started or ended, a ranking, an adoption (main -> renderer)
 
 	// Task phase logs (persistent, collapsible logs by phase)
 	TASK_LOGS_GET: "task:logsGet", // Load logs from spec dir

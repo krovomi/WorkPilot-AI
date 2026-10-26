@@ -2010,5 +2010,98 @@
 		"loading": "Chargement de la vue…",
 		"unavailable": "Cette vue ne peut plus être affichée.",
 		"frameTitle": "Vue MCP App : {{server}} · {{tool}}"
+	},
+	"goal": {
+		"title": "Objectif",
+		"description": "Fini quand une commande le dit, pas quand le relecteur le pense : la QA continue tant que la commande échoue, dans un nombre de passes et un plafond de dépense.",
+		"set": "Définir un objectif",
+		"edit": "Modifier",
+		"save": "Enregistrer",
+		"cancel": "Annuler",
+		"remove": "Retirer l'objectif",
+		"summary": "Code de sortie attendu {{exit}} · passes : {{rounds}} · plafond : {{cost}}",
+		"effortCap": "selon l'effort QA",
+		"noCap": "aucun",
+		"protectedList": "Protégés : {{list}}",
+		"spent": "Dépensé jusqu'ici : {{amount}} $",
+		"spentFloor": "Dépensé jusqu'ici : au moins {{amount}} $ (certaines sessions n'ont pas de prix connu)",
+		"unreadable": "Le fichier d'objectif est illisible : {{error}}. La QA s'arrête tant qu'il n'est pas corrigé.",
+		"status": {
+			"met": "Objectif atteint",
+			"unmet": "Objectif non atteint",
+			"error": "Impossible à vérifier",
+			"invalid": "Objectif invalide",
+			"budget": "Plafond atteint"
+		},
+		"fields": {
+			"command": "Commande",
+			"commandHint": "Une seule commande, lancée dans le worktree de la tâche, sans shell. Pour plusieurs étapes, appelle un script du dépôt : il est protégé automatiquement.",
+			"expectedExit": "Code de sortie",
+			"maxRounds": "Passes max",
+			"maxCostUsd": "Plafond (USD)",
+			"timeoutSeconds": "Délai (s)",
+			"protected": "Chemins que la tâche ne peut pas modifier",
+			"protectedHint": "Un par ligne, par ex. tests/** : une modification y est refusée, pour que l'objectif soit atteint par le code et non par ses vérifications."
+		}
+	},
+	"bestOfN": {
+		"title": "Best-of-N",
+		"description": "Construire cette tâche 2 à 4 fois, chacune dans son worktree avec son fournisseur, son modèle et son effort, puis choisir le build à garder.",
+		"configure": "Configurer",
+		"addVariant": "Ajouter une variante",
+		"removeVariant": "Retirer cette variante",
+		"start_one": "Construire {{count}} variante",
+		"start_other": "Construire {{count}} variantes",
+		"costHint": "Chaque variante est un build complet : la tâche coûte environ autant de fois qu'il y a de variantes.",
+		"phase": {
+			"running": "En construction",
+			"ranked": "Classées",
+			"adopted": "Adoptée",
+			"discarded": "Abandonnées"
+		},
+		"busy": {
+			"preparing": "Création des worktrees…",
+			"ranking": "Mesure des variantes…",
+			"adopting": "Adoption…",
+			"discarding": "Suppression des variantes…"
+		},
+		"variant": {
+			"starting": "Démarrage",
+			"running": "En cours",
+			"ended": "Terminée (code {{code}})",
+			"interrupted": "Interrompue : l'application s'est fermée pendant le build"
+		},
+		"columns": {
+			"rank": "Rang",
+			"engine": "Moteur",
+			"build": "Build",
+			"tests": "Tests (QA)",
+			"goal": "Objectif",
+			"diff": "Diff",
+			"cost": "Coût"
+		},
+		"qa": {
+			"approved": "Approuvé",
+			"rejected": "Rejeté",
+			"other": "Non validé"
+		},
+		"diffValue": "{{lines}} lignes, {{files}} fichiers",
+		"recommended": "Seule en tête",
+		"criteriaUsed": "Classées sur : {{list}}",
+		"skipped": {
+			"no_goal": "Pas d'objectif sur cette tâche : le critère objectif n'est pas utilisé.",
+			"goal_unchecked": "L'objectif n'a pas pu être vérifié pour chaque variante : il ne classe personne.",
+			"diff_unknown": "Le diff d'une variante n'a pas pu être lu : le diff ne classe personne.",
+			"cost_partial": "Une variante a utilisé un fournisseur sans prix connu : le coût ne classe personne."
+		},
+		"noRecommendation": "Aucune variante n'est seule en tête avec un build terminé : compare-les toi-même.",
+		"adopt": "Garder celle-ci",
+		"rank": "Classer les variantes",
+		"rerank": "Mesurer à nouveau",
+		"discard": "Tout abandonner",
+		"confirmTitle": "Garder ce build ?",
+		"confirmBody": "Le build sur {{engine}} devient celui de la tâche. Les {{others}} autres variantes, leurs worktrees et leurs branches sont supprimés. Rien n'est fusionné.",
+		"adoptedLine": "Gardée : {{variant}}",
+		"discardedLine": "Toutes les variantes ont été abandonnées."
 	}
 }

@@ -299,6 +299,24 @@ describe("ProjectStore", () => {
 			expect(tasks).toEqual([]);
 		});
 
+		it("keeps best-of-N variants off the board", async () => {
+			const specs = path.join(TEST_PROJECT_PATH, ".workpilot", "specs");
+			for (const id of ["001-login", "001-login-bon1"]) {
+				mkdirSync(path.join(specs, id), { recursive: true });
+				writeFileSync(path.join(specs, id, "spec.md"), "# Login\n");
+			}
+			writeFileSync(
+				path.join(specs, "001-login-bon1", "task_metadata.json"),
+				JSON.stringify({ bestOfN: { parent: "001-login", index: 1 } }),
+			);
+
+			const { ProjectStore } = await import("../project-store");
+			const store = new ProjectStore();
+			const project = store.addProject(TEST_PROJECT_PATH);
+
+			expect(store.getTasks(project.id).map((t) => t.specId)).toEqual(["001-login"]);
+		});
+
 		it("should read tasks from filesystem correctly", async () => {
 			// Create spec directory structure in .workpilot (the data directory)
 			const specsDir = path.join(

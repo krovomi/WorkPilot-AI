@@ -19,6 +19,8 @@ WorkPilot AI is a desktop application (+ CLI) where users describe a goal and AI
 - **Ideation** — Discover improvements, performance issues, and security vulnerabilities
 - **GitHub/GitLab Integration** — Import issues, AI-powered investigation, PR/MR review and creation
 - **PR Follow-Through** — A task's open GitHub PR is driven to merge: red checks and review threads go to the QA fixer, the commit is checked for weakened tests or CI edits, then pushed (never forced, never merged)
+- **Best-of-N** — One task built 2 to 4 ways, one worktree and engine each; ranked on finished build, QA, goal, diff size and cost, and the person keeps one
+- **Goal Mode** — A task carries a command and the exit code that means "done"; QA loops until it holds, within a pass and spending cap, and cannot edit the tests it runs
 - **Azure DevOps/Jira Integration** — Import work items, sync statuses
 - **GenAI Traces** — One OTLP endpoint traces every provider the same way (agent, model calls, tools) with OpenTelemetry GenAI attributes; no prompt or output in the spans, unreported usage marked as estimated
 - **OS Sandbox** — An agent's commands run under bubblewrap (Linux) or Seatbelt (macOS): writes confined to the worktree, credentials hidden, network limited to the provider's hosts and the package registries; the card says at launch when they are not isolated
