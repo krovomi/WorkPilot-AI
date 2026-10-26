@@ -303,6 +303,7 @@ def link_dependencies(project_dir: Path, copy_dir: Path, package: str) -> None:
                 if dest.resolve() == source.resolve():
                     continue
             except OSError:
+                # An unresolvable link is not the project's: set it aside below.
                 pass
             aside = dest.with_name("node_modules.agent")
             if aside.exists() or aside.is_symlink():
@@ -331,6 +332,7 @@ def unlink_dependencies(copy_dir: Path, suites: list[Suite]) -> None:
             elif getattr(os.path, "isjunction", lambda _p: False)(link):
                 os.rmdir(link)
         except OSError:
+            # Nothing left to remove: the link is already gone.
             pass
 
 
@@ -434,6 +436,7 @@ def _end_tree(process: subprocess.Popen) -> None:
         try:
             os.killpg(process.pid, signal.SIGKILL)
         except (ProcessLookupError, PermissionError):
+            # The group is already gone; the leader is killed just below.
             pass
     process.kill()
 

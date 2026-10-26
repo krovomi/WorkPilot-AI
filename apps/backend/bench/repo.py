@@ -162,19 +162,17 @@ def merge_of_branch(project_dir: Path, spec_id: str) -> tuple[str | None, str]:
             "--merges",
             "--extended-regexp",
             f"--grep={pattern}",
-            "--format=%H %ct",
+            # Parents before children: two merges made in the same second are
+            # still ordered, which the commit time alone does not do.
+            "--topo-order",
+            "--reverse",
+            "--format=%H",
             *refs,
             "--",
         ],
         project_dir,
     )
-    found = sorted(
-        {
-            (int(stamp), sha)
-            for sha, _, stamp in (line.partition(" ") for line in out.splitlines())
-            if COMMIT.match(sha) and stamp.isdigit()
-        }
-    )
+    found = list(dict.fromkeys(sha for sha in out.split() if COMMIT.match(sha)))
     if not found:
         return None, ""
     note = (
@@ -182,7 +180,7 @@ def merge_of_branch(project_dir: Path, spec_id: str) -> tuple[str | None, str]:
         if len(found) > 1
         else ""
     )
-    return found[0][1], note
+    return found[0], note
 
 
 def merge_of_pr(project_dir: Path, pr_url: str) -> str | None:
