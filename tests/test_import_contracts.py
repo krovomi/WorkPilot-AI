@@ -45,8 +45,12 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     "mobile": {"foundation"},
     "rtk": {"foundation"},
     # Read by the scheduler and the phase config: its LLM refine takes the
-    # client factory from its runner instead of importing core.
-    "cost_intelligence": {"foundation", "models_registry", "phase_config"},
+    # client factory from its runner instead of importing core. Formula Lab
+    # reads the repo bench's judged builds as success history.
+    "cost_intelligence": {"bench", "foundation", "models_registry", "phase_config"},
+    # The repo bench: git, files and test runners, read by Formula Lab and
+    # the model router. A leaf, or the router's cycle reaches it.
+    "bench": {"foundation"},
     # The security layer reads the project's stack (allowlist per stack), the
     # injection scanner, and rtk to see the command behind the proxy
     # (docs/architecture/rtk.md).

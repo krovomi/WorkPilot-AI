@@ -64,6 +64,7 @@ import { registerCopilotOAuthHandlers } from "./copilot-oauth-handlers";
 import { registerCostHandlers } from "./cost-handlers";
 import { registerCostPredictorHandlers } from "./cost-predictor-handlers";
 import { registerFormulaMatrixHandlers } from "./formula-matrix-handlers";
+import { registerBenchHandlers } from "./bench-handlers";
 import { registerCredentialHandlers } from "./credential-handlers";
 import { registerCrossLanguageTranslationHandlers } from "./cross-language-translation-handlers";
 import { registerDebugHandlers } from "./debug-handlers";
@@ -577,6 +578,9 @@ export function setupIpcHandlers(
 
 	// Formula Matrix handlers (Provider × LLM × Effort comparator — Formula Lab)
 	registerFormulaMatrixHandlers();
+
+	// Repo bench: finished cards replayed per engine, judged by their own tests
+	registerBenchHandlers(agentManager, getMainWindow);
 
 	// Agent Debugger handlers (Feature 1)
 	registerAgentDebuggerHandlers();

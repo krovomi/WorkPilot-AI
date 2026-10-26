@@ -4,6 +4,8 @@
 
 export * from "./agent";
 export * from "./app-update";
+// Repo bench (finished cards replayed and judged by their own tests)
+export * from "./bench";
 export * from "./changelog";
 export * from "./cli";
 // Common types

@@ -25,6 +25,7 @@
 		"measured": "Coûts calculés sur {{count}} exécution(s) réelle(s) de ce projet — tokens mesurés × prix catalogue.",
 		"calibrated": "Coûts calibrés sur {{count}} exécution(s) réelle(s) de ce projet — volumes mesurés × prix catalogue à jour.",
 		"heuristic": "Aucun historique d'exécution — volumes estimés (par défaut) × prix catalogue réels. La précision augmentera après vos premières tâches.",
+		"bench": "Les estimations de réussite comptent aussi {{count}} rejeu(x) jugé(s) par le banc de rejeu sur les tests des cartes.",
 		"measuredTag": "mesuré",
 		"measuredTooltip": "Coût basé sur l'usage réel mesuré de ce modèle dans ce projet"
 	},

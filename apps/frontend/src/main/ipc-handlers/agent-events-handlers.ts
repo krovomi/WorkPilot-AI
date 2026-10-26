@@ -36,6 +36,7 @@ import {
 	persistPlanPhaseSync,
 	persistPlanStatusAndReasonSync,
 } from "./task/plan-file-utils";
+import { isBenchBuild } from "./bench-handlers";
 import { findTaskAndProject } from "./task/shared";
 import { safeSendToRenderer } from "./utils";
 
@@ -405,6 +406,9 @@ export function registerAgenteventsHandlers(
 			processType: ProcessType,
 			projectId?: string,
 		) => {
+			// A repo bench build is not on the board: its handler reads its exit.
+			if (isBenchBuild(taskId)) return;
+
 			// Use projectId from event to scope the lookup (prevents cross-project contamination)
 			const { task: exitTask, project: exitProject } = findTaskAndProject(
 				taskId,
@@ -459,6 +463,7 @@ export function registerAgenteventsHandlers(
 	);
 
 	agentManager.on("task-event", (taskId: string, event, projectId?: string) => {
+		if (isBenchBuild(taskId)) return;
 		// Context-window telemetry (CONTEXT_USAGE / CONTEXT_ACTION_APPLIED) is
 		// forwarded untouched: it describes how full the session is, not a state
 		// the task reached, so it must never reach XState, the plan files or the
@@ -518,6 +523,7 @@ export function registerAgenteventsHandlers(
 	agentManager.on(
 		"execution-progress",
 		(taskId: string, progress: ExecutionProgressData, projectId?: string) => {
+			if (isBenchBuild(taskId)) return;
 			// Use projectId from event to scope the lookup (prevents cross-project contamination)
 			const { task, project } = findTaskAndProject(taskId, projectId);
 			const taskProjectId = project?.id || projectId;

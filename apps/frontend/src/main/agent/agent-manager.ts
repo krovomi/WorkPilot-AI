@@ -495,7 +495,9 @@ export class AgentManager extends EventEmitter {
 		const combinedEnv = applyVerifyLoop(
 			applyMobileTargets(
 				applyTddOverride(
-					this.processManager.getCombinedEnv(projectPath),
+					this.processManager.getCombinedEnv(
+						options.envProjectPath ?? projectPath,
+					),
 					options.tddMode,
 				),
 				options.mobileTargets,

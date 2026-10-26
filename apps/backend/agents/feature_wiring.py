@@ -47,11 +47,25 @@ def _is_truthy(value: str | None) -> bool:
 # Model Router suggestion
 
 
+def _bench_scores(project_dir: Path | None) -> dict:
+    """The repo bench's per-model scores for the project, or none."""
+    if project_dir is None:
+        return {}
+    try:
+        from bench import scores
+
+        return scores(Path(project_dir))
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("bench scores unavailable: %s", exc)
+        return {}
+
+
 def suggest_routed_model(
     *,
     prompt: str = "",
     task_hint: str | None = None,
     available_providers: list[str] | None = None,
+    project_dir: Path | None = None,
 ) -> dict[str, Any] | None:
     """Ask the ModelRouter for a cheaper/cheapest acceptable model.
 
@@ -60,6 +74,9 @@ def suggest_routed_model(
     ``task_class``, ``tier``. Always returns a *suggestion* — the caller is
     responsible for deciding whether to use it (default policy: respect the
     user's UI choice + log divergence to the audit trail).
+
+    With ``project_dir``, the project's repo bench results take part: a model
+    the bench saw fail is passed over (``model_router.router``).
     """
     try:
         from model_router import ModelRouter
@@ -67,7 +84,9 @@ def suggest_routed_model(
         return None
 
     try:
-        router = ModelRouter(available=available_providers)
+        router = ModelRouter(
+            available=available_providers, bench_scores=_bench_scores(project_dir)
+        )
         choice = router.route(prompt=prompt, hint=task_hint)
         return {
             "provider": choice.provider,
@@ -162,6 +181,8 @@ def apply_router_override(
         prompt=prompt_hint or f"{phase} phase",
         task_hint=task_hint or phase,
         available_providers=available_providers,
+        # <project>/.workpilot/specs/<spec>
+        project_dir=Path(spec_dir).parent.parent.parent if spec_dir else None,
     )
     if not suggestion:
         return current_model, None

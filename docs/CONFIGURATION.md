@@ -373,6 +373,17 @@ Both Fernet keys are secrets. Check the backend log after setting one: a key
 that is not a valid Fernet key is reported there, and the data is then written
 unencrypted.
 
+### Repo bench
+
+| Variable | Default | Meaning |
+| --- | ---: | --- |
+| `WORKPILOT_DATA_DIR` | `~/.workpilot` | Where the repo bench keeps its isolated copies and logs (`<dir>/bench/<project key>/<run>/`), outside the project checkout. Also the hooks data directory. |
+| `WORKPILOT_BENCH_JUDGE_TIMEOUT` | 900 | Seconds a judge run (one test suite on one copy) may take before its whole process tree is stopped; the tests it did not report count as failed. Calibration uses the same limit. |
+| `WORKPILOT_BENCH_CONCURRENCY` | 2 | Bench builds running at once, at most 4. Each is a full task billed by its provider. |
+
+A project the judge detection does not cover declares its test command in
+`.workpilot/bench.json` (see [repo-bench.md](architecture/repo-bench.md)).
+
 ---
 
 ## Mock / stub behaviors to be aware of

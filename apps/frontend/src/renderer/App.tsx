@@ -332,6 +332,11 @@ const CoachReportView = lazy(() =>
 		default: m.CoachReportView,
 	})),
 );
+const RepoBenchView = lazy(() =>
+	import("./components/bench/RepoBenchView").then((m) => ({
+		default: m.RepoBenchView,
+	})),
+);
 const BountyBoardView = lazy(() =>
 	import("./components/bounty-board/BountyBoardView").then((m) => ({
 		default: m.BountyBoardView,
@@ -2143,6 +2148,14 @@ export function App() {
 														<CoachReportView
 															projectPath={selectedProject?.path}
 														/>
+													</div>
+												)}
+												{activeView === "repo-bench" && (
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<RepoBenchView projectId={selectedProject?.id} />
 													</div>
 												)}
 												{activeView === "bounty-board" && (

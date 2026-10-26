@@ -21,6 +21,7 @@ WorkPilot AI is a desktop application (+ CLI) where users describe a goal and AI
 - **PR Follow-Through** — A task's open GitHub PR is driven to merge: red checks and review threads go to the QA fixer, the commit is checked for weakened tests or CI edits, then pushed (never forced, never merged)
 - **Azure DevOps/Jira Integration** — Import work items, sync statuses
 - **GenAI Traces** — One OTLP endpoint traces every provider the same way (agent, model calls, tools) with OpenTelemetry GenAI attributes; no prompt or output in the spans, unreported usage marked as estimated
+- **Repo Bench** — Finished cards replayed from the commit before them, once per provider × model × effort, in copies that do not hold the answer, and judged by the tests they landed with (calibrated fail-to-pass and pass-to-pass); the table feeds Formula Lab and the model router
 - **Needs You** — Notifications when a task waits for a person, read from the task's state machine, on the desktop, ntfy or Telegram; a waiting plan can be approved from Telegram with a one-shot, expiring button
 - **Microsoft Teams Notifications** — Webhook-based notifications for task completion and PR creation
 - **Changelog** — Generate release notes from completed tasks
@@ -77,6 +78,7 @@ to keep.
 | `agent-debugger` | Agent Debugger | Agents | — | yes |
 | `agent-replay` | Agent Replay | Agents | — | yes |
 | `arena-mode` | Arena Mode | Agents | [arena.md](arena.md) |  |
+| `repo-bench` | Repo bench | Agents | [repo-bench.md](repo-bench.md) |  |
 | `bounty-board` | Bounty Board | Agents | [bounty-board.md](bounty-board.md) |  |
 | `consensus-arbiter` | Cross-Agent Consensus Arbiter | Agents | — |  |
 | `live-companion` | Live Companion | Agents | — |  |
