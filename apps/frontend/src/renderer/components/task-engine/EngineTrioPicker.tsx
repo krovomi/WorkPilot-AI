@@ -14,6 +14,7 @@ import {
 import type { EngineTrio } from "../../../shared/utils/task-engine";
 import { buildModelSelectOptions } from "../../../shared/utils/task-thinking";
 import type { ConfiguredProvider } from "../../hooks/useConfiguredProviders";
+import { effortNote, useEffortPlan } from "../../hooks/useEffortPlan";
 import { useProviderModelCatalog } from "../../hooks/useProviderModelCatalog";
 import { cn } from "../../lib/utils";
 import { useSettingsStore } from "../../stores/settings-store";
@@ -66,7 +67,7 @@ export function EngineTrioPicker({
 	className,
 	onReadyChange,
 }: EngineTrioPickerProps) {
-	const { t } = useTranslation(["tasks"]);
+	const { t } = useTranslation(["tasks", "settings"]);
 	const codexMode = useSettingsStore(
 		(s) => s.settings.globalOpenAIAuthMode === "codex-cli",
 	);
@@ -118,6 +119,11 @@ export function EngineTrioPicker({
 			onChange({ ...value, model: effectiveModel }, "normalize");
 		}
 	}, [catalogLoading, models, value, effectiveModel, onChange]);
+
+	// What the model will actually receive for this level: a level the
+	// provider cannot take is said here, not discovered in the logs.
+	const effortPlan = useEffortPlan(value.provider, effectiveModel);
+	const note = effortNote(effortPlan, value.effort);
 
 	const ready =
 		!catalogLoading &&
@@ -235,13 +241,36 @@ export function EngineTrioPicker({
 						<SelectContent>
 							{THINKING_LEVELS.map((level) => (
 								<SelectItem key={level.value} value={level.value}>
-									{level.label}
+									{t(`settings:general.thinkingLevels.${level.value}`)}
 								</SelectItem>
 							))}
 						</SelectContent>
 					</Select>
 				</div>
 			</div>
+
+			{note && (
+				<p
+					data-testid={`${idPrefix}-effort-note`}
+					className={cn(
+						"flex items-start gap-1.5 text-xs",
+						note.kind === "notApplied"
+							? "text-amber-600 dark:text-amber-400"
+							: "text-muted-foreground",
+					)}
+				>
+					{note.kind === "notApplied" && (
+						<AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+					)}
+					<span>
+						{note.kind === "sentAs"
+							? t("tasks:engine.effortSentAs", { value: note.value })
+							: note.kind === "runtime"
+								? t("tasks:engine.effortRuntime")
+								: t("tasks:engine.effortNotApplied")}
+					</span>
+				</p>
+			)}
 
 			{!configured && providers.length > 0 && (
 				<p className="flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-400">

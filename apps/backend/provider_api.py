@@ -1258,6 +1258,25 @@ def get_agentic_capabilities():
     }
 
 
+@providers_router.get("/providers/effort")
+def get_effort_plan(provider: str = "", model: str = ""):
+    """What each Kanban effort level becomes on `provider` and `model`.
+
+    Served from `core/effort_plan.py`, the module the clients themselves read,
+    so the picker can never promise an effort the model will not receive.
+
+    Response shape::
+
+        {"provider": str, "model": str,
+         "control": "native" | "none" | "runtime",
+         "levels": {"none": str|None, "low": …, "medium": …, "high": …,
+                    "ultrathink": …}}
+    """
+    from core.effort_plan import describe_effort
+
+    return describe_effort(provider, model)
+
+
 # Per-provider key-validation specs. Keep this in sync with AUTHORIZED_URLS above.
 # auth_style: how the API key is presented to the provider.
 #   "bearer"     → Authorization: Bearer <key>

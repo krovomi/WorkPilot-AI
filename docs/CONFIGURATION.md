@@ -75,6 +75,7 @@ settings through `provider_api.py`:
 | `DELETE /providers/config/{provider}` | delete it |
 | `POST /providers/select` · `GET /providers/selected` | set / read the active provider |
 | `POST /providers/test-key/{provider}` | check an API key against the provider |
+| `GET /providers/effort?provider=…&model=…` | what each effort level becomes on that model (`core/effort_plan.py`): `native`, `none` (no effect) or `runtime` (Copilot, Ollama) |
 
 The `python -m apps.backend.cli provider …` commands this section used to
 list never existed (there is no `cli/__main__.py`), and the `--provider-action`

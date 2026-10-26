@@ -2373,5 +2373,35 @@
 		"enabledHint": "Decided per task from the plan's files; Kanban card to set a task aside.",
 		"persistMaster": "Write the design system into the project",
 		"persistMasterHint": "When the project has none, design-system/<project>/MASTER.md is added to the task's diff so the next UI tasks reuse it."
+	},
+	"needsYou": {
+		"title": "Notify me elsewhere",
+		"description": "When a task waits for you (plan to approve, review, QA hand-over, error), also send it to your phone. Task titles go to the service you pick; error details stay on this computer.",
+		"ntfy": {
+			"title": "ntfy",
+			"description": "Push notifications through an ntfy topic (ntfy.sh or your own server). Notification only.",
+			"topic": "Topic",
+			"generate": "Generate",
+			"topicHint": "On ntfy.sh, anyone who knows the topic reads it: keep the generated one (16 characters at least). Subscribe to it in the ntfy app.",
+			"server": "Server",
+			"token": "Access token (optional)"
+		},
+		"telegram": {
+			"title": "Telegram",
+			"description": "Messages from your own bot (create one with @BotFather).",
+			"botToken": "Bot token",
+			"chatId": "Your user id",
+			"chatIdHint": "Send /start to your bot from a private chat, then use your numeric user id. Messages from anyone else are ignored.",
+			"remoteApproval": "Approve plans from Telegram",
+			"remoteApprovalHint": "A \"plan waiting\" message carries an Approve button. It approves that plan only, once, within 30 minutes, and only while WorkPilot is open. Reviews, merges and anything that cannot be undone still need the app."
+		},
+		"test": "Send a test",
+		"testHint": "Sends from the saved settings: save first.",
+		"result": "ntfy: {{ntfy}} · Telegram: {{telegram}}",
+		"outcome": {
+			"sent": "sent",
+			"failed": "failed",
+			"off": "not configured"
+		}
 	}
 }

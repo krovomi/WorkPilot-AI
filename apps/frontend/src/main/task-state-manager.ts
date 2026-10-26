@@ -28,6 +28,7 @@ import {
 	persistPlanStatusAndReasonSync,
 } from "./ipc-handlers/task/plan-file-utils";
 import { safeSendToRenderer } from "./ipc-handlers/utils";
+import { type NeedsYouEvent, needsYouKind } from "./needs-you/events";
 import { findTaskWorktree } from "./worktree-paths";
 
 type TaskActor = ActorRefFrom<typeof taskMachine>;
@@ -45,10 +46,18 @@ const TERMINAL_EVENTS = new Set<string>([
 	"QA_AGENT_ERROR",
 ]);
 
+export interface NeedsYouListener {
+	/** The task settled where a person has to act. */
+	settled(event: NeedsYouEvent): void;
+	/** The task is no longer waiting for its plan to be approved. */
+	left(taskId: string): void;
+}
+
 export class TaskStateManager {
 	private actors = new Map<string, TaskActor>();
 	private lastSequenceByTask = new Map<string, number>();
 	private lastStateByTask = new Map<string, string>();
+	private needsYouListener: NeedsYouListener | null = null;
 	private taskContextById = new Map<string, TaskContextEntry>();
 	private terminalEventSeen = new Set<string>();
 	private getMainWindow: (() => BrowserWindow | null) | null = null;
@@ -107,6 +116,13 @@ export class TaskStateManager {
 			return;
 		}
 		const actor = this.getOrCreateActor(taskId);
+
+		// A plan waiting for approval is where the planning run ends: with
+		// "review before coding" the spec runner exits 1 there ("spec not
+		// approved"), and that exit used to turn the waiting plan into an error.
+		if (String(actor.getSnapshot().value) === "plan_review") {
+			return;
+		}
 
 		// Safety net: if process exited with code 0 but no terminal event was
 		// seen, and XState is stuck in coding or qa_review, synthesise a
@@ -235,6 +251,11 @@ export class TaskStateManager {
 	 * Check if the task is currently in plan_review state.
 	 * Used by TASK_START to determine correct event to send.
 	 */
+	/** Who hears about the states a person has to act on (`needs-you/`). */
+	setNeedsYouListener(listener: NeedsYouListener | null): void {
+		this.needsYouListener = listener;
+	}
+
 	isInPlanReview(taskId: string): boolean {
 		return this.getCurrentState(taskId) === "plan_review";
 	}
@@ -343,6 +364,7 @@ export class TaskStateManager {
 				errorMessage,
 			);
 			this.emitStatus(taskId, status, reviewReason, project.id, errorMessage);
+			this.announce(taskId, lastState, stateValue, reviewReason, task, project, errorMessage);
 
 			// Also emit execution progress to sync phase display with column
 			// This ensures crisp transitions - phase and column update together
@@ -352,6 +374,33 @@ export class TaskStateManager {
 		actor.start();
 		this.actors.set(taskId, actor);
 		return actor;
+	}
+
+	/**
+	 * Tell the needs-you listener about a state a person has to act on. A
+	 * state restored from disk (no previous state in this run) is not news:
+	 * the app starting must not ring for every card already waiting.
+	 */
+	private announce(
+		taskId: string,
+		lastState: string | undefined,
+		stateValue: string,
+		reviewReason: ReviewReason | undefined,
+		task: Task,
+		project: Project,
+		errorMessage: string | undefined,
+	): void {
+		if (!this.needsYouListener) return;
+		const kind = needsYouKind(stateValue, reviewReason);
+		if (kind !== "plan_review") this.needsYouListener.left(taskId);
+		if (lastState === undefined || kind === null) return;
+		this.needsYouListener.settled({
+			kind,
+			taskId,
+			projectId: project.id,
+			taskTitle: task.title,
+			...(errorMessage && { detail: errorMessage }),
+		});
 	}
 
 	private persistStatus(
