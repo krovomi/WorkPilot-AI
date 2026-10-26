@@ -539,9 +539,12 @@ setting them by hand matters mainly for the CLI and headless runs.
 
 | Variable | Default | Meaning |
 | --- | ---: | --- |
-| `AUTO_CLAUDE_PROVIDER` | — | Default provider when nothing more specific names one: a task's own engine, the provider picked in the UI, `SELECTED_LLM_PROVIDER` and `task_metadata.json` all win over it. Accepted: `claude`, `copilot`, `openai`, `google`, `gemini`, `ollama`, `meta`, `mistral`, `deepseek`, `grok`, `aws`, `windsurf`, `cursor`, `custom`, `opencode`, `antigravity`, `agy`, `pi`. Any other value, `anthropic` included, is ignored. |
+| `AUTO_CLAUDE_PROVIDER` | — | Default provider when nothing more specific names one: a task's own engine, the provider picked in the UI, `SELECTED_LLM_PROVIDER` and `task_metadata.json` all win over it. Accepted: `claude`, `copilot`, `openai`, `google`, `gemini`, `ollama`, `meta`, `mistral`, `deepseek`, `grok`, `aws`, `windsurf`, `cursor`, `custom`, `opencode`, `antigravity`, `agy`, `pi`, `gemini-cli`. Any other value, `anthropic` included, is ignored. |
 | `WORKPILOT_PI_MODE` | `json` | `rpc` keeps one pi process per session (`compact` on demand, `abort` on cancel, the model's context window read from `get_state`); `json` starts one per turn. Any other value is `json`. |
 | `PI_CODING_AGENT_DIR` | `~/.pi/agent` | Where pi keeps `trust.json`, `mcp.json` and `models.json`; read by the pi provider and by `brain connect`. The provider sets `PI_CODING_AGENT_SESSION_DIR` (the task's `<spec>/pi-sessions`) and `PI_SKIP_VERSION_CHECK=1` on the pi subprocess itself. Guide: [`integrations/pi.md`](integrations/pi.md). |
+| `GEMINI_API_KEY` | — | Read only by the `gemini-cli` (ACP) provider, to sign Gemini CLI in with its `gemini-api-key` method when a session asks for a login; otherwise sign in once with `gemini`. Guide: [`architecture/acp.md`](architecture/acp.md). |
+| `WORKPILOT_PERMISSION_TIMEOUT_SECONDS` | 1800 | How long an ACP agent's question waits on the card (or in the terminal) before it is refused. A value that is not a positive number is the default. |
+| `WORKPILOT_PERMISSION_CHANNEL` | — | Set to `stdin` by the app for a task process: an ACP agent's questions go to the card. Not for hand use; without it a terminal run asks in the terminal, and any other run refuses. |
 | `OPENAI_AUTH_MODE` | `api-key` | `codex-cli` runs OpenAI sessions through the logged-in Codex CLI instead of the API key. A model only the API serves still goes to the API when a key is configured. |
 | `GOOGLE_API_KEY` | — | Gemini API key of the `google` and `gemini` providers; their agent sessions read no other source. Secret. |
 | `MISTRAL_BASE_URL` | `https://api.mistral.ai` | Mistral API base, with or without `/v1`. |

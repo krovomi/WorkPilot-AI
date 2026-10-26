@@ -242,6 +242,13 @@ PROVIDER_DEFAULT_MODELS: dict[str, dict[str, str]] = {
         "coding": CLI_DEFAULT_MODEL,
         "qa": CLI_DEFAULT_MODEL,
     },
+    # ACP agents (capabilities/providers.yaml `acp:`) run their own default.
+    "gemini-cli": {
+        "spec": CLI_DEFAULT_MODEL,
+        "planning": CLI_DEFAULT_MODEL,
+        "coding": CLI_DEFAULT_MODEL,
+        "qa": CLI_DEFAULT_MODEL,
+    },
 }
 
 DEFAULT_PHASE_THINKING: dict[str, str] = {

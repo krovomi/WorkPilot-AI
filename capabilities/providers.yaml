@@ -213,6 +213,57 @@ pi:
     Design: docs/architecture/pi.md.
 
 # ---------------------------------------------------------------------------
+# Agent Client Protocol agents (agentclientprotocol.com): one entry per agent,
+# all driven by AcpAgentClient over JSON-RPC on the agent's stdio. The `acp:`
+# block says how to start the agent and which of its modes keep a person in
+# the loop; what the agent can do (session/load, MCP transports, usage) is
+# what it declares in `initialize`, read at run time and never assumed here.
+#   command             executable and arguments; no shell, no path
+#   model_flag          the option that names the model, when it has one
+#   model_prefixes      model ids it takes; any other id runs its default
+#   approval_mode       the mode in which it asks before acting
+#   read_only_mode      the mode in which it cannot change anything, for a
+#                       type that declares none of Write/Edit/Bash
+#   auto_approve_modes  modes that act without asking: never kept
+#   auth_env            login method → the variable that makes it usable,
+#                       tried only when the agent says a login is required
+# Design: docs/architecture/acp.md.
+# ---------------------------------------------------------------------------
+
+gemini-cli:
+  adapter: AcpAgentClient
+  subagents: none
+  effort: none
+  degrades_to: null
+  context:
+    compact: emulated
+    usage: exact
+  acp:
+    label: Gemini CLI
+    command: [gemini, --acp]
+    model_flag: --model
+    model_prefixes: [gemini-]
+    approval_mode: default
+    read_only_mode: plan
+    auto_approve_modes: [autoEdit, yolo]
+    auth_env:
+      gemini-api-key: GEMINI_API_KEY
+    login: Run `gemini` once in a terminal and sign in, or set GEMINI_API_KEY.
+    docs: https://geminicli.com/docs/cli/acp-mode/
+  note: >-
+    `gemini --acp` (Gemini CLI ≥ 0.65, fixtures in tests/fixtures/acp/gemini-cli).
+    A permission request becomes a question on the task card; an action
+    outside the agent type's declared tools is refused without asking, and a
+    type that declares none of Write/Edit/Bash runs in Gemini's `plan` mode,
+    where write_file and run_shell_command do not run. Writes inside the
+    worktree come back to WorkPilot (fs/write_text_file) and pass the same
+    write-root and protected-file checks as the SDK hook. Gemini lets a
+    command it reads as harmless (`echo`) run without asking: a type that
+    does not declare Bash and sees one run has its turn stopped. Sessions are
+    resumed with session/load when Gemini declares it. usage_update reports
+    the window fill. Gemini compacts on its own; ACP has no compact request.
+
+# ---------------------------------------------------------------------------
 # No agentic adapter yet. Selecting one of these runs the task on the Claude
 # SDK. That is a real limitation, not a configuration detail, so it is stated
 # here and traced into the task feed at run time.

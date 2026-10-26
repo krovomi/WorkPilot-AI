@@ -37,6 +37,10 @@ import {
 	persistPlanStatusAndReasonSync,
 } from "./task/plan-file-utils";
 import { findTaskAndProject } from "./task/shared";
+import {
+	clearTaskPermissions,
+	handlePermissionTaskEvent,
+} from "./task-permission-handlers";
 import { safeSendToRenderer } from "./utils";
 
 /**
@@ -405,6 +409,9 @@ export function registerAgenteventsHandlers(
 			processType: ProcessType,
 			projectId?: string,
 		) => {
+			// Nobody is left to answer an ACP agent's questions.
+			clearTaskPermissions(taskId, getMainWindow);
+
 			// Use projectId from event to scope the lookup (prevents cross-project contamination)
 			const { task: exitTask, project: exitProject } = findTaskAndProject(
 				taskId,
@@ -472,6 +479,11 @@ export function registerAgenteventsHandlers(
 				event,
 				projectId,
 			);
+			return;
+		}
+
+		// An ACP agent's question for the card (and its withdrawal): not a state.
+		if (handlePermissionTaskEvent(taskId, event, projectId, getMainWindow)) {
 			return;
 		}
 

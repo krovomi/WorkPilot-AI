@@ -146,7 +146,7 @@ from agents.tools_pkg import (
     is_tools_available,
     undeclared_builtin_tools,
 )
-from skills_registry.providers import get_provider_capabilities
+from skills_registry.providers import acp_provider_names, get_provider_capabilities
 
 # Make claude_agent_sdk optional for testing purposes
 try:
@@ -1937,6 +1937,7 @@ _PROVIDER_ALIASES: dict[str, str] = {
     "antigravity": "antigravity",
     "agy": "antigravity",
     "pi": "pi",
+    **{name: name for name in acp_provider_names()},
 }
 
 
@@ -2154,6 +2155,7 @@ def _resolve_active_provider(
         "antigravity",
         "agy",
         "pi",
+        *acp_provider_names(),
     ):
         return _normalize_provider_name(env_provider), True
 
@@ -2193,6 +2195,7 @@ def _resolve_active_provider(
                                 "antigravity",
                                 "agy",
                                 "pi",
+                                *acp_provider_names(),
                             ):
                                 return _normalize_provider_name(value), True
             except Exception:
@@ -3059,6 +3062,35 @@ def _pi_client(req: _ClientRequest):
     return client
 
 
+def _acp_client(req: _ClientRequest):
+    """An Agent Client Protocol agent, one `acp:` entry of providers.yaml.
+
+    The agent owns its tools, its login and its session; the agent type's
+    declaration picks its mode and which of its questions reach the person
+    (core/agent_clients/acp.py).
+    """
+    from core.agent_client import AcpAgentClient
+
+    client = AcpAgentClient(
+        provider=req.provider,
+        model=req.model or None,
+        system_prompt=req.prompt(tool_use_hint=False),
+        project_dir=str(req.project_dir),
+        agent_type=req.agent_type,
+        session_id=req.resume,
+        spec_dir=req.spec_dir,
+    )
+    logger.info(
+        "[create_agent_client] Using AcpAgentClient "
+        "(agent=%s, model=%s, agent_type=%s, resume=%s)",
+        req.provider,
+        client.model,
+        req.agent_type,
+        bool(req.resume),
+    )
+    return client
+
+
 def _opencode_client(req: _ClientRequest):
     from core.agent_client import OpenCodeCliAgentClient
 
@@ -3154,4 +3186,5 @@ _CLIENT_BUILDERS = {
     "pi": _pi_client,
     "opencode": _opencode_client,
     "antigravity": _antigravity_client,
+    **dict.fromkeys(acp_provider_names(), _acp_client),
 }

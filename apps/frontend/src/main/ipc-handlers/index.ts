@@ -59,6 +59,7 @@ import { registerContextAwareSnippetsHandlers } from "./context-aware-snippets-h
 import { registerContextHandlers } from "./context-handlers";
 import { registerContextMeshHandlers } from "./context-mesh-handlers";
 import { registerAgentCliHandlers } from "./agent-cli-handlers";
+import { registerTaskPermissionHandlers } from "./task-permission-handlers";
 import { registerCopilotCliHandlers } from "./copilot-cli-handlers";
 import { registerCopilotOAuthHandlers } from "./copilot-oauth-handlers";
 import { registerCostHandlers } from "./cost-handlers";
@@ -310,6 +311,8 @@ export function setupIpcHandlers(
 
 	// Agent event handlers (event forwarding from agent manager to renderer)
 	registerAgenteventsHandlers(agentManager, getMainWindow);
+	// ACP agents' questions on the card, answered back to the build's stdin
+	registerTaskPermissionHandlers(agentManager);
 
 	// Settings and dialog handlers
 	registerSettingsHandlers(agentManager, getMainWindow);

@@ -1985,5 +1985,15 @@
 			"fixer_error": "Le fixer a échoué",
 			"diverged": "Le worktree a des commits que la PR n'a pas"
 		}
+	},
+	"permission": {
+		"label": "Question de {{agent}}",
+		"asks": "{{agent}} demande avant d'agir",
+		"expires": "Refusé automatiquement à {{time}} sans réponse",
+		"failure": {
+			"not_pending": "Cette question n'est plus en attente",
+			"invalid_option": "Cette réponse ne fait pas partie de celles proposées par l'agent",
+			"process_gone": "Le build s'est arrêté, plus personne à qui répondre"
+		}
 	}
 }

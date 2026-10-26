@@ -189,6 +189,31 @@ def from_pi_usage(usage: Mapping[str, Any] | None) -> CallUsage | None:
     )
 
 
+def from_acp_usage(usage: Mapping[str, Any] | None) -> CallUsage | None:
+    """An ACP turn's ``usage``: ``inputTokens``, ``outputTokens``,
+    ``thoughtTokens``, ``cachedReadTokens``, ``cachedWriteTokens``.
+
+    Answered by an Agent Client Protocol agent with ``session/prompt``
+    (unstable in the schema, sent by Gemini CLI). The schema does not say
+    whether ``inputTokens`` counts the cached part; Gemini's API counts it in
+    the prompt, so it is read as the whole prompt. One turn may hold several
+    model calls: this is their sum.
+    """
+    if not isinstance(usage, Mapping):
+        return None
+    prompt = _count(usage.get("inputTokens"))
+    output = _count(usage.get("outputTokens"))
+    if prompt is None and output is None:
+        return None
+    return CallUsage(
+        prompt=prompt,
+        cache_read=_count(usage.get("cachedReadTokens")),
+        cache_write=_count(usage.get("cachedWriteTokens")),
+        output=output,
+        reasoning=_count(usage.get("thoughtTokens")),
+    )
+
+
 def from_ambiguous_cache_read(usage: Mapping[str, Any] | None) -> CallUsage | None:
     """``input_tokens`` and ``cache_read_tokens``, inclusion not documented.
 

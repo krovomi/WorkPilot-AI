@@ -657,6 +657,15 @@ const browserMockAPI: Partial<ElectronAPI> = {
 	checkClaudeOAuth: async () => ({ isAuthenticated: false }),
 	checkOpenAICodexOAuth: async () => ({ isAuthenticated: false }),
 	checkAgentCli: async (tool) => ({ tool, installed: false }),
+	probeAcpAgent: async (tool) => ({ tool, error: "not_installed" }),
+	listTaskPermissions: async () => [],
+	answerTaskPermission: async () => ({ ok: false, reason: "not_pending" }),
+	onTaskPermissionRequest: () => () => {
+		/* nothing to remove in the browser mock */
+	},
+	onTaskPermissionCleared: () => () => {
+		/* nothing to remove in the browser mock */
+	},
 	updateCodexCli: async () => ({
 		success: false,
 		error: "Not available in browser mode",

@@ -64,6 +64,11 @@
 			"name": "pi",
 			"label": "pi (CLI)",
 			"description": "Agent de code minimal et extensible (pi.dev) piloté via la CLI pi, avec sa propre connexion aux fournisseurs."
+		},
+		{
+			"name": "gemini-cli",
+			"label": "Gemini CLI (ACP)",
+			"description": "L'agent de code de Google piloté par l'Agent Client Protocol, avec sa propre connexion ; ses demandes d'autorisation arrivent sur la carte."
 		}
 	]
 }
