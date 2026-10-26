@@ -1992,6 +1992,16 @@
 		"off": "{{provider}}: the OS sandbox is turned off (WORKPILOT_SANDBOX=off)",
 		"noReason": "no reason given"
 	},
+	"permission": {
+		"label": "Question from {{agent}}",
+		"asks": "{{agent}} asks before acting",
+		"expires": "Refused automatically at {{time}} without an answer",
+		"failure": {
+			"not_pending": "This question is no longer pending",
+			"invalid_option": "This answer is not one the agent offered",
+			"process_gone": "The build has stopped, nobody to answer"
+		}
+	},
 	"mcpApps": {
 		"title": "MCP App views",
 		"subtitle": "Views attached by an installed MCP server to the tools the agent called. Each one shows the call that happened; it cannot call a tool, write to the agent or open a link.",

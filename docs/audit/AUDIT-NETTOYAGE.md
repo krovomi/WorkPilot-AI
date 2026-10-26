@@ -2820,6 +2820,27 @@ Justification : [`automations.md`](../architecture/automations.md).
 Vérification : `pytest tests/longevity -q` et
 `cd apps/frontend && pnpm test -- automations AutomationsIntegration ipc-bridge-guards`.
 
+### G7 — Agents ACP : un client pour tous, Gemini CLI d'abord
+
+**Fait.** `core/agent_clients/acp.py` (`AcpAgentClient`) parle Agent Client Protocol à tout agent
+déclaré par un bloc `acp:` de `capabilities/providers.yaml` ; Gemini CLI 0.65 est le premier
+(`gemini-cli`, fixtures capturées dans `tests/fixtures/acp/gemini-cli/`).
+
+- **Les droits** d'un type d'agent sont tenus trois fois : le mode de session (`plan` pour un type
+  en lecture seule, `autoEdit`/`yolo` remis), la question refusée sans demander quand elle sort
+  des outils déclarés ou des racines d'écriture, et le tour arrêté quand un outil non déclaré a
+  démarré quand même (vu, pas empêché, et dit).
+- **La question** (`session/request_permission`) va sur la carte : événement de tâche validé par le
+  main, un bouton par option, réponse écrite sur le stdin du build seulement pour une question en
+  attente et une option offerte, revérifiée par Python ; refus au bout de 30 minutes.
+- **La barre latérale** sonde `initialize` et ne coche que les capacités déclarées `true`.
+
+Justification : [`acp.md`](../architecture/acp.md).
+
+Vérification : `pytest tests/test_acp_client.py tests/test_acp_frontend_parity.py -q` et
+`cd apps/frontend && pnpm test -- task-permissions task-permission-handlers TaskPermissionPrompt
+task-permission-store agent-cli-handlers`.
+
 ### G9 — MCP 2026-07-28 : tasks et MCP Apps dans le panneau de tâche
 
 **Fait.** `apps/backend/mcp_tasks/` (une feuille) fait répondre les serveurs MCP de WorkPilot dans

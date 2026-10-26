@@ -70,7 +70,9 @@ class TestMatrix:
         assert caps.supports_subagents
         assert caps.emulates_subagents
 
-    @pytest.mark.parametrize("name", ["opencode", "antigravity", "pi", "meta", "aws"])
+    @pytest.mark.parametrize(
+        "name", ["opencode", "antigravity", "pi", "gemini-cli", "meta", "aws"]
+    )
     def test_the_clis_and_the_adapterless_do_not(self, name):
         assert not get_provider_capabilities(name).supports_subagents
 
