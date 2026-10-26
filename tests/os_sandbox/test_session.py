@@ -210,7 +210,8 @@ def test_a_cli_process_is_started_through_its_sandbox(tmp_path, monkeypatch):
     assert seen["env"]["SANDBOXED"] == "1"
     # Its profile from providers.yaml: its own state and its hosts.
     assert "~/.config/opencode" in captured["state_dirs"]
-    assert "api.anthropic.com" in captured["provider_hosts"]
+    # Compared as a set of host names (not a substring of a URL).
+    assert {"api.anthropic.com"} <= set(captured["provider_hosts"])
     assert captured["unavailable_reason"] is None
 
 

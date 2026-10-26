@@ -171,7 +171,8 @@ def test_the_network_is_the_allowlist(project, home, origin, monkeypatch):
         result.stdout + result.stderr
     )
     assert "http://example.com/ refused 403" in result.stdout
-    assert "example.com:80" in sandbox.refused_hosts()
+    # Named once, as a host:port entry of the list (not a substring of a URL).
+    assert sandbox.refused_hosts().count("example.com:80") == 1
 
 
 def test_run_command_runs_in_the_sandbox_and_names_a_refused_host(

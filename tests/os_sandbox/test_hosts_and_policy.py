@@ -12,7 +12,7 @@ from os_sandbox.hosts import (
     allowlist_for,
     parse_rule,
 )
-from os_sandbox.launch import bwrap_argv, seatbelt_profile
+from os_sandbox.launch import _sb_quote, bwrap_argv, seatbelt_profile
 from os_sandbox.policy import build_policy, install_dir
 
 
@@ -176,9 +176,10 @@ class TestLaunchers:
     def test_seatbelt_denies_writes_then_allows_the_roots(self, tmp_path, home):
         _, worktree = _worktree(tmp_path)
         profile = seatbelt_profile(build_policy(worktree))
+        # Paths as the profile quotes them (a Windows runner has backslashes).
         assert profile.index("(deny file-write*)") < profile.index(
-            f'(subpath "{worktree.resolve()}")'
+            f"(subpath {_sb_quote(worktree.resolve())})"
         )
         assert '(allow network-outbound (remote ip "localhost:*"))' in profile
         assert "(deny network-outbound)" in profile
-        assert str((home / ".ssh").resolve()) in profile
+        assert _sb_quote((home / ".ssh").resolve()) in profile
