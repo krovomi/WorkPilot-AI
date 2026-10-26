@@ -25,6 +25,7 @@ import { registerQueueRoutingHandlers } from "./queue-routing-handlers";
 import { registerSwarmHandlers } from "./swarm-handlers";
 import { registerAgentDebuggerHandlers } from "./agent-debugger-handlers";
 import { registerAgenteventsHandlers } from "./agent-events-handlers";
+import { registerTaskSandboxHandlers } from "./task-sandbox-handlers";
 import { registerBlastRadiusHandlers } from "./blast-radius-handlers";
 import { registerBountyBoardHandlers } from "./bounty-board-handlers";
 import { registerTechDebtHandlers } from "./tech-debt-handlers";
@@ -311,6 +312,7 @@ export function setupIpcHandlers(
 
 	// Agent event handlers (event forwarding from agent manager to renderer)
 	registerAgenteventsHandlers(agentManager, getMainWindow);
+	registerTaskSandboxHandlers();
 
 	// Settings and dialog handlers
 	registerSettingsHandlers(agentManager, getMainWindow);

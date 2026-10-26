@@ -461,6 +461,20 @@ the backend environment, then from `.workpilot/.env`:
 | `VERIFY_CHROME_PATH` | — | A specific Chrome/Chromium binary. |
 | `CHROME_PATH` | — | Same, read when `VERIFY_CHROME_PATH` is unset. A path that is not an existing file is ignored. |
 
+## OS sandbox (`os_sandbox`)
+
+Agent commands run under bubblewrap (Linux) or Seatbelt (macOS), see
+[architecture/os-sandbox.md](architecture/os-sandbox.md). Read from the backend environment:
+
+| Variable | Default | Meaning |
+| --- | ---: | --- |
+| `WORKPILOT_SANDBOX` | `auto` | `auto`: sandboxed when the machine can, otherwise the build runs and its card says commands are not isolated. `required`: a build that cannot be sandboxed does not start. `off`: never sandboxed (the card says so). |
+| `WORKPILOT_SANDBOX_HOSTS` | — | Extra hosts a sandboxed process may reach, comma separated: `nexus.corp.example`, `*.corp.example` (subdomains only), `127.0.0.1:5000` (a local port). Remote hosts open 443 and 80 only. |
+
+On Ubuntu 24.04 and later, unprivileged user namespaces are restricted by AppArmor and bubblewrap
+fails; the card says so. `sudo sysctl kernel.apparmor_restrict_unprivileged_userns=0` (or an
+AppArmor profile for `bwrap`) lifts it. Claude Code's own sandbox on Linux also needs `socat`.
+
 ## RUN tasks — `.workpilot/environments.toml`
 
 A card of kind `run` (an operation on something that runs: restart, purge, migrate data,

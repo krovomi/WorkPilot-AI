@@ -139,6 +139,7 @@ import {
 	createAutoRefactorAPI,
 } from "./modules/auto-refactor-api";
 import { type AgentCliAPI, createAgentCliAPI } from "./modules/agent-cli-api";
+import { createTaskSandboxAPI, type TaskSandboxAPI } from "./modules/task-sandbox-api";
 import {
 	type CopilotCliAPI,
 	createCopilotCliAPI,
@@ -253,6 +254,7 @@ export interface ElectronAPI
 		ClaudeCodeAPI,
 		CopilotCliAPI,
 		AgentCliAPI,
+		TaskSandboxAPI,
 		CopilotOAuthAPI,
 		McpAPI,
 		ProfileAPI,
@@ -462,6 +464,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createDesignToCodeAPI(),
 		...createAutoRefactorAPI(),
 		...createGenericIpcAPI(),
+		...createTaskSandboxAPI(),
 		github: createGitHubAPI(),
 		swarm: createSwarmAPI(),
 		continuousAI: createContinuousAIAPI(),
@@ -563,6 +566,8 @@ export { createAgentCliAPI } from "./modules/agent-cli-api";
 export type { CopilotCliAPI } from "./modules/copilot-cli-api";
 export { createCopilotCliAPI } from "./modules/copilot-cli-api";
 export type { DebugAPI } from "./modules/debug-api";
+export type { TaskSandboxAPI } from "./modules/task-sandbox-api";
+export { createTaskSandboxAPI } from "./modules/task-sandbox-api";
 export { createDebugAPI } from "./modules/debug-api";
 export type { DecisionLoggerAPI } from "./modules/decision-logger-api";
 export { createDecisionLoggerAPI } from "./modules/decision-logger-api";
