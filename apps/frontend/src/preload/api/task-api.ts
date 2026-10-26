@@ -8,6 +8,8 @@ import type {
 	IPCResult,
 	MergeProgress,
 	PRDetailsResult,
+	PrFollowupStartOptions,
+	PrFollowupStatus,
 	ReviewReason,
 	SupportedIDE,
 	SupportedTerminal,
@@ -244,6 +246,15 @@ export interface TaskAPI {
 	getVisualProofStatus: (
 		taskId: string,
 	) => Promise<IPCResult<{ running: boolean }>>;
+	/** Drive the task's PR to merge: fix red checks and review threads, push. */
+	startPrFollowup: (
+		taskId: string,
+		options?: PrFollowupStartOptions,
+	) => Promise<IPCResult<PrFollowupStatus>>;
+	stopPrFollowup: (taskId: string) => Promise<IPCResult<PrFollowupStatus>>;
+	getPrFollowupStatus: (
+		taskId: string,
+	) => Promise<IPCResult<PrFollowupStatus>>;
 	getPRDetails: (
 		prNumber: number,
 		taskId?: string,
@@ -317,6 +328,11 @@ export interface TaskAPI {
 	// Visual Proof Events
 	onVisualProofRunning: (
 		callback: (taskId: string, running: boolean) => void,
+	) => () => void;
+
+	// PR follow-through events
+	onPrFollowupEvent: (
+		callback: (taskId: string, status: PrFollowupStatus) => void,
 	) => () => void;
 }
 
@@ -707,6 +723,20 @@ export const createTaskAPI = (): TaskAPI => ({
 	): Promise<IPCResult<{ running: boolean }>> =>
 		ipcRenderer.invoke(IPC_CHANNELS.TASK_VISUAL_PROOF_STATUS, taskId),
 
+	startPrFollowup: (
+		taskId: string,
+		options?: PrFollowupStartOptions,
+	): Promise<IPCResult<PrFollowupStatus>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_PR_FOLLOWUP_START, taskId, options),
+
+	stopPrFollowup: (taskId: string): Promise<IPCResult<PrFollowupStatus>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_PR_FOLLOWUP_STOP, taskId),
+
+	getPrFollowupStatus: (
+		taskId: string,
+	): Promise<IPCResult<PrFollowupStatus>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_PR_FOLLOWUP_STATUS, taskId),
+
 	getPRDetails: (
 		prNumber: number,
 		taskId?: string,
@@ -915,6 +945,22 @@ export const createTaskAPI = (): TaskAPI => ({
 		ipcRenderer.on(IPC_CHANNELS.TASK_VISUAL_PROOF_RUNNING, handler);
 		return () => {
 			ipcRenderer.removeListener(IPC_CHANNELS.TASK_VISUAL_PROOF_RUNNING, handler);
+		};
+	},
+
+	onPrFollowupEvent: (
+		callback: (taskId: string, status: PrFollowupStatus) => void,
+	): (() => void) => {
+		const handler = (
+			_event: Electron.IpcRendererEvent,
+			taskId: string,
+			status: PrFollowupStatus,
+		): void => {
+			callback(taskId, status);
+		};
+		ipcRenderer.on(IPC_CHANNELS.TASK_PR_FOLLOWUP_EVENT, handler);
+		return () => {
+			ipcRenderer.removeListener(IPC_CHANNELS.TASK_PR_FOLLOWUP_EVENT, handler);
 		};
 	},
 });

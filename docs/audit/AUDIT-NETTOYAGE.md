@@ -2594,3 +2594,24 @@ tests/harness/test_subagent_results.py tests/harness/test_code_search_serving.py
 Vérification du lot M10 (`_build_agent_client`) : `pytest
 tests/core/test_build_agent_client_characterization.py tests/test_agent_client_factory.py
 tests/test_offline_mode.py tests/test_local_model_coercion.py -q`.
+
+## Annexe G — Features issues de la veille du 26 octobre 2026
+
+Onze features proposées après une veille des outils de pilotage d'agents de code (Cursor, Codex,
+Copilot, Claude Code, Gemini CLI, OpenHands…) et retenues par Leub, dans cet ordre. Ce ne sont pas
+des constats d'audit : chaque ligne est une feature, une PR vers `develop`, avec sa justification
+dans `docs/architecture/`.
+
+### G1 — La carte suit sa PR jusqu'au merge
+
+**Fait.** `apps/backend/pr_followup/` lit la PR GitHub de la tâche (`gh`, liste d'arguments),
+décide sans effet de bord (`policy.decide` : forge illisible → `unknown`, jamais du vert ; aucun
+check → `no_checks` ; échec rouge aussi sur la base → `base_red`, jamais « corrigé » ; plafond de
+trois tours), donne au QA fixer les checks en échec et les fils de revue non résolus, sur le
+provider de la phase QA de la tâche, refuse le commit qui saute, supprime ou désactive un test ou
+modifie un fichier de CI (`guards.py`, annulé avant tout push), puis pousse sans forcer.
+L'app : canaux `TASK_PR_FOLLOWUP_*`, carte `PrFollowupCard` dans « À traiter », `pythonRunnerEnv`
+accepte `taskProviders`. Justification : [`pr-followup.md`](../architecture/pr-followup.md).
+
+Vérification : `pytest tests/pr_followup -q` et
+`cd apps/frontend && pnpm test -- pr-followup-handlers PrFollowupCard python-runner-env`.
