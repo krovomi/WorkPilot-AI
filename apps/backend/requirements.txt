@@ -85,3 +85,9 @@ playwright>=1.64.0
 
 # Ajout d'une note pour l'installation automatique de uvicorn si absent
 # Pour garantir l'automatisation, il est recommandé d'ajouter uvicorn dans requirements.txt racine ou de documenter l'installation automatique.
+
+# OpenTelemetry GenAI spans for every provider (genai_trace/), exported over
+# OTLP http/protobuf when AUTO_CLAUDE_OTEL_ENDPOINT is set. The API was already
+# installed through mcp; the SDK and the exporter make the spans leave.
+opentelemetry-sdk>=1.45.1
+opentelemetry-exporter-otlp-proto-http>=1.45.1

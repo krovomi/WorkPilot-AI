@@ -63,8 +63,12 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
         "cost_intelligence",
         "docintel",
         "foundation",
+        # The loop reports each measured model call as a GenAI span.
+        "genai_trace",
         "security",
     },
+    # GenAI spans: a leaf, read by the harness loop and the AgentClient base.
+    "genai_trace": set(),
     # Read by core, phase_config and provider_api: a leaf, or the cycle it
     # was taken out of comes back.
     "provider_selection": set(),
