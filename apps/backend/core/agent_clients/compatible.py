@@ -6,6 +6,8 @@ every name defined here.
 
 from __future__ import annotations
 
+from typing import Any
+
 from .openai import (
     OpenAIAgentClient,
 )
@@ -26,6 +28,7 @@ class CompatibleProviderAgentClient(OpenAIAgentClient):
         project_dir: str | None = None,
         agent_type: str = "coder",
         spec_dir: str | None = None,
+        effort_params: dict[str, Any] | None = None,
     ):
         endpoint = base_url.rstrip("/")
         if not endpoint.endswith("/chat/completions"):
@@ -45,3 +48,6 @@ class CompatibleProviderAgentClient(OpenAIAgentClient):
             api_base=endpoint,
             provider=provider,
         )
+        # The provider's own effort fields (`compatible_effort_params`):
+        # Grok and Mistral take `reasoning_effort`, DeepSeek also `thinking`.
+        self._effort_params = dict(effort_params or {})

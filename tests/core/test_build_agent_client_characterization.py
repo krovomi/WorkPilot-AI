@@ -129,6 +129,9 @@ def harness(tmp_path: Path, monkeypatch):
             "openai_reasoning_effort": lambda model, budget: f"oa:{model}:{budget}",
             "openai_prompt_cache_key": lambda _spec, agent: f"key:{agent}",
             "gemini_reasoning_effort": lambda model, budget: f"gm:{model}:{budget}",
+            "compatible_effort_params": lambda provider, model, budget: {
+                "effort": f"cp:{provider}:{model}:{budget}"
+            },
         },
         offline: {
             "resolve_offline_route": offline_route,
@@ -344,6 +347,8 @@ def test_local_servers(harness, provider, base_url, api_format):
         "project_dir": str(harness.project_dir),
         "agent_type": "coder",
         "spec_dir": str(harness.spec_dir),
+        # Sent as Ollama's `think` when the model says it thinks.
+        "thinking_level": "high",
     }
 
 
@@ -373,6 +378,8 @@ def test_compatible_providers(harness, provider, default_url):
         "model": "model-x",
         "api_key": _FAKE,
         "base_url": default_url,
+        # Each provider's own effort scale (`compatible_effort_params`).
+        "effort_params": {"effort": f"cp:{provider}:model-x:16384"},
         "system_prompt": "BASE(hint=True)+coder",
         "project_dir": str(harness.project_dir),
         "agent_type": "coder",

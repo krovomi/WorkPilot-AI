@@ -71,6 +71,7 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 | **QA Auto-Fix Loop** | Agents automatically detect, fix, and revalidate failing acceptance criteria |
 | **Spec Approval Workflow** | Review and approve AI-generated specifications before implementation begins |
 | **Hot-Swap LLM** | Change provider, model, or reasoning effort mid-task — the next turn resumes on the new engine with context replayed |
+| **Honest Effort** | Each provider gets the effort level on its own scale (Claude, OpenAI/Codex, Gemini, Grok, DeepSeek, Mistral, Copilot, Ollama, pi, Antigravity); the picker and the task log say what the model actually receives, and a model that refuses the setting runs on without it instead of failing the phase |
 | **Pause & Resume** | Suspend a running task and resume later with full context preserved, optionally on a different provider |
 | **Per-Phase Re-run** | Redo any phase (planning, coding, validation) on demand without restarting the whole task |
 | **PR-First Review Flow** | Guided human-review with a DoD checklist, "approve & close", and reversible task abandon |
