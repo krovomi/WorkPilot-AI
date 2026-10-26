@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import subprocess
 import sys
 import textwrap
@@ -491,17 +492,19 @@ class LaunchDriver:
         pass
 
 
-def _app_target(project: Path) -> Target:
-    # A script file, not `-c "..."`: no quoting to go through on Windows.
+def _app_target(project: Path, monkeypatch) -> Target:
+    # Started as `python app.py` and found on PATH, as test_verify_loop starts
+    # its app on the Windows leg. Named by its full forward-slash path, the venv
+    # interpreter exited there at start (0xC0000142, STATUS_DLL_INIT_FAILED).
     (project / "app.py").write_text(
         "import time\nprint('booting', flush=True)\ntime.sleep(60)\n",
         encoding="utf-8",
     )
-    return Target(
-        kind="windows-app",
-        name="Orders",
-        command=f"{Path(sys.executable).as_posix()} app.py",
+    monkeypatch.setenv(
+        "PATH",
+        str(Path(sys.executable).parent) + os.pathsep + os.environ.get("PATH", ""),
     )
+    return Target(kind="windows-app", name="Orders", command="python app.py")
 
 
 @pytest.mark.parametrize(
@@ -520,7 +523,11 @@ def test_a_windows_app_is_ready_when_its_window_shows(
     base = work_dir(tmp_path, None)
     try:
         result = launching.launch(
-            _app_target(tmp_path), tmp_path, base, timeout=4.0, window_title="Orders"
+            _app_target(tmp_path, monkeypatch),
+            tmp_path,
+            base,
+            timeout=4.0,
+            window_title="Orders",
         )
     finally:
         stop_all(base)
