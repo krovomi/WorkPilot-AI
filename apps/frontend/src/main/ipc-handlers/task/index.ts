@@ -17,6 +17,7 @@ import { registerTaskCRUDHandlers } from "./crud-handlers";
 import { registerTaskExecutionHandlers } from "./execution-handlers";
 import { registerGoalHandlers } from "./goal-handlers";
 import { registerTaskLogsHandlers } from "./logs-handlers";
+import { registerMcpAppHandlers } from "./mcp-app-handlers";
 import { registerPrFollowupHandlers } from "./pr-followup-handlers";
 import { registerWorktreeHandlers } from "./worktree-handlers";
 
@@ -51,6 +52,9 @@ export function registerTaskHandlers(
 
 	// Register PR follow-through handlers (drive the task's PR to merge)
 	registerPrFollowupHandlers(getMainWindow);
+
+	// Register MCP App view handlers (list, open, close)
+	registerMcpAppHandlers();
 }
 
 // Export shared utilities for use by other modules if needed

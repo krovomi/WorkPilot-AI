@@ -162,7 +162,7 @@ class TestTheBridgeOffersWhatTheTypeIsGiven:
         connected: list[list[str]] = []
 
         class FakeManager:
-            def __init__(self, project_dir, servers):
+            def __init__(self, project_dir, servers, *, spec_dir=None):
                 connected.append([s["id"] for s in servers])
 
             async def connect(self):

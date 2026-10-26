@@ -149,7 +149,7 @@ class _FakeMCP:
 
     defs: list[dict] = []
 
-    def __init__(self, project_dir, servers):
+    def __init__(self, project_dir, servers, *, spec_dir=None):
         pass
 
     async def connect(self):

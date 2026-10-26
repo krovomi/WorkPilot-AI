@@ -2002,6 +2002,15 @@
 			"process_gone": "Le build s'est arrêté, plus personne à qui répondre"
 		}
 	},
+	"mcpApps": {
+		"title": "Vues MCP Apps",
+		"subtitle": "Les vues qu'un serveur MCP installé attache aux outils appelés par l'agent. Chacune montre l'appel qui a eu lieu ; elle ne peut ni appeler un outil, ni écrire à l'agent, ni ouvrir un lien.",
+		"count_one": "{{count}} vue",
+		"count_other": "{{count}} vues",
+		"loading": "Chargement de la vue…",
+		"unavailable": "Cette vue ne peut plus être affichée.",
+		"frameTitle": "Vue MCP App : {{server}} · {{tool}}"
+	},
 	"goal": {
 		"title": "Objectif",
 		"description": "Fini quand une commande le dit, pas quand le relecteur le pense : la QA continue tant que la commande échoue, dans un nombre de passes et un plafond de dépense.",
