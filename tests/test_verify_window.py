@@ -524,7 +524,10 @@ def test_a_windows_app_is_ready_when_its_window_shows(
         )
     finally:
         stop_all(base)
-    assert result.status == status, result.to_dict()
+    assert result.status == status, (
+        f"{result.status} (code {result.exit_code}): {result.detail}\n"
+        f"command: {result.command}\nlog: {result.log_tail[-1500:]}"
+    )
     if status == "ready":
         assert result.window["hwnd"] == 9 and result.window["namedBy"] == "card"
     if status == "timeout":
