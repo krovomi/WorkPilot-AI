@@ -747,6 +747,17 @@ export class AgentManager extends EventEmitter {
 	}
 
 	/**
+	 * Write one line to a running task's stdin: the person's answer to an ACP
+	 * agent's question (`task-permissions.ts`). False when no process can read it.
+	 */
+	writeToTaskStdin(taskId: string, line: string): boolean {
+		const stdin = this.state.getProcess(taskId)?.process?.stdin;
+		if (!stdin || stdin.destroyed || !stdin.writable) return false;
+		stdin.write(line);
+		return true;
+	}
+
+	/**
 	 * Check if a task is running
 	 */
 	isRunning(taskId: string): boolean {
