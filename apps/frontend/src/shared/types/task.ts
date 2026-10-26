@@ -368,6 +368,14 @@ export type TaskKindSource =
 	| "keywords"
 	| "default";
 
+/** The task-metadata stamp of a card an automation rule created. */
+export interface AutomationOrigin {
+	ruleId: string;
+	ruleName: string;
+	eventKey: string;
+	url?: string;
+}
+
 export interface TaskMetadata {
 	// Origin tracking
 	sourceType?:
@@ -380,7 +388,10 @@ export interface TaskMetadata {
 		| "github"
 		| "gitlab"
 		| "visual-canvas"
-		| "tech-debt";
+		| "tech-debt"
+		| "automation";
+	/** The rule that created the card (shared/types/automations.ts). */
+	automation?: AutomationOrigin;
 	ideationType?: string; // e.g., 'code_improvements', 'security_hardening'
 	ideaId?: string; // Reference to the original idea if converted
 	featureId?: string; // Reference to roadmap feature if from roadmap

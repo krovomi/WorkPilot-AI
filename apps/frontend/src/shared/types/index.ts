@@ -4,6 +4,7 @@
 
 export * from "./agent";
 export * from "./app-update";
+export * from "./automations";
 export * from "./changelog";
 export * from "./cli";
 // Common types

@@ -1,7 +1,6 @@
 import { JevSettings } from "./JevSettings";
 import { BrainSettings } from "./BrainSettings";
 import {
-	Activity,
 	Bell,
 	Bot,
 	Brain,
@@ -18,6 +17,7 @@ import {
 	Monitor,
 	Package,
 	Palette,
+	Repeat,
 	Save,
 	Search,
 	Settings,
@@ -56,7 +56,6 @@ import {
 import { AdvancedSettings } from "./AdvancedSettings";
 import { AnomalyDetectionSettings } from "./AnomalyDetectionSettings";
 import { CleanProviderSection } from "./CleanProviderSection";
-import { ContinuousAISettings } from "./ContinuousAISettings";
 import { DebugSettings } from "./DebugSettings";
 import { DevToolsSettings } from "./DevToolsSettings";
 import { DisplaySettings } from "./DisplaySettings";
@@ -142,8 +141,7 @@ export type AppSection =
 	| "notifications"
 	| "debug"
 	| "scheduler"
-	| "swarm-mode"
-	| "continuous-ai";
+	| "swarm-mode";
 
 export type ProjectSettingsSection =
 	| "general"
@@ -151,6 +149,7 @@ export type ProjectSettingsSection =
 	| "jira"
 	| "figma"
 	| "cicd"
+	| "automations"
 	| "github"
 	| "gitlab"
 	| "linear"
@@ -226,6 +225,12 @@ const createSettingsThemes = (t: {
 				type: "project",
 			},
 			{
+				id: "automations",
+				icon: Repeat,
+				label: t("automations.title"),
+				type: "project",
+			},
+			{
 				id: "teams",
 				icon: MessageSquare,
 				label: t(
@@ -280,12 +285,6 @@ const createSettingsThemes = (t: {
 				type: "app",
 			},
 			{ id: "agent", icon: Bot, label: "Agent", type: "app" },
-			{
-				id: "continuous-ai",
-				icon: Activity,
-				label: t("continuousAI:title", "Continuous AI"),
-				type: "app",
-			},
 			{
 				id: "swarm-mode",
 				icon: Zap,
@@ -363,7 +362,7 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 		onRerunWizard,
 		onOpenSetupHub,
 	} = props;
-	const { t } = useTranslation(["settings", "swarm", "continuousAI", "brain"]);
+	const { t } = useTranslation(["settings", "swarm", "brain"]);
 	const {
 		settings,
 		setSettings,
@@ -650,8 +649,6 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 				return <SchedulerSettings />;
 			case "swarm-mode":
 				return <SwarmModeSettings />;
-			case "continuous-ai":
-				return <ContinuousAISettings />;
 			case "team-invitations":
 				return isServerAdmin ? <InvitationsAdmin /> : null;
 			default:

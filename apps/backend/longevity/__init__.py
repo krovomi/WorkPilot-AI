@@ -12,6 +12,7 @@ from .ingest import (
     CoverageParseError,
     load_sentinel_vulnerabilities,
     parse_coverage_xml,
+    sentinel_snapshot_is_current,
 )
 from .scorer import (
     HealthGrade,
@@ -30,6 +31,7 @@ __all__ = [
     "LongevityScorer",
     "SENTINEL_LATEST_SCAN_REL",
     "load_sentinel_vulnerabilities",
+    "sentinel_snapshot_is_current",
     "parse_coverage_xml",
     "score_codebase",
     "score_codebase_with_signals",
