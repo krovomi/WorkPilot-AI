@@ -78,12 +78,15 @@ function readViewFile(folder: string, viewId: string): McpAppViewFile | null {
 	let fd: number | null = null;
 	try {
 		// A link could point anywhere on the disk: only plain files are read.
-		// The name is checked first (Windows has no O_NOFOLLOW), then the file
-		// actually opened, so a link swapped in between is still refused.
-		if (!lstatSync(file).isFile()) return null;
+		// O_NOFOLLOW refuses a link where it exists; Windows has none, so the
+		// name must still be a plain file and the very file that was opened.
 		fd = openSync(file, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
 		const stat = fstatSync(fd);
 		if (!stat.isFile() || stat.size > MAX_FILE_BYTES) return null;
+		const named = lstatSync(file);
+		if (!named.isFile() || named.ino !== stat.ino || named.dev !== stat.dev) {
+			return null;
+		}
 		// Read what was measured, not what the file may have grown to since.
 		const buffer = Buffer.alloc(stat.size);
 		const read = readSync(fd, buffer, 0, stat.size, 0);
