@@ -74,8 +74,24 @@ jobs:
           python-version: ${{ matrix.python-version }}
           install-test-deps: 'true'
 
+      # The OS sandbox's real tests (tests/os_sandbox/test_real_sandbox.py)
+      # run a command under bubblewrap. Ubuntu 24.04 confines unprivileged
+      # user namespaces with AppArmor; a person's machine set up for the
+      # sandbox lifts that (docs/architecture/os-sandbox.md), and so does
+      # this runner. On macOS, Seatbelt is part of the system.
+      - name: Install bubblewrap
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq bubblewrap
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+
       - name: Run all tests (including platform-specific)
         shell: bash
+        env:
+          # Fails the sandbox tests instead of skipping them where the
+          # runner is meant to have a sandbox.
+          WORKPILOT_EXPECT_SANDBOX: ${{ runner.os != 'Windows' && '1' || '' }}
         run: |
           if [ "$RUNNER_OS" == "Windows" ]; then
             source apps/backend/.venv/Scripts/activate

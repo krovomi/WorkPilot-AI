@@ -36,6 +36,16 @@
 #                          reported  per-turn prompt tokens are reported
 #                          estimated only characters can be counted
 #               "clear" (a fresh thread seeded with a handoff) works everywhere.
+#   sandbox     a CLI that runs its own commands is started whole inside the OS
+#               sandbox (os_sandbox/, docs/architecture/os-sandbox.md):
+#                 state    its login and session directories (~/… or $VAR/…),
+#                          left writable; created when missing
+#                 network  the hosts it talks to, added to the package
+#                          registries; `*.example.com` is a subdomain of it,
+#                          `127.0.0.1:port` a local endpoint
+#                 read_only files under `state` the agent may not change
+#                          (pi's trust.json), when they exist
+#               A CLI without this block is not sandboxed, and its card says so.
 #
 # Adding a real adapter for a provider is a strictly better outcome than
 # listing it here with `adapter: null`. This file records the current truth,
@@ -170,6 +180,35 @@ opencode:
     the built-in `plan` agent. OpenCode also compacts a session on its own when
     the window fills (compaction.auto, on by default), but `run` has no command
     to compact on demand, hence `emulated`. step_finish events report tokens.
+  sandbox:
+    state:
+      - ~/.local/share/opencode
+      - ~/.config/opencode
+      - ~/.cache/opencode
+      - ~/.local/state/opencode
+    network: &llm_hosts
+      - api.anthropic.com
+      - console.anthropic.com
+      - api.openai.com
+      - auth.openai.com
+      - generativelanguage.googleapis.com
+      - oauth2.googleapis.com
+      - openrouter.ai
+      - api.mistral.ai
+      - api.deepseek.com
+      - api.x.ai
+      - api.groq.com
+      - api.cerebras.ai
+      - api.together.xyz
+      - api.fireworks.ai
+      - api.github.com
+      - api.githubcopilot.com
+      - models.dev
+      - models.opencode.ai
+      - opencode.ai
+      - 127.0.0.1:11434
+      - 127.0.0.1:1234
+      - 127.0.0.1:8080
 
 antigravity:
   adapter: AntigravityCliAgentClient
@@ -211,6 +250,14 @@ pi:
     Codex. The usage of every assistant message is reported. A write guard
     (core/agent_clients/pi_guard/) runs inside pi with path_guard's policy.
     Design: docs/architecture/pi.md.
+  sandbox:
+    state:
+      - ~/.pi
+      - $PI_CODING_AGENT_DIR
+    read_only:
+      - ~/.pi/agent/trust.json
+      - $PI_CODING_AGENT_DIR/trust.json
+    network: *llm_hosts
 
 # ---------------------------------------------------------------------------
 # No agentic adapter yet. Selecting one of these runs the task on the Claude
