@@ -99,6 +99,7 @@ composition, qui importe les agents. Les autres modules sortis de `core` par le 
 | `uiux/` | design system et règles de pile UI, seulement si la tâche touche l'interface |
 | `mobile/` | Android / Apple : piles, appareils, `readiness.py` (constructible ici ?) |
 | `verify/` | boucle `/verify` : lancer l'app, erreurs → correction, preuve |
+| `goal/` | mode objectif : une commande et son code de sortie disent « fini » ; chemins protégés, plafond de dépense ([goal-mode.md](../../docs/architecture/goal-mode.md)) |
 | `architecture_visualizer/` | carte archify du projet et delta par tâche |
 | `bounty_board/` | N modèles sur une spec, preuves mesurées, juge anonyme |
 | `vendor/archify/`, `vendor/watermarks/` | code vendorisé et épinglé (`scripts/vendor_*.py`) |

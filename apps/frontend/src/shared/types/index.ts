@@ -35,3 +35,5 @@ export * from "./test-generation";
 export * from "./terminal";
 // Time Travel types (Temporal debugger for AI agents)
 export * from "./time-travel";
+// Goal mode (a command decides when the task is done)
+export * from "./goal";

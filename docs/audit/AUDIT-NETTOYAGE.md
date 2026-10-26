@@ -2594,3 +2594,37 @@ tests/harness/test_subagent_results.py tests/harness/test_code_search_serving.py
 Vérification du lot M10 (`_build_agent_client`) : `pytest
 tests/core/test_build_agent_client_characterization.py tests/test_agent_client_factory.py
 tests/test_offline_mode.py tests/test_local_model_coercion.py -q`.
+
+## Annexe G — Features issues de la veille du 26 octobre 2026
+
+Onze features proposées après une veille des outils de pilotage d'agents de code (Cursor, Codex,
+Copilot, Claude Code, Gemini CLI, OpenHands…) et retenues par Leub, dans cet ordre. Ce ne sont pas
+des constats d'audit : chaque ligne est une feature, une PR vers `develop`, avec sa justification
+dans `docs/architecture/`.
+
+### G2 — Mode objectif : une commande dit « fini »
+
+**Fait.** Une carte porte une commande et le code de sortie qui veut dire « fini », avec un nombre
+de passes et un plafond de dépense. Le backend est dans `apps/backend/goal/`.
+
+- **L'objectif.** Il est écrit dans `<spec>/.workpilot-goal.json`, ajouté à
+  `PROTECTED_CONFIG_NAMES` : aucun agent ne peut le réécrire, ni par Write/Edit, ni par Bash, ni
+  par pi.
+- **La porte.** Elle tourne dans `qa/loop.py` après le relecteur et les portes d'architecture et
+  de couverture. Les chemins protégés, et le script que lance la commande, doivent être intacts
+  par rapport au point de départ de la tâche. Un ensemble de modifications illisible vaut `error`,
+  jamais un succès. La commande tourne sans shell, sans les identifiants du backend et dans son
+  propre groupe de processus. Un échec renvoie au fixer avec la fin de sa sortie, citée par
+  `quote_untrusted`.
+- **Le plafond.** Il est lu avant chaque passe, sur `cost_data.json`, en additionnant les deux
+  copies. Un coût non tarifé fait du total un plancher.
+- **Les autres chemins vers « fini ».** Une approbation déjà enregistrée ne court-circuite plus un
+  objectif non atteint. Une QA sautée passe aussi par la porte (`_goal_allows_done`).
+- **L'app.** Canaux `TASK_GOAL_GET` et `TASK_GOAL_SET`, avec validation dans le main et écriture
+  dans chaque copie du dossier de spec. La carte `GoalCard` est dans « Plan d'exécution », et le
+  verdict est dans le plan (`goal`).
+
+Justification : [`goal-mode.md`](../architecture/goal-mode.md).
+
+Vérification : `pytest tests/goal -q` et
+`cd apps/frontend && pnpm test -- goal-handlers GoalCard TaskOverview`.

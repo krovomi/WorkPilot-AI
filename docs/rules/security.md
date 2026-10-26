@@ -99,8 +99,8 @@ l'UI n'existe pas.
   `ClaudeAgentOptions` ; un client qui contourne les hooks est un défaut.
 - Ajouter une commande à l'allowlist (`project/command_registry/`) : un validateur si elle peut
   écrire, supprimer, exécuter du code ou joindre le réseau, et un test dans `tests/`.
-- Un agent ne modifie jamais ses propres garde-fous : `.workpilot-security.json`,
-  `.workpilot-allowlist`, `.workpilot/guardrails.*`, `.claude_settings.json`, `.claude/settings*.json`.
+- Un agent ne modifie jamais ses garde-fous : `.workpilot-security.json`, `.workpilot-allowlist`,
+  `.workpilot/guardrails.*`, `.claude_settings.json`, `.claude/settings*.json`, `.workpilot-goal.json`.
 - Serveur MCP tiers : seulement par `CUSTOM_MCP_SERVERS`, validé par `_validate_custom_mcp_server`.
   N'élargir ni la liste des lanceurs autorisés ni celle des options refusées.
 

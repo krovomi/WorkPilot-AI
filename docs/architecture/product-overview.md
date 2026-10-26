@@ -18,6 +18,7 @@ WorkPilot AI is a desktop application (+ CLI) where users describe a goal and AI
 - **Roadmap** — AI-assisted feature planning with strategic roadmap generation
 - **Ideation** — Discover improvements, performance issues, and security vulnerabilities
 - **GitHub/GitLab Integration** — Import issues, AI-powered investigation, PR/MR review and creation
+- **Goal Mode** — A task carries a command and the exit code that means "done"; QA loops until it holds, within a pass and spending cap, and cannot edit the tests it runs
 - **Azure DevOps/Jira Integration** — Import work items, sync statuses
 - **Microsoft Teams Notifications** — Webhook-based notifications for task completion and PR creation
 - **Changelog** — Generate release notes from completed tasks

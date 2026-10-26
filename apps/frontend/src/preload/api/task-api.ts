@@ -13,6 +13,8 @@ import type {
 	SupportedTerminal,
 	Task,
 	TaskContextEvent,
+	TaskGoal,
+	TaskGoalState,
 	TaskLogStreamChunk,
 	TaskLogs,
 	TaskMetadata,
@@ -107,6 +109,13 @@ export interface TaskAPI {
 		taskId: string,
 		policy: Partial<ContextPolicy>,
 	) => Promise<IPCResult<{ contextPolicy: ContextPolicy }>>;
+	/** The task's goal (goal mode): the command whose exit code says "done". */
+	getTaskGoal: (taskId: string) => Promise<IPCResult<TaskGoalState>>;
+	/** Write the goal in every spec dir copy, or remove it with null. */
+	setTaskGoal: (
+		taskId: string,
+		goal: TaskGoal | null,
+	) => Promise<IPCResult<TaskGoalState>>;
 	/** CONTEXT_USAGE / CONTEXT_ACTION_APPLIED events of running tasks. */
 	onTaskContextUsage: (
 		callback: (
@@ -460,6 +469,15 @@ export const createTaskAPI = (): TaskAPI => ({
 		policy: Partial<ContextPolicy>,
 	): Promise<IPCResult<{ contextPolicy: ContextPolicy }>> =>
 		ipcRenderer.invoke(IPC_CHANNELS.TASK_CONTEXT_POLICY_UPDATE, taskId, policy),
+
+	getTaskGoal: (taskId: string): Promise<IPCResult<TaskGoalState>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_GOAL_GET, taskId),
+
+	setTaskGoal: (
+		taskId: string,
+		goal: TaskGoal | null,
+	): Promise<IPCResult<TaskGoalState>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_GOAL_SET, taskId, goal),
 
 	onTaskContextUsage: (
 		callback: (

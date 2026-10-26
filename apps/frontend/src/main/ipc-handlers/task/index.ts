@@ -15,6 +15,7 @@ import { registerTaskArchiveHandlers } from "./archive-handlers";
 import { registerTaskContextHandlers } from "./context-handlers";
 import { registerTaskCRUDHandlers } from "./crud-handlers";
 import { registerTaskExecutionHandlers } from "./execution-handlers";
+import { registerGoalHandlers } from "./goal-handlers";
 import { registerTaskLogsHandlers } from "./logs-handlers";
 import { registerWorktreeHandlers } from "./worktree-handlers";
 
@@ -34,6 +35,9 @@ export function registerTaskHandlers(
 
 	// Register context-window handlers (manual compact/clear, live policy edit)
 	registerTaskContextHandlers(agentManager);
+
+	// Register goal handlers (goal mode: the command that says "done")
+	registerGoalHandlers();
 
 	// Register worktree handlers (status, diff, merge, discard, list)
 	registerWorktreeHandlers(pythonEnvManager, getMainWindow);
