@@ -491,11 +491,16 @@ class LaunchDriver:
         pass
 
 
-def _app_target() -> Target:
+def _app_target(project: Path) -> Target:
+    # A script file, not `-c "..."`: no quoting to go through on Windows.
+    (project / "app.py").write_text(
+        "import time\nprint('booting', flush=True)\ntime.sleep(60)\n",
+        encoding="utf-8",
+    )
     return Target(
         kind="windows-app",
         name="Orders",
-        command=f"{Path(sys.executable).as_posix()} -c \"import time; print('booting', flush=True); time.sleep(60)\"",
+        command=f"{Path(sys.executable).as_posix()} app.py",
     )
 
 
@@ -515,11 +520,11 @@ def test_a_windows_app_is_ready_when_its_window_shows(
     base = work_dir(tmp_path, None)
     try:
         result = launching.launch(
-            _app_target(), tmp_path, base, timeout=4.0, window_title="Orders"
+            _app_target(tmp_path), tmp_path, base, timeout=4.0, window_title="Orders"
         )
     finally:
         stop_all(base)
-    assert result.status == status
+    assert result.status == status, result.to_dict()
     if status == "ready":
         assert result.window["hwnd"] == 9 and result.window["namedBy"] == "card"
     if status == "timeout":

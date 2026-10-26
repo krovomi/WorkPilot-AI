@@ -279,6 +279,7 @@ class UiaDriver:
             if process.stdin is not None:
                 process.stdin.close()
         except OSError:
+            # The helper already closed its end: it is stopping anyway.
             pass
         try:
             process.wait(timeout=2)
@@ -287,6 +288,8 @@ class UiaDriver:
             try:
                 process.wait(timeout=5)
             except subprocess.TimeoutExpired:
+                # Killed but not reaped yet: nothing more can be done here,
+                # and the next request starts a new helper.
                 pass
 
 
