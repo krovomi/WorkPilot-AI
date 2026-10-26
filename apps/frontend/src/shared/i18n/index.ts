@@ -48,7 +48,6 @@ import enCommon from "./locales/en/common.json";
 import enConflictPredictor from "./locales/en/conflictPredictor.json";
 import enContext from "./locales/en/context.json";
 import enContextAwareSnippets from "./locales/en/contextAwareSnippets.json";
-import enContinuousAI from "./locales/en/continuousAI.json";
 import enCostEstimator from "./locales/en/costEstimator.json";
 import enFormulaLab from "./locales/en/formulaLab.json";
 import enDashboard from "./locales/en/dashboard.json";
@@ -145,7 +144,6 @@ import frCommon from "./locales/fr/common.json";
 import frConflictPredictor from "./locales/fr/conflictPredictor.json";
 import frContext from "./locales/fr/context.json";
 import frContextAwareSnippets from "./locales/fr/contextAwareSnippets.json";
-import frContinuousAI from "./locales/fr/continuousAI.json";
 import frCostEstimator from "./locales/fr/costEstimator.json";
 import frFormulaLab from "./locales/fr/formulaLab.json";
 import frDashboard from "./locales/fr/dashboard.json";
@@ -293,7 +291,6 @@ export const resources = {
 		visualToCode: enVisualToCode,
 		qualityScore: enQualityScore,
 		swarm: enSwarm,
-		continuousAI: enContinuousAI,
 	},
 	fr: {
 		accessibility: frAccessibility,
@@ -390,7 +387,6 @@ export const resources = {
 		visualToCode: frVisualToCode,
 		qualityScore: frQualityScore,
 		swarm: frSwarm,
-		continuousAI: frContinuousAI,
 	},
 } as const;
 
@@ -494,7 +490,6 @@ i18n.use(initReactI18next).init({
 		"visualToCode",
 		"qualityScore",
 		"swarm",
-		"continuousAI",
 	],
 	interpolation: {
 		escapeValue: false,

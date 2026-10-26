@@ -219,10 +219,9 @@ class ReplayResult:
 class ReplayBudget:
     """A cap on how much one replay may spend.
 
-    Mirrors the daily cap `continuous_ai` already enforces
-    (`ContinuousAIStatus.is_over_budget`), for the same reason: the learning
-    loop runs unattended, and an unattended loop with no ceiling is a way to
-    find out what your API bill can reach.
+    The same reason automations carry a daily cap on the cards they create:
+    the learning loop runs unattended, and an unattended loop with no ceiling
+    is a way to find out what your API bill can reach.
     """
 
     max_episodes: int = 50
