@@ -2738,3 +2738,50 @@ Justification : [`needs-you.md`](../architecture/needs-you.md).
 
 Vérification : `cd apps/frontend && pnpm test -- needs-you notification-service
 task-state-manager NeedsYouChannels useNeedsYou`.
+
+### G4 — Traces OpenTelemetry GenAI pour tous les providers
+
+**Fait.** `apps/backend/genai_trace/` émet un span `invoke_agent` par réponse de client, un `chat`
+par appel modèle mesuré et un `execute_tool` par outil, aux attributs `gen_ai.*`, pour chaque
+`AgentClient`. Le crochet est unique : `AgentClient.__init_subclass__` enveloppe `query` et
+`receive_response`, et un test vérifie que chaque client réel l'est.
+
+- **Activation.** Par l'endpoint qui servait déjà au SDK Claude (`AUTO_CLAUDE_OTEL_ENDPOINT`).
+  L'export se fait en OTLP `http/protobuf`, avec `opentelemetry-sdk` et l'exporteur HTTP ajoutés
+  au lockfile sans changer d'autre version.
+- **Contenu.** Jamais de prompt, de sortie, d'argument ni de message d'erreur dans un span.
+- **Usage.** Un nombre que le provider ne donne pas est absent, pas nul. Une réponse sans aucun
+  appel mesuré est estimée (caractères ÷ 4) et marquée `estimated`. `record_client_usage`
+  l'écrit dans `cost_data.json` au lieu de laisser la session disparaître, et chaque ligne y
+  porte `usage_source`.
+- **Contrat d'imports.** `genai_trace` est une feuille. `harness` est autorisé à l'importer
+  (`tests/test_import_contracts.py`), et la taille du cycle ne change pas.
+
+Justification : [`genai-traces.md`](../architecture/genai-traces.md).
+
+Vérification : `pytest tests/genai_trace -q`.
+
+### G8 — Bac à sable de l'OS autour des commandes d'agent
+
+**Fait (Linux, macOS).** `apps/backend/os_sandbox/` fait tourner le processus de l'agent dans un
+bac à sable de l'OS : bubblewrap sous Linux, Seatbelt sous macOS. Il complète l'allowlist et
+`path_guard`, qui jugent une commande avant qu'elle tourne.
+
+- **Qui.** Chaque commande de la boucle WorkPilot (`run_command`), et le processus entier
+  d'OpenCode et de pi, avec le profil `sandbox:` de leur entrée dans `providers.yaml`. Claude
+  Code et Codex gardent leur propre bac à sable, rapporté `delegated`. Antigravity n'a pas de
+  profil et la carte le dit.
+- **Quoi.** Écritures dans le worktree, la spec, le répertoire git commun, les caches de paquets
+  et l'état du CLI ; configuration de sécurité, `.git/hooks` et `.git/config` en lecture seule ;
+  identifiants de la personne masqués (`~/.ssh`, cloud, `gh`, registres, jetons des CLI, `.env`).
+- **Réseau.** Aucun, sauf un proxy filtrant : hôtes du provider, registres de paquets,
+  `WORKPILOT_SANDBOX_HOSTS`. Un refus est nommé dans la sortie de la commande.
+- **Garde-fou.** Le probe lance le bac à sable pour de vrai. Sans lui, la carte et le fil le
+  disent au lancement (`SANDBOX_STATUS`, `TaskSandboxNotice`) ; `WORKPILOT_SANDBOX=required`
+  refuse de démarrer.
+- **Pas livré.** Windows (AppContainer, job object) : la carte dit « non isolé ».
+
+Justification : [`os-sandbox.md`](../architecture/os-sandbox.md).
+
+Vérification : `pytest tests/os_sandbox -q` (le vrai bac à sable sous
+`WORKPILOT_EXPECT_SANDBOX=1`) et `cd apps/frontend && pnpm test -- task-sandbox TaskSandboxNotice`.

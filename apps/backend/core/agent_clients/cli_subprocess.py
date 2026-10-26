@@ -188,6 +188,9 @@ class CliSubprocessAgentClient(AgentClient):
 
     #: Human label used in errors ("OpenCode CLI is not installed…").
     cli_label = "CLI"
+    #: The providers.yaml entry whose ``sandbox:`` block this CLI runs under;
+    #: None reads `provider_name()`.
+    sandbox_provider: str | None = None
 
     def __init__(
         self,
@@ -216,6 +219,50 @@ class CliSubprocessAgentClient(AgentClient):
         self.last_context_tokens: int | None = None
         self.context_window_tokens: int | None = None
         self.context_usage_source: str = "reported"
+        self._sandbox: Any = None
+
+    def session_sandbox(self, spec_dir: Path | str | None = None) -> Any:
+        """The OS sandbox this CLI's process runs in, decided once.
+
+        The whole process is wrapped: the CLI runs its own commands, so its
+        commands are as confined as it is. Its state directories and hosts
+        come from its ``sandbox:`` entry in ``providers.yaml``; without one it
+        is not wrapped, and that is reported, not guessed around. Raises
+        `os_sandbox.SandboxRequiredError` under ``WORKPILOT_SANDBOX=required``.
+        """
+        if self._sandbox is None:
+            import shutil
+
+            from os_sandbox import session_sandbox
+            from os_sandbox.policy import install_dir
+            from skills_registry.providers import get_provider_capabilities
+
+            name = self.sandbox_provider or self.provider_name()
+            spec = get_provider_capabilities(name).sandbox
+            readable = [
+                install_dir(path)
+                for path in (self._resolve_executable(), shutil.which("node"))
+                if path
+            ]
+            self._sandbox = session_sandbox(
+                self._project_dir,
+                spec_dir or getattr(self, "_spec_dir", None),
+                state_dirs=spec.state if spec else (),
+                provider_hosts=spec.network if spec else (),
+                state_read_only=spec.read_only if spec else (),
+                unavailable_reason=None
+                if spec
+                else f"{self.cli_label} has no sandbox profile in capabilities/providers.yaml",
+                readable=readable,
+            )
+        return self._sandbox
+
+    def _resolve_executable(self) -> str | None:
+        return self._executable
+
+    def _launch(self, command: list[str]) -> tuple[list[str], dict[str, str]]:
+        """The command and environment as started: under the sandbox if on."""
+        return self.session_sandbox().wrap(command, self._subprocess_env())
 
     async def __aenter__(self) -> CliSubprocessAgentClient:
         return self
@@ -268,10 +315,11 @@ class CliSubprocessAgentClient(AgentClient):
         return env
 
     async def _spawn(self, command: list[str], stdin_data: bytes) -> Any:
+        argv, env = self._launch(command)
         process = await self._process_factory(
-            *command,
+            *argv,
             cwd=self._project_dir,
-            env=self._subprocess_env(),
+            env=env,
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,

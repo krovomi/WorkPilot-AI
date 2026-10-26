@@ -450,6 +450,20 @@ the backend environment, then from `.workpilot/.env`:
 | `VERIFY_CHROME_PATH` | — | A specific Chrome/Chromium binary. |
 | `CHROME_PATH` | — | Same, read when `VERIFY_CHROME_PATH` is unset. A path that is not an existing file is ignored. |
 
+## OS sandbox (`os_sandbox`)
+
+Agent commands run under bubblewrap (Linux) or Seatbelt (macOS), see
+[architecture/os-sandbox.md](architecture/os-sandbox.md). Read from the backend environment:
+
+| Variable | Default | Meaning |
+| --- | ---: | --- |
+| `WORKPILOT_SANDBOX` | `auto` | `auto`: sandboxed when the machine can, otherwise the build runs and its card says commands are not isolated. `required`: a build that cannot be sandboxed does not start. `off`: never sandboxed (the card says so). |
+| `WORKPILOT_SANDBOX_HOSTS` | — | Extra hosts a sandboxed process may reach, comma separated: `nexus.corp.example`, `*.corp.example` (subdomains only), `127.0.0.1:5000` (a local port). Remote hosts open 443 and 80 only. |
+
+On Ubuntu 24.04 and later, unprivileged user namespaces are restricted by AppArmor and bubblewrap
+fails; the card says so. `sudo sysctl kernel.apparmor_restrict_unprivileged_userns=0` (or an
+AppArmor profile for `bwrap`) lifts it. Claude Code's own sandbox on Linux also needs `socat`.
+
 ## RUN tasks — `.workpilot/environments.toml`
 
 A card of kind `run` (an operation on something that runs: restart, purge, migrate data,
@@ -526,7 +540,7 @@ planner, coder, QA…).
 | `AUTO_CLAUDE_MAX_TURNS` | 1000 | Maximum agent turns in one session. A value that is not an integer stops the session from starting. |
 | `AUTO_CLAUDE_MAX_BUDGET_USD` | 5.0 | Spending cap, in US dollars, of one session — not of the task — on every provider. Past it the session ends (the Claude SDK ends it itself; for the other providers the session runner does, from each call's measured usage and the model's price in `cost_intelligence/catalog.py`) and the Kanban offers to resume. A model without a known price is not capped. 0 or less removes the cap; a value that is not a number falls back to 5.0. |
 | `AUTO_CLAUDE_EFFORT` | the phase's thinking level | Forces the SDK `effort` level (`low`, `medium`, `high`, `xhigh`, `max`) of sessions on an Opus model; other models ignore it. Without it, the effort follows the thinking level the user chose for the phase: `none` and `low` → `low`, `medium` → `medium`, `high` → `high`, `ultrathink` → `xhigh`. Opus 5.5 takes no thinking budget, so this is its only reasoning control. |
-| `AUTO_CLAUDE_OTEL_ENDPOINT` | — | OTLP endpoint, such as `http://localhost:4318`. When set, each session exports traces, metrics and logs over OTLP `http/protobuf` as the service `workpilot-<agent type>`, and these settings replace any `OTEL_*` variable of the same name. Point it only at a collector you control. |
+| `AUTO_CLAUDE_OTEL_ENDPOINT` | — | OTLP endpoint, such as `http://localhost:4318`. When set, each session exports traces, metrics and logs over OTLP `http/protobuf` as the service `workpilot-<agent type>`, and these settings replace any `OTEL_*` variable of the same name. It also turns on WorkPilot's own GenAI spans for every provider (`invoke_agent`, `chat`, `execute_tool`; no prompt or output), sent to `<endpoint>/v1/traces` as the service `workpilot`, with any key read from `OTEL_EXPORTER_OTLP_HEADERS` ([genai-traces.md](architecture/genai-traces.md)). Point it only at a collector you control. |
 | `AUTO_CLAUDE_AGENT_DEBUGGER` | off | `1`, `true`, `yes` or `on` attaches the Agent Debugger's breakpoints to every session, even when the debugger was not opened for that task. |
 | `CLAUDE_CLI_PATH` | the SDK's bundled CLI | `claude` executable the SDK launches. Ignored when it is not an existing file or holds shell metacharacters, `..` or a variable reference. The desktop app sets it from detection or the Claude path setting. |
 | `CLAUDE_CODE_GIT_BASH_PATH` | detected | Windows only: the Git for Windows `bash.exe` the Claude Code CLI needs; WorkPilot also looks for `git.exe` next to it. The desktop app sets it when it finds one. |

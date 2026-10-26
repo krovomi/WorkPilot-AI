@@ -36,6 +36,7 @@ import {
 	persistPlanPhaseSync,
 	persistPlanStatusAndReasonSync,
 } from "./task/plan-file-utils";
+import { handleSandboxTaskEvent } from "./task-sandbox-handlers";
 import { findTaskAndProject } from "./task/shared";
 import { safeSendToRenderer } from "./utils";
 
@@ -474,6 +475,10 @@ export function registerAgenteventsHandlers(
 			);
 			return;
 		}
+
+		// Whether the build's commands run in the OS sandbox: shown on the card,
+		// not a state the task reached.
+		if (handleSandboxTaskEvent(taskId, event, projectId, getMainWindow)) return;
 
 		// Forward decision log entries directly to renderer without going through XState (Feature 30)
 		if (event.type === "DECISION_LOG_ENTRY") {

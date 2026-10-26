@@ -1974,8 +1974,19 @@ def record_client_usage(
     try:
         _usage = getattr(client, "last_usage", None)
         tokens = session_usage_fields(client)
+        source = "reported"
         if tokens is None:
-            return
+            # The provider reported nothing: the response's size, read from its
+            # characters (genai_trace), rather than a session that vanishes
+            # from the cost data or counts as zero.
+            estimate = getattr(client, "genai_estimate", None)
+            if not isinstance(estimate, dict):
+                return
+            tokens = {
+                "input_tokens": int(estimate.get("input_tokens") or 0),
+                "output_tokens": int(estimate.get("output_tokens") or 0),
+            }
+            source = "estimated"
         _record_usage(
             spec_dir=spec_dir,
             project_dir=spec_dir.parent.parent.parent,
@@ -1984,6 +1995,7 @@ def record_client_usage(
             model=getattr(client, "model", "unknown"),
             provider=client.provider_name(),
             cost_usd=(_usage.get("cost_usd", 0.0) if isinstance(_usage, dict) else 0.0),
+            usage_source=source,
             **tokens,
         )
     except Exception as _ute:  # noqa: BLE001 - telemetry never stops a build
