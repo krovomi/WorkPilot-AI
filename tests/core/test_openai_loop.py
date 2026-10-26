@@ -624,3 +624,71 @@ async def test_a_null_field_ends_the_turn(costs, data):
     messages = await _collect(client)
 
     assert _shape(messages) == [("assistant", "text", "hi")]
+
+
+# ---------------------------------------------------------------------------
+# An effort the model refuses is dropped, never a failed phase
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_a_refused_effort_is_retried_without_it_and_said(costs):
+    refusal = _Response(
+        400,
+        body='{"error": {"message": "Unsupported parameter: \'reasoning_effort\'"}}',
+    )
+    client, session = _client(
+        [refusal, _choice("Done.")], model="gpt-5.5", reasoning_effort="high"
+    )
+
+    messages = await _collect(client)
+
+    assert session.payloads[0]["reasoning_effort"] == "high"
+    assert "reasoning_effort" not in session.payloads[1]
+    shape = _shape(messages)
+    assert shape[0][0:2] == ("system", "text")
+    assert "refused the effort setting (reasoning_effort)" in shape[0][2]
+    assert shape[-1] == ("assistant", "text", "Done.")
+    # The session stops sending it: every later turn would be refused too.
+    assert client._reasoning_effort is None
+
+
+@pytest.mark.asyncio
+async def test_a_400_about_something_else_still_ends_the_response(costs):
+    client, session = _client(
+        [_Response(400, body="messages: invalid role")],
+        model="gpt-5.5",
+        reasoning_effort="high",
+    )
+
+    messages = await _collect(client)
+
+    assert len(session.payloads) == 1
+    assert _shape(messages) == [
+        ("system", "text", "OpenAI API error (400): messages: invalid role")
+    ]
+
+
+@pytest.mark.asyncio
+async def test_a_compatible_providers_effort_fields_are_sent_and_dropped_together(
+    costs,
+):
+    client = CompatibleProviderAgentClient(
+        provider="deepseek",
+        model="deepseek-flash",
+        api_key="sk-test-0000",
+        base_url="https://api.deepseek.com",
+        effort_params={"thinking": {"type": "disabled"}},
+    )
+    client._tool_definitions = [{"name": "read_file", "parameters": {}}]
+    client._tool_executor = _Executor()
+    session = _Session(
+        [_Response(400, body="thinking: unknown field"), _choice("Done.")]
+    )
+    client._http_client = session
+
+    messages = await _collect(client)
+
+    assert session.payloads[0]["thinking"] == {"type": "disabled"}
+    assert "thinking" not in session.payloads[1]
+    assert _shape(messages)[-1] == ("assistant", "text", "Done.")

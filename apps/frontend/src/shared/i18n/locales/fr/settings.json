@@ -2376,5 +2376,35 @@
 		"enabledHint": "Décidé par tâche d'après les fichiers du plan ; la carte Kanban permet d'écarter une tâche.",
 		"persistMaster": "Écrire le design system dans le projet",
 		"persistMasterHint": "Quand le projet n'en a pas, design-system/<projet>/MASTER.md est ajouté au diff de la tâche pour que les tâches UI suivantes le réutilisent."
+	},
+	"needsYou": {
+		"title": "Me prévenir ailleurs",
+		"description": "Quand une tâche t'attend (plan à approuver, revue, QA qui passe la main, erreur), l'envoyer aussi sur ton téléphone. Les titres de tâches partent vers le service choisi ; le détail des erreurs reste sur cet ordinateur.",
+		"ntfy": {
+			"title": "ntfy",
+			"description": "Notifications push par un topic ntfy (ntfy.sh ou ton propre serveur). Notification seulement.",
+			"topic": "Topic",
+			"generate": "Générer",
+			"topicHint": "Sur ntfy.sh, quiconque connaît le topic le lit : garde celui qui est généré (16 caractères au moins). Abonne-toi dans l'app ntfy.",
+			"server": "Serveur",
+			"token": "Jeton d'accès (facultatif)"
+		},
+		"telegram": {
+			"title": "Telegram",
+			"description": "Des messages de ton propre bot (à créer avec @BotFather).",
+			"botToken": "Jeton du bot",
+			"chatId": "Ton identifiant",
+			"chatIdHint": "Envoie /start à ton bot depuis une conversation privée, puis indique ton identifiant numérique. Les messages de toute autre personne sont ignorés.",
+			"remoteApproval": "Approuver les plans depuis Telegram",
+			"remoteApprovalHint": "Un message « plan en attente » porte un bouton Approuver. Il approuve ce plan seulement, une fois, dans les 30 minutes, et seulement si WorkPilot est ouvert. Les revues, les merges et tout ce qui est irréversible passent toujours par l'app."
+		},
+		"test": "Envoyer un test",
+		"testHint": "Envoie à partir des réglages enregistrés : enregistre d'abord.",
+		"result": "ntfy : {{ntfy}} · Telegram : {{telegram}}",
+		"outcome": {
+			"sent": "envoyé",
+			"failed": "échec",
+			"off": "non configuré"
+		}
 	}
 }

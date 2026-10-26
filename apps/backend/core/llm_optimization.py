@@ -21,8 +21,14 @@ Design (matches industry guidance from Anthropic / OpenAI / Google docs):
    ultrathink, stored as an Anthropic-style token budget) is translated to each
    provider's native effort control:
      - Anthropic: handled natively by the Claude Agent SDK (`max_thinking_tokens`)
-     - OpenAI reasoning models (o-series, gpt-5*): `reasoning_effort`
+     - OpenAI reasoning models (o-series, gpt-5+): `reasoning_effort`
+     - Gemini 2.5+, Grok 4.5+, DeepSeek V4, Mistral reasoning models: their
+       own `reasoning_effort` (DeepSeek's "none" is `thinking: disabled`)
      - others: no equivalent — omitted (the trunk never sends unknown params)
+   `effort_plan()` is the one answer to "what does this provider receive for
+   this level": the clients send it, the task feed traces it and the picker
+   shows it (`GET /providers/effort`), so none of them can claim an effort
+   the model never saw.
 
 4. **Prompt-cache routing** — OpenAI's automatic caching benefits from a
    `prompt_cache_key` so requests of the same task/phase land on the same cache
@@ -231,18 +237,51 @@ def _rtk_awareness() -> str:
 # Budget thresholds mirror phase_config.THINKING_BUDGET_MAP
 # (none=None, low=1024, medium=4096, high=16384, ultrathink=63999).
 _OPENAI_EFFORT_BY_LEVEL: dict[str, str | None] = {
-    "none": None,  # omit the parameter entirely
+    "none": None,  # resolved per model by _openai_lowest_effort
     "low": "low",
     "medium": "medium",
     "high": "high",
-    # xhigh exists only on the newest OpenAI models; "high" is accepted by all
-    # reasoning models, so it is the safe ceiling for ultrathink.
-    "ultrathink": "high",
+    "ultrathink": "high",  # "xhigh" where the model takes it
 }
 
 # Models that accept the `reasoning_effort` chat-completions parameter:
-# o-series (o1, o3, o4-mini, ...) and gpt-5 family. gpt-4o/gpt-4.1 reject it.
-_OPENAI_REASONING_MODEL_RE = re.compile(r"^(o\d|gpt-5)")
+# o-series (o1, o3, o4-mini, ...) and gpt-5 onwards. gpt-4o/gpt-4.1 reject it,
+# and so do the `-chat` snapshots (gpt-5-chat-latest), which do not reason.
+_OPENAI_REASONING_MODEL_RE = re.compile(r"^(o\d|gpt-([5-9]|\d{2,}))")
+_OPENAI_VERSION_RE = re.compile(r"^gpt-(\d+)(?:\.(\d+))?")
+
+
+def _openai_version(model: str) -> tuple[int, int] | None:
+    match = _OPENAI_VERSION_RE.match(model)
+    if not match:
+        return None
+    return int(match.group(1)), int(match.group(2) or 0)
+
+
+def _openai_lowest_effort(model: str) -> str:
+    """The effort that comes closest to "no reasoning" on this model.
+
+    gpt-5.1 and later take "none", gpt-5 itself "minimal"; the o-series and the
+    Codex models stop at "low", the `-pro` models at "medium". Omitting the
+    parameter instead runs the model's default — "medium" on most of them —
+    which is the opposite of what the person asked for.
+    """
+    if model.startswith("o") or "codex" in model:
+        return "low"
+    if model.endswith("-pro") or "-pro-" in model:
+        return "medium"
+    version = _openai_version(model)
+    if version is not None and version >= (5, 1):
+        return "none"
+    return "minimal"
+
+
+def _openai_takes_xhigh(model: str) -> bool:
+    """xhigh arrived with gpt-5.1-codex-max and is general from gpt-5.2."""
+    if "codex-max" in model:
+        return True
+    version = _openai_version(model)
+    return version is not None and version >= (5, 2)
 
 
 def _thinking_level_from_budget(budget: int | None) -> str:
@@ -262,12 +301,18 @@ def openai_reasoning_effort(
 ) -> str | None:
     """Translate the Kanban thinking budget to OpenAI's `reasoning_effort`.
 
-    Returns None when the parameter must be omitted (non-reasoning model, or
-    effort level "none").
+    Returns None when the parameter must be omitted (a model that does not
+    reason). Every level of the selector reaches a reasoning model: "none" as
+    its lowest effort, "ultrathink" as its highest.
     """
-    if not model or not _OPENAI_REASONING_MODEL_RE.match(model):
+    name = (model or "").strip().lower()
+    if not name or not _OPENAI_REASONING_MODEL_RE.match(name) or "-chat" in name:
         return None
     level = _thinking_level_from_budget(thinking_budget)
+    if level == "none":
+        return _openai_lowest_effort(name)
+    if level == "ultrathink" and _openai_takes_xhigh(name):
+        return "xhigh"
     return _OPENAI_EFFORT_BY_LEVEL.get(level)
 
 
@@ -309,6 +354,9 @@ _GEMINI_EFFORT_BY_LEVEL: dict[str, str] = {
 
 # Gemini 2.5 and later think; earlier models have no reasoning setting.
 _GEMINI_THINKING_MODEL_RE = re.compile(r"^(models/)?gemini-(2\.5|[3-9])")
+# ai.google.dev/gemini-api/docs/openai: "Reasoning cannot be turned off for
+# Gemini 2.5 Pro or 3 models"; 2.5 Flash and Flash-Lite take "none".
+_GEMINI_CAN_STOP_THINKING_RE = re.compile(r"^(models/)?gemini-2\.5-flash")
 
 
 def gemini_reasoning_effort(model: str, thinking_budget: int | None) -> str | None:
@@ -319,8 +367,140 @@ def gemini_reasoning_effort(model: str, thinking_budget: int | None) -> str | No
     if not model or not _GEMINI_THINKING_MODEL_RE.match(model):
         return None
     if not thinking_budget:
+        # 2.5 Flash and Flash-Lite are the models that can stop thinking.
+        if _GEMINI_CAN_STOP_THINKING_RE.match(model):
+            return "none"
         return _GEMINI_EFFORT_BY_LEVEL["none"]
     return _GEMINI_EFFORT_BY_LEVEL[_thinking_level_from_budget(thinking_budget)]
+
+
+# ---------------------------------------------------------------------------
+# Grok, DeepSeek, Mistral: OpenAI-compatible APIs, each with its own scale
+# ---------------------------------------------------------------------------
+
+# xAI (docs.x.ai, "Reasoning"): grok-4.5 and later take low|medium|high, and
+# xhigh from 4.6 (4.5 reads it as high). Reasoning cannot be turned off, so
+# "none" is "low". grok-3-mini, the older reasoning model, takes low|high.
+# The `-non-reasoning` variants take nothing, and on grok-4.20-multi-agent the
+# same parameter sets how many agents collaborate: never sent there.
+_GROK_VERSION_RE = re.compile(r"^grok-(\d+)(?:[.-](\d+))?")
+
+
+def grok_reasoning_effort(model: str, thinking_budget: int | None) -> str | None:
+    """Translate the Kanban thinking budget to xAI's `reasoning_effort`."""
+    name = (model or "").strip().lower()
+    if "non-reasoning" in name or "multi-agent" in name:
+        return None
+    level = _thinking_level_from_budget(thinking_budget) if thinking_budget else "none"
+    if name.startswith("grok-3-mini"):
+        return "low" if level in ("none", "low") else "high"
+    match = _GROK_VERSION_RE.match(name)
+    if not match:
+        return None
+    major = int(match.group(1))
+    minor = match.group(2) or "0"
+    # "4.20" is the release before 4.3, not after 4.9: only a one-digit minor
+    # orders the 4.x line.
+    if major == 4 and (len(minor) != 1 or int(minor) < 5):
+        return None
+    if major < 4:
+        return None
+    if level == "none":
+        return "low"
+    if level == "ultrathink":
+        return "xhigh" if major > 4 or int(minor) >= 6 else "high"
+    return level
+
+
+# DeepSeek (api-docs.deepseek.com, "Thinking Mode"): deepseek-flash and
+# deepseek-v4-pro think by default at "high"; `reasoning_effort` takes
+# low|high|max and `thinking: {"type": "disabled"}` turns thinking off.
+# deepseek-chat / deepseek-reasoner predate the setting.
+_DEEPSEEK_THINKING_RE = re.compile(r"^deepseek-(flash|v([4-9]|\d{2,}))")
+_DEEPSEEK_EFFORT_BY_LEVEL = {
+    "low": "low",
+    "medium": "high",
+    "high": "high",
+    "ultrathink": "max",
+}
+
+
+def deepseek_effort_params(
+    model: str, thinking_budget: int | None
+) -> dict[str, Any] | None:
+    """The request fields that carry the effort to DeepSeek, or None."""
+    name = (model or "").strip().lower()
+    if not _DEEPSEEK_THINKING_RE.match(name):
+        return None
+    level = _thinking_level_from_budget(thinking_budget) if thinking_budget else "none"
+    if level == "none":
+        return {"thinking": {"type": "disabled"}}
+    return {"reasoning_effort": _DEEPSEEK_EFFORT_BY_LEVEL[level]}
+
+
+# Mistral (docs.mistral.ai, "Reasoning"): mistral-small-latest,
+# mistral-medium-3-5 and mistral-large-4-0 take `reasoning_effort`, documented
+# as "high" (a thinking chunk first) or "none" (minimal thinking). There is no
+# step between the two. Small 4 is served as `mistral-small-2603`; the older
+# dated snapshots (Small 3.x, Large 3 `-2512`) predate the setting, and the
+# Magistral models reason on their own and are deprecated.
+_MISTRAL_EFFORT_MODEL_RE = re.compile(
+    r"^mistral-("
+    r"(small|medium|large)-latest$"
+    r"|medium-(3-[5-9]|[4-9])(-|$)"
+    r"|large-[4-9](-|$)"
+    r"|small-[4-9](-|$)"
+    r")"
+)
+_MISTRAL_SMALL_DATED_RE = re.compile(r"^mistral-small-(\d{4})$")
+
+
+def mistral_reasoning_effort(model: str, thinking_budget: int | None) -> str | None:
+    """Translate the Kanban thinking budget to Mistral's `reasoning_effort`."""
+    name = (model or "").strip().lower()
+    dated = _MISTRAL_SMALL_DATED_RE.match(name)
+    takes_effort = bool(_MISTRAL_EFFORT_MODEL_RE.match(name)) or bool(
+        dated and int(dated.group(1)) >= 2603
+    )
+    if not takes_effort:
+        return None
+    return "high" if thinking_budget else "none"
+
+
+def compatible_effort_params(
+    provider: str, model: str, thinking_budget: int | None
+) -> dict[str, Any] | None:
+    """The effort fields for one of the OpenAI-compatible providers, or None."""
+    if provider == "deepseek":
+        return deepseek_effort_params(model, thinking_budget)
+    if provider == "grok":
+        effort = grok_reasoning_effort(model, thinking_budget)
+    elif provider == "mistral":
+        effort = mistral_reasoning_effort(model, thinking_budget)
+    else:
+        return None
+    return {"reasoning_effort": effort} if effort else None
+
+
+def effort_was_rejected(status: int, error_text: str) -> bool:
+    """Whether an API refusal is about the effort fields the request carried.
+
+    A provider that does not take the setting on a model answers 400 (422 on
+    some gateways) and names the field. The effort is an optimisation: such a
+    refusal is answered by retrying without it, never by failing the phase.
+    """
+    if status not in (400, 422):
+        return False
+    text = (error_text or "").lower()
+    return any(
+        token in text
+        for token in (
+            "reasoning_effort",
+            "reasoning.effort",
+            "reasoning effort",
+            "thinking",
+        )
+    )
 
 
 def _positive_int(value: Any) -> int | None:

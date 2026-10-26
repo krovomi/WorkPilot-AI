@@ -128,8 +128,10 @@ vi.mock("../updater/version-manager", () => ({
 vi.mock("../notification-service", () => ({
 	notificationService: {
 		initialize: vi.fn(),
-		notifyReviewNeeded: vi.fn(),
-		notifyTaskFailed: vi.fn(),
+		notify: vi.fn(),
+		revoke: vi.fn(),
+		refreshRemote: vi.fn(),
+		stop: vi.fn(),
 	},
 }));
 

@@ -487,11 +487,38 @@ class _CopilotAdapter(ChatCompletionsAdapter):
                                 f"'{fallback}'.",
                                 flush=True,
                             )
+                            requested = client.model
                             client.model = fallback
                             payload["model"] = fallback
                             # The budget's bounds were the old model's.
                             client._session_thinking_budget = None
                             payload.pop("thinking_budget", None)
+                            # The task card still names the model it asked
+                            # for: say in the feed which one answers.
+                            yield self.notice(
+                                f"⚠️ Copilot does not serve {requested}; "
+                                f"this phase runs on {fallback}."
+                            )
+                            continue
+                        from core.llm_optimization import effort_was_rejected
+
+                        if "thinking_budget" in payload and effort_was_rejected(
+                            resp.status, error_text
+                        ):
+                            # The effort is an optimisation, never a reason
+                            # to fail the phase: retry the turn without it.
+                            payload.pop("thinking_budget", None)
+                            client._session_thinking_budget = None
+                            logger.warning(
+                                "[CopilotAgentClient] %s refused thinking_budget; "
+                                "retrying without it",
+                                client.model,
+                            )
+                            yield self.notice(
+                                f"⚠️ {client.model} refused the effort setting "
+                                "(thinking_budget); continuing at the model's "
+                                "default effort."
+                            )
                             continue
                         # A different 400 (e.g. malformed request) — surface.
                         logger.error(
