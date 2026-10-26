@@ -100,6 +100,7 @@ composition, qui importe les agents. Les autres modules sortis de `core` par le 
 | `mobile/` | Android / Apple : piles, appareils, `readiness.py` (constructible ici ?) |
 | `verify/` | boucle `/verify` : lancer l'app, erreurs → correction, preuve |
 | `pr_followup/` | la PR d'une tâche suivie jusqu'au merge : `policy.decide` (pure), gardes du diff de correctif, GitHub par `gh`, `run_round` ; runner `runners/pr_followup_runner.py` ([justification](../../docs/architecture/pr-followup.md)) |
+| `best_of_n/` | best-of-N : variantes d'une tâche (une par moteur), classement chiffré, adoption de la variante choisie ([best-of-n.md](../../docs/architecture/best-of-n.md)) |
 | `goal/` | mode objectif : une commande et son code de sortie disent « fini » ; chemins protégés, plafond de dépense ([goal-mode.md](../../docs/architecture/goal-mode.md)) |
 | `architecture_visualizer/` | carte archify du projet et delta par tâche |
 | `bounty_board/` | N modèles sur une spec, preuves mesurées, juge anonyme |

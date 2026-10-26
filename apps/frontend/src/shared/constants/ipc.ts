@@ -88,6 +88,11 @@ export const IPC_CHANNELS = {
 	TASK_PR_FOLLOWUP_START: "task:prFollowupStart", // Drive the task's PR to merge: fix red checks and review threads
 	TASK_PR_FOLLOWUP_STOP: "task:prFollowupStop",
 	TASK_PR_FOLLOWUP_STATUS: "task:prFollowupStatus", // Running or not, and the last look at the PR
+	TASK_BEST_OF_N_START: "task:bestOfNStart", // Build the task N ways, one worktree and engine each (best-of-N)
+	TASK_BEST_OF_N_STATUS: "task:bestOfNStatus", // <spec>/best_of_n.json and the variants running now
+	TASK_BEST_OF_N_RANK: "task:bestOfNRank", // Measure and rank the variants again
+	TASK_BEST_OF_N_ADOPT: "task:bestOfNAdopt", // Make the chosen variant the task's build, remove the others
+	TASK_BEST_OF_N_DISCARD: "task:bestOfNDiscard", // Stop and remove every variant
 	TASK_WORKTREE_OPEN_IN_IDE: "task:worktreeOpenInIDE",
 	TASK_WORKTREE_OPEN_IN_TERMINAL: "task:worktreeOpenInTerminal",
 	TASK_WORKTREE_DETECT_TOOLS: "task:worktreeDetectTools", // Detect installed IDEs/terminals
@@ -107,6 +112,7 @@ export const IPC_CHANNELS = {
 	TASK_EXECUTION_PROGRESS: "task:executionProgress",
 	TASK_VISUAL_PROOF_RUNNING: "task:visualProofRunning", // Event: visual proof run started/finished (main -> renderer)
 	TASK_PR_FOLLOWUP_EVENT: "task:prFollowupEvent", // Event: a look at the PR, or the follow-through stopped (main -> renderer)
+	TASK_BEST_OF_N_EVENT: "task:bestOfNEvent", // Event: a variant started or ended, a ranking, an adoption (main -> renderer)
 
 	// Task phase logs (persistent, collapsible logs by phase)
 	TASK_LOGS_GET: "task:logsGet", // Load logs from spec dir

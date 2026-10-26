@@ -77,6 +77,7 @@ fichier-ci reste l'autorité sur les règles.
 | Applications mobiles | [mobile.md](architecture/mobile.md) | Détection de pile, appareils, chaîne d'outils ; iOS seulement sur macOS. |
 | Boucle de vérification | [verify.md](architecture/verify.md) | Lancer l'app, corriger, confirmer l'état, mesurer, garder la preuve. |
 | Suivi de la PR | [pr-followup.md](architecture/pr-followup.md) | La carte fait avancer sa PR jusqu'au merge : check rouge ou fil de revue au QA fixer, commit vérifié (aucun test sauté, aucune CI modifiée), push jamais forcé ; une forge illisible n'est jamais du vert, un échec rouge aussi sur la base n'est pas « corrigé ». |
+| Best-of-N | [best-of-n.md](architecture/best-of-n.md) | Une tâche construite N fois, une variante par moteur ; classement chiffré, choix humain, rien de fusionné. |
 | Mode objectif | [goal-mode.md](architecture/goal-mode.md) | Une commande dit « fini » : chemins protégés, plafond de passes et de dépense, fichier qu'aucun agent n'écrit. |
 | Bounty Board | [bounty-board.md](architecture/bounty-board.md) | Concours notés sur artefacts ; une preuve absente renormalise, ne vaut jamais zéro. |
 | Délégation aux sous-agents | [delegation.md](architecture/delegation.md) | `native` (Claude), `emulated` (outil `delegate` + session enfant du même client sur la boucle WorkPilot), `none` (CLI) ; le scope d'un enfant ne s'élargit jamais. |

@@ -37,6 +37,7 @@ import {
 	persistPlanPhaseSync,
 	persistPlanStatusAndReasonSync,
 } from "./task/plan-file-utils";
+import { isBestOfNVariant } from "./task/best-of-n-handlers";
 import { findTaskAndProject } from "./task/shared";
 import { safeSendToRenderer } from "./utils";
 
@@ -406,6 +407,9 @@ export function registerAgenteventsHandlers(
 			processType: ProcessType,
 			projectId?: string,
 		) => {
+			// A best-of-N variant is not on the board: its handler reads its exit.
+			if (isBestOfNVariant(taskId)) return;
+
 			// Use projectId from event to scope the lookup (prevents cross-project contamination)
 			const { task: exitTask, project: exitProject } = findTaskAndProject(
 				taskId,

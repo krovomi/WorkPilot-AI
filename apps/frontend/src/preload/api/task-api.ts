@@ -1,8 +1,10 @@
 import { ipcRenderer } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
 import type {
+	BestOfNStatus,
 	ContextAction,
 	ContextPolicy,
+	EngineTrio,
 	ImageAttachment,
 	ImplementationPlan,
 	IPCResult,
@@ -264,6 +266,19 @@ export interface TaskAPI {
 	getPrFollowupStatus: (
 		taskId: string,
 	) => Promise<IPCResult<PrFollowupStatus>>;
+	/** Build the task once per engine (2-4), each in its own worktree. */
+	startBestOfN: (
+		taskId: string,
+		engines: EngineTrio[],
+	) => Promise<IPCResult<BestOfNStatus>>;
+	getBestOfNStatus: (taskId: string) => Promise<IPCResult<BestOfNStatus>>;
+	rankBestOfN: (taskId: string) => Promise<IPCResult<BestOfNStatus>>;
+	/** Make the chosen variant the task's build and remove the others. */
+	adoptBestOfN: (
+		taskId: string,
+		variantSpecId: string,
+	) => Promise<IPCResult<BestOfNStatus>>;
+	discardBestOfN: (taskId: string) => Promise<IPCResult<BestOfNStatus>>;
 	getPRDetails: (
 		prNumber: number,
 		taskId?: string,
@@ -342,6 +357,11 @@ export interface TaskAPI {
 	// PR follow-through events
 	onPrFollowupEvent: (
 		callback: (taskId: string, status: PrFollowupStatus) => void,
+	) => () => void;
+
+	// Best-of-N events
+	onBestOfNEvent: (
+		callback: (taskId: string, status: BestOfNStatus) => void,
 	) => () => void;
 }
 
@@ -755,6 +775,27 @@ export const createTaskAPI = (): TaskAPI => ({
 	): Promise<IPCResult<PrFollowupStatus>> =>
 		ipcRenderer.invoke(IPC_CHANNELS.TASK_PR_FOLLOWUP_STATUS, taskId),
 
+	startBestOfN: (
+		taskId: string,
+		engines: EngineTrio[],
+	): Promise<IPCResult<BestOfNStatus>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_BEST_OF_N_START, taskId, engines),
+
+	getBestOfNStatus: (taskId: string): Promise<IPCResult<BestOfNStatus>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_BEST_OF_N_STATUS, taskId),
+
+	rankBestOfN: (taskId: string): Promise<IPCResult<BestOfNStatus>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_BEST_OF_N_RANK, taskId),
+
+	adoptBestOfN: (
+		taskId: string,
+		variantSpecId: string,
+	): Promise<IPCResult<BestOfNStatus>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_BEST_OF_N_ADOPT, taskId, variantSpecId),
+
+	discardBestOfN: (taskId: string): Promise<IPCResult<BestOfNStatus>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_BEST_OF_N_DISCARD, taskId),
+
 	getPRDetails: (
 		prNumber: number,
 		taskId?: string,
@@ -979,6 +1020,22 @@ export const createTaskAPI = (): TaskAPI => ({
 		ipcRenderer.on(IPC_CHANNELS.TASK_PR_FOLLOWUP_EVENT, handler);
 		return () => {
 			ipcRenderer.removeListener(IPC_CHANNELS.TASK_PR_FOLLOWUP_EVENT, handler);
+		};
+	},
+
+	onBestOfNEvent: (
+		callback: (taskId: string, status: BestOfNStatus) => void,
+	): (() => void) => {
+		const handler = (
+			_event: Electron.IpcRendererEvent,
+			taskId: string,
+			status: BestOfNStatus,
+		): void => {
+			callback(taskId, status);
+		};
+		ipcRenderer.on(IPC_CHANNELS.TASK_BEST_OF_N_EVENT, handler);
+		return () => {
+			ipcRenderer.removeListener(IPC_CHANNELS.TASK_BEST_OF_N_EVENT, handler);
 		};
 	},
 });

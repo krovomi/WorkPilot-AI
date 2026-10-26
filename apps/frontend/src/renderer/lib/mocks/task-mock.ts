@@ -175,4 +175,27 @@ export const taskMock = {
 	onPrFollowupEvent: () => () => {
 		/* noop */
 	},
+	startBestOfN: async () => ({
+		success: false as const,
+		error: "Best-of-N is not available in the browser preview",
+	}),
+	getBestOfNStatus: async () => ({
+		success: true as const,
+		data: { state: null, running: [] },
+	}),
+	rankBestOfN: async () => ({
+		success: true as const,
+		data: { state: null, running: [] },
+	}),
+	adoptBestOfN: async () => ({
+		success: true as const,
+		data: { state: null, running: [] },
+	}),
+	discardBestOfN: async () => ({
+		success: true as const,
+		data: { state: null, running: [] },
+	}),
+	onBestOfNEvent: () => () => {
+		/* noop */
+	},
 };

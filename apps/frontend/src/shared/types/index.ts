@@ -39,3 +39,4 @@ export * from "./terminal";
 export * from "./time-travel";
 // Goal mode (a command decides when the task is done)
 export * from "./goal";
+export * from "./best-of-n";
