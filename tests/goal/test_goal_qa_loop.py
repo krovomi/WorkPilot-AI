@@ -4,16 +4,24 @@ from __future__ import annotations
 
 import json
 import shlex
+import subprocess
 import sys
 import types
 from pathlib import Path
 
 import pytest
+from foundation.platform import is_windows
 from goal.spec import GOAL_FILENAME
 
-PY = shlex.quote(sys.executable)
+
+def _q(arg: str) -> str:
+    """Quote one argument the way ``split_command`` reads it on this OS."""
+    return subprocess.list2cmdline([arg]) if is_windows() else shlex.quote(arg)
+
+
+PY = _q(sys.executable)
 # Exits 0 once the fixer has written `fixed` in the worktree.
-GOAL_COMMAND = f"{PY} -c " + shlex.quote(
+GOAL_COMMAND = f"{PY} -c " + _q(
     "import pathlib, sys; print('checking'); "
     "sys.exit(0 if pathlib.Path('fixed').exists() else 1)"
 )

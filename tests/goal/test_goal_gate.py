@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from foundation.platform import is_windows
 from goal.check import GoalRun
 from goal.gate import (
     GOAL_ISSUE_TITLE,
@@ -22,7 +23,13 @@ from goal.protect import matches, protected_changes
 from goal.spec import GOAL_FILENAME, GoalSpec
 from goal.spend import task_spend
 
-PY = shlex.quote(sys.executable)
+
+def _q(arg: str) -> str:
+    """Quote one argument the way ``split_command`` reads it on this OS."""
+    return subprocess.list2cmdline([arg]) if is_windows() else shlex.quote(arg)
+
+
+PY = _q(sys.executable)
 
 
 def _git(cwd: Path, *args: str) -> str:
@@ -233,7 +240,7 @@ def test_the_verdict_reaches_the_plan(repo: Path):
         json.dumps({"title": "t"}), encoding="utf-8"
     )
     verdict = evaluate_goal(
-        GoalSpec(command=f"{PY} -c 'raise SystemExit(2)'"), repo, spec_dir
+        GoalSpec(command=f"{PY} -c {_q('raise SystemExit(2)')}"), repo, spec_dir
     )
     record_verdict(verdict, spec_dir)
     plan = json.loads(

@@ -249,9 +249,11 @@ def fix_request(verdict: GoalVerdict, spec_dir: Path) -> str:
     lines += [
         "## What to do",
         "",
-        "Fix the code so the command passes. Do not skip, delete or weaken a "
-        "test, and do not change the command's own script or the CI "
-        "configuration: the change set is checked, and such a fix is refused.",
+        (
+            "Fix the code so the command passes. Do not skip, delete or weaken a "
+            "test, and do not change the command's own script or the CI "
+            "configuration: the change set is checked, and such a fix is refused."
+        ),
         "",
     ]
     return "\n".join(lines)

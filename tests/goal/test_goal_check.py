@@ -4,18 +4,26 @@ from __future__ import annotations
 
 import os
 import shlex
+import subprocess
 import sys
 from pathlib import Path
 
 import pytest
+from foundation.platform import is_windows
 from goal.check import command_script, run_goal
 from goal.spec import GoalSpec
 
-PY = shlex.quote(sys.executable)
+
+def _q(arg: str) -> str:
+    """Quote one argument the way ``split_command`` reads it on this OS."""
+    return subprocess.list2cmdline([arg]) if is_windows() else shlex.quote(arg)
+
+
+PY = _q(sys.executable)
 
 
 def _spec(code: str, **kwargs) -> GoalSpec:
-    return GoalSpec(command=f"{PY} -c {shlex.quote(code)}", **kwargs)
+    return GoalSpec(command=f"{PY} -c {_q(code)}", **kwargs)
 
 
 def test_the_expected_exit_code_is_met(tmp_path: Path):
@@ -61,7 +69,7 @@ def test_a_missing_program_is_an_error(tmp_path: Path):
 def test_no_shell_reads_the_line(tmp_path: Path):
     marker = tmp_path / "pwned"
     run_goal(
-        GoalSpec(command=f"{PY} -c pass ; touch {shlex.quote(str(marker))}"),
+        GoalSpec(command=f"{PY} -c pass ; touch {_q(str(marker))}"),
         tmp_path,
     )
     assert not marker.exists()
