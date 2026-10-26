@@ -20,6 +20,7 @@ WorkPilot AI is a desktop application (+ CLI) where users describe a goal and AI
 - **GitHub/GitLab Integration** — Import issues, AI-powered investigation, PR/MR review and creation
 - **PR Follow-Through** — A task's open GitHub PR is driven to merge: red checks and review threads go to the QA fixer, the commit is checked for weakened tests or CI edits, then pushed (never forced, never merged)
 - **Azure DevOps/Jira Integration** — Import work items, sync statuses
+- **GenAI Traces** — One OTLP endpoint traces every provider the same way (agent, model calls, tools) with OpenTelemetry GenAI attributes; no prompt or output in the spans, unreported usage marked as estimated
 - **Microsoft Teams Notifications** — Webhook-based notifications for task completion and PR creation
 - **Changelog** — Generate release notes from completed tasks
 - **Memory System** — one Obsidian vault (the shared brain) keeps what every build learns, read by every agent

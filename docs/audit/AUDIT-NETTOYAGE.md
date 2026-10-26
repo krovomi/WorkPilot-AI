@@ -2615,3 +2615,26 @@ accepte `taskProviders`. Justification : [`pr-followup.md`](../architecture/pr-f
 
 Vérification : `pytest tests/pr_followup -q` et
 `cd apps/frontend && pnpm test -- pr-followup-handlers PrFollowupCard python-runner-env`.
+
+### G4 — Traces OpenTelemetry GenAI pour tous les providers
+
+**Fait.** `apps/backend/genai_trace/` émet un span `invoke_agent` par réponse de client, un `chat`
+par appel modèle mesuré et un `execute_tool` par outil, aux attributs `gen_ai.*`, pour chaque
+`AgentClient`. Le crochet est unique : `AgentClient.__init_subclass__` enveloppe `query` et
+`receive_response`, et un test vérifie que chaque client réel l'est.
+
+- **Activation.** Par l'endpoint qui servait déjà au SDK Claude (`AUTO_CLAUDE_OTEL_ENDPOINT`).
+  L'export se fait en OTLP `http/protobuf`, avec `opentelemetry-sdk` et l'exporteur HTTP ajoutés
+  au lockfile sans changer d'autre version.
+- **Contenu.** Jamais de prompt, de sortie, d'argument ni de message d'erreur dans un span.
+- **Usage.** Un nombre que le provider ne donne pas est absent, pas nul. Une réponse sans aucun
+  appel mesuré est estimée (caractères ÷ 4) et marquée `estimated`. `record_client_usage`
+  l'écrit dans `cost_data.json` au lieu de laisser la session disparaître, et chaque ligne y
+  porte `usage_source`.
+- **Contrat d'imports.** `genai_trace` est une feuille. `harness` est autorisé à l'importer
+  (`tests/test_import_contracts.py`), et la taille du cycle ne change pas.
+
+Justification : [`genai-traces.md`](../architecture/genai-traces.md).
+
+Vérification : `pytest tests/genai_trace -q`.
+
