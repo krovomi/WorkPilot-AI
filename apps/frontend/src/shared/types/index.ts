@@ -4,6 +4,7 @@
 
 export * from "./agent";
 export * from "./app-update";
+export * from "./automations";
 // Repo bench (finished cards replayed and judged by their own tests)
 export * from "./bench";
 export * from "./changelog";

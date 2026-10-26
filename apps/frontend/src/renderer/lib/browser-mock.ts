@@ -826,15 +826,12 @@ const browserMockAPI: Partial<ElectronAPI> = {
 		},
 	},
 
-	// Continuous AI API
-	continuousAI: {
-		start: async () => ({ success: false, error: "browser preview" }),
-		stop: async () => ({ success: true }),
-		getStatus: async () => null,
-		updateConfig: async () => ({ success: true }),
-		approveAction: async () => ({ success: true }),
-		rejectAction: async () => ({ success: true }),
-		isRunning: async () => false,
+	// Automations API
+	automations: {
+		get: async () => ({ success: false, error: "browser preview" }),
+		save: async () => ({ success: false, error: "browser preview" }),
+		remove: async () => ({ success: false, error: "browser preview" }),
+		run: async () => ({ success: false, error: "browser preview" }),
 		onEvent: () => () => {
 			/* noop */
 		},
