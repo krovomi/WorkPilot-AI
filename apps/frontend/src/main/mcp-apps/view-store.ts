@@ -7,7 +7,16 @@
  * an id that matches `VIEW_ID` (no path from the renderer ever reaches here).
  */
 
-import { lstatSync, readdirSync, readFileSync, realpathSync } from "node:fs";
+import {
+	closeSync,
+	constants,
+	fstatSync,
+	lstatSync,
+	openSync,
+	readdirSync,
+	readSync,
+	realpathSync,
+} from "node:fs";
 import path from "node:path";
 import { z } from "zod";
 import type { McpAppViewSummary } from "../../shared/types/mcp-apps";
@@ -66,15 +75,26 @@ function viewsFolder(specDir: string): string | null {
 function readViewFile(folder: string, viewId: string): McpAppViewFile | null {
 	if (!VIEW_ID.test(viewId)) return null;
 	const file = path.join(folder, `${viewId}.json`);
+	let fd: number | null = null;
 	try {
-		const stat = lstatSync(file);
 		// A link could point anywhere on the disk: only plain files are read.
+		// The name is checked first (Windows has no O_NOFOLLOW), then the file
+		// actually opened, so a link swapped in between is still refused.
+		if (!lstatSync(file).isFile()) return null;
+		fd = openSync(file, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+		const stat = fstatSync(fd);
 		if (!stat.isFile() || stat.size > MAX_FILE_BYTES) return null;
-		const parsed = ViewFileSchema.safeParse(JSON.parse(readFileSync(file, "utf-8")));
+		// Read what was measured, not what the file may have grown to since.
+		const buffer = Buffer.alloc(stat.size);
+		const read = readSync(fd, buffer, 0, stat.size, 0);
+		const text = buffer.subarray(0, read).toString("utf-8");
+		const parsed = ViewFileSchema.safeParse(JSON.parse(text));
 		if (!parsed.success || parsed.data.viewId !== viewId) return null;
 		return parsed.data;
 	} catch {
 		return null;
+	} finally {
+		if (fd !== null) closeSync(fd);
 	}
 }
 
