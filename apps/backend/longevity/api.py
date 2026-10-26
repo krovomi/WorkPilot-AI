@@ -37,7 +37,8 @@ class ScoreRequest(BaseModel):
         True,
         description=(
             "If true (default), reads .workpilot/continuous-ai/deps/latest_scan.json "
-            "from the project root and feeds the vulnerabilities into the scorer."
+            "from the project root and feeds the vulnerabilities into the scorer; "
+            "a snapshot older than 30 days, or undated, is no signal."
         ),
     )
 

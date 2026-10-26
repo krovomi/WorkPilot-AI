@@ -23,6 +23,7 @@ export type ProjectSettingsSection =
 	| "jira"
 	| "figma"
 	| "cicd"
+	| "automations"
 	| "teams";
 
 interface ProjectSettingsContentProps {

@@ -6,6 +6,7 @@ import { setupAgentCoachListeners } from "./agent-coach-store";
 import { setupApiWatcherListeners } from "./api-watcher-store";
 import { setupAppEmulatorListeners } from "./app-emulator-store";
 import { setupArchitectureDeltaListeners } from "./architecture-delta-store";
+import { setupAutomationsListeners } from "./automations-store";
 import {
 	setupArchitectureVisualizerListeners,
 } from "./architecture-visualizer-store";
@@ -79,6 +80,8 @@ const SETUPS: ReadonlyArray<readonly [string, ListenerSetup]> = [
 	["AppEmulator", setupAppEmulatorListeners],
 	["ArchitectureDelta", setupArchitectureDeltaListeners],
 	["ArchitectureVisualizer", setupArchitectureVisualizerListeners],
+	// Cards an automation rule created appear on the board without a reload.
+	["Automations", setupAutomationsListeners],
 	["CarbonProfiler", setupCarbonProfilerListeners],
 	["CodeMigration", setupCodeMigrationListeners],
 	["CodePlayground", setupCodePlaygroundListeners],

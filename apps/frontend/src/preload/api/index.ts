@@ -126,9 +126,9 @@ import { createConflictPredictorAPI } from "./modules/conflict-predictor-api";
 import type { ContextAwareSnippetsAPI } from "./modules/context-aware-snippets-api";
 import { createContextAwareSnippetsAPI } from "./modules/context-aware-snippets-api";
 import {
-	type ContinuousAIAPI,
-	createContinuousAIAPI,
-} from "./modules/continuous-ai-api";
+	type AutomationsAPI,
+	createAutomationsAPI,
+} from "./modules/automations-api";
 import { createSwarmAPI, type SwarmAPI } from "./modules/swarm-api";
 import {
 	createGenericIpcAPI,
@@ -323,8 +323,8 @@ export interface ElectronAPI
 	github: GitHubAPI;
 	/** Parallel subtask execution (dependency waves) */
 	swarm: SwarmAPI;
-	/** Continuous AI daemon (CI/CD watcher, dependency sentinel, PR reviewer) */
-	continuousAI: ContinuousAIAPI;
+	/** Automations: an event (issue labelled, CI red, schedule) creates a card */
+	automations: AutomationsAPI;
 	/** Multi-user server mode: connection + login (local / Entra ID) */
 	serverAuth: ServerAuthAPI;
 	serverAdmin: ServerAdminAPI;
@@ -470,7 +470,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createTaskSandboxAPI(),
 		github: createGitHubAPI(),
 		swarm: createSwarmAPI(),
-		continuousAI: createContinuousAIAPI(),
+		automations: createAutomationsAPI(),
 		serverAuth: createServerAuthAPI(), // Multi-user server mode
 		serverAdmin: createServerAdminAPI(), // Multi-tenant administration
 		queue: createQueueAPI(), // Queue routing for rate limit recovery
@@ -552,8 +552,8 @@ export { createArchitectureVisualizerAPI } from "./modules/architecture-visualiz
 export type { ArenaAPI } from "./modules/arena-api";
 export { createArenaAPI } from "./modules/arena-api";
 export { createAutoRefactorAPI } from "./modules/auto-refactor-api";
-export type { ContinuousAIAPI } from "./modules/continuous-ai-api";
-export { createContinuousAIAPI } from "./modules/continuous-ai-api";
+export type { AutomationsAPI } from "./modules/automations-api";
+export { createAutomationsAPI } from "./modules/automations-api";
 export type { SwarmAPI } from "./modules/swarm-api";
 export { createSwarmAPI } from "./modules/swarm-api";
 export type { ClaudeCodeAPI } from "./modules/claude-code-api";

@@ -84,7 +84,7 @@ composition, qui importe les agents. Les autres modules sortis de `core` par le 
 | `hermes/` | hermes-agent : doctor, persona `SOUL.md`, cycle d'apprentissage |
 | `core/merge_event.py` | un merge publié une fois ; mémoire, apprentissage et `uiux` s'y abonnent |
 | `foundation/workpilot_layout.py` | un dossier par feature sous `.workpilot/` |
-| `continuous_ai/daemon.py`, `self_healing/` | boucles autonomes avec plafond de coût ; surveillance et remédiation |
+| `self_healing/` | boucle autonome avec plafond de coût ; surveillance et remédiation (les automatisations, qui créent des cartes sur un événement, vivent côté Electron : `apps/frontend/src/main/automations/`) |
 
 ## Préparer et vérifier un build
 

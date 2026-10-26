@@ -19,7 +19,7 @@ import {
 	registerAutoRefactorHandlers,
 	setupAutoRefactorEventForwarding,
 } from "./auto-refactor-handlers";
-import { registerContinuousAIHandlers } from "./continuous-ai-handlers";
+import { registerAutomationsHandlers } from "./automations-handlers";
 import { getAutoBuildSourcePath } from "./context/utils";
 import { registerQueueRoutingHandlers } from "./queue-routing-handlers";
 import { registerSwarmHandlers } from "./swarm-handlers";
@@ -615,11 +615,8 @@ export function setupIpcHandlers(
 		getMainWindow,
 	);
 
-	// Continuous AI handlers (CI/CD watcher, dependency sentinel, PR reviewer)
-	registerContinuousAIHandlers(
-		() => pythonEnvManager.getPythonPath(),
-		getMainWindow,
-	);
+	// Automations: an event (issue labelled, CI red, schedule) creates a card
+	registerAutomationsHandlers(agentManager, getMainWindow);
 
 	// Queue routing handlers (profile swapping on rate limit). The preload
 	// `queue` bridge invokes these five channels; unregistered, every call

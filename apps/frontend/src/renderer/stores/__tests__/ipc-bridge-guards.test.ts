@@ -14,8 +14,10 @@
  * Every toggle in Settings → Continuous AI looked applied and none of it ever
  * reached the daemon.
  *
- * These tests lock the contract the bridges now have to honour: with no bridge
- * at all, nothing throws and the store says so — it never reports success.
+ * Continuous AI has since been replaced by automations (an event creates a
+ * Kanban card), whose bridge is `electronAPI.automations`. These tests lock
+ * the contract the swarm bridge has to honour: with no bridge at all, nothing
+ * throws and the store says so — it never reports success.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -33,7 +35,6 @@ beforeEach(() => {
 	vi.restoreAllMocks();
 });
 
-import { useContinuousAIStore } from "../continuous-ai-store";
 import { useSwarmStore } from "../swarm-store";
 
 describe("swarm store without an IPC bridge", () => {
@@ -97,65 +98,5 @@ describe("swarm store with a bridge", () => {
 		);
 		expect(useSwarmStore.getState().analysisStats).not.toBe(null);
 		expect(useSwarmStore.getState().error).toBe(null);
-	});
-});
-
-describe("continuous AI store without an IPC bridge", () => {
-	beforeEach(() => {
-		setElectronAPI({});
-		useContinuousAIStore.getState().reset();
-	});
-
-	it("warns rather than silently dropping a config change", () => {
-		const warn = vi.spyOn(console, "warn").mockImplementation(() => {
-			/* keep the test output clean */
-		});
-
-		expect(() =>
-			useContinuousAIStore.getState().setConfig({ enabled: true }),
-		).not.toThrow();
-
-		// The user's choice still lands in the store — it is the daemon that
-		// never hears about it, and that is what has to be said out loud.
-		expect(useContinuousAIStore.getState().config.enabled).toBe(true);
-		expect(warn).toHaveBeenCalledWith(
-			expect.stringContaining("[continuous-ai]"),
-		);
-	});
-
-	it("surfaces an error rather than a hung spinner when starting", async () => {
-		await useContinuousAIStore.getState().startDaemon();
-
-		const state = useContinuousAIStore.getState();
-		expect(state.error).toMatch(/unavailable/i);
-		expect(state.isStarting).toBe(false);
-	});
-
-	it("stops and refreshes without throwing", async () => {
-		await expect(
-			useContinuousAIStore.getState().stopDaemon(),
-		).resolves.toBeUndefined();
-		await expect(
-			useContinuousAIStore.getState().refreshStatus(),
-		).resolves.toBeUndefined();
-	});
-});
-
-describe("continuous AI store with a bridge", () => {
-	const updateConfig = vi.fn();
-
-	beforeEach(() => {
-		updateConfig.mockResolvedValue({ success: true });
-		setElectronAPI({ continuousAI: { updateConfig } });
-		useContinuousAIStore.getState().reset();
-	});
-
-	it("pushes the merged config to the daemon", () => {
-		useContinuousAIStore.getState().setConfig({ enabled: true });
-
-		expect(updateConfig).toHaveBeenCalledTimes(1);
-		expect(updateConfig).toHaveBeenCalledWith(
-			expect.objectContaining({ enabled: true }),
-		);
 	});
 });
