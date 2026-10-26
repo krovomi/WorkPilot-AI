@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 import pytest
@@ -12,7 +13,9 @@ from longevity import (
     load_sentinel_vulnerabilities,
     parse_coverage_xml,
     score_codebase_with_signals,
+    sentinel_snapshot_is_current,
 )
+from longevity.ingest import SENTINEL_MAX_AGE_SECONDS
 
 # ---------------------------------------------------------------------------
 # parse_coverage_xml
@@ -89,11 +92,14 @@ class TestParseCoverageXml:
 # load_sentinel_vulnerabilities
 
 
-def _seed_sentinel(project_dir: Path, vulns: list[dict]) -> None:
+def _seed_sentinel(
+    project_dir: Path, vulns: list[dict], scanned_at: float | None = None
+) -> None:
     snapshot = project_dir / SENTINEL_LATEST_SCAN_REL
     snapshot.parent.mkdir(parents=True, exist_ok=True)
+    stamp = time.time() if scanned_at is None else scanned_at
     snapshot.write_text(
-        json.dumps({"scanned_at": 0, "vulnerabilities": vulns}),
+        json.dumps({"scanned_at": stamp, "vulnerabilities": vulns}),
         encoding="utf-8",
     )
 
@@ -197,6 +203,27 @@ class TestScoreCodebaseWithSignals:
         # Snapshot present but empty → vulns block exists, total=0.
         assert "vulnerabilities" in report.summary
         assert report.summary["vulnerabilities"]["total"] == 0
+
+    def test_old_snapshot_is_no_signal(self, tmp_path: Path) -> None:
+        # Nothing refreshes the snapshot any more: a month-old "all clean"
+        # must not read as today's.
+        _seed_minimal_project(tmp_path)
+        _seed_sentinel(
+            tmp_path,
+            [{"severity": "critical"}],
+            scanned_at=time.time() - SENTINEL_MAX_AGE_SECONDS - 60,
+        )
+        report = score_codebase_with_signals(tmp_path, auto_load_sentinel=True)
+        assert "vulnerabilities" not in report.summary
+
+    def test_undated_snapshot_is_no_signal(self, tmp_path: Path) -> None:
+        _seed_minimal_project(tmp_path)
+        snapshot = tmp_path / SENTINEL_LATEST_SCAN_REL
+        snapshot.parent.mkdir(parents=True, exist_ok=True)
+        snapshot.write_text(json.dumps({"vulnerabilities": []}), encoding="utf-8")
+        assert not sentinel_snapshot_is_current(tmp_path)
+        report = score_codebase_with_signals(tmp_path, auto_load_sentinel=True)
+        assert "vulnerabilities" not in report.summary
 
 
 if __name__ == "__main__":
