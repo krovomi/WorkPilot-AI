@@ -1986,6 +1986,12 @@
 			"diverged": "Le worktree a des commits que la PR n'a pas"
 		}
 	},
+	"sandbox": {
+		"notIsolated": "Commandes non isolées",
+		"unavailable": "{{provider}} : pas de bac à sable OS ({{reason}})",
+		"off": "{{provider}} : le bac à sable OS est désactivé (WORKPILOT_SANDBOX=off)",
+		"noReason": "raison non précisée"
+	},
 	"goal": {
 		"title": "Objectif",
 		"description": "Fini quand une commande le dit, pas quand le relecteur le pense : la QA continue tant que la commande échoue, dans un nombre de passes et un plafond de dépense.",

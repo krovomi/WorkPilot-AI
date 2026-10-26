@@ -1986,6 +1986,12 @@
 			"diverged": "The worktree has commits the PR has not"
 		}
 	},
+	"sandbox": {
+		"notIsolated": "Commands not isolated",
+		"unavailable": "{{provider}}: no OS sandbox ({{reason}})",
+		"off": "{{provider}}: the OS sandbox is turned off (WORKPILOT_SANDBOX=off)",
+		"noReason": "no reason given"
+	},
 	"goal": {
 		"title": "Goal",
 		"description": "Done when a command says so, not when a reviewer thinks so: QA keeps going while the command fails, within a number of passes and a spending cap.",
