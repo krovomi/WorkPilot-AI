@@ -20,6 +20,8 @@ import signal
 import time
 from pathlib import Path
 
+from foundation.platform import pid_is_running
+
 __all__ = [
     "work_dir",
     "load_state",
@@ -71,17 +73,7 @@ def _write(base: Path, data: dict) -> None:
 
 
 def is_alive(pid: int | None) -> bool:
-    if not pid or pid <= 0:
-        return False
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    except OSError:
-        return False
-    return True
+    return pid_is_running(pid)
 
 
 def save_process(base: Path, name: str, entry: dict) -> None:

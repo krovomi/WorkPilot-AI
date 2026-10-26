@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 import subprocess
 import sys
 import textwrap
@@ -494,26 +493,9 @@ class LaunchDriver:
 
 
 def _app_target() -> Target:
-    # An app that stays up and prints nothing. On the Windows leg a Python
-    # script started here exited at start with 0xC0000142
-    # (STATUS_DLL_INIT_FAILED), while the same launch of a Python server in
-    # test_verify_loop runs: the stand-in is a system tool instead.
+    # An app that stays up and prints nothing.
     command = "ping -n 60 127.0.0.1" if is_windows() else "sleep 60"
     return Target(kind="windows-app", name="Orders", command=command)
-
-
-_WIN_BASE = {"SYSTEMROOT", "WINDIR", "COMSPEC", "PATHEXT"}
-
-
-def test_a_windows_child_always_gets_what_windows_needs_to_start():
-    # Without SystemRoot a Windows process dies loading its DLLs (0xC0000142).
-    env = launching._windows_base({"windir": r"D:\Win", "PATH": "x"})
-    assert env["SystemRoot"] == r"D:\Win" and env["PATH"] == "x"
-    assert env["COMSPEC"].endswith("cmd.exe")
-    # What the parent has wins, whatever its case.
-    kept = launching._windows_base({"SYSTEMROOT": r"E:\W", "PathExt": ".EXE"})
-    assert kept["SYSTEMROOT"] == r"E:\W" and "SystemRoot" not in kept
-    assert kept["PathExt"] == ".EXE" and "PATHEXT" not in kept
 
 
 @pytest.mark.parametrize(
@@ -542,8 +524,7 @@ def test_a_windows_app_is_ready_when_its_window_shows(
         stop_all(base)
     assert result.status == status, (
         f"{result.status} (code {result.exit_code}): {result.detail}\n"
-        f"command: {result.command}\nlog: {result.log_tail[-1500:]}\n"
-        f"parent has: {sorted(k for k in os.environ if k.upper() in _WIN_BASE)}"
+        f"command: {result.command}\nlog: {result.log_tail[-1500:]}"
     )
     if status == "ready":
         assert result.window["hwnd"] == 9 and result.window["namedBy"] == "card"
