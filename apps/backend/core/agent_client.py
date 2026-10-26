@@ -18,6 +18,7 @@ Architecture (one module per provider under ``core/agent_clients/``):
     └── CliSubprocessAgentClient            cli_subprocess.py — a coding-agent CLI
         ├── OpenCodeCliAgentClient          opencode_cli.py — `opencode run`
         ├── PiCliAgentClient                pi_cli.py — `pi --mode json`
+        ├── AcpAgentClient                  acp.py — any Agent Client Protocol agent
         └── AntigravityCliAgentClient       antigravity_cli.py — `agy` print mode
 
 Usage:
@@ -39,6 +40,11 @@ Usage:
 
 from __future__ import annotations
 
+from .agent_clients.acp import (  # noqa: F401
+    AcpAgentClient,
+    AcpAuthenticationError,
+    AcpError,
+)
 from .agent_clients.antigravity_cli import (  # noqa: F401
     AntigravityCliAgentClient,
     AntigravityCliAuthenticationError,

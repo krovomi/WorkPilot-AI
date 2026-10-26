@@ -52,6 +52,13 @@ _COMPATIBLE = frozenset({"grok", "deepseek", "mistral"})
 _NO_EFFORT = frozenset({"windsurf", "opencode"})
 
 
+def _acp_agent(name: str) -> bool:
+    """An Agent Client Protocol agent: ACP carries no effort setting."""
+    from skills_registry.providers import acp_provider_names
+
+    return name in acp_provider_names()
+
+
 @dataclass(frozen=True)
 class EffortPlan:
     """What one level becomes on one provider and model."""
@@ -128,7 +135,7 @@ def effort_plan(provider: str | None, model: str | None, level: str) -> EffortPl
         return EffortPlan(NATIVE, antigravity_effort(level, model_id))
     if name == "copilot" or name in _LOCAL:
         return EffortPlan(RUNTIME, None)
-    if name in _NO_EFFORT:
+    if name in _NO_EFFORT or _acp_agent(name):
         return EffortPlan(NO_CONTROL, None)
     # A provider without an adapter runs on the Claude SDK (`_degraded_client`).
     return EffortPlan(NATIVE, claude_effort(budget))

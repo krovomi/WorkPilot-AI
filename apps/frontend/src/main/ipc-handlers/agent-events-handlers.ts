@@ -39,6 +39,10 @@ import {
 import { handleSandboxTaskEvent } from "./task-sandbox-handlers";
 import { isBenchBuild } from "./bench-handlers";
 import { findTaskAndProject } from "./task/shared";
+import {
+	clearTaskPermissions,
+	handlePermissionTaskEvent,
+} from "./task-permission-handlers";
 import { safeSendToRenderer } from "./utils";
 
 /**
@@ -407,6 +411,8 @@ export function registerAgenteventsHandlers(
 			processType: ProcessType,
 			projectId?: string,
 		) => {
+			// Nobody is left to answer an ACP agent's questions.
+			clearTaskPermissions(taskId, getMainWindow);
 			// A repo bench build is not on the board: its handler reads its exit.
 			if (isBenchBuild(taskId)) return;
 
@@ -484,6 +490,10 @@ export function registerAgenteventsHandlers(
 		// Whether the build's commands run in the OS sandbox: shown on the card,
 		// not a state the task reached.
 		if (handleSandboxTaskEvent(taskId, event, projectId, getMainWindow)) return;
+		// An ACP agent's question for the card (and its withdrawal): not a state.
+		if (handlePermissionTaskEvent(taskId, event, projectId, getMainWindow)) {
+			return;
+		}
 
 		// Forward decision log entries directly to renderer without going through XState (Feature 30)
 		if (event.type === "DECISION_LOG_ENTRY") {

@@ -209,7 +209,27 @@
 		"version": "Version",
 		"notInstalledDescription": "{{name}} is not on your PATH. Install it, sign in once in a terminal, then refresh.",
 		"signInHint": "WorkPilot uses the CLI's own sign-in and never reads its credentials.",
-		"viewDocs": "View {{name}} documentation"
+		"viewDocs": "View {{name}} documentation",
+		"acp": {
+			"probing": "Asking the agent what it supports…",
+			"declares": "Declared by the agent (ACP initialize):",
+			"notDeclared": "not declared",
+			"capability": {
+				"loadSession": "Resume a session",
+				"images": "Images in prompts",
+				"audio": "Audio in prompts",
+				"embeddedContext": "Embedded context",
+				"mcpHttp": "MCP servers over HTTP",
+				"mcpSse": "MCP servers over SSE"
+			},
+			"error": {
+				"not_installed": "Not installed.",
+				"not_acp": "It did not answer as an ACP version 1 agent.",
+				"no_answer": "It did not answer initialize in time.",
+				"shell_launcher": "Its launcher needs a shell; what it declares is not read from here.",
+				"failed": "Could not ask the agent."
+			}
+		}
 	},
 	"codex": {
 		"checking": "Checking Codex CLI...",

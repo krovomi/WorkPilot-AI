@@ -25,6 +25,7 @@ WorkPilot AI is a desktop application (+ CLI) where users describe a goal and AI
 - **Repo Bench** — Finished cards replayed from the commit before them, once per provider × model × effort, in copies that do not hold the answer, and judged by the tests they landed with (calibrated fail-to-pass and pass-to-pass); the table feeds Formula Lab and the model router
 - **Needs You** — Notifications when a task waits for a person, read from the task's state machine, on the desktop, ntfy or Telegram; a waiting plan can be approved from Telegram with a one-shot, expiring button
 - **Automations** — A rule turns an event (a GitHub issue labelled, the base branch's CI going red, a time of day) into a Kanban card, a draft by default, one per issue or red streak, under a daily cap; set in a project's settings
+- **ACP Agents** — Gemini CLI (and any Agent Client Protocol agent declared in `providers.yaml`) runs a task; its permission questions are answered on the card, refused when outside the agent type's rights, and the sidebar shows only the capabilities the agent declares
 - **Microsoft Teams Notifications** — Webhook-based notifications for task completion and PR creation
 - **Changelog** — Generate release notes from completed tasks
 - **Memory System** — one Obsidian vault (the shared brain) keeps what every build learns, read by every agent

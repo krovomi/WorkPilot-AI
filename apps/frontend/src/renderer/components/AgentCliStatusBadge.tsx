@@ -11,6 +11,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import {
+	ACP_AGENT_ARGS,
+	type AcpAgentDeclaration,
 	AGENT_CLI_DOCS,
 	AGENT_CLI_EXECUTABLES,
 	type AgentCliStatus,
@@ -27,13 +29,90 @@ const TOOL_NAMES: Readonly<Record<AgentCliTool, string>> = {
 	opencode: "OpenCode CLI",
 	antigravity: "Antigravity CLI",
 	pi: "pi (pi.dev)",
+	"gemini-cli": "Gemini CLI",
 };
 
 const SHORT_NAMES: Readonly<Record<AgentCliTool, string>> = {
 	opencode: "OpenCode",
 	antigravity: "Antigravity",
 	pi: "pi",
+	"gemini-cli": "Gemini",
 };
+
+/** The capabilities an ACP agent can declare, in the order they are listed. */
+const ACP_CAPABILITIES = [
+	"loadSession",
+	"images",
+	"audio",
+	"embeddedContext",
+	"mcpHttp",
+	"mcpSse",
+] as const;
+
+/**
+ * What an ACP agent declared in `initialize`. A capability it did not declare
+ * is listed as such, never as available.
+ */
+function AcpDeclarationList({ tool }: { readonly tool: AgentCliTool }) {
+	const { t } = useTranslation(["navigation"]);
+	const [answer, setAnswer] = useState<AcpAgentDeclaration | null>(null);
+
+	useEffect(() => {
+		let cancelled = false;
+		const probe = globalThis.electronAPI?.probeAcpAgent;
+		if (!probe) {
+			setAnswer({ tool, error: "failed" });
+			return;
+		}
+		probe(tool)
+			.then((result) => {
+				if (!cancelled) setAnswer(result);
+			})
+			.catch(() => {
+				if (!cancelled) setAnswer({ tool, error: "failed" });
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, [tool]);
+
+	if (!answer) {
+		return (
+			<p className="text-xs text-muted-foreground flex items-center gap-1">
+				<Loader2 className="h-3 w-3 animate-spin" />
+				{t("navigation:agentCli.acp.probing")}
+			</p>
+		);
+	}
+	if (!answer.declared) {
+		return (
+			<p className="text-xs text-muted-foreground">
+				{t(`navigation:agentCli.acp.error.${answer.error ?? "failed"}`)}
+			</p>
+		);
+	}
+	const declared = answer.declared;
+	return (
+		<div className="text-xs p-2 bg-muted rounded-md space-y-1">
+			<p className="text-muted-foreground">{t("navigation:agentCli.acp.declares")}</p>
+			<ul className="space-y-0.5">
+				{ACP_CAPABILITIES.map((capability) => (
+					<li
+						key={capability}
+						className={cn(
+							"flex items-center gap-1",
+							!declared[capability] && "text-muted-foreground",
+						)}
+					>
+						{declared[capability] ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
+						{t(`navigation:agentCli.acp.capability.${capability}`)}
+						{!declared[capability] && ` (${t("navigation:agentCli.acp.notDeclared")})`}
+					</li>
+				))}
+			</ul>
+		</div>
+	);
+}
 
 interface AgentCliStatusBadgeProps {
 	readonly tool: AgentCliTool;
@@ -50,8 +129,9 @@ function toBadgeStatus(result: AgentCliStatus | null): BadgeStatus {
 
 /**
  * Sidebar badge for a coding-agent CLI WorkPilot drives as a provider
- * (OpenCode, Google Antigravity, pi). It only says whether the executable is on
- * PATH and its version: each CLI owns its own sign-in.
+ * (OpenCode, Google Antigravity, pi, Gemini CLI). It says whether the
+ * executable is on PATH and its version, and for an ACP agent what it declares
+ * once the popover opens: each CLI owns its own sign-in.
  */
 export function AgentCliStatusBadge({
 	tool,
@@ -179,6 +259,10 @@ export function AgentCliStatusBadge({
 							</span>
 							<span className="font-mono">{version}</span>
 						</div>
+					)}
+
+					{status === "installed" && isOpen && ACP_AGENT_ARGS[tool] && (
+						<AcpDeclarationList tool={tool} />
 					)}
 
 					{missing && (

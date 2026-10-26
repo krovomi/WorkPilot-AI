@@ -209,7 +209,27 @@
 		"version": "Version",
 		"notInstalledDescription": "{{name}} n'est pas dans votre PATH. Installez-le, connectez-vous une fois dans un terminal, puis actualisez.",
 		"signInHint": "WorkPilot utilise la connexion propre à la CLI et ne lit jamais ses identifiants.",
-		"viewDocs": "Voir la documentation de {{name}}"
+		"viewDocs": "Voir la documentation de {{name}}",
+		"acp": {
+			"probing": "L'agent est interrogé sur ce qu'il sait faire…",
+			"declares": "Déclaré par l'agent (ACP initialize) :",
+			"notDeclared": "non déclaré",
+			"capability": {
+				"loadSession": "Reprendre une session",
+				"images": "Images dans les prompts",
+				"audio": "Audio dans les prompts",
+				"embeddedContext": "Contexte intégré",
+				"mcpHttp": "Serveurs MCP en HTTP",
+				"mcpSse": "Serveurs MCP en SSE"
+			},
+			"error": {
+				"not_installed": "Non installé.",
+				"not_acp": "Il n'a pas répondu comme un agent ACP version 1.",
+				"no_answer": "Il n'a pas répondu à initialize à temps.",
+				"shell_launcher": "Son lanceur passe par un shell : ce qu'il déclare n'est pas lu d'ici.",
+				"failed": "Impossible d'interroger l'agent."
+			}
+		}
 	},
 	"codex": {
 		"checking": "Vérification Codex CLI...",
