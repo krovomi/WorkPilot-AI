@@ -21,6 +21,7 @@ WorkPilot AI is a desktop application (+ CLI) where users describe a goal and AI
 - **PR Follow-Through** — A task's open GitHub PR is driven to merge: red checks and review threads go to the QA fixer, the commit is checked for weakened tests or CI edits, then pushed (never forced, never merged)
 - **Azure DevOps/Jira Integration** — Import work items, sync statuses
 - **GenAI Traces** — One OTLP endpoint traces every provider the same way (agent, model calls, tools) with OpenTelemetry GenAI attributes; no prompt or output in the spans, unreported usage marked as estimated
+- **MCP 2026: Tasks and MCP Apps** — WorkPilot's MCP servers return long `verify_*` calls as tasks (polled, cancelled, timed out); views that installed MCP servers attach to their tools show in the task panel, sandboxed without `allow-same-origin`
 - **Needs You** — Notifications when a task waits for a person, read from the task's state machine, on the desktop, ntfy or Telegram; a waiting plan can be approved from Telegram with a one-shot, expiring button
 - **Microsoft Teams Notifications** — Webhook-based notifications for task completion and PR creation
 - **Changelog** — Generate release notes from completed tasks

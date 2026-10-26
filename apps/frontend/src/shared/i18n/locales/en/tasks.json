@@ -1985,5 +1985,14 @@
 			"fixer_error": "The fixer failed",
 			"diverged": "The worktree has commits the PR has not"
 		}
+	},
+	"mcpApps": {
+		"title": "MCP App views",
+		"subtitle": "Views attached by an installed MCP server to the tools the agent called. Each one shows the call that happened; it cannot call a tool, write to the agent or open a link.",
+		"count_one": "{{count}} view",
+		"count_other": "{{count}} views",
+		"loading": "Loading the view…",
+		"unavailable": "This view can no longer be shown.",
+		"frameTitle": "MCP App view: {{server}} · {{tool}}"
 	}
 }

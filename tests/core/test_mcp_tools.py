@@ -113,8 +113,14 @@ class _FakeSession:
     def __init__(self):
         self.calls = []
 
+    async def send_discover(self, _version):
+        # A handshake-era server: `server/discover` is an unknown method.
+        from mcp import MCPError
+
+        raise MCPError(-32601, "Method not found")
+
     async def initialize(self):
-        return None
+        self.initialized = True
 
     async def list_tools(self):
         return _FakeListResult(
@@ -128,7 +134,7 @@ class _FakeSession:
             ]
         )
 
-    async def call_tool(self, name, arguments):
+    async def call_tool(self, name, arguments, **_options):
         self.calls.append((name, arguments))
         if name == "model_search":
             return _FakeCallResult("Qwen/Qwen2.5-Coder-7B-Instruct")
@@ -159,6 +165,8 @@ async def test_manager_bridges_and_routes(monkeypatch):
 
         assert mcp.has_tool(f"{MCP_TOOL_PREFIX}hf__model_search")
         assert not mcp.has_tool("read_file")
+        # The server answered `server/discover` as unknown: the handshake ran.
+        assert fake.initialized
 
         # Routing strips the namespace and forwards to the real tool name.
         text = await mcp.call(f"{MCP_TOOL_PREFIX}hf__model_search", {"query": "qwen"})

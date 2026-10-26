@@ -77,6 +77,7 @@ fichier-ci reste l'autorité sur les règles.
 | Applications mobiles | [mobile.md](architecture/mobile.md) | Détection de pile, appareils, chaîne d'outils ; iOS seulement sur macOS. |
 | Boucle de vérification | [verify.md](architecture/verify.md) | Lancer l'app, corriger, confirmer l'état, mesurer, garder la preuve. |
 | Traces GenAI | [genai-traces.md](architecture/genai-traces.md) | Spans `gen_ai.*` pour chaque AgentClient ; jamais de contenu ; usage non remonté estimé, jamais 0. |
+| MCP 2026 : tasks et Apps | [mcp-2026.md](architecture/mcp-2026.md) | `ToolServer` répond dans les deux ères et ne rend une tâche qu'à un client qui la déclare (`verify_*` longs) ; le client de la boucle WorkPilot attend, annule, borne la tâche ; les vues MCP Apps sont gardées dans la spec et affichées dans une iframe `allow-scripts` sans `allow-same-origin`, servies par un schéma du main avec leur propre CSP. |
 | Suivi de la PR | [pr-followup.md](architecture/pr-followup.md) | La carte fait avancer sa PR jusqu'au merge : check rouge ou fil de revue au QA fixer, commit vérifié (aucun test sauté, aucune CI modifiée), push jamais forcé ; une forge illisible n'est jamais du vert, un échec rouge aussi sur la base n'est pas « corrigé ». |
 | Besoin de toi | [needs-you.md](architecture/needs-you.md) | Notifications lues dans XState ; ntfy, Telegram ; approbation d'un plan par jeton à usage unique. |
 | Bounty Board | [bounty-board.md](architecture/bounty-board.md) | Concours notés sur artefacts ; une preuve absente renormalise, ne vaut jamais zéro. |

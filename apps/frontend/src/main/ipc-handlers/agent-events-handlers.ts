@@ -36,6 +36,7 @@ import {
 	persistPlanPhaseSync,
 	persistPlanStatusAndReasonSync,
 } from "./task/plan-file-utils";
+import { parseMcpAppViewEvent } from "./task/mcp-app-handlers";
 import { findTaskAndProject } from "./task/shared";
 import { safeSendToRenderer } from "./utils";
 
@@ -485,6 +486,21 @@ export function registerAgenteventsHandlers(
 				projectId,
 			);
 			return; // Skip XState processing — decision entries are not state transitions
+		}
+
+		// An MCP App view a tool call kept: the task panel lists it; not a state.
+		if (event.type === "MCP_APP_VIEW") {
+			const view = parseMcpAppViewEvent(event);
+			if (view) {
+				safeSendToRenderer(
+					getMainWindow,
+					IPC_CHANNELS.TASK_MCP_APP_VIEW,
+					taskId,
+					view,
+					projectId,
+				);
+			}
+			return;
 		}
 
 		// Log detailed information for CODING_FAILED events

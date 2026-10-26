@@ -86,6 +86,9 @@ export const IPC_CHANNELS = {
 	TASK_PR_FOLLOWUP_START: "task:prFollowupStart", // Drive the task's PR to merge: fix red checks and review threads
 	TASK_PR_FOLLOWUP_STOP: "task:prFollowupStop",
 	TASK_PR_FOLLOWUP_STATUS: "task:prFollowupStatus", // Running or not, and the last look at the PR
+	TASK_MCP_APPS_LIST: "task:mcpAppsList", // The MCP App views a build kept for the task
+	TASK_MCP_APP_OPEN: "task:mcpAppOpen", // Serve one view on its own scheme, for one frame
+	TASK_MCP_APP_CLOSE: "task:mcpAppClose", // The frame closed: stop serving the view
 	TASK_WORKTREE_OPEN_IN_IDE: "task:worktreeOpenInIDE",
 	TASK_WORKTREE_OPEN_IN_TERMINAL: "task:worktreeOpenInTerminal",
 	TASK_WORKTREE_DETECT_TOOLS: "task:worktreeDetectTools", // Detect installed IDEs/terminals
@@ -105,6 +108,7 @@ export const IPC_CHANNELS = {
 	TASK_EXECUTION_PROGRESS: "task:executionProgress",
 	TASK_VISUAL_PROOF_RUNNING: "task:visualProofRunning", // Event: visual proof run started/finished (main -> renderer)
 	TASK_PR_FOLLOWUP_EVENT: "task:prFollowupEvent", // Event: a look at the PR, or the follow-through stopped (main -> renderer)
+	TASK_MCP_APP_VIEW: "task:mcpAppView", // Event: a build kept a new MCP App view (main -> renderer)
 
 	// Task phase logs (persistent, collapsible logs by phase)
 	TASK_LOGS_GET: "task:logsGet", // Load logs from spec dir
