@@ -5,8 +5,8 @@ pyproject.toml, Cargo.toml, go.mod) for licences, classifies them by
 permissiveness, and flags conflicts (e.g. GPL mixed into a proprietary
 codebase, or copyleft transitives sneaking in).
 
-Different from `continuous_ai/dependency_sentinel.py` which focuses on
-**vulnerabilities** (CVEs). This module focuses on **licences**.
+Vulnerabilities (CVEs) are not its subject: `longevity/` reads a dependency
+scan for those. This module focuses on **licences**.
 """
 
 from .attribution import (
