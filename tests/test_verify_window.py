@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 import subprocess
 import sys
 import textwrap
@@ -21,6 +20,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "apps" / "backend"))
 
+from foundation.platform import is_windows  # noqa: E402
 from verify import launch as launching  # noqa: E402
 from verify import window as windowing  # noqa: E402
 from verify.detect import Detection, Target, detect_targets  # noqa: E402
@@ -492,19 +492,13 @@ class LaunchDriver:
         pass
 
 
-def _app_target(project: Path, monkeypatch) -> Target:
-    # Started as `python app.py` and found on PATH, as test_verify_loop starts
-    # its app on the Windows leg. Named by its full forward-slash path, the venv
-    # interpreter exited there at start (0xC0000142, STATUS_DLL_INIT_FAILED).
-    (project / "app.py").write_text(
-        "import time\nprint('booting', flush=True)\ntime.sleep(60)\n",
-        encoding="utf-8",
-    )
-    monkeypatch.setenv(
-        "PATH",
-        str(Path(sys.executable).parent) + os.pathsep + os.environ.get("PATH", ""),
-    )
-    return Target(kind="windows-app", name="Orders", command="python app.py")
+def _app_target() -> Target:
+    # An app that stays up and prints nothing. On the Windows leg a Python
+    # script started here exited at start with 0xC0000142
+    # (STATUS_DLL_INIT_FAILED), while the same launch of a Python server in
+    # test_verify_loop runs: the stand-in is a system tool instead.
+    command = "ping -n 60 127.0.0.1" if is_windows() else "sleep 60"
+    return Target(kind="windows-app", name="Orders", command=command)
 
 
 @pytest.mark.parametrize(
@@ -523,7 +517,7 @@ def test_a_windows_app_is_ready_when_its_window_shows(
     base = work_dir(tmp_path, None)
     try:
         result = launching.launch(
-            _app_target(tmp_path, monkeypatch),
+            _app_target(),
             tmp_path,
             base,
             timeout=4.0,
