@@ -509,10 +509,12 @@ class AcpAgentClient(CliSubprocessAgentClient):
 
     def _shown_path(self, path: str) -> str:
         try:
+            # Forward slashes on every OS: the card shows the same path everywhere.
             return display_text(
-                str(
-                    Path(path).resolve().relative_to(Path(self._project_dir).resolve())
-                ),
+                Path(path)
+                .resolve()
+                .relative_to(Path(self._project_dir).resolve())
+                .as_posix(),
                 300,
             )
         except (OSError, ValueError):
