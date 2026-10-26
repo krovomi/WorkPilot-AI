@@ -199,6 +199,8 @@ WPF_PROJECT = {
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
+    <!-- The runner's SDK may be newer than net8 with no 8.x desktop runtime. -->
+    <RollForward>Major</RollForward>
   </PropertyGroup>
 </Project>
 """,
@@ -251,7 +253,10 @@ def test_a_wpf_app_is_detected_launched_and_driven(tmp_path):
     base = work_dir(project, spec)
     try:
         result = launch(target, project, base, timeout=300, window_title="Orders (WPF)")
-        assert result.status == "ready", result.to_dict()
+        assert result.status == "ready", (
+            f"{result.status} (code {result.exit_code}): {result.detail}\n"
+            f"command: {result.command}\nlog: {result.log_tail[-3000:]}"
+        )
         path = asyncio.run(_drive(box, target, "QuantityBox", "SaveButton"))
         assert Path(path).stat().st_size > 1000
     finally:
