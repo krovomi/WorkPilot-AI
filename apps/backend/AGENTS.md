@@ -99,6 +99,7 @@ composition, qui importe les agents. Les autres modules sortis de `core` par le 
 | `uiux/` | design system et règles de pile UI, seulement si la tâche touche l'interface |
 | `mobile/` | Android / Apple : piles, appareils, `readiness.py` (constructible ici ?) |
 | `verify/` | boucle `/verify` : lancer l'app, erreurs → correction, preuve |
+| `genai_trace/` | spans OpenTelemetry GenAI de chaque `AgentClient` (`invoke_agent`, `chat`, `execute_tool`), posés par `AgentClient.__init_subclass__` ; aucun contenu ; une feuille, importée par `harness` ([justification](../../docs/architecture/genai-traces.md)) |
 | `pr_followup/` | la PR d'une tâche suivie jusqu'au merge : `policy.decide` (pure), gardes du diff de correctif, GitHub par `gh`, `run_round` ; runner `runners/pr_followup_runner.py` ([justification](../../docs/architecture/pr-followup.md)) |
 | `architecture_visualizer/` | carte archify du projet et delta par tâche |
 | `bounty_board/` | N modèles sur une spec, preuves mesurées, juge anonyme |
