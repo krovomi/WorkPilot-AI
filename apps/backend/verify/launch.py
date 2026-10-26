@@ -129,6 +129,32 @@ def _url_from_log(text: str) -> str:
     return f"http://127.0.0.1:{match.group('port')}"
 
 
+def _windows_base(
+    env: dict[str, str],
+) -> dict[str, str]:  # pragma: no cover - Windows leg
+    """What every Windows process needs from its environment to start at all.
+
+    A child without ``SystemRoot`` dies while loading its DLLs (0xC0000142,
+    STATUS_DLL_INIT_FAILED), before printing anything, and WorkPilot's own
+    process may run with a built environment that lost it.
+    """
+    root = env.get("SystemRoot") or env.get("SYSTEMROOT") or env.get("windir")
+    if not root:
+        import ctypes
+
+        buffer = ctypes.create_unicode_buffer(260)
+        size = ctypes.windll.kernel32.GetWindowsDirectoryW(buffer, 260)  # type: ignore[attr-defined]
+        root = buffer.value if size else r"C:\Windows"
+    base = {
+        "SystemRoot": root,
+        "windir": root,
+        "COMSPEC": str(Path(root) / "System32" / "cmd.exe"),
+        "PATHEXT": ".COM;.EXE;.BAT;.CMD",
+    }
+    upper = {key.upper() for key in env}
+    return {**{k: v for k, v in base.items() if k.upper() not in upper}, **env}
+
+
 def _popen(command: str, cwd: Path, env: dict[str, str], log) -> subprocess.Popen:
     kwargs: dict = {
         "cwd": str(cwd),
@@ -138,6 +164,7 @@ def _popen(command: str, cwd: Path, env: dict[str, str], log) -> subprocess.Pope
         "stdin": subprocess.DEVNULL,
     }
     if is_windows():  # pragma: no cover - Windows leg
+        kwargs["env"] = _windows_base(env)
         kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP  # type: ignore[attr-defined]
     else:
         kwargs["start_new_session"] = True

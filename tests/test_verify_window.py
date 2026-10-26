@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import subprocess
 import sys
 import textwrap
@@ -501,6 +502,20 @@ def _app_target() -> Target:
     return Target(kind="windows-app", name="Orders", command=command)
 
 
+_WIN_BASE = {"SYSTEMROOT", "WINDIR", "COMSPEC", "PATHEXT"}
+
+
+def test_a_windows_child_always_gets_what_windows_needs_to_start():
+    # Without SystemRoot a Windows process dies loading its DLLs (0xC0000142).
+    env = launching._windows_base({"windir": r"D:\Win", "PATH": "x"})
+    assert env["SystemRoot"] == r"D:\Win" and env["PATH"] == "x"
+    assert env["COMSPEC"].endswith("cmd.exe")
+    # What the parent has wins, whatever its case.
+    kept = launching._windows_base({"SYSTEMROOT": r"E:\W", "PathExt": ".EXE"})
+    assert kept["SYSTEMROOT"] == r"E:\W" and "SystemRoot" not in kept
+    assert kept["PathExt"] == ".EXE" and "PATHEXT" not in kept
+
+
 @pytest.mark.parametrize(
     ("polls", "unavailable", "status", "error_kind"),
     [
@@ -527,7 +542,8 @@ def test_a_windows_app_is_ready_when_its_window_shows(
         stop_all(base)
     assert result.status == status, (
         f"{result.status} (code {result.exit_code}): {result.detail}\n"
-        f"command: {result.command}\nlog: {result.log_tail[-1500:]}"
+        f"command: {result.command}\nlog: {result.log_tail[-1500:]}\n"
+        f"parent has: {sorted(k for k in os.environ if k.upper() in _WIN_BASE)}"
     )
     if status == "ready":
         assert result.window["hwnd"] == 9 and result.window["namedBy"] == "card"
