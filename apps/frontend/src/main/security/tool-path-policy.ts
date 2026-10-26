@@ -9,12 +9,26 @@
  * executable file named like the tool, outside every registered project and
  * outside the temporary folder: the places an agent or a downloaded file can
  * write to. A value that is already stored is kept as it is.
+ *
+ * `autoBuildPath`, the backend folder, gets the same treatment: the main runs
+ * its Python scripts. It must hold `runners/spec_runner.py` and lie outside
+ * every project and the temporary folder, unless it is the backend the main
+ * detects itself (in development, the repository may be a registered project).
  */
 
-import { accessSync, constants, realpathSync, statSync } from "node:fs";
+import {
+	accessSync,
+	constants,
+	existsSync,
+	realpathSync,
+	statSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
-export { TOOL_PATH_REFUSED } from "../../shared/constants/tool-paths";
+export {
+	BACKEND_PATH_REFUSED,
+	TOOL_PATH_REFUSED,
+} from "../../shared/constants/tool-paths";
 import { isWindows } from "../platform";
 import { isWithinRoot, knownProjectRoots } from "./renderer-path";
 
@@ -128,4 +142,63 @@ export function refusedToolPath(
 		}
 	}
 	return null;
+}
+
+// The file `detectAutoBuildSourcePath` looks for in a backend folder.
+const BACKEND_MARKER = path.join("runners", "spec_runner.py");
+
+function isDirectory(resolved: string): boolean {
+	try {
+		return statSync(resolved).isDirectory();
+	} catch {
+		return false;
+	}
+}
+
+export interface BackendPathOptions {
+	/** The backend the main process finds on its own, if any. */
+	detected?: () => string | null;
+	roots?: readonly string[];
+}
+
+export function isAcceptableBackendPath(
+	value: string,
+	options: BackendPathOptions = {},
+): boolean {
+	const trimmed = value.trim();
+	if (trimmed === "") return true;
+	if (!path.isAbsolute(trimmed)) return false;
+
+	const resolved = realpathOrNull(trimmed);
+	if (!resolved || !isDirectory(resolved)) return false;
+	const marker = realpathOrNull(path.join(resolved, BACKEND_MARKER));
+	if (!marker || !existsSync(marker) || !isWithinRoot(marker, resolved)) {
+		return false;
+	}
+
+	const detected = options.detected?.();
+	if (detected && realpathOrNull(detected) === resolved) return true;
+
+	const roots = options.roots ?? untrustedToolRoots();
+	const given = path.resolve(trimmed);
+	return !roots.some(
+		(root) => isWithinRoot(resolved, root) || isWithinRoot(given, root),
+	);
+}
+
+/**
+ * Whether `update` changes the stored backend folder to one that is not
+ * acceptable.
+ */
+export function refusesBackendPath(
+	update: { autoBuildPath?: unknown },
+	stored: { autoBuildPath?: unknown },
+	options?: BackendPathOptions,
+): boolean {
+	const value = update.autoBuildPath;
+	if (value === undefined || value === null || value === stored.autoBuildPath) {
+		return false;
+	}
+	if (typeof value !== "string") return true;
+	return !isAcceptableBackendPath(value, options);
 }

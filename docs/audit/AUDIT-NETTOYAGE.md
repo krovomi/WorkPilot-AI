@@ -2020,6 +2020,14 @@ Code : `main/security/renderer-path.ts` (résolution) et `main/security/ipc-path
   valeur déjà enregistrée est gardée. L'UI dit quel champ est refusé (clé
   `settings:general.toolPathRefused`, `en` et `fr`). Garde-fous :
   `main/security/tool-path-policy.test.ts` et `main/__tests__/source-env-handlers.test.ts`.
+- **Suite** (PR « dossier du backend ») : `autoBuildPath`, le dossier du backend dont le main
+  lance les scripts Python, était lui aussi accepté tel quel. `SETTINGS_SAVE` refuse désormais une
+  nouvelle valeur qui n'est pas le chemin absolu d'un dossier contenant `runners/spec_runner.py`
+  (le marqueur de `detectAutoBuildSourcePath`, sans lien qui en sorte), hors de tout projet
+  enregistré et du dossier temporaire. Seule exception, le backend que le main détecte lui-même :
+  en développement, le dépôt WorkPilot peut être un projet enregistré. Une valeur déjà enregistrée
+  est gardée ; l'UI le dit par `settings:general.backendPathRefused` (`en` et `fr`). Mêmes
+  garde-fous, plus `isAcceptableBackendPath` et `refusesBackendPath`.
 - **Suite** (PR « expéditeur IPC ») : aucun handler ne vérifiait `event.senderFrame`, sauf la
   dictée. `main/security/ipc-sender-policy.ts` (`installIpcSenderPolicy`, posé par `ipc-setup.ts`
   avant le contrôle des dossiers) n'entend plus que la page de l'app, dans le cadre principal de
@@ -2638,7 +2646,7 @@ détaillés ici qu'une fois corrigés ([`SECURITY.md`](../SECURITY.md)).
 | M3 | Des features qui ne disent que ce qu'elles font (PR Azure DevOps factice, triage `continuous_ai`, verdict QA .NET, workflows de release jamais déclenchés, Skills Sync, Sentry) | **fait** (F63 à F68) |
 | M4 | Mode hors-ligne strict et mode serveur | **fait** (F69 à F71) |
 | M5 | Secrets et environnement des processus enfants | **fait** (F78 à F84 : journaux et processus enfants, aucun identifiant stocké dans le renderer, environnement construit pour les runners Python des vues et de forge) |
-| M6 | Frontière renderer → main, avec tests de refus | **fait** (F85 à F90, expéditeur vérifié sur chaque canal, chemins d'outils des réglages contrôlés ; reste `autoBuildPath`) |
+| M6 | Frontière renderer → main, avec tests de refus | **fait** (F85 à F90, expéditeur vérifié sur chaque canal, chemins d'outils et dossier du backend des réglages contrôlés) |
 | M7 | Contrats d'architecture (`import-linter`, canaux IPC, Sidebar ↔ `product-overview.md`) | **fait** (F91 à F94 ; contrats d'imports en test AST, sans `import-linter`) |
 | M8 | Code mort, `scripts/`, vues sans test | **fait** (F95 à F100 ; vues sans conception ni test marquées « Expérimental » ; `node-pty` retiré ensuite, F75) |
 | M9 | Doc ↔ code, i18n de la palette, jsdom, dépendances | **fait** (F72 à F77) |

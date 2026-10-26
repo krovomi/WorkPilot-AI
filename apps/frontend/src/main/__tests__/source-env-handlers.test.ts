@@ -315,4 +315,25 @@ describe("AUTOBUILD_SOURCE_ENV handlers", () => {
 		expect(readFileSync(settingsFile, "utf-8")).toBe(before);
 		expect((await saveSettings({ gitPath: "git" })).success).toBe(true);
 	});
+
+	it("refuses a backend folder in the temporary folder, and writes nothing", async () => {
+		const { saveSettings } = await register();
+		const settingsFile = path.join(env.userData, "settings.json");
+		const before = readFileSync(settingsFile, "utf-8");
+		const planted = mkdtempSync(path.join(tmpdir(), "planted-backend-"));
+		mkdirSync(path.join(planted, "runners"));
+		writeFileSync(path.join(planted, "runners", "spec_runner.py"), "", "utf-8");
+
+		try {
+			const result = await saveSettings({ autoBuildPath: planted });
+			expect(result).toEqual({
+				success: false,
+				error: "backend-path-refused",
+				data: { field: "autoBuildPath" },
+			});
+			expect(readFileSync(settingsFile, "utf-8")).toBe(before);
+		} finally {
+			rmSync(planted, { recursive: true, force: true });
+		}
+	});
 });
