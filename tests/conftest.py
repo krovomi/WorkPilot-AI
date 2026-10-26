@@ -1212,6 +1212,17 @@ def _isolated_brain(tmp_path_factory, monkeypatch):
     monkeypatch.setenv("WORKPILOT_BRAIN_HOME", str(base / "home"))
 
 
+# Whether this machine can sandbox a command is ambient too: with bubblewrap
+# installed, every client test would start `bwrap` around its fake process
+# and every `run_command` test would run in a namespace. The sandbox has its
+# own tests (`tests/os_sandbox/`), which turn it back on.
+
+
+@pytest.fixture(autouse=True)
+def _os_sandbox_off_by_default(monkeypatch):
+    monkeypatch.setenv("WORKPILOT_SANDBOX", "off")
+
+
 # ── Ambient state is not input ─────────────────────────────────────────
 #
 # These two lived in a repository-root `conftest.py` while some tests still

@@ -70,6 +70,7 @@ composition, qui importe les agents. Les autres modules sortis de `core` par le 
 | `server/auth/`, `server/authz/` | authentification (JWT, OIDC) ; permissions, rôles, tenants, portée de projet |
 | `foundation/api_safety.py` | chemins acceptés par l'API locale |
 | `offline_policy/` | hors-ligne strict (`airgapStrict`) |
+| `os_sandbox/` | bac à sable de l'OS autour des commandes d'agent : bubblewrap, Seatbelt, proxy filtrant ([conception](../../docs/architecture/os-sandbox.md)) |
 | `core/log_redaction.py` | filtre de redaction des logs |
 
 ## Mémoire, apprentissage, autonomie
