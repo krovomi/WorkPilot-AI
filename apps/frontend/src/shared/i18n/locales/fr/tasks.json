@@ -2006,5 +2006,14 @@
 			"invalid_option": "Cette réponse ne fait pas partie de celles proposées par l'agent",
 			"process_gone": "Le build s'est arrêté, plus personne à qui répondre"
 		}
+	},
+	"mcpApps": {
+		"title": "Vues MCP Apps",
+		"subtitle": "Les vues qu'un serveur MCP installé attache aux outils appelés par l'agent. Chacune montre l'appel qui a eu lieu ; elle ne peut ni appeler un outil, ni écrire à l'agent, ni ouvrir un lien.",
+		"count_one": "{{count}} vue",
+		"count_other": "{{count}} vues",
+		"loading": "Chargement de la vue…",
+		"unavailable": "Cette vue ne peut plus être affichée.",
+		"frameTitle": "Vue MCP App : {{server}} · {{tool}}"
 	}
 }

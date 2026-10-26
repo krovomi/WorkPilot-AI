@@ -688,6 +688,16 @@ message. WorkPilot's own integrations read other names, in the last column.
 | `postman` | `POSTMAN_API_KEY` | — |
 | `teams` | `TEAMS_WEBHOOK_URL` | the same, for notifications |
 
+### MCP tasks (2026-07-28)
+
+A server may return a tool call as a task (`io.modelcontextprotocol/tasks`); the
+providers on WorkPilot's own loop wait for it, see
+[architecture/mcp-2026.md](architecture/mcp-2026.md).
+
+| Variable | Default | Meaning |
+| --- | ---: | --- |
+| `WORKPILOT_MCP_TASK_TIMEOUT` | 1800 | Seconds a tool call returned as a task may run before WorkPilot cancels it (`tasks/cancel`) and gives the agent an error that says so. A value that is not a positive number keeps the default. |
+
 ## Agent features
 
 Opt-in features. Those marked *API* are read by the local API: put them in
