@@ -11,6 +11,8 @@ import type {
 	MergeProgress,
 	PRDetailsResult,
 	PrFollowupStartOptions,
+	McpAppViewOpened,
+	McpAppViewSummary,
 	PrFollowupStatus,
 	ReviewReason,
 	SupportedIDE,
@@ -359,6 +361,16 @@ export interface TaskAPI {
 		callback: (taskId: string, status: PrFollowupStatus) => void,
 	) => () => void;
 
+	// MCP App views kept by a build
+	listMcpAppViews: (taskId: string) => Promise<IPCResult<McpAppViewSummary[]>>;
+	openMcpAppView: (
+		taskId: string,
+		viewId: string,
+	) => Promise<IPCResult<McpAppViewOpened>>;
+	closeMcpAppView: (token: string) => Promise<IPCResult>;
+	onMcpAppView: (
+		callback: (taskId: string, view: McpAppViewSummary) => void,
+	) => () => void;
 	// Best-of-N events
 	onBestOfNEvent: (
 		callback: (taskId: string, status: BestOfNStatus) => void,
@@ -1020,6 +1032,34 @@ export const createTaskAPI = (): TaskAPI => ({
 		ipcRenderer.on(IPC_CHANNELS.TASK_PR_FOLLOWUP_EVENT, handler);
 		return () => {
 			ipcRenderer.removeListener(IPC_CHANNELS.TASK_PR_FOLLOWUP_EVENT, handler);
+		};
+	},
+
+	listMcpAppViews: (taskId: string): Promise<IPCResult<McpAppViewSummary[]>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_MCP_APPS_LIST, taskId),
+
+	openMcpAppView: (
+		taskId: string,
+		viewId: string,
+	): Promise<IPCResult<McpAppViewOpened>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_MCP_APP_OPEN, taskId, viewId),
+
+	closeMcpAppView: (token: string): Promise<IPCResult> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_MCP_APP_CLOSE, token),
+
+	onMcpAppView: (
+		callback: (taskId: string, view: McpAppViewSummary) => void,
+	): (() => void) => {
+		const handler = (
+			_event: Electron.IpcRendererEvent,
+			taskId: string,
+			view: McpAppViewSummary,
+		): void => {
+			callback(taskId, view);
+		};
+		ipcRenderer.on(IPC_CHANNELS.TASK_MCP_APP_VIEW, handler);
+		return () => {
+			ipcRenderer.removeListener(IPC_CHANNELS.TASK_MCP_APP_VIEW, handler);
 		};
 	},
 

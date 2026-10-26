@@ -163,7 +163,7 @@ l'UI n'existe pas.
   dans le main. → [`architecture/secrets-at-rest.md`](../architecture/secrets-at-rest.md)
 - URL externe : `openExternalUrl` (`open-external.ts`, protocoles en liste fermée), jamais
   `shell.openExternal` sur une chaîne reçue.
-- CSP (`src/renderer/index.html`) : pas d'`unsafe-eval`, pas de nouvel hôte sans raison écrite.
+- CSP (`src/renderer/index.html`) : pas d'`unsafe-eval`, pas de nouvel hôte sans raison écrite. Une vue MCP App : iframe `allow-scripts` sans `allow-same-origin`, servie par le main avec sa propre CSP ([mcp-2026](../architecture/mcp-2026.md)).
 
 ## S7 — Hors-ligne strict
 

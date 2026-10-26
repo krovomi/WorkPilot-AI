@@ -27,6 +27,7 @@ import { ExecutionFormulaBanner } from "./ExecutionFormulaBanner";
 import { BestOfNCard } from "./BestOfNCard";
 import { GoalCard } from "./GoalCard";
 import { HermesLearningCard } from "./HermesLearningCard";
+import { McpAppsCard } from "./McpAppsCard";
 import { PrFollowupCard } from "./PrFollowupCard";
 import { RtkSavingsCard } from "./RtkSavingsCard";
 import { SpecInterviewBanner } from "./SpecInterviewDialog";
@@ -245,6 +246,9 @@ export function TaskOverview({
 						{/* La boucle de vérification : l'app lancée, corrigée, amenée
 						    jusqu'au changement et mesurée. Rien tant qu'elle n'a pas tourné. */}
 						<VerifyLoopCard task={task} projectPath={projectPath} onOpenDetails={onOpenVerify} />
+						{/* Les vues MCP Apps des outils appelés pendant le build, dans
+						    une iframe sans allow-same-origin. Rien sans vue gardée. */}
+						<McpAppsCard task={task} />
 					</OverviewSection>
 
 					<OverviewSection taskId={task.id} id="learning" icon={BrainCircuit} tone="violet" onPresence={report}>

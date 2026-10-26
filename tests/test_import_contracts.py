@@ -40,6 +40,9 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     "offline_policy": {"ollama_model_detector", "phase_config"},
     # The preview's project detector, read by verify and the Kanban runner.
     "app_detection": set(),
+    # MCP 2026-07-28 and its Tasks extension, for WorkPilot's own servers:
+    # the standard library only (docs/architecture/mcp-2026.md).
+    "mcp_tasks": set(),
     # Stack detection, including the UI and test stacks moved here in M10.
     "project": {"mobile"},
     "mobile": {"foundation"},

@@ -88,6 +88,11 @@ import {
 	isPermissionGranted,
 	isWebviewSourceAllowed,
 } from "./security/webview-policy";
+import {
+	guardMcpAppFrames,
+	registerMcpAppScheme,
+	serveMcpAppScheme,
+} from "./mcp-apps/register";
 import { canUseDictationMicrophone } from "./security/dictation-permission";
 import { initializeCredentialIntegration } from "./services/credential-integration";
 import { selectLinuxPasswordStore } from "./linux-password-store";
@@ -548,6 +553,7 @@ function createWindow(): void {
 	setupContextMenu(mainWindow);
 	setupExternalLinkHandler(mainWindow);
 	setupWebviewGuards(mainWindow);
+	guardMcpAppFrames(mainWindow);
 	setupPermissionHandlers();
 
 	// Load the renderer
@@ -585,6 +591,10 @@ if (isWindows()) {
 
 // Linux without a declared desktop (WSL…): use the running keyring, not basic_text
 selectLinuxPasswordStore();
+
+// MCP App views get a scheme of their own, with their own CSP; Electron only
+// accepts the registration before ready (mcp-apps/view-protocol.ts).
+registerMcpAppScheme();
 
 // Fonction pour attendre que le backend soit prêt
 async function waitForBackendReady(url: string, timeoutMs = 10000) {
@@ -1184,6 +1194,9 @@ async function main() {
 
 	// Set dock icon on macOS
 	await setupMacOSDockIcon();
+
+	// Serve the MCP App views the task panel frames
+	serveMcpAppScheme();
 
 	// Default open or close DevTools by F12 in development
 	// and ignore CommandOrControl + R in production.

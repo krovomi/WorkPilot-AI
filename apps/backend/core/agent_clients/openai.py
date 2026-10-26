@@ -404,7 +404,11 @@ class OpenAIAgentClient(AgentClient):
                 self._agent_type, self._project_dir, getattr(self, "_spec_dir", None)
             )
             if servers:
-                manager = MCPToolManager(self._project_dir, servers)
+                manager = MCPToolManager(
+                    self._project_dir,
+                    servers,
+                    spec_dir=getattr(self, "_spec_dir", None),
+                )
                 await manager.connect()
                 mcp_defs = manager.tool_definitions()
                 if mcp_defs:

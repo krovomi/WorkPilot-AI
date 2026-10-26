@@ -175,6 +175,15 @@ export const taskMock = {
 	onPrFollowupEvent: () => () => {
 		/* noop */
 	},
+	listMcpAppViews: async () => ({ success: true as const, data: [] }),
+	openMcpAppView: async () => ({
+		success: false as const,
+		error: "MCP App views are not available in the browser preview",
+	}),
+	closeMcpAppView: async () => ({ success: true as const }),
+	onMcpAppView: () => () => {
+		/* noop */
+	},
 	startBestOfN: async () => ({
 		success: false as const,
 		error: "Best-of-N is not available in the browser preview",
