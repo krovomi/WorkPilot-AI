@@ -13,7 +13,8 @@ export type NeedsYouKind =
 	| "completed"
 	| "qa_rejected"
 	| "qa_unverified"
-	| "failed";
+	| "failed"
+	| "permission";
 
 export interface NeedsYouEvent {
 	kind: NeedsYouKind;
@@ -64,6 +65,7 @@ const STRINGS = {
 		qa_rejected: ["QA needs you", '"{title}": QA could not get the build to pass and handed it over.'],
 		qa_unverified: ["QA could not conclude", '"{title}": the work is complete but QA reached no verdict.'],
 		failed: ["Task stopped on an error", '"{title}" stopped on an error.'],
+		permission: ["The agent asks before acting", '"{title}": the agent is waiting for your answer on the card.'],
 		approve: "Approve the plan",
 		approved: "Approved: coding has started.",
 		expired: "This approval has expired or was already used. Open WorkPilot.",
@@ -77,6 +79,7 @@ const STRINGS = {
 		qa_rejected: ["La QA a besoin de toi", "« {title} » : la QA n'a pas réussi à faire passer le build et passe la main."],
 		qa_unverified: ["La QA n'a pas conclu", "« {title} » : le travail est fini mais la QA n'a rendu aucun verdict."],
 		failed: ["Tâche arrêtée sur une erreur", "« {title} » s'est arrêtée sur une erreur."],
+		permission: ["L'agent demande avant d'agir", "« {title} » : l'agent attend ta réponse sur la carte."],
 		approve: "Approuver le plan",
 		approved: "Approuvé : le code a démarré.",
 		expired: "Cette approbation a expiré ou a déjà servi. Ouvre WorkPilot.",

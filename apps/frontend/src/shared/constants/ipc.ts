@@ -60,6 +60,10 @@ export const IPC_CHANNELS = {
 	TASK_SANDBOX_STATUS: "task:sandboxStatus", // Event (main -> renderer): whether a task's commands run in the OS sandbox (SANDBOX_STATUS)
 	TASK_SANDBOX_LIST: "task:sandboxList", // The sandbox statuses main holds, for a reloaded renderer
 	TASK_CONTEXT_USAGE: "task:contextUsage", // Event (main -> renderer): CONTEXT_USAGE / CONTEXT_ACTION_APPLIED task events, forwarded untouched
+	TASK_PERMISSION_REQUEST: "task:permissionRequest", // Event (main -> renderer): an ACP agent asks before it acts (PERMISSION_REQUESTED, validated)
+	TASK_PERMISSION_CLEARED: "task:permissionCleared", // Event (main -> renderer): that question is answered, timed out or its process is gone
+	TASK_PERMISSION_LIST: "task:permissionList", // The questions waiting now (after a reload of the renderer)
+	TASK_PERMISSION_ANSWER: "task:permissionAnswer", // The person's choice, checked in main, written to the build's stdin
 	TASK_CHECK_PLAN_CONFLICTS: "task:checkPlanConflicts", // Detect file overlaps between this task's plan and other active tasks (parallel worktrees)
 
 	// CI/CD pipeline loop (« Build rouge » column) — provider-agnostic (Azure DevOps, GitHub Actions, GitLab CI, Jenkins)
@@ -997,6 +1001,7 @@ export const IPC_CHANNELS = {
 	ACCESSIBILITY_RESULT: "accessibility-result",
 	ACCESSIBILITY_RUN: "accessibility:run",
 	AGENT_CLI_CHECK: "agentCli:check",
+	AGENT_CLI_PROBE_ACP: "agentCli:probeAcp",
 	AGENT_COACH_CANCEL: "agentCoach:cancel",
 	AGENT_COACH_ERROR: "agent-coach-error",
 	AGENT_COACH_EVENT: "agent-coach-event",

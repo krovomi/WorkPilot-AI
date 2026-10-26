@@ -28,6 +28,7 @@ export type ApiProvider =
 	| "opencode"
 	| "antigravity"
 	| "pi"
+	| "gemini-cli"
 	| "unknown";
 
 /**
@@ -192,6 +193,8 @@ export function getProviderLabel(provider: ApiProvider): string {
 			return "Google Antigravity";
 		case "pi":
 			return "pi";
+		case "gemini-cli":
+			return "Gemini CLI";
 		case "unknown":
 			return "Unknown";
 	}
@@ -237,6 +240,8 @@ export function getProviderBadgeColor(provider: ApiProvider): string {
 			return "bg-indigo-500/10 text-indigo-500 border-indigo-500/20 hover:bg-indigo-500/15";
 		case "pi":
 			return "bg-rose-500/10 text-rose-500 border-rose-500/20 hover:bg-rose-500/15";
+		case "gemini-cli":
+			return "bg-sky-500/10 text-sky-500 border-sky-500/20 hover:bg-sky-500/15";
 		case "unknown":
 			return "bg-gray-500/10 text-gray-500 border-gray-500/20 hover:bg-gray-500/15";
 	}
