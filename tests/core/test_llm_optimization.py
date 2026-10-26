@@ -62,21 +62,51 @@ class TestOpenAIReasoningEffort:
     @pytest.mark.parametrize(
         ("budget", "expected"),
         [
-            (None, None),  # thinking "none" → omit the parameter
             (1024, "low"),
             (4096, "medium"),
             (16384, "high"),
-            (63999, "high"),  # ultrathink capped at "high" (xhigh not universal)
         ],
     )
     def test_budget_mapping_on_reasoning_models(self, budget, expected):
         assert openai_reasoning_effort("gpt-5.5", budget) == expected
         assert openai_reasoning_effort("o3", budget) == expected
 
+    @pytest.mark.parametrize(
+        ("model", "expected"),
+        [
+            # Omitting the field runs the model's default ("medium" on most):
+            # "none" asks for the lowest effort each model takes instead.
+            ("gpt-5.5", "none"),
+            ("gpt-6.1-sol", "none"),
+            ("gpt-5", "minimal"),
+            ("gpt-5-mini", "minimal"),
+            ("o3", "low"),
+            ("gpt-5.1-codex", "low"),
+            ("gpt-5.4-pro", "medium"),
+        ],
+    )
+    def test_none_is_the_lowest_effort_of_the_model(self, model, expected):
+        assert openai_reasoning_effort(model, None) == expected
+
+    @pytest.mark.parametrize(
+        ("model", "expected"),
+        [
+            ("gpt-5.2", "xhigh"),
+            ("gpt-6-luna", "xhigh"),
+            ("gpt-5.1-codex-max", "xhigh"),
+            ("gpt-5.1", "high"),  # xhigh is general from gpt-5.2
+            ("o3", "high"),
+        ],
+    )
+    def test_ultrathink_is_the_highest_effort_of_the_model(self, model, expected):
+        assert openai_reasoning_effort(model, 63999) == expected
+
     def test_non_reasoning_models_get_no_effort(self):
         # gpt-4o / gpt-4.1 reject reasoning_effort — must be omitted
         assert openai_reasoning_effort("gpt-4o", 16384) is None
         assert openai_reasoning_effort("gpt-4.1-mini", 16384) is None
+        # A `-chat` snapshot does not reason either.
+        assert openai_reasoning_effort("gpt-5-chat-latest", 16384) is None
 
     def test_unknown_budget_falls_back_to_medium(self):
         assert openai_reasoning_effort("gpt-5.5", 12345) == "medium"
@@ -127,10 +157,19 @@ class TestGeminiReasoningEffort:
     def test_each_level_of_the_selector(self, level, expected):
         from phase_config import THINKING_BUDGET_MAP
 
-        for model in ("gemini-3.1-pro-preview", "gemini-2.5-flash", "gemini-4-argon"):
+        for model in ("gemini-3.1-pro-preview", "gemini-2.5-pro", "gemini-4-argon"):
             assert (
                 gemini_reasoning_effort(model, THINKING_BUDGET_MAP[level]) == expected
             )
+
+    @pytest.mark.parametrize(
+        "model",
+        ["gemini-2.5-flash", "gemini-2.5-flash-lite", "models/gemini-2.5-flash"],
+    )
+    def test_none_turns_thinking_off_where_the_model_can(self, model):
+        # ai.google.dev/gemini-api/docs/openai: 2.5 Flash takes "none".
+        assert gemini_reasoning_effort(model, None) == "none"
+        assert gemini_reasoning_effort(model, 16384) == "high"
 
     @pytest.mark.parametrize("model", ["gemini-2.0-flash", "gemini-1.5-pro", ""])
     def test_a_model_without_thinking_gets_none(self, model):

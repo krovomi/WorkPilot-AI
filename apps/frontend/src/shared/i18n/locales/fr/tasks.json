@@ -466,7 +466,9 @@
 			"ctxInitialLabel": "Contexte LLM initial",
 			"provider": "Fournisseur",
 			"model": "Modèle",
-			"effort": "Effort"
+			"effort": "Effort",
+			"effortNotApplied": "non appliqué par ce modèle",
+			"effortSentAs": "envoyé comme"
 		}
 	},
 	"files": {
@@ -1748,7 +1750,10 @@
 		"notConfiguredWarning": "{{provider}} n'est pas configuré sur cette machine. Ajoutez son compte dans Paramètres → Comptes IA, ou choisissez un autre fournisseur.",
 		"chipMixed": "{{provider}} · mixte",
 		"chipAria": "Moteur de la tâche : {{engine}}",
-		"onlyResumedPhase": "Seulement pour la phase reprise ({{phase}}) — les phases suivantes gardent leur moteur"
+		"onlyResumedPhase": "Seulement pour la phase reprise ({{phase}}) — les phases suivantes gardent leur moteur",
+		"effortNotApplied": "Ce modèle n'a pas de réglage d'effort que WorkPilot puisse atteindre : le niveau choisi n'a aucun effet sur lui.",
+		"effortSentAs": "Envoyé au fournisseur comme « {{value}} », le niveau le plus proche que ce modèle accepte.",
+		"effortRuntime": "Appliqué au lancement si le modèle l'accepte ; le journal de la tâche dit ce qui a été envoyé."
 	},
 	"verify": {
 		"title": "Boucle de vérification",

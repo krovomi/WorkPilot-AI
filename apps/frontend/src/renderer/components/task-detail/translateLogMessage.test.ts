@@ -131,4 +131,23 @@ describe("translateLogMessage", () => {
 			"🔄 tasks:execution.logMessages.ctxSwitchLabel — tasks:execution.logMessages.model: claude-haiku-4-5 → claude-sonnet-4-5",
 		);
 	});
+
+	it("localises what the model received when it is not the level asked for", () => {
+		expect(
+			translateLogMessage(
+				fakeT,
+				"▶️ Initial LLM context — Provider: grok · Model: grok-4.3 · Effort: high (not applied by this model)",
+			),
+		).toBe(
+			"▶️ tasks:execution.logMessages.ctxInitialLabel — tasks:execution.logMessages.provider: grok · tasks:execution.logMessages.model: grok-4.3 · tasks:execution.logMessages.effort: high (tasks:execution.logMessages.effortNotApplied)",
+		);
+		expect(
+			translateLogMessage(
+				fakeT,
+				"🔄 LLM context switch — Effort: high → none (sent as low)",
+			),
+		).toBe(
+			"🔄 tasks:execution.logMessages.ctxSwitchLabel — tasks:execution.logMessages.effort: high → none (tasks:execution.logMessages.effortSentAs low)",
+		);
+	});
 });
