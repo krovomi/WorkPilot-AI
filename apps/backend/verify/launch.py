@@ -14,6 +14,9 @@ prompt. Its contract:
   (`{port}`, `PORT`, `ASPNETCORE_URLS`…); otherwise the first loopback URL the
   app prints is believed, which is how Vite announces itself when its default
   port is taken;
+* a Windows app (WPF, WinForms, WinUI) has no URL: it is ready when its
+  window shows, found by UI Automation among the windows of the process tree
+  it started (`verify.window`), and that window is pinned for the session;
 * the app's death, a timeout and a refusal are three different answers, each
   with the log tail that explains it.
 """
@@ -62,6 +65,8 @@ class LaunchResult:
     errors: list[VerifyError] = field(default_factory=list)
     log_tail: str = ""
     detail: str = ""
+    #: A Windows app's pinned window: hwnd, title, pid, namedBy.
+    window: dict = field(default_factory=dict)
 
     @property
     def ok(self) -> bool:
@@ -147,6 +152,7 @@ def launch(
     timeout: float = 120.0,
     command: str | None = None,
     restart: bool = False,
+    window_title: str = "",
 ) -> LaunchResult:
     """Launch ``target`` (or reuse it when it already runs). Never raises."""
     project = Path(project_dir)
@@ -156,7 +162,35 @@ def launch(
             target.name, "refused", detail="mobile targets launch through verify.mobile"
         )
 
+    if target.kind == "windows-app" and not _uia_available():
+        from .window import UNAVAILABLE
+
+        return LaunchResult(
+            target.name,
+            "refused",
+            detail=UNAVAILABLE,
+            errors=[VerifyError("environment", UNAVAILABLE, source="launch")],
+        )
+
     existing = live_process(base, target.name)
+    if (
+        existing
+        and not restart
+        and target.kind == "windows-app"
+        and isinstance(existing.get("window"), dict)
+        and _still_shown(target, base, window_title)
+    ):
+        log = read_log(existing.get("log", ""))
+        return LaunchResult(
+            target.name,
+            "reused",
+            pid=existing.get("pid"),
+            log_path=existing.get("log", ""),
+            command=existing.get("command", ""),
+            errors=collect_errors(log, project, source=f"log:{target.name}"),
+            log_tail=log[-4000:],
+            window=existing["window"],
+        )
     if (
         existing
         and not restart
@@ -263,40 +297,85 @@ def launch(
 
     deadline = started + timeout
     url = ""
-    while time.time() < deadline:
-        code = process.poll()
-        if code is not None:
-            log = read_log(log_path)
-            stop_process(base, target.name)
-            return LaunchResult(
-                target.name,
-                "exited",
-                pid=process.pid,
-                log_path=str(log_path),
-                exit_code=code,
-                seconds=round(time.time() - started, 1),
-                command=final_command,
-                errors=collect_errors(log, project, source=f"log:{target.name}")
-                or [
-                    VerifyError(
-                        "crash", f"the process exited with code {code}", source="launch"
+    window: dict | None = None
+    driver = None
+    if target.kind == "windows-app":
+        from .window import HelperUnavailable, UiaDriver
+
+        # One helper for the whole wait: it compiles its C# when it starts.
+        driver = UiaDriver()
+    try:
+        while time.time() < deadline:
+            code = process.poll()
+            if code is not None:
+                log = read_log(log_path)
+                stop_process(base, target.name)
+                return LaunchResult(
+                    target.name,
+                    "exited",
+                    pid=process.pid,
+                    log_path=str(log_path),
+                    exit_code=code,
+                    seconds=round(time.time() - started, 1),
+                    command=final_command,
+                    errors=collect_errors(log, project, source=f"log:{target.name}")
+                    or [
+                        VerifyError(
+                            "crash",
+                            f"the process exited with code {code}",
+                            source="launch",
+                        )
+                    ],
+                    log_tail=log[-4000:],
+                    detail=f"exited with code {code} before answering",
+                )
+            if driver is not None:
+                try:
+                    window = _window_of(target, base, window_title, driver)
+                except HelperUnavailable as exc:
+                    stop_process(base, target.name)
+                    return LaunchResult(
+                        target.name,
+                        "refused",
+                        pid=process.pid,
+                        log_path=str(log_path),
+                        command=final_command,
+                        detail=str(exc),
+                        errors=[VerifyError("environment", str(exc), source="launch")],
                     )
-                ],
-                log_tail=log[-4000:],
-                detail=f"exited with code {code} before answering",
-            )
-        candidates = [preferred]
-        logged = _url_from_log(read_log(log_path, 20_000))
-        if logged and logged not in candidates:
-            candidates.append(logged)
-        for candidate in candidates:
-            status = probe(candidate + ready_path, timeout=1.5)
-            if status is not None:
-                url = candidate
+                if window is not None:
+                    break
+                time.sleep(0.5)
+                continue
+            candidates = [preferred]
+            logged = _url_from_log(read_log(log_path, 20_000))
+            if logged and logged not in candidates:
+                candidates.append(logged)
+            for candidate in candidates:
+                status = probe(candidate + ready_path, timeout=1.5)
+                if status is not None:
+                    url = candidate
+                    break
+            if url:
                 break
-        if url:
-            break
-        time.sleep(0.5)
+            time.sleep(0.5)
+    finally:
+        if driver is not None:
+            driver.close()
+
+    if target.kind == "windows-app":
+        return _window_ready(
+            target,
+            project,
+            base,
+            process,
+            log_path,
+            final_command,
+            started,
+            timeout,
+            window,
+            window_title,
+        )
 
     log = read_log(log_path)
     if not url:
@@ -335,4 +414,81 @@ def launch(
         command=final_command,
         errors=errors,
         log_tail=log[-4000:],
+    )
+
+
+def _window_of(target: Target, base: Path, title: str, driver=None) -> dict | None:
+    """The app's window, pinned on first sight; None while it has none."""
+    from .window import DriverError, HelperUnavailable, UiaDriver, WindowSession
+
+    own = driver is None
+    driver = driver or UiaDriver()
+    try:
+        return WindowSession(base, target.name, title, driver).resolve()
+    except HelperUnavailable:
+        # The machine cannot look at windows: the app is not to blame.
+        raise
+    except DriverError:
+        return None
+    finally:
+        if own:
+            driver.close()
+
+
+def _uia_available() -> bool:
+    from . import window
+
+    return window.available()
+
+
+def _still_shown(target: Target, base: Path, title: str) -> bool:
+    from .window import DriverError
+
+    try:
+        return _window_of(target, base, title) is not None
+    except DriverError:
+        return False
+
+
+def _window_ready(
+    target: Target,
+    project: Path,
+    base: Path,
+    process: subprocess.Popen,
+    log_path: Path,
+    command: str,
+    started: float,
+    timeout: float,
+    window: dict | None,
+    title: str,
+) -> LaunchResult:
+    if window is None:
+        log = read_log(log_path)
+        stop_process(base, target.name)
+        shown = f"titled '{title}'" if title else "at all"
+        return LaunchResult(
+            target.name,
+            "timeout",
+            pid=process.pid,
+            log_path=str(log_path),
+            seconds=round(time.time() - started, 1),
+            command=command,
+            errors=collect_errors(log, project, source=f"log:{target.name}"),
+            log_tail=log[-4000:],
+            detail=f"no window {shown} within {int(timeout)}s",
+        )
+    # What the app prints while it builds its first screen (a binding error,
+    # an exception in a view model) belongs to this launch.
+    time.sleep(1.0)
+    log = read_log(log_path)
+    return LaunchResult(
+        target.name,
+        "ready",
+        pid=process.pid if is_alive(process.pid) else None,
+        log_path=str(log_path),
+        seconds=round(time.time() - started, 1),
+        command=command,
+        errors=collect_errors(log, project, source=f"log:{target.name}"),
+        log_tail=log[-4000:],
+        window=window,
     )

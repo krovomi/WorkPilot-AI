@@ -23,6 +23,7 @@ screenshot or a score as proof.
 |---|---|---|---|
 | `web-frontend` | Vite, Next, Angular, Nuxt, SvelteKit… (`AppEmulatorRunner`) | snapshot → click → fill, read back | screenshot (desktop + mobile viewport) + Lighthouse-curve score |
 | `desktop` | `electron` in the dependencies | the same, through `--remote-debugging-port` | the same |
+| `windows-app` | an executable `.csproj` with `UseWPF`, `UseWindowsForms` or the Windows App SDK | UI Automation in the one window the card names (`verify_window`) | a capture of that window alone |
 | `mobile` | `mobile.stacks.detect_stack` | emulator / simulator (`mobile/launch.py`) | device frame + launch time |
 | `backend-api` | ASP.NET Core, FastAPI/Flask/Django, Express/Nest, Spring, Go | the touched endpoints, called with payloads built from the OpenAPI schema | status + response validated against the schema + p50/p95 latency |
 
@@ -38,6 +39,7 @@ apps/backend/verify/
   perf.py       LCP / CLS / TBT / FCP -> Lighthouse log-normal score; latency stats
   endpoints.py  the running app's OpenAPI, filtered by docintel.api_tests.find_handler on the diff
   payloads.py   a minimal valid instance from a JSON Schema, and validation of a response against it
+  window.py     a Windows app's one window: the card's name, the pin, the UI Automation helper (uia/driver.ps1)
   mobile.py     boot -> build -> install -> launch -> frame, captures filed for the visual review
   tools.py      THE verify_* tools, and their execution (VerifyToolbox)
   mcp_server.py the same tools over stdio MCP (runners/verify_mcp.py)
@@ -60,7 +62,7 @@ clicks or the payload that reach the changed state.
 `verify_launch`, `verify_logs`, `verify_stop`, `verify_browser` (one tool, an
 `action` enum — a short list is what a small local model can use),
 `verify_screenshot`, `verify_perf_trace`, `verify_endpoints`,
-`verify_call_endpoint`, `verify_device` and `verify_record`. Non-Claude
+`verify_call_endpoint`, `verify_device`, `verify_window` and `verify_record`. Non-Claude
 providers execute them in process through `tool_executor` (the `verifier`
 agent type); the Claude SDK gets the `workpilot-verify` stdio server from
 `create_client`, beside `chrome-devtools`. Every step a tool takes is appended
@@ -78,6 +80,43 @@ replaces the base section of that name, a new heading is appended, and
 and the Kanban command bar resolve it for the phase's provider; external
 harnesses get `providers/` next to the emitted `SKILL.md` and are told to read
 their file.
+
+**A Windows app is driven through UI Automation, in one window.** WPF,
+WinForms and WinUI apps have no URL and no DevTools port: `verify/window.py`
+drives them through the accessibility tree Windows keeps for every window.
+
+- *Which window.* The card names it (`verifyWindow` in `task_metadata.json`, a
+  part of its title, set in the card's form under the verification loop). The
+  window must belong to the process tree the verification launched; without a
+  name, it is that tree's first main window. Launch waits for it ("ready" is
+  the window showing, not a port) and pins it in `state.json`. Every later
+  request re-checks the pin against the tree; the dialogs the window owns
+  (a message box) count as part of it. A model never names a window, a process
+  or a handle, only an element of the last snapshot (`e12`). When the pinned
+  window closes while the app runs (a splash screen, a login window), the app's
+  next window under the same rule replaces it. Nothing else on the desktop is
+  listed, read, captured or touched.
+- *How.* Elements are acted on through their patterns (Invoke, Value, Toggle,
+  SelectionItem, ExpandCollapse), never with synthetic mouse or keyboard
+  input: the person's own input is never taken over, and the window does not
+  need the foreground. An element without a pattern cannot be driven, and the
+  tool says so. A capture is the window printed alone (`PrintWindow`), never a
+  copy of the screen; a capture that comes back one colour is refused as
+  evidence.
+- *The helper.* `verify/uia/driver.ps1` runs in Windows PowerShell 5.1, present
+  on every Windows, so no dependency is added. It compiles its C# once per
+  session and answers one JSON line per request; a request that hangs (an app
+  that does not answer) kills it, and the next request starts a fresh one. Its
+  environment is built (Windows' own directories, no credential). Element names
+  and values go through `docintel.redact`, and one that reads like an
+  injection is withheld.
+- *Elsewhere.* Off Windows, or when PowerShell cannot run the helper, the step
+  is an environment limit: the record says "unknown", never "fail". A
+  packaged (MSIX) WinUI app is detected but not launched, because `dotnet run`
+  cannot start it; the target says how to make it launchable.
+- *After QA.* Window steps (`window_click`, `window_fill`…) are replayed like
+  browser steps: the element is found again by its AutomationId, else by its
+  type and name.
 
 **The loop is bounded by progress, not by a round count.** Errors after a
 launch are written to `VERIFY_FIX_REQUEST.md` and handed to a fixer session on

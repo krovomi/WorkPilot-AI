@@ -1801,6 +1801,7 @@
 		"latency": "Latence de l'API : p50 {{p50}} ms, p95 {{p95}} ms sur {{count}} appel(s)",
 		"scoredOn": "Score calculé sur : {{metrics}}",
 		"startup": "démarrage à froid {{value}} ms",
+		"window": "Fenêtre",
 		"screenshotAlt": "Capture de la vérification",
 		"noBrowser": "Aucun navigateur n'a pu être utilisé : {{reasons}}",
 		"sections": {
@@ -1817,6 +1818,7 @@
 		"kind": {
 			"web-frontend": "front web",
 			"desktop": "bureau",
+			"windows-app": "app Windows",
 			"mobile": "mobile",
 			"backend-api": "API"
 		},
@@ -1861,7 +1863,10 @@
 			"inherit": "Défaut du projet",
 			"on": "Activée",
 			"off": "Désactivée",
-			"hint": "Lancer l'application après le code, corriger ce qui casse, l'amener jusqu'au changement et la mesurer (trace Chrome DevTools, captures)."
+			"hint": "Lancer l'application après le code, corriger ce qui casse, l'amener jusqu'au changement et la mesurer (trace Chrome DevTools, captures).",
+			"windowLabel": "Fenêtre à vérifier (apps Windows)",
+			"windowPlaceholder": "Une partie de son titre, ex. Commandes",
+			"windowHint": "WPF, WinForms ou WinUI : seule cette fenêtre de l'app lancée est lue et pilotée, jamais le reste du bureau. Vide : la fenêtre principale de l'app."
 		},
 		"cardBadge": {
 			"pass": "Vérifié",

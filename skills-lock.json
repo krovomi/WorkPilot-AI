@@ -889,7 +889,7 @@
 			"pack": "tooling",
 			"packVersion": "1.0.0",
 			"source": "skills/tooling/verify/SKILL.md",
-			"contentSha256": "60a9038ab5b65724857c68541f4aa74a1591fa6b6f3a7d00e666821f2d18a9be",
+			"contentSha256": "6045574b9741044b6307a763d6d65810f180f4c7a890d6470820c2f31cdfc5ee",
 			"targets": {}
 		},
 		"webapp-testing": {

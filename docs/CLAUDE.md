@@ -75,7 +75,7 @@ fichier-ci reste l'autorité sur les règles.
 | ui-ux-pro-max | [uiux.md](architecture/uiux.md) | Design system et règles de pile, seulement sur les tâches qui touchent une interface. |
 | archify | [archify.md](architecture/archify.md) | Cartes d'architecture et deltas par tâche ; la continuité des identifiants est la contrainte. |
 | Applications mobiles | [mobile.md](architecture/mobile.md) | Détection de pile, appareils, chaîne d'outils ; iOS seulement sur macOS. |
-| Boucle de vérification | [verify.md](architecture/verify.md) | Lancer l'app, corriger, confirmer l'état, mesurer, garder la preuve. |
+| Boucle de vérification | [verify.md](architecture/verify.md) | Lancer l'app, corriger, confirmer l'état, mesurer, garder la preuve ; une app Windows (WPF, WinForms, WinUI) pilotée par UI Automation dans la seule fenêtre que la carte nomme, sans souris ni clavier. |
 | Traces GenAI | [genai-traces.md](architecture/genai-traces.md) | Spans `gen_ai.*` pour chaque AgentClient ; jamais de contenu ; usage non remonté estimé, jamais 0. |
 | Suivi de la PR | [pr-followup.md](architecture/pr-followup.md) | La carte fait avancer sa PR jusqu'au merge : check rouge ou fil de revue au QA fixer, commit vérifié (aucun test sauté, aucune CI modifiée), push jamais forcé ; une forge illisible n'est jamais du vert, un échec rouge aussi sur la base n'est pas « corrigé ». |
 | Bac à sable de l'OS | [os-sandbox.md](architecture/os-sandbox.md) | Processus d'agent sous bubblewrap (Linux) ou Seatbelt (macOS) : écritures dans le worktree, identifiants masqués, réseau par un proxy filtrant (provider + registres) ; sans bac à sable la carte le dit au lancement, `WORKPILOT_SANDBOX=required` refuse de démarrer ; Windows pas encore. |

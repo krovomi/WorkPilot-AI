@@ -173,6 +173,7 @@ VERIFY_TOOLS = [
         "verify_endpoints",
         "verify_call_endpoint",
         "verify_device",
+        "verify_window",
         "verify_record",
     )
 ]

@@ -103,6 +103,10 @@ def _target_entry(
         data["launch"]["log_tail"] = data["launch"].get("log_tail", "")[-2000:]
     data["errors"] = [e.to_dict() for e in errors]
     data["url"] = result.url if result else ""
+    if result and result.window:
+        data["window"] = {
+            k: result.window.get(k) for k in ("title", "namedBy") if k in result.window
+        }
     return data
 
 
@@ -197,6 +201,7 @@ async def _launch_and_fix(
             base,
             timeout=float(settings.launch_timeout),
             restart=round_no > 1,
+            window_title=toolbox.window_title(),
         )
         errors = list(result.errors)
         if result.ok:
@@ -273,9 +278,12 @@ def _verifier_prompt(options: LoopOptions, record: dict, endpoints_hint: str) ->
     ]
     for target in record["targets"]:
         launch_info = target.get("launch") or {}
+        where = target.get("url") or ""
+        if target.get("window"):
+            where = f'window "{target["window"].get("title", "")}" (drive it with verify_window)'
         lines.append(
             f"- `{target['name']}` ({target['kind']}, {target.get('framework') or '?'}): "
-            f"{launch_info.get('status')} {target.get('url') or ''} — errors left: {len(target.get('errors') or [])}"
+            f"{launch_info.get('status')} {where} — errors left: {len(target.get('errors') or [])}"
         )
         for error in (target.get("errors") or [])[:5]:
             lines.append(f"  - [{error.get('kind')}] {error.get('message')}")
@@ -329,6 +337,14 @@ async def _deterministic_evidence(
     ]
     endpoint_events = [e for e in events if e.get("kind") == "endpoint"]
     for target in targets:
+        if target.kind == "windows-app":
+            if toolbox.running(target):
+                options.log(f"verify: capture of {target.name}'s window")
+                await toolbox.call(
+                    "verify_screenshot",
+                    {"label": f"{target.name} final state", "target": target.name},
+                )
+            continue
         url = toolbox.url_of(target)
         if not url:
             continue
@@ -569,7 +585,7 @@ async def run_verify_loop(
         }
         save_record(base, record)
 
-        launched = [t for t in launchable if toolbox.url_of(t)]
+        launched = [t for t in launchable if toolbox.running(t)]
         drive = (
             options.drive
             and runner is not None

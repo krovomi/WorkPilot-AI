@@ -261,6 +261,8 @@ export interface TaskDraft {
 	requireReviewBeforeCoding?: boolean;
 	tddMode?: boolean;
 	verifyLoop?: boolean;
+	/** Part of the title of the one window a Windows app is verified in. */
+	verifyWindow?: string;
 	/** Context-window policy chosen in the wizard (absent = defaults). */
 	contextPolicy?: ContextPolicy;
 	mobileTargets?: MobilePlatform[];
@@ -494,6 +496,11 @@ export interface TaskMetadata {
 	// true -> force it, undefined -> inherit the project default. Injected as
 	// WORKPILOT_VERIFY_LOOP at spawn time.
 	verifyLoop?: boolean;
+
+	// The one window a Windows app (WPF, WinForms, WinUI) is verified in: part
+	// of its title. Read by the backend from task_metadata.json; absent = the
+	// launched app's main window.
+	verifyWindow?: string;
 
 	// Context-window management (compact / clear at a threshold). Read live by
 	// the backend; absent = defaults (auto, 50%, handoff prepared in parallel).
