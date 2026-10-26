@@ -1953,5 +1953,37 @@
 			"cleared": "New thread started (handoff from {{before}}%)",
 			"saveFailed": "Could not save the context settings"
 		}
+	},
+	"prFollowup": {
+		"title": "PR follow-through",
+		"description": "Keeps driving the pull request: a red check or an unresolved review thread goes to the QA fixer, the fix is checked and pushed. Never force-pushed, never merged.",
+		"start": "Follow the PR",
+		"stop": "Stop",
+		"running": "Following",
+		"pushed": "Fix pushed: {{sha}}",
+		"failing": "Failing: {{names}}",
+		"baseFailing": "Red on the base branch too: {{names}}",
+		"threads": "{{count}} review thread(s) given to the fixer",
+		"violations": "Undone before push: {{list}}",
+		"decision": {
+			"unknown": "Unknown",
+			"merged": "Merged",
+			"closed": "Closed",
+			"pending": "Waiting for CI",
+			"no_checks": "No CI",
+			"green": "Ready to merge",
+			"base_red": "Base branch red",
+			"stuck": "Needs a person",
+			"exhausted": "Rounds spent",
+			"fix": "Fixing"
+		},
+		"action": {
+			"fixed": "Fix pushed",
+			"no_change": "The fixer made no commit",
+			"reverted": "Fix undone: it weakened a test or the pipeline",
+			"push_failed": "Push failed",
+			"fixer_error": "The fixer failed",
+			"diverged": "The worktree has commits the PR has not"
+		}
 	}
 }

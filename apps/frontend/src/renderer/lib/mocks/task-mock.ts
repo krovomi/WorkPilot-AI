@@ -157,4 +157,19 @@ export const taskMock = {
 	onVisualProofRunning: () => () => {
 		/* noop */
 	},
+	startPrFollowup: async () => ({
+		success: true as const,
+		data: { running: false },
+	}),
+	stopPrFollowup: async () => ({
+		success: true as const,
+		data: { running: false },
+	}),
+	getPrFollowupStatus: async () => ({
+		success: true as const,
+		data: { running: false },
+	}),
+	onPrFollowupEvent: () => () => {
+		/* noop */
+	},
 };
