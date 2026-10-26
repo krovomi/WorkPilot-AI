@@ -35,6 +35,7 @@ export * from "./settings";
 export * from "./smart-estimation";
 export * from "./task";
 export * from "./task-sandbox";
+export * from "./task-permission";
 export * from "./test-generation";
 export * from "./terminal";
 // Time Travel types (Temporal debugger for AI agents)
