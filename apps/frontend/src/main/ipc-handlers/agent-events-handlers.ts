@@ -27,7 +27,6 @@ import type {
 import type { TaskEventPayload } from "../agent/task-event-schema";
 import { getClaudeProfileManager } from "../claude-profile-manager";
 import { fileWatcher } from "../file-watcher";
-import { notificationService } from "../notification-service";
 import { taskStateManager } from "../task-state-manager";
 import { titleGenerator } from "../title-generator";
 import { findTaskWorktree } from "../worktree-paths";
@@ -453,20 +452,9 @@ export function registerAgenteventsHandlers(
 				);
 				return;
 			}
-
-			const { task, project } = findTaskAndProject(taskId, projectId);
-			if (!task || !project) return;
-
-			// A cooperative pause is not a completion — don't fire a "review
-			// needed"/"failed" notification for it.
-			if (!isPaused) {
-				const taskTitle = task.title || task.specId;
-				if (code === 0) {
-					notificationService.notifyReviewNeeded(taskTitle, project.id, taskId);
-				} else {
-					notificationService.notifyTaskFailed(taskTitle, project.id, taskId);
-				}
-			}
+			// "Needs you" notifications come from the state the task settles in
+			// (TaskStateManager → notification-service), not from the exit code:
+			// a plan waiting for approval exits 1 and is not a failure.
 		},
 	);
 

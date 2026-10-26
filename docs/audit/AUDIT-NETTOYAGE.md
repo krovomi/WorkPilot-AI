@@ -2713,3 +2713,28 @@ accepte `taskProviders`. Justification : [`pr-followup.md`](../architecture/pr-f
 
 Vérification : `pytest tests/pr_followup -q` et
 `cd apps/frontend && pnpm test -- pr-followup-handlers PrFollowupCard python-runner-env`.
+
+### G3 — « Besoin de toi » : notifications et approbation à distance
+
+**Fait.** Une tâche qui attend quelqu'un le dit, sur le bureau et, si on le demande, sur ntfy ou
+Telegram. Le code est dans `apps/frontend/src/main/needs-you/`.
+
+- **La source.** Les événements viennent de l'état où la tâche s'arrête dans XState
+  (`TaskStateManager.announce`), plus du code de sortie. Un plan en attente n'est plus annoncé
+  comme un échec, et une QA qui passe la main l'est enfin. Un état restauré au démarrage ne sonne
+  pas.
+- **Correctif lié.** Avec « revue avant le code », `spec_runner` sort en 1 quand le plan attend.
+  Cette sortie faisait passer la carte de `plan_review` à `error`. `handleProcessExited` laisse
+  désormais un plan en attente tel quel.
+- **Les canaux.** ntfy (notification seulement ; topic de 16 caractères au moins sur `ntfy.sh`,
+  jeton en HTTPS seulement) et Telegram (bot de la personne, texte brut). Le détail des erreurs
+  reste sur le bureau. Les jetons sont des secrets de l'app, chiffrés et masqués.
+- **L'approbation.** Seul un plan en attente s'approuve de loin, par un bouton Telegram : un jeton
+  à usage unique de 30 minutes, venant du chat configuré, pour une tâche encore en attente au
+  moment de l'appui. Le renderer joue les deux étapes du bouton Approuver. Aucun port n'est
+  ouvert : les appuis arrivent par polling.
+
+Justification : [`needs-you.md`](../architecture/needs-you.md).
+
+Vérification : `cd apps/frontend && pnpm test -- needs-you notification-service
+task-state-manager NeedsYouChannels useNeedsYou`.
