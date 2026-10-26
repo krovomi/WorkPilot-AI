@@ -284,8 +284,13 @@ async def test_the_agent_process_is_started_through_its_sandbox(
     assert agent.env["SANDBOXED"] == "1"
     # Gemini's profile from providers.yaml: its state, and Google's hosts only.
     assert captured["state_dirs"] == ("~/.gemini",)
-    assert "generativelanguage.googleapis.com" in captured["provider_hosts"]
-    assert "api.anthropic.com" not in captured["provider_hosts"]
+    # Compared as the whole host list, not a substring of a URL.
+    assert captured["provider_hosts"] == (
+        "generativelanguage.googleapis.com",
+        "cloudcode-pa.googleapis.com",
+        "oauth2.googleapis.com",
+        "accounts.google.com",
+    )
     assert captured["unavailable_reason"] is None
 
 
