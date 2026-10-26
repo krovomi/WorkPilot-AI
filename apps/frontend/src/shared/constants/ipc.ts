@@ -59,6 +59,8 @@ export const IPC_CHANNELS = {
 	TASK_CONTEXT_POLICY_UPDATE: "task:contextPolicyUpdate", // Merge `contextPolicy` into task_metadata.json of every spec dir copy (main + worktree) — read live by the backend
 	TASK_SANDBOX_STATUS: "task:sandboxStatus", // Event (main -> renderer): whether a task's commands run in the OS sandbox (SANDBOX_STATUS)
 	TASK_SANDBOX_LIST: "task:sandboxList", // The sandbox statuses main holds, for a reloaded renderer
+	TASK_GOAL_GET: "task:goalGet", // The task's goal (goal mode), read from <spec>/.workpilot-goal.json
+	TASK_GOAL_SET: "task:goalSet", // Write or remove the goal in every spec dir copy; agents cannot write that file
 	TASK_CONTEXT_USAGE: "task:contextUsage", // Event (main -> renderer): CONTEXT_USAGE / CONTEXT_ACTION_APPLIED task events, forwarded untouched
 	TASK_PERMISSION_REQUEST: "task:permissionRequest", // Event (main -> renderer): an ACP agent asks before it acts (PERMISSION_REQUESTED, validated)
 	TASK_PERMISSION_CLEARED: "task:permissionCleared", // Event (main -> renderer): that question is answered, timed out or its process is gone

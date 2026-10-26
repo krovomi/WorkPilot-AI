@@ -24,6 +24,7 @@ import { DocumentInsightsCard } from "./DocumentInsightsCard";
 import { VerifyLoopCard } from "./VerifyLoopCard";
 import { VisualReviewCard } from "./VisualReviewCard";
 import { ExecutionFormulaBanner } from "./ExecutionFormulaBanner";
+import { GoalCard } from "./GoalCard";
 import { HermesLearningCard } from "./HermesLearningCard";
 import { McpAppsCard } from "./McpAppsCard";
 import { PrFollowupCard } from "./PrFollowupCard";
@@ -61,7 +62,7 @@ export interface TaskOverviewProps {
  * |---|---|---|
  * | **À traiter** | que dois-je faire, là, maintenant ? | la revue humaine (quand la tâche l'attend), le suivi de la PR (quand elle en a une) |
  * | **La tâche** | de quoi parle-t-on ? | description, critères d'acceptation, métadonnées |
- * | **Plan d'exécution** | que vont faire les agents, et sur quoi ? | profil d'effort, second avis JEV, traçabilité, pièces jointes et ADR |
+ * | **Plan d'exécution** | que vont faire les agents, et sur quoi ? | objectif (la commande qui dit « fini »), profil d'effort, second avis JEV, traçabilité, pièces jointes et ADR |
  * | **Mémoire & apprentissage** | qu'est-ce que le système retient ? | cerveau partagé, boucle hermes, économies rtk |
  *
  * Les bannières qui bloquent un démarrage (entretien de spec, formule
@@ -226,6 +227,8 @@ export function TaskOverview({
 					</OverviewSection>
 
 					<OverviewSection taskId={task.id} id="plan" icon={Route} tone="amber" onPresence={report}>
+						{/* Le mode objectif : la commande qui dit « fini », et ses plafonds. */}
+						<GoalCard task={task} editable={editable} />
 						<WorkflowProfileCard task={task} projectPath={projectPath} />
 						<TaskJevCard task={task} projectPath={projectPath} />
 						<SpecTraceabilityCard task={task} projectPath={projectPath} />

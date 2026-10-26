@@ -2010,5 +2010,38 @@
 		"loading": "Chargement de la vue…",
 		"unavailable": "Cette vue ne peut plus être affichée.",
 		"frameTitle": "Vue MCP App : {{server}} · {{tool}}"
+	},
+	"goal": {
+		"title": "Objectif",
+		"description": "Fini quand une commande le dit, pas quand le relecteur le pense : la QA continue tant que la commande échoue, dans un nombre de passes et un plafond de dépense.",
+		"set": "Définir un objectif",
+		"edit": "Modifier",
+		"save": "Enregistrer",
+		"cancel": "Annuler",
+		"remove": "Retirer l'objectif",
+		"summary": "Code de sortie attendu {{exit}} · passes : {{rounds}} · plafond : {{cost}}",
+		"effortCap": "selon l'effort QA",
+		"noCap": "aucun",
+		"protectedList": "Protégés : {{list}}",
+		"spent": "Dépensé jusqu'ici : {{amount}} $",
+		"spentFloor": "Dépensé jusqu'ici : au moins {{amount}} $ (certaines sessions n'ont pas de prix connu)",
+		"unreadable": "Le fichier d'objectif est illisible : {{error}}. La QA s'arrête tant qu'il n'est pas corrigé.",
+		"status": {
+			"met": "Objectif atteint",
+			"unmet": "Objectif non atteint",
+			"error": "Impossible à vérifier",
+			"invalid": "Objectif invalide",
+			"budget": "Plafond atteint"
+		},
+		"fields": {
+			"command": "Commande",
+			"commandHint": "Une seule commande, lancée dans le worktree de la tâche, sans shell. Pour plusieurs étapes, appelle un script du dépôt : il est protégé automatiquement.",
+			"expectedExit": "Code de sortie",
+			"maxRounds": "Passes max",
+			"maxCostUsd": "Plafond (USD)",
+			"timeoutSeconds": "Délai (s)",
+			"protected": "Chemins que la tâche ne peut pas modifier",
+			"protectedHint": "Un par ligne, par ex. tests/** : une modification y est refusée, pour que l'objectif soit atteint par le code et non par ses vérifications."
+		}
 	}
 }

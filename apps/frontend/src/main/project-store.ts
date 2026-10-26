@@ -803,6 +803,11 @@ export class ProjectStore {
 					typeof plan.verification.status === "string" && {
 						verification: plan.verification,
 					}),
+				// The goal gate's last verdict (goal mode), for the card.
+				...(plan?.goal &&
+					typeof plan.goal.status === "string" && {
+						goal: plan.goal,
+					}),
 				...(executionProgress && { executionProgress }),
 				stagedInMainProject,
 				stagedAt,

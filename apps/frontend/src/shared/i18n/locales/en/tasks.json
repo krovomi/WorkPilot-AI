@@ -2010,5 +2010,38 @@
 		"loading": "Loading the view…",
 		"unavailable": "This view can no longer be shown.",
 		"frameTitle": "MCP App view: {{server}} · {{tool}}"
+	},
+	"goal": {
+		"title": "Goal",
+		"description": "Done when a command says so, not when a reviewer thinks so: QA keeps going while the command fails, within a number of passes and a spending cap.",
+		"set": "Set a goal",
+		"edit": "Edit",
+		"save": "Save",
+		"cancel": "Cancel",
+		"remove": "Remove the goal",
+		"summary": "Expected exit code {{exit}} · passes: {{rounds}} · spending cap: {{cost}}",
+		"effortCap": "from the QA effort",
+		"noCap": "none",
+		"protectedList": "Protected: {{list}}",
+		"spent": "Spent so far: ${{amount}}",
+		"spentFloor": "Spent so far: at least ${{amount}} (some sessions have no known price)",
+		"unreadable": "The goal file cannot be read: {{error}}. QA stops until it is fixed.",
+		"status": {
+			"met": "Goal met",
+			"unmet": "Goal not met",
+			"error": "Cannot be checked",
+			"invalid": "Invalid goal",
+			"budget": "Cap reached"
+		},
+		"fields": {
+			"command": "Command",
+			"commandHint": "One command, run in the task's worktree without a shell. For several steps, call a script of the repository: it is protected automatically.",
+			"expectedExit": "Exit code",
+			"maxRounds": "Max passes",
+			"maxCostUsd": "Cap (USD)",
+			"timeoutSeconds": "Timeout (s)",
+			"protected": "Paths the task may not change",
+			"protectedHint": "One per line, e.g. tests/** — a change there is refused, so the goal is met by the code, not by its checks."
+		}
 	}
 }

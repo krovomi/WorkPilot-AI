@@ -12,6 +12,7 @@ import type {
 	PhaseThinkingConfig,
 	ThinkingLevel,
 } from "./settings";
+import type { TaskGoalSummary } from "./goal";
 import type { MobilePlatform } from "./mobile";
 import type { TaskSmartEstimate } from "./smart-estimation";
 
@@ -592,6 +593,8 @@ export interface Task {
 	 * the plan so the card can show it without a request per card.
 	 */
 	verification?: TaskVerificationSummary;
+	/** The goal gate's last verdict (`apps/backend/goal/`), from the plan. */
+	goal?: TaskGoalSummary;
 	subtasks: Subtask[];
 	qaReport?: QAReport;
 	logs: string[];
@@ -634,6 +637,8 @@ export interface ImplementationPlan {
 	errorMessage?: string;
 	/** Written by the verification loop (`verify/record.py::persist_plan_summary`). */
 	verification?: TaskVerificationSummary;
+	/** Written by the goal gate (`goal/gate.py::record_verdict`). */
+	goal?: TaskGoalSummary;
 	xstateState?: string; // Persisted XState machine state for restoration (e.g., 'planning', 'coding')
 	lastEvent?: {
 		eventId: string;

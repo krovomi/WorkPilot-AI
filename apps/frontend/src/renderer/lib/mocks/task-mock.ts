@@ -33,6 +33,9 @@ export const taskMock = {
 
 	deleteTask: async () => ({ success: true }),
 
+	getTaskGoal: async () => ({ success: true as const, data: { goal: null } }),
+	setTaskGoal: async () => ({ success: true as const, data: { goal: null } }),
+
 	updateTask: async (
 		_taskId: string,
 		updates: { title?: string; description?: string },
