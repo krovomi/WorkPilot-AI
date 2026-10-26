@@ -73,6 +73,7 @@ c'est une discipline, pas un garde-fou.
 | Échappement shell | `src/shared/utils/shell-escape.ts` | — |
 | Chemins dans un worktree | `src/main/worktree-paths.ts` (`isPathWithinBase`) | — |
 | CSP du renderer | `src/renderer/index.html` | — |
+| Vues MCP Apps : lues par id dans la spec de la tâche, servies sur un schéma du main avec leur propre CSP, iframe `allow-scripts` sans `allow-same-origin`, frame qui ne navigue pas ailleurs, pont qui refuse tout appel | `src/main/mcp-apps/`, `src/main/ipc-handlers/task/mcp-app-handlers.ts`, `src/renderer/components/task-detail/McpAppFrame.tsx`, `mcp-app-bridge.ts` ([mcp-2026.md](../../docs/architecture/mcp-2026.md)) | `mcp-apps.test.ts`, `mcp-app-bridge.test.ts`, `McpAppsCard.test.tsx` |
 | Passthrough IPC générique : liste fermée de canaux | `src/preload/api/modules/generic-ipc-api.ts` | `generic-ipc-allowlist.test.ts` |
 | Aucune commande venue du renderer : la release passe ses notes à `gh` sur stdin, aucun canal n'ouvre un terminal sur une commande reçue | `src/main/ipc-handlers/github/release-handlers.ts`, `src/preload/api/modules/shell-api.ts` | `release-handlers.test.ts`, `no-renderer-command.test.ts` |
 | Ouvrir un dossier dans l'IDE ou le terminal : dossier résolu et rattaché à un projet, lanceur lu dans les réglages, AppleScript par argv, `cmd.exe` cité | `src/main/ipc-handlers/task/worktree-ide-terminal.ts`, `src/main/ipc-handlers/task/launch-args.ts` | `worktree-open-launchers.test.ts` |

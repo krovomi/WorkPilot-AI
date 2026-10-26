@@ -24,6 +24,8 @@ export * from "./kanban";
 export * from "./visual-to-code-history";
 // Live Companion types (Real-time pair programming)
 export * from "./live-companion";
+// MCP Apps kept by a build, shown in the task panel
+export * from "./mcp-apps";
 // MCP Marketplace types
 export * from "./mcp-marketplace";
 // Multi-Repo Orchestration types

@@ -9,8 +9,14 @@ Same transport as ``brain/mcp_server.py`` and ``docintel/mcp_server.py``:
 stdio, JSON-RPC 2.0, one message per line, written against the protocol
 rather than an SDK. One difference: the tools are asynchronous and stateful —
 a browser stays open between a `snapshot` and the `click` that names one of
-its uids — so the server runs one event loop for its whole life and handles
-calls in order.
+its uids — so the server runs one event loop for its whole life and runs
+tools one at a time.
+
+**Both eras of the protocol** (`mcp_tasks.ToolServer`): the handshake-era
+methods as before, and 2026-07-28 (`server/discover`, ``resultType``). To a
+client that declares ``io.modelcontextprotocol/tasks`` on the request, the
+long tools (`TASK_TOOLS`) answer with a task, read with ``tasks/get`` and
+stopped with ``tasks/cancel``; any other client gets the result itself.
 
 **One project.** The server answers for one root (``--project-dir``,
 ``WORKPILOT_VERIFY_ROOT``, or the working directory) and, when WorkPilot
@@ -31,6 +37,8 @@ import traceback
 from pathlib import Path
 from typing import Any
 
+from mcp_tasks import ToolServer
+
 from .state import stop_all, work_dir
 from .tools import TOOLS, close_toolboxes, toolbox_for
 
@@ -46,6 +54,12 @@ __all__ = [
 ROOT_ENV = "WORKPILOT_VERIFY_ROOT"
 SPEC_ENV = "WORKPILOT_VERIFY_SPEC"
 PROTOCOL_VERSIONS = ("2025-06-18", "2025-03-26", "2024-11-05")
+#: Returned as a task to a client that reads tasks: they wait on an app.
+TASK_TOOLS = frozenset({"verify_launch", "verify_perf_trace", "verify_device"})
+
+_SERVERS: dict[
+    tuple[Path, Path | None], tuple[asyncio.AbstractEventLoop, ToolServer]
+] = {}
 
 SERVER_INSTRUCTIONS = (
     "WorkPilot verify — run the project's app and prove a change works.\n"
@@ -63,58 +77,43 @@ def resolve_root(argument: str | None = None) -> Path:
     return Path(argument or os.environ.get(ROOT_ENV) or os.getcwd()).resolve()
 
 
-def _result(msg_id: Any, result: Any) -> dict[str, Any]:
-    return {"jsonrpc": "2.0", "id": msg_id, "result": result}
+def _server(root: Path, spec_dir: Path | None) -> ToolServer:
+    """This root's server, one per event loop (a test runs each call in its own)."""
+    loop = asyncio.get_running_loop()
+    key = (root, spec_dir)
+    cached = _SERVERS.get(key)
+    if cached is not None and cached[0] is loop:
+        return cached[1]
 
+    async def call(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+        text = await toolbox_for(root, spec_dir).call(name, arguments)
+        return {
+            "content": [{"type": "text", "text": text}],
+            "isError": text.startswith("Error:"),
+        }
 
-def _error(msg_id: Any, code: int, message: str) -> dict[str, Any]:
-    return {"jsonrpc": "2.0", "id": msg_id, "error": {"code": code, "message": message}}
+    server = ToolServer(
+        name="workpilot-verify",
+        version="1.0.0",
+        instructions=SERVER_INSTRUCTIONS,
+        tools=TOOLS,
+        call=call,
+        legacy_versions=PROTOCOL_VERSIONS,
+        task_tools=TASK_TOOLS,
+    )
+    _SERVERS[key] = (loop, server)
+    return server
 
 
 async def handle(
     root: Path, spec_dir: Path | None, message: dict[str, Any]
 ) -> dict[str, Any] | None:
     """One JSON-RPC message in, at most one out (notifications get none)."""
-    if "id" not in message:
-        return None
-    method = message.get("method")
-    msg_id = message.get("id")
-    params = message.get("params") or {}
-    if not isinstance(params, dict):
-        return _error(msg_id, -32602, "params must be an object")
-    if method == "initialize":
-        asked = params.get("protocolVersion")
-        return _result(
-            msg_id,
-            {
-                "protocolVersion": asked
-                if asked in PROTOCOL_VERSIONS
-                else PROTOCOL_VERSIONS[0],
-                "capabilities": {"tools": {"listChanged": False}},
-                "serverInfo": {"name": "workpilot-verify", "version": "1.0.0"},
-                "instructions": SERVER_INSTRUCTIONS,
-            },
-        )
-    if method == "ping":
-        return _result(msg_id, {})
-    if method == "tools/list":
-        return _result(msg_id, {"tools": TOOLS})
-    if method == "tools/call":
-        name = str(params.get("name"))
-        if name not in {t["name"] for t in TOOLS}:
-            return _error(msg_id, -32602, f"unknown tool {name}")
-        arguments = params.get("arguments") or {}
-        if not isinstance(arguments, dict):
-            return _error(msg_id, -32602, "arguments must be an object")
-        text = await toolbox_for(root, spec_dir).call(name, arguments)
-        return _result(
-            msg_id,
-            {
-                "content": [{"type": "text", "text": text}],
-                "isError": text.startswith("Error:"),
-            },
-        )
-    return _error(msg_id, -32601, f"method not found: {method}")
+    return await _server(root, spec_dir).handle(message)
+
+
+def _error(msg_id: Any, code: int, message: str) -> dict[str, Any]:
+    return {"jsonrpc": "2.0", "id": msg_id, "error": {"code": code, "message": message}}
 
 
 def _utf8(stream):
@@ -158,6 +157,9 @@ async def _serve(root: Path, spec_dir: Path | None, stdin, stdout) -> None:
                 stdout.write(json.dumps(reply, ensure_ascii=False) + "\n")
                 stdout.flush()
     finally:
+        cached = _SERVERS.pop((root, spec_dir), None)
+        if cached is not None:
+            await cached[1].aclose()
         await close_toolboxes(root)
         # The apps this server launched: a person's IDE closing the server must
         # not leave a dev server holding the port. A build's own loop stops
