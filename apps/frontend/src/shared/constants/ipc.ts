@@ -97,6 +97,11 @@ export const IPC_CHANNELS = {
 	TASK_MCP_APPS_LIST: "task:mcpAppsList", // The MCP App views a build kept for the task
 	TASK_MCP_APP_OPEN: "task:mcpAppOpen", // Serve one view on its own scheme, for one frame
 	TASK_MCP_APP_CLOSE: "task:mcpAppClose", // The frame closed: stop serving the view
+	TASK_BEST_OF_N_START: "task:bestOfNStart", // Build the task N ways, one worktree and engine each (best-of-N)
+	TASK_BEST_OF_N_STATUS: "task:bestOfNStatus", // <spec>/best_of_n.json and the variants running now
+	TASK_BEST_OF_N_RANK: "task:bestOfNRank", // Measure and rank the variants again
+	TASK_BEST_OF_N_ADOPT: "task:bestOfNAdopt", // Make the chosen variant the task's build, remove the others
+	TASK_BEST_OF_N_DISCARD: "task:bestOfNDiscard", // Stop and remove every variant
 	TASK_WORKTREE_OPEN_IN_IDE: "task:worktreeOpenInIDE",
 	TASK_WORKTREE_OPEN_IN_TERMINAL: "task:worktreeOpenInTerminal",
 	TASK_WORKTREE_DETECT_TOOLS: "task:worktreeDetectTools", // Detect installed IDEs/terminals
@@ -117,6 +122,7 @@ export const IPC_CHANNELS = {
 	TASK_VISUAL_PROOF_RUNNING: "task:visualProofRunning", // Event: visual proof run started/finished (main -> renderer)
 	TASK_PR_FOLLOWUP_EVENT: "task:prFollowupEvent", // Event: a look at the PR, or the follow-through stopped (main -> renderer)
 	TASK_MCP_APP_VIEW: "task:mcpAppView", // Event: a build kept a new MCP App view (main -> renderer)
+	TASK_BEST_OF_N_EVENT: "task:bestOfNEvent", // Event: a variant started or ended, a ranking, an adoption (main -> renderer)
 
 	// Task phase logs (persistent, collapsible logs by phase)
 	TASK_LOGS_GET: "task:logsGet", // Load logs from spec dir

@@ -39,6 +39,7 @@ __all__ = [
     "budget_exceeded",
     "evaluate_goal",
     "fix_request",
+    "fork_bases",
     "read_goal",
     "record_verdict",
 ]
@@ -119,7 +120,7 @@ def _task_branch_settings(spec_dir: Path) -> tuple[str | None, bool]:
     return base, meta.get("useLocalBranch") is True
 
 
-def _bases(spec_dir: Path, source_spec_dir: Path | None) -> list[str]:
+def fork_bases(spec_dir: Path, source_spec_dir: Path | None) -> list[str]:
     """The refs the task may have forked from, the likeliest first.
 
     The remote ref comes before the local one: a worktree is created from
@@ -174,7 +175,7 @@ def evaluate_goal(
             patterns.append(script)
         if patterns:
             changed = protected_changes(
-                worktree, _bases(spec_dir, source_spec_dir), patterns
+                worktree, fork_bases(spec_dir, source_spec_dir), patterns
             )
             if changed is None:
                 return GoalVerdict(

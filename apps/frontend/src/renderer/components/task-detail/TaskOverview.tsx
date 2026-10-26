@@ -24,6 +24,7 @@ import { DocumentInsightsCard } from "./DocumentInsightsCard";
 import { VerifyLoopCard } from "./VerifyLoopCard";
 import { VisualReviewCard } from "./VisualReviewCard";
 import { ExecutionFormulaBanner } from "./ExecutionFormulaBanner";
+import { BestOfNCard } from "./BestOfNCard";
 import { GoalCard } from "./GoalCard";
 import { HermesLearningCard } from "./HermesLearningCard";
 import { McpAppsCard } from "./McpAppsCard";
@@ -229,6 +230,8 @@ export function TaskOverview({
 					<OverviewSection taskId={task.id} id="plan" icon={Route} tone="amber" onPresence={report}>
 						{/* Le mode objectif : la commande qui dit « fini », et ses plafonds. */}
 						<GoalCard task={task} editable={editable} />
+						{/* Best-of-N : la tâche construite N fois, classée, la personne choisit. */}
+						<BestOfNCard task={task} editable={editable} />
 						<WorkflowProfileCard task={task} projectPath={projectPath} />
 						<TaskJevCard task={task} projectPath={projectPath} />
 						<SpecTraceabilityCard task={task} projectPath={projectPath} />

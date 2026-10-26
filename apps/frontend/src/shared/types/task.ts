@@ -533,6 +533,11 @@ export interface TaskMetadata {
 	// Git/Worktree configuration
 	baseBranch?: string; // Override base branch for this task's worktree
 	prUrl?: string; // GitHub PR URL if task has been submitted as a PR
+	/**
+	 * Set on a best-of-N variant: the task it is a build of. A variant is kept
+	 * off the board; its card is the parent's (best-of-n-handlers.ts).
+	 */
+	bestOfN?: { parent: string; index: number };
 	visualProof?: VisualProofRun; // Latest automated emulator/screenshots proof for the PR
 	useWorktree?: boolean; // If false, use direct mode (no worktree isolation) - default is true for safety
 	useLocalBranch?: boolean; // If true, use the local branch directly instead of preferring origin/branch (preserves gitignored files)

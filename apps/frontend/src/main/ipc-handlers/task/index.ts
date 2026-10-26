@@ -12,6 +12,7 @@ import type { BrowserWindow } from "electron";
 import type { AgentManager } from "../../agent";
 import type { PythonEnvManager } from "../../python-env-manager";
 import { registerTaskArchiveHandlers } from "./archive-handlers";
+import { registerBestOfNHandlers } from "./best-of-n-handlers";
 import { registerTaskContextHandlers } from "./context-handlers";
 import { registerTaskCRUDHandlers } from "./crud-handlers";
 import { registerTaskExecutionHandlers } from "./execution-handlers";
@@ -55,6 +56,8 @@ export function registerTaskHandlers(
 
 	// Register MCP App view handlers (list, open, close)
 	registerMcpAppHandlers();
+	// Register best-of-N handlers (build the task N ways, the person picks one)
+	registerBestOfNHandlers(agentManager, getMainWindow);
 }
 
 // Export shared utilities for use by other modules if needed
