@@ -2492,6 +2492,7 @@ def create_agent_client(
         use_subagents=use_subagents,
         roster=roster,
     )
+    _name_for_traces(client, agent_type, spec_dir)
     if not use_subagents or not client.delegates():
         return client
     try:
@@ -2516,6 +2517,15 @@ def create_agent_client(
             ", ".join(sorted(client.agents)),
         )
     return client
+
+
+def _name_for_traces(client: "AgentClient", agent_type: str, spec_dir: Path) -> None:  # noqa: F821
+    """The agent and task names a GenAI span carries (``genai_trace``)."""
+    try:
+        client.genai_agent = agent_type
+        client.genai_spec_id = spec_dir.name if spec_dir else None
+    except Exception:  # noqa: BLE001 - a name is never worth a failed client
+        pass
 
 
 def _build_agent_client(
