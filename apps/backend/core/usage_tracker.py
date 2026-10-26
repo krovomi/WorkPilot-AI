@@ -111,6 +111,7 @@ def record_session_usage(
     cost_usd: float,
     cache_creation_input_tokens: int = 0,
     cache_read_input_tokens: int = 0,
+    usage_source: str = "reported",
 ) -> None:
     """
     Record usage from one agent session. All writes are best-effort.
@@ -127,6 +128,8 @@ def record_session_usage(
         cost_usd:                     Total cost in USD (SDK estimate)
         cache_creation_input_tokens:  Tokens written to a new cache entry (premium rate)
         cache_read_input_tokens:      Tokens read from an existing cache entry (reduced rate)
+        usage_source:                 "reported" by the provider, or "estimated" from the
+                                      response's characters when it reported nothing
     """
     spec_id = spec_dir.name
 
@@ -159,6 +162,7 @@ def record_session_usage(
             phase,
             cache_creation_input_tokens,
             cache_read_input_tokens,
+            usage_source,
         )
     except Exception as exc:
         logger.warning("[usage_tracker] cost_data.json write failed: %s", exc)
@@ -226,6 +230,7 @@ def _append_cost_data(
     phase: str,
     cache_creation_input_tokens: int = 0,
     cache_read_input_tokens: int = 0,
+    usage_source: str = "reported",
 ) -> None:
     """Append a usage record to {project_dir}/.workpilot/cost_data.json."""
     data_path = project_dir / ".workpilot" / "cost_data.json"
@@ -255,6 +260,7 @@ def _append_cost_data(
                 "agent_type": agent_type,
                 "phase": phase,
                 "spec_id": spec_id,
+                "usage_source": usage_source,
                 "timestamp": datetime.now(UTC).isoformat(),
             }
         )

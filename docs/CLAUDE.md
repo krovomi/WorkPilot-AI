@@ -76,6 +76,7 @@ fichier-ci reste l'autorité sur les règles.
 | archify | [archify.md](architecture/archify.md) | Cartes d'architecture et deltas par tâche ; la continuité des identifiants est la contrainte. |
 | Applications mobiles | [mobile.md](architecture/mobile.md) | Détection de pile, appareils, chaîne d'outils ; iOS seulement sur macOS. |
 | Boucle de vérification | [verify.md](architecture/verify.md) | Lancer l'app, corriger, confirmer l'état, mesurer, garder la preuve. |
+| Traces GenAI | [genai-traces.md](architecture/genai-traces.md) | Spans `gen_ai.*` pour chaque AgentClient ; jamais de contenu ; usage non remonté estimé, jamais 0. |
 | Suivi de la PR | [pr-followup.md](architecture/pr-followup.md) | La carte fait avancer sa PR jusqu'au merge : check rouge ou fil de revue au QA fixer, commit vérifié (aucun test sauté, aucune CI modifiée), push jamais forcé ; une forge illisible n'est jamais du vert, un échec rouge aussi sur la base n'est pas « corrigé ». |
 | Mode objectif | [goal-mode.md](architecture/goal-mode.md) | Une commande dit « fini » : chemins protégés, plafond de passes et de dépense, fichier qu'aucun agent n'écrit. |
 | Besoin de toi | [needs-you.md](architecture/needs-you.md) | Notifications lues dans XState ; ntfy, Telegram ; approbation d'un plan par jeton à usage unique. |

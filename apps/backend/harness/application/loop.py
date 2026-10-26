@@ -26,6 +26,7 @@ from collections.abc import AsyncIterator, Sequence
 from contextlib import aclosing
 from typing import Any
 
+from genai_trace.session import model_call
 from harness.domain.delegation import is_delegation
 from harness.domain.ledger import UsageLedger
 from harness.domain.progress import (
@@ -140,6 +141,7 @@ async def _relay(
         async for event in events:
             if isinstance(event, Measured):
                 ledger.record(event.usage)
+                model_call(event.usage)
             elif isinstance(event, (Reply, Outcome)):
                 answer.append(event)
             else:
