@@ -34,6 +34,7 @@ import type {
 import type { AgentManager } from "../agent";
 import { appEmulatorService } from "../app-emulator-service";
 import { setAppLanguage } from "../app-language";
+import { notificationService } from "../notification-service";
 import {
 	setUpdateChannel,
 	setUpdateChannelWithDowngradeCheck,
@@ -776,6 +777,11 @@ export function registerSettingsHandlers(
 					preWarmToolCache(["claude"]).catch((error) => {
 						console.warn("[SETTINGS_SAVE] Failed to re-warm CLI cache:", error);
 					});
+				}
+
+				// The Telegram approval poller follows the saved channel settings.
+				if (settings.needsYou !== undefined || settings.globalTelegramBotToken !== undefined) {
+					notificationService.refreshRemote();
 				}
 
 				// Update auto-updater channel if betaUpdates setting changed

@@ -196,6 +196,10 @@ export const IPC_CHANNELS = {
 	// Settings
 	SETTINGS_GET: "settings:get",
 	SETTINGS_SAVE: "settings:save",
+	NEEDS_YOU_TEST: "needsYou:test", // Send a test "needs you" to the configured remote channels; per-channel result
+	NEEDS_YOU_OPEN_TASK: "needsYou:openTask", // Event (main -> renderer): a desktop notification was clicked (taskId, projectId)
+	NEEDS_YOU_APPROVE_PLAN: "needsYou:approvePlan", // Event (main -> renderer): apply a remote plan approval (requestId, taskId)
+	NEEDS_YOU_APPROVAL_RESULT: "needsYou:approvalResult", // invoke (renderer -> main): how that approval went (requestId, outcome)
 	// Lists the custom provider's models with its stored key (main holds the key)
 	SETTINGS_CUSTOM_PROVIDER_DISCOVER_MODELS: "settings:customProviderDiscoverModels",
 	SETTINGS_GET_CLI_TOOLS_INFO: "settings:getCliToolsInfo",

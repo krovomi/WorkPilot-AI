@@ -19,6 +19,7 @@ WorkPilot AI is a desktop application (+ CLI) where users describe a goal and AI
 - **Ideation** — Discover improvements, performance issues, and security vulnerabilities
 - **GitHub/GitLab Integration** — Import issues, AI-powered investigation, PR/MR review and creation
 - **Azure DevOps/Jira Integration** — Import work items, sync statuses
+- **Needs You** — Notifications when a task waits for a person, read from the task's state machine, on the desktop, ntfy or Telegram; a waiting plan can be approved from Telegram with a one-shot, expiring button
 - **Microsoft Teams Notifications** — Webhook-based notifications for task completion and PR creation
 - **Changelog** — Generate release notes from completed tasks
 - **Memory System** — one Obsidian vault (the shared brain) keeps what every build learns, read by every agent

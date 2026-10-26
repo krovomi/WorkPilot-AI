@@ -771,4 +771,88 @@ describe("TaskStateManager", () => {
 			// Should transition from error to coding without error
 		});
 	});
+	describe("needs-you", () => {
+		const base = (type: string, sequence: number, extra: Record<string, unknown> = {}) => ({
+			type,
+			taskId: mockTask.id,
+			specId: mockTask.specId,
+			projectId: mockProject.id,
+			timestamp: new Date().toISOString(),
+			eventId: `evt-${sequence}`,
+			sequence,
+			...extra,
+		});
+
+		function listen() {
+			const listener = { settled: vi.fn(), left: vi.fn() };
+			manager.setNeedsYouListener(listener);
+			return listener;
+		}
+
+		function reachPlanReview() {
+			manager.handleTaskEvent(mockTask.id, base("PLANNING_STARTED", 0), mockTask, mockProject);
+			manager.handleTaskEvent(
+				mockTask.id,
+				base("PLANNING_COMPLETE", 1, { hasSubtasks: true, subtaskCount: 1, requireReviewBeforeCoding: true }),
+				mockTask,
+				mockProject,
+			);
+		}
+
+		it("announces a plan waiting for approval", () => {
+			const listener = listen();
+			reachPlanReview();
+			expect(listener.settled).toHaveBeenCalledTimes(1);
+			expect(listener.settled).toHaveBeenCalledWith({
+				kind: "plan_review",
+				taskId: mockTask.id,
+				projectId: mockProject.id,
+				taskTitle: "Test Task",
+			});
+		});
+
+		it("keeps a waiting plan waiting when the spec runner exits 1, and says nothing of a failure", () => {
+			const listener = listen();
+			reachPlanReview();
+			manager.handleProcessExited(mockTask.id, 1, mockTask, mockProject);
+			expect(manager.getCurrentState(mockTask.id)).toBe("plan_review");
+			expect(listener.settled).toHaveBeenCalledTimes(1);
+			expect(listener.settled.mock.calls[0][0].kind).toBe("plan_review");
+		});
+
+		it("voids the approval button once the plan is approved", () => {
+			const listener = listen();
+			reachPlanReview();
+			listener.left.mockClear();
+			manager.handleUiEvent(mockTask.id, { type: "PLAN_APPROVED" }, mockTask, mockProject);
+			expect(manager.getCurrentState(mockTask.id)).toBe("coding");
+			expect(listener.left).toHaveBeenCalledWith(mockTask.id);
+		});
+
+		it("announces a finished task and a crash, with the error for the desktop", () => {
+			const listener = listen();
+			manager.handleTaskEvent(mockTask.id, base("PLANNING_STARTED", 0), mockTask, mockProject);
+			manager.handleProcessExited(mockTask.id, 1, mockTask, mockProject);
+			const failed = listener.settled.mock.calls.at(-1)?.[0];
+			expect(failed.kind).toBe("failed");
+			expect(failed.detail).toBeTruthy();
+
+			const other = createMockTask({ id: "task-2" });
+			const send = (type: string, sequence: number, extra: Record<string, unknown> = {}) =>
+				manager.handleTaskEvent(other.id, { ...base(type, sequence, extra), taskId: other.id }, other, mockProject);
+			send("PLANNING_STARTED", 0);
+			send("PLANNING_COMPLETE", 1, { hasSubtasks: true, subtaskCount: 1, requireReviewBeforeCoding: false });
+			send("QA_PASSED", 2, { iteration: 1, testsRun: {} });
+			expect(listener.settled.mock.calls.at(-1)?.[0]).toMatchObject({ kind: "completed", taskId: "task-2" });
+		});
+
+		it("does not ring for a card restored in its waiting state", () => {
+			const listener = listen();
+			const waiting = createMockTask({ id: "task-3", status: "human_review", reviewReason: "plan_review" });
+			// An event the waiting state ignores: the actor is created from disk.
+			manager.handleUiEvent(waiting.id, { type: "QA_STARTED", iteration: 1, maxIterations: 3 }, waiting, mockProject);
+			expect(manager.getCurrentState(waiting.id)).toBe("plan_review");
+			expect(listener.settled).not.toHaveBeenCalled();
+		});
+	});
 });
