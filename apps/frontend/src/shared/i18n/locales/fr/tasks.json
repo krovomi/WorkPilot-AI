@@ -1986,6 +1986,12 @@
 			"diverged": "Le worktree a des commits que la PR n'a pas"
 		}
 	},
+	"sandbox": {
+		"notIsolated": "Commandes non isolées",
+		"unavailable": "{{provider}} : pas de bac à sable OS ({{reason}})",
+		"off": "{{provider}} : le bac à sable OS est désactivé (WORKPILOT_SANDBOX=off)",
+		"noReason": "raison non précisée"
+	},
 	"permission": {
 		"label": "Question de {{agent}}",
 		"asks": "{{agent}} demande avant d'agir",

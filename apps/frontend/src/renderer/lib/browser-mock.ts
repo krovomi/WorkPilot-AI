@@ -783,6 +783,10 @@ const browserMockAPI: Partial<ElectronAPI> = {
 	},
 	// Context-window management: registered at startup by global-listeners.
 	// No backend in the preview, so the commands report unavailable.
+	listTaskSandboxes: async () => [],
+	onTaskSandboxStatus: () => () => {
+		/* nothing to remove in the browser mock */
+	},
 	onTaskContextUsage: () => () => {
 		/* noop */
 	},

@@ -36,6 +36,7 @@ import {
 	persistPlanPhaseSync,
 	persistPlanStatusAndReasonSync,
 } from "./task/plan-file-utils";
+import { handleSandboxTaskEvent } from "./task-sandbox-handlers";
 import { findTaskAndProject } from "./task/shared";
 import {
 	clearTaskPermissions,
@@ -482,6 +483,9 @@ export function registerAgenteventsHandlers(
 			return;
 		}
 
+		// Whether the build's commands run in the OS sandbox: shown on the card,
+		// not a state the task reached.
+		if (handleSandboxTaskEvent(taskId, event, projectId, getMainWindow)) return;
 		// An ACP agent's question for the card (and its withdrawal): not a state.
 		if (handlePermissionTaskEvent(taskId, event, projectId, getMainWindow)) {
 			return;

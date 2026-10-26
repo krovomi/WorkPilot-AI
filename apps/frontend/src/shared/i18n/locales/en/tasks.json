@@ -1986,6 +1986,12 @@
 			"diverged": "The worktree has commits the PR has not"
 		}
 	},
+	"sandbox": {
+		"notIsolated": "Commands not isolated",
+		"unavailable": "{{provider}}: no OS sandbox ({{reason}})",
+		"off": "{{provider}}: the OS sandbox is turned off (WORKPILOT_SANDBOX=off)",
+		"noReason": "no reason given"
+	},
 	"permission": {
 		"label": "Question from {{agent}}",
 		"asks": "{{agent}} asks before acting",
