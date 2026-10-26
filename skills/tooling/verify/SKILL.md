@@ -1,6 +1,6 @@
 ---
 name: verify
-description: Boucle de vérification d'une modification dans l'application qui tourne — lancer l'app, constater qu'aucune erreur n'apparaît, corriger et relancer sinon, amener l'app jusqu'à l'état modifié (clics, ou appels des endpoints créés/modifiés avec leurs payloads) et le confirmer, tracer la performance via Chrome DevTools MCP, et garder une capture d'écran ou un score comme preuve. Frontend web/desktop, application mobile (émulateur Android / simulateur iOS) et backend d'API. À utiliser après une implémentation, avant de dire « c'est fait ».
+description: Boucle de vérification d'une modification dans l'application qui tourne — lancer l'app, constater qu'aucune erreur n'apparaît, corriger et relancer sinon, amener l'app jusqu'à l'état modifié (clics, ou appels des endpoints créés/modifiés avec leurs payloads) et le confirmer, tracer la performance via Chrome DevTools MCP, et garder une capture d'écran ou un score comme preuve. Frontend web/desktop, application Windows (WPF, WinForms, WinUI), application mobile (émulateur Android / simulateur iOS) et backend d'API. À utiliser après une implémentation, avant de dire « c'est fait ».
 metadata:
   workpilot:
     # Les surcharges par fournisseur vivent à côté : providers/<famille|fournisseur>.md.
@@ -37,6 +37,7 @@ tâche peut toucher plusieurs cibles (une API et le front qui l'appelle).
 |---|---|---|
 | `web-frontend` | `package.json` avec Vite, Next, Angular, Nuxt, SvelteKit… | capture de l'état modifié + score de performance |
 | `desktop` | Electron (`electron` dans les dépendances) | idem, l'app ouverte en `--remote-debugging-port` |
+| `windows-app` | `.csproj` exécutable avec `UseWPF`, `UseWindowsForms` ou le Windows App SDK | capture de la fenêtre de l'app dans l'état modifié |
 | `mobile` | Android (Gradle), iOS (Xcode), Flutter, React Native/Expo, MAUI, KMP, Capacitor | capture de l'émulateur/simulateur + temps de démarrage |
 | `backend-api` | ASP.NET Core, FastAPI/Flask/Django, Express/Nest, Spring, Go… | réponses des endpoints (codes + payloads) + latence |
 
@@ -111,6 +112,29 @@ Même procédure que *Frontend*, sur l'appareil adéquat :
    (Capacitor, WebView), la trace Chrome DevTools s'applique aussi.
 6. Capture d'écran de l'état confirmé.
 
+## Windows
+
+Une application WPF, WinForms ou WinUI se pilote par l'arbre d'accessibilité
+de Windows (UI Automation), jamais par la souris ni le clavier :
+
+1. Lancer l'application (cf. *Launch & errors*) : elle est prête quand sa
+   fenêtre s'affiche. La fenêtre visée est celle que la carte nomme ; sans nom,
+   la fenêtre principale de l'app lancée. Aucune autre fenêtre du bureau n'est
+   lue ni touchée.
+2. Prendre un instantané de la fenêtre : il liste les éléments (type, nom,
+   AutomationId, valeur) avec leur référence et les actions qu'ils acceptent.
+3. **Agir jusqu'au changement** : cliquer, saisir, cocher, sélectionner,
+   déplier, en visant une référence du dernier instantané. Un élément qui
+   n'accepte aucune de ces actions ne se pilote pas : le dire, ne pas
+   contourner.
+4. **Confirmer le nouvel état** : attendre le texte attendu dans la fenêtre,
+   et le citer.
+5. Relire le journal de l'app : aucune exception, aucune erreur de liaison.
+6. Capture de la fenêtre dans l'état confirmé.
+
+Hors Windows, ou si Windows refuse l'accès, l'étape est « non vérifiable sur
+cette machine », jamais un échec de l'application.
+
 ## Backend
 
 1. Lancer l'application (cf. *Launch & errors*) — aucune erreur au démarrage.
@@ -140,7 +164,8 @@ Jamais un serveur partagé ou de production.
 
 La preuve est un fichier, pas une phrase :
 
-- une capture par état confirmé (et par plateforme pour le mobile) ;
+- une capture par état confirmé (et par plateforme pour le mobile, de la
+  seule fenêtre de l'app pour Windows) ;
 - les métriques de performance mesurées, ou « non mesuré » avec la raison —
   jamais un zéro inventé ;
 - pour le backend, chaque appel : méthode, route, code attendu/obtenu,

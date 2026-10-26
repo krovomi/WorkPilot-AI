@@ -57,6 +57,7 @@ import {
 import { Textarea } from "../ui/textarea";
 import { ClassificationFields } from "./ClassificationFields";
 import { ContextPolicyFields } from "./ContextPolicyFields";
+import { VerifyLoopFields } from "./VerifyLoopFields";
 import { ImagePreviewModal } from "./ImagePreviewModal";
 import { RichTextEditor } from "./RichTextEditor";
 import { TaskDictation } from "./TaskDictation";
@@ -139,6 +140,9 @@ interface TaskFormFieldsProps {
 	/** The verification loop for this task; omitted, the field is not shown. */
 	verifyLoop?: boolean;
 	onVerifyLoopChange?: (enabled: boolean) => void;
+	/** The window a Windows app is verified in; omitted, the field is not shown. */
+	verifyWindow?: string;
+	onVerifyWindowChange?: (title: string) => void;
 	/** Context-window policy for this task; omitted, the field is not shown. */
 	contextPolicy?: ContextPolicy;
 	onContextPolicyChange?: (policy: ContextPolicy) => void;
@@ -220,6 +224,8 @@ export function TaskFormFields({
 	onTddModeChange,
 	verifyLoop,
 	onVerifyLoopChange,
+	verifyWindow,
+	onVerifyWindowChange,
 	contextPolicy,
 	onContextPolicyChange,
 	contextProvider,
@@ -804,28 +810,15 @@ export function TaskFormFields({
 						</div>
 					</div>
 
-					{/* Verification loop: after coding, launch the app, fix what
-					    breaks, drive it to the change and measure it. On unless the
-					    card or the project turns it off. */}
 					{onVerifyLoopChange && (
-						<div className="flex items-start gap-3 p-4 rounded-lg border border-border bg-muted/30">
-							<Checkbox
-								id={`${prefix}verify-loop`}
-								checked={verifyLoop !== false}
-								onCheckedChange={(checked) => onVerifyLoopChange(checked === true)}
-								disabled={disabled}
-								className="mt-0.5"
-							/>
-							<div className="flex-1 space-y-1">
-								<Label
-									htmlFor={`${prefix}verify-loop`}
-									className="text-sm font-medium text-foreground cursor-pointer"
-								>
-									{t("tasks:verify.form.label")}
-								</Label>
-								<p className="text-xs text-muted-foreground">{t("tasks:verify.form.hint")}</p>
-							</div>
-						</div>
+						<VerifyLoopFields
+							verifyLoop={verifyLoop}
+							onVerifyLoopChange={onVerifyLoopChange}
+							verifyWindow={verifyWindow}
+							onVerifyWindowChange={onVerifyWindowChange}
+							disabled={disabled}
+							idPrefix={idPrefix}
+						/>
 					)}
 
 					{/* Context-window management: compact / new thread at a

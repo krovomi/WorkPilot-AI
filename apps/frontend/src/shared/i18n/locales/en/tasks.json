@@ -1801,6 +1801,7 @@
 		"latency": "API latency: p50 {{p50}} ms, p95 {{p95}} ms over {{count}} call(s)",
 		"scoredOn": "Score based on: {{metrics}}",
 		"startup": "cold start {{value}} ms",
+		"window": "Window",
 		"screenshotAlt": "Verification screenshot",
 		"noBrowser": "No browser could be used: {{reasons}}",
 		"sections": {
@@ -1817,6 +1818,7 @@
 		"kind": {
 			"web-frontend": "web front end",
 			"desktop": "desktop",
+			"windows-app": "Windows app",
 			"mobile": "mobile",
 			"backend-api": "API"
 		},
@@ -1861,7 +1863,10 @@
 			"inherit": "Project default",
 			"on": "On",
 			"off": "Off",
-			"hint": "Launch the app after coding, fix what breaks, drive it to the change and measure it (Chrome DevTools trace, screenshots)."
+			"hint": "Launch the app after coding, fix what breaks, drive it to the change and measure it (Chrome DevTools trace, screenshots).",
+			"windowLabel": "Window to verify (Windows apps)",
+			"windowPlaceholder": "Part of its title, e.g. Orders",
+			"windowHint": "WPF, WinForms or WinUI: only this window of the launched app is read and driven, never the rest of the desktop. Empty: the app's main window."
 		},
 		"cardBadge": {
 			"pass": "Verified",

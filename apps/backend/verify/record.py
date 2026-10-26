@@ -157,7 +157,16 @@ def fold_events(record: dict, events: list[dict]) -> dict:
             record["scenario"].append(
                 {
                     k: event.get(k)
-                    for k in ("action", "target", "url", "uid", "value", "text", "note")
+                    for k in (
+                        "action",
+                        "target",
+                        "url",
+                        "uid",
+                        "value",
+                        "text",
+                        "automation_id",
+                        "note",
+                    )
                     if event.get(k) is not None
                 }
             )
@@ -177,7 +186,7 @@ def fold_events(record: dict, events: list[dict]) -> dict:
             record["screenshots"].append(
                 {
                     k: event.get(k)
-                    for k in ("path", "label", "target", "platform", "url")
+                    for k in ("path", "label", "target", "platform", "url", "window")
                 }
             )
         elif kind == "perf":

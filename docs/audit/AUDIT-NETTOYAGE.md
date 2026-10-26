@@ -2954,3 +2954,29 @@ Justification : [`repo-bench.md`](../architecture/repo-bench.md).
 
 Vérification : `pytest tests/bench tests/cost_intelligence/test_formula_matrix.py
 tests/model_router -q` ; `cd apps/frontend && pnpm test -- bench-handlers RepoBenchView`.
+
+### G11 — Vérifier une application Windows par UI Automation
+
+**Fait.** La boucle `/verify` reconnaît une app de bureau .NET (WPF, WinForms, WinUI non
+empaquetée : `windows-app` dans `verify/detect.py`), la lance et la conduit par l'arbre
+d'accessibilité Windows. L'assistant `verify/uia/driver.ps1` (Windows PowerShell, UI Automation)
+parle en JSON ligne par ligne avec `verify/window.py`.
+
+- **Une seule fenêtre.** La carte la nomme (`verifyWindow`, champ du formulaire de tâche) ; sans
+  nom, la première fenêtre du lancement. Elle n'est cherchée que dans l'arbre de processus lancé
+  par la vérification, puis épinglée par son handle : une fenêtre de même titre ailleurs sur le
+  bureau n'est jamais lue, conduite ni capturée. Seuls les dialogues qu'elle possède s'y ajoutent.
+- **Aucune frappe simulée.** Les actions passent par les patterns UI Automation (Invoke, Value,
+  Toggle, SelectionItem, ExpandCollapse) sur une `ref` donnée par le dernier `snapshot`, jamais
+  par la souris ou le clavier du bureau.
+- **Ce qui sort.** Le texte lu est une donnée : champs mot de passe en `***`, secrets expurgés,
+  texte qui porte une injection retenu. La capture (`PrintWindow`) ne contient que la fenêtre ;
+  une capture vide est refusée, pas comptée comme preuve.
+- **Hors Windows.** L'outil répond qu'UI Automation n'existe que sur Windows : erreur
+  d'environnement, statut inconnu, jamais un échec de l'app.
+
+Justification : [`verify.md`](../architecture/verify.md).
+
+Vérification : `pytest tests/test_verify_window.py -q` partout, et
+`tests/test_verify_window_windows.py` sur Windows (vraie fenêtre WinForms, leurre de même titre,
+app WPF compilée quand `dotnet` est là) ; `cd apps/frontend && pnpm test -- VerifyLoopFields`.

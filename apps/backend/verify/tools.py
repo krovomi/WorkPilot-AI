@@ -38,7 +38,7 @@ from typing import Any
 from .detect import Detection, Target, detect_targets
 from .record import append_event
 from .settings import load_settings
-from .state import load_state, stop_all, stop_process, work_dir
+from .state import live_process, load_state, stop_all, stop_process, work_dir
 
 logger = logging.getLogger(__name__)
 
@@ -63,13 +63,13 @@ def _schema(properties: dict, required: list[str] | None = None) -> dict:
 
 _TARGET = {
     "type": "string",
-    "description": "Target name or kind (web-frontend, backend-api, desktop). Optional.",
+    "description": "Target name or kind (web-frontend, backend-api, desktop, windows-app). Optional.",
 }
 
 TOOLS: list[dict[str, Any]] = [
     {
         "name": "verify_detect",
-        "description": "List what can be launched in this project (web front end, API, desktop app, mobile app), with the launch command, and which ones the task touched.",
+        "description": "List what can be launched in this project (web front end, API, Electron app, Windows app, mobile app), with the launch command, and which ones the task touched.",
         "inputSchema": _schema({}),
     },
     {
@@ -160,8 +160,47 @@ TOOLS: list[dict[str, Any]] = [
         ),
     },
     {
+        "name": "verify_window",
+        "description": (
+            "Drive the launched Windows app (WPF, WinForms, WinUI) through UI Automation, in its one window: "
+            "the window the card names, else the app's main window. Actions: snapshot (lists elements with "
+            "their ref, e.g. e12), click (ref), fill (ref, value), toggle (ref), select (ref), expand (ref), "
+            "collapse (ref), wait_for (text). Always snapshot before acting and use a ref from that snapshot. "
+            "No mouse or keyboard is used: an element that offers no such action cannot be driven. "
+            "Capture the window with verify_screenshot."
+        ),
+        "inputSchema": _schema(
+            {
+                "action": {
+                    "type": "string",
+                    "enum": [
+                        "snapshot",
+                        "click",
+                        "fill",
+                        "toggle",
+                        "select",
+                        "expand",
+                        "collapse",
+                        "wait_for",
+                    ],
+                },
+                "ref": {
+                    "type": "string",
+                    "description": "click/fill/toggle/select/expand/collapse: element ref from the last snapshot",
+                },
+                "value": {"type": "string", "description": "fill: the text to set"},
+                "text": {
+                    "type": "string",
+                    "description": "wait_for: text expected in the window",
+                },
+                "target": _TARGET,
+            },
+            ["action"],
+        ),
+    },
+    {
         "name": "verify_screenshot",
-        "description": "Save a screenshot of the current page (or of url) as evidence; it is filed where the visual QA review reads captures.",
+        "description": "Save a screenshot of the current page (or of url), or of the Windows app's window, as evidence; it is filed where the visual QA review reads captures.",
         "inputSchema": _schema(
             {
                 "label": {
@@ -355,6 +394,8 @@ class VerifyToolbox:
         self._documents: dict[str, dict] = {}
         self._snapshot_rows: dict[str, str] = {}
         self._current_url = ""
+        self._driver = None
+        self._windows: dict[str, Any] = {}
 
     # -- targets -------------------------------------------------------------
 
@@ -398,6 +439,34 @@ class VerifyToolbox:
         entry = load_state(self.base)["processes"].get(target.name) or {}
         return str(entry.get("url") or "")
 
+    def running(self, target: Target) -> bool:
+        """Launched and answering: a URL for a web app, a window for a Windows app."""
+        if target.kind == "windows-app":
+            entry = live_process(self.base, target.name) or {}
+            return isinstance(entry.get("window"), dict)
+        return bool(self.url_of(target))
+
+    # -- Windows apps --------------------------------------------------------
+
+    def window_title(self) -> str:
+        from .window import card_window
+
+        return card_window(self.spec_dir)
+
+    def window(self, target: Target):
+        """The `WindowSession` of a Windows app target, one helper per toolbox."""
+        from .window import UiaDriver, WindowSession
+
+        if self._driver is None:
+            self._driver = UiaDriver()
+        session = self._windows.get(target.name)
+        if session is None:
+            session = WindowSession(
+                self.base, target.name, self.window_title(), self._driver
+            )
+            self._windows[target.name] = session
+        return session
+
     # -- browser -------------------------------------------------------------
 
     async def browser(self, target: Target | None = None):
@@ -423,6 +492,10 @@ class VerifyToolbox:
         if self._browser is not None:
             await self._browser.close()
             self._browser = None
+        if self._driver is not None:
+            await asyncio.to_thread(self._driver.close)
+            self._driver = None
+            self._windows = {}
 
     def _resolve_url(self, url: str, target: Target | None) -> str:
         url = (url or "").strip()
@@ -462,7 +535,8 @@ class VerifyToolbox:
         from .launch import launch
 
         target = self.target(
-            args.get("target"), ("backend-api", "web-frontend", "desktop")
+            args.get("target"),
+            ("backend-api", "web-frontend", "desktop", "windows-app"),
         )
         if target is None:
             return "Error: no launchable target (see verify_detect); mobile apps use verify_device"
@@ -479,7 +553,9 @@ class VerifyToolbox:
             timeout=float(self.settings.launch_timeout),
             command=command,
             restart=bool(args.get("restart")),
+            window_title=self.window_title(),
         )
+        self._windows.pop(target.name, None)
         data = result.to_dict()
         data["log_tail"] = data["log_tail"][-1500:]
         return _json(data)
@@ -489,7 +565,8 @@ class VerifyToolbox:
         from .launch import read_log
 
         target = self.target(
-            args.get("target"), ("backend-api", "web-frontend", "desktop")
+            args.get("target"),
+            ("backend-api", "web-frontend", "desktop", "windows-app"),
         )
         if target is None:
             return "Error: no target"
@@ -598,6 +675,10 @@ class VerifyToolbox:
         target = self.target(
             args.get("target"), ("web-frontend", "desktop", "backend-api")
         )
+        if target is None or target.kind == "windows-app":
+            app = target or self.target(None, ("windows-app",))
+            if app is not None:
+                return await self._window_screenshot(app, args)
         browser = await self.browser(target)
         if not browser.available:
             return "Error: no browser could start — " + "; ".join(browser.reasons)
@@ -627,6 +708,81 @@ class VerifyToolbox:
         )
         return _json({"path": str(path), "filed_for_visual_review": filed})
 
+    async def _window_screenshot(self, target: Target, args: dict) -> str:
+        from .window import DriverError
+
+        label = str(args.get("label") or "screenshot")[:120]
+        slug = re.sub(r"[^a-z0-9]+", "-", label.lower()).strip("-")[:50] or "screenshot"
+        path = self.base / "screenshots" / f"{slug}.png"
+        session = self.window(target)
+        try:
+            shot = await asyncio.to_thread(session.capture, path)
+        except DriverError as exc:
+            return f"Error: {exc}"
+        if shot.get("blank"):
+            # A window that did not paint proves nothing: no evidence is kept.
+            path.unlink(missing_ok=True)
+            return (
+                "Error: the window capture came back blank (the window did not paint)"
+            )
+        window = session.pinned() or {}
+        filed = self._file_capture(path, label, target)
+        append_event(
+            self.base,
+            "screenshot",
+            {
+                "path": str(path),
+                "label": label,
+                "target": target.name,
+                "window": window.get("title", ""),
+                "platform": "desktop",
+            },
+        )
+        return _json({"path": str(path), "filed_for_visual_review": filed})
+
+    async def _t_window(self, args: dict) -> str:
+        from .window import DriverError, describe, format_snapshot
+
+        action = str(args.get("action") or "")
+        target = self.target(args.get("target"), ("windows-app",))
+        if target is None or target.kind != "windows-app":
+            return "Error: no Windows app in this project (see verify_detect)"
+        session = self.window(target)
+        try:
+            if action == "snapshot":
+                window, rows, truncated = await asyncio.to_thread(session.snapshot)
+                return format_snapshot(window, rows, truncated)
+            if action == "wait_for":
+                text = str(args.get("text") or "").strip()
+                if not text:
+                    return "Error: wait_for needs text"
+                found = await asyncio.to_thread(session.wait_for, text)
+                self._step("window_wait_for", value=text, target=target.name)
+                return (
+                    f"Found: {text!r}"
+                    if found
+                    else f"Error: {text!r} did not appear in the window within 10 s"
+                )
+            ref = str(args.get("ref") or "")
+            value = str(args.get("value") or "")
+            row = session.rows.get(ref) or {}
+            answer = await asyncio.to_thread(session.act, action, ref, value)
+        except DriverError as exc:
+            return f"Error: {exc}"
+        self._step(
+            f"window_{action}",
+            target=target.name,
+            text=describe(row),
+            automation_id=row.get("automationId", ""),
+            value=value if action == "fill" else "",
+        )
+        note = (
+            " (still running: the app may have opened a dialog — take a snapshot)"
+            if answer.get("pending")
+            else ""
+        )
+        return f"Done: {answer.get('done') or action} on {ref}{note}"
+
     def _file_capture(self, path: Path, label: str, target: Target | None) -> bool:
         if self.spec_dir is None:
             return False
@@ -638,7 +794,7 @@ class VerifyToolbox:
                 path.read_bytes(),
                 side="task",
                 platform="desktop"
-                if target is not None and target.kind == "desktop"
+                if target is not None and target.kind in ("desktop", "windows-app")
                 else "web",
                 source="verifier",
                 url=self._current_url,

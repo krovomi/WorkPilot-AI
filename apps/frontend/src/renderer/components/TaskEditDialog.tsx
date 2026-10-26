@@ -242,6 +242,7 @@ export function TaskEditDialog({
 	// TDD override (per-task)
 	const [tddMode, setTddMode] = useState(task.metadata?.tddMode ?? false);
 	const [verifyLoop, setVerifyLoop] = useState(task.metadata?.verifyLoop ?? true);
+	const [verifyWindow, setVerifyWindow] = useState(task.metadata?.verifyWindow ?? "");
 	const [contextPolicy, setContextPolicy] = useState<ContextPolicy>(() =>
 		resolveContextPolicy(task.metadata),
 	);
@@ -302,6 +303,7 @@ export function TaskEditDialog({
 			);
 			setTddMode(task.metadata?.tddMode ?? false);
 			setVerifyLoop(task.metadata?.verifyLoop ?? true);
+			setVerifyWindow(task.metadata?.verifyWindow ?? "");
 			setContextPolicy(resolveContextPolicy(task.metadata));
 			setMobileTargets(task.metadata?.mobileTargets ?? []);
 			const openedEngine = engineForTask();
@@ -413,6 +415,7 @@ export function TaskEditDialog({
 					(task.metadata?.requireReviewBeforeCoding ?? false) ||
 				tddMode !== (task.metadata?.tddMode ?? false) ||
 				verifyLoop !== (task.metadata?.verifyLoop ?? true) ||
+				verifyWindow.trim() !== (task.metadata?.verifyWindow ?? "") ||
 				contextPolicyChanged ||
 				!sameTargets(mobileTargets, task.metadata?.mobileTargets) ||
 				JSON.stringify(images) !==
@@ -451,6 +454,9 @@ export function TaskEditDialog({
 		}
 		if (verifyLoop !== (task.metadata?.verifyLoop ?? true)) {
 			metadataUpdates.verifyLoop = verifyLoop;
+		}
+		if (verifyWindow.trim() !== (task.metadata?.verifyWindow ?? "")) {
+			metadataUpdates.verifyWindow = verifyWindow.trim();
 		}
 		if (contextPolicyChanged) {
 			metadataUpdates.contextPolicy = { ...contextPolicy };
@@ -635,6 +641,8 @@ export function TaskEditDialog({
 				onTddModeChange={setTddMode}
 				verifyLoop={verifyLoop}
 				onVerifyLoopChange={setVerifyLoop}
+				verifyWindow={verifyWindow}
+				onVerifyWindowChange={setVerifyWindow}
 				contextPolicy={contextPolicy}
 				onContextPolicyChange={setContextPolicy}
 				contextProvider={engine.coding?.provider}

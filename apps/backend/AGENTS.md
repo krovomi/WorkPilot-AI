@@ -100,7 +100,7 @@ composition, qui importe les agents. Les autres modules sortis de `core` par le 
 | `watermarks/` | caractères invisibles retirés de chaque fichier généré |
 | `uiux/` | design system et règles de pile UI, seulement si la tâche touche l'interface |
 | `mobile/` | Android / Apple : piles, appareils, `readiness.py` (constructible ici ?) |
-| `verify/` | boucle `/verify` : lancer l'app, erreurs → correction, preuve |
+| `verify/` | boucle `/verify` : lancer l'app, erreurs → correction, preuve ; une app Windows (`window.py`, assistant `uia/driver.ps1`) se lit et se conduit par UI Automation dans une seule fenêtre, nommée par la carte, de l'arbre de processus lancé |
 | `genai_trace/` | spans OpenTelemetry GenAI de chaque `AgentClient` (`invoke_agent`, `chat`, `execute_tool`), posés par `AgentClient.__init_subclass__` ; aucun contenu ; une feuille, importée par `harness` ([justification](../../docs/architecture/genai-traces.md)) |
 | `mcp_tasks/` | MCP 2026-07-28 pour les serveurs de WorkPilot : `ToolServer` (deux ères), `TaskStore` (extension Tasks) ; feuille. Côté client : `core/mcp_extensions.py` ([conception](../../docs/architecture/mcp-2026.md)) |
 | `pr_followup/` | la PR d'une tâche suivie jusqu'au merge : `policy.decide` (pure), gardes du diff de correctif, GitHub par `gh`, `run_round` ; runner `runners/pr_followup_runner.py` ([justification](../../docs/architecture/pr-followup.md)) |

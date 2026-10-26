@@ -117,6 +117,11 @@ function Targets({ record }: { readonly record: VerifyRecord }) {
 						{target.launch?.command && (
 							<code className="mt-1 block truncate text-xs text-muted-foreground">{target.launch.command}</code>
 						)}
+						{target.window?.title && (
+							<p className="mt-1 truncate text-xs text-muted-foreground">
+								{t("tasks:verify.window")} : {target.window.title}
+							</p>
+						)}
 						{target.errors.length > 0 ? (
 							<ul className="mt-1 space-y-0.5 text-xs text-destructive">
 								{target.errors.slice(0, 10).map((error) => (

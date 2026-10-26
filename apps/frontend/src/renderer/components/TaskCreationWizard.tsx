@@ -207,6 +207,7 @@ export function TaskCreationWizard({
 	// TDD override (per-task) - default false (inherit project setting)
 	const [tddMode, setTddMode] = useState(false);
 	const [verifyLoop, setVerifyLoop] = useState(true);
+	const [verifyWindow, setVerifyWindow] = useState("");
 	// Context-window management (compact / new thread at a threshold).
 	const [contextPolicy, setContextPolicy] = useState<ContextPolicy>(() => ({
 		...DEFAULT_CONTEXT_POLICY,
@@ -274,6 +275,7 @@ export function TaskCreationWizard({
 				setRequireReviewBeforeCoding(draft.requireReviewBeforeCoding ?? false);
 				setTddMode(draft.tddMode ?? false);
 				setVerifyLoop(draft.verifyLoop ?? true);
+				setVerifyWindow(draft.verifyWindow ?? "");
 				setContextPolicy(normalizeContextPolicy(draft.contextPolicy));
 				setMobileTargets(draft.mobileTargets ?? []);
 				setAcceptanceCriteria(
@@ -411,6 +413,7 @@ export function TaskCreationWizard({
 			requireReviewBeforeCoding,
 			tddMode,
 			verifyLoop,
+			verifyWindow,
 			contextPolicy,
 			mobileTargets,
 			acceptanceCriteria: toCriteria(acceptanceCriteria),
@@ -436,6 +439,7 @@ export function TaskCreationWizard({
 			requireReviewBeforeCoding,
 			tddMode,
 			verifyLoop,
+			verifyWindow,
 			contextPolicy,
 			mobileTargets,
 			acceptanceCriteria,
@@ -638,6 +642,7 @@ export function TaskCreationWizard({
 			if (tddMode) metadata.tddMode = true;
 			// Only an explicit "off" is stored: absent means the project default.
 			if (!verifyLoop) metadata.verifyLoop = false;
+			if (verifyLoop && verifyWindow.trim()) metadata.verifyWindow = verifyWindow.trim();
 			// Absent means the defaults (auto, 50%, handoff prepared): only a
 			// policy that differs is written.
 			if (!isDefaultContextPolicy(contextPolicy)) {
@@ -921,6 +926,8 @@ export function TaskCreationWizard({
 					onTddModeChange={setTddMode}
 					verifyLoop={verifyLoop}
 					onVerifyLoopChange={setVerifyLoop}
+					verifyWindow={verifyWindow}
+					onVerifyWindowChange={setVerifyWindow}
 					contextPolicy={contextPolicy}
 					onContextPolicyChange={setContextPolicy}
 					contextProvider={engine.coding?.provider}
