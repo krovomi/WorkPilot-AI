@@ -39,6 +39,7 @@ import {
 import { handleSandboxTaskEvent } from "./task-sandbox-handlers";
 import { parseMcpAppViewEvent } from "./task/mcp-app-handlers";
 import { isBestOfNVariant } from "./task/best-of-n-handlers";
+import { isBenchBuild } from "./bench-handlers";
 import { findTaskAndProject } from "./task/shared";
 import {
 	clearTaskPermissions,
@@ -416,6 +417,8 @@ export function registerAgenteventsHandlers(
 			clearTaskPermissions(taskId, getMainWindow);
 			// A best-of-N variant is not on the board: its handler reads its exit.
 			if (isBestOfNVariant(taskId)) return;
+			// A repo bench build is not on the board: its handler reads its exit.
+			if (isBenchBuild(taskId)) return;
 
 			// Use projectId from event to scope the lookup (prevents cross-project contamination)
 			const { task: exitTask, project: exitProject } = findTaskAndProject(
@@ -471,6 +474,7 @@ export function registerAgenteventsHandlers(
 	);
 
 	agentManager.on("task-event", (taskId: string, event, projectId?: string) => {
+		if (isBenchBuild(taskId)) return;
 		// Context-window telemetry (CONTEXT_USAGE / CONTEXT_ACTION_APPLIED) is
 		// forwarded untouched: it describes how full the session is, not a state
 		// the task reached, so it must never reach XState, the plan files or the
@@ -553,6 +557,7 @@ export function registerAgenteventsHandlers(
 	agentManager.on(
 		"execution-progress",
 		(taskId: string, progress: ExecutionProgressData, projectId?: string) => {
+			if (isBenchBuild(taskId)) return;
 			// Use projectId from event to scope the lookup (prevents cross-project contamination)
 			const { task, project } = findTaskAndProject(taskId, projectId);
 			const taskProjectId = project?.id || projectId;

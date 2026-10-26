@@ -9,6 +9,11 @@ overridden via a `RoutingPolicy`. A real production version would learn the
 mapping from execution history (`analytics/collector.py`), but the heuristic
 version already captures 80% of the savings — refactor 50 lines should not
 spend Opus tokens.
+
+Measured evidence, when the project has it, goes first: the repo bench
+(`bench/`) replays finished cards and judges them with their own tests. A
+model it saw resolve less than half of at least three distinct cards is
+passed over, and the choice's reason says so (`bench_scores`).
 """
 
 from __future__ import annotations
@@ -18,6 +23,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from enum import Enum
 
+from bench.results import router_verdict
 from cost_intelligence.catalog import PricingCatalog
 
 logger = logging.getLogger(__name__)
@@ -174,10 +180,26 @@ class ModelRouter:
         available: Iterable[str] | None = None,
         catalog: PricingCatalog | None = None,
         policy: RoutingPolicy | None = None,
+        bench_scores: dict[tuple[str, str], dict] | None = None,
     ) -> None:
         self.available = {p.lower() for p in (available or [])} or None
         self.catalog = catalog or PricingCatalog()
         self.policy = policy or RoutingPolicy.default()
+        # ``bench.scores(project)``: {(provider, model): {resolved, judged, cases}}.
+        self.bench_scores = bench_scores or {}
+
+    def _bench(self, provider: str, model: str) -> dict | None:
+        return self.bench_scores.get((provider.lower(), model))
+
+    def _with_bench(
+        self, reason: str, provider: str, model: str, passed: list[str]
+    ) -> str:
+        score = self._bench(provider, model)
+        if score:
+            reason += f"; bench {score['resolved']}/{score['judged']} resolved"
+        if passed:
+            reason += "; passed over on bench evidence: " + ", ".join(passed)
+        return reason
 
     def route(
         self,
@@ -191,8 +213,16 @@ class ModelRouter:
         chosen_tier = tier or _default_tier(task, len(prompt or ""))
 
         chain = self.policy.chain_for(chosen_tier, task)
+        passed: list[str] = []
         for provider, model in chain:
             if self.available is not None and provider not in self.available:
+                continue
+            score = self._bench(provider, model)
+            if score and router_verdict(score):
+                passed.append(
+                    f"{provider}/{model} ({score['resolved']}/{score['judged']} "
+                    f"on {score['cases']} cards)"
+                )
                 continue
             pricing = self.catalog.get_pricing(provider, model)
             if pricing is None:
@@ -205,7 +235,12 @@ class ModelRouter:
                         task_class=task,
                         tier=chosen_tier,
                         estimated_cost_usd=0.0,
-                        reason=f"local provider {provider} (no pricing data)",
+                        reason=self._with_bench(
+                            f"local provider {provider} (no pricing data)",
+                            provider,
+                            model,
+                            passed,
+                        ),
                     )
                 continue
             input_tokens = max(1, len(prompt) // 4)  # ~4 chars/token rule of thumb
@@ -219,7 +254,12 @@ class ModelRouter:
                 task_class=task,
                 tier=chosen_tier,
                 estimated_cost_usd=cost,
-                reason=f"{chosen_tier.value} tier for {task.value}",
+                reason=self._with_bench(
+                    f"{chosen_tier.value} tier for {task.value}",
+                    provider,
+                    model,
+                    passed,
+                ),
             )
 
         # Nothing in the chain is available — fall back to the first entry
@@ -234,7 +274,12 @@ class ModelRouter:
             task_class=task,
             tier=QualityTier.BALANCED,
             estimated_cost_usd=0.0,
-            reason="no available provider matched preferred chain — using fallback",
+            reason=self._with_bench(
+                "no available provider matched preferred chain — using fallback",
+                provider,
+                model,
+                passed,
+            ),
         )
 
     def compare(

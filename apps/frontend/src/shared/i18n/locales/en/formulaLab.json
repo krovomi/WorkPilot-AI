@@ -25,6 +25,7 @@
 		"measured": "Costs computed from {{count}} real run(s) in this project — measured tokens × catalog prices.",
 		"calibrated": "Costs calibrated on {{count}} real run(s) in this project — measured volumes × up-to-date catalog prices.",
 		"heuristic": "No run history yet — estimated (default) volumes × real catalog prices. Accuracy improves after your first tasks.",
+		"bench": "Success estimates also count {{count}} replay(s) judged by the repo bench against the cards' own tests.",
 		"measuredTag": "measured",
 		"measuredTooltip": "Cost based on this model's real measured usage in this project"
 	},

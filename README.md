@@ -196,6 +196,7 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 |---------|-------------|
 | **Analytics Dashboard** | Token consumption, cost tracking, success rates, and execution time metrics — live SQLite-backed API; falls back to an explicit 503 when the analytics DB is unavailable |
 | **Formula Lab** | Pre-flight cost/success estimation per Provider × Model × Effort, calibrated on your real usage history |
+| **Repo Bench** | Replays 10 to 20 of your finished cards from the commit before them, once per engine, in isolated copies that do not hold the answer, and judges each build with the tests the card landed with — tests the agent never sees, kept only when they fail before the card and pass after it. The table says which provider × model × effort resolves your project's work; Formula Lab and the model router read it. See [docs/architecture/repo-bench.md](docs/architecture/repo-bench.md) |
 | **Cost Estimator** | Per-task cost calculation with provider comparison and budget alerts |
 | **Carbon Profiler** | Estimates the energy (kWh) and carbon footprint of your agent runs |
 | **Rate Limit Monitor** | Real-time usage tracking with proactive warnings and auto-switching triggers |

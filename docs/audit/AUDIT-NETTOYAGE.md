@@ -2924,3 +2924,33 @@ Justification : [`best-of-n.md`](../architecture/best-of-n.md).
 
 Vérification : `pytest tests/best_of_n -q` et
 `cd apps/frontend && pnpm test -- best-of-n-handlers BestOfNCard project-store`.
+
+### G10 — Banc de rejeu
+
+**Fait.** `apps/backend/bench/` reprend 10 à 20 cartes terminées du projet, les reconstruit depuis
+le commit d'avant avec chaque moteur choisi (provider × modèle × effort), et les juge avec les
+tests que la carte a livrés. Le tableau qui en sort nourrit Formula Lab et `model_router/`.
+
+- **Tests cachés.** Les tests du rejeu sont ceux du commit d'arrivée, que l'agent ne voit pas :
+  chaque build tourne dans une copie hors du projet, fetchée à la base par son identifiant, sans
+  remote. Une copie qui contient la cible n'est pas jugée (`saw-answer`).
+- **Pas de faux positif.** Avant le premier build, les tests tournent deux fois à la cible et une
+  fois à la base : seul un test qui passe à la cible et échoue à la base (F2P) prouve le travail.
+  Un cas sans F2P est écarté avec sa raison. Un build réussit quand tous ses F2P et P2P passent ;
+  un test absent du rapport échoue.
+- **Le build ne juge pas son build.** Ses fichiers de test reviennent à la base avant le jugement,
+  le runner vient du projet, `.workpilot/bench.json` est lu dans le projet.
+- **Sans identifiants.** Le juge et le runner du banc tournent avec un environnement construit,
+  sans clé ni jeton, bornés par `WORKPILOT_BENCH_JUDGE_TIMEOUT`.
+- **Un build compte s'il a vraiment tourné.** Limite de débit, échec d'authentification, build
+  non démarré ou passage abandonné ne comptent pas.
+- **Lecteurs.** Formula Lab ajoute un échantillon de réussite par build jugé ; le routeur écarte un
+  modèle qui a résolu moins de la moitié de ses builds sur au moins trois cartes.
+
+Limite : le checkout du projet reste lisible sur le disque tant que le bac à sable OS du build
+n'est pas mergé.
+
+Justification : [`repo-bench.md`](../architecture/repo-bench.md).
+
+Vérification : `pytest tests/bench tests/cost_intelligence/test_formula_matrix.py
+tests/model_router -q` ; `cd apps/frontend && pnpm test -- bench-handlers RepoBenchView`.

@@ -45,6 +45,7 @@ import {
 	FileEdit,
 	FileJson,
 	FileText,
+	FlaskConical,
 	Gauge,
 	GitBranch,
 	GitFork,
@@ -241,6 +242,7 @@ export type SidebarView =
 	| "spec-refinement"
 	| "agent-coach"
 	| "bounty-board"
+	| "repo-bench"
 	| "tech-debt"
 	| "agent-debugger"
 	| "team-bot"
@@ -359,6 +361,12 @@ const navGroups: NavGroup[] = [
 				labelKey: "navigation:items.arenaMode",
 				icon: Swords,
 				shortcut: "AM",
+			},
+			{
+				id: "repo-bench",
+				labelKey: "navigation:items.repoBench",
+				icon: FlaskConical,
+				shortcut: "RB",
 			},
 			{
 				id: "bounty-board",
