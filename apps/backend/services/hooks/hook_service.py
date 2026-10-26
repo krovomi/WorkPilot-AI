@@ -648,7 +648,7 @@ class HookService:
         # A merge is the strongest external signal the learning loop can get,
         # and the observe phase runs too early to see it. Credited here rather
         # than in one merge path, so every source of the verdict counts: the
-        # local `--merge`, a GitHub webhook, or continuous_ai closing a PR.
+        # local `--merge`, a GitHub webhook, or a PR closed on the forge.
         _credit_merge_to_learning_loop(event)
 
         results = []

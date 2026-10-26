@@ -23,6 +23,7 @@ WorkPilot AI is a desktop application (+ CLI) where users describe a goal and AI
 - **GenAI Traces** — One OTLP endpoint traces every provider the same way (agent, model calls, tools) with OpenTelemetry GenAI attributes; no prompt or output in the spans, unreported usage marked as estimated
 - **OS Sandbox** — An agent's commands run under bubblewrap (Linux) or Seatbelt (macOS): writes confined to the worktree, credentials hidden, network limited to the provider's hosts and the package registries; the card says at launch when they are not isolated
 - **Needs You** — Notifications when a task waits for a person, read from the task's state machine, on the desktop, ntfy or Telegram; a waiting plan can be approved from Telegram with a one-shot, expiring button
+- **Automations** — A rule turns an event (a GitHub issue labelled, the base branch's CI going red, a time of day) into a Kanban card, a draft by default, one per issue or red streak, under a daily cap; set in a project's settings
 - **Microsoft Teams Notifications** — Webhook-based notifications for task completion and PR creation
 - **Changelog** — Generate release notes from completed tasks
 - **Memory System** — one Obsidian vault (the shared brain) keeps what every build learns, read by every agent
