@@ -25,6 +25,7 @@ import { Button } from "../ui/button";
 import { Label } from "../ui/label";
 import { Progress } from "../ui/progress";
 import { Switch } from "../ui/switch";
+import { NeedsYouChannels } from "./NeedsYouChannels";
 import { SettingsSection } from "./SettingsSection";
 
 /**
@@ -656,6 +657,11 @@ export function AdvancedSettings({
 						/>
 					</div>
 				))}
+				<div className="space-y-1 pt-2">
+					<Label className="font-medium text-foreground">{t("needsYou.title")}</Label>
+					<p className="text-sm text-muted-foreground">{t("needsYou.description")}</p>
+				</div>
+				<NeedsYouChannels settings={settings} onSettingsChange={onSettingsChange} />
 			</div>
 		</SettingsSection>
 	);

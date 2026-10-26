@@ -11,6 +11,7 @@ import { app, type BrowserWindow } from "electron";
 import type { AgentManager } from "../agent";
 import { getClaudeProfileManager } from "../claude-profile-manager";
 import { notificationService } from "../notification-service";
+import { taskStateManager } from "../task-state-manager";
 import type { PythonEnvManager } from "../python-env-manager";
 import type { TerminalManager } from "../terminal-manager";
 import { registerAccessibilityHandlers } from "./accessibility-handlers";
@@ -286,7 +287,11 @@ export function setupIpcHandlers(
 	pythonEnvManager: PythonEnvManager,
 ): void {
 	// Initialize notification service
-	notificationService.initialize(getMainWindow);
+	notificationService.initialize(getMainWindow, (taskId) => taskStateManager.isInPlanReview(taskId));
+	taskStateManager.setNeedsYouListener({
+		settled: (event) => notificationService.notify(event),
+		left: (taskId) => notificationService.revoke(taskId),
+	});
 
 	// Project handlers (including Python environment setup)
 	registerProjectHandlers(pythonEnvManager, agentManager);

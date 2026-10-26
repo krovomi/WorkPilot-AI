@@ -286,6 +286,12 @@ export interface AppSettings {
 	autoUpdateAutoBuild: boolean;
 	autoNameTerminals: boolean;
 	notifications: NotificationSettings;
+	/** Where a "needs you" also goes: ntfy, Telegram (main/needs-you/). */
+	needsYou?: NeedsYouSettings;
+	/** ntfy access token, for a protected topic or a private server. */
+	globalNtfyAccessToken?: string;
+	/** The Telegram bot that sends the messages and receives the approvals. */
+	globalTelegramBotToken?: string;
 	// Global API keys (used as defaults for all projects)
 	globalClaudeOAuthToken?: string;
 	globalOpenAICodexOAuthToken?: string;
@@ -415,4 +421,32 @@ export interface SourceEnvCheckResult {
 	hasToken: boolean;
 	sourcePath?: string;
 	error?: string;
+}
+
+/**
+ * Remote "needs you" channels. The tokens are not here: they are secret
+ * settings (`globalNtfyAccessToken`, `globalTelegramBotToken`), encrypted at
+ * rest and masked for the renderer.
+ */
+export interface NeedsYouSettings {
+	ntfy?: {
+		enabled: boolean;
+		/** https://ntfy.sh when empty. */
+		server?: string;
+		/** The topic is a password on a public server: pick a long random one. */
+		topic: string;
+	};
+	telegram?: {
+		enabled: boolean;
+		/** Your user id, from a private chat with the bot. */
+		chatId: string;
+		/** Let a "plan waiting" message carry an Approve button. */
+		remoteApproval: boolean;
+	};
+}
+
+/** What a test send reached: "off" when the channel is not configured. */
+export interface NeedsYouTestResult {
+	ntfy: "sent" | "failed" | "off";
+	telegram: "sent" | "failed" | "off";
 }

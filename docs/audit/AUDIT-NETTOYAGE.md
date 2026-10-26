@@ -2329,6 +2329,98 @@ caractérisation puis découpée : la boucle du coder (F103), la boucle QA (F104
 - **Reste** : rien pour les fonctions géantes. Le cycle du moteur d'agents (F101) demande une
   interface entre la fabrique et les agents ; il reste plafonné par `MAX_CYCLE = 26`.
 
+### Lot M11 — L'effort que le modèle reçoit vraiment (P1)
+
+**Fait.** Le Kanban propose cinq niveaux d'effort (aucun, faible, moyen, élevé, Ultra Think) sur
+tous les providers, et chaque provider a son échelle, ou n'en a pas. Changer de provider, de modèle
+ou d'effort sur une tâche laissait trois écarts entre ce que la carte affichait et ce que le modèle
+recevait : un niveau jamais envoyé mais tracé comme appliqué, un niveau traduit sans le dire, et un
+niveau refusé par le modèle qui arrêtait la phase. Les échelles viennent de la documentation de
+chaque provider, lue le 26 octobre 2026 (xAI « Reasoning », DeepSeek « Thinking Mode », Mistral
+« Reasoning », Gemini « OpenAI compatibility », API Ollama).
+
+#### F107 · Grok, DeepSeek et Mistral ne recevaient jamais l'effort
+
+- **Sévérité** haute · **nouveau** · **corrigé par le lot M11**
+- **Preuve** (avant) : `_compatible_client` (`core/client.py`) construisait
+  `CompatibleProviderAgentClient` sans aucun champ d'effort, et `capabilities/providers.yaml`
+  déclarait `effort: none` pour les trois. Pourtant grok-4.5 et suivants prennent
+  `reasoning_effort` (low à xhigh), DeepSeek V4 `reasoning_effort` (low, high, max) et
+  `thinking: disabled`, Mistral Small 4, Medium 3.5 et Large 4 `reasoning_effort` (none ou high).
+  Une tâche Grok en Ultra Think tournait à l'effort par défaut du modèle.
+- **Correction** : `grok_reasoning_effort`, `deepseek_effort_params`, `mistral_reasoning_effort`
+  et `compatible_effort_params` (`core/llm_optimization.py`), passés au client par
+  `effort_params`. Un modèle sans réglage (grok-4.3, `grok-4.20-multi-agent`, où le même champ
+  fixe le nombre d'agents, `deepseek-chat`, Codestral, Large 3) ne reçoit rien.
+  `providers.yaml` dit `reasoning_effort` pour les trois.
+- **Garde-fou** : `tests/core/test_effort_plan.py` (`TestGrok`, `TestDeepSeek`, `TestMistral`),
+  `tests/core/test_build_agent_client_characterization.py`.
+
+#### F108 · OpenAI : « aucun » donnait l'effort par défaut, Ultra Think plafonnait à high
+
+- **Sévérité** moyenne · **nouveau** · **corrigé par le lot M11**
+- **Preuve** (avant) : `openai_reasoning_effort` omettait le champ pour « aucun », et un modèle de
+  raisonnement sans le champ tourne à son défaut (`medium` sur la plupart) : le contraire de ce
+  qui était demandé. Ultra Think envoyait `high` même aux modèles qui prennent `xhigh`, et un
+  instantané `-chat` (`gpt-5-chat-latest`) recevait un champ qu'il refuse.
+- **Correction** : « aucun » devient l'effort le plus bas du modèle (`none` dès gpt-5.1,
+  `minimal` sur gpt-5, `low` sur la série o et Codex, `medium` sur les `-pro`), Ultra Think
+  `xhigh` dès gpt-5.2 et sur `codex-max`, rien pour les `-chat`. Gemini 2.5 Flash et Flash-Lite
+  reçoivent `none` pour « aucun », les seuls Gemini qui peuvent cesser de réfléchir.
+- **Garde-fou** : `tests/core/test_llm_optimization.py` (`TestOpenAIReasoningEffort`,
+  `TestGeminiReasoningEffort`).
+
+#### F109 · Un effort refusé par le modèle arrêtait la phase
+
+- **Sévérité** haute · **nouveau** · **corrigé par le lot M11**
+- **Preuve** (avant) : un 400 de l'API sur `reasoning_effort` (boucle OpenAI, que suivent Google,
+  Grok, DeepSeek, Mistral et LM Studio) ou sur `thinking_budget` (Copilot) finissait la réponse
+  en « API error » : changer de modèle sur une tâche pouvait la faire échouer pour un réglage
+  d'optimisation. Le repli de Copilot sur un autre modèle (`model_not_supported`) ne s'écrivait
+  que dans la sortie standard, et la carte nommait toujours le modèle demandé.
+- **Correction** : `effort_was_rejected` reconnaît un refus qui nomme l'effort ; la boucle retire
+  les champs, relance le tour une fois, ne les renvoie plus de la session et le dit dans le fil
+  de la tâche. Copilot fait de même pour `thinking_budget`, et annonce dans le fil le modèle qui
+  répond à la place de celui demandé.
+- **Garde-fou** : `tests/core/test_openai_loop.py`, `tests/core/test_copilot_loop.py`
+  (`test_a_refused_*`), `tests/core/test_effort_plan.py` (`TestRejection`).
+
+#### F110 · Ollama ne recevait jamais `think`
+
+- **Sévérité** moyenne · **nouveau** · **corrigé par le lot M11**
+- **Preuve** (avant) : `LocalAgentClient` forçait l'effort à `None` ; un modèle qui réfléchit
+  (qwen3, deepseek-r1, gpt-oss) réfléchissait donc par défaut même en « aucun », et gpt-oss
+  ignorait le niveau choisi.
+- **Correction** : `_ollama_think` envoie `think` seulement quand `/api/show` liste la
+  capacité `thinking` (Ollama refuse le champ ailleurs) : `false` pour « aucun », le niveau pour
+  gpt-oss, `true` sinon. LM Studio et llama.cpp ne reçoivent rien.
+- **Garde-fou** : `tests/core/test_effort_plan.py` (`TestOllamaThink`).
+
+#### F111 · Le fil de la tâche et le sélecteur annonçaient un effort que le modèle ne recevait pas
+
+- **Sévérité** haute · **nouveau** · **corrigé par le lot M11**
+- **Preuve** (avant) : `_log_llm_context_switch` traçait le niveau choisi quoi qu'il en advienne :
+  « Effort: high » sur Windsurf, OpenCode, gpt-4o ou grok-4.3, qui ne reçoivent rien, et
+  « Effort: none » sur Claude, qui reçoit `low`. Le sélecteur d'effort (`EngineTrioPicker`)
+  proposait les cinq niveaux partout sans rien en dire, et leurs libellés étaient en anglais en
+  dur.
+- **Correction** : `core/effort_plan.py` est la seule réponse à « que reçoit ce provider pour ce
+  niveau » : les clients l'envoient, le fil trace « (not applied by this model) » ou
+  « (sent as low) », traduits par `translateLogMessage`, et `GET /providers/effort` le sert au
+  sélecteur (`useEffortPlan`), qui le dit sous l'effort en anglais et en français. Copilot et
+  Ollama, décidés au lancement, le disent aussi.
+- **Garde-fou** : `tests/core/test_effort_plan.py` (`TestEffortPlan`, `TestTraceLabel`,
+  l'endpoint), `useEffortPlan.test.ts`, `translateLogMessage.test.ts`.
+
+#### F112 · Le catalogue live de DeepSeek écartait `deepseek-flash`
+
+- **Sévérité** basse · **nouveau** · **corrigé par le lot M11**
+- **Preuve** (avant) : `_DEEPSEEK_KEEP` (`provider_models_catalog.py`) ne gardait que
+  `chat`, `reasoner` et `v\d` ; l'identifiant Flash courant, sans numéro de version, sortait de
+  la liste live, et `_supports_thinking` le disait sans raisonnement.
+- **Correction** : `flash` gardé et marqué comme raisonnant.
+- **Garde-fou** : `tests/core/test_effort_plan.py` (`test_the_live_catalogue_keeps_deepseek_flash`).
+
 ---
 
 ## Annexe A — Inventaire des fichiers candidats
@@ -2483,7 +2575,7 @@ planchers `pnpm.overrides` relevés (`pnpm-workspace.yaml`), `dompurify` ^3.4.17
 
 Statut des constats de l'audit précédent : F1, F3, F4, F5, F7, F8, F9, F10, F12, F16, F17, F19 **ouverts** ;
 F2, F13 **partiels** ; F6, F11, F14, F18 **aggravés** ; F15 **atténué**. Nouveaux : F20 à F36.
-Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F57 à F62 par M2, F63 à F68 par M3, F69 à F71 par M4, F78 à F84 par M5, F85 à F90 par M6, F91 à F94 par M7, F95 à F100 par M8, F72 à F77 par M9, F101 à F106 par M10 (annexe F).
+Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F57 à F62 par M2, F63 à F68 par M3, F69 à F71 par M4, F78 à F84 par M5, F85 à F90 par M6, F91 à F94 par M7, F95 à F100 par M8, F72 à F77 par M9, F101 à F106 par M10, F107 à F112 par M11 (annexe F).
 
 ## Annexe C — Ce qui a changé le 15 octobre 2026 (`7ef6fca` → `e3e468f` + PR #454)
 
@@ -2551,6 +2643,7 @@ détaillés ici qu'une fois corrigés ([`SECURITY.md`](../SECURITY.md)).
 | M8 | Code mort, `scripts/`, vues sans test | **fait** (F95 à F100 ; vues sans conception ni test marquées « Expérimental » ; `node-pty` retiré ensuite, F75) |
 | M9 | Doc ↔ code, i18n de la palette, jsdom, dépendances | **fait** (F72 à F77) |
 | M10 | Casser le cycle `core ⇄ agents`, découper les fonctions géantes | **fait** (F101, F102 : cycle de 81 à 26 unités, plafonné ; F103 à F106 : les quatre fonctions géantes découpées ; reste le cycle du moteur d'agents, qui demande une interface) |
+| M11 (26 octobre) | L'effort que le modèle reçoit vraiment, sur chaque provider | **fait** (F107 à F112 : effort envoyé à Grok, DeepSeek, Mistral et Ollama, échelle OpenAI complète, effort refusé relancé sans lui, fil et sélecteur qui disent ce qui est envoyé) |
 
 Vérification du lot M1 : `cd apps/frontend && pnpm run typecheck && pnpm test -- release-handlers
 no-renderer-command worktree-open-launchers pr-details-azure-script`.
@@ -2595,6 +2688,11 @@ Vérification du lot M10 (`_build_agent_client`) : `pytest
 tests/core/test_build_agent_client_characterization.py tests/test_agent_client_factory.py
 tests/test_offline_mode.py tests/test_local_model_coercion.py -q`.
 
+Vérification du lot M11 : `pytest tests/core/test_effort_plan.py tests/core/test_llm_optimization.py
+tests/core/test_openai_loop.py tests/core/test_copilot_loop.py
+tests/core/test_build_agent_client_characterization.py -q` et `cd apps/frontend && pnpm test --
+useEffortPlan translateLogMessage`.
+
 ## Annexe G — Features issues de la veille du 26 octobre 2026
 
 Onze features proposées après une veille des outils de pilotage d'agents de code (Cursor, Codex,
@@ -2615,6 +2713,31 @@ accepte `taskProviders`. Justification : [`pr-followup.md`](../architecture/pr-f
 
 Vérification : `pytest tests/pr_followup -q` et
 `cd apps/frontend && pnpm test -- pr-followup-handlers PrFollowupCard python-runner-env`.
+
+### G3 — « Besoin de toi » : notifications et approbation à distance
+
+**Fait.** Une tâche qui attend quelqu'un le dit, sur le bureau et, si on le demande, sur ntfy ou
+Telegram. Le code est dans `apps/frontend/src/main/needs-you/`.
+
+- **La source.** Les événements viennent de l'état où la tâche s'arrête dans XState
+  (`TaskStateManager.announce`), plus du code de sortie. Un plan en attente n'est plus annoncé
+  comme un échec, et une QA qui passe la main l'est enfin. Un état restauré au démarrage ne sonne
+  pas.
+- **Correctif lié.** Avec « revue avant le code », `spec_runner` sort en 1 quand le plan attend.
+  Cette sortie faisait passer la carte de `plan_review` à `error`. `handleProcessExited` laisse
+  désormais un plan en attente tel quel.
+- **Les canaux.** ntfy (notification seulement ; topic de 16 caractères au moins sur `ntfy.sh`,
+  jeton en HTTPS seulement) et Telegram (bot de la personne, texte brut). Le détail des erreurs
+  reste sur le bureau. Les jetons sont des secrets de l'app, chiffrés et masqués.
+- **L'approbation.** Seul un plan en attente s'approuve de loin, par un bouton Telegram : un jeton
+  à usage unique de 30 minutes, venant du chat configuré, pour une tâche encore en attente au
+  moment de l'appui. Le renderer joue les deux étapes du bouton Approuver. Aucun port n'est
+  ouvert : les appuis arrivent par polling.
+
+Justification : [`needs-you.md`](../architecture/needs-you.md).
+
+Vérification : `cd apps/frontend && pnpm test -- needs-you notification-service
+task-state-manager NeedsYouChannels useNeedsYou`.
 
 ### G4 — Traces OpenTelemetry GenAI pour tous les providers
 

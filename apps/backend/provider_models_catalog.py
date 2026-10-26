@@ -97,8 +97,9 @@ _MISTRAL_DROP = re.compile(
     re.IGNORECASE,
 )
 
-# DeepSeek: chat / reasoner / v3+ families
-_DEEPSEEK_KEEP = re.compile(r"^deepseek-(chat|reasoner|v\d)", re.IGNORECASE)
+# DeepSeek: chat / reasoner / v3+ families, and `deepseek-flash`, the current
+# Flash id (api-docs.deepseek.com), which carries no version number.
+_DEEPSEEK_KEEP = re.compile(r"^deepseek-(chat|reasoner|flash|v\d)", re.IGNORECASE)
 
 # Grok: grok-3+ (covers grok-3, grok-4, grok-4.1, grok-4.3, grok-4.20, …)
 _GROK_KEEP = re.compile(r"^grok-([3-9]|\d{2,})", re.IGNORECASE)
@@ -174,7 +175,7 @@ def _supports_thinking(provider: str, value: str) -> bool:
         # Gemini 2.5+ all support extended thinking ("Deep Think")
         return "2.5" in v or "3." in v or v.startswith("models/gemini-3")
     if provider == "deepseek":
-        return "reasoner" in v or "v4" in v
+        return "reasoner" in v or "v4" in v or v.startswith("deepseek-flash")
     if provider == "grok":
         return v.startswith("grok-") and not v.startswith(("grok-1", "grok-2"))
     if provider == "mistral":

@@ -2638,6 +2638,14 @@ def _build_agent_client(
         effort = (
             "none" if max_thinking_tokens is None else f"{max_thinking_tokens} tokens"
         )
+    # What the model receives, not only what was asked: a level the provider
+    # cannot take is traced as such (`core/effort_plan.py`).
+    try:
+        from core.effort_plan import effort_trace_label
+
+        effort = effort_trace_label(provider, model, effort)
+    except Exception:  # noqa: BLE001 - the trace must never block a run
+        pass
     _log_llm_context_switch(spec_dir, provider, model, effort)
 
     request = _ClientRequest(
@@ -2965,6 +2973,7 @@ def _local_client(req: _ClientRequest):
         project_dir=str(req.project_dir),
         agent_type=req.agent_type,
         spec_dir=str(req.spec_dir),
+        thinking_level=_thinking_level(req.max_thinking_tokens),
     )
 
 
@@ -2978,6 +2987,7 @@ _COMPATIBLE_PROVIDER_URLS = {
 def _compatible_client(req: _ClientRequest):
     """Mistral, DeepSeek and Grok: OpenAI-compatible APIs with their own key."""
     from core.agent_client import CompatibleProviderAgentClient
+    from core.llm_optimization import compatible_effort_params
     from provider_models_catalog import _api_key_for
 
     provider = req.provider
@@ -2996,11 +3006,25 @@ def _compatible_client(req: _ClientRequest):
         or config.get("base_url")
         or _COMPATIBLE_PROVIDER_URLS[provider]
     )
+    # Each of these APIs has its own effort scale; a model without one gets
+    # no field at all (the trunk never sends unknown params).
+    effort_params = compatible_effort_params(
+        provider, req.model, req.max_thinking_tokens
+    )
+    logger.info(
+        "[create_agent_client] Using CompatibleProviderAgentClient "
+        "(provider=%s, model=%s, agent_type=%s, effort=%s)",
+        provider,
+        req.model,
+        req.agent_type,
+        effort_params,
+    )
     return CompatibleProviderAgentClient(
         provider=provider,
         model=req.model,
         api_key=api_key,
         base_url=base_url,
+        effort_params=effort_params,
         system_prompt=req.prompt(tool_use_hint=True),
         project_dir=str(req.project_dir),
         agent_type=req.agent_type,

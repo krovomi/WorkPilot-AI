@@ -12,6 +12,16 @@ export const settingsMock = {
 	}),
 
 	saveSettings: async () => ({ success: true }),
+	testNeedsYou: async () => ({ success: true as const, data: { ntfy: "off" as const, telegram: "off" as const } }),
+	onNeedsYouOpenTask: () => () => {
+		/* noop */
+	},
+	onNeedsYouApprovePlan: () => () => {
+		/* noop */
+	},
+	reportNeedsYouApproval: async () => {
+		/* noop */
+	},
 
 	discoverCustomProviderModels: async () => ({ success: true, data: [] }),
 

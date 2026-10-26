@@ -412,6 +412,7 @@ import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useReauthNotifications } from "./hooks/use-reauth-notifications";
 import { useActivityNotifications } from "./hooks/useActivityNotifications";
 import { useTaskActivityBridge } from "./hooks/useTaskActivityBridge";
+import { useNeedsYou } from "./hooks/useNeedsYou";
 import { useTaskNotifications } from "./hooks/useTaskNotifications";
 import type { Activity } from "./stores/activity-store";
 import { setActivityActiveView } from "./stores/activity-store";
@@ -659,6 +660,8 @@ export function App() {
 
 	// Task completion toast notifications (human_review, done, pr_created, error)
 	useTaskNotifications({ onNavigate: (view) => setActiveView(view) });
+	// A clicked desktop notification, and plans approved from Telegram.
+	useNeedsYou({ onNavigate: (view) => setActiveView(view) });
 
 	// The Kanban's running builds, mirrored into the activity registry that
 	// feeds the sidebar badges.

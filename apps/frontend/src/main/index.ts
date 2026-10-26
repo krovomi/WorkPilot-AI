@@ -94,6 +94,7 @@ import { selectLinuxPasswordStore } from "./linux-password-store";
 import { ensureOllamaReady } from "./services/ollama-portable";
 import { ensureOAuthServerRunning } from "./oauth-server";
 import { openExternalUrl } from "./open-external";
+import { notificationService } from "./notification-service";
 import { isMacOS, isWindows } from "./platform";
 import {
 	migrateProjectEnvSecrets,
@@ -1330,6 +1331,7 @@ app.on("before-quit", (event) => {
 	const usageMonitor = getUsageMonitor();
 	usageMonitor.stop();
 	console.warn("[main] Usage monitor stopped");
+	notificationService.stop();
 
 	// Perform async cleanup, then allow quit to proceed
 	(async () => {
