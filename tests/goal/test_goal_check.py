@@ -6,6 +6,7 @@ import os
 import shlex
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -115,13 +116,19 @@ def test_a_timeout_takes_the_children_too(tmp_path: Path):
     object.__setattr__(spec, "timeout_s", 2)
     assert run_goal(spec, tmp_path).timed_out
     child = int(pid_file.read_text(encoding="utf-8"))
-    try:
-        os.kill(child, 0)
-        alive = True
-    except ProcessLookupError:
-        alive = False
-    if alive:
+
+    def _alive() -> bool:
+        try:
+            os.kill(child, 0)
+        except ProcessLookupError:
+            return False
         # A zombie awaiting its reaper is dead for our purpose.
         status = Path(f"/proc/{child}/status")
-        alive = status.exists() and "zombie" not in status.read_text(encoding="utf-8")
-    assert not alive
+        return status.exists() and "zombie" not in status.read_text(encoding="utf-8")
+
+    # The group is killed before run_goal returns, but a loaded machine may take a
+    # moment to deliver the signal: wait for it, far below the child's own 60 s.
+    deadline = time.monotonic() + 5
+    while _alive() and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert not _alive()
