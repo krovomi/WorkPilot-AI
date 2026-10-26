@@ -107,8 +107,8 @@ l'UI n'existe pas.
 ## S4 — Chemins résolus, processus sans shell
 
 - Une écriture d'agent reste dans le projet, la spec ou `<tmp>/workpilot` (`security/path_guard.py`) ;
-  hors SDK, `_resolve_within_project`. `WORKPILOT_WRITE_ROOTS` ajoute des racines : ne pas s'en servir
-  pour contourner un refus.
+  hors SDK, `_resolve_within_project`. `WORKPILOT_WRITE_ROOTS` (racines en plus) ne contourne pas un refus.
+  Lancée, la commande reste dans le bac à sable de l'OS (`os_sandbox/`), jamais élargi par le dépôt.
 - Valider un chemin, c'est le **résoudre** (`Path.resolve()` / `fs.realpathSync`, liens symboliques
   compris) **puis** vérifier qu'il est dans une racine autorisée. Rejeter `..` ne suffit pas.
 - Sous-processus : liste d'arguments, `shell=False` en Python, pas de `shell: true` en Node dès

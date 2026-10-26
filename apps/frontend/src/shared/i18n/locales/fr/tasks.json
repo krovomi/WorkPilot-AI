@@ -1986,6 +1986,12 @@
 			"diverged": "Le worktree a des commits que la PR n'a pas"
 		}
 	},
+	"sandbox": {
+		"notIsolated": "Commandes non isolées",
+		"unavailable": "{{provider}} : pas de bac à sable OS ({{reason}})",
+		"off": "{{provider}} : le bac à sable OS est désactivé (WORKPILOT_SANDBOX=off)",
+		"noReason": "raison non précisée"
+	},
 	"mcpApps": {
 		"title": "Vues MCP Apps",
 		"subtitle": "Les vues qu'un serveur MCP installé attache aux outils appelés par l'agent. Chacune montre l'appel qui a eu lieu ; elle ne peut ni appeler un outil, ni écrire à l'agent, ni ouvrir un lien.",

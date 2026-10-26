@@ -14,6 +14,7 @@ Used at client-creation time to answer two questions honestly:
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -22,12 +23,61 @@ import yaml
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["ProviderCapabilities", "load_providers", "get_provider_capabilities"]
+__all__ = [
+    "ProviderCapabilities",
+    "SandboxSpec",
+    "load_providers",
+    "get_provider_capabilities",
+]
 
 PROVIDERS_RELPATH = Path("capabilities") / "providers.yaml"
 
 # capabilities/ sits at the repo root, two levels above apps/backend/.
 _REPO_ROOT = Path(__file__).resolve().parents[3]
+
+
+_STATE_DIR = re.compile(
+    r"^(~(/[A-Za-z0-9._ -]+)+|\$[A-Z][A-Z0-9_]*(/[A-Za-z0-9._ -]+)*)$"
+)
+
+
+@dataclass(frozen=True)
+class SandboxSpec:
+    """How a CLI that runs its own commands is sandboxed (`os_sandbox`).
+
+    ``state`` are the directories the CLI keeps its login and sessions in,
+    left writable; ``network`` the hosts it talks to, added to the package
+    registries. Both are this file's, never a repository's.
+    """
+
+    state: tuple[str, ...] = ()
+    network: tuple[str, ...] = ()
+    # Files inside `state` the agent must not change (pi's trust.json: the
+    # trust a person grants), kept read-only when they exist.
+    read_only: tuple[str, ...] = ()
+
+
+def _parse_sandbox(name: str, raw: object) -> SandboxSpec | None:
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise ValueError(f"providers.yaml: {name}.sandbox must be a mapping")
+    from os_sandbox.hosts import parse_rule
+
+    state = tuple(str(entry) for entry in raw.get("state") or ())
+    read_only = tuple(str(entry) for entry in raw.get("read_only") or ())
+    for entry in state + read_only:
+        if not _STATE_DIR.match(entry) or "/.." in entry:
+            raise ValueError(
+                f"providers.yaml: {name}.sandbox entry {entry!r} must start with ~/ or $VAR"
+            )
+    network = tuple(str(entry) for entry in raw.get("network") or ())
+    for entry in network:
+        if parse_rule(entry) is None:
+            raise ValueError(
+                f"providers.yaml: {name}.sandbox.network entry {entry!r} is not a host"
+            )
+    return SandboxSpec(state=state, network=network, read_only=read_only)
 
 
 @dataclass(frozen=True)
@@ -43,6 +93,9 @@ class ProviderCapabilities:
     # answer: WorkPilot emulates compaction and can only estimate the fill.
     context_compact: str = "emulated"
     context_usage: str = "estimated"
+    # A CLI that runs its own commands: how its process is sandboxed. None
+    # for a CLI means it is not, and the card says so.
+    sandbox: SandboxSpec | None = None
 
     @property
     def supports_subagents(self) -> bool:
@@ -92,6 +145,7 @@ def load_providers(repo_root: Path | None = None) -> dict[str, ProviderCapabilit
             note=str(cfg.get("note", "") or ""),
             context_compact=str(context.get("compact", "emulated")),
             context_usage=str(context.get("usage", "estimated")),
+            sandbox=_parse_sandbox(name, cfg.get("sandbox")),
         )
     return out
 

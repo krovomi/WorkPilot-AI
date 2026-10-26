@@ -2490,6 +2490,7 @@ def create_agent_client(
         roster=roster,
     )
     _name_for_traces(client, agent_type, spec_dir)
+    _sandbox_at_launch(client, project_dir, spec_dir)
     if not use_subagents or not client.delegates():
         return client
     try:
@@ -2523,6 +2524,66 @@ def _name_for_traces(client: "AgentClient", agent_type: str, spec_dir: Path) -> 
         client.genai_spec_id = spec_dir.name if spec_dir else None
     except Exception:  # noqa: BLE001 - a name is never worth a failed client
         pass
+
+
+def _sandbox_at_launch(
+    client: "AgentClient",  # noqa: F821
+    project_dir: Path,
+    spec_dir: Path,
+) -> None:
+    """Decide, and say on the card, whether this session's commands are isolated.
+
+    Decided here, before the first turn: under ``WORKPILOT_SANDBOX=required``
+    a session that cannot be sandboxed does not start
+    (`os_sandbox.SandboxRequiredError`). Each kind of client runs commands
+    its own way, so each is asked its own way.
+    """
+    import os_sandbox
+
+    kind = type(client).__name__
+    if kind == "ClaudeAgentClient":
+        sandbox = os_sandbox.claude_code_status()
+    elif kind == "CodexCliAgentClient":
+        sandbox = os_sandbox.delegated_status("Codex CLI")
+    elif callable(getattr(client, "session_sandbox", None)):
+        sandbox = client.session_sandbox(spec_dir)
+    else:
+        # The WorkPilot loop: `run_command` in the tool executor decides the
+        # same way on its first command.
+        sandbox = os_sandbox.session_sandbox(project_dir, spec_dir)
+    _report_sandbox(spec_dir, client.provider_name(), sandbox)
+
+
+def _report_sandbox(spec_dir: Path | None, provider: str, sandbox) -> None:
+    """Say at launch, on the card and in the feed, whether commands are isolated."""
+    import os_sandbox
+
+    payload = os_sandbox.first_report(spec_dir, provider, sandbox)
+    if payload is None:
+        return
+    line = f"Sandbox ({provider}): {sandbox.summary()}"
+    logger.info(line)
+    if not spec_dir:
+        return
+    try:
+        from task_logger import get_task_logger
+
+        task_logger = get_task_logger()
+        if task_logger is not None and Path(task_logger.spec_dir) == Path(spec_dir):
+            if sandbox.state in (os_sandbox.ISOLATED, os_sandbox.DELEGATED):
+                task_logger.log_info(line)
+            else:
+                task_logger.log_warning(line)
+    except Exception as exc:  # pragma: no cover - tracing must not break a run
+        logger.debug("could not write to the task feed: %s", exc)
+    try:
+        from core.task_event import TaskEventEmitter
+
+        TaskEventEmitter.from_spec_dir(Path(spec_dir)).emit(
+            "SANDBOX_STATUS", {"sandbox": payload}
+        )
+    except Exception as exc:  # pragma: no cover - tracing must not break a run
+        logger.debug("could not emit the sandbox status: %s", exc)
 
 
 def _build_agent_client(
