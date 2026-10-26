@@ -16,7 +16,7 @@ cette deuxième barrière : le processus de l'agent tourne dans un bac à sable 
 | Provider | Qui lance les commandes | Bac à sable |
 |---|---|---|
 | OpenAI, Google, Copilot, Windsurf, compatibles, locaux | la boucle WorkPilot, `run_command` de `core/runtimes/tool_executor.py` | chaque commande, `/bin/sh -c` sous le bac à sable de WorkPilot |
-| OpenCode, pi | le CLI lui-même | tout le processus du CLI (`CliSubprocessAgentClient._launch`), avec le profil `sandbox:` de son entrée dans `capabilities/providers.yaml` |
+| OpenCode, pi, agents ACP (Gemini CLI) | le CLI lui-même | tout le processus du CLI (`CliSubprocessAgentClient._launch`), avec le profil `sandbox:` de son entrée dans `capabilities/providers.yaml` |
 | Antigravity | le CLI lui-même | aucun : pas de profil, la carte le dit |
 | Claude (SDK) | Claude Code | le sien (`sandbox.enabled` dans les réglages posés par `create_client`), rapporté `delegated` ; sous Linux il lui faut bubblewrap **et** `socat`, sinon la carte dit « non isolé » |
 | Codex CLI | Codex | le sien (sandbox Codex de [`agent-tool-rights.md`](agent-tool-rights.md)), rapporté `delegated` |

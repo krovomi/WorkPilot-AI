@@ -297,6 +297,18 @@ gemini-cli:
       gemini-api-key: GEMINI_API_KEY
     login: Run `gemini` once in a terminal and sign in, or set GEMINI_API_KEY.
     docs: https://geminicli.com/docs/cli/acp-mode/
+  # Gemini CLI keeps its login and sessions in ~/.gemini and only talks to
+  # Google: the Gemini API with a key, Code Assist (cloudcode-pa) and Google's
+  # OAuth hosts with a Google sign-in. Vertex AI's regional hosts are not
+  # listed: a Vertex setup runs with the sandbox off or a host added here.
+  sandbox:
+    state:
+      - ~/.gemini
+    network:
+      - generativelanguage.googleapis.com
+      - cloudcode-pa.googleapis.com
+      - oauth2.googleapis.com
+      - accounts.google.com
   note: >-
     `gemini --acp` (Gemini CLI ≥ 0.65, fixtures in tests/fixtures/acp/gemini-cli).
     A permission request becomes a question on the task card; an action

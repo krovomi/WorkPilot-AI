@@ -256,6 +256,39 @@ async def test_a_write_is_asked_on_the_card_and_written_through_the_guard(
     assert agent.answers("session/set_mode") == []
 
 
+async def test_the_agent_process_is_started_through_its_sandbox(
+    project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import os_sandbox
+    from os_sandbox.launch import ISOLATED
+
+    class Wrapping(os_sandbox.SessionSandbox):
+        def wrap(self, argv, env, *, cwd=None):
+            return ["SANDBOX", "--", *argv], {**env, "SANDBOXED": "1"}
+
+    captured: dict[str, Any] = {}
+
+    def fake_session_sandbox(project_dir, spec_dir=None, **kwargs):
+        captured.update(kwargs)
+        return Wrapping(ISOLATED, "bubblewrap")
+
+    monkeypatch.setattr(os_sandbox, "session_sandbox", fake_session_sandbox)
+    agent = FakeAgent(_fixture("write-allowed", project))
+    async with _client(
+        project, agent, broker=RecordingBroker("proceed_once")
+    ) as client:
+        await _turn(client)
+
+    # The process the card reports on is the one started.
+    assert agent.argv == ("SANDBOX", "--", "gemini", "--acp")
+    assert agent.env["SANDBOXED"] == "1"
+    # Gemini's profile from providers.yaml: its state, and Google's hosts only.
+    assert captured["state_dirs"] == ("~/.gemini",)
+    assert "generativelanguage.googleapis.com" in captured["provider_hosts"]
+    assert "api.anthropic.com" not in captured["provider_hosts"]
+    assert captured["unavailable_reason"] is None
+
+
 async def test_a_refusal_from_the_person_reaches_the_agent(project: Path) -> None:
     agent = FakeAgent(_fixture("write-rejected", project))
     client = _client(project, agent, broker=RecordingBroker("cancel"))

@@ -291,11 +291,14 @@ class AcpAgentClient(CliSubprocessAgentClient):
                 f"{self.cli_label} is not installed or is not on PATH"
                 + (f" ({self.spec.docs})." if self.spec.docs else ".")
             )
+        # Through the OS sandbox like every CLI that runs its own commands: the
+        # card reports `session_sandbox()`, so the process must be the one it wraps.
+        argv, env = self._launch(self._command(executable))
         try:
             process = await self._process_factory(
-                *self._command(executable),
+                *argv,
                 cwd=self._project_dir,
-                env=self._subprocess_env(),
+                env=env,
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,

@@ -61,6 +61,10 @@ seul de ses outils ; WorkPilot tient le droit trois fois.
 | **La question** | une `session/request_permission` d'un genre que le type ne déclare pas, ou dont un chemin sort des racines d'écriture du build ou vise un fichier protégé, est refusée **sans demander à personne** | l'agent ne demande pas tout |
 | **Ce qui a tourné** | Gemini lance sans demander une commande qu'il juge anodine (`echo`, capturé). Un outil d'un genre non déclaré qui démarre arrête le tour (`session/cancel`) et le fait échouer | vu, pas empêché : c'est dit comme tel |
 
+Sous ces trois barrières, le processus de l'agent tourne dans le bac à sable de l'OS
+([`os-sandbox.md`](os-sandbox.md)) avec le profil `sandbox:` de son entrée : pour Gemini, `~/.gemini`
+et les seuls hôtes de Google. Une commande qui part sans question reste dans le worktree.
+
 Genres d'outils ACP et droits qui les accordent :
 
 | Genre | Accordé par |
