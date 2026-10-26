@@ -2403,5 +2403,82 @@
 			"failed": "failed",
 			"off": "not configured"
 		}
+	},
+	"automations": {
+		"title": "Automations",
+		"description": "An event creates a card on the board: an issue labelled, the base branch's CI going red, a time of day.",
+		"intro": "A rule creates a Kanban card when its event happens, and the card follows the normal cycle. A rule never merges, pushes or comments. Rules run every 5 minutes while the app is open.",
+		"add": "Add a rule",
+		"runNow": "Run now",
+		"save": "Save rule",
+		"cancel": "Cancel",
+		"empty": "No rule yet.",
+		"unknownError": "Something went wrong",
+		"mainBranch": "the project's main branch",
+		"kindAuto": "Decided from the event",
+		"engineDefault": "The card uses the app's default engine.",
+		"drafts": "cards wait for you",
+		"starts": "cards start at once",
+		"enable": "Turn {{name}} on or off",
+		"edit": "Edit {{name}}",
+		"delete": "Delete {{name}}",
+		"activity": "What the rules did",
+		"fields": {
+			"name": "Name",
+			"trigger": "When",
+			"label": "Label",
+			"branch": "Branch",
+			"time": "Time",
+			"days": "Days",
+			"title": "Card title",
+			"prompt": "Card description",
+			"kind": "Card kind",
+			"engine": "Choose the engine",
+			"draft": "Draft cards",
+			"dailyCap": "Cards per day, at most"
+		},
+		"triggers": {
+			"issue_labeled": "A GitHub issue gets a label",
+			"ci_failed": "The CI turns red on a branch",
+			"schedule": "At a time of day"
+		},
+		"help": {
+			"issue_labeled": "Only issues labelled after the rule is created. An issue that already has a card is not imported twice.",
+			"ci_failed": "Read from the CI provider set in Settings › CI/CD pipeline. One card per red streak: while that card is open, a new failed run does not create another.",
+			"schedule": "Fires once on each chosen day, once the time has passed. A day the app was closed is not made up.",
+			"draft": "The card waits in the backlog until you start it.",
+			"noDraft": "Each card starts its build as soon as it is created.",
+			"dailyCap": "Events over the cap wait for the next day; none is dropped."
+		},
+		"summary": {
+			"issue_labeled": "Issue labelled “{{label}}”",
+			"ci_failed": "CI red on {{branch}}",
+			"schedule": "{{days}} at {{time}}"
+		},
+		"status": {
+			"never": "Not run yet",
+			"lastRun": "Last pass {{at}}",
+			"today_one": "{{count}} card today (at most {{cap}})",
+			"today_other": "{{count}} cards today (at most {{cap}})",
+			"deferred_one": "{{count}} event waits for tomorrow",
+			"deferred_other": "{{count}} events wait for tomorrow"
+		},
+		"outcome": {
+			"created": "created {{specId}} for {{subject}}",
+			"started": "created and started {{specId}} for {{subject}}",
+			"duplicate": "skipped {{subject}}",
+			"ignored": "ignored {{subject}}",
+			"error": "could not run on {{subject}}"
+		},
+		"reasons": {
+			"label_predates_rule": "the label was there before the rule",
+			"issue_on_board": "the board already has a card for this issue",
+			"streak_open": "a card for this red streak is still open",
+			"not_started": "the card was created but did not start",
+			"github_not_connected": "GitHub is not connected for this project (Settings › GitHub)",
+			"no_ci_provider": "no CI provider is configured for this project (Settings › CI/CD pipeline)",
+			"source_failed": "the source could not be read",
+			"card_failed": "the card could not be created"
+		}
 	}
 }

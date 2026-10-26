@@ -2786,6 +2786,40 @@ Justification : [`os-sandbox.md`](../architecture/os-sandbox.md).
 Vérification : `pytest tests/os_sandbox -q` (le vrai bac à sable sous
 `WORKPILOT_EXPECT_SANDBOX=1`) et `cd apps/frontend && pnpm test -- task-sandbox TaskSandboxNotice`.
 
+### G6 — Automatisations : un événement crée une carte
+
+**Fait.** Le démon `continuous_ai` est retiré. Il agissait hors du Kanban, et `cicd_watcher`
+répondait « Diagnosed CI failure » sans rien lancer. Il est remplacé par des règles par projet,
+dans `apps/frontend/src/main/automations/`. Une règle associe un déclencheur, un type de carte et
+un moteur. Elle ne fait qu'une chose : créer une carte du Kanban, qui suit ensuite le cycle normal.
+
+- **Les déclencheurs.**
+  - Une issue GitHub étiquetée après la création de la règle : la date vient de l'événement
+    `labeled`, pas de `since`.
+  - Le dernier run de CI de la branche de base, qui passe au rouge. Il est lu par le même
+    fournisseur que le « Build rouge » : Azure DevOps, GitHub Actions, GitLab CI ou Jenkins.
+  - Un horaire : `HH:MM` et des jours de la semaine.
+- **Les garde-fous.**
+  - Une carte par issue, y compris celles importées à la main.
+  - Une carte par série rouge, tant qu'elle est ouverte.
+  - Un plafond par jour : un événement au-delà revient le lendemain, il n'est pas perdu.
+  - Brouillon par défaut : il faut `draft: false` explicite pour que la carte démarre seule.
+  - Une source illisible est nommée, une seule fois au journal, et jamais lue comme « rien de
+    nouveau ».
+- **Les frontières.** Le renderer n'envoie qu'un id de projet et une règle. Le main la revalide
+  contre des listes fermées et refuse un id qu'il n'a pas émis. Le jeton GitHub ne quitte pas le
+  main.
+- **Ce qui est retiré.**
+  - `continuous_ai/`, son runner, son test, ses huit canaux IPC, son store, son écran et son
+    espace i18n.
+  - `longevity` ne compte plus un scan de dépendances de plus de 30 jours, ou sans date : il
+    n'est plus rafraîchi.
+
+Justification : [`automations.md`](../architecture/automations.md).
+
+Vérification : `pytest tests/longevity -q` et
+`cd apps/frontend && pnpm test -- automations AutomationsIntegration ipc-bridge-guards`.
+
 ### G9 — MCP 2026-07-28 : tasks et MCP Apps dans le panneau de tâche
 
 **Fait.** `apps/backend/mcp_tasks/` (une feuille) fait répondre les serveurs MCP de WorkPilot dans
