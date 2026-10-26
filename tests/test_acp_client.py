@@ -38,7 +38,8 @@ SESSION = "$SESSION"
 
 def _fixture(name: str, project: Path) -> list[dict[str, Any]]:
     text = (FIXTURES / f"{name}.jsonl").read_text(encoding="utf-8")
-    text = text.replace("$PROJECT", str(project.resolve()))
+    # The path goes into JSON strings: escaped, so a Windows path's backslashes stay literal.
+    text = text.replace("$PROJECT", json.dumps(str(project.resolve()))[1:-1])
     return [json.loads(line) for line in text.splitlines() if line.strip()]
 
 

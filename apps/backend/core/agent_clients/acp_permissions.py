@@ -57,7 +57,7 @@ DEFAULT_TIMEOUT_SECONDS = 30 * 60
 #: The option kinds ACP defines (`PermissionOptionKind`).
 OPTION_KINDS = ("allow_once", "allow_always", "reject_once", "reject_always")
 
-_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f​-‏‪-‮⁦-⁩]")
+_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f\u200b-\u200f\u202a-\u202e\u2066-\u2069]")
 _SPACES = re.compile(r"\s+")
 
 
