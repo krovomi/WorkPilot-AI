@@ -2602,6 +2602,20 @@ Copilot, Claude Code, Gemini CLI, OpenHands…) et retenues par Leub, dans cet o
 des constats d'audit : chaque ligne est une feature, une PR vers `develop`, avec sa justification
 dans `docs/architecture/`.
 
+### G1 — La carte suit sa PR jusqu'au merge
+
+**Fait.** `apps/backend/pr_followup/` lit la PR GitHub de la tâche (`gh`, liste d'arguments),
+décide sans effet de bord (`policy.decide` : forge illisible → `unknown`, jamais du vert ; aucun
+check → `no_checks` ; échec rouge aussi sur la base → `base_red`, jamais « corrigé » ; plafond de
+trois tours), donne au QA fixer les checks en échec et les fils de revue non résolus, sur le
+provider de la phase QA de la tâche, refuse le commit qui saute, supprime ou désactive un test ou
+modifie un fichier de CI (`guards.py`, annulé avant tout push), puis pousse sans forcer.
+L'app : canaux `TASK_PR_FOLLOWUP_*`, carte `PrFollowupCard` dans « À traiter », `pythonRunnerEnv`
+accepte `taskProviders`. Justification : [`pr-followup.md`](../architecture/pr-followup.md).
+
+Vérification : `pytest tests/pr_followup -q` et
+`cd apps/frontend && pnpm test -- pr-followup-handlers PrFollowupCard python-runner-env`.
+
 ### G3 — « Besoin de toi » : notifications et approbation à distance
 
 **Fait.** Une tâche qui attend quelqu'un le dit, sur le bureau et, si on le demande, sur ntfy ou

@@ -18,6 +18,7 @@ WorkPilot AI is a desktop application (+ CLI) where users describe a goal and AI
 - **Roadmap** — AI-assisted feature planning with strategic roadmap generation
 - **Ideation** — Discover improvements, performance issues, and security vulnerabilities
 - **GitHub/GitLab Integration** — Import issues, AI-powered investigation, PR/MR review and creation
+- **PR Follow-Through** — A task's open GitHub PR is driven to merge: red checks and review threads go to the QA fixer, the commit is checked for weakened tests or CI edits, then pushed (never forced, never merged)
 - **Azure DevOps/Jira Integration** — Import work items, sync statuses
 - **Needs You** — Notifications when a task waits for a person, read from the task's state machine, on the desktop, ntfy or Telegram; a waiting plan can be approved from Telegram with a one-shot, expiring button
 - **Microsoft Teams Notifications** — Webhook-based notifications for task completion and PR creation

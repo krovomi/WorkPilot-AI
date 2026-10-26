@@ -75,6 +75,7 @@ import {
 	resumeTasksInterruptedByAppExit,
 } from "./ipc-handlers/task/interrupted-runs";
 import { getSourceEnvPath } from "./ipc-handlers/settings-handlers";
+import { stopAllPrFollowups } from "./ipc-handlers/task/pr-followup-handlers";
 import { initializeUsageMonitorForwarding } from "./ipc-handlers/terminal-handlers";
 import { setupIpcHandlers } from "./ipc-setup";
 import {
@@ -1325,6 +1326,7 @@ app.on("before-quit", (event) => {
 
 	// Stop synchronous services immediately
 	stopPeriodicUpdates();
+	stopAllPrFollowups();
 
 	const usageMonitor = getUsageMonitor();
 	usageMonitor.stop();
