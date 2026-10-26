@@ -46,6 +46,7 @@ import type { AgentEvents } from "./agent-events";
 import type { AgentState } from "./agent-state";
 import { getOAuthModeClearVars } from "./env-utils";
 import { forwardTaskEventToHooks } from "./hook-bridge";
+import { PERMISSION_CHANNEL_ENV } from "../task-permissions";
 import { parseTaskEvent } from "./task-event-parser";
 import type { ExecutionProgressData, ProcessType } from "./types";
 
@@ -925,6 +926,7 @@ export class AgentProcessManager {
 						...oauthModeClearVars, // Clear stale ANTHROPIC_* vars when in OAuth mode
 						...apiProfileEnv, // Include active API profile config (highest priority for ANTHROPIC_* vars)
 						...providerSpecificEnv, // Include provider credentials (WINDSURF_API_KEY, SELECTED_LLM_PROVIDER)
+						...PERMISSION_CHANNEL_ENV, // An ACP agent's questions go to the card; answers come back on stdin
 					},
 					processType === "task-execution" ? "feature-build" : undefined,
 				),

@@ -22,6 +22,7 @@ import {
 import { setupContextMeshListeners } from "./context-mesh-store";
 import { setupLiveCompanionListeners } from "./live-companion-store";
 import { setupContextUsageListeners } from "./context-usage-store";
+import { setupTaskPermissionListeners } from "./task-permission-store";
 import { setupDocDriftListeners } from "./doc-drift-store";
 import { setupFlakyTestsListeners } from "./flaky-tests-store";
 import { setupGitSurgeonListeners } from "./git-surgeon-store";
@@ -119,6 +120,8 @@ const SETUPS: ReadonlyArray<readonly [string, ListenerSetup]> = [
 	["SecureStorage", setupSecureStorageListeners],
 	["SmartEstimation", setupSmartEstimationListeners],
 	["SpecRefinement", setupSpecRefinementListeners],
+	// An ACP agent's question waits on its card whether or not the board is open.
+	["TaskPermissions", setupTaskPermissionListeners],
 	["VisualToCode", setupVisualToCodeListeners],
 	["VoiceControl", setupVoiceControlListeners],
 ];

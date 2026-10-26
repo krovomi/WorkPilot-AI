@@ -2488,6 +2488,10 @@ export function Sidebar({
 									isCollapsed={isCollapsed}
 								/>
 								<AgentCliStatusBadge tool="pi" isCollapsed={isCollapsed} />
+								<AgentCliStatusBadge
+									tool="gemini-cli"
+									isCollapsed={isCollapsed}
+								/>
 							</div>
 						</CollapsibleContent>
 					</Collapsible>

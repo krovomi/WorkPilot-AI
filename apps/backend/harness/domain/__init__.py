@@ -4,6 +4,7 @@ from .cost import TokenPrices, call_cost, calls_cost, over_budget
 from .ledger import UsageLedger
 from .usage import (
     CallUsage,
+    from_acp_usage,
     from_ambiguous_cache_read,
     from_chat_completion,
     from_eval_counts,
@@ -19,6 +20,7 @@ __all__ = [
     "UsageLedger",
     "call_cost",
     "calls_cost",
+    "from_acp_usage",
     "from_ambiguous_cache_read",
     "from_chat_completion",
     "from_eval_counts",

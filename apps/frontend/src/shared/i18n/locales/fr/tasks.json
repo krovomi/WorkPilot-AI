@@ -1992,6 +1992,16 @@
 		"off": "{{provider}} : le bac à sable OS est désactivé (WORKPILOT_SANDBOX=off)",
 		"noReason": "raison non précisée"
 	},
+	"permission": {
+		"label": "Question de {{agent}}",
+		"asks": "{{agent}} demande avant d'agir",
+		"expires": "Refusé automatiquement à {{time}} sans réponse",
+		"failure": {
+			"not_pending": "Cette question n'est plus en attente",
+			"invalid_option": "Cette réponse ne fait pas partie de celles proposées par l'agent",
+			"process_gone": "Le build s'est arrêté, plus personne à qui répondre"
+		}
+	},
 	"goal": {
 		"title": "Objectif",
 		"description": "Fini quand une commande le dit, pas quand le relecteur le pense : la QA continue tant que la commande échoue, dans un nombre de passes et un plafond de dépense.",

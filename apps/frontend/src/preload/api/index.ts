@@ -141,6 +141,10 @@ import {
 import { type AgentCliAPI, createAgentCliAPI } from "./modules/agent-cli-api";
 import { createTaskSandboxAPI, type TaskSandboxAPI } from "./modules/task-sandbox-api";
 import {
+	createTaskPermissionAPI,
+	type TaskPermissionAPI,
+} from "./modules/task-permission-api";
+import {
 	type CopilotCliAPI,
 	createCopilotCliAPI,
 } from "./modules/copilot-cli-api";
@@ -254,6 +258,7 @@ export interface ElectronAPI
 		CopilotCliAPI,
 		AgentCliAPI,
 		TaskSandboxAPI,
+		TaskPermissionAPI,
 		CopilotOAuthAPI,
 		McpAPI,
 		ProfileAPI,
@@ -400,6 +405,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createClaudeCodeAPI(),
 		...createCopilotCliAPI(),
 		...createAgentCliAPI(),
+		...createTaskPermissionAPI(),
 		...createCopilotOAuthAPI(),
 		...createMcpAPI(),
 		...createProfileAPI(),
@@ -560,6 +566,8 @@ export type { ContextAwareSnippetsAPI } from "./modules/context-aware-snippets-a
 export { createContextAwareSnippetsAPI } from "./modules/context-aware-snippets-api";
 export type { AgentCliAPI } from "./modules/agent-cli-api";
 export { createAgentCliAPI } from "./modules/agent-cli-api";
+export type { TaskPermissionAPI } from "./modules/task-permission-api";
+export { createTaskPermissionAPI } from "./modules/task-permission-api";
 export type { CopilotCliAPI } from "./modules/copilot-cli-api";
 export { createCopilotCliAPI } from "./modules/copilot-cli-api";
 export type { DebugAPI } from "./modules/debug-api";
