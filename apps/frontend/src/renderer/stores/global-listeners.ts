@@ -42,6 +42,7 @@ import { setupPromptOptimizerListeners } from "./prompt-optimizer-store";
 import { setupRegressionGuardianListeners } from "./regression-guardian-store";
 import { setupReleaseCoordinatorListeners } from "./release-coordinator-store";
 import { setupSandboxListeners } from "./sandbox-store";
+import { setupTaskSandboxListeners } from "./task-sandbox-store";
 import { setupSecureStorageListeners } from "./secure-storage-store";
 import { setupSmartEstimationListeners } from "./smart-estimation-store";
 import { setupSpecRefinementListeners } from "./spec-refinement-store";
@@ -108,6 +109,8 @@ const SETUPS: ReadonlyArray<readonly [string, ListenerSetup]> = [
 	["RegressionGuardian", setupRegressionGuardianListeners],
 	["ReleaseCoordinator", setupReleaseCoordinatorListeners],
 	["Sandbox", setupSandboxListeners],
+	// Whether each task's commands run in the OS sandbox, for its card.
+	["TaskSandbox", setupTaskSandboxListeners],
 	// Not a page's feature: the sidebar's warning that stored API keys are
 	// not protected by the OS keyring.
 	["SecureStorage", setupSecureStorageListeners],

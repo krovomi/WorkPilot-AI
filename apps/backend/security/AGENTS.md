@@ -22,6 +22,7 @@ providers hors SDK passent par `core/runtimes/tool_executor.py`, qui appelle les
 | Bash / Write | garde-fous déclarés par le projet (`.workpilot/guardrails.*`) | `guardrails.py` | — |
 | Write / Edit | caractères invisibles retirés | `watermarks/` | `tests/test_watermarks_hook.py` |
 | Read | fichiers retenus par la préparation des pièces jointes | `docintel/read_guard.py` | — |
+| Bash (hors SDK), CLI OpenCode et pi | le processus tourne dans le bac à sable de l'OS : écritures dans le worktree, identifiants masqués, réseau par proxy filtrant ; Claude Code et Codex gardent le leur, rapporté | `os_sandbox/` (`session_sandbox`, `bwrap_argv`, `seatbelt_profile`, `FilteringProxy`), appelé par `core/client.py` (`_sandbox_at_launch`), `tool_executor._run_command`, `CliSubprocessAgentClient._launch` | `tests/os_sandbox/` |
 | tous | outils non déclarés refusés | `agents/tools_pkg/permissions.py` (`undeclared_builtin_tools`) | `tests/test_agent_tool_declarations.py`, `tests/test_agent_tool_rights.py`, `tests/test_non_sdk_rights.py` |
 | commande de l'objectif | environnement du backend sans ses identifiants, pour une commande qui exécute le code de la tâche | `child_env.py` (`env_without_credentials`), appelé par `goal/check.py` | `tests/goal/test_goal_protection.py`, `tests/goal/test_goal_check.py` |
 

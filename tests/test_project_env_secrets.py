@@ -63,6 +63,9 @@ READER_MODULES = {
     "apps/backend/verify/settings.py",
     "apps/backend/watermarks/settings.py",
 }
+# Modules that name the file without reading it. The OS sandbox hides it from
+# the agent's process (`tests/os_sandbox/test_hosts_and_policy.py` checks it).
+NAMING_ONLY_MODULES = {"apps/backend/os_sandbox/policy.py"}
 _OPENS_PROJECT_ENV = re.compile(
     r"""(?:\.workpilot["']|_WORKPILOT_DIR|_AUTO_CLAUDE_DIR)\s*/\s*["']\.env["']"""
 )
@@ -222,7 +225,7 @@ def test_every_module_opening_the_file_is_checked_here() -> None:
         if "tests" not in path.parts
         and _OPENS_PROJECT_ENV.search(path.read_text(encoding="utf-8"))
     }
-    assert opening == READER_MODULES, (
+    assert opening == READER_MODULES | NAMING_ONLY_MODULES, (
         "A module reads .workpilot/.env that this test does not know: say which "
         "keys it takes in project-env-secrets.json and add it to READERS."
     )
