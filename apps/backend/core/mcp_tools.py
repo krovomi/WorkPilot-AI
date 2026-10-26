@@ -38,6 +38,16 @@ from contextlib import AsyncExitStack
 from pathlib import Path
 from typing import Any
 
+from core.mcp_extensions import (
+    app_resource_uri,
+    capture_app_view,
+    is_task_handle,
+    resolve_task,
+    sdk_speaks_2026,
+    session_options,
+    visible_to_model,
+)
+
 logger = logging.getLogger(__name__)
 
 # Namespacing keeps MCP tool names from colliding with the built-in toolset and
@@ -216,9 +226,16 @@ class MCPToolManager:
     """
 
     def __init__(
-        self, project_dir: str | None, servers: list[dict[str, Any]] | None = None
+        self,
+        project_dir: str | None,
+        servers: list[dict[str, Any]] | None = None,
+        *,
+        spec_dir: str | Path | None = None,
     ):
         self._project_dir = project_dir
+        # Where a tool's MCP App view is kept for the task panel; without
+        # one, the session does not declare Apps (`core/mcp_extensions.py`).
+        self._spec_dir = Path(spec_dir) if spec_dir else None
         self._servers = (
             servers if servers is not None else load_mcp_server_configs(project_dir)
         )
@@ -226,6 +243,8 @@ class MCPToolManager:
         self._defs: list[dict[str, Any]] = []
         # full tool name -> (session, real_tool_name)
         self._route: dict[str, tuple[Any, str]] = {}
+        # full tool name -> (server id, ui:// resource) for tools with a view
+        self._views: dict[str, tuple[str, str]] = {}
 
     async def __aenter__(self) -> MCPToolManager:
         await self.connect()
@@ -242,14 +261,21 @@ class MCPToolManager:
             sid = _server_id(cfg, index)
             try:
                 session = await self._open_session(cfg)
-                await session.initialize()
+                await _handshake(session)
                 listed = await session.list_tools()
                 tools = getattr(listed, "tools", None) or []
                 for tool in tools:
                     tname = getattr(tool, "name", None)
                     if not tname:
                         continue
+                    meta = _field(tool, "meta", "_meta")
+                    if not visible_to_model(meta):
+                        # MCP Apps: an app-only tool is never the agent's.
+                        continue
                     full = f"{MCP_TOOL_PREFIX}{sid}__{_sanitize(tname)}"
+                    view = app_resource_uri(meta)
+                    if view and self._spec_dir is not None:
+                        self._views[full] = (sid, view)
                     schema = _field(tool, "inputSchema", "input_schema") or {
                         "type": "object",
                         "properties": {},
@@ -297,7 +323,11 @@ class MCPToolManager:
             )
             read, write = await self._stack.enter_async_context(stdio_client(params))
 
-        return await self._stack.enter_async_context(ClientSession(read, write))
+        return await self._stack.enter_async_context(
+            ClientSession(
+                read, write, **session_options(apps=self._spec_dir is not None)
+            )
+        )
 
     def tool_definitions(self) -> list[dict[str, Any]]:
         return list(self._defs)
@@ -307,7 +337,24 @@ class MCPToolManager:
 
     async def call(self, name: str, arguments: dict[str, Any]) -> str:
         session, real = self._route[name]
-        result = await session.call_tool(real, arguments or {})
+        if sdk_speaks_2026():
+            result = await session.call_tool(real, arguments or {}, allow_claimed=True)
+        else:
+            result = await session.call_tool(real, arguments or {})
+        if is_task_handle(result):
+            # MCP Tasks: the server runs it in the background; wait for it.
+            result = await resolve_task(session, result)
+        view = self._views.get(name)
+        if view is not None and self._spec_dir is not None:
+            await capture_app_view(
+                session,
+                spec_dir=self._spec_dir,
+                server=view[0],
+                tool=real,
+                resource_uri=view[1],
+                arguments=arguments or {},
+                result=result,
+            )
         if _field(result, "isError", "is_error"):
             return f"MCP tool error: {_result_to_text(result) or name}"
         return _result_to_text(result)
@@ -321,3 +368,19 @@ class MCPToolManager:
             self._stack = None
         self._defs.clear()
         self._route.clear()
+        self._views.clear()
+
+
+async def _handshake(session: Any) -> None:
+    """``server/discover`` first (MCP 2026-07-28), ``initialize`` for any other server.
+
+    The SDK's own connect-time policy: anything that is not positive evidence
+    of a 2026-07-28 server falls back to the handshake. An older SDK only
+    has the handshake.
+    """
+    if not sdk_speaks_2026():
+        await session.initialize()
+        return
+    from mcp.client._probe import negotiate_auto  # noqa: PLC0415
+
+    await negotiate_auto(session)
