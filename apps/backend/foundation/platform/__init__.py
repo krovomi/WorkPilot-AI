@@ -591,8 +591,9 @@ def pid_is_running(pid: int | None) -> bool:
 
 def _windows_pid_is_running(pid: int) -> bool:  # pragma: no cover - Windows leg
     import ctypes
-    from ctypes import wintypes
+    import ctypes.wintypes
 
+    wintypes = ctypes.wintypes
     synchronize = 0x00100000
     query_limited_information = 0x1000
     error_access_denied = 5
