@@ -82,7 +82,9 @@ def test_wpf_winforms_and_unpackaged_winui_apps_are_detected(tmp_path):
         "Modern": "winui",
     }
     assert all(t.kind == "windows-app" for t in targets.values())
-    assert targets["Orders"].command == "dotnet run --project Orders/Orders.csproj"
+    # The launch runs in the target's root, so the project file is named from there.
+    assert targets["Orders"].root == "Orders"
+    assert targets["Orders"].command == "dotnet run --project Orders.csproj"
     assert targets["Orders"].port == 0
 
 

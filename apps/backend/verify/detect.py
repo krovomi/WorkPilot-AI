@@ -210,6 +210,11 @@ def _relative(path: Path, project_dir: Path) -> str:
     return rel or "."
 
 
+def _project_arg(csproj: Path) -> str:
+    """The project file as `dotnet run --project` reads it from its own folder."""
+    return f'"{csproj.name}"' if " " in csproj.name else csproj.name
+
+
 def _read_json(path: Path) -> dict:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -335,7 +340,8 @@ def _windows_app(csproj: Path, text: str, project_dir: Path) -> Target | None:
         return None
     framework = "winui" if winui else found.group(1).lower()  # type: ignore[union-attr]
     framework = {"windowsforms": "winforms"}.get(framework, framework)
-    rel = _relative(csproj, project_dir)
+    # The launch runs in the target's root: the project file is named from there.
+    rel = _project_arg(csproj)
     target = Target(
         kind="windows-app",
         name=csproj.stem,
@@ -370,7 +376,7 @@ def _dotnet_targets(project_dir: Path) -> list[Target]:
             if app is not None:
                 out.append(app)
             continue
-        rel = _relative(csproj, project_dir)
+        rel = _project_arg(csproj)
         blazor = "BlazorWebAssembly" in text or (csproj.parent / "Pages").is_dir()
         out.append(
             Target(
