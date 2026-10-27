@@ -6,6 +6,7 @@ different operating systems.
 """
 
 import os
+import subprocess
 import sys
 from pathlib import Path
 from unittest.mock import patch
@@ -31,6 +32,7 @@ from foundation.platform import (
     is_macos,
     is_unix,
     is_windows,
+    pid_is_running,
     requires_shell,
     split_command,
     validate_cli_path,
@@ -1190,3 +1192,35 @@ class TestSplitCommand:
             "build",
             "src/My App/App.csproj",
         ]
+
+
+# ============================================================================
+# Processes
+# ============================================================================
+
+
+class TestPidIsRunning:
+    def test_a_probe_never_stops_the_process_it_looks_at(self):
+        # On Windows os.kill(pid, 0) is Ctrl+C to the group `pid` leads: a
+        # child in its own group, as verify.launch starts an app, died of it.
+        kwargs = (
+            {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+            if is_windows()
+            else {"start_new_session": True}
+        )
+        child = subprocess.Popen(
+            [sys.executable, "-c", "import time; time.sleep(60)"], **kwargs
+        )
+        try:
+            for _ in range(20):
+                assert pid_is_running(child.pid)
+            assert child.poll() is None
+        finally:
+            child.kill()
+            child.wait(timeout=10)
+        assert not pid_is_running(child.pid)
+
+    def test_no_pid_is_not_running(self):
+        assert not pid_is_running(None)
+        assert not pid_is_running(0)
+        assert not pid_is_running(-1)

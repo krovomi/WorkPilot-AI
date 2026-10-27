@@ -560,6 +560,64 @@ def get_env_var(name: str, default: str | None = None) -> str | None:
 
 
 # ============================================================================
+# Processes
+# ============================================================================
+
+
+def pid_is_running(pid: int | None) -> bool:
+    """
+    Whether ``pid`` names a running process, without signalling it.
+
+    ``os.kill(pid, 0)`` is no probe on Windows: 0 is ``CTRL_C_EVENT``, so it
+    sends Ctrl+C to the process group ``pid`` leads, and a child started with
+    ``CREATE_NEW_PROCESS_GROUP`` dies of it (0xC0000142 while it is still
+    loading its DLLs).
+    """
+    if not isinstance(pid, int) or pid <= 0:
+        return False
+    if is_windows():
+        return _windows_pid_is_running(pid)
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        # It exists, owned by someone else.
+        return True
+    except OSError:
+        return False
+    return True
+
+
+def _windows_pid_is_running(pid: int) -> bool:  # pragma: no cover - Windows leg
+    import ctypes
+    import ctypes.wintypes
+
+    wintypes = ctypes.wintypes
+    synchronize = 0x00100000
+    query_limited_information = 0x1000
+    error_access_denied = 5
+    wait_timeout = 0x102
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+    kernel32.WaitForSingleObject.restype = wintypes.DWORD
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+
+    handle = kernel32.OpenProcess(synchronize | query_limited_information, False, pid)
+    if not handle:
+        # A protected process exists but refuses the handle; anything else is gone.
+        return ctypes.get_last_error() == error_access_denied
+    try:
+        # Signalled once it has exited, even while a handle keeps its pid taken.
+        return kernel32.WaitForSingleObject(handle, 0) == wait_timeout
+    finally:
+        kernel32.CloseHandle(handle)
+
+
+# ============================================================================
 # Platform Description
 # ============================================================================
 

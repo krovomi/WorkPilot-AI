@@ -11,6 +11,7 @@ import subprocess
 from pathlib import Path
 
 from foundation.git_executable import get_git_executable, run_git
+from foundation.platform import pid_is_running
 
 __all__ = [
     # Exported helpers
@@ -383,13 +384,7 @@ def _is_workpilot_file(file_path: str) -> bool:
 
 def is_process_running(pid: int) -> bool:
     """Check if a process with the given PID is running."""
-    import os
-
-    try:
-        os.kill(pid, 0)
-        return True
-    except (OSError, ProcessLookupError):
-        return False
+    return pid_is_running(pid)
 
 
 def is_binary_file(file_path: str) -> bool:

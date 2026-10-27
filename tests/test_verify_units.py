@@ -81,6 +81,9 @@ class TestDetect:
         api = detection.targets[0]
         assert api.kind == "backend-api"
         assert "--no-launch-profile" in api.command
+        # Launched from its own folder: the path must hold from there.
+        assert api.root == "src/Shop.Api"
+        assert api.command.startswith("dotnet run --project Shop.Api.csproj ")
         assert api.env["ASPNETCORE_URLS"] == "http://127.0.0.1:{port}"
         assert api.touched
 
