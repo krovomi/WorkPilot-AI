@@ -19,8 +19,10 @@ vi.mock("./renderer-path", async () => {
 });
 
 import {
+	isAcceptableBackendPath,
 	isAcceptableToolPath,
 	refusedToolPath,
+	refusesBackendPath,
 	untrustedToolRoots,
 } from "./tool-path-policy";
 
@@ -147,10 +149,116 @@ describe("refusedToolPath", () => {
 	it("ignores the fields it does not guard and the ones left out", () => {
 		expect(
 			refusedToolPath(
-				{ autoBuildPath: "/anything" } as Record<string, unknown>,
+				{ defaultModel: "/anything" } as Record<string, unknown>,
 				{},
 				[],
 			),
 		).toBeNull();
+	});
+});
+
+describeUnix("isAcceptableBackendPath", () => {
+	let base: string;
+	let project: string;
+	let roots: string[];
+
+	function backend(dir: string): string {
+		mkdirSync(path.join(dir, "runners"), { recursive: true });
+		writeFileSync(path.join(dir, "runners", "spec_runner.py"), "", "utf-8");
+		return dir;
+	}
+
+	beforeAll(() => {
+		base = mkdtempSync(path.join(os.tmpdir(), "backend-path-"));
+		project = path.join(base, "project");
+		mkdirSync(project, { recursive: true });
+		// The temporary folder itself is left out: these folders live in it.
+		const tmp = realpathSync(os.tmpdir());
+		roots = untrustedToolRoots([project]).filter((root) => root !== tmp);
+	});
+
+	afterAll(() => rmSync(base, { recursive: true, force: true }));
+
+	it("accepts an empty value, which means auto-detection", () => {
+		expect(isAcceptableBackendPath("", { roots })).toBe(true);
+	});
+
+	it("accepts a backend folder outside every project", () => {
+		const dir = backend(path.join(base, "opt", "backend"));
+		expect(isAcceptableBackendPath(dir, { roots })).toBe(true);
+	});
+
+	it("refuses a relative path, a missing folder, a file", () => {
+		expect(isAcceptableBackendPath("apps/backend", { roots })).toBe(false);
+		expect(isAcceptableBackendPath(path.join(base, "nope"), { roots })).toBe(
+			false,
+		);
+		const file = path.join(base, "file");
+		writeFileSync(file, "", "utf-8");
+		expect(isAcceptableBackendPath(file, { roots })).toBe(false);
+	});
+
+	it("refuses a folder that is not a backend", () => {
+		const dir = path.join(base, "empty");
+		mkdirSync(dir);
+		expect(isAcceptableBackendPath(dir, { roots })).toBe(false);
+	});
+
+	it("refuses a backend whose runner is a link out of it", () => {
+		const real = backend(path.join(project, "real"));
+		const dir = path.join(base, "linked");
+		mkdirSync(path.join(dir, "runners"), { recursive: true });
+		symlinkSync(
+			path.join(real, "runners", "spec_runner.py"),
+			path.join(dir, "runners", "spec_runner.py"),
+		);
+		expect(isAcceptableBackendPath(dir, { roots })).toBe(false);
+	});
+
+	it("refuses a backend inside a registered project, or linked into one", () => {
+		const inside = backend(path.join(project, "apps", "backend"));
+		expect(isAcceptableBackendPath(inside, { roots })).toBe(false);
+		const link = path.join(base, "opt", "link-to-project");
+		symlinkSync(inside, link);
+		expect(isAcceptableBackendPath(link, { roots })).toBe(false);
+	});
+
+	it("accepts the backend the main detects, even inside a project", () => {
+		const inside = backend(path.join(project, "dev", "backend"));
+		expect(
+			isAcceptableBackendPath(inside, { roots, detected: () => inside }),
+		).toBe(true);
+	});
+
+	it("refuses a backend in the temporary folder", () => {
+		const dir = backend(path.join(base, "tmp-backend"));
+		expect(
+			isAcceptableBackendPath(dir, { roots: untrustedToolRoots([]) }),
+		).toBe(false);
+	});
+});
+
+describe("refusesBackendPath", () => {
+	it("keeps a stored value, even one it would refuse today", () => {
+		expect(
+			refusesBackendPath(
+				{ autoBuildPath: "relative" },
+				{ autoBuildPath: "relative" },
+				{ roots: [] },
+			),
+		).toBe(false);
+	});
+
+	it("ignores an update that leaves the field out", () => {
+		expect(refusesBackendPath({}, {}, { roots: [] })).toBe(false);
+	});
+
+	it("refuses a new value it cannot accept, or one that is not a string", () => {
+		expect(
+			refusesBackendPath({ autoBuildPath: "relative" }, {}, { roots: [] }),
+		).toBe(true);
+		expect(refusesBackendPath({ autoBuildPath: 42 }, {}, { roots: [] })).toBe(
+			true,
+		);
 	});
 });

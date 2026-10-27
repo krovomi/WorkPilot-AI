@@ -68,7 +68,9 @@ import { findEnvLineBreak, parseEnvFile } from "./utils";
 import { getCurrentOS } from "../platform";
 import { buildCmdConsoleArgs } from "./task/launch-args";
 import {
+	BACKEND_PATH_REFUSED,
 	refusedToolPath,
+	refusesBackendPath,
 	TOOL_PATH_REFUSED,
 } from "../security/tool-path-policy";
 
@@ -723,6 +725,17 @@ export function registerSettingsHandlers(
 						success: false,
 						error: TOOL_PATH_REFUSED,
 						data: { field: refusedField },
+					};
+				}
+				if (
+					refusesBackendPath(settings, currentSettings, {
+						detected: detectAutoBuildSourcePath,
+					})
+				) {
+					return {
+						success: false,
+						error: BACKEND_PATH_REFUSED,
+						data: { field: "autoBuildPath" },
 					};
 				}
 				const newSettings = { ...currentSettings, ...settings };

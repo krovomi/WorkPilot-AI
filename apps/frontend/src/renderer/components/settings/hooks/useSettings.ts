@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+	BACKEND_PATH_REFUSED,
 	TOOL_PATH_REFUSED,
 	UI_SCALE_DEFAULT,
 } from "../../../../shared/constants";
@@ -76,7 +77,9 @@ export function useSettings() {
 			setError(
 				result.error === TOOL_PATH_REFUSED && field
 					? t("general.toolPathRefused", { field: t(`general.${field}`) })
-					: "Failed to save settings",
+					: result.error === BACKEND_PATH_REFUSED
+						? t("general.backendPathRefused")
+						: "Failed to save settings",
 			);
 			return false;
 		} catch (err) {

@@ -149,8 +149,8 @@ l'UI n'existe pas.
   page de l'app, cadre principal de la fenêtre, atteint un handler (`main/security/ipc-sender-policy.ts`).
 - Le renderer ne fournit jamais une commande à exécuter ni un exécutable à lancer : le main
   construit la commande, lit un lanceur personnalisé dans les réglages et rattache un dossier
-  reçu à un projet connu (`resolveOpenableDir`). Un chemin d'outil des réglages nomme l'outil,
-  hors projet et hors dossier temporaire (`main/security/tool-path-policy.ts`).
+  reçu à un projet connu (`resolveOpenableDir`). Un chemin d'outil des réglages nomme l'outil et
+  le dossier du backend a ses runners, hors projet et hors `tmp` (`main/security/tool-path-policy.ts`).
 - Un chemin reçu du renderer est résolu puis rattaché à un projet enregistré ou à un dossier que
   l'utilisateur a choisi dans une boîte native (`main/security/renderer-path.ts`) ; seuls les
   handlers de dialogue appellent `rememberUserChosenPath`. Un paramètre de handler nommé comme un
