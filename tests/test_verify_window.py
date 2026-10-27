@@ -82,7 +82,9 @@ def test_wpf_winforms_and_unpackaged_winui_apps_are_detected(tmp_path):
         "Modern": "winui",
     }
     assert all(t.kind == "windows-app" for t in targets.values())
-    assert targets["Orders"].command == "dotnet run --project Orders/Orders.csproj"
+    # The launch runs in the target's root, so the project file is named from there.
+    assert targets["Orders"].root == "Orders"
+    assert targets["Orders"].command == "dotnet run --project Orders.csproj"
     assert targets["Orders"].port == 0
 
 
@@ -493,10 +495,7 @@ class LaunchDriver:
 
 
 def _app_target() -> Target:
-    # An app that stays up and prints nothing. On the Windows leg a Python
-    # script started here exited at start with 0xC0000142
-    # (STATUS_DLL_INIT_FAILED), while the same launch of a Python server in
-    # test_verify_loop runs: the stand-in is a system tool instead.
+    # An app that stays up and prints nothing.
     command = "ping -n 60 127.0.0.1" if is_windows() else "sleep 60"
     return Target(kind="windows-app", name="Orders", command=command)
 
