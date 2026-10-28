@@ -56,8 +56,8 @@ def wiki(tmp_path: Path) -> Path:
     seed = tmp_path / "seed"
     git(tmp_path, "clone", str(remote), str(seed))
     identify(seed)
-    (seed / "Home.md").write_text("# Home\n\nWelcome.\n")
-    (seed / "Roadmap.md").write_text("# Roadmap\n\nLater.\n")
+    (seed / "Home.md").write_text("# Home\n\nWelcome.\n", encoding="utf-8")
+    (seed / "Roadmap.md").write_text("# Roadmap\n\nLater.\n", encoding="utf-8")
     git(seed, "add", "-A")
     git(seed, "commit", "-m", "seed")
     git(seed, "push", "origin", "HEAD:master")
@@ -71,7 +71,7 @@ def wiki(tmp_path: Path) -> Path:
 def make_patch(wiki: Path, out: Path, name: str, page: str, text: str) -> Path:
     """Write `text` into `page` on a throwaway branch and format it as a patch."""
     git(wiki, "checkout", "-q", "-b", f"draft-{name}", "origin/master")
-    (wiki / page).write_text(text)
+    (wiki / page).write_text(text, encoding="utf-8")
     git(wiki, "commit", "-qam", f"docs(wiki): {name}")
     produced = git(wiki, "format-patch", "-1", "-o", str(out)).strip()
     git(wiki, "checkout", "-q", "master")
@@ -121,7 +121,9 @@ def test_a_stale_patch_is_named_and_the_others_still_apply(sw, wiki, patches, ca
     make_patch(wiki, patches, "0001-home", "Home.md", "# Home\n\nWhat's new.\n")
     make_patch(wiki, patches, "0002-roadmap", "Roadmap.md", "# Roadmap\n\nSoon.\n")
     # Someone rewrote the line the first patch changes, on the wiki itself.
-    (wiki / "Home.md").write_text("# Home\n\nRewritten on the wiki.\n")
+    (wiki / "Home.md").write_text(
+        "# Home\n\nRewritten on the wiki.\n", encoding="utf-8"
+    )
     git(wiki, "commit", "-qam", "edited in the GitHub UI")
 
     failed = sw.step_patches(wiki, patches)
@@ -129,8 +131,10 @@ def test_a_stale_patch_is_named_and_the_others_still_apply(sw, wiki, patches, ca
     assert failed == ["0001-home.patch"]
     out = capsys.readouterr().out
     assert "::error::Wiki patch 0001-home.patch" in out
-    assert (wiki / "Roadmap.md").read_text() == "# Roadmap\n\nSoon.\n"
-    assert (wiki / "Home.md").read_text() == "# Home\n\nRewritten on the wiki.\n"
+    assert (wiki / "Roadmap.md").read_text(encoding="utf-8") == "# Roadmap\n\nSoon.\n"
+    assert (wiki / "Home.md").read_text(
+        encoding="utf-8"
+    ) == "# Home\n\nRewritten on the wiki.\n"
     assert not (wiki / ".git" / "rebase-apply").exists()
     assert not sw.has_changes(wiki)
 
