@@ -102,7 +102,7 @@ class TestTasksEndToEnd:
                 await asyncio.sleep(1.0)
                 call.cancel()
                 with pytest.raises(asyncio.CancelledError):
-                    await call
+                    await asyncio.gather(call)
                 # The cancel reached the server: its work was stopped.
                 for _ in range(50):
                     if marker.exists():
