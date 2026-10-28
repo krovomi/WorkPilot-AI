@@ -37,6 +37,7 @@ import { extractSubtaskFiles } from "../shared/utils/subtask-files";
 import { isMeaningfulFeatureTitle } from "../shared/utils/task-title";
 import { stripHtml } from "./ipc-handlers/shared/sanitize";
 import { getAutoBuildPath, isInitialized } from "./project-initializer";
+import { updateExistingFile } from "./utils/existing-file";
 import { ensureAbsolutePath } from "./utils/path-helpers";
 import { findAllSpecPaths } from "./utils/spec-path-helpers";
 import { getTaskWorktreeDir } from "./worktree-paths";
@@ -1267,24 +1268,19 @@ export class ProjectStore {
 	 */
 	private persistDisplayTitle(specPath: string, title: string): void {
 		const requirementsPath = path.join(specPath, AUTO_BUILD_PATHS.REQUIREMENTS);
-		if (!existsSync(requirementsPath)) {
-			return;
-		}
 
 		try {
-			const requirements = JSON.parse(readFileSync(requirementsPath, "utf-8"));
-			if (
-				typeof requirements.display_title === "string" &&
-				requirements.display_title.trim().length > 0
-			) {
-				return;
-			}
-			requirements.display_title = title;
-			writeFileSync(
-				requirementsPath,
-				JSON.stringify(requirements, null, 2),
-				"utf-8",
-			);
+			updateExistingFile(requirementsPath, (text) => {
+				const requirements = JSON.parse(text);
+				if (
+					typeof requirements.display_title === "string" &&
+					requirements.display_title.trim().length > 0
+				) {
+					return null;
+				}
+				requirements.display_title = title;
+				return JSON.stringify(requirements, null, 2);
+			});
 		} catch {
 			// Non-fatal: durable persistence is an optimization, not correctness.
 		}

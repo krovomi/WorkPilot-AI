@@ -721,12 +721,10 @@ export function registerPluginMarketplaceHandlers(): void {
 				let localConfig: {
 					localPlugins: Array<{ path: string; enabled: boolean }>;
 				} = { localPlugins: [] };
-				if (fs.existsSync(localJsonPath)) {
-					try {
-						localConfig = JSON.parse(fs.readFileSync(localJsonPath, "utf-8"));
-					} catch {
-						/* use default */
-					}
+				try {
+					localConfig = JSON.parse(fs.readFileSync(localJsonPath, "utf-8"));
+				} catch {
+					/* missing or unreadable: use default */
 				}
 				if (!localConfig.localPlugins.some((p) => p.path === pluginsDir)) {
 					localConfig.localPlugins.push({ path: pluginsDir, enabled: true });

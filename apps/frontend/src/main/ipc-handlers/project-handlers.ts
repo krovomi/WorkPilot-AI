@@ -14,6 +14,10 @@ import type {
 	ProjectSettings,
 	RepoProviderDetectionResult,
 } from "../../shared/types";
+import {
+	providerFromRemoteUrl,
+	type RemoteProvider,
+} from "../../shared/utils/git-remote-provider";
 import type { AgentManager } from "../agent";
 import { appEmulatorService } from "../app-emulator-service";
 import { changelogService } from "../changelog-service";
@@ -296,13 +300,8 @@ function parseGitRemotes(
 }
 
 // Helper function to detect provider from URL
-function detectProviderFromUrl(
-	url: string,
-): "github" | "azure_devops" | "unknown" {
-	if (/github\.com[:/]/i.test(url)) return "github";
-	if (/dev\.azure\.com|visualstudio\.com|ssh\.dev\.azure\.com/i.test(url))
-		return "azure_devops";
-	return "unknown";
+function detectProviderFromUrl(url: string): RemoteProvider {
+	return providerFromRemoteUrl(url);
 }
 
 // Helper function to get URL from remote entry

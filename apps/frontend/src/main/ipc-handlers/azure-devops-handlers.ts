@@ -44,6 +44,7 @@ import {
 	stripHtml,
 } from "./shared/sanitize";
 import { envWithoutCredentials } from "../utils/child-env";
+import { readIfExists, updateExistingFile } from "../utils/existing-file";
 import { pythonRunnerEnv } from "../utils/python-runner-env";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -974,13 +975,14 @@ except Exception as e:
 					specDir,
 					AUTO_BUILD_PATHS.REQUIREMENTS,
 				);
-				if (!existsSync(requirementsPath)) {
+				const requirementsText = readIfExists(requirementsPath);
+				if (requirementsText === null) {
 					return { success: false, error: "requirements.json not found" };
 				}
 
 				let requirements: Record<string, unknown>;
 				try {
-					requirements = JSON.parse(readFileSync(requirementsPath, "utf-8"));
+					requirements = JSON.parse(requirementsText);
 				} catch {
 					return { success: false, error: "requirements.json is malformed" };
 				}
@@ -1068,14 +1070,16 @@ except Exception as e:
 					}
 				}
 
-				// Persist both fields together so the scanner serves them next time.
+				// Persist both fields together so the scanner serves them next time,
+				// onto the file as it is now: the work item calls above take time.
 				if (changed) {
 					try {
-						writeFileSync(
-							requirementsPath,
-							JSON.stringify(requirements, null, 2),
-							"utf-8",
-						);
+						updateExistingFile(requirementsPath, (current) => {
+							const latest = JSON.parse(current) as Record<string, unknown>;
+							latest.display_title = requirements.display_title;
+							latest.display_description = requirements.display_description;
+							return JSON.stringify(latest, null, 2);
+						});
 						projectStore.invalidateTasksCache(projectId);
 					} catch (err) {
 						console.warn(
@@ -1151,21 +1155,17 @@ except Exception as e:
 					const metadataPath = path.join(specDir, "task_metadata.json");
 					const requirementsPath = path.join(specDir, "requirements.json");
 
-					if (existsSync(metadataPath)) {
-						const meta = JSON.parse(readFileSync(metadataPath, "utf-8"));
+					updateExistingFile(metadataPath, (text) => {
+						const meta = JSON.parse(text);
 						meta.acceptanceCriteria = acceptanceCriteriaList;
-						writeFileSync(metadataPath, JSON.stringify(meta, null, 2), "utf-8");
-					}
+						return JSON.stringify(meta, null, 2);
+					});
 
-					if (existsSync(requirementsPath)) {
-						const reqs = JSON.parse(readFileSync(requirementsPath, "utf-8"));
+					updateExistingFile(requirementsPath, (text) => {
+						const reqs = JSON.parse(text);
 						reqs.acceptance_criteria = acceptanceCriteriaList;
-						writeFileSync(
-							requirementsPath,
-							JSON.stringify(reqs, null, 2),
-							"utf-8",
-						);
-					}
+						return JSON.stringify(reqs, null, 2);
+					});
 
 					projectStore.invalidateTasksCache(projectId);
 				}

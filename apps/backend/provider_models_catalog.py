@@ -73,11 +73,11 @@ _OPENAI_KEEP = re.compile(
     re.IGNORECASE,
 )
 _OPENAI_DROP = re.compile(
-    r"(embedding|whisper|tts|dall-?e|moderation|audio|realtime|transcribe|search|image"
-    # Drop dated snapshots like "gpt-5-2025-08-07" — keep only stable aliases.
-    r"|-\d{4}-\d{2}-\d{2}$"
+    r"(?:embedding|whisper|tts|dall-?e|moderation|audio|realtime|transcribe|search|image"
     # Drop niche aliases the user shouldn't pick from a generic dropdown.
-    r"|chat-latest|codex)",
+    r"|chat-latest|codex)"
+    # Drop dated snapshots like "gpt-5-2025-08-07" — keep only stable aliases.
+    r"|-\d{4}-\d{2}-\d{2}$",
     re.IGNORECASE,
 )
 

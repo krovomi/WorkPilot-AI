@@ -140,6 +140,9 @@ AUTHORIZED_URLS = {
     "windsurf": "https://server.codeium.com",
 }
 
+# Hosts a local LLM server may be probed on, mapped to the literal used in the URL.
+_LOCAL_LLM_HOSTS = {"localhost": "localhost", "127.0.0.1": "127.0.0.1"}
+
 # Private IP ranges for SSRF protection
 PRIVATE_IP_RANGES = [
     ipaddress.IPv4Network("10.0.0.0/8"),
@@ -886,20 +889,17 @@ def _validate_url_ssrf(provider: str, url: str) -> str:
     return f"{parsed.scheme}://{netloc}".rstrip("/")
 
 
-def _validate_openai_base_url(base_url: str | None) -> str:
-    """
-    Validate a user-provided OpenAI base URL to prevent SSRF.
+def _authorized_base_url(provider: str, base_url: str | None) -> str:
+    """Validate ``base_url`` for an authorized provider and return its constant root.
 
-    Returns a safe base URL string or raises ValueError if invalid.
+    ``_validate_url_ssrf`` already rebuilds an authorized provider's URL from
+    ``AUTHORIZED_URLS``; returning the constant itself keeps the request URL
+    free of any byte the client sent, which is what a reader (and CodeQL)
+    can check without following the validator.
     """
-    # Default official OpenAI API endpoint when no base_url is provided.
-    if not base_url:
-        return "https://api.openai.com"
-
-    try:
-        return _validate_url_ssrf("openai", base_url)
-    except ValueError as e:
-        raise ValueError(f"Invalid OpenAI base URL: {e}")
+    authorized = AUTHORIZED_URLS[provider]
+    _validate_url_ssrf(provider, base_url or authorized)
+    return authorized
 
 
 @providers_router.post("/providers/test-key/{provider}")
@@ -947,23 +947,20 @@ async def test_provider_api_key(request: Request, provider: str, payload: dict):
     # --- OpenAI ---
     if provider == "openai":
         try:
-            safe_base_url = _validate_openai_base_url(base_url)
+            url = _authorized_base_url("openai", base_url) + API_MODELS_ENDPOINT
         except ValueError as e:
             raise HTTPException(status_code=400, detail=_safe_error_message(e))
-        url = safe_base_url + API_MODELS_ENDPOINT
         return await _test_bearer(url, api_key, provider)
 
     # --- Google Gemini ---
     if provider == "google":
         try:
-            safe_url = (
-                _validate_url_ssrf(
-                    "google", "https://generativelanguage.googleapis.com"
-                )
-                + API_MODELS_ENDPOINT
-            )
+            safe_url = _authorized_base_url("google", None) + API_MODELS_ENDPOINT
+            # The key travels in a header, never in the URL: a URL ends up in
+            # proxy and access logs.
+            headers = {"x-goog-api-key": api_key}
             async with httpx.AsyncClient(timeout=DEFAULT_HTTP_TIMEOUT) as client:
-                resp = await client.get(f"{safe_url}?key={api_key}", timeout=10)
+                resp = await client.get(safe_url, headers=headers, timeout=10)
             if resp.status_code == 200:
                 set_validated(provider, api_key, True)
                 return {"success": True}
@@ -976,10 +973,7 @@ async def test_provider_api_key(request: Request, provider: str, payload: dict):
     # --- Mistral AI ---
     if provider == "mistral":
         try:
-            safe_base_url = _validate_url_ssrf(
-                "mistral", base_url or "https://api.mistral.ai"
-            )
-            url = safe_base_url + API_MODELS_ENDPOINT
+            url = _authorized_base_url("mistral", base_url) + API_MODELS_ENDPOINT
             return await _test_bearer(url, api_key, provider)
         except ValueError as e:
             return {"success": False, "error": _safe_error_message(e)}
@@ -987,10 +981,7 @@ async def test_provider_api_key(request: Request, provider: str, payload: dict):
     # --- DeepSeek ---
     if provider == "deepseek":
         try:
-            safe_base_url = _validate_url_ssrf(
-                "deepseek", base_url or "https://api.deepseek.com"
-            )
-            url = safe_base_url + API_MODELS_ENDPOINT
+            url = _authorized_base_url("deepseek", base_url) + API_MODELS_ENDPOINT
             return await _test_bearer(url, api_key, provider)
         except ValueError as e:
             return {"success": False, "error": _safe_error_message(e)}
@@ -998,9 +989,7 @@ async def test_provider_api_key(request: Request, provider: str, payload: dict):
     # --- Grok (xAI) ---
     if provider == "grok":
         try:
-            safe_url = (
-                _validate_url_ssrf("grok", "https://api.x.ai") + API_MODELS_ENDPOINT
-            )
+            safe_url = _authorized_base_url("grok", None) + API_MODELS_ENDPOINT
             return await _test_bearer(safe_url, api_key, provider)
         except ValueError as e:
             return {"success": False, "error": _safe_error_message(e)}
@@ -1008,10 +997,7 @@ async def test_provider_api_key(request: Request, provider: str, payload: dict):
     # --- Meta (via Together AI / Replicate — OpenAI-compatible) ---
     if provider == "meta":
         try:
-            safe_base_url = _validate_url_ssrf(
-                "meta", base_url or "https://api.together.xyz"
-            )
-            url = safe_base_url + API_MODELS_ENDPOINT
+            url = _authorized_base_url("meta", base_url) + API_MODELS_ENDPOINT
             return await _test_bearer(url, api_key, provider)
         except ValueError as e:
             return {"success": False, "error": _safe_error_message(e)}
@@ -1019,10 +1005,7 @@ async def test_provider_api_key(request: Request, provider: str, payload: dict):
     # --- Cursor ---
     if provider == "cursor":
         try:
-            safe_base_url = _validate_url_ssrf(
-                "cursor", base_url or "https://api.cursor.com"
-            )
-            url = safe_base_url + API_MODELS_ENDPOINT
+            url = _authorized_base_url("cursor", base_url) + API_MODELS_ENDPOINT
             return await _test_bearer(url, api_key, provider)
         except ValueError as e:
             return {"success": False, "error": _safe_error_message(e)}
@@ -1114,22 +1097,21 @@ async def test_provider_api_key(request: Request, provider: str, payload: dict):
             if parsed.scheme not in ("http", "https"):
                 return None
 
-            hostname = parsed.hostname or ""
-            if hostname not in ("localhost", "127.0.0.1"):
-                # Local LLM servers are local by definition — refuse anything
-                # else to avoid turning this endpoint into an SSRF probe.
+            # Every piece of the root is rebuilt from a constant or an int, so
+            # nothing the client typed reaches the request URL as text: the
+            # host comes from a closed list (local servers only, to keep this
+            # endpoint from becoming an SSRF probe) and the port is a number.
+            scheme = "https" if parsed.scheme == "https" else "http"
+            host = _LOCAL_LLM_HOSTS.get(parsed.hostname or "")
+            if host is None:
                 return None
-
-            root = f"{parsed.scheme}://{hostname}"
-            if parsed.port:
-                root += f":{parsed.port}"
-            root = root.rstrip("/")
-            # Strip any OpenAI-style suffix the user may have included.
-            for suffix in ("/v1/chat/completions", "/chat/completions", "/v1"):
-                if root.endswith(suffix):
-                    root = root[: -len(suffix)].rstrip("/")
-                    break
-            return root
+            try:
+                port = parsed.port
+            except ValueError:
+                return None
+            if port is None:
+                return f"{scheme}://{host}"
+            return f"{scheme}://{host}:{int(port):d}"
 
         root = build_local_root(base_url)
         if root is None:

@@ -94,21 +94,27 @@ describe("McpAppsCard", () => {
 	it("answers only its own frame's window", async () => {
 		render(<McpAppsCard task={task} />);
 		fireEvent.click(await screen.findByText(/weather · forecast/));
-		const frame = (await screen.findByTestId("mcp-app-frame")) as HTMLIFrameElement;
-		const target = frame.contentWindow as Window;
-		const posted = vi.spyOn(target, "postMessage");
 		const ask = { jsonrpc: "2.0", id: 1, method: "ui/initialize", params: {} };
+		// The frame is read again on each try: on a slow runner it can be
+		// mounted a second time (the view reopened), with a new window.
+		const currentWindow = () => (screen.getByTestId("mcp-app-frame") as HTMLIFrameElement).contentWindow as Window;
+		await screen.findByTestId("mcp-app-frame");
+		const first = vi.spyOn(currentWindow(), "postMessage");
 		act(() => {
 			window.dispatchEvent(new MessageEvent("message", { data: ask, source: window }));
 		});
-		expect(posted).not.toHaveBeenCalled();
-		act(() => {
-			window.dispatchEvent(new MessageEvent("message", { data: ask, source: target }));
+		expect(first).not.toHaveBeenCalled();
+		await waitFor(() => {
+			const target = currentWindow();
+			const posted = vi.spyOn(target, "postMessage");
+			act(() => {
+				window.dispatchEvent(new MessageEvent("message", { data: ask, source: target }));
+			});
+			expect(posted).toHaveBeenCalledWith(
+				expect.objectContaining({ id: 1, result: expect.objectContaining({ protocolVersion: "2026-01-26" }) }),
+				"*",
+			);
 		});
-		expect(posted).toHaveBeenCalledWith(
-			expect.objectContaining({ id: 1, result: expect.objectContaining({ protocolVersion: "2026-01-26" }) }),
-			"*",
-		);
 	});
 
 	it("reloads the list when the build keeps a new view", async () => {

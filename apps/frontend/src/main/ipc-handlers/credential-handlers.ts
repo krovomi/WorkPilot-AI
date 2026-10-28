@@ -674,7 +674,6 @@ export function registerCredentialHandlers(): void {
 
 				for (const p of candidates) {
 					try {
-						await fs.access(p);
 						const raw = await fs.readFile(p, "utf-8");
 						return JSON.parse(raw);
 					} catch {

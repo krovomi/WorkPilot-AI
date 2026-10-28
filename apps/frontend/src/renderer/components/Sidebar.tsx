@@ -2,6 +2,7 @@
 
 // Types
 import type { GitStatus, Project } from "@shared/types";
+import { providerFromRemoteUrl } from "@shared/utils/git-remote-provider";
 // Drag and drop (dnd-kit)
 import {
 	closestCenter,
@@ -1313,12 +1314,7 @@ export function Sidebar({
 		remoteUrl?: string,
 	) => {
 		if (provider !== "unknown" || !remoteUrl) return provider;
-		if (/github\.com[:/]/i.test(remoteUrl)) return "github";
-		if (
-			/dev\.azure\.com|visualstudio\.com|ssh\.dev\.azure\.com/i.test(remoteUrl)
-		)
-			return "azure_devops";
-		return "unknown";
+		return providerFromRemoteUrl(remoteUrl);
 	};
 
 	const handleProjectAdded = async (project: Project, needsInit: boolean) => {

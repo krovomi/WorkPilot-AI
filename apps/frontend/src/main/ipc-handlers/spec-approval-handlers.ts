@@ -14,6 +14,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
+import { updateExistingFile } from "../utils/existing-file";
 
 type ApprovalStatus = "pending" | "approved" | "rejected" | "changes_requested";
 
@@ -196,14 +197,11 @@ export function registerSpecApprovalHandlers(): void {
 				// If amendments provided, append to spec.md
 				if (params.amendments?.trim()) {
 					const specMd = path.join(specDir, "spec.md");
-					if (fs.existsSync(specMd)) {
-						const existing = fs.readFileSync(specMd, "utf-8");
-						fs.writeFileSync(
-							specMd,
+					updateExistingFile(
+						specMd,
+						(existing) =>
 							`${existing}\n\n## Human Amendments\n\n${params.amendments}`,
-							"utf-8",
-						);
-					}
+					);
 				}
 
 				upsertApproval(projectDir, {

@@ -2431,6 +2431,25 @@ chaque provider, lue le 26 octobre 2026 (xAI « Reasoning », DeepSeek « Thinki
 - **Correction** : `flash` gardé et marqué comme raisonnant.
 - **Garde-fou** : `tests/core/test_effort_plan.py` (`test_the_live_catalogue_keeps_deepseek_flash`).
 
+#### F113 · CodeQL rouge sur la PR de release 1.3.1
+
+- **Sévérité** moyenne · **nouveau** · **corrigé par #531**
+- **Preuve** (avant) : la PR `develop` → `main` (#530) comparait `develop` à l'analyse de 1.3.0 ;
+  22 alertes de niveau erreur faisaient échouer le check : URL de test de clé bâties depuis la
+  sortie du validateur et clé Google dans la query (`provider_api.py`), `$` inatteignable dans
+  `_OPENAI_DROP`, chemin non gardé par un préfixe résolu (`test_generation/api.py`), hôte de remote
+  cherché par regex non ancrée (`project-handlers.ts`, `Sidebar.tsx`), lecture ou réécriture après
+  un `existsSync` (émulateur, Azure DevOps, approbation de spec, reset de plan, `project-store`,
+  marketplace, identifiants, `file-handlers`), fichier de messages du pair programming dans `tmp`.
+- **Correction** : URL = constante de `AUTHORIZED_URLS`, clé Google dans `x-goog-api-key`, sonde
+  locale rebâtie depuis une liste d'hôtes fermée et un port entier ; `$` hors du groupe ; garde
+  `startswith` sur le chemin résolu avant `_is_within` ; `shared/utils/git-remote-provider.ts`
+  (hôte extrait puis comparé) ; `main/utils/existing-file.ts` (`readIfExists`,
+  `updateExistingFile` : un seul descripteur) ; dossier `mkdtemp` privé, fichier `wx` en `0600`.
+  Les avertissements (injection de log, données de fichier envoyées au réseau) restent ouverts.
+- **Garde-fou** : `git-remote-provider.test.ts`, `existing-file.test.ts`,
+  `tests/test_test_generation_post_build_scope.py`.
+
 ---
 
 ## Annexe A — Inventaire des fichiers candidats
@@ -2585,7 +2604,7 @@ planchers `pnpm.overrides` relevés (`pnpm-workspace.yaml`), `dompurify` ^3.4.17
 
 Statut des constats de l'audit précédent : F1, F3, F4, F5, F7, F8, F9, F10, F12, F16, F17, F19 **ouverts** ;
 F2, F13 **partiels** ; F6, F11, F14, F18 **aggravés** ; F15 **atténué**. Nouveaux : F20 à F36.
-Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F57 à F62 par M2, F63 à F68 par M3, F69 à F71 par M4, F78 à F84 par M5, F85 à F90 par M6, F91 à F94 par M7, F95 à F100 par M8, F72 à F77 par M9, F101 à F106 par M10, F107 à F112 par M11 (annexe F).
+Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F57 à F62 par M2, F63 à F68 par M3, F69 à F71 par M4, F78 à F84 par M5, F85 à F90 par M6, F91 à F94 par M7, F95 à F100 par M8, F72 à F77 par M9, F101 à F106 par M10, F107 à F112 par M11 (annexe F) ; F113 (CodeQL de la release 1.3.1) par #531.
 
 ## Annexe C — Ce qui a changé le 15 octobre 2026 (`7ef6fca` → `e3e468f` + PR #454)
 

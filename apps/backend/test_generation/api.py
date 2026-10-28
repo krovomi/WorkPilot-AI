@@ -217,7 +217,11 @@ def run_post_build_test_generation(
         for file_path in modified_files:
             # Validate file path stays within project directory
             real_file = os.path.realpath(file_path)
-            if not _is_within(real_file, project_dir):
+            # Both resolved: the prefix test is the guard a reader (and CodeQL)
+            # recognises, `_is_within` refuses the sibling sharing that prefix.
+            if not real_file.startswith(project_dir) or not _is_within(
+                real_file, project_dir
+            ):
                 continue
             if file_path.endswith(".py") and os.path.exists(real_file):
                 # Skip test files themselves, judged inside the project: a
