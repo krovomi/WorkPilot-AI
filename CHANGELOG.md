@@ -16,7 +16,7 @@ project adheres to [Semantic Versioning](https://semver.org/).
 ## 1.3.2 - L'application démarre de nouveau
 
 Correctif de la 1.3.1, dont le process principal d'Electron s'arrêtait au
-chargement.
+chargement, et une reconnexion Claude qui atteint enfin le profil concerné.
 
 ### 🐛 Corrections
 
@@ -27,6 +27,14 @@ chargement.
   d'eux gardait son nom dans `out/main/index.js`. Le code du main lit désormais
   `import.meta.dirname` / `import.meta.filename` et ne déclare plus ces noms ;
   `esm-dirname.test.ts` le garde (F114 de l'audit).
+- **La reconnexion Claude met à jour le bon profil** (#537). Un `claude /login`
+  lancé dans un terminal écrit dans `~/.claude`, alors qu'un profil WorkPilot lit
+  son propre `CLAUDE_CONFIG_DIR` : il gardait son jeton expiré et restait en
+  « reconnexion requise ». Le bouton Reconnecter ouvre maintenant la connexion
+  dans le terminal intégré, réglé sur le profil ; le drapeau de reconnexion
+  tombe dès qu'un jeton valide est lu, et sur `invalid_grant` un login récent
+  trouvé dans `~/.claude` est signalé, sans copier de jeton d'un dossier à
+  l'autre.
 
 ---
 
