@@ -4,7 +4,7 @@
 |---|---|
 | **Commit audité** | `b46a031` (`develop`, après PR #292) — comparé à l'audit précédent sur `7057b28` |
 | **Date** | 3 octobre 2026 |
-| **Releases** | 1.3.0 (20 octobre 2026) : lots L1 à L17 et pi ; **1.3.1** (28 octobre 2026) : lots M1 à M11 (annexe F) et les onze features de l'annexe G |
+| **Releases** | 1.3.0 (20 octobre 2026) : lots L1 à L17 et pi ; **1.3.1** (28 octobre 2026) : lots M1 à M11 (annexe F) et les onze features de l'annexe G ; **1.3.2** (28 octobre 2026) : F114 |
 | **Compagnon visuel** | [`WorkPilot-architecture.html`](WorkPilot-architecture.html) — schémas interactifs, simulateur Kanban, inventaire filtrable |
 | **Objet** | Corriger les features cassées, supprimer le code mort et les doublons, réduire le coût en tokens et en mémoire, **sans retirer une seule feature utilisée** |
 
@@ -2458,6 +2458,20 @@ chaque provider, lue le 26 octobre 2026 (xAI « Reasoning », DeepSeek « Thinki
 - **Garde-fou** : `git-remote-provider.test.ts`, `existing-file.test.ts`,
   `tests/test_test_generation_post_build_scope.py`.
 
+#### F114 · Le process principal d'Electron plantait au chargement (1.3.1)
+
+- **Sévérité** haute · **nouveau** · **corrigé par #536**
+- **Preuve** (avant) : `node --check out/main/index.js` →
+  `SyntaxError: Identifier '__filename' has already been declared`. Le shim ESM d'electron-vite 6
+  (`esmShimPlugin`) ajoute `const __filename`, `const __dirname` et `const require` en tête de
+  chaque chunk qui les nomme, sans que Rolldown le sache ; 24 modules de `src/main` déclaraient
+  `const __filename = fileURLToPath(import.meta.url)`, et l'un d'eux gardait le nom nu.
+  `esm-dirname.test.ts` imposait justement ce motif.
+- **Correction** : `import.meta.dirname` / `import.meta.filename` partout dans `src/main`, aucune
+  déclaration de ces noms ; `index.ts` pose `globalThis.require` sans liaison locale `require`.
+- **Garde-fou** : `src/main/__tests__/esm-dirname.test.ts` (aucun `__dirname` / `__filename`,
+  aucun `require` déclaré au niveau du module).
+
 ---
 
 ## Annexe A — Inventaire des fichiers candidats
@@ -2612,7 +2626,7 @@ planchers `pnpm.overrides` relevés (`pnpm-workspace.yaml`), `dompurify` ^3.4.17
 
 Statut des constats de l'audit précédent : F1, F3, F4, F5, F7, F8, F9, F10, F12, F16, F17, F19 **ouverts** ;
 F2, F13 **partiels** ; F6, F11, F14, F18 **aggravés** ; F15 **atténué**. Nouveaux : F20 à F36.
-Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F57 à F62 par M2, F63 à F68 par M3, F69 à F71 par M4, F78 à F84 par M5, F85 à F90 par M6, F91 à F94 par M7, F95 à F100 par M8, F72 à F77 par M9, F101 à F106 par M10, F107 à F112 par M11 (annexe F) ; F113 (CodeQL de la release 1.3.1) par #531.
+Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F57 à F62 par M2, F63 à F68 par M3, F69 à F71 par M4, F78 à F84 par M5, F85 à F90 par M6, F91 à F94 par M7, F95 à F100 par M8, F72 à F77 par M9, F101 à F106 par M10, F107 à F112 par M11 (annexe F) ; F113 (CodeQL de la release 1.3.1) par #531 ; F114 (démarrage du main, 1.3.1) par #536.
 
 ## Annexe C — Ce qui a changé le 15 octobre 2026 (`7ef6fca` → `e3e468f` + PR #454)
 

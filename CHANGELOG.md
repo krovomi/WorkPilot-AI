@@ -13,6 +13,23 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## 1.3.2 - L'application démarre de nouveau
+
+Correctif de la 1.3.1, dont le process principal d'Electron s'arrêtait au
+chargement.
+
+### 🐛 Corrections
+
+- **Le process principal plantait au démarrage** avec `SyntaxError: Identifier
+  '__filename' has already been declared` (#536). electron-vite 6 ajoute en tête
+  du bundle ESM ses propres `const __filename`, `const __dirname` et
+  `const require` ; 24 modules de `src/main` déclaraient aussi les leurs, et l'un
+  d'eux gardait son nom dans `out/main/index.js`. Le code du main lit désormais
+  `import.meta.dirname` / `import.meta.filename` et ne déclare plus ces noms ;
+  `esm-dirname.test.ts` le garde (F114 de l'audit).
+
+---
+
 ## 1.3.1 - La carte va jusqu'au bout, et l'effort annoncé est celui reçu
 
 Onze features issues de la veille du 26 octobre (annexe G de
