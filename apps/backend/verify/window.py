@@ -183,11 +183,13 @@ class UiaDriver:
     def available(self) -> bool:
         return bool(self.command)
 
-    def _read(self, process: subprocess.Popen) -> None:
+    def _read(self, process: subprocess.Popen, lines: queue.Queue) -> None:
+        # Each helper writes to its own queue: a killed helper's end-of-output
+        # must not land in the queue of the one started after it.
         assert process.stdout is not None
         for raw in process.stdout:
-            self._lines.put(raw.decode("utf-8", errors="replace"))
-        self._lines.put(None)
+            lines.put(raw.decode("utf-8", errors="replace"))
+        lines.put(None)
 
     def _wait_line(self, seconds: float) -> str:
         deadline = time.monotonic() + seconds
@@ -222,7 +224,9 @@ class UiaDriver:
             raise HelperUnavailable(
                 f"the UI Automation helper could not start: {exc}"
             ) from exc
-        threading.Thread(target=self._read, args=(process,), daemon=True).start()
+        threading.Thread(
+            target=self._read, args=(process, self._lines), daemon=True
+        ).start()
         self._process = process
         try:
             ready = json.loads(self._wait_line(self.start_timeout))

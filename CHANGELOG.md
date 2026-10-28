@@ -45,6 +45,10 @@ chargement, et une reconnexion Claude qui atteint enfin le profil concerné.
   tombe dès qu'un jeton valide est lu, et sur `invalid_grant` un login récent
   trouvé dans `~/.claude` est signalé, sans copier de jeton d'un dossier à
   l'autre.
+- **La boucle de vérification relance proprement son aide UI Automation.**
+  Après une requête restée sans réponse, l'aide tuée signalait sa fin dans la
+  file de la suivante, qui passait pour « arrêtée » dès son démarrage ; chaque
+  aide lit désormais dans sa propre file.
 
 ---
 
