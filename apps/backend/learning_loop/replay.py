@@ -198,6 +198,20 @@ class ReplayResult:
         """
         return self.ran and not self.regressions
 
+    @property
+    def significant(self) -> bool:
+        """Whether there was a baseline to measure the candidate against."""
+        return self.ran
+
+    @property
+    def reason(self) -> str:
+        """One line saying what the replay found: no baseline, a regression, or clean."""
+        if not self.ran:
+            return "no baseline"
+        if self.regressions:
+            return f"regressed {len(self.regressions)} episode(s)"
+        return "clean replay"
+
     def apply_to(self, evidence: Evidence) -> Evidence:
         """Record this replay on the evidence `skill_proposer.evaluate` reads."""
         evidence.replay_ran = self.ran
