@@ -11,6 +11,145 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+---
+
+## 1.3.1 - La carte va jusqu'au bout, et l'effort annoncé est celui reçu
+
+Onze features issues de la veille du 26 octobre (annexe G de
+[`docs/audit/AUDIT-NETTOYAGE.md`](docs/audit/AUDIT-NETTOYAGE.md)), l'effort de
+raisonnement enfin envoyé tel qu'il est affiché, et les lots M1 à M11 de l'audit
+du 17 octobre : moins de surface d'attaque côté renderer, une CI qui garde ce qui
+est livré, et les quatre fonctions géantes du backend découpées.
+
+### ⚠️ Changement incompatible
+
+- **Le démon « Continuous AI » est retiré** (#519). Son runner, ses canaux IPC,
+  son store et ses réglages disparaissent ; ce qu'il faisait seul, hors de toute
+  carte, passe par les **automatisations** ci-dessous, qui créent une carte que
+  la personne voit.
+
+### ✨ Nouveautés
+
+- **La carte suit sa PR jusqu'au merge** (#514). Un check rouge (avec son
+  journal) ou un fil de revue non résolu part au QA fixer, dans le worktree de
+  la tâche, avec son provider, son modèle et son effort ; le commit est vérifié
+  puis poussé, jamais en force. Aucun faux vert : une forge illisible est
+  « inconnue », l'absence de check n'est pas un succès, un commit qui saute,
+  supprime ou désactive un test est annulé. Le merge reste à une personne.
+- **Mode objectif** (#515). Une carte peut porter une définition de « fini »
+  exécutable : une commande, le code de sortie attendu, un plafond de passes et
+  de dépense. Le QA continue tant que la commande échoue ; les tests et le
+  script de la commande sont protégés, et le fichier d'objectif n'est
+  inscriptible par aucun agent.
+- **« Besoin de toi »** (#516). Une tâche qui attend (plan, revue, passage QA,
+  erreur) le dit sur le bureau, et sur ntfy ou Telegram si on le veut. Un plan
+  en attente s'approuve depuis Telegram par un bouton à usage unique, qui
+  expire et qui est vérifié contre le chat configuré et l'état de la tâche. Un
+  plan en attente de revue n'est plus annoncé comme un échec.
+- **Traces OpenTelemetry GenAI pour tous les providers** (#517). Avec un
+  endpoint OTLP, chaque provider émet les mêmes spans (`invoke_agent`, `chat`,
+  `execute_tool`) avec les attributs `gen_ai.*`, sans prompt, sortie ni entrée
+  d'outil. Un usage non rapporté est absent, pas nul.
+- **Best-of-N** (#518). Une tâche construite 2 à 4 fois, chacune dans son
+  worktree avec son provider, son modèle et son effort ; la carte classe les
+  builds sur des chiffres (build terminé, QA, objectif, taille du diff, coût) et
+  la personne garde celui qu'elle choisit.
+- **Automatisations** (#519). Une règle (issue étiquetée, CI rouge sur une
+  branche, horaire) crée une carte brouillon, une seule par issue ou par série
+  rouge, sous un plafond quotidien. Une source illisible est nommée, jamais lue
+  comme « rien de neuf ».
+- **Agents ACP, Gemini CLI d'abord** (#522). Un client Agent Client Protocol
+  pour tout agent déclaré par un bloc `acp:` de `capabilities/providers.yaml`.
+  Les droits sont tenus trois fois (mode de session, demandes de permission,
+  arrêt sur outil non déclaré) ; une question de l'agent apparaît sur la carte
+  avec ses options. L'agent démarre dans le bac à sable de l'OS.
+- **Bac à sable de l'OS** (#523). Les commandes de la boucle WorkPilot et des
+  CLI OpenCode, pi et Gemini tournent sous bubblewrap (Linux) ou Seatbelt
+  (macOS) : écritures confinées au worktree, identifiants cachés, réseau limité
+  aux hôtes du provider et aux registres de paquets par un proxy filtrant qui
+  nomme ce qu'il refuse. Sans bac à sable (Windows, Ubuntu sous AppArmor
+  restrictif), la carte le dit au lancement ; `WORKPILOT_SANDBOX=required`
+  refuse alors de démarrer.
+- **MCP 2026-07-28 : tasks et MCP Apps** (#524). Les serveurs MCP de WorkPilot
+  répondent aux deux générations du protocole ; les longs `verify_*` reviennent
+  en tâches à un client qui déclare l'extension Tasks. Les vues qu'un outil
+  attache s'affichent dans le panneau de la tâche, dans une iframe isolée
+  derrière un pont qui refuse tout appel.
+- **Banc de rejeu sur le dépôt** (#525). 10 à 20 cartes terminées sont
+  reconstruites depuis le commit qui les précède, par chaque moteur choisi,
+  dans une copie isolée, et jugées par les tests du commit d'arrivée, que
+  l'agent ne voit jamais. Le tableau nourrit Formula Lab et laisse le routeur
+  écarter un modèle que le banc a vu échouer sur au moins trois cartes.
+- **Vérifier une application Windows par UI Automation** (#526). Une app WPF,
+  WinForms ou WinUI non empaquetée est lancée et conduite par l'arbre
+  d'accessibilité, jamais par une frappe simulée, dans la seule fenêtre que la
+  carte nomme, cherchée dans l'arbre de processus lancé et épinglée par son
+  handle.
+
+### 🐛 Corrections
+
+- **L'effort annoncé est celui que le modèle reçoit** (#513, lot M11). Grok,
+  DeepSeek et Mistral reçoivent `reasoning_effort` sur les modèles qui le
+  prennent ; OpenAI « none » et Gemini 2.5 Flash reçoivent vraiment « none » ;
+  Ollama reçoit `think` quand le modèle le déclare ; un refus 400 de l'effort
+  relance le tour une fois sans lui, et le fil de la tâche le dit. Le
+  sélecteur d'effort affiche ce qui est réellement envoyé
+  (`GET /providers/effort`).
+- **Une app Windows lancée par la vérification ne meurt plus au démarrage**
+  (#527). Sous Windows, `os.kill(pid, 0)` envoie Ctrl+C au groupe de processus
+  au lieu de sonder le pid ; `foundation.platform.pid_is_running` interroge le
+  processus sans le signaler. Un projet .NET dans un sous-dossier est lancé
+  depuis le bon dossier.
+- Des features qui ne disent que ce qu'elles ont fait (lot M3) : pas de PR
+  Azure DevOps inventée en cas d'échec, une suite .NET rouge arrive au relecteur
+  QA au lieu de « exécuté avec succès ».
+- Les événements du Live Companion et de Context Mesh sont enfin écoutés, et
+  les modales de limite de débit et d'échec d'authentification s'affichent
+  (lots M7 et M8).
+
+### 🔒 Sécurité
+
+- **Aucune ligne de commande construite depuis le renderer ou un texte
+  externe** (lot M1) : release GitHub sans shell, ouverture dans l'IDE ou le
+  terminal liée à un projet connu, script Azure DevOps statique. L'app Windows
+  empaquetée tourne en `asInvoker`.
+- **Aucun identifiant stocké ne rejoint le renderer** (M5) : clés d'API, jetons
+  OAuth et clés de provider sont masqués ; les tests de connexion tournent dans
+  le main. Les journaux des runners sont expurgés, aucun `.env` n'est lu depuis
+  le dossier de lancement, et les runners de forge démarrent sans les
+  identifiants hérités du processus principal (#512).
+- **Le renderer n'atteint que les projets enregistrés et les dossiers choisis**
+  (lot M6), seule la page de l'app atteint un handler IPC, et les chemins
+  d'outils (#511) comme le dossier du backend (#528) saisis dans les réglages
+  sont vérifiés avant d'être exécutés.
+- Mode hors-ligne strict pour `libdocs`, routes des providers refusées en mode
+  serveur, `/health` réduit à son verdict (lot M4).
+
+### 🛠️ Qualité
+
+- **Une CI qui garde ce qui est livré** (lot M2) : déclencheurs sans liste
+  blanche, une seule version de Biome, Python 3.12 testé, lockfile Python avec
+  hashes, image serveur construite et migrée sur Postgres 16 en CI.
+- **Contrats d'architecture** (lot M7) : chaque canal IPC nommé par sa
+  constante et entendu des deux côtés, contrats d'import entre unités du
+  backend, une ligne par vue dans `product-overview.md`.
+- **Code mort retiré** (lot M8) : environ 17 800 lignes de modules qu'aucun
+  code n'importait ; les vues expérimentales sont marquées et masquables.
+- **Le cycle `core ⇄ agents` cassé et les fonctions géantes découpées** (lot
+  M10) : `foundation/` sort de `core`, le plus grand cycle passe de 81 à 26
+  unités ; `run_autonomous_agent`, la boucle QA, `create_client` et la fabrique
+  de clients sont découpés sous des tests de caractérisation, sans changement
+  de comportement.
+- Doc et code alignés, palette de commandes traduite, jsdom à la demande (lot
+  M9) ; `node-pty`, que rien ne chargeait, est retiré.
+- Dépendances : Electron 45, electron-vite 6, chokidar 6, et les montées
+  Dependabot de la semaine (FastAPI, SQLAlchemy, websockets, claude-agent-sdk,
+  playwright, sentry-sdk, React, Vite).
+
+---
+
+## 1.3.0 - pi, filigranes retirés des fichiers générés, CI lisible
+
 ### ✨ Nouveautés
 
 - **pi (pi.dev) est connu du dépôt et du cerveau** (lot 1 de
