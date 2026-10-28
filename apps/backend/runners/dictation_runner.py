@@ -63,7 +63,7 @@ def main():
     if args.download:
         # Enforce the project's effective airgap policy in the backend too.
         sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-        from core.offline_policy import airgap_status
+        from offline_policy import airgap_status
 
         if not args.project or airgap_status(Path(args.project))["airgapStrict"]:
             emit(error="offline")
@@ -94,4 +94,9 @@ def main():
 
 
 if __name__ == "__main__":
+    # Launched without PYTHONPATH: put the backend on the path for core.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from core.log_redaction import install_global_redaction
+
+    install_global_redaction()
     main()

@@ -12,6 +12,11 @@ It is deliberately bounded:
   * Haiku by default (a few cents at most),
   * never raises — on any failure it returns an empty list and the UI keeps
     the heuristic numbers.
+
+The caller hands in the client factory (``core.simple_client.create_simple_client``
+from the runner): ``cost_intelligence`` is read by the scheduler and the phase
+config, so importing ``core`` from here would put all three back in the import
+cycle around ``core`` (audit of 17 October, lot M10).
 """
 
 from __future__ import annotations
@@ -19,6 +24,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -112,21 +118,16 @@ async def refine_formulas(
     description: str,
     candidates: list[dict[str, Any]],
     *,
+    client_factory: Callable[..., Any],
     model: str = "claude-haiku-4-5-20251001",
 ) -> list[RefinedFormula]:
     """Run a single Haiku call to refine the candidate formulas. Never raises."""
     if not candidates:
         return []
 
-    try:
-        from core.simple_client import create_simple_client
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("simple_client unavailable — skipping AI refine: %s", exc)
-        return []
-
     prompt = _build_prompt(description, candidates)
     try:
-        client = create_simple_client(
+        client = client_factory(
             agent_type="merge_resolver",  # text-only, no tools
             model=model,
             system_prompt=_SYSTEM_PROMPT,
@@ -206,11 +207,16 @@ def refine_formulas_sync(
     description: str,
     candidates: list[dict[str, Any]],
     *,
+    client_factory: Callable[..., Any],
     model: str = "claude-haiku-4-5-20251001",
 ) -> list[RefinedFormula]:
     """Synchronous wrapper around :func:`refine_formulas`."""
     try:
-        return asyncio.run(refine_formulas(description, candidates, model=model))
+        return asyncio.run(
+            refine_formulas(
+                description, candidates, client_factory=client_factory, model=model
+            )
+        )
     except RuntimeError:
         # Already inside an event loop — run in a fresh one on a thread.
         import concurrent.futures
@@ -218,6 +224,11 @@ def refine_formulas_sync(
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
             return pool.submit(
                 lambda: asyncio.run(
-                    refine_formulas(description, candidates, model=model)
+                    refine_formulas(
+                        description,
+                        candidates,
+                        client_factory=client_factory,
+                        model=model,
+                    )
                 )
             ).result()

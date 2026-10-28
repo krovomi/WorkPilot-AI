@@ -578,7 +578,6 @@ const browserMockAPI: Partial<ElectronAPI> = {
 	}),
 
 	// User directory operations
-	getUserHome: async () => "/mock/user/home",
 
 	// Learning Loop Operations
 	getLearningPatterns: async () => ({ success: true, data: [] }),
@@ -658,6 +657,15 @@ const browserMockAPI: Partial<ElectronAPI> = {
 	checkClaudeOAuth: async () => ({ isAuthenticated: false }),
 	checkOpenAICodexOAuth: async () => ({ isAuthenticated: false }),
 	checkAgentCli: async (tool) => ({ tool, installed: false }),
+	probeAcpAgent: async (tool) => ({ tool, error: "not_installed" }),
+	listTaskPermissions: async () => [],
+	answerTaskPermission: async () => ({ ok: false, reason: "not_pending" }),
+	onTaskPermissionRequest: () => () => {
+		/* nothing to remove in the browser mock */
+	},
+	onTaskPermissionCleared: () => () => {
+		/* nothing to remove in the browser mock */
+	},
 	updateCodexCli: async () => ({
 		success: false,
 		error: "Not available in browser mode",
@@ -775,6 +783,10 @@ const browserMockAPI: Partial<ElectronAPI> = {
 	},
 	// Context-window management: registered at startup by global-listeners.
 	// No backend in the preview, so the commands report unavailable.
+	listTaskSandboxes: async () => [],
+	onTaskSandboxStatus: () => () => {
+		/* nothing to remove in the browser mock */
+	},
 	onTaskContextUsage: () => () => {
 		/* noop */
 	},
@@ -790,7 +802,6 @@ const browserMockAPI: Partial<ElectronAPI> = {
 	// Auto-Refactor API
 	startAutoRefactor: async () => ({ success: false, error: "browser preview" }),
 	cancelAutoRefactor: async () => ({ success: false, cancelled: false }),
-	configureAutoRefactor: async () => ({ success: true }),
 	onAutoRefactorStatus: () => () => {
 		/* noop */
 	},
@@ -824,15 +835,12 @@ const browserMockAPI: Partial<ElectronAPI> = {
 		},
 	},
 
-	// Continuous AI API
-	continuousAI: {
-		start: async () => ({ success: false, error: "browser preview" }),
-		stop: async () => ({ success: true }),
-		getStatus: async () => null,
-		updateConfig: async () => ({ success: true }),
-		approveAction: async () => ({ success: true }),
-		rejectAction: async () => ({ success: true }),
-		isRunning: async () => false,
+	// Automations API
+	automations: {
+		get: async () => ({ success: false, error: "browser preview" }),
+		save: async () => ({ success: false, error: "browser preview" }),
+		remove: async () => ({ success: false, error: "browser preview" }),
+		run: async () => ({ success: false, error: "browser preview" }),
 		onEvent: () => () => {
 			/* noop */
 		},

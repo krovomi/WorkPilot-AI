@@ -8,6 +8,7 @@
  */
 
 import { invokeIpc } from "./ipc-utils";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export type DataResult<T> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -189,39 +190,39 @@ export interface ServerAdminAPI {
 }
 
 export const createServerAdminAPI = (): ServerAdminAPI => ({
-	myPermissions: () => invokeIpc("server-admin:my-permissions"),
-	getActiveOrg: () => invokeIpc("server-admin:active-org"),
-	setActiveOrg: (orgId) => invokeIpc("server-admin:set-active-org", orgId),
-	switchOrg: (orgId) => invokeIpc("server-admin:switch-org", orgId),
+	myPermissions: () => invokeIpc(IPC_CHANNELS.SERVER_ADMIN_MY_PERMISSIONS),
+	getActiveOrg: () => invokeIpc(IPC_CHANNELS.SERVER_ADMIN_ACTIVE_ORG),
+	setActiveOrg: (orgId) => invokeIpc(IPC_CHANNELS.SERVER_ADMIN_SET_ACTIVE_ORG, orgId),
+	switchOrg: (orgId) => invokeIpc(IPC_CHANNELS.SERVER_ADMIN_SWITCH_ORG, orgId),
 
-	permissions: () => invokeIpc("server-admin:permissions"),
-	listRoles: () => invokeIpc("server-admin:list-roles"),
-	createRole: (body) => invokeIpc("server-admin:create-role", body),
-	updateRole: (roleId, body) => invokeIpc("server-admin:update-role", roleId, body),
-	deleteRole: (roleId) => invokeIpc("server-admin:delete-role", roleId),
+	permissions: () => invokeIpc(IPC_CHANNELS.SERVER_ADMIN_PERMISSIONS),
+	listRoles: () => invokeIpc(IPC_CHANNELS.SERVER_ADMIN_LIST_ROLES),
+	createRole: (body) => invokeIpc(IPC_CHANNELS.SERVER_ADMIN_CREATE_ROLE, body),
+	updateRole: (roleId, body) => invokeIpc(IPC_CHANNELS.SERVER_ADMIN_UPDATE_ROLE, roleId, body),
+	deleteRole: (roleId) => invokeIpc(IPC_CHANNELS.SERVER_ADMIN_DELETE_ROLE, roleId),
 
-	listMembers: () => invokeIpc("server-admin:list-members"),
-	addMember: (body) => invokeIpc("server-admin:add-member", body),
+	listMembers: () => invokeIpc(IPC_CHANNELS.SERVER_ADMIN_LIST_MEMBERS),
+	addMember: (body) => invokeIpc(IPC_CHANNELS.SERVER_ADMIN_ADD_MEMBER, body),
 	updateMemberRole: (userId, roleSlug) =>
-		invokeIpc("server-admin:update-member-role", userId, roleSlug),
-	removeMember: (userId) => invokeIpc("server-admin:remove-member", userId),
+		invokeIpc(IPC_CHANNELS.SERVER_ADMIN_UPDATE_MEMBER_ROLE, userId, roleSlug),
+	removeMember: (userId) => invokeIpc(IPC_CHANNELS.SERVER_ADMIN_REMOVE_MEMBER, userId),
 
-	listOrgs: () => invokeIpc("server-admin:list-orgs"),
-	createOrg: (body) => invokeIpc("server-admin:create-org", body),
-	updateOrg: (orgId, body) => invokeIpc("server-admin:update-org", orgId, body),
-	deleteOrg: (orgId) => invokeIpc("server-admin:delete-org", orgId),
+	listOrgs: () => invokeIpc(IPC_CHANNELS.SERVER_ADMIN_LIST_ORGS),
+	createOrg: (body) => invokeIpc(IPC_CHANNELS.SERVER_ADMIN_CREATE_ORG, body),
+	updateOrg: (orgId, body) => invokeIpc(IPC_CHANNELS.SERVER_ADMIN_UPDATE_ORG, orgId, body),
+	deleteOrg: (orgId) => invokeIpc(IPC_CHANNELS.SERVER_ADMIN_DELETE_ORG, orgId),
 
-	listUsers: () => invokeIpc("server-admin:list-users"),
-	deactivateUser: (userId) => invokeIpc("server-admin:deactivate-user", userId),
-	activateUser: (userId) => invokeIpc("server-admin:activate-user", userId),
+	listUsers: () => invokeIpc(IPC_CHANNELS.SERVER_ADMIN_LIST_USERS),
+	deactivateUser: (userId) => invokeIpc(IPC_CHANNELS.SERVER_ADMIN_DEACTIVATE_USER, userId),
+	activateUser: (userId) => invokeIpc(IPC_CHANNELS.SERVER_ADMIN_ACTIVATE_USER, userId),
 
-	listSessions: () => invokeIpc("server-admin:list-sessions"),
-	revokeSessions: (userId) => invokeIpc("server-admin:revoke-sessions", userId),
+	listSessions: () => invokeIpc(IPC_CHANNELS.SERVER_ADMIN_LIST_SESSIONS),
+	revokeSessions: (userId) => invokeIpc(IPC_CHANNELS.SERVER_ADMIN_REVOKE_SESSIONS, userId),
 
-	getQuotas: () => invokeIpc("server-admin:get-quotas"),
-	setQuotas: (body) => invokeIpc("server-admin:set-quotas", body),
+	getQuotas: () => invokeIpc(IPC_CHANNELS.SERVER_ADMIN_GET_QUOTAS),
+	setQuotas: (body) => invokeIpc(IPC_CHANNELS.SERVER_ADMIN_SET_QUOTAS, body),
 
-	listAudit: (params) => invokeIpc("server-admin:list-audit", params),
+	listAudit: (params) => invokeIpc(IPC_CHANNELS.SERVER_ADMIN_LIST_AUDIT, params),
 
-	overview: () => invokeIpc("server-admin:overview"),
+	overview: () => invokeIpc(IPC_CHANNELS.SERVER_ADMIN_OVERVIEW),
 });

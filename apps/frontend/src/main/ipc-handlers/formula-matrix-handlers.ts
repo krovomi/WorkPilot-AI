@@ -16,6 +16,8 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import { app, ipcMain } from "electron";
 import { pythonEnvManager } from "../python-env-manager.js";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
+import { pythonRunnerEnv } from "../utils/python-runner-env";
 
 interface FormulaMatrixRequest {
 	ticketId: string;
@@ -52,7 +54,7 @@ interface FormulaRefineResponse {
 
 export function registerFormulaMatrixHandlers(): void {
 	ipcMain.handle(
-		"formulaMatrix:run",
+		IPC_CHANNELS.FORMULA_MATRIX_RUN,
 		async (
 			_event,
 			req: FormulaMatrixRequest,
@@ -90,10 +92,11 @@ export function registerFormulaMatrixHandlers(): void {
 				args.push("--complexity", String(req.complexity));
 			}
 
+			const env = await pythonRunnerEnv(backendPath);
 			return await new Promise<FormulaMatrixResponse>((resolve, reject) => {
 				const child = spawn(pythonExe, args, {
 					cwd: backendPath,
-					env: { ...process.env, PYTHONPATH: backendPath },
+					env,
 				} as Parameters<typeof spawn>[2]);
 
 				let stdout = "";
@@ -139,7 +142,7 @@ export function registerFormulaMatrixHandlers(): void {
 
 	// AI refine — one cheap LLM call to sharpen the top formulas' success.
 	ipcMain.handle(
-		"formulaMatrix:refine",
+		IPC_CHANNELS.FORMULA_MATRIX_REFINE,
 		async (
 			_event,
 			req: FormulaRefineRequest,
@@ -165,10 +168,11 @@ export function registerFormulaMatrixHandlers(): void {
 				candidates: req.candidates,
 			});
 
+			const env = await pythonRunnerEnv(backendPath);
 			return await new Promise<FormulaRefineResponse>((resolve, reject) => {
 				const child = spawn(pythonExe, [runnerPath], {
 					cwd: backendPath,
-					env: { ...process.env, PYTHONPATH: backendPath },
+					env,
 				} as Parameters<typeof spawn>[2]);
 
 				let stdout = "";

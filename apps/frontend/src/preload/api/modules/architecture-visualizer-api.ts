@@ -34,10 +34,6 @@ export interface ArchitectureVisualizerAPI {
 		cancelled?: boolean;
 		error?: string;
 	}>;
-	configureArchitectureVisualizer: (config: {
-		pythonPath?: string;
-		autoBuildSourcePath?: string;
-	}) => Promise<{ success: boolean; error?: string }>;
 	/** Cheap: reads files and asks `node --version`. Safe to call on every open. */
 	checkArchifyReadiness: (projectDir: string) => Promise<{
 		success: boolean;
@@ -82,8 +78,6 @@ export function createArchitectureVisualizerAPI(): ArchitectureVisualizerAPI {
 			invokeIpc(IPC_CHANNELS.ARCHITECTURE_VISUALIZER_GENERATE, request),
 		cancelArchitectureVisualization: () =>
 			invokeIpc(IPC_CHANNELS.ARCHITECTURE_VISUALIZER_CANCEL),
-		configureArchitectureVisualizer: (config) =>
-			invokeIpc(IPC_CHANNELS.ARCHITECTURE_VISUALIZER_CONFIGURE, config),
 		checkArchifyReadiness: (projectDir) =>
 			invokeIpc(IPC_CHANNELS.ARCHITECTURE_VISUALIZER_DOCTOR, projectDir),
 		readArchitectureDelta: (specDir) =>

@@ -22,7 +22,9 @@
 #                        The CLIs (Codex, OpenCode, Antigravity) bring their
 #                        own tools and take no roster at run time; the registry
 #                        reaches them as files (`.codex/agents/`, …).
-#   effort      how reasoning depth is expressed, so phase_config can map onto it
+#   effort      how reasoning depth is expressed, so phase_config can map onto it.
+#               What each level becomes per model is core/effort_plan.py, served
+#               to the picker by GET /providers/effort.
 #   degrades_to what actually runs when `adapter` is null. Surfaced in the task
 #               feed, never silent.
 #   context     how a session's context window is managed (context_mgmt/):
@@ -34,6 +36,16 @@
 #                          reported  per-turn prompt tokens are reported
 #                          estimated only characters can be counted
 #               "clear" (a fresh thread seeded with a handoff) works everywhere.
+#   sandbox     a CLI that runs its own commands is started whole inside the OS
+#               sandbox (os_sandbox/, docs/architecture/os-sandbox.md):
+#                 state    its login and session directories (~/… or $VAR/…),
+#                          left writable; created when missing
+#                 network  the hosts it talks to, added to the package
+#                          registries; `*.example.com` is a subdomain of it,
+#                          `127.0.0.1:port` a local endpoint
+#                 read_only files under `state` the agent may not change
+#                          (pi's trust.json), when they exist
+#               A CLI without this block is not sandboxed, and its card says so.
 #
 # Adding a real adapter for a provider is a strictly better outcome than
 # listing it here with `adapter: null`. This file records the current truth,
@@ -96,7 +108,7 @@ google:
 ollama:
   adapter: LocalAgentClient
   subagents: emulated
-  effort: none
+  effort: think
   degrades_to: null
   context:
     compact: emulated
@@ -104,7 +116,7 @@ ollama:
 local:
   adapter: LocalAgentClient
   subagents: emulated
-  effort: none
+  effort: think
   degrades_to: null
   context:
     compact: emulated
@@ -125,7 +137,7 @@ lmstudio:
 mistral:
   adapter: CompatibleProviderAgentClient
   subagents: emulated
-  effort: none
+  effort: reasoning_effort
   degrades_to: null
   context:
     compact: emulated
@@ -134,7 +146,7 @@ mistral:
 deepseek:
   adapter: CompatibleProviderAgentClient
   subagents: emulated
-  effort: none
+  effort: reasoning_effort
   degrades_to: null
   context:
     compact: emulated
@@ -143,7 +155,7 @@ deepseek:
 grok:
   adapter: CompatibleProviderAgentClient
   subagents: emulated
-  effort: none
+  effort: reasoning_effort
   degrades_to: null
   context:
     compact: emulated
@@ -168,6 +180,35 @@ opencode:
     the built-in `plan` agent. OpenCode also compacts a session on its own when
     the window fills (compaction.auto, on by default), but `run` has no command
     to compact on demand, hence `emulated`. step_finish events report tokens.
+  sandbox:
+    state:
+      - ~/.local/share/opencode
+      - ~/.config/opencode
+      - ~/.cache/opencode
+      - ~/.local/state/opencode
+    network: &llm_hosts
+      - api.anthropic.com
+      - console.anthropic.com
+      - api.openai.com
+      - auth.openai.com
+      - generativelanguage.googleapis.com
+      - oauth2.googleapis.com
+      - openrouter.ai
+      - api.mistral.ai
+      - api.deepseek.com
+      - api.x.ai
+      - api.groq.com
+      - api.cerebras.ai
+      - api.together.xyz
+      - api.fireworks.ai
+      - api.github.com
+      - api.githubcopilot.com
+      - models.dev
+      - models.opencode.ai
+      - opencode.ai
+      - 127.0.0.1:11434
+      - 127.0.0.1:1234
+      - 127.0.0.1:8080
 
 antigravity:
   adapter: AntigravityCliAgentClient
@@ -209,6 +250,77 @@ pi:
     Codex. The usage of every assistant message is reported. A write guard
     (core/agent_clients/pi_guard/) runs inside pi with path_guard's policy.
     Design: docs/architecture/pi.md.
+  sandbox:
+    state:
+      - ~/.pi
+      - $PI_CODING_AGENT_DIR
+    read_only:
+      - ~/.pi/agent/trust.json
+      - $PI_CODING_AGENT_DIR/trust.json
+    network: *llm_hosts
+
+# ---------------------------------------------------------------------------
+# Agent Client Protocol agents (agentclientprotocol.com): one entry per agent,
+# all driven by AcpAgentClient over JSON-RPC on the agent's stdio. The `acp:`
+# block says how to start the agent and which of its modes keep a person in
+# the loop; what the agent can do (session/load, MCP transports, usage) is
+# what it declares in `initialize`, read at run time and never assumed here.
+#   command             executable and arguments; no shell, no path
+#   model_flag          the option that names the model, when it has one
+#   model_prefixes      model ids it takes; any other id runs its default
+#   approval_mode       the mode in which it asks before acting
+#   read_only_mode      the mode in which it cannot change anything, for a
+#                       type that declares none of Write/Edit/Bash
+#   auto_approve_modes  modes that act without asking: never kept
+#   auth_env            login method → the variable that makes it usable,
+#                       tried only when the agent says a login is required
+# Design: docs/architecture/acp.md.
+# ---------------------------------------------------------------------------
+
+gemini-cli:
+  adapter: AcpAgentClient
+  subagents: none
+  effort: none
+  degrades_to: null
+  context:
+    compact: emulated
+    usage: exact
+  acp:
+    label: Gemini CLI
+    command: [gemini, --acp]
+    model_flag: --model
+    model_prefixes: [gemini-]
+    approval_mode: default
+    read_only_mode: plan
+    auto_approve_modes: [autoEdit, yolo]
+    auth_env:
+      gemini-api-key: GEMINI_API_KEY
+    login: Run `gemini` once in a terminal and sign in, or set GEMINI_API_KEY.
+    docs: https://geminicli.com/docs/cli/acp-mode/
+  # Gemini CLI keeps its login and sessions in ~/.gemini and only talks to
+  # Google: the Gemini API with a key, Code Assist (cloudcode-pa) and Google's
+  # OAuth hosts with a Google sign-in. Vertex AI's regional hosts are not
+  # listed: a Vertex setup runs with the sandbox off or a host added here.
+  sandbox:
+    state:
+      - ~/.gemini
+    network:
+      - generativelanguage.googleapis.com
+      - cloudcode-pa.googleapis.com
+      - oauth2.googleapis.com
+      - accounts.google.com
+  note: >-
+    `gemini --acp` (Gemini CLI ≥ 0.65, fixtures in tests/fixtures/acp/gemini-cli).
+    A permission request becomes a question on the task card; an action
+    outside the agent type's declared tools is refused without asking, and a
+    type that declares none of Write/Edit/Bash runs in Gemini's `plan` mode,
+    where write_file and run_shell_command do not run. Writes inside the
+    worktree come back to WorkPilot (fs/write_text_file) and pass the same
+    write-root and protected-file checks as the SDK hook. Gemini lets a
+    command it reads as harmless (`echo`) run without asking: a type that
+    does not declare Bash and sees one run has its turn stopped. Sessions are
+    resumed with session/load when Gemini declares it. usage_update reports
+    the window fill. Gemini compacts on its own; ACP has no compact request.
 
 # ---------------------------------------------------------------------------
 # No agentic adapter yet. Selecting one of these runs the task on the Claude

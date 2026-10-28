@@ -252,3 +252,58 @@ class TestRealDataCalibration:
         )
         assert matrix.history_tasks == 1
         assert any(f.cost_basis == "measured" for f in matrix.formulas)
+
+
+class TestBenchSamples:
+    """The repo bench's judged builds count as success history (bench/)."""
+
+    def _bench(
+        self, project_root: Path, provider: str, model: str, resolved: list[bool]
+    ):
+        bench = project_root / ".workpilot" / "bench"
+        bench.mkdir(parents=True)
+        records = [
+            {
+                "runId": "20261026T100000-abcdef",
+                "buildId": f"b{i}",
+                "caseId": f"00{i}-x",
+                "provider": provider,
+                "model": model,
+                "effort": "medium",
+                "resolved": r,
+            }
+            for i, r in enumerate(resolved, start=1)
+        ]
+        (bench / "results.json").write_text(
+            json.dumps({"version": 1, "records": records}), encoding="utf-8"
+        )
+
+    def test_failed_replays_lower_the_models_success(self, tmp_path):
+        before = compute_formula_matrix(
+            ticket_id="T-1",
+            description="add a toggle",
+            project_root=tmp_path,
+            providers=["anthropic"],
+        )
+        target = before.formulas[0]
+        self._bench(tmp_path, "anthropic", target.model, [False] * 6)
+        after = compute_formula_matrix(
+            ticket_id="T-1",
+            description="add a toggle",
+            project_root=tmp_path,
+            providers=["anthropic"],
+        )
+        assert after.bench_samples == 6
+        assert after.to_dict()["bench_samples"] == 6
+        # Bench samples are success evidence, not usage: cost history is untouched.
+        assert after.history_samples == before.history_samples == 0
+
+        def success(matrix):
+            return {
+                (f.model, f.effort): f.success_probability
+                for f in matrix.formulas
+                if f.model == target.model
+            }
+
+        for key, value in success(after).items():
+            assert value < success(before)[key]

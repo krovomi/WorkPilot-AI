@@ -41,7 +41,7 @@ regarder, pas ce qui est permis. En cas de désaccord, la règle gagne et l'inde
 7. **i18n obligatoire.** Tout texte visible passe par une clé `react-i18next`, en `en` **et** `fr`.
    → [frontend](rules/frontend.md#i18n-obligatoire)
 8. **Abstraction plateforme.** Jamais `process.platform` ni `sys.platform` en direct :
-   `apps/frontend/src/main/platform/`, `apps/backend/core/platform/`. La CI teste Windows, macOS, Linux.
+   `apps/frontend/src/main/platform/`, `apps/backend/foundation/platform/`. La CI teste Windows, macOS, Linux.
 9. **PR vers `develop`**, jamais `main` (branche de release). Versions d'outils épinglées : ruff
    `0.15.7`, Biome `2.5.11`. → [workflow](rules/workflow.md#branches-commits-pr)
 10. **iOS ne se construit que sur macOS** : le signaler comme non vérifiable, ne jamais réessayer
@@ -57,14 +57,15 @@ fichier-ci reste l'autorité sur les règles.
 
 | Feature | Fichier | Contenu |
 |---|---|---|
-| Vue produit | [product-overview.md](architecture/product-overview.md) | La liste complète des features. |
+| Vue produit | [product-overview.md](architecture/product-overview.md) | Les features, et une ligne par vue de l'app (`SidebarView`), vérifiée par `tests/test_product_overview_views.py` ; une vue sans conception ni test y est marquée expérimentale, comme dans la barre latérale. |
 | Prompts d'agents | [agent-prompts.md](architecture/agent-prompts.md) | Quel prompt de `apps/backend/prompts/` sert quel agent. |
 | Droits d'outils | [agent-tool-rights.md](architecture/agent-tool-rights.md) | Une liste d'outils déclarée est un droit des deux côtés : `disallowed_tools` du SDK, garde de l'exécuteur, sandbox Codex. |
 | Secrets au repos | [secrets-at-rest.md](architecture/secrets-at-rest.md) | Clés et jetons de l'app chiffrés par `safeStorage`, trousseau Linux sans bureau déclaré (WSL), avertissement sans trousseau, migration, redaction des logs Electron ; le `.env` de projet et celui du backend : jetons chiffrés, clés lues par le backend nommées. |
 | Pipeline de spec | [spec-pipeline.md](architecture/spec-pipeline.md) | Reprise de plan, traçabilité `FR-###`, `[NEEDS CLARIFICATION]`, constitutions spec-kit. |
 | Skills | [skills.md](architecture/skills.md) | `skills/` est la source, `scripts/skills_cli.py` le seul écrivain ; frontmatter lu par `parse_frontmatter` ; gate 4 : un corps qui s'adresse à l'agent n'est pas émis. |
 | hermes-agent | [hermes.md](architecture/hermes.md) | Ingestion, tri et adoption des skills d'hermes, et `SOUL.md`. Rien n'accorde la confiance à la place de quelqu'un. |
-| pi (pi.dev) | [pi.md](architecture/pi.md) | Plan par lots, rien de livré : harness qui n'émet rien (pi lit `AGENTS.md` et `.agents/skills/`), provider `PiCliAgentClient` en `--mode json` puis RPC, droits par `--tools` depuis `harnesses.yaml`, confiance (`/trust`) jamais accordée à la place d'une personne, agent du cerveau. |
+| pi (pi.dev) | [pi.md](architecture/pi.md) | Plan par lots, lots 0 à 5 livrés (le 5 en partie) : harness qui n'émet rien (pi lit `AGENTS.md` et `.agents/skills/`), provider `PiCliAgentClient` en `--mode json` puis RPC, droits par `--tools` depuis `harnesses.yaml`, confiance (`/trust`) jamais accordée à la place d'une personne, agent du cerveau. |
+| Agents ACP | [acp.md](architecture/acp.md) | Un client Agent Client Protocol pour tous les agents qui le parlent (Gemini CLI d'abord), une entrée `acp:` par agent dans `providers.yaml` ; droits tenus trois fois (mode, question refusée, tour arrêté), `session/request_permission` posée sur la carte, capacités montrées seulement si déclarées. |
 | Cerveau partagé et mémoire | [brain.md](architecture/brain.md) | La seule mémoire : vault Obsidian, `graph.json`, serveur MCP, mémoire des builds, `mem-search`. |
 | Génération de tests | [test-generation.md](architecture/test-generation.md) | Où les tests générés sont écrits (`test_generation/layout.py`) et avec quelles bibliothèques. |
 | libdocs | [libdocs.md](architecture/libdocs.md) | Pages Context7 des bibliothèques sans exemple dans le dépôt, avant le build. |
@@ -75,7 +76,15 @@ fichier-ci reste l'autorité sur les règles.
 | ui-ux-pro-max | [uiux.md](architecture/uiux.md) | Design system et règles de pile, seulement sur les tâches qui touchent une interface. |
 | archify | [archify.md](architecture/archify.md) | Cartes d'architecture et deltas par tâche ; la continuité des identifiants est la contrainte. |
 | Applications mobiles | [mobile.md](architecture/mobile.md) | Détection de pile, appareils, chaîne d'outils ; iOS seulement sur macOS. |
-| Boucle de vérification | [verify.md](architecture/verify.md) | Lancer l'app, corriger, confirmer l'état, mesurer, garder la preuve. |
+| Boucle de vérification | [verify.md](architecture/verify.md) | Lancer l'app, corriger, confirmer l'état, mesurer, garder la preuve ; une app Windows (WPF, WinForms, WinUI) pilotée par UI Automation dans la seule fenêtre que la carte nomme, sans souris ni clavier. |
+| Traces GenAI | [genai-traces.md](architecture/genai-traces.md) | Spans `gen_ai.*` pour chaque AgentClient ; jamais de contenu ; usage non remonté estimé, jamais 0. |
+| MCP 2026 : tasks et Apps | [mcp-2026.md](architecture/mcp-2026.md) | `ToolServer` répond dans les deux ères et ne rend une tâche qu'à un client qui la déclare (`verify_*` longs) ; le client de la boucle WorkPilot attend, annule, borne la tâche ; les vues MCP Apps sont gardées dans la spec et affichées dans une iframe `allow-scripts` sans `allow-same-origin`, servies par un schéma du main avec leur propre CSP. |
+| Suivi de la PR | [pr-followup.md](architecture/pr-followup.md) | La carte fait avancer sa PR jusqu'au merge : check rouge ou fil de revue au QA fixer, commit vérifié (aucun test sauté, aucune CI modifiée), push jamais forcé ; une forge illisible n'est jamais du vert, un échec rouge aussi sur la base n'est pas « corrigé ». |
+| Bac à sable de l'OS | [os-sandbox.md](architecture/os-sandbox.md) | Processus d'agent sous bubblewrap (Linux) ou Seatbelt (macOS) : écritures dans le worktree, identifiants masqués, réseau par un proxy filtrant (provider + registres) ; sans bac à sable la carte le dit au lancement, `WORKPILOT_SANDBOX=required` refuse de démarrer ; Windows pas encore. |
+| Best-of-N | [best-of-n.md](architecture/best-of-n.md) | Une tâche construite N fois, une variante par moteur ; classement chiffré, choix humain, rien de fusionné. |
+| Mode objectif | [goal-mode.md](architecture/goal-mode.md) | Une commande dit « fini » : chemins protégés, plafond de passes et de dépense, fichier qu'aucun agent n'écrit. |
+| Besoin de toi | [needs-you.md](architecture/needs-you.md) | Notifications lues dans XState ; ntfy, Telegram ; approbation d'un plan par jeton à usage unique. |
+| Automatisations | [automations.md](architecture/automations.md) | Un événement (issue étiquetée, CI rouge sur la base, horaire) crée une carte du Kanban, en brouillon par défaut, dédoublonnée, sous plafond du jour ; remplace le démon `continuous_ai`. |
 | Bounty Board | [bounty-board.md](architecture/bounty-board.md) | Concours notés sur artefacts ; une preuve absente renormalise, ne vaut jamais zéro. |
 | Délégation aux sous-agents | [delegation.md](architecture/delegation.md) | `native` (Claude), `emulated` (outil `delegate` + session enfant du même client sur la boucle WorkPilot), `none` (CLI) ; le scope d'un enfant ne s'élargit jamais. |
 | Types de tâche Kanban | [kanban-task-types.md](architecture/kanban-task-types.md) | Plan par lots ; livrés : le type (`bug_fix`, `hotfix`, `run`, `investigation`…) décidé sans token (lot 0), un workflow YAML par type choisi par `workflows/registry.py`, `fallback:` substitué et affiché, `tests-unchanged` (lot 1), BMAD par `impl` + `fallback` là où il est documentaire, jugé installé dans le projet cible, `when: kind == … and complexity == …` (lot 2), RUN exécuté par Python derrière une pause avant l'irréversible, journal expurgé, environnements déclarés (lot 3). À venir : rosters et prompts par type, origine → type, mesure. |
@@ -90,6 +99,7 @@ fichier-ci reste l'autorité sur les règles.
 | Visual-to-code | [visual-to-code.md](architecture/visual-to-code.md) | Documents d'architecture et leur historique sur disque. |
 | Émulateur d'app | [app-emulator.md](architecture/app-emulator.md) | Adresse d'arrivée déduite du diff, barre d'adresse, ouverture dans le navigateur. |
 | Mode Arena | [arena.md](architecture/arena.md) | De vrais concurrents (provider, modèle) et un coût mesuré. |
+| Banc de rejeu | [repo-bench.md](architecture/repo-bench.md) | Cartes terminées rejouées depuis le commit d'avant, par moteur, dans des copies sans la réponse ; jugées par les tests du commit d'arrivée, calibrés (F2P/P2P) ; le tableau nourrit Formula Lab et le routeur. |
 | Outils de développement | [dev-tools.md](architecture/dev-tools.md) | MCP Electron pour l'E2E, Chrome DevTools MCP, grepai. |
 | Dépannage | [troubleshooting.md](architecture/troubleshooting.md) | Problèmes courants et où regarder. |
 

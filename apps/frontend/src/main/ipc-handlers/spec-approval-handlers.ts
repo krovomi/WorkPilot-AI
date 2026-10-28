@@ -13,6 +13,8 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { ipcMain } from "electron";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
+import { updateExistingFile } from "../utils/existing-file";
 
 type ApprovalStatus = "pending" | "approved" | "rejected" | "changes_requested";
 
@@ -105,7 +107,7 @@ function scanPendingSpecs(projectDir: string): SpecApprovalRecord[] {
 
 export function registerSpecApprovalHandlers(): void {
 	ipcMain.handle(
-		"specApproval:getPendingSpecs",
+		IPC_CHANNELS.SPEC_APPROVAL_GET_PENDING_SPECS,
 		(_event, projectDir: string) => {
 			try {
 				const pending = scanPendingSpecs(projectDir);
@@ -117,7 +119,7 @@ export function registerSpecApprovalHandlers(): void {
 	);
 
 	ipcMain.handle(
-		"specApproval:getSpec",
+		IPC_CHANNELS.SPEC_APPROVAL_GET_SPEC,
 		(_event, projectDir: string, specNumber: string) => {
 			try {
 				const specsDir = path.join(projectDir, ".workpilot", "specs");
@@ -150,7 +152,7 @@ export function registerSpecApprovalHandlers(): void {
 	);
 
 	ipcMain.handle(
-		"specApproval:approve",
+		IPC_CHANNELS.SPEC_APPROVAL_APPROVE,
 		(
 			_event,
 			projectDir: string,
@@ -195,14 +197,11 @@ export function registerSpecApprovalHandlers(): void {
 				// If amendments provided, append to spec.md
 				if (params.amendments?.trim()) {
 					const specMd = path.join(specDir, "spec.md");
-					if (fs.existsSync(specMd)) {
-						const existing = fs.readFileSync(specMd, "utf-8");
-						fs.writeFileSync(
-							specMd,
+					updateExistingFile(
+						specMd,
+						(existing) =>
 							`${existing}\n\n## Human Amendments\n\n${params.amendments}`,
-							"utf-8",
-						);
-					}
+					);
 				}
 
 				upsertApproval(projectDir, {
@@ -222,7 +221,7 @@ export function registerSpecApprovalHandlers(): void {
 	);
 
 	ipcMain.handle(
-		"specApproval:reject",
+		IPC_CHANNELS.SPEC_APPROVAL_REJECT,
 		(
 			_event,
 			projectDir: string,
@@ -279,7 +278,7 @@ export function registerSpecApprovalHandlers(): void {
 	);
 
 	ipcMain.handle(
-		"specApproval:requestChanges",
+		IPC_CHANNELS.SPEC_APPROVAL_REQUEST_CHANGES,
 		(
 			_event,
 			projectDir: string,
@@ -333,7 +332,7 @@ export function registerSpecApprovalHandlers(): void {
 	);
 
 	ipcMain.handle(
-		"specApproval:getHistory",
+		IPC_CHANNELS.SPEC_APPROVAL_GET_HISTORY,
 		(_event, projectDir: string, limit: number = 100) => {
 			try {
 				const history = loadApprovals(projectDir).slice(0, limit);

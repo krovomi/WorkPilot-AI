@@ -3,6 +3,7 @@ import {
 	type AutoRefactorRequest,
 	autoRefactorService,
 } from "../auto-refactor-service";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
 
 /**
  * Register IPC handlers for Auto-Refactor functionality
@@ -10,7 +11,7 @@ import {
 export function registerAutoRefactorHandlers(): void {
 	// Start auto-refactor analysis
 	ipcMain.handle(
-		"auto-refactor:start",
+		IPC_CHANNELS.AUTO_REFACTOR_START,
 		async (_event, request: AutoRefactorRequest) => {
 			try {
 				await autoRefactorService.analyze(request);
@@ -26,7 +27,7 @@ export function registerAutoRefactorHandlers(): void {
 	);
 
 	// Cancel auto-refactor analysis
-	ipcMain.handle("auto-refactor:cancel", async () => {
+	ipcMain.handle(IPC_CHANNELS.AUTO_REFACTOR_CANCEL, async () => {
 		try {
 			const cancelled = autoRefactorService.cancel();
 			return { success: true, cancelled };
@@ -38,29 +39,6 @@ export function registerAutoRefactorHandlers(): void {
 			};
 		}
 	});
-
-	// Configure service paths
-	ipcMain.handle(
-		"auto-refactor:configure",
-		async (
-			_event,
-			config: { pythonPath?: string; autoBuildSourcePath?: string },
-		) => {
-			try {
-				autoRefactorService.configure(
-					config.pythonPath,
-					config.autoBuildSourcePath,
-				);
-				return { success: true };
-			} catch (error) {
-				console.error("[AutoRefactor] Configure error:", error);
-				return {
-					success: false,
-					error: error instanceof Error ? error.message : "Unknown error",
-				};
-			}
-		},
-	);
 }
 
 /** Set once the service's listeners are attached; see below. */
@@ -89,20 +67,20 @@ export function setupAutoRefactorEventForwarding(
 	};
 
 	autoRefactorService.on("status", (status: string) =>
-		send("auto-refactor:status", status),
+		send(IPC_CHANNELS.AUTO_REFACTOR_STATUS, status),
 	);
 	autoRefactorService.on("stream-chunk", (chunk: string) =>
-		send("auto-refactor:stream-chunk", chunk),
+		send(IPC_CHANNELS.AUTO_REFACTOR_STREAM_CHUNK, chunk),
 	);
 	autoRefactorService.on("error", (error: string) =>
-		send("auto-refactor:error", error),
+		send(IPC_CHANNELS.AUTO_REFACTOR_ERROR, error),
 	);
 	// Completion with the analysis result
 	autoRefactorService.on("complete", (result) =>
-		send("auto-refactor:complete", result),
+		send(IPC_CHANNELS.AUTO_REFACTOR_COMPLETE, result),
 	);
 	// Execution completion (if auto-executed)
 	autoRefactorService.on("execution-complete", (result) =>
-		send("auto-refactor:execution-complete", result),
+		send(IPC_CHANNELS.AUTO_REFACTOR_EXECUTION_COMPLETE, result),
 	);
 }

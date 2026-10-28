@@ -9,6 +9,7 @@ import type {
 	ConflictPredictionResult,
 } from "../../../renderer/stores/conflict-predictor-store";
 import { createIpcListener, invokeIpc } from "./ipc-utils";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export interface ConflictPredictorAPI {
 	runConflictPrediction: (projectId: string) => Promise<void>;
@@ -30,12 +31,12 @@ export interface ConflictPredictorAPI {
 
 export const createConflictPredictorAPI = (): ConflictPredictorAPI => ({
 	runConflictPrediction: (projectId: string) =>
-		invokeIpc("run-conflict-prediction", { projectId }),
+		invokeIpc(IPC_CHANNELS.RUN_CONFLICT_PREDICTION, { projectId }),
 
-	cancelConflictPrediction: () => invokeIpc("cancel-conflict-prediction"),
+	cancelConflictPrediction: () => invokeIpc(IPC_CHANNELS.CANCEL_CONFLICT_PREDICTION),
 
 	onConflictPredictionStreamChunk: (callback: (chunk: string) => void) => {
-		return createIpcListener("conflict-predictor-event", (event: ConflictPredictionEvent) => {
+		return createIpcListener(IPC_CHANNELS.CONFLICT_PREDICTOR_EVENT, (event: ConflictPredictionEvent) => {
 			if (event.type === "progress" && event.data.status) {
 				callback(event.data.status);
 			}
@@ -43,7 +44,7 @@ export const createConflictPredictorAPI = (): ConflictPredictorAPI => ({
 	},
 
 	onConflictPredictionStatus: (callback: (status: string) => void) => {
-		return createIpcListener("conflict-predictor-event", (event: ConflictPredictionEvent) => {
+		return createIpcListener(IPC_CHANNELS.CONFLICT_PREDICTOR_EVENT, (event: ConflictPredictionEvent) => {
 			if (event.type === "progress" && event.data.status) {
 				callback(event.data.status);
 			}
@@ -51,19 +52,19 @@ export const createConflictPredictorAPI = (): ConflictPredictorAPI => ({
 	},
 
 	onConflictPredictionError: (callback: (error: string) => void) => {
-		return createIpcListener("conflict-predictor-error", (error: string) => {
+		return createIpcListener(IPC_CHANNELS.CONFLICT_PREDICTOR_ERROR, (error: string) => {
 			callback(error);
 		});
 	},
 
 	onConflictPredictionComplete: (callback: (result: ConflictPredictionResult) => void) => {
-		return createIpcListener("conflict-predictor-complete", (result: ConflictPredictionResult) => {
+		return createIpcListener(IPC_CHANNELS.CONFLICT_PREDICTOR_COMPLETE, (result: ConflictPredictionResult) => {
 			callback(result);
 		});
 	},
 
 	onConflictPredictionEvent: (callback: (event: ConflictPredictionEvent) => void) => {
-		return createIpcListener("conflict-predictor-event", (event: ConflictPredictionEvent) => {
+		return createIpcListener(IPC_CHANNELS.CONFLICT_PREDICTOR_EVENT, (event: ConflictPredictionEvent) => {
 			callback(event);
 		});
 	},
@@ -71,36 +72,36 @@ export const createConflictPredictorAPI = (): ConflictPredictorAPI => ({
 
 export const conflictPredictorAPI: ConflictPredictorAPI = {
 	runConflictPrediction: (projectId: string) =>
-		invokeIpc("run-conflict-prediction", { projectId }),
+		invokeIpc(IPC_CHANNELS.RUN_CONFLICT_PREDICTION, { projectId }),
 
-	cancelConflictPrediction: () => invokeIpc("cancel-conflict-prediction"),
+	cancelConflictPrediction: () => invokeIpc(IPC_CHANNELS.CANCEL_CONFLICT_PREDICTION),
 
 	onConflictPredictionStreamChunk: (callback: (chunk: string) => void) =>
-		createIpcListener("conflict-predictor-event", (event: ConflictPredictionEvent) => {
+		createIpcListener(IPC_CHANNELS.CONFLICT_PREDICTOR_EVENT, (event: ConflictPredictionEvent) => {
 			if (event.type === "progress" && event.data.status) {
 				callback(event.data.status);
 			}
 		}),
 
 	onConflictPredictionStatus: (callback: (status: string) => void) =>
-		createIpcListener("conflict-predictor-event", (event: ConflictPredictionEvent) => {
+		createIpcListener(IPC_CHANNELS.CONFLICT_PREDICTOR_EVENT, (event: ConflictPredictionEvent) => {
 			if (event.type === "progress" && event.data.status) {
 				callback(event.data.status);
 			}
 		}),
 
 	onConflictPredictionError: (callback: (error: string) => void) =>
-		createIpcListener("conflict-predictor-error", (error: string) => {
+		createIpcListener(IPC_CHANNELS.CONFLICT_PREDICTOR_ERROR, (error: string) => {
 			callback(error);
 		}),
 
 	onConflictPredictionComplete: (callback: (result: ConflictPredictionResult) => void) =>
-		createIpcListener("conflict-predictor-complete", (result: ConflictPredictionResult) => {
+		createIpcListener(IPC_CHANNELS.CONFLICT_PREDICTOR_COMPLETE, (result: ConflictPredictionResult) => {
 			callback(result);
 		}),
 
 	onConflictPredictionEvent: (callback: (event: ConflictPredictionEvent) => void) =>
-		createIpcListener("conflict-predictor-event", (event: ConflictPredictionEvent) => {
+		createIpcListener(IPC_CHANNELS.CONFLICT_PREDICTOR_EVENT, (event: ConflictPredictionEvent) => {
 			callback(event);
 		}),
 };

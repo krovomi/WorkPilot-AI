@@ -17,6 +17,8 @@ import { type ChildProcess, spawn } from "node:child_process";
 import path from "node:path";
 import { app, BrowserWindow, ipcMain } from "electron";
 import { pythonEnvManager } from "../python-env-manager.js";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
+import { pythonRunnerEnv } from "../utils/python-runner-env";
 
 interface RunRequest {
 	projectPath: string;
@@ -44,13 +46,13 @@ export function registerApiWatcherHandlers(): void {
 	};
 
 	ipcMain.handle(
-		"apiWatcher:run",
+		IPC_CHANNELS.API_WATCHER_RUN,
 		async (_event, { projectPath, saveBaseline = false }: RunRequest) => {
 			killExisting();
 
 			if (!projectPath) {
 				const message = "projectPath is required";
-				broadcast("api-watcher-error", message);
+				broadcast(IPC_CHANNELS.API_WATCHER_ERROR, message);
 				throw new Error(message);
 			}
 
@@ -73,7 +75,7 @@ export function registerApiWatcherHandlers(): void {
 
 			const child = spawn(pythonExe, args, {
 				cwd: backendPath,
-				env: { ...process.env, PYTHONPATH: backendPath },
+				env: await pythonRunnerEnv(backendPath),
 			} as Parameters<typeof spawn>[2]);
 			currentProcess = child;
 
@@ -93,7 +95,7 @@ export function registerApiWatcherHandlers(): void {
 					if (line.startsWith(EVENT_PREFIX)) {
 						try {
 							const payload = JSON.parse(line.slice(EVENT_PREFIX.length));
-							broadcast("api-watcher-event", payload);
+							broadcast(IPC_CHANNELS.API_WATCHER_EVENT, payload);
 						} catch (err) {
 							console.error("[APIWatcher] Bad event line:", err);
 						}
@@ -117,12 +119,12 @@ export function registerApiWatcherHandlers(): void {
 				child.on("close", (code) => {
 					currentProcess = null;
 					if (code === 0 && result) {
-						broadcast("api-watcher-result", result);
+						broadcast(IPC_CHANNELS.API_WATCHER_RESULT, result);
 						resolve(result);
 					} else {
 						const message =
 							errorMessage ?? `api watcher runner exited with code ${code}`;
-						broadcast("api-watcher-error", message);
+						broadcast(IPC_CHANNELS.API_WATCHER_ERROR, message);
 						reject(new Error(message));
 					}
 				});
@@ -130,14 +132,14 @@ export function registerApiWatcherHandlers(): void {
 				child.on("error", (err) => {
 					currentProcess = null;
 					const message = `Failed to start api watcher runner: ${err.message}`;
-					broadcast("api-watcher-error", message);
+					broadcast(IPC_CHANNELS.API_WATCHER_ERROR, message);
 					reject(new Error(message));
 				});
 			});
 		},
 	);
 
-	ipcMain.handle("apiWatcher:cancel", () => {
+	ipcMain.handle(IPC_CHANNELS.API_WATCHER_CANCEL, () => {
 		killExisting();
 		return true;
 	});

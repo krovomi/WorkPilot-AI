@@ -9,9 +9,10 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { type BrowserWindow, ipcMain } from "electron";
+import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { parsePythonCommand } from "../python-detector";
+import { resolveInProject } from "../security/renderer-path";
 import {
 	getConfiguredPythonPath,
 	pythonEnvManager,
@@ -24,9 +25,7 @@ const __dirname = path.dirname(__filename);
 /**
  * Register all browser agent IPC handlers.
  */
-export function registerBrowserAgentHandlers(
-	getMainWindow: () => BrowserWindow | null,
-): void {
+export function registerBrowserAgentHandlers(): void {
 	// ── Dashboard data ────────────────────────────────────────
 
 	ipcMain.handle(
@@ -52,14 +51,6 @@ export function registerBrowserAgentHandlers(
 		IPC_CHANNELS.BROWSER_AGENT_CAPTURE_SCREENSHOT,
 		async (_, projectPath: string, name: string, url: string) => {
 			try {
-				const mainWindow = getMainWindow();
-				if (mainWindow) {
-					mainWindow.webContents.send(IPC_CHANNELS.BROWSER_AGENT_PROGRESS, {
-						step: "capturing",
-						message: `Capturing screenshot of ${url}...`,
-					});
-				}
-
 				const result = await runBrowserAgentCommand(projectPath, [
 					"screenshot",
 					"--url",
@@ -68,13 +59,6 @@ export function registerBrowserAgentHandlers(
 					name,
 				]);
 				const data = JSON.parse(result);
-
-				if (mainWindow) {
-					mainWindow.webContents.send(
-						IPC_CHANNELS.BROWSER_AGENT_SCREENSHOT_READY,
-						data,
-					);
-				}
 
 				return data;
 			} catch (error) {
@@ -89,8 +73,16 @@ export function registerBrowserAgentHandlers(
 		IPC_CHANNELS.BROWSER_AGENT_GET_SCREENSHOT_IMAGE,
 		async (_, screenshotPath: string) => {
 			try {
-				const buffer = fs.readFileSync(screenshotPath);
-				const base64 = buffer.toString("base64");
+				// Screenshots are written inside the project (its
+				// .workpilot folder, a spec or a worktree): nothing else is read.
+				const resolved = resolveInProject(screenshotPath, "file");
+				if (!resolved || path.extname(resolved).toLowerCase() !== ".png") {
+					return {
+						success: false,
+						error: "Screenshot not found in a known project",
+					};
+				}
+				const base64 = fs.readFileSync(resolved).toString("base64");
 				return { success: true, data: { base64, mimeType: "image/png" } };
 			} catch (error) {
 				return { success: false, error: String(error) };
@@ -126,7 +118,16 @@ export function registerBrowserAgentHandlers(
 			try {
 				const args = ["baseline", "set", "--name", name];
 				if (screenshotPath) {
-					args.push("--screenshot", screenshotPath);
+					// The runner copies this file into the baselines: it must be
+					// a screenshot in the project, not any file the renderer names.
+					const screenshot = resolveInProject(screenshotPath, "file");
+					if (!screenshot) {
+						return {
+							success: false,
+							error: "Screenshot not found in a known project",
+						};
+					}
+					args.push("--screenshot", screenshot);
 				}
 				const result = await runBrowserAgentCommand(projectPath, args);
 				return JSON.parse(result);
@@ -174,14 +175,6 @@ export function registerBrowserAgentHandlers(
 		IPC_CHANNELS.BROWSER_AGENT_COMPARE,
 		async (_, projectPath: string, name: string, url?: string) => {
 			try {
-				const mainWindow = getMainWindow();
-				if (mainWindow) {
-					mainWindow.webContents.send(IPC_CHANNELS.BROWSER_AGENT_PROGRESS, {
-						step: "comparing",
-						message: `Comparing '${name}' against baseline...`,
-					});
-				}
-
 				const args = ["compare", "--name", name];
 				if (url) {
 					args.push("--url", url);
@@ -200,27 +193,12 @@ export function registerBrowserAgentHandlers(
 		IPC_CHANNELS.BROWSER_AGENT_RUN_TESTS,
 		async (_, projectPath: string) => {
 			try {
-				const mainWindow = getMainWindow();
-				if (mainWindow) {
-					mainWindow.webContents.send(IPC_CHANNELS.BROWSER_AGENT_PROGRESS, {
-						step: "testing",
-						message: "Running E2E tests...",
-					});
-				}
-
 				const result = await runBrowserAgentCommand(
 					projectPath,
 					["tests"],
 					300000,
 				);
 				const data = JSON.parse(result);
-
-				if (mainWindow) {
-					mainWindow.webContents.send(
-						IPC_CHANNELS.BROWSER_AGENT_TEST_COMPLETE,
-						data,
-					);
-				}
 
 				return data;
 			} catch (error) {

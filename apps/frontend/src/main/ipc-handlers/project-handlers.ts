@@ -2,7 +2,6 @@ import { execFile, execFileSync } from "node:child_process";
 import { existsSync, renameSync } from "node:fs";
 import * as path from "node:path";
 import { promisify } from "node:util";
-import type { BrowserWindow } from "electron";
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
 import type {
@@ -15,6 +14,10 @@ import type {
 	ProjectSettings,
 	RepoProviderDetectionResult,
 } from "../../shared/types";
+import {
+	providerFromRemoteUrl,
+	type RemoteProvider,
+} from "../../shared/utils/git-remote-provider";
 import type { AgentManager } from "../agent";
 import { appEmulatorService } from "../app-emulator-service";
 import { changelogService } from "../changelog-service";
@@ -30,6 +33,8 @@ import {
 	isInitialized,
 } from "../project-initializer";
 import { projectStore } from "../project-store";
+import { configurePythonFeatureServices } from "../python-feature-services";
+import { isAddableProject, resolveUserChosen } from "../security/renderer-path";
 import type { PythonEnvManager, PythonEnvStatus } from "../python-env-manager";
 import { testGenerationService } from "../test-generation-service";
 import { titleGenerator } from "../title-generator";
@@ -295,13 +300,8 @@ function parseGitRemotes(
 }
 
 // Helper function to detect provider from URL
-function detectProviderFromUrl(
-	url: string,
-): "github" | "azure_devops" | "unknown" {
-	if (/github\.com[:/]/i.test(url)) return "github";
-	if (/dev\.azure\.com|visualstudio\.com|ssh\.dev\.azure\.com/i.test(url))
-		return "azure_devops";
-	return "unknown";
+function detectProviderFromUrl(url: string): RemoteProvider {
+	return providerFromRemoteUrl(url);
 }
 
 // Helper function to get URL from remote entry
@@ -684,6 +684,7 @@ const configureServicesWithPython = (
 	changelogService.configure(pythonPath, autoBuildPath);
 	insightsService.configure(pythonPath, autoBuildPath);
 	titleGenerator.configure(pythonPath, autoBuildPath);
+	configurePythonFeatureServices(pythonPath, autoBuildPath);
 	// Only the managed Python path matters here; the backend directory is
 	// auto-detected by the service (dev + packaged), so we don't pass autoBuildPath.
 	testGenerationService.configure(pythonPath);
@@ -730,7 +731,6 @@ const initializePythonEnvironment = async (
 export function registerProjectHandlers(
 	pythonEnvManager: PythonEnvManager,
 	agentManager: AgentManager,
-	getMainWindow: () => BrowserWindow | null,
 ): void {
 	// ============================================
 	// Project Operations
@@ -738,11 +738,18 @@ export function registerProjectHandlers(
 
 	ipcMain.handle(
 		IPC_CHANNELS.PROJECT_ADD,
-		async (_, projectPath: string): Promise<IPCResult<Project>> => {
+		async (_, requestedPath: string): Promise<IPCResult<Project>> => {
 			try {
-				// Validate path exists
-				if (!existsSync(projectPath)) {
+				if (typeof requestedPath !== "string" || !existsSync(requestedPath)) {
 					return { success: false, error: "Directory does not exist" };
+				}
+				// Stored as given (not resolved), as before.
+				const projectPath = requestedPath;
+				if (!isAddableProject(projectPath)) {
+					return {
+						success: false,
+						error: "Choose the project folder in the folder picker",
+					};
 				}
 
 				// Migrate legacy .auto-claude/ to .workpilot/ if needed
@@ -889,12 +896,12 @@ export function registerProjectHandlers(
 			projectId: string,
 			newPath: string,
 		): Promise<IPCResult<Project>> => {
-			const trimmed = (newPath ?? "").trim();
-			if (!trimmed) {
-				return { success: false, error: "Path cannot be empty" };
-			}
-			if (!existsSync(trimmed)) {
-				return { success: false, error: "Path does not exist" };
+			const trimmed = typeof newPath === "string" ? newPath.trim() : "";
+			if (!resolveUserChosen(trimmed, "directory")) {
+				return {
+					success: false,
+					error: "Choose the new location in the folder picker",
+				};
 			}
 			const project = projectStore.repathProject(projectId, trimmed);
 			if (project) {
@@ -1049,28 +1056,6 @@ export function registerProjectHandlers(
 	// Project Initialization Operations
 	// ============================================
 
-	// Set up Python environment status events
-	pythonEnvManager.on("status", (message: string) => {
-		const mainWindow = getMainWindow();
-		if (mainWindow) {
-			mainWindow.webContents.send("python-env:status", message);
-		}
-	});
-
-	pythonEnvManager.on("error", (error: string) => {
-		const mainWindow = getMainWindow();
-		if (mainWindow) {
-			mainWindow.webContents.send("python-env:error", error);
-		}
-	});
-
-	pythonEnvManager.on("ready", (pythonPath: string) => {
-		const mainWindow = getMainWindow();
-		if (mainWindow) {
-			mainWindow.webContents.send("python-env:ready", pythonPath);
-		}
-	});
-
 	// Initialize Python environment on startup (non-blocking)
 	initializePythonEnvironment(pythonEnvManager, agentManager).then((status) => {
 		console.warn("[IPC] Python environment initialized:", status);
@@ -1078,7 +1063,7 @@ export function registerProjectHandlers(
 
 	// IPC handler to get Python environment status
 	ipcMain.handle(
-		"python-env:get-status",
+		IPC_CHANNELS.PYTHON_ENV_GET_STATUS,
 		async (): Promise<IPCResult<PythonEnvStatus>> => {
 			const status = await pythonEnvManager.getStatus();
 			return { success: true, data: status };
@@ -1087,7 +1072,7 @@ export function registerProjectHandlers(
 
 	// IPC handler to reinitialize Python environment
 	ipcMain.handle(
-		"python-env:reinitialize",
+		IPC_CHANNELS.PYTHON_ENV_REINITIALIZE,
 		async (): Promise<IPCResult<PythonEnvStatus>> => {
 			const status = await initializePythonEnvironment(
 				pythonEnvManager,
@@ -1166,7 +1151,7 @@ export function registerProjectHandlers(
 
 	// Check if project has local auto-claude source (is dev project)
 	ipcMain.handle(
-		"project:has-local-source",
+		IPC_CHANNELS.PROJECT_HAS_LOCAL_SOURCE,
 		async (_, projectId: string): Promise<IPCResult<boolean>> => {
 			try {
 				const project = projectStore.getProject(projectId);

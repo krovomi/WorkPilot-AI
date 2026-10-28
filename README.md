@@ -19,14 +19,7 @@
 <!-- STABLE_VERSION_BADGE_END -->
 
 <!-- STABLE_DOWNLOADS -->
-| Platform | Download |
-|----------|----------|
-| **Windows** | [WorkPilot-AI-1.3.0-win32-x64.exe](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.3.0/WorkPilot-AI-1.3.0-win32-x64.exe) |
-| **macOS (Apple Silicon)** | [WorkPilot-AI-1.3.0-darwin-arm64.dmg](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.3.0/WorkPilot-AI-1.3.0-darwin-arm64.dmg) |
-| **macOS (Intel)** | [WorkPilot-AI-1.3.0-darwin-x64.dmg](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.3.0/WorkPilot-AI-1.3.0-darwin-x64.dmg) |
-| **Linux** | [WorkPilot-AI-1.3.0-linux-x86_64.AppImage](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.3.0/WorkPilot-AI-1.3.0-linux-x86_64.AppImage) |
-| **Linux (Debian)** | [WorkPilot-AI-1.3.0-linux-amd64.deb](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.3.0/WorkPilot-AI-1.3.0-linux-amd64.deb) |
-| **Linux (Flatpak)** | [WorkPilot-AI-1.3.0-linux-x86_64.flatpak](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.3.0/WorkPilot-AI-1.3.0-linux-x86_64.flatpak) |
+_No binaries are attached to this release yet. See [the release page](https://github.com/krovomi/WorkPilot-AI/releases/tag/v1.3.0)._
 <!-- STABLE_DOWNLOADS_END -->
 
 ### Beta Release
@@ -41,7 +34,7 @@
 _No beta build is currently published. The table above is the latest stable release._
 <!-- BETA_DOWNLOADS_END -->
 
-> All releases include SHA256 checksums and VirusTotal scan results for security verification.
+> All releases include SHA256 checksums; VirusTotal scan results are added to the release notes when the scan is configured.
 
 ---
 
@@ -76,11 +69,22 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 | **Isolated Workspaces** | Every task runs in a dedicated git worktree — your main branch stays safe |
 | **AI-Powered Merge** | Semantic conflict resolution when integrating worktrees back to main |
 | **QA Auto-Fix Loop** | Agents automatically detect, fix, and revalidate failing acceptance criteria |
+| **Runtime Verification** | After QA, the `verify` phase launches the app the task changed, reads every error, fixes and relaunches, drives the app to the state the task asked for and keeps a proof: web and Electron apps through Chrome DevTools, mobile apps on an emulator, APIs through their OpenAPI schema, and WPF, WinForms or WinUI apps through Windows UI Automation, in the one window the card names and never by simulated keystrokes |
 | **Spec Approval Workflow** | Review and approve AI-generated specifications before implementation begins |
 | **Hot-Swap LLM** | Change provider, model, or reasoning effort mid-task — the next turn resumes on the new engine with context replayed |
+| **Honest Effort** | Each provider gets the effort level on its own scale (Claude, OpenAI/Codex, Gemini, Grok, DeepSeek, Mistral, Copilot, Ollama, pi, Antigravity); the picker and the task log say what the model actually receives, and a model that refuses the setting runs on without it instead of failing the phase |
 | **Pause & Resume** | Suspend a running task and resume later with full context preserved, optionally on a different provider |
 | **Per-Phase Re-run** | Redo any phase (planning, coding, validation) on demand without restarting the whole task |
 | **PR-First Review Flow** | Guided human-review with a DoD checklist, "approve & close", and reversible task abandon |
+| **PR Follow-Through** | Once the task's PR is open, the card keeps driving it: a red check or an unresolved review thread goes to the QA fixer in the task's worktree, the commit is checked (no test skipped or deleted, no CI file edited) and pushed — never forced, never merged. A failure that is also red on the base branch is reported, not "fixed". GitHub for now — see [docs/architecture/pr-followup.md](docs/architecture/pr-followup.md) |
+| **GenAI Traces for Every Provider** | Set one OTLP endpoint and every provider's sessions show up the same way in Jaeger, Langfuse or Phoenix: an agent span, its model calls with token counts, its tool calls. No prompt or output leaves; a provider that reports no usage is marked "estimated", never counted as zero |
+| **OS Sandbox** | An agent's commands run under bubblewrap (Linux) or Seatbelt (macOS): writes stay in the task's worktree, your SSH keys and tokens are hidden, the network is the provider's hosts and the package registries through a filtering proxy. When the machine has no sandbox the card says so at launch; `WORKPILOT_SANDBOX=required` refuses to start instead. Windows is not covered yet — see [docs/architecture/os-sandbox.md](docs/architecture/os-sandbox.md) |
+| **MCP 2026: Tasks and MCP Apps** | WorkPilot's own MCP servers speak MCP 2026-07-28 and still answer older clients as before. `verify_launch`, `verify_perf_trace` and `verify_device` come back as tasks to a client that reads them: polled, cancelled when the build stops, timed out. A tool of an installed MCP server that attaches a view shows it in the task panel, in an iframe sandboxed without `allow-same-origin` and with the view's own CSP. The view shows the call that happened and cannot act on the task. See [docs/architecture/mcp-2026.md](docs/architecture/mcp-2026.md) |
+| **Best-of-N** | Build one task 2 to 4 times, each in its own worktree with its own provider, model and effort; the card ranks them on numbers (finished build, QA, goal, diff size, cost) and you keep the one you choose. Nothing is merged on its own |
+| **Goal Mode** | A task is done when a command says so (`dotnet test` exits 0), not when a reviewer thinks so: QA keeps fixing within a pass and spending cap, and the tests it must pass are protected from edits |
+| **Needs You** | When a task waits for you (plan, review, QA hand-over, error), you hear about it on the desktop and, if you want, on ntfy or Telegram; a waiting plan can be approved from Telegram with a one-shot button |
+| **Automations** | A rule turns an event into a Kanban card: a GitHub issue labelled, the base branch's CI going red, a time of day. Cards are drafts by default, one per issue or red streak, under a daily cap; a rule never merges, pushes or comments |
+| **ACP Agents** | Any agent that speaks the Agent Client Protocol runs a task from one entry in `capabilities/providers.yaml`, Gemini CLI first. A question the agent asks before acting appears on the card with its options; the agent type's tool rights are held by the session mode, by refusing questions outside them, and by stopping a turn that runs an undeclared tool. The sidebar lists only the capabilities the agent declares — see [docs/architecture/acp.md](docs/architecture/acp.md) |
 | **Declarative Workflows** | A build is described as phases in `workflows/<name>/workflow.yaml`; the engine resolves them against your effort level, the provider's capabilities, the files the task touches and the task itself (`when: kind == … and complexity == …`). On by default |
 | **One Workflow per Task Kind** | A card's kind (`feature`, `bug_fix`, `hotfix`, `investigation`, `run`, `refactoring`, `test`, `docs`, `spike`) is decided without a model from its category, imported item type or wording, shown and editable on the card, and picks the workflow that runs: a bug is reproduced before it is fixed, an investigation writes a report and no code, a RUN writes a procedure a person reads first, then plays it with Python behind the command allowlist, pausing before anything irreversible. Every implementation a workflow names resolves on a fresh clone, on every provider |
 | **Optional Methodologies by `fallback:`** | A phase may name a methodology that needs a runtime in the target project (BMAD's `_bmad/`) and a WorkPilot fallback; the engine substitutes the fallback when the runtime is absent and shows it in the profile. Nothing is skipped in silence |
@@ -141,6 +145,8 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 
 **Multi-account switching** — Register multiple profiles per provider. WorkPilot AI automatically switches to an available account when one hits a rate limit.
 
+**Keys stay out of the interface** — Once saved, a key or token shows up masked in every screen. Connection tests run in the app's main process. If you change a profile's base URL, you are asked for its key again: a saved key is only sent to the URL it was saved for.
+
 ### Code Intelligence
 
 | Feature | Description |
@@ -191,6 +197,7 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 |---------|-------------|
 | **Analytics Dashboard** | Token consumption, cost tracking, success rates, and execution time metrics — live SQLite-backed API; falls back to an explicit 503 when the analytics DB is unavailable |
 | **Formula Lab** | Pre-flight cost/success estimation per Provider × Model × Effort, calibrated on your real usage history |
+| **Repo Bench** | Replays 10 to 20 of your finished cards from the commit before them, once per engine, in isolated copies that do not hold the answer, and judges each build with the tests the card landed with — tests the agent never sees, kept only when they fail before the card and pass after it. The table says which provider × model × effort resolves your project's work; Formula Lab and the model router read it. See [docs/architecture/repo-bench.md](docs/architecture/repo-bench.md) |
 | **Cost Estimator** | Per-task cost calculation with provider comparison and budget alerts |
 | **Carbon Profiler** | Estimates the energy (kWh) and carbon footprint of your agent runs |
 | **Rate Limit Monitor** | Real-time usage tracking with proactive warnings and auto-switching triggers |
@@ -251,6 +258,16 @@ AI-assisted feature planning with competitor analysis and audience targeting.
 > [`docs/audit/WorkPilot-architecture.html`](docs/audit/WorkPilot-architecture.html) (vue « Pour tous »,
 > schémas cliquables, constats, feuille de route). Les justifications de conception sont dans
 > [`docs/architecture/`](docs/architecture/).
+>
+> Les liens entre couches sont vérifiés par des tests qui lisent les sources : IPC dans les deux
+> sens et canaux nommés par constante (`ipc-channel-parity.test.ts`), imports entre unités du
+> backend et plafond du cycle principal, ramené de 81 à 26 unités par la couche `foundation/`
+> (`tests/test_import_contracts.py`), une ligne par vue dans
+> [`product-overview.md`](docs/architecture/product-overview.md) (`tests/test_product_overview_views.py`).
+>
+> Une vue qui n'a encore ni document de conception ni test porte le badge « Expérimental » dans la
+> barre latérale. Un bouton en bas de la barre les masque toutes. Chaque script de
+> [`scripts/`](scripts/README.md) a sa ligne dans le README du dossier.
 
 ### Vue d'Ensemble
 
@@ -334,11 +351,13 @@ en l'écrivant dans le profil. Voir [`skills/README.md`](skills/README.md#runtim
 #### Backend Python (`apps/backend/`)
 ```
 apps/backend/
-├── core/                # Client, authentification, worktree, plateforme
+├── core/                # Racine de composition : fabrique de clients, authentification, worktree
 │   ├── client.py        # Client Claude Agent SDK
+│   ├── agent_clients/   # Un client par provider (OpenAI, Gemini, Copilot, Ollama, pi, ACP…)
+│   ├── effort_plan.py   # L'effort réellement envoyé à chaque provider
 │   ├── auth.py          # Gestion multi-profils OAuth
-│   ├── worktree.py      # Isolation des espaces de travail Git
-│   └── platform/        # Abstraction cross-plateforme
+│   └── worktree.py      # Isolation des espaces de travail Git
+├── foundation/          # Couche la plus basse, n'importe rien du backend (platform/, api_safety, git)
 ├── agents/              # Logique d'exécution des agents
 │   ├── planner.py       # Agent de planification
 │   ├── coder.py         # Agent de développement
@@ -360,6 +379,14 @@ apps/backend/
 ├── integrations/        # Connecteurs (GitHub, GitLab, etc.)
 ├── project/             # Analyse et détection de projets
 ├── merge/               # Système de fusion sémantique
+├── verify/              # Boucle de vérification : lancer l'app, lire les erreurs, prouver (web, mobile, API, UI Automation)
+├── pr_followup/         # La carte suit sa PR : checks rouges et fils de revue → QA fixer
+├── goal/                # Mode objectif : une commande dit « fini »
+├── best_of_n/           # Une tâche construite N fois, classée sur des chiffres
+├── bench/               # Banc de rejeu des cartes terminées, tableau par provider
+├── os_sandbox/          # bubblewrap / Seatbelt autour des commandes d'agent
+├── genai_trace/         # Spans OpenTelemetry GenAI pour tous les providers
+├── mcp_tasks/           # MCP 2026-07-28 : tasks côté serveurs WorkPilot
 ├── self_healing/        # Surveillance de santé + auto-réparation
 ├── tech_debt/           # Suivi et résolution de la dette technique
 ├── consensus_arbiter/   # Arbitrage des avis d'agents (sécurité/QA)
@@ -382,6 +409,10 @@ apps/frontend/src/
 │   ├── claude-profile/  # Gestion multi-profils
 │   ├── terminal/        # Daemon PTY et cycle de vie
 │   ├── platform/        # Abstraction cross-plateforme
+│   ├── security/        # Politiques IPC : expéditeur, dossiers, chemins d'outils et du backend
+│   ├── automations/     # Règles qui créent une carte (issue étiquetée, CI rouge, horaire)
+│   ├── needs-you/       # Notifications bureau, ntfy, Telegram ; approbation de plan à distance
+│   ├── mcp-apps/        # Vues MCP Apps servies au panneau de tâche (workpilot-mcp-app://)
 │   ├── ipc-handlers/    # 100+ modules de gestion IPC
 │   ├── services/        # Récupération de session SDK, credentials
 │   └── utils/           # Chemins, isolation git, nettoyage worktree
@@ -421,7 +452,7 @@ apps/frontend/src/
 ### Sécurité et Isolation
 
 #### Modèle de Sécurité à 3 Couches
-1. **Sandbox OS** → Commandes Bash exécutées en isolation
+1. **Sandbox OS** → Commandes d'agent sous bubblewrap (Linux) ou Seatbelt (macOS) : écritures dans le worktree, identifiants cachés, réseau filtré ; sans bac à sable (Windows), la carte le dit, et `WORKPILOT_SANDBOX=required` refuse de démarrer
 2. **Restrictions Filesystem** → Opérations limitées au répertoire projet
 3. **Allowlist Dynamique** → Commandes approuvées selon la stack détectée
 
@@ -430,6 +461,8 @@ apps/frontend/src/
 - **Stockage Secure** → Keychain OS / Credential Manager
 - **Rotation Automatique** → Cycle de vie des tokens OAuth
 - **Validation Input** → Chemins et commandes sanitizées
+- **Aucun secret dans le renderer** → L'interface sait qu'une clé ou un jeton est configuré, jamais sa valeur ; les tests de connexion tournent dans le main
+- **Frontière renderer → main** → Seule la page de l'app atteint un handler IPC. Un chemin reçu de l'interface est résolu (liens compris) et doit être dans un projet enregistré ou un dossier choisi dans une boîte de dialogue ; l'interface ne choisit jamais l'exécutable lancé, et un chemin d'outil ou du backend saisi dans les réglages est vérifié avant d'être exécuté
 
 ### Performance et Scalabilité
 
@@ -459,7 +492,7 @@ apps/frontend/src/
 
 #### Dépendances Logicielles
 - **Node.js ≥ 20** (la CI construit sur Node 22)
-- **pnpm ≥ 8** (le dépôt est épinglé sur pnpm 10 via `packageManager`)
+- **pnpm ≥ 8** (le dépôt est épinglé sur pnpm 12.5.1 via `packageManager` ; Corepack le fournit)
 - **Python 3.12+** (Pour le backend)
 - **Git** (Dépôt initialisé obligatoire)
 - **Claude Code CLI** : `pnpm add -g @anthropic-ai/claude-code`
@@ -519,7 +552,7 @@ apps/frontend/src/
    # "Notes Spécifiques Windows" ci-dessous, il a besoin du même traitement pywin32
    cd apps\backend
    python -m venv .venv
-   .venv\Scripts\python.exe -m pip install -r requirements.txt
+   .venv\Scripts\python.exe -m pip install -r requirements.lock
    cd ..\..
 
    # Frontend
@@ -547,6 +580,12 @@ apps/frontend/src/
 
    pnpm run dev
    ```
+
+   > Versions Python : `requirements.txt` donne des plages ; `apps/backend/requirements.lock` fige
+   > les versions exactes (avec empreintes, toutes plateformes) que la CI teste et que l'image
+   > serveur embarque. `pnpm run install:backend` installe le lock ; à la main :
+   > `pip install -r apps/backend/requirements.lock`. Après avoir modifié une plage :
+   > `pnpm run lock:python`.
 
 4. **Vérifier que le backend répond**
    ```bash
@@ -602,6 +641,13 @@ Si vous avez déjà lancé l'app une fois **avec** élévation avant de désacti
 ```powershell
 Remove-Item "apps\frontend\.env-files\.env" -Force
 ```
+
+L'app **packagée** (installeur, portable) démarre sans élévation (`asInvoker`) : les agents, terminaux
+et processus qu'elle lance n'ont que vos droits. Pour qu'une preuve visuelle pilote une application
+desktop elle-même élevée, lancez WorkPilot AI par clic droit → **Exécuter en tant qu'administrateur** ;
+sans cela, la capture d'écran reste possible et l'app indique que le pilotage demande cette élévation.
+Une version précédente demandait l'élévation à chaque lancement : si des réglages ne s'enregistrent plus
+après la mise à jour, un fichier créé par le processus administrateur est en cause, comme ci-dessus.
 
 #### 3. Smart App Control / Application Control bloque les binaires natifs npm
 
@@ -819,7 +865,7 @@ WorkPilot AI uses a three-layer security model:
 2. **Filesystem Restrictions** — Operations limited to project directory
 3. **Dynamic Command Allowlist** — Only approved commands based on detected project stack
 
-All releases include SHA256 checksums and VirusTotal scans.
+All releases include SHA256 checksums, and VirusTotal scan results once the scan is configured for the repository.
 
 To report a vulnerability, follow [docs/SECURITY.md](docs/SECURITY.md) — never a public issue.
 The security rules contributors and coding agents follow are in [docs/rules/security.md](docs/rules/security.md).

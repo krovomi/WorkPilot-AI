@@ -43,6 +43,9 @@ import {
 	stripControlChars,
 	stripHtml,
 } from "./shared/sanitize";
+import { envWithoutCredentials } from "../utils/child-env";
+import { readIfExists, updateExistingFile } from "../utils/existing-file";
+import { pythonRunnerEnv } from "../utils/python-runner-env";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -259,7 +262,7 @@ except Exception as e:
 
 			const proc = spawn("python", ["-c", pythonScript], {
 				cwd: projectPath,
-				env: { ...process.env, ...envOverrides },
+				env: envWithoutCredentials(process.env, envOverrides),
 			});
 
 			let stdout = "";
@@ -972,13 +975,14 @@ except Exception as e:
 					specDir,
 					AUTO_BUILD_PATHS.REQUIREMENTS,
 				);
-				if (!existsSync(requirementsPath)) {
+				const requirementsText = readIfExists(requirementsPath);
+				if (requirementsText === null) {
 					return { success: false, error: "requirements.json not found" };
 				}
 
 				let requirements: Record<string, unknown>;
 				try {
-					requirements = JSON.parse(readFileSync(requirementsPath, "utf-8"));
+					requirements = JSON.parse(requirementsText);
 				} catch {
 					return { success: false, error: "requirements.json is malformed" };
 				}
@@ -1066,14 +1070,16 @@ except Exception as e:
 					}
 				}
 
-				// Persist both fields together so the scanner serves them next time.
+				// Persist both fields together so the scanner serves them next time,
+				// onto the file as it is now: the work item calls above take time.
 				if (changed) {
 					try {
-						writeFileSync(
-							requirementsPath,
-							JSON.stringify(requirements, null, 2),
-							"utf-8",
-						);
+						updateExistingFile(requirementsPath, (current) => {
+							const latest = JSON.parse(current) as Record<string, unknown>;
+							latest.display_title = requirements.display_title;
+							latest.display_description = requirements.display_description;
+							return JSON.stringify(latest, null, 2);
+						});
 						projectStore.invalidateTasksCache(projectId);
 					} catch (err) {
 						console.warn(
@@ -1149,21 +1155,17 @@ except Exception as e:
 					const metadataPath = path.join(specDir, "task_metadata.json");
 					const requirementsPath = path.join(specDir, "requirements.json");
 
-					if (existsSync(metadataPath)) {
-						const meta = JSON.parse(readFileSync(metadataPath, "utf-8"));
+					updateExistingFile(metadataPath, (text) => {
+						const meta = JSON.parse(text);
 						meta.acceptanceCriteria = acceptanceCriteriaList;
-						writeFileSync(metadataPath, JSON.stringify(meta, null, 2), "utf-8");
-					}
+						return JSON.stringify(meta, null, 2);
+					});
 
-					if (existsSync(requirementsPath)) {
-						const reqs = JSON.parse(readFileSync(requirementsPath, "utf-8"));
+					updateExistingFile(requirementsPath, (text) => {
+						const reqs = JSON.parse(text);
 						reqs.acceptance_criteria = acceptanceCriteriaList;
-						writeFileSync(
-							requirementsPath,
-							JSON.stringify(reqs, null, 2),
-							"utf-8",
-						);
-					}
+						return JSON.stringify(reqs, null, 2);
+					});
 
 					projectStore.invalidateTasksCache(projectId);
 				}
@@ -1226,13 +1228,13 @@ except Exception as e:
 					project.path,
 				];
 
-				const env = {
-					...process.env,
-					AZURE_DEVOPS_PAT: azConfig.pat,
-					AZURE_DEVOPS_ORG_URL: azConfig.orgUrl,
-					AZURE_DEVOPS_PROJECT: azConfig.projectName,
-					PYTHONPATH: backendPath,
-				};
+				const env = await pythonRunnerEnv(backendPath, {
+					extra: {
+						AZURE_DEVOPS_PAT: azConfig.pat,
+						AZURE_DEVOPS_ORG_URL: azConfig.orgUrl,
+						AZURE_DEVOPS_PROJECT: azConfig.projectName,
+					},
+				});
 
 				return new Promise<IPCResult>((resolve) => {
 					let stdout = "";
@@ -1415,12 +1417,11 @@ print(json.dumps({'success': True}))
 				return new Promise<IPCResult>((resolve) => {
 					const child = spawn("python", ["-c", pythonScript], {
 						cwd: backendPath,
-						env: {
-							...process.env,
+						env: envWithoutCredentials(process.env, {
 							AZURE_DEVOPS_PAT: azConfig.pat || "",
 							AZURE_DEVOPS_ORG_URL: azConfig.orgUrl || "",
 							PYTHONPATH: backendPath,
-						},
+						}),
 					});
 
 					let _stdout = "";

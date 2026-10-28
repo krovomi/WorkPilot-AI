@@ -11,6 +11,7 @@ import { app, type BrowserWindow } from "electron";
 import type { AgentManager } from "../agent";
 import { getClaudeProfileManager } from "../claude-profile-manager";
 import { notificationService } from "../notification-service";
+import { taskStateManager } from "../task-state-manager";
 import type { PythonEnvManager } from "../python-env-manager";
 import type { TerminalManager } from "../terminal-manager";
 import { registerAccessibilityHandlers } from "./accessibility-handlers";
@@ -18,12 +19,13 @@ import {
 	registerAutoRefactorHandlers,
 	setupAutoRefactorEventForwarding,
 } from "./auto-refactor-handlers";
-import { registerContinuousAIHandlers } from "./continuous-ai-handlers";
+import { registerAutomationsHandlers } from "./automations-handlers";
 import { getAutoBuildSourcePath } from "./context/utils";
 import { registerQueueRoutingHandlers } from "./queue-routing-handlers";
 import { registerSwarmHandlers } from "./swarm-handlers";
 import { registerAgentDebuggerHandlers } from "./agent-debugger-handlers";
 import { registerAgenteventsHandlers } from "./agent-events-handlers";
+import { registerTaskSandboxHandlers } from "./task-sandbox-handlers";
 import { registerBlastRadiusHandlers } from "./blast-radius-handlers";
 import { registerBountyBoardHandlers } from "./bounty-board-handlers";
 import { registerTechDebtHandlers } from "./tech-debt-handlers";
@@ -58,11 +60,13 @@ import { registerContextAwareSnippetsHandlers } from "./context-aware-snippets-h
 import { registerContextHandlers } from "./context-handlers";
 import { registerContextMeshHandlers } from "./context-mesh-handlers";
 import { registerAgentCliHandlers } from "./agent-cli-handlers";
+import { registerTaskPermissionHandlers } from "./task-permission-handlers";
 import { registerCopilotCliHandlers } from "./copilot-cli-handlers";
 import { registerCopilotOAuthHandlers } from "./copilot-oauth-handlers";
 import { registerCostHandlers } from "./cost-handlers";
 import { registerCostPredictorHandlers } from "./cost-predictor-handlers";
 import { registerFormulaMatrixHandlers } from "./formula-matrix-handlers";
+import { registerBenchHandlers } from "./bench-handlers";
 import { registerCredentialHandlers } from "./credential-handlers";
 import { registerCrossLanguageTranslationHandlers } from "./cross-language-translation-handlers";
 import { registerDebugHandlers } from "./debug-handlers";
@@ -286,10 +290,14 @@ export function setupIpcHandlers(
 	pythonEnvManager: PythonEnvManager,
 ): void {
 	// Initialize notification service
-	notificationService.initialize(getMainWindow);
+	notificationService.initialize(getMainWindow, (taskId) => taskStateManager.isInPlanReview(taskId));
+	taskStateManager.setNeedsYouListener({
+		settled: (event) => notificationService.notify(event),
+		left: (taskId) => notificationService.revoke(taskId),
+	});
 
 	// Project handlers (including Python environment setup)
-	registerProjectHandlers(pythonEnvManager, agentManager, getMainWindow);
+	registerProjectHandlers(pythonEnvManager, agentManager);
 
 	// Task handlers
 	registerTaskHandlers(agentManager, pythonEnvManager, getMainWindow);
@@ -305,6 +313,9 @@ export function setupIpcHandlers(
 
 	// Agent event handlers (event forwarding from agent manager to renderer)
 	registerAgenteventsHandlers(agentManager, getMainWindow);
+	registerTaskSandboxHandlers();
+	// ACP agents' questions on the card, answered back to the build's stdin
+	registerTaskPermissionHandlers(agentManager);
 
 	// Settings and dialog handlers
 	registerSettingsHandlers(agentManager, getMainWindow);
@@ -437,7 +448,7 @@ export function setupIpcHandlers(
 	registerSelfHealingHandlers(getMainWindow);
 
 	// Browser Agent handlers (built-in browser for testing and visual validation)
-	registerBrowserAgentHandlers(getMainWindow);
+	registerBrowserAgentHandlers();
 
 	// Architecture Visualizer handlers
 	registerArchitectureVisualizerHandlers();
@@ -508,7 +519,7 @@ export function setupIpcHandlers(
 	registerLiveCompanionHandlers(getMainWindow);
 
 	// Agent Time Travel handlers (Temporal debugger for AI agents)
-	registerTimeTravelHandlers(getMainWindow);
+	registerTimeTravelHandlers();
 
 	// Phase 3-5 backend feature modules (#3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 3.10, 3.11, 3.12)
 	registerPhase35FeatureHandlers(getMainWindow);
@@ -573,6 +584,9 @@ export function setupIpcHandlers(
 	// Formula Matrix handlers (Provider × LLM × Effort comparator — Formula Lab)
 	registerFormulaMatrixHandlers();
 
+	// Repo bench: finished cards replayed per engine, judged by their own tests
+	registerBenchHandlers(agentManager, getMainWindow);
+
 	// Agent Debugger handlers (Feature 1)
 	registerAgentDebuggerHandlers();
 
@@ -605,11 +619,8 @@ export function setupIpcHandlers(
 		getMainWindow,
 	);
 
-	// Continuous AI handlers (CI/CD watcher, dependency sentinel, PR reviewer)
-	registerContinuousAIHandlers(
-		() => pythonEnvManager.getPythonPath(),
-		getMainWindow,
-	);
+	// Automations: an event (issue labelled, CI red, schedule) creates a card
+	registerAutomationsHandlers(agentManager, getMainWindow);
 
 	// Queue routing handlers (profile swapping on rate limit). The preload
 	// `queue` bridge invokes these five channels; unregistered, every call

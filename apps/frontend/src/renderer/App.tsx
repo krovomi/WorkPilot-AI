@@ -332,6 +332,11 @@ const CoachReportView = lazy(() =>
 		default: m.CoachReportView,
 	})),
 );
+const RepoBenchView = lazy(() =>
+	import("./components/bench/RepoBenchView").then((m) => ({
+		default: m.RepoBenchView,
+	})),
+);
 const BountyBoardView = lazy(() =>
 	import("./components/bounty-board/BountyBoardView").then((m) => ({
 		default: m.BountyBoardView,
@@ -388,6 +393,7 @@ import {
 	useTerminalProfileChange,
 } from "@/hooks";
 import { AddProjectModal } from "./components/AddProjectModal";
+import { AuthFailureModal } from "./components/AuthFailureModal";
 import { AzureDevOpsSetupModal } from "./components/AzureDevOpsSetupModal";
 import { CommandPalette } from "./components/CommandPalette";
 import { GitHubSetupModal } from "./components/GitHubSetupModal";
@@ -401,6 +407,8 @@ import { OnboardingWizard } from "./components/onboarding";
 import { ProjectTabBar } from "./components/ProjectTabBar";
 import { ProviderContextProvider } from "./components/ProviderContext";
 import { PageLlmSelector } from "./components/PageLlmSelector";
+import { RateLimitModal } from "./components/RateLimitModal";
+import { SDKRateLimitModal } from "./components/SDKRateLimitModal";
 import { VersionWarningModal } from "./components/VersionWarningModal";
 import { VoiceControlDialog } from "./components/voice-control";
 import { ViewStateProvider } from "./contexts/ViewStateContext";
@@ -409,6 +417,7 @@ import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useReauthNotifications } from "./hooks/use-reauth-notifications";
 import { useActivityNotifications } from "./hooks/useActivityNotifications";
 import { useTaskActivityBridge } from "./hooks/useTaskActivityBridge";
+import { useNeedsYou } from "./hooks/useNeedsYou";
 import { useTaskNotifications } from "./hooks/useTaskNotifications";
 import type { Activity } from "./stores/activity-store";
 import { setActivityActiveView } from "./stores/activity-store";
@@ -656,6 +665,8 @@ export function App() {
 
 	// Task completion toast notifications (human_review, done, pr_created, error)
 	useTaskNotifications({ onNavigate: (view) => setActiveView(view) });
+	// A clicked desktop notification, and plans approved from Telegram.
+	useNeedsYou({ onNavigate: (view) => setActiveView(view) });
 
 	// The Kanban's running builds, mirrored into the activity registry that
 	// feeds the sidebar badges.
@@ -2139,6 +2150,14 @@ export function App() {
 														/>
 													</div>
 												)}
+												{activeView === "repo-bench" && (
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<RepoBenchView projectId={selectedProject?.id} />
+													</div>
+												)}
 												{activeView === "bounty-board" && (
 													<div
 														className="overflow-auto"
@@ -2343,6 +2362,17 @@ export function App() {
 
 					{/* Guided tour overlay (spotlight + step-by-step coachmarks) */}
 					<GuidedTourOverlay />
+
+					{/* Opened by useIpc on a rate limit or a 401, and reopened by
+					    RateLimitIndicator: mounted nowhere until lot M8, so neither
+					    event showed anything. */}
+					<RateLimitModal />
+					<SDKRateLimitModal />
+					<AuthFailureModal
+						onOpenSettings={() =>
+							navigateToSettingsSection({ kind: "app", section: "accounts" })
+						}
+					/>
 
 					{/* Version warning modal - shown once for reauthentication notice */}
 					<VersionWarningModal

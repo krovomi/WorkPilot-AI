@@ -21,7 +21,7 @@ UnicodeDecodeError: 'charmap' codec can't decode byte 0x8d in position 1234
 
 **Always specify `encoding="utf-8"` for all text file operations.**
 
-See [CONTRIBUTING.md - File Encoding](../CONTRIBUTING.md#file-encoding-python)
+See [CONTRIBUTING.md - File Encoding](CONTRIBUTING.md#file-encoding-python)
 for detailed examples and patterns.
 
 ### Testing on Windows
@@ -318,7 +318,7 @@ def test_windows_encoding():
 
 If you encounter Windows-specific issues:
 
-1. Check this guide and [CONTRIBUTING.md](../CONTRIBUTING.md)
+1. Check this guide and [CONTRIBUTING.md](CONTRIBUTING.md)
 2. Search [existing issues](https://github.com/krovomi/WorkPilot-AI/issues)
 3. Ask in [discussions](https://github.com/krovomi/WorkPilot-AI/discussions)
 4. Create an issue with `[Windows]` tag
@@ -332,7 +332,7 @@ If you encounter Windows-specific issues:
 
 ## Related
 
-- [CONTRIBUTING.md](../CONTRIBUTING.md) - General contribution
+- [CONTRIBUTING.md](CONTRIBUTING.md) - General contribution
   guidelines
 - The UTF-8 encoding rules this guide describes are enforced by the
   pre-commit hooks; see [CONTRIBUTING.md](CONTRIBUTING.md)

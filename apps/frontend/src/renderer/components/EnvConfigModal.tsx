@@ -161,9 +161,9 @@ export function EnvConfigModal({
 				return;
 			}
 
-			// Save the token to auto-claude .env
+			// Main copies the profile's token into the .env: the renderer only sees it masked
 			const result = await window.electronAPI.updateSourceEnv({
-				claudeOAuthToken: profile.oauthToken,
+				claudeProfileId: profile.id,
 			});
 
 			if (result.success) {

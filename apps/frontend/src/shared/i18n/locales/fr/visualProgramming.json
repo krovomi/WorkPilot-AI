@@ -113,7 +113,7 @@
 	"customBlock": "Bloc personnalisé",
 	"customBlockDesc": "Bloc libre pour tout usage spécifique",
 	"explorerRoot": "Racine de l'explorateur :",
-	"selectFolder": "Sélectionner",
+	"chooseFolder": "Choisir un dossier…",
 	"fileNameLabel": "Nom du fichier :",
 	"export": "Exporter JSON",
 	"saveAs": "Enregistrer sous…",

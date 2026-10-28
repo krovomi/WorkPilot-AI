@@ -4,6 +4,7 @@ import {
 	type PlaygroundResult,
 } from "../code-playground-service";
 import { projectStore } from "../project-store";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
 
 /**
  * Register IPC handlers for code playground functionality
@@ -11,7 +12,7 @@ import { projectStore } from "../project-store";
 export function registerCodePlaygroundHandlers(): void {
 	// Handle playground generation requests
 	ipcMain.on(
-		"code-playground:start",
+		IPC_CHANNELS.CODE_PLAYGROUND_START,
 		async (_, { projectId, idea, playgroundType, sandboxType }) => {
 			try {
 				const project = projectStore.getProject(projectId);
@@ -37,7 +38,7 @@ export function registerCodePlaygroundHandlers(): void {
 	);
 
 	// Handle cancellation requests
-	ipcMain.on("code-playground:cancel", () => {
+	ipcMain.on(IPC_CHANNELS.CODE_PLAYGROUND_CANCEL, () => {
 		codePlaygroundService.cancel();
 	});
 }
@@ -56,15 +57,15 @@ export function setupCodePlaygroundEventForwarding(
 	};
 
 	codePlaygroundService.on("status", (status: string) =>
-		send("code-playground:status", status),
+		send(IPC_CHANNELS.CODE_PLAYGROUND_STATUS, status),
 	);
 	codePlaygroundService.on("stream-chunk", (chunk: string) =>
-		send("code-playground:stream-chunk", chunk),
+		send(IPC_CHANNELS.CODE_PLAYGROUND_STREAM_CHUNK, chunk),
 	);
 	codePlaygroundService.on("error", (error: string) =>
-		send("code-playground:error", error),
+		send(IPC_CHANNELS.CODE_PLAYGROUND_ERROR, error),
 	);
 	codePlaygroundService.on("complete", (result: PlaygroundResult) =>
-		send("code-playground:complete", result),
+		send(IPC_CHANNELS.CODE_PLAYGROUND_COMPLETE, result),
 	);
 }

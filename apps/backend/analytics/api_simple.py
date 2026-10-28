@@ -5,7 +5,7 @@ Provides REST API endpoints for accessing build metrics, performance data,
 and analytics insights.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -15,7 +15,7 @@ def _utcnow_naive() -> datetime:
 
     DB stores naive UTC; using a tz-aware value would break comparisons.
     """
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 from sqlalchemy import Integer, asc, case, cast, desc, func

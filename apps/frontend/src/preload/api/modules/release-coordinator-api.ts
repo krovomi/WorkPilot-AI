@@ -6,6 +6,7 @@
 
 import type { ReleaseTrainPlan } from "../../../shared/types/release-coordinator";
 import { createIpcListener, invokeIpc } from "./ipc-utils";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export interface ReleaseCoordinatorRunOptions {
 	projectPath: string;
@@ -35,25 +36,25 @@ export interface ReleaseCoordinatorAPI {
 
 export const createReleaseCoordinatorAPI = (): ReleaseCoordinatorAPI => ({
 	runReleaseCoordinatorPlan: (options: ReleaseCoordinatorRunOptions) =>
-		invokeIpc<ReleaseTrainPlan>("releaseCoordinator:run", options),
+		invokeIpc<ReleaseTrainPlan>(IPC_CHANNELS.RELEASE_COORDINATOR_RUN, options),
 
 	cancelReleaseCoordinatorPlan: () =>
-		invokeIpc<boolean>("releaseCoordinator:cancel"),
+		invokeIpc<boolean>(IPC_CHANNELS.RELEASE_COORDINATOR_CANCEL),
 
 	onReleaseCoordinatorEvent: (callback) =>
 		createIpcListener<[ReleaseCoordinatorEvent]>(
-			"release-coordinator-event",
+			IPC_CHANNELS.RELEASE_COORDINATOR_EVENT,
 			(payload) => callback(payload),
 		),
 
 	onReleaseCoordinatorResult: (callback) =>
 		createIpcListener<[ReleaseTrainPlan]>(
-			"release-coordinator-result",
+			IPC_CHANNELS.RELEASE_COORDINATOR_RESULT,
 			(payload) => callback(payload),
 		),
 
 	onReleaseCoordinatorError: (callback) =>
-		createIpcListener<[string]>("release-coordinator-error", (payload) =>
+		createIpcListener<[string]>(IPC_CHANNELS.RELEASE_COORDINATOR_ERROR, (payload) =>
 			callback(payload),
 		),
 });

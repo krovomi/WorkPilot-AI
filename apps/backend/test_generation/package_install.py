@@ -24,7 +24,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-from core.platform import find_executable
+from foundation.platform import find_executable
 from test_generation.libraries import (
     NPM,
     NUGET,

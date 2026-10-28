@@ -257,7 +257,7 @@ class TestOneNamePerFeature:
         assert new.read_text(encoding="utf-8") == "rules: []\n"
 
     def test_an_existing_new_file_is_never_written_over(self, tmp_path):
-        from core.workpilot_layout import move_legacy
+        from foundation.workpilot_layout import move_legacy
 
         old = tmp_path / "old.yml"
         new = tmp_path / "quality" / "rules.yml"

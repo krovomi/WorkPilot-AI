@@ -25,6 +25,7 @@ import {
 	revokeInvite,
 	setMode,
 } from "../server-connection";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
 
 const ENTRA_SCOPES = "openid profile email";
 const LOOPBACK_TIMEOUT_MS = 5 * 60 * 1000;
@@ -133,20 +134,20 @@ export function registerServerAuthHandlers(
 ): void {
 	const notifyRenderer = () => {
 		getMainWindow()?.webContents.send(
-			"server-auth:state-changed",
+			IPC_CHANNELS.SERVER_AUTH_STATE_CHANGED,
 			getAuthState(),
 		);
 	};
 
-	ipcMain.handle("server-auth:get-state", () => getAuthState());
+	ipcMain.handle(IPC_CHANNELS.SERVER_AUTH_GET_STATE, () => getAuthState());
 
 	ipcMain.handle(
-		"server-auth:get-config",
+		IPC_CHANNELS.SERVER_AUTH_GET_CONFIG,
 		async (_e, serverUrl: string) => await getServerAuthConfig(serverUrl),
 	);
 
 	ipcMain.handle(
-		"server-auth:set-mode",
+		IPC_CHANNELS.SERVER_AUTH_SET_MODE,
 		(_e, mode: "local" | "server", serverUrl?: string) => {
 			setMode(mode, serverUrl);
 			notifyRenderer();
@@ -155,7 +156,7 @@ export function registerServerAuthHandlers(
 	);
 
 	ipcMain.handle(
-		"server-auth:login-local",
+		IPC_CHANNELS.SERVER_AUTH_LOGIN_LOCAL,
 		async (_e, serverUrl: string, email: string, password: string) => {
 			setMode("server", serverUrl);
 			const result = await loginLocal(email, password);
@@ -165,7 +166,7 @@ export function registerServerAuthHandlers(
 	);
 
 	ipcMain.handle(
-		"server-auth:login-entra",
+		IPC_CHANNELS.SERVER_AUTH_LOGIN_ENTRA,
 		async (_e, serverUrl: string) => {
 			setMode("server", serverUrl);
 			const config = await getServerAuthConfig(serverUrl);
@@ -196,13 +197,13 @@ export function registerServerAuthHandlers(
 	// --- Invitation-only self-service signup ---
 
 	ipcMain.handle(
-		"server-auth:lookup-invite",
+		IPC_CHANNELS.SERVER_AUTH_LOOKUP_INVITE,
 		async (_e, serverUrl: string, token: string) =>
 			await lookupInvite(serverUrl, token),
 	);
 
 	ipcMain.handle(
-		"server-auth:accept-invite",
+		IPC_CHANNELS.SERVER_AUTH_ACCEPT_INVITE,
 		async (
 			_e,
 			serverUrl: string,
@@ -218,7 +219,7 @@ export function registerServerAuthHandlers(
 	);
 
 	ipcMain.handle(
-		"server-auth:create-invite",
+		IPC_CHANNELS.SERVER_AUTH_CREATE_INVITE,
 		async (
 			_e,
 			payload: {
@@ -231,22 +232,22 @@ export function registerServerAuthHandlers(
 	);
 
 	ipcMain.handle(
-		"server-auth:list-invites",
+		IPC_CHANNELS.SERVER_AUTH_LIST_INVITES,
 		async () => await listInvites(),
 	);
 
 	ipcMain.handle(
-		"server-auth:revoke-invite",
+		IPC_CHANNELS.SERVER_AUTH_REVOKE_INVITE,
 		async (_e, invitationId: string) => await revokeInvite(invitationId),
 	);
 
-	ipcMain.handle("server-auth:logout", async () => {
+	ipcMain.handle(IPC_CHANNELS.SERVER_AUTH_LOGOUT, async () => {
 		await logout();
 		notifyRenderer();
 		return getAuthState();
 	});
 
-	ipcMain.handle("server-auth:restore", async () => {
+	ipcMain.handle(IPC_CHANNELS.SERVER_AUTH_RESTORE, async () => {
 		await restoreSession();
 		notifyRenderer();
 		return getAuthState();

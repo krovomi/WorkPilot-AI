@@ -7,6 +7,7 @@
 
 import type { SimulationResult } from "../../../shared/types/sandbox";
 import { createIpcListener, invokeIpc } from "./ipc-utils";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export interface SandboxRunOptions {
 	projectPath: string;
@@ -31,20 +32,20 @@ export interface SandboxAPI {
 
 export const createSandboxAPI = (): SandboxAPI => ({
 	runSandboxScan: (options: SandboxRunOptions) =>
-		invokeIpc<SandboxResult>("sandbox:run", options),
+		invokeIpc<SandboxResult>(IPC_CHANNELS.SANDBOX_RUN, options),
 
-	cancelSandboxScan: () => invokeIpc<boolean>("sandbox:cancel"),
+	cancelSandboxScan: () => invokeIpc<boolean>(IPC_CHANNELS.SANDBOX_CANCEL),
 
 	onSandboxEvent: (callback) =>
-		createIpcListener<[SandboxEvent]>("sandbox-event", (payload) =>
+		createIpcListener<[SandboxEvent]>(IPC_CHANNELS.SANDBOX_EVENT, (payload) =>
 			callback(payload),
 		),
 
 	onSandboxResult: (callback) =>
-		createIpcListener<[SandboxResult]>("sandbox-result", (payload) =>
+		createIpcListener<[SandboxResult]>(IPC_CHANNELS.SANDBOX_RESULT, (payload) =>
 			callback(payload),
 		),
 
 	onSandboxError: (callback) =>
-		createIpcListener<[string]>("sandbox-error", (payload) => callback(payload)),
+		createIpcListener<[string]>(IPC_CHANNELS.SANDBOX_ERROR, (payload) => callback(payload)),
 });

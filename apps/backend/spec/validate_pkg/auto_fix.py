@@ -10,8 +10,8 @@ import logging
 import re
 from pathlib import Path
 
-from core.file_utils import write_json_atomic
 from core.plan_normalization import normalize_subtask_aliases
+from foundation.file_utils import write_json_atomic
 
 from ..plan_recovery import extract_json_document, normalize_plan_shape
 

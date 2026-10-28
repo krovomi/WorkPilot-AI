@@ -26,6 +26,9 @@ import {
 type IpcHandler = (event: unknown, ...args: unknown[]) => Promise<unknown>;
 const handlers = vi.hoisted(() => new Map<string, IpcHandler>());
 const env = vi.hoisted(() => ({ userData: "", dev: false }));
+const claudeProfiles = vi.hoisted(
+	() => new Map<string, { id: string; oauthToken?: string }>(),
+);
 
 vi.mock("electron", async () => {
 	const { sharedFakeSafeStorage } = await import(
@@ -62,10 +65,16 @@ vi.mock("../cli-tool-manager", () => ({
 	configureTools: vi.fn(),
 	getToolInfo: vi.fn(),
 	isPathFromWrongPlatform: vi.fn(() => false),
-	preWarmToolCache: vi.fn(),
+	preWarmToolCache: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock("../agent", () => ({ AgentManager: vi.fn() }));
+
+vi.mock("../claude-profile-manager", () => ({
+	getClaudeProfileManager: () => ({
+		getProfileToken: (id: string) => claudeProfiles.get(id)?.oauthToken,
+	}),
+}));
 
 vi.mock("../app-updater", () => ({
 	setUpdateChannel: vi.fn(),
@@ -75,6 +84,7 @@ vi.mock("../app-updater", () => ({
 const fake = sharedFakeSafeStorage();
 const isWindows = process.platform === "win32";
 const TOKEN = "sk-ant-oat01-test-0000";
+const MASKED_SECRET = "••••••••";
 
 let backendDir: string;
 
@@ -103,6 +113,9 @@ async function register() {
 		update: (config: unknown) =>
 			call(IPC_CHANNELS.AUTOBUILD_SOURCE_ENV_UPDATE, config),
 		get: () => call(IPC_CHANNELS.AUTOBUILD_SOURCE_ENV_GET),
+		getSettings: () => call(IPC_CHANNELS.SETTINGS_GET),
+		saveSettings: (settings: unknown) =>
+			call(IPC_CHANNELS.SETTINGS_SAVE, settings),
 		check: () => call(IPC_CHANNELS.AUTOBUILD_SOURCE_ENV_CHECK_TOKEN),
 		status: secretStorage.getSecureStorageStatus,
 	};
@@ -156,9 +169,10 @@ describe("AUTOBUILD_SOURCE_ENV handlers", () => {
 			const read = await get();
 			expect(read.data).toMatchObject({
 				hasClaudeToken: true,
-				claudeOAuthToken: TOKEN,
 				envExists: true,
 			});
+			// The renderer learns that a token is set, never the token (S6)
+			expect(JSON.stringify(read)).not.toContain(TOKEN);
 			expect((await check()).data).toMatchObject({ hasToken: true });
 		});
 
@@ -206,7 +220,64 @@ describe("AUTOBUILD_SOURCE_ENV handlers", () => {
 				secretsAtRisk: true,
 				readableSecretKeys: ["CLAUDE_CODE_OAUTH_TOKEN"],
 			});
-			expect((await get()).data).toMatchObject({ claudeOAuthToken: TOKEN });
+			const read = await get();
+			expect(read.data).toMatchObject({ hasClaudeToken: true });
+			expect(JSON.stringify(read)).not.toContain(TOKEN);
+		});
+	});
+
+	it("copies a Claude profile's token, named by id, without the renderer holding it", async () => {
+		env.dev = false;
+		claudeProfiles.set("work", { id: "work", oauthToken: TOKEN });
+		const { update, get } = await register();
+
+		expect(await update({ claudeProfileId: "work" })).toEqual({
+			success: true,
+		});
+		expect((await get()).data).toMatchObject({ hasClaudeToken: true });
+
+		expect(await update({ claudeProfileId: "unknown" })).toMatchObject({
+			success: false,
+		});
+		expect(await update({ claudeProfileId: { id: "work" } })).toMatchObject({
+			success: false,
+		});
+	});
+
+	it("hands the renderer settings with credentials masked, and keeps them on save", async () => {
+		env.dev = false;
+		const { getSettings, saveSettings } = await register();
+		const KEY = "sk-test-0000"; // pragma: allowlist secret
+		await saveSettings({
+			globalOpenAIApiKey: KEY,
+			customProviderUrl: "https://llm.example.test/v1",
+			customProviderApiKey: KEY,
+		});
+
+		const read = await getSettings();
+		expect(JSON.stringify(read)).not.toContain(KEY);
+		expect(read.data).toMatchObject({
+			globalOpenAIApiKey: MASKED_SECRET,
+			customProviderApiKey: MASKED_SECRET,
+		});
+
+		// The screens save the whole object back, masks included
+		await saveSettings({ ...read.data, theme: "dark" });
+		const { readSettingsFile } = await import("../settings-utils");
+		expect(readSettingsFile()).toMatchObject({
+			globalOpenAIApiKey: KEY,
+			customProviderApiKey: KEY,
+			theme: "dark",
+		});
+
+		// A kept key never follows the URL to another host
+		await saveSettings({
+			...read.data,
+			customProviderUrl: "https://elsewhere.example.test/v1",
+		});
+		expect(readSettingsFile()).toMatchObject({
+			globalOpenAIApiKey: KEY,
+			customProviderApiKey: "",
 		});
 	});
 
@@ -227,5 +298,42 @@ describe("AUTOBUILD_SOURCE_ENV handlers", () => {
 			expect(result.success).toBe(false);
 		}
 		expect(existsSync(envFile)).toBe(false);
+	});
+
+	it("refuses a new tool path it would not run, and writes nothing", async () => {
+		const { saveSettings } = await register();
+		const settingsFile = path.join(env.userData, "settings.json");
+		const before = readFileSync(settingsFile, "utf-8");
+
+		const result = await saveSettings({ gitPath: "sh", theme: "dark" });
+
+		expect(result).toEqual({
+			success: false,
+			error: "tool-path-refused",
+			data: { field: "gitPath" },
+		});
+		expect(readFileSync(settingsFile, "utf-8")).toBe(before);
+		expect((await saveSettings({ gitPath: "git" })).success).toBe(true);
+	});
+
+	it("refuses a backend folder in the temporary folder, and writes nothing", async () => {
+		const { saveSettings } = await register();
+		const settingsFile = path.join(env.userData, "settings.json");
+		const before = readFileSync(settingsFile, "utf-8");
+		const planted = mkdtempSync(path.join(tmpdir(), "planted-backend-"));
+		mkdirSync(path.join(planted, "runners"));
+		writeFileSync(path.join(planted, "runners", "spec_runner.py"), "", "utf-8");
+
+		try {
+			const result = await saveSettings({ autoBuildPath: planted });
+			expect(result).toEqual({
+				success: false,
+				error: "backend-path-refused",
+				data: { field: "autoBuildPath" },
+			});
+			expect(readFileSync(settingsFile, "utf-8")).toBe(before);
+		} finally {
+			rmSync(planted, { recursive: true, force: true });
+		}
 	});
 });

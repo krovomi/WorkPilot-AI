@@ -10,7 +10,7 @@ from pathlib import Path
 
 from context_mgmt.reset_limit import ResetLimit
 from core.client import create_agent_client
-from core.phase_event import ExecutionPhase, emit_phase
+from foundation.phase_event import ExecutionPhase, emit_phase
 from phase_config import (
     get_phase_model,
     get_phase_provider,

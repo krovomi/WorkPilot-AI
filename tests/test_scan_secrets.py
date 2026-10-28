@@ -612,7 +612,7 @@ class TestPathArgument:
 def _shell_hooks_runnable() -> bool:
     import shutil
 
-    from core.platform import is_windows
+    from foundation.platform import is_windows
 
     return not is_windows() and bool(shutil.which("sh") and shutil.which("node"))
 

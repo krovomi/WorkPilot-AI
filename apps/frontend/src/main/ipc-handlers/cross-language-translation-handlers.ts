@@ -18,6 +18,8 @@ import { fileURLToPath } from "node:url";
 import { ipcMain } from "electron";
 import { parsePythonCommand } from "../python-detector";
 import { getConfiguredPythonPath } from "../python-env-manager";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
+import { pythonRunnerEnv } from "../utils/python-runner-env";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -53,8 +55,10 @@ async function runRunner(
 	const [cmd, pythonBaseArgs] = parsePythonCommand(pythonPath);
 	const cmdArgs = [...pythonBaseArgs, getRunnerPath(), ...args];
 
+	// The runner's own backend (…/apps/backend/runners/<runner>.py), then the
+	// variables of the project's `.env`, which the translation may need.
+	const env = await pythonRunnerEnv(path.dirname(path.dirname(getRunnerPath())));
 	return new Promise((resolve) => {
-		const env = { ...process.env } as Record<string, string>;
 		const envFilePath = path.join(projectDir, ".env");
 		if (fs.existsSync(envFilePath)) {
 			try {
@@ -144,13 +148,13 @@ function appendHistory(projectDir: string, entry: object): void {
 }
 
 export function registerCrossLanguageTranslationHandlers(): void {
-	ipcMain.handle("crossLangTranslation:getSupportedLanguages", () => ({
+	ipcMain.handle(IPC_CHANNELS.CROSS_LANG_TRANSLATION_GET_SUPPORTED_LANGUAGES, () => ({
 		success: true,
 		data: SUPPORTED_LANGUAGES,
 	}));
 
 	ipcMain.handle(
-		"crossLangTranslation:translate",
+		IPC_CHANNELS.CROSS_LANG_TRANSLATION_TRANSLATE,
 		async (
 			event,
 			params: {
@@ -208,7 +212,7 @@ export function registerCrossLanguageTranslationHandlers(): void {
 			}
 
 			const result = await runRunner(params.projectDir, args, (chunk) => {
-				event.sender.send("crossLangTranslation:streamChunk", chunk);
+				event.sender.send(IPC_CHANNELS.CROSS_LANG_TRANSLATION_STREAM_CHUNK, chunk);
 			});
 
 			if (tempFile && fs.existsSync(tempFile)) {
@@ -237,12 +241,11 @@ export function registerCrossLanguageTranslationHandlers(): void {
 				);
 			}
 
-			event.sender.send("crossLangTranslation:complete", result);
 			return result;
 		},
 	);
 
-	ipcMain.handle("crossLangTranslation:cancel", () => {
+	ipcMain.handle(IPC_CHANNELS.CROSS_LANG_TRANSLATION_CANCEL, () => {
 		if (_currentProcess) {
 			_currentProcess.kill("SIGTERM");
 			_currentProcess = null;
@@ -252,7 +255,7 @@ export function registerCrossLanguageTranslationHandlers(): void {
 	});
 
 	ipcMain.handle(
-		"crossLangTranslation:getHistory",
+		IPC_CHANNELS.CROSS_LANG_TRANSLATION_GET_HISTORY,
 		(_event, projectDir: string, limit: number = 50) => {
 			try {
 				const history = loadHistory(projectDir).slice(0, limit);
@@ -264,7 +267,7 @@ export function registerCrossLanguageTranslationHandlers(): void {
 	);
 
 	ipcMain.handle(
-		"crossLangTranslation:clearHistory",
+		IPC_CHANNELS.CROSS_LANG_TRANSLATION_CLEAR_HISTORY,
 		(_event, projectDir: string) => {
 			try {
 				const p = getHistoryPath(projectDir);

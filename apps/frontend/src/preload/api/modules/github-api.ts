@@ -722,7 +722,7 @@ export const createGitHubAPI = (): GitHubAPI => ({
 		repo: string;
 		token: string;
 	}): Promise<{ success: boolean; status?: number; error?: string }> =>
-		invokeIpc("github:testConnection", config),
+		invokeIpc(IPC_CHANNELS.GITHUB_TEST_CONNECTION, config),
 
 	investigateGitHubIssue: (
 		projectId: string,

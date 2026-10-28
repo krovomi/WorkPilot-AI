@@ -120,6 +120,11 @@ export function useSidebarPrefs() {
 		[update],
 	);
 
+	const setHideExperimental = useCallback(
+		(value: boolean) => update({ hideExperimental: value }),
+		[update],
+	);
+
 	const clearAllFavorites = useCallback(() => {
 		update({ pinnedItems: [], pinnedGroups: [] });
 	}, [update]);
@@ -137,6 +142,7 @@ export function useSidebarPrefs() {
 			reorderItems,
 			toggleGroupExpanded,
 			setFavoritesExpanded,
+			setHideExperimental,
 			clearAllFavorites,
 			reset,
 			mergeOrder,
@@ -149,6 +155,7 @@ export function useSidebarPrefs() {
 			reorderItems,
 			toggleGroupExpanded,
 			setFavoritesExpanded,
+			setHideExperimental,
 			clearAllFavorites,
 			reset,
 		],

@@ -10,7 +10,9 @@ import json
 import logging
 import os
 import re
+from dataclasses import dataclass
 from datetime import datetime, timedelta
+from enum import Enum
 from pathlib import Path
 
 from agents.agent_audit import audit_decision, audit_event
@@ -42,7 +44,6 @@ try:
     )
 except ImportError:
     _ut_start_build = _ut_finish_build = _ut_record_task = None  # type: ignore[assignment]
-from core.phase_event import ExecutionPhase, emit_phase
 from core.progress import (
     count_subtasks,
     count_subtasks_detailed,
@@ -53,6 +54,7 @@ from core.progress import (
     print_progress_summary,
     print_session_header,
 )
+from foundation.phase_event import ExecutionPhase, emit_phase
 from harness.domain.layout import Segment, Stability, assemble
 from integrations.linear.updater import (
     LinearTaskState,
@@ -675,6 +677,1108 @@ def _docs_section(spec_dir: Path, subtask: dict | None = None) -> str:
         return ""
 
 
+# --- One session's outcome -------------------------------------------------
+# run_autonomous_agent hands each session's status to the functions below;
+# they used to be one 460-line branch inside its loop (audit of 17 October,
+# lot M10). `tests/agents/test_coder_error_branches.py` pins what each does.
+
+# The same error message this many times in a row halts the phase instead of
+# retrying with a conversation summary that grows every time.
+MAX_REPEATED_GENERIC_ERRORS = 3
+
+
+class _Next(Enum):
+    """What the loop does once a session's outcome is handled."""
+
+    STOP = "stop"  # leave the loop
+    RETRY = "retry"  # next session now, without the pause between sessions
+    NEXT = "next"  # next session after the usual pause
+
+
+@dataclass
+class _RetryState:
+    """What the loop carries from one failed session to the next."""
+
+    concurrency_errors: int = 0
+    retry_delay: int = INITIAL_RETRY_DELAY_SECONDS
+    # Told to the next coding session after a tool concurrency error.
+    concurrency_context: str | None = None
+    # Set when a planning session hit one: the loop plans again with it.
+    replan_context: str | None = None
+    last_error_signature: str | None = None
+    repeated_errors: int = 0
+
+    def reset_concurrency(self) -> None:
+        """After a session that worked, or failed for another reason."""
+        self.concurrency_errors = 0
+        self.retry_delay = INITIAL_RETRY_DELAY_SECONDS
+        self.concurrency_context = None
+
+
+@dataclass(frozen=True)
+class _SessionScope:
+    """The session that just ended, as the outcome handlers need it."""
+
+    project_dir: Path
+    spec_dir: Path
+    source_spec_dir: Path | None
+    status_manager: object
+    task_logger: object
+    log_phase: LogPhase
+    phase: str
+    model: str
+    is_planning: bool
+    subtask_id: str | None
+    recovery_manager: RecoveryManager
+    client: object
+
+
+async def _on_build_complete(scope: _SessionScope, linear_task) -> None:
+    """Every subtask is done: tell the UI, Linear and the learning loop."""
+    # Emit ALL_SUBTASKS_DONE so frontend XState transitions coding → qa_review.
+    # Without this, the process may exit without a terminal event, causing
+    # the kanban card to stay stuck in the "In Progress" column.
+    try:
+        completed, total = count_subtasks(scope.spec_dir)
+        task_event_emitter = TaskEventEmitter.from_spec_dir(scope.spec_dir)
+        task_event_emitter.emit(
+            "ALL_SUBTASKS_DONE",
+            {"totalCount": total},
+        )
+    except Exception:
+        logger.debug("Failed to emit ALL_SUBTASKS_DONE event", exc_info=True)
+
+    print_build_complete_banner(scope.spec_dir)
+    scope.status_manager.update(state=BuildState.COMPLETE)
+
+    if scope.task_logger:
+        scope.task_logger.end_phase(
+            LogPhase.CODING,
+            success=True,
+            message="All subtasks completed successfully",
+        )
+
+    if linear_task and linear_task.task_id:
+        await linear_build_complete(scope.spec_dir)
+        print_status("Linear notified: build complete, ready for QA", "success")
+
+    # Learning Loop: extract patterns from this build
+    try:
+        from learning_loop.service import LearningLoopService
+
+        learning_service = LearningLoopService(scope.project_dir)
+        report = await learning_service.run_post_build_analysis(scope.spec_dir)
+        if report.patterns_found:
+            print_status(
+                f"Learning loop: {len(report.patterns_found)} pattern(s) extracted",
+                "success",
+            )
+    except Exception as e:
+        logger.debug(f"Learning loop post-build analysis skipped: {e}")
+
+
+async def _on_session_continue(scope: _SessionScope) -> None:
+    """A session ended with work left: show what comes next, then pause."""
+    print(muted(f"\nAgent will auto-continue in {AUTO_CONTINUE_DELAY_SECONDS}s..."))
+    print_progress_summary(scope.spec_dir)
+
+    # Update state back to building
+    scope.status_manager.update(
+        state=BuildState.PLANNING if scope.is_planning else BuildState.BUILDING
+    )
+
+    # Show next subtask info
+    next_subtask = get_next_subtask(scope.spec_dir)
+    if next_subtask:
+        next_id = next_subtask.get("id")
+        print(f"\nNext: {highlight(next_id)} - {next_subtask.get('description')}")
+
+        attempt_count = scope.recovery_manager.get_attempt_count(next_id)
+        if attempt_count > 0:
+            print_status(f"WARNING: {attempt_count} previous attempt(s)", "warning")
+
+    await asyncio.sleep(AUTO_CONTINUE_DELAY_SECONDS)
+
+
+async def _on_session_error(
+    scope: _SessionScope, retry: _RetryState, error_info: dict | None
+) -> _Next:
+    """Retry, pause for the user, or halt, depending on the kind of error."""
+    emit_phase(ExecutionPhase.FAILED, "Session encountered an error")
+    kind = error_info.get("type") if error_info else None
+    if kind == "tool_concurrency":
+        return await _on_concurrency_error(scope, retry, error_info)
+    if not error_info:
+        return await _on_other_error(scope, retry, error_info)
+    # Any other error ends a run of concurrency errors; the generic retry
+    # resets the count itself, once it knows it is not halting.
+    if kind == "model_unavailable":
+        retry.reset_concurrency()
+        return _on_model_unavailable(scope)
+    if kind == "prompt_too_long" or is_prompt_too_long_error(
+        RuntimeError(error_info.get("message", ""))
+    ):
+        retry.reset_concurrency()
+        return _on_prompt_too_long(scope, error_info)
+    if kind == "rate_limit":
+        retry.reset_concurrency()
+        return await _on_rate_limit(scope, retry, error_info)
+    if kind == "authentication":
+        retry.reset_concurrency()
+        return await _on_auth_failure(scope, error_info)
+    return await _on_other_error(scope, retry, error_info)
+
+
+async def _on_concurrency_error(
+    scope: _SessionScope, retry: _RetryState, error_info: dict
+) -> _Next:
+    """HTTP 400 tool concurrency: back off, and tell the next session why."""
+    retry.concurrency_errors += 1
+
+    # Check if we've exceeded max retries (allow 5 retries with delays: 2s, 4s, 8s, 16s, 32s)
+    if retry.concurrency_errors > MAX_CONCURRENCY_RETRIES:
+        print_status(
+            f"Tool concurrency limit hit {retry.concurrency_errors} times consecutively",
+            "error",
+        )
+        print()
+        print("=" * 70)
+        print("  CRITICAL: Agent stuck in retry loop")
+        print("=" * 70)
+        print()
+        print("The agent is repeatedly hitting Claude API's tool concurrency limit.")
+        print("This usually means the agent is trying to use too many tools at once.")
+        print()
+        print("Possible solutions:")
+        print("  1. The agent needs to reduce tool usage per request")
+        print("  2. Break down the current subtask into smaller steps")
+        print("  3. Manual intervention may be required")
+        print()
+        print(f"Error: {error_info.get('message', 'Unknown error')[:200]}")
+        print()
+
+        # Mark current subtask as stuck if we have one
+        if scope.subtask_id:
+            scope.recovery_manager.mark_subtask_stuck(
+                scope.subtask_id,
+                f"Tool concurrency errors after {retry.concurrency_errors} retries",
+            )
+            print_status(f"Subtask {scope.subtask_id} marked as STUCK", "error")
+
+        scope.status_manager.update(state=BuildState.ERROR)
+        return _Next.STOP
+
+    # Exponential backoff: 2s, 4s, 8s, 16s, 32s
+    print_status(
+        f"Tool concurrency error (retry {retry.concurrency_errors}/{MAX_CONCURRENCY_RETRIES})",
+        "warning",
+    )
+    print(muted(f"Waiting {retry.retry_delay}s before retry (exponential backoff)..."))
+    print()
+
+    # Set context for next retry so agent knows to adjust behavior
+    error_context_message = (
+        "## CRITICAL: TOOL CONCURRENCY ERROR\n\n"
+        f"Your previous session hit Claude API's tool concurrency limit (HTTP 400).\n"
+        f"This is retry {retry.concurrency_errors}/{MAX_CONCURRENCY_RETRIES}.\n\n"
+        "**IMPORTANT: You MUST adjust your approach:**\n"
+        "1. Use ONE tool at a time - do NOT call multiple tools in parallel\n"
+        "2. Wait for each tool result before calling the next tool\n"
+        "3. Avoid starting with `pwd` or multiple Read calls at once\n"
+        "4. If you need to read multiple files, read them one by one\n"
+        "5. Take a more incremental, step-by-step approach\n\n"
+        "Start by focusing on ONE specific action for this subtask."
+    )
+
+    # If we're in planning phase, reset first_run to True so next iteration
+    # re-enters the planning branch (fix for issue #1565)
+    if scope.log_phase == LogPhase.PLANNING:
+        retry.replan_context = error_context_message
+        print_status("Planning session failed - will retry planning", "warning")
+    else:
+        retry.concurrency_context = error_context_message
+
+    scope.status_manager.update(state=BuildState.ERROR)
+    await asyncio.sleep(retry.retry_delay)
+
+    # Double the retry delay for next time (cap at MAX_RETRY_DELAY_SECONDS)
+    retry.retry_delay = min(retry.retry_delay * 2, MAX_RETRY_DELAY_SECONDS)
+    return _Next.NEXT
+
+
+def _on_model_unavailable(scope: _SessionScope) -> _Next:
+    """Retrying is futile: halt and ask for another model for this phase."""
+    # The selected model is invalid or the account can't access it
+    # (typically after a hot-swap to a catalog model that isn't
+    # actually available, e.g. claude-haiku-4-6). Retrying is futile
+    # and, worse, the phase would otherwise advance with nothing done.
+    # Halt and tell the user to pick a valid model for this phase.
+    _bad_model = get_phase_model(scope.spec_dir, scope.phase, scope.model)
+    print_status(
+        f"Modèle indisponible pour la phase « {scope.phase} » : "
+        f"{_bad_model}. Choisissez un autre modèle (dropdown de la "
+        f"phase) puis relancez.",
+        "error",
+    )
+    if scope.task_logger:
+        scope.task_logger.log_error(
+            f"Unavailable model: {_bad_model}. Phase halted — pick a "
+            f"valid model for this phase and re-run it.",
+            scope.log_phase,
+        )
+    emit_phase(
+        ExecutionPhase.FAILED,
+        f"Selected model unavailable: {_bad_model}",
+    )
+    scope.status_manager.update(state=BuildState.ERROR)
+    return _Next.STOP
+
+
+def _on_prompt_too_long(scope: _SessionScope, error_info: dict) -> _Next:
+    """Retry on a fresh thread when the task allows one, else halt."""
+    # Prompt too long for the LLM context window — retrying with
+    # the same conversation will fail identically. Halt the loop
+    # and surface the right remediation to the user.
+    #
+    # We accept BOTH the new explicit type tag and the legacy
+    # string-match path so a partial deploy (only one side updated)
+    # still breaks the loop instead of spinning on the error.
+    # Unless the task's context policy allows a fresh thread: the
+    # conversation is then different, and the retry can succeed.
+    from context_mgmt.recovery import recover_from_prompt_too_long
+
+    if recover_from_prompt_too_long(
+        scope.spec_dir,
+        scope.project_dir,
+        scope.log_phase.value,
+        scope.subtask_id,
+        provider=scope.client.provider_name(),
+        model=str(getattr(scope.client, "model", "") or ""),
+    ):
+        print_status(
+            "Prompt too long — new thread started from a handoff note",
+            "warning",
+        )
+        return _Next.RETRY
+    from services.rate_limit_shield import handle_prompt_too_long
+
+    handle_prompt_too_long(
+        RuntimeError(error_info.get("message", "")),
+        scope.spec_dir,
+        "coder",
+    )
+    print_status(
+        "Prompt too long — task halted (reset conversation or switch provider)",
+        "error",
+    )
+    emit_phase(
+        ExecutionPhase.FAILED,
+        "Prompt too long for LLM context window",
+    )
+    scope.status_manager.update(state=BuildState.ERROR)
+    return _Next.STOP
+
+
+async def _on_rate_limit(
+    scope: _SessionScope, retry: _RetryState, error_info: dict
+) -> _Next:
+    """Wait for the reset when it is known and not too far away."""
+    # Rate limit error - intelligent wait for reset
+    reset_timestamp = parse_rate_limit_reset_time(error_info)
+    if reset_timestamp:
+        wait_seconds = reset_timestamp - datetime.now().timestamp()
+
+        # Handle negative wait_seconds (reset time in the past)
+        if wait_seconds <= 0:
+            print_status(
+                "Rate limit reset time already passed - retrying immediately",
+                "warning",
+            )
+            scope.status_manager.update(state=BuildState.BUILDING)
+            await asyncio.sleep(2)  # Brief delay before retry
+            return _Next.RETRY
+
+        if wait_seconds > MAX_RATE_LIMIT_WAIT_SECONDS:
+            # Wait time too long - fail the task
+            print_status("Rate limit wait time too long", "error")
+            print(f"Reset time would require waiting {wait_seconds / 3600:.1f} hours")
+            print(f"Maximum wait is {MAX_RATE_LIMIT_WAIT_SECONDS / 3600:.1f} hours")
+            emit_phase(
+                ExecutionPhase.FAILED,
+                "Rate limit wait time exceeds maximum allowed",
+            )
+            scope.status_manager.update(state=BuildState.ERROR)
+            return _Next.STOP
+
+        # Emit pause phase with reset time for frontend
+        wait_minutes = wait_seconds / 60
+        emit_phase(
+            ExecutionPhase.RATE_LIMIT_PAUSED,
+            f"Rate limit - resuming in {wait_minutes:.0f} minutes",
+            reset_timestamp=reset_timestamp,
+        )
+
+        # Create pause file for frontend detection
+        # Sanitize error message to prevent exposing sensitive data
+        raw_error = error_info.get("message", "Rate limit reached")
+        sanitized_error = (
+            sanitize_error_message(raw_error, max_length=500) or "Rate limit reached"
+        )
+        pause_data = {
+            "paused_at": datetime.now().isoformat(),
+            "reset_timestamp": reset_timestamp,
+            "error": sanitized_error,
+        }
+        pause_file = scope.spec_dir / RATE_LIMIT_PAUSE_FILE
+        pause_file.write_text(json.dumps(pause_data), encoding="utf-8")
+
+        print_status(
+            f"Rate limited - waiting {wait_minutes:.0f} minutes for reset",
+            "warning",
+        )
+        scope.status_manager.update(state=BuildState.PAUSED)
+
+        # Wait with periodic checks for resume signal
+        resumed_early = await wait_for_rate_limit_reset(
+            scope.spec_dir, wait_seconds, scope.source_spec_dir
+        )
+        if resumed_early:
+            print_status("Resumed early by user", "success")
+
+        # Resume execution
+        emit_phase(
+            ExecutionPhase.PLANNING if scope.is_planning else ExecutionPhase.CODING,
+            "Resuming after rate limit",
+        )
+        scope.status_manager.update(
+            state=BuildState.PLANNING if scope.is_planning else BuildState.BUILDING
+        )
+        return _Next.RETRY
+    else:
+        # Couldn't parse reset time - fall back to standard retry
+        print_status("Rate limit hit (unknown reset time)", "warning")
+        print(muted("Will retry with a fresh session..."))
+        scope.status_manager.update(state=BuildState.ERROR)
+        await asyncio.sleep(AUTO_CONTINUE_DELAY_SECONDS)
+        retry.reset_concurrency()
+        scope.status_manager.update(state=BuildState.BUILDING)
+        return _Next.RETRY
+
+
+async def _on_auth_failure(scope: _SessionScope, error_info: dict) -> _Next:
+    """Pause until the user signs in again."""
+    # Authentication error - pause for user re-authentication
+    emit_phase(
+        ExecutionPhase.AUTH_FAILURE_PAUSED,
+        "Re-authentication required",
+    )
+
+    # Create pause file for frontend detection
+    # Sanitize error message to prevent exposing sensitive data
+    raw_error = error_info.get("message", "Authentication failed")
+    sanitized_error = (
+        sanitize_error_message(raw_error, max_length=500) or "Authentication failed"
+    )
+    pause_data = {
+        "paused_at": datetime.now().isoformat(),
+        "error": sanitized_error,
+        "requires_action": "re-authenticate",
+    }
+    pause_file = scope.spec_dir / AUTH_FAILURE_PAUSE_FILE
+    pause_file.write_text(json.dumps(pause_data), encoding="utf-8")
+
+    print()
+    print("=" * 70)
+    print("  AUTHENTICATION REQUIRED")
+    print("=" * 70)
+    print()
+    print("OAuth token is invalid or expired.")
+    print("Please re-authenticate in the WorkPilot AI settings.")
+    print()
+    print("The task will automatically resume once you re-authenticate.")
+    print()
+
+    scope.status_manager.update(state=BuildState.PAUSED)
+
+    # Wait for user to complete re-authentication
+    await wait_for_auth_resume(scope.spec_dir, scope.source_spec_dir)
+
+    print_status("Authentication restored - resuming", "success")
+    emit_phase(
+        ExecutionPhase.PLANNING if scope.is_planning else ExecutionPhase.CODING,
+        "Resuming after re-authentication",
+    )
+    scope.status_manager.update(
+        state=BuildState.PLANNING if scope.is_planning else BuildState.BUILDING
+    )
+    return _Next.RETRY
+
+
+async def _on_other_error(
+    scope: _SessionScope, retry: _RetryState, error_info: dict | None
+) -> _Next:
+    """Retry, unless the same error keeps coming back."""
+    # Other errors - use standard retry logic, but bail out if the
+    # same error keeps recurring so we don't loop forever (and don't
+    # pollute the logs with duplicate banners). This catches the
+    # case where, for whatever reason, the rate-limit / prompt-too-
+    # long detectors don't match a new CLI banner shape: instead of
+    # retrying with the conversation-continuation summary (which
+    # makes the prompt grow every iteration) we surface the failure.
+    current_signature = (
+        (error_info or {}).get("message", "") if error_info else str(error_info)
+    )
+    # Normalise the signature so timestamps / reset-time tails don't
+    # defeat the comparison ("resets 3:20pm" vs "resets 3:21pm").
+    normalised_signature = re.sub(r"\s+", " ", current_signature[:200]).strip()
+
+    if (
+        retry.last_error_signature is not None
+        and normalised_signature == retry.last_error_signature
+    ):
+        retry.repeated_errors += 1
+    else:
+        retry.last_error_signature = normalised_signature
+        retry.repeated_errors = 1
+
+    if retry.repeated_errors >= MAX_REPEATED_GENERIC_ERRORS:
+        halt_msg = (
+            f"La même erreur s'est répétée {retry.repeated_errors} "
+            f"fois, la phase est arrêtée : {current_signature[:300]}"
+        )
+        print_status(
+            f"Same error repeated {retry.repeated_errors} times — halting "
+            "instead of growing the conversation summary further.",
+            "error",
+        )
+        emit_phase(
+            ExecutionPhase.FAILED,
+            "Repeated error (retry would not change outcome)",
+        )
+        scope.status_manager.update(state=BuildState.ERROR)
+        # Carries the repeated error itself, not "something went
+        # wrong": it is the only thing that tells the user whether
+        # to change the model, the credentials or the spec.
+        _emit_phase_failure(
+            scope.spec_dir,
+            "planning" if scope.is_planning else "coding",
+            halt_msg,
+            recoverable=False,
+            subtask_id=scope.subtask_id,
+        )
+        raise BuildHalted(
+            "planning" if scope.is_planning else "coding",
+            halt_msg,
+            recoverable=False,
+        )
+
+    print_status("Session encountered an error", "error")
+    print(muted("Will retry with a fresh session..."))
+    scope.status_manager.update(state=BuildState.ERROR)
+    await asyncio.sleep(AUTO_CONTINUE_DELAY_SECONDS)
+
+    # Reset concurrency error tracking on non-concurrency errors
+    retry.reset_concurrency()
+    return _Next.NEXT
+
+
+async def _planning_prompt(
+    spec_dir: Path,
+    project_dir: Path,
+    *,
+    jev_classification,
+    workflow_plan,
+    effort_preamble,
+    workflow_repo_root: Path,
+    planning_retry_context: str | None,
+) -> str:
+    """The planner's prompt: the template, then what this project adds to it."""
+    from integrations.jev.rubrics import advice_text
+
+    prompt = generate_planner_prompt(spec_dir, project_dir)
+    if jev_advice := advice_text(jev_classification):
+        prompt += "\n\n" + jev_advice
+    # Chantier 4's portable answer to effort sensitivity: the engine
+    # states the level rather than the prompt template branching on a
+    # variable only some harnesses expose.
+    if workflow_plan is not None and effort_preamble is not None:
+        prompt = (
+            effort_preamble(workflow_plan, "planning", workflow_repo_root)
+            + "\n\n"
+            + prompt
+        )
+    if planning_retry_context:
+        prompt += "\n\n" + planning_retry_context
+
+    # Project memory from the shared brain for the planning phase:
+    # previous patterns, gotchas and session insights of this project
+    planner_context = await get_memory_context(
+        spec_dir,
+        project_dir,
+        {
+            "description": "Planning implementation for new feature",
+            "id": "planner",
+        },
+    )
+    if planner_context:
+        prompt += "\n\n" + planner_context
+        print_status("Project memory loaded for planner", "success")
+
+    # The plan decides which APIs the subtasks will call. A planner
+    # that knows the current signatures plans against them.
+    planner_docs = _docs_section(spec_dir)
+    if planner_docs:
+        prompt += "\n\n" + planner_docs
+        print_status("Library documentation available to planner", "success")
+
+    # A spec-kit project states its own rules; a plan written without
+    # them is one its own tooling would reject.
+    planner_rules = constitution_section(project_dir)
+    if planner_rules:
+        prompt += "\n\n" + planner_rules
+        print_status("spec-kit constitution applied to planning", "success")
+
+    # The ADRs bind the plan the way the constitution does, and the
+    # diagram or mockup attached to the task is where the person said
+    # what they meant when the description did not.
+    planner_documents = docintel_section(project_dir, spec_dir)
+    if planner_documents:
+        prompt += "\n\n" + planner_documents
+        print_status("ADRs and task attachments applied to planning", "success")
+
+    # The approaches `brainstorm` compared before planning. Its report
+    # was written to the spec's workflow/ directory and read by nobody
+    # until handed over here (`workflows.handoff`).
+    planner_reports = workflow_reports_section(spec_dir, "planning")
+    if planner_reports:
+        prompt += "\n\n" + planner_reports
+        print_status("Earlier phase reports handed to the planner", "success")
+
+    # A phone application has no dev server and no URL: the plan has to
+    # say which platform each subtask is verified on, and on a machine
+    # without the toolchain for one of them, that it is not. A planner
+    # told this after the fact writes subtasks nobody can execute.
+    planner_mobile = mobile_section(project_dir)
+    if planner_mobile:
+        prompt += "\n\n" + planner_mobile
+        print_status("Mobile stack and device toolchain applied to planning", "success")
+    return prompt
+
+
+async def _coding_prompt(
+    spec_dir: Path,
+    project_dir: Path,
+    next_subtask: dict,
+    *,
+    subtask_id: str,
+    attempt_count: int,
+    recovery_manager: RecoveryManager,
+    workflow_plan,
+    effort_preamble,
+    workflow_repo_root: Path,
+    phase_provider: str | None,
+    current_phase: str,
+    phase_thinking_budget,
+    retry: _RetryState,
+) -> str:
+    """One subtask's prompt: what the task shares first, then the subtask."""
+    recovery_hints = (
+        recovery_manager.get_recovery_hints(subtask_id) if attempt_count > 0 else None
+    )
+
+    # Find the phase for this subtask
+    plan = load_implementation_plan(spec_dir)
+    phase = find_phase_for_subtask(plan, subtask_id) if plan else {}
+
+    # Generate focused, minimal prompt for this subtask
+    subtask_prompt = generate_subtask_prompt(
+        spec_dir=spec_dir,
+        project_dir=project_dir,
+        subtask=next_subtask,
+        phase=phase or {},
+        attempt_count=attempt_count,
+        recovery_hints=recovery_hints,
+    )
+    effort = (
+        effort_preamble(workflow_plan, "coding", workflow_repo_root)
+        if workflow_plan is not None and effort_preamble is not None
+        else ""
+    )
+    # What every subtask of the task shares first, the subtask after
+    # it: each subtask is a new session, and a provider that caches
+    # the first tokens of a prompt reads that block from its cache
+    # instead of being billed for it again behind a subtask header.
+    prompt = assemble(
+        [
+            *_coding_task_segments(project_dir, spec_dir, effort),
+            Segment("subtask", subtask_prompt, Stability.SESSION),
+        ]
+    )
+
+    # Interrupted mid-subtask: the replayed transcript shows what the
+    # previous session did, this says its end was not a conclusion.
+    resume_directive = interrupted_subtask_directive(next_subtask)
+    if resume_directive:
+        prompt += "\n\n" + resume_directive
+
+    # Load and append relevant file context — only when the
+    # (provider, effort) pair benefits from inlining. Claude agents
+    # and high-effort runs re-read files via tools anyway, so inline
+    # content there is duplicated input paid on every turn.
+    # Provider resolved WITHOUT side effects (get_phase_provider) —
+    # _get_active_provider would consume the RESUME_WITH_PROVIDER
+    # marker before create_agent_client gets to read it.
+    inline_provider = phase_provider or get_phase_provider(
+        spec_dir, phase=current_phase
+    )
+    if should_inline_file_context(inline_provider, phase_thinking_budget):
+        context = load_subtask_context(spec_dir, project_dir, next_subtask)
+        if context.get("patterns") or context.get("files_to_modify"):
+            prompt += "\n\n" + format_context_for_prompt(context)
+    else:
+        print(
+            muted(
+                "File context inlining skipped (agent reads files via "
+                "tools — saves duplicated prompt tokens)"
+            )
+        )
+
+    # Project memory from the shared brain, for this subtask
+    memory_context = await get_memory_context(spec_dir, project_dir, next_subtask)
+    if memory_context:
+        prompt += "\n\n" + memory_context
+        print_status("Project memory loaded", "success")
+
+    # Documentation downloaded before the build, as paths rather than
+    # inlined pages: the agent reads the one its subtask is about.
+    docs_context = _docs_section(spec_dir, next_subtask)
+    if docs_context:
+        prompt += "\n\n" + docs_context
+
+    # The opposite of the constitution and the platform rules,
+    # deliberately (`_coding_task_segments`): the design system
+    # goes to the subtasks whose declared files are on the interface,
+    # and to none other — a full-stack task pays for it on its front
+    # end only, a backend task never (`uiux.prompt`).
+    design = uiux_section(spec_dir, next_subtask)
+    if design:
+        prompt += "\n\n" + design
+
+    # Add concurrency error context if recovering from 400 error
+    if retry.concurrency_context:
+        prompt += "\n\n" + retry.concurrency_context
+        print_status(
+            f"Added tool concurrency error context (retry {retry.concurrency_errors}/{MAX_CONCURRENCY_RETRIES})",
+            "warning",
+        )
+    return prompt
+
+
+def _record_usage(
+    project_dir: Path, spec_dir: Path, build_status: str, task_status: str
+) -> None:
+    """Usage tracking is telemetry: it never costs the build anything."""
+    if _ut_finish_build is not None:
+        try:
+            _ut_finish_build(spec_dir, status=build_status)
+        except Exception:
+            pass
+    if _ut_record_task is not None:
+        try:
+            _ut_record_task(project_dir, spec_dir.name, task_status)
+        except Exception:
+            pass
+
+
+def _report_run_end(
+    project_dir: Path,
+    spec_dir: Path,
+    *,
+    iteration: int,
+    recovery_manager: RecoveryManager,
+    status_manager,
+    agent_trace_id,
+) -> None:
+    """The run's summary, its next steps, and the state it leaves the build in."""
+    # Final summary
+    content = [
+        bold(f"{icon(Icons.SESSION)} SESSION SUMMARY"),
+        "",
+        f"Project: {project_dir}",
+        f"Spec: {highlight(spec_dir.name)}",
+        f"Sessions completed: {iteration}",
+    ]
+    print()
+    print(box(content, width=70, style="heavy"))
+    print_progress_summary(spec_dir)
+
+    # Show stuck subtasks if any
+    stuck_subtasks = recovery_manager.get_stuck_subtasks()
+    if stuck_subtasks:
+        print()
+        print_status("STUCK SUBTASKS (need manual intervention):", "error")
+        for stuck in stuck_subtasks:
+            print(f"  {icon(Icons.ERROR)} {stuck['subtask_id']}: {stuck['reason']}")
+
+    # Instructions
+    completed, total = count_subtasks(spec_dir)
+    if completed < total:
+        content = [
+            bold(f"{icon(Icons.PLAY)} NEXT STEPS"),
+            "",
+            f"{total - completed} subtasks remaining.",
+            f"Run again: {highlight(f'python workpilot/run.py --spec {spec_dir.name}')}",
+        ]
+    else:
+        content = [
+            bold(f"{icon(Icons.SUCCESS)} NEXT STEPS"),
+            "",
+            "All subtasks completed!",
+            "  1. Review the workpilot/* branch",
+            "  2. Run manual tests",
+            "  3. Merge to main",
+        ]
+
+    print()
+    print(box(content, width=70, style="light"))
+    print()
+
+    # Set final status
+    if completed == total:
+        status_manager.update(state=BuildState.COMPLETE)
+        _record_usage(project_dir, spec_dir, "complete", "completed")
+        # Log agent completion
+        workflow_logger.log_agent_end(
+            AGENT_NAME,
+            "autonomous_agent_loop",
+            "success",
+            {
+                "total_sessions": iteration,
+                "completed_subtasks": completed,
+                "total_subtasks": total,
+                "project_dir": str(project_dir),
+                "spec_dir": str(spec_dir.name),
+            },
+            agent_trace_id,
+        )
+        audit_event(
+            project_dir,
+            kind="agent_completed",
+            actor="coder",
+            correlation_id=spec_dir.name,
+            summary=f"coder completed: {completed}/{total} subtasks",
+            payload={
+                "completed_subtasks": completed,
+                "total_subtasks": total,
+                "total_sessions": iteration,
+            },
+        )
+    else:
+        status_manager.update(state=BuildState.PAUSED)
+        _record_usage(project_dir, spec_dir, "paused", "in_progress")
+        # Log agent pause
+        workflow_logger.log_agent_end(
+            AGENT_NAME,
+            "autonomous_agent_loop",
+            "paused",
+            {
+                "total_sessions": iteration,
+                "completed_subtasks": completed,
+                "total_subtasks": total,
+                "remaining": total - completed,
+                "project_dir": str(project_dir),
+                "spec_dir": str(spec_dir.name),
+            },
+            agent_trace_id,
+        )
+        audit_event(
+            project_dir,
+            kind="agent_paused",
+            actor="coder",
+            correlation_id=spec_dir.name,
+            summary=f"coder paused: {completed}/{total} subtasks",
+            payload={
+                "completed_subtasks": completed,
+                "total_subtasks": total,
+                "remaining": total - completed,
+            },
+        )
+
+
+def _validate_and_fix_implementation_plan(
+    spec_dir: Path,
+    project_dir: Path,
+    task_logger,
+    response_text: str | None = None,
+) -> tuple[bool, list[str]]:
+    """Is there a usable plan, after everything that can be done for one?
+
+    Three steps, in increasing order of how far they look from the path the
+    validator reads. Validation answers for a plan the model got right;
+    `auto_fix_plan` fills in the fields it left implicit and reshapes a
+    document that is a plan under other names; `recover_plan` looks
+    everywhere else it could be — `implementation_plan.json` at the worktree
+    root, because PHASE 3 of the prompt spells a relative path; a name the
+    model invented; the JSON fenced inside its own response, when it never
+    called Write at all.
+
+    The order is the point: a plan found further out is a plan the model
+    wrote but did not file, and re-running planning to get the same content
+    filed correctly costs a whole session and gets it wrong again as often
+    as not. Nothing here invents a subtask — when no candidate carries one,
+    this returns the validator's own errors and planning fails as before.
+    """
+    from spec.validate_pkg import SpecValidator, auto_fix_plan
+
+    spec_validator = SpecValidator(spec_dir)
+    result = spec_validator.validate_implementation_plan()
+    if result.valid:
+        return True, []
+
+    fixed = auto_fix_plan(spec_dir)
+    if fixed:
+        result = spec_validator.validate_implementation_plan()
+        if result.valid:
+            return True, []
+
+    if _recover_implementation_plan(spec_dir, project_dir, task_logger, response_text):
+        # The recovered plan is raw model output: it is put through the same
+        # auto-fix as any other plan before it is judged.
+        auto_fix_plan(spec_dir)
+        recovered_result = spec_validator.validate_implementation_plan()
+        if recovered_result.valid:
+            return True, []
+        result = recovered_result
+
+    return False, result.errors
+
+
+def _recover_implementation_plan(
+    spec_dir: Path, project_dir: Path, task_logger, response_text: str | None
+) -> bool:
+    """Promote a plan found outside the path the validator reads.
+
+    Reported rather than silent: WorkPilot is about to build from a file it
+    moved or reshaped on the model's behalf, and the one line printed here
+    is what tells a reader of the log why the plan on disk is not byte for
+    byte what the transcript shows. Never raises — this runs on a build
+    that has already failed validation once.
+    """
+    try:
+        from spec.plan_recovery import recover_plan, write_recovered_plan
+
+        recovered = recover_plan(spec_dir, project_dir, response_text)
+        if recovered is None or not write_recovered_plan(spec_dir, recovered):
+            return False
+    except Exception as exc:  # noqa: BLE001 - recovery never fails a build
+        logger.debug("plan recovery unavailable: %s", exc)
+        return False
+
+    message = (
+        f"Recovered the implementation plan from {recovered.origin} "
+        f"({recovered.subtask_count} subtask(s)) — the model produced a plan "
+        "but not at the path WorkPilot reads."
+    )
+    print_status(message, "warning")
+    if task_logger:
+        task_logger.log_info(message)
+    return True
+
+
+def _report_traceability(spec_dir: Path) -> None:
+    """Requirement coverage, at the moment the plan stops changing.
+
+    This is the last point at which a missing requirement is cheap: the
+    plan is valid, no code has been written for it yet, and adding a
+    subtask costs a sentence. The same gap found by QA costs a fix cycle
+    over code that was written against an incomplete plan.
+
+    Printed, and written to `traceability.json` so the Kanban and the
+    review phases read one record rather than each re-parsing `spec.md`.
+    Never raises: this reports on the build, it is not part of it.
+    """
+    try:
+        from spec.traceability import write_record
+
+        record = write_record(spec_dir)
+    except Exception as exc:  # noqa: BLE001 - a report never fails a build
+        logger.debug("traceability record unavailable: %s", exc)
+        return
+
+    coverage = record.get("coverage") or {}
+    if questions := record.get("open_questions"):
+        print_status(
+            f"{len(questions)} open question(s) left in spec.md — the coder "
+            "will have to decide them alone",
+            "warning",
+        )
+    if not coverage.get("applicable"):
+        return
+
+    uncovered = coverage.get("uncovered") or []
+    print_status(f"Requirement coverage: {coverage.get('summary')}", "info")
+    if uncovered:
+        print_status(
+            "No subtask claims: " + ", ".join(uncovered),
+            "warning",
+        )
+    for req_id, subtask_ids in (coverage.get("unknown_refs") or {}).items():
+        print_status(
+            f"Subtask(s) {', '.join(subtask_ids)} reference {req_id}, which "
+            "spec.md does not declare",
+            "warning",
+        )
+
+
+async def _run_post_planning_phases(
+    profile,
+    *,
+    project_dir: Path,
+    spec_dir: Path,
+    model: str,
+    workflow_repo_root: Path,
+    jev_run,
+    verbose: bool,
+) -> None:
+    """The workflow phases declared between `planning` and `coding`.
+
+    The three existing windows are (start → planning), (coding → qa) and
+    (qa → end): a phase declared between planning and coding was resolved,
+    printed in the profile, and then run by nobody. It belongs here rather
+    than in `build_commands` because this function owns both of the phases
+    it sits between — the window has no other place it could open.
+    """
+    if profile is None:
+        return
+    try:
+        from workflows.engine import narrow_to_forecast
+        from workflows.forecast import planned_files
+
+        from workflows import PhaseContext, phases_between, run_skill_phases
+
+        # The profile was resolved before planning, with no change set, so
+        # every conditional phase in this window read "unknown — run".
+        # The plan now names its files: narrow the profile to that
+        # forecast, which is what keeps `mobile-design` and
+        # `ui-design-system` off a backend task. No forecast keeps the
+        # profile as it was.
+        window_profile = narrow_to_forecast(profile, planned_files(spec_dir))
+        kept = {
+            r.id
+            for r in phases_between(window_profile, after="planning", before="coding")
+        }
+        for resolved in phases_between(profile, after="planning", before="coding"):
+            if resolved.id not in kept:
+                print_status(
+                    f"Workflow phase {resolved.id} skipped: "
+                    "the plan touches none of its files",
+                    "info",
+                )
+
+        ctx = PhaseContext(
+            project_dir=project_dir,
+            spec_dir=spec_dir,
+            model=model,
+            repo_root=workflow_repo_root,
+            jev_run=jev_run,
+            effort=getattr(profile, "effort", "medium"),
+            verbose=verbose,
+        )
+        run = await run_skill_phases(
+            window_profile, ctx, after="planning", before="coding"
+        )
+        if summary := run.describe():
+            print("\n" + summary)
+    except Exception as exc:  # noqa: BLE001 - the engine never blocks a build
+        logger.debug("post-planning phases skipped: %s", exc)
+
+
+# Invalid plans in a row (persisted across processes) before planning halts.
+MAX_PLANNING_VALIDATION_RETRIES = 3
+
+
+def _on_invalid_plan(
+    spec_dir: Path,
+    project_dir: Path,
+    *,
+    client,
+    errors: list[str],
+    task_logger,
+    status_manager,
+) -> str:
+    """Count the failure; halt past the cap, else tell the planner what to fix.
+
+    Returns what the next planning session is told.
+    """
+    planning_validation_failures = _bump_planning_failures(spec_dir)
+    # The plan WorkPilot reads lives in the spec dir; a model that
+    # wrote ./implementation_plan.json to the worktree root leaves a
+    # stray (often a truncated "{") — clean it so it doesn't linger.
+    stray_msg = _cleanup_stray_root_plan(project_dir, spec_dir)
+
+    # Make explicit this is the MODEL's invalid output (not a
+    # WorkPilot fault) and point local-model users at the fix.
+    provider_hint = ""
+    try:
+        if client.provider_name() in ("ollama", "local", "lmstudio"):
+            provider_hint = (
+                " The local model produced an invalid plan — switch "
+                "the Planning phase to a tool-capable / cloud model "
+                "and re-run."
+            )
+    except Exception:
+        provider_hint = ""
+
+    if planning_validation_failures >= MAX_PLANNING_VALIDATION_RETRIES:
+        fail_msg = (
+            "Planning failed: the model did not produce a valid "
+            "implementation_plan.json (unparseable or missing "
+            "`phases`)." + provider_hint
+        )
+        print_status(fail_msg, "error")
+        for err in errors:
+            print(f"  - {err}")
+        if stray_msg:
+            print_status(stray_msg, "warning")
+        if task_logger:
+            task_logger.end_phase(LogPhase.PLANNING, success=False, message=fail_msg)
+        # Clear the cap so a deliberate re-run (e.g. after switching
+        # the Planning model to Claude) starts fresh instead of
+        # halting immediately.
+        _clear_planning_failures(spec_dir)
+        status_manager.update(state=BuildState.ERROR)
+        # The detail belongs on the card, not only in this log: the
+        # user sees a task land in review and has to be told which
+        # schema the model failed to produce, not just that it did.
+        detail = "\n".join(f"- {err}" for err in errors[:5])
+        _emit_phase_failure(
+            spec_dir,
+            "planning",
+            fail_msg + (f"\n{detail}" if detail else ""),
+            recoverable=True,
+        )
+        raise BuildHalted("planning", fail_msg)
+
+    print_status(
+        "implementation_plan.json invalid - retrying planner" + provider_hint,
+        "warning",
+    )
+    for err in errors:
+        print(f"  - {err}")
+    if stray_msg:
+        print_status(stray_msg, "warning")
+
+    return (
+        "## IMPLEMENTATION PLAN VALIDATION ERRORS\n\n"
+        "The previous `implementation_plan.json` is INVALID.\n"
+        "You MUST rewrite it to match the required schema:\n"
+        "- Top-level: `feature`, `workflow_type`, `phases`\n"
+        "- Each phase: `id` (or `phase`) and `name`, and `subtasks`\n"
+        "- Each subtask: `id`, `description`, `status` (use `pending` for not started)\n\n"
+        "Validation errors:\n" + "\n".join(f"- {e}" for e in errors)
+    )
+
+
 async def run_autonomous_agent(
     project_dir: Path,
     spec_dir: Path,
@@ -713,7 +1817,7 @@ async def run_autonomous_agent(
     """
     from integrations.jev.adapters import assess_build
     from integrations.jev.models import JevContext
-    from integrations.jev.rubrics import advice_text, classification_hint
+    from integrations.jev.rubrics import classification_hint
     from integrations.jev.runtime import JevRun
 
     jev_run = jev_run or JevRun.from_env(
@@ -789,6 +1893,7 @@ async def run_autonomous_agent(
             suggestion = suggest_routed_model(
                 prompt=f"coder run on spec {spec_dir.name}",
                 task_hint=jev_hint or "coding",
+                project_dir=project_dir,
             )
             if suggestion and suggestion["model"] != model:
                 audit_decision(
@@ -965,181 +2070,6 @@ async def run_autonomous_agent(
     current_log_phase = LogPhase.CODING
     is_planning_phase = False
     planning_retry_context: str | None = None
-    # Persisted so the cap survives planning re-running as a fresh process.
-    planning_validation_failures = _read_planning_failures(spec_dir)
-    max_planning_validation_retries = 3
-
-    def _validate_and_fix_implementation_plan(
-        response_text: str | None = None,
-    ) -> tuple[bool, list[str]]:
-        """Is there a usable plan, after everything that can be done for one?
-
-        Three steps, in increasing order of how far they look from the path the
-        validator reads. Validation answers for a plan the model got right;
-        `auto_fix_plan` fills in the fields it left implicit and reshapes a
-        document that is a plan under other names; `recover_plan` looks
-        everywhere else it could be — `implementation_plan.json` at the worktree
-        root, because PHASE 3 of the prompt spells a relative path; a name the
-        model invented; the JSON fenced inside its own response, when it never
-        called Write at all.
-
-        The order is the point: a plan found further out is a plan the model
-        wrote but did not file, and re-running planning to get the same content
-        filed correctly costs a whole session and gets it wrong again as often
-        as not. Nothing here invents a subtask — when no candidate carries one,
-        this returns the validator's own errors and planning fails as before.
-        """
-        from spec.validate_pkg import SpecValidator, auto_fix_plan
-
-        spec_validator = SpecValidator(spec_dir)
-        result = spec_validator.validate_implementation_plan()
-        if result.valid:
-            return True, []
-
-        fixed = auto_fix_plan(spec_dir)
-        if fixed:
-            result = spec_validator.validate_implementation_plan()
-            if result.valid:
-                return True, []
-
-        if _recover_implementation_plan(response_text):
-            # The recovered plan is raw model output: it is put through the same
-            # auto-fix as any other plan before it is judged.
-            auto_fix_plan(spec_dir)
-            recovered_result = spec_validator.validate_implementation_plan()
-            if recovered_result.valid:
-                return True, []
-            result = recovered_result
-
-        return False, result.errors
-
-    def _recover_implementation_plan(response_text: str | None) -> bool:
-        """Promote a plan found outside the path the validator reads.
-
-        Reported rather than silent: WorkPilot is about to build from a file it
-        moved or reshaped on the model's behalf, and the one line printed here
-        is what tells a reader of the log why the plan on disk is not byte for
-        byte what the transcript shows. Never raises — this runs on a build
-        that has already failed validation once.
-        """
-        try:
-            from spec.plan_recovery import recover_plan, write_recovered_plan
-
-            recovered = recover_plan(spec_dir, project_dir, response_text)
-            if recovered is None or not write_recovered_plan(spec_dir, recovered):
-                return False
-        except Exception as exc:  # noqa: BLE001 - recovery never fails a build
-            logger.debug("plan recovery unavailable: %s", exc)
-            return False
-
-        message = (
-            f"Recovered the implementation plan from {recovered.origin} "
-            f"({recovered.subtask_count} subtask(s)) — the model produced a plan "
-            "but not at the path WorkPilot reads."
-        )
-        print_status(message, "warning")
-        if task_logger:
-            task_logger.log_info(message)
-        return True
-
-    def _report_traceability() -> None:
-        """Requirement coverage, at the moment the plan stops changing.
-
-        This is the last point at which a missing requirement is cheap: the
-        plan is valid, no code has been written for it yet, and adding a
-        subtask costs a sentence. The same gap found by QA costs a fix cycle
-        over code that was written against an incomplete plan.
-
-        Printed, and written to `traceability.json` so the Kanban and the
-        review phases read one record rather than each re-parsing `spec.md`.
-        Never raises: this reports on the build, it is not part of it.
-        """
-        try:
-            from spec.traceability import write_record
-
-            record = write_record(spec_dir)
-        except Exception as exc:  # noqa: BLE001 - a report never fails a build
-            logger.debug("traceability record unavailable: %s", exc)
-            return
-
-        coverage = record.get("coverage") or {}
-        if questions := record.get("open_questions"):
-            print_status(
-                f"{len(questions)} open question(s) left in spec.md — the coder "
-                "will have to decide them alone",
-                "warning",
-            )
-        if not coverage.get("applicable"):
-            return
-
-        uncovered = coverage.get("uncovered") or []
-        print_status(f"Requirement coverage: {coverage.get('summary')}", "info")
-        if uncovered:
-            print_status(
-                "No subtask claims: " + ", ".join(uncovered),
-                "warning",
-            )
-        for req_id, subtask_ids in (coverage.get("unknown_refs") or {}).items():
-            print_status(
-                f"Subtask(s) {', '.join(subtask_ids)} reference {req_id}, which "
-                "spec.md does not declare",
-                "warning",
-            )
-
-    async def _run_post_planning_phases() -> None:
-        """The workflow phases declared between `planning` and `coding`.
-
-        The three existing windows are (start → planning), (coding → qa) and
-        (qa → end): a phase declared between planning and coding was resolved,
-        printed in the profile, and then run by nobody. It belongs here rather
-        than in `build_commands` because this function owns both of the phases
-        it sits between — the window has no other place it could open.
-        """
-        if profile is None:
-            return
-        try:
-            from workflows.engine import narrow_to_forecast
-            from workflows.forecast import planned_files
-
-            from workflows import PhaseContext, phases_between, run_skill_phases
-
-            # The profile was resolved before planning, with no change set, so
-            # every conditional phase in this window read "unknown — run".
-            # The plan now names its files: narrow the profile to that
-            # forecast, which is what keeps `mobile-design` and
-            # `ui-design-system` off a backend task. No forecast keeps the
-            # profile as it was.
-            window_profile = narrow_to_forecast(profile, planned_files(spec_dir))
-            kept = {
-                r.id
-                for r in phases_between(
-                    window_profile, after="planning", before="coding"
-                )
-            }
-            for resolved in phases_between(profile, after="planning", before="coding"):
-                if resolved.id not in kept:
-                    print_status(
-                        f"Workflow phase {resolved.id} skipped: "
-                        "the plan touches none of its files",
-                        "info",
-                    )
-
-            ctx = PhaseContext(
-                project_dir=project_dir,
-                spec_dir=spec_dir,
-                model=model,
-                repo_root=_workflow_repo_root,
-                jev_run=jev_run,
-                effort=getattr(profile, "effort", "medium"),
-                verbose=verbose,
-            )
-            run = await run_skill_phases(
-                window_profile, ctx, after="planning", before="coding"
-            )
-            if summary := run.describe():
-                print("\n" + summary)
-        except Exception as exc:  # noqa: BLE001 - the engine never blocks a build
-            logger.debug("post-planning phases skipped: %s", exc)
 
     if first_run:
         print_status(
@@ -1214,35 +2144,12 @@ async def run_autonomous_agent(
     iteration = 0
     status = "continue"
     error_info = {}
-    consecutive_concurrency_errors = 0  # Track consecutive 400 tool concurrency errors
-    current_retry_delay = INITIAL_RETRY_DELAY_SECONDS  # Exponential backoff delay
-    concurrency_error_context: str | None = (
-        None  # Context to pass to agent after concurrency error
-    )
-
-    # Generic-error de-duplication: if the same error message recurs more than
-    # MAX_REPEATED_GENERIC_ERRORS times back-to-back we bail out instead of
-    # retrying forever. This is what prevented the session-limit / prompt-too-
-    # long loop from filling the logs with duplicated "session limit · resets …"
-    # banners while the conversation summary kept growing.
-    MAX_REPEATED_GENERIC_ERRORS = 3
-    last_generic_error_signature: str | None = None
-    repeated_generic_error_count = 0
+    retry = _RetryState()
 
     # A "context_reset" re-runs the subtask without counting an attempt. On a
     # window too small for a fresh thread every re-run is cut again, so past a
     # few in a row the rest of the subtask runs unmanaged (gauge only).
     context_resets = ResetLimit()
-
-    def _reset_concurrency_state() -> None:
-        """Reset concurrency error tracking state after a successful session or non-concurrency error."""
-        nonlocal \
-            consecutive_concurrency_errors, \
-            current_retry_delay, \
-            concurrency_error_context
-        consecutive_concurrency_errors = 0
-        current_retry_delay = INITIAL_RETRY_DELAY_SECONDS
-        concurrency_error_context = None
 
     while True:
         iteration += 1
@@ -1456,75 +2363,15 @@ async def run_autonomous_agent(
         # Generate appropriate prompt
         if first_run:
             # Create client for planning phase
-            prompt = generate_planner_prompt(spec_dir, project_dir)
-            if jev_advice := advice_text(jev_classification):
-                prompt += "\n\n" + jev_advice
-            # Chantier 4's portable answer to effort sensitivity: the engine
-            # states the level rather than the prompt template branching on a
-            # variable only some harnesses expose.
-            if workflow_plan is not None and effort_preamble is not None:
-                prompt = (
-                    effort_preamble(workflow_plan, "planning", _workflow_repo_root)
-                    + "\n\n"
-                    + prompt
-                )
-            if planning_retry_context:
-                prompt += "\n\n" + planning_retry_context
-
-            # Project memory from the shared brain for the planning phase:
-            # previous patterns, gotchas and session insights of this project
-            planner_context = await get_memory_context(
+            prompt = await _planning_prompt(
                 spec_dir,
                 project_dir,
-                {
-                    "description": "Planning implementation for new feature",
-                    "id": "planner",
-                },
+                jev_classification=jev_classification,
+                workflow_plan=workflow_plan,
+                effort_preamble=effort_preamble,
+                workflow_repo_root=_workflow_repo_root,
+                planning_retry_context=planning_retry_context,
             )
-            if planner_context:
-                prompt += "\n\n" + planner_context
-                print_status("Project memory loaded for planner", "success")
-
-            # The plan decides which APIs the subtasks will call. A planner
-            # that knows the current signatures plans against them.
-            planner_docs = _docs_section(spec_dir)
-            if planner_docs:
-                prompt += "\n\n" + planner_docs
-                print_status("Library documentation available to planner", "success")
-
-            # A spec-kit project states its own rules; a plan written without
-            # them is one its own tooling would reject.
-            planner_rules = constitution_section(project_dir)
-            if planner_rules:
-                prompt += "\n\n" + planner_rules
-                print_status("spec-kit constitution applied to planning", "success")
-
-            # The ADRs bind the plan the way the constitution does, and the
-            # diagram or mockup attached to the task is where the person said
-            # what they meant when the description did not.
-            planner_documents = docintel_section(project_dir, spec_dir)
-            if planner_documents:
-                prompt += "\n\n" + planner_documents
-                print_status("ADRs and task attachments applied to planning", "success")
-
-            # The approaches `brainstorm` compared before planning. Its report
-            # was written to the spec's workflow/ directory and read by nobody
-            # until handed over here (`workflows.handoff`).
-            planner_reports = workflow_reports_section(spec_dir, "planning")
-            if planner_reports:
-                prompt += "\n\n" + planner_reports
-                print_status("Earlier phase reports handed to the planner", "success")
-
-            # A phone application has no dev server and no URL: the plan has to
-            # say which platform each subtask is verified on, and on a machine
-            # without the toolchain for one of them, that it is not. A planner
-            # told this after the fact writes subtasks nobody can execute.
-            planner_mobile = mobile_section(project_dir)
-            if planner_mobile:
-                prompt += "\n\n" + planner_mobile
-                print_status(
-                    "Mobile stack and device toolchain applied to planning", "success"
-                )
 
             # Stay in planning until its output has passed validation. Errors,
             # rate limits and provider switches must retry this same phase.
@@ -1735,99 +2582,21 @@ async def run_autonomous_agent(
 
             # Get attempt count for recovery context
             attempt_count = recovery_manager.get_attempt_count(subtask_id)
-            recovery_hints = (
-                recovery_manager.get_recovery_hints(subtask_id)
-                if attempt_count > 0
-                else None
-            )
-
-            # Find the phase for this subtask
-            plan = load_implementation_plan(spec_dir)
-            phase = find_phase_for_subtask(plan, subtask_id) if plan else {}
-
-            # Generate focused, minimal prompt for this subtask
-            subtask_prompt = generate_subtask_prompt(
-                spec_dir=spec_dir,
-                project_dir=project_dir,
-                subtask=next_subtask,
-                phase=phase or {},
+            prompt = await _coding_prompt(
+                spec_dir,
+                project_dir,
+                next_subtask,
+                subtask_id=subtask_id,
                 attempt_count=attempt_count,
-                recovery_hints=recovery_hints,
+                recovery_manager=recovery_manager,
+                workflow_plan=workflow_plan,
+                effort_preamble=effort_preamble,
+                workflow_repo_root=_workflow_repo_root,
+                phase_provider=phase_provider,
+                current_phase=current_phase,
+                phase_thinking_budget=phase_thinking_budget,
+                retry=retry,
             )
-            effort = (
-                effort_preamble(workflow_plan, "coding", _workflow_repo_root)
-                if workflow_plan is not None and effort_preamble is not None
-                else ""
-            )
-            # What every subtask of the task shares first, the subtask after
-            # it: each subtask is a new session, and a provider that caches
-            # the first tokens of a prompt reads that block from its cache
-            # instead of being billed for it again behind a subtask header.
-            prompt = assemble(
-                [
-                    *_coding_task_segments(project_dir, spec_dir, effort),
-                    Segment("subtask", subtask_prompt, Stability.SESSION),
-                ]
-            )
-
-            # Interrupted mid-subtask: the replayed transcript shows what the
-            # previous session did, this says its end was not a conclusion.
-            resume_directive = interrupted_subtask_directive(next_subtask)
-            if resume_directive:
-                prompt += "\n\n" + resume_directive
-
-            # Load and append relevant file context — only when the
-            # (provider, effort) pair benefits from inlining. Claude agents
-            # and high-effort runs re-read files via tools anyway, so inline
-            # content there is duplicated input paid on every turn.
-            # Provider resolved WITHOUT side effects (get_phase_provider) —
-            # _get_active_provider would consume the RESUME_WITH_PROVIDER
-            # marker before create_agent_client gets to read it.
-            inline_provider = phase_provider or get_phase_provider(
-                spec_dir, phase=current_phase
-            )
-            if should_inline_file_context(inline_provider, phase_thinking_budget):
-                context = load_subtask_context(spec_dir, project_dir, next_subtask)
-                if context.get("patterns") or context.get("files_to_modify"):
-                    prompt += "\n\n" + format_context_for_prompt(context)
-            else:
-                print(
-                    muted(
-                        "File context inlining skipped (agent reads files via "
-                        "tools — saves duplicated prompt tokens)"
-                    )
-                )
-
-            # Project memory from the shared brain, for this subtask
-            memory_context = await get_memory_context(
-                spec_dir, project_dir, next_subtask
-            )
-            if memory_context:
-                prompt += "\n\n" + memory_context
-                print_status("Project memory loaded", "success")
-
-            # Documentation downloaded before the build, as paths rather than
-            # inlined pages: the agent reads the one its subtask is about.
-            docs_context = _docs_section(spec_dir, next_subtask)
-            if docs_context:
-                prompt += "\n\n" + docs_context
-
-            # The opposite of the constitution and the platform rules,
-            # deliberately (`_coding_task_segments`): the design system
-            # goes to the subtasks whose declared files are on the interface,
-            # and to none other — a full-stack task pays for it on its front
-            # end only, a backend task never (`uiux.prompt`).
-            design = uiux_section(spec_dir, next_subtask)
-            if design:
-                prompt += "\n\n" + design
-
-            # Add concurrency error context if recovering from 400 error
-            if concurrency_error_context:
-                prompt += "\n\n" + concurrency_error_context
-                print_status(
-                    f"Added tool concurrency error context (retry {consecutive_concurrency_errors}/{MAX_CONCURRENCY_RETRIES})",
-                    "warning",
-                )
 
             # Show what we're working on
             print(f"Working on: {highlight(subtask_id)}")
@@ -1991,7 +2760,9 @@ async def run_autonomous_agent(
 
         plan_validated = False
         if is_planning_phase and status != "error":
-            valid, errors = _validate_and_fix_implementation_plan(response)
+            valid, errors = _validate_and_fix_implementation_plan(
+                spec_dir, project_dir, task_logger, response
+            )
             # Archive this LLM's plan (valid or not) so plans from different
             # models can be compared side by side later. One snapshot per
             # provider/model; survives a reset (lives under plans/).
@@ -2018,78 +2789,24 @@ async def run_autonomous_agent(
                 from implementation_plan.progress_file import write_progress_header
 
                 write_progress_header(spec_dir)
-                _report_traceability()
-                await _run_post_planning_phases()
-            else:
-                planning_validation_failures = _bump_planning_failures(spec_dir)
-                # The plan WorkPilot reads lives in the spec dir; a model that
-                # wrote ./implementation_plan.json to the worktree root leaves a
-                # stray (often a truncated "{") — clean it so it doesn't linger.
-                stray_msg = _cleanup_stray_root_plan(project_dir, spec_dir)
-
-                # Make explicit this is the MODEL's invalid output (not a
-                # WorkPilot fault) and point local-model users at the fix.
-                provider_hint = ""
-                try:
-                    if client.provider_name() in ("ollama", "local", "lmstudio"):
-                        provider_hint = (
-                            " The local model produced an invalid plan — switch "
-                            "the Planning phase to a tool-capable / cloud model "
-                            "and re-run."
-                        )
-                except Exception:
-                    provider_hint = ""
-
-                if planning_validation_failures >= max_planning_validation_retries:
-                    fail_msg = (
-                        "Planning failed: the model did not produce a valid "
-                        "implementation_plan.json (unparseable or missing "
-                        "`phases`)." + provider_hint
-                    )
-                    print_status(fail_msg, "error")
-                    for err in errors:
-                        print(f"  - {err}")
-                    if stray_msg:
-                        print_status(stray_msg, "warning")
-                    if task_logger:
-                        task_logger.end_phase(
-                            LogPhase.PLANNING, success=False, message=fail_msg
-                        )
-                    # Clear the cap so a deliberate re-run (e.g. after switching
-                    # the Planning model to Claude) starts fresh instead of
-                    # halting immediately.
-                    _clear_planning_failures(spec_dir)
-                    status_manager.update(state=BuildState.ERROR)
-                    # The detail belongs on the card, not only in this log: the
-                    # user sees a task land in review and has to be told which
-                    # schema the model failed to produce, not just that it did.
-                    detail = "\n".join(f"- {err}" for err in errors[:5])
-                    _emit_phase_failure(
-                        spec_dir,
-                        "planning",
-                        fail_msg + (f"\n{detail}" if detail else ""),
-                        recoverable=True,
-                    )
-                    raise BuildHalted("planning", fail_msg)
-
-                print_status(
-                    "implementation_plan.json invalid - retrying planner"
-                    + provider_hint,
-                    "warning",
+                _report_traceability(spec_dir)
+                await _run_post_planning_phases(
+                    profile,
+                    project_dir=project_dir,
+                    spec_dir=spec_dir,
+                    model=model,
+                    workflow_repo_root=_workflow_repo_root,
+                    jev_run=jev_run,
+                    verbose=verbose,
                 )
-                for err in errors:
-                    print(f"  - {err}")
-                if stray_msg:
-                    print_status(stray_msg, "warning")
-
-                planning_retry_context = (
-                    "## IMPLEMENTATION PLAN VALIDATION ERRORS\n\n"
-                    "The previous `implementation_plan.json` is INVALID.\n"
-                    "You MUST rewrite it to match the required schema:\n"
-                    "- Top-level: `feature`, `workflow_type`, `phases`\n"
-                    "- Each phase: `id` (or `phase`) and `name`, and `subtasks`\n"
-                    "- Each subtask: `id`, `description`, `status` (use `pending` for not started)\n\n"
-                    "Validation errors:\n" + "\n".join(f"- {e}" for e in errors)
+            else:
+                planning_retry_context = _on_invalid_plan(
+                    spec_dir,
+                    project_dir,
+                    client=client,
+                    errors=errors,
+                    task_logger=task_logger,
+                    status_manager=status_manager,
                 )
                 # Stay in planning mode for the next iteration
                 first_run = True
@@ -2141,466 +2858,39 @@ async def run_autonomous_agent(
                 print_status("Implementation plan synced to main project", "success")
 
         # Handle session status
+        scope = _SessionScope(
+            project_dir=project_dir,
+            spec_dir=spec_dir,
+            source_spec_dir=source_spec_dir,
+            status_manager=status_manager,
+            task_logger=task_logger,
+            log_phase=current_log_phase,
+            phase=current_phase,
+            model=model,
+            is_planning=is_planning_phase,
+            subtask_id=subtask_id,
+            recovery_manager=recovery_manager,
+            client=client,
+        )
         if status == "complete":
-            # Emit ALL_SUBTASKS_DONE so frontend XState transitions coding → qa_review.
-            # Without this, the process may exit without a terminal event, causing
-            # the kanban card to stay stuck in the "In Progress" column.
-            try:
-                completed, total = count_subtasks(spec_dir)
-                task_event_emitter = TaskEventEmitter.from_spec_dir(spec_dir)
-                task_event_emitter.emit(
-                    "ALL_SUBTASKS_DONE",
-                    {"totalCount": total},
-                )
-            except Exception:
-                logger.debug("Failed to emit ALL_SUBTASKS_DONE event", exc_info=True)
-
-            print_build_complete_banner(spec_dir)
-            status_manager.update(state=BuildState.COMPLETE)
-
-            # Reset error tracking on success
-            _reset_concurrency_state()
-
-            if task_logger:
-                task_logger.end_phase(
-                    LogPhase.CODING,
-                    success=True,
-                    message="All subtasks completed successfully",
-                )
-
-            if linear_task and linear_task.task_id:
-                await linear_build_complete(spec_dir)
-                print_status("Linear notified: build complete, ready for QA", "success")
-
-            # Learning Loop: extract patterns from this build
-            try:
-                from learning_loop.service import LearningLoopService
-
-                learning_service = LearningLoopService(project_dir)
-                report = await learning_service.run_post_build_analysis(spec_dir)
-                if report.patterns_found:
-                    print_status(
-                        f"Learning loop: {len(report.patterns_found)} pattern(s) extracted",
-                        "success",
-                    )
-            except Exception as e:
-                logger.debug(f"Learning loop post-build analysis skipped: {e}")
-
+            retry.reset_concurrency()
+            await _on_build_complete(scope, linear_task)
             break
-
         elif status == "continue":
-            # Reset error tracking on successful session
-            _reset_concurrency_state()
-
-            print(
-                muted(
-                    f"\nAgent will auto-continue in {AUTO_CONTINUE_DELAY_SECONDS}s..."
-                )
-            )
-            print_progress_summary(spec_dir)
-
-            # Update state back to building
-            status_manager.update(
-                state=BuildState.PLANNING if is_planning_phase else BuildState.BUILDING
-            )
-
-            # Show next subtask info
-            next_subtask = get_next_subtask(spec_dir)
-            if next_subtask:
-                subtask_id = next_subtask.get("id")
-                print(
-                    f"\nNext: {highlight(subtask_id)} - {next_subtask.get('description')}"
-                )
-
-                attempt_count = recovery_manager.get_attempt_count(subtask_id)
-                if attempt_count > 0:
-                    print_status(
-                        f"WARNING: {attempt_count} previous attempt(s)", "warning"
-                    )
-
-            await asyncio.sleep(AUTO_CONTINUE_DELAY_SECONDS)
-
+            retry.reset_concurrency()
+            await _on_session_continue(scope)
         elif status == "error":
-            emit_phase(ExecutionPhase.FAILED, "Session encountered an error")
-
-            # Check if this is a tool concurrency error (400)
-            is_concurrency_error = (
-                error_info and error_info.get("type") == "tool_concurrency"
-            )
-
-            if is_concurrency_error:
-                consecutive_concurrency_errors += 1
-
-                # Check if we've exceeded max retries (allow 5 retries with delays: 2s, 4s, 8s, 16s, 32s)
-                if consecutive_concurrency_errors > MAX_CONCURRENCY_RETRIES:
-                    print_status(
-                        f"Tool concurrency limit hit {consecutive_concurrency_errors} times consecutively",
-                        "error",
-                    )
-                    print()
-                    print("=" * 70)
-                    print("  CRITICAL: Agent stuck in retry loop")
-                    print("=" * 70)
-                    print()
-                    print(
-                        "The agent is repeatedly hitting Claude API's tool concurrency limit."
-                    )
-                    print(
-                        "This usually means the agent is trying to use too many tools at once."
-                    )
-                    print()
-                    print("Possible solutions:")
-                    print("  1. The agent needs to reduce tool usage per request")
-                    print("  2. Break down the current subtask into smaller steps")
-                    print("  3. Manual intervention may be required")
-                    print()
-                    print(f"Error: {error_info.get('message', 'Unknown error')[:200]}")
-                    print()
-
-                    # Mark current subtask as stuck if we have one
-                    if subtask_id:
-                        recovery_manager.mark_subtask_stuck(
-                            subtask_id,
-                            f"Tool concurrency errors after {consecutive_concurrency_errors} retries",
-                        )
-                        print_status(f"Subtask {subtask_id} marked as STUCK", "error")
-
-                    status_manager.update(state=BuildState.ERROR)
-                    break  # Exit the loop
-
-                # Exponential backoff: 2s, 4s, 8s, 16s, 32s
-                print_status(
-                    f"Tool concurrency error (retry {consecutive_concurrency_errors}/{MAX_CONCURRENCY_RETRIES})",
-                    "warning",
-                )
-                print(
-                    muted(
-                        f"Waiting {current_retry_delay}s before retry (exponential backoff)..."
-                    )
-                )
-                print()
-
-                # Set context for next retry so agent knows to adjust behavior
-                error_context_message = (
-                    "## CRITICAL: TOOL CONCURRENCY ERROR\n\n"
-                    f"Your previous session hit Claude API's tool concurrency limit (HTTP 400).\n"
-                    f"This is retry {consecutive_concurrency_errors}/{MAX_CONCURRENCY_RETRIES}.\n\n"
-                    "**IMPORTANT: You MUST adjust your approach:**\n"
-                    "1. Use ONE tool at a time - do NOT call multiple tools in parallel\n"
-                    "2. Wait for each tool result before calling the next tool\n"
-                    "3. Avoid starting with `pwd` or multiple Read calls at once\n"
-                    "4. If you need to read multiple files, read them one by one\n"
-                    "5. Take a more incremental, step-by-step approach\n\n"
-                    "Start by focusing on ONE specific action for this subtask."
-                )
-
-                # If we're in planning phase, reset first_run to True so next iteration
-                # re-enters the planning branch (fix for issue #1565)
-                if current_log_phase == LogPhase.PLANNING:
-                    first_run = True
-                    planning_retry_context = error_context_message
-                    print_status(
-                        "Planning session failed - will retry planning", "warning"
-                    )
-                else:
-                    concurrency_error_context = error_context_message
-
-                status_manager.update(state=BuildState.ERROR)
-                await asyncio.sleep(current_retry_delay)
-
-                # Double the retry delay for next time (cap at MAX_RETRY_DELAY_SECONDS)
-                current_retry_delay = min(
-                    current_retry_delay * 2, MAX_RETRY_DELAY_SECONDS
-                )
-
-            elif error_info and error_info.get("type") == "model_unavailable":
-                # The selected model is invalid or the account can't access it
-                # (typically after a hot-swap to a catalog model that isn't
-                # actually available, e.g. claude-haiku-4-6). Retrying is futile
-                # and, worse, the phase would otherwise advance with nothing done.
-                # Halt and tell the user to pick a valid model for this phase.
-                _reset_concurrency_state()
-                _bad_model = get_phase_model(spec_dir, current_phase, model)
-                print_status(
-                    f"Modèle indisponible pour la phase « {current_phase} » : "
-                    f"{_bad_model}. Choisissez un autre modèle (dropdown de la "
-                    f"phase) puis relancez.",
-                    "error",
-                )
-                if task_logger:
-                    task_logger.log_error(
-                        f"Unavailable model: {_bad_model}. Phase halted — pick a "
-                        f"valid model for this phase and re-run it.",
-                        current_log_phase,
-                    )
-                emit_phase(
-                    ExecutionPhase.FAILED,
-                    f"Selected model unavailable: {_bad_model}",
-                )
-                status_manager.update(state=BuildState.ERROR)
+            next_step = await _on_session_error(scope, retry, error_info)
+            if retry.replan_context is not None:
+                # A planning session hit the concurrency limit: plan again,
+                # told why (issue #1565).
+                first_run = True
+                planning_retry_context = retry.replan_context
+                retry.replan_context = None
+            if next_step is _Next.STOP:
                 break
-
-            elif error_info and (
-                error_info.get("type") == "prompt_too_long"
-                or is_prompt_too_long_error(RuntimeError(error_info.get("message", "")))
-            ):
-                # Prompt too long for the LLM context window — retrying with
-                # the same conversation will fail identically. Halt the loop
-                # and surface the right remediation to the user.
-                #
-                # We accept BOTH the new explicit type tag and the legacy
-                # string-match path so a partial deploy (only one side updated)
-                # still breaks the loop instead of spinning on the error.
-                _reset_concurrency_state()
-                # Unless the task's context policy allows a fresh thread: the
-                # conversation is then different, and the retry can succeed.
-                from context_mgmt.recovery import recover_from_prompt_too_long
-
-                if recover_from_prompt_too_long(
-                    spec_dir,
-                    project_dir,
-                    current_log_phase.value,
-                    subtask_id,
-                    provider=client.provider_name(),
-                    model=str(getattr(client, "model", "") or ""),
-                ):
-                    print_status(
-                        "Prompt too long — new thread started from a handoff note",
-                        "warning",
-                    )
-                    continue
-                from services.rate_limit_shield import handle_prompt_too_long
-
-                handle_prompt_too_long(
-                    RuntimeError(error_info.get("message", "")),
-                    spec_dir,
-                    "coder",
-                )
-                print_status(
-                    "Prompt too long — task halted (reset conversation or "
-                    "switch provider)",
-                    "error",
-                )
-                emit_phase(
-                    ExecutionPhase.FAILED,
-                    "Prompt too long for LLM context window",
-                )
-                status_manager.update(state=BuildState.ERROR)
-                break
-
-            elif error_info and error_info.get("type") == "rate_limit":
-                # Rate limit error - intelligent wait for reset
-                _reset_concurrency_state()
-
-                reset_timestamp = parse_rate_limit_reset_time(error_info)
-                if reset_timestamp:
-                    wait_seconds = reset_timestamp - datetime.now().timestamp()
-
-                    # Handle negative wait_seconds (reset time in the past)
-                    if wait_seconds <= 0:
-                        print_status(
-                            "Rate limit reset time already passed - retrying immediately",
-                            "warning",
-                        )
-                        status_manager.update(state=BuildState.BUILDING)
-                        await asyncio.sleep(2)  # Brief delay before retry
-                        continue
-
-                    if wait_seconds > MAX_RATE_LIMIT_WAIT_SECONDS:
-                        # Wait time too long - fail the task
-                        print_status("Rate limit wait time too long", "error")
-                        print(
-                            f"Reset time would require waiting {wait_seconds / 3600:.1f} hours"
-                        )
-                        print(
-                            f"Maximum wait is {MAX_RATE_LIMIT_WAIT_SECONDS / 3600:.1f} hours"
-                        )
-                        emit_phase(
-                            ExecutionPhase.FAILED,
-                            "Rate limit wait time exceeds maximum allowed",
-                        )
-                        status_manager.update(state=BuildState.ERROR)
-                        break
-
-                    # Emit pause phase with reset time for frontend
-                    wait_minutes = wait_seconds / 60
-                    emit_phase(
-                        ExecutionPhase.RATE_LIMIT_PAUSED,
-                        f"Rate limit - resuming in {wait_minutes:.0f} minutes",
-                        reset_timestamp=reset_timestamp,
-                    )
-
-                    # Create pause file for frontend detection
-                    # Sanitize error message to prevent exposing sensitive data
-                    raw_error = error_info.get("message", "Rate limit reached")
-                    sanitized_error = (
-                        sanitize_error_message(raw_error, max_length=500)
-                        or "Rate limit reached"
-                    )
-                    pause_data = {
-                        "paused_at": datetime.now().isoformat(),
-                        "reset_timestamp": reset_timestamp,
-                        "error": sanitized_error,
-                    }
-                    pause_file = spec_dir / RATE_LIMIT_PAUSE_FILE
-                    pause_file.write_text(json.dumps(pause_data), encoding="utf-8")
-
-                    print_status(
-                        f"Rate limited - waiting {wait_minutes:.0f} minutes for reset",
-                        "warning",
-                    )
-                    status_manager.update(state=BuildState.PAUSED)
-
-                    # Wait with periodic checks for resume signal
-                    resumed_early = await wait_for_rate_limit_reset(
-                        spec_dir, wait_seconds, source_spec_dir
-                    )
-                    if resumed_early:
-                        print_status("Resumed early by user", "success")
-
-                    # Resume execution
-                    emit_phase(
-                        ExecutionPhase.PLANNING
-                        if is_planning_phase
-                        else ExecutionPhase.CODING,
-                        "Resuming after rate limit",
-                    )
-                    status_manager.update(
-                        state=BuildState.PLANNING
-                        if is_planning_phase
-                        else BuildState.BUILDING
-                    )
-                    continue  # Resume the loop
-                else:
-                    # Couldn't parse reset time - fall back to standard retry
-                    print_status("Rate limit hit (unknown reset time)", "warning")
-                    print(muted("Will retry with a fresh session..."))
-                    status_manager.update(state=BuildState.ERROR)
-                    await asyncio.sleep(AUTO_CONTINUE_DELAY_SECONDS)
-                    _reset_concurrency_state()
-                    status_manager.update(state=BuildState.BUILDING)
-                    continue
-
-            elif error_info and error_info.get("type") == "authentication":
-                # Authentication error - pause for user re-authentication
-                _reset_concurrency_state()
-
-                emit_phase(
-                    ExecutionPhase.AUTH_FAILURE_PAUSED,
-                    "Re-authentication required",
-                )
-
-                # Create pause file for frontend detection
-                # Sanitize error message to prevent exposing sensitive data
-                raw_error = error_info.get("message", "Authentication failed")
-                sanitized_error = (
-                    sanitize_error_message(raw_error, max_length=500)
-                    or "Authentication failed"
-                )
-                pause_data = {
-                    "paused_at": datetime.now().isoformat(),
-                    "error": sanitized_error,
-                    "requires_action": "re-authenticate",
-                }
-                pause_file = spec_dir / AUTH_FAILURE_PAUSE_FILE
-                pause_file.write_text(json.dumps(pause_data), encoding="utf-8")
-
-                print()
-                print("=" * 70)
-                print("  AUTHENTICATION REQUIRED")
-                print("=" * 70)
-                print()
-                print("OAuth token is invalid or expired.")
-                print("Please re-authenticate in the WorkPilot AI settings.")
-                print()
-                print("The task will automatically resume once you re-authenticate.")
-                print()
-
-                status_manager.update(state=BuildState.PAUSED)
-
-                # Wait for user to complete re-authentication
-                await wait_for_auth_resume(spec_dir, source_spec_dir)
-
-                print_status("Authentication restored - resuming", "success")
-                emit_phase(
-                    ExecutionPhase.PLANNING
-                    if is_planning_phase
-                    else ExecutionPhase.CODING,
-                    "Resuming after re-authentication",
-                )
-                status_manager.update(
-                    state=BuildState.PLANNING
-                    if is_planning_phase
-                    else BuildState.BUILDING
-                )
-                continue  # Resume the loop
-
-            else:
-                # Other errors - use standard retry logic, but bail out if the
-                # same error keeps recurring so we don't loop forever (and don't
-                # pollute the logs with duplicate banners). This catches the
-                # case where, for whatever reason, the rate-limit / prompt-too-
-                # long detectors don't match a new CLI banner shape: instead of
-                # retrying with the conversation-continuation summary (which
-                # makes the prompt grow every iteration) we surface the failure.
-                current_signature = (
-                    (error_info or {}).get("message", "")
-                    if error_info
-                    else str(error_info)
-                )
-                # Normalise the signature so timestamps / reset-time tails don't
-                # defeat the comparison ("resets 3:20pm" vs "resets 3:21pm").
-                normalised_signature = re.sub(
-                    r"\s+", " ", current_signature[:200]
-                ).strip()
-
-                if (
-                    last_generic_error_signature is not None
-                    and normalised_signature == last_generic_error_signature
-                ):
-                    repeated_generic_error_count += 1
-                else:
-                    last_generic_error_signature = normalised_signature
-                    repeated_generic_error_count = 1
-
-                if repeated_generic_error_count >= MAX_REPEATED_GENERIC_ERRORS:
-                    halt_msg = (
-                        f"La même erreur s'est répétée {repeated_generic_error_count} "
-                        f"fois, la phase est arrêtée : {current_signature[:300]}"
-                    )
-                    print_status(
-                        f"Same error repeated {repeated_generic_error_count} times — halting "
-                        "instead of growing the conversation summary further.",
-                        "error",
-                    )
-                    emit_phase(
-                        ExecutionPhase.FAILED,
-                        "Repeated error (retry would not change outcome)",
-                    )
-                    status_manager.update(state=BuildState.ERROR)
-                    # Carries the repeated error itself, not "something went
-                    # wrong": it is the only thing that tells the user whether
-                    # to change the model, the credentials or the spec.
-                    _emit_phase_failure(
-                        spec_dir,
-                        "planning" if is_planning_phase else "coding",
-                        halt_msg,
-                        recoverable=False,
-                        subtask_id=subtask_id,
-                    )
-                    raise BuildHalted(
-                        "planning" if is_planning_phase else "coding",
-                        halt_msg,
-                        recoverable=False,
-                    )
-
-                print_status("Session encountered an error", "error")
-                print(muted("Will retry with a fresh session..."))
-                status_manager.update(state=BuildState.ERROR)
-                await asyncio.sleep(AUTO_CONTINUE_DELAY_SECONDS)
-
-                # Reset concurrency error tracking on non-concurrency errors
-                _reset_concurrency_state()
+            if next_step is _Next.RETRY:
+                continue
 
         # Small delay between sessions
         if max_iterations is None or iteration < max_iterations:
@@ -2632,131 +2922,14 @@ async def run_autonomous_agent(
                 logger.warning("Failed to end streaming session: %s", exc)
         raise BuildHalted(failed_phase, halt_msg)
 
-    # Final summary
-    content = [
-        bold(f"{icon(Icons.SESSION)} SESSION SUMMARY"),
-        "",
-        f"Project: {project_dir}",
-        f"Spec: {highlight(spec_dir.name)}",
-        f"Sessions completed: {iteration}",
-    ]
-    print()
-    print(box(content, width=70, style="heavy"))
-    print_progress_summary(spec_dir)
-
-    # Show stuck subtasks if any
-    stuck_subtasks = recovery_manager.get_stuck_subtasks()
-    if stuck_subtasks:
-        print()
-        print_status("STUCK SUBTASKS (need manual intervention):", "error")
-        for stuck in stuck_subtasks:
-            print(f"  {icon(Icons.ERROR)} {stuck['subtask_id']}: {stuck['reason']}")
-
-    # Instructions
-    completed, total = count_subtasks(spec_dir)
-    if completed < total:
-        content = [
-            bold(f"{icon(Icons.PLAY)} NEXT STEPS"),
-            "",
-            f"{total - completed} subtasks remaining.",
-            f"Run again: {highlight(f'python workpilot/run.py --spec {spec_dir.name}')}",
-        ]
-    else:
-        content = [
-            bold(f"{icon(Icons.SUCCESS)} NEXT STEPS"),
-            "",
-            "All subtasks completed!",
-            "  1. Review the workpilot/* branch",
-            "  2. Run manual tests",
-            "  3. Merge to main",
-        ]
-
-    print()
-    print(box(content, width=70, style="light"))
-    print()
-
-    # Set final status
-    if completed == total:
-        status_manager.update(state=BuildState.COMPLETE)
-        if _ut_finish_build is not None:
-            try:
-                _ut_finish_build(spec_dir, status="complete")
-            except Exception:
-                # Le suivi d'usage est de la telemetrie : jamais au prix du build.
-                pass
-        if _ut_record_task is not None:
-            try:
-                _ut_record_task(project_dir, spec_dir.name, "completed")
-            except Exception:
-                # Le suivi d'usage est de la telemetrie : jamais au prix du build.
-                pass
-        # Log agent completion
-        workflow_logger.log_agent_end(
-            AGENT_NAME,
-            "autonomous_agent_loop",
-            "success",
-            {
-                "total_sessions": iteration,
-                "completed_subtasks": completed,
-                "total_subtasks": total,
-                "project_dir": str(project_dir),
-                "spec_dir": str(spec_dir.name),
-            },
-            agent_trace_id,
-        )
-        audit_event(
-            project_dir,
-            kind="agent_completed",
-            actor="coder",
-            correlation_id=spec_dir.name,
-            summary=f"coder completed: {completed}/{total} subtasks",
-            payload={
-                "completed_subtasks": completed,
-                "total_subtasks": total,
-                "total_sessions": iteration,
-            },
-        )
-    else:
-        status_manager.update(state=BuildState.PAUSED)
-        if _ut_finish_build is not None:
-            try:
-                _ut_finish_build(spec_dir, status="paused")
-            except Exception:
-                # Le suivi d'usage est de la telemetrie : jamais au prix du build.
-                pass
-        if _ut_record_task is not None:
-            try:
-                _ut_record_task(project_dir, spec_dir.name, "in_progress")
-            except Exception:
-                # Le suivi d'usage est de la telemetrie : jamais au prix du build.
-                pass
-        # Log agent pause
-        workflow_logger.log_agent_end(
-            AGENT_NAME,
-            "autonomous_agent_loop",
-            "paused",
-            {
-                "total_sessions": iteration,
-                "completed_subtasks": completed,
-                "total_subtasks": total,
-                "remaining": total - completed,
-                "project_dir": str(project_dir),
-                "spec_dir": str(spec_dir.name),
-            },
-            agent_trace_id,
-        )
-        audit_event(
-            project_dir,
-            kind="agent_paused",
-            actor="coder",
-            correlation_id=spec_dir.name,
-            summary=f"coder paused: {completed}/{total} subtasks",
-            payload={
-                "completed_subtasks": completed,
-                "total_subtasks": total,
-                "remaining": total - completed,
-            },
-        )
+    _report_run_end(
+        project_dir,
+        spec_dir,
+        iteration=iteration,
+        recovery_manager=recovery_manager,
+        status_manager=status_manager,
+        agent_trace_id=agent_trace_id,
+    )
 
     # Clean up streaming session
     if streaming_wrapper:

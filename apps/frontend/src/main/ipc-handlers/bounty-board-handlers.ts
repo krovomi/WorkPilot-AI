@@ -17,6 +17,7 @@ import { app, ipcMain } from "electron";
 import { pythonEnvManager } from "../python-env-manager.js";
 import { credentialManager } from "../services/credential-manager.js";
 import { getRunnerEnv } from "./github/utils/runner-env.js";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
 
 interface ContestantInput {
 	provider: string;
@@ -124,7 +125,7 @@ export async function buildContestantEnv(
 
 export function registerBountyBoardHandlers(): void {
 	ipcMain.handle(
-		"bountyBoard:start",
+		IPC_CHANNELS.BOUNTY_BOARD_START,
 		async (_event, req: StartRequest): Promise<StartResponse> => {
 			if (!req.projectPath || !req.specId) {
 				throw new Error("projectPath and specId are required");
@@ -163,12 +164,11 @@ export function registerBountyBoardHandlers(): void {
 				args.push("--prompt-overrides", overridesArg);
 			}
 
-			const child_env = {
-				...process.env,
-				...(await buildContestantEnv(req.contestants, {
-					PYTHONPATH: backendPath,
-				})),
-			};
+			// getRunnerEnv already starts from the main env, git variables
+			// isolated: spreading process.env again would bring them back.
+			const child_env = await buildContestantEnv(req.contestants, {
+				PYTHONPATH: backendPath,
+			});
 
 			return await new Promise<StartResponse>((resolve, reject) => {
 				const child = spawn(pythonExe, args, {
@@ -216,7 +216,7 @@ export function registerBountyBoardHandlers(): void {
 	);
 
 	ipcMain.handle(
-		"bountyBoard:listArchives",
+		IPC_CHANNELS.BOUNTY_BOARD_LIST_ARCHIVES,
 		async (
 			_event,
 			req: ListArchivesRequest,

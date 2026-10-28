@@ -2,6 +2,7 @@
  * Visual Programming API — preload bridge for diagram-to-code and code-to-diagram features.
  */
 import { ipcRenderer } from "electron";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export interface VisualProgrammingRequest {
 	action: "generate-code" | "code-to-visual";
@@ -74,35 +75,35 @@ export interface VisualProgrammingAPI {
 export function createVisualProgrammingAPI(): VisualProgrammingAPI {
 	return {
 		runVisualProgramming: (request) =>
-			ipcRenderer.invoke("visualProgramming:run", request),
+			ipcRenderer.invoke(IPC_CHANNELS.VISUAL_PROGRAMMING_RUN, request),
 
 		cancelVisualProgramming: () =>
-			ipcRenderer.invoke("visualProgramming:cancel"),
+			ipcRenderer.invoke(IPC_CHANNELS.VISUAL_PROGRAMMING_CANCEL),
 
 		onVisualProgrammingStatus: (callback) => {
 			const listener = (_: unknown, msg: string) => callback(msg);
-			ipcRenderer.on("visualProgramming:status", listener);
+			ipcRenderer.on(IPC_CHANNELS.VISUAL_PROGRAMMING_STATUS, listener);
 			return () =>
 				ipcRenderer.removeListener("visualProgramming:status", listener);
 		},
 
 		onVisualProgrammingFile: (callback) => {
 			const listener = (_: unknown, file: GeneratedFile) => callback(file);
-			ipcRenderer.on("visualProgramming:file", listener);
+			ipcRenderer.on(IPC_CHANNELS.VISUAL_PROGRAMMING_FILE, listener);
 			return () =>
 				ipcRenderer.removeListener("visualProgramming:file", listener);
 		},
 
 		onVisualProgrammingWriting: (callback) => {
 			const listener = (_: unknown, filename: string) => callback(filename);
-			ipcRenderer.on("visualProgramming:writing", listener);
+			ipcRenderer.on(IPC_CHANNELS.VISUAL_PROGRAMMING_WRITING, listener);
 			return () =>
 				ipcRenderer.removeListener("visualProgramming:writing", listener);
 		},
 
 		onVisualProgrammingError: (callback) => {
 			const listener = (_: unknown, err: string) => callback(err);
-			ipcRenderer.on("visualProgramming:error", listener);
+			ipcRenderer.on(IPC_CHANNELS.VISUAL_PROGRAMMING_ERROR, listener);
 			return () =>
 				ipcRenderer.removeListener("visualProgramming:error", listener);
 		},
@@ -115,7 +116,7 @@ export function createVisualProgrammingAPI(): VisualProgrammingAPI {
 					data: GenerateCodeResult | CodeToVisualResult;
 				},
 			) => callback(result);
-			ipcRenderer.on("visualProgramming:complete", listener);
+			ipcRenderer.on(IPC_CHANNELS.VISUAL_PROGRAMMING_COMPLETE, listener);
 			return () =>
 				ipcRenderer.removeListener("visualProgramming:complete", listener);
 		},

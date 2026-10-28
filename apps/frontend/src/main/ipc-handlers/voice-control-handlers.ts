@@ -1,6 +1,7 @@
 import { ipcMain } from "electron";
 import type { VoiceControlRequest } from "../voice-control-service";
 import { voiceControlService } from "../voice-control-service";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
 
 /**
  * Register IPC handlers for voice control functionality
@@ -8,7 +9,7 @@ import { voiceControlService } from "../voice-control-service";
 export function registerVoiceControlHandlers(): void {
 	// Start voice recording
 	ipcMain.handle(
-		"voice-control:startRecording",
+		IPC_CHANNELS.VOICE_CONTROL_START_RECORDING,
 		async (_event, request?: VoiceControlRequest) => {
 			try {
 				await voiceControlService.startRecording(request);
@@ -24,7 +25,7 @@ export function registerVoiceControlHandlers(): void {
 	);
 
 	// Stop voice recording
-	ipcMain.handle("voice-control:stopRecording", async () => {
+	ipcMain.handle(IPC_CHANNELS.VOICE_CONTROL_STOP_RECORDING, async () => {
 		try {
 			voiceControlService.stopRecording();
 			return { success: true };
@@ -38,7 +39,7 @@ export function registerVoiceControlHandlers(): void {
 	});
 
 	// Cancel voice control
-	ipcMain.handle("voice-control:cancel", async () => {
+	ipcMain.handle(IPC_CHANNELS.VOICE_CONTROL_CANCEL, async () => {
 		try {
 			const cancelled = voiceControlService.cancel();
 			return { success: true, cancelled };
@@ -52,7 +53,7 @@ export function registerVoiceControlHandlers(): void {
 	});
 
 	// Check if voice control is active
-	ipcMain.handle("voice-control:isActive", async () => {
+	ipcMain.handle(IPC_CHANNELS.VOICE_CONTROL_IS_ACTIVE, async () => {
 		try {
 			const isActive = voiceControlService.isActive();
 			return { success: true, isActive };
@@ -64,29 +65,6 @@ export function registerVoiceControlHandlers(): void {
 			};
 		}
 	});
-
-	// Configure voice control service
-	ipcMain.handle(
-		"voice-control:configure",
-		async (
-			_event,
-			config: { pythonPath?: string; autoBuildSourcePath?: string },
-		) => {
-			try {
-				voiceControlService.configure(
-					config.pythonPath,
-					config.autoBuildSourcePath,
-				);
-				return { success: true };
-			} catch (error) {
-				console.error("[VoiceControl] Failed to configure:", error);
-				return {
-					success: false,
-					error: error instanceof Error ? error.message : "Unknown error",
-				};
-			}
-		},
-	);
 }
 
 /**
@@ -99,7 +77,7 @@ export function setupVoiceControlEvents(): void {
 		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 		windows.forEach((window: any) => {
 			if (!window.isDestroyed()) {
-				window.webContents.send("voice-control:status", status);
+				window.webContents.send(IPC_CHANNELS.VOICE_CONTROL_STATUS, status);
 			}
 		});
 	});
@@ -110,7 +88,7 @@ export function setupVoiceControlEvents(): void {
 		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 		windows.forEach((window: any) => {
 			if (!window.isDestroyed()) {
-				window.webContents.send("voice-control:stream-chunk", chunk);
+				window.webContents.send(IPC_CHANNELS.VOICE_CONTROL_STREAM_CHUNK, chunk);
 			}
 		});
 	});
@@ -121,7 +99,7 @@ export function setupVoiceControlEvents(): void {
 		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 		windows.forEach((window: any) => {
 			if (!window.isDestroyed()) {
-				window.webContents.send("voice-control:error", error);
+				window.webContents.send(IPC_CHANNELS.VOICE_CONTROL_ERROR, error);
 			}
 		});
 	});
@@ -133,7 +111,7 @@ export function setupVoiceControlEvents(): void {
 		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 		windows.forEach((window: any) => {
 			if (!window.isDestroyed()) {
-				window.webContents.send("voice-control:complete", result);
+				window.webContents.send(IPC_CHANNELS.VOICE_CONTROL_COMPLETE, result);
 			}
 		});
 	});
@@ -144,7 +122,7 @@ export function setupVoiceControlEvents(): void {
 		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 		windows.forEach((window: any) => {
 			if (!window.isDestroyed()) {
-				window.webContents.send("voice-control:audio-level", level);
+				window.webContents.send(IPC_CHANNELS.VOICE_CONTROL_AUDIO_LEVEL, level);
 			}
 		});
 	});
@@ -155,7 +133,7 @@ export function setupVoiceControlEvents(): void {
 		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 		windows.forEach((window: any) => {
 			if (!window.isDestroyed()) {
-				window.webContents.send("voice-control:duration", duration);
+				window.webContents.send(IPC_CHANNELS.VOICE_CONTROL_DURATION, duration);
 			}
 		});
 	});

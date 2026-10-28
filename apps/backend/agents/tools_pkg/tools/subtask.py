@@ -7,11 +7,11 @@ Tools for managing subtask status in implementation_plan.json.
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from core.file_utils import write_json_atomic
+from foundation.file_utils import write_json_atomic
 from spec.validate_pkg.auto_fix import auto_fix_plan
 
 try:
@@ -48,14 +48,14 @@ def _update_subtask_in_plan(
                 subtask["status"] = status
                 if notes:
                     subtask["notes"] = notes
-                subtask["updated_at"] = datetime.now(timezone.utc).isoformat()
+                subtask["updated_at"] = datetime.now(UTC).isoformat()
                 subtask_found = True
                 break
         if subtask_found:
             break
 
     if subtask_found:
-        plan["last_updated"] = datetime.now(timezone.utc).isoformat()
+        plan["last_updated"] = datetime.now(UTC).isoformat()
 
     return subtask_found
 

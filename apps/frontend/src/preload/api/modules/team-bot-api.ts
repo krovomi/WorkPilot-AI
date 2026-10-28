@@ -6,6 +6,7 @@
  */
 
 import { invokeIpc } from "./ipc-utils";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export type TeamBotKind = "slack" | "teams";
 export type TeamBotSeverity = "info" | "warning" | "critical";
@@ -43,6 +44,6 @@ export interface TeamBotAPI {
 
 export const createTeamBotAPI = (): TeamBotAPI => ({
 	teamBotSend: (config, payload) =>
-		invokeIpc("teamBot:send", { config, payload }),
-	teamBotTest: (config) => invokeIpc("teamBot:test", { config }),
+		invokeIpc(IPC_CHANNELS.TEAM_BOT_SEND, { config, payload }),
+	teamBotTest: (config) => invokeIpc(IPC_CHANNELS.TEAM_BOT_TEST, { config }),
 });

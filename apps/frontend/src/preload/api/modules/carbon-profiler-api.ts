@@ -6,6 +6,7 @@
 
 import type { CarbonReport } from "../../../shared/types/carbon-profiler";
 import { createIpcListener, invokeIpc } from "./ipc-utils";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export interface CarbonProfilerRunOptions {
 	projectPath: string;
@@ -33,22 +34,22 @@ export interface CarbonProfilerAPI {
 
 export const createCarbonProfilerAPI = (): CarbonProfilerAPI => ({
 	runCarbonProfilerScan: (options: CarbonProfilerRunOptions) =>
-		invokeIpc<CarbonReport>("carbonProfiler:run", options),
+		invokeIpc<CarbonReport>(IPC_CHANNELS.CARBON_PROFILER_RUN, options),
 
-	cancelCarbonProfilerScan: () => invokeIpc<boolean>("carbonProfiler:cancel"),
+	cancelCarbonProfilerScan: () => invokeIpc<boolean>(IPC_CHANNELS.CARBON_PROFILER_CANCEL),
 
 	onCarbonProfilerEvent: (callback) =>
-		createIpcListener<[CarbonProfilerEvent]>("carbon-profiler-event", (payload) =>
+		createIpcListener<[CarbonProfilerEvent]>(IPC_CHANNELS.CARBON_PROFILER_EVENT, (payload) =>
 			callback(payload),
 		),
 
 	onCarbonProfilerResult: (callback) =>
-		createIpcListener<[CarbonReport]>("carbon-profiler-result", (payload) =>
+		createIpcListener<[CarbonReport]>(IPC_CHANNELS.CARBON_PROFILER_RESULT, (payload) =>
 			callback(payload),
 		),
 
 	onCarbonProfilerError: (callback) =>
-		createIpcListener<[string]>("carbon-profiler-error", (payload) =>
+		createIpcListener<[string]>(IPC_CHANNELS.CARBON_PROFILER_ERROR, (payload) =>
 			callback(payload),
 		),
 });

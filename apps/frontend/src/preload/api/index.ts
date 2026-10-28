@@ -34,6 +34,14 @@ import {
 	type TimeTravelAPI,
 	createTimeTravelAPI,
 } from "./modules/time-travel-api";
+import {
+	type ContextMeshAPI,
+	createContextMeshAPI,
+} from "./modules/context-mesh-api";
+import {
+	createLiveCompanionAPI,
+	type LiveCompanionAPI,
+} from "./modules/live-companion-api";
 import { type TeamBotAPI, createTeamBotAPI } from "./modules/team-bot-api";
 import {
 	type ApiExplorerAPI,
@@ -118,9 +126,9 @@ import { createConflictPredictorAPI } from "./modules/conflict-predictor-api";
 import type { ContextAwareSnippetsAPI } from "./modules/context-aware-snippets-api";
 import { createContextAwareSnippetsAPI } from "./modules/context-aware-snippets-api";
 import {
-	type ContinuousAIAPI,
-	createContinuousAIAPI,
-} from "./modules/continuous-ai-api";
+	type AutomationsAPI,
+	createAutomationsAPI,
+} from "./modules/automations-api";
 import { createSwarmAPI, type SwarmAPI } from "./modules/swarm-api";
 import {
 	createGenericIpcAPI,
@@ -131,6 +139,11 @@ import {
 	createAutoRefactorAPI,
 } from "./modules/auto-refactor-api";
 import { type AgentCliAPI, createAgentCliAPI } from "./modules/agent-cli-api";
+import { createTaskSandboxAPI, type TaskSandboxAPI } from "./modules/task-sandbox-api";
+import {
+	createTaskPermissionAPI,
+	type TaskPermissionAPI,
+} from "./modules/task-permission-api";
 import {
 	type CopilotCliAPI,
 	createCopilotCliAPI,
@@ -148,6 +161,7 @@ import {
 	createFormulaMatrixAPI,
 	type FormulaMatrixAPI,
 } from "./modules/formula-matrix-api";
+import { type BenchAPI, createBenchAPI } from "./modules/bench-api";
 import { createDebugAPI, type DebugAPI } from "./modules/debug-api";
 import type { DecisionLoggerAPI } from "./modules/decision-logger-api";
 import { createDecisionLoggerAPI } from "./modules/decision-logger-api";
@@ -223,6 +237,7 @@ import {
 import { createSettingsAPI, type SettingsAPI } from "./settings-api";
 import { createTaskAPI, type TaskAPI } from "./task-api";
 import { createTerminalAPI, type TerminalAPI } from "./terminal-api";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
 
 export interface ElectronAPI
 	extends ProjectAPI,
@@ -243,6 +258,8 @@ export interface ElectronAPI
 		ClaudeCodeAPI,
 		CopilotCliAPI,
 		AgentCliAPI,
+		TaskSandboxAPI,
+		TaskPermissionAPI,
 		CopilotOAuthAPI,
 		McpAPI,
 		ProfileAPI,
@@ -270,6 +287,7 @@ export interface ElectronAPI
 		CostAPI,
 		CostPredictorAPI,
 		FormulaMatrixAPI,
+		BenchAPI,
 		AccessibilityAPI,
 		I18nAgentAPI,
 		DocDriftAPI,
@@ -295,6 +313,8 @@ export interface ElectronAPI
 		TechDebtAPI,
 		TeamBotAPI,
 		TimeTravelAPI,
+		ContextMeshAPI,
+		LiveCompanionAPI,
 		EnvSnapshotAPI,
 		OfflineModeAPI,
 		VisualProgrammingAPI,
@@ -305,8 +325,8 @@ export interface ElectronAPI
 	github: GitHubAPI;
 	/** Parallel subtask execution (dependency waves) */
 	swarm: SwarmAPI;
-	/** Continuous AI daemon (CI/CD watcher, dependency sentinel, PR reviewer) */
-	continuousAI: ContinuousAIAPI;
+	/** Automations: an event (issue labelled, CI red, schedule) creates a card */
+	automations: AutomationsAPI;
 	/** Multi-user server mode: connection + login (local / Entra ID) */
 	serverAuth: ServerAuthAPI;
 	serverAdmin: ServerAdminAPI;
@@ -387,6 +407,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createClaudeCodeAPI(),
 		...createCopilotCliAPI(),
 		...createAgentCliAPI(),
+		...createTaskPermissionAPI(),
 		...createCopilotOAuthAPI(),
 		...createMcpAPI(),
 		...createProfileAPI(),
@@ -414,6 +435,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createCostAPI(),
 		...createCostPredictorAPI(),
 		...createFormulaMatrixAPI(),
+		...createBenchAPI(),
 		...createAccessibilityAPI(),
 		...createI18nAgentAPI(),
 		...createDocDriftAPI(),
@@ -439,6 +461,8 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createTechDebtAPI(),
 		...createTeamBotAPI(),
 		...createTimeTravelAPI(),
+		...createContextMeshAPI(),
+		...createLiveCompanionAPI(),
 		...createEnvSnapshotAPI(),
 		...createOfflineModeAPI(),
 		...createVisualProgrammingAPI(),
@@ -446,9 +470,10 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createDesignToCodeAPI(),
 		...createAutoRefactorAPI(),
 		...createGenericIpcAPI(),
+		...createTaskSandboxAPI(),
 		github: createGitHubAPI(),
 		swarm: createSwarmAPI(),
-		continuousAI: createContinuousAIAPI(),
+		automations: createAutomationsAPI(),
 		serverAuth: createServerAuthAPI(), // Multi-user server mode
 		serverAdmin: createServerAdminAPI(), // Multi-tenant administration
 		queue: createQueueAPI(), // Queue routing for rate limit recovery
@@ -456,25 +481,25 @@ export const createElectronAPI = (): ElectronAPI => {
 		selfHealing: createSelfHealingAPI(),
 		createClaudeProfileDirectory: (profileName: string) =>
 			invokeIpc<{ success: boolean; data?: string; error?: string }>(
-				"claude:profileCreateDir",
+				IPC_CHANNELS.CLAUDE_PROFILE_CREATE_DIR,
 				profileName,
 			),
 		requestUsageUpdate: (providerName?: string) =>
 			invokeIpc<IPCResult<UsageSnapshot | null>>(
-				"claude:usageRequest",
+				IPC_CHANNELS.USAGE_REQUEST,
 				providerName,
 			),
 		getGithubCliStatus: () =>
 			invokeIpc<
 				IPCResult<{ available: boolean; isAuth?: boolean; username?: string }>
-			>("copilotCli:getStatus"),
+			>(IPC_CHANNELS.COPILOT_CLI_GET_STATUS),
 		selectProvider: (provider: string) =>
-			invokeIpc<IPCResult<string>>("provider:select", provider),
+			invokeIpc<IPCResult<string>>(IPC_CHANNELS.PROVIDER_SELECT, provider),
 		getSelectedProvider: () =>
-			invokeIpc<IPCResult<string | null>>("provider:getSelected"),
+			invokeIpc<IPCResult<string | null>>(IPC_CHANNELS.PROVIDER_GET_SELECTED),
 		testGitHubConnection: (config: { repo: string; token: string }) =>
 			invokeIpc<{ success: boolean; status?: number; error?: string }>(
-				"github:testConnection",
+				IPC_CHANNELS.GITHUB_TEST_CONNECTION,
 				config,
 			),
 		detectWindsurfToken: () =>
@@ -483,10 +508,10 @@ export const createElectronAPI = (): ElectronAPI => {
 				apiKey?: string;
 				userName?: string;
 				error?: string;
-			}>("credential:detectWindsurfToken"),
+			}>(IPC_CHANNELS.CREDENTIAL_DETECT_WINDSURF_TOKEN),
 		checkClaudeOAuth: () =>
 			invokeIpc<{ isAuthenticated: boolean; profileName?: string }>(
-				"credential:checkClaudeOAuth",
+				IPC_CHANNELS.CREDENTIAL_CHECK_CLAUDE_OAUTH,
 			),
 		checkOpenAICodexOAuth: () =>
 			invokeIpc<{
@@ -495,7 +520,7 @@ export const createElectronAPI = (): ElectronAPI => {
 				version?: string;
 				latest?: string;
 				isOutdated?: boolean;
-			}>("credential:checkOpenAICodexOAuth"),
+			}>(IPC_CHANNELS.CREDENTIAL_CHECK_OPENAI_CODEX_OAUTH),
 		updateCodexCli: () =>
 			invokeIpc<{
 				success: boolean;
@@ -503,7 +528,7 @@ export const createElectronAPI = (): ElectronAPI => {
 				latest?: string;
 				isOutdated?: boolean;
 				error?: string;
-			}>("credential:updateCodexCli"),
+			}>(IPC_CHANNELS.CREDENTIAL_UPDATE_CODEX_CLI),
 	};
 };
 
@@ -530,8 +555,8 @@ export { createArchitectureVisualizerAPI } from "./modules/architecture-visualiz
 export type { ArenaAPI } from "./modules/arena-api";
 export { createArenaAPI } from "./modules/arena-api";
 export { createAutoRefactorAPI } from "./modules/auto-refactor-api";
-export type { ContinuousAIAPI } from "./modules/continuous-ai-api";
-export { createContinuousAIAPI } from "./modules/continuous-ai-api";
+export type { AutomationsAPI } from "./modules/automations-api";
+export { createAutomationsAPI } from "./modules/automations-api";
 export type { SwarmAPI } from "./modules/swarm-api";
 export { createSwarmAPI } from "./modules/swarm-api";
 export type { ClaudeCodeAPI } from "./modules/claude-code-api";
@@ -544,9 +569,13 @@ export type { ContextAwareSnippetsAPI } from "./modules/context-aware-snippets-a
 export { createContextAwareSnippetsAPI } from "./modules/context-aware-snippets-api";
 export type { AgentCliAPI } from "./modules/agent-cli-api";
 export { createAgentCliAPI } from "./modules/agent-cli-api";
+export type { TaskPermissionAPI } from "./modules/task-permission-api";
+export { createTaskPermissionAPI } from "./modules/task-permission-api";
 export type { CopilotCliAPI } from "./modules/copilot-cli-api";
 export { createCopilotCliAPI } from "./modules/copilot-cli-api";
 export type { DebugAPI } from "./modules/debug-api";
+export type { TaskSandboxAPI } from "./modules/task-sandbox-api";
+export { createTaskSandboxAPI } from "./modules/task-sandbox-api";
 export { createDebugAPI } from "./modules/debug-api";
 export type { DecisionLoggerAPI } from "./modules/decision-logger-api";
 export { createDecisionLoggerAPI } from "./modules/decision-logger-api";
@@ -571,6 +600,10 @@ export type { TestGenerationAPI } from "./modules/test-generation-api";
 export { createTestGenerationAPI } from "./modules/test-generation-api";
 export type { TimeTravelAPI } from "./modules/time-travel-api";
 export { createTimeTravelAPI } from "./modules/time-travel-api";
+export type { ContextMeshAPI } from "./modules/context-mesh-api";
+export { createContextMeshAPI } from "./modules/context-mesh-api";
+export type { LiveCompanionAPI } from "./modules/live-companion-api";
+export { createLiveCompanionAPI } from "./modules/live-companion-api";
 export type { DesignToCodeAPI } from "./modules/design-to-code-api";
 export { createDesignToCodeAPI } from "./modules/design-to-code-api";
 export type { VisualProgrammingAPI } from "./modules/visual-programming-api";

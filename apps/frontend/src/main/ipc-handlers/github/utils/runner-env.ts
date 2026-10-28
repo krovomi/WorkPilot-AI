@@ -8,13 +8,16 @@ import {
 	getPageProviderEnv,
 } from "../../../services/page-llm-config";
 import { getAPIProfileEnv } from "../../../services/profile";
+import { envWithoutCredentials } from "../../../utils/child-env";
 import { getGitHubTokenForSubprocess } from "../utils";
 
 /**
  * Get environment variables for Python runner subprocesses.
  *
  * Environment variable precedence (lowest to highest):
- * 1. pythonEnv - Python environment including PYTHONPATH for bundled packages (fixes #139)
+ * 1. pythonEnv - Python environment including PYTHONPATH for bundled packages (fixes #139),
+ *    without any credential the main process env holds: each one the runner
+ *    needs comes from a layer below (docs/rules/security.md, S1 and S4)
  * 2. apiProfileEnv - Custom Anthropic-compatible API profile (ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN)
  * 3. oauthModeClearVars - Clears stale ANTHROPIC_* vars when in OAuth mode
  * 4. profileEnv - Claude OAuth token from profile manager (CLAUDE_CODE_OAUTH_TOKEN)
@@ -68,7 +71,7 @@ export async function getRunnerEnv(
 
 	return buildJevEnvironment(
 		{
-			...pythonEnv, // Python environment including PYTHONPATH (fixes #139)
+			...envWithoutCredentials(pythonEnv), // PYTHONPATH (fixes #139), no inherited credential
 			...apiProfileEnv,
 			...oauthModeClearVars,
 			...profileEnv, // OAuth token from profile manager (fixes #563, rate-limit aware)

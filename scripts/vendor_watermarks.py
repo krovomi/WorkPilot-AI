@@ -49,7 +49,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 SOURCE = "https://github.com/guillaumemeyer/watermarks-remover"
@@ -61,7 +61,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 # The manifest format is shared with `vendor/archify`; one definition of
 # "is this tree the one it claims to be" for both trees.
 sys.path.insert(0, str(REPO_ROOT / "apps" / "backend"))
-from core.vendor_manifest import (  # noqa: E402
+from foundation.vendor_manifest import (  # noqa: E402
     RECEIPT_NAME,
     file_digests,
     tree_digest,
@@ -177,7 +177,7 @@ def _receipt(
         "tree_sha256": tree_digest(staging),
         "files": file_digests(staging),
         "paths": dict(REQUIRED_FILES),
-        "vendored_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "vendored_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "vendored_by": "scripts/vendor_watermarks.py",
         "excluded": list(EXCLUDED),
         "absent_upstream": absent,

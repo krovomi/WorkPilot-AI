@@ -16,6 +16,8 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import { app, ipcMain } from "electron";
 import { pythonEnvManager } from "../python-env-manager.js";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
+import { pythonRunnerEnv } from "../utils/python-runner-env";
 
 function resolveBackendPath(): string {
 	return app.isPackaged
@@ -23,7 +25,7 @@ function resolveBackendPath(): string {
 		: path.resolve(app.getAppPath(), "..", "backend");
 }
 
-function runRunner(args: string[]): Promise<unknown> {
+async function runRunner(args: string[]): Promise<unknown> {
 	const pythonExe = pythonEnvManager.getPythonPath();
 	if (!pythonExe) throw new Error("Python environment not ready");
 
@@ -34,10 +36,11 @@ function runRunner(args: string[]): Promise<unknown> {
 		"offline_mode_runner.py",
 	);
 
+	const env = await pythonRunnerEnv(backendPath);
 	return new Promise((resolve, reject) => {
 		const child = spawn(pythonExe, [runnerPath, ...args], {
 			cwd: backendPath,
-			env: { ...process.env, PYTHONPATH: backendPath },
+			env,
 		} as Parameters<typeof spawn>[2]);
 
 		let stdout = "";
@@ -80,7 +83,7 @@ function runRunner(args: string[]): Promise<unknown> {
 
 export function registerOfflineModeHandlers(): void {
 	ipcMain.handle(
-		"offlineMode:status",
+		IPC_CHANNELS.OFFLINE_MODE_STATUS,
 		async (_evt, { projectPath }: { projectPath: string }) => {
 			if (!projectPath) throw new Error("projectPath is required");
 			return runRunner(["--command", "status", "--project-path", projectPath]);
@@ -88,7 +91,7 @@ export function registerOfflineModeHandlers(): void {
 	);
 
 	ipcMain.handle(
-		"offlineMode:listModels",
+		IPC_CHANNELS.OFFLINE_MODE_LIST_MODELS,
 		async (_evt, { projectPath }: { projectPath: string }) => {
 			if (!projectPath) throw new Error("projectPath is required");
 			return runRunner([
@@ -101,7 +104,7 @@ export function registerOfflineModeHandlers(): void {
 	);
 
 	ipcMain.handle(
-		"offlineMode:scanModels",
+		IPC_CHANNELS.OFFLINE_MODE_SCAN_MODELS,
 		async (
 			_evt,
 			{
@@ -117,7 +120,7 @@ export function registerOfflineModeHandlers(): void {
 	);
 
 	ipcMain.handle(
-		"offlineMode:getPolicy",
+		IPC_CHANNELS.OFFLINE_MODE_GET_POLICY,
 		async (_evt, { projectPath }: { projectPath: string }) => {
 			if (!projectPath) throw new Error("projectPath is required");
 			return runRunner([
@@ -130,7 +133,7 @@ export function registerOfflineModeHandlers(): void {
 	);
 
 	ipcMain.handle(
-		"offlineMode:setPolicy",
+		IPC_CHANNELS.OFFLINE_MODE_SET_POLICY,
 		async (
 			_evt,
 			{
@@ -151,7 +154,7 @@ export function registerOfflineModeHandlers(): void {
 	);
 
 	ipcMain.handle(
-		"offlineMode:report",
+		IPC_CHANNELS.OFFLINE_MODE_REPORT,
 		async (_evt, { projectPath }: { projectPath: string }) => {
 			if (!projectPath) throw new Error("projectPath is required");
 			return runRunner(["--command", "report", "--project-path", projectPath]);

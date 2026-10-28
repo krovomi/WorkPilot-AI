@@ -3,6 +3,7 @@
  */
 
 import { invokeIpc } from "./ipc-utils";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export interface OfflineRuntimeInfo {
 	available: boolean;
@@ -102,15 +103,15 @@ export interface OfflineModeAPI {
 
 export const createOfflineModeAPI = (): OfflineModeAPI => ({
 	getOfflineStatus: (projectPath) =>
-		invokeIpc("offlineMode:status", { projectPath }),
+		invokeIpc(IPC_CHANNELS.OFFLINE_MODE_STATUS, { projectPath }),
 	listOfflineModels: (projectPath) =>
-		invokeIpc("offlineMode:listModels", { projectPath }),
+		invokeIpc(IPC_CHANNELS.OFFLINE_MODE_LIST_MODELS, { projectPath }),
 	scanOfflineModels: (projectPath, force) =>
-		invokeIpc("offlineMode:scanModels", { projectPath, force }),
+		invokeIpc(IPC_CHANNELS.OFFLINE_MODE_SCAN_MODELS, { projectPath, force }),
 	getOfflinePolicy: (projectPath) =>
-		invokeIpc("offlineMode:getPolicy", { projectPath }),
+		invokeIpc(IPC_CHANNELS.OFFLINE_MODE_GET_POLICY, { projectPath }),
 	setOfflinePolicy: (projectPath, policy) =>
-		invokeIpc("offlineMode:setPolicy", { projectPath, policy }),
+		invokeIpc(IPC_CHANNELS.OFFLINE_MODE_SET_POLICY, { projectPath, policy }),
 	getOfflineReport: (projectPath) =>
-		invokeIpc("offlineMode:report", { projectPath }),
+		invokeIpc(IPC_CHANNELS.OFFLINE_MODE_REPORT, { projectPath }),
 });

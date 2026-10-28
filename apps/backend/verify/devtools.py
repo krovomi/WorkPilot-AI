@@ -86,7 +86,7 @@ def _strict_airgap(project_dir: Path | None) -> bool:
     if project_dir is None:
         return False
     try:
-        from core.offline_policy import airgap_status
+        from offline_policy import airgap_status
 
         return bool(airgap_status(project_dir).get("airgapStrict"))
     except Exception:  # noqa: BLE001 - an unreadable policy is not a reason to fail
@@ -218,7 +218,7 @@ class BrowserSession:
         )
         try:
             await asyncio.wait_for(manager.connect(), timeout=_CONNECT_TIMEOUT)
-        except (asyncio.TimeoutError, Exception) as exc:  # noqa: BLE001
+        except (TimeoutError, Exception) as exc:  # noqa: BLE001
             await manager.aclose()
             self.reasons.append(
                 f"chrome-devtools-mcp: could not connect ({exc or 'timeout'})"
@@ -323,7 +323,7 @@ class BrowserSession:
             return await asyncio.wait_for(
                 self._mcp.call(self._tool(name), args), timeout=timeout
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return f"MCP tool error: {name} timed out after {int(timeout)}s"
         except Exception as exc:  # noqa: BLE001
             return f"MCP tool error: {exc}"

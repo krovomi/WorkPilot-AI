@@ -147,7 +147,7 @@ export function registerGetRepositories(): void {
  */
 export function registerTestConnection(): void {
 	ipcMain.handle(
-		"github:testConnection",
+		IPC_CHANNELS.GITHUB_TEST_CONNECTION,
 		async (
 			_,
 			config: { repo: string; token: string },

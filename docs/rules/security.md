@@ -45,7 +45,10 @@ l'UI n'existe pas.
   message d'erreur renvoyé à l'UI, un prompt, une URL, un artefact de spec (`.workpilot/specs/`),
   un rapport de QA, un commentaire de PR.
 - **Logs** : l'API backend installe `core/log_redaction.py` (`install_global_redaction`) au
-  démarrage de `provider_api.py` ; un nouveau point d'entrée (runner, CLI) l'installe aussi. Côté
+  démarrage de `provider_api.py` ; `run.py` et chaque runner l'installent en tête de leur bloc
+  `__main__` (`tests/test_entrypoints_redaction.py`), un nouveau point d'entrée aussi. Le masque
+  s'applique à la création de chaque enregistrement, donc aussi aux handlers posés après ;
+  `core/debug.py`, qui écrit hors `logging`, passe par `redact_text`. Côté
   Electron, `app-logger.ts` expurge chaque message avant écriture (hook electron-log,
   `shared/utils/secret-redaction.ts`). Côté UI, une clé s'affiche masquée (`maskApiKey`). Ne jamais logger un en-tête `Authorization`, un
   jeton, ni le corps d'une requête d'authentification.
@@ -96,16 +99,16 @@ l'UI n'existe pas.
   `ClaudeAgentOptions` ; un client qui contourne les hooks est un défaut.
 - Ajouter une commande à l'allowlist (`project/command_registry/`) : un validateur si elle peut
   écrire, supprimer, exécuter du code ou joindre le réseau, et un test dans `tests/`.
-- Un agent ne modifie jamais ses propres garde-fous : `.workpilot-security.json`,
-  `.workpilot-allowlist`, `.workpilot/guardrails.*`, `.claude_settings.json`, `.claude/settings*.json`.
+- Un agent ne modifie jamais ses garde-fous : `.workpilot-security.json`, `.workpilot-allowlist`,
+  `.workpilot/guardrails.*`, `.claude_settings.json`, `.claude/settings*.json`, `.workpilot-goal.json`.
 - Serveur MCP tiers : seulement par `CUSTOM_MCP_SERVERS`, validé par `_validate_custom_mcp_server`.
   N'élargir ni la liste des lanceurs autorisés ni celle des options refusées.
 
 ## S4 — Chemins résolus, processus sans shell
 
 - Une écriture d'agent reste dans le projet, la spec ou `<tmp>/workpilot` (`security/path_guard.py`) ;
-  hors SDK, `_resolve_within_project`. `WORKPILOT_WRITE_ROOTS` ajoute des racines : ne pas s'en servir
-  pour contourner un refus.
+  hors SDK, `_resolve_within_project`. `WORKPILOT_WRITE_ROOTS` (racines en plus) ne contourne pas un refus.
+  Lancée, la commande reste dans le bac à sable de l'OS (`os_sandbox/`), jamais élargi par le dépôt.
 - Valider un chemin, c'est le **résoudre** (`Path.resolve()` / `fs.realpathSync`, liens symboliques
   compris) **puis** vérifier qu'il est dans une racine autorisée. Rejeter `..` ne suffit pas.
 - Sous-processus : liste d'arguments, `shell=False` en Python, pas de `shell: true` en Node dès
@@ -114,12 +117,18 @@ l'UI n'existe pas.
 - Environnement d'un processus enfant : construit, pas hérité en bloc. Les variables d'un dépôt
   passent par `claude-code-settings/env-sanitizer.ts` (refus de `LD_PRELOAD`, `NODE_OPTIONS`…,
   détail dans son [`SECURITY.md`](../../apps/frontend/src/main/claude-code-settings/SECURITY.md)).
-  Un secret ne va qu'au processus qui en a besoin.
+  Un secret ne va qu'au processus qui en a besoin : un processus qui exécute le code d'un autre
+  (serveur de dev de l'émulateur, commande mobile, Ollama) reçoit `envWithoutCredentials`
+  (`main/utils/child-env.ts`) ; un runner Python lancé par une vue reçoit `pythonRunnerEnv`
+  (`main/utils/python-runner-env.ts`), jamais `...process.env`. L'app packagée ne lit aucun
+  `.env-files/.env`, et jamais celui du dossier d'où elle est lancée (`main/dev-env-files.ts`).
 
 ## S5 — Mode serveur : authentification, autorisation, tenant
 
 - Chaque route porte une permission (`server/authz/` : `require_permission`, `mount_guarded`) ;
-  `tests/backend/test_feature_router_authz.py` échoue sinon. Masquer un bouton n'est pas un contrôle.
+  `tests/backend/test_feature_router_authz.py` échoue sinon, y compris pour une route déclarée sur
+  `app` hors de `_mount` (seule `/health` l'est, et n'y répond que son verdict). Masquer un bouton
+  n'est pas un contrôle.
 - Un client ne fournit jamais de chemin (`project_dir`, `spec_dir`, `file_path`…), ni en query ni
   dans le corps JSON : il donne un `project_id` et le serveur résout son checkout
   (`server/authz/scope.py`). Le middleware refuse ces clés (`CLIENT_PATH_PARAMS`) en query et dans
@@ -136,16 +145,30 @@ l'UI n'existe pas.
   par `security/webview-policy.ts` ; une nouvelle fenêtre reçoit les gardes de navigation.
 - Preload : des fonctions typées, une par canal. Aucun nouvel appel au passthrough générique
   `invoke(channel, …)` : un canal = une constante (`shared/constants/ipc*.ts`) + un handler + un type.
-- Main : chaque handler IPC revalide ses arguments (type, chemin résolu et contenu, URL) ; un
-  handler sensible vérifie l'expéditeur (`event.senderFrame`).
+- Main : chaque handler IPC revalide ses arguments (type, chemin résolu et contenu, URL) ; seule la
+  page de l'app, cadre principal de la fenêtre, atteint un handler (`main/security/ipc-sender-policy.ts`).
+- Le renderer ne fournit jamais une commande à exécuter ni un exécutable à lancer : le main
+  construit la commande, lit un lanceur personnalisé dans les réglages et rattache un dossier
+  reçu à un projet connu (`resolveOpenableDir`). Un chemin d'outil des réglages nomme l'outil et
+  le dossier du backend a ses runners, hors projet et hors `tmp` (`main/security/tool-path-policy.ts`).
+- Un chemin reçu du renderer est résolu puis rattaché à un projet enregistré ou à un dossier que
+  l'utilisateur a choisi dans une boîte native (`main/security/renderer-path.ts`) ; seuls les
+  handlers de dialogue appellent `rememberUserChosenPath`. Un paramètre de handler nommé comme un
+  dossier (`projectPath`, `worktreePath`, `specDir`…) va dans `DIRECTORY_ARGS`
+  (`main/security/ipc-path-policy.ts`), contrôlé avant le handler ; `ipc-path-policy.test.ts`
+  échoue sinon.
+- Le renderer ne reçoit jamais un identifiant stocké, seulement qu'il est défini : `MASKED_SECRET`
+  (`main/utils/masked-secret.ts`), relu au retour comme « garder la valeur ». Une clé masquée ne sert
+  qu'à l'URL pour laquelle elle a été enregistrée ; un appel à un provider avec une clé se fait
+  dans le main. → [`architecture/secrets-at-rest.md`](../architecture/secrets-at-rest.md)
 - URL externe : `openExternalUrl` (`open-external.ts`, protocoles en liste fermée), jamais
   `shell.openExternal` sur une chaîne reçue.
-- CSP (`src/renderer/index.html`) : pas d'`unsafe-eval`, pas de nouvel hôte sans raison écrite.
+- CSP (`src/renderer/index.html`) : pas d'`unsafe-eval`, pas de nouvel hôte sans raison écrite. Une vue MCP App : iframe `allow-scripts` sans `allow-same-origin`, servie par le main avec sa propre CSP ([mcp-2026](../architecture/mcp-2026.md)).
 
 ## S7 — Hors-ligne strict
 
 `airgapStrict` (`.workpilot/offline-mode.json`) est une barrière, pas une préférence : tout nouvel
-appel réseau du backend passe par `core/offline_policy.py`. Voir
+appel réseau du backend passe par `offline_policy/`. Voir
 [`architecture/offline-mode.md`](../architecture/offline-mode.md).
 
 ## S8 — Chaîne d'approvisionnement

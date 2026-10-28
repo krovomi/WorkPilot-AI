@@ -36,6 +36,7 @@ import type {
 import { estimateTokens } from "../../shared/utils/arena-contenders";
 import { appLog } from "../app-logger";
 import { runOneShotLLM } from "../oneshot-llm";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
 
 // ─── Storage ──────────────────────────────────────────────────────────────────
 
@@ -426,7 +427,7 @@ async function runParticipant(
 		debugLabel: `Arena ${participant.label}`,
 		onDelta: (chunk) => {
 			output += chunk;
-			safeSend("arena:battleProgress", {
+			safeSend(IPC_CHANNELS.ARENA_BATTLE_PROGRESS, {
 				battleId: battle.id,
 				label: participant.label,
 				chunk,
@@ -492,7 +493,7 @@ async function runBattle(
 				request,
 				safeSend,
 			);
-			safeSend("arena:battleResult", {
+			safeSend(IPC_CHANNELS.ARENA_BATTLE_RESULT, {
 				battleId: battle.id,
 				...outcome,
 			});
@@ -521,7 +522,7 @@ async function runBattle(
 					? result.reason.message
 					: "Unexpected failure";
 			appLog.error(`[Arena] Participant ${p.label} crashed: ${reason}`);
-			safeSend("arena:battleResult", {
+			safeSend(IPC_CHANNELS.ARENA_BATTLE_RESULT, {
 				battleId: battle.id,
 				label: p.label,
 				output: "",
@@ -534,7 +535,7 @@ async function runBattle(
 		},
 	);
 
-	safeSend("arena:battleComplete", {
+	safeSend(IPC_CHANNELS.ARENA_BATTLE_COMPLETE, {
 		battleId: battle.id,
 		participants: finalParticipants,
 	});
@@ -587,7 +588,7 @@ export function registerArenaHandlers(
 ): void {
 	// Start a new battle
 	ipcMain.handle(
-		"arena:startBattle",
+		IPC_CHANNELS.ARENA_START_BATTLE,
 		async (_event, request: StartBattleRequest) => {
 			try {
 				const invalid = validateContenders(request?.contenders);
@@ -635,7 +636,7 @@ export function registerArenaHandlers(
 					appLog.error(`[Arena] Battle error: ${err}`);
 					const win = getMainWindow();
 					if (win && !win.isDestroyed()) {
-						win.webContents.send("arena:battleError", {
+						win.webContents.send(IPC_CHANNELS.ARENA_BATTLE_ERROR, {
 							battleId,
 							error: err instanceof Error ? err.message : "Unknown error",
 						});
@@ -654,7 +655,7 @@ export function registerArenaHandlers(
 	);
 
 	// Submit a vote for a battle
-	ipcMain.handle("arena:vote", async (_event, vote: ArenaVote) => {
+	ipcMain.handle(IPC_CHANNELS.ARENA_VOTE, async (_event, vote: ArenaVote) => {
 		try {
 			// Update battle as completed
 			const battles = readBattles();
@@ -689,7 +690,7 @@ export function registerArenaHandlers(
 	});
 
 	// Get battle history
-	ipcMain.handle("arena:getBattles", async () => {
+	ipcMain.handle(IPC_CHANNELS.ARENA_GET_BATTLES, async () => {
 		try {
 			const battles = readBattles();
 			return { success: true, data: battles };
@@ -702,7 +703,7 @@ export function registerArenaHandlers(
 	});
 
 	// Get analytics
-	ipcMain.handle("arena:getAnalytics", async () => {
+	ipcMain.handle(IPC_CHANNELS.ARENA_GET_ANALYTICS, async () => {
 		try {
 			const battles = readBattles();
 			const votes = readVotes();
@@ -718,7 +719,7 @@ export function registerArenaHandlers(
 	});
 
 	// Clear battle history
-	ipcMain.handle("arena:clearHistory", async () => {
+	ipcMain.handle(IPC_CHANNELS.ARENA_CLEAR_HISTORY, async () => {
 		try {
 			writeBattles([]);
 			writeVotes([]);

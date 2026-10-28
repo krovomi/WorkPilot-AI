@@ -20,6 +20,7 @@ vi.mock("./TaskMetadata", () => ({ TaskMetadata: () => <p>the description</p> })
 vi.mock("./WorkflowProfileCard", () => ({
 	WorkflowProfileCard: () => (show.plan ? <p>workflow profile</p> : null),
 }));
+vi.mock("./GoalCard", () => ({ GoalCard: () => null }));
 vi.mock("./TaskJevCard", () => ({ TaskJevCard: () => null }));
 vi.mock("./SpecTraceabilityCard", () => ({ SpecTraceabilityCard: () => null }));
 vi.mock("./DocumentInsightsCard", () => ({ DocumentInsightsCard: () => null }));

@@ -12,15 +12,25 @@ Toute interaction LLM passe par ces fichiers ; les modifier touche tout le produ
 
 | Fichier | Lignes | Rôle |
 |---|---|---|
-| `core/client.py` | ~2 750 | **la fabrique** : `create_client()` (SDK Claude), `create_agent_client()` (multi-provider) ; modèle, outils, MCP, sous-agents, hooks de sécurité |
+| `core/client.py` | ~3 100 | **la fabrique** : `create_client()` (SDK Claude), `create_agent_client()` (multi-provider) ; modèle, outils, MCP, sous-agents, hooks de sécurité, une fonction par sujet sous `create_client`, un constructeur par provider sous `create_agent_client` |
 | `core/simple_client.py` | — | client sans hooks, refusé aux types qui écrivent ou exécutent |
-| `core/agent_clients/` | ~6 800 | un module par provider (`claude`, `copilot`, `openai`, `google`, `compatible`, `local`, `windsurf`, les CLI `opencode_cli`, `antigravity_cli`, `pi_cli` sur `cli_subprocess`, `pi_guard/` le garde-fou chargé dans pi…) ; `core/agent_client.py` les réexporte |
+| `core/agent_clients/` | ~6 800 | un module par provider (`claude`, `copilot`, `openai`, `google`, `compatible`, `local`, `windsurf`, les CLI `opencode_cli`, `antigravity_cli`, `pi_cli` sur `cli_subprocess`, `acp` le client Agent Client Protocol commun à tous les agents ACP et `acp_permissions` qui pose leurs questions sur la carte, `pi_guard/` le garde-fou chargé dans pi…) ; `core/agent_client.py` les réexporte |
 | `core/worktree.py` + `worktree_pr.py` + `worktree_common.py` | ~3 450 | worktrees par spec ; la création de PR/MR est le mixin `WorktreePRMixin` |
 | `agents/session.py` | ~2 500 | boucle de session : streaming, reprise, erreurs, rate limits |
-| `agents/coder.py` | ~2 700 | l'agent d'implémentation, découpage en sous-tâches |
+| `agents/coder.py` | ~2 950 | l'agent d'implémentation : `run_autonomous_agent` (la boucle, ~1 150 lignes), les prompts de planification et de sous-tâche (`_planning_prompt`, `_coding_prompt`), l'issue d'une session (`_on_session_error` et un `_on_*` par type d'erreur, `_RetryState`), le plan invalide, le bilan de fin |
 | `cli/build_commands.py` | ~1 300 | enchaîne les phases d'un build : planning → coding → QA |
-| `qa/loop.py` | ~1 350 | boucle de validation QA |
+| `qa/loop.py` | ~1 600 | boucle de validation QA : `run_qa_validation_loop` et une fonction par session, gate et verdict |
 | `provider_api.py` | ~2 050 | point d'entrée FastAPI : monte les routeurs, CORS, redaction des logs |
+
+## Couches
+
+`foundation/` est la couche la plus basse et n'importe rien du backend : `platform/`,
+`api_safety.py`, `file_utils.py`, `git_executable.py`, `phase_event.py`, `dotnet_tools.py`,
+`codex_catalog_rpc.py`, `vendor_manifest.py`, `workpilot_layout.py`. `core/` est la racine de
+composition, qui importe les agents. Les autres modules sortis de `core` par le lot M10 :
+`offline_policy/` (avec `local_model_catalog.py`), `app_detection.py` (détecteur de l'aperçu),
+`project/ui_stack.py` et `project/test_stack.py` (les piles UI et de test, venues de `uiux` et de
+`test_generation`). `tests/test_import_contracts.py` tient ces frontières.
 
 ## Modèle, effort, routage
 
@@ -28,8 +38,9 @@ Toute interaction LLM passe par ces fichiers ; les modifier touche tout le produ
 |---|---|
 | `phase_config.py` | `MODEL_ID_MAP`, `THINKING_BUDGET_MAP`, `DEFAULT_PHASE_MODELS`, `PROVIDER_DEFAULT_MODELS`, `get_phase_model()`, `get_phase_thinking_budget()` |
 | `models_registry.py` | catalogue livré des modèles et de leurs capacités |
-| `model_router/router.py` | `TaskClass` × `QualityTier` (budget / balanced / premium) → modèle |
-| `core/phase_event.py` | événements de phase vers l'UI |
+| `model_router/router.py` | `TaskClass` × `QualityTier` (budget / balanced / premium) → modèle ; écarte un modèle que le banc de rejeu a vu échouer |
+| `bench/` | banc de rejeu ([justification](../../docs/architecture/repo-bench.md)) : cartes terminées rejouées depuis leur commit d'avant dans des copies isolées, jugées par les tests du commit d'arrivée (calibrés F2P / P2P), tableau par provider × modèle × effort lu par Formula Lab et `model_router/` ; commandes : `runners/bench_runner.py` |
+| `foundation/phase_event.py` | événements de phase vers l'UI |
 | `core/pause_state.py`, `core/build_signals.py` | pause coopérative ; `BuildPaused` / `BuildHalted` |
 | `context_mgmt/` | fenêtre de contexte par session : jauge, compact / clear au seuil |
 | `harness/` | harness de contexte ([plan](../../docs/architecture/context-harness.md)) : `harness/domain/` mesure chaque appel dans une unité commune à tous les providers et le chiffre (`harness/domain/usage.py`, `harness/domain/ledger.py`, `harness/domain/cost.py`), ordonne un prompt du segment le plus stable au plus volatil (`harness/domain/layout.py`), pagine ce que lisent les outils ou déverse ce qui ne se relit pas (`harness/domain/paging.py`), purge les vieux résultats d'outils par lots (`harness/domain/policies.py`), arrête un modèle qui se répète (`harness/domain/progress.py`), borne et marque ce que rend un sous-agent (`harness/domain/subagents.py`) et fige un jeu d'outils trié par session, qu'il pèse (`harness/domain/tools.py`) ; `harness/application/budget.py` plafonne chaque session, `harness/application/subagents.py` délimite ce résultat comme une donnée et lance les sous-agents en échelon, `harness/domain/delegation.py` et `harness/application/delegation.py` donnent un roster à tout provider de la boucle (outil `delegate`, session enfant du même client, [justification](../../docs/architecture/delegation.md)), `harness/application/tools.py` pose le jeu d'outils sur chaque client WorkPilot et pèse chaque type d'agent ; `harness/domain/evals.py` juge une session rejouée (cache par capacité, régressions contre une base) et `harness/application/replay.py` la rejoue dans le code de production (fixtures : `tests/harness/replay/`) ; `harness/application/loop.py` est la seule boucle WorkPilot, derrière `harness/ports.py` (`ModelPort`), et `harness/domain/stop.py` dit quand elle s'arrête ; ses adaptateurs restent dans `core/agent_clients/` (`LoopAdapter`) ; `harness/domain/code_chunks.py` et `harness/domain/code_ranking.py` découpent le code par symbole et le classent (BM25 + RRF), `harness/application/code_search.py` l'indexe et répond à `search_code`, que `harness/tools/` sert en MCP (`workpilot-code`) et à `ToolExecutor` |
@@ -58,8 +69,9 @@ Toute interaction LLM passe par ces fichiers ; les modifier touche tout le produ
 | `security/` | allowlist de commandes, écritures confinées, contenu non fiable ([index](security/AGENTS.md)) |
 | `injection_guard/` | scanner d'injection de prompt |
 | `server/auth/`, `server/authz/` | authentification (JWT, OIDC) ; permissions, rôles, tenants, portée de projet |
-| `core/api_safety.py` | chemins acceptés par l'API locale |
-| `core/offline_policy.py` | hors-ligne strict (`airgapStrict`) |
+| `foundation/api_safety.py` | chemins acceptés par l'API locale |
+| `offline_policy/` | hors-ligne strict (`airgapStrict`) |
+| `os_sandbox/` | bac à sable de l'OS autour des commandes d'agent : bubblewrap, Seatbelt, proxy filtrant ([conception](../../docs/architecture/os-sandbox.md)) |
 | `core/log_redaction.py` | filtre de redaction des logs |
 
 ## Mémoire, apprentissage, autonomie
@@ -72,8 +84,8 @@ Toute interaction LLM passe par ces fichiers ; les modifier touche tout le produ
 | `learning_loop/` | patterns des builds, phase `observe` (`skills/_proposed/`), replay A/B |
 | `hermes/` | hermes-agent : doctor, persona `SOUL.md`, cycle d'apprentissage |
 | `core/merge_event.py` | un merge publié une fois ; mémoire, apprentissage et `uiux` s'y abonnent |
-| `core/workpilot_layout.py` | un dossier par feature sous `.workpilot/` |
-| `continuous_ai/daemon.py`, `self_healing/` | boucles autonomes avec plafond de coût ; surveillance et remédiation |
+| `foundation/workpilot_layout.py` | un dossier par feature sous `.workpilot/` |
+| `self_healing/` | boucle autonome avec plafond de coût ; surveillance et remédiation (les automatisations, qui créent des cartes sur un événement, vivent côté Electron : `apps/frontend/src/main/automations/`) |
 
 ## Préparer et vérifier un build
 
@@ -88,7 +100,12 @@ Toute interaction LLM passe par ces fichiers ; les modifier touche tout le produ
 | `watermarks/` | caractères invisibles retirés de chaque fichier généré |
 | `uiux/` | design system et règles de pile UI, seulement si la tâche touche l'interface |
 | `mobile/` | Android / Apple : piles, appareils, `readiness.py` (constructible ici ?) |
-| `verify/` | boucle `/verify` : lancer l'app, erreurs → correction, preuve |
+| `verify/` | boucle `/verify` : lancer l'app, erreurs → correction, preuve ; une app Windows (`window.py`, assistant `uia/driver.ps1`) se lit et se conduit par UI Automation dans une seule fenêtre, nommée par la carte, de l'arbre de processus lancé |
+| `genai_trace/` | spans OpenTelemetry GenAI de chaque `AgentClient` (`invoke_agent`, `chat`, `execute_tool`), posés par `AgentClient.__init_subclass__` ; aucun contenu ; une feuille, importée par `harness` ([justification](../../docs/architecture/genai-traces.md)) |
+| `mcp_tasks/` | MCP 2026-07-28 pour les serveurs de WorkPilot : `ToolServer` (deux ères), `TaskStore` (extension Tasks) ; feuille. Côté client : `core/mcp_extensions.py` ([conception](../../docs/architecture/mcp-2026.md)) |
+| `pr_followup/` | la PR d'une tâche suivie jusqu'au merge : `policy.decide` (pure), gardes du diff de correctif, GitHub par `gh`, `run_round` ; runner `runners/pr_followup_runner.py` ([justification](../../docs/architecture/pr-followup.md)) |
+| `best_of_n/` | best-of-N : variantes d'une tâche (une par moteur), classement chiffré, adoption de la variante choisie ([best-of-n.md](../../docs/architecture/best-of-n.md)) |
+| `goal/` | mode objectif : une commande et son code de sortie disent « fini » ; chemins protégés, plafond de dépense ([goal-mode.md](../../docs/architecture/goal-mode.md)) |
 | `architecture_visualizer/` | carte archify du projet et delta par tâche |
 | `bounty_board/` | N modèles sur une spec, preuves mesurées, juge anonyme |
 | `vendor/archify/`, `vendor/watermarks/` | code vendorisé et épinglé (`scripts/vendor_*.py`) |
@@ -101,6 +118,9 @@ ici. Six modules de production portent seulement le préfixe `test_` (`agents/te
 `analysis/test_discovery.py`…) : `apps/backend` reste dans `testpaths` pour eux seuls, car
 `tests/test_test_discovery.py` exige que tout `test_*.py` soit collecté ; ils ne produisent aucun test.
 
-À la racine du backend restent des modules propres (`phase_config.py`, `models_registry.py`) et des
+À la racine du backend restent des modules propres (`phase_config.py`, `models_registry.py`,
+`provider_selection.py`, le provider choisi dans l'UI, lu sans importer l'API) et des
 points d'entrée lancés par chemin ou par uvicorn (`run.py`, `start_backend.py`, `provider_api.py`,
 `analyzer.py`, `commit_message.py`) ; `insight_extractor.py` est un réexport en sursis.
+Les dépendances entre unités de premier niveau sont gardées par `tests/test_import_contracts.py`
+(règle dans [`backend.md`](../../docs/rules/backend.md#code-python)).

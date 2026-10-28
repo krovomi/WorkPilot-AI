@@ -1,7 +1,7 @@
 {
 	"source": "NousResearch/hermes-agent",
 	"ref": "HEAD",
-	"commit": "62e5f466565ee56351e4483ead8e62f9e782f8b3",
+	"commit": "d49e2ebbaed42718659c13f82c04cde7d8ab10bd",
 	"skills": 12,
 	"subdirs": [
 		"skills/autonomous-ai-agents",

@@ -33,6 +33,9 @@ export const taskMock = {
 
 	deleteTask: async () => ({ success: true }),
 
+	getTaskGoal: async () => ({ success: true as const, data: { goal: null } }),
+	setTaskGoal: async () => ({ success: true as const, data: { goal: null } }),
+
 	updateTask: async (
 		_taskId: string,
 		updates: { title?: string; description?: string },
@@ -122,6 +125,9 @@ export const taskMock = {
 	onTaskStatusChange: () => () => {
 		/* noop */
 	},
+	onTaskUpdated: () => () => {
+		/* noop */
+	},
 	onTaskExecutionProgress: () => () => {
 		/* noop */
 	},
@@ -152,6 +158,53 @@ export const taskMock = {
 		data: { running: false },
 	}),
 	onVisualProofRunning: () => () => {
+		/* noop */
+	},
+	startPrFollowup: async () => ({
+		success: true as const,
+		data: { running: false },
+	}),
+	stopPrFollowup: async () => ({
+		success: true as const,
+		data: { running: false },
+	}),
+	getPrFollowupStatus: async () => ({
+		success: true as const,
+		data: { running: false },
+	}),
+	onPrFollowupEvent: () => () => {
+		/* noop */
+	},
+	listMcpAppViews: async () => ({ success: true as const, data: [] }),
+	openMcpAppView: async () => ({
+		success: false as const,
+		error: "MCP App views are not available in the browser preview",
+	}),
+	closeMcpAppView: async () => ({ success: true as const }),
+	onMcpAppView: () => () => {
+		/* noop */
+	},
+	startBestOfN: async () => ({
+		success: false as const,
+		error: "Best-of-N is not available in the browser preview",
+	}),
+	getBestOfNStatus: async () => ({
+		success: true as const,
+		data: { state: null, running: [] },
+	}),
+	rankBestOfN: async () => ({
+		success: true as const,
+		data: { state: null, running: [] },
+	}),
+	adoptBestOfN: async () => ({
+		success: true as const,
+		data: { state: null, running: [] },
+	}),
+	discardBestOfN: async () => ({
+		success: true as const,
+		data: { state: null, running: [] },
+	}),
+	onBestOfNEvent: () => () => {
 		/* noop */
 	},
 };

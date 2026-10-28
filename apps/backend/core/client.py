@@ -26,10 +26,11 @@ import os
 import threading
 import time
 from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from core.platform import (
+from foundation.platform import (
     is_windows,
     validate_cli_path,
 )
@@ -145,7 +146,7 @@ from agents.tools_pkg import (
     is_tools_available,
     undeclared_builtin_tools,
 )
-from skills_registry.providers import get_provider_capabilities
+from skills_registry.providers import acp_provider_names, get_provider_capabilities
 
 # Make claude_agent_sdk optional for testing purposes
 try:
@@ -849,10 +850,166 @@ def create_client(
     if isinstance(spec_dir, str):
         spec_dir = Path(spec_dir)
 
-    from core.offline_policy import guard_cloud_client
+    from offline_policy import guard_cloud_client
 
     guard_cloud_client(project_dir, spec_dir)
 
+    sdk_env, config_dir = _cli_environment(project_dir, spec_dir, model, agent_type)
+
+    # Check if Linear integration is enabled
+    linear_enabled = is_linear_enabled()
+
+    # Check if custom workpilot tools are available
+    auto_claude_tools_enabled = is_tools_available()
+
+    # Load project capabilities for dynamic MCP tool selection
+    # This enables context-aware tool injection based on project type
+    # Uses caching to avoid reloading on every create_client() call
+    _, project_capabilities = _get_cached_project_data(project_dir)
+
+    # Load per-project MCP configuration from _AUTO_CLAUDE_DIR/.env
+    mcp_config = load_project_mcp_config(project_dir)
+
+    # Get allowed tools using phase-aware configuration
+    # This respects AGENT_CONFIGS and only includes tools the agent needs
+    # Also respects per-project MCP configuration
+    allowed_tools_list = get_allowed_tools(
+        agent_type,
+        project_capabilities,
+        linear_enabled,
+        mcp_config,
+        spec_dir=spec_dir,
+    )
+
+    # Get required MCP servers for this agent type
+    # This is the key optimization - only start servers the agent needs
+    # Now also respects per-project MCP configuration
+    required_servers = get_required_mcp_servers(
+        agent_type,
+        project_capabilities,
+        linear_enabled,
+        mcp_config,
+        spec_dir=spec_dir,
+    )
+
+    settings_file, original_project_permissions = _write_security_settings(
+        project_dir, spec_dir, required_servers
+    )
+    _print_session_summary(
+        project_dir,
+        settings_file,
+        has_worktree_permissions=bool(original_project_permissions),
+        max_thinking_tokens=max_thinking_tokens,
+        required_servers=required_servers,
+        workpilot_tools_enabled=auto_claude_tools_enabled,
+        agent_type=agent_type,
+        project_capabilities=project_capabilities,
+    )
+
+    # Configure MCP servers - ONLY start servers that are required
+    # This is the key optimization to reduce context bloat and startup latency
+    mcp_servers = _mcp_servers(
+        required_servers,
+        mcp_config,
+        project_dir,
+        spec_dir,
+        workpilot_tools_enabled=auto_claude_tools_enabled,
+    )
+
+    base_prompt = _system_prompt(project_dir, spec_dir, agent_type, sdk_env)
+
+    # Build options dict, conditionally including output_format
+    options_kwargs: dict[str, Any] = {
+        "model": model,
+        "system_prompt": base_prompt,
+        "allowed_tools": allowed_tools_list,
+        "mcp_servers": mcp_servers,
+        "hooks": _session_hooks(
+            project_dir, spec_dir, _debugger_hooks(project_dir, spec_dir, agent_type)
+        ),
+        "max_turns": int(os.environ.get("AUTO_CLAUDE_MAX_TURNS", "1000")),
+        # Budget cap as a meaningful runaway guard, the same per-session cap
+        # every other client gets from the session runner
+        # (harness.application.budget). The error path (`error_max_budget_usd`)
+        # is already handled in agents/session.py. Users can raise it via env;
+        # 0 or less removes it.
+        "max_budget_usd": session_budget_usd(),
+        "cwd": str(project_dir.resolve()),
+        "settings": str(settings_file.resolve()),
+        # setting_sources auto-loads CLAUDE.md, project rules, skills, and
+        # filesystem-defined hooks from ~/.claude (user), <cwd>/.claude (project),
+        # and .claude/settings.local.json (local). The SDK handles prompt-cache
+        # prefixing automatically for these sources. CLAUDE.md and the rules
+        # files follow the project's `useClaudeMd` setting; skills and hooks
+        # do not (`apply_claude_md_setting`).
+        # See: code.claude.com/docs/en/agent-sdk/claude-code-features
+        "setting_sources": ["project", "user", "local"],
+        "env": sdk_env,  # Pass ANTHROPIC_BASE_URL etc. to subprocess
+        "max_thinking_tokens": max_thinking_tokens,  # Extended thinking budget
+        "max_buffer_size": 10
+        * 1024
+        * 1024,  # 10MB buffer (default: 1MB) - fixes large tool results
+        # Enable file checkpointing to track file read/write state across tool calls
+        # This prevents "File has not been read yet" errors in recovery sessions
+        "enable_file_checkpointing": True,
+    }
+
+    # Optional: Allow CLI path override via environment variable
+    # The SDK bundles its own CLI, but users can override if needed
+    env_cli_path = os.environ.get("CLAUDE_CLI_PATH")
+    if env_cli_path and validate_cli_path(env_cli_path):
+        options_kwargs["cli_path"] = env_cli_path
+        logger.info(f"Using CLAUDE_CLI_PATH override: {env_cli_path}")
+
+    # Add structured output format if specified
+    # See: https://platform.claude.com/docs/en/agent-sdk/structured-outputs
+    if output_format:
+        options_kwargs["output_format"] = output_format
+
+    _add_subagents(
+        options_kwargs,
+        agent_type,
+        project_dir,
+        spec_dir,
+        agents=agents,
+        use_subagents=use_subagents,
+        roster=roster,
+    )
+
+    if _resume_id := _resume_session_id(resume, config_dir):
+        options_kwargs["resume"] = _resume_id
+        logger.info(f"Resuming Claude SDK session: {_resume_id}")
+
+    # Read-only phases run in permission mode "plan" (READ_ONLY_AGENT_TYPES).
+    if agent_type in READ_ONLY_AGENT_TYPES and "permission_mode" not in options_kwargs:
+        options_kwargs["permission_mode"] = "plan"
+
+    # What a type does not declare, it does not have. `allowed_tools` only
+    # auto-approves, and the settings file above allows Write, Edit and
+    # `Bash(*)` to every type, so until this line a declaration was a wish:
+    # a `pr_reviewer` reading a hostile diff could write and run commands.
+    # `disallowed_tools` removes the tool from the model's context and wins
+    # over allow rules, which is why the settings file can stay shared.
+    if denied := undeclared_builtin_tools(agent_type):
+        options_kwargs["disallowed_tools"] = denied
+
+    _add_effort(options_kwargs, model, max_thinking_tokens, agent_type)
+
+    return ClaudeSDKClient(options=ClaudeAgentOptions(**options_kwargs))
+
+
+# -----------------------------------------------------------------------------
+# create_client, one concern per function
+# -----------------------------------------------------------------------------
+
+
+def _cli_environment(
+    project_dir: Path, spec_dir: Path, model: str, agent_type: str
+) -> tuple[dict[str, str], str | None]:
+    """The environment the CLI subprocess gets, and its CLAUDE_CONFIG_DIR.
+
+    Also configures the SDK's authentication for that config dir.
+    """
     # rtk settings a project carries in `.workpilot/.env` — the file the
     # Electron settings screen writes. Applied here rather than read at each
     # call site so the hook, the awareness paragraph and WorkPilot's own
@@ -893,28 +1050,7 @@ def create_client(
     for _key, _value in native_auto_compact_env(spec_dir, model).items():
         sdk_env.setdefault(_key, _value)
 
-    # OpenTelemetry observability (opt-in). When AUTO_CLAUDE_OTEL_ENDPOINT is
-    # set (e.g. `http://localhost:4318` for a local OTLP collector / Jaeger),
-    # we flip on the CLI's built-in tracing so spans for each turn, tool call,
-    # and hook flow into the user's backend. Traces are in beta on the CLI
-    # side, so we gate them explicitly. The agent_type becomes the OTEL
-    # service name so multiple runner kinds (coder, planner, analyzer, …)
-    # appear as separate services in the dashboard.
-    # See: code.claude.com/docs/en/agent-sdk/observability
-    _otel_endpoint = os.environ.get("AUTO_CLAUDE_OTEL_ENDPOINT")
-    if _otel_endpoint:
-        sdk_env.setdefault("CLAUDE_CODE_ENABLE_TELEMETRY", "1")
-        sdk_env.setdefault("CLAUDE_CODE_ENHANCED_TELEMETRY_BETA", "1")
-        sdk_env.setdefault("OTEL_TRACES_EXPORTER", "otlp")
-        sdk_env.setdefault("OTEL_METRICS_EXPORTER", "otlp")
-        sdk_env.setdefault("OTEL_LOGS_EXPORTER", "otlp")
-        sdk_env.setdefault("OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf")
-        sdk_env.setdefault("OTEL_EXPORTER_OTLP_ENDPOINT", _otel_endpoint)
-        sdk_env.setdefault("OTEL_SERVICE_NAME", f"workpilot-{agent_type}")
-        # Tighter export intervals so short Kanban cards flush before exit.
-        sdk_env.setdefault("OTEL_METRIC_EXPORT_INTERVAL", "1000")
-        sdk_env.setdefault("OTEL_LOGS_EXPORT_INTERVAL", "1000")
-        sdk_env.setdefault("OTEL_TRACES_EXPORT_INTERVAL", "1000")
+    _add_otel_env(sdk_env, agent_type)
 
     # Get the config dir for profile-specific credential lookup
     # CLAUDE_CONFIG_DIR enables per-profile Keychain entries with SHA256-hashed service names
@@ -940,64 +1076,48 @@ def create_client(
         logger.info(f"Git Bash path found: {sdk_env['CLAUDE_CODE_GIT_BASH_PATH']}")
     elif is_windows():
         logger.warning("Git Bash path not detected on Windows!")
+    return sdk_env, config_dir
 
-    # Check if Linear integration is enabled
-    linear_enabled = is_linear_enabled()
-    linear_api_key = os.environ.get("LINEAR_API_KEY", "")
 
-    # Check if custom workpilot tools are available
-    auto_claude_tools_enabled = is_tools_available()
+def _add_otel_env(sdk_env: dict[str, str], agent_type: str) -> None:
+    """OpenTelemetry observability (opt-in).
 
-    # Load project capabilities for dynamic MCP tool selection
-    # This enables context-aware tool injection based on project type
-    # Uses caching to avoid reloading on every create_client() call
-    _, project_capabilities = _get_cached_project_data(project_dir)
+    When AUTO_CLAUDE_OTEL_ENDPOINT is set (e.g. `http://localhost:4318` for a
+    local OTLP collector / Jaeger), we flip on the CLI's built-in tracing so
+    spans for each turn, tool call, and hook flow into the user's backend.
+    Traces are in beta on the CLI side, so we gate them explicitly. The
+    agent_type becomes the OTEL service name so multiple runner kinds (coder,
+    planner, analyzer, …) appear as separate services in the dashboard.
+    See: code.claude.com/docs/en/agent-sdk/observability
+    """
+    _otel_endpoint = os.environ.get("AUTO_CLAUDE_OTEL_ENDPOINT")
+    if not _otel_endpoint:
+        return
+    sdk_env.setdefault("CLAUDE_CODE_ENABLE_TELEMETRY", "1")
+    sdk_env.setdefault("CLAUDE_CODE_ENHANCED_TELEMETRY_BETA", "1")
+    sdk_env.setdefault("OTEL_TRACES_EXPORTER", "otlp")
+    sdk_env.setdefault("OTEL_METRICS_EXPORTER", "otlp")
+    sdk_env.setdefault("OTEL_LOGS_EXPORTER", "otlp")
+    sdk_env.setdefault("OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf")
+    sdk_env.setdefault("OTEL_EXPORTER_OTLP_ENDPOINT", _otel_endpoint)
+    sdk_env.setdefault("OTEL_SERVICE_NAME", f"workpilot-{agent_type}")
+    # Tighter export intervals so short Kanban cards flush before exit.
+    sdk_env.setdefault("OTEL_METRIC_EXPORT_INTERVAL", "1000")
+    sdk_env.setdefault("OTEL_LOGS_EXPORT_INTERVAL", "1000")
+    sdk_env.setdefault("OTEL_TRACES_EXPORT_INTERVAL", "1000")
 
-    # Load per-project MCP configuration from _AUTO_CLAUDE_DIR/.env
-    mcp_config = load_project_mcp_config(project_dir)
 
-    # Get allowed tools using phase-aware configuration
-    # This respects AGENT_CONFIGS and only includes tools the agent needs
-    # Also respects per-project MCP configuration
-    allowed_tools_list = get_allowed_tools(
-        agent_type,
-        project_capabilities,
-        linear_enabled,
-        mcp_config,
-        spec_dir=spec_dir,
-    )
+def _worktree_permissions(project_dir: Path) -> list[str]:
+    """File-tool rules for the main checkout of the worktree `project_dir` is in.
 
-    # Get required MCP servers for this agent type
-    # This is the key optimization - only start servers the agent needs
-    # Now also respects per-project MCP configuration
-    required_servers = get_required_mcp_servers(
-        agent_type,
-        project_capabilities,
-        linear_enabled,
-        mcp_config,
-        spec_dir=spec_dir,
-    )
-
-    # Determine browser tools for permissions (already in allowed_tools_list)
-    browser_tools_permissions = []
-    if "electron" in required_servers:
-        browser_tools_permissions = ELECTRON_TOOLS
-    elif "puppeteer" in required_servers:
-        browser_tools_permissions = PUPPETEER_TOOLS
-
-    # Create comprehensive security settings
-    # Note: Using both relative paths ("./**") and absolute paths to handle
-    # cases where Claude uses absolute paths for file operations
-    project_path_str = str(project_dir.resolve())
-    spec_path_str = str(spec_dir.resolve()) if spec_dir else project_path_str
-
-    # Detect if we're running in a worktree and get the original project directory
-    # Worktrees are located in either:
-    # - _AUTO_CLAUDE_DIR/worktrees/tasks/{spec-name}/ (new location)
-    # - .worktrees/{spec-name}/ (legacy location)
-    # When running in a worktree, we need to allow access to both the worktree
-    # and the original project's _AUTO_CLAUDE_DIR/ directory for spec files
-    original_project_permissions = []
+    Worktrees are located in either:
+    - _AUTO_CLAUDE_DIR/worktrees/tasks/{spec-name}/ (new location)
+    - .worktrees/{spec-name}/ (legacy location)
+    When running in a worktree, we need to allow access to both the worktree
+    and the original project's _AUTO_CLAUDE_DIR/ directory for spec files.
+    Empty outside a worktree.
+    """
+    original_project_permissions: list[str] = []
     resolved_project_path = project_dir.resolve()
 
     # Check for worktree paths and extract original project directory
@@ -1031,6 +1151,26 @@ def create_client(
                         [f"{op}({path_str}/**)" for op in permission_ops]
                     )
             break
+    return original_project_permissions
+
+
+def _write_security_settings(
+    project_dir: Path, spec_dir: Path, required_servers
+) -> tuple[Path, list[str]]:
+    """Write `.claude_settings.json`; returns it and the worktree rules it holds."""
+    # Determine browser tools for permissions (already in allowed_tools_list)
+    browser_tools_permissions = []
+    if "electron" in required_servers:
+        browser_tools_permissions = ELECTRON_TOOLS
+    elif "puppeteer" in required_servers:
+        browser_tools_permissions = PUPPETEER_TOOLS
+
+    # Create comprehensive security settings
+    # Note: Using both relative paths ("./**") and absolute paths to handle
+    # cases where Claude uses absolute paths for file operations
+    project_path_str = str(project_dir.resolve())
+    spec_path_str = str(spec_dir.resolve()) if spec_dir else project_path_str
+    original_project_permissions = _worktree_permissions(project_dir)
 
     security_settings = {
         "sandbox": {"enabled": True, "autoAllowBashIfSandboxed": True},
@@ -1099,11 +1239,25 @@ def create_client(
     settings_file = project_dir / ".claude_settings.json"
     with open(settings_file, "w", encoding="utf-8") as f:
         json.dump(security_settings, f, indent=2)
+    return settings_file, original_project_permissions
 
+
+def _print_session_summary(
+    project_dir: Path,
+    settings_file: Path,
+    *,
+    has_worktree_permissions: bool,
+    max_thinking_tokens: int | None,
+    required_servers,
+    workpilot_tools_enabled: bool,
+    agent_type: str,
+    project_capabilities: dict[str, bool],
+) -> None:
+    """What the session runs with, printed for the task log."""
     print(f"Security settings: {settings_file}")
     print("   - Sandbox enabled (OS-level bash isolation)")
     print(f"   - Filesystem restricted to: {project_dir.resolve()}")
-    if original_project_permissions:
+    if has_worktree_permissions:
         print("   - Worktree permissions: granted for original project directories")
     print("   - Bash commands restricted to allowlist")
     if max_thinking_tokens:
@@ -1129,7 +1283,7 @@ def create_client(
         mcp_servers_list.append("workpilot-uiux (ui-ux-pro-max design data)")
     if "code" in required_servers:
         mcp_servers_list.append("workpilot-code (ranked code excerpts)")
-    if "workpilot" in required_servers and auto_claude_tools_enabled:
+    if "workpilot" in required_servers and workpilot_tools_enabled:
         mcp_servers_list.append(f"workpilot ({agent_type} tools)")
     if mcp_servers_list:
         print(f"   - MCP servers: {', '.join(mcp_servers_list)}")
@@ -1146,9 +1300,50 @@ def create_client(
         print(f"   - Project capabilities: {', '.join(caps)}")
     print()
 
-    # Configure MCP servers - ONLY start servers that are required
-    # This is the key optimization to reduce context bloat and startup latency
-    mcp_servers = {}
+
+# Servers launched with `npx -y <package>` that start only once every variable
+# they need is set, and receive exactly those variables. In the order they are
+# registered, which is the order the SDK starts them.
+_CREDENTIALED_NPX_SERVERS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    (
+        "github",
+        "@modelcontextprotocol/server-github",
+        ("GITHUB_PERSONAL_ACCESS_TOKEN",),
+    ),
+    ("brave-search", "@modelcontextprotocol/server-brave-search", ("BRAVE_API_KEY",)),
+    ("jira", "mcp-atlassian", ("JIRA_URL", "JIRA_USERNAME", "JIRA_API_TOKEN")),
+    ("azure-devops", "azure-devops-mcp", ("AZURE_DEVOPS_TOKEN", "AZURE_DEVOPS_ORG")),
+    ("sentry", "@sentry/mcp-server", ("SENTRY_AUTH_TOKEN",)),
+    ("slack", "@modelcontextprotocol/server-slack", ("SLACK_BOT_TOKEN",)),
+    ("postman", "@postman/mcp-postman", ("POSTMAN_API_KEY",)),
+    ("teams", "teams-mcp-server", ("TEAMS_WEBHOOK_URL",)),
+)
+
+
+def _mcp_servers(
+    required_servers,
+    mcp_config: dict,
+    project_dir: Path,
+    spec_dir: Path,
+    *,
+    workpilot_tools_enabled: bool,
+) -> dict[str, dict]:
+    """The MCP servers the session starts: only the ones its type requires."""
+    mcp_servers = _third_party_servers(required_servers, mcp_config)
+    mcp_servers.update(
+        _workpilot_servers(
+            required_servers,
+            project_dir,
+            spec_dir,
+            workpilot_tools_enabled=workpilot_tools_enabled,
+        )
+    )
+    mcp_servers.update(_custom_servers(required_servers, mcp_config))
+    return mcp_servers
+
+
+def _third_party_servers(required_servers, mcp_config: dict) -> dict[str, dict]:
+    mcp_servers: dict[str, dict] = {}
 
     if "context7" in required_servers:
         # The key is passed through the environment rather than `--api-key`:
@@ -1210,93 +1405,34 @@ def create_client(
         }
 
     if "linear" in required_servers:
+        linear_api_key = os.environ.get("LINEAR_API_KEY", "")
         mcp_servers["linear"] = {
             "type": "http",
             "url": "https://mcp.linear.app/mcp",
             "headers": {"Authorization": f"Bearer {linear_api_key}"},
         }
 
-    if "github" in required_servers:
-        github_pat = os.environ.get("GITHUB_PERSONAL_ACCESS_TOKEN", "")
-        if github_pat:
-            mcp_servers["github"] = {
+    for server_id, package, variables in _CREDENTIALED_NPX_SERVERS:
+        if server_id not in required_servers:
+            continue
+        values = {name: os.environ.get(name, "") for name in variables}
+        if all(values.values()):
+            mcp_servers[server_id] = {
                 "command": "npx",
-                "args": ["-y", "@modelcontextprotocol/server-github"],
-                "env": {"GITHUB_PERSONAL_ACCESS_TOKEN": github_pat},
+                "args": ["-y", package],
+                "env": values,
             }
+    return mcp_servers
 
-    if "brave-search" in required_servers:
-        brave_api_key = os.environ.get("BRAVE_API_KEY", "")
-        if brave_api_key:
-            mcp_servers["brave-search"] = {
-                "command": "npx",
-                "args": ["-y", "@modelcontextprotocol/server-brave-search"],
-                "env": {"BRAVE_API_KEY": brave_api_key},
-            }
 
-    if "jira" in required_servers:
-        jira_url = os.environ.get("JIRA_URL", "")
-        jira_username = os.environ.get("JIRA_USERNAME", "")
-        jira_api_token = os.environ.get("JIRA_API_TOKEN", "")
-        if jira_url and jira_username and jira_api_token:
-            mcp_servers["jira"] = {
-                "command": "npx",
-                "args": ["-y", "mcp-atlassian"],
-                "env": {
-                    "JIRA_URL": jira_url,
-                    "JIRA_USERNAME": jira_username,
-                    "JIRA_API_TOKEN": jira_api_token,
-                },
-            }
-
-    if "azure-devops" in required_servers:
-        ado_token = os.environ.get("AZURE_DEVOPS_TOKEN", "")
-        ado_org = os.environ.get("AZURE_DEVOPS_ORG", "")
-        if ado_token and ado_org:
-            mcp_servers["azure-devops"] = {
-                "command": "npx",
-                "args": ["-y", "azure-devops-mcp"],
-                "env": {
-                    "AZURE_DEVOPS_TOKEN": ado_token,
-                    "AZURE_DEVOPS_ORG": ado_org,
-                },
-            }
-
-    if "sentry" in required_servers:
-        sentry_token = os.environ.get("SENTRY_AUTH_TOKEN", "")
-        if sentry_token:
-            mcp_servers["sentry"] = {
-                "command": "npx",
-                "args": ["-y", "@sentry/mcp-server"],
-                "env": {"SENTRY_AUTH_TOKEN": sentry_token},
-            }
-
-    if "slack" in required_servers:
-        slack_token = os.environ.get("SLACK_BOT_TOKEN", "")
-        if slack_token:
-            mcp_servers["slack"] = {
-                "command": "npx",
-                "args": ["-y", "@modelcontextprotocol/server-slack"],
-                "env": {"SLACK_BOT_TOKEN": slack_token},
-            }
-
-    if "postman" in required_servers:
-        postman_api_key = os.environ.get("POSTMAN_API_KEY", "")
-        if postman_api_key:
-            mcp_servers["postman"] = {
-                "command": "npx",
-                "args": ["-y", "@postman/mcp-postman"],
-                "env": {"POSTMAN_API_KEY": postman_api_key},
-            }
-
-    if "teams" in required_servers:
-        teams_webhook_url = os.environ.get("TEAMS_WEBHOOK_URL", "")
-        if teams_webhook_url:
-            mcp_servers["teams"] = {
-                "command": "npx",
-                "args": ["-y", "teams-mcp-server"],
-                "env": {"TEAMS_WEBHOOK_URL": teams_webhook_url},
-            }
+def _workpilot_servers(
+    required_servers,
+    project_dir: Path,
+    spec_dir: Path,
+    *,
+    workpilot_tools_enabled: bool,
+) -> dict[str, dict]:
+    mcp_servers: dict[str, dict] = {}
 
     # The shared brain (`brain/runtime.py`): offered to every agent with tools
     # once a brain exists on this machine, whatever the feature.
@@ -1338,12 +1474,16 @@ def create_client(
         mcp_servers[CODE_SERVER_KEY] = code_server_config(project_dir)
 
     # Add custom workpilot MCP server if required and available
-    if "workpilot" in required_servers and auto_claude_tools_enabled:
+    if "workpilot" in required_servers and workpilot_tools_enabled:
         auto_claude_mcp_server = create_auto_claude_mcp_server(spec_dir, project_dir)
         if auto_claude_mcp_server:
             mcp_servers["workpilot"] = auto_claude_mcp_server
+    return mcp_servers
 
-    # Add custom MCP servers from project config
+
+def _custom_servers(required_servers, mcp_config: dict) -> dict[str, dict]:
+    """The project's CUSTOM_MCP_SERVERS that this type requires."""
+    mcp_servers: dict[str, dict] = {}
     custom_servers = mcp_config.get("CUSTOM_MCP_SERVERS", [])
     for custom in custom_servers:
         server_id = custom.get("id")
@@ -1366,10 +1506,17 @@ def create_client(
             if custom.get("headers"):
                 server_config["headers"] = custom["headers"]
             mcp_servers[server_id] = server_config
+    return mcp_servers
 
-    # Build system prompt (single source — core/llm_optimization.py).
-    # Byte-stable across sessions of the same task so the SDK's prompt cache
-    # (1h TTL enabled above) keeps hitting between Kanban cards.
+
+def _system_prompt(
+    project_dir: Path, spec_dir: Path, agent_type: str, sdk_env: dict[str, str]
+) -> str:
+    """The system prompt (single source — core/llm_optimization.py).
+
+    Byte-stable across sessions of the same task so the SDK's prompt cache
+    (1h TTL enabled above) keeps hitting between Kanban cards.
+    """
     from core.llm_optimization import build_base_system_prompt
 
     base_prompt = build_base_system_prompt(project_dir)
@@ -1385,17 +1532,21 @@ def create_client(
     base_prompt = _inject_domain_addendum(base_prompt, agent_type, spec_dir)
 
     print()
+    return base_prompt
 
-    # Agent Debugger (opt-in) — install a PreToolUse hook that pauses on the
-    # user's breakpoints and waits for a resume decision issued from the UI.
-    #
-    # Zero impact on normal runs: the hook is installed ONLY when this run opts
-    # in, which happens when either (a) AUTO_CLAUDE_AGENT_DEBUGGER is truthy, or
-    # (b) the user has already attached a debugger session for this spec in the
-    # UI (a row exists in the file-backed store keyed by the spec name). Both
-    # checks are cheap and off the tool-call hot path — session_exists() is a
-    # single stat when the store file is absent. Wiring failures must never
-    # abort session startup, hence the broad guard.
+
+def _debugger_hooks(project_dir: Path, spec_dir: Path, agent_type: str) -> list:
+    """Agent Debugger (opt-in): a PreToolUse hook that pauses on breakpoints.
+
+    It waits for a resume decision issued from the UI. Zero impact on normal
+    runs: the hook is installed ONLY when this run opts in, which happens when
+    either (a) AUTO_CLAUDE_AGENT_DEBUGGER is truthy, or (b) the user has
+    already attached a debugger session for this spec in the UI (a row exists
+    in the file-backed store keyed by the spec name). Both checks are cheap and
+    off the tool-call hot path — session_exists() is a single stat when the
+    store file is absent. Wiring failures must never abort session startup,
+    hence the broad guard.
+    """
     _debugger_hooks: list = []
     try:
         from agents import debugger_store
@@ -1424,7 +1575,11 @@ def create_client(
             print(f"   - Agent Debugger: attached to session '{_dbg_session_id}'")
     except Exception:
         logger.debug("Agent debugger wiring skipped", exc_info=True)
+    return _debugger_hooks
 
+
+def _session_hooks(project_dir: Path, spec_dir: Path, debugger_hooks: list) -> dict:
+    """Every hook the session runs, in the order the CLI calls them."""
     # One hook instance for the four write tools rather than four: the
     # factory closes over the spec directory so the ledger has somewhere to
     # go, and nothing else about it varies per tool.
@@ -1444,128 +1599,98 @@ def create_client(
     # sees the result first.
     _subagent_result_hook = make_subagent_result_hook(spec_dir)
 
-    # Build options dict, conditionally including output_format
-    options_kwargs: dict[str, Any] = {
-        "model": model,
-        "system_prompt": base_prompt,
-        "allowed_tools": allowed_tools_list,
-        "mcp_servers": mcp_servers,
-        "hooks": {
-            "PreToolUse": [
-                HookMatcher(matcher="Bash", hooks=[bash_security_hook]),
+    return {
+        "PreToolUse": [
+            HookMatcher(matcher="Bash", hooks=[bash_security_hook]),
+            HookMatcher(
+                matcher="Bash",
+                hooks=[_make_guardrails_hook(project_dir)],
+            ),
+            # rtk — condense what the command prints before the model reads
+            # it. Registered after the two hooks that decide whether the
+            # command may run at all, and returning only `updatedInput`:
+            # this one changes the output, never the permission. A machine
+            # without rtk answers in a cached `shutil.which` and the
+            # command runs exactly as written.
+            HookMatcher(matcher="Bash", hooks=[rtk_rewrite_hook]),
+            # Where a write may land. Registered before the guardrails
+            # hook because it answers the same question the guardrails
+            # answer — may this write happen — from a rule the project does
+            # not have to have written down. `guardrails.evaluate` returns
+            # "no opinion" with no `.workpilot/guardrails.yaml`, which is
+            # the default, so until this hook existed nothing held an agent
+            # to the worktree it was given.
+            *(
                 HookMatcher(
-                    matcher="Bash",
+                    matcher=tool,
+                    hooks=[_write_path_hook],
+                )
+                for tool in GUARDED_WRITE_TOOLS
+            ),
+            HookMatcher(matcher="Read", hooks=[_read_guard_hook]),
+            # The user's own policies, on every tool that writes. This used
+            # to name `Write` and `Edit` only; `MultiEdit` and
+            # `NotebookEdit` write too, and a rule a team wrote about a
+            # path was not being applied to two of the four tools that can
+            # reach it.
+            *(
+                HookMatcher(
+                    matcher=tool,
                     hooks=[_make_guardrails_hook(project_dir)],
-                ),
-                # rtk — condense what the command prints before the model reads
-                # it. Registered after the two hooks that decide whether the
-                # command may run at all, and returning only `updatedInput`:
-                # this one changes the output, never the permission. A machine
-                # without rtk answers in a cached `shutil.which` and the
-                # command runs exactly as written.
-                HookMatcher(matcher="Bash", hooks=[rtk_rewrite_hook]),
-                # Where a write may land. Registered before the guardrails
-                # hook because it answers the same question the guardrails
-                # answer — may this write happen — from a rule the project does
-                # not have to have written down. `guardrails.evaluate` returns
-                # "no opinion" with no `.workpilot/guardrails.yaml`, which is
-                # the default, so until this hook existed nothing held an agent
-                # to the worktree it was given.
-                *(
-                    HookMatcher(
-                        matcher=tool,
-                        hooks=[_write_path_hook],
-                    )
-                    for tool in GUARDED_WRITE_TOOLS
-                ),
-                HookMatcher(matcher="Read", hooks=[_read_guard_hook]),
-                # The user's own policies, on every tool that writes. This used
-                # to name `Write` and `Edit` only; `MultiEdit` and
-                # `NotebookEdit` write too, and a rule a team wrote about a
-                # path was not being applied to two of the four tools that can
-                # reach it.
-                *(
-                    HookMatcher(
-                        matcher=tool,
-                        hooks=[_make_guardrails_hook(project_dir)],
-                    )
-                    for tool in GUARDED_WRITE_TOOLS
-                ),
-                # watermarks — strip the invisible codepoints a model leaves in
-                # what it writes, before the bytes reach the disk. Registered
-                # after the guardrails hook for the same reason rtk is
-                # registered after bash_security_hook: that one decides whether
-                # the write happens, this one only decides what it contains.
-                # `Pre`, not `Post`, so the dirty bytes never exist on disk and
-                # no file watcher sees two writes. A checkout without the
-                # vendored table answers in one `str.isascii()` and the content
-                # is written exactly as the model produced it.
-                *(
-                    HookMatcher(matcher=tool, hooks=[_watermarks_hook])
-                    for tool in WATERMARK_CLEANED_TOOLS
-                ),
-                # Debugger breakpoints (any tool). Empty unless this run opted in.
-                *_debugger_hooks,
-            ],
-            "PostToolUse": [
-                HookMatcher(matcher=tool, hooks=[_subagent_result_hook])
-                for tool in SUBAGENT_TOOLS
-            ],
-            "PreCompact": [HookMatcher(hooks=[_make_pre_compact_hook(spec_dir)])],
-            "Stop": [HookMatcher(hooks=[_make_stop_hook(spec_dir)])],
-        },
-        "max_turns": int(os.environ.get("AUTO_CLAUDE_MAX_TURNS", "1000")),
-        # Budget cap as a meaningful runaway guard, the same per-session cap
-        # every other client gets from the session runner
-        # (harness.application.budget). The error path (`error_max_budget_usd`)
-        # is already handled in agents/session.py. Users can raise it via env;
-        # 0 or less removes it.
-        "max_budget_usd": session_budget_usd(),
-        "cwd": str(project_dir.resolve()),
-        "settings": str(settings_file.resolve()),
-        # setting_sources auto-loads CLAUDE.md, project rules, skills, and
-        # filesystem-defined hooks from ~/.claude (user), <cwd>/.claude (project),
-        # and .claude/settings.local.json (local). The SDK handles prompt-cache
-        # prefixing automatically for these sources. CLAUDE.md and the rules
-        # files follow the project's `useClaudeMd` setting; skills and hooks
-        # do not (`apply_claude_md_setting`).
-        # See: code.claude.com/docs/en/agent-sdk/claude-code-features
-        "setting_sources": ["project", "user", "local"],
-        "env": sdk_env,  # Pass ANTHROPIC_BASE_URL etc. to subprocess
-        "max_thinking_tokens": max_thinking_tokens,  # Extended thinking budget
-        "max_buffer_size": 10
-        * 1024
-        * 1024,  # 10MB buffer (default: 1MB) - fixes large tool results
-        # Enable file checkpointing to track file read/write state across tool calls
-        # This prevents "File has not been read yet" errors in recovery sessions
-        "enable_file_checkpointing": True,
+                )
+                for tool in GUARDED_WRITE_TOOLS
+            ),
+            # watermarks — strip the invisible codepoints a model leaves in
+            # what it writes, before the bytes reach the disk. Registered
+            # after the guardrails hook for the same reason rtk is
+            # registered after bash_security_hook: that one decides whether
+            # the write happens, this one only decides what it contains.
+            # `Pre`, not `Post`, so the dirty bytes never exist on disk and
+            # no file watcher sees two writes. A checkout without the
+            # vendored table answers in one `str.isascii()` and the content
+            # is written exactly as the model produced it.
+            *(
+                HookMatcher(matcher=tool, hooks=[_watermarks_hook])
+                for tool in WATERMARK_CLEANED_TOOLS
+            ),
+            # Debugger breakpoints (any tool). Empty unless this run opted in.
+            *debugger_hooks,
+        ],
+        "PostToolUse": [
+            HookMatcher(matcher=tool, hooks=[_subagent_result_hook])
+            for tool in SUBAGENT_TOOLS
+        ],
+        "PreCompact": [HookMatcher(hooks=[_make_pre_compact_hook(spec_dir)])],
+        "Stop": [HookMatcher(hooks=[_make_stop_hook(spec_dir)])],
     }
 
-    # Optional: Allow CLI path override via environment variable
-    # The SDK bundles its own CLI, but users can override if needed
-    env_cli_path = os.environ.get("CLAUDE_CLI_PATH")
-    if env_cli_path and validate_cli_path(env_cli_path):
-        options_kwargs["cli_path"] = env_cli_path
-        logger.info(f"Using CLAUDE_CLI_PATH override: {env_cli_path}")
 
-    # Add structured output format if specified
-    # See: https://platform.claude.com/docs/en/agent-sdk/structured-outputs
-    if output_format:
-        options_kwargs["output_format"] = output_format
+def _add_subagents(
+    options_kwargs: dict[str, Any],
+    agent_type: str,
+    project_dir: Path,
+    spec_dir: Path,
+    *,
+    agents: dict | None,
+    use_subagents: bool,
+    roster: str | None,
+) -> None:
+    """Compose the subagent roster and allow the `Agent` tool that runs it.
 
-    # Compose the subagent roster: phase defaults, specialised by the detected
-    # language stack, with caller-supplied agents winning on key collision.
-    # The phase split means the planner does not carry QA subagents into its
-    # context, and vice versa; the language layer means a Rust card and a .NET
-    # card no longer get the same generic `test-runner` prompt.
-    # See: code.claude.com/docs/en/agent-sdk/subagents
-    #
-    # `use_subagents=False` is the workflow engine's `sequential-reset`: the
-    # resolved phase asked for dispatch the run cannot have, so the roster is
-    # suppressed at the source instead of being handed over to be ignored. It
-    # is a separate question from the provider check inside `resolve()` — that
-    # one is about capability, this one about what the phase was allowed.
-    # Default True, so every existing caller keeps the behaviour it had.
+    Phase defaults, specialised by the detected language stack, with
+    caller-supplied agents winning on key collision. The phase split means the
+    planner does not carry QA subagents into its context, and vice versa; the
+    language layer means a Rust card and a .NET card no longer get the same
+    generic `test-runner` prompt.
+    See: code.claude.com/docs/en/agent-sdk/subagents
+
+    `use_subagents=False` is the workflow engine's `sequential-reset`: the
+    resolved phase asked for dispatch the run cannot have, so the roster is
+    suppressed at the source instead of being handed over to be ignored. It
+    is a separate question from the provider check inside `resolve()` — that
+    one is about capability, this one about what the phase was allowed.
+    Default True, so every existing caller keeps the behaviour it had.
+    """
     _merged_agents = None
     try:
         if not use_subagents:
@@ -1607,18 +1732,23 @@ def create_client(
             _allowed.append("Agent")
             options_kwargs["allowed_tools"] = _allowed
 
-    # Resume a prior SDK session if a session_id was provided. The SDK reads
-    # the on-disk transcript at ~/.claude/projects/<encoded-cwd>/<session_id>.jsonl
-    # and rehydrates context, saving the cost of replaying earlier turns.
-    # Resolution order: explicit kwarg > env var > none. The env var path is
-    # how the frontend's "Reprendre" button signals a session resume: it spawns
-    # the subprocess with AUTO_CLAUDE_RESUME_SESSION_ID set, and the value MUST
-    # be consumed exactly once for this client — leaving the env var set across
-    # iterations of the coder loop made every subsequent session re-rehydrate
-    # the same on-disk transcript, which is what caused the
-    # "Continuing implementation… / Prompt is too long" cascade once the
-    # transcript grew past the model's context window.
-    # See: code.claude.com/docs/en/agent-sdk/sessions
+
+def _resume_session_id(resume: str | None, config_dir: str | None) -> str | None:
+    """The prior SDK session to resume, if any.
+
+    The SDK reads the on-disk transcript at
+    ~/.claude/projects/<encoded-cwd>/<session_id>.jsonl and rehydrates context,
+    saving the cost of replaying earlier turns. Resolution order: explicit
+    kwarg > env var > none. The env var path is how the frontend's "Reprendre"
+    button signals a session resume: it spawns the subprocess with
+    AUTO_CLAUDE_RESUME_SESSION_ID set, and the value MUST be consumed exactly
+    once for this client — leaving the env var set across iterations of the
+    coder loop made every subsequent session re-rehydrate the same on-disk
+    transcript, which is what caused the "Continuing implementation… / Prompt
+    is too long" cascade once the transcript grew past the model's context
+    window.
+    See: code.claude.com/docs/en/agent-sdk/sessions
+    """
     _env_resume_id = os.environ.get("AUTO_CLAUDE_RESUME_SESSION_ID")
     _resume_id = resume or _env_resume_id
     if _env_resume_id:
@@ -1642,56 +1772,47 @@ def create_client(
             "conversation log instead",
             _resume_id,
         )
-        _resume_id = None
-    if _resume_id:
-        options_kwargs["resume"] = _resume_id
-        logger.info(f"Resuming Claude SDK session: {_resume_id}")
+        return None
+    return _resume_id
 
-    # Read-only phases run in permission mode "plan" (READ_ONLY_AGENT_TYPES).
-    if agent_type in READ_ONLY_AGENT_TYPES and "permission_mode" not in options_kwargs:
-        options_kwargs["permission_mode"] = "plan"
 
-    # What a type does not declare, it does not have. `allowed_tools` only
-    # auto-approves, and the settings file above allows Write, Edit and
-    # `Bash(*)` to every type, so until this line a declaration was a wish:
-    # a `pr_reviewer` reading a hostile diff could write and run commands.
-    # `disallowed_tools` removes the tool from the model's context and wins
-    # over allow rules, which is why the settings file can stay shared.
-    if denied := undeclared_builtin_tools(agent_type):
-        options_kwargs["disallowed_tools"] = denied
+def _add_effort(
+    options_kwargs: dict[str, Any],
+    model: str,
+    max_thinking_tokens: int | None,
+    agent_type: str,
+) -> None:
+    """Reasoning effort, on Opus only.
 
-    # Reasoning effort, on Opus only. It follows the user's thinking level for
-    # the phase, which the caller resolved into `max_thinking_tokens`: on Opus
-    # 5.5 a thinking budget is not accepted and effort is the only control, so
-    # a fixed table here would silently overrule the selector. The env var
-    # still wins, to force a level for debugging.
-    # See: code.claude.com/docs/en/agent-sdk/agent-loop#effort-level
-    #
-    # Only emit the kwarg when the installed SDK actually supports it: older
-    # ``claude_agent_sdk`` builds lack the ``effort`` field and would otherwise
-    # raise "unexpected keyword argument 'effort'", aborting the agent run.
-    if "opus" in (model or "").lower():
-        from core.llm_optimization import claude_effort
+    It follows the user's thinking level for the phase, which the caller
+    resolved into `max_thinking_tokens`: on Opus 5.5 a thinking budget is not
+    accepted and effort is the only control, so a fixed table here would
+    silently overrule the selector. The env var still wins, to force a level
+    for debugging.
+    See: code.claude.com/docs/en/agent-sdk/agent-loop#effort-level
 
-        _effort = os.environ.get("AUTO_CLAUDE_EFFORT") or claude_effort(
-            max_thinking_tokens
+    Only emit the kwarg when the installed SDK actually supports it: older
+    ``claude_agent_sdk`` builds lack the ``effort`` field and would otherwise
+    raise "unexpected keyword argument 'effort'", aborting the agent run.
+    """
+    if "opus" not in (model or "").lower():
+        return
+    from core.llm_optimization import claude_effort
+
+    _effort = os.environ.get("AUTO_CLAUDE_EFFORT") or claude_effort(max_thinking_tokens)
+    if _claude_options_supports("effort"):
+        options_kwargs["effort"] = _effort
+        print(f"   - Effort: {_effort} (agent_type={agent_type}, model=opus)")
+    else:
+        logger.info(
+            "Skipping 'effort=%s' — installed claude_agent_sdk's "
+            "ClaudeAgentOptions does not support it (upgrade the SDK to "
+            "enable reasoning effort control)",
+            _effort,
         )
-        if _claude_options_supports("effort"):
-            options_kwargs["effort"] = _effort
-            print(f"   - Effort: {_effort} (agent_type={agent_type}, model=opus)")
-        else:
-            logger.info(
-                "Skipping 'effort=%s' — installed claude_agent_sdk's "
-                "ClaudeAgentOptions does not support it (upgrade the SDK to "
-                "enable reasoning effort control)",
-                _effort,
-            )
-            print(
-                "   - Effort: unsupported by installed SDK "
-                f"(would be {_effort}); skipping"
-            )
-
-    return ClaudeSDKClient(options=ClaudeAgentOptions(**options_kwargs))
+        print(
+            f"   - Effort: unsupported by installed SDK (would be {_effort}); skipping"
+        )
 
 
 # =============================================================================
@@ -1778,7 +1899,7 @@ def peek_active_provider(spec_dir: Path | None = None) -> str:
 
 # Le fournisseur retenu quand personne n'en nomme un. C'est un defaut, pas un
 # choix, et `_resolve_active_provider` le dit — voir la regle de routage dans
-# `core.offline_policy.resolve_offline_route`.
+# `offline_policy.resolve_offline_route`.
 _DEFAULT_PROVIDER = "claude"
 
 
@@ -1816,6 +1937,7 @@ _PROVIDER_ALIASES: dict[str, str] = {
     "antigravity": "antigravity",
     "agy": "antigravity",
     "pi": "pi",
+    **{name: name for name in acp_provider_names()},
 }
 
 
@@ -1896,7 +2018,7 @@ def _resolve_active_provider(
     Returns `(provider, chosen)`. `chosen` is False only in the last case
     below — nobody named a provider anywhere and "claude" is a fallback.
     The difference matters exactly once, and it is where it used to be
-    invisible: `core.offline_policy.resolve_offline_route` may re-route a
+    invisible: `offline_policy.resolve_offline_route` may re-route a
     task to a local model, and it must know whether it is overriding a
     decision somebody took or filling a blank nobody filled.
 
@@ -1957,7 +2079,7 @@ def _resolve_active_provider(
 
     # 1. Check provider selected via IPC (from frontend UI)
     try:
-        from provider_api import get_selected_provider
+        from provider_selection import get_selected_provider
 
         selected_provider = get_selected_provider()
         if selected_provider:
@@ -2033,6 +2155,7 @@ def _resolve_active_provider(
         "antigravity",
         "agy",
         "pi",
+        *acp_provider_names(),
     ):
         return _normalize_provider_name(env_provider), True
 
@@ -2072,6 +2195,7 @@ def _resolve_active_provider(
                                 "antigravity",
                                 "agy",
                                 "pi",
+                                *acp_provider_names(),
                             ):
                                 return _normalize_provider_name(value), True
             except Exception:
@@ -2368,6 +2492,8 @@ def create_agent_client(
         use_subagents=use_subagents,
         roster=roster,
     )
+    _name_for_traces(client, agent_type, spec_dir)
+    _sandbox_at_launch(client, project_dir, spec_dir)
     if not use_subagents or not client.delegates():
         return client
     try:
@@ -2392,6 +2518,75 @@ def create_agent_client(
             ", ".join(sorted(client.agents)),
         )
     return client
+
+
+def _name_for_traces(client: "AgentClient", agent_type: str, spec_dir: Path) -> None:  # noqa: F821
+    """The agent and task names a GenAI span carries (``genai_trace``)."""
+    try:
+        client.genai_agent = agent_type
+        client.genai_spec_id = spec_dir.name if spec_dir else None
+    except Exception:  # noqa: BLE001 - a name is never worth a failed client
+        pass
+
+
+def _sandbox_at_launch(
+    client: "AgentClient",  # noqa: F821
+    project_dir: Path,
+    spec_dir: Path,
+) -> None:
+    """Decide, and say on the card, whether this session's commands are isolated.
+
+    Decided here, before the first turn: under ``WORKPILOT_SANDBOX=required``
+    a session that cannot be sandboxed does not start
+    (`os_sandbox.SandboxRequiredError`). Each kind of client runs commands
+    its own way, so each is asked its own way.
+    """
+    import os_sandbox
+
+    kind = type(client).__name__
+    if kind == "ClaudeAgentClient":
+        sandbox = os_sandbox.claude_code_status()
+    elif kind == "CodexCliAgentClient":
+        sandbox = os_sandbox.delegated_status("Codex CLI")
+    elif callable(getattr(client, "session_sandbox", None)):
+        sandbox = client.session_sandbox(spec_dir)
+    else:
+        # The WorkPilot loop: `run_command` in the tool executor decides the
+        # same way on its first command.
+        sandbox = os_sandbox.session_sandbox(project_dir, spec_dir)
+    _report_sandbox(spec_dir, client.provider_name(), sandbox)
+
+
+def _report_sandbox(spec_dir: Path | None, provider: str, sandbox) -> None:
+    """Say at launch, on the card and in the feed, whether commands are isolated."""
+    import os_sandbox
+
+    payload = os_sandbox.first_report(spec_dir, provider, sandbox)
+    if payload is None:
+        return
+    line = f"Sandbox ({provider}): {sandbox.summary()}"
+    logger.info(line)
+    if not spec_dir:
+        return
+    try:
+        from task_logger import get_task_logger
+
+        task_logger = get_task_logger()
+        if task_logger is not None and Path(task_logger.spec_dir) == Path(spec_dir):
+            if sandbox.state in (os_sandbox.ISOLATED, os_sandbox.DELEGATED):
+                task_logger.log_info(line)
+            else:
+                task_logger.log_warning(line)
+    except Exception as exc:  # pragma: no cover - tracing must not break a run
+        logger.debug("could not write to the task feed: %s", exc)
+    try:
+        from core.task_event import TaskEventEmitter
+
+        TaskEventEmitter.from_spec_dir(Path(spec_dir)).emit(
+            "SANDBOX_STATUS", {"sandbox": payload}
+        )
+    except Exception as exc:  # pragma: no cover - tracing must not break a run
+        logger.debug("could not emit the sandbox status: %s", exc)
 
 
 def _build_agent_client(
@@ -2449,8 +2644,6 @@ def _build_agent_client(
     Raises:
         ValueError: If agent_type is unknown or provider is unsupported
     """
-    from core.agent_client import ClaudeAgentClient, CopilotAgentClient
-
     # Normalize to Path objects in case strings are passed
     if isinstance(project_dir, str):
         project_dir = Path(project_dir)
@@ -2476,7 +2669,7 @@ def _build_agent_client(
     else:
         provider = _normalize_provider_name(provider)
 
-    from core.offline_policy import local_endpoint, resolve_offline_route
+    from offline_policy import resolve_offline_route
 
     provider, model, offline_base_url = resolve_offline_route(
         project_dir, spec_dir, agent_type, provider, model, chosen=provider_chosen
@@ -2509,471 +2702,560 @@ def _build_agent_client(
         effort = (
             "none" if max_thinking_tokens is None else f"{max_thinking_tokens} tokens"
         )
+    # What the model receives, not only what was asked: a level the provider
+    # cannot take is traced as such (`core/effort_plan.py`).
+    try:
+        from core.effort_plan import effort_trace_label
+
+        effort = effort_trace_label(provider, model, effort)
+    except Exception:  # noqa: BLE001 - the trace must never block a run
+        pass
     _log_llm_context_switch(spec_dir, provider, model, effort)
 
-    if provider == "copilot":
-        # Shared system prompt (single source — core/llm_optimization.py)
+    request = _ClientRequest(
+        project_dir=project_dir,
+        spec_dir=spec_dir,
+        model=model,
+        agent_type=agent_type,
+        max_thinking_tokens=max_thinking_tokens,
+        output_format=output_format,
+        agents=agents,
+        provider=provider,
+        resume=resume,
+        system_prompt=system_prompt,
+        use_subagents=use_subagents,
+        roster=roster,
+        offline_base_url=offline_base_url,
+    )
+    # A provider without an agentic adapter runs on the SDK it degrades to.
+    return _CLIENT_BUILDERS.get(provider, _degraded_client)(request)
+
+
+# -----------------------------------------------------------------------------
+# _build_agent_client, one builder per provider
+# -----------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class _ClientRequest:
+    """One resolved client request: the provider, model and effort are final."""
+
+    project_dir: Path
+    spec_dir: Path
+    model: str
+    agent_type: str
+    max_thinking_tokens: int | None
+    output_format: dict | None
+    agents: dict | None
+    provider: str
+    resume: str | None
+    system_prompt: str | None
+    use_subagents: bool
+    roster: str | None
+    # Set when the offline route chose a local server for this run.
+    offline_base_url: str | None
+
+    def prompt(self, *, tool_use_hint: bool) -> str:
+        """The caller's prompt, or the shared one with the domain addendum.
+
+        Shared system prompt (single source — core/llm_optimization.py). The
+        hint is for clients that run WorkPilot's tool loop; a CLI or the
+        Copilot SDK brings its own.
+        """
+        if self.system_prompt:
+            return self.system_prompt
         from core.llm_optimization import build_base_system_prompt
 
-        if system_prompt:
-            base_prompt = system_prompt
+        if tool_use_hint:
+            base_prompt = build_base_system_prompt(self.project_dir, tool_use_hint=True)
         else:
-            base_prompt = build_base_system_prompt(project_dir)
-            base_prompt = _inject_domain_addendum(base_prompt, agent_type, spec_dir)
+            base_prompt = build_base_system_prompt(self.project_dir)
+        return _inject_domain_addendum(base_prompt, self.agent_type, self.spec_dir)
 
-        # Get allowed tools for the agent type
-        _, project_capabilities = _get_cached_project_data(project_dir)
-        from integrations.linear.updater import is_linear_enabled as _is_linear_enabled
 
-        mcp_config = load_project_mcp_config(project_dir)
-        allowed_tools_list = get_allowed_tools(
-            agent_type,
-            project_capabilities,
-            _is_linear_enabled(),
-            mcp_config,
-            spec_dir=spec_dir,
-        )
+def _thinking_level(max_thinking_tokens: int | None) -> str | None:
+    """The effort level a CLI reads by name; effort is optional on these CLIs."""
+    try:
+        from phase_config import thinking_level_from_budget
 
-        return CopilotAgentClient(
-            model=model,
-            system_prompt=base_prompt,
-            allowed_tools=allowed_tools_list,
-            cwd=str(project_dir.resolve()),
-            agent_type=agent_type,
-            spec_dir=str(spec_dir),
-            thinking_budget=max_thinking_tokens,
-        )
+        return thinking_level_from_budget(max_thinking_tokens)
+    except Exception:  # noqa: BLE001 - effort is optional on this CLI
+        return None
 
-    elif provider == "claude":
-        # Default: use existing create_client() and wrap in ClaudeAgentClient
-        sdk_client = create_client(
-            project_dir=project_dir,
-            spec_dir=spec_dir,
-            model=model,
-            agent_type=agent_type,
-            max_thinking_tokens=max_thinking_tokens,
-            output_format=output_format,
-            agents=agents,
-            resume=resume,
-            use_subagents=use_subagents,
-            roster=roster,
-        )
-        return ClaudeAgentClient(sdk_client)
 
-    elif provider == "windsurf":
-        # Windsurf (Codeium) — dual-mode:
-        # Mode 1: gRPC to local Windsurf IDE language server (tool execution
-        #         via text-based tool calling — consumes Windsurf credits)
-        # Mode 2: REST API with OpenAI-compatible function calling
-        #
-        # sk-ws-* keys are IDE session keys that work through the local
-        # Windsurf language server (gRPC).  WindsurfAgentClient automatically
-        # detects these keys and routes to gRPC mode with text-based tool
-        # execution so that Windsurf credits are consumed.
-        from core.agent_client import WindsurfAgentClient
+def _copilot_client(req: _ClientRequest):
+    from core.agent_client import CopilotAgentClient
 
-        # Shared system prompt (single source — core/llm_optimization.py)
-        from core.llm_optimization import build_base_system_prompt
+    base_prompt = req.prompt(tool_use_hint=False)
 
-        if system_prompt:
-            windsurf_system_prompt = system_prompt
-        else:
-            windsurf_system_prompt = build_base_system_prompt(
-                project_dir, tool_use_hint=True
-            )
-            windsurf_system_prompt = _inject_domain_addendum(
-                windsurf_system_prompt, agent_type, spec_dir
-            )
+    # Get allowed tools for the agent type
+    _, project_capabilities = _get_cached_project_data(req.project_dir)
+    from integrations.linear.updater import is_linear_enabled as _is_linear_enabled
 
+    mcp_config = load_project_mcp_config(req.project_dir)
+    allowed_tools_list = get_allowed_tools(
+        req.agent_type,
+        project_capabilities,
+        _is_linear_enabled(),
+        mcp_config,
+        spec_dir=req.spec_dir,
+    )
+
+    return CopilotAgentClient(
+        model=req.model,
+        system_prompt=base_prompt,
+        allowed_tools=allowed_tools_list,
+        cwd=str(req.project_dir.resolve()),
+        agent_type=req.agent_type,
+        spec_dir=str(req.spec_dir),
+        thinking_budget=req.max_thinking_tokens,
+    )
+
+
+def _claude_client(req: _ClientRequest):
+    """The existing create_client(), wrapped in ClaudeAgentClient."""
+    from core.agent_client import ClaudeAgentClient
+
+    sdk_client = create_client(
+        project_dir=req.project_dir,
+        spec_dir=req.spec_dir,
+        model=req.model,
+        agent_type=req.agent_type,
+        max_thinking_tokens=req.max_thinking_tokens,
+        output_format=req.output_format,
+        agents=req.agents,
+        resume=req.resume,
+        use_subagents=req.use_subagents,
+        roster=req.roster,
+    )
+    return ClaudeAgentClient(sdk_client)
+
+
+def _windsurf_client(req: _ClientRequest):
+    """Windsurf (Codeium) — dual-mode.
+
+    Mode 1: gRPC to local Windsurf IDE language server (tool execution
+            via text-based tool calling — consumes Windsurf credits)
+    Mode 2: REST API with OpenAI-compatible function calling
+
+    sk-ws-* keys are IDE session keys that work through the local
+    Windsurf language server (gRPC).  WindsurfAgentClient automatically
+    detects these keys and routes to gRPC mode with text-based tool
+    execution so that Windsurf credits are consumed.
+    """
+    from core.agent_client import WindsurfAgentClient
+
+    windsurf_system_prompt = req.prompt(tool_use_hint=True)
+
+    logger.info(
+        "[create_agent_client] Using WindsurfAgentClient "
+        "(gRPC for sk-ws-* keys / REST for SSO keys, model=%s, agent_type=%s)",
+        req.model,
+        req.agent_type,
+    )
+    return WindsurfAgentClient(
+        model=req.model,
+        system_prompt=windsurf_system_prompt,
+        max_turns=50,
+        project_dir=str(req.project_dir),
+        agent_type=req.agent_type,
+        spec_dir=str(req.spec_dir),
+    )
+
+
+def _openai_client(req: _ClientRequest):
+    from core.agent_client import OpenAIAgentClient
+    from core.codex_cli_client import (
+        CodexCliAgentClient,
+        openai_model_uses_api_key,
+        openai_uses_codex_cli,
+    )
+    from core.llm_optimization import (
+        openai_prompt_cache_key,
+        openai_reasoning_effort,
+    )
+
+    model = req.model
+    agent_type = req.agent_type
+    openai_system_prompt = req.prompt(tool_use_hint=True)
+
+    # Provider-specific token optimizations layered on the common trunk:
+    # - reasoning_effort: maps the Kanban thinking level to OpenAI's native
+    #   effort control (reasoning models only — omitted otherwise)
+    # - prompt_cache_key: routes consecutive sessions of the same task/phase
+    #   to the same automatic-prompt-cache shard
+    resolved_openai_model = model or "gpt-4o"
+    reasoning_effort = openai_reasoning_effort(
+        resolved_openai_model, req.max_thinking_tokens
+    )
+    prompt_cache_key = openai_prompt_cache_key(req.spec_dir, agent_type)
+
+    if openai_uses_codex_cli() and not openai_model_uses_api_key(resolved_openai_model):
         logger.info(
-            "[create_agent_client] Using WindsurfAgentClient "
-            "(gRPC for sk-ws-* keys / REST for SSO keys, model=%s, agent_type=%s)",
-            model,
-            agent_type,
-        )
-        return WindsurfAgentClient(
-            model=model,
-            system_prompt=windsurf_system_prompt,
-            max_turns=50,
-            project_dir=str(project_dir),
-            agent_type=agent_type,
-            spec_dir=str(spec_dir),
-        )
-
-    elif provider == "openai":
-        from core.agent_client import OpenAIAgentClient
-        from core.codex_cli_client import (
-            CodexCliAgentClient,
-            openai_model_uses_api_key,
-            openai_uses_codex_cli,
-        )
-        from core.llm_optimization import (
-            build_base_system_prompt,
-            openai_prompt_cache_key,
-            openai_reasoning_effort,
-        )
-
-        if system_prompt:
-            openai_system_prompt = system_prompt
-        else:
-            openai_system_prompt = build_base_system_prompt(
-                project_dir, tool_use_hint=True
-            )
-            openai_system_prompt = _inject_domain_addendum(
-                openai_system_prompt, agent_type, spec_dir
-            )
-
-        # Provider-specific token optimizations layered on the common trunk:
-        # - reasoning_effort: maps the Kanban thinking level to OpenAI's native
-        #   effort control (reasoning models only — omitted otherwise)
-        # - prompt_cache_key: routes consecutive sessions of the same task/phase
-        #   to the same automatic-prompt-cache shard
-        resolved_openai_model = model or "gpt-4o"
-        reasoning_effort = openai_reasoning_effort(
-            resolved_openai_model, max_thinking_tokens
-        )
-        prompt_cache_key = openai_prompt_cache_key(spec_dir, agent_type)
-
-        if openai_uses_codex_cli() and not openai_model_uses_api_key(
-            resolved_openai_model
-        ):
-            logger.info(
-                "[create_agent_client] Using CodexCliAgentClient "
-                "(model=%s, agent_type=%s, reasoning_effort=%s)",
-                resolved_openai_model,
-                agent_type,
-                reasoning_effort,
-            )
-            from context_mgmt import codex_auto_compact_limit
-            from context_mgmt.windows import resolve_context_window
-
-            return CodexCliAgentClient(
-                model=model or None,
-                system_prompt=openai_system_prompt,
-                project_dir=str(project_dir),
-                agent_type=agent_type,
-                reasoning_effort=reasoning_effort,
-                thread_id=resume,
-                auto_compact_token_limit=codex_auto_compact_limit(
-                    spec_dir, resolve_context_window(model or "codex"), model
-                ),
-            )
-
-        if openai_uses_codex_cli():
-            logger.info(
-                "[create_agent_client] Routing API-only model through OpenAI API (model=%s)",
-                resolved_openai_model,
-            )
-
-        logger.info(
-            "[create_agent_client] Using OpenAIAgentClient (model=%s, agent_type=%s, "
-            "reasoning_effort=%s)",
-            model,
+            "[create_agent_client] Using CodexCliAgentClient "
+            "(model=%s, agent_type=%s, reasoning_effort=%s)",
+            resolved_openai_model,
             agent_type,
             reasoning_effort,
         )
-        return OpenAIAgentClient(
-            model=resolved_openai_model,
+        from context_mgmt import codex_auto_compact_limit
+        from context_mgmt.windows import resolve_context_window
+
+        return CodexCliAgentClient(
+            model=model or None,
             system_prompt=openai_system_prompt,
-            max_turns=50,
-            project_dir=str(project_dir),
+            project_dir=str(req.project_dir),
             agent_type=agent_type,
             reasoning_effort=reasoning_effort,
-            prompt_cache_key=prompt_cache_key,
-            spec_dir=str(spec_dir),
+            thread_id=req.resume,
+            auto_compact_token_limit=codex_auto_compact_limit(
+                req.spec_dir, resolve_context_window(model or "codex"), model
+            ),
         )
 
-    elif provider == "google":
-        # Google Gemini via its OpenAI-compatible endpoint — reuses the proven
-        # OpenAI tool-use loop (GoogleAgentClient subclasses OpenAIAgentClient).
-        from core.agent_client import GoogleAgentClient
-        from core.llm_optimization import (
-            build_base_system_prompt,
-            gemini_reasoning_effort,
+    if openai_uses_codex_cli():
+        logger.info(
+            "[create_agent_client] Routing API-only model through OpenAI API (model=%s)",
+            resolved_openai_model,
         )
 
-        if system_prompt:
-            gemini_system_prompt = system_prompt
-        else:
-            gemini_system_prompt = build_base_system_prompt(
-                project_dir, tool_use_hint=True
-            )
-            gemini_system_prompt = _inject_domain_addendum(
-                gemini_system_prompt, agent_type, spec_dir
-            )
+    logger.info(
+        "[create_agent_client] Using OpenAIAgentClient (model=%s, agent_type=%s, "
+        "reasoning_effort=%s)",
+        model,
+        agent_type,
+        reasoning_effort,
+    )
+    return OpenAIAgentClient(
+        model=resolved_openai_model,
+        system_prompt=openai_system_prompt,
+        max_turns=50,
+        project_dir=str(req.project_dir),
+        agent_type=agent_type,
+        reasoning_effort=reasoning_effort,
+        prompt_cache_key=prompt_cache_key,
+        spec_dir=str(req.spec_dir),
+    )
 
-        resolved_gemini_model = model or "gemini-2.5-pro"
-        gemini_effort = gemini_reasoning_effort(
-            resolved_gemini_model, max_thinking_tokens
-        )
+
+def _google_client(req: _ClientRequest, *, announce: bool = True):
+    """Google Gemini via its OpenAI-compatible endpoint.
+
+    Reuses the proven OpenAI tool-use loop (GoogleAgentClient subclasses
+    OpenAIAgentClient). `gemini`, the older provider name, builds the same
+    client without the log line.
+    """
+    from core.agent_client import GoogleAgentClient
+    from core.llm_optimization import gemini_reasoning_effort
+
+    gemini_system_prompt = req.prompt(tool_use_hint=True)
+    resolved_gemini_model = req.model or "gemini-2.5-pro"
+    gemini_effort = gemini_reasoning_effort(
+        resolved_gemini_model, req.max_thinking_tokens
+    )
+    if announce:
         logger.info(
             "[create_agent_client] Using GoogleAgentClient "
             "(model=%s, agent_type=%s, reasoning_effort=%s)",
             resolved_gemini_model,
-            agent_type,
+            req.agent_type,
             gemini_effort,
         )
-        return GoogleAgentClient(
-            model=resolved_gemini_model,
-            system_prompt=gemini_system_prompt,
-            max_turns=50,
-            project_dir=str(project_dir),
-            agent_type=agent_type,
-            reasoning_effort=gemini_effort,
-            spec_dir=str(spec_dir),
-        )
+    return GoogleAgentClient(
+        model=resolved_gemini_model,
+        system_prompt=gemini_system_prompt,
+        max_turns=50,
+        project_dir=str(req.project_dir),
+        agent_type=req.agent_type,
+        reasoning_effort=gemini_effort,
+        spec_dir=str(req.spec_dir),
+    )
 
-    elif provider == "gemini":
-        from core.agent_client import GoogleAgentClient
-        from core.llm_optimization import (
-            build_base_system_prompt,
-            gemini_reasoning_effort,
-        )
 
-        gemini_prompt = system_prompt or build_base_system_prompt(
-            project_dir, tool_use_hint=True
-        )
-        if not system_prompt:
-            gemini_prompt = _inject_domain_addendum(gemini_prompt, agent_type, spec_dir)
-        gemini_model = model or "gemini-2.5-pro"
-        return GoogleAgentClient(
-            model=gemini_model,
-            system_prompt=gemini_prompt,
-            max_turns=50,
-            project_dir=str(project_dir),
-            agent_type=agent_type,
-            reasoning_effort=gemini_reasoning_effort(gemini_model, max_thinking_tokens),
-            spec_dir=str(spec_dir),
-        )
+def _gemini_client(req: _ClientRequest):
+    return _google_client(req, announce=False)
 
-    elif provider in ("ollama", "local", "lmstudio", "lm-studio", "llama-cpp"):
-        # Local LLM via any OpenAI-compatible server (Ollama, LM Studio,
-        # llama.cpp, vLLM, LocalAI). Reuses the proven OpenAI tool-use loop
-        # (LocalAgentClient subclasses OpenAIAgentClient) and only swaps the
-        # base URL (from OLLAMA_BASE_URL / saved config) and the key (optional).
-        from core.agent_client import LocalAgentClient
-        from core.llm_optimization import build_base_system_prompt
 
-        if system_prompt:
-            local_system_prompt = system_prompt
-        else:
-            local_system_prompt = build_base_system_prompt(
-                project_dir, tool_use_hint=True
-            )
-            local_system_prompt = _inject_domain_addendum(
-                local_system_prompt, agent_type, spec_dir
-            )
+# The local servers that speak the OpenAI API rather than Ollama's.
+_OPENAI_FORMAT_LOCAL_PROVIDERS = ("lmstudio", "lm-studio", "llama-cpp")
 
-        # Last line of defence on the model id. A local server can only answer
-        # for what is pulled on the machine, so a hosted-only id arriving here
-        # (a task whose saved model is still `claude-…`/`gpt-…` after switching
-        # to Ollama) is a guaranteed 404 followed by a doomed registry pull.
-        # Coerce it to the configured local model and say so where the user
-        # looks — silently running a different model than the one displayed is
-        # worse than the 404 it replaces.
-        from phase_config import coerce_local_model, is_hosted_only_model
 
-        resolved_local_model = model if offline_base_url else coerce_local_model(model)
-        if not offline_base_url and model and is_hosted_only_model(model):
-            logger.warning(
-                "[create_agent_client] %r cannot run on a local server "
-                "(provider=%s) — using %r instead.",
-                model,
-                provider,
-                resolved_local_model,
-            )
-            print(
-                f"⚠️  « {model} » n'est pas un modèle local — "
-                f"exécution avec « {resolved_local_model} » "
-                f"(modèle configuré pour {provider}).",
-                flush=True,
-            )
-        logger.info(
-            "[create_agent_client] Using LocalAgentClient (model=%s, agent_type=%s)",
-            resolved_local_model,
-            agent_type,
-        )
-        return LocalAgentClient(
-            model=resolved_local_model,
-            base_url=offline_base_url
-            or (
-                local_endpoint(provider)
-                if provider in ("lmstudio", "lm-studio", "llama-cpp")
-                else None
-            ),
-            api_format="openai"
-            if provider in ("lmstudio", "lm-studio", "llama-cpp")
-            else "ollama",
-            offline_only=offline_base_url is not None,
-            system_prompt=local_system_prompt,
-            max_turns=50,
-            project_dir=str(project_dir),
-            agent_type=agent_type,
-            spec_dir=str(spec_dir),
-        )
+def _local_client(req: _ClientRequest):
+    """Local LLM via any OpenAI-compatible server.
 
-    elif provider in ("mistral", "deepseek", "grok"):
-        from core.agent_client import CompatibleProviderAgentClient
-        from core.llm_optimization import build_base_system_prompt
-        from provider_models_catalog import _api_key_for
+    Ollama, LM Studio, llama.cpp, vLLM, LocalAI. Reuses the proven OpenAI
+    tool-use loop (LocalAgentClient subclasses OpenAIAgentClient) and only
+    swaps the base URL (from OLLAMA_BASE_URL / saved config) and the key
+    (optional).
+    """
+    from core.agent_client import LocalAgentClient
+    from offline_policy import local_endpoint
 
-        config = {}
-        try:
-            from src.connectors.llm_config import load_provider_config
+    model = req.model
+    provider = req.provider
+    offline_base_url = req.offline_base_url
+    local_system_prompt = req.prompt(tool_use_hint=True)
 
-            config = load_provider_config(provider) or {}
-        except Exception:  # noqa: BLE001 - environment credentials still work
-            pass
-        api_key = _api_key_for(provider)
-        if not api_key:
-            raise ValueError(f"No API key configured for {provider}")
-        base_urls = {
-            "mistral": "https://api.mistral.ai",
-            "deepseek": "https://api.deepseek.com",
-            "grok": "https://api.x.ai",
-        }
-        base_url = (
-            os.environ.get(f"{provider.upper()}_BASE_URL")
-            or config.get("base_url")
-            or base_urls[provider]
-        )
-        provider_prompt = system_prompt or build_base_system_prompt(
-            project_dir, tool_use_hint=True
-        )
-        if not system_prompt:
-            provider_prompt = _inject_domain_addendum(
-                provider_prompt, agent_type, spec_dir
-            )
-        return CompatibleProviderAgentClient(
-            provider=provider,
-            model=model,
-            api_key=api_key,
-            base_url=base_url,
-            system_prompt=provider_prompt,
-            project_dir=str(project_dir),
-            agent_type=agent_type,
-            spec_dir=str(spec_dir),
-        )
+    # Last line of defence on the model id. A local server can only answer
+    # for what is pulled on the machine, so a hosted-only id arriving here
+    # (a task whose saved model is still `claude-…`/`gpt-…` after switching
+    # to Ollama) is a guaranteed 404 followed by a doomed registry pull.
+    # Coerce it to the configured local model and say so where the user
+    # looks — silently running a different model than the one displayed is
+    # worse than the 404 it replaces.
+    from phase_config import coerce_local_model, is_hosted_only_model
 
-    elif provider in ("opencode", "antigravity", "pi"):
-        # Coding-agent CLIs that bring their own tools, sessions and context
-        # management (core/agent_clients/cli_subprocess.py). Each CLI owns its
-        # login; the agent type's declaration picks its rights (OpenCode's
-        # `plan` agent for a read-only type; Antigravity refuses one; pi gets
-        # the declaration as its `--tools` allowlist).
-        from core.llm_optimization import build_base_system_prompt
-
-        cli_prompt = system_prompt or build_base_system_prompt(project_dir)
-        if not system_prompt:
-            cli_prompt = _inject_domain_addendum(cli_prompt, agent_type, spec_dir)
-
-        if provider == "pi":
-            from core.agent_client import PiCliAgentClient
-
-            try:
-                from phase_config import thinking_level_from_budget
-
-                pi_level = thinking_level_from_budget(max_thinking_tokens)
-            except Exception:  # noqa: BLE001 - effort is optional on this CLI
-                pi_level = None
-            client = PiCliAgentClient(
-                model=model or None,
-                system_prompt=cli_prompt,
-                project_dir=str(project_dir),
-                agent_type=agent_type,
-                session_id=resume,
-                thinking_level=pi_level,
-                spec_dir=spec_dir,
-            )
-            trust = client.trust_state()
-            logger.info(
-                "[create_agent_client] Using PiCliAgentClient "
-                "(model=%s, agent_type=%s, tools=%s, resume=%s, project .pi trust=%s)",
-                model,
-                agent_type,
-                client.tools,
-                bool(resume),
-                trust,
-            )
-            if trust in ("undecided", "untrusted"):
-                # pi loads nothing from `<project>/.pi` without a decision, and
-                # says nothing about it in json mode. The skills are already
-                # passed explicitly; the rest is the person's call.
-                _trace_pi_trust(spec_dir, trust)
-            return client
-
-        if provider == "opencode":
-            from core.agent_client import OpenCodeCliAgentClient
-
-            logger.info(
-                "[create_agent_client] Using OpenCodeCliAgentClient "
-                "(model=%s, agent_type=%s, resume=%s)",
-                model,
-                agent_type,
-                bool(resume),
-            )
-            return OpenCodeCliAgentClient(
-                model=model or None,
-                system_prompt=cli_prompt,
-                project_dir=str(project_dir),
-                agent_type=agent_type,
-                session_id=resume,
-            )
-
-        from core.agent_client import AntigravityCliAgentClient
-
-        try:
-            from phase_config import thinking_level_from_budget
-
-            thinking_level = thinking_level_from_budget(max_thinking_tokens)
-        except Exception:  # noqa: BLE001 - effort is optional on this CLI
-            thinking_level = None
-        logger.info(
-            "[create_agent_client] Using AntigravityCliAgentClient "
-            "(model=%s, agent_type=%s, effort=%s, resume=%s)",
-            model,
-            agent_type,
-            thinking_level,
-            bool(resume),
-        )
-        return AntigravityCliAgentClient(
-            model=model or None,
-            system_prompt=cli_prompt,
-            project_dir=str(project_dir),
-            agent_type=agent_type,
-            thinking_level=thinking_level,
-            conversation_id=resume,
-        )
-
-    else:
-        # No agentic adapter for this provider (meta, aws, cursor, custom). The
-        # task still runs — on the Claude SDK — but
-        # that is a real limitation, not a detail, so say so where the user can
-        # see it instead of in a log line nobody reads. capabilities/providers.yaml
-        # is the record of which providers are in this state.
-        #
-        # `create_client` takes no provider argument: the previous comment here
-        # claimed "with provider selection", which was never true.
-        caps = get_provider_capabilities(provider)
-        target = caps.degrades_to or "claude"
-        _log_provider_degradation(spec_dir, provider, target)
+    resolved_local_model = model if offline_base_url else coerce_local_model(model)
+    if not offline_base_url and model and is_hosted_only_model(model):
         logger.warning(
-            "Provider %r has no agentic adapter; running on the %s SDK instead. "
-            "Subagents are disabled for this run.",
+            "[create_agent_client] %r cannot run on a local server "
+            "(provider=%s) — using %r instead.",
+            model,
             provider,
-            target,
+            resolved_local_model,
         )
-        sdk_client = create_client(
-            project_dir=project_dir,
-            spec_dir=spec_dir,
-            model=model,
-            agent_type=agent_type,
-            max_thinking_tokens=max_thinking_tokens,
-            output_format=output_format,
-            # Deliberately dropped: this provider does not run subagents, and
-            # passing a dict nobody reads makes the roster look active when it
-            # is not.
-            agents=None,
-            resume=resume,
+        print(
+            f"⚠️  « {model} » n'est pas un modèle local — "
+            f"exécution avec « {resolved_local_model} » "
+            f"(modèle configuré pour {provider}).",
+            flush=True,
         )
-        return ClaudeAgentClient(sdk_client)
+    logger.info(
+        "[create_agent_client] Using LocalAgentClient (model=%s, agent_type=%s)",
+        resolved_local_model,
+        req.agent_type,
+    )
+    openai_format = provider in _OPENAI_FORMAT_LOCAL_PROVIDERS
+    return LocalAgentClient(
+        model=resolved_local_model,
+        base_url=offline_base_url
+        or (local_endpoint(provider) if openai_format else None),
+        api_format="openai" if openai_format else "ollama",
+        offline_only=offline_base_url is not None,
+        system_prompt=local_system_prompt,
+        max_turns=50,
+        project_dir=str(req.project_dir),
+        agent_type=req.agent_type,
+        spec_dir=str(req.spec_dir),
+        thinking_level=_thinking_level(req.max_thinking_tokens),
+    )
+
+
+_COMPATIBLE_PROVIDER_URLS = {
+    "mistral": "https://api.mistral.ai",
+    "deepseek": "https://api.deepseek.com",
+    "grok": "https://api.x.ai",
+}
+
+
+def _compatible_client(req: _ClientRequest):
+    """Mistral, DeepSeek and Grok: OpenAI-compatible APIs with their own key."""
+    from core.agent_client import CompatibleProviderAgentClient
+    from core.llm_optimization import compatible_effort_params
+    from provider_models_catalog import _api_key_for
+
+    provider = req.provider
+    config = {}
+    try:
+        from src.connectors.llm_config import load_provider_config
+
+        config = load_provider_config(provider) or {}
+    except Exception:  # noqa: BLE001 - environment credentials still work
+        pass
+    api_key = _api_key_for(provider)
+    if not api_key:
+        raise ValueError(f"No API key configured for {provider}")
+    base_url = (
+        os.environ.get(f"{provider.upper()}_BASE_URL")
+        or config.get("base_url")
+        or _COMPATIBLE_PROVIDER_URLS[provider]
+    )
+    # Each of these APIs has its own effort scale; a model without one gets
+    # no field at all (the trunk never sends unknown params).
+    effort_params = compatible_effort_params(
+        provider, req.model, req.max_thinking_tokens
+    )
+    logger.info(
+        "[create_agent_client] Using CompatibleProviderAgentClient "
+        "(provider=%s, model=%s, agent_type=%s, effort=%s)",
+        provider,
+        req.model,
+        req.agent_type,
+        effort_params,
+    )
+    return CompatibleProviderAgentClient(
+        provider=provider,
+        model=req.model,
+        api_key=api_key,
+        base_url=base_url,
+        effort_params=effort_params,
+        system_prompt=req.prompt(tool_use_hint=True),
+        project_dir=str(req.project_dir),
+        agent_type=req.agent_type,
+        spec_dir=str(req.spec_dir),
+    )
+
+
+# Coding-agent CLIs that bring their own tools, sessions and context management
+# (core/agent_clients/cli_subprocess.py). Each CLI owns its login; the agent
+# type's declaration picks its rights (OpenCode's `plan` agent for a read-only
+# type; Antigravity refuses one; pi gets the declaration as its `--tools`
+# allowlist).
+
+
+def _pi_client(req: _ClientRequest):
+    from core.agent_client import PiCliAgentClient
+
+    client = PiCliAgentClient(
+        model=req.model or None,
+        system_prompt=req.prompt(tool_use_hint=False),
+        project_dir=str(req.project_dir),
+        agent_type=req.agent_type,
+        session_id=req.resume,
+        thinking_level=_thinking_level(req.max_thinking_tokens),
+        spec_dir=req.spec_dir,
+    )
+    trust = client.trust_state()
+    logger.info(
+        "[create_agent_client] Using PiCliAgentClient "
+        "(model=%s, agent_type=%s, tools=%s, resume=%s, project .pi trust=%s)",
+        req.model,
+        req.agent_type,
+        client.tools,
+        bool(req.resume),
+        trust,
+    )
+    if trust in ("undecided", "untrusted"):
+        # pi loads nothing from `<project>/.pi` without a decision, and
+        # says nothing about it in json mode. The skills are already
+        # passed explicitly; the rest is the person's call.
+        _trace_pi_trust(req.spec_dir, trust)
+    return client
+
+
+def _acp_client(req: _ClientRequest):
+    """An Agent Client Protocol agent, one `acp:` entry of providers.yaml.
+
+    The agent owns its tools, its login and its session; the agent type's
+    declaration picks its mode and which of its questions reach the person
+    (core/agent_clients/acp.py).
+    """
+    from core.agent_clients.acp import AcpAgentClient
+
+    client = AcpAgentClient(
+        provider=req.provider,
+        model=req.model or None,
+        system_prompt=req.prompt(tool_use_hint=False),
+        project_dir=str(req.project_dir),
+        agent_type=req.agent_type,
+        session_id=req.resume,
+        spec_dir=req.spec_dir,
+    )
+    logger.info(
+        "[create_agent_client] Using AcpAgentClient "
+        "(agent=%s, model=%s, agent_type=%s, resume=%s)",
+        req.provider,
+        client.model,
+        req.agent_type,
+        bool(req.resume),
+    )
+    return client
+
+
+def _opencode_client(req: _ClientRequest):
+    from core.agent_client import OpenCodeCliAgentClient
+
+    cli_prompt = req.prompt(tool_use_hint=False)
+    logger.info(
+        "[create_agent_client] Using OpenCodeCliAgentClient "
+        "(model=%s, agent_type=%s, resume=%s)",
+        req.model,
+        req.agent_type,
+        bool(req.resume),
+    )
+    return OpenCodeCliAgentClient(
+        model=req.model or None,
+        system_prompt=cli_prompt,
+        project_dir=str(req.project_dir),
+        agent_type=req.agent_type,
+        session_id=req.resume,
+    )
+
+
+def _antigravity_client(req: _ClientRequest):
+    from core.agent_client import AntigravityCliAgentClient
+
+    cli_prompt = req.prompt(tool_use_hint=False)
+    thinking_level = _thinking_level(req.max_thinking_tokens)
+    logger.info(
+        "[create_agent_client] Using AntigravityCliAgentClient "
+        "(model=%s, agent_type=%s, effort=%s, resume=%s)",
+        req.model,
+        req.agent_type,
+        thinking_level,
+        bool(req.resume),
+    )
+    return AntigravityCliAgentClient(
+        model=req.model or None,
+        system_prompt=cli_prompt,
+        project_dir=str(req.project_dir),
+        agent_type=req.agent_type,
+        thinking_level=thinking_level,
+        conversation_id=req.resume,
+    )
+
+
+def _degraded_client(req: _ClientRequest):
+    """A provider with no agentic adapter (meta, aws, cursor, custom).
+
+    The task still runs — on the Claude SDK — but that is a real limitation,
+    not a detail, so say so where the user can see it instead of in a log line
+    nobody reads. capabilities/providers.yaml is the record of which providers
+    are in this state.
+
+    `create_client` takes no provider argument: the previous comment here
+    claimed "with provider selection", which was never true.
+    """
+    from core.agent_client import ClaudeAgentClient
+
+    caps = get_provider_capabilities(req.provider)
+    target = caps.degrades_to or "claude"
+    _log_provider_degradation(req.spec_dir, req.provider, target)
+    logger.warning(
+        "Provider %r has no agentic adapter; running on the %s SDK instead. "
+        "Subagents are disabled for this run.",
+        req.provider,
+        target,
+    )
+    sdk_client = create_client(
+        project_dir=req.project_dir,
+        spec_dir=req.spec_dir,
+        model=req.model,
+        agent_type=req.agent_type,
+        max_thinking_tokens=req.max_thinking_tokens,
+        output_format=req.output_format,
+        # Deliberately dropped: this provider does not run subagents, and
+        # passing a dict nobody reads makes the roster look active when it
+        # is not.
+        agents=None,
+        resume=req.resume,
+    )
+    return ClaudeAgentClient(sdk_client)
+
+
+_CLIENT_BUILDERS = {
+    "copilot": _copilot_client,
+    "claude": _claude_client,
+    "windsurf": _windsurf_client,
+    "openai": _openai_client,
+    "google": _google_client,
+    "gemini": _gemini_client,
+    **dict.fromkeys(
+        ("ollama", "local", *_OPENAI_FORMAT_LOCAL_PROVIDERS), _local_client
+    ),
+    **dict.fromkeys(_COMPATIBLE_PROVIDER_URLS, _compatible_client),
+    "pi": _pi_client,
+    "opencode": _opencode_client,
+    "antigravity": _antigravity_client,
+    **dict.fromkeys(acp_provider_names(), _acp_client),
+}

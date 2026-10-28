@@ -7,7 +7,7 @@
  */
 
 import { type ChildProcess, spawn } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,7 +17,8 @@ import { IPC_CHANNELS } from "../../shared/constants";
 import type { IPCResult } from "../../shared/types";
 import { projectStore } from "../project-store";
 import { getConfiguredPythonPath } from "../python-env-manager";
-import { credentialManager } from "../services/credential-manager";
+import { readIfExists } from "../utils/existing-file";
+import { pythonRunnerEnv } from "../utils/python-runner-env";
 import { safeSendToRenderer } from "./utils";
 
 // ESM-compatible __dirname
@@ -102,18 +103,22 @@ function getRunnerPath(): string {
 }
 
 function createMessagesFile(sessionId: string): string {
-	const dir = path.join(os.tmpdir(), "workpilot-pair");
-	mkdirSync(dir, { recursive: true });
-	const filePath = path.join(dir, `${sessionId}.json`);
-	writeFileSync(filePath, JSON.stringify({ pending: [] }), "utf-8");
+	// A fresh private folder (0700, random name) rather than a fixed
+	// `<tmp>/workpilot-pair/`, where another local user could have planted a
+	// link under the session's name before the first write.
+	const dir = mkdtempSync(path.join(os.tmpdir(), "workpilot-pair-"));
+	const filePath = path.join(dir, `${path.basename(sessionId)}.json`);
+	writeFileSync(filePath, JSON.stringify({ pending: [] }), {
+		encoding: "utf-8",
+		mode: 0o600,
+		flag: "wx",
+	});
 	return filePath;
 }
 
 function appendUserMessage(messagesFile: string, content: string): void {
 	try {
-		const data = existsSync(messagesFile)
-			? JSON.parse(readFileSync(messagesFile, "utf-8"))
-			: { pending: [] };
+		const data = JSON.parse(readIfExists(messagesFile) ?? '{"pending":[]}');
 		data.pending = data.pending || [];
 		data.pending.push({ content, timestamp: new Date().toISOString() });
 		writeFileSync(messagesFile, JSON.stringify(data), "utf-8");
@@ -175,22 +180,9 @@ export function registerPairProgrammingHandlers(
 
 			const backendDir = getBackendDir();
 
-			// Get provider credentials (SELECTED_LLM_PROVIDER, API keys, etc.)
-			// so the Python runner uses the user-selected provider instead of defaulting to Claude
-			const providerEnv = credentialManager.getEnvironmentVariables();
-			const nonClaudeProvider =
-				providerEnv.SELECTED_LLM_PROVIDER &&
-				!["claude", "anthropic"].includes(providerEnv.SELECTED_LLM_PROVIDER) &&
-				providerEnv.SELECTED_LLM_PROVIDER !== "copilot";
-			const claudeAuthClearVars: Record<string, string | undefined> =
-				nonClaudeProvider
-					? {
-							CLAUDE_CODE_OAUTH_TOKEN: undefined,
-							CLAUDE_CONFIG_DIR: undefined,
-							ANTHROPIC_API_KEY: undefined,
-							ANTHROPIC_AUTH_TOKEN: undefined,
-						}
-					: {};
+			// The user-selected provider and its key, not whatever the main
+			// process env holds (utils/python-runner-env.ts).
+			const env = await pythonRunnerEnv(backendDir);
 
 			const proc = spawn(
 				pythonPath,
@@ -213,15 +205,7 @@ export function registerPairProgrammingHandlers(
 				],
 				{
 					cwd: backendDir,
-					env: {
-						...process.env,
-						...claudeAuthClearVars,
-						...providerEnv,
-						PYTHONPATH: backendDir,
-						PYTHONUNBUFFERED: "1",
-						PYTHONIOENCODING: "utf-8",
-						PYTHONUTF8: "1",
-					} as NodeJS.ProcessEnv,
+					env,
 				},
 			);
 

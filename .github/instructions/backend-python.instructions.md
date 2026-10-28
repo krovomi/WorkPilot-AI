@@ -11,7 +11,7 @@ description: 'Conventions backend Python WorkPilot AI : FastAPI, agents multi-LL
 
 - **Python 3.12+** (Python embarqué par l'app : 3.12 ; la CI teste aussi 3.13).
 - **FastAPI** comme façade HTTP (`apps/backend/api/`, `apps/backend/websocket_server.py`).
-- Agents organisés en modules par domaine au niveau racine de `apps/backend/` (un dossier par capability : `accessibility_agent/`, `adversarial_qa/`, `architecture/`, etc.).
+- Agents organisés en modules par domaine au niveau racine de `apps/backend/` (un dossier par capability : `accessibility_agent/`, `architecture/`, etc.).
 - LLM providers via `apps/backend/provider_api.py` + `provider_models_catalog.py`.
 - **Ruff** pour lint+format (`ruff.toml`, double quotes, indent spaces).
 - **pytest** pour tests (`pytest.ini`, `tests/`).

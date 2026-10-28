@@ -9,7 +9,7 @@ for AI-powered analysis.
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -205,7 +205,7 @@ class ContextMeshService:
             self.storage.save_recommendations(existing_recs)
 
         # Update project last_analyzed_at
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         for proj in projects:
             proj.last_analyzed_at = now
             proj.pattern_count = len(

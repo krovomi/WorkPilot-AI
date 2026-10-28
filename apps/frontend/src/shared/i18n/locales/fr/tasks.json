@@ -466,7 +466,9 @@
 			"ctxInitialLabel": "Contexte LLM initial",
 			"provider": "Fournisseur",
 			"model": "Modèle",
-			"effort": "Effort"
+			"effort": "Effort",
+			"effortNotApplied": "non appliqué par ce modèle",
+			"effortSentAs": "envoyé comme"
 		}
 	},
 	"files": {
@@ -1748,7 +1750,10 @@
 		"notConfiguredWarning": "{{provider}} n'est pas configuré sur cette machine. Ajoutez son compte dans Paramètres → Comptes IA, ou choisissez un autre fournisseur.",
 		"chipMixed": "{{provider}} · mixte",
 		"chipAria": "Moteur de la tâche : {{engine}}",
-		"onlyResumedPhase": "Seulement pour la phase reprise ({{phase}}) — les phases suivantes gardent leur moteur"
+		"onlyResumedPhase": "Seulement pour la phase reprise ({{phase}}) — les phases suivantes gardent leur moteur",
+		"effortNotApplied": "Ce modèle n'a pas de réglage d'effort que WorkPilot puisse atteindre : le niveau choisi n'a aucun effet sur lui.",
+		"effortSentAs": "Envoyé au fournisseur comme « {{value}} », le niveau le plus proche que ce modèle accepte.",
+		"effortRuntime": "Appliqué au lancement si le modèle l'accepte ; le journal de la tâche dit ce qui a été envoyé."
 	},
 	"verify": {
 		"title": "Boucle de vérification",
@@ -1796,6 +1801,7 @@
 		"latency": "Latence de l'API : p50 {{p50}} ms, p95 {{p95}} ms sur {{count}} appel(s)",
 		"scoredOn": "Score calculé sur : {{metrics}}",
 		"startup": "démarrage à froid {{value}} ms",
+		"window": "Fenêtre",
 		"screenshotAlt": "Capture de la vérification",
 		"noBrowser": "Aucun navigateur n'a pu être utilisé : {{reasons}}",
 		"sections": {
@@ -1812,6 +1818,7 @@
 		"kind": {
 			"web-frontend": "front web",
 			"desktop": "bureau",
+			"windows-app": "app Windows",
 			"mobile": "mobile",
 			"backend-api": "API"
 		},
@@ -1856,7 +1863,10 @@
 			"inherit": "Défaut du projet",
 			"on": "Activée",
 			"off": "Désactivée",
-			"hint": "Lancer l'application après le code, corriger ce qui casse, l'amener jusqu'au changement et la mesurer (trace Chrome DevTools, captures)."
+			"hint": "Lancer l'application après le code, corriger ce qui casse, l'amener jusqu'au changement et la mesurer (trace Chrome DevTools, captures).",
+			"windowLabel": "Fenêtre à vérifier (apps Windows)",
+			"windowPlaceholder": "Une partie de son titre, ex. Commandes",
+			"windowHint": "WPF, WinForms ou WinUI : seule cette fenêtre de l'app lancée est lue et pilotée, jamais le reste du bureau. Vide : la fenêtre principale de l'app."
 		},
 		"cardBadge": {
 			"pass": "Vérifié",
@@ -1948,5 +1958,155 @@
 			"cleared": "Nouveau fil démarré (relais à {{before}} %)",
 			"saveFailed": "Impossible d'enregistrer les réglages de contexte"
 		}
+	},
+	"prFollowup": {
+		"title": "Suivi de la PR",
+		"description": "Continue de faire avancer la pull request : un check rouge ou un fil de revue non résolu part au QA fixer, le correctif est vérifié puis poussé. Jamais de push forcé, jamais de merge.",
+		"start": "Suivre la PR",
+		"stop": "Arrêter",
+		"running": "Suivi en cours",
+		"pushed": "Correctif poussé : {{sha}}",
+		"failing": "En échec : {{names}}",
+		"baseFailing": "Rouge aussi sur la branche de base : {{names}}",
+		"threads": "{{count}} fil(s) de revue confié(s) au fixer",
+		"violations": "Annulé avant le push : {{list}}",
+		"decision": {
+			"unknown": "Inconnu",
+			"merged": "Mergée",
+			"closed": "Fermée",
+			"pending": "CI en cours",
+			"no_checks": "Pas de CI",
+			"green": "Prête à merger",
+			"base_red": "Base rouge",
+			"stuck": "À voir par une personne",
+			"exhausted": "Tours épuisés",
+			"fix": "Correction en cours"
+		},
+		"action": {
+			"fixed": "Correctif poussé",
+			"no_change": "Le fixer n'a fait aucun commit",
+			"reverted": "Correctif annulé : il affaiblissait un test ou la CI",
+			"push_failed": "Le push a échoué",
+			"fixer_error": "Le fixer a échoué",
+			"diverged": "Le worktree a des commits que la PR n'a pas"
+		}
+	},
+	"sandbox": {
+		"notIsolated": "Commandes non isolées",
+		"unavailable": "{{provider}} : pas de bac à sable OS ({{reason}})",
+		"off": "{{provider}} : le bac à sable OS est désactivé (WORKPILOT_SANDBOX=off)",
+		"noReason": "raison non précisée"
+	},
+	"permission": {
+		"label": "Question de {{agent}}",
+		"asks": "{{agent}} demande avant d'agir",
+		"expires": "Refusé automatiquement à {{time}} sans réponse",
+		"failure": {
+			"not_pending": "Cette question n'est plus en attente",
+			"invalid_option": "Cette réponse ne fait pas partie de celles proposées par l'agent",
+			"process_gone": "Le build s'est arrêté, plus personne à qui répondre"
+		}
+	},
+	"mcpApps": {
+		"title": "Vues MCP Apps",
+		"subtitle": "Les vues qu'un serveur MCP installé attache aux outils appelés par l'agent. Chacune montre l'appel qui a eu lieu ; elle ne peut ni appeler un outil, ni écrire à l'agent, ni ouvrir un lien.",
+		"count_one": "{{count}} vue",
+		"count_other": "{{count}} vues",
+		"loading": "Chargement de la vue…",
+		"unavailable": "Cette vue ne peut plus être affichée.",
+		"frameTitle": "Vue MCP App : {{server}} · {{tool}}"
+	},
+	"goal": {
+		"title": "Objectif",
+		"description": "Fini quand une commande le dit, pas quand le relecteur le pense : la QA continue tant que la commande échoue, dans un nombre de passes et un plafond de dépense.",
+		"set": "Définir un objectif",
+		"edit": "Modifier",
+		"save": "Enregistrer",
+		"cancel": "Annuler",
+		"remove": "Retirer l'objectif",
+		"summary": "Code de sortie attendu {{exit}} · passes : {{rounds}} · plafond : {{cost}}",
+		"effortCap": "selon l'effort QA",
+		"noCap": "aucun",
+		"protectedList": "Protégés : {{list}}",
+		"spent": "Dépensé jusqu'ici : {{amount}} $",
+		"spentFloor": "Dépensé jusqu'ici : au moins {{amount}} $ (certaines sessions n'ont pas de prix connu)",
+		"unreadable": "Le fichier d'objectif est illisible : {{error}}. La QA s'arrête tant qu'il n'est pas corrigé.",
+		"status": {
+			"met": "Objectif atteint",
+			"unmet": "Objectif non atteint",
+			"error": "Impossible à vérifier",
+			"invalid": "Objectif invalide",
+			"budget": "Plafond atteint"
+		},
+		"fields": {
+			"command": "Commande",
+			"commandHint": "Une seule commande, lancée dans le worktree de la tâche, sans shell. Pour plusieurs étapes, appelle un script du dépôt : il est protégé automatiquement.",
+			"expectedExit": "Code de sortie",
+			"maxRounds": "Passes max",
+			"maxCostUsd": "Plafond (USD)",
+			"timeoutSeconds": "Délai (s)",
+			"protected": "Chemins que la tâche ne peut pas modifier",
+			"protectedHint": "Un par ligne, par ex. tests/** : une modification y est refusée, pour que l'objectif soit atteint par le code et non par ses vérifications."
+		}
+	},
+	"bestOfN": {
+		"title": "Best-of-N",
+		"description": "Construire cette tâche 2 à 4 fois, chacune dans son worktree avec son fournisseur, son modèle et son effort, puis choisir le build à garder.",
+		"configure": "Configurer",
+		"addVariant": "Ajouter une variante",
+		"removeVariant": "Retirer cette variante",
+		"start_one": "Construire {{count}} variante",
+		"start_other": "Construire {{count}} variantes",
+		"costHint": "Chaque variante est un build complet : la tâche coûte environ autant de fois qu'il y a de variantes.",
+		"phase": {
+			"running": "En construction",
+			"ranked": "Classées",
+			"adopted": "Adoptée",
+			"discarded": "Abandonnées"
+		},
+		"busy": {
+			"preparing": "Création des worktrees…",
+			"ranking": "Mesure des variantes…",
+			"adopting": "Adoption…",
+			"discarding": "Suppression des variantes…"
+		},
+		"variant": {
+			"starting": "Démarrage",
+			"running": "En cours",
+			"ended": "Terminée (code {{code}})",
+			"interrupted": "Interrompue : l'application s'est fermée pendant le build"
+		},
+		"columns": {
+			"rank": "Rang",
+			"engine": "Moteur",
+			"build": "Build",
+			"tests": "Tests (QA)",
+			"goal": "Objectif",
+			"diff": "Diff",
+			"cost": "Coût"
+		},
+		"qa": {
+			"approved": "Approuvé",
+			"rejected": "Rejeté",
+			"other": "Non validé"
+		},
+		"diffValue": "{{lines}} lignes, {{files}} fichiers",
+		"recommended": "Seule en tête",
+		"criteriaUsed": "Classées sur : {{list}}",
+		"skipped": {
+			"no_goal": "Pas d'objectif sur cette tâche : le critère objectif n'est pas utilisé.",
+			"goal_unchecked": "L'objectif n'a pas pu être vérifié pour chaque variante : il ne classe personne.",
+			"diff_unknown": "Le diff d'une variante n'a pas pu être lu : le diff ne classe personne.",
+			"cost_partial": "Une variante a utilisé un fournisseur sans prix connu : le coût ne classe personne."
+		},
+		"noRecommendation": "Aucune variante n'est seule en tête avec un build terminé : compare-les toi-même.",
+		"adopt": "Garder celle-ci",
+		"rank": "Classer les variantes",
+		"rerank": "Mesurer à nouveau",
+		"discard": "Tout abandonner",
+		"confirmTitle": "Garder ce build ?",
+		"confirmBody": "Le build sur {{engine}} devient celui de la tâche. Les {{others}} autres variantes, leurs worktrees et leurs branches sont supprimés. Rien n'est fusionné.",
+		"adoptedLine": "Gardée : {{variant}}",
+		"discardedLine": "Toutes les variantes ont été abandonnées."
 	}
 }

@@ -6,6 +6,7 @@ import type {
 	TestGenStageEvent,
 	TestLibrarySelection,
 } from "../../../shared/types/test-generation";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 /**
  * Test Generation API
@@ -172,7 +173,7 @@ export const createTestGenerationAPI = (): TestGenerationAPI => ({
 		existingTestPath?: string,
 		projectPath?: string,
 	): Promise<{ success: boolean; error?: string }> => {
-		return await ipcRenderer.invoke("test-generation:analyze-coverage", {
+		return await ipcRenderer.invoke(IPC_CHANNELS.TEST_GENERATION_ANALYZE_COVERAGE, {
 			filePath,
 			existingTestPath,
 			projectPath,
@@ -188,7 +189,7 @@ export const createTestGenerationAPI = (): TestGenerationAPI => ({
 		destination?: TestDestination | null;
 		error?: string;
 	}> => {
-		return await ipcRenderer.invoke("test-generation:resolve-destination", {
+		return await ipcRenderer.invoke(IPC_CHANNELS.TEST_GENERATION_RESOLVE_DESTINATION, {
 			filePath,
 			projectPath,
 			existingTestPath,
@@ -204,7 +205,7 @@ export const createTestGenerationAPI = (): TestGenerationAPI => ({
 		libraries?: TestLibrarySelection | null;
 		error?: string;
 	}> => {
-		return await ipcRenderer.invoke("test-generation:resolve-libraries", {
+		return await ipcRenderer.invoke(IPC_CHANNELS.TEST_GENERATION_RESOLVE_LIBRARIES, {
 			filePath,
 			projectPath,
 			selected,
@@ -221,7 +222,7 @@ export const createTestGenerationAPI = (): TestGenerationAPI => ({
 		report?: PackageInstallReport | null;
 		error?: string;
 	}> => {
-		return await ipcRenderer.invoke("test-generation:add-packages", {
+		return await ipcRenderer.invoke(IPC_CHANNELS.TEST_GENERATION_ADD_PACKAGES, {
 			selected,
 			projectPath,
 			testDir,
@@ -237,7 +238,7 @@ export const createTestGenerationAPI = (): TestGenerationAPI => ({
 		testDir?: string,
 		testLibraries?: string[],
 	): Promise<{ success: boolean; error?: string }> => {
-		return await ipcRenderer.invoke("test-generation:generate-unit", {
+		return await ipcRenderer.invoke(IPC_CHANNELS.TEST_GENERATION_GENERATE_UNIT, {
 			filePath,
 			existingTestPath,
 			coverageTarget,
@@ -254,7 +255,7 @@ export const createTestGenerationAPI = (): TestGenerationAPI => ({
 		testDir?: string,
 		testLibraries?: string[],
 	): Promise<{ success: boolean; error?: string }> => {
-		return await ipcRenderer.invoke("test-generation:generate-e2e", {
+		return await ipcRenderer.invoke(IPC_CHANNELS.TEST_GENERATION_GENERATE_E2E, {
 			userStory,
 			targetModule,
 			projectPath,
@@ -271,7 +272,7 @@ export const createTestGenerationAPI = (): TestGenerationAPI => ({
 		testDir?: string,
 		testLibraries?: string[],
 	): Promise<{ success: boolean; error?: string }> => {
-		return await ipcRenderer.invoke("test-generation:generate-tdd", {
+		return await ipcRenderer.invoke(IPC_CHANNELS.TEST_GENERATION_GENERATE_TDD, {
 			description,
 			language,
 			snippetType,
@@ -286,7 +287,7 @@ export const createTestGenerationAPI = (): TestGenerationAPI => ({
 		cancelled?: boolean;
 		error?: string;
 	}> => {
-		return await ipcRenderer.invoke("test-generation:cancel");
+		return await ipcRenderer.invoke(IPC_CHANNELS.TEST_GENERATION_CANCEL);
 	},
 
 	onTestGenerationStatus: (callback: (status: string) => void) => {
@@ -298,7 +299,7 @@ export const createTestGenerationAPI = (): TestGenerationAPI => ({
 		const listener = (_event: IpcRendererEvent, status: string) =>
 			callback(status);
 		statusListeners.set(callback, listener);
-		ipcRenderer.on("test-generation:status", listener);
+		ipcRenderer.on(IPC_CHANNELS.TEST_GENERATION_STATUS, listener);
 	},
 
 	onTestGenerationError: (callback: ErrorListenerFn) => {
@@ -311,7 +312,7 @@ export const createTestGenerationAPI = (): TestGenerationAPI => ({
 			error: TestGenerationError | string,
 		) => callback(error);
 		errorListeners.set(callback, listener);
-		ipcRenderer.on("test-generation:error", listener);
+		ipcRenderer.on(IPC_CHANNELS.TEST_GENERATION_ERROR, listener);
 	},
 
 	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
@@ -324,7 +325,7 @@ export const createTestGenerationAPI = (): TestGenerationAPI => ({
 		const listener = (_event: IpcRendererEvent, result: any) =>
 			callback(result);
 		resultListeners.set(callback, listener);
-		ipcRenderer.on("test-generation:result", listener);
+		ipcRenderer.on(IPC_CHANNELS.TEST_GENERATION_RESULT, listener);
 	},
 
 	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
@@ -337,7 +338,7 @@ export const createTestGenerationAPI = (): TestGenerationAPI => ({
 		const listener = (_event: IpcRendererEvent, result: any) =>
 			callback(result);
 		completeListeners.set(callback, listener);
-		ipcRenderer.on("test-generation:complete", listener);
+		ipcRenderer.on(IPC_CHANNELS.TEST_GENERATION_COMPLETE, listener);
 	},
 
 	onTestGenerationProgress: (callback: (event: TestGenStageEvent) => void) => {
@@ -348,7 +349,7 @@ export const createTestGenerationAPI = (): TestGenerationAPI => ({
 		const listener = (_event: IpcRendererEvent, payload: TestGenStageEvent) =>
 			callback(payload);
 		progressListeners.set(callback, listener);
-		ipcRenderer.on("test-generation:progress", listener);
+		ipcRenderer.on(IPC_CHANNELS.TEST_GENERATION_PROGRESS, listener);
 	},
 
 	onTestGenerationCode: (callback: (delta: string) => void) => {
@@ -359,7 +360,7 @@ export const createTestGenerationAPI = (): TestGenerationAPI => ({
 		const listener = (_event: IpcRendererEvent, delta: string) =>
 			callback(delta);
 		codeListeners.set(callback, listener);
-		ipcRenderer.on("test-generation:code", listener);
+		ipcRenderer.on(IPC_CHANNELS.TEST_GENERATION_CODE, listener);
 	},
 
 	removeTestGenerationStatusListener: (callback: (status: string) => void) => {

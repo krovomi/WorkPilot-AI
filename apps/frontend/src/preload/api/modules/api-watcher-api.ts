@@ -6,6 +6,7 @@
 
 import type { ContractDiff } from "../../../shared/types/api-watcher";
 import { createIpcListener, invokeIpc } from "./ipc-utils";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export interface ApiWatcherRunOptions {
 	projectPath: string;
@@ -39,22 +40,22 @@ export interface ApiWatcherAPI {
 
 export const createApiWatcherAPI = (): ApiWatcherAPI => ({
 	runApiWatcherScan: (options: ApiWatcherRunOptions) =>
-		invokeIpc<ApiWatcherResult>("apiWatcher:run", options),
+		invokeIpc<ApiWatcherResult>(IPC_CHANNELS.API_WATCHER_RUN, options),
 
-	cancelApiWatcherScan: () => invokeIpc<boolean>("apiWatcher:cancel"),
+	cancelApiWatcherScan: () => invokeIpc<boolean>(IPC_CHANNELS.API_WATCHER_CANCEL),
 
 	onApiWatcherEvent: (callback) =>
-		createIpcListener<[ApiWatcherEvent]>("api-watcher-event", (payload) =>
+		createIpcListener<[ApiWatcherEvent]>(IPC_CHANNELS.API_WATCHER_EVENT, (payload) =>
 			callback(payload),
 		),
 
 	onApiWatcherResult: (callback) =>
-		createIpcListener<[ApiWatcherResult]>("api-watcher-result", (payload) =>
+		createIpcListener<[ApiWatcherResult]>(IPC_CHANNELS.API_WATCHER_RESULT, (payload) =>
 			callback(payload),
 		),
 
 	onApiWatcherError: (callback) =>
-		createIpcListener<[string]>("api-watcher-error", (payload) =>
+		createIpcListener<[string]>(IPC_CHANNELS.API_WATCHER_ERROR, (payload) =>
 			callback(payload),
 		),
 });

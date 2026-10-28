@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
+from foundation.platform import pid_is_running
+
 
 class WorkspaceMode(Enum):
     """How workpilot should work."""
@@ -102,14 +104,7 @@ class MergeLock:
                 if self.lock_file.exists():
                     try:
                         pid = int(self.lock_file.read_text(encoding="utf-8").strip())
-                        # Import locally to avoid circular dependency
-                        import os as _os
-
-                        try:
-                            _os.kill(pid, 0)
-                            is_running = True
-                        except (OSError, ProcessLookupError):
-                            is_running = False
+                        is_running = pid_is_running(pid)
 
                         if not is_running:
                             # Stale lock - remove it
@@ -192,13 +187,7 @@ class SpecNumberLock:
                 if self.lock_file.exists():
                     try:
                         pid = int(self.lock_file.read_text(encoding="utf-8").strip())
-                        import os as _os
-
-                        try:
-                            _os.kill(pid, 0)
-                            is_running = True
-                        except (OSError, ProcessLookupError):
-                            is_running = False
+                        is_running = pid_is_running(pid)
 
                         if not is_running:
                             # Stale lock - remove it

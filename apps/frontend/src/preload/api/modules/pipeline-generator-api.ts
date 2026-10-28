@@ -12,6 +12,7 @@ import {
 	type IpcListenerCleanup,
 	invokeIpc,
 } from "./ipc-utils";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export type { CiPlatform, PipelineGeneratorRequest, PipelineGeneratorResult };
 
@@ -24,10 +25,6 @@ export interface PipelineGeneratorAPI {
 		cancelled: boolean;
 		error?: string;
 	}>;
-	configurePipelineGenerator: (config: {
-		pythonPath?: string;
-		autoBuildSourcePath?: string;
-	}) => Promise<{ success: boolean; error?: string }>;
 	onPipelineGeneratorStatus: (
 		callback: (status: string) => void,
 	) => IpcListenerCleanup;
@@ -46,27 +43,22 @@ export function createPipelineGeneratorAPI(): PipelineGeneratorAPI {
 	return {
 		generatePipelines: (request) =>
 			invokeIpc<{ success: boolean; error?: string }>(
-				"pipelineGenerator:generate",
+				IPC_CHANNELS.PIPELINE_GENERATOR_GENERATE,
 				request,
 			),
 		cancelPipelineGeneration: () =>
 			invokeIpc<{ success: boolean; cancelled: boolean; error?: string }>(
-				"pipelineGenerator:cancel",
-			),
-		configurePipelineGenerator: (config) =>
-			invokeIpc<{ success: boolean; error?: string }>(
-				"pipelineGenerator:configure",
-				config,
+				IPC_CHANNELS.PIPELINE_GENERATOR_CANCEL,
 			),
 		onPipelineGeneratorStatus: (callback) =>
-			createIpcListener<[string]>("pipelineGenerator:status", callback),
+			createIpcListener<[string]>(IPC_CHANNELS.PIPELINE_GENERATOR_STATUS, callback),
 		onPipelineGeneratorStreamChunk: (callback) =>
-			createIpcListener<[string]>("pipelineGenerator:streamChunk", callback),
+			createIpcListener<[string]>(IPC_CHANNELS.PIPELINE_GENERATOR_STREAM_CHUNK, callback),
 		onPipelineGeneratorError: (callback) =>
-			createIpcListener<[string]>("pipelineGenerator:error", callback),
+			createIpcListener<[string]>(IPC_CHANNELS.PIPELINE_GENERATOR_ERROR, callback),
 		onPipelineGeneratorComplete: (callback) =>
 			createIpcListener<[PipelineGeneratorResult]>(
-				"pipelineGenerator:complete",
+				IPC_CHANNELS.PIPELINE_GENERATOR_COMPLETE,
 				callback,
 			),
 	};

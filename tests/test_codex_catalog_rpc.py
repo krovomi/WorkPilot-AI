@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
-from core import codex_catalog_rpc as rpc
+from foundation import codex_catalog_rpc as rpc
 
 
 def fake_server(monkeypatch, tmp_path: Path, source: str):

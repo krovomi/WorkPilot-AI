@@ -1558,10 +1558,12 @@ export interface VerifyError {
 
 export interface VerifyTarget {
 	name: string;
-	kind: "web-frontend" | "desktop" | "mobile" | "backend-api" | string;
+	kind: "web-frontend" | "desktop" | "windows-app" | "mobile" | "backend-api" | string;
 	framework?: string;
 	root?: string;
 	url?: string;
+	/** A Windows app's window, the only one the verification touched. */
+	window?: { title?: string; namedBy?: "card" | "launch" };
 	touched?: boolean;
 	origin?: string;
 	launch?: {

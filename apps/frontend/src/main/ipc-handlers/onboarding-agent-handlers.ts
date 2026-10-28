@@ -18,6 +18,8 @@ import { type ChildProcess, spawn } from "node:child_process";
 import path from "node:path";
 import { app, BrowserWindow, ipcMain } from "electron";
 import { pythonEnvManager } from "../python-env-manager.js";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
+import { pythonRunnerEnv } from "../utils/python-runner-env";
 
 interface RunRequest {
 	projectPath: string;
@@ -44,13 +46,13 @@ export function registerOnboardingAgentHandlers(): void {
 	};
 
 	ipcMain.handle(
-		"onboardingAgent:run",
+		IPC_CHANNELS.ONBOARDING_AGENT_RUN,
 		async (_event, { projectPath }: RunRequest) => {
 			killExisting();
 
 			if (!projectPath) {
 				const message = "projectPath is required";
-				broadcast("onboarding-error", message);
+				broadcast(IPC_CHANNELS.ONBOARDING_ERROR, message);
 				throw new Error(message);
 			}
 
@@ -73,7 +75,7 @@ export function registerOnboardingAgentHandlers(): void {
 				[runnerPath, "--project-path", projectPath],
 				{
 					cwd: backendPath,
-					env: { ...process.env, PYTHONPATH: backendPath },
+					env: await pythonRunnerEnv(backendPath),
 				} as Parameters<typeof spawn>[2],
 			);
 			currentProcess = child;
@@ -94,7 +96,7 @@ export function registerOnboardingAgentHandlers(): void {
 					if (line.startsWith(EVENT_PREFIX)) {
 						try {
 							const payload = JSON.parse(line.slice(EVENT_PREFIX.length));
-							broadcast("onboarding-event", payload);
+							broadcast(IPC_CHANNELS.ONBOARDING_EVENT, payload);
 						} catch (err) {
 							console.error("[Onboarding] Bad event line:", err);
 						}
@@ -118,12 +120,12 @@ export function registerOnboardingAgentHandlers(): void {
 				child.on("close", (code) => {
 					currentProcess = null;
 					if (code === 0 && result) {
-						broadcast("onboarding-result", result);
+						broadcast(IPC_CHANNELS.ONBOARDING_RESULT, result);
 						resolve(result);
 					} else {
 						const message =
 							errorMessage ?? `onboarding runner exited with code ${code}`;
-						broadcast("onboarding-error", message);
+						broadcast(IPC_CHANNELS.ONBOARDING_ERROR, message);
 						reject(new Error(message));
 					}
 				});
@@ -131,14 +133,14 @@ export function registerOnboardingAgentHandlers(): void {
 				child.on("error", (err) => {
 					currentProcess = null;
 					const message = `Failed to start onboarding runner: ${err.message}`;
-					broadcast("onboarding-error", message);
+					broadcast(IPC_CHANNELS.ONBOARDING_ERROR, message);
 					reject(new Error(message));
 				});
 			});
 		},
 	);
 
-	ipcMain.handle("onboardingAgent:cancel", () => {
+	ipcMain.handle(IPC_CHANNELS.ONBOARDING_AGENT_CANCEL, () => {
 		killExisting();
 		return true;
 	});

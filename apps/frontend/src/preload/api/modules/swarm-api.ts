@@ -17,6 +17,7 @@ import type {
 	SwarmStatus,
 } from "../../../shared/types/swarm";
 import { createIpcListener, invokeIpc } from "./ipc-utils";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 /** What `swarm:start` reports back once the runner process is spawned. */
 export interface SwarmStartResult {
@@ -47,24 +48,24 @@ export interface SwarmAPI {
 export const createSwarmAPI = (): SwarmAPI => ({
 	analyze: (specId, config) =>
 		invokeIpc<SwarmAnalysisEvent & { parallelismStats: ParallelismStats }>(
-			"swarm:analyze",
+			IPC_CHANNELS.SWARM_ANALYZE,
 			specId,
 			config,
 		),
 
 	start: (specId, config, projectId) =>
-		invokeIpc<SwarmStartResult>("swarm:start", specId, config, projectId),
+		invokeIpc<SwarmStartResult>(IPC_CHANNELS.SWARM_START, specId, config, projectId),
 
 	cancel: () =>
-		invokeIpc<{ success: boolean; cancelled?: boolean }>("swarm:cancel"),
+		invokeIpc<{ success: boolean; cancelled?: boolean }>(IPC_CHANNELS.SWARM_CANCEL),
 
-	status: () => invokeIpc<SwarmStatus | null>("swarm:status"),
+	status: () => invokeIpc<SwarmStatus | null>(IPC_CHANNELS.SWARM_STATUS),
 
 	onEvent: (callback) =>
-		createIpcListener<[SwarmEvent]>("swarm:event", (payload) =>
+		createIpcListener<[SwarmEvent]>(IPC_CHANNELS.SWARM_EVENT, (payload) =>
 			callback(payload),
 		),
 
 	onLog: (callback) =>
-		createIpcListener<[string]>("swarm:log", (payload) => callback(payload)),
+		createIpcListener<[string]>(IPC_CHANNELS.SWARM_LOG, (payload) => callback(payload)),
 });

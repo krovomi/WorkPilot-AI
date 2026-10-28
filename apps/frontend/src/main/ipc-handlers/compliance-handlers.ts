@@ -17,6 +17,8 @@ import { type ChildProcess, spawn } from "node:child_process";
 import path from "node:path";
 import { app, BrowserWindow, ipcMain } from "electron";
 import { pythonEnvManager } from "../python-env-manager.js";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
+import { pythonRunnerEnv } from "../utils/python-runner-env";
 
 interface RunRequest {
 	projectPath: string;
@@ -44,13 +46,13 @@ export function registerComplianceHandlers(): void {
 	};
 
 	ipcMain.handle(
-		"compliance:run",
+		IPC_CHANNELS.COMPLIANCE_RUN,
 		async (_event, { projectPath, framework = "SOC2" }: RunRequest) => {
 			killExisting();
 
 			if (!projectPath) {
 				const message = "projectPath is required";
-				broadcast("compliance-error", message);
+				broadcast(IPC_CHANNELS.COMPLIANCE_ERROR, message);
 				throw new Error(message);
 			}
 
@@ -73,7 +75,7 @@ export function registerComplianceHandlers(): void {
 				[runnerPath, "--project-path", projectPath, "--framework", framework],
 				{
 					cwd: backendPath,
-					env: { ...process.env, PYTHONPATH: backendPath },
+					env: await pythonRunnerEnv(backendPath),
 				} as Parameters<typeof spawn>[2],
 			);
 			currentProcess = child;
@@ -94,7 +96,7 @@ export function registerComplianceHandlers(): void {
 					if (line.startsWith(EVENT_PREFIX)) {
 						try {
 							const payload = JSON.parse(line.slice(EVENT_PREFIX.length));
-							broadcast("compliance-event", payload);
+							broadcast(IPC_CHANNELS.COMPLIANCE_EVENT, payload);
 						} catch (err) {
 							console.error("[Compliance] Bad event line:", err);
 						}
@@ -118,12 +120,12 @@ export function registerComplianceHandlers(): void {
 				child.on("close", (code) => {
 					currentProcess = null;
 					if (code === 0 && result) {
-						broadcast("compliance-result", result);
+						broadcast(IPC_CHANNELS.COMPLIANCE_RESULT, result);
 						resolve(result);
 					} else {
 						const message =
 							errorMessage ?? `compliance runner exited with code ${code}`;
-						broadcast("compliance-error", message);
+						broadcast(IPC_CHANNELS.COMPLIANCE_ERROR, message);
 						reject(new Error(message));
 					}
 				});
@@ -131,14 +133,14 @@ export function registerComplianceHandlers(): void {
 				child.on("error", (err) => {
 					currentProcess = null;
 					const message = `Failed to start compliance runner: ${err.message}`;
-					broadcast("compliance-error", message);
+					broadcast(IPC_CHANNELS.COMPLIANCE_ERROR, message);
 					reject(new Error(message));
 				});
 			});
 		},
 	);
 
-	ipcMain.handle("compliance:cancel", () => {
+	ipcMain.handle(IPC_CHANNELS.COMPLIANCE_CANCEL, () => {
 		killExisting();
 		return true;
 	});

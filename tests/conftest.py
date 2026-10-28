@@ -61,10 +61,10 @@ sys.path.insert(0, _PROJECT_ROOT)
 # Save real module objects BEFORE any test-file collection can pollute them.
 #
 # Several test files (test_spec_phases.py, test_qa_loop.py, …) inject
-# ``sys.modules["core.platform"] = MagicMock()`` at *module level* during
+# ``sys.modules["foundation.platform"] = MagicMock()`` at *module level* during
 # collection.  That replaces M1 (the real module) in the cache.  Later, when
-# an unrelated test uses ``@patch("core.platform.is_windows", …)``, mock.patch
-# looks up ``sys.modules["core.platform"]`` and gets a *new* module M2 (after
+# an unrelated test uses ``@patch("foundation.platform.is_windows", …)``, mock.patch
+# looks up ``sys.modules["foundation.platform"]`` and gets a *new* module M2 (after
 # our cleanup deleted the MagicMock), so the patch is applied to M2 — but the
 # already-imported function objects (e.g. ``get_path_delimiter``) still hold
 # a reference to M1's ``__dict__``.  Patching M2 has no effect on M1.
@@ -76,7 +76,7 @@ sys.path.insert(0, _PROJECT_ROOT)
 _MODULES_TO_PRESERVE = [
     "core",
     "core.agent_client",
-    "core.platform",
+    "foundation.platform",
     "core.auth",
     # Four files mock core.workspace and core.workspace.models. Deleting the
     # mock instead of restoring re-imported models (a new WorkspaceMode class)
@@ -118,6 +118,8 @@ _PROTECTED_PACKAGES = [
     "apps",
     # Core infrastructure
     "core",
+    "foundation",
+    "offline_policy",
     "client",
     "init",
     "debug",
@@ -235,7 +237,7 @@ def pytest_runtest_setup(item) -> None:
     level during *collection*.  The ``pytest_collectstart`` hook only fires
     before collection, so by the time tests *execute* those mocks are still
     present and break ``@patch`` decorators in unrelated test files (e.g.
-    test_platform.py whose ``@patch("core.platform.is_windows", ...)`` ends
+    test_platform.py whose ``@patch("foundation.platform.is_windows", ...)`` ends
     up patching a MagicMock instead of the real module).
 
     Running the same cleanup before every test ensures that mocks injected
@@ -1208,6 +1210,17 @@ def _isolated_brain(tmp_path_factory, monkeypatch):
     monkeypatch.setenv("WORKPILOT_BRAIN_DIR", str(base / "brain"))
     monkeypatch.setenv("WORKPILOT_BRAIN_CONFIG", str(base / "brain.json"))
     monkeypatch.setenv("WORKPILOT_BRAIN_HOME", str(base / "home"))
+
+
+# Whether this machine can sandbox a command is ambient too: with bubblewrap
+# installed, every client test would start `bwrap` around its fake process
+# and every `run_command` test would run in a namespace. The sandbox has its
+# own tests (`tests/os_sandbox/`), which turn it back on.
+
+
+@pytest.fixture(autouse=True)
+def _os_sandbox_off_by_default(monkeypatch):
+    monkeypatch.setenv("WORKPILOT_SANDBOX", "off")
 
 
 # ── Ambient state is not input ─────────────────────────────────────────

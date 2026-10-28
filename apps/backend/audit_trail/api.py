@@ -20,10 +20,10 @@ from pathlib import Path
 from threading import Lock
 from typing import Any
 
-from core.api_safety import safe_error, server_mode_roots, validated_dir
 from fastapi import APIRouter, Query
 from fastapi import Path as PathParam
 from fastapi.responses import PlainTextResponse
+from foundation.api_safety import safe_error, server_mode_roots, validated_dir
 from pydantic import BaseModel, Field
 
 from .exports import build_dsar_bundle, render_soc2_csv
@@ -52,7 +52,7 @@ def _allowed_storage_roots() -> list[Path] | None:
       project is cloned under. Tighter than what this used to do, and the
       answer the rest of the backend already gives.
     * **local mode**: unconfined, like every other path-taking endpoint in
-      this backend. `core.api_safety` states the reason for all of them:
+      this backend. `foundation.api_safety` states the reason for all of them:
       there is no privilege boundary to draw, because the backend runs as
       the person who chose the directory in their own desktop app.
 

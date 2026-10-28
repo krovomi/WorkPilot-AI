@@ -3,6 +3,7 @@ import { IPC_CHANNELS } from "../../shared/constants";
 import type {
 	AppSettings,
 	IPCResult,
+	NeedsYouTestResult,
 	SourceEnvCheckResult,
 	SourceEnvConfig,
 	ToolDetectionResult,
@@ -12,6 +13,13 @@ export interface SettingsAPI {
 	// App Settings
 	getSettings: () => Promise<IPCResult<AppSettings>>;
 	saveSettings: (settings: Partial<AppSettings>) => Promise<IPCResult>;
+	/** Send a test "needs you" to the remote channels as saved. */
+	testNeedsYou: () => Promise<IPCResult<NeedsYouTestResult>>;
+	/** A desktop "needs you" was clicked: open that task. */
+	onNeedsYouOpenTask: (callback: (taskId: string, projectId: string) => void) => () => void;
+	/** Main asks the app to apply a remote plan approval; answer with reportNeedsYouApproval. */
+	onNeedsYouApprovePlan: (callback: (requestId: string, taskId: string) => void) => () => void;
+	reportNeedsYouApproval: (requestId: string, outcome: "approved" | "notPending") => Promise<void>;
 
 	// CLI Tools Detection
 	getCliToolsInfo: () => Promise<
@@ -39,6 +47,8 @@ export interface SettingsAPI {
 	getSourceEnv: () => Promise<IPCResult<SourceEnvConfig>>;
 	updateSourceEnv: (config: {
 		claudeOAuthToken?: string;
+		/** A Claude profile whose token main copies (the renderer never holds it) */
+		claudeProfileId?: string;
 	}) => Promise<IPCResult>;
 	checkSourceToken: () => Promise<IPCResult<SourceEnvCheckResult>>;
 
@@ -56,6 +66,9 @@ export interface SettingsAPI {
 		language: string,
 	) => Promise<IPCResult<{ success: boolean }>>;
 
+	// The custom provider's `/models` response, fetched by main with the stored key
+	discoverCustomProviderModels: () => Promise<IPCResult<unknown>>;
+
 	// LLM Provider operations
 	selectProvider: (provider: string) => Promise<IPCResult<string>>;
 	getSelectedProvider: () => Promise<IPCResult<string | null>>;
@@ -68,6 +81,29 @@ export const createSettingsAPI = (): SettingsAPI => ({
 
 	saveSettings: (settings: Partial<AppSettings>): Promise<IPCResult> =>
 		ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_SAVE, settings),
+
+	testNeedsYou: (): Promise<IPCResult<NeedsYouTestResult>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.NEEDS_YOU_TEST),
+
+	onNeedsYouOpenTask: (callback: (taskId: string, projectId: string) => void): (() => void) => {
+		const handler = (_event: Electron.IpcRendererEvent, taskId: string, projectId: string): void =>
+			callback(taskId, projectId);
+		ipcRenderer.on(IPC_CHANNELS.NEEDS_YOU_OPEN_TASK, handler);
+		return () => ipcRenderer.removeListener(IPC_CHANNELS.NEEDS_YOU_OPEN_TASK, handler);
+	},
+
+	onNeedsYouApprovePlan: (callback: (requestId: string, taskId: string) => void): (() => void) => {
+		const handler = (_event: Electron.IpcRendererEvent, requestId: string, taskId: string): void =>
+			callback(requestId, taskId);
+		ipcRenderer.on(IPC_CHANNELS.NEEDS_YOU_APPROVE_PLAN, handler);
+		return () => ipcRenderer.removeListener(IPC_CHANNELS.NEEDS_YOU_APPROVE_PLAN, handler);
+	},
+
+	reportNeedsYouApproval: (requestId: string, outcome: "approved" | "notPending"): Promise<void> =>
+		ipcRenderer.invoke(IPC_CHANNELS.NEEDS_YOU_APPROVAL_RESULT, requestId, outcome),
+
+	discoverCustomProviderModels: (): Promise<IPCResult<unknown>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_CUSTOM_PROVIDER_DISCOVER_MODELS),
 
 	// CLI Tools Detection
 	getCliToolsInfo: (): Promise<
@@ -99,6 +135,7 @@ export const createSettingsAPI = (): SettingsAPI => ({
 
 	updateSourceEnv: (config: {
 		claudeOAuthToken?: string;
+		claudeProfileId?: string;
 	}): Promise<IPCResult> =>
 		ipcRenderer.invoke(IPC_CHANNELS.AUTOBUILD_SOURCE_ENV_UPDATE, config),
 

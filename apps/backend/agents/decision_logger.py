@@ -24,7 +24,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from core.task_event import TaskEventEmitter
@@ -228,7 +228,7 @@ class AgentDecisionLogger:
             session_id=self.session_id,
             agent_type=self.agent_type,
             decision_type=decision_type,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             summary=summary[:MAX_SUMMARY_LENGTH],
             **kwargs,
         )
@@ -323,7 +323,7 @@ def create_decision_logger(
     Returns:
         Ready-to-use AgentDecisionLogger
     """
-    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
+    ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
     session_id = f"{agent_type}-{ts}"
     return AgentDecisionLogger(
         spec_dir=spec_dir,

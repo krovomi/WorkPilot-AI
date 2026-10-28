@@ -34,7 +34,7 @@ function slugifyTitle(title: string): string {
  * Determine task category based on GitHub issue labels
  * Maps to TaskCategory type from shared/types/task.ts
  */
-function determineCategoryFromLabels(
+export function determineCategoryFromLabels(
 	labels: string[],
 ):
 	| "feature"

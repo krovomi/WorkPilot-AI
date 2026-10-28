@@ -11,13 +11,10 @@ Usage:
     workpilot-merge-wrapper.py pull <remote> [<branch>]
 """
 
-import os
-import sys
-import subprocess
-import json
-from pathlib import Path
-from datetime import datetime
 import logging
+import subprocess
+import sys
+from pathlib import Path
 
 # Setup logging
 logging.basicConfig(
@@ -60,7 +57,7 @@ class WorkPilotMergeWrapper:
             logger.warning(f"Smart Merge Manager not found at {self.manager_script}")
             return True  # Continue anyway
 
-        logger.info(f"Backing up .workpilot before merge...")
+        logger.info("Backing up .workpilot before merge...")
         code, stdout, stderr = self.run_command(
             "python3", str(self.manager_script), "prepare", target_branch
         )
@@ -77,7 +74,7 @@ class WorkPilotMergeWrapper:
         if not self.manager_script.exists():
             return True  # Continue anyway
 
-        logger.info(f"Restoring and merging .workpilot files...")
+        logger.info("Restoring and merging .workpilot files...")
         code, stdout, stderr = self.run_command(
             "python3", str(self.manager_script), "complete"
         )
@@ -110,7 +107,7 @@ class WorkPilotMergeWrapper:
         # Post-merge
         self.complete_merge("merge")
 
-        logger.info(f"✓ Smart merge completed successfully")
+        logger.info("✓ Smart merge completed successfully")
         return 0
 
     def rebase(self, args: list) -> int:
@@ -135,7 +132,7 @@ class WorkPilotMergeWrapper:
         # Post-rebase
         self.complete_merge("rebase")
 
-        logger.info(f"✓ Smart rebase completed successfully")
+        logger.info("✓ Smart rebase completed successfully")
         return 0
 
     def pull(self, args: list) -> int:
@@ -163,7 +160,7 @@ class WorkPilotMergeWrapper:
         # Post-merge
         self.complete_merge("merge")
 
-        logger.info(f"✓ Smart pull completed successfully")
+        logger.info("✓ Smart pull completed successfully")
         return 0
 
     def main(self, argv: list) -> int:

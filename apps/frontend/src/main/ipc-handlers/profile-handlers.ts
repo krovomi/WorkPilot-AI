@@ -32,6 +32,37 @@ import {
 	updateProfile,
 	validateFilePermissions,
 } from "../services/profile";
+import { maskSecret, sameEndpoint, unmaskSecret } from "../utils/masked-secret";
+
+/** A profile as the renderer may see it: its key masked (rule S6). */
+function maskProfile<T extends APIProfile>(profile: T): T {
+	return { ...profile, apiKey: maskSecret(profile.apiKey) };
+}
+
+const KEY_FOR_NEW_URL =
+	"Enter the API key again to use it with another base URL";
+
+/**
+ * The key a request from the renderer stands for. Typed, it is used as is;
+ * masked, it is the stored key of `profileId`, and only for the URL that
+ * profile was saved with: a stored key never goes to a host the renderer names.
+ */
+async function resolveProfileKey(
+	baseUrl: string,
+	apiKey: string,
+	profileId: unknown,
+): Promise<{ apiKey: string } | { error: string }> {
+	const typed = unmaskSecret(apiKey);
+	if (typed !== undefined) return { apiKey: typed };
+	const file = await loadProfilesFile();
+	const profile =
+		typeof profileId === "string"
+			? file.profiles.find((p) => p.id === profileId)
+			: undefined;
+	if (!profile?.apiKey) return { error: "API key is required" };
+	if (!sameEndpoint(baseUrl, profile.baseUrl)) return { error: KEY_FOR_NEW_URL };
+	return { apiKey: profile.apiKey };
+}
 
 // Track active test connection requests for cancellation
 const activeTestConnections = new Map<number, AbortController>();
@@ -51,7 +82,11 @@ export function registerProfileHandlers(): void {
 		async (): Promise<IPCResult<ProfilesFile>> => {
 			try {
 				const profiles = await loadProfilesFile();
-				return { success: true, data: profiles };
+				// The renderer learns which profiles have a key, never the key
+				return {
+					success: true,
+					data: { ...profiles, profiles: profiles.profiles.map(maskProfile) },
+				};
 			} catch (error) {
 				return {
 					success: false,
@@ -80,7 +115,7 @@ export function registerProfileHandlers(): void {
 					);
 				});
 
-				return { success: true, data: newProfile };
+				return { success: true, data: maskProfile(newProfile) };
 			} catch (error) {
 				return {
 					success: false,
@@ -98,12 +133,20 @@ export function registerProfileHandlers(): void {
 		IPC_CHANNELS.PROFILES_UPDATE,
 		async (_, profileData: APIProfile): Promise<IPCResult<APIProfile>> => {
 			try {
+				// A masked key keeps the stored one, for the stored URL only
+				const key = await resolveProfileKey(
+					profileData?.baseUrl,
+					profileData?.apiKey,
+					profileData?.id,
+				);
+				if ("error" in key) return { success: false, error: key.error };
+
 				// Use updateProfile from service layer (handles validation)
 				const updatedProfile = await updateProfile({
 					id: profileData.id,
 					name: profileData.name,
 					baseUrl: profileData.baseUrl,
-					apiKey: profileData.apiKey,
+					apiKey: key.apiKey,
 					models: profileData.models,
 				});
 
@@ -115,7 +158,7 @@ export function registerProfileHandlers(): void {
 					);
 				});
 
-				return { success: true, data: updatedProfile };
+				return { success: true, data: maskProfile(updatedProfile) };
 			} catch (error) {
 				return {
 					success: false,
@@ -202,6 +245,7 @@ export function registerProfileHandlers(): void {
 			baseUrl: string,
 			apiKey: string,
 			requestId: number,
+			profileId?: string,
 		): Promise<IPCResult<TestConnectionResult>> => {
 			// Create AbortController for timeout and cancellation
 			const controller = new AbortController();
@@ -235,8 +279,16 @@ export function registerProfileHandlers(): void {
 					};
 				}
 
+				// A masked key is the stored one of profileId, for its own URL only
+				const key = await resolveProfileKey(baseUrl, apiKey, profileId);
+				if ("error" in key) {
+					clearTimeout(timeoutId);
+					activeTestConnections.delete(requestId);
+					return { success: false, error: key.error };
+				}
+
 				// Call testConnection from service layer with abort signal
-				const result = await testConnection(baseUrl, apiKey, controller.signal);
+				const result = await testConnection(baseUrl, key.apiKey, controller.signal);
 
 				// Clear timeout on success
 				clearTimeout(timeoutId);
@@ -294,6 +346,7 @@ export function registerProfileHandlers(): void {
 			baseUrl: string,
 			apiKey: string,
 			requestId: number,
+			profileId?: string,
 		): Promise<IPCResult<DiscoverModelsResult>> => {
 			// Create AbortController for timeout and cancellation
 			const controller = new AbortController();
@@ -327,8 +380,16 @@ export function registerProfileHandlers(): void {
 					};
 				}
 
+				// A masked key is the stored one of profileId, for its own URL only
+				const key = await resolveProfileKey(baseUrl, apiKey, profileId);
+				if ("error" in key) {
+					clearTimeout(timeoutId);
+					activeDiscoverModelsRequests.delete(requestId);
+					return { success: false, error: key.error };
+				}
+
 				// Call discoverModels from service layer with abort signal
-				const result = await discoverModels(baseUrl, apiKey, controller.signal);
+				const result = await discoverModels(baseUrl, key.apiKey, controller.signal);
 
 				// Clear timeout on success
 				clearTimeout(timeoutId);
@@ -391,7 +452,7 @@ export function registerProfileHandlers(): void {
 	 * - Returns the created directory path or an error
 	 */
 	ipcMain.handle(
-		"claude:profileCreateDir",
+		IPC_CHANNELS.CLAUDE_PROFILE_CREATE_DIR,
 		async (_event, profileName: string) => {
 			try {
 				const dir = await createProfileDirectoryImpl(profileName);

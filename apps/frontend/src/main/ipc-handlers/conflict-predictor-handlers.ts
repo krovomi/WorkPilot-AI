@@ -12,6 +12,8 @@ import { app, ipcMain } from "electron";
 import { projectStore } from "../project-store";
 import { parsePythonCommand } from "../python-detector";
 import { getConfiguredPythonPath } from "../python-env-manager";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
+import { pythonRunnerEnv } from "../utils/python-runner-env";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -48,15 +50,16 @@ export function setupConflictPredictorHandlers() {
 
 	// Handle conflict predictor request
 	ipcMain.handle(
-		"run-conflict-prediction",
+		IPC_CHANNELS.RUN_CONFLICT_PREDICTION,
 		async (event, { projectId }: ConflictPredictorRequest) => {
+			const env = await pythonRunnerEnv(getBackendPath());
 			return new Promise((resolve, reject) => {
 				killExistingProcess();
 
 				const project = projectStore.getProject(projectId);
 				if (!project) {
 					const errorMessage = `Project not found: ${projectId}`;
-					event.sender.send("conflict-predictor-error", errorMessage);
+					event.sender.send(IPC_CHANNELS.CONFLICT_PREDICTOR_ERROR, errorMessage);
 					reject(new Error(errorMessage));
 					return;
 				}
@@ -76,10 +79,7 @@ export function setupConflictPredictorHandlers() {
 					[...pythonBaseArgs, runnerPath, "--project-path", project.path],
 					{
 						cwd: backendPath,
-						env: {
-							...process.env,
-							PYTHONPATH: backendPath,
-						},
+						env,
 					},
 				);
 
@@ -101,7 +101,7 @@ export function setupConflictPredictorHandlers() {
 								const eventData = JSON.parse(
 									line.substring("CONFLICT_PREDICTOR_EVENT:".length),
 								);
-								event.sender.send("conflict-predictor-event", eventData);
+								event.sender.send(IPC_CHANNELS.CONFLICT_PREDICTOR_EVENT, eventData);
 							} catch (e) {
 								console.error("Failed to parse conflict predictor event:", e);
 							}
@@ -130,14 +130,14 @@ export function setupConflictPredictorHandlers() {
 					currentProcess = null;
 
 					if (code === 0 && result) {
-						event.sender.send("conflict-predictor-complete", result);
+						event.sender.send(IPC_CHANNELS.CONFLICT_PREDICTOR_COMPLETE, result);
 						resolve(result);
 					} else {
 						const errorMessage =
 							stdoutError ||
 							stderrOutput.trim() ||
 							`Process exited with code ${code}`;
-						event.sender.send("conflict-predictor-error", errorMessage);
+						event.sender.send(IPC_CHANNELS.CONFLICT_PREDICTOR_ERROR, errorMessage);
 						reject(new Error(errorMessage));
 					}
 				});
@@ -146,7 +146,7 @@ export function setupConflictPredictorHandlers() {
 				spawnedProcess.on("error", (err: Error) => {
 					currentProcess = null;
 					const errorMessage = `Failed to start conflict predictor process: ${err.message}`;
-					event.sender.send("conflict-predictor-error", errorMessage);
+					event.sender.send(IPC_CHANNELS.CONFLICT_PREDICTOR_ERROR, errorMessage);
 					reject(new Error(errorMessage));
 				});
 			});
@@ -154,7 +154,7 @@ export function setupConflictPredictorHandlers() {
 	);
 
 	// Handle process cancellation
-	ipcMain.handle("cancel-conflict-prediction", () => {
+	ipcMain.handle(IPC_CHANNELS.CANCEL_CONFLICT_PREDICTION, () => {
 		killExistingProcess();
 		return true;
 	});

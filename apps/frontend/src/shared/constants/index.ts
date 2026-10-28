@@ -16,7 +16,6 @@ export * from "./ideation";
 // IPC Channel constants
 export * from "./ipc";
 // IPC Namespace helpers (typed grouped view of IPC channels)
-export * from "./ipc-namespaces";
 
 // Model and agent profile constants
 export * from "./models";
@@ -32,3 +31,5 @@ export * from "./spellcheck";
 export * from "./task";
 // Theme constants
 export * from "./themes";
+// Tool paths typed in the settings
+export * from "./tool-paths";

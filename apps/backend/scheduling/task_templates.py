@@ -17,7 +17,7 @@ Example:
 import logging
 import os
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -115,7 +115,7 @@ class TaskTemplate:
     estimated_complexity: str = "medium"
     checklist: list[str] = field(default_factory=list)
     author: str = ""
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     is_builtin: bool = False
 
     def render(self, **kwargs: str) -> dict[str, Any]:
@@ -213,7 +213,7 @@ class TaskTemplate:
         variables = [TemplateVariable.from_dict(v) for v in data.get("variables", [])]
 
         created_at_str = data.get("created_at")
-        created_at = datetime.now(timezone.utc)
+        created_at = datetime.now(UTC)
         if created_at_str:
             try:
                 created_at = datetime.fromisoformat(str(created_at_str))

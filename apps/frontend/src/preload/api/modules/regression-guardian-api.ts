@@ -7,6 +7,7 @@
 
 import type { RegressionGuardianResult } from "../../../shared/types/regression-guardian";
 import { createIpcListener, invokeIpc } from "./ipc-utils";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export interface RegressionGuardianRunOptions {
 	projectPath: string;
@@ -40,27 +41,27 @@ export interface RegressionGuardianAPI {
 export const createRegressionGuardianAPI = (): RegressionGuardianAPI => ({
 	runRegressionGuardianScan: (options: RegressionGuardianRunOptions) =>
 		invokeIpc<RegressionGuardianScanResult>(
-			"regressionGuardian:run",
+			IPC_CHANNELS.REGRESSION_GUARDIAN_RUN,
 			options,
 		),
 
 	cancelRegressionGuardianScan: () =>
-		invokeIpc<boolean>("regressionGuardian:cancel"),
+		invokeIpc<boolean>(IPC_CHANNELS.REGRESSION_GUARDIAN_CANCEL),
 
 	onRegressionGuardianEvent: (callback) =>
 		createIpcListener<[RegressionGuardianEvent]>(
-			"regression-guardian-event",
+			IPC_CHANNELS.REGRESSION_GUARDIAN_EVENT,
 			(payload) => callback(payload),
 		),
 
 	onRegressionGuardianResult: (callback) =>
 		createIpcListener<[RegressionGuardianScanResult]>(
-			"regression-guardian-result",
+			IPC_CHANNELS.REGRESSION_GUARDIAN_RESULT,
 			(payload) => callback(payload),
 		),
 
 	onRegressionGuardianError: (callback) =>
-		createIpcListener<[string]>("regression-guardian-error", (payload) =>
+		createIpcListener<[string]>(IPC_CHANNELS.REGRESSION_GUARDIAN_ERROR, (payload) =>
 			callback(payload),
 		),
 });

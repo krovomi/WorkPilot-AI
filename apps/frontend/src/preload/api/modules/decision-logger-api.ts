@@ -7,6 +7,7 @@ import type {
 	DecisionLog,
 } from "../../../shared/types/decision-logger";
 import { createIpcListener, invokeIpc } from "./ipc-utils";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export interface DecisionLoggerAPI {
 	/** Load the persisted decision log for a spec. */
@@ -34,14 +35,14 @@ export interface DecisionLoggerAPI {
 export function createDecisionLoggerAPI(): DecisionLoggerAPI {
 	return {
 		getDecisionLog: (specDirPath, taskId, specId) =>
-			invokeIpc("agentDecision:getLog", specDirPath, taskId, specId),
+			invokeIpc(IPC_CHANNELS.AGENT_DECISION_LOG_GET, specDirPath, taskId, specId),
 
 		clearDecisionLog: (specDirPath) =>
-			invokeIpc("agentDecision:clearLog", specDirPath),
+			invokeIpc(IPC_CHANNELS.AGENT_DECISION_LOG_CLEAR, specDirPath),
 
 		onDecisionLogEntry: (callback) =>
 			createIpcListener<[string, DecisionEntry, string | undefined]>(
-				"agentDecision:entry",
+				IPC_CHANNELS.AGENT_DECISION_LOG_ENTRY,
 				callback,
 			),
 	};

@@ -6,9 +6,11 @@ import { setupAgentCoachListeners } from "./agent-coach-store";
 import { setupApiWatcherListeners } from "./api-watcher-store";
 import { setupAppEmulatorListeners } from "./app-emulator-store";
 import { setupArchitectureDeltaListeners } from "./architecture-delta-store";
+import { setupAutomationsListeners } from "./automations-store";
 import {
 	setupArchitectureVisualizerListeners,
 } from "./architecture-visualizer-store";
+import { setupBenchListeners } from "./bench-store";
 import { setupCarbonProfilerListeners } from "./carbon-profiler-store";
 import { setupCodeMigrationListeners } from "./code-migration-store";
 import { setupCodePlaygroundListeners } from "./code-playground-store";
@@ -18,7 +20,10 @@ import { setupConsensusArbiterListeners } from "./consensus-arbiter-store";
 import {
 	setupContextAwareSnippetsListeners,
 } from "./context-aware-snippets-store";
+import { setupContextMeshListeners } from "./context-mesh-store";
+import { setupLiveCompanionListeners } from "./live-companion-store";
 import { setupContextUsageListeners } from "./context-usage-store";
+import { setupTaskPermissionListeners } from "./task-permission-store";
 import { setupDocDriftListeners } from "./doc-drift-store";
 import { setupFlakyTestsListeners } from "./flaky-tests-store";
 import { setupGitSurgeonListeners } from "./git-surgeon-store";
@@ -40,6 +45,7 @@ import { setupPromptOptimizerListeners } from "./prompt-optimizer-store";
 import { setupRegressionGuardianListeners } from "./regression-guardian-store";
 import { setupReleaseCoordinatorListeners } from "./release-coordinator-store";
 import { setupSandboxListeners } from "./sandbox-store";
+import { setupTaskSandboxListeners } from "./task-sandbox-store";
 import { setupSecureStorageListeners } from "./secure-storage-store";
 import { setupSmartEstimationListeners } from "./smart-estimation-store";
 import { setupSpecRefinementListeners } from "./spec-refinement-store";
@@ -75,6 +81,9 @@ const SETUPS: ReadonlyArray<readonly [string, ListenerSetup]> = [
 	["AppEmulator", setupAppEmulatorListeners],
 	["ArchitectureDelta", setupArchitectureDeltaListeners],
 	["ArchitectureVisualizer", setupArchitectureVisualizerListeners],
+	// Cards an automation rule created appear on the board without a reload.
+	["Automations", setupAutomationsListeners],
+	["Bench", setupBenchListeners],
 	["CarbonProfiler", setupCarbonProfilerListeners],
 	["CodeMigration", setupCodeMigrationListeners],
 	["CodePlayground", setupCodePlaygroundListeners],
@@ -82,6 +91,8 @@ const SETUPS: ReadonlyArray<readonly [string, ListenerSetup]> = [
 	["ConflictPredictor", setupConflictPredictorListeners],
 	["ConsensusArbiter", setupConsensusArbiterListeners],
 	["ContextAwareSnippets", setupContextAwareSnippetsListeners],
+	["ContextMesh", setupContextMeshListeners],
+	["LiveCompanion", setupLiveCompanionListeners],
 	// Context-window telemetry of running tasks: the gauge in the task modal
 	// and the mini ring on the card read it whether or not they are mounted.
 	["ContextUsage", setupContextUsageListeners],
@@ -104,11 +115,15 @@ const SETUPS: ReadonlyArray<readonly [string, ListenerSetup]> = [
 	["RegressionGuardian", setupRegressionGuardianListeners],
 	["ReleaseCoordinator", setupReleaseCoordinatorListeners],
 	["Sandbox", setupSandboxListeners],
+	// Whether each task's commands run in the OS sandbox, for its card.
+	["TaskSandbox", setupTaskSandboxListeners],
 	// Not a page's feature: the sidebar's warning that stored API keys are
 	// not protected by the OS keyring.
 	["SecureStorage", setupSecureStorageListeners],
 	["SmartEstimation", setupSmartEstimationListeners],
 	["SpecRefinement", setupSpecRefinementListeners],
+	// An ACP agent's question waits on its card whether or not the board is open.
+	["TaskPermissions", setupTaskPermissionListeners],
 	["VisualToCode", setupVisualToCodeListeners],
 	["VoiceControl", setupVoiceControlListeners],
 ];

@@ -15,6 +15,7 @@ natifs.
 | trace de performance | `mcp__chrome-devtools__performance_start_trace` (`reload: true`, `autoStop: true`), `performance_stop_trace`, `performance_analyze_insight` — ou `mcp__workpilot-verify__verify_perf_trace`, qui calcule le score |
 | capture | `mcp__workpilot-verify__verify_screenshot` (elle est rangée là où la revue visuelle la lit) |
 | endpoints | `mcp__workpilot-verify__verify_endpoints` (candidats + payloads depuis le schéma), `verify_call_endpoint` |
+| application Windows | `mcp__workpilot-verify__verify_window` (`snapshot`, puis `click`, `fill`, `toggle`, `select`, `expand`, `collapse`, `wait_for`) ; capture avec `verify_screenshot` |
 | mobile | `mcp__workpilot-verify__verify_device` |
 | journal de la preuve | `mcp__workpilot-verify__verify_record` |
 

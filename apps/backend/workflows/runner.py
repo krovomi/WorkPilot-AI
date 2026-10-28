@@ -51,7 +51,7 @@ import json
 import logging
 import os
 from dataclasses import dataclass, field, replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from .engine import BUILTIN_PACKS
@@ -765,7 +765,7 @@ def _announce(phase_id: str) -> None:
     if name is None:
         return
     try:
-        from core.phase_event import ExecutionPhase, emit_phase
+        from foundation.phase_event import ExecutionPhase, emit_phase
 
         emit_phase(getattr(ExecutionPhase, name), f"Running the {phase_id} phase")
     except Exception as exc:  # noqa: BLE001 - a badge never fails a phase
@@ -824,7 +824,7 @@ def irreversible_gate(spec_dir: Path, phase_id: str) -> None:
             {
                 "phase": phase_id,
                 "status": "awaiting-resume",
-                "written": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                "written": datetime.now(UTC).isoformat(timespec="seconds"),
             },
             indent=2,
         ),

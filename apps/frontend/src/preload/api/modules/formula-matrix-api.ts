@@ -7,6 +7,7 @@
  */
 
 import { invokeIpc } from "./ipc-utils";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 /** One Provider × LLM × Effort candidate. */
 export interface Formula {
@@ -65,6 +66,11 @@ export interface FormulaMatrix {
 	 * > 0 the cost figures are calibrated on measured runs, not pure heuristics.
 	 */
 	history_tasks?: number;
+	/**
+	 * Builds the repo bench judged against a card's own tests, counted in the
+	 * success estimates next to the run history.
+	 */
+	bench_samples?: number;
 	formulas: Formula[];
 	warnings: string[];
 }
@@ -113,7 +119,7 @@ export interface FormulaMatrixAPI {
 
 export const createFormulaMatrixAPI = (): FormulaMatrixAPI => ({
 	runFormulaMatrix: (options) =>
-		invokeIpc<{ matrix: FormulaMatrix }>("formulaMatrix:run", options),
+		invokeIpc<{ matrix: FormulaMatrix }>(IPC_CHANNELS.FORMULA_MATRIX_RUN, options),
 	refineFormulas: (options) =>
-		invokeIpc<{ refined: RefinedFormula[] }>("formulaMatrix:refine", options),
+		invokeIpc<{ refined: RefinedFormula[] }>(IPC_CHANNELS.FORMULA_MATRIX_REFINE, options),
 });

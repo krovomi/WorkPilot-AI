@@ -75,6 +75,7 @@ settings through `provider_api.py`:
 | `DELETE /providers/config/{provider}` | delete it |
 | `POST /providers/select` · `GET /providers/selected` | set / read the active provider |
 | `POST /providers/test-key/{provider}` | check an API key against the provider |
+| `GET /providers/effort?provider=…&model=…` | what each effort level becomes on that model (`core/effort_plan.py`): `native`, `none` (no effect) or `runtime` (Copilot, Ollama) |
 
 The `python -m apps.backend.cli provider …` commands this section used to
 list never existed (there is no `cli/__main__.py`), and the `--provider-action`
@@ -188,6 +189,11 @@ refuses to start rather than booting unauthenticated. See
 environment file and [deploy/docker-compose.yml](../deploy/docker-compose.yml)
 for a PostgreSQL-backed deployment.
 
+The image (`deploy/Dockerfile.server`) installs `apps/backend/requirements.lock`, runs as the
+unprivileged user `workpilot` (uid 10001: mount SSH keys under `/home/workpilot/.ssh`), and starts
+through `deploy/server-entrypoint.sh`: `alembic upgrade head` first, and a failed migration stops
+the container instead of serving. CI builds it and migrates a PostgreSQL 16 with it on every PR.
+
 | Variable | Default | What it does |
 |---|---|---|
 | `WORKPILOT_SERVER_MODE` | `false` | Master switch. Everything in this section is inert without it. |
@@ -265,7 +271,7 @@ in server mode it is refused outright (HTTP 400) and callers identify a project
 by `project_id`; the server resolves its own checkout. Two barriers enforce it:
 the auth middleware rejects the key (`server.integration.CLIENT_PATH_PARAMS`)
 in the query string and anywhere in the body — JSON at any depth, or form
-fields — and `core.api_safety.validated_dir` confines resolution to
+fields — and `foundation.api_safety.validated_dir` confines resolution to
 `WORKPILOT_REPOS_ROOT` when no allowed root is given, as a backstop.
 `tests/backend/test_project_scope_coverage.py` walks every route's parameters
 and body models, so a new path-taking field fails the build until it is either
@@ -367,6 +373,17 @@ Both Fernet keys are secrets. Check the backend log after setting one: a key
 that is not a valid Fernet key is reported there, and the data is then written
 unencrypted.
 
+### Repo bench
+
+| Variable | Default | Meaning |
+| --- | ---: | --- |
+| `WORKPILOT_DATA_DIR` | `~/.workpilot` | Where the repo bench keeps its isolated copies and logs (`<dir>/bench/<project key>/<run>/`), outside the project checkout. Also the hooks data directory. |
+| `WORKPILOT_BENCH_JUDGE_TIMEOUT` | 900 | Seconds a judge run (one test suite on one copy) may take before its whole process tree is stopped; the tests it did not report count as failed. Calibration uses the same limit. |
+| `WORKPILOT_BENCH_CONCURRENCY` | 2 | Bench builds running at once, at most 4. Each is a full task billed by its provider. |
+
+A project the judge detection does not cover declares its test command in
+`.workpilot/bench.json` (see [repo-bench.md](architecture/repo-bench.md)).
+
 ---
 
 ## Mock / stub behaviors to be aware of
@@ -381,19 +398,6 @@ is taken so the user knows the output is not live data:
 - **Analytics API** ([apps/backend/analytics/api_minimal.py](../apps/backend/analytics/api_minimal.py))
   currently returns empty/mock payloads for every endpoint. Treat it as a
   scaffold until a real database-backed implementation lands.
-- **Azure DevOps PR details** ([apps/frontend/src/main/ipc-handlers/pr-details-handlers.ts](../apps/frontend/src/main/ipc-handlers/pr-details-handlers.ts),
-  `getAzureDevOpsPRDetails` → `getMockAzureDevOpsPRDetails`) — the `pr:details`
-  IPC handler, which feeds the PR files modal and the PR stats of a task whose
-  PR is on Azure DevOps, returns a fixed placeholder (title, author, dates,
-  diff stats and three file names; only the PR number, organization, project
-  and repository come from the URL) whenever the Azure DevOps call fails —
-  including when `AZURE_DEVOPS_PAT` or `AZURE_DEVOPS_ORG_URL` is not set. The
-  result is reported as a success; the only signal is a `console.warn` in the
-  Electron main-process log. The other Azure DevOps paths (connection check,
-  repositories, work items, import, PR review, PR comments) call the real
-  connector in [src/connectors/azure_devops/](../src/connectors/azure_devops/)
-  or the runner in [apps/backend/runners/azure_devops/](../apps/backend/runners/azure_devops/)
-  and return an error rather than stub data.
 
 ## QA validation loop
 
@@ -456,6 +460,20 @@ the backend environment, then from `.workpilot/.env`:
 | `VERIFY_BROWSER` | `auto` | `auto` (chrome-devtools-mcp, then Playwright), `devtools`, `playwright`, `off`. |
 | `VERIFY_CHROME_PATH` | — | A specific Chrome/Chromium binary. |
 | `CHROME_PATH` | — | Same, read when `VERIFY_CHROME_PATH` is unset. A path that is not an existing file is ignored. |
+
+## OS sandbox (`os_sandbox`)
+
+Agent commands run under bubblewrap (Linux) or Seatbelt (macOS), see
+[architecture/os-sandbox.md](architecture/os-sandbox.md). Read from the backend environment:
+
+| Variable | Default | Meaning |
+| --- | ---: | --- |
+| `WORKPILOT_SANDBOX` | `auto` | `auto`: sandboxed when the machine can, otherwise the build runs and its card says commands are not isolated. `required`: a build that cannot be sandboxed does not start. `off`: never sandboxed (the card says so). |
+| `WORKPILOT_SANDBOX_HOSTS` | — | Extra hosts a sandboxed process may reach, comma separated: `nexus.corp.example`, `*.corp.example` (subdomains only), `127.0.0.1:5000` (a local port). Remote hosts open 443 and 80 only. |
+
+On Ubuntu 24.04 and later, unprivileged user namespaces are restricted by AppArmor and bubblewrap
+fails; the card says so. `sudo sysctl kernel.apparmor_restrict_unprivileged_userns=0` (or an
+AppArmor profile for `bwrap`) lifts it. Claude Code's own sandbox on Linux also needs `socat`.
 
 ## RUN tasks — `.workpilot/environments.toml`
 
@@ -533,7 +551,7 @@ planner, coder, QA…).
 | `AUTO_CLAUDE_MAX_TURNS` | 1000 | Maximum agent turns in one session. A value that is not an integer stops the session from starting. |
 | `AUTO_CLAUDE_MAX_BUDGET_USD` | 5.0 | Spending cap, in US dollars, of one session — not of the task — on every provider. Past it the session ends (the Claude SDK ends it itself; for the other providers the session runner does, from each call's measured usage and the model's price in `cost_intelligence/catalog.py`) and the Kanban offers to resume. A model without a known price is not capped. 0 or less removes the cap; a value that is not a number falls back to 5.0. |
 | `AUTO_CLAUDE_EFFORT` | the phase's thinking level | Forces the SDK `effort` level (`low`, `medium`, `high`, `xhigh`, `max`) of sessions on an Opus model; other models ignore it. Without it, the effort follows the thinking level the user chose for the phase: `none` and `low` → `low`, `medium` → `medium`, `high` → `high`, `ultrathink` → `xhigh`. Opus 5.5 takes no thinking budget, so this is its only reasoning control. |
-| `AUTO_CLAUDE_OTEL_ENDPOINT` | — | OTLP endpoint, such as `http://localhost:4318`. When set, each session exports traces, metrics and logs over OTLP `http/protobuf` as the service `workpilot-<agent type>`, and these settings replace any `OTEL_*` variable of the same name. Point it only at a collector you control. |
+| `AUTO_CLAUDE_OTEL_ENDPOINT` | — | OTLP endpoint, such as `http://localhost:4318`. When set, each session exports traces, metrics and logs over OTLP `http/protobuf` as the service `workpilot-<agent type>`, and these settings replace any `OTEL_*` variable of the same name. It also turns on WorkPilot's own GenAI spans for every provider (`invoke_agent`, `chat`, `execute_tool`; no prompt or output), sent to `<endpoint>/v1/traces` as the service `workpilot`, with any key read from `OTEL_EXPORTER_OTLP_HEADERS` ([genai-traces.md](architecture/genai-traces.md)). Point it only at a collector you control. |
 | `AUTO_CLAUDE_AGENT_DEBUGGER` | off | `1`, `true`, `yes` or `on` attaches the Agent Debugger's breakpoints to every session, even when the debugger was not opened for that task. |
 | `CLAUDE_CLI_PATH` | the SDK's bundled CLI | `claude` executable the SDK launches. Ignored when it is not an existing file or holds shell metacharacters, `..` or a variable reference. The desktop app sets it from detection or the Claude path setting. |
 | `CLAUDE_CODE_GIT_BASH_PATH` | detected | Windows only: the Git for Windows `bash.exe` the Claude Code CLI needs; WorkPilot also looks for `git.exe` next to it. The desktop app sets it when it finds one. |
@@ -546,9 +564,12 @@ setting them by hand matters mainly for the CLI and headless runs.
 
 | Variable | Default | Meaning |
 | --- | ---: | --- |
-| `AUTO_CLAUDE_PROVIDER` | — | Default provider when nothing more specific names one: a task's own engine, the provider picked in the UI, `SELECTED_LLM_PROVIDER` and `task_metadata.json` all win over it. Accepted: `claude`, `copilot`, `openai`, `google`, `gemini`, `ollama`, `meta`, `mistral`, `deepseek`, `grok`, `aws`, `windsurf`, `cursor`, `custom`, `opencode`, `antigravity`, `agy`, `pi`. Any other value, `anthropic` included, is ignored. |
+| `AUTO_CLAUDE_PROVIDER` | — | Default provider when nothing more specific names one: a task's own engine, the provider picked in the UI, `SELECTED_LLM_PROVIDER` and `task_metadata.json` all win over it. Accepted: `claude`, `copilot`, `openai`, `google`, `gemini`, `ollama`, `meta`, `mistral`, `deepseek`, `grok`, `aws`, `windsurf`, `cursor`, `custom`, `opencode`, `antigravity`, `agy`, `pi`, `gemini-cli`. Any other value, `anthropic` included, is ignored. |
 | `WORKPILOT_PI_MODE` | `json` | `rpc` keeps one pi process per session (`compact` on demand, `abort` on cancel, the model's context window read from `get_state`); `json` starts one per turn. Any other value is `json`. |
 | `PI_CODING_AGENT_DIR` | `~/.pi/agent` | Where pi keeps `trust.json`, `mcp.json` and `models.json`; read by the pi provider and by `brain connect`. The provider sets `PI_CODING_AGENT_SESSION_DIR` (the task's `<spec>/pi-sessions`) and `PI_SKIP_VERSION_CHECK=1` on the pi subprocess itself. Guide: [`integrations/pi.md`](integrations/pi.md). |
+| `GEMINI_API_KEY` | — | Read only by the `gemini-cli` (ACP) provider, to sign Gemini CLI in with its `gemini-api-key` method when a session asks for a login; otherwise sign in once with `gemini`. Guide: [`architecture/acp.md`](architecture/acp.md). |
+| `WORKPILOT_PERMISSION_TIMEOUT_SECONDS` | 1800 | How long an ACP agent's question waits on the card (or in the terminal) before it is refused. A value that is not a positive number is the default. |
+| `WORKPILOT_PERMISSION_CHANNEL` | — | Set to `stdin` by the app for a task process: an ACP agent's questions go to the card. Not for hand use; without it a terminal run asks in the terminal, and any other run refuses. |
 | `OPENAI_AUTH_MODE` | `api-key` | `codex-cli` runs OpenAI sessions through the logged-in Codex CLI instead of the API key. A model only the API serves still goes to the API when a key is configured. |
 | `GOOGLE_API_KEY` | — | Gemini API key of the `google` and `gemini` providers; their agent sessions read no other source. Secret. |
 | `MISTRAL_BASE_URL` | `https://api.mistral.ai` | Mistral API base, with or without `/v1`. |
@@ -677,6 +698,16 @@ message. WorkPilot's own integrations read other names, in the last column.
 | `slack` | `SLACK_BOT_TOKEN` | — |
 | `postman` | `POSTMAN_API_KEY` | — |
 | `teams` | `TEAMS_WEBHOOK_URL` | the same, for notifications |
+
+### MCP tasks (2026-07-28)
+
+A server may return a tool call as a task (`io.modelcontextprotocol/tasks`); the
+providers on WorkPilot's own loop wait for it, see
+[architecture/mcp-2026.md](architecture/mcp-2026.md).
+
+| Variable | Default | Meaning |
+| --- | ---: | --- |
+| `WORKPILOT_MCP_TASK_TIMEOUT` | 1800 | Seconds a tool call returned as a task may run before WorkPilot cancels it (`tasks/cancel`) and gives the agent an error that says so. A value that is not a positive number keeps the default. |
 
 ## Agent features
 

@@ -7,6 +7,7 @@
 
 import type { RefinementHistory } from "../../../shared/types/spec-refinement";
 import { createIpcListener, invokeIpc } from "./ipc-utils";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export interface SpecRefinementRunOptions {
 	projectPath: string;
@@ -37,22 +38,22 @@ export interface SpecRefinementAPI {
 
 export const createSpecRefinementAPI = (): SpecRefinementAPI => ({
 	runSpecRefinementScan: (options: SpecRefinementRunOptions) =>
-		invokeIpc<SpecRefinementResult>("specRefinement:run", options),
+		invokeIpc<SpecRefinementResult>(IPC_CHANNELS.SPEC_REFINEMENT_RUN, options),
 
-	cancelSpecRefinementScan: () => invokeIpc<boolean>("specRefinement:cancel"),
+	cancelSpecRefinementScan: () => invokeIpc<boolean>(IPC_CHANNELS.SPEC_REFINEMENT_CANCEL),
 
 	onSpecRefinementEvent: (callback) =>
-		createIpcListener<[SpecRefinementEvent]>("spec-refinement-event", (payload) =>
+		createIpcListener<[SpecRefinementEvent]>(IPC_CHANNELS.SPEC_REFINEMENT_EVENT, (payload) =>
 			callback(payload),
 		),
 
 	onSpecRefinementResult: (callback) =>
-		createIpcListener<[SpecRefinementResult]>("spec-refinement-result", (payload) =>
+		createIpcListener<[SpecRefinementResult]>(IPC_CHANNELS.SPEC_REFINEMENT_RESULT, (payload) =>
 			callback(payload),
 		),
 
 	onSpecRefinementError: (callback) =>
-		createIpcListener<[string]>("spec-refinement-error", (payload) =>
+		createIpcListener<[string]>(IPC_CHANNELS.SPEC_REFINEMENT_ERROR, (payload) =>
 			callback(payload),
 		),
 });

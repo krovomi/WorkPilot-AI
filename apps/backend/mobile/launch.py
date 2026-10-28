@@ -18,7 +18,7 @@ import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from core.platform import split_command
+from foundation.platform import split_command
 
 from .stacks import ANDROID, MobilePlatform, MobileStack
 from .toolchain import find_tool

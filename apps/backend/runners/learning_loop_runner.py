@@ -13,6 +13,7 @@ import argparse
 import asyncio
 import json
 import sys
+from datetime import UTC
 from pathlib import Path
 from typing import Any
 
@@ -59,7 +60,7 @@ async def record_outcome(
 
     Returns the spec directory, or None if it does not exist.
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     spec_dir = Path(project_dir) / ".workpilot" / "specs" / spec_id
     if not spec_dir.exists():
@@ -69,7 +70,7 @@ async def record_outcome(
     outcome = {
         "verdict": verdict,
         "details": details[:2000],
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
 
     # Keep a short history of outcomes (a task can fail CI several times
@@ -227,4 +228,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    from core.log_redaction import install_global_redaction
+
+    install_global_redaction()
     main()

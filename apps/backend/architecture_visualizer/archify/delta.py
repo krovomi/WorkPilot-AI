@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field
+from datetime import UTC
 from pathlib import Path
 from typing import Any
 
@@ -112,10 +113,10 @@ def status_path(spec_dir: Path) -> Path:
 
 
 def write_status(spec_dir: Path, status: DeltaStatus) -> DeltaStatus:
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     if not status.generated_at:
-        status.generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        status.generated_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     target = status_path(spec_dir)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(

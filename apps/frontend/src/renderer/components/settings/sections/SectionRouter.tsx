@@ -12,6 +12,7 @@ import type {
 } from "../../../../shared/types";
 import { GeneralSettings } from "../../project-settings/GeneralSettings";
 import { InitializationGuard } from "../common/InitializationGuard";
+import { AutomationsIntegration } from "../integrations/AutomationsIntegration";
 import { AzureDevOpsIntegration } from "../integrations/AzureDevOpsIntegration";
 import { ChannelNotificationsIntegration } from "../integrations/ChannelNotificationsIntegration";
 import { CICDPipelineIntegration } from "../integrations/CICDPipelineIntegration";
@@ -242,6 +243,22 @@ export function SectionRouter({
 							envConfig={envConfig}
 							updateEnvConfig={updateEnvConfig}
 						/>
+					</InitializationGuard>
+				</SettingsSection>
+			);
+
+		case "automations":
+			return (
+				<SettingsSection
+					title={t("automations.title")}
+					description={t("automations.description")}
+				>
+					<InitializationGuard
+						initialized={!!project.autoBuildPath}
+						title={t("automations.title")}
+						description={t("automations.description")}
+					>
+						<AutomationsIntegration projectId={project.id} />
 					</InitializationGuard>
 				</SettingsSection>
 			);

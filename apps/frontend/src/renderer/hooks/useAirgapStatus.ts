@@ -8,7 +8,7 @@
  * le backend le refusait une seconde plus tard, en parlant d'un modèle local
  * que personne n'avait nommé.
  *
- * Le backend est la seule autorité (`core.offline_policy.airgap_status`, servi
+ * Le backend est la seule autorité (`offline_policy.airgap_status`, servi
  * par `offlineMode:status`) : il lit le fichier, remonte les répertoires
  * parents comme le fait la résolution réelle, et dit *quel* fichier décide.
  * Une seconde lecture en TypeScript répondrait à côté le jour où un projet

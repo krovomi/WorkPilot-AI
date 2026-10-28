@@ -19,6 +19,7 @@ le navigateur, la trace Chrome DevTools et les appareils passent par les outils
 | trace de performance | `verify_perf_trace` (Chrome DevTools MCP, score calculé) |
 | capture | `verify_screenshot` |
 | endpoints | `verify_endpoints`, puis `verify_call_endpoint` |
+| application Windows | `verify_window` avec `action` : `snapshot`, `click`, `fill`, `toggle`, `select`, `expand`, `collapse`, `wait_for` ; capture avec `verify_screenshot` |
 | mobile | `verify_device` avec `action` : `devices`, `launch`, `screenshot`, `logs`, `perf` |
 | journal de la preuve | `verify_record` |
 
@@ -30,6 +31,12 @@ Corriger le code se fait avec les outils de fichiers habituels
 Toujours `verify_browser` `snapshot` avant un `click` ou un `fill` : la
 réponse liste les éléments avec leur `uid`, et c'est ce `uid` qui se passe à
 l'action suivante. Ne jamais inventer un sélecteur CSS.
+
+## Windows
+<!-- append -->
+Toujours `verify_window` `snapshot` avant une action : la réponse liste les
+éléments avec leur `ref` (`e12`), et c'est cette `ref` qui se passe à
+l'action suivante.
 
 ## Report
 <!-- append -->

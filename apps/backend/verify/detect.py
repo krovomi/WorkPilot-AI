@@ -9,7 +9,8 @@ The detectors already in the repository are reused rather than repeated:
 `AppEmulatorRunner` (the Kanban preview's answer for Node, Python, Go, Rust),
 `mobile.stacks.detect_stack` (every phone framework) and
 `project.stack.detect_api_stack`. What they did not cover is added here
-and nowhere else: an ASP.NET Core project, an API written in Node (the
+and nowhere else: an ASP.NET Core project, a WPF / WinForms / WinUI app, an
+API written in Node (the
 preview treats every `package.json` as a page), Spring Boot, and a monorepo
 whose apps live one or two directories down.
 
@@ -37,8 +38,10 @@ __all__ = [
     "free_port",
 ]
 
-#: The four kinds of thing a verification knows how to drive.
-KINDS = ("web-frontend", "desktop", "mobile", "backend-api")
+#: The kinds of thing a verification knows how to drive. ``desktop`` is an
+#: Electron app (driven through its DevTools port); ``windows-app`` a WPF,
+#: WinForms or WinUI app (driven through UI Automation, `verify.window`).
+KINDS = ("web-frontend", "desktop", "windows-app", "mobile", "backend-api")
 
 #: Directories never searched for an app: dependencies, build output, VCS.
 _SKIP = {
@@ -207,6 +210,11 @@ def _relative(path: Path, project_dir: Path) -> str:
     return rel or "."
 
 
+def _project_arg(csproj: Path) -> str:
+    """The project file as `dotnet run --project` reads it from its own folder."""
+    return f'"{csproj.name}"' if " " in csproj.name else csproj.name
+
+
 def _read_json(path: Path) -> dict:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -287,7 +295,7 @@ def _node_target(directory: Path, project_dir: Path) -> Target | None:
     if not is_frontend:
         return None
     try:
-        from runners.app_emulator_runner import AppEmulatorRunner
+        from app_detection import AppEmulatorRunner
 
         found = AppEmulatorRunner(str(directory)).detect_project_type()
     except Exception as exc:  # noqa: BLE001 - the preview's detector is optional
@@ -316,8 +324,45 @@ _TEST_PROJECT = re.compile(
 )
 
 
+_WINDOWS_UI = re.compile(r"<\s*Use(WPF|WindowsForms|WinUI)\s*>\s*true\s*<", re.I)
+_WINDOWS_APP_SDK = re.compile(r'Include\s*=\s*"Microsoft\.WindowsAppSDK"', re.I)
+_EXECUTABLE = re.compile(r"<\s*OutputType\s*>\s*(?:WinExe|Exe)\s*<", re.I)
+_UNPACKAGED = re.compile(r"<\s*WindowsPackageType\s*>\s*None\s*<", re.I)
+
+
+def _windows_app(csproj: Path, text: str, project_dir: Path) -> Target | None:
+    """A WPF, WinForms or WinUI application (a control library is not one)."""
+    found = _WINDOWS_UI.search(text)
+    winui = bool(_WINDOWS_APP_SDK.search(text)) or (
+        found is not None and found.group(1).lower() == "winui"
+    )
+    if (found is None and not winui) or not _EXECUTABLE.search(text):
+        return None
+    framework = "winui" if winui else found.group(1).lower()  # type: ignore[union-attr]
+    framework = {"windowsforms": "winforms"}.get(framework, framework)
+    # The launch runs in the target's root: the project file is named from there.
+    rel = _project_arg(csproj)
+    target = Target(
+        kind="windows-app",
+        name=csproj.stem,
+        root=_relative(csproj.parent, project_dir),
+        framework=framework,
+        command=f"dotnet run --project {rel}",
+        env={"DOTNET_ENVIRONMENT": "Development"},
+    )
+    if winui and not _UNPACKAGED.search(text):
+        # A packaged (MSIX) WinUI app is started by its package, not by
+        # `dotnet run`: nothing is launched rather than a wrong command.
+        target.command = ""
+        target.notes.append(
+            "packaged WinUI app: set <WindowsPackageType>None</WindowsPackageType> "
+            "to let the verification start it with dotnet run"
+        )
+    return target
+
+
 def _dotnet_targets(project_dir: Path) -> list[Target]:
-    """Every ASP.NET Core project that is not a test project."""
+    """Every ASP.NET Core project and Windows app that is not a test project."""
     out: list[Target] = []
     for csproj in _walk(project_dir, "*.csproj", depth=4):
         if _TEST_PROJECT.search(csproj.stem):
@@ -327,8 +372,11 @@ def _dotnet_targets(project_dir: Path) -> list[Target]:
         except OSError:
             continue
         if not _WEB_SDK.search(text):
+            app = _windows_app(csproj, text, project_dir)
+            if app is not None:
+                out.append(app)
             continue
-        rel = _relative(csproj, project_dir)
+        rel = _project_arg(csproj)
         blazor = "BlazorWebAssembly" in text or (csproj.parent / "Pages").is_dir()
         out.append(
             Target(
@@ -355,7 +403,7 @@ def _dotnet_targets(project_dir: Path) -> list[Target]:
 
 def _python_target(directory: Path, project_dir: Path) -> Target | None:
     try:
-        from runners.app_emulator_runner import AppEmulatorRunner
+        from app_detection import AppEmulatorRunner
 
         found = AppEmulatorRunner(str(directory))._detect_from_python()  # noqa: SLF001
     except Exception:  # noqa: BLE001

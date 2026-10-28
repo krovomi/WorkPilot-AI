@@ -8,7 +8,7 @@ Provides streaming output and structured results.
 import argparse
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -96,7 +96,7 @@ class SmartEstimationRunner:
 
     def _get_timestamp(self) -> str:
         """Get current timestamp"""
-        return datetime.now(timezone.utc).isoformat()
+        return datetime.now(UTC).isoformat()
 
 
 def _emit_error(message: str) -> None:
@@ -135,4 +135,7 @@ def main():
 
 
 if __name__ == "__main__":
+    from core.log_redaction import install_global_redaction
+
+    install_global_redaction()
     main()

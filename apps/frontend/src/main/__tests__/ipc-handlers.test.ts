@@ -25,6 +25,23 @@ type MockedFs = {
 const TEST_DIR = path.join("..", "..", "tmp", "ipc-handlers-test");
 const TEST_PROJECT_PATH = path.join(TEST_DIR, "test-project");
 
+// The folder picker is not part of these tests: every existing path counts as
+// one the user picked (renderer-path.test.ts covers the refusals).
+vi.mock("../security/renderer-path", async () => {
+	const fs = await import("node:fs");
+	const chosen = (target: unknown) =>
+		typeof target === "string" && fs.existsSync(target) ? target : null;
+	return {
+		resolveUserChosen: chosen,
+		resolveInProject: chosen,
+		isAddableProject: (target: unknown) => chosen(target) !== null,
+		rememberUserChosenPath: vi.fn(),
+		// tool-path-policy.ts: no registered project to keep a tool path out of
+		knownProjectRoots: () => [],
+		isWithinRoot: () => false,
+	};
+});
+
 // Mock electron-updater before importing
 vi.mock("electron-updater", () => ({
 	autoUpdater: {
@@ -111,8 +128,10 @@ vi.mock("../updater/version-manager", () => ({
 vi.mock("../notification-service", () => ({
 	notificationService: {
 		initialize: vi.fn(),
-		notifyReviewNeeded: vi.fn(),
-		notifyTaskFailed: vi.fn(),
+		notify: vi.fn(),
+		revoke: vi.fn(),
+		refreshRemote: vi.fn(),
+		stop: vi.fn(),
 	},
 }));
 
@@ -862,14 +881,16 @@ describe("IPC Handlers", { timeout: 30000 }, () => {
 				mockPythonEnvManager as never,
 			);
 
+			// A bare name: the tool path policy accepts it on every platform,
+			// whereas /usr/bin/python3 does not exist on Windows.
 			await ipcMain.invokeHandler(
 				"settings:save",
 				{},
-				{ pythonPath: "/usr/bin/python3" },
+				{ pythonPath: "python3" },
 			);
 
 			expect(mockAgentManager.configure).toHaveBeenCalledWith(
-				"/usr/bin/python3",
+				"python3",
 				undefined,
 			);
 		});

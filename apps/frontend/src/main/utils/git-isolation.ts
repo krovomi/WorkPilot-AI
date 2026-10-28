@@ -10,7 +10,7 @@
  * ensuring each git operation targets the correct repository.
  *
  * Related fix: .husky/pre-commit hook also clears these vars.
- * Backend equivalent: apps/backend/core/git_executable.py:get_isolated_git_env()
+ * Backend equivalent: apps/backend/foundation/git_executable.py:get_isolated_git_env()
  */
 
 import { execFileSync } from "node:child_process";

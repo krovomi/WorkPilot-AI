@@ -7,8 +7,8 @@
 
 ## Pile
 
-React 19, TypeScript 7 (strict), Electron 41, Zustand 5, Tailwind CSS 4, Radix UI, xterm.js 6,
-Vite 8 (electron-vite), Vitest 4, Playwright, Biome **2.5.11** exactement, Motion.
+React 19, TypeScript 7 (strict), Electron 44, Zustand 5, Tailwind CSS 4, Radix UI, xterm.js 6,
+Vite 8 (electron-vite), Vitest 5, Playwright, Biome **2.5.11** exactement, Motion.
 
 ## Trois processus, une seule porte
 
@@ -18,9 +18,12 @@ Vite 8 (electron-vite), Vitest 4, Playwright, Biome **2.5.11** exactement, Motio
 | `src/preload/` | preload | expose une API typée au renderer via `contextBridge` |
 | `src/renderer/` | renderer React | **aucun accès système** : tout passe par `window.electronAPI` |
 
-Un canal IPC = une constante (`src/shared/constants/ipc.ts`, `ipc-namespaces.ts`, jamais de chaîne
-littérale) + une méthode typée dans `src/preload/` + un handler dans `src/main/ipc-handlers/` + un type
-de retour dans `src/shared/types/ipc.ts`. Le handler revalide ses arguments (règle S6).
+Un canal IPC = une constante (`src/shared/constants/ipc.ts`, jamais de chaîne littérale, ni dans
+le main ni dans le preload) + une méthode typée dans `src/preload/` + un handler dans
+`src/main/ipc-handlers/` + un type de retour dans `src/shared/types/ipc.ts`. Le handler revalide ses
+arguments (règle S6). Un événement du main a son écouteur dans le preload, et un écouteur son émetteur ;
+une constante sert à un appel. `main/ipc-handlers/__tests__/ipc-channel-parity.test.ts` vérifie les
+deux sens, le nommage par constante et l'absence de constante orpheline.
 
 ## Une page ne possède jamais son abonnement
 

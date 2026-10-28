@@ -92,7 +92,7 @@ async function invokeInitialize(): Promise<{
 describe("project:initialize", () => {
 	beforeAll(async () => {
 		const { registerProjectHandlers } = await import("../project-handlers");
-		registerProjectHandlers(pythonEnvManager, {} as never, () => null);
+		registerProjectHandlers(pythonEnvManager, {} as never);
 	});
 
 	beforeEach(() => {

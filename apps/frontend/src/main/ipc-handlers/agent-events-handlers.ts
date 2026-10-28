@@ -27,7 +27,6 @@ import type {
 import type { TaskEventPayload } from "../agent/task-event-schema";
 import { getClaudeProfileManager } from "../claude-profile-manager";
 import { fileWatcher } from "../file-watcher";
-import { notificationService } from "../notification-service";
 import { taskStateManager } from "../task-state-manager";
 import { titleGenerator } from "../title-generator";
 import { findTaskWorktree } from "../worktree-paths";
@@ -37,7 +36,15 @@ import {
 	persistPlanPhaseSync,
 	persistPlanStatusAndReasonSync,
 } from "./task/plan-file-utils";
+import { handleSandboxTaskEvent } from "./task-sandbox-handlers";
+import { parseMcpAppViewEvent } from "./task/mcp-app-handlers";
+import { isBestOfNVariant } from "./task/best-of-n-handlers";
+import { isBenchBuild } from "./bench-handlers";
 import { findTaskAndProject } from "./task/shared";
+import {
+	clearTaskPermissions,
+	handlePermissionTaskEvent,
+} from "./task-permission-handlers";
 import { safeSendToRenderer } from "./utils";
 
 /**
@@ -406,6 +413,13 @@ export function registerAgenteventsHandlers(
 			processType: ProcessType,
 			projectId?: string,
 		) => {
+			// Nobody is left to answer an ACP agent's questions.
+			clearTaskPermissions(taskId, getMainWindow);
+			// A best-of-N variant is not on the board: its handler reads its exit.
+			if (isBestOfNVariant(taskId)) return;
+			// A repo bench build is not on the board: its handler reads its exit.
+			if (isBenchBuild(taskId)) return;
+
 			// Use projectId from event to scope the lookup (prevents cross-project contamination)
 			const { task: exitTask, project: exitProject } = findTaskAndProject(
 				taskId,
@@ -453,24 +467,14 @@ export function registerAgenteventsHandlers(
 				);
 				return;
 			}
-
-			const { task, project } = findTaskAndProject(taskId, projectId);
-			if (!task || !project) return;
-
-			// A cooperative pause is not a completion — don't fire a "review
-			// needed"/"failed" notification for it.
-			if (!isPaused) {
-				const taskTitle = task.title || task.specId;
-				if (code === 0) {
-					notificationService.notifyReviewNeeded(taskTitle, project.id, taskId);
-				} else {
-					notificationService.notifyTaskFailed(taskTitle, project.id, taskId);
-				}
-			}
+			// "Needs you" notifications come from the state the task settles in
+			// (TaskStateManager → notification-service), not from the exit code:
+			// a plan waiting for approval exits 1 and is not a failure.
 		},
 	);
 
 	agentManager.on("task-event", (taskId: string, event, projectId?: string) => {
+		if (isBenchBuild(taskId)) return;
 		// Context-window telemetry (CONTEXT_USAGE / CONTEXT_ACTION_APPLIED) is
 		// forwarded untouched: it describes how full the session is, not a state
 		// the task reached, so it must never reach XState, the plan files or the
@@ -487,6 +491,14 @@ export function registerAgenteventsHandlers(
 			return;
 		}
 
+		// Whether the build's commands run in the OS sandbox: shown on the card,
+		// not a state the task reached.
+		if (handleSandboxTaskEvent(taskId, event, projectId, getMainWindow)) return;
+		// An ACP agent's question for the card (and its withdrawal): not a state.
+		if (handlePermissionTaskEvent(taskId, event, projectId, getMainWindow)) {
+			return;
+		}
+
 		// Forward decision log entries directly to renderer without going through XState (Feature 30)
 		if (event.type === "DECISION_LOG_ENTRY") {
 			safeSendToRenderer(
@@ -497,6 +509,21 @@ export function registerAgenteventsHandlers(
 				projectId,
 			);
 			return; // Skip XState processing — decision entries are not state transitions
+		}
+
+		// An MCP App view a tool call kept: the task panel lists it; not a state.
+		if (event.type === "MCP_APP_VIEW") {
+			const view = parseMcpAppViewEvent(event);
+			if (view) {
+				safeSendToRenderer(
+					getMainWindow,
+					IPC_CHANNELS.TASK_MCP_APP_VIEW,
+					taskId,
+					view,
+					projectId,
+				);
+			}
+			return;
 		}
 
 		// Log detailed information for CODING_FAILED events
@@ -530,6 +557,7 @@ export function registerAgenteventsHandlers(
 	agentManager.on(
 		"execution-progress",
 		(taskId: string, progress: ExecutionProgressData, projectId?: string) => {
+			if (isBenchBuild(taskId)) return;
 			// Use projectId from event to scope the lookup (prevents cross-project contamination)
 			const { task, project } = findTaskAndProject(taskId, projectId);
 			const taskProjectId = project?.id || projectId;

@@ -12,7 +12,7 @@ Two barriers close it, and both are checked here:
   than silent. The body used to go unread, and about forty routes take
   ``project_dir``, ``spec_dir`` or ``file_path`` there — one of them,
   ``/api/slash-commands/run``, as a bare ``dict`` no signature shows;
-* ``core.api_safety.validated_dir`` imposes ``REPOS_ROOT`` when no allowed root
+* ``foundation.api_safety.validated_dir`` imposes ``REPOS_ROOT`` when no allowed root
   is given, the backstop for a path that reaches an endpoint anyway.
 
 The last tests walk the real application's routes. They are the ones that keep
@@ -140,7 +140,7 @@ class TestValidatedDirConfinement:
         """The desktop app must lose nothing: there is no boundary to draw."""
         monkeypatch.setenv("WORKPILOT_SERVER_MODE", "0")
         server_config.reset_settings_cache()
-        from core.api_safety import validated_dir
+        from foundation.api_safety import validated_dir
 
         somewhere = tmp_path / "anywhere"
         somewhere.mkdir()
@@ -151,7 +151,7 @@ class TestValidatedDirConfinement:
         (repos_root / "proj-a").mkdir(parents=True)
         _enable_server_mode(monkeypatch, repos_root)
 
-        from core.api_safety import validated_dir
+        from foundation.api_safety import validated_dir
 
         inside = repos_root / "proj-a"
         assert validated_dir(str(inside), "project_dir") == inside.resolve()
@@ -164,7 +164,7 @@ class TestValidatedDirConfinement:
         outside.mkdir()
         _enable_server_mode(monkeypatch, repos_root)
 
-        from core.api_safety import validated_dir
+        from foundation.api_safety import validated_dir
 
         with pytest.raises(ValueError, match="outside every allowed root"):
             validated_dir(str(outside), "project_dir")
@@ -177,7 +177,7 @@ class TestValidatedDirConfinement:
         other.mkdir()
         _enable_server_mode(monkeypatch, repos_root)
 
-        from core.api_safety import validated_dir
+        from foundation.api_safety import validated_dir
 
         assert validated_dir(str(other), "d", allowed_roots=[other]) == other.resolve()
 
@@ -186,7 +186,7 @@ class TestValidatedDirConfinement:
         repos_root.mkdir()
         _enable_server_mode(monkeypatch, repos_root)
 
-        from core.api_safety import validated_dir
+        from foundation.api_safety import validated_dir
 
         with pytest.raises(ValueError, match="must not contain"):
             validated_dir(str(repos_root / ".." / "etc"), "project_dir")

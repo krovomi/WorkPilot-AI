@@ -16,6 +16,8 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import { app, ipcMain } from "electron";
 import { pythonEnvManager } from "../python-env-manager.js";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
+import { pythonRunnerEnv } from "../utils/python-runner-env";
 
 type ExportFormat = "dockerfile" | "nix" | "script";
 
@@ -25,7 +27,7 @@ function resolveBackendPath(): string {
 		: path.resolve(app.getAppPath(), "..", "backend");
 }
 
-function runRunner(args: string[]): Promise<unknown> {
+async function runRunner(args: string[]): Promise<unknown> {
 	const pythonExe = pythonEnvManager.getPythonPath();
 	if (!pythonExe) throw new Error("Python environment not ready");
 
@@ -36,10 +38,11 @@ function runRunner(args: string[]): Promise<unknown> {
 		"env_snapshot_runner.py",
 	);
 
+	const env = await pythonRunnerEnv(backendPath);
 	return new Promise((resolve, reject) => {
 		const child = spawn(pythonExe, [runnerPath, ...args], {
 			cwd: backendPath,
-			env: { ...process.env, PYTHONPATH: backendPath },
+			env,
 		} as Parameters<typeof spawn>[2]);
 
 		let stdout = "";
@@ -82,7 +85,7 @@ function runRunner(args: string[]): Promise<unknown> {
 
 export function registerEnvSnapshotHandlers(): void {
 	ipcMain.handle(
-		"envSnapshot:capture",
+		IPC_CHANNELS.ENV_SNAPSHOT_CAPTURE,
 		async (
 			_evt,
 			{
@@ -100,7 +103,7 @@ export function registerEnvSnapshotHandlers(): void {
 	);
 
 	ipcMain.handle(
-		"envSnapshot:list",
+		IPC_CHANNELS.ENV_SNAPSHOT_LIST,
 		async (_evt, { projectPath }: { projectPath: string }) => {
 			if (!projectPath) throw new Error("projectPath is required");
 			return runRunner(["--command", "list", "--project-path", projectPath]);
@@ -108,7 +111,7 @@ export function registerEnvSnapshotHandlers(): void {
 	);
 
 	ipcMain.handle(
-		"envSnapshot:get",
+		IPC_CHANNELS.ENV_SNAPSHOT_GET,
 		async (
 			_evt,
 			{ projectPath, snapId }: { projectPath: string; snapId: string },
@@ -127,7 +130,7 @@ export function registerEnvSnapshotHandlers(): void {
 	);
 
 	ipcMain.handle(
-		"envSnapshot:replay",
+		IPC_CHANNELS.ENV_SNAPSHOT_REPLAY,
 		async (
 			_evt,
 			{
@@ -152,7 +155,7 @@ export function registerEnvSnapshotHandlers(): void {
 	);
 
 	ipcMain.handle(
-		"envSnapshot:export",
+		IPC_CHANNELS.ENV_SNAPSHOT_EXPORT,
 		async (
 			_evt,
 			{

@@ -92,5 +92,8 @@ class TestBuildPrompt:
 class TestRefineNoCandidates:
     def test_empty_candidates_short_circuits(self):
         # Must return [] without touching the LLM client.
-        out = asyncio.run(refine_formulas("desc", []))
+        def no_client(**_kwargs):
+            raise AssertionError("the client factory must not be called")
+
+        out = asyncio.run(refine_formulas("desc", [], client_factory=no_client))
         assert out == []

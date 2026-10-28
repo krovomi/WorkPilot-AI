@@ -68,15 +68,16 @@ coder, la QA et la spec. Voir [`architecture/pause-resume.md`](../architecture/p
 | Quelle pile technique ? | `project/stack.py` | écrire un nouveau détecteur |
 | Frontmatter d'un skill ? | `skills_registry.frontmatter.parse_frontmatter` | parser du YAML à la main |
 | Mémoire des builds ? | `brain/project_memory.py` (le vault) | ouvrir un second magasin |
-| OS, exécutables, chemins ? | `core/platform/` (`is_windows`, `find_executable`, `requires_shell`…) | lire `sys.platform` / `os.name` |
-| Projet hors-ligne strict ? | `core/offline_policy.py` | appeler un service cloud sans passer par lui |
+| OS, exécutables, chemins ? | `foundation/platform/` (`is_windows`, `find_executable`, `requires_shell`…) | lire `sys.platform` / `os.name` |
+| Projet hors-ligne strict ? | `offline_policy/` | appeler un service cloud sans passer par lui |
 | Appli mobile constructible ici ? | `mobile/readiness.py` | lancer un build iOS hors macOS |
 
 **iOS ne se construit que sur macOS** : le signaler comme non vérifiable, ne jamais réessayer.
 
 ## Code Python
 
-- **Python 3.12+** (le Python embarqué par l'app est 3.12 ; la CI teste aussi 3.13).
+- **Python 3.12+** : le plancher (Python embarqué, image serveur, `target-version` de ruff) ; la CI
+  teste 3.12 sur Linux et 3.13 sur les trois OS.
 - Annotations de type sur toute signature publique ; **ruff `0.15.7`** exactement
   (`ruff check apps/backend tests src`, `ruff format --check …`).
 - **Encodage explicite** : `open(..., encoding="utf-8")`, `Path.read_text(encoding="utf-8")`,
@@ -87,6 +88,18 @@ coder, la QA et la spec. Voir [`architecture/pause-resume.md`](../architecture/p
 - **Importer le module réel**, jamais un fichier de la racine qui le réexporte : `core.debug`,
   `core.worktree`, `qa`. Les cales de compatibilité ont été retirées.
 - Un sous-processus prend une liste d'arguments, sans shell (règle S4 de [`security.md`](security.md)).
+- **Contrats d'imports** entre unités de premier niveau (`tests/test_import_contracts.py`) :
+  les unités listées dans `ALLOWED_IMPORTS` (`foundation`, `security`, `project`, `phase_config`,
+  `offline_policy`, `harness`…) n'importent que ce qu'il leur accorde, et le plus grand cycle
+  d'imports (`MAX_CYCLE`) ne grandit pas. Un import paresseux dans une fonction compte. Élargir un
+  contrat se justifie dans la PR ; casser une partie du cycle fait baisser `MAX_CYCLE`.
+- **Deux couches sous les agents.** `foundation/` est la plus basse : un utilitaire qui n'importe
+  rien du backend y va (plateforme, sûreté des routes, écritures atomiques, git, événements de
+  phase) et rien n'y importe `core`. `core/` est la racine de composition (`client.py`,
+  `agent_clients/`, `worktree.py`) : il importe les agents, donc un module bas niveau qui y vit
+  entraîne chacun de ses lecteurs dans le cycle des agents. Une fonctionnalité de bas niveau qui a
+  besoin d'un LLM reçoit la fabrique de son appelant plutôt que d'importer `core`
+  (`cost_intelligence.formula_refine`).
 
 ## Tests
 

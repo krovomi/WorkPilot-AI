@@ -5,10 +5,13 @@
  * All IPC handlers have been organized into domain-specific modules in ./ipc-handlers/
  */
 
-import type { BrowserWindow } from "electron";
+import { is } from "@electron-toolkit/utils";
+import { type BrowserWindow, ipcMain } from "electron";
 import type { AgentManager } from "./agent";
 import { setupIpcHandlers as setupModularHandlers } from "./ipc-handlers";
 import type { PythonEnvManager } from "./python-env-manager";
+import { installIpcPathPolicy } from "./security/ipc-path-policy";
+import { installIpcSenderPolicy } from "./security/ipc-sender-policy";
 import type { TerminalManager } from "./terminal-manager";
 
 /**
@@ -44,6 +47,16 @@ export function setupIpcHandlers(
 	getMainWindow: () => BrowserWindow | null,
 	pythonEnvManager: PythonEnvManager,
 ): void {
+	// Before any handler exists, and in this order: only the app's page in
+	// the main window's top frame is heard, then a directory argument from it
+	// is checked against the registered projects, on every channel.
+	installIpcSenderPolicy(ipcMain, {
+		getMainWindow,
+		// What index.ts loads: the dev server while developing, file:// otherwise.
+		devServerUrl: is.dev ? process.env.ELECTRON_RENDERER_URL : undefined,
+	});
+	installIpcPathPolicy(ipcMain);
+
 	// Delegate to modular handler setup
 	setupModularHandlers(
 		agentManager,

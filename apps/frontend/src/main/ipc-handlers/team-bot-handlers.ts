@@ -12,8 +12,10 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import { app, ipcMain } from "electron";
 import { pythonEnvManager } from "../python-env-manager.js";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
+import { pythonRunnerEnv } from "../utils/python-runner-env";
 
-function runRunner(
+async function runRunner(
 	action: "send" | "test",
 	payload: Record<string, unknown>,
 ): Promise<unknown> {
@@ -36,10 +38,11 @@ function runRunner(
 		JSON.stringify(payload),
 	];
 
+	const env = await pythonRunnerEnv(backendPath);
 	return new Promise((resolve, reject) => {
 		const child = spawn(pythonExe, args, {
 			cwd: backendPath,
-			env: { ...process.env, PYTHONPATH: backendPath },
+			env,
 		} as Parameters<typeof spawn>[2]);
 
 		let stdout = "";
@@ -77,7 +80,7 @@ function runRunner(
 
 export function registerTeamBotHandlers(): void {
 	ipcMain.handle(
-		"teamBot:send",
+		IPC_CHANNELS.TEAM_BOT_SEND,
 		async (
 			_e,
 			{
@@ -87,7 +90,7 @@ export function registerTeamBotHandlers(): void {
 		) => runRunner("send", { config, payload }),
 	);
 	ipcMain.handle(
-		"teamBot:test",
+		IPC_CHANNELS.TEAM_BOT_TEST,
 		async (_e, { config }: { config: Record<string, unknown> }) =>
 			runRunner("test", { config }),
 	);

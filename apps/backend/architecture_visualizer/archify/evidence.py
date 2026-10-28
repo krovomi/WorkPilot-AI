@@ -18,11 +18,10 @@ from __future__ import annotations
 
 import json
 import logging
+import tomllib
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
-
-import tomllib
 
 from ..analyzer import ArchitectureAnalyzer
 

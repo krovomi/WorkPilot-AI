@@ -12,9 +12,7 @@ streaming/
 ├── streaming_manager.py         # Core event broadcasting
 ├── websocket_server.py          # WebSocket server
 ├── session_recorder.py          # Recording & replay
-├── agent_wrapper.py             # Agent integration wrapper
-├── demo.py                      # Interactive demo script
-└── integration_example.py       # Integration guide
+└── agent_wrapper.py             # Agent integration wrapper
 ```
 
 ## Quick Start
@@ -25,13 +23,7 @@ streaming/
 python apps/backend/run.py --streaming-server
 ```
 
-### 2. Run the demo
-
-```bash
-python -m streaming.demo
-```
-
-### 3. Watch in the UI
+### 2. Watch in the UI
 
 Open the frontend and click "Watch Live" on any task!
 
@@ -205,7 +197,7 @@ pytest tests/test_streaming.py -v
 ## Dependencies
 
 - `websockets>=12.0` - WebSocket server/client
-- Python 3.10+ - Async/await support
+- Python 3.12+ (the backend floor)
 
 ## Performance
 
@@ -233,10 +225,6 @@ pip install websockets>=12.0
 1. Ensure `--enable-streaming` is used
 2. Check session_id matches
 3. Verify wrapper is properly initialized
-
-## Examples
-
-See the `demo.py` file for a complete working example that demonstrates all features.
 
 ---
 

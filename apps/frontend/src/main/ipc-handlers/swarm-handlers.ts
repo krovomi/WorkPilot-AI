@@ -15,6 +15,8 @@ import type { BrowserWindow } from "electron";
 import { ipcMain } from "electron";
 import type { SwarmConfig } from "../../shared/types/swarm";
 import { appLog } from "../app-logger";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
+import { pythonRunnerEnv } from "../utils/python-runner-env";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -69,7 +71,7 @@ export function registerSwarmHandlers(
 	 * Returns parallelism stats and wave plan.
 	 */
 	ipcMain.handle(
-		"swarm:analyze",
+		IPC_CHANNELS.SWARM_ANALYZE,
 		async (_event, specId: string, config: SwarmConfig) => {
 			try {
 				appLog.info(`[Swarm] Analyzing dependencies for spec: ${specId}`);
@@ -81,6 +83,7 @@ export function registerSwarmHandlers(
 				const sourcePath = getAutoBuildSourcePath();
 				const runnerPath = path.join(sourcePath, "runners", "swarm_runner.py");
 
+				const env = await pythonRunnerEnv(sourcePath);
 				return await new Promise<Record<string, unknown>>((resolve, reject) => {
 					const args = [
 						runnerPath,
@@ -92,7 +95,7 @@ export function registerSwarmHandlers(
 					];
 
 					const proc = spawn(pythonPath, args, {
-						env: { ...process.env, PYTHONPATH: sourcePath },
+						env,
 					});
 
 					let stdout = "";
@@ -144,7 +147,7 @@ export function registerSwarmHandlers(
 	 * Streams events to the renderer via webContents.send().
 	 */
 	ipcMain.handle(
-		"swarm:start",
+		IPC_CHANNELS.SWARM_START,
 		async (_event, specId: string, config: SwarmConfig, projectId?: string) => {
 			try {
 				// Kill any existing swarm process
@@ -174,7 +177,7 @@ export function registerSwarmHandlers(
 				if (config.dryRun) args.push("--dry-run");
 
 				const proc = spawn(pythonPath, args, {
-					env: { ...process.env, PYTHONPATH: sourcePath },
+					env: await pythonRunnerEnv(sourcePath),
 				});
 
 				activeSwarmProcess = proc;
@@ -194,7 +197,7 @@ export function registerSwarmHandlers(
 						const event = parseSwarmEvent(line);
 						if (event) {
 							if (win && !win.isDestroyed()) {
-								win.webContents.send("swarm:event", event);
+								win.webContents.send(IPC_CHANNELS.SWARM_EVENT, event);
 							}
 							continue;
 						}
@@ -202,7 +205,7 @@ export function registerSwarmHandlers(
 						// Forward exec phase events
 						if (line.includes(EXEC_PHASE_PREFIX)) {
 							if (win && !win.isDestroyed()) {
-								win.webContents.send("swarm:log", line);
+								win.webContents.send(IPC_CHANNELS.SWARM_LOG, line);
 							}
 						}
 					}
@@ -219,7 +222,7 @@ export function registerSwarmHandlers(
 					activeSwarmProjectId = null;
 
 					if (win && !win.isDestroyed()) {
-						win.webContents.send("swarm:event", {
+						win.webContents.send(IPC_CHANNELS.SWARM_EVENT, {
 							type: code === 0 ? "swarm_complete" : "swarm_failed",
 							exitCode: code,
 							error:
@@ -234,7 +237,7 @@ export function registerSwarmHandlers(
 					activeSwarmProjectId = null;
 
 					if (win && !win.isDestroyed()) {
-						win.webContents.send("swarm:event", {
+						win.webContents.send(IPC_CHANNELS.SWARM_EVENT, {
 							type: "swarm_failed",
 							error: err.message,
 						});
@@ -255,7 +258,7 @@ export function registerSwarmHandlers(
 	/**
 	 * Cancel the running swarm.
 	 */
-	ipcMain.handle("swarm:cancel", async () => {
+	ipcMain.handle(IPC_CHANNELS.SWARM_CANCEL, async () => {
 		if (!activeSwarmProcess) {
 			return { success: false, error: "No active swarm process" };
 		}
@@ -268,7 +271,7 @@ export function registerSwarmHandlers(
 	/**
 	 * Get swarm status.
 	 */
-	ipcMain.handle("swarm:status", async () => {
+	ipcMain.handle(IPC_CHANNELS.SWARM_STATUS, async () => {
 		return {
 			isRunning: activeSwarmProcess !== null,
 			projectId: activeSwarmProjectId,

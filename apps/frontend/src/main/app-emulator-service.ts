@@ -25,6 +25,8 @@ import {
 	ensureLegacyWorktreeBuildAssets,
 	LEGACY_RESOURCE_PROPERTY,
 } from "./legacy-dotnet-build";
+import { envWithoutCredentials } from "./utils/child-env";
+import { updateExistingFile } from "./utils/existing-file";
 
 // ESM-compatible __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -2534,11 +2536,10 @@ exit $launched.ExitCode
 
 			const proc = spawn(cmd, args, {
 				cwd: projectDir,
-				env: {
-					...process.env,
+				env: envWithoutCredentials(process.env, {
 					BROWSER: "none",
 					PORT: String(config.port),
-				} as Record<string, string>,
+				}),
 				shell,
 				stdio: ["ignore", "pipe", "pipe"],
 			});
@@ -2696,11 +2697,10 @@ exit $launched.ExitCode
 			}
 			const proc = spawn(cmd, args, {
 				cwd: svc.projectDir,
-				env: {
-					...process.env,
+				env: envWithoutCredentials(process.env, {
 					BROWSER: "none",
 					PORT: String(svc.port),
-				} as Record<string, string>,
+				}),
 				shell,
 				stdio: ["ignore", "pipe", "pipe"],
 			});
@@ -2751,11 +2751,10 @@ exit $launched.ExitCode
 		}
 		const primaryProc = spawn(primaryCmd, primaryArgs, {
 			cwd: primary.projectDir,
-			env: {
-				...process.env,
+			env: envWithoutCredentials(process.env, {
 				BROWSER: "none",
 				PORT: String(primary.port),
-			} as Record<string, string>,
+			}),
 			shell,
 			stdio: ["ignore", "pipe", "pipe"],
 		});
@@ -3165,41 +3164,42 @@ exit $launched.ExitCode
 			"ivy",
 			"plugin.js",
 		);
-		if (!existsSync(pluginPath)) return;
 		if (this.angularWebpackPatches.has(pluginPath)) return; // already patched this session
 
 		try {
-			const original = readFileSync(pluginPath, "utf-8");
+			// One descriptor for the read and the write; a missing plugin.js
+			// (Angular CLI not installed) leaves nothing to patch.
+			updateExistingFile(pluginPath, (original) => {
+				// Guard: patch already present (Angular CLI 15.1+)
+				if (
+					original.includes("decodeURIComponent(file)") ||
+					original.includes("decodeURIComponent(resource)")
+				)
+					return null;
 
-			// Guard: patch already present (Angular CLI 15.1+)
-			if (
-				original.includes("decodeURIComponent(file)") ||
-				original.includes("decodeURIComponent(resource)")
-			)
-				return;
+				let patched = original;
 
-			let patched = original;
+				// Fix 1: createFileEmitter — decode the resource path before TypeScript program lookup.
+				// normalizePath)(file) → normalizePath)(decodeURIComponent(file))
+				patched = patched.replace(
+					/normalizePath\)\(file\)/g,
+					"normalizePath)(decodeURIComponent(file))",
+				);
 
-			// Fix 1: createFileEmitter — decode the resource path before TypeScript program lookup.
-			// normalizePath)(file) → normalizePath)(decodeURIComponent(file))
-			patched = patched.replace(
-				/normalizePath\)\(file\)/g,
-				"normalizePath)(decodeURIComponent(file))",
-			);
+				// Fix 2: unused-file detection and rebuild-file detection.
+				// normalizePath)(resource) → normalizePath)(decodeURIComponent(resource))
+				patched = patched.replace(
+					/normalizePath\)\(resource\)/g,
+					"normalizePath)(decodeURIComponent(resource))",
+				);
 
-			// Fix 2: unused-file detection and rebuild-file detection.
-			// normalizePath)(resource) → normalizePath)(decodeURIComponent(resource))
-			patched = patched.replace(
-				/normalizePath\)\(resource\)/g,
-				"normalizePath)(decodeURIComponent(resource))",
-			);
+				if (patched === original) {
+					return null;
+				}
 
-			if (patched === original) {
-				return;
-			}
-
-			writeFileSync(pluginPath, patched, "utf-8");
-			this.angularWebpackPatches.set(pluginPath, original);
+				this.angularWebpackPatches.set(pluginPath, original);
+				return patched;
+			});
 		} catch (err) {
 			console.warn("[AppEmulator] Could not patch @ngtools/webpack:", err);
 		}

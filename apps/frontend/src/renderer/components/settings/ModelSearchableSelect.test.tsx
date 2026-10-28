@@ -84,6 +84,7 @@ describe("ModelSearchableSelect", () => {
 				"https://api.anthropic.com",
 				"sk-test-key-12chars",
 				expect.any(AbortSignal),
+				undefined,
 			);
 		});
 	});

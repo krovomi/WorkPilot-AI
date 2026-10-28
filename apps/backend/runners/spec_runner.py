@@ -36,10 +36,10 @@ Usage:
 
 import sys
 
-# Python version check - must be before any imports using 3.10+ syntax
-if sys.version_info < (3, 10):  # noqa: UP036
+# Python version check - must be before any imports using 3.12+ syntax
+if sys.version_info < (3, 12):  # noqa: UP036
     sys.exit(
-        f"Error: WorkPilot AI requires Python 3.10 or higher.\n"
+        f"Error: WorkPilot AI requires Python 3.12 or higher.\n"
         f"You are running Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}\n"
         f"\n"
         f"Please upgrade Python: https://www.python.org/downloads/"
@@ -109,7 +109,7 @@ init_sentry(component="spec-runner")
 
 from core.build_signals import BuildPaused
 from core.debug import debug, debug_error, debug_section, debug_success
-from core.platform import is_windows
+from foundation.platform import is_windows
 from phase_config import resolve_model_id
 from review import ReviewState
 from spec import SpecOrchestrator
@@ -535,4 +535,7 @@ Examples:
 
 
 if __name__ == "__main__":
+    from core.log_redaction import install_global_redaction
+
+    install_global_redaction()
     main()

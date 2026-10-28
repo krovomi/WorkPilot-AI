@@ -13,6 +13,7 @@ import type {
 	ArchitectureVersionMeta,
 } from "../../../shared/types/visual-to-code-history";
 import type { IPCResult } from "../../../shared/types";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export interface VisualToCodeHistoryAPI {
 	listArchitectureVersions: (
@@ -43,29 +44,29 @@ export interface VisualToCodeHistoryAPI {
 export function createVisualToCodeHistoryAPI(): VisualToCodeHistoryAPI {
 	return {
 		listArchitectureVersions: (architectureId) =>
-			ipcRenderer.invoke("visualToCodeHistory:list", architectureId),
+			ipcRenderer.invoke(IPC_CHANNELS.VISUAL_TO_CODE_HISTORY_LIST, architectureId),
 		getArchitectureVersion: (architectureId, versionId) =>
-			ipcRenderer.invoke("visualToCodeHistory:get", architectureId, versionId),
+			ipcRenderer.invoke(IPC_CHANNELS.VISUAL_TO_CODE_HISTORY_GET, architectureId, versionId),
 		appendArchitectureVersion: (architectureId, version) =>
 			ipcRenderer.invoke(
-				"visualToCodeHistory:append",
+				IPC_CHANNELS.VISUAL_TO_CODE_HISTORY_APPEND,
 				architectureId,
 				version,
 			),
 		labelArchitectureVersion: (architectureId, versionId, label) =>
 			ipcRenderer.invoke(
-				"visualToCodeHistory:label",
+				IPC_CHANNELS.VISUAL_TO_CODE_HISTORY_LABEL,
 				architectureId,
 				versionId,
 				label,
 			),
 		deleteArchitectureVersion: (architectureId, versionId) =>
 			ipcRenderer.invoke(
-				"visualToCodeHistory:deleteVersion",
+				IPC_CHANNELS.VISUAL_TO_CODE_HISTORY_DELETE_VERSION,
 				architectureId,
 				versionId,
 			),
 		deleteArchitectureHistory: (architectureId) =>
-			ipcRenderer.invoke("visualToCodeHistory:deleteAll", architectureId),
+			ipcRenderer.invoke(IPC_CHANNELS.VISUAL_TO_CODE_HISTORY_DELETE_ALL, architectureId),
 	};
 }

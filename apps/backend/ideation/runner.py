@@ -191,7 +191,7 @@ class IdeationOrchestrator:
                 asyncio.gather(*ideation_task_objs, return_exceptions=True),
                 timeout=IDEATION_TIMEOUT_SECONDS,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             print_status(
                 "Ideation generation timed out after 5 minutes",
                 "error",

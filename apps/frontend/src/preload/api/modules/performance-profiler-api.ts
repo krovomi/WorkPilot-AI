@@ -34,9 +34,6 @@ export interface PerformanceProfilerAPI {
 		cancelled: boolean;
 		error?: string;
 	}>;
-	configurePerformanceProfiler: (config: {
-		pythonPath?: string;
-	}) => Promise<{ success: boolean; error?: string }>;
 	onPerformanceProfilerStatus: (
 		callback: (status: string) => void,
 	) => () => void;
@@ -55,11 +52,9 @@ export interface PerformanceProfilerAPI {
 export function createPerformanceProfilerAPI(): PerformanceProfilerAPI {
 	return {
 		startPerformanceProfiling: (request) =>
-			invokeIpc("performanceProfiler:start", request),
+			invokeIpc(IPC_CHANNELS.PERFORMANCE_PROFILER_START, request),
 		cancelPerformanceProfiling: () =>
-			invokeIpc("performanceProfiler:cancel"),
-		configurePerformanceProfiler: (config) =>
-			invokeIpc("performanceProfiler:configure", config),
+			invokeIpc(IPC_CHANNELS.PERFORMANCE_PROFILER_CANCEL),
 		onPerformanceProfilerStatus: (callback) =>
 			createIpcListener(IPC_CHANNELS.PERFORMANCE_PROFILER_STATUS, callback),
 		onPerformanceProfilerStreamChunk: (callback) =>

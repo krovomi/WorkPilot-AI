@@ -9,6 +9,8 @@ answer to *did the QA fixes break what was verified?* — and it costs no token:
   click aims at the element **described** in the recorded snapshot row
   (`button "Save"`), not at its uid, which does not survive a reload — the
   same endpoint calls made, and the confirmed state looked for on the page.
+  A Windows app's steps (`window_*`) are replayed in its window the same way:
+  the element is found again by its AutomationId, else by its type and name.
 
 A replay that fails turns the record to `fail` ("regressed after QA"), so the
 `app-verified` gate, the Kanban badge and the brain all read the regression
@@ -60,9 +62,77 @@ def _uid_for(snapshot: str, description: str) -> str:
     return ""
 
 
+def _window_ref(rows: list[dict], step: dict) -> str:
+    """The ref, in a fresh snapshot, of the element a window step acted on."""
+    from .window import describe
+
+    wanted = str(step.get("automation_id") or "")
+    if wanted:
+        for row in rows:
+            if row.get("automationId") == wanted:
+                return str(row.get("ref") or "")
+    text = str(step.get("text") or "")
+    for row in rows:
+        if text and describe(row) == text:
+            return str(row.get("ref") or "")
+    return ""
+
+
+async def _replay_window(
+    toolbox, steps: list[dict], confirmations: list[dict]
+) -> list[str]:
+    from .window import DriverError
+
+    target = toolbox.target(None, ("windows-app",))
+    if target is None or target.kind != "windows-app":
+        return ["the Windows app is no longer detected"]
+    session = toolbox.window(target)
+    problems: list[str] = []
+    try:
+        for step in steps[:60]:
+            action = str(step.get("action") or "").removeprefix("window_")
+            if action == "wait_for":
+                value = str(step.get("value") or "")
+                found = await asyncio.to_thread(session.wait_for, value)
+                if not found:
+                    problems.append(f"'{value}' never appeared in the window")
+                continue
+            _window, rows, _truncated = await asyncio.to_thread(session.snapshot)
+            ref = _window_ref(rows, step)
+            if not ref:
+                problems.append(
+                    f"{action}: {step.get('text') or '?'} is no longer in the window"
+                )
+                continue
+            await asyncio.to_thread(
+                session.act, action, ref, str(step.get("value") or "")
+            )
+        for confirmation in confirmations:
+            evidence = str(confirmation.get("evidence") or "").strip()
+            if evidence and len(evidence) <= 120 and "\n" not in evidence:
+                found = await asyncio.to_thread(session.wait_for, evidence, 8.0)
+                if not found:
+                    problems.append(f"confirmed state no longer shows: {evidence[:80]}")
+    except DriverError as exc:
+        problems.append(f"{target.name}: {exc}")
+    return problems
+
+
 async def _replay_scenario(toolbox, record: dict) -> list[str]:
     problems: list[str] = []
-    steps = record.get("scenario") or []
+    every = record.get("scenario") or []
+    window_steps = [
+        s for s in every if str(s.get("action") or "").startswith("window_")
+    ]
+    steps = [s for s in every if s not in window_steps]
+    if window_steps:
+        # The confirmed state is looked for in the window when the scenario
+        # never used a browser; otherwise on the page, below.
+        problems += await _replay_window(
+            toolbox,
+            window_steps,
+            [] if steps else list(record.get("confirmations") or []),
+        )
     if not steps:
         return problems
     target = toolbox.target(None, ("web-frontend", "desktop"))
@@ -179,6 +249,7 @@ async def run_replay(project_dir: Path | str, spec_dir: Path | str) -> dict:
                 project,
                 base,
                 timeout=float(toolbox.settings.launch_timeout),
+                window_title=toolbox.window_title(),
             )
             blocking = [e for e in result.errors if e.kind != "environment"]
             if not result.ok:

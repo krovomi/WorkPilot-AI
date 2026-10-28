@@ -162,6 +162,23 @@ def test_an_empty_replay_is_not_a_pass():
     result = run([], {})
     assert not result.ran
     assert not result.clean
+    assert not result.significant
+    assert result.reason == "no baseline"
+
+
+def test_the_reason_names_a_regression_or_a_clean_replay():
+    broke = run(
+        [episode("broke", signals=[ExternalSignal.TESTS_PASSED])],
+        {("broke", CANDIDATE): []},
+    )
+    assert broke.significant
+    assert broke.reason == "regressed 1 episode(s)"
+
+    kept = run(
+        [episode("kept", signals=[ExternalSignal.TESTS_PASSED])],
+        {("kept", CANDIDATE): [ExternalSignal.TESTS_PASSED]},
+    )
+    assert kept.reason == "clean replay"
 
 
 def test_passing_means_an_external_signal_not_a_claim():

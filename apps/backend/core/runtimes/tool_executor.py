@@ -14,6 +14,7 @@ import math
 import os
 import re
 import signal
+import time
 from pathlib import Path
 from typing import Any
 
@@ -258,6 +259,9 @@ class ToolExecutor:
         # ``None`` is the type's own set. Checked after the type's gate, never
         # instead of it: a child cannot be granted what its parent's type lacks.
         self.allowed_tools: frozenset[str] | None = None
+        # The OS sandbox `run_command` runs in (`os_sandbox`), decided on the
+        # first command so a bare executor that never runs one costs nothing.
+        self._sandbox = None
         self.working_directory = self.project_dir
         if working_directory is not None:
             self.working_directory = self._resolve_within_project(working_directory)
@@ -544,7 +548,7 @@ class ToolExecutor:
         Only when there is no document at all does the write fail, and the error
         goes back to the model so it can correct itself in the same session.
         """
-        from core.file_utils import write_json_atomic
+        from foundation.file_utils import write_json_atomic
         from spec.plan_recovery import extract_json_document
 
         if empty_file:
@@ -745,14 +749,32 @@ class ToolExecutor:
         work_dir = self._resolve_within_project(cwd) if cwd else self.working_directory
 
         try:
-            process = await asyncio.create_subprocess_shell(
-                command,
-                cwd=str(work_dir),
-                stdin=asyncio.subprocess.DEVNULL,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                start_new_session=os.name != "nt",
-            )
+            started = time.time()
+            sandbox = self.session_sandbox()
+            if sandbox.isolated:
+                # The same shell line, inside the sandbox (`os_sandbox`):
+                # writes held to the build's roots, network to the allowlist.
+                argv, env = sandbox.wrap(
+                    ["/bin/sh", "-c", command], dict(os.environ), cwd=work_dir
+                )
+                process = await asyncio.create_subprocess_exec(
+                    *argv,
+                    cwd=str(work_dir),
+                    env=env,
+                    stdin=asyncio.subprocess.DEVNULL,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    start_new_session=True,
+                )
+            else:
+                process = await asyncio.create_subprocess_shell(
+                    command,
+                    cwd=str(work_dir),
+                    stdin=asyncio.subprocess.DEVNULL,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    start_new_session=os.name != "nt",
+                )
 
             try:
                 stdout_bytes, stderr_bytes = await asyncio.wait_for(
@@ -773,6 +795,17 @@ class ToolExecutor:
             stderr = (
                 stderr_bytes.decode("utf-8", errors="replace") if stderr_bytes else ""
             )
+            if refused := sandbox.refused_hosts(started):
+                # Said, not left to a timeout to guess from.
+                note = (
+                    "[WorkPilot sandbox] network refused: "
+                    + ", ".join(refused)
+                    + " (not on this task's allowlist; WORKPILOT_SANDBOX_HOSTS adds a host)"
+                )
+                if process.returncode == 0:
+                    stdout += ("\n" if stdout else "") + note
+                else:
+                    stderr += ("\n" if stderr else "") + note
 
             if process.returncode != 0:
                 # Include both stdout and stderr: many tools (dotnet, msbuild,
@@ -854,6 +887,14 @@ class ToolExecutor:
         except ValueError:
             return None
         return directory
+
+    def session_sandbox(self):
+        """The OS sandbox this executor's commands run in."""
+        if self._sandbox is None:
+            from os_sandbox import session_sandbox
+
+            self._sandbox = session_sandbox(self.project_dir, self.spec_dir)
+        return self._sandbox
 
     async def _stop_command(self, process) -> None:
         """Reap the shell and its children when a command times out or is cancelled."""

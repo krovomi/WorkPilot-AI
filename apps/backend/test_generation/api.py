@@ -6,19 +6,22 @@ domain. Mounted by provider_api via app.include_router(router).
 
 from __future__ import annotations
 
+import logging
 import os
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Body
+from foundation.api_safety import safe_error
 
-try:
-    from provider_api import _safe_error_message
-except ImportError:
-    # Module loaded via the apps.backend.* package path (no top-level
-    # provider_api on sys.path). Fall back to the package-qualified import.
-    from apps.backend.provider_api import _safe_error_message  # type: ignore[no-redef]
-
+logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def _safe_error_message(e: Exception) -> str:
+    # The mounting app is not imported back: provider_api mounts this router,
+    # so reading its helper from here closed an import cycle (lot M10).
+    return safe_error(e, logger, "test generation")
 
 
 @router.post("/api/test-generation/analyze-coverage")
@@ -187,6 +190,17 @@ def generate_tdd_tests(spec: Annotated[dict, Body(...)]):
         return {"success": False, "error": _safe_error_message(e)}
 
 
+def _is_within(path: str, root: str) -> bool:
+    """`path` is `root` or below it. A shared prefix (`/repo-evil`) is not."""
+    # commonpath normalises separators (and Windows compares case-insensitively),
+    # so the root is normalised the same way before comparing.
+    try:
+        common = os.path.commonpath([path, root])
+    except ValueError:  # different drives on Windows
+        return False
+    return os.path.normcase(common) == os.path.normcase(os.path.normpath(root))
+
+
 @router.post("/api/test-generation/run-post-build")
 def run_post_build_test_generation(
     project_path: Annotated[str, Body(...)],
@@ -203,11 +217,17 @@ def run_post_build_test_generation(
         for file_path in modified_files:
             # Validate file path stays within project directory
             real_file = os.path.realpath(file_path)
-            if not real_file.startswith(project_dir):
+            # Both resolved: the prefix test is the guard a reader (and CodeQL)
+            # recognises, `_is_within` refuses the sibling sharing that prefix.
+            if not real_file.startswith(project_dir) or not _is_within(
+                real_file, project_dir
+            ):
                 continue
             if file_path.endswith(".py") and os.path.exists(real_file):
-                # Skip test files themselves
-                if "test_" in file_path or "/tests/" in file_path:
+                # Skip test files themselves, judged inside the project: a
+                # checkout under `/home/me/test_repos/` is not a test file.
+                relative = Path(os.path.relpath(real_file, project_dir))
+                if relative.name.startswith("test_") or "tests" in relative.parts:
                     continue
 
                 # Find existing test file

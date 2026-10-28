@@ -22,6 +22,8 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import { app, ipcMain } from "electron";
 import { pythonEnvManager } from "../python-env-manager.js";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
+import { pythonRunnerEnv } from "../utils/python-runner-env";
 
 interface RunnerArgs {
 	action: string;
@@ -29,7 +31,7 @@ interface RunnerArgs {
 	payload?: Record<string, unknown>;
 }
 
-function runRunner(req: RunnerArgs): Promise<unknown> {
+async function runRunner(req: RunnerArgs): Promise<unknown> {
 	const backendPath = app.isPackaged
 		? path.resolve(process.resourcesPath, "backend")
 		: path.resolve(app.getAppPath(), "..", "backend");
@@ -51,10 +53,11 @@ function runRunner(req: RunnerArgs): Promise<unknown> {
 		JSON.stringify(req.payload ?? {}),
 	];
 
+	const env = await pythonRunnerEnv(backendPath);
 	return new Promise((resolve, reject) => {
 		const child = spawn(pythonExe, args, {
 			cwd: backendPath,
-			env: { ...process.env, PYTHONPATH: backendPath },
+			env,
 		} as Parameters<typeof spawn>[2]);
 
 		let stdout = "";
@@ -92,22 +95,22 @@ function runRunner(req: RunnerArgs): Promise<unknown> {
 
 export function registerAgentDebuggerHandlers(): void {
 	ipcMain.handle(
-		"agentDebugger:attach",
+		IPC_CHANNELS.AGENT_DEBUGGER_ATTACH,
 		async (_e, { sessionId }: { sessionId: string }) =>
 			runRunner({ action: "attach", sessionId }),
 	);
 	ipcMain.handle(
-		"agentDebugger:detach",
+		IPC_CHANNELS.AGENT_DEBUGGER_DETACH,
 		async (_e, { sessionId }: { sessionId: string }) =>
 			runRunner({ action: "detach", sessionId }),
 	);
 	ipcMain.handle(
-		"agentDebugger:listBreakpoints",
+		IPC_CHANNELS.AGENT_DEBUGGER_LIST_BREAKPOINTS,
 		async (_e, { sessionId }: { sessionId: string }) =>
 			runRunner({ action: "list_bp", sessionId }),
 	);
 	ipcMain.handle(
-		"agentDebugger:setBreakpoint",
+		IPC_CHANNELS.AGENT_DEBUGGER_SET_BREAKPOINT,
 		async (
 			_e,
 			{
@@ -117,25 +120,25 @@ export function registerAgentDebuggerHandlers(): void {
 		) => runRunner({ action: "add_bp", sessionId, payload: breakpoint }),
 	);
 	ipcMain.handle(
-		"agentDebugger:removeBreakpoint",
+		IPC_CHANNELS.AGENT_DEBUGGER_REMOVE_BREAKPOINT,
 		async (_e, { sessionId, id }: { sessionId: string; id: string }) =>
 			runRunner({ action: "remove_bp", sessionId, payload: { id } }),
 	);
 	ipcMain.handle(
-		"agentDebugger:listFrames",
+		IPC_CHANNELS.AGENT_DEBUGGER_LIST_FRAMES,
 		async (_e, { sessionId }: { sessionId: string }) =>
 			runRunner({ action: "list_frames", sessionId }),
 	);
 	ipcMain.handle(
-		"agentDebugger:getState",
+		IPC_CHANNELS.AGENT_DEBUGGER_GET_STATE,
 		async (_e, { sessionId }: { sessionId: string }) =>
 			runRunner({ action: "get_state", sessionId }),
 	);
-	ipcMain.handle("agentDebugger:listSessions", async () =>
+	ipcMain.handle(IPC_CHANNELS.AGENT_DEBUGGER_LIST_SESSIONS, async () =>
 		runRunner({ action: "list_sessions", sessionId: "" }),
 	);
 	ipcMain.handle(
-		"agentDebugger:resume",
+		IPC_CHANNELS.AGENT_DEBUGGER_RESUME,
 		async (
 			_e,
 			payload: {

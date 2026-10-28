@@ -102,9 +102,7 @@ class Episode:
     def baseline_passed(self) -> bool:
         return bool(self.baseline_signals)
 
-    def matches(
-        self, agent_id: str, language: str = "", workflow: str = ""
-    ) -> bool:
+    def matches(self, agent_id: str, language: str = "", workflow: str = "") -> bool:
         """Whether this episode is evidence about that agent in that context.
 
         An empty field on either side means "any": a golden case recorded
@@ -137,7 +135,7 @@ class Grader(Protocol):
     """Runs one arm on one episode and reports what the verifiers found."""
 
     def __call__(self, episode: Episode, arm: str, instruction: str) -> ArmResult:
-        ...
+        """The verifiers' findings for `arm` run on `episode` with `instruction`."""
 
 
 @dataclass(frozen=True)
@@ -203,20 +201,16 @@ class ReplayResult:
 
     @property
     def significant(self) -> bool:
-        """Whether the replay result is significant (has baseline to measure
-        against).
-        """
+        """Whether there was a baseline to measure the candidate against."""
         return self.ran
 
     @property
     def reason(self) -> str:
-        """Human-readable reason describing the replay result."""
+        """One line saying what the replay found: no baseline, a regression, or clean."""
         if not self.ran:
             return "no baseline"
         if self.regressions:
-            return (
-                f"regressed {len(self.regressions)} episode(s)"
-            )
+            return f"regressed {len(self.regressions)} episode(s)"
         return "clean replay"
 
     def apply_to(self, evidence: Evidence) -> Evidence:
@@ -233,19 +227,16 @@ class ReplayResult:
             f"{self.agent_id}: {len(self.comparisons)} episode(s), "
             f"{len(self.improvements)} improved, {len(self.regressions)} regressed"
         )
-        return "\n".join(
-            [head, *(f"  {c.describe()}" for c in self.comparisons)]
-        )
+        return "\n".join([head, *(f"  {c.describe()}" for c in self.comparisons)])
 
 
 @dataclass
 class ReplayBudget:
     """A cap on how much one replay may spend.
 
-    Mirrors the daily cap `continuous_ai` already enforces
-    (`ContinuousAIStatus.is_over_budget`), for the same reason: the learning
-    loop runs unattended, and an unattended loop with no ceiling is a way to
-    find out what your API bill can reach.
+    The same reason automations carry a daily cap on the cards they create:
+    the learning loop runs unattended, and an unattended loop with no ceiling
+    is a way to find out what your API bill can reach.
     """
 
     max_episodes: int = 50
@@ -297,16 +288,13 @@ def replay_ab(
         candidate = grader(episode, CANDIDATE, candidate_instruction)
         budget.charge(cost)
         result.comparisons.append(
-            EpisodeComparison(
-                episode=episode, baseline=baseline, candidate=candidate
-            )
+            EpisodeComparison(episode=episode, baseline=baseline, candidate=candidate)
         )
 
     return result
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# the golden corpus
+# ── the golden corpus ─────────────────────────────────────────────────────────
 
 
 def load_episodes(root: Path, *, agent_id: str = "") -> list[Episode]:
@@ -325,9 +313,7 @@ def load_episodes(root: Path, *, agent_id: str = "") -> list[Episode]:
         try:
             raw = json.loads(path.read_text(encoding="utf-8"))
         except json.JSONDecodeError as exc:
-            raise ValueError(
-                f"{path}: invalid episode JSON — {exc}"
-            ) from exc
+            raise ValueError(f"{path}: invalid episode JSON — {exc}") from exc
         episode = _episode_from_dict(raw, path)
         if agent_id and episode.agent_id != agent_id:
             continue
@@ -340,9 +326,7 @@ def _episode_from_dict(raw: dict[str, Any], path: Path) -> Episode:
     if missing:
         raise ValueError(f"{path}: episode is missing {', '.join(missing)}")
     try:
-        signals = tuple(
-            ExternalSignal(s) for s in (raw.get("baseline_signals") or [])
-        )
+        signals = tuple(ExternalSignal(s) for s in (raw.get("baseline_signals") or []))
     except ValueError as exc:
         # A typo'd signal name would silently become "this episode failed",
         # which turns a passing candidate into a false improvement.
@@ -451,8 +435,7 @@ def table_grader(
         if key in outcomes:
             raw = outcomes[key]
             signals = tuple(
-                s if isinstance(s, ExternalSignal) else ExternalSignal(s)
-                for s in raw
+                s if isinstance(s, ExternalSignal) else ExternalSignal(s) for s in raw
             )
             return ArmResult(episode.episode_id, arm, signals, note="recorded")
         if arm == BASELINE and default_to_baseline:

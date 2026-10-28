@@ -7,6 +7,7 @@
 
 import type { ConsensusResult } from "../../../shared/types/consensus-arbiter";
 import { createIpcListener, invokeIpc } from "./ipc-utils";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export interface ConsensusArbiterRunOptions {
 	projectPath: string;
@@ -39,25 +40,25 @@ export interface ConsensusArbiterAPI {
 
 export const createConsensusArbiterAPI = (): ConsensusArbiterAPI => ({
 	runConsensusArbiterScan: (options: ConsensusArbiterRunOptions) =>
-		invokeIpc<ConsensusArbiterScanResult>("consensusArbiter:run", options),
+		invokeIpc<ConsensusArbiterScanResult>(IPC_CHANNELS.CONSENSUS_ARBITER_RUN, options),
 
 	cancelConsensusArbiterScan: () =>
-		invokeIpc<boolean>("consensusArbiter:cancel"),
+		invokeIpc<boolean>(IPC_CHANNELS.CONSENSUS_ARBITER_CANCEL),
 
 	onConsensusArbiterEvent: (callback) =>
 		createIpcListener<[ConsensusArbiterEvent]>(
-			"consensus-arbiter-event",
+			IPC_CHANNELS.CONSENSUS_ARBITER_EVENT,
 			(payload) => callback(payload),
 		),
 
 	onConsensusArbiterResult: (callback) =>
 		createIpcListener<[ConsensusArbiterScanResult]>(
-			"consensus-arbiter-result",
+			IPC_CHANNELS.CONSENSUS_ARBITER_RESULT,
 			(payload) => callback(payload),
 		),
 
 	onConsensusArbiterError: (callback) =>
-		createIpcListener<[string]>("consensus-arbiter-error", (payload) =>
+		createIpcListener<[string]>(IPC_CHANNELS.CONSENSUS_ARBITER_ERROR, (payload) =>
 			callback(payload),
 		),
 });

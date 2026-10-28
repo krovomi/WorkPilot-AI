@@ -19,8 +19,8 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from core.platform import find_executable
-from core.vendor_manifest import RECEIPT_NAME, file_digests, tree_digest
+from foundation.platform import find_executable
+from foundation.vendor_manifest import RECEIPT_NAME, file_digests, tree_digest
 
 # `apps/backend/vendor/archify` — three parents up from this file
 # (`archify/` -> `architecture_visualizer/` -> `apps/backend/`).
@@ -174,7 +174,7 @@ def check() -> Readiness:
 # --------------------------------------------------------------------------- #
 
 # Re-exported, not redefined. The manifest format is shared with the other
-# vendored tree (`vendor/watermarks`), so it moved to `core.vendor_manifest`
+# vendored tree (`vendor/watermarks`), so it moved to `foundation.vendor_manifest`
 # when the second one arrived; this name stays because the doctor, the contract
 # test and `scripts/vendor_archify.py` all import it from here.
 

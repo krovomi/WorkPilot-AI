@@ -8,7 +8,7 @@ Validates platform-specific dependencies are installed before running agents.
 import sys
 from pathlib import Path
 
-from core.platform import is_linux, is_windows
+from foundation.platform import is_linux, is_windows
 
 
 def validate_platform_dependencies() -> None:

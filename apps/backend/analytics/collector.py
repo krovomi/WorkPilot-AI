@@ -7,7 +7,7 @@ and build results to populate the analytics database.
 
 import uuid
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 
@@ -17,10 +17,10 @@ def _utcnow_naive() -> datetime:
     DB stores naive UTC; using a tz-aware value would break comparisons
     with stored columns.
     """
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
-from core.phase_event import ExecutionPhase, emit_phase
+from foundation.phase_event import ExecutionPhase, emit_phase
 from sqlalchemy.orm import Session
 
 from .database import get_db

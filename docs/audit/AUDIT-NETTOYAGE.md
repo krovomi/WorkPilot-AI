@@ -4,6 +4,7 @@
 |---|---|
 | **Commit audité** | `b46a031` (`develop`, après PR #292) — comparé à l'audit précédent sur `7057b28` |
 | **Date** | 3 octobre 2026 |
+| **Releases** | 1.3.0 (20 octobre 2026) : lots L1 à L17 et pi ; **1.3.1** (28 octobre 2026) : lots M1 à M11 (annexe F) et les onze features de l'annexe G |
 | **Compagnon visuel** | [`WorkPilot-architecture.html`](WorkPilot-architecture.html) — schémas interactifs, simulateur Kanban, inventaire filtrable |
 | **Objet** | Corriger les features cassées, supprimer le code mort et les doublons, réduire le coût en tokens et en mémoire, **sans retirer une seule feature utilisée** |
 
@@ -764,9 +765,10 @@ avant/après, recherche stricte des `import`, `pnpm run typecheck`, suite vitest
 >   lisent `bump-version.js` et `prepare-release.yml` ; `docs/CHANGELOG.md` (notes complètes de
 >   1.0.0, historique 2.x de l'amont) est supprimé, la racine pointe vers sa dernière version.
 >   `shared_docs/FEATURE_IDEAS*.md` : non traité, décision du mainteneur.
-> - **F25 (backend)** — aucune release depuis #290 (dernière : v1.2.1, 27 août 2026 ; #290 est du
->   3 octobre) : la lecture du marqueur reste, datée dans `core/client.py` (« à retirer après la
->   première release qui suit 1.2.1 ») avec la liste de ce qu'il faudra retirer.
+> - **F25 (backend)** — aucune release depuis #290 au moment du lot (dernière : v1.2.1, 27 août
+>   2026 ; #290 est du 3 octobre) : la lecture du marqueur reste, datée dans `core/client.py`
+>   (« à retirer après la première release qui suit 1.2.1 ») avec la liste de ce qu'il faudra
+>   retirer. Cette release est la 1.3.0 (20 octobre 2026) : le retrait est dû.
 >
 > **Écarts au cahier.** `.security-reports/` n'était pas vide ; la copie racine du test de
 > `context_gatherer` est supprimée et non déplacée ; `utils/` est aussi retiré de `pre-push.js` ;
@@ -783,7 +785,8 @@ avant/après, recherche stricte des `import`, `pnpm run typecheck`, suite vitest
 > - Le runner vocal exige toujours le SDK Claude et un jeton OAuth (`setup_client`) alors qu'il ne
 >   parle plus à aucun modèle — même défaut que la règle « Auth belongs to the provider ».
 > - `core/workspace.py` (2 248 l.) est masqué par le paquet `core/workspace/`, qui le charge par
->   `importlib` : vivant, mais à résorber avec le découpage du lot L11.
+>   `importlib` : vivant. Le lot L11 l'a laissé en place ; l'audit du 17 octobre le reporte au lot
+>   M10 (annexe F).
 > - Isolément, `tests/test_qa_criteria.py`, `test_qa_loop.py` et `test_spec_pipeline.py` échouent
 >   à la collecte (`core.build_signals` sous un `core` mocké) ; ils ne passent que grâce à l'ordre
 >   de la suite complète. `tests/conftest.py` restaure désormais `core.workspace` et
@@ -1463,6 +1466,998 @@ le câblage étant un chantier à part (décrit ci-dessous).
   stockés avant la correction rouverts ; hermes toujours observé) et
   `renderer/components/self-healing/HealingTimeline.test.tsx`.
 
+### Lot M1 — Aucune commande construite depuis le renderer ou un texte externe (P0)
+
+**Fait.** Premier lot de l'audit du 17 octobre (annexe F). Règle tenue : S4 de
+[`security.md`](../rules/security.md#s4--chemins-résolus-processus-sans-shell) (processus sans
+shell, chemin résolu puis rattaché) et S2 (un texte externe ne devient jamais une commande).
+Chemins relatifs à `apps/frontend/src/`.
+
+#### F52 · Les notes de release atteignaient `gh` par un shell
+
+- **Sévérité** critique · **nouveau** (audit du 17 oct.) · **corrigé par le lot M1**
+- **Preuve** (avant correction) : `main/ipc-handlers/github/release-handlers.ts`,
+  `registerCreateRelease` recollait les arguments de `buildReleaseArgs` en une chaîne passée à
+  `execSync`. Les notes viennent du changelog généré par un LLM à partir des commits du dépôt cible.
+- **Correction** : `execFileSync(getToolPath("gh"), buildReleaseArgs(version, options), { input })` ;
+  les notes passent par `--notes-file -` (stdin), jamais par argv (ni shell, ni limite de longueur
+  de ligne Windows). La version doit être un tag (`v?X.Y.Z…`), les notes une chaîne.
+- **Garde-fou** : `main/ipc-handlers/github/__tests__/release-handlers.test.ts` (notes contenant
+  `$(id)`, backticks et `&` : aucun `execSync`, notes absentes d'argv et reçues sur stdin ; versions
+  `--repo=…`, `1.2.0; id`, `$(id)` refusées avant tout lancement).
+
+#### F53 · Un canal IPC ouvrait un terminal sur une commande choisie par le renderer
+
+- **Sévérité** haute · **nouveau** · **corrigé par le lot M1**
+- **Preuve** (avant correction) : `shell:openTerminalWithCommand` (`shared/constants/ipc.ts`,
+  `preload/api/modules/shell-api.ts`, handler dans `settings-handlers.ts`) transmettait la chaîne
+  reçue à `openTerminalWithCommand`. Aucun composant ne l'appelait : `CopilotCliStatusBadge` a sa
+  propre fonction homonyme, qui passe par un PTY interne.
+- **Correction** : canal, constante, entrée `ipc-namespaces`, méthode preload et handler retirés.
+  Les appels restants d'`openTerminalWithCommand` (installation, mise à jour, authentification de
+  Claude Code, Ollama, GitLab, Copilot) construisent leur commande dans le main.
+- **Garde-fou** : `preload/api/__tests__/no-renderer-command.test.ts`.
+
+#### F54 · Ouvrir un dossier dans un IDE ou un terminal
+
+- **Sévérité** haute · **nouveau** · **corrigé par le lot M1**
+- **Preuve** (avant correction) : `main/ipc-handlers/task/worktree-ide-terminal.ts` et les handlers
+  `TASK_WORKTREE_OPEN_IN_IDE` / `_TERMINAL` de `worktree-handlers.ts`. Le dossier reçu n'était
+  vérifié que par `existsSync` ; le lanceur personnalisé venait du renderer et n'était refusé que
+  s'il contenait `..` ; sous macOS, le dossier entrait dans le source AppleScript, sous Linux dans
+  la commande `xterm -e` ; sous Windows, un lanceur `.cmd` partait en `shell: true` avec le dossier
+  non cité, et la console `cmd.exe /K cd /d <dossier>` laissait cmd.exe réinterpréter un chemin sans
+  espace (même motif dans `settings-handlers.ts`, `openTerminalForPlatform`).
+- **Correction** :
+  - `resolveOpenableDir` : chemin absolu, résolu par `realpathSync` (liens compris), dossier, et
+    dans un projet connu (`projectStore.getProjects()`, `isPathWithinBase`) ; sinon refus.
+  - Le lanceur personnalisé est lu dans les réglages (`customIDEPath`, `customTerminalPath` par
+    `readSettingsFile`) : les méthodes preload `worktreeOpenInIDE` / `worktreeOpenInTerminal` ne
+    prennent plus de `customPath`. `resolveCustomLauncher` exige un fichier absolu existant.
+  - `main/ipc-handlers/task/launch-args.ts` (sans effet de bord, importable par tout handler) :
+    les lignes de commande ci-dessous.
+  - macOS : `buildMacTerminalScript`, le dossier est un argument d'`osascript` lu par
+    `quoted form of (item 1 of argv)`. Linux : `xterm -e bash` lancé avec `cwd`.
+  - Windows : `buildBatchLaunchArgs` et `buildCmdConsoleArgs` citent le dossier
+    (`/d /s /c|/k "…"`, `windowsVerbatimArguments`) et refusent ce que des guillemets ne protègent
+    pas (`"`, `%`, retours à la ligne). La console de `settings-handlers.ts` les réutilise et ne
+    bloque plus le main process (`spawn` détaché au lieu d'`execFileSync`).
+- **Garde-fou** : `main/ipc-handlers/task/__tests__/worktree-open-launchers.test.ts` (dossier hors
+  projet, traversée, lien sortant, fichier, chemin relatif ; lanceur nu ou absent ; `&`, `"`, `%`).
+
+#### F55 · Le script Python des détails de PR Azure DevOps était construit par interpolation
+
+- **Sévérité** haute · **nouveau** · **corrigé par le lot M1**
+- **Preuve** (avant correction) : `main/ipc-handlers/pr-details-handlers.ts`,
+  `callAzureDevOpsPythonWithExistingConfig` interpolait `projectPath` et `prUrl` (lu dans
+  `task.metadata`, dans un dossier de spec où un agent écrit) dans le source passé à `python -c` ;
+  le script chargeait un `.env` à la racine du projet cible et désactivait la vérification TLS.
+- **Correction** : `AZURE_DEVOPS_PR_DETAILS_SCRIPT` est statique (`String.raw`, aucune
+  interpolation) ; `buildAzureDevOpsPRScriptArgs` valide l'URL entière
+  (`AZURE_DEVOPS_PR_URL_REGEX`, ancrée, `https://dev.azure.com/…`) et passe projet, dépôt et
+  numéro en argv. Le PAT et l'URL d'organisation viennent de `readProjectEnv` (le `.workpilot/.env`
+  déchiffré par le main) dans l'environnement de l'enfant ; aucun `.env` n'est lu dans le dossier
+  du projet ; le certificat est vérifié.
+- **Hors lot** : la PR factice renvoyée quand l'appel échoue reste (lot M3).
+- **Garde-fou** : `main/ipc-handlers/__tests__/pr-details-azure-script.test.ts`.
+
+#### F56 · L'app Windows packagée demandait l'élévation à chaque lancement
+
+- **Sévérité** moyenne · **nouveau** · **corrigé par le lot M1**
+- **Preuve** (avant correction) : `apps/frontend/package.json`, `build.win.requestedExecutionLevel:
+  "requireAdministrator"`, pour la seule preuve visuelle d'une app desktop élevée (Windows UIPI).
+  Tout ce que WorkPilot lance (agents, terminaux, commandes choisies par un LLM) héritait des droits
+  administrateur.
+- **Correction** (choix du mainteneur) : `asInvoker`. Pour piloter une app élevée, l'utilisateur
+  lance WorkPilot en administrateur ; non élevé, `visual-proof-service.ts` garde la capture et le dit
+  déjà (`isCurrentProcessElevated`, message « Relaunch WorkPilot as administrator »). Le lanceur de
+  développement (`scripts/dev-elevated.cjs`, `dev:noadmin`) ne change pas.
+- **Doc** : README racine, section « `pnpm run dev` ouvre une seconde console élevée ».
+
+### Lot M2 — Une CI qui garde (P1)
+
+**Fait.** Deuxième lot de l'audit du 17 octobre (annexe F, constats I1 à I4 et R3). Règle tenue :
+n°12 du noyau ([`docs/CLAUDE.md`](../CLAUDE.md)), un contrôle qui ne tourne pas n'en est pas un.
+
+#### F57 · CI et Lint ne se déclenchaient que sur une liste blanche de chemins
+
+- **Sévérité** haute · **nouveau** (audit du 17 oct., I1) · **corrigé par le lot M2**
+- **Preuve** (avant) : `ci.yml` et `lint.yml`, `paths:` sans `pnpm-lock.yaml`, `pnpm-workspace.yaml`,
+  `pytest.ini`, `workflows/**`, `capabilities/**`, `config/**`, `skills/**` (23 fichiers de tests
+  les lisent), avec trois entrées mortes (`biome.jsonc` et `tsconfig*.json` à la racine,
+  `pyproject.toml`) ; `ruff.toml` absent de `lint.yml`.
+- **Correction** : `paths-ignore` sur les seuls fichiers inertes (`CHANGELOG.md`, `LICENSE`,
+  gabarits d'issue et de PR, `FUNDING.yml`). `tests/test_ci_triggers.py` refuse un retour à la liste
+  blanche et un fichier ignoré qu'un test lit.
+
+#### F58 · Deux versions de Biome
+
+- **Sévérité** moyenne · **nouveau** (I2) · **corrigé par le lot M2**
+- **Preuve** (avant) : `apps/frontend/package.json` en `2.5.15` (montée Dependabot groupée),
+  `lint.yml` et cinq documents normatifs en `2.5.11` ; `config/.biome.json` et `config/.biomeignore`
+  lus par rien.
+- **Correction** : `2.5.11` dans `package.json` (la règle), lu par `lint.yml` au lieu d'être répété,
+  ignoré par Dependabot ; les deux fichiers orphelins supprimés. `tests/test_tool_pins.py` tient
+  `package.json`, `lint.yml` (ruff, uv) et `docs/rules/workflow.md` d'accord.
+
+#### F59 · Aucun lockfile Python
+
+- **Sévérité** haute · **nouveau** (I3) · **corrigé par le lot M2**
+- **Preuve** (avant) : `apps/backend/requirements.txt`, 92 `>=` pour 2 `==`, rien de figé ; la CI,
+  l'image et les contributeurs installaient ce que PyPI publiait le jour même. `greenlet`, sans
+  lequel tout moteur SQLAlchemy asynchrone échoue (base serveur, migrations), n'arrivait que par
+  `playwright` ; `anthropic` et `google-generativeai` déclarés, jamais importés ; `tomli` pour un
+  Python < 3.11 non supporté.
+- **Correction** : `apps/backend/requirements.lock` (`uv pip compile --universal --generate-hashes`,
+  toutes plateformes) installé par la CI, l'image et `install:backend` ; `lint.yml` le régénère et
+  échoue sur toute différence ; `pnpm run lock:python`. `sqlalchemy[asyncio]` ; `anthropic`,
+  `google-generativeai`, `tomli` retirés (et du `doctor`).
+
+#### F60 · Python 3.12, le plancher, jamais testé
+
+- **Sévérité** moyenne · **nouveau** (I4) · **corrigé par le lot M2**
+- **Preuve** (avant) : matrice pytest 3.13 seulement ; `backend.md:79` disait l'inverse ; ruff sans
+  `target-version`.
+- **Correction** : jambe 3.12 sur Linux ; `target-version = "py312"` ; 566 réécritures sûres
+  appliquées (`datetime.UTC`, `TimeoutError`, ordre des imports), `UP042` (StrEnum change `str()`)
+  et `UP046`/`UP047` écartés et justifiés dans `ruff.toml` ; le repli `tomli` de
+  `project/config_parser.py` retiré. 12 919 tests verts sous 3.12.
+
+#### F61 · L'image serveur ne se construisait pas et ne migrait pas
+
+- **Sévérité** haute · **nouveau** (R3) · **corrigé par le lot M2**
+- **Preuve** (avant) : `deploy/Dockerfile.server` copiait `configured_providers.json`, absent de la
+  racine ; `alembic upgrade head` échouait sur une base neuve (`0001` crée toutes les tables du
+  modèle, `0002` recréait `invitations`) ; le `CMD` lançait uvicorn même après l'échec de la
+  migration ; image root, base sans digest, sans `.dockerignore` (tout le dépôt, `.env-files/`
+  compris, partait au démon) ; `config/`, `workflows/`, `capabilities/`, `skills/`, `.agents/`,
+  `SOUL.md`, lus par le backend à la racine, absents de l'image ; aucun job ne la construisait.
+  Trouvé en corrigeant : la descente `0003` échouait sous SQLite, et `env.py` désactivait tous les
+  loggers du processus qui migre (`fileConfig`).
+- **Correction** : `0002` inspecte avant d'agir, `0003` descend en mode batch, `env.py` garde les
+  loggers ; image sur digest (Dependabot `docker`), installée depuis le lock avec
+  `--require-hashes`, utilisateur `workpilot` (uid 10001), `.dockerignore` en liste blanche, fichiers
+  de la racine copiés, `deploy/server-entrypoint.sh` (`set -eu` : migration ratée = conteneur
+  arrêté ; un des deux processus qui meurt arrête le conteneur). Job `server-image` dans `ci.yml` :
+  build, Postgres 16, `/health`, révision `head`. `tests/backend/test_alembic_migrations.py` monte,
+  descend et remonte.
+
+#### F62 · `scripts/` hors du lint
+
+- **Sévérité** basse · **nouveau** · **corrigé par le lot M2**
+- **Preuve** (avant) : `lint.yml` ne passait ruff que sur sept scripts ; 28 erreurs dans le reste.
+- **Correction** : ruff (check + format) sur tout `scripts/`, erreurs corrigées.
+### Lot M3 — Des features qui ne disent que ce qu'elles font (P1)
+
+**Fait.** Troisième lot de l'audit du 17 octobre (annexe F, constats R1, R2, R4 à R7). Règle tenue :
+un succès affiché est un succès produit ; un échec se voit.
+
+#### F63 · Une PR Azure DevOps inventée, rendue en succès
+
+- **Sévérité** haute · **nouveau** (R1) · **corrigé par le lot M3**
+- **Preuve** (avant) : `apps/frontend/src/main/ipc-handlers/pr-details-handlers.ts`,
+  `getMockAzureDevOpsPRDetails` : sur tout échec du connecteur (PAT absent compris), un titre, un
+  auteur, des dates, `additions: 25`, des labels et trois fichiers fixes, avec `success: true`.
+- **Correction** : le repli est supprimé ; l'échec remonte avec sa cause (`success: false`).
+  `ipc-handlers/__tests__/pr-details-azure-failure.test.ts`. La section correspondante de
+  `docs/CONFIGURATION.md` est retirée.
+
+#### F64 · Le triage `continuous_ai` échouait avant de lancer `gh`
+
+- **Sévérité** moyenne · **nouveau** (R2) · **corrigé par le lot M3**
+- **Preuve** (avant) : `continuous_ai/issue_responder.py`, `create_subprocess_exec(..., text=True)`
+  lève `ValueError` ; l'exception était avalée et l'action marquée réussie. Un label refusé par `gh`
+  rendait aussi un succès, et `_investigate_bug` répondait « investigation initiated » sans rien
+  lancer.
+- **Correction** : sortie en octets décodée, échec de `gh` (code, absence, délai) rendu comme tel,
+  enquête déclarée indisponible. `tests/test_continuous_ai_issue_responder.py`. Le budget en dollars
+  du démon reste à zéro : aucun module n'appelle de modèle.
+
+#### F65 · `dotnet test` bloquait la boucle QA et son échec ne comptait pas
+
+- **Sévérité** moyenne · **nouveau** (R4) · **corrigé par le lot M3**
+- **Preuve** (avant) : `qa/loop.py`, `subprocess.run` (300 s) dans une coroutine ; un code de
+  retour non nul rendait `True`, affiché « dotnet test executed successfully ».
+- **Correction** : `asyncio.create_subprocess_exec`, résultat `passed` / `failed` / `unavailable`
+  (`DotnetTestRun`) ; une suite rouge arrive au relecteur QA, sortie citée comme donnée
+  (`quote_untrusted`, S2) ; seul `unavailable` produit un plan de test manuel.
+  `tests/test_qa_dotnet_tests.py`.
+
+#### F66 · Les workflows d'après-release ne tournaient jamais
+
+- **Sévérité** moyenne · **nouveau** (R5) · **corrigé par le lot M3**
+- **Preuve** (avant) : `discord-release.yml`, `virustotal-scan.yml`, `build-prebuilds.yml`
+  n'écoutaient que `release: published`, que la release publiée par `GITHUB_TOKEN` ne déclenche
+  pas ; chaque release promettait pourtant un scan VirusTotal. `build-prebuilds.yml`, lancé une fois
+  à la main, échouait (`npm ci` dans un espace pnpm, ABI d'Electron 40 pour une app en 44).
+- **Correction** : `release.yml` les déclenche par nom avec le tag, comme le wiki ;
+  `discord-release.yml` accepte un tag ; `build-prebuilds.yml` supprimé (aucune release ne portait
+  de prebuild, `download-prebuilds.cjs` retombe déjà sur la compilation) ; `docs/RELEASE.md` et la
+  note de release ne promettent plus le scan sans clé.
+
+#### F67 · Skills Sync échouait chaque semaine sans prévenir
+
+- **Sévérité** basse · **nouveau** (R6) · **corrigé par le lot M3**
+- **Preuve** (journal du 19 octobre) : branche poussée, puis `GitHub Actions is not permitted to
+  create or approve pull requests` ; 7 runs, 7 échecs, aucune notification.
+- **Correction** : si la PR ne peut pas être ouverte, le workflow ouvre une issue avec la cause, le
+  lien de comparaison et le résumé. Réglage à activer par le mainteneur pour que la PR s'ouvre
+  seule : Settings → Actions → General → « Allow GitHub Actions to create and approve pull
+  requests ».
+
+#### F68 · Sentry absent de l'API et du WebSocket, éteint dans l'app packagée
+
+- **Sévérité** moyenne · **nouveau** (R7) · **corrigé par le lot M3**
+- **Preuve** (avant) : `init_sentry` appelé par trois runners et la CLI seulement ; et même là,
+  `core/sentry.py` ne s'activait que sur `sys.frozen`, que le Python de l'app packagée (des scripts)
+  n'a jamais.
+- **Correction** : `provider_api.py` et `websocket_server.py` installent la redaction puis Sentry
+  (le second n'avait pas non plus la redaction, S1) ; le main transmet `WORKPILOT_PACKAGED_APP=1`
+  au backend qu'il lance. `tests/test_backend_entrypoints_observability.py`,
+  `main/__tests__/sentry-subprocess-env.test.ts`.
+### Lot M4 — Mode hors-ligne strict et mode serveur (P1)
+
+**Fait.** Quatrième lot de l'audit du 17 octobre (annexe F). Règles tenues : S7 de
+[`security.md`](../rules/security.md#s7--hors-ligne-strict) (`airgapStrict` est une barrière) et S5
+(chaque route porte une permission). Chemins relatifs à `apps/backend/`.
+
+#### F69 · libdocs interrogeait Context7 sous `airgapStrict`
+
+- **Sévérité** haute · **nouveau** (audit du 17 oct.) · **corrigé par le lot M4**
+- **Preuve** (avant correction) : `libdocs/preflight.py`, `run_preflight` ne consultait pas
+  `core/offline_policy.py` ; la requête porte le texte de la tâche.
+- **Correction** : `_airgap_policy` lit `airgap_status` (projet, spec, réglages) juste après
+  `is_enabled` ; strict ou politique illisible, le préflight n'envoie rien et persiste une erreur
+  qui nomme la politique (échec fermé).
+- **Garde-fou** : `tests/test_libdocs.py`, `test_airgap_strict_sends_nothing` et
+  `test_an_unreadable_policy_counts_as_strict` (aucun appel au client).
+
+#### F70 · Les routes providers étaient déclarées sur `app`, hors `_mount`
+
+- **Sévérité** haute · **nouveau** · **corrigé par le lot M4**
+- **Preuve** (avant correction) : `provider_api.py` déclarait seize routes par `@app.<verbe>` ;
+  `test_feature_router_authz.py` ne vérifiait que les routeurs montés par `_mount`, si bien qu'en
+  mode serveur ces routes ne portaient aucune permission. `/providers/select` modifie un état
+  global au processus.
+- **Correction** : `providers_router`, monté par `_mount(providers_router, "providers")` (domaine
+  `settings`) avant les routeurs de feature ; `/providers/select` refusé en mode serveur
+  (`deny_in_server_mode`), comme l'écriture des configurations.
+- **Garde-fou** : `tests/backend/test_feature_router_authz.py`,
+  `test_no_route_is_declared_on_the_app_itself` (AST : seule `GET /health` reste sur `app`) et
+  `test_the_provider_router_is_mounted_with_a_permission`.
+
+#### F71 · `/health` détaillait l'état du backend sans authentification
+
+- **Sévérité** basse · **nouveau** · **corrigé par le lot M4**
+- **Preuve** (avant correction) : en mode serveur, la seule route publique renvoyait plus que son
+  verdict.
+- **Correction** : en mode serveur, `health_check` ne renvoie que `{"status": …}` ; le détail reste
+  en mode bureau (127.0.0.1).
+- **Garde-fou** : `tests/backend/test_server_mode_fail_closed.py`, `TestPublicHealth`.
+
+**Reste hors lot** : les autres modules réseau du backend ne consultent pas encore tous
+`airgap_status` ; la racine d'écriture partagée `<tmp>/workpilot` de `security/path_guard.py` ;
+la limite de débit derrière un proxy (`--forwarded-allow-ips` d'uvicorn).
+
+### Lot M5 — Secrets et environnement des processus enfants (P1)
+
+**Fait** pour cette partie. Cinquième lot de l'audit du 17 octobre (annexe F), en deux PR : celle-ci
+traite les journaux et l'environnement des processus enfants ; la seconde (PR #499, section suivante)
+retire les secrets du renderer.
+Règles tenues : S1 et S4 de [`security.md`](../rules/security.md#s1--un-secret-ne-quitte-jamais-son-coffre)
+(un secret ne quitte pas son coffre, il ne va qu'au processus qui en a besoin).
+
+#### F78 · Les runners écrivaient leurs journaux sans masque
+
+- **Sévérité** haute · **nouveau** (audit du 17 oct.) · **corrigé par le lot M5**
+- **Preuve** (avant correction) : seul `provider_api.py` (et, depuis M3, `websocket_server.py`)
+  installait `core/log_redaction.py` ; ni `run.py` ni les 75 runners qu'Electron lance, dont la
+  sortie d'erreur finit dans le journal de l'app. Le filtre ne couvrait que les handlers présents
+  à l'installation, et `core/debug.py` écrivait hors `logging`.
+- **Correction** : chaque bloc `__main__` (run.py, runners, serveurs MCP) appelle
+  `install_global_redaction()` en premier ; l'installation pose aussi une fabrique
+  d'enregistrements qui masque à la création (handlers ajoutés après compris) ; `_write_log` de
+  `core/debug.py` passe par `redact_text`. Les neuf runners lancés sans `PYTHONPATH` mettent le
+  backend sur le chemin avant.
+- **Garde-fou** : `tests/test_entrypoints_redaction.py` (tout point d'entrée sous `runners/`),
+  `tests/core/test_log_redaction.py` (`TestLateHandlers`, sortie de debug).
+
+#### F79 · L'app packagée chargeait un `.env-files/.env` du dossier de lancement
+
+- **Sévérité** haute · **nouveau** · **corrigé par le lot M5**
+- **Preuve** (avant correction) : `apps/frontend/src/main/index.ts` essayait
+  `resolve(process.cwd(), ".env-files/.env")` quel que soit le mode ; les variables chargées
+  passent à chaque processus enfant.
+- **Correction** : `main/dev-env-files.ts` (`devEnvFilePaths`), vide pour une app packagée.
+- **Garde-fou** : `main/__tests__/dev-env-files.test.ts`.
+
+#### F80 · Le code d'un autre recevait les identifiants de WorkPilot
+
+- **Sévérité** moyenne · **nouveau** · **corrigé par le lot M5**
+- **Preuve** (avant correction) : le serveur de dev d'un projet (`app-emulator-service.ts`, trois
+  lancements), la commande d'une session mobile (`mobile-service.ts`) et Ollama
+  (`services/ollama-portable.ts`) héritaient de `{...process.env}`, jetons et clés compris.
+- **Correction** : `main/utils/child-env.ts`, `envWithoutCredentials` retire toute variable nommée
+  comme un identifiant (liste de `project-env-secrets.json`, jetons Claude, motif
+  `*_API_KEY` / `*_TOKEN` / `*_SECRET` / `*_PASSWORD`…) ; seules les variables du lanceur
+  s'ajoutent.
+- **Garde-fou** : `main/utils/__tests__/child-env.test.ts`.
+
+**Suite** (PR « runners Python des vues ») : les runners Python lancés par les vues (dette
+technique, dérive de doc, swarm, auto-réparation, programmation en binôme, revue de PR Azure
+DevOps…) recevaient `{ ...process.env, PYTHONPATH }` : tous les identifiants du main, et aucun
+de ceux que l'utilisateur a configurés dans l'app, si bien qu'une vue réglée sur OpenAI partait
+sur ce que `process.env` contenait. `main/utils/python-runner-env.ts` (`pythonRunnerEnv`) les
+construit comme `agent-process.ts` et `oneshot-llm.ts` : l'env du main sans identifiant, le `.env`
+du backend déchiffré, le jeton du profil Claude ou le profil d'API (aucun des deux quand le
+provider n'est ni Claude ni Copilot), le provider de la page ou le global avec sa clé, le backend
+en tête de `PYTHONPATH`, puis les variables propres à l'appel. Les scripts de connecteur Jira et
+Azure DevOps, sans LLM, reçoivent `envWithoutCredentials` et leurs seuls réglages. Garde-fous :
+`main/utils/__tests__/python-runner-env.test.ts` et
+`main/ipc-handlers/__tests__/runner-env-inheritance.test.ts`, qui refuse tout `...process.env`
+dans un handler IPC hors des deux qui installent la CLI de l'utilisateur. Les runners de forge
+(`getRunnerEnv` : revues GitHub et GitLab, auto-fix, bounty board, snippets, optimiseur de prompt)
+partent eux aussi de l'env du main sans identifiant ; la revue GitLab reçoit le jeton et
+l'instance des réglages du projet (`getGitLabConfig`, ou glab), qu'elle ne trouvait jusque-là que
+s'il était exporté dans le shell. Garde-fou : `github/utils/__tests__/runner-env.test.ts`.
+
+### Lot M5 (suite) — Aucun identifiant stocké dans le renderer (P0)
+
+**Fait** pour cette partie. Elle suit les journaux et les processus enfants (section précédente, PR #491). Règle tenue
+(S6) : le renderer apprend qu'un identifiant est défini, jamais sa valeur ; une clé masquée ne sert
+qu'à l'URL pour laquelle elle a été enregistrée. Détail :
+[`architecture/secrets-at-rest.md`](../architecture/secrets-at-rest.md#app-settings-and-profiles-as-the-renderer-sees-them).
+
+#### F81 · Les clés des réglages de l'app arrivaient en clair dans le renderer
+
+- **Sévérité** haute · **nouveau** · **corrigé par le lot M5**
+- **Preuve** (avant) : `SETTINGS_GET` rendait les réglages déchiffrés, dont toutes les clés de
+  `isSecretSettingsKey` (clés des providers, jetons, `customProviderApiKey`).
+- **Correction** : `main/settings-secrets.ts`. `maskSettingsSecrets` remplace chaque clé définie par
+  `MASKED_SECRET` ; à la sauvegarde, `unmaskSettingsUpdate` garde la valeur stockée quand le masque
+  revient. La clé du provider personnalisé tombe si son URL change. La découverte de ses modèles
+  passe par `SETTINGS_CUSTOM_PROVIDER_DISCOVER_MODELS`, sans argument : le main lit l'URL et la clé.
+  Test : `source-env-handlers.test.ts`.
+
+#### F82 · Les clés des profils API arrivaient dans le renderer
+
+- **Sévérité** haute · **nouveau** · **corrigé par le lot M5**
+- **Preuve** (avant) : `PROFILES_GET` et les réponses de sauvegarde rendaient `apiKey` en clair ; le
+  test de connexion et la liste des modèles recevaient la clé du renderer.
+- **Correction** : `apiKey` masquée dans chaque réponse. Une clé masquée désigne celle du profil
+  `profileId`, et seulement à son `baseUrl` enregistré (`resolveProfileKey`, `sameEndpoint`). À une
+  autre URL, la clé se saisit à nouveau, et la boîte d'édition la redemande avant tout envoi
+  (clé i18n `apiProfiles.validation.apiKeyForNewUrl`). Test : `profile-handlers.test.ts`,
+  `ProfileEditDialog.test.tsx`.
+
+#### F83 · Le jeton OAuth des profils Claude passait par le renderer
+
+- **Sévérité** haute · **nouveau** · **corrigé par le lot M5**
+- **Preuve** (avant) : `CLAUDE_PROFILES_GET` et le meilleur profil rendaient `oauthToken` ;
+  `AUTOBUILD_SOURCE_ENV_GET` rendait le jeton du `.env` du backend. `EnvConfigModal` recopiait
+  `oauthToken` dans ce `.env`, alors que ce jeton est chiffré en mémoire : le fichier recevait du
+  chiffré.
+- **Correction** : `main/claude-profile/renderer-view.ts` masque le jeton, et une sauvegarde qui le
+  renvoie masqué garde le jeton stocké. `AUTOBUILD_SOURCE_ENV_GET` ne rend plus que `hasClaudeToken`.
+  `AUTOBUILD_SOURCE_ENV_UPDATE` accepte `claudeProfileId` : le main copie le jeton déchiffré
+  (`getProfileToken`). Test : `renderer-view.test.ts`, `source-env-handlers.test.ts`.
+
+#### F84 · Des tests de connexion appelaient les providers depuis le renderer
+
+- **Sévérité** moyenne · **nouveau** · **corrigé par le lot M5**
+- **Preuve** (avant) : `shared/services/providerService.ts` appelait OpenAI, Google, Mistral,
+  Ollama ou un `/health` générique avec la clé lue dans les profils et les réglages, chaque fois
+  que `credential:testProvider` échouait. Google recevait la clé dans l'URL.
+- **Correction** : `testProvider` ne fait plus que demander au main, qui teste déjà chaque provider.
+  Test : `shared/services/__tests__/providerService.test.ts`.
+
+### Lot M6 — Frontière renderer → main (P1)
+
+**Fait.** Sixième lot de l'audit du 17 octobre (annexe F). Règle tenue : S6 de
+[`security.md`](../rules/security.md#s6--electron--le-renderer-nest-pas-fiable) (le main revalide
+chaque argument, chemin résolu compris) et S4 (un chemin est résolu, liens compris, puis rattaché
+à sa racine). Le renderer ne peut plus nommer que deux sortes de dossiers : un projet enregistré
+et ce que l'utilisateur a choisi dans une boîte de dialogue native pendant la session.
+Code : `main/security/renderer-path.ts` (résolution) et `main/security/ipc-path-policy.ts`
+(contrôle posé avant chaque handler par `ipc-setup.ts`).
+
+#### F85 · Le renderer choisissait l'interpréteur Python de huit features
+
+- **Sévérité** haute · **nouveau** · **corrigé par le lot M6**
+- **Preuve** (avant) : huit canaux `<feature>:configure` (voice-control, performance-profiler,
+  code-migration, auto-refactor, pipeline-generator, documentation-agent, visual-programming,
+  architecture-visualizer) prenaient `pythonPath` et `autoBuildPath` du renderer, puis lançaient
+  cet exécutable.
+- **Correction** : canaux, méthodes du preload, types et constantes retirés.
+  `main/python-feature-services.ts` configure les huit services depuis les réglages, au démarrage
+  d'un projet et à chaque sauvegarde de `pythonPath`.
+- **Garde-fou** : `preload/api/__tests__/no-renderer-interpreter.test.ts` (aucun canal
+  `:configure`, aucune méthode `configureX`), `main/__tests__/python-feature-services.test.ts`.
+
+#### F86 · Des handlers lisaient ou écrivaient le fichier que le renderer nommait
+
+- **Sévérité** haute · **nouveau** · **corrigé par le lot M6**
+- **Preuve** (avant) : `changelog:readLocalImage` et `changelog:saveImage` (nom de fichier
+  libre), `browserAgent:getScreenshotImage` et `setBaseline`, `architectureVisualizer:readArtifact`
+  et la lecture des deltas, `fileExplorer:read`, la lecture, l'écriture et la suppression de
+  fichiers d'un worktree, les miniatures d'images d'une tâche : le chemin reçu était lu ou écrit
+  tel quel, ou comparé par préfixe sans résoudre les liens.
+- **Correction** : chaque handler passe par `resolveInProject`, `resolveUnder` ou
+  `resolveWritableUnder` (pour un fichier à créer, le plus proche ancêtre existant est résolu) ;
+  une image enregistrée a un nom simple et une extension d'image.
+- **Garde-fou** : `main/security/renderer-path.test.ts` (lien sortant, voisin au même préfixe,
+  `..`, chemin relatif) et `main/ipc-handlers/__tests__/renderer-path-refusals.test.ts`, qui
+  échoue sur l'ancien code.
+
+#### F87 · Un dossier de projet reçu du renderer n'était vérifié nulle part
+
+- **Sévérité** haute · **nouveau** · **corrigé par le lot M6**
+- **Preuve** (avant) : 94 canaux prenaient un `projectPath`, `projectDir`, `worktreePath`,
+  `specDir`… et y lançaient git, une analyse ou une écriture, sans rattacher ce dossier à un projet.
+- **Correction** : `DIRECTORY_ARGS` liste la position de chacun de ces arguments ;
+  `installIpcPathPolicy` refuse l'appel avant le handler quand l'argument n'est ni dans un projet
+  enregistré ni dans un dossier choisi (`{ success: false, error: PATH_REFUSED }`). Les clés
+  `projectPath`, `projectDir`, `project_path`, `project_dir` d'un objet sont vérifiées sur tous
+  les canaux.
+- **Garde-fou** : `main/security/ipc-path-policy.test.ts` lit chaque `ipcMain.handle/on` du main
+  et échoue sur un paramètre nommé comme un dossier absent de la liste, ou sur un canal listé sans
+  handler.
+
+#### F88 · `project:add` enregistrait n'importe quel chemin
+
+- **Sévérité** moyenne · **nouveau** · **corrigé par le lot M6**
+- **Preuve** (avant) : un projet ajouté devenait une racine de confiance, et `project:add` comme
+  `project:repath` acceptaient tout dossier existant, ce qui rendait le contrôle de F87 inutile.
+- **Correction** : le dossier doit venir du sélecteur de dossier ou de la création de dossier
+  (`rememberUserChosenPath`, appelé par les seuls handlers de dialogue), ou être déjà enregistré.
+  Message : « Choose the project folder in the folder picker ».
+
+#### F89 · Le chemin actif des CLI Claude et Copilot était libre
+
+- **Sévérité** moyenne · **nouveau** · **corrigé par le lot M6**
+- **Preuve** (avant) : `SET_ACTIVE_PATH` acceptait tout exécutable qui passait le validateur, donc
+  lancé ensuite comme CLI.
+- **Correction** : le chemin doit être une des installations détectées
+  (`scanClaudeInstallations`, `scanCopilotInstallations`).
+
+#### F90 · L'export de la programmation visuelle parcourait le dossier personnel
+
+- **Sévérité** basse · **nouveau** · **corrigé par le lot M6**
+- **Preuve** (avant) : `CanvasPanel` ouvrait son explorateur sur `getUserHome()` et laissait
+  saisir une racine.
+- **Correction** : racine = projet actif, ou un dossier choisi dans la boîte native
+  (clé i18n `visualProgramming:chooseFolder`, `en` et `fr`) ; le canal `fileExplorer:getUserHome`
+  est retiré.
+- **Reste** (lot M6) : les handlers qui déstructurent un objet ne sont couverts que par le
+  contrôle des clés ; `autoBuildPath`, le dossier du backend, reste libre.
+- **Suite** (PR « chemins d'outils ») : les chemins d'outils saisis dans les réglages
+  (`pythonPath`, `gitPath`, `githubCLIPath`, `gitlabCLIPath`, `claudePath`) étaient acceptés tels
+  quels, puis exécutés par le main. Le champ reste libre, mais
+  `SETTINGS_SAVE` refuse une nouvelle valeur qui n'est ni le nom nu de l'outil (cherché dans le
+  `PATH`), ni le chemin absolu d'un fichier exécutable nommé comme l'outil, hors de tout projet
+  enregistré et du dossier temporaire (`main/security/tool-path-policy.ts`, liens résolus). Une
+  valeur déjà enregistrée est gardée. L'UI dit quel champ est refusé (clé
+  `settings:general.toolPathRefused`, `en` et `fr`). Garde-fous :
+  `main/security/tool-path-policy.test.ts` et `main/__tests__/source-env-handlers.test.ts`.
+- **Suite** (PR « dossier du backend ») : `autoBuildPath`, le dossier du backend dont le main
+  lance les scripts Python, était lui aussi accepté tel quel. `SETTINGS_SAVE` refuse désormais une
+  nouvelle valeur qui n'est pas le chemin absolu d'un dossier contenant `runners/spec_runner.py`
+  (le marqueur de `detectAutoBuildSourcePath`, sans lien qui en sorte), hors de tout projet
+  enregistré et du dossier temporaire. Seule exception, le backend que le main détecte lui-même :
+  en développement, le dépôt WorkPilot peut être un projet enregistré. Une valeur déjà enregistrée
+  est gardée ; l'UI le dit par `settings:general.backendPathRefused` (`en` et `fr`). Mêmes
+  garde-fous, plus `isAcceptableBackendPath` et `refusesBackendPath`.
+- **Suite** (PR « expéditeur IPC ») : aucun handler ne vérifiait `event.senderFrame`, sauf la
+  dictée. `main/security/ipc-sender-policy.ts` (`installIpcSenderPolicy`, posé par `ipc-setup.ts`
+  avant le contrôle des dossiers) n'entend plus que la page de l'app, dans le cadre principal de
+  la fenêtre principale : une autre `webContents`, un sous-cadre, un cadre déjà détruit ou une page
+  qui n'est ni `file://` (app packagée) ni l'origine du serveur de dev reçoit
+  `ipc-sender-refused`, et un message `ipcMain.on` est ignoré. Garde-fou :
+  `main/security/ipc-sender-policy.test.ts`.
+
+### Lot M7 — Contrats d'architecture (P1)
+
+**Fait.** Septième lot de l'audit du 17 octobre (annexe F). Chaque contrat est un test qui lit les
+sources, sans dépendance nouvelle : les deux sens de l'IPC, le nommage des canaux, les imports
+entre unités du backend, les vues de l'app. Le test AST des routes `@app.` hors `_mount` demandé
+par l'audit est livré depuis M4 (`test_no_route_is_declared_on_the_app_itself`).
+Règles : [`frontend.md`](../rules/frontend.md) (un canal = une constante), [`backend.md`](../rules/backend.md#code-python)
+(contrats d'imports).
+
+#### F91 · Des événements du main ne trouvaient personne, et des écouteurs aucun émetteur
+
+- **Sévérité** haute · **nouveau** · **corrigé par le lot M7**
+- **Preuve** (avant) : le test de parité ne lisait que le sens renderer → main. Dans l'autre sens,
+  28 canaux envoyés par le main n'avaient pas d'écouteur dans le preload, et 3 écouteurs n'avaient
+  pas d'émetteur. L'URL de PR et la preuve visuelle d'une tâche partaient sur `task:update`, un
+  canal d'appel où rien n'écoutait : elles n'apparaissaient qu'au rechargement. Les quatre
+  événements de Context Mesh n'étaient pas écoutés : l'analyse restait sur « Starting analysis... ».
+- **Correction** : événement `task:updated` (`TASK_UPDATED_EVENT`), `onTaskUpdated`, fusion de
+  `metadata` dans `useIpc.ts` ; `preload/api/modules/context-mesh-api.ts` et
+  `setupContextMeshListeners` dans `global-listeners.ts`. Retirés : les envois qui répétaient la
+  réponse de l'appel (time travel, browser agent, `crossLangTranslation:complete`), les
+  événements `python-env:*`, quatre handlers `*:subscribe` qu'aucun preload n'appelait, trois
+  écouteurs sans appelant (`onTerminalAuthCreated`, `onTerminalOAuthCodeNeeded`,
+  `onIncidentDetected`).
+- **Garde-fou** : `ipc-channel-parity.test.ts`, bloc « main → renderer » (envois lus à travers les
+  fonctions qui relaient un canal), `useIpc-task-updated.test.tsx`, `context-mesh-events.test.ts`.
+- **Reste** (lot M8) : Live Companion (5 événements, la vue interroge par appel) et le triage
+  GitHub (aucun appelant dans le preload), dans `UNHEARD_ALLOWLIST`, qui ne fait que rétrécir.
+
+#### F92 · Les canaux étaient nommés par leur chaîne
+
+- **Sévérité** moyenne · **nouveau** · **corrigé par le lot M7**
+- **Preuve** (avant) : 706 appels IPC du main et du preload écrivaient la chaîne du canal ou une
+  copie locale (`self-healing-api.ts`, objet `CH`) ; 321 de ces canaux n'avaient pas de constante.
+  22 constantes ne servaient à aucun appel. `shared/constants/ipc-namespaces.ts` (441 lignes) était
+  une deuxième carte des canaux qu'aucun module n'importait.
+- **Correction** : 321 constantes ajoutées à `IPC_CHANNELS`, chaque appel réécrit ; les 22
+  constantes et `ipc-namespaces.ts` retirés.
+- **Garde-fou** : `ipc-channel-parity.test.ts`, bloc « IPC channels are named through
+  IPC_CHANNELS » (aucun canal littéral, aucune constante orpheline).
+
+#### F93 · Aucun contrat d'imports, et le cycle principal avait grandi
+
+- **Sévérité** moyenne · **nouveau** · **corrigé par le lot M7**
+- **Preuve** (avant) : ni `import-linter` ni test. Le plus grand cycle comptait 60 unités sur 126
+  à l'audit, 81 sur 126 à `develop` le 24 octobre. `phase_config`, `core/client.py` et
+  `core/model_info.py` importaient `provider_api` (l'app FastAPI) pour lire le provider choisi ;
+  `model_info` devait lire `sys.modules` pour ne pas refermer un cycle pendant un log.
+- **Correction** : `provider_selection.py`, une feuille, porte ce choix. `tests/test_import_contracts.py`
+  lit le graphe avec `ast` (imports paresseux compris) et tient `security`, `server`,
+  `phase_config`, `harness` et `provider_selection` à leur liste ; le plus grand cycle ne dépasse
+  pas `MAX_CYCLE = 81` et le test demande de baisser la limite quand il rétrécit. Un test plutôt
+  qu'`import-linter` : même garde sans dépendance, et import-linter n'exprime pas ce cliquet.
+- **Reste** : casser le cycle, c'est le lot M10.
+
+#### F94 · La liste des vues ne couvrait qu'un tiers de l'app
+
+- **Sévérité** basse · **nouveau** · **corrigé par le lot M7**
+- **Preuve** (avant) : `docs/CLAUDE.md` présentait `product-overview.md` comme la liste complète ;
+  elle citait 26 des 78 vues de `SidebarView`.
+- **Correction** : section « Views », une ligne par vue (libellé, groupe, fichier de conception
+  quand il existe).
+- **Garde-fou** : `tests/test_product_overview_views.py` (vue sans ligne, ligne sans vue,
+  doublon).
+- **Reste** (lot M8) : les vues sans fichier de conception ni test.
+
+### Lot M8 — Code mort, `scripts/`, vues sans test (P2)
+
+**Fait.** Le code que rien n'appelle est retiré (≈ 30 k lignes, tests compris, accord du mainteneur
+le 24 octobre), les événements et modales qu'on croyait morts sont câblés, `scripts/` est décrit
+ligne à ligne, et les vues sans conception ni test sont marquées « Expérimental » au lieu d'être
+retirées. `node-pty` est retiré ensuite, l'installation Windows vérifiée par la CI (F75).
+
+#### F95 · 17,8 k lignes backend qu'aucun module n'importait
+
+- **Sévérité** moyenne · **nouveau** (le lot L9 en avait retiré 6,7 k ; ceux-ci étaient restés ou
+  revenus) · **corrigé par le lot M8**
+- **Preuve** (avant) : graphe `ast` de `apps/backend` (imports paresseux, `import_module` et
+  `__import__` compris), chemins de runners cherchés dans le TS, le YAML et le JSON, itéré jusqu'à
+  ce que la liste ne bouge plus : `adversarial_qa/`, `database_agent/`, `design_to_code/`, `teams/`,
+  `intent/`, `api/cache_api.py`, la famille de cache de `services/` (`intelligent_context_cache`,
+  `context_cache_integration`, `cache_freshness_system`, `git_cache_invalidation`),
+  `services/test_generation_service.py`, `scheduling/{dashboard_metrics,task_dependency_graph}.py`,
+  `spec/validation_strategy.py`, `agents/migration_agent.py` et son wrapper,
+  `ui/{command_palette,desktop_notifications,keyboard_shortcuts,theme_manager}.py`,
+  `streaming/demo.py`, `runners/github/{example_usage,output_validator}.py`.
+- **Correction** : supprimés, avec les tests qui ne couvraient qu'eux et les passages de doc qui les
+  décrivaient (`docs/providers/`, `migration/README.md`, `streaming/README.md`,
+  `kanban-task-types.md`).
+- **Gardés** : les outils qu'une personne lance (`task_logger/reimport.py`,
+  `runners/github/cleanup_pr_worktrees.py`, `security/verify_security_feature.py`) et les scripts
+  des skills, lus par les agents.
+- **Trouvé** : en mode serveur, le middleware refuse tout chemin fourni par le client, mais aucune
+  route n'appelle encore `server.authz.scope.resolve_project_scope` ; une route qui travaille sur
+  un projet ne sait donc pas encore servir un `project_id`. Échec fermé : rien ne fuit, la route
+  ne sert rien. À brancher route par route avec le mode serveur.
+
+#### F96 · Live Companion : quatre événements envoyés, aucun écouté
+
+- **Sévérité** basse · **nouveau** (laissé par M7 dans `UNHEARD_ALLOWLIST`) · **corrigé par le lot M8**
+- **Preuve** (avant) : `live-companion-handlers.ts` relayait l'état, chaque suggestion, chaque
+  proposition de reprise et chaque changement de fichier ; aucune méthode du preload ne les
+  écoutait. Le tableau de bord ne voyait que ce que son polling allait chercher, et sa liste
+  « changements récents », alimentée par aucun appel, restait vide. `liveCompanion:error` avait un
+  relais, mais le service n'émet jamais `error`.
+- **Correction** : `preload/api/modules/live-companion-api.ts`, `setupLiveCompanionListeners`
+  enregistré dans `global-listeners.ts` ; le relais d'erreur et sa constante retirés.
+- **Garde-fou** : `stores/__tests__/live-companion-events.test.ts`.
+
+#### F97 · Les modales de limite de débit et d'échec d'authentification n'étaient montées nulle part
+
+- **Sévérité** moyenne · **connu** (question du lot L8) · **corrigé par le lot M8**
+- **Preuve** (avant) : `useIpc.ts` ouvre `RateLimitModal`, `SDKRateLimitModal` et
+  `AuthFailureModal` dans leurs stores, et `RateLimitIndicator` les rouvre au clic, mais aucun
+  composant ne les rendait : une limite atteinte ou un jeton expiré (401) n'affichait rien.
+- **Correction** : `App.tsx` monte les trois ; celle du 401 mène à Réglages → Comptes.
+- **Garde-fou** : `components/__tests__/AuthFailureModal.test.tsx` (ouverture, renvoi vers les
+  réglages, montage dans `App.tsx`).
+
+#### F98 · `scripts/` : 9 scripts décrits sur 53, et des ponctuels que plus rien n'appelait
+
+- **Sévérité** basse · **connu** (audit du 17 octobre) · **corrigé par le lot M8**
+- **Preuve** (avant) : le README citait 9 scripts ; 18 n'étaient cités par aucun fichier suivi.
+- **Correction** : supprimés, les ponctuels : correctif d'encodage de `quality_scorer.py` et ses
+  deux vérifications, l'évaluation « Phase 2 » (trois scripts, et
+  `core/optimization/phase2_evaluation.py` qu'eux seuls lisaient), `run_backend_tests.py`
+  (`test-backend.js` le fait), la démo d'`intent/`. Les autres sont des outils lancés à la main,
+  désormais décrits.
+- **Garde-fou** : `tests/test_scripts_readme.py` (un script sans ligne, une ligne sans script).
+
+#### F99 · Handlers de triage GitHub sans appelant, `config-paths.ts` sans importeur
+
+- **Sévérité** basse · **nouveau** (laissé par M7 dans `UNHEARD_ALLOWLIST`) · **corrigé par le lot M8**
+- **Preuve** (avant) : `ipc-handlers/github/triage-handlers.ts` (531 lignes) n'avait aucune méthode
+  preload ni aucune vue ; le triage reste en CLI (`runners/github/runner.py triage`).
+  `main/config-paths.ts` n'avait aucun importeur.
+- **Correction** : retirés, avec les huit canaux du triage ; `UNHEARD_ALLOWLIST` est vide.
+
+#### F100 · 20 vues sans fichier de conception ni test
+
+- **Sévérité** basse · **connu** (F19, L13) · **traité par le lot M8**, décision du mainteneur
+- **Preuve** : 20 des 78 vues n'ont ni fichier dans `docs/architecture/` ni test qui nomme leur
+  composant (recherche dans les tests Vitest et pytest). L'audit en comptait 26 ; Context Mesh et
+  Live Companion ont reçu un test (M7, M8), Pixel Office et Visual-to-code ont un fichier de
+  conception, et les vues GitHub et GitLab, conditionnelles, sont couvertes par les tests de leurs
+  handlers.
+- **Correction** : la barre latérale marque ces vues « Expérimental » et propose de les masquer
+  toutes (`SidebarPrefs.hideExperimental`) ; aucune n'est retirée tant que les données d'usage
+  (L13) ne disent pas lesquelles garder. Liste : `sidebar/experimental-views.ts` ; dernière
+  colonne de `product-overview.md`.
+- **Garde-fou** : `tests/test_product_overview_views.py` (la colonne et la liste concordent, aucune
+  vue expérimentale n'a de fichier de conception) ; `sidebar/__tests__/use-sidebar-prefs.test.ts`.
+- **Reste** : une vue sort de la liste quand elle reçoit un fichier de conception ou un test.
+
+### Lot M9 — Doc ↔ code, i18n de la palette, jsdom, dépendances (P2)
+
+**Fait.** Neuvième lot de l'audit du 17 octobre (annexe F). Règles tenues : i18n obligatoire
+([`frontend.md`](../rules/frontend.md#i18n-obligatoire)), la règle gagne et l'index se corrige
+([`CLAUDE.md`](../CLAUDE.md)), S4 de [`security.md`](../rules/security.md#s4--chemins-résolus-processus-sans-shell)
+(un chemin est résolu puis rattaché à sa racine).
+
+#### F72 · La documentation disait autre chose que le code
+
+- **Sévérité** basse · **nouveau** (audit du 17 oct.) · **corrigé par le lot M9**
+- **Preuve** (avant correction) : `docs/CLAUDE.md` annonçait pi « rien de livré » (lots 0 à 5
+  livrés) ; l'atlas ignorait `PiCliAgentClient` ; `README.md` et `apps/frontend/README.md`
+  citaient pnpm 10 (épinglé : 12.5.1) ; `docs/windows-development.md` pointait trois fois vers
+  `../CONTRIBUTING.md`, `docs/providers/claude-code.md` et `github-copilot.md` vers une ancre
+  absente, `docs/CONTRIBUTING.md` vers un `CLA.md` et un bot de signature qui n'ont jamais existé ;
+  une note avant F29 promettait `core/workspace.py` au lot L11, qui l'a laissé. `tests/test_docs_context.py`
+  ne lisait ni `CONTRIBUTING.md`, ni `providers/`, ni `windows-development.md`.
+- **Correction** : textes alignés ; liens et ancres réparés ; procédure de CLA dite telle qu'elle
+  est (choix du mainteneur : l'exigence reste, un mainteneur indique quoi signer) ;
+  `core/workspace.py` reporté au lot M10.
+- **Garde-fou** : `test_relative_links_resolve` balaie toute page suivie sous `docs/` et les trois
+  README (racine, backend, frontend).
+
+#### F73 · La palette de commandes était en anglais dur
+
+- **Sévérité** moyenne · **nouveau** · **corrigé par le lot M9**
+- **Preuve** (avant correction) : `renderer/components/CommandPalette.tsx`, 32 commandes, leurs
+  catégories, le placeholder, le pied et le compteur écrits en anglais ; `t` importé et ignoré
+  (`biome-ignore noUnusedVariables`).
+- **Correction** : `common:commandPalette.*` en `en` et `fr` (compteur au pluriel i18next) ; la
+  recherche floue porte sur le libellé traduit.
+- **Garde-fou** : `renderer/components/__tests__/CommandPalette.i18n.test.tsx` (mêmes clés dans les
+  deux langues, rendu et recherche en français).
+
+#### F74 · Chaque fichier de test Vitest construisait un DOM
+
+- **Sévérité** basse · **nouveau** · **corrigé par le lot M9**
+- **Preuve** (avant correction) : `apps/frontend/vitest.config.ts`, `environment: "jsdom"` pour
+  les 386 fichiers ; Vitest mesurait jsdom à 45 % du temps suivi.
+- **Correction** : deux projets, `dom` (`*.test.tsx`, jsdom) et `node` (`*.test.ts`) ; les 19
+  fichiers `.ts` qui touchent `window` le disent par `@vitest-environment jsdom`. Suite complète :
+  243 s → 169 s en local, même nombre de tests.
+
+#### F75 · Dépendances déclarées sans usage, et une dépendance utilisée sans déclaration
+
+- **Sévérité** basse · **nouveau** · **corrigé par le lot M9**
+- **Preuve** (avant correction) : `@radix-ui/react-scroll-area` et `@xterm/addon-webgl` sans
+  importeur ; `@types/dompurify`, `@types/minimatch`, `@types/uuid` doublaient les types que ces
+  paquets livrent ; `test:coverage` demandait `@vitest/coverage-v8`, non déclaré.
+- **Correction** : les cinq retirés ; `@vitest/coverage-v8` épinglé sur la version de Vitest ;
+  lockfile régénéré par pnpm.
+- **Suite** (après M8) : `node-pty` retiré à son tour. Rien ne l'importait (le code charge
+  `@lydell/node-pty`, que `package-with-python.cjs` embarque), `apps/frontend/scripts/postinstall.cjs`
+  et `download-prebuilds.cjs` n'étaient appelés par aucun script de `package.json` (le
+  `postinstall` déclaré lance `install-electron` puis `electron-rebuild`), et les quatre étapes
+  « Install node-pty in frontend » de `beta-release.yml` ajoutaient au paquet une dépendance que
+  l'app ne charge pas. Les deux scripts, l'entrée `allowBuilds` et ces étapes sont retirés ;
+  lockfile régénéré par pnpm. L'essai d'installation sous Windows est le job
+  `test-frontend (windows-latest)` de la CI, qui installe depuis ce lockfile.
+
+#### F76 · Le détecteur acceptait un Python que le backend ne peut pas importer
+
+- **Sévérité** moyenne · **nouveau** · **corrigé par le lot M9**
+- **Preuve** (avant correction) : `main/python-detector.ts` et quatre méthodes de
+  `cli-tool-manager.ts` exigeaient 3.10, `run.py` et `runners/spec_runner.py` aussi, alors que le
+  backend utilise la syntaxe 3.12 (`src/connectors/jira/work_items.py`, f-string imbriquée) et que
+  la documentation dit 3.12.
+- **Correction** : `shared/constants/python.ts` (`MINIMUM_PYTHON_VERSION = "3.12.0"`) lu par les
+  cinq vérifications ; les deux points d'entrée refusent sous 3.12 ; messages et chemins Homebrew
+  alignés.
+- **Garde-fou** : `tests/test_python_floor.py` (même plancher partout, aucun littéral restant).
+
+#### F77 · La génération de tests post-build comparait des chemins par préfixe
+
+- **Sévérité** moyenne · **nouveau** · **corrigé par le lot M9**
+- **Preuve** (avant correction) : `test_generation/api.py`, `run_post_build_test_generation`
+  gardait un fichier si son chemin résolu commençait par celui du projet (`/repo-other` passait
+  pour `/repo`), et prenait pour un test tout fichier dont le chemin absolu contenait `test_`.
+- **Correction** : `_is_within` (`os.path.commonpath`) ; le test se juge sur le chemin relatif au
+  projet.
+- **Garde-fou** : `tests/test_test_generation_post_build_scope.py` (voisin au même préfixe, lien
+  sortant, projet sous un dossier `test_…`).
+
+### Lot M10 — Casser le cycle `core ⇄ agents`, découper les fonctions géantes (P3)
+
+**Fait**, sauf le cycle du moteur d'agents (26 unités, plafonné). Première partie : le plus grand
+cycle d'imports passe de 81 à 26 unités. Les utilitaires sortent de `core` vers `foundation/`,
+`offline_policy/` et `app_detection.py`, et quatre imports vers le haut sont retirés. Deuxième
+partie : les quatre fonctions géantes relevées par l'audit, chacune figée par des tests de
+caractérisation puis découpée : la boucle du coder (F103), la boucle QA (F104), `create_client`
+(F105) et `_build_agent_client` (F106).
+
+#### F101 · `core` était à la fois la boîte à outils et la racine de composition
+
+- **Sévérité** moyenne · **connu** (F93, M7) · **corrigé par le lot M10** (première partie)
+- **Preuve** (avant) : 81 des 126 unités du backend s'importaient l'une l'autre. `core` importait
+  `agents`, `security`, `harness` et douze autres (`client.py`, `agent_clients/`, `worktree.py`) ;
+  dans le même paquet vivaient les utilitaires que tout le monde lit : `api_safety` (31 unités),
+  `platform`, `file_utils`, `phase_event`… Une unité qui ne voulait que `safe_error` entrait donc
+  dans le cycle des agents.
+- **Correction** : `foundation/`, une couche qui n'importe rien du backend (sauf la lecture
+  facultative des réglages du mode serveur par `api_safety`, et `server` n'importe rien) :
+  `platform/`, `api_safety`, `file_utils`, `git_executable`, `phase_event`, `dotnet_tools`,
+  `codex_catalog_rpc`, `vendor_manifest`, `workpilot_layout`. `offline_policy/` (avec
+  `local_model_catalog`) devient une unité qui ne lit que `phase_config` et
+  `ollama_model_detector`. Les imports sont réécrits, sans cale de compatibilité ; les règles
+  (`docs/CLAUDE.md` règle 8, `rules/backend.md`, `rules/security.md` S7) nomment les nouveaux
+  chemins.
+- **Garde-fou** : `tests/test_import_contracts.py` tient `foundation`, `offline_policy`,
+  `app_detection`, `project`, `mobile`, `rtk` et `cost_intelligence` à leur liste, et
+  `MAX_CYCLE = 26`.
+- **Reste** : les 26 unités sont le moteur d'agents lui-même : `core.client` et `agents.session`,
+  les phases qui s'en servent (`spec`, `qa`, `workflows`, `verify`, `services`), et ce que
+  `core` compose (`merge`, `integrations`, `brain`, `skills_registry`, `docintel`, `uiux`). Les
+  séparer demande une interface entre la fabrique et les agents, pas un déplacement de fichiers.
+
+#### F102 · Quatre imports vers le haut depuis des unités de bas niveau
+
+- **Sévérité** basse · **nouveau** · **corrigé par le lot M10**
+- **Preuve** (avant) : `test_generation/api.py` importait `provider_api` (l'app qui le monte) pour
+  un message d'erreur ; `verify/detect.py` importait `runners` pour le détecteur de l'aperçu, et
+  `runners` importe presque toutes les features ; `project/stack.py` lisait `uiux.stack` et
+  `test_generation.stack_aware`, ce qui mettait `project`, puis `security`, dans le cycle ;
+  `cost_intelligence.formula_refine` importait `core.simple_client`, et `phase_config` lit
+  `cost_intelligence` par le planificateur.
+- **Correction** : `safe_error` de `foundation.api_safety` ; le détecteur dans `app_detection.py`,
+  que le runner de l'aperçu importe ; `project/ui_stack.py` et `project/test_stack.py` ;
+  `refine_formulas(..., client_factory=...)`, la fabrique passée par
+  `runners/formula_refine_runner.py`.
+- **Garde-fou** : les contrats ci-dessus ; `tests/cost_intelligence/test_formula_refine.py`
+  vérifie que la fabrique n'est pas appelée sans candidat.
+
+#### F103 · La boucle du coder tenait en une fonction de 2 090 lignes
+
+- **Sévérité** moyenne · **connu** (audit du 17 octobre) · **corrigé par le lot M10** (deuxième partie, le coder)
+- **Preuve** (avant) : `run_autonomous_agent` (`agents/coder.py`) faisait 2 090 lignes, dont une
+  branche de 460 lignes pour l'issue d'une session : dix `break` / `continue` et une trentaine de
+  variables partagées avec la boucle (compteurs d'erreurs, délai de reprise, pause). Les
+  branches d'erreur (concurrence d'outils, modèle indisponible, prompt trop long, limite de
+  débit, authentification, erreur répétée) n'avaient aucun test.
+- **Correction** (choix du mainteneur) : des tests de caractérisation d'abord, verts sur le code d'avant, puis la
+  découpe : `_on_build_complete`, `_on_session_continue`,
+  `_on_session_error` et un `_on_*` par type d'erreur, qui rendent `_Next` (`STOP`, `RETRY`,
+  `NEXT`) ; l'état d'une session à l'autre dans `_RetryState` ; les prompts dans
+  `_planning_prompt` et `_coding_prompt` ; le plan invalide dans `_on_invalid_plan` ; le bilan
+  dans `_report_run_end` ; les quatre fonctions imbriquées remontées au niveau du module. La
+  fonction passe à 1 158 lignes, sans changement de comportement.
+- **Garde-fou** : `tests/agents/test_coder_error_branches.py` (15 tests : délais de reprise,
+  message à la session suivante, sous-tâche bloquée, fichiers de pause, secret masqué, arrêt
+  sur erreur répétée, replanification après une erreur de concurrence).
+- **Reste** : `run_qa_validation_loop` (F104) puis `create_client` (909 lignes), une PR chacune,
+  avec leurs propres tests de caractérisation.
+
+#### F104 · La boucle QA tenait en une fonction de 1 146 lignes
+
+- **Sévérité** moyenne · **connu** (audit du 17 octobre) · **corrigé par le lot M10** (deuxième partie, la boucle QA)
+- **Preuve** (avant) : `run_qa_validation_loop` (`qa/loop.py`) faisait 1 146 lignes : le retour
+  humain, le scan de sécurité, la passe du reviewer, deux gates qui renversent son approbation,
+  le fixer, et les branches d'erreur, de limite de débit et d'escalade, avec quatre variables
+  partagées d'un tour à l'autre. Seul `tests/test_qa_loop_gate_rejection.py` faisait tourner la
+  vraie boucle, sur les deux gates.
+- **Correction** (choix du mainteneur, comme pour F103) : 21 tests de caractérisation d'abord,
+  verts sur le code d'avant, puis la découpe : `_run_reviewer` et `_run_fixer` pour les
+  sessions, `_architecture_gate` et `_coverage_gate` qui rendent les issues d'un rejet ou
+  `None`, `_on_approved`, `_on_human_escalation`, `_on_rejected` et `_on_reviewer_error` pour
+  les verdicts, qui rendent `_Next` (`APPROVED`, `FAILED`, `EXHAUSTED`, `RETRY`, `NEXT`) ;
+  l'état d'une passe à l'autre dans `_QaState`, ce qui ne change pas dans `_QaScope` ; le
+  retour humain, le scan, le projet sans tests et le bilan final dans leurs fonctions. La
+  fonction passe à 234 lignes, sans changement de comportement.
+- **Garde-fou** : `tests/test_qa_loop_characterization.py` (21 tests : build incomplet, déjà
+  approuvé, approbation, rejet puis fixer, dernière passe sans fix, issue récurrente, escalade
+  humaine, erreur du reviewer renvoyée à la passe suivante, trois erreurs de suite, compteur
+  remis à zéro par un rejet, limite de débit rejouée sur la même passe, prompt trop long,
+  clients impossibles à construire, erreur du fixer, retour humain et son nouveau budget,
+  pause).
+- **Reste** : `create_client` (F105).
+
+#### F105 · `create_client` tenait en une fonction de 909 lignes
+
+- **Sévérité** moyenne · **connu** (audit du 17 octobre) · **corrigé par le lot M10** (deuxième partie, `create_client`)
+- **Preuve** (avant) : `create_client` (`core/client.py`) faisait 909 lignes, dans cet ordre :
+  l'environnement du CLI, le fichier de permissions et ses règles de worktree, l'affichage, une
+  trentaine de serveurs MCP, le prompt système, le débogueur, les hooks, le roster de
+  sous-agents, la reprise de session, le mode plan, les outils refusés et l'effort. Les tests
+  existants couvraient l'authentification, l'effort, la recherche d'outils, les droits par type
+  et deux serveurs, mais ni le fichier de permissions, ni les serveurs qui attendent un
+  identifiant, ni les serveurs du projet, ni l'ordre des hooks, ni la reprise.
+- **Correction** (choix du mainteneur, comme pour F103) : 23 tests de caractérisation d'abord,
+  verts sur le code d'avant, puis une fonction par sujet : `_cli_environment` (et
+  `_add_otel_env`), `_worktree_permissions`, `_write_security_settings`,
+  `_print_session_summary`, `_mcp_servers` (`_third_party_servers`, `_workpilot_servers`,
+  `_custom_servers`), `_system_prompt`, `_debugger_hooks`, `_session_hooks`, `_add_subagents`,
+  `_resume_session_id` et `_add_effort`. Les huit serveurs lancés par `npx -y` qui attendent
+  leurs variables sont une table (`_CREDENTIALED_NPX_SERVERS`) au lieu de huit blocs copiés. La
+  fonction passe à 212 lignes. Les options rendues sont identiques avant et après sur neuf
+  configurations (tous les serveurs, aucun, deux ; codeur sur Opus, type en lecture seule,
+  relecteur QA), comparées par un script hors du dépôt.
+- **Garde-fou** : `tests/core/test_create_client_characterization.py` (23 tests : règles du
+  fichier de permissions et du worktree, outils MCP approuvés seulement avec leur serveur, clé
+  Context7 dans l'environnement et jamais dans les arguments, Chrome DevTools sans navigateur,
+  serveurs qui attendent tous leurs identifiants, serveurs du projet, ordre des hooks, options
+  par défaut, environnement du CLI, surcharge du CLI, mode plan, outils refusés, roster et outil
+  `Agent`, reprise explicite, variable de reprise consommée une fois, reprise sans transcript).
+- **Reste** : `_build_agent_client` (F106).
+
+#### F106 · `_build_agent_client` tenait en une fonction de 583 lignes
+
+- **Sévérité** moyenne · **connu** (audit du 17 octobre) · **corrigé par le lot M10** (deuxième partie, la fabrique multi-provider)
+- **Preuve** (avant) : `_build_agent_client` (`core/client.py`) résolvait le provider, la route
+  hors-ligne et l'effort, puis enchaînait onze branches `elif`, une par provider, chacune avec sa
+  copie du même prompt (« celui de l'appelant, sinon le prompt commun et l'addendum du
+  domaine »). Windsurf, Grok, llama.cpp et le repli sur le SDK d'un provider sans adaptateur
+  n'avaient aucun test.
+- **Correction** (choix du mainteneur, comme pour F103) : 38 tests de caractérisation d'abord,
+  verts sur le code d'avant, puis la découpe : la requête résolue dans `_ClientRequest`, dont
+  `prompt()` remplace les onze copies ; un constructeur par provider (`_copilot_client`,
+  `_claude_client`, `_windsurf_client`, `_openai_client`, `_google_client`, `_local_client`,
+  `_compatible_client`, `_pi_client`, `_opencode_client`, `_antigravity_client`,
+  `_degraded_client`), choisi dans la table `_CLIENT_BUILDERS` ; un provider absent de la table
+  se replie sur le SDK comme avant. La fonction passe à 132 lignes, sans changement de
+  comportement.
+- **Garde-fou** : `tests/core/test_build_agent_client_characterization.py` (38 tests : la classe
+  construite et chacun de ses arguments pour chaque provider et alias, l'effort de l'utilisateur
+  sauf choix de l'appelant, l'identifiant Claude pointé réécrit, la route hors-ligne qui
+  l'emporte, le modèle hébergé remplacé sur un serveur local, l'URL d'un provider compatible,
+  la clé manquante refusée, la confiance pi tracée, le prompt de l'appelant, le repli sans
+  sous-agents).
+- **Reste** : rien pour les fonctions géantes. Le cycle du moteur d'agents (F101) demande une
+  interface entre la fabrique et les agents ; il reste plafonné par `MAX_CYCLE = 26`.
+
+### Lot M11 — L'effort que le modèle reçoit vraiment (P1)
+
+**Fait.** Le Kanban propose cinq niveaux d'effort (aucun, faible, moyen, élevé, Ultra Think) sur
+tous les providers, et chaque provider a son échelle, ou n'en a pas. Changer de provider, de modèle
+ou d'effort sur une tâche laissait trois écarts entre ce que la carte affichait et ce que le modèle
+recevait : un niveau jamais envoyé mais tracé comme appliqué, un niveau traduit sans le dire, et un
+niveau refusé par le modèle qui arrêtait la phase. Les échelles viennent de la documentation de
+chaque provider, lue le 26 octobre 2026 (xAI « Reasoning », DeepSeek « Thinking Mode », Mistral
+« Reasoning », Gemini « OpenAI compatibility », API Ollama).
+
+#### F107 · Grok, DeepSeek et Mistral ne recevaient jamais l'effort
+
+- **Sévérité** haute · **nouveau** · **corrigé par le lot M11**
+- **Preuve** (avant) : `_compatible_client` (`core/client.py`) construisait
+  `CompatibleProviderAgentClient` sans aucun champ d'effort, et `capabilities/providers.yaml`
+  déclarait `effort: none` pour les trois. Pourtant grok-4.5 et suivants prennent
+  `reasoning_effort` (low à xhigh), DeepSeek V4 `reasoning_effort` (low, high, max) et
+  `thinking: disabled`, Mistral Small 4, Medium 3.5 et Large 4 `reasoning_effort` (none ou high).
+  Une tâche Grok en Ultra Think tournait à l'effort par défaut du modèle.
+- **Correction** : `grok_reasoning_effort`, `deepseek_effort_params`, `mistral_reasoning_effort`
+  et `compatible_effort_params` (`core/llm_optimization.py`), passés au client par
+  `effort_params`. Un modèle sans réglage (grok-4.3, `grok-4.20-multi-agent`, où le même champ
+  fixe le nombre d'agents, `deepseek-chat`, Codestral, Large 3) ne reçoit rien.
+  `providers.yaml` dit `reasoning_effort` pour les trois.
+- **Garde-fou** : `tests/core/test_effort_plan.py` (`TestGrok`, `TestDeepSeek`, `TestMistral`),
+  `tests/core/test_build_agent_client_characterization.py`.
+
+#### F108 · OpenAI : « aucun » donnait l'effort par défaut, Ultra Think plafonnait à high
+
+- **Sévérité** moyenne · **nouveau** · **corrigé par le lot M11**
+- **Preuve** (avant) : `openai_reasoning_effort` omettait le champ pour « aucun », et un modèle de
+  raisonnement sans le champ tourne à son défaut (`medium` sur la plupart) : le contraire de ce
+  qui était demandé. Ultra Think envoyait `high` même aux modèles qui prennent `xhigh`, et un
+  instantané `-chat` (`gpt-5-chat-latest`) recevait un champ qu'il refuse.
+- **Correction** : « aucun » devient l'effort le plus bas du modèle (`none` dès gpt-5.1,
+  `minimal` sur gpt-5, `low` sur la série o et Codex, `medium` sur les `-pro`), Ultra Think
+  `xhigh` dès gpt-5.2 et sur `codex-max`, rien pour les `-chat`. Gemini 2.5 Flash et Flash-Lite
+  reçoivent `none` pour « aucun », les seuls Gemini qui peuvent cesser de réfléchir.
+- **Garde-fou** : `tests/core/test_llm_optimization.py` (`TestOpenAIReasoningEffort`,
+  `TestGeminiReasoningEffort`).
+
+#### F109 · Un effort refusé par le modèle arrêtait la phase
+
+- **Sévérité** haute · **nouveau** · **corrigé par le lot M11**
+- **Preuve** (avant) : un 400 de l'API sur `reasoning_effort` (boucle OpenAI, que suivent Google,
+  Grok, DeepSeek, Mistral et LM Studio) ou sur `thinking_budget` (Copilot) finissait la réponse
+  en « API error » : changer de modèle sur une tâche pouvait la faire échouer pour un réglage
+  d'optimisation. Le repli de Copilot sur un autre modèle (`model_not_supported`) ne s'écrivait
+  que dans la sortie standard, et la carte nommait toujours le modèle demandé.
+- **Correction** : `effort_was_rejected` reconnaît un refus qui nomme l'effort ; la boucle retire
+  les champs, relance le tour une fois, ne les renvoie plus de la session et le dit dans le fil
+  de la tâche. Copilot fait de même pour `thinking_budget`, et annonce dans le fil le modèle qui
+  répond à la place de celui demandé.
+- **Garde-fou** : `tests/core/test_openai_loop.py`, `tests/core/test_copilot_loop.py`
+  (`test_a_refused_*`), `tests/core/test_effort_plan.py` (`TestRejection`).
+
+#### F110 · Ollama ne recevait jamais `think`
+
+- **Sévérité** moyenne · **nouveau** · **corrigé par le lot M11**
+- **Preuve** (avant) : `LocalAgentClient` forçait l'effort à `None` ; un modèle qui réfléchit
+  (qwen3, deepseek-r1, gpt-oss) réfléchissait donc par défaut même en « aucun », et gpt-oss
+  ignorait le niveau choisi.
+- **Correction** : `_ollama_think` envoie `think` seulement quand `/api/show` liste la
+  capacité `thinking` (Ollama refuse le champ ailleurs) : `false` pour « aucun », le niveau pour
+  gpt-oss, `true` sinon. LM Studio et llama.cpp ne reçoivent rien.
+- **Garde-fou** : `tests/core/test_effort_plan.py` (`TestOllamaThink`).
+
+#### F111 · Le fil de la tâche et le sélecteur annonçaient un effort que le modèle ne recevait pas
+
+- **Sévérité** haute · **nouveau** · **corrigé par le lot M11**
+- **Preuve** (avant) : `_log_llm_context_switch` traçait le niveau choisi quoi qu'il en advienne :
+  « Effort: high » sur Windsurf, OpenCode, gpt-4o ou grok-4.3, qui ne reçoivent rien, et
+  « Effort: none » sur Claude, qui reçoit `low`. Le sélecteur d'effort (`EngineTrioPicker`)
+  proposait les cinq niveaux partout sans rien en dire, et leurs libellés étaient en anglais en
+  dur.
+- **Correction** : `core/effort_plan.py` est la seule réponse à « que reçoit ce provider pour ce
+  niveau » : les clients l'envoient, le fil trace « (not applied by this model) » ou
+  « (sent as low) », traduits par `translateLogMessage`, et `GET /providers/effort` le sert au
+  sélecteur (`useEffortPlan`), qui le dit sous l'effort en anglais et en français. Copilot et
+  Ollama, décidés au lancement, le disent aussi.
+- **Garde-fou** : `tests/core/test_effort_plan.py` (`TestEffortPlan`, `TestTraceLabel`,
+  l'endpoint), `useEffortPlan.test.ts`, `translateLogMessage.test.ts`.
+
+#### F112 · Le catalogue live de DeepSeek écartait `deepseek-flash`
+
+- **Sévérité** basse · **nouveau** · **corrigé par le lot M11**
+- **Preuve** (avant) : `_DEEPSEEK_KEEP` (`provider_models_catalog.py`) ne gardait que
+  `chat`, `reasoner` et `v\d` ; l'identifiant Flash courant, sans numéro de version, sortait de
+  la liste live, et `_supports_thinking` le disait sans raisonnement.
+- **Correction** : `flash` gardé et marqué comme raisonnant.
+- **Garde-fou** : `tests/core/test_effort_plan.py` (`test_the_live_catalogue_keeps_deepseek_flash`).
+
+#### F113 · CodeQL rouge sur la PR de release 1.3.1
+
+- **Sévérité** moyenne · **nouveau** · **corrigé par #531, #532 et #533**
+- **Preuve** (avant) : la PR `develop` → `main` (#530) comparait `develop` à l'analyse de 1.3.0 ;
+  22 alertes de niveau erreur faisaient échouer le check : URL de test de clé bâties depuis la
+  sortie du validateur et clé Google dans la query (`provider_api.py`), `$` inatteignable dans
+  `_OPENAI_DROP`, chemin non gardé par un préfixe résolu (`test_generation/api.py`), hôte de remote
+  cherché par regex non ancrée (`project-handlers.ts`, `Sidebar.tsx`), lecture ou réécriture après
+  un `existsSync` (émulateur, Azure DevOps, approbation de spec, reset de plan, `project-store`,
+  marketplace, identifiants, `file-handlers`), fichier de messages du pair programming dans `tmp`.
+- **Correction** : URL = constante de `AUTHORIZED_URLS`, clé Google dans `x-goog-api-key`, sonde
+  locale rebâtie depuis une liste d'hôtes fermée et un port entier ; `$` hors du groupe ; garde
+  `startswith` sur le chemin résolu avant `_is_within` ; `shared/utils/git-remote-provider.ts`
+  (hôte extrait puis comparé) ; `main/utils/existing-file.ts` (`readIfExists`,
+  `updateExistingFile` : un seul descripteur) ; dossier `mkdtemp` privé, fichier `wx` en `0600`.
+  Après #531, une dernière erreur sur la PR de release : `scripts/smart-merge-manager.py` bouclait
+  sur les motifs critiques sans s'en servir (chaque fichier de `.workpilot/` noté une fois par
+  motif) ; les motifs choisissent désormais les fichiers, chacun noté une fois (#532).
+  Les fils de revue que CodeQL ouvre sur la PR de release se rouvrent tant que l'alerte existe :
+  except vides commentés, `Protocol` documentés au lieu de `...`, `logger` et import inutilisés
+  retirés, `OPTION_KINDS` exporté, `aclose` des tâches MCP par `gather`, tracer sans drapeau
+  `_resolved` (#533). Les trois envois de clé configurée (Telegram, fournisseur personnalisé) sont
+  voulus : l'alerte se rejette dans l'onglet Security.
+  Les avertissements (injection de log, données de fichier envoyées au réseau) restent ouverts.
+- **Garde-fou** : `git-remote-provider.test.ts`, `existing-file.test.ts`,
+  `tests/test_test_generation_post_build_scope.py`.
+
 ---
 
 ## Annexe A — Inventaire des fichiers candidats
@@ -1597,6 +2592,15 @@ le câblage étant un chantier à part (décrit ci-dessous).
 
 ---
 
+## Annexe A bis — Avis de sécurité des dépendances (24 octobre 2026)
+
+`Dependency Audit` (`quality-security.yml`) rougit sans changement de code quand un avis sort.
+Le 24 octobre : `dompurify` ≤ 3.4.16 (critique), `electron` < 44.9.1, `body-parser` < 2.4.0 (par
+`@modelcontextprotocol/sdk`), `undici` < 7.30.1 (par `jsdom`, `@electron/get`). Correction :
+planchers `pnpm.overrides` relevés (`pnpm-workspace.yaml`), `dompurify` ^3.4.17 et Electron 44.9.3
+(`apps/frontend/package.json`), lockfile régénéré par `pnpm install`. Vérification :
+`pnpm audit --audit-level high` sans avis haut ni critique.
+
 ## Annexe B — Ce qui a changé depuis l'audit précédent (`7057b28` → `b46a031`)
 
 | PR | Changement | Effet sur les constats |
@@ -1608,7 +2612,7 @@ le câblage étant un chantier à part (décrit ci-dessous).
 
 Statut des constats de l'audit précédent : F1, F3, F4, F5, F7, F8, F9, F10, F12, F16, F17, F19 **ouverts** ;
 F2, F13 **partiels** ; F6, F11, F14, F18 **aggravés** ; F15 **atténué**. Nouveaux : F20 à F36.
-Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16.
+Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F57 à F62 par M2, F63 à F68 par M3, F69 à F71 par M4, F78 à F84 par M5, F85 à F90 par M6, F91 à F94 par M7, F95 à F100 par M8, F72 à F77 par M9, F101 à F106 par M10, F107 à F112 par M11 (annexe F) ; F113 (CodeQL de la release 1.3.1) par #531.
 
 ## Annexe C — Ce qui a changé le 15 octobre 2026 (`7ef6fca` → `e3e468f` + PR #454)
 
@@ -1620,19 +2624,6 @@ Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 e
 
 Les trois constats sont décrits dans l'atlas (`WorkPilot-architecture.html`, vue 06) ; la feuille de
 route est la vue 09, lisible sans prérequis technique comme la vue 00.
-
-## Annexe E — Ce qui a changé le 17 octobre 2026 (pi, lots 0 à 5)
-
-| Lot | Changement | Effet sur les constats |
-|---|---|---|
-| plan | `docs/architecture/pi.md` : pi (pi.dev) comme harness et comme provider, par lots ; douze points vérifiés dans la source de pi 1.3.0 (`AGENTS.md` prime sur `CLAUDE.md`, `--skill` accepte un dossier hors de la barrière de confiance, `--session <id>` résolu dans `PI_CODING_AGENT_SESSION_DIR`, `--tools` allowlist réelle, projet non approuvé ignoré sans trace en mode json, code de sortie 0 sur `stopReason: error`) | aucun |
-| 0 | `tests/fixtures/pi/` : six flux réels de pi 1.3.0 (`tool-call`, `resume-by-id`, `auth-error`, `unknown-model`, `readonly-write-refused`, `length`) capturés par `capture.py` contre un serveur OpenAI-compatible factice, clé fictive, aucun réseau | aucun ; S1 tenue (aucun secret dans les fixtures) |
-| 3-5 | `PiCliAgentClient(mode="rpc")` (`WORKPILOT_PI_MODE`) : un processus par session, `prompt`→`agent_settled`, `get_state`, `abort`, `compact`, `extension_ui_request` → `cancelled` ; `context_mgmt/capabilities.py` : `pi-rpc` natif ; `ENV_DENYLIST` ; `core/agent_clients/pi_guard/workpilot-guard.js` chargé par `--extension`, politique de `path_guard` par `WORKPILOT_PI_GUARD`, recopié à chaque run ; `skills/tooling/pi` ; fixtures `rpc-session`, `guard-*` ; `tests/test_pi_cli_client.py` (80) | S4 (environnement construit, aucun chemin absolu en argv), S3 (écritures confinées dans le processus pi, prouvé par `guard-escape-refused.jsonl` et `guard-config-refused.jsonl`) ; `bash` non jugé dans pi, dit tel quel |
-| 2 | `core/agent_clients/pi_cli.py` (`PiCliAgentClient` sur `CliSubprocessAgentClient` : `--tools` depuis `AGENT_CONFIGS` via `harnesses.yaml` et les noms MCP de pi, `--skill .agents/skills`, session par id dans `<spec>/pi-sessions`, `stopReason` lu, jamais `--approve`, état de confiance de `.pi/` tracé dans le fil) ; `cli_subprocess.qualify_provider_model` partagé avec OpenCode ; `harness/domain/usage.from_pi_usage` ; `providers.yaml`, `configured_providers.json`, `client.py`, `phase_config.py` ; frontend : type `pi` dans `agent-cli.ts`, badge, registre, détection ; `brain/connect` écrit `exposure: direct` pour pi ; `tests/test_pi_cli_client.py` (63 tests sur les fixtures réelles) | S3 (allowlist réelle, prouvée par `readonly-write-refused.jsonl`), S4 (aucun chemin en argv : id de session validé, skills en relatif), S1 (`safe_error_text` sur chaque erreur, clé JEV absente de l'environnement) tenues ; inventaire : `core/agent_clients/pi_cli.py`, `docs/integrations/pi.md` |
-| 1 | `capabilities/harnesses.yaml` : entrée `pi` (`default: false`, n'émet rien, `tools:` = `read`/`write`/`edit`/`bash`/`grep`/`find`) ; `brain/agents.py` : `AgentSpec("pi")` et le préfixe `$PI_AGENT_DIR/` (`PI_CODING_AGENT_DIR`, sinon `~/.pi/agent`) ; `tests/test_brain.py`, `tests/test_skills_registry_agents.py` | `skills:check` sans diff (485 fichiers, `agnostic` + `gemini`) ; inventaire : `capabilities/harnesses.yaml`, `brain/agents.py` |
-
-Vérification de cette annexe : `pytest tests/test_pi_cli_client.py tests/test_opencode_cli_client.py tests/test_provider_capabilities.py tests/test_workflow_engine.py tests/harness tests/test_brain.py tests/test_skills_registry_agents.py tests/test_docs_context.py -q` ;
-`python scripts/skills_cli.py build --check` ; `pnpm test -- agent-cli-handlers`.
 
 ## Annexe D — Ce qui a changé le 16 octobre 2026 (PR #457 à #462, puis le lot 3)
 
@@ -1657,3 +2648,393 @@ tests/test_workflows_run_execute.py tests/test_workflow_engine.py tests/test_wor
 tests/test_workflow_handoff.py -q` ;
 `python scripts/skills_cli.py build --check` ; l'atlas (vue 04) simule chaque type de carte avec ou
 sans BMAD installé.
+
+## Annexe E — Ce qui a changé le 17 octobre 2026 (pi, lots 0 à 5)
+
+| Lot | Changement | Effet sur les constats |
+|---|---|---|
+| plan | `docs/architecture/pi.md` : pi (pi.dev) comme harness et comme provider, par lots ; douze points vérifiés dans la source de pi 1.3.0 (`AGENTS.md` prime sur `CLAUDE.md`, `--skill` accepte un dossier hors de la barrière de confiance, `--session <id>` résolu dans `PI_CODING_AGENT_SESSION_DIR`, `--tools` allowlist réelle, projet non approuvé ignoré sans trace en mode json, code de sortie 0 sur `stopReason: error`) | aucun |
+| 0 | `tests/fixtures/pi/` : six flux réels de pi 1.3.0 (`tool-call`, `resume-by-id`, `auth-error`, `unknown-model`, `readonly-write-refused`, `length`) capturés par `capture.py` contre un serveur OpenAI-compatible factice, clé fictive, aucun réseau | aucun ; S1 tenue (aucun secret dans les fixtures) |
+| 3-5 | `PiCliAgentClient(mode="rpc")` (`WORKPILOT_PI_MODE`) : un processus par session, `prompt`→`agent_settled`, `get_state`, `abort`, `compact`, `extension_ui_request` → `cancelled` ; `context_mgmt/capabilities.py` : `pi-rpc` natif ; `ENV_DENYLIST` ; `core/agent_clients/pi_guard/workpilot-guard.js` chargé par `--extension`, politique de `path_guard` par `WORKPILOT_PI_GUARD`, recopié à chaque run ; `skills/tooling/pi` ; fixtures `rpc-session`, `guard-*` ; `tests/test_pi_cli_client.py` (80) | S4 (environnement construit, aucun chemin absolu en argv), S3 (écritures confinées dans le processus pi, prouvé par `guard-escape-refused.jsonl` et `guard-config-refused.jsonl`) ; `bash` non jugé dans pi, dit tel quel |
+| 2 | `core/agent_clients/pi_cli.py` (`PiCliAgentClient` sur `CliSubprocessAgentClient` : `--tools` depuis `AGENT_CONFIGS` via `harnesses.yaml` et les noms MCP de pi, `--skill .agents/skills`, session par id dans `<spec>/pi-sessions`, `stopReason` lu, jamais `--approve`, état de confiance de `.pi/` tracé dans le fil) ; `cli_subprocess.qualify_provider_model` partagé avec OpenCode ; `harness/domain/usage.from_pi_usage` ; `providers.yaml`, `configured_providers.json`, `client.py`, `phase_config.py` ; frontend : type `pi` dans `agent-cli.ts`, badge, registre, détection ; `brain/connect` écrit `exposure: direct` pour pi ; `tests/test_pi_cli_client.py` (63 tests sur les fixtures réelles) | S3 (allowlist réelle, prouvée par `readonly-write-refused.jsonl`), S4 (aucun chemin en argv : id de session validé, skills en relatif), S1 (`safe_error_text` sur chaque erreur, clé JEV absente de l'environnement) tenues ; inventaire : `core/agent_clients/pi_cli.py`, `docs/integrations/pi.md` |
+| 1 | `capabilities/harnesses.yaml` : entrée `pi` (`default: false`, n'émet rien, `tools:` = `read`/`write`/`edit`/`bash`/`grep`/`find`) ; `brain/agents.py` : `AgentSpec("pi")` et le préfixe `$PI_AGENT_DIR/` (`PI_CODING_AGENT_DIR`, sinon `~/.pi/agent`) ; `tests/test_brain.py`, `tests/test_skills_registry_agents.py` | `skills:check` sans diff (485 fichiers, `agnostic` + `gemini`) ; inventaire : `capabilities/harnesses.yaml`, `brain/agents.py` |
+
+Vérification de cette annexe : `pytest tests/test_pi_cli_client.py tests/test_opencode_cli_client.py tests/test_provider_capabilities.py tests/test_workflow_engine.py tests/harness tests/test_brain.py tests/test_skills_registry_agents.py tests/test_docs_context.py -q` ;
+`python scripts/skills_cli.py build --check` ; `pnpm test -- agent-cli-handlers`.
+
+## Annexe F — Audit du 17 octobre 2026 (`473bbf1`)
+
+Audit de `develop` après les lots L1 à L17 ; tout ce qu'il relève est nouveau ou une régression
+prouvée. Il ordonne dix lots, un lot = une PR vers `develop`. Les constats de sécurité ne sont
+détaillés ici qu'une fois corrigés ([`SECURITY.md`](../SECURITY.md)).
+
+| Lot | Thème | Statut |
+|---|---|---|
+| M1 | Aucune commande construite depuis le renderer ou un texte externe ; app Windows sans élévation | **fait** (F52 à F56) |
+| M2 | Une CI qui garde : filtres `paths:`, version de Biome, Python 3.12, lockfile Python, image serveur construite et migrée | **fait** (F57 à F62) |
+| M3 | Des features qui ne disent que ce qu'elles font (PR Azure DevOps factice, triage `continuous_ai`, verdict QA .NET, workflows de release jamais déclenchés, Skills Sync, Sentry) | **fait** (F63 à F68) |
+| M4 | Mode hors-ligne strict et mode serveur | **fait** (F69 à F71) |
+| M5 | Secrets et environnement des processus enfants | **fait** (F78 à F84 : journaux et processus enfants, aucun identifiant stocké dans le renderer, environnement construit pour les runners Python des vues et de forge) |
+| M6 | Frontière renderer → main, avec tests de refus | **fait** (F85 à F90, expéditeur vérifié sur chaque canal, chemins d'outils et dossier du backend des réglages contrôlés) |
+| M7 | Contrats d'architecture (`import-linter`, canaux IPC, Sidebar ↔ `product-overview.md`) | **fait** (F91 à F94 ; contrats d'imports en test AST, sans `import-linter`) |
+| M8 | Code mort, `scripts/`, vues sans test | **fait** (F95 à F100 ; vues sans conception ni test marquées « Expérimental » ; `node-pty` retiré ensuite, F75) |
+| M9 | Doc ↔ code, i18n de la palette, jsdom, dépendances | **fait** (F72 à F77) |
+| M10 | Casser le cycle `core ⇄ agents`, découper les fonctions géantes | **fait** (F101, F102 : cycle de 81 à 26 unités, plafonné ; F103 à F106 : les quatre fonctions géantes découpées ; reste le cycle du moteur d'agents, qui demande une interface) |
+| M11 (26 octobre) | L'effort que le modèle reçoit vraiment, sur chaque provider | **fait** (F107 à F112 : effort envoyé à Grok, DeepSeek, Mistral et Ollama, échelle OpenAI complète, effort refusé relancé sans lui, fil et sélecteur qui disent ce qui est envoyé) |
+
+Vérification du lot M1 : `cd apps/frontend && pnpm run typecheck && pnpm test -- release-handlers
+no-renderer-command worktree-open-launchers pr-details-azure-script`.
+
+Vérification du lot M2 : `pytest tests/test_ci_triggers.py tests/test_tool_pins.py
+tests/backend/test_alembic_migrations.py` ; `docker build -f deploy/Dockerfile.server .` ; le job
+`server-image` de `ci.yml`.
+
+Vérification du lot M4 : `pytest tests/test_libdocs.py tests/backend/test_feature_router_authz.py
+tests/backend/test_server_mode_fail_closed.py -q`.
+
+Vérification du lot M5 : `pytest tests/test_entrypoints_redaction.py tests/core/test_log_redaction.py -q`
+et `cd apps/frontend && pnpm test -- child-env dev-env-files`.
+
+Vérification du lot M6 : `cd apps/frontend && pnpm test -- renderer-path ipc-path-policy
+renderer-path-refusals no-renderer-interpreter python-feature-services`.
+
+Vérification du lot M7 : `pytest tests/test_import_contracts.py tests/test_product_overview_views.py -q`
+et `cd apps/frontend && pnpm test -- ipc-channel-parity useIpc-task-updated context-mesh-events`.
+
+Vérification du lot M8 : `pytest tests/test_product_overview_views.py tests/test_scripts_readme.py
+tests/test_import_contracts.py -q` et `cd apps/frontend && pnpm test -- ipc-channel-parity
+live-companion-events AuthFailureModal use-sidebar-prefs`.
+
+Vérification du lot M9 : `pytest tests/test_docs_context.py tests/test_python_floor.py
+tests/test_test_generation_post_build_scope.py -q` et `cd apps/frontend && pnpm test`.
+
+Vérification du lot M10 (cycle) : `pytest tests/test_import_contracts.py
+tests/cost_intelligence/test_formula_refine.py tests/test_offline_mode.py tests/test_platform.py -q`.
+
+Vérification du lot M10 (coder) : `pytest tests/agents/ tests/test_pipeline_phase_recovery.py -q`.
+
+Vérification du lot M10 (boucle QA) : `pytest tests/test_qa_loop_characterization.py
+tests/test_qa_loop_gate_rejection.py tests/test_qa_loop.py tests/test_qa_loop_enhancements.py
+tests/test_qa_loop_fix_request.py tests/test_qa_dotnet_tests.py -q`.
+
+Vérification du lot M10 (`create_client`) : `pytest tests/core/test_create_client_characterization.py
+tests/test_client.py tests/test_sdk_options_factories.py tests/test_agent_tool_rights.py
+tests/harness/test_subagent_results.py tests/harness/test_code_search_serving.py -q`.
+
+Vérification du lot M10 (`_build_agent_client`) : `pytest
+tests/core/test_build_agent_client_characterization.py tests/test_agent_client_factory.py
+tests/test_offline_mode.py tests/test_local_model_coercion.py -q`.
+
+Vérification du lot M11 : `pytest tests/core/test_effort_plan.py tests/core/test_llm_optimization.py
+tests/core/test_openai_loop.py tests/core/test_copilot_loop.py
+tests/core/test_build_agent_client_characterization.py -q` et `cd apps/frontend && pnpm test --
+useEffortPlan translateLogMessage`.
+
+## Annexe G — Features issues de la veille du 26 octobre 2026
+
+Onze features proposées après une veille des outils de pilotage d'agents de code (Cursor, Codex,
+Copilot, Claude Code, Gemini CLI, OpenHands…) et retenues par Leub, dans cet ordre. Ce ne sont pas
+des constats d'audit : chaque ligne est une feature, une PR vers `develop`, avec sa justification
+dans `docs/architecture/`. Les onze sont livrées dans la **1.3.1**.
+
+| | Feature | PR |
+|---|---|---|
+| G1 | La carte suit sa PR jusqu'au merge | #514 |
+| G2 | Mode objectif | #515 |
+| G3 | « Besoin de toi » | #516 |
+| G4 | Traces OpenTelemetry GenAI | #517 |
+| G5 | Best-of-N | #518 |
+| G6 | Automatisations (retire le démon Continuous AI) | #519 |
+| G7 | Agents ACP, Gemini CLI | #522 |
+| G8 | Bac à sable de l'OS | #523 |
+| G9 | MCP 2026-07-28 : tasks et MCP Apps | #524 |
+| G10 | Banc de rejeu | #525 |
+| G11 | Application Windows par UI Automation | #526, #527 |
+
+### G1 — La carte suit sa PR jusqu'au merge
+
+**Fait.** `apps/backend/pr_followup/` lit la PR GitHub de la tâche (`gh`, liste d'arguments),
+décide sans effet de bord (`policy.decide` : forge illisible → `unknown`, jamais du vert ; aucun
+check → `no_checks` ; échec rouge aussi sur la base → `base_red`, jamais « corrigé » ; plafond de
+trois tours), donne au QA fixer les checks en échec et les fils de revue non résolus, sur le
+provider de la phase QA de la tâche, refuse le commit qui saute, supprime ou désactive un test ou
+modifie un fichier de CI (`guards.py`, annulé avant tout push), puis pousse sans forcer.
+L'app : canaux `TASK_PR_FOLLOWUP_*`, carte `PrFollowupCard` dans « À traiter », `pythonRunnerEnv`
+accepte `taskProviders`. Justification : [`pr-followup.md`](../architecture/pr-followup.md).
+
+Vérification : `pytest tests/pr_followup -q` et
+`cd apps/frontend && pnpm test -- pr-followup-handlers PrFollowupCard python-runner-env`.
+
+### G2 — Mode objectif : une commande dit « fini »
+
+**Fait.** Une carte porte une commande et le code de sortie qui veut dire « fini », avec un nombre
+de passes et un plafond de dépense. Le backend est dans `apps/backend/goal/`.
+
+- **L'objectif.** Il est écrit dans `<spec>/.workpilot-goal.json`, ajouté à
+  `PROTECTED_CONFIG_NAMES` : aucun agent ne peut le réécrire, ni par Write/Edit, ni par Bash, ni
+  par pi.
+- **La porte.** Elle tourne dans `qa/loop.py` après le relecteur et les portes d'architecture et
+  de couverture. Les chemins protégés, et le script que lance la commande, doivent être intacts
+  par rapport au point de départ de la tâche. Un ensemble de modifications illisible vaut `error`,
+  jamais un succès. La commande tourne sans shell, sans les identifiants du backend et dans son
+  propre groupe de processus. Un échec renvoie au fixer avec la fin de sa sortie, citée par
+  `quote_untrusted`.
+- **Le plafond.** Il est lu avant chaque passe, sur `cost_data.json`, en additionnant les deux
+  copies. Un coût non tarifé fait du total un plancher.
+- **Les autres chemins vers « fini ».** Une approbation déjà enregistrée ne court-circuite plus un
+  objectif non atteint. Une QA sautée passe aussi par la porte (`_goal_allows_done`).
+- **L'app.** Canaux `TASK_GOAL_GET` et `TASK_GOAL_SET`, avec validation dans le main et écriture
+  dans chaque copie du dossier de spec. La carte `GoalCard` est dans « Plan d'exécution », et le
+  verdict est dans le plan (`goal`).
+
+Justification : [`goal-mode.md`](../architecture/goal-mode.md).
+
+Vérification : `pytest tests/goal -q` et
+`cd apps/frontend && pnpm test -- goal-handlers GoalCard TaskOverview`.
+
+### G3 — « Besoin de toi » : notifications et approbation à distance
+
+**Fait.** Une tâche qui attend quelqu'un le dit, sur le bureau et, si on le demande, sur ntfy ou
+Telegram. Le code est dans `apps/frontend/src/main/needs-you/`.
+
+- **La source.** Les événements viennent de l'état où la tâche s'arrête dans XState
+  (`TaskStateManager.announce`), plus du code de sortie. Un plan en attente n'est plus annoncé
+  comme un échec, et une QA qui passe la main l'est enfin. Un état restauré au démarrage ne sonne
+  pas.
+- **Correctif lié.** Avec « revue avant le code », `spec_runner` sort en 1 quand le plan attend.
+  Cette sortie faisait passer la carte de `plan_review` à `error`. `handleProcessExited` laisse
+  désormais un plan en attente tel quel.
+- **Les canaux.** ntfy (notification seulement ; topic de 16 caractères au moins sur `ntfy.sh`,
+  jeton en HTTPS seulement) et Telegram (bot de la personne, texte brut). Le détail des erreurs
+  reste sur le bureau. Les jetons sont des secrets de l'app, chiffrés et masqués.
+- **L'approbation.** Seul un plan en attente s'approuve de loin, par un bouton Telegram : un jeton
+  à usage unique de 30 minutes, venant du chat configuré, pour une tâche encore en attente au
+  moment de l'appui. Le renderer joue les deux étapes du bouton Approuver. Aucun port n'est
+  ouvert : les appuis arrivent par polling.
+
+Justification : [`needs-you.md`](../architecture/needs-you.md).
+
+Vérification : `cd apps/frontend && pnpm test -- needs-you notification-service
+task-state-manager NeedsYouChannels useNeedsYou`.
+
+### G4 — Traces OpenTelemetry GenAI pour tous les providers
+
+**Fait.** `apps/backend/genai_trace/` émet un span `invoke_agent` par réponse de client, un `chat`
+par appel modèle mesuré et un `execute_tool` par outil, aux attributs `gen_ai.*`, pour chaque
+`AgentClient`. Le crochet est unique : `AgentClient.__init_subclass__` enveloppe `query` et
+`receive_response`, et un test vérifie que chaque client réel l'est.
+
+- **Activation.** Par l'endpoint qui servait déjà au SDK Claude (`AUTO_CLAUDE_OTEL_ENDPOINT`).
+  L'export se fait en OTLP `http/protobuf`, avec `opentelemetry-sdk` et l'exporteur HTTP ajoutés
+  au lockfile sans changer d'autre version.
+- **Contenu.** Jamais de prompt, de sortie, d'argument ni de message d'erreur dans un span.
+- **Usage.** Un nombre que le provider ne donne pas est absent, pas nul. Une réponse sans aucun
+  appel mesuré est estimée (caractères ÷ 4) et marquée `estimated`. `record_client_usage`
+  l'écrit dans `cost_data.json` au lieu de laisser la session disparaître, et chaque ligne y
+  porte `usage_source`.
+- **Contrat d'imports.** `genai_trace` est une feuille. `harness` est autorisé à l'importer
+  (`tests/test_import_contracts.py`), et la taille du cycle ne change pas.
+
+Justification : [`genai-traces.md`](../architecture/genai-traces.md).
+
+Vérification : `pytest tests/genai_trace -q`.
+
+### G5 — Best-of-N réel : N worktrees, un classement chiffré, un choix humain
+
+**Fait.** `parallel_variations/` planifiait des variantes sans lancer d'agent, et l'Arena compare
+des réponses, pas des builds. Une tâche du Kanban peut maintenant être construite 2 à 4 fois. Le
+backend est dans `apps/backend/best_of_n/`.
+
+- **Les variantes.** Chacune est un dossier de spec frère, `<tâche>-bon<k>`, copié avant tout
+  build. Son moteur est verrouillé dans `task_metadata.json`, et un marqueur `bestOfN` la garde
+  hors du tableau. Les worktrees sont créés l'un après l'autre avant le premier build. Le main
+  lance ensuite les `run.py` par l'agent manager : mêmes identifiants, mêmes logs et même arrêt
+  que n'importe quelle tâche.
+- **Le refus de démarrer.** Une tâche qui a déjà un build, un plan commencé, un spec en attente de
+  revue ou une variante d'un run précédent n'en lance pas un nouveau.
+- **Le classement.** Il est lancé à la dernière sortie et se lit dans cet ordre : build fini,
+  QA (les tests), objectif du mode objectif revérifié dans chaque worktree, lignes du diff, coût.
+  Un critère illisible pour une variante ne classe personne et la carte dit pourquoi : objectif en
+  erreur, diff illisible, coût plancher. Aucune variante n'est recommandée si elle n'est pas
+  seule en tête avec un build fini.
+- **L'adoption.** Elle n'a lieu qu'après une confirmation sur la carte. `git worktree move` et
+  `git branch -m` donnent à la variante le nom de la tâche. Ce que le build a écrit rejoint le
+  dossier de la tâche, avec le moteur gagnant, et les autres variantes sont supprimées. Rien
+  n'est fusionné ni poussé.
+- **L'app.** Canaux `TASK_BEST_OF_N_*`. La carte `BestOfNCard` est dans « Plan d'exécution ».
+  Une sortie de variante ne passe pas par la machine d'état des tâches (`isBestOfNVariant`).
+
+Justification : [`best-of-n.md`](../architecture/best-of-n.md).
+
+Vérification : `pytest tests/best_of_n -q` et
+`cd apps/frontend && pnpm test -- best-of-n-handlers BestOfNCard project-store`.
+
+### G6 — Automatisations : un événement crée une carte
+
+**Fait.** Le démon `continuous_ai` est retiré. Il agissait hors du Kanban, et `cicd_watcher`
+répondait « Diagnosed CI failure » sans rien lancer. Il est remplacé par des règles par projet,
+dans `apps/frontend/src/main/automations/`. Une règle associe un déclencheur, un type de carte et
+un moteur. Elle ne fait qu'une chose : créer une carte du Kanban, qui suit ensuite le cycle normal.
+
+- **Les déclencheurs.**
+  - Une issue GitHub étiquetée après la création de la règle : la date vient de l'événement
+    `labeled`, pas de `since`.
+  - Le dernier run de CI de la branche de base, qui passe au rouge. Il est lu par le même
+    fournisseur que le « Build rouge » : Azure DevOps, GitHub Actions, GitLab CI ou Jenkins.
+  - Un horaire : `HH:MM` et des jours de la semaine.
+- **Les garde-fous.**
+  - Une carte par issue, y compris celles importées à la main.
+  - Une carte par série rouge, tant qu'elle est ouverte.
+  - Un plafond par jour : un événement au-delà revient le lendemain, il n'est pas perdu.
+  - Brouillon par défaut : il faut `draft: false` explicite pour que la carte démarre seule.
+  - Une source illisible est nommée, une seule fois au journal, et jamais lue comme « rien de
+    nouveau ».
+- **Les frontières.** Le renderer n'envoie qu'un id de projet et une règle. Le main la revalide
+  contre des listes fermées et refuse un id qu'il n'a pas émis. Le jeton GitHub ne quitte pas le
+  main.
+- **Ce qui est retiré.**
+  - `continuous_ai/`, son runner, son test, ses huit canaux IPC, son store, son écran et son
+    espace i18n.
+  - `longevity` ne compte plus un scan de dépendances de plus de 30 jours, ou sans date : il
+    n'est plus rafraîchi.
+
+Justification : [`automations.md`](../architecture/automations.md).
+
+Vérification : `pytest tests/longevity -q` et
+`cd apps/frontend && pnpm test -- automations AutomationsIntegration ipc-bridge-guards`.
+
+### G7 — Agents ACP : un client pour tous, Gemini CLI d'abord
+
+**Fait.** `core/agent_clients/acp.py` (`AcpAgentClient`) parle Agent Client Protocol à tout agent
+déclaré par un bloc `acp:` de `capabilities/providers.yaml` ; Gemini CLI 0.65 est le premier
+(`gemini-cli`, fixtures capturées dans `tests/fixtures/acp/gemini-cli/`).
+
+- **Les droits** d'un type d'agent sont tenus trois fois : le mode de session (`plan` pour un type
+  en lecture seule, `autoEdit`/`yolo` remis), la question refusée sans demander quand elle sort
+  des outils déclarés ou des racines d'écriture, et le tour arrêté quand un outil non déclaré a
+  démarré quand même (vu, pas empêché, et dit).
+- **La question** (`session/request_permission`) va sur la carte : événement de tâche validé par le
+  main, un bouton par option, réponse écrite sur le stdin du build seulement pour une question en
+  attente et une option offerte, revérifiée par Python ; refus au bout de 30 minutes.
+- **La barre latérale** sonde `initialize` et ne coche que les capacités déclarées `true`.
+
+Justification : [`acp.md`](../architecture/acp.md).
+
+Vérification : `pytest tests/test_acp_client.py tests/test_acp_frontend_parity.py -q` et
+`cd apps/frontend && pnpm test -- task-permissions task-permission-handlers TaskPermissionPrompt
+task-permission-store agent-cli-handlers`.
+
+### G8 — Bac à sable de l'OS autour des commandes d'agent
+
+**Fait (Linux, macOS).** `apps/backend/os_sandbox/` fait tourner le processus de l'agent dans un
+bac à sable de l'OS : bubblewrap sous Linux, Seatbelt sous macOS. Il complète l'allowlist et
+`path_guard`, qui jugent une commande avant qu'elle tourne.
+
+- **Qui.** Chaque commande de la boucle WorkPilot (`run_command`), et le processus entier
+  d'OpenCode et de pi, avec le profil `sandbox:` de leur entrée dans `providers.yaml`. Claude
+  Code et Codex gardent leur propre bac à sable, rapporté `delegated`. Antigravity n'a pas de
+  profil et la carte le dit.
+- **Quoi.** Écritures dans le worktree, la spec, le répertoire git commun, les caches de paquets
+  et l'état du CLI ; configuration de sécurité, `.git/hooks` et `.git/config` en lecture seule ;
+  identifiants de la personne masqués (`~/.ssh`, cloud, `gh`, registres, jetons des CLI, `.env`).
+- **Réseau.** Aucun, sauf un proxy filtrant : hôtes du provider, registres de paquets,
+  `WORKPILOT_SANDBOX_HOSTS`. Un refus est nommé dans la sortie de la commande.
+- **Garde-fou.** Le probe lance le bac à sable pour de vrai. Sans lui, la carte et le fil le
+  disent au lancement (`SANDBOX_STATUS`, `TaskSandboxNotice`) ; `WORKPILOT_SANDBOX=required`
+  refuse de démarrer.
+- **Pas livré.** Windows (AppContainer, job object) : la carte dit « non isolé ».
+
+Justification : [`os-sandbox.md`](../architecture/os-sandbox.md).
+
+Vérification : `pytest tests/os_sandbox -q` (le vrai bac à sable sous
+`WORKPILOT_EXPECT_SANDBOX=1`) et `cd apps/frontend && pnpm test -- task-sandbox TaskSandboxNotice`.
+
+### G9 — MCP 2026-07-28 : tasks et MCP Apps dans le panneau de tâche
+
+**Fait.** `apps/backend/mcp_tasks/` (une feuille) fait répondre les serveurs MCP de WorkPilot dans
+les deux ères. Une requête sans version reçoit les réponses d'avant. Une requête 2026-07-28 reçoit
+`server/discover`, `resultType`, et une tâche pour un outil long quand elle déclare l'extension
+Tasks.
+
+- **Serveur.** `workpilot-verify` rend `verify_launch`, `verify_perf_trace` et `verify_device` en
+  tâches. Les ids ne se devinent pas, un état terminal ne change plus, la rétention est d'une heure
+  et le plafond de 64 tâches. Un client qui ne déclare pas l'extension reçoit le résultat lui-même.
+- **Client.** `core/mcp_tools.py` négocie par `server/discover` et retombe sur `initialize`.
+  `resolve_task` attend la tâche, l'annule quand le build s'arrête, quand elle demande une saisie
+  ou au-delà de `WORKPILOT_MCP_TASK_TIMEOUT`. Un SDK `mcp` plus ancien garde le handshake. Un
+  outil réservé à la vue n'est jamais donné à l'agent.
+- **MCP Apps.** La vue d'un outil appelé est gardée dans `<spec>/mcp-apps/` et annoncée par
+  `MCP_APP_VIEW`. La carte la montre dans une iframe `sandbox="allow-scripts"` **sans
+  `allow-same-origin`**, servie par `workpilot-mcp-app://` avec sa propre CSP (rien hors de la vue
+  sans déclaration, seulement des origines `https://` nues avec). La frame ne navigue pas ailleurs,
+  et le pont refuse tout appel d'outil, message, lien ou contexte. Le contraire du playground relevé
+  plus haut.
+- **Pas livré.** Les builds eux-mêmes ne sont pas des tâches MCP : aucun serveur MCP ne les expose.
+  Le chemin du SDK Claude n'affiche pas les vues, puisque Claude Code est alors le client.
+
+Justification : [`mcp-2026.md`](../architecture/mcp-2026.md).
+
+Vérification : `pytest tests/mcp_2026 tests/core/test_mcp_tools.py -q` et
+`cd apps/frontend && pnpm test -- mcp-apps mcp-app-bridge McpAppsCard`.
+
+### G10 — Banc de rejeu
+
+**Fait.** `apps/backend/bench/` reprend 10 à 20 cartes terminées du projet, les reconstruit depuis
+le commit d'avant avec chaque moteur choisi (provider × modèle × effort), et les juge avec les
+tests que la carte a livrés. Le tableau qui en sort nourrit Formula Lab et `model_router/`.
+
+- **Tests cachés.** Les tests du rejeu sont ceux du commit d'arrivée, que l'agent ne voit pas :
+  chaque build tourne dans une copie hors du projet, fetchée à la base par son identifiant, sans
+  remote. Une copie qui contient la cible n'est pas jugée (`saw-answer`).
+- **Pas de faux positif.** Avant le premier build, les tests tournent deux fois à la cible et une
+  fois à la base : seul un test qui passe à la cible et échoue à la base (F2P) prouve le travail.
+  Un cas sans F2P est écarté avec sa raison. Un build réussit quand tous ses F2P et P2P passent ;
+  un test absent du rapport échoue.
+- **Le build ne juge pas son build.** Ses fichiers de test reviennent à la base avant le jugement,
+  le runner vient du projet, `.workpilot/bench.json` est lu dans le projet.
+- **Sans identifiants.** Le juge et le runner du banc tournent avec un environnement construit,
+  sans clé ni jeton, bornés par `WORKPILOT_BENCH_JUDGE_TIMEOUT`.
+- **Un build compte s'il a vraiment tourné.** Limite de débit, échec d'authentification, build
+  non démarré ou passage abandonné ne comptent pas.
+- **Lecteurs.** Formula Lab ajoute un échantillon de réussite par build jugé ; le routeur écarte un
+  modèle qui a résolu moins de la moitié de ses builds sur au moins trois cartes.
+
+Limite : le checkout du projet reste lisible sur le disque tant que le bac à sable OS du build
+n'est pas mergé.
+
+Justification : [`repo-bench.md`](../architecture/repo-bench.md).
+
+Vérification : `pytest tests/bench tests/cost_intelligence/test_formula_matrix.py
+tests/model_router -q` ; `cd apps/frontend && pnpm test -- bench-handlers RepoBenchView`.
+
+### G11 — Vérifier une application Windows par UI Automation
+
+**Fait.** La boucle `/verify` reconnaît une app de bureau .NET (WPF, WinForms, WinUI non
+empaquetée : `windows-app` dans `verify/detect.py`), la lance et la conduit par l'arbre
+d'accessibilité Windows. L'assistant `verify/uia/driver.ps1` (Windows PowerShell, UI Automation)
+parle en JSON ligne par ligne avec `verify/window.py`.
+
+- **Une seule fenêtre.** La carte la nomme (`verifyWindow`, champ du formulaire de tâche) ; sans
+  nom, la première fenêtre du lancement. Elle n'est cherchée que dans l'arbre de processus lancé
+  par la vérification, puis épinglée par son handle : une fenêtre de même titre ailleurs sur le
+  bureau n'est jamais lue, conduite ni capturée. Seuls les dialogues qu'elle possède s'y ajoutent.
+- **Aucune frappe simulée.** Les actions passent par les patterns UI Automation (Invoke, Value,
+  Toggle, SelectionItem, ExpandCollapse) sur une `ref` donnée par le dernier `snapshot`, jamais
+  par la souris ou le clavier du bureau.
+- **Ce qui sort.** Le texte lu est une donnée : champs mot de passe en `***`, secrets expurgés,
+  texte qui porte une injection retenu. La capture (`PrintWindow`) ne contient que la fenêtre ;
+  une capture vide est refusée, pas comptée comme preuve.
+- **Hors Windows.** L'outil répond qu'UI Automation n'existe que sur Windows : erreur
+  d'environnement, statut inconnu, jamais un échec de l'app.
+- **Suite** (#527) : l'app lancée mourait au démarrage (`0xC0000142`). Sous Windows,
+  `os.kill(pid, 0)` n'est pas une sonde : 0 est `CTRL_C_EVENT`, envoyé au groupe de processus
+  que la vérification venait de créer. `foundation.platform.pid_is_running` ouvre le processus
+  et l'attend avec un délai nul sous Windows (`os.kill(pid, 0)` ailleurs) ; l'état de
+  vérification et les verrous de workspace l'utilisent. Un projet .NET dans un sous-dossier est
+  lancé avec un `--project` relatif au dossier où la commande tourne.
+
+Justification : [`verify.md`](../architecture/verify.md).
+
+Vérification : `pytest tests/test_verify_window.py -q` partout, et
+`tests/test_verify_window_windows.py` sur Windows (vraie fenêtre WinForms, leurre de même titre,
+app WPF compilée quand `dotnet` est là) ; `cd apps/frontend && pnpm test -- VerifyLoopFields`.

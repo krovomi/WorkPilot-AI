@@ -17,7 +17,7 @@ import threading
 import time
 import uuid
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -246,7 +246,7 @@ async def _execute_action(
                     proc.communicate(),
                     timeout=action.timeout_ms / 1000.0 if action.timeout_ms else 30,
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 proc.kill()
                 try:
                     await proc.wait()
@@ -395,7 +395,7 @@ async def _execute_action(
             result["status"] = "skipped"
             result["output"] = {"reason": f"Unknown action type: {action.type}"}
 
-    except asyncio.TimeoutError:
+    except TimeoutError:
         result["status"] = "timeout"
         result["error"] = f"Action timed out after {action.timeout_ms}ms"
     except Exception as e:
@@ -563,7 +563,7 @@ class HookService:
         """Create a new hook."""
         hook = Hook.from_dict(data)
         hook.id = str(uuid.uuid4())
-        hook.created_at = datetime.now(timezone.utc).isoformat()
+        hook.created_at = datetime.now(UTC).isoformat()
         hook.updated_at = hook.created_at
         self._hooks[hook.id] = hook
         self._save_hooks()
@@ -576,7 +576,7 @@ class HookService:
             return None
         existing = self._hooks[hook_id]
         updated = Hook.from_dict({**existing.to_dict(), **data, "id": hook_id})
-        updated.updated_at = datetime.now(timezone.utc).isoformat()
+        updated.updated_at = datetime.now(UTC).isoformat()
         updated.created_at = existing.created_at
         self._hooks[hook_id] = updated
         self._save_hooks()
@@ -602,7 +602,7 @@ class HookService:
             hook.status = HookStatus.PAUSED
         else:
             hook.status = HookStatus.ACTIVE
-        hook.updated_at = datetime.now(timezone.utc).isoformat()
+        hook.updated_at = datetime.now(UTC).isoformat()
         self._save_hooks()
         return hook.to_dict()
 
@@ -648,7 +648,7 @@ class HookService:
         # A merge is the strongest external signal the learning loop can get,
         # and the observe phase runs too early to see it. Credited here rather
         # than in one merge path, so every source of the verdict counts: the
-        # local `--merge`, a GitHub webhook, or continuous_ai closing a PR.
+        # local `--merge`, a GitHub webhook, or a PR closed on the forge.
         _credit_merge_to_learning_loop(event)
 
         results = []
@@ -754,7 +754,7 @@ class HookService:
             logger.error("[HookEngine] Hook '%s' execution failed: %s", hook.name, e)
 
         elapsed = time.monotonic() - start_time
-        execution.completed_at = datetime.now(timezone.utc).isoformat()
+        execution.completed_at = datetime.now(UTC).isoformat()
         execution.duration_ms = int(elapsed * 1000)
         execution.action_results = action_results
 

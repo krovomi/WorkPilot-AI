@@ -6,7 +6,7 @@ from the existing agent execution flow.
 """
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -19,7 +19,7 @@ def _utcnow_naive() -> datetime:
     would break the comparison with stored columns. We compute the same
     instant using the non-deprecated API and strip tzinfo at the end.
     """
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 from .collector import get_analytics_collector
@@ -48,7 +48,7 @@ class AnalyticsService:
         Setup monitoring of phase events from stdout.
         """
         # This monitors the phase events that are printed to stdout
-        # by the core.phase_event.emit_phase function
+        # by the foundation.phase_event.emit_phase function
         pass
 
     def start_build_from_spec(self, spec_path: str, **kwargs):
@@ -130,7 +130,7 @@ class AnalyticsService:
         Parse phase events from agent output and update analytics.
         """
         try:
-            from core.phase_event import PHASE_MARKER_PREFIX
+            from foundation.phase_event import PHASE_MARKER_PREFIX
 
             for line in output.split("\n"):
                 if line.startswith(PHASE_MARKER_PREFIX):

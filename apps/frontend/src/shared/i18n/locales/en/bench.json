@@ -1,0 +1,93 @@
+{
+	"title": "Repo bench",
+	"description": "Finished cards of this project, rebuilt from the commit before them with each engine you choose, and judged by the tests they landed with. The replaying agent never sees those tests.",
+	"noProject": "Open a project to bench it.",
+	"table": {
+		"title": "What resolves this project's work",
+		"empty": "No replay judged yet.",
+		"engine": "Engine",
+		"resolved": "Resolved",
+		"ofJudged": "{{resolved}} of {{judged}}",
+		"f2p": "Card tests passed",
+		"cost": "Avg. cost",
+		"duration": "Avg. duration",
+		"cards": "Cards",
+		"readers": "Formula Lab counts these replays in its success estimates, and the model router passes over a model that resolved less than half of at least three cards."
+	},
+	"new": {
+		"title": "New run",
+		"refresh": "Refresh",
+		"loading": "Looking for finished cards…",
+		"none": "No finished card in this project yet.",
+		"cardsHelp": "Choose up to {{max}} finished cards. A card can be replayed when the commit it landed as is found and it changed tests a runner can run.",
+		"found": "{{tests}} test file(s), found by {{source}}",
+		"commitPlaceholder": "Commit it landed as",
+		"engines": "Engines (up to {{max}})",
+		"addEngine": "Add an engine",
+		"removeEngine": "Remove this engine",
+		"summary": "{{cards}} card(s) × {{engines}} engine(s) = {{builds}} full build(s)",
+		"start": "Start the run",
+		"oneAtATime": "A run is in progress for this project: one at a time.",
+		"costWarning": "Each build is a complete task (planning, coding, QA) billed by its provider. The judge runs each card's tests three times first, to keep only the tests that tell the card's work from its absence."
+	},
+	"source": {
+		"merge": "its merge",
+		"pr": "its pull request",
+		"given": "the commit given"
+	},
+	"caseStatus": {
+		"candidate": "replayable",
+		"refused": "not replayable",
+		"calibrating": "calibrating the judge",
+		"excluded": "set aside",
+		"ready": "judged by its tests"
+	},
+	"phase": {
+		"calibrating": "calibrating",
+		"running": "building",
+		"done": "done",
+		"discarded": "discarded"
+	},
+	"suites": {
+		"pytest": "pytest",
+		"vitest": "Vitest",
+		"jest": "Jest",
+		"go": "go test",
+		"dotnet": "dotnet test",
+		"custom": "your judge (bench.json)"
+	},
+	"reasons": {
+		"no-card": "The card's spec is missing.",
+		"commit-unknown": "That commit is not in the repository.",
+		"no-target": "No merge of its branch was found: give the commit it landed as.",
+		"no-parent": "The commit it landed as has no parent.",
+		"no-judge": "It changed no test a runner can run: nothing can judge it.",
+		"never-passes": "Its tests do not pass at the commit it landed as.",
+		"already-passes": "Its tests already pass without it: they cannot judge it.",
+		"judge-error": "The judge could not run.",
+		"copy-failed": "The isolated copy could not be made.",
+		"not-started": "The build did not start: not counted.",
+		"interrupted": "The build was interrupted (stop, rate limit or sign-in): not counted.",
+		"discarded": "The run was discarded.",
+		"saw-answer": "The copy held the answer's commit: not counted."
+	},
+	"run": {
+		"title": "Runs",
+		"stale": "stopped with the app",
+		"preparing": "Calibrating the judge and making the copies…",
+		"progress": "{{running}} building, {{queued}} waiting",
+		"discard": "Discard",
+		"card": "Card",
+		"tests": "{{f2p}} test(s) the card makes pass, {{p2p}} it keeps passing",
+		"resolved": "resolved",
+		"notResolved": "not resolved",
+		"notCounted": "not counted",
+		"building": "building…",
+		"waiting": "waiting"
+	},
+	"errors": {
+		"candidates": "Could not list the finished cards.",
+		"start": "The run could not start.",
+		"discard": "The run could not be discarded."
+	}
+}

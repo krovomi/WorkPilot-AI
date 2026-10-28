@@ -30,12 +30,12 @@ import json
 import os
 import sys
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from core.local_model_catalog import detect_runtime
-from core.offline_policy import LOCAL_PROVIDERS, airgap_status
+from offline_policy import LOCAL_PROVIDERS, airgap_status
+from offline_policy.local_model_catalog import detect_runtime
 from ollama_model_detector import is_embedding_model
 
 SCAN_CACHE_TTL_SECONDS = 900  # 15 minutes
@@ -164,7 +164,7 @@ def _cache_path(project_path: Path) -> Path:
 
 def _scan_models(project_path: Path, force: bool = False) -> dict:
     cache_file = _cache_path(project_path)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if not force and cache_file.exists():
         try:
             cached = json.loads(cache_file.read_text(encoding="utf-8"))
@@ -268,7 +268,7 @@ def _status(project_path: Path) -> dict:
     # pendant que le backend refusait chaque appel cloud.
     airgap = airgap_status(project_path)
     return {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "runtimes": {
             "ollama": ollama,
             "llamaCpp": llama_cpp,
@@ -379,4 +379,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    from core.log_redaction import install_global_redaction
+
+    install_global_redaction()
     main()

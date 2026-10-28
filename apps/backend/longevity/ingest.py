@@ -15,18 +15,25 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from pathlib import Path
 from xml.etree import ElementTree as ET  # noqa: S405 - ParseError type only
 
-from core.api_safety import validated_dir
 from defusedxml.ElementTree import parse as defused_parse
+from foundation.api_safety import validated_dir
 
 logger = logging.getLogger(__name__)
 
-# The Sentinel persists a snapshot at this relative path.
+# The Dependency Sentinel of the former continuous-AI daemon persisted a
+# snapshot at this relative path. The daemon is gone (replaced by
+# automations, see docs/architecture/automations.md); a scan written there
+# by another tool keeps the same shape.
 SENTINEL_LATEST_SCAN_REL = (
     Path(".workpilot") / "continuous-ai" / "deps" / "latest_scan.json"
 )
+
+# A scan older than this says what the dependencies were, not what they are.
+SENTINEL_MAX_AGE_SECONDS = 30 * 24 * 3600
 
 # Cobertura puts the project-level coverage on the root <coverage> element
 # as a 0..1 fraction in the line-rate attribute. We accept either that
@@ -96,6 +103,28 @@ def parse_coverage_xml(path: str | Path) -> float:
     if ratio != ratio:  # NaN
         raise CoverageParseError(f"NaN coverage ratio in {p}")
     return max(0.0, min(1.0, ratio))
+
+
+def sentinel_snapshot_is_current(
+    project_dir: str | Path, *, now: float | None = None
+) -> bool:
+    """Whether a snapshot exists and was scanned within the last 30 days.
+
+    A snapshot nobody refreshes would keep scoring yesterday's
+    vulnerabilities (or yesterday's "all clean") as today's, so an old or
+    undated one is no signal at all.
+    """
+    snapshot = Path(project_dir) / SENTINEL_LATEST_SCAN_REL
+    if not snapshot.is_file():
+        return False
+    try:
+        scanned_at = json.loads(snapshot.read_text(encoding="utf-8")).get("scanned_at")
+    except (OSError, json.JSONDecodeError, AttributeError):
+        return False
+    if not isinstance(scanned_at, (int, float)) or isinstance(scanned_at, bool):
+        return False
+    current = time.time() if now is None else now
+    return 0 <= current - scanned_at <= SENTINEL_MAX_AGE_SECONDS
 
 
 def load_sentinel_vulnerabilities(project_dir: str | Path) -> list[dict]:

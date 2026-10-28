@@ -4,7 +4,7 @@ import os
 import subprocess
 from unittest.mock import patch
 
-from core.git_executable import (
+from foundation.git_executable import (
     GIT_ENV_VARS_TO_CLEAR,
     get_git_executable,
     get_isolated_git_env,
@@ -123,7 +123,7 @@ class TestRunGit:
 
     def test_uses_isolated_env_by_default(self):
         """run_git should use isolated environment by default."""
-        with patch("core.git_executable.subprocess.run") as mock_run:
+        with patch("foundation.git_executable.subprocess.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(
                 args=["git", "status"], returncode=0, stdout="", stderr=""
             )
@@ -138,7 +138,7 @@ class TestRunGit:
 
     def test_respects_isolate_env_false(self):
         """run_git with isolate_env=False should not modify environment."""
-        with patch("core.git_executable.subprocess.run") as mock_run:
+        with patch("foundation.git_executable.subprocess.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(
                 args=["git", "status"], returncode=0, stdout="", stderr=""
             )
@@ -153,7 +153,7 @@ class TestRunGit:
         """run_git should accept custom environment."""
         custom_env = {"PATH": "/custom/path", "CUSTOM": "value"}
 
-        with patch("core.git_executable.subprocess.run") as mock_run:
+        with patch("foundation.git_executable.subprocess.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(
                 args=["git", "status"], returncode=0, stdout="", stderr=""
             )
@@ -165,7 +165,7 @@ class TestRunGit:
 
     def test_handles_timeout(self):
         """run_git should handle timeout gracefully."""
-        with patch("core.git_executable.subprocess.run") as mock_run:
+        with patch("foundation.git_executable.subprocess.run") as mock_run:
             mock_run.side_effect = subprocess.TimeoutExpired(cmd="git", timeout=60)
 
             result = run_git(["status"], timeout=60)
@@ -175,7 +175,7 @@ class TestRunGit:
 
     def test_handles_file_not_found(self):
         """run_git should handle missing git executable gracefully."""
-        with patch("core.git_executable.subprocess.run") as mock_run:
+        with patch("foundation.git_executable.subprocess.run") as mock_run:
             mock_run.side_effect = FileNotFoundError()
 
             result = run_git(["status"])

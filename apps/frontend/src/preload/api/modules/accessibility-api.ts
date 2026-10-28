@@ -6,6 +6,7 @@
 
 import type { A11yReport } from "../../../shared/types/accessibility";
 import { createIpcListener, invokeIpc } from "./ipc-utils";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export interface AccessibilityRunOptions {
 	projectPath: string;
@@ -31,23 +32,23 @@ export interface AccessibilityAPI {
 
 export const createAccessibilityAPI = (): AccessibilityAPI => ({
 	runAccessibilityScan: (options: AccessibilityRunOptions) =>
-		invokeIpc<A11yReport>("accessibility:run", options),
+		invokeIpc<A11yReport>(IPC_CHANNELS.ACCESSIBILITY_RUN, options),
 
-	cancelAccessibilityScan: () => invokeIpc<boolean>("accessibility:cancel"),
+	cancelAccessibilityScan: () => invokeIpc<boolean>(IPC_CHANNELS.ACCESSIBILITY_CANCEL),
 
 	onAccessibilityEvent: (callback) =>
 		createIpcListener<[AccessibilityEvent]>(
-			"accessibility-event",
+			IPC_CHANNELS.ACCESSIBILITY_EVENT,
 			(payload) => callback(payload),
 		),
 
 	onAccessibilityResult: (callback) =>
-		createIpcListener<[A11yReport]>("accessibility-result", (payload) =>
+		createIpcListener<[A11yReport]>(IPC_CHANNELS.ACCESSIBILITY_RESULT, (payload) =>
 			callback(payload),
 		),
 
 	onAccessibilityError: (callback) =>
-		createIpcListener<[string]>("accessibility-error", (payload) =>
+		createIpcListener<[string]>(IPC_CHANNELS.ACCESSIBILITY_ERROR, (payload) =>
 			callback(payload),
 		),
 });

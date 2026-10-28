@@ -2,6 +2,7 @@
 
 // Types
 import type { GitStatus, Project } from "@shared/types";
+import { providerFromRemoteUrl } from "@shared/utils/git-remote-provider";
 // Drag and drop (dnd-kit)
 import {
 	closestCenter,
@@ -45,6 +46,7 @@ import {
 	FileEdit,
 	FileJson,
 	FileText,
+	FlaskConical,
 	Gauge,
 	GitBranch,
 	GitFork,
@@ -172,6 +174,7 @@ import {
 	type SortableKind,
 } from "./sidebar/sortable-primitives";
 import { ActivityBadge } from "./sidebar/ActivityBadge";
+import { EXPERIMENTAL_VIEWS } from "./sidebar/experimental-views";
 import { useSidebarPrefs } from "./sidebar/use-sidebar-prefs";
 import { VoiceControlDialog } from "./voice-control/VoiceControlDialog";
 
@@ -240,6 +243,7 @@ export type SidebarView =
 	| "spec-refinement"
 	| "agent-coach"
 	| "bounty-board"
+	| "repo-bench"
 	| "tech-debt"
 	| "agent-debugger"
 	| "team-bot"
@@ -358,6 +362,12 @@ const navGroups: NavGroup[] = [
 				labelKey: "navigation:items.arenaMode",
 				icon: Swords,
 				shortcut: "AM",
+			},
+			{
+				id: "repo-bench",
+				labelKey: "navigation:items.repoBench",
+				icon: FlaskConical,
+				shortcut: "RB",
 			},
 			{
 				id: "bounty-board",
@@ -923,6 +933,7 @@ export function Sidebar({
 		reorderItems,
 		toggleGroupExpanded,
 		setFavoritesExpanded,
+		setHideExperimental,
 		clearAllFavorites,
 		reset: resetSidebarPrefs,
 		mergeOrder,
@@ -1077,18 +1088,24 @@ export function Sidebar({
 			.map((id) => byId.get(id))
 			.filter((g): g is NavGroup => Boolean(g));
 
-		// Apply custom per-group item order
-		return orderedGroups.map((group) => {
-			const actualItemIds = group.items.map((i) => i.id);
-			const preferredOrder = sidebarPrefs.itemOrder[group.id] ?? [];
-			const orderedItemIds = mergeOrder(preferredOrder, actualItemIds);
-			const itemById = new Map(group.items.map((i) => [i.id, i]));
-			const items = orderedItemIds
-				.map((id) => itemById.get(id as SidebarView))
-				.filter((i): i is NavItem => Boolean(i));
-			return { ...group, items };
-		});
+		// Apply custom per-group item order, without the experimental views
+		// when the user hid them
+		const hideExperimental = sidebarPrefs.hideExperimental === true;
+		return orderedGroups
+			.map((group) => {
+				const actualItemIds = group.items.map((i) => i.id);
+				const preferredOrder = sidebarPrefs.itemOrder[group.id] ?? [];
+				const orderedItemIds = mergeOrder(preferredOrder, actualItemIds);
+				const itemById = new Map(group.items.map((i) => [i.id, i]));
+				const items = orderedItemIds
+					.map((id) => itemById.get(id as SidebarView))
+					.filter((i): i is NavItem => Boolean(i))
+					.filter((i) => !(hideExperimental && EXPERIMENTAL_VIEWS.has(i.id)));
+				return { ...group, items };
+			})
+			.filter((group) => group.items.length > 0);
 	}, [
+		sidebarPrefs.hideExperimental,
 		githubEnabled,
 		gitlabEnabled,
 		canAdminister,
@@ -1297,12 +1314,7 @@ export function Sidebar({
 		remoteUrl?: string,
 	) => {
 		if (provider !== "unknown" || !remoteUrl) return provider;
-		if (/github\.com[:/]/i.test(remoteUrl)) return "github";
-		if (
-			/dev\.azure\.com|visualstudio\.com|ssh\.dev\.azure\.com/i.test(remoteUrl)
-		)
-			return "azure_devops";
-		return "unknown";
+		return providerFromRemoteUrl(remoteUrl);
 	};
 
 	const handleProjectAdded = async (project: Project, needsInit: boolean) => {
@@ -1652,6 +1664,14 @@ export function Sidebar({
 							<span className="flex-1 text-left truncate">
 								{t(item.labelKey)}
 							</span>
+							{EXPERIMENTAL_VIEWS.has(item.id) && (
+								<span
+									title={t("navigation:experimental.tooltip")}
+									className="shrink-0 rounded border border-amber-400/40 px-1 text-[10px] uppercase tracking-wide text-amber-500"
+								>
+									{t("navigation:experimental.badge")}
+								</span>
+							)}
 							<ActivityBadge badge={badge} attention={hasAttention} />
 							{item.shortcut && (
 								<kbd
@@ -2361,6 +2381,22 @@ export function Sidebar({
 											{t("navigation:actions.resetLayout")}
 										</button>
 									)}
+								{!isCollapsed && !searchQuery.trim() && (
+									<button
+										type="button"
+										onClick={() =>
+											setHideExperimental(sidebarPrefs.hideExperimental !== true)
+										}
+										aria-pressed={sidebarPrefs.hideExperimental === true}
+										className="mt-1 w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+									>
+										{sidebarPrefs.hideExperimental === true
+											? t("navigation:experimental.show", {
+													count: EXPERIMENTAL_VIEWS.size,
+												})
+											: t("navigation:experimental.hide")}
+									</button>
+								)}
 							</div>
 							<DragOverlay dropAnimation={null}>
 								{activeDragId ? (
@@ -2456,6 +2492,10 @@ export function Sidebar({
 									isCollapsed={isCollapsed}
 								/>
 								<AgentCliStatusBadge tool="pi" isCollapsed={isCollapsed} />
+								<AgentCliStatusBadge
+									tool="gemini-cli"
+									isCollapsed={isCollapsed}
+								/>
 							</div>
 						</CollapsibleContent>
 					</Collapsible>

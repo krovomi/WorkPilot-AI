@@ -18,6 +18,8 @@ import { type ChildProcess, spawn } from "node:child_process";
 import path from "node:path";
 import { app, BrowserWindow, ipcMain } from "electron";
 import { pythonEnvManager } from "../python-env-manager.js";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
+import { pythonRunnerEnv } from "../utils/python-runner-env";
 
 interface RunRequest {
 	projectPath: string;
@@ -44,13 +46,13 @@ export function registerDocDriftHandlers(): void {
 	};
 
 	ipcMain.handle(
-		"docDrift:run",
+		IPC_CHANNELS.DOC_DRIFT_RUN,
 		async (_event, { projectPath }: RunRequest) => {
 			killExisting();
 
 			if (!projectPath) {
 				const message = "projectPath is required";
-				broadcast("doc-drift-error", message);
+				broadcast(IPC_CHANNELS.DOC_DRIFT_ERROR, message);
 				throw new Error(message);
 			}
 
@@ -73,7 +75,7 @@ export function registerDocDriftHandlers(): void {
 				[runnerPath, "--project-path", projectPath],
 				{
 					cwd: backendPath,
-					env: { ...process.env, PYTHONPATH: backendPath },
+					env: await pythonRunnerEnv(backendPath),
 				} as Parameters<typeof spawn>[2],
 			);
 			currentProcess = child;
@@ -94,7 +96,7 @@ export function registerDocDriftHandlers(): void {
 					if (line.startsWith(EVENT_PREFIX)) {
 						try {
 							const payload = JSON.parse(line.slice(EVENT_PREFIX.length));
-							broadcast("doc-drift-event", payload);
+							broadcast(IPC_CHANNELS.DOC_DRIFT_EVENT, payload);
 						} catch (err) {
 							console.error("[DocDrift] Bad event line:", err);
 						}
@@ -118,12 +120,12 @@ export function registerDocDriftHandlers(): void {
 				child.on("close", (code) => {
 					currentProcess = null;
 					if (code === 0 && result) {
-						broadcast("doc-drift-result", result);
+						broadcast(IPC_CHANNELS.DOC_DRIFT_RESULT, result);
 						resolve(result);
 					} else {
 						const message =
 							errorMessage ?? `doc drift runner exited with code ${code}`;
-						broadcast("doc-drift-error", message);
+						broadcast(IPC_CHANNELS.DOC_DRIFT_ERROR, message);
 						reject(new Error(message));
 					}
 				});
@@ -131,14 +133,14 @@ export function registerDocDriftHandlers(): void {
 				child.on("error", (err) => {
 					currentProcess = null;
 					const message = `Failed to start doc drift runner: ${err.message}`;
-					broadcast("doc-drift-error", message);
+					broadcast(IPC_CHANNELS.DOC_DRIFT_ERROR, message);
 					reject(new Error(message));
 				});
 			});
 		},
 	);
 
-	ipcMain.handle("docDrift:cancel", () => {
+	ipcMain.handle(IPC_CHANNELS.DOC_DRIFT_CANCEL, () => {
 		killExisting();
 		return true;
 	});

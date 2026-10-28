@@ -147,7 +147,7 @@ class BaseAgent(ABC, Generic[T]):
                     duration_seconds=duration,
                     retries=attempts,
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 duration = time.monotonic() - start
                 self._log_end(
                     trace_id,

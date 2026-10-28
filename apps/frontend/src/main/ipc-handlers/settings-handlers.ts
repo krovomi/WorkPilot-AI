@@ -1,5 +1,5 @@
 import { parseJevSettings } from "../../shared/utils/jev-settings";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import {
 	existsSync,
 	mkdirSync,
@@ -34,11 +34,13 @@ import type {
 import type { AgentManager } from "../agent";
 import { appEmulatorService } from "../app-emulator-service";
 import { setAppLanguage } from "../app-language";
+import { notificationService } from "../notification-service";
 import {
 	setUpdateChannel,
 	setUpdateChannelWithDowngradeCheck,
 } from "../app-updater";
 import { getUsageMonitor } from "../claude-profile/usage-monitor";
+import { getClaudeProfileManager } from "../claude-profile-manager";
 import {
 	configureTools,
 	getToolInfo,
@@ -49,6 +51,12 @@ import {
 import { credentialManager } from "../services/credential-manager";
 import { openExternalUrl } from "../open-external";
 import { decryptSecret } from "../secret-storage";
+import { configurePythonFeatureServices } from "../python-feature-services";
+import { rememberUserChosenPath } from "../security/renderer-path";
+import {
+	maskSettingsSecrets,
+	unmaskSettingsUpdate,
+} from "../settings-secrets";
 import { readSettingsFile, writeSettingsFile } from "../settings-utils";
 import {
 	getPackagedSourceEnvPath,
@@ -58,6 +66,13 @@ import {
 import { testGenerationService } from "../test-generation-service";
 import { findEnvLineBreak, parseEnvFile } from "./utils";
 import { getCurrentOS } from "../platform";
+import { buildCmdConsoleArgs } from "./task/launch-args";
+import {
+	BACKEND_PATH_REFUSED,
+	refusedToolPath,
+	refusesBackendPath,
+	TOOL_PATH_REFUSED,
+} from "../security/tool-path-policy";
 
 
 /**
@@ -112,14 +127,20 @@ function openTerminalForPlatform(resolvedPath: string): IPCResult<void> {
 	}
 
 	if (platform === "win32") {
-		// Windows: Use cmd.exe directly with argument array
-		// /C tells cmd to execute the command and terminate
-		// /K keeps the window open after executing cd
-		execFileSync("cmd.exe", ["/K", "cd", "/d", resolvedPath], {
+		// cmd.exe parses its own command line: the path is quoted, not split
+		const args = buildCmdConsoleArgs(resolvedPath);
+		if (!args) {
+			return {
+				success: false,
+				error: "This folder path cannot be opened in cmd.exe",
+			};
+		}
+		spawn("cmd.exe", args, {
+			detached: true,
 			stdio: "ignore",
 			windowsHide: false,
-			shell: false, // Explicitly disable shell to prevent injection
-		});
+			windowsVerbatimArguments: true,
+		}).unref();
 		return { success: true };
 	}
 
@@ -641,17 +662,82 @@ export function registerSettingsHandlers(
 				console.warn("[SETTINGS_GET] Failed to re-warm CLI cache:", error);
 			});
 
-			return { success: true, data: settings };
+			// The renderer learns which credentials are set, never their value (S6)
+			return { success: true, data: maskSettingsSecrets(settings) };
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.SETTINGS_CUSTOM_PROVIDER_DISCOVER_MODELS,
+		async (): Promise<IPCResult<unknown>> => {
+			// URL and key both come from the stored settings, never from the
+			// renderer: the key only goes to the URL it was saved with (S6)
+			const saved = (readSettingsFile() ?? {}) as Partial<AppSettings>;
+			const baseUrl = (saved.customProviderUrl ?? "").trim().replace(/\/+$/, "");
+			let url: URL;
+			try {
+				url = new URL(`${baseUrl}/models`);
+			} catch {
+				return { success: false, error: "Custom provider URL is invalid" };
+			}
+			if (url.protocol !== "https:" && url.protocol !== "http:") {
+				return { success: false, error: "Custom provider URL is invalid" };
+			}
+			const key = saved.customProviderApiKey;
+			try {
+				const response = await fetch(url, {
+					headers: key ? { Authorization: `Bearer ${key}` } : undefined,
+					signal: AbortSignal.timeout(15000),
+				});
+				if (!response.ok) {
+					return {
+						success: false,
+						error: `HTTP ${response.status}: ${response.statusText}`,
+					};
+				}
+				return { success: true, data: await response.json() };
+			} catch (error) {
+				return {
+					success: false,
+					error:
+						error instanceof Error ? error.message : "Failed to discover models",
+				};
+			}
 		},
 	);
 
 	ipcMain.handle(
 		IPC_CHANNELS.SETTINGS_SAVE,
-		async (_, settings: Partial<AppSettings>): Promise<IPCResult> => {
+		async (_, update: Partial<AppSettings>): Promise<IPCResult> => {
 			try {
 				// Load current settings using shared helper
 				const savedSettings = readSettingsFile();
 				const currentSettings = { ...DEFAULT_APP_SETTINGS, ...savedSettings };
+				// A masked secret coming back keeps its stored value
+				const settings = unmaskSettingsUpdate<AppSettings>(
+					update ?? {},
+					currentSettings,
+				);
+				// A tool path the main process would run must be one it can trust.
+				const refusedField = refusedToolPath(settings, currentSettings);
+				if (refusedField) {
+					return {
+						success: false,
+						error: TOOL_PATH_REFUSED,
+						data: { field: refusedField },
+					};
+				}
+				if (
+					refusesBackendPath(settings, currentSettings, {
+						detected: detectAutoBuildSourcePath,
+					})
+				) {
+					return {
+						success: false,
+						error: BACKEND_PATH_REFUSED,
+						data: { field: "autoBuildPath" },
+					};
+				}
 				const newSettings = { ...currentSettings, ...settings };
 				if (settings.jev !== undefined)
 					newSettings.jev = parseJevSettings(settings.jev);
@@ -677,6 +763,10 @@ export function registerSettingsHandlers(
 					);
 					if (settings.pythonPath) {
 						testGenerationService.configure(settings.pythonPath);
+						configurePythonFeatureServices(
+							settings.pythonPath,
+							settings.autoBuildPath,
+						);
 					}
 				}
 
@@ -700,6 +790,11 @@ export function registerSettingsHandlers(
 					preWarmToolCache(["claude"]).catch((error) => {
 						console.warn("[SETTINGS_SAVE] Failed to re-warm CLI cache:", error);
 					});
+				}
+
+				// The Telegram approval poller follows the saved channel settings.
+				if (settings.needsYou !== undefined || settings.globalTelegramBotToken !== undefined) {
+					notificationService.refreshRemote();
 				}
 
 				// Update auto-updater channel if betaUpdates setting changed
@@ -838,6 +933,9 @@ export function registerSettingsHandlers(
 				return null;
 			}
 
+			// The user picked it: handlers may now act on it before it is a
+			// registered project (adding one, checking its git status).
+			rememberUserChosenPath(result.filePaths[0]);
 			return result.filePaths[0];
 		},
 	);
@@ -867,6 +965,7 @@ export function registerSettingsHandlers(
 			});
 
 			if (result.canceled) return [];
+			for (const filePath of result.filePaths) rememberUserChosenPath(filePath);
 			return result.filePaths;
 		},
 	);
@@ -1025,6 +1124,8 @@ export function registerSettingsHandlers(
 
 				// Create the directory
 				mkdirSync(projectPath, { recursive: true });
+				// Created at the user's request: it may be added as a project.
+				rememberUserChosenPath(projectPath);
 
 				// Initialize git if requested
 				let gitInitialized = false;
@@ -1144,27 +1245,6 @@ export function registerSettingsHandlers(
 		},
 	);
 
-	ipcMain.handle(
-		IPC_CHANNELS.SHELL_OPEN_TERMINAL_WITH_COMMAND,
-		async (_, command: string): Promise<IPCResult<void>> => {
-			try {
-				// Import the function from claude-code-handlers
-				const { openTerminalWithCommand } = await import(
-					"./claude-code-handlers"
-				);
-				await openTerminalWithCommand(command);
-				return { success: true };
-			} catch (error) {
-				const errorMsg =
-					error instanceof Error ? error.message : "Unknown error";
-				return {
-					success: false,
-					error: `Failed to open terminal with command: ${errorMsg}`,
-				};
-			}
-		},
-	);
-
 	// ============================================
 	// WorkPilot AI Source Environment Operations
 	// ============================================
@@ -1186,7 +1266,6 @@ export function registerSettingsHandlers(
 						success: true,
 						data: {
 							hasClaudeToken: !!globalToken && globalToken.length > 0,
-							claudeOAuthToken: globalToken,
 							envExists: false,
 						},
 					};
@@ -1194,28 +1273,26 @@ export function registerSettingsHandlers(
 
 				const envExists = envPath ? existsSync(envPath) : false;
 				let hasClaudeToken = false;
-				let claudeOAuthToken: string | undefined;
 
 				// First, check source .env file
 				if (envExists && envPath) {
 					const content = readFileSync(envPath, "utf-8");
 					const stored = parseEnvFile(content)[SOURCE_ENV_TOKEN_KEY];
 					// Undefined while the keyring cannot decrypt it: the global token stands in
-					claudeOAuthToken = stored ? decryptSecret(stored) : undefined;
-					hasClaudeToken = !!claudeOAuthToken && claudeOAuthToken.length > 0;
+					const token = stored ? decryptSecret(stored) : undefined;
+					hasClaudeToken = !!token && token.length > 0;
 				}
 
 				// Fallback to global settings if no token in source .env
 				if (!hasClaudeToken && globalSettings.globalClaudeOAuthToken) {
-					claudeOAuthToken = globalSettings.globalClaudeOAuthToken;
 					hasClaudeToken = true;
 				}
 
 				return {
 					success: true,
+					// Whether a token is set, never the token itself (S6)
 					data: {
 						hasClaudeToken,
-						claudeOAuthToken,
 						sourcePath,
 						envExists,
 					},
@@ -1234,9 +1311,28 @@ export function registerSettingsHandlers(
 
 	ipcMain.handle(
 		IPC_CHANNELS.AUTOBUILD_SOURCE_ENV_UPDATE,
-		async (_, config: { claudeOAuthToken?: string }): Promise<IPCResult> => {
+		async (
+			_,
+			config: { claudeOAuthToken?: string; claudeProfileId?: string },
+		): Promise<IPCResult> => {
 			try {
-				const token = config?.claudeOAuthToken;
+				// A Claude profile's token is read here: the renderer only sees it masked
+				const profileId = config?.claudeProfileId;
+				let token = config?.claudeOAuthToken;
+				if (profileId !== undefined) {
+					// Decrypted here: the profile keeps it encrypted at rest
+					const profileToken =
+						typeof profileId === "string"
+							? getClaudeProfileManager().getProfileToken(profileId)
+							: undefined;
+					if (!profileToken) {
+						return {
+							success: false,
+							error: "Selected profile does not have a valid token",
+						};
+					}
+					token = profileToken;
+				}
 				// Revalidated here (rule S6): the file holds one variable per line.
 				if (
 					token !== undefined &&

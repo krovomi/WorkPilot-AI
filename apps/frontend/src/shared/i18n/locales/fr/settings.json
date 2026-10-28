@@ -794,6 +794,7 @@
 		},
 		"validation": {
 			"apiKeyInvalid": "Format de clé API invalide",
+			"apiKeyForNewUrl": "Saisissez à nouveau la clé API pour l'utiliser avec cette URL de base",
 			"apiKeyRequired": "La clé API est requise",
 			"baseUrlInvalid": "Format d'URL invalide (doit commencer par http:// ou https://)",
 			"baseUrlRequired": "L'URL de base est requise",
@@ -1013,6 +1014,8 @@
 		"claudePath": "Chemin Claude CLI",
 		"claudePathDescription": "Chemin vers l'exécutable Claude CLI (laisser vide pour la détection automatique)",
 		"claudePathPlaceholder": "claude (par défaut)",
+		"toolPathRefused": "{{field}} : indiquez le nom de l'outil (par exemple git) ou le chemin absolu de son exécutable. Un fichier situé dans un projet ou dans le dossier temporaire est refusé.",
+		"backendPathRefused": "Dossier du backend WorkPilot AI : indiquez le chemin absolu d'un dossier qui contient runners/spec_runner.py. Un dossier situé dans un projet ou dans le dossier temporaire est refusé.",
 		"detectedPath": "Détecté automatiquement",
 		"detectedSource": "Source",
 		"detectedVersion": "Version",
@@ -2374,5 +2377,112 @@
 		"enabledHint": "Décidé par tâche d'après les fichiers du plan ; la carte Kanban permet d'écarter une tâche.",
 		"persistMaster": "Écrire le design system dans le projet",
 		"persistMasterHint": "Quand le projet n'en a pas, design-system/<projet>/MASTER.md est ajouté au diff de la tâche pour que les tâches UI suivantes le réutilisent."
+	},
+	"needsYou": {
+		"title": "Me prévenir ailleurs",
+		"description": "Quand une tâche t'attend (plan à approuver, revue, QA qui passe la main, erreur), l'envoyer aussi sur ton téléphone. Les titres de tâches partent vers le service choisi ; le détail des erreurs reste sur cet ordinateur.",
+		"ntfy": {
+			"title": "ntfy",
+			"description": "Notifications push par un topic ntfy (ntfy.sh ou ton propre serveur). Notification seulement.",
+			"topic": "Topic",
+			"generate": "Générer",
+			"topicHint": "Sur ntfy.sh, quiconque connaît le topic le lit : garde celui qui est généré (16 caractères au moins). Abonne-toi dans l'app ntfy.",
+			"server": "Serveur",
+			"token": "Jeton d'accès (facultatif)"
+		},
+		"telegram": {
+			"title": "Telegram",
+			"description": "Des messages de ton propre bot (à créer avec @BotFather).",
+			"botToken": "Jeton du bot",
+			"chatId": "Ton identifiant",
+			"chatIdHint": "Envoie /start à ton bot depuis une conversation privée, puis indique ton identifiant numérique. Les messages de toute autre personne sont ignorés.",
+			"remoteApproval": "Approuver les plans depuis Telegram",
+			"remoteApprovalHint": "Un message « plan en attente » porte un bouton Approuver. Il approuve ce plan seulement, une fois, dans les 30 minutes, et seulement si WorkPilot est ouvert. Les revues, les merges et tout ce qui est irréversible passent toujours par l'app."
+		},
+		"test": "Envoyer un test",
+		"testHint": "Envoie à partir des réglages enregistrés : enregistre d'abord.",
+		"result": "ntfy : {{ntfy}} · Telegram : {{telegram}}",
+		"outcome": {
+			"sent": "envoyé",
+			"failed": "échec",
+			"off": "non configuré"
+		}
+	},
+	"automations": {
+		"title": "Automatisations",
+		"description": "Un événement crée une carte sur le tableau : une issue étiquetée, la CI de la branche de base qui passe au rouge, une heure de la journée.",
+		"intro": "Une règle crée une carte Kanban quand son événement arrive, et la carte suit le cycle normal. Une règle ne merge, ne pousse et ne commente jamais rien. Les règles tournent toutes les 5 minutes tant que l'app est ouverte.",
+		"add": "Ajouter une règle",
+		"runNow": "Lancer maintenant",
+		"save": "Enregistrer la règle",
+		"cancel": "Annuler",
+		"empty": "Aucune règle pour l'instant.",
+		"unknownError": "Une erreur s'est produite",
+		"mainBranch": "la branche principale du projet",
+		"kindAuto": "Déduit de l'événement",
+		"engineDefault": "La carte utilise le moteur par défaut de l'app.",
+		"drafts": "les cartes t'attendent",
+		"starts": "les cartes démarrent aussitôt",
+		"enable": "Activer ou désactiver {{name}}",
+		"edit": "Modifier {{name}}",
+		"delete": "Supprimer {{name}}",
+		"activity": "Ce que les règles ont fait",
+		"fields": {
+			"name": "Nom",
+			"trigger": "Quand",
+			"label": "Étiquette",
+			"branch": "Branche",
+			"time": "Heure",
+			"days": "Jours",
+			"title": "Titre de la carte",
+			"prompt": "Description de la carte",
+			"kind": "Type de carte",
+			"engine": "Choisir le moteur",
+			"draft": "Cartes en brouillon",
+			"dailyCap": "Cartes par jour, au plus"
+		},
+		"triggers": {
+			"issue_labeled": "Une issue GitHub reçoit une étiquette",
+			"ci_failed": "La CI passe au rouge sur une branche",
+			"schedule": "À une heure de la journée"
+		},
+		"help": {
+			"issue_labeled": "Seulement les issues étiquetées après la création de la règle. Une issue qui a déjà une carte n'est pas importée deux fois.",
+			"ci_failed": "Lu chez le fournisseur de CI réglé dans Réglages › Pipeline CI/CD. Une carte par série rouge : tant qu'elle est ouverte, un nouvel échec n'en crée pas d'autre.",
+			"schedule": "Se déclenche une fois par jour choisi, une fois l'heure passée. Un jour où l'app était fermée n'est pas rattrapé.",
+			"draft": "La carte attend dans le backlog que tu la lances.",
+			"noDraft": "Chaque carte lance son build dès sa création.",
+			"dailyCap": "Les événements au-delà du plafond attendent le lendemain ; aucun n'est perdu."
+		},
+		"summary": {
+			"issue_labeled": "Issue étiquetée « {{label}} »",
+			"ci_failed": "CI rouge sur {{branch}}",
+			"schedule": "{{days}} à {{time}}"
+		},
+		"status": {
+			"never": "Pas encore lancée",
+			"lastRun": "Dernier passage {{at}}",
+			"today_one": "{{count}} carte aujourd'hui (au plus {{cap}})",
+			"today_other": "{{count}} cartes aujourd'hui (au plus {{cap}})",
+			"deferred_one": "{{count}} événement attend demain",
+			"deferred_other": "{{count}} événements attendent demain"
+		},
+		"outcome": {
+			"created": "a créé {{specId}} pour {{subject}}",
+			"started": "a créé et lancé {{specId}} pour {{subject}}",
+			"duplicate": "a écarté {{subject}}",
+			"ignored": "a ignoré {{subject}}",
+			"error": "n'a pas pu tourner sur {{subject}}"
+		},
+		"reasons": {
+			"label_predates_rule": "l'étiquette était là avant la règle",
+			"issue_on_board": "le tableau a déjà une carte pour cette issue",
+			"streak_open": "une carte pour cette série rouge est encore ouverte",
+			"not_started": "la carte a été créée mais n'a pas démarré",
+			"github_not_connected": "GitHub n'est pas connecté pour ce projet (Réglages › GitHub)",
+			"no_ci_provider": "aucun fournisseur de CI n'est réglé pour ce projet (Réglages › Pipeline CI/CD)",
+			"source_failed": "la source n'a pas pu être lue",
+			"card_failed": "la carte n'a pas pu être créée"
+		}
 	}
 }

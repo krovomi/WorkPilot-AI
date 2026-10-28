@@ -12,7 +12,7 @@ description: 'Conventions Electron main process WorkPilot AI : IPC handlers, ser
 - **Electron** + TypeScript, build via **electron-vite**.
 - IPC handlers organisés par domaine dans `apps/frontend/src/main/ipc-handlers/`.
 - Services métier au niveau racine du dossier `main/` (un fichier par service).
-- Terminal multi-PTY via `node-pty` (`terminal/`).
+- Terminal multi-PTY via `@lydell/node-pty` (`terminal/`).
 
 ## Règles
 

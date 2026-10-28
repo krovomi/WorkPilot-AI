@@ -4,14 +4,28 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
 	test: {
 		globals: true,
-		environment: "jsdom",
-		include: [
-			"src/**/*.test.ts",
-			"src/**/*.test.tsx",
-			"src/**/*.spec.ts",
-			"src/**/*.spec.tsx",
-		],
 		exclude: ["node_modules", "dist", "out"],
+		// jsdom only where a test renders: building a DOM for each of the
+		// main-process and pure-logic files cost 45 % of the suite. A `.ts`
+		// test that needs one says so with `@vitest-environment jsdom`.
+		projects: [
+			{
+				extends: true,
+				test: {
+					name: "dom",
+					environment: "jsdom",
+					include: ["src/**/*.test.tsx", "src/**/*.spec.tsx"],
+				},
+			},
+			{
+				extends: true,
+				test: {
+					name: "node",
+					environment: "node",
+					include: ["src/**/*.test.ts", "src/**/*.spec.ts"],
+				},
+			},
+		],
 		coverage: {
 			provider: "v8",
 			reporter: ["text", "json", "html"],

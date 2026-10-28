@@ -82,7 +82,7 @@ complete results. The text carries no version, path or count, because it sits
 in the cacheable prompt prefix.
 
 **rtk is for output a model reads, never for output code parses.** That is why
-`core.git_executable.run_git` is deliberately untouched and there is no global
+`foundation.git_executable.run_git` is deliberately untouched and there is no global
 switch: `git status --porcelain` feeds a parser, `git diff --numstat` feeds a
 counter, and condensing either saves nothing — none of it is ever sent to a
 model — while breaking the caller. A call site opts in by calling

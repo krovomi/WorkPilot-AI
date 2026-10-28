@@ -3,6 +3,7 @@
  * (design image → structured spec → generated code).
  */
 import { ipcRenderer } from "electron";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export interface DesignToCodeRequest {
 	imageData?: string;
@@ -44,6 +45,6 @@ export interface DesignToCodeAPI {
 export function createDesignToCodeAPI(): DesignToCodeAPI {
 	return {
 		runDesignToCodePipeline: (request) =>
-			ipcRenderer.invoke("designToCode:run", request),
+			ipcRenderer.invoke(IPC_CHANNELS.DESIGN_TO_CODE_RUN, request),
 	};
 }

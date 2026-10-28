@@ -46,6 +46,7 @@ import { getAppLanguage } from "../../app-language";
 import { getToolPath } from "../../cli-tool-manager";
 import { killProcessGracefully } from "../../platform";
 import { projectStore } from "../../project-store";
+import { readSettingsFile } from "../../settings-utils";
 import { parsePythonCommand } from "../../python-detector";
 import {
 	getConfiguredPythonPath,
@@ -64,6 +65,7 @@ import {
 	detectInstalledTools,
 	openInIDE,
 	openInTerminal,
+	resolveOpenableDir,
 } from "./worktree-ide-terminal";
 import type { DetectedTools } from "./worktree-ide-terminal";
 import {
@@ -84,6 +86,10 @@ import {
 	initializePythonEnvForPR,
 	withRetry,
 } from "./worktree-pr-helpers";
+import {
+	resolveUnder,
+	resolveWritableUnder,
+} from "../../security/renderer-path";
 // Moved to ./worktree-git-refs.ts (audit lot L11, F36); re-exported for existing importers.
 export { GIT_BRANCH_REGEX, validateWorktreeBranch } from "./worktree-git-refs";
 
@@ -2389,12 +2395,9 @@ export function registerWorktreeHandlers(
 			relativePath: string,
 		): Promise<IPCResult<string>> => {
 			try {
-				const fullPath = path.join(worktreePath, relativePath);
-				const resolved = path.resolve(fullPath);
-				const resolvedWorktree = path.resolve(worktreePath);
-
-				// Security: ensure the resolved path is still inside the worktree
-				if (!resolved.startsWith(resolvedWorktree)) {
+				// Resolved, links included, and still inside the worktree.
+				const resolved = resolveUnder(worktreePath, relativePath, "file");
+				if (!resolved) {
 					return { success: false, error: "Path traversal not allowed" };
 				}
 
@@ -2422,12 +2425,10 @@ export function registerWorktreeHandlers(
 			content: string,
 		): Promise<IPCResult<{ written: boolean }>> => {
 			try {
-				const fullPath = path.join(worktreePath, relativePath);
-				const resolved = path.resolve(fullPath);
-				const resolvedWorktree = path.resolve(worktreePath);
-
-				// Security: ensure the resolved path is still inside the worktree
-				if (!resolved.startsWith(resolvedWorktree)) {
+				// Inside the worktree once its existing part is resolved: a link
+				// in the worktree does not carry the write elsewhere.
+				const resolved = resolveWritableUnder(worktreePath, relativePath);
+				if (!resolved) {
 					return { success: false, error: "Path traversal not allowed" };
 				}
 
@@ -2458,6 +2459,9 @@ export function registerWorktreeHandlers(
 		): Promise<IPCResult<{ deleted: string[]; failed: string[] }>> => {
 			const deleted: string[] = [];
 			const failed: string[] = [];
+			if (!Array.isArray(relativePaths)) {
+				return { success: false, error: "Expected a list of paths" };
+			}
 			const resolvedWorktree = path.resolve(worktreePath);
 			// Discarding means "restore this file to the base branch's version".
 			// Which branch that is depends on the project — never assume one.
@@ -2483,10 +2487,8 @@ export function registerWorktreeHandlers(
 			for (const relativePath of relativePaths) {
 				try {
 					// Security: validate path stays within worktree
-					const fullPath = path.join(resolvedWorktree, relativePath);
-					const resolved = path.resolve(fullPath);
-					const relative = path.relative(resolvedWorktree, resolved);
-					if (relative.startsWith("..")) {
+					const resolved = resolveWritableUnder(resolvedWorktree, relativePath);
+					if (!resolved) {
 						failed.push(relativePath);
 						continue;
 					}
@@ -2572,14 +2574,22 @@ export function registerWorktreeHandlers(
 			_,
 			worktreePath: string,
 			ide: SupportedIDE,
-			customPath?: string,
 		): Promise<IPCResult<{ opened: boolean }>> => {
 			try {
-				if (!existsSync(worktreePath)) {
-					return { success: false, error: "Worktree path does not exist" };
+				const dirPath = resolveOpenableDir(
+					worktreePath,
+					projectStore.getProjects().map((project) => project.path),
+				);
+				if (!dirPath) {
+					return {
+						success: false,
+						error: "Path is not a folder of a known project",
+					};
 				}
 
-				const result = await openInIDE(worktreePath, ide, customPath);
+				// The custom launcher is the user's setting, never a renderer value
+				const customPath = readSettingsFile()?.customIDEPath;
+				const result = await openInIDE(dirPath, ide, customPath as string);
 				if (!result.success) {
 					return { success: false, error: result.error };
 				}
@@ -2605,14 +2615,26 @@ export function registerWorktreeHandlers(
 			_,
 			worktreePath: string,
 			terminal: SupportedTerminal,
-			customPath?: string,
 		): Promise<IPCResult<{ opened: boolean }>> => {
 			try {
-				if (!existsSync(worktreePath)) {
-					return { success: false, error: "Worktree path does not exist" };
+				const dirPath = resolveOpenableDir(
+					worktreePath,
+					projectStore.getProjects().map((project) => project.path),
+				);
+				if (!dirPath) {
+					return {
+						success: false,
+						error: "Path is not a folder of a known project",
+					};
 				}
 
-				const result = await openInTerminal(worktreePath, terminal, customPath);
+				// The custom launcher is the user's setting, never a renderer value
+				const customPath = readSettingsFile()?.customTerminalPath;
+				const result = await openInTerminal(
+					dirPath,
+					terminal,
+					customPath as string,
+				);
 				if (!result.success) {
 					return { success: false, error: result.error };
 				}
@@ -3014,7 +3036,7 @@ export function registerWorktreeHandlers(
 										const mainWindow = getMainWindow();
 										if (mainWindow) {
 											mainWindow.webContents.send(
-												IPC_CHANNELS.TASK_UPDATE,
+												IPC_CHANNELS.TASK_UPDATED_EVENT,
 												task.id,
 												{ metadata: { visualProof } },
 												project.id,
@@ -3148,7 +3170,7 @@ export function registerWorktreeHandlers(
 				const mainWindow = getMainWindow();
 				if (mainWindow) {
 					mainWindow.webContents.send(
-						IPC_CHANNELS.TASK_UPDATE,
+						IPC_CHANNELS.TASK_UPDATED_EVENT,
 						task.id,
 						{ metadata: { visualProof } },
 						project.id,

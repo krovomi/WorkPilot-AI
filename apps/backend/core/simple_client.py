@@ -68,7 +68,7 @@ from core.auth import (
     configure_sdk_authentication,
     get_sdk_env_vars,
 )
-from core.platform import validate_cli_path
+from foundation.platform import validate_cli_path
 from phase_config import get_thinking_budget
 
 logger = logging.getLogger(__name__)
@@ -143,7 +143,7 @@ def create_simple_client(
             )
         allowed_tools.extend(mcp_tools_for_servers(list(mcp_servers)))
 
-    from core.offline_policy import guard_cloud_client
+    from offline_policy import guard_cloud_client
 
     guard_cloud_client(cwd or Path.cwd(), os.environ.get("AUTO_CLAUDE_PROJECT_DIR"))
 

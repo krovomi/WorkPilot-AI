@@ -12,6 +12,7 @@ import {
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { type BrowserWindow, ipcMain } from "electron";
+import { pythonRunnerEnv } from "../../utils/python-runner-env";
 
 // ESM doesn't expose __dirname out of the box. The main process is bundled
 // as ESM (apps/frontend/package.json sets "type": "module"), so we have to
@@ -97,6 +98,7 @@ import {
 	startPhaseRerun,
 	type RerunPhase,
 } from "./plan-rerun-utils";
+import { updateExistingFile } from "../../utils/existing-file";
 
 /**
  * Whether starting `task` needs Claude OAuth authentication.
@@ -1071,9 +1073,9 @@ export function registerTaskExecutionHandlers(
 						: []),
 				];
 				for (const resetPlanPath of resetPlanPaths) {
-					if (!existsSync(resetPlanPath)) continue;
 					try {
-						const resetPlan = JSON.parse(readFileSync(resetPlanPath, "utf-8"));
+						updateExistingFile(resetPlanPath, (text) => {
+						const resetPlan = JSON.parse(text);
 						if (resetPlan.phases) {
 							for (const phase of resetPlan.phases) {
 								if (Array.isArray(phase.subtasks)) {
@@ -1093,11 +1095,8 @@ export function registerTaskExecutionHandlers(
 						resetPlan.status = "in_progress";
 						resetPlan.planStatus = "in_progress";
 						resetPlan.updated_at = new Date().toISOString();
-						writeFileSync(
-							resetPlanPath,
-							JSON.stringify(resetPlan, null, 2),
-							"utf-8",
-						);
+						return JSON.stringify(resetPlan, null, 2);
+						});
 					} catch (resetError) {
 						appLog.warn(
 							`[TASK_REVIEW] Could not reset plan ${resetPlanPath}: ${resetError instanceof Error ? resetError.message : String(resetError)}`,
@@ -1293,13 +1292,11 @@ print(json.dumps(result))
 							timeout: 60000, // 60 seconds timeout for PR creation
 							input: Buffer.from(prParams, "utf-8"),
 							maxBuffer: 10 * 1024 * 1024, // PR output can be sizable
-							env: {
-								...process.env,
-								APP_LANGUAGE: getAppLanguage(),
-								PYTHONPATH: backendPath,
-								PYTHONUTF8: "1",
-								PYTHONIOENCODING: "utf-8",
-							},
+							env: await pythonRunnerEnv(backendPath, {
+								extra: {
+									APP_LANGUAGE: getAppLanguage(),
+								},
+							}),
 						});
 
 						// Clean up temporary script
@@ -1321,7 +1318,7 @@ print(json.dumps(result))
 							const mainWindow = getMainWindow();
 							if (mainWindow && prResult.pr_url) {
 								mainWindow.webContents.send(
-									IPC_CHANNELS.TASK_UPDATE,
+									IPC_CHANNELS.TASK_UPDATED_EVENT,
 									taskId,
 									{ prUrl: prResult.pr_url },
 									project.id,
@@ -3001,7 +2998,7 @@ print(json.dumps(result))
 	 * loop and its spec pipeline, so one Pause click stops all three.
 	 */
 	ipcMain.handle(
-		"TASK_PAUSE",
+		IPC_CHANNELS.TASK_PAUSE,
 		async (_, taskId: string, subtaskId?: string): Promise<IPCResult> => {
 			try {
 				const { task, project } = findTaskAndProject(taskId);
@@ -3075,7 +3072,7 @@ print(json.dumps(result))
 	 * is also what resumes, at launch, the tasks WorkPilot was running when it
 	 * was closed.
 	 */
-	ipcMain.handle("TASK_RESUME", async (_, taskId: string): Promise<IPCResult> => {
+	ipcMain.handle(IPC_CHANNELS.TASK_RESUME, async (_, taskId: string): Promise<IPCResult> => {
 		try {
 			return await resumePausedTask(agentManager, taskId);
 		} catch (error) {

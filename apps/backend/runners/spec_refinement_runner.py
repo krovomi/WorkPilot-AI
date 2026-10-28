@@ -16,7 +16,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -44,7 +44,7 @@ def _emit_event(event_type: str, data: dict[str, Any]) -> None:
 
 
 def _iso(ts: float) -> str:
-    return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+    return datetime.fromtimestamp(ts, tz=UTC).isoformat()
 
 
 def _signal_to_dict(signal: FeedbackSignal) -> dict[str, Any]:
@@ -190,4 +190,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    from core.log_redaction import install_global_redaction
+
+    install_global_redaction()
     main()

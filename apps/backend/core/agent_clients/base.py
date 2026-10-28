@@ -15,6 +15,7 @@ import os
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Iterable, Mapping
 from dataclasses import dataclass, field
+from datetime import UTC
 from enum import Enum
 from typing import Any
 
@@ -103,9 +104,9 @@ def _parse_retry_after(headers: object, cap_seconds: float) -> float | None:
         reset_dt = parsedate_to_datetime(raw)
         if reset_dt is None:
             return None
-        from datetime import datetime, timezone
+        from datetime import datetime
 
-        now = datetime.now(reset_dt.tzinfo or timezone.utc)
+        now = datetime.now(reset_dt.tzinfo or UTC)
         seconds = (reset_dt - now).total_seconds()
         return max(0.0, min(seconds, cap_seconds))
     except (TypeError, ValueError, OverflowError):
@@ -254,6 +255,25 @@ class AgentClient(ABC):
     - Declaring sub-agent support capability
     """
 
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        """Trace every client the same way (``genai_trace``).
+
+        Each subclass's own ``query`` and ``receive_response`` are wrapped once,
+        here, so a new adapter is traced without a line of its own: one
+        ``invoke_agent`` span per response, its tools, and the model calls it
+        records through :meth:`_record_call`. Off unless an OTLP endpoint is
+        set; the prompt's size is noted either way, for an estimate.
+        """
+        super().__init_subclass__(**kwargs)
+        from genai_trace.session import traced_query, traced_response
+
+        own = cls.__dict__
+        if "query" in own and not getattr(own["query"], "__genai_traced__", False):
+            cls.query = traced_query(own["query"])
+        receive = own.get("receive_response")
+        if receive is not None and not getattr(receive, "__genai_traced__", False):
+            cls.receive_response = traced_response(receive)
+
     @abstractmethod
     async def query(self, prompt: str) -> None:
         """Send a prompt/query to the agent.
@@ -382,6 +402,9 @@ class AgentClient(ABC):
         if self.usage_ledger is None:
             self.usage_ledger = UsageLedger()
         self.usage_ledger.record(usage, thread=thread)
+        from genai_trace.session import model_call
+
+        model_call(usage, thread)
 
     def _record_subagent_return(self, report: SubagentReturn | None) -> None:
         """What one sub-agent brought back into this client's context."""

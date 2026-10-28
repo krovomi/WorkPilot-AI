@@ -7,7 +7,7 @@ import { IPC_CHANNELS } from "../../shared/constants";
 
 export function registerCodeMigrationHandlers(): void {
 	ipcMain.handle(
-		"codeMigration:start",
+		IPC_CHANNELS.CODE_MIGRATION_START,
 		async (_event, request: CodeMigrationRequest) => {
 			try {
 				await codeMigrationService.startMigration(request);
@@ -22,7 +22,7 @@ export function registerCodeMigrationHandlers(): void {
 		},
 	);
 
-	ipcMain.handle("codeMigration:cancel", async () => {
+	ipcMain.handle(IPC_CHANNELS.CODE_MIGRATION_CANCEL, async () => {
 		try {
 			const cancelled = codeMigrationService.cancel();
 			return { success: true, cancelled };
@@ -33,27 +33,6 @@ export function registerCodeMigrationHandlers(): void {
 			};
 		}
 	});
-
-	ipcMain.handle(
-		"codeMigration:configure",
-		async (
-			_event,
-			config: { pythonPath?: string; autoBuildSourcePath?: string },
-		) => {
-			try {
-				codeMigrationService.configure(
-					config.pythonPath,
-					config.autoBuildSourcePath,
-				);
-				return { success: true };
-			} catch (error) {
-				return {
-					success: false,
-					error: error instanceof Error ? error.message : "Unknown error",
-				};
-			}
-		},
-	);
 }
 
 /**

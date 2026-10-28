@@ -41,7 +41,7 @@ _mocked_module_names = [
     "client",
     # Config & phases
     "phase_config",
-    "core.phase_event",
+    "foundation.phase_event",
     # Logging & utilities
     "core.debug",
     "ui",

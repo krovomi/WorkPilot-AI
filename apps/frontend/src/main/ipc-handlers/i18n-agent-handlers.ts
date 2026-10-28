@@ -18,6 +18,8 @@ import { type ChildProcess, spawn } from "node:child_process";
 import path from "node:path";
 import { app, BrowserWindow, ipcMain } from "electron";
 import { pythonEnvManager } from "../python-env-manager.js";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
+import { pythonRunnerEnv } from "../utils/python-runner-env";
 
 interface RunRequest {
 	projectPath: string;
@@ -45,13 +47,13 @@ export function registerI18nAgentHandlers(): void {
 	};
 
 	ipcMain.handle(
-		"i18nAgent:run",
+		IPC_CHANNELS.I18N_AGENT_RUN,
 		async (_event, { projectPath, referenceLocale = "en" }: RunRequest) => {
 			killExisting();
 
 			if (!projectPath) {
 				const message = "projectPath is required";
-				broadcast("i18n-agent-error", message);
+				broadcast(IPC_CHANNELS.I18N_AGENT_ERROR, message);
 				throw new Error(message);
 			}
 
@@ -80,7 +82,7 @@ export function registerI18nAgentHandlers(): void {
 				],
 				{
 					cwd: backendPath,
-					env: { ...process.env, PYTHONPATH: backendPath },
+					env: await pythonRunnerEnv(backendPath),
 				} as Parameters<typeof spawn>[2],
 			);
 			currentProcess = child;
@@ -101,7 +103,7 @@ export function registerI18nAgentHandlers(): void {
 					if (line.startsWith(EVENT_PREFIX)) {
 						try {
 							const payload = JSON.parse(line.slice(EVENT_PREFIX.length));
-							broadcast("i18n-agent-event", payload);
+							broadcast(IPC_CHANNELS.I18N_AGENT_EVENT, payload);
 						} catch (err) {
 							console.error("[i18nAgent] Bad event line:", err);
 						}
@@ -125,12 +127,12 @@ export function registerI18nAgentHandlers(): void {
 				child.on("close", (code) => {
 					currentProcess = null;
 					if (code === 0 && result) {
-						broadcast("i18n-agent-result", result);
+						broadcast(IPC_CHANNELS.I18N_AGENT_RESULT, result);
 						resolve(result);
 					} else {
 						const message =
 							errorMessage ?? `i18n runner exited with code ${code}`;
-						broadcast("i18n-agent-error", message);
+						broadcast(IPC_CHANNELS.I18N_AGENT_ERROR, message);
 						reject(new Error(message));
 					}
 				});
@@ -138,14 +140,14 @@ export function registerI18nAgentHandlers(): void {
 				child.on("error", (err) => {
 					currentProcess = null;
 					const message = `Failed to start i18n runner: ${err.message}`;
-					broadcast("i18n-agent-error", message);
+					broadcast(IPC_CHANNELS.I18N_AGENT_ERROR, message);
 					reject(new Error(message));
 				});
 			});
 		},
 	);
 
-	ipcMain.handle("i18nAgent:cancel", () => {
+	ipcMain.handle(IPC_CHANNELS.I18N_AGENT_CANCEL, () => {
 		killExisting();
 		return true;
 	});

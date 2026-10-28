@@ -12,8 +12,8 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from core.api_safety import safe_error, validated_dir
 from fastapi import APIRouter
+from foundation.api_safety import safe_error, validated_dir
 from pydantic import BaseModel, Field
 
 from .ingest import CoverageParseError
@@ -37,7 +37,8 @@ class ScoreRequest(BaseModel):
         True,
         description=(
             "If true (default), reads .workpilot/continuous-ai/deps/latest_scan.json "
-            "from the project root and feeds the vulnerabilities into the scorer."
+            "from the project root and feeds the vulnerabilities into the scorer; "
+            "a snapshot older than 30 days, or undated, is no signal."
         ),
     )
 

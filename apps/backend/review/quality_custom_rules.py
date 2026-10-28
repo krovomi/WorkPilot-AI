@@ -226,7 +226,7 @@ def load_project_rules(project_dir: Path) -> CustomRuleEngine:
     - .workpilot/quality/rules.yml (la feature qualité n'a qu'un dossier sous
       .workpilot/ ; un ancien .workpilot/quality-rules.yml y est déplacé)
     """
-    from core.workpilot_layout import move_legacy
+    from foundation.workpilot_layout import move_legacy
 
     engine = CustomRuleEngine()
     quality_dir = project_dir / ".workpilot" / "quality"

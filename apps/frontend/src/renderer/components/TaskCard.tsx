@@ -80,9 +80,11 @@ import {
 	useTaskStore,
 } from "../stores/task-store";
 import { PhaseProgressIndicator } from "./PhaseProgressIndicator";
+import { TaskSandboxNotice } from "./task-sandbox/TaskSandboxNotice";
 import { SessionCompactionBadge } from "./SessionCompactionBadge";
 import { StreamingSessionButton } from "./streaming/StreamingSessionButton";
 import { TaskKindBadge } from "./task-detail/TaskKindBadge";
+import { TaskPermissionPrompt } from "./task-permission/TaskPermissionPrompt";
 import { SyncFromBranchDialog } from "./task-detail/task-review/SyncFromBranchDialog";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -1573,6 +1575,10 @@ export const TaskCard = memo(function TaskCard({
 
 						{/* Azure DevOps pipeline badge (CI/CD loop) */}
 						<PipelineBadge task={task} t={t} />
+						<TaskSandboxNotice taskId={task.id} specId={task.specId} />
+
+						{/* An ACP agent waiting for the person before it acts */}
+						<TaskPermissionPrompt taskId={task.id} specId={task.specId} />
 
 
 						{/* Progress section - Phase-aware with animations */}

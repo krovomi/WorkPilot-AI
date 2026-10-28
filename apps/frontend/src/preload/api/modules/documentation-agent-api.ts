@@ -36,9 +36,6 @@ export interface DocumentationAgentAPI {
 		cancelled: boolean;
 		error?: string;
 	}>;
-	configureDocumentationAgent: (config: {
-		pythonPath?: string;
-	}) => Promise<{ success: boolean; error?: string }>;
 	onDocumentationAgentStatus: (
 		callback: (status: string) => void,
 	) => () => void;
@@ -54,11 +51,9 @@ export interface DocumentationAgentAPI {
 export function createDocumentationAgentAPI(): DocumentationAgentAPI {
 	return {
 		generateDocumentation: (request) =>
-			invokeIpc("documentationAgent:generate", request),
+			invokeIpc(IPC_CHANNELS.DOCUMENTATION_AGENT_GENERATE, request),
 		cancelDocumentation: () =>
-			invokeIpc("documentationAgent:cancel"),
-		configureDocumentationAgent: (config) =>
-			invokeIpc("documentationAgent:configure", config),
+			invokeIpc(IPC_CHANNELS.DOCUMENTATION_AGENT_CANCEL),
 		onDocumentationAgentStatus: (callback) =>
 			createIpcListener(IPC_CHANNELS.DOCUMENTATION_AGENT_STATUS, callback),
 		onDocumentationAgentStreamChunk: (callback) =>

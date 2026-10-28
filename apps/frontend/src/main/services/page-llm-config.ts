@@ -85,7 +85,7 @@ export function getGlobalProviderEnv(): Record<string, string> {
 		// force `SELECTED_LLM_PROVIDER` même quand le choix est Claude, que le
 		// chemin sans surcharge laisse au défaut du backend. La distinction
 		// compte maintenant qu'une route hors-ligne hybride ne peut plus passer
-		// devant un fournisseur choisi (`core.offline_policy.resolve_offline_route`).
+		// devant un fournisseur choisi (`offline_policy.resolve_offline_route`).
 		return credentialManager.getEnvironmentVariables(provider || undefined);
 	} catch {
 		return {};

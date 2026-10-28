@@ -8,8 +8,12 @@ Autonomous coding framework. Builds software features through coordinated multi-
 
 ```bash
 cd apps/backend
-python -m pip install -r requirements.txt
+python -m pip install -r requirements.lock
 ```
+
+`requirements.lock` holds the exact versions (with hashes, for every platform) that CI tests and the
+server image ships; `requirements.txt` holds the ranges it is compiled from. After editing a range,
+run `pnpm run lock:python` from the repository root.
 
 ### 2. Configure
 
@@ -66,6 +70,13 @@ Optional `.env-files/.env` settings:
 | `DEBUG=true` | Enable debug logging |
 | `LINEAR_API_KEY` | Enable Linear integration |
 | `BRAIN_ENABLED=false` | Turn memory (the shared brain) off |
+| `WORKPILOT_SANDBOX` | `auto` (default), `required` or `off`: run agent commands under bubblewrap / Seatbelt ([os-sandbox.md](../../docs/architecture/os-sandbox.md)) |
+| `WORKPILOT_SANDBOX_HOSTS` | Extra hosts a sandboxed command may reach (private registry, mirror) |
+| `AUTO_CLAUDE_OTEL_ENDPOINT` | OTLP endpoint; also turns on GenAI spans for every provider ([genai-traces.md](../../docs/architecture/genai-traces.md)) |
+| `WORKPILOT_MCP_TASK_TIMEOUT` | Seconds an MCP tool call returned as a task may run before it is cancelled (default 1800) |
+| `WORKPILOT_BENCH_CONCURRENCY` | Repo bench builds running at once (default 2, at most 4) |
+
+The complete list is in [`docs/CONFIGURATION.md`](../../docs/CONFIGURATION.md).
 
 ## Troubleshooting
 
@@ -88,11 +99,21 @@ backend/
 ├── agents/              # AI agent execution (planner, coder, session) + subagents/ registry
 ├── qa/                  # QA reviewer / fixer validation loop
 ├── spec/                # Spec creation and management
-├── core/                # Client factory, auth, worktree, platform/ abstraction
+├── core/                # Composition root: client factory, provider clients (agent_clients/, ACP included), effort plan, auth, worktree
+├── foundation/          # Lowest layer, imports nothing back: platform/, api_safety, git, phase events
+├── offline_policy/      # airgapStrict: every backend network call asks it first
 ├── prompts/             # Agent system prompts (~50, incl. github/)
 ├── skills/              # Token-optimized dynamic skill execution
 ├── integrations/        # External services (GitHub, GitLab, Azure, Linear, Jira)
 ├── merge/               # Semantic git merge handling
+├── verify/              # Launch the changed app, read its errors, keep a proof (web, mobile, API, Windows UI Automation)
+├── pr_followup/         # The card follows its PR: red checks and review threads go to the QA fixer
+├── goal/                # Goal mode: a command and its exit code decide when a task is done
+├── best_of_n/           # Build a task N ways, rank the builds on numbers
+├── bench/               # Repo bench: replay finished cards against hidden tests
+├── os_sandbox/          # bubblewrap / Seatbelt around agent commands, filtering proxy
+├── genai_trace/         # OpenTelemetry GenAI spans for every AgentClient
+├── mcp_tasks/           # MCP 2026-07-28 tasks on WorkPilot's own MCP servers
 ├── project/             # Project / stack detection
 ├── context/             # Task context building
 ├── runners/             # One-shot task runners (insights, oneshot, etc.)
@@ -113,39 +134,45 @@ backend/
 ### Design Principles
 
 - **SOLID** - Single responsibility, clean interfaces
-- **DRY** - Shared utilities in `core/`
+- **DRY** - Shared utilities in `foundation/`, which imports nothing of the backend; `core/` composes the agents on top of it
 - **KISS** - Flat imports from the backend root (`from agents.coder import …`); compatibility shims have been removed
 
 ### Import Convention
 
 ```python
-# Use facade modules for clean imports
-from debug import debug, debug_error
-from progress import count_subtasks
-from workspace import setup_workspace
+# Import the real module; the root-level facades are gone
+from core.debug import debug, debug_error
+from core.progress import count_subtasks
+from foundation.platform import is_windows
 ```
+
+`tests/test_import_contracts.py` holds the layers: `foundation`, `security`, `project`,
+`offline_policy` and a few more import only what their contract lists, and the largest import
+cycle (`MAX_CYCLE`) may only shrink.
 
 ### Adding Features
 
 1. Create module in appropriate folder
 2. Export API in `__init__.py`
-3. Add facade module at root if commonly imported
+3. A helper that imports nothing of the backend goes in `foundation/`, not `core/`
 
 ## Multi-Provider LLM Support
 
 Le backend supporte la sélection dynamique du LLM via l'interface utilisateur ou la configuration du projet.
 
 Providers supportés :
-- Anthropic (Claude Opus, Sonnet, Haiku)
-- OpenAI (GPT-4, GPT-3.5)
+- Anthropic (Claude Opus, Sonnet, Haiku), par le SDK Claude Agent ou le CLI Claude Code
+- OpenAI (API et Codex)
 - GitHub Copilot
-- Google (Gemini)
-- Ollama (modèles locaux)
-- Meta (Llama)
-- Mistral AI
-- DeepSeek
+- Google (Gemini API, et Gemini CLI par le client ACP)
+- xAI (Grok), Mistral AI, DeepSeek
+- Ollama (modèles locaux) et tout endpoint compatible OpenAI
+- CLI pi (pi.dev), OpenCode, Antigravity
+- Tout agent Agent Client Protocol déclaré par un bloc `acp:` de `capabilities/providers.yaml`
 
 La sélection du provider se fait automatiquement via l'interface utilisateur et est synchronisée avec les agents d'exécution.
+Chaque provider reçoit l'effort de raisonnement sur sa propre échelle ; `core/effort_plan.py` dit ce qui
+est réellement envoyé, et le sélecteur d'effort l'affiche (`GET /providers/effort`).
 
 ## License
 

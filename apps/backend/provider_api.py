@@ -31,16 +31,24 @@ try:
 except Exception as _e:  # noqa: BLE001 — never block boot on this
     logging.getLogger(__name__).warning("Could not install log redaction: %s", _e)
 
+# Error reporting, after redaction so a captured log line is already masked.
+# Inert without SENTRY_DSN, and in development unless SENTRY_DEV is set.
+try:
+    from core.sentry import init_sentry
+
+    init_sentry(component="api")
+except Exception as _e:  # noqa: BLE001 — never block boot on this
+    logging.getLogger(__name__).warning("Could not initialise Sentry: %s", _e)
+
 import ipaddress
 import json
 import os
 import socket
-import threading
 from typing import Annotated, Any
 from urllib.parse import urlparse
 
 import httpx
-from fastapi import Body, Depends, FastAPI, HTTPException, Query, Request
+from fastapi import APIRouter, Body, Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -132,6 +140,9 @@ AUTHORIZED_URLS = {
     "windsurf": "https://server.codeium.com",
 }
 
+# Hosts a local LLM server may be probed on, mapped to the literal used in the URL.
+_LOCAL_LLM_HOSTS = {"localhost": "localhost", "127.0.0.1": "127.0.0.1"}
+
 # Private IP ranges for SSRF protection
 PRIVATE_IP_RANGES = [
     ipaddress.IPv4Network("10.0.0.0/8"),
@@ -186,6 +197,7 @@ def force_claude_provider_config(*args, **kwargs):
     return _get_llm_config()["force_claude_provider_config"](*args, **kwargs)
 
 
+import provider_selection
 from validated_keys_db import is_validated, set_validated
 
 
@@ -232,6 +244,13 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+# The provider surface defined in this file. A route declared on `app` itself
+# carries no permission in server mode; these are mounted through `_mount`
+# like every feature router (below, before the feature routers, so route
+# precedence is what it was). Only liveness (`/health`) stays on `app`, and
+# tests/backend/test_feature_router_authz.py holds it to that.
+providers_router = APIRouter()
 
 # --- Multi-user server mode (no-op unless WORKPILOT_SERVER_MODE is enabled) ---
 # SECURITY: this must FAIL CLOSED. `mount_server_mode` is what installs the
@@ -340,10 +359,6 @@ app.add_middleware(
         "X-Provider",
     ],
 )
-
-# Global variable to store selected provider (ContextVar doesn't work across HTTP requests)
-_selected_provider: str | None = None
-_provider_lock = threading.Lock()
 
 
 def _get_anthropic_token() -> str | None:
@@ -513,7 +528,7 @@ def get_env_provider_config(name: str) -> dict | None:
 
 
 # Correction de la détection dynamique : n'afficher que les providers réellement implémentés
-@app.get("/providers/{provider}/status")
+@providers_router.get("/providers/{provider}/status")
 def get_provider_status(provider: str):
     """Get the status of a specific provider."""
     try:
@@ -542,7 +557,7 @@ def get_provider_status(provider: str):
         }
 
 
-@app.get("/providers")
+@providers_router.get("/providers")
 def get_providers():
     config_path = os.path.abspath(
         os.path.join(
@@ -665,12 +680,12 @@ def get_providers():
     return {"providers": providers, "status": status}
 
 
-@app.get("/providers/configs", dependencies=[Depends(deny_in_server_mode)])
+@providers_router.get("/providers/configs", dependencies=[Depends(deny_in_server_mode)])
 def get_provider_configs():
     return {"configs": list_provider_configs()}
 
 
-@app.get(
+@providers_router.get(
     "/providers/config/{provider}",
     responses={404: {"description": PROVIDER_CONFIG_NOT_FOUND}},
     dependencies=[Depends(deny_in_server_mode)],
@@ -682,35 +697,38 @@ def get_provider_config(provider: str):
     return config
 
 
-@app.post("/providers/config/{provider}", dependencies=[Depends(deny_in_server_mode)])
+@providers_router.post(
+    "/providers/config/{provider}", dependencies=[Depends(deny_in_server_mode)]
+)
 def set_provider_config(provider: str, config: dict[str, Any]):
     save_provider_config(provider, config)
     return {"status": "ok"}
 
 
-@app.delete("/providers/config/{provider}", dependencies=[Depends(deny_in_server_mode)])
+@providers_router.delete(
+    "/providers/config/{provider}", dependencies=[Depends(deny_in_server_mode)]
+)
 def delete_provider_config_api(provider: str):
     delete_provider_config(provider)
     return {"status": "deleted"}
 
 
-@app.post("/providers/select")
+# Process-wide (provider_selection.py): every build reads it, whoever asked.
+# One user's choice on a shared server is everyone's.
+@providers_router.post("/providers/select", dependencies=[Depends(deny_in_server_mode)])
 def select_provider(provider: Annotated[str, Query(...)]):
-    global _selected_provider
-    with _provider_lock:
-        _selected_provider = provider
+    provider_selection.select_provider(provider)
     return {"selected": provider}
 
 
-@app.get("/providers/selected")
+@providers_router.get("/providers/selected")
 def get_selected_provider_endpoint():
     """Get the currently selected provider."""
     return {"selected": get_selected_provider()}
 
 
 def get_selected_provider() -> str | None:
-    with _provider_lock:
-        return _selected_provider
+    return provider_selection.get_selected_provider()
 
 
 def validate_url_ssrf(provider: str, url: str) -> str:
@@ -871,23 +889,20 @@ def _validate_url_ssrf(provider: str, url: str) -> str:
     return f"{parsed.scheme}://{netloc}".rstrip("/")
 
 
-def _validate_openai_base_url(base_url: str | None) -> str:
+def _authorized_base_url(provider: str, base_url: str | None) -> str:
+    """Validate ``base_url`` for an authorized provider and return its constant root.
+
+    ``_validate_url_ssrf`` already rebuilds an authorized provider's URL from
+    ``AUTHORIZED_URLS``; returning the constant itself keeps the request URL
+    free of any byte the client sent, which is what a reader (and CodeQL)
+    can check without following the validator.
     """
-    Validate a user-provided OpenAI base URL to prevent SSRF.
-
-    Returns a safe base URL string or raises ValueError if invalid.
-    """
-    # Default official OpenAI API endpoint when no base_url is provided.
-    if not base_url:
-        return "https://api.openai.com"
-
-    try:
-        return _validate_url_ssrf("openai", base_url)
-    except ValueError as e:
-        raise ValueError(f"Invalid OpenAI base URL: {e}")
+    authorized = AUTHORIZED_URLS[provider]
+    _validate_url_ssrf(provider, base_url or authorized)
+    return authorized
 
 
-@app.post("/providers/test-key/{provider}")
+@providers_router.post("/providers/test-key/{provider}")
 @limiter.limit("5/minute")
 async def test_provider_api_key(request: Request, provider: str, payload: dict):
     """Test an API key for any supported provider."""
@@ -932,23 +947,20 @@ async def test_provider_api_key(request: Request, provider: str, payload: dict):
     # --- OpenAI ---
     if provider == "openai":
         try:
-            safe_base_url = _validate_openai_base_url(base_url)
+            url = _authorized_base_url("openai", base_url) + API_MODELS_ENDPOINT
         except ValueError as e:
             raise HTTPException(status_code=400, detail=_safe_error_message(e))
-        url = safe_base_url + API_MODELS_ENDPOINT
         return await _test_bearer(url, api_key, provider)
 
     # --- Google Gemini ---
     if provider == "google":
         try:
-            safe_url = (
-                _validate_url_ssrf(
-                    "google", "https://generativelanguage.googleapis.com"
-                )
-                + API_MODELS_ENDPOINT
-            )
+            safe_url = _authorized_base_url("google", None) + API_MODELS_ENDPOINT
+            # The key travels in a header, never in the URL: a URL ends up in
+            # proxy and access logs.
+            headers = {"x-goog-api-key": api_key}
             async with httpx.AsyncClient(timeout=DEFAULT_HTTP_TIMEOUT) as client:
-                resp = await client.get(f"{safe_url}?key={api_key}", timeout=10)
+                resp = await client.get(safe_url, headers=headers, timeout=10)
             if resp.status_code == 200:
                 set_validated(provider, api_key, True)
                 return {"success": True}
@@ -961,10 +973,7 @@ async def test_provider_api_key(request: Request, provider: str, payload: dict):
     # --- Mistral AI ---
     if provider == "mistral":
         try:
-            safe_base_url = _validate_url_ssrf(
-                "mistral", base_url or "https://api.mistral.ai"
-            )
-            url = safe_base_url + API_MODELS_ENDPOINT
+            url = _authorized_base_url("mistral", base_url) + API_MODELS_ENDPOINT
             return await _test_bearer(url, api_key, provider)
         except ValueError as e:
             return {"success": False, "error": _safe_error_message(e)}
@@ -972,10 +981,7 @@ async def test_provider_api_key(request: Request, provider: str, payload: dict):
     # --- DeepSeek ---
     if provider == "deepseek":
         try:
-            safe_base_url = _validate_url_ssrf(
-                "deepseek", base_url or "https://api.deepseek.com"
-            )
-            url = safe_base_url + API_MODELS_ENDPOINT
+            url = _authorized_base_url("deepseek", base_url) + API_MODELS_ENDPOINT
             return await _test_bearer(url, api_key, provider)
         except ValueError as e:
             return {"success": False, "error": _safe_error_message(e)}
@@ -983,9 +989,7 @@ async def test_provider_api_key(request: Request, provider: str, payload: dict):
     # --- Grok (xAI) ---
     if provider == "grok":
         try:
-            safe_url = (
-                _validate_url_ssrf("grok", "https://api.x.ai") + API_MODELS_ENDPOINT
-            )
+            safe_url = _authorized_base_url("grok", None) + API_MODELS_ENDPOINT
             return await _test_bearer(safe_url, api_key, provider)
         except ValueError as e:
             return {"success": False, "error": _safe_error_message(e)}
@@ -993,10 +997,7 @@ async def test_provider_api_key(request: Request, provider: str, payload: dict):
     # --- Meta (via Together AI / Replicate — OpenAI-compatible) ---
     if provider == "meta":
         try:
-            safe_base_url = _validate_url_ssrf(
-                "meta", base_url or "https://api.together.xyz"
-            )
-            url = safe_base_url + API_MODELS_ENDPOINT
+            url = _authorized_base_url("meta", base_url) + API_MODELS_ENDPOINT
             return await _test_bearer(url, api_key, provider)
         except ValueError as e:
             return {"success": False, "error": _safe_error_message(e)}
@@ -1004,10 +1005,7 @@ async def test_provider_api_key(request: Request, provider: str, payload: dict):
     # --- Cursor ---
     if provider == "cursor":
         try:
-            safe_base_url = _validate_url_ssrf(
-                "cursor", base_url or "https://api.cursor.com"
-            )
-            url = safe_base_url + API_MODELS_ENDPOINT
+            url = _authorized_base_url("cursor", base_url) + API_MODELS_ENDPOINT
             return await _test_bearer(url, api_key, provider)
         except ValueError as e:
             return {"success": False, "error": _safe_error_message(e)}
@@ -1059,7 +1057,7 @@ async def test_provider_api_key(request: Request, provider: str, payload: dict):
             )
             try:
                 stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=5)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 proc.kill()
                 try:
                     await proc.wait()
@@ -1099,22 +1097,21 @@ async def test_provider_api_key(request: Request, provider: str, payload: dict):
             if parsed.scheme not in ("http", "https"):
                 return None
 
-            hostname = parsed.hostname or ""
-            if hostname not in ("localhost", "127.0.0.1"):
-                # Local LLM servers are local by definition — refuse anything
-                # else to avoid turning this endpoint into an SSRF probe.
+            # Every piece of the root is rebuilt from a constant or an int, so
+            # nothing the client typed reaches the request URL as text: the
+            # host comes from a closed list (local servers only, to keep this
+            # endpoint from becoming an SSRF probe) and the port is a number.
+            scheme = "https" if parsed.scheme == "https" else "http"
+            host = _LOCAL_LLM_HOSTS.get(parsed.hostname or "")
+            if host is None:
                 return None
-
-            root = f"{parsed.scheme}://{hostname}"
-            if parsed.port:
-                root += f":{parsed.port}"
-            root = root.rstrip("/")
-            # Strip any OpenAI-style suffix the user may have included.
-            for suffix in ("/v1/chat/completions", "/chat/completions", "/v1"):
-                if root.endswith(suffix):
-                    root = root[: -len(suffix)].rstrip("/")
-                    break
-            return root
+            try:
+                port = parsed.port
+            except ValueError:
+                return None
+            if port is None:
+                return f"{scheme}://{host}"
+            return f"{scheme}://{host}:{int(port):d}"
 
         root = build_local_root(base_url)
         if root is None:
@@ -1149,7 +1146,7 @@ async def test_provider_api_key(request: Request, provider: str, payload: dict):
     }
 
 
-@app.get("/providers/models/{provider}")
+@providers_router.get("/providers/models/{provider}")
 def get_provider_models(provider: str, refresh: bool = False):
     """Returns a list of known model IDs for the given provider.
 
@@ -1168,7 +1165,7 @@ def get_provider_models(provider: str, refresh: bool = False):
     }
 
 
-@app.get("/providers/ollama/library/search")
+@providers_router.get("/providers/ollama/library/search")
 def search_official_ollama_library(q: str = ""):
     """Autocomplete only names and tags listed by the official Ollama library."""
     import httpx
@@ -1184,7 +1181,7 @@ def search_official_ollama_library(q: str = ""):
         ) from exc
 
 
-@app.get("/providers/models/{provider}/catalog")
+@providers_router.get("/providers/models/{provider}/catalog")
 def get_provider_models_catalog(provider: str, refresh: bool = False):
     """Returns the full model catalog for `provider` with provenance.
 
@@ -1203,7 +1200,7 @@ def get_provider_models_catalog(provider: str, refresh: bool = False):
     return list_models(provider, force_refresh=refresh)
 
 
-@app.get("/providers/agentic-capabilities")
+@providers_router.get("/providers/agentic-capabilities")
 def get_agentic_capabilities():
     """What each provider can drive, from `capabilities/providers.yaml`.
 
@@ -1241,6 +1238,25 @@ def get_agentic_capabilities():
             for name, caps in load_providers().items()
         }
     }
+
+
+@providers_router.get("/providers/effort")
+def get_effort_plan(provider: str = "", model: str = ""):
+    """What each Kanban effort level becomes on `provider` and `model`.
+
+    Served from `core/effort_plan.py`, the module the clients themselves read,
+    so the picker can never promise an effort the model will not receive.
+
+    Response shape::
+
+        {"provider": str, "model": str,
+         "control": "native" | "none" | "runtime",
+         "levels": {"none": str|None, "low": …, "medium": …, "high": …,
+                    "ultrathink": …}}
+    """
+    from core.effort_plan import describe_effort
+
+    return describe_effort(provider, model)
 
 
 # Per-provider key-validation specs. Keep this in sync with AUTHORIZED_URLS above.
@@ -1334,7 +1350,7 @@ async def _validate_key_http(provider: str, api_key: str, spec: dict[str, Any]) 
         )
 
 
-@app.post(
+@providers_router.post(
     "/providers/validate/{provider}",
     responses={400: {"description": "API key validation failed"}},
 )
@@ -1360,7 +1376,7 @@ async def validate_provider_key(
     return {"status": "validated"}
 
 
-@app.get("/db/health")
+@providers_router.get("/db/health")
 def db_health():
     try:
         from validated_keys_db import get_db
@@ -1439,14 +1455,20 @@ def health_check():
         if isinstance(s, dict) and "status" in s
     )
 
+    status = "healthy" if all_ok else "degraded"
+    # This route answers without a token (an orchestrator probes it). On a
+    # shared server that makes the detail public: which providers hold keys,
+    # the Python and OS versions, the PID. The verdict is all a probe needs.
+    if _server_mode_active():
+        return {"status": status}
     return {
-        "status": "healthy" if all_ok else "degraded",
+        "status": status,
         "response_time_ms": elapsed_ms,
         "subsystems": subsystems,
     }
 
 
-@app.get("/providers/usage/{provider}")
+@providers_router.get("/providers/usage/{provider}")
 async def get_provider_usage(provider: str):
     """
     Récupère l'usage et le crédit restant pour le provider OpenAI, Copilot ou autre si implémenté.
@@ -1705,6 +1727,10 @@ async def get_provider_usage(provider: str):
 
 
 # Event-Driven Hooks System API moved to event_hooks/api.py
+
+
+# Every route of `providers_router` is declared above this line.
+_mount(providers_router, "providers")
 
 
 # --- Analytics API (prefer real DB implementation, fall back to minimal stub) ---

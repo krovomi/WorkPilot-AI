@@ -140,8 +140,19 @@ const PI_MODELS: Provider["models"] = [
 	},
 ];
 
+/**
+ * Gemini CLI over the Agent Client Protocol takes its own model ids
+ * (`gemini --model`); `default` leaves it on its `auto` routing.
+ */
+const GEMINI_CLI_MODELS: Provider["models"] = [
+	{ value: CLI_DEFAULT_MODEL, label: "Gemini CLI default (auto)", tier: "standard" },
+	{ value: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro (preview)", tier: "flagship" },
+	{ value: "gemini-2.5-pro", label: "Gemini 2.5 Pro", tier: "standard" },
+	{ value: "gemini-3-flash-preview", label: "Gemini 3 Flash (preview)", tier: "fast" },
+];
+
 /** The CLI each CLI-backed provider runs, as `checkAgentCli` names it. */
-const AGENT_CLI_PROVIDERS = new Set(["opencode", "antigravity", "pi"]);
+const AGENT_CLI_PROVIDERS = new Set(["opencode", "antigravity", "pi", "gemini-cli"]);
 
 /**
  * Registre central des providers LLM
@@ -353,6 +364,19 @@ class ProviderRegistry {
 			requiresOAuth: false,
 			requiresCLI: true,
 			models: PROVIDER_MODELS_MAP.pi ?? PI_MODELS,
+		});
+
+		// --- Gemini CLI (Agent Client Protocol) ---
+		this.providers.set("gemini-cli", {
+			name: "gemini-cli",
+			label: "Gemini CLI (ACP)",
+			description:
+				"Google's coding agent driven over the Agent Client Protocol; it asks on the card before acting",
+			category: "google",
+			requiresApiKey: false,
+			requiresOAuth: false,
+			requiresCLI: true,
+			models: PROVIDER_MODELS_MAP["gemini-cli"] ?? GEMINI_CLI_MODELS,
 		});
 	}
 

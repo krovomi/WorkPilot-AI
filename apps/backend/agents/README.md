@@ -30,7 +30,6 @@ apps/backend/agents/
 ├── test_generator.py        # Streaming unit / integration test generation
 ├── refactorer.py            # Refactoring with smell detection
 ├── documenter.py            # Documentation generation
-├── migration_agent.py       # Framework / library migration (+ skill wrapper)
 ├── impact_analyzer.py       # PR impact analysis
 ├── pr_template_filler.py    # Fills the repository's PR template
 ├── swarm/                   # Wave-based parallel execution of independent subtasks

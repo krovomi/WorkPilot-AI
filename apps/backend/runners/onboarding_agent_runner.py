@@ -15,7 +15,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -189,7 +189,7 @@ def _guide_to_dict(guide: OnboardingGuide) -> dict[str, Any]:
         "techStack": list(guide.tech_stack),
         "steps": steps,
         "totalEstimatedMinutes": total_minutes,
-        "generatedAt": datetime.now(tz=timezone.utc).isoformat(),
+        "generatedAt": datetime.now(tz=UTC).isoformat(),
         "summary": summary.fallback,
         "summaryI18n": summary.to_dict(),
     }
@@ -237,4 +237,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    from core.log_redaction import install_global_redaction
+
+    install_global_redaction()
     main()

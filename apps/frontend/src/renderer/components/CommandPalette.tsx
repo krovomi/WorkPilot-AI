@@ -31,6 +31,7 @@ import {
 	Wrench,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { cn } from "../lib/utils";
 
@@ -128,6 +129,7 @@ function fuzzyMatch(
 // ---------------------------------------------------------------------------
 
 function getBuiltinCommands(
+	t: TFunction,
 	onNavigate: (view: string) => void,
 	onNewTask: () => void,
 	onOpenSettings: () => void,
@@ -137,8 +139,8 @@ function getBuiltinCommands(
 	return [
 		{
 			id: "create_task",
-			label: "Create Task",
-			description: "Create a new task in the Kanban board",
+			label: t("commandPalette.commands.create_task.label"),
+			description: t("commandPalette.commands.create_task.description"),
 			category: "tasks",
 			icon: PlusCircle,
 			shortcut: "Ctrl+N",
@@ -147,8 +149,8 @@ function getBuiltinCommands(
 		},
 		{
 			id: "search_tasks",
-			label: "Search Tasks",
-			description: "Search and filter tasks",
+			label: t("commandPalette.commands.search_tasks.label"),
+			description: t("commandPalette.commands.search_tasks.description"),
 			category: "tasks",
 			icon: Search,
 			shortcut: "/",
@@ -157,8 +159,8 @@ function getBuiltinCommands(
 		},
 		{
 			id: "go_kanban",
-			label: "Go to Kanban",
-			description: "Navigate to the Kanban board",
+			label: t("commandPalette.commands.go_kanban.label"),
+			description: t("commandPalette.commands.go_kanban.description"),
 			category: "navigation",
 			icon: LayoutGrid,
 			shortcut: "Ctrl+1",
@@ -167,8 +169,8 @@ function getBuiltinCommands(
 		},
 		{
 			id: "go_terminals",
-			label: "Go to Terminals",
-			description: "Navigate to the terminal view",
+			label: t("commandPalette.commands.go_terminals.label"),
+			description: t("commandPalette.commands.go_terminals.description"),
 			category: "navigation",
 			icon: Terminal,
 			shortcut: "Ctrl+2",
@@ -177,8 +179,8 @@ function getBuiltinCommands(
 		},
 		{
 			id: "go_insights",
-			label: "Go to Insights",
-			description: "Navigate to the AI Insights chat",
+			label: t("commandPalette.commands.go_insights.label"),
+			description: t("commandPalette.commands.go_insights.description"),
 			category: "navigation",
 			icon: Sparkles,
 			shortcut: "Ctrl+3",
@@ -187,8 +189,8 @@ function getBuiltinCommands(
 		},
 		{
 			id: "go_roadmap",
-			label: "Go to Roadmap",
-			description: "Navigate to the project roadmap",
+			label: t("commandPalette.commands.go_roadmap.label"),
+			description: t("commandPalette.commands.go_roadmap.description"),
 			category: "navigation",
 			icon: Map,
 			shortcut: "Ctrl+4",
@@ -197,8 +199,8 @@ function getBuiltinCommands(
 		},
 		{
 			id: "go_ideation",
-			label: "Go to Ideation",
-			description: "Navigate to the ideation view",
+			label: t("commandPalette.commands.go_ideation.label"),
+			description: t("commandPalette.commands.go_ideation.description"),
 			category: "navigation",
 			icon: Lightbulb,
 			keywords: ["ideation", "brainstorm", "ideas"],
@@ -206,8 +208,8 @@ function getBuiltinCommands(
 		},
 		{
 			id: "go_context",
-			label: "Go to Context",
-			description: "Navigate to the context view",
+			label: t("commandPalette.commands.go_context.label"),
+			description: t("commandPalette.commands.go_context.description"),
 			category: "navigation",
 			icon: BookOpen,
 			keywords: ["context", "memory", "knowledge"],
@@ -215,8 +217,8 @@ function getBuiltinCommands(
 		},
 		{
 			id: "go_agent_tools",
-			label: "Go to Agent Tools",
-			description: "Navigate to agent tools configuration",
+			label: t("commandPalette.commands.go_agent_tools.label"),
+			description: t("commandPalette.commands.go_agent_tools.description"),
 			category: "navigation",
 			icon: Wrench,
 			keywords: ["tools", "agent", "mcp"],
@@ -224,8 +226,8 @@ function getBuiltinCommands(
 		},
 		{
 			id: "go_changelog",
-			label: "Go to Changelog",
-			description: "Navigate to the changelog",
+			label: t("commandPalette.commands.go_changelog.label"),
+			description: t("commandPalette.commands.go_changelog.description"),
 			category: "navigation",
 			icon: FileText,
 			keywords: ["changelog", "updates", "history"],
@@ -233,8 +235,8 @@ function getBuiltinCommands(
 		},
 		{
 			id: "go_worktrees",
-			label: "Go to Worktrees",
-			description: "Navigate to Git worktrees",
+			label: t("commandPalette.commands.go_worktrees.label"),
+			description: t("commandPalette.commands.go_worktrees.description"),
 			category: "navigation",
 			icon: GitBranch,
 			keywords: ["worktrees", "git", "branches"],
@@ -242,8 +244,8 @@ function getBuiltinCommands(
 		},
 		{
 			id: "go_dashboard",
-			label: "Go to Dashboard",
-			description: "View project metrics, KPIs, and analytics",
+			label: t("commandPalette.commands.go_dashboard.label"),
+			description: t("commandPalette.commands.go_dashboard.description"),
 			category: "navigation",
 			icon: BarChart3,
 			keywords: ["dashboard", "metrics", "kpi", "analytics", "stats"],
@@ -251,8 +253,8 @@ function getBuiltinCommands(
 		},
 		{
 			id: "go_code_review",
-			label: "Go to Code Review",
-			description: "AI-powered code review with quality scoring",
+			label: t("commandPalette.commands.go_code_review.label"),
+			description: t("commandPalette.commands.go_code_review.description"),
 			category: "navigation",
 			icon: FileCode2,
 			keywords: ["review", "code", "diff", "quality"],
@@ -260,8 +262,8 @@ function getBuiltinCommands(
 		},
 		{
 			id: "go_refactoring",
-			label: "Go to Refactoring",
-			description: "Detect code smells and get refactoring proposals",
+			label: t("commandPalette.commands.go_refactoring.label"),
+			description: t("commandPalette.commands.go_refactoring.description"),
 			category: "navigation",
 			icon: Wand2,
 			keywords: ["refactor", "smells", "clean", "code"],
@@ -269,8 +271,8 @@ function getBuiltinCommands(
 		},
 		{
 			id: "go_documentation",
-			label: "Go to Documentation",
-			description: "Check coverage and generate docstrings",
+			label: t("commandPalette.commands.go_documentation.label"),
+			description: t("commandPalette.commands.go_documentation.description"),
 			category: "navigation",
 			icon: BookOpenCheck,
 			keywords: ["docs", "documentation", "docstring", "readme"],
@@ -278,8 +280,8 @@ function getBuiltinCommands(
 		},
 		{
 			id: "go_cost_estimator",
-			label: "Go to Cost Estimator",
-			description: "View LLM usage costs and budgets",
+			label: t("commandPalette.commands.go_cost_estimator.label"),
+			description: t("commandPalette.commands.go_cost_estimator.description"),
 			category: "navigation",
 			icon: Coins,
 			keywords: ["cost", "budget", "spending", "tokens", "money"],
@@ -287,8 +289,8 @@ function getBuiltinCommands(
 		},
 		{
 			id: "go_session_history",
-			label: "Go to Session History",
-			description: "Track agent session performance and costs",
+			label: t("commandPalette.commands.go_session_history.label"),
+			description: t("commandPalette.commands.go_session_history.description"),
 			category: "navigation",
 			icon: History,
 			keywords: ["sessions", "history", "timeline", "past"],
@@ -296,8 +298,8 @@ function getBuiltinCommands(
 		},
 		{
 			id: "go_migration",
-			label: "Go to Migration",
-			description: "Framework migration wizard",
+			label: t("commandPalette.commands.go_migration.label"),
+			description: t("commandPalette.commands.go_migration.description"),
 			category: "navigation",
 			icon: Download,
 			keywords: ["migration", "framework", "upgrade", "wizard"],
@@ -305,8 +307,8 @@ function getBuiltinCommands(
 		},
 		{
 			id: "go_visual_programming",
-			label: "Go to Visual Programming",
-			description: "Visual node-based programming interface",
+			label: t("commandPalette.commands.go_visual_programming.label"),
+			description: t("commandPalette.commands.go_visual_programming.description"),
 			category: "navigation",
 			icon: Sparkles,
 			keywords: ["visual", "programming", "nodes", "flow"],
@@ -314,8 +316,8 @@ function getBuiltinCommands(
 		},
 		{
 			id: "go_github_issues",
-			label: "Go to GitHub Issues",
-			description: "View and manage GitHub issues",
+			label: t("commandPalette.commands.go_github_issues.label"),
+			description: t("commandPalette.commands.go_github_issues.description"),
 			category: "navigation",
 			icon: Globe,
 			keywords: ["github", "issues", "bugs", "tickets"],
@@ -323,8 +325,8 @@ function getBuiltinCommands(
 		},
 		{
 			id: "go_github_prs",
-			label: "Go to GitHub PRs",
-			description: "View and review GitHub pull requests",
+			label: t("commandPalette.commands.go_github_prs.label"),
+			description: t("commandPalette.commands.go_github_prs.description"),
 			category: "navigation",
 			icon: GitPullRequest,
 			keywords: ["github", "pull", "requests", "prs", "review"],
@@ -332,8 +334,8 @@ function getBuiltinCommands(
 		},
 		{
 			id: "go_gitlab_issues",
-			label: "Go to GitLab Issues",
-			description: "View and manage GitLab issues",
+			label: t("commandPalette.commands.go_gitlab_issues.label"),
+			description: t("commandPalette.commands.go_gitlab_issues.description"),
 			category: "navigation",
 			icon: GitMerge,
 			keywords: ["gitlab", "issues", "bugs", "tickets"],
@@ -341,8 +343,8 @@ function getBuiltinCommands(
 		},
 		{
 			id: "go_gitlab_merge_requests",
-			label: "Go to GitLab Merge Requests",
-			description: "View and review GitLab merge requests",
+			label: t("commandPalette.commands.go_gitlab_merge_requests.label"),
+			description: t("commandPalette.commands.go_gitlab_merge_requests.description"),
 			category: "navigation",
 			icon: GitMerge,
 			keywords: ["gitlab", "merge", "requests", "mrs", "review"],
@@ -350,8 +352,8 @@ function getBuiltinCommands(
 		},
 		{
 			id: "go_settings",
-			label: "Open Settings",
-			description: "Open application settings",
+			label: t("commandPalette.commands.go_settings.label"),
+			description: t("commandPalette.commands.go_settings.description"),
 			category: "settings",
 			icon: Settings,
 			shortcut: "Ctrl+,",
@@ -362,9 +364,8 @@ function getBuiltinCommands(
 			? [
 					{
 						id: "open_sandbox_settings",
-						label: "Open Sandbox Settings",
-						description:
-							"Agent execution isolation, file whitelist, resource limits",
+						label: t("commandPalette.commands.open_sandbox_settings.label"),
+						description: t("commandPalette.commands.open_sandbox_settings.description"),
 						category: "settings" as CommandCategory,
 						icon: Shield,
 						keywords: [
@@ -378,8 +379,8 @@ function getBuiltinCommands(
 					},
 					{
 						id: "open_anomaly_settings",
-						label: "Open Anomaly Detection Settings",
-						description: "Agent behavior monitoring, trust scores, alerts",
+						label: t("commandPalette.commands.open_anomaly_settings.label"),
+						description: t("commandPalette.commands.open_anomaly_settings.description"),
 						category: "settings" as CommandCategory,
 						icon: ShieldAlert,
 						keywords: [
@@ -394,9 +395,8 @@ function getBuiltinCommands(
 					},
 					{
 						id: "open_router_settings",
-						label: "Open LLM Router Settings",
-						description:
-							"Provider routing strategy, fallback chains, A/B testing",
+						label: t("commandPalette.commands.open_router_settings.label"),
+						description: t("commandPalette.commands.open_router_settings.description"),
 						category: "settings" as CommandCategory,
 						icon: Router,
 						keywords: [
@@ -412,8 +412,8 @@ function getBuiltinCommands(
 					},
 					{
 						id: "open_scheduler_settings",
-						label: "Open Scheduler Settings",
-						description: "Cron-like task scheduling, chains, priority queues",
+						label: t("commandPalette.commands.open_scheduler_settings.label"),
+						description: t("commandPalette.commands.open_scheduler_settings.description"),
 						category: "settings" as CommandCategory,
 						icon: CalendarClock,
 						keywords: [
@@ -430,8 +430,8 @@ function getBuiltinCommands(
 			: []),
 		{
 			id: "toggle_theme",
-			label: "Toggle Theme",
-			description: "Switch between light and dark theme",
+			label: t("commandPalette.commands.toggle_theme.label"),
+			description: t("commandPalette.commands.toggle_theme.description"),
 			category: "settings",
 			icon: Sun,
 			keywords: ["theme", "dark", "light", "mode"],
@@ -439,8 +439,8 @@ function getBuiltinCommands(
 		},
 		{
 			id: "new_terminal",
-			label: "New Terminal",
-			description: "Open a new terminal tab",
+			label: t("commandPalette.commands.new_terminal.label"),
+			description: t("commandPalette.commands.new_terminal.description"),
 			category: "terminal",
 			icon: Terminal,
 			shortcut: "Ctrl+Shift+T",
@@ -449,8 +449,8 @@ function getBuiltinCommands(
 		},
 		{
 			id: "keyboard_shortcuts",
-			label: "Keyboard Shortcuts",
-			description: "Show all keyboard shortcuts",
+			label: t("commandPalette.commands.keyboard_shortcuts.label"),
+			description: t("commandPalette.commands.keyboard_shortcuts.description"),
 			category: "help",
 			icon: Keyboard,
 			shortcut: "Ctrl+/",
@@ -458,8 +458,8 @@ function getBuiltinCommands(
 		},
 		{
 			id: "export_report",
-			label: "Export Report",
-			description: "Export project report as JSON or CSV",
+			label: t("commandPalette.commands.export_report.label"),
+			description: t("commandPalette.commands.export_report.description"),
 			category: "tasks",
 			icon: Download,
 			keywords: ["export", "report", "download", "csv", "json"],
@@ -471,15 +471,15 @@ function getBuiltinCommands(
 // Category labels & colors
 // ---------------------------------------------------------------------------
 
-const CATEGORY_LABELS: Record<CommandCategory, string> = {
-	tasks: "Tasks",
-	navigation: "Navigation",
-	agents: "Agents",
-	settings: "Settings",
-	providers: "Providers",
-	terminal: "Terminal",
-	help: "Help",
-};
+const CATEGORIES: CommandCategory[] = [
+	"tasks",
+	"navigation",
+	"agents",
+	"settings",
+	"providers",
+	"terminal",
+	"help",
+];
 
 // ---------------------------------------------------------------------------
 // Component
@@ -494,7 +494,6 @@ export function CommandPalette({
 	onOpenSettingsSection,
 	onToggleTheme,
 }: CommandPaletteProps) {
-	// biome-ignore lint/correctness/noUnusedVariables: variable kept for clarity
 	const { t } = useTranslation();
 	const [query, setQuery] = useState("");
 	const [selectedIndex, setSelectedIndex] = useState(0);
@@ -504,6 +503,7 @@ export function CommandPalette({
 	const commands = useMemo(
 		() =>
 			getBuiltinCommands(
+				t,
 				onNavigate,
 				onNewTask,
 				onOpenSettings,
@@ -511,6 +511,7 @@ export function CommandPalette({
 				onOpenSettingsSection,
 			),
 		[
+			t,
 			onNavigate,
 			onNewTask,
 			onOpenSettings,
@@ -664,7 +665,7 @@ export function CommandPalette({
 							value={query}
 							onChange={(e) => setQuery(e.target.value)}
 							onKeyDown={handleKeyDown}
-							placeholder="Type a command or search..."
+							placeholder={t("commandPalette.placeholder")}
 							className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
 							spellCheck={false}
 						/>
@@ -677,13 +678,15 @@ export function CommandPalette({
 					<div ref={listRef} className="max-h-80 overflow-y-auto p-2">
 						{results.length === 0 ? (
 							<div className="px-4 py-8 text-center text-sm text-muted-foreground">
-								No commands found for "{query}"
+								{t("commandPalette.noResults", { query })}
 							</div>
 						) : (
 							Object.entries(grouped).map(([category, cmds]) => (
 								<div key={category}>
 									<div className="px-2 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-										{CATEGORY_LABELS[category as CommandCategory] || category}
+										{CATEGORIES.includes(category as CommandCategory)
+											? t(`commandPalette.categories.${category}`)
+											: category}
 									</div>
 									{cmds.map((cmd) => {
 										const itemIndex = flatIndex++;
@@ -731,23 +734,23 @@ export function CommandPalette({
 								<kbd className="rounded border border-border bg-secondary px-1 font-mono text-[10px]">
 									↑↓
 								</kbd>
-								navigate
+								{t("commandPalette.footer.navigate")}
 							</span>
 							<span className="flex items-center gap-1">
 								<kbd className="rounded border border-border bg-secondary px-1 font-mono text-[10px]">
 									↵
 								</kbd>
-								select
+								{t("commandPalette.footer.select")}
 							</span>
 							<span className="flex items-center gap-1">
 								<kbd className="rounded border border-border bg-secondary px-1 font-mono text-[10px]">
 									esc
 								</kbd>
-								close
+								{t("commandPalette.footer.close")}
 							</span>
 						</div>
 						<span>
-							{results.length} command{results.length !== 1 ? "s" : ""}
+							{t("commandPalette.count", { count: results.length })}
 						</span>
 					</div>
 				</div>

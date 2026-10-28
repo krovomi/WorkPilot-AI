@@ -242,6 +242,13 @@ PROVIDER_DEFAULT_MODELS: dict[str, dict[str, str]] = {
         "coding": CLI_DEFAULT_MODEL,
         "qa": CLI_DEFAULT_MODEL,
     },
+    # ACP agents (capabilities/providers.yaml `acp:`) run their own default.
+    "gemini-cli": {
+        "spec": CLI_DEFAULT_MODEL,
+        "planning": CLI_DEFAULT_MODEL,
+        "coding": CLI_DEFAULT_MODEL,
+        "qa": CLI_DEFAULT_MODEL,
+    },
 }
 
 DEFAULT_PHASE_THINKING: dict[str, str] = {
@@ -466,15 +473,12 @@ def get_phase_provider(
     if metadata and metadata.get("provider"):
         return metadata["provider"]
 
-    # Check provider selected via IPC (from frontend UI)
-    try:
-        import provider_api
+    # Provider selected in the UI (POST /providers/select)
+    from provider_selection import get_selected_provider
 
-        selected_provider = provider_api.get_selected_provider()
-        if selected_provider:
-            return selected_provider
-    except Exception:
-        pass
+    selected_provider = get_selected_provider()
+    if selected_provider:
+        return selected_provider
 
     return None
 

@@ -36,7 +36,7 @@ Référence complète : [`docs/CLI-USAGE.md`](../CLI-USAGE.md).
 | Pile | Commande | Outil |
 |---|---|---|
 | Backend | `pytest tests/ -v` depuis la racine (venv : `.venv/bin` ou `.venv/Scripts`) | pytest |
-| Backend, lint | `ruff check apps/backend tests src` et `ruff format --check apps/backend tests src` | ruff `0.15.7` |
+| Backend, lint | `ruff check apps/backend tests src scripts` et `ruff format --check apps/backend tests src scripts` | ruff `0.15.7` |
 | Frontend | `cd apps/frontend && pnpm test` | Vitest |
 | Frontend, types | `cd apps/frontend && pnpm run typecheck` | tsc |
 | Frontend, lint | `pnpm run lint` | Biome `2.5.11` |
@@ -44,7 +44,15 @@ Référence complète : [`docs/CLI-USAGE.md`](../CLI-USAGE.md).
 | Comme le hook pre-push | `PRE_PUSH_FULL=1 pnpm run test:all` | — |
 
 **Versions épinglées** : ruff `0.15.7`, Biome `2.5.11`. Toute autre version produit un diff que la
-CI refuse. Un lockfile (`pnpm-lock.yaml`) se régénère par l'outil, jamais à la main.
+CI refuse. Biome n'est écrit qu'à un endroit, `apps/frontend/package.json`, que `lint.yml` lit et
+que Dependabot ne bouge pas ; `tests/test_tool_pins.py` le tient égal à cette règle. ruff vise
+Python 3.12 (`target-version` de `ruff.toml`), le plancher supporté.
+
+**Lockfiles** : `pnpm-lock.yaml` et `apps/backend/requirements.lock` se régénèrent par l'outil,
+jamais à la main. `apps/backend/requirements.txt` porte les plages ; le lock (versions exactes,
+empreintes, toutes plateformes) est ce qu'installent la CI, l'image serveur et
+`pnpm run install:backend`. Après avoir touché une plage : `pnpm run lock:python`
+(`uv pip compile`, uv `0.11.32`) ; `lint.yml` régénère le lock et échoue sur toute différence.
 
 Fichiers générés qui ont leur `--check` en CI — les régénérer, ne pas les éditer :
 `scripts/skills_cli.py build`, `scripts/generate_model_catalog.py`, `scripts/vendor_archify.py`,
@@ -79,10 +87,14 @@ positif se traite par la règle S1 de [`security.md`](security.md), jamais par `
 
 | Workflow | Vérifie |
 |---|---|
-| `ci.yml` | pytest et frontend (typecheck, tests, build) sur Linux, Windows, macOS ; chaque test pytest en échec est aussi une annotation du job, lisible sans ouvrir le journal |
-| `lint.yml` | ruff, Biome, `--check` des fichiers vendorisés et des skills, évaluation des skills |
+| `ci.yml` | pytest (3.13 sur Linux, Windows, macOS ; 3.12 sur Linux) et frontend (typecheck, tests, build) ; chaque test pytest en échec est aussi une annotation du job, lisible sans ouvrir le journal ; `server-image` construit `deploy/Dockerfile.server`, migre un Postgres 16 avec l'image et attend `/health` |
+| `lint.yml` | ruff (dont `scripts/`), Biome, fraîcheur de `requirements.lock`, `--check` des fichiers vendorisés et des skills, évaluation des skills |
 | `quality-security.yml` | CodeQL étendu, Bandit, pip-audit, pnpm audit |
 | `codeql.yml` | CodeQL sur Actions, JS/TS, Python |
+
+`ci.yml` et `lint.yml` tournent sur tout changement sauf les quelques fichiers que rien ne lit
+(`paths-ignore` : `CHANGELOG.md`, `LICENSE`, gabarits d'issue et de PR, `FUNDING.yml`) ; une liste
+blanche oubliait ce que les tests se mettaient à lire. `tests/test_ci_triggers.py` garde la liste.
 
 Une CI rouge se répare à la racine : pas de test sauté, désactivé ni mis en quarantaine, pas de
 commit vide pour relancer.

@@ -1,5 +1,6 @@
 import { ipcRenderer } from "electron";
 import { invokeIpc } from "./modules/ipc-utils";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
 
 export interface NaturalLanguageGitRequest {
 	projectPath: string;
@@ -69,7 +70,7 @@ function registerStatusListener(
 		callback(status);
 	};
 	statusHandlerMap.set(callback, handler);
-	ipcRenderer.on("natural-language-git-status", handler);
+	ipcRenderer.on(IPC_CHANNELS.NATURAL_LANGUAGE_GIT_STATUS, handler);
 	return () => {
 		ipcRenderer.removeListener("natural-language-git-status", handler);
 		statusHandlerMap.delete(callback);
@@ -83,7 +84,7 @@ function registerChunkListener(
 		callback(chunk);
 	};
 	chunkHandlerMap.set(callback, handler);
-	ipcRenderer.on("natural-language-git-stream-chunk", handler);
+	ipcRenderer.on(IPC_CHANNELS.NATURAL_LANGUAGE_GIT_STREAM_CHUNK, handler);
 	return () => {
 		ipcRenderer.removeListener("natural-language-git-stream-chunk", handler);
 		chunkHandlerMap.delete(callback);
@@ -97,7 +98,7 @@ function registerErrorListener(
 		callback(error);
 	};
 	errorHandlerMap.set(callback, handler);
-	ipcRenderer.on("natural-language-git-error", handler);
+	ipcRenderer.on(IPC_CHANNELS.NATURAL_LANGUAGE_GIT_ERROR, handler);
 	return () => {
 		ipcRenderer.removeListener("natural-language-git-error", handler);
 		errorHandlerMap.delete(callback);
@@ -114,7 +115,7 @@ function registerCompleteListener(
 		callback(result);
 	};
 	completeHandlerMap.set(callback, handler);
-	ipcRenderer.on("natural-language-git-complete", handler);
+	ipcRenderer.on(IPC_CHANNELS.NATURAL_LANGUAGE_GIT_COMPLETE, handler);
 	return () => {
 		ipcRenderer.removeListener("natural-language-git-complete", handler);
 		completeHandlerMap.delete(callback);
@@ -157,8 +158,8 @@ function removeCompleteListener(
 
 export const createNaturalLanguageGitAPI = (): NaturalLanguageGitAPI => ({
 	executeNaturalLanguageGit: (request: NaturalLanguageGitRequest) =>
-		invokeIpc("execute-natural-language-git", request),
-	cancelNaturalLanguageGit: () => invokeIpc("cancel-natural-language-git"),
+		invokeIpc(IPC_CHANNELS.EXECUTE_NATURAL_LANGUAGE_GIT, request),
+	cancelNaturalLanguageGit: () => invokeIpc(IPC_CHANNELS.CANCEL_NATURAL_LANGUAGE_GIT),
 	onNaturalLanguageGitStatus: (callback: (status: string) => void) =>
 		registerStatusListener(callback),
 	onNaturalLanguageGitStreamChunk: (callback: (chunk: string) => void) =>

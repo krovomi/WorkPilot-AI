@@ -55,7 +55,7 @@ from contextlib import aclosing
 from pathlib import Path
 from typing import Any
 
-from core.platform import build_windows_command, find_executable, is_windows
+from foundation.platform import build_windows_command, find_executable, is_windows
 from harness.domain import from_pi_usage
 
 from .base import AgentMessage, MessageRole
@@ -477,6 +477,8 @@ class PiCliAgentClient(CliSubprocessAgentClient):
     is always answered ``cancelled``: a run without a UI asks nobody.
     """
 
+    sandbox_provider = "pi"
+
     cli_label = "pi"
 
     def __init__(
@@ -774,10 +776,11 @@ class PiCliAgentClient(CliSubprocessAgentClient):
             )
         try:
             self.session_dir.mkdir(parents=True, exist_ok=True)
+            argv, env = self._launch(self._command(executable))
             process = await self._process_factory(
-                *self._command(executable),
+                *argv,
                 cwd=self._project_dir,
-                env=self._subprocess_env(),
+                env=env,
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,

@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { UI_SCALE_DEFAULT } from "../../../../shared/constants";
+import { useTranslation } from "react-i18next";
+import {
+	BACKEND_PATH_REFUSED,
+	TOOL_PATH_REFUSED,
+	UI_SCALE_DEFAULT,
+} from "../../../../shared/constants";
 import type { AppSettings } from "../../../../shared/types";
 import {
 	loadSettings as loadSettingsFromStore,
-	saveSettings as saveSettingsToStore,
+	saveSettingsResult as saveSettingsToStore,
 	useSettingsStore,
 } from "../../../stores/settings-store";
 
@@ -15,6 +20,7 @@ import {
  * cancels without saving, call revertTheme() to restore the original values.
  */
 export function useSettings() {
+	const { t } = useTranslation("settings");
 	const currentSettings = useSettingsStore((state) => state.settings);
 	const updateStoreSettings = useSettingsStore((state) => state.updateSettings);
 	const [settings, setSettings] = useState<AppSettings>(currentSettings);
@@ -61,15 +67,21 @@ export function useSettings() {
 		setError(null);
 
 		try {
-			const success = await saveSettingsToStore(settings);
-			if (success) {
+			const result = await saveSettingsToStore(settings);
+			if (result.success) {
 				// Apply theme immediately
 				applyTheme(settings.theme);
 				return true;
-			} else {
-				setError("Failed to save settings");
-				return false;
 			}
+			const field = (result.data as { field?: string } | undefined)?.field;
+			setError(
+				result.error === TOOL_PATH_REFUSED && field
+					? t("general.toolPathRefused", { field: t(`general.${field}`) })
+					: result.error === BACKEND_PATH_REFUSED
+						? t("general.backendPathRefused")
+						: "Failed to save settings",
+			);
+			return false;
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Unknown error");
 			return false;

@@ -16,6 +16,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { ipcMain } from "electron";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
 
 export interface GuardrailRuleDoc {
 	id: string;
@@ -132,13 +133,13 @@ const ACTION_PRIORITY: Record<string, number> = {
 
 export function registerGuardrailsHandlers(): void {
 	ipcMain.handle(
-		"guardrails:load",
+		IPC_CHANNELS.GUARDRAILS_LOAD,
 		async (_evt, { projectPath }: { projectPath: string }) =>
 			readDoc(projectPath),
 	);
 
 	ipcMain.handle(
-		"guardrails:save",
+		IPC_CHANNELS.GUARDRAILS_SAVE,
 		async (
 			_evt,
 			{ projectPath, doc }: { projectPath: string; doc: GuardrailsDoc },
@@ -149,7 +150,7 @@ export function registerGuardrailsHandlers(): void {
 	);
 
 	ipcMain.handle(
-		"guardrails:test",
+		IPC_CHANNELS.GUARDRAILS_TEST,
 		async (
 			_evt,
 			{

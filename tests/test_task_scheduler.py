@@ -4,7 +4,7 @@ Tests for CronExpression, ScheduledTask, TaskChain, TaskQueue, and TaskScheduler
 """
 
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -78,21 +78,21 @@ class TestCronExpression:
     def test_matches_every_minute(self):
         """Wildcard cron matches any datetime."""
         cron = CronExpression("* * * * *")
-        dt = datetime(2026, 2, 20, 14, 30, tzinfo=timezone.utc)
+        dt = datetime(2026, 2, 20, 14, 30, tzinfo=UTC)
         assert cron.matches(dt)
 
     def test_matches_specific_time(self):
         """Specific cron matches the correct time."""
         cron = CronExpression("30 14 * * *")
-        dt_match = datetime(2026, 2, 20, 14, 30, tzinfo=timezone.utc)
-        dt_no_match = datetime(2026, 2, 20, 14, 31, tzinfo=timezone.utc)
+        dt_match = datetime(2026, 2, 20, 14, 30, tzinfo=UTC)
+        dt_no_match = datetime(2026, 2, 20, 14, 31, tzinfo=UTC)
         assert cron.matches(dt_match)
         assert not cron.matches(dt_no_match)
 
     def test_next_occurrence(self):
         """next_occurrence should find the next matching datetime."""
         cron = CronExpression("0 * * * *")
-        after = datetime(2026, 2, 20, 14, 30, tzinfo=timezone.utc)
+        after = datetime(2026, 2, 20, 14, 30, tzinfo=UTC)
         next_dt = cron.next_occurrence(after)
         assert next_dt.minute == 0
         assert next_dt.hour == 15
@@ -139,7 +139,7 @@ class TestScheduledTask:
 
     def test_run_at_sets_next_run(self):
         """Task with run_at in the future should have next_run set."""
-        future = datetime.now(timezone.utc) + timedelta(hours=1)
+        future = datetime.now(UTC) + timedelta(hours=1)
         task = ScheduledTask(name="Scheduled", run_at=future)
         assert task.next_run == future
 
@@ -153,19 +153,19 @@ class TestScheduledTask:
     def test_is_due(self):
         """Task with past next_run should be due."""
         task = ScheduledTask(name="Due")
-        task.next_run = datetime.now(timezone.utc) - timedelta(minutes=1)
+        task.next_run = datetime.now(UTC) - timedelta(minutes=1)
         assert task.is_due
 
     def test_is_not_due_when_disabled(self):
         """Disabled task should not be due."""
         task = ScheduledTask(name="Disabled", enabled=False)
-        task.next_run = datetime.now(timezone.utc) - timedelta(minutes=1)
+        task.next_run = datetime.now(UTC) - timedelta(minutes=1)
         assert not task.is_due
 
     def test_is_not_due_when_running(self):
         """Running task should not be due."""
         task = ScheduledTask(name="Running", status=TaskStatus.RUNNING)
-        task.next_run = datetime.now(timezone.utc) - timedelta(minutes=1)
+        task.next_run = datetime.now(UTC) - timedelta(minutes=1)
         assert not task.is_due
 
     def test_mark_running(self):
@@ -182,7 +182,7 @@ class TestScheduledTask:
         task.mark_completed()
         assert task.status == TaskStatus.PENDING
         assert task.next_run is not None
-        assert task.next_run > datetime.now(timezone.utc) - timedelta(minutes=1)
+        assert task.next_run > datetime.now(UTC) - timedelta(minutes=1)
 
     def test_mark_failed_with_retry(self):
         """Failed task with retries left should stay pending."""
@@ -266,7 +266,7 @@ class TestTaskQueue:
         """pop should return a due task."""
         q = TaskQueue()
         task = ScheduledTask(name="Due")
-        task.next_run = datetime.now(timezone.utc) - timedelta(minutes=1)
+        task.next_run = datetime.now(UTC) - timedelta(minutes=1)
         q.push(task)
         popped = q.pop()
         assert popped is not None
@@ -277,14 +277,14 @@ class TestTaskQueue:
         """pop should return None when no tasks are due."""
         q = TaskQueue()
         task = ScheduledTask(name="Future")
-        task.next_run = datetime.now(timezone.utc) + timedelta(hours=1)
+        task.next_run = datetime.now(UTC) + timedelta(hours=1)
         q.push(task)
         assert q.pop() is None
 
     def test_priority_ordering(self):
         """Higher priority tasks (lower number) should come first."""
         q = TaskQueue()
-        past = datetime.now(timezone.utc) - timedelta(minutes=1)
+        past = datetime.now(UTC) - timedelta(minutes=1)
 
         low = ScheduledTask(name="Low", priority=10)
         low.next_run = past
@@ -323,8 +323,8 @@ class TestTaskQueue:
     def test_list_due(self):
         """list_due should return only due tasks."""
         q = TaskQueue()
-        past = datetime.now(timezone.utc) - timedelta(minutes=1)
-        future = datetime.now(timezone.utc) + timedelta(hours=1)
+        past = datetime.now(UTC) - timedelta(minutes=1)
+        future = datetime.now(UTC) + timedelta(hours=1)
 
         due = ScheduledTask(name="Due")
         due.next_run = past
@@ -415,7 +415,7 @@ class TestTaskScheduler:
             name="Tick Task",
             action="tick_action",
         )
-        task.next_run = datetime.now(timezone.utc) - timedelta(minutes=1)
+        task.next_run = datetime.now(UTC) - timedelta(minutes=1)
         scheduler.add_task(task)
 
         results = scheduler.tick()
@@ -429,7 +429,7 @@ class TestTaskScheduler:
         scheduler.register_handler("chain_action", mock_handler)
 
         t1 = ScheduledTask(task_id="c1", name="Chain1", action="chain_action")
-        t1.next_run = datetime.now(timezone.utc) - timedelta(minutes=1)
+        t1.next_run = datetime.now(UTC) - timedelta(minutes=1)
         t2 = ScheduledTask(
             task_id="c2", name="Chain2", action="chain_action", enabled=False
         )

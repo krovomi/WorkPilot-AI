@@ -24,7 +24,11 @@ import { DocumentInsightsCard } from "./DocumentInsightsCard";
 import { VerifyLoopCard } from "./VerifyLoopCard";
 import { VisualReviewCard } from "./VisualReviewCard";
 import { ExecutionFormulaBanner } from "./ExecutionFormulaBanner";
+import { BestOfNCard } from "./BestOfNCard";
+import { GoalCard } from "./GoalCard";
 import { HermesLearningCard } from "./HermesLearningCard";
+import { McpAppsCard } from "./McpAppsCard";
+import { PrFollowupCard } from "./PrFollowupCard";
 import { RtkSavingsCard } from "./RtkSavingsCard";
 import { SpecInterviewBanner } from "./SpecInterviewDialog";
 import { SpecTraceabilityCard } from "./SpecTraceabilityCard";
@@ -57,9 +61,9 @@ export interface TaskOverviewProps {
  *
  * | Section | Répond à | Contient |
  * |---|---|---|
- * | **À traiter** | que dois-je faire, là, maintenant ? | la revue humaine (quand la tâche l'attend) |
+ * | **À traiter** | que dois-je faire, là, maintenant ? | la revue humaine (quand la tâche l'attend), le suivi de la PR (quand elle en a une) |
  * | **La tâche** | de quoi parle-t-on ? | description, critères d'acceptation, métadonnées |
- * | **Plan d'exécution** | que vont faire les agents, et sur quoi ? | profil d'effort, second avis JEV, traçabilité, pièces jointes et ADR |
+ * | **Plan d'exécution** | que vont faire les agents, et sur quoi ? | objectif (la commande qui dit « fini »), profil d'effort, second avis JEV, traçabilité, pièces jointes et ADR |
  * | **Mémoire & apprentissage** | qu'est-ce que le système retient ? | cerveau partagé, boucle hermes, économies rtk |
  *
  * Les bannières qui bloquent un démarrage (entretien de spec, formule
@@ -91,8 +95,11 @@ export function TaskOverview({
 	onOpenVerify,
 }: TaskOverviewProps) {
 	const { t } = useTranslation(["tasks"]);
+	// Une PR ouverte est quelque chose à faire avancer : sa carte de suivi
+	// tient la section « À traiter » même quand aucune revue n'attend.
+	const hasPr = Boolean(task.prUrl ?? task.metadata?.prUrl);
 	const [present, setPresent] = useState<Record<OverviewSectionId, boolean>>({
-		review: Boolean(review),
+		review: Boolean(review) || hasPr,
 		task: true,
 		plan: false,
 		learning: false,
@@ -209,9 +216,10 @@ export function TaskOverview({
 						<ExecutionFormulaBanner task={task} />
 					</div>
 
-					{review && (
+					{(review || hasPr) && (
 						<OverviewSection taskId={task.id} id="review" icon={ClipboardCheck} tone="warning" onPresence={report}>
 							{review}
+							<PrFollowupCard task={task} />
 						</OverviewSection>
 					)}
 
@@ -220,6 +228,10 @@ export function TaskOverview({
 					</OverviewSection>
 
 					<OverviewSection taskId={task.id} id="plan" icon={Route} tone="amber" onPresence={report}>
+						{/* Le mode objectif : la commande qui dit « fini », et ses plafonds. */}
+						<GoalCard task={task} editable={editable} />
+						{/* Best-of-N : la tâche construite N fois, classée, la personne choisit. */}
+						<BestOfNCard task={task} editable={editable} />
 						<WorkflowProfileCard task={task} projectPath={projectPath} />
 						<TaskJevCard task={task} projectPath={projectPath} />
 						<SpecTraceabilityCard task={task} projectPath={projectPath} />
@@ -234,6 +246,9 @@ export function TaskOverview({
 						{/* La boucle de vérification : l'app lancée, corrigée, amenée
 						    jusqu'au changement et mesurée. Rien tant qu'elle n'a pas tourné. */}
 						<VerifyLoopCard task={task} projectPath={projectPath} onOpenDetails={onOpenVerify} />
+						{/* Les vues MCP Apps des outils appelés pendant le build, dans
+						    une iframe sans allow-same-origin. Rien sans vue gardée. */}
+						<McpAppsCard task={task} />
 					</OverviewSection>
 
 					<OverviewSection taskId={task.id} id="learning" icon={BrainCircuit} tone="violet" onPresence={report}>

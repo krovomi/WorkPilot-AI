@@ -169,6 +169,7 @@ class _OpenAIAdapter(ChatCompletionsAdapter):
         # Provider-specific token optimizations (omitted when None):
         if client._reasoning_effort:
             payload["reasoning_effort"] = client._reasoning_effort
+        payload.update(client._effort_params)
         if client._prompt_cache_key:
             payload["prompt_cache_key"] = client._prompt_cache_key
 
@@ -182,24 +183,43 @@ class _OpenAIAdapter(ChatCompletionsAdapter):
         client = self.client
         data: Any = None
         failure: str | None = None
+        refused_effort: dict[str, Any] | None = None
         try:
-            async with self.session.post(
-                client._api_base,
-                json=payload,
-                headers=self.headers,
-                allow_redirects=not getattr(client, "_offline_only", False),
-            ) as resp:
-                if resp.status != 200:
+            # At most twice: once as asked, once without effort fields the
+            # model refused (`effort_was_rejected`).
+            for _attempt in range(2):
+                async with self.session.post(
+                    client._api_base,
+                    json=payload,
+                    headers=self.headers,
+                    allow_redirects=not getattr(client, "_offline_only", False),
+                ) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        break
                     error_text = await resp.text()
+                    if refused_effort is None:
+                        refused_effort = client._drop_refused_effort(
+                            payload, resp.status, error_text
+                        )
+                        if refused_effort:
+                            continue
                     logger.error(
                         f"[OpenAIAgentClient] API error ({resp.status}): {error_text[:500]}"
                     )
                     failure = f"OpenAI API error ({resp.status}): {error_text}"
-                else:
-                    data = await resp.json()
+                    break
         except Exception as e:
             logger.error(f"[OpenAIAgentClient] Request failed: {e}")
             failure = client._describe_request_error(e)
+        if refused_effort:
+            # Said where the person looks: the phase runs, at the model's
+            # default effort rather than the one the task shows.
+            yield self.notice(
+                f"⚠️ {client.model} refused the effort setting "
+                f"({', '.join(sorted(refused_effort))}); continuing at the "
+                "model's default effort."
+            )
         if failure is not None:
             yield self.notice(failure)
             yield Outcome.HALT
@@ -282,6 +302,9 @@ class OpenAIAgentClient(AgentClient):
         # models; prompt_cache_key routes same-task sessions to the same
         # automatic-prompt-cache shard. Both omitted from payload when None.
         self._reasoning_effort = reasoning_effort
+        # Provider-specific effort fields beyond `reasoning_effort` (DeepSeek's
+        # `thinking`, …); set by the subclasses that have them.
+        self._effort_params: dict[str, Any] = {}
         self._prompt_cache_key = prompt_cache_key
         self._api_key: str = (
             api_key if api_key is not None else _os.environ.get("OPENAI_API_KEY", "")
@@ -381,7 +404,11 @@ class OpenAIAgentClient(AgentClient):
                 self._agent_type, self._project_dir, getattr(self, "_spec_dir", None)
             )
             if servers:
-                manager = MCPToolManager(self._project_dir, servers)
+                manager = MCPToolManager(
+                    self._project_dir,
+                    servers,
+                    spec_dir=getattr(self, "_spec_dir", None),
+                )
                 await manager.connect()
                 mcp_defs = manager.tool_definitions()
                 if mcp_defs:
@@ -502,6 +529,36 @@ class OpenAIAgentClient(AgentClient):
             pass
         text = str(exc).lower()
         return "cannot connect to host" in text or "refused" in text
+
+    def _drop_refused_effort(
+        self, payload: dict[str, Any], status: int, error_text: str
+    ) -> dict[str, Any] | None:
+        """Take the effort fields out of `payload` when the model refused them.
+
+        Returns the fields removed, or None when the refusal is about something
+        else or there was no effort to remove. The session stops sending them:
+        every later turn would be refused the same way.
+        """
+        from core.llm_optimization import effort_was_rejected
+
+        fields = {
+            key: payload[key]
+            for key in ("reasoning_effort", *self._effort_params)
+            if key in payload
+        }
+        if not fields or not effort_was_rejected(status, error_text):
+            return None
+        for key in fields:
+            payload.pop(key, None)
+        self._reasoning_effort = None
+        self._effort_params = {}
+        logger.warning(
+            "[OpenAIAgentClient] %s refused %s (%s); retrying without it",
+            self.model,
+            sorted(fields),
+            status,
+        )
+        return fields
 
     def _describe_request_error(self, exc: Exception) -> str:
         """Human-friendly text for a failed chat request. Overridable per provider."""

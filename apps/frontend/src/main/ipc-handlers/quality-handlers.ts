@@ -7,6 +7,8 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import { app, ipcMain } from "electron";
 import { logger } from "../app-logger";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
+import { pythonRunnerEnv } from "../utils/python-runner-env";
 
 interface QualityAnalyzeParams {
 	files: string[];
@@ -21,7 +23,7 @@ interface QualityAnalyzePRParams {
 
 export function setupQualityHandlers(): void {
 	// Handler: quality:analyze
-	ipcMain.handle("quality:analyze", async (_, params: QualityAnalyzeParams) => {
+	ipcMain.handle(IPC_CHANNELS.QUALITY_ANALYZE, async (_, params: QualityAnalyzeParams) => {
 		try {
 			logger.info("Quality analysis requested", { files: params.files });
 
@@ -44,7 +46,7 @@ export function setupQualityHandlers(): void {
 
 	// Handler: quality:analyze-pr
 	ipcMain.handle(
-		"quality:analyze-pr",
+		IPC_CHANNELS.QUALITY_ANALYZE_PR,
 		async (_, params: QualityAnalyzePRParams) => {
 			try {
 				logger.info("PR quality analysis requested", {
@@ -84,15 +86,10 @@ async function runQualityAnalysis(
 	backendPath: string,
 	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 ): Promise<any> {
+	const env = await pythonRunnerEnv(backendPath);
 	return new Promise((resolve, reject) => {
 		// Build command to run quality_cli.py
 		const scriptPath = path.join(backendPath, "..", "..", "quality_cli.py");
-
-		// Add backend to PYTHONPATH
-		const env = {
-			...process.env,
-			PYTHONPATH: backendPath,
-		};
 
 		const args = [
 			scriptPath,

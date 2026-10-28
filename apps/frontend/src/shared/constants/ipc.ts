@@ -57,13 +57,22 @@ export const IPC_CHANNELS = {
 	TASK_HOT_SWAP: "task:hotSwap", // Live provider/model/effort change during a running phase (applied at the next turn, context replayed)
 	TASK_CONTEXT_ACTION: "task:contextAction", // One-shot compact/clear of the running session's context (writes CONTEXT_ACTION.json in every spec dir copy)
 	TASK_CONTEXT_POLICY_UPDATE: "task:contextPolicyUpdate", // Merge `contextPolicy` into task_metadata.json of every spec dir copy (main + worktree) — read live by the backend
+	TASK_SANDBOX_STATUS: "task:sandboxStatus", // Event (main -> renderer): whether a task's commands run in the OS sandbox (SANDBOX_STATUS)
+	TASK_SANDBOX_LIST: "task:sandboxList", // The sandbox statuses main holds, for a reloaded renderer
+	TASK_GOAL_GET: "task:goalGet", // The task's goal (goal mode), read from <spec>/.workpilot-goal.json
+	TASK_GOAL_SET: "task:goalSet", // Write or remove the goal in every spec dir copy; agents cannot write that file
 	TASK_CONTEXT_USAGE: "task:contextUsage", // Event (main -> renderer): CONTEXT_USAGE / CONTEXT_ACTION_APPLIED task events, forwarded untouched
+	TASK_PERMISSION_REQUEST: "task:permissionRequest", // Event (main -> renderer): an ACP agent asks before it acts (PERMISSION_REQUESTED, validated)
+	TASK_PERMISSION_CLEARED: "task:permissionCleared", // Event (main -> renderer): that question is answered, timed out or its process is gone
+	TASK_PERMISSION_LIST: "task:permissionList", // The questions waiting now (after a reload of the renderer)
+	TASK_PERMISSION_ANSWER: "task:permissionAnswer", // The person's choice, checked in main, written to the build's stdin
 	TASK_CHECK_PLAN_CONFLICTS: "task:checkPlanConflicts", // Detect file overlaps between this task's plan and other active tasks (parallel worktrees)
 
 	// CI/CD pipeline loop (« Build rouge » column) — provider-agnostic (Azure DevOps, GitHub Actions, GitLab CI, Jenkins)
 	TASK_PIPELINE_STATUS_GET: "task:pipelineStatusGet", // On-demand fetch of the latest build for a task's branch
 	TASK_PIPELINE_FIX: "task:pipelineFix", // Launch the agent to repair a red build (writes BUILD_FAILURE.md + fix subtask)
 	TASK_PIPELINE_STATUS_EVENT: "task:pipelineStatus", // Event (main -> renderer): pipeline status changed for a task
+	TASK_UPDATED_EVENT: "task:updated", // Event (main -> renderer): fields of a task changed in main (PR URL, visual proof)
 	TASK_SPEC_INTERVIEW: "task:specInterview", // Generate 3-5 clarifying questions about the spec before planning (answers are appended to the description)
 	TASK_LOAD_IMAGE_THUMBNAIL: "task:loadImageThumbnail",
 
@@ -82,6 +91,17 @@ export const IPC_CHANNELS = {
 	TASK_VISUAL_PROOF_RUN: "task:visualProofRun", // Run emulator + screenshot proof (PR optional)
 	TASK_VISUAL_PROOF_SYNC: "task:visualProofSync", // Detect a PR on the branch and publish stored captures to it
 	TASK_VISUAL_PROOF_STATUS: "task:visualProofStatus", // Query whether a visual proof run is in progress for a task
+	TASK_PR_FOLLOWUP_START: "task:prFollowupStart", // Drive the task's PR to merge: fix red checks and review threads
+	TASK_PR_FOLLOWUP_STOP: "task:prFollowupStop",
+	TASK_PR_FOLLOWUP_STATUS: "task:prFollowupStatus", // Running or not, and the last look at the PR
+	TASK_MCP_APPS_LIST: "task:mcpAppsList", // The MCP App views a build kept for the task
+	TASK_MCP_APP_OPEN: "task:mcpAppOpen", // Serve one view on its own scheme, for one frame
+	TASK_MCP_APP_CLOSE: "task:mcpAppClose", // The frame closed: stop serving the view
+	TASK_BEST_OF_N_START: "task:bestOfNStart", // Build the task N ways, one worktree and engine each (best-of-N)
+	TASK_BEST_OF_N_STATUS: "task:bestOfNStatus", // <spec>/best_of_n.json and the variants running now
+	TASK_BEST_OF_N_RANK: "task:bestOfNRank", // Measure and rank the variants again
+	TASK_BEST_OF_N_ADOPT: "task:bestOfNAdopt", // Make the chosen variant the task's build, remove the others
+	TASK_BEST_OF_N_DISCARD: "task:bestOfNDiscard", // Stop and remove every variant
 	TASK_WORKTREE_OPEN_IN_IDE: "task:worktreeOpenInIDE",
 	TASK_WORKTREE_OPEN_IN_TERMINAL: "task:worktreeOpenInTerminal",
 	TASK_WORKTREE_DETECT_TOOLS: "task:worktreeDetectTools", // Detect installed IDEs/terminals
@@ -100,6 +120,9 @@ export const IPC_CHANNELS = {
 	TASK_STATUS_CHANGE: "task:statusChange",
 	TASK_EXECUTION_PROGRESS: "task:executionProgress",
 	TASK_VISUAL_PROOF_RUNNING: "task:visualProofRunning", // Event: visual proof run started/finished (main -> renderer)
+	TASK_PR_FOLLOWUP_EVENT: "task:prFollowupEvent", // Event: a look at the PR, or the follow-through stopped (main -> renderer)
+	TASK_MCP_APP_VIEW: "task:mcpAppView", // Event: a build kept a new MCP App view (main -> renderer)
+	TASK_BEST_OF_N_EVENT: "task:bestOfNEvent", // Event: a variant started or ended, a ranking, an adoption (main -> renderer)
 
 	// Task phase logs (persistent, collapsible logs by phase)
 	TASK_LOGS_GET: "task:logsGet", // Load logs from spec dir
@@ -152,8 +175,6 @@ export const IPC_CHANNELS = {
 	TERMINAL_PENDING_RESUME: "terminal:pendingResume", // Terminal has pending Claude resume (for deferred activation)
 	TERMINAL_RATE_LIMIT: "terminal:rateLimit", // Claude Code rate limit detected
 	TERMINAL_OAUTH_TOKEN: "terminal:oauthToken", // OAuth token captured from setup-token output
-	TERMINAL_AUTH_CREATED: "terminal:authCreated", // Auth terminal created for OAuth flow
-	TERMINAL_OAUTH_CODE_NEEDED: "terminal:oauthCodeNeeded", // Request user to paste OAuth code from browser
 	TERMINAL_CLAUDE_BUSY: "terminal:claudeBusy", // Claude Code busy state (for visual indicator)
 	TERMINAL_CLAUDE_EXIT: "terminal:claudeExit", // Claude Code exited (returned to shell)
 	TERMINAL_ONBOARDING_COMPLETE: "terminal:onboardingComplete", // Claude onboarding complete (ready for input after login)
@@ -197,6 +218,12 @@ export const IPC_CHANNELS = {
 	// Settings
 	SETTINGS_GET: "settings:get",
 	SETTINGS_SAVE: "settings:save",
+	NEEDS_YOU_TEST: "needsYou:test", // Send a test "needs you" to the configured remote channels; per-channel result
+	NEEDS_YOU_OPEN_TASK: "needsYou:openTask", // Event (main -> renderer): a desktop notification was clicked (taskId, projectId)
+	NEEDS_YOU_APPROVE_PLAN: "needsYou:approvePlan", // Event (main -> renderer): apply a remote plan approval (requestId, taskId)
+	NEEDS_YOU_APPROVAL_RESULT: "needsYou:approvalResult", // invoke (renderer -> main): how that approval went (requestId, outcome)
+	// Lists the custom provider's models with its stored key (main holds the key)
+	SETTINGS_CUSTOM_PROVIDER_DISCOVER_MODELS: "settings:customProviderDiscoverModels",
 	SETTINGS_GET_CLI_TOOLS_INFO: "settings:getCliToolsInfo",
 	SETTINGS_CLAUDE_CODE_GET_ONBOARDING_STATUS:
 		"settings:claudeCode:getOnboardingStatus", // Check hasCompletedOnboarding from ~/.claude.json
@@ -225,14 +252,12 @@ export const IPC_CHANNELS = {
 	// Shell operations
 	SHELL_OPEN_EXTERNAL: "shell:openExternal",
 	SHELL_OPEN_TERMINAL: "shell:openTerminal",
-	SHELL_OPEN_TERMINAL_WITH_COMMAND: "shell:openTerminalWithCommand",
 
 	// Roadmap operations
 	ROADMAP_GET: "roadmap:get",
 	ROADMAP_GET_STATUS: "roadmap:getStatus",
 	ROADMAP_SAVE: "roadmap:save",
 	ROADMAP_GENERATE: "roadmap:generate",
-	ROADMAP_GENERATE_WITH_COMPETITOR: "roadmap:generateWithCompetitor",
 	ROADMAP_REFRESH: "roadmap:refresh",
 	ROADMAP_STOP: "roadmap:stop",
 	ROADMAP_UPDATE_FEATURE: "roadmap:updateFeature",
@@ -406,22 +431,17 @@ export const IPC_CHANNELS = {
 
 	// GitLab Auto-Fix operations
 	GITLAB_AUTOFIX_START: "gitlab:autofix:start",
-	GITLAB_AUTOFIX_STOP: "gitlab:autofix:stop",
 	GITLAB_AUTOFIX_GET_QUEUE: "gitlab:autofix:getQueue",
 	GITLAB_AUTOFIX_CHECK_LABELS: "gitlab:autofix:checkLabels",
 	GITLAB_AUTOFIX_CHECK_NEW: "gitlab:autofix:checkNew",
 	GITLAB_AUTOFIX_GET_CONFIG: "gitlab:autofix:getConfig",
 	GITLAB_AUTOFIX_SAVE_CONFIG: "gitlab:autofix:saveConfig",
-	GITLAB_AUTOFIX_BATCH: "gitlab:autofix:batch",
 	GITLAB_AUTOFIX_GET_BATCHES: "gitlab:autofix:getBatches",
 
 	// GitLab Auto-Fix events (main -> renderer)
 	GITLAB_AUTOFIX_PROGRESS: "gitlab:autofix:progress",
 	GITLAB_AUTOFIX_COMPLETE: "gitlab:autofix:complete",
 	GITLAB_AUTOFIX_ERROR: "gitlab:autofix:error",
-	GITLAB_AUTOFIX_BATCH_PROGRESS: "gitlab:autofix:batchProgress",
-	GITLAB_AUTOFIX_BATCH_COMPLETE: "gitlab:autofix:batchComplete",
-	GITLAB_AUTOFIX_BATCH_ERROR: "gitlab:autofix:batchError",
 
 	// GitLab Issue Analysis Preview (proactive batch workflow)
 	GITLAB_AUTOFIX_ANALYZE_PREVIEW: "gitlab:autofix:analyzePreview",
@@ -446,7 +466,6 @@ export const IPC_CHANNELS = {
 
 	// GitHub Auto-Fix operations
 	GITHUB_AUTOFIX_START: "github:autofix:start",
-	GITHUB_AUTOFIX_STOP: "github:autofix:stop",
 	GITHUB_AUTOFIX_GET_QUEUE: "github:autofix:getQueue",
 	GITHUB_AUTOFIX_CHECK_LABELS: "github:autofix:checkLabels",
 	GITHUB_AUTOFIX_CHECK_NEW: "github:autofix:checkNew",
@@ -486,7 +505,6 @@ export const IPC_CHANNELS = {
 	GITHUB_PR_MERGE: "github:pr:merge",
 	GITHUB_PR_ASSIGN: "github:pr:assign",
 	GITHUB_PR_POST_COMMENT: "github:pr:postComment",
-	GITHUB_PR_FIX: "github:pr:fix",
 	GITHUB_PR_FOLLOWUP_REVIEW: "github:pr:followupReview",
 	GITHUB_PR_CHECK_NEW_COMMITS: "github:pr:checkNewCommits",
 	GITHUB_PR_CHECK_MERGE_READINESS: "github:pr:checkMergeReadiness",
@@ -512,17 +530,6 @@ export const IPC_CHANNELS = {
 	GITHUB_WORKFLOWS_AWAITING_APPROVAL: "github:workflows:awaitingApproval",
 	GITHUB_WORKFLOW_APPROVE: "github:workflow:approve",
 
-	// GitHub Issue Triage operations
-	GITHUB_TRIAGE_RUN: "github:triage:run",
-	GITHUB_TRIAGE_GET_RESULTS: "github:triage:getResults",
-	GITHUB_TRIAGE_APPLY_LABELS: "github:triage:applyLabels",
-	GITHUB_TRIAGE_GET_CONFIG: "github:triage:getConfig",
-	GITHUB_TRIAGE_SAVE_CONFIG: "github:triage:saveConfig",
-
-	// GitHub Issue Triage events (main -> renderer)
-	GITHUB_TRIAGE_PROGRESS: "github:triage:progress",
-	GITHUB_TRIAGE_COMPLETE: "github:triage:complete",
-	GITHUB_TRIAGE_ERROR: "github:triage:error",
 
 	// Ollama model detection and management
 	OLLAMA_CHECK_STATUS: "ollama:checkStatus",
@@ -589,7 +596,6 @@ export const IPC_CHANNELS = {
 	FILE_EXPLORER_LIST: "fileExplorer:list",
 	FILE_EXPLORER_READ: "fileExplorer:read",
 	FILE_EXPLORER_SAVE: "fileExplorer:save", // Save JSON files
-	FILE_EXPLORER_GET_USER_HOME: "fileExplorer:getUserHome",
 	FILE_EXPLORER_SEARCH: "fileExplorer:search", // Recursive path search for autocomplete
 
 	// API Explorer — project route scanning
@@ -633,12 +639,6 @@ export const IPC_CHANNELS = {
 
 	// Release operations
 	RELEASE_SUGGEST_VERSION: "release:suggestVersion",
-	RELEASE_CREATE: "release:create",
-	RELEASE_PREFLIGHT: "release:preflight",
-	RELEASE_GET_VERSIONS: "release:getVersions",
-
-	// Release events (main -> renderer)
-	RELEASE_PROGRESS: "release:progress",
 
 	// Debug operations
 	DEBUG_GET_INFO: "debug:getInfo",
@@ -646,7 +646,6 @@ export const IPC_CHANNELS = {
 	DEBUG_COPY_DEBUG_INFO: "debug:copyDebugInfo",
 	DEBUG_GET_RECENT_ERRORS: "debug:getRecentErrors",
 	DEBUG_LIST_LOG_FILES: "debug:listLogFiles",
-	DEBUG_SIMULATE_RATE_LIMIT: "debug:simulateRateLimit", // Simulate rate limit for testing auto-swap
 
 	// Claude Code CLI operations
 	CLAUDE_CODE_CHECK_VERSION: "claudeCode:checkVersion",
@@ -784,7 +783,6 @@ export const IPC_CHANNELS = {
 	SELF_HEALING_DISMISS_INCIDENT: "selfHealing:dismissIncident",
 	SELF_HEALING_RETRY_INCIDENT: "selfHealing:retryIncident",
 	// Events (main -> renderer)
-	SELF_HEALING_INCIDENT_DETECTED: "selfHealing:incidentDetected",
 	SELF_HEALING_OPERATION_PROGRESS: "selfHealing:operationProgress",
 	SELF_HEALING_OPERATION_COMPLETE: "selfHealing:operationComplete",
 
@@ -798,15 +796,10 @@ export const IPC_CHANNELS = {
 	BROWSER_AGENT_COMPARE: "browserAgent:compare",
 	BROWSER_AGENT_DELETE_BASELINE: "browserAgent:deleteBaseline",
 	BROWSER_AGENT_RUN_TESTS: "browserAgent:runTests",
-	// Browser Agent events (main -> renderer)
-	BROWSER_AGENT_PROGRESS: "browserAgent:progress",
-	BROWSER_AGENT_TEST_COMPLETE: "browserAgent:testComplete",
-	BROWSER_AGENT_SCREENSHOT_READY: "browserAgent:screenshotReady",
 
 	// Architecture Visualizer
 	ARCHITECTURE_VISUALIZER_GENERATE: "architectureVisualizer:generate",
 	ARCHITECTURE_VISUALIZER_CANCEL: "architectureVisualizer:cancel",
-	ARCHITECTURE_VISUALIZER_CONFIGURE: "architectureVisualizer:configure",
 	ARCHITECTURE_VISUALIZER_DOCTOR: "architectureVisualizer:doctor",
 	// Per-task architecture delta
 	ARCHITECTURE_DELTA_READ: "architectureVisualizer:delta",
@@ -822,7 +815,6 @@ export const IPC_CHANNELS = {
 	// Code Migration Agent
 	CODE_MIGRATION_START: "codeMigration:start",
 	CODE_MIGRATION_CANCEL: "codeMigration:cancel",
-	CODE_MIGRATION_CONFIGURE: "codeMigration:configure",
 	// Code Migration events (main -> renderer)
 	CODE_MIGRATION_STATUS: "codeMigration:status",
 	CODE_MIGRATION_STREAM_CHUNK: "codeMigration:streamChunk",
@@ -833,7 +825,6 @@ export const IPC_CHANNELS = {
 	// Performance Profiler Agent
 	PERFORMANCE_PROFILER_START: "performanceProfiler:start",
 	PERFORMANCE_PROFILER_CANCEL: "performanceProfiler:cancel",
-	PERFORMANCE_PROFILER_CONFIGURE: "performanceProfiler:configure",
 	// Performance Profiler events (main -> renderer)
 	PERFORMANCE_PROFILER_STATUS: "performanceProfiler:status",
 	PERFORMANCE_PROFILER_STREAM_CHUNK: "performanceProfiler:streamChunk",
@@ -845,7 +836,6 @@ export const IPC_CHANNELS = {
 	// Documentation Agent
 	DOCUMENTATION_AGENT_GENERATE: "documentationAgent:generate",
 	DOCUMENTATION_AGENT_CANCEL: "documentationAgent:cancel",
-	DOCUMENTATION_AGENT_CONFIGURE: "documentationAgent:configure",
 	// Documentation Agent events (main -> renderer)
 	DOCUMENTATION_AGENT_STATUS: "documentationAgent:status",
 	DOCUMENTATION_AGENT_STREAM_CHUNK: "documentationAgent:streamChunk",
@@ -855,7 +845,6 @@ export const IPC_CHANNELS = {
 	// Pipeline Generator (Feature 23) — AI-powered CI/CD pipeline generation
 	PIPELINE_GENERATOR_GENERATE: "pipelineGenerator:generate",
 	PIPELINE_GENERATOR_CANCEL: "pipelineGenerator:cancel",
-	PIPELINE_GENERATOR_CONFIGURE: "pipelineGenerator:configure",
 	// Pipeline Generator events (main -> renderer)
 	PIPELINE_GENERATOR_STATUS: "pipelineGenerator:status",
 	PIPELINE_GENERATOR_STREAM_CHUNK: "pipelineGenerator:streamChunk",
@@ -914,7 +903,6 @@ export const IPC_CHANNELS = {
 	LIVE_COMPANION_SUGGESTION: "liveCompanion:suggestion",
 	LIVE_COMPANION_TAKEOVER_PROPOSAL: "liveCompanion:takeoverProposal",
 	LIVE_COMPANION_FILE_CHANGE: "liveCompanion:fileChange",
-	LIVE_COMPANION_ERROR: "liveCompanion:error",
 
 	// Agent Time Travel — Temporal debugger for AI agents
 	TIME_TRAVEL_GENERATE_CHECKPOINTS: "timeTravel:generateCheckpoints",
@@ -931,10 +919,6 @@ export const IPC_CHANNELS = {
 	TIME_TRAVEL_SCORE_DECISIONS: "timeTravel:scoreDecisions",
 	TIME_TRAVEL_GET_DECISION_SCORES: "timeTravel:getDecisionScores",
 	TIME_TRAVEL_GET_DECISION_HEATMAP: "timeTravel:getDecisionHeatmap",
-	// Time Travel events (main -> renderer)
-	TIME_TRAVEL_CHECKPOINTS_READY: "timeTravel:checkpointsReady",
-	TIME_TRAVEL_FORK_STATUS_CHANGED: "timeTravel:forkStatusChanged",
-	TIME_TRAVEL_ERROR: "timeTravel:error",
 
 	// === Phase 3-5 backend modules (one HTTP-backed channel per module) ===
 	// Longevity Score (#3.8)
@@ -1020,4 +1004,331 @@ export const IPC_CHANNELS = {
 	MOBILE_SCREENSHOT_EVENT: "mobile:screenshot-update",
 	MOBILE_ERROR_EVENT: "mobile:error",
 	MOBILE_STOPPED_EVENT: "mobile:stopped",
+
+	// Channels that main and preload named by their string until lot M7,
+	// sorted by name
+	ACCESSIBILITY_CANCEL: "accessibility:cancel",
+	ACCESSIBILITY_ERROR: "accessibility-error",
+	ACCESSIBILITY_EVENT: "accessibility-event",
+	ACCESSIBILITY_RESULT: "accessibility-result",
+	ACCESSIBILITY_RUN: "accessibility:run",
+	AGENT_CLI_CHECK: "agentCli:check",
+	AGENT_CLI_PROBE_ACP: "agentCli:probeAcp",
+	AGENT_COACH_CANCEL: "agentCoach:cancel",
+	AGENT_COACH_ERROR: "agent-coach-error",
+	AGENT_COACH_EVENT: "agent-coach-event",
+	AGENT_COACH_RESULT: "agent-coach-result",
+	AGENT_COACH_RUN: "agentCoach:run",
+	AGENT_DEBUGGER_ATTACH: "agentDebugger:attach",
+	AGENT_DEBUGGER_DETACH: "agentDebugger:detach",
+	AGENT_DEBUGGER_GET_STATE: "agentDebugger:getState",
+	AGENT_DEBUGGER_LIST_BREAKPOINTS: "agentDebugger:listBreakpoints",
+	AGENT_DEBUGGER_LIST_FRAMES: "agentDebugger:listFrames",
+	AGENT_DEBUGGER_LIST_SESSIONS: "agentDebugger:listSessions",
+	AGENT_DEBUGGER_REMOVE_BREAKPOINT: "agentDebugger:removeBreakpoint",
+	AGENT_DEBUGGER_RESUME: "agentDebugger:resume",
+	AGENT_DEBUGGER_SET_BREAKPOINT: "agentDebugger:setBreakpoint",
+	API_WATCHER_CANCEL: "apiWatcher:cancel",
+	API_WATCHER_ERROR: "api-watcher-error",
+	API_WATCHER_EVENT: "api-watcher-event",
+	API_WATCHER_RESULT: "api-watcher-result",
+	API_WATCHER_RUN: "apiWatcher:run",
+	APP_EMULATOR_CONFIG: "app-emulator:config",
+	APP_EMULATOR_DETECT: "app-emulator:detect",
+	APP_EMULATOR_ERROR: "app-emulator:error",
+	APP_EMULATOR_OUTPUT: "app-emulator:output",
+	APP_EMULATOR_READY: "app-emulator:ready",
+	APP_EMULATOR_START: "app-emulator:start",
+	APP_EMULATOR_STATUS: "app-emulator:status",
+	APP_EMULATOR_STATUS_UPDATE: "app-emulator:status-update",
+	APP_EMULATOR_STOP: "app-emulator:stop",
+	APP_EMULATOR_STOPPED: "app-emulator:stopped",
+	ARENA_BATTLE_COMPLETE: "arena:battleComplete",
+	ARENA_BATTLE_ERROR: "arena:battleError",
+	ARENA_BATTLE_PROGRESS: "arena:battleProgress",
+	ARENA_BATTLE_RESULT: "arena:battleResult",
+	ARENA_CLEAR_HISTORY: "arena:clearHistory",
+	ARENA_GET_ANALYTICS: "arena:getAnalytics",
+	ARENA_GET_BATTLES: "arena:getBattles",
+	ARENA_START_BATTLE: "arena:startBattle",
+	ARENA_VOTE: "arena:vote",
+	AUTO_REFACTOR_CANCEL: "auto-refactor:cancel",
+	AUTO_REFACTOR_COMPLETE: "auto-refactor:complete",
+	AUTO_REFACTOR_ERROR: "auto-refactor:error",
+	AUTO_REFACTOR_EXECUTION_COMPLETE: "auto-refactor:execution-complete",
+	AUTO_REFACTOR_START: "auto-refactor:start",
+	AUTO_REFACTOR_STATUS: "auto-refactor:status",
+	AUTO_REFACTOR_STREAM_CHUNK: "auto-refactor:stream-chunk",
+	AUTOMATIONS_DELETE: "automations:delete",
+	AUTOMATIONS_EVENT: "automations:event",
+	AUTOMATIONS_GET: "automations:get",
+	AUTOMATIONS_RUN: "automations:run",
+	AUTOMATIONS_SAVE: "automations:save",
+	BENCH_CANDIDATES: "bench:candidates",
+	BENCH_DISCARD: "bench:discard",
+	BENCH_EVENT: "bench:event",
+	BENCH_START: "bench:start",
+	BENCH_STATUS: "bench:status",
+	BLAST_RADIUS_ANALYZE: "blastRadius:analyze",
+	BOUNTY_BOARD_LIST_ARCHIVES: "bountyBoard:listArchives",
+	BOUNTY_BOARD_START: "bountyBoard:start",
+	CANCEL_CONFLICT_PREDICTION: "cancel-conflict-prediction",
+	CANCEL_NATURAL_LANGUAGE_GIT: "cancel-natural-language-git",
+	CANCEL_SMART_ESTIMATION: "cancel-smart-estimation",
+	CARBON_PROFILER_CANCEL: "carbonProfiler:cancel",
+	CARBON_PROFILER_ERROR: "carbon-profiler-error",
+	CARBON_PROFILER_EVENT: "carbon-profiler-event",
+	CARBON_PROFILER_RESULT: "carbon-profiler-result",
+	CARBON_PROFILER_RUN: "carbonProfiler:run",
+	CICD_TRIGGERS_CANCEL_RUN: "cicdTriggers:cancelRun",
+	CICD_TRIGGERS_GET_CONFIG: "cicdTriggers:getConfig",
+	CICD_TRIGGERS_GET_RUN_STATUS: "cicdTriggers:getRunStatus",
+	CICD_TRIGGERS_LIST_RUNS: "cicdTriggers:listRuns",
+	CICD_TRIGGERS_SET_CONFIG: "cicdTriggers:setConfig",
+	CICD_TRIGGERS_TRIGGER: "cicdTriggers:trigger",
+	CLAUDE_PROFILE_CREATE_DIR: "claude:profileCreateDir",
+	CODE_PLAYGROUND_CANCEL: "code-playground:cancel",
+	CODE_PLAYGROUND_COMPLETE: "code-playground:complete",
+	CODE_PLAYGROUND_ERROR: "code-playground:error",
+	CODE_PLAYGROUND_START: "code-playground:start",
+	CODE_PLAYGROUND_STATUS: "code-playground:status",
+	CODE_PLAYGROUND_STREAM_CHUNK: "code-playground:stream-chunk",
+	COMPLIANCE_CANCEL: "compliance:cancel",
+	COMPLIANCE_ERROR: "compliance-error",
+	COMPLIANCE_EVENT: "compliance-event",
+	COMPLIANCE_RESULT: "compliance-result",
+	COMPLIANCE_RUN: "compliance:run",
+	CONFLICT_PREDICTOR_COMPLETE: "conflict-predictor-complete",
+	CONFLICT_PREDICTOR_ERROR: "conflict-predictor-error",
+	CONFLICT_PREDICTOR_EVENT: "conflict-predictor-event",
+	CONSENSUS_ARBITER_CANCEL: "consensusArbiter:cancel",
+	CONSENSUS_ARBITER_ERROR: "consensus-arbiter-error",
+	CONSENSUS_ARBITER_EVENT: "consensus-arbiter-event",
+	CONSENSUS_ARBITER_RESULT: "consensus-arbiter-result",
+	CONSENSUS_ARBITER_RUN: "consensusArbiter:run",
+	COSTS_GET_BUDGET: "costs:getBudget",
+	COSTS_GET_CONTEXT_USAGE: "costs:getContextUsage",
+	COSTS_GET_SUMMARY: "costs:getSummary",
+	COSTS_SET_BUDGET: "costs:setBudget",
+	COST_PREDICTOR_RUN: "costPredictor:run",
+	CREDENTIAL_CHECK_CLAUDE_OAUTH: "credential:checkClaudeOAuth",
+	CREDENTIAL_CHECK_OPENAI_CODEX_OAUTH: "credential:checkOpenAICodexOAuth",
+	CREDENTIAL_DETECT_WINDSURF_TOKEN: "credential:detectWindsurfToken",
+	CREDENTIAL_GET_ACTIVE: "credential:getActive",
+	CREDENTIAL_SET_ACTIVE: "credential:setActive",
+	CREDENTIAL_TEST_PROVIDER: "credential:testProvider",
+	CREDENTIAL_UPDATE_CODEX_CLI: "credential:updateCodexCli",
+	CREDENTIAL_VALIDATE: "credential:validate",
+	CROSS_LANG_TRANSLATION_CANCEL: "crossLangTranslation:cancel",
+	CROSS_LANG_TRANSLATION_CLEAR_HISTORY: "crossLangTranslation:clearHistory",
+	CROSS_LANG_TRANSLATION_GET_HISTORY: "crossLangTranslation:getHistory",
+	CROSS_LANG_TRANSLATION_GET_SUPPORTED_LANGUAGES: "crossLangTranslation:getSupportedLanguages",
+	CROSS_LANG_TRANSLATION_STREAM_CHUNK: "crossLangTranslation:streamChunk",
+	CROSS_LANG_TRANSLATION_TRANSLATE: "crossLangTranslation:translate",
+	DASHBOARD_GET_SNAPSHOT: "dashboard:getSnapshot",
+	DESIGN_TO_CODE_RUN: "designToCode:run",
+	DOC_DRIFT_CANCEL: "docDrift:cancel",
+	DOC_DRIFT_ERROR: "doc-drift-error",
+	DOC_DRIFT_EVENT: "doc-drift-event",
+	DOC_DRIFT_RESULT: "doc-drift-result",
+	DOC_DRIFT_RUN: "docDrift:run",
+	ENV_SNAPSHOT_CAPTURE: "envSnapshot:capture",
+	ENV_SNAPSHOT_EXPORT: "envSnapshot:export",
+	ENV_SNAPSHOT_GET: "envSnapshot:get",
+	ENV_SNAPSHOT_LIST: "envSnapshot:list",
+	ENV_SNAPSHOT_REPLAY: "envSnapshot:replay",
+	EXECUTE_NATURAL_LANGUAGE_GIT: "execute-natural-language-git",
+	FLAKY_TESTS_CANCEL: "flakyTests:cancel",
+	FLAKY_TESTS_ERROR: "flaky-tests-error",
+	FLAKY_TESTS_EVENT: "flaky-tests-event",
+	FLAKY_TESTS_RESULT: "flaky-tests-result",
+	FLAKY_TESTS_RUN: "flakyTests:run",
+	FORMULA_MATRIX_REFINE: "formulaMatrix:refine",
+	FORMULA_MATRIX_RUN: "formulaMatrix:run",
+	GITHUB_COPILOT_AUTHENTICATE: "github-copilot:authenticate",
+	GITHUB_COPILOT_GET_CONFIG: "github-copilot:getConfig",
+	GITHUB_COPILOT_GET_ENV: "github-copilot:getEnv",
+	GITHUB_COPILOT_GET_STATUS: "github-copilot:getStatus",
+	GITHUB_COPILOT_LOGOUT: "github-copilot:logout",
+	GITHUB_COPILOT_REFRESH_STATUS: "github-copilot:refreshStatus",
+	GITHUB_COPILOT_REMOVE_TOKEN: "github-copilot:removeToken",
+	GITHUB_COPILOT_SET_TOKEN: "github-copilot:setToken",
+	GITHUB_COPILOT_TEST_CONNECTION: "github-copilot:testConnection",
+	GITHUB_TEST_CONNECTION: "github:testConnection",
+	GIT_SURGEON_CANCEL: "gitSurgeon:cancel",
+	GIT_SURGEON_ERROR: "git-surgeon-error",
+	GIT_SURGEON_EVENT: "git-surgeon-event",
+	GIT_SURGEON_RESULT: "git-surgeon-result",
+	GIT_SURGEON_RUN: "gitSurgeon:run",
+	GUARDRAILS_LOAD: "guardrails:load",
+	GUARDRAILS_SAVE: "guardrails:save",
+	GUARDRAILS_TEST: "guardrails:test",
+	I18N_AGENT_CANCEL: "i18nAgent:cancel",
+	I18N_AGENT_ERROR: "i18n-agent-error",
+	I18N_AGENT_EVENT: "i18n-agent-event",
+	I18N_AGENT_RESULT: "i18n-agent-result",
+	I18N_AGENT_RUN: "i18nAgent:run",
+	INJECTION_GUARD_CANCEL: "injectionGuard:cancel",
+	INJECTION_GUARD_ERROR: "injection-guard-error",
+	INJECTION_GUARD_EVENT: "injection-guard-event",
+	INJECTION_GUARD_RESULT: "injection-guard-result",
+	INJECTION_GUARD_RUN: "injectionGuard:run",
+	NATURAL_LANGUAGE_GIT_COMPLETE: "natural-language-git-complete",
+	NATURAL_LANGUAGE_GIT_ERROR: "natural-language-git-error",
+	NATURAL_LANGUAGE_GIT_STATUS: "natural-language-git-status",
+	NATURAL_LANGUAGE_GIT_STREAM_CHUNK: "natural-language-git-stream-chunk",
+	NOTEBOOK_AGENT_CANCEL: "notebookAgent:cancel",
+	NOTEBOOK_AGENT_RUN: "notebookAgent:run",
+	NOTEBOOK_ERROR: "notebook-error",
+	NOTEBOOK_EVENT: "notebook-event",
+	NOTEBOOK_RESULT: "notebook-result",
+	OFFLINE_MODE_GET_POLICY: "offlineMode:getPolicy",
+	OFFLINE_MODE_LIST_MODELS: "offlineMode:listModels",
+	OFFLINE_MODE_REPORT: "offlineMode:report",
+	OFFLINE_MODE_SCAN_MODELS: "offlineMode:scanModels",
+	OFFLINE_MODE_SET_POLICY: "offlineMode:setPolicy",
+	OFFLINE_MODE_STATUS: "offlineMode:status",
+	ONBOARDING_AGENT_CANCEL: "onboardingAgent:cancel",
+	ONBOARDING_AGENT_RUN: "onboardingAgent:run",
+	ONBOARDING_ERROR: "onboarding-error",
+	ONBOARDING_EVENT: "onboarding-event",
+	ONBOARDING_RESULT: "onboarding-result",
+	PLUGIN_MARKETPLACE_CREATE: "pluginMarketplace:create",
+	PLUGIN_MARKETPLACE_GET_CATALOG: "pluginMarketplace:getCatalog",
+	PLUGIN_MARKETPLACE_GET_INSTALLED: "pluginMarketplace:getInstalled",
+	PLUGIN_MARKETPLACE_INSTALL: "pluginMarketplace:install",
+	PLUGIN_MARKETPLACE_OPEN_LOCAL_FOLDER: "pluginMarketplace:openLocalFolder",
+	PLUGIN_MARKETPLACE_TOGGLE: "pluginMarketplace:toggle",
+	PLUGIN_MARKETPLACE_UNINSTALL: "pluginMarketplace:uninstall",
+	PROJECT_HAS_LOCAL_SOURCE: "project:has-local-source",
+	PROVIDERS_GET_CONFIGURED_PROVIDERS: "providers:getConfiguredProviders",
+	PYTHON_ENV_GET_STATUS: "python-env:get-status",
+	PYTHON_ENV_REINITIALIZE: "python-env:reinitialize",
+	QUALITY_ANALYZE: "quality:analyze",
+	QUALITY_ANALYZE_PR: "quality:analyze-pr",
+	REGRESSION_GUARDIAN_CANCEL: "regressionGuardian:cancel",
+	REGRESSION_GUARDIAN_ERROR: "regression-guardian-error",
+	REGRESSION_GUARDIAN_EVENT: "regression-guardian-event",
+	REGRESSION_GUARDIAN_RESULT: "regression-guardian-result",
+	REGRESSION_GUARDIAN_RUN: "regressionGuardian:run",
+	RELEASE_COORDINATOR_CANCEL: "releaseCoordinator:cancel",
+	RELEASE_COORDINATOR_ERROR: "release-coordinator-error",
+	RELEASE_COORDINATOR_EVENT: "release-coordinator-event",
+	RELEASE_COORDINATOR_RESULT: "release-coordinator-result",
+	RELEASE_COORDINATOR_RUN: "releaseCoordinator:run",
+	RUN_CONFLICT_PREDICTION: "run-conflict-prediction",
+	RUN_SMART_ESTIMATION: "run-smart-estimation",
+	SANDBOX_CANCEL: "sandbox:cancel",
+	SANDBOX_ERROR: "sandbox-error",
+	SANDBOX_EVENT: "sandbox-event",
+	SANDBOX_RESULT: "sandbox-result",
+	SANDBOX_RUN: "sandbox:run",
+	SERVER_ADMIN_ACTIVATE_USER: "server-admin:activate-user",
+	SERVER_ADMIN_ACTIVE_ORG: "server-admin:active-org",
+	SERVER_ADMIN_ADD_MEMBER: "server-admin:add-member",
+	SERVER_ADMIN_CREATE_ORG: "server-admin:create-org",
+	SERVER_ADMIN_CREATE_ROLE: "server-admin:create-role",
+	SERVER_ADMIN_DEACTIVATE_USER: "server-admin:deactivate-user",
+	SERVER_ADMIN_DELETE_ORG: "server-admin:delete-org",
+	SERVER_ADMIN_DELETE_ROLE: "server-admin:delete-role",
+	SERVER_ADMIN_GET_QUOTAS: "server-admin:get-quotas",
+	SERVER_ADMIN_LIST_AUDIT: "server-admin:list-audit",
+	SERVER_ADMIN_LIST_MEMBERS: "server-admin:list-members",
+	SERVER_ADMIN_LIST_ORGS: "server-admin:list-orgs",
+	SERVER_ADMIN_LIST_ROLES: "server-admin:list-roles",
+	SERVER_ADMIN_LIST_SESSIONS: "server-admin:list-sessions",
+	SERVER_ADMIN_LIST_USERS: "server-admin:list-users",
+	SERVER_ADMIN_MY_PERMISSIONS: "server-admin:my-permissions",
+	SERVER_ADMIN_OVERVIEW: "server-admin:overview",
+	SERVER_ADMIN_PERMISSIONS: "server-admin:permissions",
+	SERVER_ADMIN_REMOVE_MEMBER: "server-admin:remove-member",
+	SERVER_ADMIN_REVOKE_SESSIONS: "server-admin:revoke-sessions",
+	SERVER_ADMIN_SET_ACTIVE_ORG: "server-admin:set-active-org",
+	SERVER_ADMIN_SET_QUOTAS: "server-admin:set-quotas",
+	SERVER_ADMIN_SWITCH_ORG: "server-admin:switch-org",
+	SERVER_ADMIN_UPDATE_MEMBER_ROLE: "server-admin:update-member-role",
+	SERVER_ADMIN_UPDATE_ORG: "server-admin:update-org",
+	SERVER_ADMIN_UPDATE_ROLE: "server-admin:update-role",
+	SERVER_AUTH_ACCEPT_INVITE: "server-auth:accept-invite",
+	SERVER_AUTH_CREATE_INVITE: "server-auth:create-invite",
+	SERVER_AUTH_GET_CONFIG: "server-auth:get-config",
+	SERVER_AUTH_GET_STATE: "server-auth:get-state",
+	SERVER_AUTH_LIST_INVITES: "server-auth:list-invites",
+	SERVER_AUTH_LOGIN_ENTRA: "server-auth:login-entra",
+	SERVER_AUTH_LOGIN_LOCAL: "server-auth:login-local",
+	SERVER_AUTH_LOGOUT: "server-auth:logout",
+	SERVER_AUTH_LOOKUP_INVITE: "server-auth:lookup-invite",
+	SERVER_AUTH_RESTORE: "server-auth:restore",
+	SERVER_AUTH_REVOKE_INVITE: "server-auth:revoke-invite",
+	SERVER_AUTH_SET_MODE: "server-auth:set-mode",
+	SERVER_AUTH_STATE_CHANGED: "server-auth:state-changed",
+	SMART_ESTIMATION_COMPLETE: "smart-estimation-complete",
+	SMART_ESTIMATION_ERROR: "smart-estimation-error",
+	SMART_ESTIMATION_EVENT: "smart-estimation-event",
+	SPEC_APPROVAL_APPROVE: "specApproval:approve",
+	SPEC_APPROVAL_GET_HISTORY: "specApproval:getHistory",
+	SPEC_APPROVAL_GET_PENDING_SPECS: "specApproval:getPendingSpecs",
+	SPEC_APPROVAL_GET_SPEC: "specApproval:getSpec",
+	SPEC_APPROVAL_REJECT: "specApproval:reject",
+	SPEC_APPROVAL_REQUEST_CHANGES: "specApproval:requestChanges",
+	SPEC_REFINEMENT_CANCEL: "specRefinement:cancel",
+	SPEC_REFINEMENT_ERROR: "spec-refinement-error",
+	SPEC_REFINEMENT_EVENT: "spec-refinement-event",
+	SPEC_REFINEMENT_RESULT: "spec-refinement-result",
+	SPEC_REFINEMENT_RUN: "specRefinement:run",
+	SWARM_ANALYZE: "swarm:analyze",
+	SWARM_CANCEL: "swarm:cancel",
+	SWARM_EVENT: "swarm:event",
+	SWARM_LOG: "swarm:log",
+	SWARM_START: "swarm:start",
+	SWARM_STATUS: "swarm:status",
+	TASK_PAUSE: "TASK_PAUSE",
+	TASK_RESUME: "TASK_RESUME",
+	TEAM_BOT_SEND: "teamBot:send",
+	TEAM_BOT_TEST: "teamBot:test",
+	TECH_DEBT_GENERATE_SPEC: "techDebt:generateSpec",
+	TECH_DEBT_GET_TREND: "techDebt:getTrend",
+	TECH_DEBT_LIST_ITEMS: "techDebt:listItems",
+	TECH_DEBT_SCAN: "techDebt:scan",
+	TEST_GENERATION_ADD_PACKAGES: "test-generation:add-packages",
+	TEST_GENERATION_ANALYZE_COVERAGE: "test-generation:analyze-coverage",
+	TEST_GENERATION_CANCEL: "test-generation:cancel",
+	TEST_GENERATION_CODE: "test-generation:code",
+	TEST_GENERATION_COMPLETE: "test-generation:complete",
+	TEST_GENERATION_ERROR: "test-generation:error",
+	TEST_GENERATION_GENERATE_E2E: "test-generation:generate-e2e",
+	TEST_GENERATION_GENERATE_TDD: "test-generation:generate-tdd",
+	TEST_GENERATION_GENERATE_UNIT: "test-generation:generate-unit",
+	TEST_GENERATION_PROGRESS: "test-generation:progress",
+	TEST_GENERATION_RESOLVE_DESTINATION: "test-generation:resolve-destination",
+	TEST_GENERATION_RESOLVE_LIBRARIES: "test-generation:resolve-libraries",
+	TEST_GENERATION_RESULT: "test-generation:result",
+	TEST_GENERATION_STATUS: "test-generation:status",
+	USAGE_GET: "usage:get",
+	USAGE_GET_ALL_DATA: "usage:getAllData",
+	USAGE_GET_DATA: "usage:getData",
+	USAGE_UPDATE_DATA: "usage:updateData",
+	VISUAL_PROGRAMMING_CANCEL: "visualProgramming:cancel",
+	VISUAL_PROGRAMMING_COMPLETE: "visualProgramming:complete",
+	VISUAL_PROGRAMMING_ERROR: "visualProgramming:error",
+	VISUAL_PROGRAMMING_FILE: "visualProgramming:file",
+	VISUAL_PROGRAMMING_RUN: "visualProgramming:run",
+	VISUAL_PROGRAMMING_STATUS: "visualProgramming:status",
+	VISUAL_PROGRAMMING_WRITING: "visualProgramming:writing",
+	VISUAL_TO_CODE_HISTORY_APPEND: "visualToCodeHistory:append",
+	VISUAL_TO_CODE_HISTORY_DELETE_ALL: "visualToCodeHistory:deleteAll",
+	VISUAL_TO_CODE_HISTORY_DELETE_VERSION: "visualToCodeHistory:deleteVersion",
+	VISUAL_TO_CODE_HISTORY_GET: "visualToCodeHistory:get",
+	VISUAL_TO_CODE_HISTORY_LABEL: "visualToCodeHistory:label",
+	VISUAL_TO_CODE_HISTORY_LIST: "visualToCodeHistory:list",
+	VOICE_CONTROL_AUDIO_LEVEL: "voice-control:audio-level",
+	VOICE_CONTROL_CANCEL: "voice-control:cancel",
+	VOICE_CONTROL_COMPLETE: "voice-control:complete",
+	VOICE_CONTROL_DURATION: "voice-control:duration",
+	VOICE_CONTROL_ERROR: "voice-control:error",
+	VOICE_CONTROL_IS_ACTIVE: "voice-control:isActive",
+	VOICE_CONTROL_START_RECORDING: "voice-control:startRecording",
+	VOICE_CONTROL_STATUS: "voice-control:status",
+	VOICE_CONTROL_STOP_RECORDING: "voice-control:stopRecording",
+	VOICE_CONTROL_STREAM_CHUNK: "voice-control:stream-chunk",
 } as const;

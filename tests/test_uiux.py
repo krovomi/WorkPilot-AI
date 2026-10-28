@@ -20,6 +20,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 BACKEND = REPO_ROOT / "apps" / "backend"
 sys.path.insert(0, str(BACKEND))
 
+from project.ui_stack import detect_ui_stack  # noqa: E402
 from uiux import engine  # noqa: E402
 from uiux.integration import (  # noqa: E402
     MCP_TOOL_NAMES,
@@ -31,7 +32,6 @@ from uiux.preflight import read_result, run_preflight  # noqa: E402
 from uiux.prompt import uiux_section  # noqa: E402
 from uiux.relevance import assess, write_override  # noqa: E402
 from uiux.runtime import doctor  # noqa: E402
-from uiux.stack import detect_ui_stack  # noqa: E402
 from uiux.surface import UI_GLOBS, is_ui_path  # noqa: E402
 from workflows.engine import _touched, narrow_to_forecast, resolve_profile  # noqa: E402
 from workflows.forecast import planned_files  # noqa: E402

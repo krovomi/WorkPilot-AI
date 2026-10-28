@@ -5,6 +5,7 @@
  */
 
 import { createIpcListener, invokeIpc } from "./ipc-utils";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export interface AutoRefactorRequest {
 	projectDir: string;
@@ -48,10 +49,6 @@ export interface AutoRefactorAPI {
 		cancelled: boolean;
 		error?: string;
 	}>;
-	configureAutoRefactor: (config: {
-		pythonPath?: string;
-		autoBuildSourcePath?: string;
-	}) => Promise<{ success: boolean; error?: string }>;
 
 	// Event listeners
 	onAutoRefactorStatus: (callback: (status: string) => void) => () => void;
@@ -72,30 +69,25 @@ export function createAutoRefactorAPI(): AutoRefactorAPI {
 	return {
 		// Methods
 		startAutoRefactor: (request: AutoRefactorRequest) =>
-			invokeIpc("auto-refactor:start", request),
+			invokeIpc(IPC_CHANNELS.AUTO_REFACTOR_START, request),
 
-		cancelAutoRefactor: () => invokeIpc("auto-refactor:cancel"),
-
-		configureAutoRefactor: (config: {
-			pythonPath?: string;
-			autoBuildSourcePath?: string;
-		}) => invokeIpc("auto-refactor:configure", config),
+		cancelAutoRefactor: () => invokeIpc(IPC_CHANNELS.AUTO_REFACTOR_CANCEL),
 
 		// Event listeners
 		onAutoRefactorStatus: (callback: (status: string) => void) =>
-			createIpcListener("auto-refactor:status", callback),
+			createIpcListener(IPC_CHANNELS.AUTO_REFACTOR_STATUS, callback),
 
 		onAutoRefactorStreamChunk: (callback: (chunk: string) => void) =>
-			createIpcListener("auto-refactor:stream-chunk", callback),
+			createIpcListener(IPC_CHANNELS.AUTO_REFACTOR_STREAM_CHUNK, callback),
 
 		onAutoRefactorError: (callback: (error: string) => void) =>
-			createIpcListener("auto-refactor:error", callback),
+			createIpcListener(IPC_CHANNELS.AUTO_REFACTOR_ERROR, callback),
 
 		onAutoRefactorComplete: (callback: (result: AutoRefactorResult) => void) =>
-			createIpcListener("auto-refactor:complete", callback),
+			createIpcListener(IPC_CHANNELS.AUTO_REFACTOR_COMPLETE, callback),
 
 		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 		onAutoRefactorExecutionComplete: (callback: (result: any) => void) =>
-			createIpcListener("auto-refactor:execution-complete", callback),
+			createIpcListener(IPC_CHANNELS.AUTO_REFACTOR_EXECUTION_COMPLETE, callback),
 	};
 }

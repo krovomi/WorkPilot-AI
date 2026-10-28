@@ -41,7 +41,7 @@ import shutil
 import subprocess
 import sys
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 SECRET_PATTERNS = re.compile(
@@ -146,10 +146,8 @@ def _capture_lockfiles(project_path: Path) -> list[dict[str, str | None]]:
 
 
 def _capture(project_path: Path, spec_id: str | None, label: str | None) -> dict:
-    now = datetime.now(timezone.utc).isoformat()
-    snap_id = (
-        f"snap-{int(datetime.now(timezone.utc).timestamp())}-{uuid.uuid4().hex[:6]}"
-    )
+    now = datetime.now(UTC).isoformat()
+    snap_id = f"snap-{int(datetime.now(UTC).timestamp())}-{uuid.uuid4().hex[:6]}"
 
     snapshot = {
         "id": snap_id,
@@ -326,4 +324,9 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    # Launched without PYTHONPATH: put the backend on the path for core.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from core.log_redaction import install_global_redaction
+
+    install_global_redaction()
     main()

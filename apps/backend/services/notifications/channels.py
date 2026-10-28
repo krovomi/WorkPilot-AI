@@ -21,7 +21,7 @@ import urllib.error
 import urllib.request
 from urllib.parse import urlparse
 
-from core.api_safety import safe_error
+from foundation.api_safety import safe_error
 
 from .models import ChannelResult, NotificationChannel, PRReadyNotification
 
