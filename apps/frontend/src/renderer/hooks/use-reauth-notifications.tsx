@@ -31,6 +31,7 @@ import { LogIn } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import type { AppSection } from "@/components/settings/AppSettings";
+import { requestProviderReauth } from "@/components/settings/reauth-request";
 import { ToastAction } from "../components/ui/toast";
 import { toast } from "./use-toast";
 
@@ -38,10 +39,11 @@ import { toast } from "./use-toast";
 const REAUTH_TOAST_DURATION_MS = 15000;
 
 /**
- * Open Settings → Accounts, where every provider exposes its re-auth flow.
- * Mirrors the navigation used by UsageIndicator's ReauthContent.
+ * Open Settings → Accounts and start the provider's login flow there. For
+ * Claude that is the in-app terminal bound to the profile's CLAUDE_CONFIG_DIR.
  */
-function openAccountsSettings(): void {
+function openAccountsSettings(providerId: string): void {
+	requestProviderReauth(providerId);
 	const event = new CustomEvent<AppSection>("open-app-settings", {
 		detail: "accounts",
 	});
@@ -87,7 +89,7 @@ export function useReauthNotifications(): void {
 				action: (
 					<ToastAction
 						altText={t("common:usage.reauthToastAction")}
-						onClick={openAccountsSettings}
+						onClick={() => openAccountsSettings(providerName ?? "anthropic")}
 					>
 						{t("common:usage.reauthToastAction")}
 					</ToastAction>

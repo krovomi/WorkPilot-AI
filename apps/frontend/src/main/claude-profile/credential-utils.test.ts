@@ -264,6 +264,74 @@ describe("credential-utils", () => {
 			expect(result.error).toBeUndefined();
 		});
 
+		it("prefers a newer `claude /login` in .credentials.json over a stale Secret Service copy", () => {
+			// WSL/Linux: WorkPilot's own refreshes go to Secret Service, but the
+			// CLI writes the new login to the file. The stale copy must not win.
+			const configDir = "/home/testuser/.claude-profiles/primary";
+			const now = Date.now();
+			vi.mocked(existsSync).mockReturnValue(true);
+			vi.mocked(execFileSync).mockReturnValue(
+				JSON.stringify({
+					claudeAiOauth: {
+						accessToken: "sk-ant-oat01-stale-secret-service",
+						refreshToken: "sk-ant-ort01-expired",
+						expiresAt: now - 60 * 60 * 1000,
+					},
+				}),
+			);
+			vi.mocked(readFileSync).mockReturnValue(
+				JSON.stringify({
+					claudeAiOauth: {
+						accessToken: "sk-ant-oat01-fresh-login",
+						refreshToken: "sk-ant-ort01-fresh",
+						expiresAt: now + 8 * 60 * 60 * 1000,
+					},
+				}),
+			);
+
+			clearCredentialCache();
+			expect(getFullCredentialsFromKeychain(configDir).token).toBe(
+				"sk-ant-oat01-fresh-login",
+			);
+			clearCredentialCache();
+			expect(getCredentialsFromKeychain(configDir).token).toBe(
+				"sk-ant-oat01-fresh-login",
+			);
+		});
+
+		it("keeps the Secret Service token when it is the freshest", () => {
+			const configDir = "/home/testuser/.claude-profiles/primary";
+			const now = Date.now();
+			vi.mocked(existsSync).mockReturnValue(true);
+			vi.mocked(execFileSync).mockReturnValue(
+				JSON.stringify({
+					claudeAiOauth: {
+						accessToken: "sk-ant-oat01-refreshed-by-workpilot",
+						refreshToken: "sk-ant-ort01-new",
+						expiresAt: now + 8 * 60 * 60 * 1000,
+					},
+				}),
+			);
+			vi.mocked(readFileSync).mockReturnValue(
+				JSON.stringify({
+					claudeAiOauth: {
+						accessToken: "sk-ant-oat01-older-file",
+						refreshToken: "sk-ant-ort01-old",
+						expiresAt: now + 60 * 60 * 1000,
+					},
+				}),
+			);
+
+			clearCredentialCache();
+			expect(getFullCredentialsFromKeychain(configDir).token).toBe(
+				"sk-ant-oat01-refreshed-by-workpilot",
+			);
+			clearCredentialCache();
+			expect(getCredentialsFromKeychain(configDir).token).toBe(
+				"sk-ant-oat01-refreshed-by-workpilot",
+			);
+		});
+
 		it("should fall back to .credentials.json when Secret Service unavailable", () => {
 			mockSecretServiceUnavailable();
 			vi.mocked(readFileSync).mockReturnValue(
