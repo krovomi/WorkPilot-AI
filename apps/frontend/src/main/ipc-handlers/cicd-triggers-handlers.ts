@@ -15,7 +15,6 @@
 import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { fileURLToPath } from "node:url";
 import { ipcMain } from "electron";
 import type { Project } from "../../shared/types";
 import {
@@ -30,12 +29,10 @@ import { getConfiguredPythonPath } from "../python-env-manager";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { envWithoutCredentials } from "../utils/child-env";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 function getRunnerPath(): string {
 	return path.join(
-		__dirname,
+		import.meta.dirname,
 		"..",
 		"..",
 		"..",

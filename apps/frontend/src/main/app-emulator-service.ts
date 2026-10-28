@@ -11,7 +11,6 @@ import {
 import http from "node:http";
 import net from "node:net";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { app } from "electron";
 import { isUnix, isWindows } from "./platform";
 import {
@@ -28,9 +27,6 @@ import {
 import { envWithoutCredentials } from "./utils/child-env";
 import { updateExistingFile } from "./utils/existing-file";
 
-// ESM-compatible __dirname
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 const IIS_EXPRESS_ENV = "WORKPILOT_IIS_EXPRESS_PATH";
 const IIS_EXPRESS_UNAVAILABLE_MESSAGE =
 	"IIS Express/xsp was not found. Set WORKPILOT_IIS_EXPRESS_PATH, install IIS Express on Windows or Mono xsp on Linux/macOS, or configure a remote/VM runner.";
@@ -251,7 +247,7 @@ export class AppEmulatorService extends EventEmitter {
 			// Packaged app: backend is in extraResources (process.resourcesPath/backend)
 			...(app.isPackaged ? [path.join(process.resourcesPath, "backend")] : []),
 			// Dev mode: from out/main -> ../../../backend (apps/frontend/out/main -> apps/backend)
-			path.resolve(__dirname, "..", "..", "..", "backend"),
+			path.resolve(import.meta.dirname, "..", "..", "..", "backend"),
 			// Sibling to asar (some packaged layouts)
 			path.resolve(appPath, "..", "backend"),
 			// macOS bundle structure

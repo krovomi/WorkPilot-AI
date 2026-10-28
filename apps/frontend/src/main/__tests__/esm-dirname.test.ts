@@ -18,16 +18,31 @@ function typescriptFiles(dir: string): string[] {
 	return files;
 }
 
+// The main process is bundled as ESM by electron-vite, whose CommonJS shim
+// injects `const __filename`, `const __dirname` and `const require` at the
+// top of any chunk that mentions them. A module-level binding of one of those
+// names in our code can then keep its bare name in the bundle, and the main
+// process fails to load with "Identifier '__filename' has already been
+// declared". Main-process code therefore reads its location from
+// import.meta.dirname / import.meta.filename and never declares these names.
 describe("Electron main ESM paths", () => {
-	it("derives __dirname from import.meta.url before using it", () => {
+	it("uses import.meta.dirname / import.meta.filename instead of __dirname / __filename", () => {
 		const offenders = typescriptFiles(MAIN_DIR)
-			.filter((file) => {
-				const source = readFileSync(file, "utf-8");
-				return (
-					source.includes("__dirname") &&
-					!source.includes("fileURLToPath(import.meta.url)")
-				);
-			})
+			.filter((file) =>
+				/\b__(dirname|filename)\b/.test(readFileSync(file, "utf-8")),
+			)
+			.map((file) => path.relative(MAIN_DIR, file));
+
+		expect(offenders).toEqual([]);
+	});
+
+	it("never declares a module-level require", () => {
+		const offenders = typescriptFiles(MAIN_DIR)
+			.filter((file) =>
+				/^(?:export\s+)?(?:const|let|var)\s+require\b/m.test(
+					readFileSync(file, "utf-8"),
+				),
+			)
 			.map((file) => path.relative(MAIN_DIR, file));
 
 		expect(offenders).toEqual([]);

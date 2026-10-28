@@ -11,7 +11,6 @@
 import { execFileSync, spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { fileURLToPath } from "node:url";
 import { app, BrowserWindow, ipcMain } from "electron";
 import {
 	getOllamaExecutablePaths,
@@ -19,9 +18,6 @@ import {
 	getWhichCommand,
 } from "../platform";
 
-// ESM-compatible __dirname
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 import { IPC_CHANNELS } from "../../shared/constants";
 import type { IPCResult } from "../../shared/types";
@@ -359,7 +355,7 @@ async function executeOllamaDetectorImpl(
 			: []),
 		// Development paths
 		path.resolve(
-			__dirname,
+			import.meta.dirname,
 			"..",
 			"..",
 			"..",
@@ -781,7 +777,7 @@ export function registerOllamaHandlers(): void {
 						: []),
 					// Development paths
 					path.resolve(
-						__dirname,
+						import.meta.dirname,
 						"..",
 						"..",
 						"..",

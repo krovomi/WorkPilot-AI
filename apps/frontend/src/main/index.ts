@@ -5,29 +5,25 @@
 // loading fails with "ReferenceError: require is not defined".
 import { createRequire } from "node:module";
 
-const require = createRequire(import.meta.url);
-// Make require globally available for Sentry's require-in-the-middle hooks
-globalThis.require = require;
+// Make require globally available for Sentry's require-in-the-middle hooks.
+// Not bound to a local `require`: electron-vite's ESM shim already declares
+// one in the bundle (see __tests__/esm-dirname.test.ts).
+globalThis.require = createRequire(import.meta.url);
 
 import { accessSync, existsSync, rmSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, resolve } from "node:path";
 // Load .env file FIRST before any other imports that might use process.env
 import { config } from "dotenv";
 import { app } from "electron";
 import { devEnvFilePaths } from "./dev-env-files";
 
-// ESM-compatible __dirname
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
 // Load .env from centralized .env-files directory at project root, in
-// development only: __dirname is out/main (compiled), so go up 4 levels to
-// reach the checkout. A packaged app has no checkout, and the directory it
+// development only: import.meta.dirname is out/main (compiled), so go up 4
+// levels to reach the checkout. A packaged app has no checkout, and the directory it
 // was launched from (process.cwd()) is anybody's: a `.env-files/.env` there
 // would set variables every child process inherits.
 const possibleEnvPaths = devEnvFilePaths(
-	__dirname,
+	import.meta.dirname,
 	process.cwd(),
 	app.isPackaged,
 );
@@ -181,10 +177,10 @@ function cleanupStaleUpdateMetadata(): void {
 
 // Get icon path based on platform
 function getIconPath(): string {
-	// In dev mode, __dirname is out/main, so we go up to project root then into resources
+	// In dev mode, import.meta.dirname is out/main, so we go up to project root then into resources
 	// In production, resources are in the app's resources folder
 	const resourcesPath = is.dev
-		? join(__dirname, "../../resources")
+		? join(import.meta.dirname, "../../resources")
 		: join(process.resourcesPath);
 
 	let iconName: string;
@@ -531,7 +527,7 @@ function createWindow(): void {
 		trafficLightPosition: { x: 15, y: 10 },
 		icon: getIconPath(),
 		webPreferences: {
-			preload: join(__dirname, "../preload/index.cjs"),
+			preload: join(import.meta.dirname, "../preload/index.cjs"),
 			sandbox: true,
 			contextIsolation: true,
 			nodeIntegration: false,
@@ -561,7 +557,7 @@ function createWindow(): void {
 		if (is.dev && process.env.ELECTRON_RENDERER_URL) {
 			mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
 		} else {
-			mainWindow.loadFile(join(__dirname, "../renderer/index.html"));
+			mainWindow.loadFile(join(import.meta.dirname, "../renderer/index.html"));
 		}
 	}
 
@@ -637,7 +633,7 @@ async function launchBackendIfNeeded() {
 		/* noop */
 	}
 	// Détermine le chemin Python dynamique via pythonEnvManager
-	const backendDir = resolve(__dirname, "../../../backend");
+	const backendDir = resolve(import.meta.dirname, "../../../backend");
 	const pythonPath = pythonEnvManager.getPythonPath();
 	if (!pythonPath || !existsSync(pythonPath)) {
 		throw new Error(
@@ -724,7 +720,7 @@ async function ensureBackendLaunched() {
 
 // Launch streaming WebSocket server as a background process
 async function launchStreamingServer() {
-	const backendDir = resolve(__dirname, "../../../backend");
+	const backendDir = resolve(import.meta.dirname, "../../../backend");
 	const pythonPath = pythonEnvManager.getPythonPath();
 	if (!pythonPath || !existsSync(pythonPath)) {
 		console.warn("[main] Cannot start streaming server: Python not found");
@@ -802,7 +798,7 @@ async function ensureStreamingServerLaunched() {
 // (backend FastAPI, serveur de streaming) attend déjà l'event "ready"
 // (cf. ensureBackendLaunched / ensureStreamingServerLaunched), donc rien ne
 // requiert que l'init soit terminée de façon synchrone ici.
-const backendSourcePath = resolve(__dirname, "../../../backend");
+const backendSourcePath = resolve(import.meta.dirname, "../../../backend");
 pythonEnvManager
 	.initialize(backendSourcePath)
 	.then((status) => console.warn("[main] PythonEnvManager status:", status))

@@ -10,7 +10,6 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import type { BrowserWindow } from "electron";
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
@@ -21,9 +20,6 @@ import { readIfExists } from "../utils/existing-file";
 import { pythonRunnerEnv } from "../utils/python-runner-env";
 import { safeSendToRenderer } from "./utils";
 
-// ESM-compatible __dirname
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 // ---------------------------------------------------------------------------
 // Types
@@ -86,7 +82,7 @@ const activeSessions = new Map<string, ActiveSession>();
 function getBackendDir(): string {
 	// In packaged app: resources/backend | In dev: apps/backend
 	const devPath = path.resolve(
-		__dirname,
+		import.meta.dirname,
 		"..",
 		"..",
 		"..",

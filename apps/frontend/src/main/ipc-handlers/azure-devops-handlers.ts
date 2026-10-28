@@ -8,7 +8,6 @@ import {
 	writeFileSync,
 } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import type { BrowserWindow } from "electron";
 import { ipcMain } from "electron";
 import {
@@ -47,10 +46,8 @@ import { envWithoutCredentials } from "../utils/child-env";
 import { readIfExists, updateExistingFile } from "../utils/existing-file";
 import { pythonRunnerEnv } from "../utils/python-runner-env";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const connectorSrcPath = path.resolve(__dirname, "..", "..", "..", "..", "src");
-const backendPath = path.resolve(__dirname, "..", "..", "..", "backend");
+const connectorSrcPath = path.resolve(import.meta.dirname, "..", "..", "..", "..", "src");
+const backendPath = path.resolve(import.meta.dirname, "..", "..", "..", "backend");
 
 /**
  * Register all Azure DevOps-related IPC handlers

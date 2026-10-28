@@ -8,13 +8,9 @@ import {
 	statSync,
 } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { is } from "@electron-toolkit/utils";
 import { app, dialog, ipcMain, session } from "electron";
 
-// ESM-compatible __dirname
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 import type { BrowserWindow } from "electron";
 import {
@@ -376,10 +372,10 @@ const detectAutoBuildSourcePath = (): string | null => {
 
 	// Development mode paths
 	if (is.dev) {
-		// In dev, __dirname is typically apps/frontend/out/main
+		// In dev, import.meta.dirname is typically apps/frontend/out/main
 		// We need to go up to find apps/backend
 		possiblePaths.push(
-			path.resolve(__dirname, "..", "..", "..", "backend"), // From out/main -> apps/backend
+			path.resolve(import.meta.dirname, "..", "..", "..", "backend"), // From out/main -> apps/backend
 			path.resolve(process.cwd(), "apps", "backend"), // From cwd (repo root)
 		);
 	} else {
@@ -406,7 +402,7 @@ const detectAutoBuildSourcePath = (): string | null => {
 	if (debug) {
 		console.warn("[detectAutoBuildSourcePath] Platform:", process.platform);
 		console.warn("[detectAutoBuildSourcePath] Is dev:", is.dev);
-		console.warn("[detectAutoBuildSourcePath] __dirname:", __dirname);
+		console.warn("[detectAutoBuildSourcePath] import.meta.dirname:", import.meta.dirname);
 		console.warn(
 			"[detectAutoBuildSourcePath] app.getAppPath():",
 			app.getAppPath(),

@@ -2,7 +2,6 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { app } from "electron";
 import type {
 	MobileDevice,
@@ -12,8 +11,6 @@ import type {
 } from "../shared/types/mobile";
 import { envWithoutCredentials } from "./utils/child-env";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 /** The line `runners/mobile_runner.py` prints its answer on. */
 const RESULT_MARKER = "__MOBILE_RESULT__:";
@@ -97,7 +94,7 @@ export class MobileService extends EventEmitter {
 		const appPath = app.getAppPath();
 		const candidates = [
 			...(app.isPackaged ? [path.join(process.resourcesPath, "backend")] : []),
-			path.resolve(__dirname, "..", "..", "..", "backend"),
+			path.resolve(import.meta.dirname, "..", "..", "..", "backend"),
 			path.resolve(appPath, "..", "backend"),
 			path.resolve(appPath, "..", "..", "Resources", "backend"),
 			path.resolve(process.cwd(), "apps", "backend"),
