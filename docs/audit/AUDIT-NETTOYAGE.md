@@ -2433,7 +2433,7 @@ chaque provider, lue le 26 octobre 2026 (xAI « Reasoning », DeepSeek « Thinki
 
 #### F113 · CodeQL rouge sur la PR de release 1.3.1
 
-- **Sévérité** moyenne · **nouveau** · **corrigé par #531**
+- **Sévérité** moyenne · **nouveau** · **corrigé par #531 et #532**
 - **Preuve** (avant) : la PR `develop` → `main` (#530) comparait `develop` à l'analyse de 1.3.0 ;
   22 alertes de niveau erreur faisaient échouer le check : URL de test de clé bâties depuis la
   sortie du validateur et clé Google dans la query (`provider_api.py`), `$` inatteignable dans
@@ -2446,6 +2446,9 @@ chaque provider, lue le 26 octobre 2026 (xAI « Reasoning », DeepSeek « Thinki
   `startswith` sur le chemin résolu avant `_is_within` ; `shared/utils/git-remote-provider.ts`
   (hôte extrait puis comparé) ; `main/utils/existing-file.ts` (`readIfExists`,
   `updateExistingFile` : un seul descripteur) ; dossier `mkdtemp` privé, fichier `wx` en `0600`.
+  Après #531, une dernière erreur sur la PR de release : `scripts/smart-merge-manager.py` bouclait
+  sur les motifs critiques sans s'en servir (chaque fichier de `.workpilot/` noté une fois par
+  motif) ; les motifs choisissent désormais les fichiers, chacun noté une fois (#532).
   Les avertissements (injection de log, données de fichier envoyées au réseau) restent ouverts.
 - **Garde-fou** : `git-remote-provider.test.ts`, `existing-file.test.ts`,
   `tests/test_test_generation_post_build_scope.py`.
