@@ -1,8 +1,8 @@
 import { projectStore } from "../project-store";
 import { listReviewFiles, readReviewFile } from "../code-review-service";
 import type { ReviewScope } from "../../shared/types/code-review";
-import { readdirSync, statSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { readdirSync } from "node:fs";
+import { open } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { ipcMain } from "electron";
@@ -214,15 +214,19 @@ export function registerFileHandlers(): void {
 					return { success: false, error: PATH_REFUSED };
 				}
 
-				// Check file size before reading
-				const stats = statSync(safePath);
-				if (stats.size > MAX_FILE_SIZE) {
-					return { success: false, error: "File too large (max 1MB)" };
+				// Size checked and content read through one descriptor, so the
+				// file measured is the file read.
+				const handle = await open(safePath, "r");
+				try {
+					const stats = await handle.stat();
+					if (stats.size > MAX_FILE_SIZE) {
+						return { success: false, error: "File too large (max 1MB)" };
+					}
+					const content = await handle.readFile("utf-8");
+					return { success: true, data: content };
+				} finally {
+					await handle.close();
 				}
-
-				// Use async file read to avoid blocking
-				const content = await readFile(safePath, "utf-8");
-				return { success: true, data: content };
 			} catch (error) {
 				return {
 					success: false,

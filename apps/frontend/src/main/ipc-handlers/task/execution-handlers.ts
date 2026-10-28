@@ -98,6 +98,7 @@ import {
 	startPhaseRerun,
 	type RerunPhase,
 } from "./plan-rerun-utils";
+import { updateExistingFile } from "../../utils/existing-file";
 
 /**
  * Whether starting `task` needs Claude OAuth authentication.
@@ -1072,9 +1073,9 @@ export function registerTaskExecutionHandlers(
 						: []),
 				];
 				for (const resetPlanPath of resetPlanPaths) {
-					if (!existsSync(resetPlanPath)) continue;
 					try {
-						const resetPlan = JSON.parse(readFileSync(resetPlanPath, "utf-8"));
+						updateExistingFile(resetPlanPath, (text) => {
+						const resetPlan = JSON.parse(text);
 						if (resetPlan.phases) {
 							for (const phase of resetPlan.phases) {
 								if (Array.isArray(phase.subtasks)) {
@@ -1094,11 +1095,8 @@ export function registerTaskExecutionHandlers(
 						resetPlan.status = "in_progress";
 						resetPlan.planStatus = "in_progress";
 						resetPlan.updated_at = new Date().toISOString();
-						writeFileSync(
-							resetPlanPath,
-							JSON.stringify(resetPlan, null, 2),
-							"utf-8",
-						);
+						return JSON.stringify(resetPlan, null, 2);
+						});
 					} catch (resetError) {
 						appLog.warn(
 							`[TASK_REVIEW] Could not reset plan ${resetPlanPath}: ${resetError instanceof Error ? resetError.message : String(resetError)}`,
