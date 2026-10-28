@@ -217,12 +217,14 @@ describe("RepositorySection", () => {
 		const project = createProject();
 
 		// Destructurer avec findByLabelText au lieu de getByLabelText
-		const { findByLabelText, getAllByText } = renderSection(
+		const { findByLabelText, findByText, getAllByText } = renderSection(
 			project,
 			baseSettings,
 		);
 
-		// findByLabelText attend automatiquement que l'élément soit rendu et disponible
+		// Le champ est rendu avant la fin de la lecture git, qui le réinitialise
+		// quand elle répond : attendre qu'elle ait dit « aucun remote ».
+		await findByText("No remote configured");
 		const urlInput = await findByLabelText("Remote URL") as HTMLInputElement;
 		expect(urlInput.value).toBe("");
 
