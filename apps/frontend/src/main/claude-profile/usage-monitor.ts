@@ -910,6 +910,10 @@ export class UsageMonitor extends EventEmitter {
 						// Token was refreshed and persisted successfully - clear from needsReauth if present
 						this.needsReauthProfiles.delete(profile.id);
 					}
+				} else if (tokenResult.token && !tokenResult.error) {
+					// A valid token was read straight from the store (e.g. the user just
+					// re-logged into this profile's config dir): the flag is stale.
+					this.needsReauthProfiles.delete(profile.id);
 				}
 
 				token = tokenResult.token;
@@ -1127,6 +1131,10 @@ export class UsageMonitor extends EventEmitter {
 						// Token was refreshed and persisted successfully - clear from needsReauth if present
 						this.needsReauthProfiles.delete(activeProfile.id);
 					}
+				} else if (tokenResult.token && !tokenResult.error) {
+					// A valid token was read straight from the store (e.g. the user just
+					// re-logged into this profile's config dir): the flag is stale.
+					this.needsReauthProfiles.delete(activeProfile.id);
 				}
 
 				if (tokenResult.token) {
@@ -1244,6 +1252,9 @@ export class UsageMonitor extends EventEmitter {
 				} else {
 					this.needsReauthProfiles.delete(profile.id);
 				}
+			} else if (tokenResult.token && !tokenResult.error) {
+				// Valid token read straight from the store: clear a stale re-auth flag.
+				this.needsReauthProfiles.delete(profile.id);
 			}
 
 			if (tokenResult.token) {

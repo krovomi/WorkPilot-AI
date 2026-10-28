@@ -1,6 +1,5 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import type { BrowserWindow } from "electron";
 import { ipcMain } from "electron";
 import { IPC_CHANNELS, MASKED_SECRET_CHAR } from "../../shared/constants";
@@ -17,9 +16,7 @@ import { projectStore } from "../project-store";
 import { downloadJiraImageAttachments } from "./shared/jira-attachments";
 import { envWithoutCredentials } from "../utils/child-env";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const connectorSrcPath = path.resolve(__dirname, "..", "..", "..", "..", "src");
+const connectorSrcPath = path.resolve(import.meta.dirname, "..", "..", "..", "..", "src");
 
 /**
  * Register all Jira-related IPC handlers

@@ -9,14 +9,11 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { type BrowserWindow, ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { getConfiguredPythonPath } from "../python-env-manager";
 import { pythonRunnerEnv } from "../utils/python-runner-env";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 /** Tracks running fix/retry processes by incident ID so they can be cancelled. */
 const activeFixProcesses = new Map<string, ChildProcess>();
@@ -635,7 +632,7 @@ async function getEmptyDashboardWithPersistedData(projectPath: string) {
 function getBackendDir(): string {
 	// In packaged app: resources/backend | In dev: apps/backend
 	const devPath = path.resolve(
-		__dirname,
+		import.meta.dirname,
 		"..",
 		"..",
 		"..",
