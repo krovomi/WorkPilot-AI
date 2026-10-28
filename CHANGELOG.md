@@ -124,6 +124,10 @@ est livré, et les quatre fonctions géantes du backend découpées.
   sont vérifiés avant d'être exécutés.
 - Mode hors-ligne strict pour `libdocs`, routes des providers refusées en mode
   serveur, `/health` réduit à son verdict (lot M4).
+- CodeQL vert pour la release (#531) : tests de clé sur les URL autorisées
+  seulement, clé Google en en-tête, hôte des remotes git comparé exactement,
+  fichiers lus ou réécrits sans vérification préalable séparée, fichier
+  temporaire du pair programming privé.
 
 ### 🛠️ Qualité
 
