@@ -9,12 +9,8 @@ import type { ChildProcess } from "node:child_process";
 import { exec, execFile, spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
-// ESM-compatible __dirname
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 import type { Project } from "../../../../shared/types";
 import type {
@@ -565,7 +561,7 @@ export function getBackendPath(project: Project): string | null {
 	// Auto-detect from app location (same logic as agent-process.ts)
 	const possiblePaths = [
 		// Dev mode: from dist/main -> ../../backend (apps/frontend/out/main -> apps/backend)
-		path.resolve(__dirname, "..", "..", "..", "..", "..", "backend"),
+		path.resolve(import.meta.dirname, "..", "..", "..", "..", "..", "backend"),
 		// Alternative: from app root -> apps/backend
 		app ? path.resolve(app.getAppPath(), "..", "backend") : null,
 		// If running from repo root with apps structure
