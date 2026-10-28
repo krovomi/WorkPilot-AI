@@ -38,7 +38,10 @@ interface CleanProviderCardProps {
 			authMethod?: AuthMethod;
 		};
 	};
-	onConfigure?: (providerId: string) => void;
+	onConfigure?: (
+		providerId: string,
+		options?: { startOAuth?: boolean },
+	) => void;
 	onTest?: (providerId: string) => void;
 	onToggle?: (providerId: string, enabled: boolean) => void;
 	onRemove?: (providerId: string) => void;
@@ -321,6 +324,12 @@ export function CleanProviderCard({
 		}
 	};
 
+	// Reconnect must re-run the login for this profile's own config dir; the
+	// dialog's embedded terminal sets CLAUDE_CONFIG_DIR, so start it directly.
+	const handleReconnect = () => {
+		onConfigure?.(provider.id, { startOAuth: true });
+	};
+
 	const handleTest = () => {
 		if (onTest) {
 			onTest(provider.id);
@@ -446,7 +455,7 @@ export function CleanProviderCard({
 					<Button
 						variant="ghost"
 						size="sm"
-						onClick={handleConfigure}
+						onClick={handleReconnect}
 						className="h-6 px-2 text-xs shrink-0 text-amber-700 dark:text-amber-500 hover:bg-amber-100/60 dark:hover:bg-amber-500/15"
 					>
 						<LogIn className="w-3 h-3 mr-1" />

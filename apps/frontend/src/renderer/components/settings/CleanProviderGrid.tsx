@@ -30,7 +30,10 @@ interface Provider {
 interface CleanProviderGridProps {
 	providers: Provider[];
 	isLoading?: boolean;
-	onConfigure: (providerId: string) => void;
+	onConfigure: (
+		providerId: string,
+		options?: { startOAuth?: boolean },
+	) => void;
 	onTest?: (providerId: string) => void;
 	onToggle?: (providerId: string, enabled: boolean) => void;
 	onRemove?: (providerId: string) => void;

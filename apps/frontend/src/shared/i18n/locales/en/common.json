@@ -559,7 +559,7 @@
 		"notAuthenticated": "Not authenticated",
 		"needsReauth": "Needs re-auth",
 		"reauthRequired": "Re-authentication required",
-		"reauthRequiredDescription": "Your session has expired. Re-authenticate to view usage and continue using this account.",
+		"reauthRequiredDescription": "Your session has expired. Re-authenticate to view usage and continue using this account. For Claude, use the button below: a `claude /login` typed in a terminal does not update WorkPilot accounts.",
 		"reauthButton": "Re-authenticate",
 		"reauthToastTitle": "Reconnection required",
 		"reauthToastDescription": "Your {{provider}} session expired and could not be refreshed automatically. Reconnect to continue.",

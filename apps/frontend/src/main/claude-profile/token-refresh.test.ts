@@ -4,6 +4,8 @@
  * Tests token expiry detection and refresh functionality.
  */
 
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	ensureValidToken,
@@ -334,6 +336,88 @@ describe("token-refresh", () => {
 				"new-refresh",
 				expect.any(Number),
 			);
+		});
+	});
+
+	describe("ensureValidToken - plain `claude /login` into the default store", () => {
+		const profileDir = join(homedir(), ".claude-profiles", "primary");
+
+		const invalidGrantResponse = {
+			ok: false,
+			status: 400,
+			statusText: "Bad Request",
+			json: async () => ({
+				error: "invalid_grant",
+				error_description: "Refresh token expired",
+			}),
+		};
+
+		async function mockStores(
+			defaultStore: { token: string | null; expiresAt: number | null },
+		) {
+			const { getFullCredentialsFromKeychain } = await import(
+				"./credential-utils"
+			);
+			(
+				getFullCredentialsFromKeychain as ReturnType<typeof vi.fn>
+			).mockImplementation((configDir?: string) =>
+				configDir === undefined
+					? { ...defaultStore, refreshToken: "default-refresh", email: null }
+					: {
+							token: "profile-expired-token",
+							refreshToken: "profile-expired-refresh",
+							expiresAt: Date.now() - 60_000,
+							email: null,
+						},
+			);
+		}
+
+		it("flags a fresh login found in ~/.claude instead of the profile dir", async () => {
+			await mockStores({
+				token: "fresh-cli-token",
+				expiresAt: Date.now() + 8 * 60 * 60 * 1000,
+			});
+			mockFetch.mockResolvedValueOnce(invalidGrantResponse);
+
+			const result = await ensureValidToken(profileDir);
+
+			expect(result.token).toBeNull();
+			expect(result.errorCode).toBe("invalid_grant");
+			expect(result.reauthHint).toBe("login_in_default_config_dir");
+		});
+
+		it("does not flag when the default store token is expired too", async () => {
+			await mockStores({
+				token: "old-cli-token",
+				expiresAt: Date.now() - 60_000,
+			});
+			mockFetch.mockResolvedValueOnce(invalidGrantResponse);
+
+			const result = await ensureValidToken(`${profileDir}-stale`);
+
+			expect(result.token).toBeNull();
+			expect(result.errorCode).toBe("invalid_grant");
+			expect(result.reauthHint).toBeUndefined();
+		});
+
+		it("does not flag a profile that already uses ~/.claude", async () => {
+			const { getFullCredentialsFromKeychain } = await import(
+				"./credential-utils"
+			);
+			(
+				getFullCredentialsFromKeychain as ReturnType<typeof vi.fn>
+			).mockReturnValue({
+				token: "expired-token",
+				refreshToken: "expired-refresh",
+				expiresAt: Date.now() - 60_000,
+				email: null,
+			});
+			mockFetch.mockResolvedValueOnce(invalidGrantResponse);
+
+			const result = await ensureValidToken(join(homedir(), ".claude"));
+
+			expect(result.token).toBeNull();
+			expect(result.reauthHint).toBeUndefined();
 		});
 	});
 

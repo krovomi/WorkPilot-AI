@@ -113,6 +113,7 @@ export function CleanProviderSection({
 		null,
 	);
 	const [configDialogOpen, setConfigDialogOpen] = useState(false);
+	const [autoStartOAuth, setAutoStartOAuth] = useState(false);
 	const [providersState, setProvidersState] = useState<Provider[]>([]);
 
 	// Real data states
@@ -697,10 +698,14 @@ export function CleanProviderSection({
 		);
 	};
 
-	const handleConfigure = (providerId: string) => {
+	const handleConfigure = (
+		providerId: string,
+		options?: { startOAuth?: boolean },
+	) => {
 		const provider = providers.find((p) => p.id === providerId);
 		if (provider) {
 			setSelectedProvider(provider);
+			setAutoStartOAuth(options?.startOAuth === true);
 			setConfigDialogOpen(true);
 		}
 	};
@@ -1036,6 +1041,7 @@ export function CleanProviderSection({
 						onTest={handleTest}
 						useSheet={true}
 						onProviderActivated={handleProviderActivated}
+						autoStartOAuth={autoStartOAuth}
 					/>
 				</DialogContent>
 			</Dialog>
