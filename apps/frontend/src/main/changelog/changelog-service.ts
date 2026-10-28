@@ -1,12 +1,8 @@
 import { EventEmitter } from "node:events";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import * as path from "node:path";
-import { fileURLToPath } from "node:url";
 import { app } from "electron";
 
-// ESM-compatible __dirname
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 import {
 	AUTO_BUILD_PATHS,
@@ -127,7 +123,7 @@ export class ChangelogService extends EventEmitter {
 
 		const possiblePaths = [
 			// Apps structure: from out/main -> apps/backend
-			path.resolve(__dirname, "..", "..", "..", "backend"),
+			path.resolve(import.meta.dirname, "..", "..", "..", "backend"),
 			path.resolve(app.getAppPath(), "..", "backend"),
 			path.resolve(process.cwd(), "apps", "backend"),
 		];

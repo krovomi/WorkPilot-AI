@@ -6,8 +6,7 @@
 
 import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { app, ipcMain } from "electron";
 import { projectStore } from "../project-store";
 import { parsePythonCommand } from "../python-detector";
@@ -15,8 +14,6 @@ import { getConfiguredPythonPath } from "../python-env-manager";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { pythonRunnerEnv } from "../utils/python-runner-env";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 
 interface ConflictPredictorRequest {
 	projectId: string;
@@ -37,7 +34,7 @@ export function setupConflictPredictorHandlers() {
 	const getBackendPath = (): string => {
 		const candidates = [
 			...(app.isPackaged ? [join(process.resourcesPath, "backend")] : []),
-			join(__dirname, "..", "..", "..", "backend"),
+			join(import.meta.dirname, "..", "..", "..", "backend"),
 			join(app.getAppPath(), "..", "backend"),
 			join(process.cwd(), "apps", "backend"),
 		];

@@ -2,14 +2,11 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { app } from "electron";
 import { MODEL_ID_MAP } from "../shared/constants";
 import type { AppSettings } from "../shared/types";
 import { readSettingsFile } from "./settings-utils";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 /**
  * Request configuration for a learning loop analysis
@@ -64,7 +61,7 @@ export class LearningLoopService extends EventEmitter {
 			// Packaged app: backend is in extraResources
 			...(app.isPackaged ? [path.join(process.resourcesPath, "backend")] : []),
 			// Dev mode: from dist/main -> ../../backend (apps/frontend/out/main -> apps/backend)
-			path.resolve(__dirname, "..", "..", "..", "backend"),
+			path.resolve(import.meta.dirname, "..", "..", "..", "backend"),
 			// Alternative: from app root -> apps/backend
 			path.resolve(app.getAppPath(), "..", "backend"),
 			// If running from repo root with apps structure

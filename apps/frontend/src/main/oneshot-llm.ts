@@ -7,7 +7,6 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { app } from "electron";
 import { getOAuthModeClearVars } from "./agent/env-utils";
 import { logger } from "./app-logger";
@@ -23,9 +22,6 @@ import { credentialManager } from "./services/credential-manager";
 import { getAPIProfileEnv } from "./services/profile";
 import { loadBackendEnv } from "./source-env";
 
-// ESM-compatible __dirname
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 /** Marker the runner prints before the raw model output (see runner docstring). */
 const RESULT_MARKER = "__ONESHOT_RESULT__:";
@@ -133,7 +129,7 @@ function resolveBackendSource(override?: string): string | null {
 	}
 
 	const candidates = [
-		path.resolve(__dirname, "..", "..", "..", "backend"),
+		path.resolve(import.meta.dirname, "..", "..", "..", "backend"),
 		path.resolve(app.getAppPath(), "..", "backend"),
 		path.resolve(process.cwd(), "apps", "backend"),
 	];

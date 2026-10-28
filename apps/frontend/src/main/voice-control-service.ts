@@ -2,14 +2,11 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { app } from "electron";
 import { MODEL_ID_MAP } from "../shared/constants";
 import type { AppSettings } from "../shared/types";
 import { readSettingsFile } from "./settings-utils";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 /**
  * Result of voice command processing
@@ -76,8 +73,8 @@ export class VoiceControlService extends EventEmitter {
 		const possiblePaths = [
 			path.join(appPath, "..", "backend"), // dev: apps/backend
 			path.join(appPath, "..", "..", "apps", "backend"), // prod unpacked: resources/apps/backend
-			path.join(__dirname, "..", "..", "..", "apps", "backend"), // dev out/main → apps/backend
-			path.join(__dirname, "..", "..", "backend"), // alt build layout
+			path.join(import.meta.dirname, "..", "..", "..", "apps", "backend"), // dev out/main → apps/backend
+			path.join(import.meta.dirname, "..", "..", "backend"), // alt build layout
 			path.join(process.cwd(), "apps", "backend"),
 			path.join(process.cwd(), "..", "backend"),
 			path.join(app.getPath("userData"), "..", "auto-claude"),
@@ -94,8 +91,8 @@ export class VoiceControlService extends EventEmitter {
 		console.error(
 			"[VoiceControl] Runner not found. appPath:",
 			appPath,
-			"__dirname:",
-			__dirname,
+			"import.meta.dirname:",
+			import.meta.dirname,
 			"cwd:",
 			process.cwd(),
 		);
