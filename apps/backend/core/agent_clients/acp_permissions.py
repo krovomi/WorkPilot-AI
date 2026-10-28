@@ -38,6 +38,7 @@ logger = logging.getLogger(__name__)
 __all__ = [
     "ANSWER_PREFIX",
     "CHANNEL_ENV",
+    "OPTION_KINDS",
     "TIMEOUT_ENV",
     "PermissionBroker",
     "PermissionOption",
@@ -95,7 +96,6 @@ class PermissionQuestion:
 class PermissionBroker(Protocol):
     async def ask(self, question: PermissionQuestion) -> str | None:
         """The option the person chose, or None for no answer."""
-        ...
 
 
 def _timeout_seconds() -> float:
@@ -228,6 +228,7 @@ class StdinBroker:
                 logger.warning("[acp] ignored an answer naming no offered option")
                 future = answers.wait(question.request_id)
         except TimeoutError:
+            # Nobody answered in time: the outcome stays "unanswered".
             pass
         except asyncio.CancelledError:
             outcome = "cancelled"

@@ -25,8 +25,9 @@ ENDPOINT_ENV = "AUTO_CLAUDE_OTEL_ENDPOINT"
 SERVICE_NAME = "workpilot"
 
 _lock = threading.Lock()
-_tracer: Any = None
-_resolved = False
+# The environment has not been read yet; None means read, and tracing is off.
+_UNREAD: Any = object()
+_tracer: Any = _UNREAD
 
 
 def traces_url(endpoint: str | None) -> str | None:
@@ -45,14 +46,12 @@ def traces_url(endpoint: str | None) -> str | None:
 
 def get_tracer() -> Any:
     """The tracer, or None when tracing is off or cannot start."""
-    global _tracer, _resolved
-    if _resolved:
+    global _tracer
+    if _tracer is not _UNREAD:
         return _tracer
     with _lock:
-        if _resolved:
-            return _tracer
-        _tracer = _build(traces_url(os.environ.get(ENDPOINT_ENV)))
-        _resolved = True
+        if _tracer is _UNREAD:
+            _tracer = _build(traces_url(os.environ.get(ENDPOINT_ENV)))
         return _tracer
 
 
@@ -88,15 +87,13 @@ def _build(url: str | None) -> Any:
 
 def use_tracer_for_tests(tracer: Any) -> None:
     """Install a tracer (an in-memory exporter's) or None; tests only."""
-    global _tracer, _resolved
+    global _tracer
     with _lock:
         _tracer = tracer
-        _resolved = True
 
 
 def reset() -> None:
     """Forget the tracer, so the next call reads the environment again."""
-    global _tracer, _resolved
+    global _tracer
     with _lock:
-        _tracer = None
-        _resolved = False
+        _tracer = _UNREAD

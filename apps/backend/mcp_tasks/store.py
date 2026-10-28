@@ -9,7 +9,6 @@ answers with ``isError`` completed.
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import secrets
 import time
 from collections.abc import Awaitable, Callable
@@ -151,9 +150,8 @@ class TaskStore:
         jobs = [e.job for e in self._entries.values() if e.job and not e.job.done()]
         for job in jobs:
             job.cancel()
-        for job in jobs:
-            with contextlib.suppress(asyncio.CancelledError, Exception):
-                await job
+        # Wait for every cancelled job to finish; their errors are not ours.
+        await asyncio.gather(*jobs, return_exceptions=True)
 
     def _entry(self, task_id: Any) -> _Entry:
         self._purge()

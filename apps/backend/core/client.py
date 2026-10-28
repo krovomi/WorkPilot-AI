@@ -3140,7 +3140,7 @@ def _acp_client(req: _ClientRequest):
     declaration picks its mode and which of its questions reach the person
     (core/agent_clients/acp.py).
     """
-    from core.agent_client import AcpAgentClient
+    from core.agent_clients.acp import AcpAgentClient
 
     client = AcpAgentClient(
         provider=req.provider,

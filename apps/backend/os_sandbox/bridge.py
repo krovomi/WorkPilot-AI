@@ -28,11 +28,13 @@ def _relay(source: socket.socket, target: socket.socket) -> None:
                 break
             target.sendall(chunk)
     except OSError:
+        # The other side went away: stop relaying, then close our half.
         pass
     finally:
         try:
             target.shutdown(socket.SHUT_WR)
         except OSError:
+            # Already shut down or closed by the peer: nothing left to close.
             pass
 
 

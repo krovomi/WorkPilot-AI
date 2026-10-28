@@ -40,11 +40,6 @@ Usage:
 
 from __future__ import annotations
 
-from .agent_clients.acp import (  # noqa: F401
-    AcpAgentClient,
-    AcpAuthenticationError,
-    AcpError,
-)
 from .agent_clients.antigravity_cli import (  # noqa: F401
     AntigravityCliAgentClient,
     AntigravityCliAuthenticationError,

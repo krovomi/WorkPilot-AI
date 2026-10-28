@@ -25,7 +25,6 @@ theirs (`delegated`) and does not wrap them twice.
 
 from __future__ import annotations
 
-import logging
 import os
 import threading
 import time
@@ -35,8 +34,6 @@ from pathlib import Path
 
 from .launch import ISOLATED, UNAVAILABLE, SandboxStatus, probe, sandboxed
 from .policy import SandboxPolicy, build_policy
-
-logger = logging.getLogger(__name__)
 
 __all__ = [
     "DELEGATED",
