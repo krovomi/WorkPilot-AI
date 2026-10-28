@@ -188,13 +188,15 @@ class SmartMergeManager:
 
         # Identify .workpilot files
         if self.workpilot_dir.exists():
-            for pattern in self.critical_patterns:
-                # Simple glob pattern handling
-                for file in self.workpilot_dir.rglob("*"):
-                    if file.is_file():
-                        merge_state["workpilot_files"].append(
-                            str(file.relative_to(self.repo_path))
-                        )
+            # Each critical file once, whichever patterns match it (every file
+            # under .workpilot/ used to be listed once per pattern).
+            critical = {
+                str(file.relative_to(self.repo_path))
+                for pattern in self.critical_patterns
+                for file in self.repo_path.glob(pattern)
+                if file.is_file()
+            }
+            merge_state["workpilot_files"] = sorted(critical)
 
         self.merge_state_file.write_text(json.dumps(merge_state, indent=2))
         return merge_state
