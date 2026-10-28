@@ -11,6 +11,16 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### ✨ Nouveautés
+
+- **Le wiki suit chaque release sans push à la main.** Les pages écrites à la
+  main (nouveautés, feuille de route, sécurité) vivent comme patchs
+  `git format-patch` dans `scripts/wiki/patches/`, relus en PR ; la synchro
+  `full` que lance chaque release les applique au wiki avant de rafraîchir ses
+  blocs `AUTOGEN`. Un patch déjà présent est sauté, un patch qui ne s'applique
+  plus est nommé et fait échouer le job sans bloquer les autres (F115 de
+  l'audit). Le contenu 1.3.1 du wiki passe par ce chemin.
+
 ---
 
 ## 1.3.2 - L'application démarre de nouveau

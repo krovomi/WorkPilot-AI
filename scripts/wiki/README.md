@@ -10,6 +10,7 @@ Two update tracks with different cost and cadence:
 |-------|---------|------|-----------------|
 | **Inventories** (deterministic) | every push to `develop` with relevant paths | free | Tables of agents, integrations, providers, modules, CLI |
 | **Narrative** (AI) | each GitHub release | ~€1 per run | Prose sections + FR translations |
+| **Patches** (human) | each GitHub release | free | Hand-written prose outside the markers, from [`patches/`](patches/) |
 
 Every auto-updated block is delimited by markers in the wiki pages:
 
@@ -21,6 +22,32 @@ Every auto-updated block is delimited by markers in the wiki pages:
 
 Anything outside markers is **preserved untouched** — wiki editors can freely hand-edit.
 
+## Hand-written pages: `patches/`
+
+Prose outside the markers (a "what's new" section, a release on the roadmap, a
+security page) is written by people, so no generator produces it. Instead of
+pushing it to the wiki by hand, keep it in the source repo:
+
+1. Clone the wiki, edit the pages, commit.
+2. `git format-patch -1 -o <repo>/scripts/wiki/patches/` and rename the file
+   with an ordering prefix (`0002-release-1.4.0.patch`).
+3. Open a PR to `develop`, like any other change.
+
+Each release then runs the `full` sync, which applies every patch **before**
+regenerating the AUTOGEN blocks:
+
+- a patch whose changes are already in the wiki is skipped, so the folder is
+  replayed safely on every run (an applied patch may also be deleted);
+- a patch that no longer applies (`git am --3way` conflict) is aborted and
+  named in an `::error::` line, the other patches still go through, and the
+  job fails so the stale patch gets rebased.
+
+To apply them without waiting for a release:
+`gh workflow run wiki-narrative.yml --ref develop -f mode=patches`.
+
+`.gitattributes` marks `*.patch` there as binary-safe (`-text`): a line-ending
+conversion would make `git am` refuse it.
+
 ## Files
 
 | File | Role |
@@ -28,6 +55,7 @@ Anything outside markers is **preserved untouched** — wiki editors can freely 
 | [generate_inventories.py](generate_inventories.py) | Deterministic table regen from source tree |
 | [update_narrative.py](update_narrative.py) | Narrative refresh + FR translation via Claude |
 | [sync_wiki.py](sync_wiki.py) | Orchestrator: clone wiki, run steps, commit, push |
+| [patches/](patches/) | Hand-written wiki edits as `git format-patch` files, applied on each release |
 
 ## Bilingual convention
 
@@ -62,7 +90,8 @@ python scripts/wiki/sync_wiki.py --mode full --workdir /tmp/wp-work --no-push
 | `narrative` | Rewrite `<!-- AUTOGEN:NARRATIVE -->` blocks from canonical source docs. |
 | `translate` | EN → FR translation of whole pages when the FR is missing/stub. |
 | `translate-en` | FR → EN bootstrap (for initial FR-first state). |
-| `full` | inventories + narrative + translate (EN→FR). |
+| `patches` | Apply `patches/` only. Free. |
+| `full` | patches + inventories + narrative + translate (EN→FR). |
 | `bootstrap` | inventories + translate-en + translate-fr. Use once to lift FR content into EN. |
 
 ## Required secrets
