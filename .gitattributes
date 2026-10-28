@@ -9,6 +9,8 @@
 *.py text eol=lf
 *.json text eol=lf
 *.md text eol=lf
+# Applied byte for byte by `git am`: never normalised.
+scripts/wiki/patches/*.patch -text
 *.yml text eol=lf
 *.yaml text eol=lf
 *.toml text eol=lf

@@ -11,6 +11,45 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### ✨ Nouveautés
+
+- **Le wiki suit chaque release sans push à la main.** Les pages écrites à la
+  main (nouveautés, feuille de route, sécurité) vivent comme patchs
+  `git format-patch` dans `scripts/wiki/patches/`, relus en PR ; la synchro
+  `full` que lance chaque release les applique au wiki avant de rafraîchir ses
+  blocs `AUTOGEN`. Un patch déjà présent est sauté, un patch qui ne s'applique
+  plus est nommé et fait échouer le job sans bloquer les autres (F115 de
+  l'audit). Le contenu 1.3.1 du wiki passe par ce chemin.
+
+---
+
+## 1.3.2 - L'application démarre de nouveau
+
+Correctif de la 1.3.1, dont le process principal d'Electron s'arrêtait au
+chargement, et une reconnexion Claude qui atteint enfin le profil concerné.
+
+### 🐛 Corrections
+
+- **Le process principal plantait au démarrage** avec `SyntaxError: Identifier
+  '__filename' has already been declared` (#536). electron-vite 6 ajoute en tête
+  du bundle ESM ses propres `const __filename`, `const __dirname` et
+  `const require` ; 24 modules de `src/main` déclaraient aussi les leurs, et l'un
+  d'eux gardait son nom dans `out/main/index.js`. Le code du main lit désormais
+  `import.meta.dirname` / `import.meta.filename` et ne déclare plus ces noms ;
+  `esm-dirname.test.ts` le garde (F114 de l'audit).
+- **La reconnexion Claude met à jour le bon profil** (#537). Un `claude /login`
+  lancé dans un terminal écrit dans `~/.claude`, alors qu'un profil WorkPilot lit
+  son propre `CLAUDE_CONFIG_DIR` : il gardait son jeton expiré et restait en
+  « reconnexion requise ». Le bouton Reconnecter ouvre maintenant la connexion
+  dans le terminal intégré, réglé sur le profil ; le drapeau de reconnexion
+  tombe dès qu'un jeton valide est lu, et sur `invalid_grant` un login récent
+  trouvé dans `~/.claude` est signalé, sans copier de jeton d'un dossier à
+  l'autre.
+- **La boucle de vérification relance proprement son aide UI Automation.**
+  Après une requête restée sans réponse, l'aide tuée signalait sa fin dans la
+  file de la suivante, qui passait pour « arrêtée » dès son démarrage ; chaque
+  aide lit désormais dans sa propre file.
+
 ---
 
 ## 1.3.1 - La carte va jusqu'au bout, et l'effort annoncé est celui reçu
