@@ -1,6 +1,6 @@
 {
 	"name": "workpilot-ai-ui",
-	"version": "1.2.1",
+	"version": "1.3.1",
 	"type": "module",
 	"description": "Desktop UI for WorkPilot AI autonomous coding framework",
 	"homepage": "https://github.com/krovomi/WorkPilot-AI",
@@ -225,7 +225,9 @@
 			"hardenedRuntime": true,
 			"gatekeeperAssess": false,
 			"entitlements": "resources/entitlements.mac.plist",
-			"extendInfo": { "NSMicrophoneUsageDescription": "WorkPilot uses the microphone to transcribe your task descriptions locally when you start dictation." },
+			"extendInfo": {
+				"NSMicrophoneUsageDescription": "WorkPilot uses the microphone to transcribe your task descriptions locally when you start dictation."
+			},
 			"entitlementsInherit": "resources/entitlements.mac.plist",
 			"target": [
 				"dmg",
