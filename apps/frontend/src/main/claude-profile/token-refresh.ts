@@ -15,6 +15,7 @@
  */
 
 import { homedir } from "node:os";
+import { join, resolve } from "node:path";
 import {
 	clearKeychainCache,
 	getFullCredentialsFromKeychain,
@@ -84,6 +85,13 @@ export interface EnsureValidTokenResult {
 	 * Callers should alert the user to re-authenticate.
 	 */
 	persistenceFailed?: boolean;
+	/**
+	 * Set alongside a permanent refresh failure when a fresh login was found in
+	 * the default `~/.claude` store instead of this profile's own config dir:
+	 * the user ran a plain `claude /login`, which never reaches an isolated
+	 * WorkPilot profile. The UI should point them to the in-app reconnect flow.
+	 */
+	reauthHint?: "login_in_default_config_dir";
 }
 
 /**
@@ -470,6 +478,59 @@ function recoverTokenAfterInvalidGrant(
 }
 
 /**
+ * Profiles we already warned about a login landing in the default store, so
+ * the 30s usage polling does not repeat the same warning forever.
+ */
+const warnedDefaultStoreLogins = new Set<string>();
+
+/**
+ * Detect the "I ran `claude /login` but WorkPilot still says re-auth" case.
+ *
+ * WorkPilot profiles are isolated: each one reads the credentials stored for
+ * its own CLAUDE_CONFIG_DIR (e.g. ~/.claude-profiles/primary). A plain
+ * `claude /login` typed in a terminal has no CLAUDE_CONFIG_DIR, so it writes
+ * the new tokens to the default ~/.claude store and the profile keeps its
+ * expired refresh token. We only diagnose this, never copy the tokens over:
+ * two stores sharing one single-use refresh token would keep revoking each
+ * other (see recoverTokenAfterInvalidGrant).
+ *
+ * @returns true when the default store holds a valid token that this profile does not have
+ */
+function detectLoginInDefaultConfigDir(
+	expandedConfigDir: string | undefined,
+	profileAccessToken: string | null,
+): boolean {
+	if (!expandedConfigDir) return false;
+	const defaultConfigDir = join(homedir(), ".claude");
+	if (resolve(expandedConfigDir) === resolve(defaultConfigDir)) return false;
+
+	const defaultCreds = getFullCredentialsFromKeychain(undefined);
+	const found =
+		!!defaultCreds.token &&
+		defaultCreds.token !== profileAccessToken &&
+		!isTokenExpiredOrNearExpiry(defaultCreds.expiresAt, 0);
+
+	if (found && !warnedDefaultStoreLogins.has(expandedConfigDir)) {
+		warnedDefaultStoreLogins.add(expandedConfigDir);
+		console.warn(
+			"[TokenRefresh] A fresh `claude /login` was found in the default ~/.claude store, but this profile reads",
+			expandedConfigDir,
+			"- a plain `claude /login` does not update WorkPilot profiles. Use Settings > Accounts > Reconnect, or run `claude /login` with CLAUDE_CONFIG_DIR set to that directory.",
+		);
+	}
+	return found;
+}
+
+/**
+ * Forget the default-store warning for a profile (e.g. after it recovered),
+ * so a later occurrence is logged again. Exposed for tests.
+ */
+export function resetDefaultStoreLoginWarning(configDir?: string): void {
+	if (configDir) warnedDefaultStoreLogins.delete(configDir);
+	else warnedDefaultStoreLogins.clear();
+}
+
+/**
  * Ensure a valid token is available, refreshing if necessary.
  *
  * This function:
@@ -680,11 +741,18 @@ export async function ensureValidToken(
 				console.error(
 					"[TokenRefresh:ensureValidToken] Permanent error detected, returning null token",
 				);
+				const loginInDefaultDir = detectLoginInDefaultConfigDir(
+					expandedConfigDir,
+					creds.token,
+				);
 				return {
 					token: null,
 					wasRefreshed: false,
 					error: `Token refresh failed: ${refreshResult.error}`,
 					errorCode: refreshResult.errorCode,
+					...(loginInDefaultDir && {
+						reauthHint: "login_in_default_config_dir" as const,
+					}),
 				};
 			}
 

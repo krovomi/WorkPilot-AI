@@ -38,6 +38,12 @@ interface ProviderConfigDialogProps {
 	readonly onTest?: (providerId: string) => Promise<void>;
 	readonly useSheet?: boolean;
 	readonly onProviderActivated?: (providerId: string) => void;
+	/**
+	 * Open straight on the OAuth tab and start the in-app login terminal.
+	 * Used by "Reconnect": the terminal runs `claude /login` with the profile's
+	 * CLAUDE_CONFIG_DIR, which a plain `claude /login` in a shell does not.
+	 */
+	readonly autoStartOAuth?: boolean;
 }
 
 type ActiveTab = "api" | "oauth" | "github-copilot";
@@ -51,6 +57,7 @@ export function ProviderConfigDialog({
 	onTest,
 	useSheet = false,
 	onProviderActivated,
+	autoStartOAuth = false,
 }: ProviderConfigDialogProps) {
 	const { t } = useTranslation("settings");
 	const { toast } = useToast();
@@ -330,7 +337,14 @@ export function ProviderConfigDialog({
 		if (provider.id === "windsurf") {
 			loadWindsurfAccountInfo();
 		}
+
+		if (autoStartOAuth && supportsOAuth) {
+			setActiveTab("oauth");
+			void handleOAuthAuth(provider.id, provider.name);
+		}
 	}, [
+		autoStartOAuth,
+		handleOAuthAuth,
 		provider,
 		providerConfig,
 		settings,
