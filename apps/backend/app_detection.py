@@ -157,11 +157,13 @@ class AppEmulatorRunner:
             try:
                 deps_text = requirements.read_text(encoding="utf-8").lower()
             except OSError:
+                # Unreadable file: detection falls back to the other sources.
                 pass
         if pyproject.exists():
             try:
                 deps_text += "\n" + pyproject.read_text(encoding="utf-8").lower()
             except OSError:
+                # Unreadable file: detection falls back to the other sources.
                 pass
 
         # Django

@@ -134,7 +134,8 @@ class ArmResult:
 class Grader(Protocol):
     """Runs one arm on one episode and reports what the verifiers found."""
 
-    def __call__(self, episode: Episode, arm: str, instruction: str) -> ArmResult: ...
+    def __call__(self, episode: Episode, arm: str, instruction: str) -> ArmResult:
+        """The verifiers' findings for `arm` run on `episode` with `instruction`."""
 
 
 @dataclass(frozen=True)

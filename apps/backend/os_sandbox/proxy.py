@@ -96,6 +96,7 @@ async def _pipe(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> N
             writer.write(chunk)
             await writer.drain()
     except (TimeoutError, ConnectionError, OSError):
+        # An idle, reset or closed side ends the tunnel; the finally closes both.
         pass
     finally:
         with contextlib.suppress(Exception):
@@ -132,7 +133,8 @@ class FilteringProxy:
             asyncio.set_event_loop(self._loop)
             try:
                 self._loop.run_until_complete(self._listen(unix_dir))
-            except BaseException as error:  # reported to the starting thread
+            # Reported to the starting thread, cancellation included.
+            except (Exception, asyncio.CancelledError) as error:
                 failure.append(error)
                 ready.set()
                 return

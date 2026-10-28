@@ -16,8 +16,14 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from core.agent_client import AcpAgentClient, AcpAuthenticationError, AcpError
-from core.agent_clients.acp import CLIENT_CAPABILITIES, acp_model, kind_allowed
+from core.agent_clients.acp import (
+    CLIENT_CAPABILITIES,
+    AcpAgentClient,
+    AcpAuthenticationError,
+    AcpError,
+    acp_model,
+    kind_allowed,
+)
 from core.agent_clients.acp_permissions import (
     ANSWER_PREFIX,
     PermissionOption,

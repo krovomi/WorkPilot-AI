@@ -2433,7 +2433,7 @@ chaque provider, lue le 26 octobre 2026 (xAI « Reasoning », DeepSeek « Thinki
 
 #### F113 · CodeQL rouge sur la PR de release 1.3.1
 
-- **Sévérité** moyenne · **nouveau** · **corrigé par #531 et #532**
+- **Sévérité** moyenne · **nouveau** · **corrigé par #531, #532 et #533**
 - **Preuve** (avant) : la PR `develop` → `main` (#530) comparait `develop` à l'analyse de 1.3.0 ;
   22 alertes de niveau erreur faisaient échouer le check : URL de test de clé bâties depuis la
   sortie du validateur et clé Google dans la query (`provider_api.py`), `$` inatteignable dans
@@ -2449,6 +2449,11 @@ chaque provider, lue le 26 octobre 2026 (xAI « Reasoning », DeepSeek « Thinki
   Après #531, une dernière erreur sur la PR de release : `scripts/smart-merge-manager.py` bouclait
   sur les motifs critiques sans s'en servir (chaque fichier de `.workpilot/` noté une fois par
   motif) ; les motifs choisissent désormais les fichiers, chacun noté une fois (#532).
+  Les fils de revue que CodeQL ouvre sur la PR de release se rouvrent tant que l'alerte existe :
+  except vides commentés, `Protocol` documentés au lieu de `...`, `logger` et import inutilisés
+  retirés, `OPTION_KINDS` exporté, `aclose` des tâches MCP par `gather`, tracer sans drapeau
+  `_resolved` (#533). Les trois envois de clé configurée (Telegram, fournisseur personnalisé) sont
+  voulus : l'alerte se rejette dans l'onglet Security.
   Les avertissements (injection de log, données de fichier envoyées au réseau) restent ouverts.
 - **Garde-fou** : `git-remote-provider.test.ts`, `existing-file.test.ts`,
   `tests/test_test_generation_post_build_scope.py`.

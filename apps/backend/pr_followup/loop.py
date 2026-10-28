@@ -26,11 +26,14 @@ _THREAD_COMMENT_CHARS = 2_000
 
 
 class Forge(Protocol):
-    async def snapshot(self) -> PRSnapshot: ...
+    async def snapshot(self) -> PRSnapshot:
+        """The PR as the forge sees it now: head, checks, review threads."""
 
-    async def base_failing_names(self, base_branch: str) -> frozenset[str] | None: ...
+    async def base_failing_names(self, base_branch: str) -> frozenset[str] | None:
+        """Checks red on the base branch too, or None when the forge cannot say."""
 
-    async def failed_log(self, check: Check) -> str: ...
+    async def failed_log(self, check: Check) -> str:
+        """The log of a failed check, as the forge serves it."""
 
 
 Fixer = Callable[[Path, Path, int], Awaitable[tuple[str, str]]]
