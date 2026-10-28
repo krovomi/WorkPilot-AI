@@ -11,8 +11,8 @@ before reporting if you can.
 
 | Version | Supported |
 | ------- | --------- |
-| 1.2.x (latest) | ✅ |
-| < 1.2 | ❌ |
+| 1.3.x (latest) | ✅ |
+| < 1.3 | ❌ |
 
 ## Reporting a vulnerability
 

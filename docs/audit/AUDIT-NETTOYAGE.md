@@ -4,6 +4,7 @@
 |---|---|
 | **Commit audité** | `b46a031` (`develop`, après PR #292) — comparé à l'audit précédent sur `7057b28` |
 | **Date** | 3 octobre 2026 |
+| **Releases** | 1.3.0 (20 octobre 2026) : lots L1 à L17 et pi ; **1.3.1** (28 octobre 2026) : lots M1 à M11 (annexe F) et les onze features de l'annexe G |
 | **Compagnon visuel** | [`WorkPilot-architecture.html`](WorkPilot-architecture.html) — schémas interactifs, simulateur Kanban, inventaire filtrable |
 | **Objet** | Corriger les features cassées, supprimer le code mort et les doublons, réduire le coût en tokens et en mémoire, **sans retirer une seule feature utilisée** |
 
@@ -764,9 +765,10 @@ avant/après, recherche stricte des `import`, `pnpm run typecheck`, suite vitest
 >   lisent `bump-version.js` et `prepare-release.yml` ; `docs/CHANGELOG.md` (notes complètes de
 >   1.0.0, historique 2.x de l'amont) est supprimé, la racine pointe vers sa dernière version.
 >   `shared_docs/FEATURE_IDEAS*.md` : non traité, décision du mainteneur.
-> - **F25 (backend)** — aucune release depuis #290 (dernière : v1.2.1, 27 août 2026 ; #290 est du
->   3 octobre) : la lecture du marqueur reste, datée dans `core/client.py` (« à retirer après la
->   première release qui suit 1.2.1 ») avec la liste de ce qu'il faudra retirer.
+> - **F25 (backend)** — aucune release depuis #290 au moment du lot (dernière : v1.2.1, 27 août
+>   2026 ; #290 est du 3 octobre) : la lecture du marqueur reste, datée dans `core/client.py`
+>   (« à retirer après la première release qui suit 1.2.1 ») avec la liste de ce qu'il faudra
+>   retirer. Cette release est la 1.3.0 (20 octobre 2026) : le retrait est dû.
 >
 > **Écarts au cahier.** `.security-reports/` n'était pas vide ; la copie racine du test de
 > `context_gatherer` est supprimée et non déplacée ; `utils/` est aussi retiré de `pre-push.js` ;
@@ -1849,89 +1851,6 @@ qu'à l'URL pour laquelle elle a été enregistrée. Détail :
 - **Correction** : `testProvider` ne fait plus que demander au main, qui teste déjà chaque provider.
   Test : `shared/services/__tests__/providerService.test.ts`.
 
-### Lot M9 — Doc ↔ code, i18n de la palette, jsdom, dépendances (P2)
-
-**Fait.** Neuvième lot de l'audit du 17 octobre (annexe F). Règles tenues : i18n obligatoire
-([`frontend.md`](../rules/frontend.md#i18n-obligatoire)), la règle gagne et l'index se corrige
-([`CLAUDE.md`](../CLAUDE.md)), S4 de [`security.md`](../rules/security.md#s4--chemins-résolus-processus-sans-shell)
-(un chemin est résolu puis rattaché à sa racine).
-
-#### F72 · La documentation disait autre chose que le code
-
-- **Sévérité** basse · **nouveau** (audit du 17 oct.) · **corrigé par le lot M9**
-- **Preuve** (avant correction) : `docs/CLAUDE.md` annonçait pi « rien de livré » (lots 0 à 5
-  livrés) ; l'atlas ignorait `PiCliAgentClient` ; `README.md` et `apps/frontend/README.md`
-  citaient pnpm 10 (épinglé : 12.5.1) ; `docs/windows-development.md` pointait trois fois vers
-  `../CONTRIBUTING.md`, `docs/providers/claude-code.md` et `github-copilot.md` vers une ancre
-  absente, `docs/CONTRIBUTING.md` vers un `CLA.md` et un bot de signature qui n'ont jamais existé ;
-  une note avant F29 promettait `core/workspace.py` au lot L11, qui l'a laissé. `tests/test_docs_context.py`
-  ne lisait ni `CONTRIBUTING.md`, ni `providers/`, ni `windows-development.md`.
-- **Correction** : textes alignés ; liens et ancres réparés ; procédure de CLA dite telle qu'elle
-  est (choix du mainteneur : l'exigence reste, un mainteneur indique quoi signer) ;
-  `core/workspace.py` reporté au lot M10.
-- **Garde-fou** : `test_relative_links_resolve` balaie toute page suivie sous `docs/` et les trois
-  README (racine, backend, frontend).
-
-#### F73 · La palette de commandes était en anglais dur
-
-- **Sévérité** moyenne · **nouveau** · **corrigé par le lot M9**
-- **Preuve** (avant correction) : `renderer/components/CommandPalette.tsx`, 32 commandes, leurs
-  catégories, le placeholder, le pied et le compteur écrits en anglais ; `t` importé et ignoré
-  (`biome-ignore noUnusedVariables`).
-- **Correction** : `common:commandPalette.*` en `en` et `fr` (compteur au pluriel i18next) ; la
-  recherche floue porte sur le libellé traduit.
-- **Garde-fou** : `renderer/components/__tests__/CommandPalette.i18n.test.tsx` (mêmes clés dans les
-  deux langues, rendu et recherche en français).
-
-#### F74 · Chaque fichier de test Vitest construisait un DOM
-
-- **Sévérité** basse · **nouveau** · **corrigé par le lot M9**
-- **Preuve** (avant correction) : `apps/frontend/vitest.config.ts`, `environment: "jsdom"` pour
-  les 386 fichiers ; Vitest mesurait jsdom à 45 % du temps suivi.
-- **Correction** : deux projets, `dom` (`*.test.tsx`, jsdom) et `node` (`*.test.ts`) ; les 19
-  fichiers `.ts` qui touchent `window` le disent par `@vitest-environment jsdom`. Suite complète :
-  243 s → 169 s en local, même nombre de tests.
-
-#### F75 · Dépendances déclarées sans usage, et une dépendance utilisée sans déclaration
-
-- **Sévérité** basse · **nouveau** · **corrigé par le lot M9**
-- **Preuve** (avant correction) : `@radix-ui/react-scroll-area` et `@xterm/addon-webgl` sans
-  importeur ; `@types/dompurify`, `@types/minimatch`, `@types/uuid` doublaient les types que ces
-  paquets livrent ; `test:coverage` demandait `@vitest/coverage-v8`, non déclaré.
-- **Correction** : les cinq retirés ; `@vitest/coverage-v8` épinglé sur la version de Vitest ;
-  lockfile régénéré par pnpm.
-- **Suite** (après M8) : `node-pty` retiré à son tour. Rien ne l'importait (le code charge
-  `@lydell/node-pty`, que `package-with-python.cjs` embarque), `apps/frontend/scripts/postinstall.cjs`
-  et `download-prebuilds.cjs` n'étaient appelés par aucun script de `package.json` (le
-  `postinstall` déclaré lance `install-electron` puis `electron-rebuild`), et les quatre étapes
-  « Install node-pty in frontend » de `beta-release.yml` ajoutaient au paquet une dépendance que
-  l'app ne charge pas. Les deux scripts, l'entrée `allowBuilds` et ces étapes sont retirés ;
-  lockfile régénéré par pnpm. L'essai d'installation sous Windows est le job
-  `test-frontend (windows-latest)` de la CI, qui installe depuis ce lockfile.
-
-#### F76 · Le détecteur acceptait un Python que le backend ne peut pas importer
-
-- **Sévérité** moyenne · **nouveau** · **corrigé par le lot M9**
-- **Preuve** (avant correction) : `main/python-detector.ts` et quatre méthodes de
-  `cli-tool-manager.ts` exigeaient 3.10, `run.py` et `runners/spec_runner.py` aussi, alors que le
-  backend utilise la syntaxe 3.12 (`src/connectors/jira/work_items.py`, f-string imbriquée) et que
-  la documentation dit 3.12.
-- **Correction** : `shared/constants/python.ts` (`MINIMUM_PYTHON_VERSION = "3.12.0"`) lu par les
-  cinq vérifications ; les deux points d'entrée refusent sous 3.12 ; messages et chemins Homebrew
-  alignés.
-- **Garde-fou** : `tests/test_python_floor.py` (même plancher partout, aucun littéral restant).
-
-#### F77 · La génération de tests post-build comparait des chemins par préfixe
-
-- **Sévérité** moyenne · **nouveau** · **corrigé par le lot M9**
-- **Preuve** (avant correction) : `test_generation/api.py`, `run_post_build_test_generation`
-  gardait un fichier si son chemin résolu commençait par celui du projet (`/repo-other` passait
-  pour `/repo`), et prenait pour un test tout fichier dont le chemin absolu contenait `test_`.
-- **Correction** : `_is_within` (`os.path.commonpath`) ; le test se juge sur le chemin relatif au
-  projet.
-- **Garde-fou** : `tests/test_test_generation_post_build_scope.py` (voisin au même préfixe, lien
-  sortant, projet sous un dossier `test_…`).
-
 ### Lot M6 — Frontière renderer → main (P1)
 
 **Fait.** Sixième lot de l'audit du 17 octobre (annexe F). Règle tenue : S6 de
@@ -2189,6 +2108,89 @@ retirées. `node-pty` est retiré ensuite, l'installation Windows vérifiée par
 - **Garde-fou** : `tests/test_product_overview_views.py` (la colonne et la liste concordent, aucune
   vue expérimentale n'a de fichier de conception) ; `sidebar/__tests__/use-sidebar-prefs.test.ts`.
 - **Reste** : une vue sort de la liste quand elle reçoit un fichier de conception ou un test.
+
+### Lot M9 — Doc ↔ code, i18n de la palette, jsdom, dépendances (P2)
+
+**Fait.** Neuvième lot de l'audit du 17 octobre (annexe F). Règles tenues : i18n obligatoire
+([`frontend.md`](../rules/frontend.md#i18n-obligatoire)), la règle gagne et l'index se corrige
+([`CLAUDE.md`](../CLAUDE.md)), S4 de [`security.md`](../rules/security.md#s4--chemins-résolus-processus-sans-shell)
+(un chemin est résolu puis rattaché à sa racine).
+
+#### F72 · La documentation disait autre chose que le code
+
+- **Sévérité** basse · **nouveau** (audit du 17 oct.) · **corrigé par le lot M9**
+- **Preuve** (avant correction) : `docs/CLAUDE.md` annonçait pi « rien de livré » (lots 0 à 5
+  livrés) ; l'atlas ignorait `PiCliAgentClient` ; `README.md` et `apps/frontend/README.md`
+  citaient pnpm 10 (épinglé : 12.5.1) ; `docs/windows-development.md` pointait trois fois vers
+  `../CONTRIBUTING.md`, `docs/providers/claude-code.md` et `github-copilot.md` vers une ancre
+  absente, `docs/CONTRIBUTING.md` vers un `CLA.md` et un bot de signature qui n'ont jamais existé ;
+  une note avant F29 promettait `core/workspace.py` au lot L11, qui l'a laissé. `tests/test_docs_context.py`
+  ne lisait ni `CONTRIBUTING.md`, ni `providers/`, ni `windows-development.md`.
+- **Correction** : textes alignés ; liens et ancres réparés ; procédure de CLA dite telle qu'elle
+  est (choix du mainteneur : l'exigence reste, un mainteneur indique quoi signer) ;
+  `core/workspace.py` reporté au lot M10.
+- **Garde-fou** : `test_relative_links_resolve` balaie toute page suivie sous `docs/` et les trois
+  README (racine, backend, frontend).
+
+#### F73 · La palette de commandes était en anglais dur
+
+- **Sévérité** moyenne · **nouveau** · **corrigé par le lot M9**
+- **Preuve** (avant correction) : `renderer/components/CommandPalette.tsx`, 32 commandes, leurs
+  catégories, le placeholder, le pied et le compteur écrits en anglais ; `t` importé et ignoré
+  (`biome-ignore noUnusedVariables`).
+- **Correction** : `common:commandPalette.*` en `en` et `fr` (compteur au pluriel i18next) ; la
+  recherche floue porte sur le libellé traduit.
+- **Garde-fou** : `renderer/components/__tests__/CommandPalette.i18n.test.tsx` (mêmes clés dans les
+  deux langues, rendu et recherche en français).
+
+#### F74 · Chaque fichier de test Vitest construisait un DOM
+
+- **Sévérité** basse · **nouveau** · **corrigé par le lot M9**
+- **Preuve** (avant correction) : `apps/frontend/vitest.config.ts`, `environment: "jsdom"` pour
+  les 386 fichiers ; Vitest mesurait jsdom à 45 % du temps suivi.
+- **Correction** : deux projets, `dom` (`*.test.tsx`, jsdom) et `node` (`*.test.ts`) ; les 19
+  fichiers `.ts` qui touchent `window` le disent par `@vitest-environment jsdom`. Suite complète :
+  243 s → 169 s en local, même nombre de tests.
+
+#### F75 · Dépendances déclarées sans usage, et une dépendance utilisée sans déclaration
+
+- **Sévérité** basse · **nouveau** · **corrigé par le lot M9**
+- **Preuve** (avant correction) : `@radix-ui/react-scroll-area` et `@xterm/addon-webgl` sans
+  importeur ; `@types/dompurify`, `@types/minimatch`, `@types/uuid` doublaient les types que ces
+  paquets livrent ; `test:coverage` demandait `@vitest/coverage-v8`, non déclaré.
+- **Correction** : les cinq retirés ; `@vitest/coverage-v8` épinglé sur la version de Vitest ;
+  lockfile régénéré par pnpm.
+- **Suite** (après M8) : `node-pty` retiré à son tour. Rien ne l'importait (le code charge
+  `@lydell/node-pty`, que `package-with-python.cjs` embarque), `apps/frontend/scripts/postinstall.cjs`
+  et `download-prebuilds.cjs` n'étaient appelés par aucun script de `package.json` (le
+  `postinstall` déclaré lance `install-electron` puis `electron-rebuild`), et les quatre étapes
+  « Install node-pty in frontend » de `beta-release.yml` ajoutaient au paquet une dépendance que
+  l'app ne charge pas. Les deux scripts, l'entrée `allowBuilds` et ces étapes sont retirés ;
+  lockfile régénéré par pnpm. L'essai d'installation sous Windows est le job
+  `test-frontend (windows-latest)` de la CI, qui installe depuis ce lockfile.
+
+#### F76 · Le détecteur acceptait un Python que le backend ne peut pas importer
+
+- **Sévérité** moyenne · **nouveau** · **corrigé par le lot M9**
+- **Preuve** (avant correction) : `main/python-detector.ts` et quatre méthodes de
+  `cli-tool-manager.ts` exigeaient 3.10, `run.py` et `runners/spec_runner.py` aussi, alors que le
+  backend utilise la syntaxe 3.12 (`src/connectors/jira/work_items.py`, f-string imbriquée) et que
+  la documentation dit 3.12.
+- **Correction** : `shared/constants/python.ts` (`MINIMUM_PYTHON_VERSION = "3.12.0"`) lu par les
+  cinq vérifications ; les deux points d'entrée refusent sous 3.12 ; messages et chemins Homebrew
+  alignés.
+- **Garde-fou** : `tests/test_python_floor.py` (même plancher partout, aucun littéral restant).
+
+#### F77 · La génération de tests post-build comparait des chemins par préfixe
+
+- **Sévérité** moyenne · **nouveau** · **corrigé par le lot M9**
+- **Preuve** (avant correction) : `test_generation/api.py`, `run_post_build_test_generation`
+  gardait un fichier si son chemin résolu commençait par celui du projet (`/repo-other` passait
+  pour `/repo`), et prenait pour un test tout fichier dont le chemin absolu contenait `test_`.
+- **Correction** : `_is_within` (`os.path.commonpath`) ; le test se juge sur le chemin relatif au
+  projet.
+- **Garde-fou** : `tests/test_test_generation_post_build_scope.py` (voisin au même préfixe, lien
+  sortant, projet sous un dossier `test_…`).
 
 ### Lot M10 — Casser le cycle `core ⇄ agents`, découper les fonctions géantes (P3)
 
@@ -2596,19 +2598,6 @@ Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 e
 Les trois constats sont décrits dans l'atlas (`WorkPilot-architecture.html`, vue 06) ; la feuille de
 route est la vue 09, lisible sans prérequis technique comme la vue 00.
 
-## Annexe E — Ce qui a changé le 17 octobre 2026 (pi, lots 0 à 5)
-
-| Lot | Changement | Effet sur les constats |
-|---|---|---|
-| plan | `docs/architecture/pi.md` : pi (pi.dev) comme harness et comme provider, par lots ; douze points vérifiés dans la source de pi 1.3.0 (`AGENTS.md` prime sur `CLAUDE.md`, `--skill` accepte un dossier hors de la barrière de confiance, `--session <id>` résolu dans `PI_CODING_AGENT_SESSION_DIR`, `--tools` allowlist réelle, projet non approuvé ignoré sans trace en mode json, code de sortie 0 sur `stopReason: error`) | aucun |
-| 0 | `tests/fixtures/pi/` : six flux réels de pi 1.3.0 (`tool-call`, `resume-by-id`, `auth-error`, `unknown-model`, `readonly-write-refused`, `length`) capturés par `capture.py` contre un serveur OpenAI-compatible factice, clé fictive, aucun réseau | aucun ; S1 tenue (aucun secret dans les fixtures) |
-| 3-5 | `PiCliAgentClient(mode="rpc")` (`WORKPILOT_PI_MODE`) : un processus par session, `prompt`→`agent_settled`, `get_state`, `abort`, `compact`, `extension_ui_request` → `cancelled` ; `context_mgmt/capabilities.py` : `pi-rpc` natif ; `ENV_DENYLIST` ; `core/agent_clients/pi_guard/workpilot-guard.js` chargé par `--extension`, politique de `path_guard` par `WORKPILOT_PI_GUARD`, recopié à chaque run ; `skills/tooling/pi` ; fixtures `rpc-session`, `guard-*` ; `tests/test_pi_cli_client.py` (80) | S4 (environnement construit, aucun chemin absolu en argv), S3 (écritures confinées dans le processus pi, prouvé par `guard-escape-refused.jsonl` et `guard-config-refused.jsonl`) ; `bash` non jugé dans pi, dit tel quel |
-| 2 | `core/agent_clients/pi_cli.py` (`PiCliAgentClient` sur `CliSubprocessAgentClient` : `--tools` depuis `AGENT_CONFIGS` via `harnesses.yaml` et les noms MCP de pi, `--skill .agents/skills`, session par id dans `<spec>/pi-sessions`, `stopReason` lu, jamais `--approve`, état de confiance de `.pi/` tracé dans le fil) ; `cli_subprocess.qualify_provider_model` partagé avec OpenCode ; `harness/domain/usage.from_pi_usage` ; `providers.yaml`, `configured_providers.json`, `client.py`, `phase_config.py` ; frontend : type `pi` dans `agent-cli.ts`, badge, registre, détection ; `brain/connect` écrit `exposure: direct` pour pi ; `tests/test_pi_cli_client.py` (63 tests sur les fixtures réelles) | S3 (allowlist réelle, prouvée par `readonly-write-refused.jsonl`), S4 (aucun chemin en argv : id de session validé, skills en relatif), S1 (`safe_error_text` sur chaque erreur, clé JEV absente de l'environnement) tenues ; inventaire : `core/agent_clients/pi_cli.py`, `docs/integrations/pi.md` |
-| 1 | `capabilities/harnesses.yaml` : entrée `pi` (`default: false`, n'émet rien, `tools:` = `read`/`write`/`edit`/`bash`/`grep`/`find`) ; `brain/agents.py` : `AgentSpec("pi")` et le préfixe `$PI_AGENT_DIR/` (`PI_CODING_AGENT_DIR`, sinon `~/.pi/agent`) ; `tests/test_brain.py`, `tests/test_skills_registry_agents.py` | `skills:check` sans diff (485 fichiers, `agnostic` + `gemini`) ; inventaire : `capabilities/harnesses.yaml`, `brain/agents.py` |
-
-Vérification de cette annexe : `pytest tests/test_pi_cli_client.py tests/test_opencode_cli_client.py tests/test_provider_capabilities.py tests/test_workflow_engine.py tests/harness tests/test_brain.py tests/test_skills_registry_agents.py tests/test_docs_context.py -q` ;
-`python scripts/skills_cli.py build --check` ; `pnpm test -- agent-cli-handlers`.
-
 ## Annexe D — Ce qui a changé le 16 octobre 2026 (PR #457 à #462, puis le lot 3)
 
 | PR | Changement | Effet sur les constats |
@@ -2632,6 +2621,19 @@ tests/test_workflows_run_execute.py tests/test_workflow_engine.py tests/test_wor
 tests/test_workflow_handoff.py -q` ;
 `python scripts/skills_cli.py build --check` ; l'atlas (vue 04) simule chaque type de carte avec ou
 sans BMAD installé.
+
+## Annexe E — Ce qui a changé le 17 octobre 2026 (pi, lots 0 à 5)
+
+| Lot | Changement | Effet sur les constats |
+|---|---|---|
+| plan | `docs/architecture/pi.md` : pi (pi.dev) comme harness et comme provider, par lots ; douze points vérifiés dans la source de pi 1.3.0 (`AGENTS.md` prime sur `CLAUDE.md`, `--skill` accepte un dossier hors de la barrière de confiance, `--session <id>` résolu dans `PI_CODING_AGENT_SESSION_DIR`, `--tools` allowlist réelle, projet non approuvé ignoré sans trace en mode json, code de sortie 0 sur `stopReason: error`) | aucun |
+| 0 | `tests/fixtures/pi/` : six flux réels de pi 1.3.0 (`tool-call`, `resume-by-id`, `auth-error`, `unknown-model`, `readonly-write-refused`, `length`) capturés par `capture.py` contre un serveur OpenAI-compatible factice, clé fictive, aucun réseau | aucun ; S1 tenue (aucun secret dans les fixtures) |
+| 3-5 | `PiCliAgentClient(mode="rpc")` (`WORKPILOT_PI_MODE`) : un processus par session, `prompt`→`agent_settled`, `get_state`, `abort`, `compact`, `extension_ui_request` → `cancelled` ; `context_mgmt/capabilities.py` : `pi-rpc` natif ; `ENV_DENYLIST` ; `core/agent_clients/pi_guard/workpilot-guard.js` chargé par `--extension`, politique de `path_guard` par `WORKPILOT_PI_GUARD`, recopié à chaque run ; `skills/tooling/pi` ; fixtures `rpc-session`, `guard-*` ; `tests/test_pi_cli_client.py` (80) | S4 (environnement construit, aucun chemin absolu en argv), S3 (écritures confinées dans le processus pi, prouvé par `guard-escape-refused.jsonl` et `guard-config-refused.jsonl`) ; `bash` non jugé dans pi, dit tel quel |
+| 2 | `core/agent_clients/pi_cli.py` (`PiCliAgentClient` sur `CliSubprocessAgentClient` : `--tools` depuis `AGENT_CONFIGS` via `harnesses.yaml` et les noms MCP de pi, `--skill .agents/skills`, session par id dans `<spec>/pi-sessions`, `stopReason` lu, jamais `--approve`, état de confiance de `.pi/` tracé dans le fil) ; `cli_subprocess.qualify_provider_model` partagé avec OpenCode ; `harness/domain/usage.from_pi_usage` ; `providers.yaml`, `configured_providers.json`, `client.py`, `phase_config.py` ; frontend : type `pi` dans `agent-cli.ts`, badge, registre, détection ; `brain/connect` écrit `exposure: direct` pour pi ; `tests/test_pi_cli_client.py` (63 tests sur les fixtures réelles) | S3 (allowlist réelle, prouvée par `readonly-write-refused.jsonl`), S4 (aucun chemin en argv : id de session validé, skills en relatif), S1 (`safe_error_text` sur chaque erreur, clé JEV absente de l'environnement) tenues ; inventaire : `core/agent_clients/pi_cli.py`, `docs/integrations/pi.md` |
+| 1 | `capabilities/harnesses.yaml` : entrée `pi` (`default: false`, n'émet rien, `tools:` = `read`/`write`/`edit`/`bash`/`grep`/`find`) ; `brain/agents.py` : `AgentSpec("pi")` et le préfixe `$PI_AGENT_DIR/` (`PI_CODING_AGENT_DIR`, sinon `~/.pi/agent`) ; `tests/test_brain.py`, `tests/test_skills_registry_agents.py` | `skills:check` sans diff (485 fichiers, `agnostic` + `gemini`) ; inventaire : `capabilities/harnesses.yaml`, `brain/agents.py` |
+
+Vérification de cette annexe : `pytest tests/test_pi_cli_client.py tests/test_opencode_cli_client.py tests/test_provider_capabilities.py tests/test_workflow_engine.py tests/harness tests/test_brain.py tests/test_skills_registry_agents.py tests/test_docs_context.py -q` ;
+`python scripts/skills_cli.py build --check` ; `pnpm test -- agent-cli-handlers`.
 
 ## Annexe F — Audit du 17 octobre 2026 (`473bbf1`)
 
@@ -2706,7 +2708,21 @@ useEffortPlan translateLogMessage`.
 Onze features proposées après une veille des outils de pilotage d'agents de code (Cursor, Codex,
 Copilot, Claude Code, Gemini CLI, OpenHands…) et retenues par Leub, dans cet ordre. Ce ne sont pas
 des constats d'audit : chaque ligne est une feature, une PR vers `develop`, avec sa justification
-dans `docs/architecture/`.
+dans `docs/architecture/`. Les onze sont livrées dans la **1.3.1**.
+
+| | Feature | PR |
+|---|---|---|
+| G1 | La carte suit sa PR jusqu'au merge | #514 |
+| G2 | Mode objectif | #515 |
+| G3 | « Besoin de toi » | #516 |
+| G4 | Traces OpenTelemetry GenAI | #517 |
+| G5 | Best-of-N | #518 |
+| G6 | Automatisations (retire le démon Continuous AI) | #519 |
+| G7 | Agents ACP, Gemini CLI | #522 |
+| G8 | Bac à sable de l'OS | #523 |
+| G9 | MCP 2026-07-28 : tasks et MCP Apps | #524 |
+| G10 | Banc de rejeu | #525 |
+| G11 | Application Windows par UI Automation | #526, #527 |
 
 ### G1 — La carte suit sa PR jusqu'au merge
 
@@ -2748,6 +2764,7 @@ Justification : [`goal-mode.md`](../architecture/goal-mode.md).
 
 Vérification : `pytest tests/goal -q` et
 `cd apps/frontend && pnpm test -- goal-handlers GoalCard TaskOverview`.
+
 ### G3 — « Besoin de toi » : notifications et approbation à distance
 
 **Fait.** Une tâche qui attend quelqu'un le dit, sur le bureau et, si on le demande, sur ntfy ou
@@ -2795,30 +2812,35 @@ Justification : [`genai-traces.md`](../architecture/genai-traces.md).
 
 Vérification : `pytest tests/genai_trace -q`.
 
-### G8 — Bac à sable de l'OS autour des commandes d'agent
+### G5 — Best-of-N réel : N worktrees, un classement chiffré, un choix humain
 
-**Fait (Linux, macOS).** `apps/backend/os_sandbox/` fait tourner le processus de l'agent dans un
-bac à sable de l'OS : bubblewrap sous Linux, Seatbelt sous macOS. Il complète l'allowlist et
-`path_guard`, qui jugent une commande avant qu'elle tourne.
+**Fait.** `parallel_variations/` planifiait des variantes sans lancer d'agent, et l'Arena compare
+des réponses, pas des builds. Une tâche du Kanban peut maintenant être construite 2 à 4 fois. Le
+backend est dans `apps/backend/best_of_n/`.
 
-- **Qui.** Chaque commande de la boucle WorkPilot (`run_command`), et le processus entier
-  d'OpenCode et de pi, avec le profil `sandbox:` de leur entrée dans `providers.yaml`. Claude
-  Code et Codex gardent leur propre bac à sable, rapporté `delegated`. Antigravity n'a pas de
-  profil et la carte le dit.
-- **Quoi.** Écritures dans le worktree, la spec, le répertoire git commun, les caches de paquets
-  et l'état du CLI ; configuration de sécurité, `.git/hooks` et `.git/config` en lecture seule ;
-  identifiants de la personne masqués (`~/.ssh`, cloud, `gh`, registres, jetons des CLI, `.env`).
-- **Réseau.** Aucun, sauf un proxy filtrant : hôtes du provider, registres de paquets,
-  `WORKPILOT_SANDBOX_HOSTS`. Un refus est nommé dans la sortie de la commande.
-- **Garde-fou.** Le probe lance le bac à sable pour de vrai. Sans lui, la carte et le fil le
-  disent au lancement (`SANDBOX_STATUS`, `TaskSandboxNotice`) ; `WORKPILOT_SANDBOX=required`
-  refuse de démarrer.
-- **Pas livré.** Windows (AppContainer, job object) : la carte dit « non isolé ».
+- **Les variantes.** Chacune est un dossier de spec frère, `<tâche>-bon<k>`, copié avant tout
+  build. Son moteur est verrouillé dans `task_metadata.json`, et un marqueur `bestOfN` la garde
+  hors du tableau. Les worktrees sont créés l'un après l'autre avant le premier build. Le main
+  lance ensuite les `run.py` par l'agent manager : mêmes identifiants, mêmes logs et même arrêt
+  que n'importe quelle tâche.
+- **Le refus de démarrer.** Une tâche qui a déjà un build, un plan commencé, un spec en attente de
+  revue ou une variante d'un run précédent n'en lance pas un nouveau.
+- **Le classement.** Il est lancé à la dernière sortie et se lit dans cet ordre : build fini,
+  QA (les tests), objectif du mode objectif revérifié dans chaque worktree, lignes du diff, coût.
+  Un critère illisible pour une variante ne classe personne et la carte dit pourquoi : objectif en
+  erreur, diff illisible, coût plancher. Aucune variante n'est recommandée si elle n'est pas
+  seule en tête avec un build fini.
+- **L'adoption.** Elle n'a lieu qu'après une confirmation sur la carte. `git worktree move` et
+  `git branch -m` donnent à la variante le nom de la tâche. Ce que le build a écrit rejoint le
+  dossier de la tâche, avec le moteur gagnant, et les autres variantes sont supprimées. Rien
+  n'est fusionné ni poussé.
+- **L'app.** Canaux `TASK_BEST_OF_N_*`. La carte `BestOfNCard` est dans « Plan d'exécution ».
+  Une sortie de variante ne passe pas par la machine d'état des tâches (`isBestOfNVariant`).
 
-Justification : [`os-sandbox.md`](../architecture/os-sandbox.md).
+Justification : [`best-of-n.md`](../architecture/best-of-n.md).
 
-Vérification : `pytest tests/os_sandbox -q` (le vrai bac à sable sous
-`WORKPILOT_EXPECT_SANDBOX=1`) et `cd apps/frontend && pnpm test -- task-sandbox TaskSandboxNotice`.
+Vérification : `pytest tests/best_of_n -q` et
+`cd apps/frontend && pnpm test -- best-of-n-handlers BestOfNCard project-store`.
 
 ### G6 — Automatisations : un événement crée une carte
 
@@ -2875,6 +2897,31 @@ Vérification : `pytest tests/test_acp_client.py tests/test_acp_frontend_parity.
 `cd apps/frontend && pnpm test -- task-permissions task-permission-handlers TaskPermissionPrompt
 task-permission-store agent-cli-handlers`.
 
+### G8 — Bac à sable de l'OS autour des commandes d'agent
+
+**Fait (Linux, macOS).** `apps/backend/os_sandbox/` fait tourner le processus de l'agent dans un
+bac à sable de l'OS : bubblewrap sous Linux, Seatbelt sous macOS. Il complète l'allowlist et
+`path_guard`, qui jugent une commande avant qu'elle tourne.
+
+- **Qui.** Chaque commande de la boucle WorkPilot (`run_command`), et le processus entier
+  d'OpenCode et de pi, avec le profil `sandbox:` de leur entrée dans `providers.yaml`. Claude
+  Code et Codex gardent leur propre bac à sable, rapporté `delegated`. Antigravity n'a pas de
+  profil et la carte le dit.
+- **Quoi.** Écritures dans le worktree, la spec, le répertoire git commun, les caches de paquets
+  et l'état du CLI ; configuration de sécurité, `.git/hooks` et `.git/config` en lecture seule ;
+  identifiants de la personne masqués (`~/.ssh`, cloud, `gh`, registres, jetons des CLI, `.env`).
+- **Réseau.** Aucun, sauf un proxy filtrant : hôtes du provider, registres de paquets,
+  `WORKPILOT_SANDBOX_HOSTS`. Un refus est nommé dans la sortie de la commande.
+- **Garde-fou.** Le probe lance le bac à sable pour de vrai. Sans lui, la carte et le fil le
+  disent au lancement (`SANDBOX_STATUS`, `TaskSandboxNotice`) ; `WORKPILOT_SANDBOX=required`
+  refuse de démarrer.
+- **Pas livré.** Windows (AppContainer, job object) : la carte dit « non isolé ».
+
+Justification : [`os-sandbox.md`](../architecture/os-sandbox.md).
+
+Vérification : `pytest tests/os_sandbox -q` (le vrai bac à sable sous
+`WORKPILOT_EXPECT_SANDBOX=1`) et `cd apps/frontend && pnpm test -- task-sandbox TaskSandboxNotice`.
+
 ### G9 — MCP 2026-07-28 : tasks et MCP Apps dans le panneau de tâche
 
 **Fait.** `apps/backend/mcp_tasks/` (une feuille) fait répondre les serveurs MCP de WorkPilot dans
@@ -2902,36 +2949,6 @@ Justification : [`mcp-2026.md`](../architecture/mcp-2026.md).
 
 Vérification : `pytest tests/mcp_2026 tests/core/test_mcp_tools.py -q` et
 `cd apps/frontend && pnpm test -- mcp-apps mcp-app-bridge McpAppsCard`.
-
-### G5 — Best-of-N réel : N worktrees, un classement chiffré, un choix humain
-
-**Fait.** `parallel_variations/` planifiait des variantes sans lancer d'agent, et l'Arena compare
-des réponses, pas des builds. Une tâche du Kanban peut maintenant être construite 2 à 4 fois. Le
-backend est dans `apps/backend/best_of_n/`.
-
-- **Les variantes.** Chacune est un dossier de spec frère, `<tâche>-bon<k>`, copié avant tout
-  build. Son moteur est verrouillé dans `task_metadata.json`, et un marqueur `bestOfN` la garde
-  hors du tableau. Les worktrees sont créés l'un après l'autre avant le premier build. Le main
-  lance ensuite les `run.py` par l'agent manager : mêmes identifiants, mêmes logs et même arrêt
-  que n'importe quelle tâche.
-- **Le refus de démarrer.** Une tâche qui a déjà un build, un plan commencé, un spec en attente de
-  revue ou une variante d'un run précédent n'en lance pas un nouveau.
-- **Le classement.** Il est lancé à la dernière sortie et se lit dans cet ordre : build fini,
-  QA (les tests), objectif du mode objectif revérifié dans chaque worktree, lignes du diff, coût.
-  Un critère illisible pour une variante ne classe personne et la carte dit pourquoi : objectif en
-  erreur, diff illisible, coût plancher. Aucune variante n'est recommandée si elle n'est pas
-  seule en tête avec un build fini.
-- **L'adoption.** Elle n'a lieu qu'après une confirmation sur la carte. `git worktree move` et
-  `git branch -m` donnent à la variante le nom de la tâche. Ce que le build a écrit rejoint le
-  dossier de la tâche, avec le moteur gagnant, et les autres variantes sont supprimées. Rien
-  n'est fusionné ni poussé.
-- **L'app.** Canaux `TASK_BEST_OF_N_*`. La carte `BestOfNCard` est dans « Plan d'exécution ».
-  Une sortie de variante ne passe pas par la machine d'état des tâches (`isBestOfNVariant`).
-
-Justification : [`best-of-n.md`](../architecture/best-of-n.md).
-
-Vérification : `pytest tests/best_of_n -q` et
-`cd apps/frontend && pnpm test -- best-of-n-handlers BestOfNCard project-store`.
 
 ### G10 — Banc de rejeu
 
@@ -2982,6 +2999,12 @@ parle en JSON ligne par ligne avec `verify/window.py`.
   une capture vide est refusée, pas comptée comme preuve.
 - **Hors Windows.** L'outil répond qu'UI Automation n'existe que sur Windows : erreur
   d'environnement, statut inconnu, jamais un échec de l'app.
+- **Suite** (#527) : l'app lancée mourait au démarrage (`0xC0000142`). Sous Windows,
+  `os.kill(pid, 0)` n'est pas une sonde : 0 est `CTRL_C_EVENT`, envoyé au groupe de processus
+  que la vérification venait de créer. `foundation.platform.pid_is_running` ouvre le processus
+  et l'attend avec un délai nul sous Windows (`os.kill(pid, 0)` ailleurs) ; l'état de
+  vérification et les verrous de workspace l'utilisent. Un projet .NET dans un sous-dossier est
+  lancé avec un `--project` relatif au dossier où la commande tourne.
 
 Justification : [`verify.md`](../architecture/verify.md).
 

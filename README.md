@@ -69,6 +69,7 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 | **Isolated Workspaces** | Every task runs in a dedicated git worktree — your main branch stays safe |
 | **AI-Powered Merge** | Semantic conflict resolution when integrating worktrees back to main |
 | **QA Auto-Fix Loop** | Agents automatically detect, fix, and revalidate failing acceptance criteria |
+| **Runtime Verification** | After QA, the `verify` phase launches the app the task changed, reads every error, fixes and relaunches, drives the app to the state the task asked for and keeps a proof: web and Electron apps through Chrome DevTools, mobile apps on an emulator, APIs through their OpenAPI schema, and WPF, WinForms or WinUI apps through Windows UI Automation, in the one window the card names and never by simulated keystrokes |
 | **Spec Approval Workflow** | Review and approve AI-generated specifications before implementation begins |
 | **Hot-Swap LLM** | Change provider, model, or reasoning effort mid-task — the next turn resumes on the new engine with context replayed |
 | **Honest Effort** | Each provider gets the effort level on its own scale (Claude, OpenAI/Codex, Gemini, Grok, DeepSeek, Mistral, Copilot, Ollama, pi, Antigravity); the picker and the task log say what the model actually receives, and a model that refuses the setting runs on without it instead of failing the phase |
@@ -350,11 +351,13 @@ en l'écrivant dans le profil. Voir [`skills/README.md`](skills/README.md#runtim
 #### Backend Python (`apps/backend/`)
 ```
 apps/backend/
-├── core/                # Client, authentification, worktree, plateforme
+├── core/                # Racine de composition : fabrique de clients, authentification, worktree
 │   ├── client.py        # Client Claude Agent SDK
+│   ├── agent_clients/   # Un client par provider (OpenAI, Gemini, Copilot, Ollama, pi, ACP…)
+│   ├── effort_plan.py   # L'effort réellement envoyé à chaque provider
 │   ├── auth.py          # Gestion multi-profils OAuth
-│   ├── worktree.py      # Isolation des espaces de travail Git
-│   └── platform/        # Abstraction cross-plateforme
+│   └── worktree.py      # Isolation des espaces de travail Git
+├── foundation/          # Couche la plus basse, n'importe rien du backend (platform/, api_safety, git)
 ├── agents/              # Logique d'exécution des agents
 │   ├── planner.py       # Agent de planification
 │   ├── coder.py         # Agent de développement
@@ -376,6 +379,14 @@ apps/backend/
 ├── integrations/        # Connecteurs (GitHub, GitLab, etc.)
 ├── project/             # Analyse et détection de projets
 ├── merge/               # Système de fusion sémantique
+├── verify/              # Boucle de vérification : lancer l'app, lire les erreurs, prouver (web, mobile, API, UI Automation)
+├── pr_followup/         # La carte suit sa PR : checks rouges et fils de revue → QA fixer
+├── goal/                # Mode objectif : une commande dit « fini »
+├── best_of_n/           # Une tâche construite N fois, classée sur des chiffres
+├── bench/               # Banc de rejeu des cartes terminées, tableau par provider
+├── os_sandbox/          # bubblewrap / Seatbelt autour des commandes d'agent
+├── genai_trace/         # Spans OpenTelemetry GenAI pour tous les providers
+├── mcp_tasks/           # MCP 2026-07-28 : tasks côté serveurs WorkPilot
 ├── self_healing/        # Surveillance de santé + auto-réparation
 ├── tech_debt/           # Suivi et résolution de la dette technique
 ├── consensus_arbiter/   # Arbitrage des avis d'agents (sécurité/QA)
@@ -398,6 +409,10 @@ apps/frontend/src/
 │   ├── claude-profile/  # Gestion multi-profils
 │   ├── terminal/        # Daemon PTY et cycle de vie
 │   ├── platform/        # Abstraction cross-plateforme
+│   ├── security/        # Politiques IPC : expéditeur, dossiers, chemins d'outils et du backend
+│   ├── automations/     # Règles qui créent une carte (issue étiquetée, CI rouge, horaire)
+│   ├── needs-you/       # Notifications bureau, ntfy, Telegram ; approbation de plan à distance
+│   ├── mcp-apps/        # Vues MCP Apps servies au panneau de tâche (workpilot-mcp-app://)
 │   ├── ipc-handlers/    # 100+ modules de gestion IPC
 │   ├── services/        # Récupération de session SDK, credentials
 │   └── utils/           # Chemins, isolation git, nettoyage worktree
@@ -437,7 +452,7 @@ apps/frontend/src/
 ### Sécurité et Isolation
 
 #### Modèle de Sécurité à 3 Couches
-1. **Sandbox OS** → Commandes Bash exécutées en isolation
+1. **Sandbox OS** → Commandes d'agent sous bubblewrap (Linux) ou Seatbelt (macOS) : écritures dans le worktree, identifiants cachés, réseau filtré ; sans bac à sable (Windows), la carte le dit, et `WORKPILOT_SANDBOX=required` refuse de démarrer
 2. **Restrictions Filesystem** → Opérations limitées au répertoire projet
 3. **Allowlist Dynamique** → Commandes approuvées selon la stack détectée
 
@@ -446,7 +461,8 @@ apps/frontend/src/
 - **Stockage Secure** → Keychain OS / Credential Manager
 - **Rotation Automatique** → Cycle de vie des tokens OAuth
 - **Validation Input** → Chemins et commandes sanitizées
-- **Frontière renderer → main** → Un chemin reçu de l'interface est résolu (liens compris) et doit être dans un projet enregistré ou un dossier choisi dans une boîte de dialogue ; l'interface ne choisit jamais l'exécutable lancé
+- **Aucun secret dans le renderer** → L'interface sait qu'une clé ou un jeton est configuré, jamais sa valeur ; les tests de connexion tournent dans le main
+- **Frontière renderer → main** → Seule la page de l'app atteint un handler IPC. Un chemin reçu de l'interface est résolu (liens compris) et doit être dans un projet enregistré ou un dossier choisi dans une boîte de dialogue ; l'interface ne choisit jamais l'exécutable lancé, et un chemin d'outil ou du backend saisi dans les réglages est vérifié avant d'être exécuté
 
 ### Performance et Scalabilité
 
