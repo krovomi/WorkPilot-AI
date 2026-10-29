@@ -541,15 +541,14 @@ develop                ← Integration branch - all PRs merge here first
   │
 ├── feature/xxx        ← New features
 ├── fix/xxx            ← Bug fixes
-├── release/vX.Y.Z     ← Release preparation
-└── hotfix/xxx         ← Emergency production fixes
+└── hotfix/xxx         ← Emergency production fixes (rare)
 ```
 
 ### Main Branches
 
 | Branch | Purpose | Protected |
 |--------|---------|-----------|
-| `main` | Production-ready code. Only receives merges from `release/*` or `hotfix/*` branches. Every merge is tagged (v2.7.0, v2.8.0, etc.) | ✅ Yes |
+| `main` | Released code. Receives `develop` through a pull request merged with a **merge commit** (never squash or rebase); every version bump is tagged (v1.3.3, v1.4.0, etc.) | ✅ Yes |
 | `develop` | Integration branch where all features and fixes are combined. This is the default target for all PRs. | ✅ Yes |
 
 ### Supporting Branches
@@ -558,8 +557,7 @@ develop                ← Integration branch - all PRs merge here first
 |-------------|-------------|----------|---------|
 | `feature/*` | `develop` | `develop` | New features and enhancements |
 | `fix/*` | `develop` | `develop` | Bug fixes (non-critical) |
-| `release/*` | `develop` | `main` + `develop` | Release preparation and final testing |
-| `hotfix/*` | `main` | `main` + `develop` | Critical production bug fixes |
+| `hotfix/*` | `main` | `main` + `develop`, both by merge commit | Critical fix when `develop` holds work that must not ship yet |
 
 ### Branch Naming
 
@@ -574,7 +572,6 @@ Use descriptive branch names with a prefix indicating the type of change:
 | `refactor/` | Code refactoring | `refactor/simplify-auth-flow` |
 | `test/` | Test additions/fixes | `test/add-integration-tests` |
 | `chore/` | Maintenance tasks | `chore/update-dependencies` |
-| `release/` | Release preparation | `release/v2.8.0` |
 | `hotfix/` | Emergency fixes | `hotfix/critical-auth-bug` |
 
 ### Where to Branch From
@@ -604,36 +601,21 @@ git checkout -b hotfix/critical-fix
 | `test/*` | `develop` |
 | `chore/*` | `develop` |
 | `hotfix/*` | `main` (maintainers only) |
-| `release/*` | `main` (maintainers only) |
+| `develop` (release PR) | `main` (maintainers only, merge commit) |
 
 ### Release Process (Maintainers)
 
 When ready to release a new version:
 
-```bash
-# 1. Create release branch from develop
-git checkout develop
-git pull origin develop
-git checkout -b release/v2.8.0
+1. On a branch from `develop`, run `node scripts/bump-version.js X.Y.Z` and add the
+   `## X.Y.Z - Title` section to `CHANGELOG.md`; merge it into `develop` by pull request.
+2. Open a pull request from `develop` to `main` and merge it with **Create a merge commit**.
+   The `main` ruleset refuses squash and rebase: both would give `main` commits `develop` never
+   had, and the next release would conflict.
+3. `prepare-release.yml` tags `vX.Y.Z`, `release.yml` builds and publishes, then commits the README
+   once and merges that commit into both branches. No merge back from `main` to `develop` is needed.
 
-# 2. Update version numbers, CHANGELOG, final fixes only
-# No new features allowed in release branches!
-
-# 3. Merge to main and tag
-git checkout main
-git merge release/v2.8.0
-git tag v2.8.0
-git push origin main --tags
-
-# 4. Merge back to develop (important!)
-git checkout develop
-git merge release/v2.8.0
-git push origin develop
-
-# 5. Delete release branch
-git branch -d release/v2.8.0
-git push origin --delete release/v2.8.0
-```
+Details and the repair procedure if the branches ever diverge: [docs/RELEASE.md](RELEASE.md).
 
 ### Beta Release Process (Maintainers)
 

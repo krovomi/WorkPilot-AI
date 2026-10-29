@@ -756,6 +756,9 @@ jobs:
       - uses: actions/checkout@v7.0.1
         with:
           ref: develop
+          # Full history: the README commit is built on `main` and merged into
+          # `develop`, which needs their common ancestor.
+          fetch-depth: 0
           # Use PAT_TOKEN if configured, otherwise fall back to GITHUB_TOKEN
           token: ${{ secrets.PAT_TOKEN || github.token }}
 
@@ -803,24 +806,14 @@ jobs:
           echo "--- Verifying update ---"
           grep -E "(stable-|beta-|version-)[0-9]" README.md | head -5
 
-      - name: Commit and push README update
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          # Check if there are changes to commit
-          if git diff --quiet README.md; then
-            echo "No changes to README.md, skipping commit"
-            exit 0
-          fi
-
-          git add README.md
-          git commit -m "docs: update README to v${{ steps.version.outputs.version }} [skip ci]"
-          git push origin develop
-
-      # This job writes to `develop` by design, which leaves `main` advertising
-      # the *previous* release until someone opens a sync PR by hand. That lag
-      # is not cosmetic: after v1.2.1 shipped, `main` still offered
+      # One README commit, shared by both branches. It is built on `main`,
+      # merged into `develop` with a merge commit, and carried to `main` by a
+      # pull request merged with a merge commit too (the only method the `main`
+      # ruleset allows). Two separate commits with the same change, one per
+      # branch, is how `main` and `develop` drifted apart: each release left a
+      # commit on one side the other never had.
+      #
+      # Why `main` needs it at all: after v1.2.1 shipped, `main` still offered
       # `WorkPilot-AI-1.2.0-darwin-x64.dmg` — an asset that never existed,
       # because that release had no macOS Intel build. Anyone landing on the
       # repository got a 404.
@@ -832,31 +825,65 @@ jobs:
       # it merge on its own.
       #
       # It lives here rather than in a push-triggered workflow because the
-      # commit above carries `[skip ci]` — a `push: develop` trigger would never
-      # fire for it.
-      - name: Carry the README to main
+      # `develop` push below carries `[skip ci]`: a `push: develop` trigger
+      # would never fire for it.
+      - name: Commit the README on main's history and merge it into develop
+        id: readme
         env:
-          GH_TOKEN: ${{ secrets.PAT_TOKEN || github.token }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           BRANCH="chore/readme-v${VERSION}"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
 
           # Keep the freshly generated README before moving off `develop`.
           cp README.md /tmp/readme-updated.md
+          git checkout -- README.md
 
-          # Fetch the sync branch too when a re-run finds it already pushed:
-          # without its remote-tracking ref, --force-with-lease below refuses.
-          git fetch origin main "$BRANCH" --depth=1 || git fetch origin main --depth=1
+          git fetch origin main develop
           git checkout -B "$BRANCH" origin/main
           cp /tmp/readme-updated.md README.md
-
           if git diff --quiet -- README.md; then
-            echo "main already carries this README — nothing to sync."
-            exit 0
+            echo "main already carries this README."
+            echo "carry=false" >> "$GITHUB_OUTPUT"
+          else
+            git add README.md
+            git commit -m "docs: update README to v${VERSION}"
+            echo "carry=true" >> "$GITHUB_OUTPUT"
           fi
 
-          git add README.md
-          git commit -m "docs: carry the v${VERSION} README to main"
+          git checkout -B develop origin/develop
+          if git merge --no-ff --no-edit "$BRANCH" \
+               -m "docs: merge the v${VERSION} README into develop [skip ci]"; then
+            if [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/develop)" ]; then
+              echo "develop already has this commit."
+            else
+              git push origin develop
+            fi
+          else
+            # develop changed the same README lines since the release: keep
+            # develop's README history linear and say so, rather than block.
+            git merge --abort
+            cp /tmp/readme-updated.md README.md
+            if ! git diff --quiet -- README.md; then
+              git add README.md
+              git commit -m "docs: update README to v${VERSION} [skip ci]"
+              git push origin develop
+            fi
+            echo "::warning::README commit could not be merged into develop; committed on develop directly. main and develop now differ by this README commit."
+          fi
+
+      - name: Carry the README to main
+        if: steps.readme.outputs.carry == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN || github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          BRANCH: ${{ steps.readme.outputs.branch }}
+        run: |
+          # Fetch the sync branch too when a re-run finds it already pushed:
+          # without its remote-tracking ref, --force-with-lease below refuses.
+          git fetch origin "$BRANCH" --depth=1 || true
           git push --force-with-lease -u origin "$BRANCH"
 
           # Reuse an open PR for this version rather than stacking duplicates
@@ -872,18 +899,18 @@ jobs:
               --body "$(printf '%s\n' \
                 "Generated by \`release.yml\` after publishing **v${VERSION}**." \
                 "" \
-                "\`update-readme\` writes to \`develop\`, so \`main\` keeps advertising the" \
-                "previous release until this lands — including download links to assets" \
-                "that release may not have carried." \
+                "The same commit is already merged into \`develop\`, so \`main\` and" \
+                "\`develop\` keep one shared history. Merge with a **merge commit**." \
                 "" \
                 "Touches \`README.md\` only.")")
           fi
           echo "Sync PR: $url"
 
           # Auto-merge rather than a straight push: `main` is protected, and
-          # this keeps the change reviewable in the meantime. Not fatal if the
-          # repository has auto-merge switched off.
-          gh pr merge "$url" --auto --squash \
-            || echo "::warning::Could not enable auto-merge — merge $url by hand."
+          # this keeps the change reviewable in the meantime. A merge commit,
+          # never a squash: a squash would give `main` a commit `develop` lacks.
+          # Not fatal if the repository has auto-merge switched off.
+          gh pr merge "$url" --auto --merge \
+            || echo "::warning::Could not enable auto-merge — merge $url by hand, with a merge commit."
 
           echo "::notice::README sync PR for v${VERSION}: $url"

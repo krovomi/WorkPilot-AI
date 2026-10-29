@@ -74,8 +74,12 @@ positif se traite par la règle S1 de [`security.md`](security.md), jamais par `
 
 ## Branches, commits, PR
 
-- **Toute PR vise `develop`**, jamais `main` : `main` est la branche de release (seuls `hotfix/*`
-  et `release/*` y vont, par les mainteneurs).
+- **Toute PR vise `develop`**, jamais `main` : `main` est la branche de release. Seule la PR de
+  release `develop` → `main` y va (et, à défaut, un `hotfix/*`), par les mainteneurs.
+- **Méthode de fusion** : squash permis vers `develop` ; vers `main`, **commit de merge seulement**
+  (le ruleset de `main` refuse squash et rebase, `main-history-guard.yml` signale un push à un seul
+  parent). Un squash vers `main` y écrit des commits que `develop` n'a pas : les deux branches
+  divergent et la release suivante conflicte. Réparation : [`docs/RELEASE.md`](../RELEASE.md).
 - Branche depuis `develop`, préfixée : `feature/`, `fix/`, `docs/`, `refactor/`, `test/`, `chore/`.
 - Commit : `type(scope)?: description` avec `type` parmi feat, fix, docs, style, refactor, perf,
   test, build, ci, chore, revert.
@@ -101,5 +105,7 @@ commit vide pour relancer.
 
 ## Livraison
 
-`node scripts/bump-version.js patch|minor|major`, puis PR `develop` → `main` : la fusion déclenche
-la release (tag, build, signature, publication). Détails : [`docs/RELEASE.md`](../RELEASE.md).
+`node scripts/bump-version.js patch|minor|major` sur une branche issue de `develop`, PR vers
+`develop`, puis PR `develop` → `main` fusionnée par commit de merge : la fusion déclenche la release
+(tag, build, signature, publication). Le README de la version arrive sur `develop` et sur `main`
+par un même commit ; aucune PR de réconciliation `main` → `develop`. Détails : [`docs/RELEASE.md`](../RELEASE.md).
