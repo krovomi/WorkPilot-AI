@@ -25,7 +25,7 @@ runs:
         python-version: ${{ inputs.python-version }}
 
     - name: Install uv package manager
-      uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4
+      uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
       with:
         # Pinned: the lockfile check in lint.yml regenerates the lock with
         # the same uv, and a resolver change must not show up as drift.
