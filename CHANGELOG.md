@@ -31,6 +31,16 @@ project adheres to [Semantic Versioning](https://semver.org/).
   mesurés, contre 10 % exigés jusque-là), et un seuil Vitest, qui n'existait pas.
 - **Actions GitHub épinglées par SHA** (F121), suivies par Dependabot jusque dans les
   actions composites.
+- **De vrais tests de bout en bout** (F123). Les anciennes specs Playwright n'ouvraient pas
+  l'app ; elles sont remplacées par un parcours du premier lancement dans l'app construite,
+  lancé en CI sous xvfb.
+
+### 🐛 Corrections
+
+- **Ajouter un dossier existant mène à son initialisation** (F122). Après « Open existing
+  project », rien ne proposait d'initialiser WorkPilot et « New Task » restait grisé. Les
+  réglages du projet s'ouvrent maintenant sur le bouton d'initialisation, et le message de
+  la barre latérale est un lien vers lui.
 
 ---
 

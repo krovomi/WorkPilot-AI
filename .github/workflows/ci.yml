@@ -190,6 +190,50 @@ jobs:
           fi
 
   # --------------------------------------------------------------------------
+  # E2E - the built app, driven by Playwright like a new user would
+  # --------------------------------------------------------------------------
+  # The specs in apps/frontend/e2e/ used to write files and read them back
+  # without starting the app, and the ones that did start it skipped
+  # themselves when it failed. These start the real build under xvfb with a
+  # fresh home and profile (e2e/app-harness.ts); a launch failure fails.
+  e2e:
+    name: e2e (ubuntu-latest)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js frontend
+        uses: ./.github/actions/setup-node-frontend
+        with:
+          ignore-scripts: 'true'
+
+      - name: Fetch the Electron binary
+        working-directory: apps/frontend
+        run: node node_modules/electron/install.js
+
+      - name: Build application
+        working-directory: apps/frontend
+        run: pnpm run build
+
+      - name: Run the E2E specs
+        working-directory: apps/frontend
+        env:
+          CI: 'true'
+        run: xvfb-run -a -s "-screen 0 1600x1000x24" pnpm run test:e2e
+
+      - name: Upload traces and screenshots
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-results
+          path: |
+            apps/frontend/test-results/
+            apps/frontend/playwright-report/
+          retention-days: 7
+
+  # --------------------------------------------------------------------------
   # Server image - build it, migrate a real database with it, serve /health
   # --------------------------------------------------------------------------
   # The image had shipped a COPY of a file that did not exist and a first
@@ -254,7 +298,7 @@ jobs:
   ci-complete:
     name: CI Complete
     runs-on: ubuntu-latest
-    needs: [test-python, test-frontend, server-image]
+    needs: [test-python, test-frontend, e2e, server-image]
     if: always()
     steps:
       - name: Check all CI jobs passed
@@ -262,11 +306,13 @@ jobs:
           echo "CI Job Results:"
           echo "  test-python:   ${{ needs.test-python.result }}"
           echo "  test-frontend: ${{ needs.test-frontend.result }}"
+          echo "  e2e:           ${{ needs.e2e.result }}"
           echo "  server-image:  ${{ needs.server-image.result }}"
           echo ""
 
           if [[ "${{ needs.test-python.result }}" != "success" ]] || \
              [[ "${{ needs.test-frontend.result }}" != "success" ]] || \
+             [[ "${{ needs.e2e.result }}" != "success" ]] || \
              [[ "${{ needs.server-image.result }}" != "success" ]]; then
             echo "❌ One or more CI jobs failed"
             exit 1
