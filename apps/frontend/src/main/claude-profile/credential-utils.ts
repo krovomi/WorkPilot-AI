@@ -1097,9 +1097,15 @@ function getCredentialsFromLinux(
 		forceRefresh,
 	);
 
-	// If we got a token from Secret Service, use it
+	// If we got a token from Secret Service, use it unless the CLI wrote a
+	// different one to `.credentials.json` since (see getFullCredentialsFromLinux)
 	if (secretServiceResult.token) {
-		return secretServiceResult;
+		const fileResult = getCredentialsFromLinuxFile(configDir, forceRefresh);
+		if (!fileResult.token || fileResult.token === secretServiceResult.token) {
+			return secretServiceResult;
+		}
+		const freshest = getFullCredentialsFromLinux(configDir);
+		return freshest.token === fileResult.token ? fileResult : secretServiceResult;
 	}
 
 	// If Secret Service had an error (not just "not found"), log it and try file fallback
@@ -1806,6 +1812,21 @@ function getFullCredentialsFromLinuxSecretService(
 }
 
 /**
+ * Pick the credentials whose access token expires last. Used when two stores
+ * hold a token for the same profile; the store refreshed or logged into most
+ * recently wins. Ties and unknown expiries keep `preferred`.
+ */
+export function pickFresherCredentials(
+	preferred: FullOAuthCredentials,
+	other: FullOAuthCredentials,
+): FullOAuthCredentials {
+	if (!other.token || other.token === preferred.token) return preferred;
+	if (!preferred.token) return other;
+	if ((other.expiresAt ?? 0) > (preferred.expiresAt ?? 0)) return other;
+	return preferred;
+}
+
+/**
  * Retrieve full credentials from Linux - tries Secret Service first, falls back to file
  */
 function getFullCredentialsFromLinux(configDir?: string): FullOAuthCredentials {
@@ -1816,7 +1837,12 @@ function getFullCredentialsFromLinux(configDir?: string): FullOAuthCredentials {
 		getFullCredentialsFromLinuxSecretService(configDir);
 
 	if (secretServiceResult.token) {
-		return secretServiceResult;
+		// Claude CLI on Linux only writes `.credentials.json`; only WorkPilot's own
+		// refreshes land in Secret Service. After a new `claude /login` the file is
+		// newer than the Secret Service copy, whose refresh token may be long
+		// expired, so it must not shadow the file. Keep whichever expires last.
+		const fileResult = getFullCredentialsFromLinuxFile(configDir);
+		return pickFresherCredentials(secretServiceResult, fileResult);
 	}
 
 	if (

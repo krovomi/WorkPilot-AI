@@ -4,7 +4,7 @@
 |---|---|
 | **Commit audité** | `b46a031` (`develop`, après PR #292) — comparé à l'audit précédent sur `7057b28` |
 | **Date** | 3 octobre 2026 |
-| **Releases** | 1.3.0 (20 octobre 2026) : lots L1 à L17 et pi ; **1.3.1** (28 octobre 2026) : lots M1 à M11 (annexe F) et les onze features de l'annexe G ; **1.3.2** (28 octobre 2026) : F114 |
+| **Releases** | 1.3.0 (20 octobre 2026) : lots L1 à L17 et pi ; **1.3.1** (28 octobre 2026) : lots M1 à M11 (annexe F) et les onze features de l'annexe G ; **1.3.2** (28 octobre 2026) : F114 ; **1.3.3** (29 octobre 2026) : F115 et F116 |
 | **Compagnon visuel** | [`WorkPilot-architecture.html`](WorkPilot-architecture.html) — schémas interactifs, simulateur Kanban, inventaire filtrable |
 | **Objet** | Corriger les features cassées, supprimer le code mort et les doublons, réduire le coût en tokens et en mémoire, **sans retirer une seule feature utilisée** |
 
@@ -2472,6 +2472,35 @@ chaque provider, lue le 26 octobre 2026 (xAI « Reasoning », DeepSeek « Thinki
 - **Garde-fou** : `src/main/__tests__/esm-dirname.test.ts` (aucun `__dirname` / `__filename`,
   aucun `require` déclaré au niveau du module).
 
+#### F115 · Les pages écrites à la main du wiki ne suivaient pas la release
+
+- **Sévérité** basse · **nouveau** · **corrigé par la PR du mécanisme `scripts/wiki/patches/`**
+- **Preuve** (avant) : la release 1.3.1 a rafraîchi les blocs `AUTOGEN` du wiki, mais les
+  nouveautés, la feuille de route et la page sécurité, hors marqueurs, n'avaient aucun chemin
+  automatique : le commit préparé ne pouvait partir que d'un poste avec des droits sur
+  `WorkPilot-AI.wiki` (la session de release recevait un 403).
+- **Correction** : ces pages vivent comme patchs `git format-patch` dans `scripts/wiki/patches/`,
+  relus en PR ; `sync_wiki.py` les applique (`git am --3way`) en mode `patches` et en tête du mode
+  `full` lancé par chaque release, saute un patch déjà présent, nomme et écarte un patch qui ne
+  s'applique plus, puis pousse avec le jeton de la synchro. Le contenu 1.3.1 y est versé.
+- **Garde-fou** : `tests/test_wiki_patches.py` (application, rejeu sans effet, conflit nommé sans
+  bloquer les autres, push d'un commit sans modification en attente).
+
+#### F116 · Un ancien jeton Secret Service masquait une nouvelle connexion Claude sous Linux (1.3.2)
+
+- **Sévérité** haute · **nouveau** · **corrigé par #543**
+- **Preuve** (avant) : sous Linux et WSL, `getFullCredentialsFromLinux` et
+  `getCredentialsFromLinux` rendaient le jeton de Secret Service dès qu'il existait. Seul WorkPilot
+  y écrit ses rafraîchissements ; la CLI Claude n'écrit que `.credentials.json`. Après un
+  `claude /login` réussi, la copie Secret Service, au refresh token expiré, masquait le fichier :
+  `invalid_grant` puis « reconnexion requise », en boucle.
+- **Correction** : quand les deux magasins ont un jeton différent, `pickFresherCredentials` garde
+  celui qui expire le plus tard (égalité ou expiration inconnue : Secret Service), pour les lectures
+  complètes et courtes. L'action Reconnecter de la notification ouvre Réglages > Comptes et lance la
+  connexion du provider.
+- **Garde-fou** : `src/main/claude-profile/credential-utils.test.ts` (choix du jeton le plus frais,
+  égalité, magasin vide).
+
 ---
 
 ## Annexe A — Inventaire des fichiers candidats
@@ -2626,7 +2655,7 @@ planchers `pnpm.overrides` relevés (`pnpm-workspace.yaml`), `dompurify` ^3.4.17
 
 Statut des constats de l'audit précédent : F1, F3, F4, F5, F7, F8, F9, F10, F12, F16, F17, F19 **ouverts** ;
 F2, F13 **partiels** ; F6, F11, F14, F18 **aggravés** ; F15 **atténué**. Nouveaux : F20 à F36.
-Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F57 à F62 par M2, F63 à F68 par M3, F69 à F71 par M4, F78 à F84 par M5, F85 à F90 par M6, F91 à F94 par M7, F95 à F100 par M8, F72 à F77 par M9, F101 à F106 par M10, F107 à F112 par M11 (annexe F) ; F113 (CodeQL de la release 1.3.1) par #531 ; F114 (démarrage du main, 1.3.1) par #536.
+Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F57 à F62 par M2, F63 à F68 par M3, F69 à F71 par M4, F78 à F84 par M5, F85 à F90 par M6, F91 à F94 par M7, F95 à F100 par M8, F72 à F77 par M9, F101 à F106 par M10, F107 à F112 par M11 (annexe F) ; F113 (CodeQL de la release 1.3.1) par #531 ; F114 (démarrage du main, 1.3.1) par #536 ; F115 (pages du wiki écrites à la main) par le mécanisme `scripts/wiki/patches/` ; F116 (boucle de reconnexion Claude sous Linux) par #543.
 
 ## Annexe C — Ce qui a changé le 15 octobre 2026 (`7ef6fca` → `e3e468f` + PR #454)
 
