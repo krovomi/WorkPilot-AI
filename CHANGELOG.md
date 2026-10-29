@@ -11,6 +11,17 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### 🧹 Maintenance
+
+- **Le marqueur `RESUME_WITH_PROVIDER` n'est plus lu** (F25 de l'audit). Plus rien ne
+  l'écrit depuis #290 : reprendre une tâche avec un autre provider verrouille le moteur
+  de la tâche dans `task_metadata.json`. La lecture gardée une version pour les tâches
+  mises en pause sous 1.2.1 est retirée, et la résolution du provider n'a plus d'effet
+  de bord.
+- **L'annonce Discord ne laisse plus de run rouge** (F118). Sans le secret
+  `DISCORD_WEBHOOK_URL`, le workflow dit que la release n'est pas annoncée et se
+  termine vert.
+
 ---
 
 ## 1.3.3 - La reconnexion Claude tient sous Linux et WSL

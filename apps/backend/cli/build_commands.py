@@ -189,12 +189,6 @@ def _resolve_workflow_profile(
         profile = resolve_profile(
             workflow,
             effort,
-            # Peeked, not consumed. `_get_active_provider` deletes the
-            # RESUME_WITH_PROVIDER marker on read — it is single-shot by
-            # design — so resolving the profile with it would eat the user's
-            # "resume with X" choice before the session meant to honour it
-            # ever started. The engine decides here; it does not start
-            # anything.
             provider=peek_active_provider(spec_dir),
             changed_files=changed_files,
             inventory=inventory,
