@@ -261,6 +261,8 @@ export type SidebarView =
 
 interface SidebarProps {
 	readonly onSettingsClick: () => void;
+	/** Opens the project's settings, where an uninitialized project is set up. */
+	readonly onInitializeProject?: (projectId: string) => void;
 	readonly onNewTaskClick: () => void;
 	readonly activeView?: SidebarView;
 	readonly onViewChange?: (view: SidebarView, force?: boolean) => void;
@@ -892,6 +894,7 @@ export function navItemLabelKey(view: SidebarView): string | undefined {
 
 export function Sidebar({
 	onSettingsClick,
+	onInitializeProject,
 	onNewTaskClick,
 	activeView = "kanban",
 	onViewChange,
@@ -2584,9 +2587,18 @@ export function Sidebar({
 					{!isCollapsed &&
 						selectedProject &&
 						!selectedProject.autoBuildPath && (
-							<p className="mt-2 text-xs text-muted-foreground text-center">
+							// The hint used to be plain text pointing at an
+							// initialization dialog that no longer rendered: a project
+							// added from an existing folder had no way from here to
+							// its first task. It now opens the pane that initializes it.
+							<Button
+								variant="link"
+								size="sm"
+								className="mt-1 h-auto w-full whitespace-normal text-xs text-muted-foreground"
+								onClick={() => onInitializeProject?.(selectedProject.id)}
+							>
 								{t("messages.initializeToCreateTasks")}
-							</p>
+							</Button>
 						)}
 				</div>
 
