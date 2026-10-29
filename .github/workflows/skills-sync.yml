@@ -62,6 +62,12 @@ jobs:
           ONLY_PACK: ${{ inputs.pack }}
         run: python3 scripts/skills_sync.py --apply --report "$GITHUB_STEP_SUMMARY"
 
+      # The generated outputs (.agents/, the harness mirrors, skills-lock.json)
+      # follow the sources in the same PR: lint.yml checks them as committed.
+      - name: Rebuild the generated outputs
+        if: steps.check.outputs.changed == 'true'
+        run: python3 scripts/skills_cli.py build
+
       - name: Open a pull request
         if: steps.check.outputs.changed == 'true'
         env:
@@ -76,7 +82,8 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b "$branch"
-          git add skills-lock.json skills/
+          # Sources and every output the build wrote (.gitignore still applies).
+          git add -A
           printf 'chore(skills): sync upstream packs\n\n%s\n' "$SUMMARY" > /tmp/msg
           git commit -F /tmp/msg
           git push -u origin "$branch"
