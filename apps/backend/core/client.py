@@ -1820,81 +1820,14 @@ def _add_effort(
 # =============================================================================
 
 
-# Filename for the single-shot "resume task X under provider Y" marker.
-# _get_active_provider() consumes it on the very next session start and
-# deletes the file so it doesn't keep overriding.
-#
-# TO REMOVE after the first release that follows 1.2.1 (audit F25, lot L9).
-# Nothing writes the marker since #290: TASK_RESUME_WITH_PROVIDER records the
-# engine in task_metadata.json and deletes the marker. The read stays for one
-# version so a task paused under 1.2.1, whose marker is still on disk, resumes
-# with the provider the user picked. No release has shipped since #290 (the
-# last is v1.2.1, 2026-08-27). Remove then: this constant,
-# _consume_resume_with_provider_marker, the `consume` parameter of
-# _get_active_provider and the comments that cite the marker (agents/coder.py,
-# workflows/api.py, cli/build_commands.py, cli/utils.py), and adapt
-# core/test_resume_with_provider.py and test_e2e_provider_switch_resume.py;
-# peek_active_provider can then become an alias of _get_active_provider.
-RESUME_WITH_PROVIDER_FILE = "RESUME_WITH_PROVIDER"
-
-
-def _consume_resume_with_provider_marker(
-    spec_dir: Path, *, consume: bool = True
-) -> str | None:
-    """Read the RESUME_WITH_PROVIDER marker, returning the provider the user
-    picked (or None if no marker exists).
-
-    The file can be either plain text containing the provider id
-    (``copilot``) or JSON ``{"provider": "copilot"}``. Anything else is
-    treated as no override and the file is left in place for inspection.
-
-    ``consume=False`` leaves the marker on disk. It exists because the marker
-    is single-shot and destructive to read: anything that only wants to *know*
-    which provider a run will use — the workflow resolver deciding whether to
-    degrade a dispatch, an endpoint showing the user their resolved profile —
-    would otherwise eat the user's "resume with X" choice before the session
-    that was supposed to honour it ever started.
-
-    Failures here must NEVER prevent session startup — log and return None.
-    """
-    marker = spec_dir / RESUME_WITH_PROVIDER_FILE
-    if not marker.exists():
-        return None
-    try:
-        raw = marker.read_text(encoding="utf-8").strip()
-        if not raw:
-            if consume:
-                marker.unlink(missing_ok=True)
-            return None
-        # Try JSON first, fall back to plain text.
-        provider: str | None
-        try:
-            import json as _json
-
-            data = _json.loads(raw)
-            provider = (
-                str(data.get("provider", "")).strip()
-                if isinstance(data, dict)
-                else None
-            )
-        except Exception:
-            provider = raw
-        if consume:
-            marker.unlink(missing_ok=True)  # single-shot
-        return provider or None
-    except Exception as e:
-        logger.warning("[_get_active_provider] could not read %s: %s", marker, e)
-        return None
-
-
 def peek_active_provider(spec_dir: Path | None = None) -> str:
-    """Which provider a run would use, without consuming anything.
+    """Which provider a run would use.
 
-    Same resolution as `_get_active_provider`, minus the single-shot side
-    effect on the RESUME_WITH_PROVIDER marker. Callers that are *deciding*
-    rather than *starting* must use this one.
+    Resolution has no side effect since the single-shot RESUME_WITH_PROVIDER
+    marker was retired (audit F25): this is `_get_active_provider` under the
+    name the deciding callers (workflow resolver, slash commands, CLI) use.
     """
-    return _get_active_provider(spec_dir, consume=False)
+    return _get_active_provider(spec_dir)
 
 
 # Le fournisseur retenu quand personne n'en nomme un. C'est un defaut, pas un
@@ -1903,14 +1836,14 @@ def peek_active_provider(spec_dir: Path | None = None) -> str:
 _DEFAULT_PROVIDER = "claude"
 
 
-def _get_active_provider(spec_dir: Path | None = None, *, consume: bool = True) -> str:
+def _get_active_provider(spec_dir: Path | None = None) -> str:
     """The active provider, without saying where it came from.
 
     Thin wrapper over `_resolve_active_provider` — see there for the
     resolution order. Callers that must tell a *choice* from the fallback
     default use that one instead.
     """
-    return _resolve_active_provider(spec_dir, consume=consume)[0]
+    return _resolve_active_provider(spec_dir)[0]
 
 
 # Every spelling a provider arrives under, mapped to the name the client
@@ -2009,9 +1942,7 @@ def _normalize_provider_name(provider: str) -> str:
     return "claude" if name == "anthropic" else name
 
 
-def _resolve_active_provider(
-    spec_dir: Path | None = None, *, consume: bool = True
-) -> tuple[str, bool]:
+def _resolve_active_provider(spec_dir: Path | None = None) -> tuple[str, bool]:
     """
     Determine the active AI provider from IPC selection, environment or project settings.
 
@@ -2025,7 +1956,6 @@ def _resolve_active_provider(
     Resolution order:
     -1. task_metadata.json `provider` when the task's engine is locked
         (`engineLocked`): the task owns its provider, nothing global wins
-    0. RESUME_WITH_PROVIDER marker file (single-shot, "Reprendre avec X")
     1. Provider selected via IPC (from frontend UI selection)
     1.5. SELECTED_LLM_PROVIDER environment variable
     1.7. task_metadata.json `provider` (unlocked, legacy tasks)
@@ -2045,13 +1975,11 @@ def _resolve_active_provider(
 
     # A task that owns its engine answers before anything else: the provider
     # was chosen for this task, at creation or on a resume, and neither the
-    # default provider (SELECTED_LLM_PROVIDER, inherited from the app) nor a
-    # leftover marker from an older resume path may replace it.
+    # default provider (SELECTED_LLM_PROVIDER, inherited from the app) nor
+    # the app-wide IPC selection may replace it.
     if spec_dir:
         locked = _locked_task_provider(Path(spec_dir))
         if locked:
-            if consume:
-                (Path(spec_dir) / RESUME_WITH_PROVIDER_FILE).unlink(missing_ok=True)
             mapped_locked = provider_mapping.get(locked, locked)
             logger.info(
                 "[_get_active_provider] Resolved from the task's own engine: "
@@ -2060,22 +1988,6 @@ def _resolve_active_provider(
                 mapped_locked,
             )
             return mapped_locked, True
-
-    # 0. Highest priority: explicit "resume with X" marker written by the
-    # frontend when the user picked a different provider from the paused-task
-    # modal (Niveau 3b). Consumed once and removed so subsequent sessions
-    # for the same spec don't keep overriding.
-    if spec_dir:
-        override = _consume_resume_with_provider_marker(Path(spec_dir), consume=consume)
-        if override:
-            mapped_override = provider_mapping.get(override.lower(), override.lower())
-            logger.info(
-                "[_get_active_provider] Resolved from RESUME_WITH_PROVIDER marker: "
-                "'%s' -> '%s'",
-                override,
-                mapped_override,
-            )
-            return mapped_override, True
 
     # 1. Check provider selected via IPC (from frontend UI)
     try:

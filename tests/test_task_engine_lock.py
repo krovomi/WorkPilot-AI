@@ -29,7 +29,6 @@ if "claude_agent_sdk" not in sys.modules:
 
 from core.agent_client import ClaudeAgentClient
 from core.client import (
-    RESUME_WITH_PROVIDER_FILE,
     _normalize_provider_name,
     _resolve_active_provider,
 )
@@ -75,18 +74,12 @@ class TestResolveActiveProvider:
         monkeypatch.setenv("SELECTED_LLM_PROVIDER", "copilot")
         assert _resolve_active_provider(tmp_path) == ("openai", True)
 
-    def test_locked_task_beats_and_removes_a_leftover_marker(self, tmp_path):
-        _locked(tmp_path)
-        marker = tmp_path / RESUME_WITH_PROVIDER_FILE
-        marker.write_text(json.dumps({"provider": "copilot"}), encoding="utf-8")
-        assert _resolve_active_provider(tmp_path) == ("openai", True)
-        assert not marker.exists()
-
-    def test_peek_leaves_the_marker_in_place(self, tmp_path):
-        _locked(tmp_path)
-        marker = tmp_path / RESUME_WITH_PROVIDER_FILE
+    def test_a_marker_left_by_1_2_1_is_ignored(self, tmp_path, monkeypatch):
+        """The single-shot RESUME_WITH_PROVIDER marker was retired (audit F25)."""
+        monkeypatch.setenv("SELECTED_LLM_PROVIDER", "openai")
+        marker = tmp_path / "RESUME_WITH_PROVIDER"
         marker.write_text("copilot", encoding="utf-8")
-        assert _resolve_active_provider(tmp_path, consume=False)[0] == "openai"
+        assert _resolve_active_provider(tmp_path) == ("openai", True)
         assert marker.exists()
 
     def test_locked_anthropic_maps_to_claude(self, tmp_path, monkeypatch):

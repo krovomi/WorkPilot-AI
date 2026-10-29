@@ -103,6 +103,18 @@ blanche oubliait ce que les tests se mettaient à lire. `tests/test_ci_triggers.
 Une CI rouge se répare à la racine : pas de test sauté, désactivé ni mis en quarantaine, pas de
 commit vide pour relancer.
 
+Planchers et démarrage (plan du 29 octobre 2026, lot N2) :
+
+- **Couverture** : pytest `--cov-fail-under=58` (`ci.yml`), Vitest `coverage.thresholds`
+  (`apps/frontend/vitest.config.ts`, mesuré sur Linux). Ce sont des planchers sous le niveau
+  mesuré : on les monte quand la suite grandit, on ne les baisse jamais pour merger.
+- **Démarrage** : `apps/frontend/scripts/smoke-test.cjs` lance l'app avec `WORKPILOT_SMOKE_TEST=1`
+  et exige que le renderer monte (`src/main/smoke-test.ts`) ; `ci.yml` le fait sur le build des
+  trois OS, `release.yml` sur chaque app packagée avant publication (`--packaged`).
+  `tests/test_smoke_test_wiring.py` garde ces étapes.
+- **Actions** : chaque action externe est épinglée par SHA, version en commentaire ; Dependabot
+  suit aussi `.github/actions/*` (`tests/test_action_pins.py`).
+
 ## Livraison
 
 `node scripts/bump-version.js patch|minor|major` sur une branche issue de `develop`, PR vers

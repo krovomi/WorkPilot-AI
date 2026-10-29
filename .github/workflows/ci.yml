@@ -66,7 +66,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Python backend
         uses: ./.github/actions/setup-python-backend
@@ -118,7 +118,9 @@ jobs:
         shell: bash
         run: |
           source apps/backend/.venv/bin/activate
-          pytest -v --cov=apps/backend --cov-report=xml:apps/backend/coverage.xml --cov-report=term-missing --cov-fail-under=10
+          # A floor, not a goal: about two points under the 60 % the suite
+          # covered on 29 October 2026. Raise it when the suite grows.
+          pytest -v --cov=apps/backend --cov-report=xml:apps/backend/coverage.xml --cov-report=term-missing --cov-fail-under=58
 
       - name: Upload coverage to Codecov
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.13'
@@ -141,7 +143,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node.js frontend
         uses: ./.github/actions/setup-node-frontend
@@ -152,13 +154,40 @@ jobs:
         working-directory: apps/frontend
         run: pnpm run typecheck
 
+      # Coverage, and its floor in vitest.config.ts, on Linux only: the
+      # numbers do not depend on the OS, the instrumentation costs time.
       - name: Run unit tests
         working-directory: apps/frontend
-        run: pnpm run test
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            pnpm run test:coverage --coverage.reporter=text-summary
+          else
+            pnpm run test
+          fi
 
       - name: Build application
         working-directory: apps/frontend
         run: pnpm run build
+
+      # The 1.3.1 main process threw while loading (F114) and every check
+      # was green: nothing ever started the app. Start the build once and
+      # require the renderer to mount (apps/frontend/src/main/smoke-test.ts).
+      # Dependencies are installed with --ignore-scripts, so the Electron
+      # binary is fetched here.
+      - name: Fetch the Electron binary
+        working-directory: apps/frontend
+        run: node node_modules/electron/install.js
+
+      - name: Start the app once (smoke test)
+        working-directory: apps/frontend
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            xvfb-run -a node scripts/smoke-test.cjs
+          else
+            node scripts/smoke-test.cjs
+          fi
 
   # --------------------------------------------------------------------------
   # Server image - build it, migrate a real database with it, serve /health
@@ -185,7 +214,7 @@ jobs:
           --health-retries 10
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Build the server image
         run: docker build -f deploy/Dockerfile.server -t workpilot-server:ci .

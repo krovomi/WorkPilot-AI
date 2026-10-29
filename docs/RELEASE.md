@@ -156,7 +156,8 @@ The `main` ruleset refuses the other methods. Once merged, GitHub Actions will a
 7. **Create GitHub release** with release notes from CHANGELOG.md
 8. **Dispatch the follow-ups** by name, with the tag: `virustotal-scan.yml` (adds the scan
    results to the release notes when `VIRUSTOTAL_API_KEY` is set, and says it skipped otherwise),
-   `discord-release.yml` (needs `DISCORD_WEBHOOK_URL`), `wiki-narrative.yml`. A release published
+   `discord-release.yml` (needs `DISCORD_WEBHOOK_URL`; without it the run ends green with a
+   notice that the release was not announced), `wiki-narrative.yml`. A release published
    with `GITHUB_TOKEN` raises no event other workflows can listen to, so `release: published`
    alone would never start them.
 9. **Update README** with new version badge and download links: one commit, built on `main`,
