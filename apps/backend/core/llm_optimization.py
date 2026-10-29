@@ -739,11 +739,6 @@ def should_inline_file_context(
       anyway) — inline is mostly duplicated. Skip it.
 
     Env override: LLM_INLINE_FILE_CONTEXT = always | never | auto (default).
-
-    Note for callers: resolve `provider` WITHOUT side effects (e.g.
-    `phase_config.get_phase_provider`) — never via
-    `core.client._get_active_provider`, which consumes the single-shot
-    RESUME_WITH_PROVIDER marker.
     """
     policy = os.environ.get("LLM_INLINE_FILE_CONTEXT", "auto").strip().lower()
     if policy == "always":
