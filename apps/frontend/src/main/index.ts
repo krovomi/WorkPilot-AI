@@ -106,6 +106,7 @@ import { projectStore } from "./project-store";
 import { pythonEnvManager } from "./python-env-manager";
 import { migrateProfilesSecrets } from "./services/profile/profile-manager";
 import { initSentryMain } from "./sentry";
+import { armSmokeTest } from "./smoke-test";
 import {
 	migrateSettingsSecrets,
 	readSettingsFile,
@@ -541,6 +542,9 @@ function createWindow(): void {
 	mainWindow.on("ready-to-show", () => {
 		mainWindow?.show();
 	});
+
+	// WORKPILOT_SMOKE_TEST=1: quit once the renderer has mounted (CI, release)
+	armSmokeTest(mainWindow);
 
 	// Initialize spell check languages
 	initializeSpellCheckLanguages();

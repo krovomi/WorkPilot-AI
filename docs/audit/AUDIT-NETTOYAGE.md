@@ -2523,6 +2523,9 @@ chaque provider, lue le 26 octobre 2026 (xAI « Reasoning », DeepSeek « Thinki
   refusée à la session) ; le README de la release est un seul commit, bâti sur `main`, fusionné dans
   `develop` et porté vers `main` par une PR en `--merge` ; `docs/RELEASE.md` décrit le modèle, la
   réparation (`merge -s ours`) et le hotfix.
+- **Garde-fou** : `main-history-guard.yml` (un push sur `main` dont le commit n'a qu'un parent est
+  rouge) ; `tests/test_release_merge_commits.py` (aucun `--squash` ni `--rebase` dans les workflows
+  de release, README partagé entre les deux branches).
 
 #### F118 · L'annonce Discord échouait à chaque release, faute de webhook
 
@@ -2534,9 +2537,37 @@ chaque provider, lue le 26 octobre 2026 (xAI « Reasoning », DeepSeek « Thinki
 - **Correction** : un premier pas lit le secret ; absent, le job écrit une notice « release non
   annoncée » et se termine vert sans lire la release. Définir `DISCORD_WEBHOOK_URL` suffit à
   rétablir l'annonce.
-- **Garde-fou** : `main-history-guard.yml` (un push sur `main` dont le commit n'a qu'un parent est
-  rouge) ; `tests/test_release_merge_commits.py` (aucun `--squash` ni `--rebase` dans les workflows
-  de release, README partagé entre les deux branches).
+
+#### F119 · Les planchers de couverture ne mesuraient presque rien
+
+- **Sévérité** moyenne · **reste de l'audit du 17 octobre (I5)** · **corrigé par le lot N2**
+- **Preuve** (avant) : `ci.yml` exigeait `--cov-fail-under=10` alors que la suite couvre 60 % du
+  backend ; `vitest.config.ts` n'avait aucun seuil et la CI lançait Vitest sans couverture. Une PR
+  pouvait retirer la moitié des tests sans faire rougir la CI.
+- **Correction** : pytest `--cov-fail-under=58` ; Vitest `coverage.thresholds` (29,5 % en
+  instructions et lignes, 29 % en fonctions, 24 % en branches, pour 30,6 / 30,2 / 25,3 % mesurés),
+  et la CI Linux lance `test:coverage`. Planchers, pas objectifs : on les monte avec la suite.
+
+#### F120 · Rien ne démarrait l'application avant de la publier
+
+- **Sévérité** haute · **reste de l'audit du 17 octobre (I5)** · **corrigé par le lot N2**
+- **Preuve** (avant) : la 1.3.1 est sortie avec un process principal qui levait au chargement
+  (F114) ; typecheck, tests et build étaient verts, aucun job ne lançait l'app, ni en CI ni avant
+  publication.
+- **Correction** : `src/main/smoke-test.ts` (avec `WORKPILOT_SMOKE_TEST=1`, l'app quitte 0 quand le
+  `#root` du renderer a des enfants, 1 si le renderer échoue) et `scripts/smoke-test.cjs`, qui
+  exige le marqueur dans un délai. `ci.yml` démarre le build sur les trois OS, `release.yml` chaque
+  app packagée avant l'envoi. Vérifié en local sous xvfb : vert sur `develop`, rouge sur un
+  `out/main/index.js` qui lève au chargement. `tests/test_smoke_test_wiring.py` garde les étapes.
+
+#### F121 · Les actions GitHub étaient épinglées par tag
+
+- **Sévérité** moyenne · **reste de l'audit du 17 octobre (I7)** · **corrigé par le lot N2**
+- **Preuve** (avant) : 108 `uses:` par tag (`actions/checkout@v7.0.1`, `actions/cache@v6`…) contre
+  19 par SHA ; un tag se déplace, un SHA non. Dependabot ne lisait que `.github/workflows/`, pas
+  les actions composites de `.github/actions/`.
+- **Correction** : toutes les actions externes par SHA, version exacte en commentaire ; Dependabot
+  lit aussi `/.github/actions/*` ; `tests/test_action_pins.py` refuse un nouveau tag nu.
 
 ---
 
@@ -2692,7 +2723,7 @@ planchers `pnpm.overrides` relevés (`pnpm-workspace.yaml`), `dompurify` ^3.4.17
 
 Statut des constats de l'audit précédent : F1, F3, F4, F5, F7, F8, F9, F10, F12, F16, F17, F19 **ouverts** ;
 F2, F13 **partiels** ; F6, F11, F14, F18 **aggravés** ; F15 **atténué**. Nouveaux : F20 à F36.
-Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F57 à F62 par M2, F63 à F68 par M3, F69 à F71 par M4, F78 à F84 par M5, F85 à F90 par M6, F91 à F94 par M7, F95 à F100 par M8, F72 à F77 par M9, F101 à F106 par M10, F107 à F112 par M11 (annexe F) ; F113 (CodeQL de la release 1.3.1) par #531 ; F114 (démarrage du main, 1.3.1) par #536 ; F115 (pages du wiki écrites à la main) par le mécanisme `scripts/wiki/patches/` ; F116 (boucle de reconnexion Claude sous Linux) par #543 ; F117 (releases en squash vers `main`) par #549 et la PR des commits de merge vers `main` ; lecture du marqueur F25 retirée et F118 (annonce Discord sans webhook) par le lot N1 du plan du 29 octobre.
+Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F57 à F62 par M2, F63 à F68 par M3, F69 à F71 par M4, F78 à F84 par M5, F85 à F90 par M6, F91 à F94 par M7, F95 à F100 par M8, F72 à F77 par M9, F101 à F106 par M10, F107 à F112 par M11 (annexe F) ; F113 (CodeQL de la release 1.3.1) par #531 ; F114 (démarrage du main, 1.3.1) par #536 ; F115 (pages du wiki écrites à la main) par le mécanisme `scripts/wiki/patches/` ; F116 (boucle de reconnexion Claude sous Linux) par #543 ; F117 (releases en squash vers `main`) par #549 et la PR des commits de merge vers `main` ; lecture du marqueur F25 retirée et F118 (annonce Discord sans webhook) par le lot N1 du plan du 29 octobre ; F119 à F121 (planchers de couverture, démarrage de l'app, actions par SHA) par le lot N2.
 
 ## Annexe C — Ce qui a changé le 15 octobre 2026 (`7ef6fca` → `e3e468f` + PR #454)
 
