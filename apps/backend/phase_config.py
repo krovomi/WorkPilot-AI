@@ -813,7 +813,7 @@ def get_phase_thinking(
         # Per-phase thinking wins whenever the phase is present — regardless of
         # isAutoProfile. This mirrors the frontend selector, whose `getPhaseConfig`
         # reads `metadata.phaseThinking[phase]` unconditionally. A single-model
-        # resume (RESUME_WITH_PROVIDER sets isAutoProfile=false to force its chosen
+        # resume (TASK_RESUME_WITH_PROVIDER sets isAutoProfile=false to force its chosen
         # model) must keep honouring the per-phase effort the user still sees;
         # otherwise the UI shows e.g. "Low" while the run uses the "high" default.
         phase_thinking = metadata.get("phaseThinking") or {}
