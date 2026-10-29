@@ -1701,7 +1701,19 @@ const FINDINGS=[
  {id:"F118",sev:"basse",cat:"pipeline",st:"résolu",v:"lu",t:"L'annonce Discord échouait à chaque release, faute de webhook",
   c:"<b>Corrigé par le lot N1</b>. <code>release.yml</code> dispatche <code>discord-release.yml</code> après chaque publication ; sans le secret <code>DISCORD_WEBHOOK_URL</code>, l'action échouait sur une URL vide et laissait un run rouge muet. Le job lit d'abord le secret et, absent, écrit une notice « release non annoncée » et termine vert.",
   p:".github/workflows/discord-release.yml · docs/RELEASE.md",
-  r:"Définir <code>DISCORD_WEBHOOK_URL</code> dans les secrets du dépôt pour annoncer les releases.",g:"Plus de run rouge sans cause après une release.",k:"Annonce des releases."}];
+  r:"Définir <code>DISCORD_WEBHOOK_URL</code> dans les secrets du dépôt pour annoncer les releases.",g:"Plus de run rouge sans cause après une release.",k:"Annonce des releases."},
+ {id:"F119",sev:"moy",cat:"pipeline",st:"résolu",v:"vérifié",t:"Les planchers de couverture ne mesuraient presque rien",
+  c:"<b>Corrigé par le lot N2</b>. <code>--cov-fail-under=10</code> pour 60 % mesurés, aucun seuil Vitest et Vitest lancé sans couverture en CI. Désormais pytest 58 %, Vitest 29,5 / 29 / 24 % (mesuré 30,6 / 30,2 / 25,3 %), couverture Vitest sur Linux.",
+  p:".github/workflows/ci.yml · apps/frontend/vitest.config.ts · docs/rules/workflow.md",
+  r:"Planchers sous le mesuré : à monter avec la suite, jamais à baisser pour merger.",g:"Retirer des tests fait rougir la CI.",k:"CI."},
+ {id:"F120",sev:"haute",cat:"pipeline",st:"résolu",v:"vérifié",t:"Rien ne démarrait l'application avant de la publier",
+  c:"<b>Corrigé par le lot N2</b>. La 1.3.1 est sortie avec un main qui levait au chargement (F114), tous les checks verts. <code>WORKPILOT_SMOKE_TEST=1</code> fait quitter l'app 0 quand le renderer a monté <code>#root</code> ; <code>scripts/smoke-test.cjs</code> l'exige sur le build (CI, trois OS) et sur chaque app packagée (release, avant l'envoi).",
+  p:"apps/frontend/src/main/smoke-test.ts · apps/frontend/scripts/smoke-test.cjs · .github/workflows/ci.yml · .github/workflows/release.yml · tests/test_smoke_test_wiring.py",
+  r:"Vérifié sous xvfb : vert sur develop, rouge sur un main qui lève au chargement.",g:"Une app qui ne démarre pas ne sort plus.",k:"Release."},
+ {id:"F121",sev:"moy",cat:"sécurité",st:"résolu",v:"vérifié",t:"Les actions GitHub étaient épinglées par tag",
+  c:"<b>Corrigé par le lot N2</b>. 108 <code>uses:</code> par tag mobile. Toutes les actions externes sont épinglées par SHA, version en commentaire ; Dependabot lit aussi <code>.github/actions/*</code>.",
+  p:".github/workflows/*.yml · .github/actions/*/action.yml · .github/dependabot.yml · tests/test_action_pins.py",
+  r:"Dependabot met à jour SHA et commentaire ensemble.",g:"Un tag déplacé ne change plus ce que la CI exécute.",k:"CI."}];
 const PLAN=[
  ["P1","Effort réellement reçu (26 oct.)","Fait (lot M11) : effort envoyé à Grok, DeepSeek, Mistral et Ollama, échelle OpenAI complète, effort refusé relancé sans lui, fil de la tâche et sélecteur qui disent ce que le modèle reçoit","F107, F108, F109, F110, F111, F112","Ce que la carte annonce, le modèle le reçoit"],
  ["P3","Cycle d'imports (audit du 17 oct.)","Fait (lot M10) : utilitaires sortis de core vers foundation/ et offline_policy/, quatre imports vers le haut retirés, cycle de 81 à 26 unités, plafonné ; les quatre fonctions géantes découpées sous tests de caractérisation ; reste le cycle du moteur d'agents, qui demande une interface","F101, F102, F103, F104, F105, F106","Une couche basse ne dépend pas des agents"],

@@ -22,6 +22,16 @@ project adheres to [Semantic Versioning](https://semver.org/).
   `DISCORD_WEBHOOK_URL`, le workflow dit que la release n'est pas annoncée et se
   termine vert.
 
+### 🧪 Filets de test
+
+- **L'app est démarrée avant d'être publiée** (F120). La CI lance le build sur les trois
+  OS et la release chaque app packagée avant l'envoi ; l'app doit monter son interface,
+  sinon le job échoue. La 1.3.1, qui ne démarrait pas, n'aurait pas pu sortir.
+- **Des planchers de couverture qui comptent** (F119) : 58 % pour le backend (60 %
+  mesurés, contre 10 % exigés jusque-là), et un seuil Vitest, qui n'existait pas.
+- **Actions GitHub épinglées par SHA** (F121), suivies par Dependabot jusque dans les
+  actions composites.
+
 ---
 
 ## 1.3.3 - La reconnexion Claude tient sous Linux et WSL
