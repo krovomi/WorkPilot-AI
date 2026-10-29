@@ -3,10 +3,10 @@
 Simulates the full ground-truth scenario:
 
 1. A Claude session writes 3 messages to {spec_dir}/conversation.jsonl
-2. The user hits the rate limit; the frontend writes a RESUME_WITH_PROVIDER
-   marker asking to resume on Copilot.
-3. The next session starts → _get_active_provider() honors the marker and
-   returns "copilot".
+2. The user hits the rate limit and picks Copilot in the pause modal; the
+   frontend (TASK_RESUME_WITH_PROVIDER) records it in task_metadata.json and
+   locks the task's engine.
+3. The next session starts → _get_active_provider() returns "copilot".
 4. _maybe_replay_conversation() loads the 3 prior messages and hands them
    to the new (mock) Copilot client via resume().
 5. When the new Copilot client builds its next OpenAI-style messages list,
@@ -31,10 +31,7 @@ from core.agent_client import (
     ContentBlockType,
     MessageRole,
 )
-from core.client import (
-    RESUME_WITH_PROVIDER_FILE,
-    _consume_resume_with_provider_marker,
-)
+from core.client import _get_active_provider
 from core.conversation_log import append_message
 
 #: The (provider, model) pair `_seed_claude_conversation` writes under.
@@ -152,15 +149,14 @@ async def test_e2e_claude_to_copilot_provider_switch_with_replay(
     spec_dir = tmp_path
 
     # --- Setup: Claude wrote 3 messages, then the user picked Copilot in
-    # the pause modal (frontend writes RESUME_WITH_PROVIDER) ---
+    # the pause modal (frontend locks the task's engine) ---
     _seed_claude_conversation(spec_dir)
-    (spec_dir / RESUME_WITH_PROVIDER_FILE).write_text("copilot", encoding="utf-8")
+    (spec_dir / "task_metadata.json").write_text(
+        '{"engineLocked": true, "provider": "copilot"}', encoding="utf-8"
+    )
 
-    # --- Step 1: session startup reads the marker, override wins ---
-    override = _consume_resume_with_provider_marker(spec_dir)
-    assert override == "copilot"
-    # Marker is single-shot — gone after consumption.
-    assert not (spec_dir / RESUME_WITH_PROVIDER_FILE).exists()
+    # --- Step 1: session startup resolves the task's own engine ---
+    assert _get_active_provider(spec_dir) == "copilot"
 
     # --- Step 2a: Copilot does not inherit Claude's transcript ---
     # Conversation logs are per (provider, model) — `read_log` keys on the pair
@@ -225,23 +221,17 @@ async def test_e2e_claude_to_copilot_provider_switch_with_replay(
 
 
 @pytest.mark.asyncio
-async def test_e2e_no_marker_means_default_provider_kept(tmp_path: Path) -> None:
-    """If no RESUME_WITH_PROVIDER marker is written, the override step
-    returns None and the rest of _get_active_provider() resolution applies.
-    The conversation replay should still happen with whatever client is
-    chosen (proving replay is independent of the override mechanism)."""
+async def test_e2e_replay_without_a_provider_switch(tmp_path: Path) -> None:
+    """Without a provider switch the conversation replay still happens with
+    whatever client is chosen (replay is independent of the provider choice)."""
     from agents.session import _maybe_replay_conversation
 
     spec_dir = tmp_path
     _seed_claude_conversation(spec_dir)
 
-    # No marker written.
-    assert _consume_resume_with_provider_marker(spec_dir) is None
-
-    # Replay still fires (the marker is orthogonal to replay) — for the
-    # (provider, model) pair that owns the log. It used to pass "opus" here,
-    # a different slug from the seeded model, and only passed back when a
-    # single log served every pair.
+    # Replay fires for the (provider, model) pair that owns the log. It used
+    # to pass "opus" here, a different slug from the seeded model, and only
+    # passed back when a single log served every pair.
     fake_client = AsyncMock()
     await _maybe_replay_conversation(
         fake_client, spec_dir, _SEEDED_PROVIDER, _SEEDED_MODEL

@@ -90,4 +90,4 @@ nouveau canal n'y entre jamais.
 |---|---|---|
 | Unitaires | `src/**/__tests__/`, `*.test.ts(x)` | `pnpm test` (Vitest) |
 | Intégration | `src/__tests__/integration/` | `pnpm test` |
-| E2E | `e2e/` | `pnpm run test:e2e` (Playwright) |
+| E2E | `e2e/`, l'app lancée par `e2e/app-harness.ts` | `pnpm run build && pnpm run test:e2e` (Playwright, xvfb sous Linux) |

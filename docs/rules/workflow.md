@@ -40,7 +40,7 @@ Référence complète : [`docs/CLI-USAGE.md`](../CLI-USAGE.md).
 | Frontend | `cd apps/frontend && pnpm test` | Vitest |
 | Frontend, types | `cd apps/frontend && pnpm run typecheck` | tsc |
 | Frontend, lint | `pnpm run lint` | Biome `2.5.11` |
-| E2E | `cd apps/frontend && pnpm run test:e2e` | Playwright |
+| E2E | `cd apps/frontend && pnpm run build && pnpm run test:e2e` (Linux sans écran : `xvfb-run -a`) | Playwright |
 | Comme le hook pre-push | `PRE_PUSH_FULL=1 pnpm run test:all` | — |
 
 **Versions épinglées** : ruff `0.15.7`, Biome `2.5.11`. Toute autre version produit un diff que la
@@ -102,6 +102,22 @@ blanche oubliait ce que les tests se mettaient à lire. `tests/test_ci_triggers.
 
 Une CI rouge se répare à la racine : pas de test sauté, désactivé ni mis en quarantaine, pas de
 commit vide pour relancer.
+
+Planchers et démarrage (plan du 29 octobre 2026, lot N2) :
+
+- **Couverture** : pytest `--cov-fail-under=58` (`ci.yml`), Vitest `coverage.thresholds`
+  (`apps/frontend/vitest.config.ts`, mesuré sur Linux). Ce sont des planchers sous le niveau
+  mesuré : on les monte quand la suite grandit, on ne les baisse jamais pour merger.
+- **Démarrage** : `apps/frontend/scripts/smoke-test.cjs` lance l'app avec `WORKPILOT_SMOKE_TEST=1`
+  et exige que le renderer monte (`src/main/smoke-test.ts`) ; `ci.yml` le fait sur le build des
+  trois OS, `release.yml` sur chaque app packagée avant publication (`--packaged`).
+  `tests/test_smoke_test_wiring.py` garde ces étapes.
+- **Actions** : chaque action externe est épinglée par SHA, version en commentaire ; Dependabot
+  suit aussi `.github/actions/*` (`tests/test_action_pins.py`).
+- **E2E** (lot N3) : le job `e2e` de `ci.yml` construit l'app et lance `pnpm run test:e2e` sous
+  xvfb ; `ci-complete` l'attend. Chaque spec démarre l'app par `e2e/app-harness.ts` (HOME et
+  profil jetables), aucun `test.skip`, et un test qui ne passe qu'au second essai fait échouer
+  le job (`failOnFlakyTests`). `tests/test_e2e_wiring.py` le garde.
 
 ## Livraison
 
