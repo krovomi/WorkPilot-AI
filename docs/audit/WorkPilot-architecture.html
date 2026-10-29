@@ -1685,7 +1685,15 @@ const FINDINGS=[
  {id:"F114",sev:"haute",cat:"bug",st:"résolu",v:"vérifié",t:"Le process principal d'Electron plantait au chargement (1.3.1)",
   c:"<b>Corrigé par #536</b>. Le shim ESM d'electron-vite 6 déclare <code>__filename</code>, <code>__dirname</code> et <code>require</code> en tête du bundle ; 24 modules de <code>src/main</code> déclaraient aussi <code>__filename</code> et l'un gardait le nom nu : « Identifier '__filename' has already been declared ». Le main lit <code>import.meta.dirname</code> / <code>import.meta.filename</code>.",
   p:"apps/frontend/src/main/ · apps/frontend/src/main/__tests__/esm-dirname.test.ts",
-  r:"Rien.",g:"L'application démarre.",k:"Frontend (main)."}];
+  r:"Rien.",g:"L'application démarre.",k:"Frontend (main)."},
+ {id:"F115",sev:"basse",cat:"doc",st:"résolu",v:"vérifié",t:"Les pages écrites à la main du wiki ne suivaient pas la release",
+  c:"<b>Corrigé par <code>scripts/wiki/patches/</code></b>. Les blocs AUTOGEN se rafraîchissaient à chaque release, pas les nouveautés, la feuille de route ni la page sécurité, écrites hors marqueurs. Elles vivent désormais comme patchs <code>git format-patch</code> relus en PR, appliqués par <code>sync_wiki.py</code> (mode <code>patches</code>, et en tête de <code>full</code>) ; un patch déjà présent est sauté, un patch qui ne s'applique plus est nommé.",
+  p:"scripts/wiki/sync_wiki.py · scripts/wiki/patches/ · .github/workflows/wiki-narrative.yml · tests/test_wiki_patches.py",
+  r:"Rien.",g:"Le wiki suit la release sans push à la main.",k:"Scripts et CI."},
+ {id:"F116",sev:"haute",cat:"bug",st:"résolu",v:"vérifié",t:"Un ancien jeton Secret Service masquait une nouvelle connexion Claude sous Linux",
+  c:"<b>Corrigé par #543</b>. Sous Linux et WSL, le jeton de Secret Service (écrit par les rafraîchissements de WorkPilot) passait avant <code>.credentials.json</code> (écrit par la CLI Claude) : après un <code>/login</code> réussi, l'ancien refresh token expiré revenait, <code>invalid_grant</code>, reconnexion en boucle. <code>pickFresherCredentials</code> garde le jeton qui expire le plus tard ; Reconnecter lance la connexion depuis Réglages > Comptes.",
+  p:"apps/frontend/src/main/claude-profile/credential-utils.ts · apps/frontend/src/renderer/hooks/use-reauth-notifications.tsx · apps/frontend/src/renderer/components/settings/reauth-request.ts",
+  r:"Rien.",g:"Une connexion Claude réussie le reste.",k:"Frontend (main et renderer)."}];
 const PLAN=[
  ["P1","Effort réellement reçu (26 oct.)","Fait (lot M11) : effort envoyé à Grok, DeepSeek, Mistral et Ollama, échelle OpenAI complète, effort refusé relancé sans lui, fil de la tâche et sélecteur qui disent ce que le modèle reçoit","F107, F108, F109, F110, F111, F112","Ce que la carte annonce, le modèle le reçoit"],
  ["P3","Cycle d'imports (audit du 17 oct.)","Fait (lot M10) : utilitaires sortis de core vers foundation/ et offline_policy/, quatre imports vers le haut retirés, cycle de 81 à 26 unités, plafonné ; les quatre fonctions géantes découpées sous tests de caractérisation ; reste le cycle du moteur d'agents, qui demande une interface","F101, F102, F103, F104, F105, F106","Une couche basse ne dépend pas des agents"],

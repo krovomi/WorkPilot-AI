@@ -33,7 +33,7 @@ Une ligne par fichier et par dossier de `scripts/`, et rien d'autre :
 | `vendor_watermarks.py` | Vendorise le nettoyeur de texte de watermarks-remover. | à la main, `--check` en CI |
 | `generate_model_catalog.py` | Écrit les catalogues de modèles et de prix du frontend depuis le backend. | à la main ; `tests/cost_intelligence/test_catalog.py` vérifie la sortie |
 | `sync_surface_globs.py` | Écrit l'ancre `&ui_surface` des workflows depuis `uiux.surface.UI_GLOBS`. | à la main ; `tests/test_uiux.py` vérifie la sortie |
-| `wiki/` | Inventaires et récit du wiki GitHub (`sync_wiki.py`, `generate_inventories.py`, `update_narrative.py`). | `wiki-inventories.yml`, `wiki-narrative.yml` |
+| `wiki/` | Inventaires, récit et pages écrites à la main du wiki GitHub (`sync_wiki.py`, `generate_inventories.py`, `update_narrative.py`, `patches/`). | `wiki-inventories.yml`, `wiki-narrative.yml` |
 
 ## Release
 

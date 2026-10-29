@@ -1,0 +1,188 @@
+From 9b90771defb517d9301ca61b268613f84ab0d86a Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 28 Oct 2026 09:24:52 +0000
+Subject: [PATCH] =?UTF-8?q?docs(wiki):=201.3.1=20=E2=80=94=20what's=20new,?=
+ =?UTF-8?q?=20roadmap,=20OS=20sandbox,=20module=20inventory?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Inventories regenerated from release/v1.3.1 (continuous_ai out; bench,
+best_of_n, genai_trace, goal, mcp_tasks, os_sandbox, pr_followup in).
+Home and Roadmap (EN, FR) list what 1.3.1 ships; Security.fr describes the
+OS sandbox and the renderer's secret boundary. Narrative sections are left
+to the release run.
+---
+ Home.md        |  6 ++++++
+ Roadmap.fr.md  | 49 +++++++++++++++++++++++++++++++++++++++++++++++--
+ Roadmap.md     | 25 +++++++++++++++++++++++++
+ Security.fr.md | 19 +++++++++++++++++++
+ 4 files changed, 97 insertions(+), 2 deletions(-)
+
+diff --git a/Home.md b/Home.md
+index 01f2e89..04496af 100644
+--- a/Home.md
++++ b/Home.md
+@@ -6,6 +6,12 @@
+ 
+ ---
+ 
++## 🆕 What's new in 1.3.1 / Nouveautés de la 1.3.1
++
++PR follow-through to merge, goal mode, "needs you" notifications (ntfy, Telegram), OpenTelemetry GenAI traces, Best-of-N, automations (replacing the Continuous AI daemon), ACP agents (Gemini CLI), OS sandbox, MCP 2026 tasks and MCP Apps, repo bench, Windows apps verified through UI Automation, and honest reasoning effort on every provider. → [Roadmap](Roadmap) · [Feuille de route](Roadmap.fr) · [Release notes](https://github.com/krovomi/WorkPilot-AI/releases)
++
++---
++
+ ## 🌐 Choose your language / Choisissez votre langue
+ 
+ ### 🇬🇧 [English Wiki →](Introduction)
+diff --git a/Roadmap.fr.md b/Roadmap.fr.md
+index 98e19a4..3ef1ab2 100644
+--- a/Roadmap.fr.md
++++ b/Roadmap.fr.md
+@@ -20,7 +20,48 @@ WorkPilot AI vise à devenir le **framework de référence pour le développemen
+ 
+ ## 🧭 Versions récentes
+ 
+-### v1.1.0 — Stable actuelle
++### v1.3.1 — Stable actuelle (28 octobre 2026)
++
++*La carte va jusqu'au bout, et l'effort annoncé est celui reçu.* Détail dans le
++[CHANGELOG](https://github.com/krovomi/WorkPilot-AI/blob/main/CHANGELOG.md).
++
++**Onze nouveautés** (annexe G de l'audit)
++- **La carte suit sa PR jusqu'au merge** : check rouge et fil de revue partent au QA fixer, commit
++  vérifié puis poussé, jamais en force ; le merge reste humain
++- **Mode objectif** : une commande et son code de sortie disent quand une tâche est finie
++- **« Besoin de toi »** : notification bureau, ntfy ou Telegram quand une tâche attend ; plan
++  approuvable depuis Telegram
++- **Traces OpenTelemetry GenAI** identiques pour tous les providers
++- **Best-of-N** : une tâche construite 2 à 4 fois, classée sur des chiffres, la personne choisit
++- **Automatisations** : issue étiquetée, CI rouge ou horaire → une carte brouillon
++- **Agents ACP**, Gemini CLI d'abord, avec les questions de l'agent sur la carte
++- **Bac à sable de l'OS** (bubblewrap, Seatbelt) autour des commandes d'agent
++- **MCP 2026-07-28** : tasks et MCP Apps dans le panneau de tâche
++- **Banc de rejeu** : vos cartes terminées rejouées par chaque moteur, jugées par des tests cachés
++- **Applications Windows** (WPF, WinForms, WinUI) vérifiées par UI Automation
++
++**Effort honnête** — chaque provider reçoit l'effort sur sa propre échelle, et le sélecteur affiche
++ce qui est réellement envoyé.
++
++**Durcissement** (lots M1 à M10) — aucune commande construite depuis l'interface, aucun secret
++stocké dans le renderer, frontière renderer → main vérifiée, CI qui construit et migre l'image
++serveur, contrats d'architecture testés, 17 800 lignes de code mort retirées, cycle `core ⇄ agents`
++ramené de 81 à 26 unités.
++
++**⚠️ Incompatible** — le démon « Continuous AI » est retiré, remplacé par les automatisations.
++
++### v1.3.0 — 20 octobre 2026
++
++*pi, filigranes, CI lisible.* pi (pi.dev) comme harness et comme provider (modes JSON et RPC,
++garde-fou d'écriture) ; les caractères invisibles qui portent une marque de provenance sont
++retirés de chaque fichier écrit par un agent ; la CI nomme le test qui échoue.
++
++### v1.2.x — août 2026
++
++Workflows déclaratifs, skills au standard Agent Skills, 141 alertes de code scanning traitées
++(1.2.0) ; build macOS Intel et chaîne de release fiabilisée (1.2.1).
++
++### v1.1.0
+ 
+ *Multi-Provider, Formula Lab & agents autonomes.* Plus de 150 fonctionnalités
+ et 150 correctifs depuis la 1.0.0. Détail complet dans le
+@@ -129,7 +170,8 @@ et 150 correctifs depuis la 1.0.0. Détail complet dans le
+ 
+ ### Multi-LLM orchestration
+ - Répartir automatiquement les sous-agents sur **plusieurs modèles** (ex : Opus pour le planning, Sonnet pour le coding, Haiku pour la revue)
+-- Apprentissage automatique du meilleur mix selon le type de tâche
++- Apprentissage automatique du meilleur mix selon le type de tâche — premier pas livré en 1.3.1 :
++  le banc de rejeu nourrit Formula Lab et le routeur, et Best-of-N compare des moteurs sur une vraie tâche
+ 
+ ### Benchmarks publics
+ - Suite de benchmarks pour comparer WorkPilot AI à d'autres frameworks (SWE-bench, HumanEval…)
+@@ -145,6 +187,9 @@ et 150 correctifs depuis la 1.0.0. Détail complet dans le
+ ## 🌅 Long terme (vision)
+ 
+ ### Agents proactifs en continu
++- Premier pas livré en 1.3.1 : les **automatisations** créent une carte quand une issue est
++  étiquetée, quand la CI passe au rouge ou à heure fixe — toujours une carte visible, jamais une
++  action en silence
+ - WorkPilot AI devient un **collègue permanent** qui :
+   - Surveille votre projet en continu
+   - Propose des améliorations sans qu'on lui demande
+diff --git a/Roadmap.md b/Roadmap.md
+index 845f2ba..f764659 100644
+--- a/Roadmap.md
++++ b/Roadmap.md
+@@ -23,6 +23,31 @@ The Roadmap view is part of WorkPilot's broader Developer Productivity toolset,
+ For teams exploring what to build next, the Roadmap view is intended as the entry point that feeds directly into the autonomous pipeline: a planned feature can move from roadmap item to an executable Kanban card without leaving the app, keeping planning and execution in the same tool rather than split across a separate product-management system.
+ <!-- AUTOGEN:NARRATIVE:END -->
+ 
++## Recent releases
++
++### v1.3.1 — current stable (October 28, 2026)
++
++- **PR follow-through**: the card keeps driving its PR to merge (red checks and review threads go to the QA fixer; the merge stays human)
++- **Goal mode**: a command and its exit code decide when a task is done
++- **Needs you**: desktop, ntfy or Telegram notice when a task waits; approve a plan from Telegram
++- **OpenTelemetry GenAI traces** for every provider
++- **Best-of-N**: one task built 2 to 4 ways, ranked on numbers, you keep one
++- **Automations**: a labelled issue, a red CI or a schedule creates a draft card
++- **ACP agents**, Gemini CLI first
++- **OS sandbox** (bubblewrap, Seatbelt) around agent commands
++- **MCP 2026-07-28**: tasks and MCP Apps in the task panel
++- **Repo bench**: finished cards replayed by every engine, judged by hidden tests
++- **Windows apps** (WPF, WinForms, WinUI) verified through UI Automation
++- **Honest effort**: each provider gets the effort on its own scale, and the picker shows what is sent
++- Hardening lots M1 to M10 (no command built from the UI, no stored secret in the renderer, checked IPC boundary, CI that builds what ships, dead code removed)
++- ⚠️ **Breaking**: the Continuous AI daemon is removed; automations replace it
++
++### v1.3.0 — October 20, 2026
++
++pi (pi.dev) as harness and provider; invisible provenance characters stripped from every file an agent writes; CI names the failing test.
++
++Full notes: [CHANGELOG](https://github.com/krovomi/WorkPilot-AI/blob/main/CHANGELOG.md).
++
+ ---
+ 
+ ➡️ Continue: [FAQ](FAQ)
+diff --git a/Security.fr.md b/Security.fr.md
+index b5302db..4ed9d05 100644
+--- a/Security.fr.md
++++ b/Security.fr.md
+@@ -29,6 +29,18 @@ Chaque commande exécutée par un agent passe par un **subprocess contrôlé** :
+ - Capture stdout/stderr sans interprétation directe du shell
+ - Pas de héritage de file descriptors sensibles
+ 
++Depuis la **1.3.1**, ces commandes tournent dans un vrai **bac à sable de l'OS** : bubblewrap sous
++Linux, Seatbelt sous macOS. Les commandes de la boucle WorkPilot et des CLI OpenCode, pi et
++Gemini (ACP) y sont confinées :
++- écritures limitées au worktree de la tâche ;
++- clés SSH, jetons et fichiers d'identifiants de la personne cachés ;
++- réseau limité aux hôtes du provider et aux registres de paquets, par un proxy filtrant qui nomme
++  ce qu'il refuse (hôtes supplémentaires : `WORKPILOT_SANDBOX_HOSTS`).
++
++Claude Code et Codex gardent leur propre bac à sable, signalé comme tel. Sans bac à sable possible
++(Windows, Ubuntu avec AppArmor restrictif), la carte le dit au lancement ;
++`WORKPILOT_SANDBOX=required` refuse alors de démarrer, `off` le désactive.
++
+ ---
+ 
+ ## 📁 Couche 2 — Restrictions filesystem
+@@ -122,6 +134,13 @@ Plusieurs comptes (Claude, OpenAI, etc.) peuvent coexister sans conflit. Chaque
+ ### Validation d'input
+ Tous les inputs utilisateur (noms de profil, URLs d'endpoints custom, commandes…) sont **validés et sanitizés** avant usage.
+ 
++### Aucun secret dans l'interface (1.3.1)
++L'interface sait qu'une clé ou un jeton est configuré, jamais sa valeur : le processus principal
++renvoie un masque, et les tests de connexion aux providers tournent dans le processus principal.
++Seule la page de l'application atteint un handler IPC ; un chemin reçu de l'interface doit être
++dans un projet enregistré ou un dossier choisi dans une boîte de dialogue, et un chemin d'outil ou
++du backend saisi dans les réglages est vérifié avant d'être exécuté.
++
+ ---
+ 
+ ## 🧱 Isolation par worktree
+-- 
+2.43.0
+

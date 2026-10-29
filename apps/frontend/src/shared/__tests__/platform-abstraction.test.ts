@@ -47,15 +47,15 @@ const ALLOWED = new Map<string, string>([
 	],
 	["main/app-logger.ts:187", "métadonnée de log"],
 	[
-		"main/claude-profile/credential-utils.ts:1533",
+		"main/claude-profile/credential-utils.ts:1539",
 		"message « Unsupported platform » : la plateforme brute est l'information",
 	],
 	[
-		"main/claude-profile/credential-utils.ts:2139",
+		"main/claude-profile/credential-utils.ts:2165",
 		"message « Unsupported platform » : la plateforme brute est l'information",
 	],
 	[
-		"main/claude-profile/credential-utils.ts:2869",
+		"main/claude-profile/credential-utils.ts:2895",
 		"message « Unsupported platform » : la plateforme brute est l'information",
 	],
 ]);

@@ -28,6 +28,10 @@ import { CleanProviderGrid } from "./CleanProviderGrid";
 import { GlobalAutoSwitching } from "./GlobalAutoSwitching";
 import { getAllConnectors } from "./multiconnector/utils";
 import { ProviderConfigDialog } from "./ProviderConfigDialog";
+import {
+	consumeProviderReauthRequest,
+	onProviderReauthRequest,
+} from "./reauth-request";
 import { SettingsSection } from "./SettingsSection";
 
 interface Provider {
@@ -709,6 +713,26 @@ export function CleanProviderSection({
 			setConfigDialogOpen(true);
 		}
 	};
+
+	// "Reconnect" from the re-auth toast: start the provider's login as soon as
+	// its card exists (providers load asynchronously after mount).
+	useEffect(() => {
+		const answerPendingRequest = () => {
+			if (providers.length === 0) return;
+			const requested = consumeProviderReauthRequest();
+			if (!requested) return;
+			const provider = providers.find(
+				(p) => p.id === requested || p.name === requested,
+			);
+			if (provider) {
+				setSelectedProvider(provider);
+				setAutoStartOAuth(true);
+				setConfigDialogOpen(true);
+			}
+		};
+		answerPendingRequest();
+		return onProviderReauthRequest(answerPendingRequest);
+	}, [providers]);
 
 	const handleTest = async (providerId: string) => {
 		setTestingProviders((prev) => new Set(prev).add(providerId));

@@ -13,6 +13,36 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## 1.3.3 - La reconnexion Claude tient sous Linux et WSL
+
+Correctif de la 1.3.2 : après un `/login` réussi sous Linux ou WSL, l'application
+retombait aussitôt en « reconnexion requise ». Le wiki suit aussi chaque release
+sans intervention.
+
+### 🐛 Corrections
+
+- **Boucle de reconnexion Claude sous Linux et WSL** (#543). WorkPilot range les
+  jetons qu'il rafraîchit dans Secret Service, alors que la CLI Claude n'écrit que
+  `.credentials.json`. Secret Service était lu en premier : après un nouveau
+  `claude /login`, l'application gardait l'ancienne copie et son refresh token
+  expiré, d'où un `invalid_grant` juste après chaque reconnexion. Les deux
+  magasins sont désormais comparés et le jeton qui expire le plus tard l'emporte
+  (`pickFresherCredentials`), pour les lectures complètes comme courtes (F116 de
+  l'audit). Le bouton Reconnecter de la notification ouvre Réglages > Comptes et
+  lance directement la connexion du provider.
+
+### ✨ Nouveautés
+
+- **Le wiki suit chaque release sans push à la main.** Les pages écrites à la
+  main (nouveautés, feuille de route, sécurité) vivent comme patchs
+  `git format-patch` dans `scripts/wiki/patches/`, relus en PR ; la synchro
+  `full` que lance chaque release les applique au wiki avant de rafraîchir ses
+  blocs `AUTOGEN`. Un patch déjà présent est sauté, un patch qui ne s'applique
+  plus est nommé et fait échouer le job sans bloquer les autres (F115 de
+  l'audit). Le contenu 1.3.1 du wiki passe par ce chemin.
+
+---
+
 ## 1.3.2 - L'application démarre de nouveau
 
 Correctif de la 1.3.1, dont le process principal d'Electron s'arrêtait au
