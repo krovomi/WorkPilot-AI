@@ -2569,6 +2569,34 @@ chaque provider, lue le 26 octobre 2026 (xAI « Reasoning », DeepSeek « Thinki
 - **Correction** : toutes les actions externes par SHA, version exacte en commentaire ; Dependabot
   lit aussi `/.github/actions/*` ; `tests/test_action_pins.py` refuse un nouveau tag nu.
 
+#### F122 · Ajouter un dossier existant ne menait jamais à son initialisation
+
+- **Sévérité** haute · **trouvé par le premier test E2E du lot N3** · **corrigé par le lot N3**
+- **Preuve** (avant) : « Open existing project » ajoutait le projet, puis `App.tsx` posait
+  `_showInitDialog` et `_pendingProject` ; aucun composant ne lisait plus ces états depuis le
+  retrait du dialogue d'initialisation. La modale passe en plus `needsInit: false`, donc même ce
+  chemin mort ne se déclenchait qu'au hasard. Résultat : « New Task » restait grisé, et la barre
+  latérale disait seulement « Initialize WorkPilot AI to create tasks », en texte simple.
+- **Correction** : un projet sans `.workpilot` ouvre ses réglages sur le volet General, où se
+  trouve le bouton d'initialisation ; le texte de la barre latérale devient un lien vers ce même
+  volet. Les cinq états morts et leurs deux effets sans effet sont retirés.
+- **Garde-fou** : `e2e/first-run.e2e.ts` ajoute un dépôt git, l'initialise et crée une tâche ;
+  le test échoue sur l'ancien code.
+
+#### F123 · Les specs E2E ne pilotaient pas l'application
+
+- **Sévérité** moyenne · **reste du plan du 29 octobre (T1)** · **corrigé par le lot N3**
+- **Preuve** (avant) : 32 tests « verts » écrivaient et relisaient des fichiers sans ouvrir de
+  fenêtre, 16 étaient sautés en silence, un ne chargeait plus ; aucun job de CI ne les lançait,
+  et `npx playwright` résolvait une autre version que celle du dépôt.
+- **Correction** : les six fichiers sont retirés. `e2e/app-harness.ts` lance l'app construite
+  avec un HOME et un profil jetables ; `e2e/first-run.e2e.ts` parcourt le premier lancement
+  (mode local, projet existant, initialisation, première tâche). Le job `e2e` de `ci.yml` construit
+  l'app et lance la suite sous xvfb ; un test qui ne passe qu'au second essai fait échouer le job
+  (`failOnFlakyTests`).
+- **Garde-fou** : `tests/test_e2e_wiring.py` exige que chaque spec passe par le harness, refuse
+  `test.skip` et `test.fixme`, et vérifie que `ci-complete` attend le job `e2e`.
+
 ---
 
 ## Annexe A — Inventaire des fichiers candidats
@@ -2723,7 +2751,7 @@ planchers `pnpm.overrides` relevés (`pnpm-workspace.yaml`), `dompurify` ^3.4.17
 
 Statut des constats de l'audit précédent : F1, F3, F4, F5, F7, F8, F9, F10, F12, F16, F17, F19 **ouverts** ;
 F2, F13 **partiels** ; F6, F11, F14, F18 **aggravés** ; F15 **atténué**. Nouveaux : F20 à F36.
-Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F57 à F62 par M2, F63 à F68 par M3, F69 à F71 par M4, F78 à F84 par M5, F85 à F90 par M6, F91 à F94 par M7, F95 à F100 par M8, F72 à F77 par M9, F101 à F106 par M10, F107 à F112 par M11 (annexe F) ; F113 (CodeQL de la release 1.3.1) par #531 ; F114 (démarrage du main, 1.3.1) par #536 ; F115 (pages du wiki écrites à la main) par le mécanisme `scripts/wiki/patches/` ; F116 (boucle de reconnexion Claude sous Linux) par #543 ; F117 (releases en squash vers `main`) par #549 et la PR des commits de merge vers `main` ; lecture du marqueur F25 retirée et F118 (annonce Discord sans webhook) par le lot N1 du plan du 29 octobre ; F119 à F121 (planchers de couverture, démarrage de l'app, actions par SHA) par le lot N2.
+Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F57 à F62 par M2, F63 à F68 par M3, F69 à F71 par M4, F78 à F84 par M5, F85 à F90 par M6, F91 à F94 par M7, F95 à F100 par M8, F72 à F77 par M9, F101 à F106 par M10, F107 à F112 par M11 (annexe F) ; F113 (CodeQL de la release 1.3.1) par #531 ; F114 (démarrage du main, 1.3.1) par #536 ; F115 (pages du wiki écrites à la main) par le mécanisme `scripts/wiki/patches/` ; F116 (boucle de reconnexion Claude sous Linux) par #543 ; F117 (releases en squash vers `main`) par #549 et la PR des commits de merge vers `main` ; lecture du marqueur F25 retirée et F118 (annonce Discord sans webhook) par le lot N1 du plan du 29 octobre ; F119 à F121 (planchers de couverture, démarrage de l'app, actions par SHA) par le lot N2 ; F122 (initialisation d'un projet existant) et F123 (specs E2E qui ne vérifiaient rien) par le lot N3.
 
 ## Annexe C — Ce qui a changé le 15 octobre 2026 (`7ef6fca` → `e3e468f` + PR #454)
 
