@@ -401,7 +401,7 @@ npm run test:watch
 # Run with coverage
 npm run test:coverage
 
-# Run E2E tests (requires built app)
+# Run E2E tests (requires built app; on Linux without a display, prefix with xvfb-run -a)
 npm run build
 npm run test:e2e
 

@@ -21,8 +21,12 @@ description: 'Conventions tests WorkPilot AI : vitest (front), pytest (back), Pl
 
 ## E2E (Playwright)
 
-- Dossier : `apps/frontend/e2e/`.
-- Lancer Electron via `playwright._electron.launch(...)`.
+- Dossier : `apps/frontend/e2e/`. Construire d'abord (`pnpm run build`), puis `pnpm run test:e2e` ;
+  sous Linux sans écran, `xvfb-run -a`. Jamais `npx playwright` : il résout une autre version.
+- Lancer l'app par `launchIsolatedApp()` de `e2e/app-harness.ts` (HOME et profil jetables) ;
+  un sélecteur de dossier se répond par `answerNextFolderPicker`.
+- Pas de `test.skip` ni de `test.fixme` (`tests/test_e2e_wiring.py`) : un parcours qui ne tourne
+  pas en CI n'est pas un test.
 - Sélecteurs : `data-testid` prioritaire, sinon role/text accessible.
 
 ## Règles communes

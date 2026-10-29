@@ -1713,7 +1713,15 @@ const FINDINGS=[
  {id:"F121",sev:"moy",cat:"sécurité",st:"résolu",v:"vérifié",t:"Les actions GitHub étaient épinglées par tag",
   c:"<b>Corrigé par le lot N2</b>. 108 <code>uses:</code> par tag mobile. Toutes les actions externes sont épinglées par SHA, version en commentaire ; Dependabot lit aussi <code>.github/actions/*</code>.",
   p:".github/workflows/*.yml · .github/actions/*/action.yml · .github/dependabot.yml · tests/test_action_pins.py",
-  r:"Dependabot met à jour SHA et commentaire ensemble.",g:"Un tag déplacé ne change plus ce que la CI exécute.",k:"CI."}];
+  r:"Dependabot met à jour SHA et commentaire ensemble.",g:"Un tag déplacé ne change plus ce que la CI exécute.",k:"CI."},
+ {id:"F122",sev:"haute",cat:"frontend",st:"résolu",v:"vérifié",t:"Ajouter un dossier existant ne menait jamais à son initialisation",
+  c:"<b>Corrigé par le lot N3</b>, trouvé par son premier test E2E. Le dialogue d'initialisation avait été retiré, mais <code>App.tsx</code> posait encore ses états ; « New Task » restait grisé sans autre piste qu'un texte. Un projet sans <code>.workpilot</code> ouvre maintenant ses réglages sur le volet General, et le texte de la barre latérale y mène.",
+  p:"apps/frontend/src/renderer/App.tsx · apps/frontend/src/renderer/components/Sidebar.tsx · apps/frontend/e2e/first-run.e2e.ts",
+  r:"Le test E2E échoue sur l'ancien code.",g:"Un nouvel utilisateur arrive à sa première tâche.",k:"Premier lancement."},
+ {id:"F123",sev:"moy",cat:"pipeline",st:"résolu",v:"vérifié",t:"Les specs E2E ne pilotaient pas l'application",
+  c:"<b>Corrigé par le lot N3</b>. 32 tests écrivaient des fichiers sans ouvrir de fenêtre, 16 étaient sautés, aucun job ne les lançait. Remplacés par un parcours du premier lancement dans l'app construite, HOME et profil jetables, lancé par le job <code>e2e</code> sous xvfb.",
+  p:"apps/frontend/e2e/app-harness.ts · apps/frontend/e2e/first-run.e2e.ts · apps/frontend/e2e/playwright.config.ts · .github/workflows/ci.yml · tests/test_e2e_wiring.py",
+  r:"Un test qui ne passe qu'au second essai fait échouer le job.",g:"Un parcours cassé rougit la CI.",k:"CI."}];
 const PLAN=[
  ["P1","Effort réellement reçu (26 oct.)","Fait (lot M11) : effort envoyé à Grok, DeepSeek, Mistral et Ollama, échelle OpenAI complète, effort refusé relancé sans lui, fil de la tâche et sélecteur qui disent ce que le modèle reçoit","F107, F108, F109, F110, F111, F112","Ce que la carte annonce, le modèle le reçoit"],
  ["P3","Cycle d'imports (audit du 17 oct.)","Fait (lot M10) : utilitaires sortis de core vers foundation/ et offline_policy/, quatre imports vers le haut retirés, cycle de 81 à 26 unités, plafonné ; les quatre fonctions géantes découpées sous tests de caractérisation ; reste le cycle du moteur d'agents, qui demande une interface","F101, F102, F103, F104, F105, F106","Une couche basse ne dépend pas des agents"],
