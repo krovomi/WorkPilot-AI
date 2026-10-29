@@ -30,8 +30,9 @@ Tous les chemins backend sont relatifs à `apps/backend/`, tous les chemins fron
 - **Abstraction plateforme** : jamais `process.platform` ; `main/platform/` ou `core/platform/`.
 - **Versions d'outils épinglées** : ruff `0.15.7`, Biome `2.5.11`.
 - **Pas d'estimation de durée** dans les PR ou la doc.
-- Le provider d'un endpoint se lit avec `core.client.peek_active_provider`, jamais
-  `_get_active_provider` (voir F13/F25).
+- Le provider d'un endpoint se lit avec `core.client.peek_active_provider` ; depuis le retrait du
+  marqueur `RESUME_WITH_PROVIDER` (F25, lot N1), c'est un alias sans effet de bord de
+  `_get_active_provider`.
 
 ### 0.2 Principe de suppression
 
@@ -873,8 +874,14 @@ avant/après, recherche stricte des `import`, `pnpm run typecheck`, suite vitest
   de `_get_active_provider` (`core/client.py:1647-1717,1841`) et les commentaires associés
   (`agents/coder.py:1279,1715`, `workflows/api.py:23`, `cli/build_commands.py:169`, `cli/utils.py:171`).
   `peek_active_provider` peut alors devenir un alias, puis disparaître.
-- **Vérification** : `pytest tests/test_task_engine_lock.py tests/test_phase_provider_resolution.py apps/backend/core/test_resume_with_provider.py -q`
-  (adapter le dernier une fois le marqueur retiré).
+- **Fait (lot N1, 29 octobre 2026, après la 1.3.3).** La lecture du marqueur est retirée de
+  `core/client.py` avec `RESUME_WITH_PROVIDER_FILE`, `_consume_resume_with_provider_marker` et le
+  paramètre `consume` ; `peek_active_provider` est un alias de `_get_active_provider`, sans effet de
+  bord. Un marqueur resté sur disque est ignoré (et toujours supprimé par la reprise côté main).
+  `tests/core/test_resume_with_provider.py` et `tests/test_slash_commands_provider_peek.py` sont
+  retirés ; le scénario de reprise passe par le moteur verrouillé de la tâche.
+- **Vérification** : `pytest tests/test_task_engine_lock.py tests/test_phase_provider_resolution.py
+  tests/test_e2e_provider_switch_resume.py tests/test_workflow_engine_default.py -q`.
 
 ### Lot L10 — Tokens à haut effort (P3)
 
@@ -1153,6 +1160,7 @@ commandes ne consomme plus le choix « reprendre avec X ». `core/client.py` n'e
   - Portée réelle : le marqueur est écrit dans le dossier de spec, ces deux chemins résolvent sur la
     racine du projet ; la consommation n'y touchait donc qu'un marqueur posé à la racine. Le correctif
     applique la règle §0.1, il ne répare pas une perte observée.
+  - Le marqueur et ce test sont retirés avec F25 (lot N1).
   - **Signalés, non corrigés** (hors cas évident) : `core/oneshot.oneshot_completion` appelle
     `_resolve_active_provider` en mode consommant quand un `spec_dir` est passé (`commit_message.py`,
     `runners/oneshot_completion_runner.py`) ; `create_agent_client` sans `provider` consomme aussi.
@@ -2519,6 +2527,48 @@ chaque provider, lue le 26 octobre 2026 (xAI « Reasoning », DeepSeek « Thinki
   rouge) ; `tests/test_release_merge_commits.py` (aucun `--squash` ni `--rebase` dans les workflows
   de release, README partagé entre les deux branches).
 
+#### F118 · L'annonce Discord échouait à chaque release, faute de webhook
+
+- **Sévérité** basse · **nouveau** · **corrigé par le lot N1**
+- **Preuve** (avant) : `release.yml` dispatche `discord-release.yml` après chaque publication (R5,
+  lot M3) ; le secret `DISCORD_WEBHOOK_URL` n'est pas défini sur le dépôt, et l'action
+  `github-releases-to-discord` échoue sur une URL vide. 1.3.1 à 1.3.3 ont chacune laissé un run
+  rouge, qui ne dit pas pourquoi.
+- **Correction** : un premier pas lit le secret ; absent, le job écrit une notice « release non
+  annoncée » et se termine vert sans lire la release. Définir `DISCORD_WEBHOOK_URL` suffit à
+  rétablir l'annonce.
+
+#### F119 · Les planchers de couverture ne mesuraient presque rien
+
+- **Sévérité** moyenne · **reste de l'audit du 17 octobre (I5)** · **corrigé par le lot N2**
+- **Preuve** (avant) : `ci.yml` exigeait `--cov-fail-under=10` alors que la suite couvre 60 % du
+  backend ; `vitest.config.ts` n'avait aucun seuil et la CI lançait Vitest sans couverture. Une PR
+  pouvait retirer la moitié des tests sans faire rougir la CI.
+- **Correction** : pytest `--cov-fail-under=58` ; Vitest `coverage.thresholds` (29,5 % en
+  instructions et lignes, 29 % en fonctions, 24 % en branches, pour 30,6 / 30,2 / 25,3 % mesurés),
+  et la CI Linux lance `test:coverage`. Planchers, pas objectifs : on les monte avec la suite.
+
+#### F120 · Rien ne démarrait l'application avant de la publier
+
+- **Sévérité** haute · **reste de l'audit du 17 octobre (I5)** · **corrigé par le lot N2**
+- **Preuve** (avant) : la 1.3.1 est sortie avec un process principal qui levait au chargement
+  (F114) ; typecheck, tests et build étaient verts, aucun job ne lançait l'app, ni en CI ni avant
+  publication.
+- **Correction** : `src/main/smoke-test.ts` (avec `WORKPILOT_SMOKE_TEST=1`, l'app quitte 0 quand le
+  `#root` du renderer a des enfants, 1 si le renderer échoue) et `scripts/smoke-test.cjs`, qui
+  exige le marqueur dans un délai. `ci.yml` démarre le build sur les trois OS, `release.yml` chaque
+  app packagée avant l'envoi. Vérifié en local sous xvfb : vert sur `develop`, rouge sur un
+  `out/main/index.js` qui lève au chargement. `tests/test_smoke_test_wiring.py` garde les étapes.
+
+#### F121 · Les actions GitHub étaient épinglées par tag
+
+- **Sévérité** moyenne · **reste de l'audit du 17 octobre (I7)** · **corrigé par le lot N2**
+- **Preuve** (avant) : 108 `uses:` par tag (`actions/checkout@v7.0.1`, `actions/cache@v6`…) contre
+  19 par SHA ; un tag se déplace, un SHA non. Dependabot ne lisait que `.github/workflows/`, pas
+  les actions composites de `.github/actions/`.
+- **Correction** : toutes les actions externes par SHA, version exacte en commentaire ; Dependabot
+  lit aussi `/.github/actions/*` ; `tests/test_action_pins.py` refuse un nouveau tag nu.
+
 ---
 
 ## Annexe A — Inventaire des fichiers candidats
@@ -2673,7 +2723,7 @@ planchers `pnpm.overrides` relevés (`pnpm-workspace.yaml`), `dompurify` ^3.4.17
 
 Statut des constats de l'audit précédent : F1, F3, F4, F5, F7, F8, F9, F10, F12, F16, F17, F19 **ouverts** ;
 F2, F13 **partiels** ; F6, F11, F14, F18 **aggravés** ; F15 **atténué**. Nouveaux : F20 à F36.
-Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F57 à F62 par M2, F63 à F68 par M3, F69 à F71 par M4, F78 à F84 par M5, F85 à F90 par M6, F91 à F94 par M7, F95 à F100 par M8, F72 à F77 par M9, F101 à F106 par M10, F107 à F112 par M11 (annexe F) ; F113 (CodeQL de la release 1.3.1) par #531 ; F114 (démarrage du main, 1.3.1) par #536 ; F115 (pages du wiki écrites à la main) par le mécanisme `scripts/wiki/patches/` ; F116 (boucle de reconnexion Claude sous Linux) par #543 ; F117 (releases en squash vers `main`) par #549 et la PR des commits de merge vers `main`.
+Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F57 à F62 par M2, F63 à F68 par M3, F69 à F71 par M4, F78 à F84 par M5, F85 à F90 par M6, F91 à F94 par M7, F95 à F100 par M8, F72 à F77 par M9, F101 à F106 par M10, F107 à F112 par M11 (annexe F) ; F113 (CodeQL de la release 1.3.1) par #531 ; F114 (démarrage du main, 1.3.1) par #536 ; F115 (pages du wiki écrites à la main) par le mécanisme `scripts/wiki/patches/` ; F116 (boucle de reconnexion Claude sous Linux) par #543 ; F117 (releases en squash vers `main`) par #549 et la PR des commits de merge vers `main` ; lecture du marqueur F25 retirée et F118 (annonce Discord sans webhook) par le lot N1 du plan du 29 octobre ; F119 à F121 (planchers de couverture, démarrage de l'app, actions par SHA) par le lot N2.
 
 ## Annexe C — Ce qui a changé le 15 octobre 2026 (`7ef6fca` → `e3e468f` + PR #454)
 
