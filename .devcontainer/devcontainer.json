@@ -1,0 +1,19 @@
+{
+	"name": "WorkPilot AI",
+	"build": { "dockerfile": "Dockerfile" },
+	"remoteUser": "vscode",
+	// Backend and frontend dependencies, as on a workstation (README, "Installation").
+	"postCreateCommand": "pnpm run install:all",
+	// FastAPI and the WebSocket server; both listen on 127.0.0.1 inside the container.
+	"forwardPorts": [9000, 8765],
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-python.python",
+				"charliermarsh.ruff",
+				"biomejs.biome",
+				"ms-playwright.playwright"
+			]
+		}
+	}
+}

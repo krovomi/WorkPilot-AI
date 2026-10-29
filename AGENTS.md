@@ -59,6 +59,7 @@ workflows/           workflows déclaratifs, un par type de tâche (feature-buil
 config/  deploy/     registre de providers ; image Docker du mode serveur
 scripts/             build, release, hooks, vendorisation, wiki
 docs/                règles, architecture, guides, politique de sécurité
+changelog.d/         une entrée de changelog par PR, versée dans CHANGELOG.md à la release
 ```
 
 Le détail par paquet est dans les index locaux.

@@ -103,27 +103,22 @@ This will:
 
 **IMPORTANT: The release will fail if CHANGELOG.md doesn't have an entry for the new version.**
 
-Add release notes to `CHANGELOG.md` at the top of the file:
+Unreleased changes live as fragments in `changelog.d/` (one file per PR, see
+[`changelog.d/README.md`](../changelog.d/README.md)). Fold them into the version's section:
 
-```markdown
-## 1.1.0 - Your Release Title
-
-### ✨ New Features
-- Feature description
-
-### 🛠️ Improvements
-- Improvement description
-
-### 🐛 Bug Fixes
-- Fix description
-
----
+```bash
+python scripts/changelog.py preview                      # what the notes will say
+python scripts/changelog.py release 1.1.0 "Your Release Title"
 ```
+
+This writes `## 1.1.0 - Your Release Title` at the top of `CHANGELOG.md`, with the fragments
+grouped by section, and removes them. Replace the intro comment it leaves with one or two
+sentences on what the version changes for the user.
 
 Then amend the version bump commit:
 
 ```bash
-git add CHANGELOG.md
+git add CHANGELOG.md changelog.d
 git commit --amend --no-edit
 ```
 
@@ -181,7 +176,9 @@ We follow [Semantic Versioning](https://semver.org/):
 
 ## Changelog Management
 
-Release notes are managed in `CHANGELOG.md` and used for GitHub releases.
+Release notes are managed in `CHANGELOG.md` and used for GitHub releases. Between releases,
+each PR adds a fragment to `changelog.d/` instead of editing `CHANGELOG.md`, so open PRs do
+not conflict; `scripts/changelog.py release` folds them in (Step 2).
 
 ### Changelog Format
 

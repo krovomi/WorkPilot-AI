@@ -165,6 +165,11 @@ npm start
 
 ## Development Setup
 
+**Dev container.** `.devcontainer/` gives the toolchain CI uses (Python 3.13, uv, Node 22, pnpm,
+and Electron's libraries with xvfb for the E2E suite) and runs `pnpm run install:all` on creation:
+open the repository with VS Code's "Reopen in Container", or in Codespaces. Run the desktop app
+itself on your machine; inside the container, use the tests and `xvfb-run -a`.
+
 The project consists of two main components:
 
 1. **Python Backend** (`apps/backend/`) - The core autonomous coding framework
@@ -228,7 +233,7 @@ Python package. `pnpm install` at the root runs `prepare`, which points git at t
 |------|-----------|--------------|
 | `pre-commit` | On **staged files only**: `ruff format` + `ruff check --fix` (Python), `biome check --write` (frontend), re-stage, secret scan (blocks the commit), then `scripts/staged-tests.js` | `PRE_COMMIT_SKIP_TESTS=1` skips the tests, not the formatters or the secret scan |
 | `commit-msg` | Conventional Commits: `type(scope)!?: description`, first line ≤ 100 characters | — |
-| `pre-push` | `scripts/pre-push.js`: ruff check + format check, `skills_cli build --check`, Biome lint | `PRE_PUSH_FULL=1` adds pytest, `tsc` and vitest; `PRE_PUSH_SKIP=1` skips everything |
+| `pre-push` | `scripts/pre-push.js`: ruff check + format check, `skills_cli build --check`, audit cards and changelog fragments, Biome lint | `PRE_PUSH_FULL=1` (or `pnpm verify`, without pushing) adds pytest, `tsc` and vitest; `PRE_PUSH_SKIP=1` skips everything |
 
 The tool versions are pinned (ruff `0.15.7`, Biome `2.5.11`): any other version produces a diff
 CI rejects. `git commit --no-verify` exists, but CI runs the same checks — it only moves the
@@ -424,7 +429,7 @@ Before submitting a PR:
 ## Continuous Integration
 
 All pull requests and pushes to `develop` and `main` trigger automated CI checks via GitHub Actions,
-whatever they touch: only `CHANGELOG.md`, `LICENSE` and the issue/PR templates are skipped.
+whatever they touch: only `LICENSE` and the issue/PR templates are skipped.
 
 ### Workflows
 
@@ -607,8 +612,10 @@ git checkout -b hotfix/critical-fix
 
 When ready to release a new version:
 
-1. On a branch from `develop`, run `node scripts/bump-version.js X.Y.Z` and add the
-   `## X.Y.Z - Title` section to `CHANGELOG.md`; merge it into `develop` by pull request.
+1. On a branch from `develop`, run `node scripts/bump-version.js X.Y.Z`, then
+   `python scripts/changelog.py release X.Y.Z "Title"`: the fragments of `changelog.d/` become the
+   `## X.Y.Z - Title` section of `CHANGELOG.md` (write its intro). Merge it into `develop` by pull
+   request.
 2. Open a pull request from `develop` to `main` and merge it with **Create a merge commit**.
    The `main` ruleset refuses squash and rebase: both would give `main` commits `develop` never
    had, and the next release would conflict.
@@ -782,6 +789,9 @@ cd apps/frontend && npm test && npm run lint && npm run typecheck
    - Public APIs
    - Configuration options
    - User-facing behavior
+
+   A user-facing change also adds a fragment to [`changelog.d/`](../changelog.d/README.md)
+   instead of editing `CHANGELOG.md`, so open PRs do not conflict on the same lines.
 
 5. **Create the Pull Request**:
    - Use a clear, descriptive title
