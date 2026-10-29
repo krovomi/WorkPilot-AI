@@ -40,7 +40,7 @@ Référence complète : [`docs/CLI-USAGE.md`](../CLI-USAGE.md).
 | Frontend | `cd apps/frontend && pnpm test` | Vitest |
 | Frontend, types | `cd apps/frontend && pnpm run typecheck` | tsc |
 | Frontend, lint | `pnpm run lint` | Biome `2.5.11` |
-| E2E | `cd apps/frontend && pnpm run test:e2e` | Playwright |
+| E2E | `cd apps/frontend && pnpm run build && pnpm run test:e2e` (Linux sans écran : `xvfb-run -a`) | Playwright |
 | Comme le hook pre-push | `PRE_PUSH_FULL=1 pnpm run test:all` | — |
 
 **Versions épinglées** : ruff `0.15.7`, Biome `2.5.11`. Toute autre version produit un diff que la
@@ -114,6 +114,10 @@ Planchers et démarrage (plan du 29 octobre 2026, lot N2) :
   `tests/test_smoke_test_wiring.py` garde ces étapes.
 - **Actions** : chaque action externe est épinglée par SHA, version en commentaire ; Dependabot
   suit aussi `.github/actions/*` (`tests/test_action_pins.py`).
+- **E2E** (lot N3) : le job `e2e` de `ci.yml` construit l'app et lance `pnpm run test:e2e` sous
+  xvfb ; `ci-complete` l'attend. Chaque spec démarre l'app par `e2e/app-harness.ts` (HOME et
+  profil jetables), aucun `test.skip`, et un test qui ne passe qu'au second essai fait échouer
+  le job (`failOnFlakyTests`). `tests/test_e2e_wiring.py` le garde.
 
 ## Livraison
 

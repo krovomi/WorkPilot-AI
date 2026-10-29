@@ -745,6 +745,9 @@ pnpm run test:backend
 
 # Suite complète (pré-push)
 pnpm run test:all
+
+# Parcours E2E dans l'app construite (Linux sans écran : xvfb-run -a)
+cd apps/frontend && pnpm run build && pnpm run test:e2e
 ```
 
 #### Vérification de l'Environnement
@@ -767,7 +770,7 @@ Les hooks sont volontairement **rapides**. La CI (`ci.yml`, `lint.yml`) rejoue l
 |-------|---------------|--------|
 | `pre-commit` | ruff + biome **sur les fichiers stagés uniquement**, scan des secrets (bloquant), puis les tests liés à ces fichiers | quelques secondes |
 | `pre-push` | ruff check, ruff format --check, biome lint | < 30 s |
-| CI | pytest, typecheck, vitest, build — sur 3 OS | — |
+| CI | pytest, typecheck, vitest, build et démarrage de l'app — sur 3 OS ; parcours E2E Playwright sous Linux | — |
 
 Le typecheck est **incrémental** (`incremental` + `tsBuildInfoFile` dans `apps/frontend/tsconfig.json`) : la première passe reste longue, les suivantes tombent à quelques secondes.
 
