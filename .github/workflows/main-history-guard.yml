@@ -1,0 +1,36 @@
+name: Main history guard
+
+# `main` receives `develop` through pull requests merged with a merge commit.
+# A squash or a rebase writes new commits on `main` that `develop` never had:
+# the two branches stop sharing history, GitHub counts hundreds of commits
+# "behind", and the next `develop -> main` pull request conflicts on files
+# both sides changed the same way (package.json, CHANGELOG.md). That happened
+# for 1.3.0 to 1.3.3 (#470, #530, #540, #546, #548).
+#
+# The `main` ruleset should allow the "Merge" method only (docs/RELEASE.md).
+# This job is the alarm for when it does not: it turns the push red and says
+# how to repair the history before the next release.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  merge-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check that main moved by a merge commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        run: |
+          parents=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${SHA}" --jq '.parents | length')
+          echo "${SHA} has ${parents} parent(s)."
+          if [ "$parents" -ge 2 ]; then
+            exit 0
+          fi
+          echo "::error title=main moved without a merge commit::${SHA} has a single parent: the pull request was squashed or rebased. main and develop no longer share this history, and the next develop -> main pull request may conflict. Repair it now: see 'main and develop have diverged' in docs/RELEASE.md, and set the main ruleset to allow the Merge method only."
+          exit 1

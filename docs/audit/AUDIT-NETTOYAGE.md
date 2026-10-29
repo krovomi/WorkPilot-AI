@@ -2501,6 +2501,24 @@ chaque provider, lue le 26 octobre 2026 (xAI « Reasoning », DeepSeek « Thinki
 - **Garde-fou** : `src/main/claude-profile/credential-utils.test.ts` (choix du jeton le plus frais,
   égalité, magasin vide).
 
+#### F117 · Les releases arrivaient sur `main` en squash : `main` et `develop` divergeaient
+
+- **Sévérité** moyenne · **nouveau** · **corrigé par #549 (historique) et la PR « commits de merge
+  vers main »**
+- **Preuve** (avant) : 1.3.0 à 1.3.3 (#470, #530, #540, #546) et la PR de réalignement #548 ont
+  été fusionnées en squash. Chaque squash écrit sur `main` un commit que `develop` n'a pas :
+  GitHub comptait `main` « 460 commits behind », chaque PR `develop` → `main` conflictait sur
+  `package.json` et `CHANGELOG.md`, et il fallait une PR de réconciliation par version. Le ruleset
+  de `main` autorisait merge, squash et rebase ; `release.yml` portait le README vers `main` par un
+  second commit, fusionné en `--squash`.
+- **Correction** : ruleset de `main` limité à « Merge » (réglage manuel, l'API d'écriture est
+  refusée à la session) ; le README de la release est un seul commit, bâti sur `main`, fusionné dans
+  `develop` et porté vers `main` par une PR en `--merge` ; `docs/RELEASE.md` décrit le modèle, la
+  réparation (`merge -s ours`) et le hotfix.
+- **Garde-fou** : `main-history-guard.yml` (un push sur `main` dont le commit n'a qu'un parent est
+  rouge) ; `tests/test_release_merge_commits.py` (aucun `--squash` ni `--rebase` dans les workflows
+  de release, README partagé entre les deux branches).
+
 ---
 
 ## Annexe A — Inventaire des fichiers candidats
@@ -2655,7 +2673,7 @@ planchers `pnpm.overrides` relevés (`pnpm-workspace.yaml`), `dompurify` ^3.4.17
 
 Statut des constats de l'audit précédent : F1, F3, F4, F5, F7, F8, F9, F10, F12, F16, F17, F19 **ouverts** ;
 F2, F13 **partiels** ; F6, F11, F14, F18 **aggravés** ; F15 **atténué**. Nouveaux : F20 à F36.
-Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F57 à F62 par M2, F63 à F68 par M3, F69 à F71 par M4, F78 à F84 par M5, F85 à F90 par M6, F91 à F94 par M7, F95 à F100 par M8, F72 à F77 par M9, F101 à F106 par M10, F107 à F112 par M11 (annexe F) ; F113 (CodeQL de la release 1.3.1) par #531 ; F114 (démarrage du main, 1.3.1) par #536 ; F115 (pages du wiki écrites à la main) par le mécanisme `scripts/wiki/patches/` ; F116 (boucle de reconnexion Claude sous Linux) par #543.
+Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16 ; F52 à F56 relevés par l'audit du 17 octobre et corrigés par M1, F57 à F62 par M2, F63 à F68 par M3, F69 à F71 par M4, F78 à F84 par M5, F85 à F90 par M6, F91 à F94 par M7, F95 à F100 par M8, F72 à F77 par M9, F101 à F106 par M10, F107 à F112 par M11 (annexe F) ; F113 (CodeQL de la release 1.3.1) par #531 ; F114 (démarrage du main, 1.3.1) par #536 ; F115 (pages du wiki écrites à la main) par le mécanisme `scripts/wiki/patches/` ; F116 (boucle de reconnexion Claude sous Linux) par #543 ; F117 (releases en squash vers `main`) par #549 et la PR des commits de merge vers `main`.
 
 ## Annexe C — Ce qui a changé le 15 octobre 2026 (`7ef6fca` → `e3e468f` + PR #454)
 
