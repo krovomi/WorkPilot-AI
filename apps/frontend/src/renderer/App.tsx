@@ -572,11 +572,6 @@ export function App() {
 	const claudeProfiles = useClaudeProfileStore((state) => state.profiles);
 
 	// Initialize dialog state
-	const [_showInitDialog, setShowInitDialog] = useState(false);
-	const [_pendingProject, setPendingProject] = useState<Project | null>(null);
-	const [isInitializing, _setIsInitializing] = useState(false);
-	const [initSuccess, setInitSuccess] = useState(false);
-	const [_initError, setInitError] = useState<string | null>(null);
 	const [showAddProjectModal, setShowAddProjectModal] = useState(false);
 
 	// GitHub setup state (shown after WorkPilot AI init)
@@ -611,6 +606,17 @@ export function App() {
 	const [settingsProjectId, setSettingsProjectId] = useState<string | null>(
 		null,
 	);
+	// The gear on a project tab opens *that project's* settings — the "Projet"
+	// pane of the settings dialog, scoped to the tab's own project — not the
+	// global WorkPilot preferences the sidebar gear opens. It is also where a
+	// project that has no `.workpilot/` yet is initialized (with the git
+	// repairs that may need), so adding such a project lands there.
+	const openProjectSettings = useCallback((projectId: string) => {
+		setSettingsProjectId(projectId);
+		setSettingsInitialSection(undefined);
+		setSettingsInitialProjectSection("general");
+		setIsSettingsDialogOpen(true);
+	}, []);
 	const [activeView, setActiveView] = useState<SidebarView>("kanban");
 	const [hasRestoredView, setHasRestoredView] = useState(false);
 	const isRestoringView = useRef(false);
@@ -1127,27 +1133,6 @@ export function App() {
 		};
 	}, []);
 
-	// Reset init success flag when a selected project changes
-	// This allows the init dialog to show for new/different projects
-	useEffect(() => {
-		setInitSuccess(false);
-		setInitError(null);
-	}, []);
-
-	// Check if a selected project needs initialization (e.g., .workpilot folder was deleted)
-	useEffect(() => {
-		// Don't show dialog while initialization is in progress
-		if (isInitializing) return;
-
-		// Don't reopen dialog after successful initialization
-		// (project update with autoBuildPath may not have propagated yet)
-		if (initSuccess) return;
-
-		if (selectedProject && !selectedProject.autoBuildPath) {
-			// Project exists but isn't initialized - show init dialog
-		}
-	}, [selectedProject, isInitializing, initSuccess]);
-
 	// Global keyboard shortcut: Cmd/Ctrl+T to add project (when not on terminals view)
 	useEffect(() => {
 		const handleKeyDown = async (e: KeyboardEvent) => {
@@ -1182,10 +1167,7 @@ export function App() {
 						if (project) {
 							openProjectTab(project.id);
 							if (!project.autoBuildPath) {
-								setPendingProject(project);
-								setInitError(null);
-								setInitSuccess(false);
-								setShowInitDialog(true);
+								openProjectSettings(project.id);
 							}
 						}
 					}
@@ -1197,7 +1179,7 @@ export function App() {
 
 		globalThis.addEventListener("keydown", handleKeyDown);
 		return () => globalThis.removeEventListener("keydown", handleKeyDown);
-	}, [activeView, openProjectTab, toast]);
+	}, [activeView, openProjectTab, openProjectSettings, toast]);
 
 	// Load tasks when project changes
 	useEffect(() => {
@@ -1451,15 +1433,11 @@ export function App() {
 
 	const handleProjectAdded = async (project: Project, needsInit: boolean) => {
 		openProjectTab(project.id);
-		// Si le projet a déjà une description et un provider, il est déjà initialisé
-		const alreadyInitialized = !!(
-			project.settings?.description && project.settings?.provider
-		);
-		if (needsInit && !alreadyInitialized) {
-			setPendingProject(project);
-			setInitError(null);
-			setInitSuccess(false);
-			setShowInitDialog(true);
+		// `autoBuildPath` is what the sidebar and the task dialog check: without
+		// it no task can be created. The add-project modal passes
+		// `needsInit: false` for an existing folder, so the flag alone missed it.
+		if (needsInit || !project.autoBuildPath) {
+			openProjectSettings(project.id);
 			return;
 		}
 		try {
@@ -1500,15 +1478,7 @@ export function App() {
 		renameProject(projectId, name);
 	};
 
-	// The gear on a project tab opens *that project's* settings — the "Projet"
-	// pane of the settings dialog, scoped to the tab's own project — not the
-	// global WorkPilot preferences the sidebar gear opens.
-	const handleProjectTabSettingsClick = (projectId: string) => {
-		setSettingsProjectId(projectId);
-		setSettingsInitialSection(undefined);
-		setSettingsInitialProjectSection("general");
-		setIsSettingsDialogOpen(true);
-	};
+	const handleProjectTabSettingsClick = openProjectSettings;
 
 	// Handle confirm remove project
 	const handleConfirmRemoveProject = () => {
@@ -1677,6 +1647,7 @@ export function App() {
 							{/* Sidebar */}
 							<Sidebar
 								onSettingsClick={() => setIsSettingsDialogOpen(true)}
+								onInitializeProject={openProjectSettings}
 								onNewTaskClick={() => setIsNewTaskDialogOpen(true)}
 								activeView={activeView}
 								onViewChange={handleViewChange}
