@@ -83,9 +83,14 @@ updates:
     commit-message:
       prefix: "chore(deps)"
 
-  # GitHub Actions
+  # GitHub Actions. Every external action is pinned by commit SHA with its
+  # version in a comment (tests/test_action_pins.py); Dependabot bumps both.
+  # `directory: /` alone only reads .github/workflows: the composite actions
+  # under .github/actions/ are listed too, or their pins would never move.
   - package-ecosystem: github-actions
-    directory: /
+    directories:
+      - /
+      - /.github/actions/*
     schedule:
       interval: weekly
     open-pull-requests-limit: 5

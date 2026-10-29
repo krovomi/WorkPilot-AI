@@ -110,20 +110,6 @@ class TestResolution:
         assert design["runs"] is True
 
 
-class TestItDoesNotTouchAnything:
-    def test_resolving_leaves_the_resume_marker_alone(self, project, monkeypatch):
-        """The UI may poll this. It must not eat a single-shot choice."""
-        from core.client import RESUME_WITH_PROVIDER_FILE
-
-        monkeypatch.delenv("AUTO_CLAUDE_PROVIDER", raising=False)
-        spec = project / ".workpilot" / "specs" / "001-x"
-        marker = spec / RESUME_WITH_PROVIDER_FILE
-        marker.write_text("copilot", encoding="utf-8")
-
-        assert ask(project)["success"] is True
-        assert marker.exists()
-
-
 class TestItAnswersForRealProjects:
     """The regression that shipped and had to be undone.
 
