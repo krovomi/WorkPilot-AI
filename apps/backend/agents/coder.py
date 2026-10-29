@@ -1325,9 +1325,8 @@ async def _coding_prompt(
     # (provider, effort) pair benefits from inlining. Claude agents
     # and high-effort runs re-read files via tools anyway, so inline
     # content there is duplicated input paid on every turn.
-    # Provider resolved WITHOUT side effects (get_phase_provider) —
-    # _get_active_provider would consume the RESUME_WITH_PROVIDER
-    # marker before create_agent_client gets to read it.
+    # Provider of this phase (get_phase_provider), which a per-phase
+    # override can set apart from the task-wide one.
     inline_provider = phase_provider or get_phase_provider(
         spec_dir, phase=current_phase
     )
@@ -2234,10 +2233,11 @@ async def run_autonomous_agent(
                     success=True,
                     message=f"Paused by user during {paused_phase}",
                 )
-            # A provider switch made while paused is applied by the
-            # RESUME_WITH_PROVIDER marker that `core.client` consumes on the
-            # next session, not here: this branch stops the build, so anything
-            # it assigned to `model` was read by nobody.
+            # A provider switch made while paused is applied by
+            # TASK_RESUME_WITH_PROVIDER, which records the engine in
+            # task_metadata.json for the next session, not here: this branch
+            # stops the build, so anything it assigned to `model` was read by
+            # nobody.
             #
             # Unwinds to handle_build_command, which skips QA and finalization.
             # A bare `return` here let the build carry on to QA and finalize a

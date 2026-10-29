@@ -21,14 +21,14 @@ runs:
   steps:
     # 1. Détection automatique de la version de pnpm depuis le package.json (évite les conflits)
     - name: Setup pnpm
-      uses: pnpm/action-setup@v4
+      uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
       with:
         run_install: false
 
     # 2. Configuration de Node.js et activation du cache pnpm natif
     - name: Setup Node.js ${{ inputs.node-version }}
       id: cache-pnpm
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
       with:
         node-version: ${{ inputs.node-version }}
         cache: 'pnpm'
