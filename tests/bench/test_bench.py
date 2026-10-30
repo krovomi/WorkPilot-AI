@@ -469,6 +469,16 @@ def test_formula_lab_and_router_read_the_table(project):
     assert scores(worktree) == scores(project)
 
 
+def test_a_record_keeps_the_kind_of_its_card(project):
+    manifest = _prepare(project, [ENGINE_B])
+    assert manifest["cases"][0]["kind"] == "feature"
+    _agent_writes(manifest, "b1", CALC_TARGET)
+    judge_build(project, manifest["runId"], "b1", "ended", 0)
+    data = json.loads(results_path(project).read_text(encoding="utf-8"))
+    assert [r["kind"] for r in data["records"]] == ["feature"]
+    assert scores(project, "feature") == scores(project)
+
+
 # --------------------------------------------------------------------------
 # requests
 

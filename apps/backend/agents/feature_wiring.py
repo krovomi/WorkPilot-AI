@@ -47,14 +47,28 @@ def _is_truthy(value: str | None) -> bool:
 # Model Router suggestion
 
 
-def _bench_scores(project_dir: Path | None) -> dict:
+def card_kind(spec_dir: Path | None) -> str | None:
+    """The card's kind (``task_metadata.json``), which the bench reads per kind."""
+    if spec_dir is None:
+        return None
+    try:
+        data = json.loads(
+            (Path(spec_dir) / "task_metadata.json").read_text(encoding="utf-8")
+        )
+    except (OSError, ValueError):
+        return None
+    kind = data.get("kind") if isinstance(data, dict) else None
+    return kind if isinstance(kind, str) else None
+
+
+def _bench_scores(project_dir: Path | None, kind: str | None = None) -> dict:
     """The repo bench's per-model scores for the project, or none."""
     if project_dir is None:
         return {}
     try:
         from bench import scores
 
-        return scores(Path(project_dir))
+        return scores(Path(project_dir), kind)
     except Exception as exc:  # noqa: BLE001
         logger.debug("bench scores unavailable: %s", exc)
         return {}
@@ -66,6 +80,7 @@ def suggest_routed_model(
     task_hint: str | None = None,
     available_providers: list[str] | None = None,
     project_dir: Path | None = None,
+    kind: str | None = None,
 ) -> dict[str, Any] | None:
     """Ask the ModelRouter for a cheaper/cheapest acceptable model.
 
@@ -76,7 +91,8 @@ def suggest_routed_model(
     user's UI choice + log divergence to the audit trail).
 
     With ``project_dir``, the project's repo bench results take part: a model
-    the bench saw fail is passed over (``model_router.router``).
+    the bench saw fail is passed over (``model_router.router``), judged on the
+    cards of ``kind`` when the bench has enough of them.
     """
     try:
         from model_router import ModelRouter
@@ -85,7 +101,8 @@ def suggest_routed_model(
 
     try:
         router = ModelRouter(
-            available=available_providers, bench_scores=_bench_scores(project_dir)
+            available=available_providers,
+            bench_scores=_bench_scores(project_dir, kind),
         )
         choice = router.route(prompt=prompt, hint=task_hint)
         return {
@@ -183,6 +200,7 @@ def apply_router_override(
         available_providers=available_providers,
         # <project>/.workpilot/specs/<spec>
         project_dir=Path(spec_dir).parent.parent.parent if spec_dir else None,
+        kind=card_kind(spec_dir),
     )
     if not suggestion:
         return current_model, None

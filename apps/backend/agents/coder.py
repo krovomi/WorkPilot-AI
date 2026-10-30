@@ -18,6 +18,7 @@ from pathlib import Path
 from agents.agent_audit import audit_decision, audit_event
 from agents.feature_wiring import (
     apply_router_override,
+    card_kind,
     cognitive_context_enabled,
     load_domain_addendum,
     suggest_routed_model,
@@ -1893,6 +1894,7 @@ async def run_autonomous_agent(
                 prompt=f"coder run on spec {spec_dir.name}",
                 task_hint=jev_hint or "coding",
                 project_dir=project_dir,
+                kind=card_kind(spec_dir),
             )
             if suggestion and suggestion["model"] != model:
                 audit_decision(
