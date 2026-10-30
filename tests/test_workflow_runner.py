@@ -78,6 +78,7 @@ class TestPhaseWindows:
             "analyze",
             "ui-design-system",
             "mobile-design",
+            "spec-by-example",
         ]
         # `design-check` sits between `coding` and `qa` in the file and is
         # absent here on purpose: `gates.run_deterministic_gates` runs it.
@@ -209,8 +210,9 @@ class TestPhaseWindows:
         post = phases_between(profile, after="qa", before=None)
         assert pre == []
         # `analyze` is bought at medium; `ui-design-system` runs no model, so
-        # no effort level has anything to save by dropping it.
-        assert [r.id for r in planned] == ["ui-design-system"]
+        # no effort level has anything to save by dropping it. The tests
+        # written first are switched on by the project, not by the effort.
+        assert [r.id for r in planned] == ["ui-design-system", "spec-by-example"]
         # `verify` is a hard gate: never pruned, at any level. It runs before
         # QA so the reviewer judges code already seen running.
         assert [r.id for r in mid] == ["verify"]
