@@ -94,5 +94,5 @@ Un `biome-ignore` de plus dans un fichier est refusé : `tests/baselines/biome-i
 chaque fichier à son compte du 30 octobre 2026 (`python scripts/quality_baselines.py`, depuis la
 racine ; `update` ne fait que baisser). Typer la valeur plutôt que taire la règle. De même, un
 fichier de plus de 2 000 lignes ne grossit plus (`tests/baselines/file-size.json`, voir
-[`backend.md`](backend.md)) : `KanbanBoard.tsx` ou `execution-handlers.ts` reçoivent un import,
+[`backend.md`](backend.md)) : `KanbanBoard.tsx` ou `usage-monitor.ts` reçoivent un import,
 pas une fonction de plus.

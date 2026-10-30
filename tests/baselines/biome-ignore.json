@@ -50,7 +50,7 @@
   "apps/frontend/src/main/ipc-handlers/task/__tests__/duplicate-task.test.ts": 1,
   "apps/frontend/src/main/ipc-handlers/task/__tests__/interrupted-runs.test.ts": 6,
   "apps/frontend/src/main/ipc-handlers/task/__tests__/logs-integration.test.ts": 1,
-  "apps/frontend/src/main/ipc-handlers/task/execution-handlers.ts": 4,
+  "apps/frontend/src/main/ipc-handlers/task/execution-recovery-handlers.ts": 4,
   "apps/frontend/src/main/ipc-handlers/task/resume-task.ts": 4,
   "apps/frontend/src/main/ipc-handlers/task/worktree-merge-handlers.ts": 1,
   "apps/frontend/src/main/ipc-handlers/utils.ts": 1,

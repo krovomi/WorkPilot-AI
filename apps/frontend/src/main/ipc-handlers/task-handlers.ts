@@ -6,7 +6,8 @@
  * organized by responsibility:
  *
  * - task/crud-handlers.ts - Create, Read, Update, Delete operations
- * - task/execution-handlers.ts - Start, Stop, Review, Status management, Recovery
+ * - task/execution-handlers.ts - Start, Stop, Pause, Plan; registering the execution-review,
+ *   -status, -resume and -recovery modules
  * - task/worktree-handlers.ts - Worktree management (status, discard, list), registering
  *   the worktree-diff, -merge, -file, -create-pr and -visual-proof modules
  * - task/logs-handlers.ts - Task logs management (get, watch, unwatch)

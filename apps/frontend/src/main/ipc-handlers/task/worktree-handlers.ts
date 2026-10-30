@@ -259,8 +259,6 @@ export function registerWorktreeHandlers(
 		},
 	);
 
-
-
 	/**
 	 * Discard the worktree changes
 	 * Per-spec architecture: Each spec has its own worktree at .workpilot/worktrees/tasks/{spec-name}/
@@ -664,7 +662,6 @@ export function registerWorktreeHandlers(
 		},
 	);
 
-
 	/**
 	 * Open a worktree directory in the specified IDE
 	 */
@@ -858,8 +855,6 @@ export function registerWorktreeHandlers(
 			}
 		},
 	);
-
-
 
 	/**
 	 * Preview the PR body + impact analysis WITHOUT pushing or creating a PR.

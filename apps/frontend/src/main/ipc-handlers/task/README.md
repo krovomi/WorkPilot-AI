@@ -9,7 +9,12 @@ This directory contains the refactored task-related IPC handlers, previously con
 | Module | Lines | Responsibility |
 |--------|-------|----------------|
 | `crud-handlers.ts` | ~428 | Task CRUD operations (Create, Read, Update, Delete, List) |
-| `execution-handlers.ts` | ~553 | Task execution lifecycle (Start, Stop, Review, Status, Recovery) |
+| `execution-handlers.ts` | ~500 | Task execution lifecycle (Start, Resume session, Stop, Check running, Plan, Pause); registers the groups below |
+| `execution-review-handlers.ts` | ~400 | Review a task (approve, reject with feedback) |
+| `execution-status-handlers.ts` | ~640 | Manual status change |
+| `execution-resume-handlers.ts` | ~670 | Resume paused, resume with another provider, rerun a phase, hot swap, reset conversation |
+| `execution-recovery-handlers.ts` | ~570 | Recover a stuck task (and restart it) |
+| `execution-utils.ts` | ~500 | Helpers shared by the execution modules, `ExecutionHandlerContext` |
 | `worktree-handlers.ts` | ~1 200 | Git worktree management (Status, Discard, List, IDE/terminal, impact, sync); registers the groups below |
 | `worktree-diff-handlers.ts` | ~500 | Worktree diff and single-file diff |
 | `worktree-merge-handlers.ts` | ~1 150 | Merge into the base branch, merge preview |
@@ -40,7 +45,7 @@ Features:
 - Creates spec directories with proper structure
 - Updates implementation plans and requirements
 
-### Execution Handlers (`execution-handlers.ts`)
+### Execution Handlers (`execution-*.ts`)
 Manages task execution lifecycle:
 - **TASK_START** - Start task execution (spec creation or implementation)
 - **TASK_STOP** - Stop running task

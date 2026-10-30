@@ -10,7 +10,6 @@
   "apps/frontend/src/main/cli-tool-manager.ts": 2856,
   "apps/frontend/src/main/ipc-handlers/claude-code-handlers.ts": 2753,
   "apps/frontend/src/main/ipc-handlers/github/pr-handlers.ts": 2438,
-  "apps/frontend/src/main/ipc-handlers/task/execution-handlers.ts": 3092,
   "apps/frontend/src/main/services/credential-manager.ts": 2478,
   "apps/frontend/src/main/terminal/claude-integration-handler.ts": 2079,
   "apps/frontend/src/main/visual-proof-service.ts": 2711,
