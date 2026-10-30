@@ -1813,7 +1813,8 @@
 			"mobile": "Appareils",
 			"screenshots": "Captures",
 			"scenario": "Scénario (rejoué après la QA)",
-			"findings": "Constats"
+			"findings": "Constats",
+			"cardScenario": "Scénario écrit sur la carte"
 		},
 		"kind": {
 			"web-frontend": "front web",
@@ -1866,11 +1867,26 @@
 			"hint": "Lancer l'application après le code, corriger ce qui casse, l'amener jusqu'au changement et la mesurer (trace Chrome DevTools, captures).",
 			"windowLabel": "Fenêtre à vérifier (apps Windows)",
 			"windowPlaceholder": "Une partie de son titre, ex. Commandes",
-			"windowHint": "WPF, WinForms ou WinUI : seule cette fenêtre de l'app lancée est lue et pilotée, jamais le reste du bureau. Vide : la fenêtre principale de l'app."
+			"windowHint": "WPF, WinForms ou WinUI : seule cette fenêtre de l'app lancée est lue et pilotée, jamais le reste du bureau. Vide : la fenêtre principale de l'app.",
+			"scenarioLabel": "Scénario à vérifier (apps web)",
+			"scenarioPlaceholder": "Une étape par ligne, ex.\n1. Ouvrir la page des commandes\n2. Cliquer sur Enregistrer\n3. Le message dit Enregistré",
+			"scenarioHint": "La vérification suit ces étapes dans le navigateur, prend une capture après chacune et garde une trace Playwright. Une étape non réalisée n'est jamais un succès. Vide : le vérificateur choisit ses propres clics."
 		},
 		"cardBadge": {
 			"pass": "Vérifié",
 			"fail": "Vérif. en échec"
+		},
+		"step": {
+			"pass": "réussie",
+			"fail": "échouée",
+			"blocked": "bloquée",
+			"missing": "non rapportée"
+		},
+		"stepCapture": "Capture après l'étape {{number}}",
+		"trace": {
+			"download": "Télécharger la trace Playwright",
+			"hint": "et l'ouvrir sur trace.playwright.dev ou avec npx playwright show-trace.",
+			"none": "Pas de trace Playwright : Playwright n'a pas piloté cette session."
 		}
 	},
 	"qaUnverified": {

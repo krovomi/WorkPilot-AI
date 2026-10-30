@@ -45,9 +45,10 @@ apps/backend/verify/
   mcp_server.py the same tools over stdio MCP (runners/verify_mcp.py)
   loop.py       launch -> errors -> fixer, bounded by progress; then the verifier session; then evidence
   replay.py     the verify-replay phase: the recorded scenario and endpoints, without a model
+  scenario.py   the card's own scenario (verifyScenario): steps, verifier instructions, verdict
   record.py     <spec_dir>/verify/verify.json, report.md, events.jsonl; the computed status
   learn.py      launch recipe, perf baseline, brain note, gotchas
-  api.py        GET /api/verify/, GET /api/verify/screenshot, POST /api/verify/run
+  api.py        GET /api/verify/, GET /api/verify/screenshot, GET /api/verify/trace, POST /api/verify/run
 ```
 
 **Python does the deterministic half, for every provider.** Launching,
@@ -117,6 +118,42 @@ drives them through the accessibility tree Windows keeps for every window.
 - *After QA.* Window steps (`window_click`, `window_fill`…) are replayed like
   browser steps: the element is found again by its AutomationId, else by its
   type and name.
+
+**A web change can be verified by the card's own scenario.** Plan of 29
+October, IA8, the web counterpart of the Windows window above. Without it the
+verifier picks its own clicks to reach the changed state; with it, the person
+says which steps prove the change.
+
+- *Where it is written.* `verifyScenario` in `task_metadata.json`, set in the
+  card's form under the verification loop: plain language, one step per line
+  (`1.`, `-`, `[ ]` markers are dropped). `verify/scenario.py` reads it,
+  bounded (20 steps of 300 characters), control characters removed.
+- *How it is followed.* The verifier's prompt lists the steps and asks, after
+  each, for a capture (`verify_screenshot`) and a report
+  (`verify_record kind=scenario_step`, `step`, `outcome` pass | fail |
+  blocked, `note`). The step number and the outcome are checked against the
+  card's scenario and a closed list; a capture is kept only if this
+  verification took it, under its own `screenshots/`. The steps say what to
+  check, never what the tools may do: URLs stay on the launched app.
+- *Playwright, and its trace.* A card with a scenario puts Playwright first
+  (`VERIFY_BROWSER=auto`), with its trace recording captures and DOM
+  snapshots per action. The trace is written when the verifier records its
+  verdict (the session may be stopped without a goodbye), else when the
+  browser closes, as `verify/scenario-trace.zip`. Only the toolbox through
+  which steps were reported keeps it: on the Claude path the verifier drives
+  the `workpilot-verify` server's browser, and the loop's own browser (launch
+  errors, evidence) drops its trace instead of overwriting that one. Chrome
+  DevTools MCP has no such trace: when only it can start, the record says
+  there is none.
+- *The verdict.* A failed step fails the verification. A scenario not carried
+  out in full (a step blocked or never reported, no verifier session at effort
+  `low`) cannot pass: it is `unknown`, with the count of steps that passed.
+  When a step is reported twice, the last report stands.
+- *Where it shows.* `report.md` and QA's `verify_section` list each step with
+  its outcome; the *Verification* tab shows each step with its note and
+  capture, and a link to the trace (`GET /api/verify/trace`, the one the
+  record names, inside the spec, opened by the OS browser), to open at
+  trace.playwright.dev or with `npx playwright show-trace`.
 
 **The loop is bounded by progress, not by a round count.** Errors after a
 launch are written to `VERIFY_FIX_REQUEST.md` and handed to a fixer session on

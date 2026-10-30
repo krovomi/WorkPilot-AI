@@ -57,6 +57,19 @@ def verify_section(spec_dir: Path | str | None) -> str:
         lines.append(
             f"- Confirmed state: {str(item.get('state'))[:200]} (evidence: {str(item.get('evidence'))[:160]})"
         )
+    requested = record.get("scenario_requested") or []
+    if requested:
+        reported = {
+            item.get("step"): item.get("outcome")
+            for item in record.get("scenario_steps") or []
+        }
+        lines.append(f"- Scenario written on the card ({len(requested)} steps):")
+        for number, step in enumerate(requested, start=1):
+            lines.append(
+                f"  {number}. {step[:160]} — {reported.get(number) or 'not reported'}"
+            )
+        if record.get("trace"):
+            lines.append(f"  Playwright trace: `{record['trace']}`")
     endpoints = record.get("endpoints") or []
     failed = [
         e
@@ -86,7 +99,7 @@ def verify_section(spec_dir: Path | str | None) -> str:
         f"`{Path(spec_dir) / 'verify' / 'screenshots'}` and `captures/task/`.",
         "",
         "How to use it:",
-        "- `fail` → report each remaining error / failed endpoint as at least a HIGH finding.",
+        "- `fail` → report each remaining error / failed endpoint / failed scenario step as at least a HIGH finding.",
         "- `unknown` → write that the change was **not verified on a running app**, and why; never count it as a pass.",
         "- `pass` → you may cite it as runtime evidence; it does not replace reading the diff.",
     ]

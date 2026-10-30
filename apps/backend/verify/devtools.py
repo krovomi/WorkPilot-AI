@@ -16,6 +16,12 @@ the network list — so one parser reads both and the model sees one dialect.
 Neither available is an answer (`unavailable`, with the reasons), never a
 guess.
 
+A card with a written scenario (`verify.scenario`) asks for a replayable
+proof: the session is then Playwright first, with its trace recording
+(captures and DOM snapshots per action) until `save_trace` writes it. Chrome
+DevTools MCP has no such trace, so it is only the fallback there, and the
+record says the trace is missing.
+
 Three switches are always on for the MCP server, and they are not cosmetic:
 `--isolated` (a throwaway profile, never the user's), `--no-usage-statistics`
 and `--no-performance-crux` — the trace of a developer's local page has no
@@ -148,8 +154,11 @@ class BrowserSession:
         chrome_path: str = "",
         browser_url: str = "",
         prefer: str = "auto",
+        trace_path: Path | None = None,
     ):
         self.base = base
+        self.trace_path = trace_path
+        self._tracing = False
         self.project_dir = project_dir
         self.chrome_path = chrome_path
         self.browser_url = browser_url
@@ -185,7 +194,13 @@ class BrowserSession:
         order = {
             "devtools": ("devtools",),
             "playwright": ("playwright",),
-        }.get(self.prefer, ("devtools", "playwright"))
+        }.get(
+            self.prefer,
+            # A trace is asked for: only Playwright keeps one.
+            ("playwright", "devtools")
+            if self.trace_path
+            else ("devtools", "playwright"),
+        )
         for engine in order:
             try:
                 ok = await (
@@ -278,7 +293,38 @@ class BrowserSession:
             self._pw = None
             return False
         self._wire_page(self._page)
+        if self.trace_path is not None:
+            from playwright.async_api import Error as PlaywrightError
+
+            try:
+                await self._context.tracing.start(
+                    screenshots=True, snapshots=True, sources=False
+                )
+                self._tracing = True
+            except PlaywrightError as exc:  # the trace is proof, not the session
+                self.reasons.append(f"playwright: no trace ({exc})")
         return True
+
+    async def save_trace(self, keep: bool = True) -> Path | None:
+        """Stop the scenario's trace and write it (or drop it, ``keep=False``).
+
+        None when nothing was traced or written.
+        """
+        if not self._tracing or self._context is None or self.trace_path is None:
+            return None
+        self._tracing = False
+        from playwright.async_api import Error as PlaywrightError
+
+        try:
+            if not keep:
+                await self._context.tracing.stop()
+                return None
+            self.trace_path.parent.mkdir(parents=True, exist_ok=True)
+            await self._context.tracing.stop(path=str(self.trace_path))
+        except (PlaywrightError, OSError) as exc:
+            self.reasons.append(f"playwright: the trace could not be written ({exc})")
+            return None
+        return self.trace_path if self.trace_path.is_file() else None
 
     def _wire_page(self, page) -> None:
         page.on("console", lambda msg: self._console.append((msg.type, msg.text)))
@@ -303,6 +349,8 @@ class BrowserSession:
             await self._mcp.aclose()
             self._mcp = None
         if self._pw is not None:
+            # A session closed before its verdict still leaves its trace.
+            await self.save_trace()
             try:
                 if self._browser is not None and not self.browser_url:
                     await self._browser.close()

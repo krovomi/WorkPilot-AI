@@ -54,6 +54,32 @@ describe("VerifyLoopFields", () => {
 		expect(screen.queryByLabelText("tasks:verify.form.windowLabel")).toBeNull();
 	});
 
+	it("takes the scenario of a web app, one step per line, while the loop is on", () => {
+		const onVerifyScenarioChange = vi.fn();
+		const { rerender } = render(
+			<VerifyLoopFields
+				verifyLoop
+				onVerifyLoopChange={vi.fn()}
+				verifyScenario={"1. Open orders"}
+				onVerifyScenarioChange={onVerifyScenarioChange}
+			/>,
+		);
+		const field = screen.getByLabelText("tasks:verify.form.scenarioLabel");
+		expect(field).toHaveValue("1. Open orders");
+		expect(field).toHaveAttribute("maxLength", "4000");
+		fireEvent.change(field, { target: { value: "1. Open orders\n2. Click Save" } });
+		expect(onVerifyScenarioChange).toHaveBeenCalledWith("1. Open orders\n2. Click Save");
+		rerender(
+			<VerifyLoopFields
+				verifyLoop={false}
+				onVerifyLoopChange={vi.fn()}
+				verifyScenario={"1. Open orders"}
+				onVerifyScenarioChange={onVerifyScenarioChange}
+			/>,
+		);
+		expect(screen.queryByLabelText("tasks:verify.form.scenarioLabel")).toBeNull();
+	});
+
 	it("turns the loop off", () => {
 		const onVerifyLoopChange = vi.fn();
 		render(<VerifyLoopFields verifyLoop onVerifyLoopChange={onVerifyLoopChange} />);

@@ -14,7 +14,8 @@ which server mode refuses outright — a desktop feature until a
 `project_id`-addressed endpoint exists.
 
 `GET /api/verify/screenshot` serves one screenshot the record names — never a
-path from the request.
+path from the request. `GET /api/verify/trace` serves the Playwright trace of
+the card's scenario the same way: the one the record names, inside the spec.
 """
 
 from __future__ import annotations
@@ -32,6 +33,7 @@ from foundation.api_safety import (
 from pydantic import BaseModel
 
 from .record import load_record
+from .scenario import TRACE_FILE
 from .settings import load_settings
 
 logger = logging.getLogger(__name__)
@@ -107,6 +109,24 @@ def _latest(spec_dir: Path) -> tuple[dict | None, Path]:
 def _public(record: dict, where: Path) -> dict:
     """The record without filesystem paths: screenshots become indices."""
     out = {k: v for k, v in record.items() if k not in ("agent",)}
+    shot_index = {
+        str(s.get("path") or ""): i
+        for i, s in enumerate(record.get("screenshots") or [])
+    }
+    out["scenario_steps"] = [
+        {
+            **{k: v for k, v in step.items() if k != "screenshot"},
+            **(
+                {"screenshotIndex": shot_index[str(step["screenshot"])]}
+                if str(step.get("screenshot") or "") in shot_index
+                else {}
+            ),
+        }
+        for step in record.get("scenario_steps") or []
+        if isinstance(step, dict)
+    ]
+    # Whether there is a trace to download, not where it lives.
+    out["trace"] = bool(record.get("trace"))
     out["screenshots"] = [
         {
             "index": i,
@@ -178,6 +198,37 @@ def verify_screenshot(
         )
     return FileResponse(
         real, media_type="image/png" if real.suffix.lower() == ".png" else "image/jpeg"
+    )
+
+
+@router.get("/trace")
+def verify_trace(
+    spec_dir: str | None = Query(None),
+    project_dir: str | None = Query(None),
+    spec_id: str | None = Query(None),
+):
+    resolved, error = _resolve(spec_dir, project_dir, spec_id)
+    if error:
+        return JSONResponse(error, status_code=400)
+    record, _where = _latest(resolved)
+    path = Path(str((record or {}).get("trace") or ""))
+    try:
+        if not (record or {}).get("trace"):
+            raise ValueError("no trace")
+        real = path.resolve(strict=True)
+        allowed = [copy.resolve() for copy in _spec_copies(resolved)]
+        if not any(real.is_relative_to(root) for root in allowed) or path.is_symlink():
+            raise ValueError("outside the spec")
+        if real.name != TRACE_FILE:
+            raise ValueError("not the scenario's trace")
+    except (OSError, ValueError):
+        return JSONResponse(
+            {"success": False, "error": "trace unavailable"}, status_code=404
+        )
+    return FileResponse(
+        real,
+        media_type="application/zip",
+        filename=f"{resolved.name}-{TRACE_FILE}",
     )
 
 

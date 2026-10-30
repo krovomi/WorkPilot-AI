@@ -55,6 +55,7 @@ from .record import (
     read_events,
     save_record,
 )
+from .scenario import TRACE_FILE, card_scenario, scenario_prompt
 from .settings import VerifySettings, load_settings
 from .state import stop_all, work_dir
 
@@ -301,6 +302,9 @@ def _verifier_prompt(options: LoopOptions, record: dict, endpoints_hint: str) ->
             "",
             endpoints_hint,
         ]
+    scenario = scenario_prompt(record.get("scenario_requested") or [])
+    if scenario:
+        lines += ["", scenario]
     if options.context:
         lines += ["", "---", "", options.context]
     lines += [
@@ -537,6 +541,8 @@ async def run_verify_loop(
 
     try:
         (base / EVENTS_FILE).unlink(missing_ok=True)
+        # Last run's trace is not this run's proof.
+        (base / TRACE_FILE).unlink(missing_ok=True)
     except OSError:
         # A stale event log is folded into this run's record at worst; the
         # verification itself does not depend on removing it.
@@ -544,6 +550,7 @@ async def run_verify_loop(
     detection: Detection = detect_targets(project, options.changed_files)
     if not detection.applicable:
         return _finish("not-applicable", detection.reason)
+    record["scenario_requested"] = card_scenario(spec)
 
     from .tools import toolbox_for
 
@@ -606,6 +613,9 @@ async def run_verify_loop(
                 "status": status,
                 "response_tail": (response or "")[-3000:],
             }
+            # In process, the verifier's browser is this toolbox's: its trace
+            # is written before the deterministic evidence adds to the page.
+            await toolbox.save_trace()
 
         await _deterministic_evidence(record, toolbox, launched, settings, options)
         browser = toolbox._browser
@@ -615,6 +625,8 @@ async def run_verify_loop(
         events = read_events(base)
         record["_latency"] = [e for e in events if e.get("kind") == "latency"]
         fold_events(record, events)
+        if (base / TRACE_FILE).is_file():
+            record["trace"] = str(base / TRACE_FILE)
         _final_errors(record, project, base)
         _summarise(record)
 

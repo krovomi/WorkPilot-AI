@@ -271,13 +271,15 @@ TOOLS: list[dict[str, Any]] = [
         "description": (
             "Record what only you know: kind=confirm (state, evidence) when the changed state is shown; "
             "kind=verdict (verdict: pass|fail|unknown, summary) at the end; kind=fix (file, summary) after a code fix; "
-            "kind=step (action, note) for a step the tools did not capture."
+            "kind=step (action, note) for a step the tools did not capture; "
+            "kind=scenario_step (step, outcome: pass|fail|blocked, note, screenshot) after each step "
+            "of the card's scenario."
         ),
         "inputSchema": _schema(
             {
                 "kind": {
                     "type": "string",
-                    "enum": ["confirm", "verdict", "fix", "step"],
+                    "enum": ["confirm", "verdict", "fix", "step", "scenario_step"],
                 },
                 "state": {"type": "string"},
                 "evidence": {"type": "string"},
@@ -286,6 +288,9 @@ TOOLS: list[dict[str, Any]] = [
                 "file": {"type": "string"},
                 "action": {"type": "string"},
                 "note": {"type": "string"},
+                "step": {"type": "integer", "minimum": 1},
+                "outcome": {"type": "string", "enum": ["pass", "fail", "blocked"]},
+                "screenshot": {"type": "string"},
             },
             ["kind"],
         ),
@@ -396,6 +401,10 @@ class VerifyToolbox:
         self._current_url = ""
         self._driver = None
         self._windows: dict[str, Any] = {}
+        #: Scenario steps reported through this toolbox. On the Claude path
+        #: the verifier drives the MCP server's toolbox, and the loop's own
+        #: browser (launch errors, evidence) must not overwrite its trace.
+        self._scenario_steps = 0
 
     # -- targets -------------------------------------------------------------
 
@@ -477,19 +486,37 @@ class VerifyToolbox:
                 browser_url = ""
                 if target is not None and target.kind == "desktop":
                     browser_url = self.url_of(target)
+                from .scenario import TRACE_FILE, card_scenario
+
                 session = BrowserSession(
                     self.base,
                     project_dir=self.project_dir,
                     chrome_path=self.settings.chrome_path,
                     browser_url=browser_url,
                     prefer=self.settings.browser,
+                    # The card's scenario is kept as a replayable trace.
+                    trace_path=(
+                        self.base / TRACE_FILE if card_scenario(self.spec_dir) else None
+                    ),
                 )
                 await session.start()
                 self._browser = session
             return self._browser
 
+    async def save_trace(self) -> str:
+        """Write the scenario's trace now; its path, or "" when there is none.
+
+        Only a toolbox through which scenario steps were reported keeps its
+        trace: another one's is dropped.
+        """
+        if self._browser is None:
+            return ""
+        path = await self._browser.save_trace(keep=self._scenario_steps > 0)
+        return str(path) if path else ""
+
     async def aclose(self) -> None:
         if self._browser is not None:
+            await self.save_trace()
             await self._browser.close()
             self._browser = None
         if self._driver is not None:
@@ -970,15 +997,60 @@ class VerifyToolbox:
 
     async def _t_record(self, args: dict) -> str:
         kind = str(args.get("kind") or "")
-        if kind not in ("confirm", "verdict", "fix", "step"):
-            return "Error: kind must be confirm, verdict, fix or step"
+        if kind not in ("confirm", "verdict", "fix", "step", "scenario_step"):
+            return "Error: kind must be confirm, verdict, fix, step or scenario_step"
+        if kind == "scenario_step":
+            return self._scenario_step(args)
         payload = {
             k: str(v)[:2000] for k, v in args.items() if k != "kind" and v is not None
         }
         if kind == "confirm":
             payload.setdefault("url", self._current_url)
         append_event(self.base, kind, payload)
+        if kind == "verdict":
+            # The session may be stopped without a goodbye: the trace is
+            # written while the verifier is still here.
+            await self.save_trace()
         return f"Recorded ({kind})."
+
+    def _scenario_step(self, args: dict) -> str:
+        from .scenario import OUTCOMES, card_scenario
+
+        steps = card_scenario(self.spec_dir)
+        if not steps:
+            return "Error: this card has no scenario; record what you saw with kind=confirm"
+        try:
+            step = int(args.get("step"))
+        except (TypeError, ValueError):
+            step = 0
+        if not 1 <= step <= len(steps):
+            return f"Error: step must be a number from 1 to {len(steps)}"
+        outcome = str(args.get("outcome") or "")
+        if outcome not in OUTCOMES:
+            return "Error: outcome must be pass, fail or blocked"
+        payload: dict[str, Any] = {
+            "step": step,
+            "outcome": outcome,
+            "note": str(args.get("note") or "")[:2000],
+            "url": self._current_url,
+        }
+        shot = self._own_capture(str(args.get("screenshot") or ""))
+        if shot:
+            payload["screenshot"] = shot
+        append_event(self.base, "scenario_step", payload)
+        self._scenario_steps += 1
+        return f"Recorded step {step} of {len(steps)} ({outcome})."
+
+    def _own_capture(self, path: str) -> str:
+        """A capture this verification took, or "": a model never names another file."""
+        if not path:
+            return ""
+        try:
+            resolved = Path(path).resolve()
+            resolved.relative_to((self.base / "screenshots").resolve())
+        except (OSError, ValueError):
+            return ""
+        return str(resolved) if resolved.is_file() else ""
 
 
 _TOOLBOXES: dict[tuple, VerifyToolbox] = {}

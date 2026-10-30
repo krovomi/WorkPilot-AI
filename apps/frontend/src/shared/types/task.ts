@@ -264,6 +264,8 @@ export interface TaskDraft {
 	verifyLoop?: boolean;
 	/** Part of the title of the one window a Windows app is verified in. */
 	verifyWindow?: string;
+	/** The steps a web front end's verification follows, one per line. */
+	verifyScenario?: string;
 	/** Context-window policy chosen in the wizard (absent = defaults). */
 	contextPolicy?: ContextPolicy;
 	mobileTargets?: MobilePlatform[];
@@ -513,6 +515,11 @@ export interface TaskMetadata {
 	// of its title. Read by the backend from task_metadata.json; absent = the
 	// launched app's main window.
 	verifyWindow?: string;
+
+	// The steps that prove the change on a web front end, one per line, in
+	// plain language. Read by `verify/scenario.py`: the verifier follows them
+	// in Playwright, captures each and keeps a trace. Absent = its own clicks.
+	verifyScenario?: string;
 
 	// Context-window management (compact / clear at a threshold). Read live by
 	// the backend; absent = defaults (auto, 50%, handoff prepared in parallel).

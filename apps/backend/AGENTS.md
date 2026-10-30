@@ -101,7 +101,7 @@ composition, qui importe les agents. Les autres modules sortis de `core` par le 
 | `watermarks/` | caractères invisibles retirés de chaque fichier généré |
 | `uiux/` | design system et règles de pile UI, seulement si la tâche touche l'interface |
 | `mobile/` | Android / Apple : piles, appareils, `readiness.py` (constructible ici ?) |
-| `verify/` | boucle `/verify` : lancer l'app, erreurs → correction, preuve ; une app Windows (`window.py`, assistant `uia/driver.ps1`) se lit et se conduit par UI Automation dans une seule fenêtre, nommée par la carte, de l'arbre de processus lancé |
+| `verify/` | boucle `/verify` : lancer l'app, erreurs → correction, preuve ; une app Windows (`window.py`, assistant `uia/driver.ps1`) se lit et se conduit par UI Automation dans une seule fenêtre, nommée par la carte, de l'arbre de processus lancé ; le scénario écrit sur la carte (`scenario.py`, `verifyScenario`) est suivi dans Playwright, étape par étape, avec captures et trace (`scenario-trace.zip`) |
 | `genai_trace/` | spans OpenTelemetry GenAI de chaque `AgentClient` (`invoke_agent`, `chat`, `execute_tool`), posés par `AgentClient.__init_subclass__` ; aucun contenu ; une feuille, importée par `harness` ([justification](../../docs/architecture/genai-traces.md)) |
 | `mcp_tasks/` | MCP 2026-07-28 pour les serveurs de WorkPilot : `ToolServer` (deux ères), `TaskStore` (extension Tasks) ; feuille. Côté client : `core/mcp_extensions.py` ([conception](../../docs/architecture/mcp-2026.md)) |
 | `board_mcp/` | serveur MCP `workpilot-board` : le Kanban d'un projet pour un agent en terminal (lister, lire, créer au backlog, attendre une colonne) ; ni lancement, ni approbation, ni merge ; runner `runners/board_mcp.py` ([conception](../../docs/architecture/board-mcp.md)) |
