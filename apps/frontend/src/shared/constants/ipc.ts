@@ -741,6 +741,9 @@ export const IPC_CHANNELS = {
 	LEARNING_LOOP_STOP_ANALYSIS: "learningLoop:stopAnalysis",
 	LEARNING_LOOP_DELETE_PATTERN: "learningLoop:deletePattern",
 	LEARNING_LOOP_TOGGLE_PATTERN: "learningLoop:togglePattern",
+	LEARNING_LOOP_GET_LESSONS: "learningLoop:getLessons",
+	LEARNING_LOOP_ADOPT_LESSON: "learningLoop:adoptLesson",
+	LEARNING_LOOP_DISMISS_LESSON: "learningLoop:dismissLesson",
 
 	// Learning Loop events (main -> renderer)
 	LEARNING_LOOP_STATUS: "learningLoop:status",

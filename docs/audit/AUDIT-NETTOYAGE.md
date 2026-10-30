@@ -2466,3 +2466,4 @@ le sien (`annexes/G<n>.md`).
 - [Annexe E — Ce qui a changé le 17 octobre 2026 (pi, lots 0 à 5)](annexes/E.md)
 - [Annexe F — Audit du 17 octobre 2026 (`473bbf1`)](annexes/F.md)
 - [Annexe G — Features issues de la veille du 26 octobre 2026](annexes/G.md)
+- [Annexe H — Idées IA du plan du 29 octobre 2026](annexes/H.md)

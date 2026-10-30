@@ -86,15 +86,23 @@ def get_learning_context(
 
     Returns:
         Formatted markdown string to append to agent prompts, or empty string.
+
+    The rules a person adopted from reviews (`review_lessons`) come first and
+    apply to every phase: they are the project's word, not a pattern ranked
+    by confidence.
     """
+    from .review_lessons import rules_block
+
+    rules = rules_block(project_dir)
     try:
         from .service import LearningLoopService
 
         service = LearningLoopService(Path(project_dir))
-        return service.get_prompt_augmentation(phase, task_context=task_context)
+        patterns = service.get_prompt_augmentation(phase, task_context=task_context)
     except Exception as e:
         logger.debug(f"Learning context unavailable: {e}")
-        return ""
+        patterns = ""
+    return "\n".join(part for part in (rules, patterns) if part)
 
 
 def context_for_agent(

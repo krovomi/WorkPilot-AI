@@ -608,6 +608,15 @@ const browserMockAPI: Partial<ElectronAPI> = {
 		success: false,
 		error: "Not available in browser mode",
 	}),
+	getReviewLessons: async () => ({ success: true, data: [] }),
+	adoptReviewLesson: async () => ({
+		success: false,
+		error: "Not available in browser mode",
+	}),
+	dismissReviewLesson: async () => ({
+		success: false,
+		error: "Not available in browser mode",
+	}),
 	onLearningLoopStatus: () => () => {
 		/* noop */
 	},

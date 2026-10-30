@@ -22,6 +22,7 @@ import {
 	deleteLearningPattern,
 	loadLearningPatterns,
 	loadLearningSummary,
+	loadReviewLessons,
 	startLearningAnalysis,
 	toggleLearningPattern,
 	useLearningLoopStore,
@@ -38,6 +39,7 @@ import {
 	DialogTitle,
 } from "../ui/dialog";
 import { ScrollArea } from "../ui/scroll-area";
+import { ReviewLessonsSection } from "./ReviewLessonsSection";
 
 const CATEGORY_COLORS: Record<string, string> = {
 	tool_sequence: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
@@ -88,6 +90,7 @@ export function LearningLoopDialog() {
 		if (isOpen && selectedProject?.path) {
 			loadLearningPatterns(selectedProject.path);
 			loadLearningSummary(selectedProject.path);
+			loadReviewLessons(selectedProject.path);
 		}
 	}, [isOpen, selectedProject?.path]);
 
@@ -244,6 +247,11 @@ export function LearningLoopDialog() {
 							<Check className="h-4 w-4" />
 							<span>{t("learningLoop:status.complete")}</span>
 						</div>
+					)}
+
+					{/* Rules learned from reviews: candidates to adopt, adopted rules */}
+					{!isAnalyzing && selectedProject?.path && (
+						<ReviewLessonsSection projectDir={selectedProject.path} />
 					)}
 
 					{/* Patterns List */}
