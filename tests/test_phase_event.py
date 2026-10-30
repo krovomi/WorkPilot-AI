@@ -341,9 +341,11 @@ class TestErrorHandling:
 
         import importlib
 
-        from foundation import phase_event
-
-        importlib.reload(phase_event)
+        # A fresh import reads DEBUG at import time. Not `reload`: a test run
+        # earlier in the session may have dropped the module from
+        # `sys.modules`, and reload then raises instead of reloading.
+        monkeypatch.delitem(sys.modules, "foundation.phase_event", raising=False)
+        importlib.import_module("foundation.phase_event")
 
         call_count = [0]
         original_print = print
