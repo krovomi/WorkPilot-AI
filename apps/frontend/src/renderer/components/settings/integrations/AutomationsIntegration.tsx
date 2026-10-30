@@ -30,10 +30,15 @@ interface AutomationsIntegrationProps {
 	readonly projectId: string;
 }
 
-const TRIGGERS: AutomationTriggerType[] = ["issue_labeled", "ci_failed", "schedule"];
+const TRIGGERS: AutomationTriggerType[] = ["issue_labeled", "ci_failed", "schedule", "pr_opened"];
 const WEEKDAYS = [1, 2, 3, 4, 5, 6, 0];
 /** Reasons whose raw message says more than the translated line. */
-const RAW_DETAIL = new Set<AutomationReason>(["source_failed", "card_failed", "not_started"]);
+const RAW_DETAIL = new Set<AutomationReason>([
+	"source_failed",
+	"card_failed",
+	"not_started",
+	"review_failed",
+]);
 
 interface Draft {
 	id?: string;
@@ -42,6 +47,7 @@ interface Draft {
 	type: AutomationTriggerType;
 	label: string;
 	branch: string;
+	base: string;
 	time: string;
 	days: number[];
 	title: string;
@@ -59,6 +65,7 @@ function emptyDraft(): Draft {
 		type: "issue_labeled",
 		label: "",
 		branch: "",
+		base: "",
 		time: "09:00",
 		days: [1, 2, 3, 4, 5],
 		title: "",
@@ -81,6 +88,7 @@ function draftOf(rule: AutomationRule): Draft {
 		type: trigger.type,
 		label: trigger.type === "issue_labeled" ? trigger.label : "",
 		branch: trigger.type === "ci_failed" ? (trigger.branch ?? "") : "",
+		base: trigger.type === "pr_opened" ? (trigger.base ?? "") : "",
 		...(trigger.type === "schedule" && {
 			time: trigger.time,
 			days: trigger.days,
@@ -100,13 +108,15 @@ function ruleInput(draft: Draft): Record<string, unknown> {
 			? { type: draft.type, label: draft.label }
 			: draft.type === "ci_failed"
 				? { type: draft.type, branch: draft.branch }
-				: {
-						type: draft.type,
-						time: draft.time,
-						days: draft.days,
-						title: draft.title,
-						prompt: draft.prompt,
-					};
+				: draft.type === "pr_opened"
+					? { type: draft.type, base: draft.base }
+					: {
+							type: draft.type,
+							time: draft.time,
+							days: draft.days,
+							title: draft.title,
+							prompt: draft.prompt,
+						};
 	return {
 		...(draft.id && { id: draft.id }),
 		name: draft.name,
@@ -120,9 +130,10 @@ function ruleInput(draft: Draft): Record<string, unknown> {
 }
 
 /**
- * Automations of a project: a rule turns an event into a Kanban card. The
- * main process checks every rule and runs them; this panel only edits them
- * and shows what they did, failures included.
+ * Automations of a project: a rule turns an event into a Kanban card, or a
+ * PR opened by someone else into a draft review. The main process checks
+ * every rule and runs them; this panel only edits them and shows what they
+ * did, failures included.
  */
 export function AutomationsIntegration({ projectId }: AutomationsIntegrationProps) {
 	const { t, i18n } = useTranslation(["settings", "tasks"]);
@@ -222,6 +233,10 @@ export function AutomationsIntegration({ projectId }: AutomationsIntegrationProp
 				return t("automations.summary.schedule", {
 					time: trigger.time,
 					days: trigger.days.map(dayName).join(", "),
+				});
+			case "pr_opened":
+				return t("automations.summary.pr_opened", {
+					base: trigger.base || t("automations.anyBranch"),
 				});
 		}
 	};
@@ -331,6 +346,19 @@ export function AutomationsIntegration({ projectId }: AutomationsIntegrationProp
 						</div>
 					)}
 
+					{editing.type === "pr_opened" && (
+						<div className="space-y-2">
+							<Label htmlFor="automation-base">{t("automations.fields.base")}</Label>
+							<Input
+								id="automation-base"
+								value={editing.base}
+								placeholder={t("automations.anyBranch")}
+								onChange={(e) => setEditing({ ...editing, base: e.target.value })}
+							/>
+							<p className="text-xs text-muted-foreground">{t("automations.help.pr_opened")}</p>
+						</div>
+					)}
+
 					{editing.type === "schedule" && (
 						<div className="space-y-4">
 							<div className="flex flex-wrap items-end gap-4">
@@ -395,59 +423,66 @@ export function AutomationsIntegration({ projectId }: AutomationsIntegrationProp
 
 					<Separator />
 
-					<div className="space-y-2">
-						<Label htmlFor="automation-kind">{t("automations.fields.kind")}</Label>
-						<select
-							id="automation-kind"
-							className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-							value={editing.kind}
-							onChange={(e) => setEditing({ ...editing, kind: e.target.value as TaskKind | "" })}
-						>
-							<option value="">{t("automations.kindAuto")}</option>
-							{TASK_KINDS.map((kind) => (
-								<option key={kind} value={kind}>
-									{t(`tasks:kind.values.${kind}`)}
-								</option>
-							))}
-						</select>
-					</div>
+					{editing.type === "pr_opened" ? (
+						// No card: no kind, no engine, and a review is always a draft.
+						<p className="text-xs text-muted-foreground">{t("automations.help.review")}</p>
+					) : (
+						<>
+							<div className="space-y-2">
+								<Label htmlFor="automation-kind">{t("automations.fields.kind")}</Label>
+								<select
+									id="automation-kind"
+									className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+									value={editing.kind}
+									onChange={(e) => setEditing({ ...editing, kind: e.target.value as TaskKind | "" })}
+								>
+									<option value="">{t("automations.kindAuto")}</option>
+									{TASK_KINDS.map((kind) => (
+										<option key={kind} value={kind}>
+											{t(`tasks:kind.values.${kind}`)}
+										</option>
+									))}
+								</select>
+							</div>
 
-					<div className="space-y-2">
-						<div className="flex items-center justify-between gap-4">
-							<Label htmlFor="automation-engine">{t("automations.fields.engine")}</Label>
-							<Switch
-								id="automation-engine"
-								checked={editing.engine !== null}
-								onCheckedChange={(on) =>
-									setEditing({ ...editing, engine: on ? engineSeed() : null })
-								}
-							/>
-						</div>
-						{editing.engine ? (
-							<EngineTrioPicker
-								value={editing.engine}
-								onChange={(trio) => setEditing((prev) => (prev ? { ...prev, engine: trio } : prev))}
-								providers={providers}
-								idPrefix="automation-engine"
-							/>
-						) : (
-							<p className="text-xs text-muted-foreground">{t("automations.engineDefault")}</p>
-						)}
-					</div>
+							<div className="space-y-2">
+								<div className="flex items-center justify-between gap-4">
+									<Label htmlFor="automation-engine">{t("automations.fields.engine")}</Label>
+									<Switch
+										id="automation-engine"
+										checked={editing.engine !== null}
+										onCheckedChange={(on) =>
+											setEditing({ ...editing, engine: on ? engineSeed() : null })
+										}
+									/>
+								</div>
+								{editing.engine ? (
+									<EngineTrioPicker
+										value={editing.engine}
+										onChange={(trio) => setEditing((prev) => (prev ? { ...prev, engine: trio } : prev))}
+										providers={providers}
+										idPrefix="automation-engine"
+									/>
+								) : (
+									<p className="text-xs text-muted-foreground">{t("automations.engineDefault")}</p>
+								)}
+							</div>
 
-					<div className="space-y-2">
-						<div className="flex items-center justify-between gap-4">
-							<Label htmlFor="automation-draft">{t("automations.fields.draft")}</Label>
-							<Switch
-								id="automation-draft"
-								checked={editing.draft}
-								onCheckedChange={(draft) => setEditing({ ...editing, draft })}
-							/>
-						</div>
-						<p className={editing.draft ? "text-xs text-muted-foreground" : "text-xs text-warning"}>
-							{editing.draft ? t("automations.help.draft") : t("automations.help.noDraft")}
-						</p>
-					</div>
+							<div className="space-y-2">
+								<div className="flex items-center justify-between gap-4">
+									<Label htmlFor="automation-draft">{t("automations.fields.draft")}</Label>
+									<Switch
+										id="automation-draft"
+										checked={editing.draft}
+										onCheckedChange={(draft) => setEditing({ ...editing, draft })}
+									/>
+								</div>
+								<p className={editing.draft ? "text-xs text-muted-foreground" : "text-xs text-warning"}>
+									{editing.draft ? t("automations.help.draft") : t("automations.help.noDraft")}
+								</p>
+							</div>
+						</>
+					)}
 
 					<div className="space-y-2">
 						<Label htmlFor="automation-cap">{t("automations.fields.dailyCap")}</Label>
@@ -498,7 +533,11 @@ export function AutomationsIntegration({ projectId }: AutomationsIntegrationProp
 										<div className="text-xs text-muted-foreground">
 											{summary(rule)}
 											{" · "}
-											{rule.draft ? t("automations.drafts") : t("automations.starts")}
+											{rule.trigger.type === "pr_opened"
+												? t("automations.reviewDrafts")
+												: rule.draft
+													? t("automations.drafts")
+													: t("automations.starts")}
 										</div>
 									</div>
 									<div className="flex shrink-0 items-center gap-1">
@@ -535,10 +574,12 @@ export function AutomationsIntegration({ projectId }: AutomationsIntegrationProp
 											})
 										: t("automations.status.never")}
 									{" · "}
-									{t("automations.status.today", {
-										count: status?.createdToday ?? 0,
-										cap: rule.dailyCap,
-									})}
+									{t(
+										rule.trigger.type === "pr_opened"
+											? "automations.status.reviewsToday"
+											: "automations.status.today",
+										{ count: status?.createdToday ?? 0, cap: rule.dailyCap },
+									)}
 									{status && status.deferred > 0 && (
 										<>
 											{" · "}

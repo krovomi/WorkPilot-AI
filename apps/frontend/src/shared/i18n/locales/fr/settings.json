@@ -2423,8 +2423,8 @@
 	},
 	"automations": {
 		"title": "Automatisations",
-		"description": "Un événement crée une carte sur le tableau : une issue étiquetée, la CI de la branche de base qui passe au rouge, une heure de la journée.",
-		"intro": "Une règle crée une carte Kanban quand son événement arrive, et la carte suit le cycle normal. Une règle ne merge, ne pousse et ne commente jamais rien. Les règles tournent toutes les 5 minutes tant que l'app est ouverte.",
+		"description": "Un événement crée une carte sur le tableau : une issue étiquetée, la CI de la branche de base qui passe au rouge, une heure de la journée. Une PR ouverte par quelqu'un d'autre reçoit une revue en brouillon.",
+		"intro": "Une règle crée une carte Kanban quand son événement arrive, et la carte suit le cycle normal. Une règle sur les PR lance plutôt la revue IA, gardée en brouillon. Une règle ne merge, ne pousse et ne commente jamais rien. Les règles tournent toutes les 5 minutes tant que l'app est ouverte.",
 		"add": "Ajouter une règle",
 		"runNow": "Lancer maintenant",
 		"save": "Enregistrer la règle",
@@ -2452,12 +2452,14 @@
 			"kind": "Type de carte",
 			"engine": "Choisir le moteur",
 			"draft": "Cartes en brouillon",
-			"dailyCap": "Cartes par jour, au plus"
+			"dailyCap": "Cartes par jour, au plus",
+			"base": "Branche de base"
 		},
 		"triggers": {
 			"issue_labeled": "Une issue GitHub reçoit une étiquette",
 			"ci_failed": "La CI passe au rouge sur une branche",
-			"schedule": "À une heure de la journée"
+			"schedule": "À une heure de la journée",
+			"pr_opened": "Quelqu'un d'autre ouvre une PR GitHub"
 		},
 		"help": {
 			"issue_labeled": "Seulement les issues étiquetées après la création de la règle. Une issue qui a déjà une carte n'est pas importée deux fois.",
@@ -2465,12 +2467,15 @@
 			"schedule": "Se déclenche une fois par jour choisi, une fois l'heure passée. Un jour où l'app était fermée n'est pas rattrapé.",
 			"draft": "La carte attend dans le backlog que tu la lances.",
 			"noDraft": "Chaque carte lance son build dès sa création.",
-			"dailyCap": "Les événements au-delà du plafond attendent le lendemain ; aucun n'est perdu."
+			"dailyCap": "Les événements au-delà du plafond attendent le lendemain ; aucun n'est perdu.",
+			"pr_opened": "Seulement les PR ouvertes après la création de la règle, par quelqu'un d'autre que toi et pas par un bot. Une PR en brouillon attend d'être prête pour la revue. Laisse la branche vide pour toutes les branches de base.",
+			"review": "La règle lance la revue de GitHub PRs, avec le moteur de cette page. La revue n'est jamais publiée : elle t'attend dans GitHub PRs jusqu'à ce que tu la publies, la modifies ou l'écartes. Personne n'est assigné. Le plafond du jour compte les revues."
 		},
 		"summary": {
 			"issue_labeled": "Issue étiquetée « {{label}} »",
 			"ci_failed": "CI rouge sur {{branch}}",
-			"schedule": "{{days}} à {{time}}"
+			"schedule": "{{days}} à {{time}}",
+			"pr_opened": "PR ouverte vers {{base}}"
 		},
 		"status": {
 			"never": "Pas encore lancée",
@@ -2478,14 +2483,17 @@
 			"today_one": "{{count}} carte aujourd'hui (au plus {{cap}})",
 			"today_other": "{{count}} cartes aujourd'hui (au plus {{cap}})",
 			"deferred_one": "{{count}} événement attend demain",
-			"deferred_other": "{{count}} événements attendent demain"
+			"deferred_other": "{{count}} événements attendent demain",
+			"reviewsToday_one": "{{count}} revue aujourd'hui (au plus {{cap}})",
+			"reviewsToday_other": "{{count}} revues aujourd'hui (au plus {{cap}})"
 		},
 		"outcome": {
 			"created": "a créé {{specId}} pour {{subject}}",
 			"started": "a créé et lancé {{specId}} pour {{subject}}",
 			"duplicate": "a écarté {{subject}}",
 			"ignored": "a ignoré {{subject}}",
-			"error": "n'a pas pu tourner sur {{subject}}"
+			"error": "n'a pas pu tourner sur {{subject}}",
+			"review_started": "a lancé la revue de {{subject}}"
 		},
 		"reasons": {
 			"label_predates_rule": "l'étiquette était là avant la règle",
@@ -2495,7 +2503,13 @@
 			"github_not_connected": "GitHub n'est pas connecté pour ce projet (Réglages › GitHub)",
 			"no_ci_provider": "aucun fournisseur de CI n'est réglé pour ce projet (Réglages › Pipeline CI/CD)",
 			"source_failed": "la source n'a pas pu être lue",
-			"card_failed": "la carte n'a pas pu être créée"
-		}
+			"card_failed": "la carte n'a pas pu être créée",
+			"own_pr": "tu as ouvert cette PR",
+			"bot_author": "un bot a ouvert cette PR",
+			"already_reviewed": "cette PR a déjà une revue",
+			"review_failed": "la revue n'a pas pu démarrer"
+		},
+		"anyBranch": "n'importe quelle branche",
+		"reviewDrafts": "les revues t'attendent"
 	}
 }

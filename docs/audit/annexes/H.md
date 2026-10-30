@@ -1,7 +1,7 @@
 # Annexe H — Idées IA du plan du 29 octobre 2026
 
 Les pistes IA du plan d'améliorations du 29 octobre (section 9), implémentées dans l'ordre retenu
-par Leub : IA1 et IA2 d'abord, puis IA4, IA6 et IA5. Comme l'annexe G, ce ne sont pas des constats d'audit : chaque
+par Leub : IA1 et IA2 d'abord, puis IA4, IA6, IA5 et IA3, puis IA7. Comme l'annexe G, ce ne sont pas des constats d'audit : chaque
 ligne est une feature, une PR vers `develop`, avec sa justification dans `docs/architecture/`.
 
 | | Feature | PR |
@@ -12,6 +12,7 @@ ligne est une feature, une PR vers `develop`, avec sa justification dans `docs/a
 | [H4](H4.md) | Tests d'intégration ASP.NET Core avant le code, posés en objectif (IA6) | #576 |
 | [H5](H5.md) | Le Kanban comme serveur MCP (IA5) | #577 |
 | [H6](H6.md) | Moteur recommandé par type de carte, appris du banc (IA3) | #578 |
+| [H7](H7.md) | Revue en brouillon des PR ouvertes par d'autres, depuis les automatisations (IA7) | #579 |
 
 Une feature, un fichier : `H<n>.md` dans ce dossier.
 

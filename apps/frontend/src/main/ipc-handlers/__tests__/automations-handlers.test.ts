@@ -32,7 +32,7 @@ vi.mock("../../project-store", () => ({
 import { readLedger, writeLedger } from "../../automations/store";
 import { registerAutomationsHandlers } from "../automations-handlers";
 
-const run = vi.fn(async () => ({ created: 0, errors: 0 }));
+const run = vi.fn(async () => ({ created: 0, reviews: 0, errors: 0 }));
 registerAutomationsHandlers({} as never, () => null, () => ({ start: vi.fn(), run }) as never);
 
 type Result = { success: boolean; error?: string; data?: AutomationsState };

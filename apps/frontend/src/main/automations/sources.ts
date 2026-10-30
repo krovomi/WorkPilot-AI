@@ -1,6 +1,6 @@
 /**
  * The events a rule listens to, read from the project's own connectors:
- * GitHub issues through the project's GitHub token, the base branch's
+ * GitHub issues and PRs through the project's GitHub token, the base branch's
  * pipeline through the same CI provider as the « Build rouge » loop, and
  * the clock. A source that cannot be read throws, with the reason; it never
  * answers "nothing new" in its place.
@@ -11,6 +11,7 @@ import type {
 	AutomationRule,
 	CiFailedTrigger,
 	IssueLabeledTrigger,
+	PrOpenedTrigger,
 	Project,
 	ScheduleTrigger,
 } from "../../shared/types";
@@ -28,6 +29,8 @@ export interface AutomationEvent {
 	description: string;
 	url?: string;
 	issue?: { number: number; url: string; labels: string[]; body?: string };
+	/** A PR to review instead of a card to create. */
+	pr?: { number: number; url: string };
 }
 
 /** A source that cannot be read, for a reason the panel can name. */
@@ -163,6 +166,82 @@ ${issue.body || "No description provided."}
 				labels,
 				body: issue.body ?? undefined,
 			},
+		});
+	}
+	return result;
+}
+
+export function prKey(repo: string, number: number): string {
+	return `github-pr:${repo.toLowerCase()}#${number}`;
+}
+
+interface GitHubPull {
+	number: number;
+	html_url: string;
+	draft?: boolean;
+	created_at?: string;
+	user?: { login?: string; type?: string } | null;
+}
+
+/**
+ * Open PRs another person opened after the rule was created, oldest first.
+ * The person's own PRs and bots' are ignored, and remembered as such; a
+ * draft PR is not an event yet and comes back once it is ready for review.
+ * Who "the person" is comes from the token: when GitHub does not say, the
+ * source fails rather than review the person's own work.
+ */
+export async function prOpenedEvents(
+	rule: AutomationRule & { trigger: PrOpenedTrigger },
+	github: GitHubSource,
+	alreadySeen: (key: string) => boolean,
+): Promise<SourceResult> {
+	const since = Date.parse(rule.createdAt);
+	const base = rule.trigger.base;
+	const pulls = (await github.fetch(
+		`/repos/${github.repo}/pulls?state=open&sort=created&direction=desc` +
+			`${base ? `&base=${encodeURIComponent(base)}` : ""}&per_page=${ISSUES_PER_PASS}`,
+	)) as GitHubPull[];
+	if (!Array.isArray(pulls)) {
+		throw new Error("GitHub answered the PR list with something else than a list");
+	}
+	const candidates = pulls
+		.filter(
+			(pull) =>
+				Number.isInteger(pull.number) &&
+				pull.number > 0 &&
+				!pull.draft &&
+				Date.parse(pull.created_at ?? "") >= since &&
+				!alreadySeen(prKey(github.repo, pull.number)),
+		)
+		.reverse();
+	const result: SourceResult = { events: [], ignored: [] };
+	if (candidates.length === 0) return result;
+
+	const me = (await github.fetch("/user")) as { login?: unknown } | null;
+	const login = typeof me?.login === "string" ? me.login.toLowerCase() : "";
+	if (!login) throw new Error("GitHub did not say whose token this is");
+
+	for (const pull of candidates) {
+		const key = prKey(github.repo, pull.number);
+		const subject = `PR #${pull.number}`;
+		const author = pull.user?.login?.toLowerCase();
+		if (!author || pull.user?.type === "Bot") {
+			result.ignored.push({ key, subject, reason: "bot_author" });
+			continue;
+		}
+		if (author === login) {
+			result.ignored.push({ key, subject, reason: "own_pr" });
+			continue;
+		}
+		// Only the number goes on: the PR's title and body reach the reviewer
+		// through its own fetch, as untrusted content, never through the rule.
+		result.events.push({
+			key,
+			subject,
+			title: subject,
+			description: "",
+			url: pull.html_url,
+			pr: { number: pull.number, url: pull.html_url },
 		});
 	}
 	return result;
