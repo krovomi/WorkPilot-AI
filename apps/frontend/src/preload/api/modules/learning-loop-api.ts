@@ -35,6 +35,24 @@ export interface LearningLoopAPI {
 		projectId: string,
 		patternId: string,
 	) => Promise<{ success: boolean; data?: boolean; error?: string }>;
+	getReviewLessons: (projectId: string) => Promise<{
+		success: boolean;
+		data?: LearningLoopTypes.ReviewLesson[];
+		error?: string;
+	}>;
+	adoptReviewLesson: (
+		projectId: string,
+		lessonId: string,
+		rule: string,
+	) => Promise<{
+		success: boolean;
+		data?: LearningLoopTypes.ReviewLesson;
+		error?: string;
+	}>;
+	dismissReviewLesson: (
+		projectId: string,
+		lessonId: string,
+	) => Promise<{ success: boolean; error?: string }>;
 
 	// Event listeners
 	onLearningLoopStatus: (callback: (status: string) => void) => () => void;
@@ -67,6 +85,15 @@ export function createLearningLoopAPI(): LearningLoopAPI {
 
 		toggleLearningPattern: (projectId: string, patternId: string) =>
 			invokeIpc(IPC_CHANNELS.LEARNING_LOOP_TOGGLE_PATTERN, projectId, patternId),
+
+		getReviewLessons: (projectId: string) =>
+			invokeIpc(IPC_CHANNELS.LEARNING_LOOP_GET_LESSONS, projectId),
+
+		adoptReviewLesson: (projectId: string, lessonId: string, rule: string) =>
+			invokeIpc(IPC_CHANNELS.LEARNING_LOOP_ADOPT_LESSON, projectId, lessonId, rule),
+
+		dismissReviewLesson: (projectId: string, lessonId: string) =>
+			invokeIpc(IPC_CHANNELS.LEARNING_LOOP_DISMISS_LESSON, projectId, lessonId),
 
 		// Event listeners
 		onLearningLoopStatus: (callback: (status: string) => void) =>

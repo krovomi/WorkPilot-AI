@@ -27,7 +27,7 @@ import re
 from pathlib import Path
 
 from fastapi import APIRouter
-from foundation.api_safety import server_mode_roots
+from foundation.api_safety import server_mode_roots, validated_dir
 from pydantic import BaseModel
 
 from .home import (
@@ -442,6 +442,87 @@ def delete_learning_pattern(request: LearningPatternRequest) -> dict:
     if not storage.delete_pattern(request.pattern_id):
         return {"success": False, "error": "Pattern not found"}
     return {"success": True}
+
+
+class ReviewLessonRequest(BaseModel):
+    project_dir: str = ""
+    lesson_id: str = ""
+    rule: str | None = None
+    """adopt: the person's wording; omitted, the candidate as it stands."""
+
+
+class PlanFeedbackRequest(BaseModel):
+    project_dir: str = ""
+    spec_id: str = ""
+    feedback: str = ""
+
+
+def _lessons_project(project_dir: str) -> Path | None:
+    """The project's checkout. Desktop only: these routes open its files."""
+    try:
+        return validated_dir(project_dir, "project_dir")
+    except ValueError:
+        return None
+
+
+@router.get("/review-lessons")
+def review_lessons(project_dir: str = "") -> dict:
+    """Rule candidates from reviews and rejected plans, and the adopted rules."""
+    if _refused():
+        return _DESKTOP_ONLY
+    project = _lessons_project(project_dir)
+    if project is None:
+        return {"success": False, "error": "project_dir is required"}
+    from learning_loop.review_lessons import load_lessons
+
+    return {"success": True, "lessons": load_lessons(project)}
+
+
+@router.post("/review-lessons/adopt")
+def adopt_review_lesson(request: ReviewLessonRequest) -> dict:
+    """A person makes a candidate one of the project's rules."""
+    if _refused():
+        return _DESKTOP_ONLY
+    project = _lessons_project(request.project_dir)
+    if project is None or not request.lesson_id:
+        return {"success": False, "error": "project_dir and lesson_id are required"}
+    from learning_loop.review_lessons import adopt
+
+    lesson = adopt(project, request.lesson_id, request.rule)
+    if lesson is None:
+        return {"success": False, "error": "Lesson not found or empty rule"}
+    return {"success": True, "lesson": lesson}
+
+
+@router.post("/review-lessons/dismiss")
+def dismiss_review_lesson(request: ReviewLessonRequest) -> dict:
+    """A person turns a candidate down, or withdraws a rule."""
+    if _refused():
+        return _DESKTOP_ONLY
+    project = _lessons_project(request.project_dir)
+    if project is None or not request.lesson_id:
+        return {"success": False, "error": "project_dir and lesson_id are required"}
+    from learning_loop.review_lessons import dismiss
+
+    if not dismiss(project, request.lesson_id):
+        return {"success": False, "error": "Lesson not found"}
+    return {"success": True}
+
+
+@router.post("/review-lessons/plan-feedback")
+def record_plan_feedback(request: PlanFeedbackRequest) -> dict:
+    """The feedback given with a rejected plan, as a rule candidate."""
+    if _refused():
+        return _DESKTOP_ONLY
+    project = _lessons_project(request.project_dir)
+    if project is None:
+        return {"success": False, "error": "project_dir is required"}
+    from learning_loop.review_lessons import record_plan_feedback as record
+
+    return {
+        "success": True,
+        "recorded": record(project, request.spec_id, request.feedback),
+    }
 
 
 @router.post("/instruction")

@@ -103,6 +103,19 @@ def _pusher(project: Path, spec_name: str):
     return push
 
 
+def _learn_from_review(project: Path, pr_url: str, result: RoundResult) -> None:
+    """A review thread fixed and pushed becomes a rule candidate (IA1).
+
+    Nothing reaches a prompt from here: a person adopts or dismisses it in the
+    Learning Loop.
+    """
+    if result.action != "fixed" or not result.decision.threads:
+        return
+    from learning_loop.review_lessons import record_review_threads
+
+    record_review_threads(project, pr_url, result.decision.threads)
+
+
 async def _run(args: argparse.Namespace) -> int:
     project, spec, worktree = _resolve_inputs(args)
     forge = forge_for_url(args.pr_url, worktree)
@@ -130,6 +143,7 @@ async def _run(args: argparse.Namespace) -> int:
             config=config,
         )
         _emit({"event": "round", "round": last.to_dict()})
+        _learn_from_review(project, args.pr_url, last)
         if args.once or last.finished:
             break
         await asyncio.sleep(interval)

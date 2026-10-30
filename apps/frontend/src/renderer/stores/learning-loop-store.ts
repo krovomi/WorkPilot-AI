@@ -3,6 +3,7 @@ import type {
 	LearningLoopCompleteResult,
 	LearningPattern,
 	LearningSummary,
+	ReviewLesson,
 } from "../../shared/types/learning-loop";
 
 export type LearningLoopPhase = "idle" | "analyzing" | "complete" | "error";
@@ -14,6 +15,8 @@ interface LearningLoopState {
 	streamingOutput: string;
 	patterns: LearningPattern[];
 	summary: LearningSummary | null;
+	/** Rule candidates from reviews and rejected plans, and the adopted rules. */
+	lessons: ReviewLesson[];
 	error: string | null;
 	isOpen: boolean;
 	isLoading: boolean;
@@ -26,6 +29,7 @@ interface LearningLoopState {
 	appendStreamingOutput: (chunk: string) => void;
 	setPatterns: (patterns: LearningPattern[]) => void;
 	setSummary: (summary: LearningSummary | null) => void;
+	setLessons: (lessons: ReviewLesson[]) => void;
 	setError: (error: string) => void;
 	setIsLoading: (isLoading: boolean) => void;
 	updatePatternInList: (
@@ -42,6 +46,7 @@ const initialState = {
 	streamingOutput: "",
 	patterns: [] as LearningPattern[],
 	summary: null as LearningSummary | null,
+	lessons: [] as ReviewLesson[],
 	error: null as string | null,
 	isOpen: false,
 	isLoading: false,
@@ -80,6 +85,8 @@ export const useLearningLoopStore = create<LearningLoopState>((set) => ({
 	setPatterns: (patterns) => set({ patterns }),
 
 	setSummary: (summary) => set({ summary }),
+
+	setLessons: (lessons) => set({ lessons }),
 
 	setError: (error) =>
 		set({
@@ -205,6 +212,72 @@ export async function toggleLearningPattern(
 			return true;
 		}
 		return false;
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Load the rule candidates and adopted rules of a project (IA1)
+ */
+export async function loadReviewLessons(projectDir: string): Promise<void> {
+	try {
+		const result = await globalThis.electronAPI.getReviewLessons(projectDir);
+		if (result.success && result.data) {
+			useLearningLoopStore.getState().setLessons(result.data);
+		}
+	} catch (error) {
+		console.error("[LearningLoop] Error loading review lessons:", error);
+	}
+}
+
+function replaceLesson(lesson: ReviewLesson): void {
+	const { lessons, setLessons } = useLearningLoopStore.getState();
+	setLessons(lessons.map((l) => (l.id === lesson.id ? lesson : l)));
+}
+
+/**
+ * Make a candidate one of the project's rules, in the person's wording
+ */
+export async function adoptReviewLesson(
+	projectDir: string,
+	lessonId: string,
+	rule: string,
+): Promise<boolean> {
+	try {
+		const result = await globalThis.electronAPI.adoptReviewLesson(
+			projectDir,
+			lessonId,
+			rule,
+		);
+		if (result.success && result.data) {
+			replaceLesson(result.data);
+			return true;
+		}
+		return false;
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Turn a candidate down, or withdraw an adopted rule
+ */
+export async function dismissReviewLesson(
+	projectDir: string,
+	lessonId: string,
+): Promise<boolean> {
+	try {
+		const result = await globalThis.electronAPI.dismissReviewLesson(
+			projectDir,
+			lessonId,
+		);
+		if (!result.success) return false;
+		const lesson = useLearningLoopStore
+			.getState()
+			.lessons.find((l) => l.id === lessonId);
+		if (lesson) replaceLesson({ ...lesson, status: "dismissed" });
+		return true;
 	} catch {
 		return false;
 	}

@@ -209,7 +209,7 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 | **Carbon Profiler** | Estimates the energy (kWh) and carbon footprint of your agent runs |
 | **Rate Limit Monitor** | Real-time usage tracking with proactive warnings and auto-switching triggers |
 | **Workflow Logger** | Structured execution logs with trace IDs for all agents, skills, and hooks |
-| **Learning Loop** | Extracts patterns from completed builds and A/B-replays promoted changes, so a suggestion is backed by an observed run rather than a guess |
+| **Learning Loop** | Extracts patterns from completed builds and A/B-replays promoted changes, so a suggestion is backed by an observed run rather than a guess. Review comments the PR follow-up fixed and the feedback of rejected plans become rule candidates; once you adopt one, every build follows it |
 
 ### Customization
 

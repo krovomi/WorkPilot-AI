@@ -51,6 +51,7 @@ import type { AgentManager } from "../../agent";
 import { getAppLanguage } from "../../app-language";
 import { appLog } from "../../app-logger";
 import { learningLoopService } from "../../learning-loop-service";
+import { recordPlanFeedback } from "../../review-lessons";
 import {
 	type ClaudeProfileManager,
 	initializeClaudeProfileManager,
@@ -1003,6 +1004,12 @@ export function registerTaskExecutionHandlers(
 						success: false,
 						error: "Failed to write QA fix request file",
 					};
+				}
+
+				// A rejected plan's feedback is a rule candidate (IA1); the person
+				// adopts it or not in the Learning Loop. Never waits, never fails the review.
+				if (task.reviewReason === "plan_review") {
+					void recordPlanFeedback(project.path, task.specId, feedback);
 				}
 
 				// Record the requested change as a single, traceable subtask so the
