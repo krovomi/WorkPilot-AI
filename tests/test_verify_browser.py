@@ -93,3 +93,40 @@ def test_the_same_scenario_on_each_engine(engine, site, tmp_path):
     perf = result["perf"]
     assert perf.measured, perf.reason
     assert perf.lcp_ms is not None and perf.score is not None
+
+
+async def _traced(url: str, base: Path, keep: bool):
+    trace = base / "scenario-trace.zip"
+    async with BrowserSession(base, trace_path=trace) as browser:
+        if browser.engine != "playwright":
+            pytest.skip(f"playwright unavailable: {'; '.join(browser.reasons)}")
+        await browser.navigate(url)
+        snapshot = await browser.snapshot()
+        await browser.click(_uid_of(snapshot, '"Save"'))
+        await browser.wait_for(["Saved!"], timeout_ms=5000)
+        saved = await browser.save_trace(keep=keep)
+        # A second save, and the close, write nothing more.
+        again = await browser.save_trace()
+    return trace, saved, again
+
+
+def test_a_scenario_is_traced_by_playwright_first(site, tmp_path):
+    """A card's scenario asks for a replayable proof: Playwright's trace."""
+    if not chrome_executable():
+        pytest.skip("no Chromium on this machine")
+    import zipfile
+
+    trace, saved, again = asyncio.run(_traced(site, tmp_path, keep=True))
+    assert saved == trace and again is None
+    with zipfile.ZipFile(trace) as archive:
+        names = archive.namelist()
+    # The actions with their DOM snapshots, and the captures of the page.
+    assert any(name.endswith(".trace") for name in names)
+    assert any(name.startswith("resources/") for name in names)
+
+
+def test_a_trace_not_kept_is_not_written(site, tmp_path):
+    if not chrome_executable():
+        pytest.skip("no Chromium on this machine")
+    trace, saved, _ = asyncio.run(_traced(site, tmp_path, keep=False))
+    assert saved is None and not trace.exists()

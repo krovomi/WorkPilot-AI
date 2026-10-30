@@ -1,7 +1,11 @@
 import { Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { Task } from "../../../shared/types";
-import { type VerifyRecord, verifyScreenshotUrl } from "../../lib/agent-tools-api";
+import {
+	type VerifyRecord,
+	verifyScreenshotUrl,
+	verifyTraceUrl,
+} from "../../lib/agent-tools-api";
 import { useVerifyStore } from "../../stores/verify-store";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -66,6 +70,7 @@ export function TaskVerify({ task, projectPath }: TaskVerifyProps) {
 			<Endpoints record={record} />
 			<Performance record={record} />
 			<Mobile record={record} />
+			<CardScenario record={record} query={query} />
 			<Screenshots record={record} query={query} />
 			<Scenario record={record} />
 			<Findings record={record} />
@@ -342,6 +347,76 @@ function Screenshots({
 					</figure>
 				))}
 			</div>
+		</Section>
+	);
+}
+
+const STEP_VARIANT = { pass: "outline", fail: "destructive", blocked: "secondary" } as const;
+
+/**
+ * The scenario written on the card: each step with what the verifier saw,
+ * its capture, and the Playwright trace to replay the whole session.
+ */
+function CardScenario({
+	record,
+	query,
+}: {
+	readonly record: VerifyRecord;
+	readonly query: { projectDir: string; specId: string };
+}) {
+	const { t } = useTranslation(["tasks"]);
+	const requested = record.scenario_requested ?? [];
+	if (requested.length === 0) return null;
+	const reported = new Map((record.scenario_steps ?? []).map((item) => [item.step, item]));
+	return (
+		<Section title={t("tasks:verify.sections.cardScenario")}>
+			<ol className="space-y-2">
+				{requested.map((step, index) => {
+					const number = index + 1;
+					const item = reported.get(number);
+					return (
+						<li key={number} className="rounded border border-border p-2">
+							<div className="flex flex-wrap items-start gap-2">
+								<span className="text-muted-foreground">{number}.</span>
+								<span className="flex-1">{step}</span>
+								<Badge
+									variant={item ? STEP_VARIANT[item.outcome] : "outline"}
+									className="text-[10px]"
+								>
+									{t(`tasks:verify.step.${item?.outcome ?? "missing"}`)}
+								</Badge>
+							</div>
+							{item?.note && <p className="mt-1 text-xs text-muted-foreground">{item.note}</p>}
+							{item?.screenshotIndex !== undefined && (
+								<img
+									src={verifyScreenshotUrl(query, item.screenshotIndex)}
+									alt={t("tasks:verify.stepCapture", { number })}
+									className="mt-2 block max-h-48 rounded border border-border bg-background object-contain"
+									loading="lazy"
+								/>
+							)}
+						</li>
+					);
+				})}
+			</ol>
+			<p className="mt-2 text-xs text-muted-foreground">
+				{record.trace ? (
+					<>
+						{/* Opened by the OS browser (the window's open handler), which saves the zip. */}
+						<a
+							href={verifyTraceUrl(query)}
+							target="_blank"
+							rel="noreferrer"
+							className="font-medium text-primary underline"
+						>
+							{t("tasks:verify.trace.download")}
+						</a>{" "}
+						{t("tasks:verify.trace.hint")}
+					</>
+				) : (
+					t("tasks:verify.trace.none")
+				)}
+			</p>
 		</Section>
 	);
 }

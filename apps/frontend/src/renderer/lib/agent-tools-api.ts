@@ -1635,6 +1635,11 @@ export interface VerifyRecord {
 	targets: VerifyTarget[];
 	rounds: VerifyRound[];
 	scenario: Array<{ action: string; url?: string; text?: string; value?: string; note?: string }>;
+	/** The steps the card asked for (`verifyScenario`), and what the verifier saw for each. */
+	scenario_requested?: string[];
+	scenario_steps?: VerifyScenarioStep[];
+	/** Whether a Playwright trace of the scenario can be downloaded (`verifyTraceUrl`). */
+	trace?: boolean;
 	confirmations: Array<{ state?: string; evidence?: string; url?: string }>;
 	endpoints: VerifyEndpoint[];
 	perf: VerifyPerf[];
@@ -1645,6 +1650,15 @@ export interface VerifyRecord {
 	findings: Array<{ severity: string; kind?: string; message: string }>;
 	browser?: { engine: string; reasons: string[] };
 	replay?: { status: string; problems?: string[]; reason?: string };
+}
+
+export interface VerifyScenarioStep {
+	step: number;
+	outcome: "pass" | "fail" | "blocked";
+	note?: string;
+	url?: string;
+	/** Index in `screenshots` of the capture taken after the step. */
+	screenshotIndex?: number;
 }
 
 export interface VerifySettings {
@@ -1690,4 +1704,10 @@ export function verifyScreenshotUrl(
 		index: String(index),
 	}).toString();
 	return `${backendUrl()}/api/verify/screenshot?${qs}`;
+}
+
+/** The Playwright trace of the card's scenario, served by the record, never by path. */
+export function verifyTraceUrl(query: SpecTraceabilityQuery): string {
+	const qs = new URLSearchParams(specAddress(query)).toString();
+	return `${backendUrl()}/api/verify/trace?${qs}`;
 }

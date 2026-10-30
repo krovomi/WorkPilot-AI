@@ -30,6 +30,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+from .scenario import scenario_status
+
 __all__ = [
     "RECORD_FILE",
     "EVENTS_FILE",
@@ -82,6 +84,11 @@ def new_record(**fields: Any) -> dict:
         "targets": [],
         "rounds": [],
         "scenario": [],
+        # The card's own scenario (`verify.scenario`): the steps asked for,
+        # what the verifier reported for each, and the Playwright trace.
+        "scenario_requested": [],
+        "scenario_steps": [],
+        "trace": None,
         "confirmations": [],
         "endpoints": [],
         "perf": [],
@@ -167,6 +174,14 @@ def fold_events(record: dict, events: list[dict]) -> dict:
                         "automation_id",
                         "note",
                     )
+                    if event.get(k) is not None
+                }
+            )
+        elif kind == "scenario_step":
+            record.setdefault("scenario_steps", []).append(
+                {
+                    k: event.get(k)
+                    for k in ("step", "outcome", "note", "url", "screenshot")
                     if event.get(k) is not None
                 }
             )
@@ -267,6 +282,9 @@ def compute_status(record: dict) -> tuple[str, str]:
         return "fail", f"{len(not_started)} target(s) did not start"
     if agent and agent[-1] == "fail":
         return "fail", "the verifier reported a failure"
+    scenario = scenario_status(record)
+    if scenario and scenario[0] == "fail":
+        return scenario
     if environment:
         return "unknown", "the environment prevented the check: " + environment[0].get(
             "message", ""
@@ -278,6 +296,8 @@ def compute_status(record: dict) -> tuple[str, str]:
         ):
             return "unknown", "no device could run the app on this machine"
         return "unknown", "nothing could be launched"
+    if scenario:
+        return scenario
     return "pass", ""
 
 
@@ -331,6 +351,30 @@ def render_report(record: dict) -> str:
             lines.append(
                 f"- round {item.get('round')}: {item.get('errors_before')} → {item.get('errors_after')} error(s)"
                 + (f" — {item.get('note')}" if item.get("note") else "")
+            )
+        lines.append("")
+    requested = record.get("scenario_requested") or []
+    if requested:
+        reported = {
+            item.get("step"): item for item in record.get("scenario_steps") or []
+        }
+        lines.append("## Scenario written on the card")
+        for number, step in enumerate(requested, start=1):
+            item = reported.get(number) or {}
+            outcome = item.get("outcome") or "not reported"
+            lines.append(f"{number}. {step} — **{outcome}**")
+            if item.get("note"):
+                lines.append(f"   - {item['note']}")
+            if item.get("screenshot"):
+                lines.append(f"   - capture: `{item['screenshot']}`")
+        if record.get("trace"):
+            lines.append(
+                f"- Playwright trace: `{record['trace']}` "
+                "(open it with `npx playwright show-trace <file>`)"
+            )
+        else:
+            lines.append(
+                "- Playwright trace: none (Playwright did not drive this session)"
             )
         lines.append("")
     if record.get("confirmations"):

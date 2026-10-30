@@ -1813,7 +1813,8 @@
 			"mobile": "Devices",
 			"screenshots": "Screenshots",
 			"scenario": "Scenario (replayed after QA)",
-			"findings": "Findings"
+			"findings": "Findings",
+			"cardScenario": "Scenario written on the card"
 		},
 		"kind": {
 			"web-frontend": "web front end",
@@ -1866,11 +1867,26 @@
 			"hint": "Launch the app after coding, fix what breaks, drive it to the change and measure it (Chrome DevTools trace, screenshots).",
 			"windowLabel": "Window to verify (Windows apps)",
 			"windowPlaceholder": "Part of its title, e.g. Orders",
-			"windowHint": "WPF, WinForms or WinUI: only this window of the launched app is read and driven, never the rest of the desktop. Empty: the app's main window."
+			"windowHint": "WPF, WinForms or WinUI: only this window of the launched app is read and driven, never the rest of the desktop. Empty: the app's main window.",
+			"scenarioLabel": "Scenario to check (web apps)",
+			"scenarioPlaceholder": "One step per line, e.g.\n1. Open the orders page\n2. Click Save\n3. The toast says Saved",
+			"scenarioHint": "The verification follows these steps in the browser, takes a capture after each and keeps a Playwright trace. A step not carried out is never a pass. Empty: the verifier chooses its own clicks."
 		},
 		"cardBadge": {
 			"pass": "Verified",
 			"fail": "Verify failed"
+		},
+		"step": {
+			"pass": "passed",
+			"fail": "failed",
+			"blocked": "blocked",
+			"missing": "not reported"
+		},
+		"stepCapture": "Capture after step {{number}}",
+		"trace": {
+			"download": "Download the Playwright trace",
+			"hint": "and open it at trace.playwright.dev or with npx playwright show-trace.",
+			"none": "No Playwright trace: Playwright did not drive this session."
 		}
 	},
 	"qaUnverified": {

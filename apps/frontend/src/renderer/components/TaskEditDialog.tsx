@@ -248,6 +248,7 @@ export function TaskEditDialog({
 	const [tddMode, setTddMode] = useState(task.metadata?.tddMode ?? false);
 	const [verifyLoop, setVerifyLoop] = useState(task.metadata?.verifyLoop ?? true);
 	const [verifyWindow, setVerifyWindow] = useState(task.metadata?.verifyWindow ?? "");
+	const [verifyScenario, setVerifyScenario] = useState(task.metadata?.verifyScenario ?? "");
 	const [contextPolicy, setContextPolicy] = useState<ContextPolicy>(() =>
 		resolveContextPolicy(task.metadata),
 	);
@@ -309,6 +310,7 @@ export function TaskEditDialog({
 			setTddMode(task.metadata?.tddMode ?? false);
 			setVerifyLoop(task.metadata?.verifyLoop ?? true);
 			setVerifyWindow(task.metadata?.verifyWindow ?? "");
+			setVerifyScenario(task.metadata?.verifyScenario ?? "");
 			setContextPolicy(resolveContextPolicy(task.metadata));
 			setMobileTargets(task.metadata?.mobileTargets ?? []);
 			const openedEngine = engineForTask();
@@ -421,6 +423,7 @@ export function TaskEditDialog({
 				tddMode !== (task.metadata?.tddMode ?? false) ||
 				verifyLoop !== (task.metadata?.verifyLoop ?? true) ||
 				verifyWindow.trim() !== (task.metadata?.verifyWindow ?? "") ||
+				verifyScenario.trim() !== (task.metadata?.verifyScenario ?? "") ||
 				contextPolicyChanged ||
 				!sameTargets(mobileTargets, task.metadata?.mobileTargets) ||
 				JSON.stringify(images) !==
@@ -462,6 +465,9 @@ export function TaskEditDialog({
 		}
 		if (verifyWindow.trim() !== (task.metadata?.verifyWindow ?? "")) {
 			metadataUpdates.verifyWindow = verifyWindow.trim();
+		}
+		if (verifyScenario.trim() !== (task.metadata?.verifyScenario ?? "")) {
+			metadataUpdates.verifyScenario = verifyScenario.trim();
 		}
 		if (contextPolicyChanged) {
 			metadataUpdates.contextPolicy = { ...contextPolicy };
@@ -658,6 +664,8 @@ export function TaskEditDialog({
 				onVerifyLoopChange={setVerifyLoop}
 				verifyWindow={verifyWindow}
 				onVerifyWindowChange={setVerifyWindow}
+				verifyScenario={verifyScenario}
+				onVerifyScenarioChange={setVerifyScenario}
 				contextPolicy={contextPolicy}
 				onContextPolicyChange={setContextPolicy}
 				contextProvider={engine.coding?.provider}

@@ -76,7 +76,7 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 | **Isolated Workspaces** | Every task runs in a dedicated git worktree — your main branch stays safe |
 | **AI-Powered Merge** | Semantic conflict resolution when integrating worktrees back to main |
 | **QA Auto-Fix Loop** | Agents automatically detect, fix, and revalidate failing acceptance criteria |
-| **Runtime Verification** | After QA, the `verify` phase launches the app the task changed, reads every error, fixes and relaunches, drives the app to the state the task asked for and keeps a proof: web and Electron apps through Chrome DevTools, mobile apps on an emulator, APIs through their OpenAPI schema, and WPF, WinForms or WinUI apps through Windows UI Automation, in the one window the card names and never by simulated keystrokes |
+| **Runtime Verification** | After QA, the `verify` phase launches the app the task changed, reads every error, fixes and relaunches, drives the app to the state the task asked for and keeps a proof: web and Electron apps through Chrome DevTools, mobile apps on an emulator, APIs through their OpenAPI schema, and WPF, WinForms or WinUI apps through Windows UI Automation, in the one window the card names and never by simulated keystrokes. A card can also list, in plain language, the steps that prove a web change: the verifier follows them in Playwright, captures each step and attaches the Playwright trace to the card; a step not carried out is never a pass |
 | **Spec Approval Workflow** | Review and approve AI-generated specifications before implementation begins |
 | **Hot-Swap LLM** | Change provider, model, or reasoning effort mid-task — the next turn resumes on the new engine with context replayed |
 | **Honest Effort** | Each provider gets the effort level on its own scale (Claude, OpenAI/Codex, Gemini, Grok, DeepSeek, Mistral, Copilot, Ollama, pi, Antigravity); the picker and the task log say what the model actually receives, and a model that refuses the setting runs on without it instead of failing the phase |
@@ -390,7 +390,7 @@ apps/backend/
 ├── integrations/        # Connecteurs (GitHub, GitLab, etc.)
 ├── project/             # Analyse et détection de projets
 ├── merge/               # Système de fusion sémantique
-├── verify/              # Boucle de vérification : lancer l'app, lire les erreurs, prouver (web, mobile, API, UI Automation)
+├── verify/              # Boucle de vérification : lancer l'app, lire les erreurs, prouver (web, mobile, API, UI Automation, scénario Playwright)
 ├── pr_followup/         # La carte suit sa PR : checks rouges et fils de revue → QA fixer
 ├── goal/                # Mode objectif : une commande dit « fini »
 ├── best_of_n/           # Une tâche construite N fois, classée sur des chiffres
