@@ -1,7 +1,8 @@
 /**
  * One pass over a project's rules: read each rule's source, drop what was
  * already answered, hold back what the daily cap does not allow, create the
- * rest as cards. The ledger is written once, at the end.
+ * rest as cards (or, for a PR, start its unposted review). The ledger is
+ * written once, at the end.
  */
 
 import type {
@@ -27,10 +28,15 @@ export interface RunDeps {
 	/** Whether the board still has the card open (not done, not archived). */
 	isCardOpen(project: Project, specId: string): boolean;
 	issueNumbersOnBoard(project: Project): Set<number>;
+	/** Whether the PR already has a review, saved or running. */
+	hasPRReview(project: Project, prNumber: number): Promise<boolean>;
+	/** Starts the PR's review, never posted; resolves once launched. */
+	startPRReview(project: Project, prNumber: number): Promise<void>;
 }
 
 export interface RunSummary {
 	created: number;
+	reviews: number;
 	errors: number;
 }
 
@@ -46,7 +52,7 @@ export async function runProjectAutomations(
 	deps: RunDeps,
 ): Promise<RunSummary> {
 	const rules = readRules(project).filter((rule) => rule.enabled);
-	const summary: RunSummary = { created: 0, errors: 0 };
+	const summary: RunSummary = { created: 0, reviews: 0, errors: 0 };
 	if (rules.length === 0) return summary;
 
 	const ledger = readLedger(project);
@@ -128,6 +134,12 @@ export async function runProjectAutomations(
 					continue;
 				}
 			}
+			if (event.pr && (await deps.hasPRReview(project, event.pr.number))) {
+				// Reviewed by hand, or by another rule: one draft per PR.
+				remember(event.key, "duplicate");
+				log("duplicate", event.subject, { url: event.url, reason: "already_reviewed" });
+				continue;
+			}
 			const streak = ledger.openCi[rule.id];
 			if (rule.trigger.type === "ci_failed" && streak && deps.isCardOpen(project, streak)) {
 				// Same red streak: the open card is the answer to it.
@@ -142,6 +154,22 @@ export async function runProjectAutomations(
 			if (status.createdToday >= rule.dailyCap) {
 				// Not remembered: it comes back tomorrow, under tomorrow's cap.
 				status.deferred += 1;
+				continue;
+			}
+
+			if (event.pr) {
+				try {
+					await deps.startPRReview(project, event.pr.number);
+				} catch (error) {
+					// Not remembered: the next pass tries again, and logs the same failure once.
+					fail("review_failed", message(error), event.subject);
+					continue;
+				}
+				status.createdToday += 1;
+				created[today] = status.createdToday;
+				summary.reviews += 1;
+				remember(event.key, "review_started");
+				log("review_started", event.subject, { url: event.url });
 				continue;
 			}
 

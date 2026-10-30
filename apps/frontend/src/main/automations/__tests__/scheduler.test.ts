@@ -61,17 +61,17 @@ describe("AutomationScheduler", () => {
 		const readSource = vi.spyOn(deps, "readSource");
 		const scheduler = new AutomationScheduler(deps, () => window as never);
 		const [a, b] = await Promise.all([scheduler.run(project), scheduler.run(project)]);
-		expect(a).toEqual({ created: 1, errors: 0 });
+		expect(a).toEqual({ created: 1, reviews: 0, errors: 0 });
 		expect(b).toBe(a);
 		expect(readSource).toHaveBeenCalledTimes(1);
-		expect(sent).toEqual([[IPC_CHANNELS.AUTOMATIONS_EVENT, { projectId: "p1", created: 1 }]]);
+		expect(sent).toEqual([[IPC_CHANNELS.AUTOMATIONS_EVENT, { projectId: "p1", created: 1, reviews: 0 }]]);
 	});
 
 	it("names the missing connector instead of finding nothing", async () => {
 		const rule = parseRule({ name: "Issues", trigger: { type: "issue_labeled", label: "wp" } }) as AutomationRule;
 		writeRules(project, [rule]);
 		const scheduler = new AutomationScheduler(liveDeps({} as never), () => window as never);
-		expect(await scheduler.run(project)).toEqual({ created: 0, errors: 1 });
+		expect(await scheduler.run(project)).toEqual({ created: 0, reviews: 0, errors: 1 });
 		expect(readLedger(project).statuses[rule.id].lastError).toBe("github_not_connected");
 
 		const ci = parseRule({ name: "CI", trigger: { type: "ci_failed" } }) as AutomationRule;

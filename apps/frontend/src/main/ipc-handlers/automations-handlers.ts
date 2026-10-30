@@ -37,7 +37,7 @@ export function registerAutomationsHandlers(
 	agentManager: AgentManager,
 	getMainWindow: () => BrowserWindow | null,
 	createScheduler: () => AutomationScheduler = () =>
-		new AutomationScheduler(liveDeps(agentManager), getMainWindow),
+		new AutomationScheduler(liveDeps(agentManager, getMainWindow), getMainWindow),
 ): void {
 	scheduler = createScheduler();
 	scheduler.start();

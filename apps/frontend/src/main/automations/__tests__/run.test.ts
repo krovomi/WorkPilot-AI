@@ -3,7 +3,7 @@
  * not allow, keeps one card per CI red streak, and says when a source
  * cannot be read — once, not on every pass.
  */
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -20,6 +20,8 @@ let now: Date;
 let source: (rule: AutomationRule) => SourceResult | Promise<SourceResult>;
 let started: string[];
 let open: Set<string>;
+let reviewed: Set<number>;
+let reviewsStarted: number[];
 
 function deps(overrides: Partial<RunDeps> = {}): RunDeps {
 	return {
@@ -31,6 +33,10 @@ function deps(overrides: Partial<RunDeps> = {}): RunDeps {
 		},
 		isCardOpen: (_project, specId) => open.has(specId),
 		issueNumbersOnBoard,
+		hasPRReview: async (_project, prNumber) => reviewed.has(prNumber),
+		startPRReview: async (_project, prNumber) => {
+			reviewsStarted.push(prNumber);
+		},
 		...overrides,
 	};
 }
@@ -41,6 +47,15 @@ function addRule(raw: object): AutomationRule {
 	writeRules(project, [rule]);
 	return rule;
 }
+
+const prEvent = (n: number): AutomationEvent => ({
+	key: `github-pr:acme/app#${n}`,
+	subject: `PR #${n}`,
+	title: `PR #${n}`,
+	description: "",
+	url: `https://github.com/acme/app/pull/${n}`,
+	pr: { number: n, url: `https://github.com/acme/app/pull/${n}` },
+});
 
 const issueEvent = (n: number): AutomationEvent => ({
 	key: `github-issue:acme/app#${n}`,
@@ -63,6 +78,8 @@ beforeEach(() => {
 	now = new Date(2026, 9, 26, 10, 0);
 	started = [];
 	open = new Set();
+	reviewed = new Set();
+	reviewsStarted = [];
 	source = () => ({ events: [], ignored: [] });
 });
 afterEach(() => rmSync(root, { recursive: true, force: true }));
@@ -77,8 +94,8 @@ describe("runProjectAutomations", () => {
 		});
 		source = () => ({ events: [issueEvent(7)], ignored: [] });
 
-		expect(await runProjectAutomations(project, deps())).toEqual({ created: 1, errors: 0 });
-		expect(await runProjectAutomations(project, deps())).toEqual({ created: 0, errors: 0 });
+		expect(await runProjectAutomations(project, deps())).toEqual({ created: 1, reviews: 0, errors: 0 });
+		expect(await runProjectAutomations(project, deps())).toEqual({ created: 0, reviews: 0, errors: 0 });
 
 		const ledger = readLedger(project);
 		const [entry] = Object.values(ledger.seen);
@@ -192,7 +209,7 @@ describe("runProjectAutomations", () => {
 		source = () => {
 			throw new SourceError("github_not_connected", "GitHub is not connected");
 		};
-		expect(await runProjectAutomations(project, deps())).toEqual({ created: 0, errors: 1 });
+		expect(await runProjectAutomations(project, deps())).toEqual({ created: 0, reviews: 0, errors: 1 });
 		await runProjectAutomations(project, deps());
 		let ledger = readLedger(project);
 		const ruleId = Object.keys(ledger.statuses)[0];
@@ -211,7 +228,7 @@ describe("runProjectAutomations", () => {
 		const failing = vi.fn(async () => {
 			throw new Error("disk full");
 		});
-		expect(await runProjectAutomations(project, deps({ createCard: failing }))).toEqual({ created: 0, errors: 1 });
+		expect(await runProjectAutomations(project, deps({ createCard: failing }))).toEqual({ created: 0, reviews: 0, errors: 1 });
 		expect(readLedger(project).seen).toEqual({});
 		expect((await runProjectAutomations(project, deps())).created).toBe(1);
 	});
@@ -223,10 +240,64 @@ describe("runProjectAutomations", () => {
 		expect(readLedger(project).seen["github-issue:acme/app#2"].outcome).toBe("ignored");
 	});
 
+	it("starts a PR's review instead of a card, once, under the daily cap", async () => {
+		addRule({ name: "PRs", trigger: { type: "pr_opened" }, dailyCap: 2 });
+		source = () => ({ events: [prEvent(10), prEvent(11), prEvent(12)], ignored: [] });
+
+		expect(await runProjectAutomations(project, deps())).toEqual({ created: 0, reviews: 2, errors: 0 });
+		expect(reviewsStarted).toEqual([10, 11]);
+		// No card: the board is untouched.
+		expect(existsSync(path.join(root, ".workpilot", "specs"))).toBe(false);
+		let ledger = readLedger(project);
+		const ruleId = Object.keys(ledger.statuses)[0];
+		expect(ledger.statuses[ruleId]).toMatchObject({ createdToday: 2, deferred: 1 });
+		expect(ledger.seen["github-pr:acme/app#10"].outcome).toBe("review_started");
+		expect(ledger.activity.at(-1)).toMatchObject({ outcome: "review_started", subject: "PR #11" });
+
+		// Same day: nothing more, and nothing reviewed twice.
+		await runProjectAutomations(project, deps());
+		expect(reviewsStarted).toEqual([10, 11]);
+		now = new Date(2026, 9, 27, 10, 0);
+		await runProjectAutomations(project, deps());
+		expect(reviewsStarted).toEqual([10, 11, 12]);
+		ledger = readLedger(project);
+		expect(ledger.statuses[ruleId]).toMatchObject({ createdToday: 1, deferred: 0 });
+	});
+
+	it("leaves a PR that already has a review alone", async () => {
+		addRule({ name: "PRs", trigger: { type: "pr_opened" } });
+		reviewed.add(20);
+		source = () => ({ events: [prEvent(20)], ignored: [] });
+		expect((await runProjectAutomations(project, deps())).reviews).toBe(0);
+		expect(reviewsStarted).toEqual([]);
+		expect(readLedger(project).activity.at(-1)).toMatchObject({ outcome: "duplicate", reason: "already_reviewed" });
+	});
+
+	it("says once that a review could not start, and tries again on the next pass", async () => {
+		addRule({ name: "PRs", trigger: { type: "pr_opened" } });
+		source = () => ({ events: [prEvent(30)], ignored: [] });
+		const failing = vi.fn(async () => {
+			throw new Error("The app window is not open");
+		});
+		expect(await runProjectAutomations(project, deps({ startPRReview: failing }))).toEqual({
+			created: 0,
+			reviews: 0,
+			errors: 1,
+		});
+		await runProjectAutomations(project, deps({ startPRReview: failing }));
+		let ledger = readLedger(project);
+		expect(ledger.seen).toEqual({});
+		expect(ledger.activity.filter((a) => a.reason === "review_failed")).toHaveLength(1);
+
+		expect((await runProjectAutomations(project, deps())).reviews).toBe(1);
+		ledger = readLedger(project);
+		expect(Object.values(ledger.statuses)[0].lastError).toBeUndefined();
+	});
+
 	it("does nothing for a project without an enabled rule", async () => {
 		const rule = addRule({ name: "Off", enabled: false, trigger: { type: "ci_failed" } });
 		const readSource = vi.fn();
-		expect(await runProjectAutomations(project, deps({ readSource }))).toEqual({ created: 0, errors: 0 });
+		expect(await runProjectAutomations(project, deps({ readSource }))).toEqual({ created: 0, reviews: 0, errors: 0 });
 		expect(readSource).not.toHaveBeenCalled();
 		expect(rule.enabled).toBe(false);
 	});

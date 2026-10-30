@@ -427,6 +427,86 @@ async function runPRReview(
 }
 
 /**
+ * Whether a PR already has a review, saved or under way: an automation does
+ * not start a second one.
+ */
+export function hasPRReview(project: Project, prNumber: number): boolean {
+	return (
+		runningReviews.has(getReviewKey(project.id, prNumber)) ||
+		getReviewResult(project, prNumber) !== null
+	);
+}
+
+/**
+ * Starts the AI review of a PR for an automation (plan of 29 October, IA7).
+ * Unlike the button it assigns nobody and does not wait for CI; like it, the
+ * result is saved locally and never posted (`review-pr` runs without
+ * `--auto-post`): posting stays the person's click in GitHub PRs. Resolves
+ * once the review is launched; its progress and result reach the view by the
+ * usual events.
+ */
+export async function startDraftPRReview(
+	project: Project,
+	prNumber: number,
+	mainWindow: BrowserWindow,
+): Promise<void> {
+	if (!Number.isInteger(prNumber) || prNumber < 1) {
+		throw new Error("Not a pull request number");
+	}
+	const reviewKey = getReviewKey(project.id, prNumber);
+	if (runningReviews.has(reviewKey)) {
+		throw new Error("A review of this PR is already running");
+	}
+	// Held before the first await, so a click on the button meanwhile waits its turn.
+	runningReviews.set(reviewKey, CI_WAIT_PLACEHOLDER);
+	const abortController = new AbortController();
+	ciWaitAbortControllers.set(reviewKey, abortController);
+	const release = () => {
+		if (runningReviews.get(reviewKey) === CI_WAIT_PLACEHOLDER) {
+			runningReviews.delete(reviewKey);
+		}
+		ciWaitAbortControllers.delete(reviewKey);
+	};
+
+	try {
+		const validation = await validateGitHubModule(project);
+		if (!validation.valid) throw new Error(validation.error);
+		if (abortController.signal.aborted) throw new Error("The review was cancelled");
+	} catch (error) {
+		release();
+		throw error;
+	}
+
+	const { sendComplete, sendError } = createIPCCommunicators<
+		PRReviewProgress,
+		PRReviewResult
+	>(
+		mainWindow,
+		{
+			progress: IPC_CHANNELS.GITHUB_PR_REVIEW_PROGRESS,
+			error: IPC_CHANNELS.GITHUB_PR_REVIEW_ERROR,
+			complete: IPC_CHANNELS.GITHUB_PR_REVIEW_COMPLETE,
+		},
+		project.id,
+	);
+	ciWaitAbortControllers.delete(reviewKey);
+	void runPRReview(project, prNumber, mainWindow)
+		.then(sendComplete, (error: unknown) => {
+			debugLog("Automation PR review failed", {
+				prNumber,
+				error: error instanceof Error ? error.message : error,
+			});
+			sendError({
+				prNumber,
+				error: error instanceof Error ? error.message : "Failed to run PR review",
+			});
+		})
+		.finally(release)
+		// A window closed meanwhile: the result is on disk, the view reads it on open.
+		.catch((error: unknown) => debugLog("Automation PR review not announced", { prNumber, error }));
+}
+
+/**
  * Register PR-related handlers
  */
 export function registerPRHandlers(

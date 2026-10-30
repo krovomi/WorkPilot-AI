@@ -104,6 +104,48 @@ describe("AutomationsIntegration", () => {
 		expect(screen.getByText("Each card starts its build as soon as it is created.")).toBeInTheDocument();
 	});
 
+	it("sends a PR rule without card settings, and shows its reviews", async () => {
+		api.get.mockResolvedValue({ success: true, data: { rules: [], statuses: {}, activity: [] } });
+		render(<AutomationsIntegration projectId="p1" />);
+		fireEvent.click(await screen.findByRole("button", { name: "Add a rule" }));
+		fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Others' PRs" } });
+		fireEvent.change(screen.getByLabelText("When"), { target: { value: "pr_opened" } });
+		// A review is no card: nothing to choose about one, and nothing posted.
+		expect(screen.queryByLabelText("Card kind")).not.toBeInTheDocument();
+		expect(screen.queryByLabelText("Draft cards")).not.toBeInTheDocument();
+		expect(screen.getByText(/The review is never posted/)).toBeInTheDocument();
+		fireEvent.change(screen.getByLabelText("Base branch"), { target: { value: "develop" } });
+		fireEvent.click(screen.getByRole("button", { name: "Save rule" }));
+		await waitFor(() => expect(api.save).toHaveBeenCalledTimes(1));
+		expect(api.save).toHaveBeenCalledWith("p1", {
+			name: "Others' PRs",
+			enabled: true,
+			trigger: { type: "pr_opened", base: "develop" },
+			draft: true,
+			dailyCap: 3,
+		});
+	});
+
+	it("lists a PR rule with its reviews and why a PR was skipped", async () => {
+		api.get.mockResolvedValue({
+			success: true,
+			data: {
+				rules: [{ ...withRule.rules[0], name: "PRs", trigger: { type: "pr_opened" } }],
+				statuses: { "r-000000000001": { createdToday: 2, deferred: 0 } },
+				activity: [
+					{ at: "2026-10-26T09:00:00.000Z", ruleId: "r-000000000001", ruleName: "PRs", outcome: "review_started", subject: "PR #9" },
+					{ at: "2026-10-26T09:00:00.000Z", ruleId: "r-000000000001", ruleName: "PRs", outcome: "ignored", subject: "PR #8", reason: "own_pr" },
+				],
+			},
+		});
+		render(<AutomationsIntegration projectId="p1" />);
+		expect(await screen.findByText(/PR opened into any branch/)).toBeInTheDocument();
+		expect(screen.getByText(/reviews wait for you/)).toBeInTheDocument();
+		expect(screen.getByText(/2 reviews today \(at most 3\)/)).toBeInTheDocument();
+		expect(screen.getByText(/started the review of PR #9/)).toBeInTheDocument();
+		expect(screen.getByText(/you opened this PR/)).toBeInTheDocument();
+	});
+
 	it("shows the main process's refusal", async () => {
 		api.get.mockResolvedValue({ success: true, data: { rules: [], statuses: {}, activity: [] } });
 		api.save.mockResolvedValue({ success: false, error: "The trigger needs a label" });

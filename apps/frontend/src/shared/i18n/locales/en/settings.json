@@ -2420,8 +2420,8 @@
 	},
 	"automations": {
 		"title": "Automations",
-		"description": "An event creates a card on the board: an issue labelled, the base branch's CI going red, a time of day.",
-		"intro": "A rule creates a Kanban card when its event happens, and the card follows the normal cycle. A rule never merges, pushes or comments. Rules run every 5 minutes while the app is open.",
+		"description": "An event creates a card on the board: an issue labelled, the base branch's CI going red, a time of day. A PR opened by someone else gets a draft review.",
+		"intro": "A rule creates a Kanban card when its event happens, and the card follows the normal cycle. A rule on PRs starts the AI review instead, kept as a draft. A rule never merges, pushes or comments. Rules run every 5 minutes while the app is open.",
 		"add": "Add a rule",
 		"runNow": "Run now",
 		"save": "Save rule",
@@ -2449,12 +2449,14 @@
 			"kind": "Card kind",
 			"engine": "Choose the engine",
 			"draft": "Draft cards",
-			"dailyCap": "Cards per day, at most"
+			"dailyCap": "Cards per day, at most",
+			"base": "Base branch"
 		},
 		"triggers": {
 			"issue_labeled": "A GitHub issue gets a label",
 			"ci_failed": "The CI turns red on a branch",
-			"schedule": "At a time of day"
+			"schedule": "At a time of day",
+			"pr_opened": "Someone else opens a GitHub PR"
 		},
 		"help": {
 			"issue_labeled": "Only issues labelled after the rule is created. An issue that already has a card is not imported twice.",
@@ -2462,12 +2464,15 @@
 			"schedule": "Fires once on each chosen day, once the time has passed. A day the app was closed is not made up.",
 			"draft": "The card waits in the backlog until you start it.",
 			"noDraft": "Each card starts its build as soon as it is created.",
-			"dailyCap": "Events over the cap wait for the next day; none is dropped."
+			"dailyCap": "Events over the cap wait for the next day; none is dropped.",
+			"pr_opened": "Only PRs opened after the rule is created, by someone other than you and not by a bot. A draft PR waits until it is ready for review. Leave the branch empty for any base branch.",
+			"review": "The rule starts the review from GitHub PRs, with that page's engine. The review is never posted: it waits in GitHub PRs until you post, edit or drop it. Nobody is assigned. The daily cap counts reviews."
 		},
 		"summary": {
 			"issue_labeled": "Issue labelled “{{label}}”",
 			"ci_failed": "CI red on {{branch}}",
-			"schedule": "{{days}} at {{time}}"
+			"schedule": "{{days}} at {{time}}",
+			"pr_opened": "PR opened into {{base}}"
 		},
 		"status": {
 			"never": "Not run yet",
@@ -2475,14 +2480,17 @@
 			"today_one": "{{count}} card today (at most {{cap}})",
 			"today_other": "{{count}} cards today (at most {{cap}})",
 			"deferred_one": "{{count}} event waits for tomorrow",
-			"deferred_other": "{{count}} events wait for tomorrow"
+			"deferred_other": "{{count}} events wait for tomorrow",
+			"reviewsToday_one": "{{count}} review today (at most {{cap}})",
+			"reviewsToday_other": "{{count}} reviews today (at most {{cap}})"
 		},
 		"outcome": {
 			"created": "created {{specId}} for {{subject}}",
 			"started": "created and started {{specId}} for {{subject}}",
 			"duplicate": "skipped {{subject}}",
 			"ignored": "ignored {{subject}}",
-			"error": "could not run on {{subject}}"
+			"error": "could not run on {{subject}}",
+			"review_started": "started the review of {{subject}}"
 		},
 		"reasons": {
 			"label_predates_rule": "the label was there before the rule",
@@ -2492,7 +2500,13 @@
 			"github_not_connected": "GitHub is not connected for this project (Settings › GitHub)",
 			"no_ci_provider": "no CI provider is configured for this project (Settings › CI/CD pipeline)",
 			"source_failed": "the source could not be read",
-			"card_failed": "the card could not be created"
-		}
+			"card_failed": "the card could not be created",
+			"own_pr": "you opened this PR",
+			"bot_author": "a bot opened this PR",
+			"already_reviewed": "this PR already has a review",
+			"review_failed": "the review could not start"
+		},
+		"anyBranch": "any branch",
+		"reviewDrafts": "reviews wait for you"
 	}
 }
