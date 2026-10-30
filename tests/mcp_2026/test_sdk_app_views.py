@@ -196,17 +196,30 @@ class TestClaudeClientWiring:
         assert _app_view_servers(started, {"CUSTOM_MCP_SERVERS": custom}) == [custom[0]]
         assert _app_view_servers(started, {}) == []
 
-    def test_the_hook_is_registered_only_with_a_custom_server(self, tmp_path):
-        from core.client import _session_hooks
+    def test_the_hook_is_registered_only_with_a_custom_server(
+        self, tmp_path, monkeypatch
+    ):
+        from dataclasses import dataclass, field
+
+        from core import client
+
+        # Other tests stand a mock SDK in for `claude_agent_sdk`; read the
+        # matchers through a plain record so the answer does not depend on it.
+        @dataclass
+        class Matcher:
+            matcher: str | None = None
+            hooks: list = field(default_factory=list)
+
+        monkeypatch.setattr(client, "HookMatcher", Matcher)
 
         def matchers(hooks: dict) -> list:
             return [m.matcher for m in hooks["PostToolUse"]]
 
-        bare = _session_hooks(tmp_path, tmp_path, [])
+        bare = client._session_hooks(tmp_path, tmp_path, [])
         assert "mcp__.*" not in matchers(bare)
 
         server = _command("weather", FIXTURES / "apps_server.py")
-        wired = _session_hooks(tmp_path, tmp_path, [], app_view_servers=[server])
+        wired = client._session_hooks(tmp_path, tmp_path, [], app_view_servers=[server])
         assert matchers(wired).count("mcp__.*") == 1
         # The sub-agent hook is still there.
         assert set(matchers(bare)) <= set(matchers(wired))
