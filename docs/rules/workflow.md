@@ -131,6 +131,10 @@ Planchers et démarrage (plan du 29 octobre 2026, lot N2) :
   xvfb ; `ci-complete` l'attend. Chaque spec démarre l'app par `e2e/app-harness.ts` (HOME et
   profil jetables), aucun `test.skip`, et un test qui ne passe qu'au second essai fait échouer
   le job (`failOnFlakyTests`). `tests/test_e2e_wiring.py` le garde.
+- **Chaîne d'approvisionnement** (lot N6) : `release.yml` publie un SBOM CycloneDX
+  (`workpilot-sbom.cdx.json`) et une attestation de provenance pour chaque fichier de la release ;
+  seuls `create-release` et la signature Windows obtiennent un jeton OIDC
+  (`tests/test_release_supply_chain.py`).
 
 ## Livraison
 

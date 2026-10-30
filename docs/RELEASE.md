@@ -312,3 +312,9 @@ git push origin v1.1.0
 - Windows binaries are code signed
 - Binaries are scanned with VirusTotal after publication, when `VIRUSTOTAL_API_KEY` is configured
 - SHA256 checksums are generated for all artifacts
+- A CycloneDX SBOM (`workpilot-sbom.cdx.json`) lists the npm and Python packages of the release; it
+  is read from the checkout by `anchore/sbom-action` before the binaries are downloaded
+- Every published file (binaries, manifests, SBOM, checksums) has a build provenance attestation
+  (`actions/attest-build-provenance`); verify one with
+  `gh attestation verify <file> --repo krovomi/WorkPilot-AI`. Dry runs attest nothing.
+  `tests/test_release_supply_chain.py` keeps both steps in place
