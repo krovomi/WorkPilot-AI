@@ -327,17 +327,27 @@ def build_prompt(ctx, projects: list[Path], libraries: str) -> str:
                 "## Rules",
                 "",
                 f"- {where}",
-                "- Go through HTTP only: `WebApplicationFactory<Program>` and its "
-                "`HttpClient`. Do not reference a type, a method or a file the feature "
-                "has not created yet: the tests must compile today and fail because "
-                "the behaviour is missing (404, wrong status, wrong body).",
-                "- Change nothing outside the test project and the solution file. "
-                "No controller, no endpoint, no model, no `Program.cs`: the coder "
-                "writes the feature after you, against your tests.",
-                "- Assert what the spec states: status codes, response bodies, "
-                "headers. Not implementation details the spec does not name.",
-                "- Build the test project (`dotnet build`) and fix what does not "
-                "compile. Then run it once: the tests for the new behaviour must fail.",
+                (
+                    "- Go through HTTP only: `WebApplicationFactory<Program>` and its "
+                    "`HttpClient`. Do not reference a type, a method or a file the "
+                    "feature has not created yet: the tests must compile today and "
+                    "fail because the behaviour is missing (404, wrong status, wrong "
+                    "body)."
+                ),
+                (
+                    "- Change nothing outside the test project and the solution file. "
+                    "No controller, no endpoint, no model, no `Program.cs`: the coder "
+                    "writes the feature after you, against your tests."
+                ),
+                (
+                    "- Assert what the spec states: status codes, response bodies, "
+                    "headers. Not implementation details the spec does not name."
+                ),
+                (
+                    "- Build the test project (`dotnet build`) and fix what does not "
+                    "compile. Then run it once: the tests for the new behaviour must "
+                    "fail."
+                ),
                 "- Never weaken a test to make it pass, and do not make any pass.",
                 "",
                 libraries,
