@@ -12,6 +12,11 @@ import type React from "react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
+import {
+	SECRET_RENEWAL_DAYS,
+	secretAgeDays,
+	secretNeedsRenewal,
+} from "../../../shared/utils/secret-age";
 import { GUIDE_ANCHORS } from "../guided-tour/anchors";
 import { Button } from "../ui/button";
 import { Switch } from "../ui/switch";
@@ -36,6 +41,8 @@ interface CleanProviderCardProps {
 			provider?: string;
 			isOAuth?: boolean;
 			authMethod?: AuthMethod;
+			/** When the stored key got its value; undefined when unknown. */
+			setAt?: string | number;
 		};
 	};
 	onConfigure?: (
@@ -351,6 +358,16 @@ export function CleanProviderCard({
 	// the card never shows "OAuth connected" and "re-auth required" at once.
 	const needsReauth = provider.realUsageData?.needsReauthentication === true;
 
+	// A stored API key says how old it is; past SECRET_RENEWAL_DAYS the card
+	// suggests renewing it. An undated key is never called old nor new.
+	const hasStoredKey =
+		provider.realApiKeyInfo?.hasKey === true &&
+		provider.realApiKeyInfo.authMethod === "api-key";
+	const keyAgeDays = hasStoredKey
+		? secretAgeDays(provider.realApiKeyInfo?.setAt)
+		: undefined;
+	const keyNeedsRenewal = secretNeedsRenewal(keyAgeDays);
+
 	const getStatusColor = () => {
 		if (!provider.isConfigured) return "text-muted-foreground";
 		if (needsReauth) return "text-amber-600 dark:text-amber-500";
@@ -560,6 +577,14 @@ export function CleanProviderCard({
 							{provider.description}
 						</p>
 					)}
+					{keyNeedsRenewal && (
+						<p className="text-xs text-amber-700 dark:text-amber-500 mt-0.5">
+							{t("sections.accounts.providerCard.keyRenewal", {
+								count: keyAgeDays,
+								threshold: SECRET_RENEWAL_DAYS,
+							})}
+						</p>
+					)}
 				</div>
 
 				{/* Statut compact */}
@@ -658,6 +683,8 @@ export function CleanProviderCard({
 					size="sm"
 					onClick={() => setIsExpanded(!isExpanded)}
 					className="h-7 w-7 p-0"
+					aria-label={t("sections.accounts.providerCard.toggleDetails")}
+					aria-expanded={isExpanded}
 				>
 					<MoreHorizontal className="w-4 h-4" />
 				</Button>
@@ -675,6 +702,29 @@ export function CleanProviderCard({
 							{renderAuthStatus()}
 						</div>
 					</div>
+
+					{/* Age of the stored key */}
+					{hasStoredKey && (
+						<div
+							className={cn(
+								"flex items-center justify-between text-xs",
+								keyNeedsRenewal
+									? "text-amber-700 dark:text-amber-500"
+									: "text-gray-500",
+							)}
+						>
+							<span>{t("sections.accounts.providerCard.keySaved")}</span>
+							<span className={cn(keyAgeDays === undefined && "italic")}>
+								{keyAgeDays === undefined
+									? t("sections.accounts.providerCard.keySavedUnknown")
+									: keyAgeDays === 0
+										? t("sections.accounts.providerCard.keySavedToday")
+										: t("sections.accounts.providerCard.keySavedDaysAgo", {
+												count: keyAgeDays,
+											})}
+							</span>
+						</div>
+					)}
 
 					{/* Dernier test */}
 					{provider.lastTested ? (

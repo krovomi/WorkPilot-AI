@@ -27,6 +27,8 @@ export interface APIProfile {
 	};
 	createdAt: number; // Unix timestamp (ms)
 	updatedAt: number; // Unix timestamp (ms)
+	/** When apiKey got its current value (ms); absent for a key saved before it was dated. */
+	apiKeySetAt?: number;
 }
 
 /**

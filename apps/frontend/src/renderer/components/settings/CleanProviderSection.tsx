@@ -54,6 +54,8 @@ interface Provider {
 		provider?: string;
 		isOAuth?: boolean;
 		authMethod?: AuthMethod;
+		/** When the stored key got its value; undefined when unknown. */
+		setAt?: string | number;
 	};
 }
 
@@ -450,6 +452,7 @@ export function CleanProviderSection({
 			provider?: string;
 			isOAuth?: boolean;
 			authMethod?: AuthMethod;
+			setAt?: string | number;
 		} => {
 			// Determine auth method from registry
 			const authMethod = getProviderAuthMethod(providerId);
@@ -501,6 +504,7 @@ export function CleanProviderSection({
 					provider: profile.name,
 					isOAuth: false,
 					authMethod: "api-key",
+					setAt: profile.apiKeySetAt,
 				};
 			}
 
@@ -512,6 +516,7 @@ export function CleanProviderSection({
 					keyPreview: (settings as AppSettings & Record<string, unknown>)[apiKeyField] as string,
 					isOAuth: false,
 					authMethod: "api-key",
+					setAt: settings.credentialsSetAt?.[apiKeyField],
 				};
 			}
 

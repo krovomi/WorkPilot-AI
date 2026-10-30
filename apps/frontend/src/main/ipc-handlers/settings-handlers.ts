@@ -748,7 +748,7 @@ export function registerSettingsHandlers(
 					}
 				}
 
-				writeSettingsFile(newSettings);
+				const credentialsSetAt = writeSettingsFile(newSettings);
 
 				// Apply Python path if changed
 				if (settings.pythonPath || settings.autoBuildPath) {
@@ -810,7 +810,8 @@ export function registerSettingsHandlers(
 					}
 				}
 
-				return { success: true };
+				// The renderer's copy of the dates is stale once a key changed.
+				return { success: true, data: { credentialsSetAt } };
 			} catch (error) {
 				return {
 					success: false,
