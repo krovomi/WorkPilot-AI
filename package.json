@@ -22,6 +22,7 @@
 		"test": "cd apps/frontend && pnpm test",
 		"test:backend": "node scripts/test-backend.js",
 		"test:all": "node scripts/pre-push.js",
+		"verify": "node scripts/pre-push.js --full",
 		"package": "cd apps/frontend && pnpm run package",
 		"package:mac": "cd apps/frontend && pnpm run package:mac",
 		"package:win": "cd apps/frontend && pnpm run package:win",

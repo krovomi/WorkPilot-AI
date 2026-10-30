@@ -8,9 +8,10 @@
  *   en parallèle sans bloquer personne. Les jouer ici aussi, c'est payer deux
  *   fois la même garantie et rendre chaque push pénible.
  *
- * MODE COMPLET (opt-in) : PRE_PUSH_FULL=1 git push
+ * MODE COMPLET (opt-in) : PRE_PUSH_FULL=1 git push, ou `pnpm verify`
  *   Ajoute pytest (ciblé sur le diff), tsc et vitest — utile avant une release
- *   ou quand on veut la certitude avant d'attendre la CI.
+ *   ou quand on veut la certitude avant d'attendre la CI. `pnpm verify` lance
+ *   ce mode sans pousser (`node scripts/pre-push.js --full`).
  *
  * Skip rules:
  *   - PRE_PUSH_SKIP=1 or `git push --no-verify` bypass entirely.
@@ -65,6 +66,10 @@ const RELEVANT_PATTERNS = [
 	/^tsconfig.*\.json$/,
 	/^biome\.jsonc$/,
 	/^scripts\//,
+	// Read by tests/test_audit_findings.py and tests/test_changelog_fragments.py.
+	/^docs\/audit\//,
+	/^changelog\.d\//,
+	/^CHANGELOG\.md$/,
 ];
 
 function getChangedFiles() {
@@ -230,7 +235,9 @@ if (ruffPath) {
 	// Same set as the CI job. `tests/` and `src/` (and `utils/`, removed in
 	// audit lot L9) were checked by neither, which is how they reached 11 lint
 	// errors and 169 unformatted files while apps/backend/ stayed clean.
-	const PYTHON_LINT_PATHS = ["apps/backend/", "tests/", "src/"];
+	// scripts/ as well: lint.yml checks it, and scripts write generated
+	// output (skills, audit cards, changelog) that later jobs verify.
+	const PYTHON_LINT_PATHS = ["apps/backend/", "tests/", "src/", "scripts/"];
 
 	jobs.push(runJob("backend:ruff", ruffPath, ["check", ...PYTHON_LINT_PATHS]));
 	// Mirrors the CI "ruff format check" step — a check-only `ruff check`
@@ -240,15 +247,6 @@ if (ruffPath) {
 			"format",
 			...PYTHON_LINT_PATHS,
 			"--check",
-		]),
-	);
-	// The two scripts that write the generated skill output. CI lints them for
-	// the same reason: they produce files the `skills` job then verifies.
-	jobs.push(
-		runJob("skills:ruff", ruffPath, [
-			"check",
-			"scripts/skills_cli.py",
-			"scripts/skills_sync.py",
 		]),
 	);
 } else {
@@ -265,6 +263,10 @@ const pythonPath = findVenvBin(ROOT, "python") || "python3";
 jobs.push(
 	runJob("skills:check", pythonPath, ["scripts/skills_cli.py", "build", "--check"]),
 );
+// Same reasoning for the audit cards (docs/audit/findings/F<n>.js) and the
+// changelog fragments: CI fails on a stale card or a malformed fragment.
+jobs.push(runJob("audit:findings", pythonPath, ["scripts/audit_findings.py", "check"]));
+jobs.push(runJob("changelog:fragments", pythonPath, ["scripts/changelog.py", "check"]));
 
 // --- Checks lourds : opt-in seulement -------------------------------------
 // pytest / tsc / vitest coûtent plusieurs minutes et sont DÉJÀ rejoués par la
@@ -272,7 +274,8 @@ jobs.push(
 // payer deux fois pour la même garantie — et c'est ce qui rendait le push
 // insupportable. Ils restent disponibles à la demande :
 //     PRE_PUSH_FULL=1 git push
-const FULL = process.env.PRE_PUSH_FULL === "1";
+const FULL =
+	process.env.PRE_PUSH_FULL === "1" || process.argv.includes("--full");
 
 if (FULL) {
 	if (pytestPath) {

@@ -24,7 +24,9 @@ upstreams are adaptations of each other and share names on purpose, so leaving t
 iteration order meant the emitted content depended on alphabetical luck.
 
 Those are **generated**. `skills/` is the source, and `scripts/skills_cli.py` is the only
-thing that writes the outputs — `pnpm run skills:check` fails CI on drift. Packs are
+thing that writes the outputs — `pnpm run skills:check` fails CI on drift (the `skills` job of
+`lint.yml` checks the outputs as committed, and the weekly `skills-sync` commits the outputs it
+rebuilds; until F125 the job rebuilt them before checking, so it could not fail). Packs are
 added, updated and dropped through the same CLI (`skills:add`, `skills:update`,
 `skills:remove`), which keeps `skills-lock.json`, `.workpilot/skills.toml` and the
 `.gitignore` entries in step. See [skills/README.md](../../skills/README.md).

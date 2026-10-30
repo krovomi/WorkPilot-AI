@@ -27,7 +27,7 @@ metadata:
     - subagent-driven-development
   workpilot:
     pack: hermes
-    version: 0.0.1
+    version: 0.1.0
     content_sha256: 4473123d3dadc62b1b247c2a4c32694c39b3b02e342d76584035e887a0e78b74
 ---
 

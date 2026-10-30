@@ -10,7 +10,7 @@ metadata:
       - python
       - py
     pack: ui-ux-pro-max
-    version: 2.15.0
+    version: 2.15.1
     content_sha256: 42502ab84c9bf61039c155a5904a6f78c226814d1d735ffc3b9768b878d8b789
 ---
 

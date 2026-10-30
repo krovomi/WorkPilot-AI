@@ -22,7 +22,7 @@ metadata:
     - github
   workpilot:
     pack: hermes
-    version: 0.0.1
+    version: 0.1.0
     content_sha256: 8d9b465c5c579b00247f06e4699d5b9b61146319ee454311f21d15405db1dfad
 prerequisites:
   commands:

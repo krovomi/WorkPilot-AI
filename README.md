@@ -263,7 +263,8 @@ AI-assisted feature planning with competitor analysis and audience targeting.
 
 > Pour une lecture guidée — y compris sans prérequis technique — ouvrez l'atlas
 > [`docs/audit/WorkPilot-architecture.html`](docs/audit/WorkPilot-architecture.html) (vue « Pour tous »,
-> schémas cliquables, constats, feuille de route). Les justifications de conception sont dans
+> schémas cliquables, constats, feuille de route ; un fichier par constat depuis F113 dans
+> [`docs/audit/findings/`](docs/audit/findings/)). Les justifications de conception sont dans
 > [`docs/architecture/`](docs/architecture/).
 >
 > Les liens entre couches sont vérifiés par des tests qui lisent les sources : IPC dans les deux
@@ -537,6 +538,10 @@ apps/frontend/src/
    ```
    *Crée automatiquement l'environnement virtuel Python et installe toutes les dépendances*
 
+   Ou, sans rien installer sur la machine : ouvrez le dépôt dans le conteneur de
+   [`.devcontainer/`](.devcontainer/) (VS Code « Reopen in Container », ou Codespaces). Il porte
+   Python 3.13, uv, Node 22, pnpm et de quoi lancer Electron sous xvfb pour les tests E2E.
+
 3. **Lancement Manuel — Guide Pas à Pas par OS**
 
    Si l'installation automatique échoue (dépendances Python manquantes, environnement corrompu, etc.), suivez ces étapes détaillées.
@@ -778,6 +783,7 @@ Le typecheck est **incrémental** (`incremental` + `tsBuildInfoFile` dans `apps/
 
 ```bash
 PRE_PUSH_FULL=1 git push        # ajoute pytest, typecheck et vitest au pre-push
+pnpm verify                     # la même chose, sans pousser
 pnpm run test:all               # ou directement, sans pousser
 ```
 
