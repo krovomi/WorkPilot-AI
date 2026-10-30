@@ -91,6 +91,7 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 | **Goal Mode** | A task is done when a command says so (`dotnet test` exits 0), not when a reviewer thinks so: QA keeps fixing within a pass and spending cap, and the tests it must pass are protected from edits |
 | **Spec by Example (.NET)** | On an ASP.NET Core Web API, when the project turns it on, the spec's acceptance criteria are written as HTTP integration tests (`WebApplicationFactory`) before any code. WorkPilot checks they touch only the test project, compile and fail, then makes `dotnet test` the task's goal with those tests protected. A goal you set yourself is kept. See [docs/architecture/spec-by-example.md](docs/architecture/spec-by-example.md) |
 | **Cross Review** | After QA, a second engine (another provider and model, chosen per project) reads the diff against the spec and the goal. If it names a blocking problem, the pull request waits for you: fix it, or create it anyway. An answer it cannot read is never taken as approval. See [docs/architecture/cross-review.md](docs/architecture/cross-review.md) |
+| **Board over MCP** | The `workpilot-board` MCP server gives Claude Code, Codex or Gemini CLI in a terminal the project's Kanban: list and read cards, add one to the backlog, wait until a card is ready for your review. Starting a build, approving a plan and merging stay with you, on the card. See [docs/architecture/board-mcp.md](docs/architecture/board-mcp.md) |
 | **Needs You** | When a task waits for you (plan, review, QA hand-over, error), you hear about it on the desktop and, if you want, on ntfy or Telegram; a waiting plan can be approved from Telegram with a one-shot button |
 | **Automations** | A rule turns an event into a Kanban card: a GitHub issue labelled, the base branch's CI going red, a time of day. Cards are drafts by default, one per issue or red streak, under a daily cap; a rule never merges, pushes or comments |
 | **ACP Agents** | Any agent that speaks the Agent Client Protocol runs a task from one entry in `capabilities/providers.yaml`, Gemini CLI first. A question the agent asks before acting appears on the card with its options; the agent type's tool rights are held by the session mode, by refusing questions outside them, and by stopping a turn that runs an undeclared tool. The sidebar lists only the capabilities the agent declares — see [docs/architecture/acp.md](docs/architecture/acp.md) |
@@ -397,6 +398,7 @@ apps/backend/
 ├── os_sandbox/          # bubblewrap / Seatbelt autour des commandes d'agent
 ├── genai_trace/         # Spans OpenTelemetry GenAI pour tous les providers
 ├── mcp_tasks/           # MCP 2026-07-28 : tasks côté serveurs WorkPilot
+├── board_mcp/           # Serveur MCP workpilot-board : le Kanban depuis le terminal
 ├── self_healing/        # Surveillance de santé + auto-réparation
 ├── tech_debt/           # Suivi et résolution de la dette technique
 ├── consensus_arbiter/   # Arbitrage des avis d'agents (sécurité/QA)

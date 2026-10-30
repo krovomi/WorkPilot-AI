@@ -43,6 +43,9 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # MCP 2026-07-28 and its Tasks extension, for WorkPilot's own servers:
     # the standard library only (docs/architecture/mcp-2026.md).
     "mcp_tasks": set(),
+    # The board as an MCP server: the spec numbering lock and the MCP layer,
+    # nothing that runs an agent (docs/architecture/board-mcp.md).
+    "board_mcp": {"core", "mcp_tasks"},
     # Stack detection, including the UI and test stacks moved here in M10.
     "project": {"mobile"},
     "mobile": {"foundation"},
