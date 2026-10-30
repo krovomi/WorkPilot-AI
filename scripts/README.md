@@ -39,6 +39,7 @@ Une ligne par fichier et par dossier de `scripts/`, et rien d'autre :
 
 | Script | Rôle | Appelé par |
 |---|---|---|
+| `changelog.py` | Valide les fragments de `changelog.d/` (`check`), montre les notes de la prochaine version (`preview`), les verse dans `CHANGELOG.md` (`release X.Y.Z "Titre"`). | `pre-push.js`, `tests/test_changelog_fragments.py` ; `release` à la main avant la release |
 | `bump-version.js` | Change la version partout où elle est écrite. | `prepare-release.yml` |
 | `update-readme.py` | Met à jour les badges et liens de téléchargement du README. | `release.yml`, `beta-release.yml` |
 | `validate-release.js` | Vérifie qu'une release est cohérente avant publication. | `bump-version.js` |
@@ -67,5 +68,6 @@ Une ligne par fichier et par dossier de `scripts/`, et rien d'autre :
 | `verify_azure_config.py` | Vérifie la configuration Azure DevOps. | à la main |
 | `fix_azure_devops_config.py` | Corrige la configuration Azure DevOps. | à la main |
 | `quality_cli.py` | Lance le Quality Scorer de la revue de code sur des fichiers. | `quality-handlers.ts` (main) |
+| `audit_findings.py` | Écrit la carte `F<n>.js` de chaque constat `docs/audit/findings/F<n>.md` (`build`) ou vérifie qu'elles sont à jour (`check`). | `pre-push.js`, `tests/test_audit_findings.py` ; `build` à la main après un constat |
 | `audit-large-files.js` | Liste les fichiers source de plus de 500 lignes. | à la main |
 | `ai-pr-reviewer.md` | Prompt de revue de PR à coller dans un assistant. | à la main |
