@@ -32,6 +32,12 @@ export interface ProjectSettings {
 	 * (`cross_review/`). Absent means off; it must not be the build's provider.
 	 */
 	crossReview?: EngineTrio;
+	/**
+	 * ASP.NET Core Web APIs: write the spec's acceptance criteria as integration
+	 * tests before any code, and make `dotnet test` the task's goal when they
+	 * fail (`workflows/spec_by_example_phase.py`). Default: false.
+	 */
+	specByExample?: boolean;
 	/** Maximum parallel tasks allowed (default: 3) */
 	maxParallelTasks?: number;
 	/** Description utilisateur du projet (optionnel) */

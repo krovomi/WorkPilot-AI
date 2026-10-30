@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import {
 	applyVerifyLoop,
 	crossReviewEnv,
+	specByExampleEnv,
 	applyMobileTargets,
 	applyTddOverride,
 	getOAuthModeClearVars,
@@ -229,5 +230,13 @@ describe("crossReviewEnv", () => {
 		expect(crossReviewEnv(undefined)).toEqual({});
 		expect(crossReviewEnv({ provider: "openai", model: "  " })).toEqual({});
 		expect(crossReviewEnv({ provider: "", model: "gpt-5.5" })).toEqual({});
+	});
+});
+
+describe("specByExampleEnv", () => {
+	it("sends the switch only when the project turns it on", () => {
+		expect(specByExampleEnv(true)).toEqual({ WORKPILOT_SPEC_BY_EXAMPLE: "1" });
+		expect(specByExampleEnv(false)).toEqual({});
+		expect(specByExampleEnv(undefined)).toEqual({});
 	});
 });
