@@ -89,9 +89,9 @@ def _one_line(text: str, limit: int) -> str:
 def load_lessons(project_dir: str | Path) -> list[dict[str, Any]]:
     """Every lesson of the project, oldest first. Empty on anything unreadable."""
     path = _file(project_dir)
-    if not path.is_file():
-        return []
     try:
+        if not path.is_file():
+            return []
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
         logger.warning("review lessons unreadable: %s", exc)
@@ -194,7 +194,8 @@ def record_review_threads(
                 }
             )
         return _add(project_dir, candidates)
-    except Exception as exc:  # noqa: BLE001 - learning never fails a fix round
+    except (AttributeError, TypeError, ValueError) as exc:
+        # A thread of an unexpected shape: learning never fails a fix round.
         logger.warning("review lessons not recorded: %s", exc)
         return 0
 
@@ -260,7 +261,7 @@ def dismiss(project_dir: str | Path, lesson_id: str) -> bool:
 
 def adopted_rules(project_dir: str | Path) -> list[str]:
     return [
-        lesson["rule"]
+        str(lesson["rule"])
         for lesson in load_lessons(project_dir)
         if lesson["status"] == "adopted" and lesson.get("rule")
     ]
@@ -271,11 +272,7 @@ def rules_block(project_dir: str | Path) -> str:
 
     Bounded by count and size; a rule is never cut in the middle.
     """
-    try:
-        rules = list(reversed(adopted_rules(project_dir)))[:MAX_RULES_IN_PROMPT]
-    except Exception as exc:  # noqa: BLE001 - a prompt is built without them
-        logger.debug("review rules unavailable: %s", exc)
-        return ""
+    rules = list(reversed(adopted_rules(project_dir)))[:MAX_RULES_IN_PROMPT]
     if not rules:
         return ""
     lines = [RULES_HEADING, "", _RULES_INTRO, ""]
