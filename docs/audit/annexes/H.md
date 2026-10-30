@@ -12,7 +12,7 @@ ligne est une feature, une PR vers `develop`, avec sa justification dans `docs/a
 | [H4](H4.md) | Tests d'intégration ASP.NET Core avant le code, posés en objectif (IA6) | #576 |
 | [H5](H5.md) | Le Kanban comme serveur MCP (IA5) | #577 |
 | [H6](H6.md) | Moteur recommandé par type de carte, appris du banc (IA3) | #578 |
-| [H7](H7.md) | Revue en brouillon des PR ouvertes par d'autres, depuis les automatisations (IA7) | à venir |
+| [H7](H7.md) | Revue en brouillon des PR ouvertes par d'autres, depuis les automatisations (IA7) | #579 |
 
 Une feature, un fichier : `H<n>.md` dans ce dossier.
 
