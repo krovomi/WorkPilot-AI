@@ -8,7 +8,6 @@ from .review import (
     parse_verdict,
     read_verdict,
     refusal_message,
-    resolve_reviewer,
     tree_fingerprint,
     write_verdict,
 )
@@ -21,7 +20,6 @@ __all__ = [
     "parse_verdict",
     "read_verdict",
     "refusal_message",
-    "resolve_reviewer",
     "tree_fingerprint",
     "write_verdict",
 ]

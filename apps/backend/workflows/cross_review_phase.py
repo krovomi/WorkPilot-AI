@@ -2,26 +2,41 @@
 
 Runs after QA, on the code QA corrected, and before anyone opens the pull
 request. What it writes, `cross_review.json`, has one reader: the pull request
-step (`review.blocking_verdict`), which holds a ``disagree`` back. A phase
-whose engine is not configured runs nothing and says so.
+step (`cross_review.blocking_verdict`), which holds a ``disagree`` back. A
+phase whose engine is not configured runs nothing and says so.
+
+The phase lives here, with the runner, and not in `cross_review/`: it opens an
+agent session, and the pull request step in `core` reads the verdict. A
+package doing both would sit in the agent runtime's import cycle
+(`tests/test_import_contracts.py`); `cross_review/` stays a leaf on
+`foundation`.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 import os
+import re
 from pathlib import Path
+from typing import Any
 
-from .review import (
+from cross_review.review import (
     Reviewer,
     Verdict,
+    _git,
     parse_verdict,
-    resolve_reviewer,
     tree_fingerprint,
     write_verdict,
 )
 
 logger = logging.getLogger(__name__)
+
+ENV_PROVIDER = "WORKPILOT_CROSS_REVIEW_PROVIDER"
+ENV_MODEL = "WORKPILOT_CROSS_REVIEW_MODEL"
+ENV_EFFORT = "WORKPILOT_CROSS_REVIEW_EFFORT"
+
+_NAME = re.compile(r"^[A-Za-z0-9._:/@+-]{1,120}$")
 
 AGENT_TYPE = "pr_reviewer"
 """Read-only: a reviewer that could edit would be a second coder."""
@@ -40,6 +55,60 @@ _SESSION_ERRORS = (
     TypeError,
     ValueError,
 )
+
+
+def _name(value: Any) -> str:
+    text = str(value or "").strip()
+    return text if _NAME.match(text) else ""
+
+
+# ── Which engine reviews ────────────────────────────────────────────────
+
+
+def _metadata_reviewer(spec_dir: Path) -> dict[str, Any] | None:
+    try:
+        meta = json.loads((spec_dir / "task_metadata.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    value = meta.get("crossReview") if isinstance(meta, dict) else None
+    return value if isinstance(value, dict) else None
+
+
+def resolve_reviewer(
+    spec_dir: Path, build_provider: str | None
+) -> tuple[Reviewer | None, str]:
+    """The second engine, or None and the reason the review does not run.
+
+    The task's ``crossReview`` wins over the project's; ``{"enabled": false}``
+    in the task turns a project default off for that task.
+    """
+    from core.effort_plan import canonical_provider
+
+    configured = _metadata_reviewer(spec_dir)
+    if configured is not None and configured.get("enabled") is False:
+        return None, "turned off for this task"
+    if configured is not None and configured.get("provider"):
+        provider = _name(configured.get("provider"))
+        model = _name(configured.get("model"))
+        effort = _name(configured.get("effort")) or None
+    else:
+        provider = _name(os.environ.get(ENV_PROVIDER))
+        model = _name(os.environ.get(ENV_MODEL))
+        effort = _name(os.environ.get(ENV_EFFORT)) or None
+    if not provider:
+        return None, "no second engine configured"
+    if not model:
+        return None, f"no model named for {provider}"
+    if canonical_provider(provider) == canonical_provider(build_provider or "claude"):
+        return None, (
+            f"the second engine ({provider}) is the build's own provider; "
+            "a cross review needs another one"
+        )
+    return Reviewer(provider, model, effort), ""
+
+
+# ── The session ─────────────────────────────────────────────────────────
+
 
 _ANSWER_FORMAT = """\
 Answer with one JSON object and nothing after it:
@@ -61,8 +130,6 @@ taste are "minor" and never a reason to disagree. If you cannot tell, say
 def _diff(worktree: Path, spec_dir: Path, source_spec_dir: Path | None) -> str:
     """The task's change against the branch it forked from, bounded."""
     from goal.gate import fork_bases
-
-    from .review import _git
 
     fork = None
     for base in fork_bases(spec_dir, source_spec_dir):
@@ -175,7 +242,7 @@ async def _session(ctx, reviewer: Reviewer, prompt: str) -> tuple[str, str]:
 
 async def run_cross_review_phase(resolved, ctx):
     """Review the finished task on a second engine. Never raises."""
-    from workflows.runner import PhaseOutcome, _write_output, phase_provider
+    from .runner import PhaseOutcome, _write_output, phase_provider
 
     phase = resolved.phase
 

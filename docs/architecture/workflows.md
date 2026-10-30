@@ -38,7 +38,7 @@ a `gate` command is implemented by that gate (`pack_inventory`).
 | Phase | Who runs it |
 |---|---|
 | `brainstorm`, `analyze`, `review` | the engine (`workflows/runner.py`), as one-shot skill sessions |
-| `verify`, `verify-replay`, `architecture-map`, `cross-review` | the engine, through a dedicated executor (`CUSTOM_EXECUTORS`): Python drives the deterministic steps and opens a session only where a model is needed — `verify/phase.py`, `verify/replay.py` (no model at all), `architecture_visualizer/archify/phase.py`, `cross_review/phase.py` (one session on a second provider, [cross-review.md](cross-review.md)) |
+| `verify`, `verify-replay`, `architecture-map`, `cross-review` | the engine, through a dedicated executor (`CUSTOM_EXECUTORS`): Python drives the deterministic steps and opens a session only where a model is needed — `verify/phase.py`, `verify/replay.py` (no model at all), `architecture_visualizer/archify/phase.py`, `workflows/cross_review_phase.py` (one session on a second provider, [cross-review.md](cross-review.md)) |
 | `planning` and `coding` | `run_autonomous_agent`, **driven by the profile** — it decides the dispatch and injects the effort and the declared methodology |
 | `design-check` and any deterministic gate | the engine (`workflows/gates.py`) |
 | `mobile-design` | the engine (`workflows/runner.py`), when the task touches mobile files |

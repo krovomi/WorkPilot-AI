@@ -21,21 +21,24 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "apps" / "backend"))
 
 from core.worktree import WorktreeManager  # noqa: E402
-from cross_review import phase as cross_phase  # noqa: E402
 from cross_review.review import (  # noqa: E402
-    ENV_EFFORT,
-    ENV_MODEL,
-    ENV_PROVIDER,
     VERDICT_FILE,
     Reviewer,
     Verdict,
     blocking_verdict,
     parse_verdict,
     read_verdict,
-    resolve_reviewer,
     tree_fingerprint,
     write_verdict,
 )
+from workflows.cross_review_phase import (  # noqa: E402
+    ENV_EFFORT,
+    ENV_MODEL,
+    ENV_PROVIDER,
+    resolve_reviewer,
+)
+
+from workflows import cross_review_phase as cross_phase  # noqa: E402
 
 BLOCKER = {
     "severity": "blocker",
@@ -100,13 +103,16 @@ class TestWhichEngineReviews:
         metadata = spec_dir / "task_metadata.json"
 
         metadata.write_text(
-            json.dumps({"crossReview": {"provider": "mistral", "model": "devstral"}})
+            json.dumps({"crossReview": {"provider": "mistral", "model": "devstral"}}),
+            encoding="utf-8",
         )
         assert resolve_reviewer(spec_dir, "claude")[0] == Reviewer(
             "mistral", "devstral"
         )
 
-        metadata.write_text(json.dumps({"crossReview": {"enabled": False}}))
+        metadata.write_text(
+            json.dumps({"crossReview": {"enabled": False}}), encoding="utf-8"
+        )
         assert resolve_reviewer(spec_dir, "claude") == (
             None,
             "turned off for this task",
@@ -173,7 +179,9 @@ def _git(repo: Path, *args: str) -> str:
 
 class TestWhatWasReviewed:
     def test_a_commit_of_the_same_content_keeps_the_fingerprint(self, temp_git_repo):
-        (temp_git_repo / "orders.py").write_text("def delete(): ...\n")
+        (temp_git_repo / "orders.py").write_text(
+            "def delete(): ...\n", encoding="utf-8"
+        )
         before = tree_fingerprint(temp_git_repo)
         status_before = _git(temp_git_repo, "status", "--porcelain")
 
@@ -186,18 +194,22 @@ class TestWhatWasReviewed:
 
     def test_an_edit_changes_it(self, temp_git_repo):
         before = tree_fingerprint(temp_git_repo)
-        (temp_git_repo / "orders.py").write_text("def delete(): ...\n")
+        (temp_git_repo / "orders.py").write_text(
+            "def delete(): ...\n", encoding="utf-8"
+        )
         assert tree_fingerprint(temp_git_repo) != before
 
     def test_workpilot_files_and_ignored_files_do_not(self, temp_git_repo):
-        (temp_git_repo / ".gitignore").write_text("build/\n")
+        (temp_git_repo / ".gitignore").write_text("build/\n", encoding="utf-8")
         _git(temp_git_repo, "add", "-A")
         _git(temp_git_repo, "commit", "-qm", "ignore")
         before = tree_fingerprint(temp_git_repo)
 
-        (temp_git_repo / ".workpilot-discard-list").write_text("src/a.py\n")
+        (temp_git_repo / ".workpilot-discard-list").write_text(
+            "src/a.py\n", encoding="utf-8"
+        )
         (temp_git_repo / "build").mkdir()
-        (temp_git_repo / "build" / "out.bin").write_text("x")
+        (temp_git_repo / "build" / "out.bin").write_text("x", encoding="utf-8")
 
         assert tree_fingerprint(temp_git_repo) == before
 
@@ -217,7 +229,7 @@ def _record(spec_dir, worktree, verdict, *, at=None, tree=None):
     )
     if at:
         record["at"] = at
-        (spec_dir / VERDICT_FILE).write_text(json.dumps(record))
+        (spec_dir / VERDICT_FILE).write_text(json.dumps(record), encoding="utf-8")
     return record
 
 
@@ -234,7 +246,9 @@ class TestOnlyACurrentDisagreementBlocks:
 
     def test_a_disagreement_about_older_code_is_stale(self, temp_git_repo, spec_dir):
         _record(spec_dir, temp_git_repo, "disagree")
-        (temp_git_repo / "orders.py").write_text("def delete(): return 204\n")
+        (temp_git_repo / "orders.py").write_text(
+            "def delete(): return 204\n", encoding="utf-8"
+        )
         assert blocking_verdict([spec_dir], temp_git_repo) is None
 
     def test_an_unknown_tree_blocks_nothing(self, temp_git_repo, spec_dir):
@@ -249,7 +263,7 @@ class TestOnlyACurrentDisagreementBlocks:
         assert blocking_verdict([spec_dir, other], temp_git_repo) is None
 
     def test_an_unreadable_record_is_no_record(self, temp_git_repo, spec_dir):
-        (spec_dir / VERDICT_FILE).write_text("{oops")
+        (spec_dir / VERDICT_FILE).write_text("{oops", encoding="utf-8")
         assert read_verdict(spec_dir) is None
         assert blocking_verdict([spec_dir], temp_git_repo) is None
 
@@ -260,7 +274,7 @@ class TestThePullRequestIsHeldBack:
         manager = WorktreeManager(temp_git_repo)
         manager.setup()
         info = manager.create_worktree("004-orders")
-        (info.path / "orders.py").write_text("def delete(): ...\n")
+        (info.path / "orders.py").write_text("def delete(): ...\n", encoding="utf-8")
         manager.commit_in_worktree("004-orders", "feat: orders")
         pushed = []
         monkeypatch.setattr(
@@ -371,7 +385,9 @@ class TestThePhase:
         monkeypatch.setenv(ENV_PROVIDER, "openai")
         monkeypatch.setenv(ENV_MODEL, "gpt-5.5")
         plan_path = ctx.source_spec_dir / "implementation_plan.json"
-        plan_path.write_text(json.dumps({"feature": "Orders", "phases": []}))
+        plan_path.write_text(
+            json.dumps({"feature": "Orders", "phases": []}), encoding="utf-8"
+        )
 
         async def session(*_a):
             return "complete", _answer(
@@ -382,7 +398,7 @@ class TestThePhase:
 
         self._run(resolved, ctx)
 
-        plan = json.loads(plan_path.read_text())
+        plan = json.loads(plan_path.read_text(encoding="utf-8"))
         assert plan["feature"] == "Orders", "merged, never replaced"
         assert plan["crossReview"]["verdict"] == "disagree"
         assert plan["crossReview"]["blockers"] == 1

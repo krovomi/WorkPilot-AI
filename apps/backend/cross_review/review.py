@@ -23,7 +23,10 @@ Off until a second engine is named: in the project settings (the desktop
 passes ``WORKPILOT_CROSS_REVIEW_PROVIDER`` / ``_MODEL`` / ``_EFFORT``) or in
 the task's ``task_metadata.json`` (``crossReview``). An engine equal to the
 build's is refused: the same model reading its own work twice is not a
-second look.
+second look. Choosing the engine and running its session is the workflow
+phase's job (`workflows/cross_review_phase.py`); this package reads and keeps
+the verdict, and imports nothing above `foundation`, so the pull request step
+in `core` can read it without joining the agent runtime's import cycle.
 """
 
 from __future__ import annotations
@@ -31,7 +34,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import re
 import subprocess
 import tempfile
 from dataclasses import dataclass, field
@@ -45,10 +47,6 @@ VERDICT_FILE = "cross_review.json"
 VERDICTS = ("agree", "disagree", "inconclusive")
 SEVERITIES = ("blocker", "major", "minor")
 
-ENV_PROVIDER = "WORKPILOT_CROSS_REVIEW_PROVIDER"
-ENV_MODEL = "WORKPILOT_CROSS_REVIEW_MODEL"
-ENV_EFFORT = "WORKPILOT_CROSS_REVIEW_EFFORT"
-
 MAX_FINDINGS = 20
 MAX_TEXT = 500
 
@@ -56,8 +54,6 @@ MAX_TEXT = 500
 # (`.workpilot-discard-list` and the like) change between the review and the
 # push without changing the code anyone reviewed.
 _FINGERPRINT_EXCLUDES = (":(exclude,glob).workpilot*", ":(exclude,glob).workpilot*/**")
-
-_NAME = re.compile(r"^[A-Za-z0-9._:/@+-]{1,120}$")
 
 
 @dataclass(frozen=True)
@@ -88,56 +84,6 @@ def _now() -> str:
 
 def _clip(value: Any, limit: int = MAX_TEXT) -> str:
     return " ".join(str(value or "").split())[:limit]
-
-
-def _name(value: Any) -> str:
-    text = str(value or "").strip()
-    return text if _NAME.match(text) else ""
-
-
-# ── Which engine reviews ────────────────────────────────────────────────
-
-
-def _metadata_reviewer(spec_dir: Path) -> dict[str, Any] | None:
-    try:
-        meta = json.loads((spec_dir / "task_metadata.json").read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return None
-    value = meta.get("crossReview") if isinstance(meta, dict) else None
-    return value if isinstance(value, dict) else None
-
-
-def resolve_reviewer(
-    spec_dir: Path, build_provider: str | None
-) -> tuple[Reviewer | None, str]:
-    """The second engine, or None and the reason the review does not run.
-
-    The task's ``crossReview`` wins over the project's; ``{"enabled": false}``
-    in the task turns a project default off for that task.
-    """
-    from core.effort_plan import canonical_provider
-
-    configured = _metadata_reviewer(spec_dir)
-    if configured is not None and configured.get("enabled") is False:
-        return None, "turned off for this task"
-    if configured is not None and configured.get("provider"):
-        provider = _name(configured.get("provider"))
-        model = _name(configured.get("model"))
-        effort = _name(configured.get("effort")) or None
-    else:
-        provider = _name(os.environ.get(ENV_PROVIDER))
-        model = _name(os.environ.get(ENV_MODEL))
-        effort = _name(os.environ.get(ENV_EFFORT)) or None
-    if not provider:
-        return None, "no second engine configured"
-    if not model:
-        return None, f"no model named for {provider}"
-    if canonical_provider(provider) == canonical_provider(build_provider or "claude"):
-        return None, (
-            f"the second engine ({provider}) is the build's own provider; "
-            "a cross review needs another one"
-        )
-    return Reviewer(provider, model, effort), ""
 
 
 # ── Reading the answer ──────────────────────────────────────────────────

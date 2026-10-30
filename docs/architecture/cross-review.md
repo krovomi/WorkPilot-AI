@@ -11,9 +11,15 @@ the pull request back when that engine names a blocking problem.
 
 The `cross-review` phase, declared after `qa` in `feature-build`, `bug-fix`,
 `hotfix` and `refactoring` (`workflows/*/workflow.yaml`), run by
-`apps/backend/cross_review/phase.py` (`CUSTOM_EXECUTORS` in
+`apps/backend/workflows/cross_review_phase.py` (`CUSTOM_EXECUTORS` in
 `workflows/runner.py`). After QA because it judges the code that will be
 pushed; its reader is the pull request step, not a fixer.
+
+The code is in two places on purpose. The phase opens an agent session, so it
+lives with the runner. The verdict (parsing, record, fingerprint, the hold) is
+`apps/backend/cross_review/`, which imports nothing above `foundation`: the
+pull request step in `core` reads it, and a package that did both would join
+the agent runtime's import cycle (`tests/test_import_contracts.py`).
 
 It is never pruned by effort (`always: true`): the switch is the project's
 setting, and a gate the person asked for does not vanish at a low level.
@@ -21,7 +27,7 @@ Without a second engine the phase opens no session and costs nothing.
 
 ## Which engine
 
-`cross_review.review.resolve_reviewer`, in this order:
+`workflows.cross_review_phase.resolve_reviewer`, in this order:
 
 1. the task's `task_metadata.json`, key `crossReview`
    (`{provider, model, effort}`, or `{"enabled": false}` to turn the project

@@ -143,7 +143,7 @@ CONFIG_PHASE = {
     # Architecture mapping runs after QA and describes the system topology changes.
     "architecture-map": "qa",
     # A second engine reading the finished task: a QA cost. Its own provider
-    # and model come from `cross_review.resolve_reviewer`, not from this.
+    # and model come from `cross_review_phase.resolve_reviewer`, not from this.
     "cross-review": "qa",
     # Phases of the per-kind workflows (`workflows/registry.py`). Before the
     # code is written, they are planning costs; what reads the finished work
@@ -218,7 +218,7 @@ SKILL_PHASE_AGENTS = {
     "analyze": "spec_validation",
     "mobile-design": "pr_reviewer",
     "review": "pr_reviewer",
-    # Read-only; `cross_review.phase` opens the session itself, on the
+    # Read-only; `workflows.cross_review_phase` opens the session itself, on the
     # second engine, and names this agent too.
     "cross-review": "pr_reviewer",
     # The verification loop drives the app and may fix it: `verifier` writes,
@@ -1178,9 +1178,9 @@ async def _run_execute(resolved, ctx: PhaseContext) -> PhaseOutcome:
 
 
 async def _run_cross_review(resolved, ctx: PhaseContext) -> PhaseOutcome:
-    """The `cross-review` phase: `cross_review.phase`, on a second engine."""
+    """The `cross-review` phase: `workflows.cross_review_phase`, on a second engine."""
     try:
-        from cross_review.phase import run_cross_review_phase
+        from workflows.cross_review_phase import run_cross_review_phase
     except ImportError as exc:  # pragma: no cover - import-time environment
         return PhaseOutcome(
             resolved.phase.id,

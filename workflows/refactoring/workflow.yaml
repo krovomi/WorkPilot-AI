@@ -90,7 +90,6 @@ phases:
     impl: tooling/review-lenses
     always: true
     dispatch: fresh-context
-    roster: solo
     description: >-
       A second engine — another provider, the model the project names — reads
       the corrected diff against the spec and the goal and answers agree,
