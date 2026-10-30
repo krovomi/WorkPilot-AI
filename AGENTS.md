@@ -106,7 +106,8 @@ Le reste (CLI, hooks, CI, release) : [`docs/rules/workflow.md`](docs/rules/workf
 
 ## Discipline de contexte
 
-Plusieurs fichiers dépassent 2 500 lignes (`usage-monitor.ts`, `worktree-handlers.ts`,
-`KanbanBoard.tsx`, `app-emulator-service.ts`, `execution-handlers.ts`, `core/client.py`,
-`agents/coder.py`) : **ne pas les ouvrir en entier**. Chercher le symbole (`grep -n`), lire le
-voisinage, éditer. Les index locaux donnent la carte de ces fichiers.
+Plusieurs fichiers dépassent 2 500 lignes (`usage-monitor.ts`, `KanbanBoard.tsx`,
+`app-emulator-service.ts`, `execution-handlers.ts`, `core/client.py`, `agents/coder.py`) : **ne
+pas les ouvrir en entier**. Chercher le symbole (`grep -n`), lire le voisinage, éditer. Les index
+locaux donnent la carte de ces fichiers. Aucun fichier source ne grossit au-delà de son plafond
+(`tests/baselines/file-size.json`) : du code nouveau va dans un module à lui.

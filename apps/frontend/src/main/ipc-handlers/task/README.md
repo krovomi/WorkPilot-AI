@@ -10,7 +10,13 @@ This directory contains the refactored task-related IPC handlers, previously con
 |--------|-------|----------------|
 | `crud-handlers.ts` | ~428 | Task CRUD operations (Create, Read, Update, Delete, List) |
 | `execution-handlers.ts` | ~553 | Task execution lifecycle (Start, Stop, Review, Status, Recovery) |
-| `worktree-handlers.ts` | ~759 | Git worktree management (Status, Diff, Merge, Preview, Discard, List) |
+| `worktree-handlers.ts` | ~1 200 | Git worktree management (Status, Discard, List, IDE/terminal, impact, sync); registers the groups below |
+| `worktree-diff-handlers.ts` | ~500 | Worktree diff and single-file diff |
+| `worktree-merge-handlers.ts` | ~1 150 | Merge into the base branch, merge preview |
+| `worktree-file-handlers.ts` | ~300 | Read, write, delete files in a worktree |
+| `worktree-create-pr-handlers.ts` | ~480 | Create a PR from a worktree |
+| `worktree-visual-proof-handlers.ts` | ~300 | Visual proof run, sync, status |
+| `worktree-handler-utils.ts` | ~340 | Helpers shared by the worktree modules |
 | `logs-handlers.ts` | ~111 | Task logs operations (Get, Watch, Unwatch) |
 | `shared.ts` | ~22 | Shared utilities and helper functions |
 | `index.ts` | ~41 | Main module exports and registration |
@@ -49,8 +55,8 @@ Features:
 - Intelligent recovery with subtask analysis
 - File watcher integration
 
-### Worktree Handlers (`worktree-handlers.ts`)
-Manages git worktree operations:
+### Worktree Handlers (`worktree-*.ts`)
+Manages git worktree operations (one module per group, all registered by `registerWorktreeHandlers`):
 - **TASK_WORKTREE_STATUS** - Get worktree status and git info
 - **TASK_WORKTREE_DIFF** - Get detailed file-level diff
 - **TASK_WORKTREE_MERGE** - Merge worktree into main branch

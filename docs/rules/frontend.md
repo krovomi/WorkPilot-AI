@@ -92,4 +92,7 @@ Aucun chemin en dur. Notes Windows : [`docs/windows-development.md`](../windows-
 
 Un `biome-ignore` de plus dans un fichier est refusé : `tests/baselines/biome-ignore.json` plafonne
 chaque fichier à son compte du 30 octobre 2026 (`python scripts/quality_baselines.py`, depuis la
-racine ; `update` ne fait que baisser). Typer la valeur plutôt que taire la règle.
+racine ; `update` ne fait que baisser). Typer la valeur plutôt que taire la règle. De même, un
+fichier de plus de 2 000 lignes ne grossit plus (`tests/baselines/file-size.json`, voir
+[`backend.md`](backend.md)) : `KanbanBoard.tsx` ou `execution-handlers.ts` reçoivent un import,
+pas une fonction de plus.
