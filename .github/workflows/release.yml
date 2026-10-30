@@ -493,10 +493,27 @@ jobs:
       # Needed to dispatch the wiki refresh below — a `release: published`
       # event raised by GITHUB_TOKEN does not trigger other workflows.
       actions: write
+      # The build provenance attestation (lot N6, S3): a short-lived OIDC
+      # token signs it, and it is stored with the repository's attestations.
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+
+      # What the release is built from, as a CycloneDX SBOM published beside
+      # the binaries: the npm packages of pnpm-lock.yaml and the Python
+      # packages of apps/backend/requirements.lock, read from the checkout
+      # before any binary is downloaded next to it.
+      - name: Generate the SBOM
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: release-assets/workpilot-sbom.cdx.json
+          upload-artifact: false
+          upload-release-assets: false
 
       - name: Download all artifacts
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -580,6 +597,15 @@ jobs:
           cd release-assets
           sha256sum ./* > checksums.sha256
           cat checksums.sha256
+
+      # Every published file, SBOM and checksums included, gets a signed
+      # statement of the workflow run that built it:
+      #   gh attestation verify <file> --repo krovomi/WorkPilot-AI
+      - name: Attest the build provenance
+        if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.dry_run != true) }}
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: release-assets/*
 
       - name: Dry run summary
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run == true }}
@@ -718,6 +744,8 @@ jobs:
             ---
 
             **Full Changelog**: https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md
+
+            **Supply chain**: `workpilot-sbom.cdx.json` lists the npm and Python packages this release is built from. Each file carries a build provenance attestation: `gh attestation verify <file> --repo ${{ github.repository }}`.
 
             _VirusTotal scan results are added to these notes after release when the scan is configured._
           files: release-assets/*
