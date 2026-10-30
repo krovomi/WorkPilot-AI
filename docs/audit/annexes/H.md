@@ -8,6 +8,7 @@ ligne est une feature, une PR vers `develop`, avec sa justification dans `docs/a
 |---|---|---|
 | [H1](H1.md) | Règles apprises des revues, adoptées d'un clic (IA1) | #573 |
 | [H2](H2.md) | Revue croisée par un second moteur avant la PR (IA2) | #574 |
+| [H3](H3.md) | Vues MCP Apps sur le chemin du SDK Claude (IA4) | #575 |
 | [H4](H4.md) | Tests d'intégration ASP.NET Core avant le code, posés en objectif (IA6) | #576 |
 
 Une feature, un fichier : `H<n>.md` dans ce dossier.
