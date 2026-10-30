@@ -142,6 +142,9 @@ CONFIG_PHASE = {
     "verify-replay": "qa",
     # Architecture mapping runs after QA and describes the system topology changes.
     "architecture-map": "qa",
+    # A second engine reading the finished task: a QA cost. Its own provider
+    # and model come from `cross_review.resolve_reviewer`, not from this.
+    "cross-review": "qa",
     # Phases of the per-kind workflows (`workflows/registry.py`). Before the
     # code is written, they are planning costs; what reads the finished work
     # is a QA cost.
@@ -215,6 +218,9 @@ SKILL_PHASE_AGENTS = {
     "analyze": "spec_validation",
     "mobile-design": "pr_reviewer",
     "review": "pr_reviewer",
+    # Read-only; `cross_review.phase` opens the session itself, on the
+    # second engine, and names this agent too.
+    "cross-review": "pr_reviewer",
     # The verification loop drives the app and may fix it: `verifier` writes,
     # like `qa_fixer`, and gets the `verify_*` tools on every provider.
     "verify": "verifier",
@@ -1171,6 +1177,21 @@ async def _run_execute(resolved, ctx: PhaseContext) -> PhaseOutcome:
     return await run_execute_phase(resolved, ctx)
 
 
+async def _run_cross_review(resolved, ctx: PhaseContext) -> PhaseOutcome:
+    """The `cross-review` phase: `cross_review.phase`, on a second engine."""
+    try:
+        from cross_review.phase import run_cross_review_phase
+    except ImportError as exc:  # pragma: no cover - import-time environment
+        return PhaseOutcome(
+            resolved.phase.id,
+            resolved.phase.impl,
+            resolved.dispatch,
+            None,
+            detail=f"unavailable: {exc}",
+        )
+    return await run_cross_review_phase(resolved, ctx)
+
+
 async def _run_architecture_map(resolved, ctx: PhaseContext) -> PhaseOutcome:
     """The `architecture-map` phase: `archify.phase`, imported when it runs."""
     try:
@@ -1199,10 +1220,15 @@ async def _run_architecture_map(resolved, ctx: PhaseContext) -> PhaseOutcome:
 # validate/deliver/compare and the record the Delta tab reads are Python; only
 # authoring the head model needs a session. As a one-shot session it answered
 # in prose, mapped nothing, and left the tab empty.
+#
+# `cross-review` opens its session on another provider than the build's, and
+# what it must produce is a verdict the pull request step can read, not prose:
+# both are the executor's, so the phase is too.
 CUSTOM_EXECUTORS = {
     "verify": _run_verify_loop,
     "verify-replay": _run_verify_replay,
     "architecture-map": _run_architecture_map,
+    "cross-review": _run_cross_review,
     "execute": _run_execute,
 }
 

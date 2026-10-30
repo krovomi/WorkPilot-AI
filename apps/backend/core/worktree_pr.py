@@ -1597,6 +1597,37 @@ class WorktreePRMixin:
 
         return reverted
 
+    def _cross_review_hold(self, spec_name: str) -> PushAndCreatePRResult | None:
+        """The refusal when the cross review disagrees with the worktree's code."""
+        try:
+            from cross_review import blocking_verdict, refusal_message
+
+            worktree = self.get_worktree_path(spec_name)
+            spec_dirs = [
+                self.project_dir / ".workpilot" / "specs" / spec_name,
+                worktree / ".workpilot" / "specs" / spec_name,
+            ]
+            record = blocking_verdict(spec_dirs, worktree)
+        except (ImportError, OSError, ValueError) as exc:
+            logger.warning("[push_and_create_pr] cross review unreadable: %s", exc)
+            return None
+        if record is None:
+            return None
+        logger.warning(
+            "[push_and_create_pr] Holding back the PR for '%s': the cross review "
+            "by %s disagrees.",
+            spec_name,
+            record.get("provider"),
+        )
+        return PushAndCreatePRResult(
+            success=False,
+            pushed=False,
+            branch="",
+            remote="",
+            error=refusal_message(record),
+            cross_review_blocked=True,
+        )
+
     def push_and_create_pr(
         self,
         spec_name: str,
@@ -1605,6 +1636,7 @@ class WorktreePRMixin:
         draft: bool = False,
         force_push: bool = False,
         body: str | None = None,
+        allow_cross_review_disagreement: bool = False,
     ) -> PushAndCreatePRResult:
         """
         Push branch and create a pull request/merge request in one operation.
@@ -1619,6 +1651,9 @@ class WorktreePRMixin:
             body: Optional PR/MR body. If provided, used verbatim (no AI
                   generation, no impact block injection) - the caller is
                   responsible for the full content including any impact block.
+            allow_cross_review_disagreement: Create the PR even though the
+                  cross review (`cross_review/`) disagrees with this exact
+                  code. Only a person's explicit choice sets it.
 
         Returns:
             PushAndCreatePRResult with keys:
@@ -1629,6 +1664,14 @@ class WorktreePRMixin:
                 - already_exists: bool (if PR/MR already exists)
                 - error: str (if failed)
         """
+        # Step -1: A second engine that disagrees with this exact code holds
+        # the PR back, before anything is committed or pushed. Stale or
+        # inconclusive verdicts block nothing (`cross_review.blocking_verdict`).
+        if not allow_cross_review_disagreement:
+            held = self._cross_review_hold(spec_name)
+            if held is not None:
+                return held
+
         # Step 0: Commit any uncommitted changes before pushing
         has_changes, changed_files = self._has_uncommitted_changes(spec_name)
         if has_changes:

@@ -498,4 +498,83 @@ describe("CreatePRDialog", () => {
 			expect(screen.getByText(azurePrUrl)).toBeInTheDocument();
 		});
 	});
+
+	// IA2 : la revue croisée retient la PR ; seule la personne la crée quand même.
+	describe("cross review", () => {
+		const blocked = {
+			success: false,
+			error:
+				"Cross review by openai / gpt-5.5 disagrees with this change (1 blocking problem(s)):\n- src/Orders.cs:42: DELETE /orders/{id} is missing.",
+			crossReviewBlocked: true,
+		};
+
+		const renderDialog = (task: Task = mockTask) =>
+			render(
+				<CreatePRDialog
+					open={true}
+					task={task}
+					worktreeStatus={mockWorktreeStatus}
+					onOpenChange={mockOnOpenChange}
+					onCreatePR={mockOnCreatePR}
+				/>,
+			);
+
+		it("holds the PR back and lets the person create it anyway", async () => {
+			mockOnCreatePR
+				.mockResolvedValueOnce(blocked)
+				.mockResolvedValueOnce({
+					success: true,
+					prUrl: "https://github.com/test/pr/2",
+				});
+			renderDialog();
+
+			fireEvent.click(screen.getByRole("button", { name: /create pull request/i }));
+
+			const alert = await screen.findByRole("alert");
+			expect(alert).toHaveTextContent(/cross review disagrees/i);
+			expect(alert).toHaveTextContent("src/Orders.cs:42");
+			expect(mockOnCreatePR.mock.calls[0][0].allowCrossReviewDisagreement).toBe(
+				undefined,
+			);
+			expect(
+				screen.queryByRole("button", { name: /retry/i }),
+			).not.toBeInTheDocument();
+
+			fireEvent.click(screen.getByRole("button", { name: /create anyway/i }));
+
+			await waitFor(() => expect(mockOnCreatePR).toHaveBeenCalledTimes(2));
+			expect(mockOnCreatePR.mock.calls[1][0].allowCrossReviewDisagreement).toBe(
+				true,
+			);
+		});
+
+		it("offers no override for any other failure", async () => {
+			mockOnCreatePR.mockResolvedValue({ success: false, error: "push rejected" });
+			renderDialog();
+
+			fireEvent.click(screen.getByRole("button", { name: /create pull request/i }));
+
+			await screen.findByText("push rejected");
+			expect(
+				screen.queryByRole("button", { name: /create anyway/i }),
+			).not.toBeInTheDocument();
+			expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
+		});
+
+		it("shows the last verdict before the PR is created", async () => {
+			renderDialog({
+				...mockTask,
+				crossReview: {
+					verdict: "inconclusive",
+					provider: "openai",
+					model: "gpt-5.5",
+					blockers: 0,
+				},
+			});
+
+			expect(
+				await screen.findByText(/no usable verdict.*not an approval/i),
+			).toBeInTheDocument();
+		});
+	});
 });

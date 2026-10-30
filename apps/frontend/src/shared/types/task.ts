@@ -607,6 +607,8 @@ export interface Task {
 	verification?: TaskVerificationSummary;
 	/** The goal gate's last verdict (`apps/backend/goal/`), from the plan. */
 	goal?: TaskGoalSummary;
+	/** The second engine's verdict (`apps/backend/cross_review/`), from the plan. */
+	crossReview?: TaskCrossReviewSummary;
 	subtasks: Subtask[];
 	qaReport?: QAReport;
 	logs: string[];
@@ -620,6 +622,20 @@ export interface Task {
 	prUrl?: string; // URL of the PR created automatically when task is completed
 	createdAt: Date;
 	updatedAt: Date;
+}
+
+/**
+ * What a second engine said about the finished task (`cross_review/`).
+ * `disagree` names at least one blocking problem and holds the pull request
+ * back; `inconclusive` is everything unclear and never reads as `agree`.
+ */
+export interface TaskCrossReviewSummary {
+	verdict: "agree" | "disagree" | "inconclusive";
+	provider: string;
+	model: string;
+	blockers: number;
+	summary?: string;
+	at?: string;
 }
 
 /** What the card needs to know about the task's last verification. */
@@ -651,6 +667,8 @@ export interface ImplementationPlan {
 	verification?: TaskVerificationSummary;
 	/** Written by the goal gate (`goal/gate.py::record_verdict`). */
 	goal?: TaskGoalSummary;
+	/** Written by the cross review (`cross_review/review.py::write_verdict`). */
+	crossReview?: TaskCrossReviewSummary;
 	xstateState?: string; // Persisted XState machine state for restoration (e.g., 'planning', 'coding')
 	lastEvent?: {
 		eventId: string;
@@ -986,6 +1004,11 @@ export interface WorktreeCreatePROptions {
 	 * Defaults to true.
 	 */
 	runVisualProof?: boolean;
+	/**
+	 * Create the PR although the cross review disagrees with this code. Set
+	 * only by the person's "create anyway" in the PR dialog.
+	 */
+	allowCrossReviewDisagreement?: boolean;
 }
 
 /**
@@ -998,6 +1021,8 @@ export interface WorktreeCreatePRResult {
 	message?: string; // Human-readable message for both success and error cases
 	alreadyExists?: boolean;
 	visualProof?: VisualProofRun;
+	/** Held back because the cross review disagrees with this code. */
+	crossReviewBlocked?: boolean;
 }
 
 export type VisualProofStatus = "pending" | "passed" | "failed" | "skipped";

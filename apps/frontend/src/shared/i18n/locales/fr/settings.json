@@ -1694,7 +1694,10 @@
 			"tddMode": "Mode TDD",
 			"tddModeDescription": "Imposer le TDD strict (Red-Green-Refactor) : l'agent écrit le test, le voit échouer, puis implémente",
 			"verifyLoop": "Boucle de vérification",
-			"verifyLoopDescription": "Après le code, lancer l'application, corriger ce qui casse, l'amener jusqu'au changement et la mesurer (trace Chrome DevTools, captures). Chaque tâche peut la désactiver."
+			"verifyLoopDescription": "Après le code, lancer l'application, corriger ce qui casse, l'amener jusqu'au changement et la mesurer (trace Chrome DevTools, captures). Chaque tâche peut la désactiver.",
+			"crossReview": "Revue croisée par un second moteur",
+			"crossReviewDescription": "Après la QA, un autre fournisseur relit le diff au regard de la spec et de l'objectif. S'il signale un problème bloquant, la pull request t'attend.",
+			"crossReviewSameProvider": "C'est le fournisseur avec lequel les tâches sont construites ({{provider}}). Choisis-en un autre : un modèle qui relit son propre travail n'apporte pas de second regard, et la revue ne se lancera pas."
 		},
 		"github": {
 			"authenticatedAs": "Authentifié en tant que {{username}}",

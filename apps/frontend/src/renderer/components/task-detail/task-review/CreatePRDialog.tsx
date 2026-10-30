@@ -3,10 +3,12 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type {
 	Task,
+	WorktreeCreatePROptions,
 	WorktreeCreatePRResult,
 	WorktreeStatus,
 } from "../../../../shared/types";
 import { appendImpactBlock } from "../../../../shared/utils/pr-impact-block";
+import { cn } from "../../../lib/utils";
 import { Button } from "../../ui/button";
 import { Checkbox } from "../../ui/checkbox";
 import {
@@ -26,12 +28,9 @@ interface CreatePRDialogProps {
 	task: Task;
 	worktreeStatus: WorktreeStatus | null;
 	onOpenChange: (open: boolean) => void;
-	onCreatePR: (options: {
-		targetBranch?: string;
-		title?: string;
-		draft?: boolean;
-		customBody?: string;
-	}) => Promise<WorktreeCreatePRResult | null>;
+	onCreatePR: (
+		options: WorktreeCreatePROptions,
+	) => Promise<WorktreeCreatePRResult | null>;
 }
 
 /**
@@ -56,6 +55,8 @@ export function CreatePRDialog({
 	const [isCreating, setIsCreating] = useState(false);
 	const [result, setResult] = useState<WorktreeCreatePRResult | null>(null);
 	const [error, setError] = useState<string | null>(null);
+	// The cross review disagrees with this code: the person may still go on.
+	const [crossReviewBlocked, setCrossReviewBlocked] = useState(false);
 
 	// Impact analysis state
 	const [impactRating, setImpactRating] = useState<string>("N/A");
@@ -152,7 +153,7 @@ export function CreatePRDialog({
 		return null;
 	};
 
-	const handleCreatePR = async () => {
+	const handleCreatePR = async (allowCrossReviewDisagreement = false) => {
 		// Frontend validation before submitting
 		const branchError = validateBranchName(targetBranch);
 		if (branchError) {
@@ -169,6 +170,7 @@ export function CreatePRDialog({
 		setIsCreating(true);
 		setError(null);
 		setResult(null);
+		setCrossReviewBlocked(false);
 
 		// If the analyzer produced a body, rebuild the final body from the
 		// (possibly user-edited) rating + features and send it as customBody.
@@ -186,6 +188,9 @@ export function CreatePRDialog({
 				title: prTitle || undefined,
 				draft: isDraft,
 				customBody,
+				...(allowCrossReviewDisagreement && {
+					allowCrossReviewDisagreement: true,
+				}),
 			});
 
 			if (prResult) {
@@ -193,6 +198,7 @@ export function CreatePRDialog({
 					setResult(prResult);
 				} else {
 					setError(prResult.error || t("taskReview:pr.errors.unknown"));
+					setCrossReviewBlocked(prResult.crossReviewBlocked === true);
 				}
 			} else {
 				setError(t("taskReview:pr.errors.unknown"));
@@ -321,16 +327,41 @@ export function CreatePRDialog({
 				{/* Error State */}
 				{error && !result?.success && (
 					<div className="space-y-4">
-						<div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4">
-							<p className="text-sm text-destructive">{error}</p>
+						<div
+							className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 space-y-2"
+							role="alert"
+						>
+							{crossReviewBlocked && (
+								<p className="text-sm font-medium text-destructive">
+									{t("taskReview:pr.crossReview.blockedTitle")}
+								</p>
+							)}
+							<p className="text-sm text-destructive whitespace-pre-line">
+								{error}
+							</p>
+							{crossReviewBlocked && (
+								<p className="text-xs text-muted-foreground">
+									{t("taskReview:pr.crossReview.blockedHint")}
+								</p>
+							)}
 						</div>
 						<DialogFooter>
 							<Button variant="outline" onClick={handleClose}>
 								{t("common:buttons.cancel")}
 							</Button>
-							<Button onClick={handleCreatePR} disabled={isCreating}>
-								{t("taskReview:pr.actions.retry")}
-							</Button>
+							{crossReviewBlocked ? (
+								<Button
+									variant="destructive"
+									onClick={() => handleCreatePR(true)}
+									disabled={isCreating}
+								>
+									{t("taskReview:pr.crossReview.createAnyway")}
+								</Button>
+							) : (
+								<Button onClick={() => handleCreatePR()} disabled={isCreating}>
+									{t("taskReview:pr.actions.retry")}
+								</Button>
+							)}
 						</DialogFooter>
 					</div>
 				)}
@@ -338,6 +369,21 @@ export function CreatePRDialog({
 				{/* Form State */}
 				{!result?.success && !error && (
 					<div className="space-y-4">
+						{task.crossReview && (
+							<p
+								className={cn(
+									"text-xs rounded-md border px-3 py-2",
+									task.crossReview.verdict === "disagree"
+										? "border-destructive/30 bg-destructive/10 text-destructive"
+										: "border-border bg-muted/50 text-muted-foreground",
+								)}
+							>
+								{t(`taskReview:pr.crossReview.verdict.${task.crossReview.verdict}`, {
+									engine: `${task.crossReview.provider} / ${task.crossReview.model}`,
+									count: task.crossReview.blockers,
+								})}
+							</p>
+						)}
 						{/* Existing PR banner — when a PR already exists, creating
 							again just pushes a new commit onto it. Make that explicit. */}
 						{hasExistingPr && (
@@ -537,7 +583,7 @@ export function CreatePRDialog({
 								{t("common:buttons.cancel")}
 							</Button>
 							<Button
-								onClick={handleCreatePR}
+								onClick={() => handleCreatePR()}
 								disabled={
 									isCreating ||
 									(worktreeStatus?.exists === true &&

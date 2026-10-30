@@ -275,7 +275,9 @@ class TestEveryWorkflow:
         ids = [p.id for p in workflow.phases]
         last_consumer = max((ids.index(c) for c in CONSUMERS if c in ids), default=-1)
         deliverables = {"investigate", "procedure", "execute", "verdict", "proofread"}
-        allowed_after = {"architecture-map", "verify-replay", "observe"}
+        # `cross-review` is read by the pull request step, which holds a
+        # disagreement back (`cross_review.blocking_verdict`).
+        allowed_after = {"architecture-map", "verify-replay", "cross-review", "observe"}
         for i, phase in enumerate(workflow.phases):
             if i > last_consumer and phase.id not in BUILTIN_EXECUTORS:
                 assert phase.id in deliverables | allowed_after, (name, phase.id)

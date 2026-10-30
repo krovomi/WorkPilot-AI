@@ -177,6 +177,17 @@
 		},
 		"warnings": {
 			"emptyBranch": "Aucun commit à pousser : la branche est identique à « {{base}} ». La PR serait vide. Vérifiez que l'agent a bien commité ses changements ou qu'il ne s'agit pas d'une tâche dupliquée déjà fusionnée."
+		},
+		"crossReview": {
+			"blockedTitle": "La revue croisée n'est pas d'accord avec ce changement",
+			"blockedHint": "Corriger le code et relancer le build déclenche une nouvelle revue. Si tu as lu les problèmes et veux quand même la pull request, crée-la quand même.",
+			"createAnyway": "Créer quand même",
+			"verdict": {
+				"agree": "Revue croisée par {{engine}} : aucun problème bloquant.",
+				"disagree_one": "Revue croisée par {{engine}} : 1 problème bloquant. La pull request est retenue jusqu'à ce que le code change ou que tu la crées quand même.",
+				"disagree_other": "Revue croisée par {{engine}} : {{count}} problèmes bloquants. La pull request est retenue jusqu'à ce que le code change ou que tu la crées quand même.",
+				"inconclusive": "Revue croisée par {{engine}} : pas de verdict exploitable. Elle ne retient pas la pull request, et ce n'est pas une approbation."
+			}
 		}
 	},
 	"mergeProgress": {

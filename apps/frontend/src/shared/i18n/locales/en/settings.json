@@ -789,7 +789,10 @@
 			"tddMode": "TDD Mode",
 			"tddModeDescription": "Enforce strict TDD (Red-Green-Refactor): the agent writes the test, watches it fail, then implements",
 			"verifyLoop": "Verification loop",
-			"verifyLoopDescription": "After coding, launch the app, fix what breaks, drive it to the change and measure it (Chrome DevTools trace, screenshots). Cards can override it."
+			"verifyLoopDescription": "After coding, launch the app, fix what breaks, drive it to the change and measure it (Chrome DevTools trace, screenshots). Cards can override it.",
+			"crossReview": "Cross review by a second engine",
+			"crossReviewDescription": "After QA, another provider reads the diff against the spec and the goal. If it names a blocking problem, the pull request waits for you.",
+			"crossReviewSameProvider": "This is the provider tasks are built with ({{provider}}). Pick another one: a model rereading its own work is not a second look, and the review will not run."
 		},
 		"autoBuild": {
 			"title": "WorkPilot AI Integration",

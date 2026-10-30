@@ -28,6 +28,7 @@ import {
 	Square,
 	Target,
 	Undo2,
+	Users,
 	Wrench,
 	X,
 	XCircle,
@@ -626,6 +627,28 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 				</Badge>
 			) : null}
 
+			{/* The second engine's verdict on the finished task. Inconclusive
+			    is shown too: it is not an agreement, and must not read as one. */}
+			{task.crossReview ? (
+				<Badge
+					variant="outline"
+					className={cn(
+						"text-[10px] px-1.5 py-0.5 flex items-center gap-1",
+						task.crossReview.verdict === "agree"
+							? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+							: task.crossReview.verdict === "disagree"
+								? "bg-destructive/10 text-destructive border-destructive/30"
+								: "bg-muted text-muted-foreground border-border",
+					)}
+					title={`${task.crossReview.provider} / ${task.crossReview.model}${
+						task.crossReview.summary ? ` — ${task.crossReview.summary}` : ""
+					}`}
+				>
+					<Users className="h-2.5 w-2.5" />
+					{t(`tasks:crossReview.cardBadge.${task.crossReview.verdict}`)}
+				</Badge>
+			) : null}
+
 			{/* Kind of work (bug, hotfix, RUN…), decided without a model */}
 			<TaskKindBadge task={task} className="text-[10px] px-1.5 py-0" />
 
@@ -1161,6 +1184,8 @@ function taskCardPropsAreEqual(
 		// The engine chip: a resume on another LLM changes only these.
 		sameEngineFields(prevTask.metadata, nextTask.metadata) &&
 		prevTask.verification?.status === nextTask.verification?.status &&
+		prevTask.crossReview?.verdict === nextTask.crossReview?.verdict &&
+		prevTask.crossReview?.at === nextTask.crossReview?.at &&
 		prevTask.verification?.score === nextTask.verification?.score &&
 		// Check if any subtask statuses changed (compare all subtasks)
 		prevTask.subtasks.every(

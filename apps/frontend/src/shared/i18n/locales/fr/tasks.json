@@ -2108,5 +2108,12 @@
 		"confirmBody": "Le build sur {{engine}} devient celui de la tâche. Les {{others}} autres variantes, leurs worktrees et leurs branches sont supprimés. Rien n'est fusionné.",
 		"adoptedLine": "Gardée : {{variant}}",
 		"discardedLine": "Toutes les variantes ont été abandonnées."
+	},
+	"crossReview": {
+		"cardBadge": {
+			"agree": "Revue croisée OK",
+			"disagree": "Revue croisée : désaccord",
+			"inconclusive": "Revue croisée : sans verdict"
+		}
 	}
 }

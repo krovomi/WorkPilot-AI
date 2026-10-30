@@ -812,6 +812,11 @@ export class ProjectStore {
 					typeof plan.goal.status === "string" && {
 						goal: plan.goal,
 					}),
+				// The second engine's verdict (cross review), for the card.
+				...(plan?.crossReview &&
+					typeof plan.crossReview.verdict === "string" && {
+						crossReview: plan.crossReview,
+					}),
 				...(executionProgress && { executionProgress }),
 				stagedInMainProject,
 				stagedAt,

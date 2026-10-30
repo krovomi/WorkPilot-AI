@@ -20,6 +20,7 @@ import { useProviderModelCatalog } from "../../hooks/useProviderModelCatalog";
 import { cn } from "../../lib/utils";
 import { useSettingsStore } from "../../stores/settings-store";
 import { useProviderContext } from "../ProviderContext";
+import { CrossReviewSettings } from "./CrossReviewSettings";
 import { RepositorySection } from "./RepositorySection";
 import { Button } from "../ui/button";
 import { Label } from "../ui/label";
@@ -338,6 +339,7 @@ export function GeneralSettings({
 								}
 							/>
 						</div>
+						<CrossReviewSettings settings={settings} setSettings={setSettings} />
 					</section>
 
 					<Separator />
