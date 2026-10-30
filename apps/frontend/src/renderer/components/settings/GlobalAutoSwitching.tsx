@@ -20,6 +20,7 @@ import {
 	useClaudeProfileStore,
 } from "../../stores/claude-profile-store";
 import { saveSettings, useSettingsStore } from "../../stores/settings-store";
+import { useShallow } from "zustand/react/shallow";
 import { Label } from "../ui/label";
 import { Switch } from "../ui/switch";
 import {
@@ -60,8 +61,12 @@ export function GlobalAutoSwitching({
 }: GlobalAutoSwitchingProps) {
 	const { t } = useTranslation("settings");
 	const { toast } = useToast();
-	const { profiles: apiProfiles, activeProfileId: activeApiProfileId } =
-		useSettingsStore();
+	const { profiles: apiProfiles, activeProfileId: activeApiProfileId } = useSettingsStore(
+		useShallow((s) => ({
+			profiles: s.profiles,
+			activeProfileId: s.activeProfileId,
+		})),
+	);
 	// Select only the fields we need to avoid re-renders from unrelated store changes (e.g. isLoading)
 	const claudeProfiles = useClaudeProfileStore((s) => s.profiles);
 	const activeClaudeProfileId = useClaudeProfileStore((s) => s.activeProfileId);

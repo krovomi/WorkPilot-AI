@@ -13,6 +13,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { notifySentryStateChanged } from "../../lib/sentry";
 import { useSettingsStore } from "../../stores/settings-store";
+import { useShallow } from "zustand/react/shallow";
 import {
 	rankViewUsage,
 	useViewUsageStore,
@@ -34,7 +35,12 @@ interface DebugInfo {
  */
 export function DebugSettings() {
 	const { t } = useTranslation("settings");
-	const { settings, updateSettings } = useSettingsStore();
+	const { settings, updateSettings } = useSettingsStore(
+		useShallow((s) => ({
+			settings: s.settings,
+			updateSettings: s.updateSettings,
+		})),
+	);
 	const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
 	const [isLoading, setIsLoading] = useState(false);
 	const [copySuccess, setCopySuccess] = useState(false);

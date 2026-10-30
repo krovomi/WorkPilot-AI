@@ -599,7 +599,7 @@ def _windows_pid_is_running(pid: int) -> bool:  # pragma: no cover - Windows leg
     error_access_denied = 5
     wait_timeout = 0x102
 
-    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)  # type: ignore[attr-defined]
     kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
     kernel32.OpenProcess.restype = wintypes.HANDLE
     kernel32.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
@@ -609,7 +609,7 @@ def _windows_pid_is_running(pid: int) -> bool:  # pragma: no cover - Windows leg
     handle = kernel32.OpenProcess(synchronize | query_limited_information, False, pid)
     if not handle:
         # A protected process exists but refuses the handle; anything else is gone.
-        return ctypes.get_last_error() == error_access_denied
+        return ctypes.get_last_error() == error_access_denied  # type: ignore[attr-defined]
     try:
         # Signalled once it has exited, even while a handle keeps its pid taken.
         return kernel32.WaitForSingleObject(handle, 0) == wait_timeout

@@ -33,6 +33,7 @@ import type {
 } from "../../../../shared/types";
 import { cn } from "../../../lib/utils";
 import { useSettingsStore } from "../../../stores/settings-store";
+import { useShallow } from "zustand/react/shallow";
 import { Button } from "../../ui/button";
 import { Checkbox } from "../../ui/checkbox";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/tooltip";
@@ -134,7 +135,7 @@ export function WorkspaceStatus({
 	onRequestComplete,
 }: WorkspaceStatusProps) {
 	const { t } = useTranslation(["taskReview", "common", "tasks"]);
-	const { settings } = useSettingsStore();
+	const { settings } = useSettingsStore(useShallow((s) => ({ settings: s.settings })));
 	const preferredIDE = settings.preferredIDE || "vscode";
 	const preferredTerminal = settings.preferredTerminal || "system";
 

@@ -17,6 +17,7 @@ import {
 import { getStaticProviders } from "@shared/utils/providers";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useShallow } from "zustand/react/shallow";
 import { fetchAgenticCapabilities } from "./useAgenticCapabilities";
 import { fetchProviderModelCatalog } from "./useProviderModelCatalog";
 
@@ -38,7 +39,12 @@ export interface ArenaRoster {
 }
 
 export function useArenaContenders(): ArenaRoster {
-	const { profiles, settings } = useSettingsStore();
+	const { profiles, settings } = useSettingsStore(
+		useShallow((s) => ({
+			profiles: s.profiles,
+			settings: s.settings,
+		})),
+	);
 	const [roster, setRoster] = useState<
 		Omit<ArenaRoster, "refresh" | "loading">
 	>({

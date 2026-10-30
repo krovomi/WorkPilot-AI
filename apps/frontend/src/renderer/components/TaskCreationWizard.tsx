@@ -61,6 +61,7 @@ import { buildBranchOptions } from "../lib/branch-utils";
 import { cn } from "../lib/utils";
 import { useProjectStore } from "../stores/project-store";
 import { useSettingsStore } from "../stores/settings-store";
+import { useShallow } from "zustand/react/shallow";
 import {
 	clearDraft,
 	createTask,
@@ -99,7 +100,7 @@ export function TaskCreationWizard({
 	onOpenChange,
 }: TaskCreationWizardProps) {
 	const { t } = useTranslation(["tasks", "common"]);
-	const { settings } = useSettingsStore();
+	const { settings } = useSettingsStore(useShallow((s) => ({ settings: s.settings })));
 	const selectedProfile =
 		DEFAULT_AGENT_PROFILES.find(
 			(p) => p.id === settings.selectedAgentProfile,

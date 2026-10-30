@@ -88,6 +88,14 @@ coder, la QA et la spec. Voir [`architecture/pause-resume.md`](../architecture/p
 - **Importer le module réel**, jamais un fichier de la racine qui le réexporte : `core.debug`,
   `core.worktree`, `qa`. Les cales de compatibilité ont été retirées.
 - Un sous-processus prend une liste d'arguments, sans shell (règle S4 de [`security.md`](security.md)).
+- **Attraper ce qu'on attend.** Un `except Exception` (ou `except:`) de plus dans un fichier est
+  refusé : `tests/baselines/blind-except.json` plafonne chaque fichier à son compte du
+  30 octobre 2026, et un corps qui ne fait que `pass` compte à part. Une correction fait baisser
+  le plafond (`python scripts/quality_baselines.py update`, qui ne monte jamais) ; un relèvement
+  s'écrit à la main dans le JSON et se justifie dans la PR.
+- **Types vérifiés** par pyright `1.1.408` (mode `basic`) sur les paquets listés dans
+  `apps/backend/pyrightconfig.json` (`bench`, `best_of_n`, `genai_trace`, `goal`, `mcp_tasks`,
+  `os_sandbox`, `security`) ; on élargit la liste paquet par paquet, une fois le paquet à zéro.
 - **Contrats d'imports** entre unités de premier niveau (`tests/test_import_contracts.py`) :
   les unités listées dans `ALLOWED_IMPORTS` (`foundation`, `security`, `project`, `phase_config`,
   `offline_policy`, `harness`…) n'importent que ce qu'il leur accorde, et le plus grand cycle

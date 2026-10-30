@@ -20,6 +20,7 @@ import {
 	saveSettings as saveSettingsToDisk,
 	useSettingsStore,
 } from "@/stores/settings-store";
+import { useShallow } from "zustand/react/shallow";
 import { useProviderContext } from "../ProviderContext";
 import { Alert, AlertDescription } from "../ui/alert";
 import { Button } from "../ui/button";
@@ -143,7 +144,12 @@ export function CleanProviderSection({
 	>(new Map());
 
 	// Use store directly for real-time updates (like ProviderSelector)
-	const { profiles, settings: storeSettings } = useSettingsStore();
+	const { profiles, settings: storeSettings } = useSettingsStore(
+		useShallow((s) => ({
+			profiles: s.profiles,
+			settings: s.settings,
+		})),
+	);
 	const { setSelectedProvider: setContextProvider } = useProviderContext();
 
 	// Create a unified settings object and onSettingsChange that updates both props and store

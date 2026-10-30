@@ -30,6 +30,7 @@ import os
 import threading
 import time
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -43,7 +44,7 @@ _CONNECT_TIMEOUT = 20.0
 _IDLE_TIMEOUT = 300.0
 
 
-def upstream_proxy(env: dict[str, str] | None = None) -> tuple[str, int] | None:
+def upstream_proxy(env: Mapping[str, str] | None = None) -> tuple[str, int] | None:
     """The machine's own HTTP proxy, which this one connects through.
 
     Read from ``HTTPS_PROXY`` (then ``HTTP_PROXY``) of the WorkPilot process,
@@ -51,9 +52,9 @@ def upstream_proxy(env: dict[str, str] | None = None) -> tuple[str, int] | None:
     chained. Credentials in the URL are not supported and the proxy is then
     not used: a refused tunnel says so rather than leaking them in a log.
     """
-    env = os.environ if env is None else env
+    source: Mapping[str, str] = os.environ if env is None else env
     for name in ("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"):
-        value = (env.get(name) or "").strip()
+        value = (source.get(name) or "").strip()
         if not value:
             continue
         parsed = urlsplit(value if "://" in value else f"http://{value}")
