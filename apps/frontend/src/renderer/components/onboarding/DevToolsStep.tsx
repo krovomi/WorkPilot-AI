@@ -2,6 +2,7 @@ import { Check, Code, Info, Loader2, RefreshCw, Terminal } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import type { SupportedIDE, SupportedTerminal } from "../../../shared/types";
 import { useSettingsStore } from "../../stores/settings-store";
+import { useShallow } from "zustand/react/shallow";
 import { Button } from "../ui/button";
 import { Card, CardContent } from "../ui/card";
 import { Input } from "../ui/input";
@@ -86,7 +87,12 @@ const TERMINAL_NAMES: Partial<Record<SupportedTerminal, string>> = {
  * their preferred tools for opening worktrees.
  */
 export function DevToolsStep({ onNext, onBack }: DevToolsStepProps) {
-	const { settings, updateSettings } = useSettingsStore();
+	const { settings, updateSettings } = useSettingsStore(
+		useShallow((s) => ({
+			settings: s.settings,
+			updateSettings: s.updateSettings,
+		})),
+	);
 	const [preferredIDE, setPreferredIDE] = useState<SupportedIDE>(
 		settings.preferredIDE || "vscode",
 	);

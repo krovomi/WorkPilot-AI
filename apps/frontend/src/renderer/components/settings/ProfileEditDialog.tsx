@@ -22,6 +22,7 @@ import { API_PROVIDER_PRESETS } from "../../../shared/constants";
 import { useToast } from "../../hooks/use-toast";
 import { isValidApiKey, isValidUrl, maskApiKey } from "../../lib/profile-utils";
 import { useSettingsStore } from "../../stores/settings-store";
+import { useShallow } from "zustand/react/shallow";
 import { Button } from "../ui/button";
 import {
 	Dialog,
@@ -68,7 +69,17 @@ export function ProfileEditDialog({
 		testConnection,
 		isTestingConnection,
 		testConnectionResult,
-	} = useSettingsStore();
+	} = useSettingsStore(
+		useShallow((s) => ({
+			saveProfile: s.saveProfile,
+			updateProfile: s.updateProfile,
+			profilesLoading: s.profilesLoading,
+			profilesError: s.profilesError,
+			testConnection: s.testConnection,
+			isTestingConnection: s.isTestingConnection,
+			testConnectionResult: s.testConnectionResult,
+		})),
+	);
 	const { toast } = useToast();
 
 	// Edit mode detection: profile prop determines mode

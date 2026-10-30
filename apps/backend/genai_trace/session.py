@@ -28,7 +28,7 @@ import contextvars
 import functools
 import logging
 import time
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncGenerator, AsyncIterator, Callable
 from contextlib import aclosing
 from dataclasses import dataclass
 from typing import Any
@@ -287,7 +287,9 @@ def traced_query(query: Callable[..., Any]) -> Callable[..., Any]:
     return wrapper
 
 
-def traced_response(receive: Callable[..., AsyncIterator[Any]]) -> Callable[..., Any]:
+def traced_response(
+    receive: Callable[..., AsyncGenerator[Any, None]],
+) -> Callable[..., Any]:
     """Wrap ``AgentClient.receive_response``: one ``invoke_agent`` span."""
 
     @functools.wraps(receive)

@@ -152,7 +152,8 @@ class SecurityOrchestrator:
         # Set output directory
         if self.config.output_dir is None:
             self.config.output_dir = self.project_path / ".security-reports"
-        self.config.output_dir.mkdir(exist_ok=True)
+        self.output_dir: Path = self.config.output_dir
+        self.output_dir.mkdir(exist_ok=True)
 
     def run_full_scan(self) -> SecurityScanResult:
         """
@@ -233,7 +234,7 @@ class SecurityOrchestrator:
         reports = {}
         if self.config.generate_json:
             json_path = (
-                self.config.output_dir
+                self.output_dir
                 / f"security-scan-quick-{datetime.now().strftime('%Y%m%d-%H%M%S')}.json"
             )
             self.report_generator.generate_json_report(vuln_dict, None, json_path)
@@ -320,7 +321,7 @@ class SecurityOrchestrator:
         vuln_dict = vuln_result.to_dict()
 
         # Generate SARIF
-        sarif_path = self.config.output_dir / "security-scan.sarif"
+        sarif_path = self.output_dir / "security-scan.sarif"
         self.report_generator.generate_sarif_report(vuln_dict, sarif_path)
 
         return sarif_path
@@ -365,7 +366,7 @@ class SecurityOrchestrator:
 
         # JSON report
         if self.config.generate_json:
-            json_path = self.config.output_dir / f"security-scan-{timestamp}.json"
+            json_path = self.output_dir / f"security-scan-{timestamp}.json"
             self.report_generator.generate_json_report(
                 vulnerability_results, compliance_results, json_path
             )
@@ -373,7 +374,7 @@ class SecurityOrchestrator:
 
         # Markdown report
         if self.config.generate_markdown:
-            md_path = self.config.output_dir / f"security-scan-{timestamp}.md"
+            md_path = self.output_dir / f"security-scan-{timestamp}.md"
             self.report_generator.generate_markdown_report(
                 vulnerability_results, compliance_results, md_path
             )
@@ -381,7 +382,7 @@ class SecurityOrchestrator:
 
         # HTML report
         if self.config.generate_html:
-            html_path = self.config.output_dir / f"security-scan-{timestamp}.html"
+            html_path = self.output_dir / f"security-scan-{timestamp}.html"
             self.report_generator.generate_html_report(
                 vulnerability_results, compliance_results, html_path
             )
@@ -389,7 +390,7 @@ class SecurityOrchestrator:
 
         # SARIF report (for GitHub)
         if self.config.generate_sarif:
-            sarif_path = self.config.output_dir / "security-scan.sarif"
+            sarif_path = self.output_dir / "security-scan.sarif"
             self.report_generator.generate_sarif_report(
                 vulnerability_results, sarif_path
             )

@@ -32,6 +32,7 @@ import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { saveSettings, useSettingsStore } from "../stores/settings-store";
+import { useShallow } from "zustand/react/shallow";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Label } from "./ui/label";
@@ -54,7 +55,12 @@ interface PageLlmSelectorProps {
 
 export const PageLlmSelector: React.FC<PageLlmSelectorProps> = ({ page }) => {
 	const { t } = useTranslation(["dialogs", "common"]);
-	const { settings, profiles } = useSettingsStore();
+	const { settings, profiles } = useSettingsStore(
+		useShallow((s) => ({
+			settings: s.settings,
+			profiles: s.profiles,
+		})),
+	);
 	const [providers, setProviders] = useState<CanonicalProvider[]>([]);
 	const [providerStatus, setProviderStatus] = useState<Record<string, boolean>>(
 		{},

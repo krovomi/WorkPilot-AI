@@ -14,6 +14,7 @@ import type { Task } from "../../../shared/types";
 import type { FileNode } from "../../../shared/types/project";
 import { cn } from "../../lib/utils";
 import { useSettingsStore } from "../../stores/settings-store";
+import { useShallow } from "zustand/react/shallow";
 import { Button } from "../ui/button";
 import { ScrollArea } from "../ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
@@ -35,7 +36,7 @@ function getFileIcon(filename: string) {
 
 export function TaskFiles({ task }: TaskFilesProps) {
 	const { t } = useTranslation(["tasks"]);
-	const { settings } = useSettingsStore();
+	const { settings } = useSettingsStore(useShallow((s) => ({ settings: s.settings })));
 
 	// State for file listing
 	const [files, setFiles] = useState<FileNode[]>([]);

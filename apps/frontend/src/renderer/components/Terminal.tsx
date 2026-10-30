@@ -16,6 +16,7 @@ import { useToast } from "../hooks/use-toast";
 import { isWindows as checkIsWindows } from "../lib/os-detection";
 import { cn } from "../lib/utils";
 import { useSettingsStore } from "../stores/settings-store";
+import { useShallow } from "zustand/react/shallow";
 import { useTerminalStore } from "../stores/terminal-store";
 import { CreateWorktreeDialog } from "./terminal/CreateWorktreeDialog";
 import { TerminalHeader } from "./terminal/TerminalHeader";
@@ -136,7 +137,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
 		const effectiveCwd = terminal?.cwd || cwd;
 
 		// Settings store for IDE preferences
-		const { settings } = useSettingsStore();
+		const { settings } = useSettingsStore(useShallow((s) => ({ settings: s.settings })));
 
 		// Toast for user feedback
 		const { toast } = useToast();

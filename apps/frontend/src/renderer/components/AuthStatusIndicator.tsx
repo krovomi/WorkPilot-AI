@@ -32,6 +32,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useClaudeProfileStore } from "@/stores/claude-profile-store";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useShallow } from "zustand/react/shallow";
 import { useProviderContext } from "./ProviderContext";
 import {
 	Tooltip,
@@ -70,7 +71,12 @@ const OAUTH_FALLBACK = {
 } as const;
 
 export function AuthStatusIndicator() {
-	const { profiles, activeProfileId } = useSettingsStore();
+	const { profiles, activeProfileId } = useSettingsStore(
+		useShallow((s) => ({
+			profiles: s.profiles,
+			activeProfileId: s.activeProfileId,
+		})),
+	);
 	const { t } = useTranslation(["common"]);
 	// The provider the usage badges observe: the running tasks', unless the
 	// person picked one (UsageLensSelector). Not the default provider.

@@ -71,7 +71,9 @@ Aucun chemin en dur. Notes Windows : [`docs/windows-development.md`](../windows-
 ## État, style, imports
 
 - **Zustand** : un store par domaine sous `src/renderer/stores/`, sélecteurs granulaires
-  `useX((s) => s.champ)`, jamais le store entier (tout re-rendrait).
+  `useX((s) => s.champ)`, `useShallow` pour plusieurs champs, jamais le store entier (tout
+  re-rendrait). `useSettingsStore()` sans sélecteur est refusé par
+  `stores/__tests__/settings-store-selectors.test.ts`.
 - **Style** : Tailwind v4 ; 7 thèmes clair/sombre dans `src/shared/constants/themes.ts` ;
   `cn()` (`clsx` + `tailwind-merge`) depuis `src/renderer/lib/utils.ts` ; variantes en CVA.
 - **Alias** : `@/*` → `src/renderer/*`, `@shared/*` → `src/shared/*`, `@preload/*` → `src/preload/*`,
@@ -87,3 +89,7 @@ Aucun chemin en dur. Notes Windows : [`docs/windows-development.md`](../windows-
 | E2E | `e2e/` | `pnpm run test:e2e` (Playwright) |
 | Types | — | `pnpm run typecheck` |
 | Lint / format | — | `pnpm run lint` / `pnpm run lint:fix` (Biome) |
+
+Un `biome-ignore` de plus dans un fichier est refusé : `tests/baselines/biome-ignore.json` plafonne
+chaque fichier à son compte du 30 octobre 2026 (`python scripts/quality_baselines.py`, depuis la
+racine ; `update` ne fait que baisser). Typer la valeur plutôt que taire la règle.
