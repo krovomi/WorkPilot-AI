@@ -861,7 +861,8 @@ describe("IPC Handlers", { timeout: 30000 }, () => {
 				{ theme: "dark", defaultModel: "opus" },
 			);
 
-			expect(result).toEqual({ success: true });
+			// No credential in this save, so no key date (S5)
+			expect(result).toEqual({ success: true, data: { credentialsSetAt: {} } });
 
 			// Verify settings were saved
 			const getResult = await ipcMain.invokeHandler("settings:get", {});

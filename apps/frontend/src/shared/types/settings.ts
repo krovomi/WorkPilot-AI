@@ -379,6 +379,11 @@ export interface AppSettings {
 	// Configuration pour providers custom/enterprise
 	customProviderUrl?: string;
 	customProviderApiKey?: string;
+	/**
+	 * When each secret key above got its current value (ISO 8601). Written by
+	 * the main process only (settings-utils), never from what the renderer sends.
+	 */
+	credentialsSetAt?: import("../utils/secret-age").SecretDates;
 	customProviderModels?: import("../constants/models").ProviderModel[];
 	// Auto-switching settings
 	autoSwitchEnabled?: boolean;

@@ -467,6 +467,7 @@ apps/frontend/src/
 #### Gestion des Credentials
 - **Système de Profils Claude** → Gestion OAuth multi-comptes
 - **Stockage Secure** → Keychain OS / Credential Manager
+- **Âge des clés** → Réglages > Comptes dit depuis quand chaque clé d'API est enregistrée, rappel après 90 jours
 - **Rotation Automatique** → Cycle de vie des tokens OAuth
 - **Validation Input** → Chemins et commandes sanitizées
 - **Aucun secret dans le renderer** → L'interface sait qu'une clé ou un jeton est configuré, jamais sa valeur ; les tests de connexion tournent dans le main
@@ -880,6 +881,8 @@ WorkPilot AI uses a three-layer security model:
 1. **OS Sandbox** — Bash commands run in isolation
 2. **Filesystem Restrictions** — Operations limited to project directory
 3. **Dynamic Command Allowlist** — Only approved commands based on detected project stack
+
+API keys and tokens are encrypted at rest with the OS keyring; Settings > Accounts shows how long ago each API key was saved and suggests renewing it after 90 days.
 
 All releases include SHA256 checksums, a CycloneDX SBOM and a build provenance attestation for each file (`gh attestation verify <file> --repo krovomi/WorkPilot-AI`), and VirusTotal scan results once the scan is configured for the repository.
 

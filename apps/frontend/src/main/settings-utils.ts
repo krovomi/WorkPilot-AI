@@ -11,7 +11,8 @@
  *
  * Secret fields (see isSecretSettingsKey) are encrypted on write and decrypted
  * on read, so callers only ever see plaintext and the file never holds it
- * unless the OS cannot encrypt — see ./secret-storage.
+ * unless the OS cannot encrypt — see ./secret-storage. Each secret is dated
+ * when its value changes (credentialsSetAt), so the UI can say how old a key is.
  */
 
 import {
@@ -24,6 +25,7 @@ import {
 } from "node:fs";
 import path from "node:path";
 import { app } from "electron";
+import { type SecretDates, stampSecretDates } from "../shared/utils/secret-age";
 import {
 	decryptSecretFields,
 	encryptSecretFields,
@@ -93,12 +95,18 @@ export function readSettingsFile(): Record<string, unknown> | undefined {
 	}
 }
 
+/** Key of the secret dates in settings.json; never taken from the caller. */
+const CREDENTIALS_SET_AT = "credentialsSetAt";
+
 /**
  * Write settings to disk, secret fields encrypted, file mode 0600.
+ * The secret dates are worked out from the file being replaced: whatever
+ * `settings` carries under credentialsSetAt is ignored.
  *
  * @param settings - The settings object to write
+ * @returns the secret dates written with it
  */
-export function writeSettingsFile(settings: object): void {
+export function writeSettingsFile(settings: object): SecretDates {
 	const settingsPath = getSettingsPath();
 
 	// Ensure the directory exists
@@ -107,13 +115,29 @@ export function writeSettingsFile(settings: object): void {
 		mkdirSync(dir, { recursive: true });
 	}
 
+	const previous = readSettingsFile();
+	const { [CREDENTIALS_SET_AT]: _ignored, ...fields } = settings as Record<
+		string,
+		unknown
+	>;
+	const dates = stampSecretDates(
+		fields,
+		previous,
+		previous?.[CREDENTIALS_SET_AT],
+		isSecretSettingsKey,
+	);
+	const toWrite =
+		Object.keys(dates).length > 0
+			? { ...fields, [CREDENTIALS_SET_AT]: dates }
+			: fields;
 	const content = JSON.stringify(
-		encryptSecretFields(settings, isSecretSettingsKey),
+		encryptSecretFields(toWrite, isSecretSettingsKey),
 		null,
 		2,
 	);
 	writeFileSync(settingsPath, content, { encoding: "utf-8", mode: 0o600 });
 	restrictToOwner(settingsPath);
+	return dates;
 }
 
 /**

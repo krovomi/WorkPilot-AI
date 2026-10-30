@@ -308,3 +308,25 @@ longer does.
 Before this, the renderer copied a Claude profile's `oauthToken` into the
 backend's `.env`. That token is encrypted in memory, so the `.env` received
 ciphertext. The main process now uses `getProfileToken`.
+
+## How old a stored key is
+
+Réglages > Comptes says how long ago each stored API key was saved, and past
+90 days (`SECRET_RENEWAL_DAYS`, `shared/utils/secret-age.ts`) the provider card
+suggests renewing it. A key is dated when its **value** changes, never when the
+settings are merely saved again:
+
+- App settings: `writeSettingsFile` compares each secret with the file it
+  replaces and writes `credentialsSetAt` (key → ISO date) beside the fields.
+  The dates are worked out in the main process from the previous file;
+  whatever the caller passes under `credentialsSetAt` is ignored. An emptied
+  key loses its date. `SETTINGS_SAVE` returns the new dates so the renderer's
+  copy is never stale.
+- API profiles: `apiKeySetAt` (ms), set on creation and when an update
+  changes the key, kept when only the name or URL changes.
+- A key stored before dating existed stays undated. The card says the date
+  is unknown and never asks to renew it, rather than calling it new.
+
+A date is not a secret: it goes to the renderer as is. The card shows an age
+only for a key (`authMethod: "api-key"`), not for an OAuth or CLI connection,
+whose tokens are refreshed outside the settings screen.
