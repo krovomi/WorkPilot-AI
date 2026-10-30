@@ -30,10 +30,12 @@ a warning, never breaking the agent loop.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
 import re
+from collections.abc import Awaitable, Callable, Mapping
 from contextlib import AsyncExitStack
 from pathlib import Path
 from typing import Any
@@ -344,20 +346,40 @@ class MCPToolManager:
         if is_task_handle(result):
             # MCP Tasks: the server runs it in the background; wait for it.
             result = await resolve_task(session, result)
-        view = self._views.get(name)
-        if view is not None and self._spec_dir is not None:
-            await capture_app_view(
-                session,
-                spec_dir=self._spec_dir,
-                server=view[0],
-                tool=real,
-                resource_uri=view[1],
-                arguments=arguments or {},
-                result=result,
-            )
+        await self.capture_view(name, arguments, result)
         if _field(result, "isError", "is_error"):
             return f"MCP tool error: {_result_to_text(result) or name}"
         return _result_to_text(result)
+
+    def connected(self) -> bool:
+        """Whether any server answered with its tools."""
+        return bool(self._route)
+
+    def view_tools(self) -> frozenset[str]:
+        """The full names of the bridged tools that name an MCP App view."""
+        return frozenset(self._views)
+
+    async def capture_view(
+        self, name: str, arguments: dict[str, Any] | None, result: Any
+    ) -> str | None:
+        """Keep the view of a call to `name` for the task panel, if it has one.
+
+        `result` is the call's result, whoever made the call: this manager
+        (`call`), or Claude Code on the Agent SDK path (`make_app_view_hook`).
+        """
+        view = self._views.get(name)
+        if view is None or self._spec_dir is None:
+            return None
+        session, real = self._route[name]
+        return await capture_app_view(
+            session,
+            spec_dir=self._spec_dir,
+            server=view[0],
+            tool=real,
+            resource_uri=view[1],
+            arguments=arguments or {},
+            result=result,
+        )
 
     async def aclose(self) -> None:
         if self._stack is not None:
@@ -369,6 +391,85 @@ class MCPToolManager:
         self._defs.clear()
         self._route.clear()
         self._views.clear()
+
+
+# How long the Agent SDK path may hold a tool's result to keep its view: one
+# server started, its tools listed, the view read. The agent waits this long
+# at most, and only for a server named in CUSTOM_MCP_SERVERS.
+APP_VIEW_CAPTURE_TIMEOUT = 20.0
+
+# The fields of a CUSTOM_MCP_SERVERS entry Claude Code starts a server with
+# (`core.client._custom_servers`); the side session starts it the same way.
+_SDK_SERVER_FIELDS = ("id", "name", "type", "command", "args", "url", "headers")
+
+
+def _sdk_tool_result(response: Any) -> dict[str, Any]:
+    """Claude Code's ``tool_response`` for an MCP tool, as a ``CallToolResult``."""
+    if isinstance(response, Mapping) and "content" in response:
+        return dict(response)
+    if isinstance(response, list):
+        return {"content": response}
+    text = "" if response is None else str(response)
+    return {"content": [{"type": "text", "text": text}]}
+
+
+def make_app_view_hook(
+    spec_dir: str | Path, servers: list[dict[str, Any]]
+) -> Callable[..., Awaitable[dict[str, Any]]]:
+    """A PostToolUse hook that keeps MCP App views on the Claude Agent SDK path (IA4).
+
+    There Claude Code is the MCP client: it calls the tool, and neither knows
+    nor shows the tool's view. After a call to one of `servers` (the
+    project's CUSTOM_MCP_SERVERS this session started), the hook opens its own
+    short session to the same server, lists its tools once, and for a tool
+    that names a view reads that view and keeps it with the call's input and
+    result, exactly as `MCPToolManager.call` does on the WorkPilot loop.
+
+    The side session is a second start of the server: it lists tools and
+    reads a resource, never calls a tool. It never changes the result the
+    agent reads (the hook returns nothing), it is bounded by
+    `APP_VIEW_CAPTURE_TIMEOUT`, and a server that fails is skipped.
+    """
+    configs = {
+        _server_id(cfg, index): {k: cfg[k] for k in _SDK_SERVER_FIELDS if k in cfg}
+        for index, cfg in enumerate(servers)
+    }
+    # server id -> the tools that name a view, once the server has answered
+    view_tools: dict[str, frozenset[str]] = {}
+
+    async def _capture(sid: str, name: str, arguments: Any, result: Any) -> None:
+        async with MCPToolManager(None, [configs[sid]], spec_dir=spec_dir) as mcp:
+            if not mcp.connected():
+                return
+            view_tools[sid] = mcp.view_tools()
+            await mcp.capture_view(
+                name, arguments if isinstance(arguments, dict) else {}, result
+            )
+
+    async def _hook(
+        input_data: dict[str, Any],
+        tool_use_id: str | None = None,
+        context: Any | None = None,
+    ) -> dict[str, Any]:
+        name = str(input_data.get("tool_name") or "")
+        if not name.startswith(MCP_TOOL_PREFIX):
+            return {}
+        sid = name[len(MCP_TOOL_PREFIX) :].split("__", 1)[0]
+        if sid not in configs or name not in view_tools.get(sid, frozenset({name})):
+            return {}
+        try:
+            async with asyncio.timeout(APP_VIEW_CAPTURE_TIMEOUT):
+                await _capture(
+                    sid,
+                    name,
+                    input_data.get("tool_input"),
+                    _sdk_tool_result(input_data.get("tool_response")),
+                )
+        except (ImportError, OSError, RuntimeError, TimeoutError, ValueError) as exc:
+            logger.debug("[mcp] app view for %s not kept: %s", name, exc)
+        return {}
+
+    return _hook
 
 
 async def _handshake(session: Any) -> None:

@@ -925,7 +925,10 @@ def create_client(
         "allowed_tools": allowed_tools_list,
         "mcp_servers": mcp_servers,
         "hooks": _session_hooks(
-            project_dir, spec_dir, _debugger_hooks(project_dir, spec_dir, agent_type)
+            project_dir,
+            spec_dir,
+            _debugger_hooks(project_dir, spec_dir, agent_type),
+            app_view_servers=_app_view_servers(mcp_servers, mcp_config),
         ),
         "max_turns": int(os.environ.get("AUTO_CLAUDE_MAX_TURNS", "1000")),
         # Budget cap as a meaningful runaway guard, the same per-session cap
@@ -1509,6 +1512,20 @@ def _custom_servers(required_servers, mcp_config: dict) -> dict[str, dict]:
     return mcp_servers
 
 
+def _app_view_servers(mcp_servers: dict[str, dict], mcp_config: dict) -> list[dict]:
+    """The CUSTOM_MCP_SERVERS this session starts, whose views the hook keeps.
+
+    Only those: WorkPilot's own servers and the built-in third-party ones name
+    no MCP App view, and a server the session does not start is never started
+    to read one (`core.mcp_tools.make_app_view_hook`).
+    """
+    return [
+        custom
+        for custom in mcp_config.get("CUSTOM_MCP_SERVERS", [])
+        if isinstance(custom, dict) and custom.get("id") in mcp_servers
+    ]
+
+
 def _system_prompt(
     project_dir: Path, spec_dir: Path, agent_type: str, sdk_env: dict[str, str]
 ) -> str:
@@ -1578,7 +1595,13 @@ def _debugger_hooks(project_dir: Path, spec_dir: Path, agent_type: str) -> list:
     return _debugger_hooks
 
 
-def _session_hooks(project_dir: Path, spec_dir: Path, debugger_hooks: list) -> dict:
+def _session_hooks(
+    project_dir: Path,
+    spec_dir: Path,
+    debugger_hooks: list,
+    *,
+    app_view_servers: list[dict] | None = None,
+) -> dict:
     """Every hook the session runs, in the order the CLI calls them."""
     # One hook instance for the four write tools rather than four: the
     # factory closes over the spec directory so the ledger has somewhere to
@@ -1598,6 +1621,8 @@ def _session_hooks(project_dir: Path, spec_dir: Path, debugger_hooks: list) -> d
     # The CLI runs the sub-agent; its tool's PostToolUse is where WorkPilot
     # sees the result first.
     _subagent_result_hook = make_subagent_result_hook(spec_dir)
+    if app_view_servers:
+        from core.mcp_tools import make_app_view_hook
 
     return {
         "PreToolUse": [
@@ -1657,8 +1682,24 @@ def _session_hooks(project_dir: Path, spec_dir: Path, debugger_hooks: list) -> d
             *debugger_hooks,
         ],
         "PostToolUse": [
-            HookMatcher(matcher=tool, hooks=[_subagent_result_hook])
-            for tool in SUBAGENT_TOOLS
+            *(
+                HookMatcher(matcher=tool, hooks=[_subagent_result_hook])
+                for tool in SUBAGENT_TOOLS
+            ),
+            # MCP Apps (IA4): Claude Code calls the tool and shows no view;
+            # this keeps it for the task panel, as the WorkPilot loop does.
+            # Only when a custom server is started; the hook never changes
+            # the result.
+            *(
+                [
+                    HookMatcher(
+                        matcher="mcp__.*",
+                        hooks=[make_app_view_hook(spec_dir, app_view_servers)],
+                    )
+                ]
+                if app_view_servers
+                else []
+            ),
         ],
         "PreCompact": [HookMatcher(hooks=[_make_pre_compact_hook(spec_dir)])],
         "Stop": [HookMatcher(hooks=[_make_stop_hook(spec_dir)])],
