@@ -90,6 +90,29 @@ export interface BenchTableRow {
 	avgDurationS: number | null;
 }
 
+/**
+ * The engine the bench recommends for a kind of card (`bench/results.py`):
+ * among the engines that resolved at least half of at least three cards of
+ * that kind, the cheapest within ten points of the best rate.
+ */
+export interface BenchRecommendation {
+	provider: string;
+	model: string;
+	effort: string;
+	judged: number;
+	resolved: number;
+	rate: number;
+	cases: number;
+	avgCostUsd: number | null;
+	/** The best rate among the engines with enough evidence. */
+	bestRate: number;
+	/** How many engines had enough evidence. */
+	considered: number;
+}
+
+/** Per card kind (`bug_fix`, `feature`…), and `"*"` over every card. */
+export type BenchRecommendations = Record<string, BenchRecommendation>;
+
 /** A finished card of the project, and whether it can be a case. */
 export interface BenchCandidate {
 	specId: string;
@@ -109,4 +132,5 @@ export interface BenchStatus {
 	concurrency: number;
 	runs: Array<BenchManifest & { stale?: boolean }>;
 	table: BenchTableRow[];
+	recommendations: BenchRecommendations;
 }

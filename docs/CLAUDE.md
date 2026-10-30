@@ -103,7 +103,7 @@ fichier-ci reste l'autorité sur les règles.
 | Visual-to-code | [visual-to-code.md](architecture/visual-to-code.md) | Documents d'architecture et leur historique sur disque. |
 | Émulateur d'app | [app-emulator.md](architecture/app-emulator.md) | Adresse d'arrivée déduite du diff, barre d'adresse, ouverture dans le navigateur. |
 | Mode Arena | [arena.md](architecture/arena.md) | De vrais concurrents (provider, modèle) et un coût mesuré. |
-| Banc de rejeu | [repo-bench.md](architecture/repo-bench.md) | Cartes terminées rejouées depuis le commit d'avant, par moteur, dans des copies sans la réponse ; jugées par les tests du commit d'arrivée, calibrés (F2P/P2P) ; le tableau nourrit Formula Lab et le routeur. |
+| Banc de rejeu | [repo-bench.md](architecture/repo-bench.md) | Cartes terminées rejouées depuis le commit d'avant, par moteur, dans des copies sans la réponse ; jugées par les tests du commit d'arrivée, calibrés (F2P/P2P) ; le tableau nourrit Formula Lab et le routeur, et recommande par type de carte le moteur le moins cher proche du meilleur taux, proposé sur l'étape moteur, jamais appliqué seul. |
 | Outils de développement | [dev-tools.md](architecture/dev-tools.md) | MCP Electron pour l'E2E, Chrome DevTools MCP, grepai. |
 | Dépannage | [troubleshooting.md](architecture/troubleshooting.md) | Problèmes courants et où regarder. |
 

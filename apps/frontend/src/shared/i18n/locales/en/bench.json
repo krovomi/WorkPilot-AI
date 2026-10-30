@@ -12,7 +12,7 @@
 		"cost": "Avg. cost",
 		"duration": "Avg. duration",
 		"cards": "Cards",
-		"readers": "Formula Lab counts these replays in its success estimates, and the model router passes over a model that resolved less than half of at least three cards."
+		"readers": "Formula Lab counts these replays in its success estimates, and the model router passes over a model that resolved less than half of at least three cards (of the task's kind, when there are enough)."
 	},
 	"new": {
 		"title": "New run",
@@ -89,5 +89,18 @@
 		"candidates": "Could not list the finished cards.",
 		"start": "The run could not start.",
 		"discard": "The run could not be discarded."
+	},
+	"recommend": {
+		"title": "Recommended engine per kind of card",
+		"allKinds": "All cards",
+		"evidence": "{{rate}} resolved ({{resolved}} of {{judged}}) on {{cases}} cards",
+		"cost": "avg. {{cost}}",
+		"costUnknown": "cost not measured",
+		"rule": "Among the engines that resolved at least half of at least three cards of a kind, the cheapest within ten points of the best rate. A kind with less evidence has no recommendation of its own. On a card's engine step the recommendation is offered, never applied for you.",
+		"empty": "Not enough replays yet: an engine needs at least three judged cards.",
+		"hintKind": "On this project's cards of kind “{{kind}}”, the bench recommends",
+		"hintAll": "On this project's cards, the bench recommends",
+		"use": "Use it",
+		"inUse": "In use"
 	}
 }

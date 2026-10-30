@@ -219,3 +219,80 @@ class TestBenchEvidence:
         assert without["model"] == "claude-haiku-4-5"
         assert with_bench["model"] != "claude-haiku-4-5"
         assert "bench" in with_bench["reason"]
+
+
+class TestBenchEvidencePerKind:
+    """With enough cards of the task's kind, those cards are the evidence."""
+
+    @staticmethod
+    def _project(tmp_path):
+        import json
+
+        def record(i: int, kind: str, resolved: bool) -> dict:
+            return {
+                "runId": "r",
+                "buildId": f"{kind}{i}",
+                "caseId": f"{kind}-{i}",
+                "kind": kind,
+                "provider": "anthropic",
+                "model": "claude-haiku-4-5",
+                "resolved": resolved,
+            }
+
+        bench = tmp_path / ".workpilot" / "bench"
+        bench.mkdir(parents=True)
+        # Fine on features, failing on bug fixes: 3/6 overall is not a verdict.
+        records = [record(i, "feature", True) for i in range(3)]
+        records += [record(i, "bug_fix", False) for i in range(3)]
+        (bench / "results.json").write_text(
+            json.dumps({"records": records}), encoding="utf-8"
+        )
+        return tmp_path
+
+    def test_scores_per_kind(self, tmp_path) -> None:
+        from bench import scores
+
+        project = self._project(tmp_path)
+        key = ("anthropic", "claude-haiku-4-5")
+        assert scores(project)[key] == {"resolved": 3, "judged": 6, "cases": 6}
+        assert scores(project, "bug_fix")[key] == {
+            "resolved": 0,
+            "judged": 3,
+            "cases": 3,
+            "kind": "bug_fix",
+        }
+        # A kind the bench saw too little of keeps the overall score.
+        assert scores(project, "docs")[key] == scores(project)[key]
+
+    def test_the_card_kind_decides(self, tmp_path) -> None:
+        import json
+
+        from agents.feature_wiring import card_kind, suggest_routed_model
+
+        project = self._project(tmp_path)
+        spec = project / ".workpilot" / "specs" / "007-x"
+        spec.mkdir(parents=True)
+        (spec / "task_metadata.json").write_text(
+            json.dumps({"kind": "bug_fix"}), encoding="utf-8"
+        )
+        assert card_kind(spec) == "bug_fix"
+        assert card_kind(project / "nowhere") is None
+
+        bug = suggest_routed_model(
+            prompt="fix typo",
+            task_hint="trivial",
+            available_providers=["anthropic", "openai"],
+            project_dir=project,
+            kind="bug_fix",
+        )
+        feature = suggest_routed_model(
+            prompt="fix typo",
+            task_hint="trivial",
+            available_providers=["anthropic", "openai"],
+            project_dir=project,
+            kind="feature",
+        )
+        assert bug["model"] != "claude-haiku-4-5"
+        assert "(0/3 on 3 bug_fix cards)" in bug["reason"]
+        assert feature["model"] == "claude-haiku-4-5"
+        assert "bench 3/3 resolved on feature cards" in feature["reason"]

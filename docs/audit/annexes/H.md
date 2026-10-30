@@ -11,6 +11,7 @@ ligne est une feature, une PR vers `develop`, avec sa justification dans `docs/a
 | [H3](H3.md) | Vues MCP Apps sur le chemin du SDK Claude (IA4) | #575 |
 | [H4](H4.md) | Tests d'intégration ASP.NET Core avant le code, posés en objectif (IA6) | #576 |
 | [H5](H5.md) | Le Kanban comme serveur MCP (IA5) | #577 |
+| [H6](H6.md) | Moteur recommandé par type de carte, appris du banc (IA3) | #578 |
 
 Une feature, un fichier : `H<n>.md` dans ce dossier.
 

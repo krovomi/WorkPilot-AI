@@ -132,7 +132,32 @@ réussis, taux de F2P passés, coût moyen (lu dans le `cost_data.json` de la co
   d'usage : les volumes et les coûts n'en sont pas changés. La vue dit combien de rejeux comptent.
 - **Le routeur** écarte un modèle que le banc a vu réussir moins de la moitié de ses builds sur au
   moins trois cartes distinctes, et la raison du choix le dit ; avec moins de preuves, il cite le
-  score sans rien écarter. Une build dans un worktree lit le tableau du projet.
+  score sans rien écarter. Une build dans un worktree lit le tableau du projet. Quand le banc a
+  jugé le modèle sur au moins trois cartes du type de la tâche (`kind` de `task_metadata.json`),
+  ce sont elles qui comptent (`scores(projet, kind)`), et la raison nomme le type.
+- **L'étape moteur d'une carte** propose le moteur recommandé pour son type (plan du 29 octobre,
+  IA3), voir plus bas.
+
+## Le moteur recommandé par type de carte
+
+Chaque record garde le type de sa carte, lu dans `task_metadata.json` à la découverte du cas
+(`case.kind`). `results.json` écrit à côté du tableau `recommendations` : par type, et sous `"*"`
+pour toutes les cartes, un moteur (provider × modèle × effort) choisi ainsi :
+
+1. les moteurs retenus sont ceux du routeur : au moins trois cartes distinctes du type, au moins la
+   moitié des builds résolus ;
+2. parmi eux, ceux à dix points ou moins du meilleur taux (`RECOMMEND_MARGIN`) ;
+3. le moins cher en coût moyen mesuré ; un moteur sans coût mesuré passe après les autres, puis le
+   meilleur taux, puis le plus de builds.
+
+Un type avec moins de preuves n'a pas d'entrée : la carte se rabat sur `"*"` et le dit. Les records
+écrits avant ce champ ne comptent que pour `"*"`.
+
+La recommandation est **proposée, jamais appliquée** : l'étape moteur de la carte
+(`TaskEditDialog`, `bench/BenchRecommendation.tsx`) affiche le moteur, son taux, ses cartes et son
+coût, et un bouton « L'utiliser » qui pose le même trio sur les quatre phases. Rien ne change le
+moteur d'une carte sans ce clic : le banc mesure un projet passé, sur dix à vingt cartes, et un type
+de carte n'est pas une garantie. La vue du banc liste les recommandations sous le tableau.
 
 ## Coût et durée
 
