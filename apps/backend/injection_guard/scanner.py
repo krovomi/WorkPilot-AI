@@ -16,6 +16,7 @@ import base64
 import binascii
 import html
 import re
+import unicodedata
 import urllib.parse
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -53,7 +54,7 @@ _INJECTION_PATTERNS: list[tuple[str, str, str]] = [
         "critical",
     ),
     (
-        r"disregard\s+(?:all\s+|any\s+)?(?:earlier\s+|prior\s+|previous\s+|the\s+)?"
+        r"disregard\s+(?:all\s+|any\s+)?(?:your\s+|the\s+)?(?:earlier\s+|prior\s+|previous\s+)?"
         r"(?:rules|instructions|system|directives)",
         "Instruction disregard attempt",
         "critical",
@@ -188,6 +189,18 @@ _INJECTION_PATTERNS: list[tuple[str, str, str]] = [
         "high",
     ),
     (
+        # A heading that opens a new set of orders, the shape an override
+        # takes when it does not say "ignore": `New instructions: …`.
+        r"\bnew\s+instructions?\s*:",
+        "New instruction block",
+        "high",
+    ),
+    (
+        r"```\s*(?:system|assistant|instructions?)\b",
+        "Role code fence",
+        "high",
+    ),
+    (
         r"\bHuman\s*[:>]",
         "Conversation role injection",
         "high",
@@ -214,11 +227,25 @@ _INJECTION_PATTERNS: list[tuple[str, str, str]] = [
         "French role reassignment",
         "high",
     ),
+    (
+        r"nouvelles?\s+(?:consignes?|instructions?)\s*:",
+        "French new instruction block",
+        "high",
+    ),
 ]
 
 _ZERO_WIDTH = re.compile(r"[\u200b-\u200f\u202a-\u202e\ufeff]")
 _BASE64_HINT = re.compile(r"(?:^|[^A-Za-z0-9+/])([A-Za-z0-9+/]{24,}={0,2})")
 _HEX_HINT = re.compile(r"\\x[0-9a-fA-F]{2}")
+_HEX_RUN = re.compile(r"(?:\\x[0-9a-fA-F]{2})+")
+# `i g n o r e   a l l`: letters one space apart, words further apart.
+_SPACED_LETTERS = re.compile(r"(?:\b\w\b[ \t]){6,}\b\w\b")
+# Latin look-alikes from Cyrillic and Greek: `<ѕystem>` reads as `<system>` to a
+# model and to a person, and to no regex written in ASCII.
+_CONFUSABLES = str.maketrans(
+    "аеорсухіјѕԁɡοαρνϲАЕОРСХІЈЅВНКМТ",
+    "aeopcyxijsdgoapvcAEOPCXIJSBHKMT",
+)
 
 
 class InjectionScanner:
@@ -307,6 +334,25 @@ class InjectionScanner:
                     confidence=0.3,
                 )
             )
+            pieces.append(
+                _HEX_RUN.sub(
+                    lambda m: bytes.fromhex(m.group(0).replace("\\x", "")).decode(
+                        "utf-8", errors="ignore"
+                    ),
+                    text,
+                )
+            )
+
+        # The two below only feed the regex layer: spaced letters and
+        # look-alikes are ordinary in prose (an ellipsis folds, Russian is
+        # Cyrillic), so what counts is a pattern they reveal, not themselves.
+        if _SPACED_LETTERS.search(text):
+            joined = re.sub(r"(?<=\b\w)[ \t](?=\w\b)", "", text)
+            pieces.append(re.sub(r"[ \t]{2,}", " ", joined))
+
+        folded = unicodedata.normalize("NFKC", text).translate(_CONFUSABLES)
+        if folded != text:
+            pieces.append(folded)
 
         # URL and HTML-entity decoding, merged in from the former
         # `security/injection_scanner.py`. Both are how an injection reaches a

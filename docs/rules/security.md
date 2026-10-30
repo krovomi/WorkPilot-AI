@@ -181,9 +181,6 @@ appel réseau du backend passe par `offline_policy/`. Voir
   en CI). Packs de skills amont : `skills-lock.json`. Un skill proposé par hermes n'est jamais
   activé sans revue humaine.
 - `quality-security.yml` (CodeQL, Bandit, pip-audit, pnpm audit) ne se désactive pas pour passer.
-- Une release publie son SBOM CycloneDX et une attestation de provenance pour chaque fichier
-  (`release.yml`, job `create-release`) ; seuls ce job et la signature Windows obtiennent un jeton
-  OIDC (`tests/test_release_supply_chain.py`).
 
 ## Interdits
 
