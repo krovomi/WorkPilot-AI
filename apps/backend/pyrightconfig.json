@@ -1,0 +1,16 @@
+{
+  "include": [
+    "best_of_n",
+    "bench",
+    "genai_trace",
+    "goal",
+    "mcp_tasks",
+    "os_sandbox",
+    "security"
+  ],
+  "exclude": ["**/__pycache__", ".venv"],
+  "venvPath": ".",
+  "venv": ".venv",
+  "pythonVersion": "3.12",
+  "typeCheckingMode": "basic"
+}

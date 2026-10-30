@@ -41,6 +41,7 @@ Référence complète : [`docs/CLI-USAGE.md`](../CLI-USAGE.md).
 |---|---|---|
 | Backend | `pytest tests/ -v` depuis la racine (venv : `.venv/bin` ou `.venv/Scripts`) | pytest |
 | Backend, lint | `ruff check apps/backend tests src scripts` et `ruff format --check apps/backend tests src scripts` | ruff `0.15.7` |
+| Backend, types | `cd apps/backend && .venv/bin/pyright` (paquets de `pyrightconfig.json`) | pyright `1.1.408` |
 | Frontend | `cd apps/frontend && pnpm test` | Vitest |
 | Frontend, types | `cd apps/frontend && pnpm run typecheck` | tsc |
 | Frontend, lint | `pnpm run lint` | Biome `2.5.11` |
@@ -48,7 +49,7 @@ Référence complète : [`docs/CLI-USAGE.md`](../CLI-USAGE.md).
 | Comme la CI, sans pousser | `pnpm verify` : ruff, Biome, fichiers générés, pytest ciblé sur le diff, typecheck, Vitest | — |
 | Comme le hook pre-push | `pnpm run test:all` (lint et fichiers générés seulement) | — |
 
-**Versions épinglées** : ruff `0.15.7`, Biome `2.5.11`. Toute autre version produit un diff que la
+**Versions épinglées** : ruff `0.15.7`, Biome `2.5.11`, pyright `1.1.408`. Toute autre version produit un diff que la
 CI refuse. Biome n'est écrit qu'à un endroit, `apps/frontend/package.json`, que `lint.yml` lit et
 que Dependabot ne bouge pas ; `tests/test_tool_pins.py` le tient égal à cette règle. ruff vise
 Python 3.12 (`target-version` de `ruff.toml`), le plancher supporté.
@@ -71,7 +72,7 @@ Fichiers générés qui ont leur `--check` en CI — les régénérer, ne pas le
 |---|---|---|
 | `pre-commit` | sur les fichiers indexés : ruff format + fix, Biome, scan des secrets (bloquant), puis les tests ciblés | `PRE_COMMIT_SKIP_TESTS=1` (tests seulement) |
 | `commit-msg` | Conventional Commits, première ligne ≤ 100 caractères | — |
-| `pre-push` | ruff, `skills_cli build --check`, cartes d'audit et fragments de changelog, Biome | `PRE_PUSH_FULL=1` (ou `pnpm verify`, sans pousser) ajoute pytest, tsc, Vitest ; `PRE_PUSH_SKIP=1` saute tout |
+| `pre-push` | ruff, `skills_cli build --check`, cartes d'audit et fragments de changelog, plafonds `quality_baselines.py`, Biome | `PRE_PUSH_FULL=1` (ou `pnpm verify`, sans pousser) ajoute pytest, tsc, Vitest ; `PRE_PUSH_SKIP=1` saute tout |
 
 Un agent n'utilise ni `--no-verify` ni `PRE_PUSH_SKIP` pour faire passer un changement : il corrige.
 Le scan des secrets porte sur tout fichier indexé, pas seulement Python et frontend ; un faux
@@ -104,7 +105,7 @@ positif se traite par la règle S1 de [`security.md`](security.md), jamais par `
 | Workflow | Vérifie |
 |---|---|
 | `ci.yml` | pytest (3.13 sur Linux, Windows, macOS ; 3.12 sur Linux) et frontend (typecheck, tests, build) ; chaque test pytest en échec est aussi une annotation du job, lisible sans ouvrir le journal ; `server-image` construit `deploy/Dockerfile.server`, migre un Postgres 16 avec l'image et attend `/health` |
-| `lint.yml` | ruff (dont `scripts/`), Biome, fraîcheur de `requirements.lock`, `--check` des fichiers vendorisés et des skills, évaluation des skills |
+| `lint.yml` | ruff (dont `scripts/`), pyright sur les paquets de `apps/backend/pyrightconfig.json`, Biome, fraîcheur de `requirements.lock`, `--check` des fichiers vendorisés et des skills, évaluation des skills |
 | `quality-security.yml` | CodeQL étendu, Bandit, pip-audit, pnpm audit |
 | `codeql.yml` | CodeQL sur Actions, JS/TS, Python |
 

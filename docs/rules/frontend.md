@@ -87,3 +87,7 @@ Aucun chemin en dur. Notes Windows : [`docs/windows-development.md`](../windows-
 | E2E | `e2e/` | `pnpm run test:e2e` (Playwright) |
 | Types | — | `pnpm run typecheck` |
 | Lint / format | — | `pnpm run lint` / `pnpm run lint:fix` (Biome) |
+
+Un `biome-ignore` de plus dans un fichier est refusé : `tests/baselines/biome-ignore.json` plafonne
+chaque fichier à son compte du 30 octobre 2026 (`python scripts/quality_baselines.py`, depuis la
+racine ; `update` ne fait que baisser). Typer la valeur plutôt que taire la règle.

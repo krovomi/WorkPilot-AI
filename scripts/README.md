@@ -69,5 +69,6 @@ Une ligne par fichier et par dossier de `scripts/`, et rien d'autre :
 | `fix_azure_devops_config.py` | Corrige la configuration Azure DevOps. | à la main |
 | `quality_cli.py` | Lance le Quality Scorer de la revue de code sur des fichiers. | `quality-handlers.ts` (main) |
 | `audit_findings.py` | Écrit la carte `F<n>.js` de chaque constat `docs/audit/findings/F<n>.md` (`build`) ou vérifie qu'elles sont à jour (`check`). | `pre-push.js`, `tests/test_audit_findings.py` ; `build` à la main après un constat |
+| `quality_baselines.py` | Plafonds par fichier des `except` aveugles (backend) et des `biome-ignore` (frontend) dans `tests/baselines/` : `check`, et `update` qui ne fait que les baisser. | `pre-push.js`, `tests/test_quality_baselines.py` ; `update` à la main après une correction |
 | `audit-large-files.js` | Liste les fichiers source de plus de 500 lignes. | à la main |
 | `ai-pr-reviewer.md` | Prompt de revue de PR à coller dans un assistant. | à la main |

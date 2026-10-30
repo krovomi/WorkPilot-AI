@@ -41,6 +41,13 @@ def test_lint_installs_the_ruff_the_rules_name():
     assert f"ruff=={_rule_pin('ruff')}" in LINT
 
 
+def test_lint_runs_the_pyright_the_rules_name():
+    pin = _rule_pin("pyright")
+    assert f"pyright=={pin}" in LINT
+    # pip's pyright fetches the npm release named here, not its own default.
+    assert f"PYRIGHT_PYTHON_FORCE_VERSION: '{pin}'" in LINT
+
+
 def test_the_python_lock_is_checked_with_the_uv_ci_installs():
     action = (
         ROOT / ".github" / "actions" / "setup-python-backend" / "action.yml"

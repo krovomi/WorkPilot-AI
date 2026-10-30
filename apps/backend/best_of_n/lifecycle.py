@@ -225,8 +225,10 @@ def _entries(parent_dir: Path, state: dict) -> list[tuple[dict, Path]]:
         index = entry.get("index") if isinstance(entry, dict) else None
         # The state file is ours, but a name read from disk is checked before
         # it becomes a path or a branch.
-        if not isinstance(index, int) or spec_id != variant_spec_id(
-            parent_dir.name, index
+        if (
+            not isinstance(index, int)
+            or not isinstance(spec_id, str)
+            or spec_id != variant_spec_id(parent_dir.name, index)
         ):
             raise BestOfNError(f"{STATE_FILENAME} names an unexpected variant")
         found.append((entry, parent_dir.parent / spec_id))

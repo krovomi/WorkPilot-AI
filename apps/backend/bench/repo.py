@@ -183,7 +183,7 @@ def merge_of_branch(project_dir: Path, spec_id: str) -> tuple[str | None, str]:
     return found[0], note
 
 
-def merge_of_pr(project_dir: Path, pr_url: str) -> str | None:
+def merge_of_pr(project_dir: Path, pr_url: str | None) -> str | None:
     """The commit a merged pull request landed as, asked of ``gh``.
 
     Best effort: ``gh`` may be missing or signed out, and the commit may not

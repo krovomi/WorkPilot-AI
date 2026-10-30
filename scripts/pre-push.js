@@ -267,6 +267,9 @@ jobs.push(
 // changelog fragments: CI fails on a stale card or a malformed fragment.
 jobs.push(runJob("audit:findings", pythonPath, ["scripts/audit_findings.py", "check"]));
 jobs.push(runJob("changelog:fragments", pythonPath, ["scripts/changelog.py", "check"]));
+// And the per-file ceilings of blind excepts and biome-ignore (lot N4): a few
+// seconds here, a red CI run otherwise.
+jobs.push(runJob("quality:baselines", pythonPath, ["scripts/quality_baselines.py", "check"]));
 
 // --- Checks lourds : opt-in seulement -------------------------------------
 // pytest / tsc / vitest coûtent plusieurs minutes et sont DÉJÀ rejoués par la

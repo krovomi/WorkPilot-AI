@@ -774,7 +774,7 @@ Les hooks sont volontairement **rapides**. La CI (`ci.yml`, `lint.yml`) rejoue l
 | Étage | Ce qui tourne | Budget |
 |-------|---------------|--------|
 | `pre-commit` | ruff + biome **sur les fichiers stagés uniquement**, scan des secrets (bloquant), puis les tests liés à ces fichiers | quelques secondes |
-| `pre-push` | ruff check, ruff format --check, biome lint | < 30 s |
+| `pre-push` | ruff check, ruff format --check, fichiers générés, plafonds des `except` aveugles et des `biome-ignore`, biome lint | < 30 s |
 | CI | pytest, typecheck, vitest, build et démarrage de l'app — sur 3 OS ; parcours E2E Playwright sous Linux | — |
 
 Le typecheck est **incrémental** (`incremental` + `tsBuildInfoFile` dans `apps/frontend/tsconfig.json`) : la première passe reste longue, les suivantes tombent à quelques secondes.
