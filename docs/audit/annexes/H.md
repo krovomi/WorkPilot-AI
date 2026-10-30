@@ -6,7 +6,7 @@ ligne est une feature, une PR vers `develop`, avec sa justification dans `docs/a
 
 | | Feature | PR |
 |---|---|---|
-| [H1](H1.md) | Règles apprises des revues, adoptées d'un clic (IA1) | à venir |
+| [H1](H1.md) | Règles apprises des revues, adoptées d'un clic (IA1) | #573 |
 
 Une feature, un fichier : `H<n>.md` dans ce dossier.
 
