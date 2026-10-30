@@ -38,9 +38,12 @@ L'objectif vit dans `<spec>/.workpilot-goal.json` et **pas** dans
 qu'il peut réécrire est un objectif qu'il atteint avec `true`. Le nom est dans
 `PROTECTED_CONFIG_NAMES` (`security/path_guard.py`) : le hook d'écriture,
 l'exécuteur hors SDK, le validateur Bash et le garde-fou pi le refusent à tous
-les agents, comme la configuration de sécurité (S3). Seul le main l'écrit,
+les agents, comme la configuration de sécurité (S3). Le main l'écrit,
 depuis la carte, dans chaque copie du dossier de spec. Le backend lit la copie
-du projet principal d'abord.
+du projet principal d'abord. Une seule autre écriture, en Python et jamais par
+un agent : la phase `spec-by-example`, sur une tâche qui n'a pas d'objectif,
+après avoir vérifié que les tests qu'elle a fait écrire compilent et échouent
+([spec-by-example.md](spec-by-example.md)).
 
 Un fichier présent mais illisible ne veut pas dire « pas d'objectif » : la QA
 s'arrête avant la première passe (`invalid`), et une personne corrige

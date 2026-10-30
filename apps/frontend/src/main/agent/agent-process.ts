@@ -40,7 +40,7 @@ import { getAPIProfileEnv } from "../services/profile";
 import { loadBackendEnv } from "../source-env";
 import type { AgentEvents } from "./agent-events";
 import type { AgentState } from "./agent-state";
-import { crossReviewEnv, getOAuthModeClearVars } from "./env-utils";
+import { crossReviewEnv, getOAuthModeClearVars, specByExampleEnv } from "./env-utils";
 import { forwardTaskEventToHooks } from "./hook-bridge";
 import { PERMISSION_CHANNEL_ENV } from "../task-permissions";
 import { parseTaskEvent } from "./task-event-parser";
@@ -706,6 +706,9 @@ export class AgentProcessManager {
 			// The cross review's second engine (off when absent). The backend
 			// refuses one equal to the build's provider (`cross_review/`).
 			Object.assign(env, crossReviewEnv(project.settings.crossReview));
+
+			// Integration tests before code, for an ASP.NET Core API (off when absent).
+			Object.assign(env, specByExampleEnv(project.settings.specByExample));
 		}
 
 		return env;

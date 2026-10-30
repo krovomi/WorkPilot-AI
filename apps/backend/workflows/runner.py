@@ -144,6 +144,8 @@ CONFIG_PHASE = {
     "architecture-map": "qa",
     # A second engine reading the finished task: a QA cost. Its own provider
     # and model come from `cross_review_phase.resolve_reviewer`, not from this.
+    # The integration tests written before the code (IA6): coding's model.
+    "spec-by-example": "coding",
     "cross-review": "qa",
     # Phases of the per-kind workflows (`workflows/registry.py`). Before the
     # code is written, they are planning costs; what reads the finished work
@@ -1177,6 +1179,21 @@ async def _run_execute(resolved, ctx: PhaseContext) -> PhaseOutcome:
     return await run_execute_phase(resolved, ctx)
 
 
+async def _run_spec_by_example(resolved, ctx: PhaseContext) -> PhaseOutcome:
+    """The `spec-by-example` phase: red integration tests, then the goal (IA6)."""
+    try:
+        from workflows.spec_by_example_phase import run_spec_by_example_phase
+    except ImportError as exc:  # pragma: no cover - import-time environment
+        return PhaseOutcome(
+            resolved.phase.id,
+            resolved.phase.impl,
+            resolved.dispatch,
+            None,
+            detail=f"unavailable: {exc}",
+        )
+    return await run_spec_by_example_phase(resolved, ctx)
+
+
 async def _run_cross_review(resolved, ctx: PhaseContext) -> PhaseOutcome:
     """The `cross-review` phase: `workflows.cross_review_phase`, on a second engine."""
     try:
@@ -1228,6 +1245,7 @@ CUSTOM_EXECUTORS = {
     "verify": _run_verify_loop,
     "verify-replay": _run_verify_replay,
     "architecture-map": _run_architecture_map,
+    "spec-by-example": _run_spec_by_example,
     "cross-review": _run_cross_review,
     "execute": _run_execute,
 }
