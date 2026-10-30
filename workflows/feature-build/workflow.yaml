@@ -123,6 +123,21 @@ phases:
       parce qu'un écran mal découpé se corrige en une phrase à ce moment-là et
       en un cycle complet après la QA.
 
+  - id: spec-by-example
+    impl: tooling/tdd-cycle
+    always: true
+    when: touches("**/*.cs,**/*.csproj")
+    dispatch: fresh-context
+    description: >-
+      ASP.NET Core Web APIs only, and only when the project or the task turns
+      it on. Before any code, one session writes the spec's acceptance
+      criteria as integration tests through HTTP (`WebApplicationFactory`);
+      Python checks it wrote only in test projects, that the tests compile
+      and that they fail, and only then makes `dotnet test` the task's goal,
+      with those tests protected. A task that already has a goal keeps it.
+      Never pruned by effort: the switch is the project's. Run by
+      `workflows/spec_by_example_phase.py` (docs/architecture/spec-by-example.md).
+
   - id: coding
     impl: tooling/tdd-cycle
     dispatch: subagent-per-task

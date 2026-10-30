@@ -128,6 +128,15 @@ export function crossReviewEnv(
 	};
 }
 
+/**
+ * The project's switch for writing integration tests before the code
+ * (`workflows/spec_by_example_phase.py`). Only "on" is sent: off is the
+ * backend's default, and a task's own `specByExample` wins either way.
+ */
+export function specByExampleEnv(enabled?: boolean): Record<string, string> {
+	return enabled === true ? { WORKPILOT_SPEC_BY_EXAMPLE: "1" } : {};
+}
+
 export function applyTddOverride(
 	env: Record<string, string>,
 	tddMode?: boolean,

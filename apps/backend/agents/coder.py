@@ -1638,6 +1638,7 @@ async def _run_post_planning_phases(
     workflow_repo_root: Path,
     jev_run,
     verbose: bool,
+    source_spec_dir: Path | None = None,
 ) -> None:
     """The workflow phases declared between `planning` and `coding`.
 
@@ -1682,6 +1683,9 @@ async def _run_post_planning_phases(
             jev_run=jev_run,
             effort=getattr(profile, "effort", "medium"),
             verbose=verbose,
+            # The card reads the main spec directory: a goal written by
+            # `spec-by-example` must reach it (`goal.spec.load_goal`).
+            source_spec_dir=source_spec_dir,
         )
         run = await run_skill_phases(
             window_profile, ctx, after="planning", before="coding"
@@ -2798,6 +2802,7 @@ async def run_autonomous_agent(
                     workflow_repo_root=_workflow_repo_root,
                     jev_run=jev_run,
                     verbose=verbose,
+                    source_spec_dir=source_spec_dir,
                 )
             else:
                 planning_retry_context = _on_invalid_plan(
