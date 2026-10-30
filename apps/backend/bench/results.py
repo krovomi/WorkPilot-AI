@@ -5,12 +5,15 @@ across runs; the table is computed from the records when read. Only judged
 builds are records: a build that did not start, or that was interrupted, says
 nothing about its model.
 
-Two readers outside the bench:
+Three readers outside the bench:
 
 * Formula Lab takes ``history_samples`` as success samples per
   (provider, model), next to the usage history (``cost_intelligence``);
 * the model router takes ``scores`` and skips a model the bench saw resolve
-  less than half of at least three cases (``model_router``).
+  less than half of at least three cases (``model_router``), on the cards of
+  the task's kind when there are enough of them;
+* the card's engine step reads ``recommendations``: per kind of card, the
+  cheapest engine among those close to the best measured rate.
 """
 
 from __future__ import annotations
@@ -23,11 +26,17 @@ MAX_RECORDS = 2000
 # The router's rule: a model is set aside only on this much evidence.
 ROUTER_MIN_CASES = 3
 ROUTER_MIN_RATE = 0.5
+# The recommendation's rule: an engine is recommended only on the router's
+# evidence (three cards, half resolved); among the engines within this margin
+# of the best rate, the cheapest measured one wins.
+RECOMMEND_MARGIN = 0.1
+ALL_KINDS = "*"
 
 _RECORD_KEYS = (
     "runId",
     "buildId",
     "caseId",
+    "kind",
     "provider",
     "model",
     "effort",
@@ -64,13 +73,15 @@ def add_records(project_dir: Path, new: list[dict]) -> None:
     ]
     records.extend({key: r.get(key) for key in _RECORD_KEYS} for r in new)
     records = records[-MAX_RECORDS:]
+    valid = _records_from(records)
     write_json(
         results_path(project_dir),
         {
             "version": 1,
             "updatedAt": now(),
             "records": records,
-            "table": _table(_records_from(records)),
+            "table": _table(valid),
+            "recommendations": _recommendations(valid),
         },
     )
 
@@ -168,10 +179,77 @@ def history_samples(project_dir: Path) -> list[dict]:
     ]
 
 
-def scores(project_dir: Path) -> dict[tuple[str, str], dict]:
-    """``{(provider, model): {resolved, judged, cases}}``, every effort together."""
+def recommendations(project_dir: Path) -> dict[str, dict]:
+    """``{kind: engine}``, and ``"*"`` over every card; a kind without enough
+    evidence has no entry."""
+    return _recommendations(_records(main_project(project_dir)))
+
+
+def _recommendations(records: list[dict]) -> dict[str, dict]:
+    out: dict[str, dict] = {}
+    overall = _recommend(records)
+    if overall:
+        out[ALL_KINDS] = overall
+    kinds = sorted({r["kind"] for r in records if isinstance(r.get("kind"), str)})
+    for kind in kinds:
+        pick = _recommend([r for r in records if r.get("kind") == kind])
+        if pick:
+            out[kind] = pick
+    return out
+
+
+def _recommend(records: list[dict]) -> dict | None:
+    rows = [
+        row
+        for row in _table(records)
+        if row["cases"] >= ROUTER_MIN_CASES and row["rate"] >= ROUTER_MIN_RATE
+    ]
+    if not rows:
+        return None
+    best = max(row["rate"] for row in rows)
+    close = [row for row in rows if row["rate"] >= best - RECOMMEND_MARGIN - 1e-9]
+    # An engine whose cost was never measured cannot win on cost.
+    close.sort(
+        key=lambda row: (
+            row["avgCostUsd"] is None,
+            row["avgCostUsd"] or 0.0,
+            -row["rate"],
+            -row["judged"],
+            row["provider"],
+            row["model"],
+            row["effort"],
+        )
+    )
+    pick = close[0]
+    keys = ("provider", "model", "effort", "judged", "resolved", "rate", "cases")
+    return {
+        **{key: pick[key] for key in keys},
+        "avgCostUsd": pick["avgCostUsd"],
+        "bestRate": best,
+        "considered": len(rows),
+    }
+
+
+def scores(project_dir: Path, kind: str | None = None) -> dict[tuple[str, str], dict]:
+    """``{(provider, model): {resolved, judged, cases}}``, every effort together.
+
+    With ``kind``, a model the bench judged on enough cards of that kind is
+    scored on those cards only (and its entry says ``kind``); the others keep
+    their score over every card.
+    """
+    records = _records(main_project(project_dir))
+    out = _scores(records)
+    if kind:
+        same = _scores([r for r in records if r.get("kind") == kind])
+        for key, entry in same.items():
+            if entry["cases"] >= ROUTER_MIN_CASES:
+                out[key] = {**entry, "kind": kind}
+    return out
+
+
+def _scores(records: list[dict]) -> dict[tuple[str, str], dict]:
     out: dict[tuple[str, str], dict] = {}
-    for r in _records(main_project(project_dir)):
+    for r in records:
         entry = out.setdefault(
             (r["provider"].lower(), r["model"]),
             {"resolved": 0, "judged": 0, "cases": set()},

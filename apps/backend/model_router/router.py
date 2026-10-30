@@ -13,7 +13,9 @@ spend Opus tokens.
 Measured evidence, when the project has it, goes first: the repo bench
 (`bench/`) replays finished cards and judges them with their own tests. A
 model it saw resolve less than half of at least three distinct cards is
-passed over, and the choice's reason says so (`bench_scores`).
+passed over, and the choice's reason says so (`bench_scores`). When the
+bench judged the model on enough cards of the task's kind, those cards are
+the evidence (`bench.scores(project, kind)`).
 """
 
 from __future__ import annotations
@@ -197,6 +199,8 @@ class ModelRouter:
         score = self._bench(provider, model)
         if score:
             reason += f"; bench {score['resolved']}/{score['judged']} resolved"
+            if score.get("kind"):
+                reason += f" on {score['kind']} cards"
         if passed:
             reason += "; passed over on bench evidence: " + ", ".join(passed)
         return reason
@@ -219,9 +223,10 @@ class ModelRouter:
                 continue
             score = self._bench(provider, model)
             if score and router_verdict(score):
+                scope = f"{score['kind']} cards" if score.get("kind") else "cards"
                 passed.append(
                     f"{provider}/{model} ({score['resolved']}/{score['judged']} "
-                    f"on {score['cases']} cards)"
+                    f"on {score['cases']} {scope})"
                 )
                 continue
             pricing = self.catalog.get_pricing(provider, model)

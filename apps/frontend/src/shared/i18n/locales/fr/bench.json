@@ -12,7 +12,7 @@
 		"cost": "Coût moyen",
 		"duration": "Durée moyenne",
 		"cards": "Cartes",
-		"readers": "Formula Lab compte ces rejeux dans ses estimations de réussite, et le routeur de modèles écarte un modèle qui a réussi moins de la moitié d'au moins trois cartes."
+		"readers": "Formula Lab compte ces rejeux dans ses estimations de réussite, et le routeur de modèles écarte un modèle qui a réussi moins de la moitié d'au moins trois cartes (du type de la tâche, quand il y en a assez)."
 	},
 	"new": {
 		"title": "Nouveau passage",
@@ -89,5 +89,18 @@
 		"candidates": "Impossible de lister les cartes terminées.",
 		"start": "Le passage n'a pas pu démarrer.",
 		"discard": "Le passage n'a pas pu être abandonné."
+	},
+	"recommend": {
+		"title": "Moteur recommandé par type de carte",
+		"allKinds": "Toutes les cartes",
+		"evidence": "{{rate}} résolues ({{resolved}} sur {{judged}}) sur {{cases}} cartes",
+		"cost": "coût moyen {{cost}}",
+		"costUnknown": "coût non mesuré",
+		"rule": "Parmi les moteurs qui ont résolu au moins la moitié d'au moins trois cartes d'un type, le moins cher à dix points ou moins du meilleur taux. Un type avec moins de preuves n'a pas de recommandation propre. Sur l'étape moteur d'une carte, la recommandation est proposée, jamais appliquée à ta place.",
+		"empty": "Pas encore assez de rejeux : un moteur a besoin d'au moins trois cartes jugées.",
+		"hintKind": "Sur les cartes de type « {{kind}} » de ce projet, le banc recommande",
+		"hintAll": "Sur les cartes de ce projet, le banc recommande",
+		"use": "L'utiliser",
+		"inUse": "Déjà choisi"
 	}
 }
