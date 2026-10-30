@@ -7,6 +7,7 @@ import type {
 import { create } from "zustand";
 import { DEFAULT_APP_SETTINGS } from "../../shared/constants";
 import type { AppSettings, IPCResult } from "../../shared/types";
+import type { SecretDates } from "../../shared/utils/secret-age";
 import { toast } from "../hooks/use-toast";
 import { markSettingsLoaded } from "../lib/sentry";
 
@@ -462,7 +463,14 @@ export async function saveSettingsResult(
 ): Promise<IPCResult> {
 	try {
 		const result = await window.electronAPI.saveSettings(updates);
-		if (result.success) useSettingsStore.getState().updateSettings(updates);
+		if (result.success) {
+			// Main dates the secrets (S5); a changed key is dated today.
+			const dates = (result.data as { credentialsSetAt?: SecretDates } | undefined)
+				?.credentialsSetAt;
+			useSettingsStore
+				.getState()
+				.updateSettings(dates ? { ...updates, credentialsSetAt: dates } : updates);
+		}
 		return result;
 	} catch (error) {
 		return {
