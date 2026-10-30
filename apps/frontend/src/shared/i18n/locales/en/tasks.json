@@ -2108,5 +2108,12 @@
 		"confirmBody": "The build on {{engine}} becomes the task's build. The {{others}} other variants, their worktrees and their branches are deleted. Nothing is merged.",
 		"adoptedLine": "Kept: {{variant}}",
 		"discardedLine": "Every variant was discarded."
+	},
+	"crossReview": {
+		"cardBadge": {
+			"agree": "Cross review OK",
+			"disagree": "Cross review: disagrees",
+			"inconclusive": "Cross review: no verdict"
+		}
 	}
 }

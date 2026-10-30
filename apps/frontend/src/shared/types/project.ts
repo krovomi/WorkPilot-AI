@@ -2,6 +2,8 @@
  * Project-related types
  */
 
+import type { EngineTrio } from "./task";
+
 export interface Project {
 	id: string;
 	name: string;
@@ -25,6 +27,11 @@ export interface ProjectSettings {
 	tddMode?: boolean;
 	/** Run the verification loop after coding (launch, fix, drive, measure) (default: true) */
 	verifyLoop?: boolean;
+	/**
+	 * The second engine that reads a finished task before its pull request
+	 * (`cross_review/`). Absent means off; it must not be the build's provider.
+	 */
+	crossReview?: EngineTrio;
 	/** Maximum parallel tasks allowed (default: 3) */
 	maxParallelTasks?: number;
 	/** Description utilisateur du projet (optionnel) */

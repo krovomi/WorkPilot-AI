@@ -7,6 +7,7 @@ ligne est une feature, une PR vers `develop`, avec sa justification dans `docs/a
 | | Feature | PR |
 |---|---|---|
 | [H1](H1.md) | Règles apprises des revues, adoptées d'un clic (IA1) | #573 |
+| [H2](H2.md) | Revue croisée par un second moteur avant la PR (IA2) | #574 |
 
 Une feature, un fichier : `H<n>.md` dans ce dossier.
 

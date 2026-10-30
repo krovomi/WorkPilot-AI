@@ -1235,6 +1235,7 @@ def handle_create_pr_command(
     title: str | None = None,
     draft: bool = False,
     body: str | None = None,
+    allow_cross_review_disagreement: bool = False,
 ) -> CreatePRResult:
     """
     Handle the --create-pr command: push branch and create a GitHub PR.
@@ -1247,6 +1248,8 @@ def handle_create_pr_command(
         draft: Whether to create as draft PR
         body: Optional PR body. If provided, used verbatim (no AI generation,
               no impact block auto-injection).
+        allow_cross_review_disagreement: Create the PR although the cross
+              review disagrees with this code (the person's explicit choice).
 
     Returns:
         CreatePRResult with success status, pr_url, and any errors
@@ -1289,6 +1292,7 @@ def handle_create_pr_command(
             title=title,
             draft=draft,
             body=body,
+            allow_cross_review_disagreement=allow_cross_review_disagreement,
         )
     except Exception as e:
         debug_error(MODULE, f"Exception during PR creation: {e}")
@@ -1312,6 +1316,8 @@ def handle_create_pr_command(
         "remote": raw_result.get("remote", ""),
         "branch": raw_result.get("branch", ""),
     }
+    if raw_result.get("cross_review_blocked"):
+        result["cross_review_blocked"] = True
 
     if result.get("success"):
         pr_url = result.get("pr_url")

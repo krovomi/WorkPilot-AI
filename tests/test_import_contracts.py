@@ -83,6 +83,9 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # clients) and by the provider registry: a leaf, or it joins the cycle.
     # The card and the feed are written by core (`_report_sandbox`).
     "os_sandbox": {"foundation", "security"},
+    # The cross review's verdict, read by the pull request step in core: a
+    # leaf, or it joins the cycle. Its session is `workflows/cross_review_phase.py`.
+    "cross_review": {"foundation"},
 }
 
 # The largest set of units that all import one another, directly or not. It

@@ -109,6 +109,25 @@ export function applyVerifyLoop(
 	return { ...env, WORKPILOT_VERIFY_LOOP: verifyLoop ? "true" : "false" };
 }
 
+/**
+ * The project's cross-review engine as the variables `cross_review/review.py`
+ * reads. Nothing when the project names no second engine, or names one
+ * without a model: the backend would refuse it anyway, and saying nothing
+ * keeps the phase's own "not configured" message.
+ */
+export function crossReviewEnv(
+	engine?: { provider?: string; model?: string; effort?: string } | null,
+): Record<string, string> {
+	const provider = engine?.provider?.trim();
+	const model = engine?.model?.trim();
+	if (!provider || !model) return {};
+	return {
+		WORKPILOT_CROSS_REVIEW_PROVIDER: provider,
+		WORKPILOT_CROSS_REVIEW_MODEL: model,
+		...(engine?.effort && { WORKPILOT_CROSS_REVIEW_EFFORT: engine.effort }),
+	};
+}
+
 export function applyTddOverride(
 	env: Record<string, string>,
 	tddMode?: boolean,

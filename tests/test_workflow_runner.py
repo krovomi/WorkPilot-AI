@@ -85,6 +85,7 @@ class TestPhaseWindows:
         assert [r.id for r in post] == [
             "architecture-map",
             "verify-replay",
+            "cross-review",
         ]
 
     def test_the_detector_is_run_by_the_gates_not_by_a_window(self, workflow):
@@ -177,6 +178,7 @@ class TestPhaseWindows:
         assert [r.id for r in post] == [
             "architecture-map",
             "verify-replay",
+            "cross-review",
         ]
 
     def test_phases_owned_by_another_executor_are_stepped_over(self, workflow):
@@ -212,8 +214,9 @@ class TestPhaseWindows:
         # `verify` is a hard gate: never pruned, at any level. It runs before
         # QA so the reviewer judges code already seen running.
         assert [r.id for r in mid] == ["verify"]
-        # Its replay costs no token, so no level drops it either.
-        assert [r.id for r in post] == ["verify-replay"]
+        # Its replay costs no token, so no level drops it either; the cross
+        # review is switched on by the project's setting, not by the effort.
+        assert [r.id for r in post] == ["verify-replay", "cross-review"]
 
     def test_every_builtin_phase_named_here_exists_in_the_workflow(self, workflow):
         declared = {p.id for p in workflow.phases}

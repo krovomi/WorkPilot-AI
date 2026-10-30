@@ -177,6 +177,17 @@
 		},
 		"warnings": {
 			"emptyBranch": "Nothing to push: the branch is identical to « {{base}} », so the PR would be empty. Check that the agent committed its changes, or that this is not a duplicate task already merged."
+		},
+		"crossReview": {
+			"blockedTitle": "The cross review disagrees with this change",
+			"blockedHint": "Fixing the code and running the build again starts a new review. If you have read the problems and still want the pull request, create it anyway.",
+			"createAnyway": "Create anyway",
+			"verdict": {
+				"agree": "Cross review by {{engine}}: no blocking problem.",
+				"disagree_one": "Cross review by {{engine}}: 1 blocking problem. The pull request is held back until the code changes or you create it anyway.",
+				"disagree_other": "Cross review by {{engine}}: {{count}} blocking problems. The pull request is held back until the code changes or you create it anyway.",
+				"inconclusive": "Cross review by {{engine}}: no usable verdict. It does not hold the pull request back, and it is not an approval."
+			}
 		}
 	},
 	"mergeProgress": {

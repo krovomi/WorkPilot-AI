@@ -393,6 +393,7 @@ export function Worktrees({ projectId }: WorktreesProps) {
 				error: result.error,
 				prUrl: undefined,
 				alreadyExists: false,
+				crossReviewBlocked: result.data?.crossReviewBlocked === true,
 			};
 		} catch (err) {
 			// Propagate actual error message; let CreatePRDialog handle i18n fallback for undefined

@@ -219,6 +219,7 @@ class PushAndCreatePRResult(TypedDict, total=False):
     already_exists: bool
     error: str
     message: str
+    cross_review_blocked: bool  # held back by a cross review that disagrees
 
 
 class WorktreeError(Exception):

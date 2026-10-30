@@ -3076,6 +3076,14 @@ export function registerWorktreeHandlers(
 								resolve({
 									success: false,
 									error: result.error || "Failed to create PR",
+									// The dialog offers "create anyway" only on this.
+									...(result.crossReviewBlocked && {
+										data: {
+											success: false,
+											error: result.error,
+											crossReviewBlocked: true,
+										},
+									}),
 								});
 							} else {
 								// Fallback to raw output if JSON parsing fails

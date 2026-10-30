@@ -222,6 +222,14 @@ Environment Variables:
         help="With --create-pr: create as draft PR",
     )
     parser.add_argument(
+        "--pr-ignore-cross-review",
+        action="store_true",
+        help=(
+            "With --create-pr: create the PR even though the cross review "
+            "disagrees with this code. A person's explicit choice."
+        ),
+    )
+    parser.add_argument(
         "--pr-body-file",
         type=str,
         metavar="PATH",
@@ -855,6 +863,7 @@ def _run_cli(argv=None, jev_run=None) -> None:
             title=args.pr_title,
             draft=args.pr_draft,
             body=body_override,
+            allow_cross_review_disagreement=args.pr_ignore_cross_review,
         )
         # JSON output is already printed by handle_create_pr_command
         if not result.get("success"):

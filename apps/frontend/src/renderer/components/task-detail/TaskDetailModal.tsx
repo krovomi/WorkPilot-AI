@@ -825,6 +825,7 @@ function TaskDetailModalContent({
 				error: result.error,
 				prUrl: undefined,
 				alreadyExists: false,
+				crossReviewBlocked: result.data?.crossReviewBlocked === true,
 			};
 		} catch (error) {
 			// Propagate actual error message; let CreatePRDialog handle i18n fallback for undefined

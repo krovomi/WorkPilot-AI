@@ -87,10 +87,18 @@ export class AgentManager extends EventEmitter {
 		const project = projectStore
 			.getProjects()
 			.find((p) => p.path === location.projectPath);
-		return planTaskProviders(
+		const plan = planTaskProviders(
 			taskEngineFromMetadata(metadata, undefined, project?.settings?.provider),
 			startPhase,
 		);
+		// The cross review opens a session on its own provider: its
+		// credentials go to the build too. Claude's are not added here; they
+		// follow the task's own OAuth chain, as `buildTaskProviderEnv` says.
+		const reviewer = project?.settings?.crossReview?.provider?.trim();
+		if (reviewer && !plan.providers.includes(reviewer)) {
+			plan.providers = [...plan.providers, reviewer];
+		}
+		return plan;
 	}
 
 	/**
