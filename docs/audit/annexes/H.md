@@ -13,7 +13,7 @@ ligne est une feature, une PR vers `develop`, avec sa justification dans `docs/a
 | [H5](H5.md) | Le Kanban comme serveur MCP (IA5) | #577 |
 | [H6](H6.md) | Moteur recommandé par type de carte, appris du banc (IA3) | #578 |
 | [H7](H7.md) | Revue en brouillon des PR ouvertes par d'autres, depuis les automatisations (IA7) | #579 |
-| [H8](H8.md) | Scénario de vérification web écrit sur la carte, suivi dans Playwright avec captures et trace (IA8) | à venir |
+| [H8](H8.md) | Scénario de vérification web écrit sur la carte, suivi dans Playwright avec captures et trace (IA8) | #580 |
 
 Une feature, un fichier : `H<n>.md` dans ce dossier.
 
