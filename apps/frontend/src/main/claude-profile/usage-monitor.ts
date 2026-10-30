@@ -36,6 +36,7 @@ import {
 import { getOperationRegistry } from "./operation-registry";
 import { calculateProfileScore } from "./profile-scorer";
 import { getProfileSelectionLock } from "./profile-selection-lock";
+import { hasSignedInBefore, type SignInRecord } from "./profile-utils";
 import { isProfileRateLimited } from "./rate-limit-manager";
 import { ensureValidToken, reactiveTokenRefresh } from "./token-refresh";
 import { parseUsageOutput } from "./usage-parser";
@@ -617,8 +618,8 @@ export class UsageMonitor extends EventEmitter {
 						: profile.configDir;
 					const creds = getCredentialsFromKeychain(expandedConfigDir);
 					if (!creds.token) {
-						// Credentials are missing - mark for re-auth
-						this.needsReauthProfiles.add(profile.id);
+						// Credentials are missing - mark for re-auth if it was signed in
+						this.flagMissingCredentials(profile);
 						this.debugLog(
 							"[UsageMonitor:getAllProfilesUsage] Profile needs re-auth (no credentials): " +
 								profile.name,
@@ -942,7 +943,7 @@ export class UsageMonitor extends EventEmitter {
 							"[UsageMonitor] Profile needs authentication (no credentials found): " +
 								profile.name,
 						);
-						this.needsReauthProfiles.add(profile.id);
+						this.flagMissingCredentials(profile);
 					}
 				}
 			} catch (error) {
@@ -964,7 +965,7 @@ export class UsageMonitor extends EventEmitter {
 							profile.name,
 					);
 					// Mark profile as needing re-authentication since credentials are missing
-					this.needsReauthProfiles.add(profile.id);
+					this.flagMissingCredentials(profile);
 					return null;
 				}
 			}
@@ -1173,7 +1174,7 @@ export class UsageMonitor extends EventEmitter {
 							"[UsageMonitor] Profile needs authentication (no credentials found): " +
 								activeProfile.name,
 						);
-						this.needsReauthProfiles.add(activeProfile.id);
+						this.flagMissingCredentials(activeProfile);
 					}
 				}
 			} catch (error) {
@@ -1208,7 +1209,7 @@ export class UsageMonitor extends EventEmitter {
 			}
 
 			// Mark profile as needing re-authentication since credentials are missing
-			this.needsReauthProfiles.add(activeProfile.id);
+			this.flagMissingCredentials(activeProfile);
 		}
 
 		// No credential available
@@ -1219,17 +1220,34 @@ export class UsageMonitor extends EventEmitter {
 	}
 
 	/**
+	 * Missing credentials: a profile that was signed in has lost its sign-in
+	 * and gets the re-auth flag (and its toast); one never signed in is simply
+	 * not connected, which the Accounts settings already show, so it does not.
+	 */
+	private flagMissingCredentials(
+		profile: { id: string } & Partial<SignInRecord>,
+	): void {
+		if (hasSignedInBefore(profile)) {
+			this.needsReauthProfiles.add(profile.id);
+		} else {
+			this.needsReauthProfiles.delete(profile.id);
+		}
+	}
+
+	/**
 	 * Get credential for a specific OAuth profile.
 	 *
 	 * Unlike getCredential() which uses getActiveProfile() (which may return a different
 	 * profile than the one we want), this method directly targets the specified profile's
 	 * configDir for token retrieval.
 	 */
-	private async getCredentialForProfile(profile: {
-		id: string;
-		name: string;
-		configDir?: string;
-	}): Promise<string | undefined> {
+	private async getCredentialForProfile(
+		profile: {
+			id: string;
+			name: string;
+			configDir?: string;
+		} & Partial<SignInRecord>,
+	): Promise<string | undefined> {
 		if (!profile.configDir) {
 			console.warn(
 				"[UsageMonitor:getCredentialForProfile] Profile has no configDir:",
@@ -1269,11 +1287,10 @@ export class UsageMonitor extends EventEmitter {
 					":",
 					tokenResult.error,
 				);
-				if (
-					tokenResult.errorCode === "invalid_grant" ||
-					tokenResult.errorCode === "missing_credentials"
-				) {
+				if (tokenResult.errorCode === "invalid_grant") {
 					this.needsReauthProfiles.add(profile.id);
+				} else if (tokenResult.errorCode === "missing_credentials") {
+					this.flagMissingCredentials(profile);
 				}
 			}
 		} catch (error) {
@@ -1301,7 +1318,7 @@ export class UsageMonitor extends EventEmitter {
 		}
 
 		// Mark as needing re-authentication
-		this.needsReauthProfiles.add(profile.id);
+		this.flagMissingCredentials(profile);
 		console.warn(
 			"[UsageMonitor:getCredentialForProfile] No credential found for:",
 			profile.name,

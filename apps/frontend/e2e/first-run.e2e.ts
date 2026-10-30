@@ -39,6 +39,29 @@ test("first start offers local mode and reaches the welcome screen", async () =>
 	await expect(page.getByText("Welcome to WorkPilot AI!")).toBeVisible();
 });
 
+test("a fresh install raises no re-authentication alarm", async () => {
+	// The default Claude profile exists before anyone signs in; its missing
+	// credentials are not an expired account (F126). Asked from the real main
+	// process, which is what the "Reconnection required" toast listens to.
+	const usage = await ctx.page.evaluate(async () => {
+		const api = (
+			globalThis as unknown as {
+				electronAPI: {
+					requestAllProfilesUsage(): Promise<{
+						success: boolean;
+						data?: { allProfiles: Array<{ needsReauthentication?: boolean }> };
+					}>;
+				};
+			}
+		).electronAPI;
+		return api.requestAllProfilesUsage();
+	});
+	expect(usage.success).toBe(true);
+	const flagged = (usage.data?.allProfiles ?? []).filter((p) => p.needsReauthentication);
+	expect(flagged).toEqual([]);
+	await expect(ctx.page.getByText("Reconnection required")).toHaveCount(0);
+});
+
 test("an existing folder becomes a project, initialized from where it lands", async () => {
 	const { app, page } = ctx;
 	await answerNextFolderPicker(app, projectDir);
