@@ -57,6 +57,7 @@ import type {
 import { cn } from "../lib/utils";
 import { useProjectStore } from "../stores/project-store";
 import { useSettingsStore } from "../stores/settings-store";
+import { useShallow } from "zustand/react/shallow";
 import { duplicateTask, persistUpdateTask } from "../stores/task-store";
 import {
 	buildEngineMetadata,
@@ -130,7 +131,7 @@ export function TaskEditDialog({
 		? `${task.title} ${t("tasks:actions.duplicateSuffix")}`
 		: task.title;
 	// Get selected agent profile from settings for defaults
-	const { settings } = useSettingsStore();
+	const { settings } = useSettingsStore(useShallow((s) => ({ settings: s.settings })));
 	const selectedProfile =
 		DEFAULT_AGENT_PROFILES.find(
 			(p) => p.id === settings.selectedAgentProfile,

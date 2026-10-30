@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/hooks/use-toast";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useShallow } from "zustand/react/shallow";
 import { useProviderContext } from "./ProviderContext";
 import {
 	AlertDialog,
@@ -316,7 +317,13 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
 }) => {
 	const { t } = useTranslation();
 	const { selectedProvider, setSelectedProvider } = useProviderContext();
-	const { profiles, setActiveProfile, settings } = useSettingsStore();
+	const { profiles, setActiveProfile, settings } = useSettingsStore(
+		useShallow((s) => ({
+			profiles: s.profiles,
+			setActiveProfile: s.setActiveProfile,
+			settings: s.settings,
+		})),
+	);
 	const { toast } = useToast();
 	const [showAuthDialog, setShowAuthDialog] = useState(false);
 	const [pendingProvider, setPendingProvider] = useState<string>("");

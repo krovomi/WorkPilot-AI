@@ -8,3 +8,6 @@ section: 🛠️ Qualité
 - **Les types Python sont vérifiés en CI** (F127). pyright `1.1.408` tourne sur sept paquets du
   backend (`bench`, `best_of_n`, `genai_trace`, `goal`, `mcp_tasks`, `os_sandbox`, `security`),
   remis à zéro erreur ; la liste s'élargit paquet par paquet.
+- **Moins de re-rendus dans les réglages, les assistants et le terminal**. Seize composants
+  s'abonnaient à tout le store des réglages et se redessinaient à chaque changement, même sans
+  rapport ; ils ne lisent plus que les champs qu'ils affichent.
