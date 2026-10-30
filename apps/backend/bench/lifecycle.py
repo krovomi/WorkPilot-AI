@@ -67,6 +67,7 @@ SPEC_FILES = (
 # Task metadata a replay keeps: what kind of task it is, never where it went.
 METADATA_KEYS = ("kind", "kindSource", "category", "priority", "complexity", "impact")
 
+_KIND = re.compile(r"^[a-z][a-z_]{0,31}$")
 _PROVIDER = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
 _EFFORT = re.compile(r"^[a-z][a-z_-]{0,31}$")
 
@@ -166,6 +167,10 @@ def discover_case(project_dir: Path, spec_id: str, given: str | None) -> dict:
     except BenchError as error:
         _refuse(case, "no-card", str(error))
         return case
+    # The card's kind, so the table can be read per kind (bug fix, feature…).
+    kind = (read_json(folder / "task_metadata.json") or {}).get("kind")
+    if isinstance(kind, str) and _KIND.match(kind):
+        case["kind"] = kind
     target, source, note = None, "", ""
     if given:
         target = repo.resolve_commit(project_dir, given)
@@ -495,6 +500,7 @@ def judge_build(
                     "runId": run_id,
                     "buildId": build_id,
                     "caseId": case["caseId"],
+                    "kind": case.get("kind"),
                     "provider": engine["provider"],
                     "model": engine["model"],
                     "effort": engine["effort"],

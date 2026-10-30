@@ -28,6 +28,8 @@ import { useConfiguredProviders } from "../../hooks/useConfiguredProviders";
 import { useBenchStore } from "../../stores/bench-store";
 import { useSettingsStore } from "../../stores/settings-store";
 import { EngineTrioPicker } from "../task-engine/EngineTrioPicker";
+import { BenchRecommendationList } from "./BenchRecommendation";
+import { dollars, minutes, percent } from "./format";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
@@ -38,18 +40,6 @@ export const MAX_ENGINES = 4;
 
 interface Props {
 	readonly projectId?: string;
-}
-
-function percent(value: number | null | undefined): string {
-	return typeof value === "number" ? `${Math.round(value * 100)} %` : "—";
-}
-
-function dollars(value: number | null | undefined): string {
-	return typeof value === "number" ? `$${value.toFixed(2)}` : "—";
-}
-
-function minutes(value: number | null | undefined): string {
-	return typeof value === "number" ? `${Math.round(value / 60)} min` : "—";
 }
 
 function ResultsTable({ rows }: { rows: BenchTableRow[] }) {
@@ -411,6 +401,12 @@ export function RepoBenchView({ projectId }: Props) {
 				<h2 className="text-sm font-semibold">{t("bench:table.title")}</h2>
 				<ResultsTable rows={status?.table ?? []} />
 				<p className="text-xs text-muted-foreground">{t("bench:table.readers")}</p>
+			</section>
+
+			<section className="space-y-2">
+				<h2 className="text-sm font-semibold">{t("bench:recommend.title")}</h2>
+				<BenchRecommendationList recommendations={status?.recommendations ?? {}} />
+				<p className="text-xs text-muted-foreground">{t("bench:recommend.rule")}</p>
 			</section>
 
 			<section className="space-y-3 rounded-lg border border-border p-4">

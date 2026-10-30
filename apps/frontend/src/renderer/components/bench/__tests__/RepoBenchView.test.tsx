@@ -57,6 +57,20 @@ const STATUS: BenchStatus = {
 			avgDurationS: 600,
 		},
 	],
+	recommendations: {
+		bug_fix: {
+			provider: "openai",
+			model: "gpt-mini",
+			effort: "low",
+			judged: 3,
+			resolved: 3,
+			rate: 1,
+			cases: 3,
+			avgCostUsd: 0.5,
+			bestRate: 1,
+			considered: 2,
+		},
+	},
 };
 
 const CANDIDATES: BenchCandidate[] = [
@@ -104,6 +118,13 @@ describe("RepoBenchView", () => {
 		expect(screen.getByText("80 %")).toBeInTheDocument();
 		expect(screen.getByText("$1.23")).toBeInTheDocument();
 		expect(screen.getByText("10 min")).toBeInTheDocument();
+	});
+
+	it("lists the engine recommended per kind of card", async () => {
+		render(<RepoBenchView projectId="p1" />);
+		expect(await screen.findByText("gpt-mini")).toBeInTheDocument();
+		expect(screen.getByText("tasks:kind.values.bug_fix")).toBeInTheDocument();
+		expect(screen.queryByText("bench:recommend.empty")).not.toBeInTheDocument();
 	});
 
 	it("offers only cards that can be judged, and says why the others cannot", async () => {

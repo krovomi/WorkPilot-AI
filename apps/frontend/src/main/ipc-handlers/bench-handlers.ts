@@ -38,6 +38,7 @@ import type {
 	BenchEngine,
 	BenchManifest,
 	BenchStatus,
+	BenchRecommendations,
 	BenchTableRow,
 	IPCResult,
 	Project,
@@ -323,11 +324,22 @@ function readRuns(project: Project): BenchManifest[] {
 		);
 }
 
-function readTable(project: Project): BenchTableRow[] {
+function readResults(project: Project): {
+	table: BenchTableRow[];
+	recommendations: BenchRecommendations;
+} {
 	const data = readJson(path.join(benchDir(project), "results.json")) as {
 		table?: unknown;
+		recommendations?: unknown;
 	} | null;
-	return Array.isArray(data?.table) ? (data.table as BenchTableRow[]) : [];
+	const recommendations = data?.recommendations;
+	return {
+		table: Array.isArray(data?.table) ? (data.table as BenchTableRow[]) : [],
+		recommendations:
+			recommendations && typeof recommendations === "object" && !Array.isArray(recommendations)
+				? (recommendations as BenchRecommendations)
+				: {},
+	};
 }
 
 function finishedCards(project: Project): Task[] {
@@ -356,7 +368,7 @@ export function registerBenchHandlers(
 					(manifest.phase === "running" || manifest.phase === "calibrating") &&
 					manifest.runId !== run?.runId,
 			})),
-			table: readTable(project),
+			...readResults(project),
 		};
 	};
 

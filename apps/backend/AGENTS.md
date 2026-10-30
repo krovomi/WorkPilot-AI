@@ -39,7 +39,7 @@ composition, qui importe les agents. Les autres modules sortis de `core` par le 
 | `phase_config.py` | `MODEL_ID_MAP`, `THINKING_BUDGET_MAP`, `DEFAULT_PHASE_MODELS`, `PROVIDER_DEFAULT_MODELS`, `get_phase_model()`, `get_phase_thinking_budget()` |
 | `models_registry.py` | catalogue livré des modèles et de leurs capacités |
 | `model_router/router.py` | `TaskClass` × `QualityTier` (budget / balanced / premium) → modèle ; écarte un modèle que le banc de rejeu a vu échouer |
-| `bench/` | banc de rejeu ([justification](../../docs/architecture/repo-bench.md)) : cartes terminées rejouées depuis leur commit d'avant dans des copies isolées, jugées par les tests du commit d'arrivée (calibrés F2P / P2P), tableau par provider × modèle × effort lu par Formula Lab et `model_router/` ; commandes : `runners/bench_runner.py` |
+| `bench/` | banc de rejeu ([justification](../../docs/architecture/repo-bench.md)) : cartes terminées rejouées depuis leur commit d'avant dans des copies isolées, jugées par les tests du commit d'arrivée (calibrés F2P / P2P), tableau par provider × modèle × effort lu par Formula Lab et `model_router/`, recommandations par type de carte (`recommendations`) ; commandes : `runners/bench_runner.py` |
 | `foundation/phase_event.py` | événements de phase vers l'UI |
 | `core/pause_state.py`, `core/build_signals.py` | pause coopérative ; `BuildPaused` / `BuildHalted` |
 | `context_mgmt/` | fenêtre de contexte par session : jauge, compact / clear au seuil |

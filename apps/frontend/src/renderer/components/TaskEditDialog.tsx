@@ -62,10 +62,14 @@ import { duplicateTask, persistUpdateTask } from "../stores/task-store";
 import {
 	buildEngineMetadata,
 	defaultEngineProvider,
+	isUniformEngine,
 	resolveTaskEngine,
+	sameTrio,
 	seedEngine,
 	type TaskEngine,
+	uniformEngine,
 } from "../../shared/utils/task-engine";
+import { BenchEngineHint } from "./bench/BenchRecommendation";
 import { TaskEngineEditor } from "./task-engine/TaskEngineEditor";
 import { TaskFormFields } from "./task-form/TaskFormFields";
 import { TaskModalLayout } from "./task-form/TaskModalLayout";
@@ -604,12 +608,22 @@ export function TaskEditDialog({
 				model={model}
 				thinkingLevel={thinkingLevel}
 				engineSlot={
-					<TaskEngineEditor
-						engine={engine}
-						onChange={setEngine}
-						idPrefix={`task-engine-${task.id}`}
-						disabled={isSaving}
-					/>
+					<div className="space-y-3">
+						{/* What the repo bench measured for cards of this kind: offered, never applied. */}
+						<BenchEngineHint
+							projectId={task.projectId}
+							kind={task.metadata?.kind}
+							isCurrent={(trio) => isUniformEngine(engine) && sameTrio(engine.spec, trio)}
+							onUse={(trio) => setEngine(uniformEngine(trio))}
+							disabled={isSaving}
+						/>
+						<TaskEngineEditor
+							engine={engine}
+							onChange={setEngine}
+							idPrefix={`task-engine-${task.id}`}
+							disabled={isSaving}
+						/>
+					</div>
 				}
 				phaseModels={phaseModels}
 				phaseThinking={phaseThinking}
