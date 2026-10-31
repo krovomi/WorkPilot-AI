@@ -288,7 +288,7 @@ def _card_on_disk(root: Path, name: str, require_review: bool) -> None:
     )
 
 
-def test_the_spec_phase_writes_the_spec_without_building(tmp_path):
+def test_the_spec_phase_waits_for_a_review_or_goes_on_to_the_build(tmp_path):
     from server.services.run_manager import build_command
 
     _card_on_disk(tmp_path, "001-x", require_review=True)
@@ -304,10 +304,10 @@ def test_the_spec_phase_writes_the_spec_without_building(tmp_path):
     assert cmd[cmd.index("--spec-dir") + 1] == str(tmp_path / ".workpilot/specs/001-x")
     assert cmd[-2:] == ["--model", "m-1"]
 
+    # Without a review, the spec phase goes on to the build, as in the app.
     _card_on_disk(tmp_path, "002-y", require_review=False)
-    assert "--auto-approve" in build_command(
-        "spec", "002-y", str(tmp_path), None, scratch
-    )
+    unreviewed = build_command("spec", "002-y", str(tmp_path), None, scratch)
+    assert "--auto-approve" in unreviewed and "--no-build" not in unreviewed
 
 
 def test_run_phases_are_non_interactive_and_never_force_the_approval(tmp_path):

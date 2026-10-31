@@ -21,7 +21,7 @@ Règles : [`rules/security.md`](../rules/security.md#s5--mode-serveur--authentif
 | Runs | `services/run_manager.py`, `services/run_env.py` | une phase (`spec`, `build`, `qa`, `merge`, `pr`) lancée sur le serveur pour une carte, sous un plafond de concurrence, sans entrée standard, avec l'environnement construit pour elle |
 | Flux en direct | `streaming/websocket_server.py`, `server/authz/ws_channels.py` | les événements du tableau (`project:<id>`) et d'un run (`run:<id>`), ouverts aux seuls membres du projet |
 | Client | `apps/frontend/src/main/server-connection.ts` | connexion, refresh dans `safeStorage`, organisation active ; vue Administration |
-| Projets dans l'app | `main/server-projects.ts`, `main/remote-board.ts` | les projets du serveur à côté de ceux de l'ordinateur, ajoutés par l'URL de leur dépôt ; leur tableau dessiné depuis l'instantané du serveur |
+| Projets dans l'app | `main/server-projects.ts`, `main/remote-board.ts`, `main/server-board-actions.ts` | les projets du serveur à côté de ceux de l'ordinateur, ajoutés par l'URL de leur dépôt ; leur tableau dessiné depuis l'instantané du serveur ; les actions du Kanban sur leurs cartes envoyées au serveur |
 
 ## Pourquoi le flux en direct a sa propre autorisation
 
@@ -66,9 +66,9 @@ du backend. Après chaque écriture, l'index du serveur est relu et un événeme
 | Lancer une phase | `POST /projects/{id}/specs/{spec}/runs` | `agent.execute` ; `merge` demande aussi `task.merge`, `pr` aussi `vcs.pr.create` |
 
 Une carte peut demander une revue avant le code (`require_review`, vrai par défaut, comme dans
-l'app). Sans revue, la phase `spec` approuve ce qu'elle écrit ; avec, le build attend
-l'approbation d'un membre. Le serveur ne passe jamais `--force` : l'approbation est une décision
-d'une personne, pas un drapeau. Une phase ne lit jamais l'entrée standard : une question qui
+l'app). Sans revue, la phase `spec` approuve ce qu'elle écrit et enchaîne le build, comme dans
+l'app ; avec, elle s'arrête à la spec et le build attend l'approbation d'un membre. Le serveur ne
+passe jamais `--force` : l'approbation est une décision d'une personne, pas un drapeau. Une phase ne lit jamais l'entrée standard : une question qui
 attendrait une réponse bloquerait le run sans fin.
 
 ## Les projets du serveur dans l'app
@@ -92,9 +92,29 @@ La barre latérale n'offre pour un projet du serveur que les vues qui passent pa
 le miroir. La liste des projets est relue quand la session change (connexion, déconnexion, autre
 compte).
 
+Les actions du Kanban sur une carte du serveur partent au serveur (`main/server-board-actions.ts`),
+jamais vers l'ordinateur. Une carte du serveur a pour id `server:<project_id>:<carte>` : les noms
+de carte se répètent d'un projet à l'autre, et un handler de tâche qui reçoit cet id sait sans
+recherche que la carte est au serveur et où ; un id qui ne nomme pas un projet listé n'est pas
+pris pour une carte du serveur.
+
+| Dans l'app | Au serveur |
+|---|---|
+| Nouvelle tâche (`TASK_CREATE`) | `POST /api/board/cards`, avec la revue avant le code demandée ou non |
+| Modifier le titre ou la description (`TASK_UPDATE`) | `PATCH /api/board/cards/{id}` ; le reste des métadonnées n'est pas envoyé |
+| Supprimer (`TASK_DELETE`) | `DELETE /api/board/cards/{id}` |
+| Démarrer (`TASK_START`) | sans spec : phase `spec` ; avec : phase `build`, précédée, si la carte demande une revue, de l'approbation de la spec par la personne qui démarre (comme Démarrer sur un plan en revue dans l'app) |
+| Arrêter (`TASK_STOP`) | annule le run en file ou en cours de la carte |
+
+Chaque refus du serveur (droit manquant, carte déjà démarrée, réservée par un autre) revient tel
+quel à l'app. Un tableau du serveur affiché est relu toutes les cinq secondes
+(`useServerBoardRefresh`) : ce qu'un collègue crée, modifie, lance ou supprime apparaît sans
+recharger ; une lecture qui échoue garde les cartes affichées.
+
 ## Ce qui vient
 
-Le plan multi-tenant du 31 octobre, par lots : les actions sur les cartes depuis l'app et leurs
-événements en direct, le diff d'une carte côté serveur,
+Le plan multi-tenant du 31 octobre, par lots : la revue, la fusion et la pull request d'une carte
+du serveur depuis l'app, les événements en direct à la place de la relecture, le diff d'une carte
+côté serveur,
 les groupes d'utilisateurs, chaque feature de l'app servie par `project_id`, un test de bout en
 bout à deux organisations, et le guide d'exploitation. Ce fichier grandit avec chaque lot.
