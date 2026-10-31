@@ -31,6 +31,8 @@ import type { IPCResult, Project } from "../shared/types";
 import { authedFetch } from "./server-connection";
 
 export type SharedFeature = "roadmap" | "ideation";
+/** What runs jobs on the server: a feature with files, or Insights. */
+export type JobFeature = SharedFeature | "insights";
 
 interface FeatureFiles {
 	directory: string;
@@ -92,7 +94,7 @@ function isJsonObject(text: string): boolean {
 	}
 }
 
-function base(project: Project, feature: SharedFeature, rest = ""): string {
+function base(project: Project, feature: JobFeature, rest = ""): string {
 	return `/api/features/${feature}${rest}${rest.includes("?") ? "&" : "?"}project_id=${encodeURIComponent(project.id)}`;
 }
 
@@ -207,12 +209,13 @@ export interface JobRelayOptions {
 /**
  * A server job, followed like a child process: its output arrives on
  * `stdout`, its end as `exit` (0 when it succeeded, after the feature's files
- * were read into the mirror), and `kill()` asks the server to stop it.
+ * were read into the mirror; Insights has none), and `kill()` asks the server
+ * to stop it.
  * Either starts a job (`options`) or follows one already running (`jobId`).
  */
 export function relayServerJob(
 	project: Project,
-	feature: SharedFeature,
+	feature: JobFeature,
 	start: { options: Record<string, unknown> } | { jobId: string },
 	relay: JobRelayOptions = {},
 ): JobStream {
@@ -281,7 +284,10 @@ export function relayServerJob(
 		const job = parseJob(data);
 		if (job && FINAL.has(job.status)) {
 			if (job.status === "succeeded") {
-				const pulled = await pullFeature(project, feature);
+				const pulled =
+					feature === "insights"
+						? { success: true as const, error: undefined }
+						: await pullFeature(project, feature);
 				finish(
 					pulled.success ? 0 : 1,
 					pulled.success ? undefined : pulled.error,

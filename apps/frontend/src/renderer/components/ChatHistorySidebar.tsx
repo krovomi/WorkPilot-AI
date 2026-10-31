@@ -329,6 +329,11 @@ function SessionItem({
 					<p className="text-[11px] text-muted-foreground mt-0.5">
 						{t("chatHistory.messageCount", { count: session.messageCount })}
 					</p>
+					{session.readOnly && session.ownerName && (
+						<p className="text-[11px] text-muted-foreground">
+							{t("chatHistory.byTeammate", { name: session.ownerName })}
+						</p>
+					)}
 				</div>
 			</div>
 

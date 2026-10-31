@@ -52,6 +52,8 @@ class EventType(str, Enum):
     # rewrote, and a job's status as it starts and ends.
     FEATURE_UPDATED = "feature_updated"
     FEATURE_JOB = "feature_job"
+    # An Insights conversation created, answered, renamed or deleted.
+    INSIGHTS_UPDATED = "insights_updated"
     MEMBER_PRESENCE = "member_presence"
 
 
