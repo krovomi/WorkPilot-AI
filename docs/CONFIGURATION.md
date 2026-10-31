@@ -473,7 +473,11 @@ Agent commands run under bubblewrap (Linux) or Seatbelt (macOS), see
 
 On Ubuntu 24.04 and later, unprivileged user namespaces are restricted by AppArmor and bubblewrap
 fails; the card says so. `sudo sysctl kernel.apparmor_restrict_unprivileged_userns=0` (or an
-AppArmor profile for `bwrap`) lifts it. Claude Code's own sandbox on Linux also needs `socat`.
+AppArmor profile for `bwrap`) lifts it. Claude Code's own sandbox on Linux also needs `socat`: when
+it is missing, the Claude provider's commands run without isolation and the task feed shows
+`Sandbox (claude): commands are NOT isolated: … socat … install it with …`. On Debian, Ubuntu or
+WSL: `sudo apt install bubblewrap socat`, then start the task again. The reason line names the
+command of the package manager found on the machine (apt, dnf, pacman, zypper, apk).
 
 ## RUN tasks — `.workpilot/environments.toml`
 
