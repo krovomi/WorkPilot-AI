@@ -1947,13 +1947,13 @@ try:
 except ImportError as e:
     print(f"Warning: Could not import watermarks router: {e}")
 
-# --- Shared board (server mode: the cards of a project, by project_id) ---
+# --- Shared board and features (server mode: cards, roadmap..., by project_id) ---
 try:
-    from shared_board.api import router as shared_board_router
+    from shared_features import mount_all as mount_shared_project_routers
 
-    _mount(shared_board_router, "board")
+    mount_shared_project_routers(_mount)
 except ImportError as e:
-    print(f"Warning: Could not import shared board router: {e}")
+    print(f"Warning: Could not import shared board routers: {e}")
 
 # --- Spec Traceability API (open questions + requirement coverage for a spec) ---
 try:

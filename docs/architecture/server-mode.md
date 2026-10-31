@@ -120,8 +120,8 @@ lecture, et les lit avec le chargeur des projets locaux : une carte du serveur r
 carte locale.
 
 La barre latérale n'offre pour un projet du serveur que les vues qui passent par le serveur
-(`sidebar/server-gates.ts`, aujourd'hui le Kanban et l'administration) ; les autres agiraient sur
-le miroir. La liste des projets est relue quand la session change (connexion, déconnexion, autre
+(`sidebar/server-gates.ts`, aujourd'hui le Kanban, la Roadmap et l'administration) ; les autres
+agiraient sur le miroir. La liste des projets est relue quand la session change (connexion, déconnexion, autre
 compte).
 
 Les actions du Kanban sur une carte du serveur partent au serveur (`main/server-board-actions.ts`),
@@ -197,7 +197,59 @@ rôle ou un projet d'un autre tenant répond 404, et chaque changement est écri
 (`main/server-admin-groups.ts`, qui refuse un identifiant ou un rôle mal formé avant toute
 requête) n'offre que ce que ces permissions permettent.
 
+## Les features partagées
+
+Le Kanban n'est pas la seule chose qu'une équipe partage : la roadmap d'un projet, ses idées, ses
+analyses sont aussi les siennes. Sur l'ordinateur, chacune est un dossier `.workpilot/<feature>/`
+du projet et un runner qui l'écrit ; sur le serveur, c'est le dossier du clone et le runner y
+tourne. Une feature se déclare une fois (`shared_features/registry.py`) : ses fichiers, chacun
+sous sa taille, ceux qu'un membre peut réécrire, son runner et ses options. Les routes
+`/api/features/<feature>` la servent (`shared_features/api.py`), toutes par `project_id` :
+
+| Action | Route | Il faut |
+|---|---|---|
+| Lire ses fichiers et son dernier job | `GET .../snapshot` | `insight.read`, un rôle sur le projet |
+| Réécrire un fichier | `PUT .../files/{nom}` | `insight.write`, rôle `member` ou plus ; un objet JSON, un fichier déclaré réécrivable |
+| Lancer son runner | `POST .../jobs` | `agent.execute`, rôle `member` ou plus |
+| Suivre un job (statut, sortie) | `GET .../jobs/{id}?after=n` | `insight.read` |
+| Arrêter un job | `POST .../jobs/{id}/cancel` | `agent.cancel`, rôle `member` ou plus |
+| Faire d'une feature de la roadmap une carte | `POST /api/features/roadmap/features/{id}/convert` | `task.write`, rôle `member` ou plus |
+
+**Une réécriture part de la version lue.** L'instantané donne l'empreinte SHA-256 de chaque
+fichier, et l'app la renvoie avec le fichier modifié : si un collègue a enregistré entre-temps,
+le serveur répond 409, l'app relit le fichier et la vue montre sa version au lieu d'écraser son
+travail. Une réécriture est aussi refusée pendant qu'un job écrit la feature. Changer le statut
+d'une seule feature de la roadmap part, lui, de la dernière version : c'est une retouche, pas un
+remplacement.
+
+**Un job est un run sans carte** (`server/services/project_jobs.py`, table `project_jobs`) :
+le runner de la feature, choisi par sa déclaration et jamais par le client, sur le clone, avec
+`--project <clone>` puis des options d'une liste fermée (un modèle ne commence jamais par un
+tiret). Il tourne comme un run : confiné à son projet, avec l'environnement d'un run, sous le
+plafond du serveur et le quota de l'organisation, qui compte runs et jobs ensemble, sans entrée
+standard. Un seul job à la fois par feature d'un projet. Un job qu'un serveur arrêté a laissé en
+cours est marqué en échec à la lecture suivante : rien ne le finira, et il garderait sinon une place
+du quota et s'afficherait en cours sans fin. Sa sortie est gardée en mémoire (les 400
+dernières lignes, jamais sur disque ni au journal) et passée par `redact_text` avant d'être
+servie. Chaque début et chaque fin partent sur `project:<id>` (`feature_job`), comme chaque
+réécriture (`feature_updated`).
+
+Dans l'app, la feature d'un projet du serveur est lue dans son miroir (`main/server-features.ts`),
+seulement ses fichiers déclarés et chacun sous sa taille, puis par les handlers habituels : pour la
+roadmap, `roadmap-handlers.ts` ne change que d'où vient le projet (`roadmap/server-roadmap.ts`).
+Un job est suivi comme le runner local : `relayServerJob` a la forme du processus que suit
+`agent-queue.ts`, nourri de la sortie du job, et sa fin relit les fichiers. Une roadmap qu'un
+collègue génère est suivie de la même façon dès que la vue la demande. Le tableau ne remplace plus
+que ses propres dossiers du miroir (`specs`, `worktrees`), pas ceux des features.
+
+Convertir une feature de la roadmap en carte passe par le serveur : la carte est écrite comme
+celles de `POST /api/board/cards`, numérotée sous le verrou du tableau, sans `spec.md` (la phase
+`spec` l'écrit, comme pour toute carte du serveur), puis la feature est liée à la carte dans
+`roadmap.json`.
+
 ## Ce qui vient
 
-Le plan multi-tenant du 31 octobre, par lots : chaque feature de l'app servie par `project_id`, un test de bout en
-bout à deux organisations, et le guide d'exploitation. Ce fichier grandit avec chaque lot.
+Le plan multi-tenant du 31 octobre, par lots : les autres features servies de la même façon
+(idéation, insights, contexte, forges, analyses, tableau de bord), le flux du projet ouvert pour
+chaque vue partagée, un test de bout en bout à deux organisations, et le guide d'exploitation. Ce
+fichier grandit avec chaque lot.

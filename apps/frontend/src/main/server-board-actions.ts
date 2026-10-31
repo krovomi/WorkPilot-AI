@@ -43,6 +43,15 @@ function specsUrl(project: Project, rest = ""): string {
 
 /** The card as the board now has it, read again from the server. */
 async function reread(card: ServerCard): Promise<IPCResult<Task>> {
+	return serverCardTask(card.project, card.cardId);
+}
+
+/** A card of a server project's board, read again from the server. */
+export async function serverCardTask(
+	project: Project,
+	cardId: string,
+): Promise<IPCResult<Task>> {
+	const card = { project, cardId };
 	const tasks = await getRemoteTasks(card.project);
 	if (!tasks.success || !tasks.data) {
 		return { success: false, error: tasks.error ?? "Board unavailable" };

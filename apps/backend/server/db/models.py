@@ -434,6 +434,35 @@ class AgentRun(Base):
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
+class ProjectJob(Base):
+    """A feature's runner launched on a project's clone (roadmap, ideation...).
+
+    Not tied to a card, unlike ``AgentRun``: it writes the feature's own
+    files under ``.workpilot/<feature>/`` (``shared_features``). Counted with
+    the runs in the organization's concurrency quota.
+    """
+
+    __tablename__ = "project_jobs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    project_id: Mapped[str] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), index=True
+    )
+    feature: Mapped[str] = mapped_column(String(40))
+    started_by: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    status: Mapped[str] = mapped_column(String(20), default="queued")
+    # queued / running / succeeded / failed / cancelled
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+    finished_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
 class UserSecret(Base):
     """Per-user integration secret (Azure PAT, Jira token...), Fernet-encrypted."""
 

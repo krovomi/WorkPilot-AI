@@ -104,10 +104,15 @@ function writeCard(directory: string, files: CardFiles): void {
 	}
 }
 
-/** Replace the mirror's board with the snapshot, in a local project's layout. */
+/**
+ * Replace the mirror's board with the snapshot, in a local project's layout.
+ * Only the board is replaced: a shared feature's files beside it
+ * (`server-features.ts`) are read on their own.
+ */
 export function writeMirror(root: string, snapshot: BoardSnapshot): void {
 	const workpilot = path.join(root, ".workpilot");
-	rmSync(workpilot, { recursive: true, force: true });
+	rmSync(path.join(workpilot, "specs"), { recursive: true, force: true });
+	rmSync(path.join(workpilot, "worktrees"), { recursive: true, force: true });
 	mkdirSync(path.join(workpilot, "specs"), { recursive: true });
 	for (const [id, files] of Object.entries(snapshot.cards)) {
 		writeCard(path.join(workpilot, "specs", id), files);

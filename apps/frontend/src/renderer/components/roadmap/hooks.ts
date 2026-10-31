@@ -94,7 +94,10 @@ export function useRoadmapSave(projectId: string) {
 		if (!roadmap) return;
 
 		try {
-			await window.electronAPI.saveRoadmap(projectId, roadmap);
+			const result = await window.electronAPI.saveRoadmap(projectId, roadmap);
+			// Refused (on a server project, a teammate saved first): show what
+			// is saved rather than an edit that is not.
+			if (!result.success) await loadRoadmap(projectId);
 		} catch (error) {
 			console.error("Failed to save roadmap:", error);
 		}
@@ -117,7 +120,8 @@ export function useFeatureDelete(projectId: string) {
 		const roadmap = useRoadmapStore.getState().roadmap;
 		if (roadmap) {
 			try {
-				await window.electronAPI.saveRoadmap(projectId, roadmap);
+				const result = await window.electronAPI.saveRoadmap(projectId, roadmap);
+				if (!result.success) await loadRoadmap(projectId);
 			} catch (error) {
 				console.error("Failed to save roadmap after delete:", error);
 			}

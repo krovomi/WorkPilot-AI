@@ -163,7 +163,7 @@ def _warn_once(key: str, message: str) -> None:
         logger.warning(message)
 
 
-def _confine(
+def confine(
     cmd: list[str], project_id: str, server_path: str, scratch: Path, env: dict
 ) -> list[str]:
     """The run's argv, started confined to its own project unless the
@@ -205,6 +205,15 @@ class RunManager:
         if self._semaphore is None:
             self._semaphore = asyncio.Semaphore(get_settings().max_concurrent_runs)
         return self._semaphore
+
+    def admission(self) -> asyncio.Semaphore:
+        """The deployment-wide ceiling every agent process waits on, project
+        jobs (``server.services.project_jobs``) included."""
+        return self._get_semaphore()
+
+    async def run_env(self, user_id: str, run_id: str) -> dict[str, str]:
+        """The environment of one agent process, as :meth:`_build_env`."""
+        return await self._build_env(user_id, run_id)
 
     async def start_run(
         self,
@@ -340,7 +349,7 @@ class RunManager:
                         phase, spec_name, server_path, model, Path(scratch)
                     )
                     env = await self._build_env(user_id, run_id)
-                    cmd = _confine(cmd, project_id, server_path, Path(scratch), env)
+                    cmd = confine(cmd, project_id, server_path, Path(scratch), env)
                     logger.info("Run %s starting: %s", run_id, " ".join(cmd[:6]))
                     proc = await asyncio.create_subprocess_exec(
                         *cmd,
