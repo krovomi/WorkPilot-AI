@@ -1707,6 +1707,8 @@ class WorktreePRMixin:
                 len(stripped),
                 spec_name,
             )
+        # Same for the project's build and test outputs (bin/, obj/...).
+        self.strip_build_artifacts(spec_name)
 
         # Step 0.5: Garde-fou contre la création d'une PR vide.
         # Si la branche du worktree n'a aucun commit en avance de la cible,

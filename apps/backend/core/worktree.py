@@ -25,6 +25,8 @@ import unicodedata
 from datetime import datetime
 from pathlib import Path
 
+from core.build_artifacts import ensure_artifact_excludes, strip_committed_artifacts
+
 # Helpers and types live in `core.worktree_common`, the PR half in
 # `core.worktree_pr` (audit lot L11, F36). Every name is imported back so the
 # module keeps its surface.
@@ -946,6 +948,8 @@ class WorktreeManager(WorktreePRMixin):
             print(f"No worktree found for spec: {spec_name}")
             return False
 
+        self.strip_build_artifacts(spec_name)
+
         if no_commit:
             print(
                 f"Merging {info.branch} into {self.base_branch} (staged, not committed)..."
@@ -1053,6 +1057,9 @@ class WorktreeManager(WorktreePRMixin):
         if not worktree_path.exists():
             return False
 
+        # Build and test outputs (bin/, obj/, TestResults/, node_modules/...)
+        # stay out of the commit even when the project has no .gitignore.
+        ensure_artifact_excludes(worktree_path, self.base_branch)
         self._run_git(
             [
                 "add",
@@ -1073,6 +1080,29 @@ class WorktreeManager(WorktreePRMixin):
         else:
             print(f"Commit failed: {result.stderr}")
             return False
+
+    def ensure_build_artifact_excludes(self, spec_name: str) -> list[str]:
+        """Keep the project's build and test outputs out of ``git add``.
+
+        See ``core.build_artifacts``: a managed block in the repository's
+        ``info/exclude``, so it works whatever agent commits.
+        """
+        worktree_path = self.get_worktree_path(spec_name)
+        if not worktree_path.exists():
+            return []
+        return ensure_artifact_excludes(worktree_path, self.base_branch)
+
+    def strip_build_artifacts(self, spec_name: str) -> list[str]:
+        """Take the build and test outputs the branch committed back out.
+
+        Files the branch added that ``.gitignore`` or the managed excludes
+        ignore (``bin/``, ``obj/``, ``TestResults/``...) leave the index in a
+        commit of their own and stay on disk. Files of the base branch are
+        never touched.
+        """
+        return strip_committed_artifacts(
+            self.get_worktree_path(spec_name), self.base_branch
+        )
 
     def _strip_workpilot_artifacts(self, spec_name: str) -> list[str]:
         """Retire les artefacts internes de WorkPilot de la branche poussée.
