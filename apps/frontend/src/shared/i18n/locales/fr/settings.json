@@ -970,7 +970,11 @@
 			"title": "Usage des pages",
 			"reset": "Réinitialiser",
 			"description": "Visites et temps passé par page, conservés sur cette machine uniquement.",
-			"row": "{{visits}} visites · {{minutes}} min"
+			"row": "{{visits}} visites · {{minutes}} min",
+			"export": "Exporter en JSON",
+			"since": "Compté depuis le {{date}}.",
+			"neverOpenedTitle": "Pages expérimentales jamais ouvertes",
+			"allOpened": "Chaque page expérimentale a été ouverte au moins une fois."
 		}
 	},
 	"devtools": {

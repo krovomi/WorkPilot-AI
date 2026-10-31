@@ -3,6 +3,7 @@ import {
 	Bug,
 	Check,
 	Copy,
+	Download,
 	FileText,
 	FolderOpen,
 	Loader2,
@@ -15,9 +16,11 @@ import { notifySentryStateChanged } from "../../lib/sentry";
 import { useSettingsStore } from "../../stores/settings-store";
 import { useShallow } from "zustand/react/shallow";
 import {
+	buildViewUsageReport,
 	rankViewUsage,
 	useViewUsageStore,
 } from "../../stores/view-usage-store";
+import { EXPERIMENTAL_VIEWS } from "../sidebar/experimental-views";
 import { Button } from "../ui/button";
 import { Label } from "../ui/label";
 import { Switch } from "../ui/switch";
@@ -47,6 +50,31 @@ export function DebugSettings() {
 	const [error, setError] = useState<string | null>(null);
 	const viewUsage = useViewUsageStore((state) => state.usage);
 	const resetViewUsage = useViewUsageStore((state) => state.reset);
+	const usageSince = useViewUsageStore((state) => state.since);
+	const usageReport = buildViewUsageReport(
+		viewUsage,
+		usageSince,
+		EXPERIMENTAL_VIEWS,
+	);
+
+	// The page-usage export (plan of 29 October, T5): a JSON file the person
+	// keeps, the data the removal of experimental pages is decided on.
+	const handleExportViewUsage = () => {
+		const report = buildViewUsageReport(
+			viewUsage,
+			usageSince,
+			EXPERIMENTAL_VIEWS,
+		);
+		const blob = new Blob([JSON.stringify(report, null, 2)], {
+			type: "application/json",
+		});
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement("a");
+		a.href = url;
+		a.download = `workpilot-page-usage-${report.exportedAt.slice(0, 10)}.json`;
+		a.click();
+		URL.revokeObjectURL(url);
+	};
 
 	// Handle Sentry toggle
 	const handleSentryToggle = async (checked: boolean) => {
@@ -216,16 +244,54 @@ export function DebugSettings() {
 						<h4 className="font-medium text-sm">
 							{t("debug.viewUsage.title", "Page usage")}
 						</h4>
-						<Button variant="outline" size="sm" onClick={resetViewUsage}>
-							{t("debug.viewUsage.reset", "Reset")}
-						</Button>
+						<div className="flex gap-2">
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={handleExportViewUsage}
+							>
+								<Download className="h-4 w-4 mr-2" />
+								{t("debug.viewUsage.export", "Export JSON")}
+							</Button>
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={() => resetViewUsage()}
+							>
+								{t("debug.viewUsage.reset", "Reset")}
+							</Button>
+						</div>
 					</div>
 					<p className="text-xs text-muted-foreground mb-3">
 						{t(
 							"debug.viewUsage.description",
 							"Visits and time spent per page, kept on this machine only.",
-						)}
+						)}{" "}
+						{t("debug.viewUsage.since", {
+							date: new Date(usageSince).toLocaleDateString(),
+							defaultValue: "Counting since {{date}}.",
+						})}
 					</p>
+					<div className="mb-3 text-xs">
+						<p className="font-medium mb-1">
+							{t(
+								"debug.viewUsage.neverOpenedTitle",
+								"Experimental pages never opened",
+							)}
+						</p>
+						{usageReport.neverOpened.length > 0 ? (
+							<p className="font-mono text-muted-foreground">
+								{usageReport.neverOpened.join(", ")}
+							</p>
+						) : (
+							<p className="text-muted-foreground">
+								{t(
+									"debug.viewUsage.allOpened",
+									"Every experimental page has been opened at least once.",
+								)}
+							</p>
+						)}
+					</div>
 					<div className="space-y-1 text-xs">
 						{rankViewUsage(viewUsage).map((row) => (
 							<div key={row.view} className="flex justify-between gap-2">
