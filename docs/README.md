@@ -7,7 +7,7 @@ fichiers y renvoient.
 
 | Dossier / fichier | Contenu | Statut |
 |---|---|---|
-| [`CLAUDE.md`](CLAUDE.md) | le noyau des règles : règles critiques, index des règles et des justifications | normatif |
+| [`CLAUDE.md`](CLAUDE.md) | carte des règles et table des justifications de conception (les règles critiques sont dans [`../AGENTS.md`](../AGENTS.md)) | normatif |
 | [`rules/`](rules/) | règles par thème : [sécurité](rules/security.md), [backend](rules/backend.md), [frontend](rules/frontend.md), [workflow](rules/workflow.md) | normatif |
 | [`architecture/`](architecture/) | pourquoi chaque feature est construite ainsi, une feature par fichier | référence |
 | [`SECURITY.md`](SECURITY.md) | politique de sécurité : versions supportées, signaler une vulnérabilité | public |
@@ -23,19 +23,19 @@ fichiers y renvoient.
 | [`audit/`](audit/) | l'atlas d'architecture (`WorkPilot-architecture.html`, vue « Pour tous » lisible sans prérequis technique, feuille de route par type de tâche) et le cahier de nettoyage, avec un fichier par constat depuis F113 (`findings/`) et par annexe (`annexes/`) ; un historique, pas une règle | atlas · historique |
 | [`validation/`](validation/) | captures de validation manuelle | preuves |
 
-Les instructions des agents de code se répartissent ainsi : [`../AGENTS.md`](../AGENTS.md) (index lu
-par tous les harnesses), [`../CLAUDE.md`](../CLAUDE.md) (l'import pour Claude Code), un `AGENTS.md`
-par dossier qui en a besoin, et `.github/copilot-instructions.md` avec
-`.github/instructions/*.instructions.md` pour Copilot.
+Les instructions des agents de code partent d'un seul fichier, [`../AGENTS.md`](../AGENTS.md) (règles
+critiques, lu par tous les agents), complété par un `AGENTS.md` par dossier qui en a besoin ; chaque
+agent n'a qu'un fichier fin qui y renvoie. Qui lit quoi, et pourquoi : [`architecture/agent-instructions.md`](architecture/agent-instructions.md).
 
 ## Maintenir cette documentation
 
-- **Une règle** va dans le fichier de `rules/` de son thème — ou dans `CLAUDE.md` si elle vaut
-  partout. Jamais dans un `AGENTS.md`, qui ne fait que pointer.
+- **Une règle** va dans le fichier de `rules/` de son thème. Elle n'entre dans les règles critiques
+  de `../AGENTS.md` que si elle vaut partout : ce fichier est payé à chaque session, par chaque agent.
+  Un `AGENTS.md` local ne fait que pointer.
 - **Une justification** (« pourquoi c'est construit ainsi ») va dans `architecture/<feature>.md`,
   avec une ligne dans la table de `CLAUDE.md`.
 - **Un nouvel index local** `AGENTS.md` vient avec un `CLAUDE.md` voisin qui contient `@AGENTS.md`,
-  et une ligne dans la table « Index locaux » de `../AGENTS.md`.
+  et un lien dans la liste des index locaux de `../AGENTS.md`.
 - **Pas de fichier d'instructions au-delà de 200 lignes** ; au-delà, on découpe par thème.
 - Un chemin cité doit exister, un lien doit résoudre : `tests/test_docs_context.py` le vérifie.
 - Un compte rendu de refactoring ou de session va dans le message de commit ou la PR, pas dans un

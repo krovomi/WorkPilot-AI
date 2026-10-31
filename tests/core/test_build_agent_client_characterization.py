@@ -105,7 +105,9 @@ def harness(tmp_path: Path, monkeypatch):
         state.route_chosen = chosen
         return state.offline or (provider, model, None)
 
-    def prompt(_project, tool_use_hint=False):
+    def prompt(_project, tool_use_hint=False, project_instructions=False):
+        # The WorkPilot-loop clients (hint on) are the ones given AGENTS.md.
+        assert project_instructions == tool_use_hint
         return f"BASE(hint={tool_use_hint})"
 
     patches = {

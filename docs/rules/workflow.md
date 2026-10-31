@@ -1,8 +1,8 @@
 # Règles de travail : commandes, git, CI, livraison
 
 > **Normatif.** Ce qu'un agent ou un contributeur fait entre « j'ai modifié » et « c'est fusionné ».
-> Version longue pour les humains : [`docs/CONTRIBUTING.md`](../CONTRIBUTING.md). Noyau :
-> [`docs/CLAUDE.md`](../CLAUDE.md).
+> Version longue pour les humains : [`docs/CONTRIBUTING.md`](../CONTRIBUTING.md). Règles critiques :
+> [`AGENTS.md`](../../AGENTS.md).
 
 ## Installer et lancer
 

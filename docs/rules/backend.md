@@ -2,7 +2,7 @@
 
 > **Normatif** pour `apps/backend/`, `src/` et `tests/`. Chargé par Claude Code dès qu'il lit un
 > fichier de `apps/backend/` ; carte du code : [`apps/backend/AGENTS.md`](../../apps/backend/AGENTS.md).
-> Sécurité : [`security.md`](security.md). Noyau : [`docs/CLAUDE.md`](../CLAUDE.md).
+> Sécurité : [`security.md`](security.md). Règles critiques : [`AGENTS.md`](../../AGENTS.md).
 
 ## Clients LLM : une seule fabrique
 

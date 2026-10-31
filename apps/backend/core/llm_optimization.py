@@ -57,6 +57,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+from core.project_instructions import project_instructions_section
 from harness.domain.layout import Segment, Stability, assemble
 from harness.domain.policies import ClearingPolicy, Entry, plan_clearing
 
@@ -116,6 +117,7 @@ def build_base_system_prompt(
     project_dir: Path | str,
     *,
     tool_use_hint: bool = False,
+    project_instructions: bool = False,
 ) -> str:
     """Build the shared agent system prompt used by every provider branch.
 
@@ -124,17 +126,29 @@ def build_base_system_prompt(
         tool_use_hint: Add the explicit "use the tools" paragraph required
             by providers without native agentic tool training (Windsurf gRPC
             text-mode, OpenAI generic loop).
+        project_instructions: Add the project's AGENTS.md (or CLAUDE.md), for
+            providers that do not read it themselves
+            (`core.project_instructions`).
 
     Returns:
         The system prompt string. Byte-stable for a given (project_dir,
         tool_use_hint) pair — never embed timestamps or per-request data here,
         it would invalidate provider-side prompt caches on every call.
     """
-    return assemble(system_prompt_segments(project_dir, tool_use_hint=tool_use_hint))
+    return assemble(
+        system_prompt_segments(
+            project_dir,
+            tool_use_hint=tool_use_hint,
+            project_instructions=project_instructions,
+        )
+    )
 
 
 def system_prompt_segments(
-    project_dir: Path | str, *, tool_use_hint: bool = False
+    project_dir: Path | str,
+    *,
+    tool_use_hint: bool = False,
+    project_instructions: bool = False,
 ) -> list[Segment]:
     """The shared system prompt as segments, from the most stable to the least.
 
@@ -153,6 +167,11 @@ def system_prompt_segments(
         ),
         Segment("rtk", _rtk_awareness(), Stability.STATIC),
         Segment("brain", _brain_awareness(), Stability.STATIC),
+        Segment(
+            "project_instructions",
+            project_instructions_section(resolved) if project_instructions else "",
+            Stability.PROJECT,
+        ),
         Segment("document_skill", _document_skill_section(resolved), Stability.PROJECT),
         Segment(
             "working_directory",

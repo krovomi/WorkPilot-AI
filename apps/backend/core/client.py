@@ -2719,10 +2719,10 @@ class _ClientRequest:
             return self.system_prompt
         from core.llm_optimization import build_base_system_prompt
 
-        if tool_use_hint:
-            base_prompt = build_base_system_prompt(self.project_dir, tool_use_hint=True)
-        else:
-            base_prompt = build_base_system_prompt(self.project_dir)
+        hint = tool_use_hint  # loop clients also get AGENTS.md (project_instructions)
+        base_prompt = build_base_system_prompt(
+            self.project_dir, tool_use_hint=hint, project_instructions=hint
+        )
         return _inject_domain_addendum(base_prompt, self.agent_type, self.spec_dir)
 
 
