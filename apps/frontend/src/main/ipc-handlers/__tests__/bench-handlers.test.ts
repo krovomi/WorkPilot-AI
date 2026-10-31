@@ -116,13 +116,15 @@ const ENGINES = [
 	{ provider: "openai", model: "model-b", effort: "medium" },
 ];
 
+/** Finished cards, all updated at the same instant: the clock can tick between two cards. */
 function finished(...ids: string[]) {
+	const updatedAt = new Date().toISOString();
 	state.tasks = ids.map((specId) => ({
 		id: specId,
 		specId,
 		title: `Card ${specId}`,
 		status: "done",
-		updatedAt: new Date().toISOString(),
+		updatedAt,
 	}));
 }
 
@@ -379,5 +381,13 @@ describe("a run", () => {
 			["001-a", "Card 001-a", "candidate"],
 			["002-b", "Card 002-b", "candidate"],
 		]);
+	});
+
+	it("lists the most recently finished cards first", async () => {
+		finished("001-a", "002-b");
+		(state.tasks[1] as { updatedAt: string }).updatedAt = new Date(Date.now() + 60_000).toISOString();
+		state.reply = backend(0);
+		const result = await call<Array<{ specId: string }>>(IPC_CHANNELS.BENCH_CANDIDATES, "p1");
+		expect(result.data?.map((c) => c.specId)).toEqual(["002-b", "001-a"]);
 	});
 });
