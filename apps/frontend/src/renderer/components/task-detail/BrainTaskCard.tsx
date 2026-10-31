@@ -6,6 +6,7 @@ import {
 	type BrainNoteSummary,
 	obsidianUri,
 } from "../../lib/agent-tools-api";
+import { useToast } from "../../hooks/use-toast";
 import { useBrainStore } from "../../stores/brain-store";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -41,6 +42,7 @@ export interface BrainTaskCardProps {
 export function BrainTaskCard({ task, projectPath }: BrainTaskCardProps) {
 	const { t } = useTranslation(["brain"]);
 	const [expanded, setExpanded] = useState(false);
+	const { toast } = useToast();
 
 	const loadTask = useBrainStore((s) => s.loadTask);
 	const clearTask = useBrainStore((s) => s.clearTask);
@@ -60,8 +62,19 @@ export function BrainTaskCard({ task, projectPath }: BrainTaskCardProps) {
 	const { build, notes, proposals } = learning;
 	if (!build && notes.length === 0) return null;
 
-	const open = (note: BrainNoteSummary) =>
-		void window.electronAPI.openExternal(obsidianUri(note.absPath));
+	// Un échec se dit : un bouton qui ne fait rien et ne dit rien est ce que
+	// l'utilisateur voyait quand Obsidian n'avait pas pu être lancé.
+	const open = (note: BrainNoteSummary) => {
+		window.electronAPI
+			.openExternal(obsidianUri(note.absPath))
+			.catch(() =>
+				toast({
+					title: t("brain:card.openFailedTitle"),
+					description: t("brain:card.openFailed", { path: note.path }),
+					variant: "destructive",
+				}),
+			);
+	};
 
 	const verdict = (value: boolean | null | undefined, yes: string, no: string) =>
 		value === null || value === undefined
