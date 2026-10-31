@@ -28,6 +28,7 @@ try:
 except ImportError:
     ResultMessage = None  # type: ignore[assignment,misc]
 
+from foundation.change_scope import ChangeScope
 from foundation.debug import (
     debug,
     debug_detailed,
@@ -36,7 +37,7 @@ from foundation.debug import (
     debug_success,
     debug_warning,
 )
-from prompts_pkg import get_qa_reviewer_prompt
+from prompts_pkg import get_qa_reviewer_light_prompt, get_qa_reviewer_prompt
 from security.tool_input_validator import get_safe_tool_input
 from task_logger import (
     LogEntryType,
@@ -273,6 +274,7 @@ async def run_qa_agent_session(
     verbose: bool = False,
     previous_error: dict | None = None,
     jev_advice: str = "",
+    review_scope: ChangeScope | None = None,
 ) -> tuple[str, str]:
     """
     Run a QA reviewer agent session.
@@ -290,6 +292,10 @@ async def run_qa_agent_session(
         max_iterations: Maximum number of QA iterations
         verbose: Whether to show detailed output
         previous_error: Error context from previous iteration for self-correction
+        review_scope: The change set's scope (`foundation.change_scope`). A
+            light scope gets the text-only prompt with the spec and the diff
+            inlined, and none of the memory or learned code patterns: they
+            are about code this change did not touch.
 
     Returns:
         (status, response_text) where status is:
@@ -351,7 +357,11 @@ async def run_qa_agent_session(
 
     # Load QA prompt with dynamically-injected project-specific MCP tools
     # This includes Electron validation for Electron apps, Puppeteer for web, etc.
-    prompt = get_qa_reviewer_prompt(spec_dir, project_dir)
+    light = review_scope is not None and review_scope.is_light
+    if light:
+        prompt = get_qa_reviewer_light_prompt(spec_dir, project_dir, review_scope)
+    else:
+        prompt = get_qa_reviewer_prompt(spec_dir, project_dir)
     if jev_advice:
         prompt += "\n\n" + jev_advice
     debug_detailed(
@@ -362,13 +372,17 @@ async def run_qa_agent_session(
     )
 
     # Retrieve memory context for QA (past patterns, gotchas, validation insights)
-    qa_memory_context = await get_memory_context(
-        spec_dir,
-        project_dir,
-        {
-            "description": "QA validation and acceptance criteria review",
-            "id": f"qa_reviewer_{qa_session}",
-        },
+    qa_memory_context = (
+        ""
+        if light
+        else await get_memory_context(
+            spec_dir,
+            project_dir,
+            {
+                "description": "QA validation and acceptance criteria review",
+                "id": f"qa_reviewer_{qa_session}",
+            },
+        )
     )
     if qa_memory_context:
         prompt += "\n\n" + qa_memory_context
@@ -379,7 +393,9 @@ async def run_qa_agent_session(
     try:
         from learning_loop.prompt_injection import get_learning_context
 
-        learning_context = get_learning_context(project_dir, "qa_review")
+        learning_context = (
+            "" if light else get_learning_context(project_dir, "qa_review")
+        )
         if learning_context:
             prompt += "\n\n" + learning_context
             debug_success("qa_reviewer", "Learning loop patterns injected for QA")

@@ -89,7 +89,10 @@ cat project_index.json | jq '.services[].test_command'
 # [Execute test commands based on project_index]
 ```
 
-Note pass/fail counts for `tests_passed`.
+Note pass/fail counts for `tests_passed`. Run suites in their quiet or
+summary mode (`pytest -q`, `vitest run --reporter=dot`, `dotnet test -v q`) and
+keep the tail of the output (`2>&1 | tail -n 60`): a full log costs context on
+every later turn of this session, and the counts are all the sign-off needs.
 
 ### 3.2: Integration Tests
 
@@ -270,18 +273,19 @@ Add any mismatch with the documented usage to `issues_found` (Phase 8).
 
 ### 6.1: Security Review
 
-Check for common vulnerabilities:
+Check the files this task changed — not the whole repository: a repository-wide
+`grep -r` also walks `node_modules`, `bin/`, `obj/` and virtualenvs, returns
+hundreds of kilobytes of other people's code and judges nothing this task did.
 
 ```bash
-# Look for security issues
-grep -r "eval(" --include="*.js" --include="*.ts" .
-grep -r "innerHTML" --include="*.js" --include="*.ts" .
-grep -r "dangerouslySetInnerHTML" --include="*.tsx" --include="*.jsx" .
-grep -r "exec(" --include="*.py" .
-grep -r "shell=True" --include="*.py" .
+# The task's own files (three-dot diff: only the spec branch's changes)
+CHANGED=$(git diff {{BASE_BRANCH}}...HEAD --name-only --diff-filter=ACMR)
+
+# Look for security issues in them
+echo "$CHANGED" | xargs -r grep -nE "eval\(|innerHTML|dangerouslySetInnerHTML|exec\(|shell=True" --
 
 # Check for hardcoded secrets
-grep -rE "(password|secret|api_key|token)\s*=\s*['\"][^'\"]+['\"]" --include="*.py" --include="*.js" --include="*.ts" .
+echo "$CHANGED" | xargs -r grep -nE "(password|secret|api_key|token)\s*=\s*['\"][^'\"]+['\"]" --
 ```
 
 ### 6.2: Pattern Compliance
