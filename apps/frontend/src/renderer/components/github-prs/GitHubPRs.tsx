@@ -295,6 +295,7 @@ export function GitHubPRs({
 							onAssignPR={handleAssignPR}
 							onGetLogs={handleGetLogs}
 							onMarkReviewPosted={handleMarkReviewPosted}
+							aiReview={!selectedProject?.remote}
 						/>
 					) : (
 						<EmptyState message={t("prReview.selectPRToView")} />

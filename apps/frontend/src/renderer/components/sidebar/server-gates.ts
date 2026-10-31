@@ -17,8 +17,22 @@ export const SERVER_PROJECT_VIEWS: ReadonlySet<SidebarView> = new Set<SidebarVie
 	"ideation",
 	"insights",
 	"context",
+	"github-issues",
+	"github-prs",
 	"administration",
 ]);
+
+const GITHUB_URL =
+	/^(?:https:\/\/(?:[^@/]+@)?github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)/;
+
+/**
+ * The forge whose views a server project offers, read from the URL it was
+ * cloned from: its GitHub issues and pull requests go through the server
+ * with the person's own token (`ipc-handlers/github/server-relay.ts`).
+ */
+export function serverForge(project: Project | undefined): "github" | null {
+	return GITHUB_URL.test((project?.remote?.repoUrl ?? "").trim()) ? "github" : null;
+}
 
 const ADMIN_PERMISSIONS = [
 	"org.member.read",
@@ -27,9 +41,23 @@ const ADMIN_PERMISSIONS = [
 	"audit.read",
 ];
 
-/** Whether the sidebar shows this view for the selected project. */
-export function showsView(view: SidebarView, serverProject: boolean): boolean {
-	return !serverProject || SERVER_PROJECT_VIEWS.has(view);
+const GITHUB_VIEWS: ReadonlySet<SidebarView> = new Set<SidebarView>([
+	"github-issues",
+	"github-prs",
+]);
+
+/**
+ * Whether the sidebar shows this view for the selected project; a server
+ * project's GitHub views only when it is on GitHub ({@link serverForge}).
+ */
+export function showsView(
+	view: SidebarView,
+	serverProject: boolean,
+	forge: "github" | null = null,
+): boolean {
+	if (!serverProject) return true;
+	if (GITHUB_VIEWS.has(view)) return forge === "github";
+	return SERVER_PROJECT_VIEWS.has(view);
 }
 
 /**
@@ -47,8 +75,9 @@ export function useServerNavGates(
 	const isServerMode = useServerSessionStore((state) => state.mode) === "server";
 	const hasAdminPermission = useAnyPermission(ADMIN_PERMISSIONS);
 	const serverProject = Boolean(project?.remote);
+	const forge = serverForge(project);
 	useEffect(() => {
-		if (!showsView(activeView, serverProject)) onViewChange?.("kanban");
-	}, [activeView, serverProject, onViewChange]);
+		if (!showsView(activeView, serverProject, forge)) onViewChange?.("kanban");
+	}, [activeView, serverProject, forge, onViewChange]);
 	return { canAdminister: isServerMode && hasAdminPermission, serverProject };
 }

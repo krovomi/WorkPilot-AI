@@ -311,9 +311,34 @@ jamais lu pour un projet du serveur.
 | Reconstruire l'index | `POST /api/features/context/jobs` | `agent.execute`, rôle `member` ou plus |
 | Lire, chercher les mémoires | `GET /api/features/context/memories` | `insight.read` |
 
+**Les vues GitHub d'un projet serveur passent par le serveur, avec le jeton de la personne.** Un
+projet cloné depuis github.com montre ses issues et ses pull requests. L'app n'a ni clone ni
+`gh` pour lui : `getGitHubConfig` lui donne pour jeton une poignée qui nomme le projet, pas un
+secret, et `githubFetch` envoie tout appel fait avec elle au serveur
+(`ipc-handlers/github/server-relay.ts`). Le serveur (`shared_features/forge.py`) fait l'appel avec
+le jeton GitHub que la personne y a enregistré (« Mes jetons sur le serveur »), jamais celui d'une
+autre ni celui du déploiement ; sans jeton, rien ne part et la vue le dit (412). Il tient l'appel
+au dépôt du projet, lu dans son `repo_url` et jamais dans la requête : un appel REST n'est que
+l'un de ceux que font les vues (`_ROUTES` : lectures sous `/repos/<dépôt>` et de `/user`, et les
+changements du tableau ci-dessous), et l'URL envoyée est reconstruite à partir des mots de la
+route, du dépôt du projet et de nombres, sans rien recopier de la requête ; la chaîne de requête
+ne garde que les clés des vues, passées en paramètres ; GraphQL ne sert qu'une requête, la liste des PR ouvertes, écrite par le serveur. Ce que l'app
+faisait avec `gh` (diff, commentaire, fusion, mise à jour de la branche) devient l'appel REST
+équivalent (`pr-actions.ts`). « Créer une tâche » sur une issue en fait une carte du tableau
+partagé. La revue IA, l'investigation, l'auto-fix et l'analyse groupée des issues tournent sur
+l'ordinateur, dans le dossier du projet : elles restent masquées pour un projet du serveur
+jusqu'à leurs jobs serveur. Une politique hors ligne stricte du projet bloque le relais (409).
+
+| Action | Route | Il faut |
+|---|---|---|
+| Lire (issues, PR, diff, statut des checks) | `POST /api/features/forge/github/read` | `vcs.read` |
+| Lister les PR ouvertes | `POST /api/features/forge/github/pulls` | `vcs.read` |
+| Commenter, assigner, mettre à jour une branche, approuver un workflow | `POST /api/features/forge/github/write` | `vcs.write`, rôle `member` ou plus |
+| Fusionner une PR | la même, sur `/repos/<dépôt>/pulls/<n>/merge` | en plus `vcs.pr.merge` |
+
 ## Ce qui vient
 
 Le plan multi-tenant du 31 octobre, par lots : les autres features servies de la même façon
-(forges, analyses, tableau de bord), le flux du projet ouvert pour
+(GitLab et les actions IA des forges en jobs, analyses, tableau de bord), le flux du projet ouvert pour
 chaque vue partagée, un test de bout en bout à deux organisations, et le guide d'exploitation. Ce
 fichier grandit avec chaque lot.

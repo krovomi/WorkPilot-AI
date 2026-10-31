@@ -19,6 +19,7 @@ import {
 	useIssueFiltering,
 } from "./github-issues/hooks";
 import { useAnalyzePreview } from "./github-issues/hooks/useAnalyzePreview";
+import { useServerIssueCards } from "./github-issues/hooks/useServerIssueCards";
 import type { GitHubIssuesProps } from "./github-issues/types";
 
 export function GitHubIssues({
@@ -29,6 +30,10 @@ export function GitHubIssues({
 	const selectedProjectId = useProjectStore((state) => state.selectedProjectId);
 	const selectedProject = projects.find((p) => p.id === selectedProjectId);
 	const tasks = useTaskStore((state) => state.tasks);
+	// A server project's issues become cards of its shared board; its agents
+	// (investigation, auto-fix, batch analysis) do not run on this computer.
+	const serverProject = Boolean(selectedProject?.remote);
+	const serverCards = useServerIssueCards(selectedProject?.id, onNavigateToTask);
 
 	const {
 		syncStatus,
@@ -105,8 +110,11 @@ export function GitHubIssues({
 				map.set(task.metadata.githubIssueNumber, task.specId || task.id);
 			}
 		}
+		for (const [issueNumber, taskId] of serverCards.created) {
+			map.set(issueNumber, taskId);
+		}
 		return map;
-	}, [tasks]);
+	}, [tasks, serverCards.created]);
 
 	// Enhanced refresh that also checks for new auto-fix issues
 	const handleRefreshWithAutoFix = useCallback(() => {
@@ -117,10 +125,18 @@ export function GitHubIssues({
 		}
 	}, [handleRefresh, autoFixConfig?.enabled, checkForNewIssues]);
 
-	const handleInvestigate = useCallback((issue: GitHubIssue) => {
-		setSelectedIssueForInvestigation(issue);
-		setShowInvestigateDialog(true);
-	}, []);
+	const { createCard } = serverCards;
+	const handleInvestigate = useCallback(
+		(issue: GitHubIssue) => {
+			if (serverProject) {
+				void createCard(issue);
+				return;
+			}
+			setSelectedIssueForInvestigation(issue);
+			setShowInvestigateDialog(true);
+		},
+		[serverProject, createCard],
+	);
 
 	const handleStartInvestigation = useCallback(
 		(selectedCommentIds: number[]) => {
@@ -161,8 +177,8 @@ export function GitHubIssues({
 				autoFixEnabled={autoFixConfig?.enabled}
 				autoFixRunning={isBatchRunning}
 				autoFixProcessing={batchProgress?.totalIssues}
-				onAutoFixToggle={toggleAutoFix}
-				onAnalyzeAndGroup={openWizard}
+				onAutoFixToggle={serverProject ? undefined : toggleAutoFix}
+				onAnalyzeAndGroup={serverProject ? undefined : openWizard}
 				isAnalyzing={isAnalyzing}
 			/>
 
@@ -197,7 +213,7 @@ export function GitHubIssues({
 							linkedTaskId={issueToTaskMap.get(selectedIssue.number)}
 							onViewTask={onNavigateToTask}
 							projectId={selectedProject?.id}
-							autoFixConfig={autoFixConfig}
+							autoFixConfig={serverProject ? null : autoFixConfig}
 							autoFixQueueItem={getAutoFixQueueItem(selectedIssue.number)}
 						/>
 					) : (
