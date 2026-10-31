@@ -75,6 +75,7 @@ génération de tests ;
 | `security/` | allowlist de commandes, écritures confinées, contenu non fiable ([index](security/AGENTS.md)) |
 | `injection_guard/` | scanner d'injection de prompt |
 | `server/auth/`, `server/authz/` | authentification (JWT, OIDC) ; permissions, rôles, tenants, portée de projet, canaux du flux en direct (`ws_channels.py`) ; conception : [`server-mode.md`](../../docs/architecture/server-mode.md) |
+| `shared_board/` | les cartes du tableau partagé d'un projet serveur : créer, lire, modifier, supprimer, approuver |
 | `foundation/api_safety.py` | chemins acceptés par l'API locale |
 | `offline_policy/` | hors-ligne strict (`airgapStrict`) |
 | `os_sandbox/` | bac à sable de l'OS autour des commandes d'agent : bubblewrap, Seatbelt, proxy filtrant ([conception](../../docs/architecture/os-sandbox.md)) |

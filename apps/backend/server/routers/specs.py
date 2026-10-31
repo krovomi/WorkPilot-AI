@@ -36,6 +36,13 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/projects/{project_id}/specs", tags=["specs"])
 
+#: What a phase needs beyond ``agent.execute``: merging lands code on the base
+#: branch of the server's clone, a pull request writes to the forge.
+PHASE_PERMISSIONS: dict[str, tuple[str, ...]] = {
+    "merge": ("task.merge",),
+    "pr": ("vcs.pr.create",),
+}
+
 
 async def _get_project_or_404(db: AsyncSession, project_id: str) -> Project:
     project = await db.get(Project, project_id)
@@ -201,8 +208,9 @@ async def start_run(
     from server.services.run_manager import RunManagerError, get_run_manager
 
     principal = get_principal(request)
-    if not principal.has("agent.execute"):
-        raise HTTPException(status_code=403, detail="Missing permission: agent.execute")
+    for needed in ("agent.execute", *PHASE_PERMISSIONS.get(body.phase, ())):
+        if not principal.has(needed):
+            raise HTTPException(status_code=403, detail=f"Missing permission: {needed}")
 
     project = await _get_project_or_404(db, project_id)
     spec = await _get_spec_or_404(db, project_id, spec_id)
