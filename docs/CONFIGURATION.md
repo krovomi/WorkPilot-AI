@@ -718,7 +718,6 @@ Opt-in features. Those marked *API* are read by the local API: put them in
 | --- | ---: | --- |
 | `WORKPILOT_LOOP_DETECTION_ENABLED` | off | `1`, `true`, `yes` or `on`: from the coder's second iteration, a diff that repeats one of the last four pauses the build, with the event in the audit trail. It resumes like any paused build. |
 | `WORKPILOT_AUTO_PROMOTE_THRESHOLD` | off | *API.* Integer from 0 to 100. Enables "Accept & skip human review" in the QA promotion dialog when the build's QA score reaches it; the score is 0 unless QA signed off. Nothing moves a card on its own. |
-| `WORKPILOT_PARALLEL_VARIATIONS` | 1 | *API.* How many variations, 1 to 5, the "Parallel variations" dialog may prepare; `1` leaves the feature off. |
 | `AUTO_TEST_GENERATION` | on | `false`, and only `false`, removes the "automated tests" section from each subtask's coding prompt. That section tells the coder which kinds of tests to write, with the test libraries the project already has. |
 | `AUTO_FIX_MAX_ATTEMPTS` | 5 | CLI: attempts of `run.py --spec … --auto-fix` when `--auto-fix-max-attempts` is not given. |
 

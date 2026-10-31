@@ -20,19 +20,27 @@ from learning_loop.service import LearningLoopService
 
 
 class _NoModel:
-    """A runtime that fails the test if the analysis reaches for a model."""
+    """A runtime that records every attribute the analysis asks it for."""
+
+    def __init__(self) -> None:
+        self.asked: list[str] = []
 
     def __getattr__(self, name):
-        raise AssertionError(f"the learning analysis called the runtime ({name})")
+        self.asked.append(name)
+        raise AttributeError(name)
 
 
 @pytest.fixture
-def service(tmp_path: Path, monkeypatch) -> LearningLoopService:
-    monkeypatch.setattr(agent_runtime, "_runtime", _NoModel())
-    return LearningLoopService(tmp_path)
+def runtime(monkeypatch) -> _NoModel:
+    model = _NoModel()
+    monkeypatch.setattr(agent_runtime, "_runtime", model)
+    return model
 
 
-def test_an_escalated_build_yields_the_heuristic_pattern(service) -> None:
+def test_an_escalated_build_yields_the_heuristic_pattern(
+    tmp_path: Path, runtime
+) -> None:
+    service = LearningLoopService(tmp_path)
     builds = [{"spec_id": "001-x", "had_escalation": True, "context_tags": ["api"]}]
     statuses: list[str] = []
 
@@ -41,3 +49,4 @@ def test_an_escalated_build_yields_the_heuristic_pattern(service) -> None:
     assert [p.agent_phase for p in report.patterns_found] == ["qa_fixing"]
     assert [p.source_build_ids for p in report.patterns_found] == [["001-x"]]
     assert statuses and not any("AI" in status for status in statuses)
+    assert runtime.asked == []
