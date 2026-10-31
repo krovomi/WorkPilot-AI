@@ -21,6 +21,7 @@ Règles : [`rules/security.md`](../rules/security.md#s5--mode-serveur--authentif
 | Runs | `services/run_manager.py`, `services/run_env.py` | une phase (`spec`, `build`, `qa`, `merge`, `pr`) lancée sur le serveur pour une carte, sous un plafond de concurrence, sans entrée standard, avec l'environnement construit pour elle |
 | Flux en direct | `streaming/websocket_server.py`, `server/authz/ws_channels.py` | les événements du tableau (`project:<id>`) et d'un run (`run:<id>`), ouverts aux seuls membres du projet |
 | Client | `apps/frontend/src/main/server-connection.ts` | connexion, refresh dans `safeStorage`, organisation active ; vue Administration |
+| Projets dans l'app | `main/server-projects.ts`, `main/remote-board.ts` | les projets du serveur à côté de ceux de l'ordinateur, ajoutés par l'URL de leur dépôt ; leur tableau dessiné depuis l'instantané du serveur |
 
 ## Pourquoi le flux en direct a sa propre autorisation
 
@@ -70,9 +71,30 @@ l'approbation d'un membre. Le serveur ne passe jamais `--force` : l'approbation 
 d'une personne, pas un drapeau. Une phase ne lit jamais l'entrée standard : une question qui
 attendrait une réponse bloquerait le run sans fin.
 
+## Les projets du serveur dans l'app
+
+Connectée à un serveur, l'app liste ses projets après ceux de l'ordinateur (`PROJECT_LIST`), avec
+le rôle de la personne sur chacun. « Ajouter un projet » demande alors l'URL d'un dépôt : le
+serveur le clone pour l'équipe (`POST /projects`, canal `SERVER_PROJECT_CREATE`) ; un dossier de
+l'ordinateur reste à un clic. L'app n'envoie jamais de chemin, seulement un `project_id`.
+
+Un projet du serveur n'entre jamais dans le magasin de projets local. Tout handler qui cherche un
+projet par son id ne le trouve pas et refuse : rien ne tourne sur l'ordinateur contre lui. Son
+tableau vient de `GET /api/board/snapshot` : les seuls fichiers qu'une carte a pour être dessinée
+(`SNAPSHOT_FILES`, chacun sous sa taille), ceux de la spec et ceux de son espace de build, sans
+suivre un lien qui sortirait du clone. Le main les vérifie à nouveau (identifiant de carte, nom de
+fichier, taille), les écrit dans un miroir sous le dossier de données de l'app, réécrit à chaque
+lecture, et les lit avec le chargeur des projets locaux : une carte du serveur ressemble à une
+carte locale.
+
+La barre latérale n'offre pour un projet du serveur que les vues qui passent par le serveur
+(`sidebar/server-gates.ts`, aujourd'hui le Kanban et l'administration) ; les autres agiraient sur
+le miroir. La liste des projets est relue quand la session change (connexion, déconnexion, autre
+compte).
+
 ## Ce qui vient
 
-Le plan multi-tenant du 31 octobre, par lots : le diff d'une carte côté serveur, les projets et le
-Kanban du serveur dans l'app,
+Le plan multi-tenant du 31 octobre, par lots : les actions sur les cartes depuis l'app et leurs
+événements en direct, le diff d'une carte côté serveur,
 les groupes d'utilisateurs, chaque feature de l'app servie par `project_id`, un test de bout en
 bout à deux organisations, et le guide d'exploitation. Ce fichier grandit avec chaque lot.

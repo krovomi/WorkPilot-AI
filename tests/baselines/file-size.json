@@ -16,7 +16,7 @@
   "apps/frontend/src/renderer/App.tsx": 2437,
   "apps/frontend/src/renderer/components/AgentTools.tsx": 2043,
   "apps/frontend/src/renderer/components/KanbanBoard.tsx": 3249,
-  "apps/frontend/src/renderer/components/Sidebar.tsx": 2686,
+  "apps/frontend/src/renderer/components/Sidebar.tsx": 2682,
   "apps/frontend/src/renderer/components/task-detail/TaskLogs.tsx": 2454,
   "apps/frontend/src/renderer/components/visual-to-code/CanvasPanel.tsx": 2032
 }

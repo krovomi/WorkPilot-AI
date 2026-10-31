@@ -12,6 +12,20 @@ export interface Project {
 	settings: ProjectSettings;
 	createdAt: Date;
 	updatedAt: Date;
+	/**
+	 * Set on a project that lives on the WorkPilot server (server mode): its
+	 * board is the server's, shared with the other members; `path` is only the
+	 * app's read-only mirror of it. Absent on a project of this computer.
+	 */
+	remote?: RemoteProjectInfo;
+}
+
+/** What the app knows of a server project, as `/projects` lists it. */
+export interface RemoteProjectInfo {
+	repoUrl: string;
+	defaultBranch: string;
+	/** The caller's role on the project: viewer, member or owner. */
+	role: "viewer" | "member" | "owner";
 }
 
 export interface ProjectSettings {

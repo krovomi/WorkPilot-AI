@@ -328,5 +328,18 @@
 			"high": "High",
 			"ultrathink": "Ultra Think"
 		}
+	},
+	"serverProject": {
+		"title": "Add a project for your team",
+		"description": "The WorkPilot server clones the repository, and everyone on the project shares its board.",
+		"repoUrl": "Repository URL",
+		"repoUrlHelp": "The server must be able to clone it (a public URL, or one its credentials reach).",
+		"name": "Project name",
+		"namePlaceholder": "My project",
+		"branch": "Main branch",
+		"create": "Add to the server",
+		"creating": "Cloning on the server…",
+		"failed": "The server could not add the project",
+		"useLocalFolder": "Use a folder on this computer instead"
 	}
 }

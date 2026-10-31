@@ -383,6 +383,13 @@
 			"confidence": "Confidence: {{percent}}%",
 			"qaIterations_one": "1 QA pass expected.",
 			"qaIterations_other": "{{count}} QA passes expected."
+		},
+		"serverBoard": "Shared board · {{role}}",
+		"serverBoardHint": "This project lives on the WorkPilot server: everyone on it sees the same cards. Changing cards from the app comes in a next version.",
+		"serverRole": {
+			"viewer": "Viewer",
+			"member": "Member",
+			"owner": "Owner"
 		}
 	},
 	"queue": {

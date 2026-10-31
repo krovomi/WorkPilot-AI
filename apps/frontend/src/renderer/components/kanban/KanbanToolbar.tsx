@@ -32,6 +32,7 @@ import { Input } from "../ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Separator } from "../ui/separator";
 import { QuickCommandBar } from "./QuickCommandBar";
+import { ServerBoardNotice, useSelectedServerProject } from "./ServerBoardNotice";
 
 const CATEGORY_OPTIONS = Object.keys(TASK_CATEGORY_LABELS) as TaskCategory[];
 const PRIORITY_OPTIONS = Object.keys(TASK_PRIORITY_LABELS) as TaskPriority[];
@@ -127,6 +128,7 @@ export function KanbanToolbar({ projectPath }: KanbanToolbarProps) {
 	const applyView = useKanbanFilterStore((s) => s.applyView);
 	const deleteView = useKanbanFilterStore((s) => s.deleteView);
 	const [viewName, setViewName] = useState("");
+	const serverProject = useSelectedServerProject();
 
 	const count = activeFilterCount(filters);
 	const filtersActive = hasActiveFilters(filters);
@@ -387,12 +389,17 @@ export function KanbanToolbar({ projectPath }: KanbanToolbarProps) {
 
 			<Separator orientation="vertical" className="h-5" />
 
-			{/* Quick Commands */}
-			<QuickCommandBar
-				projectPath={projectPath}
-				className="h-8"
-				variant="compact"
-			/>
+			{/* Quick Commands run on this computer: a server board has its notice
+			    instead, until commands run on the server. */}
+			{serverProject ? (
+				<ServerBoardNotice project={serverProject} />
+			) : (
+				<QuickCommandBar
+					projectPath={projectPath}
+					className="h-8"
+					variant="compact"
+				/>
+			)}
 		</div>
 	);
 }

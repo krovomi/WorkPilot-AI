@@ -32,6 +32,14 @@ export interface ProjectAPI {
 	addProject: (projectPath: string) => Promise<IPCResult<Project>>;
 	removeProject: (projectId: string) => Promise<IPCResult>;
 	getProjects: () => Promise<IPCResult<Project[]>>;
+	/** Server mode: register a repository on the server for the team. */
+	createServerProject: (input: {
+		name: string;
+		repoUrl: string;
+		defaultBranch?: string;
+	}) => Promise<IPCResult<Project>>;
+	/** Server mode: delete a server project for everyone (owner only). */
+	deleteServerProject: (projectId: string) => Promise<IPCResult>;
 	updateProjectSettings: (
 		projectId: string,
 		settings: Partial<ProjectSettings>,
@@ -313,6 +321,16 @@ export const createProjectAPI = (): ProjectAPI => ({
 
 	getProjects: (): Promise<IPCResult<Project[]>> =>
 		ipcRenderer.invoke(IPC_CHANNELS.PROJECT_LIST),
+
+	createServerProject: (input: {
+		name: string;
+		repoUrl: string;
+		defaultBranch?: string;
+	}): Promise<IPCResult<Project>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.SERVER_PROJECT_CREATE, input),
+
+	deleteServerProject: (projectId: string): Promise<IPCResult> =>
+		ipcRenderer.invoke(IPC_CHANNELS.SERVER_PROJECT_DELETE, projectId),
 
 	updateProjectSettings: (
 		projectId: string,

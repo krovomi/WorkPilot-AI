@@ -117,7 +117,6 @@ import {
 	loadProjectEnvConfig,
 	useProjectEnvStore,
 } from "@/stores/project-env-store";
-import { useAnyPermission } from "@/stores/permissions-store";
 // Stores
 import { useProjectStore } from "@/stores/project-store";
 import {
@@ -127,7 +126,6 @@ import {
 	useAttentionView,
 } from "@/stores/activity-store";
 import { openPromptOptimizerDialog } from "@/stores/prompt-optimizer-store";
-import { useServerSessionStore } from "@/stores/server-session-store";
 import { saveSettings, useSettingsStore } from "@/stores/settings-store";
 import { useSetupHubStore } from "@/stores/setup-hub-store";
 import { openTestGenerationDialog } from "@/stores/test-generation-store";
@@ -175,6 +173,7 @@ import {
 } from "./sidebar/sortable-primitives";
 import { ActivityBadge } from "./sidebar/ActivityBadge";
 import { EXPERIMENTAL_VIEWS } from "./sidebar/experimental-views";
+import { showsView, useServerNavGates } from "./sidebar/server-gates";
 import { useSidebarPrefs } from "./sidebar/use-sidebar-prefs";
 import { VoiceControlDialog } from "./voice-control/VoiceControlDialog";
 
@@ -1045,18 +1044,13 @@ export function Sidebar({
 		(state) => state.envConfig?.gitlabEnabled ?? false,
 	);
 
-	// The administration console is reachable only in server mode, and only for
-	// someone holding at least one administration permission. `useAnyPermission`
-	// reports true in local mode, so the server-mode check is what keeps the
-	// entry out of the desktop app, where there is nothing to administer.
-	const isServerMode = useServerSessionStore((state) => state.mode) === "server";
-	const hasAdminPermission = useAnyPermission([
-		"org.member.read",
-		"org.role.read",
-		"org.quota.read",
-		"audit.read",
-	]);
-	const canAdminister = isServerMode && hasAdminPermission;
+	// Server mode: the administration console, and the views a server project
+	// offers (`sidebar/server-gates.ts`).
+	const { canAdminister, serverProject } = useServerNavGates(
+		selectedProject,
+		activeView,
+		onViewChange,
+	);
 
 	// Track the last loaded project ID to avoid redundant loads
 	const lastLoadedProjectIdRef = useRef<string | null>(null);
@@ -1103,7 +1097,8 @@ export function Sidebar({
 				const items = orderedItemIds
 					.map((id) => itemById.get(id as SidebarView))
 					.filter((i): i is NavItem => Boolean(i))
-					.filter((i) => !(hideExperimental && EXPERIMENTAL_VIEWS.has(i.id)));
+					.filter((i) => !(hideExperimental && EXPERIMENTAL_VIEWS.has(i.id)))
+					.filter((i) => showsView(i.id, serverProject));
 				return { ...group, items };
 			})
 			.filter((group) => group.items.length > 0);
@@ -1112,6 +1107,7 @@ export function Sidebar({
 		githubEnabled,
 		gitlabEnabled,
 		canAdminister,
+		serverProject,
 		sidebarPrefs.groupOrder,
 		sidebarPrefs.itemOrder,
 		mergeOrder,
