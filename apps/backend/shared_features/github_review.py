@@ -199,8 +199,18 @@ async def mark_posted(
     if get_project_jobs().running_job(scope.project_id, f"{FEATURE}:{pr_number}"):
         raise HTTPException(status_code=409, detail="The review is running")
     directory = _review_dir(scope)
-    name = f"review_{pr_number}.json"
-    text = read_file(directory, name, MAX_REVIEW)
+    # The file written is one the runner saved, named as the directory lists
+    # it: nothing of the request goes into the path.
+    wanted = f"review_{pr_number}.json"
+    name = (
+        next(
+            (e.name for e in directory.iterdir() if e.name == wanted),
+            None,
+        )
+        if directory.is_dir()
+        else None
+    )
+    text = read_file(directory, name, MAX_REVIEW) if name else None
     try:
         data = json.loads(text) if text is not None else None
     except ValueError:
@@ -217,5 +227,5 @@ async def mark_posted(
         )
     )
     data["posted_at"] = datetime.now(UTC).isoformat()
-    write_json_file(directory, name, json.dumps(data, indent=2))
+    write_json_file(directory, str(name), json.dumps(data, indent=2))
     return {"posted": True}
