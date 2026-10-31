@@ -293,7 +293,6 @@ FEATURE_DOMAINS: MappingProxyType[str, str] = MappingProxyType(
         "verify": "qa",
         "workflow_profile": "task",
         "slash_commands": "agent",
-        "parallel_variations": "lab",
         "virtual_reviewer": "review",
         "test_generation": "qa",
         "github": "vcs",

@@ -67,7 +67,6 @@ export interface TimeTravelState {
 			additionalInstructions?: string;
 			forkProvider?: string;
 			forkModel?: string;
-			forkApiKey?: string;
 			forkBaseUrl?: string;
 		},
 	) => Promise<ForkSession | null>;
@@ -207,7 +206,6 @@ export const useTimeTravelStore = create<TimeTravelState>((set) => ({
 				additional_instructions: options.additionalInstructions || "",
 				fork_provider: options.forkProvider || "",
 				fork_model: options.forkModel || "",
-				fork_api_key: options.forkApiKey || "",
 				fork_base_url: options.forkBaseUrl || "",
 			});
 			if (res.success && res.fork) {

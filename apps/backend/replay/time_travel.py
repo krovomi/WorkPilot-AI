@@ -217,7 +217,6 @@ class TimeTravelEngine:
             "additional_instructions": fork.fork_request.additional_instructions,
             "provider": fork.fork_request.fork_provider,
             "model": fork.fork_request.fork_model,
-            "api_key": fork.fork_request.fork_api_key,
             "base_url": fork.fork_request.fork_base_url,
         }
 
@@ -235,9 +234,7 @@ class TimeTravelEngine:
         forks: list[ForkSession] = []
         for filepath in self._forks_dir.glob("*.json"):
             try:
-                with open(filepath, encoding="utf-8") as f:
-                    data = json.load(f)
-                fork = ForkSession.from_dict(data)
+                fork = self._read_fork_file(filepath)
                 if session_id is None or fork.original_session_id == session_id:
                     forks.append(fork)
             except Exception as e:
@@ -467,6 +464,17 @@ class TimeTravelEngine:
             logger.error(f"Failed to load checkpoints for {session_id}: {e}")
             return []
 
+    def _read_fork_file(self, filepath: Path) -> ForkSession:
+        """A stored fork. A file an older version wrote with a provider key is
+        rewritten without it the first time it is read."""
+        with open(filepath, encoding="utf-8") as f:
+            data = json.load(f)
+        fork = ForkSession.from_dict(data)
+        request = data.get("fork_request")
+        if isinstance(request, dict) and "fork_api_key" in request:
+            self._save_fork(fork)
+        return fork
+
     def _save_fork(self, fork: ForkSession) -> None:
         filepath = self._forks_dir / f"{fork.fork_id}.json"
         with open(filepath, "w", encoding="utf-8") as f:
@@ -477,9 +485,7 @@ class TimeTravelEngine:
         if not filepath.exists():
             return None
         try:
-            with open(filepath, encoding="utf-8") as f:
-                data = json.load(f)
-            return ForkSession.from_dict(data)
+            return self._read_fork_file(filepath)
         except Exception as e:
             logger.error(f"Failed to load fork {fork_id}: {e}")
             return None

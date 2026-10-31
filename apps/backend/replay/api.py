@@ -58,7 +58,6 @@ class ForkSessionRequest(BaseModel):
     additional_instructions: str = ""
     fork_provider: str = ""
     fork_model: str = ""
-    fork_api_key: str = ""
     fork_base_url: str = ""
 
 
@@ -449,7 +448,6 @@ async def fork_session(session_id: str, req: ForkSessionRequest):
         additional_instructions=req.additional_instructions,
         fork_provider=req.fork_provider,
         fork_model=req.fork_model,
-        fork_api_key=req.fork_api_key,
         fork_base_url=req.fork_base_url,
     )
     fork = engine.create_fork(fork_request)

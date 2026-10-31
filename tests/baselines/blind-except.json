@@ -236,7 +236,6 @@
   "apps/backend/orchestration/breaking_changes.py": {"blind": 3, "silent": 0},
   "apps/backend/orchestration/orchestrator.py": {"blind": 5, "silent": 3},
   "apps/backend/os_sandbox/proxy.py": {"blind": 1, "silent": 0},
-  "apps/backend/parallel_variations/api.py": {"blind": 2, "silent": 0},
   "apps/backend/performance/benchmark_runner.py": {"blind": 5, "silent": 1},
   "apps/backend/performance/profiler.py": {"blind": 1, "silent": 0},
   "apps/backend/pr_followup/loop.py": {"blind": 1, "silent": 0},

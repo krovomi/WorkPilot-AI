@@ -1,6 +1,7 @@
 # Best-of-N : une tâche construite N fois, la personne garde un build (`best_of_n`)
 
-`parallel_variations/` écrivait des plans de variantes sans lancer d'agent. L'Arena compare des
+`parallel_variations/` écrivait des plans de variantes sans lancer d'agent (supprimé depuis, voir
+[variants-and-replays.md](variants-and-replays.md)). L'Arena compare des
 réponses de modèles, pas des builds. Personne ne pouvait donc demander « construis cette tâche
 avec trois moteurs et montre-moi lequel a le mieux fait ». Best-of-N le fait sur une vraie tâche
 du Kanban, avec ses vrais worktrees, et laisse le choix à la personne.
