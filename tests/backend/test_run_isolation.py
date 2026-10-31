@@ -82,6 +82,9 @@ def _policy(paths: dict[str, Path]):
         backend_dir=paths["code"],
         repo_root=paths["code"],
         interpreter_dirs=(),
+        # The tree stands for the whole filesystem: hermetic, and the same on
+        # every platform (on Windows "/" is only the current drive).
+        fs_root=paths["repos"].parent,
     )
 
 

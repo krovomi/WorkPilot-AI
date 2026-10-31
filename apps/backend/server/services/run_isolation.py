@@ -199,6 +199,7 @@ def build_policy(
     backend_dir: Path = _BACKEND_DIR,
     repo_root: Path = _REPO_ROOT,
     interpreter_dirs: Iterable[Path] = (Path(sys.prefix), Path(sys.base_prefix)),
+    fs_root: Path = Path("/"),
 ) -> RunPolicy:
     """The policy of one run of the project cloned at ``clone``.
 
@@ -212,7 +213,7 @@ def build_policy(
     hard = [repos_root, *_server_state(backend_dir, repo_root, database_url)]
     regions = [server_home, *(Path(p) for p in _SHARED_TMP)]
 
-    read_only, listable = readable_complement([*hard, *regions])
+    read_only, listable = readable_complement([*hard, *regions], fs_root)
     carve_outs = [
         repo_root,
         *interpreter_dirs,
