@@ -1,8 +1,9 @@
 """Server-side agent run execution.
 
 Replaces the Electron AgentManager in server mode: runs are queued and
-executed on the server as ``python run.py --spec <name> --project-dir
-<server clone>`` subprocesses, tracked in the ``agent_runs`` table, and
+executed on the server as subprocesses (``runners/spec_runner.py`` for the
+``spec`` phase, ``run.py`` for the others; see :func:`build_command`), never
+interactive, tracked in the ``agent_runs`` table, and
 streamed to clients through the existing WebSocket pipeline (the agent's
 streaming wrapper authenticates with the injected WORKPILOT_WS_TOKEN).
 
@@ -16,8 +17,10 @@ Concurrency model:
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import sys
+import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -33,12 +36,77 @@ logger = logging.getLogger(__name__)
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 
-#: Extra args per phase, mirroring what the Electron AgentManager passes.
+#: Extra ``run.py`` args per phase, mirroring what the Electron AgentManager
+#: passes. A run is never interactive (stdin is closed): ``--auto-continue``
+#: answers the build's own prompts, and the spec approval the build checks is
+#: given on the card (``shared_board``) or by spec creation when the card asks
+#: for no review, never by ``--force``.
 PHASE_ARGS: dict[str, list[str]] = {
-    "build": [],
+    "build": ["--auto-continue"],
     "qa": ["--qa"],
     "merge": ["--merge"],
+    "pr": ["--create-pr"],
 }
+
+#: Writes the spec (and its plan) from the card's description, then stops:
+#: ``runners/spec_runner.py --no-build``.
+SPEC_PHASE = "spec"
+PHASES: tuple[str, ...] = (SPEC_PHASE, *PHASE_ARGS)
+
+
+def _json_file(path: Path) -> dict:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def build_command(
+    phase: str, spec_name: str, server_path: str, model: str | None, scratch: Path
+) -> list[str]:
+    """The argv of one run. `scratch` is a private directory the run may use."""
+    if phase == SPEC_PHASE:
+        spec_dir = Path(server_path) / ".workpilot" / "specs" / spec_name
+        requirements = _json_file(spec_dir / "requirements.json")
+        metadata = _json_file(spec_dir / "task_metadata.json")
+        plan = _json_file(spec_dir / "implementation_plan.json")
+        task = str(
+            requirements.get("task_description")
+            or plan.get("description")
+            or plan.get("feature")
+            or spec_name
+        )
+        # A file, not argv: the description is long and written by a person.
+        task_file = scratch / "task.txt"
+        task_file.write_text(task, encoding="utf-8")
+        cmd = [
+            sys.executable,
+            str(BACKEND_DIR / "runners" / "spec_runner.py"),
+            "--task-file",
+            str(task_file),
+            "--project-dir",
+            server_path,
+            "--spec-dir",
+            str(spec_dir),
+            "--no-build",
+        ]
+        if metadata.get("requireReviewBeforeCoding", True) is False:
+            cmd.append("--auto-approve")
+    else:
+        cmd = [
+            sys.executable,
+            str(BACKEND_DIR / "run.py"),
+            "--spec",
+            spec_name,
+            "--project-dir",
+            server_path,
+            *PHASE_ARGS[phase],
+        ]
+    if model:
+        cmd += ["--model", model]
+    return cmd
+
 
 #: Secrets injected into the run env when the launching user configured them.
 USER_SECRET_ENV: dict[str, str] = {
@@ -111,7 +179,7 @@ class RunManager:
         queueing twenty builds would own the server, since the global semaphore
         cannot tell whose work it is admitting.
         """
-        if phase not in PHASE_ARGS:
+        if phase not in PHASES:
             raise RunManagerError(f"Unknown phase: {phase}")
         if spec.id in self._running_specs:
             raise RunManagerError("A run is already in progress for this spec")
@@ -158,6 +226,10 @@ class RunManager:
             )
         )
         return run
+
+    def is_running(self, spec_id: str) -> bool:
+        """Whether a run is queued or active on this spec."""
+        return spec_id in self._running_specs
 
     async def cancel_run(self, run_id: str) -> bool:
         proc = self._active.get(run_id)
@@ -220,29 +292,23 @@ class RunManager:
                     project_id, spec_id, spec_name, run_id, phase, user_id, "running"
                 )
 
-                cmd = [
-                    sys.executable,
-                    str(BACKEND_DIR / "run.py"),
-                    "--spec",
-                    spec_name,
-                    "--project-dir",
-                    server_path,
-                    *PHASE_ARGS[phase],
-                ]
-                if model:
-                    cmd += ["--model", model]
-
-                env = await self._build_env(user_id, run_id)
-                logger.info("Run %s starting: %s", run_id, " ".join(cmd[:6]))
-                proc = await asyncio.create_subprocess_exec(
-                    *cmd,
-                    cwd=str(BACKEND_DIR),
-                    env=env,
-                    stdout=asyncio.subprocess.DEVNULL,  # agents log to task_logs/WS
-                    stderr=asyncio.subprocess.PIPE,
-                )
-                self._active[run_id] = proc
-                _, stderr = await proc.communicate()
+                with tempfile.TemporaryDirectory(prefix="workpilot-run-") as scratch:
+                    cmd = build_command(
+                        phase, spec_name, server_path, model, Path(scratch)
+                    )
+                    env = await self._build_env(user_id, run_id)
+                    logger.info("Run %s starting: %s", run_id, " ".join(cmd[:6]))
+                    proc = await asyncio.create_subprocess_exec(
+                        *cmd,
+                        cwd=str(BACKEND_DIR),
+                        env=env,
+                        # Never interactive: a prompt would wait forever.
+                        stdin=asyncio.subprocess.DEVNULL,
+                        stdout=asyncio.subprocess.DEVNULL,  # agents log to task_logs/WS
+                        stderr=asyncio.subprocess.PIPE,
+                    )
+                    self._active[run_id] = proc
+                    _, stderr = await proc.communicate()
 
                 if run_id in self._cancelled:
                     # terminate() makes the process exit non-zero; that is a

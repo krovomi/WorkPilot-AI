@@ -223,13 +223,14 @@ def create_card(
         metadata.update(kind=kind, kindSource="user", kindConfidence=1)
 
     try:
-        directory = _write_card(root, title, body, metadata)
+        directory = write_card(root, title, body, metadata)
     except SpecNumberLockError as exc:
         raise ValueError("another card is being numbered; try again") from exc
     return summary(directory)
 
 
-def _write_card(root: Path, title: str, body: str, metadata: dict[str, Any]) -> Path:
+def write_card(root: Path, title: str, body: str, metadata: dict[str, Any]) -> Path:
+    """A backlog card on disk, numbered under the board's lock; its directory."""
     from core.workspace.models import SpecNumberLock
 
     specs = root / SPECS
