@@ -165,7 +165,8 @@ def test_the_light_prompt_inlines_the_spec_and_the_diff(repo):
 
     assert "toto.txt contains OK" in prompt
     assert "+OK" in prompt
-    assert str(spec_dir / "implementation_plan.json") in prompt
+    # The prompt joins with "/" on every OS, as the full QA prompt does.
+    assert f"{spec_dir}/implementation_plan.json" in prompt
     assert "Verdict: APPROVED" in prompt
     assert "{{" not in prompt
     # The point of it: a fraction of the full prompt, and no test run asked.
