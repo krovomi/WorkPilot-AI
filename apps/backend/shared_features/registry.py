@@ -139,4 +139,22 @@ IDEATION = Feature(
     args=_ideation_args,
 )
 
-FEATURES: dict[str, Feature] = {f.key: f for f in (ROADMAP, IDEATION)}
+
+def _index_args(_options: JobOptions) -> list[str]:
+    # The analyzer runs no model: a model or thinking level changes nothing.
+    return []
+
+
+#: The Context view: the project's index, rebuilt by the analyzer. Its
+#: memories are the project's brain, served by ``shared_features.context``.
+CONTEXT = Feature(
+    key="context",
+    directory=".workpilot",
+    files={"project_index.json": 4_000_000},
+    writable=frozenset(),
+    runner="project_index_runner.py",
+    options=JobOptions,
+    args=_index_args,
+)
+
+FEATURES: dict[str, Feature] = {f.key: f for f in (ROADMAP, IDEATION, CONTEXT)}

@@ -93,6 +93,9 @@
 		"showAll": "Show all memories",
 		"brainHint": "Every build writes what it learns to the shared brain — an Obsidian vault every agent reads. It is created on the first write; to use an existing vault or a git remote, open Settings → Integrations → Shared brain.",
 		"reasons.brainNotCreated": "The shared brain does not exist yet",
-		"reasons.brainUnreachable": "The backend could not be reached to read the shared brain"
+		"reasons.brainUnreachable": "The backend could not be reached to read the shared brain",
+		"onServer": "On the server, this project's own",
+		"reasons.serverBrainNotCreated": "No build of this project has learned anything on the server yet",
+		"serverBrainHint": "Every build of this project on the server writes what it learns to the project's own brain there. Every member of the project reads it here."
 	}
 }

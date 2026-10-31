@@ -16,6 +16,7 @@ export const SERVER_PROJECT_VIEWS: ReadonlySet<SidebarView> = new Set<SidebarVie
 	"roadmap",
 	"ideation",
 	"insights",
+	"context",
 	"administration",
 ]);
 

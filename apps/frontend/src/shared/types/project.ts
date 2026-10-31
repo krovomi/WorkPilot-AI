@@ -194,6 +194,8 @@ export interface MemoryStatus {
 	database?: string;
 	dbPath?: string;
 	reason?: string;
+	/** A server project's memory: its own brain, kept on the server. */
+	onServer?: boolean;
 }
 
 export interface MemoryState {

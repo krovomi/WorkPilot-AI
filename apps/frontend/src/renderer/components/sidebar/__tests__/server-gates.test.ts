@@ -8,12 +8,14 @@ describe("server project views", () => {
 		expect(showsView("roadmap", true)).toBe(true);
 		expect(showsView("ideation", true)).toBe(true);
 		expect(showsView("insights", true)).toBe(true);
+		expect(showsView("context", true)).toBe(true);
 		// Views that read or run things on this computer would act on the mirror.
-		for (const view of ["terminals", "github-prs", "context"] as const) {
+		for (const view of ["terminals", "github-prs"] as const) {
 			expect(showsView(view, true)).toBe(false);
 		}
 		expect([...SERVER_PROJECT_VIEWS].sort()).toEqual([
 			"administration",
+			"context",
 			"ideation",
 			"insights",
 			"kanban",

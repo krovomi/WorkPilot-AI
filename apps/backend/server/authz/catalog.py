@@ -289,6 +289,8 @@ FEATURE_DOMAINS: MappingProxyType[str, str] = MappingProxyType(
         "roadmap": "insight",
         "ideation": "insight",
         "insights": "insight",
+        # The Context view: the project's index and its brain's memories.
+        "context": "insight",
         # What a task's attachments and the project's ADRs say. Read-only and
         # addressed like spec_traceability, so it answers to the same domain.
         "docintel": "task",

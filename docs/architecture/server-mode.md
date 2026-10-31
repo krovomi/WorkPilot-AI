@@ -282,9 +282,29 @@ relit la conversation enregistrée ; une tâche suggérée devient une carte du 
 
 Le mode Apprentissage n'est pas encore transmis aux conversations du serveur.
 
+**Le contexte d'un projet est le sien sur le serveur.** Son index (`.workpilot/project_index.json`)
+est un fichier déclaré comme les autres (`registry.CONTEXT`, aucun fichier réécrit par un membre) ;
+le rafraîchir est un job du runner `project_index_runner.py`, l'analyseur du desktop, sans modèle,
+qui remplace le fichier d'un coup. Sa mémoire est le cerveau du projet
+(`run_isolation.project_brain` : `REPOS_ROOT/.run-homes/<projet>/.workpilot/brain`) : chaque run et
+chaque job du projet y apprend, qu'il soit confiné ou non, car le serveur lui pose
+`WORKPILOT_BRAIN_DIR` et `WORKPILOT_BRAIN_CONFIG` (`run_manager.confine`) et retire ceux de son propre
+environnement (`run_env.RUN_ENV`) : sans eux le cerveau serait celui de l'utilisateur du serveur, le
+même pour tous les tenants, et un `WORKPILOT_BRAIN_DIR` d'opérateur aussi. L'onglet Mémoires lit ce
+cerveau par `GET /api/features/context/memories` (`shared_features/context.py`) : les plus récentes,
+ou classées par `query` ; le contenu passe par `redact_text`, et rien ne dit où est le cerveau. Côté
+app, `ipc-handlers/context/server-context.ts` ; le cerveau de la personne sur son ordinateur n'est
+jamais lu pour un projet du serveur.
+
+| Action | Route | Il faut |
+|---|---|---|
+| Lire l'index | `GET /api/features/context/snapshot` | `insight.read` |
+| Reconstruire l'index | `POST /api/features/context/jobs` | `agent.execute`, rôle `member` ou plus |
+| Lire, chercher les mémoires | `GET /api/features/context/memories` | `insight.read` |
+
 ## Ce qui vient
 
 Le plan multi-tenant du 31 octobre, par lots : les autres features servies de la même façon
-(contexte, forges, analyses, tableau de bord), le flux du projet ouvert pour
+(forges, analyses, tableau de bord), le flux du projet ouvert pour
 chaque vue partagée, un test de bout en bout à deux organisations, et le guide d'exploitation. Ce
 fichier grandit avec chaque lot.

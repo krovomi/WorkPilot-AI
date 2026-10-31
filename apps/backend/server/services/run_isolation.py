@@ -91,6 +91,30 @@ def project_home(repos_root: Path, project_id: str) -> Path:
     return repos_root / RUN_HOMES_DIR / project_id
 
 
+#: Where the brain finds itself and its settings (``brain.home``): set for
+#: each run, whatever the server's own environment says.
+BRAIN_DIR_ENV = "WORKPILOT_BRAIN_DIR"
+BRAIN_CONFIG_ENV = "WORKPILOT_BRAIN_CONFIG"
+
+
+def project_brain(repos_root: Path, project_id: str) -> Path:
+    """The project's memory: the brain its runs learn into and its members
+    read (``shared_features.context``). In its project's home, so a confined
+    run writes it and no other project's run reads it."""
+    return project_home(repos_root, project_id) / ".workpilot" / "brain"
+
+
+def project_brain_env(repos_root: Path, project_id: str) -> dict[str, str]:
+    """The variables that point a run at its project's brain, with or without
+    isolation: unset, the brain would be the server user's, one for every
+    tenant, and an operator's ``WORKPILOT_BRAIN_DIR`` would be the same."""
+    brain = project_brain(repos_root, project_id)
+    return {
+        BRAIN_DIR_ENV: str(brain),
+        BRAIN_CONFIG_ENV: str(brain.parent / "brain.json"),
+    }
+
+
 @dataclass(frozen=True)
 class RunPolicy:
     read_only: tuple[str, ...]
