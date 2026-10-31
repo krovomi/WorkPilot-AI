@@ -196,14 +196,14 @@ def test_the_run_manager_confines_each_run_unless_turned_off(tmp_path, monkeypat
     server_config.reset_settings_cache()
     try:
         env: dict[str, str] = {}
-        cmd = run_manager._confine(
+        cmd = run_manager.confine(
             ["python", "run.py"], "proj-a", str(paths["mine"]), paths["scratch"], env
         )
         assert cmd[-2:] == ["python", "run.py"] and str(_CONFINE) in cmd
         assert env["HOME"] == str(project_home(paths["repos"], "proj-a"))
 
         monkeypatch.setenv(ISOLATION_ENV, "off")
-        assert run_manager._confine(
+        assert run_manager.confine(
             ["python", "run.py"], "proj-a", str(paths["mine"]), paths["scratch"], {}
         ) == ["python", "run.py"]
     finally:

@@ -284,6 +284,9 @@ FEATURE_DOMAINS: MappingProxyType[str, str] = MappingProxyType(
         "spec_traceability": "task",
         # The cards of a server-mode project's shared board (shared_board/).
         "board": "task",
+        # A server project's shared features (shared_features/): their files
+        # and their jobs. Each answers to the domain its view belongs to.
+        "roadmap": "insight",
         # What a task's attachments and the project's ADRs say. Read-only and
         # addressed like spec_traceability, so it answers to the same domain.
         "docintel": "task",

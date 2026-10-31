@@ -28,8 +28,14 @@ import { slugifySpecTitle } from "../../shared/utils/spec-slug";
 import { debugError, debugLog } from "../../shared/utils/debug-logger";
 import type { AgentManager } from "../agent";
 import type { RoadmapConfig } from "../agent/types";
-import { projectStore } from "../project-store";
+import { isActiveJob, pullFeature } from "../server-features";
 import { getPageFeatureSettings } from "../services/page-llm-config";
+import {
+	convertOnServer,
+	refreshServerRoadmap,
+	roadmapProject,
+	saveServerRoadmap,
+} from "./roadmap/server-roadmap";
 import { safeSendToRenderer } from "./utils";
 
 /**
@@ -46,10 +52,12 @@ export function registerRoadmapHandlers(
 	ipcMain.handle(
 		IPC_CHANNELS.ROADMAP_GET,
 		async (_, projectId: string): Promise<IPCResult<Roadmap | null>> => {
-			const project = projectStore.getProject(projectId);
+			const project = roadmapProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
 			}
+			const unreadable = await refreshServerRoadmap(project);
+			if (unreadable) return { success: false, error: unreadable };
 
 			const roadmapPath = path.join(
 				project.path,
@@ -223,7 +231,17 @@ export function registerRoadmapHandlers(
 			_,
 			projectId: string,
 		): Promise<IPCResult<{ isRunning: boolean }>> => {
-			const isRunning = agentManager.isRoadmapRunning(projectId);
+			let isRunning = agentManager.isRoadmapRunning(projectId);
+			const project = isRunning ? undefined : roadmapProject(projectId);
+			if (project?.remote) {
+				// A teammate's job on the server: follow it like one started here.
+				const pulled = await pullFeature(project, "roadmap");
+				const job = pulled.success ? pulled.data?.job ?? null : null;
+				if (isActiveJob(job)) {
+					agentManager.followServerRoadmap(project, job.id);
+					isRunning = true;
+				}
+			}
 			debugLog("[Roadmap Handler] Get status:", { projectId, isRunning });
 			return { success: true, data: { isRunning } };
 		},
@@ -254,7 +272,7 @@ export function registerRoadmapHandlers(
 			const mainWindow = getMainWindow();
 			if (!mainWindow) return;
 
-			const project = projectStore.getProject(projectId);
+			const project = roadmapProject(projectId);
 			if (!project) {
 				debugError("[Roadmap Handler] Project not found:", projectId);
 				safeSendToRenderer(
@@ -321,7 +339,7 @@ export function registerRoadmapHandlers(
 			const mainWindow = getMainWindow();
 			if (!mainWindow) return;
 
-			const project = projectStore.getProject(projectId);
+			const project = roadmapProject(projectId);
 			if (!project) {
 				safeSendToRenderer(
 					getMainWindow,
@@ -386,7 +404,10 @@ export function registerRoadmapHandlers(
 	ipcMain.handle(
 		IPC_CHANNELS.ROADMAP_SAVE,
 		async (_, projectId: string, roadmapData: Roadmap): Promise<IPCResult> => {
-			const project = projectStore.getProject(projectId);
+			// A server roadmap is saved over the version the person saw (the
+			// mirror as last read), so a teammate's save in between is refused
+			// rather than overwritten.
+			const project = roadmapProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
 			}
@@ -437,7 +458,7 @@ export function registerRoadmapHandlers(
 					"utf-8",
 				);
 
-				return { success: true };
+				return await saveServerRoadmap(project);
 			} catch (error) {
 				return {
 					success: false,
@@ -456,10 +477,13 @@ export function registerRoadmapHandlers(
 			featureId: string,
 			status: RoadmapFeatureStatus,
 		): Promise<IPCResult> => {
-			const project = projectStore.getProject(projectId);
+			// One feature's status: applied to the server's latest roadmap.
+			const project = roadmapProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
 			}
+			const unreadable = await refreshServerRoadmap(project);
+			if (unreadable) return { success: false, error: unreadable };
 
 			const roadmapPath = path.join(
 				project.path,
@@ -493,7 +517,7 @@ export function registerRoadmapHandlers(
 
 				writeFileSync(roadmapPath, JSON.stringify(roadmap, null, 2), "utf-8");
 
-				return { success: true };
+				return await saveServerRoadmap(project);
 			} catch (error) {
 				return {
 					success: false,
@@ -511,10 +535,12 @@ export function registerRoadmapHandlers(
 			projectId: string,
 			featureId: string,
 		): Promise<IPCResult<Task>> => {
-			const project = projectStore.getProject(projectId);
+			const project = roadmapProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
 			}
+			// The server makes the card on the shared board and links it.
+			if (project.remote) return convertOnServer(project, featureId);
 
 			const roadmapPath = path.join(
 				project.path,
@@ -691,7 +717,7 @@ ${(feature.acceptance_criteria || []).map((c: string) => `- [ ] ${c}`).join("\n"
 			projectId: string,
 			progressData: PersistedRoadmapProgress,
 		): Promise<IPCResult> => {
-			const project = projectStore.getProject(projectId);
+			const project = roadmapProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
 			}
@@ -749,7 +775,7 @@ ${(feature.acceptance_criteria || []).map((c: string) => `- [ ] ${c}`).join("\n"
 			_,
 			projectId: string,
 		): Promise<IPCResult<PersistedRoadmapProgress | null>> => {
-			const project = projectStore.getProject(projectId);
+			const project = roadmapProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
 			}
@@ -820,7 +846,7 @@ ${(feature.acceptance_criteria || []).map((c: string) => `- [ ] ${c}`).join("\n"
 	ipcMain.handle(
 		IPC_CHANNELS.ROADMAP_PROGRESS_CLEAR,
 		async (_, projectId: string): Promise<IPCResult> => {
-			const project = projectStore.getProject(projectId);
+			const project = roadmapProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
 			}

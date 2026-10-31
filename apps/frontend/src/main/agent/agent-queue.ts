@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import type { EventEmitter } from "node:events";
 import {
 	existsSync,
@@ -9,7 +9,7 @@ import {
 } from "node:fs";
 import path from "node:path";
 import { AUTO_BUILD_PATHS } from "../../shared/constants";
-import type { Idea, IdeationConfig } from "../../shared/types";
+import type { Idea, IdeationConfig, Project } from "../../shared/types";
 import { stripAnsiCodes } from "../../shared/utils/ansi-sanitizer";
 import { debugError, debugLog } from "../../shared/utils/debug-logger";
 import { clearKeychainCache } from "../claude-profile/credential-utils";
@@ -24,6 +24,8 @@ import { transformRoadmapFromSnakeCase } from "../ipc-handlers/roadmap/transform
 import { getPathDelimiter } from "../platform";
 import { parsePythonCommand } from "../python-detector";
 import { pythonEnvManager } from "../python-env-manager";
+import { relayServerJob } from "../server-features";
+import { getServerProject } from "../server-projects";
 import {
 	createSDKRateLimitInfo,
 	detectRateLimit,
@@ -241,6 +243,23 @@ export class AgentQueueManager {
 			refreshCompetitorAnalysis,
 			config,
 		});
+
+		const serverProject = getServerProject(projectId);
+		if (serverProject) {
+			// Server mode: the server runs the roadmap on its clone.
+			await this.followServerRoadmap(serverProject, {
+				options: {
+					refresh,
+					competitor_analysis: enableCompetitorAnalysis,
+					refresh_competitor_analysis: refreshCompetitorAnalysis,
+					...(config?.model ? { model: config.model } : {}),
+					...(config?.thinkingLevel
+						? { thinking_level: config.thinkingLevel }
+						: {}),
+				},
+			});
+			return;
+		}
 
 		const autoBuildSource = this.processManager.getAutoBuildSourcePath();
 
@@ -816,37 +835,14 @@ export class AgentQueueManager {
 	/**
 	 * Spawn a Python process for roadmap generation
 	 */
-	private async spawnRoadmapProcess(
-		projectId: string,
+	/** The roadmap runner, started on this computer for a local project. */
+	private async spawnLocalRoadmap(
 		projectPath: string,
 		args: string[],
-	): Promise<void> {
-		debugLog("[Agent Queue] Spawning roadmap process:", {
-			projectId,
-			projectPath,
-		});
-
+	): Promise<ChildProcess> {
 		// Run from auto-claude source directory so imports work correctly
 		const autoBuildSource = this.processManager.getAutoBuildSourcePath();
 		const cwd = autoBuildSource || process.cwd();
-
-		// Ensure Python environment is ready before spawning
-		if (!(await this.ensurePythonEnvReady(projectId, "roadmap-error"))) {
-			return;
-		}
-
-		// Kill existing process for this project if any
-		const wasKilled = this.processManager.killProcess(projectId);
-		if (wasKilled) {
-			debugLog(
-				"[Agent Queue] Killed existing roadmap process for project:",
-				projectId,
-			);
-		}
-
-		// Generate unique spawn ID for this process instance
-		const spawnId = this.state.generateSpawnId();
-		debugLog("[Agent Queue] Generated roadmap spawn ID:", spawnId);
 
 		// Get combined environment variables
 		const combinedEnv = this.processManager.getCombinedEnv(projectPath);
@@ -921,10 +917,64 @@ export class AgentQueueManager {
 
 		// Parse Python command to handle space-separated commands like "py -3"
 		const [pythonCommand, pythonBaseArgs] = parsePythonCommand(pythonPath);
-		const childProcess = spawn(pythonCommand, [...pythonBaseArgs, ...args], {
+		return spawn(pythonCommand, [...pythonBaseArgs, ...args], {
 			cwd,
 			env: finalEnv,
 		});
+	}
+
+	/**
+	 * Follow a server project's roadmap job (server mode): one started here
+	 * with `options`, or a teammate's already running (`jobId`). The job runs
+	 * on the server; its relay is followed like the local runner, so progress,
+	 * completion and stop take the same path.
+	 */
+	async followServerRoadmap(
+		project: Project,
+		start: { options: Record<string, unknown> } | { jobId: string },
+	): Promise<void> {
+		await this.spawnRoadmapProcess(project.id, project.path, [], () =>
+			// The relay has what the handlers below use of a child process:
+			// stdout, stderr, exit and kill.
+			relayServerJob(project, "roadmap", start) as unknown as ChildProcess,
+		);
+	}
+
+	private async spawnRoadmapProcess(
+		projectId: string,
+		projectPath: string,
+		args: string[],
+		remote?: () => ChildProcess,
+	): Promise<void> {
+		debugLog("[Agent Queue] Spawning roadmap process:", {
+			projectId,
+			projectPath,
+		});
+
+		// Ensure Python environment is ready before spawning
+		if (
+			!remote &&
+			!(await this.ensurePythonEnvReady(projectId, "roadmap-error"))
+		) {
+			return;
+		}
+
+		// Kill existing process for this project if any
+		const wasKilled = this.processManager.killProcess(projectId);
+		if (wasKilled) {
+			debugLog(
+				"[Agent Queue] Killed existing roadmap process for project:",
+				projectId,
+			);
+		}
+
+		// Generate unique spawn ID for this process instance
+		const spawnId = this.state.generateSpawnId();
+		debugLog("[Agent Queue] Generated roadmap spawn ID:", spawnId);
+
+		const childProcess = remote
+			? remote()
+			: await this.spawnLocalRoadmap(projectPath, args);
 
 		this.state.addProcess(projectId, {
 			taskId: projectId,

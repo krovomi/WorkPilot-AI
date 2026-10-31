@@ -5,13 +5,15 @@ import { useServerSessionStore } from "@/stores/server-session-store";
 import type { SidebarView } from "../Sidebar";
 
 /**
- * The views a server project offers (server mode). Its board is the server's
- * and its runs run there; a view that reads or runs things on this computer
- * would act on the app's mirror of the board, so it stays hidden until the
- * view works through the server (`docs/architecture/server-mode.md`).
+ * The views a server project offers (server mode). Its board and its shared
+ * features are the server's and their agents run there; a view that reads or
+ * runs things on this computer would act on the app's mirror, so it stays
+ * hidden until the view works through the server
+ * (`docs/architecture/server-mode.md`).
  */
 export const SERVER_PROJECT_VIEWS: ReadonlySet<SidebarView> = new Set<SidebarView>([
 	"kanban",
+	"roadmap",
 	"administration",
 ]);
 

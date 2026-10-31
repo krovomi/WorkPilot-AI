@@ -48,6 +48,10 @@ class EventType(str, Enum):
     SPEC_UPDATED = "spec_updated"
     SPEC_DELETED = "spec_deleted"
     SPEC_APPROVED = "spec_approved"
+    # A shared feature of the project (``shared_features``): a file a member
+    # rewrote, and a job's status as it starts and ends.
+    FEATURE_UPDATED = "feature_updated"
+    FEATURE_JOB = "feature_job"
     MEMBER_PRESENCE = "member_presence"
 
 

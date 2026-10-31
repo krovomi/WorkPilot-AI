@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import type { IdeationConfig } from "../../shared/types";
+import type { IdeationConfig, Project } from "../../shared/types";
 import { getOperationRegistry } from "../claude-profile/operation-registry";
 import type { ClaudeProfileManager } from "../claude-profile-manager";
 import {
@@ -747,6 +747,11 @@ export class AgentManager extends EventEmitter {
 	 */
 	isRoadmapRunning(projectId: string): boolean {
 		return this.queueManager.isRoadmapRunning(projectId);
+	}
+
+	/** Follow a teammate's roadmap job on the server (server mode). */
+	followServerRoadmap(project: Project, jobId: string): void {
+		void this.queueManager.followServerRoadmap(project, { jobId });
 	}
 
 	/**
