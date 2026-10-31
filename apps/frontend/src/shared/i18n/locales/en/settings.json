@@ -1252,7 +1252,11 @@
 			"title": "Page usage",
 			"reset": "Reset",
 			"description": "Visits and time spent per page, kept on this machine only.",
-			"row": "{{visits}} visits · {{minutes}} min"
+			"row": "{{visits}} visits · {{minutes}} min",
+			"export": "Export JSON",
+			"since": "Counting since {{date}}.",
+			"neverOpenedTitle": "Experimental pages never opened",
+			"allOpened": "Every experimental page has been opened at least once."
 		}
 	},
 	"projectSettings": {

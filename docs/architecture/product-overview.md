@@ -71,7 +71,10 @@ hide all of them. The list lives in
 column below marks the same views, and the test fails when the two differ or
 when an experimental view has a design file. A view leaves the list when it
 gets a design file or a test; none is removed before usage data says which
-to keep.
+to keep. That data is local: Settings → Debug & Logs counts visits and time per
+page since a date it shows, lists the experimental pages never opened, and
+exports it all as JSON (`buildViewUsageReport`,
+`apps/frontend/src/renderer/stores/view-usage-store.ts`).
 
 | View | Label | Group | Design | Experimental |
 |---|---|---|---|---|

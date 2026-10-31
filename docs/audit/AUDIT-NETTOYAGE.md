@@ -1177,7 +1177,9 @@ commandes ne consomme plus le choix « reprendre avec X ». `core/client.py` n'e
 **Instrumenté, décision en attente.** `renderer/stores/view-usage-store.ts` compte les visites et le
 temps passé par vue (plafonné à 30 min par visite), en `localStorage`, sans rien envoyer. `App.tsx`
 l'alimente à chaque changement de vue ; Réglages → Debug & Logs affiche le classement et permet de
-le remettre à zéro. Garde-fou : `stores/__tests__/view-usage-store.test.ts`. **Aucune vue n'est
+le remettre à zéro ; depuis le plan du 29 octobre (T5), il affiche aussi la date de début du
+comptage et les pages expérimentales jamais ouvertes, et exporte le tout en JSON. Garde-fou :
+`stores/__tests__/view-usage-store.test.ts`. **Aucune vue n'est
 retirée ou regroupée** : le cahier l'interdit sans donnée d'usage, et choisir quelles pages
 regrouper ou passer en plugin revient au mainteneur une fois les données collectées.
 
