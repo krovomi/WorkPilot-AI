@@ -87,7 +87,13 @@ async def fetch_project(server_path: str) -> None:
 
 
 def delete_clone(project_id: str) -> None:
+    """Delete the clone and the home its runs kept (build memory, caches)."""
+    from server.services.run_isolation import project_home
+
     dest = project_clone_path(project_id)
     if dest.exists():
         shutil.rmtree(dest, ignore_errors=True)
         logger.info("Deleted server clone %s", dest)
+    home = project_home(get_settings().repos_root, project_id)
+    if home.exists():
+        shutil.rmtree(home, ignore_errors=True)

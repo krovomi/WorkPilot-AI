@@ -79,6 +79,7 @@ génération de tests ;
 | `foundation/api_safety.py` | chemins acceptés par l'API locale |
 | `offline_policy/` | hors-ligne strict (`airgapStrict`) |
 | `os_sandbox/` | bac à sable de l'OS autour des commandes d'agent : bubblewrap, Seatbelt, proxy filtrant ([conception](../../docs/architecture/os-sandbox.md)) |
+| `foundation/landlock.py`, `server/services/run_isolation.py`, `runners/confined_run.py` | mode serveur : chaque run confiné par Landlock à son clone, au home de son projet et à son dossier temporaire ([conception](../../docs/architecture/server-mode.md#ce-quun-run-voit-sur-le-disque)) |
 | `foundation/log_redaction.py` | filtre de redaction des logs |
 
 ## Mémoire, apprentissage, autonomie

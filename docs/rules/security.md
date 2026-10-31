@@ -134,7 +134,7 @@ l'UI n'existe pas.
   `tests/backend/test_project_scope_coverage.py` balaie paramètres et corps de chaque route.
 - Le projet d'un autre tenant répond 404, jamais 403. Le flux en direct et les runs tiennent la même
   frontière : un canal ne s'ouvre qu'aux membres de son projet, un run démarre sans les variables du
-  serveur ([server-mode.md](../architecture/server-mode.md), `ws_channels.py`, `run_env.py`).
+  serveur et ne voit sur le disque que son projet ([server-mode.md](../architecture/server-mode.md), `run_isolation.py`).
 - Le backend écoute sur `127.0.0.1` ; CORS est une liste explicite. Ni `0.0.0.0`, ni `*`.
 - Échec fermé : si le mode serveur ne se monte pas, le backend ne démarre pas
   (`tests/backend/test_server_mode_fail_closed.py`).
