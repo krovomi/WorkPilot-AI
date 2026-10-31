@@ -8,6 +8,7 @@ approval or max iterations.
 
 import asyncio
 import os
+import subprocess
 import time as time_module
 from dataclasses import dataclass
 from enum import Enum
@@ -17,7 +18,9 @@ from typing import Any
 from core.client import create_agent_client
 from core.progress import count_subtasks, is_build_complete
 from core.task_event import TaskEventEmitter
+from foundation.base_branch import detect_base_branch
 from foundation.build_signals import BuildPaused
+from foundation.change_scope import ChangeScope, change_scope
 from foundation.debug import (
     debug,
     debug_error,
@@ -287,6 +290,9 @@ class _QaState:
     # The last reviewer error, fed back to the next pass for self-correction.
     last_error_context: dict | None = None
     max_iterations_emitted: bool = False
+    # The change set the last reviewer pass judged (`foundation.change_scope`).
+    # Read by the coverage gate: a text-only change has no coverage to measure.
+    review_scope: ChangeScope | None = None
 
     def reset_errors(self) -> None:
         self.consecutive_errors = 0
@@ -519,7 +525,7 @@ async def run_qa_validation_loop(
             )
             gate = await _architecture_gate(
                 scope, state.qa_iteration, qa_model
-            ) or _coverage_gate(spec_dir, state.qa_iteration)
+            ) or _coverage_gate(spec_dir, state.qa_iteration, state.review_scope)
             if gate is None and goal is not None:
                 goal_gate = _goal_gate(scope, state, goal)
                 if goal_gate is _Next.FAILED:
@@ -831,6 +837,7 @@ async def _run_reviewer(
     spec_dir = scope.spec_dir
     qa_thinking_budget = get_phase_thinking_budget(spec_dir, "qa")
     qa_provider = get_phase_provider(spec_dir, phase="qa")
+    state.review_scope = review_scope = _review_scope(scope)
     debug(
         "qa_loop",
         "Creating client for QA reviewer session...",
@@ -845,6 +852,9 @@ async def _run_reviewer(
             agent_type="qa_reviewer",
             max_thinking_tokens=qa_thinking_budget,
             provider=qa_provider,
+            # A text-only change has nothing for a test-runner subagent to
+            # run: its roster would be context billed on every turn.
+            use_subagents=not review_scope.is_light,
         )
     except Exception as e:
         debug_error("qa_loop", f"Failed to create QA reviewer client: {e}")
@@ -871,6 +881,7 @@ async def _run_reviewer(
                 scope.verbose,
                 jev_advice=advice,
                 previous_error=state.last_error_context,  # Pass error context for self-correction
+                review_scope=review_scope,
             )
     except Exception as e:
         # Prompt-too-long errors are not retryable — the conversation
@@ -898,6 +909,34 @@ async def _run_reviewer(
         status = "error"
         response = str(e)
     return status, response, client
+
+
+def _review_scope(scope: _QaScope) -> ChangeScope:
+    """How much review this pass's change set calls for, written to the task log.
+
+    Read again on every pass: a fixer that touched code after a text-only
+    first pass turns the next review into a full one.
+    """
+    try:
+        review_scope = change_scope(
+            scope.project_dir, detect_base_branch(scope.spec_dir, scope.project_dir)
+        )
+    except (OSError, ValueError, subprocess.SubprocessError) as exc:
+        # Unknown is never light.
+        debug_warning("qa_loop", f"Change scope unavailable, full review: {exc}")
+        return ChangeScope("full", "change scope unavailable")
+    if review_scope.is_light:
+        message = (
+            f"QA scope: light ({review_scope.reason}: "
+            f"{', '.join(review_scope.files)}) — the reviewer checks the change "
+            "against the spec; no test suite, coverage or repository scan."
+        )
+    else:
+        message = f"QA scope: full ({review_scope.reason})."
+    print(f"\n🔎 {message}")
+    if scope.task_logger:
+        scope.task_logger.log(message, LogEntryType.INFO, LogPhase.VALIDATION)
+    return review_scope
 
 
 def _halted_on_prompt_too_long(
@@ -1068,7 +1107,9 @@ async def _architecture_gate(
     return None
 
 
-def _coverage_gate(spec_dir: Path, qa_iteration: int) -> tuple[list[dict], str] | None:
+def _coverage_gate(
+    spec_dir: Path, qa_iteration: int, review_scope: ChangeScope | None = None
+) -> tuple[list[dict], str] | None:
     """Coverage Enforcement Gate, run once QA and architecture approve.
 
     Enforces the minimum test coverage threshold (default 100% for unit +
@@ -1076,7 +1117,16 @@ def _coverage_gate(spec_dir: Path, qa_iteration: int) -> tuple[list[dict], str] 
     numbers recorded by the QA reviewer in qa_signoff.coverage. Controlled by
     WORKPILOT_QA_MIN_COVERAGE (0 = disabled). Returns the issues and the
     verdict of a rejection, or None.
+
+    Not applicable when git showed a text-only change set: no source file
+    changed, so coverage cannot have moved, and demanding a measurement is
+    what sent the reviewer to run every suite of the repository with
+    coverage for a `.txt`. Decided from `review_scope` (git), never from what
+    the reviewer wrote in its sign-off.
     """
+    if review_scope is not None and review_scope.is_light:
+        debug("qa_loop", "Coverage gate not applicable: text-only change set")
+        return None
     try:
         from .coverage_gate import (
             build_coverage_issues,

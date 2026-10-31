@@ -9,8 +9,12 @@ Supports dynamic prompt assembly based on project type for context optimization.
 import json
 import re
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from foundation.base_branch import detect_base_branch
+
+if TYPE_CHECKING:
+    from foundation.change_scope import ChangeScope
 
 from .project_context import (
     detect_project_capabilities,
@@ -445,6 +449,60 @@ This shows only changes made in the spec branch since it diverged from `{base_br
         base_prompt += "\n\n---\n\n".join(mcp_sections)
 
     return spec_context + base_prompt
+
+
+#: What the light review inlines, so the reviewer reads the evidence from its
+#: prompt instead of spending turns (and context) fetching it.
+LIGHT_QA_SPEC_MAX_CHARS = 8_000
+LIGHT_QA_DIFF_MAX_CHARS = 12_000
+
+
+def get_qa_reviewer_light_prompt(
+    spec_dir: Path, project_dir: Path, scope: "ChangeScope"
+) -> str:
+    """The QA reviewer prompt for a change set of text files only.
+
+    `foundation.change_scope` decided from git that nothing a program reads
+    changed. The full prompt would still send the reviewer to start the dev
+    environment, run every suite with coverage and grep the whole repository;
+    this one inlines the spec and the diff and asks the one question left:
+    is this the change the spec asked for. Same sign-off contract, same
+    verdict line, so the loop reads it like any other pass.
+    """
+    from foundation.change_scope import change_diff
+
+    try:
+        spec = (spec_dir / "spec.md").read_text(encoding="utf-8")
+    except OSError:
+        spec = f"(spec.md not readable — read `{spec_dir}/spec.md`)"
+    if len(spec) > LIGHT_QA_SPEC_MAX_CHARS:
+        spec = (
+            spec[:LIGHT_QA_SPEC_MAX_CHARS]
+            + f"\n\n[... truncated: read `{spec_dir}/spec.md` for the rest ...]"
+        )
+    diff = change_diff(project_dir, scope, LIGHT_QA_DIFF_MAX_CHARS) or (
+        "(diff unavailable — read the changed files)"
+    )
+    files = ", ".join(f"`{f}`" for f in scope.files)
+    base_branch = detect_base_branch(spec_dir, project_dir)
+    prompt = _load_prompt_file("qa_reviewer_light.md")
+    for key, value in (
+        ("{{BASE_BRANCH}}", base_branch),
+        ("{{SPEC_DIR}}", str(spec_dir)),
+        ("{{FILES}}", files),
+    ):
+        prompt = prompt.replace(key, value)
+    # Spec and diff last: they are data, and must not be scanned for
+    # placeholders themselves.
+    prompt = prompt.replace("{{SPEC}}", spec.replace("{{", "{ {"), 1)
+    prompt = prompt.replace("{{DIFF}}", diff.replace("```", "``​`"), 1)
+    header = (
+        "## SPEC LOCATION\n\n"
+        f"- Spec: `{spec_dir}/spec.md`\n"
+        f"- Implementation plan: `{spec_dir}/implementation_plan.json`\n\n"
+        f"The project root is: `{project_dir}`\n\n---\n\n"
+    )
+    return header + prompt
 
 
 def get_qa_fixer_prompt(spec_dir: Path, project_dir: Path) -> str:

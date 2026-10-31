@@ -17,6 +17,7 @@ import os
 import re
 from pathlib import Path
 
+from foundation.change_scope import is_text_only_path
 from foundation.dotnet_tools import generate_dotnet_env_section
 
 # Stack-aware automatic test planning (API contract / WinForms UI / web E2E
@@ -57,8 +58,18 @@ def subtask_is_tdd_eligible(subtask: dict, phase: dict) -> bool:
 
     Eligible when its verification can be proven by an automated test/command
     and the phase actually produces production code. Manual/none/browser
-    verifications and investigation/setup/cleanup phases keep the classic flow.
+    verifications and investigation/setup/cleanup phases keep the classic flow,
+    and so does a subtask whose files are all plain text or documentation
+    (`foundation.change_scope.is_text_only_path`): there is no behaviour to
+    drive with a test, and a test asserting a `.txt` holds "OK" restates the
+    file at the price of a full red-green-refactor session.
     """
+    files = [
+        *(subtask.get("files_to_create") or []),
+        *(subtask.get("files_to_modify") or []),
+    ]
+    if files and all(isinstance(f, str) and is_text_only_path(f) for f in files):
+        return False
     verification = subtask.get("verification") or {}
     v_type = (verification.get("type") or "manual").lower()
     phase_type = (phase.get("type") or "").lower()
@@ -635,7 +646,9 @@ produce so the coding agent can work test-first:
    the coder knows to enforce the red-green-refactor cycle.
 
 Setup, investigation, cleanup, and purely manual/visual subtasks are exempt and keep
-their normal verification.
+their normal verification. So is a subtask that only creates or edits plain text or
+documentation (`.txt`, `.md`, `.rst`, README, LICENSE…): no test file, no `"tdd"`
+flag — give it a one-line `command` verification that reads the file instead.
 """
 
 

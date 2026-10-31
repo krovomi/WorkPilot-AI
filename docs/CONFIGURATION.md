@@ -429,6 +429,7 @@ environment wins:
 | --- | ---: | --- |
 | `WORKPILOT_QA_MAX_ITERATIONS` | by effort | Review passes a task may run, whatever its QA effort. Capped at 50; a value below 1 or that is not a number is ignored. |
 | `WORKPILOT_QA_RECURRING_THRESHOLD` | 8 | Occurrences of the same issue, across passes, that make QA escalate to a human. Bounded by the budget; a value below 2 or that is not a number falls back to 8. |
+| `WORKPILOT_QA_LIGHT` | 1 | `0` reviews every task in full, text-only changes included (see *Text-only changes* below). |
 | `WORKPILOT_QA_MIN_COVERAGE` | 100 | Minimum coverage, in percent, of the `unit` **and** `integration` tests; `e2e` below it only warns. `0` disables the gate. Clamped to 0–100; a value that is not a number falls back to 100. |
 
 ### Review budget
@@ -461,6 +462,21 @@ gaps, then a new review runs, within the task's QA budget. A project without int
 tests never passes at 100: lower the threshold or set it to `0`. The same value is written
 into the spec writer, planner, QA reviewer and QA fixer prompts, so the agents aim at the
 threshold the gate enforces.
+
+### Text-only changes
+
+Before each review pass, the loop reads the task's change set from git
+([apps/backend/foundation/change_scope.py](../apps/backend/foundation/change_scope.py)):
+committed, uncommitted and untracked files since the base branch. When every changed file is
+plain text or documentation (`.txt`, `.md`, `.rst`, `.adoc`, README, LICENSE…), at most
+10 files and 400 changed lines, the pass is a **light review**: the reviewer gets the spec and
+the diff inline (`prompts/qa_reviewer_light.md`) and checks the change against the acceptance
+criteria, without the dev environment, the test suites, coverage, repository scans, the
+subagent roster or the project memory. The coverage gate does not apply: no source file
+changed. JSON, YAML, TOML, XML, `.env`, project files and scripts are read by a program and
+always get the full review, and so does a change set git cannot read. The decision is made
+from git and file names only, so it is the same for every provider and model. With strict TDD
+on, a subtask whose files are all text-only is not run as a red-green-refactor cycle either.
 
 ## Verification loop (`verify`)
 
