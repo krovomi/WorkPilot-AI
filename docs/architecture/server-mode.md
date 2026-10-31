@@ -49,6 +49,15 @@ secrets d'intégration. Les identifiants de provider posés pour les builds pass
 du déploiement. La liste est tenue par un test qui lit chaque `WORKPILOT_*` du paquet `server` et
 refuse une variable non classée : une nouvelle variable ne fuit pas par défaut.
 
+**Les jetons d'intégration sont ceux de la personne** (`server/services/secrets.py`, chiffrés par
+Fernet) : son jeton GitHub ou GitLab, sa clé Jira ou Linear, son PAT Azure DevOps. Chacun les pose
+dans l'app (Réglages → Intégrations → Mes jetons sur le serveur, `ServerTokensSettings.tsx`, par
+`main/server-user-secrets.ts`) ; le serveur ne dit ensuite que lesquels sont posés, jamais leur
+valeur, et `PUT /users/me/secrets` vérifie la valeur lui-même plutôt que par le modèle, dont
+l'erreur citerait le jeton. Un run reçoit les jetons de qui l'a lancé (`USER_SECRET_ENV`), et le
+sien remplace celui que l'opérateur aurait posé pour le déploiement : ce qu'il fait sur une forge
+ou un outil de tickets est fait au nom de cette personne.
+
 ## Ce qu'un run voit sur le disque
 
 Tous les runs de toutes les organisations tournent sous le même utilisateur de l'OS, à côté des

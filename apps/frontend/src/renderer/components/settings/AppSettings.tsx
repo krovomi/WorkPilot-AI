@@ -12,6 +12,7 @@ import {
 	Compass,
 	FolderOpen,
 	Globe,
+	KeyRound,
 	Loader2,
 	MessageSquare,
 	Monitor,
@@ -43,6 +44,7 @@ import { useProjectStore } from "@/stores/project-store";
 import { useServerSessionStore } from "@/stores/server-session-store";
 import { useGuidedTourStore } from "../guided-tour/guided-tour-store";
 import { InvitationsAdmin } from "../auth/InvitationsAdmin";
+import { ServerTokensSettings } from "./ServerTokensSettings";
 import { Button } from "../ui/button";
 import {
 	FullScreenDialog,
@@ -134,8 +136,9 @@ export type AppSection =
 	| "sandbox"
 	| "guardrails"
 	| "anomaly-detection"
-	// Multi-utilisateurs (serveur, admin uniquement)
+	// Multi-utilisateurs (serveur ; les invitations pour les admins seulement)
 	| "team-invitations"
+	| "server-tokens"
 	// Système & Maintenance
 	| "updates"
 	| "notifications"
@@ -243,6 +246,12 @@ const createSettingsThemes = (t: {
 				id: "team-invitations",
 				icon: UserPlus,
 				label: t("invitationsAdmin.navLabel", "Invitations (équipe)"),
+				type: "app",
+			},
+			{
+				id: "server-tokens",
+				icon: KeyRound,
+				label: t("serverTokens.navLabel"),
 				type: "app",
 			},
 		],
@@ -387,12 +396,13 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 	const serverMode = useServerSessionStore((state) => state.mode);
 	const serverUserRole = useServerSessionStore((state) => state.user?.role);
 	const isServerAdmin = serverMode === "server" && serverUserRole === "admin";
-	if (!isServerAdmin) {
-		SETTINGS_THEMES.integrations.sections =
-			SETTINGS_THEMES.integrations.sections.filter(
-				(s) => s.id !== "team-invitations",
-			);
-	}
+	// The person's own tokens on the server: anyone signed in to one.
+	const hidden = new Set([
+		...(isServerAdmin ? [] : ["team-invitations"]),
+		...(serverMode === "server" ? [] : ["server-tokens"]),
+	]);
+	SETTINGS_THEMES.integrations.sections =
+		SETTINGS_THEMES.integrations.sections.filter((s) => !hidden.has(s.id));
 
 	// Project state (déclaré avant tout usage)
 	const projects = useProjectStore((state) => state.projects);
@@ -651,6 +661,8 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 				return <SwarmModeSettings />;
 			case "team-invitations":
 				return isServerAdmin ? <InvitationsAdmin /> : null;
+			case "server-tokens":
+				return serverMode === "server" ? <ServerTokensSettings /> : null;
 			default:
 				return null;
 		}

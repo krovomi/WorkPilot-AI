@@ -1398,6 +1398,24 @@
 		"pollLabel": "Intervalle de vérification (secondes)",
 		"pollDescription": "Fréquence de vérification du statut du pipeline (minimum 15 s, défaut 60 s)"
 	},
+	"serverTokens": {
+		"navLabel": "Mes jetons sur le serveur",
+		"title": "Mes jetons sur le serveur",
+		"description": "Les runs que vous lancez sur le serveur utilisent ces jetons : ce qu'ils font sur GitHub, GitLab, Jira, Linear ou Azure DevOps est fait en votre nom. Un jeton est gardé chiffré sur le serveur et n'est plus jamais affiché.",
+		"kinds": {
+			"github_token": "Jeton GitHub",
+			"gitlab_token": "Jeton GitLab",
+			"jira_token": "Jeton d'API Jira",
+			"linear_api_key": "Clé d'API Linear",
+			"azure_pat": "Jeton d'accès personnel Azure DevOps"
+		},
+		"stored": "Enregistré",
+		"placeholder": "Collez un jeton",
+		"replacePlaceholder": "Collez un nouveau jeton pour le remplacer",
+		"save": "Enregistrer",
+		"remove": "Retirer du serveur",
+		"unavailable": "Le serveur est injoignable"
+	},
 	"invitationsAdmin": {
 		"navLabel": "Invitations (équipe)",
 		"title": "Invitations",

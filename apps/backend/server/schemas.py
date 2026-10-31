@@ -363,7 +363,9 @@ class AgentRunPublic(BaseModel):
 
 class SetSecretRequest(BaseModel):
     kind: str
-    value: str = Field(min_length=1)
+    #: Checked by the route, not here: a validation error quotes the input,
+    #: and this input is a token.
+    value: str
 
 
 class SecretKindsResponse(BaseModel):

@@ -1272,6 +1272,11 @@ export const IPC_CHANNELS = {
 	SERVER_AUTH_REVOKE_INVITE: "server-auth:revoke-invite",
 	SERVER_AUTH_SET_MODE: "server-auth:set-mode",
 	SERVER_AUTH_STATE_CHANGED: "server-auth:state-changed",
+	// The person's own integration tokens on the server: listed by kind, set,
+	// removed, never read back (main/server-user-secrets.ts).
+	SERVER_AUTH_LIST_SECRETS: "server-auth:list-secrets",
+	SERVER_AUTH_SET_SECRET: "server-auth:set-secret",
+	SERVER_AUTH_DELETE_SECRET: "server-auth:delete-secret",
 	// Server mode: register or delete a project on the server, for the team
 	SERVER_PROJECT_CREATE: "server-project:create",
 	SERVER_PROJECT_DELETE: "server-project:delete",

@@ -5,6 +5,15 @@
 
 import { createIpcListener, invokeIpc } from "./ipc-utils";
 import { IPC_CHANNELS } from "../../../shared/constants/ipc";
+import type { IPCResult } from "../../../shared/types";
+
+/** The person's integration tokens the server can hold (never read back). */
+export type ServerSecretKind =
+	| "github_token"
+	| "gitlab_token"
+	| "jira_token"
+	| "linear_api_key"
+	| "azure_pat";
 
 export interface ServerUser {
 	id: string;
@@ -92,6 +101,9 @@ export interface ServerAuthAPI {
 	revokeInvite: (
 		invitationId: string,
 	) => Promise<DataResult<{ revoked: boolean }>>;
+	listSecrets: () => Promise<IPCResult<ServerSecretKind[]>>;
+	setSecret: (kind: ServerSecretKind, value: string) => Promise<IPCResult>;
+	deleteSecret: (kind: ServerSecretKind) => Promise<IPCResult>;
 	logout: () => Promise<ServerAuthState>;
 	restore: () => Promise<ServerAuthState>;
 	onStateChanged: (callback: (state: ServerAuthState) => void) => () => void;
@@ -137,6 +149,12 @@ export const createServerAuthAPI = (): ServerAuthAPI => ({
 			IPC_CHANNELS.SERVER_AUTH_REVOKE_INVITE,
 			invitationId,
 		),
+	listSecrets: () =>
+		invokeIpc<IPCResult<ServerSecretKind[]>>(IPC_CHANNELS.SERVER_AUTH_LIST_SECRETS),
+	setSecret: (kind, value) =>
+		invokeIpc<IPCResult>(IPC_CHANNELS.SERVER_AUTH_SET_SECRET, kind, value),
+	deleteSecret: (kind) =>
+		invokeIpc<IPCResult>(IPC_CHANNELS.SERVER_AUTH_DELETE_SECRET, kind),
 	logout: () => invokeIpc<ServerAuthState>(IPC_CHANNELS.SERVER_AUTH_LOGOUT),
 	restore: () => invokeIpc<ServerAuthState>(IPC_CHANNELS.SERVER_AUTH_RESTORE),
 	onStateChanged: (callback) =>
