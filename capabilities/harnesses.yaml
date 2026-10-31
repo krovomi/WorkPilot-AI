@@ -124,7 +124,10 @@ gemini:
   default: true
   note: >-
     Gemini CLI reads the agnostic skills path, but its slash commands are TOML
-    files. Those are generated here, never hand-edited.
+    files. Those are generated here, never hand-edited. It reads GEMINI.md by
+    default; the committed `.gemini/settings.json` (`context.fileName`) makes
+    it read AGENTS.md, at the root and just-in-time in each folder it touches,
+    so no GEMINI.md duplicates the rules.
 
 hermes:
   skills_path: .agents/skills
