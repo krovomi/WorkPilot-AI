@@ -25,6 +25,7 @@ from server.config import get_settings
 from server.db.engine import get_session_factory
 from server.db.models import AgentRun, SpecIndex, User
 from server.services.events import emit_board_event
+from server.services.run_env import run_environment
 from server.services.secrets import get_user_secret
 from sqlalchemy import select
 
@@ -53,8 +54,13 @@ class RunManagerError(RuntimeError):
     pass
 
 
-def _mint_ws_token(hours: int = 12) -> str:
-    """Long-lived service token for the agent's streaming connection."""
+def _mint_ws_token(run_id: str, hours: int = 12) -> str:
+    """Service token for the agent's streaming connection.
+
+    It names its run: the streaming server opens that run's channel for it and
+    nothing else (``server.authz.ws_channels``), and the REST API grants it no
+    permission at all.
+    """
     import jwt as pyjwt
 
     settings = get_settings()
@@ -65,6 +71,7 @@ def _mint_ws_token(hours: int = 12) -> str:
             "sub": "service:agent",
             "name": "WorkPilot Agent",
             "role": "service",
+            "run": run_id,
             "iat": int(now.timestamp()),
             "exp": int((now + timedelta(hours=hours)).timestamp()),
         },
@@ -160,13 +167,18 @@ class RunManager:
         proc.terminate()
         return True
 
-    async def _build_env(self, user_id: str) -> dict[str, str]:
-        """Run env = server env + WS token + the launcher's integration secrets."""
+    async def _build_env(self, user_id: str, run_id: str) -> dict[str, str]:
+        """Run env: the server env without its own secrets, the run's WS token,
+        and the launcher's integration secrets (``server.services.run_env``)."""
         import os
 
-        env = dict(os.environ)
-        env["WORKPILOT_WS_TOKEN"] = _mint_ws_token()
-        env["WORKPILOT_RUN_USER_ID"] = user_id
+        env = run_environment(
+            os.environ,
+            {
+                "WORKPILOT_WS_TOKEN": _mint_ws_token(run_id),
+                "WORKPILOT_RUN_USER_ID": user_id,
+            },
+        )
         async with get_session_factory()() as db:
             for kind, env_name in USER_SECRET_ENV.items():
                 try:
@@ -220,7 +232,7 @@ class RunManager:
                 if model:
                     cmd += ["--model", model]
 
-                env = await self._build_env(user_id)
+                env = await self._build_env(user_id, run_id)
                 logger.info("Run %s starting: %s", run_id, " ".join(cmd[:6]))
                 proc = await asyncio.create_subprocess_exec(
                     *cmd,

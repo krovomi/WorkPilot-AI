@@ -26,6 +26,12 @@ vi.mock("../../lib/agent-tools-api", async (importOriginal) => ({
 	setBrainInstructionStatus: (...args: unknown[]) => mockSetStatus(...args),
 }));
 
+const mockToast = vi.fn();
+vi.mock("../../hooks/use-toast", () => ({
+	useToast: () => ({ toast: mockToast }),
+	toast: (...args: unknown[]) => mockToast(...args),
+}));
+
 import { useBrainStore } from "../../stores/brain-store";
 import { BrainTaskCard } from "./BrainTaskCard";
 
@@ -114,6 +120,27 @@ it("shows the verdicts, what was learned, and opens a note in Obsidian", async (
 	fireEvent.click(openButtons[openButtons.length - 1]);
 	expect(window.electronAPI.openExternal).toHaveBeenCalledWith(
 		`obsidian://open?path=${encodeURIComponent("/home/me/brain/knowledge/Rotation des clés.md")}`,
+	);
+});
+
+it("says so when Obsidian could not be opened, instead of doing nothing", async () => {
+	mockFetchTask.mockResolvedValue(learning());
+	Object.assign(window.electronAPI, {
+		openExternal: vi.fn().mockRejectedValue(new Error("no handler for obsidian:")),
+	});
+	render(<BrainTaskCard task={task} projectPath="/home/me/shop" />);
+
+	fireEvent.click(await screen.findByRole("button", { name: "Details" }));
+	const openButtons = screen.getAllByRole("button", { name: /Open in Obsidian/ });
+	fireEvent.click(openButtons[openButtons.length - 1]);
+
+	await waitFor(() =>
+		expect(mockToast).toHaveBeenCalledWith(
+			expect.objectContaining({
+				title: "Could not open the note in Obsidian",
+				variant: "destructive",
+			}),
+		),
 	);
 });
 

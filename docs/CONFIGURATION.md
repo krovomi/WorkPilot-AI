@@ -277,6 +277,26 @@ fields — and `foundation.api_safety.validated_dir` confines resolution to
 and body models, so a new path-taking field fails the build until it is either
 refused or explicitly exempted with its reason.
 
+### Live feed and agent runs
+
+The streaming WebSocket server (`:8765`) has the same boundaries as the API. A
+client connects to `/stream/project:<project_id>` (the board) or
+`/stream/run:<run_id>` (one run's live feed) with `?token=<access token>`, and
+optionally `&org=<org id>` to name the organization it acts in. The channel
+opens only when the user has a role on that project in that organization;
+`viewer` reads, `member` and above may also chat and pause. Any other channel
+name is refused (close code `4403`), and so is a switch to a channel the user
+may not open. Only the API and a run publish events; a run's token names that
+run and opens nothing else.
+
+A run starts with the server's environment **minus** every variable the server
+reads for itself (signing key, secrets key, database, mail, Entra, repos root,
+`POSTGRES_PASSWORD`), plus its own streaming token, the launching user's id and
+that user's integration secrets. Provider credentials set for builds, such as
+`CLAUDE_CODE_OAUTH_TOKEN`, are passed. A new server variable is classified in
+[apps/backend/server/services/run_env.py](../apps/backend/server/services/run_env.py);
+`tests/backend/test_run_env.py` fails until it is.
+
 ### Quotas
 
 Per-organization ceilings on members, projects, concurrent runs and monthly

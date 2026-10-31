@@ -32,6 +32,8 @@
 		"activate": "Activer",
 		"reject": "Refuser",
 		"openInObsidian": "Ouvrir dans Obsidian",
+		"openFailedTitle": "Impossible d'ouvrir la note dans Obsidian",
+		"openFailed": "Vérifiez qu'Obsidian est installé et que le dossier du cerveau y est ouvert comme vault. Note : {{path}}",
 		"by": "par {{agents}}",
 		"kind": {
 			"instruction": "règle",
