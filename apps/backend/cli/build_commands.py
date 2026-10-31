@@ -1037,6 +1037,10 @@ def handle_build_command(
         # anything was written; this one decides the conditional phases.
         # `announce=False` — reprinting the plan here would read as a second
         # build starting.
+        # Build outputs the coder committed (bin/, obj/, TestResults/...) are
+        # taken out before anything reads the change set: QA scope, review.
+        if worktree_manager:
+            worktree_manager.strip_build_artifacts(spec_dir.name)
         _changed = _changed_files(worktree_manager, spec_dir.name)
         _post_profile = (
             _resolve_workflow_profile(
