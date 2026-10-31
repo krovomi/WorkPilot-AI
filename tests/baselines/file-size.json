@@ -1,6 +1,6 @@
 {
   "apps/backend/agents/coder.py": 2947,
-  "apps/backend/agents/session.py": 2591,
+  "apps/backend/agents/session.py": 2482,
   "apps/backend/core/client.py": 3214,
   "apps/backend/core/workspace.py": 2249,
   "apps/backend/provider_api.py": 2092,
