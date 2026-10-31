@@ -17,6 +17,7 @@
 	"status": { "thinking": "Thinking..." },
 	"input": {
 		"placeholder": "Ask about your codebase...",
+		"readOnly": "This conversation is {{name}}'s: start a new one to ask your own questions",
 		"hint": "Press Enter to send, Shift+Enter for new line"
 	},
 	"tasks": {

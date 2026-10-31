@@ -1084,6 +1084,7 @@
 	},
 	"chatHistory": {
 		"title": "Chat History",
+		"byTeammate": "By {{name}}, read only",
 		"noConversations": "No conversations yet",
 		"today": "Today",
 		"yesterday": "Yesterday",

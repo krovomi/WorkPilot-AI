@@ -20,6 +20,7 @@
 	"status": { "thinking": "Réflexion..." },
 	"input": {
 		"placeholder": "Demandez à propos de votre base de code...",
+		"readOnly": "Cette conversation est celle de {{name}} : lancez-en une nouvelle pour poser vos questions",
 		"hint": "Appuyez sur Entrée pour envoyer, Shift+Entrée pour une nouvelle ligne"
 	},
 	"tasks": {
