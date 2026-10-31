@@ -55,5 +55,9 @@ WORKPILOT_REPOS_ROOT=/var/lib/workpilot/repos
 # are set per tenant in the administration console (Quotas tab); without one an
 # organization is unlimited, which is the historical behaviour.
 WORKPILOT_MAX_CONCURRENT_RUNS=3
+# Each run sees only its own project on disk (Landlock: Linux 5.13+, Docker
+# 23+, server not running as root). Runs fail rather than start unconfined.
+# `off` only where every user may read every project.
+# WORKPILOT_RUN_ISOLATION=required
 WORKPILOT_ACCESS_TOKEN_TTL_MINUTES=15
 WORKPILOT_REFRESH_TOKEN_TTL_DAYS=14

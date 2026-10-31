@@ -19,6 +19,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import sys
 import tempfile
 from datetime import UTC, datetime, timedelta
@@ -29,6 +30,7 @@ from server.db.engine import get_session_factory
 from server.db.models import AgentRun, SpecIndex, User
 from server.services.events import emit_board_event
 from server.services.run_env import run_environment
+from server.services.run_isolation import OFF, isolation_mode, prepare_run
 from server.services.secrets import get_user_secret
 from sqlalchemy import select
 
@@ -151,6 +153,45 @@ def _mint_ws_token(run_id: str, hours: int = 12) -> str:
     )
 
 
+#: Each operator warning is logged once per process, not once per run.
+_WARNED: set[str] = set()
+
+
+def _warn_once(key: str, message: str) -> None:
+    if key not in _WARNED:
+        _WARNED.add(key)
+        logger.warning(message)
+
+
+def _confine(
+    cmd: list[str], project_id: str, server_path: str, scratch: Path, env: dict
+) -> list[str]:
+    """The run's argv, started confined to its own project unless the
+    operator turned isolation off (``server.services.run_isolation``)."""
+    if isolation_mode() == OFF:
+        _warn_once(
+            "off",
+            "WORKPILOT_RUN_ISOLATION=off: runs can read every project on this server",
+        )
+        return cmd
+    if getattr(os, "geteuid", lambda: -1)() == 0:
+        _warn_once(
+            "root",
+            "The server runs as root: CAP_SYS_PTRACE lets a run read other "
+            "processes' environment despite its isolation; run it unprivileged",
+        )
+    settings = get_settings()
+    prefix = prepare_run(
+        project_id=project_id,
+        clone=Path(server_path),
+        scratch=scratch,
+        repos_root=settings.repos_root,
+        database_url=settings.database_url,
+        env=env,
+    )
+    return [*prefix, *cmd]
+
+
 class RunManager:
     """Singleton orchestrating server-side agent subprocesses."""
 
@@ -245,7 +286,6 @@ class RunManager:
     async def _build_env(self, user_id: str, run_id: str) -> dict[str, str]:
         """Run env: the server env without its own secrets, the run's WS token,
         and the launcher's integration secrets (``server.services.run_env``)."""
-        import os
 
         env = run_environment(
             os.environ,
@@ -300,6 +340,7 @@ class RunManager:
                         phase, spec_name, server_path, model, Path(scratch)
                     )
                     env = await self._build_env(user_id, run_id)
+                    cmd = _confine(cmd, project_id, server_path, Path(scratch), env)
                     logger.info("Run %s starting: %s", run_id, " ".join(cmd[:6]))
                     proc = await asyncio.create_subprocess_exec(
                         *cmd,

@@ -19,6 +19,7 @@ Règles : [`rules/security.md`](../rules/security.md#s5--mode-serveur--authentif
 | Projets | `server/routers/projects.py`, `services/repos.py` | un projet est un dépôt distant que le serveur clone sous `WORKPILOT_REPOS_ROOT/<id>` ; ses membres et leur rôle (`viewer`, `member`, `owner`) |
 | Tableau | `server/routers/specs.py`, `services/spec_indexer.py` | les specs du clone indexées en base, la réservation d'une carte par une personne, les runs d'une carte |
 | Cartes | `shared_board/api.py` | créer, lire, modifier, supprimer une carte, approuver sa spec, par `project_id` |
+| Isolation des runs | `services/run_isolation.py`, `runners/confined_run.py`, `foundation/landlock.py` | ce qu'un run voit sur le disque : son clone, le home de son projet, son dossier temporaire ; le reste en lecture, les autres projets et l'état du serveur pas du tout |
 | Runs | `services/run_manager.py`, `services/run_env.py` | une phase (`spec`, `build`, `qa`, `merge`, `pr`) lancée sur le serveur pour une carte, sous un plafond de concurrence, sans entrée standard, avec l'environnement construit pour elle |
 | Flux en direct | `streaming/websocket_server.py`, `server/authz/ws_channels.py` | les événements du tableau (`project:<id>`) et d'un run (`run:<id>`), ouverts aux seuls membres du projet |
 | Client | `apps/frontend/src/main/server-connection.ts` | connexion, refresh dans `safeStorage`, organisation active ; vue Administration |
@@ -47,6 +48,34 @@ variables (`SERVER_ONLY_ENV`), plus son jeton de streaming, l'utilisateur qui l'
 secrets d'intégration. Les identifiants de provider posés pour les builds passent : ils sont ceux
 du déploiement. La liste est tenue par un test qui lit chaque `WORKPILOT_*` du paquet `server` et
 refuse une variable non classée : une nouvelle variable ne fuit pas par défaut.
+
+## Ce qu'un run voit sur le disque
+
+Tous les runs de toutes les organisations tournent sous le même utilisateur de l'OS, à côté des
+clones de tous les projets (`REPOS_ROOT`), de l'état du serveur et des autres runs. Sans rien de
+plus, un agent qui travaille sur un projet pourrait lire le code d'un autre tenant, sa mémoire de
+build ou les transcriptions de ses sessions, ou réécrire le code du serveur. Chaque run démarre
+donc par `runners/confined_run.py`, qui le restreint avec Landlock (`foundation/landlock.py`)
+avant que l'agent démarre ; la restriction tient pour lui et pour tout ce qu'il lance, et rien de
+ce qu'il fait ne peut la lever.
+
+| Accès | Quoi |
+|---|---|
+| lecture et écriture | son clone, le home de son projet (`REPOS_ROOT/.run-homes/<projet>` : mémoire de build, sessions des CLI, caches de paquets, de ce projet seulement), son dossier temporaire, quelques périphériques (`/dev/null`…) |
+| lecture seule | le reste du système : l'interpréteur, les outils, le code de WorkPilot ; dans le home de l'utilisateur du serveur, la configuration git, `~/.ssh` et les dossiers où sont installés les CLI |
+| rien | les autres clones et homes de projet (même leur liste), le reste du home de l'utilisateur du serveur, `/tmp` et `/var/tmp` partagés, la base SQLite, les journaux et les `.env` du serveur |
+
+Landlock fermant aussi l'accès d'un processus restreint aux autres (ptrace, `/proc/<pid>/environ`),
+un run ne lit pas les jetons d'un autre run ni l'environnement du serveur ; `CAP_SYS_PTRACE` lève
+cette garde, d'où un serveur qui tourne sans privilège (l'image Docker le fait, le serveur
+l'avertit sinon). Landlock n'a besoin ni de root ni d'espace de noms : il marche dans un conteneur
+ordinaire, là où bubblewrap ([os-sandbox.md](os-sandbox.md)) est bloqué par le profil seccomp de
+Docker. Il faut Linux 5.13 ou plus avec Landlock actif (Docker 23 ou plus l'autorise).
+
+`WORKPILOT_RUN_ISOLATION` vaut `required` par défaut : une machine qui ne sait pas l'appliquer fait
+échouer chaque run avec la raison, au lieu de le lancer ouvert. `off` lance les runs sans
+confinement, pour un déploiement où chacun peut lire tous les projets, et le serveur le journalise.
+Git joint la forge comme le serveur : avec ses identifiants, qui servent à tous les projets.
 
 ## Le tableau partagé
 
