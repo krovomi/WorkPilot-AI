@@ -119,21 +119,21 @@ def _create_linear_client():
     if not SDK_AVAILABLE:
         raise ImportError("claude_agent_sdk is not available")
 
-    from core.auth import (
-        ensure_claude_code_oauth_token,
-        require_auth_token,
-    )
-    from core.simple_client import create_simple_client
+    # Through the agent_runtime port: core imports this module.
+    import agent_runtime
     from phase_config import resolve_model_id
 
-    require_auth_token()  # Raises ValueError if no token found
-    ensure_claude_code_oauth_token()
+    runtime = agent_runtime.current()
+    if runtime is None:
+        raise ImportError("no agent runtime installed (core is not imported)")
+    runtime.require_auth_token()  # Raises ValueError if no token found
+    runtime.ensure_claude_code_oauth_token()
 
     linear_api_key = get_linear_api_key()
     if not linear_api_key:
         raise ValueError("LINEAR_API_KEY not set")
 
-    return create_simple_client(
+    return runtime.create_simple_client(
         agent_type="linear_updater",
         model=resolve_model_id("haiku"),  # Resolves via API Profile if configured
         system_prompt="You are a Linear API assistant. Execute the requested Linear operation precisely.",

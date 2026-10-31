@@ -201,10 +201,21 @@ class TestInsightExtraction:
             requested.update(kwargs)
             return _Runtime()
 
+        class _Port:
+            # The agent_runtime port, as core installs it.
+            def get_auth_token(self):
+                return "token"
+
+            def ensure_claude_code_oauth_token(self):
+                return None
+
+            def create_agent_runtime(self, **kwargs):
+                return factory(**kwargs)
+
+        import agent_runtime
+
         monkeypatch.setattr(extractor, "SDK_AVAILABLE", True)
-        monkeypatch.setattr(extractor, "get_auth_token", lambda: "token")
-        monkeypatch.setattr(extractor, "ensure_claude_code_oauth_token", lambda: None)
-        monkeypatch.setattr(extractor, "create_agent_runtime", factory)
+        monkeypatch.setattr(agent_runtime, "_runtime", _Port())
         result = asyncio.run(
             extractor.run_insight_extraction(dict(self.INPUTS), project_dir=tmp_path)
         )

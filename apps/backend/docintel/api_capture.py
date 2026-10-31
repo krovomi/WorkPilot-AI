@@ -498,7 +498,7 @@ def parse_ocr(text: str, source: str) -> list[ApiExchange]:
     headers = {m["name"]: m["value"].strip() for m in _OCR_HEADER_NAMES.finditer(after)}
     body = ""
     try:
-        from spec.plan_recovery import extract_json_document
+        from foundation.json_document import extract_json_document
 
         document = extract_json_document(after)
         if isinstance(document, (dict, list)):

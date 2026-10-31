@@ -11,6 +11,11 @@ en direct : `create_client()` (SDK Claude) ou `create_agent_client()` (multi-pro
 dans `core/client.py`. Seuls `core/client.py` et `core/simple_client.py` construisent un
 `ClaudeAgentOptions`.
 
+Une unité que `core` ou `agents` importe (merge, intégrations, analyse, architecture) ne les
+importe pas en retour pour lancer une session : elle passe par le port `agent_runtime`
+(`agent_runtime.current()`), que `core` installe et qui appelle ces mêmes fabriques.
+→ [`architecture/agent-runtime.md`](../architecture/agent-runtime.md)
+
 Le modèle et le budget de réflexion se résolvent par phase, depuis les réglages de l'utilisateur :
 
 ```python

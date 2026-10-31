@@ -30,8 +30,8 @@ except ImportError:
     ClaudeAgentOptions = None
     ClaudeSDKClient = None
 
-from core.auth import ensure_claude_code_oauth_token, get_auth_token
-from core.runtimes import create_agent_runtime
+# Through the agent_runtime port: core and agents import this module.
+import agent_runtime
 
 # Default model for insight extraction (fast and cheap)
 # Note: Using Haiku 4.5 for fast, cheap extraction. Haiku does not support
@@ -67,7 +67,8 @@ def is_extraction_enabled() -> bool:
     # Extraction requires Claude SDK and authentication token
     if not SDK_AVAILABLE:
         return False
-    if not get_auth_token():
+    port = agent_runtime.current()
+    if port is None or not port.get_auth_token():
         return False
     enabled_str = os.environ.get("INSIGHT_EXTRACTION_ENABLED", "true").lower()
     return enabled_str in ("true", "1", "yes")
@@ -372,17 +373,18 @@ async def run_insight_extraction(
         logger.warning("Claude SDK not available, skipping insight extraction")
         return None
 
-    if not get_auth_token():
+    port = agent_runtime.current()
+    if port is None or not port.get_auth_token():
         logger.warning("No authentication token found, skipping insight extraction")
         return None
 
     # Ensure SDK can find the token
-    ensure_claude_code_oauth_token()
+    port.ensure_claude_code_oauth_token()
 
     prompt = _build_extraction_prompt(inputs)
 
     try:
-        runtime = create_agent_runtime(
+        runtime = port.create_agent_runtime(
             spec_dir=None,
             phase="insight_extraction",
             project_dir=project_dir,
@@ -413,7 +415,7 @@ async def run_insight_extraction(
     # Parsing stays inside the "None if failed" contract: json.loads raises
     # RecursionError on a deeply nested answer, which ValueError does not cover.
     try:
-        from spec.plan_recovery import extract_json_document
+        from foundation.json_document import extract_json_document
 
         extracted = extract_json_document(output)
     except Exception as e:
