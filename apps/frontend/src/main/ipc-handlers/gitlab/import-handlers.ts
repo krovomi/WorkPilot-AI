@@ -5,16 +5,26 @@
 
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../../shared/constants";
-import type { GitLabImportResult, IPCResult } from "../../../shared/types";
-import { projectStore } from "../../project-store";
+import type {
+	GitLabImportResult,
+	IPCResult,
+	Task,
+} from "../../../shared/types";
+import { createServerCard } from "../../server-board-actions";
+import { featureProject } from "../server-feature-files";
 import { attachGitLabIssueImages } from "../shared/issue-attachments";
 import {
+	buildIssueContext,
 	createSpecForIssue,
 	type GitLabTaskInfo,
 	gitlabSpecDir,
 } from "./spec-utils";
 import type { GitLabAPIIssue } from "./types";
 import { encodeProjectPath, getGitLabConfig, gitlabFetch } from "./utils";
+
+// What a server card takes (`shared_board/api.py`).
+const SERVER_TITLE_MAX = 200;
+const SERVER_DESCRIPTION_MAX = 20_000;
 
 // Debug logging helper
 const DEBUG =
@@ -43,7 +53,7 @@ export function registerImportIssues(): void {
 		): Promise<IPCResult<GitLabImportResult>> => {
 			debugLog("importGitLabIssues handler called", { issueIids });
 
-			const project = projectStore.getProject(projectId);
+			const project = featureProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
 			}
@@ -57,12 +67,17 @@ export function registerImportIssues(): void {
 			}
 
 			const tasks: GitLabTaskInfo[] = [];
+			const cards: Task[] = [];
 			const errors: string[] = [];
 			let imported = 0;
 			let failed = 0;
 
-			for (const iid of issueIids) {
+			for (const iid of Array.isArray(issueIids) ? issueIids : []) {
 				try {
+					// From the renderer: a number, before it is put in a URL
+					if (!Number.isInteger(iid) || iid <= 0) {
+						throw new Error("Invalid issue number");
+					}
 					const encodedProject = encodeProjectPath(config.project);
 
 					// Fetch the issue
@@ -71,6 +86,26 @@ export function registerImportIssues(): void {
 						config.instanceUrl,
 						`/projects/${encodedProject}/issues/${iid}`,
 					)) as GitLabAPIIssue;
+
+					// A server project's issue becomes a card of its shared board; the
+					// server writes the spec and its agents run there.
+					if (project.remote) {
+						const card = await createServerCard(
+							project,
+							String(apiIssue.title ?? "").slice(0, SERVER_TITLE_MAX),
+							buildIssueContext(
+								apiIssue,
+								config.project,
+								config.instanceUrl,
+							).slice(0, SERVER_DESCRIPTION_MAX),
+						);
+						if (!card.success || !card.data) {
+							throw new Error(card.error ?? "Server unavailable");
+						}
+						cards.push(card.data);
+						imported++;
+						continue;
+					}
 
 					// Create a spec/task from the issue
 					const task = await createSpecForIssue(
@@ -119,6 +154,7 @@ export function registerImportIssues(): void {
 					imported,
 					failed,
 					errors: errors.length > 0 ? errors : undefined,
+					...(project.remote ? { tasks: cards } : {}),
 				},
 			};
 		},

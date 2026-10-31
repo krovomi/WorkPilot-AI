@@ -42,6 +42,19 @@ function text(value: unknown, max: number): string | null {
 		: null;
 }
 
+const FORGES = new Set(["github", "gitlab"]);
+
+/**
+ * The forge the server lists for a project, whose views the app shows; none
+ * when the server does not list one (a server older than the field).
+ */
+function forgeOf(value: unknown): Pick<RemoteProjectInfo, "forge"> {
+	if (value === null) return { forge: null };
+	return typeof value === "string" && FORGES.has(value)
+		? { forge: value as "github" | "gitlab" }
+		: {};
+}
+
 /** A `/projects` entry as an app project, or null when it is not one. */
 export function toProject(raw: unknown, serverUrl: string): Project | null {
 	if (!raw || typeof raw !== "object") return null;
@@ -65,7 +78,7 @@ export function toProject(raw: unknown, serverUrl: string): Project | null {
 		settings: { ...DEFAULT_PROJECT_SETTINGS, mainBranch: defaultBranch },
 		createdAt: created,
 		updatedAt: created,
-		remote: { repoUrl, defaultBranch, role },
+		remote: { repoUrl, defaultBranch, role, ...forgeOf(item.forge) },
 	};
 }
 

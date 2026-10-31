@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, computed_field
 
 # ---------------------------------------------------------------------------
 # Auth
@@ -297,6 +297,14 @@ class ProjectPublic(BaseModel):
     my_role: str | None = None
 
     model_config = {"from_attributes": True}
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def forge(self) -> str | None:
+        """``github`` or ``gitlab`` when the app can show that forge's views."""
+        from server.forges import forge_of
+
+        return forge_of(self.repo_url)
 
 
 class AddMemberRequest(BaseModel):

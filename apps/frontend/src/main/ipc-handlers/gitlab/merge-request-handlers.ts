@@ -6,7 +6,7 @@
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../../shared/constants";
 import type { GitLabMergeRequest, IPCResult } from "../../../shared/types";
-import { projectStore } from "../../project-store";
+import { featureProject } from "../server-feature-files";
 import type { CreateMergeRequestOptions, GitLabAPIMergeRequest } from "./types";
 import { encodeProjectPath, getGitLabConfig, gitlabFetch } from "./utils";
 
@@ -86,7 +86,7 @@ export function registerGetMergeRequests(): void {
 		): Promise<IPCResult<GitLabMergeRequest[]>> => {
 			debugLog("getGitLabMergeRequests handler called", { state });
 
-			const project = projectStore.getProject(projectId);
+			const project = featureProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
 			}
@@ -155,7 +155,7 @@ export function registerGetMergeRequest(): void {
 		): Promise<IPCResult<GitLabMergeRequest>> => {
 			debugLog("getGitLabMergeRequest handler called", { mrIid });
 
-			const project = projectStore.getProject(projectId);
+			const project = featureProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
 			}
@@ -215,7 +215,7 @@ export function registerCreateMergeRequest(): void {
 				title: options.title,
 			});
 
-			const project = projectStore.getProject(projectId);
+			const project = featureProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
 			}
@@ -306,7 +306,7 @@ export function registerUpdateMergeRequest(): void {
 		): Promise<IPCResult<GitLabMergeRequest>> => {
 			debugLog("updateGitLabMergeRequest handler called", { mrIid });
 
-			const project = projectStore.getProject(projectId);
+			const project = featureProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
 			}

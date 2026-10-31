@@ -69,10 +69,10 @@ describe("server projects", () => {
 		connection.authedFetch.mockResolvedValue({
 			ok: true,
 			data: [
-				serverProject(),
+				serverProject({ forge: "gitlab" }),
 				serverProject({ id: "../../etc", name: "Escape" }),
 				serverProject({ id: "b2", name: "", my_role: null }),
-				serverProject({ id: "c3", name: "Admin view", my_role: null }),
+				serverProject({ id: "c3", name: "Admin view", my_role: null, forge: "bitbucket" }),
 			],
 		});
 		const { listServerProjects, getServerProject } = await import(
@@ -87,7 +87,10 @@ describe("server projects", () => {
 			repoUrl: "https://git.example/shop.git",
 			defaultBranch: "develop",
 			role: "member",
+			forge: "gitlab",
 		});
+		// The forge is the server's to say; an unknown value is none.
+		expect(projects[1].remote?.forge).toBeUndefined();
 		expect(shop.path.startsWith(path.join(TEST_DIR, "userData", "server-boards"))).toBe(true);
 		expect(shop.path.endsWith(PROJECT_ID)).toBe(true);
 		// No role on the project: shown as a viewer, the server decides the rest.

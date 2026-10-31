@@ -19,19 +19,29 @@ export const SERVER_PROJECT_VIEWS: ReadonlySet<SidebarView> = new Set<SidebarVie
 	"context",
 	"github-issues",
 	"github-prs",
+	"gitlab-issues",
+	"gitlab-merge-requests",
 	"administration",
 ]);
+
+/** The forge a server project's issue and review views go through. */
+export type ServerForge = "github" | "gitlab";
 
 const GITHUB_URL =
 	/^(?:https:\/\/(?:[^@/]+@)?github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)/;
 
 /**
- * The forge whose views a server project offers, read from the URL it was
- * cloned from: its GitHub issues and pull requests go through the server
- * with the person's own token (`ipc-handlers/github/server-relay.ts`).
+ * The forge whose views a server project offers, as the server lists it (a
+ * GitLab one only on an instance its operator named): its issues and pull or
+ * merge requests go through the server with the person's own token
+ * (`ipc-handlers/github/server-relay.ts`, `ipc-handlers/gitlab/server-relay.ts`).
+ * A server that does not list it yet: GitHub, read from the clone URL.
  */
-export function serverForge(project: Project | undefined): "github" | null {
-	return GITHUB_URL.test((project?.remote?.repoUrl ?? "").trim()) ? "github" : null;
+export function serverForge(project: Project | undefined): ServerForge | null {
+	const remote = project?.remote;
+	if (!remote) return null;
+	if (remote.forge !== undefined) return remote.forge;
+	return GITHUB_URL.test((remote.repoUrl ?? "").trim()) ? "github" : null;
 }
 
 const ADMIN_PERMISSIONS = [
@@ -41,22 +51,25 @@ const ADMIN_PERMISSIONS = [
 	"audit.read",
 ];
 
-const GITHUB_VIEWS: ReadonlySet<SidebarView> = new Set<SidebarView>([
-	"github-issues",
-	"github-prs",
-]);
+const FORGE_VIEWS: Readonly<Record<ServerForge, ReadonlySet<SidebarView>>> = {
+	github: new Set<SidebarView>(["github-issues", "github-prs"]),
+	gitlab: new Set<SidebarView>(["gitlab-issues", "gitlab-merge-requests"]),
+};
 
 /**
  * Whether the sidebar shows this view for the selected project; a server
- * project's GitHub views only when it is on GitHub ({@link serverForge}).
+ * project's GitHub or GitLab views only when it is on that forge
+ * ({@link serverForge}).
  */
 export function showsView(
 	view: SidebarView,
 	serverProject: boolean,
-	forge: "github" | null = null,
+	forge: ServerForge | null = null,
 ): boolean {
 	if (!serverProject) return true;
-	if (GITHUB_VIEWS.has(view)) return forge === "github";
+	for (const [name, views] of Object.entries(FORGE_VIEWS)) {
+		if (views.has(view)) return forge === name;
+	}
 	return SERVER_PROJECT_VIEWS.has(view);
 }
 

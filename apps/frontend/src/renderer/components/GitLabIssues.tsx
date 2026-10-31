@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import type { GitLabIssue } from "../../shared/types";
 import { useProjectStore } from "../stores/project-store";
 import { useTaskStore } from "../stores/task-store";
+import { useServerIssueCards } from "./github-issues/hooks/useServerIssueCards";
 import {
 	EmptyState,
 	InvestigationDialog,
@@ -27,6 +28,13 @@ export function GitLabIssues({
 	const selectedProjectId = useProjectStore((state) => state.selectedProjectId);
 	const selectedProject = projects.find((p) => p.id === selectedProjectId);
 	const tasks = useTaskStore((state) => state.tasks);
+	// A server project's issue becomes a card of its shared board
+	const serverProject = Boolean(selectedProject?.remote);
+	const serverCards = useServerIssueCards(
+		selectedProject?.id,
+		onNavigateToTask,
+		"gitlab",
+	);
 
 	const {
 		syncStatus,
@@ -65,13 +73,24 @@ export function GitLabIssues({
 				map.set(task.metadata.gitlabIssueIid, task.specId || task.id);
 			}
 		}
+		for (const [issueIid, taskId] of serverCards.created) {
+			map.set(issueIid, taskId);
+		}
 		return map;
-	}, [tasks]);
+	}, [tasks, serverCards.created]);
 
-	const handleInvestigate = useCallback((issue: GitLabIssue) => {
-		setSelectedIssueForInvestigation(issue);
-		setShowInvestigateDialog(true);
-	}, []);
+	const { createCard } = serverCards;
+	const handleInvestigate = useCallback(
+		(issue: GitLabIssue) => {
+			if (serverProject) {
+				void createCard(issue.iid);
+				return;
+			}
+			setSelectedIssueForInvestigation(issue);
+			setShowInvestigateDialog(true);
+		},
+		[serverProject, createCard],
+	);
 
 	const handleStartInvestigation = useCallback(
 		(selectedNoteIds: number[]) => {
