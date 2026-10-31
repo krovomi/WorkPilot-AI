@@ -28,6 +28,12 @@ export const projectMock = {
 
 	deleteServerProject: async () => ({ success: true }),
 
+	watchServerBoard: async () => ({ success: false }),
+
+	unwatchServerBoard: async () => ({ success: true }),
+
+	onServerBoardLive: () => () => {},
+
 	getProjects: async () => ({
 		success: true,
 		data: mockProjects,

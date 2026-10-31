@@ -121,12 +121,30 @@ tourne avec une liste d'arguments et une branche de base qui ne peut pas se lire
 Abandonner l'espace de build (`TASK_WORKTREE_DISCARD`) reste refusé pour une carte du serveur.
 
 Chaque refus du serveur (droit manquant, carte déjà démarrée, réservée par un autre) revient tel
-quel à l'app. Un tableau du serveur affiché est relu toutes les cinq secondes
-(`useServerBoardRefresh`) : ce qu'un collègue crée, modifie, lance ou supprime apparaît sans
-recharger ; une lecture qui échoue garde les cartes affichées.
+quel à l'app.
+
+## Le tableau en direct
+
+Tant qu'un tableau du serveur est affiché, le main tient une WebSocket sur le canal du projet
+(`main/server-board-live.ts`, `project:<id>`) : ce qu'un collègue crée, modifie, approuve, réserve,
+lance ou supprime arrive en un événement, et la fenêtre relit le tableau aussitôt
+(`useServerBoardRefresh`, canaux `SERVER_BOARD_WATCH`, `SERVER_BOARD_UNWATCH`, `SERVER_BOARD_LIVE`).
+Le flux ne dit pas chaque pas d'un build, donc le tableau est aussi relu toutes les quinze
+secondes tant que le flux est ouvert, et toutes les cinq quand il ne l'est pas ; une lecture qui
+échoue garde les cartes affichées. Un flux tombé est rouvert (2, 5, 15 puis 30 s) tant que le
+tableau est affiché, jamais après, et tous sont fermés à la déconnexion.
+
+Le jeton d'accès part dans l'en-tête `Authorization` de la poignée de main, jamais dans l'URL
+qu'un proxy journalise, et reste dans le main : la fenêtre apprend seulement que le tableau a
+changé et si le flux est ouvert. Le serveur WebSocket lit l'en-tête, ou `?token=` pour les
+connexions locales de l'API et des runs, et décide du canal comme pour un client
+(`server/authz/ws_channels.py`). L'adresse du flux est celle que le serveur donne
+(`GET /api/board/stream`, réglage `WORKPILOT_PUBLIC_STREAM_URL`, `ws://` ou `wss://` seulement),
+sinon l'hôte de l'API sur le port 8765, en `wss` derrière `https`. Les événements de carte
+`spec_updated`, `spec_deleted` et `spec_approved` étaient jetés par le flux comme inconnus :
+ils sont maintenant de ses types.
 
 ## Ce qui vient
 
-Le plan multi-tenant du 31 octobre, par lots : les événements en direct à la place de la
-relecture, les groupes d'utilisateurs, chaque feature de l'app servie par `project_id`, un test de bout en
+Le plan multi-tenant du 31 octobre, par lots : les groupes d'utilisateurs, chaque feature de l'app servie par `project_id`, un test de bout en
 bout à deux organisations, et le guide d'exploitation. Ce fichier grandit avec chaque lot.

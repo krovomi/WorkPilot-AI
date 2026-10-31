@@ -40,6 +40,12 @@ export interface ProjectAPI {
 	}) => Promise<IPCResult<Project>>;
 	/** Server mode: delete a server project for everyone (owner only). */
 	deleteServerProject: (projectId: string) => Promise<IPCResult>;
+	/** Server mode: follow a shown server board's changes live. */
+	watchServerBoard: (projectId: string) => Promise<IPCResult>;
+	unwatchServerBoard: (projectId: string) => Promise<IPCResult>;
+	onServerBoardLive: (
+		callback: (update: { projectId: string; live: boolean; changed: boolean }) => void,
+	) => () => void;
 	updateProjectSettings: (
 		projectId: string,
 		settings: Partial<ProjectSettings>,
@@ -331,6 +337,21 @@ export const createProjectAPI = (): ProjectAPI => ({
 
 	deleteServerProject: (projectId: string): Promise<IPCResult> =>
 		ipcRenderer.invoke(IPC_CHANNELS.SERVER_PROJECT_DELETE, projectId),
+
+	watchServerBoard: (projectId: string): Promise<IPCResult> =>
+		ipcRenderer.invoke(IPC_CHANNELS.SERVER_BOARD_WATCH, projectId),
+
+	unwatchServerBoard: (projectId: string): Promise<IPCResult> =>
+		ipcRenderer.invoke(IPC_CHANNELS.SERVER_BOARD_UNWATCH, projectId),
+
+	onServerBoardLive: (
+		callback: (update: { projectId: string; live: boolean; changed: boolean }) => void,
+	) => {
+		type Update = Parameters<typeof callback>[0];
+		const listener = (_event: IpcRendererEvent, update: Update) => callback(update);
+		ipcRenderer.on(IPC_CHANNELS.SERVER_BOARD_LIVE, listener);
+		return () => ipcRenderer.off(IPC_CHANNELS.SERVER_BOARD_LIVE, listener);
+	},
 
 	updateProjectSettings: (
 		projectId: string,

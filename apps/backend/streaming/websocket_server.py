@@ -453,8 +453,24 @@ class StreamingWebSocketServer:
         finally:
             self._ensure_cleanup(ctx, websocket)
 
-    def _authenticate_connection(self, path: str, ctx: dict) -> bool:
-        """Server mode: require a valid ?token=<JWT> on the WS URL.
+    @staticmethod
+    def _request_headers(websocket) -> Any:
+        """The handshake's headers, whichever websockets version accepted it."""
+        request = getattr(websocket, "request", None)
+        headers = getattr(request, "headers", None)
+        if headers is None:
+            headers = getattr(websocket, "request_headers", None)
+        return headers if hasattr(headers, "get") else None
+
+    def _authenticate_connection(
+        self, path: str, ctx: dict, headers: Any = None
+    ) -> bool:
+        """Server mode: require a valid access token.
+
+        The token comes in an ``Authorization: Bearer`` header, which the
+        desktop app sends so that it never appears in a URL a proxy logs, or
+        else as ``?token=`` (the API's and the runs' own local connections).
+        The organization comes in ``X-WorkPilot-Org`` or ``?org=``.
 
         Stores the user claims in ctx["user"] for event attribution.
         Local mode: no-op, anonymous ctx. Returns False when the connection
@@ -467,13 +483,24 @@ class StreamingWebSocketServer:
         from urllib.parse import parse_qs, urlparse
 
         query = parse_qs(urlparse(path).query)
-        token_values = query.get("token", [])
-        claims = _validate_ws_token(token_values[0]) if token_values else None
+        token = None
+        org = None
+        if headers is not None:
+            bearer = str(headers.get("Authorization") or "")
+            if bearer[:7].lower() == "bearer ":
+                token = bearer[7:].strip() or None
+            org = headers.get("X-WorkPilot-Org") or None
+        if token is None:
+            token_values = query.get("token", [])
+            token = token_values[0] if token_values else None
+        claims = _validate_ws_token(token) if token else None
         if claims is None:
             return False
         ctx["claims"] = claims
-        org_values = query.get("org", [])
-        ctx["org_hint"] = org_values[0] if org_values else None
+        if org is None:
+            org_values = query.get("org", [])
+            org = org_values[0] if org_values else None
+        ctx["org_hint"] = org
         ctx["user"] = {
             "id": claims.get("sub"),
             "name": claims.get("name", ""),
@@ -489,7 +516,8 @@ class StreamingWebSocketServer:
         # Extract path and session ID
         path = self._extract_websocket_path(websocket)
 
-        if not self._authenticate_connection(path, ctx):
+        headers = self._request_headers(websocket)
+        if not self._authenticate_connection(path, ctx, headers):
             logger.warning(
                 "Rejecting unauthenticated WS connection from %s",
                 getattr(websocket, "remote_address", "?"),

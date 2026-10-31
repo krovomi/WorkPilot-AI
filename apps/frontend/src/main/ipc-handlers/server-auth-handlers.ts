@@ -26,6 +26,7 @@ import {
 	setMode,
 } from "../server-connection";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
+import { unwatchAllServerBoards } from "../server-board-live";
 
 const ENTRA_SCOPES = "openid profile email";
 const LOOPBACK_TIMEOUT_MS = 5 * 60 * 1000;
@@ -242,6 +243,7 @@ export function registerServerAuthHandlers(
 	);
 
 	ipcMain.handle(IPC_CHANNELS.SERVER_AUTH_LOGOUT, async () => {
+		unwatchAllServerBoards();
 		await logout();
 		notifyRenderer();
 		return getAuthState();

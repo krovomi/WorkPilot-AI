@@ -43,6 +43,11 @@ class EventType(str, Enum):
     SPEC_CLAIMED = "spec_claimed"
     SPEC_RELEASED = "spec_released"
     SPEC_STATUS_CHANGED = "spec_status_changed"
+    # The shared board's cards (``shared_board``): without these the stream
+    # dropped them as unknown and nobody saw the change live.
+    SPEC_UPDATED = "spec_updated"
+    SPEC_DELETED = "spec_deleted"
+    SPEC_APPROVED = "spec_approved"
     MEMBER_PRESENCE = "member_presence"
 
 
