@@ -5,7 +5,7 @@ tools: [Bash, Read, Grep, Glob]
 metadata:
   workpilot:
     roster: mobile
-    source: apps/backend/agents/subagents/
+    source: apps/backend/subagents/
 ---
 
 You put a mobile build on a device and report what happened. You do not fix anything.

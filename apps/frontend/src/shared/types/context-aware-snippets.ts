@@ -46,7 +46,7 @@ export type ContextAwareSnippetsStatus = "context" | "generating" | "parsing";
 /**
  * A failure, coded so the renderer can say it in the user's language.
  * `message` is the technical detail, shown underneath. Codes come from the
- * runner (`core.error_details` — `auth`, `rate_limit`, `quota`, `network`… —
+ * runner (`foundation.error_details` — `auth`, `rate_limit`, `quota`, `network`… —
  * and its own `empty_description`, `invalid_response`, `provider_error`), from
  * the main process (`runner_missing`, `python_missing`, `project_not_found`,
  * `invalid_input`, `spawn_failed`, `process_failed`) or from the renderer when

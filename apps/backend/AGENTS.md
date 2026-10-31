@@ -31,7 +31,8 @@ composition, qui importe les agents. Les autres modules sortis de `core` par le 
 `offline_policy/` (avec `local_model_catalog.py`), `app_detection.py` (détecteur de l'aperçu),
 `project/ui_stack.py` et `project/test_stack.py` (les piles UI et de test, venues de `uiux` et de
 `test_generation`). `agent_runtime/` est le port par lequel une unité que `core` importe lance
-une session sans importer `core` ni `agents` (merge, intégrations, analyse, architecture ;
+une session sans importer `core` ni `agents` (merge, intégrations, analyse, architecture,
+génération de tests ;
 [justification](../../docs/architecture/agent-runtime.md)) ; `core/agent_runtime.py` l'installe.
 `tests/test_import_contracts.py` tient ces frontières.
 
@@ -53,10 +54,10 @@ une session sans importer `core` ni `agents` (merge, intégrations, analyse, arc
 | Chemin | Rôle |
 |---|---|
 | `agents/tools_pkg/models.py` | `AGENT_CONFIGS` : les outils de chaque type d'agent |
-| `agents/subagents/__init__.py` | `resolve` : le roster servi à un `agent_type` ; un dict `agents` passé par l'appelant gagne |
-| `agents/subagents/phases.py` | sous-agents par défaut par phase |
-| `agents/subagents/languages/` | overlays par langage (.NET, Python, TypeScript, Java, Go, Rust) |
-| `agents/subagents/pr_review.py` | relecteurs de PR, prompts sous `prompts/github/` |
+| `subagents/__init__.py` | `resolve` : le roster servi à un `agent_type` ; un dict `agents` passé par l'appelant gagne |
+| `subagents/phases.py` | sous-agents par défaut par phase |
+| `subagents/languages/` | overlays par langage (.NET, Python, TypeScript, Java, Go, Rust) |
+| `subagents/pr_review.py` | relecteurs de PR, prompts sous `prompts/github/` |
 | `prompts/` | les prompts système réels (une quarantaine, dont `github/`) |
 | `skills_registry/frontmatter.py` | **le** parseur de frontmatter |
 | `skills_registry/agents.py` | émet le registre de sous-agents vers chaque harness |
@@ -119,7 +120,7 @@ une session sans importer `core` ni `agents` (merge, intégrations, analyse, arc
 
 Imports plats depuis la racine du backend (`from phase_config import …`) ; tests dans
 `../../tests/<paquet>/`, une seule configuration (`pytest.ini` à la racine) ; aucun test ne vit
-ici. Six modules de production portent seulement le préfixe `test_` (`agents/test_generator.py`,
+ici. Cinq modules de production portent seulement le préfixe `test_` (`regression_guardian/test_generator.py`,
 `analysis/test_discovery.py`…) : `apps/backend` reste dans `testpaths` pour eux seuls, car
 `tests/test_test_discovery.py` exige que tout `test_*.py` soit collecté ; ils ne produisent aucun test.
 

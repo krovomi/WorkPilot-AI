@@ -28,7 +28,6 @@ apps/backend/agents/
 ├── feedback_learning.py     # Collect user feedback on agent outputs
 ├── feature_wiring.py        # Wiring of the model router / cognitive context features
 ├── pair_programming.py      # Interactive pair-programming mode
-├── test_generator.py        # Streaming unit / integration test generation
 ├── refactorer.py            # Refactoring with smell detection
 ├── documenter.py            # Documentation generation
 ├── impact_analyzer.py       # PR impact analysis
@@ -66,8 +65,8 @@ the submodule directly.
 
 A *subagent* is a specialist the parent session can delegate to (Claude Agent SDK
 `agents=`, Copilot's equivalent). WorkPilot does not let each phase invent its own:
-every specialist is declared once, in `agents/subagents/`, and each run gets a
-**roster** composed from it by `agents.subagents.resolve()`, called from
+every specialist is declared once, in `subagents/`, and each run gets a
+**roster** composed from it by `subagents.resolve()`, called from
 `core/client.py` (`create_client` for Claude, `create_agent_client` for the other
 providers).
 

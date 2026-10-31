@@ -237,7 +237,7 @@ Coût : un skill BMAD vaut 2 à 6 k tokens de prompt ; il n'est lu que dans sa p
 
 ## Lot 4 — rosters et prompts par type
 
-- `agents/subagents/phases.py` : rosters `bugfix` (`test-runner`, `regression-hunter`),
+- `subagents/phases.py` : rosters `bugfix` (`test-runner`, `regression-hunter`),
   `operator` (`test-runner` seulement : il sait lancer les commandes de santé),
   `investigate` = `research`. `PHASE_ALIASES` : `operator → operator`,
   `reproducer → verify`. Rien de nouveau dans `SPECS` sauf si une lentille le réclame.

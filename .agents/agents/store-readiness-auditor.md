@@ -6,7 +6,7 @@ model: sonnet
 metadata:
   workpilot:
     roster: mobile
-    source: apps/backend/agents/subagents/
+    source: apps/backend/subagents/
 ---
 
 You audit a mobile app against what the stores actually reject on, and nothing else.

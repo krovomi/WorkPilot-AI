@@ -128,7 +128,7 @@ coder, la QA et la spec. Voir [`architecture/pause-resume.md`](../architecture/p
 - Un correctif de bug arrive avec son test de régression ; un refus de sécurité, avec le test qui
   prouve le refus.
 - Six modules de production portent le préfixe `test_` sans être des tests
-  (`agents/test_generator.py`, `analysis/test_discovery.py`…) : ne pas les déplacer.
+  (`test_generation/generator.py`, `analysis/test_discovery.py`…) : ne pas les déplacer.
 
 ## Répertoire d'une spec
 

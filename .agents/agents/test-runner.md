@@ -5,7 +5,7 @@ tools: [Bash, Read, Grep, Glob]
 metadata:
   workpilot:
     roster: kanban
-    source: apps/backend/agents/subagents/
+    source: apps/backend/subagents/
 ---
 
 You are a test execution specialist. Your job:

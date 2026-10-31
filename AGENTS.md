@@ -46,7 +46,8 @@ Une vulnérabilité se signale par [`docs/SECURITY.md`](docs/SECURITY.md), jamai
 apps/backend/        Python : agents, pipeline, API FastAPI (127.0.0.1:9000), WebSocket (:8765)
   core/client.py     LA fabrique de clients LLM — tout passe par là
   foundation/        la couche la plus basse : plateforme, sûreté des routes, git ; n'importe rien
-  agents/            planner, coder, sessions ; agents/subagents/ = registre des sous-agents
+  agents/            planner, coder, sessions
+  subagents/         registre des sous-agents : défauts de phase, overlays de langage, relecteurs de PR
   security/          allowlist de commandes, écritures confinées, contenu non fiable
   server/            mode serveur : auth/, authz/ (permissions, tenants)
   prompts/           les prompts système réels des agents
@@ -85,7 +86,7 @@ Chaque index a un `CLAUDE.md` voisin qui se contente de l'importer : Claude Code
 | `.agents/skills/<nom>/SKILL.md` | sortie **lue en production** par la barre de commandes du Kanban, quel que soit le LLM |
 | `.gemini/commands/*.toml` | miroir Gemini CLI (généré) |
 | `.claude/skills/`, `.github/skills/`, `.cursor/skills/` | miroirs par harness, **non émis par défaut** (`capabilities/harnesses.yaml`) |
-| `apps/backend/agents/subagents/` | **la** source des sous-agents : défauts de phase, overlays de langage, relecteurs de PR |
+| `apps/backend/subagents/` | **la** source des sous-agents : défauts de phase, overlays de langage, relecteurs de PR |
 | `.agents/agents/` | sortie générée depuis ce registre (`.github/agents/`, `.codex/agents/` non émis par défaut) |
 
 Un fichier généré ne s'édite pas : on modifie la source et on relance `python scripts/skills_cli.py build`.

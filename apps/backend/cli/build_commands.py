@@ -501,7 +501,7 @@ def _primary_language(spec_dir: Path) -> str:
     coarser lesson, a raised exception is a failed build.
     """
     try:
-        from agents.subagents import detect_languages
+        from subagents import detect_languages
 
         languages = detect_languages(_project_dir(spec_dir))
         return languages[0] if languages else ""

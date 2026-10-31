@@ -269,7 +269,7 @@ sequenceDiagram
 ```
 
 ### 4. Test Generator Agent
-**Fichier** : `apps/backend/agents/test_generator.py`
+**Fichier** : `apps/backend/test_generation/generator.py`
 
 #### Workflow d'Appel
 

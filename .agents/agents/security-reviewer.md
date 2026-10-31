@@ -6,7 +6,7 @@ model: inherit
 metadata:
   workpilot:
     roster: pr-review
-    source: apps/backend/agents/subagents/
+    source: apps/backend/subagents/
 ---
 
 You are a security expert. Find vulnerabilities.

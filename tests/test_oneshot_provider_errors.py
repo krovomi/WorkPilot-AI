@@ -108,7 +108,7 @@ def test_an_ordinary_answer_is_untouched(monkeypatch):
 
 
 def test_classify_names_an_unknown_model_whichever_provider_said_it():
-    from core.error_details import MODEL_UNAVAILABLE, classify
+    from foundation.error_details import MODEL_UNAVAILABLE, classify
 
     assert classify(MODEL_ERROR) == MODEL_UNAVAILABLE
     # OpenAI's 404 body, and Ollama's.

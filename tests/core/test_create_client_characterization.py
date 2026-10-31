@@ -116,8 +116,8 @@ def harness(tmp_path: Path, monkeypatch):
     for name, value in patches.items():
         monkeypatch.setattr(module, name, value)
 
-    import agents.subagents as subagents
     import core.llm_optimization as llm_optimization
+    import subagents as subagents
 
     monkeypatch.setattr(subagents, "resolve", resolve)
     monkeypatch.setattr(

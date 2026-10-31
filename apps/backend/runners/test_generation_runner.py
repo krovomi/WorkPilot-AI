@@ -71,7 +71,7 @@ def _print_error(
     message: str, *, code: str = "unknown", stage: str | None = None
 ) -> None:
     """Report a failure the runner detected itself (bad arguments, no input)."""
-    from core.error_details import ErrorDetail
+    from foundation.error_details import ErrorDetail
 
     _print_error_detail(ErrorDetail(message=message, code=code, stage=stage).to_dict())
 
@@ -98,7 +98,7 @@ def _fail(exc: BaseException, *, stage: str | None = None) -> None:
     UI can only say "it failed", which is what this whole protocol exists to
     stop.
     """
-    from core.error_details import DetailedError, ErrorDetail, classify
+    from foundation.error_details import DetailedError, ErrorDetail, classify
 
     if isinstance(exc, DetailedError):
         detail = exc.detail
@@ -200,7 +200,7 @@ def _write_test_file(
             else:
                 resolved = resolved.resolve()
 
-    from core.error_details import WRITE_FAILED, DetailedError, ErrorDetail
+    from foundation.error_details import WRITE_FAILED, DetailedError, ErrorDetail
 
     try:
         resolved.parent.mkdir(parents=True, exist_ok=True)
@@ -386,7 +386,7 @@ def _selected_library_ids(args) -> list[str] | None:
 
 def _resolve_language(args, source: str) -> str:
     """The language of *source*, detected the same way the generator does."""
-    from agents.test_generator import ProjectAnalyzer
+    from test_generation.generator import ProjectAnalyzer
 
     if source:
         detected = ProjectAnalyzer().detect(source, args.project_path)
@@ -471,7 +471,7 @@ def _run_resolve_destination(agent, args) -> None:  # noqa: ARG001 — no LLM ne
     person, not of the model. Pure path arithmetic: no provider, no network, no
     source file read.
     """
-    from agents.test_generator import ProjectAnalyzer
+    from test_generation.generator import ProjectAnalyzer
     from test_generation.layout import resolve_test_destination
 
     source = args.file_path or args.target_module or ""
@@ -575,7 +575,7 @@ def main() -> None:
     args = parser.parse_args()
 
     try:
-        from agents.test_generator import TestGeneratorAgent
+        from test_generation.generator import TestGeneratorAgent
     except ImportError as exc:
         _print_error(
             f"The test-generation backend could not be loaded: {exc}",

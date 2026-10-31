@@ -89,7 +89,7 @@ sens partout, une boucle unique, et la troncature à la source.
 | Tool clearing | boucles WorkPilot : `compact_messages` remplace les vieux résultats par un marqueur au-delà de 300 k caractères ; lot 4 : par lots, jusqu'à 60 % du budget, et seulement pour un gain d'au moins 10 % ; les arguments des appels comptent, et les longs partent des vieux appels. Claude Code purge de son côté | — |
 | Troncature | rtk sur Bash ; boucles WorkPilot : résultat coupé à 10 k caractères (70 % tête / 30 % queue). Lot 3 : `read_file`, `search_files` et `find_files` paginent sous ce plafond ; une longue sortie de `run_command` ou d'un outil exécuté dans le processus va dans un fichier ; le cerveau pagine ses notes et ses skills. Claude Code plafonne nativement (table ci-dessus) | aucun plafond natif réglé par WorkPilot : la ligne de base dira s'il faut baisser ceux de Claude Code |
 | Mémoire externe | cerveau (vault, `graph.json`, serveur MCP 9 outils), `implementation_plan.json`, `build-progress.txt`, `handoff_pending.md`, rapports de phase plafonnés. Lot 3b : les sorties longues des boucles WorkPilot vont dans `<spec>/tool-output/`, relues par `read_file` | un `MemoryPort` unique, avec la boucle partagée (lot 1b-ii) |
-| Sous-agents | registre `agents/subagents/`, roster ≤ 7 ; Claude et Copilot. Lot 5 : contrat `{conclusion, files, evidence}` sous 2 000 tokens, résultat coupé et marqué au-delà, délimité comme une donnée (hook PostToolUse sur Claude, `run_subagents` sur Copilot) ; Copilot les lance en échelon | `run_subagents` n'a pas d'appelant en production |
+| Sous-agents | registre `subagents/`, roster ≤ 7 ; Claude et Copilot. Lot 5 : contrat `{conclusion, files, evidence}` sous 2 000 tokens, résultat coupé et marqué au-delà, délimité comme une donnée (hook PostToolUse sur Claude, `run_subagents` sur Copilot) ; Copilot les lance en échelon | `run_subagents` n'a pas d'appelant en production |
 | Outils dynamiques | `AGENT_CONFIGS` par type d'agent ; MCP ajoutés selon la tâche ; schémas MCP différés sur Claude face à l'API d'Anthropic (`ENABLE_TOOL_SEARCH=auto:5`). Lot 6 : un jeu d'outils canonique, trié et figé par session dans les boucles WorkPilot (`harness/domain/tools.py`) ; ni cerveau ni ui-ux pour un type sans outils | rien par sous-tâche ; la réduction des phases de build, mesurée par `tool_weights` |
 | Effort et routage | effort par phase (`phase_config.py`), traduit par provider (`reasoning_effort`, budget de réflexion) ; routeur de complexité et `model_router` presque toujours éteints | pas d'escalade automatique |
 | Récupération de code | `context/search.py` : correspondance de sous-chaînes ; grepai seulement pour l'autofix. Lot 7 : `search_code`, BM25 sur des morceaux par symbole fusionné par RRF avec une recherche exacte d'identifiants, 5 à 8 extraits par appel avec curseur, servi en MCP (`workpilot-code`) et par `ToolExecutor` aux types qui déclarent `code` | l'éval qui tranche (5, 20, 50 extraits), sur la ligne de base du lot 0 |
@@ -372,7 +372,7 @@ après le texte propre à la sous-tâche.
   ADR et pièces jointes, rapports des phases précédentes (tâche). Le texte de la sous-tâche vient
   ensuite, et son en-tête d'environnement, stable sur la tâche, le prolonge. Avant, seul le
   préambule d'effort précédait la sous-tâche ; le reste la suivait.
-- **Rosters** : déjà en place. `agents/subagents/phases.py` donne le roster vide `solo` à chaque
+- **Rosters** : déjà en place. `subagents/phases.py` donne le roster vide `solo` à chaque
   type à tâche unique (`commit_message`, `merge_resolver`…), et
   `tests/test_subagents_coverage.py` vérifie que seul `coder` retombe sur le roster par défaut.
 
@@ -566,7 +566,7 @@ texte remis à un parent.
 - **Le dire au sous-agent**, là où son prompt part chez le provider : `bind_contract` ajoute le
   contrat à une copie de chaque définition du roster que `create_client` donne au SDK, et
   `subagent_messages` le place dans le message système de chaque appel Copilot. Le registre
-  `agents/subagents/` et ses sorties générées (`.agents/agents/`) ne changent pas : des harnesses
+  `subagents/` et ses sorties générées (`.agents/agents/`) ne changent pas : des harnesses
   dont WorkPilot ne reçoit pas les résultats les lisent.
 - **Mesurer** : le ledger garde chaque retour (`SubagentReturn` : tokens reçus, tokens lus par le
   parent, coupé ou non), et `summary()` en donne le nombre, les tokens et les coupes. Copilot

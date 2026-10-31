@@ -1,6 +1,7 @@
 """The agent_runtime port: core installs it, the units below core go through it.
 
-``merge``, ``integrations``, ``analysis`` and ``architecture`` used to import
+``merge``, ``integrations``, ``analysis``, ``architecture`` and the test
+generator used to import
 ``core`` (or ``agents``) to start one utility session, which put them in the
 agents' import cycle. They now ask ``agent_runtime.current()``; these tests
 hold that ``core`` installs the runtime, that it reaches the same factories a
@@ -91,6 +92,13 @@ class TestWithoutARuntime:
             )
         )
         assert violations == []
+
+    def test_the_test_generator_reports_it(self, no_runtime):
+        from foundation.error_details import DetailedError
+        from test_generation.generator import TestGeneratorAgent
+
+        with pytest.raises(DetailedError, match="No agent runtime"):
+            asyncio.run(TestGeneratorAgent()._call_llm("PROMPT"))
 
 
 class TestWithoutAToken:

@@ -6,7 +6,7 @@ model: sonnet
 metadata:
   workpilot:
     roster: research
-    source: apps/backend/agents/subagents/
+    source: apps/backend/subagents/
 ---
 
 You are given one claim about this codebase. Establish whether it is true.

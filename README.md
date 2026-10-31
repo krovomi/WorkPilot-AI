@@ -272,7 +272,7 @@ AI-assisted feature planning with competitor analysis and audience targeting.
 >
 > Les liens entre couches sont vérifiés par des tests qui lisent les sources : IPC dans les deux
 > sens et canaux nommés par constante (`ipc-channel-parity.test.ts`), imports entre unités du
-> backend et plafond du cycle principal, ramené de 81 à 20 unités par la couche `foundation/` et le port `agent_runtime`
+> backend et plafond du cycle principal, ramené de 81 à 18 unités par la couche `foundation/` et le port `agent_runtime`
 > (`tests/test_import_contracts.py`), une ligne par vue dans
 > [`product-overview.md`](docs/architecture/product-overview.md) (`tests/test_product_overview_views.py`).
 >
@@ -319,8 +319,8 @@ Détail et plan par lots : [`docs/architecture/kanban-task-types.md`](docs/archi
 
 #### Sous-agents spécialisés
 Les sous-agents ne sont pas déclarés par chaque agent : ils vivent dans **un seul registre**,
-[`apps/backend/agents/subagents/`](apps/backend/agents/subagents/), et chaque session reçoit un
-*roster* composé par `agents.subagents.resolve()` depuis `core/client.py` :
+[`apps/backend/subagents/`](apps/backend/subagents/), et chaque session reçoit un
+*roster* composé par `subagents.resolve()` depuis `core/client.py` :
 
 1. **Défauts de phase** (`phases.py`) — p. ex. coder : `code-reviewer`, `test-runner`,
    `architecture-analyst` ; planner : `architecture-analyst`, `dependency-tracer` ;

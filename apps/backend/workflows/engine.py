@@ -431,7 +431,7 @@ def narrow_to_forecast(
 
     The profile a build starts with was resolved before anything was planned,
     so every `when: touches(...)` phase was kept on "unknown — run". Once the
-    plan names its files (`workflows.forecast.planned_files`), the phases that
+    plan names its files (`foundation.plan_forecast.planned_files`), the phases that
     run *before* the code exists can be decided on that forecast. This only
     ever removes: a phase effort pruned stays pruned, and ``None`` — no
     forecast — returns the profile unchanged.
