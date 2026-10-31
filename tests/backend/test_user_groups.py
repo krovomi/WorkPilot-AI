@@ -249,20 +249,20 @@ async def test_nothing_crosses_a_tenant(env):
     outsider = env["users"]["outsider"]
     async with _client(await _principal(env, "admin")) as c:
         gid = (await c.post("/admin/groups", json={"name": "QA"})).json()["id"]
-        assert (
-            await c.put(f"/admin/groups/{gid}/members/{outsider}")
-        ).status_code == 404
+        r = await c.put(f"/admin/groups/{gid}/members/{outsider}")
+        assert r.status_code == 404
         r = await c.put(
             f"/admin/groups/{gid}/projects/{env['other']}", json={"role": "owner"}
         )
         assert r.status_code == 404
 
     async with _client(await _principal(env, "outsider", "globex")) as c:
-        assert (await c.get("/admin/groups")).json() == []
-        assert (
-            await c.patch(f"/admin/groups/{gid}", json={"name": "Mine"})
-        ).status_code == 404
-        assert (await c.delete(f"/admin/groups/{gid}")).status_code == 404
+        r = await c.get("/admin/groups")
+        assert r.json() == []
+        r = await c.patch(f"/admin/groups/{gid}", json={"name": "Mine"})
+        assert r.status_code == 404
+        r = await c.delete(f"/admin/groups/{gid}")
+        assert r.status_code == 404
         r = await c.put(f"/admin/groups/{gid}/members/{outsider}")
         assert r.status_code == 404
 
@@ -271,13 +271,15 @@ async def test_managing_groups_needs_the_rights_that_hand_out_access(env):
     async with _client(await _principal(env, "admin")) as c:
         gid = (await c.post("/admin/groups", json={"name": "QA"})).json()["id"]
     async with _client(await _principal(env, "vic")) as c:
-        assert (await c.get("/admin/groups")).status_code == 200
+        r = await c.get("/admin/groups")
+        assert r.status_code == 200
         denied = await c.post("/admin/groups", json={"name": "Mine"})
         assert (
             denied.status_code == 403 and "org.member.write" in denied.json()["detail"]
         )
         vic = env["users"]["vic"]
-        assert (await c.put(f"/admin/groups/{gid}/members/{vic}")).status_code == 403
+        r = await c.put(f"/admin/groups/{gid}/members/{vic}")
+        assert r.status_code == 403
         r = await c.put(
             f"/admin/groups/{gid}/projects/{env['shop']}", json={"role": "owner"}
         )
@@ -296,7 +298,8 @@ async def test_leaving_the_organization_ends_what_its_groups_gave(env):
         await c.put(
             f"/admin/groups/{gid}/projects/{env['shop']}", json={"role": "owner"}
         )
-        assert (await c.delete(f"/admin/members/{vic}")).status_code == 200
+        r = await c.delete(f"/admin/members/{vic}")
+        assert r.status_code == 200
         group = (await c.get("/admin/groups")).json()[0]
     assert group["members"] == []
     assert (await _principal(env, "vic")).permissions == frozenset()
@@ -305,8 +308,10 @@ async def test_leaving_the_organization_ends_what_its_groups_gave(env):
 
 async def test_names_roles_and_project_roles_are_checked(env):
     async with _client(await _principal(env, "admin")) as c:
-        assert (await c.post("/admin/groups", json={"name": "QA"})).status_code == 201
-        assert (await c.post("/admin/groups", json={"name": "QA"})).status_code == 409
+        r = await c.post("/admin/groups", json={"name": "QA"})
+        assert r.status_code == 201
+        r = await c.post("/admin/groups", json={"name": "QA"})
+        assert r.status_code == 409
         bad_role = await c.post(
             "/admin/groups", json={"name": "X", "role_slug": "nope"}
         )
@@ -320,8 +325,10 @@ async def test_names_roles_and_project_roles_are_checked(env):
         await c.patch(f"/admin/groups/{gid}", json={"role_slug": "maintainer"})
         r = await c.patch(f"/admin/groups/{gid}", json={"role_slug": ""})
         assert r.json()["role_slug"] is None
-        assert (await c.delete(f"/admin/groups/{gid}")).json() == {"deleted": True}
-        assert (await c.get("/admin/groups")).json() == []
+        r = await c.delete(f"/admin/groups/{gid}")
+        assert r.json() == {"deleted": True}
+        r = await c.get("/admin/groups")
+        assert r.json() == []
 
 
 async def test_every_change_is_audited(env):
