@@ -19,6 +19,8 @@ describe("server project views", () => {
 			"context",
 			"github-issues",
 			"github-prs",
+			"gitlab-issues",
+			"gitlab-merge-requests",
 			"ideation",
 			"insights",
 			"kanban",
@@ -38,6 +40,22 @@ describe("server project views", () => {
 		expect(showsView("github-prs", true, "github")).toBe(true);
 		expect(showsView("github-prs", true, null)).toBe(false);
 		expect(showsView("terminals", true, "github")).toBe(false);
+	});
+
+	it("a server project on GitLab shows the views of the forge the server lists", () => {
+		const listed = (forge: "github" | "gitlab" | null, repoUrl: string) =>
+			serverForge({
+				remote: { repoUrl, defaultBranch: "main", role: "member", forge },
+			} as Project);
+		expect(listed("gitlab", "https://git.acme.test/team/shop.git")).toBe("gitlab");
+		// The server decides: a GitLab host its operator did not name is no forge.
+		expect(listed(null, "https://gitlab.evil.test/team/shop.git")).toBeNull();
+		expect(listed(null, "https://github.com/acme/shop.git")).toBeNull();
+		expect(showsView("gitlab-issues", true, "gitlab")).toBe(true);
+		expect(showsView("gitlab-merge-requests", true, "gitlab")).toBe(true);
+		expect(showsView("github-issues", true, "gitlab")).toBe(false);
+		expect(showsView("gitlab-issues", true, "github")).toBe(false);
+		expect(showsView("gitlab-merge-requests", true, null)).toBe(false);
 	});
 
 	it("a project of this computer shows every view", () => {

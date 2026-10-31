@@ -31,8 +31,11 @@ export function githubRepoOf(repoUrl: string | undefined): string | null {
 
 /** The config of a server project on GitHub; null for another forge. */
 export function serverGitHubConfig(project: Project): GitHubConfig | null {
+	// The forge the server lists, when it lists one (`server/forges.py`)
+	const forge = project.remote?.forge;
+	if (forge !== undefined && forge !== "github") return null;
 	const repo = githubRepoOf(project.remote?.repoUrl);
-	return repo ? { token: HANDLE + project.id, repo } : null;
+	return repo ? { token: serverHandle(project.id), repo } : null;
 }
 
 /** Whether a config's token is a server project's handle. */
@@ -40,20 +43,33 @@ export function isServerHandle(token: string): boolean {
 	return token.startsWith(HANDLE);
 }
 
-interface RelayAnswer {
+export interface RelayAnswer {
 	status?: number;
 	body?: unknown;
 	text?: string;
+	/** GitLab's `X-Total`, when it gave one. */
+	total?: number;
 }
 
-async function relay(
+/** The server project a handle names, made from `serverHandle`. */
+export function serverHandle(projectId: string): string {
+	return HANDLE + projectId;
+}
+
+/**
+ * One call of a forge relay of the server (`github/read`, `gitlab/write`…)
+ * for the project a handle names; a forge's error status is thrown as the
+ * forge's own fetch throws it.
+ */
+export async function relayToServer(
 	handle: string,
-	route: "read" | "write" | "pulls",
+	route: `${"github" | "gitlab"}/${"read" | "write" | "pulls"}`,
 	payload: Record<string, unknown>,
 ): Promise<RelayAnswer> {
 	const projectId = handle.slice(HANDLE.length);
+	const forge = route.startsWith("gitlab") ? "GitLab" : "GitHub";
 	const result = await authedFetch<RelayAnswer>(
-		`/api/features/forge/github/${route}?project_id=${encodeURIComponent(projectId)}`,
+		`/api/features/forge/${route}?project_id=${encodeURIComponent(projectId)}`,
 		"POST",
 		payload,
 	);
@@ -65,7 +81,7 @@ async function relay(
 			0,
 			ERROR_BODY_MAX,
 		);
-		throw new Error(`GitHub API error: ${status} - ${detail}`);
+		throw new Error(`${forge} API error: ${status} - ${detail}`);
 	}
 	return answer;
 }
@@ -87,7 +103,7 @@ export async function relayGitHubFetch(
 		typeof options.body === "string" && options.body
 			? (JSON.parse(options.body) as unknown)
 			: undefined;
-	const answer = await relay(handle, method === "GET" ? "read" : "write", {
+	const answer = await relayToServer(handle, method === "GET" ? "github/read" : "github/write", {
 		method,
 		endpoint: endpointOf(endpoint),
 		...(body === undefined ? {} : { body }),
@@ -101,7 +117,7 @@ export async function relayGitHubDiff(
 	repo: string,
 	prNumber: number,
 ): Promise<string> {
-	const answer = await relay(handle, "read", {
+	const answer = await relayToServer(handle, "github/read", {
 		endpoint: `/repos/${repo}/pulls/${prNumber}`,
 		accept: "diff",
 	});
@@ -114,7 +130,7 @@ export async function relayOpenPulls<T>(
 	first: number,
 	after: string | null,
 ): Promise<T> {
-	const answer = await relay(handle, "pulls", { first, after });
+	const answer = await relayToServer(handle, "github/pulls", { first, after });
 	const result = answer.body as T & { errors?: Array<{ message: string }> };
 	if (!result || (result.errors && result.errors.length > 0)) {
 		throw new Error("GitHub API request failed");

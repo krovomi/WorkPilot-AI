@@ -6,7 +6,7 @@
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../../shared/constants";
 import type { GitLabIssue, GitLabNote, IPCResult } from "../../../shared/types";
-import { projectStore } from "../../project-store";
+import { featureProject } from "../server-feature-files";
 import type { GitLabAPIIssue, GitLabAPINote } from "./types";
 import { encodeProjectPath, getGitLabConfig, gitlabFetch } from "./utils";
 
@@ -96,7 +96,7 @@ export function registerGetIssues(): void {
 		): Promise<IPCResult<GitLabIssue[]>> => {
 			debugLog("getGitLabIssues handler called", { state });
 
-			const project = projectStore.getProject(projectId);
+			const project = featureProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
 			}
@@ -157,7 +157,7 @@ export function registerGetIssue(): void {
 		): Promise<IPCResult<GitLabIssue>> => {
 			debugLog("getGitLabIssue handler called", { issueIid });
 
-			const project = projectStore.getProject(projectId);
+			const project = featureProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
 			}
@@ -212,7 +212,7 @@ export function registerGetIssueNotes(): void {
 		): Promise<IPCResult<GitLabNote[]>> => {
 			debugLog("getGitLabIssueNotes handler called", { issueIid });
 
-			const project = projectStore.getProject(projectId);
+			const project = featureProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
 			}

@@ -1038,18 +1038,18 @@ export function Sidebar({
 
 	// Subscribe to project-env-store for reactive GitHub/GitLab tab visibility
 	const envGitHub = useProjectEnvStore((state) => state.envConfig?.githubEnabled ?? false);
-	const gitlabEnabled = useProjectEnvStore(
-		(state) => state.envConfig?.gitlabEnabled ?? false,
-	);
+	const envGitLab = useProjectEnvStore((state) => state.envConfig?.gitlabEnabled ?? false);
 
 	// Server mode: the administration console, and the views a server project
-	// offers (`sidebar/server-gates.ts`), GitHub's when it was cloned from there.
+	// offers (`sidebar/server-gates.ts`), its forge's (GitHub or GitLab) among them.
 	const { canAdminister, serverProject } = useServerNavGates(
 		selectedProject,
 		activeView,
 		onViewChange,
 	);
-	const githubEnabled = serverProject ? serverForge(selectedProject) === "github" : envGitHub;
+	const forge = serverForge(selectedProject);
+	const githubEnabled = serverProject ? forge === "github" : envGitHub;
+	const gitlabEnabled = serverProject ? forge === "gitlab" : envGitLab;
 
 	// Track the last loaded project ID to avoid redundant loads
 	const lastLoadedProjectIdRef = useRef<string | null>(null);

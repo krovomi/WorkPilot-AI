@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -36,6 +37,27 @@ def _env_int(name: str, default: int) -> int:
             "Invalid integer for %s=%r, using default %d", name, raw, default
         )
         return default
+
+
+_HOST = re.compile(
+    r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$"
+)
+
+
+def _gitlab_hosts(value: str) -> tuple[str, ...]:
+    """gitlab.com and the hosts listed, lowercased; a malformed one is left out."""
+    hosts = ["gitlab.com"]
+    for raw in value.split(","):
+        host = raw.strip().lower()
+        if not host:
+            continue
+        if _HOST.match(host) and host not in hosts:
+            hosts.append(host)
+        else:
+            logger.warning(
+                "Ignoring invalid host in WORKPILOT_GITLAB_HOSTS: %r", raw[:100]
+            )
+    return tuple(hosts)
 
 
 def _stream_url(value: str) -> str:
@@ -86,6 +108,11 @@ class ServerSettings:
     # the API's host on port 8765 (a reverse proxy, TLS). ws:// or wss://
     # only; anything else is ignored.
     public_stream_url: str
+
+    # The GitLab instances whose API the forge relay calls with a person's
+    # token: gitlab.com and the hosts listed (comma-separated). A project
+    # cloned from any other host shows no GitLab views.
+    gitlab_hosts: tuple[str, ...]
 
     # Self-service signup (invitation-only).
     invitation_ttl_hours: int
@@ -149,6 +176,7 @@ class ServerSettings:
             public_stream_url=_stream_url(
                 os.environ.get("WORKPILOT_PUBLIC_STREAM_URL", "")
             ),
+            gitlab_hosts=_gitlab_hosts(os.environ.get("WORKPILOT_GITLAB_HOSTS", "")),
             invitation_ttl_hours=_env_int("WORKPILOT_INVITATION_TTL_HOURS", 72),
             password_min_length=_env_int("WORKPILOT_PASSWORD_MIN_LENGTH", 12),
             password_hibp_check=_env_bool("WORKPILOT_PASSWORD_HIBP_CHECK", False),

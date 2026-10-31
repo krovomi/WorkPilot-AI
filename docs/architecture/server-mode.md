@@ -336,9 +336,30 @@ jusqu'à leurs jobs serveur. Une politique hors ligne stricte du projet bloque l
 | Commenter, assigner, mettre à jour une branche, approuver un workflow | `POST /api/features/forge/github/write` | `vcs.write`, rôle `member` ou plus |
 | Fusionner une PR | la même, sur `/repos/<dépôt>/pulls/<n>/merge` | en plus `vcs.pr.merge` |
 
+**Les vues GitLab aussi, sur une instance nommée par l'opérateur.** Un projet cloné depuis
+gitlab.com ou depuis un hôte de `WORKPILOT_GITLAB_HOSTS` montre ses issues et ses merge requests,
+de la même façon : `getGitLabConfig` donne une poignée, `gitlabFetch` envoie l'appel au serveur
+(`ipc-handlers/gitlab/server-relay.ts`), qui le fait avec le jeton GitLab de la personne
+(`shared_features/forge_gitlab.py`). L'hôte vient du `repo_url`, qu'un propriétaire de projet
+choisit : sans la liste de l'opérateur, il suffirait d'un projet pointé vers un hôte quelconque
+pour y envoyer le jeton de chaque membre qui ouvre la vue. Le serveur décide donc seul de la forge
+d'un projet (`server/forges.py`, champ `forge` de sa fiche) et l'app ne montre que les vues de
+celle-ci. L'URL envoyée est `https://<hôte listé>/api/v4/projects/<chemin du projet>/…`,
+reconstruite comme pour GitHub (`_ROUTES` : issues, notes, merge requests, leurs changements et
+commits ; noter, approuver, ouvrir, modifier, rebaser, fusionner une MR). « Créer une tâche » sur
+une issue en fait une carte du tableau partagé ; la revue IA reste masquée, l'approbation et la
+fusion d'une MR ouverte restent offertes.
+
+| Action | Route | Il faut |
+|---|---|---|
+| Lire (issues, notes, MR, changements, commits) | `POST /api/features/forge/gitlab/read` | `vcs.read` |
+| Noter, approuver, modifier, rebaser une MR | `POST /api/features/forge/gitlab/write` | `vcs.write`, rôle `member` ou plus |
+| Ouvrir une MR | la même, `POST` sur `/merge_requests` | en plus `vcs.pr.create` |
+| Fusionner une MR | la même, sur `/merge_requests/<n>/merge` | en plus `vcs.pr.merge` |
+
 ## Ce qui vient
 
 Le plan multi-tenant du 31 octobre, par lots : les autres features servies de la même façon
-(GitLab et les actions IA des forges en jobs, analyses, tableau de bord), le flux du projet ouvert pour
+(les actions IA des forges en jobs, analyses, tableau de bord), le flux du projet ouvert pour
 chaque vue partagée, un test de bout en bout à deux organisations, et le guide d'exploitation. Ce
 fichier grandit avec chaque lot.

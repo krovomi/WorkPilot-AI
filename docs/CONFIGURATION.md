@@ -204,6 +204,7 @@ the container instead of serving. CI builds it and migrates a PostgreSQL 16 with
 | `WORKPILOT_MAX_CONCURRENT_RUNS` | `3` | Deployment-wide ceiling. Per-organization ceilings are set in the console (see quotas below). |
 | `WORKPILOT_RUN_ISOLATION` | `required` | Each run is confined by Landlock to its own clone, its project's home (`REPOS_ROOT/.run-homes/<project>`) and its own temp directory; other projects and the server's state are out of its reach. Needs Linux 5.13+ with Landlock enabled (Docker 23+ allows it) and a server that does not run as root. Where it cannot be enforced, runs fail with the reason. `off` runs them unconfined: only for a deployment where every user may read every project. See [server-mode.md](architecture/server-mode.md#ce-quun-run-voit-sur-le-disque). |
 | `WORKPILOT_WS_URL` | `ws://127.0.0.1:8765` | Where the API pushes board events (projects, specs, runs) to the streaming WebSocket server. Change it only when that server is not on the API's loopback. |
+| `WORKPILOT_GITLAB_HOSTS` | — | Self-hosted GitLab instances (comma-separated host names, e.g. `git.acme.test`) whose projects show their GitLab views, relayed with each person's own GitLab token. gitlab.com is always one. A project cloned from any other host shows none: its owner chose that URL, and a member's token is never sent to a host the operator did not name. |
 
 Sign-in, invitations and email have their own variables, after
 [Quotas](#quotas).

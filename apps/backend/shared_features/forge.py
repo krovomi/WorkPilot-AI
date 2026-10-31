@@ -37,6 +37,7 @@ from server.authz.principal import Principal, get_principal
 from server.authz.scope import ProjectScope, resolve_project_scope
 from server.db.engine import get_db
 from server.db.models import Project
+from server.forges import github_repo
 from server.services.secrets import SecretsVaultError, get_user_secret
 from shared_board.cards import _require_writer
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -49,11 +50,6 @@ MAX_CURSOR = 200
 MAX_ANSWER = 8_000_000
 TIMEOUT = 30.0
 
-#: ``owner/repo`` from the URL a project was cloned from: github.com only.
-_GITHUB_URL = re.compile(
-    r"^(?:https://(?:[^@/]+@)?github\.com/|git@github\.com:|ssh://git@github\.com/)"
-    r"(?P<repo>[A-Za-z0-9-]{1,39}/[A-Za-z0-9._-]{1,100}?)(?:\.git)?/?$"
-)
 #: The kinds of a path's variable segments.
 NUMBER, COMMIT, RANGE = "<number>", "<commit>", "<range>"
 #: The calls the app's GitHub views make below ``/repos/<owner>/<repo>``,
@@ -122,10 +118,7 @@ query($owner: String!, $repo: String!, $first: Int!, $after: String) {
 """
 
 
-def github_repo(repo_url: str) -> str | None:
-    """``owner/repo`` of a GitHub URL, else None."""
-    match = _GITHUB_URL.match((repo_url or "").strip())
-    return match.group("repo") if match else None
+__all__ = ["github_repo", "router"]
 
 
 def _number(text: str) -> str | None:
@@ -157,15 +150,12 @@ def _segment(kind: str, text: str) -> str | None:
     return kind if text == kind else None
 
 
-def api_call(
-    method: str, endpoint: str, repo: str
-) -> tuple[str, dict[str, str], tuple[str, ...]] | None:
-    """The path and query parameters to send for a call of the views, with
-    the route it matched; None for any other call.
-
-    The path is rebuilt from the route, the project's ``repo`` and numbers:
-    it holds no text of ``endpoint``.
-    """
+def split_call(
+    method: str, endpoint: str, query_keys: frozenset[str]
+) -> tuple[list[str], dict[str, str]] | None:
+    """The path segments of ``endpoint`` and its query parameters, when it is
+    a plain relative path whose query has only ``query_keys`` (and none for a
+    change); else None."""
     if any(c in endpoint for c in ("\\", "#", "%", "@")) or any(
         ord(c) < 0x21 for c in endpoint
     ):
@@ -178,12 +168,40 @@ def api_call(
     if (
         (pairs and method != "GET")
         or len(set(keys)) != len(keys)
-        or any(key not in _QUERY_KEYS for key in keys)
+        or any(key not in query_keys for key in keys)
         or any(len(value) > _QUERY_VALUE_MAX for _, value in pairs)
     ):
         return None
-    params = dict(pairs)
-    segments = split.path.split("/")[1:]
+    return split.path.split("/")[1:], dict(pairs)
+
+
+def match_route(
+    method: str, rest: list[str], routes: tuple[tuple[str, tuple[str, ...]], ...]
+) -> tuple[list[str], tuple[str, ...]] | None:
+    """The route ``rest`` is a call of, and its segments rebuilt from the
+    route's own words and numbers: none of them is text of the request."""
+    for route_method, route in routes:
+        if route_method != method or len(route) != len(rest):
+            continue
+        built = [_segment(kind, text) for kind, text in zip(route, rest, strict=True)]
+        if None not in built:
+            return [b for b in built if b is not None], route
+    return None
+
+
+def api_call(
+    method: str, endpoint: str, repo: str
+) -> tuple[str, dict[str, str], tuple[str, ...]] | None:
+    """The path and query parameters to send for a call of the GitHub views,
+    with the route it matched; None for any other call.
+
+    The path is rebuilt from the route, the project's ``repo`` and numbers:
+    it holds no text of ``endpoint``.
+    """
+    found = split_call(method, endpoint, _QUERY_KEYS)
+    if found is None:
+        return None
+    segments, params = found
     if segments == ["user"]:
         return ("/user", params, ()) if method == "GET" else None
     owner, name = repo.split("/", 1)
@@ -194,15 +212,11 @@ def api_call(
         or segments[2].lower() != name.lower()
     ):
         return None
-    rest = segments[3:]
-    for route_method, route in _ROUTES:
-        if route_method != method or len(route) != len(rest):
-            continue
-        built = [_segment(kind, text) for kind, text in zip(route, rest, strict=True)]
-        if None not in built:
-            path = "/".join([f"/repos/{repo}", *(b for b in built if b is not None)])
-            return path, params, route
-    return None
+    matched = match_route(method, segments[3:], _ROUTES)
+    if matched is None:
+        return None
+    built, route = matched
+    return "/".join([f"/repos/{repo}", *built]), params, route
 
 
 async def _project_repo(db: AsyncSession, scope: ProjectScope) -> str:
@@ -213,7 +227,7 @@ async def _project_repo(db: AsyncSession, scope: ProjectScope) -> str:
     return repo
 
 
-def _guard_offline(scope: ProjectScope) -> None:
+def guard_offline(scope: ProjectScope) -> None:
     from offline_policy import guard_cloud_client
 
     try:
@@ -222,50 +236,65 @@ def _guard_offline(scope: ProjectScope) -> None:
         raise HTTPException(status_code=409, detail=str(e)) from e
 
 
-async def _token(db: AsyncSession, principal: Principal) -> str:
+async def user_token(
+    db: AsyncSession, principal: Principal, kind: str, forge: str
+) -> str:
+    """The caller's own token for a forge, stored on the server; 412 if none."""
     try:
-        token = await get_user_secret(db, principal.id, "github_token")
+        token = await get_user_secret(db, principal.id, kind)
     except SecretsVaultError as e:
         raise HTTPException(status_code=503, detail="Tokens unavailable") from e
     if not token:
         raise HTTPException(
             status_code=412,
-            detail="Add your GitHub token in Settings → My tokens on the server",
+            detail=f"Add your {forge} token in Settings → My tokens on the server",
         )
     return token
 
 
-async def _send(
-    token: str,
+async def send(
     method: str,
     url: str,
+    headers: dict[str, str],
     *,
     params: dict[str, str] | None = None,
     json: Any = None,
-    accept: str = "application/vnd.github+json",
+    text: bool = False,
 ) -> dict[str, Any]:
-    headers = {
-        "Accept": accept,
-        "Authorization": f"Bearer {token}",
-        "User-Agent": "WorkPilot-AI",
-        "X-GitHub-Api-Version": "2022-11-28",
-    }
+    """One call of a forge's API, its redirects not followed: the status and
+    the body (``text`` for a diff), and GitLab's ``X-Total`` when given."""
     try:
         async with httpx.AsyncClient(timeout=TIMEOUT, follow_redirects=False) as client:
             answer = await client.request(
                 method, url, headers=headers, params=params, json=json
             )
     except httpx.HTTPError as e:
-        raise HTTPException(status_code=502, detail="GitHub unreachable") from e
+        raise HTTPException(status_code=502, detail="Forge unreachable") from e
     if len(answer.content) > MAX_ANSWER:
-        raise HTTPException(status_code=502, detail="GitHub's answer is too large")
-    if accept.endswith("diff"):
-        return {"status": answer.status_code, "text": answer.text}
+        raise HTTPException(status_code=502, detail="The forge's answer is too large")
+    result: dict[str, Any] = {"status": answer.status_code}
+    total = answer.headers.get("X-Total", "")
+    if total.isascii() and total.isdigit():
+        result["total"] = int(total)
+    if text:
+        result["text"] = answer.text
+        return result
     try:
-        body = answer.json() if answer.content else None
+        result["body"] = answer.json() if answer.content else None
     except ValueError:
-        body = None
-    return {"status": answer.status_code, "body": body}
+        result["body"] = None
+    return result
+
+
+def _github_headers(
+    token: str, accept: str = "application/vnd.github+json"
+) -> dict[str, str]:
+    return {
+        "Accept": accept,
+        "Authorization": f"Bearer {token}",
+        "User-Agent": "WorkPilot-AI",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
 
 
 async def _relay(
@@ -279,17 +308,19 @@ async def _relay(
     path, params, route = found
     if route == _MERGE and not principal.has("vcs.pr.merge"):
         raise HTTPException(status_code=403, detail="Missing permission: vcs.pr.merge")
-    _guard_offline(scope)
-    token = await _token(db, principal)
-    return await _send(
-        token,
+    guard_offline(scope)
+    token = await user_token(db, principal, "github_token", "GitHub")
+    diff = call.accept == "diff"
+    return await send(
         call.method,
         GITHUB_API + path,
+        _github_headers(
+            token,
+            "application/vnd.github.diff" if diff else "application/vnd.github+json",
+        ),
         params=params,
         json=call.body,
-        accept="application/vnd.github.diff"
-        if call.accept == "diff"
-        else "application/vnd.github+json",
+        text=diff,
     )
 
 
@@ -330,13 +361,13 @@ async def github_pulls(
 ) -> dict[str, Any]:
     """A page of the project's open pull requests (GraphQL), as the caller."""
     repo = await _project_repo(db, scope)
-    _guard_offline(scope)
-    token = await _token(db, get_principal(request))
+    guard_offline(scope)
+    token = await user_token(db, get_principal(request), "github_token", "GitHub")
     owner, name = repo.split("/", 1)
     variables = {"owner": owner, "repo": name, "first": page.first, "after": page.after}
-    return await _send(
-        token,
+    return await send(
         "POST",
         GITHUB_API + "/graphql",
+        _github_headers(token),
         json={"query": OPEN_PULLS_QUERY, "variables": variables},
     )

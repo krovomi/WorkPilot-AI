@@ -20,7 +20,10 @@ import type { Project } from "../../../shared/types";
 import type { AuthFailureInfo } from "../../../shared/types/terminal";
 import { createIPCCommunicators } from "../github/utils/ipc-communicator";
 import { createContextLogger } from "../github/utils/logger";
-import { withProjectOrNull } from "../github/utils/project-middleware";
+import {
+	withForgeProjectOrNull,
+	withProjectOrNull,
+} from "../github/utils/project-middleware";
 import { getPageFeatureSettings } from "../../services/page-llm-config";
 import { getRunnerEnv } from "../github/utils/runner-env";
 import {
@@ -75,6 +78,11 @@ const REBASE_TIMEOUT_MS = parseInt(
 /**
  * Get the registry key for an MR review
  */
+/** An MR iid or a GitLab user id: a positive whole number. */
+function isIid(value: unknown): value is number {
+	return Number.isInteger(value) && (value as number) > 0;
+}
+
 function getReviewKey(projectId: string, mrIid: number): string {
 	return `${projectId}:${mrIid}`;
 }
@@ -328,7 +336,7 @@ export function registerMRReviewHandlers(
 	ipcMain.handle(
 		IPC_CHANNELS.GITLAB_MR_GET_DIFF,
 		async (_, projectId: string, mrIid: number): Promise<string | null> => {
-			return withProjectOrNull(projectId, async (project) => {
+			return withForgeProjectOrNull(projectId, async (project) => {
 				const config = await getGitLabConfig(project);
 				if (!config) return null;
 
@@ -635,9 +643,9 @@ export function registerMRReviewHandlers(
 			body: string,
 		): Promise<boolean> => {
 			debugLog("postMRNote handler called", { projectId, mrIid });
-			const postResult = await withProjectOrNull(projectId, async (project) => {
+			const postResult = await withForgeProjectOrNull(projectId, async (project) => {
 				const config = await getGitLabConfig(project);
-				if (!config) return false;
+				if (!config || !isIid(mrIid)) return false;
 
 				try {
 					const encodedProject = encodeProjectPath(config.project);
@@ -674,7 +682,7 @@ export function registerMRReviewHandlers(
 			mergeMethod: "merge" | "squash" | "rebase" = "squash",
 		): Promise<boolean> => {
 			debugLog("mergeMR handler called", { projectId, mrIid, mergeMethod });
-			const mergeResult = await withProjectOrNull(
+			const mergeResult = await withForgeProjectOrNull(
 				projectId,
 				async (project) => {
 					const config = await getGitLabConfig(project);
@@ -698,7 +706,7 @@ export function registerMRReviewHandlers(
 								config.token,
 								config.instanceUrl,
 								`/projects/${encodedProject}/merge_requests/${mrIid}/rebase`,
-								{ method: "POST" },
+								{ method: "PUT" },
 							);
 							await waitForRebaseCompletion(
 								config.token,
@@ -749,11 +757,18 @@ export function registerMRReviewHandlers(
 			userIds: number[],
 		): Promise<boolean> => {
 			debugLog("assignMR handler called", { projectId, mrIid, userIds });
-			const assignResult = await withProjectOrNull(
+			const assignResult = await withForgeProjectOrNull(
 				projectId,
 				async (project) => {
 					const config = await getGitLabConfig(project);
-					if (!config) return false;
+					if (
+						!config ||
+						!isIid(mrIid) ||
+						!Array.isArray(userIds) ||
+						!userIds.every(isIid)
+					) {
+						return false;
+					}
 
 					try {
 						const encodedProject = encodeProjectPath(config.project);
@@ -787,11 +802,11 @@ export function registerMRReviewHandlers(
 		IPC_CHANNELS.GITLAB_MR_APPROVE,
 		async (_, projectId: string, mrIid: number): Promise<boolean> => {
 			debugLog("approveMR handler called", { projectId, mrIid });
-			const approveResult = await withProjectOrNull(
+			const approveResult = await withForgeProjectOrNull(
 				projectId,
 				async (project) => {
 					const config = await getGitLabConfig(project);
-					if (!config) return false;
+					if (!config || !isIid(mrIid)) return false;
 
 					try {
 						const encodedProject = encodeProjectPath(config.project);

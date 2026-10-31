@@ -26,6 +26,11 @@ export interface RemoteProjectInfo {
 	defaultBranch: string;
 	/** The caller's role on the project: viewer, member or owner. */
 	role: "viewer" | "member" | "owner";
+	/**
+	 * The forge whose views the server relays for this project, as the server
+	 * says (`server/forges.py`); absent from an older server.
+	 */
+	forge?: "github" | "gitlab" | null;
 }
 
 export interface ProjectSettings {

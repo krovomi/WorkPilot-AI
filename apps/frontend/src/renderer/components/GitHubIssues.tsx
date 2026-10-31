@@ -129,7 +129,7 @@ export function GitHubIssues({
 	const handleInvestigate = useCallback(
 		(issue: GitHubIssue) => {
 			if (serverProject) {
-				void createCard(issue);
+				void createCard(issue.number);
 				return;
 			}
 			setSelectedIssueForInvestigation(issue);
