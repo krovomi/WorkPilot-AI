@@ -126,15 +126,15 @@ l'UI n'existe pas.
 ## S5 — Mode serveur : authentification, autorisation, tenant
 
 - Chaque route porte une permission (`server/authz/` : `require_permission`, `mount_guarded`) ;
-  `tests/backend/test_feature_router_authz.py` échoue sinon, y compris pour une route déclarée sur
-  `app` hors de `_mount` (seule `/health` l'est, et n'y répond que son verdict). Masquer un bouton
-  n'est pas un contrôle.
-- Un client ne fournit jamais de chemin (`project_dir`, `spec_dir`, `file_path`…), ni en query ni
-  dans le corps JSON : il donne un `project_id` et le serveur résout son checkout
-  (`server/authz/scope.py`). Le middleware refuse ces clés (`CLIENT_PATH_PARAMS`) en query et dans
-  le corps (JSON à toute profondeur, formulaire) ; `tests/backend/test_project_scope_coverage.py`
-  balaie les paramètres et les modèles de corps de chaque route.
-- Le projet d'un autre tenant répond 404, jamais 403.
+  `tests/backend/test_feature_router_authz.py` échoue sinon, même pour une route sur `app` hors de
+  `_mount` (seule `/health`, qui ne répond que son verdict). Masquer un bouton n'est pas un contrôle.
+- Un client ne fournit jamais de chemin (`project_dir`, `spec_dir`, `file_path`…) : il donne un
+  `project_id` et le serveur résout son checkout (`server/authz/scope.py`). Le middleware refuse ces
+  clés (`CLIENT_PATH_PARAMS`) en query et dans le corps, à toute profondeur ;
+  `tests/backend/test_project_scope_coverage.py` balaie paramètres et corps de chaque route.
+- Le projet d'un autre tenant répond 404, jamais 403. Le flux en direct et les runs tiennent la même
+  frontière : un canal ne s'ouvre qu'aux membres de son projet, un run démarre sans les variables du
+  serveur ([server-mode.md](../architecture/server-mode.md), `ws_channels.py`, `run_env.py`).
 - Le backend écoute sur `127.0.0.1` ; CORS est une liste explicite. Ni `0.0.0.0`, ni `*`.
 - Échec fermé : si le mode serveur ne se monte pas, le backend ne démarre pas
   (`tests/backend/test_server_mode_fail_closed.py`).
