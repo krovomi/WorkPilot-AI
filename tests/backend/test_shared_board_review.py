@@ -335,3 +335,20 @@ def test_the_review_routes_are_mounted_with_their_permissions():
     for feedback in ("", "x" * 20_001):
         with pytest.raises(ValidationError):
             ChangeRequest(feedback=feedback)
+
+
+def test_no_path_leaves_the_place_it_names(tmp_path):
+    from shared_board.review import _within
+
+    root = tmp_path / "clone"
+    (root / "a").mkdir(parents=True)
+    assert _within(root, "a") == (root / "a").resolve()
+    for parts in (("..",), ("a", "..", "..", "x"), ("/etc",), ("",)):
+        assert _within(root, *parts) is None
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    try:
+        (root / "link").symlink_to(outside, target_is_directory=True)
+    except OSError:
+        pytest.skip("cannot create a symbolic link here")
+    assert _within(root, "link") is None

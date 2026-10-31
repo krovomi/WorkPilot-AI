@@ -6,6 +6,8 @@ workspace is the server's (``.workpilot/worktrees/tasks/<card>`` in the
 clone), so these routes read and write it there, by ``project_id``: the app
 never gets a path, and git runs with an argument list, never a shell.
 
+The handlers are mounted on the board's router by ``shared_board.api``
+(``GET /api/board/cards/{id}/changes``, ``POST .../request-changes``).
 Merging and opening the pull request are run phases (``merge``, ``pr``),
 started by the run route with their own permissions.
 """
@@ -14,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import re
 from datetime import UTC, datetime
 from pathlib import Path
@@ -26,11 +29,8 @@ from server.authz.scope import ProjectScope, resolve_project_scope
 from server.db.engine import get_db
 from server.db.models import Project
 from server.services.events import emit_board_event
-from shared_board.api import _card_or_404, _index_row, _require_writer, router
+from shared_board.cards import _card_or_404, _index_row, _require_writer
 from sqlalchemy.ext.asyncio import AsyncSession
-
-# ``router`` is the board's own: ``shared_board.api`` imports this module once
-# its helpers exist, so these routes are mounted with the board's.
 
 MAX_FILES = 300
 MAX_PATCH = 200_000
@@ -46,12 +46,23 @@ class ChangeRequest(BaseModel):
     feedback: str = Field(min_length=1, max_length=MAX_FEEDBACK)
 
 
+def _within(root: Path, *parts: str) -> Path | None:
+    """``root/parts`` resolved (links followed), or None when it leaves root.
+
+    The card id was already checked by ``_card_or_404``; resolving again
+    here keeps every path this module writes inside the place it names.
+    """
+    base = os.path.realpath(root)
+    candidate = os.path.realpath(os.path.join(base, *parts))
+    if not candidate.startswith(base + os.sep):
+        return None
+    return Path(candidate)
+
+
 def _workspace(scope: ProjectScope, card_id: str) -> Path | None:
     """The card's build workspace, if it exists inside the clone."""
-    path = scope.path / ".workpilot" / "worktrees" / "tasks" / card_id
-    if not path.is_dir() or not path.resolve().is_relative_to(scope.path.resolve()):
-        return None
-    return path
+    path = _within(scope.path, ".workpilot", "worktrees", "tasks", card_id)
+    return path if path is not None and path.is_dir() else None
 
 
 def _changes(project_dir: Path, base: str, card_id: str) -> dict[str, Any]:
@@ -104,7 +115,6 @@ def _changes(project_dir: Path, base: str, card_id: str) -> dict[str, Any]:
     }
 
 
-@router.get("/cards/{card_id}/changes")
 async def card_changes(
     card_id: str,
     scope: ProjectScope = Depends(resolve_project_scope),
@@ -157,7 +167,6 @@ def _reopen_plan(plan_path: Path, subtask: dict[str, Any]) -> None:
     plan_path.write_text(json.dumps(plan, indent=2), encoding="utf-8")
 
 
-@router.post("/cards/{card_id}/request-changes")
 async def request_changes(
     card_id: str,
     body: ChangeRequest,
@@ -187,7 +196,9 @@ async def request_changes(
         raise HTTPException(status_code=409, detail="A run is working on this card")
 
     now = datetime.now(UTC).isoformat()
-    workspace_spec = workspace / _SPECS / card_id
+    workspace_spec = _within(workspace, str(_SPECS), card_id)
+    if workspace_spec is None:
+        raise HTTPException(status_code=404, detail="Card not found")
     workspace_spec.mkdir(parents=True, exist_ok=True)
     (workspace_spec / "QA_FIX_REQUEST.md").write_text(
         f"# QA Fix Request\n\nStatus: REJECTED\n\n## Feedback\n\n{feedback}\n\n"
