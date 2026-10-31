@@ -1,5 +1,5 @@
 /**
- * The shared features of a server project (server mode), roadmap first.
+ * The shared features of a server project (server mode): roadmap, ideation.
  *
  * A feature's files live on the server's clone (`.workpilot/<feature>/`),
  * and its runner runs there (`apps/backend/shared_features/`). The app reads
@@ -26,10 +26,11 @@ import {
 	writeFileSync,
 } from "node:fs";
 import path from "node:path";
+import { IDEATION_TYPE_LABELS } from "../shared/constants/ideation";
 import type { IPCResult, Project } from "../shared/types";
 import { authedFetch } from "./server-connection";
 
-export type SharedFeature = "roadmap";
+export type SharedFeature = "roadmap" | "ideation";
 
 interface FeatureFiles {
 	directory: string;
@@ -44,6 +45,16 @@ export const SHARED_FEATURES: Readonly<Record<SharedFeature, FeatureFiles>> = {
 			["roadmap.json", 2_000_000],
 			["competitor_analysis.json", 1_000_000],
 			["roadmap_discovery.json", 500_000],
+		]),
+	},
+	ideation: {
+		directory: path.join(".workpilot", "ideation"),
+		files: new Map([
+			["ideation.json", 2_000_000],
+			// Written type by type while a job runs.
+			...Object.keys(IDEATION_TYPE_LABELS).map(
+				(kind): [string, number] => [`${kind}_ideas.json`, 1_000_000],
+			),
 		]),
 	},
 };

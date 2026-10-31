@@ -214,6 +214,13 @@ sous sa taille, ceux qu'un membre peut réécrire, son runner et ses options. Le
 | Suivre un job (statut, sortie) | `GET .../jobs/{id}?after=n` | `insight.read` |
 | Arrêter un job | `POST .../jobs/{id}/cancel` | `agent.cancel`, rôle `member` ou plus |
 | Faire d'une feature de la roadmap une carte | `POST /api/features/roadmap/features/{id}/convert` | `task.write`, rôle `member` ou plus |
+| Faire d'une idée une carte | `POST /api/features/ideation/ideas/{id}/convert` | `task.write`, rôle `member` ou plus |
+
+Deux features sont déclarées : la roadmap (`roadmap.json`, réécrivable, l'analyse concurrentielle
+et la découverte) et l'idéation (`ideation.json`, réécrivable, et un fichier d'idées par type, que
+le runner écrit type par type). Les options d'un job d'idéation sont celles de la vue : les types
+(ceux du runner, `ideation.generator.IDEATION_TYPES`, vérifiés égaux par les tests), le contexte de
+la roadmap et du tableau, le nombre d'idées par type (1 à 50), régénérer ou ajouter.
 
 **Une réécriture part de la version lue.** L'instantané donne l'empreinte SHA-256 de chaque
 fichier, et l'app la renvoie avec le fichier modifié : si un collègue a enregistré entre-temps,
@@ -236,20 +243,28 @@ réécriture (`feature_updated`).
 
 Dans l'app, la feature d'un projet du serveur est lue dans son miroir (`main/server-features.ts`),
 seulement ses fichiers déclarés et chacun sous sa taille, puis par les handlers habituels : pour la
-roadmap, `roadmap-handlers.ts` ne change que d'où vient le projet (`roadmap/server-roadmap.ts`).
+roadmap comme pour l'idéation, les handlers ne changent que d'où vient le projet, et chaque
+modification relit le fichier puis le renvoie (`ipc-handlers/server-feature-files.ts`).
 Un job est suivi comme le runner local : `relayServerJob` a la forme du processus que suit
-`agent-queue.ts`, nourri de la sortie du job, et sa fin relit les fichiers. Une roadmap qu'un
-collègue génère est suivie de la même façon dès que la vue la demande. Le tableau ne remplace plus
+`agent-queue.ts`, nourri de la sortie du job, et sa fin relit les fichiers ; pendant une idéation,
+chaque type annoncé fini (`IDEATION_TYPE_COMPLETE`) est relu du serveur avant d'être affiché. Une
+roadmap ou une idéation qu'un collègue génère est suivie de la même façon dès que la vue la demande.
+Une modification refusée (un collègue est passé avant) recharge la vue. Le tableau ne remplace plus
 que ses propres dossiers du miroir (`specs`, `worktrees`), pas ceux des features.
 
-Convertir une feature de la roadmap en carte passe par le serveur : la carte est écrite comme
-celles de `POST /api/board/cards`, numérotée sous le verrou du tableau, sans `spec.md` (la phase
-`spec` l'écrit, comme pour toute carte du serveur), puis la feature est liée à la carte dans
-`roadmap.json`.
+Convertir une feature de la roadmap ou une idée en carte passe par le serveur
+(`shared_features/convert.py`) : la carte est écrite comme celles de `POST /api/board/cards`,
+numérotée sous le verrou du tableau, sans `spec.md` (la phase `spec` l'écrit, comme pour toute
+carte du serveur), puis l'élément est lié à la carte dans son fichier : la feature passe `planned`
+dans `roadmap.json`, l'idée est archivée dans `ideation.json`. Le texte et les métadonnées d'une
+carte née d'une idée sont ceux qu'écrit l'app (`ideation/task-converter.ts`).
+
+Insights n'est pas encore partagé : c'est une conversation, pas un fichier qu'un runner écrit, et
+il demande ses propres sessions, une par personne, lisibles par les autres membres.
 
 ## Ce qui vient
 
 Le plan multi-tenant du 31 octobre, par lots : les autres features servies de la même façon
-(idéation, insights, contexte, forges, analyses, tableau de bord), le flux du projet ouvert pour
+(insights, contexte, forges, analyses, tableau de bord), le flux du projet ouvert pour
 chaque vue partagée, un test de bout en bout à deux organisations, et le guide d'exploitation. Ce
 fichier grandit avec chaque lot.

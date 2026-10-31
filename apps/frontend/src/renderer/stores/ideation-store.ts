@@ -529,6 +529,9 @@ export async function dismissAllIdeasForProject(
 	if (result.success) {
 		store.dismissAllIdeas();
 		store.addLog("All ideas dismissed");
+	} else {
+		// Refused (a server project changed since it was read): show it as it is.
+		await loadIdeation(projectId);
 	}
 	return result.success;
 }
@@ -542,6 +545,9 @@ export async function archiveIdeaForProject(
 	if (result.success) {
 		store.archiveIdea(ideaId);
 		store.addLog("Idea archived");
+	} else {
+		// Refused (a server project changed since it was read): show it as it is.
+		await loadIdeation(projectId);
 	}
 	return result.success;
 }
@@ -555,6 +561,9 @@ export async function deleteIdeaForProject(
 	if (result.success) {
 		store.deleteIdea(ideaId);
 		store.addLog("Idea deleted");
+	} else {
+		// Refused (a server project changed since it was read): show it as it is.
+		await loadIdeation(projectId);
 	}
 	return result.success;
 }
@@ -572,6 +581,9 @@ export async function deleteMultipleIdeasForProject(
 		store.deleteMultipleIdeas(ideaIds);
 		store.clearSelection();
 		store.addLog(`${ideaIds.length} ideas deleted`);
+	} else {
+		// Refused (a server project changed since it was read): show it as it is.
+		await loadIdeation(projectId);
 	}
 	return result.success;
 }

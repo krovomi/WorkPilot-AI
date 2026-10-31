@@ -59,11 +59,14 @@ ROUTE_OVERRIDES: dict[tuple[str, str], str] = {
     # Sending a card's work back is the other answer to the same review.
     ("POST", "/api/board/cards/{card_id}/request-changes"): "review.approve",
     # A shared feature's job runs its agent on the project's clone; stopping
-    # one is the same right as stopping a run. Turning a roadmap feature into
-    # a card writes a card.
+    # one is the same right as stopping a run. Turning a roadmap feature or
+    # an idea into a card writes a card.
     ("POST", "/api/features/roadmap/jobs"): "agent.execute",
     ("POST", "/api/features/roadmap/jobs/{job_id}/cancel"): "agent.cancel",
     ("POST", "/api/features/roadmap/features/{feature_id}/convert"): "task.write",
+    ("POST", "/api/features/ideation/jobs"): "agent.execute",
+    ("POST", "/api/features/ideation/jobs/{job_id}/cancel"): "agent.cancel",
+    ("POST", "/api/features/ideation/ideas/{idea_id}/convert"): "task.write",
     # Audit trail is append-only and its exports carry personal data.
     ("GET", "/api/audit-trail/export/soc2"): "audit.export",
     ("GET", "/api/audit-trail/export/gdpr"): "audit.export",

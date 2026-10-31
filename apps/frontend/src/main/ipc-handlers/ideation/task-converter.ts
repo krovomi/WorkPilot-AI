@@ -17,8 +17,8 @@ import type {
 	TaskPriority,
 } from "../../../shared/types";
 import { slugifySpecTitle } from "../../../shared/utils/spec-slug";
-import { projectStore } from "../../project-store";
 import { withSpecNumberLock } from "../../utils/spec-number-lock";
+import { convertOnServer, featureProject } from "../server-feature-files";
 import {
 	readIdeationFile,
 	updateIdeationTimestamp,
@@ -215,9 +215,13 @@ export async function convertIdeaToTask(
 	projectId: string,
 	ideaId: string,
 ): Promise<IPCResult<Task>> {
-	const project = projectStore.getProject(projectId);
+	const project = featureProject(projectId);
 	if (!project) {
 		return { success: false, error: "Project not found" };
+	}
+	if (project.remote) {
+		// Server mode: the card is the shared board's, made by the server.
+		return convertOnServer(project, "ideation", "ideas", ideaId, "Idea not found");
 	}
 
 	const ideationPath = path.join(

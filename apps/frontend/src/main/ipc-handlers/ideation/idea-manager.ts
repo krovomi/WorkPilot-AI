@@ -1,17 +1,93 @@
 /**
  * Individual idea operations (update, dismiss, etc.)
+ *
+ * Each one reads `ideation.json`, changes it and writes it back. For a server
+ * project (server mode) the file is read fresh from the server first and the
+ * change is sent back with the version it started from, so a teammate's
+ * change is never overwritten (`../server-feature-files.ts`).
  */
 
 import path from "node:path";
 import type { IpcMainInvokeEvent } from "electron";
 import { AUTO_BUILD_PATHS } from "../../../shared/constants";
 import type { IdeationStatus, IPCResult } from "../../../shared/types";
-import { projectStore } from "../../project-store";
+import {
+	featureProject,
+	refreshServerFeature,
+	saveServerFeature,
+} from "../server-feature-files";
 import {
 	readIdeationFile,
 	updateIdeationTimestamp,
 	writeIdeationFile,
 } from "./file-utils";
+import type { RawIdeationData } from "./types";
+
+/**
+ * Read the project's ideation, apply `edit`, and write it back when the edit
+ * succeeded. `failure` is the error when writing throws.
+ */
+async function editIdeation<T = unknown>(
+	projectId: string,
+	failure: string,
+	edit: (ideation: RawIdeationData) => IPCResult<T>,
+): Promise<IPCResult<T>> {
+	const project = featureProject(projectId);
+	if (!project) {
+		return { success: false, error: "Project not found" };
+	}
+	const unreadable = await refreshServerFeature(project, "ideation");
+	if (unreadable) {
+		return { success: false, error: unreadable };
+	}
+
+	const ideationPath = path.join(
+		project.path,
+		AUTO_BUILD_PATHS.IDEATION_DIR,
+		AUTO_BUILD_PATHS.IDEATION_FILE,
+	);
+
+	const ideation = readIdeationFile(ideationPath);
+	if (!ideation) {
+		return { success: false, error: "Ideation not found" };
+	}
+
+	let result: IPCResult<T>;
+	try {
+		result = edit(ideation);
+		if (!result.success) return result;
+		updateIdeationTimestamp(ideation);
+		writeIdeationFile(ideationPath, ideation);
+	} catch (error) {
+		return {
+			success: false,
+			error: error instanceof Error ? error.message : failure,
+		};
+	}
+	const saved = await saveServerFeature(
+		project,
+		"ideation",
+		AUTO_BUILD_PATHS.IDEATION_FILE,
+	);
+	return saved.success ? result : { success: false, error: saved.error };
+}
+
+/** Set one idea's status. */
+function setStatus(
+	projectId: string,
+	ideaId: string,
+	status: IdeationStatus,
+	failure: string,
+): Promise<IPCResult> {
+	return editIdeation(projectId, failure, (ideation) => {
+		const idea = ideation.ideas?.find((i) => i.id === ideaId);
+		if (!idea) {
+			return { success: false, error: "Idea not found" };
+		}
+		idea.status = status;
+		return { success: true };
+	});
+}
 
 /**
  * Update an idea's status
@@ -22,40 +98,7 @@ export async function updateIdeaStatus(
 	ideaId: string,
 	status: IdeationStatus,
 ): Promise<IPCResult> {
-	const project = projectStore.getProject(projectId);
-	if (!project) {
-		return { success: false, error: "Project not found" };
-	}
-
-	const ideationPath = path.join(
-		project.path,
-		AUTO_BUILD_PATHS.IDEATION_DIR,
-		AUTO_BUILD_PATHS.IDEATION_FILE,
-	);
-
-	const ideation = readIdeationFile(ideationPath);
-	if (!ideation) {
-		return { success: false, error: "Ideation not found" };
-	}
-
-	try {
-		// Find and update the idea
-		const idea = ideation.ideas?.find((i) => i.id === ideaId);
-		if (!idea) {
-			return { success: false, error: "Idea not found" };
-		}
-
-		idea.status = status;
-		updateIdeationTimestamp(ideation);
-		writeIdeationFile(ideationPath, ideation);
-
-		return { success: true };
-	} catch (error) {
-		return {
-			success: false,
-			error: error instanceof Error ? error.message : "Failed to update idea",
-		};
-	}
+	return setStatus(projectId, ideaId, status, "Failed to update idea");
 }
 
 /**
@@ -66,40 +109,7 @@ export async function dismissIdea(
 	projectId: string,
 	ideaId: string,
 ): Promise<IPCResult> {
-	const project = projectStore.getProject(projectId);
-	if (!project) {
-		return { success: false, error: "Project not found" };
-	}
-
-	const ideationPath = path.join(
-		project.path,
-		AUTO_BUILD_PATHS.IDEATION_DIR,
-		AUTO_BUILD_PATHS.IDEATION_FILE,
-	);
-
-	const ideation = readIdeationFile(ideationPath);
-	if (!ideation) {
-		return { success: false, error: "Ideation not found" };
-	}
-
-	try {
-		// Find and dismiss the idea
-		const idea = ideation.ideas?.find((i) => i.id === ideaId);
-		if (!idea) {
-			return { success: false, error: "Idea not found" };
-		}
-
-		idea.status = "dismissed";
-		updateIdeationTimestamp(ideation);
-		writeIdeationFile(ideationPath, ideation);
-
-		return { success: true };
-	} catch (error) {
-		return {
-			success: false,
-			error: error instanceof Error ? error.message : "Failed to dismiss idea",
-		};
-	}
+	return setStatus(projectId, ideaId, "dismissed", "Failed to dismiss idea");
 }
 
 /**
@@ -109,23 +119,7 @@ export async function dismissAllIdeas(
 	_event: IpcMainInvokeEvent,
 	projectId: string,
 ): Promise<IPCResult> {
-	const project = projectStore.getProject(projectId);
-	if (!project) {
-		return { success: false, error: "Project not found" };
-	}
-
-	const ideationPath = path.join(
-		project.path,
-		AUTO_BUILD_PATHS.IDEATION_DIR,
-		AUTO_BUILD_PATHS.IDEATION_FILE,
-	);
-
-	const ideation = readIdeationFile(ideationPath);
-	if (!ideation) {
-		return { success: false, error: "Ideation not found" };
-	}
-
-	try {
+	return editIdeation(projectId, "Failed to dismiss all ideas", (ideation) => {
 		// Dismiss all ideas that are not already dismissed or converted
 		let dismissedCount = 0;
 		ideation.ideas?.forEach((idea) => {
@@ -134,18 +128,8 @@ export async function dismissAllIdeas(
 				dismissedCount++;
 			}
 		});
-
-		updateIdeationTimestamp(ideation);
-		writeIdeationFile(ideationPath, ideation);
-
 		return { success: true, data: { dismissedCount } };
-	} catch (error) {
-		return {
-			success: false,
-			error:
-				error instanceof Error ? error.message : "Failed to dismiss all ideas",
-		};
-	}
+	});
 }
 
 /**
@@ -156,39 +140,7 @@ export async function archiveIdea(
 	projectId: string,
 	ideaId: string,
 ): Promise<IPCResult> {
-	const project = projectStore.getProject(projectId);
-	if (!project) {
-		return { success: false, error: "Project not found" };
-	}
-
-	const ideationPath = path.join(
-		project.path,
-		AUTO_BUILD_PATHS.IDEATION_DIR,
-		AUTO_BUILD_PATHS.IDEATION_FILE,
-	);
-
-	const ideation = readIdeationFile(ideationPath);
-	if (!ideation) {
-		return { success: false, error: "Ideation not found" };
-	}
-
-	try {
-		const idea = ideation.ideas?.find((i) => i.id === ideaId);
-		if (!idea) {
-			return { success: false, error: "Idea not found" };
-		}
-
-		idea.status = "archived";
-		updateIdeationTimestamp(ideation);
-		writeIdeationFile(ideationPath, ideation);
-
-		return { success: true };
-	} catch (error) {
-		return {
-			success: false,
-			error: error instanceof Error ? error.message : "Failed to archive idea",
-		};
-	}
+	return setStatus(projectId, ideaId, "archived", "Failed to archive idea");
 }
 
 /**
@@ -199,39 +151,14 @@ export async function deleteIdea(
 	projectId: string,
 	ideaId: string,
 ): Promise<IPCResult> {
-	const project = projectStore.getProject(projectId);
-	if (!project) {
-		return { success: false, error: "Project not found" };
-	}
-
-	const ideationPath = path.join(
-		project.path,
-		AUTO_BUILD_PATHS.IDEATION_DIR,
-		AUTO_BUILD_PATHS.IDEATION_FILE,
-	);
-
-	const ideation = readIdeationFile(ideationPath);
-	if (!ideation) {
-		return { success: false, error: "Ideation not found" };
-	}
-
-	try {
+	return editIdeation(projectId, "Failed to delete idea", (ideation) => {
 		const ideaIndex = ideation.ideas?.findIndex((i) => i.id === ideaId);
 		if (ideaIndex === undefined || ideaIndex === -1) {
 			return { success: false, error: "Idea not found" };
 		}
-
 		ideation.ideas?.splice(ideaIndex, 1);
-		updateIdeationTimestamp(ideation);
-		writeIdeationFile(ideationPath, ideation);
-
 		return { success: true };
-	} catch (error) {
-		return {
-			success: false,
-			error: error instanceof Error ? error.message : "Failed to delete idea",
-		};
-	}
+	});
 }
 
 /**
@@ -242,38 +169,12 @@ export async function deleteMultipleIdeas(
 	projectId: string,
 	ideaIds: string[],
 ): Promise<IPCResult> {
-	const project = projectStore.getProject(projectId);
-	if (!project) {
-		return { success: false, error: "Project not found" };
-	}
-
-	const ideationPath = path.join(
-		project.path,
-		AUTO_BUILD_PATHS.IDEATION_DIR,
-		AUTO_BUILD_PATHS.IDEATION_FILE,
-	);
-
-	const ideation = readIdeationFile(ideationPath);
-	if (!ideation) {
-		return { success: false, error: "Ideation not found" };
-	}
-
-	try {
+	return editIdeation(projectId, "Failed to delete ideas", (ideation) => {
 		const idsToDelete = new Set(ideaIds);
 		const originalCount = ideation.ideas?.length || 0;
-
 		ideation.ideas =
 			ideation.ideas?.filter((idea) => !idsToDelete.has(idea.id)) || [];
-
 		const deletedCount = originalCount - (ideation.ideas?.length || 0);
-		updateIdeationTimestamp(ideation);
-		writeIdeationFile(ideationPath, ideation);
-
 		return { success: true, data: { deletedCount } };
-	} catch (error) {
-		return {
-			success: false,
-			error: error instanceof Error ? error.message : "Failed to delete ideas",
-		};
-	}
+	});
 }

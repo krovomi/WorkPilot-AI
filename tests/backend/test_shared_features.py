@@ -1,10 +1,10 @@
-"""Server mode: a project's shared features, roadmap first.
+"""Server mode: a project's shared features, roadmap and ideation.
 
 On the desktop the roadmap is a file on the person's computer and its runner
 runs there. On a shared server both are the server's: these tests hold its
 files to what the feature declares, a rewrite to the version the member read,
 a job to the feature's runner with a closed list of options, and turning a
-roadmap feature into a card to the shared board.
+roadmap feature or an idea into a card to the shared board.
 """
 
 from __future__ import annotations
@@ -42,14 +42,14 @@ def events(monkeypatch, tmp_path):
     )
     server_config.reset_settings_cache()
     from server.services import project_jobs
-    from shared_features import api, roadmap
+    from shared_features import api, convert
 
     sent: list[tuple[str, str, dict]] = []
 
     def record(project_id, event, data):
         sent.append((project_id, event, data))
 
-    for module in (api, roadmap, project_jobs):
+    for module in (api, convert, project_jobs):
         monkeypatch.setattr(module, "emit_board_event", record)
     monkeypatch.setattr(project_jobs, "_jobs", None)
     yield sent
@@ -265,12 +265,53 @@ def test_every_feature_job_needs_the_right_to_run_an_agent():
         assert (
             permission_for("PUT", f"{base}/files/{{name}}", domain) == "insight.write"
         )
-    assert (
-        permission_for(
-            "POST", "/api/features/roadmap/features/{feature_id}/convert", "insight"
-        )
-        == "task.write"
-    )
+    for convert in (
+        "/api/features/roadmap/features/{feature_id}/convert",
+        "/api/features/ideation/ideas/{idea_id}/convert",
+    ):
+        assert permission_for("POST", convert, "insight") == "task.write"
+
+
+def test_ideation_jobs_take_the_runner_s_own_types_and_nothing_else():
+    from ideation.generator import IDEATION_TYPES
+    from shared_features.registry import IDEATION
+    from shared_features.registry import IDEATION_TYPES as DECLARED
+
+    assert list(DECLARED) == IDEATION_TYPES
+    assert set(IDEATION.files) == {"ideation.json"} | {
+        f"{kind}_ideas.json" for kind in IDEATION_TYPES
+    }
+
+    def args(options):
+        return IDEATION.args(IDEATION.options.model_validate(options))
+
+    assert args({}) == []
+    assert args(
+        {
+            "types": ["code_quality", "security_hardening", "code_quality"],
+            "include_roadmap_context": False,
+            "include_kanban_context": False,
+            "max_ideas_per_type": 3,
+            "append": True,
+        }
+    ) == [
+        "--types",
+        "code_quality,security_hardening",
+        "--no-roadmap",
+        "--no-kanban",
+        "--max-ideas",
+        "3",
+        "--append",
+    ]
+    for bad in (
+        {"types": ["code_quality,--output=/etc"]},
+        {"types": "code_quality"},
+        {"max_ideas_per_type": 0},
+        {"max_ideas_per_type": 500},
+        {"output": "/tmp/x"},
+    ):
+        with pytest.raises(ValueError):
+            IDEATION.options.model_validate(bad)
 
 
 _FAKE_RUNNER = """
@@ -439,7 +480,7 @@ async def test_a_roadmap_feature_becomes_a_card_of_the_shared_board(tmp_path, ev
     )
     feature = json.loads(roadmap_text)["features"][0]
     assert feature["linked_spec_id"] == card_id and feature["status"] == "planned"
-    assert result["roadmap_sha256"] == _sha(roadmap_text)
+    assert result["sha256"] == _sha(roadmap_text)
     assert {e for _, e, _ in events} >= {"spec_created", "feature_updated"}
 
     for feature_id, role, status in (
@@ -496,3 +537,67 @@ async def test_a_job_left_running_by_a_stopped_server_is_settled(tmp_path):
     assert snapshot["job"]["error"] == INTERRUPTED
     async with await _session() as db:
         assert await count_active_runs(db, org_id) == 0
+
+
+@pytest.mark.asyncio
+async def test_an_idea_becomes_a_card_of_the_shared_board(tmp_path, events):
+    from fastapi import HTTPException
+    from shared_features.ideation import convert_idea
+
+    project_id, org_id, clone = await _project(tmp_path)
+    directory = clone / ".workpilot" / "ideation"
+    directory.mkdir(parents=True)
+    (directory / "ideation.json").write_text(
+        json.dumps(
+            {
+                "ideas": [
+                    {
+                        "id": "sec-1",
+                        "type": "security_hardening",
+                        "title": "Rotate the signing key",
+                        "description": "Keys never rotate.",
+                        "rationale": "A leaked key stays valid.",
+                        "severity": "critical",
+                        "affected_files": ["server/auth.py"],
+                        "status": "draft",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    scope = _scope(project_id, org_id, clone)
+    async with await _session() as db:
+        result = await convert_idea(
+            idea_id="sec-1", request=_request(), scope=scope, db=db
+        )
+    card = clone / ".workpilot" / "specs" / result["card"]["id"]
+    metadata = json.loads((card / "task_metadata.json").read_text("utf-8"))
+    assert metadata["sourceType"] == "ideation" and metadata["ideaId"] == "sec-1"
+    assert metadata["category"] == "security" and metadata["priority"] == "urgent"
+    assert metadata["affectedFiles"] == ["server/auth.py"]
+    assert metadata["createdBy"] == "u-1"
+
+    text = (directory / "ideation.json").read_text("utf-8")
+    idea = json.loads(text)["ideas"][0]
+    assert idea["status"] == "archived"
+    assert idea["linked_task_id"] == result["card"]["id"]
+    assert result["sha256"] == _sha(text)
+    assert [e for _, e, d in events if d.get("feature") == "ideation"] == [
+        "feature_updated"
+    ]
+
+    for idea_id, role, status in (
+        ("sec-1", "member", 409),  # already a card
+        ("nope", "member", 404),
+        ("sec-1", "viewer", 403),
+    ):
+        async with await _session() as db:
+            with pytest.raises(HTTPException) as refused:
+                await convert_idea(
+                    idea_id=idea_id,
+                    request=_request(),
+                    scope=_scope(project_id, org_id, clone, role),
+                    db=db,
+                )
+        assert refused.value.status_code == status
