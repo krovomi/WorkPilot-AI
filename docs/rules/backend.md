@@ -93,6 +93,10 @@ coder, la QA et la spec. Voir [`architecture/pause-resume.md`](../architecture/p
   30 octobre 2026, et un corps qui ne fait que `pass` compte à part. Une correction fait baisser
   le plafond (`python scripts/quality_baselines.py update`, qui ne monte jamais) ; un relèvement
   s'écrit à la main dans le JSON et se justifie dans la PR.
+- **Un gros fichier ne grossit plus.** Au-delà de 2 000 lignes, un fichier source (backend ou
+  frontend) a un plafond dans `tests/baselines/file-size.json`, à sa taille du 30 octobre 2026 ;
+  un nouveau fichier au-delà est refusé. Le code d'une feature va dans un module à lui ; une
+  découpe abaisse le plafond (`python scripts/quality_baselines.py update`).
 - **Types vérifiés** par pyright `1.1.408` (mode `basic`) sur les paquets listés dans
   `apps/backend/pyrightconfig.json` (`bench`, `best_of_n`, `genai_trace`, `goal`, `mcp_tasks`,
   `os_sandbox`, `security`) ; on élargit la liste paquet par paquet, une fois le paquet à zéro.

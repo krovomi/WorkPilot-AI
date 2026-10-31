@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Per-file ceilings that can only go down: blind excepts and biome-ignore.
+"""Per-file ceilings that can only go down: blind excepts, biome-ignore, file size.
 
 The backend had 1 533 ``except Exception`` (or bare ``except:``), 413 of them
 with a body that only passes; the frontend had 766 ``biome-ignore`` comments.
 Fixing them all at once is a rewrite; letting them grow is how they got
-there. Each file keeps its count of the day, and ``tests/test_quality_baselines.py``
+there. The same holds for size: 20 source files were over 2 000 lines, the
+largest 4 637, and the features of October kept adding to them (plan of
+29 October, A2). Each file keeps its count of the day, and ``tests/test_quality_baselines.py``
 fails when a file goes above it.
 
     python scripts/quality_baselines.py check    exit 1 if a file is above its ceiling or below it
@@ -27,9 +29,12 @@ ROOT = Path(__file__).resolve().parent.parent
 BASELINES = ROOT / "tests" / "baselines"
 EXCEPT_BASELINE = BASELINES / "blind-except.json"
 BIOME_BASELINE = BASELINES / "biome-ignore.json"
+SIZE_BASELINE = BASELINES / "file-size.json"
 
 BLIND_TYPES = frozenset({"Exception", "BaseException"})
 FRONTEND_SUFFIXES = (".ts", ".tsx", ".js", ".cjs", ".mjs")
+#: A source file above this many lines has a ceiling; a new one is refused.
+LARGE_FILE = 2000
 
 
 def _tracked(*patterns: str) -> list[str]:
@@ -84,6 +89,18 @@ def biome_counts() -> dict[str, int]:
             n = (ROOT / path).read_text(encoding="utf-8").count("biome-ignore")
             if n:
                 counts[path] = n
+    return counts
+
+
+def size_counts() -> dict[str, int]:
+    """Lines of each tracked source file above ``LARGE_FILE``."""
+    counts = {}
+    for path in _tracked("apps/backend/*.py", "src/*.py", "apps/frontend"):
+        if path.endswith((".py", *FRONTEND_SUFFIXES)):
+            with open(ROOT / path, "rb") as handle:
+                lines = sum(1 for _ in handle)
+            if lines > LARGE_FILE:
+                counts[path] = lines
     return counts
 
 
@@ -142,6 +159,7 @@ def lowered(current: dict, ceiling: dict) -> dict:
 CHECKS: tuple[tuple[Path, Callable[[], dict], str], ...] = (
     (EXCEPT_BASELINE, except_counts, "except"),
     (BIOME_BASELINE, biome_counts, "biome-ignore"),
+    (SIZE_BASELINE, size_counts, "lines"),
 )
 
 

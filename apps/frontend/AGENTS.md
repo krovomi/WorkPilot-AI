@@ -21,15 +21,24 @@ modules de handlers IPC. Ce fichier donne les points d'entrée.
 | Fichier | Lignes | Voisins / index |
 |---|---|---|
 | `src/main/claude-profile/usage-monitor.ts` | ~4 600 | une seule classe |
-| `src/main/ipc-handlers/task/worktree-handlers.ts` | ~3 600 | `worktree-ide-terminal.ts`, `worktree-git-refs.ts`, `worktree-pr-helpers.ts` |
 | `src/main/app-emulator-service.ts` | ~3 250 | — |
 | `src/renderer/components/KanbanBoard.tsx` | ~3 250 | [`kanban/AGENTS.md`](src/renderer/components/kanban/AGENTS.md) ; colonnes dans `kanban/KanbanColumn.tsx` |
-| `src/main/ipc-handlers/task/execution-handlers.ts` | ~3 100 | — |
 | `src/main/ipc-handlers/github/pr-handlers.ts` | ~2 350 | `pr-graphql.ts`, `pr-logs.ts`, `pr-ci-wait.ts` |
 | `src/renderer/stores/task-store.ts` | ~1 850 | — |
 
 Chercher le symbole (`grep -n`), lire le voisinage, éditer. Rien ne bloque une lecture complète :
-c'est une discipline, pas un garde-fou.
+c'est une discipline, pas un garde-fou. Leur taille, elle, est plafonnée : un fichier de plus de
+2 000 lignes ne peut pas grossir (`tests/baselines/file-size.json`), donc une feature y ajoute un
+module voisin plutôt que des lignes. Les handlers de worktree sont répartis par groupe :
+`task/worktree-handlers.ts` (état, liste, abandon, IDE, terminal, impact, synchronisation)
+enregistre `worktree-diff-handlers.ts`, `worktree-merge-handlers.ts`, `worktree-file-handlers.ts`,
+`worktree-create-pr-handlers.ts` et `worktree-visual-proof-handlers.ts` ; fonctions partagées
+dans `worktree-handler-utils.ts`. Ceux de l'exécution de même : `task/execution-handlers.ts`
+(démarrer, reprendre la session, arrêter, état, plan, pause) enregistre
+`execution-review-handlers.ts`, `execution-status-handlers.ts` (changement de statut à la main),
+`execution-resume-handlers.ts` (reprise, changement de provider, relance d'une phase, hot swap,
+remise à zéro de la conversation) et `execution-recovery-handlers.ts` (tâche bloquée) ;
+`execution-utils.ts` porte les fonctions partagées et `ExecutionHandlerContext`.
 
 ## Où ajouter quoi
 

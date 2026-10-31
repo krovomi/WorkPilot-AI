@@ -233,7 +233,7 @@ Python package. `pnpm install` at the root runs `prepare`, which points git at t
 |------|-----------|--------------|
 | `pre-commit` | On **staged files only**: `ruff format` + `ruff check --fix` (Python), `biome check --write` (frontend), re-stage, secret scan (blocks the commit), then `scripts/staged-tests.js` | `PRE_COMMIT_SKIP_TESTS=1` skips the tests, not the formatters or the secret scan |
 | `commit-msg` | Conventional Commits: `type(scope)!?: description`, first line ≤ 100 characters | — |
-| `pre-push` | `scripts/pre-push.js`: ruff check + format check, `skills_cli build --check`, audit cards and changelog fragments, per-file ceilings of blind excepts and `biome-ignore` (`scripts/quality_baselines.py`), Biome lint | `PRE_PUSH_FULL=1` (or `pnpm verify`, without pushing) adds pytest, `tsc` and vitest; `PRE_PUSH_SKIP=1` skips everything |
+| `pre-push` | `scripts/pre-push.js`: ruff check + format check, `skills_cli build --check`, audit cards and changelog fragments, per-file ceilings of blind excepts, `biome-ignore` and the size of files over 2 000 lines (`scripts/quality_baselines.py`), Biome lint | `PRE_PUSH_FULL=1` (or `pnpm verify`, without pushing) adds pytest, `tsc` and vitest; `PRE_PUSH_SKIP=1` skips everything |
 
 The tool versions are pinned (ruff `0.15.7`, Biome `2.5.11`, pyright `1.1.408`): any other version produces a diff
 CI rejects. `git commit --no-verify` exists, but CI runs the same checks — it only moves the

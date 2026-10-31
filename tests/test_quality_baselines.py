@@ -1,4 +1,4 @@
-"""Blind excepts and biome-ignore comments can only go down, file by file.
+"""Blind excepts, biome-ignore comments and large files can only go down, file by file.
 
 The ceilings are tests/baselines/*.json, written by scripts/quality_baselines.py.
 """
@@ -24,7 +24,7 @@ UPDATE = "python scripts/quality_baselines.py update"
 @pytest.mark.parametrize(
     ("baseline", "counter", "what"),
     quality_baselines.CHECKS,
-    ids=["blind-except", "biome-ignore"],
+    ids=["blind-except", "biome-ignore", "file-size"],
 )
 def test_no_file_goes_above_its_ceiling_and_every_fix_lowers_it(
     baseline, counter, what
@@ -86,3 +86,26 @@ def test_update_lowers_but_never_raises_nor_adds():
 def test_a_fixed_file_leaves_the_baseline():
     assert quality_baselines.lowered({}, {"a.py": {"blind": 1, "silent": 1}}) == {}
     assert quality_baselines.lowered({"a.ts": 0}, {"a.ts": 4}) == {}
+
+
+def test_a_large_file_cannot_grow_and_a_new_one_is_refused(tmp_path, monkeypatch):
+    big = "x\n" * (quality_baselines.LARGE_FILE + 1)
+    (tmp_path / "apps" / "backend").mkdir(parents=True)
+    (tmp_path / "apps" / "backend" / "big.py").write_text(big, encoding="utf-8")
+    (tmp_path / "apps" / "backend" / "small.py").write_text("x\n", encoding="utf-8")
+    monkeypatch.setattr(quality_baselines, "ROOT", tmp_path)
+    monkeypatch.setattr(
+        quality_baselines,
+        "_tracked",
+        lambda *_: ["apps/backend/big.py", "apps/backend/small.py"],
+    )
+    current = quality_baselines.size_counts()
+    assert current == {"apps/backend/big.py": quality_baselines.LARGE_FILE + 1}
+    above, _ = quality_baselines.compare(current, {}, "lines")
+    assert above == [
+        f"apps/backend/big.py: lines {quality_baselines.LARGE_FILE + 1} > 0"
+    ]
+    above, below = quality_baselines.compare(
+        current, {"apps/backend/big.py": quality_baselines.LARGE_FILE + 5}, "lines"
+    )
+    assert above == [] and below

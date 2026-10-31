@@ -2,8 +2,8 @@
  * Context-window management IPC: the manual "compact now" / "new thread"
  * command, and the live edit of a task's `contextPolicy`.
  *
- * Kept out of execution-handlers.ts on purpose (that file is already ~3 000
- * lines). The telemetry itself (CONTEXT_USAGE / CONTEXT_ACTION_APPLIED) is
+ * A module of its own, like the execution handler groups (execution-*.ts).
+ * The telemetry itself (CONTEXT_USAGE / CONTEXT_ACTION_APPLIED) is
  * forwarded by agent-events-handlers.ts on TASK_CONTEXT_USAGE.
  */
 
