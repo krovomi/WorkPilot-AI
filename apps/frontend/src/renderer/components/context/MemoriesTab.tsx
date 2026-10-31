@@ -174,7 +174,11 @@ export function MemoriesTab({
 									/>
 									<InfoItem
 										label={t("context:memories.path")}
-										value={memoryStatus.dbPath || "~/.workpilot/brain"}
+										value={
+											memoryStatus.onServer
+												? t("context:memories.onServer")
+												: memoryStatus.dbPath || "~/.workpilot/brain"
+										}
 									/>
 								</div>
 
@@ -244,7 +248,9 @@ export function MemoriesTab({
 										: t("context:memories.notConfigured")}
 								</p>
 								<p className="mt-2 text-xs">
-									{t("context:memories.brainHint")}
+									{memoryStatus?.onServer
+										? t("context:memories.serverBrainHint")
+										: t("context:memories.brainHint")}
 								</p>
 							</div>
 						)}

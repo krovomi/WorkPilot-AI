@@ -65,6 +65,10 @@ RUN_ENV: frozenset[str] = frozenset(
     {
         "WORKPILOT_WS_TOKEN",
         "WORKPILOT_RUN_USER_ID",
+        # The run's project brain (``run_isolation.project_brain_env``): the
+        # server's own value would be one brain for every tenant.
+        "WORKPILOT_BRAIN_DIR",
+        "WORKPILOT_BRAIN_CONFIG",
     }
 )
 

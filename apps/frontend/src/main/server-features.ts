@@ -1,5 +1,6 @@
 /**
- * The shared features of a server project (server mode): roadmap, ideation.
+ * The shared features of a server project (server mode): roadmap, ideation,
+ * the project's index (the Context view).
  *
  * A feature's files live on the server's clone (`.workpilot/<feature>/`),
  * and its runner runs there (`apps/backend/shared_features/`). The app reads
@@ -30,7 +31,7 @@ import { IDEATION_TYPE_LABELS } from "../shared/constants/ideation";
 import type { IPCResult, Project } from "../shared/types";
 import { authedFetch } from "./server-connection";
 
-export type SharedFeature = "roadmap" | "ideation";
+export type SharedFeature = "roadmap" | "ideation" | "context";
 /** What runs jobs on the server: a feature with files, or Insights. */
 export type JobFeature = SharedFeature | "insights";
 
@@ -58,6 +59,11 @@ export const SHARED_FEATURES: Readonly<Record<SharedFeature, FeatureFiles>> = {
 				(kind): [string, number] => [`${kind}_ideas.json`, 1_000_000],
 			),
 		]),
+	},
+	context: {
+		directory: ".workpilot",
+		// Rebuilt by the analyzer, never written by the app.
+		files: new Map([["project_index.json", 4_000_000]]),
 	},
 };
 

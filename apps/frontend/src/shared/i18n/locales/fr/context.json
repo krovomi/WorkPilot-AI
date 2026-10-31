@@ -93,6 +93,9 @@
 		"showAll": "Afficher toutes les mémoires",
 		"brainHint": "Chaque build écrit ce qu'il apprend dans le cerveau partagé — un vault Obsidian que lisent tous les agents. Il est créé à la première écriture ; pour utiliser un vault existant ou un distant git, ouvrez Réglages → Intégrations → Cerveau partagé.",
 		"reasons.brainNotCreated": "Le cerveau partagé n'existe pas encore",
-		"reasons.brainUnreachable": "Le backend est injoignable : impossible de lire le cerveau partagé"
+		"reasons.brainUnreachable": "Le backend est injoignable : impossible de lire le cerveau partagé",
+		"onServer": "Sur le serveur, propre à ce projet",
+		"reasons.serverBrainNotCreated": "Aucun build de ce projet n'a encore rien appris sur le serveur",
+		"serverBrainHint": "Chaque build de ce projet sur le serveur écrit ce qu'il apprend dans le cerveau propre au projet, sur le serveur. Chaque membre du projet le lit ici."
 	}
 }

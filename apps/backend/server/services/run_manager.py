@@ -30,7 +30,12 @@ from server.db.engine import get_session_factory
 from server.db.models import AgentRun, SpecIndex, User
 from server.services.events import emit_board_event
 from server.services.run_env import run_environment
-from server.services.run_isolation import OFF, isolation_mode, prepare_run
+from server.services.run_isolation import (
+    OFF,
+    isolation_mode,
+    prepare_run,
+    project_brain_env,
+)
 from server.services.secrets import get_user_secret
 from sqlalchemy import select
 
@@ -167,7 +172,10 @@ def confine(
     cmd: list[str], project_id: str, server_path: str, scratch: Path, env: dict
 ) -> list[str]:
     """The run's argv, started confined to its own project unless the
-    operator turned isolation off (``server.services.run_isolation``)."""
+    operator turned isolation off (``server.services.run_isolation``). Either
+    way its brain is its project's."""
+    settings = get_settings()
+    env.update(project_brain_env(settings.repos_root, project_id))
     if isolation_mode() == OFF:
         _warn_once(
             "off",
@@ -180,7 +188,6 @@ def confine(
             "The server runs as root: CAP_SYS_PTRACE lets a run read other "
             "processes' environment despite its isolation; run it unprivileged",
         )
-    settings = get_settings()
     prefix = prepare_run(
         project_id=project_id,
         clone=Path(server_path),

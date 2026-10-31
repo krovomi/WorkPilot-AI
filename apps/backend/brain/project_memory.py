@@ -929,18 +929,24 @@ def _graph_hints(
 # ---------------------------------------------------------------------------
 
 
-def list_memories(project: str, *, limit: int = 20) -> list[dict[str, Any]]:
-    """The project's most recent memories, newest first, in the tab's shape."""
-    memory = ProjectMemory(project=project)
+def list_memories(
+    project: str, *, limit: int = 20, brain: Brain | None = None
+) -> list[dict[str, Any]]:
+    """The project's most recent memories, newest first, in the tab's shape.
+
+    From ``brain`` when given (a server project's own, read by
+    ``shared_features.context``), else the person's brain.
+    """
+    memory = ProjectMemory(project=project, brain=brain)
     return (
         [_episode(h) for h in memory.search("", limit=limit)] if memory.project else []
     )
 
 
 def search_memories(
-    project: str, query: str, *, limit: int = 20
+    project: str, query: str, *, limit: int = 20, brain: Brain | None = None
 ) -> list[dict[str, Any]]:
-    memory = ProjectMemory(project=project)
+    memory = ProjectMemory(project=project, brain=brain)
     if not memory.project:
         return []
     return [

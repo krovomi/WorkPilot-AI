@@ -373,7 +373,9 @@ vault ou un dépôt dans les Réglages, et c'est là que reste la décision.
 `GET /api/brain/status`, `POST /api/brain/sync` et `POST /api/brain/recall`
 exposent la même chose au desktop ; comme `hermes/api.py`, le routeur est refusé
 en mode serveur — le cerveau vit dans le répertoire personnel de la machine qui
-exécute le backend.
+exécute le backend. Sur un serveur, chaque projet a le sien, où ses builds
+apprennent et que ses membres lisent par `/api/features/context/memories`
+([server-mode.md](server-mode.md)).
 
 ### La mémoire des builds, dans le vault (`project_memory.py`)
 
