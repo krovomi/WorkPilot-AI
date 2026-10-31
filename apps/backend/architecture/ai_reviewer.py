@@ -109,7 +109,9 @@ async def run_architecture_ai_review(
         async with client:
             from task_logger import LogPhase
 
-            _status, response, _metadata = await runtime.run_agent_session(
+            # The reviewer writes its report to the spec directory, read below;
+            # the session's own answer is not used.
+            await runtime.run_agent_session(
                 client,
                 prompt,
                 spec_dir,

@@ -21,7 +21,9 @@ BACKEND = Path(__file__).resolve().parent.parent / "apps" / "backend"
 sys.path.insert(0, str(BACKEND))
 
 import agent_runtime  # noqa: E402
-import core  # noqa: E402,F401  (installs the runtime)
+
+# Importing core (any of its modules) installs the runtime.
+from core.agent_runtime import CoreAgentRuntime  # noqa: E402
 
 
 @pytest.fixture
@@ -31,8 +33,6 @@ def no_runtime(monkeypatch):
 
 class TestCoreInstallsTheRuntime:
     def test_importing_core_installs_it(self):
-        from core.agent_runtime import CoreAgentRuntime
-
         assert isinstance(agent_runtime.current(), CoreAgentRuntime)
 
     def test_it_reads_core_auth_when_called(self, monkeypatch):
