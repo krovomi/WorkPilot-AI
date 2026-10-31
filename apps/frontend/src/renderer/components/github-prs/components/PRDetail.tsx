@@ -78,11 +78,6 @@ interface PRDetailProps {
 	onAssignPR: (username: string) => void;
 	onGetLogs: () => Promise<PRLogsType | null>;
 	onMarkReviewPosted?: (prNumber: number) => Promise<void>;
-	/**
-	 * Whether the AI review can run here: not on a server project (server
-	 * mode), whose agents run on the server, not on this computer.
-	 */
-	aiReview?: boolean;
 }
 
 function getStatusColor(status: PRReviewResult["overallStatus"]): string {
@@ -117,7 +112,6 @@ export function PRDetail({
 	onAssignPR: _onAssignPR,
 	onGetLogs,
 	onMarkReviewPosted,
-	aiReview = true,
 }: PRDetailProps) {
 	const { t } = useTranslation("common");
 
@@ -1058,12 +1052,7 @@ ${t("prReview.blockedStatusMessageFooter")}`;
 				)}
 
 				{/* Review Status & Actions */}
-				{!aiReview && (
-					<p className="text-sm text-muted-foreground">
-						{t("prReview.serverProjectNoAIReview")}
-					</p>
-				)}
-				{aiReview && <ReviewStatusTree
+				<ReviewStatusTree
 					status={prStatus.status}
 					isReviewing={isReviewing}
 					startedAt={startedAt}
@@ -1085,7 +1074,7 @@ ${t("prReview.blockedStatusMessageFooter")}`;
 							? new Date(reviewResult.postedAt).getTime()
 							: null)
 					}
-				/>}
+				/>
 
 				{/* Action Bar (Legacy Actions that fit under the tree context) */}
 				{reviewResult?.success && !isReviewing && (

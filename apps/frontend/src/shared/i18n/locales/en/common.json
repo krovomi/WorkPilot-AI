@@ -278,7 +278,6 @@
 		"pullRequests": "Pull Requests",
 		"open": "open",
 		"selectPRToView": "Select a pull request to view details",
-		"serverProjectNoAIReview": "The AI review of a server project's pull requests does not run on this computer yet. You can read, comment on, update and merge them here with your own GitHub token.",
 		"serverProjectNoAIReviewGitLab": "The AI review of a server project's merge requests does not run on this computer yet. You can read, approve and merge them here with your own GitLab token.",
 		"loadingPRs": "Loading pull requests...",
 		"noOpenPRs": "No open pull requests",

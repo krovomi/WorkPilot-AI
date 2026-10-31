@@ -281,7 +281,6 @@
 		"pullRequests": "Pull Requests",
 		"open": "ouvert",
 		"selectPRToView": "Sélectionner une pull request pour voir les détails",
-		"serverProjectNoAIReview": "La revue IA des pull requests d'un projet serveur ne tourne pas encore sur cet ordinateur. Vous pouvez les lire, les commenter, les mettre à jour et les fusionner ici avec votre propre jeton GitHub.",
 		"serverProjectNoAIReviewGitLab": "La revue IA des merge requests d'un projet serveur ne tourne pas encore sur cet ordinateur. Vous pouvez les lire, les approuver et les fusionner ici avec votre propre jeton GitLab.",
 		"loadingPRs": "Chargement des pull requests...",
 		"noOpenPRs": "Aucune pull request ouverte",

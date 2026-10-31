@@ -27,6 +27,15 @@ vi.mock("../utils/runner-env", () => ({ getRunnerEnv: async () => ({}) }));
 vi.mock("../utils/project-middleware", () => ({ withProjectOrNull: vi.fn() }));
 vi.mock("../pr-graphql", () => ({ fetchPRsFromGraphQL: vi.fn() }));
 vi.mock("../pr-ci-wait", () => ({ performCIWaitCheck: vi.fn() }));
+// A local project: nothing goes to a server.
+vi.mock("../server-pr-review", () => ({
+	serverProjectOf: () => undefined,
+	serverReviews: vi.fn(),
+	startServerReview: vi.fn(),
+	cancelServerReview: () => false,
+	postServerReview: vi.fn(),
+	markServerReviewPosted: vi.fn(),
+}));
 vi.mock("../pr-logs", () => ({
 	sanitizeNetworkData: (data: string) => data,
 	getGitHubDir: () => "/nowhere",

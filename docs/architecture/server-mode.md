@@ -325,9 +325,21 @@ route, du dépôt du projet et de nombres, sans rien recopier de la requête ; l
 ne garde que les clés des vues, passées en paramètres ; GraphQL ne sert qu'une requête, la liste des PR ouvertes, écrite par le serveur. Ce que l'app
 faisait avec `gh` (diff, commentaire, fusion, mise à jour de la branche) devient l'appel REST
 équivalent (`pr-actions.ts`). « Créer une tâche » sur une issue en fait une carte du tableau
-partagé. La revue IA, l'investigation, l'auto-fix et l'analyse groupée des issues tournent sur
-l'ordinateur, dans le dossier du projet : elles restent masquées pour un projet du serveur
-jusqu'à leurs jobs serveur. Une politique hors ligne stricte du projet bloque le relais (409).
+partagé. L'investigation, l'auto-fix et l'analyse groupée des issues tournent sur l'ordinateur,
+dans le dossier du projet : elles restent masquées pour un projet du serveur jusqu'à leurs jobs
+serveur. Une politique hors ligne stricte du projet bloque le relais (409).
+
+**La revue IA d'une PR tourne sur le serveur.** Le bouton de revue d'un projet serveur lance le
+runner GitHub (`runners/github/runner.py review-pr` ou `followup-review-pr`) en job sur le clone
+(`shared_features/github_review.py`, par `project_jobs`, confiné comme tout job), avec le dépôt du
+projet lu dans son `repo_url` (`--repo`) et un numéro de PR, rien d'autre de la requête. Il tourne
+avec le jeton GitHub de qui le lance, que tout run reçoit de ses jetons enregistrés ; sans ce jeton
+rien ne démarre (412). L'image du serveur porte `gh`, que le runner appelle : une release épinglée
+par version et par SHA-256. La revue enregistrée est le fichier du runner,
+`.workpilot/github/pr/review_<n>.json` dans le clone, que chaque membre lit ; l'app suit le job
+comme un processus local (`ipc-handlers/github/server-pr-review.ts`). Publier les findings poste la
+revue sur GitHub par le relais, avec le jeton de la personne, puis note sur le serveur ce qui a été
+publié, d'où part la revue de suivi.
 
 | Action | Route | Il faut |
 |---|---|---|
@@ -335,6 +347,9 @@ jusqu'à leurs jobs serveur. Une politique hors ligne stricte du projet bloque l
 | Lister les PR ouvertes | `POST /api/features/forge/github/pulls` | `vcs.read` |
 | Commenter, assigner, mettre à jour une branche, approuver un workflow | `POST /api/features/forge/github/write` | `vcs.write`, rôle `member` ou plus |
 | Fusionner une PR | la même, sur `/repos/<dépôt>/pulls/<n>/merge` | en plus `vcs.pr.merge` |
+| Lancer, arrêter la revue IA d'une PR | `POST /api/features/forge/github/reviews/jobs`, `…/jobs/<id>/cancel` | `agent.execute`, `agent.cancel`, rôle `member` ou plus |
+| Suivre la revue, lire les revues enregistrées | `GET …/reviews/jobs/<id>`, `GET …/reviews?numbers=` | `vcs.read` |
+| Publier les findings | `/repos/<dépôt>/pulls/<n>/reviews` par le relais, puis `POST …/reviews/<n>/posted` | `vcs.write`, rôle `member` ou plus |
 
 **Les vues GitLab aussi, sur une instance nommée par l'opérateur.** Un projet cloné depuis
 gitlab.com ou depuis un hôte de `WORKPILOT_GITLAB_HOSTS` montre ses issues et ses merge requests,
@@ -360,6 +375,6 @@ fusion d'une MR ouverte restent offertes.
 ## Ce qui vient
 
 Le plan multi-tenant du 31 octobre, par lots : les autres features servies de la même façon
-(les actions IA des forges en jobs, analyses, tableau de bord), le flux du projet ouvert pour
+(l'investigation, l'auto-fix et la revue des MR GitLab en jobs, analyses, tableau de bord), le flux du projet ouvert pour
 chaque vue partagée, un test de bout en bout à deux organisations, et le guide d'exploitation. Ce
 fichier grandit avec chaque lot.
