@@ -32,8 +32,11 @@ import type { IPCResult, Project } from "../shared/types";
 import { authedFetch } from "./server-connection";
 
 export type SharedFeature = "roadmap" | "ideation" | "context";
-/** What runs jobs on the server: a feature with files, or Insights. */
-export type JobFeature = SharedFeature | "insights";
+/**
+ * What runs jobs on the server: a feature with files, Insights, or the AI
+ * review of a pull request (`ipc-handlers/github/server-pr-review.ts`).
+ */
+export type JobFeature = SharedFeature | "insights" | "forge/github/reviews";
 
 interface FeatureFiles {
 	directory: string;
@@ -290,10 +293,11 @@ export function relayServerJob(
 		const job = parseJob(data);
 		if (job && FINAL.has(job.status)) {
 			if (job.status === "succeeded") {
+				// Insights and a review are read by their own views.
 				const pulled =
-					feature === "insights"
-						? { success: true as const, error: undefined }
-						: await pullFeature(project, feature);
+					feature in SHARED_FEATURES
+						? await pullFeature(project, feature as SharedFeature)
+						: { success: true as const, error: undefined };
 				finish(
 					pulled.success ? 0 : 1,
 					pulled.success ? undefined : pulled.error,

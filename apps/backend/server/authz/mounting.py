@@ -73,6 +73,9 @@ ROUTE_OVERRIDES: dict[tuple[str, str], str] = {
     ("POST", "/api/features/forge/github/read"): "vcs.read",
     ("POST", "/api/features/forge/github/pulls"): "vcs.read",
     ("POST", "/api/features/forge/gitlab/read"): "vcs.read",
+    # The AI review of a pull request runs the reviewer agent on the clone.
+    ("POST", "/api/features/forge/github/reviews/jobs"): "agent.execute",
+    ("POST", "/api/features/forge/github/reviews/jobs/{job_id}/cancel"): "agent.cancel",
     # A question to Insights runs the insights agent on the clone.
     ("POST", "/api/features/insights/sessions/{session_id}/messages"): "agent.execute",
     ("POST", "/api/features/insights/jobs/{job_id}/cancel"): "agent.cancel",

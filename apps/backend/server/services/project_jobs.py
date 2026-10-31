@@ -44,7 +44,9 @@ from server.services.run_manager import (
 from sqlalchemy import select
 
 FEATURE_KEY = re.compile(r"^[a-z][a-z0-9_-]{0,39}$")
-RUNNER_NAME = re.compile(r"^[a-z][a-z0-9_]{0,60}\.py$")
+#: A file of ``runners/``, or of one of its packages (``github/runner.py``):
+#: never a ``..`` or an absolute path.
+RUNNER_NAME = re.compile(r"^(?:[a-z][a-z0-9_]{0,30}/)?[a-z][a-z0-9_]{0,60}\.py$")
 
 #: Lines of a job's output kept for the app to follow, and the longest line.
 OUTPUT_LINES = 400

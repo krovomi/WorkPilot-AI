@@ -28,3 +28,12 @@ def test_the_server_does_not_run_as_root():
     lines = DOCKERFILE.read_text(encoding="utf-8").splitlines()
     users = [line.split()[1] for line in lines if line.startswith("USER ")]
     assert users and users[-1] == "workpilot"
+
+
+def test_the_github_cli_is_a_pinned_release_checked_against_its_sha256():
+    # The AI review of a server project's pull requests runs `gh`.
+    text = DOCKERFILE.read_text(encoding="utf-8")
+    assert "github.com/cli/cli/releases/download/v${version}/" in text
+    assert "sha256sum -c -" in text
+    assert "version=2." in text
+    assert "apt-get install -y --no-install-recommends gh" not in text

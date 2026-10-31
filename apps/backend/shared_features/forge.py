@@ -68,6 +68,8 @@ _ROUTES: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("GET", ("actions", "runs")),
     ("POST", ("issues", NUMBER, "comments")),
     ("POST", ("issues", NUMBER, "assignees")),
+    # A review, the AI review's findings posted by the person (their token).
+    ("POST", ("pulls", NUMBER, "reviews")),
     ("PUT", ("pulls", NUMBER, "merge")),
     ("PUT", ("pulls", NUMBER, "update-branch")),
     ("POST", ("actions", "runs", NUMBER, "approve")),
@@ -118,7 +120,7 @@ query($owner: String!, $repo: String!, $first: Int!, $after: String) {
 """
 
 
-__all__ = ["github_repo", "router"]
+__all__ = ["github_repo", "project_repo", "router"]
 
 
 def _number(text: str) -> str | None:
@@ -219,7 +221,7 @@ def api_call(
     return "/".join([f"/repos/{repo}", *built]), params, route
 
 
-async def _project_repo(db: AsyncSession, scope: ProjectScope) -> str:
+async def project_repo(db: AsyncSession, scope: ProjectScope) -> str:
     project = await db.get(Project, scope.project_id)
     repo = github_repo(project.repo_url) if project else None
     if repo is None:
@@ -300,7 +302,7 @@ def _github_headers(
 async def _relay(
     call: RestCall, request: Request, scope: ProjectScope, db: AsyncSession
 ) -> dict[str, Any]:
-    repo = await _project_repo(db, scope)
+    repo = await project_repo(db, scope)
     principal = get_principal(request)
     found = api_call(call.method, call.endpoint, repo)
     if found is None:
@@ -360,7 +362,7 @@ async def github_pulls(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """A page of the project's open pull requests (GraphQL), as the caller."""
-    repo = await _project_repo(db, scope)
+    repo = await project_repo(db, scope)
     guard_offline(scope)
     token = await user_token(db, get_principal(request), "github_token", "GitHub")
     owner, name = repo.split("/", 1)
