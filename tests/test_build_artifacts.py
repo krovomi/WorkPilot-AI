@@ -69,12 +69,18 @@ class TestDetectPatterns:
         assert "[Bb]in/" in patterns
         assert "[Oo]bj/" in patterns
 
-    def test_bin_is_not_excluded_without_dotnet(self):
-        """bin/ holds scripts in a Node or shell project."""
-        patterns = detect_patterns(["package.json", "bin/cli.js"])
-        assert "[Bb]in/" not in patterns
+    def test_bin_and_obj_are_excluded_in_every_project(self):
+        """Leub, 31 October: never bin/ or obj/ content, whatever the project."""
+        for files in ([], ["package.json"], ["pyproject.toml"], ["README.md"]):
+            patterns = detect_patterns(files)
+            assert "[Bb]in/" in patterns
+            assert "[Oo]bj/" in patterns
+
+    def test_stack_patterns_need_their_stack(self):
+        patterns = detect_patterns(["package.json"])
         assert "node_modules/" in patterns
         assert "dist/" in patterns
+        assert "target/" not in patterns
 
     def test_common_patterns_always_apply(self):
         patterns = detect_patterns([])
@@ -115,19 +121,51 @@ class TestEnsureExcludes:
         assert content.count(BLOCK_BEGIN) == 1
         assert "[Oo]bj/" in content
 
-    def test_pattern_matching_a_versioned_file_is_left_out(self, dotnet_repo: Path):
-        """A project that commits a bin/ folder keeps being able to add to it."""
+    def test_pattern_matching_a_versioned_file_is_left_out(self, tmp_path: Path):
+        """A project that commits its dist/ keeps being able to add to it."""
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        _git(repo, "init", "-q", "-b", "main")
+        _git(repo, "config", "user.email", "t@example.com")
+        _git(repo, "config", "user.name", "Test")
+        _write(repo, "package.json", "{}")
+        _write(repo, "dist/index.js", "x")
+        _git(repo, "add", ".")
+        _git(repo, "commit", "-q", "-m", "init")
+        wt = _worktree(repo)
+
+        patterns = ensure_artifact_excludes(wt)
+
+        assert "dist/" not in patterns
+        assert "node_modules/" in patterns
+
+    def test_bin_and_obj_stay_excluded_even_when_versioned(self, dotnet_repo: Path):
+        """An earlier task merged obj/ files: obj/ is still excluded."""
         _write(dotnet_repo, "scripts/bin/tool.sh", "echo")
+        _write(dotnet_repo, "src/Rag.Domain/obj/project.nuget.cache", "{}")
         _git(dotnet_repo, "add", ".")
-        _git(dotnet_repo, "commit", "-q", "-m", "scripts")
+        _git(dotnet_repo, "commit", "-q", "-m", "versioned outputs")
         wt = _worktree(dotnet_repo)
 
         patterns = ensure_artifact_excludes(wt)
 
-        assert "[Bb]in/" not in patterns
-        # The configuration folders stay covered.
-        assert "**/[Bb]in/[Dd]ebug/" in patterns
+        assert "[Bb]in/" in patterns
         assert "[Oo]bj/" in patterns
+
+    def test_build_rewriting_a_versioned_obj_file_is_not_staged(
+        self, dotnet_repo: Path
+    ):
+        _write(dotnet_repo, "tests/Rag.Tests.Unit/obj/project.nuget.cache", "v1")
+        _git(dotnet_repo, "add", ".")
+        _git(dotnet_repo, "commit", "-q", "-m", "versioned obj")
+        wt = _worktree(dotnet_repo)
+        ensure_artifact_excludes(wt)
+        _write(wt, "tests/Rag.Tests.Unit/obj/project.nuget.cache", "v2")
+        _write(wt, "toto.txt")
+
+        _git(wt, "add", ".")
+
+        assert _git(wt, "diff", "--cached", "--name-only").split() == ["toto.txt"]
 
     def test_outputs_committed_on_the_branch_do_not_count_as_versioned(
         self, dotnet_repo: Path
@@ -185,7 +223,7 @@ class TestStripCommittedArtifacts:
 
         assert strip_committed_artifacts(wt, "main") == ["settings.local"]
 
-    def test_never_touches_files_of_the_base_branch(self, dotnet_repo: Path):
+    def test_never_untracks_files_of_the_base_branch(self, dotnet_repo: Path):
         _write(dotnet_repo, "src/Rag.Domain/obj/keep.json", "{}")
         _git(dotnet_repo, "add", ".")
         _git(dotnet_repo, "commit", "-q", "-m", "versioned obj")
@@ -196,6 +234,35 @@ class TestStripCommittedArtifacts:
 
         assert strip_committed_artifacts(wt, "main") == []
         assert "src/Rag.Domain/obj/keep.json" in _git(wt, "ls-files").split()
+
+    def test_reverts_changes_to_versioned_obj_files(self, dotnet_repo: Path):
+        """The screenshot of 31 October: obj/project.nuget.cache and the
+        nuget.g.props/targets of a test project, rewritten by a restore."""
+        obj = "tests/Rag.Tests.Unit/obj"
+        names = [
+            "project.nuget.cache",
+            "Rag.Tests.Unit.csproj.nuget.g.props",
+            "Rag.Tests.Unit.csproj.nuget.g.targets",
+        ]
+        for name in names:
+            _write(dotnet_repo, f"{obj}/{name}", "base")
+        _git(dotnet_repo, "add", ".")
+        _git(dotnet_repo, "commit", "-q", "-m", "versioned obj")
+        wt = _worktree(dotnet_repo)
+        for name in names:
+            _write(wt, f"{obj}/{name}", "restored")
+        _write(wt, "toto.txt")
+        # An agent that commits without WorkPilot's excludes (git add -A -f).
+        _git(wt, "add", "-A", "-f")
+        _git(wt, "commit", "-q", "-m", "agent")
+
+        stripped = strip_committed_artifacts(wt, "main")
+
+        assert sorted(stripped) == sorted(f"{obj}/{n}" for n in names)
+        assert _git(wt, "diff", "--name-only", "main...HEAD").split() == ["toto.txt"]
+        # The restored files stay on disk for the build.
+        assert (wt / obj / names[0]).read_text(encoding="utf-8") == "restored"
+        assert _git(wt, "status", "--porcelain").strip() == ""
 
     def test_nothing_to_strip_makes_no_commit(self, dotnet_repo: Path):
         wt = _worktree(dotnet_repo)
