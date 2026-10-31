@@ -141,7 +141,7 @@ backend/
 
 ```python
 # Import the real module; the root-level facades are gone
-from core.debug import debug, debug_error
+from foundation.debug import debug, debug_error
 from core.progress import count_subtasks
 from foundation.platform import is_windows
 ```

@@ -16,7 +16,6 @@ if str(_PARENT_DIR) not in sys.path:
 
 # Import only what we need at module level
 # Heavy imports are lazy-loaded in functions to avoid import errors
-from core.build_signals import BuildHalted, BuildPaused
 from core.progress import print_paused_banner
 from core.workspace import (
     WorkspaceMode,
@@ -27,6 +26,7 @@ from core.workspace import (
     handle_workspace_choice,
     setup_workspace,
 )
+from foundation.build_signals import BuildHalted, BuildPaused
 from review import ReviewState
 from ui import (
     BuildState,
@@ -114,7 +114,7 @@ def _changed_files(worktree_manager, spec_name: str) -> list[str] | None:
     try:
         return [path for _status, path in worktree_manager.get_changed_files(spec_name)]
     except Exception as exc:  # noqa: BLE001 - advisory input, never fatal
-        from core.debug import debug_warning
+        from foundation.debug import debug_warning
 
         debug_warning("run.py", f"Could not list changed files: {exc}")
         return None
@@ -252,7 +252,7 @@ def _conclude_without_coder(profile, run, spec_dir: Path, source_spec_dir) -> No
 
         sync_spec_to_source(spec_dir, source_spec_dir)
     except Exception as exc:  # noqa: BLE001 - a sync never fails a build
-        from core.debug import debug_warning
+        from foundation.debug import debug_warning
 
         debug_warning("run.py", f"Spec sync skipped: {exc}")
     try:
@@ -274,7 +274,7 @@ def _conclude_without_coder(profile, run, spec_dir: Path, source_spec_dir) -> No
         else:
             emitter.emit("QA_PASSED", {"iteration": 0, "testsRun": {}})
     except Exception as exc:  # noqa: BLE001 - best-effort
-        from core.debug import debug_warning
+        from foundation.debug import debug_warning
 
         debug_warning("run.py", f"Could not settle the card: {exc}")
     print(
@@ -325,7 +325,7 @@ def _run_deterministic_gates(profile, working_dir: Path, spec_dir: Path):
             print("\n" + summary)
         return run
     except Exception as exc:  # noqa: BLE001 - gates never fail a build
-        from core.debug import debug_warning
+        from foundation.debug import debug_warning
 
         debug_warning("run.py", f"Deterministic gates skipped: {exc}")
         return None
@@ -347,7 +347,7 @@ def _run_docs_preflight(
     try:
         from libdocs import run_preflight
     except Exception as exc:  # noqa: BLE001 - the package is optional at runtime
-        from core.debug import debug_warning
+        from foundation.debug import debug_warning
 
         debug_warning("run.py", f"Documentation preflight unavailable: {exc}")
         return
@@ -355,7 +355,7 @@ def _run_docs_preflight(
     try:
         result = run_preflight(working_dir, spec_dir, cache_dir=source_project_dir)
     except Exception as exc:  # noqa: BLE001 - documentation never fails a build
-        from core.debug import debug_warning
+        from foundation.debug import debug_warning
 
         debug_warning("run.py", f"Documentation preflight skipped: {exc}")
         return
@@ -380,7 +380,7 @@ def _run_attachments_preflight(spec_dir: Path, source_project_dir: Path) -> None
         if summary := result.describe():
             print("\n" + summary)
     except Exception as exc:  # noqa: BLE001 - attachments never fail a build
-        from core.debug import debug_warning
+        from foundation.debug import debug_warning
 
         debug_warning("run.py", f"Attachments preflight skipped: {exc}")
 
@@ -421,7 +421,7 @@ def _phase_context(
             source_spec_dir=source_spec_dir,
         )
     except Exception as exc:  # noqa: BLE001 - never block a build
-        from core.debug import debug_warning
+        from foundation.debug import debug_warning
 
         debug_warning("run.py", f"Workflow phase context unavailable: {exc}")
         return None
@@ -451,7 +451,7 @@ def _run_workflow_phases(profile, ctx, *, after: str | None, before: str | None)
     except (BuildPaused, BuildHalted):
         raise
     except Exception as exc:  # noqa: BLE001 - phases report, they do not fail builds
-        from core.debug import debug_warning
+        from foundation.debug import debug_warning
 
         debug_warning("run.py", f"Workflow phases skipped: {exc}")
         return None
@@ -471,12 +471,12 @@ def _sync_spec_back(spec_dir: Path, source_spec_dir: Path | None, moment: str) -
         return
     try:
         from agents.utils import sync_spec_to_source
-        from core.debug import debug_info
+        from foundation.debug import debug_info
 
         if sync_spec_to_source(spec_dir, source_spec_dir):
             debug_info("run.py", f"Spec directory synced to main project {moment}")
     except Exception as exc:  # noqa: BLE001 - a copy never fails a build
-        from core.debug import debug_warning
+        from foundation.debug import debug_warning
 
         debug_warning("run.py", f"Spec sync {moment} skipped: {exc}")
 
@@ -535,7 +535,7 @@ def _record_build_in_brain(
         if rel:
             print(f"  brain: build recorded in {rel}")
     except Exception as exc:  # noqa: BLE001 - learning never fails a build
-        from core.debug import debug_warning
+        from foundation.debug import debug_warning
 
         debug_warning("run.py", f"Brain record skipped: {exc}")
 
@@ -611,7 +611,7 @@ def _run_observe_phase(
         # signals as everything else above.
         _run_convention_pass(spec_dir, outcome, changed_files)
     except Exception as exc:  # noqa: BLE001 - observation never fails a build
-        from core.debug import debug_warning
+        from foundation.debug import debug_warning
 
         debug_warning("run.py", f"Observe phase skipped: {exc}")
 
@@ -646,7 +646,7 @@ def _run_convention_pass(
         for path in proposals:
             print(f"  proposed  conventions/_proposed/{path.name}")
     except Exception as exc:  # noqa: BLE001 - observation never fails a build
-        from core.debug import debug_warning
+        from foundation.debug import debug_warning
 
         debug_warning("run.py", f"Convention pass skipped: {exc}")
 
@@ -677,7 +677,7 @@ def _report_hard_gates(
         if report.blocking:
             print("  → the branch is not ready to merge on this evidence.")
     except Exception as exc:  # noqa: BLE001 - a gate reports, never fails a build
-        from core.debug import debug_warning
+        from foundation.debug import debug_warning
 
         debug_warning("run.py", f"Hard gate check skipped: {exc}")
 
@@ -764,7 +764,11 @@ def handle_build_command(
         JevContext("feature-build", project_dir, spec_dir)
     )
     from core.agent import run_autonomous_agent, sync_spec_to_source
-    from core.debug import (
+    from foundation.base_branch import (
+        get_base_branch_from_metadata,
+        get_use_local_branch_from_metadata,
+    )
+    from foundation.debug import (
         debug,
         debug_info,
         debug_section,
@@ -772,10 +776,6 @@ def handle_build_command(
         debug_warning,
     )
     from phase_config import get_phase_model
-    from prompts_pkg.prompts import (
-        get_base_branch_from_metadata,
-        get_use_local_branch_from_metadata,
-    )
     from qa import is_qa_approved, run_qa_validation_loop, should_run_qa
 
     from .utils import print_banner, validate_environment

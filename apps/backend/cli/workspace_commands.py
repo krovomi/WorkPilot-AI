@@ -15,7 +15,6 @@ _PARENT_DIR = Path(__file__).parent.parent
 if str(_PARENT_DIR) not in sys.path:
     sys.path.insert(0, str(_PARENT_DIR))
 
-from core.debug import debug_warning
 from core.workspace import (
     cleanup_all_worktrees,
     discard_existing_build,
@@ -34,6 +33,7 @@ from core.workspace.git_utils import (
 )
 from core.worktree import PushAndCreatePRResult as CreatePRResult
 from core.worktree import WorktreeManager
+from foundation.debug import debug_warning
 from ui import (
     Icons,
     icon,
@@ -323,7 +323,7 @@ def _detect_parallel_task_conflicts(
 
 # Import debug utilities
 try:
-    from core.debug import (
+    from foundation.debug import (
         debug,
         debug_detailed,
         debug_error,

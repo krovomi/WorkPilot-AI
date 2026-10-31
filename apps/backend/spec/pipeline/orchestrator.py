@@ -11,10 +11,10 @@ from collections.abc import Callable
 from pathlib import Path
 
 from analysis.analyzers import analyze_project
-from core.build_signals import BuildPaused
-from core.pause_state import is_paused
 from core.task_event import TaskEventEmitter
 from core.workspace.models import SpecNumberLock
+from foundation.build_signals import BuildPaused
+from foundation.pause_state import is_paused
 from phase_config import get_thinking_budget
 from prompts_pkg.project_context import should_refresh_project_index
 from review import run_review_checkpoint

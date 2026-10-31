@@ -46,7 +46,7 @@ MAX_DIFF_CHARS = 60_000
 # What opening the second engine can raise: an unknown provider, a CLI that is
 # not installed, a connection refused. The session itself turns its errors
 # into an ``error`` status (`agents.session.run_agent_session`), and a pause or
-# a halt (`core.build_signals`) must go through, so the list is closed.
+# a halt (`foundation.build_signals`) must go through, so the list is closed.
 _SESSION_ERRORS = (
     ImportError,
     OSError,

@@ -23,7 +23,7 @@ from .storage import EvolutionStorage
 
 # Import debug utilities
 try:
-    from core.debug import debug, debug_success
+    from foundation.debug import debug, debug_success
 except ImportError:
 
     def debug(*args, **kwargs):

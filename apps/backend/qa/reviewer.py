@@ -28,7 +28,7 @@ try:
 except ImportError:
     ResultMessage = None  # type: ignore[assignment,misc]
 
-from core.debug import (
+from foundation.debug import (
     debug,
     debug_detailed,
     debug_error,

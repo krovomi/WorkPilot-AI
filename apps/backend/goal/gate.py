@@ -46,7 +46,7 @@ __all__ = [
 
 RESULT_FILENAME = "goal_result.json"
 GOAL_ISSUE_TITLE = "Goal not met"
-# The order `prompts_pkg.prompts._detect_base_branch` creates worktrees from.
+# The order `foundation.base_branch.detect_base_branch` creates worktrees from.
 _FALLBACK_BASES = ("main", "master", "develop")
 
 

@@ -22,7 +22,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from cli.utils import import_dotenv
-from core.debug import (
+from foundation.debug import (
     debug,
     debug_error,
     debug_section,
@@ -371,7 +371,7 @@ async def main():
 
 
 if __name__ == "__main__":
-    from core.log_redaction import install_global_redaction
+    from foundation.log_redaction import install_global_redaction
 
     install_global_redaction()
     asyncio.run(main())

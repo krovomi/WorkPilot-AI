@@ -143,7 +143,7 @@ if not is_uvicorn_running():
         )
 
 if __name__ == "__main__":
-    from core.log_redaction import install_global_redaction
+    from foundation.log_redaction import install_global_redaction
 
     install_global_redaction()
     main(jev_run=_jev_run)

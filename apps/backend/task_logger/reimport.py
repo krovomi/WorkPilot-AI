@@ -127,7 +127,7 @@ def rebuild_task_logs_from_conversations(
     Idempotent: re-running rebuilds each per-LLM file and refreshes that model's
     slice of the shared ``task_logs.json``. Returns the per-LLM files written.
     """
-    from core.conversation_log import _log_slug
+    from foundation.llm_slug import llm_slug
 
     spec_dir = Path(spec_dir)
     written: list[Path] = []
@@ -152,7 +152,7 @@ def rebuild_task_logs_from_conversations(
         if not feed:
             continue
 
-        per = LogStorage(spec_dir, f"task_logs.{_log_slug(provider, model)}.json")
+        per = LogStorage(spec_dir, f"task_logs.{llm_slug(provider, model)}.json")
         for ph in LogPhase:
             per.clear_phase(ph.value)  # rebuild from scratch (idempotent)
         per.add_entries(feed)

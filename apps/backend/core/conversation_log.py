@@ -46,10 +46,8 @@ goes through the neutral ContentBlock representation only.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
-import re
 from collections import OrderedDict
 from dataclasses import asdict, is_dataclass
 from datetime import UTC, datetime
@@ -58,6 +56,7 @@ from pathlib import Path
 from typing import Any
 
 from core.agent_client import AgentMessage, ContentBlock, ContentBlockType, MessageRole
+from foundation.llm_slug import llm_slug
 
 logger = logging.getLogger(__name__)
 
@@ -75,29 +74,11 @@ _LOG_SUFFIX = ".jsonl"
 SCHEMA_VERSION = 1
 
 
-def _log_slug(provider: str | None, model: str | None) -> str:
-    """Filesystem-safe slug identifying a (provider, model) pair.
-
-    e.g. ("ollama", "qwen2.5-coder:latest") -> "ollama-qwen2.5-coder-latest".
-    Keeps ``[A-Za-z0-9._-]``; everything else (':' '/' spaces) becomes '-'.
-    Long ids (e.g. ``hf.co/org/Model-GGUF:latest``) are truncated with a short
-    hash so the filename stays well under filesystem limits yet stays unique.
-    """
-    raw = f"{(provider or 'local').strip()}-{(model or 'default').strip()}"
-    slug = re.sub(r"[^A-Za-z0-9._-]+", "-", raw).strip("-") or "default"
-    if len(slug) > 80:
-        digest = hashlib.sha1(  # noqa: S324 - filename uniqueness, not security
-            raw.encode("utf-8"), usedforsecurity=False
-        ).hexdigest()[:8]
-        slug = slug[:60].rstrip("-") + "-" + digest
-    return slug
-
-
 def conversation_log_path(
     spec_dir: Path, provider: str | None, model: str | None
 ) -> Path:
     """Path of the conversation log for a given (provider, model)."""
-    return spec_dir / f"{_LOG_PREFIX}.{_log_slug(provider, model)}{_LOG_SUFFIX}"
+    return spec_dir / f"{_LOG_PREFIX}.{llm_slug(provider, model)}{_LOG_SUFFIX}"
 
 
 def migrate_legacy_log(spec_dir: Path) -> None:

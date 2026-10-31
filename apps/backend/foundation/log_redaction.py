@@ -7,7 +7,7 @@ values.
 
 Usage at process start:
 
-    from core.log_redaction import install_global_redaction
+    from foundation.log_redaction import install_global_redaction
     install_global_redaction()
 
 We never raise from inside the filter — filters that crash silently drop

@@ -107,8 +107,8 @@ from core.sentry import capture_exception, init_sentry
 
 init_sentry(component="spec-runner")
 
-from core.build_signals import BuildPaused
-from core.debug import debug, debug_error, debug_section, debug_success
+from foundation.build_signals import BuildPaused
+from foundation.debug import debug, debug_error, debug_section, debug_success
 from foundation.platform import is_windows
 from phase_config import resolve_model_id
 from review import ReviewState
@@ -535,7 +535,7 @@ Examples:
 
 
 if __name__ == "__main__":
-    from core.log_redaction import install_global_redaction
+    from foundation.log_redaction import install_global_redaction
 
     install_global_redaction()
     main()

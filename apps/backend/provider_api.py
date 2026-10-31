@@ -25,7 +25,7 @@ logging.basicConfig(level=logging.INFO, stream=sys.stdout, force=True)
 # Install the global log redaction filter as early as possible — before
 # any module logs anything sensitive at import time. Idempotent.
 try:
-    from core.log_redaction import install_global_redaction
+    from foundation.log_redaction import install_global_redaction
 
     install_global_redaction()
 except Exception as _e:  # noqa: BLE001 — never block boot on this

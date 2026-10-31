@@ -13,8 +13,8 @@ after the upgrade.
 import json
 
 import pytest
-from core.build_signals import BuildHalted, BuildPaused
-from core.pause_state import (
+from foundation.build_signals import BuildHalted, BuildPaused
+from foundation.pause_state import (
     PAUSE_STATE_FILE,
     clear_pause_state,
     is_paused,

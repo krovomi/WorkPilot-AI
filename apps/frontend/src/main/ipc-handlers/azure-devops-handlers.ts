@@ -118,7 +118,7 @@ from pathlib import Path
 
 # Add project root (parent of src/) at the front so it takes priority
 sys.path.insert(0, str(Path('${connectorSrcPath.replaceAll("\\", "\\\\")}').parent))
-# Append apps/backend at the end (lower priority) for core.git_provider
+# Append apps/backend at the end (lower priority) for foundation.git_provider
 sys.path.append(str(Path('${backendPath.replaceAll("\\", "\\\\")}')))
 from src.connectors.azure_devops import AzureDevOpsConnector
 try:
@@ -136,7 +136,7 @@ except (ImportError, ModuleNotFoundError):
 try:
     # Try to import git_provider for auto-detection
     try:
-        from core.git_provider import extract_azure_devops_project
+        from foundation.git_provider import extract_azure_devops_project
         has_git_provider = True
     except ImportError:
         has_git_provider = False
@@ -441,7 +441,7 @@ sys.path.insert(0, str(Path('${connectorSrcPath.replaceAll("\\", "\\\\")}').pare
 sys.path.insert(0, str(Path('${backendPath.replaceAll("\\", "\\\\")}')))
 
 try:
-    from core.git_provider import extract_azure_devops_repository
+    from foundation.git_provider import extract_azure_devops_repository
     
     project_dir = Path('${projectPath.replaceAll("\\", "\\\\")}')
     repository = extract_azure_devops_repository(project_dir)

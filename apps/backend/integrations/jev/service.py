@@ -7,8 +7,8 @@ import json
 import math
 from collections.abc import Mapping
 
-from core.build_signals import BuildPaused
-from core.pause_state import is_paused
+from foundation.build_signals import BuildPaused
+from foundation.pause_state import is_paused
 
 from .client import JevClient, JevRequestError
 from .context import MAX_STATE_BYTES

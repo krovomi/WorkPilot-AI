@@ -49,7 +49,10 @@ try:
     backend_path = Path(__file__).parent / "apps" / "backend"
     sys.path.insert(0, str(backend_path))
 
-    from core.git_provider import detect_git_provider, extract_azure_devops_project
+    from foundation.git_provider import (
+        detect_git_provider,
+        extract_azure_devops_project,
+    )
 
     provider = detect_git_provider(".")
     print(f"   Provider détecté: {provider}")

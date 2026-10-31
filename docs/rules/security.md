@@ -44,11 +44,11 @@ l'UI n'existe pas.
 - **Jamais dans** : un fichier suivi, un test (valeur factice évidente : `sk-test-0000`), un log, un
   message d'erreur renvoyé à l'UI, un prompt, une URL, un artefact de spec (`.workpilot/specs/`),
   un rapport de QA, un commentaire de PR.
-- **Logs** : l'API backend installe `core/log_redaction.py` (`install_global_redaction`) au
+- **Logs** : l'API backend installe `foundation/log_redaction.py` (`install_global_redaction`) au
   démarrage de `provider_api.py` ; `run.py` et chaque runner l'installent en tête de leur bloc
   `__main__` (`tests/test_entrypoints_redaction.py`), un nouveau point d'entrée aussi. Le masque
   s'applique à la création de chaque enregistrement, donc aussi aux handlers posés après ;
-  `core/debug.py`, qui écrit hors `logging`, passe par `redact_text`. Côté
+  `foundation/debug.py`, qui écrit hors `logging`, passe par `redact_text`. Côté
   Electron, `app-logger.ts` expurge chaque message avant écriture (hook electron-log,
   `shared/utils/secret-redaction.ts`). Côté UI, une clé s'affiche masquée (`maskApiKey`). Ne jamais logger un en-tête `Authorization`, un
   jeton, ni le corps d'une requête d'authentification.

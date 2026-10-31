@@ -25,10 +25,16 @@ from core.agent_client import (
     MessageRole,
 )
 from core.conversation_log import append_message as _log_append_message
-from core.debug import debug, debug_detailed, debug_error, debug_section, debug_success
 from core.progress import (
     count_subtasks_detailed,
     is_build_complete,
+)
+from foundation.debug import (
+    debug,
+    debug_detailed,
+    debug_error,
+    debug_section,
+    debug_success,
 )
 from harness.application.budget import BUDGET_ENV
 from insight_extractor import extract_session_insights

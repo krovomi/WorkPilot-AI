@@ -46,7 +46,7 @@ _mocked_module_names = [
     "phase_config",
     "foundation.phase_event",
     # Logging & UI
-    "core.debug",
+    "foundation.debug",
     "ui",
     "ui.capabilities",
     "task_logger",

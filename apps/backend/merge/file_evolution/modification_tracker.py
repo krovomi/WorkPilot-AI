@@ -21,7 +21,7 @@ from .storage import EvolutionStorage
 
 # Import debug utilities
 try:
-    from core.debug import debug, debug_warning
+    from foundation.debug import debug, debug_warning
 except ImportError:
 
     def debug(*args, **kwargs):

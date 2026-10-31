@@ -24,13 +24,13 @@ from agents.feature_wiring import (
     suggest_routed_model,
 )
 from context_mgmt.reset_limit import ResetLimit
-from core.build_signals import BuildHalted, BuildPaused
 from core.client import create_agent_client
 from core.llm_optimization import should_inline_file_context
-from core.pause_state import is_paused, read_pause_state
 from core.progress import interrupted_subtask_directive, reopen_interrupted_subtasks
 from core.task_event import TaskEventEmitter
 from core.workflow_logger import workflow_logger
+from foundation.build_signals import BuildHalted, BuildPaused
+from foundation.pause_state import is_paused, read_pause_state
 from qa.criteria import save_implementation_plan
 
 try:

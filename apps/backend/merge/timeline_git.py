@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 # Import debug utilities
 try:
-    from core.debug import debug_warning
+    from foundation.debug import debug_warning
 except ImportError:
 
     def debug_warning(*args, **kwargs):

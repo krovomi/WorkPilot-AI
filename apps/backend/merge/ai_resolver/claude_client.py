@@ -35,7 +35,7 @@ def create_claude_resolver() -> AIResolver:
     """
     # Import here to avoid circular dependency
     from core.auth import ensure_claude_code_oauth_token, get_auth_token
-    from core.model_config import get_utility_model_config
+    from foundation.model_config import get_utility_model_config
 
     from .resolver import AIResolver
 

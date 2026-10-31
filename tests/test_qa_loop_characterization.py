@@ -17,7 +17,7 @@ import types
 from pathlib import Path
 
 import pytest
-from core.build_signals import BuildPaused
+from foundation.build_signals import BuildPaused
 
 
 class _Logger:

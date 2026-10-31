@@ -15,14 +15,14 @@ which of the two the previous session had happened to reach.
 import logging
 from pathlib import Path
 
-from core.debug import (
+from core.sentry import capture_exception
+from foundation.debug import (
     debug,
     debug_error,
     debug_section,
     debug_success,
     is_debug_enabled,
 )
-from core.sentry import capture_exception
 from memory.store import get_project_memory
 
 logger = logging.getLogger(__name__)
