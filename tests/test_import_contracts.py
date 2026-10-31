@@ -117,11 +117,43 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     "test_generation": {"agent_runtime", "foundation", "project"},
     # The QA loop's architecture gate; its reviewer's prompt is built here.
     "architecture": {"agent_runtime", "foundation", "phase_config", "task_logger"},
+    # Out of the agents' cycle since A1's third step. The archify map builds its
+    # own prompts; its workflow phase lives in workflows/architecture_map_phase.py.
+    "architecture_visualizer": {"foundation"},
+    # Attachments and diagnostics: the CI parsers and the traceability record
+    # are read from foundation, not from self_healing or spec.
+    "docintel": {
+        "brain",
+        "foundation",
+        "injection_guard",
+        "offline_policy",
+        "project",
+        "provider_models_catalog",
+        "security",
+        "test_generation",
+        "watermarks",
+    },
+    # The shared brain and what sits on it: with docintel, a cycle of five of
+    # their own below the agents' one; none of them imports core, agents or a
+    # phase.
+    "brain": {"docintel", "foundation", "learning_loop", "skills_registry"},
+    "learning_loop": {
+        "brain",
+        "foundation",
+        "hermes",
+        "memory",
+        "security",
+        "skills_registry",
+        "subagents",
+    },
+    "hermes": {"brain", "foundation", "learning_loop"},
+    "memory": {"brain"},
+    "uiux": {"brain", "foundation", "injection_guard", "project", "skills_registry"},
 }
 
 # The largest set of units that all import one another, directly or not. It
 # may only shrink: lower the number when a change breaks a part of it.
-MAX_CYCLE = 18
+MAX_CYCLE = 10
 
 
 def _units() -> dict[str, Path]:

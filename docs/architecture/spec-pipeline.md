@@ -114,7 +114,7 @@ one in the middle silently repointed every reference to the ones below it, so
 nothing downstream referenced a requirement at all — and "which requirement is
 covered by no subtask?" had no answer until QA read the finished branch.
 
-`spec/traceability.py` is the single reader: `parse_requirements`,
+`foundation/traceability.py` is the single reader: `parse_requirements`,
 `parse_open_questions`, `compute_coverage`. The parsing takes text, so the
 validators, a workflow phase and a test all use it the same way.
 

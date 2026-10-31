@@ -722,7 +722,7 @@ def decide(
 
     if decision.spec_updated and (spec_dir / "traceability.json").is_file():
         try:
-            from spec.traceability import write_record
+            from foundation.traceability import write_record
 
             decision.traceability = write_record(spec_dir)["coverage"]["summary"]
         except Exception:  # noqa: BLE001 - the record is refreshed next build

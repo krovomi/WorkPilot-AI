@@ -46,11 +46,12 @@ apps/backend/architecture_visualizer/archify/
   evidence.py      what the codebase says, without a model
   ir.py            load, pin to real code, check id continuity
   authoring.py     write a model, repair while repairing helps
+  prompts.py       the authoring, delta and repair prompts (text in apps/backend/prompts/)
   significance.py  is this task worth mapping? (paths only, no API call)
   delta.py         compare two models; the six states the UI can be in
   task_delta.py    one task's delta, end to end: baseline, significance, author, compare
-  phase.py         the `architecture-map` workflow phase, on task_delta
   ../../runners/architecture_visualizer_runner.py   --action map | delta | doctor
+  ../../workflows/architecture_map_phase.py         the `architecture-map` workflow phase, on task_delta
 ```
 
 **Id continuity is the constraint everything else rests on.** `archify compare`
@@ -87,7 +88,7 @@ describe the code QA corrected, not the code that was written — in a fresh
 context, at `min_effort: medium`. It is **not** a skill session. It used to be
 one: the read-only default agent answered in prose, nothing asked
 `significance`, nothing ran archify, and the Delta tab stayed empty on every
-build. `archify/phase.py` is its executor (`CUSTOM_EXECUTORS`, like `verify`),
+build. `workflows/architecture_map_phase.py` is its executor (`CUSTOM_EXECUTORS`, like `verify`),
 and it runs `task_delta.run_task_delta` — the function the tab's regenerate
 button runs through `--action delta`, so the two cannot drift. Two filters gate
 it, and it needs both: `when: touches(...)` is a glob and can only say "a `.ts`

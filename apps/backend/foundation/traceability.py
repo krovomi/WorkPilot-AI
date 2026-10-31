@@ -32,6 +32,11 @@ disk is kept to the bottom of the file and to a single artifact,
 `traceability.json`: the record the Kanban, the QA stage and the `analyze` phase
 read instead of each re-deriving it from `spec.md` — three parsers of the same
 document is how three answers to one question start.
+
+It lives in `foundation` (it was `spec/traceability.py`) because it imports
+nothing of the backend and is read by `spec`, `docintel` and the coder alike:
+the attachment reader refreshing the record must not drag the spec pipeline
+into its imports (N8 A1, F131).
 """
 
 from __future__ import annotations

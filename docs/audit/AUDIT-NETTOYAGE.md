@@ -227,7 +227,7 @@ Ordre recommandé : L1, L2, L3, L4, L5, L6, L7, L8, L9, L10, L11, L12, L14, L15,
 
 - **Corrigé par le lot L2.** Le pipeline d'`action_delta` vit dans
   `architecture_visualizer/archify/task_delta.py::run_task_delta` (le runner CLI y délègue) ;
-  `archify/phase.py::run_architecture_map_phase` est l'exécuteur de la phase (`CUSTOM_EXECUTORS`),
+  `workflows/architecture_map_phase.py::run_architecture_map_phase` (ex-`archify/phase.py`, déplacé par N8 A1) est l'exécuteur de la phase (`CUSTOM_EXECUTORS`),
   qui crée ses sessions d'authoring sous `architecture_visualizer` via `verify.phase.make_agent_runner`.
   `significance.assess` passe en premier : un changement non significatif n'ouvre aucune session.
   `PhaseContext` porte `source_project_dir` (la baseline vit sous le `.workpilot/` du projet principal,

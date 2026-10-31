@@ -205,7 +205,7 @@ Coût : un skill BMAD vaut 2 à 6 k tokens de prompt ; il n'est lu que dans sa p
   `ToolExecutor.run_command`) ; une commande refusée ou une étape qui échoue (code retour, ou
   sa vérification) **arrête le reste** et laisse l'état écrit. Aucun jeton pendant l'exécution.
 - Journal `workflow/run.md` (étape, commande, code retour, sortie coupée à une page par
-  `harness.domain.paging.spill_excerpt`, secrets masqués par `foundation.log_redaction.redact_text`,
+  `foundation.paging.spill_excerpt`, secrets masqués par `foundation.log_redaction.redact_text`,
   fonction ajoutée pour cela) ; état `workflow/run-state.json` (`running` / `done` / `failed`
   / `refused` / `blocked`, `next_step`) : un échec reprend à l'étape échouée, une procédure
   modifiée après le début bloque (« the procedure changed since execution started »), une

@@ -11,6 +11,11 @@ step that needs a model — authoring the head model — runs on
 Everything else is `task_delta.run_task_delta`, the same code the Delta tab's
 regenerate button runs, so a non-significant change records its answer and
 returns before any session is opened.
+
+It lives in `workflows`, beside `cross_review_phase`, rather than in
+`architecture_visualizer/archify/`: the phase is the runner's, and archify
+importing the runner and `verify` back put it in the agents' import cycle
+(N8 A1, F131).
 """
 
 from __future__ import annotations
@@ -55,7 +60,7 @@ def task_summary(spec_dir: Path) -> str:
 
 def _report(status, record_dir: Path, session_errors: list[str]) -> str:
     """The phase's markdown, kept beside the other phases' reports."""
-    from .delta import status_path
+    from architecture_visualizer.archify.delta import status_path
 
     lines = [
         "# architecture-map",
@@ -109,6 +114,8 @@ async def run_architecture_map_phase(resolved, ctx):
 
 
 async def _run(resolved, ctx):
+    from architecture_visualizer.archify import delta as delta_module
+    from architecture_visualizer.archify import task_delta
     from workflows.runner import (
         CONFIG_PHASE,
         PhaseOutcome,
@@ -116,9 +123,6 @@ async def _run(resolved, ctx):
         phase_provider,
         subagents_allowed,
     )
-
-    from . import delta as delta_module
-    from . import task_delta
 
     phase = resolved.phase
     try:

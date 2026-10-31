@@ -1210,9 +1210,9 @@ async def _run_cross_review(resolved, ctx: PhaseContext) -> PhaseOutcome:
 
 
 async def _run_architecture_map(resolved, ctx: PhaseContext) -> PhaseOutcome:
-    """The `architecture-map` phase: `archify.phase`, imported when it runs."""
+    """The `architecture-map` phase: `workflows.architecture_map_phase`, imported when it runs."""
     try:
-        from architecture_visualizer.archify.phase import run_architecture_map_phase
+        from workflows.architecture_map_phase import run_architecture_map_phase
     except ImportError as exc:  # pragma: no cover - import-time environment
         return PhaseOutcome(
             resolved.phase.id,

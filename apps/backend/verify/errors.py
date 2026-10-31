@@ -6,7 +6,7 @@ repository and are reused rather than imitated:
 
 * `docintel.stacktrace.analyze` — a trace of any backend runtime, attached to
   *this* repository's file:line;
-* `self_healing.incident_responder.cicd_mode.parse_build_errors` — the compiler
+* `foundation.ci_logs.parse_build_errors` — the compiler
   and restore codes (`CS0103`, `TS2345`, `NU1101`…), the one table of them;
 * below, the handful of lines every runtime prints when it fails without a
   trace: `fail:` (ASP.NET Core's logger), `Traceback`, `panic:`,
@@ -22,6 +22,8 @@ from __future__ import annotations
 import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
+
+from foundation.ci_logs import parse_build_errors
 
 __all__ = ["VerifyError", "collect_errors", "console_errors", "network_errors"]
 
@@ -130,10 +132,6 @@ def _trace_errors(
 
 
 def _build_errors(text: str, source: str) -> list[VerifyError]:
-    try:
-        from self_healing.incident_responder.cicd_mode import parse_build_errors
-    except Exception:  # noqa: BLE001
-        return []
     try:
         errors = parse_build_errors(text)
     except Exception:  # noqa: BLE001

@@ -184,7 +184,7 @@ def _page(text: str) -> str:
     if len(text) <= OUTPUT_CHARS:
         return text.rstrip()
     try:
-        from harness.domain.paging import spill_excerpt
+        from foundation.paging import spill_excerpt
 
         return spill_excerpt(
             text, max_chars=OUTPUT_CHARS, location="(the step's full output)"
