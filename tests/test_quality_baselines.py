@@ -91,8 +91,8 @@ def test_a_fixed_file_leaves_the_baseline():
 def test_a_large_file_cannot_grow_and_a_new_one_is_refused(tmp_path, monkeypatch):
     big = "x\n" * (quality_baselines.LARGE_FILE + 1)
     (tmp_path / "apps" / "backend").mkdir(parents=True)
-    (tmp_path / "apps" / "backend" / "big.py").write_text(big)
-    (tmp_path / "apps" / "backend" / "small.py").write_text("x\n")
+    (tmp_path / "apps" / "backend" / "big.py").write_text(big, encoding="utf-8")
+    (tmp_path / "apps" / "backend" / "small.py").write_text("x\n", encoding="utf-8")
     monkeypatch.setattr(quality_baselines, "ROOT", tmp_path)
     monkeypatch.setattr(
         quality_baselines,
