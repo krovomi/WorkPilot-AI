@@ -341,3 +341,86 @@ async def test_merge_and_pr_runs_need_their_own_permission(tmp_path, monkeypatch
                 )
             assert exc.value.status_code == 403
             assert missing in exc.value.detail
+
+
+# --- the snapshot the app draws a server project from -----------------------
+
+
+def _link(path: Path, target: Path) -> None:
+    try:
+        path.symlink_to(target, target_is_directory=target.is_dir())
+    except (OSError, NotImplementedError):
+        pytest.skip("symlinks need privileges on this platform")
+
+
+async def _two_cards(tmp_path):
+    from shared_board.api import CardCreate, create_card
+
+    pid, oid, clone = await _project(tmp_path)
+    scope = _scope(pid, oid, clone, "member")
+    async with await _db() as db:
+        first = await create_card(CardCreate(title="A"), _request(), scope, db)
+        second = await create_card(CardCreate(title="B"), _request(), scope, db)
+    return pid, oid, clone, first["id"], second["id"]
+
+
+@pytest.mark.asyncio
+async def test_the_snapshot_sends_only_the_card_files_the_app_reads(tmp_path):
+    from shared_board.api import SNAPSHOT_FILES, board_snapshot
+
+    pid, oid, clone, card_id, _ = await _two_cards(tmp_path)
+    directory = clone / ".workpilot/specs" / card_id
+    (directory / "spec.md").write_text("# Spec\n", encoding="utf-8")
+    (directory / "agent.log").write_text("not for the app", encoding="utf-8")
+    (directory / "implementation_plan.json").write_text(
+        "x" * (SNAPSHOT_FILES["implementation_plan.json"] + 1), encoding="utf-8"
+    )
+    (clone / ".workpilot/specs/not-a-card").mkdir()
+
+    # A viewer reads the board too.
+    snapshot = await board_snapshot(_scope(pid, oid, clone, "viewer"))
+    assert len(snapshot["cards"]) == 2
+    assert set(snapshot["cards"][card_id]) == {
+        "requirements.json",
+        "task_metadata.json",
+        "spec.md",
+    }
+    assert snapshot["worktrees"] == {}
+
+
+@pytest.mark.asyncio
+async def test_the_snapshot_carries_the_build_workspace(tmp_path):
+    from shared_board.api import board_snapshot
+
+    pid, oid, clone, card_id, _ = await _two_cards(tmp_path)
+    building = clone / ".workpilot/worktrees/tasks" / card_id / ".workpilot/specs"
+    (building / card_id).mkdir(parents=True)
+    (building / card_id / "implementation_plan.json").write_text(
+        '{"phases": []}', encoding="utf-8"
+    )
+    snapshot = await board_snapshot(_scope(pid, oid, clone, "member"))
+    assert snapshot["worktrees"] == {
+        card_id: {"implementation_plan.json": '{"phases": []}'}
+    }
+
+
+@pytest.mark.asyncio
+async def test_the_snapshot_follows_no_link_out_of_the_checkout(tmp_path):
+    from shared_board.api import board_snapshot
+
+    pid, oid, clone, first, second = await _two_cards(tmp_path)
+    outside = tmp_path / "outside.md"
+    outside.write_text("secret", encoding="utf-8")
+    _link(clone / ".workpilot/specs" / first / "qa_report.md", outside)
+    _link(clone / ".workpilot/specs/003-linked", tmp_path)
+    elsewhere = tmp_path / "elsewhere" / ".workpilot/specs" / second
+    elsewhere.mkdir(parents=True)
+    (elsewhere / "spec.md").write_text("from outside", encoding="utf-8")
+    tasks = clone / ".workpilot/worktrees/tasks"
+    tasks.mkdir(parents=True)
+    _link(tasks / second, tmp_path / "elsewhere")
+
+    snapshot = await board_snapshot(_scope(pid, oid, clone, "member"))
+    assert set(snapshot["cards"]) == {first, second}
+    assert "qa_report.md" not in snapshot["cards"][first]
+    assert snapshot["worktrees"] == {}

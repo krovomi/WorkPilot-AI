@@ -24,6 +24,7 @@ import { changelogService } from "../changelog-service";
 import { getToolPath } from "../cli-tool-manager";
 import { insightsService } from "../insights-service";
 import { migrateProjectEnvSecrets } from "../project-env-file";
+import { listServerProjects } from "../server-projects";
 import {
 	checkGitStatusAsync,
 	ensureProjectEnvFilesIgnored,
@@ -823,7 +824,11 @@ export function registerProjectHandlers(
 				);
 			}
 
-			const projects = projectStore.getProjects();
+			// Server mode: the server's projects come after this computer's.
+			const projects = [
+				...projectStore.getProjects(),
+				...(await listServerProjects()),
+			];
 			console.warn("[IPC] PROJECT_LIST returning", projects.length, "projects");
 			return { success: true, data: projects };
 		},

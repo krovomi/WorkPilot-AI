@@ -9,9 +9,11 @@ import { useTranslation } from "react-i18next";
 import { useToast } from "@/hooks/use-toast";
 import { Globe } from "@/lib/icons";
 import { addProject } from "@/stores/project-store";
+import { useServerSessionStore } from "@/stores/server-session-store";
 import { AzureDevOpsRemoteConfigModal } from "./AzureDevOpsRemoteConfigModal";
 import { GitHubRemoteConfigModal } from "./GitHubRemoteConfigModal";
 import { GitSetupModal } from "./GitSetupModal";
+import { ServerProjectDialog } from "./server-projects/ServerProjectDialog";
 import { Button } from "./ui/button";
 import {
 	Dialog,
@@ -65,6 +67,10 @@ export function AddProjectModal({
 }: AddProjectModalProps) {
 	const { t } = useTranslation("dialogs");
 	const { toast } = useToast();
+	// Server mode: a project is first a repository the server clones for the
+	// team; a folder of this computer stays one click away.
+	const serverMode = useServerSessionStore((state) => state.mode) === "server";
+	const [localFolder, setLocalFolder] = useState(false);
 	const [step, setStep] = useState<number>(0);
 	const [projectName, setProjectName] = useState<string>("");
 	const [projectLocation, setProjectLocation] = useState<string>("");
@@ -140,6 +146,7 @@ export function AddProjectModal({
 
 	useEffect(() => {
 		if (open) {
+			setLocalFolder(false);
 			setStep(0);
 			setProjectName("");
 			setProjectLocation("");
@@ -948,6 +955,16 @@ export function AddProjectModal({
 			);
 		return true;
 	};
+
+	if (serverMode && !localFolder) {
+		return (
+			<ServerProjectDialog
+				open={open}
+				onOpenChange={onOpenChange}
+				onChooseLocal={() => setLocalFolder(true)}
+			/>
+		);
+	}
 
 	// Rendu principal
 	return (

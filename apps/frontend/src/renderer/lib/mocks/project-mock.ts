@@ -21,6 +21,13 @@ export const projectMock = {
 
 	removeProject: async () => ({ success: true }),
 
+	createServerProject: async () => ({
+		success: false,
+		error: "Not connected to a WorkPilot server",
+	}),
+
+	deleteServerProject: async () => ({ success: true }),
+
 	getProjects: async () => ({
 		success: true,
 		data: mockProjects,

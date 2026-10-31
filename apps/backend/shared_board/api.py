@@ -46,6 +46,20 @@ MAX_TITLE = 200
 MAX_DESCRIPTION = 20_000
 SPEC_TEXT_LIMIT = 100_000
 
+#: The files of a card the desktop app reads to draw it (``project-store.ts``,
+#: ``createTaskFromSpec``), with the most of each it receives. A snapshot sends
+#: these and nothing else: no log, no attachment, no file an agent wrote.
+SNAPSHOT_FILES: dict[str, int] = {
+    "implementation_plan.json": 1_000_000,
+    "task_metadata.json": 200_000,
+    "requirements.json": 200_000,
+    "pause_state.json": 50_000,
+    "review_state.json": 50_000,
+    "spec.md": 300_000,
+    "qa_report.md": 300_000,
+}
+MAX_SNAPSHOT_CARDS = 500
+
 _WRITER_ROLES = {ProjectRole.MEMBER.value, ProjectRole.OWNER.value}
 
 
@@ -112,6 +126,63 @@ async def _index_row(
             SpecIndex.project_id == scope.project_id, SpecIndex.spec_name == card_id
         )
     )
+
+
+def _card_files(directory: Path) -> dict[str, str]:
+    files: dict[str, str] = {}
+    for name, limit in SNAPSHOT_FILES.items():
+        path = directory / name
+        try:
+            if (
+                path.is_file()
+                and not path.is_symlink()
+                and path.stat().st_size <= limit
+            ):
+                files[name] = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+    return files
+
+
+@router.get("/snapshot")
+async def board_snapshot(
+    scope: ProjectScope = Depends(resolve_project_scope),
+) -> dict[str, Any]:
+    """The board's cards as files, for the app to draw them as it draws its own.
+
+    ``cards`` are the project's specs; ``worktrees`` the same cards as their
+    build workspace has them, which the app prefers while a build runs. Only
+    :data:`SNAPSHOT_FILES`, each under its size limit; a symlink is skipped.
+    """
+    from board_mcp.server import CARD_ID, SPECS
+
+    root = scope.path.resolve()
+
+    def collect(specs: Path) -> dict[str, dict[str, str]]:
+        out: dict[str, dict[str, str]] = {}
+        if not specs.is_dir():
+            return out
+        for entry in sorted(specs.iterdir(), reverse=True):
+            if len(out) >= MAX_SNAPSHOT_CARDS:
+                break
+            if (
+                CARD_ID.match(entry.name)
+                and entry.is_dir()
+                and entry.resolve().is_relative_to(root)
+            ):
+                out[entry.name] = _card_files(entry)
+        return out
+
+    cards = collect(scope.path / SPECS)
+    worktrees: dict[str, dict[str, str]] = {}
+    tasks_dir = scope.path / ".workpilot" / "worktrees" / "tasks"
+    for card_id in cards:
+        directory = tasks_dir / card_id / SPECS / card_id
+        # A build writes in its worktree: resolve the whole chain, so a link
+        # planted on the way cannot point the snapshot outside the checkout.
+        if directory.is_dir() and directory.resolve().is_relative_to(root):
+            worktrees[card_id] = _card_files(directory)
+    return {"cards": cards, "worktrees": worktrees}
 
 
 @router.post("/cards", status_code=201)
