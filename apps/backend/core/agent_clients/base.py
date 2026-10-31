@@ -321,7 +321,7 @@ class AgentClient(ABC):
     # that sends no tools of its own: the CLIs bring theirs.
     tool_set: ToolSet | None = None
     # The sub-agent roster this session may delegate to, by name
-    # (``agents.subagents.resolve``): ``SubagentDefinition``s, or the SDK's
+    # (``subagents.resolve``): ``SubagentDefinition``s, or the SDK's
     # ``AgentDefinition``s on the Claude client, which runs them natively. On
     # every other client the roster is offered to the model as the one
     # ``delegate`` tool and run as a child session of this client

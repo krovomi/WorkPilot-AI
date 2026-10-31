@@ -3,7 +3,8 @@
 ``core`` builds every LLM client (``create_client``, ``create_agent_client``,
 ``create_simple_client``) and ``agents.session`` runs them, so a unit that
 imported either to start one utility session (the merge resolver, the Linear
-updater, the insight extractor, the architecture reviewer) sat in the agents'
+updater, the insight extractor, the architecture reviewer, the test
+generator) sat in the agents'
 import cycle: ``core`` and ``agents`` import half the backend. Those units
 now ask this port, which imports nothing of the backend, and ``core``
 installs the implementation when it is imported (``core/agent_runtime.py``).
@@ -48,6 +49,9 @@ class AgentRuntime(Protocol):
         self, client: Any, message: str, spec_dir: Path, **kwargs: Any
     ) -> tuple[str, str, dict]:
         """``agents.session.run_agent_session``."""
+
+    async def oneshot_completion(self, prompt: str, **kwargs: Any) -> str:
+        """``core.oneshot.oneshot_completion``: one answer, the user's provider."""
 
 
 _runtime: AgentRuntime | None = None

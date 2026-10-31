@@ -1652,8 +1652,8 @@ async def _run_post_planning_phases(
     if profile is None:
         return
     try:
+        from foundation.plan_forecast import planned_files
         from workflows.engine import narrow_to_forecast
-        from workflows.forecast import planned_files
 
         from workflows import PhaseContext, phases_between, run_skill_phases
 

@@ -22,7 +22,8 @@ l'import.
 agent_runtime/            le port : un Protocol, install(), current() ; n'importe rien du backend
 core/agent_runtime.py     l'implémentation, installée quand core est importé (core/__init__.py)
 merge, integrations,      demandent agent_runtime.current() au lieu d'importer core ou agents
-analysis, architecture
+analysis, architecture,
+test_generation
 ```
 
 - **Le port n'ajoute aucun client.** Chaque méthode appelle la fabrique de `core` qu'elle
@@ -37,7 +38,8 @@ analysis, architecture
   agent importe `core` avant d'atteindre ces unités. Une unité qui reçoit `None` prend le
   chemin qu'elle avait déjà pour « pas de SDK, pas de jeton » : le résolveur de merge sans IA,
   l'extraction d'insights désactivée, la revue d'architecture sans violation ajoutée, le client
-  Linear refusé par `ImportError` (que son appelant traitait déjà).
+  Linear refusé par `ImportError` (que son appelant traitait déjà), le générateur de tests en
+  `DetailedError` que le runner transmet à l'UI.
 - **Le prompt du relecteur d'architecture** est construit dans `architecture/ai_reviewer.py`
   (`architecture_reviewer_prompt`), plus dans `prompts_pkg`, que la boucle de QA importe : il
   n'avait pas d'autre lecteur.
@@ -45,19 +47,28 @@ analysis, architecture
   `spec.plan_recovery` à `foundation.json_document` : `analysis`, `docintel` et les runners ne
   dépendent plus de `spec` pour lire un objet JSON.
 
+- **Le générateur de tests** (`test_generation/generator.py`, ex-`agents/test_generator.py`)
+  appelle `oneshot_completion` par le port : le provider choisi par l'utilisateur, comme avant.
+  Avec lui, `test_generation` sort du cycle ; `core.error_details`, que lisent le générateur et
+  les runners, devient `foundation.error_details`.
+- **Le registre des sous-agents** (`apps/backend/subagents/`, ex-`agents/subagents/`) n'importait
+  rien d'`agents` : il devient une unité à lui, et `skills_registry` sort du cycle avec lui. Les
+  sorties générées (`.agents/agents/`) nomment leur nouvelle source.
+- **La prévision du plan** (`foundation/plan_forecast.py`, ex-`workflows/forecast.py`), lue par
+  le moteur de workflows, le coder et `uiux`, n'importe que la bibliothèque standard.
+
 ## Ce qui le garde
 
 - `tests/test_import_contracts.py` : `agent_runtime` n'importe rien ; `merge`,
-  `integrations`, `analysis` et `architecture` ont chacun leur liste fermée, sans `core` ni
-  `agents` ; `MAX_CYCLE = 20`.
+  `integrations`, `analysis`, `architecture`, `subagents` et `test_generation` ont chacun leur
+  liste fermée, sans `core` ni `agents` ; `MAX_CYCLE = 18`.
 - `tests/test_agent_runtime_port.py` : `core` installe le runtime, le runtime atteint les
   fabriques de `core` au moment de l'appel, et chaque unité sans runtime ou sans jeton prend son
   chemin de repli.
 
 ## La suite
 
-Le cycle compte 20 unités : le moteur (`core`, `agents`, `harness`, `context_mgmt`, `qa`,
+Le cycle compte 18 unités : le moteur (`core`, `agents`, `harness`, `context_mgmt`, `qa`,
 `spec`, `services`, `workflows`, `verify`, `prompts_pkg`) et des unités qui ne lancent pas
-d'agent mais en lisent un morceau (`brain`, `memory`, `learning_loop`, `hermes`,
-`skills_registry`, `docintel`, `self_healing`, `uiux`, `test_generation`,
-`architecture_visualizer`). L'objectif du plan reste `MAX_CYCLE` ≤ 10.
+d'agent mais en lisent un morceau (`brain`, `memory`, `learning_loop`, `hermes`, `docintel`,
+`self_healing`, `uiux`, `architecture_visualizer`). L'objectif du plan reste `MAX_CYCLE` ≤ 10.

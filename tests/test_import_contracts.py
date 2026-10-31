@@ -12,7 +12,8 @@ The plan of 29 October (A1) took the logging toolbox, the base branch and the
 build signals to ``foundation`` too, which let ``task_logger`` and
 ``consensus_arbiter`` out (24 units), then the ``agent_runtime`` port, through
 which ``merge``, ``integrations``, ``analysis`` and ``architecture`` start a
-session without importing ``core`` or ``agents`` (20 units). This test keeps
+session without importing ``core`` or ``agents`` (20 units), and the subagent
+registry and test generation out of ``agents`` (18 units). This test keeps
 it from growing back, and the units taken out of it that way.
 
 The graph is read from the source with ``ast``, every ``import`` of the file
@@ -108,13 +109,19 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
         "server",
     },
     "analysis": {"agent_runtime", "foundation", "project", "security"},
+    # The subagent registry, out of agents (it never imported it): read by
+    # core, the skills emitter and the learning loop.
+    "subagents": {"mobile", "project", "skills_registry"},
+    # Test generation, the generator included; its model call goes through
+    # the agent_runtime port.
+    "test_generation": {"agent_runtime", "foundation", "project"},
     # The QA loop's architecture gate; its reviewer's prompt is built here.
     "architecture": {"agent_runtime", "foundation", "phase_config", "task_logger"},
 }
 
 # The largest set of units that all import one another, directly or not. It
 # may only shrink: lower the number when a change breaks a part of it.
-MAX_CYCLE = 20
+MAX_CYCLE = 18
 
 
 def _units() -> dict[str, Path]:

@@ -133,7 +133,7 @@ def _language_for(source_file: str, language: str | None) -> str:
     # Imported here rather than at module import time: the map lives with the
     # analyser that owns it, and a second copy is how two answers to "what
     # language is this" start.
-    from agents.test_generator import ProjectAnalyzer
+    from test_generation.generator import ProjectAnalyzer
 
     ext = Path(source_file).suffix.lower()
     return ProjectAnalyzer.EXTENSION_TO_LANGUAGE.get(ext, "unknown")

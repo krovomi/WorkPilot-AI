@@ -155,7 +155,7 @@ deterministic pack is a manifest, not a branch.
 
 ## Agents
 
-`apps/backend/agents/subagents/` is the source for the specialists the pipeline
+`apps/backend/subagents/` is the source for the specialists the pipeline
 runs, and `skills-cli build` emits them into every harness that has subagents —
 `.agents/agents/`, `.claude/agents/`, `.github/agents/`, `.codex/agents/`. Same
 rule as the skills: one source, N outputs, `skills:check` fails on drift. Packs

@@ -6,7 +6,7 @@ model: sonnet
 metadata:
   workpilot:
     roster: spec
-    source: apps/backend/agents/subagents/
+    source: apps/backend/subagents/
 ---
 
 You collect the rules a proposed change has to live within.

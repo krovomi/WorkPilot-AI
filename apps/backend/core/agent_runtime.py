@@ -55,5 +55,10 @@ class CoreAgentRuntime:
 
         return await run_agent_session(client, message, spec_dir, **kwargs)
 
+    async def oneshot_completion(self, prompt: str, **kwargs: Any) -> str:
+        from core.oneshot import oneshot_completion
+
+        return await oneshot_completion(prompt, **kwargs)
+
 
 agent_runtime.install(CoreAgentRuntime())

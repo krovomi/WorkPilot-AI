@@ -217,8 +217,8 @@ class TestEveryWorkflow:
 
     @pytest.mark.parametrize("name", WORKFLOWS)
     def test_every_agent_and_roster_it_names_exists(self, name):
-        from agents.subagents.phases import ROSTERS
         from agents.tools_pkg.models import AGENT_CONFIGS
+        from subagents.phases import ROSTERS
 
         for phase in _load(name).phases:
             if phase.agent:

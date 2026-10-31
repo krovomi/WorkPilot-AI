@@ -173,7 +173,7 @@ def _provider_reported_error(msg) -> ProviderReportedError | None:
 
 
 def _error_code(error: Exception, message: str) -> str:
-    from core.error_details import (
+    from foundation.error_details import (
         AUTH,
         MODEL_UNAVAILABLE,
         PROVIDER_UNAVAILABLE,
@@ -448,7 +448,7 @@ async def oneshot_completion(
     never break the generation.
 
     ``on_error`` — optional callback invoked with a **redacted** diagnostic dict
-    (``core.error_details.ErrorDetail.to_dict``) when the provider call fails.
+    (``foundation.error_details.ErrorDetail.to_dict``) when the provider call fails.
     The return value stays an empty string either way; this is how a caller that
     wants to *explain* the failure gets something to explain, instead of having
     to guess from "the model returned nothing". Nothing here re-raises: the
@@ -491,7 +491,7 @@ async def oneshot_completion(
         )
         logger.warning("[oneshot] %s", message)
         if on_error is not None:
-            from core.error_details import PROVIDER_UNAVAILABLE, ErrorDetail
+            from foundation.error_details import PROVIDER_UNAVAILABLE, ErrorDetail
 
             detail = ErrorDetail(
                 message=message,
@@ -545,7 +545,7 @@ async def oneshot_completion(
                 "[oneshot] provider completion failed (%s)", type(error).__name__
             )
             if on_error is not None:
-                from core.error_details import ErrorDetail
+                from foundation.error_details import ErrorDetail
 
                 message = str(error).strip() or type(error).__name__
                 label = (

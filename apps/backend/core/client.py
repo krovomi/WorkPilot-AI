@@ -822,7 +822,7 @@ def create_client(
         use_subagents: Whether this call may compose a subagent roster at all.
         roster: Which subagent roster to compose, when it is not the one
             agent_type implies. A workflow phase sets this; see
-            `agents.subagents.phases.phase_specs`.
+            `subagents.phases.phase_specs`.
                       False is the workflow engine's `sequential-reset`: same
                       isolation, no parallel dispatch. Defaults to True, which
                       is the behaviour every existing caller already had.
@@ -1736,7 +1736,7 @@ def _add_subagents(
     try:
         if not use_subagents:
             raise _NoSubagents
-        from agents.subagents import resolve as _resolve_subagents
+        from subagents import resolve as _resolve_subagents
 
         # The provider matters: `resolve` returns no roster at all for one
         # that cannot run subagents, rather than handing the SDK a list it
@@ -2353,7 +2353,7 @@ _ANTHROPIC_TIER_ALIASES = frozenset({"sonnet", "opus", "haiku"})
 def _portable_subagent_model(model: str | None) -> str:
     """Translate a roster's model hint for a non-Anthropic provider.
 
-    The registry in `agents/subagents/` is provider-agnostic by design, but its
+    The registry in `subagents/` is provider-agnostic by design, but its
     specs name a tier the way the Claude SDK does. Handing "sonnet" to Copilot
     costs a `400 model_not_supported` round-trip per subagent before the
     fallback rescues it, so the alias is resolved to "inherit" here: the
@@ -2418,7 +2418,7 @@ def create_agent_client(
     """A provider-agnostic agent client, with its sub-agent roster attached.
 
     The client comes from ``_build_agent_client`` (one branch per provider).
-    The roster is the same for every provider — ``agents.subagents.resolve``:
+    The roster is the same for every provider — ``subagents.resolve``:
     phase defaults, the detected stack's overlays, the caller's ``agents``
     winning, capped — and it is attached here, once, rather than in each
     branch: the Copilot branch used to convert the caller's dict and nobody
@@ -2450,7 +2450,7 @@ def create_agent_client(
     if not use_subagents or not client.delegates():
         return client
     try:
-        from agents.subagents import resolve as _resolve_subagents
+        from subagents import resolve as _resolve_subagents
 
         composed = _resolve_subagents(
             agent_type,
@@ -2584,7 +2584,7 @@ def _build_agent_client(
                  implies. Separate from `agent_type` on purpose: that decides
                  the tool allowlist and whether the phase may write, this
                  decides which specialists it may dispatch to. See
-                 `agents.subagents.phases.phase_specs`.
+                 `subagents.phases.phase_specs`.
         system_prompt: Optional system-prompt override. When provided, it
                  replaces the default coding base prompt for the
                  copilot/openai/windsurf clients (used by utilities that need

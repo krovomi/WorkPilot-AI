@@ -24,7 +24,7 @@
 #
 # The canonical vocabulary is Claude Code's (Read, Write, Edit, Bash, Grep,
 # Glob), because that is what the subagent registry in
-# apps/backend/agents/subagents/ is written in. Emitting an agent definition
+# apps/backend/subagents/ is written in. Emitting an agent definition
 # into another harness means translating those names, or the harness ignores
 # the whole list and hands the agent every tool it has.
 #

@@ -6,7 +6,7 @@ model: sonnet
 metadata:
   workpilot:
     roster: spec
-    source: apps/backend/agents/subagents/
+    source: apps/backend/subagents/
 ---
 
 You search for prior art inside this repository.

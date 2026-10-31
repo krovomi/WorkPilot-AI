@@ -747,7 +747,7 @@ class TestGeneratorAgent:
         empty. Both cases end the run, and the user's next move differs, so the
         message says which one happened.
         """
-        from core.error_details import FILE_NOT_FOUND, DetailedError, ErrorDetail
+        from foundation.error_details import FILE_NOT_FOUND, DetailedError, ErrorDetail
 
         if reason is None:
             message = (
@@ -1009,7 +1009,7 @@ class TestGeneratorAgent:
     ) -> str:
         """Run a one-shot completion against the user's active LLM provider.
 
-        Routes through ``core.oneshot.oneshot_completion`` so test generation
+        Routes through ``core.oneshot.oneshot_completion`` (by the agent_runtime port) so test generation
         honours the provider selected in WorkPilot (Claude / Copilot / OpenAI /
         Windsurf / Google / local) instead of hardcoding the Claude Agent SDK —
         the previous ``create_simple_client`` path silently did nothing for
@@ -1029,12 +1029,22 @@ class TestGeneratorAgent:
         ``on_error`` hook captures the real (redacted) diagnostic, and it is
         re-raised as a ``DetailedError`` the runner forwards verbatim.
         """
-        from core.error_details import (
+        # Through the agent_runtime port: the workflow phases that generate
+        # tests import this module, and core imports the workflows.
+        import agent_runtime
+        from foundation.error_details import (
             EMPTY_RESPONSE,
             DetailedError,
             ErrorDetail,
         )
-        from core.oneshot import oneshot_completion
+
+        runtime = agent_runtime.current()
+        if runtime is None:
+            raise DetailedError(
+                ErrorDetail(
+                    message="No agent runtime is installed (core is not imported)."
+                )
+            )
 
         failure: dict[str, Any] = {}
 
@@ -1044,7 +1054,7 @@ class TestGeneratorAgent:
         kwargs: dict[str, Any] = {}
         if on_delta is not None:
             kwargs["on_delta"] = on_delta
-        text = await oneshot_completion(
+        text = await runtime.oneshot_completion(
             prompt,
             system_prompt=_TEST_GEN_SYSTEM_PROMPT,
             project_dir=project_path,

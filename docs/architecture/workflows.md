@@ -219,7 +219,7 @@ cost the right specialists, not the build.
 
 This matters beyond tidiness — the roster is context the parent pays for on **every
 turn**, so a mismatched roster is not merely unhelpful, it is billed. Hence three
-rules in `agents.subagents.resolve`:
+rules in `subagents.resolve`:
 
 - **Every `AGENT_CONFIGS` entry but `coder` names its roster** in `PHASE_ALIASES`
   (`test_every_agent_config_names_its_roster`). The PR orchestrators fell through to

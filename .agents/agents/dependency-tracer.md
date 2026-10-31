@@ -6,7 +6,7 @@ model: sonnet
 metadata:
   workpilot:
     roster: planner
-    source: apps/backend/agents/subagents/
+    source: apps/backend/subagents/
 ---
 
 You are a dependency tracer.

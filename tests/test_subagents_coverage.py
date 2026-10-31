@@ -19,7 +19,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "apps" / "backend"))
 
-from agents.subagents.phases import (  # noqa: E402
+from subagents.phases import (  # noqa: E402
     PHASE_ALIASES,
     all_specs,
     phase_specs,

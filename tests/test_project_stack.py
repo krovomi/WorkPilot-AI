@@ -147,9 +147,9 @@ def test_the_facade_answers_as_the_detectors_did(tmp_path, name):
 
 def test_the_old_import_paths_still_answer():
     """Re-exported while callers migrate: the same function, not a copy."""
-    from agents.subagents import detect_languages
     from docintel.api_tests import detect_api_stack
     from runners.pipeline_generator_runner import detect_project_stack
+    from subagents import detect_languages
 
     assert detect_languages is stack.detect_languages
     assert detect_api_stack is stack.detect_api_stack

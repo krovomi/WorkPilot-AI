@@ -15,11 +15,11 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "apps" / "backend"))
 
-from agents.subagents.mobile import MOBILE_ROLES, overlay_for  # noqa: E402
 from mobile.devices import parse_adb_devices  # noqa: E402
 from mobile.prompt import TARGETS_ENV, mobile_section, requested_targets  # noqa: E402
 from mobile.readiness import doctor  # noqa: E402
 from mobile.stacks import ANDROID, IOS  # noqa: E402
+from subagents.mobile import MOBILE_ROLES, overlay_for  # noqa: E402
 
 
 @pytest.fixture
@@ -159,7 +159,7 @@ class TestTheRoster:
         assert len([c for c in overlay.test_commands if "flutter test" in c]) == 1
 
     def test_the_specialists_survive_the_roster_cap(self, flutter_app):
-        from agents.subagents import _apply_cap, _as_language_overlay
+        from subagents import _apply_cap, _as_language_overlay
 
         overlay = overlay_for(flutter_app)
         roster = {f"filler-{i}": object() for i in range(10)}
@@ -176,8 +176,8 @@ class TestTheRoster:
     ):
         """`pr_reviewer` is the agent the `mobile-design` workflow phase runs
         under."""
-        from agents.subagents import resolve
-        from agents.subagents.phases import sdk_available
+        from subagents import resolve
+        from subagents.phases import sdk_available
 
         if not sdk_available():
             pytest.skip("claude_agent_sdk not installed")
@@ -190,16 +190,16 @@ class TestTheRoster:
     def test_a_solo_call_stays_solo_on_a_phone_project(self, android_app, agent_type):
         """An overlay specialises a roster; it does not start one. A commit
         message on an Android project was handed a device-runner."""
-        from agents.subagents import resolve
-        from agents.subagents.phases import sdk_available
+        from subagents import resolve
+        from subagents.phases import sdk_available
 
         if not sdk_available():
             pytest.skip("claude_agent_sdk not installed")
         assert resolve(agent_type, project_dir=android_app) is None
 
     def test_the_pr_orchestrator_gets_no_mobile_extras(self, android_app):
-        from agents.subagents import resolve
-        from agents.subagents.phases import sdk_available
+        from subagents import resolve
+        from subagents.phases import sdk_available
 
         if not sdk_available():
             pytest.skip("claude_agent_sdk not installed")

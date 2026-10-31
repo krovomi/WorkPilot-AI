@@ -360,8 +360,8 @@ def baseline_instruction(agent_id: str) -> str:
     it clean — and the replay exists to veto exactly that.
     """
     try:
-        from agents.subagents.languages import overlays_for
-        from agents.subagents.phases import all_specs
+        from subagents.languages import overlays_for
+        from subagents.phases import all_specs
 
         prompt = ""
         for roster in all_specs().values():

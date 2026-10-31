@@ -84,7 +84,7 @@ build starts with is resolved before planning, with no change set, and
 phase the workflow declared then) used to run on every backend task at medium
 effort. Once the plan validates,
 `agents/coder.py` narrows the profile to the plan's files
-(`workflows.forecast.planned_files`, `engine.narrow_to_forecast`) before
+(`foundation.plan_forecast.planned_files`, `engine.narrow_to_forecast`) before
 running the planning→coding window. It only ever removes, and no forecast
 keeps the profile as it was; the post-coding resolution still reads the real
 diff. `_touched` also matches a root file now: `fnmatch("App.tsx", "**/*.tsx")`

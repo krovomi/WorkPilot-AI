@@ -66,7 +66,7 @@ def qa_checklist() -> str:
 def _subtask_touches_ui(subtask: Any) -> bool | None:
     """True / False from the subtask's declared files; None when it names none."""
     try:
-        from workflows.forecast import subtask_files
+        from foundation.plan_forecast import subtask_files
     except Exception:  # noqa: BLE001
         return None
     files = subtask_files(subtask)
