@@ -28,6 +28,12 @@ import { getAppLanguage } from "../../app-language";
 import { readProjectEnv } from "../../project-env-file";
 import { projectStore } from "../../project-store";
 import { getRemoteTasks } from "../../remote-board";
+import {
+	createServerCard,
+	deleteServerCard,
+	findServerCard,
+	updateServerCard,
+} from "../../server-board-actions";
 import { getServerProject } from "../../server-projects";
 import { specInterviewService } from "../../spec-interview-service";
 import { taskStateManager } from "../../task-state-manager";
@@ -110,6 +116,11 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 			description: string,
 			metadata?: TaskMetadata,
 		): Promise<IPCResult<Task>> => {
+			// A server project's card is created by the server, for the team.
+			const serverProject = getServerProject(projectId);
+			if (serverProject) {
+				return createServerCard(serverProject, title, description, metadata);
+			}
 			const project = projectStore.getProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
@@ -640,6 +651,8 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 	ipcMain.handle(
 		IPC_CHANNELS.TASK_DELETE,
 		async (_, taskId: string): Promise<IPCResult> => {
+			const serverCard = findServerCard(taskId);
+			if (serverCard) return deleteServerCard(serverCard);
 			const { rm } = await import("node:fs/promises");
 
 			// Find task and project
@@ -962,6 +975,8 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 				metadata?: Partial<TaskMetadata>;
 			},
 		): Promise<IPCResult<Task>> => {
+			const serverCard = findServerCard(taskId);
+			if (serverCard) return updateServerCard(serverCard, updates);
 			try {
 				// Find task and project
 				const { task, project } = findTaskAndProject(taskId);

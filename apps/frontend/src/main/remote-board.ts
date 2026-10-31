@@ -31,6 +31,26 @@ export const SNAPSHOT_FILES: ReadonlyMap<string, number> = new Map([
 
 /** Same pattern as the board's (`board_mcp/server.py`, `CARD_ID`). */
 const CARD_ID = /^\d{3,4}-[a-z0-9][a-z0-9-]{0,80}$/;
+const SERVER_TASK_ID =
+	/^server:([A-Za-z0-9][A-Za-z0-9-]{0,63}):(\d{3,4}-[a-z0-9][a-z0-9-]{0,80})$/;
+
+/**
+ * The id a server card has in the app. Card names repeat across projects
+ * (`001-…`), so the id names the project too; a task handler that receives
+ * one knows it is a server card and where it lives, without a lookup.
+ */
+export function serverTaskId(projectId: string, cardId: string): string {
+	return `server:${projectId}:${cardId}`;
+}
+
+/** The project and card a server task id names, or null for any other id. */
+export function parseServerTaskId(
+	taskId: unknown,
+): { projectId: string; cardId: string } | null {
+	if (typeof taskId !== "string") return null;
+	const match = SERVER_TASK_ID.exec(taskId);
+	return match ? { projectId: match[1], cardId: match[2] } : null;
+}
 const MAX_CARDS = 500;
 
 type CardFiles = Record<string, string>;
@@ -109,7 +129,10 @@ async function load(project: Project): Promise<IPCResult<Task[]>> {
 		return { success: false, error: "Unexpected answer from the server" };
 	}
 	writeMirror(project.path, snapshot);
-	return { success: true, data: projectStore.getMirrorTasks(project) };
+	const tasks = projectStore
+		.getMirrorTasks(project)
+		.map((task) => ({ ...task, id: serverTaskId(project.id, task.specId) }));
+	return { success: true, data: tasks };
 }
 
 const inFlight = new Map<string, Promise<IPCResult<Task[]>>>();

@@ -45,6 +45,11 @@ import {
 	validateTaskPrerequisites,
 } from "./execution-utils";
 import { registerTaskReviewHandlers } from "./execution-review-handlers";
+import {
+	findServerCard,
+	startServerCard,
+	stopServerCard,
+} from "../../server-board-actions";
 import { registerTaskStatusHandlers } from "./execution-status-handlers";
 import { registerTaskResumeHandlers } from "./execution-resume-handlers";
 import { registerTaskRecoveryHandlers } from "./execution-recovery-handlers";
@@ -148,6 +153,20 @@ export function registerTaskExecutionHandlers(
 			const mainWindow = getMainWindow();
 			if (!mainWindow) {
 				console.warn("[TASK_START] No main window found");
+				return;
+			}
+
+			// A server card runs on the server; nothing starts on this computer.
+			const serverCard = findServerCard(taskId);
+			if (serverCard) {
+				const started = await startServerCard(serverCard);
+				if (!started.success) {
+					mainWindow.webContents.send(
+						IPC_CHANNELS.TASK_ERROR,
+						taskId,
+						started.error,
+					);
+				}
 				return;
 			}
 
@@ -305,6 +324,19 @@ export function registerTaskExecutionHandlers(
 	 * Stop a task
 	 */
 	ipcMain.on(IPC_CHANNELS.TASK_STOP, (_, taskId: string) => {
+		const serverCard = findServerCard(taskId);
+		if (serverCard) {
+			void stopServerCard(serverCard).then((stopped) => {
+				if (!stopped.success) {
+					getMainWindow()?.webContents.send(
+						IPC_CHANNELS.TASK_ERROR,
+						taskId,
+						stopped.error,
+					);
+				}
+			});
+			return;
+		}
 		// haltTask (not killTask) also unregisters the task from the
 		// OperationRegistry so a proactive profile-swap can't resurrect it after
 		// the user stopped it.
