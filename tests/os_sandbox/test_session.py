@@ -161,6 +161,22 @@ def test_claude_code_needs_socat_on_linux(monkeypatch, available):
     monkeypatch.setenv("WORKPILOT_SANDBOX", "auto")
     status = os_sandbox.claude_code_status()
     assert status.state == UNAVAILABLE and "socat" in (status.reason or "")
+    assert "install the socat package" in (status.reason or "")
+
+
+def test_claude_code_socat_reason_names_the_install_command(monkeypatch, available):
+    import foundation.platform as platform
+
+    monkeypatch.setattr(platform, "is_windows", lambda: False)
+    monkeypatch.setattr(platform, "is_linux", lambda: True)
+    monkeypatch.setattr(platform, "find_executable", lambda name, *a, **k: None)
+    monkeypatch.setattr(
+        "shutil.which",
+        lambda name, *a, **k: "/usr/bin/apt-get" if name == "apt-get" else None,
+    )
+    monkeypatch.setenv("WORKPILOT_SANDBOX", "auto")
+    status = os_sandbox.claude_code_status()
+    assert "`sudo apt install socat`" in (status.reason or "")
 
 
 class _Process:

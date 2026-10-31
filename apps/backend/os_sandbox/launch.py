@@ -58,6 +58,24 @@ class SandboxStatus:
         return self.state == ISOLATED
 
 
+#: The install command each Linux package manager takes, first found wins.
+_PACKAGE_MANAGERS = (
+    ("apt-get", "sudo apt install {}"),
+    ("dnf", "sudo dnf install {}"),
+    ("pacman", "sudo pacman -S {}"),
+    ("zypper", "sudo zypper install {}"),
+    ("apk", "sudo apk add {}"),
+)
+
+
+def install_hint(package: str) -> str:
+    """How to install a missing Linux package, for a card's reason line."""
+    for tool, command in _PACKAGE_MANAGERS:
+        if shutil.which(tool):
+            return f"install it with `{command.format(package)}`, then start the task again"
+    return f"install the {package} package, then start the task again"
+
+
 def _bwrap() -> str | None:
     return find_executable("bwrap") or shutil.which("bwrap")
 
@@ -66,7 +84,9 @@ def _probe_linux() -> SandboxStatus:
     bwrap = _bwrap()
     if not bwrap:
         return SandboxStatus(
-            UNAVAILABLE, "bubblewrap", "bubblewrap (bwrap) is not installed"
+            UNAVAILABLE,
+            "bubblewrap",
+            f"bubblewrap (bwrap) is not installed: {install_hint('bubblewrap')}",
         )
     command = [
         bwrap,
