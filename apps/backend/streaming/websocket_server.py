@@ -34,16 +34,26 @@ logger = logging.getLogger(__name__)
 
 # WebSocket close code used when authentication fails in server mode.
 WS_CLOSE_UNAUTHORIZED = 4401
+# Close code for a valid token that is not entitled to the channel it asked for.
+WS_CLOSE_FORBIDDEN = 4403
+
+_TRUTHY = {"1", "true", "yes", "on"}
 
 
 def _server_mode_enabled() -> bool:
-    """True when multi-user server mode is active (lazy, never raises)."""
+    """True when multi-user server mode is active (lazy, never raises).
+
+    Fails closed: when server mode was asked for but its settings cannot be
+    built (a missing JWT secret, say), the server still behaves as a server
+    and refuses every connection, since no token can be checked. Falling back
+    to local mode would serve every channel to anyone who can reach the port.
+    """
     try:
         from server.config import get_settings
 
         return get_settings().server_mode
     except Exception:
-        return False
+        return os.environ.get("WORKPILOT_SERVER_MODE", "").strip().lower() in _TRUTHY
 
 
 def _validate_ws_token(token: str) -> dict | None:
@@ -461,6 +471,9 @@ class StreamingWebSocketServer:
         claims = _validate_ws_token(token_values[0]) if token_values else None
         if claims is None:
             return False
+        ctx["claims"] = claims
+        org_values = query.get("org", [])
+        ctx["org_hint"] = org_values[0] if org_values else None
         ctx["user"] = {
             "id": claims.get("sub"),
             "name": claims.get("name", ""),
@@ -486,7 +499,19 @@ class StreamingWebSocketServer:
             )
             return
 
-        ctx["session_id"] = self._extract_session_id(path, websocket)
+        session_id = self._extract_session_id(path, websocket)
+        if ctx.get("claims") is not None:
+            grant = await self._authorize_channel(ctx, session_id)
+            if grant is None:
+                logger.warning(
+                    "Refusing WS channel %s to %s", session_id, ctx["claims"].get("sub")
+                )
+                await websocket.close(
+                    code=WS_CLOSE_FORBIDDEN, reason="channel not allowed"
+                )
+                return
+            ctx["grant"] = grant
+        ctx["session_id"] = session_id
         logger.info(
             f"New connection for session {ctx['session_id']} from {websocket.remote_address}"
         )
@@ -500,6 +525,35 @@ class StreamingWebSocketServer:
         # Send welcome message
         session_info = self.streaming_manager.get_session_info(ctx["session_id"])
         await self._send_welcome_message(ctx["session_id"], websocket, session_info)
+
+    async def _authorize_channel(self, ctx: dict, channel: str):
+        """Server mode: the grant this connection's token has on `channel`.
+
+        ``None`` refuses it. A database or settings failure refuses it too;
+        anything else propagates and the connection is dropped unregistered.
+        """
+        try:
+            from server.authz.ws_channels import authorize_channel
+            from server.db.engine import get_session_factory
+            from sqlalchemy.exc import SQLAlchemyError
+        except ImportError as e:
+            logger.warning("WS channel check unavailable: %s", e)
+            return None
+        try:
+            async with get_session_factory()() as db:
+                return await authorize_channel(
+                    db, ctx["claims"], channel, org_hint=ctx.get("org_hint")
+                )
+        except (SQLAlchemyError, OSError, RuntimeError, ValueError) as e:
+            logger.warning("WS channel check failed: %s", type(e).__name__)
+            return None
+
+    def _may(self, ctx: dict, what: str) -> bool:
+        """Local mode: always. Server mode: what this connection's grant allows."""
+        if ctx.get("claims") is None:
+            return True
+        grant = ctx.get("grant")
+        return bool(grant is not None and getattr(grant, what, False))
 
     async def _handle_client_messages(
         self, websocket: WebSocketServerProtocol, ctx: dict
@@ -572,11 +626,14 @@ class StreamingWebSocketServer:
             if msg_type == "init_session":
                 await self._handle_init_session(ctx, websocket, data)
             elif msg_type == "agent_event":
-                await self._handle_agent_event(session_id, data, websocket, ctx)
+                if self._may(ctx, "can_publish"):
+                    await self._handle_agent_event(session_id, data, websocket, ctx)
             elif msg_type == "chat_message":
-                await self._handle_chat_message(session_id, data, ctx)
+                if self._may(ctx, "can_interact"):
+                    await self._handle_chat_message(session_id, data, ctx)
             elif msg_type == "control":
-                await self._handle_control(session_id, data.get("action"))
+                if self._may(ctx, "can_interact"):
+                    await self._handle_control(session_id, data.get("action"))
             # Unknown message types are ignored gracefully
 
         except json.JSONDecodeError:
@@ -594,6 +651,18 @@ class StreamingWebSocketServer:
 
         if not actual_session_id or actual_session_id == current_session_id:
             return
+        if ctx.get("claims") is not None:
+            # Server mode: switching channel is opening a channel, and is
+            # checked the same way as the one in the URL.
+            grant = await self._authorize_channel(ctx, str(actual_session_id))
+            if grant is None:
+                logger.warning(
+                    "Refusing WS channel switch to %s for %s",
+                    actual_session_id,
+                    ctx["claims"].get("sub"),
+                )
+                return
+            ctx["grant"] = grant
 
         logger.info(
             f"Client requested session change: {current_session_id} -> {actual_session_id}"
@@ -677,8 +746,13 @@ class StreamingWebSocketServer:
 
         from .streaming_manager import EventType, StreamingEvent
 
-        # Use session_id from event data as authoritative source
-        event_session = event_data.get("session_id", session_id)
+        # Local mode: the event names its session. Server mode: a connection
+        # publishes on the one channel it was authorized for, whatever the
+        # event says.
+        if (ctx or {}).get("claims") is not None:
+            event_session = session_id
+        else:
+            event_session = event_data.get("session_id", session_id)
         try:
             payload = event_data.get("data", {})
             # Server mode: stamp the authenticated sender on the event so
