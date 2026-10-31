@@ -2,8 +2,13 @@ import { EventEmitter } from "node:events";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const exit = vi.fn();
+const quit = vi.fn();
 vi.mock("electron", () => ({
-	app: { exit: (code: number) => exit(code), getVersion: () => "9.9.9" },
+	app: {
+		exit: (code: number) => exit(code),
+		quit: () => quit(),
+		getVersion: () => "9.9.9",
+	},
 }));
 
 import {
@@ -24,6 +29,7 @@ function fakeWindow(probe: () => Promise<unknown>) {
 afterEach(() => {
 	delete process.env[SMOKE_TEST_ENV];
 	exit.mockReset();
+	quit.mockReset();
 	vi.restoreAllMocks();
 });
 
@@ -62,7 +68,9 @@ describe("armSmokeTest", () => {
 		expect(contents.listenerCount("did-finish-load")).toBe(0);
 	});
 
-	it("exits 0 once the renderer has mounted", async () => {
+	// app.exit() skipped before-quit and will-quit: the startup work kept
+	// running while the main process tore down, and it died with SIGILL (F134).
+	it("quits like a user once the renderer has mounted", async () => {
 		process.env[SMOKE_TEST_ENV] = "1";
 		vi.spyOn(process.stdout, "write").mockImplementation(((
 			_line: string,
@@ -74,7 +82,8 @@ describe("armSmokeTest", () => {
 		const { window, contents } = fakeWindow(async () => 2);
 		armSmokeTest(window);
 		contents.emit("did-finish-load");
-		await vi.waitFor(() => expect(exit).toHaveBeenCalledWith(0));
+		await vi.waitFor(() => expect(quit).toHaveBeenCalledTimes(1));
+		expect(exit).not.toHaveBeenCalled();
 	});
 
 	it("exits 1 when the renderer process goes away", () => {
@@ -90,5 +99,6 @@ describe("armSmokeTest", () => {
 		armSmokeTest(window);
 		contents.emit("render-process-gone", {}, { reason: "crashed" });
 		expect(exit).toHaveBeenCalledWith(1);
+		expect(quit).not.toHaveBeenCalled();
 	});
 });
