@@ -25,8 +25,6 @@ import unicodedata
 from datetime import datetime
 from pathlib import Path
 
-from core.debug import debug_warning
-
 # Helpers and types live in `core.worktree_common`, the PR half in
 # `core.worktree_pr` (audit lot L11, F36). Every name is imported back so the
 # module keeps its surface.
@@ -48,6 +46,7 @@ from core.worktree_common import (  # noqa: F401
     _wt,
 )
 from core.worktree_pr import WorktreePRMixin
+from foundation.debug import debug_warning
 from foundation.git_executable import run_git
 
 logger = logging.getLogger(__name__)

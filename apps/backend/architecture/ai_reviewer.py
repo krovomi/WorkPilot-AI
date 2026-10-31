@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from core.debug import debug, debug_error, debug_warning
+from foundation.debug import debug, debug_error, debug_warning
 
 from .models import ArchitectureConfig, ArchitectureReport, ArchitectureViolation
 

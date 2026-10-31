@@ -8,7 +8,7 @@ import os
 import re
 
 import pytest
-from core.log_redaction import (
+from foundation.log_redaction import (
     RedactingFilter,
     install_global_redaction,
     reset_for_tests,
@@ -233,7 +233,7 @@ class TestLateHandlers:
 
 
 def test_debug_output_is_masked(monkeypatch, capsys) -> None:
-    from core import debug
+    from foundation import debug
 
     monkeypatch.setattr(debug, "_get_log_file", lambda: None)
     debug._write_log(

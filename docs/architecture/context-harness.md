@@ -155,7 +155,7 @@ apps/backend/harness/
    table ; la boucle ne contient pas de `if` de politique, ni de `if provider ==`.
 7. **Les règles du dépôt tiennent.** Une sortie d'outil, un fichier relu depuis la mémoire ou un
    handoff entre délimité comme une donnée (S2). Le journal de contexte passe par
-   `core/log_redaction.py` et ne garde que des nombres et des empreintes, jamais un corps (S1).
+   `foundation/log_redaction.py` et ne garde que des nombres et des empreintes, jamais un corps (S1).
    Aucun nouvel appel réseau hors `offline_policy/` (S7).
 
 ## Les décisions à prendre

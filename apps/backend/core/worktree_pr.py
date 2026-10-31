@@ -16,16 +16,8 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from agents.impact_analyzer import ImpactAnalysis
-from core.debug import debug_warning
 from core.gh_executable import get_gh_executable, invalidate_gh_cache
-from core.git_provider import (
-    detect_git_provider,
-    extract_azure_devops_org,
-    extract_azure_devops_project,
-    extract_azure_devops_repository,
-)
 from core.glab_executable import get_glab_executable, invalidate_glab_cache
-from core.model_config import get_utility_model_config
 from core.worktree_common import (
     PullRequestResult,
     PushAndCreatePRResult,
@@ -35,7 +27,15 @@ from core.worktree_common import (
     _with_retry,
     _wt,
 )
+from foundation.debug import debug_warning
 from foundation.git_executable import get_git_executable, get_isolated_git_env
+from foundation.git_provider import (
+    detect_git_provider,
+    extract_azure_devops_org,
+    extract_azure_devops_project,
+    extract_azure_devops_repository,
+)
+from foundation.model_config import get_utility_model_config
 
 # The name the monolith logged under (`core.worktree`), kept so logging
 # configuration and log filters keyed on it still match.

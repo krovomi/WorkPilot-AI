@@ -16,6 +16,7 @@ apps/backend/agents/
 ├── memory.py                # Session memory in the shared brain
 ├── memory_manager.py        # Memory diagnostics / context retrieval used by the public API
 ├── session.py               # run_agent_session(), post_session_processing()
+├── tool_display.py          # How a tool call reads in the activity feed and streaming view
 ├── session_history.py       # Record and replay sessions
 ├── planner.py               # Follow-up planner
 ├── coder.py                 # run_autonomous_agent(): the main autonomous loop

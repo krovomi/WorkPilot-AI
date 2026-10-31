@@ -14,12 +14,18 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from core.build_signals import BuildPaused
 from core.client import create_agent_client
-from core.debug import debug, debug_error, debug_section, debug_success, debug_warning
-from core.pause_state import is_paused, read_pause_state
 from core.progress import count_subtasks, is_build_complete
 from core.task_event import TaskEventEmitter
+from foundation.build_signals import BuildPaused
+from foundation.debug import (
+    debug,
+    debug_error,
+    debug_section,
+    debug_success,
+    debug_warning,
+)
+from foundation.pause_state import is_paused, read_pause_state
 from foundation.phase_event import ExecutionPhase, emit_phase
 from goal import (
     GoalSpec,
@@ -805,11 +811,11 @@ async def _jev_review_advice(
     if jev_run is None:
         jev_run = JevRun.from_env(JevContext("feature-build", project_dir, spec_dir))
     if not hasattr(jev_run, "base_revision") and not jev_run.eligibility():
+        from foundation.base_branch import detect_base_branch
         from integrations.jev.adapters import capture_base
-        from prompts_pkg.prompts import _detect_base_branch
 
         try:
-            capture_base(jev_run, _detect_base_branch(spec_dir, project_dir))
+            capture_base(jev_run, detect_base_branch(spec_dir, project_dir))
         except (OSError, ValueError):
             jev_run.base_revision = None
     jev_advice = advice_text(

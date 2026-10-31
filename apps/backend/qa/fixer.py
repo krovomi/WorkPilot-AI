@@ -38,7 +38,7 @@ except ImportError:
     ContentBlockType = None  # type: ignore[assignment,misc]
 
 try:
-    from core.debug import (
+    from foundation.debug import (
         debug,
         debug_detailed,
         debug_error,

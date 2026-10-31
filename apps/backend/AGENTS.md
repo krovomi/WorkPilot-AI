@@ -16,7 +16,7 @@ Toute interaction LLM passe par ces fichiers ; les modifier touche tout le produ
 | `core/simple_client.py` | — | client sans hooks, refusé aux types qui écrivent ou exécutent |
 | `core/agent_clients/` | ~6 800 | un module par provider (`claude`, `copilot`, `openai`, `google`, `compatible`, `local`, `windsurf`, les CLI `opencode_cli`, `antigravity_cli`, `pi_cli` sur `cli_subprocess`, `acp` le client Agent Client Protocol commun à tous les agents ACP et `acp_permissions` qui pose leurs questions sur la carte, `pi_guard/` le garde-fou chargé dans pi…) ; `core/agent_client.py` les réexporte |
 | `core/worktree.py` + `worktree_pr.py` + `worktree_common.py` | ~3 450 | worktrees par spec ; la création de PR/MR est le mixin `WorktreePRMixin` |
-| `agents/session.py` | ~2 500 | boucle de session : streaming, reprise, erreurs, rate limits |
+| `agents/session.py` | ~2 500 | boucle de session : streaming, reprise, erreurs, rate limits ; l'affichage d'un appel d'outil (fil d'activité, vue streaming) vit dans `agents/tool_display.py` |
 | `agents/coder.py` | ~2 950 | l'agent d'implémentation : `run_autonomous_agent` (la boucle, ~1 150 lignes), les prompts de planification et de sous-tâche (`_planning_prompt`, `_coding_prompt`), l'issue d'une session (`_on_session_error` et un `_on_*` par type d'erreur, `_RetryState`), le plan invalide, le bilan de fin |
 | `cli/build_commands.py` | ~1 300 | enchaîne les phases d'un build : planning → coding → QA |
 | `qa/loop.py` | ~1 600 | boucle de validation QA : `run_qa_validation_loop` et une fonction par session, gate et verdict |
@@ -41,7 +41,7 @@ composition, qui importe les agents. Les autres modules sortis de `core` par le 
 | `model_router/router.py` | `TaskClass` × `QualityTier` (budget / balanced / premium) → modèle ; écarte un modèle que le banc de rejeu a vu échouer |
 | `bench/` | banc de rejeu ([justification](../../docs/architecture/repo-bench.md)) : cartes terminées rejouées depuis leur commit d'avant dans des copies isolées, jugées par les tests du commit d'arrivée (calibrés F2P / P2P), tableau par provider × modèle × effort lu par Formula Lab et `model_router/`, recommandations par type de carte (`recommendations`) ; commandes : `runners/bench_runner.py` |
 | `foundation/phase_event.py` | événements de phase vers l'UI |
-| `core/pause_state.py`, `core/build_signals.py` | pause coopérative ; `BuildPaused` / `BuildHalted` |
+| `foundation/pause_state.py`, `foundation/build_signals.py` | pause coopérative ; `BuildPaused` / `BuildHalted` |
 | `context_mgmt/` | fenêtre de contexte par session : jauge, compact / clear au seuil |
 | `harness/` | harness de contexte ([plan](../../docs/architecture/context-harness.md)) : `harness/domain/` mesure chaque appel dans une unité commune à tous les providers et le chiffre (`harness/domain/usage.py`, `harness/domain/ledger.py`, `harness/domain/cost.py`), ordonne un prompt du segment le plus stable au plus volatil (`harness/domain/layout.py`), pagine ce que lisent les outils ou déverse ce qui ne se relit pas (`harness/domain/paging.py`), purge les vieux résultats d'outils par lots (`harness/domain/policies.py`), arrête un modèle qui se répète (`harness/domain/progress.py`), borne et marque ce que rend un sous-agent (`harness/domain/subagents.py`) et fige un jeu d'outils trié par session, qu'il pèse (`harness/domain/tools.py`) ; `harness/application/budget.py` plafonne chaque session, `harness/application/subagents.py` délimite ce résultat comme une donnée et lance les sous-agents en échelon, `harness/domain/delegation.py` et `harness/application/delegation.py` donnent un roster à tout provider de la boucle (outil `delegate`, session enfant du même client, [justification](../../docs/architecture/delegation.md)), `harness/application/tools.py` pose le jeu d'outils sur chaque client WorkPilot et pèse chaque type d'agent ; `harness/domain/evals.py` juge une session rejouée (cache par capacité, régressions contre une base) et `harness/application/replay.py` la rejoue dans le code de production (fixtures : `tests/harness/replay/`) ; `harness/application/loop.py` est la seule boucle WorkPilot, derrière `harness/ports.py` (`ModelPort`), et `harness/domain/stop.py` dit quand elle s'arrête ; ses adaptateurs restent dans `core/agent_clients/` (`LoopAdapter`) ; `harness/domain/code_chunks.py` et `harness/domain/code_ranking.py` découpent le code par symbole et le classent (BM25 + RRF), `harness/application/code_search.py` l'indexe et répond à `search_code`, que `harness/tools/` sert en MCP (`workpilot-code`) et à `ToolExecutor` |
 
@@ -72,7 +72,7 @@ composition, qui importe les agents. Les autres modules sortis de `core` par le 
 | `foundation/api_safety.py` | chemins acceptés par l'API locale |
 | `offline_policy/` | hors-ligne strict (`airgapStrict`) |
 | `os_sandbox/` | bac à sable de l'OS autour des commandes d'agent : bubblewrap, Seatbelt, proxy filtrant ([conception](../../docs/architecture/os-sandbox.md)) |
-| `core/log_redaction.py` | filtre de redaction des logs |
+| `foundation/log_redaction.py` | filtre de redaction des logs |
 
 ## Mémoire, apprentissage, autonomie
 

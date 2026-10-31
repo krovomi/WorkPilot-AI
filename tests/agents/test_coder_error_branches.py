@@ -17,7 +17,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock
 
 import pytest
-from core.build_signals import BuildHalted
+from foundation.build_signals import BuildHalted
 from foundation.phase_event import ExecutionPhase
 from services.recovery import RecoveryManager
 

@@ -8,7 +8,10 @@ any unit wanting ``safe_error`` sat in the agents' cycle. Lot M10 took the
 toolbox out (``foundation``, ``offline_policy``, ``app_detection``, the stack
 detectors into ``project``) and the cycle down to 26 units: the agent runtime
 itself (``core.client`` and ``agents.session`` with the phases built on them).
-This test keeps it from growing back, and the units taken out of it that way.
+The plan of 29 October (A1) took the logging toolbox, the base branch and the
+build signals to ``foundation`` too, which let ``task_logger`` and
+``consensus_arbiter`` out (24 units). This test keeps it from growing back,
+and the units taken out of it that way.
 
 The graph is read from the source with ``ast``, every ``import`` of the file
 counted, including the ones inside a function: a lazy import is still a
@@ -93,7 +96,7 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
 
 # The largest set of units that all import one another, directly or not. It
 # may only shrink: lower the number when a change breaks a part of it.
-MAX_CYCLE = 26
+MAX_CYCLE = 24
 
 
 def _units() -> dict[str, Path]:

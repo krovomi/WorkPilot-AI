@@ -47,7 +47,7 @@ Tests : `tests/test_security_untrusted.py`, `tests/injection_guard/test_middlewa
 | Autorisation du mode serveur | `server/authz/` (`require_permission`, `mount_guarded`, `scope.py`), `server/integration.py` | `tests/backend/test_feature_router_authz.py`, `tests/backend/test_project_scope_coverage.py` |
 | Authentification du mode serveur | `server/auth/` (JWT, argon2id, OIDC), `server/ratelimit.py` | `tests/backend/test_auth_session_lifecycle.py` |
 | Chemins côté API | `foundation/api_safety.py` (`validated_dir`) | `tests/test_api_safety.py` |
-| Redaction des logs | `core/log_redaction.py` (installé par `run.py`, chaque runner, l'API) | `tests/core/test_log_redaction.py`, `tests/test_entrypoints_redaction.py` |
+| Redaction des logs | `foundation/log_redaction.py` (installé par `run.py`, chaque runner, l'API) | `tests/core/test_log_redaction.py`, `tests/test_entrypoints_redaction.py` |
 | Hors-ligne strict | `offline_policy/` | `tests/test_offline_mode.py` |
 | Secrets des pièces jointes | `docintel/redact.py` | `tests/backend/security_suite/test_secret_scanning.py` |
 | Secrets d'un commit sur ce dépôt | `.husky/pre-commit` → `scan_secrets.py --staged-only` (lit l'index) | `tests/test_scan_secrets.py` |

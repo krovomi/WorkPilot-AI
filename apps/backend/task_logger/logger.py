@@ -5,7 +5,13 @@ Main TaskLogger class for logging task execution.
 from datetime import UTC, datetime
 from pathlib import Path
 
-from core.debug import debug, debug_error, debug_info, debug_success, is_debug_enabled
+from foundation.debug import (
+    debug,
+    debug_error,
+    debug_info,
+    debug_success,
+    is_debug_enabled,
+)
 
 from .ansi import strip_ansi_codes
 from .models import LogEntry, LogEntryType, LogPhase
@@ -56,9 +62,9 @@ class TaskLogger:
         self._per_llm: dict[str, LogStorage] = {}
 
     def _per_llm_storage(self, provider: str | None, model: str | None) -> LogStorage:
-        from core.conversation_log import _log_slug
+        from foundation.llm_slug import llm_slug
 
-        filename = f"task_logs.{_log_slug(provider, model)}.json"
+        filename = f"task_logs.{llm_slug(provider, model)}.json"
         storage = self._per_llm.get(filename)
         if storage is None:
             storage = LogStorage(self.spec_dir, filename)

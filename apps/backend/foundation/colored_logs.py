@@ -21,6 +21,18 @@ Usage:
 
 import os
 import sys
+from collections.abc import Callable
+
+# The provider and model shown on each backend log line. ``core.model_info``
+# registers itself here when ``core`` is imported: foundation imports nothing
+# of the backend, and a line logged before that reads ``[unknown:unknown]``.
+_model_info_source: Callable[[], dict[str, str]] | None = None
+
+
+def set_model_info_source(source: Callable[[], dict[str, str]] | None) -> None:
+    """Register what tells the log lines which provider and model are in use."""
+    global _model_info_source
+    _model_info_source = source
 
 
 class LogColors:
@@ -145,9 +157,9 @@ def format_backend_log(
 
     # Get model information for logging
     try:
-        from .model_info import get_model_info_for_logs
-
-        model_info = get_model_info_for_logs()
+        if _model_info_source is None:
+            raise LookupError("no model info source registered")
+        model_info = _model_info_source()
         model_info_string = f"{colors.RESET}[{model_info['provider']}:{model_info['model_label']}]{colors.RESET}"
     except Exception:
         # Fallback if model info is not available

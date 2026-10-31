@@ -353,7 +353,7 @@ def get_task_changed_files(project_dir: Path, spec_dir: Path) -> list[str]:
 def _detect_base_branch(spec_dir: Path, project_dir: Path) -> str:
     """Best-effort default-branch detection (this repo's main is ``develop``)."""
     try:
-        from prompts_pkg.prompts import _detect_base_branch as _detect
+        from foundation.base_branch import detect_base_branch as _detect
 
         return _detect(spec_dir, project_dir)
     except Exception:

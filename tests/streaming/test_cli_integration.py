@@ -18,7 +18,7 @@ import pytest
 import websockets
 from cli.build_commands import handle_build_command
 from cli.main import parse_args
-from core.build_signals import BuildHalted
+from foundation.build_signals import BuildHalted
 from websockets.client import WebSocketClientProtocol
 
 

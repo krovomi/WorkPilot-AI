@@ -28,7 +28,7 @@ from .types import (
 
 # Import debug utilities
 try:
-    from core.debug import debug, debug_detailed, debug_verbose
+    from foundation.debug import debug, debug_detailed, debug_verbose
 except ImportError:
 
     def debug(*args, **kwargs):

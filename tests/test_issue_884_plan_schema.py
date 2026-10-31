@@ -336,7 +336,7 @@ async def test_planner_session_does_not_trigger_post_session_processing_on_retry
     monkeypatch.setattr("agents.coder.AUTO_CONTINUE_DELAY_SECONDS", 0)
     monkeypatch.setattr("agents.coder.load_subtask_context", lambda *_a, **_k: {})
 
-    from core.build_signals import BuildHalted
+    from foundation.build_signals import BuildHalted
 
     with pytest.raises(BuildHalted, match="Planning stopped"):
         await run_autonomous_agent(

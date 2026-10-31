@@ -9,7 +9,7 @@ import { appLog } from "../../app-logger";
  * `pause_state.json` lives in the spec directory — which exists from the moment
  * the task does, unlike `implementation_plan.json`, whose absence during
  * planning is why a pause used to be impossible there. The backend's coder
- * loop, QA loop and spec pipeline all read this one file (`core/pause_state.py`),
+ * loop, QA loop and spec pipeline all read this one file (`foundation/pause_state.py`),
  * so one write reaches every phase.
  *
  * Every caller that resumes a build goes through `clearPauseState`. Four of them

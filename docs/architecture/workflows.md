@@ -81,7 +81,7 @@ belongs to no window.
 
 **`irreversible: true`.** The runner stops before such a phase
 (`irreversible_gate`): it writes `workflow/<id>.pause.json`, marks the build
-paused in the one pause store (`core/pause_state.py`, which the Kanban reads
+paused in the one pause store (`foundation/pause_state.py`, which the Kanban reads
 to offer Resume), prints the steps that would run and raises `BuildPaused`.
 Resuming lifts the flag and restarts the build; the window re-enters the
 phase, consumes the marker and lets it through once. A RUN's `execute` phase

@@ -799,7 +799,7 @@ def irreversible_gate(spec_dir: Path, phase_id: str) -> None:
 
     The first time the build reaches the phase, the gate writes a marker
     (`workflow/<id>.pause.json`), marks the build paused in the one pause
-    store (`core.pause_state`, which the Kanban reads to show the Resume
+    store (`foundation.pause_state`, which the Kanban reads to show the Resume
     control), prints what would run, and raises `BuildPaused` — the signal
     that unwinds to the entry point without finalizing anything. Resuming
     clears the pause flag and restarts the build; the window re-enters the
@@ -810,8 +810,8 @@ def irreversible_gate(spec_dir: Path, phase_id: str) -> None:
     spec's `workflow/` directory and does not touch the pause store (rule
     S3: an agent never edits its own guard-rails).
     """
-    from core.build_signals import BuildPaused
-    from core.pause_state import is_paused, write_pause_state
+    from foundation.build_signals import BuildPaused
+    from foundation.pause_state import is_paused, write_pause_state
 
     workflow = Path(spec_dir) / OUTPUT_DIRNAME
     workflow.mkdir(parents=True, exist_ok=True)

@@ -57,8 +57,8 @@ le frontend puis refuser par le backend une tâche configurée pour Ollama.
 
 ## Signaux de build
 
-`BuildPaused` / `BuildHalted` (`core/build_signals.py`) remontent jusqu'à `handle_build_command` :
-ne pas les attraper en chemin. Le drapeau de pause coopérative est `core/pause_state.py`, lu par le
+`BuildPaused` / `BuildHalted` (`foundation/build_signals.py`) remontent jusqu'à `handle_build_command` :
+ne pas les attraper en chemin. Le drapeau de pause coopérative est `foundation/pause_state.py`, lu par le
 coder, la QA et la spec. Voir [`architecture/pause-resume.md`](../architecture/pause-resume.md).
 
 ## Une porte par question
@@ -85,7 +85,7 @@ coder, la QA et la spec. Voir [`architecture/pause-resume.md`](../architecture/p
   `python scripts/check_encoding.py` ; détails dans [`windows-development.md`](../windows-development.md).
 - **Imports plats** : `pytest.ini` pose `pythonpath = apps/backend . ./src` ; on écrit
   `from phase_config import …`, `from agents.coder import …`, jamais `from apps.backend…`.
-- **Importer le module réel**, jamais un fichier de la racine qui le réexporte : `core.debug`,
+- **Importer le module réel**, jamais un fichier de la racine qui le réexporte : `foundation.debug`,
   `core.worktree`, `qa`. Les cales de compatibilité ont été retirées.
 - Un sous-processus prend une liste d'arguments, sans shell (règle S4 de [`security.md`](security.md)).
 - **Attraper ce qu'on attend.** Un `except Exception` (ou `except:`) de plus dans un fichier est

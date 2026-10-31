@@ -686,7 +686,7 @@ export interface ImplementationPlan {
 	recoveryNote?: string;
 	description?: string;
 	// Pause/Resume state, LEGACY. The live store is `pause_state.json` (see
-	// AUTO_BUILD_PATHS.PAUSE_STATE and core/pause_state.py): it lives beside the
+	// AUTO_BUILD_PATHS.PAUSE_STATE and foundation/pause_state.py): it lives beside the
 	// spec, which exists from the moment the task does, so a pause also works
 	// during spec creation and planning — the phases where this file does not
 	// exist yet. This block is still read so a task paused before the move does
