@@ -113,6 +113,23 @@ def _redact(text: str) -> str:
     return redact_text(text)
 
 
+async def job_with_output(
+    db: AsyncSession, scope: ProjectScope, job: ProjectJob, after: int
+) -> dict[str, Any]:
+    """A job and the lines of its output after line ``after``; a job left
+    running by a server that stopped is settled first."""
+    jobs = get_project_jobs()
+    if job.status in ("queued", "running") and not jobs.is_tracked(job.id):
+        await jobs.settle_orphans(scope.project_id)
+        await db.refresh(job)
+    lines, following = jobs.output(job.id, after)
+    return {
+        **job_public(job),
+        "lines": [_redact(line) for line in lines],
+        "next": following,
+    }
+
+
 def ensure_no_job(scope: ProjectScope, feature: Feature) -> None:
     if get_project_jobs().running_job(scope.project_id, feature.key) is not None:
         raise HTTPException(
@@ -233,17 +250,7 @@ def feature_router(feature: Feature) -> APIRouter:
         scope: ProjectScope = Depends(resolve_project_scope),
         db: AsyncSession = Depends(get_db),
     ) -> dict[str, Any]:
-        jobs = get_project_jobs()
-        job = await own_job(db, scope, job_id)
-        if job.status in ("queued", "running") and not jobs.is_tracked(job.id):
-            await jobs.settle_orphans(scope.project_id)
-            await db.refresh(job)
-        lines, following = jobs.output(job.id, after)
-        return {
-            **job_public(job),
-            "lines": [_redact(line) for line in lines],
-            "next": following,
-        }
+        return await job_with_output(db, scope, await own_job(db, scope, job_id), after)
 
     @router.post("/jobs/{job_id}/cancel")
     async def cancel_job(

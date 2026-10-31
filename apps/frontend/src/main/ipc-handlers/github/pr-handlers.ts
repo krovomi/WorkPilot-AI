@@ -42,6 +42,19 @@ import {
 } from "./pr-logs";
 import type { PRLogs } from "./pr-logs";
 import { performCIWaitCheck } from "./pr-ci-wait";
+import { postReviewToGitHub } from "./pr-review-post";
+import { reviewFromJson } from "./review-result";
+import {
+	cancelServerReview,
+	markServerReviewPosted,
+	postServerReview,
+	serverProjectOf,
+	serverReviews,
+	startServerReview,
+} from "./server-pr-review";
+import type { PRReviewResult } from "./review-result";
+// Moved to ./review-result.ts, shared with a server project's review.
+export type { PRReviewFinding, PRReviewResult } from "./review-result";
 import type { PRReviewProgress } from "./pr-ci-wait";
 // Moved to ./pr-ci-wait.ts (audit lot L11, F36); re-exported for existing importers.
 export type { PRReviewProgress } from "./pr-ci-wait";
@@ -98,57 +111,6 @@ function getClaudeMdEnv(project: Project): Record<string, string> {
 		env.TDD_MODE = "true";
 	}
 	return env;
-}
-
-/**
- * PR review finding from AI analysis
- */
-export interface PRReviewFinding {
-	id: string;
-	severity: "critical" | "high" | "medium" | "low";
-	category:
-		| "security"
-		| "quality"
-		| "style"
-		| "test"
-		| "docs"
-		| "pattern"
-		| "performance";
-	title: string;
-	description: string;
-	file: string;
-	line: number;
-	endLine?: number;
-	suggestedFix?: string;
-	fixable: boolean;
-}
-
-/**
- * Complete PR review result
- */
-export interface PRReviewResult {
-	jev?: import("../../../shared/types/jev").JevObservation;
-	prNumber: number;
-	repo: string;
-	success: boolean;
-	findings: PRReviewFinding[];
-	summary: string;
-	overallStatus: "approve" | "request_changes" | "comment";
-	reviewId?: number;
-	reviewedAt: string;
-	error?: string;
-	// Follow-up review fields
-	reviewedCommitSha?: string;
-	reviewedFileBlobs?: Record<string, string>; // filename → blob SHA for rebase-resistant follow-ups
-	isFollowupReview?: boolean;
-	previousReviewId?: number;
-	resolvedFindings?: string[];
-	unresolvedFindings?: string[];
-	newFindingsSinceLastReview?: string[];
-	// Track if findings have been posted to GitHub (enables follow-up review)
-	hasPostedFindings?: boolean;
-	postedFindingIds?: string[];
-	postedAt?: string;
 }
 
 /**
@@ -231,45 +193,7 @@ function getReviewResult(
 	);
 
 	try {
-		const rawData = fs.readFileSync(reviewPath, "utf-8");
-		const sanitizedData = sanitizeNetworkData(rawData);
-		const data = JSON.parse(sanitizedData);
-		return {
-			prNumber: data.pr_number,
-			repo: data.repo,
-			success: data.success,
-			findings:
-				data.findings?.map((f: Record<string, unknown>) => ({
-					id: f.id,
-					severity: f.severity,
-					category: f.category,
-					title: f.title,
-					description: f.description,
-					file: f.file,
-					line: f.line,
-					endLine: f.end_line,
-					suggestedFix: f.suggested_fix,
-					fixable: f.fixable ?? false,
-				})) ?? [],
-			summary: data.summary ?? "",
-			overallStatus: data.overall_status ?? "comment",
-			reviewId: data.review_id,
-			reviewedAt: data.reviewed_at ?? new Date().toISOString(),
-			error: data.error,
-			// Follow-up review fields (snake_case -> camelCase)
-			reviewedCommitSha: data.reviewed_commit_sha,
-			jev: data.jev,
-			reviewedFileBlobs: data.reviewed_file_blobs,
-			isFollowupReview: data.is_followup_review ?? false,
-			previousReviewId: data.previous_review_id,
-			resolvedFindings: data.resolved_findings ?? [],
-			unresolvedFindings: data.unresolved_findings ?? [],
-			newFindingsSinceLastReview: data.new_findings_since_last_review ?? [],
-			// Track posted findings for follow-up review eligibility
-			hasPostedFindings: data.has_posted_findings ?? false,
-			postedFindingIds: data.posted_finding_ids ?? [],
-			postedAt: data.posted_at,
-		};
+		return reviewFromJson(fs.readFileSync(reviewPath, "utf-8"));
 	} catch {
 		// File doesn't exist or couldn't be read
 		return null;
@@ -646,6 +570,8 @@ export function registerPRHandlers(
 			projectId: string,
 			prNumber: number,
 		): Promise<PRReviewResult | null> => {
+			const remote = serverProjectOf(projectId);
+			if (remote) return (await serverReviews(remote, [prNumber]))[prNumber] ?? null;
 			return withProjectOrNull(projectId, async (project) => {
 				return getReviewResult(project, prNumber);
 			});
@@ -664,6 +590,8 @@ export function registerPRHandlers(
 				projectId,
 				count: prNumbers.length,
 			});
+			const remote = serverProjectOf(projectId);
+			if (remote) return serverReviews(remote, Array.isArray(prNumbers) ? prNumbers : []);
 			const result = await withProjectOrNull(projectId, async (project) => {
 				const reviews: Record<number, PRReviewResult | null> = {};
 				for (const prNumber of prNumbers) {
@@ -696,6 +624,12 @@ export function registerPRHandlers(
 			const mainWindow = getMainWindow();
 			if (!mainWindow) {
 				debugLog("No main window available");
+				return;
+			}
+			// A server project's review runs on the server (`server-pr-review.ts`).
+			const remote = serverProjectOf(projectId);
+			if (remote) {
+				startServerReview(remote, prNumber, false, mainWindow, getGitHubPRSettings());
 				return;
 			}
 
@@ -866,6 +800,10 @@ export function registerPRHandlers(
 				selectedCount: selectedFindingIds?.length,
 				forceApprove: options?.forceApprove,
 			});
+			const remote = serverProjectOf(projectId);
+			if (remote) {
+				return postServerReview(remote, prNumber, selectedFindingIds, options);
+			}
 			const postResult = await withProjectOrNull(projectId, async (project) => {
 				const result = getReviewResult(project, prNumber);
 				if (!result) {
@@ -880,161 +818,13 @@ export function registerPRHandlers(
 				}
 
 				try {
-					// Filter findings if selection provided
-					const selectedSet = selectedFindingIds
-						? new Set(selectedFindingIds)
-						: null;
-					const findings = selectedSet
-						? result.findings.filter((f) => selectedSet.has(f.id))
-						: result.findings;
-
-					debugLog("Posting findings", {
-						total: result.findings.length,
-						selected: findings.length,
-					});
-
-					// Build review body - different format for auto-approve with suggestions
-					let body: string;
-
-					if (options?.forceApprove) {
-						// Auto-approve format: clean approval message with optional suggestions
-						body = `## ✅ WorkPilot AI Review - APPROVED\n\n`;
-						body += `**Status:** Ready to Merge\n\n`;
-						body += `**Summary:** ${result.summary}\n\n`;
-
-						if (findings.length > 0) {
-							body += `---\n\n`;
-							body += `### 💡 Suggestions (${findings.length})\n\n`;
-							body += `*These are non-blocking suggestions for consideration:*\n\n`;
-
-							for (const f of findings) {
-								const emoji =
-									{ critical: "🔴", high: "🟠", medium: "🟡", low: "🔵" }[
-										f.severity
-									] || "⚪";
-								body += `#### ${emoji} [${f.id}] [${f.severity.toUpperCase()}] ${f.title}\n`;
-								body += `📁 \`${f.file}:${f.line}\`\n\n`;
-								body += `${f.description}\n\n`;
-								const suggestedFix = f.suggestedFix?.trim();
-								if (suggestedFix) {
-									body += `**Suggested fix:**\n\`\`\`\n${suggestedFix}\n\`\`\`\n\n`;
-								}
-							}
-						}
-
-						body += `---\n*This automated review found no blocking issues. The PR can be safely merged.*\n\n`;
-						body += `*Generated by WorkPilot AI*`;
-					} else {
-						// Standard review format
-						body = `## 🤖 WorkPilot AI PR Review\n\n${result.summary}\n\n`;
-
-						if (findings.length > 0) {
-							// Show selected count vs total if filtered
-							const countText = selectedSet
-								? `${findings.length} selected of ${result.findings.length} total`
-								: `${findings.length} total`;
-							body += `### Findings (${countText})\n\n`;
-
-							for (const f of findings) {
-								const emoji =
-									{ critical: "🔴", high: "🟠", medium: "🟡", low: "🔵" }[
-										f.severity
-									] || "⚪";
-								body += `#### ${emoji} [${f.id}] [${f.severity.toUpperCase()}] ${f.title}\n`;
-								body += `📁 \`${f.file}:${f.line}\`\n\n`;
-								body += `${f.description}\n\n`;
-								// Only show suggested fix if it has actual content
-								const suggestedFix = f.suggestedFix?.trim();
-								if (suggestedFix) {
-									body += `**Suggested fix:**\n\`\`\`\n${suggestedFix}\n\`\`\`\n\n`;
-								}
-							}
-						} else {
-							body += `*No findings selected for this review.*\n\n`;
-						}
-
-						body += `---\n*This review was generated by WorkPilot AI.*`;
-					}
-
-					// Determine review status based on selected findings (or force approve)
-					let overallStatus = result.overallStatus;
-					if (options?.forceApprove) {
-						// Force approve regardless of findings
-						overallStatus = "approve";
-					} else if (selectedSet) {
-						const hasBlocker = findings.some(
-							(f) => f.severity === "critical" || f.severity === "high",
-						);
-						overallStatus = hasBlocker
-							? "request_changes"
-							: findings.length > 0
-								? "comment"
-								: "approve";
-					}
-
-					// Map to GitHub API event type
-					const event =
-						overallStatus === "approve"
-							? "APPROVE"
-							: overallStatus === "request_changes"
-								? "REQUEST_CHANGES"
-								: "COMMENT";
-
-					debugLog("Posting review to GitHub", {
+					const { reviewId, findings } = await postReviewToGitHub(
+						config,
 						prNumber,
-						status: overallStatus,
-						event,
-						findingsCount: findings.length,
-					});
-
-					// Post review via GitHub API to capture review ID
-					let reviewId: number;
-					try {
-						const reviewResponse = (await githubFetch(
-							config.token,
-							`/repos/${config.repo}/pulls/${prNumber}/reviews`,
-							{
-								method: "POST",
-								body: JSON.stringify({
-									body,
-									event,
-								}),
-							},
-						)) as { id: number };
-						reviewId = reviewResponse.id;
-					} catch (error) {
-						// GitHub doesn't allow REQUEST_CHANGES or APPROVE on your own PR
-						// Fall back to COMMENT if that's the error
-						const errorMsg =
-							error instanceof Error ? error.message : String(error);
-						if (
-							errorMsg.includes(
-								"Can not request changes on your own pull request",
-							) ||
-							errorMsg.includes("Can not approve your own pull request")
-						) {
-							debugLog(
-								"Cannot use REQUEST_CHANGES/APPROVE on own PR, falling back to COMMENT",
-								{
-									prNumber,
-								},
-							);
-							const fallbackResponse = (await githubFetch(
-								config.token,
-								`/repos/${config.repo}/pulls/${prNumber}/reviews`,
-								{
-									method: "POST",
-									body: JSON.stringify({
-										body,
-										event: "COMMENT",
-									}),
-								},
-							)) as { id: number };
-							reviewId = fallbackResponse.id;
-						} else {
-							throw error;
-						}
-					}
+						result,
+						selectedFindingIds,
+						options,
+					);
 					debugLog("Review posted successfully", { prNumber, reviewId });
 
 					// Update the stored review result with the review ID and posted findings
@@ -1096,6 +886,8 @@ export function registerPRHandlers(
 		IPC_CHANNELS.GITHUB_PR_MARK_REVIEW_POSTED,
 		async (_, projectId: string, prNumber: number): Promise<boolean> => {
 			debugLog("markReviewPosted handler called", { projectId, prNumber });
+			const remote = serverProjectOf(projectId);
+			if (remote) return markServerReviewPosted(remote, prNumber);
 			const result = await withProjectOrNull(projectId, async (project) => {
 				try {
 					const reviewPath = path.join(
@@ -1325,6 +1117,7 @@ export function registerPRHandlers(
 		IPC_CHANNELS.GITHUB_PR_REVIEW_CANCEL,
 		async (_, projectId: string, prNumber: number): Promise<boolean> => {
 			debugLog("cancelPRReview handler called", { projectId, prNumber });
+			if (cancelServerReview(projectId, prNumber)) return true;
 			const reviewKey = getReviewKey(projectId, prNumber);
 			const entry = runningReviews.get(reviewKey);
 
@@ -1390,7 +1183,7 @@ export function registerPRHandlers(
 		): Promise<NewCommitsCheck> => {
 			debugLog("checkNewCommits handler called", { projectId, prNumber });
 
-			const result = await withProjectOrNull(projectId, async (project) => {
+			const result = await withForgeProjectOrNull(projectId, async (project) => {
 				// Check if review exists and has reviewed_commit_sha
 				const githubDir = path.join(project.path, ".workpilot", "github");
 				const reviewPath = path.join(
@@ -1401,9 +1194,11 @@ export function registerPRHandlers(
 
 				let review: PRReviewResult;
 				try {
-					const rawData = fs.readFileSync(reviewPath, "utf-8");
-					const sanitizedData = sanitizeNetworkData(rawData);
-					review = JSON.parse(sanitizedData);
+					const saved = project.remote
+						? (await serverReviews(project, [prNumber]))[prNumber]
+						: JSON.parse(sanitizeNetworkData(fs.readFileSync(reviewPath, "utf-8")));
+					if (!saved) throw new Error("No review");
+					review = saved;
 				} catch {
 					// File doesn't exist or couldn't be read
 					return { hasNewCommits: false, newCommitCount: 0 };
@@ -1815,6 +1610,11 @@ export function registerPRHandlers(
 			const mainWindow = getMainWindow();
 			if (!mainWindow) {
 				debugLog("No main window available");
+				return;
+			}
+			const remote = serverProjectOf(projectId);
+			if (remote) {
+				startServerReview(remote, prNumber, true, mainWindow, getGitHubPRSettings());
 				return;
 			}
 

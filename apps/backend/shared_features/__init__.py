@@ -3,7 +3,8 @@
 its index and the views that follow, as their files on the server's clone and
 their runners as jobs; its Insights conversations (``insights``); its
 memories (``context``); its GitHub repository or GitLab project, with each
-person's own token (``forge``, ``forge_gitlab``).
+person's own token (``forge``, ``forge_gitlab``), and the AI review of its
+pull requests as a job on the clone (``github_review``).
 
 See ``docs/architecture/server-mode.md``.
 """
@@ -23,6 +24,7 @@ def mount_all(mount: Callable[[APIRouter, str], None]) -> None:
     from shared_features.context import router as context
     from shared_features.forge import router as forge
     from shared_features.forge_gitlab import router as forge_gitlab
+    from shared_features.github_review import router as github_review
     from shared_features.ideation import router as ideation
     from shared_features.insights import router as insights
     from shared_features.registry import FEATURES
@@ -37,3 +39,4 @@ def mount_all(mount: Callable[[APIRouter, str], None]) -> None:
     mount(context, "context")
     mount(forge, "forge")
     mount(forge_gitlab, "forge")
+    mount(github_review, "forge")
