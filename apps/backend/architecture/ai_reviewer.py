@@ -11,9 +11,34 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from foundation.base_branch import detect_base_branch
 from foundation.debug import debug, debug_error, debug_warning
 
 from .models import ArchitectureConfig, ArchitectureReport, ArchitectureViolation
+
+# apps/backend/prompts, where every agent's system prompt lives.
+_PROMPT_FILE = Path(__file__).parent.parent / "prompts" / "architecture_reviewer.md"
+
+
+def architecture_reviewer_prompt(
+    spec_dir: Path,
+    project_dir: Path,
+    architecture_rules: str,
+    deterministic_report: str,
+) -> str:
+    """The architecture reviewer's prompt, with the spec's context filled in.
+
+    Built here rather than in ``prompts_pkg``, which the QA loop imports: the
+    reviewer's prompt has no other reader.
+    """
+    prompt = _PROMPT_FILE.read_text(encoding="utf-8")
+    prompt = prompt.replace("{{SPEC_DIR}}", str(spec_dir))
+    prompt = prompt.replace(
+        "{{BASE_BRANCH}}", detect_base_branch(spec_dir, project_dir)
+    )
+    prompt = prompt.replace("{{PROJECT_DIR}}", str(project_dir))
+    prompt = prompt.replace("{{ARCHITECTURE_RULES}}", architecture_rules)
+    return prompt.replace("{{DETERMINISTIC_REPORT}}", deterministic_report)
 
 
 async def run_architecture_ai_review(
@@ -41,25 +66,21 @@ async def run_architecture_ai_review(
     Returns:
         List of additional ArchitectureViolation objects found by AI.
     """
-    try:
-        from core.client import create_agent_client
-        from phase_config import get_phase_thinking_budget
-    except ImportError as e:
-        debug_warning("architecture_ai", f"Cannot import agent SDK: {e}")
-        return []
+    # Through the agent_runtime port: the QA loop imports architecture, and
+    # core and agents import the QA loop.
+    import agent_runtime
+    from phase_config import get_phase_thinking_budget
 
-    # Build the prompt
-    try:
-        from prompts_pkg.prompts import get_architecture_reviewer_prompt
-    except ImportError:
-        debug_warning("architecture_ai", "Cannot import prompt loader")
+    runtime = agent_runtime.current()
+    if runtime is None:
+        debug_warning("architecture_ai", "No agent runtime installed")
         return []
 
     # Serialize config and report for prompt injection
     architecture_rules = _serialize_config(config)
     det_report_str = _serialize_deterministic_report(deterministic_report)
 
-    prompt = get_architecture_reviewer_prompt(
+    prompt = architecture_reviewer_prompt(
         spec_dir=spec_dir,
         project_dir=project_dir,
         architecture_rules=architecture_rules,
@@ -69,7 +90,7 @@ async def run_architecture_ai_review(
     # Create agent client
     thinking_budget = get_phase_thinking_budget(spec_dir, "qa")
     try:
-        client = create_agent_client(
+        client = runtime.create_agent_client(
             project_dir=project_dir,
             spec_dir=spec_dir,
             model=model,
@@ -86,10 +107,9 @@ async def run_architecture_ai_review(
     debug("architecture_ai", "Starting AI architecture review session...")
     try:
         async with client:
-            from agents.session import run_agent_session
             from task_logger import LogPhase
 
-            _status, response, _metadata = await run_agent_session(
+            _status, response, _metadata = await runtime.run_agent_session(
                 client,
                 prompt,
                 spec_dir,

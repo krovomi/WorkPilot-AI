@@ -24,7 +24,7 @@ What it does now, in three steps:
    ``core.oneshot.oneshot_completion`` — provider-agnostic, so the
    ``SELECTED_LLM_PROVIDER`` the Electron side sets from the default provider is
    honoured.
-3. **One JSON object, parsed leniently.** ``spec.plan_recovery.extract_json_document``
+3. **One JSON object, parsed leniently.** ``foundation.json_document.extract_json_document``
    reads it out of a fence or prose; a model that answered with a fenced code
    block instead gets that block as the snippet.
 
@@ -510,7 +510,7 @@ def parse_response(text: str, *, language: str, description: str) -> dict | None
     if not text:
         return None
 
-    from spec.plan_recovery import extract_json_document
+    from foundation.json_document import extract_json_document
 
     data = extract_json_document(text)
     if isinstance(data, dict):

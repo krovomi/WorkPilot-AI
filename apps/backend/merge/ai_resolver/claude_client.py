@@ -33,24 +33,31 @@ def create_claude_resolver() -> AIResolver:
     Returns:
         Configured AIResolver instance
     """
-    # Import here to avoid circular dependency
-    from core.auth import ensure_claude_code_oauth_token, get_auth_token
+    # Through the agent_runtime port: core imports merge, so merge cannot
+    # import core back.
+    import agent_runtime
     from foundation.model_config import get_utility_model_config
 
     from .resolver import AIResolver
 
-    if not get_auth_token():
+    runtime = agent_runtime.current()
+    if runtime is None:
+        logger.warning("No agent runtime installed, AI resolution unavailable")
+        return AIResolver()
+
+    if not runtime.get_auth_token():
         logger.warning("No authentication token found, AI resolution unavailable")
         return AIResolver()
 
     # Ensure SDK can find the token
-    ensure_claude_code_oauth_token()
+    runtime.ensure_claude_code_oauth_token()
 
     try:
-        from core.simple_client import create_simple_client
+        import claude_agent_sdk  # noqa: F401
     except ImportError:
-        logger.warning("core.simple_client not available, AI resolution unavailable")
+        logger.warning("claude_agent_sdk not available, AI resolution unavailable")
         return AIResolver()
+    create_simple_client = runtime.create_simple_client
 
     # Get model settings from environment (passed from frontend)
     model, thinking_budget = get_utility_model_config()

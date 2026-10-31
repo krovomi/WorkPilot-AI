@@ -549,7 +549,7 @@ class ToolExecutor:
         goes back to the model so it can correct itself in the same session.
         """
         from foundation.file_utils import write_json_atomic
-        from spec.plan_recovery import extract_json_document
+        from foundation.json_document import extract_json_document
 
         if empty_file:
             # Said plainly rather than through the JSON parser: blanking the

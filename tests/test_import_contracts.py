@@ -10,8 +10,10 @@ detectors into ``project``) and the cycle down to 26 units: the agent runtime
 itself (``core.client`` and ``agents.session`` with the phases built on them).
 The plan of 29 October (A1) took the logging toolbox, the base branch and the
 build signals to ``foundation`` too, which let ``task_logger`` and
-``consensus_arbiter`` out (24 units). This test keeps it from growing back,
-and the units taken out of it that way.
+``consensus_arbiter`` out (24 units), then the ``agent_runtime`` port, through
+which ``merge``, ``integrations``, ``analysis`` and ``architecture`` start a
+session without importing ``core`` or ``agents`` (20 units). This test keeps
+it from growing back, and the units taken out of it that way.
 
 The graph is read from the source with ``ast``, every ``import`` of the file
 counted, including the ones inside a function: a lazy import is still a
@@ -92,11 +94,27 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # The cross review's verdict, read by the pull request step in core: a
     # leaf, or it joins the cycle. Its session is `workflows/cross_review_phase.py`.
     "cross_review": {"foundation"},
+    # The agent runtime as a port (docs/architecture/agent-runtime.md): core
+    # installs it, the units below reach a session through it. A leaf.
+    "agent_runtime": set(),
+    # Taken out of the agents' cycle by the port (plan of 29 October, A1):
+    # each starts its session through agent_runtime, never core or agents.
+    "merge": {"agent_runtime", "foundation"},
+    "integrations": {
+        "agent_runtime",
+        "foundation",
+        "offline_policy",
+        "phase_config",
+        "server",
+    },
+    "analysis": {"agent_runtime", "foundation", "project", "security"},
+    # The QA loop's architecture gate; its reviewer's prompt is built here.
+    "architecture": {"agent_runtime", "foundation", "phase_config", "task_logger"},
 }
 
 # The largest set of units that all import one another, directly or not. It
 # may only shrink: lower the number when a change breaks a part of it.
-MAX_CYCLE = 24
+MAX_CYCLE = 20
 
 
 def _units() -> dict[str, Path]:
