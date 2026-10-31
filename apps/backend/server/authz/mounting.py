@@ -52,6 +52,10 @@ ROUTE_OVERRIDES: dict[tuple[str, str], str] = {
     ("POST", "/api/test-generation/generate"): "agent.execute",
     # Fires a real outbound notification.
     ("POST", "/api/notifications/test"): "integration.write",
+    # A card of the shared board: deleting it and approving its spec are
+    # their own permissions, not the board's plain write.
+    ("DELETE", "/api/board/cards/{card_id}"): "task.delete",
+    ("POST", "/api/board/cards/{card_id}/approve"): "review.approve",
     # Audit trail is append-only and its exports carry personal data.
     ("GET", "/api/audit-trail/export/soc2"): "audit.export",
     ("GET", "/api/audit-trail/export/gdpr"): "audit.export",

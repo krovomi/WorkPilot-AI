@@ -367,6 +367,10 @@ def setup_workspace(
     # Get or create worktree for THIS SPECIFIC SPEC
     worktree_info = manager.get_or_create_worktree(spec_name)
 
+    # Build and test outputs (bin/, obj/, TestResults/, node_modules/...) must
+    # never be committed by the agent, even without a .gitignore for them.
+    manager.ensure_build_artifact_excludes(spec_name)
+
     # Copy .env files to worktree so user can run the project
     copied_env_files = copy_env_files_to_worktree(project_dir, worktree_info.path)
     if copied_env_files:

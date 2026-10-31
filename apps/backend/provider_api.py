@@ -1715,20 +1715,6 @@ async def get_provider_usage(provider: str):
 # ---------------------------------------------------------------------------
 
 
-# Dashboard + Session History endpoints moved to dashboard/api.py
-
-
-# Refactoring + documentation + feedback + templates + code-review
-# endpoints moved to agent_endpoints/api.py
-# System status endpoints moved to system_status/api.py
-# GitHub PR Details endpoint moved to runners/github/api.py
-# Test Generation Agent API moved to test_generation/api.py
-# Both mounted below alongside the other feature routers.
-
-
-# Event-Driven Hooks System API moved to event_hooks/api.py
-
-
 # Every route of `providers_router` is declared above this line.
 _mount(providers_router, "providers")
 
@@ -1960,6 +1946,14 @@ try:
     _mount(watermarks_router, "watermarks")
 except ImportError as e:
     print(f"Warning: Could not import watermarks router: {e}")
+
+# --- Shared board (server mode: the cards of a project, by project_id) ---
+try:
+    from shared_board.api import router as shared_board_router
+
+    _mount(shared_board_router, "board")
+except ImportError as e:
+    print(f"Warning: Could not import shared board router: {e}")
 
 # --- Spec Traceability API (open questions + requirement coverage for a spec) ---
 try:
