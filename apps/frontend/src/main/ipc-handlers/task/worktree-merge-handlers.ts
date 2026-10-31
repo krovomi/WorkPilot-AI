@@ -16,6 +16,8 @@ import { stripAnsiCodes } from "../../../shared/utils/ansi-sanitizer";
 import { getToolPath } from "../../cli-tool-manager";
 import { killProcessGracefully } from "../../platform";
 import { parsePythonCommand } from "../../python-detector";
+import { findServerCard } from "../../server-board-actions";
+import { mergeServerCard, previewServerMerge } from "../../server-board-review";
 import {
 	getConfiguredPythonPath,
 	type PythonEnvManager,
@@ -50,6 +52,8 @@ export function registerWorktreeMergeHandlers(
 			taskId: string,
 			options?: { noCommit?: boolean },
 		): Promise<IPCResult<WorktreeMergeResult>> => {
+			const serverCard = findServerCard(taskId);
+			if (serverCard) return mergeServerCard(serverCard, options);
 			const isDebugMode =
 				process.env.DEBUG === "true" || process.env.NODE_ENV === "development";
 			const debug = (...args: unknown[]) => {
@@ -837,6 +841,7 @@ export function registerWorktreeMergeHandlers(
 	ipcMain.handle(
 		IPC_CHANNELS.TASK_WORKTREE_MERGE_PREVIEW,
 		async (_, taskId: string): Promise<IPCResult<WorktreeMergeResult>> => {
+			if (findServerCard(taskId)) return previewServerMerge();
 			console.warn(
 				"[IPC] TASK_WORKTREE_MERGE_PREVIEW called with taskId:",
 				taskId,

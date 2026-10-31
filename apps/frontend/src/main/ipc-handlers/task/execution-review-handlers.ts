@@ -18,6 +18,8 @@ import {
 import type { ImageAttachment, IPCResult } from "../../../shared/types";
 import { appLog } from "../../app-logger";
 import { recordPlanFeedback } from "../../review-lessons";
+import { findServerCard } from "../../server-board-actions";
+import { reviewServerCard } from "../../server-board-review";
 import { getToolPath } from "../../cli-tool-manager";
 import { taskStateManager } from "../../task-state-manager";
 import { getIsolatedGitEnv } from "../../utils/git-isolation";
@@ -45,6 +47,10 @@ export function registerTaskReviewHandlers(ctx: ExecutionHandlerContext): void {
 			feedback?: string,
 			images?: ImageAttachment[],
 		): Promise<IPCResult> => {
+			const serverCard = findServerCard(taskId);
+			if (serverCard) {
+				return reviewServerCard(serverCard, approved, feedback, images);
+			}
 			// Find task and project
 			const { task, project } = findTaskAndProject(taskId);
 

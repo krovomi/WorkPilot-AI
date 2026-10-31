@@ -31,13 +31,13 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
-from server.authz.principal import Principal, get_principal
+from server.authz.principal import get_principal
 from server.authz.scope import ProjectScope, resolve_project_scope
 from server.db.engine import get_db
-from server.db.models import Project, ProjectRole, SpecIndex
+from server.db.models import ProjectRole
 from server.services.events import emit_board_event
-from server.services.spec_indexer import reindex_project
-from sqlalchemy import select
+from shared_board import review
+from shared_board.cards import _card_or_404, _index_row, _require_writer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/api/board", tags=["board"])
@@ -60,8 +60,6 @@ SNAPSHOT_FILES: dict[str, int] = {
 }
 MAX_SNAPSHOT_CARDS = 500
 
-_WRITER_ROLES = {ProjectRole.MEMBER.value, ProjectRole.OWNER.value}
-
 
 class CardCreate(BaseModel):
     title: str = Field(min_length=1, max_length=MAX_TITLE)
@@ -75,26 +73,6 @@ class CardCreate(BaseModel):
 class CardUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=MAX_TITLE)
     description: str | None = Field(default=None, max_length=MAX_DESCRIPTION)
-
-
-def _require_writer(scope: ProjectScope, principal: Principal) -> None:
-    # An organization administrator reaches a project without a membership
-    # row (``project_role`` is None); everyone else needs member or owner.
-    if scope.project_role is None:
-        if principal.is_platform_admin or principal.has("project.member.write"):
-            return
-    elif scope.project_role in _WRITER_ROLES:
-        return
-    raise HTTPException(status_code=403, detail="Requires project role 'member'")
-
-
-def _card_or_404(scope: ProjectScope, card_id: str) -> Path:
-    from board_mcp.server import card_dir
-
-    directory = card_dir(scope.path, card_id)
-    if directory is None:
-        raise HTTPException(status_code=404, detail="Card not found")
-    return directory
 
 
 def _started(scope: ProjectScope, directory: Path) -> bool:
@@ -113,19 +91,6 @@ def _read_json(path: Path) -> dict[str, Any]:
 
 def _write_json(path: Path, value: dict[str, Any]) -> None:
     path.write_text(json.dumps(value, indent=2, ensure_ascii=False), encoding="utf-8")
-
-
-async def _index_row(
-    db: AsyncSession, scope: ProjectScope, card_id: str
-) -> SpecIndex | None:
-    project = await db.get(Project, scope.project_id)
-    if project is not None:
-        await reindex_project(db, project)
-    return await db.scalar(
-        select(SpecIndex).where(
-            SpecIndex.project_id == scope.project_id, SpecIndex.spec_name == card_id
-        )
-    )
 
 
 def _card_files(directory: Path) -> dict[str, str]:
@@ -355,3 +320,11 @@ async def approve_card(
         scope.project_id, "spec_approved", {"spec": card_id, "by": principal.id}
     )
     return {"approved": True, "approvedBy": review.approved_by}
+
+
+# Reviewing a card's work from the app (its changes, a request for changes):
+# its own module, on this router.
+router.add_api_route("/cards/{card_id}/changes", review.card_changes, methods=["GET"])
+router.add_api_route(
+    "/cards/{card_id}/request-changes", review.request_changes, methods=["POST"]
+)

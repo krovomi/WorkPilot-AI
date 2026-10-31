@@ -23,6 +23,8 @@ import { getToolPath } from "../../cli-tool-manager";
 import { killProcessGracefully } from "../../platform";
 import { projectStore } from "../../project-store";
 import { readSettingsFile } from "../../settings-utils";
+import { findServerCard } from "../../server-board-actions";
+import { serverWorktreeStatus } from "../../server-board-review";
 import { parsePythonCommand } from "../../python-detector";
 import {
 	getConfiguredPythonPath,
@@ -80,6 +82,8 @@ export function registerWorktreeHandlers(
 	ipcMain.handle(
 		IPC_CHANNELS.TASK_WORKTREE_STATUS,
 		async (_, taskId: string): Promise<IPCResult<WorktreeStatus>> => {
+			const serverCard = findServerCard(taskId);
+			if (serverCard) return serverWorktreeStatus(serverCard);
 			try {
 				const { task, project } = findTaskAndProject(taskId);
 				if (!task || !project) {
