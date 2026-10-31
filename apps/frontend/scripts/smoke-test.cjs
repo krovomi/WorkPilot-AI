@@ -66,6 +66,15 @@ function run() {
 	// A fresh profile: the smoke test must not depend on, or write to, the
 	// settings of whoever runs it.
 	const userData = fs.mkdtempSync(path.join(os.tmpdir(), "workpilot-smoke-"));
+	// Chromium's helpers can still be writing to the profile when the main process
+	// exits: retry, and never let the cleanup decide the verdict.
+	const removeUserData = () => {
+		try {
+			fs.rmSync(userData, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+		} catch (error) {
+			console.warn(`smoke test: could not remove ${userData}: ${error.message}`);
+		}
+	};
 
 	console.log(`smoke test: ${command} ${[...args, ...extra].join(" ")}`);
 	const child = spawn(command, [...args, ...extra, `--user-data-dir=${userData}`], {
@@ -94,7 +103,7 @@ function run() {
 	});
 	child.on("exit", (code, signal) => {
 		clearTimeout(timer);
-		fs.rmSync(userData, { recursive: true, force: true });
+		removeUserData();
 		const ok = code === 0 && output.includes(OK_MARKER);
 		if (ok) {
 			console.log("smoke test: passed");
