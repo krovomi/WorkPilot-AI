@@ -78,6 +78,7 @@ describe("a shared feature's files", () => {
 					"roadmap.json": { content: '{"features":[]}', sha256: SHA_A },
 					"competitor_analysis.json": { content: "x".repeat(1_000_001), sha256: SHA_A },
 					"../../escape.json": { content: "{}", sha256: SHA_A },
+					"roadmap_discovery.json": { content: "<html>", sha256: SHA_A },
 					"notes.txt": { content: "no", sha256: SHA_A },
 				},
 				job: { id: "job-1", status: "running", error: null },
@@ -96,7 +97,7 @@ describe("a shared feature's files", () => {
 		});
 		expect(readFileSync(roadmapFile(p), "utf-8")).toBe('{"features":[]}');
 		expect(existsSync(roadmapFile(p, "competitor_analysis.json"))).toBe(false);
-		// Gone on the server, gone from the mirror.
+		// Gone on the server, or not a JSON object: gone from the mirror.
 		expect(existsSync(roadmapFile(p, "roadmap_discovery.json"))).toBe(false);
 		expect(existsSync(path.join(TEST_DIR, "escape.json"))).toBe(false);
 		expect(existsSync(roadmapFile(p, "notes.txt"))).toBe(false);

@@ -72,6 +72,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
+/** Every shared file is a JSON object: anything else is not mirrored. */
+function isJsonObject(text: string): boolean {
+	try {
+		return isRecord(JSON.parse(text));
+	} catch {
+		return false;
+	}
+}
+
 function base(project: Project, feature: SharedFeature, rest = ""): string {
 	return `/api/features/${feature}${rest}${rest.includes("?") ? "&" : "?"}project_id=${encodeURIComponent(project.id)}`;
 }
@@ -123,6 +132,7 @@ export async function pullFeature(
 		if (
 			typeof content === "string" &&
 			Buffer.byteLength(content, "utf-8") <= limit &&
+			isJsonObject(content) &&
 			typeof sha === "string" &&
 			SHA256.test(sha)
 		) {

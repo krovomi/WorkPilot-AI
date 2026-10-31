@@ -79,7 +79,11 @@ def write_json_file(directory: Path, name: str, content: str) -> None:
     """Replace a file at once: a reader never sees half of it."""
     directory.mkdir(parents=True, exist_ok=True)
     target = directory / name
-    if target.is_symlink():
+    # Callers pass a declared name; still, nothing is written outside the
+    # feature's directory whatever the name holds.
+    if target.is_symlink() or os.path.dirname(
+        os.path.normpath(target)
+    ) != os.path.normpath(directory):
         raise HTTPException(status_code=409, detail="File unavailable")
     fd, tmp = tempfile.mkstemp(prefix=f".{name}.", dir=directory)
     try:
@@ -119,6 +123,7 @@ def ensure_no_job(scope: ProjectScope, feature: Feature) -> None:
 def feature_router(feature: Feature) -> APIRouter:
     """The routes of one feature, under ``/api/features/<key>``."""
     router = APIRouter(prefix=f"/api/features/{feature.key}", tags=["features"])
+    writable_names = {declared: declared for declared in feature.writable}
 
     @router.get("/snapshot")
     async def snapshot(
@@ -152,8 +157,12 @@ def feature_router(feature: Feature) -> APIRouter:
     ) -> dict[str, str]:
         principal = get_principal(request)
         _require_writer(scope, principal)
-        if name not in feature.writable:
+        # The file named is the declaration's own string, never the request's:
+        # a name outside it has nothing to look up.
+        declared = writable_names.get(name)
+        if declared is None:
             raise HTTPException(status_code=404, detail="Unknown file")
+        name = declared
         limit = min(feature.files.get(name, MAX_WRITE), MAX_WRITE)
         if len(body.content.encode("utf-8")) > limit:
             raise HTTPException(status_code=413, detail="File too large")
