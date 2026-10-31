@@ -318,10 +318,11 @@ secret, et `githubFetch` envoie tout appel fait avec elle au serveur
 (`ipc-handlers/github/server-relay.ts`). Le serveur (`shared_features/forge.py`) fait l'appel avec
 le jeton GitHub que la personne y a enregistré (« Mes jetons sur le serveur »), jamais celui d'une
 autre ni celui du déploiement ; sans jeton, rien ne part et la vue le dit (412). Il tient l'appel
-au dépôt du projet, lu dans son `repo_url` et jamais dans la requête : un chemin REST est
-`/repos/<dépôt>` ou en dessous (ou `/user`), sans schéma, hôte, `..` ni échappement `%` ; une
-écriture n'est que l'un des changements que font les vues (le tableau ci-dessous), jamais un
-autre appel de l'API ; GraphQL ne sert qu'une requête, la liste des PR ouvertes, écrite par le serveur. Ce que l'app
+au dépôt du projet, lu dans son `repo_url` et jamais dans la requête : un appel REST n'est que
+l'un de ceux que font les vues (`_ROUTES` : lectures sous `/repos/<dépôt>` et de `/user`, et les
+changements du tableau ci-dessous), et l'URL envoyée est reconstruite à partir des mots de la
+route, du dépôt du projet et de nombres, sans rien recopier de la requête ; la chaîne de requête
+ne garde que les clés des vues, passées en paramètres ; GraphQL ne sert qu'une requête, la liste des PR ouvertes, écrite par le serveur. Ce que l'app
 faisait avec `gh` (diff, commentaire, fusion, mise à jour de la branche) devient l'appel REST
 équivalent (`pr-actions.ts`). « Créer une tâche » sur une issue en fait une carte du tableau
 partagé. La revue IA, l'investigation, l'auto-fix et l'analyse groupée des issues tournent sur

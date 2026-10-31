@@ -137,30 +137,65 @@ def test_the_repository_is_read_from_the_project_url():
     assert github_repo("https://github.com.evil.test/acme/shop") is None
 
 
-def test_only_the_project_s_repository_is_reachable():
-    from shared_features.forge import allowed_path
+def test_only_the_views_calls_on_the_project_s_repository_are_made():
+    from shared_features.forge import api_call
 
-    for ok in (
-        "/repos/acme/shop",
-        "/repos/acme/shop/issues?state=open&per_page=100",
-        "/repos/ACME/Shop/pulls/3/files",
-        "/user",
+    sha = "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567"
+    for method, endpoint, path, params in (
+        ("GET", "/repos/acme/shop", "/repos/acme/shop", {}),
+        (
+            "GET",
+            "/repos/acme/shop/issues?state=open&per_page=100&sort=updated&page=2",
+            "/repos/acme/shop/issues",
+            {"state": "open", "per_page": "100", "sort": "updated", "page": "2"},
+        ),
+        ("GET", "/repos/ACME/Shop/pulls/3/files", "/repos/acme/shop/pulls/3/files", {}),
+        ("GET", f"/repos/acme/shop/commits/{sha}/status", None, {}),
+        ("GET", f"/repos/acme/shop/compare/0a1b2c3...{sha}", None, {}),
+        (
+            "GET",
+            "/repos/acme/shop/actions/runs?status=action_required",
+            "/repos/acme/shop/actions/runs",
+            {"status": "action_required"},
+        ),
+        ("GET", "/user", "/user", {}),
+        ("POST", "/repos/acme/shop/issues/3/comments", None, {}),
+        ("PUT", "/repos/acme/shop/pulls/3/merge", None, {}),
+        ("PUT", "/repos/acme/shop/pulls/3/update-branch", None, {}),
+        ("POST", "/repos/acme/shop/actions/runs/9/approve", None, {}),
     ):
-        assert allowed_path(ok, "acme/shop"), ok
-    for refused in (
-        "/repos/acme/other/issues",
-        "/repos/acme/shop-private/issues",
-        "/repos/acme/shop/../other/issues",
-        "/repos/acme/shop/%2e%2e/other",
-        "//api.github.com/repos/acme/other",
-        "https://evil.test/repos/acme/shop",
-        "/orgs/acme/members",
-        "/user/repos",
-        "/repos/acme/shop/issues#x",
-        "repos/acme/shop",
-        "/repos/acme/shop/ issues",
+        found = api_call(method, endpoint, "acme/shop")
+        assert found is not None, endpoint
+        assert found[0] == (path or endpoint), endpoint
+        assert found[1] == params, endpoint
+    # The path sent is the project's repository as the server knows it.
+    assert api_call("GET", "/repos/ACME/SHOP", "acme/shop")[0] == "/repos/acme/shop"
+    for method, refused in (
+        ("GET", "/repos/acme/other/issues"),
+        ("GET", "/repos/acme/shop-private/issues"),
+        ("GET", "/repos/acme/shop/../other/issues"),
+        ("GET", "/repos/acme/shop/%2e%2e/other"),
+        ("GET", "//api.github.com/repos/acme/other"),
+        ("GET", "https://evil.test/repos/acme/shop"),
+        ("GET", "/orgs/acme/members"),
+        ("GET", "/user/repos"),
+        ("GET", "/repos/acme/shop/issues#x"),
+        ("GET", "repos/acme/shop"),
+        ("GET", "/repos/acme/shop/ issues"),
+        ("GET", "/repos/acme/shop/issues/3x"),
+        ("GET", "/repos/acme/shop/issues/٣"),
+        ("GET", "/repos/acme/shop/commits/main/status"),
+        ("GET", "/repos/acme/shop/compare/main...dev"),
+        ("GET", "/repos/acme/shop/contents/README.md"),
+        ("GET", "/repos/acme/shop/issues?state=open&state=closed"),
+        ("GET", "/repos/acme/shop/issues?q=x"),
+        ("GET", "/repos/acme/shop/issues?state=" + "x" * 101),
+        ("POST", "/repos/acme/shop/issues/3/comments?x=1"),
+        ("POST", "/user"),
+        ("POST", "/repos/acme/shop/issues"),
+        ("DELETE", "/repos/acme/shop"),
     ):
-        assert not allowed_path(refused, "acme/shop"), refused
+        assert api_call(method, refused, "acme/shop") is None, refused
 
 
 @pytest.mark.asyncio

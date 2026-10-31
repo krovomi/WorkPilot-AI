@@ -9,13 +9,15 @@ computer, and no other person's token is ever used for them.
 The relay is kept to the project's own repository, read from the project's
 ``repo_url`` on the server, never from the request:
 
-- a REST path is ``/repos/<owner>/<repo>`` or below it, or ``/user`` (whose
-  token this is), with no scheme, host, ``..`` or percent-escape;
+- a REST call is one of the calls the views make (``_ROUTES``) on
+  ``/repos/<owner>/<repo>``, or a read of ``/user`` (whose token this is);
+  the URL sent is rebuilt from the route's own words, the project's
+  repository and numbers, never copied from the request, and the query
+  string keeps only the views' keys, sent as parameters;
 - GraphQL serves one query, the open pull requests of the project's
   repository, written here with the repository filled in by the server;
-- a write is one of the changes the views make (a comment, an assignee, a
-  branch brought up to date, a workflow approved, a merge), never any other
-  call of the API; it needs ``vcs.write`` and the member role, a merge
+- a write (a comment, an assignee, a branch brought up to date, a workflow
+  approved, a merge) needs ``vcs.write`` and the member role, a merge
   ``vcs.pr.merge``.
 
 A strict offline policy of the project blocks the relay. A token is never
@@ -26,7 +28,7 @@ from __future__ import annotations
 
 import re
 from typing import Any, Literal
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, urlsplit
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -52,19 +54,32 @@ _GITHUB_URL = re.compile(
     r"^(?:https://(?:[^@/]+@)?github\.com/|git@github\.com:|ssh://git@github\.com/)"
     r"(?P<repo>[A-Za-z0-9-]{1,39}/[A-Za-z0-9._-]{1,100}?)(?:\.git)?/?$"
 )
-_MERGE = re.compile(r"^/repos/[^/]+/[^/]+/pulls/\d+/merge$", re.IGNORECASE)
-#: The changes the app's GitHub views make, and only those: the write route
-#: is not a way to reach all of GitHub's API with the person's token.
-_WRITES: tuple[tuple[str, re.Pattern[str]], ...] = (
-    ("POST", re.compile(r"^/repos/[^/]+/[^/]+/issues/\d+/comments$", re.IGNORECASE)),
-    ("POST", re.compile(r"^/repos/[^/]+/[^/]+/issues/\d+/assignees$", re.IGNORECASE)),
-    ("PUT", re.compile(r"^/repos/[^/]+/[^/]+/pulls/\d+/update-branch$", re.IGNORECASE)),
-    (
-        "POST",
-        re.compile(r"^/repos/[^/]+/[^/]+/actions/runs/\d+/approve$", re.IGNORECASE),
-    ),
-    ("PUT", _MERGE),
+#: The kinds of a path's variable segments.
+NUMBER, COMMIT, RANGE = "<number>", "<commit>", "<range>"
+#: The calls the app's GitHub views make below ``/repos/<owner>/<repo>``,
+#: and only those: the relay is not a way to reach all of GitHub's API with
+#: the person's token.
+_ROUTES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("GET", ()),
+    ("GET", ("issues",)),
+    ("GET", ("issues", NUMBER)),
+    ("GET", ("issues", NUMBER, "comments")),
+    ("GET", ("pulls", NUMBER)),
+    ("GET", ("pulls", NUMBER, "files")),
+    ("GET", ("commits", COMMIT, "status")),
+    ("GET", ("commits", COMMIT, "check-runs")),
+    ("GET", ("compare", RANGE)),
+    ("GET", ("actions", "runs")),
+    ("POST", ("issues", NUMBER, "comments")),
+    ("POST", ("issues", NUMBER, "assignees")),
+    ("PUT", ("pulls", NUMBER, "merge")),
+    ("PUT", ("pulls", NUMBER, "update-branch")),
+    ("POST", ("actions", "runs", NUMBER, "approve")),
 )
+_MERGE = ("pulls", NUMBER, "merge")
+_QUERY_KEYS = frozenset({"state", "per_page", "sort", "page", "status"})
+_QUERY_VALUE_MAX = 100
+_COMMIT = re.compile(r"[0-9a-fA-F]{7,40}")
 
 Method = Literal["GET", "POST", "PATCH", "PUT", "DELETE"]
 
@@ -113,23 +128,81 @@ def github_repo(repo_url: str) -> str | None:
     return match.group("repo") if match else None
 
 
-def allowed_path(path: str, repo: str) -> bool:
-    """A path of the project's repository (or ``/user``), and nothing else."""
-    if any(c in path for c in ("\\", "#", "%", "@")) or any(
-        ord(c) < 0x21 for c in path
+def _number(text: str) -> str | None:
+    return (
+        str(int(text))
+        if text.isascii() and text.isdigit() and len(text) <= 12
+        else None
+    )
+
+
+def _commit(text: str) -> str | None:
+    # Written back from its value: nothing of the request's text is kept.
+    if not _COMMIT.fullmatch(text):
+        return None
+    return f"{int(text, 16):0{len(text)}x}"
+
+
+def _segment(kind: str, text: str) -> str | None:
+    if kind == NUMBER:
+        return _number(text)
+    if kind == COMMIT:
+        return _commit(text)
+    if kind == RANGE:
+        ends = text.split("...")
+        commits = [_commit(end) for end in ends]
+        if len(ends) != 2 or None in commits:
+            return None
+        return f"{commits[0]}...{commits[1]}"
+    return kind if text == kind else None
+
+
+def api_call(
+    method: str, endpoint: str, repo: str
+) -> tuple[str, dict[str, str], tuple[str, ...]] | None:
+    """The path and query parameters to send for a call of the views, with
+    the route it matched; None for any other call.
+
+    The path is rebuilt from the route, the project's ``repo`` and numbers:
+    it holds no text of ``endpoint``.
+    """
+    if any(c in endpoint for c in ("\\", "#", "%", "@")) or any(
+        ord(c) < 0x21 for c in endpoint
     ):
-        return False
-    split = urlsplit(path)
+        return None
+    split = urlsplit(endpoint)
     if split.scheme or split.netloc or not split.path.startswith("/"):
-        return False
+        return None
+    pairs = parse_qsl(split.query, keep_blank_values=True)
+    keys = [key for key, _ in pairs]
+    if (
+        (pairs and method != "GET")
+        or len(set(keys)) != len(keys)
+        or any(key not in _QUERY_KEYS for key in keys)
+        or any(len(value) > _QUERY_VALUE_MAX for _, value in pairs)
+    ):
+        return None
+    params = dict(pairs)
     segments = split.path.split("/")[1:]
-    if any(s in ("", ".", "..") for s in segments):
-        return False
-    if split.path == "/user":
-        return True
-    prefix = f"/repos/{repo}".lower()
-    lowered = split.path.lower()
-    return lowered == prefix or lowered.startswith(prefix + "/")
+    if segments == ["user"]:
+        return ("/user", params, ()) if method == "GET" else None
+    owner, name = repo.split("/", 1)
+    if (
+        len(segments) < 3
+        or segments[0] != "repos"
+        or segments[1].lower() != owner.lower()
+        or segments[2].lower() != name.lower()
+    ):
+        return None
+    rest = segments[3:]
+    for route_method, route in _ROUTES:
+        if route_method != method or len(route) != len(rest):
+            continue
+        built = [_segment(kind, text) for kind, text in zip(route, rest, strict=True)]
+        if None not in built:
+            path = "/".join([f"/repos/{repo}", *(b for b in built if b is not None)])
+            return path, params, route
+    return None
 
 
 async def _project_repo(db: AsyncSession, scope: ProjectScope) -> str:
@@ -167,6 +240,7 @@ async def _send(
     method: str,
     url: str,
     *,
+    params: dict[str, str] | None = None,
     json: Any = None,
     accept: str = "application/vnd.github+json",
 ) -> dict[str, Any]:
@@ -178,7 +252,9 @@ async def _send(
     }
     try:
         async with httpx.AsyncClient(timeout=TIMEOUT, follow_redirects=False) as client:
-            answer = await client.request(method, url, headers=headers, json=json)
+            answer = await client.request(
+                method, url, headers=headers, params=params, json=json
+            )
     except httpx.HTTPError as e:
         raise HTTPException(status_code=502, detail="GitHub unreachable") from e
     if len(answer.content) > MAX_ANSWER:
@@ -196,16 +272,20 @@ async def _relay(
     call: RestCall, request: Request, scope: ProjectScope, db: AsyncSession
 ) -> dict[str, Any]:
     repo = await _project_repo(db, scope)
-    if not allowed_path(call.endpoint, repo):
-        raise HTTPException(status_code=403, detail="Outside the project's repository")
-    if call.endpoint == "/user" and call.method != "GET":
-        raise HTTPException(status_code=403, detail="Outside the project's repository")
+    principal = get_principal(request)
+    found = api_call(call.method, call.endpoint, repo)
+    if found is None:
+        raise HTTPException(status_code=403, detail="Not a call of the GitHub views")
+    path, params, route = found
+    if route == _MERGE and not principal.has("vcs.pr.merge"):
+        raise HTTPException(status_code=403, detail="Missing permission: vcs.pr.merge")
     _guard_offline(scope)
-    token = await _token(db, get_principal(request))
+    token = await _token(db, principal)
     return await _send(
         token,
         call.method,
-        GITHUB_API + call.endpoint,
+        GITHUB_API + path,
+        params=params,
         json=call.body,
         accept="application/vnd.github.diff"
         if call.accept == "diff"
@@ -235,18 +315,9 @@ async def github_write(
 ) -> dict[str, Any]:
     """A change on the project's repository (a comment, a review, an
     assignee, a merge…), as the caller."""
-    principal = get_principal(request)
-    _require_writer(scope, principal)
+    _require_writer(scope, get_principal(request))
     if call.method == "GET":
         raise HTTPException(status_code=405, detail="Use the read route")
-    split = urlsplit(call.endpoint)
-    if split.query or not any(
-        call.method == method and pattern.match(split.path)
-        for method, pattern in _WRITES
-    ):
-        raise HTTPException(status_code=403, detail="Not a change the views make")
-    if _MERGE.match(split.path) and not principal.has("vcs.pr.merge"):
-        raise HTTPException(status_code=403, detail="Missing permission: vcs.pr.merge")
     return await _relay(call, request, scope, db)
 
 
