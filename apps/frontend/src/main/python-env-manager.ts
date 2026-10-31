@@ -1,4 +1,9 @@
-import { type ChildProcess, execSync, spawn } from "node:child_process";
+import {
+	type ChildProcess,
+	execSync,
+	type SpawnOptions,
+	spawn,
+} from "node:child_process";
 import { EventEmitter } from "node:events";
 import { existsSync, readdirSync } from "node:fs";
 import path from "node:path";
@@ -42,6 +47,8 @@ export class PythonEnvManager extends EventEmitter {
 	private isInitializing = false;
 	private initializationPromise: Promise<PythonEnvStatus> | null = null;
 	private activeProcesses: Set<ChildProcess> = new Set();
+	/** Set by cleanup(): the app is quitting, start no new Python process. */
+	private shuttingDown = false;
 	private static readonly VENV_CREATION_TIMEOUT_MS = 120000; // 2 minutes timeout for venv creation
 
 	/**
@@ -225,9 +232,13 @@ export class PythonEnvManager extends EventEmitter {
 			try {
 				// Pass the script over stdin ("-") rather than -c: avoids fragile
 				// cross-platform quoting of a multi-line script on Windows.
-				const proc = spawn(venvPython, ["-"], {
+				const proc = this.spawnTracked(venvPython, ["-"], {
 					stdio: ["pipe", "ignore", "ignore"],
 				});
+				if (!proc) {
+					resolvePromise(false);
+					return;
+				}
 				const timer = setTimeout(() => {
 					try {
 						proc.kill();
@@ -244,8 +255,8 @@ export class PythonEnvManager extends EventEmitter {
 					clearTimeout(timer);
 					resolvePromise(code === 0);
 				});
-				proc.stdin.write(checkScript);
-				proc.stdin.end();
+				proc.stdin?.write(checkScript);
+				proc.stdin?.end();
 			} catch {
 				resolvePromise(false);
 			}
@@ -329,15 +340,16 @@ export class PythonEnvManager extends EventEmitter {
 		);
 
 		return new Promise((resolve) => {
-			const proc = spawn(systemPython, ["-m", "venv", venvPath], {
+			const proc = this.spawnTracked(systemPython, ["-m", "venv", venvPath], {
 				// biome-ignore lint/style/noNonNullAssertion: value is guaranteed by context
 				cwd: this.autoBuildSourcePath!,
 				stdio: "pipe",
 				env: { ...process.env, PYTHONIOENCODING: "utf-8", PYTHONUTF8: "1" },
 			});
-
-			// Track the process for cleanup on app exit
-			this.activeProcesses.add(proc);
+			if (!proc) {
+				resolve(false);
+				return;
+			}
 
 			let stderr = "";
 			let resolved = false;
@@ -412,12 +424,16 @@ export class PythonEnvManager extends EventEmitter {
 
 		console.warn("[PythonEnvManager] Bootstrapping pip...");
 		return new Promise((resolve) => {
-			const proc = spawn(venvPython, ["-m", "ensurepip"], {
+			const proc = this.spawnTracked(venvPython, ["-m", "ensurepip"], {
 				// biome-ignore lint/style/noNonNullAssertion: value is guaranteed by context
 				cwd: this.autoBuildSourcePath!,
 				stdio: "pipe",
 				env: { ...process.env, PYTHONIOENCODING: "utf-8", PYTHONUTF8: "1" },
 			});
+			if (!proc) {
+				resolve(false);
+				return;
+			}
 
 			let stderr = "";
 			proc.stderr?.on("data", (data) => {
@@ -477,7 +493,7 @@ export class PythonEnvManager extends EventEmitter {
 
 		return new Promise((resolve) => {
 			// Use python -m pip for better compatibility across Python versions
-			const proc = spawn(
+			const proc = this.spawnTracked(
 				venvPython,
 				["-m", "pip", "install", "-r", requirementsPath],
 				{
@@ -487,6 +503,10 @@ export class PythonEnvManager extends EventEmitter {
 					env: { ...process.env, PYTHONIOENCODING: "utf-8", PYTHONUTF8: "1" },
 				},
 			);
+			if (!proc) {
+				resolve(false);
+				return;
+			}
 
 			let stdout = "";
 			let stderr = "";
@@ -903,10 +923,30 @@ export class PythonEnvManager extends EventEmitter {
 	}
 
 	/**
+	 * Spawn a Python process that cleanup() kills on quit, or nothing once
+	 * the app is quitting. Every bootstrap step goes through here: an
+	 * untracked ensurepip or pip install outlived the app (F134).
+	 */
+	private spawnTracked(
+		command: string,
+		args: string[],
+		options: SpawnOptions,
+	): ChildProcess | null {
+		if (this.shuttingDown) return null;
+		const proc = spawn(command, args, options);
+		this.activeProcesses.add(proc);
+		const forget = () => this.activeProcesses.delete(proc);
+		proc.on("close", forget);
+		proc.on("error", forget);
+		return proc;
+	}
+
+	/**
 	 * Clean up any active processes on app exit.
 	 * Should be called when the application is about to quit.
 	 */
 	cleanup(): void {
+		this.shuttingDown = true;
 		if (this.activeProcesses.size > 0) {
 			console.warn(
 				"[PythonEnvManager] Cleaning up",

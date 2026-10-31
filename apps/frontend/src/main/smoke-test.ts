@@ -6,6 +6,13 @@
  * (release) with it. A main process that throws while loading never reaches
  * this code and never prints the marker, which is the 1.3.1 crash (F114): the
  * script reads that as a failure too.
+ *
+ * A pass quits the way a user does (`app.quit()`): `before-quit` and
+ * `will-quit` stop the agents, terminals, backend and the Python bootstrap.
+ * `app.exit()` skipped them and left the main process tearing down while the
+ * startup work still ran; the DevTools a built app opens docked could then
+ * attach to the closing window, a Chromium CHECK, SIGILL (F134). The smoke
+ * test no longer opens the DevTools either (index.ts).
  */
 import type { BrowserWindow } from "electron";
 import { app } from "electron";
@@ -46,9 +53,10 @@ export async function waitForMountedRoot(
 
 function finish(ok: boolean, reason: string): void {
 	// Plain stdout/stderr: the script reads the marker from the process output.
-	// Exit once the line is flushed: a pipe is asynchronous on Windows, and
-	// exiting first would drop the marker.
-	const exit = () => app.exit(ok ? 0 : 1);
+	// Quit once the line is flushed: a pipe is asynchronous on Windows, and
+	// quitting first would drop the marker. A failure still exits at once,
+	// with code 1: `app.quit()` always ends with 0.
+	const exit = () => (ok ? app.quit() : app.exit(1));
 	if (ok) {
 		process.stdout.write(`${SMOKE_OK_MARKER} ${reason}\n`, exit);
 	} else {

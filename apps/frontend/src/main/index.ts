@@ -106,7 +106,7 @@ import { projectStore } from "./project-store";
 import { pythonEnvManager } from "./python-env-manager";
 import { migrateProfilesSecrets } from "./services/profile/profile-manager";
 import { initSentryMain } from "./sentry";
-import { armSmokeTest } from "./smoke-test";
+import { armSmokeTest, isSmokeTest } from "./smoke-test";
 import {
 	migrateSettingsSecrets,
 	readSettingsFile,
@@ -565,8 +565,9 @@ function createWindow(): void {
 		}
 	}
 
-	// Open DevTools in development
-	if (is.dev && mainWindow) {
+	// Open DevTools in development. Not in the smoke test: it models the
+	// shipped app, and DevTools docking into the closing window crashed it (F134).
+	if (is.dev && mainWindow && !isSmokeTest()) {
 		mainWindow.webContents.openDevTools({ mode: "right" });
 	}
 
