@@ -565,7 +565,7 @@ class TestAnalyzePhase:
 
     Everything here is about *when* and *how* it runs. What it looks for is in
     the skill body; what a parser can already answer is in
-    `spec.traceability`, and the skill is told to read that rather than
+    `foundation.traceability`, and the skill is told to read that rather than
     recompute it.
     """
 

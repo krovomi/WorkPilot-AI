@@ -32,8 +32,7 @@ from foundation.api_safety import (
     SpecAddressError,
     resolve_spec_dir,
 )
-
-from .traceability import collect
+from foundation.traceability import collect
 
 logger = logging.getLogger(__name__)
 

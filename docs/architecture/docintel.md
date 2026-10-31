@@ -337,7 +337,8 @@ of a failed CI run is read for its codes — `CS0103`, `NU1101`, `MSB1009`,
 `NETSDK1045`, `TS2345`, `npm ERR! code`, `ERR_PNPM_*`, `error[E0425]`, javac,
 kotlinc, go, mypy, pytest collection errors — and its failing tests (pytest,
 jest/vitest, go, cargo, `dotnet test`, Gradle, Surefire). The table lives in
-`self_healing/incident_responder/cicd_mode.py` and nowhere else: the incident
+`foundation/ci_logs.py` and nowhere else (the incident model re-exports it from
+`self_healing/incident_responder/cicd_mode.py`): the incident
 created from a failed pipeline records the same `build_errors`, titles a
 pipeline that does not compile "Build broken" rather than "0 test(s) failing",
 and hands the analyzer a **Build Errors** section. Two tables would disagree
@@ -383,7 +384,7 @@ with a checkbox and an editable wording, and `decide` is the one writer:
 accepted requirements go into `spec.md` under *Requirements from attachments*
 with the next free `FR-###` / `NFR-###` *at that moment* (the provisional id
 shown before is just that), next to the requirements section so
-`spec/traceability.py` reads them like any other, and `traceability.json` is
+`foundation/traceability.py` reads them like any other, and `traceability.json` is
 refreshed when it exists. Before the spec exists they go into the task
 description — the path `SpecInterviewBanner` already takes — and
 `spec_writer.md` keeps their ids and wording. Accepted criteria join the bullet

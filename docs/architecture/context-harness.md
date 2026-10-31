@@ -403,7 +403,7 @@ Ollama/LM Studio, Copilot, Windsurf) lisent et cherchent par `ToolExecutor`, et 
 long résultat en une tête et une queue : le milieu d'un long fichier était illisible, et le modèle ne
 pouvait pas le demander.
 
-- `harness/domain/paging.py` (pur) : `page_lines` rend une suite de lignes sous un plafond de
+- `foundation/paging.py` (pur) : `page_lines` rend une suite de lignes sous un plafond de
   caractères, `render_page` la fait suivre de sa plage et de l'`offset` qui lit la suite, `page_items`
   pagine une liste produite à la demande (une recherche s'arrête de parcourir les fichiers dès que la
   page est pleine).
@@ -425,7 +425,7 @@ sortie, et coûter des minutes.
 
 - **Déversement** (`ToolExecutor._fit_output`) : une sortie de `run_command` plus longue qu'une page
   est écrite entière dans `<spec>/tool-output/command-<empreinte>.txt`, et le modèle lit
-  `spill_excerpt` (`harness/domain/paging.py`, pur) : d'abord la note qui dit où est le tout et sa
+  `spill_excerpt` (`foundation/paging.py`, pur) : d'abord la note qui dit où est le tout et sa
   taille, puis la tête et la queue en lignes entières, avec l'`offset` exact où commence la partie
   cachée, relue par `read_file`. La note vient en premier : un client qui coupe le résultat ensuite
   en garde la tête, donc le chemin. Une commande qui échoue déverse sa sortie de la même façon, et

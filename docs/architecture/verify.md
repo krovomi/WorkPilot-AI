@@ -34,7 +34,7 @@ pass nor a failure.
 apps/backend/verify/
   detect.py     which targets, their launch command, port and readiness URL (a learned recipe first)
   launch.py     own process group, a free port injected, readiness on loopback, the log captured
-  errors.py     stack traces (docintel/stacktrace), build codes (cicd_mode), console and network errors
+  errors.py     stack traces (docintel/stacktrace), build codes (foundation/ci_logs), console and network errors
   devtools.py   chrome-devtools-mcp driven from Python (MCPToolManager); Playwright fallback, same output
   perf.py       LCP / CLS / TBT / FCP -> Lighthouse log-normal score; latency stats
   endpoints.py  the running app's OpenAPI, filtered by docintel.api_tests.find_handler on the diff
