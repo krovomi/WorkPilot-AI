@@ -5,6 +5,7 @@
 	"tabs": {
 		"overview": "Vue d'ensemble",
 		"members": "Membres",
+		"groups": "Groupes",
 		"roles": "Rôles et permissions",
 		"organizations": "Organisations",
 		"invitations": "Invitations",
@@ -52,6 +53,39 @@
 			"status": "Statut",
 			"sessions": "Sessions",
 			"actions": "Actions"
+		}
+	},
+	"groups": {
+		"title": "Groupes",
+		"create": "Nouveau groupe",
+		"description": "Donnez son accès à une équipe en une fois : chaque membre d'un groupe reçoit son rôle d'organisation et son rôle sur chaque projet, en plus des siens. Un groupe ne retire jamais un droit.",
+		"empty": "Aucun groupe pour l'instant.",
+		"summary": "{{members}} membres, {{projects}} projets",
+		"newGroup": "Nouveau groupe",
+		"name": "Nom",
+		"namePlaceholder": "Équipe front-end",
+		"descriptionLabel": "Description",
+		"save": "Créer le groupe",
+		"delete": "Supprimer ce groupe",
+		"orgRole": "Rôle d'organisation",
+		"orgRoleHelp": "S'ajoute au rôle que chaque membre a déjà.",
+		"noOrgRole": "Aucun rôle en plus",
+		"members": "Membres",
+		"noMembers": "Personne n'est encore dans ce groupe.",
+		"pickMember": "Choisir un membre…",
+		"addMember": "Ajouter au groupe",
+		"removeMember": "Retirer du groupe",
+		"projects": "Projets",
+		"projectsHelp": "Les membres ont au moins ce rôle sur le projet.",
+		"noProjects": "Ce groupe n'a encore aucun projet.",
+		"pickProject": "Choisir un projet…",
+		"addProject": "Donner l'accès",
+		"removeProject": "Retirer ce projet au groupe",
+		"projectRole": "Rôle sur le projet",
+		"projectRoles": {
+			"viewer": "Lecteur",
+			"member": "Membre",
+			"owner": "Propriétaire"
 		}
 	},
 	"roles": {

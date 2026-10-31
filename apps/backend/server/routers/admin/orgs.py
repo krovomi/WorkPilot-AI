@@ -9,7 +9,7 @@ from server.auth.deps import CurrentUser
 from server.authz.deps import require_org, require_permission, require_platform_admin
 from server.authz.roles import DEFAULT_ORG_ROLE
 from server.db.engine import get_db
-from server.db.models import Organization, OrgMember, Role, User
+from server.db.models import GroupMember, Organization, OrgMember, Role, User, UserGroup
 from server.schemas import (
     AddOrgMemberRequest,
     CreateOrganizationRequest,
@@ -20,7 +20,7 @@ from server.schemas import (
 )
 from server.services.audit import record
 from server.services.quotas import enforce_seat_quota
-from sqlalchemy import or_, select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
@@ -304,6 +304,15 @@ async def remove_member(
         )
 
     await db.delete(member)
+    # Leaving the organization ends every group membership in it.
+    await db.execute(
+        delete(GroupMember).where(
+            GroupMember.user_id == member_user_id,
+            GroupMember.group_id.in_(
+                select(UserGroup.id).where(UserGroup.org_id == org_id)
+            ),
+        )
+    )
     await record(
         db,
         action="org.member.removed",

@@ -18,6 +18,7 @@ import { useAdminStore } from "@/stores/admin-store";
 import { usePermissionsStore } from "@/stores/permissions-store";
 import { useServerSessionStore } from "@/stores/server-session-store";
 import { AuditTab } from "./AuditTab";
+import { GroupsTab } from "./GroupsTab";
 import { MembersTab } from "./MembersTab";
 import { OrganizationsTab } from "./OrganizationsTab";
 import { OverviewTab } from "./OverviewTab";
@@ -27,6 +28,7 @@ import { RolesTab } from "./RolesTab";
 type TabId =
 	| "overview"
 	| "members"
+	| "groups"
 	| "roles"
 	| "organizations"
 	| "invitations"
@@ -45,6 +47,7 @@ interface TabDef {
 const TABS: readonly TabDef[] = [
 	{ id: "overview", labelKey: "tabs.overview", permission: "analytics.read" },
 	{ id: "members", labelKey: "tabs.members", permission: "org.member.read" },
+	{ id: "groups", labelKey: "tabs.groups", permission: "org.member.read" },
 	{ id: "roles", labelKey: "tabs.roles", permission: "org.role.read" },
 	{ id: "organizations", labelKey: "tabs.organizations", platformOnly: true },
 	{
@@ -178,6 +181,7 @@ export function AdministrationView() {
 					<div>
 						{current === "overview" && <OverviewTab />}
 						{current === "members" && <MembersTab />}
+						{current === "groups" && <GroupsTab />}
 						{current === "roles" && <RolesTab />}
 						{current === "organizations" && <OrganizationsTab />}
 						{current === "invitations" && <InvitationsAdmin />}

@@ -83,12 +83,16 @@ async def get_project_role(
 
     if user.is_admin:
         return ProjectRole.OWNER.value
-    return await db.scalar(
+    from server.authz.groups import group_project_role, highest_role
+
+    own = await db.scalar(
         select(ProjectMember.role).where(
             ProjectMember.project_id == project_id,
             ProjectMember.user_id == user.id,
         )
     )
+    # The highest of the user's own role and the ones their groups give.
+    return highest_role(own, await group_project_role(db, user.id, project_id))
 
 
 def require_project_role(minimum: str = ProjectRole.VIEWER.value):

@@ -305,6 +305,72 @@ class ProjectMember(Base):
     project: Mapped[Project] = relationship(back_populates="members")
 
 
+class UserGroup(Base):
+    """A group of people in one organization (« Front team », « QA »).
+
+    A group carries what its members inherit: optionally an organization role
+    (its permissions are added to each member's own, never removed), and a
+    project role on the projects it is given (``ProjectGroup``). A member's
+    effective project role is the highest of their own and their groups'.
+    Only people who belong to the organization count: leaving it ends every
+    group membership in it.
+    """
+
+    __tablename__ = "user_groups"
+    __table_args__ = (UniqueConstraint("org_id", "name", name="uq_group_org_name"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(120))
+    description: Mapped[str] = mapped_column(Text, default="")
+    # An organization role every member inherits on top of their own.
+    role_id: Mapped[str | None] = mapped_column(
+        ForeignKey("roles.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+
+
+class GroupMember(Base):
+    __tablename__ = "group_members"
+    __table_args__ = (UniqueConstraint("group_id", "user_id", name="uq_group_member"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    group_id: Mapped[str] = mapped_column(
+        ForeignKey("user_groups.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+
+
+class ProjectGroup(Base):
+    """A group's role on a project: each of its members has at least it."""
+
+    __tablename__ = "project_groups"
+    __table_args__ = (
+        UniqueConstraint("project_id", "group_id", name="uq_project_group"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    project_id: Mapped[str] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), index=True
+    )
+    group_id: Mapped[str] = mapped_column(
+        ForeignKey("user_groups.id", ondelete="CASCADE"), index=True
+    )
+    role: Mapped[str] = mapped_column(String(20), default=ProjectRole.MEMBER.value)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+
+
 class SpecIndex(Base):
     """Queryable mirror of ``.workpilot/specs/{spec_name}`` on the server FS.
 

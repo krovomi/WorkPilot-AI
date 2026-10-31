@@ -83,6 +83,22 @@ async def list_projects(
         rows = result.all()
         projects = [p for p, _ in rows]
         roles = {p.id: role for p, role in rows}
+        # Projects the person reaches through a group, at the highest role.
+        from server.authz.groups import group_project_roles, highest_role
+
+        via_groups = await group_project_roles(db, user.id, org_id)
+        missing = [pid for pid in via_groups if pid not in roles]
+        if missing:
+            projects += list(
+                await db.scalars(
+                    select(Project).where(
+                        Project.id.in_(missing), Project.org_id == org_id
+                    )
+                )
+            )
+            projects.sort(key=lambda p: p.created_at)
+        for pid, role in via_groups.items():
+            roles[pid] = highest_role(roles.get(pid), role) or role
 
     out = []
     for p in projects:

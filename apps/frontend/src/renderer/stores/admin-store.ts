@@ -11,6 +11,9 @@ import { create } from "zustand";
 import type {
 	AdminOverview,
 	AuditEntry,
+	GroupProjectOption,
+	GroupProjectRole,
+	GroupSummary,
 	OrganizationSummary,
 	OrgMemberSummary,
 	PermissionDescriptor,
@@ -30,6 +33,8 @@ interface AdminState {
 	sessions: SessionSummary[];
 	quotas: QuotaSummary | null;
 	audit: AuditEntry[];
+	groups: GroupSummary[];
+	groupProjects: GroupProjectOption[];
 
 	loading: Record<string, boolean>;
 	error: string | null;
@@ -43,6 +48,8 @@ interface AdminState {
 	loadSessions: () => Promise<void>;
 	loadQuotas: () => Promise<void>;
 	loadAudit: (params?: { action?: string; limit?: number }) => Promise<void>;
+	loadGroups: () => Promise<void>;
+	loadGroupProjects: () => Promise<void>;
 
 	createRole: (body: {
 		slug: string;
@@ -60,6 +67,23 @@ interface AdminState {
 	removeMember: (userId: string) => Promise<boolean>;
 	setUserActive: (userId: string, active: boolean) => Promise<boolean>;
 	revokeSessions: (userId: string) => Promise<boolean>;
+
+	createGroup: (body: {
+		name: string;
+		description?: string;
+		role_slug?: string;
+	}) => Promise<boolean>;
+	updateGroup: (
+		groupId: string,
+		body: { name?: string; description?: string; role_slug?: string },
+	) => Promise<boolean>;
+	deleteGroup: (groupId: string) => Promise<boolean>;
+	setGroupMember: (groupId: string, userId: string, inGroup: boolean) => Promise<boolean>;
+	setGroupProjectRole: (
+		groupId: string,
+		projectId: string,
+		role: GroupProjectRole | null,
+	) => Promise<boolean>;
 
 	createOrganization: (body: { name: string; slug: string }) => Promise<boolean>;
 	setOrganizationActive: (orgId: string, active: boolean) => Promise<boolean>;
@@ -100,6 +124,11 @@ export const useAdminStore = create<AdminState>((set, get) => {
 		return true;
 	}
 
+	/** Put the server's answer for one group in place of the one shown. */
+	function replaceGroup(group: GroupSummary): void {
+		set((s) => ({ groups: s.groups.map((g) => (g.id === group.id ? group : g)) }));
+	}
+
 	return {
 		overview: null,
 		permissions: [],
@@ -109,6 +138,8 @@ export const useAdminStore = create<AdminState>((set, get) => {
 		sessions: [],
 		quotas: null,
 		audit: [],
+		groups: [],
+		groupProjects: [],
 		loading: {},
 		error: null,
 
@@ -156,6 +187,17 @@ export const useAdminStore = create<AdminState>((set, get) => {
 				"audit",
 				(a) => a.listAudit({ limit: 100, ...params }),
 				(d) => set({ audit: d }),
+			);
+		},
+
+		loadGroups: async () => {
+			await withLoading("groups", (a) => a.listGroups(), (d) => set({ groups: d }));
+		},
+		loadGroupProjects: async () => {
+			await withLoading(
+				"groupProjects",
+				(a) => a.listGroupProjects(),
+				(d) => set({ groupProjects: d }),
 			);
 		},
 
@@ -223,6 +265,36 @@ export const useAdminStore = create<AdminState>((set, get) => {
 			if (ok) await get().loadSessions();
 			return ok;
 		},
+
+		createGroup: async (body) => {
+			const ok = await withLoading(
+				"createGroup",
+				(a) => a.createGroup(body),
+				() => undefined,
+			);
+			if (ok) await get().loadGroups();
+			return ok;
+		},
+		updateGroup: async (groupId, body) =>
+			withLoading("updateGroup", (a) => a.updateGroup(groupId, body), (d) =>
+				replaceGroup(d),
+			),
+		deleteGroup: async (groupId) =>
+			withLoading("deleteGroup", (a) => a.deleteGroup(groupId), () =>
+				set((s) => ({ groups: s.groups.filter((g) => g.id !== groupId) })),
+			),
+		setGroupMember: async (groupId, userId, inGroup) =>
+			withLoading(
+				"setGroupMember",
+				(a) => a.setGroupMember(groupId, userId, inGroup),
+				(d) => replaceGroup(d),
+			),
+		setGroupProjectRole: async (groupId, projectId, role) =>
+			withLoading(
+				"setGroupProjectRole",
+				(a) => a.setGroupProjectRole(groupId, projectId, role),
+				(d) => replaceGroup(d),
+			),
 
 		createOrganization: async (body) => {
 			const ok = await withLoading(

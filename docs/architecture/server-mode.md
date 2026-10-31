@@ -15,6 +15,7 @@ Règles : [`rules/security.md`](../rules/security.md#s5--mode-serveur--authentif
 |---|---|---|
 | Identité | `server/auth/` | comptes locaux et Microsoft Entra, jetons d'accès courts, sessions de refresh révocables, invitations |
 | Tenant et droits | `server/authz/` | l'organisation où agit la requête, les permissions de ses rôles, une permission sur chaque route (`mount_guarded`), le projet résolu depuis un `project_id` (`scope.py`) |
+| Groupes | `server/authz/groups.py`, `server/routers/admin/groups.py` | des personnes d'une organisation réunies pour recevoir ensemble un rôle d'organisation et un rôle sur des projets |
 | Projets | `server/routers/projects.py`, `services/repos.py` | un projet est un dépôt distant que le serveur clone sous `WORKPILOT_REPOS_ROOT/<id>` ; ses membres et leur rôle (`viewer`, `member`, `owner`) |
 | Tableau | `server/routers/specs.py`, `services/spec_indexer.py` | les specs du clone indexées en base, la réservation d'une carte par une personne, les runs d'une carte |
 | Cartes | `shared_board/api.py` | créer, lire, modifier, supprimer une carte, approuver sa spec, par `project_id` |
@@ -144,7 +145,30 @@ sinon l'hôte de l'API sur le port 8765, en `wss` derrière `https`. Les événe
 `spec_updated`, `spec_deleted` et `spec_approved` étaient jetés par le flux comme inconnus :
 ils sont maintenant de ses types.
 
+## Les groupes
+
+Donner l'accès personne par personne ne tient pas pour une équipe : à chaque arrivée il faut
+refaire chaque projet. Un groupe (« Équipe front », « QA ») réunit des membres d'une organisation
+et porte deux choses que ses membres héritent : un rôle d'organisation, dont les permissions
+s'ajoutent aux leurs (`resolve_permissions`), et un rôle sur chaque projet qu'on lui donne, dont
+le plus haut l'emporte sur le leur (`load_project_scope`, `get_project_role`, liste des projets).
+Un groupe **ajoute** et ne retire jamais : un rôle plus bas que celui de la personne ne la fait
+pas descendre, et il n'existe pas de « refus » par groupe, qui rendrait un droit impossible à lire
+d'un coup d'œil.
+
+Un groupe ne fait pas passer d'un tenant à l'autre. Son appartenance ne compte que tant que la
+personne est membre de l'organisation du groupe (la retirer de l'organisation la retire aussi de
+ses groupes), son accès ne vaut que pour les projets de cette organisation, et son rôle doit être
+de portée organisation, intégré ou propre à elle : chaque requête de `groups.py` le vérifie, pas
+seulement l'écriture. Gérer un groupe distribue des droits, donc ses routes demandent celles qui
+les distribuent déjà une personne à la fois : `org.member.read` pour lire, `org.member.write` pour
+le groupe et ses membres, `project.member.write` pour ses projets. Un groupe, une personne, un
+rôle ou un projet d'un autre tenant répond 404, et chaque changement est écrit au journal d'audit
+(`org.group.*`, `project.group.*`). Dans l'app, l'onglet « Groupes » de l'administration
+(`main/server-admin-groups.ts`, qui refuse un identifiant ou un rôle mal formé avant toute
+requête) n'offre que ce que ces permissions permettent.
+
 ## Ce qui vient
 
-Le plan multi-tenant du 31 octobre, par lots : les groupes d'utilisateurs, chaque feature de l'app servie par `project_id`, un test de bout en
+Le plan multi-tenant du 31 octobre, par lots : chaque feature de l'app servie par `project_id`, un test de bout en
 bout à deux organisations, et le guide d'exploitation. Ce fichier grandit avec chaque lot.

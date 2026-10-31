@@ -14,6 +14,7 @@ import {
 	setActiveOrg,
 	switchOrg,
 } from "../server-connection";
+import { groupsApi } from "../server-admin-groups";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 
 export function registerServerAdminHandlers(): void {
@@ -73,6 +74,30 @@ export function registerServerAdminHandlers(): void {
 	);
 	ipcMain.handle(IPC_CHANNELS.SERVER_ADMIN_REMOVE_MEMBER, async (_e, userId: string) =>
 		adminApi.removeMember(userId),
+	);
+
+	// --- Groups: every argument is checked by groupsApi before any request ----
+	ipcMain.handle(IPC_CHANNELS.SERVER_ADMIN_GROUPS_LIST, async () => groupsApi.list());
+	ipcMain.handle(IPC_CHANNELS.SERVER_ADMIN_GROUPS_PROJECTS, async () => groupsApi.projects());
+	ipcMain.handle(IPC_CHANNELS.SERVER_ADMIN_GROUP_CREATE, async (_e, body: unknown) =>
+		groupsApi.create(body),
+	);
+	ipcMain.handle(
+		IPC_CHANNELS.SERVER_ADMIN_GROUP_UPDATE,
+		async (_e, groupId: unknown, body: unknown) => groupsApi.update(groupId, body),
+	);
+	ipcMain.handle(IPC_CHANNELS.SERVER_ADMIN_GROUP_DELETE, async (_e, groupId: unknown) =>
+		groupsApi.remove(groupId),
+	);
+	ipcMain.handle(
+		IPC_CHANNELS.SERVER_ADMIN_GROUP_SET_MEMBER,
+		async (_e, groupId: unknown, userId: unknown, inGroup: unknown) =>
+			groupsApi.setMember(groupId, userId, inGroup),
+	);
+	ipcMain.handle(
+		IPC_CHANNELS.SERVER_ADMIN_GROUP_SET_PROJECT_ROLE,
+		async (_e, groupId: unknown, projectId: unknown, role: unknown) =>
+			groupsApi.setProjectRole(groupId, projectId, role),
 	);
 
 	// --- Organizations (platform administrators) -----------------------------
