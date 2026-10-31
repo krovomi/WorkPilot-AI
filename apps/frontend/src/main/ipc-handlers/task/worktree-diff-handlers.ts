@@ -15,6 +15,7 @@ import type {
 import { getToolPath } from "../../cli-tool-manager";
 import { findServerCard } from "../../server-board-actions";
 import { serverFileDiff, serverWorktreeDiff } from "../../server-board-review";
+import { isBuildOutputPath } from "../../../shared/utils/build-output-paths";
 import { findTaskWorktree } from "../../worktree-paths";
 import { findTaskAndProject } from "./shared";
 import {
@@ -190,7 +191,8 @@ export function registerWorktreeDiffHandlers(): void {
 				const filteredFiles = files.filter(
 					(file) =>
 						!discardedFiles.includes(file.path) &&
-						!isWorkpilotArtifact(file.path),
+						!isWorkpilotArtifact(file.path) &&
+						!isBuildOutputPath(file.path),
 				);
 				if (discardedFiles.length > 0) {
 					console.error(
