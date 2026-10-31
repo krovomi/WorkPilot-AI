@@ -2,7 +2,7 @@
 
     effective(user, org, project) =
         every permission                       if the user is a platform admin
-        otherwise  perms(org role)
+        otherwise  perms(org role) ∪ perms(the org roles of their groups)
                  ∪ perms(project role)         when a project is in scope
                  − org.settings.disabled_permissions
 
@@ -18,6 +18,7 @@ from __future__ import annotations
 import logging
 
 from server.authz.catalog import ALL_PERMISSION_KEYS
+from server.authz.groups import group_org_roles
 from server.db.models import (
     GlobalRole,
     Organization,
@@ -99,6 +100,9 @@ async def resolve_permissions(
         return frozenset(), None
 
     granted = set(org_role.permissions or ())
+    # Roles the person's groups give them add to their own, never remove.
+    for group_role in await group_org_roles(db, user_id, org_id):
+        granted |= set(group_role.permissions or ())
 
     if project_id:
         project_role = await project_role_for(db, user_id, project_id)

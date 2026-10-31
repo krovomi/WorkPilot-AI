@@ -5,6 +5,7 @@
 	"tabs": {
 		"overview": "Overview",
 		"members": "Members",
+		"groups": "Groups",
 		"roles": "Roles & permissions",
 		"organizations": "Organizations",
 		"invitations": "Invitations",
@@ -52,6 +53,39 @@
 			"status": "Status",
 			"sessions": "Sessions",
 			"actions": "Actions"
+		}
+	},
+	"groups": {
+		"title": "Groups",
+		"create": "New group",
+		"description": "Give a team its access once: everyone in a group gets its organization role and its role on each project, on top of their own. A group never takes a right away.",
+		"empty": "No groups yet.",
+		"summary": "{{members}} members, {{projects}} projects",
+		"newGroup": "New group",
+		"name": "Name",
+		"namePlaceholder": "Front-end team",
+		"descriptionLabel": "Description",
+		"save": "Create group",
+		"delete": "Delete this group",
+		"orgRole": "Organization role",
+		"orgRoleHelp": "Added to the role each member already has.",
+		"noOrgRole": "No extra role",
+		"members": "Members",
+		"noMembers": "Nobody is in this group yet.",
+		"pickMember": "Choose a member…",
+		"addMember": "Add to the group",
+		"removeMember": "Remove from the group",
+		"projects": "Projects",
+		"projectsHelp": "Members get at least this role on the project.",
+		"noProjects": "This group has no project yet.",
+		"pickProject": "Choose a project…",
+		"addProject": "Give access",
+		"removeProject": "Take this project away from the group",
+		"projectRole": "Role on the project",
+		"projectRoles": {
+			"viewer": "Viewer",
+			"member": "Member",
+			"owner": "Owner"
 		}
 	},
 	"roles": {

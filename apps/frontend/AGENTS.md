@@ -50,6 +50,7 @@ remise à zéro de la conversation) et `execution-recovery-handlers.ts` (tâche 
 | une détection d'OS ou d'exécutable | `src/main/platform/` |
 | une couleur ou un thème | `src/shared/constants/themes.ts` |
 | ce que l'app fait d'un projet du serveur (mode serveur) | `src/main/server-projects.ts` (liste, ajout, suppression), `src/main/remote-board.ts` (tableau par instantané), `src/main/server-board-actions.ts` (actions du Kanban envoyées au serveur), `src/main/server-board-review.ts` (revue, fusion, PR d'une carte du serveur), `src/main/server-board-live.ts` (flux en direct du tableau), `src/renderer/components/sidebar/server-gates.ts` (vues offertes) ; conception : [`server-mode.md`](../../docs/architecture/server-mode.md#les-projets-du-serveur-dans-lapp) |
+| l'administration du serveur (mode serveur) | `src/main/server-connection.ts` (`adminApi`), `src/main/server-admin-groups.ts` (groupes, arguments vérifiés avant la requête), `src/renderer/components/administration/` (un onglet par permission), `src/renderer/stores/admin-store.ts` ; conception : [`server-mode.md`](../../docs/architecture/server-mode.md#les-groupes) |
 
 ## Sécurité
 
