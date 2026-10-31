@@ -328,6 +328,7 @@ sign-in page.
 | Variable | Default | Meaning |
 | --- | ---: | --- |
 | `WORKPILOT_PUBLIC_BASE_URL` | — | Public URL of the server, the base of invitation links (`<url>/invite?token=…`). Without it the link is relative and the administrator completes it. |
+| `WORKPILOT_PUBLIC_STREAM_URL` | — | Where the desktop app opens a board's live stream (`ws://` or `wss://`), when it is not the API's host on port 8765, e.g. behind a TLS reverse proxy. Anything else is ignored. |
 | `WORKPILOT_INVITATION_TTL_HOURS` | 72 | How long an invitation link stays usable. |
 | `WORKPILOT_PASSWORD_MIN_LENGTH` | 12 | Minimum length of a local password. It can only raise the floor: a value below 12 keeps 12. |
 | `WORKPILOT_PASSWORD_HIBP_CHECK` | `false` | Refuses a new local password found in Have I Been Pwned. Only the first five hex characters of its SHA-1 leave the server; when the service cannot be reached, the password is accepted. |

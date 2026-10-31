@@ -109,6 +109,16 @@ def _card_files(directory: Path) -> dict[str, str]:
     return files
 
 
+@router.get("/stream")
+async def board_stream() -> dict[str, str | None]:
+    """Where the app opens a board's live stream, when the server says so
+    (``WORKPILOT_PUBLIC_STREAM_URL``); otherwise the app uses the API's host
+    on the stream's port."""
+    from server.config import get_settings
+
+    return {"url": get_settings().public_stream_url or None}
+
+
 @router.get("/snapshot")
 async def board_snapshot(
     scope: ProjectScope = Depends(resolve_project_scope),

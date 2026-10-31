@@ -24,6 +24,10 @@ CLAUDE_CODE_OAUTH_TOKEN=
 # Public base URL of this server (used to build invitation links)
 WORKPILOT_PUBLIC_BASE_URL=https://workpilot.example.com
 
+# Where the desktop app opens the live board stream, when the proxy serves it
+# elsewhere than the API's host on port 8765 (ws:// or wss:// only)
+# WORKPILOT_PUBLIC_STREAM_URL=wss://workpilot.example.com:8765
+
 # Invitation-only self-service signup
 WORKPILOT_INVITATION_TTL_HOURS=72
 WORKPILOT_PASSWORD_MIN_LENGTH=12

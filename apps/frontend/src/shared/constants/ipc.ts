@@ -1268,6 +1268,10 @@ export const IPC_CHANNELS = {
 	// Server mode: register or delete a project on the server, for the team
 	SERVER_PROJECT_CREATE: "server-project:create",
 	SERVER_PROJECT_DELETE: "server-project:delete",
+	// Server mode: follow a shown server board's changes live (main → renderer)
+	SERVER_BOARD_WATCH: "server-board:watch",
+	SERVER_BOARD_UNWATCH: "server-board:unwatch",
+	SERVER_BOARD_LIVE: "server-board:live",
 	SMART_ESTIMATION_COMPLETE: "smart-estimation-complete",
 	SMART_ESTIMATION_ERROR: "smart-estimation-error",
 	SMART_ESTIMATION_EVENT: "smart-estimation-event",

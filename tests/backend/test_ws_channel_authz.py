@@ -350,3 +350,88 @@ def test_ws_server_fails_closed_when_server_settings_cannot_load(monkeypatch):
     monkeypatch.delenv("WORKPILOT_JWT_SECRET", raising=False)
     server_config.reset_settings_cache()
     assert websocket_server._server_mode_enabled() is True
+
+
+# --- the desktop app's live board ---------------------------------------------
+
+
+class _Request:
+    def __init__(self, headers: dict[str, str]):
+        self.headers = headers
+
+
+async def _connect_with_headers(server, path, headers):
+    ws = _FakeSocket(path)
+    ws.request = _Request(headers)
+    ctx = {"session_id": None}
+    server._extract_websocket_path = lambda _ws: path
+    await server._setup_client_connection(ws, ctx)
+    return ws, ctx
+
+
+@pytest.mark.asyncio
+async def test_the_app_authenticates_in_a_header_never_in_the_url():
+    from streaming.websocket_server import WS_CLOSE_FORBIDDEN, WS_CLOSE_UNAUTHORIZED
+
+    w = await _world()
+    server = _server()
+    token = _token(_user(w, "alice", "org_a"))
+    channel = f"project:{w['proj_a']}"
+
+    ws, ctx = await _connect_with_headers(
+        server,
+        f"/stream/{channel}",
+        {"Authorization": f"Bearer {token}", "X-WorkPilot-Org": w["org_a"]},
+    )
+    assert ws.closed is None and ctx["session_id"] == channel
+    assert ctx["org_hint"] == w["org_a"]
+
+    # A header token is checked like a URL one: another tenant's channel is refused.
+    ws, ctx = await _connect_with_headers(
+        server,
+        f"/stream/project:{w['proj_b']}",
+        {"Authorization": f"Bearer {token}"},
+    )
+    assert ws.closed is not None and ws.closed[0] == WS_CLOSE_FORBIDDEN
+
+    for headers in ({"Authorization": "Bearer nope"}, {"Authorization": token}, {}):
+        ws, ctx = await _connect_with_headers(server, f"/stream/{channel}", headers)
+        assert ws.closed is not None and ws.closed[0] == WS_CLOSE_UNAUTHORIZED
+
+
+@pytest.mark.asyncio
+async def test_board_card_events_reach_the_projects_members():
+    w = await _world()
+    server = _server()
+    published: list[str] = []
+
+    async def _spy(session_id, event, exclude=None):
+        published.append(event.event_type.value)
+
+    server._broadcast_to_subscribers = _spy
+    api = _token({"sub": "service:api", "role": "service"})
+    ws, ctx = await _connect(server, f"/stream/project:{w['proj_a']}?token={api}")
+    for kind in ("spec_created", "spec_updated", "spec_deleted", "spec_approved"):
+        event = {"type": "agent_event", "event": {"event_type": kind, "data": {}}}
+        await server._handle_message(ctx, ws, json.dumps(event))
+    assert published == [
+        "spec_created",
+        "spec_updated",
+        "spec_deleted",
+        "spec_approved",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_the_server_says_where_its_stream_is(monkeypatch):
+    from shared_board.api import board_stream
+
+    assert await board_stream() == {"url": None}
+    for value, expected in (
+        ("wss://live.example.com/ws/", "wss://live.example.com/ws"),
+        ("https://live.example.com", None),
+        ("javascript:alert(1)", None),
+    ):
+        monkeypatch.setenv("WORKPILOT_PUBLIC_STREAM_URL", value)
+        server_config.reset_settings_cache()
+        assert await board_stream() == {"url": expected}

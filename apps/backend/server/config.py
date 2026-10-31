@@ -38,6 +38,11 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
+def _stream_url(value: str) -> str:
+    value = value.strip().rstrip("/")
+    return value if value.startswith(("ws://", "wss://")) else ""
+
+
 @dataclass(frozen=True)
 class ServerSettings:
     """Immutable snapshot of the server-mode configuration."""
@@ -76,6 +81,11 @@ class ServerSettings:
     # https://workpilot.example.com). Falls back to empty -> the API
     # returns a relative-looking link the admin can complete manually.
     public_base_url: str
+
+    # Where the desktop app opens the board's live stream, when it is not
+    # the API's host on port 8765 (a reverse proxy, TLS). ws:// or wss://
+    # only; anything else is ignored.
+    public_stream_url: str
 
     # Self-service signup (invitation-only).
     invitation_ttl_hours: int
@@ -136,6 +146,9 @@ class ServerSettings:
             repos_root=repos_root,
             max_concurrent_runs=_env_int("WORKPILOT_MAX_CONCURRENT_RUNS", 3),
             public_base_url=os.environ.get("WORKPILOT_PUBLIC_BASE_URL", "").rstrip("/"),
+            public_stream_url=_stream_url(
+                os.environ.get("WORKPILOT_PUBLIC_STREAM_URL", "")
+            ),
             invitation_ttl_hours=_env_int("WORKPILOT_INVITATION_TTL_HOURS", 72),
             password_min_length=_env_int("WORKPILOT_PASSWORD_MIN_LENGTH", 12),
             password_hibp_check=_env_bool("WORKPILOT_PASSWORD_HIBP_CHECK", False),
