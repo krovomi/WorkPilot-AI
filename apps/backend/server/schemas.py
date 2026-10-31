@@ -337,7 +337,7 @@ class ClaimRequest(BaseModel):
 
 
 class StartRunRequest(BaseModel):
-    phase: str = "build"  # build / qa / merge
+    phase: str = "build"  # spec / build / qa / merge / pr
     model: str | None = None
 
 
