@@ -19,6 +19,8 @@ import { getAppLanguage } from "../../app-language";
 import { getToolPath } from "../../cli-tool-manager";
 import { killProcessGracefully } from "../../platform";
 import { parsePythonCommand } from "../../python-detector";
+import { findServerCard } from "../../server-board-actions";
+import { createServerCardPR } from "../../server-board-review";
 import {
 	getConfiguredPythonPath,
 	type PythonEnvManager,
@@ -56,6 +58,8 @@ export function registerWorktreeCreatePRHandlers(
 			taskId: string,
 			options?: WorktreeCreatePROptions,
 		): Promise<IPCResult<WorktreeCreatePRResult>> => {
+			const serverCard = findServerCard(taskId);
+			if (serverCard) return createServerCardPR(serverCard);
 			const isDebugMode =
 				process.env.DEBUG === "true" || process.env.NODE_ENV === "development";
 			const debug = (...args: unknown[]) => {

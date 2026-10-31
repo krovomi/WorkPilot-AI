@@ -56,6 +56,8 @@ ROUTE_OVERRIDES: dict[tuple[str, str], str] = {
     # their own permissions, not the board's plain write.
     ("DELETE", "/api/board/cards/{card_id}"): "task.delete",
     ("POST", "/api/board/cards/{card_id}/approve"): "review.approve",
+    # Sending a card's work back is the other answer to the same review.
+    ("POST", "/api/board/cards/{card_id}/request-changes"): "review.approve",
     # Audit trail is append-only and its exports carry personal data.
     ("GET", "/api/audit-trail/export/soc2"): "audit.export",
     ("GET", "/api/audit-trail/export/gdpr"): "audit.export",

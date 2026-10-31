@@ -63,6 +63,8 @@ du backend. Après chaque écriture, l'index du serveur est relu et un événeme
 | Modifier le titre ou la description | `PATCH /api/board/cards/{id}` | idem ; refusé (409) dès qu'une spec ou un espace de build existe |
 | Supprimer | `DELETE /api/board/cards/{id}` | `task.delete` ; refusé pendant un run, sur une carte réservée par un autre (sauf `owner`), ou tant que son espace de build existe |
 | Approuver la spec et le plan | `POST /api/board/cards/{id}/approve` | `review.approve` ; l'approbation porte l'empreinte de la spec et tombe si elle change |
+| Lire ce que le build a changé | `GET /api/board/cards/{id}/changes` | `task.read` ; fichiers, lignes et patch de la branche `workpilot/<carte>` contre la branche du projet, lus dans l'espace de build du clone |
+| Renvoyer le travail avec des demandes | `POST /api/board/cards/{id}/request-changes` | `review.approve`, rôle `member` ou plus ; refusé (409) sans espace de build ou pendant un run |
 | Lancer une phase | `POST /projects/{id}/specs/{spec}/runs` | `agent.execute` ; `merge` demande aussi `task.merge`, `pr` aussi `vcs.pr.create` |
 
 Une carte peut demander une revue avant le code (`require_review`, vrai par défaut, comme dans
@@ -105,6 +107,18 @@ pris pour une carte du serveur.
 | Supprimer (`TASK_DELETE`) | `DELETE /api/board/cards/{id}` |
 | Démarrer (`TASK_START`) | sans spec : phase `spec` ; avec : phase `build`, précédée, si la carte demande une revue, de l'approbation de la spec par la personne qui démarre (comme Démarrer sur un plan en revue dans l'app) |
 | Arrêter (`TASK_STOP`) | annule le run en file ou en cours de la carte |
+| Voir les changements (`TASK_WORKTREE_STATUS`, `TASK_WORKTREE_DIFF`, `TASK_FILE_DIFF`) | `GET /api/board/cards/{id}/changes`, repris champ par champ ; le chemin du serveur n'arrive jamais à l'app |
+| Fusionner (`TASK_WORKTREE_MERGE`) | phase `merge` ; l'aperçu (`…_MERGE_PREVIEW`) ne signale aucun conflit qu'il n'a pas vérifié, et « préparer sans commiter » n'est pas offert : le clone du serveur n'est à personne |
+| Créer la PR (`TASK_WORKTREE_CREATE_PR`) | phase `pr` ; le titre et le corps viennent de la spec, les retouches du dialogue ne sont pas envoyées |
+| Approuver (`TASK_REVIEW`, oui) | `POST /api/board/cards/{id}/approve` |
+| Demander des changements (`TASK_REVIEW`, non) | `POST /api/board/cards/{id}/request-changes`, puis phase `build` ; des images jointes sont refusées plutôt que perdues |
+
+Renvoyer le travail fait sur le serveur ce que l'app fait sur l'ordinateur
+(`shared_board/review.py`) : la demande va dans `QA_FIX_REQUEST.md` de l'espace de build, là où le
+build la lit, et le plan est rouvert (une sous-tâche tracée, les sous-tâches en échec reprises,
+la QA à refaire). Le texte de la personne est écrit dans un fichier, jamais passé en argument ; git
+tourne avec une liste d'arguments et une branche de base qui ne peut pas se lire comme une option.
+Abandonner l'espace de build (`TASK_WORKTREE_DISCARD`) reste refusé pour une carte du serveur.
 
 Chaque refus du serveur (droit manquant, carte déjà démarrée, réservée par un autre) revient tel
 quel à l'app. Un tableau du serveur affiché est relu toutes les cinq secondes
@@ -113,8 +127,6 @@ recharger ; une lecture qui échoue garde les cartes affichées.
 
 ## Ce qui vient
 
-Le plan multi-tenant du 31 octobre, par lots : la revue, la fusion et la pull request d'une carte
-du serveur depuis l'app, les événements en direct à la place de la relecture, le diff d'une carte
-côté serveur,
-les groupes d'utilisateurs, chaque feature de l'app servie par `project_id`, un test de bout en
+Le plan multi-tenant du 31 octobre, par lots : les événements en direct à la place de la
+relecture, les groupes d'utilisateurs, chaque feature de l'app servie par `project_id`, un test de bout en
 bout à deux organisations, et le guide d'exploitation. Ce fichier grandit avec chaque lot.
