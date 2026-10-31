@@ -140,9 +140,8 @@ def test_isolation_is_required_unless_turned_off():
     assert isolation_mode({ISOLATION_ENV: " OFF "}) == OFF
 
 
-def test_a_run_gets_its_project_home_and_own_temp(tmp_path, monkeypatch):
+def test_a_run_gets_its_project_home_and_own_temp(tmp_path):
     paths = _tree(tmp_path)
-    monkeypatch.setenv("HOME", str(paths["server_home"]))
     env = {"HOME": "/elsewhere", "TMPDIR": "/tmp", "XDG_CONFIG_HOME": "/x"}
     prefix = prepare_run(
         project_id="proj-a",
@@ -151,6 +150,7 @@ def test_a_run_gets_its_project_home_and_own_temp(tmp_path, monkeypatch):
         repos_root=paths["repos"],
         database_url="postgresql+asyncpg://db/w",
         env=env,
+        server_home=paths["server_home"],
     )
     assert env["HOME"] == str(project_home(paths["repos"], "proj-a"))
     assert env["TMPDIR"].startswith(str(paths["scratch"]))
@@ -246,9 +246,8 @@ attempt("home", lambda: open(os.environ["HOME"] + "/memory.md", "w").write("x"))
 
 
 @pytest.mark.skipif(not is_linux(), reason="Landlock is a Linux module")
-def test_a_confined_run_is_refused_the_other_tenant_for_real(tmp_path, monkeypatch):
+def test_a_confined_run_is_refused_the_other_tenant_for_real(tmp_path):
     paths = _tree(tmp_path)
-    monkeypatch.setenv("HOME", str(paths["server_home"]))
     env = dict(os.environ)
     prefix = prepare_run(
         project_id="proj-a",
@@ -257,6 +256,7 @@ def test_a_confined_run_is_refused_the_other_tenant_for_real(tmp_path, monkeypat
         repos_root=paths["repos"],
         database_url="postgresql+asyncpg://db/w",
         env=env,
+        server_home=paths["server_home"],
     )
     code_file = _BACKEND / "server" / "__init__.py"
     result = subprocess.run(

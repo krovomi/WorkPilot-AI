@@ -251,14 +251,16 @@ def prepare_run(
     repos_root: Path,
     database_url: str,
     env: dict[str, str],
+    server_home: Path | None = None,
 ) -> list[str]:
     """Set ``env`` for a confined run and return the argv prefix that starts it.
 
     The run's ``HOME`` is its project's home and its temporary directory is
     its own; git keeps the server's identity. Call with the run's command
-    appended to the returned prefix.
+    appended to the returned prefix. ``server_home`` is the server user's
+    home, the current user's by default.
     """
-    server_home = Path(os.path.expanduser("~"))
+    server_home = server_home if server_home is not None else Path.home()
     home = project_home(repos_root, project_id)
     home.mkdir(parents=True, exist_ok=True, mode=0o700)
     tmp = scratch / "tmp"
