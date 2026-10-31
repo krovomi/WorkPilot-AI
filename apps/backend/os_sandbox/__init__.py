@@ -32,7 +32,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
-from .launch import ISOLATED, UNAVAILABLE, SandboxStatus, probe, sandboxed
+from .launch import ISOLATED, UNAVAILABLE, SandboxStatus, install_hint, probe, sandboxed
 from .policy import SandboxPolicy, build_policy
 from .proxy import FilteringProxy
 
@@ -213,7 +213,8 @@ def claude_code_status() -> SessionSandbox:
             and not (find_executable("socat") or shutil.which("socat"))
         ):
             reason = (
-                "Claude Code's sandbox needs socat on Linux, which is not installed"
+                "Claude Code's sandbox needs socat on Linux, which is not installed: "
+                + install_hint("socat")
             )
     if reason is None:
         return delegated_status("Claude Code")
