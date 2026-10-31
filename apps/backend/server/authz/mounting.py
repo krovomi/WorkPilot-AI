@@ -67,6 +67,9 @@ ROUTE_OVERRIDES: dict[tuple[str, str], str] = {
     ("POST", "/api/features/ideation/jobs"): "agent.execute",
     ("POST", "/api/features/ideation/jobs/{job_id}/cancel"): "agent.cancel",
     ("POST", "/api/features/ideation/ideas/{idea_id}/convert"): "task.write",
+    # A question to Insights runs the insights agent on the clone.
+    ("POST", "/api/features/insights/sessions/{session_id}/messages"): "agent.execute",
+    ("POST", "/api/features/insights/jobs/{job_id}/cancel"): "agent.cancel",
     # Audit trail is append-only and its exports carry personal data.
     ("GET", "/api/audit-trail/export/soc2"): "audit.export",
     ("GET", "/api/audit-trail/export/gdpr"): "audit.export",

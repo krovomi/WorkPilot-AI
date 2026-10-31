@@ -16,6 +16,7 @@ import {
 	detectRateLimit,
 } from "../rate-limit-detector";
 import type { InsightsConfig } from "./config";
+import { chunkForLine } from "./output-lines";
 
 /**
  * Message processor result
@@ -155,25 +156,22 @@ export class InsightsExecutor extends EventEmitter {
 				allInsightsOutput = (allInsightsOutput + text).slice(-10000);
 
 				// Process output lines
-				const lines = text.split("\n");
-				for (const line of lines) {
-					if (line.startsWith("__TASK_SUGGESTION__:")) {
-						this.handleTaskSuggestion(projectId, line, (task) => {
-							suggestedTask = task;
+				for (const line of text.split("\n")) {
+					const chunk = chunkForLine(line);
+					if (!chunk) continue;
+					if (chunk.type === "task_suggestion") {
+						suggestedTask = chunk.suggestedTask;
+					} else if (chunk.type === "tool_start" && chunk.tool) {
+						// Accumulate tool usage for persistence
+						toolsUsed.push({
+							name: chunk.tool.name,
+							input: chunk.tool.input,
+							timestamp: new Date(),
 						});
-					} else if (line.startsWith("__TOOL_START__:")) {
-						this.handleToolStart(projectId, line, toolsUsed);
-					} else if (line.startsWith("__TOOL_END__:")) {
-						this.handleToolEnd(projectId, line);
-					} else if (line.startsWith("__EXPLANATION__:")) {
-						this.handleExplanation(projectId, line);
-					} else if (line.trim()) {
-						fullResponse += `${line}\n`;
-						this.emit("stream-chunk", projectId, {
-							type: "text",
-							content: `${line}\n`,
-						} as InsightsStreamChunk);
+					} else if (chunk.type === "text") {
+						fullResponse += chunk.content;
 					}
+					this.emit("stream-chunk", projectId, chunk);
 				}
 			});
 
@@ -254,91 +252,6 @@ export class InsightsExecutor extends EventEmitter {
 				reject(err);
 			});
 		});
-	}
-
-	/**
-	 * Handle task suggestion from output
-	 */
-	private handleTaskSuggestion(
-		projectId: string,
-		line: string,
-		onTaskFound: (task: InsightsChatMessage["suggestedTask"]) => void,
-	): void {
-		try {
-			const taskJson = line.substring("__TASK_SUGGESTION__:".length);
-			const suggestedTask = JSON.parse(taskJson);
-			onTaskFound(suggestedTask);
-			this.emit("stream-chunk", projectId, {
-				type: "task_suggestion",
-				suggestedTask,
-			} as InsightsStreamChunk);
-		} catch {
-			// Not valid JSON, treat as normal text (should not emit here as it's already handled)
-		}
-	}
-
-	/**
-	 * Handle tool start marker
-	 */
-	private handleToolStart(
-		projectId: string,
-		line: string,
-		toolsUsed: InsightsToolUsage[],
-	): void {
-		try {
-			const toolJson = line.substring("__TOOL_START__:".length);
-			const toolData = JSON.parse(toolJson);
-			// Accumulate tool usage for persistence
-			toolsUsed.push({
-				name: toolData.name,
-				input: toolData.input,
-				timestamp: new Date(),
-			});
-			this.emit("stream-chunk", projectId, {
-				type: "tool_start",
-				tool: {
-					name: toolData.name,
-					input: toolData.input,
-				},
-			} as InsightsStreamChunk);
-		} catch {
-			// Ignore parse errors for tool markers
-		}
-	}
-
-	/**
-	 * Handle tool end marker
-	 */
-	private handleToolEnd(projectId: string, line: string): void {
-		try {
-			const toolJson = line.substring("__TOOL_END__:".length);
-			const toolData = JSON.parse(toolJson);
-			this.emit("stream-chunk", projectId, {
-				type: "tool_end",
-				tool: {
-					name: toolData.name,
-				},
-			} as InsightsStreamChunk);
-		} catch {
-			// Ignore parse errors for tool markers
-		}
-	}
-
-	/**
-	 * Handle Learning Mode explanation marker
-	 */
-	private handleExplanation(projectId: string, line: string): void {
-		try {
-			const explanationJson = line.substring("__EXPLANATION__:".length);
-			const explanation = JSON.parse(explanationJson);
-			this.emit("stream-chunk", projectId, {
-				type: "explanation",
-				explanation,
-			} as InsightsStreamChunk);
-		} catch (err) {
-			console.error("[Insights] Failed to parse explanation:", err);
-			// Ignore parse errors for explanation markers
-		}
 	}
 
 	/**

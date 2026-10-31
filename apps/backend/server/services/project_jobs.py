@@ -10,7 +10,10 @@ the deployment's ceiling and the organization's quota, never interactive.
 What a job runs is decided here and by the feature's declaration
 (``shared_features``), never by the client: the runner is a file of
 ``runners/``, its first arguments name the clone, and the rest come from a
-closed list of options. One job at a time per feature of a project.
+closed list of options. One job at a time per feature of a project, or per
+slot when a feature runs several (Insights: one per conversation). A job's
+inputs (a conversation's history) are files of its own temporary folder,
+never of the clone; ``on_finish`` receives its whole output when it ends.
 
 The app follows a job by reading its output (``output``): the last lines are
 kept in memory, never written to disk or to the log, for as long as the job
@@ -25,6 +28,7 @@ import sys
 import tempfile
 import uuid
 from collections import OrderedDict, deque
+from collections.abc import Awaitable, Callable, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -49,6 +53,14 @@ LINE_CHARS = 2_000
 KEPT_JOBS = 50
 FINAL = frozenset({"succeeded", "failed", "cancelled"})
 INTERRUPTED = "Interrupted: the server stopped while the job ran"
+#: An argument ``f"{INPUT}{name}"`` becomes the path of input file ``name``.
+INPUT = "@job-input:"
+INPUT_NAME = re.compile(r"^[a-z][a-z0-9_.-]{0,60}$")
+#: The most of a job's output handed to ``on_finish``.
+COLLECTED_CHARS = 4_000_000
+
+#: Called when a job ends, with its status and everything it printed.
+OnFinish = Callable[[str, list[str]], Awaitable[None]]
 
 
 class _Output:
@@ -72,14 +84,14 @@ class ProjectJobs:
     """The project jobs of this server process."""
 
     def __init__(self) -> None:
-        self._running: dict[tuple[str, str], str] = {}  # (project, feature) -> job
+        self._running: dict[tuple[str, str], str] = {}  # (project, slot) -> job
         self._active: dict[str, asyncio.subprocess.Process] = {}
         self._cancelled: set[str] = set()
         self._output: OrderedDict[str, _Output] = OrderedDict()
 
-    def running_job(self, project_id: str, feature: str) -> str | None:
-        """The job queued or running for this feature of the project."""
-        return self._running.get((project_id, feature))
+    def running_job(self, project_id: str, slot: str) -> str | None:
+        """The job queued or running for this feature (or slot) of the project."""
+        return self._running.get((project_id, slot))
 
     def is_tracked(self, job_id: str) -> bool:
         """Whether this process is running (or about to run) the job."""
@@ -121,14 +133,20 @@ class ProjectJobs:
         runner: str,
         args: list[str],
         user_id: str,
+        slot: str | None = None,
+        project_flag: str = "--project",
+        inputs: Mapping[str, str] | None = None,
+        on_finish: OnFinish | None = None,
     ) -> ProjectJob:
         """Queue a job and return its row (status ``queued``)."""
         if not FEATURE_KEY.match(feature) or not RUNNER_NAME.match(runner):
             raise RunManagerError("Unknown feature")
+        if not all(INPUT_NAME.match(name) for name in inputs or {}):
+            raise RunManagerError("Unknown input")
         runner_path = BACKEND_DIR / "runners" / runner
         if not runner_path.is_file():
             raise RunManagerError(f"This server has no {runner}")
-        key = (project_id, feature)
+        key = (project_id, slot or feature)
         await self.settle_orphans(project_id)
         if org_id:
             from server.services.quotas import enforce_run_quota
@@ -160,9 +178,18 @@ class ProjectJobs:
             if not recorded:
                 self._running.pop(key, None)
         self._keep(job.id)
-        cmd = [sys.executable, str(runner_path), "--project", server_path, *args]
+        cmd = [sys.executable, str(runner_path), project_flag, server_path, *args]
         asyncio.get_running_loop().create_task(
-            self._execute(job.id, key, server_path, cmd, user_id)
+            self._execute(
+                job.id,
+                (project_id, feature),
+                key,
+                server_path,
+                cmd,
+                user_id,
+                dict(inputs or {}),
+                on_finish,
+            )
         )
         return job
 
@@ -188,13 +215,19 @@ class ProjectJobs:
     async def _execute(
         self,
         job_id: str,
+        what: tuple[str, str],
         key: tuple[str, str],
         server_path: str,
         cmd: list[str],
         user_id: str,
+        inputs: dict[str, str],
+        on_finish: OnFinish | None,
     ) -> None:
-        project_id, feature = key
+        project_id, feature = what
         out = self._output.get(job_id) or _Output()
+        collected: list[str] = []
+        collected_chars = 0
+        errors: deque[str] = deque(maxlen=20)
         # What is recorded if the manager itself fails on the way (the
         # exception still reaches the event loop's handler).
         status = "failed"
@@ -209,21 +242,55 @@ class ProjectJobs:
                 _notify(project_id, feature, job_id, "running", user_id)
                 with tempfile.TemporaryDirectory(prefix="workpilot-job-") as scratch:
                     env = await manager.run_env(user_id, job_id)
-                    argv = confine(cmd, project_id, server_path, Path(scratch), env)
+                    for name, content in inputs.items():
+                        Path(scratch, name).write_text(content, encoding="utf-8")
+                    resolved = [
+                        str(Path(scratch, arg.removeprefix(INPUT)))
+                        if arg.startswith(INPUT)
+                        else arg
+                        for arg in cmd
+                    ]
+                    argv = confine(
+                        resolved, project_id, server_path, Path(scratch), env
+                    )
+                    # A job that hands its output to ``on_finish`` keeps its
+                    # stderr (logs, tracebacks) out of it: only the reason
+                    # when it fails.
                     proc = await asyncio.create_subprocess_exec(
                         *argv,
                         cwd=str(BACKEND_DIR),
                         env=env,
                         stdin=asyncio.subprocess.DEVNULL,
                         stdout=asyncio.subprocess.PIPE,
-                        stderr=asyncio.subprocess.STDOUT,
+                        stderr=(
+                            asyncio.subprocess.PIPE
+                            if on_finish
+                            else asyncio.subprocess.STDOUT
+                        ),
                     )
                     self._active[job_id] = proc
-                    if proc.stdout is not None:
+
+                    async def read_stdout() -> None:
+                        nonlocal collected_chars
+                        if proc.stdout is None:
+                            return
                         async for raw in proc.stdout:
                             line = raw.decode("utf-8", errors="replace").rstrip()
                             if line:
                                 out.add(line)
+                            if on_finish and collected_chars < COLLECTED_CHARS:
+                                collected.append(line)
+                                collected_chars += len(line) + 1
+
+                    async def read_stderr() -> None:
+                        if proc.stderr is None:
+                            return
+                        async for raw in proc.stderr:
+                            line = raw.decode("utf-8", errors="replace").rstrip()
+                            if line:
+                                errors.append(line[:LINE_CHARS])
+
+                    await asyncio.gather(read_stdout(), read_stderr())
                     await proc.wait()
                 if job_id in self._cancelled:
                     status, error = "cancelled", None
@@ -232,15 +299,20 @@ class ProjectJobs:
                 else:
                     # The tail of what it printed: the app shows it as the
                     # reason, as it shows a local runner's last lines.
-                    error = "\n".join(list(out.lines)[-20:])[-2_000:] or (
+                    tail = list(errors) or list(out.lines)[-20:]
+                    error = "\n".join(tail)[-2_000:] or (
                         f"The runner exited with code {proc.returncode}"
                     )
         finally:
             self._active.pop(job_id, None)
-            self._running.pop(key, None)
             self._cancelled.discard(job_id)
-            await _set_status(job_id, status, error)
-            _notify(project_id, feature, job_id, status, user_id)
+            try:
+                if on_finish is not None:
+                    await on_finish(status, collected)
+            finally:
+                self._running.pop(key, None)
+                await _set_status(job_id, status, error)
+                _notify(project_id, feature, job_id, status, user_id)
 
 
 async def _set_status(job_id: str, status: str, error: str | None = None) -> None:

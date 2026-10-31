@@ -463,6 +463,37 @@ class ProjectJob(Base):
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
+class InsightSession(Base):
+    """One person's Insights conversation on a server project.
+
+    Its owner writes it (sends a message, renames it, deletes it); every
+    member of the project reads it. Each answer is a project job running the
+    insights runner on the clone (``shared_features/insights.py``).
+    """
+
+    __tablename__ = "insight_sessions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    project_id: Mapped[str] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), index=True
+    )
+    owner_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    title: Mapped[str] = mapped_column(String(200), default="")
+    #: The messages, a JSON list; the model and effort, a JSON object.
+    messages: Mapped[str] = mapped_column(Text, default="[]")
+    model_settings: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: The job answering its last message, while it runs and after.
+    job_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+
+
 class UserSecret(Base):
     """Per-user integration secret (Azure PAT, Jira token...), Fernet-encrypted."""
 

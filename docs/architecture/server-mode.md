@@ -259,12 +259,32 @@ carte du serveur), puis l'élément est lié à la carte dans son fichier : la f
 dans `roadmap.json`, l'idée est archivée dans `ideation.json`. Le texte et les métadonnées d'une
 carte née d'une idée sont ceux qu'écrit l'app (`ideation/task-converter.ts`).
 
-Insights n'est pas encore partagé : c'est une conversation, pas un fichier qu'un runner écrit, et
-il demande ses propres sessions, une par personne, lisibles par les autres membres.
+**Insights est une conversation, pas un fichier** (`shared_features/insights.py`, table
+`insight_sessions`, Alembic `0006`). Chaque conversation a un auteur : lui seul y pose ses
+questions, la renomme ou la vide ; le propriétaire du projet peut aussi la supprimer ; tous les
+membres du projet les lisent toutes, et la vue montre celle d'un collègue en lecture seule, son nom
+dans l'historique. Une question est un job du runner `insights_runner.py` sur le clone, un seul à
+la fois par conversation (deux conversations répondent en parallèle) ; c'est le serveur qui
+construit l'historique que le runner relit, depuis la conversation enregistrée, jamais le client,
+et il le passe dans un fichier du dossier temporaire du job, pas du clone. La question part en un
+seul argument (`--message=…`) : une question qui commence par un tiret reste une question. La
+sortie d'erreur du runner (ses journaux) n'entre pas dans la réponse ; la réponse est enregistrée
+à la fin du job, passée par `redact_text` comme la sortie suivie. Côté app, `insights/server-insights.ts`
+suit le job comme le runner local (`insights/output-lines.ts` lit les marqueurs des deux), puis
+relit la conversation enregistrée ; une tâche suggérée devient une carte du tableau partagé.
+
+| Action | Route | Il faut |
+|---|---|---|
+| Lister, lire les conversations | `GET /api/features/insights/sessions[/{id}]` | `insight.read` |
+| Créer, renommer, vider, supprimer | `POST`, `PATCH`, `DELETE .../sessions[/{id}]` | `insight.write`, rôle `member` ou plus, auteur (ou propriétaire du projet pour supprimer) |
+| Poser une question | `POST .../sessions/{id}/messages` | `agent.execute`, auteur |
+| Suivre, arrêter la réponse | `GET .../jobs/{id}`, `POST .../jobs/{id}/cancel` | `insight.read` ; `agent.cancel`, qui l'a posée ou le propriétaire |
+
+Le mode Apprentissage n'est pas encore transmis aux conversations du serveur.
 
 ## Ce qui vient
 
 Le plan multi-tenant du 31 octobre, par lots : les autres features servies de la même façon
-(insights, contexte, forges, analyses, tableau de bord), le flux du projet ouvert pour
+(contexte, forges, analyses, tableau de bord), le flux du projet ouvert pour
 chaque vue partagée, un test de bout en bout à deux organisations, et le guide d'exploitation. Ce
 fichier grandit avec chaque lot.

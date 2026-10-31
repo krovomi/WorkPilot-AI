@@ -254,6 +254,8 @@ export function Insights({ projectId }: InsightsProps) {
 
 	const isLoading = status.phase === "thinking" || status.phase === "streaming";
 	const messages = session?.messages || [];
+	// Server mode: a teammate's conversation is read, not written.
+	const readOnly = session?.readOnly === true;
 
 	return (
 		<div className="flex h-full">
@@ -449,13 +451,17 @@ export function Insights({ projectId }: InsightsProps) {
 							value={inputValue}
 							onChange={(e) => setInputValue(e.target.value)}
 							onKeyDown={handleKeyDown}
-							placeholder={t("insights:input.placeholder")}
+							placeholder={
+								readOnly
+									? t("insights:input.readOnly", { name: session?.ownerName ?? "?" })
+									: t("insights:input.placeholder")
+							}
 							className="min-h-[80px] resize-none"
-							disabled={isLoading}
+							disabled={isLoading || readOnly}
 						/>
 						<Button
 							onClick={handleSend}
-							disabled={!inputValue.trim() || isLoading}
+							disabled={!inputValue.trim() || isLoading || readOnly}
 							className="self-end"
 						>
 							{isLoading ? (
