@@ -153,7 +153,14 @@ def _mint_ws_token(run_id: str, hours: int = 12) -> str:
     )
 
 
-_warned_unconfined = False
+#: Each operator warning is logged once per process, not once per run.
+_WARNED: set[str] = set()
+
+
+def _warn_once(key: str, message: str) -> None:
+    if key not in _WARNED:
+        _WARNED.add(key)
+        logger.warning(message)
 
 
 def _confine(
@@ -161,20 +168,18 @@ def _confine(
 ) -> list[str]:
     """The run's argv, started confined to its own project unless the
     operator turned isolation off (``server.services.run_isolation``)."""
-    global _warned_unconfined
     if isolation_mode() == OFF:
-        if not _warned_unconfined:
-            logger.warning(
-                "WORKPILOT_RUN_ISOLATION=off: runs can read every project on this server"
-            )
-            _warned_unconfined = True
-        return cmd
-    if not _warned_unconfined and getattr(os, "geteuid", lambda: -1)() == 0:
-        logger.warning(
-            "The server runs as root: CAP_SYS_PTRACE lets a run read other "
-            "processes' environment despite its isolation; run it unprivileged"
+        _warn_once(
+            "off",
+            "WORKPILOT_RUN_ISOLATION=off: runs can read every project on this server",
         )
-        _warned_unconfined = True
+        return cmd
+    if getattr(os, "geteuid", lambda: -1)() == 0:
+        _warn_once(
+            "root",
+            "The server runs as root: CAP_SYS_PTRACE lets a run read other "
+            "processes' environment despite its isolation; run it unprivileged",
+        )
     settings = get_settings()
     prefix = prepare_run(
         project_id=project_id,
