@@ -385,7 +385,7 @@
 			"qaIterations_other": "{{count}} QA passes expected."
 		},
 		"serverBoard": "Shared board · {{role}}",
-		"serverBoardHint": "This project lives on the WorkPilot server: everyone on it sees the same cards. Changing cards from the app comes in a next version.",
+		"serverBoardHint": "This project lives on the WorkPilot server: everyone on it sees the same cards, and its builds run there. The board refreshes every few seconds.",
 		"serverRole": {
 			"viewer": "Viewer",
 			"member": "Member",

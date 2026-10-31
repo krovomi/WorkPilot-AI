@@ -89,10 +89,13 @@ def build_command(
             server_path,
             "--spec-dir",
             str(spec_dir),
-            "--no-build",
         ]
+        # As in the app: a card that asks for no review goes on to its build
+        # once its spec is written; one that does waits for a member's approval.
         if metadata.get("requireReviewBeforeCoding", True) is False:
             cmd.append("--auto-approve")
+        else:
+            cmd.append("--no-build")
     else:
         cmd = [
             sys.executable,

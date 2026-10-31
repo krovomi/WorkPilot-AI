@@ -385,7 +385,7 @@
 			"qaIterations_other": "{{count}} passes QA attendues."
 		},
 		"serverBoard": "Tableau partagé · {{role}}",
-		"serverBoardHint": "Ce projet vit sur le serveur WorkPilot : tous ses membres voient les mêmes cartes. Modifier les cartes depuis l'app arrive dans une prochaine version.",
+		"serverBoardHint": "Ce projet vit sur le serveur WorkPilot : tous ses membres voient les mêmes cartes, et ses builds tournent là-bas. Le tableau se met à jour toutes les quelques secondes.",
 		"serverRole": {
 			"viewer": "Lecteur",
 			"member": "Membre",
