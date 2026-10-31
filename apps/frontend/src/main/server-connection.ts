@@ -216,9 +216,10 @@ export async function getServerAuthConfig(
 
 /**
  * Authenticated request against the current server, attaching the access
- * token. Used by admin-only invitation management.
+ * token and the organization it acts in. An expired access token is refreshed
+ * once, shared with any concurrent caller, and the request sent again.
  */
-async function authedFetch<T>(
+export async function authedFetch<T>(
 	pathName: string,
 	method: string,
 	body?: unknown,
@@ -226,20 +227,23 @@ async function authedFetch<T>(
 	if (!serverUrl) return { ok: false, error: "No server URL configured" };
 	if (!accessToken) return { ok: false, error: "Not authenticated" };
 	try {
-		const headers: Record<string, string> = {
-			"Content-Type": "application/json",
-			Authorization: `Bearer ${accessToken}`,
+		const send = () => {
+			const headers: Record<string, string> = {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${accessToken}`,
+			};
+			// Which tenant this request acts in. The server verifies membership
+			// against the database every time, so this only *selects* among the
+			// organizations the caller already belongs to; it never grants access.
+			if (activeOrgId) headers["X-WorkPilot-Org"] = activeOrgId;
+			return fetch(`${serverUrl}${pathName}`, {
+				method,
+				headers,
+				body: body === undefined ? undefined : JSON.stringify(body),
+			});
 		};
-		// Which tenant this request acts in. The server verifies membership
-		// against the database every time, so this only *selects* among the
-		// organizations the caller already belongs to — it never grants access.
-		if (activeOrgId) headers["X-WorkPilot-Org"] = activeOrgId;
-
-		const res = await fetch(`${serverUrl}${pathName}`, {
-			method,
-			headers,
-			body: body === undefined ? undefined : JSON.stringify(body),
-		});
+		let res = await send();
+		if (res.status === 401 && (await refreshShared())) res = await send();
 		const text = await res.text();
 		if (!res.ok) {
 			try {
@@ -418,8 +422,15 @@ export async function logout(): Promise<void> {
 export async function restoreSession(): Promise<boolean> {
 	if (accessToken) return true; // already restored this run
 	if (!isServerMode() || !refreshToken) return false;
-	// Share a single in-flight refresh so a concurrent main + renderer restore
-	// does not rotate the refresh token twice (the second call would fail).
+	return refreshShared();
+}
+
+/**
+ * One refresh at a time: a concurrent main + renderer restore, or several
+ * requests meeting an expired token together, must not rotate the refresh
+ * token twice (the second call would fail and sign the user out).
+ */
+function refreshShared(): Promise<boolean> {
 	if (restoreInFlight) return restoreInFlight;
 	restoreInFlight = refreshSession().finally(() => {
 		restoreInFlight = null;

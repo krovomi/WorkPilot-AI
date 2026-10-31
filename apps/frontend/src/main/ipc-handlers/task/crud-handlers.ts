@@ -27,6 +27,8 @@ import type { AgentManager } from "../../agent";
 import { getAppLanguage } from "../../app-language";
 import { readProjectEnv } from "../../project-env-file";
 import { projectStore } from "../../project-store";
+import { getRemoteTasks } from "../../remote-board";
+import { getServerProject } from "../../server-projects";
 import { specInterviewService } from "../../spec-interview-service";
 import { taskStateManager } from "../../task-state-manager";
 import { titleGenerator } from "../../title-generator";
@@ -85,6 +87,10 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 					"[IPC] TASK_LIST cache and task state cleared for forceRefresh",
 				);
 			}
+
+			// A server project's cards come from the server, every time.
+			const serverProject = getServerProject(projectId);
+			if (serverProject) return getRemoteTasks(serverProject);
 
 			const tasks = projectStore.getTasks(projectId);
 			console.warn("[IPC] TASK_LIST returning", tasks.length, "tasks");

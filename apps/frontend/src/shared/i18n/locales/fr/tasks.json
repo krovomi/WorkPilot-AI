@@ -383,6 +383,13 @@
 			"confidence": "Confiance : {{percent}} %",
 			"qaIterations_one": "1 passe QA attendue.",
 			"qaIterations_other": "{{count}} passes QA attendues."
+		},
+		"serverBoard": "Tableau partagé · {{role}}",
+		"serverBoardHint": "Ce projet vit sur le serveur WorkPilot : tous ses membres voient les mêmes cartes. Modifier les cartes depuis l'app arrive dans une prochaine version.",
+		"serverRole": {
+			"viewer": "Lecteur",
+			"member": "Membre",
+			"owner": "Propriétaire"
 		}
 	},
 	"queue": {

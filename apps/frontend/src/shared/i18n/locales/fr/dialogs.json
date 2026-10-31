@@ -328,5 +328,18 @@
 			"high": "Élevé",
 			"ultrathink": "Ultra Think"
 		}
+	},
+	"serverProject": {
+		"title": "Ajouter un projet pour l'équipe",
+		"description": "Le serveur WorkPilot clone le dépôt, et tous les membres du projet partagent son tableau.",
+		"repoUrl": "URL du dépôt",
+		"repoUrlHelp": "Le serveur doit pouvoir le cloner (une URL publique, ou une que ses identifiants atteignent).",
+		"name": "Nom du projet",
+		"namePlaceholder": "Mon projet",
+		"branch": "Branche principale",
+		"create": "Ajouter au serveur",
+		"creating": "Clonage sur le serveur…",
+		"failed": "Le serveur n'a pas pu ajouter le projet",
+		"useLocalFolder": "Utiliser plutôt un dossier de cet ordinateur"
 	}
 }

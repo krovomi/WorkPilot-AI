@@ -7,6 +7,7 @@
  */
 import { create } from "zustand";
 import { usePermissionsStore } from "./permissions-store";
+import { refreshProjects } from "./project-store";
 
 export interface ServerUser {
 	id: string;
@@ -65,6 +66,10 @@ type AuthStatePayload = {
 };
 
 export const useServerSessionStore = create<ServerSessionState>((set, get) => {
+	// Whose server projects the project list holds: when the session changes,
+	// the list is read again so it shows this user's projects and no one else's.
+	let projectsSession: string | null = null;
+
 	const applyState = (state: AuthStatePayload) => {
 		set({
 			mode: state.mode,
@@ -82,6 +87,15 @@ export const useServerSessionStore = create<ServerSessionState>((set, get) => {
 			void permissions.load();
 		} else {
 			permissions.reset();
+		}
+		const session =
+			state.mode === "server" && state.isAuthenticated
+				? `${state.serverUrl}|${state.user?.id ?? ""}`
+				: null;
+		if (session !== projectsSession) {
+			const first = projectsSession === null && session === null;
+			projectsSession = session;
+			if (!first) void refreshProjects();
 		}
 	};
 

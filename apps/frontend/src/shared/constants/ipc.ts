@@ -1265,6 +1265,9 @@ export const IPC_CHANNELS = {
 	SERVER_AUTH_REVOKE_INVITE: "server-auth:revoke-invite",
 	SERVER_AUTH_SET_MODE: "server-auth:set-mode",
 	SERVER_AUTH_STATE_CHANGED: "server-auth:state-changed",
+	// Server mode: register or delete a project on the server, for the team
+	SERVER_PROJECT_CREATE: "server-project:create",
+	SERVER_PROJECT_DELETE: "server-project:delete",
 	SMART_ESTIMATION_COMPLETE: "smart-estimation-complete",
 	SMART_ESTIMATION_ERROR: "smart-estimation-error",
 	SMART_ESTIMATION_EVENT: "smart-estimation-event",

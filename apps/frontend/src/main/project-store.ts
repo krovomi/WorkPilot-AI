@@ -427,6 +427,15 @@ export class ProjectStore {
 	}
 
 	/**
+	 * Tasks of a project that is not in this store: a server project's board,
+	 * mirrored on disk (`remote-board.ts`). Read the way a local project's are,
+	 * never cached, never registered, so no local handler finds it.
+	 */
+	getMirrorTasks(project: Project): Task[] {
+		return this.deduplicateTasks(this.loadAllTasks(project));
+	}
+
+	/**
 	 * Get cached tasks if valid
 	 * @param projectId - Project ID
 	 * @returns Cached tasks or null if expired/not found
