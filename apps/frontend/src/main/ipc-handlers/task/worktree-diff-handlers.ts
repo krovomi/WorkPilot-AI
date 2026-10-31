@@ -13,6 +13,8 @@ import type {
 	WorktreeDiffFile,
 } from "../../../shared/types";
 import { getToolPath } from "../../cli-tool-manager";
+import { findServerCard } from "../../server-board-actions";
+import { serverFileDiff, serverWorktreeDiff } from "../../server-board-review";
 import { findTaskWorktree } from "../../worktree-paths";
 import { findTaskAndProject } from "./shared";
 import {
@@ -28,6 +30,8 @@ export function registerWorktreeDiffHandlers(): void {
 	ipcMain.handle(
 		IPC_CHANNELS.TASK_WORKTREE_DIFF,
 		async (_, taskId: string): Promise<IPCResult<WorktreeDiff>> => {
+			const serverCard = findServerCard(taskId);
+			if (serverCard) return serverWorktreeDiff(serverCard);
 			try {
 				const { task, project } = findTaskAndProject(taskId);
 				if (!task || !project) {
@@ -240,6 +244,8 @@ export function registerWorktreeDiffHandlers(): void {
 			taskId: string,
 			filePath: string,
 		): Promise<IPCResult<WorktreeDiffFile>> => {
+			const serverCard = findServerCard(taskId);
+			if (serverCard) return serverFileDiff(serverCard, filePath);
 			try {
 				const { task, project } = findTaskAndProject(taskId);
 				if (!task || !project) {

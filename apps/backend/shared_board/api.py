@@ -355,3 +355,8 @@ async def approve_card(
         scope.project_id, "spec_approved", {"spec": card_id, "by": principal.id}
     )
     return {"approved": True, "approvedBy": review.approved_by}
+
+
+# Reviewing a card's work from the app (its changes, a request for changes):
+# its own module, on this router. Imported last, once the helpers it uses exist.
+import shared_board.review  # noqa: E402, F401

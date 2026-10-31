@@ -120,7 +120,11 @@ async function indexId(card: ServerCard): Promise<IPCResult<string>> {
 	return typeof id === "string" ? { success: true, data: id } : { success: false, error: "Card not found" };
 }
 
-async function startRun(card: ServerCard, phase: "spec" | "build"): Promise<IPCResult> {
+/** Start one of the card's run phases on the server, which checks its permission. */
+export async function startRun(
+	card: ServerCard,
+	phase: "spec" | "build" | "merge" | "pr",
+): Promise<IPCResult> {
 	const id = await indexId(card);
 	if (!id.success || !id.data) return { success: false, error: id.error };
 	const result = await authedFetch(
