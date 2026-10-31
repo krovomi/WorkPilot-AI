@@ -24,6 +24,12 @@ interface ServerSessionState {
 	configured: boolean;
 	isLoginScreenOpen: boolean;
 	initialized: boolean;
+	/**
+	 * True once the persisted session has been read and the connection gate
+	 * decided (shown or not). Until then nothing else may open over the gate:
+	 * the first-run wizard would cover the local/server choice.
+	 */
+	sessionResolved: boolean;
 
 	initialize: () => Promise<void>;
 	openLoginScreen: () => void;
@@ -87,6 +93,7 @@ export const useServerSessionStore = create<ServerSessionState>((set, get) => {
 		configured: false,
 		isLoginScreenOpen: false,
 		initialized: false,
+		sessionResolved: false,
 
 		initialize: async () => {
 			if (get().initialized) return;
@@ -108,6 +115,8 @@ export const useServerSessionStore = create<ServerSessionState>((set, get) => {
 				}
 			} catch (err) {
 				console.error("[server-session] init failed:", err);
+			} finally {
+				set({ sessionResolved: true });
 			}
 		},
 

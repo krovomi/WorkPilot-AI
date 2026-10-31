@@ -404,6 +404,7 @@ import { ActivityCentre } from "./components/ActivityCentre";
 import { NavigationConfirmDialog } from "./components/NavigationConfirmDialog";
 import { NoProjectPage } from "./components/NoProjectPage";
 import { OnboardingWizard } from "./components/onboarding";
+import { shouldOpenOnboardingWizard } from "./components/onboarding/first-run";
 import { ProjectTabBar } from "./components/ProjectTabBar";
 import { ProviderContextProvider } from "./components/ProviderContext";
 import { PageLlmSelector } from "./components/PageLlmSelector";
@@ -515,6 +516,9 @@ export function App() {
 	);
 	const isLoginScreenOpen = useServerSessionStore(
 		(state) => state.isLoginScreenOpen,
+	);
+	const serverSessionResolved = useServerSessionStore(
+		(state) => state.sessionResolved,
 	);
 	useEffect(() => {
 		void initServerSession();
@@ -991,25 +995,21 @@ export function App() {
 		}
 	}, [settingsLoading, settingsHaveLoaded]);
 
-	// First-run detection - show onboarding wizard if not completed
-	// Only check AFTER settings have been loaded from disk to avoid race condition
+	// First-run detection: see shouldOpenOnboardingWizard for when it opens.
 	useEffect(() => {
-		// Check if either auth method is configured
-		// API profiles: if profiles exist, auth is configured (user has gone through setup)
-		const hasAPIProfileConfigured = profiles.length > 0;
-		const hasOAuthConfigured = claudeProfiles.some((p) => p.oauthToken);
-		const hasAnyAuth = hasAPIProfileConfigured || hasOAuthConfigured;
-
-		// Only show wizard if onboarding not completed AND no auth is configured
-		if (
-			settingsHaveLoaded &&
-			settings.onboardingCompleted === false &&
-			!hasAnyAuth
-		) {
-			setIsOnboardingWizardOpen(true);
-		}
+		const open = shouldOpenOnboardingWizard({
+			settingsHaveLoaded,
+			serverSessionResolved,
+			showServerLogin,
+			onboardingCompleted: settings.onboardingCompleted,
+			apiProfileCount: profiles.length,
+			claudeProfiles,
+		});
+		if (open) setIsOnboardingWizardOpen(true);
 	}, [
 		settingsHaveLoaded,
+		serverSessionResolved,
+		showServerLogin,
 		settings.onboardingCompleted,
 		profiles,
 		claudeProfiles,
