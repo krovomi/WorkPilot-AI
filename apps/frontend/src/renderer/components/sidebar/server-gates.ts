@@ -14,6 +14,7 @@ import type { SidebarView } from "../Sidebar";
 export const SERVER_PROJECT_VIEWS: ReadonlySet<SidebarView> = new Set<SidebarView>([
 	"kanban",
 	"roadmap",
+	"ideation",
 	"administration",
 ]);
 

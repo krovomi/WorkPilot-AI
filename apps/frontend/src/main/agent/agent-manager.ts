@@ -754,6 +754,11 @@ export class AgentManager extends EventEmitter {
 		void this.queueManager.followServerRoadmap(project, { jobId });
 	}
 
+	/** Follow a teammate's ideation job on the server (server mode). */
+	followServerIdeation(project: Project, jobId: string): void {
+		void this.queueManager.followServerIdeation(project, { jobId });
+	}
+
 	/**
 	 * Kill all running processes
 	 */

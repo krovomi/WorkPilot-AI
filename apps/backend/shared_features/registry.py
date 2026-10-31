@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -86,4 +86,57 @@ ROADMAP = Feature(
     args=_roadmap_args,
 )
 
-FEATURES: dict[str, Feature] = {f.key: f for f in (ROADMAP,)}
+#: The ideation runner's types (``ideation.generator.IDEATION_TYPES``,
+#: checked equal by the tests): a job runs a subset of them.
+IdeationType = Literal[
+    "code_improvements",
+    "ui_ux_improvements",
+    "documentation_gaps",
+    "security_hardening",
+    "performance_optimizations",
+    "code_quality",
+]
+IDEATION_TYPES: tuple[str, ...] = get_args(IdeationType)
+
+
+class IdeationOptions(JobOptions):
+    types: list[IdeationType] = Field(default_factory=list, max_length=6)
+    include_roadmap_context: bool = True
+    include_kanban_context: bool = True
+    max_ideas_per_type: int | None = Field(default=None, ge=1, le=50)
+    refresh: bool = False
+    append: bool = False
+
+
+def _ideation_args(options: IdeationOptions) -> list[str]:
+    args = options.common_args()
+    if options.types:
+        args += ["--types", ",".join(dict.fromkeys(options.types))]
+    if not options.include_roadmap_context:
+        args.append("--no-roadmap")
+    if not options.include_kanban_context:
+        args.append("--no-kanban")
+    if options.max_ideas_per_type:
+        args += ["--max-ideas", str(options.max_ideas_per_type)]
+    if options.refresh:
+        args.append("--refresh")
+    if options.append:
+        args.append("--append")
+    return args
+
+
+IDEATION = Feature(
+    key="ideation",
+    directory=".workpilot/ideation",
+    files={
+        "ideation.json": 2_000_000,
+        # Written type by type while a job runs; the app reads each as it lands.
+        **{f"{kind}_ideas.json": 1_000_000 for kind in IDEATION_TYPES},
+    },
+    writable=frozenset({"ideation.json"}),
+    runner="ideation_runner.py",
+    options=IdeationOptions,
+    args=_ideation_args,
+)
+
+FEATURES: dict[str, Feature] = {f.key: f for f in (ROADMAP, IDEATION)}
