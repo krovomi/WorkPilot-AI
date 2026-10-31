@@ -14,7 +14,8 @@ Two layers, both provider-agnostic since they act on git, not on the agent:
   repository's ``info/exclude``. Git reads that file on every ``git add``, so
   whatever agent runs the commit, the outputs stay untracked. The file is
   local to the clone (never committed) and shared by the worktrees and the
-  main checkout. A pattern is left out when the project already versions a
+  main checkout. ``bin/`` and ``obj/`` are excluded in every project, at any
+  depth; any other pattern is left out when the project already versions a
   file it would match: a project that commits its ``dist/`` keeps doing so.
 * :func:`strip_committed_artifacts` is the safety net for what was committed
   before the excludes existed (or with ``git add -f``): files the branch
@@ -39,8 +40,14 @@ logger = logging.getLogger(__name__)
 BLOCK_BEGIN = "# >>> workpilot: build and test outputs (managed block) >>>"
 BLOCK_END = "# <<< workpilot: build and test outputs <<<"
 
+# Excluded in every project, at any depth, even when the base branch already
+# versions files under them: MSBuild writes bin/ and obj/ next to each
+# project, and they must never show up in a task's changes (Leub, 31 Oct).
+ALWAYS_EXCLUDED: tuple[str, ...] = ("[Bb]in/", "[Oo]bj/")
+
 # Output directories and files that are never source, whatever the stack.
 COMMON_PATTERNS: tuple[str, ...] = (
+    *ALWAYS_EXCLUDED,
     "node_modules/",
     "__pycache__/",
     "*.py[cod]",
@@ -63,19 +70,15 @@ COMMON_PATTERNS: tuple[str, ...] = (
     ".parcel-cache/",
 )
 
-# Output directories whose name is a source directory elsewhere (``bin/``
-# holds scripts in a Node or shell project, ``build/`` and ``dist/`` are
-# sometimes committed), so they are excluded only when a file of the stack
-# that produces them is present. Marker globs match a file name.
+# Output directories whose name is a source directory elsewhere (``build/``
+# and ``dist/`` are sometimes committed), so they are excluded only when a
+# file of the stack that produces them is present. Marker globs match a file
+# name.
 STACK_PATTERNS: tuple[tuple[tuple[str, ...], tuple[str, ...]], ...] = (
     # .NET: MSBuild writes bin/<Configuration>/ and obj/ next to each project.
     (
         ("*.csproj", "*.fsproj", "*.vbproj", "*.sln", "*.slnx"),
         (
-            "[Bb]in/",
-            "**/[Bb]in/[Dd]ebug/",
-            "**/[Bb]in/[Rr]elease/",
-            "[Oo]bj/",
             ".vs/",
             "*.user",
             "*.suo",
@@ -187,7 +190,7 @@ def ensure_artifact_excludes(
     files = _lines(listing.stdout, nul=True) if listing.returncode == 0 else []
     patterns = detect_patterns(files)
     versioned = _versioned_patterns(worktree, base_ref, patterns, git)
-    patterns = [p for p in patterns if p not in versioned]
+    patterns = [p for p in patterns if p in ALWAYS_EXCLUDED or p not in versioned]
 
     try:
         current = exclude.read_text(encoding="utf-8") if exclude.exists() else ""
@@ -198,19 +201,75 @@ def ensure_artifact_excludes(
     except OSError as exc:
         logger.warning("[build_artifacts] Could not write %s: %s", exclude, exc)
         return []
+    _freeze_tracked_outputs(worktree, base_ref, git)
     return patterns
+
+
+def _tracked_outputs(worktree: Path, git: GitRunner) -> set[str]:
+    """Tracked files under a ``bin/`` or ``obj/`` folder, at any depth."""
+    args = ["ls-files", "-z", "-c", "-i"]
+    for pattern in ALWAYS_EXCLUDED:
+        args += ["-x", pattern]
+    result = git(args, cwd=worktree)
+    return set(_lines(result.stdout, nul=True)) if result.returncode == 0 else set()
+
+
+def _freeze_tracked_outputs(worktree: Path, base_ref: str, git: GitRunner) -> None:
+    """Make ``git add`` blind to what a build rewrites in tracked bin/ and obj/.
+
+    Excludes only apply to untracked files: when the project (or an earlier
+    task merged before this fix) versions ``obj/project.nuget.cache``, every
+    restore rewrites it and ``git add .`` stages the change. ``skip-worktree``
+    lives in this worktree's own index, so the main checkout is untouched.
+    Only files of the base branch are frozen: what the branch added is
+    untracked by :func:`strip_committed_artifacts` instead.
+    """
+    added = _branch_changes(worktree, base_ref, "A", git) or set()
+    tracked = _tracked_outputs(worktree, git) - added
+    if tracked:
+        git(
+            ["update-index", "-z", "--skip-worktree", "--stdin"],
+            cwd=worktree,
+            input_data="\0".join(sorted(tracked)),
+        )
+
+
+def _branch_changes(
+    worktree: Path, base_ref: str, diff_filter: str, git: GitRunner
+) -> set[str] | None:
+    result = git(
+        [
+            "diff",
+            "-z",
+            "--name-only",
+            f"--diff-filter={diff_filter}",
+            f"{base_ref}...HEAD",
+        ],
+        cwd=worktree,
+    )
+    if result.returncode != 0:
+        logger.warning(
+            "[build_artifacts] Cannot diff against %s: %s", base_ref, result.stderr
+        )
+        return None
+    return set(_lines(result.stdout, nul=True))
 
 
 def strip_committed_artifacts(
     worktree: Path, base_ref: str, git: GitRunner = run_git
 ) -> list[str]:
-    """Untrack the ignored files the branch added since ``base_ref``.
+    """Take the build and test outputs out of the branch's changes.
 
-    The files stay on disk (the build still needs them); the removal is
+    * Ignored files the branch added (``.gitignore`` or the managed excludes)
+      are untracked.
+    * Files under ``bin/`` or ``obj/`` that the base branch versions and the
+      branch changed go back to their base version in the index.
+
+    The files on disk are kept (the build still needs them); the result is
     committed so the review diff, the PR and the merge no longer carry them.
 
     Returns:
-        The paths taken out of the branch.
+        The paths taken out of the branch's changes.
     """
     if not worktree.exists():
         return []
@@ -219,40 +278,52 @@ def strip_committed_artifacts(
     ignored = git(["ls-files", "-z", "-c", "-i", "--exclude-standard"], cwd=worktree)
     if ignored.returncode != 0:
         return []
-    candidates = set(_lines(ignored.stdout, nul=True))
-    if not candidates:
+    added = _branch_changes(worktree, base_ref, "A", git)
+    modified = _branch_changes(worktree, base_ref, "MT", git)
+    if added is None or modified is None:
+        return []
+    to_untrack = sorted(set(_lines(ignored.stdout, nul=True)) & added)
+    to_restore = sorted(_tracked_outputs(worktree, git) & modified)
+    if not to_untrack and not to_restore:
         return []
 
-    added = git(
-        ["diff", "-z", "--name-only", "--diff-filter=A", f"{base_ref}...HEAD"],
-        cwd=worktree,
-    )
-    if added.returncode != 0:
-        logger.warning(
-            "[build_artifacts] Cannot diff against %s: %s", base_ref, added.stderr
+    if to_untrack:
+        rm = git(
+            [
+                "rm",
+                "-r",
+                "--cached",
+                "--quiet",
+                "--ignore-unmatch",
+                "--pathspec-from-file=-",
+                "--pathspec-file-nul",
+            ],
+            cwd=worktree,
+            input_data="\0".join(to_untrack),
         )
-        return []
-    to_strip = sorted(candidates & set(_lines(added.stdout, nul=True)))
-    if not to_strip:
-        return []
+        if rm.returncode != 0:
+            logger.warning("[build_artifacts] git rm --cached failed: %s", rm.stderr)
+            return []
+    if to_restore:
+        merge_base = git(["merge-base", base_ref, "HEAD"], cwd=worktree)
+        restore = git(
+            [
+                "restore",
+                f"--source={merge_base.stdout.strip()}",
+                "--staged",
+                "--pathspec-from-file=-",
+                "--pathspec-file-nul",
+            ],
+            cwd=worktree,
+            input_data="\0".join(to_restore),
+        )
+        if merge_base.returncode != 0 or restore.returncode != 0:
+            logger.warning("[build_artifacts] git restore failed: %s", restore.stderr)
+            to_restore = []
 
-    rm = git(
-        [
-            "rm",
-            "-r",
-            "--cached",
-            "--quiet",
-            "--ignore-unmatch",
-            "--pathspec-from-file=-",
-            "--pathspec-file-nul",
-        ],
-        cwd=worktree,
-        input_data="\0".join(to_strip),
-    )
-    if rm.returncode != 0:
-        logger.warning("[build_artifacts] git rm --cached failed: %s", rm.stderr)
+    stripped = to_untrack + to_restore
+    if not stripped:
         return []
-
     commit = git(
         ["commit", "-m", "workpilot: exclude build and test outputs from the branch"],
         cwd=worktree,
@@ -264,13 +335,14 @@ def strip_committed_artifacts(
         git(
             ["reset", "-q", "HEAD", "--pathspec-from-file=-", "--pathspec-file-nul"],
             cwd=worktree,
-            input_data="\0".join(to_strip),
+            input_data="\0".join(stripped),
         )
         return []
 
+    _freeze_tracked_outputs(worktree, base_ref, git)
     logger.info(
         "[build_artifacts] Removed %d build/test output(s) from %s.",
-        len(to_strip),
+        len(stripped),
         worktree,
     )
-    return to_strip
+    return stripped

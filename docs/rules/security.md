@@ -1,9 +1,8 @@
 # Règles de sécurité
 
-> **Normatif.** Chargé dans chaque session Claude Code par [`CLAUDE.md`](../../CLAUDE.md) ; les
-> autres agents y arrivent par [`AGENTS.md`](../../AGENTS.md). Carte du code qui applique ces
-> règles : [`apps/backend/security/AGENTS.md`](../../apps/backend/security/AGENTS.md) (backend),
-> [`apps/frontend/AGENTS.md`](../../apps/frontend/AGENTS.md#sécurité) (Electron).
+> **Normatif.** L'essentiel est dans les règles critiques d'[`AGENTS.md`](../../AGENTS.md) ; ici le détail, à
+> lire avant de toucher une frontière (Claude Code le charge sous `security/`, `server/`, `src/main/`,
+> `.github/workflows/`). Code : [backend](../../apps/backend/security/AGENTS.md), [Electron](../../apps/frontend/AGENTS.md#sécurité).
 > Une vulnérabilité se signale par [`docs/SECURITY.md`](../SECURITY.md), **jamais** par une issue publique.
 
 ## Modèle de menace
