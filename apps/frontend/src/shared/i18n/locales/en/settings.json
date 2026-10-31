@@ -1904,6 +1904,24 @@
 		"pollLabel": "Polling interval (seconds)",
 		"pollDescription": "How often the pipeline status is checked (minimum 15s, default 60s)"
 	},
+	"serverTokens": {
+		"navLabel": "My tokens on the server",
+		"title": "My tokens on the server",
+		"description": "The runs you start on the server use these tokens, so what they do on GitHub, GitLab, Jira, Linear or Azure DevOps is done in your name. A token is stored encrypted on the server and never shown again.",
+		"kinds": {
+			"github_token": "GitHub token",
+			"gitlab_token": "GitLab token",
+			"jira_token": "Jira API token",
+			"linear_api_key": "Linear API key",
+			"azure_pat": "Azure DevOps personal access token"
+		},
+		"stored": "Stored",
+		"placeholder": "Paste a token",
+		"replacePlaceholder": "Paste a new token to replace it",
+		"save": "Save",
+		"remove": "Remove from the server",
+		"unavailable": "The server could not be reached"
+	},
 	"invitationsAdmin": {
 		"navLabel": "Invitations (team)",
 		"title": "Invitations",

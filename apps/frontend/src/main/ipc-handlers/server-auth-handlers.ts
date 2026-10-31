@@ -27,6 +27,11 @@ import {
 } from "../server-connection";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { unwatchAllServerBoards } from "../server-board-live";
+import {
+	deleteServerSecret,
+	listServerSecrets,
+	setServerSecret,
+} from "../server-user-secrets";
 
 const ENTRA_SCOPES = "openid profile email";
 const LOOPBACK_TIMEOUT_MS = 5 * 60 * 1000;
@@ -240,6 +245,14 @@ export function registerServerAuthHandlers(
 	ipcMain.handle(
 		IPC_CHANNELS.SERVER_AUTH_REVOKE_INVITE,
 		async (_e, invitationId: string) => await revokeInvite(invitationId),
+	);
+
+	ipcMain.handle(IPC_CHANNELS.SERVER_AUTH_LIST_SECRETS, () => listServerSecrets());
+	ipcMain.handle(IPC_CHANNELS.SERVER_AUTH_SET_SECRET, (_e, kind: unknown, value: unknown) =>
+		setServerSecret(kind, value),
+	);
+	ipcMain.handle(IPC_CHANNELS.SERVER_AUTH_DELETE_SECRET, (_e, kind: unknown) =>
+		deleteServerSecret(kind),
 	);
 
 	ipcMain.handle(IPC_CHANNELS.SERVER_AUTH_LOGOUT, async () => {

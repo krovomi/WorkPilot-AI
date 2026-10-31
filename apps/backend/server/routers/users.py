@@ -19,6 +19,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/users", tags=["users"])
 
+#: The longest token kept: longer than any forge or tracker issues.
+MAX_SECRET_LENGTH = 4096
+
 
 @router.get("", response_model=list[UserPublic])
 async def list_users(
@@ -50,10 +53,13 @@ async def set_my_secret(
     if body.kind not in SECRET_KINDS:
         raise HTTPException(
             status_code=400,
-            detail=f"Unknown secret kind '{body.kind}'. Allowed: {sorted(SECRET_KINDS)}",
+            detail=f"Unknown secret kind. Allowed: {sorted(SECRET_KINDS)}",
         )
+    value = body.value.strip()
+    if not value or len(value) > MAX_SECRET_LENGTH:
+        raise HTTPException(status_code=400, detail="Invalid secret value")
     try:
-        await set_user_secret(db, user.id, body.kind, body.value)
+        await set_user_secret(db, user.id, body.kind, value)
     except SecretsVaultError as e:
         raise HTTPException(status_code=500, detail=str(e))
     return {"saved": True}
