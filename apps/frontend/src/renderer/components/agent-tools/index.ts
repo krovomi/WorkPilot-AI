@@ -12,7 +12,5 @@ export { ProgressIndicatorBadge } from "./ProgressIndicatorBadge";
 export type { ProgressIndicatorBadgeProps } from "./ProgressIndicatorBadge";
 export { PromotionDecisionDialog } from "./PromotionDecisionDialog";
 export type { PromotionDecisionDialogProps } from "./PromotionDecisionDialog";
-export { VariationsDialog } from "./VariationsDialog";
-export type { VariationsDialogProps } from "./VariationsDialog";
 export { VirtualReviewerDialog } from "./VirtualReviewerDialog";
 export type { VirtualReviewerDialogProps } from "./VirtualReviewerDialog";

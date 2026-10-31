@@ -14,7 +14,6 @@ import { PromotionDecisionDialog } from "./PromotionDecisionDialog";
 import { PromptPreviewDialog } from "./PromptPreviewDialog";
 import { RestartDialog } from "./RestartDialog";
 import { TimelineDialog } from "./TimelineDialog";
-import { VariationsDialog } from "./VariationsDialog";
 import { VirtualReviewerDialog } from "./VirtualReviewerDialog";
 import type {
 	PromotionDecision,
@@ -45,11 +44,6 @@ export interface AgentToolsButtonProps {
 	 */
 	readonly onPromote?: (decision: PromotionDecision) => void;
 	/**
-	 * Triggered when the user picks a winning variation in the Arena.
-	 * The Kanban does the actual merge (we never auto-merge).
-	 */
-	readonly onPickVariation?: (label: string, path: string) => void;
-	/**
 	 * Triggered after virtual_review.md is written. The Kanban can show a
 	 * notification or refresh its file tree.
 	 */
@@ -65,7 +59,6 @@ export interface AgentToolsButtonProps {
 		| "prompt"
 		| "timeline"
 		| "promotion"
-		| "variations"
 		| "virtual_review"
 	>;
 }
@@ -76,7 +69,6 @@ const ALL_TOOLS = [
 	"prompt",
 	"timeline",
 	"promotion",
-	"variations",
 	"virtual_review",
 ] as const;
 
@@ -87,7 +79,6 @@ export function AgentToolsButton({
 	onStartBuild,
 	onRestart,
 	onPromote,
-	onPickVariation,
 	onVirtualReviewWritten,
 	tools = ALL_TOOLS,
 }: AgentToolsButtonProps) {
@@ -97,7 +88,6 @@ export function AgentToolsButton({
 	const [openPrompt, setOpenPrompt] = useState(false);
 	const [openTimeline, setOpenTimeline] = useState(false);
 	const [openPromotion, setOpenPromotion] = useState(false);
-	const [openVariations, setOpenVariations] = useState(false);
 	const [openVirtualReview, setOpenVirtualReview] = useState(false);
 
 	const showCost = tools.includes("cost");
@@ -105,7 +95,6 @@ export function AgentToolsButton({
 	const showPrompt = tools.includes("prompt");
 	const showTimeline = tools.includes("timeline");
 	const showPromotion = tools.includes("promotion");
-	const showVariations = tools.includes("variations");
 	const showVirtualReview = tools.includes("virtual_review");
 
 	if (
@@ -114,7 +103,6 @@ export function AgentToolsButton({
 		!showPrompt &&
 		!showTimeline &&
 		!showPromotion &&
-		!showVariations &&
 		!showVirtualReview
 	) {
 		return null;
@@ -186,16 +174,6 @@ export function AgentToolsButton({
 							{t("checkPromotion", "Check QA promotion…")}
 						</DropdownMenuItem>
 					)}
-					{showVariations && (
-						<DropdownMenuItem
-							onSelect={(e) => {
-								e.preventDefault();
-								setOpenVariations(true);
-							}}
-						>
-							{t("manageVariations", "Variations (Arena)…")}
-						</DropdownMenuItem>
-					)}
 					{showVirtualReview && (
 						<DropdownMenuItem
 							onSelect={(e) => {
@@ -250,14 +228,6 @@ export function AgentToolsButton({
 					onOpenChange={setOpenPromotion}
 					specDir={specDir}
 					onAcceptPromotion={(d) => onPromote?.(d)}
-				/>
-			)}
-			{showVariations && (
-				<VariationsDialog
-					open={openVariations}
-					onOpenChange={setOpenVariations}
-					specDir={specDir}
-					onPickWinner={(label, path) => onPickVariation?.(label, path)}
 				/>
 			)}
 			{showVirtualReview && (

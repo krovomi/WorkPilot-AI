@@ -295,69 +295,6 @@ export async function fetchPromotionDecision(
 }
 
 // ---------------------------------------------------------------------------
-// Parallel variations (item 9)
-
-export interface VariationDescriptor {
-	label: string;
-	path: string;
-	spec_id: string;
-	seed: number;
-}
-
-export interface VariationManifest {
-	spec_id: string;
-	parent_path: string;
-	variations: VariationDescriptor[];
-}
-
-export interface VariationComparison {
-	spec_id: string;
-	rows: Array<{
-		label: string;
-		subtasks_completed: number;
-		subtasks_total: number;
-		qa_status: string;
-		qa_report_chars: number;
-		has_self_review: boolean;
-	}>;
-	suggested_winner: string | null;
-}
-
-export async function listVariations(
-	specDir: string,
-	signal?: AbortSignal,
-): Promise<ApiResult<{ manifest: VariationManifest }>> {
-	return _get<{ manifest: VariationManifest }>(
-		"/api/parallel-variations/list",
-		{ spec_dir: specDir },
-		signal,
-	);
-}
-
-export async function createVariations(
-	specDir: string,
-	count: number,
-	signal?: AbortSignal,
-): Promise<ApiResult<{ manifest: VariationManifest }>> {
-	return _post<{ manifest: VariationManifest }>(
-		"/api/parallel-variations/create",
-		{ spec_dir: specDir, count },
-		signal,
-	);
-}
-
-export async function compareVariations(
-	specDir: string,
-	signal?: AbortSignal,
-): Promise<ApiResult<{ comparison: VariationComparison }>> {
-	return _get<{ comparison: VariationComparison }>(
-		"/api/parallel-variations/compare",
-		{ spec_dir: specDir },
-		signal,
-	);
-}
-
-// ---------------------------------------------------------------------------
 // Virtual reviewer (item 10)
 
 export interface VirtualReviewSummaryPayload {

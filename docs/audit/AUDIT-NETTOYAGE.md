@@ -951,6 +951,8 @@ et figé par `tests/test_review_lenses.py`.
   - Reste : les indicateurs d'affichage `has_self_review` (variations) et `self_review_present`
     (virtual reviewer) lisent toujours la présence du fichier, que plus rien n'écrit ; les retirer
     touche le frontend (`VariationsDialog`, `VirtualReviewerDialog`, `agent-tools-api.ts`).
+    `has_self_review` est parti avec `parallel_variations` (N8 A3,
+    [variants-and-replays.md](../architecture/variants-and-replays.md)) ; reste `self_review_present`.
 
 #### F10 · Prompts volumineux et onze prompts orphelins
 

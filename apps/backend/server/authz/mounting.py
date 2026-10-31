@@ -46,8 +46,6 @@ ROUTE_OVERRIDES: dict[tuple[str, str], str] = {
     # Starts and stops orchestration sessions.
     ("POST", "/api/mission-control/session/start"): "ops.execute",
     ("POST", "/api/mission-control/session/stop"): "ops.execute",
-    # Scaffolds worktrees and runs variations.
-    ("POST", "/api/parallel-variations/create"): "agent.execute",
     # Runs the reviewer agent.
     ("POST", "/api/virtual-reviewer/run"): "agent.execute",
     # Generates and writes test files.

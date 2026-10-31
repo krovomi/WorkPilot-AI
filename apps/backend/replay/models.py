@@ -513,7 +513,8 @@ class ForkRequest:
     # LLM config (can differ from original — works with any provider)
     fork_provider: str = ""
     fork_model: str = ""
-    fork_api_key: str = ""
+    # No API key: a fork is recorded, never executed, and a key typed here
+    # would only have been written to disk in clear (N8 A3).
     fork_base_url: str = ""
 
     def to_dict(self) -> dict[str, Any]:
@@ -524,7 +525,6 @@ class ForkRequest:
             "additional_instructions": self.additional_instructions,
             "fork_provider": self.fork_provider,
             "fork_model": self.fork_model,
-            "fork_api_key": self.fork_api_key,
             "fork_base_url": self.fork_base_url,
         }
 
@@ -537,7 +537,6 @@ class ForkRequest:
             additional_instructions=data.get("additional_instructions", ""),
             fork_provider=data.get("fork_provider", ""),
             fork_model=data.get("fork_model", ""),
-            fork_api_key=data.get("fork_api_key", ""),
             fork_base_url=data.get("fork_base_url", ""),
         )
 

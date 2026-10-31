@@ -2001,14 +2001,6 @@ try:
 except ImportError as e:
     print(f"Warning: Could not import slash_commands router: {e}")
 
-# --- Parallel Variations API (local Arena: scaffold + compare, never auto-merge) ---
-try:
-    from parallel_variations.api import router as parallel_variations_router
-
-    _mount(parallel_variations_router, "parallel_variations")
-except ImportError as e:
-    print(f"Warning: Could not import parallel_variations router: {e}")
-
 # --- Virtual Reviewer API (advisory only, no signature, no PR) ---
 try:
     from virtual_reviewer.api import router as virtual_reviewer_router
