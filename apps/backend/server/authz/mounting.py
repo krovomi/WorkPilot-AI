@@ -69,6 +69,9 @@ ROUTE_OVERRIDES: dict[tuple[str, str], str] = {
     ("POST", "/api/features/ideation/ideas/{idea_id}/convert"): "task.write",
     ("POST", "/api/features/context/jobs"): "agent.execute",
     ("POST", "/api/features/context/jobs/{job_id}/cancel"): "agent.cancel",
+    # The GitHub relay: a read and a query are reads, whatever their verb.
+    ("POST", "/api/features/forge/github/read"): "vcs.read",
+    ("POST", "/api/features/forge/github/pulls"): "vcs.read",
     # A question to Insights runs the insights agent on the clone.
     ("POST", "/api/features/insights/sessions/{session_id}/messages"): "agent.execute",
     ("POST", "/api/features/insights/jobs/{job_id}/cancel"): "agent.cancel",

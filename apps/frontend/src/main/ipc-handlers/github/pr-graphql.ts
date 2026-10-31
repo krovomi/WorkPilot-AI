@@ -3,6 +3,7 @@
  * Split out of pr-handlers.ts (audit lot L11, F36).
  */
 
+import { isServerHandle, relayOpenPulls } from "./server-relay";
 import { normalizeRepoReference } from "./utils";
 import { createContextLogger } from "./utils/logger";
 
@@ -200,16 +201,19 @@ export async function fetchPRsFromGraphQL(
 	try {
 		// Use GraphQL API to get PRs with diff stats (REST list endpoint doesn't include them)
 		// Fetches up to 100 open PRs (GitHub GraphQL max per request)
-		const response = await githubGraphQL<GraphQLPRListResponse>(
-			config.token,
-			LIST_PRS_QUERY,
-			{
-				owner,
-				repo,
-				first: 100, // GitHub GraphQL max is 100
-				after: cursor,
-			},
-		);
+		// A server project's list is the server's same query (`forge.py`).
+		const response = isServerHandle(config.token)
+			? await relayOpenPulls<GraphQLPRListResponse>(config.token, 100, cursor)
+			: await githubGraphQL<GraphQLPRListResponse>(
+					config.token,
+					LIST_PRS_QUERY,
+					{
+						owner,
+						repo,
+						first: 100, // GitHub GraphQL max is 100
+						after: cursor,
+					},
+				);
 
 		// Handle case where repository doesn't exist or user lacks access
 		if (!response.data.repository) {

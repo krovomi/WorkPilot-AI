@@ -10,10 +10,15 @@ import type {
 	Task,
 } from "../../../shared/types";
 import type { AgentManager } from "../../agent";
-import { projectStore } from "../../project-store";
+import { createServerCard } from "../../server-board-actions";
+import { featureProject } from "../server-feature-files";
 import { attachGitHubIssueImages } from "../shared/issue-attachments";
 import { createSpecForIssue } from "./spec-utils";
 import { getGitHubConfig, githubFetch } from "./utils";
+
+// What a server card takes (`shared_board/api.py`).
+const SERVER_TITLE_MAX = 200;
+const SERVER_DESCRIPTION_MAX = 20_000;
 
 /**
  * Import multiple GitHub issues as tasks
@@ -26,7 +31,7 @@ export function registerImportIssues(agentManager: AgentManager): void {
 			projectId: string,
 			issueNumbers: number[],
 		): Promise<IPCResult<GitHubImportResult>> => {
-			const project = projectStore.getProject(projectId);
+			const project = featureProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
 			}
@@ -44,8 +49,12 @@ export function registerImportIssues(agentManager: AgentManager): void {
 			const errors: string[] = [];
 			const tasks: Task[] = [];
 
-			for (const issueNumber of issueNumbers) {
+			for (const issueNumber of Array.isArray(issueNumbers) ? issueNumbers : []) {
 				try {
+					// From the renderer: a number, before it is put in a URL
+					if (!Number.isInteger(issueNumber) || issueNumber <= 0) {
+						throw new Error("Invalid issue number");
+					}
 					// Fetch issue details
 					const issue = (await githubFetch(
 						config.token,
@@ -70,6 +79,22 @@ ${labelsString ? `**Labels:** ${labelsString}` : ""}
 
 ${issue.body || "No description provided."}
 `;
+
+					// A server project's issue becomes a card of its shared board; the
+					// server writes the spec and its agents run there.
+					if (project.remote) {
+						const card = await createServerCard(
+							project,
+							issue.title.slice(0, SERVER_TITLE_MAX),
+							description.slice(0, SERVER_DESCRIPTION_MAX),
+						);
+						if (!card.success || !card.data) {
+							throw new Error(card.error ?? "Server unavailable");
+						}
+						tasks.push(card.data);
+						imported++;
+						continue;
+					}
 
 					// Create spec directory and files (with coordinated numbering)
 					const specData = await createSpecForIssue(

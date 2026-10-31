@@ -173,7 +173,7 @@ import {
 } from "./sidebar/sortable-primitives";
 import { ActivityBadge } from "./sidebar/ActivityBadge";
 import { EXPERIMENTAL_VIEWS } from "./sidebar/experimental-views";
-import { showsView, useServerNavGates } from "./sidebar/server-gates";
+import { serverForge, showsView, useServerNavGates } from "./sidebar/server-gates";
 import { useSidebarPrefs } from "./sidebar/use-sidebar-prefs";
 import { VoiceControlDialog } from "./voice-control/VoiceControlDialog";
 
@@ -1037,20 +1037,19 @@ export function Sidebar({
 		saveSettings({ cliPanelExpanded: value });
 
 	// Subscribe to project-env-store for reactive GitHub/GitLab tab visibility
-	const githubEnabled = useProjectEnvStore(
-		(state) => state.envConfig?.githubEnabled ?? false,
-	);
+	const envGitHub = useProjectEnvStore((state) => state.envConfig?.githubEnabled ?? false);
 	const gitlabEnabled = useProjectEnvStore(
 		(state) => state.envConfig?.gitlabEnabled ?? false,
 	);
 
 	// Server mode: the administration console, and the views a server project
-	// offers (`sidebar/server-gates.ts`).
+	// offers (`sidebar/server-gates.ts`), GitHub's when it was cloned from there.
 	const { canAdminister, serverProject } = useServerNavGates(
 		selectedProject,
 		activeView,
 		onViewChange,
 	);
+	const githubEnabled = serverProject ? serverForge(selectedProject) === "github" : envGitHub;
 
 	// Track the last loaded project ID to avoid redundant loads
 	const lastLoadedProjectIdRef = useRef<string | null>(null);

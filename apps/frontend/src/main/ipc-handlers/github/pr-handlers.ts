@@ -15,11 +15,14 @@ import { ipcMain } from "electron";
 import { IPC_CHANNELS, MODEL_ID_MAP } from "../../../shared/constants";
 import type { Project } from "../../../shared/types";
 import type { AuthFailureInfo } from "../../../shared/types/terminal";
-import { getAugmentedEnv } from "../../env-utils";
 import { getGitHubConfig, githubFetch } from "./utils";
 import { createIPCCommunicators } from "./utils/ipc-communicator";
 import { createContextLogger } from "./utils/logger";
-import { withProjectOrNull } from "./utils/project-middleware";
+import {
+	withForgeProjectOrNull,
+	withProjectOrNull,
+} from "./utils/project-middleware";
+import { prComment, prDiff, prMerge, prUpdateBranch } from "./pr-actions";
 import { getPageFeatureSettings } from "../../services/page-llm-config";
 import { getRunnerEnv } from "./utils/runner-env";
 import {
@@ -519,7 +522,7 @@ export function registerPRHandlers(
 		IPC_CHANNELS.GITHUB_PR_LIST,
 		async (_, projectId: string): Promise<PRListResult> => {
 			debugLog("listPRs handler called", { projectId });
-			const result = await withProjectOrNull(projectId, async (project) => {
+			const result = await withForgeProjectOrNull(projectId, async (project) => {
 				const config = getGitHubConfig(project);
 				if (!config) {
 					debugLog("No GitHub config found for project");
@@ -536,7 +539,7 @@ export function registerPRHandlers(
 		IPC_CHANNELS.GITHUB_PR_LIST_MORE,
 		async (_, projectId: string, cursor: string): Promise<PRListResult> => {
 			debugLog("listMorePRs handler called", { projectId, cursor });
-			const result = await withProjectOrNull(projectId, async (project) => {
+			const result = await withForgeProjectOrNull(projectId, async (project) => {
 				const config = getGitHubConfig(project);
 				if (!config) {
 					debugLog("No GitHub config found for project");
@@ -553,7 +556,7 @@ export function registerPRHandlers(
 		IPC_CHANNELS.GITHUB_PR_GET,
 		async (_, projectId: string, prNumber: number): Promise<PRData | null> => {
 			debugLog("getPR handler called", { projectId, prNumber });
-			return withProjectOrNull(projectId, async (project) => {
+			return withForgeProjectOrNull(projectId, async (project) => {
 				const config = getGitHubConfig(project);
 				if (!config) return null;
 
@@ -624,23 +627,10 @@ export function registerPRHandlers(
 	ipcMain.handle(
 		IPC_CHANNELS.GITHUB_PR_GET_DIFF,
 		async (_, projectId: string, prNumber: number): Promise<string | null> => {
-			return withProjectOrNull(projectId, async (project) => {
-				const config = getGitHubConfig(project);
-				if (!config) return null;
-
+			return withForgeProjectOrNull(projectId, async (project) => {
+				if (!getGitHubConfig(project)) return null;
 				try {
-					const { execFileSync } = await import("node:child_process");
-					// Validate prNumber to prevent command injection
-					if (!Number.isInteger(prNumber) || prNumber <= 0) {
-						throw new Error("Invalid PR number");
-					}
-					// Use execFileSync with arguments array to prevent command injection
-					const diff = execFileSync("gh", ["pr", "diff", String(prNumber)], {
-						cwd: project.path,
-						encoding: "utf-8",
-						env: getAugmentedEnv(),
-					});
-					return diff;
+					return await prDiff(project, prNumber);
 				} catch {
 					return null;
 				}
@@ -1160,46 +1150,10 @@ export function registerPRHandlers(
 			body: string,
 		): Promise<boolean> => {
 			debugLog("postPRComment handler called", { projectId, prNumber });
-			const postResult = await withProjectOrNull(projectId, async (project) => {
+			const postResult = await withForgeProjectOrNull(projectId, async (project) => {
 				try {
-					const { execFileSync } = await import("node:child_process");
-					const { writeFileSync, unlinkSync } = await import("node:fs");
-					const { join } = await import("node:path");
-
 					debugLog("Posting comment to PR", { prNumber });
-
-					// Validate prNumber to prevent command injection
-					if (!Number.isInteger(prNumber) || prNumber <= 0) {
-						throw new Error("Invalid PR number");
-					}
-
-					// Use temp file to avoid shell escaping issues
-					const tmpFile = join(
-						project.path,
-						".workpilot",
-						"tmp_comment_body.txt",
-					);
-					try {
-						writeFileSync(tmpFile, body, "utf-8");
-						// Use execFileSync with arguments array to prevent command injection
-						execFileSync(
-							"gh",
-							["pr", "comment", String(prNumber), "--body-file", tmpFile],
-							{
-								cwd: project.path,
-								env: getAugmentedEnv(),
-							},
-						);
-						unlinkSync(tmpFile);
-					} catch (error) {
-						try {
-							unlinkSync(tmpFile);
-						} catch {
-							// Ignore cleanup errors
-						}
-						throw error;
-					}
-
+					await prComment(project, prNumber, body);
 					debugLog("Comment posted successfully", { prNumber });
 					return true;
 				} catch (error) {
@@ -1303,33 +1257,12 @@ export function registerPRHandlers(
 			mergeMethod: "merge" | "squash" | "rebase" = "squash",
 		): Promise<boolean> => {
 			debugLog("mergePR handler called", { projectId, prNumber, mergeMethod });
-			const mergeResult = await withProjectOrNull(
+			const mergeResult = await withForgeProjectOrNull(
 				projectId,
 				async (project) => {
 					try {
-						const { execFileSync } = await import("node:child_process");
 						debugLog("Merging PR", { prNumber, method: mergeMethod });
-
-						// Validate prNumber to prevent command injection
-						if (!Number.isInteger(prNumber) || prNumber <= 0) {
-							throw new Error("Invalid PR number");
-						}
-
-						// Validate mergeMethod to prevent command injection
-						const validMethods = ["merge", "squash", "rebase"];
-						if (!validMethods.includes(mergeMethod)) {
-							throw new Error("Invalid merge method");
-						}
-
-						// Use execFileSync with arguments array to prevent command injection
-						execFileSync(
-							"gh",
-							["pr", "merge", String(prNumber), `--${mergeMethod}`],
-							{
-								cwd: project.path,
-								env: getAugmentedEnv(),
-							},
-						);
+						await prMerge(project, prNumber, mergeMethod);
 						debugLog("PR merged successfully", { prNumber });
 						return true;
 					} catch (error) {
@@ -1355,7 +1288,7 @@ export function registerPRHandlers(
 			username: string,
 		): Promise<boolean> => {
 			debugLog("assignPR handler called", { projectId, prNumber, username });
-			const assignResult = await withProjectOrNull(
+			const assignResult = await withForgeProjectOrNull(
 				projectId,
 				async (project) => {
 					const config = getGitHubConfig(project);
@@ -1653,7 +1586,7 @@ export function registerPRHandlers(
 				blockers: [],
 			};
 
-			const result = await withProjectOrNull(projectId, async (project) => {
+			const result = await withForgeProjectOrNull(projectId, async (project) => {
 				const config = getGitHubConfig(project);
 				if (!config) {
 					debugLog("No GitHub config found for checkMergeReadiness");
@@ -1800,30 +1733,12 @@ export function registerPRHandlers(
 		): Promise<{ success: boolean; error?: string }> => {
 			debugLog("updateBranch handler called", { projectId, prNumber });
 
-			const updateResult = await withProjectOrNull(
+			const updateResult = await withForgeProjectOrNull(
 				projectId,
 				async (project) => {
 					try {
-						const { execFile } = await import("node:child_process");
-						const { promisify } = await import("node:util");
-						const execFileAsync = promisify(execFile);
 						debugLog("Updating PR branch", { prNumber });
-
-						// Validate prNumber to prevent command injection
-						if (!Number.isInteger(prNumber) || prNumber <= 0) {
-							throw new Error("Invalid PR number");
-						}
-
-						// Use gh pr update-branch to sync with base branch (async to avoid blocking main process)
-						// --rebase is not used to avoid force-push requirements
-						await execFileAsync(
-							"gh",
-							["pr", "update-branch", String(prNumber)],
-							{
-								cwd: project.path,
-								env: getAugmentedEnv(),
-							},
-						);
+						await prUpdateBranch(project, prNumber);
 
 						debugLog("PR branch updated successfully", { prNumber });
 						return { success: true };
@@ -2149,7 +2064,7 @@ export function registerPRHandlers(
 				projectId,
 				prNumber,
 			});
-			const result = await withProjectOrNull(projectId, async (project) => {
+			const result = await withForgeProjectOrNull(projectId, async (project) => {
 				const config = getGitHubConfig(project);
 				if (!config) {
 					return {
@@ -2241,7 +2156,7 @@ export function registerPRHandlers(
 		IPC_CHANNELS.GITHUB_WORKFLOW_APPROVE,
 		async (_, projectId: string, runId: number): Promise<boolean> => {
 			debugLog("approveWorkflow handler called", { projectId, runId });
-			const result = await withProjectOrNull(projectId, async (project) => {
+			const result = await withForgeProjectOrNull(projectId, async (project) => {
 				const config = getGitHubConfig(project);
 				if (!config) {
 					debugLog("No GitHub config found");
