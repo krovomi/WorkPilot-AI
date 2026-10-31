@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from core.llm_optimization import tool_result_max_chars, truncate_tool_result
-from harness.domain.paging import (
+from foundation.paging import (
     FOOTER_RESERVE,
     page_items,
     page_lines,

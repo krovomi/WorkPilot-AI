@@ -43,7 +43,7 @@ from docintel.tables import (  # noqa: E402
     tables_from_boxes,
     tables_from_text,
 )
-from spec.traceability import parse_requirements  # noqa: E402
+from foundation.traceability import parse_requirements  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Fixtures

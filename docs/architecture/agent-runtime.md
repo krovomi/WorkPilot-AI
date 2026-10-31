@@ -61,14 +61,17 @@ test_generation
 
 - `tests/test_import_contracts.py` : `agent_runtime` n'importe rien ; `merge`,
   `integrations`, `analysis`, `architecture`, `subagents` et `test_generation` ont chacun leur
-  liste fermée, sans `core` ni `agents` ; `MAX_CYCLE = 18`.
+  liste fermée, sans `core` ni `agents`, comme `architecture_visualizer`, `docintel`, `brain`,
+  `learning_loop`, `hermes`, `memory` et `uiux` ; `MAX_CYCLE = 10`.
 - `tests/test_agent_runtime_port.py` : `core` installe le runtime, le runtime atteint les
   fabriques de `core` au moment de l'appel, et chaque unité sans runtime ou sans jeton prend son
   chemin de repli.
 
-## La suite
+## Où en est le cycle
 
-Le cycle compte 18 unités : le moteur (`core`, `agents`, `harness`, `context_mgmt`, `qa`,
-`spec`, `services`, `workflows`, `verify`, `prompts_pkg`) et des unités qui ne lancent pas
-d'agent mais en lisent un morceau (`brain`, `memory`, `learning_loop`, `hermes`, `docintel`,
-`self_healing`, `uiux`, `architecture_visualizer`). L'objectif du plan reste `MAX_CYCLE` ≤ 10.
+Le cycle compte 10 unités, l'objectif du plan : le moteur (`core`, `agents`, `harness`,
+`context_mgmt`, `qa`, `spec`, `services`, `workflows`, `verify`, `prompts_pkg`). Les unités qui
+en lisaient un morceau sans lancer d'agent en sont sorties par `foundation` (parseurs de CI,
+traçabilité des exigences, pagination) ou en rendant sa phase au moteur de workflows (archify).
+La boucle d'apprentissage n'avait pas besoin du port : son appel au modèle importait un module
+qui n'a jamais existé et n'a jamais tourné ([F131](../audit/findings/F131.md)).

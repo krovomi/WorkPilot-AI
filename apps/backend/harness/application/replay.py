@@ -100,7 +100,7 @@ SPILL_OFFSET = "$spill.offset"
 # one temporary directory is the number measured in any other.
 PROJECT_MARK = "<project>"
 
-# The gap line of ``harness.domain.paging.spill_excerpt``.
+# The gap line of ``foundation.paging.spill_excerpt``.
 _SPILL_GAP = re.compile(r"read_file (?P<path>\S+) with offset=(?P<offset>\d+)\]")
 
 TaskSegments = Callable[[Path, Path, str], list[Segment]]

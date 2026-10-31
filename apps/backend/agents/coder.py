@@ -1598,7 +1598,7 @@ def _report_traceability(spec_dir: Path) -> None:
     Never raises: this reports on the build, it is not part of it.
     """
     try:
-        from spec.traceability import write_record
+        from foundation.traceability import write_record
 
         record = write_record(spec_dir)
     except Exception as exc:  # noqa: BLE001 - a report never fails a build

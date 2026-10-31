@@ -5,12 +5,12 @@ Two readers, one question — *where did it break?* — and neither is new:
 | Reader | What it finds | Where it lives |
 |---|---|---|
 | stack traces | the frames, attached to this repository's files | `docintel/stacktrace.py` |
-| CI logs | compiler/restore codes (`CS0103`, `NU1101`, `TS2345`, `E0425`…) and failing tests | `self_healing/incident_responder/cicd_mode.py` |
+| CI logs | compiler/restore codes (`CS0103`, `NU1101`, `TS2345`, `E0425`…) and failing tests | `foundation/ci_logs.py` |
 
-The CI parsers stay in `cicd_mode.py` — the incident model is where they were
-needed first, and a second table here would drift from it the first time a
-toolchain changes its output. They are imported on first use, so the MCP server
-and the status endpoint never pay for the self-healing package.
+The CI parsers are the incident model's, moved to `foundation/ci_logs.py` so
+that `docintel` reads them without importing the self-healing package: a second
+table here would drift from that one the first time a toolchain changes its
+output. They are plain regular expressions, cheap to import.
 
 Both run on text that has already been cleaned, secret-masked and scanned by
 `injection_guard`: a diagnosis is read out of data, it is never a way around the
@@ -22,21 +22,12 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+from foundation.ci_logs import parse_build_errors, parse_failing_tests
+
 from .stacktrace import RepoIndex, StackFrame, StackTrace, analyze, render_stacktrace
 from .stacktrace import resolve_file as _resolve_file
 
 logger = logging.getLogger(__name__)
-
-
-def _cicd():
-    """`cicd_mode`'s parsers, or None when the package cannot be imported here."""
-    try:
-        from self_healing.incident_responder import cicd_mode
-
-        return cicd_mode
-    except Exception:  # noqa: BLE001 - no CI reading is a reason, not a crash
-        logger.debug("docintel: cicd parsers unavailable", exc_info=True)
-        return None
 
 
 def _repo_path(file: str, index: RepoIndex | None) -> str:
@@ -49,11 +40,10 @@ def _repo_path(file: str, index: RepoIndex | None) -> str:
 
 def read_ci(text: str, index: RepoIndex | None = None) -> dict | None:
     """Build errors and failing tests in `text`, or None when there are none."""
-    cicd = _cicd()
-    if cicd is None or not text:
+    if not text:
         return None
-    errors = cicd.parse_build_errors(text)
-    failing = cicd.parse_failing_tests(text)
+    errors = parse_build_errors(text)
+    failing = parse_failing_tests(text)
     if not errors and not failing:
         return None
     rows = []

@@ -397,7 +397,7 @@ class TestTheWorkflowPhase:
     def test_a_mapped_delta_succeeds_on_the_architecture_agent(
         self, tmp_path: Path, agent_stack, fake_pipeline, monkeypatch
     ):
-        from architecture_visualizer.archify.phase import run_architecture_map_phase
+        from workflows.architecture_map_phase import run_architecture_map_phase
 
         monkeypatch.setenv("AUTO_CLAUDE_RESUME_SESSION_ID", "sess-7")
         ctx = phase_context(tmp_path, changed_files=["src/api/routes.py"])
@@ -429,7 +429,7 @@ class TestTheWorkflowPhase:
     def test_a_direct_build_records_in_its_own_spec(
         self, tmp_path: Path, agent_stack, fake_pipeline
     ):
-        from architecture_visualizer.archify.phase import run_architecture_map_phase
+        from workflows.architecture_map_phase import run_architecture_map_phase
 
         ctx = phase_context(
             tmp_path, changed_files=["src/api/routes.py"], isolated=False
@@ -444,7 +444,7 @@ class TestTheWorkflowPhase:
     def test_a_missing_runtime_could_not_run(
         self, tmp_path: Path, agent_stack, monkeypatch
     ):
-        from architecture_visualizer.archify.phase import run_architecture_map_phase
+        from workflows.architecture_map_phase import run_architecture_map_phase
 
         async def refuse(**_kwargs):
             raise unavailable()
@@ -462,7 +462,7 @@ class TestTheWorkflowPhase:
     def test_a_failed_authoring_is_a_failure(
         self, tmp_path: Path, agent_stack, monkeypatch
     ):
-        from architecture_visualizer.archify.phase import run_architecture_map_phase
+        from workflows.architecture_map_phase import run_architecture_map_phase
 
         async def fail(**_kwargs):
             return authoring.AuthoringResult(ok=False, error="the model is invalid")
@@ -479,7 +479,7 @@ class TestTheWorkflowPhase:
     def test_an_unexpected_error_is_unknown_never_success(
         self, tmp_path: Path, monkeypatch
     ):
-        from architecture_visualizer.archify.phase import run_architecture_map_phase
+        from workflows.architecture_map_phase import run_architecture_map_phase
 
         async def boom(*_a, **_k):
             raise RuntimeError("disk full")
@@ -496,7 +496,7 @@ class TestTheWorkflowPhase:
     def test_a_setup_error_is_unknown_never_raised(self, tmp_path: Path, monkeypatch):
         """Resolving the provider happens before the delta; it is guarded too."""
         import workflows.runner as runner
-        from architecture_visualizer.archify.phase import run_architecture_map_phase
+        from workflows.architecture_map_phase import run_architecture_map_phase
 
         def broken(*_a, **_k):
             raise ValueError("task_metadata.json is unreadable")
@@ -513,7 +513,7 @@ class TestTheWorkflowPhase:
     def test_a_report_error_is_unknown_never_raised(
         self, tmp_path: Path, agent_stack, monkeypatch
     ):
-        from architecture_visualizer.archify import phase as phase_module
+        from workflows import architecture_map_phase as phase_module
 
         def broken(*_a, **_k):
             raise TypeError("unserialisable summary")
@@ -531,7 +531,7 @@ class TestTheWorkflowPhase:
         self, tmp_path: Path, agent_stack, monkeypatch
     ):
         """The record keeps one sentence; the refusals land in the phase report."""
-        from architecture_visualizer.archify.phase import run_architecture_map_phase
+        from workflows.architecture_map_phase import run_architecture_map_phase
 
         async def fail(**_kwargs):
             return authoring.AuthoringResult(

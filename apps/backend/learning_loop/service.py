@@ -88,45 +88,21 @@ class LearningLoopService:
         builds_data: list[dict[str, Any]],
         status_callback: Any | None = None,
     ) -> LearningReport:
-        """Core analysis logic using Claude Agent SDK."""
+        """Extract patterns from the builds' records, by heuristics.
+
+        No model runs here, and none ever has. This method used to import
+        `core.session`, a module that has never existed, so every analysis
+        ended in its `ImportError` branch and in `_heuristic_extract`, while the
+        status line said "with AI". Calling a model instead is a decision of its
+        own (it would run after every build, and what it writes becomes
+        instructions in later prompts), not the side effect of an import fix
+        (N8 A1, F131). `PatternExtractor.build_analysis_prompt` and
+        `parse_patterns_from_response` are kept for that decision.
+        """
         if status_callback:
-            status_callback(f"Analyzing {len(builds_data)} build(s) with AI...")
+            status_callback(f"Analyzing {len(builds_data)} build(s)...")
 
-        # Build the analysis prompt
-        prompt = self.extractor.build_analysis_prompt(builds_data)
-
-        # Run the meta-agent
-        try:
-            from core.client import create_client
-            from core.session import run_agent_session
-            from phase_config import get_thinking_budget, resolve_model_id
-
-            model_id = resolve_model_id(self.extractor.model)
-            thinking_budget = get_thinking_budget(self.extractor.thinking_level)
-
-            client = create_client(
-                project_dir=str(self.project_dir),
-                model=model_id,
-                agent_type="learning_analyzer",
-                max_thinking_tokens=thinking_budget,
-            )
-
-            async with client:
-                status, response = await run_agent_session(client, prompt)
-
-            if status_callback:
-                status_callback("Extracting patterns from analysis...")
-
-            patterns = self.extractor.parse_patterns_from_response(
-                response, builds_data
-            )
-        except ImportError:
-            # Fallback: if SDK is not available, use basic heuristic extraction
-            logger.warning("Claude Agent SDK not available, using heuristic extraction")
-            patterns = self._heuristic_extract(builds_data)
-        except Exception as e:
-            logger.error(f"AI analysis failed: {e}")
-            patterns = self._heuristic_extract(builds_data)
+        patterns = self._heuristic_extract(builds_data)
 
         # Store patterns (with deduplication)
         if patterns:
@@ -211,7 +187,7 @@ class LearningLoopService:
     def _heuristic_extract(
         self, builds_data: list[dict[str, Any]]
     ) -> list[LearningPattern]:
-        """Basic heuristic pattern extraction as fallback when AI is not available."""
+        """The pattern extraction this service does: rules over the build records."""
         patterns = []
 
         # Extract QA patterns from iteration history
