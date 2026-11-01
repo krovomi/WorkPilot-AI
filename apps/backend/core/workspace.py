@@ -247,7 +247,7 @@ def merge_existing_build(
     print(box(content, width=60, style="heavy"))
 
     manager = WorktreeManager(project_dir, base_branch=current_branch)
-    manager.strip_build_artifacts(spec_name)  # bin/, obj/... never reach the project
+    manager.settle_branch(spec_name)  # pending work in, bin/, obj/... out
     show_build_summary(manager, spec_name)
     print()
 
