@@ -34,9 +34,13 @@ import { authedFetch } from "./server-connection";
 export type SharedFeature = "roadmap" | "ideation" | "context";
 /**
  * What runs jobs on the server: a feature with files, Insights, or the AI
- * review of a pull request (`ipc-handlers/github/server-pr-review.ts`).
+ * review of a pull or merge request (`ipc-handlers/server-review-jobs.ts`).
  */
-export type JobFeature = SharedFeature | "insights" | "forge/github/reviews";
+export type JobFeature =
+	| SharedFeature
+	| "insights"
+	| "forge/github/reviews"
+	| "forge/gitlab/reviews";
 
 interface FeatureFiles {
 	directory: string;
