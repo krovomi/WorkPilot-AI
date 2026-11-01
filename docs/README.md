@@ -14,6 +14,7 @@ fichiers y renvoient.
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | contribuer : installation, style, tests, branches, PR | humains |
 | [`CONFIGURATION.md`](CONFIGURATION.md) | providers, résolution des identifiants, variables d'environnement | référence |
 | [`CLI-USAGE.md`](CLI-USAGE.md) | utilisation en terminal et en CI | guide |
+| [`server-operations.md`](server-operations.md) | exploiter le serveur multi-utilisateurs d'une équipe : déploiement, TLS, sauvegarde, mise à jour, quotas, audit | guide |
 | [`MODEL_CATALOG.md`](MODEL_CATALOG.md) | mettre à jour le catalogue de modèles livré | guide |
 | [`RELEASE.md`](RELEASE.md) | publier une version | mainteneurs |
 | [`linux.md`](linux.md), [`windows-development.md`](windows-development.md) | notes par plateforme | guide |
