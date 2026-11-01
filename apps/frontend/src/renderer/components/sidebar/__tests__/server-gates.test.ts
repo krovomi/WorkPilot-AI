@@ -24,20 +24,25 @@ describe("server project views", () => {
 			expect(showsView(view, true)).toBe(false);
 		}
 		expect([...SERVER_PROJECT_VIEWS].sort()).toEqual([
+			"accessibility-agent",
 			"administration",
 			"analytics",
 			"context",
 			"cost-estimator",
 			"dashboard",
+			"doc-drift",
+			"flaky-tests",
 			"github-issues",
 			"github-prs",
 			"gitlab-issues",
 			"gitlab-merge-requests",
+			"i18n-agent",
 			"ideation",
 			"insights",
 			"kanban",
 			"roadmap",
 			"session-history",
+			"tech-debt",
 		]);
 	});
 

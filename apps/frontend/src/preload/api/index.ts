@@ -14,6 +14,10 @@ import {
 	createAccessibilityAPI,
 } from "./modules/accessibility-api";
 import {
+	createSharedAnalysisAPI,
+	type SharedAnalysisAPI,
+} from "./modules/shared-analysis-api";
+import {
 	type AgentDebuggerAPI,
 	createAgentDebuggerAPI,
 } from "./modules/agent-debugger-api";
@@ -289,6 +293,7 @@ export interface ElectronAPI
 		FormulaMatrixAPI,
 		BenchAPI,
 		AccessibilityAPI,
+		SharedAnalysisAPI,
 		I18nAgentAPI,
 		DocDriftAPI,
 		FlakyTestsAPI,
@@ -437,6 +442,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createFormulaMatrixAPI(),
 		...createBenchAPI(),
 		...createAccessibilityAPI(),
+		...createSharedAnalysisAPI(),
 		...createI18nAgentAPI(),
 		...createDocDriftAPI(),
 		...createFlakyTestsAPI(),

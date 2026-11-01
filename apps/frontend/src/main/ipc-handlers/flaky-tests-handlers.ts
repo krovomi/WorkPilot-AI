@@ -19,6 +19,11 @@ import { app, BrowserWindow, ipcMain } from "electron";
 import { pythonEnvManager } from "../python-env-manager.js";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { pythonRunnerEnv } from "../utils/python-runner-env";
+import {
+	cancelServerAnalysis,
+	relayServerAnalysis,
+	serverProjectAtPath,
+} from "./server-analyses";
 
 interface RunRequest {
 	projectPath: string;
@@ -38,6 +43,7 @@ export function registerFlakyTestsHandlers(): void {
 	let currentProcess: ChildProcess | null = null;
 
 	const killExisting = (): void => {
+		cancelServerAnalysis("flaky-tests");
 		if (currentProcess) {
 			currentProcess.kill("SIGTERM");
 			currentProcess = null;
@@ -53,6 +59,16 @@ export function registerFlakyTestsHandlers(): void {
 				const message = "projectPath is required";
 				broadcast(IPC_CHANNELS.FLAKY_TESTS_ERROR, message);
 				throw new Error(message);
+			}
+
+			// A server project's analysis runs on the server (`server-analyses.ts`).
+			const remote = serverProjectAtPath(projectPath);
+			if (remote) {
+				return relayServerAnalysis(remote, "flaky-tests", {}, {
+					event: IPC_CHANNELS.FLAKY_TESTS_EVENT,
+					result: IPC_CHANNELS.FLAKY_TESTS_RESULT,
+					error: IPC_CHANNELS.FLAKY_TESTS_ERROR,
+				});
 			}
 
 			const backendPath = app.isPackaged

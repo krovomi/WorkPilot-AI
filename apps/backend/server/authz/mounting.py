@@ -78,6 +78,9 @@ ROUTE_OVERRIDES: dict[tuple[str, str], str] = {
     ("POST", "/api/features/forge/github/reviews/jobs/{job_id}/cancel"): "agent.cancel",
     ("POST", "/api/features/forge/gitlab/reviews/jobs"): "agent.execute",
     ("POST", "/api/features/forge/gitlab/reviews/jobs/{job_id}/cancel"): "agent.cancel",
+    # An analysis runs its runner on the clone, as a job.
+    ("POST", "/api/features/analyses/{kind}/jobs"): "agent.execute",
+    ("POST", "/api/features/analyses/{kind}/jobs/{job_id}/cancel"): "agent.cancel",
     # A question to Insights runs the insights agent on the clone.
     ("POST", "/api/features/insights/sessions/{session_id}/messages"): "agent.execute",
     ("POST", "/api/features/insights/jobs/{job_id}/cancel"): "agent.cancel",

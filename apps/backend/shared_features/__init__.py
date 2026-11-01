@@ -4,9 +4,11 @@ its index and the views that follow, as their files on the server's clone and
 their runners as jobs; its Insights conversations (``insights``); its
 memories (``context``); its GitHub repository or GitLab project, with each
 person's own token (``forge``, ``forge_gitlab``), and the AI review of its
-pull or merge requests as a job on the clone (``forge_review``); its
-dashboard, analytics, sessions and costs, computed from its runs, its jobs
-and the ledgers its agents keep in the clone (``workspace``, ``usage_ledger``).
+pull or merge requests as a job on the clone (``forge_review``); its analyses
+(accessibility, i18n, documentation drift, flaky tests, technical debt) as
+jobs whose reports every member reads (``analyses``); its dashboard,
+analytics, sessions and costs, computed from its runs, its jobs and the
+ledgers its agents keep in the clone (``workspace``, ``usage_ledger``).
 
 See ``docs/architecture/server-mode.md``.
 """
@@ -22,6 +24,7 @@ def mount_all(mount: Callable[[APIRouter, str], None]) -> None:
     """Mount each router with ``mount``, naming the feature its permission
     derives from (``server.authz.catalog.FEATURE_DOMAINS``)."""
     from shared_board.api import router as board
+    from shared_features.analyses import router as analyses
     from shared_features.api import feature_router
     from shared_features.context import router as context
     from shared_features.forge import router as forge
@@ -44,4 +47,5 @@ def mount_all(mount: Callable[[APIRouter, str], None]) -> None:
     mount(forge_gitlab, "forge")
     mount(GITHUB.router, "forge")
     mount(GITLAB.router, "forge")
+    mount(analyses, "analyses")
     mount(workspace, "workspace")

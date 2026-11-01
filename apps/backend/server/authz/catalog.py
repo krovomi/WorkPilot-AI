@@ -293,6 +293,9 @@ FEATURE_DOMAINS: MappingProxyType[str, str] = MappingProxyType(
         "context": "insight",
         # GitHub for a server project, relayed with the caller's own token.
         "forge": "vcs",
+        # The analyses of a server project (accessibility, i18n, drift of the
+        # docs, flaky tests, technical debt) and their shared reports.
+        "analyses": "insight",
         # A server project's dashboard, analytics, sessions and costs, read
         # from its runs, jobs and the ledgers in its clone.
         "workspace": "analytics",

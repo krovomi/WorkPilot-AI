@@ -1,5 +1,7 @@
 import type React from "react";
 import { useTranslation } from "react-i18next";
+import { useSharedAnalysisReport } from "../../hooks/useSharedAnalysisReport";
+import { SharedReportNote } from "../analyses/SharedReportNote";
 import { useFlakyTestsStore } from "../../stores/flaky-tests-store";
 import type {
 	FlakyConfidence,
@@ -31,6 +33,9 @@ export function FlakyTestReport({
 
 	const isScanning = phase === "scanning";
 	const canRun = !!projectPath && !isScanning;
+	const setReport = useFlakyTestsStore((s) => s.setReport);
+	// A server project's last report, saved on the server by any member.
+	const shared = useSharedAnalysisReport("flaky-tests", projectPath, setReport, isScanning);
 
 	return (
 		<div className="flex flex-col gap-4 p-6 bg-(--bg-primary) text-(--text-primary)">
@@ -63,6 +68,8 @@ export function FlakyTestReport({
 					</button>
 				)}
 			</div>
+
+			{!isScanning && <SharedReportNote saved={shared} />}
 
 			{!projectPath && (
 				<div className="text-sm text-(--text-secondary)">

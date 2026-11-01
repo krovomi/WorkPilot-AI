@@ -33,14 +33,24 @@ import { authedFetch } from "./server-connection";
 
 export type SharedFeature = "roadmap" | "ideation" | "context";
 /**
- * What runs jobs on the server: a feature with files, Insights, or the AI
- * review of a pull or merge request (`ipc-handlers/server-review-jobs.ts`).
+ * What runs jobs on the server: a feature with files, Insights, the AI
+ * review of a pull or merge request (`ipc-handlers/server-review-jobs.ts`),
+ * or an analysis.
  */
 export type JobFeature =
 	| SharedFeature
 	| "insights"
 	| "forge/github/reviews"
-	| "forge/gitlab/reviews";
+	| "forge/gitlab/reviews"
+	| `analyses/${AnalysisKind}`;
+
+/** The analyses a server project runs on the server (`ipc-handlers/server-analyses.ts`). */
+export type AnalysisKind =
+	| "accessibility"
+	| "i18n"
+	| "doc-drift"
+	| "flaky-tests"
+	| "tech-debt";
 
 interface FeatureFiles {
 	directory: string;
