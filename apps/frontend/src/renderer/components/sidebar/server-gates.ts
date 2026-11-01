@@ -21,6 +21,12 @@ export const SERVER_PROJECT_VIEWS: ReadonlySet<SidebarView> = new Set<SidebarVie
 	"github-prs",
 	"gitlab-issues",
 	"gitlab-merge-requests",
+	// Analyses run on the server, their last report shared (`server-analyses.ts`).
+	"accessibility-agent",
+	"i18n-agent",
+	"doc-drift",
+	"flaky-tests",
+	"tech-debt",
 	"administration",
 ]);
 

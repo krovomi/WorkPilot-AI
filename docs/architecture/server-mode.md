@@ -384,9 +384,28 @@ relais, avec le jeton de la personne, puis note sur le serveur ce qui a été pu
 | Suivre la revue, lire les revues enregistrées | `GET …/reviews/jobs/<id>`, `GET …/reviews?numbers=` | `vcs.read` |
 | Publier les findings | `/merge_requests/<n>/notes` par le relais, puis `POST …/reviews/<n>/posted` | `vcs.write`, rôle `member` ou plus |
 
+**Les analyses tournent sur le serveur, leur rapport est partagé.** Accessibilité, i18n, dérive de
+la documentation, tests instables et dette technique lancent chacune un runner de `runners/` dans le
+dossier du projet. Pour un projet du serveur, la vue envoie l'analyse au serveur
+(`shared_features/analyses.py`) : un job sur le clone par `project_jobs`, confiné comme tout job,
+avec `--project-path <clone>` et les seules options de l'analyse, un modèle fermé par analyse (niveau
+WCAG, locale de référence, seuil et nombre de runs) ; la requête nomme une analyse de la liste, jamais
+un runner ni un chemin. Le rapport que le runner imprime est enregistré à la fin du job dans
+`.workpilot/analyses/<analyse>.json` du clone, avec qui l'a lancé et quand : chaque membre lit le
+dernier, un lecteur compris, et la vue l'affiche dès son ouverture. Un job échoué n'en enregistre pas,
+le précédent reste. Côté app, la vue nomme son projet par son dossier : le miroir d'un projet du
+serveur fait passer l'analyse par le serveur (`ipc-handlers/server-analyses.ts`,
+`serverProjectAtPath`), qui ne reçoit jamais de chemin. La dette technique lit ses éléments et sa
+tendance dans ce rapport ; transformer un élément en tâche crée une carte du tableau partagé.
+
+| Action | Route | Il faut |
+|---|---|---|
+| Lancer, arrêter une analyse | `POST /api/features/analyses/<analyse>/jobs`, `…/jobs/<id>/cancel` | `agent.execute`, `agent.cancel`, rôle `member` ou plus |
+| Suivre une analyse, lire son dernier rapport | `GET …/jobs/<id>`, `GET /api/features/analyses/<analyse>/report` | `insight.read` |
+
 ## Ce qui vient
 
 Le plan multi-tenant du 31 octobre, par lots : les autres features servies de la même façon
-(l'investigation et l'auto-fix des issues en jobs, analyses, tableau de bord), le flux du projet ouvert pour
+(l'investigation et l'auto-fix des issues en jobs, les autres analyses, tableau de bord), le flux du projet ouvert pour
 chaque vue partagée, un test de bout en bout à deux organisations, et le guide d'exploitation. Ce
 fichier grandit avec chaque lot.

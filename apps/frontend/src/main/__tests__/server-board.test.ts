@@ -75,11 +75,17 @@ describe("server projects", () => {
 				serverProject({ id: "c3", name: "Admin view", my_role: null, forge: "bitbucket" }),
 			],
 		});
-		const { listServerProjects, getServerProject } = await import(
+		const { listServerProjects, getServerProject, serverProjectAtPath } = await import(
 			"../server-projects"
 		);
 
 		const projects = await listServerProjects();
+		// A view naming its project by folder finds a server project by its mirror only.
+		expect(serverProjectAtPath(projects[0].path)?.id).toBe(PROJECT_ID);
+		expect(serverProjectAtPath(`${projects[0].path}/../${PROJECT_ID}`)?.id).toBe(PROJECT_ID);
+		expect(serverProjectAtPath(path.join(TEST_DIR, "elsewhere"))).toBeUndefined();
+		expect(serverProjectAtPath("")).toBeUndefined();
+		expect(serverProjectAtPath(42)).toBeUndefined();
 
 		expect(projects.map((p) => p.name)).toEqual(["Shop", "Admin view"]);
 		const shop = projects[0];

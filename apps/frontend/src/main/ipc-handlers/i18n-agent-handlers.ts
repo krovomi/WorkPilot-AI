@@ -20,6 +20,11 @@ import { app, BrowserWindow, ipcMain } from "electron";
 import { pythonEnvManager } from "../python-env-manager.js";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { pythonRunnerEnv } from "../utils/python-runner-env";
+import {
+	cancelServerAnalysis,
+	relayServerAnalysis,
+	serverProjectAtPath,
+} from "./server-analyses";
 
 interface RunRequest {
 	projectPath: string;
@@ -40,6 +45,7 @@ export function registerI18nAgentHandlers(): void {
 	let currentProcess: ChildProcess | null = null;
 
 	const killExisting = (): void => {
+		cancelServerAnalysis("i18n");
 		if (currentProcess) {
 			currentProcess.kill("SIGTERM");
 			currentProcess = null;
@@ -55,6 +61,16 @@ export function registerI18nAgentHandlers(): void {
 				const message = "projectPath is required";
 				broadcast(IPC_CHANNELS.I18N_AGENT_ERROR, message);
 				throw new Error(message);
+			}
+
+			// A server project's analysis runs on the server (`server-analyses.ts`).
+			const remote = serverProjectAtPath(projectPath);
+			if (remote) {
+				return relayServerAnalysis(remote, "i18n", { reference_locale: referenceLocale }, {
+					event: IPC_CHANNELS.I18N_AGENT_EVENT,
+					result: IPC_CHANNELS.I18N_AGENT_RESULT,
+					error: IPC_CHANNELS.I18N_AGENT_ERROR,
+				});
 			}
 
 			const backendPath = app.isPackaged

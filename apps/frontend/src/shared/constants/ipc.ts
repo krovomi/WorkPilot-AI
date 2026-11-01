@@ -1031,6 +1031,8 @@ export const IPC_CHANNELS = {
 	AGENT_DEBUGGER_REMOVE_BREAKPOINT: "agentDebugger:removeBreakpoint",
 	AGENT_DEBUGGER_RESUME: "agentDebugger:resume",
 	AGENT_DEBUGGER_SET_BREAKPOINT: "agentDebugger:setBreakpoint",
+	// The last report a member saved of an analysis of a server project
+	ANALYSIS_SHARED_REPORT: "analyses:sharedReport",
 	API_WATCHER_CANCEL: "apiWatcher:cancel",
 	API_WATCHER_ERROR: "api-watcher-error",
 	API_WATCHER_EVENT: "api-watcher-event",

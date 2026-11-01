@@ -17,6 +17,7 @@ import { app, ipcMain } from "electron";
 import { pythonEnvManager } from "../python-env-manager.js";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { pythonRunnerEnv } from "../utils/python-runner-env";
+import { runServerAnalysis, serverAnalysisReport, serverProjectAtPath } from "./server-analyses";
 
 interface ScanRequest {
 	projectPath: string;
@@ -87,9 +88,30 @@ async function runRunner(args: string[]): Promise<unknown> {
 	});
 }
 
+interface SavedDebt {
+	items?: Array<{ roi?: unknown }>;
+	trend?: unknown[];
+	summary?: unknown;
+}
+
+/**
+ * A server project's last scan, as the server saved it (`server-analyses.ts`):
+ * every member reads the same items and trend.
+ */
+async function serverDebt(projectPath: string): Promise<SavedDebt | null> {
+	const project = serverProjectAtPath(projectPath);
+	if (!project) return null;
+	const saved = await serverAnalysisReport(project, "tech-debt");
+	const report = saved?.report;
+	return report && typeof report === "object" ? (report as SavedDebt) : {};
+}
+
 export function registerTechDebtHandlers(): void {
 	ipcMain.handle(IPC_CHANNELS.TECH_DEBT_SCAN, async (_e, req: ScanRequest) => {
 		if (!req.projectPath) throw new Error("projectPath is required");
+		// A server project's scan runs on the server, its report shared.
+		const remote = serverProjectAtPath(req.projectPath);
+		if (remote) return { result: await runServerAnalysis(remote, "tech-debt", {}) };
 		const result = await runRunner([
 			"--project-path",
 			req.projectPath,
@@ -101,6 +123,18 @@ export function registerTechDebtHandlers(): void {
 
 	ipcMain.handle(IPC_CHANNELS.TECH_DEBT_LIST_ITEMS, async (_e, req: ListRequest) => {
 		if (!req.projectPath) throw new Error("projectPath is required");
+		const shared = await serverDebt(req.projectPath);
+		if (shared) {
+			const minScore = Number(req.minScore ?? 0) || 0;
+			const items = Array.isArray(shared.items) ? shared.items : [];
+			return {
+				result: {
+					items: items.filter((item) => Number(item?.roi ?? 0) >= minScore),
+					trend: Array.isArray(shared.trend) ? shared.trend : [],
+					summary: shared.summary ?? {},
+				},
+			};
+		}
 		const args = [
 			"--project-path",
 			req.projectPath,
@@ -116,6 +150,10 @@ export function registerTechDebtHandlers(): void {
 
 	ipcMain.handle(IPC_CHANNELS.TECH_DEBT_GET_TREND, async (_e, req: ScanRequest) => {
 		if (!req.projectPath) throw new Error("projectPath is required");
+		const shared = await serverDebt(req.projectPath);
+		if (shared) {
+			return { result: { trend: Array.isArray(shared.trend) ? shared.trend : [] } };
+		}
 		const result = await runRunner([
 			"--project-path",
 			req.projectPath,
@@ -128,6 +166,11 @@ export function registerTechDebtHandlers(): void {
 	ipcMain.handle(IPC_CHANNELS.TECH_DEBT_GENERATE_SPEC, async (_e, req: SpecRequest) => {
 		if (!req.projectPath || !req.itemId) {
 			throw new Error("projectPath and itemId are required");
+		}
+		// A spec folder would land in the mirror, which nothing runs: a
+		// server project's debt item becomes a card of its board instead.
+		if (serverProjectAtPath(req.projectPath)) {
+			throw new Error("Create a task from the item: its spec lives on the server");
 		}
 		const args = [
 			"--project-path",

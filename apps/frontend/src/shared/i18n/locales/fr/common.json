@@ -1,4 +1,5 @@
 {
+	"sharedAnalysis": { "lastReport": "Rapport partagé sur le serveur, lancé le {{date}}" },
 	"selectSearch": {
 		"placeholder": "Saisir pour filtrer…",
 		"empty": "Aucun résultat"

@@ -1,6 +1,8 @@
 import type React from "react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useSharedAnalysisReport } from "../../hooks/useSharedAnalysisReport";
+import { SharedReportNote } from "../analyses/SharedReportNote";
 import {
 	setupI18nAgentListeners,
 	useI18nAgentStore,
@@ -41,6 +43,9 @@ export function I18nReportView({
 
 	const isScanning = phase === "scanning";
 	const canRun = !!projectPath && !isScanning;
+	const setReport = useI18nAgentStore((s) => s.setReport);
+	// A server project's last report, saved on the server by any member.
+	const shared = useSharedAnalysisReport("i18n", projectPath, setReport, isScanning);
 
 	return (
 		<div className="flex flex-col gap-4 p-6 bg-(--bg-primary) text-(--text-primary)">
@@ -63,6 +68,8 @@ export function I18nReportView({
 					className="px-3 py-2 rounded bg-(--bg-secondary) border border-(--border-color) text-(--text-primary) text-sm focus:outline-none focus:ring-2 focus:ring-(--accent-color)"
 				/>
 			)}
+
+			{!isScanning && <SharedReportNote saved={shared} />}
 
 			{!projectPath && (
 				<div className="text-sm text-(--text-secondary)">

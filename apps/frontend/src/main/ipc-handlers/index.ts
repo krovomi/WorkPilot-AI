@@ -29,6 +29,7 @@ import { registerTaskSandboxHandlers } from "./task-sandbox-handlers";
 import { registerBlastRadiusHandlers } from "./blast-radius-handlers";
 import { registerBountyBoardHandlers } from "./bounty-board-handlers";
 import { registerTechDebtHandlers } from "./tech-debt-handlers";
+import { registerServerAnalysisHandlers } from "./server-analyses";
 import { registerTeamBotHandlers } from "./team-bot-handlers";
 import { registerApiExplorerHandlers } from "./api-explorer-handlers";
 import { registerApiWatcherHandlers } from "./api-watcher-handlers";
@@ -600,6 +601,9 @@ export function setupIpcHandlers(
 
 	// Tech Debt handlers (Feature 9 — ROI-scored tech debt dashboard)
 	registerTechDebtHandlers();
+
+	// The analyses of a server project, run on the server, their reports shared
+	registerServerAnalysisHandlers();
 
 	// Team Bot handlers (Feature 4 — Slack / Microsoft Teams notifications)
 	registerTeamBotHandlers();
