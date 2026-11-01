@@ -130,3 +130,28 @@ export interface CardChanges {
 	deletions?: number;
 	files: ChangedFile[];
 }
+
+export type LogPhase = "planning" | "coding" | "validation";
+
+export interface TaskLogEntry {
+	timestamp: string;
+	type: string;
+	content: string;
+	tool_name?: string;
+}
+
+export interface TaskPhaseLog {
+	phase: LogPhase;
+	status: "pending" | "active" | "completed" | "failed";
+	started_at: string | null;
+	completed_at: string | null;
+	entries: TaskLogEntry[];
+}
+
+/** `GET /api/board/cards/{id}/logs`: the build log, bounded and masked by the server. */
+export interface TaskLogs {
+	spec_id?: string;
+	updated_at?: string;
+	truncated?: boolean;
+	phases: Record<LogPhase, TaskPhaseLog>;
+}

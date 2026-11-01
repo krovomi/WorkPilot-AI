@@ -231,6 +231,19 @@ async def get_card(
     return card
 
 
+@router.get("/cards/{card_id}/logs")
+async def get_card_logs(
+    card_id: str,
+    scope: ProjectScope = Depends(resolve_project_scope),
+) -> dict[str, Any]:
+    """The card's build log (``shared_board/logs.py``): what the agent did, for
+    every member who may read the card, whoever started the run."""
+    from shared_board.logs import card_logs
+
+    directory = _card_or_404(scope, card_id)
+    return {"logs": card_logs(scope.path, directory)}
+
+
 @router.patch("/cards/{card_id}")
 async def update_card(
     card_id: str,

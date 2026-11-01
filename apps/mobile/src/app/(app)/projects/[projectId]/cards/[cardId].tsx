@@ -15,6 +15,7 @@ import {
 } from "../../../../../board/actions";
 import { ACTIVE_COLUMNS } from "../../../../../board/columns";
 import { ChangesSection } from "../../../../../card/ChangesSection";
+import { LogsSection } from "../../../../../card/LogsSection";
 import { canEditCard, EditCard } from "../../../../../card/EditCard";
 import { LongText } from "../../../../../card/LongText";
 import { useCard } from "../../../../../board/useCard";
@@ -58,7 +59,7 @@ export default function CardScreen() {
 		);
 	}
 
-	const { card, details, runs, changes } = data;
+	const { card, details, runs, changes, logs } = data;
 	const actions = allowedActions(availableActions(card, details, runs), can);
 	const editable = can("task.write") && canEditCard(details, working);
 
@@ -231,6 +232,8 @@ export default function CardScreen() {
 			) : null}
 
 			<ChangesSection changes={changes} />
+
+			<LogsSection logs={logs} />
 
 			<Section title={t("card.runs")}>
 				{runs.length === 0 ? (
