@@ -558,6 +558,12 @@ export class TaskStateManager {
 					reviewReason === "plan_review" ? "plan_review" : "human_review";
 				contextReviewReason = reviewReason;
 				break;
+			case "build_failed":
+				// Code finished, CI red: a review state the user or the repair
+				// loop resumes from (USER_RESUMED), not a fresh backlog task.
+				stateValue = "human_review";
+				contextReviewReason = reviewReason ?? "completed";
+				break;
 			case "pr_created":
 				stateValue = "pr_created";
 				break;
