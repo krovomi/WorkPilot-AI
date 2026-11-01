@@ -327,6 +327,11 @@ Entra sign-in is on only when both Entra variables are set; local accounts work
 either way. Neither identifier is a secret: `GET /auth/config` hands both to the
 sign-in page.
 
+The phone app signs in with the same app registration, as a public client
+(authorization code with PKCE, no secret on the phone). Add a **Mobile and
+desktop applications** platform to the registration with the redirect URI
+`workpilot://auth`; without it Microsoft refuses the phone's request.
+
 ### Invitations and local passwords
 
 | Variable | Default | Meaning |

@@ -13,7 +13,10 @@
 		"forbidden": "You don't have the rights for this action.",
 		"generic": "Something went wrong: {{message}}",
 		"card_not_indexed": "The server hasn't indexed this card yet. Pull to refresh.",
-		"feedback_required": "Say what needs to change."
+		"feedback_required": "Say what needs to change.",
+		"entra_disabled": "This server doesn't offer Microsoft sign-in.",
+		"entra_failed": "Microsoft sign-in didn't complete.",
+		"entra_misconfigured": "The server's Microsoft sign-in settings are invalid."
 	},
 	"signIn": {
 		"title": "WorkPilot AI",
@@ -27,7 +30,11 @@
 		"insecureUrl": "Use an https:// address. Plain http is only allowed on your local network.",
 		"localDisabled": "This server only accepts Microsoft sign-in, which the mobile app doesn't support yet.",
 		"failed": "Sign-in failed: {{message}}",
-		"badCredentials": "Wrong email or password."
+		"badCredentials": "Wrong email or password.",
+		"or": "or",
+		"microsoft": "Sign in with Microsoft",
+		"entraDisabled": "This server doesn't offer Microsoft sign-in.",
+		"entraRefused": "The server refused this Microsoft account."
 	},
 	"unreachable": {
 		"title": "Server unreachable",
@@ -150,7 +157,8 @@
 		"jobRunning": "An agent is working on it…",
 		"jobFailed": "The last run failed. {{error}}",
 		"toCard": "Turn into a card",
-		"openCard": "Open its card"
+		"openCard": "Open its card",
+		"context": "Context"
 	},
 	"roadmap": {
 		"empty": "No roadmap yet. Generate one: an agent studies the project and proposes phases and features.",
@@ -285,5 +293,70 @@
 				"body": "Debt items found in the code, by cost."
 			}
 		}
+	},
+	"context": {
+		"index": "Index",
+		"memories": "Memories",
+		"noIndex": "The project hasn't been indexed yet. Generate the index to see its services, infrastructure and conventions.",
+		"projectType": "Project: {{type}}",
+		"type": {
+			"single": "single service",
+			"monorepo": "monorepo"
+		},
+		"services_one": "{{count}} service",
+		"services_other": "{{count}} services",
+		"port": "port {{port}}",
+		"infrastructure": "Infrastructure",
+		"conventions": "Conventions",
+		"infrastructureKeys": {
+			"docker_compose": "Docker Compose",
+			"docker_services": "Compose services",
+			"dockerfile": "Dockerfile",
+			"dockerfiles": "Dockerfiles",
+			"ci": "CI",
+			"ci_workflows": "CI workflows",
+			"deployment": "Deployment"
+		},
+		"conventionsKeys": {
+			"python_linting": "Python linting",
+			"python_formatting": "Python formatting",
+			"js_linting": "JS linting",
+			"formatting": "Formatting",
+			"typescript": "TypeScript",
+			"git_hooks": "Git hooks"
+		},
+		"search": "Search the memories",
+		"noBrain": "No memories yet: the project's first build that learns something creates them.",
+		"noMemories": "No memories yet.",
+		"noMatch": "No memory matches this search.",
+		"memoryType": {
+			"gotcha": "Gotcha",
+			"pattern": "Pattern",
+			"codebase_discovery": "Discovery",
+			"task_outcome": "Outcome",
+			"session_insight": "Session"
+		}
+	},
+	"tokens": {
+		"title": "My tokens on the server",
+		"summary": "Your GitHub, GitLab, Azure DevOps, Jira and Linear tokens, used for your own calls.",
+		"manage": "Manage my tokens",
+		"intro": "The server keeps these tokens encrypted and uses them for your own forge and tracker calls. Once saved, a token is never shown again, on the phone or anywhere else.",
+		"kinds": {
+			"github_token": "GitHub",
+			"gitlab_token": "GitLab",
+			"azure_pat": "Azure DevOps",
+			"jira_token": "Jira",
+			"linear_api_key": "Linear"
+		},
+		"set": "Saved",
+		"notSet": "Not set",
+		"add": "Add",
+		"replace": "Replace",
+		"remove": "Remove",
+		"save": "Save",
+		"value": "{{name}} token",
+		"removeTitle": "Remove the {{name}} token?",
+		"removeBody": "The server forgets it; calls that need it stop until you add one again."
 	}
 }

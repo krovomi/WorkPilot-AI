@@ -5,6 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { ApiError, ServerClient } from "../api/client";
 import { api } from "../api/endpoints";
 import { normaliseServerUrl } from "../api/server-url";
+import { entraIdToken } from "../auth/entra";
 import { useSession } from "../auth/session";
 import { describeError } from "../i18n";
 import { Button, ErrorBanner, Field } from "../ui/components";
@@ -17,33 +18,46 @@ export default function SignIn() {
 	const [server, setServer] = useState(session.serverUrl ?? "");
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
-	const [busy, setBusy] = useState(false);
+	const [busy, setBusy] = useState<"password" | "microsoft" | null>(null);
 	const [error, setError] = useState<string | null>(null);
 
-	const submit = async () => {
+	/** Check the address, read what the server offers, then sign in one way or the other. */
+	const attempt = async (how: "password" | "microsoft") => {
 		const url = normaliseServerUrl(server);
 		if (!url.ok) {
 			setError(t(url.reason === "insecure" ? "signIn.insecureUrl" : "signIn.invalidUrl"));
 			return;
 		}
-		setBusy(true);
+		setBusy(how);
 		setError(null);
 		try {
 			const config = await api(new ServerClient({ baseUrl: url.url })).authConfig();
+			if (how === "microsoft") {
+				if (!config.entra_enabled) {
+					setError(t("signIn.entraDisabled"));
+					return;
+				}
+				const idToken = await entraIdToken(config);
+				if (idToken) await session.signInWithEntra(url.url, idToken);
+				return;
+			}
 			if (!config.local_enabled) {
 				setError(t("signIn.localDisabled"));
 				return;
 			}
 			await session.signIn(url.url, email.trim(), password);
 		} catch (err) {
-			// A 401 here is a refused password, not an ended session.
+			// A 401 here is a refused password or Microsoft account, not an ended session.
 			const message =
-				err instanceof ApiError && err.status === 401 ? t("signIn.badCredentials") : describeError(err);
+				err instanceof ApiError && err.status === 401
+					? t(how === "password" ? "signIn.badCredentials" : "signIn.entraRefused")
+					: describeError(err);
 			setError(t("signIn.failed", { message }));
 		} finally {
-			setBusy(false);
+			setBusy(null);
 		}
 	};
+	const submit = () => attempt("password");
 
 	const ready = server.trim() && email.trim() && password;
 	return (
@@ -86,7 +100,20 @@ export default function SignIn() {
 						onSubmitEditing={() => void submit()}
 					/>
 					<ErrorBanner message={error} />
-					<Button label={t("signIn.submit")} busy={busy} disabled={!ready} onPress={() => void submit()} />
+					<Button
+						label={t("signIn.submit")}
+						busy={busy === "password"}
+						disabled={!ready || !!busy}
+						onPress={() => void submit()}
+					/>
+					<Text style={{ color: theme.textFaint, textAlign: "center" }}>{t("signIn.or")}</Text>
+					<Button
+						label={t("signIn.microsoft")}
+						variant="secondary"
+						busy={busy === "microsoft"}
+						disabled={!server.trim() || !!busy}
+						onPress={() => void attempt("microsoft")}
+					/>
 				</ScrollView>
 			</KeyboardAvoidingView>
 		</SafeAreaView>

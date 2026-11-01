@@ -12,7 +12,7 @@ applications mobiles pour un projet.
 
 | Écran | Fichier | Au serveur |
 |---|---|---|
-| Connexion | `src/app/sign-in.tsx` | `GET /auth/config`, puis `POST /auth/login` (email et mot de passe) |
+| Connexion | `src/app/sign-in.tsx` | `GET /auth/config`, puis `POST /auth/login` (email et mot de passe) ou `POST /auth/oidc/exchange` (compte Microsoft, voir plus bas) |
 | Projets | `src/app/(app)/index.tsx` | `GET /projects`, ceux de l'organisation active |
 | Kanban | `src/app/(app)/projects/[projectId]/index.tsx` | `GET /api/board/cards`, relu à chaque événement de `project:<id>` |
 | Nouvelle carte | `src/app/(app)/projects/[projectId]/new.tsx` | `POST /api/board/cards` |
@@ -21,10 +21,12 @@ applications mobiles pour un projet.
 | Roadmap | `src/app/(app)/projects/[projectId]/roadmap.tsx` | `GET /api/features/roadmap/snapshot`, `POST .../jobs` pour la générer, `POST .../features/{id}/convert` pour en faire une carte |
 | Idées | `src/app/(app)/projects/[projectId]/ideas.tsx` | idem sous `/api/features/ideation` (`.../ideas/{id}/convert`) |
 | GitHub ou GitLab | `src/app/(app)/projects/[projectId]/forge/` | `POST /api/features/forge/<forge>/read` et `.../write` (le relais, avec le jeton de la personne), `.../github/pulls`, `.../<forge>/reviews` pour la revue IA |
+| Contexte | `src/app/(app)/projects/[projectId]/context.tsx` | l'index : `GET /api/features/context/snapshot`, `POST .../jobs` pour le reconstruire ; les mémoires : `GET /api/features/context/memories` (`query` pour chercher) |
 | Tableau de bord | `src/app/(app)/projects/[projectId]/dashboard.tsx` | `GET /api/features/workspace/dashboard` et `.../costs` |
 | Sessions | `src/app/(app)/projects/[projectId]/sessions.tsx` | `GET /api/features/workspace/sessions` (les 100 dernières) |
 | Analyses | `src/app/(app)/projects/[projectId]/analyses/` | `GET /api/features/analyses/<analyse>/report`, `POST .../jobs` pour la lancer, suivie comme un job |
 | Réglages | `src/app/(app)/settings.tsx` | `POST /auth/switch-org`, `POST /auth/logout` |
+| Mes jetons sur le serveur | `src/app/(app)/tokens.tsx` | `GET`, `PUT /users/me/secrets`, `DELETE /users/me/secrets/{kind}` |
 
 Les actions d'une carte sont celles de l'app de bureau sur une carte du serveur
 (`main/server-board-actions.ts`), avec la même correspondance (`src/board/actions.ts`) :
@@ -128,6 +130,24 @@ tout appel que les vues du bureau ne font pas : le téléphone ne voit jamais le
 | Commenter, fusionner | oui (`vcs.write`, la fusion `vcs.pr.merge`, après confirmation) | oui |
 | Revue IA | lancée comme job sur le serveur, suivie, puis lue (`review_<n>.json`) | idem |
 
+## Contexte, jetons personnels et connexion Microsoft
+
+Le contexte est celui d'un projet du serveur, comme sur le bureau : l'index du clone (services,
+infrastructure, conventions), lu avec méfiance (`src/context/index-file.ts`, jamais le chemin du
+serveur), reconstruit par un job, et les mémoires du cerveau du projet, que chaque build enrichit.
+Les deux demandent `insight.read` ; reconstruire l'index, `agent.execute`.
+
+Les jetons personnels (GitHub, GitLab, Azure DevOps, Jira, Linear) sont ceux que le serveur garde
+chiffrés pour les appels de la personne, par exemple ceux du relais GitHub et GitLab. Le téléphone
+envoie un jeton une fois et ne le relit jamais : le serveur ne dit que lesquels sont enregistrés.
+
+La connexion Microsoft Entra utilise l'enregistrement d'application du serveur (`GET /auth/config`
+donne son tenant et son client). Le navigateur du système ouvre la page de Microsoft, l'app reçoit un
+code sur `workpilot://auth` (PKCE, aucun secret sur le téléphone), l'échange chez Microsoft contre un
+id_token et le remet au serveur, qui en vérifie la signature, l'audience et l'émetteur
+(`src/auth/entra.ts`). L'enregistrement Entra doit déclarer cette URI de redirection pour une
+plateforme « Applications mobiles et de bureau » (voir [CONFIGURATION.md](../CONFIGURATION.md)).
+
 ## Tableau de bord, sessions et analyses
 
 Le tableau de bord reprend les chiffres de la vue du bureau (cartes par colonne, qualité, dépenses
@@ -166,5 +186,4 @@ développement, simulateur, web), l'app fonctionne de la même façon, sans noti
 
 ## Ce qui vient
 
-- Connexion Microsoft Entra (`expo-auth-session`, puis `POST /auth/oidc/exchange`).
-- L'administration (membres, rôles, groupes, invitations), le contexte du projet, les jetons personnels.
+- L'administration (membres, rôles, groupes, invitations).

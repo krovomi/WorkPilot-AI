@@ -28,6 +28,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+from cryptography.fernet import Fernet
+
 from tests.server_e2e import stack as e2e
 
 PROJECT_NAME = "Team Board"
@@ -102,6 +104,9 @@ def main() -> int:
             f"sqlite+aiosqlite:///{(root / 'server.db').as_posix()}"
         )
         env = e2e.server_env(database, root / "repos")
+        # The vault of personal tokens (Settings → My tokens): a key drawn
+        # for this run only, gone with it.
+        env["WORKPILOT_SECRETS_MASTER_KEY"] = Fernet.generate_key().decode()
         e2e.migrate(env)
         run = e2e.run_suffix()
         people = {key: e2e.new_person(key, run) for key in ("platform", *PEOPLE)}

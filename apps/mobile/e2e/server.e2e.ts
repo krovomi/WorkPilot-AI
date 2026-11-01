@@ -246,3 +246,34 @@ test("the dashboard, the sessions and the analyses open from the board", async (
 	await expect(alice.getByText("Never run on this project.")).toBeVisible({ timeout: 30_000 });
 	await expect(alice.getByRole("button", { name: "Generate" })).toBeVisible();
 });
+
+test("the project's context, and a personal token kept on the server", async () => {
+	// Alice is still on the analyses, where the previous scenario left her.
+	const alice = signedInPage("alice");
+	await alice.goBack();
+	await alice.goBack();
+	await alice.goBack();
+	await alice.getByRole("link", { name: "Context" }).click();
+	await expect(alice.getByText(/hasn't been indexed yet/)).toBeVisible({ timeout: 30_000 });
+	await expect(alice.getByRole("button", { name: "Generate" })).toBeVisible();
+	await alice.getByRole("tab", { name: "Memories" }).click();
+	await expect(alice.getByText(/No memories yet/)).toBeVisible({ timeout: 30_000 });
+	await shot(alice, "10-context");
+
+	// Bob saves a GitHub token: the server says it is set, and never shows it back.
+	// Bob is on the Insights conversation where an earlier scenario left him.
+	const bob = signedInPage("bob");
+	await bob.goBack();
+	await bob.goBack();
+	await bob.goBack();
+	await bob.getByText("Settings", { exact: true }).click();
+	await bob.getByRole("button", { name: "Manage my tokens" }).click();
+	await bob.getByRole("button", { name: "Add" }).first().click({ timeout: 30_000 });
+	const token = `ghp_${randomBytes(12).toString("hex")}`;
+	await bob.getByLabel("GitHub token").fill(token);
+	await bob.getByRole("button", { name: "Save" }).click();
+	await expect(bob.getByText("Saved")).toBeVisible({ timeout: 30_000 });
+	await expect(bob.getByRole("button", { name: "Replace" })).toBeVisible();
+	await shot(bob, "11-tokens");
+	expect(await bob.content()).not.toContain(token);
+});
