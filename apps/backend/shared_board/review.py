@@ -29,6 +29,12 @@ from server.authz.scope import ProjectScope, resolve_project_scope
 from server.db.engine import get_db
 from server.db.models import Project
 from server.services.events import emit_board_event
+from shared_board.attachments import (
+    MAX_IMAGES,
+    ImageUpload,
+    decode_images,
+    store_images,
+)
 from shared_board.cards import _card_or_404, _index_row, _require_writer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -44,6 +50,8 @@ _BRANCH = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9._/-]{0,199}$")
 
 class ChangeRequest(BaseModel):
     feedback: str = Field(min_length=1, max_length=MAX_FEEDBACK)
+    # Screenshots of what is wrong, as the review panel attaches them.
+    images: list[ImageUpload] = Field(default_factory=list, max_length=MAX_IMAGES)
 
 
 def _within(root: Path, *parts: str) -> Path | None:
@@ -187,6 +195,7 @@ async def request_changes(
     feedback = body.feedback.strip()
     if not feedback:
         raise HTTPException(status_code=422, detail="Say what to change")
+    images = decode_images(body.images)
     directory = _card_or_404(scope, card_id)
     workspace = _workspace(scope, card_id)
     if workspace is None:
@@ -200,9 +209,15 @@ async def request_changes(
     if workspace_spec is None:
         raise HTTPException(status_code=404, detail="Card not found")
     workspace_spec.mkdir(parents=True, exist_ok=True)
+    # As the desktop review panel does: images in feedback_images/, listed
+    # under the feedback for the QA fixer to open.
+    stored = store_images(workspace_spec / "feedback_images", images)
+    references = "\n\n".join(f"![Feedback Image]({image['path']})" for image in stored)
+    if references:
+        references = f"## Reference Images\n\n{references}\n\n"
     (workspace_spec / "QA_FIX_REQUEST.md").write_text(
         f"# QA Fix Request\n\nStatus: REJECTED\n\n## Feedback\n\n{feedback}\n\n"
-        f"Created at: {now}\n",
+        f"{references}Created at: {now}\n",
         encoding="utf-8",
     )
     first_line = feedback.splitlines()[0][:120]

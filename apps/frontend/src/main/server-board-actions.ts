@@ -12,6 +12,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import type { IPCResult, Project, Task, TaskMetadata } from "../shared/types";
 import { getRemoteTasks, parseServerTaskId } from "./remote-board";
+import { serverImageUploads } from "./server-card-images";
 import { patchServerCardSettings, settingsFromMetadata } from "./server-card-settings";
 import { authedFetch } from "./server-connection";
 import { getServerProject } from "./server-projects";
@@ -88,6 +89,8 @@ export async function createServerCard(
 		return { success: false, error: "Invalid title or description" };
 	}
 	const settings = settingsFromMetadata(metadata);
+	const images = serverImageUploads(metadata?.attachedImages);
+	if (images.error) return { success: false, error: images.error };
 	const result = await authedFetch<{ id?: unknown }>(cardsUrl(project), "POST", {
 		title: name,
 		description: text,
@@ -95,6 +98,7 @@ export async function createServerCard(
 		// The engine, priority and category the dialog chose; the server writes
 		// them where the build reads them.
 		...(settings ? { settings } : {}),
+		...(images.uploads?.length ? { attachments: images.uploads } : {}),
 	});
 	if (!result.ok) return { success: false, error: result.error };
 	const cardId = result.data?.id;

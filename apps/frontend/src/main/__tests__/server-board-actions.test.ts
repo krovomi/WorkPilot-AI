@@ -238,6 +238,26 @@ describe("server card actions", () => {
 		expect(sent[1].settings).toBeUndefined();
 	});
 
+	it("sends the dialog's images, and refuses one it cannot send", async () => {
+		const { actions, project } = await setup();
+		const sent: Array<Record<string, unknown>> = [];
+		serve({
+			[`POST /api/board/cards${Q}`]: (body) => {
+				sent.push(body as Record<string, unknown>);
+				return { ok: true, data: { id: "002-new" } };
+			},
+			[`GET /api/board/snapshot${Q}`]: () => snapshot({}),
+		});
+		const png = { id: "1", filename: "shot.png", mimeType: "image/png", size: 3, data: "iVBO" };
+		await actions.createServerCard(project, "New", "Text", { attachedImages: [png] } as never);
+		expect(sent[0].attachments).toEqual([{ filename: "shot.png", mimeType: "image/png", data: "iVBO" }]);
+
+		const svg = { ...png, filename: "logo.svg", mimeType: "image/svg+xml" };
+		const refused = await actions.createServerCard(project, "New", "Text", { attachedImages: [svg] } as never);
+		expect(refused.success).toBe(false);
+		expect(sent).toHaveLength(1);
+	});
+
 	it("deletes through the server", async () => {
 		const { actions } = await setup();
 		const card = actions.findServerCard(`server:${PID}:001-login`);
