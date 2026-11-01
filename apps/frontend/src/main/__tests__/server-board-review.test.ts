@@ -181,6 +181,41 @@ describe("a server card's review", () => {
 		expect(phases).toEqual(["merge", "pr"]);
 	});
 
+	it("sends the PR dialog's title, body, target and draft with the run", async () => {
+		const { card, review } = await setup();
+		const bodies: unknown[] = [];
+		serve({
+			...SPECS,
+			[`POST /projects/${PID}/specs/row-1/runs`]: (body) => {
+				bodies.push(body);
+				return { ok: true, data: { id: "run-1" } };
+			},
+		});
+		await review.createServerCardPR(card, {
+			title: "  Add login ",
+			customBody: "## Why\nUsers sign in.",
+			targetBranch: "develop",
+			draft: true,
+			allowCrossReviewDisagreement: true,
+			runVisualProof: true,
+		});
+		await review.createServerCardPR(card, { draft: false });
+		expect(bodies).toEqual([
+			{
+				phase: "pr",
+				pr: {
+					title: "Add login",
+					body: "## Why\nUsers sign in.",
+					target_branch: "develop",
+					draft: true,
+					ignore_cross_review: true,
+				},
+			},
+			// Nothing edited: the server writes the PR from the spec.
+			{ phase: "pr" },
+		]);
+	});
+
 	it("approves as this person, and sends the work back before building again", async () => {
 		const { card, review } = await setup();
 		const calls: string[] = [];

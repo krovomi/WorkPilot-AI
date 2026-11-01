@@ -126,7 +126,7 @@ du backend. Après chaque écriture, l'index du serveur est relu et un événeme
 | Lire ce que le build a changé | `GET /api/board/cards/{id}/changes` | `task.read` ; fichiers, lignes et patch de la branche `workpilot/<carte>` contre la branche du projet, lus dans l'espace de build du clone |
 | Lire le journal du build | `GET /api/board/cards/{id}/logs` | `task.read` ; `task_logs.json` du dossier de spec fusionné avec celui de l'espace de build comme l'app le fait en local (`shared_board/logs.py`), borné (1 000 lignes par phase, 8 000 caractères par ligne) et masqué ; `null` tant qu'aucun run n'a écrit ; un lien symbolique ou un fichier hors du clone n'est pas lu |
 | Renvoyer le travail avec des demandes | `POST /api/board/cards/{id}/request-changes` | `review.approve`, rôle `member` ou plus ; refusé (409) sans espace de build ou pendant un run. Les `images` jointes vont dans `feedback_images/` de l'espace de build, listées sous la demande comme le fait l'app |
-| Lancer une phase | `POST /projects/{id}/specs/{spec}/runs` | `agent.execute` ; `merge` demande aussi `task.merge`, `pr` aussi `vcs.pr.create` |
+| Lancer une phase | `POST /projects/{id}/specs/{spec}/runs` | `agent.execute` ; `merge` demande aussi `task.merge`, `pr` aussi `vcs.pr.create`. Avec `pr`, un objet `pr` facultatif (titre d'une ligne, corps, branche cible, brouillon, passer outre la revue croisée, `PullRequestOptions`) devient les arguments de `run.py --create-pr` ; le corps passe par un fichier du dossier temporaire du run, jamais par argv, et le titre en un seul jeton |
 
 Une carte peut demander une revue avant le code (`require_review`, vrai par défaut, comme dans
 l'app). Sans revue, la phase `spec` approuve ce qu'elle écrit et enchaîne le build, comme dans
@@ -177,7 +177,7 @@ pris pour une carte du serveur.
 | Voir les changements (`TASK_WORKTREE_STATUS`, `TASK_WORKTREE_DIFF`, `TASK_FILE_DIFF`) | `GET /api/board/cards/{id}/changes`, repris champ par champ ; le chemin du serveur n'arrive jamais à l'app |
 | Onglet Logs (`TASK_LOGS_GET`, `TASK_LOGS_WATCH`) | `GET /api/board/cards/{id}/logs`, relu toutes les 3 s tant que l'onglet est ouvert, envoyé à la fenêtre seulement s'il a changé (`main/server-card-logs.ts`) ; pas de journaux par modèle pour une carte du serveur |
 | Fusionner (`TASK_WORKTREE_MERGE`) | phase `merge` ; l'aperçu (`…_MERGE_PREVIEW`) ne signale aucun conflit qu'il n'a pas vérifié, et « préparer sans commiter » n'est pas offert : le clone du serveur n'est à personne |
-| Créer la PR (`TASK_WORKTREE_CREATE_PR`) | phase `pr` ; le titre et le corps viennent de la spec, les retouches du dialogue ne sont pas envoyées |
+| Créer la PR (`TASK_WORKTREE_CREATE_PR`) | phase `pr`, avec le titre, le corps, la branche cible et le brouillon du dialogue (`serverPROptions`) ; sans retouche, le serveur les écrit depuis la spec. La preuve visuelle n'est pas lancée pour une carte du serveur |
 | Approuver (`TASK_REVIEW`, oui) | `POST /api/board/cards/{id}/approve` |
 | Demander des changements (`TASK_REVIEW`, non) | `POST /api/board/cards/{id}/request-changes` avec ses images, puis phase `build` ; une image que le serveur n'accepte pas (SVG, plus de 5 Mo, plus de 10) est refusée dans l'app plutôt que perdue |
 
