@@ -387,7 +387,7 @@ async def test_a_job_runs_the_features_runner_on_the_clone(
     assert later["lines"] == ["done"]
     assert (clone / ".workpilot" / "roadmap" / "roadmap.json").exists()
     statuses = [d["status"] for _, e, d in events if e == "feature_job"]
-    assert statuses == ["running", "succeeded"]
+    assert statuses == ["queued", "running", "succeeded"]
 
     async with await _session() as db:
         snapshot = await routes[("GET", "/snapshot")](scope=scope, db=db)

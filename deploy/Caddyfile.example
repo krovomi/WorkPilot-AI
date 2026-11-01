@@ -1,0 +1,38 @@
+# WorkPilot AI — TLS reverse proxy in front of the multi-user server (Caddy 2)
+#
+#   cd deploy
+#   cp Caddyfile.example Caddyfile
+#   cp docker-compose.override.example.yml docker-compose.override.yml
+#   docker compose --env-file .env.server up -d
+#
+# Caddy runs in the network namespace of the `api` container (see the
+# override): the API listens there on port 9000, and the streaming WebSocket
+# server on the loopback only (localhost:8765), which no published port and
+# no other container reaches.
+#
+# The site is WORKPILOT_PUBLIC_BASE_URL from .env.server, without a trailing
+# slash (e.g. https://workpilot.example.com). With a public DNS name and
+# ports 80 and 443 reachable, Caddy obtains and renews the certificate
+# itself. Otherwise give it yours inside the site block below:
+#   tls /certs/fullchain.pem /certs/privkey.pem
+# and mount /certs read-only into the proxy service.
+#
+# Point the desktop app's live board at this proxy, in .env.server:
+#   WORKPILOT_PUBLIC_STREAM_URL=wss://workpilot.example.com
+#
+# Guide: docs/server-operations.md
+
+{$WORKPILOT_PUBLIC_BASE_URL} {
+	# The live stream (/stream/project:<id>, /stream/run:<id>). The app sends
+	# its token in the Authorization header of the handshake, never in the URL.
+	handle /stream/* {
+		reverse_proxy 127.0.0.1:8765
+	}
+
+	# Everything else: the REST API. Caddy sets X-Forwarded-For, which the
+	# API trusts only from 127.0.0.1 (uvicorn's default): the audit log and
+	# the sign-in rate limit see the client's address, not the proxy's.
+	handle {
+		reverse_proxy 127.0.0.1:9000
+	}
+}

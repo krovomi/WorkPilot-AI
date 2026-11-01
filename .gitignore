@@ -26,6 +26,12 @@ Desktop.ini
 /.env.development
 /.env.production
 /.env.test
+# Server deployment: the operator's copies of the deploy/ examples, and the
+# SSH key the server reaches the forges with (docs/server-operations.md)
+/deploy/.env.server
+/deploy/docker-compose.override.yml
+/deploy/Caddyfile
+/deploy/git-ssh/
 /config.json
 *.pem
 *.key

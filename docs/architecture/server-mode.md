@@ -6,7 +6,9 @@ les autres. Les droits passent par des rôles ; deux organisations d'un même se
 pas. Sans `WORKPILOT_SERVER_MODE`, rien de ceci n'existe : l'app locale garde un seul
 propriétaire implicite, sans base ni authentification.
 
-Réglages et déploiement : [`CONFIGURATION.md`](../CONFIGURATION.md#4-multi-user-server-mode--tenants-roles-and-permissions).
+Réglages : [`CONFIGURATION.md`](../CONFIGURATION.md#4-multi-user-server-mode--tenants-roles-and-permissions).
+Déployer, mettre derrière TLS, sauvegarder, mettre à jour : le guide d'exploitation,
+[`server-operations.md`](../server-operations.md).
 Règles : [`rules/security.md`](../rules/security.md#s5--mode-serveur--authentification-autorisation-tenant).
 
 ## Les pièces
@@ -129,8 +131,8 @@ lecture, et les lit avec le chargeur des projets locaux : une carte du serveur r
 carte locale.
 
 La barre latérale n'offre pour un projet du serveur que les vues qui passent par le serveur
-(`sidebar/server-gates.ts`, aujourd'hui le Kanban, la Roadmap et l'administration) ; les autres
-agiraient sur le miroir. La liste des projets est relue quand la session change (connexion, déconnexion, autre
+(`sidebar/server-gates.ts` : le Kanban, l'espace de travail, les features partagées, les vues de sa
+forge et l'administration) ; les autres agiraient sur le miroir. La liste des projets est relue quand la session change (connexion, déconnexion, autre
 compte).
 
 Les actions du Kanban sur une carte du serveur partent au serveur (`main/server-board-actions.ts`),
@@ -165,7 +167,7 @@ quel à l'app.
 ## Le tableau en direct
 
 Tant qu'un tableau du serveur est affiché, le main tient une WebSocket sur le canal du projet
-(`main/server-board-live.ts`, `project:<id>`) : ce qu'un collègue crée, modifie, approuve, réserve,
+(`main/server-board-live.ts`, `project:<id>`, celle que partagent les [vues partagées](#les-vues-partagées-en-direct)) : ce qu'un collègue crée, modifie, approuve, réserve,
 lance ou supprime arrive en un événement, et la fenêtre relit le tableau aussitôt
 (`useServerBoardRefresh`, canaux `SERVER_BOARD_WATCH`, `SERVER_BOARD_UNWATCH`, `SERVER_BOARD_LIVE`).
 Le flux ne dit pas chaque pas d'un build, donc le tableau est aussi relu toutes les quinze
@@ -247,7 +249,7 @@ standard. Un seul job à la fois par feature d'un projet. Un job qu'un serveur a
 cours est marqué en échec à la lecture suivante : rien ne le finira, et il garderait sinon une place
 du quota et s'afficherait en cours sans fin. Sa sortie est gardée en mémoire (les 400
 dernières lignes, jamais sur disque ni au journal) et passée par `redact_text` avant d'être
-servie. Chaque début et chaque fin partent sur `project:<id>` (`feature_job`), comme chaque
+servie. Sa mise en file, son début et sa fin partent sur `project:<id>` (`feature_job`), comme chaque
 réécriture (`feature_updated`).
 
 Dans l'app, la feature d'un projet du serveur est lue dans son miroir (`main/server-features.ts`),
@@ -403,9 +405,71 @@ tendance dans ce rapport ; transformer un élément en tâche crée une carte du
 | Lancer, arrêter une analyse | `POST /api/features/analyses/<analyse>/jobs`, `…/jobs/<id>/cancel` | `agent.execute`, `agent.cancel`, rôle `member` ou plus |
 | Suivre une analyse, lire son dernier rapport | `GET …/jobs/<id>`, `GET /api/features/analyses/<analyse>/report` | `insight.read` |
 
+## Les vues partagées en direct
+
+Le tableau n'est pas la seule vue qu'un collègue change : sa roadmap, ses idées, une conversation
+Insights, l'index du projet. Tant qu'une de ces vues d'un projet du serveur est affichée, elle
+tient le flux du projet (`useServerViewLive`, canaux `SERVER_VIEW_WATCH`, `SERVER_VIEW_UNWATCH`),
+le même que le tableau : le main n'ouvre qu'une WebSocket par projet (`main/server-project-stream.ts`),
+qu'il garde tant qu'un tableau ou une vue la tient, une référence par vue affichée, et ferme avec
+la dernière ; une fenêtre fermée rend les siennes, la déconnexion toutes. Le main dit alors à la
+fenêtre quelle vue a changé (`SERVER_VIEW_CHANGED`, `main/server-live-views.ts`), sans rien du
+contenu, et la vue se relit par ses chargeurs habituels, qui relisent les fichiers de la feature
+du serveur dans le miroir.
+
+| Événement du flux | Vue relue |
+|---|---|
+| `feature_updated`, `feature_job` (mise en file, début, fin) de `roadmap`, `ideation`, `context` | la roadmap, l'idéation, le contexte ; un job d'un collègue en cours est suivi comme à l'ouverture de la vue |
+| `insights_updated` | la liste des conversations, et celle affichée si c'est elle qui a changé |
+| `spec_status_changed` d'un run fini | les mémoires du contexte, où le run a pu apprendre |
+
+Un événement ne porte que des noms de listes fermées (la feature, le fichier déclaré, le job, la
+conversation) et qui l'a causé, jamais un chemin ni un contenu ; le main ne retient que ces noms.
+Ce que la personne a fait elle-même ne lui revient pas : sa fenêtre l'affiche déjà. Une vue
+occupée par son propre travail (une génération qu'elle suit, une réponse en cours d'écriture)
+n'est pas relue sous ses yeux : ce travail la relit à sa fin. Un flux tombé puis rouvert fait
+relire les vues affichées. Les vues GitHub et GitLab ne sont pas branchées : leurs changements
+viennent surtout de la forge elle-même, que le serveur ne voit pas.
+
+## L'espace de travail d'un projet
+
+Le tableau de bord, les analytics, les coûts et l'historique des sessions disent ce qu'une équipe a
+fait d'un projet et ce que cela a coûté. Sur l'ordinateur, ces vues lisent le dossier du projet
+(`cost_data.json`, `dashboard_snapshot.json`) et un historique global de la machine ; pour un
+projet du serveur, ce serait le miroir ou l'ordinateur de la personne, qui ne savent rien des runs
+de l'équipe. Le serveur les calcule donc pour le projet (`shared_features/workspace.py`), à partir
+de ce qu'il tient : les cartes indexées (`specs_index`, relues comme le tableau), les runs lancés
+sur elles (`agent_runs`) et les jobs du projet (`project_jobs`), avec le nom de qui les a lancés.
+
+Ce qu'ont dépensé les agents, le serveur ne l'enregistre pas en base : chaque session d'agent
+l'écrit (`core/usage_tracker.py`) dans le dossier où elle travaille, le clone pour la phase `spec`
+et les jobs, l'espace de build d'une carte pour son build et sa QA. `shared_features/usage_ledger.py`
+lit ces relevés par liste fermée : `cost_data.json` et `dashboard_snapshot.json` du `.workpilot` du
+clone et de chaque espace de build nommé comme une carte, chacun un fichier régulier sous sa taille,
+résolu dans le clone, avec un plafond sur le tout. Un relevé est écrit par un run, donc par un agent
+qui lit du contenu non fiable : on n'en prend que des nombres, une date et des libellés coupés
+(fournisseur, modèle, phase, carte) ; le dossier du serveur qu'il nomme n'est jamais lu ni servi.
+La dépense d'un run est celle de sa carte entre son début et sa fin, phase par phase ; celle d'un
+job n'est pas attribuée (plusieurs peuvent tourner en même temps) mais compte dans les totaux. Les
+budgets restent une feature de l'ordinateur : un projet du serveur n'en a pas encore, et le temps
+moyen par complexité n'est enregistré nulle part, sur l'ordinateur non plus.
+
+Dans l'app, ces vues reconnaissent un projet du serveur (`useServerProjectId`) et demandent au main
+ses données par son id (`main/server-workspace.ts`, canaux `SERVER_WORKSPACE_*`), qui ne répond que
+pour un projet du serveur listé et revérifie chaque nombre et chaque libellé ; ni le miroir, ni le
+backend local, ni les fichiers de l'ordinateur ne sont lus pour lui. Les routes du tableau de bord
+écrites pour l'ordinateur (`dashboard/api.py` : `/api/dashboard/*`, `/api/sessions/*`), qui lisent
+la machine et non un projet, ne répondent qu'en mode local (404 sur un serveur).
+
+| Action | Route | Il faut |
+|---|---|---|
+| Historique des sessions : runs et jobs, qui, quand, comment ils ont fini, la dépense d'un run | `GET /api/features/workspace/sessions?limit=` | `analytics.read`, un rôle sur le projet |
+| Coûts des trente derniers jours, par fournisseur et modèle, tendance | `GET /api/features/workspace/costs` | `analytics.read` |
+| Tableau de bord : cartes par statut, jetons et coûts, QA du premier coup, fusions | `GET /api/features/workspace/dashboard` | `analytics.read` |
+
 ## Ce qui vient
 
 Le plan multi-tenant du 31 octobre, par lots : les autres features servies de la même façon
-(l'investigation et l'auto-fix des issues en jobs, les autres analyses, tableau de bord), le flux du projet ouvert pour
-chaque vue partagée, un test de bout en bout à deux organisations, et le guide d'exploitation. Ce
-fichier grandit avec chaque lot.
+(l'investigation et l'auto-fix des issues en jobs, les autres analyses, budgets d'un projet), les vues de forge en direct (par les
+webhooks de la forge), et un test de bout en bout à deux organisations. Ce fichier
+grandit avec chaque lot.

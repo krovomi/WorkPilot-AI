@@ -193,6 +193,8 @@ The image (`deploy/Dockerfile.server`) installs `apps/backend/requirements.lock`
 unprivileged user `workpilot` (uid 10001: mount SSH keys under `/home/workpilot/.ssh`), and starts
 through `deploy/server-entrypoint.sh`: `alembic upgrade head` first, and a failed migration stops
 the container instead of serving. CI builds it and migrates a PostgreSQL 16 with it on every PR.
+Operating it — TLS reverse proxy, backups, upgrades, quotas, audit, key changes — is covered,
+in French, by [server-operations.md](server-operations.md).
 
 | Variable | Default | What it does |
 |---|---|---|

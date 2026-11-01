@@ -47,6 +47,7 @@ import { setupReleaseCoordinatorListeners } from "./release-coordinator-store";
 import { setupSandboxListeners } from "./sandbox-store";
 import { setupTaskSandboxListeners } from "./task-sandbox-store";
 import { setupSecureStorageListeners } from "./secure-storage-store";
+import { setupServerViewListeners } from "./server-live-views";
 import { setupSmartEstimationListeners } from "./smart-estimation-store";
 import { setupSpecRefinementListeners } from "./spec-refinement-store";
 import { setupVisualToCodeListeners } from "./visual-to-code-store";
@@ -120,6 +121,8 @@ const SETUPS: ReadonlyArray<readonly [string, ListenerSetup]> = [
 	// Not a page's feature: the sidebar's warning that stored API keys are
 	// not protected by the OS keyring.
 	["SecureStorage", setupSecureStorageListeners],
+	// A shared view of a server project read again when a teammate changes it.
+	["ServerViews", setupServerViewListeners],
 	["SmartEstimation", setupSmartEstimationListeners],
 	["SpecRefinement", setupSpecRefinementListeners],
 	// An ACP agent's question waits on its card whether or not the board is open.

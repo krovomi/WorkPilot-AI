@@ -296,6 +296,9 @@ FEATURE_DOMAINS: MappingProxyType[str, str] = MappingProxyType(
         # The analyses of a server project (accessibility, i18n, drift of the
         # docs, flaky tests, technical debt) and their shared reports.
         "analyses": "insight",
+        # A server project's dashboard, analytics, sessions and costs, read
+        # from its runs, jobs and the ledgers in its clone.
+        "workspace": "analytics",
         # What a task's attachments and the project's ADRs say. Read-only and
         # addressed like spec_traceability, so it answers to the same domain.
         "docintel": "task",

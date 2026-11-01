@@ -12,8 +12,10 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useServerProjectId } from "../hooks/useServerProjectId";
 import { formatCurrency, getEurRate } from "../lib/currency";
 import { cn } from "../lib/utils";
+import { loadCostSummary } from "../lib/workspace-data";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
@@ -289,6 +291,7 @@ export function CostEstimator({ projectPath }: CostEstimatorProps) {
 	const [budget, setBudget] = useState<BudgetInfo | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+	const serverProjectId = useServerProjectId({ path: projectPath });
 
 	const fmtCurrency = (usd: number, decimals = 4) =>
 		formatCurrency(usd, i18n.language, eurRate, decimals);
@@ -333,9 +336,12 @@ export function CostEstimator({ projectPath }: CostEstimatorProps) {
 	const fetchFromAPIs = useCallback(
 		async (silent: boolean) => {
 			try {
+				// A server project keeps no budget: only what its agents spent.
 				const [summaryRes, budgetRes] = await Promise.allSettled([
-					globalThis.electronAPI.getCostSummary(projectPath),
-					globalThis.electronAPI.getCostBudget(projectPath),
+					loadCostSummary(projectPath, serverProjectId),
+					serverProjectId
+						? Promise.resolve({ success: false })
+						: globalThis.electronAPI.getCostBudget(projectPath),
 				]);
 
 				const summarySuccess = handleApiResponse(
@@ -347,7 +353,7 @@ export function CostEstimator({ projectPath }: CostEstimatorProps) {
 				const budgetSuccess = handleApiResponse(
 					budgetRes,
 					(v) => setBudget(v as BudgetInfo | null),
-					silent,
+					silent || Boolean(serverProjectId),
 					"error",
 				);
 
@@ -359,7 +365,7 @@ export function CostEstimator({ projectPath }: CostEstimatorProps) {
 				return false;
 			}
 		},
-		[projectPath, handleApiResponse, t],
+		[projectPath, serverProjectId, handleApiResponse, t],
 	);
 
 	// Main fetchData function
@@ -386,8 +392,10 @@ export function CostEstimator({ projectPath }: CostEstimatorProps) {
 		fetchData();
 	}, [fetchData]);
 
-	// Auto-refresh when cost_data.json changes (pushed by main process)
+	// Auto-refresh when cost_data.json changes (pushed by main process; this
+	// computer's file, so not for a server project)
 	useEffect(() => {
+		if (serverProjectId) return;
 		if (typeof globalThis.electronAPI?.onCostsUpdated !== "function") return;
 		const unsubscribe = globalThis.electronAPI.onCostsUpdated(
 			(updatedPath: string) => {
@@ -395,7 +403,7 @@ export function CostEstimator({ projectPath }: CostEstimatorProps) {
 			},
 		);
 		return unsubscribe;
-	}, [projectPath, fetchData]);
+	}, [projectPath, fetchData, serverProjectId]);
 
 	if (loading) {
 		return (
@@ -429,7 +437,9 @@ export function CostEstimator({ projectPath }: CostEstimatorProps) {
 							<h1 className="text-xl font-bold text-foreground">
 								{t("title")}
 							</h1>
-							<p className="text-sm text-muted-foreground">{t("subtitle")}</p>
+							<p className="text-sm text-muted-foreground">
+								{serverProjectId ? t("serverSubtitle") : t("subtitle")}
+							</p>
 						</div>
 					</div>
 					<Button variant="outline" size="sm" onClick={() => fetchData()}>

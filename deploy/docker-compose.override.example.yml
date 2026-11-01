@@ -1,0 +1,43 @@
+# WorkPilot AI — TLS in front of the multi-user server
+#
+#   cd deploy
+#   cp docker-compose.override.example.yml docker-compose.override.yml
+#   cp Caddyfile.example Caddyfile
+#   docker compose --env-file .env.server up -d
+#
+# `docker compose` merges docker-compose.override.yml on its own. Caddy shares
+# the network namespace of `api`, because the streaming WebSocket server
+# listens on the container's loopback only. Only 80 and 443 are published:
+# the API (9000) and the stream (8765) are no longer reachable in clear text.
+# `!override` needs Docker Compose 2.24.4 or later.
+#
+# Guide: docs/server-operations.md
+
+services:
+  api:
+    ports: !override
+      - "80:80"         # ACME challenge, redirect to HTTPS
+      - "443:443"
+      - "443:443/udp"   # HTTP/3
+    # SSH key and known_hosts the server clones, fetches and pushes with
+    # (owned by uid 10001, the image's `workpilot` user):
+    # volumes:
+    #   - ./git-ssh:/home/workpilot/.ssh:ro
+
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - api
+    network_mode: "service:api"
+    environment:
+      # Only this value, not the whole .env.server: the proxy needs no secret.
+      WORKPILOT_PUBLIC_BASE_URL: ${WORKPILOT_PUBLIC_BASE_URL:?set WORKPILOT_PUBLIC_BASE_URL in .env.server}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data       # certificates and ACME account
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

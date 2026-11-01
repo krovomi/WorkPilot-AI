@@ -28,6 +28,7 @@ import type {
 	InsightsChatMessage,
 	InsightsModelConfig,
 } from "../../shared/types";
+import { useServerViewLive } from "../hooks/useServerViewLive";
 import { cn } from "../lib/utils";
 import {
 	createTaskFromSuggestion,
@@ -160,6 +161,8 @@ export function Insights({ projectId }: InsightsProps) {
 	useEffect(() => {
 		loadInsightsSession(projectId);
 	}, [projectId]);
+	// A server project's conversations show a teammate's change at once.
+	useServerViewLive(projectId, "insights");
 
 	// Smart auto-scroll: only scroll if user is already at bottom
 	// This allows users to scroll up to read previous messages without being
