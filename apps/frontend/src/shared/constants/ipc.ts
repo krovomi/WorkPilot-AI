@@ -1284,6 +1284,11 @@ export const IPC_CHANNELS = {
 	SERVER_BOARD_WATCH: "server-board:watch",
 	SERVER_BOARD_UNWATCH: "server-board:unwatch",
 	SERVER_BOARD_LIVE: "server-board:live",
+	// Server mode: follow a shown shared view of a server project (roadmap,
+	// ideation, Insights, context) on the project's stream (main → renderer)
+	SERVER_VIEW_WATCH: "server-view:watch",
+	SERVER_VIEW_UNWATCH: "server-view:unwatch",
+	SERVER_VIEW_CHANGED: "server-view:changed",
 	SMART_ESTIMATION_COMPLETE: "smart-estimation-complete",
 	SMART_ESTIMATION_ERROR: "smart-estimation-error",
 	SMART_ESTIMATION_EVENT: "smart-estimation-event",

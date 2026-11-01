@@ -1,6 +1,7 @@
 import { Brain, FolderTree } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useServerViewLive } from "../../hooks/useServerViewLive";
 import { useContextStore } from "../../stores/context-store";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { useMemorySearch, useProjectContext, useRefreshIndex } from "./hooks";
@@ -11,6 +12,8 @@ import type { ContextProps } from "./types";
 export function Context(props: ContextProps) {
 	const { projectId } = props;
 	const { t } = useTranslation(["context"]);
+	// A server project's index and memories show a teammate's change at once.
+	useServerViewLive(projectId, "context");
 
 	const {
 		projectIndex,
