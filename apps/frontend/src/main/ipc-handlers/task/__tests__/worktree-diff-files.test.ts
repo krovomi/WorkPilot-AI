@@ -139,6 +139,16 @@ describe("collectWorktreeDiffFiles", () => {
 		]);
 	});
 
+	it("lists a large untracked file without its content", () => {
+		writeFileSync(path.join(repo, "big.log"), "y".repeat(600 * 1024), "utf-8");
+
+		const files = collectWorktreeDiffFiles("git", repo, localRefs);
+
+		expect(files).toEqual([
+			{ path: "big.log", status: "added", additions: 0, deletions: 0 },
+		]);
+	});
+
 	it("throws instead of answering an empty list when git fails", () => {
 		expect(() =>
 			collectWorktreeDiffFiles("git", repo, {

@@ -12,7 +12,7 @@
  * reads as "the task changed nothing", which is a wrong answer, not an error.
  */
 import { execFileSync } from "node:child_process";
-import { readFileSync, statSync } from "node:fs";
+import { closeSync, openSync, readSync } from "node:fs";
 import path from "node:path";
 import type { WorktreeDiffFile } from "../../../shared/types";
 import type { ResolvedDiffRefs } from "./worktree-git-refs";
@@ -79,15 +79,36 @@ export function parseDiffSections(fullDiff: string): WorktreeDiffFile[] {
 	return files;
 }
 
+/**
+ * The file's text, or null above the size cap. One open descriptor, no
+ * stat-then-read: the size is what was actually read.
+ */
+function readCapped(absolute: string): string | null {
+	const fd = openSync(absolute, "r");
+	try {
+		const buffer = Buffer.alloc(MAX_UNTRACKED_PATCH_BYTES + 1);
+		let total = 0;
+		while (total < buffer.length) {
+			const read = readSync(fd, buffer, total, buffer.length - total, null);
+			if (read === 0) break;
+			total += read;
+		}
+		if (total > MAX_UNTRACKED_PATCH_BYTES) return null;
+		return buffer.toString("utf-8", 0, total);
+	} finally {
+		closeSync(fd);
+	}
+}
+
 /** An "added" entry for a file git does not track yet. */
 function untrackedFile(worktreePath: string, filePath: string): WorktreeDiffFile {
 	const absolute = path.join(worktreePath, filePath);
 	const header = `diff --git a/${filePath} b/${filePath}\nnew file mode 100644\n--- /dev/null\n+++ b/${filePath}\n`;
 	try {
-		if (statSync(absolute).size > MAX_UNTRACKED_PATCH_BYTES) {
+		const content = readCapped(absolute);
+		if (content === null) {
 			return { path: filePath, status: "added", additions: 0, deletions: 0 };
 		}
-		const content = readFileSync(absolute, "utf-8");
 		if (content.includes("\0")) {
 			return {
 				path: filePath,
