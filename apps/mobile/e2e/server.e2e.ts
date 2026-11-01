@@ -182,3 +182,33 @@ test("a person of another organization never sees the project", async ({ browser
 	await expect(carol.getByText(/No project yet/)).toBeVisible({ timeout: 30_000 });
 	await expect(carol.getByRole("button", { name: world.project })).toHaveCount(0);
 });
+
+test("the project's Insights, roadmap and ideas open from the board", async ({ browser }) => {
+	const alice = await signIn(browser, world, "alice");
+	await alice.getByRole("button", { name: world.project }).click({ timeout: 30_000 });
+
+	// Insights: a conversation, then the teammate sees it but cannot ask in it.
+	await alice.getByRole("link", { name: "Insights" }).click();
+	await alice.getByRole("button", { name: "New conversation" }).click();
+	await expect(alice.getByText("Ask your first question below.")).toBeVisible({ timeout: 30_000 });
+	await expect(alice.getByLabel("Your question")).toBeVisible();
+	await shot(alice, "7-insights");
+	await alice.goBack();
+	await alice.goBack();
+
+	await alice.getByRole("link", { name: "Roadmap" }).click();
+	await expect(alice.getByText(/No roadmap yet/)).toBeVisible({ timeout: 30_000 });
+	await expect(alice.getByRole("button", { name: "Generate" })).toBeVisible();
+	await shot(alice, "8-roadmap");
+	await alice.goBack();
+
+	await alice.getByRole("link", { name: "Ideas" }).click();
+	await expect(alice.getByText(/No ideas yet/)).toBeVisible({ timeout: 30_000 });
+
+	const bob = await signIn(browser, world, "bob");
+	await bob.getByRole("button", { name: world.project }).click({ timeout: 30_000 });
+	await bob.getByRole("link", { name: "Insights" }).click();
+	await bob.getByRole("button", { name: /New Conversation/ }).first().click({ timeout: 30_000 });
+	await expect(bob.getByText("Ask your first question below.")).toBeVisible();
+	await expect(bob.getByLabel("Your question")).toHaveCount(0);
+});

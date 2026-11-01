@@ -137,5 +137,59 @@
 		"qa": "QA",
 		"merge": "Fusion",
 		"pr": "Pull request"
+	},
+	"features": {
+		"insights": "Insights",
+		"roadmap": "Roadmap",
+		"ideas": "Idées",
+		"generate": "Générer",
+		"regenerate": "Générer à nouveau",
+		"jobRunning": "Un agent y travaille…",
+		"jobFailed": "La dernière exécution a échoué. {{error}}",
+		"toCard": "En faire une carte",
+		"openCard": "Ouvrir sa carte"
+	},
+	"roadmap": {
+		"empty": "Pas encore de roadmap. Générez-en une : un agent étudie le projet et propose des phases et des fonctionnalités.",
+		"vision": "Vision",
+		"otherPhase": "Autres fonctionnalités",
+		"priority": {
+			"must": "Indispensable",
+			"should": "Important",
+			"could": "Souhaitable",
+			"wont": "Écarté"
+		},
+		"status": {
+			"idea": "Idée",
+			"planned": "Planifiée",
+			"in_progress": "En cours",
+			"done": "Terminée",
+			"under_review": "En revue"
+		}
+	},
+	"ideas": {
+		"empty": "Pas encore d'idées. Générez-en : des agents cherchent des améliorations, des failles de sécurité et de performance, des manques de documentation.",
+		"types": {
+			"code_improvements": "Améliorations du code",
+			"ui_ux_improvements": "UI et UX",
+			"documentation_gaps": "Documentation",
+			"security_hardening": "Sécurité",
+			"performance_optimizations": "Performance",
+			"code_quality": "Qualité du code"
+		}
+	},
+	"insights": {
+		"intro": "Posez des questions à un agent sur le code du projet. Toute l'équipe du projet lit les conversations ; seul leur auteur les poursuit.",
+		"new": "Nouvelle conversation",
+		"empty": "Pas encore de conversation.",
+		"meta": "{{owner}} · {{count}} messages · {{date}}",
+		"you": "Vous",
+		"askFirst": "Posez votre première question ci-dessous.",
+		"answering": "L'agent rédige sa réponse…",
+		"question": "Votre question",
+		"delete": "Supprimer la conversation",
+		"deleteTitle": "Supprimer cette conversation ?",
+		"deleteBody": "Elle disparaît pour tout le projet.",
+		"suggested": "Tâche suggérée : {{title}}"
 	}
 }

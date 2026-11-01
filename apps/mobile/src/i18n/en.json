@@ -137,5 +137,59 @@
 		"qa": "QA",
 		"merge": "Merge",
 		"pr": "Pull request"
+	},
+	"features": {
+		"insights": "Insights",
+		"roadmap": "Roadmap",
+		"ideas": "Ideas",
+		"generate": "Generate",
+		"regenerate": "Generate again",
+		"jobRunning": "An agent is working on it…",
+		"jobFailed": "The last run failed. {{error}}",
+		"toCard": "Turn into a card",
+		"openCard": "Open its card"
+	},
+	"roadmap": {
+		"empty": "No roadmap yet. Generate one: an agent studies the project and proposes phases and features.",
+		"vision": "Vision",
+		"otherPhase": "Other features",
+		"priority": {
+			"must": "Must have",
+			"should": "Should have",
+			"could": "Could have",
+			"wont": "Won't have"
+		},
+		"status": {
+			"idea": "Idea",
+			"planned": "Planned",
+			"in_progress": "In progress",
+			"done": "Done",
+			"under_review": "Under review"
+		}
+	},
+	"ideas": {
+		"empty": "No ideas yet. Generate some: agents look for improvements, security and performance issues, documentation gaps.",
+		"types": {
+			"code_improvements": "Code improvements",
+			"ui_ux_improvements": "UI and UX",
+			"documentation_gaps": "Documentation",
+			"security_hardening": "Security",
+			"performance_optimizations": "Performance",
+			"code_quality": "Code quality"
+		}
+	},
+	"insights": {
+		"intro": "Ask an agent about the project's code. Everyone on the project reads the conversations; only their author continues them.",
+		"new": "New conversation",
+		"empty": "No conversation yet.",
+		"meta": "{{owner}} · {{count}} messages · {{date}}",
+		"you": "You",
+		"askFirst": "Ask your first question below.",
+		"answering": "The agent is writing its answer…",
+		"question": "Your question",
+		"delete": "Delete the conversation",
+		"deleteTitle": "Delete this conversation?",
+		"deleteBody": "It is removed for the whole project.",
+		"suggested": "Suggested task: {{title}}"
 	}
 }

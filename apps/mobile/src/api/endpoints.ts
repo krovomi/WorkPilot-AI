@@ -15,6 +15,13 @@ import type {
 	RunPhase,
 	ServerProject,
 } from "./types";
+import type {
+	FeatureJob,
+	FeatureJobOutput,
+	FeatureSnapshot,
+	InsightSession,
+	InsightSummary,
+} from "../features/types";
 
 const enc = encodeURIComponent;
 
@@ -23,6 +30,13 @@ function cardsPath(projectId: string, cardId?: string, action?: string): string 
 	const verb = action ? `/${action}` : "";
 	return `/api/board/cards${card}${verb}?project_id=${enc(projectId)}`;
 }
+
+/** A shared feature's route; `project_id` always in the query. */
+function featurePath(feature: string, rest: string, projectId: string, query = ""): string {
+	return `/api/features/${feature}${rest}?project_id=${enc(projectId)}${query}`;
+}
+
+export type JobFeature = "roadmap" | "ideation";
 
 function runsPath(projectId: string, specId: string, rest = ""): string {
 	return `/projects/${enc(projectId)}/specs/${enc(specId)}/runs${rest}`;
@@ -68,6 +82,34 @@ export function api(client: ServerClient) {
 			client.request<{ removed: boolean }>("DELETE", "/users/me/devices", { token }),
 		updateCard: (projectId: string, cardId: string, changes: { title?: string; description?: string }) =>
 			client.request<BoardCard>("PATCH", cardsPath(projectId, cardId), changes),
+		insightSessions: (projectId: string) =>
+			client.request<InsightSummary[]>("GET", featurePath("insights", "/sessions", projectId)),
+		insightSession: (projectId: string, sessionId: string) =>
+			client.request<InsightSession>("GET", featurePath("insights", `/sessions/${enc(sessionId)}`, projectId)),
+		createInsight: (projectId: string) =>
+			client.request<InsightSession>("POST", featurePath("insights", "/sessions", projectId), {}),
+		deleteInsight: (projectId: string, sessionId: string) =>
+			client.request<{ deleted: boolean }>("DELETE", featurePath("insights", `/sessions/${enc(sessionId)}`, projectId)),
+		askInsight: (projectId: string, sessionId: string, message: string) =>
+			client.request<{ job: FeatureJob; session: InsightSession }>(
+				"POST",
+				featurePath("insights", `/sessions/${enc(sessionId)}/messages`, projectId),
+				{ message },
+			),
+		cancelInsightJob: (projectId: string, jobId: string) =>
+			client.request<{ cancelled: boolean }>("POST", featurePath("insights", `/jobs/${enc(jobId)}/cancel`, projectId)),
+		featureSnapshot: (feature: JobFeature, projectId: string) =>
+			client.request<FeatureSnapshot>("GET", featurePath(feature, "/snapshot", projectId)),
+		startFeatureJob: (feature: JobFeature, projectId: string, options: Record<string, unknown> = {}) =>
+			client.request<FeatureJob>("POST", featurePath(feature, "/jobs", projectId), options),
+		featureJob: (feature: JobFeature, projectId: string, jobId: string, after = 0) =>
+			client.request<FeatureJobOutput>("GET", featurePath(feature, `/jobs/${enc(jobId)}`, projectId, `&after=${after}`)),
+		cancelFeatureJob: (feature: JobFeature, projectId: string, jobId: string) =>
+			client.request<{ cancelled: boolean }>("POST", featurePath(feature, `/jobs/${enc(jobId)}/cancel`, projectId)),
+		convertRoadmapFeature: (projectId: string, featureId: string) =>
+			client.request<{ card: { id: string } }>("POST", featurePath("roadmap", `/features/${enc(featureId)}/convert`, projectId)),
+		convertIdea: (projectId: string, ideaId: string) =>
+			client.request<{ card: { id: string } }>("POST", featurePath("ideation", `/ideas/${enc(ideaId)}/convert`, projectId)),
 		streamInfo: () => client.request<{ url: string | null }>("GET", "/api/board/stream"),
 	};
 }
