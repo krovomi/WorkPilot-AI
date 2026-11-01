@@ -113,10 +113,18 @@ def require_project_role(minimum: str = ProjectRole.VIEWER.value):
         user: CurrentUser = Depends(get_current_user),
         db: AsyncSession = Depends(get_db),
     ) -> CurrentUser:
-        role = await get_project_role(
-            db, user, project_id, org_id=getattr(request.state, "org_id", None)
-        )
+        org_id = getattr(request.state, "org_id", None)
+        role = await get_project_role(db, user, project_id, org_id=org_id)
         if role is None:
+            # As `server.authz.scope`: a project of another organization, or
+            # one the caller acts in no organization of, is reported missing
+            # like an unknown id, never as forbidden; only a project of the
+            # caller's own organization says that they are not a member.
+            owner_org = await db.scalar(
+                select(Project.org_id).where(Project.id == project_id)
+            )
+            if owner_org is None or owner_org != org_id:
+                raise HTTPException(status_code=404, detail="Project not found")
             raise HTTPException(status_code=403, detail="Not a member of this project")
         if _PROJECT_ROLE_RANK.get(role, -1) < _PROJECT_ROLE_RANK[minimum]:
             raise HTTPException(

@@ -467,9 +467,53 @@ la machine et non un projet, ne répondent qu'en mode local (404 sur un serveur)
 | Coûts des trente derniers jours, par fournisseur et modèle, tendance | `GET /api/features/workspace/costs` | `analytics.read` |
 | Tableau de bord : cartes par statut, jetons et coûts, QA du premier coup, fusions | `GET /api/features/workspace/dashboard` | `analytics.read` |
 
+## La preuve de bout en bout
+
+Les autres tests du mode serveur appellent les routes une à une, comme des fonctions.
+`tests/backend/test_server_two_orgs_e2e.py` démarre le serveur comme `deploy/` (migrations Alembic,
+`websocket_server.py`, `provider_api:app` sous uvicorn) contre une vraie base, et ne passe que par
+HTTP et WebSocket, comme l'app :
+
+- l'opérateur crée l'administrateur de la plateforme par le script de l'image, deux organisations,
+  et y invite leurs personnes ; chaque administrateur d'organisation enregistre un projet, que le
+  serveur clone depuis un petit dépôt servi en HTTP sur la boucle locale ;
+- chaque membre crée, modifie et supprime une carte, et son flux `project:<id>` le dit ; le membre
+  de l'autre organisation reçoit 404 sur chacune de ces routes, ne peut ni ouvrir ce flux ni y
+  basculer ; un lecteur lit le tableau et chaque écriture lui est refusée (403) ;
+- un run tourne sur une carte avec un agent factice à la place du modèle
+  (`tests/server_e2e/fake_backend/`, seul changement fait au serveur, par `serve_api.py`) : confiné
+  par Landlock, il ne lit ni le clone de l'autre organisation, ni la liste des clones, ni l'état du
+  serveur, publie sur `run:<id>` avec son jeton, écrit la spec et finit ; son flux, son historique
+  et son annulation sont fermés à l'autre organisation, comme un job de projet (l'index du
+  contexte, par son vrai runner) ;
+- chaque route qui prend un `project_id` répond à l'administrateur et au membre de l'autre
+  organisation, sur le projet de la première, exactement comme pour un projet qui n'existe pas ;
+  celles des projets, du tableau et des features partagées répondent 404 (ou le refus d'une
+  permission qu'ils n'ont sur aucun projet).
+
+Il lui faut une base (`WORKPILOT_E2E_DATABASE_URL`, PostgreSQL en CI ; une URL SQLite marche
+aussi), Linux avec Landlock et le port 8765, fixe, du serveur de streaming (le test refuse de
+démarrer s'il est pris, plutôt que de laisser le serveur de streaming arrêter celui qui l'occupe).
+Sans URL, le module est sauté ; le job `server-e2e` de `ci.yml` (service Postgres 16) pose
+`WORKPILOT_EXPECT_SERVER_E2E=1`, et il échoue alors au lieu d'être sauté. En local, par exemple :
+
+```bash
+WORKPILOT_E2E_DATABASE_URL=postgresql+asyncpg://workpilot:<mot de passe>@127.0.0.1:5432/workpilot \
+  pytest tests/backend/test_server_two_orgs_e2e.py -v
+```
+
+Il a trouvé deux défauts, corrigés avec leur test : le serveur de streaming lisait le chemin de la
+poignée de main là où websockets 13 et plus ne le met plus (`request.path`), si bien qu'en mode
+serveur aucun canal n'était nommé (chaque membre refusé sur le sien) et que le `?token=` de l'API
+et des runs n'était jamais lu (aucun de leurs événements publié) ; les routes
+`/projects/{project_id}/…` répondaient 403 au projet d'une autre organisation, au lieu du 404 de
+la règle.
+
+L'app de bureau en mode serveur contre ce serveur (Playwright) n'est pas encore écrite.
+
 ## Ce qui vient
 
 Le plan multi-tenant du 31 octobre, par lots : les autres features servies de la même façon
 (l'investigation et l'auto-fix des issues en jobs, les autres analyses, budgets d'un projet), les vues de forge en direct (par les
-webhooks de la forge), et un test de bout en bout à deux organisations. Ce fichier
-grandit avec chaque lot.
+webhooks de la forge), et le parcours de l'app de bureau contre le serveur de la preuve de bout en
+bout. Ce fichier grandit avec chaque lot.
