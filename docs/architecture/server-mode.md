@@ -165,7 +165,7 @@ quel à l'app.
 ## Le tableau en direct
 
 Tant qu'un tableau du serveur est affiché, le main tient une WebSocket sur le canal du projet
-(`main/server-board-live.ts`, `project:<id>`) : ce qu'un collègue crée, modifie, approuve, réserve,
+(`main/server-board-live.ts`, `project:<id>`, celle que partagent les [vues partagées](#les-vues-partagées-en-direct)) : ce qu'un collègue crée, modifie, approuve, réserve,
 lance ou supprime arrive en un événement, et la fenêtre relit le tableau aussitôt
 (`useServerBoardRefresh`, canaux `SERVER_BOARD_WATCH`, `SERVER_BOARD_UNWATCH`, `SERVER_BOARD_LIVE`).
 Le flux ne dit pas chaque pas d'un build, donc le tableau est aussi relu toutes les quinze
@@ -247,7 +247,7 @@ standard. Un seul job à la fois par feature d'un projet. Un job qu'un serveur a
 cours est marqué en échec à la lecture suivante : rien ne le finira, et il garderait sinon une place
 du quota et s'afficherait en cours sans fin. Sa sortie est gardée en mémoire (les 400
 dernières lignes, jamais sur disque ni au journal) et passée par `redact_text` avant d'être
-servie. Chaque début et chaque fin partent sur `project:<id>` (`feature_job`), comme chaque
+servie. Sa mise en file, son début et sa fin partent sur `project:<id>` (`feature_job`), comme chaque
 réécriture (`feature_updated`).
 
 Dans l'app, la feature d'un projet du serveur est lue dans son miroir (`main/server-features.ts`),
@@ -384,6 +384,32 @@ relais, avec le jeton de la personne, puis note sur le serveur ce qui a été pu
 | Suivre la revue, lire les revues enregistrées | `GET …/reviews/jobs/<id>`, `GET …/reviews?numbers=` | `vcs.read` |
 | Publier les findings | `/merge_requests/<n>/notes` par le relais, puis `POST …/reviews/<n>/posted` | `vcs.write`, rôle `member` ou plus |
 
+## Les vues partagées en direct
+
+Le tableau n'est pas la seule vue qu'un collègue change : sa roadmap, ses idées, une conversation
+Insights, l'index du projet. Tant qu'une de ces vues d'un projet du serveur est affichée, elle
+tient le flux du projet (`useServerViewLive`, canaux `SERVER_VIEW_WATCH`, `SERVER_VIEW_UNWATCH`),
+le même que le tableau : le main n'ouvre qu'une WebSocket par projet (`main/server-project-stream.ts`),
+qu'il garde tant qu'un tableau ou une vue la tient, une référence par vue affichée, et ferme avec
+la dernière ; une fenêtre fermée rend les siennes, la déconnexion toutes. Le main dit alors à la
+fenêtre quelle vue a changé (`SERVER_VIEW_CHANGED`, `main/server-live-views.ts`), sans rien du
+contenu, et la vue se relit par ses chargeurs habituels, qui relisent les fichiers de la feature
+du serveur dans le miroir.
+
+| Événement du flux | Vue relue |
+|---|---|
+| `feature_updated`, `feature_job` (mise en file, début, fin) de `roadmap`, `ideation`, `context` | la roadmap, l'idéation, le contexte ; un job d'un collègue en cours est suivi comme à l'ouverture de la vue |
+| `insights_updated` | la liste des conversations, et celle affichée si c'est elle qui a changé |
+| `spec_status_changed` d'un run fini | les mémoires du contexte, où le run a pu apprendre |
+
+Un événement ne porte que des noms de listes fermées (la feature, le fichier déclaré, le job, la
+conversation) et qui l'a causé, jamais un chemin ni un contenu ; le main ne retient que ces noms.
+Ce que la personne a fait elle-même ne lui revient pas : sa fenêtre l'affiche déjà. Une vue
+occupée par son propre travail (une génération qu'elle suit, une réponse en cours d'écriture)
+n'est pas relue sous ses yeux : ce travail la relit à sa fin. Un flux tombé puis rouvert fait
+relire les vues affichées. Les vues GitHub et GitLab ne sont pas branchées : leurs changements
+viennent surtout de la forge elle-même, que le serveur ne voit pas.
+
 ## L'espace de travail d'un projet
 
 Le tableau de bord, les analytics, les coûts et l'historique des sessions disent ce qu'une équipe a
@@ -423,6 +449,6 @@ la machine et non un projet, ne répondent qu'en mode local (404 sur un serveur)
 ## Ce qui vient
 
 Le plan multi-tenant du 31 octobre, par lots : les autres features servies de la même façon
-(l'investigation et l'auto-fix des issues en jobs, analyses, budgets d'un projet), le flux du projet ouvert pour
-chaque vue partagée, un test de bout en bout à deux organisations, et le guide d'exploitation. Ce
+(l'investigation et l'auto-fix des issues en jobs, analyses, budgets d'un projet), les vues de forge en direct (par les
+webhooks de la forge), un test de bout en bout à deux organisations, et le guide d'exploitation. Ce
 fichier grandit avec chaque lot.
