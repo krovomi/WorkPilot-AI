@@ -114,7 +114,17 @@
 		"qaReport": "QA report",
 		"showReport": "Show the full report",
 		"hideReport": "Hide the report",
-		"changesSummaryFiles": "{{files}} files · +{{additions}} −{{deletions}}"
+		"changesSummaryFiles": "{{files}} files · +{{additions}} −{{deletions}}",
+		"settings": "Runs with",
+		"engine": "Engine: {{engine}}",
+		"engineAuto": "auto",
+		"priority": "Priority: {{priority}}",
+		"priority_low": "low",
+		"priority_medium": "medium",
+		"priority_high": "high",
+		"priority_urgent": "urgent",
+		"goal": "Done when this passes:",
+		"goalError": "The goal cannot be read: {{error}}"
 	},
 	"actions": {
 		"start": "Start",

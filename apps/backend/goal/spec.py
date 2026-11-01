@@ -6,7 +6,8 @@ write the task metadata, and a goal an agent could rewrite would let it
 declare itself done with ``true``. The file name is in
 ``security.path_guard.PROTECTED_CONFIG_NAMES``, so the write hook, the
 non-SDK executor and the Bash validator refuse it to every agent; only the
-main process writes it, from the task's goal card.
+main process writes it, from the task's goal card (in server mode, the API, from
+``PATCH /api/board/cards/{id}/settings``: ``shared_board/settings.py``).
 
 A file that is there but does not parse is an error, never "no goal": the
 user asked for a check, and a typo must not switch it off.

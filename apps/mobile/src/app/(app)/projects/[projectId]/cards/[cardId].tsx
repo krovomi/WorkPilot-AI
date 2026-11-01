@@ -17,6 +17,7 @@ import { ACTIVE_COLUMNS } from "../../../../../board/columns";
 import { ChangesSection } from "../../../../../card/ChangesSection";
 import { canEditCard, EditCard } from "../../../../../card/EditCard";
 import { LongText } from "../../../../../card/LongText";
+import { SettingsSection } from "../../../../../card/SettingsSection";
 import { useCard } from "../../../../../board/useCard";
 import { describeError } from "../../../../../i18n";
 import { Button, ErrorBanner, Field, Loading, Section } from "../../../../../ui/components";
@@ -205,6 +206,8 @@ export default function CardScreen() {
 					) : null}
 				</Section>
 			)}
+
+			<SettingsSection settings={details.settings} />
 
 			<Section title={t("card.spec")}>
 				{details.spec ? (

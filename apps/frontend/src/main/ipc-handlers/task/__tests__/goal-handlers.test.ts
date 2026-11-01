@@ -33,6 +33,18 @@ vi.mock("../resume-task", () => ({
 		[p.worktreeSpecDir, p.specDir].filter((d): d is string => !!d && existsSync(d)),
 }));
 vi.mock("../../../app-logger", () => ({ appLog: { info: vi.fn(), warn: vi.fn() } }));
+const server = vi.hoisted(() => ({
+	findServerCard: vi.fn((id: unknown) =>
+		id === "server:p-1:001-a" ? { project: { id: "p-1" }, cardId: "001-a" } : null,
+	),
+	getServerCardGoal: vi.fn(),
+	setServerCardGoal: vi.fn(),
+}));
+vi.mock("../../../server-board-actions", () => ({ findServerCard: server.findServerCard }));
+vi.mock("../../../server-card-settings", () => ({
+	getServerCardGoal: server.getServerCardGoal,
+	setServerCardGoal: server.setServerCardGoal,
+}));
 
 import { GOAL_FILE, readGoal, registerGoalHandlers, sanitizeGoal } from "../goal-handlers";
 
@@ -137,5 +149,29 @@ describe("sanitizeGoal", () => {
 		expect(
 			sanitizeGoal({ command: "pytest", expectedExit: 0, maxRounds: 4, timeoutSeconds: 60, protected: [] }),
 		).toEqual({ goal: { command: "pytest", expectedExit: 0, maxRounds: 4, timeoutSeconds: 60 } });
+	});
+});
+
+describe("goal of a server card", () => {
+	it("is read from and written to the server, never to the mirror", async () => {
+		server.getServerCardGoal.mockResolvedValue({ success: true, data: { goal: null } });
+		server.setServerCardGoal.mockResolvedValue({
+			success: true,
+			data: { goal: { command: "npm test" } },
+		});
+		expect((await call(IPC_CHANNELS.TASK_GOAL_GET, "server:p-1:001-a")).data).toEqual({ goal: null });
+		const set = await call(IPC_CHANNELS.TASK_GOAL_SET, "server:p-1:001-a", { command: " npm test " });
+		expect(set.success).toBe(true);
+		expect(server.setServerCardGoal).toHaveBeenCalledWith(
+			{ project: { id: "p-1" }, cardId: "001-a" },
+			{ command: "npm test" },
+		);
+	});
+
+	it("is validated here before it goes", async () => {
+		server.setServerCardGoal.mockClear();
+		const set = await call(IPC_CHANNELS.TASK_GOAL_SET, "server:p-1:001-a", { command: "a\nb" });
+		expect(set.success).toBe(false);
+		expect(server.setServerCardGoal).not.toHaveBeenCalled();
 	});
 });
