@@ -9,6 +9,7 @@
 		"network": "The server can't be reached. Check your connection.",
 		"timeout": "The server took too long to answer.",
 		"signed_out": "Your session has ended. Sign in again.",
+		"too_many": "Too many attempts. Wait a minute, then try again.",
 		"forbidden": "You don't have the rights for this action.",
 		"generic": "Something went wrong: {{message}}",
 		"card_not_indexed": "The server hasn't indexed this card yet. Pull to refresh.",
@@ -25,7 +26,8 @@
 		"invalidUrl": "This isn't a valid server address.",
 		"insecureUrl": "Use an https:// address. Plain http is only allowed on your local network.",
 		"localDisabled": "This server only accepts Microsoft sign-in, which the mobile app doesn't support yet.",
-		"failed": "Sign-in failed: {{message}}"
+		"failed": "Sign-in failed: {{message}}",
+		"badCredentials": "Wrong email or password."
 	},
 	"unreachable": {
 		"title": "Server unreachable",
@@ -225,6 +227,63 @@
 			"merge_with_changes": "Mergeable after small changes",
 			"needs_revision": "Needs revision",
 			"blocked": "Blocked"
+		}
+	},
+	"dashboard": {
+		"title": "Dashboard",
+		"sessions": "Sessions",
+		"analyses": "Analyses",
+		"cards": "Cards",
+		"noCards": "No card yet.",
+		"status": {
+			"pending": "To do",
+			"in_progress": "In progress",
+			"ai_review": "AI review",
+			"human_review": "Human review",
+			"completed": "Done",
+			"error": "Error"
+		},
+		"quality": "Quality",
+		"qaFirstPass": "QA passed first time",
+		"qaScore": "Average QA score",
+		"mergesAuto": "Merged automatically",
+		"mergesManual": "Merged by hand",
+		"costs": "Spending, last {{days}} days",
+		"total": "Total",
+		"dailyAvg": "Per day",
+		"trend": "Against the period before",
+		"tokens": "Tokens",
+		"allTime": "Since the start",
+		"noSessions": "No session yet."
+	},
+	"analyses": {
+		"intro": "Each analysis runs on the server, on the project's code; everyone on the project reads its last report.",
+		"none": "Never run on this project.",
+		"lastRun": "Last run {{date}}",
+		"summary": "Summary",
+		"more": "And {{count}} more on the desktop.",
+		"unknown": "Unknown analysis.",
+		"kinds": {
+			"accessibility": {
+				"title": "Accessibility",
+				"body": "WCAG issues in the interface's code."
+			},
+			"i18n": {
+				"title": "Translations",
+				"body": "Missing and unused translation keys, hard-coded text."
+			},
+			"doc-drift": {
+				"title": "Documentation drift",
+				"body": "Docs that no longer say what the code does."
+			},
+			"flaky-tests": {
+				"title": "Flaky tests",
+				"body": "Tests that pass and fail without a change."
+			},
+			"tech-debt": {
+				"title": "Technical debt",
+				"body": "Debt items found in the code, by cost."
+			}
 		}
 	}
 }

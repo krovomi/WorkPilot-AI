@@ -15,6 +15,7 @@ import type {
 	RunPhase,
 	ServerProject,
 } from "./types";
+import type { AnalysisKind, CostSummary, DashboardSnapshot, WorkSession } from "../insights/types";
 import type {
 	FeatureJob,
 	FeatureJobOutput,
@@ -110,6 +111,27 @@ export function api(client: ServerClient) {
 			client.request<{ card: { id: string } }>("POST", featurePath("roadmap", `/features/${enc(featureId)}/convert`, projectId)),
 		convertIdea: (projectId: string, ideaId: string) =>
 			client.request<{ card: { id: string } }>("POST", featurePath("ideation", `/ideas/${enc(ideaId)}/convert`, projectId)),
+		dashboard: async (projectId: string) =>
+			(await client.request<{ snapshot: DashboardSnapshot }>("GET", featurePath("workspace", "/dashboard", projectId)))
+				.snapshot,
+		costs: async (projectId: string) =>
+			(await client.request<{ summary: CostSummary }>("GET", featurePath("workspace", "/costs", projectId))).summary,
+		sessions: async (projectId: string) =>
+			(
+				await client.request<{ sessions: WorkSession[] }>(
+					"GET",
+					featurePath("workspace", "/sessions", projectId, "&limit=100"),
+				)
+			).sessions,
+		analysisReport: async (kind: AnalysisKind, projectId: string) =>
+			(await client.request<{ report: string | null }>("GET", featurePath("analyses", `/${kind}/report`, projectId)))
+				.report,
+		startAnalysis: (kind: AnalysisKind, projectId: string) =>
+			client.request<FeatureJob>("POST", featurePath("analyses", `/${kind}/jobs`, projectId), {}),
+		analysisJob: (kind: AnalysisKind, projectId: string, jobId: string) =>
+			client.request<FeatureJobOutput>("GET", featurePath("analyses", `/${kind}/jobs/${enc(jobId)}`, projectId)),
+		cancelAnalysis: (kind: AnalysisKind, projectId: string, jobId: string) =>
+			client.request<{ cancelled: boolean }>("POST", featurePath("analyses", `/${kind}/jobs/${enc(jobId)}/cancel`, projectId)),
 		streamInfo: () => client.request<{ url: string | null }>("GET", "/api/board/stream"),
 	};
 }

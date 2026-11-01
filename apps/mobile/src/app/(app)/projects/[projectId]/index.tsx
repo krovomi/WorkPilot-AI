@@ -23,6 +23,7 @@ export default function Board() {
 	const links = [
 		...(can("insight.read") ? (["insights", "roadmap", "ideas"] as const) : []),
 		...(forge && can("vcs.read") ? (["forge"] as const) : []),
+		...(can("analytics.read") ? (["dashboard"] as const) : []),
 	];
 	const groups = useMemo(() => groupByColumn(cards ?? []), [cards]);
 	const [chosen, setChosen] = useState<Column | null>(null);
@@ -65,7 +66,11 @@ export default function Board() {
 							style={[styles.link, { borderColor: theme.border, backgroundColor: theme.surface }]}
 						>
 							<Text style={{ color: theme.accent, fontWeight: "600" }} numberOfLines={1}>
-								{target === "forge" && forge ? t(`forge.${forge}`) : t(`features.${target}`)}
+								{target === "forge" && forge
+									? t(`forge.${forge}`)
+									: target === "dashboard"
+										? t("dashboard.title")
+										: t(`features.${target}`)}
 							</Text>
 						</Pressable>
 					))}

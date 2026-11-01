@@ -32,6 +32,7 @@ describe("i18n", () => {
 	it("turns failures into sentences", () => {
 		expect(describeError(new ApiError(0, "network"))).toBe(en.errors.network);
 		expect(describeError(new ApiError(403, "Missing permission"))).toBe(en.errors.forbidden);
+		expect(describeError(new ApiError(429, "HTTP 429"))).toBe(en.errors.too_many);
 		expect(describeError(new ApiError(409, "Busy"))).toBe("Something went wrong: Busy");
 		expect(describeError(new Error("feedback_required"))).toBe(en.errors.feedback_required);
 	});
