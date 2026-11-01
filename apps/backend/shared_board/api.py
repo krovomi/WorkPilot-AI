@@ -36,6 +36,7 @@ from server.authz.scope import ProjectScope, resolve_project_scope
 from server.db.engine import get_db
 from server.db.models import ProjectRole
 from server.services.events import emit_board_event
+from shared_board import attachments as card_images
 from shared_board import listing, review
 from shared_board import settings as card_settings
 from shared_board.cards import _card_or_404, _index_row, _require_writer
@@ -71,6 +72,10 @@ class CardCreate(BaseModel):
     require_review: bool = True
     # Engine, priority, category and goal, as the desktop card carries them.
     settings: card_settings.CardSettings | None = None
+    # Images from the New Task dialog, stored in the card's attachments/.
+    attachments: list[card_images.ImageUpload] = Field(
+        default_factory=list, max_length=card_images.MAX_IMAGES
+    )
 
 
 class CardUpdate(BaseModel):
@@ -188,6 +193,7 @@ async def create_card(
         metadata.update(kind=body.kind, kindSource="user", kindConfidence=1)
     if body.settings is not None:
         card_settings.checked_goal(body.settings)  # 422 before the card exists
+    images = card_images.decode_images(body.attachments)
     try:
         directory = write_card(
             scope.path, title, body.description.strip() or title, metadata
@@ -197,6 +203,8 @@ async def create_card(
 
     if body.settings is not None:
         card_settings.apply_settings(scope.path.resolve(), directory, body.settings)
+    if images:
+        _attach(directory, card_images.store_images(directory / "attachments", images))
     row = await _index_row(db, scope, directory.name)
     if row is not None and row.created_by is None:
         row.created_by = principal.id
@@ -206,6 +214,21 @@ async def create_card(
         scope.project_id, "spec_created", {"spec": directory.name, "by": principal.id}
     )
     return {**card, "specId": row.id if row else None}
+
+
+def _attach(directory: Path, stored: list[dict[str, Any]]) -> None:
+    """Record stored images where the desktop card and the agents look for them."""
+    metadata_path = directory / "task_metadata.json"
+    metadata = _read_json(metadata_path)
+    metadata["attachedImages"] = stored
+    _write_json(metadata_path, metadata)
+    requirements_path = directory / "requirements.json"
+    requirements = _read_json(requirements_path)
+    requirements["attached_images"] = [
+        {"filename": image["filename"], "path": image["path"], "description": ""}
+        for image in stored
+    ]
+    _write_json(requirements_path, requirements)
 
 
 @router.get("/cards/{card_id}")

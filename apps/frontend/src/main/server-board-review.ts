@@ -18,6 +18,7 @@ import type {
 	WorktreeStatus,
 } from "../shared/types";
 import { type ServerCard, startRun } from "./server-board-actions";
+import { serverImageUploads } from "./server-card-images";
 import { authedFetch } from "./server-connection";
 
 const MAX_FEEDBACK = 20_000;
@@ -186,16 +187,15 @@ export async function reviewServerCard(
 		const result = await authedFetch(cardUrl(card, "approve"), "POST");
 		return result.ok ? { success: true } : { success: false, error: result.error };
 	}
-	if (Array.isArray(images) && images.length > 0) {
-		// Refused rather than dropped: the person would believe they were sent.
-		return { success: false, error: "Images cannot be sent to a server card yet" };
-	}
+	const uploads = serverImageUploads(images);
+	if (uploads.error) return { success: false, error: uploads.error };
 	const said = typeof feedback === "string" ? feedback.trim() : "";
 	if (!said || said.length > MAX_FEEDBACK) {
 		return { success: false, error: "Say what to change" };
 	}
 	const sent = await authedFetch(cardUrl(card, "request-changes"), "POST", {
 		feedback: said,
+		...(uploads.uploads?.length ? { images: uploads.uploads } : {}),
 	});
 	if (!sent.ok) return { success: false, error: sent.error };
 	return startRun(card, "build");

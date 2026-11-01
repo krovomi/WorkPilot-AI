@@ -119,12 +119,13 @@ du backend. Après chaque écriture, l'index du serveur est relu et un événeme
 | Lire une carte (texte, spec, rapport QA, approbation ; la copie de l'espace de build pendant un build) | `GET /api/board/cards/{id}` | `task.read`, un rôle sur le projet |
 | Créer | `POST /api/board/cards` | `task.write`, rôle `member` ou plus |
 | Modifier le titre ou la description | `PATCH /api/board/cards/{id}` | idem ; refusé (409) dès qu'une spec ou un espace de build existe |
+| Joindre des images à une carte | `images` de `request-changes`, `attachments` de la création | Au plus 10 images de 5 Mo, PNG, JPEG, GIF ou WebP dont les octets sont vérifiés (pas de SVG, qui peut porter du script) ; nom réduit à un nom de base sûr, rendu unique, jamais d'écrasement ; un dossier qui est un lien est refusé (`shared_board/attachments.py`) |
 | Régler le moteur, la priorité, la catégorie, l'objectif | `PATCH /api/board/cards/{id}/settings`, ou `settings` à la création | `task.write`, rôle `member` ou plus ; permis après le début du travail, refusé (409) pendant un run. Le provider doit être dans `capabilities/providers.yaml` (ses identifiants sont ceux du déploiement), le modèle est un identifiant borné, l'objectif est validé par `goal/spec.py`. Écrits dans `task_metadata.json` (`engineLocked`) et `.workpilot-goal.json`, dans le dossier de spec et sa copie de l'espace de build (`shared_board/settings.py`). Un champ omis est gardé, `null` l'efface ; `GET /api/board/cards/{id}` les rend sous `settings` |
 | Supprimer | `DELETE /api/board/cards/{id}` | `task.delete` ; refusé pendant un run, sur une carte réservée par un autre (sauf `owner`), ou tant que son espace de build existe |
 | Approuver la spec et le plan | `POST /api/board/cards/{id}/approve` | `review.approve` ; l'approbation porte l'empreinte de la spec et tombe si elle change |
 | Lire ce que le build a changé | `GET /api/board/cards/{id}/changes` | `task.read` ; fichiers, lignes et patch de la branche `workpilot/<carte>` contre la branche du projet, lus dans l'espace de build du clone |
 | Lire le journal du build | `GET /api/board/cards/{id}/logs` | `task.read` ; `task_logs.json` du dossier de spec fusionné avec celui de l'espace de build comme l'app le fait en local (`shared_board/logs.py`), borné (1 000 lignes par phase, 8 000 caractères par ligne) et masqué ; `null` tant qu'aucun run n'a écrit ; un lien symbolique ou un fichier hors du clone n'est pas lu |
-| Renvoyer le travail avec des demandes | `POST /api/board/cards/{id}/request-changes` | `review.approve`, rôle `member` ou plus ; refusé (409) sans espace de build ou pendant un run |
+| Renvoyer le travail avec des demandes | `POST /api/board/cards/{id}/request-changes` | `review.approve`, rôle `member` ou plus ; refusé (409) sans espace de build ou pendant un run. Les `images` jointes vont dans `feedback_images/` de l'espace de build, listées sous la demande comme le fait l'app |
 | Lancer une phase | `POST /projects/{id}/specs/{spec}/runs` | `agent.execute` ; `merge` demande aussi `task.merge`, `pr` aussi `vcs.pr.create` |
 
 Une carte peut demander une revue avant le code (`require_review`, vrai par défaut, comme dans
@@ -167,7 +168,7 @@ pris pour une carte du serveur.
 
 | Dans l'app | Au serveur |
 |---|---|
-| Nouvelle tâche (`TASK_CREATE`) | `POST /api/board/cards`, avec la revue avant le code demandée ou non, et le moteur, la priorité et la catégorie choisis (`main/server-card-settings.ts`) ; les pièces jointes ne sont pas encore envoyées |
+| Nouvelle tâche (`TASK_CREATE`) | `POST /api/board/cards`, avec la revue avant le code demandée ou non, et le moteur, la priorité et la catégorie choisis (`main/server-card-settings.ts`) ; les images du dialogue partent en `attachments` (`main/server-card-images.ts`), rangées dans `attachments/` de la carte et citées dans `requirements.json` |
 | Modifier (`TASK_UPDATE`) | le texte, s'il a changé, par `PATCH /api/board/cards/{id}` ; le moteur, la priorité et la catégorie par `PATCH …/settings`. Les autres métadonnées ne sont pas envoyées |
 | Objectif (`TASK_GOAL_GET`, `TASK_GOAL_SET`) | lu dans `settings` de la carte, écrit par `PATCH …/settings` ; le miroir de l'app n'est jamais lu par un run |
 | Supprimer (`TASK_DELETE`) | `DELETE /api/board/cards/{id}` |
@@ -178,7 +179,7 @@ pris pour une carte du serveur.
 | Fusionner (`TASK_WORKTREE_MERGE`) | phase `merge` ; l'aperçu (`…_MERGE_PREVIEW`) ne signale aucun conflit qu'il n'a pas vérifié, et « préparer sans commiter » n'est pas offert : le clone du serveur n'est à personne |
 | Créer la PR (`TASK_WORKTREE_CREATE_PR`) | phase `pr` ; le titre et le corps viennent de la spec, les retouches du dialogue ne sont pas envoyées |
 | Approuver (`TASK_REVIEW`, oui) | `POST /api/board/cards/{id}/approve` |
-| Demander des changements (`TASK_REVIEW`, non) | `POST /api/board/cards/{id}/request-changes`, puis phase `build` ; des images jointes sont refusées plutôt que perdues |
+| Demander des changements (`TASK_REVIEW`, non) | `POST /api/board/cards/{id}/request-changes` avec ses images, puis phase `build` ; une image que le serveur n'accepte pas (SVG, plus de 5 Mo, plus de 10) est refusée dans l'app plutôt que perdue |
 
 Renvoyer le travail fait sur le serveur ce que l'app fait sur l'ordinateur
 (`shared_board/review.py`) : la demande va dans `QA_FIX_REQUEST.md` de l'espace de build, là où le
