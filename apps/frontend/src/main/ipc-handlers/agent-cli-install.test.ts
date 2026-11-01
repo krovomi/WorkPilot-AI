@@ -7,7 +7,15 @@ vi.mock("../env-utils", () => ({
 }));
 vi.mock("../platform", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("../platform")>();
-	return { ...actual, findExecutable: vi.fn(() => null) };
+	// installAgentCli is tested as on Linux whatever the CI runner is: the
+	// Windows and macOS plans are covered through planAgentCliInstall.
+	return {
+		...actual,
+		findExecutable: vi.fn(() => null),
+		getCurrentOS: vi.fn(() => "linux"),
+		getPathDelimiter: vi.fn(() => ":"),
+		isWindows: vi.fn(() => false),
+	};
 });
 vi.mock("node:child_process", async (importOriginal) => ({
 	...(await importOriginal<typeof import("node:child_process")>()),
