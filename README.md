@@ -2,7 +2,7 @@
 
 **Autonomous multi-agent coding framework that plans, builds, and validates software for you.**
 
-![WorkPilot AI Kanban Board](.github/assets/WorkPilot-AI-Kanban.png)
+![WorkPilot AI: the Kanban board, with agents planning, coding and reviewing tasks](.github/assets/screenshots/kanban.png)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-green?style=flat-square)](./LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-Join%20Community-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/KCXaPBr4Dj)
 [![YouTube](https://img.shields.io/badge/YouTube-Subscribe-FF0000?style=flat-square&logo=youtube&logoColor=white)](https://www.youtube.com/@AndreMikalsen)
@@ -236,8 +236,37 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 
 ## Interface
 
+> Every screenshot below comes from the real app, filled with an invented demo project (`acme-storefront`). They are regenerated with `scripts/readme-screenshots/`.
+
 ### Kanban Board
-Visual task management from planning through completion. Create tasks and monitor agent progress in real-time.
+Describe a task, and agents take it from planning to a merged pull request. Each card shows its phase (plan, code, QA), its progress, the provider at work and what it is about (category, impact, priority). Columns follow the pipeline: Planning, Queue, In Progress, AI Review, Human Review, Done.
+
+![Kanban board](.github/assets/screenshots/kanban.png)
+
+### Task Detail
+Open a card to follow the agents live: the plan split into subtasks with the files each one touches, the logs, the changed files, the change graph, visual proofs and the emulator.
+
+![Task detail with its subtasks](.github/assets/screenshots/task-detail.png)
+
+### Insights
+Ask questions about your codebase. The assistant reads the code (the tools it used are listed), answers with file and line references, and turns a finding into a ready-to-run task in one click.
+
+![Insights: a conversation about the codebase that ends in a suggested task](.github/assets/screenshots/insights.png)
+
+### Roadmap
+AI-assisted feature planning: product vision, target audience, phases, MoSCoW priorities, competitor analysis and votes imported from Canny or GitHub. Any feature becomes a task with **Build**.
+
+![Roadmap as a Kanban of features](.github/assets/screenshots/roadmap.png)
+
+### Ideation
+Agents scan the project and propose improvements by type: code, UI/UX, documentation, security, performance and code quality, each with its rationale and the files concerned.
+
+![Ideation: improvement ideas by type](.github/assets/screenshots/ideation.png)
+
+### Dashboard
+What the agents produce and cost: tasks by status, QA first-pass rate, tokens and cost by provider and model, merges resolved automatically, completion time by complexity. Exportable as JSON or CSV.
+
+![Dashboard of project metrics](.github/assets/screenshots/dashboard.png)
 
 ### Agent Terminals
 AI-powered terminals with one-click task context injection. Spawn multiple agents for parallel work.
@@ -247,18 +276,17 @@ AI-powered terminals with one-click task context injection. Spawn multiple agent
 ### Mission Control
 NASA-style multi-agent orchestration hub with per-agent monitoring, model assignment, and live decision visualization.
 
-### Roadmap
-AI-assisted feature planning with competitor analysis and audience targeting.
+### Mobile App (iOS & Android)
+The team's board in your pocket: in server mode, the phone app follows the shared Kanban, opens a card (spec, approval, runs, changes), starts, approves or stops the agents, and reads the dashboard, Insights, roadmap and ideas. The agents keep running on the team server.
 
-![Roadmap](.github/assets/WorkPilot-AI-roadmap.png)
+![Mobile app: board, card and dashboard](.github/assets/screenshots/mobile.png)
 
 ### Additional Views
-- **Insights** — AI chat for codebase exploration and semantic search
-- **Ideation** — Discover improvements, vulnerabilities, and performance issues
 - **Changelog** — Generate release notes from completed tasks
 - **Architecture Visualizer** — Interactive dependency and module graphs
 - **Agent Replay** — Step-by-step session replay with breakpoints and diffs
 - **Analytics** — Usage, cost, and performance dashboards
+- **Session History** — Every agent session with its phases, tokens and cost
 
 ---
 
