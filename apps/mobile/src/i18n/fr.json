@@ -9,6 +9,7 @@
 		"network": "Le serveur est injoignable. Vérifiez votre connexion.",
 		"timeout": "Le serveur a mis trop de temps à répondre.",
 		"signed_out": "Votre session a pris fin. Reconnectez-vous.",
+		"too_many": "Trop de tentatives. Attendez une minute, puis réessayez.",
 		"forbidden": "Vous n'avez pas les droits pour cette action.",
 		"generic": "Une erreur est survenue : {{message}}",
 		"card_not_indexed": "Le serveur n'a pas encore indexé cette carte. Tirez pour actualiser.",
@@ -25,7 +26,8 @@
 		"invalidUrl": "Cette adresse de serveur n'est pas valide.",
 		"insecureUrl": "Utilisez une adresse https://. Le http simple n'est permis que sur votre réseau local.",
 		"localDisabled": "Ce serveur n'accepte que la connexion Microsoft, que l'app mobile ne gère pas encore.",
-		"failed": "Connexion impossible : {{message}}"
+		"failed": "Connexion impossible : {{message}}",
+		"badCredentials": "E-mail ou mot de passe incorrect."
 	},
 	"unreachable": {
 		"title": "Serveur injoignable",
@@ -225,6 +227,63 @@
 			"merge_with_changes": "Fusionnable après de petits changements",
 			"needs_revision": "À reprendre",
 			"blocked": "Bloquée"
+		}
+	},
+	"dashboard": {
+		"title": "Tableau de bord",
+		"sessions": "Sessions",
+		"analyses": "Analyses",
+		"cards": "Cartes",
+		"noCards": "Pas encore de carte.",
+		"status": {
+			"pending": "À faire",
+			"in_progress": "En cours",
+			"ai_review": "Revue IA",
+			"human_review": "Revue humaine",
+			"completed": "Terminées",
+			"error": "Erreur"
+		},
+		"quality": "Qualité",
+		"qaFirstPass": "QA réussie du premier coup",
+		"qaScore": "Score QA moyen",
+		"mergesAuto": "Fusionnées automatiquement",
+		"mergesManual": "Fusionnées à la main",
+		"costs": "Dépenses, {{days}} derniers jours",
+		"total": "Total",
+		"dailyAvg": "Par jour",
+		"trend": "Par rapport à la période d'avant",
+		"tokens": "Tokens",
+		"allTime": "Depuis le début",
+		"noSessions": "Pas encore de session."
+	},
+	"analyses": {
+		"intro": "Chaque analyse tourne sur le serveur, sur le code du projet ; toute l'équipe du projet lit son dernier rapport.",
+		"none": "Jamais lancée sur ce projet.",
+		"lastRun": "Dernière exécution : {{date}}",
+		"summary": "Résumé",
+		"more": "Et {{count}} de plus sur le bureau.",
+		"unknown": "Analyse inconnue.",
+		"kinds": {
+			"accessibility": {
+				"title": "Accessibilité",
+				"body": "Problèmes WCAG dans le code de l'interface."
+			},
+			"i18n": {
+				"title": "Traductions",
+				"body": "Clés de traduction manquantes ou inutilisées, texte en dur."
+			},
+			"doc-drift": {
+				"title": "Dérive de la documentation",
+				"body": "La doc qui ne dit plus ce que fait le code."
+			},
+			"flaky-tests": {
+				"title": "Tests instables",
+				"body": "Les tests qui passent puis échouent sans changement."
+			},
+			"tech-debt": {
+				"title": "Dette technique",
+				"body": "La dette trouvée dans le code, par coût."
+			}
 		}
 	}
 }

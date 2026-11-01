@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { ServerClient } from "../api/client";
+import { ApiError, ServerClient } from "../api/client";
 import { api } from "../api/endpoints";
 import { normaliseServerUrl } from "../api/server-url";
 import { useSession } from "../auth/session";
@@ -36,7 +36,10 @@ export default function SignIn() {
 			}
 			await session.signIn(url.url, email.trim(), password);
 		} catch (err) {
-			setError(t("signIn.failed", { message: describeError(err) }));
+			// A 401 here is a refused password, not an ended session.
+			const message =
+				err instanceof ApiError && err.status === 401 ? t("signIn.badCredentials") : describeError(err);
+			setError(t("signIn.failed", { message }));
 		} finally {
 			setBusy(false);
 		}

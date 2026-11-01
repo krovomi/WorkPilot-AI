@@ -39,6 +39,7 @@ export function describeError(err: unknown): string {
 		if (err.status === 0) return i18n.t(err.message === "timeout" ? "errors.timeout" : "errors.network");
 		if (err.status === 401) return i18n.t("errors.signed_out");
 		if (err.status === 403) return i18n.t("errors.forbidden");
+		if (err.status === 429) return i18n.t("errors.too_many");
 		return i18n.t("errors.generic", { message: err.message });
 	}
 	if (err instanceof Error && i18n.exists(`errors.${err.message}`)) return i18n.t(`errors.${err.message}`);

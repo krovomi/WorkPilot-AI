@@ -21,6 +21,9 @@ applications mobiles pour un projet.
 | Roadmap | `src/app/(app)/projects/[projectId]/roadmap.tsx` | `GET /api/features/roadmap/snapshot`, `POST .../jobs` pour la générer, `POST .../features/{id}/convert` pour en faire une carte |
 | Idées | `src/app/(app)/projects/[projectId]/ideas.tsx` | idem sous `/api/features/ideation` (`.../ideas/{id}/convert`) |
 | GitHub ou GitLab | `src/app/(app)/projects/[projectId]/forge/` | `POST /api/features/forge/<forge>/read` et `.../write` (le relais, avec le jeton de la personne), `.../github/pulls`, `.../<forge>/reviews` pour la revue IA |
+| Tableau de bord | `src/app/(app)/projects/[projectId]/dashboard.tsx` | `GET /api/features/workspace/dashboard` et `.../costs` |
+| Sessions | `src/app/(app)/projects/[projectId]/sessions.tsx` | `GET /api/features/workspace/sessions` (les 100 dernières) |
+| Analyses | `src/app/(app)/projects/[projectId]/analyses/` | `GET /api/features/analyses/<analyse>/report`, `POST .../jobs` pour la lancer, suivie comme un job |
 | Réglages | `src/app/(app)/settings.tsx` | `POST /auth/switch-org`, `POST /auth/logout` |
 
 Les actions d'une carte sont celles de l'app de bureau sur une carte du serveur
@@ -125,6 +128,17 @@ tout appel que les vues du bureau ne font pas : le téléphone ne voit jamais le
 | Commenter, fusionner | oui (`vcs.write`, la fusion `vcs.pr.merge`, après confirmation) | oui |
 | Revue IA | lancée comme job sur le serveur, suivie, puis lue (`review_<n>.json`) | idem |
 
+## Tableau de bord, sessions et analyses
+
+Le tableau de bord reprend les chiffres de la vue du bureau (cartes par colonne, qualité, dépenses
+sur la période et depuis le début), les sessions listent les runs et les jobs du projet (qui, quand,
+combien de temps, combien), et les cinq analyses (accessibilité, i18n, dérive de la documentation,
+tests instables, dette technique) montrent le dernier rapport enregistré sur le serveur et se
+relancent comme un job. Tout cela demande `analytics.read` ; lancer une analyse demande en plus
+`agent.execute`, que le serveur revérifie. Un rapport d'analyse est une sortie d'agent : l'app ne
+l'affiche pas tel quel mais en tire des chiffres et des listes bornés (`src/insights/digest.ts`),
+et ignore ce qu'elle ne reconnaît pas.
+
 ## Les notifications push
 
 Quand un run se termine (réussi ou en échec), la personne qui l'a lancé reçoit une notification sur
@@ -153,4 +167,4 @@ développement, simulateur, web), l'app fonctionne de la même façon, sans noti
 ## Ce qui vient
 
 - Connexion Microsoft Entra (`expo-auth-session`, puis `POST /auth/oidc/exchange`).
-- Le tableau de bord et les analyses, l'administration.
+- L'administration (membres, rôles, groupes, invitations), le contexte du projet, les jetons personnels.

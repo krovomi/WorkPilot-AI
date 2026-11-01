@@ -112,8 +112,22 @@ async function signIn(browser: Browser, world: World, who: Who, password = world
 	await page.getByLabel("Password").fill(password);
 	if (who === "alice") await shot(page, "1-sign-in");
 	await page.getByRole("button", { name: "Sign in" }).click();
+	if (password === world.passwords[who]) signedIn.set(who, page);
 	return page;
 }
+
+/**
+ * The page of someone already signed in, as an earlier scenario left it: the
+ * server allows ten sign-ins a minute from one address, and the web build keeps
+ * its tokens in memory, so a new page would have to sign in again.
+ */
+function signedInPage(who: Who): Page {
+	const page = signedIn.get(who);
+	if (!page) throw new Error(`${who} never signed in`);
+	return page;
+}
+
+const signedIn = new Map<Who, Page>();
 
 let world: World;
 let app: http.Server;
@@ -130,7 +144,7 @@ test.afterAll(async () => {
 
 test("a refused password says so and keeps the person signed out", async ({ browser }) => {
 	const page = await signIn(browser, world, "alice", "not-the-password-at-all");
-	await expect(page.getByText(/Sign-in failed/)).toBeVisible();
+	await expect(page.getByText("Sign-in failed: Wrong email or password.")).toBeVisible();
 	await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
 });
 
@@ -211,4 +225,24 @@ test("the project's Insights, roadmap and ideas open from the board", async ({ b
 	await bob.getByRole("button", { name: /New Conversation/ }).first().click({ timeout: 30_000 });
 	await expect(bob.getByText("Ask your first question below.")).toBeVisible();
 	await expect(bob.getByLabel("Your question")).toHaveCount(0);
+});
+
+test("the dashboard, the sessions and the analyses open from the board", async () => {
+	// Alice is still on the ideas, where the previous scenario left her.
+	const alice = signedInPage("alice");
+	await alice.goBack();
+	await alice.getByRole("link", { name: "Dashboard" }).click();
+	await expect(alice.getByText("Quality")).toBeVisible({ timeout: 30_000 });
+	await expect(alice.getByText(/Spending, last \d+ days/)).toBeVisible();
+	await shot(alice, "9-dashboard");
+
+	// The card started in an earlier scenario is in the history.
+	await alice.getByRole("button", { name: "Sessions" }).click();
+	await expect(alice.getByText(/ · Spec$/).first()).toBeVisible({ timeout: 30_000 });
+	await alice.goBack();
+
+	await alice.getByRole("button", { name: "Analyses" }).click();
+	await alice.getByRole("button", { name: /Technical debt/ }).click();
+	await expect(alice.getByText("Never run on this project.")).toBeVisible({ timeout: 30_000 });
+	await expect(alice.getByRole("button", { name: "Generate" })).toBeVisible();
 });
