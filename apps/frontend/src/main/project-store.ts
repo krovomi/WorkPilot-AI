@@ -1435,11 +1435,13 @@ export class ProjectStore {
 
 		// Only auto-correct if all subtasks are done and status is in a stale state.
 		// Preserve in_progress (task is actively running — auto-correction would race with XState),
-		// ai_review (QA in progress), error (needs investigation), human_review, done, pr_created.
+		// ai_review (QA in progress), error (needs investigation), human_review,
+		// build_failed (all subtasks are done there: the CI is what is red), done, pr_created.
 		if (
 			!allCompleted ||
 			finalStatus === "in_progress" ||
 			finalStatus === "human_review" ||
+			finalStatus === "build_failed" ||
 			finalStatus === "done" ||
 			finalStatus === "pr_created" ||
 			finalStatus === "ai_review" ||
