@@ -166,13 +166,14 @@ async function indexId(card: ServerCard): Promise<IPCResult<string>> {
 export async function startRun(
 	card: ServerCard,
 	phase: "spec" | "build" | "merge" | "pr",
+	pr?: Record<string, unknown>,
 ): Promise<IPCResult> {
 	const id = await indexId(card);
 	if (!id.success || !id.data) return { success: false, error: id.error };
 	const result = await authedFetch(
 		specsUrl(card.project, `/${encodeURIComponent(id.data)}/runs`),
 		"POST",
-		{ phase },
+		pr ? { phase, pr } : { phase },
 	);
 	return result.ok ? { success: true } : { success: false, error: result.error };
 }
