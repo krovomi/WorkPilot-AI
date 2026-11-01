@@ -34,6 +34,12 @@ export const projectMock = {
 
 	onServerBoardLive: () => () => {},
 
+	watchServerView: async () => ({ success: false }),
+
+	unwatchServerView: async () => ({ success: true }),
+
+	onServerViewChanged: () => () => undefined,
+
 	getProjects: async () => ({
 		success: true,
 		data: mockProjects,
