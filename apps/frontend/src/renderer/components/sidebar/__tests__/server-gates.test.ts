@@ -10,13 +10,25 @@ describe("server project views", () => {
 		expect(showsView("ideation", true)).toBe(true);
 		expect(showsView("insights", true)).toBe(true);
 		expect(showsView("context", true)).toBe(true);
+		// The workspace views are computed by the server for its projects.
+		for (const view of [
+			"dashboard",
+			"analytics",
+			"cost-estimator",
+			"session-history",
+		] as const) {
+			expect(showsView(view, true)).toBe(true);
+		}
 		// Views that read or run things on this computer would act on the mirror.
 		for (const view of ["terminals", "gitlab-issues", "github-prs"] as const) {
 			expect(showsView(view, true)).toBe(false);
 		}
 		expect([...SERVER_PROJECT_VIEWS].sort()).toEqual([
 			"administration",
+			"analytics",
 			"context",
+			"cost-estimator",
+			"dashboard",
 			"github-issues",
 			"github-prs",
 			"gitlab-issues",
@@ -25,6 +37,7 @@ describe("server project views", () => {
 			"insights",
 			"kanban",
 			"roadmap",
+			"session-history",
 		]);
 	});
 

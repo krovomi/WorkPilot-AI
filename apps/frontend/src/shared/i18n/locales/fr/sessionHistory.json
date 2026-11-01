@@ -1,6 +1,10 @@
 {
 	"title": "Historique des sessions",
 	"subtitle": "Suivez les sessions des agents, les coûts et les performances",
+	"serverSubtitle": "Les runs et les jobs de ce projet sur le serveur, pour toute l'équipe",
+	"server": {
+		"startedBy": "par {{name}}"
+	},
 	"refresh": "Actualiser",
 	"noSessions": "Aucune session trouvée",
 	"stats": {

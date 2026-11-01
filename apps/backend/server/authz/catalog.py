@@ -293,6 +293,9 @@ FEATURE_DOMAINS: MappingProxyType[str, str] = MappingProxyType(
         "context": "insight",
         # GitHub for a server project, relayed with the caller's own token.
         "forge": "vcs",
+        # A server project's dashboard, analytics, sessions and costs, read
+        # from its runs, jobs and the ledgers in its clone.
+        "workspace": "analytics",
         # What a task's attachments and the project's ADRs say. Read-only and
         # addressed like spec_traceability, so it answers to the same domain.
         "docintel": "task",

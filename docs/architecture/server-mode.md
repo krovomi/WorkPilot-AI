@@ -129,8 +129,8 @@ lecture, et les lit avec le chargeur des projets locaux : une carte du serveur r
 carte locale.
 
 La barre latérale n'offre pour un projet du serveur que les vues qui passent par le serveur
-(`sidebar/server-gates.ts`, aujourd'hui le Kanban, la Roadmap et l'administration) ; les autres
-agiraient sur le miroir. La liste des projets est relue quand la session change (connexion, déconnexion, autre
+(`sidebar/server-gates.ts` : le Kanban, l'espace de travail, les features partagées, les vues de sa
+forge et l'administration) ; les autres agiraient sur le miroir. La liste des projets est relue quand la session change (connexion, déconnexion, autre
 compte).
 
 Les actions du Kanban sur une carte du serveur partent au serveur (`main/server-board-actions.ts`),
@@ -384,9 +384,45 @@ relais, avec le jeton de la personne, puis note sur le serveur ce qui a été pu
 | Suivre la revue, lire les revues enregistrées | `GET …/reviews/jobs/<id>`, `GET …/reviews?numbers=` | `vcs.read` |
 | Publier les findings | `/merge_requests/<n>/notes` par le relais, puis `POST …/reviews/<n>/posted` | `vcs.write`, rôle `member` ou plus |
 
+## L'espace de travail d'un projet
+
+Le tableau de bord, les analytics, les coûts et l'historique des sessions disent ce qu'une équipe a
+fait d'un projet et ce que cela a coûté. Sur l'ordinateur, ces vues lisent le dossier du projet
+(`cost_data.json`, `dashboard_snapshot.json`) et un historique global de la machine ; pour un
+projet du serveur, ce serait le miroir ou l'ordinateur de la personne, qui ne savent rien des runs
+de l'équipe. Le serveur les calcule donc pour le projet (`shared_features/workspace.py`), à partir
+de ce qu'il tient : les cartes indexées (`specs_index`, relues comme le tableau), les runs lancés
+sur elles (`agent_runs`) et les jobs du projet (`project_jobs`), avec le nom de qui les a lancés.
+
+Ce qu'ont dépensé les agents, le serveur ne l'enregistre pas en base : chaque session d'agent
+l'écrit (`core/usage_tracker.py`) dans le dossier où elle travaille, le clone pour la phase `spec`
+et les jobs, l'espace de build d'une carte pour son build et sa QA. `shared_features/usage_ledger.py`
+lit ces relevés par liste fermée : `cost_data.json` et `dashboard_snapshot.json` du `.workpilot` du
+clone et de chaque espace de build nommé comme une carte, chacun un fichier régulier sous sa taille,
+résolu dans le clone, avec un plafond sur le tout. Un relevé est écrit par un run, donc par un agent
+qui lit du contenu non fiable : on n'en prend que des nombres, une date et des libellés coupés
+(fournisseur, modèle, phase, carte) ; le dossier du serveur qu'il nomme n'est jamais lu ni servi.
+La dépense d'un run est celle de sa carte entre son début et sa fin, phase par phase ; celle d'un
+job n'est pas attribuée (plusieurs peuvent tourner en même temps) mais compte dans les totaux. Les
+budgets restent une feature de l'ordinateur : un projet du serveur n'en a pas encore, et le temps
+moyen par complexité n'est enregistré nulle part, sur l'ordinateur non plus.
+
+Dans l'app, ces vues reconnaissent un projet du serveur (`useServerProjectId`) et demandent au main
+ses données par son id (`main/server-workspace.ts`, canaux `SERVER_WORKSPACE_*`), qui ne répond que
+pour un projet du serveur listé et revérifie chaque nombre et chaque libellé ; ni le miroir, ni le
+backend local, ni les fichiers de l'ordinateur ne sont lus pour lui. Les routes du tableau de bord
+écrites pour l'ordinateur (`dashboard/api.py` : `/api/dashboard/*`, `/api/sessions/*`), qui lisent
+la machine et non un projet, ne répondent qu'en mode local (404 sur un serveur).
+
+| Action | Route | Il faut |
+|---|---|---|
+| Historique des sessions : runs et jobs, qui, quand, comment ils ont fini, la dépense d'un run | `GET /api/features/workspace/sessions?limit=` | `analytics.read`, un rôle sur le projet |
+| Coûts des trente derniers jours, par fournisseur et modèle, tendance | `GET /api/features/workspace/costs` | `analytics.read` |
+| Tableau de bord : cartes par statut, jetons et coûts, QA du premier coup, fusions | `GET /api/features/workspace/dashboard` | `analytics.read` |
+
 ## Ce qui vient
 
 Le plan multi-tenant du 31 octobre, par lots : les autres features servies de la même façon
-(l'investigation et l'auto-fix des issues en jobs, analyses, tableau de bord), le flux du projet ouvert pour
+(l'investigation et l'auto-fix des issues en jobs, analyses, budgets d'un projet), le flux du projet ouvert pour
 chaque vue partagée, un test de bout en bout à deux organisations, et le guide d'exploitation. Ce
 fichier grandit avec chaque lot.

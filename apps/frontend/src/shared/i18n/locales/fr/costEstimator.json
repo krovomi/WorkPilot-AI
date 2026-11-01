@@ -1,6 +1,7 @@
 {
 	"title": "Estimateur de coûts",
 	"subtitle": "Coûts d'utilisation LLM, budgets et prévisions",
+	"serverSubtitle": "Ce qu'ont dépensé les agents de ce projet sur le serveur ces 30 derniers jours",
 	"retry": "Réessayer",
 	"error": "Impossible de charger les données de coûts",
 	"kpi": {

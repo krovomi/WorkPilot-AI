@@ -1,6 +1,10 @@
 {
 	"title": "Session History",
 	"subtitle": "Track agent sessions, costs, and performance",
+	"serverSubtitle": "The runs and jobs of this project on the server, for the whole team",
+	"server": {
+		"startedBy": "by {{name}}"
+	},
 	"refresh": "Refresh",
 	"noSessions": "No sessions found",
 	"stats": {

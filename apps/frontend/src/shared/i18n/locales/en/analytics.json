@@ -1,6 +1,7 @@
 {
 	"title": "Build Analytics",
 	"subtitle": "Monitor agent performance, token usage, and build metrics",
+	"serverSubtitle": "Computed by the server from this project's runs, for the whole team",
 	"periodSelector": {
 		"last7Days": "Last 7 days",
 		"last30Days": "Last 30 days",
