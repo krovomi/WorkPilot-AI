@@ -38,7 +38,7 @@ Une vulnérabilité se signale par [`docs/SECURITY.md`](docs/SECURITY.md), jamai
 Index locaux (chacun a un `CLAUDE.md` voisin qui l'importe pour Claude Code) :
 [backend](apps/backend/AGENTS.md) · [sécurité backend](apps/backend/security/AGENTS.md) ·
 [skills Python](apps/backend/skills/AGENTS.md) · [frontend](apps/frontend/AGENTS.md) ·
-[Kanban](apps/frontend/src/renderer/components/kanban/AGENTS.md).
+[Kanban](apps/frontend/src/renderer/components/kanban/AGENTS.md) · [app mobile](apps/mobile/AGENTS.md).
 
 ## Carte du dépôt
 
@@ -50,6 +50,7 @@ apps/backend/        Python : agents, pipeline, API FastAPI (127.0.0.1:9000), We
   security/  server/ allowlist et écritures confinées ; mode serveur (auth/, authz/)
   prompts/           prompts système des agents
 apps/frontend/       Electron + React + TypeScript (main / preload / renderer)
+apps/mobile/         app iOS et Android (Expo, React Native), client du mode serveur
 src/                 Python partagé : connecteurs (Jira, Azure DevOps, grepai…)
 tests/               pytest ; les tests frontend vivent près du code
 skills/              source des skills ; .agents/skills/ = sortie générée, lue en production

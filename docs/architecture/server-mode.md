@@ -115,6 +115,7 @@ du backend. Après chaque écriture, l'index du serveur est relu et un événeme
 
 | Action | Route | Il faut |
 |---|---|---|
+| Lister les cartes résumées (l'app mobile, [mobile-app.md](mobile-app.md)) | `GET /api/board/cards` | `task.read`, un rôle sur le projet |
 | Lire une carte (texte, spec, approbation) | `GET /api/board/cards/{id}` | `task.read`, un rôle sur le projet |
 | Créer | `POST /api/board/cards` | `task.write`, rôle `member` ou plus |
 | Modifier le titre ou la description | `PATCH /api/board/cards/{id}` | idem ; refusé (409) dès qu'une spec ou un espace de build existe |

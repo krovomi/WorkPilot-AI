@@ -1,0 +1,128 @@
+/**
+ * What the WorkPilot server answers, as the phone app reads it. The shapes
+ * mirror `apps/backend/server/schemas.py` and the board routes of
+ * `apps/backend/shared_board/`; a field the app does not show is left out.
+ */
+
+export interface ServerUser {
+	id: string;
+	email: string;
+	display_name: string;
+	avatar_url?: string | null;
+	role: string;
+}
+
+export interface TokenResponse {
+	access_token: string;
+	refresh_token: string;
+	expires_in: number;
+	user: ServerUser;
+}
+
+export interface AuthConfig {
+	local_enabled: boolean;
+	entra_enabled: boolean;
+}
+
+export interface Organization {
+	id: string;
+	name: string;
+	slug: string;
+	my_role?: string | null;
+}
+
+export interface MyPermissions {
+	user_id: string;
+	is_platform_admin: boolean;
+	org_id: string | null;
+	org_role: string | null;
+	permissions: string[];
+	organizations: Organization[];
+}
+
+export interface ServerProject {
+	id: string;
+	org_id?: string | null;
+	name: string;
+	repo_url: string;
+	default_branch: string;
+	my_role?: string | null;
+	forge?: string | null;
+}
+
+/** The columns of the board, as `board_mcp.server.COLUMNS` maps a plan's status. */
+export type Column =
+	| "backlog"
+	| "queue"
+	| "in_progress"
+	| "ai_review"
+	| "human_review"
+	| "build_failed"
+	| "pr_created"
+	| "done"
+	| "error";
+
+export type CardKind =
+	| "feature"
+	| "bug_fix"
+	| "refactoring"
+	| "investigation"
+	| "docs"
+	| "test";
+
+/** One card of `GET /api/board/cards`. */
+export interface BoardCard {
+	id: string;
+	title: string;
+	column: Column;
+	kind: CardKind | null;
+	updatedAt: string | null;
+	subtasks: { completed: number; total: number };
+	reviewReason?: string;
+	qa?: string;
+	specId: string | null;
+	claimedBy: string | null;
+	claimedByName: string | null;
+}
+
+/** `GET /api/board/cards/{id}`. */
+export interface CardDetails extends Omit<BoardCard, "specId" | "claimedBy" | "claimedByName"> {
+	description: string;
+	spec: string | null;
+	approval: { approved: boolean; approvedBy: string | null; approvedAt: string | null };
+	requireReview: boolean;
+}
+
+export type RunPhase = "spec" | "build" | "qa" | "merge" | "pr";
+
+export interface AgentRun {
+	id: string;
+	spec_id: string;
+	phase: RunPhase | string;
+	started_by: string | null;
+	model: string | null;
+	status: string;
+	started_at: string;
+	finished_at: string | null;
+	error: string | null;
+}
+
+export interface ChangedFile {
+	path: string;
+	status: "added" | "modified" | "deleted" | "renamed";
+	additions: number;
+	deletions: number;
+	patch: string | null;
+}
+
+/** `GET /api/board/cards/{id}/changes`. */
+export interface CardChanges {
+	exists: boolean;
+	branch?: string;
+	baseBranch?: string;
+	commitCount?: number;
+	filesChanged?: number;
+	additions?: number;
+	deletions?: number;
+	files: ChangedFile[];
+}

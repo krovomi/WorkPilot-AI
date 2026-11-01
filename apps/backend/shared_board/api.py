@@ -36,7 +36,7 @@ from server.authz.scope import ProjectScope, resolve_project_scope
 from server.db.engine import get_db
 from server.db.models import ProjectRole
 from server.services.events import emit_board_event
-from shared_board import review
+from shared_board import listing, review
 from shared_board.cards import _card_or_404, _index_row, _require_writer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -331,6 +331,9 @@ async def approve_card(
     )
     return {"approved": True, "approvedBy": review.approved_by}
 
+
+# The board as a list of summarised cards, for the phone app: its own module.
+router.add_api_route("/cards", listing.list_board_cards, methods=["GET"])
 
 # Reviewing a card's work from the app (its changes, a request for changes):
 # its own module, on this router.

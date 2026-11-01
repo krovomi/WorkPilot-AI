@@ -161,6 +161,11 @@ jobs:
         # Use --error-on-warnings when ready to enforce all rules
         run: biome ci .
 
+      # The phone app has its own Biome root (apps/mobile/biome.jsonc).
+      - name: Run Biome (mobile app)
+        working-directory: apps/mobile
+        run: biome ci .
+
   # Skills are generated: `skills/` is the source, `.agents/skills/` and the
   # harness mirrors are build output. This fails when someone edits an output
   # by hand or forgets to rebuild after editing a source.

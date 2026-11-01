@@ -1,6 +1,10 @@
 packages:
   - apps/*
   - libs/*
+  # The phone app is its own pnpm project (apps/mobile/pnpm-workspace.yaml):
+  # React Native needs a hoisted node_modules, and its toolchain must not move
+  # the desktop's lockfile or overrides.
+  - '!apps/mobile'
 
 allowBuilds:
   better-sqlite3: true
