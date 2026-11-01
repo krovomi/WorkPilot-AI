@@ -25,6 +25,69 @@ export const AGENT_CLI_DOCS: Readonly<Record<AgentCliTool, string>> = {
 };
 
 /**
+ * How WorkPilot installs a CLI that is missing, from the vendor's own
+ * channels: the npm package when there is one (and a Node.js recent enough
+ * for it), else the vendor's install script. Each CLI still owns its sign-in.
+ */
+export interface AgentCliInstallRecipe {
+	/** npm package installed globally, with its version tag. */
+	npmPackage?: string;
+	/** Extra `npm install -g` arguments the vendor documents. */
+	npmArgs?: readonly string[];
+	/** Lowest Node.js the npm package runs on, `major.minor`. */
+	minNode?: string;
+	/** Vendor install script for macOS and Linux, piped to the named shell. */
+	unixScript?: { url: string; shell: "bash" | "sh" };
+	/** Vendor PowerShell install script for Windows. */
+	windowsScript?: string;
+}
+
+export const AGENT_CLI_INSTALL: Readonly<Record<AgentCliTool, AgentCliInstallRecipe>> = {
+	opencode: {
+		npmPackage: "opencode-ai@latest",
+		unixScript: { url: "https://opencode.ai/install", shell: "bash" },
+	},
+	antigravity: {
+		unixScript: { url: "https://antigravity.google/cli/install.sh", shell: "bash" },
+		windowsScript: "https://antigravity.google/cli/install.ps1",
+	},
+	pi: {
+		npmPackage: "@earendil-works/pi-coding-agent@latest",
+		npmArgs: ["--ignore-scripts"],
+		minNode: "22.19",
+		unixScript: { url: "https://pi.dev/install.sh", shell: "sh" },
+		windowsScript: "https://pi.dev/install.ps1",
+	},
+	"gemini-cli": {
+		npmPackage: "@google/gemini-cli@latest",
+		minNode: "20.0",
+	},
+};
+
+/** Why an install did not end with the CLI found on PATH. */
+export type AgentCliInstallError =
+	/** Neither a usable npm nor a vendor script for this platform. */
+	| "node_required"
+	/** Every install method failed: `detail` holds the last output. */
+	| "failed"
+	/** The installer succeeded but the executable is still not found. */
+	| "not_on_path"
+	/** An install of this CLI is already running. */
+	| "busy";
+
+export interface AgentCliInstallResult {
+	tool: AgentCliTool;
+	success: boolean;
+	/** Which channel installed it. */
+	method?: "npm" | "script";
+	/** The check run after the install. */
+	status?: AgentCliStatus;
+	error?: AgentCliInstallError;
+	/** The tail of the failing command's output, for the user. */
+	detail?: string;
+}
+
+/**
  * How each ACP agent is started: the arguments after its executable, as
  * `capabilities/providers.yaml` writes them in its `acp.command`
  * (`tests/test_acp_frontend_parity.py` keeps the two equal).
