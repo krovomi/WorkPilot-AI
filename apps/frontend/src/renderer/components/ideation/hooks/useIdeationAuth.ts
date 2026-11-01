@@ -1,85 +1,67 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { resolvePageLlm } from "../../../../shared/utils/page-llm";
 import { useSettingsStore } from "../../../stores/settings-store";
 
 /**
- * Hook to check if the ideation feature has valid authentication.
- * This combines two sources of authentication:
- * 1. OAuth token from source .env (checked via checkSourceToken)
- * 2. Active API profile (custom Anthropic-compatible endpoint)
+ * Whether an API profile is active: the store when it already knows, the
+ * main process otherwise.
+ */
+async function resolveHasAPIProfile(profileId?: string | null): Promise<boolean> {
+	if (profileId && profileId !== "") {
+		return true;
+	}
+	try {
+		const profilesResult = await window.electronAPI.getAPIProfiles();
+		return Boolean(
+			profilesResult.success &&
+				profilesResult.data?.activeProfileId &&
+				profilesResult.data.activeProfileId !== "",
+		);
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Whether the ideation page can start a generation.
+ *
+ * Ideation runs on the provider of its page (`resolvePageLlm`, the same answer
+ * the main process uses to spawn the runner). Only Claude needs a credential
+ * the renderer can check here: the OAuth token of the source `.env`
+ * (`checkSourceToken`) or an active API profile (Anthropic-compatible
+ * endpoint). Another provider (Codex, Copilot, Gemini, Ollama…) is not gated
+ * on Claude's credentials: the runner reports its own sign-in error.
+ *
+ * The check runs once per provider and profile change, and again on
+ * `checkAuth`; it used to re-run after every render (a dependency recreated
+ * on each render), calling both IPC channels in a loop while the page was open.
  *
  * @returns { hasToken, isLoading, error, checkAuth }
- * - hasToken: true if either source OAuth token exists OR active API profile is configured
- * - isLoading: true while checking authentication status
- * - error: any error that occurred during auth check
- * - checkAuth: function to manually re-check authentication status
  */
 export function useIdeationAuth() {
 	const [hasToken, setHasToken] = useState<boolean | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 
-	// Get active API profile info from settings store
 	const activeProfileId = useSettingsStore((state) => state.activeProfileId);
+	const provider = useSettingsStore(
+		(state) => resolvePageLlm(state.settings, "ideation").provider,
+	);
+	// "" means no provider named anywhere: the backend default, Claude.
+	const needsClaudeCredential = provider === "" || provider === "claude";
 
-	const resolveHasAPIProfile = async (
-		profileId?: string | null,
-	): Promise<boolean> => {
-		// Trust the store when it's already populated to avoid extra IPC calls; fallback to IPC only when empty.
-		if (profileId && profileId !== "") {
-			return true;
-		}
-
-		try {
-			const profilesResult = await window.electronAPI.getAPIProfiles();
-			return Boolean(
-				profilesResult.success &&
-					profilesResult.data?.activeProfileId &&
-					profilesResult.data.activeProfileId !== "",
-			);
-		} catch {
-			return false;
-		}
-	};
-
-	useEffect(() => {
-		const performCheck = async () => {
-			setIsLoading(true);
-			setError(null);
-
-			try {
-				// Check for OAuth token from source .env
-				const sourceTokenResult = await window.electronAPI.checkSourceToken();
-				const hasSourceOAuthToken =
-					sourceTokenResult.success && sourceTokenResult.data?.hasToken;
-
-				const hasAPIProfile = await resolveHasAPIProfile(activeProfileId);
-
-				// Auth is valid if either source token or API profile exists
-				setHasToken(Boolean(hasSourceOAuthToken || hasAPIProfile));
-			} catch (err) {
-				setHasToken(false);
-				setError(err instanceof Error ? err.message : "Unknown error");
-			} finally {
-				setIsLoading(false);
-			}
-		};
-
-		performCheck();
-		// biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency omission
-	}, [activeProfileId, resolveHasAPIProfile]);
-
-	// Expose checkAuth for manual re-checks
-	const checkAuth = async () => {
+	const checkAuth = useCallback(async () => {
 		setIsLoading(true);
 		setError(null);
-
 		try {
+			if (!needsClaudeCredential) {
+				setHasToken(true);
+				return;
+			}
 			const sourceTokenResult = await window.electronAPI.checkSourceToken();
 			const hasSourceOAuthToken =
 				sourceTokenResult.success && sourceTokenResult.data?.hasToken;
-
 			const hasAPIProfile = await resolveHasAPIProfile(activeProfileId);
-
 			setHasToken(Boolean(hasSourceOAuthToken || hasAPIProfile));
 		} catch (err) {
 			setHasToken(false);
@@ -87,7 +69,11 @@ export function useIdeationAuth() {
 		} finally {
 			setIsLoading(false);
 		}
-	};
+	}, [activeProfileId, needsClaudeCredential]);
+
+	useEffect(() => {
+		void checkAuth();
+	}, [checkAuth]);
 
 	return { hasToken, isLoading, error, checkAuth };
 }

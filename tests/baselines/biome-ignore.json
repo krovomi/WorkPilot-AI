@@ -165,7 +165,6 @@
   "apps/frontend/src/renderer/components/ideation/IdeationDialogs.tsx": 3,
   "apps/frontend/src/renderer/components/ideation/details/SecurityHardeningDetails.tsx": 3,
   "apps/frontend/src/renderer/components/ideation/details/UIUXDetails.tsx": 1,
-  "apps/frontend/src/renderer/components/ideation/hooks/useIdeationAuth.ts": 1,
   "apps/frontend/src/renderer/components/jira-import/JiraSidePanel.tsx": 10,
   "apps/frontend/src/renderer/components/kanban/KanbanColumn.tsx": 3,
   "apps/frontend/src/renderer/components/learning-loop/LearningLoopDialog.tsx": 1,

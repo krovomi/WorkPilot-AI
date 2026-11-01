@@ -42,9 +42,9 @@ WorkPilot AI is a desktop application (+ CLI) where users describe a goal and AI
 - **Pair Programming** — AI-assisted pair programming mode
 - **Code Migration** — AI-guided code migration workflows
 - **Design-to-Code** — Convert designs into code implementations
-- **Performance Profiler** — AI-powered performance analysis and profiling
-- **Documentation Agent** — Automated documentation generation and maintenance
-- **Smart Estimation** — AI-based task complexity and effort estimation
+- **Performance Profiler** — Static performance analysis of the code (rules, no model call)
+- **Documentation** — Documentation coverage and templated generation from the code (no model call)
+- **Smart Estimation** — Task complexity and effort estimated from the project's build history (statistics, no model call)
 - **Test Generation** — Automated test creation for existing code
 - **Conflict Predictor** — AI-powered git conflict prediction
 - **Arena Mode** — Compare AI model outputs side-by-side
@@ -123,9 +123,9 @@ exports it all as JSON (`buildViewUsageReport`,
 | `env-snapshot` | Environment Snapshots | Planning | — | yes |
 | `release-coordinator` | Release Train Coordinator | Planning | — | yes |
 | `roadmap` | Roadmap | Planning | [agent-prompts.md](agent-prompts.md) |  |
-| `spec-approval` | Spec Approval | Planning | — | yes |
+| `spec-approval` | Spec Approval | Planning | — |  |
 | `tech-debt` | Tech Debt Dashboard | Planning | — |  |
-| `accessibility-agent` | Accessibility Agent | Toolbox | — |  |
+| `accessibility-agent` | Accessibility Scan | Toolbox | — |  |
 | `agent-tools` | MCP Overview | Toolbox | — |  |
 | `api-explorer` | API Studio | Toolbox | — |  |
 | `api-watcher` | API Contract Watcher | Toolbox | — | yes |
@@ -137,19 +137,18 @@ exports it all as JSON (`buildViewUsageReport`,
 | `dependency-sentinel` | Dependency Sentinel | Toolbox | — |  |
 | `doc-drift` | Documentation Drift Detector | Toolbox | — | yes |
 | `guardrails` | Agent Guardrails | Toolbox | — |  |
-| `i18n-agent` | i18n Agent | Toolbox | — |  |
+| `i18n-agent` | i18n Scan | Toolbox | — |  |
 | `injection-guard` | Injection Guard | Toolbox | — |  |
 | `mcp-marketplace` | MCP Marketplace | Toolbox | — | yes |
 | `migration` | Code Migration | Toolbox | — |  |
-| `notebook-agent` | Notebook Agent | Toolbox | — | yes |
+| `notebook-agent` | Notebook Checks | Toolbox | — | yes |
 | `offline-mode` | Offline Mode | Toolbox | [offline-mode.md](offline-mode.md) |  |
-| `onboarding-agent` | Onboarding Agent | Toolbox | — |  |
+| `onboarding-agent` | Onboarding Pack | Toolbox | — |  |
 | `pipeline-generator` | Pipeline Generator | Toolbox | — | yes |
 | `plugin-marketplace` | Plugin Marketplace | Toolbox | — | yes |
 | `prompt-optimizer` | Prompt Optimizer | Toolbox | — |  |
 | `regression-guardian` | Regression Guardian | Toolbox | — | yes |
-| `sandbox` | Agent Simulation Sandbox | Toolbox | — |  |
-| `spec-refinement` | Incremental Spec Refinement | Toolbox | — | yes |
+| `sandbox` | Change Preview | Toolbox | — |  |
 | `team-bot` | Team Bot (Slack/Teams) | Toolbox | — | yes |
 | `voice-control` | Voice Control | Toolbox | — |  |
 | `administration` | Administration | Administration, in server mode for an administrator | — |  |

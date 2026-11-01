@@ -322,11 +322,6 @@ const NotebookView = lazy(() =>
 		default: m.NotebookView,
 	})),
 );
-const RefinementHistoryView = lazy(() =>
-	import("./components/spec-refinement/RefinementHistoryView").then((m) => ({
-		default: m.RefinementHistoryView,
-	})),
-);
 const CoachReportView = lazy(() =>
 	import("./components/agent-coach/CoachReportView").then((m) => ({
 		default: m.CoachReportView,
@@ -2099,16 +2094,6 @@ export function App() {
 														style={{ height: "calc(100vh - 100px)" }}
 													>
 														<NotebookView projectPath={selectedProject?.path} />
-													</div>
-												)}
-												{activeView === "spec-refinement" && (
-													<div
-														className="overflow-auto"
-														style={{ height: "calc(100vh - 100px)" }}
-													>
-														<RefinementHistoryView
-															projectPath={selectedProject?.path}
-														/>
 													</div>
 												)}
 												{activeView === "agent-coach" && (

@@ -67,7 +67,7 @@
 	},
 	"auth": {
 		"title": "Authentification Claude requise",
-		"description": "Un token OAuth Claude Code est requis pour générer des idées de fonctionnalités."
+		"description": "Cette page génère les idées avec Claude, qui demande un token OAuth Claude Code ou un profil d'API actif. Connectez-vous, ou choisissez un autre fournisseur pour cette page."
 	},
 	"noIdeas": "Aucune idée à afficher",
 	"performanceDetails": {
