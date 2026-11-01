@@ -154,6 +154,15 @@ test("a card created from the phone is on the team's board, and starts", async (
 	await expect(alice.getByText("A switch in the settings")).toBeVisible();
 	await shot(alice, "4-card");
 
+	// Before work starts, the card can still be edited (PATCH, then read back).
+	await alice.getByRole("button", { name: "Edit" }).click();
+	await alice.getByLabel("Description").fill("A switch in the settings, following the system by default.");
+	await shot(alice, "4b-edit-card");
+	await alice.getByRole("button", { name: "Save" }).click();
+	await expect(alice.getByText("A switch in the settings, following the system by default.")).toBeVisible({
+		timeout: 30_000,
+	});
+
 	// Bob, of the same organization, finds it on the board.
 	const bob = await signIn(browser, world, "bob");
 	await bob.getByRole("button", { name: world.project }).click({ timeout: 30_000 });

@@ -210,11 +210,13 @@ async def get_card(
     from review.state import ReviewState
 
     directory = _card_or_404(scope, card_id)
-    card = details(directory)
-    spec = directory / "spec.md"
-    card["spec"] = (
-        spec.read_text(encoding="utf-8")[:SPEC_TEXT_LIMIT] if spec.is_file() else None
-    )
+    # While a build runs, its workspace holds the live plan and the QA report.
+    source = listing.card_source(scope.path.resolve(), directory)
+    card = details(source)
+    card["id"] = directory.name
+    files = _card_files(source)
+    card["spec"] = files["spec.md"][:SPEC_TEXT_LIMIT] if "spec.md" in files else None
+    card["qaReport"] = files.get("qa_report.md")
     review = ReviewState.load(directory)
     card["approval"] = {
         "approved": review.is_approval_valid(directory),

@@ -95,7 +95,16 @@
 		"send": "Envoyer",
 		"deleteConfirmTitle": "Supprimer cette carte ?",
 		"deleteConfirmBody": "La carte et sa spec disparaissent pour toute l'équipe.",
-		"done": "Terminé"
+		"done": "Terminé",
+		"edit": "Modifier",
+		"editTitle": "Modifier la carte",
+		"save": "Enregistrer",
+		"fileToggle": "Afficher ou masquer les modifications de {{path}}",
+		"noPatch": "Aucune différence à afficher pour ce fichier (binaire ou trop volumineux).",
+		"patchTruncated": "La différence s'arrête ici ; la suite se lit sur le bureau.",
+		"qaReport": "Rapport QA",
+		"showReport": "Afficher tout le rapport",
+		"hideReport": "Masquer le rapport"
 	},
 	"actions": {
 		"start": "Démarrer",

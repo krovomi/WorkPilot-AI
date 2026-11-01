@@ -89,6 +89,8 @@ export interface BoardCard {
 export interface CardDetails extends Omit<BoardCard, "specId" | "claimedBy" | "claimedByName"> {
 	description: string;
 	spec: string | null;
+	/** The QA reviewer's report (`qa_report.md`), once QA has run. */
+	qaReport?: string | null;
 	approval: { approved: boolean; approvedBy: string | null; approvedAt: string | null };
 	requireReview: boolean;
 }

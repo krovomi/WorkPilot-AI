@@ -29,6 +29,7 @@ from server.config import get_settings
 from server.db.engine import get_session_factory
 from server.db.models import Project, PushDevice
 from sqlalchemy import delete, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
@@ -141,6 +142,8 @@ def build_messages(
                 "title": project_name[:80],
                 "body": template.format(phase=label, card=card),
                 "sound": "default",
+                # The Android channel the app creates (apps/mobile/src/push).
+                "channelId": "runs",
                 "data": {
                     "type": "run_finished",
                     "projectId": project_id,
@@ -215,7 +218,8 @@ def notify_run_finished(
     async def run() -> None:
         try:
             await _notify(project_id, card_id, phase, status, user_id)
-        except Exception as e:  # never fail a run over a notification
+        # Never fail a run over a notification: Expo down, a bad answer, the DB.
+        except (httpx.HTTPError, SQLAlchemyError, ValueError, OSError) as e:
             logger.warning("Push notification not sent: %s", type(e).__name__)
 
     try:
