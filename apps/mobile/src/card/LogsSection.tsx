@@ -63,11 +63,13 @@ function PhaseLines({ phase }: { phase: TaskPhaseLog }) {
 		return <Text style={{ color: theme.textMuted }}>{t("card.logsEmptyPhase")}</Text>;
 	}
 	const hidden = Math.max(0, phase.entries.length - MAX_LOG_LINES);
+	// A line's place in the whole log: entries are appended, never reordered.
+	const lines = phase.entries.slice(hidden).map((entry, i) => ({ entry, n: hidden + i }));
 	return (
 		<View style={[styles.lines, { borderColor: theme.border, backgroundColor: theme.surface }]}>
 			{hidden > 0 ? <Text style={{ color: theme.textFaint }}>{t("card.logsEarlier", { count: hidden })}</Text> : null}
-			{phase.entries.slice(hidden).map((entry, i) => (
-				<Text key={hidden + i} style={[mono.text, { color: entryColor(theme, entry.type) }]} selectable>
+			{lines.map(({ entry, n }) => (
+				<Text key={n} style={[mono.text, { color: entryColor(theme, entry.type) }]} selectable>
 					{entry.tool_name ? `[${entry.tool_name}] ` : ""}
 					{entry.content}
 				</Text>
