@@ -8,8 +8,8 @@
  * the project's name, the card's number, the phase and its result; tapping
  * the notification opens the card from its `data`.
  *
- * A finished spec whose plan waits for approval arrives as `plan_review`,
- * in the category of the same name: "Approve and build" and "View" buttons
+ * A finished spec whose plan waits for approval arrives with
+ * `awaitingApproval`, in the `plan_review` category: "Approve and build" and "View" buttons
  * (`PLAN_REVIEW_ACTIONS`). Approving asks for the phone's lock first
  * (`auth/lock.ts`; on iOS the device must also be unlocked), then calls the
  * same routes as the card's Start button.
@@ -43,19 +43,19 @@ export const ACTION_VIEW = "view";
 // A project or spec id is a uuid; a card id is its folder name ("012-add-login").
 const ID = /^[A-Za-z0-9-]{1,64}$/;
 const CARD_ID = /^\d{3,4}-[A-Za-z0-9._-]{1,200}$/;
-const KINDS: ReadonlySet<unknown> = new Set<PushKind>(["run_finished", "plan_review"]);
 
 let registered: string | null = null;
 
 /** The card a notification opens, or null when its data is not one of ours. */
 export function cardFromData(data: unknown): PushCard | null {
 	if (!data || typeof data !== "object") return null;
-	const { type, projectId, cardId, specId } = data as Record<string, unknown>;
-	if (!KINDS.has(type)) return null;
+	const { type, projectId, cardId, specId, awaitingApproval } = data as Record<string, unknown>;
+	if (type !== "run_finished") return null;
 	if (typeof projectId !== "string" || !ID.test(projectId)) return null;
 	if (typeof cardId !== "string" || !CARD_ID.test(cardId)) return null;
 	const spec = typeof specId === "string" && ID.test(specId) ? specId : null;
-	return { kind: type as PushKind, projectId, cardId, specId: spec };
+	const kind: PushKind = awaitingApproval === true ? "plan_review" : "run_finished";
+	return { kind, projectId, cardId, specId: spec };
 }
 
 /**

@@ -191,7 +191,7 @@ chacun de ses téléphones ; la toucher ouvre la carte.
 | À la fin d'un run, le serveur envoie un message par téléphone, dans sa langue | `server/services/push.py`, appelé par le gestionnaire de runs |
 | Expo transmet à Apple (APNs) ou Google (FCM) ; un jeton qu'Expo dit désinscrit est supprimé | `https://exp.host/--/api/v2/push/send` |
 | Toucher la notification ouvre la carte de son `data` (`projectId`, `cardId`, vérifiés) | `src/push/PushBridge.tsx` |
-| Un plan à valider (`type: "plan_review"`, catégorie `plan_review`) porte les boutons « Valider et construire » et « Voir » | `src/push/push.ts` (`configureCategories`), `src/push/respond.ts` |
+| Un plan à valider (`awaitingApproval: true`, catégorie `plan_review`) porte les boutons « Valider et construire » et « Voir » | `src/push/push.ts` (`configureCategories`), `src/push/respond.ts` |
 
 Un run de spec qui laisse la carte en attente de validation (la carte demande une revue, le plan
 n'est pas encore validé, lu dans `review_state.json` comme le fait le build) n'envoie pas « Spec

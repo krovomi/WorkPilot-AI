@@ -229,7 +229,9 @@ class TestPlanReview:
         assert en["body"] == "Plan ready for your approval on card 012"
         assert fr["body"] == "Plan prêt à valider sur la carte 012"
         assert en["categoryId"] == PLAN_REVIEW_CATEGORY == "plan_review"
-        assert en["data"]["type"] == "plan_review"
+        # The type older apps open on a tap; the flag says what it is.
+        assert en["data"]["type"] == "run_finished"
+        assert en["data"]["awaitingApproval"] is True
         assert en["data"]["specId"] == "5d1c-77"
         assert "secret" not in en["title"] + en["body"]
 
@@ -249,7 +251,7 @@ class TestPlanReview:
             awaiting_approval=True,
         )
         assert "categoryId" not in message
-        assert message["data"]["type"] == "run_finished"
+        assert "awaitingApproval" not in message["data"]
 
     def test_it_reads_the_approval_the_build_checks(self, tmp_path):
         import shared_board.api  # noqa: F401 - installs the approval check

@@ -13,7 +13,7 @@ text, which are the team's and would otherwise sit in three vendors' logs.
 The phone opens the card from ``data`` (``projectId``, ``cardId``).
 
 A spec run that leaves the card waiting for its plan to be approved is told
-as such (``type: "plan_review"``) and carries the ``plan_review`` category:
+as such (``awaitingApproval: true``) and carries the ``plan_review`` category:
 the phone shows "Approve and build" and "View" buttons on it
 (``apps/mobile/src/push``). The button only calls the same routes the app
 does, as the person, after the phone's lock; the server checks them again.
@@ -163,7 +163,8 @@ def build_messages(
             continue
         label = _PHASES[locale].get(phase, phase)
         data = {
-            "type": "plan_review" if review else "run_finished",
+            # Kept "run_finished": an older app still opens the card on a tap.
+            "type": "run_finished",
             "projectId": project_id,
             "cardId": card_id,
             "phase": phase,
@@ -171,6 +172,8 @@ def build_messages(
         }
         if spec_id:
             data["specId"] = spec_id
+        if review:
+            data["awaitingApproval"] = True
         message = {
             "to": device.token,
             "title": project_name[:80],

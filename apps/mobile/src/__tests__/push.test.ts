@@ -32,9 +32,18 @@ describe("cardFromData", () => {
 
 	it("knows a plan to approve, and keeps its spec id only when it looks like one", () => {
 		expect(
-			cardFromData({ type: "plan_review", projectId: "p", cardId: "012-add-login", specId: "5d1c-77" }),
+			cardFromData({
+				type: "run_finished",
+				awaitingApproval: true,
+				projectId: "p",
+				cardId: "012-add-login",
+				specId: "5d1c-77",
+			}),
 		).toEqual({ kind: "plan_review", projectId: "p", cardId: "012-add-login", specId: "5d1c-77" });
-		expect(cardFromData({ type: "plan_review", projectId: "p", cardId: "012-x", specId: "../x" })?.specId).toBeNull();
+		expect(cardFromData({ type: "run_finished", projectId: "p", cardId: "012-x", specId: "../x" })?.specId).toBeNull();
+		expect(cardFromData({ type: "run_finished", awaitingApproval: "yes", projectId: "p", cardId: "012-x" })?.kind).toBe(
+			"run_finished",
+		);
 	});
 
 	it.each([
