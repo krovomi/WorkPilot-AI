@@ -146,6 +146,11 @@ fichier, taille), les écrit dans un miroir sous le dossier de données de l'app
 lecture, et les lit avec le chargeur des projets locaux : une carte du serveur ressemble à une
 carte locale.
 
+Les projets de l'ordinateur restent servis par l'ordinateur pendant la connexion : l'app lance son
+backend local comme sans serveur, et les appels du main vers ce backend (`backendFetch`, dans
+`ipc-handlers/_backend-fetch.ts` : hooks, mémoire, notifications, boucle d'apprentissage) y vont
+toujours, sans le jeton de la session. Seul `authedFetch` (`server-connection.ts`) parle au serveur.
+
 La barre latérale n'offre pour un projet du serveur que les vues qui passent par le serveur
 (`sidebar/server-gates.ts` : le Kanban, l'espace de travail, les features partagées, les vues de sa
 forge et l'administration) ; les autres agiraient sur le miroir. La liste des projets est relue quand la session change (connexion, déconnexion, autre
