@@ -207,6 +207,17 @@ sinon l'hôte de l'API sur le port 8765, en `wss` derrière `https`. Les événe
 `spec_updated`, `spec_deleted` et `spec_approved` étaient jetés par le flux comme inconnus :
 ils sont maintenant de ses types.
 
+## Qui invite
+
+Une invitation appartient à l'organisation où agit la personne qui l'émet : l'émettre ou la
+révoquer demande `org.invitation.write` dans cette organisation, la lister `org.invitation.read`
+(`server/routers/invitations.py`). Le rôle d'une invitation est le rôle **plateforme** du futur
+compte (`GlobalRole`) : `member` ou `viewer` le fait entrer dans l'organisation comme contributeur
+ou lecteur, `admin` en fait un administrateur du serveur, qui atteint toutes les organisations.
+Seul un administrateur de la plateforme donne ce dernier : un administrateur d'organisation qui le
+demande reçoit 403, sinon il pourrait sortir de son organisation
+(`tests/backend/test_invitation_organization.py`, `TestWhoMayInvite`).
+
 ## Les groupes
 
 Donner l'accès personne par personne ne tient pas pour une équipe : à chaque arrivée il faut

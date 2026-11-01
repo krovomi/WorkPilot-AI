@@ -3,6 +3,7 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { visiblePages } from "../../admin/pages";
 import { useSession } from "../../auth/session";
 import { describeError } from "../../i18n";
 import { Button, ErrorBanner, Section } from "../../ui/components";
@@ -11,7 +12,7 @@ import { RADIUS, SPACE, useTheme } from "../../ui/theme";
 export default function Settings() {
 	const { t } = useTranslation();
 	const theme = useTheme();
-	const { user, serverUrl, permissions, switchOrg, signOut } = useSession();
+	const { user, serverUrl, permissions, switchOrg, signOut, can } = useSession();
 	const router = useRouter();
 	const [busy, setBusy] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
@@ -30,6 +31,7 @@ export default function Settings() {
 	};
 
 	const organizations = permissions?.organizations ?? [];
+	const administers = visiblePages(can).length > 0;
 	return (
 		<ScrollView contentContainerStyle={styles.content}>
 			<Section title={t("settings.account")}>
@@ -41,6 +43,12 @@ export default function Settings() {
 					{serverUrl}
 				</Text>
 			</Section>
+			{administers ? (
+				<Section title={t("admin.title")}>
+					<Text style={{ color: theme.textMuted }}>{t("admin.summary")}</Text>
+					<Button label={t("admin.open")} variant="secondary" onPress={() => router.push("/admin")} />
+				</Section>
+			) : null}
 			<Section title={t("tokens.title")}>
 				<Text style={{ color: theme.textMuted }}>{t("tokens.summary")}</Text>
 				<Button label={t("tokens.manage")} variant="secondary" onPress={() => router.push("/tokens")} />

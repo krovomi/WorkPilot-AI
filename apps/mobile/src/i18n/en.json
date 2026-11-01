@@ -358,5 +358,100 @@
 		"value": "{{name}} token",
 		"removeTitle": "Remove the {{name}} token?",
 		"removeBody": "The server forgets it; calls that need it stop until you add one again."
+	},
+	"admin": {
+		"title": "Administration",
+		"summary": "Members, invitations, groups and roles of this organization.",
+		"open": "Open the administration",
+		"of": "Organization: {{org}}",
+		"remove": "Remove",
+		"projectRole": {
+			"owner": "Owner",
+			"member": "Member",
+			"viewer": "Viewer"
+		},
+		"members": {
+			"title": "Members",
+			"summary": "Who belongs to the organization, and with which role.",
+			"you": "(you)",
+			"inactive": "deactivated",
+			"remove": "Remove from the organization",
+			"removeTitle": "Remove {{name}}?",
+			"removeBody": "They lose access to the organization's projects. Their account stays on the server."
+		},
+		"invitations": {
+			"title": "Invitations",
+			"summary": "Invite someone by email, and the invitations still pending.",
+			"new": "Invite someone",
+			"email": "Email",
+			"send": "Invite",
+			"sent": "Invitation emailed to {{email}}.",
+			"notSent": "No email went out to {{email}}: share this link with them. It is shown only once.",
+			"share": "Share the link",
+			"pending_one": "{{count}} pending invitation",
+			"pending_other": "{{count}} pending invitations",
+			"expires": "expires {{date}}",
+			"revoke": "Revoke",
+			"revokeTitle": "Revoke the invitation to {{email}}?",
+			"revokeBody": "Its link stops working.",
+			"roles": {
+				"member": {
+					"label": "Member",
+					"detail": "Joins this organization as a contributor."
+				},
+				"viewer": {
+					"label": "Viewer",
+					"detail": "Joins this organization read-only."
+				},
+				"admin": {
+					"label": "Server administrator",
+					"detail": "Administers this organization and the whole server, every organization included."
+				}
+			}
+		},
+		"groups": {
+			"title": "Groups",
+			"summary": "Groups of members, the projects they reach and the role they give.",
+			"new": "New group",
+			"name": "Name",
+			"create": "Create the group",
+			"none": "No group yet.",
+			"gone": "This group no longer exists.",
+			"memberCount_one": "{{count}} member",
+			"memberCount_other": "{{count}} members",
+			"projectCount_one": "{{count}} project",
+			"projectCount_other": "{{count}} projects",
+			"orgRole": "Role in the organization",
+			"noRole": "No role from the group",
+			"addMember": "Add a member",
+			"addProject": "Give access to a project",
+			"delete": "Delete the group",
+			"deleteTitle": "Delete the group {{name}}?",
+			"deleteBody": "Its members keep their own access; what the group gave them goes."
+		},
+		"roles": {
+			"title": "Roles",
+			"summary": "The roles and the permissions each one grants.",
+			"new": "New role",
+			"name": "Name",
+			"description": "Description",
+			"slug": "Identifier: {{slug}}",
+			"create": "Create the role",
+			"save": "Save",
+			"delete": "Delete the role",
+			"deleteTitle": "Delete the role {{name}}?",
+			"deleteBody": "The server refuses while someone still holds it.",
+			"gone": "This role no longer exists.",
+			"builtIn": "built in",
+			"custom": "custom",
+			"readOnly": "A built-in role can't be changed.",
+			"privileged": "sensitive",
+			"permissionCount_one": "{{count}} permission",
+			"permissionCount_other": "{{count}} permissions",
+			"scope": {
+				"org": "Organization",
+				"project": "Project"
+			}
+		}
 	}
 }
