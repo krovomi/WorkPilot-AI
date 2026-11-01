@@ -7,6 +7,7 @@ import { useSession } from "../../../../auth/session";
 import { groupByColumn } from "../../../../board/columns";
 import { initialColumn } from "../../../../board/pickColumn";
 import { useBoard } from "../../../../board/useBoard";
+import { forgeKind, useProject } from "../../../../forge/useForge";
 import { describeError } from "../../../../i18n";
 import { ErrorBanner, Loading } from "../../../../ui/components";
 import { columnColor, RADIUS, SPACE, useTheme } from "../../../../ui/theme";
@@ -18,6 +19,11 @@ export default function Board() {
 	const router = useRouter();
 	const { can } = useSession();
 	const { cards, error, live, refreshing, reload } = useBoard(projectId);
+	const forge = forgeKind(useProject(projectId).data?.forge);
+	const links = [
+		...(can("insight.read") ? (["insights", "roadmap", "ideas"] as const) : []),
+		...(forge && can("vcs.read") ? (["forge"] as const) : []),
+	];
 	const groups = useMemo(() => groupByColumn(cards ?? []), [cards]);
 	const [chosen, setChosen] = useState<Column | null>(null);
 	const column = chosen ?? initialColumn(groups);
@@ -44,22 +50,23 @@ export default function Board() {
 				<View style={[styles.dot, { backgroundColor: live ? theme.success : theme.textFaint }]} />
 				<Text style={{ color: theme.textMuted, fontSize: 12 }}>{live ? t("board.live") : t("board.offline")}</Text>
 			</View>
-			{can("insight.read") ? (
+			{links.length ? (
 				<View style={styles.links}>
-					{(["insights", "roadmap", "ideas"] as const).map((target) => (
+					{links.map((target) => (
 						<Pressable
 							key={target}
 							accessibilityRole="link"
 							onPress={() =>
 								router.push({
-									pathname:
-										target === "insights" ? "/projects/[projectId]/insights" : `/projects/[projectId]/${target}`,
+									pathname: `/projects/[projectId]/${target}`,
 									params: { projectId },
 								})
 							}
 							style={[styles.link, { borderColor: theme.border, backgroundColor: theme.surface }]}
 						>
-							<Text style={{ color: theme.accent, fontWeight: "600" }}>{t(`features.${target}`)}</Text>
+							<Text style={{ color: theme.accent, fontWeight: "600" }} numberOfLines={1}>
+								{target === "forge" && forge ? t(`forge.${forge}`) : t(`features.${target}`)}
+							</Text>
 						</Pressable>
 					))}
 				</View>

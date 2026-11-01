@@ -20,6 +20,7 @@ applications mobiles pour un projet.
 | Insights | `src/app/(app)/projects/[projectId]/insights/` | `GET` et `POST /api/features/insights/sessions`, puis `.../messages` pour poser une question ; relu toutes les 3 s pendant que l'agent répond |
 | Roadmap | `src/app/(app)/projects/[projectId]/roadmap.tsx` | `GET /api/features/roadmap/snapshot`, `POST .../jobs` pour la générer, `POST .../features/{id}/convert` pour en faire une carte |
 | Idées | `src/app/(app)/projects/[projectId]/ideas.tsx` | idem sous `/api/features/ideation` (`.../ideas/{id}/convert`) |
+| GitHub ou GitLab | `src/app/(app)/projects/[projectId]/forge/` | `POST /api/features/forge/<forge>/read` et `.../write` (le relais, avec le jeton de la personne), `.../github/pulls`, `.../<forge>/reviews` pour la revue IA |
 | Réglages | `src/app/(app)/settings.tsx` | `POST /auth/switch-org`, `POST /auth/logout` |
 
 Les actions d'une carte sont celles de l'app de bureau sur une carte du serveur
@@ -106,6 +107,24 @@ conversation Insights appartient à son auteur : les autres membres la lisent, s
 L'app montre chaque bouton selon les permissions (`insight.read`, `insight.write`, `agent.execute`,
 `agent.cancel`, `task.write`), que le serveur revérifie.
 
+## GitHub et GitLab
+
+Quand le dépôt du projet est sur GitHub ou sur une instance GitLab que le serveur sert (le champ
+`forge` du projet), le Kanban ouvre ses issues et ses pull ou merge requests. Chaque appel passe par
+le relais du serveur (`shared_features/forge.py`, `forge_gitlab.py`), qui le fait avec le jeton de la
+personne enregistré sur le serveur (Réglages → Mes jetons sur le serveur, sur le bureau) et refuse
+tout appel que les vues du bureau ne font pas : le téléphone ne voit jamais le jeton.
+`src/forge/forge.ts` traduit les deux forges dans une même forme.
+
+| Quoi | GitHub | GitLab |
+|---|---|---|
+| Issues ouvertes, leur fil | oui | oui, sans les notes système |
+| Commenter une issue | oui | non (le relais ne sert pas les notes d'issue) |
+| PR ou MR ouvertes, leurs fichiers et patchs | oui (liste par GraphQL) | oui |
+| Vérifications de la PR | oui (check-runs du dernier commit) | non |
+| Commenter, fusionner | oui (`vcs.write`, la fusion `vcs.pr.merge`, après confirmation) | oui |
+| Revue IA | lancée comme job sur le serveur, suivie, puis lue (`review_<n>.json`) | idem |
+
 ## Les notifications push
 
 Quand un run se termine (réussi ou en échec), la personne qui l'a lancé reçoit une notification sur
@@ -134,4 +153,4 @@ développement, simulateur, web), l'app fonctionne de la même façon, sans noti
 ## Ce qui vient
 
 - Connexion Microsoft Entra (`expo-auth-session`, puis `POST /auth/oidc/exchange`).
-- GitHub et GitLab, le tableau de bord et les analyses, l'administration.
+- Le tableau de bord et les analyses, l'administration.
