@@ -21,12 +21,19 @@ const mockCheckSourceToken = vi.fn();
 const mockGetApiProfiles = vi.fn();
 
 describe("useIdeationAuth", () => {
+	const initialSettings = useSettingsStore.getState().settings;
+
 	beforeEach(() => {
 		// Reset all mocks
 		vi.clearAllMocks();
 
 		// Reset store to initial state (minimal settings, actual settings loaded by store)
 		useSettingsStore.setState({
+			settings: {
+				...initialSettings,
+				selectedProvider: "claude",
+				pageLlmOverrides: {},
+			},
 			profiles: [],
 			activeProfileId: null,
 			profilesLoading: false,
@@ -708,6 +715,77 @@ describe("useIdeationAuth", () => {
 
 			// Has active profile
 			expect(result.current.hasToken).toBe(true);
+		});
+	});
+	describe("check runs once (no render loop)", () => {
+		it("calls each IPC channel once after mount, not on every render", async () => {
+			const { result } = renderHook(() => useIdeationAuth());
+			await waitFor(() => {
+				expect(result.current.isLoading).toBe(false);
+			});
+			// Give a looping effect time to fire again.
+			await act(async () => {
+				await new Promise((resolve) => setTimeout(resolve, 50));
+			});
+			expect(mockCheckSourceToken).toHaveBeenCalledTimes(1);
+			expect(mockGetApiProfiles).toHaveBeenCalledTimes(1);
+		});
+	});
+
+	describe("provider of the ideation page", () => {
+		const withProvider = (selectedProvider: string, pageProvider?: string) => {
+			const settings = useSettingsStore.getState().settings;
+			useSettingsStore.setState({
+				settings: {
+					...settings,
+					selectedProvider,
+					pageLlmOverrides: pageProvider
+						? { ideation: { provider: pageProvider } }
+						: {},
+				},
+			} as Partial<ReturnType<typeof useSettingsStore.getState>>);
+		};
+
+		it("does not require Claude credentials when the page runs on another provider", async () => {
+			withProvider("openai");
+			mockCheckSourceToken.mockResolvedValue({
+				success: true,
+				data: { hasToken: false },
+			});
+			const { result } = renderHook(() => useIdeationAuth());
+			await waitFor(() => {
+				expect(result.current.isLoading).toBe(false);
+			});
+			expect(result.current.hasToken).toBe(true);
+			expect(mockCheckSourceToken).not.toHaveBeenCalled();
+			expect(mockGetApiProfiles).not.toHaveBeenCalled();
+		});
+
+		it("follows the page's own provider over the global one", async () => {
+			withProvider("claude", "ollama");
+			mockCheckSourceToken.mockResolvedValue({
+				success: true,
+				data: { hasToken: false },
+			});
+			const { result } = renderHook(() => useIdeationAuth());
+			await waitFor(() => {
+				expect(result.current.isLoading).toBe(false);
+			});
+			expect(result.current.hasToken).toBe(true);
+		});
+
+		it("still requires a Claude credential when the page runs on Claude", async () => {
+			withProvider("anthropic");
+			mockCheckSourceToken.mockResolvedValue({
+				success: true,
+				data: { hasToken: false },
+			});
+			const { result } = renderHook(() => useIdeationAuth());
+			await waitFor(() => {
+				expect(result.current.isLoading).toBe(false);
+			});
+			expect(result.current.hasToken).toBe(false);
+			expect(mockCheckSourceToken).toHaveBeenCalledTimes(1);
 		});
 	});
 });

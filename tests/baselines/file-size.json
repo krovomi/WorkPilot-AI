@@ -13,10 +13,10 @@
   "apps/frontend/src/main/services/credential-manager.ts": 2478,
   "apps/frontend/src/main/terminal/claude-integration-handler.ts": 2079,
   "apps/frontend/src/main/visual-proof-service.ts": 2711,
-  "apps/frontend/src/renderer/App.tsx": 2437,
+  "apps/frontend/src/renderer/App.tsx": 2422,
   "apps/frontend/src/renderer/components/AgentTools.tsx": 2043,
   "apps/frontend/src/renderer/components/KanbanBoard.tsx": 3249,
-  "apps/frontend/src/renderer/components/Sidebar.tsx": 2681,
+  "apps/frontend/src/renderer/components/Sidebar.tsx": 2672,
   "apps/frontend/src/renderer/components/task-detail/TaskLogs.tsx": 2454,
   "apps/frontend/src/renderer/components/visual-to-code/CanvasPanel.tsx": 2032
 }

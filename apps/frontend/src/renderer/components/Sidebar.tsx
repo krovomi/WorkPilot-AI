@@ -43,7 +43,6 @@ import {
 	Database,
 	Download,
 	FileCode2,
-	FileEdit,
 	FileJson,
 	FileText,
 	FlaskConical,
@@ -239,7 +238,6 @@ export type SidebarView =
 	| "carbon-profiler"
 	| "consensus-arbiter"
 	| "notebook-agent"
-	| "spec-refinement"
 	| "agent-coach"
 	| "bounty-board"
 	| "repo-bench"
@@ -698,13 +696,6 @@ const navGroups: NavGroup[] = [
 				labelKey: "navigation:items.docDrift",
 				icon: FileText,
 				shortcut: "DD",
-				subGroup: "navigation:subGroups.documentation",
-			},
-			{
-				id: "spec-refinement",
-				labelKey: "navigation:items.specRefinement",
-				icon: FileEdit,
-				shortcut: "SR",
 				subGroup: "navigation:subGroups.documentation",
 			},
 			// Accessibility & i18n

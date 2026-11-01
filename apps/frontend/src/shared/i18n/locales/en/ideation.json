@@ -67,7 +67,7 @@
 	},
 	"auth": {
 		"title": "Claude Authentication Required",
-		"description": "A Claude Code OAuth token is required to generate AI-powered feature ideas."
+		"description": "This page generates ideas with Claude, which needs a Claude Code OAuth token or an active API profile. Sign in, or pick another provider for this page."
 	},
 	"noIdeas": "No ideas to display",
 	"performanceDetails": {

@@ -1,19 +1,10 @@
 {
 	"title": "Approbation des specs",
-	"subtitle": "Lire une spécification avant que les agents ne construisent dessus, et consigner votre décision",
+	"subtitle": "Les plans qui vous attendent avant que les agents n'écrivent du code. Approuvez-en un pour lancer son build, ou renvoyez-le avec ce qui doit changer.",
 	"pending": {
-		"heading_one": "{{count}} spec en attente de revue",
-		"heading_other": "{{count}} specs en attente de revue",
-		"empty": "Rien n'attend de revue."
-	},
-	"history": {
-		"heading": "Déjà revues"
-	},
-	"status": {
-		"pending": "En attente",
-		"approved": "Approuvée",
-		"rejected": "Rejetée",
-		"changes_requested": "Modifications demandées"
+		"heading_one": "{{count}} plan en attente de revue",
+		"heading_other": "{{count}} plans en attente de revue",
+		"empty": "Aucun plan n'attend de revue."
 	},
 	"content": {
 		"spec": "Spécification",
@@ -26,18 +17,17 @@
 	"decision": {
 		"feedbackLabel": "Retour",
 		"feedbackPlaceholder": "Ce qui doit changer, et pourquoi.",
-		"feedbackRequired": "Rejeter ou demander des modifications exige un retour.",
+		"feedbackRequired": "Demander des modifications exige un retour.",
 		"approve": "Approuver",
 		"requestChanges": "Demander des modifications",
-		"reject": "Rejeter"
+		"failed": "La décision n'a pas pu être enregistrée. Réessayez depuis la carte de la tâche."
 	},
 	"actions": {
-		"refresh": "Rafraîchir",
 		"dismiss": "Masquer"
 	},
 	"empty": {
-		"title": "Choisissez une spécification",
-		"body": "Sélectionnez une spec à gauche pour lire ce que les agents s'apprêtent à construire, puis approuvez-la, renvoyez-la ou rejetez-la.",
-		"noProject": "Ouvrez un projet pour revoir les specs qui l'attendent."
+		"title": "Choisissez un plan",
+		"body": "Sélectionnez une tâche à gauche pour lire sa spec et son plan, puis approuvez-la pour lancer le build, ou demandez des modifications.",
+		"noProject": "Ouvrez un projet pour relire les plans qui l'attendent."
 	}
 }

@@ -1,216 +1,76 @@
+/**
+ * Spec Approval: the plans waiting for a person, read from the task store.
+ *
+ * A task waits for its plan to be approved when it sits in `human_review`
+ * with `reviewReason: "plan_review"`; that is the list. The decision goes
+ * through the task's review channel (`submitReview`, then `startTask` on an
+ * approval), exactly as the plan approval on the card does, so the build sees
+ * it (`review_state.json`). This store only loads the spec files shown next
+ * to the decision.
+ */
+
 import { create } from "zustand";
+import type { Task } from "../../shared/types";
 
-export type ApprovalStatus =
-	| "pending"
-	| "approved"
-	| "rejected"
-	| "changes_requested";
-
-export interface SpecApprovalRecord {
-	specNumber: string;
-	specName: string;
-	specDir: string;
-	status: ApprovalStatus;
-	reviewedAt?: string;
-	feedback?: string;
-	amendments?: string;
-}
-
-export interface SpecContent {
-	spec_number: string;
+export interface SpecReviewContent {
+	spec_id?: string;
 	spec_md?: string;
 	requirements_json?: string;
 	context_json?: string;
 	implementation_plan_json?: string;
 }
 
-interface SpecApprovalState {
-	pendingSpecs: SpecApprovalRecord[];
-	history: SpecApprovalRecord[];
-	selectedSpec: SpecApprovalRecord | null;
-	specContent: SpecContent | null;
-	isLoading: boolean;
-	isSubmitting: boolean;
-	error: string | null;
+/** Whether a task's plan waits for a person. */
+export function isAwaitingPlanApproval(task: Task): boolean {
+	return task.status === "human_review" && task.reviewReason === "plan_review";
+}
 
-	loadPendingSpecs: (projectDir: string) => Promise<void>;
-	loadHistory: (projectDir: string) => Promise<void>;
-	selectSpec: (spec: SpecApprovalRecord | null) => void;
-	loadSpecContent: (projectDir: string, specNumber: string) => Promise<void>;
-	approve: (
-		projectDir: string,
-		specNumber: string,
-		amendments?: string,
-	) => Promise<void>;
-	reject: (
-		projectDir: string,
-		specNumber: string,
-		feedback: string,
-	) => Promise<void>;
-	requestChanges: (
-		projectDir: string,
-		specNumber: string,
-		feedback: string,
-	) => Promise<void>;
-	clearError: () => void;
+/** The tasks of a project whose plan waits for a person, oldest first. */
+export function pendingPlanApprovals(tasks: Task[], projectId: string | undefined): Task[] {
+	if (!projectId) return [];
+	return tasks
+		.filter((task) => task.projectId === projectId && isAwaitingPlanApproval(task))
+		.sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime());
+}
+
+interface SpecApprovalState {
+	content: SpecReviewContent | null;
+	contentFor: string | null;
+	isLoading: boolean;
+	error: string | null;
+	loadContent: (projectDir: string, specId: string) => Promise<void>;
+	clear: () => void;
+	setError: (error: string | null) => void;
 }
 
 export const useSpecApprovalStore = create<SpecApprovalState>((set, get) => ({
-	pendingSpecs: [],
-	history: [],
-	selectedSpec: null,
-	specContent: null,
+	content: null,
+	contentFor: null,
 	isLoading: false,
-	isSubmitting: false,
 	error: null,
 
-	loadPendingSpecs: async (projectDir) => {
-		set({ isLoading: true, error: null });
+	loadContent: async (projectDir, specId) => {
+		set({ isLoading: true, error: null, content: null, contentFor: specId });
 		try {
-			const result = await globalThis.electronAPI.invoke(
-				"specApproval:getPendingSpecs",
-				projectDir,
-			);
-			if (result.success) {
-				set({ pendingSpecs: result.data as SpecApprovalRecord[] });
-			} else {
-				set({ error: result.error ?? "Failed to load pending specs" });
-			}
-		} catch (err) {
-			set({ error: String(err) });
-		} finally {
-			set({ isLoading: false });
-		}
-	},
-
-	loadHistory: async (projectDir) => {
-		try {
-			const result = await globalThis.electronAPI.invoke(
-				"specApproval:getHistory",
-				projectDir,
-			);
-			if (result.success) {
-				set({ history: result.data as SpecApprovalRecord[] });
-			}
-		} catch {
-			/* ignore */
-		}
-	},
-
-	selectSpec: (spec) => {
-		set({ selectedSpec: spec, specContent: null });
-	},
-
-	loadSpecContent: async (projectDir, specNumber) => {
-		set({ isLoading: true });
-		try {
-			const result = await globalThis.electronAPI.invoke(
+			const result = (await globalThis.electronAPI.invoke(
 				"specApproval:getSpec",
 				projectDir,
-				specNumber,
-			);
+				specId,
+			)) as { success: boolean; data?: SpecReviewContent; error?: string };
+			// A slower answer for a spec no longer selected is dropped.
+			if (get().contentFor !== specId) return;
 			if (result.success) {
-				set({ specContent: result.data as SpecContent });
+				set({ content: result.data ?? null });
 			} else {
-				set({ error: result.error ?? "Failed to load spec content" });
+				set({ error: result.error ?? "Failed to load the specification" });
 			}
 		} catch (err) {
-			set({ error: String(err) });
+			if (get().contentFor === specId) set({ error: String(err) });
 		} finally {
-			set({ isLoading: false });
+			if (get().contentFor === specId) set({ isLoading: false });
 		}
 	},
 
-	approve: async (projectDir, specNumber, amendments) => {
-		set({ isSubmitting: true, error: null });
-		try {
-			const result = await globalThis.electronAPI.invoke(
-				"specApproval:approve",
-				projectDir,
-				{
-					specNumber,
-					amendments,
-				},
-			);
-			if (result.success) {
-				set((state) => ({
-					pendingSpecs: state.pendingSpecs.filter(
-						(s) => s.specNumber !== specNumber,
-					),
-					selectedSpec: null,
-					specContent: null,
-				}));
-				await get().loadHistory(projectDir);
-			} else {
-				set({ error: result.error ?? "Approval failed" });
-			}
-		} catch (err) {
-			set({ error: String(err) });
-		} finally {
-			set({ isSubmitting: false });
-		}
-	},
-
-	reject: async (projectDir, specNumber, feedback) => {
-		set({ isSubmitting: true, error: null });
-		try {
-			const result = await globalThis.electronAPI.invoke(
-				"specApproval:reject",
-				projectDir,
-				{
-					specNumber,
-					feedback,
-				},
-			);
-			if (result.success) {
-				set((state) => ({
-					pendingSpecs: state.pendingSpecs.filter(
-						(s) => s.specNumber !== specNumber,
-					),
-					selectedSpec: null,
-					specContent: null,
-				}));
-				await get().loadHistory(projectDir);
-			} else {
-				set({ error: result.error ?? "Rejection failed" });
-			}
-		} catch (err) {
-			set({ error: String(err) });
-		} finally {
-			set({ isSubmitting: false });
-		}
-	},
-
-	requestChanges: async (projectDir, specNumber, feedback) => {
-		set({ isSubmitting: true, error: null });
-		try {
-			const result = await globalThis.electronAPI.invoke(
-				"specApproval:requestChanges",
-				projectDir,
-				{
-					specNumber,
-					feedback,
-				},
-			);
-			if (result.success) {
-				set((state) => ({
-					pendingSpecs: state.pendingSpecs.map((s) =>
-						s.specNumber === specNumber
-							? { ...s, status: "changes_requested" as ApprovalStatus }
-							: s,
-					),
-					selectedSpec: null,
-					specContent: null,
-				}));
-			} else {
-				set({ error: result.error ?? "Request changes failed" });
-			}
-		} catch (err) {
-			set({ error: String(err) });
-		} finally {
-			set({ isSubmitting: false });
-		}
-	},
-
-	clearError: () => set({ error: null }),
+	clear: () => set({ content: null, contentFor: null, error: null, isLoading: false }),
+	setError: (error) => set({ error }),
 }));

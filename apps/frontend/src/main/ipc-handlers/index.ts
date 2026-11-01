@@ -136,7 +136,6 @@ import { registerRegressionGuardianHandlers } from "./regression-guardian-handle
 import { registerConsensusArbiterHandlers } from "./consensus-arbiter-handlers";
 import { registerInjectionGuardHandlers } from "./injection-guard-handlers";
 import { registerSpecApprovalHandlers } from "./spec-approval-handlers";
-import { registerSpecRefinementHandlers } from "./spec-refinement-handlers";
 import { registerPhase35FeatureHandlers } from "./phase35-features-handlers";
 import { registerPipelineHandlers } from "./pipeline-handlers";
 import { registerTaskHandlers } from "./task-handlers";
@@ -252,7 +251,6 @@ export { registerRegressionGuardianHandlers } from "./regression-guardian-handle
 export { registerConsensusArbiterHandlers } from "./consensus-arbiter-handlers";
 export { registerInjectionGuardHandlers } from "./injection-guard-handlers";
 export { registerSpecApprovalHandlers } from "./spec-approval-handlers";
-export { registerSpecRefinementHandlers } from "./spec-refinement-handlers";
 export { registerTaskHandlers } from "./task-handlers";
 export { registerTerminalWorktreeIpcHandlers } from "./terminal";
 export { registerTerminalHandlers } from "./terminal-handlers";
@@ -560,7 +558,6 @@ export function setupIpcHandlers(
 	registerNotebookAgentHandlers();
 
 	// Spec Refinement handlers (load persisted refinement histories)
-	registerSpecRefinementHandlers();
 
 	// Agent Coach handlers (analyse persisted agent run records)
 	registerAgentCoachHandlers();
