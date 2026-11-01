@@ -111,7 +111,7 @@ async function signIn(browser: Browser, world: World, who: Who, password = world
 	await page.getByLabel("Email").fill(world.emails[who]);
 	await page.getByLabel("Password").fill(password);
 	if (who === "alice") await shot(page, "1-sign-in");
-	await page.getByRole("button", { name: "Sign in" }).click();
+	await page.getByRole("button", { name: "Sign in", exact: true }).click();
 	if (password === world.passwords[who]) signedIn.set(who, page);
 	return page;
 }
@@ -145,7 +145,7 @@ test.afterAll(async () => {
 test("a refused password says so and keeps the person signed out", async ({ browser }) => {
 	const page = await signIn(browser, world, "alice", "not-the-password-at-all");
 	await expect(page.getByText("Sign-in failed: Wrong email or password.")).toBeVisible();
-	await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
+	await expect(page.getByRole("button", { name: "Sign in", exact: true })).toBeVisible();
 });
 
 test("a card created from the phone is on the team's board, and starts", async ({ browser }) => {
