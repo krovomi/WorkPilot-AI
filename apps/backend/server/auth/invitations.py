@@ -176,6 +176,10 @@ def _assert_usable(invitation: Invitation | None) -> Invitation:
         raise InvitationError("Invitation has already been used")
     if _aware(invitation.expires_at) < _utcnow():
         raise InvitationError("Invitation has expired")
+    # One issued before invitations named their organization, or whose role
+    # was since deleted, places the account nowhere: it is not offered either.
+    if invitation.org_id is None or invitation.org_role_id is None:
+        raise InvitationError("Invitation is no longer valid; ask for a new one")
     return invitation
 
 
@@ -199,8 +203,6 @@ async def accept_invitation(
     is refused before any account is created.
     """
     invitation = _assert_usable(await _fetch_by_token(db, token))
-    if invitation.org_id is None or invitation.org_role_id is None:
-        raise InvitationError("Invitation is no longer valid; ask for a new one")
 
     # create_local_user enforces the password policy and the unique-email
     # constraint (which also makes a token race safe: the 2nd accept fails).

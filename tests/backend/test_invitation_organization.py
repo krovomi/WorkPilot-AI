@@ -186,7 +186,11 @@ class TestAcceptance:
     async def test_an_invitation_without_an_organization_creates_no_account(self, env):
         from datetime import UTC, datetime, timedelta
 
-        from server.auth.invitations import InvitationError, hash_token
+        from server.auth.invitations import (
+            InvitationError,
+            hash_token,
+            lookup_invitation,
+        )
         from server.db.models import Invitation, User
         from sqlalchemy import select
 
@@ -204,6 +208,10 @@ class TestAcceptance:
 
         with pytest.raises(InvitationError):
             await _accept(token)
+        # Nor is it offered as valid when looked up.
+        async with _session() as db:
+            with pytest.raises(InvitationError):
+                await lookup_invitation(db, token)
 
         async with _session() as db:
             assert (
