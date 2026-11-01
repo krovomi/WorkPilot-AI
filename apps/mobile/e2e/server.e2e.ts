@@ -12,7 +12,8 @@
  * project, creates a card that the board lists through `GET /api/board/cards`,
  * starts it (the fake agent writes the spec), and a teammate sees the card;
  * a person of another organization never sees the project; a refused password
- * says so. The browser cannot set headers on a WebSocket, so on the web the
+ * says so; a theme chosen in Settings is kept on the person's account and
+ * applies on another device. The browser cannot set headers on a WebSocket, so on the web the
  * board follows by its periodic read; the header handshake is the native
  * app's (unit-tested in `src/__tests__`).
  *
@@ -97,14 +98,32 @@ function serveApp(): Promise<http.Server> {
 	return new Promise((resolve) => server.listen(APP_PORT, "127.0.0.1", () => resolve(server)));
 }
 
+/** Two frames: the app's `useColorScheme()` has re-rendered after a scheme change. */
+async function settled(page: Page): Promise<void> {
+	await page.evaluate(
+		() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+	);
+}
+
+/**
+ * The screen as it is, in the device's light then dark scheme (`name-light.png`,
+ * `name-dark.png`), on the same page: no new sign-in (the server allows ten a
+ * minute). The page goes back to light, the scheme the scenarios run in.
+ */
 async function shot(page: Page, name: string): Promise<void> {
 	if (!SHOTS) return;
 	mkdirSync(SHOTS, { recursive: true });
-	await page.screenshot({ path: path.join(SHOTS, `${name}.png`) });
+	for (const colorScheme of ["light", "dark"] as const) {
+		await page.emulateMedia({ colorScheme });
+		await settled(page);
+		await page.screenshot({ path: path.join(SHOTS, `${name}-${colorScheme}.png`) });
+	}
+	await page.emulateMedia({ colorScheme: "light" });
+	await settled(page);
 }
 
 async function signIn(browser: Browser, world: World, who: Who, password = world.passwords[who]): Promise<Page> {
-	const context = await browser.newContext();
+	const context = await browser.newContext({ colorScheme: "light" });
 	const page = await context.newPage();
 	await page.goto(`http://localhost:${APP_PORT}/`);
 	await page.getByLabel("Server address").fill(world.serverUrl);
@@ -312,4 +331,40 @@ test("an organization admin runs members, invitations and groups from the phone"
 	await alice.getByRole("radio", { name: "bob", exact: true }).click();
 	await expect(alice.getByText("1 member")).toBeVisible({ timeout: 30_000 });
 	await shot(alice, "14-group");
+});
+
+/** Whether an element of the page is painted in this background colour. */
+async function paints(page: Page, rgb: string): Promise<boolean> {
+	return await page.evaluate(
+		(wanted) =>
+			Array.from(document.querySelectorAll("div")).some((el) => getComputedStyle(el).backgroundColor === wanted),
+		rgb,
+	);
+}
+
+test("the theme chosen on the phone follows the person to another device", async ({ browser }) => {
+	// Alice is still on the group, where the previous scenario left her.
+	const alice = signedInPage("alice");
+	await alice.goBack();
+	await alice.goBack();
+	await alice.goBack();
+	await alice.getByRole("radio", { name: "Ocean", exact: true }).click();
+	await alice.getByRole("radio", { name: "Dark", exact: true }).click();
+	// Ocean, dark (#082F49), although this browser asks for light.
+	await expect.poll(() => paints(alice, "rgb(8, 47, 73)"), { timeout: 10_000 }).toBe(true);
+	await shot(alice, "15-theme");
+
+	// A second device, in light, with no copy of its own: the account's theme wins.
+	// The run has used most of the server's ten sign-ins a minute by now: when
+	// it refuses, the next minute's window lets this one through.
+	const elsewhere = await signIn(browser, world, "alice");
+	const projects = elsewhere.getByRole("button", { name: world.project });
+	const refused = elsewhere.getByText(/Too many attempts/);
+	await expect(projects.or(refused)).toBeVisible({ timeout: 30_000 });
+	if (await refused.isVisible()) {
+		await elsewhere.waitForTimeout(61_000);
+		await elsewhere.getByRole("button", { name: "Sign in", exact: true }).click();
+	}
+	await expect(projects).toBeVisible({ timeout: 30_000 });
+	await expect.poll(() => paints(elsewhere, "rgb(8, 47, 73)"), { timeout: 30_000 }).toBe(true);
 });

@@ -15,7 +15,9 @@ import type {
 	RunPhase,
 	ServerProject,
 	TaskLogs,
+	UiPreferences,
 } from "./types";
+import type { ThemePrefs } from "../ui/theme-ids";
 import type { Memory } from "../context/index-file";
 import type { AnalysisKind, CostSummary, DashboardSnapshot, WorkSession } from "../insights/types";
 import type {
@@ -153,6 +155,12 @@ export function api(client: ServerClient) {
 			client.request<{ saved: boolean }>("PUT", "/users/me/secrets", { kind, value }),
 		deleteSecret: (kind: SecretKind) =>
 			client.request<{ deleted: boolean }>("DELETE", `/users/me/secrets/${enc(kind)}`),
+		preferences: () => client.request<UiPreferences>("GET", "/users/me/preferences"),
+		setPreferences: (prefs: ThemePrefs) =>
+			client.request<UiPreferences>("PUT", "/users/me/preferences", {
+				theme: prefs.theme,
+				colorTheme: prefs.colorTheme,
+			}),
 		streamInfo: () => client.request<{ url: string | null }>("GET", "/api/board/stream"),
 	};
 }

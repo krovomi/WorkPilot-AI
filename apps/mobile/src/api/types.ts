@@ -4,6 +4,8 @@
  * `apps/backend/shared_board/`; a field the app does not show is left out.
  */
 
+import type { ColorThemeId, ThemeMode } from "../ui/theme-ids";
+
 export interface ServerUser {
 	id: string;
 	email: string;
@@ -164,4 +166,13 @@ export interface TaskLogs {
 	updated_at?: string;
 	truncated?: boolean;
 	phases: Record<LogPhase, TaskPhaseLog>;
+}
+
+/**
+ * `GET/PUT /users/me/preferences` (`server/routers/preferences.py`): the
+ * person's theme for all their devices; `null` until they choose one.
+ */
+export interface UiPreferences {
+	theme: ThemeMode | null;
+	colorTheme: ColorThemeId | null;
 }

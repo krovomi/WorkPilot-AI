@@ -53,6 +53,7 @@ import {
 	maskSettingsSecrets,
 	unmaskSettingsUpdate,
 } from "../settings-secrets";
+import { pushThemeIfChanged } from "../server-ui-preferences";
 import { readSettingsFile, writeSettingsFile } from "../settings-utils";
 import {
 	getPackagedSourceEnvPath,
@@ -749,6 +750,8 @@ export function registerSettingsHandlers(
 				}
 
 				const credentialsSetAt = writeSettingsFile(newSettings);
+				// Server mode: the theme follows the person to their other devices.
+				pushThemeIfChanged(settings, newSettings);
 
 				// Apply Python path if changed
 				if (settings.pythonPath || settings.autoBuildPath) {

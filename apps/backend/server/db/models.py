@@ -520,6 +520,26 @@ class PushDevice(Base):
     )
 
 
+class UserPreference(Base):
+    """A person's interface choices, the same on every device they sign in on.
+
+    ``theme`` is the mode (light, dark, system) and ``color_theme`` one of the
+    desktop's colour themes; ``server.services.preferences`` holds the closed
+    lists. One row per person, created on the first save.
+    """
+
+    __tablename__ = "user_preferences"
+
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    theme: Mapped[str] = mapped_column(String(10))
+    color_theme: Mapped[str] = mapped_column(String(20))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )
+
+
 class UserSecret(Base):
     """Per-user integration secret (Azure PAT, Jira token...), Fernet-encrypted."""
 

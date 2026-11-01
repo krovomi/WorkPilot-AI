@@ -76,6 +76,15 @@ l'erreur citerait le jeton. Un run reçoit les jetons de qui l'a lancé (`USER_S
 sien remplace celui que l'opérateur aurait posé pour le déploiement : ce qu'il fait sur une forge
 ou un outil de tickets est fait au nom de cette personne.
 
+**Le thème de la personne la suit d'un appareil à l'autre** (`server/routers/preferences.py`,
+table `user_preferences`, révision `0009`). `GET /users/me/preferences` rend le mode (`light`,
+`dark`, `system`) et le thème de couleur (un des sept du bureau), `null` tant qu'elle n'a rien
+choisi ; `PUT` les remplace. La route ne nomme personne : chacun ne lit et n'écrit que sa ligne,
+être connecté est toute la permission, comme pour `/users/me/devices` et `/users/me/secrets`.
+Toute autre valeur, un champ en trop ou manquant est refusé (422). L'app de bureau la lit à la
+connexion et l'écrit quand le thème change (`main/server-ui-preferences.ts`), le téléphone de
+même ([mobile-app.md](mobile-app.md#les-thèmes)).
+
 ## Ce qu'un run voit sur le disque
 
 Tous les runs de toutes les organisations tournent sous le même utilisateur de l'OS, à côté des

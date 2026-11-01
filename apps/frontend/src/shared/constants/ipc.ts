@@ -1280,6 +1280,8 @@ export const IPC_CHANNELS = {
 	SERVER_AUTH_LIST_SECRETS: "server-auth:list-secrets",
 	SERVER_AUTH_SET_SECRET: "server-auth:set-secret",
 	SERVER_AUTH_DELETE_SECRET: "server-auth:delete-secret",
+	// The person's theme on the server, read at connection (main/server-ui-preferences.ts).
+	SERVER_AUTH_PULL_UI_PREFERENCES: "server-auth:pull-ui-preferences",
 	// Server mode: register or delete a project on the server, for the team
 	SERVER_PROJECT_CREATE: "server-project:create",
 	SERVER_PROJECT_DELETE: "server-project:delete",

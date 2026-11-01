@@ -164,6 +164,24 @@
 		"signOut": "Se déconnecter",
 		"version": "Version {{version}}"
 	},
+	"theme": {
+		"title": "Apparence",
+		"hint": "Suit votre compte sur chaque appareil où vous vous connectez.",
+		"mode": "Mode",
+		"system": "Système",
+		"light": "Clair",
+		"dark": "Sombre",
+		"colorTheme": "Thème de couleur",
+		"colors": {
+			"default": "Par défaut",
+			"dusk": "Dusk",
+			"lime": "Lime",
+			"ocean": "Ocean",
+			"retro": "Retro",
+			"neo": "Neo",
+			"forest": "Forest"
+		}
+	},
 	"runPhase": {
 		"spec": "Spec",
 		"build": "Build",

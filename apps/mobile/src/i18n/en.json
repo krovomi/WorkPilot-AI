@@ -164,6 +164,24 @@
 		"signOut": "Sign out",
 		"version": "Version {{version}}"
 	},
+	"theme": {
+		"title": "Appearance",
+		"hint": "Follows your account on every device you sign in on.",
+		"mode": "Mode",
+		"system": "System",
+		"light": "Light",
+		"dark": "Dark",
+		"colorTheme": "Color theme",
+		"colors": {
+			"default": "Default",
+			"dusk": "Dusk",
+			"lime": "Lime",
+			"ocean": "Ocean",
+			"retro": "Retro",
+			"neo": "Neo",
+			"forest": "Forest"
+		}
+	},
 	"runPhase": {
 		"spec": "Spec",
 		"build": "Build",
