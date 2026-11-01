@@ -17,6 +17,9 @@ applications mobiles pour un projet.
 | Kanban | `src/app/(app)/projects/[projectId]/index.tsx` | `GET /api/board/cards`, relu à chaque événement de `project:<id>` |
 | Nouvelle carte | `src/app/(app)/projects/[projectId]/new.tsx` | `POST /api/board/cards` |
 | Fiche d'une carte | `src/app/(app)/projects/[projectId]/cards/[cardId].tsx` | la carte (lue dans l'espace de build pendant un build), sa spec, son rapport QA, ses runs, ses changements avec le patch de chaque fichier (`src/card/`) ; les actions ci-dessous |
+| Insights | `src/app/(app)/projects/[projectId]/insights/` | `GET` et `POST /api/features/insights/sessions`, puis `.../messages` pour poser une question ; relu toutes les 3 s pendant que l'agent répond |
+| Roadmap | `src/app/(app)/projects/[projectId]/roadmap.tsx` | `GET /api/features/roadmap/snapshot`, `POST .../jobs` pour la générer, `POST .../features/{id}/convert` pour en faire une carte |
+| Idées | `src/app/(app)/projects/[projectId]/ideas.tsx` | idem sous `/api/features/ideation` (`.../ideas/{id}/convert`) |
 | Réglages | `src/app/(app)/settings.tsx` | `POST /auth/switch-org`, `POST /auth/logout` |
 
 Les actions d'une carte sont celles de l'app de bureau sur une carte du serveur
@@ -92,6 +95,17 @@ Publier sur l'App Store et Google Play demande un compte Apple Developer et un c
 Console, puis EAS (`npx eas-cli build`, `npx eas-cli submit`) avec les identifiants de signature ;
 rien de cela n'est dans le dépôt.
 
+## Insights, roadmap et idées
+
+Ce sont les features partagées du serveur (`shared_features/`), lues et écrites par `project_id`
+comme sur le bureau. La roadmap et les idées sont des fichiers JSON écrits par un job (un agent sur
+le clone) : l'app lit l'instantané, suit le job en cours (sa dernière ligne, toutes les 3 s) et relit
+l'instantané quand il se termine (`src/features/useFeature.ts`). Les fichiers sont lus avec
+méfiance (`src/features/files.ts`) : un champ absent ou du mauvais type n'est pas affiché. Une
+conversation Insights appartient à son auteur : les autres membres la lisent, seul lui la poursuit.
+L'app montre chaque bouton selon les permissions (`insight.read`, `insight.write`, `agent.execute`,
+`agent.cancel`, `task.write`), que le serveur revérifie.
+
 ## Les notifications push
 
 Quand un run se termine (réussi ou en échec), la personne qui l'a lancé reçoit une notification sur
@@ -120,5 +134,4 @@ développement, simulateur, web), l'app fonctionne de la même façon, sans noti
 ## Ce qui vient
 
 - Connexion Microsoft Entra (`expo-auth-session`, puis `POST /auth/oidc/exchange`).
-- Les features partagées (roadmap, idéation, Insights), GitHub et GitLab, le tableau de bord et les
-  analyses, l'administration.
+- GitHub et GitLab, le tableau de bord et les analyses, l'administration.

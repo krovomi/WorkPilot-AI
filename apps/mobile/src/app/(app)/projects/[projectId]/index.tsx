@@ -44,6 +44,26 @@ export default function Board() {
 				<View style={[styles.dot, { backgroundColor: live ? theme.success : theme.textFaint }]} />
 				<Text style={{ color: theme.textMuted, fontSize: 12 }}>{live ? t("board.live") : t("board.offline")}</Text>
 			</View>
+			{can("insight.read") ? (
+				<View style={styles.links}>
+					{(["insights", "roadmap", "ideas"] as const).map((target) => (
+						<Pressable
+							key={target}
+							accessibilityRole="link"
+							onPress={() =>
+								router.push({
+									pathname:
+										target === "insights" ? "/projects/[projectId]/insights" : `/projects/[projectId]/${target}`,
+									params: { projectId },
+								})
+							}
+							style={[styles.link, { borderColor: theme.border, backgroundColor: theme.surface }]}
+						>
+							<Text style={{ color: theme.accent, fontWeight: "600" }}>{t(`features.${target}`)}</Text>
+						</Pressable>
+					))}
+				</View>
+			) : null}
 			<ScrollView
 				horizontal
 				showsHorizontalScrollIndicator={false}
@@ -146,6 +166,8 @@ function CardRow({ card, onPress }: { card: BoardCard; onPress: () => void }) {
 }
 
 const styles = StyleSheet.create({
+	links: { flexDirection: "row", gap: SPACE.sm, paddingHorizontal: SPACE.lg, paddingTop: SPACE.sm },
+	link: { flex: 1, alignItems: "center", borderWidth: StyleSheet.hairlineWidth, borderRadius: RADIUS.md, paddingVertical: SPACE.sm },
 	status: {
 		flexDirection: "row",
 		alignItems: "center",
