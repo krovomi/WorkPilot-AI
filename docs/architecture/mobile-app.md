@@ -219,7 +219,7 @@ dessus. Un test vérifie ces contrastes pour chaque palette.
 |---|---|
 | Au démarrage, la copie du téléphone s'applique avant tout réseau | `src/ui/theme-store.ts` (expo-secure-store, déjà là pour les jetons : pas d'AsyncStorage ; `localStorage` sur le web) |
 | Un fournisseur à la racine donne la palette à tous les `useTheme()`, aux en-têtes natifs et au thème de navigation | `src/ui/ThemeProvider.tsx`, `src/app/_layout.tsx` |
-| Une fois connectée, la copie est réconciliée avec le compte, une fois par personne : un choix fait hors ligne part d'abord ; sinon le choix du serveur gagne ; un serveur sans choix reçoit celui du téléphone | `src/ui/theme-sync.ts`, `GET` et `PUT /users/me/preferences` |
+| Une fois connectée, la copie est réconciliée avec le compte, une fois par personne : un choix fait hors ligne part d'abord, seulement vers le compte de qui l'a fait (la copie garde son id ; celui d'une autre personne n'est jamais envoyé, il perd son attente) ; sinon le choix du serveur gagne ; un serveur sans choix reçoit celui du téléphone | `src/ui/theme-sync.ts`, `GET` et `PUT /users/me/preferences` |
 | Un choix dans Réglages s'applique, est gardé sur le téléphone puis envoyé ; un envoi qui échoue reste en attente pour la prochaine synchronisation, sans erreur à l'écran | `src/ui/ThemeSection.tsx` |
 
 Le mode `system` suit l'appareil (`useColorScheme`). Les noms des thèmes sont ceux du produit, sauf

@@ -2,7 +2,8 @@
  * The phone's own copy of the theme, read at launch before any network, so
  * the first screen already has the person's colours and the app works
  * offline. `pending` marks a choice the server has not taken yet (a save
- * made offline): the next sync sends it instead of reading the server's.
+ * made offline): the next sync sends it instead of reading the server's,
+ * but only to the account of `owner`, the person who made it.
  *
  * Not a secret, but expo-secure-store is the one store already in the app
  * (no AsyncStorage): a few bytes in the Keychain / Keystore. On the web
@@ -21,6 +22,8 @@ const OPTIONS: SecureStore.SecureStoreOptions = {
 
 export interface StoredPrefs extends ThemePrefs {
 	pending: boolean;
+	/** The id of the person whose choice this is; null when unknown. */
+	owner: string | null;
 }
 
 function webStorage(): Storage | null {
@@ -49,7 +52,12 @@ export async function loadPrefs(): Promise<StoredPrefs | null> {
 		const parsed: unknown = JSON.parse(raw);
 		const prefs = parsePrefs(parsed);
 		if (!prefs) return null;
-		return { ...prefs, pending: (parsed as { pending?: unknown }).pending === true };
+		const { pending, owner } = parsed as { pending?: unknown; owner?: unknown };
+		return {
+			...prefs,
+			pending: pending === true,
+			owner: typeof owner === "string" && owner.length > 0 ? owner : null,
+		};
 	} catch {
 		// An unreadable entry is no choice made, never a crash at launch.
 		return null;
@@ -60,7 +68,12 @@ export async function loadPrefs(): Promise<StoredPrefs | null> {
 export async function savePrefs(prefs: StoredPrefs): Promise<void> {
 	try {
 		await writeRaw(
-			JSON.stringify({ theme: prefs.theme, colorTheme: prefs.colorTheme, pending: prefs.pending }),
+			JSON.stringify({
+				theme: prefs.theme,
+				colorTheme: prefs.colorTheme,
+				pending: prefs.pending,
+				owner: prefs.owner,
+			}),
 		);
 	} catch {
 		// The theme still applies for this session.

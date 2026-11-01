@@ -69,14 +69,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 		syncedFor.current = who;
 		void (async () => {
 			await loaded.current;
-			const next = await syncPrefs(api, stored.current);
+			const next = await syncPrefs(api, stored.current, who);
 			if (next && syncedFor.current === who) apply(next);
 		})();
 	}, [signedIn, api, who, status, apply]);
 
 	const choose = useCallback(
 		(chosen: ThemePrefs) => {
-			const waiting: StoredPrefs = { ...chosen, pending: true };
+			// Tagged with who made it: a pending choice only ever goes to their account.
+			const waiting: StoredPrefs = { ...chosen, pending: true, owner: who };
 			apply(waiting);
 			if (!signedIn || !api) return;
 			void pushPrefs(api, chosen).then((pending) => {
@@ -86,7 +87,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 				}
 			});
 		},
-		[apply, signedIn, api],
+		[apply, signedIn, api, who],
 	);
 
 	const value = useMemo<ThemeChoice>(() => ({ prefs, choose }), [prefs, choose]);

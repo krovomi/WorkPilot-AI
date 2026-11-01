@@ -112,8 +112,8 @@ describe("palettes", () => {
 
 describe("the phone's copy", () => {
 	it("reads back what it kept, and nothing from a broken entry", async () => {
-		await savePrefs({ theme: "dark", colorTheme: "neo", pending: true });
-		expect(await loadPrefs()).toEqual({ theme: "dark", colorTheme: "neo", pending: true });
+		await savePrefs({ theme: "dark", colorTheme: "neo", pending: true, owner: "u1" });
+		expect(await loadPrefs()).toEqual({ theme: "dark", colorTheme: "neo", pending: true, owner: "u1" });
 		store.set(KEY, "{not json");
 		expect(await loadPrefs()).toBeNull();
 		store.set(KEY, JSON.stringify({ theme: "dark", colorTheme: "evil" }));
@@ -124,31 +124,49 @@ describe("the phone's copy", () => {
 describe("sync with the server", () => {
 	it("lets the server's choice win over the phone's copy", async () => {
 		const api = fakeApi({ theme: "dark", colorTheme: "ocean" });
-		const next = await syncPrefs(api, { theme: "light", colorTheme: "lime", pending: false });
-		expect(next).toEqual({ theme: "dark", colorTheme: "ocean", pending: false });
+		const next = await syncPrefs(api, { theme: "light", colorTheme: "lime", pending: false, owner: "u1" }, "u1");
+		expect(next).toEqual({ theme: "dark", colorTheme: "ocean", pending: false, owner: "u1" });
 		expect(api.setPreferences).not.toHaveBeenCalled();
 	});
 
 	it("sends a choice made offline before reading the server's", async () => {
 		const api = fakeApi({ theme: "dark", colorTheme: "ocean" });
-		const next = await syncPrefs(api, { theme: "light", colorTheme: "lime", pending: true });
+		const next = await syncPrefs(api, { theme: "light", colorTheme: "lime", pending: true, owner: "u1" }, "u1");
 		expect(api.setPreferences).toHaveBeenCalledWith({ theme: "light", colorTheme: "lime" });
 		expect(api.preferences).not.toHaveBeenCalled();
-		expect(next).toEqual({ theme: "light", colorTheme: "lime", pending: false });
+		expect(next).toEqual({ theme: "light", colorTheme: "lime", pending: false, owner: "u1" });
 	});
 
 	it("gives the phone's copy to a server that has none", async () => {
 		const api = fakeApi();
-		expect(await syncPrefs(api, { theme: "dark", colorTheme: "retro", pending: false })).toBeNull();
+		expect(await syncPrefs(api, { theme: "dark", colorTheme: "retro", pending: false, owner: "u1" }, "u1")).toBeNull();
 		expect(api.setPreferences).toHaveBeenCalledWith({ theme: "dark", colorTheme: "retro" });
+	});
+
+	it("never sends another person's pending choice: the server's wins", async () => {
+		const api = fakeApi({ theme: "dark", colorTheme: "ocean" });
+		const local = { theme: "light", colorTheme: "lime", pending: true, owner: "u1" } as const;
+		const next = await syncPrefs(api, local, "u2");
+		expect(api.setPreferences).not.toHaveBeenCalled();
+		expect(next).toEqual({ theme: "dark", colorTheme: "ocean", pending: false, owner: "u2" });
+	});
+
+	it("drops another person's pending flag when the server has nothing, without sending it", async () => {
+		const api = fakeApi();
+		const local = { theme: "light", colorTheme: "lime", pending: true, owner: "u1" } as const;
+		expect(await syncPrefs(api, local, "u2")).toEqual({ ...local, pending: false });
+		// Nor a copy without an owner (made before anyone signed in).
+		expect(await syncPrefs(api, { ...local, owner: null }, "u2")).toEqual({ ...local, owner: null, pending: false });
+		expect(await syncPrefs(api, { ...local, pending: false, owner: null }, "u2")).toBeNull();
+		expect(api.setPreferences).not.toHaveBeenCalled();
 	});
 
 	it("keeps the phone's copy when the server cannot be reached", async () => {
 		const api = fakeApi();
 		api.preferences.mockRejectedValue(new Error("network"));
 		api.setPreferences.mockRejectedValue(new Error("network"));
-		expect(await syncPrefs(api, { theme: "dark", colorTheme: "retro", pending: false })).toBeNull();
-		expect(await syncPrefs(api, { theme: "dark", colorTheme: "retro", pending: true })).toBeNull();
+		expect(await syncPrefs(api, { theme: "dark", colorTheme: "retro", pending: false, owner: "u1" }, "u1")).toBeNull();
+		expect(await syncPrefs(api, { theme: "dark", colorTheme: "retro", pending: true, owner: "u1" }, "u1")).toBeNull();
 		expect(await pushPrefs(api, { theme: "dark", colorTheme: "retro" })).toBe(true);
 	});
 });
@@ -170,7 +188,7 @@ describe("theme provider and settings section", () => {
 			</ThemeProvider>,
 		);
 		await waitFor(() => expect(screen.getByTestId("probe")).toHaveTextContent("#082F49|#38BDF8"));
-		expect(JSON.parse(store.get(KEY) ?? "{}")).toEqual({ theme: "dark", colorTheme: "ocean", pending: false });
+		expect(JSON.parse(store.get(KEY) ?? "{}")).toEqual({ theme: "dark", colorTheme: "ocean", pending: false, owner: "u1" });
 	});
 
 	it("shows the modes and the seven themes, and a choice applies, is kept and sent", async () => {
@@ -194,7 +212,7 @@ describe("theme provider and settings section", () => {
 		expect(screen.getByRole("radio", { name: "Retro" })).toBeSelected();
 		await waitFor(() => expect(api.setPreferences).toHaveBeenLastCalledWith({ theme: "dark", colorTheme: "retro" }));
 		await waitFor(() =>
-			expect(JSON.parse(store.get(KEY) ?? "{}")).toEqual({ theme: "dark", colorTheme: "retro", pending: false }),
+			expect(JSON.parse(store.get(KEY) ?? "{}")).toEqual({ theme: "dark", colorTheme: "retro", pending: false, owner: "u1" }),
 		);
 	});
 
@@ -214,6 +232,25 @@ describe("theme provider and settings section", () => {
 		});
 		expect(screen.getByTestId("probe")).toHaveTextContent(`${PALETTES.lime.light.background}|${PALETTES.lime.light.accent}`);
 		await waitFor(() => expect(api.setPreferences).toHaveBeenCalled());
-		expect(JSON.parse(store.get(KEY) ?? "{}")).toEqual({ theme: "system", colorTheme: "lime", pending: true });
+		expect(JSON.parse(store.get(KEY) ?? "{}")).toEqual({ theme: "system", colorTheme: "lime", pending: true, owner: "u1" });
+	});
+
+	it("never sends a pending choice of the previous person to the one now signed in", async () => {
+		store.set(KEY, JSON.stringify({ theme: "dark", colorTheme: "neo", pending: true, owner: "u1" }));
+		const api = fakeApi({ theme: "light", colorTheme: "forest" });
+		Object.assign(mockSession, { status: "signedIn", api, user: { id: "u2" } });
+		await render(
+			<ThemeProvider>
+				<Probe />
+			</ThemeProvider>,
+		);
+		await waitFor(() => expect(screen.getByTestId("probe")).toHaveTextContent("#DCFCE7|#16A34A"));
+		expect(api.setPreferences).not.toHaveBeenCalled();
+		expect(JSON.parse(store.get(KEY) ?? "{}")).toEqual({
+			theme: "light",
+			colorTheme: "forest",
+			pending: false,
+			owner: "u2",
+		});
 	});
 });
