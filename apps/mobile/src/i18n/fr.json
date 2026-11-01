@@ -124,7 +124,20 @@
 		"priority_high": "haute",
 		"priority_urgent": "urgente",
 		"goal": "Terminé quand ceci passe :",
-		"goalError": "L'objectif est illisible : {{error}}"
+		"goalError": "L'objectif est illisible : {{error}}",
+		"logs": "Journal du build",
+		"noLogs": "Pas encore de journal.",
+		"logsEmptyPhase": "Rien d'écrit dans cette phase pour l'instant.",
+		"logsEarlier": "{{count}} lignes plus anciennes masquées",
+		"logsTruncated": "Le serveur n'a envoyé que les dernières lignes.",
+		"logPhase_planning": "Planification",
+		"logPhase_coding": "Code",
+		"logPhase_validation": "Validation",
+		"logStatus_pending": "en attente",
+		"logStatus_active": "en cours",
+		"logStatus_completed": "terminé",
+		"logStatus_failed": "échec",
+		"logPhaseToggle": "Afficher le journal de {{phase}}"
 	},
 	"actions": {
 		"start": "Démarrer",

@@ -124,7 +124,20 @@
 		"priority_high": "high",
 		"priority_urgent": "urgent",
 		"goal": "Done when this passes:",
-		"goalError": "The goal cannot be read: {{error}}"
+		"goalError": "The goal cannot be read: {{error}}",
+		"logs": "Build log",
+		"noLogs": "No log yet.",
+		"logsEmptyPhase": "Nothing written in this phase yet.",
+		"logsEarlier": "{{count}} earlier lines hidden",
+		"logsTruncated": "The server sent only the latest lines.",
+		"logPhase_planning": "Planning",
+		"logPhase_coding": "Coding",
+		"logPhase_validation": "Validation",
+		"logStatus_pending": "waiting",
+		"logStatus_active": "running",
+		"logStatus_completed": "done",
+		"logStatus_failed": "failed",
+		"logPhaseToggle": "Show the {{phase}} log"
 	},
 	"actions": {
 		"start": "Start",

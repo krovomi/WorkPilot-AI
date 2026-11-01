@@ -3,9 +3,10 @@ import type { Api } from "../api/endpoints";
 import type { CardDetails } from "../api/types";
 import "../i18n";
 import { ChangesSection } from "../card/ChangesSection";
-import { SettingsSection } from "../card/SettingsSection";
 import { canEditCard, EditCard } from "../card/EditCard";
+import { LogsSection, MAX_LOG_LINES } from "../card/LogsSection";
 import { MAX_PATCH_LINES, patchLines } from "../card/patch";
+import { SettingsSection } from "../card/SettingsSection";
 
 const mockApi = { updateCard: jest.fn(async () => ({})) } as unknown as Api & { updateCard: jest.Mock };
 jest.mock("../auth/session", () => ({ useApi: () => mockApi }));
@@ -134,5 +135,56 @@ describe("SettingsSection", () => {
 		expect(screen.queryByText("Runs with")).toBeNull();
 		await render(<SettingsSection />);
 		expect(screen.queryByText("Runs with")).toBeNull();
+	});
+});
+
+describe("LogsSection", () => {
+	const phase = (name: "planning" | "coding" | "validation", status: string, texts: string[]) => ({
+		phase: name,
+		status: status as "pending",
+		started_at: null,
+		completed_at: null,
+		entries: texts.map((content) => ({ timestamp: "t", type: "text", content })),
+	});
+
+	it("opens the running phase and shows its latest lines", async () => {
+		const many = Array.from({ length: MAX_LOG_LINES + 3 }, (_, i) => `line ${i}`);
+		await render(
+			<LogsSection
+				logs={{
+					phases: {
+						planning: phase("planning", "completed", ["planned it"]),
+						coding: phase("coding", "active", many),
+						validation: phase("validation", "pending", []),
+					},
+				}}
+			/>,
+		);
+		expect(screen.getByText(`line ${MAX_LOG_LINES + 2}`)).toBeTruthy();
+		expect(screen.queryByText("line 0")).toBeNull();
+		expect(screen.getByText("3 earlier lines hidden")).toBeTruthy();
+		expect(screen.queryByText("planned it")).toBeNull();
+		await fireEvent.press(screen.getByRole("button", { name: /Planning/ }));
+		expect(screen.getByText("planned it")).toBeTruthy();
+	});
+
+	it("says when no run wrote anything yet", async () => {
+		await render(
+			<LogsSection
+				logs={{
+					phases: {
+						planning: phase("planning", "pending", []),
+						coding: phase("coding", "pending", []),
+						validation: phase("validation", "pending", []),
+					},
+				}}
+			/>,
+		);
+		expect(screen.getByText("No log yet.")).toBeTruthy();
+	});
+
+	it("shows nothing for a card the server has no log for", async () => {
+		await render(<LogsSection logs={null} />);
+		expect(screen.queryByText("Build log")).toBeNull();
 	});
 });

@@ -1017,6 +1017,7 @@ export const IPC_CHANNELS = {
 	ACCESSIBILITY_RUN: "accessibility:run",
 	AGENT_CLI_CHECK: "agentCli:check",
 	AGENT_CLI_PROBE_ACP: "agentCli:probeAcp",
+	AGENT_CLI_INSTALL: "agentCli:install",
 	AGENT_COACH_CANCEL: "agentCoach:cancel",
 	AGENT_COACH_ERROR: "agent-coach-error",
 	AGENT_COACH_EVENT: "agent-coach-event",

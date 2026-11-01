@@ -65,11 +65,31 @@ def test_one_code_file_makes_it_full():
     assert "src/app.py" in scope.reason
 
 
-def test_unknown_or_empty_change_sets_are_full():
-    assert not classify(None, 0).is_light
+def test_an_unknown_change_set_is_full_and_may_touch_code():
+    scope = classify(None, 0)
+    assert not scope.is_light
+    assert scope.touches_code
+
+
+def test_an_empty_change_set_is_light_and_touches_no_code():
+    # A card whose file was already on the base branch: nothing to test.
+    # Sent to the full review it met the coverage gate, and the fixer made
+    # up test projects (DummyTest.cs, TESTING.md) instead of tutu.txt.
+    for scope in (classify([], 0), classify([".workpilot/specs/001/spec.md"], 4)):
+        assert scope.is_light
+        assert not scope.touches_code
+        assert scope.files == ()
+
+
+def test_touches_code_is_independent_of_the_review_level(monkeypatch):
+    assert classify(["src/app.py"], 3).touches_code
+    many = [f"doc{i}.md" for i in range(LIGHT_MAX_FILES + 1)]
+    assert not classify(many, 10).touches_code
+    assert not classify(["a.md"], LIGHT_MAX_CHANGED_LINES + 1).touches_code
+    monkeypatch.setenv("WORKPILOT_QA_LIGHT", "0")
+    assert not classify(["toto.txt"], 1).touches_code
     assert not classify([], 0).is_light
-    # The pipeline's own files are not the task's change.
-    assert not classify([".workpilot/specs/001/spec.md"], 4).is_light
+    assert classify(["src/app.py"], 1).touches_code
 
 
 def test_large_text_changes_get_the_full_review():
@@ -198,3 +218,55 @@ def test_tdd_skips_subtasks_that_touch_only_text(files, eligible):
 
     subtask = {"verification": {"type": "command", "command": "cat toto.txt"}, **files}
     assert subtask_is_tdd_eligible(subtask, {"type": "implementation"}) is eligible
+
+
+def test_an_unchanged_worktree_is_light(repo):
+    scope = change_scope(repo, "main")
+    assert scope.is_light
+    assert not scope.touches_code
+    assert scope.files == ()
+
+
+def test_the_light_prompt_for_an_empty_change_checks_the_repository(repo):
+    from prompts_pkg import get_qa_reviewer_light_prompt
+
+    spec_dir = repo / ".workpilot" / "specs" / "001"
+    spec_dir.mkdir(parents=True)
+    (spec_dir / "spec.md").write_text(
+        "# Create tutu.txt\n\n- tutu.txt contains OK\n", encoding="utf-8"
+    )
+    (spec_dir / "implementation_plan.json").write_text("{}", encoding="utf-8")
+
+    prompt = get_qa_reviewer_light_prompt(spec_dir, repo, change_scope(repo, "main"))
+
+    assert "tutu.txt contains OK" in prompt
+    assert "no file differs from the base branch" in prompt
+    assert "If the change is empty" in prompt
+    assert "Never ask for tests" in prompt
+    assert "{{" not in prompt
+
+
+def test_the_coverage_gate_skips_change_sets_without_code(monkeypatch, tmp_path):
+    from qa import loop
+
+    called = []
+    monkeypatch.setattr(
+        "qa.coverage_gate.run_coverage_gate",
+        lambda spec_dir: called.append(spec_dir) or {"enabled": False},
+    )
+    many = [f"doc{i}.md" for i in range(LIGHT_MAX_FILES + 1)]
+    for scope in (classify([], 0), classify(many, 10)):
+        assert loop._coverage_gate(tmp_path, 1, scope) is None
+    assert called == []
+    loop._coverage_gate(tmp_path, 1, classify(["src/app.py"], 1))
+    assert called == [tmp_path]
+
+
+def test_fix_requests_forbid_placeholder_tests():
+    from prompts_pkg.prompts import _load_prompt_file
+    from qa.coverage_gate import evaluate_coverage, render_coverage_fix_request
+
+    assert "placeholder test" in _load_prompt_file("qa_fixer.md")
+    assert "this task changed" in _load_prompt_file("qa_reviewer.md")
+    request = render_coverage_fix_request(evaluate_coverage({}, 100))
+    assert "test factice" in request
