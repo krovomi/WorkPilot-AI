@@ -19,6 +19,7 @@ agent of their card could not already do.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 from pathlib import Path
@@ -26,6 +27,12 @@ from typing import Any, Literal
 
 from fastapi import HTTPException
 from pydantic import BaseModel, Field, field_validator
+
+logger = logging.getLogger(__name__)
+
+#: What a reader is told of a goal file that is there but unusable. The cause
+#: (a parse error, an OS error naming a path) stays in the server's log.
+GOAL_UNREADABLE = "The goal file cannot be used; set the goal again"
 
 Level = Literal["none", "low", "medium", "high", "ultrathink"]
 Phase = Literal["spec", "planning", "coding", "qa"]
@@ -216,7 +223,8 @@ def read_settings(root: Path, directory: Path) -> dict[str, Any]:
     try:
         goal = load_goal(*_copies(root, directory))
     except GoalConfigError as e:
-        result["goalError"] = str(e)
+        logger.warning("card %s: unusable goal: %s", directory.name, e)
+        result["goalError"] = GOAL_UNREADABLE
     else:
         if goal is not None:
             result["goal"] = goal_dict(goal)

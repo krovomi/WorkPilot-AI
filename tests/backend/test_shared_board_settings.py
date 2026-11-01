@@ -218,3 +218,17 @@ def test_changing_them_needs_task_write():
         permission_for("PATCH", "/api/board/cards/{card_id}/settings", "task")
         == "task.write"
     )
+
+
+@pytest.mark.asyncio
+async def test_an_unusable_goal_file_is_reported_without_its_cause(tmp_path):
+    from shared_board.api import get_card
+    from shared_board.settings import GOAL_UNREADABLE
+
+    scope, clone, card_id = await _create(tmp_path)
+    goal_file = clone / ".workpilot/specs" / card_id / ".workpilot-goal.json"
+    goal_file.write_text("{not json", encoding="utf-8")
+    shown = (await get_card(card_id, scope))["settings"]
+    assert shown["goal"] is None
+    assert shown["goalError"] == GOAL_UNREADABLE
+    assert str(clone) not in shown["goalError"]
