@@ -279,6 +279,12 @@ branches). Then re-run with coverage and update
 A task will be rejected again automatically while unit or integration coverage
 stays below {{MIN_COVERAGE}}%.
 
+The tests you add must exercise the code **this task changed** and assert its
+behaviour. Never add a placeholder test (an assertion that always holds, an
+empty `DummyTest`), a test project or a file such as `TESTING.md` that only
+exists to produce a coverage number: QA reviews the diff, and the spec did not
+ask for them.
+
 ---
 
 ## PHASE 5: SELF-VERIFICATION
@@ -417,6 +423,7 @@ npx prisma migrate dev --name [name]
 
 ### Fix What Was Asked
 - Don't add features
+- Don't add files the spec and `QA_FIX_REQUEST.md` do not call for
 - Don't refactor
 - Don't "improve" code
 - Just fix the issues
