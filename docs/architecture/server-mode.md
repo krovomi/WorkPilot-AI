@@ -6,7 +6,9 @@ les autres. Les droits passent par des rôles ; deux organisations d'un même se
 pas. Sans `WORKPILOT_SERVER_MODE`, rien de ceci n'existe : l'app locale garde un seul
 propriétaire implicite, sans base ni authentification.
 
-Réglages et déploiement : [`CONFIGURATION.md`](../CONFIGURATION.md#4-multi-user-server-mode--tenants-roles-and-permissions).
+Réglages : [`CONFIGURATION.md`](../CONFIGURATION.md#4-multi-user-server-mode--tenants-roles-and-permissions).
+Déployer, mettre derrière TLS, sauvegarder, mettre à jour : le guide d'exploitation,
+[`server-operations.md`](../server-operations.md).
 Règles : [`rules/security.md`](../rules/security.md#s5--mode-serveur--authentification-autorisation-tenant).
 
 ## Les pièces
@@ -450,5 +452,5 @@ la machine et non un projet, ne répondent qu'en mode local (404 sur un serveur)
 
 Le plan multi-tenant du 31 octobre, par lots : les autres features servies de la même façon
 (l'investigation et l'auto-fix des issues en jobs, analyses, budgets d'un projet), les vues de forge en direct (par les
-webhooks de la forge), un test de bout en bout à deux organisations, et le guide d'exploitation. Ce
-fichier grandit avec chaque lot.
+webhooks de la forge), et un test de bout en bout à deux organisations. Ce fichier
+grandit avec chaque lot.
