@@ -123,6 +123,7 @@ import { registerSelfHealingHandlers } from "./self-healing-handlers";
 import { registerServerAdminHandlers } from "./server-admin-handlers";
 import { registerServerAuthHandlers } from "./server-auth-handlers";
 import { registerServerProjectHandlers } from "./server-project-handlers";
+import { registerServerWorkspaceHandlers } from "./server-workspace-handlers";
 import { registerJevHandlers } from "./jev-handlers";
 import { registerSecureStorageHandlers } from "./secure-storage-handlers";
 import { registerSettingsHandlers } from "./settings-handlers";
@@ -328,6 +329,7 @@ export function setupIpcHandlers(
 	// Multi-tenant administration console (orgs, roles, members, quotas, audit)
 	registerServerAdminHandlers();
 	registerServerProjectHandlers();
+	registerServerWorkspaceHandlers();
 
 	// File explorer handlers
 	registerFileHandlers();

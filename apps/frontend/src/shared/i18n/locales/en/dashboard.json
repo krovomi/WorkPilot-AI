@@ -1,6 +1,7 @@
 {
 	"title": "Dashboard",
 	"subtitle": "Project metrics & KPIs",
+	"serverSubtitle": "Computed by the server from this project's cards and runs",
 	"kpi": {
 		"totalTasks": {
 			"title": "Total Tasks",

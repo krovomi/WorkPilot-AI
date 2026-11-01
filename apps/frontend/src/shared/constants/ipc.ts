@@ -1289,6 +1289,11 @@ export const IPC_CHANNELS = {
 	SERVER_VIEW_WATCH: "server-view:watch",
 	SERVER_VIEW_UNWATCH: "server-view:unwatch",
 	SERVER_VIEW_CHANGED: "server-view:changed",
+	// Server mode: a server project's dashboard, analytics, costs and session
+	// history, computed by the server (main/server-workspace.ts)
+	SERVER_WORKSPACE_COSTS: "server-workspace:costs",
+	SERVER_WORKSPACE_DASHBOARD: "server-workspace:dashboard",
+	SERVER_WORKSPACE_SESSIONS: "server-workspace:sessions",
 	SMART_ESTIMATION_COMPLETE: "smart-estimation-complete",
 	SMART_ESTIMATION_ERROR: "smart-estimation-error",
 	SMART_ESTIMATION_EVENT: "smart-estimation-event",

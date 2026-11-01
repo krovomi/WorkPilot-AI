@@ -14,7 +14,9 @@ import {
 	Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import type { WorkspaceSession } from "@shared/types";
 import { useTranslation } from "react-i18next";
+import { useServerProjectId } from "../hooks/useServerProjectId";
 import { cn } from "../lib/utils";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -25,27 +27,7 @@ import { ScrollArea } from "./ui/scroll-area";
 // Types
 // ---------------------------------------------------------------------------
 
-interface SessionEntry {
-	session_id: string;
-	task_id?: string;
-	task_title?: string;
-	status: string;
-	started_at: string;
-	ended_at?: string;
-	duration_seconds?: number;
-	tokens_used?: number;
-	cost?: number;
-	files_changed?: number;
-	error?: string;
-	phases?: SessionPhase[];
-}
-
-interface SessionPhase {
-	name: string;
-	status: string;
-	duration_seconds?: number;
-	tokens?: number;
-}
+type SessionEntry = WorkspaceSession;
 
 interface SessionHistoryProps {
 	readonly projectId: string;
@@ -140,12 +122,22 @@ function SessionCard({ session }: { readonly session: SessionEntry }) {
 						<span className="text-sm font-medium text-foreground truncate">
 							{session.task_title || session.task_id || session.session_id}
 						</span>
+						{session.phase && session.phase !== session.task_title && (
+							<Badge variant="secondary" className="text-[10px]">
+								{session.phase}
+							</Badge>
+						)}
 						<Badge variant="outline" className="text-[10px] capitalize">
 							{session.status}
 						</Badge>
 					</div>
 					<div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
 						<span>{formatDateTime(session.started_at)}</span>
+						{session.started_by && (
+							<span>
+								{t("server.startedBy", { name: session.started_by })}
+							</span>
+						)}
 						{session.duration_seconds !== undefined && (
 							<span className="flex items-center gap-1">
 								<Timer className="h-3 w-3" />
@@ -241,12 +233,22 @@ export function SessionHistory({ projectId }: SessionHistoryProps) {
 	const [filter, setFilter] = useState<
 		"all" | "completed" | "failed" | "running"
 	>("all");
+	const serverProjectId = useServerProjectId({ id: projectId });
 
 	const fetchSessions = useCallback(
 		async (signal?: AbortSignal) => {
 			setLoading(true);
 			setError(null);
 			try {
+				// A server project's sessions are its runs and jobs on the server.
+				if (serverProjectId) {
+					const result =
+						await globalThis.electronAPI.getServerSessions(serverProjectId);
+					if (signal?.aborted) return;
+					if (result.success) setSessions(result.data ?? []);
+					else setError(result.error || "Failed to load sessions");
+					return;
+				}
 				const backendUrl = import.meta.env?.VITE_BACKEND_URL || "";
 				const res = await fetch(
 					`${backendUrl}/api/sessions/${projectId}`,
@@ -265,7 +267,7 @@ export function SessionHistory({ projectId }: SessionHistoryProps) {
 				setLoading(false);
 			}
 		},
-		[projectId],
+		[projectId, serverProjectId],
 	);
 
 	useEffect(() => {
@@ -319,7 +321,9 @@ export function SessionHistory({ projectId }: SessionHistoryProps) {
 							<h1 className="text-xl font-bold text-foreground">
 								{t("title")}
 							</h1>
-							<p className="text-sm text-muted-foreground">{t("subtitle")}</p>
+							<p className="text-sm text-muted-foreground">
+								{serverProjectId ? t("serverSubtitle") : t("subtitle")}
+							</p>
 						</div>
 					</div>
 					<Button variant="outline" size="sm" onClick={() => fetchSessions()}>
