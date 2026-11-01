@@ -33,7 +33,13 @@
 			"expo-router",
 			"expo-status-bar",
 			"expo-secure-store",
-			"expo-localization"
+			"expo-localization",
+			[
+				"expo-notifications",
+				{
+					"color": "#2C3136"
+				}
+			]
 		],
 		"experiments": {
 			"typedRoutes": true

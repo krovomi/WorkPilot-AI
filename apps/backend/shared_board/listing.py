@@ -35,7 +35,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 MAX_LISTED_CARDS = 500
 
 
-def _source(root: Path, directory: Path) -> Path:
+def card_source(root: Path, directory: Path) -> Path:
     """The copy of the card the board shows: the build workspace's when it has one."""
     from board_mcp.server import SPECS
 
@@ -50,7 +50,7 @@ def card_entry(root: Path, directory: Path) -> dict[str, Any]:
     """One card of the list, without the index's fields."""
     from board_mcp.server import details
 
-    card = details(_source(root, directory))
+    card = details(card_source(root, directory))
     card.pop("description", None)
     # The id is the card's folder in the clone, whichever copy was read.
     card["id"] = directory.name

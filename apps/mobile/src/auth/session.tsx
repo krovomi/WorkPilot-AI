@@ -12,6 +12,7 @@ import { createContext, type ReactNode, useCallback, useContext, useEffect, useM
 import { ApiError, ServerClient } from "../api/client";
 import { type Api, api } from "../api/endpoints";
 import type { MyPermissions, ServerUser, TokenResponse } from "../api/types";
+import { unregisterFromPush } from "../push/push";
 import { clearSession, loadSession, saveSession } from "./token-store";
 
 export type SessionStatus = "loading" | "signedOut" | "unreachable" | "signedIn";
@@ -123,6 +124,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
 	const signOut = useCallback(async () => {
 		const current = clientRef.current;
+		// While the session can still call the server: this phone stops
+		// receiving the person's notifications.
+		await unregisterFromPush(current ? api(current) : null);
 		if (current) await current.logout();
 		await clearSession();
 		setUser(null);

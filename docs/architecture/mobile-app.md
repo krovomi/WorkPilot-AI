@@ -16,7 +16,7 @@ applications mobiles pour un projet.
 | Projets | `src/app/(app)/index.tsx` | `GET /projects`, ceux de l'organisation active |
 | Kanban | `src/app/(app)/projects/[projectId]/index.tsx` | `GET /api/board/cards`, relu à chaque événement de `project:<id>` |
 | Nouvelle carte | `src/app/(app)/projects/[projectId]/new.tsx` | `POST /api/board/cards` |
-| Fiche d'une carte | `src/app/(app)/projects/[projectId]/cards/[cardId].tsx` | la carte, ses runs, ses changements ; les actions ci-dessous |
+| Fiche d'une carte | `src/app/(app)/projects/[projectId]/cards/[cardId].tsx` | la carte (lue dans l'espace de build pendant un build), sa spec, son rapport QA, ses runs, ses changements avec le patch de chaque fichier (`src/card/`) ; les actions ci-dessous |
 | Réglages | `src/app/(app)/settings.tsx` | `POST /auth/switch-org`, `POST /auth/logout` |
 
 Les actions d'une carte sont celles de l'app de bureau sur une carte du serveur
@@ -30,6 +30,7 @@ Les actions d'une carte sont celles de l'app de bureau sur une carte du serveur
 | Demander des changements | `POST .../request-changes`, puis phase `build` |
 | Fusionner, créer la PR, relancer le build | phases `merge`, `pr`, `build` |
 | Supprimer | `DELETE /api/board/cards/{id}`, après confirmation |
+| Modifier le titre et la description | `PATCH /api/board/cards/{id}`, tant qu'aucune spec n'est écrite (le serveur refuse ensuite, 409) |
 
 L'app ne montre que les actions que l'état de la carte et les permissions de la personne
 (`GET /auth/me/permissions`) permettent. C'est un confort, jamais le contrôle : le serveur revérifie
@@ -91,10 +92,33 @@ Publier sur l'App Store et Google Play demande un compte Apple Developer et un c
 Console, puis EAS (`npx eas-cli build`, `npx eas-cli submit`) avec les identifiants de signature ;
 rien de cela n'est dans le dépôt.
 
+## Les notifications push
+
+Quand un run se termine (réussi ou en échec), la personne qui l'a lancé reçoit une notification sur
+chacun de ses téléphones ; la toucher ouvre la carte.
+
+| Étape | Où |
+|---|---|
+| Le téléphone demande la permission, obtient son jeton Expo et l'enregistre avec la langue de l'app | `src/push/push.ts`, `PUT /users/me/devices` |
+| À la déconnexion, le jeton est retiré avant de fermer la session | `DELETE /users/me/devices` |
+| À la fin d'un run, le serveur envoie un message par téléphone, dans sa langue | `server/services/push.py`, appelé par le gestionnaire de runs |
+| Expo transmet à Apple (APNs) ou Google (FCM) ; un jeton qu'Expo dit désinscrit est supprimé | `https://exp.host/--/api/v2/push/send` |
+| Toucher la notification ouvre la carte de son `data` (`projectId`, `cardId`, vérifiés) | `src/push/PushBridge.tsx` |
+
+Ce qui sort du serveur est le minimum : le nom du projet, le numéro de la carte, la phase et son
+résultat, jamais le titre ni le texte de la carte, qui resteraient sinon dans les journaux de trois
+fournisseurs. C'est aussi pourquoi l'envoi est **désactivé par défaut** : l'opérateur l'active avec
+`WORKPILOT_PUSH_ENABLED=true` (voir [CONFIGURATION.md](../CONFIGURATION.md)). Une personne garde au
+plus dix téléphones ; un jeton enregistré par une autre personne passe à celle-ci (un téléphone, une
+personne connectée).
+
+Pour qu'un téléphone obtienne un jeton, l'app doit être construite pour un projet EAS : son id vient
+de `EAS_PROJECT_ID` (lu par `app.config.ts`), Android demande en plus le fichier Firebase du projet
+(`GOOGLE_SERVICES_JSON`, un chemin) et iOS la clé APNs, que EAS gère. Sans eux (build de
+développement, simulateur, web), l'app fonctionne de la même façon, sans notifications.
+
 ## Ce qui vient
 
-- Notifications push (une carte attend une revue, un build a échoué) : un service d'envoi côté serveur
-  (APNs et FCM, ou le service d'Expo) et l'enregistrement des appareils.
 - Connexion Microsoft Entra (`expo-auth-session`, puis `POST /auth/oidc/exchange`).
-- Modifier le titre et la description d'une carte, lire le patch d'un fichier changé, les features
-  partagées (roadmap, idéation, Insights).
+- Les features partagées (roadmap, idéation, Insights), GitHub et GitLab, le tableau de bord et les
+  analyses, l'administration.

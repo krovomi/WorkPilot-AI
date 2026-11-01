@@ -62,6 +62,12 @@ export function api(client: ServerClient) {
 			client.request<AgentRun>("POST", runsPath(projectId, specId), { phase }),
 		cancelRun: (projectId: string, specId: string, runId: string) =>
 			client.request<{ cancelled: boolean }>("POST", runsPath(projectId, specId, `/${enc(runId)}/cancel`)),
+		registerDevice: (token: string, platform: "ios" | "android", locale: string) =>
+			client.request<{ registered: boolean }>("PUT", "/users/me/devices", { token, platform, locale }),
+		unregisterDevice: (token: string) =>
+			client.request<{ removed: boolean }>("DELETE", "/users/me/devices", { token }),
+		updateCard: (projectId: string, cardId: string, changes: { title?: string; description?: string }) =>
+			client.request<BoardCard>("PATCH", cardsPath(projectId, cardId), changes),
 		streamInfo: () => client.request<{ url: string | null }>("GET", "/api/board/stream"),
 	};
 }

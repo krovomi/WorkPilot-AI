@@ -95,7 +95,16 @@
 		"send": "Send",
 		"deleteConfirmTitle": "Delete this card?",
 		"deleteConfirmBody": "The card and its spec are removed for the whole team.",
-		"done": "Done"
+		"done": "Done",
+		"edit": "Edit",
+		"editTitle": "Edit the card",
+		"save": "Save",
+		"fileToggle": "Show or hide the changes of {{path}}",
+		"noPatch": "No diff to show for this file (binary or too large).",
+		"patchTruncated": "The diff is cut here; read the rest on the desktop.",
+		"qaReport": "QA report",
+		"showReport": "Show the full report",
+		"hideReport": "Hide the report"
 	},
 	"actions": {
 		"start": "Start",

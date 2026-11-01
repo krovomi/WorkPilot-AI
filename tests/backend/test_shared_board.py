@@ -424,3 +424,51 @@ async def test_the_snapshot_follows_no_link_out_of_the_checkout(tmp_path):
     assert set(snapshot["cards"]) == {first, second}
     assert "qa_report.md" not in snapshot["cards"][first]
     assert snapshot["worktrees"] == {}
+
+
+@pytest.mark.asyncio
+async def test_a_card_shows_the_build_workspaces_plan_and_qa_report(tmp_path):
+    """While a build runs, the card is read from its workspace, QA report included."""
+    from shared_board.api import CardCreate, create_card, get_card
+
+    pid, oid, clone = await _project(tmp_path)
+    scope = _scope(pid, oid, clone, "member")
+    async with await _db() as db:
+        card = await create_card(CardCreate(title="T"), _request(), scope, db)
+    card_id = card["id"]
+    assert (await get_card(card_id, scope))["qaReport"] is None
+
+    copy = clone / ".workpilot/worktrees/tasks" / card_id / ".workpilot/specs" / card_id
+    copy.mkdir(parents=True)
+    plan = json.loads(
+        (clone / ".workpilot/specs" / card_id / "implementation_plan.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    plan["feature"] = "T, as the build sees it"
+    (copy / "implementation_plan.json").write_text(json.dumps(plan), encoding="utf-8")
+    (copy / "spec.md").write_text("# Spec", encoding="utf-8")
+    (copy / "qa_report.md").write_text("# QA\n\nAll good.", encoding="utf-8")
+
+    read = await get_card(card_id, scope)
+    assert read["id"] == card_id
+    assert read["title"] == "T, as the build sees it"
+    assert read["spec"] == "# Spec"
+    assert read["qaReport"] == "# QA\n\nAll good."
+
+
+@pytest.mark.asyncio
+async def test_a_linked_qa_report_is_not_read(tmp_path):
+    from shared_board.api import CardCreate, create_card, get_card
+
+    pid, oid, clone = await _project(tmp_path)
+    scope = _scope(pid, oid, clone, "member")
+    async with await _db() as db:
+        card = await create_card(CardCreate(title="T"), _request(), scope, db)
+    outside = tmp_path / "secret.md"
+    outside.write_text("secret", encoding="utf-8")
+    try:
+        (clone / ".workpilot/specs" / card["id"] / "qa_report.md").symlink_to(outside)
+    except OSError:
+        pytest.skip("symlinks unavailable")
+    assert (await get_card(card["id"], scope))["qaReport"] is None

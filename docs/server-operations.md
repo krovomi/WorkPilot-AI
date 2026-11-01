@@ -238,6 +238,7 @@ Le bloc `environment:` du compose l'emporte sur `.env.server` pour `WORKPILOT_SE
 | `WORKPILOT_WS_URL` | `ws://127.0.0.1:8765` | Où l'API et les runs publient les événements du flux. Toujours la boucle locale. |
 | `WORKPILOT_PUBLIC_BASE_URL` | — | L'adresse publique, sans `/` final : base des liens d'invitation (sans elle, le lien est relatif) et site du Caddyfile d'exemple. |
 | `WORKPILOT_PUBLIC_STREAM_URL` | — | L'adresse du flux donnée à l'app (`ws://` ou `wss://` seulement, toute autre valeur est ignorée). Sans elle, l'hôte de l'API sur le port 8765. Derrière le proxy d'exemple : `wss://<même hôte>`. |
+| `WORKPILOT_PUSH_ENABLED` | `false` | Notifications de l'app mobile (un run que vous avez lancé a réussi ou échoué) par le service push d'Expo (`exp.host`), qui les passe à Apple et Google : le nom du projet, le numéro de la carte, la phase et son résultat, jamais le texte d'une carte. Sans elle, rien ne sort du serveur. |
 | `WORKPILOT_GITLAB_HOSTS` | — (gitlab.com toujours) | Instances GitLab auto-hébergées, noms d'hôte séparés par des virgules, dont les projets montrent leurs vues GitLab avec le jeton de chacun ; un nom mal formé est ignoré et journalisé. Un projet cloné depuis un autre hôte n'en montre aucune. |
 | `WORKPILOT_JWT_ISSUER` | `workpilot` | Le `iss` des jetons ; le changer invalide les jetons d'accès en cours. |
 | `WORKPILOT_ACCESS_TOKEN_TTL_MINUTES` | `15` | Durée d'un jeton d'accès. Les permissions sont relues en base à chaque requête, pas portées par le jeton. |

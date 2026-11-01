@@ -293,6 +293,7 @@ def mount_server_mode(app: FastAPI) -> bool:
         ("server.routers.projects", "projects"),
         ("server.routers.specs", "specs"),
         ("server.routers.users", "users"),
+        ("server.routers.devices", "devices"),
         ("server.routers.admin", "admin"),
     ):
         try:

@@ -1,8 +1,8 @@
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Alert, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
-import type { AgentRun, CardChanges } from "../../../../../api/types";
+import { Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import type { AgentRun } from "../../../../../api/types";
 import { useApi, useSession } from "../../../../../auth/session";
 import {
 	activeRun,
@@ -14,13 +14,15 @@ import {
 	stopCard,
 } from "../../../../../board/actions";
 import { ACTIVE_COLUMNS } from "../../../../../board/columns";
+import { ChangesSection } from "../../../../../card/ChangesSection";
+import { canEditCard, EditCard } from "../../../../../card/EditCard";
+import { LongText } from "../../../../../card/LongText";
 import { useCard } from "../../../../../board/useCard";
 import { describeError } from "../../../../../i18n";
 import { Button, ErrorBanner, Field, Loading, Section } from "../../../../../ui/components";
 import { formatDate } from "../../../../../ui/format";
-import { columnColor, RADIUS, SPACE, useTheme } from "../../../../../ui/theme";
+import { columnColor, SPACE, useTheme } from "../../../../../ui/theme";
 
-const SPEC_PREVIEW = 1_200;
 const WORKING_POLL_MS = 5_000;
 
 export default function CardScreen() {
@@ -35,7 +37,7 @@ export default function CardScreen() {
 	const [actionError, setActionError] = useState<string | null>(null);
 	const [feedbackOpen, setFeedbackOpen] = useState(false);
 	const [feedback, setFeedback] = useState("");
-	const [specOpen, setSpecOpen] = useState(false);
+	const [editing, setEditing] = useState(false);
 	const working = !!data && (!!activeRun(data.runs) || ACTIVE_COLUMNS.has(data.card.column));
 
 	// While an agent works on the card, read it again: its column, runs and
@@ -58,6 +60,7 @@ export default function CardScreen() {
 
 	const { card, details, runs, changes } = data;
 	const actions = allowedActions(availableActions(card, details, runs), can);
+	const editable = can("task.write") && canEditCard(details, working);
 
 	const run = async (action: CardAction, work: () => Promise<unknown>) => {
 		setBusy(action);
@@ -122,7 +125,6 @@ export default function CardScreen() {
 		}
 	};
 
-	const spec = details.spec ?? "";
 	return (
 		<ScrollView
 			contentContainerStyle={styles.content}
@@ -183,24 +185,30 @@ export default function CardScreen() {
 				</Section>
 			) : null}
 
-			<Section title={t("card.description")}>
-				<Text style={{ color: theme.text, lineHeight: 22 }} selectable>
-					{details.description}
-				</Text>
-			</Section>
+			{editing ? (
+				<EditCard
+					projectId={projectId}
+					details={details}
+					onCancel={() => setEditing(false)}
+					onSaved={async () => {
+						setEditing(false);
+						await reload();
+					}}
+				/>
+			) : (
+				<Section title={t("card.description")}>
+					<Text style={{ color: theme.text, lineHeight: 22 }} selectable>
+						{details.description}
+					</Text>
+					{editable ? (
+						<Button label={t("card.edit")} variant="secondary" onPress={() => setEditing(true)} />
+					) : null}
+				</Section>
+			)}
 
 			<Section title={t("card.spec")}>
-				{spec ? (
-					<>
-						<Text style={[styles.mono, { color: theme.text }]} selectable>
-							{specOpen || spec.length <= SPEC_PREVIEW ? spec : `${spec.slice(0, SPEC_PREVIEW)}…`}
-						</Text>
-						{spec.length > SPEC_PREVIEW ? (
-							<Pressable accessibilityRole="button" onPress={() => setSpecOpen((open) => !open)}>
-								<Text style={{ color: theme.accent }}>{specOpen ? t("card.hideSpec") : t("card.showSpec")}</Text>
-							</Pressable>
-						) : null}
-					</>
+				{details.spec ? (
+					<LongText text={details.spec} showLabel={t("card.showSpec")} hideLabel={t("card.hideSpec")} />
 				) : (
 					<Text style={{ color: theme.textMuted }}>{t("card.noSpec")}</Text>
 				)}
@@ -213,6 +221,12 @@ export default function CardScreen() {
 							? t("card.approvedBy", { name: details.approval.approvedBy ?? "?" })
 							: t("card.notApproved")}
 					</Text>
+				</Section>
+			) : null}
+
+			{details.qaReport ? (
+				<Section title={t("card.qaReport")}>
+					<LongText text={details.qaReport} showLabel={t("card.showReport")} hideLabel={t("card.hideReport")} />
 				</Section>
 			) : null}
 
@@ -252,39 +266,6 @@ function RunRow({ run, locale }: { run: AgentRun; locale: string }) {
 	);
 }
 
-function ChangesSection({ changes }: { changes: CardChanges | null }) {
-	const { t } = useTranslation();
-	const theme = useTheme();
-	if (!changes) return null;
-	return (
-		<Section title={t("card.changes")}>
-			{!changes.exists ? (
-				<Text style={{ color: theme.textMuted }}>{t("card.noChanges")}</Text>
-			) : (
-				<>
-					<Text style={{ color: theme.textMuted }}>
-						{t("card.changesSummary", {
-							files: changes.filesChanged ?? changes.files.length,
-							additions: changes.additions ?? 0,
-							deletions: changes.deletions ?? 0,
-							commits: changes.commitCount ?? 0,
-						})}
-					</Text>
-					{changes.files.slice(0, 50).map((file) => (
-						<View key={file.path} style={styles.file}>
-							<Text style={[styles.mono, { color: theme.text, flex: 1 }]} numberOfLines={1} ellipsizeMode="head">
-								{file.path}
-							</Text>
-							<Text style={{ color: theme.success }}>+{file.additions}</Text>
-							<Text style={{ color: theme.danger }}>−{file.deletions}</Text>
-						</View>
-					))}
-				</>
-			)}
-		</Section>
-	);
-}
-
 const styles = StyleSheet.create({
 	content: { padding: SPACE.lg, gap: SPACE.lg, paddingBottom: SPACE.xl * 2 },
 	columnRow: { flexDirection: "row", alignItems: "center", gap: SPACE.sm },
@@ -292,7 +273,6 @@ const styles = StyleSheet.create({
 	title: { fontSize: 24, fontWeight: "700" },
 	actions: { gap: SPACE.sm },
 	inline: { flexDirection: "row", gap: SPACE.sm },
-	mono: { fontFamily: Platform.select({ ios: "Menlo", default: "monospace" }), fontSize: 13, lineHeight: 19 },
 	run: {
 		flexDirection: "row",
 		alignItems: "center",
@@ -300,5 +280,4 @@ const styles = StyleSheet.create({
 		borderTopWidth: StyleSheet.hairlineWidth,
 		paddingTop: SPACE.sm,
 	},
-	file: { flexDirection: "row", gap: SPACE.sm, alignItems: "center", borderRadius: RADIUS.sm },
 });
