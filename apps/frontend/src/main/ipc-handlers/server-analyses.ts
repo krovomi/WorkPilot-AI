@@ -40,6 +40,17 @@ export interface SharedAnalysisReport {
 	runBy: string | null;
 }
 
+/**
+ * A run stopped from here: by the view's cancel, or by a new run of the same
+ * analysis. The view asked for it, so it is not told as an error.
+ */
+export class AnalysisStopped extends Error {
+	constructor() {
+		super("The analysis was stopped");
+		this.name = "AnalysisStopped";
+	}
+}
+
 /** The analyses running on the server from here, one per analysis. */
 const running = new Map<AnalysisKind, { kill(): boolean }>();
 
@@ -116,7 +127,7 @@ export function runServerAnalysis(
 		job.on("exit", (code: number | null) => {
 			if (running.get(kind) === job) running.delete(kind);
 			if (code === null) {
-				reject(new Error("The analysis was stopped"));
+				reject(new AnalysisStopped());
 				return;
 			}
 			if (code !== 0) {
@@ -161,6 +172,7 @@ export async function relayServerAnalysis(
 		broadcast(channels.result, report);
 		return report;
 	} catch (error) {
+		if (error instanceof AnalysisStopped) throw error;
 		const message = error instanceof Error ? error.message : String(error);
 		broadcast(channels.error, message);
 		throw new Error(message);

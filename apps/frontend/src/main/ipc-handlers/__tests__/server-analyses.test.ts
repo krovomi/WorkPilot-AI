@@ -135,6 +135,20 @@ describe("a server project's analyses", () => {
 		await expect(stopped).rejects.toThrow("stopped");
 	});
 
+	it("a run replaced by a new one is not told to the view as an error", async () => {
+		const first = job();
+		const replaced = relayServerAnalysis(project, "flaky-tests", {}, channels);
+		const second = job();
+		const next = relayServerAnalysis(project, "flaky-tests", {}, channels);
+		expect(first.kill).toHaveBeenCalled();
+		first.emit("exit", null);
+		await expect(replaced).rejects.toThrow("stopped");
+		expect(mocks.send).not.toHaveBeenCalledWith("err", expect.anything());
+		mocks.authedFetch.mockResolvedValueOnce({ ok: true, data: { report: saved([]) } });
+		second.emit("exit", 0);
+		expect(await next).toEqual([]);
+	});
+
 	it("a run that ends without a report is an error", async () => {
 		const stream = job();
 		const run = runServerAnalysis(project, "tech-debt", {});

@@ -155,9 +155,11 @@ def analysis_named(kind: str) -> Analysis:
 
 
 def _report_dir(clone: Path) -> Path | None:
-    """The reports' directory in the clone; None if a link leads it out."""
+    """The reports' directory in the clone; None if a link leads it out,
+    its own or one of its parents' (``.workpilot`` may not exist yet, or be
+    a link the repository holds)."""
     directory = clone / REPORT_DIR
-    if directory.exists() and not directory.resolve().is_relative_to(clone.resolve()):
+    if not directory.resolve().is_relative_to(clone.resolve()):
         return None
     return directory
 

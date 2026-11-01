@@ -302,6 +302,28 @@ async def test_a_report_directory_led_out_of_the_clone_is_neither_read_nor_writt
     )
 
 
+@pytest.mark.asyncio
+async def test_a_workpilot_directory_led_out_of_the_clone_is_not_written(
+    server, tmp_path
+):
+    from shared_features.analyses import ANALYSES, _save_report, get_report
+
+    outside = tmp_path / "outside-workpilot"
+    outside.mkdir()
+    try:
+        # No analyses directory yet: the link is its parent.
+        os.symlink(outside, server["clones"][0] / ".workpilot")
+    except (OSError, NotImplementedError):
+        pytest.skip("no symlinks here")
+    await _save_report(
+        ANALYSES[0], server["clones"][0], "u-ada", "succeeded", ['A11Y_RESULT:{"x": 1}']
+    )
+    assert list(outside.iterdir()) == []
+    with pytest.raises(HTTPException) as refused:
+        await get_report("accessibility", _scope(server))
+    assert refused.value.status_code == 409
+
+
 def test_running_an_analysis_is_running_an_agent():
     from server.authz.mounting import permission_for
 
