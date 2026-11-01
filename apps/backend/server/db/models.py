@@ -494,6 +494,32 @@ class InsightSession(Base):
     )
 
 
+class PushDevice(Base):
+    """A phone that receives a person's notifications (the mobile app).
+
+    The token is the Expo push token the app obtained on that phone; it names
+    a device, not a person, so registering it again under another account
+    moves it (one phone, one signed-in person). ``locale`` picks the language
+    of the text the server sends.
+    """
+
+    __tablename__ = "push_devices"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    token: Mapped[str] = mapped_column(String(200), unique=True)
+    platform: Mapped[str] = mapped_column(String(10))  # ios / android
+    locale: Mapped[str] = mapped_column(String(8), default="en")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+    last_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+
+
 class UserSecret(Base):
     """Per-user integration secret (Azure PAT, Jira token...), Fernet-encrypted."""
 

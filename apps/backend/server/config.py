@@ -114,6 +114,11 @@ class ServerSettings:
     # cloned from any other host shows no GitLab views.
     gitlab_hosts: tuple[str, ...]
 
+    # Notifications to the mobile app through Expo's push service
+    # (exp.host), which hands them to Apple and Google. Off by default: the
+    # server then sends nothing outside, and phones simply get no push.
+    push_enabled: bool
+
     # Self-service signup (invitation-only).
     invitation_ttl_hours: int
     password_min_length: int
@@ -177,6 +182,7 @@ class ServerSettings:
                 os.environ.get("WORKPILOT_PUBLIC_STREAM_URL", "")
             ),
             gitlab_hosts=_gitlab_hosts(os.environ.get("WORKPILOT_GITLAB_HOSTS", "")),
+            push_enabled=_env_bool("WORKPILOT_PUSH_ENABLED", False),
             invitation_ttl_hours=_env_int("WORKPILOT_INVITATION_TTL_HOURS", 72),
             password_min_length=_env_int("WORKPILOT_PASSWORD_MIN_LENGTH", 12),
             password_hibp_check=_env_bool("WORKPILOT_PASSWORD_HIBP_CHECK", False),
