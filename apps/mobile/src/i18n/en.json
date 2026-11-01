@@ -83,7 +83,30 @@
 		"kind": "Type",
 		"requireReview": "Review the spec before coding",
 		"requireReviewHint": "The build waits until someone approves the spec and plan.",
-		"create": "Create"
+		"create": "Create",
+		"dictationHint": "Tip: the keyboard's microphone dictates the description.",
+		"fromShare": "Filled from what another app shared. Read it before creating the card.",
+		"default": "Default",
+		"provider": "Engine",
+		"model": "Model",
+		"modelPlaceholder": "Provider's default model",
+		"modelInvalid": "A model id has letters, digits and . _ : / @ + - only, without spaces.",
+		"effort": "Effort",
+		"effort_none": "none",
+		"effort_low": "low",
+		"effort_medium": "medium",
+		"effort_high": "high",
+		"effort_ultrathink": "ultrathink",
+		"priority": "Priority",
+		"images": "Images ({{count}}/{{max}})",
+		"fromLibrary": "Photo library",
+		"fromCamera": "Camera",
+		"removeImage": "Remove {{name}}",
+		"cameraDenied": "The camera is not allowed for WorkPilot AI. Allow it in the system settings.",
+		"imageRefused_tooMany": "{{name}} not added: a card takes at most {{max}} images.",
+		"imageRefused_tooLarge": "{{name}} not added: it is larger than {{mb}} MB.",
+		"imageRefused_unsupported": "{{name}} not added: only PNG, JPEG, GIF and WebP images are accepted.",
+		"imageRefused_unreadable": "{{name}} not added: it could not be read."
 	},
 	"card": {
 		"description": "Description",
@@ -476,5 +499,11 @@
 				"project": "Project"
 			}
 		}
+	},
+	"share": {
+		"title": "Share to a card",
+		"pickProject": "Create a card in which project?",
+		"nothing": "Nothing to make a card from: share text or a link.",
+		"back": "Back to projects"
 	}
 }

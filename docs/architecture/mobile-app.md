@@ -15,7 +15,8 @@ applications mobiles pour un projet.
 | Connexion | `src/app/sign-in.tsx` | `GET /auth/config`, puis `POST /auth/login` (email et mot de passe) ou `POST /auth/oidc/exchange` (compte Microsoft, voir plus bas) |
 | Projets | `src/app/(app)/index.tsx` | `GET /projects`, ceux de l'organisation active |
 | Kanban | `src/app/(app)/projects/[projectId]/index.tsx` | `GET /api/board/cards`, relu à chaque événement de `project:<id>` |
-| Nouvelle carte | `src/app/(app)/projects/[projectId]/new.tsx` | `POST /api/board/cards` |
+| Nouvelle carte | `src/app/(app)/projects/[projectId]/new.tsx`, `src/new-card/` | `GET /api/board/engines`, `POST /api/board/cards` (voir « Créer une carte ») |
+| Partager vers une carte | `src/app/(app)/share.tsx` | `GET /projects`, puis la Nouvelle carte préremplie |
 | Fiche d'une carte | `src/app/(app)/projects/[projectId]/cards/[cardId].tsx` | la carte (lue dans l'espace de build pendant un build), sa spec, son rapport QA, ses runs, ses changements avec le patch de chaque fichier (`src/card/`) ; les actions ci-dessous |
 | Insights | `src/app/(app)/projects/[projectId]/insights/` | `GET` et `POST /api/features/insights/sessions`, puis `.../messages` pour poser une question ; relu toutes les 3 s pendant que l'agent répond |
 | Roadmap | `src/app/(app)/projects/[projectId]/roadmap.tsx` | `GET /api/features/roadmap/snapshot`, `POST .../jobs` pour la générer, `POST .../features/{id}/convert` pour en faire une carte |
@@ -51,6 +52,53 @@ lignes, et l'écran les relit pendant que les agents travaillent.
 L'app ne montre que les actions que l'état de la carte et les permissions de la personne
 (`GET /auth/me/permissions`) permettent. C'est un confort, jamais le contrôle : le serveur revérifie
 chaque requête (règle 7).
+
+## Créer une carte
+
+L'écran Nouvelle carte envoie ce que la boîte de dialogue New Task du bureau envoie à une carte du
+serveur (`CardCreate` de `shared_board/api.py`) : titre, description, type, revue de la spec, et
+désormais le moteur, la priorité et les images.
+
+| Champ | Sur le téléphone | Envoyé |
+|---|---|---|
+| Moteur | les providers que liste `GET /api/board/engines` (`shared_board/engines.py` : ceux de `capabilities/providers.yaml` qui ont un adaptateur, avec le nom et les modèles du catalogue) | `settings.engine.provider` |
+| Modèle | une liste si le serveur en donne, sinon un texte libre validé comme `MODEL_PATTERN` du serveur (Create reste grisé tant qu'il est invalide) | `settings.engine.model` |
+| Effort | `none` à `ultrathink`, montré seulement pour un provider qui en prend un | `settings.engine.thinkingLevel` |
+| Priorité | basse à urgente | `settings.priority` |
+| Images | jusqu'à 10, de la photothèque ou de l'appareil photo (`expo-image-picker`) | `attachments` (base64) |
+
+Chaque choix part de « Par défaut » : une carte créée sans y toucher n'envoie pas de `settings` et
+tourne avec ce que le déploiement décide. Un serveur plus ancien sans `GET /api/board/engines` ne
+montre que la priorité.
+
+Une image est vérifiée sur le téléphone avec les règles du serveur (`src/new-card/images.ts`) : son
+type est lu dans ses octets (PNG, JPEG, GIF, WebP ; un HEIC ou un PDF est refusé), 5 Mo au plus une
+fois décodée, 10 par carte. Une image refusée est nommée avec sa raison sous les vignettes, jamais
+écartée en silence ; le serveur revérifie tout. Les photos sont lues sans EXIF, compressées à 0,8
+(une photo de l'appareil dépasse sinon souvent 5 Mo). L'app demande l'appareil photo au moment de
+s'en servir ; les textes d'autorisation iOS sont dans `app.json` (anglais) et `locales/fr.json`, le
+micro est bloqué (`microphonePermission: false`, pas de vidéo).
+
+**La dictée** est celle du clavier : le champ Description est multiligne, et le micro des claviers
+iOS et Android y dicte sans dépendance de reconnaissance vocale dans l'app (un rappel s'affiche sous
+le champ).
+
+**Le partage depuis une autre app** passe par `expo-sharing`, le module du SDK qui reçoit un partage.
+Sur Android, son plugin ajoute un filtre d'intention `SEND` pour `text/plain` (un texte ou un lien) ;
+le système ouvre `workpilot://expo-sharing`, que `+native-intent.tsx` envoie vers `/share`, dans la
+garde de connexion. Cet écran lit le partage une fois (`getSharedPayloads`, la variante qui ne
+charge pas le lien), l'efface, demande le projet, et ouvre la Nouvelle carte préremplie. Ce qui est
+partagé est le texte de quelqu'un d'autre : une donnée, jamais une instruction (règle 4). Il est
+borné (10 éléments, 20 000 caractères, titre de 120 caractères pris dans la première ligne),
+débarrassé des caractères de contrôle et des inversions bidirectionnelles, et ne fait que remplir le
+formulaire : rien n'est créé avant que la personne le relise et touche Create, et un lien partagé
+reste du texte, l'app ne le charge jamais. Un fichier ou une image partagé est ignoré.
+
+Sur iOS, le partage demande une extension de partage : le plugin d'`expo-sharing` sait la générer,
+mais elle est désactivée (`"ios": { "enabled": false }`) tant que le propriétaire n'a pas choisi
+l'App Group (`group.io.github.krovomi.workpilot` par défaut, à enregistrer dans l'équipe Apple ou
+laissé à EAS Build) et vérifié la build iOS sur macOS. L'activer est une ligne de `app.json` ; le
+code de l'app est déjà le même pour les deux systèmes.
 
 ## Pourquoi une route de liste
 
@@ -206,5 +254,6 @@ développement, simulateur, web), l'app fonctionne de la même façon, sans noti
 
 ## Ce qui vient
 
+- Le partage vers une carte sur iOS (l'extension d'`expo-sharing`, voir « Créer une carte »), et le partage d'images.
 - Les organisations, les quotas, les sessions et le journal d'audit de l'administration.
 - La publication sur l'App Store et Google Play (comptes Apple et Google, projet EAS).

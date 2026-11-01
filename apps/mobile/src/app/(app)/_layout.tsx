@@ -19,6 +19,7 @@ export default function SignedInLayout() {
 			>
 				<Stack.Screen name="index" options={{ title: t("projects.title") }} />
 				<Stack.Screen name="settings" options={{ title: t("settings.title") }} />
+				<Stack.Screen name="share" options={{ title: t("share.title") }} />
 				<Stack.Screen name="projects/[projectId]/index" options={{ title: "" }} />
 				<Stack.Screen
 					name="projects/[projectId]/new"

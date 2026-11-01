@@ -83,7 +83,30 @@
 		"kind": "Type",
 		"requireReview": "Relire la spec avant le code",
 		"requireReviewHint": "Le build attend qu'une personne approuve la spec et le plan.",
-		"create": "Créer"
+		"create": "Créer",
+		"dictationHint": "Astuce : le micro du clavier dicte la description.",
+		"fromShare": "Rempli avec ce qu'une autre app a partagé. Relisez-le avant de créer la carte.",
+		"default": "Par défaut",
+		"provider": "Moteur",
+		"model": "Modèle",
+		"modelPlaceholder": "Modèle par défaut du fournisseur",
+		"modelInvalid": "Un identifiant de modèle ne contient que des lettres, des chiffres et . _ : / @ + -, sans espace.",
+		"effort": "Effort",
+		"effort_none": "aucun",
+		"effort_low": "faible",
+		"effort_medium": "moyen",
+		"effort_high": "élevé",
+		"effort_ultrathink": "ultrathink",
+		"priority": "Priorité",
+		"images": "Images ({{count}}/{{max}})",
+		"fromLibrary": "Photothèque",
+		"fromCamera": "Appareil photo",
+		"removeImage": "Retirer {{name}}",
+		"cameraDenied": "L'appareil photo n'est pas autorisé pour WorkPilot AI. Autorisez-le dans les réglages du système.",
+		"imageRefused_tooMany": "{{name}} non ajoutée : une carte prend au plus {{max}} images.",
+		"imageRefused_tooLarge": "{{name}} non ajoutée : elle dépasse {{mb}} Mo.",
+		"imageRefused_unsupported": "{{name}} non ajoutée : seules les images PNG, JPEG, GIF et WebP sont acceptées.",
+		"imageRefused_unreadable": "{{name}} non ajoutée : elle n'a pas pu être lue."
 	},
 	"card": {
 		"description": "Description",
@@ -476,5 +499,11 @@
 				"project": "Projet"
 			}
 		}
+	},
+	"share": {
+		"title": "Partager vers une carte",
+		"pickProject": "Créer une carte dans quel projet ?",
+		"nothing": "Rien pour faire une carte : partagez un texte ou un lien.",
+		"back": "Retour aux projets"
 	}
 }
