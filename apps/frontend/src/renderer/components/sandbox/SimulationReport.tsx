@@ -87,6 +87,10 @@ function ResultBody({
 			</p>
 
 			<div className="grid grid-cols-4 gap-3">
+				{/* The preview diffs the working tree against HEAD and runs no
+				step: steps, warnings and cost only show when a run has some. */}
+				{result.steps.length > 0 && (
+					<>
 				<SummaryCard
 					label={t("steps")}
 					value={`${result.successCount}/${result.steps.length}`}
@@ -105,6 +109,8 @@ function ResultBody({
 					sub={`${costSavingPercent}${t("savedVsReal")}`}
 					color="text-blue-400"
 				/>
+					</>
+				)}
 				<SummaryCard
 					label={t("files")}
 					value={String(result.diffs.length)}

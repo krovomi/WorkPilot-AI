@@ -105,12 +105,7 @@ export const GENERIC_INVOKE_CHANNELS = [
 	"pluginMarketplace:create",
 	"pluginMarketplace:openLocalFolder",
 	// Spec approval (spec-approval-store)
-	"specApproval:getPendingSpecs",
-	"specApproval:getHistory",
 	"specApproval:getSpec",
-	"specApproval:approve",
-	"specApproval:reject",
-	"specApproval:requestChanges",
 	// Cooperative pause (task-store pauseTask / resumeTask)
 	"TASK_PAUSE",
 	"TASK_RESUME",

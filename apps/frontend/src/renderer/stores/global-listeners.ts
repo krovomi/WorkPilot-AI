@@ -49,7 +49,6 @@ import { setupTaskSandboxListeners } from "./task-sandbox-store";
 import { setupSecureStorageListeners } from "./secure-storage-store";
 import { setupServerViewListeners } from "./server-live-views";
 import { setupSmartEstimationListeners } from "./smart-estimation-store";
-import { setupSpecRefinementListeners } from "./spec-refinement-store";
 import { setupVisualToCodeListeners } from "./visual-to-code-store";
 import { setupVoiceControlListeners } from "./voice-control-store";
 
@@ -124,7 +123,6 @@ const SETUPS: ReadonlyArray<readonly [string, ListenerSetup]> = [
 	// A shared view of a server project read again when a teammate changes it.
 	["ServerViews", setupServerViewListeners],
 	["SmartEstimation", setupSmartEstimationListeners],
-	["SpecRefinement", setupSpecRefinementListeners],
 	// An ACP agent's question waits on its card whether or not the board is open.
 	["TaskPermissions", setupTaskPermissionListeners],
 	["VisualToCode", setupVisualToCodeListeners],

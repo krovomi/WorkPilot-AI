@@ -1,16 +1,16 @@
 {
-	"noData": "No simulation data available",
+	"noData": "No preview yet",
 	"noChanges": "No uncommitted changes to preview",
-	"title": "Sandbox Simulation Report",
+	"title": "Uncommitted Changes Preview",
 	"actions": {
-		"runScan": "Run Dry-Run",
+		"runScan": "Preview changes",
 		"cancel": "Cancel",
-		"scanning": "Running dry-run...",
+		"scanning": "Reading the changes...",
 		"reset": "Reset"
 	},
 	"errors": {
-		"noProject": "Select a project to run a sandbox dry-run.",
-		"failed": "Dry-run failed: {{error}}"
+		"noProject": "Select a project to preview its uncommitted changes.",
+		"failed": "Preview failed: {{error}}"
 	},
 	"dryRun": "Dry-run for spec {{specId}}",
 	"estimatedCost": "Estimated Cost",
