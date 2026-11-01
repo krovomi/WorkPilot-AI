@@ -109,6 +109,19 @@ export function getServerProject(projectId: unknown): Project | undefined {
 	return typeof projectId === "string" ? known.get(projectId) : undefined;
 }
 
+/**
+ * The server project whose mirror is this folder, for a view that names its
+ * project by path; undefined for any other folder.
+ */
+export function serverProjectAtPath(projectPath: unknown): Project | undefined {
+	if (typeof projectPath !== "string" || !projectPath) return undefined;
+	const wanted = path.resolve(projectPath);
+	for (const project of known.values()) {
+		if (path.resolve(project.path) === wanted) return project;
+	}
+	return undefined;
+}
+
 /** Register a repository on the server, which clones it for the whole team. */
 export async function createServerProject(
 	input: unknown,

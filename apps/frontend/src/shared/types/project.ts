@@ -33,6 +33,22 @@ export interface RemoteProjectInfo {
 	forge?: "github" | "gitlab" | null;
 }
 
+/** A shared view of a server project that follows the project's live stream. */
+export type ServerLiveView = "roadmap" | "ideation" | "insights" | "context";
+
+/**
+ * What a teammate changed in a shared view of a server project: the view
+ * reads itself again (`main/server-live-views.ts`).
+ */
+export interface ServerViewChange {
+	projectId: string;
+	view: ServerLiveView;
+	/** Insights: the conversation that changed. */
+	sessionId?: string;
+	/** Context: only its memories may have changed (a run of the project ended). */
+	memoriesOnly?: boolean;
+}
+
 export interface ProjectSettings {
 	model: string;
 	linearSync: boolean;

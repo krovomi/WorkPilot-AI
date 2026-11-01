@@ -13,29 +13,19 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useServerProjectId } from "../hooks/useServerProjectId";
 import { formatCurrency, getEurRate } from "../lib/currency";
 import { cn } from "../lib/utils";
+import { loadDashboardSnapshot } from "../lib/workspace-data";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
 import { ScrollArea } from "./ui/scroll-area";
+import type { DashboardSnapshot } from "@shared/types";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-
-interface DashboardSnapshot {
-	tasks_by_status: Record<string, number>;
-	avg_completion_by_complexity: Record<string, number>;
-	qa_first_pass_rate: number;
-	qa_avg_score: number;
-	total_tokens: number;
-	tokens_by_provider: Record<string, number>;
-	total_cost: number;
-	cost_by_model: Record<string, number>;
-	merge_auto_count: number;
-	merge_manual_count: number;
-}
 
 interface DashboardMetricsProps {
 	projectPath: string;
@@ -226,6 +216,7 @@ export function DashboardMetrics({ projectPath }: DashboardMetricsProps) {
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [eurRate, setEurRate] = useState(0.92);
+	const serverProjectId = useServerProjectId({ path: projectPath });
 
 	const fmtCost = useCallback(
 		(usd: number, decimals = 4) => formatCurrency(usd, lang, eurRate, decimals),
@@ -236,10 +227,9 @@ export function DashboardMetrics({ projectPath }: DashboardMetricsProps) {
 		setLoading(true);
 		setError(null);
 		try {
-			const result = await window.electronAPI.getDashboardSnapshot(projectPath);
+			const result = await loadDashboardSnapshot(projectPath, serverProjectId);
 			if (result.success) {
-				// biome-ignore lint/style/noNonNullAssertion: value is guaranteed by context
-				setSnapshot(result.snapshot!);
+				setSnapshot(result.snapshot ?? null);
 			} else {
 				setError(result.error || "Failed to load dashboard");
 			}
@@ -248,7 +238,7 @@ export function DashboardMetrics({ projectPath }: DashboardMetricsProps) {
 		} finally {
 			setLoading(false);
 		}
-	}, [projectPath]);
+	}, [projectPath, serverProjectId]);
 
 	useEffect(() => {
 		fetchSnapshot();
@@ -256,7 +246,9 @@ export function DashboardMetrics({ projectPath }: DashboardMetricsProps) {
 	}, [fetchSnapshot]);
 
 	// Subscribe to real-time updates when dashboard_snapshot.json changes
+	// (this computer's file; a server project is read again on refresh)
 	useEffect(() => {
+		if (serverProjectId) return;
 		const unsubscribe = window.electronAPI.onDashboardSnapshotUpdated(
 			(updatedPath: string) => {
 				if (updatedPath === projectPath) {
@@ -265,11 +257,11 @@ export function DashboardMetrics({ projectPath }: DashboardMetricsProps) {
 			},
 		);
 		return () => unsubscribe();
-	}, [projectPath, fetchSnapshot]);
+	}, [projectPath, fetchSnapshot, serverProjectId]);
 
 	const handleExport = async (fmt: "json" | "csv") => {
 		try {
-			const result = await window.electronAPI.getDashboardSnapshot(projectPath);
+			const result = await loadDashboardSnapshot(projectPath, serverProjectId);
 			if (!result.success || !result.snapshot) return;
 			const snap = result.snapshot;
 			let content: string;
@@ -370,7 +362,9 @@ export function DashboardMetrics({ projectPath }: DashboardMetricsProps) {
 							<h1 className="text-xl font-bold text-foreground">
 								{t("title")}
 							</h1>
-							<p className="text-sm text-muted-foreground">{t("subtitle")}</p>
+							<p className="text-sm text-muted-foreground">
+								{serverProjectId ? t("serverSubtitle") : t("subtitle")}
+							</p>
 						</div>
 					</div>
 					<div className="flex items-center gap-2">

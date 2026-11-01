@@ -18,6 +18,8 @@ import type {
 	ProjectEnvConfig,
 	ProjectSettings,
 	RepoProviderDetectionResult,
+	ServerLiveView,
+	ServerViewChange,
 } from "../../shared/types";
 
 // Tab state interface (persisted in main process)
@@ -46,6 +48,13 @@ export interface ProjectAPI {
 	onServerBoardLive: (
 		callback: (update: { projectId: string; live: boolean; changed: boolean }) => void,
 	) => () => void;
+	/**
+	 * Server mode: follow a shown shared view of a server project on its live
+	 * stream (one reference per call, released by `unwatchServerView`).
+	 */
+	watchServerView: (projectId: string, view: ServerLiveView) => Promise<IPCResult>;
+	unwatchServerView: (projectId: string, view: ServerLiveView) => Promise<IPCResult>;
+	onServerViewChanged: (callback: (change: ServerViewChange) => void) => () => void;
 	updateProjectSettings: (
 		projectId: string,
 		settings: Partial<ProjectSettings>,
@@ -351,6 +360,19 @@ export const createProjectAPI = (): ProjectAPI => ({
 		const listener = (_event: IpcRendererEvent, update: Update) => callback(update);
 		ipcRenderer.on(IPC_CHANNELS.SERVER_BOARD_LIVE, listener);
 		return () => ipcRenderer.off(IPC_CHANNELS.SERVER_BOARD_LIVE, listener);
+	},
+
+	watchServerView: (projectId: string, view: ServerLiveView): Promise<IPCResult> =>
+		ipcRenderer.invoke(IPC_CHANNELS.SERVER_VIEW_WATCH, projectId, view),
+
+	unwatchServerView: (projectId: string, view: ServerLiveView): Promise<IPCResult> =>
+		ipcRenderer.invoke(IPC_CHANNELS.SERVER_VIEW_UNWATCH, projectId, view),
+
+	onServerViewChanged: (callback: (change: ServerViewChange) => void) => {
+		const listener = (_event: IpcRendererEvent, change: ServerViewChange) =>
+			callback(change);
+		ipcRenderer.on(IPC_CHANNELS.SERVER_VIEW_CHANGED, listener);
+		return () => ipcRenderer.off(IPC_CHANNELS.SERVER_VIEW_CHANGED, listener);
 	},
 
 	updateProjectSettings: (

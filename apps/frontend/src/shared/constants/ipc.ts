@@ -1031,6 +1031,8 @@ export const IPC_CHANNELS = {
 	AGENT_DEBUGGER_REMOVE_BREAKPOINT: "agentDebugger:removeBreakpoint",
 	AGENT_DEBUGGER_RESUME: "agentDebugger:resume",
 	AGENT_DEBUGGER_SET_BREAKPOINT: "agentDebugger:setBreakpoint",
+	// The last report a member saved of an analysis of a server project
+	ANALYSIS_SHARED_REPORT: "analyses:sharedReport",
 	API_WATCHER_CANCEL: "apiWatcher:cancel",
 	API_WATCHER_ERROR: "api-watcher-error",
 	API_WATCHER_EVENT: "api-watcher-event",
@@ -1284,6 +1286,16 @@ export const IPC_CHANNELS = {
 	SERVER_BOARD_WATCH: "server-board:watch",
 	SERVER_BOARD_UNWATCH: "server-board:unwatch",
 	SERVER_BOARD_LIVE: "server-board:live",
+	// Server mode: follow a shown shared view of a server project (roadmap,
+	// ideation, Insights, context) on the project's stream (main → renderer)
+	SERVER_VIEW_WATCH: "server-view:watch",
+	SERVER_VIEW_UNWATCH: "server-view:unwatch",
+	SERVER_VIEW_CHANGED: "server-view:changed",
+	// Server mode: a server project's dashboard, analytics, costs and session
+	// history, computed by the server (main/server-workspace.ts)
+	SERVER_WORKSPACE_COSTS: "server-workspace:costs",
+	SERVER_WORKSPACE_DASHBOARD: "server-workspace:dashboard",
+	SERVER_WORKSPACE_SESSIONS: "server-workspace:sessions",
 	SMART_ESTIMATION_COMPLETE: "smart-estimation-complete",
 	SMART_ESTIMATION_ERROR: "smart-estimation-error",
 	SMART_ESTIMATION_EVENT: "smart-estimation-event",

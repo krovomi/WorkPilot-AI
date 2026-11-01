@@ -4,6 +4,11 @@ Mounted under ``/auth/invitations``. The ``lookup`` and ``accept`` endpoints
 are public (listed in ``PUBLIC_PATHS``) and rate-limited; everything else
 requires an admin. Acceptance auto-logs the new user in by returning a fresh
 token pair (same shape as ``/auth/login``).
+
+An invitation belongs to the organization the admin is acting in (the
+request's active organization, which the auth middleware has verified), and
+issuing one takes ``org.invitation.write`` there. Listing and revoking see only
+that organization's invitations.
 """
 
 from __future__ import annotations
@@ -23,6 +28,7 @@ from server.auth.invitations import (
 from server.auth.invitations import revoke as revoke_invitation
 from server.auth.jwt_tokens import issue_token_pair
 from server.auth.local import LocalAuthError
+from server.authz.deps import require_org, require_permission
 from server.config import get_settings
 from server.db.engine import get_db
 from server.db.models import AuditLog
@@ -51,16 +57,23 @@ def _client_meta(request: Request) -> tuple[str | None, str | None]:
     return ua, ip
 
 
-@router.post("", response_model=CreateInvitationResponse, status_code=201)
+@router.post(
+    "",
+    response_model=CreateInvitationResponse,
+    status_code=201,
+    dependencies=[Depends(require_permission("org.invitation.write"))],
+)
 async def create_invitation_endpoint(
     body: CreateInvitationRequest,
     admin: CurrentUser = Depends(require_admin),
+    org_id: str = Depends(require_org),
     db: AsyncSession = Depends(get_db),
 ) -> CreateInvitationResponse:
     try:
         invitation, token = await create_invitation(
             db,
             email=str(body.email),
+            org_id=org_id,
             role=body.role,
             invited_by=admin.id,
             project_id=body.project_id,
@@ -89,26 +102,36 @@ async def create_invitation_endpoint(
     )
 
 
-@router.get("", response_model=list[InvitationPublic])
+@router.get(
+    "",
+    response_model=list[InvitationPublic],
+    dependencies=[Depends(require_permission("org.invitation.read"))],
+)
 async def list_invitations_endpoint(
     admin: CurrentUser = Depends(require_admin),
+    org_id: str = Depends(require_org),
     db: AsyncSession = Depends(get_db),
 ) -> list[InvitationPublic]:
-    return [InvitationPublic.model_validate(i) for i in await list_pending(db)]
+    return [InvitationPublic.model_validate(i) for i in await list_pending(db, org_id)]
 
 
-@router.delete("/{invitation_id}")
+@router.delete(
+    "/{invitation_id}",
+    dependencies=[Depends(require_permission("org.invitation.write"))],
+)
 async def revoke_invitation_endpoint(
     invitation_id: str,
     admin: CurrentUser = Depends(require_admin),
+    org_id: str = Depends(require_org),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    revoked = await revoke_invitation(db, invitation_id)
+    revoked = await revoke_invitation(db, invitation_id, org_id)
     if not revoked:
         raise HTTPException(status_code=404, detail="No revocable invitation found")
     db.add(
         AuditLog(
             user_id=admin.id,
+            org_id=org_id,
             action="auth.invitation.revoked",
             payload={"invitation_id": invitation_id},
         )

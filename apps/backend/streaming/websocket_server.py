@@ -345,11 +345,22 @@ class StreamingWebSocketServer:
         return None
 
     def _extract_websocket_path(self, websocket: WebSocketServerProtocol) -> str:
-        """Extract path from websocket connection."""
+        """Extract path from websocket connection.
+
+        websockets 13 and later (the asyncio server ``websockets.serve`` is
+        since 14) keep it on the handshake's request, the legacy server on the
+        connection. Missing it, every connection fell back to the default
+        path: in server mode no channel was named, so the app was refused
+        every channel, and the ``?token=`` of the API and of runs was never
+        read, so none of their events was published.
+        """
         path = "/stream/default"  # Default fallback
 
         try:
-            if hasattr(websocket, "path"):
+            request = getattr(websocket, "request", None)
+            if isinstance(getattr(request, "path", None), str):
+                path = request.path
+            elif hasattr(websocket, "path"):
                 path = websocket.path
             elif hasattr(websocket, "scope"):
                 scope = websocket.scope

@@ -49,7 +49,7 @@ remise à zéro de la conversation) et `execution-recovery-handlers.ts` (tâche 
 | un texte visible | une clé dans `src/shared/i18n/locales/en/` **et** `fr/` |
 | une détection d'OS ou d'exécutable | `src/main/platform/` |
 | une couleur ou un thème | `src/shared/constants/themes.ts` |
-| ce que l'app fait d'un projet du serveur (mode serveur) | `src/main/server-projects.ts` (liste, ajout, suppression), `src/main/remote-board.ts` (tableau par instantané), `src/main/server-board-actions.ts` (actions du Kanban envoyées au serveur), `src/main/server-board-review.ts` (revue, fusion, PR d'une carte du serveur), `src/main/server-board-live.ts` (flux en direct du tableau), `src/renderer/components/sidebar/server-gates.ts` (vues offertes) ; conception : [`server-mode.md`](../../docs/architecture/server-mode.md#les-projets-du-serveur-dans-lapp) |
+| ce que l'app fait d'un projet du serveur (mode serveur) | `src/main/server-projects.ts` (liste, ajout, suppression), `src/main/remote-board.ts` (tableau par instantané), `src/main/server-board-actions.ts` (actions du Kanban envoyées au serveur), `src/main/server-board-review.ts` (revue, fusion, PR d'une carte du serveur), `src/main/server-project-stream.ts` (le flux en direct d'un projet, une WebSocket partagée par références), `src/main/server-board-live.ts` (le tableau sur ce flux), `src/main/server-live-views.ts` et `src/renderer/hooks/useServerViewLive.ts` (une vue partagée affichée tient le flux et se relit quand un collègue la change ; ne pas ouvrir de seconde WebSocket), `src/renderer/components/sidebar/server-gates.ts` (vues offertes) ; conception : [`server-mode.md`](../../docs/architecture/server-mode.md#les-projets-du-serveur-dans-lapp) |
 | l'administration du serveur (mode serveur) | `src/main/server-connection.ts` (`adminApi`), `src/main/server-admin-groups.ts` (groupes, arguments vérifiés avant la requête), `src/renderer/components/administration/` (un onglet par permission), `src/renderer/stores/admin-store.ts` ; conception : [`server-mode.md`](../../docs/architecture/server-mode.md#les-groupes) |
 
 ## Sécurité
@@ -102,3 +102,4 @@ nouveau canal n'y entre jamais.
 | Unitaires | `src/**/__tests__/`, `*.test.ts(x)` | `pnpm test` (Vitest) |
 | Intégration | `src/__tests__/integration/` | `pnpm test` |
 | E2E | `e2e/`, l'app lancée par `e2e/app-harness.ts` | `pnpm run build && pnpm run test:e2e` (Playwright, xvfb sous Linux) |
+| E2E contre un serveur | `e2e/*.server-e2e.ts` : un vrai serveur démarré par `tests/server_e2e/app_world.py` (Python du backend) | `pnpm run build && pnpm run test:e2e:server` |

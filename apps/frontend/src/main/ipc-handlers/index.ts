@@ -29,6 +29,7 @@ import { registerTaskSandboxHandlers } from "./task-sandbox-handlers";
 import { registerBlastRadiusHandlers } from "./blast-radius-handlers";
 import { registerBountyBoardHandlers } from "./bounty-board-handlers";
 import { registerTechDebtHandlers } from "./tech-debt-handlers";
+import { registerServerAnalysisHandlers } from "./server-analyses";
 import { registerTeamBotHandlers } from "./team-bot-handlers";
 import { registerApiExplorerHandlers } from "./api-explorer-handlers";
 import { registerApiWatcherHandlers } from "./api-watcher-handlers";
@@ -123,6 +124,7 @@ import { registerSelfHealingHandlers } from "./self-healing-handlers";
 import { registerServerAdminHandlers } from "./server-admin-handlers";
 import { registerServerAuthHandlers } from "./server-auth-handlers";
 import { registerServerProjectHandlers } from "./server-project-handlers";
+import { registerServerWorkspaceHandlers } from "./server-workspace-handlers";
 import { registerJevHandlers } from "./jev-handlers";
 import { registerSecureStorageHandlers } from "./secure-storage-handlers";
 import { registerSettingsHandlers } from "./settings-handlers";
@@ -328,6 +330,7 @@ export function setupIpcHandlers(
 	// Multi-tenant administration console (orgs, roles, members, quotas, audit)
 	registerServerAdminHandlers();
 	registerServerProjectHandlers();
+	registerServerWorkspaceHandlers();
 
 	// File explorer handlers
 	registerFileHandlers();
@@ -600,6 +603,9 @@ export function setupIpcHandlers(
 
 	// Tech Debt handlers (Feature 9 — ROI-scored tech debt dashboard)
 	registerTechDebtHandlers();
+
+	// The analyses of a server project, run on the server, their reports shared
+	registerServerAnalysisHandlers();
 
 	// Team Bot handlers (Feature 4 — Slack / Microsoft Teams notifications)
 	registerTeamBotHandlers();

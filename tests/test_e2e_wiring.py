@@ -16,7 +16,17 @@ CI = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
 
 
 def _specs() -> list[Path]:
-    return sorted(E2E.glob("*.e2e.ts"))
+    return sorted(E2E.glob("*.e2e.ts")) + _server_specs()
+
+
+def _server_specs() -> list[Path]:
+    """The specs that drive the app against a real server (their own job)."""
+    return sorted(E2E.glob("*.server-e2e.ts"))
+
+
+def _job(name: str) -> str:
+    job = CI[CI.index(f"\n  {name}:") :]
+    return job[: job.index("\n  # ----")]
 
 
 def test_there_are_specs():
@@ -35,8 +45,7 @@ def test_no_spec_skips_itself():
 
 
 def test_ci_runs_the_specs_and_waits_for_them():
-    job = CI[CI.index("\n  e2e:") :]
-    job = job[: job.index("\n  # ----")]
+    job = _job("e2e")
     assert "pnpm run build" in job
     assert "xvfb-run" in job and "pnpm run test:e2e" in job
     complete = CI[CI.index("ci-complete:") :]
@@ -47,3 +56,21 @@ def test_ci_runs_the_specs_and_waits_for_them():
 def test_a_retry_never_turns_a_failure_green():
     config = (E2E / "playwright.config.ts").read_text(encoding="utf-8")
     assert "failOnFlakyTests" in config
+
+
+def test_ci_runs_the_server_specs_and_waits_for_them():
+    assert _server_specs()
+    job = _job("app-server-e2e")
+    assert "setup-python-backend" in job and "pnpm run build" in job
+    assert "xvfb-run" in job and "pnpm run test:e2e:server" in job
+    complete = CI[CI.index("ci-complete:") :]
+    assert re.search(r"needs: \[[^\]]*\bapp-server-e2e\b", complete)
+    assert "needs.app-server-e2e.result" in complete
+
+
+def test_the_server_specs_keep_the_same_rules():
+    config = (E2E / "playwright.server.config.ts").read_text(encoding="utf-8")
+    # It inherits the base config's retry rules rather than restating them.
+    assert "...base" in config
+    assert "failOnFlakyTests" not in config and "retries" not in config
+    assert "server-e2e.ts" in config

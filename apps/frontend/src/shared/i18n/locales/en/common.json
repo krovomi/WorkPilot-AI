@@ -1,4 +1,5 @@
 {
+	"sharedAnalysis": { "lastReport": "Report shared on the server, run on {{date}}" },
 	"selectSearch": { "placeholder": "Type to filter…", "empty": "No results" },
 	"projectTab": {
 		"settings": "Project settings",
@@ -278,7 +279,6 @@
 		"pullRequests": "Pull Requests",
 		"open": "open",
 		"selectPRToView": "Select a pull request to view details",
-		"serverProjectNoAIReviewGitLab": "The AI review of a server project's merge requests does not run on this computer yet. You can read, approve and merge them here with your own GitLab token.",
 		"loadingPRs": "Loading pull requests...",
 		"noOpenPRs": "No open pull requests",
 		"notConnected": "GitHub Not Connected",
@@ -1295,5 +1295,34 @@
 				"description": "Export project report as JSON or CSV"
 			}
 		}
+	},
+	"serverLogin": {
+		"title": "Sign in to a WorkPilot server",
+		"description": "Sign in to a shared server, or continue in local mode.",
+		"serverUrl": "Server URL",
+		"entraButton": "Sign in with Microsoft",
+		"email": "Email",
+		"password": "Password",
+		"localAccountButton": "Sign in",
+		"localModeButton": "Local mode",
+		"haveInvite": "I have an invitation"
+	},
+	"acceptInvite": {
+		"title": "Create your account",
+		"description": "Use the invitation link you received to set your password.",
+		"tokenLabel": "Invitation link or code",
+		"displayName": "Display name",
+		"passwordHint": "At least 12 characters. Avoid a password you already use elsewhere.",
+		"strength0": "Very weak",
+		"strength1": "Weak",
+		"strength2": "Fair",
+		"strength3": "Good",
+		"strength4": "Strong",
+		"confirm": "Confirm password",
+		"mismatch": "The passwords do not match",
+		"invalidToken": "Invitation not found or expired",
+		"failed": "Could not create the account",
+		"submit": "Create my account",
+		"back": "Back"
 	}
 }

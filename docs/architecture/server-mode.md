@@ -6,7 +6,9 @@ les autres. Les droits passent par des rôles ; deux organisations d'un même se
 pas. Sans `WORKPILOT_SERVER_MODE`, rien de ceci n'existe : l'app locale garde un seul
 propriétaire implicite, sans base ni authentification.
 
-Réglages et déploiement : [`CONFIGURATION.md`](../CONFIGURATION.md#4-multi-user-server-mode--tenants-roles-and-permissions).
+Réglages : [`CONFIGURATION.md`](../CONFIGURATION.md#4-multi-user-server-mode--tenants-roles-and-permissions).
+Déployer, mettre derrière TLS, sauvegarder, mettre à jour : le guide d'exploitation,
+[`server-operations.md`](../server-operations.md).
 Règles : [`rules/security.md`](../rules/security.md#s5--mode-serveur--authentification-autorisation-tenant).
 
 ## Les pièces
@@ -24,6 +26,22 @@ Règles : [`rules/security.md`](../rules/security.md#s5--mode-serveur--authentif
 | Flux en direct | `streaming/websocket_server.py`, `server/authz/ws_channels.py` | les événements du tableau (`project:<id>`) et d'un run (`run:<id>`), ouverts aux seuls membres du projet |
 | Client | `apps/frontend/src/main/server-connection.ts` | connexion, refresh dans `safeStorage`, organisation active ; vue Administration |
 | Projets dans l'app | `main/server-projects.ts`, `main/remote-board.ts`, `main/server-board-actions.ts` | les projets du serveur à côté de ceux de l'ordinateur, ajoutés par l'URL de leur dépôt ; leur tableau dessiné depuis l'instantané du serveur ; les actions du Kanban sur leurs cartes envoyées au serveur |
+
+## Ce qu'un serveur sert
+
+Un serveur ne sert que ce qui appartient aux projets d'une organisation : ses propres routes
+(`server/routers/` : comptes, organisations, projets, administration) et les features d'un projet
+désigné par son `project_id`, résolu par la base du serveur vers son clone (`shared_board/`,
+`shared_features/`). Les outils de la machine restent au backend local de l'app de bureau : un
+router qui garde son état sur la machine (le home, un fichier ou une base globale, le processus),
+reçoit un dossier du client, ou agit avec l'identité et l'environnement du processus n'est pas
+monté sur un serveur, et ses routes y répondent 404 ; le planificateur des hooks n'y démarre pas.
+`server/authz/catalog.py` le déclare : `SERVER_FEATURES` est la liste de ce qu'un serveur monte
+(`_mount` passe par `mount_served`), `LOCAL_ONLY_FEATURES` celle de ce qui reste local. Chaque
+feature est dans l'une des deux, `tests/backend/test_server_served_features.py` le vérifie : une
+nouvelle feature choisit, et une feature d'aucune liste n'est pas montée sur un serveur. Servir un
+outil de l'ordinateur à une équipe, c'est en faire une feature d'un projet, comme le tableau de
+bord est devenu [l'espace de travail](#lespace-de-travail-dun-projet).
 
 ## Pourquoi le flux en direct a sa propre autorisation
 
@@ -128,9 +146,14 @@ fichier, taille), les écrit dans un miroir sous le dossier de données de l'app
 lecture, et les lit avec le chargeur des projets locaux : une carte du serveur ressemble à une
 carte locale.
 
+Les projets de l'ordinateur restent servis par l'ordinateur pendant la connexion : l'app lance son
+backend local comme sans serveur, et les appels du main vers ce backend (`backendFetch`, dans
+`ipc-handlers/_backend-fetch.ts` : hooks, mémoire, notifications, boucle d'apprentissage) y vont
+toujours, sans le jeton de la session. Seul `authedFetch` (`server-connection.ts`) parle au serveur.
+
 La barre latérale n'offre pour un projet du serveur que les vues qui passent par le serveur
-(`sidebar/server-gates.ts`, aujourd'hui le Kanban, la Roadmap et l'administration) ; les autres
-agiraient sur le miroir. La liste des projets est relue quand la session change (connexion, déconnexion, autre
+(`sidebar/server-gates.ts` : le Kanban, l'espace de travail, les features partagées, les vues de sa
+forge et l'administration) ; les autres agiraient sur le miroir. La liste des projets est relue quand la session change (connexion, déconnexion, autre
 compte).
 
 Les actions du Kanban sur une carte du serveur partent au serveur (`main/server-board-actions.ts`),
@@ -165,7 +188,7 @@ quel à l'app.
 ## Le tableau en direct
 
 Tant qu'un tableau du serveur est affiché, le main tient une WebSocket sur le canal du projet
-(`main/server-board-live.ts`, `project:<id>`) : ce qu'un collègue crée, modifie, approuve, réserve,
+(`main/server-board-live.ts`, `project:<id>`, celle que partagent les [vues partagées](#les-vues-partagées-en-direct)) : ce qu'un collègue crée, modifie, approuve, réserve,
 lance ou supprime arrive en un événement, et la fenêtre relit le tableau aussitôt
 (`useServerBoardRefresh`, canaux `SERVER_BOARD_WATCH`, `SERVER_BOARD_UNWATCH`, `SERVER_BOARD_LIVE`).
 Le flux ne dit pas chaque pas d'un build, donc le tableau est aussi relu toutes les quinze
@@ -247,7 +270,7 @@ standard. Un seul job à la fois par feature d'un projet. Un job qu'un serveur a
 cours est marqué en échec à la lecture suivante : rien ne le finira, et il garderait sinon une place
 du quota et s'afficherait en cours sans fin. Sa sortie est gardée en mémoire (les 400
 dernières lignes, jamais sur disque ni au journal) et passée par `redact_text` avant d'être
-servie. Chaque début et chaque fin partent sur `project:<id>` (`feature_job`), comme chaque
+servie. Sa mise en file, son début et sa fin partent sur `project:<id>` (`feature_job`), comme chaque
 réécriture (`feature_updated`).
 
 Dans l'app, la feature d'un projet du serveur est lue dans son miroir (`main/server-features.ts`),
@@ -331,13 +354,14 @@ serveur. Une politique hors ligne stricte du projet bloque le relais (409).
 
 **La revue IA d'une PR tourne sur le serveur.** Le bouton de revue d'un projet serveur lance le
 runner GitHub (`runners/github/runner.py review-pr` ou `followup-review-pr`) en job sur le clone
-(`shared_features/github_review.py`, par `project_jobs`, confiné comme tout job), avec le dépôt du
+(`shared_features/forge_review.py`, par `project_jobs`, confiné comme tout job), avec le dépôt du
 projet lu dans son `repo_url` (`--repo`) et un numéro de PR, rien d'autre de la requête. Il tourne
 avec le jeton GitHub de qui le lance, que tout run reçoit de ses jetons enregistrés ; sans ce jeton
 rien ne démarre (412). L'image du serveur porte `gh`, que le runner appelle : une release épinglée
 par version et par SHA-256. La revue enregistrée est le fichier du runner,
 `.workpilot/github/pr/review_<n>.json` dans le clone, que chaque membre lit ; l'app suit le job
-comme un processus local (`ipc-handlers/github/server-pr-review.ts`). Publier les findings poste la
+comme un processus local (`ipc-handlers/server-review-jobs.ts`, dit à la vue GitHub par
+`github/server-pr-review.ts`). Publier les findings poste la
 revue sur GitHub par le relais, avec le jeton de la personne, puis note sur le serveur ce qui a été
 publié, d'où part la revue de suivi.
 
@@ -362,8 +386,16 @@ d'un projet (`server/forges.py`, champ `forge` de sa fiche) et l'app ne montre q
 celle-ci. L'URL envoyée est `https://<hôte listé>/api/v4/projects/<chemin du projet>/…`,
 reconstruite comme pour GitHub (`_ROUTES` : issues, notes, merge requests, leurs changements et
 commits ; noter, approuver, ouvrir, modifier, rebaser, fusionner une MR). « Créer une tâche » sur
-une issue en fait une carte du tableau partagé ; la revue IA reste masquée, l'approbation et la
-fusion d'une MR ouverte restent offertes.
+une issue en fait une carte du tableau partagé.
+
+La revue IA d'une MR tourne sur le serveur comme celle d'une PR, par le même module
+(`forge_review.py`) : le runner GitLab (`runners/gitlab/runner.py review-mr` ou
+`followup-review-mr`) en job sur le clone, avec le chemin du projet et l'instance lus dans son
+`repo_url` sur la liste de l'opérateur (`--project`, `--instance`) et un IID de MR, rien d'autre de
+la requête, et le jeton GitLab de qui le lance (412 sans lui). La revue enregistrée est
+`.workpilot/gitlab/mr/review_<iid>.json` dans le clone ; l'app la suit et la lit par
+`ipc-handlers/gitlab/server-mr-review.ts`. Publier les findings les poste en note sur la MR par le
+relais, avec le jeton de la personne, puis note sur le serveur ce qui a été publié.
 
 | Action | Route | Il faut |
 |---|---|---|
@@ -371,10 +403,154 @@ fusion d'une MR ouverte restent offertes.
 | Noter, approuver, modifier, rebaser une MR | `POST /api/features/forge/gitlab/write` | `vcs.write`, rôle `member` ou plus |
 | Ouvrir une MR | la même, `POST` sur `/merge_requests` | en plus `vcs.pr.create` |
 | Fusionner une MR | la même, sur `/merge_requests/<n>/merge` | en plus `vcs.pr.merge` |
+| Lancer, arrêter la revue IA d'une MR | `POST /api/features/forge/gitlab/reviews/jobs`, `…/jobs/<id>/cancel` | `agent.execute`, `agent.cancel`, rôle `member` ou plus |
+| Suivre la revue, lire les revues enregistrées | `GET …/reviews/jobs/<id>`, `GET …/reviews?numbers=` | `vcs.read` |
+| Publier les findings | `/merge_requests/<n>/notes` par le relais, puis `POST …/reviews/<n>/posted` | `vcs.write`, rôle `member` ou plus |
+
+**Les analyses tournent sur le serveur, leur rapport est partagé.** Accessibilité, i18n, dérive de
+la documentation, tests instables et dette technique lancent chacune un runner de `runners/` dans le
+dossier du projet. Pour un projet du serveur, la vue envoie l'analyse au serveur
+(`shared_features/analyses.py`) : un job sur le clone par `project_jobs`, confiné comme tout job,
+avec `--project-path <clone>` et les seules options de l'analyse, un modèle fermé par analyse (niveau
+WCAG, locale de référence, seuil et nombre de runs) ; la requête nomme une analyse de la liste, jamais
+un runner ni un chemin. Le rapport que le runner imprime est enregistré à la fin du job dans
+`.workpilot/analyses/<analyse>.json` du clone, avec qui l'a lancé et quand : chaque membre lit le
+dernier, un lecteur compris, et la vue l'affiche dès son ouverture. Un job échoué n'en enregistre pas,
+le précédent reste. Côté app, la vue nomme son projet par son dossier : le miroir d'un projet du
+serveur fait passer l'analyse par le serveur (`ipc-handlers/server-analyses.ts`,
+`serverProjectAtPath`), qui ne reçoit jamais de chemin. La dette technique lit ses éléments et sa
+tendance dans ce rapport ; transformer un élément en tâche crée une carte du tableau partagé.
+
+| Action | Route | Il faut |
+|---|---|---|
+| Lancer, arrêter une analyse | `POST /api/features/analyses/<analyse>/jobs`, `…/jobs/<id>/cancel` | `agent.execute`, `agent.cancel`, rôle `member` ou plus |
+| Suivre une analyse, lire son dernier rapport | `GET …/jobs/<id>`, `GET /api/features/analyses/<analyse>/report` | `insight.read` |
+
+## Les vues partagées en direct
+
+Le tableau n'est pas la seule vue qu'un collègue change : sa roadmap, ses idées, une conversation
+Insights, l'index du projet. Tant qu'une de ces vues d'un projet du serveur est affichée, elle
+tient le flux du projet (`useServerViewLive`, canaux `SERVER_VIEW_WATCH`, `SERVER_VIEW_UNWATCH`),
+le même que le tableau : le main n'ouvre qu'une WebSocket par projet (`main/server-project-stream.ts`),
+qu'il garde tant qu'un tableau ou une vue la tient, une référence par vue affichée, et ferme avec
+la dernière ; une fenêtre fermée rend les siennes, la déconnexion toutes. Le main dit alors à la
+fenêtre quelle vue a changé (`SERVER_VIEW_CHANGED`, `main/server-live-views.ts`), sans rien du
+contenu, et la vue se relit par ses chargeurs habituels, qui relisent les fichiers de la feature
+du serveur dans le miroir.
+
+| Événement du flux | Vue relue |
+|---|---|
+| `feature_updated`, `feature_job` (mise en file, début, fin) de `roadmap`, `ideation`, `context` | la roadmap, l'idéation, le contexte ; un job d'un collègue en cours est suivi comme à l'ouverture de la vue |
+| `insights_updated` | la liste des conversations, et celle affichée si c'est elle qui a changé |
+| `spec_status_changed` d'un run fini | les mémoires du contexte, où le run a pu apprendre |
+
+Un événement ne porte que des noms de listes fermées (la feature, le fichier déclaré, le job, la
+conversation) et qui l'a causé, jamais un chemin ni un contenu ; le main ne retient que ces noms.
+Ce que la personne a fait elle-même ne lui revient pas : sa fenêtre l'affiche déjà. Une vue
+occupée par son propre travail (une génération qu'elle suit, une réponse en cours d'écriture)
+n'est pas relue sous ses yeux : ce travail la relit à sa fin. Un flux tombé puis rouvert fait
+relire les vues affichées. Les vues GitHub et GitLab ne sont pas branchées : leurs changements
+viennent surtout de la forge elle-même, que le serveur ne voit pas.
+
+## L'espace de travail d'un projet
+
+Le tableau de bord, les analytics, les coûts et l'historique des sessions disent ce qu'une équipe a
+fait d'un projet et ce que cela a coûté. Sur l'ordinateur, ces vues lisent le dossier du projet
+(`cost_data.json`, `dashboard_snapshot.json`) et un historique global de la machine ; pour un
+projet du serveur, ce serait le miroir ou l'ordinateur de la personne, qui ne savent rien des runs
+de l'équipe. Le serveur les calcule donc pour le projet (`shared_features/workspace.py`), à partir
+de ce qu'il tient : les cartes indexées (`specs_index`, relues comme le tableau), les runs lancés
+sur elles (`agent_runs`) et les jobs du projet (`project_jobs`), avec le nom de qui les a lancés.
+
+Ce qu'ont dépensé les agents, le serveur ne l'enregistre pas en base : chaque session d'agent
+l'écrit (`core/usage_tracker.py`) dans le dossier où elle travaille, le clone pour la phase `spec`
+et les jobs, l'espace de build d'une carte pour son build et sa QA. `shared_features/usage_ledger.py`
+lit ces relevés par liste fermée : `cost_data.json` et `dashboard_snapshot.json` du `.workpilot` du
+clone et de chaque espace de build nommé comme une carte, chacun un fichier régulier sous sa taille,
+résolu dans le clone, avec un plafond sur le tout. Un relevé est écrit par un run, donc par un agent
+qui lit du contenu non fiable : on n'en prend que des nombres, une date et des libellés coupés
+(fournisseur, modèle, phase, carte) ; le dossier du serveur qu'il nomme n'est jamais lu ni servi.
+La dépense d'un run est celle de sa carte entre son début et sa fin, phase par phase ; celle d'un
+job n'est pas attribuée (plusieurs peuvent tourner en même temps) mais compte dans les totaux. Les
+budgets restent une feature de l'ordinateur : un projet du serveur n'en a pas encore, et le temps
+moyen par complexité n'est enregistré nulle part, sur l'ordinateur non plus.
+
+Dans l'app, ces vues reconnaissent un projet du serveur (`useServerProjectId`) et demandent au main
+ses données par son id (`main/server-workspace.ts`, canaux `SERVER_WORKSPACE_*`), qui ne répond que
+pour un projet du serveur listé et revérifie chaque nombre et chaque libellé ; ni le miroir, ni le
+backend local, ni les fichiers de l'ordinateur ne sont lus pour lui. Les routes du tableau de bord
+écrites pour l'ordinateur (`dashboard/api.py` : `/api/dashboard/*`, `/api/sessions/*`), qui lisent
+la machine et non un projet, ne répondent qu'en mode local (404 sur un serveur).
+
+| Action | Route | Il faut |
+|---|---|---|
+| Historique des sessions : runs et jobs, qui, quand, comment ils ont fini, la dépense d'un run | `GET /api/features/workspace/sessions?limit=` | `analytics.read`, un rôle sur le projet |
+| Coûts des trente derniers jours, par fournisseur et modèle, tendance | `GET /api/features/workspace/costs` | `analytics.read` |
+| Tableau de bord : cartes par statut, jetons et coûts, QA du premier coup, fusions | `GET /api/features/workspace/dashboard` | `analytics.read` |
+
+## La preuve de bout en bout
+
+Les autres tests du mode serveur appellent les routes une à une, comme des fonctions.
+`tests/backend/test_server_two_orgs_e2e.py` démarre le serveur comme `deploy/` (migrations Alembic,
+`websocket_server.py`, `provider_api:app` sous uvicorn) contre une vraie base, et ne passe que par
+HTTP et WebSocket, comme l'app :
+
+- l'opérateur crée l'administrateur de la plateforme par le script de l'image, deux organisations,
+  et y invite leurs personnes ; chaque administrateur d'organisation enregistre un projet, que le
+  serveur clone depuis un petit dépôt servi en HTTP sur la boucle locale ;
+- chaque membre crée, modifie et supprime une carte, et son flux `project:<id>` le dit ; le membre
+  de l'autre organisation reçoit 404 sur chacune de ces routes, ne peut ni ouvrir ce flux ni y
+  basculer ; un lecteur lit le tableau et chaque écriture lui est refusée (403) ;
+- un run tourne sur une carte avec un agent factice à la place du modèle
+  (`tests/server_e2e/fake_backend/`, seul changement fait au serveur, par `serve_api.py`) : confiné
+  par Landlock, il ne lit ni le clone de l'autre organisation, ni la liste des clones, ni l'état du
+  serveur, publie sur `run:<id>` avec son jeton, écrit la spec et finit ; son flux, son historique
+  et son annulation sont fermés à l'autre organisation, comme un job de projet (l'index du
+  contexte, par son vrai runner) ;
+- chaque route qui prend un `project_id` répond à l'administrateur et au membre de l'autre
+  organisation, sur le projet de la première, exactement comme pour un projet qui n'existe pas ;
+  celles des projets, du tableau et des features partagées répondent 404 (ou le refus d'une
+  permission qu'ils n'ont sur aucun projet).
+
+Il lui faut une base (`WORKPILOT_E2E_DATABASE_URL`, PostgreSQL en CI ; une URL SQLite marche
+aussi), Linux avec Landlock et le port 8765, fixe, du serveur de streaming (le test refuse de
+démarrer s'il est pris, plutôt que de laisser le serveur de streaming arrêter celui qui l'occupe).
+Sans URL, le module est sauté ; le job `server-e2e` de `ci.yml` (service Postgres 16) pose
+`WORKPILOT_EXPECT_SERVER_E2E=1`, et il échoue alors au lieu d'être sauté. En local, par exemple :
+
+```bash
+WORKPILOT_E2E_DATABASE_URL=postgresql+asyncpg://workpilot:<mot de passe>@127.0.0.1:5432/workpilot \
+  pytest tests/backend/test_server_two_orgs_e2e.py -v
+```
+
+Il a trouvé deux défauts, corrigés avec leur test : le serveur de streaming lisait le chemin de la
+poignée de main là où websockets 13 et plus ne le met plus (`request.path`), si bien qu'en mode
+serveur aucun canal n'était nommé (chaque membre refusé sur le sien) et que le `?token=` de l'API
+et des runs n'était jamais lu (aucun de leurs événements publié) ; les routes
+`/projects/{project_id}/…` répondaient 403 au projet d'une autre organisation, au lieu du 404 de
+la règle.
+
+L'app de bureau fait le même chemin (`apps/frontend/e2e/server-mode.server-e2e.ts`, Playwright).
+`tests/server_e2e/app_world.py` démarre ce serveur sur une base SQLite temporaire et y crée deux
+organisations : Alice, qui l'administre et enregistre le projet, et Bob, membre du projet, dans la
+première ; Carol dans la seconde. Les mots de passe sont tirés par la spec et ne vont au serveur
+que par l'entrée standard du script, qui ne répond que l'URL et les adresses. Chacun lance sa copie de l'app compilée (profil et home neufs) et se connecte
+par l'écran de connexion :
+
+- Alice et Bob trouvent le projet de l'équipe et son tableau partagé ;
+- une carte qu'Alice crée depuis le dialogue « New Task » apparaît sur le tableau de Bob sans
+  qu'il fasse rien ;
+- une carte que Bob supprime quitte le tableau d'Alice ;
+- Carol, connectée, n'a aucun projet et ne voit le nom de celui de l'équipe nulle part.
+
+Elle tourne dans le job `app-server-e2e` (`pnpm run test:e2e:server`, configuration
+`playwright.server.config.ts`, mêmes règles de nouvel essai que les autres specs). Elle a trouvé
+un défaut, corrigé avec son test : une carte créée sans titre, ce que le dialogue permet, était
+refusée par l'app avant d'atteindre le serveur ; elle prend désormais la première ligne de sa
+description, comme une tâche locale dont le titre n'a pas pu être généré.
 
 ## Ce qui vient
 
 Le plan multi-tenant du 31 octobre, par lots : les autres features servies de la même façon
-(l'investigation, l'auto-fix et la revue des MR GitLab en jobs, analyses, tableau de bord), le flux du projet ouvert pour
-chaque vue partagée, un test de bout en bout à deux organisations, et le guide d'exploitation. Ce
-fichier grandit avec chaque lot.
+(l'investigation et l'auto-fix des issues en jobs, les autres analyses, budgets d'un projet), et les vues de forge en direct (par
+les webhooks de la forge). Ce fichier grandit avec chaque lot.

@@ -293,6 +293,12 @@ FEATURE_DOMAINS: MappingProxyType[str, str] = MappingProxyType(
         "context": "insight",
         # GitHub for a server project, relayed with the caller's own token.
         "forge": "vcs",
+        # The analyses of a server project (accessibility, i18n, drift of the
+        # docs, flaky tests, technical debt) and their shared reports.
+        "analyses": "insight",
+        # A server project's dashboard, analytics, sessions and costs, read
+        # from its runs, jobs and the ledgers in its clone.
+        "workspace": "analytics",
         # What a task's attachments and the project's ADRs say. Read-only and
         # addressed like spec_traceability, so it answers to the same domain.
         "docintel": "task",
@@ -315,6 +321,86 @@ FEATURE_DOMAINS: MappingProxyType[str, str] = MappingProxyType(
         "providers": "settings",
     }
 )
+
+
+# --------------------------------------------------------------------------
+# What a server serves
+# --------------------------------------------------------------------------
+# Server mode serves only what an organization's projects own: each feature in
+# SERVER_FEATURES addresses a project by its ``project_id``, resolved through
+# the server's database to that project's clone. Machine-local tools stay with
+# the desktop app's local backend: a router that keeps its state on the machine
+# (the home directory, a global file or database, the process itself), takes a
+# directory from the caller, or acts with the backend process's own identity
+# and environment is not mounted on a server, so its routes answer 404 there.
+#
+# The list is the allowlist: a feature it does not name is not mounted on a
+# server. Every feature of FEATURE_DOMAINS is in exactly one of the two sets
+# (tests/backend/test_server_served_features.py), so a new feature chooses.
+
+SERVER_FEATURES: frozenset[str] = frozenset(
+    {
+        "board",
+        "roadmap",
+        "ideation",
+        "insights",
+        "context",
+        "forge",
+        "analyses",
+        "workspace",
+    }
+)
+
+LOCAL_ONLY_FEATURES: frozenset[str] = frozenset(
+    {
+        "providers",
+        "analytics",
+        "mission_control",
+        "replay",
+        "model_router",
+        "longevity",
+        "architecture_drift",
+        "generational_tests",
+        "cognitive_context",
+        "agent_health",
+        "cicd_anomaly",
+        "license_governance",
+        "domain_agents",
+        "i18n_scaler",
+        "audit_trail",
+        "pair_realtime",
+        "code_playground",
+        "cost_estimator",
+        "restart_planner",
+        "prompt_preview",
+        "timeline",
+        "progress_indicator",
+        "qa_promotion",
+        "hermes",
+        "brain",
+        "rtk",
+        "watermarks",
+        "spec_traceability",
+        "docintel",
+        "uiux",
+        "verify",
+        "workflow_profile",
+        "slash_commands",
+        "virtual_reviewer",
+        "test_generation",
+        "github",
+        "system_status",
+        "dashboard",
+        "agent_endpoints",
+        "event_hooks",
+        "notifications",
+    }
+)
+
+
+def served_in_server_mode(feature: str) -> bool:
+    """Whether a server mounts `feature` (see SERVER_FEATURES)."""
+    return feature in SERVER_FEATURES
 
 
 def domain_for_feature(feature: str) -> str:

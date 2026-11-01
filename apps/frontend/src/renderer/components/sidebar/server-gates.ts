@@ -13,6 +13,11 @@ import type { SidebarView } from "../Sidebar";
  */
 export const SERVER_PROJECT_VIEWS: ReadonlySet<SidebarView> = new Set<SidebarView>([
 	"kanban",
+	// Read from the server's runs, jobs and ledgers (main/server-workspace.ts)
+	"dashboard",
+	"analytics",
+	"cost-estimator",
+	"session-history",
 	"roadmap",
 	"ideation",
 	"insights",
@@ -21,6 +26,12 @@ export const SERVER_PROJECT_VIEWS: ReadonlySet<SidebarView> = new Set<SidebarVie
 	"github-prs",
 	"gitlab-issues",
 	"gitlab-merge-requests",
+	// Analyses run on the server, their last report shared (`server-analyses.ts`).
+	"accessibility-agent",
+	"i18n-agent",
+	"doc-drift",
+	"flaky-tests",
+	"tech-debt",
 	"administration",
 ]);
 

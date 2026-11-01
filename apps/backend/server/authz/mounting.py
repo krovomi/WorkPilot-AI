@@ -26,7 +26,11 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
-from server.authz.catalog import PERMISSIONS, domain_for_feature
+from server.authz.catalog import (
+    PERMISSIONS,
+    domain_for_feature,
+    served_in_server_mode,
+)
 from server.authz.principal import Principal, get_principal
 
 logger = logging.getLogger(__name__)
@@ -73,9 +77,14 @@ ROUTE_OVERRIDES: dict[tuple[str, str], str] = {
     ("POST", "/api/features/forge/github/read"): "vcs.read",
     ("POST", "/api/features/forge/github/pulls"): "vcs.read",
     ("POST", "/api/features/forge/gitlab/read"): "vcs.read",
-    # The AI review of a pull request runs the reviewer agent on the clone.
+    # The AI review of a pull or merge request runs the reviewer agent on the clone.
     ("POST", "/api/features/forge/github/reviews/jobs"): "agent.execute",
     ("POST", "/api/features/forge/github/reviews/jobs/{job_id}/cancel"): "agent.cancel",
+    ("POST", "/api/features/forge/gitlab/reviews/jobs"): "agent.execute",
+    ("POST", "/api/features/forge/gitlab/reviews/jobs/{job_id}/cancel"): "agent.cancel",
+    # An analysis runs its runner on the clone, as a job.
+    ("POST", "/api/features/analyses/{kind}/jobs"): "agent.execute",
+    ("POST", "/api/features/analyses/{kind}/jobs/{job_id}/cancel"): "agent.cancel",
     # A question to Insights runs the insights agent on the clone.
     ("POST", "/api/features/insights/sessions/{session_id}/messages"): "agent.execute",
     ("POST", "/api/features/insights/jobs/{job_id}/cancel"): "agent.cancel",
@@ -145,3 +154,22 @@ def mount_guarded(
     logger.debug(
         "Mounted %s router guarded by %s.*", feature, domain_for_feature(feature)
     )
+
+
+def mount_served(app: FastAPI, router: APIRouter, feature: str) -> bool:
+    """Mount `feature` on a server, guarded, when a server serves it.
+
+    Server mode serves only what an organization's projects own; machine-local
+    tools stay with the desktop app's local backend
+    (:data:`server.authz.catalog.SERVER_FEATURES`). A feature outside that set
+    is not mounted, so its routes answer 404. An unknown name still raises, as
+    it does for :func:`mount_guarded`. Returns whether the router was mounted.
+    """
+    domain_for_feature(feature)
+    if not served_in_server_mode(feature):
+        logger.debug(
+            "Not mounting %s on a server: it stays with the local app", feature
+        )
+        return False
+    mount_guarded(app, router, feature)
+    return True
