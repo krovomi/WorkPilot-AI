@@ -331,13 +331,14 @@ serveur. Une politique hors ligne stricte du projet bloque le relais (409).
 
 **La revue IA d'une PR tourne sur le serveur.** Le bouton de revue d'un projet serveur lance le
 runner GitHub (`runners/github/runner.py review-pr` ou `followup-review-pr`) en job sur le clone
-(`shared_features/github_review.py`, par `project_jobs`, confiné comme tout job), avec le dépôt du
+(`shared_features/forge_review.py`, par `project_jobs`, confiné comme tout job), avec le dépôt du
 projet lu dans son `repo_url` (`--repo`) et un numéro de PR, rien d'autre de la requête. Il tourne
 avec le jeton GitHub de qui le lance, que tout run reçoit de ses jetons enregistrés ; sans ce jeton
 rien ne démarre (412). L'image du serveur porte `gh`, que le runner appelle : une release épinglée
 par version et par SHA-256. La revue enregistrée est le fichier du runner,
 `.workpilot/github/pr/review_<n>.json` dans le clone, que chaque membre lit ; l'app suit le job
-comme un processus local (`ipc-handlers/github/server-pr-review.ts`). Publier les findings poste la
+comme un processus local (`ipc-handlers/server-review-jobs.ts`, dit à la vue GitHub par
+`github/server-pr-review.ts`). Publier les findings poste la
 revue sur GitHub par le relais, avec le jeton de la personne, puis note sur le serveur ce qui a été
 publié, d'où part la revue de suivi.
 
@@ -362,8 +363,16 @@ d'un projet (`server/forges.py`, champ `forge` de sa fiche) et l'app ne montre q
 celle-ci. L'URL envoyée est `https://<hôte listé>/api/v4/projects/<chemin du projet>/…`,
 reconstruite comme pour GitHub (`_ROUTES` : issues, notes, merge requests, leurs changements et
 commits ; noter, approuver, ouvrir, modifier, rebaser, fusionner une MR). « Créer une tâche » sur
-une issue en fait une carte du tableau partagé ; la revue IA reste masquée, l'approbation et la
-fusion d'une MR ouverte restent offertes.
+une issue en fait une carte du tableau partagé.
+
+La revue IA d'une MR tourne sur le serveur comme celle d'une PR, par le même module
+(`forge_review.py`) : le runner GitLab (`runners/gitlab/runner.py review-mr` ou
+`followup-review-mr`) en job sur le clone, avec le chemin du projet et l'instance lus dans son
+`repo_url` sur la liste de l'opérateur (`--project`, `--instance`) et un IID de MR, rien d'autre de
+la requête, et le jeton GitLab de qui le lance (412 sans lui). La revue enregistrée est
+`.workpilot/gitlab/mr/review_<iid>.json` dans le clone ; l'app la suit et la lit par
+`ipc-handlers/gitlab/server-mr-review.ts`. Publier les findings les poste en note sur la MR par le
+relais, avec le jeton de la personne, puis note sur le serveur ce qui a été publié.
 
 | Action | Route | Il faut |
 |---|---|---|
@@ -371,10 +380,13 @@ fusion d'une MR ouverte restent offertes.
 | Noter, approuver, modifier, rebaser une MR | `POST /api/features/forge/gitlab/write` | `vcs.write`, rôle `member` ou plus |
 | Ouvrir une MR | la même, `POST` sur `/merge_requests` | en plus `vcs.pr.create` |
 | Fusionner une MR | la même, sur `/merge_requests/<n>/merge` | en plus `vcs.pr.merge` |
+| Lancer, arrêter la revue IA d'une MR | `POST /api/features/forge/gitlab/reviews/jobs`, `…/jobs/<id>/cancel` | `agent.execute`, `agent.cancel`, rôle `member` ou plus |
+| Suivre la revue, lire les revues enregistrées | `GET …/reviews/jobs/<id>`, `GET …/reviews?numbers=` | `vcs.read` |
+| Publier les findings | `/merge_requests/<n>/notes` par le relais, puis `POST …/reviews/<n>/posted` | `vcs.write`, rôle `member` ou plus |
 
 ## Ce qui vient
 
 Le plan multi-tenant du 31 octobre, par lots : les autres features servies de la même façon
-(l'investigation, l'auto-fix et la revue des MR GitLab en jobs, analyses, tableau de bord), le flux du projet ouvert pour
+(l'investigation et l'auto-fix des issues en jobs, analyses, tableau de bord), le flux du projet ouvert pour
 chaque vue partagée, un test de bout en bout à deux organisations, et le guide d'exploitation. Ce
 fichier grandit avec chaque lot.

@@ -98,7 +98,7 @@ describe("a server project's AI review", () => {
 			thinkingLevel: "ultrathink",
 		});
 		expect(mocks.relayServerJob).toHaveBeenCalledWith(project, "forge/github/reviews", {
-			options: { pr_number: 7, followup: false, model: "claude-sonnet" },
+			options: { number: 7, followup: false, model: "claude-sonnet" },
 		});
 		// One review of a PR at a time from here.
 		startServerReview(project, 7, false, mainWindow, { model: "m", thinkingLevel: "high" });
@@ -128,7 +128,7 @@ describe("a server project's AI review", () => {
 		const { send, mainWindow } = window();
 		startServerReview(project, 8, true, mainWindow, { model: "m", thinkingLevel: "low" });
 		expect(mocks.relayServerJob.mock.calls[0][2]).toEqual({
-			options: { pr_number: 8, followup: true, model: "m", thinking_level: "low" },
+			options: { number: 8, followup: true, model: "m", thinking_level: "low" },
 		});
 		failing.stderr.emit("data", Buffer.from("Add your GitHub token\n"));
 		failing.emit("exit", 1);

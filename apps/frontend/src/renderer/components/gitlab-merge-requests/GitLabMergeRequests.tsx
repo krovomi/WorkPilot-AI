@@ -1,7 +1,6 @@
 import { AlertCircle, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { initializeMRReviewListeners } from "../../stores/gitlab";
-import { useProjectStore } from "../../stores/project-store";
 import { Button } from "../ui/button";
 import { CreateMergeRequestDialog } from "./components/CreateMergeRequestDialog";
 import { MergeRequestList } from "./components/MergeRequestList";
@@ -21,10 +20,6 @@ export function GitLabMergeRequests({
 		"opened" | "closed" | "merged" | "all"
 	>("opened");
 	const [showCreateDialog, setShowCreateDialog] = useState(false);
-	// A server project's AI review runs on the server, not here
-	const serverProject = useProjectStore((state) =>
-		Boolean(state.projects.find((p) => p.id === projectId)?.remote),
-	);
 
 	// Initialize MR review listeners on mount
 	useEffect(() => {
@@ -117,7 +112,6 @@ export function GitLabMergeRequests({
 						onMergeMR={(mergeMethod) => mergeMR(selectedMR.iid, mergeMethod)}
 						onAssignMR={(userIds) => assignMR(selectedMR.iid, userIds)}
 						onApproveMR={() => approveMR(selectedMR.iid)}
-						aiReview={!serverProject}
 					/>
 				) : (
 					<div className="flex items-center justify-center h-full text-muted-foreground">
