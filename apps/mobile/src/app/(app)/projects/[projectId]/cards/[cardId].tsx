@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import type { AgentRun } from "../../../../../api/types";
+import { confirmSensitive } from "../../../../../auth/lock";
 import { useApi, useSession } from "../../../../../auth/session";
 import {
 	activeRun,
@@ -79,6 +80,12 @@ export default function CardScreen() {
 		}
 	};
 
+	// Merge and pull request cannot be taken back from the phone: the lock asks first.
+	const runConfirmed = async (action: CardAction, work: () => Promise<unknown>) => {
+		if (!(await confirmSensitive(t("lock.actionPrompt"), t("common.cancel")))) return false;
+		return run(action, work);
+	};
+
 	const perform = (action: CardAction) => {
 		switch (action) {
 			case "start":
@@ -90,9 +97,9 @@ export default function CardScreen() {
 			case "retry":
 				return run(action, () => api.startRun(projectId, card.specId ?? "", "build"));
 			case "merge":
-				return run(action, () => api.startRun(projectId, card.specId ?? "", "merge"));
+				return runConfirmed(action, () => api.startRun(projectId, card.specId ?? "", "merge"));
 			case "createPr":
-				return run(action, () => api.startRun(projectId, card.specId ?? "", "pr"));
+				return runConfirmed(action, () => api.startRun(projectId, card.specId ?? "", "pr"));
 			case "requestChanges":
 				setFeedbackOpen(true);
 				return;
@@ -103,6 +110,7 @@ export default function CardScreen() {
 						text: t("actions.delete"),
 						style: "destructive",
 						onPress: async () => {
+							if (!(await confirmSensitive(t("lock.actionPrompt"), t("common.cancel")))) return;
 							setBusy("delete");
 							try {
 								await api.deleteCard(projectId, card.id);

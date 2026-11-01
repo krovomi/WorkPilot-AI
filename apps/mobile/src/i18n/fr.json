@@ -476,5 +476,23 @@
 				"project": "Projet"
 			}
 		}
+	},
+	"lock": {
+		"title": "WorkPilot AI est verrouillé",
+		"unlock": "Déverrouiller",
+		"failed": "Non reconnu. Réessayez.",
+		"prompt": "Déverrouiller WorkPilot AI",
+		"actionPrompt": "Confirmez que c'est vous",
+		"approvePrompt": "Confirmez que c'est vous pour valider le plan",
+		"section": "Verrouillage",
+		"atLaunch": "Demander à l'ouverture de l'app",
+		"atLaunchHint": "Face ID, Touch ID ou empreinte, avec votre code en secours. Redemandé après une minute en arrière-plan.",
+		"sensitive": "Demander avant de fusionner, de créer une pull request, de supprimer une carte ou de valider depuis une notification",
+		"unavailable": "Définissez un code ou la biométrie sur ce téléphone pour utiliser le verrouillage."
+	},
+	"push": {
+		"approve": "Valider et construire",
+		"view": "Voir",
+		"approveFailed": "Le plan n'a pas été validé"
 	}
 }

@@ -27,8 +27,17 @@ jest.mock("expo-notifications", () => ({
 	getPermissionsAsync: jest.fn(async () => ({ status: "granted" })),
 	requestPermissionsAsync: jest.fn(async () => ({ status: "granted" })),
 	getExpoPushTokenAsync: jest.fn(async () => ({ type: "expo", data: "ExponentPushToken[testtesttest]" })),
+	setNotificationCategoryAsync: jest.fn(async (identifier, actions) => ({ identifier, actions })),
 	useLastNotificationResponse: jest.fn(() => null),
 	clearLastNotificationResponseAsync: jest.fn(async () => undefined),
 }));
 
 jest.mock("expo-device", () => ({ isDevice: true }));
+
+// The app lock: a phone with biometrics enrolled that recognizes the person.
+// A test that cares overrides these.
+jest.mock("expo-local-authentication", () => ({
+	SecurityLevel: { NONE: 0, SECRET: 1, BIOMETRIC_WEAK: 2, BIOMETRIC_STRONG: 3 },
+	getEnrolledLevelAsync: jest.fn(async () => 3),
+	authenticateAsync: jest.fn(async () => ({ success: true })),
+}));

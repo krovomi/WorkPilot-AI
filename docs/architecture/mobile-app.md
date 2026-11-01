@@ -191,6 +191,33 @@ chacun de ses téléphones ; la toucher ouvre la carte.
 | À la fin d'un run, le serveur envoie un message par téléphone, dans sa langue | `server/services/push.py`, appelé par le gestionnaire de runs |
 | Expo transmet à Apple (APNs) ou Google (FCM) ; un jeton qu'Expo dit désinscrit est supprimé | `https://exp.host/--/api/v2/push/send` |
 | Toucher la notification ouvre la carte de son `data` (`projectId`, `cardId`, vérifiés) | `src/push/PushBridge.tsx` |
+| Un plan à valider (`type: "plan_review"`, catégorie `plan_review`) porte les boutons « Valider et construire » et « Voir » | `src/push/push.ts` (`configureCategories`), `src/push/respond.ts` |
+
+Un run de spec qui laisse la carte en attente de validation (la carte demande une revue, le plan
+n'est pas encore validé, lu dans `review_state.json` comme le fait le build) n'envoie pas « Spec
+terminé » mais « Plan prêt à valider », avec la catégorie `plan_review`. « Valider et construire »
+ouvre l'app (sur iOS, l'appareil doit d'abord être déverrouillé : `isAuthenticationRequired`), demande
+le verrouillage de l'app, puis appelle les routes du bouton Démarrer : `POST …/approve`, puis un run
+`build`. Le serveur revérifie les droits sur les deux ; un refus s'affiche et la carte s'ouvre. Il
+n'y a pas de bouton « Arrêter » : le serveur ne notifie que la fin d'un run, il n'y a alors rien à
+arrêter.
+
+## Le verrouillage de l'app
+
+Face ID, Touch ID ou l'empreinte, avec le code de l'appareil en secours (`expo-local-authentication`).
+Deux réglages, gardés sur le téléphone (`expo-secure-store`, jamais sauvegardés ailleurs), dans
+Réglages :
+
+| Réglage | Par défaut | Effet |
+|---|---|---|
+| Demander à l'ouverture | non | Un écran couvre l'app jusqu'à la reconnaissance, et revient après une minute en arrière-plan (`RELOCK_AFTER_MS`). Il couvre les écrans sans les démonter : déverrouiller ramène où l'on était |
+| Demander avant une action sensible | oui | Fusionner, créer une pull request, supprimer une carte, valider un plan depuis une notification |
+
+Changer un réglage demande d'abord la reconnaissance : qui tient un téléphone déverrouillé ne peut
+pas couper le verrouillage. Un téléphone sans biométrie ni code ne peut rien demander : les réglages
+sont alors grisés et tout passe, comme l'OS le ferait. Le verrouillage n'arrête que la personne qui
+tient le téléphone ; le serveur revérifie chaque action. Code : `src/auth/lock.ts`,
+`src/auth/LockGate.tsx`, `src/auth/LockSection.tsx`.
 
 Ce qui sort du serveur est le minimum : le nom du projet, le numéro de la carte, la phase et son
 résultat, jamais le titre ni le texte de la carte, qui resteraient sinon dans les journaux de trois

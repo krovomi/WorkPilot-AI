@@ -36,6 +36,12 @@
 			"expo-localization",
 			"expo-web-browser",
 			[
+				"expo-local-authentication",
+				{
+					"faceIDPermission": "Allow $(PRODUCT_NAME) to use Face ID to unlock the app and confirm merges, pull requests and approvals."
+				}
+			],
+			[
 				"expo-notifications",
 				{
 					"color": "#2C3136"
