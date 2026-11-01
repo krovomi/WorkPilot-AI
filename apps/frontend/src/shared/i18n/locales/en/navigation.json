@@ -209,6 +209,18 @@
 		"notInstalledDescription": "{{name}} is not on your PATH. Install it, sign in once in a terminal, then refresh.",
 		"signInHint": "WorkPilot uses the CLI's own sign-in and never reads its credentials.",
 		"viewDocs": "View {{name}} documentation",
+		"install": {
+			"button": "Install {{name}}",
+			"installing": "Installing, please wait…",
+			"installingShort": "Installing…",
+			"description": "{{name}} is not on your PATH. WorkPilot can download and install it for you using the vendor's official method; then sign in once in a terminal.",
+			"error": {
+				"node_required": "{{name}} cannot be installed here: install Node.js (nodejs.org) first, then try again.",
+				"failed": "Installing {{name}} failed.",
+				"not_on_path": "{{name}} was installed but is still not found. Restart WorkPilot, then refresh.",
+				"busy": "{{name}} is already being installed."
+			}
+		},
 		"acp": {
 			"probing": "Asking the agent what it supports…",
 			"declares": "Declared by the agent (ACP initialize):",

@@ -457,6 +457,24 @@ LIGHT_QA_SPEC_MAX_CHARS = 8_000
 LIGHT_QA_DIFF_MAX_CHARS = 12_000
 
 
+#: The light review's instructions when git shows no change at all: the spec
+#: may already hold on the base branch. Only that pass pays for them.
+LIGHT_QA_EMPTY_CHANGE = """
+### If the change is empty
+
+No file differs from the base branch: the coder changed nothing. The spec may
+already hold there (for example the file it asks for was merged by an earlier
+task, with the right content). Open the files the spec names, as they are now:
+
+- every criterion holds → `approved` (the repository already met the spec);
+- otherwise → `rejected`, one issue per criterion not met, naming the file
+  and the content the spec asks for.
+
+Never ask for tests, a test project, coverage or documentation the spec does
+not name: nothing a program reads changed, so there is nothing to test.
+"""
+
+
 def get_qa_reviewer_light_prompt(
     spec_dir: Path, project_dir: Path, scope: "ChangeScope"
 ) -> str:
@@ -480,16 +498,23 @@ def get_qa_reviewer_light_prompt(
             spec[:LIGHT_QA_SPEC_MAX_CHARS]
             + f"\n\n[... truncated: read `{spec_dir}/spec.md` for the rest ...]"
         )
-    diff = change_diff(project_dir, scope, LIGHT_QA_DIFF_MAX_CHARS) or (
-        "(diff unavailable — read the changed files)"
-    )
-    files = ", ".join(f"`{f}`" for f in scope.files)
+    empty_change = ""
+    if scope.files:
+        diff = change_diff(project_dir, scope, LIGHT_QA_DIFF_MAX_CHARS) or (
+            "(diff unavailable — read the changed files)"
+        )
+        files = ", ".join(f"`{f}`" for f in scope.files)
+    else:
+        diff = "(empty: no file differs from the base branch)"
+        files = "none — see « If the change is empty » below"
+        empty_change = LIGHT_QA_EMPTY_CHANGE
     base_branch = detect_base_branch(spec_dir, project_dir)
     prompt = _load_prompt_file("qa_reviewer_light.md")
     for key, value in (
         ("{{BASE_BRANCH}}", base_branch),
         ("{{SPEC_DIR}}", str(spec_dir)),
         ("{{FILES}}", files),
+        ("{{EMPTY_CHANGE}}", empty_change),
     ):
         prompt = prompt.replace(key, value)
     # Spec and diff last: they are data, and must not be scanned for

@@ -925,7 +925,13 @@ def _review_scope(scope: _QaScope) -> ChangeScope:
         # Unknown is never light.
         debug_warning("qa_loop", f"Change scope unavailable, full review: {exc}")
         return ChangeScope("full", "change scope unavailable")
-    if review_scope.is_light:
+    if review_scope.is_light and not review_scope.files:
+        message = (
+            f"QA scope: light ({review_scope.reason} against the base branch) — "
+            "the reviewer checks whether the repository already meets the spec; "
+            "no test suite, coverage or repository scan."
+        )
+    elif review_scope.is_light:
         message = (
             f"QA scope: light ({review_scope.reason}: "
             f"{', '.join(review_scope.files)}) — the reviewer checks the change "
@@ -1118,14 +1124,15 @@ def _coverage_gate(
     WORKPILOT_QA_MIN_COVERAGE (0 = disabled). Returns the issues and the
     verdict of a rejection, or None.
 
-    Not applicable when git showed a text-only change set: no source file
-    changed, so coverage cannot have moved, and demanding a measurement is
-    what sent the reviewer to run every suite of the repository with
-    coverage for a `.txt`. Decided from `review_scope` (git), never from what
-    the reviewer wrote in its sign-off.
+    Not applicable when git showed no file a program reads in the change
+    set (text only, however large, or no change at all): coverage cannot have
+    moved, and demanding a measurement is what sent the reviewer to run every
+    suite of the repository with coverage for a `.txt`, then the fixer to
+    invent placeholder test projects to produce a number. Decided from
+    `review_scope` (git), never from what the reviewer wrote in its sign-off.
     """
-    if review_scope is not None and review_scope.is_light:
-        debug("qa_loop", "Coverage gate not applicable: text-only change set")
+    if review_scope is not None and not review_scope.touches_code:
+        debug("qa_loop", "Coverage gate not applicable: no code in the change set")
         return None
     try:
         from .coverage_gate import (

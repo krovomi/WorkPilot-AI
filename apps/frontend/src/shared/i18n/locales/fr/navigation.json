@@ -209,6 +209,18 @@
 		"notInstalledDescription": "{{name}} n'est pas dans votre PATH. Installez-le, connectez-vous une fois dans un terminal, puis actualisez.",
 		"signInHint": "WorkPilot utilise la connexion propre à la CLI et ne lit jamais ses identifiants.",
 		"viewDocs": "Voir la documentation de {{name}}",
+		"install": {
+			"button": "Installer {{name}}",
+			"installing": "Installation en cours, merci de patienter…",
+			"installingShort": "Installation…",
+			"description": "{{name}} n'est pas dans votre PATH. WorkPilot peut le télécharger et l'installer pour vous avec la méthode officielle de l'éditeur ; connectez-vous ensuite une fois dans un terminal.",
+			"error": {
+				"node_required": "Impossible d'installer {{name}} ici : installez d'abord Node.js (nodejs.org), puis réessayez.",
+				"failed": "L'installation de {{name}} a échoué.",
+				"not_on_path": "{{name}} a été installé mais reste introuvable. Redémarrez WorkPilot, puis actualisez.",
+				"busy": "Une installation de {{name}} est déjà en cours."
+			}
+		},
 		"acp": {
 			"probing": "L'agent est interrogé sur ce qu'il sait faire…",
 			"declares": "Déclaré par l'agent (ACP initialize) :",

@@ -22,6 +22,7 @@ import {
 	isAgentCliTool,
 } from "../../shared/types/agent-cli";
 import { getAugmentedEnv } from "../env-utils";
+import { installAgentCli } from "./agent-cli-install";
 import {
 	findExecutable,
 	getPathDelimiter,
@@ -207,5 +208,8 @@ export function registerAgentCliHandlers(): void {
 	);
 	ipcMain.handle(IPC_CHANNELS.AGENT_CLI_PROBE_ACP, (_event, tool: unknown) =>
 		probeAcpAgent(tool),
+	);
+	ipcMain.handle(IPC_CHANNELS.AGENT_CLI_INSTALL, (_event, tool: unknown) =>
+		installAgentCli(tool, checkAgentCli),
 	);
 }
