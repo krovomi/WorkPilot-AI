@@ -27,7 +27,5 @@ export const EXPERIMENTAL_VIEWS: ReadonlySet<SidebarView> = new Set<SidebarView>
 	"plugin-marketplace",
 	"regression-guardian",
 	"release-coordinator",
-	"spec-approval",
-	"spec-refinement",
 	"team-bot",
 ]);

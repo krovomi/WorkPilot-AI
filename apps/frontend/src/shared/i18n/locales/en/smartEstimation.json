@@ -1,6 +1,6 @@
 {
 	"title": "Smart Estimation",
-	"description": "Get AI-powered complexity estimates based on your project's build history",
+	"description": "Complexity estimates computed from your project's build history",
 	"task": {
 		"label": "Task Description",
 		"placeholder": "Describe the task you want to estimate (e.g., 'Add user authentication with JWT', 'Create dashboard with charts', 'Refactor payment service')"

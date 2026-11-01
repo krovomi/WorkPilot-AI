@@ -1,16 +1,16 @@
 {
-	"noData": "Aucune donnée de simulation disponible",
+	"noData": "Aucun aperçu pour l'instant",
 	"noChanges": "Aucune modification non commitée à prévisualiser",
-	"title": "Rapport de Simulation Sandbox",
+	"title": "Aperçu des changements non commités",
 	"actions": {
-		"runScan": "Lancer le test à blanc",
+		"runScan": "Prévisualiser les changements",
 		"cancel": "Annuler",
-		"scanning": "Exécution du test à blanc...",
+		"scanning": "Lecture des changements...",
 		"reset": "Réinitialiser"
 	},
 	"errors": {
-		"noProject": "Sélectionnez un projet pour lancer un test à blanc.",
-		"failed": "Échec du test à blanc : {{error}}"
+		"noProject": "Sélectionnez un projet pour prévisualiser ses changements non commités.",
+		"failed": "L'aperçu a échoué : {{error}}"
 	},
 	"dryRun": "Test à blanc pour la spec {{specId}}",
 	"estimatedCost": "Coût Estimé",

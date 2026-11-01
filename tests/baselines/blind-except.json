@@ -362,7 +362,6 @@
   "apps/backend/runners/sandbox_runner.py": {"blind": 1, "silent": 0},
   "apps/backend/runners/self_healing_runner.py": {"blind": 1, "silent": 1},
   "apps/backend/runners/smart_estimation_runner.py": {"blind": 2, "silent": 0},
-  "apps/backend/runners/spec_refinement_runner.py": {"blind": 1, "silent": 0},
   "apps/backend/runners/spec_runner.py": {"blind": 1, "silent": 0},
   "apps/backend/runners/team_bot_runner.py": {"blind": 1, "silent": 0},
   "apps/backend/runners/tech_debt_runner.py": {"blind": 1, "silent": 0},
