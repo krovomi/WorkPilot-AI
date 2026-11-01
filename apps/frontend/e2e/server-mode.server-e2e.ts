@@ -56,6 +56,13 @@ async function startServer(): Promise<Server> {
 	const exited = new Promise<number | null>((resolve) =>
 		child.once("exit", (code) => resolve(code)),
 	);
+	// Closing its standard input ends the script, which stops the server
+	// and removes its files; a kill only comes after a grace period.
+	const stop = async () => {
+		child.stdin.end();
+		await Promise.race([exited, new Promise((resolve) => setTimeout(resolve, 30_000))]);
+		if (child.exitCode === null) child.kill();
+	};
 	// The passwords are drawn here and go to the server only through the
 	// script's standard input; it answers with the URL and the emails.
 	const passwords = {
@@ -69,14 +76,20 @@ async function startServer(): Promise<Server> {
 		lines.once("line", resolve);
 		void exited.then((code) => reject(new Error(`server exited (${code})`)));
 	});
-	const answer = JSON.parse(
-		await Promise.race([
-			firstLine,
-			new Promise<string>((_, reject) =>
-				setTimeout(() => reject(new Error("server not ready in time")), 180_000),
-			),
-		]),
-	) as { serverUrl: string; project: string; emails: Record<Who, string> };
+	let answer: { serverUrl: string; project: string; emails: Record<Who, string> };
+	try {
+		answer = JSON.parse(
+			await Promise.race([
+				firstLine,
+				new Promise<string>((_, reject) =>
+					setTimeout(() => reject(new Error("server not ready in time")), 180_000),
+				),
+			]),
+		);
+	} catch (error) {
+		await stop();
+		throw error;
+	}
 	const account = (who: Who): Account => ({
 		email: answer.emails[who],
 		password: passwords[who],
@@ -86,17 +99,7 @@ async function startServer(): Promise<Server> {
 		project: answer.project,
 		people: { alice: account("alice"), bob: account("bob"), carol: account("carol") },
 	};
-	return {
-		world,
-		stop: async () => {
-			child.stdin.end();
-			await Promise.race([
-				exited,
-				new Promise((resolve) => setTimeout(resolve, 30_000)),
-			]);
-			if (child.exitCode === null) child.kill();
-		},
-	};
+	return { world, stop };
 }
 
 /** Sign in from the app's first screen, as a person of the world. */
@@ -119,7 +122,8 @@ async function signIn(page: Page, world: World, who: Account): Promise<void> {
 async function openBoard(page: Page, project: string): Promise<void> {
 	const tab = page.getByText(project, { exact: true }).first();
 	const fromWelcome = page.getByRole("button", { name: `Open project ${project}` });
-	await expect(tab.or(fromWelcome)).toBeVisible({ timeout: 15_000 });
+	// On the welcome screen both match (the name is inside the button).
+	await expect(tab.or(fromWelcome).first()).toBeVisible({ timeout: 15_000 });
 	if (await fromWelcome.isVisible()) await fromWelcome.click();
 	await expect(page.getByText(/Shared board/).first()).toBeVisible({
 		timeout: 15_000,
