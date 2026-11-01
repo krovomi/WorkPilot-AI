@@ -26,6 +26,7 @@ applications mobiles pour un projet.
 | Sessions | `src/app/(app)/projects/[projectId]/sessions.tsx` | `GET /api/features/workspace/sessions` (les 100 dernières) |
 | Analyses | `src/app/(app)/projects/[projectId]/analyses/` | `GET /api/features/analyses/<analyse>/report`, `POST .../jobs` pour la lancer, suivie comme un job |
 | Réglages | `src/app/(app)/settings.tsx` | `POST /auth/switch-org`, `POST /auth/logout` |
+| Administration | `src/app/(app)/admin/` | `/admin/members`, `/auth/invitations`, `/admin/groups` (membres et projets), `/admin/roles` et `/admin/permissions` (`src/admin/api.ts`) |
 | Mes jetons sur le serveur | `src/app/(app)/tokens.tsx` | `GET`, `PUT /users/me/secrets`, `DELETE /users/me/secrets/{kind}` |
 
 Les actions d'une carte sont celles de l'app de bureau sur une carte du serveur
@@ -148,6 +149,19 @@ id_token et le remet au serveur, qui en vérifie la signature, l'audience et l'�
 (`src/auth/entra.ts`). L'enregistrement Entra doit déclarer cette URI de redirection pour une
 plateforme « Applications mobiles et de bureau » (voir [CONFIGURATION.md](../CONFIGURATION.md)).
 
+## Administration
+
+Les Réglages ouvrent l'administration de l'organisation où la personne agit, comme la vue du bureau :
+les membres (changer de rôle, retirer), les invitations (inviter par e-mail comme membre ou lecteur,
+révoquer ; sans serveur de mail, le lien d'acceptation revient une seule fois pour être partagé ;
+seul un administrateur de la plateforme peut inviter un administrateur du serveur, voir
+[server-mode.md](server-mode.md#qui-invite)), les groupes
+(membres, projets atteints avec leur rôle, rôle donné dans l'organisation) et les rôles (un rôle
+intégré se lit, un rôle personnalisé se crée, se modifie permission par permission et se supprime).
+Chaque page n'apparaît qu'avec sa permission de lecture (`org.member.read`, `org.invitation.read`,
+`org.role.read`) et chaque action qu'avec celle d'écriture ; le serveur revérifie tout. Les
+organisations, quotas, sessions et journal d'audit restent sur le bureau.
+
 ## Tableau de bord, sessions et analyses
 
 Le tableau de bord reprend les chiffres de la vue du bureau (cartes par colonne, qualité, dépenses
@@ -186,4 +200,5 @@ développement, simulateur, web), l'app fonctionne de la même façon, sans noti
 
 ## Ce qui vient
 
-- L'administration (membres, rôles, groupes, invitations).
+- Les organisations, les quotas, les sessions et le journal d'audit de l'administration.
+- La publication sur l'App Store et Google Play (comptes Apple et Google, projet EAS).

@@ -277,3 +277,39 @@ test("the project's context, and a personal token kept on the server", async () 
 	await shot(bob, "11-tokens");
 	expect(await bob.content()).not.toContain(token);
 });
+
+test("an organization admin runs members, invitations and groups from the phone", async () => {
+	// Alice, an admin of the team's organization, is still on the context.
+	const alice = signedInPage("alice");
+	await alice.goBack();
+	await alice.goBack();
+	await alice.getByText("Settings", { exact: true }).click();
+	await alice.getByRole("button", { name: "Open the administration" }).click();
+
+	await alice.getByRole("link", { name: /^Members/ }).click();
+	await expect(alice.getByText(world.emails.bob, { exact: false })).toBeVisible({ timeout: 30_000 });
+	await shot(alice, "12-members");
+	await alice.goBack();
+
+	// No mail server: the link to share comes back once, and the invitation is
+	// pending. An organization admin is not offered a server administrator.
+	await alice.getByRole("link", { name: /^Invitations/ }).click();
+	await expect(alice.getByRole("radio", { name: "Member" })).toBeVisible({ timeout: 30_000 });
+	await expect(alice.getByRole("radio", { name: "Server administrator" })).toHaveCount(0);
+	const invited = `dave-${randomBytes(4).toString("hex")}@example.com`;
+	await alice.getByLabel("Email").fill(invited);
+	await alice.getByRole("button", { name: "Invite", exact: true }).click();
+	await expect(alice.getByText(/share this link with them/)).toBeVisible({ timeout: 30_000 });
+	await expect(alice.getByText("1 pending invitation")).toBeVisible();
+	await shot(alice, "13-invitations");
+	await alice.goBack();
+
+	await alice.getByRole("link", { name: /^Groups/ }).click();
+	await alice.getByLabel("Name").fill("Mobile team");
+	await alice.getByRole("button", { name: "Create the group" }).click();
+	await alice.getByRole("link", { name: /Mobile team/ }).click({ timeout: 30_000 });
+	await alice.getByRole("button", { name: "Add a member" }).click();
+	await alice.getByRole("radio", { name: "bob", exact: true }).click();
+	await expect(alice.getByText("1 member")).toBeVisible({ timeout: 30_000 });
+	await shot(alice, "14-group");
+});

@@ -358,5 +358,100 @@
 		"value": "Jeton {{name}}",
 		"removeTitle": "Retirer le jeton {{name}} ?",
 		"removeBody": "Le serveur l'oublie ; les appels qui en ont besoin s'arrêtent jusqu'à ce que vous en ajoutiez un."
+	},
+	"admin": {
+		"title": "Administration",
+		"summary": "Membres, invitations, groupes et rôles de cette organisation.",
+		"open": "Ouvrir l'administration",
+		"of": "Organisation : {{org}}",
+		"remove": "Retirer",
+		"projectRole": {
+			"owner": "Propriétaire",
+			"member": "Membre",
+			"viewer": "Lecteur"
+		},
+		"members": {
+			"title": "Membres",
+			"summary": "Qui fait partie de l'organisation, et avec quel rôle.",
+			"you": "(vous)",
+			"inactive": "désactivé",
+			"remove": "Retirer de l'organisation",
+			"removeTitle": "Retirer {{name}} ?",
+			"removeBody": "Cette personne perd l'accès aux projets de l'organisation. Son compte reste sur le serveur."
+		},
+		"invitations": {
+			"title": "Invitations",
+			"summary": "Inviter quelqu'un par e-mail, et les invitations en attente.",
+			"new": "Inviter quelqu'un",
+			"email": "E-mail",
+			"send": "Inviter",
+			"sent": "Invitation envoyée par e-mail à {{email}}.",
+			"notSent": "Aucun e-mail n'est parti vers {{email}} : partagez-lui ce lien. Il n'est affiché qu'une fois.",
+			"share": "Partager le lien",
+			"pending_one": "{{count}} invitation en attente",
+			"pending_other": "{{count}} invitations en attente",
+			"expires": "expire le {{date}}",
+			"revoke": "Révoquer",
+			"revokeTitle": "Révoquer l'invitation de {{email}} ?",
+			"revokeBody": "Son lien cesse de fonctionner.",
+			"roles": {
+				"member": {
+					"label": "Membre",
+					"detail": "Rejoint cette organisation comme contributeur."
+				},
+				"viewer": {
+					"label": "Lecteur",
+					"detail": "Rejoint cette organisation en lecture seule."
+				},
+				"admin": {
+					"label": "Administrateur du serveur",
+					"detail": "Administre cette organisation et tout le serveur, toutes organisations comprises."
+				}
+			}
+		},
+		"groups": {
+			"title": "Groupes",
+			"summary": "Des groupes de membres, les projets qu'ils atteignent et le rôle qu'ils donnent.",
+			"new": "Nouveau groupe",
+			"name": "Nom",
+			"create": "Créer le groupe",
+			"none": "Aucun groupe pour l'instant.",
+			"gone": "Ce groupe n'existe plus.",
+			"memberCount_one": "{{count}} membre",
+			"memberCount_other": "{{count}} membres",
+			"projectCount_one": "{{count}} projet",
+			"projectCount_other": "{{count}} projets",
+			"orgRole": "Rôle dans l'organisation",
+			"noRole": "Aucun rôle donné par le groupe",
+			"addMember": "Ajouter un membre",
+			"addProject": "Donner accès à un projet",
+			"delete": "Supprimer le groupe",
+			"deleteTitle": "Supprimer le groupe {{name}} ?",
+			"deleteBody": "Ses membres gardent leurs propres accès ; ce que le groupe leur donnait disparaît."
+		},
+		"roles": {
+			"title": "Rôles",
+			"summary": "Les rôles et les permissions que chacun accorde.",
+			"new": "Nouveau rôle",
+			"name": "Nom",
+			"description": "Description",
+			"slug": "Identifiant : {{slug}}",
+			"create": "Créer le rôle",
+			"save": "Enregistrer",
+			"delete": "Supprimer le rôle",
+			"deleteTitle": "Supprimer le rôle {{name}} ?",
+			"deleteBody": "Le serveur refuse tant que quelqu'un l'a encore.",
+			"gone": "Ce rôle n'existe plus.",
+			"builtIn": "intégré",
+			"custom": "personnalisé",
+			"readOnly": "Un rôle intégré ne se modifie pas.",
+			"privileged": "sensible",
+			"permissionCount_one": "{{count}} permission",
+			"permissionCount_other": "{{count}} permissions",
+			"scope": {
+				"org": "Organisation",
+				"project": "Projet"
+			}
+		}
 	}
 }

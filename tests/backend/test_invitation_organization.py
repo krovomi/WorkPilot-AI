@@ -263,9 +263,15 @@ class TestCreation:
                 )
 
 
-def _client(env, org_key: str | None) -> AsyncClient:
-    """The invitations router, called by the platform admin acting in `org_key`."""
-    from server.auth.deps import CurrentUser, require_admin
+def _client(
+    env,
+    org_key: str | None,
+    *,
+    platform_role: str = "admin",
+    permissions: frozenset[str] = frozenset(),
+) -> AsyncClient:
+    """The invitations router, called by `ops` acting in `org_key`: the
+    platform admin by default, else a person holding `permissions` there."""
     from server.authz.principal import Principal
     from server.routers.invitations import router
 
@@ -274,8 +280,9 @@ def _client(env, org_key: str | None) -> AsyncClient:
         id=env["ops"],
         email="ops@example.test",
         display_name="ops",
-        platform_role="admin",
+        platform_role=platform_role,
         org_id=org_id,
+        permissions=permissions,
     )
 
     app = FastAPI()
@@ -287,9 +294,6 @@ def _client(env, org_key: str | None) -> AsyncClient:
         return await call_next(request)
 
     app.include_router(router)
-    app.dependency_overrides[require_admin] = lambda: CurrentUser(
-        id=env["ops"], email="ops@example.test", display_name="ops", role="admin"
-    )
     return AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
 
 
@@ -330,3 +334,69 @@ class TestRoutes:
         assert [i["id"] for i in listed_in_acme.json()] == [invitation_id]
         assert listed_in_globex.json() == []
         assert revoked.status_code == 404
+
+
+#: What the built-in organization admin role holds about invitations.
+_ORG_ADMIN = frozenset({"org.invitation.read", "org.invitation.write"})
+
+
+class TestWhoMayInvite:
+    """An organization admin invites into their organization; only a
+    platform admin makes a server administrator."""
+
+    async def test_an_organization_admin_invites_a_member(self, env):
+        async with _client(
+            env, "acme", platform_role="member", permissions=_ORG_ADMIN
+        ) as c:
+            created = await c.post(
+                "/auth/invitations",
+                json={"email": "dev@acme.example.com", "role": "member"},
+            )
+            listed = await c.get("/auth/invitations")
+        assert created.status_code == 201, created.text
+        assert [i["id"] for i in listed.json()] == [created.json()["id"]]
+
+    async def test_an_organization_admin_cannot_invite_a_server_administrator(
+        self, env
+    ):
+        from server.db.models import Invitation
+        from sqlalchemy import select
+
+        async with _client(
+            env, "acme", platform_role="member", permissions=_ORG_ADMIN
+        ) as c:
+            resp = await c.post(
+                "/auth/invitations",
+                json={"email": "boss@acme.example.com", "role": "admin"},
+            )
+        assert resp.status_code == 403
+        async with _session() as db:
+            found = await db.scalar(
+                select(Invitation).where(Invitation.email == "boss@acme.example.com")
+            )
+        assert found is None
+
+    async def test_a_platform_admin_can_invite_a_server_administrator(self, env):
+        async with _client(env, "acme") as c:
+            resp = await c.post(
+                "/auth/invitations",
+                json={"email": "ops2@acme.example.com", "role": "admin"},
+            )
+        assert resp.status_code == 201, resp.text
+
+    async def test_without_the_invitation_permissions_nothing_is_reached(self, env):
+        async with _client(
+            env,
+            "acme",
+            platform_role="member",
+            permissions=frozenset({"org.invitation.read"}),
+        ) as c:
+            issued = await c.post(
+                "/auth/invitations", json={"email": "dev@acme.example.com"}
+            )
+            revoked = await c.delete("/auth/invitations/whatever")
+        async with _client(env, "acme", platform_role="member") as c:
+            listed = await c.get("/auth/invitations")
+        assert issued.status_code == 403
+        assert revoked.status_code == 403
+        assert listed.status_code == 403
