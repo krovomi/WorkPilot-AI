@@ -64,14 +64,16 @@ async def init_db() -> None:
     a fresh dev or test instance would come up with no built-in roles at all
     and every membership write would fail on a missing ``role_id``. Running it
     after Alembic too is what propagates a permission newly granted to a
-    built-in role.
+    built-in role. The move of existing users into the default organization is
+    not part of it after the first time: see
+    :func:`server.db.seed.bootstrap_deployment`.
     """
-    from server.db.seed import backfill_existing_deployment
+    from server.db.seed import bootstrap_deployment
 
     engine = get_engine()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        await conn.run_sync(backfill_existing_deployment)
+        await conn.run_sync(bootstrap_deployment)
 
 
 async def dispose_engine() -> None:

@@ -584,3 +584,19 @@ class AuditLog(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow
     )
+
+
+class DeploymentMarker(Base):
+    """A one-time step this deployment has already taken, by key.
+
+    Startup code that must run once per deployment, rather than on every
+    start, looks for its key here and records it when done. The row is the
+    only state: what the step did lives in the tables it changed.
+    """
+
+    __tablename__ = "deployment_markers"
+
+    key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )

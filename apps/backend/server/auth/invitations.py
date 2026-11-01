@@ -10,6 +10,9 @@ created. Security properties:
   also guarded by the unique ``users.email`` constraint, so a token race
   cannot create two accounts.
 - The target email is fixed by the issuer; the invitee cannot change it.
+- The organization is fixed at creation: the one the issuer is acting in. The
+  invitee joins that organization, with the role recorded on the invitation,
+  and no other.
 """
 
 from __future__ import annotations
@@ -25,11 +28,16 @@ from server.db.models import (
     AuditLog,
     GlobalRole,
     Invitation,
+    Organization,
+    OrgMember,
+    Project,
     ProjectMember,
     ProjectRole,
+    Role,
+    RoleScope,
     User,
 )
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
@@ -64,22 +72,57 @@ def build_invite_link(token: str) -> str:
     return f"/invite?token={token}"
 
 
+async def _org_role(db: AsyncSession, org_id: str, slug: str) -> Role:
+    """An organization-scope role usable in ``org_id``: built-in or its own."""
+    role = await db.scalar(
+        select(Role).where(
+            Role.slug == slug,
+            Role.scope == RoleScope.ORG.value,
+            or_(Role.org_id.is_(None), Role.org_id == org_id),
+        )
+    )
+    if role is None:
+        raise InvitationError(f"Invalid organization role: {slug}")
+    return role
+
+
 async def create_invitation(
     db: AsyncSession,
     *,
     email: str,
+    org_id: str,
     role: str = GlobalRole.MEMBER.value,
     invited_by: str | None,
+    org_role: str | None = None,
     project_id: str | None = None,
     project_role: str | None = None,
 ) -> tuple[Invitation, str]:
-    """Create a pending invitation. Returns (invitation, raw_token)."""
+    """Create a pending invitation into ``org_id``. Returns (invitation, raw_token).
+
+    ``org_id`` is the organization the issuer is acting in, as the request
+    resolved it; the caller has already checked the issuer's right to invite
+    there. ``org_role`` defaults to the organization role the platform
+    ``role`` maps onto, as for the users of a single-tenant deployment. A
+    project, when given, must belong to the same organization.
+    """
+    from server.authz.roles import DEFAULT_ORG_ROLE, LEGACY_ROLE_MAP
+
     email = email.strip().lower()
     if not email or "@" not in email:
         raise InvitationError("Invalid email address")
     if role not in {r.value for r in GlobalRole}:
         raise InvitationError(f"Invalid role: {role}")
+    if not org_id or await db.get(Organization, org_id) is None:
+        raise InvitationError("Unknown organization")
+    membership_role = await _org_role(
+        db, org_id, org_role or LEGACY_ROLE_MAP.get(role, DEFAULT_ORG_ROLE)
+    )
     if project_id is not None:
+        project_org = await db.scalar(
+            select(Project.org_id).where(Project.id == project_id)
+        )
+        if project_org != org_id:
+            raise InvitationError("Unknown project")
         project_role = project_role or ProjectRole.MEMBER.value
         if project_role not in {r.value for r in ProjectRole}:
             raise InvitationError(f"Invalid project role: {project_role}")
@@ -96,6 +139,8 @@ async def create_invitation(
         role=role,
         token_hash=hash_token(token),
         invited_by=invited_by,
+        org_id=org_id,
+        org_role_id=membership_role.id,
         project_id=project_id,
         project_role=project_role,
         expires_at=_utcnow() + timedelta(hours=settings.invitation_ttl_hours),
@@ -104,9 +149,10 @@ async def create_invitation(
     db.add(
         AuditLog(
             user_id=invited_by,
+            org_id=org_id,
             project_id=project_id,
             action="auth.invitation.created",
-            payload={"email": email, "role": role},
+            payload={"email": email, "role": role, "org_role": membership_role.slug},
         )
     )
     await db.commit()
@@ -130,6 +176,10 @@ def _assert_usable(invitation: Invitation | None) -> Invitation:
         raise InvitationError("Invitation has already been used")
     if _aware(invitation.expires_at) < _utcnow():
         raise InvitationError("Invitation has expired")
+    # One issued before invitations named their organization, or whose role
+    # was since deleted, places the account nowhere: it is not offered either.
+    if invitation.org_id is None or invitation.org_role_id is None:
+        raise InvitationError("Invitation is no longer valid; ask for a new one")
     return invitation
 
 
@@ -147,7 +197,10 @@ async def accept_invitation(
     """Create the account behind an invitation and consume it (single-use).
 
     The email is taken from the invitation, never from the request, so an
-    invitee cannot register a different address than the one invited.
+    invitee cannot register a different address than the one invited. The
+    account joins the invitation's organization, with the invitation's role;
+    an invitation that names no organization, or whose role no longer exists,
+    is refused before any account is created.
     """
     invitation = _assert_usable(await _fetch_by_token(db, token))
 
@@ -162,6 +215,13 @@ async def accept_invitation(
     )
 
     invitation.accepted_at = _utcnow()
+    db.add(
+        OrgMember(
+            org_id=invitation.org_id,
+            user_id=user.id,
+            role_id=invitation.org_role_id,
+        )
+    )
     if invitation.project_id is not None:
         db.add(
             ProjectMember(
@@ -173,6 +233,7 @@ async def accept_invitation(
     db.add(
         AuditLog(
             user_id=user.id,
+            org_id=invitation.org_id,
             project_id=invitation.project_id,
             action="auth.invitation.accepted",
             payload={"email": invitation.email},
@@ -183,19 +244,27 @@ async def accept_invitation(
     return user
 
 
-async def list_pending(db: AsyncSession) -> list[Invitation]:
-    """Invitations that are neither accepted nor revoked (may be expired)."""
+async def list_pending(db: AsyncSession, org_id: str) -> list[Invitation]:
+    """Invitations into ``org_id`` that are neither accepted nor revoked (may be expired)."""
     rows = await db.scalars(
         select(Invitation)
-        .where(Invitation.accepted_at.is_(None), Invitation.revoked_at.is_(None))
+        .where(
+            Invitation.org_id == org_id,
+            Invitation.accepted_at.is_(None),
+            Invitation.revoked_at.is_(None),
+        )
         .order_by(Invitation.created_at.desc())
     )
     return list(rows)
 
 
-async def revoke(db: AsyncSession, invitation_id: str) -> bool:
+async def revoke(db: AsyncSession, invitation_id: str, org_id: str) -> bool:
     invitation = await db.get(Invitation, invitation_id)
-    if invitation is None or invitation.accepted_at is not None:
+    if (
+        invitation is None
+        or invitation.org_id != org_id
+        or invitation.accepted_at is not None
+    ):
         return False
     if invitation.revoked_at is None:
         invitation.revoked_at = _utcnow()
