@@ -30,7 +30,9 @@ from tests.server_e2e import stack as e2e
 PROJECT_NAME = "Team Board"
 
 
-def _seed(st: e2e.Stack, people: dict[str, e2e.Person], run: str, repo_url: str) -> None:
+def _seed(
+    st: e2e.Stack, people: dict[str, e2e.Person], run: str, repo_url: str
+) -> None:
     platform = people["platform"]
     st.login(platform)
     orgs = {
@@ -38,7 +40,10 @@ def _seed(st: e2e.Stack, people: dict[str, e2e.Person], run: str, repo_url: str)
             platform,
             "POST",
             "/admin/orgs",
-            json={"name": f"App E2E {side.upper()} {run}", "slug": f"app-e2e-{side}-{run}"},
+            json={
+                "name": f"App E2E {side.upper()} {run}",
+                "slug": f"app-e2e-{side}-{run}",
+            },
         )["id"]
         for side in ("a", "b")
     }
@@ -83,7 +88,8 @@ def main() -> int:
         e2e.migrate(env)
         run = e2e.run_suffix()
         people = {
-            key: e2e.new_person(key, run) for key in ("platform", "alice", "bob", "carol")
+            key: e2e.new_person(key, run)
+            for key in ("platform", "alice", "bob", "carol")
         }
         e2e.create_platform_admin(env, people["platform"])
         with e2e.serve_directory(forge) as forge_url:
