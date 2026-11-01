@@ -74,11 +74,7 @@ import { getSourceEnvPath } from "./ipc-handlers/settings-handlers";
 import { stopAllPrFollowups } from "./ipc-handlers/task/pr-followup-handlers";
 import { initializeUsageMonitorForwarding } from "./ipc-handlers/terminal-handlers";
 import { setupIpcHandlers } from "./ipc-setup";
-import {
-	isServerMode,
-	loadPersistedState,
-	restoreSession,
-} from "./server-connection";
+import { loadPersistedState, restoreSession } from "./server-connection";
 import {
 	enforceWebviewPreferences,
 	isPermissionGranted,
@@ -625,11 +621,9 @@ async function waitForBackendReady(url: string, timeoutMs = 10000) {
 
 // Fonction pour lancer le backend si nécessaire
 async function launchBackendIfNeeded() {
-	// Mode serveur multi-utilisateurs : le backend tourne sur un serveur
-	// distant, on ne spawne rien en local.
-	if (isServerMode()) {
-		return;
-	}
+	// Lancé aussi quand l'app est connectée à un serveur WorkPilot : les
+	// projets locaux et les outils propres à la machine (hooks, mémoire,
+	// notifications) parlent à ce backend local, le serveur ne les sert pas.
 	// Vérifie si le backend répond déjà
 	try {
 		await waitForBackendReady("http://127.0.0.1:9000/providers", 1500);
