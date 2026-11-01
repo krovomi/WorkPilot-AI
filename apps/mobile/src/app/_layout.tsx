@@ -7,12 +7,15 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { SessionProvider, useSession } from "../auth/session";
 import { Button, Centered, Loading } from "../ui/components";
 import { useTheme } from "../ui/theme";
+import { ThemeProvider } from "../ui/ThemeProvider";
 
 export default function RootLayout() {
 	return (
 		<SafeAreaProvider>
 			<SessionProvider>
-				<Root />
+				<ThemeProvider>
+					<Root />
+				</ThemeProvider>
 			</SessionProvider>
 		</SafeAreaProvider>
 	);

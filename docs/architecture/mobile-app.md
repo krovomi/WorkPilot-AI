@@ -25,7 +25,7 @@ applications mobiles pour un projet.
 | Tableau de bord | `src/app/(app)/projects/[projectId]/dashboard.tsx` | `GET /api/features/workspace/dashboard` et `.../costs` |
 | Sessions | `src/app/(app)/projects/[projectId]/sessions.tsx` | `GET /api/features/workspace/sessions` (les 100 dernières) |
 | Analyses | `src/app/(app)/projects/[projectId]/analyses/` | `GET /api/features/analyses/<analyse>/report`, `POST .../jobs` pour la lancer, suivie comme un job |
-| Réglages | `src/app/(app)/settings.tsx` | `POST /auth/switch-org`, `POST /auth/logout` |
+| Réglages | `src/app/(app)/settings.tsx` | `POST /auth/switch-org`, `POST /auth/logout`, `PUT /users/me/preferences` (le thème, `src/ui/ThemeSection.tsx`) |
 | Administration | `src/app/(app)/admin/` | `/admin/members`, `/auth/invitations`, `/admin/groups` (membres et projets), `/admin/roles` et `/admin/permissions` (`src/admin/api.ts`) |
 | Mes jetons sur le serveur | `src/app/(app)/tokens.tsx` | `GET`, `PUT /users/me/secrets`, `DELETE /users/me/secrets/{kind}` |
 
@@ -203,6 +203,31 @@ Pour qu'un téléphone obtienne un jeton, l'app doit être construite pour un pr
 de `EAS_PROJECT_ID` (lu par `app.config.ts`), Android demande en plus le fichier Firebase du projet
 (`GOOGLE_SERVICES_JSON`, un chemin) et iOS la clé APNs, que EAS gère. Sans eux (build de
 développement, simulateur, web), l'app fonctionne de la même façon, sans notifications.
+
+## Les thèmes
+
+L'app reprend les sept thèmes de couleur de l'app de bureau (`COLOR_THEMES`), chacun en clair et en
+sombre : `src/ui/palettes.ts` porte les valeurs du bloc CSS de chaque thème
+(`apps/frontend/src/renderer/styles/globals.css`), le fichier dit quelle variable donne quelle
+couleur. Sur le téléphone, l'accent et les couleurs d'état servent aussi de texte (un état, une
+coche, un lien) sur le fond ou une carte ; là où la valeur du bureau n'atteint pas 3:1, elle est
+foncée (clair) ou éclaircie (sombre) juste assez, et la ligne garde la valeur du bureau en
+commentaire. Default clair garde l'accent olive plus foncé que l'app avait déjà, avec du texte blanc
+dessus. Un test vérifie ces contrastes pour chaque palette.
+
+| Étape | Où |
+|---|---|
+| Au démarrage, la copie du téléphone s'applique avant tout réseau | `src/ui/theme-store.ts` (expo-secure-store, déjà là pour les jetons : pas d'AsyncStorage ; `localStorage` sur le web) |
+| Un fournisseur à la racine donne la palette à tous les `useTheme()`, aux en-têtes natifs et au thème de navigation | `src/ui/ThemeProvider.tsx`, `src/app/_layout.tsx` |
+| Une fois connectée, la copie est réconciliée avec le compte, une fois par personne : un choix fait hors ligne part d'abord ; sinon le choix du serveur gagne ; un serveur sans choix reçoit celui du téléphone | `src/ui/theme-sync.ts`, `GET` et `PUT /users/me/preferences` |
+| Un choix dans Réglages s'applique, est gardé sur le téléphone puis envoyé ; un envoi qui échoue reste en attente pour la prochaine synchronisation, sans erreur à l'écran | `src/ui/ThemeSection.tsx` |
+
+Le mode `system` suit l'appareil (`useColorScheme`). Les noms des thèmes sont ceux du produit, sauf
+« Default », traduit. L'app de bureau connectée à un serveur fait de même : elle lit le choix à la
+connexion (`main/server-ui-preferences.ts`, canal `SERVER_AUTH_PULL_UI_PREFERENCES`) et envoie le
+sien quand la personne change de thème (`SETTINGS_SAVE`). Les captures de l'e2e
+(`WORKPILOT_E2E_SCREENSHOTS`) sont prises en clair puis en sombre sur la même page, sans nouvelle
+connexion.
 
 ## Ce qui vient
 

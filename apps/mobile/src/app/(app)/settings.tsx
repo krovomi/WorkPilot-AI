@@ -8,6 +8,7 @@ import { useSession } from "../../auth/session";
 import { describeError } from "../../i18n";
 import { Button, ErrorBanner, Section } from "../../ui/components";
 import { RADIUS, SPACE, useTheme } from "../../ui/theme";
+import { ThemeSection } from "../../ui/ThemeSection";
 
 export default function Settings() {
 	const { t } = useTranslation();
@@ -43,6 +44,7 @@ export default function Settings() {
 					{serverUrl}
 				</Text>
 			</Section>
+			<ThemeSection />
 			{administers ? (
 				<Section title={t("admin.title")}>
 					<Text style={{ color: theme.textMuted }}>{t("admin.summary")}</Text>
