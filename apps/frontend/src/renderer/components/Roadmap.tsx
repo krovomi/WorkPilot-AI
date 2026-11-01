@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { RoadmapFeature } from "../../shared/types";
+import { useServerViewLive } from "../hooks/useServerViewLive";
 import { AddFeatureDialog } from "./AddFeatureDialog";
 import { CompetitorAnalysisDialog } from "./CompetitorAnalysisDialog";
 import { CompetitorAnalysisViewer } from "./CompetitorAnalysisViewer";
@@ -20,6 +21,8 @@ import type { RoadmapProps } from "./roadmap/types";
 import { getCompetitorInsightsForFeature } from "./roadmap/utils";
 
 export function Roadmap({ projectId, onGoToTask }: Readonly<RoadmapProps>) {
+	// A server project's roadmap shows a teammate's change at once.
+	useServerViewLive(projectId, "roadmap");
 	// State management
 	const [selectedFeature, setSelectedFeature] = useState<RoadmapFeature | null>(
 		null,

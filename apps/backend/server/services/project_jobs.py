@@ -180,6 +180,9 @@ class ProjectJobs:
             if not recorded:
                 self._running.pop(key, None)
         self._keep(job.id)
+        # Announced while it waits for a slot, not only once it runs: a
+        # teammate's open view follows it from the start.
+        _notify(project_id, feature, job.id, "queued", user_id)
         cmd = [sys.executable, str(runner_path), project_flag, server_path, *args]
         asyncio.get_running_loop().create_task(
             self._execute(
