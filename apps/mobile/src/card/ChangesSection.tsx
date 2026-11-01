@@ -26,7 +26,7 @@ export function ChangesSection({ changes }: { changes: CardChanges | null }) {
 			) : (
 				<>
 					<Text style={{ color: theme.textMuted }}>
-						{t("card.changesSummary", {
+						{t(changes.commitCount === undefined ? "card.changesSummaryFiles" : "card.changesSummary", {
 							files: changes.filesChanged ?? changes.files.length,
 							additions: changes.additions ?? 0,
 							deletions: changes.deletions ?? 0,

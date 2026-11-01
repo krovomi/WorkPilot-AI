@@ -104,7 +104,8 @@
 		"patchTruncated": "The diff is cut here; read the rest on the desktop.",
 		"qaReport": "QA report",
 		"showReport": "Show the full report",
-		"hideReport": "Hide the report"
+		"hideReport": "Hide the report",
+		"changesSummaryFiles": "{{files}} files · +{{additions}} −{{deletions}}"
 	},
 	"actions": {
 		"start": "Start",
@@ -191,5 +192,39 @@
 		"deleteTitle": "Delete this conversation?",
 		"deleteBody": "It is removed for the whole project.",
 		"suggested": "Suggested task: {{title}}"
+	},
+	"forge": {
+		"github": "GitHub",
+		"gitlab": "GitLab",
+		"none": "This project's repository is not on a forge the server serves.",
+		"issues": "Issues",
+		"pulls_github": "Pull requests",
+		"pulls_gitlab": "Merge requests",
+		"noIssues": "No open issue.",
+		"noPulls": "Nothing open.",
+		"noDescription": "No description.",
+		"comments": "Comments ({{count}})",
+		"newComment": "Your comment",
+		"comment": "Comment",
+		"aiReview": "AI review",
+		"noReview": "Not reviewed yet.",
+		"runReview": "Run the AI review",
+		"followupReview": "Review what changed since",
+		"checks": "Checks: {{passed}} passed, {{failed}} failed, {{pending}} pending",
+		"mergeTitle": "Merge #{{number}}?",
+		"mergeBody": "It is merged into {{base}} with your token.",
+		"state": {
+			"open": "Open",
+			"opened": "Open",
+			"closed": "Closed",
+			"merged": "Merged",
+			"locked": "Locked"
+		},
+		"verdict": {
+			"ready_to_merge": "Ready to merge",
+			"merge_with_changes": "Mergeable after small changes",
+			"needs_revision": "Needs revision",
+			"blocked": "Blocked"
+		}
 	}
 }

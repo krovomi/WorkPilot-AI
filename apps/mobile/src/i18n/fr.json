@@ -104,7 +104,8 @@
 		"patchTruncated": "La différence s'arrête ici ; la suite se lit sur le bureau.",
 		"qaReport": "Rapport QA",
 		"showReport": "Afficher tout le rapport",
-		"hideReport": "Masquer le rapport"
+		"hideReport": "Masquer le rapport",
+		"changesSummaryFiles": "{{files}} fichiers · +{{additions}} −{{deletions}}"
 	},
 	"actions": {
 		"start": "Démarrer",
@@ -191,5 +192,39 @@
 		"deleteTitle": "Supprimer cette conversation ?",
 		"deleteBody": "Elle disparaît pour tout le projet.",
 		"suggested": "Tâche suggérée : {{title}}"
+	},
+	"forge": {
+		"github": "GitHub",
+		"gitlab": "GitLab",
+		"none": "Le dépôt de ce projet n'est pas sur une forge que le serveur sert.",
+		"issues": "Issues",
+		"pulls_github": "Pull requests",
+		"pulls_gitlab": "Merge requests",
+		"noIssues": "Aucune issue ouverte.",
+		"noPulls": "Rien d'ouvert.",
+		"noDescription": "Pas de description.",
+		"comments": "Commentaires ({{count}})",
+		"newComment": "Votre commentaire",
+		"comment": "Commenter",
+		"aiReview": "Revue IA",
+		"noReview": "Pas encore revue.",
+		"runReview": "Lancer la revue IA",
+		"followupReview": "Revoir ce qui a changé depuis",
+		"checks": "Vérifications : {{passed}} réussies, {{failed}} en échec, {{pending}} en attente",
+		"mergeTitle": "Fusionner #{{number}} ?",
+		"mergeBody": "Elle est fusionnée dans {{base}} avec votre jeton.",
+		"state": {
+			"open": "Ouverte",
+			"opened": "Ouverte",
+			"closed": "Fermée",
+			"merged": "Fusionnée",
+			"locked": "Verrouillée"
+		},
+		"verdict": {
+			"ready_to_merge": "Prête à fusionner",
+			"merge_with_changes": "Fusionnable après de petits changements",
+			"needs_revision": "À reprendre",
+			"blocked": "Bloquée"
+		}
 	}
 }
