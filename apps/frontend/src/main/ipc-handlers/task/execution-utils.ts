@@ -333,7 +333,11 @@ export function determineStartEvent(
 		return { type: "PLAN_APPROVED" };
 	}
 
-	if (task.status === "human_review" || task.status === "error") {
+	if (
+		task.status === "human_review" ||
+		task.status === "error" ||
+		task.status === "build_failed"
+	) {
 		if (task.status === "error" && (task.subtasks?.length ?? 0) === 0) {
 			return { type: "PLANNING_STARTED" };
 		}

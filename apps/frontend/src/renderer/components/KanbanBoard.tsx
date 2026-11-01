@@ -54,6 +54,7 @@ import JiraLogo from "../assets/logos/jira.svg";
 import { useViewState } from "../contexts/ViewStateContext";
 import { useKanbanAccessibility } from "../hooks/useKanbanAccessibility";
 import { useToast } from "../hooks/use-toast";
+import { useVisibleKanbanColumns } from "../hooks/useVisibleKanbanColumns";
 import { formatAgingDuration, listAgingTasks } from "../lib/kanban-aging";
 import { computeBoardCostForecast } from "../lib/kanban-cost";
 import {
@@ -235,15 +236,14 @@ export function KanbanBoard({
 	const projects = useProjectStore((state) => state.projects);
 	const selectedProjectId = useProjectStore((state) => state.selectedProjectId);
 	const activeProjectId = useProjectStore((state) => state.activeProjectId);
-
 	// Project environment store for Azure DevOps configuration.
 	const envConfig = useProjectEnvStore((state) => state.envConfig);
-
-	// Kanban settings store for column preferences (collapse state, width, lock state, order)
+	// Kanban settings: column preferences (collapse, width, lock) and order
+	// (minus « Build rouge » on a project without CI, see the hook).
 	const columnPreferences = useKanbanSettingsStore(
 		(state) => state.columnPreferences,
 	);
-	const columnOrder = useKanbanSettingsStore((state) => state.columnOrder);
+	const columnOrder = useVisibleKanbanColumns(tasks);
 	const loadKanbanPreferences = useKanbanSettingsStore(
 		(state) => state.loadPreferences,
 	);
