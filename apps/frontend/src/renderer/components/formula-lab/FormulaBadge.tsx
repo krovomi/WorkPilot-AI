@@ -70,10 +70,12 @@ export function FormulaBadge({ task, projectPath, specDir }: FormulaBadgeProps) 
 			type="button"
 			onClick={open}
 			title={t("formulaLab:badge.estimateTooltip")}
-			className="flex items-center gap-1 rounded-full border border-dashed border-border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary"
+			aria-label={t("formulaLab:badge.estimate")}
+			// Icon-only call-to-action: the label lives in the tooltip so the card
+			// footer stays on one line in a narrow column.
+			className="flex items-center rounded-full border border-dashed border-border p-1 text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary"
 		>
 			<Sparkles className="h-3 w-3" />
-			{t("formulaLab:badge.estimate")}
 		</button>
 	);
 }

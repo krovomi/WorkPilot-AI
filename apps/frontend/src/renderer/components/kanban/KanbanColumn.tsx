@@ -26,6 +26,7 @@ import {
 	ListPlus,
 	Loader2,
 	Lock,
+	MoreHorizontal,
 	Plus,
 	Settings,
 	Unlock,
@@ -45,6 +46,12 @@ import {
 import { SortableTaskCard } from "../SortableTaskCard";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
 import { Input } from "../ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { ScrollArea } from "../ui/scroll-area";
@@ -278,10 +285,10 @@ export function WipLimitPopover({ wipLimit, onSetWipLimit }: WipLimitPopoverProp
 							variant="ghost"
 							size="icon"
 							className={cn(
-								"h-7 w-7 transition-colors",
+								"h-6 w-6 transition-colors",
 								wipLimit
 									? "text-primary bg-primary/10 hover:bg-primary/20"
-									: "hover:bg-muted-foreground/10 hover:text-muted-foreground",
+									: "hover:bg-muted-foreground/10 hover:text-muted-foreground kanban-col-tool",
 							)}
 							aria-label={t("kanban.wipLimit.set")}
 						>
@@ -583,9 +590,8 @@ export const DroppableColumn = memo(function DroppableColumn({
 			<div
 				ref={setNodeRef}
 				className={cn(
-					"relative flex flex-col rounded-xl border border-white/5 bg-linear-to-b from-secondary/30 to-transparent backdrop-blur-sm transition-all duration-200",
+					"kanban-column relative flex flex-col rounded-xl transition-colors duration-200",
 					getColumnBorderColor(),
-					"border-t-2",
 					isOver && "drop-zone-highlight",
 					isImportForbidden && "border-destructive/60",
 				)}
@@ -695,9 +701,8 @@ export const DroppableColumn = memo(function DroppableColumn({
 			<div
 				ref={setNodeRef}
 				className={cn(
-					"relative flex flex-1 flex-col rounded-xl border border-white/5 bg-linear-to-b from-secondary/30 to-transparent backdrop-blur-sm transition-all duration-200",
+					"kanban-column relative flex min-w-0 flex-1 flex-col rounded-xl transition-colors duration-200",
 					getColumnBorderColor(),
-					"border-t-2",
 					isOver && "drop-zone-highlight",
 					isImportForbidden && "border-destructive/60",
 				)}
@@ -708,69 +713,18 @@ export const DroppableColumn = memo(function DroppableColumn({
 						<Ban className="h-10 w-10 text-destructive/70" />
 					</div>
 				)}
-				{/* Column header - enhanced styling */}
-				<div className="flex items-center justify-between p-4 border-b border-white/5">
-					<div className="flex items-center gap-2.5">
-						{/* Column drag handle for reordering */}
-						{dragHandleProps && (
-							<Tooltip delayDuration={400}>
-								<TooltipTrigger asChild>
-									<button
-										type="button"
-										className="h-6 w-5 flex items-center justify-center cursor-grab active:cursor-grabbing text-muted-foreground/30 hover:text-muted-foreground/70 transition-colors touch-none"
-										{...dragHandleProps.listeners}
-										{...dragHandleProps.attributes}
-										aria-label={t("kanban.dragColumn")}
-									>
-										<GripVertical className="h-4 w-4" />
-									</button>
-								</TooltipTrigger>
-								<TooltipContent>{t("kanban.dragColumn")}</TooltipContent>
-							</Tooltip>
-						)}
-						{/* Collapse button */}
-						{onToggleCollapsed && (
-							<Tooltip delayDuration={200}>
-								<TooltipTrigger asChild>
-									<Button
-										variant="ghost"
-										size="icon"
-										className="h-6 w-6 hover:bg-muted-foreground/10 hover:text-muted-foreground transition-colors"
-										onClick={onToggleCollapsed}
-										aria-label={t("kanban.collapseColumn")}
-									>
-										<ChevronLeft className="h-3.5 w-3.5" />
-									</Button>
-								</TooltipTrigger>
-								<TooltipContent>{t("kanban.collapseColumn")}</TooltipContent>
-							</Tooltip>
-						)}
-						{/* Select All checkbox for column */}
-						{onSelectAll && onDeselectAll && (
-							<Tooltip delayDuration={200}>
-								<TooltipTrigger asChild>
-									<div className="flex items-center">
-										<Checkbox
-											checked={selectAllCheckedState}
-											onCheckedChange={handleSelectAllChange}
-											disabled={taskCount === 0}
-											aria-label={
-												isAllSelected
-													? t("kanban.deselectAll")
-													: t("kanban.selectAll")
-											}
-											className="h-4 w-4"
-										/>
-									</div>
-								</TooltipTrigger>
-								<TooltipContent>
-									{isAllSelected
-										? t("kanban.deselectAll")
-										: t("kanban.selectAll")}
-								</TooltipContent>
-							</Tooltip>
-						)}
-						<h2 className="font-semibold text-sm text-foreground">
+				{/* Column header — the name and the count always show; the tools
+				    (reorder, collapse, select, lock, WIP…) appear when the pointer
+				    or the keyboard focus is on the column, so a resting board reads
+				    as six names and six numbers. State worth seeing (a locked
+				    column, a partial selection) stays visible. */}
+				<div className="flex items-center justify-between gap-2 px-3 pt-3 pb-2">
+					<div className="flex min-w-0 items-center gap-1.5">
+						<span
+							aria-hidden="true"
+							className="kanban-column-dot h-2 w-2 shrink-0 rounded-full"
+						/>
+						<h2 className="truncate font-semibold text-sm text-foreground">
 							{t(TASK_STATUS_LABELS[status])}
 						</h2>
 						{status === "in_progress" && maxParallelTasks ? (
@@ -809,19 +763,50 @@ export const DroppableColumn = memo(function DroppableColumn({
 							<span className="column-count-badge">{tasks.length}</span>
 						)}
 					</div>
-					<div className="flex items-center gap-1">
-						{/* Lock toggle button - available for all columns */}
-						{onToggleLocked && (
+					<div className="flex shrink-0 items-center gap-0.5">
+						{/* Select All checkbox for column */}
+						{onSelectAll && onDeselectAll && (
+							<Tooltip delayDuration={200}>
+								<TooltipTrigger asChild>
+									<div
+										className={cn(
+											"flex shrink-0 items-center",
+											selectAllCheckedState === false && "kanban-col-tool",
+										)}
+									>
+										<Checkbox
+											checked={selectAllCheckedState}
+											onCheckedChange={handleSelectAllChange}
+											disabled={taskCount === 0}
+											aria-label={
+												isAllSelected
+													? t("kanban.deselectAll")
+													: t("kanban.selectAll")
+											}
+											className="mx-1.5 h-4 w-4"
+										/>
+									</div>
+								</TooltipTrigger>
+								<TooltipContent>
+									{isAllSelected
+										? t("kanban.deselectAll")
+										: t("kanban.selectAll")}
+								</TooltipContent>
+							</Tooltip>
+						)}
+						{/* A locked column shows its lock, a click away from unlocking;
+						    locking itself lives in the column menu. */}
+						{onToggleLocked && isLocked && (
 							<Tooltip delayDuration={200}>
 								<TooltipTrigger asChild>
 									<Button
 										variant="ghost"
 										size="icon"
 										className={cn(
-											"h-7 w-7 transition-colors",
+											"h-6 w-6 transition-colors",
 											isLocked
 												? "text-amber-500 bg-amber-500/10 hover:bg-amber-500/20"
-												: "hover:bg-muted-foreground/10 hover:text-muted-foreground",
+												: "hover:bg-muted-foreground/10 hover:text-muted-foreground kanban-col-tool",
 										)}
 										onClick={onToggleLocked}
 										aria-pressed={isLocked}
@@ -851,26 +836,13 @@ export const DroppableColumn = memo(function DroppableColumn({
 								onSetWipLimit={onSetWipLimit}
 							/>
 						)}
-						{status === "backlog" && (
-							<>
-								{onQueueAll && tasks.length > 0 && (
-									<Button
-										variant="ghost"
-										size="icon"
-										className="h-7 w-7 hover:bg-cyan-500/10 hover:text-cyan-400 transition-colors"
-										onClick={onQueueAll}
-										title={t("queue.queueAll")}
-									>
-										<ListPlus className="h-4 w-4" />
-									</Button>
-								)}
-								{onAddClick && (
+						{status === "backlog" && onAddClick && (
 									<Tooltip delayDuration={200}>
 										<TooltipTrigger asChild>
 											<Button
 												variant="ghost"
 												size="icon"
-												className="h-7 w-7 hover:bg-primary/10 hover:text-primary transition-colors"
+												className="h-6 w-6 hover:bg-primary/10 hover:text-primary transition-colors"
 												onClick={onAddClick}
 												aria-label={t("kanban.addTaskAriaLabel")}
 											>
@@ -881,14 +853,12 @@ export const DroppableColumn = memo(function DroppableColumn({
 											{t("kanban.addTaskAriaLabel")}
 										</TooltipContent>
 									</Tooltip>
-								)}
-							</>
 						)}
 						{status === "queue" && onQueueSettings && (
 							<Button
 								variant="ghost"
 								size="icon"
-								className="h-7 w-7 hover:bg-cyan-500/10 hover:text-cyan-400 transition-colors"
+								className="h-6 w-6 hover:bg-cyan-500/10 hover:text-cyan-400 kanban-col-tool transition-colors"
 								onClick={onQueueSettings}
 								title={t("kanban.queueSettings")}
 							>
@@ -902,7 +872,7 @@ export const DroppableColumn = memo(function DroppableColumn({
 								<Button
 									variant="ghost"
 									size="icon"
-									className="h-7 w-7 hover:bg-muted-foreground/10 hover:text-muted-foreground transition-colors"
+									className="h-6 w-6 hover:bg-muted-foreground/10 hover:text-muted-foreground kanban-col-tool transition-colors"
 									onClick={onArchiveAll}
 									aria-label={t("tooltips.archiveAllDone")}
 								>
@@ -919,7 +889,7 @@ export const DroppableColumn = memo(function DroppableColumn({
 											variant="ghost"
 											size="icon"
 											className={cn(
-												"h-7 w-7 transition-colors relative",
+												"h-6 w-6 transition-colors relative",
 												showArchived
 													? "text-primary bg-primary/10 hover:bg-primary/20"
 													: "hover:bg-muted-foreground/10 hover:text-muted-foreground",
@@ -943,17 +913,77 @@ export const DroppableColumn = memo(function DroppableColumn({
 									</TooltipContent>
 								</Tooltip>
 							)}
+						{/* Column menu: width lock and collapse, rarely used, so out of
+						    the header. */}
+						{(onToggleLocked || onToggleCollapsed) && (
+							<DropdownMenu>
+								<DropdownMenuTrigger asChild>
+									<Button
+										variant="ghost"
+										size="icon"
+										className="h-6 w-6 hover:bg-muted-foreground/10 hover:text-muted-foreground kanban-col-tool"
+										aria-label={t("kanban.columnOptions")}
+										title={t("kanban.columnOptions")}
+									>
+										<MoreHorizontal className="h-3.5 w-3.5" />
+									</Button>
+								</DropdownMenuTrigger>
+								<DropdownMenuContent align="end">
+									{onToggleLocked && (
+										<DropdownMenuItem onClick={onToggleLocked}>
+											{isLocked ? (
+												<Unlock className="mr-2 h-4 w-4" />
+											) : (
+												<Lock className="mr-2 h-4 w-4" />
+											)}
+											{isLocked
+												? t("kanban.unlockColumn")
+												: t("kanban.lockColumn")}
+										</DropdownMenuItem>
+									)}
+									{status === "backlog" && onQueueAll && tasks.length > 0 && (
+										<DropdownMenuItem onClick={onQueueAll}>
+											<ListPlus className="mr-2 h-4 w-4" />
+											{t("queue.queueAll")}
+										</DropdownMenuItem>
+									)}
+									{onToggleCollapsed && (
+										<DropdownMenuItem onClick={onToggleCollapsed}>
+											<ChevronLeft className="mr-2 h-4 w-4" />
+											{t("kanban.collapseColumn")}
+										</DropdownMenuItem>
+									)}
+								</DropdownMenuContent>
+							</DropdownMenu>
+						)}
+						{/* Column drag handle for reordering */}
+						{dragHandleProps && (
+							<Tooltip delayDuration={400}>
+								<TooltipTrigger asChild>
+									<button
+										type="button"
+										className="h-6 w-4 shrink-0 flex items-center justify-center cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground kanban-col-tool touch-none"
+										{...dragHandleProps.listeners}
+										{...dragHandleProps.attributes}
+										aria-label={t("kanban.dragColumn")}
+									>
+										<GripVertical className="h-4 w-4" />
+									</button>
+								</TooltipTrigger>
+								<TooltipContent>{t("kanban.dragColumn")}</TooltipContent>
+							</Tooltip>
+						)}
 					</div>
 				</div>
 
 				{/* Task list */}
 				<div className="flex-1 min-h-0">
-					<ScrollArea className="h-full px-3 pb-3 pt-2">
+					<ScrollArea className="h-full px-2.5 pb-2.5 pt-1">
 						<SortableContext
 							items={taskIds}
 							strategy={verticalListSortingStrategy}
 						>
-							<div className="space-y-3 min-h-0">
+							<div className="space-y-2 min-h-0">
 								{tasks.length === 0 ? (
 									<div
 										className={cn(
@@ -972,12 +1002,14 @@ export const DroppableColumn = memo(function DroppableColumn({
 											</>
 										) : (
 											<>
-												{emptyState.icon}
-												<span className="mt-2 text-sm font-medium text-muted-foreground/70">
+												<span className="opacity-60 [&>svg]:h-5 [&>svg]:w-5">
+													{emptyState.icon}
+												</span>
+												<span className="mt-2 text-xs font-medium text-muted-foreground/80">
 													{emptyState.message}
 												</span>
 												{emptyState.subtext && (
-													<span className="mt-0.5 text-xs text-muted-foreground/50">
+													<span className="mt-0.5 max-w-[22ch] text-[11px] leading-snug text-muted-foreground/50">
 														{emptyState.subtext}
 													</span>
 												)}

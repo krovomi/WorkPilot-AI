@@ -181,62 +181,135 @@ export const PhaseProgressIndicator = memo(function PhaseProgressIndicator({
 		progressLabel = phaseLabel;
 	}
 
+	// Compact layout (kanban card): one row carries the phase flow, the subtask
+	// dots and the figure; the bar sits right under it. Same information as the
+	// former four stacked rows (label, bar, dots, steps), half the height, and it
+	// wraps cleanly when the column is narrow.
+	const showPhaseSteps = isRunning || phase !== "idle";
+	let progressValue: React.ReactNode;
+	if (showSubtaskProgress) {
+		progressValue = `${displayProgress}%`;
+	} else if (activeEntries > 0) {
+		progressValue = (
+			<span className="text-muted-foreground">
+				{activeEntries}{" "}
+				{activeEntries === 1
+					? t("execution.labels.entry")
+					: t("execution.labels.entries")}
+			</span>
+		);
+	} else if (isRunning && isIndeterminatePhase && displayProgress > 0) {
+		progressValue = `${displayProgress}%`;
+	} else {
+		progressValue = "—";
+	}
+
 	return (
 		<div ref={containerRef} className={cn("space-y-1.5", className)}>
-			{/* Progress label row */}
-			<div className="flex items-center justify-between">
-				<div className="flex items-center gap-2">
-					<span className="text-xs text-muted-foreground">
+			<div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+				{showPhaseSteps ? (
+					<PhaseStepsIndicator
+						currentPhase={phase}
+						isStuck={isStuck}
+						isVisible={isVisible}
+						onPlanClick={onPlanClick}
+					/>
+				) : (
+					<span className="text-[11px] text-muted-foreground">
 						{progressLabel}
 					</span>
-					{/* Activity indicator dot for non-coding phases - only animate when visible */}
-					{isRunning && !isStuck && isIndeterminatePhase && (
-						<motion.div
-							className={cn("h-1.5 w-1.5 rounded-full", colors.color)}
-							animate={
-								shouldAnimate
-									? {
-											scale: [1, 1.5, 1],
-											opacity: [1, 0.5, 1],
-										}
-									: { scale: 1, opacity: 1 }
-							}
-							transition={
-								shouldAnimate
-									? {
-											duration: 1,
-											repeat: Infinity,
-											ease: "easeInOut",
-										}
-									: undefined
-							}
-						/>
+				)}
+				{/* The steps already name the phase; "interrupted" still needs words. */}
+				{showPhaseSteps && isStuck && (
+					<span className="text-[11px] font-medium text-warning">
+						{progressLabel}
+					</span>
+				)}
+				{/* Activity dot for non-coding phases, only when no step pill already
+				    pulses for the active phase. */}
+				{!showPhaseSteps && isRunning && !isStuck && isIndeterminatePhase && (
+					<motion.div
+						className={cn("h-1.5 w-1.5 rounded-full", colors.color)}
+						animate={
+							shouldAnimate
+								? {
+										scale: [1, 1.5, 1],
+										opacity: [1, 0.5, 1],
+									}
+								: { scale: 1, opacity: 1 }
+						}
+						transition={
+							shouldAnimate
+								? {
+										duration: 1,
+										repeat: Infinity,
+										ease: "easeInOut",
+									}
+								: undefined
+						}
+					/>
+				)}
+				<div className="ml-auto flex items-center gap-2">
+					{/* Subtask indicators (only show when subtasks exist) */}
+					{totalSubtasks > 0 && (
+						<div className="flex items-center gap-1">
+							{subtasks.slice(0, 10).map((subtask, index) => {
+								const isInProgress = subtask.status === "in_progress";
+								const shouldPulse = isInProgress && isVisible;
+
+								return (
+									<motion.div
+										key={subtask.id || `subtask-${index}`}
+										className={cn(
+											"h-1.5 w-1.5 rounded-full",
+											subtask.status === "completed" && "bg-success",
+											subtask.status === "blocked" && "bg-warning",
+											isInProgress && "bg-info",
+											subtask.status === "failed" && "bg-destructive",
+											subtask.status === "pending" && "bg-muted-foreground/30",
+										)}
+										initial={{ scale: 0, opacity: 0 }}
+										animate={{
+											scale: 1,
+											opacity: 1,
+											...(shouldPulse && {
+												boxShadow: [
+													"0 0 0 0 rgba(var(--info), 0.4)",
+													"0 0 0 4px rgba(var(--info), 0)",
+												],
+											}),
+										}}
+										transition={{
+											scale: { delay: index * 0.03, duration: 0.2 },
+											opacity: { delay: index * 0.03, duration: 0.2 },
+											boxShadow: shouldPulse
+												? { duration: 1, repeat: Infinity, ease: "easeOut" }
+												: undefined,
+										}}
+										title={`${subtask.title || subtask.id}: ${subtask.status}`}
+									/>
+								);
+							})}
+							{totalSubtasks > 10 && (
+								<span
+									key="overflow-count"
+									className="text-[10px] text-muted-foreground font-medium"
+								>
+									+{totalSubtasks - 10}
+								</span>
+							)}
+						</div>
 					)}
+					<span className="text-[11px] font-medium tabular-nums text-foreground">
+						{progressValue}
+					</span>
 				</div>
-				<span className="text-xs font-medium text-foreground">
-					{showSubtaskProgress ? (
-						`${displayProgress}%`
-					) : activeEntries > 0 ? (
-						<span className="text-muted-foreground">
-							{activeEntries}{" "}
-							{activeEntries === 1
-								? t("execution.labels.entry")
-								: t("execution.labels.entries")}
-						</span>
-					) : isRunning && isIndeterminatePhase && displayProgress > 0 ? (
-						// Progression globale de la tâche (planification = bande 0-20%),
-						// jamais la progression interne à la phase.
-						`${displayProgress}%`
-					) : (
-						"—"
-					)}
-				</span>
 			</div>
 
 			{/* Progress bar */}
 			<div
 				className={cn(
-					"relative h-1.5 w-full overflow-hidden rounded-full",
+					"relative h-1 w-full overflow-hidden rounded-full",
 					isStuck ? "bg-warning/20" : "bg-border",
 				)}
 			>
@@ -291,71 +364,6 @@ export const PhaseProgressIndicator = memo(function PhaseProgressIndicator({
 					) : null}
 				</AnimatePresence>
 			</div>
-
-			{/* Subtask indicators (only show when subtasks exist) */}
-			{totalSubtasks > 0 && (
-				<div className="flex flex-wrap gap-1.5 mt-2">
-					{subtasks.slice(0, 10).map((subtask, index) => {
-						const isInProgress = subtask.status === "in_progress";
-						const shouldPulse = isInProgress && isVisible;
-
-						return (
-							<motion.div
-								key={subtask.id || `subtask-${index}`}
-								className={cn(
-									"h-2 w-2 rounded-full",
-									subtask.status === "completed" && "bg-success",
-									// Blocked = handled by the build but needs a manual step
-									// (e.g. a manual e2e test) — distinct amber, counts as done.
-									subtask.status === "blocked" && "bg-warning",
-									isInProgress && "bg-info",
-									subtask.status === "failed" && "bg-destructive",
-									subtask.status === "pending" && "bg-muted-foreground/30",
-								)}
-								initial={{ scale: 0, opacity: 0 }}
-								animate={{
-									scale: 1,
-									opacity: 1,
-									// Only animate boxShadow when visible to save GPU cycles
-									...(shouldPulse && {
-										boxShadow: [
-											"0 0 0 0 rgba(var(--info), 0.4)",
-											"0 0 0 4px rgba(var(--info), 0)",
-										],
-									}),
-								}}
-								transition={{
-									scale: { delay: index * 0.03, duration: 0.2 },
-									opacity: { delay: index * 0.03, duration: 0.2 },
-									// Only repeat animation when visible
-									boxShadow: shouldPulse
-										? { duration: 1, repeat: Infinity, ease: "easeOut" }
-										: undefined,
-								}}
-								title={`${subtask.title || subtask.id}: ${subtask.status}`}
-							/>
-						);
-					})}
-					{totalSubtasks > 10 && (
-						<span
-							key="overflow-count"
-							className="text-[10px] text-muted-foreground font-medium ml-0.5"
-						>
-							+{totalSubtasks - 10}
-						</span>
-					)}
-				</div>
-			)}
-
-			{/* Phase steps indicator (shows overall flow) */}
-			{(isRunning || phase !== "idle") && (
-				<PhaseStepsIndicator
-					currentPhase={phase}
-					isStuck={isStuck}
-					isVisible={isVisible}
-					onPlanClick={onPlanClick}
-				/>
-			)}
 		</div>
 	);
 });
@@ -411,7 +419,7 @@ const PhaseStepsIndicator = memo(function PhaseStepsIndicator({
 	};
 
 	return (
-		<div className="flex items-center gap-1 mt-2">
+		<div className="flex items-center gap-0.5">
 			{phases.map((phase, index) => {
 				const state = getPhaseState(phase.key);
 				const shouldAnimate = state === "active" && !isStuck && isVisible;
@@ -422,7 +430,7 @@ const PhaseStepsIndicator = memo(function PhaseStepsIndicator({
 					<div key={phase.key} className="flex items-center">
 						<motion.div
 							className={cn(
-								"flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium",
+								"flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] font-medium",
 								state === "complete" && "bg-success/10 text-success",
 								state === "active" && "bg-primary/10 text-primary",
 								state === "stuck" && "bg-warning/10 text-warning",
@@ -468,7 +476,7 @@ const PhaseStepsIndicator = memo(function PhaseStepsIndicator({
 						{index < phases.length - 1 && (
 							<div
 								className={cn(
-									"w-2 h-px mx-0.5",
+									"w-1.5 h-px mx-0.5",
 									getPhaseState(phases[index + 1].key) === "pending"
 										? "bg-border"
 										: "bg-success/50",

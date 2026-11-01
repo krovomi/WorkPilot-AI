@@ -137,9 +137,6 @@
 		"pauseTask": "Pause task",
 		"resumeTask": "Resume task"
 	},
-	"prFiles": {
-		"short": "Files"
-	},
 	"creation": {
 		"title": "Create New Task",
 		"description": "Describe what you want to build",
@@ -248,6 +245,7 @@
 		"bulkMoveSuccess": "{{count}} task(s) moved successfully",
 		"bulkMoveError": "Failed to move {{failed}} of {{total}} tasks",
 		"dragColumn": "Drag to reorder column",
+		"columnOptions": "Column options",
 		"collapseColumn": "Collapse column",
 		"expandColumn": "Expand column",
 		"resizeColumn": "Resize column",
