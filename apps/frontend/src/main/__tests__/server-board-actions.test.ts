@@ -120,11 +120,30 @@ describe("server card actions", () => {
 		expect(sent[1]).toMatchObject({ require_review: true });
 	});
 
-	it("refuses an empty title before asking the server", async () => {
+	it("refuses a card with neither title nor description before asking the server", async () => {
 		const { project, actions } = await setup();
 		connection.authedFetch.mockClear();
-		expect((await actions.createServerCard(project, "  ", "x")).success).toBe(false);
+		expect((await actions.createServerCard(project, "  ", " \n ")).success).toBe(false);
 		expect(connection.authedFetch).not.toHaveBeenCalled();
+	});
+
+	it("titles a card left without one after its description's first line", async () => {
+		const { project, actions } = await setup();
+		const sent: Array<{ title?: string }> = [];
+		serve({
+			[`POST /api/board/cards${Q}`]: (body) => {
+				sent.push(body as { title?: string });
+				return { ok: true, data: { id: "001-login" } };
+			},
+			[`GET /api/board/snapshot${Q}`]: () =>
+				snapshot({ "001-login": { "requirements.json": REQUIREMENTS } }),
+		});
+
+		await actions.createServerCard(project, "", "\n  Let users sign in  \nwith email.");
+		await actions.createServerCard(project, "", "x".repeat(80));
+
+		expect(sent[0].title).toBe("Let users sign in");
+		expect(sent[1].title).toBe(`${"x".repeat(60)}...`);
 	});
 
 	it("edits only the title and description, and reports the server's refusal", async () => {

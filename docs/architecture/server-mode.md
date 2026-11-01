@@ -525,11 +525,27 @@ et des runs n'était jamais lu (aucun de leurs événements publié) ; les route
 `/projects/{project_id}/…` répondaient 403 au projet d'une autre organisation, au lieu du 404 de
 la règle.
 
-L'app de bureau en mode serveur contre ce serveur (Playwright) n'est pas encore écrite.
+L'app de bureau fait le même chemin (`apps/frontend/e2e/server-mode.server-e2e.ts`, Playwright).
+`tests/server_e2e/app_world.py` démarre ce serveur sur une base SQLite temporaire et y crée deux
+organisations : Alice, qui l'administre et enregistre le projet, et Bob, membre du projet, dans la
+première ; Carol dans la seconde. Les mots de passe, tirés pour la session, ne passent que par le
+tuyau vers la spec. Chacun lance sa copie de l'app compilée (profil et home neufs) et se connecte
+par l'écran de connexion :
+
+- Alice et Bob trouvent le projet de l'équipe et son tableau partagé ;
+- une carte qu'Alice crée depuis le dialogue « New Task » apparaît sur le tableau de Bob sans
+  qu'il fasse rien ;
+- une carte que Bob supprime quitte le tableau d'Alice ;
+- Carol, connectée, n'a aucun projet et ne voit le nom de celui de l'équipe nulle part.
+
+Elle tourne dans le job `app-server-e2e` (`pnpm run test:e2e:server`, configuration
+`playwright.server.config.ts`, mêmes règles de nouvel essai que les autres specs). Elle a trouvé
+un défaut, corrigé avec son test : une carte créée sans titre, ce que le dialogue permet, était
+refusée par l'app avant d'atteindre le serveur ; elle prend désormais la première ligne de sa
+description, comme une tâche locale dont le titre n'a pas pu être généré.
 
 ## Ce qui vient
 
 Le plan multi-tenant du 31 octobre, par lots : les autres features servies de la même façon
-(l'investigation et l'auto-fix des issues en jobs, les autres analyses, budgets d'un projet), les vues de forge en direct (par les
-webhooks de la forge), et le parcours de l'app de bureau contre le serveur de la preuve de bout en
-bout. Ce fichier grandit avec chaque lot.
+(l'investigation et l'auto-fix des issues en jobs, les autres analyses, budgets d'un projet), et les vues de forge en direct (par
+les webhooks de la forge). Ce fichier grandit avec chaque lot.
