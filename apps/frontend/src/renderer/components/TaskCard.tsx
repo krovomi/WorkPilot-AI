@@ -831,7 +831,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
 					<Button
 						variant="ghost"
 						size="sm"
-						className="h-7 px-2 cursor-pointer"
+						className="h-7 w-7 p-0 cursor-pointer"
 						onClick={(e) => {
 							e.stopPropagation();
 							onPreviewApp();
@@ -845,7 +845,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
 					<Button
 						variant="ghost"
 						size="sm"
-						className="h-7 px-2 cursor-pointer"
+						className="h-7 w-7 p-0 cursor-pointer"
 						onClick={handleViewPR}
 						title={t("tooltips.viewPR")}
 					>
@@ -856,22 +856,22 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
 					<Button
 						variant="outline"
 						size="sm"
-						className="h-7 px-2 hover:bg-primary/10 transition-colors"
+						className="h-7 w-7 p-0 hover:bg-primary/10 transition-colors"
 						onClick={() =>
 							task.metadata?.prUrl &&
 							onViewPRFiles(task.metadata.prUrl, task.id)
 						}
 						title={t("tooltips.viewPRFiles")}
+						aria-label={t("tooltips.viewPRFiles")}
 					>
-						<FileText className="h-3 w-3 mr-1" />
-						{t("tasks:prFiles.short")}
+						<FileText className="h-3 w-3" />
 					</Button>
 				)}
 				{!task.metadata?.archivedAt && (
 					<Button
 						variant="ghost"
 						size="sm"
-						className="h-7 px-2 cursor-pointer"
+						className="h-7 w-7 p-0 cursor-pointer"
 						onClick={handleArchive}
 						title={t("tooltips.archiveTask")}
 					>
@@ -889,7 +889,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
 					<Button
 						variant="ghost"
 						size="sm"
-						className="h-7 px-2 cursor-pointer"
+						className="h-7 w-7 p-0 cursor-pointer"
 						onClick={(e) => {
 							e.stopPropagation();
 							onPreviewApp();
@@ -902,12 +902,12 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
 				<Button
 					variant="ghost"
 					size="sm"
-					className="h-7 px-2.5 hover:bg-muted-foreground/10"
+					className="h-7 w-7 p-0 hover:bg-muted-foreground/10"
 					onClick={handleArchive}
 					title={t("tooltips.archiveTask")}
+					aria-label={t("actions.archive")}
 				>
-					<Archive className="mr-1.5 h-3 w-3" />
-					{t("actions.archive")}
+					<Archive className="h-3 w-3" />
 				</Button>
 			</div>
 		);
@@ -921,7 +921,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
 					<Button
 						variant="ghost"
 						size="sm"
-						className="h-7 px-2 cursor-pointer"
+						className="h-7 w-7 p-0 cursor-pointer"
 						onClick={(e) => {
 							e.stopPropagation();
 							onPreviewApp();
@@ -945,7 +945,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
 					<Button
 						variant="ghost"
 						size="sm"
-						className="h-7 px-2 cursor-pointer"
+						className="h-7 w-7 p-0 cursor-pointer"
 						onClick={(e) => {
 							e.stopPropagation();
 							onPreviewApp();
@@ -1485,7 +1485,7 @@ export const TaskCard = memo(function TaskCard({
 			}}
 			ref={cardRef}
 			className={cn(
-				"card-surface task-card-enhanced cursor-pointer relative group",
+				"card-surface task-card-enhanced kanban-card cursor-pointer relative group",
 				isRunning &&
 					!isStuck &&
 					"ring-2 ring-primary border-primary task-running-pulse",
@@ -1511,7 +1511,7 @@ export const TaskCard = memo(function TaskCard({
 				}
 			}}
 		>
-			<CardContent className="p-3">
+			<CardContent className="py-2.5 pr-3 pl-3.5">
 				{/* Abandoned banner — reversible "set aside" state. Kept ungreyed
 				    (relative + not affected by the card's grayscale) so "Reprendre"
 				    stays actionable. */}
@@ -1574,7 +1574,11 @@ export const TaskCard = memo(function TaskCard({
 
 						{/* Title - full width, no wrapper */}
 						<h3
-							className="mt-1 font-semibold text-sm text-foreground line-clamp-2 leading-snug"
+							className={cn(
+								"mt-1 font-semibold text-sm text-foreground line-clamp-2 leading-snug",
+								// Leave room for the hover-only delete cross.
+								onDelete && "pr-5",
+							)}
 							title={displayTitle}
 						>
 							{displayTitle}
@@ -1582,7 +1586,10 @@ export const TaskCard = memo(function TaskCard({
 
 						{/* Description - sanitized to handle markdown content (memoized) */}
 						{sanitizedDescription && (
-							<p className="mt-2 text-xs text-muted-foreground line-clamp-2">
+							<p
+								className="mt-1 text-xs text-muted-foreground line-clamp-2"
+								title={sanitizedDescription}
+							>
 								{sanitizedDescription}
 							</p>
 						)}
@@ -1611,7 +1618,7 @@ export const TaskCard = memo(function TaskCard({
 							hasActiveExecution ||
 							isRunning ||
 							isStuck) && (
-							<div className="mt-3 space-y-2">
+							<div className="mt-2.5 space-y-1.5">
 								<PhaseProgressIndicator
 									phase={executionPhase}
 									subtasks={task.subtasks}
@@ -1633,24 +1640,38 @@ export const TaskCard = memo(function TaskCard({
 							</div>
 						)}
 
-						{/* Footer */}
-						<div className="mt-3 flex items-center justify-between">
-							<div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-								<Clock className="h-3 w-3" />
-								<span>{relativeTime}</span>
+						{/* Footer — meta (time, engine, formula) then actions. Wraps onto
+						    two lines in a narrow column instead of squeezing the time
+						    label into a two-line stack. */}
+						<div className="mt-2.5 flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
+							<div className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+								<span className="flex items-center gap-1 whitespace-nowrap">
+									<Clock className="h-3 w-3 shrink-0" />
+									{relativeTime}
+								</span>
 								{!task.metadata?.appliedFormula && (
 									<TaskEngineChip task={task} />
 								)}
 								{/* Context-window fill of the running session (renders
 								    nothing until the backend reports it). */}
 								<ContextGaugeMini task={task} />
-								<FormulaBadge
-									task={task}
-									projectPath={currentProject?.path}
-								/>
+								{/* An applied formula is information (model, odds, cost)… */}
+								{task.metadata?.appliedFormula && (
+									<FormulaBadge
+										task={task}
+										projectPath={currentProject?.path}
+									/>
+								)}
 							</div>
 
-							<div className="flex items-center gap-1.5">
+							<div className="ml-auto flex shrink-0 items-center gap-1">
+								{/* …while "estimate" is an action, so it sits with the others. */}
+								{!task.metadata?.appliedFormula && (
+									<FormulaBadge
+										task={task}
+										projectPath={currentProject?.path}
+									/>
+								)}
 								<ActionButtons
 									isStuck={isStuck}
 									isRecovering={isRecovering}

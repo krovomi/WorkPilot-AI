@@ -137,9 +137,6 @@
 		"pauseTask": "Mettre en pause la tâche",
 		"resumeTask": "Reprendre la tâche"
 	},
-	"prFiles": {
-		"short": "Fichiers"
-	},
 	"creation": {
 		"title": "Créer une nouvelle tâche",
 		"description": "Décrivez ce que vous voulez construire",
@@ -248,6 +245,7 @@
 		"bulkMoveSuccess": "{{count}} tâche(s) déplacée(s) avec succès",
 		"bulkMoveError": "Échec du déplacement de {{failed}} tâche(s) sur {{total}}",
 		"dragColumn": "Glisser pour réordonner la colonne",
+		"columnOptions": "Options de la colonne",
 		"collapseColumn": "Réduire la colonne",
 		"expandColumn": "Développer la colonne",
 		"resizeColumn": "Redimensionner la colonne",

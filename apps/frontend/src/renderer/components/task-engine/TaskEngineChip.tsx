@@ -56,7 +56,7 @@ export function TaskEngineChip({ task, onClick }: TaskEngineChipProps) {
 	const content = (
 		<span className="flex min-w-0 items-center gap-1">
 			<Cpu className="h-3 w-3 shrink-0" />
-			<span className="max-w-[160px] truncate">{label}</span>
+			<span className="max-w-[110px] truncate">{label}</span>
 		</span>
 	);
 
