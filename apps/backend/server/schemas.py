@@ -4,7 +4,14 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field, computed_field
+from pydantic import (
+    BaseModel,
+    EmailStr,
+    Field,
+    computed_field,
+    field_validator,
+    model_validator,
+)
 
 # ---------------------------------------------------------------------------
 # Auth
@@ -344,9 +351,40 @@ class ClaimRequest(BaseModel):
     force: bool = False
 
 
+class PullRequestOptions(BaseModel):
+    """What the PR dialog lets a person edit before the server opens the PR.
+
+    Sent only with ``phase="pr"``; each field becomes an argument of
+    ``run.py --create-pr`` (the body through a file, never argv).
+    """
+
+    title: str | None = Field(default=None, min_length=1, max_length=256)
+    body: str | None = Field(default=None, max_length=65_536)
+    draft: bool = False
+    target_branch: str | None = Field(
+        default=None, max_length=255, pattern=r"^[A-Za-z0-9_][A-Za-z0-9._/-]*$"
+    )
+    # Create the PR although the cross review disagrees: the person's choice.
+    ignore_cross_review: bool = False
+
+    @field_validator("title")
+    @classmethod
+    def _one_line(cls, value: str | None) -> str | None:
+        if value is not None and ("\n" in value or "\r" in value or "\0" in value):
+            raise ValueError("the title must be one line")
+        return value.strip() if value is not None else None
+
+
 class StartRunRequest(BaseModel):
     phase: str = "build"  # spec / build / qa / merge / pr
     model: str | None = None
+    pr: PullRequestOptions | None = None
+
+    @model_validator(mode="after")
+    def _pr_only_for_pr(self) -> StartRunRequest:
+        if self.pr is not None and self.phase != "pr":
+            raise ValueError("pr options go with phase 'pr' only")
+        return self
 
 
 class AgentRunPublic(BaseModel):

@@ -229,6 +229,7 @@ async def start_run(
             user_id=user.id,
             model=body.model,
             org_id=project.org_id,
+            pr=body.pr.model_dump() if body.pr else None,
         )
     except RunManagerError as e:
         raise HTTPException(status_code=409, detail=str(e))
