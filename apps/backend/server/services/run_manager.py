@@ -457,7 +457,7 @@ class RunManager:
             user_name = await db.scalar(
                 select(User.display_name).where(User.id == user_id)
             )
-        notify_run_finished(project_id, spec_name, phase, status, user_id)
+        notify_run_finished(project_id, spec_name, phase, status, user_id, spec_id)
         emit_board_event(
             project_id,
             "spec_status_changed",

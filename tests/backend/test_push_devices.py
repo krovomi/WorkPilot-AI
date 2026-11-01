@@ -210,6 +210,69 @@ class TestMessages:
         )
 
 
+class TestPlanReview:
+    """A plan waiting for approval comes with Approve and View buttons."""
+
+    def test_a_plan_to_approve_carries_its_category(self):
+        from server.services.push import PLAN_REVIEW_CATEGORY, build_messages
+
+        en, fr = build_messages(
+            [_device(_TOKEN_A, "en"), _device(_TOKEN_B, "fr")],
+            "p1",
+            "Payments",
+            "012-secret-plan",
+            "spec",
+            "succeeded",
+            spec_id="5d1c-77",
+            awaiting_approval=True,
+        )
+        assert en["body"] == "Plan ready for your approval on card 012"
+        assert fr["body"] == "Plan prêt à valider sur la carte 012"
+        assert en["categoryId"] == PLAN_REVIEW_CATEGORY == "plan_review"
+        # The type older apps open on a tap; the flag says what it is.
+        assert en["data"]["type"] == "run_finished"
+        assert en["data"]["awaitingApproval"] is True
+        assert en["data"]["specId"] == "5d1c-77"
+        assert "secret" not in en["title"] + en["body"]
+
+    @pytest.mark.parametrize(
+        ("phase", "status"), [("spec", "failed"), ("build", "succeeded")]
+    )
+    def test_only_a_finished_spec_is_a_plan_to_approve(self, phase, status):
+        from server.services.push import build_messages
+
+        (message,) = build_messages(
+            [_device(_TOKEN_A)],
+            "p",
+            "P",
+            "001-x",
+            phase,
+            status,
+            awaiting_approval=True,
+        )
+        assert "categoryId" not in message
+        assert "awaitingApproval" not in message["data"]
+
+    def test_it_reads_the_approval_the_build_checks(self, tmp_path):
+        import shared_board.api  # noqa: F401 - installs the approval check
+        from review.state import ReviewState
+        from server.services.push import awaits_approval
+
+        card = tmp_path / ".workpilot/specs/001-x"
+        assert not awaits_approval(str(tmp_path), "001-x")  # no spec yet
+        card.mkdir(parents=True)
+        (card / "spec.md").write_text("# Spec", encoding="utf-8")
+        assert awaits_approval(str(tmp_path), "001-x")
+        (card / "task_metadata.json").write_text(
+            json.dumps({"requireReviewBeforeCoding": False}), encoding="utf-8"
+        )
+        assert not awaits_approval(str(tmp_path), "001-x")
+        (card / "task_metadata.json").unlink()
+        ReviewState.load(card).approve(card, approved_by="a@example.com")
+        assert not awaits_approval(str(tmp_path), "001-x")
+        assert not awaits_approval(str(tmp_path), "../outside")
+
+
 class TestSend:
     @pytest.mark.asyncio
     async def test_gone_tokens_are_returned(self):
@@ -304,7 +367,7 @@ class TestNotifyRunFinished:
         push.notify_run_finished("p", "001-x", "build", "running", "u")
         push.notify_run_finished("p", "001-x", "build", "succeeded", None)
         await asyncio.gather(*push._background)
-        assert called == [("p", "001-x", "build", "failed", "u")]
+        assert called == [("p", "001-x", "build", "failed", "u", None)]
 
     @pytest.mark.asyncio
     async def test_a_failure_never_escapes(self, monkeypatch):
