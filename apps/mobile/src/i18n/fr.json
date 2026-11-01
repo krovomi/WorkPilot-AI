@@ -1,0 +1,132 @@
+{
+	"common": {
+		"cancel": "Annuler",
+		"retry": "Réessayer",
+		"loading": "Chargement…",
+		"back": "Retour"
+	},
+	"errors": {
+		"network": "Le serveur est injoignable. Vérifiez votre connexion.",
+		"timeout": "Le serveur a mis trop de temps à répondre.",
+		"signed_out": "Votre session a pris fin. Reconnectez-vous.",
+		"forbidden": "Vous n'avez pas les droits pour cette action.",
+		"generic": "Une erreur est survenue : {{message}}",
+		"card_not_indexed": "Le serveur n'a pas encore indexé cette carte. Tirez pour actualiser.",
+		"feedback_required": "Dites ce qu'il faut changer."
+	},
+	"signIn": {
+		"title": "WorkPilot AI",
+		"subtitle": "Connectez-vous au serveur WorkPilot de votre équipe.",
+		"server": "Adresse du serveur",
+		"serverPlaceholder": "workpilot.exemple.fr",
+		"email": "E-mail",
+		"password": "Mot de passe",
+		"submit": "Se connecter",
+		"invalidUrl": "Cette adresse de serveur n'est pas valide.",
+		"insecureUrl": "Utilisez une adresse https://. Le http simple n'est permis que sur votre réseau local.",
+		"localDisabled": "Ce serveur n'accepte que la connexion Microsoft, que l'app mobile ne gère pas encore.",
+		"failed": "Connexion impossible : {{message}}"
+	},
+	"unreachable": {
+		"title": "Serveur injoignable",
+		"body": "Votre session est conservée. Vérifiez votre connexion puis réessayez.",
+		"signOut": "Se déconnecter"
+	},
+	"projects": {
+		"title": "Projets",
+		"empty": "Aucun projet pour l'instant. Ajoutez-en un depuis l'app de bureau.",
+		"role": "Rôle : {{role}}",
+		"settings": "Réglages"
+	},
+	"board": {
+		"live": "En direct",
+		"offline": "Actualisé toutes les quelques secondes",
+		"newCard": "Nouvelle carte",
+		"emptyColumn": "Aucune carte ici.",
+		"subtasks": "{{completed}}/{{total}} sous-tâches",
+		"claimedBy": "Réservée par {{name}}"
+	},
+	"columns": {
+		"backlog": "Planification",
+		"queue": "File d'attente",
+		"in_progress": "En cours",
+		"ai_review": "Révision IA",
+		"human_review": "Révision humaine",
+		"build_failed": "Build rouge",
+		"pr_created": "PR créée",
+		"done": "Terminé",
+		"error": "Erreur"
+	},
+	"kinds": {
+		"none": "Non précisé",
+		"feature": "Fonctionnalité",
+		"bug_fix": "Correctif",
+		"refactoring": "Refactorisation",
+		"investigation": "Investigation",
+		"docs": "Documentation",
+		"test": "Test"
+	},
+	"newCard": {
+		"title": "Nouvelle carte",
+		"cardTitle": "Titre",
+		"description": "Description",
+		"descriptionPlaceholder": "Que doivent construire les agents ?",
+		"kind": "Type",
+		"requireReview": "Relire la spec avant le code",
+		"requireReviewHint": "Le build attend qu'une personne approuve la spec et le plan.",
+		"create": "Créer"
+	},
+	"card": {
+		"description": "Description",
+		"spec": "Spec",
+		"noSpec": "Pas encore de spec. Démarrez la carte pour l'écrire.",
+		"approval": "Approbation",
+		"approvedBy": "Approuvée par {{name}}",
+		"notApproved": "Pas encore approuvée",
+		"runs": "Runs",
+		"noRuns": "Aucun run pour l'instant.",
+		"changes": "Changements",
+		"noChanges": "Pas encore d'espace de build.",
+		"changesSummary": "{{files}} fichiers · +{{additions}} −{{deletions}} · {{commits}} commits",
+		"showSpec": "Afficher toute la spec",
+		"hideSpec": "Masquer la spec",
+		"feedbackTitle": "Demander des changements",
+		"feedbackPlaceholder": "Que doivent changer les agents ?",
+		"send": "Envoyer",
+		"deleteConfirmTitle": "Supprimer cette carte ?",
+		"deleteConfirmBody": "La carte et sa spec disparaissent pour toute l'équipe.",
+		"done": "Terminé"
+	},
+	"actions": {
+		"start": "Démarrer",
+		"approve": "Approuver la spec",
+		"stop": "Arrêter",
+		"requestChanges": "Demander des changements",
+		"merge": "Fusionner",
+		"createPr": "Créer la PR",
+		"retry": "Relancer le build",
+		"delete": "Supprimer"
+	},
+	"runStatus": {
+		"queued": "En file",
+		"running": "En cours",
+		"succeeded": "Réussi",
+		"failed": "Échoué",
+		"cancelled": "Annulé"
+	},
+	"settings": {
+		"title": "Réglages",
+		"account": "Compte",
+		"server": "Serveur",
+		"organization": "Organisation",
+		"signOut": "Se déconnecter",
+		"version": "Version {{version}}"
+	},
+	"runPhase": {
+		"spec": "Spec",
+		"build": "Build",
+		"qa": "QA",
+		"merge": "Fusion",
+		"pr": "Pull request"
+	}
+}

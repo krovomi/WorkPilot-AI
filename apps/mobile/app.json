@@ -1,0 +1,42 @@
+{
+	"expo": {
+		"name": "WorkPilot AI",
+		"slug": "workpilot-ai",
+		"version": "1.3.3",
+		"scheme": "workpilot",
+		"orientation": "default",
+		"icon": "./assets/icon.png",
+		"userInterfaceStyle": "automatic",
+		"ios": {
+			"supportsTablet": true,
+			"bundleIdentifier": "io.github.krovomi.workpilot",
+			"config": {
+				"usesNonExemptEncryption": false
+			}
+		},
+		"android": {
+			"package": "io.github.krovomi.workpilot",
+			"adaptiveIcon": {
+				"backgroundColor": "#2C3136",
+				"foregroundImage": "./assets/android-icon-foreground.png",
+				"backgroundImage": "./assets/android-icon-background.png",
+				"monochromeImage": "./assets/android-icon-monochrome.png"
+			},
+			"allowBackup": false,
+			"predictiveBackGestureEnabled": false
+		},
+		"web": {
+			"favicon": "./assets/favicon.png",
+			"output": "single"
+		},
+		"plugins": [
+			"expo-router",
+			"expo-status-bar",
+			"expo-secure-store",
+			"expo-localization"
+		],
+		"experiments": {
+			"typedRoutes": true
+		}
+	}
+}

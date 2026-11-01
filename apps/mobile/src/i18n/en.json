@@ -1,0 +1,132 @@
+{
+	"common": {
+		"cancel": "Cancel",
+		"retry": "Try again",
+		"loading": "Loading…",
+		"back": "Back"
+	},
+	"errors": {
+		"network": "The server can't be reached. Check your connection.",
+		"timeout": "The server took too long to answer.",
+		"signed_out": "Your session has ended. Sign in again.",
+		"forbidden": "You don't have the rights for this action.",
+		"generic": "Something went wrong: {{message}}",
+		"card_not_indexed": "The server hasn't indexed this card yet. Pull to refresh.",
+		"feedback_required": "Say what needs to change."
+	},
+	"signIn": {
+		"title": "WorkPilot AI",
+		"subtitle": "Sign in to your team's WorkPilot server.",
+		"server": "Server address",
+		"serverPlaceholder": "workpilot.example.com",
+		"email": "Email",
+		"password": "Password",
+		"submit": "Sign in",
+		"invalidUrl": "This isn't a valid server address.",
+		"insecureUrl": "Use an https:// address. Plain http is only allowed on your local network.",
+		"localDisabled": "This server only accepts Microsoft sign-in, which the mobile app doesn't support yet.",
+		"failed": "Sign-in failed: {{message}}"
+	},
+	"unreachable": {
+		"title": "Server unreachable",
+		"body": "Your session is kept. Check your connection, then try again.",
+		"signOut": "Sign out"
+	},
+	"projects": {
+		"title": "Projects",
+		"empty": "No project yet. Add one from the desktop app.",
+		"role": "Role: {{role}}",
+		"settings": "Settings"
+	},
+	"board": {
+		"live": "Live",
+		"offline": "Refreshing every few seconds",
+		"newCard": "New card",
+		"emptyColumn": "No card here.",
+		"subtasks": "{{completed}}/{{total}} subtasks",
+		"claimedBy": "Claimed by {{name}}"
+	},
+	"columns": {
+		"backlog": "Planning",
+		"queue": "Queue",
+		"in_progress": "In Progress",
+		"ai_review": "AI Review",
+		"human_review": "Human Review",
+		"build_failed": "Red Build",
+		"pr_created": "PR Created",
+		"done": "Done",
+		"error": "Error"
+	},
+	"kinds": {
+		"none": "Unspecified",
+		"feature": "Feature",
+		"bug_fix": "Bug fix",
+		"refactoring": "Refactoring",
+		"investigation": "Investigation",
+		"docs": "Docs",
+		"test": "Test"
+	},
+	"newCard": {
+		"title": "New card",
+		"cardTitle": "Title",
+		"description": "Description",
+		"descriptionPlaceholder": "What should the agents build?",
+		"kind": "Type",
+		"requireReview": "Review the spec before coding",
+		"requireReviewHint": "The build waits until someone approves the spec and plan.",
+		"create": "Create"
+	},
+	"card": {
+		"description": "Description",
+		"spec": "Spec",
+		"noSpec": "No spec yet. Start the card to write it.",
+		"approval": "Approval",
+		"approvedBy": "Approved by {{name}}",
+		"notApproved": "Not approved yet",
+		"runs": "Runs",
+		"noRuns": "No run yet.",
+		"changes": "Changes",
+		"noChanges": "No build workspace yet.",
+		"changesSummary": "{{files}} files · +{{additions}} −{{deletions}} · {{commits}} commits",
+		"showSpec": "Show the full spec",
+		"hideSpec": "Hide the spec",
+		"feedbackTitle": "Request changes",
+		"feedbackPlaceholder": "What should the agents change?",
+		"send": "Send",
+		"deleteConfirmTitle": "Delete this card?",
+		"deleteConfirmBody": "The card and its spec are removed for the whole team.",
+		"done": "Done"
+	},
+	"actions": {
+		"start": "Start",
+		"approve": "Approve the spec",
+		"stop": "Stop",
+		"requestChanges": "Request changes",
+		"merge": "Merge",
+		"createPr": "Create the PR",
+		"retry": "Build again",
+		"delete": "Delete"
+	},
+	"runStatus": {
+		"queued": "Queued",
+		"running": "Running",
+		"succeeded": "Succeeded",
+		"failed": "Failed",
+		"cancelled": "Cancelled"
+	},
+	"settings": {
+		"title": "Settings",
+		"account": "Account",
+		"server": "Server",
+		"organization": "Organization",
+		"signOut": "Sign out",
+		"version": "Version {{version}}"
+	},
+	"runPhase": {
+		"spec": "Spec",
+		"build": "Build",
+		"qa": "QA",
+		"merge": "Merge",
+		"pr": "Pull request"
+	}
+}

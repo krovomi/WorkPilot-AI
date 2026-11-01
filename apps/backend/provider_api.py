@@ -327,11 +327,10 @@ _ALLOWED_ORIGINS = [
 
 # There used to be an `allow_origin_regex` of
 # ``^https?://(localhost|127\.0\.0\.1)(:\d+)?$`` here. Combined with
-# ``allow_credentials=True`` that trusted *any* page served from *any* local
-# port — so any other local dev server, or a page a user happened to open from
-# a local static server, could make credentialed calls to this API. The
-# explicit list above already covers the ports WorkPilot itself uses; anything
-# else must be opted into deliberately.
+# ``allow_credentials=True`` that trusted *any* page served from *any* local port — so
+# any other local dev server, or a page a user happened to open from a local static
+# server, could make credentialed calls to this API. The explicit list above already
+# covers the ports WorkPilot itself uses; anything else must be opted into deliberately.
 _EXTRA_ORIGINS = [
     origin.strip()
     for origin in os.environ.get("WORKPILOT_EXTRA_CORS_ORIGINS", "").split(",")
@@ -357,6 +356,7 @@ app.add_middleware(
         "Content-Language",
         "X-Requested-With",
         "X-Provider",
+        "X-WorkPilot-Org",  # server mode: the org a request acts in, checked server-side
     ],
 )
 

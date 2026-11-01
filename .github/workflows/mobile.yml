@@ -1,0 +1,247 @@
+# The phone app (apps/mobile, Expo / React Native): typecheck, unit tests and
+# a web bundle of every screen on each change to it, then the two native
+# builds: an Android APK and an iOS Simulator app, kept as artifacts so a
+# reviewer can install the exact build of the PR.
+#
+# The native builds are unsigned for distribution: the APK is signed with the
+# debug key Expo generates, the iOS build targets the Simulator without code
+# signing. Store builds need Leub's Apple and Google accounts (EAS, see
+# docs/architecture/mobile-app.md). iOS only builds on macOS (AGENTS.md, 13).
+name: Mobile
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'apps/mobile/**'
+      # What the app talks to: a server change can break it too.
+      - 'apps/backend/server/**'
+      - 'apps/backend/shared_board/**'
+      - 'tests/server_e2e/**'
+      - '.github/workflows/mobile.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'apps/mobile/**'
+      # What the app talks to: a server change can break it too.
+      - 'apps/backend/server/**'
+      - 'apps/backend/shared_board/**'
+      - 'tests/server_e2e/**'
+      - '.github/workflows/mobile.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: mobile-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: apps/mobile
+
+jobs:
+  test:
+    name: Mobile — typecheck, tests, bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: apps/mobile/package.json
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: apps/mobile/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Unit tests
+        run: pnpm run test:coverage --coverageReporters=text-summary
+
+      # Metro resolves every route and import here; a screen that would only
+      # fail to bundle on a phone fails this step instead. Offline: the
+      # version check against Expo's API is not this job's question.
+      - name: Bundle every screen
+        env:
+          EXPO_OFFLINE: '1'
+        run: pnpm exec expo export --platform web --output-dir dist
+
+  # The screens against a real server (tests/server_e2e/app_world.py: API,
+  # streaming server, migrations, a fake agent), from the web bundle at a
+  # phone's size: sign-in, a card created and started, seen by a teammate,
+  # invisible to another organization (apps/mobile/e2e/server.e2e.ts).
+  server-e2e:
+    name: Mobile — against a real server
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Python backend
+        uses: ./.github/actions/setup-python-backend
+        with:
+          python-version: '3.12'
+          install-test-deps: 'true'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: apps/mobile/package.json
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: apps/mobile/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Bundle the screens
+        env:
+          EXPO_OFFLINE: '1'
+        run: pnpm run export:web
+
+      - name: The app against the server
+        env:
+          CI: 'true'
+        run: pnpm run test:e2e:server
+
+      - name: Upload traces and screenshots
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mobile-server-e2e-results
+          path: apps/mobile/test-results/
+          retention-days: 7
+
+  android:
+    name: Mobile — Android APK
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: apps/mobile/package.json
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: apps/mobile/pnpm-lock.yaml
+
+      - name: Setup Java
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Continuous Native Generation: android/ is generated from app.json and
+      # the config plugins, never committed (apps/mobile/AGENTS.md).
+      - name: Generate the Android project
+        env:
+          EXPO_OFFLINE: '1'
+        run: pnpm exec expo prebuild --platform android --no-install
+
+      - name: Build the APK
+        working-directory: apps/mobile/android
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Keep the APK
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: workpilot-android-apk
+          path: apps/mobile/android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  ios:
+    name: Mobile — iOS Simulator app
+    needs: test
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: apps/mobile/package.json
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: apps/mobile/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Generates ios/ and installs its CocoaPods.
+      - name: Generate the iOS project
+        env:
+          EXPO_OFFLINE: '1'
+        run: pnpm exec expo prebuild --platform ios
+
+      - name: Build for the Simulator
+        shell: bash
+        run: |
+          workspace=$(ls -d ios/*.xcworkspace | head -n 1)
+          scheme=$(basename "$workspace" .xcworkspace)
+          xcodebuild \
+            -workspace "$workspace" \
+            -scheme "$scheme" \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            build | tail -n 200
+          test "${PIPESTATUS[0]}" -eq 0
+          app=$(ls -d build/Build/Products/Release-iphonesimulator/*.app | head -n 1)
+          ditto -c -k --keepParent "$app" workpilot-ios-simulator.zip
+
+      - name: Keep the Simulator app
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: workpilot-ios-simulator
+          path: apps/mobile/workpilot-ios-simulator.zip
+          if-no-files-found: error
+          retention-days: 14
