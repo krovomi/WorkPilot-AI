@@ -17,6 +17,8 @@ import { getServerProject } from "./server-projects";
 
 const MAX_TITLE = 200;
 const MAX_DESCRIPTION = 20_000;
+/** Length of a title taken from the description, as `TASK_CREATE` cuts it. */
+const FALLBACK_TITLE = 60;
 const ACTIVE_RUN = new Set(["queued", "running"]);
 
 export interface ServerCard {
@@ -60,14 +62,27 @@ export async function serverCardTask(
 	return task ? { success: true, data: task } : { success: false, error: "Card not found" };
 }
 
+/** A card title made of the description's first non-empty line. */
+function titleFromDescription(description: string): string {
+	const line =
+		description
+			.split("\n")
+			.map((part) => part.trim())
+			.find(Boolean) ?? "";
+	return line.length > FALLBACK_TITLE ? `${line.slice(0, FALLBACK_TITLE)}...` : line;
+}
+
 export async function createServerCard(
 	project: Project,
 	title: unknown,
 	description: unknown,
 	metadata?: TaskMetadata,
 ): Promise<IPCResult<Task>> {
-	const name = typeof title === "string" ? title.trim() : "";
 	const text = typeof description === "string" ? description : "";
+	const given = typeof title === "string" ? title.trim() : "";
+	// The New Task dialog leaves the title optional: as on the computer when
+	// no title can be generated, the description's first line stands for it.
+	const name = given || titleFromDescription(text);
 	if (!name || name.length > MAX_TITLE || text.length > MAX_DESCRIPTION) {
 		return { success: false, error: "Invalid title or description" };
 	}

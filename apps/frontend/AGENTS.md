@@ -102,3 +102,4 @@ nouveau canal n'y entre jamais.
 | Unitaires | `src/**/__tests__/`, `*.test.ts(x)` | `pnpm test` (Vitest) |
 | Intégration | `src/__tests__/integration/` | `pnpm test` |
 | E2E | `e2e/`, l'app lancée par `e2e/app-harness.ts` | `pnpm run build && pnpm run test:e2e` (Playwright, xvfb sous Linux) |
+| E2E contre un serveur | `e2e/*.server-e2e.ts` : un vrai serveur démarré par `tests/server_e2e/app_world.py` (Python du backend) | `pnpm run build && pnpm run test:e2e:server` |

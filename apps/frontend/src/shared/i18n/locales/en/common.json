@@ -1295,5 +1295,34 @@
 				"description": "Export project report as JSON or CSV"
 			}
 		}
+	},
+	"serverLogin": {
+		"title": "Sign in to a WorkPilot server",
+		"description": "Sign in to a shared server, or continue in local mode.",
+		"serverUrl": "Server URL",
+		"entraButton": "Sign in with Microsoft",
+		"email": "Email",
+		"password": "Password",
+		"localAccountButton": "Sign in",
+		"localModeButton": "Local mode",
+		"haveInvite": "I have an invitation"
+	},
+	"acceptInvite": {
+		"title": "Create your account",
+		"description": "Use the invitation link you received to set your password.",
+		"tokenLabel": "Invitation link or code",
+		"displayName": "Display name",
+		"passwordHint": "At least 12 characters. Avoid a password you already use elsewhere.",
+		"strength0": "Very weak",
+		"strength1": "Weak",
+		"strength2": "Fair",
+		"strength3": "Good",
+		"strength4": "Strong",
+		"confirm": "Confirm password",
+		"mismatch": "The passwords do not match",
+		"invalidToken": "Invitation not found or expired",
+		"failed": "Could not create the account",
+		"submit": "Create my account",
+		"back": "Back"
 	}
 }

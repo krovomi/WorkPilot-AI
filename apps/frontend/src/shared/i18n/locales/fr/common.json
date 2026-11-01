@@ -1298,5 +1298,34 @@
 				"description": "Exporter le rapport du projet en JSON ou CSV"
 			}
 		}
+	},
+	"serverLogin": {
+		"title": "Connexion au serveur WorkPilot",
+		"description": "Connectez-vous à un serveur partagé, ou continuez en mode local.",
+		"serverUrl": "URL du serveur",
+		"entraButton": "Se connecter avec Microsoft",
+		"email": "Email",
+		"password": "Mot de passe",
+		"localAccountButton": "Connexion",
+		"localModeButton": "Mode local",
+		"haveInvite": "J'ai une invitation"
+	},
+	"acceptInvite": {
+		"title": "Créer votre compte",
+		"description": "Utilisez le lien d'invitation reçu pour définir votre mot de passe.",
+		"tokenLabel": "Lien ou code d'invitation",
+		"displayName": "Nom affiché",
+		"passwordHint": "Au moins 12 caractères. Évitez un mot de passe déjà utilisé ailleurs.",
+		"strength0": "Très faible",
+		"strength1": "Faible",
+		"strength2": "Moyen",
+		"strength3": "Bon",
+		"strength4": "Fort",
+		"confirm": "Confirmer le mot de passe",
+		"mismatch": "Les mots de passe ne correspondent pas",
+		"invalidToken": "Invitation introuvable ou expirée",
+		"failed": "Impossible de créer le compte",
+		"submit": "Créer mon compte",
+		"back": "Retour"
 	}
 }
