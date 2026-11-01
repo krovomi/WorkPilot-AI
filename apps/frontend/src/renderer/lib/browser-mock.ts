@@ -667,6 +667,7 @@ const browserMockAPI: Partial<ElectronAPI> = {
 	checkOpenAICodexOAuth: async () => ({ isAuthenticated: false }),
 	checkAgentCli: async (tool) => ({ tool, installed: false }),
 	probeAcpAgent: async (tool) => ({ tool, error: "not_installed" }),
+	installAgentCli: async (tool) => ({ tool, success: false, error: "node_required" }),
 	listTaskPermissions: async () => [],
 	answerTaskPermission: async () => ({ ok: false, reason: "not_pending" }),
 	onTaskPermissionRequest: () => () => {
