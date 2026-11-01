@@ -435,3 +435,33 @@ async def test_the_server_says_where_its_stream_is(monkeypatch):
         monkeypatch.setenv("WORKPILOT_PUBLIC_STREAM_URL", value)
         server_config.reset_settings_cache()
         assert await board_stream() == {"url": expected}
+
+
+@pytest.mark.asyncio
+async def test_a_real_handshake_names_its_channel_and_its_token():
+    """The tests above hand the server its path; websockets itself keeps it on
+    the handshake's request (since 13). Read from the connection only, it was
+    always the default path: every member was refused their own channel, and
+    the ``?token=`` of the API and of runs was never seen."""
+    from streaming.websocket_server import WS_CLOSE_FORBIDDEN
+    from websockets.asyncio.client import connect
+    from websockets.asyncio.server import serve
+    from websockets.exceptions import ConnectionClosed
+
+    w = await _world()
+    server = _server()
+    alice = _token(_user(w, "alice", "org_a"))
+    async with serve(server._handle_client, "127.0.0.1", 0) as listening:
+        port = listening.sockets[0].getsockname()[1]
+        base = f"ws://127.0.0.1:{port}/stream"
+
+        async with connect(f"{base}/project:{w['proj_a']}?token={alice}") as ws:
+            welcome = json.loads(await ws.recv())
+        assert welcome["event_type"] == "session_start"
+        assert welcome["data"]["session_id"] == f"project:{w['proj_a']}"
+
+        async with connect(f"{base}/project:{w['proj_b']}?token={alice}") as ws:
+            with pytest.raises(ConnectionClosed) as refused:
+                await ws.recv()
+        assert refused.value.rcvd is not None
+        assert refused.value.rcvd.code == WS_CLOSE_FORBIDDEN
