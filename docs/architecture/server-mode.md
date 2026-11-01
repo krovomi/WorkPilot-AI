@@ -533,8 +533,8 @@ la règle.
 L'app de bureau fait le même chemin (`apps/frontend/e2e/server-mode.server-e2e.ts`, Playwright).
 `tests/server_e2e/app_world.py` démarre ce serveur sur une base SQLite temporaire et y crée deux
 organisations : Alice, qui l'administre et enregistre le projet, et Bob, membre du projet, dans la
-première ; Carol dans la seconde. Les mots de passe, tirés pour la session, ne passent que par le
-tuyau vers la spec. Chacun lance sa copie de l'app compilée (profil et home neufs) et se connecte
+première ; Carol dans la seconde. Les mots de passe sont tirés par la spec et ne vont au serveur
+que par l'entrée standard du script, qui ne répond que l'URL et les adresses. Chacun lance sa copie de l'app compilée (profil et home neufs) et se connecte
 par l'écran de connexion :
 
 - Alice et Bob trouvent le projet de l'équipe et son tableau partagé ;

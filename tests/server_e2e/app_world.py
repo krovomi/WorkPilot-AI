@@ -1,17 +1,20 @@
 """A server for the desktop app's end-to-end spec, seeded with two teams.
 
-``apps/frontend/e2e/server-mode.server-e2e.ts`` starts this script, reads one
-JSON line from its standard output, drives the built app against the server
-it names, and closes the script's standard input when it is done; the script
-then stops the server and removes everything it made.
+``apps/frontend/e2e/server-mode.server-e2e.ts`` starts this script and writes
+one JSON line to its standard input: the passwords it drew for the people
+below (``{"alice": ..., "bob": ..., "carol": ...}``). The script seeds the
+server with them, writes one JSON line to its standard output (the server's
+URL, the project, each person's email, never a password), and serves until
+the spec closes its standard input; it then stops the server and removes
+everything it made.
 
 The server is ``stack.py``'s (migrations, streaming server, API under uvicorn,
 a fake agent in place of the model) on a SQLite database in a temporary
 directory, unless ``WORKPILOT_E2E_DATABASE_URL`` names another one. Two
 organizations: in the first, Alice (its administrator, who registers the
-project) and Bob (a member of the project); in the second, Carol. The
-passwords are drawn at random for this run and only travel through the pipe
-to the spec, never into a file.
+project) and Bob (a member of the project); in the second, Carol. Their
+passwords stay with the spec that drew them; the platform administrator's is
+drawn here, and neither is ever written out.
 
 Usage, from the repository root: ``python -m tests.server_e2e.app_world``.
 """
@@ -69,6 +72,19 @@ def _seed(
     )
 
 
+PEOPLE = ("alice", "bob", "carol")
+
+
+def _read_passwords() -> dict[str, str]:
+    """The spec's passwords, one JSON line on standard input."""
+    given = json.loads(sys.stdin.readline() or "{}")
+    if not isinstance(given, dict) or not all(
+        isinstance(given.get(key), str) and len(given[key]) >= 12 for key in PEOPLE
+    ):
+        raise SystemExit("expected one JSON line with a password for each person")
+    return {key: given[key] for key in PEOPLE}
+
+
 def main() -> int:
     if e2e.port_in_use(e2e.WS_PORT):
         print(
@@ -77,6 +93,7 @@ def main() -> int:
             file=sys.stderr,
         )
         return 2
+    passwords = _read_passwords()
     root = Path(tempfile.mkdtemp(prefix="workpilot-app-e2e-"))
     try:
         forge = root / "forge"
@@ -87,10 +104,9 @@ def main() -> int:
         env = e2e.server_env(database, root / "repos")
         e2e.migrate(env)
         run = e2e.run_suffix()
-        people = {
-            key: e2e.new_person(key, run)
-            for key in ("platform", "alice", "bob", "carol")
-        }
+        people = {key: e2e.new_person(key, run) for key in ("platform", *PEOPLE)}
+        for key in PEOPLE:
+            people[key].password = passwords[key]
         e2e.create_platform_admin(env, people["platform"])
         with e2e.serve_directory(forge) as forge_url:
             st = e2e.Stack(env, root)
@@ -100,11 +116,7 @@ def main() -> int:
                 world = {
                     "serverUrl": st.base_url,
                     "project": PROJECT_NAME,
-                    "people": {
-                        key: {"email": p.email, "password": p.password}
-                        for key, p in people.items()
-                        if key != "platform"
-                    },
+                    "emails": {key: people[key].email for key in PEOPLE},
                 }
                 print(json.dumps(world), flush=True)
                 # Serve until the spec closes our standard input.

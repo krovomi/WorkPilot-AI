@@ -15,6 +15,7 @@
  * machine without a display (CI job `app-server-e2e`).
  */
 import { spawn } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { createInterface } from "node:readline";
@@ -28,10 +29,12 @@ interface Account {
 	password: string;
 }
 
+type Who = "alice" | "bob" | "carol";
+
 interface World {
 	serverUrl: string;
 	project: string;
-	people: Record<"alice" | "bob" | "carol", Account>;
+	people: Record<Who, Account>;
 }
 
 interface Server {
@@ -53,19 +56,36 @@ async function startServer(): Promise<Server> {
 	const exited = new Promise<number | null>((resolve) =>
 		child.once("exit", (code) => resolve(code)),
 	);
+	// The passwords are drawn here and go to the server only through the
+	// script's standard input; it answers with the URL and the emails.
+	const passwords = {
+		alice: randomBytes(18).toString("base64url"),
+		bob: randomBytes(18).toString("base64url"),
+		carol: randomBytes(18).toString("base64url"),
+	} satisfies Record<Who, string>;
+	child.stdin.write(`${JSON.stringify(passwords)}\n`);
 	const firstLine = new Promise<string>((resolve, reject) => {
 		const lines = createInterface({ input: child.stdout });
 		lines.once("line", resolve);
 		void exited.then((code) => reject(new Error(`server exited (${code})`)));
 	});
-	const world = JSON.parse(
+	const answer = JSON.parse(
 		await Promise.race([
 			firstLine,
 			new Promise<string>((_, reject) =>
 				setTimeout(() => reject(new Error("server not ready in time")), 180_000),
 			),
 		]),
-	) as World;
+	) as { serverUrl: string; project: string; emails: Record<Who, string> };
+	const account = (who: Who): Account => ({
+		email: answer.emails[who],
+		password: passwords[who],
+	});
+	const world: World = {
+		serverUrl: answer.serverUrl,
+		project: answer.project,
+		people: { alice: account("alice"), bob: account("bob"), carol: account("carol") },
+	};
 	return {
 		world,
 		stop: async () => {
