@@ -1,3 +1,4 @@
+import { isAuthReturn, redirectSystemPath } from "../app/+native-intent";
 import { entraIdToken, entraIssuer } from "../auth/entra";
 
 describe("Entra sign-in", () => {
@@ -14,5 +15,15 @@ describe("Entra sign-in", () => {
 		await expect(
 			entraIdToken({ local_enabled: true, entra_enabled: true, entra_tenant_id: "t", entra_client_id: null }),
 		).rejects.toThrow("entra_disabled");
+	});
+
+	it("sends Microsoft's return link back to the app, and leaves other links alone", () => {
+		for (const link of ["workpilot://auth?code=x&state=y", "/auth?code=x", "auth", "workpilot://auth/"]) {
+			expect(isAuthReturn(link)).toBe(true);
+			expect(redirectSystemPath({ path: link, initial: false })).toBe("/");
+		}
+		for (const link of ["/authors", "/projects/p1", "workpilot://settings", "/tokens"]) {
+			expect(redirectSystemPath({ path: link, initial: true })).toBe(link);
+		}
 	});
 });
