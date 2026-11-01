@@ -40,10 +40,35 @@
 				{
 					"color": "#2C3136"
 				}
+			],
+			[
+				"expo-image-picker",
+				{
+					"photosPermission": "WorkPilot AI attaches the photos you choose to the card you are creating.",
+					"cameraPermission": "WorkPilot AI attaches the photos you take to the card you are creating.",
+					"microphonePermission": false
+				}
+			],
+			[
+				"expo-sharing",
+				{
+					"ios": {
+						"enabled": false
+					},
+					"android": {
+						"enabled": true,
+						"singleShareMimeTypes": [
+							"text/plain"
+						]
+					}
+				}
 			]
 		],
 		"experiments": {
 			"typedRoutes": true
+		},
+		"locales": {
+			"fr": "./locales/fr.json"
 		}
 	}
 }

@@ -30,7 +30,7 @@ EXPO_OFFLINE=1 pnpm exec expo export --platform web --output-dir dist   # bundle
   jamais dans un log, une URL ou `AsyncStorage`. Le jeton du flux part dans l'en-tête.
 - **HTTPS** sauf réseau local (`api/server-url.ts`) ; ne pas élargir la liste des hôtes locaux.
 - **Navigation** : Expo Router, les écrans dans `src/app/` (`(app)/` = connecté) ; le reste
-  (`admin/`, `api/`, `auth/`, `board/`, `card/`, `context/`, `features/`, `forge/`, `insights/`, `push/`, `ui/`, `i18n/`) hors de `src/app/`.
+  (`admin/`, `api/`, `auth/`, `board/`, `card/`, `context/`, `features/`, `forge/`, `insights/`, `new-card/`, `push/`, `ui/`, `i18n/`) hors de `src/app/`.
 - **Les dossiers natifs iOS et Android sont générés** (`expo prebuild`) : ne jamais les créer ni les commiter ;
   configurer par `app.json` et les plugins. iOS ne se construit que sur macOS (CI : job `ios`).
 - **Textes** : `react-i18next`, clés dans `src/i18n/en.json` et `fr.json` (un test vérifie la parité).
