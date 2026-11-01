@@ -119,6 +119,7 @@ du backend. Après chaque écriture, l'index du serveur est relu et un événeme
 | Lire une carte (texte, spec, rapport QA, approbation ; la copie de l'espace de build pendant un build) | `GET /api/board/cards/{id}` | `task.read`, un rôle sur le projet |
 | Créer | `POST /api/board/cards` | `task.write`, rôle `member` ou plus |
 | Modifier le titre ou la description | `PATCH /api/board/cards/{id}` | idem ; refusé (409) dès qu'une spec ou un espace de build existe |
+| Régler le moteur, la priorité, la catégorie, l'objectif | `PATCH /api/board/cards/{id}/settings`, ou `settings` à la création | `task.write`, rôle `member` ou plus ; permis après le début du travail, refusé (409) pendant un run. Le provider doit être dans `capabilities/providers.yaml` (ses identifiants sont ceux du déploiement), le modèle est un identifiant borné, l'objectif est validé par `goal/spec.py`. Écrits dans `task_metadata.json` (`engineLocked`) et `.workpilot-goal.json`, dans le dossier de spec et sa copie de l'espace de build (`shared_board/settings.py`). Un champ omis est gardé, `null` l'efface ; `GET /api/board/cards/{id}` les rend sous `settings` |
 | Supprimer | `DELETE /api/board/cards/{id}` | `task.delete` ; refusé pendant un run, sur une carte réservée par un autre (sauf `owner`), ou tant que son espace de build existe |
 | Approuver la spec et le plan | `POST /api/board/cards/{id}/approve` | `review.approve` ; l'approbation porte l'empreinte de la spec et tombe si elle change |
 | Lire ce que le build a changé | `GET /api/board/cards/{id}/changes` | `task.read` ; fichiers, lignes et patch de la branche `workpilot/<carte>` contre la branche du projet, lus dans l'espace de build du clone |
@@ -166,8 +167,9 @@ pris pour une carte du serveur.
 
 | Dans l'app | Au serveur |
 |---|---|
-| Nouvelle tâche (`TASK_CREATE`) | `POST /api/board/cards`, avec la revue avant le code demandée ou non |
-| Modifier le titre ou la description (`TASK_UPDATE`) | `PATCH /api/board/cards/{id}` ; le reste des métadonnées n'est pas envoyé |
+| Nouvelle tâche (`TASK_CREATE`) | `POST /api/board/cards`, avec la revue avant le code demandée ou non, et le moteur, la priorité et la catégorie choisis (`main/server-card-settings.ts`) ; les pièces jointes ne sont pas encore envoyées |
+| Modifier (`TASK_UPDATE`) | le texte, s'il a changé, par `PATCH /api/board/cards/{id}` ; le moteur, la priorité et la catégorie par `PATCH …/settings`. Les autres métadonnées ne sont pas envoyées |
+| Objectif (`TASK_GOAL_GET`, `TASK_GOAL_SET`) | lu dans `settings` de la carte, écrit par `PATCH …/settings` ; le miroir de l'app n'est jamais lu par un run |
 | Supprimer (`TASK_DELETE`) | `DELETE /api/board/cards/{id}` |
 | Démarrer (`TASK_START`) | sans spec : phase `spec` ; avec : phase `build`, précédée, si la carte demande une revue, de l'approbation de la spec par la personne qui démarre (comme Démarrer sur un plan en revue dans l'app) |
 | Arrêter (`TASK_STOP`) | annule le run en file ou en cours de la carte |

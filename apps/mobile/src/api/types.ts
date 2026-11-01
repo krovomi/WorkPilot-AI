@@ -95,6 +95,16 @@ export interface CardDetails extends Omit<BoardCard, "specId" | "claimedBy" | "c
 	qaReport?: string | null;
 	approval: { approved: boolean; approvedBy: string | null; approvedAt: string | null };
 	requireReview: boolean;
+	/** Engine, priority, category and goal (`shared_board/settings.py`); absent on an older server. */
+	settings?: CardSettings;
+}
+
+export interface CardSettings {
+	engine: { provider: string; model?: string; thinkingLevel?: string; isAutoProfile?: boolean } | null;
+	priority: string | null;
+	category: string | null;
+	goal: { command: string; expectedExit?: number; maxRounds?: number; maxCostUsd?: number } | null;
+	goalError: string | null;
 }
 
 export type RunPhase = "spec" | "build" | "qa" | "merge" | "pr";

@@ -37,6 +37,7 @@ from server.db.engine import get_db
 from server.db.models import ProjectRole
 from server.services.events import emit_board_event
 from shared_board import listing, review
+from shared_board import settings as card_settings
 from shared_board.cards import _card_or_404, _index_row, _require_writer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -68,6 +69,8 @@ class CardCreate(BaseModel):
     # As on the desktop card: when true, the build waits for someone to
     # approve the spec and plan; when false, spec creation approves them.
     require_review: bool = True
+    # Engine, priority, category and goal, as the desktop card carries them.
+    settings: card_settings.CardSettings | None = None
 
 
 class CardUpdate(BaseModel):
@@ -183,6 +186,8 @@ async def create_card(
     }
     if body.kind:
         metadata.update(kind=body.kind, kindSource="user", kindConfidence=1)
+    if body.settings is not None:
+        card_settings.checked_goal(body.settings)  # 422 before the card exists
     try:
         directory = write_card(
             scope.path, title, body.description.strip() or title, metadata
@@ -190,6 +195,8 @@ async def create_card(
     except SpecNumberLockError as e:
         raise HTTPException(status_code=409, detail="Board busy, try again") from e
 
+    if body.settings is not None:
+        card_settings.apply_settings(scope.path.resolve(), directory, body.settings)
     row = await _index_row(db, scope, directory.name)
     if row is not None and row.created_by is None:
         row.created_by = principal.id
@@ -228,6 +235,7 @@ async def get_card(
             "requireReviewBeforeCoding", True
         )
     )
+    card["settings"] = card_settings.read_settings(scope.path.resolve(), directory)
     return card
 
 
@@ -281,6 +289,35 @@ async def update_card(
         scope.project_id, "spec_updated", {"spec": card_id, "by": principal.id}
     )
     return summary(directory)
+
+
+@router.patch("/cards/{card_id}/settings")
+async def update_card_settings(
+    card_id: str,
+    body: card_settings.CardSettings,
+    request: Request,
+    scope: ProjectScope = Depends(resolve_project_scope),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Change the card's engine, priority, category or goal.
+
+    Unlike its text, these may change once work has started, as on the
+    desktop; not while a run reads them.
+    """
+    from server.services.run_manager import get_run_manager
+
+    principal = get_principal(request)
+    _require_writer(scope, principal)
+    directory = _card_or_404(scope, card_id)
+    row = await _index_row(db, scope, card_id)
+    if row is not None and get_run_manager().is_running(row.id):
+        raise HTTPException(status_code=409, detail="A run is active on this card")
+    root = scope.path.resolve()
+    card_settings.apply_settings(root, directory, body)
+    emit_board_event(
+        scope.project_id, "spec_updated", {"spec": card_id, "by": principal.id}
+    )
+    return card_settings.read_settings(root, directory)
 
 
 @router.delete("/cards/{card_id}")

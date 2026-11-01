@@ -174,6 +174,70 @@ describe("server card actions", () => {
 		});
 	});
 
+	it("sends the engine, priority and category, even once work started", async () => {
+		const { actions } = await setup();
+		const card = actions.findServerCard(`server:${PID}:001-login`);
+		if (!card) throw new Error("card");
+		const sent: Array<[string, unknown]> = [];
+		serve({
+			[`PATCH /api/board/cards/001-login/settings${Q}`]: (body) => {
+				sent.push(["settings", body]);
+				return { ok: true, data: {} };
+			},
+			[`PATCH /api/board/cards/001-login${Q}`]: (body) => {
+				sent.push(["text", body]);
+				return { ok: false, error: "Work has started on this card" };
+			},
+			[`GET /api/board/snapshot${Q}`]: () =>
+				snapshot({ "001-login": { "requirements.json": REQUIREMENTS } }),
+		});
+		const current = await actions.serverCardTask(card.project, card.cardId);
+		const result = await actions.updateServerCard(card, {
+			// The edit dialog sends the text back unchanged.
+			title: current.data?.title,
+			description: current.data?.description,
+			metadata: {
+				provider: "openai",
+				model: "gpt-5.5",
+				thinkingLevel: "high",
+				phaseModels: undefined,
+				priority: "urgent",
+				category: "",
+			},
+		});
+		expect(result.success).toBe(true);
+		expect(sent).toEqual([
+			[
+				"settings",
+				{
+					engine: { provider: "openai", model: "gpt-5.5", thinkingLevel: "high" },
+					priority: "urgent",
+					category: null,
+				},
+			],
+		]);
+	});
+
+	it("creates a card with its engine", async () => {
+		const { actions, project } = await setup();
+		const sent: Array<Record<string, unknown>> = [];
+		serve({
+			[`POST /api/board/cards${Q}`]: (body) => {
+				sent.push(body as Record<string, unknown>);
+				return { ok: true, data: { id: "002-new" } };
+			},
+			[`GET /api/board/snapshot${Q}`]: () => snapshot({}),
+		});
+		await actions.createServerCard(project, "New", "Text", {
+			provider: "claude",
+			model: "claude-opus-4-8",
+			requireReviewBeforeCoding: true,
+		} as never);
+		await actions.createServerCard(project, "Plain", "Text", { requireReviewBeforeCoding: true } as never);
+		expect(sent[0].settings).toEqual({ engine: { provider: "claude", model: "claude-opus-4-8" } });
+		expect(sent[1].settings).toBeUndefined();
+	});
+
 	it("deletes through the server", async () => {
 		const { actions } = await setup();
 		const card = actions.findServerCard(`server:${PID}:001-login`);

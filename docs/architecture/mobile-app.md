@@ -42,6 +42,8 @@ Les actions d'une carte sont celles de l'app de bureau sur une carte du serveur
 | Supprimer | `DELETE /api/board/cards/{id}`, après confirmation |
 | Modifier le titre et la description | `PATCH /api/board/cards/{id}`, tant qu'aucune spec n'est écrite (le serveur refuse ensuite, 409) |
 
+L'écran d'une carte montre aussi avec quoi elle tourne (moteur, priorité, objectif, `src/card/SettingsSection.tsx`), en lecture seule : l'app de bureau les règle.
+
 L'écran d'une carte montre aussi les changements du build (`GET .../changes`) et son journal
 (`GET .../logs`, `src/card/LogsSection.tsx`) : la phase en cours est ouverte avec ses 30 dernières
 lignes, et l'écran les relit pendant que les agents travaillent.

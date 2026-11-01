@@ -9,6 +9,9 @@
  * in every copy of the spec directory: the backend reads the main copy
  * first, and a worktree build falls back to its own.
  *
+ * A server card's goal goes to the server (`server-card-settings.ts`), which
+ * writes it where its build reads it.
+ *
  * The renderer names a task and sends a goal; the goal is validated here with
  * the backend's rules (`goal/spec.py`), and the backend validates it again.
  *
@@ -23,6 +26,8 @@ import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../../shared/constants";
 import type { IPCResult, TaskGoal, TaskGoalState } from "../../../shared/types";
 import { appLog } from "../../app-logger";
+import { findServerCard } from "../../server-board-actions";
+import { getServerCardGoal, setServerCardGoal } from "../../server-card-settings";
 import { allSpecDirs, getSpecPaths } from "./resume-task";
 import { findTaskAndProject } from "./shared";
 
@@ -156,6 +161,9 @@ export function registerGoalHandlers(): void {
 			if (typeof taskId !== "string" || !taskId) {
 				return { success: false, error: "taskId is required" };
 			}
+			// A server card's goal is the server's file: the mirror here is never read.
+			const serverCard = findServerCard(taskId);
+			if (serverCard) return getServerCardGoal(serverCard);
 			const dirs = goalDirs(taskId);
 			if (!dirs) return { success: false, error: "Task not found" };
 			return { success: true, data: readGoal(dirs) };
@@ -174,6 +182,8 @@ export function registerGoalHandlers(): void {
 				if (!result.goal) return { success: false, error: result.error };
 				goal = result.goal;
 			}
+			const serverCard = findServerCard(taskId);
+			if (serverCard) return setServerCardGoal(serverCard, goal);
 			const dirs = goalDirs(taskId);
 			if (!dirs) return { success: false, error: "Task not found" };
 			if (dirs.length === 0) return { success: false, error: "The task has no spec directory" };

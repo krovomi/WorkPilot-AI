@@ -39,8 +39,10 @@ qu'il peut réécrire est un objectif qu'il atteint avec `true`. Le nom est dans
 `PROTECTED_CONFIG_NAMES` (`security/path_guard.py`) : le hook d'écriture,
 l'exécuteur hors SDK, le validateur Bash et le garde-fou pi le refusent à tous
 les agents, comme la configuration de sécurité (S3). Le main l'écrit,
-depuis la carte, dans chaque copie du dossier de spec. Le backend lit la copie
-du projet principal d'abord. Une seule autre écriture, en Python et jamais par
+depuis la carte, dans chaque copie du dossier de spec. Pour une carte du
+serveur, c'est l'API du serveur qui l'écrit (`PATCH /api/board/cards/{id}/settings`,
+`shared_board/settings.py`), avec les mêmes règles : le miroir de l'app n'est
+lu par aucun run. Le backend lit la copie du projet principal d'abord. Une seule autre écriture, en Python et jamais par
 un agent : la phase `spec-by-example`, sur une tâche qui n'a pas d'objectif,
 après avoir vérifié que les tests qu'elle a fait écrire compilent et échouent
 ([spec-by-example.md](spec-by-example.md)).

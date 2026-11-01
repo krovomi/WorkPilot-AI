@@ -3,9 +3,10 @@ import type { Api } from "../api/endpoints";
 import type { CardDetails } from "../api/types";
 import "../i18n";
 import { ChangesSection } from "../card/ChangesSection";
-import { LogsSection, MAX_LOG_LINES } from "../card/LogsSection";
 import { canEditCard, EditCard } from "../card/EditCard";
+import { LogsSection, MAX_LOG_LINES } from "../card/LogsSection";
 import { MAX_PATCH_LINES, patchLines } from "../card/patch";
+import { SettingsSection } from "../card/SettingsSection";
 
 const mockApi = { updateCard: jest.fn(async () => ({})) } as unknown as Api & { updateCard: jest.Mock };
 jest.mock("../auth/session", () => ({ useApi: () => mockApi }));
@@ -106,6 +107,34 @@ describe("ChangesSection", () => {
 		);
 		await fireEvent.press(screen.getByRole("button", { name: /logo\.png/ }));
 		expect(screen.getByText(/No diff to show/)).toBeTruthy();
+	});
+});
+
+describe("SettingsSection", () => {
+	it("shows the engine, priority and goal the card runs with", async () => {
+		await render(
+			<SettingsSection
+				settings={{
+					engine: { provider: "openai", model: "gpt-5.5", thinkingLevel: "high" },
+					priority: "urgent",
+					category: null,
+					goal: { command: "pytest -q" },
+					goalError: null,
+				}}
+			/>,
+		);
+		expect(screen.getByText("Engine: openai · gpt-5.5 · high")).toBeTruthy();
+		expect(screen.getByText("Priority: urgent")).toBeTruthy();
+		expect(screen.getByText("pytest -q")).toBeTruthy();
+	});
+
+	it("shows nothing when the card sets none, or the server is older", async () => {
+		await render(
+			<SettingsSection settings={{ engine: null, priority: null, category: null, goal: null, goalError: null }} />,
+		);
+		expect(screen.queryByText("Runs with")).toBeNull();
+		await render(<SettingsSection />);
+		expect(screen.queryByText("Runs with")).toBeNull();
 	});
 });
 

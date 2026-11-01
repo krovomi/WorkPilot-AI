@@ -12,6 +12,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import type { IPCResult, Project, Task, TaskMetadata } from "../shared/types";
 import { getRemoteTasks, parseServerTaskId } from "./remote-board";
+import { patchServerCardSettings, settingsFromMetadata } from "./server-card-settings";
 import { authedFetch } from "./server-connection";
 import { getServerProject } from "./server-projects";
 
@@ -86,10 +87,14 @@ export async function createServerCard(
 	if (!name || name.length > MAX_TITLE || text.length > MAX_DESCRIPTION) {
 		return { success: false, error: "Invalid title or description" };
 	}
+	const settings = settingsFromMetadata(metadata);
 	const result = await authedFetch<{ id?: unknown }>(cardsUrl(project), "POST", {
 		title: name,
 		description: text,
 		require_review: metadata?.requireReviewBeforeCoding !== false,
+		// The engine, priority and category the dialog chose; the server writes
+		// them where the build reads them.
+		...(settings ? { settings } : {}),
 	});
 	if (!result.ok) return { success: false, error: result.error };
 	const cardId = result.data?.id;
@@ -107,14 +112,27 @@ export async function updateServerCard(
 		string,
 		unknown
 	>;
+	const current = await reread(card);
+	if (!current.success || !current.data) return { success: false, error: current.error };
+	// Only what changed: the edit dialog sends the text back unchanged, and the
+	// server refuses a text edit once work started, while the engine may change.
 	const body: Record<string, string> = {};
-	if (typeof raw.title === "string") body.title = raw.title.trim();
-	if (typeof raw.description === "string") body.description = raw.description;
+	if (typeof raw.title === "string" && raw.title.trim() !== current.data.title) {
+		body.title = raw.title.trim();
+	}
+	if (typeof raw.description === "string" && raw.description !== current.data.description) {
+		body.description = raw.description;
+	}
 	if (body.title !== undefined && (!body.title || body.title.length > MAX_TITLE)) {
 		return { success: false, error: "Invalid title" };
 	}
 	if ((body.description?.length ?? 0) > MAX_DESCRIPTION) {
 		return { success: false, error: "Description too long" };
+	}
+	const settings = settingsFromMetadata(raw.metadata as Partial<TaskMetadata> | undefined);
+	if (settings) {
+		const result = await patchServerCardSettings(card, settings);
+		if (!result.success) return { success: false, error: result.error };
 	}
 	if (Object.keys(body).length > 0) {
 		const result = await authedFetch(cardsUrl(card.project, card.cardId), "PATCH", body);
