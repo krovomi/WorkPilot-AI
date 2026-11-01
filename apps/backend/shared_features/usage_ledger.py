@@ -21,6 +21,8 @@ from __future__ import annotations
 
 import json
 import math
+import os
+import stat
 from collections import defaultdict
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
@@ -78,15 +80,21 @@ def _count(value: object) -> int:
     # A bool is an int to Python; a ledger never means it as a count.
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return 0
-    if not math.isfinite(value) or value < 0:
+    try:
+        number = float(value)
+    except OverflowError:
+        # An integer too large for a float is no count a run wrote.
         return 0
-    return int(value)
+    return int(number) if math.isfinite(number) and number >= 0 else 0
 
 
 def _amount(value: object) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return 0.0
-    number = float(value)
+    try:
+        number = float(value)
+    except OverflowError:
+        return 0.0
     return number if math.isfinite(number) and number >= 0 else 0.0
 
 
@@ -124,30 +132,46 @@ def _workspaces(clone: Path) -> Iterator[Path]:
 
     yield clone / ".workpilot"
     tasks = clone / ".workpilot" / "worktrees" / "tasks"
-    if not tasks.is_dir():
+    try:
+        # A build workspace can be removed while it is listed.
+        names = sorted(
+            (entry.name for entry in tasks.iterdir() if CARD_ID.match(entry.name)),
+            reverse=True,
+        )
+    except OSError:
         return
-    names = sorted(
-        (entry.name for entry in tasks.iterdir() if CARD_ID.match(entry.name)),
-        reverse=True,
-    )
     for name in names[:MAX_WORKSPACES]:
         yield tasks / name / ".workpilot"
 
 
 def _read(path: Path, root: Path, limit: int) -> tuple[Any, int]:
-    """A JSON file's value and its size; nothing for a link, a file out of the
-    clone, over its size, or not JSON."""
+    """A JSON file's value and the bytes read for it; nothing for a link, a
+    file out of the clone, over its size, or not JSON.
+
+    The file is opened without following a link and checked on the open file
+    itself, so one swapped in after the path was checked is not read either.
+    """
     try:
-        if path.is_symlink() or not path.is_file():
-            return None, 0
         if not path.resolve().is_relative_to(root):
             return None, 0
-        size = path.stat().st_size
-        if size > limit:
-            return None, 0
-        return json.loads(path.read_text(encoding="utf-8")), size
-    except (OSError, UnicodeDecodeError, ValueError):
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    except OSError:
         return None, 0
+    with os.fdopen(fd, "rb") as handle:
+        try:
+            info = os.fstat(handle.fileno())
+            if not stat.S_ISREG(info.st_mode) or info.st_size > limit:
+                return None, 0
+            data = handle.read(limit + 1)
+        except OSError:
+            return None, 0
+    if len(data) > limit:
+        return None, len(data)
+    try:
+        # What was read counts against the whole read, JSON or not.
+        return json.loads(data.decode("utf-8")), len(data)
+    except (UnicodeDecodeError, ValueError):
+        return None, len(data)
 
 
 def read_ledgers(clone: Path) -> Ledgers:

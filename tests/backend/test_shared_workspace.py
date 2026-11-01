@@ -442,6 +442,67 @@ def test_a_ledger_out_of_the_clone_or_too_large_is_not_read(tmp_path):
     assert len(ledgers.usages[0].provider) == usage_ledger.LABEL_MAX
 
 
+def test_a_ledger_s_numbers_too_large_or_its_garbage_count_but_never_break_it(
+    tmp_path, monkeypatch
+):
+    from shared_features import usage_ledger
+
+    clone = tmp_path / "clone"
+    tasks = clone / ".workpilot" / "worktrees" / "tasks"
+    huge = 10**400
+    _write(
+        tasks / "001-x" / ".workpilot" / "cost_data.json",
+        {
+            "usages": [
+                {
+                    "timestamp": _iso(NOW),
+                    "cost": huge,
+                    "input_tokens": huge,
+                    "output_tokens": 2,
+                }
+            ]
+        },
+    )
+    _write(
+        tasks / "002-y" / ".workpilot" / "dashboard_snapshot.json", {"_qa_total": huge}
+    )
+    ledgers = usage_ledger.read_ledgers(clone)
+    assert [(u.cost, u.tokens) for u in ledgers.usages] == [(0.0, 2)]
+    assert ledgers.qa_total == 0
+
+    # What is not JSON still counts against the whole read.
+    for name in ("003-a", "004-b", "005-c"):
+        garbage = tasks / name / ".workpilot" / "cost_data.json"
+        garbage.parent.mkdir(parents=True)
+        garbage.write_text("x" * 500, encoding="utf-8")
+    monkeypatch.setattr(usage_ledger, "MAX_TOTAL_BYTES", 1500)
+    seen: list[str] = []
+    real_read = usage_ledger._read
+
+    def counting(path, root, limit):
+        seen.append(path.parent.parent.name)
+        return real_read(path, root, limit)
+
+    monkeypatch.setattr(usage_ledger, "_read", counting)
+    usage_ledger.read_ledgers(clone)
+    assert "002-y" not in seen and "001-x" not in seen
+
+
+def test_a_build_workspace_removed_while_listed_is_skipped(tmp_path, monkeypatch):
+    from pathlib import Path
+
+    from shared_features import usage_ledger
+
+    clone = tmp_path / "clone"
+    (clone / ".workpilot" / "worktrees" / "tasks").mkdir(parents=True)
+
+    def gone(self):
+        raise FileNotFoundError(self)
+
+    monkeypatch.setattr(Path, "iterdir", gone)
+    assert usage_ledger.read_ledgers(clone).usages == []
+
+
 def test_the_workspace_is_read_with_the_analytics_permission():
     from server.authz.catalog import domain_for_feature
     from server.authz.mounting import permission_for
