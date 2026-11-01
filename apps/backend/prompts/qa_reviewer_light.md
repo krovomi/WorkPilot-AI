@@ -43,7 +43,7 @@ Changed files: {{FILES}}
 3. A criterion you cannot verify from the change is an issue, not an approval.
 
 Do not invent requirements the spec does not state. Minor style never blocks.
-
+{{EMPTY_CHANGE}}
 ---
 
 ## RECORD THE SIGN-OFF (THE ONLY FILE YOU WRITE)

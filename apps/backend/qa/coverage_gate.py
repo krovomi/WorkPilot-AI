@@ -325,7 +325,10 @@ def render_coverage_fix_request(report: CoverageGateReport) -> str:
     lines.append("")
     lines.append(
         "1. Ajouter/compléter les tests jusqu'à atteindre le seuil pour `unit` "
-        "et `integration`."
+        "et `integration`. Les tests doivent exercer le code modifié par cette "
+        "tâche : jamais de test factice (assertion toujours vraie, `DummyTest`), "
+        "ni de projet de tests ou de fichier (`TESTING.md`…) créé seulement "
+        "pour produire un chiffre."
     )
     lines.append(
         "2. Relancer les tests avec couverture et enregistrer les pourcentages "

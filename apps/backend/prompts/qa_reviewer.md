@@ -143,6 +143,10 @@ Rules:
 - **e2e**: best-effort — record it if measurable; a shortfall is a warning, not a blocker.
 - If coverage **cannot be measured** for unit/integration, treat it as a blocking
   issue (REJECT) and request the Coder Agent to add the missing tests/tooling.
+- Coverage is about the code **this task changed**. When the change set holds
+  no source file (only text or documentation), record
+  `"coverage": {"measured": false, "not_applicable": true}` and do not reject
+  for coverage: never ask for tests or a test project the spec does not need.
 
 Note pass/fail counts for `tests_passed`.
 

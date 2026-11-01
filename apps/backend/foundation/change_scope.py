@@ -15,8 +15,19 @@ and every model:
   test runner or interpreter reads (README, notes, `.txt`), and the change is
   small. Tests and coverage cannot have moved, so the reviewer checks the
   change against the spec instead of re-measuring the repository.
+- ``light`` too when git shows no change at all: nothing a program reads
+  moved, so there is nothing to test. The reviewer checks whether the
+  repository already holds what the spec asks (a `tutu.txt` merged by an
+  earlier card) or sends the coder back, but it never asks for tests. Sent
+  to the full review, an empty change met the coverage gate, and the fixer
+  invented test projects to get a number for a task that wrote no code.
 - ``full``: anything else, including every case where the change set cannot
   be read. Unknown is never light.
+
+``touches_code`` is the separate, narrower fact the coverage gate needs: did
+any file a program reads change. A text-only change too large for the light
+review still gets the full review, but no coverage demand: coverage cannot
+have moved.
 
 The list of text extensions is deliberately short. JSON, YAML, TOML, XML,
 `.env`, `.csproj`, lockfiles and shell scripts are configuration a program
@@ -47,6 +58,9 @@ LIGHT_MAX_CHANGED_LINES = 400
 
 #: The kill switch, for a project that wants every card reviewed in full.
 LIGHT_QA_ENV = "WORKPILOT_QA_LIGHT"
+
+#: The reason of the scope of an empty change set.
+NO_CHANGE_REASON = "no file changed"
 
 #: Paths of the pipeline's own bookkeeping, never part of the change set.
 _IGNORED_PREFIXES = (".workpilot/", ".auto-claude/")
@@ -82,6 +96,8 @@ class ChangeScope:
     files: tuple[str, ...] = field(default_factory=tuple)
     changed_lines: int = 0
     base: str = ""
+    #: Whether a file a program reads changed. Unknown is True.
+    touches_code: bool = True
 
     @property
     def is_light(self) -> bool:
@@ -97,12 +113,13 @@ def classify(
     kept = tuple(
         sorted({f for f in files if f and not f.startswith(_IGNORED_PREFIXES)})
     )
-    if not kept:
-        # Nothing changed: the full reviewer is the one that says so.
-        return ChangeScope("full", "no file changed", base=base)
-    if not light_qa_enabled():
-        return ChangeScope("full", f"{LIGHT_QA_ENV}=0", kept, changed_lines, base)
     code = [f for f in kept if not is_text_only_path(f)]
+    if not light_qa_enabled():
+        return ChangeScope(
+            "full", f"{LIGHT_QA_ENV}=0", kept, changed_lines, base, bool(code)
+        )
+    if not kept:
+        return ChangeScope("light", NO_CHANGE_REASON, base=base, touches_code=False)
     if code:
         return ChangeScope(
             "full",
@@ -113,7 +130,12 @@ def classify(
         )
     if len(kept) > LIGHT_MAX_FILES:
         return ChangeScope(
-            "full", f"{len(kept)} files > {LIGHT_MAX_FILES}", kept, changed_lines, base
+            "full",
+            f"{len(kept)} files > {LIGHT_MAX_FILES}",
+            kept,
+            changed_lines,
+            base,
+            touches_code=False,
         )
     if changed_lines > LIGHT_MAX_CHANGED_LINES:
         return ChangeScope(
@@ -122,9 +144,15 @@ def classify(
             kept,
             changed_lines,
             base,
+            touches_code=False,
         )
     return ChangeScope(
-        "light", "text/documentation files only", kept, changed_lines, base
+        "light",
+        "text/documentation files only",
+        kept,
+        changed_lines,
+        base,
+        touches_code=False,
     )
 
 
