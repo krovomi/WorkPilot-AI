@@ -26,7 +26,11 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
-from server.authz.catalog import PERMISSIONS, domain_for_feature
+from server.authz.catalog import (
+    PERMISSIONS,
+    domain_for_feature,
+    served_in_server_mode,
+)
 from server.authz.principal import Principal, get_principal
 
 logger = logging.getLogger(__name__)
@@ -150,3 +154,22 @@ def mount_guarded(
     logger.debug(
         "Mounted %s router guarded by %s.*", feature, domain_for_feature(feature)
     )
+
+
+def mount_served(app: FastAPI, router: APIRouter, feature: str) -> bool:
+    """Mount `feature` on a server, guarded, when a server serves it.
+
+    Server mode serves only what an organization's projects own; machine-local
+    tools stay with the desktop app's local backend
+    (:data:`server.authz.catalog.SERVER_FEATURES`). A feature outside that set
+    is not mounted, so its routes answer 404. An unknown name still raises, as
+    it does for :func:`mount_guarded`. Returns whether the router was mounted.
+    """
+    domain_for_feature(feature)
+    if not served_in_server_mode(feature):
+        logger.debug(
+            "Not mounting %s on a server: it stays with the local app", feature
+        )
+        return False
+    mount_guarded(app, router, feature)
+    return True

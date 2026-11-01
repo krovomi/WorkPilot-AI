@@ -127,6 +127,7 @@ l'UI n'existe pas.
 - Chaque route porte une permission (`server/authz/` : `require_permission`, `mount_guarded`) ;
   `tests/backend/test_feature_router_authz.py` échoue sinon, même pour une route sur `app` hors de
   `_mount` (seule `/health`, qui ne répond que son verdict). Masquer un bouton n'est pas un contrôle.
+- Un serveur ne monte que les features d'un projet (`SERVER_FEATURES`) ; un outil de la machine reste local.
 - Un client ne fournit jamais de chemin (`project_dir`, `spec_dir`, `file_path`…) : il donne un
   `project_id` et le serveur résout son checkout (`server/authz/scope.py`). Le middleware refuse ces
   clés (`CLIENT_PATH_PARAMS`) en query et dans le corps, à toute profondeur ;

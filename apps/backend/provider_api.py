@@ -285,12 +285,12 @@ except Exception as e:
 def _mount(router, feature: str) -> None:
     """Mount a feature router with its permission attached.
 
-    In server mode the router's whole surface is gated by the permission its
-    feature maps onto (``server.authz.catalog.FEATURE_DOMAINS``): ``<domain>.read``
-    for GET, ``<domain>.write`` otherwise, with ``ROUTE_OVERRIDES`` raising the
-    bar for the routes that execute agents. In local mode the router mounts
-    untouched, so the desktop app pays nothing for a check that would always
-    pass.
+    In server mode only what an organization's projects own is mounted
+    (``server.authz.catalog.SERVER_FEATURES``); machine-local tools stay with
+    the desktop app's local backend. A served router's whole surface is gated
+    by its feature's domain (``FEATURE_DOMAINS``): ``<domain>.read`` for GET,
+    ``<domain>.write`` otherwise, ``ROUTE_OVERRIDES`` raising the bar for the
+    routes that execute agents. In local mode every router mounts untouched.
 
     Attaching the guard here rather than editing ~150 endpoint signatures is
     deliberate, and so is doing it at the mount rather than from a table keyed
@@ -300,9 +300,9 @@ def _mount(router, feature: str) -> None:
     if not _SERVER_MODE_ACTIVE:
         app.include_router(router)
         return
-    from server.authz.mounting import mount_guarded
+    from server.authz.mounting import mount_served
 
-    mount_guarded(app, router, feature)
+    mount_served(app, router, feature)
 
 
 # Single shared limiter instance (also imported by server.routers.* so all
