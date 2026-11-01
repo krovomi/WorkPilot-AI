@@ -14,6 +14,7 @@ import type {
 	MyPermissions,
 	RunPhase,
 	ServerProject,
+	TaskLogs,
 } from "./types";
 import type { Memory } from "../context/index-file";
 import type { AnalysisKind, CostSummary, DashboardSnapshot, WorkSession } from "../insights/types";
@@ -75,6 +76,8 @@ export function api(client: ServerClient) {
 		approve: (projectId: string, cardId: string) => client.request("POST", cardsPath(projectId, cardId, "approve")),
 		changes: (projectId: string, cardId: string) =>
 			client.request<CardChanges>("GET", cardsPath(projectId, cardId, "changes")),
+		logs: async (projectId: string, cardId: string) =>
+			(await client.request<{ logs: TaskLogs | null }>("GET", cardsPath(projectId, cardId, "logs"))).logs,
 		requestChanges: (projectId: string, cardId: string, feedback: string) =>
 			client.request("POST", cardsPath(projectId, cardId, "request-changes"), { feedback }),
 		runs: (projectId: string, specId: string) => client.request<AgentRun[]>("GET", runsPath(projectId, specId)),

@@ -114,7 +114,20 @@
 		"qaReport": "Rapport QA",
 		"showReport": "Afficher tout le rapport",
 		"hideReport": "Masquer le rapport",
-		"changesSummaryFiles": "{{files}} fichiers · +{{additions}} −{{deletions}}"
+		"changesSummaryFiles": "{{files}} fichiers · +{{additions}} −{{deletions}}",
+		"logs": "Journal du build",
+		"noLogs": "Pas encore de journal.",
+		"logsEmptyPhase": "Rien d'écrit dans cette phase pour l'instant.",
+		"logsEarlier": "{{count}} lignes plus anciennes masquées",
+		"logsTruncated": "Le serveur n'a envoyé que les dernières lignes.",
+		"logPhase_planning": "Planification",
+		"logPhase_coding": "Code",
+		"logPhase_validation": "Validation",
+		"logStatus_pending": "en attente",
+		"logStatus_active": "en cours",
+		"logStatus_completed": "terminé",
+		"logStatus_failed": "échec",
+		"logPhaseToggle": "Afficher le journal de {{phase}}"
 	},
 	"actions": {
 		"start": "Démarrer",

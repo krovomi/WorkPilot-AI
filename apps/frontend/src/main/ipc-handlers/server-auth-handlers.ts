@@ -27,6 +27,7 @@ import {
 } from "../server-connection";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { unwatchAllServerBoards } from "../server-board-live";
+import { unwatchAllServerCardLogs } from "../server-card-logs";
 import { unwatchAllServerViews } from "../server-live-views";
 import {
 	deleteServerSecret,
@@ -259,6 +260,7 @@ export function registerServerAuthHandlers(
 	ipcMain.handle(IPC_CHANNELS.SERVER_AUTH_LOGOUT, async () => {
 		unwatchAllServerBoards();
 		unwatchAllServerViews();
+		unwatchAllServerCardLogs();
 		await logout();
 		notifyRenderer();
 		return getAuthState();
