@@ -6,7 +6,9 @@ les autres. Les droits passent par des rôles ; deux organisations d'un même se
 pas. Sans `WORKPILOT_SERVER_MODE`, rien de ceci n'existe : l'app locale garde un seul
 propriétaire implicite, sans base ni authentification.
 
-Réglages et déploiement : [`CONFIGURATION.md`](../CONFIGURATION.md#4-multi-user-server-mode--tenants-roles-and-permissions).
+Réglages : [`CONFIGURATION.md`](../CONFIGURATION.md#4-multi-user-server-mode--tenants-roles-and-permissions).
+Déployer, mettre derrière TLS, sauvegarder, mettre à jour : le guide d'exploitation,
+[`server-operations.md`](../server-operations.md).
 Règles : [`rules/security.md`](../rules/security.md#s5--mode-serveur--authentification-autorisation-tenant).
 
 ## Les pièces
@@ -376,5 +378,5 @@ fusion d'une MR ouverte restent offertes.
 
 Le plan multi-tenant du 31 octobre, par lots : les autres features servies de la même façon
 (l'investigation, l'auto-fix et la revue des MR GitLab en jobs, analyses, tableau de bord), le flux du projet ouvert pour
-chaque vue partagée, un test de bout en bout à deux organisations, et le guide d'exploitation. Ce
-fichier grandit avec chaque lot.
+chaque vue partagée, et un test de bout en bout à deux organisations. Ce fichier grandit avec
+chaque lot.
