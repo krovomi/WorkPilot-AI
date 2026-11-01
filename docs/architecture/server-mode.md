@@ -27,6 +27,22 @@ Règles : [`rules/security.md`](../rules/security.md#s5--mode-serveur--authentif
 | Client | `apps/frontend/src/main/server-connection.ts` | connexion, refresh dans `safeStorage`, organisation active ; vue Administration |
 | Projets dans l'app | `main/server-projects.ts`, `main/remote-board.ts`, `main/server-board-actions.ts` | les projets du serveur à côté de ceux de l'ordinateur, ajoutés par l'URL de leur dépôt ; leur tableau dessiné depuis l'instantané du serveur ; les actions du Kanban sur leurs cartes envoyées au serveur |
 
+## Ce qu'un serveur sert
+
+Un serveur ne sert que ce qui appartient aux projets d'une organisation : ses propres routes
+(`server/routers/` : comptes, organisations, projets, administration) et les features d'un projet
+désigné par son `project_id`, résolu par la base du serveur vers son clone (`shared_board/`,
+`shared_features/`). Les outils de la machine restent au backend local de l'app de bureau : un
+router qui garde son état sur la machine (le home, un fichier ou une base globale, le processus),
+reçoit un dossier du client, ou agit avec l'identité et l'environnement du processus n'est pas
+monté sur un serveur, et ses routes y répondent 404 ; le planificateur des hooks n'y démarre pas.
+`server/authz/catalog.py` le déclare : `SERVER_FEATURES` est la liste de ce qu'un serveur monte
+(`_mount` passe par `mount_served`), `LOCAL_ONLY_FEATURES` celle de ce qui reste local. Chaque
+feature est dans l'une des deux, `tests/backend/test_server_served_features.py` le vérifie : une
+nouvelle feature choisit, et une feature d'aucune liste n'est pas montée sur un serveur. Servir un
+outil de l'ordinateur à une équipe, c'est en faire une feature d'un projet, comme le tableau de
+bord est devenu [l'espace de travail](#lespace-de-travail-dun-projet).
+
 ## Pourquoi le flux en direct a sa propre autorisation
 
 Le serveur de streaming est un autre processus que l'API, et le jeton qu'il reçoit ne dit rien du

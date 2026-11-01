@@ -646,4 +646,7 @@ def test_every_project_route_answers_the_other_org_as_if_the_project_did_not_exi
                 problems.append(f"{method} {route}: {seen}")
             checked += 1
     assert problems == []
-    assert checked >= 70
+    # A server mounts only the features of a project (server.authz.catalog.
+    # SERVER_FEATURES): the operations that name one are those of its board,
+    # runs and shared features, plus a group's projects; 69 when written.
+    assert checked >= 69
