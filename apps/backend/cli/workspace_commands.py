@@ -119,15 +119,30 @@ def _get_changed_files_from_git(
         )
         merge_base = merge_base_result.stdout.strip()
 
-        # Use two-dot diff from merge-base to get only task's changes
+        # Diff the worktree itself against the merge-base, not just HEAD: a
+        # file the agent left uncommitted is committed before the merge
+        # (WorktreeManager.commit_pending_changes), so it counts here too.
         result = subprocess.run(
-            ["git", "diff", "--name-only", f"{merge_base}..HEAD"],
+            ["git", "diff", "--name-only", merge_base],
             cwd=worktree_path,
             capture_output=True,
             text=True,
             check=True,
         )
         files = [f.strip() for f in result.stdout.strip().split("\n") if f.strip()]
+        untracked = subprocess.run(
+            ["git", "ls-files", "--others", "--exclude-standard"],
+            cwd=worktree_path,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        for f in untracked.stdout.split("\n"):
+            f = f.strip()
+            # WorkPilot's own working files (.workpilot-discard-list...) never
+            # reach the branch: commit_in_worktree leaves them out.
+            if f and f not in files and not f.startswith(".workpilot"):
+                files.append(f)
         return files
     except subprocess.CalledProcessError as e:
         # Log the failure before trying fallback

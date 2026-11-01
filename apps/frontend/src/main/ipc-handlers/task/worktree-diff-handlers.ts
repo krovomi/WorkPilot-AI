@@ -17,11 +17,22 @@ import { findServerCard } from "../../server-board-actions";
 import { serverFileDiff, serverWorktreeDiff } from "../../server-board-review";
 import { isBuildOutputPath } from "../../../shared/utils/build-output-paths";
 import { findTaskWorktree } from "../../worktree-paths";
+import { collectWorktreeDiffFiles } from "./worktree-diff-files";
 import { findTaskAndProject } from "./shared";
 import {
 	getEffectiveBaseBranch,
 	resolveDiffRefs,
 } from "./worktree-git-refs";
+
+/** WorkPilot's own working files, never part of a task's changes. */
+function isWorkpilotArtifact(p: string): boolean {
+	const normalized = p.replaceAll("\\", "/");
+	return (
+		normalized === ".workpilot" ||
+		normalized.startsWith(".workpilot/") ||
+		normalized.startsWith(".workpilot-")
+	);
+}
 
 export function registerWorktreeDiffHandlers(): void {
 	/**
@@ -76,72 +87,15 @@ export function registerWorktreeDiffHandlers(): void {
 					worktreeBranch,
 					baseBranch,
 				);
-				const diffRange = `${diffRefs.baseRef}...${diffRefs.headRef}`;
-
-				// Get the diff with file stats
-				const files: WorktreeDiffFile[] = [];
-
-				try {
-					// Single atomic git call: status, stats and patch all come from the
-					// same snapshot, preventing a race where separate numstat/fullDiff
-					// invocations could see different HEAD commits on an
-					// actively-committing worktree (causing additions > 0 but patch = "").
-					const fullDiff = execFileSync(
-						getToolPath("git"),
-						["diff", diffRange],
-						{
-							cwd: worktreePath,
-							encoding: "utf-8",
-							stdio: ["pipe", "pipe", "pipe"],
-						},
-					).trim();
-
-					// Split into per-file sections by walking the diff line by line.
-					const sections: string[] = [];
-					let currentLines: string[] = [];
-					for (const line of fullDiff.split("\n")) {
-						if (line.startsWith("diff --git ")) {
-							if (currentLines.length > 0) sections.push(currentLines.join("\n"));
-							currentLines = [line];
-						} else {
-							currentLines.push(line);
-						}
-					}
-					if (currentLines.length > 0) sections.push(currentLines.join("\n"));
-
-					for (const section of sections) {
-						const headerMatch = section.match(/^diff --git a\/(.*) b\/(.*)$/m);
-						if (!headerMatch) continue;
-
-						// Use the b/ (destination) path as canonical — correct for renames too.
-						const filePath = headerMatch[2];
-
-						let status: "added" | "modified" | "deleted" | "renamed" =
-							"modified";
-						if (/^new file mode/m.test(section)) status = "added";
-						else if (/^deleted file mode/m.test(section)) status = "deleted";
-						else if (/^rename from /m.test(section)) status = "renamed";
-
-						// Count additions/deletions from the same content as the patch.
-						let additions = 0;
-						let deletions = 0;
-						for (const line of section.split("\n")) {
-							if (line.startsWith("+") && !line.startsWith("+++")) additions++;
-							else if (line.startsWith("-") && !line.startsWith("---"))
-								deletions++;
-						}
-
-						files.push({
-							path: filePath,
-							status,
-							additions,
-							deletions,
-							patch: section || undefined,
-						});
-					}
-				} catch (diffError) {
-					console.error("Error getting diff:", diffError);
-				}
+				// Committed, uncommitted and untracked changes of the task. A git
+				// failure goes to the catch below and reaches the UI as an error,
+				// never as an empty "0 files changed" list.
+				const files = collectWorktreeDiffFiles(
+					getToolPath("git"),
+					worktreePath,
+					diffRefs,
+					(p) => isWorkpilotArtifact(p) || isBuildOutputPath(p),
+				);
 
 				// Load and apply discard list filter
 				const discardListPath = path.join(
@@ -180,14 +134,6 @@ export function registerWorktreeDiffHandlers(): void {
 				}
 
 				// Filter out discarded files from the diff
-				const isWorkpilotArtifact = (p: string): boolean => {
-					const normalized = p.replaceAll("\\", "/");
-					return (
-						normalized === ".workpilot" ||
-						normalized.startsWith(".workpilot/") ||
-						normalized.startsWith(".workpilot-")
-					);
-				};
 				const filteredFiles = files.filter(
 					(file) =>
 						!discardedFiles.includes(file.path) &&
@@ -231,8 +177,8 @@ export function registerWorktreeDiffHandlers(): void {
 	/**
 	 * Get the diff for a single impacted file, on demand.
 	 *
-	 * Contrairement à TASK_WORKTREE_DIFF (qui n'expose que les changements
-	 * commités via `base...head`), ce handler tente plusieurs stratégies afin de
+	 * Comme TASK_WORKTREE_DIFF (worktree-diff-files.ts), ce handler ne se
+	 * limite pas aux commits : il tente plusieurs stratégies afin de
 	 * toujours pouvoir montrer les lignes modifiées d'un fichier impacté :
 	 *   1. plage commitée `base...head`,
 	 *   2. changements non commités vs `HEAD`,

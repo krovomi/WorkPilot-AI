@@ -1092,6 +1092,36 @@ class WorktreeManager(WorktreePRMixin):
             return []
         return ensure_artifact_excludes(worktree_path, self.base_branch)
 
+    def commit_pending_changes(self, spec_name: str) -> list[str]:
+        """Commit what the agent left uncommitted in the task's worktree.
+
+        An agent can end its session with a file it created but never
+        committed. Everything downstream reads the branch: the review diff,
+        QA's change set, the merge. Such a file was shown as "0 files changed"
+        and silently left behind by the merge. WorkPilot's own files stay out
+        (see :meth:`commit_in_worktree`).
+
+        Returns:
+            The paths ``git status`` reported (empty when nothing was pending).
+        """
+        has_changes, changed_files = self._has_uncommitted_changes(spec_name)
+        if not has_changes:
+            return []
+        self.commit_in_worktree(
+            spec_name, "workpilot: commit changes left uncommitted by the agent"
+        )
+        return changed_files
+
+    def settle_branch(self, spec_name: str) -> None:
+        """Make the branch hold exactly the task's work, before anything reads it.
+
+        Commits what the agent left uncommitted, then takes the build and test
+        outputs back out. Called after coding, at the end of the build and
+        before a merge.
+        """
+        self.commit_pending_changes(spec_name)
+        self.strip_build_artifacts(spec_name)
+
     def strip_build_artifacts(self, spec_name: str) -> list[str]:
         """Take the build and test outputs the branch committed back out.
 
