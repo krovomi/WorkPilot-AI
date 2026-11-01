@@ -278,7 +278,6 @@
 		"pullRequests": "Pull Requests",
 		"open": "open",
 		"selectPRToView": "Select a pull request to view details",
-		"serverProjectNoAIReviewGitLab": "The AI review of a server project's merge requests does not run on this computer yet. You can read, approve and merge them here with your own GitLab token.",
 		"loadingPRs": "Loading pull requests...",
 		"noOpenPRs": "No open pull requests",
 		"notConnected": "GitHub Not Connected",

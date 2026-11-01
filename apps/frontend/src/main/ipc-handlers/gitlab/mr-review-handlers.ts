@@ -36,6 +36,14 @@ import type {
 	MRReviewResult,
 	NewCommitsCheck,
 } from "./types";
+import { serverProjectOf } from "../server-review-jobs";
+import { mrReviewFromJson, mrReviewNote } from "./mr-review-result";
+import {
+	cancelServerMRReview,
+	postServerMRReview,
+	serverMRReview,
+	startServerMRReview,
+} from "./server-mr-review";
 import { encodeProjectPath, getGitLabConfig, gitlabFetch } from "./utils";
 
 /**
@@ -136,43 +144,80 @@ function getReviewResult(
 
 	if (fs.existsSync(reviewPath)) {
 		try {
-			const data = JSON.parse(fs.readFileSync(reviewPath, "utf-8"));
-			return {
-				mrIid: data.mr_iid,
-				project: data.project,
-				success: data.success,
-				findings:
-					data.findings?.map((f: Record<string, unknown>) => ({
-						id: f.id,
-						severity: f.severity,
-						category: f.category,
-						title: f.title,
-						description: f.description,
-						file: f.file,
-						line: f.line,
-						endLine: f.end_line,
-						suggestedFix: f.suggested_fix,
-						fixable: f.fixable ?? false,
-					})) ?? [],
-				summary: data.summary ?? "",
-				overallStatus: data.overall_status ?? "comment",
-				reviewedAt: data.reviewed_at ?? new Date().toISOString(),
-				reviewedCommitSha: data.reviewed_commit_sha,
-				jev: data.jev,
-				isFollowupReview: data.is_followup_review ?? false,
-				previousReviewId: data.previous_review_id,
-				resolvedFindings: data.resolved_findings ?? [],
-				unresolvedFindings: data.unresolved_findings ?? [],
-				newFindingsSinceLastReview: data.new_findings_since_last_review ?? [],
-				hasPostedFindings: data.has_posted_findings ?? false,
-				postedFindingIds: data.posted_finding_ids ?? [],
-			};
+			return mrReviewFromJson(fs.readFileSync(reviewPath, "utf-8"));
 		} catch {
 			return null;
 		}
 	}
 
 	return null;
+}
+
+/**
+ * Whether the merge request moved on since its saved review: the head the
+ * review read against the head the merge request has now.
+ */
+async function newCommitsSince(
+	project: Project,
+	review: MRReviewResult | null,
+	mrIid: number,
+): Promise<NewCommitsCheck> {
+	const reviewedCommitSha = review?.reviewedCommitSha;
+	if (!reviewedCommitSha) {
+		debugLog("No reviewedCommitSha in review", { mrIid });
+		return { hasNewCommits: false };
+	}
+
+	const config = await getGitLabConfig(project);
+	if (!config) {
+		return { hasNewCommits: false };
+	}
+
+	try {
+		const encodedProject = encodeProjectPath(config.project);
+		const mrData = (await gitlabFetch(
+			config.token,
+			config.instanceUrl,
+			`/projects/${encodedProject}/merge_requests/${mrIid}`,
+		)) as { sha: string; diff_refs: { head_sha: string } };
+
+		const currentHeadSha = mrData.sha || mrData.diff_refs?.head_sha;
+
+		if (reviewedCommitSha === currentHeadSha) {
+			return {
+				hasNewCommits: false,
+				currentSha: currentHeadSha,
+				reviewedSha: reviewedCommitSha,
+			};
+		}
+
+		// Get commits to count new ones
+		const commits = (await gitlabFetch(
+			config.token,
+			config.instanceUrl,
+			`/projects/${encodedProject}/merge_requests/${mrIid}/commits`,
+		)) as Array<{ id: string }>;
+
+		// Find how many commits are after the reviewed one
+		let newCommitCount = 0;
+		for (const commit of commits) {
+			if (commit.id === reviewedCommitSha) break;
+			newCommitCount++;
+		}
+
+		return {
+			hasNewCommits: true,
+			currentSha: currentHeadSha,
+			reviewedSha: reviewedCommitSha,
+			newCommitCount: newCommitCount || 1,
+		};
+	} catch (error) {
+		debugLog("Error checking new commits", {
+			mrIid,
+			error: error instanceof Error ? error.message : error,
+		});
+		return { hasNewCommits: false };
+	}
 }
 
 /**
@@ -374,6 +419,8 @@ export function registerMRReviewHandlers(
 			projectId: string,
 			mrIid: number,
 		): Promise<MRReviewResult | null> => {
+			const remote = serverProjectOf(projectId);
+			if (remote) return serverMRReview(remote, mrIid);
 			return withProjectOrNull(projectId, async (project) => {
 				return getReviewResult(project, mrIid);
 			});
@@ -388,6 +435,12 @@ export function registerMRReviewHandlers(
 			const mainWindow = getMainWindow();
 			if (!mainWindow) {
 				debugLog("No main window available");
+				return;
+			}
+			// A server project's review runs on the server (`server-mr-review.ts`).
+			const remote = serverProjectOf(projectId);
+			if (remote) {
+				startServerMRReview(remote, mrIid, false, mainWindow, getGitLabMRSettings());
 				return;
 			}
 
@@ -515,6 +568,8 @@ export function registerMRReviewHandlers(
 				mrIid,
 				selectedCount: selectedFindingIds?.length,
 			});
+			const remote = serverProjectOf(projectId);
+			if (remote) return postServerMRReview(remote, mrIid, selectedFindingIds);
 			const postResult = await withProjectOrNull(projectId, async (project) => {
 				const result = getReviewResult(project, mrIid);
 				if (!result) {
@@ -529,46 +584,11 @@ export function registerMRReviewHandlers(
 				}
 
 				try {
-					// Filter findings if selection provided
-					const selectedSet = selectedFindingIds
-						? new Set(selectedFindingIds)
-						: null;
-					const findings = selectedSet
-						? result.findings.filter((f) => selectedSet.has(f.id))
-						: result.findings;
-
+					const { body, findings } = mrReviewNote(result, selectedFindingIds);
 					debugLog("Posting findings", {
 						total: result.findings.length,
 						selected: findings.length,
 					});
-
-					// Build note body
-					let body = `## WorkPilot AI MR Review\n\n${result.summary}\n\n`;
-
-					if (findings.length > 0) {
-						const countText = selectedSet
-							? `${findings.length} selected of ${result.findings.length} total`
-							: `${findings.length} total`;
-						body += `### Findings (${countText})\n\n`;
-
-						for (const f of findings) {
-							const emoji =
-								{ critical: "🔴", high: "🟠", medium: "🟡", low: "🔵" }[
-									f.severity
-								] || "⚪";
-							body += `#### ${emoji} [${f.severity.toUpperCase()}] ${f.title}\n`;
-							body += `📁 \`${f.file}:${f.line}\`\n\n`;
-							body += `${f.description}\n\n`;
-							const suggestedFix = f.suggestedFix?.trim();
-							if (suggestedFix) {
-								body += `**Suggested fix:**\n\`\`\`\n${suggestedFix}\n\`\`\`\n\n`;
-							}
-						}
-					} else {
-						body += `*No findings selected for this review.*\n\n`;
-					}
-
-					body += `---\n*This review was generated by WorkPilot AI.*`;
 
 					const encodedProject = encodeProjectPath(config.project);
 
@@ -838,6 +858,7 @@ export function registerMRReviewHandlers(
 		IPC_CHANNELS.GITLAB_MR_REVIEW_CANCEL,
 		async (_, projectId: string, mrIid: number): Promise<boolean> => {
 			debugLog("cancelMRReview handler called", { projectId, mrIid });
+			if (serverProjectOf(projectId)) return cancelServerMRReview(projectId, mrIid);
 			const reviewKey = getReviewKey(projectId, mrIid);
 			const childProcess = runningReviews.get(reviewKey);
 
@@ -882,83 +903,12 @@ export function registerMRReviewHandlers(
 		async (_, projectId: string, mrIid: number): Promise<NewCommitsCheck> => {
 			debugLog("checkNewCommits handler called", { projectId, mrIid });
 
-			const result = await withProjectOrNull(projectId, async (project) => {
-				const gitlabDir = path.join(project.path, ".workpilot", "gitlab");
-				const reviewPath = path.join(gitlabDir, "mr", `review_${mrIid}.json`);
-
-				if (!fs.existsSync(reviewPath)) {
-					return { hasNewCommits: false };
-				}
-
-				let review: MRReviewResult;
-				try {
-					const data = fs.readFileSync(reviewPath, "utf-8");
-					review = JSON.parse(data);
-				} catch {
-					return { hasNewCommits: false };
-				}
-
-				const reviewedCommitSha: string | undefined =
-					review.reviewedCommitSha ||
-					((review as unknown as Record<string, unknown>).reviewed_commit_sha as
-						| string
-						| undefined);
-				if (!reviewedCommitSha) {
-					debugLog("No reviewedCommitSha in review", { mrIid });
-					return { hasNewCommits: false };
-				}
-
-				const config = await getGitLabConfig(project);
-				if (!config) {
-					return { hasNewCommits: false };
-				}
-
-				try {
-					const encodedProject = encodeProjectPath(config.project);
-					const mrData = (await gitlabFetch(
-						config.token,
-						config.instanceUrl,
-						`/projects/${encodedProject}/merge_requests/${mrIid}`,
-					)) as { sha: string; diff_refs: { head_sha: string } };
-
-					const currentHeadSha = mrData.sha || mrData.diff_refs?.head_sha;
-
-					if (reviewedCommitSha === currentHeadSha) {
-						return {
-							hasNewCommits: false,
-							currentSha: currentHeadSha,
-							reviewedSha: reviewedCommitSha,
-						};
-					}
-
-					// Get commits to count new ones
-					const commits = (await gitlabFetch(
-						config.token,
-						config.instanceUrl,
-						`/projects/${encodedProject}/merge_requests/${mrIid}/commits`,
-					)) as Array<{ id: string }>;
-
-					// Find how many commits are after the reviewed one
-					let newCommitCount = 0;
-					for (const commit of commits) {
-						if (commit.id === reviewedCommitSha) break;
-						newCommitCount++;
-					}
-
-					return {
-						hasNewCommits: true,
-						currentSha: currentHeadSha,
-						reviewedSha: reviewedCommitSha,
-						newCommitCount: newCommitCount || 1,
-					};
-				} catch (error) {
-					debugLog("Error checking new commits", {
-						mrIid,
-						error: error instanceof Error ? error.message : error,
-					});
-					return { hasNewCommits: false };
-				}
-			});
+			const remote = serverProjectOf(projectId);
+			const result = remote
+				? await newCommitsSince(remote, await serverMRReview(remote, mrIid), mrIid)
+				: await withProjectOrNull(projectId, async (project) =>
+						newCommitsSince(project, getReviewResult(project, mrIid), mrIid),
+					);
 
 			return result ?? { hasNewCommits: false };
 		},
@@ -972,6 +922,11 @@ export function registerMRReviewHandlers(
 			const mainWindow = getMainWindow();
 			if (!mainWindow) {
 				debugLog("No main window available");
+				return;
+			}
+			const remote = serverProjectOf(projectId);
+			if (remote) {
+				startServerMRReview(remote, mrIid, true, mainWindow, getGitLabMRSettings());
 				return;
 			}
 

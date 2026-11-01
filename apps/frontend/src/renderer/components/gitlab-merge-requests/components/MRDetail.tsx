@@ -49,13 +49,6 @@ interface MRDetailProps {
 	onMergeMR: (mergeMethod?: "merge" | "squash" | "rebase") => Promise<boolean>;
 	onAssignMR: (userIds: number[]) => Promise<boolean>;
 	onApproveMR: () => Promise<boolean>;
-	/**
-	 * Whether the AI review runs here: false for a server project (server
-	 * mode), whose agents run on the server, not on this computer. Its open
-	 * merge requests can still be approved and merged, with the person's own
-	 * GitLab token.
-	 */
-	aiReview?: boolean;
 }
 
 function formatDate(dateString: string): string {
@@ -107,7 +100,6 @@ export function MRDetail({
 	onPostNote,
 	onMergeMR,
 	onApproveMR,
-	aiReview = true,
 }: MRDetailProps) {
 	const { t } = useTranslation("common");
 	// Selection state for findings
@@ -467,12 +459,7 @@ export function MRDetail({
 
 					{/* Actions */}
 					<div className="flex flex-col gap-2">
-						{!aiReview && (
-							<p className="text-sm text-muted-foreground">
-								{t("prReview.serverProjectNoAIReviewGitLab")}
-							</p>
-						)}
-						{aiReview && <div className="flex items-center gap-2">
+						<div className="flex items-center gap-2">
 							{/* Show Follow-up Review button if there are new commits since last review */}
 							{newCommitsCheck?.hasNewCommits && !isReviewing ? (
 								<Button
@@ -538,10 +525,11 @@ export function MRDetail({
 									{postSuccess.count !== 1 ? "s" : ""} to GitLab
 								</div>
 							)}
-						</div>}
+						</div>
 
 						{/* Approval and Merge buttons */}
-						{(aiReview ? reviewResult?.success && isReadyToMerge : true) &&
+						{reviewResult?.success &&
+							isReadyToMerge &&
 							mr.state === "opened" && (
 								<div className="flex items-center gap-2">
 									<Button
@@ -585,7 +573,7 @@ export function MRDetail({
 					</div>
 
 					{/* MR Review Status Banner */}
-					{aiReview && <Card
+					<Card
 						className={`border-2 ${mrStatus.color} ${mrStatus.status === "ready_for_followup" ? "animate-pulse-subtle" : ""}`}
 					>
 						<CardContent className="py-3">
@@ -631,7 +619,7 @@ export function MRDetail({
 									)}
 							</div>
 						</CardContent>
-					</Card>}
+					</Card>
 
 					{/* Review Progress */}
 					{reviewProgress && (
