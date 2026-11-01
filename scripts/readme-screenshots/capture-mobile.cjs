@@ -301,6 +301,26 @@ function answer(url, method) {
 	return null;
 }
 
+/** Every file of the web bundle, by its URL path ("/_expo/static/js/web/…"). */
+function bundleFiles(dir, prefix = "") {
+	const files = new Map();
+	for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+		const url = `${prefix}/${entry.name}`;
+		const full = path.join(dir, entry.name);
+		if (entry.isDirectory()) {
+			for (const [u, f] of bundleFiles(full, url)) files.set(u, f);
+		} else {
+			files.set(url, full);
+		}
+	}
+	return files;
+}
+
+/**
+ * Serves the bundle on localhost only. A request is looked up among the
+ * bundle's own files, never joined to a path; anything else gets index.html,
+ * whose router takes the path.
+ */
 function serveDist() {
 	const types = {
 		".html": "text/html",
@@ -311,22 +331,18 @@ function serveDist() {
 		".ico": "image/x-icon",
 		".ttf": "font/ttf",
 	};
+	const files = bundleFiles(DIST);
+	const index = path.join(DIST, "index.html");
 	return http
 		.createServer((req, res) => {
-			let file = path.join(DIST, decodeURIComponent(req.url.split("?")[0]));
-			if (
-				!file.startsWith(DIST) ||
-				!fs.existsSync(file) ||
-				fs.statSync(file).isDirectory()
-			) {
-				file = path.join(DIST, "index.html"); // the app's own router takes the path
-			}
+			const file =
+				files.get(decodeURIComponent(req.url.split("?")[0])) ?? index;
 			res.writeHead(200, {
 				"content-type": types[path.extname(file)] || "application/octet-stream",
 			});
 			fs.createReadStream(file).pipe(res);
 		})
-		.listen(APP_PORT);
+		.listen(APP_PORT, "127.0.0.1");
 }
 
 /** Lays the phone screens side by side, in rounded frames, as one picture. */
@@ -395,7 +411,7 @@ async function strip(browser, shots) {
 		page.on("pageerror", (e) =>
 			console.warn("pageerror:", e.message.slice(0, 160)),
 		);
-		await page.goto(`http://localhost:${APP_PORT}/`);
+		await page.goto(`http://127.0.0.1:${APP_PORT}/`);
 		await page.getByLabel("Server address").fill(SERVER);
 		await page.getByLabel("Email").fill(user.email);
 		await page.getByLabel("Password").fill("demo-password");
