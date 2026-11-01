@@ -13,7 +13,10 @@
 		"forbidden": "Vous n'avez pas les droits pour cette action.",
 		"generic": "Une erreur est survenue : {{message}}",
 		"card_not_indexed": "Le serveur n'a pas encore indexé cette carte. Tirez pour actualiser.",
-		"feedback_required": "Dites ce qu'il faut changer."
+		"feedback_required": "Dites ce qu'il faut changer.",
+		"entra_disabled": "Ce serveur ne propose pas la connexion Microsoft.",
+		"entra_failed": "La connexion Microsoft n'a pas abouti.",
+		"entra_misconfigured": "Les réglages de connexion Microsoft du serveur sont invalides."
 	},
 	"signIn": {
 		"title": "WorkPilot AI",
@@ -27,7 +30,11 @@
 		"insecureUrl": "Utilisez une adresse https://. Le http simple n'est permis que sur votre réseau local.",
 		"localDisabled": "Ce serveur n'accepte que la connexion Microsoft, que l'app mobile ne gère pas encore.",
 		"failed": "Connexion impossible : {{message}}",
-		"badCredentials": "E-mail ou mot de passe incorrect."
+		"badCredentials": "E-mail ou mot de passe incorrect.",
+		"or": "ou",
+		"microsoft": "Se connecter avec Microsoft",
+		"entraDisabled": "Ce serveur ne propose pas la connexion Microsoft.",
+		"entraRefused": "Le serveur a refusé ce compte Microsoft."
 	},
 	"unreachable": {
 		"title": "Serveur injoignable",
@@ -150,7 +157,8 @@
 		"jobRunning": "Un agent y travaille…",
 		"jobFailed": "La dernière exécution a échoué. {{error}}",
 		"toCard": "En faire une carte",
-		"openCard": "Ouvrir sa carte"
+		"openCard": "Ouvrir sa carte",
+		"context": "Contexte"
 	},
 	"roadmap": {
 		"empty": "Pas encore de roadmap. Générez-en une : un agent étudie le projet et propose des phases et des fonctionnalités.",
@@ -285,5 +293,70 @@
 				"body": "La dette trouvée dans le code, par coût."
 			}
 		}
+	},
+	"context": {
+		"index": "Index",
+		"memories": "Mémoires",
+		"noIndex": "Le projet n'est pas encore indexé. Générez l'index pour voir ses services, son infrastructure et ses conventions.",
+		"projectType": "Projet : {{type}}",
+		"type": {
+			"single": "service unique",
+			"monorepo": "monorepo"
+		},
+		"services_one": "{{count}} service",
+		"services_other": "{{count}} services",
+		"port": "port {{port}}",
+		"infrastructure": "Infrastructure",
+		"conventions": "Conventions",
+		"infrastructureKeys": {
+			"docker_compose": "Docker Compose",
+			"docker_services": "Services Compose",
+			"dockerfile": "Dockerfile",
+			"dockerfiles": "Dockerfiles",
+			"ci": "CI",
+			"ci_workflows": "Workflows CI",
+			"deployment": "Déploiement"
+		},
+		"conventionsKeys": {
+			"python_linting": "Lint Python",
+			"python_formatting": "Formatage Python",
+			"js_linting": "Lint JS",
+			"formatting": "Formatage",
+			"typescript": "TypeScript",
+			"git_hooks": "Hooks Git"
+		},
+		"search": "Chercher dans les mémoires",
+		"noBrain": "Pas encore de mémoires : le premier build du projet qui apprend quelque chose les crée.",
+		"noMemories": "Pas encore de mémoires.",
+		"noMatch": "Aucune mémoire ne correspond à cette recherche.",
+		"memoryType": {
+			"gotcha": "Piège",
+			"pattern": "Modèle",
+			"codebase_discovery": "Découverte",
+			"task_outcome": "Résultat",
+			"session_insight": "Session"
+		}
+	},
+	"tokens": {
+		"title": "Mes jetons sur le serveur",
+		"summary": "Vos jetons GitHub, GitLab, Azure DevOps, Jira et Linear, utilisés pour vos propres appels.",
+		"manage": "Gérer mes jetons",
+		"intro": "Le serveur garde ces jetons chiffrés et s'en sert pour vos propres appels aux forges et aux outils de suivi. Une fois enregistré, un jeton n'est plus jamais affiché, ni sur le téléphone ni ailleurs.",
+		"kinds": {
+			"github_token": "GitHub",
+			"gitlab_token": "GitLab",
+			"azure_pat": "Azure DevOps",
+			"jira_token": "Jira",
+			"linear_api_key": "Linear"
+		},
+		"set": "Enregistré",
+		"notSet": "Absent",
+		"add": "Ajouter",
+		"replace": "Remplacer",
+		"remove": "Retirer",
+		"save": "Enregistrer",
+		"value": "Jeton {{name}}",
+		"removeTitle": "Retirer le jeton {{name}} ?",
+		"removeBody": "Le serveur l'oublie ; les appels qui en ont besoin s'arrêtent jusqu'à ce que vous en ajoutiez un."
 	}
 }

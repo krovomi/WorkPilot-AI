@@ -22,6 +22,8 @@ export interface TokenResponse {
 export interface AuthConfig {
 	local_enabled: boolean;
 	entra_enabled: boolean;
+	entra_tenant_id?: string | null;
+	entra_client_id?: string | null;
 }
 
 export interface Organization {

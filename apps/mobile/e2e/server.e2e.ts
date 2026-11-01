@@ -111,7 +111,7 @@ async function signIn(browser: Browser, world: World, who: Who, password = world
 	await page.getByLabel("Email").fill(world.emails[who]);
 	await page.getByLabel("Password").fill(password);
 	if (who === "alice") await shot(page, "1-sign-in");
-	await page.getByRole("button", { name: "Sign in" }).click();
+	await page.getByRole("button", { name: "Sign in", exact: true }).click();
 	if (password === world.passwords[who]) signedIn.set(who, page);
 	return page;
 }
@@ -145,7 +145,7 @@ test.afterAll(async () => {
 test("a refused password says so and keeps the person signed out", async ({ browser }) => {
 	const page = await signIn(browser, world, "alice", "not-the-password-at-all");
 	await expect(page.getByText("Sign-in failed: Wrong email or password.")).toBeVisible();
-	await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
+	await expect(page.getByRole("button", { name: "Sign in", exact: true })).toBeVisible();
 });
 
 test("a card created from the phone is on the team's board, and starts", async ({ browser }) => {
@@ -245,4 +245,35 @@ test("the dashboard, the sessions and the analyses open from the board", async (
 	await alice.getByRole("button", { name: /Technical debt/ }).click();
 	await expect(alice.getByText("Never run on this project.")).toBeVisible({ timeout: 30_000 });
 	await expect(alice.getByRole("button", { name: "Generate" })).toBeVisible();
+});
+
+test("the project's context, and a personal token kept on the server", async () => {
+	// Alice is still on the analyses, where the previous scenario left her.
+	const alice = signedInPage("alice");
+	await alice.goBack();
+	await alice.goBack();
+	await alice.goBack();
+	await alice.getByRole("link", { name: "Context" }).click();
+	await expect(alice.getByText(/hasn't been indexed yet/)).toBeVisible({ timeout: 30_000 });
+	await expect(alice.getByRole("button", { name: "Generate" })).toBeVisible();
+	await alice.getByRole("tab", { name: "Memories" }).click();
+	await expect(alice.getByText(/No memories yet/)).toBeVisible({ timeout: 30_000 });
+	await shot(alice, "10-context");
+
+	// Bob saves a GitHub token: the server says it is set, and never shows it back.
+	// Bob is on the Insights conversation where an earlier scenario left him.
+	const bob = signedInPage("bob");
+	await bob.goBack();
+	await bob.goBack();
+	await bob.goBack();
+	await bob.getByText("Settings", { exact: true }).click();
+	await bob.getByRole("button", { name: "Manage my tokens" }).click();
+	await bob.getByRole("button", { name: "Add" }).first().click({ timeout: 30_000 });
+	const token = `ghp_${randomBytes(12).toString("hex")}`;
+	await bob.getByLabel("GitHub token").fill(token);
+	await bob.getByRole("button", { name: "Save" }).click();
+	await expect(bob.getByText("Saved")).toBeVisible({ timeout: 30_000 });
+	await expect(bob.getByRole("button", { name: "Replace" })).toBeVisible();
+	await shot(bob, "11-tokens");
+	expect(await bob.content()).not.toContain(token);
 });

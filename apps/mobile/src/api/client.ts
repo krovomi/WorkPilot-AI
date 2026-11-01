@@ -158,6 +158,14 @@ export class ServerClient {
 		return tokens;
 	}
 
+	/** Sign in with a Microsoft Entra id_token, which the server checks against its own app registration. */
+	async loginWithEntra(idToken: string): Promise<TokenResponse> {
+		const tokens = await this.publicRequest<TokenResponse>("POST", "/auth/oidc/exchange", { id_token: idToken });
+		this.orgId = null;
+		this.adopt(tokens);
+		return tokens;
+	}
+
 	/**
 	 * Exchange the refresh token for a new pair; one exchange at a time. False
 	 * when there is no session or the server refused it (the person is then

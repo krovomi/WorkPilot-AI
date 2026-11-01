@@ -21,7 +21,7 @@ export default function Board() {
 	const { cards, error, live, refreshing, reload } = useBoard(projectId);
 	const forge = forgeKind(useProject(projectId).data?.forge);
 	const links = [
-		...(can("insight.read") ? (["insights", "roadmap", "ideas"] as const) : []),
+		...(can("insight.read") ? (["insights", "roadmap", "ideas", "context"] as const) : []),
 		...(forge && can("vcs.read") ? (["forge"] as const) : []),
 		...(can("analytics.read") ? (["dashboard"] as const) : []),
 	];
@@ -178,8 +178,9 @@ function CardRow({ card, onPress }: { card: BoardCard; onPress: () => void }) {
 }
 
 const styles = StyleSheet.create({
-	links: { flexDirection: "row", gap: SPACE.sm, paddingHorizontal: SPACE.lg, paddingTop: SPACE.sm },
-	link: { flex: 1, alignItems: "center", borderWidth: StyleSheet.hairlineWidth, borderRadius: RADIUS.md, paddingVertical: SPACE.sm },
+	links: { flexDirection: "row", flexWrap: "wrap", gap: SPACE.sm, paddingHorizontal: SPACE.lg, paddingTop: SPACE.sm },
+	// Three a row: up to six links, which one row would squeeze on a phone.
+	link: { flexGrow: 1, flexBasis: "30%", alignItems: "center", borderWidth: StyleSheet.hairlineWidth, borderRadius: RADIUS.md, paddingVertical: SPACE.sm },
 	status: {
 		flexDirection: "row",
 		alignItems: "center",

@@ -1,4 +1,5 @@
 import Constants from "expo-constants";
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -11,6 +12,7 @@ export default function Settings() {
 	const { t } = useTranslation();
 	const theme = useTheme();
 	const { user, serverUrl, permissions, switchOrg, signOut } = useSession();
+	const router = useRouter();
 	const [busy, setBusy] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
 
@@ -38,6 +40,10 @@ export default function Settings() {
 				<Text style={{ color: theme.text }} selectable>
 					{serverUrl}
 				</Text>
+			</Section>
+			<Section title={t("tokens.title")}>
+				<Text style={{ color: theme.textMuted }}>{t("tokens.summary")}</Text>
+				<Button label={t("tokens.manage")} variant="secondary" onPress={() => router.push("/tokens")} />
 			</Section>
 			{organizations.length > 0 ? (
 				<Section title={t("settings.organization")}>

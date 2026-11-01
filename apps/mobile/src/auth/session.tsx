@@ -25,6 +25,8 @@ export interface Session {
 	client: ServerClient | null;
 	api: Api | null;
 	signIn(serverUrl: string, email: string, password: string): Promise<void>;
+	/** Sign in with the id_token of a Microsoft Entra account (`auth/entra.ts`). */
+	signInWithEntra(serverUrl: string, idToken: string): Promise<void>;
 	signOut(): Promise<void>;
 	switchOrg(orgId: string): Promise<void>;
 	retry(): Promise<void>;
@@ -122,6 +124,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 		[makeClient, loadPermissions],
 	);
 
+	const signInWithEntra = useCallback(
+		async (url: string, idToken: string) => {
+			const current = makeClient(url, null, null);
+			await current.loginWithEntra(idToken);
+			await saveSession({ serverUrl: url, orgId: null });
+			setServerUrl(url);
+			await loadPermissions(current);
+		},
+		[makeClient, loadPermissions],
+	);
+
 	const signOut = useCallback(async () => {
 		const current = clientRef.current;
 		// While the session can still call the server: this phone stops
@@ -154,12 +167,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 			client,
 			api: client ? api(client) : null,
 			signIn,
+			signInWithEntra,
 			signOut,
 			switchOrg,
 			retry: resume,
 			can: (permission) => !!permissions?.is_platform_admin || !!permissions?.permissions.includes(permission),
 		}),
-		[status, serverUrl, user, permissions, client, signIn, signOut, switchOrg, resume],
+		[status, serverUrl, user, permissions, client, signIn, signInWithEntra, signOut, switchOrg, resume],
 	);
 
 	return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

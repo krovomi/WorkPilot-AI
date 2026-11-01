@@ -15,6 +15,7 @@ import type {
 	RunPhase,
 	ServerProject,
 } from "./types";
+import type { Memory } from "../context/index-file";
 import type { AnalysisKind, CostSummary, DashboardSnapshot, WorkSession } from "../insights/types";
 import type {
 	FeatureJob,
@@ -37,11 +38,15 @@ function featurePath(feature: string, rest: string, projectId: string, query = "
 	return `/api/features/${feature}${rest}?project_id=${enc(projectId)}${query}`;
 }
 
-export type JobFeature = "roadmap" | "ideation";
+export type JobFeature = "roadmap" | "ideation" | "context";
 
 function runsPath(projectId: string, specId: string, rest = ""): string {
 	return `/projects/${enc(projectId)}/specs/${enc(specId)}/runs${rest}`;
 }
+
+/** The personal tokens the server keeps for a person (`server/services/secrets.py`). */
+export const SECRET_KINDS = ["github_token", "gitlab_token", "azure_pat", "jira_token", "linear_api_key"] as const;
+export type SecretKind = (typeof SECRET_KINDS)[number];
 
 export interface NewCard {
 	title: string;
@@ -132,6 +137,19 @@ export function api(client: ServerClient) {
 			client.request<FeatureJobOutput>("GET", featurePath("analyses", `/${kind}/jobs/${enc(jobId)}`, projectId)),
 		cancelAnalysis: (kind: AnalysisKind, projectId: string, jobId: string) =>
 			client.request<{ cancelled: boolean }>("POST", featurePath("analyses", `/${kind}/jobs/${enc(jobId)}/cancel`, projectId)),
+		memories: async (projectId: string, query: string) => {
+			const q = query.trim();
+			const found = await client.request<{ available: boolean; memories?: Memory[]; results?: Memory[] }>(
+				"GET",
+				featurePath("context", "/memories", projectId, `&limit=50${q ? `&query=${enc(q)}` : ""}`),
+			);
+			return { available: found.available, memories: (q ? found.results : found.memories) ?? [] };
+		},
+		secretKinds: async () => (await client.request<{ kinds: string[] }>("GET", "/users/me/secrets")).kinds,
+		setSecret: (kind: SecretKind, value: string) =>
+			client.request<{ saved: boolean }>("PUT", "/users/me/secrets", { kind, value }),
+		deleteSecret: (kind: SecretKind) =>
+			client.request<{ deleted: boolean }>("DELETE", `/users/me/secrets/${enc(kind)}`),
 		streamInfo: () => client.request<{ url: string | null }>("GET", "/api/board/stream"),
 	};
 }
