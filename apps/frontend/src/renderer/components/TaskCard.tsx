@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { AutomationBadge } from "./kanban/AutomationBadge";
 import { useFormatRelativeTime } from "@/hooks/useFormatRelativeTime";
 import AzureDevOpsLogo from "../assets/logos/azure-devops.svg";
 import JiraLogo from "../assets/logos/jira.svg";
@@ -1571,6 +1572,8 @@ export const TaskCard = memo(function TaskCard({
 					<div className={cn("flex-1 min-w-0", !isSelectable && "w-full")}>
 						{/* Tracker reference (Azure DevOps / Jira work-item number) */}
 						<TrackerBadge task={task} t={t} />
+						{/* Created by an automation rule (on a server: the Automations account) */}
+						<AutomationBadge task={task} />
 
 						{/* Title - full width, no wrapper */}
 						<h3

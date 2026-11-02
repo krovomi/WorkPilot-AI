@@ -27,8 +27,12 @@ function specsDir(project: Project): string {
 	return path.join(project.path, getSpecsDir(project.autoBuildPath));
 }
 
-/** The GitHub issues the board already has a card for, imported or not. */
-export function issueNumbersOnBoard(project: Project): Set<number> {
+/** The GitHub (or GitLab) issues the board already has a card for, imported or not. */
+export function issueNumbersOnBoard(
+	project: Project,
+	forge: "github" | "gitlab" = "github",
+): Set<number> {
+	const field = forge === "github" ? "githubIssueNumber" : "gitlabIssueIid";
 	const numbers = new Set<number>();
 	const dir = specsDir(project);
 	if (!existsSync(dir)) return numbers;
@@ -38,9 +42,8 @@ export function issueNumbersOnBoard(project: Project): Set<number> {
 			const metadata = JSON.parse(
 				readFileSync(path.join(dir, entry.name, "task_metadata.json"), "utf-8"),
 			) as TaskMetadata;
-			if (typeof metadata.githubIssueNumber === "number") {
-				numbers.add(metadata.githubIssueNumber);
-			}
+			const number = metadata[field];
+			if (typeof number === "number") numbers.add(number);
 		} catch {
 			// No metadata, or unreadable: not an issue card.
 		}
@@ -65,11 +68,17 @@ export function cardMetadata(
 		...(project.settings?.mainBranch && { baseBranch: project.settings.mainBranch }),
 	};
 	if (event.issue) {
-		// The fields the GitHub import writes, so the import and the issue
-		// views see this card as the issue's card.
-		metadata.sourceType = "github";
-		metadata.githubIssueNumber = event.issue.number;
-		metadata.githubUrl = sanitizeUrl(event.issue.url);
+		// The fields the GitHub (GitLab) import writes, so the import and the
+		// issue views see this card as the issue's card.
+		if (event.issue.forge === "gitlab") {
+			metadata.sourceType = "gitlab";
+			metadata.gitlabIssueIid = event.issue.number;
+			metadata.gitlabUrl = sanitizeUrl(event.issue.url);
+		} else {
+			metadata.sourceType = "github";
+			metadata.githubIssueNumber = event.issue.number;
+			metadata.githubUrl = sanitizeUrl(event.issue.url);
+		}
 		metadata.category = determineCategoryFromLabels(
 			sanitizeStringArray(event.issue.labels, 50, 200),
 		);

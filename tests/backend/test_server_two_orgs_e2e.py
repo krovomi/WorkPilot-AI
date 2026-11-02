@@ -574,6 +574,7 @@ def _path_values(
         "number": "1",
         "kind": "i18n",
         "name": "roadmap.json",
+        "rule_id": "r-000000000001",
     }
 
 

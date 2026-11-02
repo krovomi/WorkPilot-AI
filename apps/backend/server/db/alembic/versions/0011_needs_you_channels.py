@@ -1,7 +1,7 @@
 """Needs-you channels: each person's own ntfy, Telegram or Teams.
 
-Revision ID: 0010_needs_you_channels
-Revises: 0009_user_preferences
+Revision ID: 0011_needs_you_channels
+Revises: 0010_project_automations
 Create Date: 2026-11-02
 
 Two new tables, nothing changed in the existing ones. Like ``0005``, the step
@@ -14,8 +14,8 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0010_needs_you_channels"
-down_revision = "0009_user_preferences"
+revision = "0011_needs_you_channels"
+down_revision = "0010_project_automations"
 branch_labels = None
 depends_on = None
 

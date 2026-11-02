@@ -157,4 +157,23 @@ describe("AutomationsIntegration", () => {
 		// The form stays open with what was typed.
 		expect(screen.getByLabelText("Name")).toHaveValue("Bugs");
 	});
+
+	it("says a server project's rules run on the server, and with whose tokens", async () => {
+		api.get.mockResolvedValue({
+			success: true,
+			data: {
+				...withRule,
+				statuses: {
+					"r-000000000001": { createdToday: 0, deferred: 0, lastError: "owner_not_allowed" },
+				},
+				runsOn: "server",
+				owners: { "r-000000000001": "Ada" },
+			},
+		});
+		render(<AutomationsIntegration projectId="srv-1" />);
+		expect(await screen.findByText(/the server runs them every 5 minutes/)).toBeInTheDocument();
+		expect(screen.queryByText(/while the app is open/)).not.toBeInTheDocument();
+		expect(screen.getByText(/runs with Ada's tokens/)).toBeInTheDocument();
+		expect(screen.getByRole("alert")).toHaveTextContent(/may no longer run it on this project/);
+	});
 });
