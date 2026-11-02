@@ -43,10 +43,10 @@ function SummaryCard({
 	readonly color: string;
 }): React.ReactElement {
 	return (
-		<div className="p-3 rounded-lg bg-(--bg-secondary) border border-(--border-color)">
-			<p className="text-xs text-(--text-secondary)">{label}</p>
+		<div className="p-3 rounded-lg bg-card border border-border">
+			<p className="text-xs text-muted-foreground">{label}</p>
 			<p className={`text-xl font-bold ${color}`}>{value}</p>
-			<p className="text-xs text-(--text-secondary)">{sub}</p>
+			<p className="text-xs text-muted-foreground">{sub}</p>
 		</div>
 	);
 }
@@ -82,7 +82,7 @@ function ResultBody({
 
 	return (
 		<div className="flex flex-col gap-4">
-			<p className="text-sm text-(--text-secondary)">
+			<p className="text-sm text-muted-foreground">
 				{t("dryRun", { specId: result.specId })}
 			</p>
 
@@ -121,7 +121,7 @@ function ResultBody({
 
 			{result.steps.length > 0 && (
 				<div>
-					<h3 className="text-sm font-medium text-(--text-secondary) mb-2">
+					<h3 className="text-sm font-medium text-muted-foreground mb-2">
 						{t("executionSteps")}
 					</h3>
 					<div className="space-y-2">
@@ -145,14 +145,14 @@ function ResultBody({
 			)}
 
 			<div>
-				<h3 className="text-sm font-medium text-(--text-secondary) mb-2">
+				<h3 className="text-sm font-medium text-muted-foreground mb-2">
 					{t("fileChanges")}
 				</h3>
 				<div className="space-y-1">
 					{result.diffs.map((diff) => (
 						<div
 							key={diff.filePath}
-							className="flex items-center gap-3 px-3 py-1.5 text-sm rounded hover:bg-(--bg-secondary)"
+							className="flex items-center gap-3 px-3 py-1.5 text-sm rounded hover:bg-card"
 						>
 							<ChangeTypeTag type={diff.changeType} />
 							<span className="flex-1 font-mono text-xs">{diff.filePath}</span>
@@ -187,7 +187,7 @@ export function SimulationReport({
 	const isScanning = phase === "scanning";
 
 	return (
-		<div className="flex flex-col gap-4 p-6 bg-(--bg-primary) text-(--text-primary)">
+		<div className="flex flex-col gap-4 p-6 bg-background text-foreground">
 			<div className="flex items-center justify-between">
 				<h2 className="text-lg font-semibold">{t("title")}</h2>
 				<div className="flex gap-2">
@@ -214,7 +214,7 @@ export function SimulationReport({
 						<button
 							type="button"
 							onClick={reset}
-							className="px-3 py-1.5 rounded-md border border-(--border-color) hover:bg-(--bg-secondary) text-sm font-medium transition-colors"
+							className="px-3 py-1.5 rounded-md border border-border hover:bg-card text-sm font-medium transition-colors"
 						>
 							{t("actions.reset")}
 						</button>
@@ -223,13 +223,13 @@ export function SimulationReport({
 			</div>
 
 			{!projectPath && (
-				<p className="text-sm text-(--text-secondary)">
+				<p className="text-sm text-muted-foreground">
 					{t("errors.noProject")}
 				</p>
 			)}
 
 			{isScanning && (
-				<p className="text-sm text-(--text-secondary)">
+				<p className="text-sm text-muted-foreground">
 					{status || t("actions.scanning")}
 				</p>
 			)}
@@ -239,7 +239,7 @@ export function SimulationReport({
 			)}
 
 			{phase === "complete" && result && result.diffs.length === 0 && (
-				<p className="text-sm text-(--text-secondary)">{t("noChanges")}</p>
+				<p className="text-sm text-muted-foreground">{t("noChanges")}</p>
 			)}
 
 			{phase === "complete" && result && result.diffs.length > 0 && (

@@ -35,7 +35,7 @@ export function DocDriftReport({
 	const shared = useSharedAnalysisReport("doc-drift", projectPath, setReport, isScanning);
 
 	return (
-		<div className="flex flex-col gap-4 p-6 bg-(--bg-primary) text-(--text-primary)">
+		<div className="flex flex-col gap-4 p-6 bg-background text-foreground">
 			<div className="flex items-center gap-3 flex-wrap">
 				{isScanning ? (
 					<button
@@ -50,7 +50,7 @@ export function DocDriftReport({
 						type="button"
 						onClick={() => projectPath && startScan(projectPath)}
 						disabled={!canRun}
-						className="px-3 py-1.5 rounded bg-(--accent-color) text-white text-sm disabled:opacity-50"
+						className="px-3 py-1.5 rounded bg-primary text-white text-sm disabled:opacity-50"
 					>
 						{t("actions.runScan")}
 					</button>
@@ -59,7 +59,7 @@ export function DocDriftReport({
 					<button
 						type="button"
 						onClick={reset}
-						className="px-3 py-1.5 rounded bg-(--bg-secondary) border border-(--border-color) text-sm hover:bg-(--bg-tertiary)"
+						className="px-3 py-1.5 rounded bg-card border border-border text-sm hover:bg-muted"
 					>
 						{t("actions.reset")}
 					</button>
@@ -69,13 +69,13 @@ export function DocDriftReport({
 			{!isScanning && <SharedReportNote saved={shared} />}
 
 			{!projectPath && (
-				<div className="text-sm text-(--text-secondary)">
+				<div className="text-sm text-muted-foreground">
 					{t("errors.noProject")}
 				</div>
 			)}
 
 			{isScanning && (
-				<div className="text-sm text-(--text-secondary) animate-pulse">
+				<div className="text-sm text-muted-foreground animate-pulse">
 					{status || t("actions.scanning")}
 				</div>
 			)}
@@ -90,7 +90,7 @@ export function DocDriftReport({
 				<ReportBody report={report} t={t} />
 			) : (
 				phase === "idle" && (
-					<div className="flex items-center justify-center h-40 text-(--text-secondary)">
+					<div className="flex items-center justify-center h-40 text-muted-foreground">
 						<p>{t("noData")}</p>
 					</div>
 				)
@@ -110,7 +110,7 @@ function ReportBody({
 		<div className="flex flex-col gap-4">
 			<div>
 				<h2 className="text-lg font-semibold">{t("title")}</h2>
-				<p className="text-sm text-(--text-secondary)">
+				<p className="text-sm text-muted-foreground">
 					{t("info", {
 						docs: report.docsScanned,
 						files: report.codeFilesIndexed,
@@ -144,12 +144,12 @@ function ReportBody({
 			</div>
 
 			{report.issues.length === 0 ? (
-				<p className="text-sm text-(--text-secondary) italic mt-2">
+				<p className="text-sm text-muted-foreground italic mt-2">
 					{t("noDriftDetected")}
 				</p>
 			) : (
 				report.summary && (
-					<p className="text-sm text-(--text-secondary) italic mt-2">
+					<p className="text-sm text-muted-foreground italic mt-2">
 						{report.summary}
 					</p>
 				)
