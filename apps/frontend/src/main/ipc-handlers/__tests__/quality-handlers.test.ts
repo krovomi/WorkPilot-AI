@@ -1,3 +1,4 @@
+import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
@@ -54,7 +55,8 @@ describe("PR quality score", () => {
 		expect(score).toEqual({ overall_score: 92, grade: "A" });
 		const [run] = state.spawned;
 		expect(run.cmd).toBe("/venv/bin/python");
-		expect(run.args[0].replaceAll("\\", "/")).toBe("/repo/apps/backend/runners/quality_score_runner.py");
+		// path.resolve adds the drive letter on Windows, so build the expectation the same way.
+		expect(run.args[0]).toBe(path.resolve("/repo/apps/backend", "runners", "quality_score_runner.py"));
 		expect(run.args.slice(1)).toEqual(["--project-dir", "/work/shop", "--files", "a.py"]);
 	});
 
