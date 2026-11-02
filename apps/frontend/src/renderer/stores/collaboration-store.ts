@@ -1,127 +1,66 @@
 /**
- * Collaboration Store — Zustand store for real-time multi-user collaboration state.
+ * The team room of the shown server board (server mode): who is on the
+ * project, whose claim holds which card, the team chat, and what teammates
+ * did. The main process follows the room on the project's stream
+ * (`main/server-team-room.ts`) and sends its updates here; this store only
+ * keeps them for the components of `components/collaboration/`.
  *
- * Manages:
- * - Connected users and presence indicators
- * - Task locks (user and agent)
- * - Team chat messages
- * - Conflict detection and resolution
- * - Real-time event stream
- * - Collaboration settings
- *
- * Feature 3.1 — Mode multi-utilisateurs en temps réel.
+ * The person's collaboration settings (what to show, what to be told, how to
+ * settle an edit conflict) live in this browser profile's local storage.
  */
 
 import { create } from "zustand";
+import type {
+	TeamActivity,
+	TeamChatMessage,
+	TeamChatRejection,
+	TeamLock,
+	TeamMember,
+	TeamRoomUpdate,
+} from "../../shared/types";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-export type UserStatus = "online" | "away" | "busy" | "offline";
-export type LockType = "user" | "agent";
-export type ConflictResolution =
-	| "last_write_wins"
-	| "first_write_wins"
-	| "manual"
-	| "merge";
-export type EventType =
-	| "user_joined"
-	| "user_left"
-	| "user_status_changed"
-	| "task_updated"
-	| "task_locked"
-	| "task_unlocked"
-	| "task_created"
-	| "task_deleted"
-	| "task_moved"
-	| "chat_message"
-	| "agent_started"
-	| "agent_completed"
-	| "notification"
-	| "conflict_detected"
-	| "sync_request"
-	| "sync_response";
-
-export interface ConnectedUser {
-	userId: string;
-	displayName: string;
-	role: string;
-	status: UserStatus;
-	currentTask: string;
-	connectedAt: string;
-	lastActivity: string;
-	avatarColor: string;
-}
-
-export interface TaskLock {
-	taskId: string;
-	lockedBy: string;
-	lockType: LockType;
-	lockedAt: string;
-	reason: string;
-}
-
-export interface ChatMessage {
-	messageId: string;
-	senderId: string;
-	senderName: string;
-	content: string;
-	timestamp: string;
-	replyTo: string;
-	mentions: string[];
-}
-
-export interface ConflictRecord {
-	conflictId: string;
-	taskId: string;
-	userA: string;
-	userB: string;
-	fieldName: string;
-	valueA: unknown;
-	valueB: unknown;
-	resolution: ConflictResolution;
-	resolved: boolean;
-	resolvedValue: unknown;
-	timestamp: string;
-}
-
-export interface RealtimeEvent {
-	eventId: string;
-	eventType: EventType;
-	senderId: string;
-	data: Record<string, unknown>;
-	timestamp: string;
-	targetUsers: string[];
-}
+/**
+ * What to do when a card edit meets a teammate's change of the same field:
+ * ask (`manual`), keep this person's edit (`last_write_wins`) or keep the
+ * teammate's (`first_write_wins`).
+ */
+export type ConflictStrategy = "manual" | "last_write_wins" | "first_write_wins";
 
 export interface CollaborationSettings {
-	conflictStrategy: ConflictResolution;
+	conflictStrategy: ConflictStrategy;
 	showPresenceIndicator: boolean;
 	chatEnabled: boolean;
-	chatSoundNotifications: boolean;
-	chatDesktopNotifications: boolean;
 	notifyUserJoinLeave: boolean;
 	notifyTaskLocks: boolean;
 	notifyAgentActivity: boolean;
 	notifyChatMentions: boolean;
-	notifyConflicts: boolean;
 }
 
-export interface CollaborationStats {
-	totalUsers: number;
-	onlineUsers: number;
-	activeLocks: number;
-	agentLocks: number;
-	totalEvents: number;
-	chatMessages: number;
-	totalConflicts: number;
-	unresolvedConflicts: number;
-}
+export const DEFAULT_COLLABORATION_SETTINGS: CollaborationSettings = {
+	conflictStrategy: "manual",
+	showPresenceIndicator: true,
+	chatEnabled: true,
+	notifyUserJoinLeave: true,
+	notifyTaskLocks: true,
+	notifyAgentActivity: true,
+	notifyChatMentions: true,
+};
 
-// ---------------------------------------------------------------------------
-// Avatar color palette
-// ---------------------------------------------------------------------------
+const SETTINGS_KEY = "workpilot.collaboration.settings";
+const MAX_MESSAGES = 200;
+const MAX_ACTIVITIES = 50;
+
+/** A notification to show once: a teammate's action, or a mention of me. */
+export type CollaborationNotice =
+	| { seq: number; kind: "activity"; activity: TeamActivity }
+	| { seq: number; kind: "mention"; author: string; message: string }
+	| { seq: number; kind: "rejected"; reason: TeamChatRejection };
+
+type NoticeBody = CollaborationNotice extends infer N
+	? N extends CollaborationNotice
+		? Omit<N, "seq">
+		: never
+	: never;
 
 const AVATAR_COLORS = [
 	"#ef4444",
@@ -136,7 +75,8 @@ const AVATAR_COLORS = [
 	"#f43f5e",
 ];
 
-function getAvatarColor(userId: string): string {
+/** A stable color for a person. */
+export function avatarColor(userId: string): string {
 	let hash = 0;
 	for (let i = 0; i < userId.length; i++) {
 		hash = ((hash << 5) - hash + userId.charCodeAt(i)) | 0;
@@ -144,358 +84,208 @@ function getAvatarColor(userId: string): string {
 	return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
-// ---------------------------------------------------------------------------
-// Default settings
-// ---------------------------------------------------------------------------
+/** Whether a message names `me` as `@Name` (case and spaces as written). */
+export function mentions(message: string, me: TeamMember | null): boolean {
+	const name = me?.name.trim();
+	if (!name) return false;
+	const at = message.toLowerCase().indexOf(`@${name.toLowerCase()}`);
+	if (at < 0) return false;
+	const after = message.charAt(at + name.length + 1);
+	return after === "" || !/[\p{L}\p{N}_]/u.test(after);
+}
 
-const DEFAULT_COLLABORATION_SETTINGS: CollaborationSettings = {
-	conflictStrategy: "manual",
-	showPresenceIndicator: true,
-	chatEnabled: true,
-	chatSoundNotifications: true,
-	chatDesktopNotifications: true,
-	notifyUserJoinLeave: true,
-	notifyTaskLocks: true,
-	notifyAgentActivity: true,
-	notifyChatMentions: true,
-	notifyConflicts: true,
-};
+function loadSettings(): CollaborationSettings {
+	try {
+		const raw = globalThis.localStorage?.getItem(SETTINGS_KEY);
+		if (!raw) return { ...DEFAULT_COLLABORATION_SETTINGS };
+		const saved = JSON.parse(raw) as Partial<CollaborationSettings>;
+		const settings = { ...DEFAULT_COLLABORATION_SETTINGS };
+		for (const key of Object.keys(settings) as Array<keyof CollaborationSettings>) {
+			if (typeof saved[key] === typeof settings[key]) {
+				(settings as Record<string, unknown>)[key] = saved[key];
+			}
+		}
+		if (!["manual", "last_write_wins", "first_write_wins"].includes(settings.conflictStrategy)) {
+			settings.conflictStrategy = "manual";
+		}
+		return settings;
+	} catch {
+		return { ...DEFAULT_COLLABORATION_SETTINGS };
+	}
+}
 
-// ---------------------------------------------------------------------------
-// Store interface
-// ---------------------------------------------------------------------------
+function saveSettings(settings: CollaborationSettings): void {
+	try {
+		globalThis.localStorage?.setItem(SETTINGS_KEY, JSON.stringify(settings));
+	} catch {
+		// A full or blocked storage keeps the settings for this session only.
+	}
+}
 
 interface CollaborationState {
-	// State
-	currentUserId: string;
-	currentUserName: string;
+	/** The server project whose room is joined, or "" when none. */
 	projectId: string;
-	connected: boolean;
-	syncing: boolean;
-	users: ConnectedUser[];
-	locks: TaskLock[];
-	chatMessages: ChatMessage[];
-	conflicts: ConflictRecord[];
-	events: RealtimeEvent[];
+	live: boolean;
+	me: TeamMember | null;
+	users: TeamMember[];
+	locks: Record<string, TeamLock>;
+	messages: TeamChatMessage[];
+	notices: CollaborationNotice[];
 	settings: CollaborationSettings;
 	chatOpen: boolean;
 	unreadChatCount: number;
-	replyingTo: ChatMessage | null;
+	replyingTo: TeamChatMessage | null;
+	/** The last message this person could not send, and why. */
+	sendError: string | null;
 
-	// Actions — connection
-	initialize: (projectId: string, userId: string, displayName: string) => void;
-	disconnect: () => void;
-	setConnected: (connected: boolean) => void;
-	setSyncing: (syncing: boolean) => void;
-
-	// Actions — users
-	addUser: (user: Omit<ConnectedUser, "avatarColor">) => void;
-	removeUser: (userId: string) => void;
-	updateUserStatus: (userId: string, status: UserStatus) => void;
-	setUserCurrentTask: (userId: string, taskId: string) => void;
-
-	// Actions — locks
-	lockTask: (
-		taskId: string,
-		lockedBy: string,
-		lockType: LockType,
-		reason?: string,
-	) => void;
-	unlockTask: (taskId: string) => void;
-	isTaskLocked: (taskId: string) => boolean;
-	getTaskLock: (taskId: string) => TaskLock | undefined;
-
-	// Actions — chat
-	addChatMessage: (message: ChatMessage) => void;
-	sendMessage: (content: string) => void;
-	setReplyingTo: (message: ChatMessage | null) => void;
-	toggleChat: () => void;
+	join: (projectId: string) => Promise<void>;
+	leave: () => void;
+	applyUpdate: (update: TeamRoomUpdate) => void;
+	sendMessage: (content: string) => Promise<boolean>;
+	releaseLock: (taskId: string) => Promise<string | null>;
+	setReplyingTo: (message: TeamChatMessage | null) => void;
 	setChatOpen: (open: boolean) => void;
-	markChatRead: () => void;
-
-	// Actions — conflicts
-	addConflict: (conflict: ConflictRecord) => void;
-	resolveConflict: (conflictId: string, resolvedValue: unknown) => void;
-
-	// Actions — events
-	addEvent: (event: RealtimeEvent) => void;
-
-	// Actions — settings
+	toggleChat: () => void;
+	takeNotices: () => CollaborationNotice[];
 	updateSettings: (updates: Partial<CollaborationSettings>) => void;
-
-	// Computed
-	getOnlineUsers: () => ConnectedUser[];
-	getStats: () => CollaborationStats;
-	getUnresolvedConflicts: () => ConflictRecord[];
 }
 
-// ---------------------------------------------------------------------------
-// Store
-// ---------------------------------------------------------------------------
+let noticeSeq = 0;
 
-let _msgCounter = 0;
-let _evtCounter = 0;
-
-export const useCollaborationStore = create<CollaborationState>((set, get) => ({
-	// Initial state
-	currentUserId: "",
-	currentUserName: "",
+const EMPTY_ROOM = {
 	projectId: "",
-	connected: false,
-	syncing: false,
+	live: false,
+	me: null,
 	users: [],
-	locks: [],
-	chatMessages: [],
-	conflicts: [],
-	events: [],
-	settings: { ...DEFAULT_COLLABORATION_SETTINGS },
+	locks: {},
+	messages: [],
+	notices: [],
 	chatOpen: false,
 	unreadChatCount: 0,
 	replyingTo: null,
+	sendError: null,
+} satisfies Partial<CollaborationState>;
 
-	// -- Connection ----------------------------------------------------------
+export const useCollaborationStore = create<CollaborationState>((set, get) => ({
+	...EMPTY_ROOM,
+	settings: loadSettings(),
 
-	initialize: (projectId, userId, displayName) => {
-		set({
-			projectId,
-			currentUserId: userId,
-			currentUserName: displayName,
-			connected: true,
-			users: [
-				{
-					userId,
-					displayName,
-					role: "developer",
-					status: "online",
-					currentTask: "",
-					connectedAt: new Date().toISOString(),
-					lastActivity: new Date().toISOString(),
-					avatarColor: getAvatarColor(userId),
-				},
-			],
-		});
+	join: async (projectId) => {
+		if (get().projectId === projectId) return;
+		const previous = get().projectId;
+		if (previous) void globalThis.electronAPI?.leaveTeamRoom?.(previous);
+		set({ ...EMPTY_ROOM, projectId });
+		const result = await globalThis.electronAPI?.joinTeamRoom?.(projectId);
+		if (!result?.success && get().projectId === projectId) set({ projectId: "" });
 	},
 
-	disconnect: () => {
-		set({
-			connected: false,
-			users: [],
-			locks: [],
-			chatMessages: [],
-			conflicts: [],
-			events: [],
-			unreadChatCount: 0,
-		});
+	leave: () => {
+		const { projectId } = get();
+		if (projectId) void globalThis.electronAPI?.leaveTeamRoom?.(projectId);
+		set({ ...EMPTY_ROOM });
 	},
 
-	setConnected: (connected) => set({ connected }),
-	setSyncing: (syncing) => set({ syncing }),
-
-	// -- Users ---------------------------------------------------------------
-
-	addUser: (user) => {
-		set((state) => {
-			const exists = state.users.find((u) => u.userId === user.userId);
-			if (exists) {
-				return {
-					users: state.users.map((u) =>
-						u.userId === user.userId
-							? { ...u, ...user, status: "online" as UserStatus }
-							: u,
-					),
-				};
-			}
-			return {
-				users: [
-					...state.users,
-					{ ...user, avatarColor: getAvatarColor(user.userId) },
-				],
-			};
-		});
-	},
-
-	removeUser: (userId) => {
-		set((state) => ({
-			users: state.users.map((u) =>
-				u.userId === userId ? { ...u, status: "offline" as UserStatus } : u,
-			),
-		}));
-	},
-
-	updateUserStatus: (userId, status) => {
-		set((state) => ({
-			users: state.users.map((u) =>
-				u.userId === userId
-					? { ...u, status, lastActivity: new Date().toISOString() }
-					: u,
-			),
-		}));
-	},
-
-	setUserCurrentTask: (userId, taskId) => {
-		set((state) => ({
-			users: state.users.map((u) =>
-				u.userId === userId
-					? {
-							...u,
-							currentTask: taskId,
-							lastActivity: new Date().toISOString(),
-						}
-					: u,
-			),
-		}));
-	},
-
-	// -- Locks ---------------------------------------------------------------
-
-	lockTask: (taskId, lockedBy, lockType, reason = "") => {
-		set((state) => {
-			const existing = state.locks.find((l) => l.taskId === taskId);
-			if (existing) return state;
-			return {
-				locks: [
-					...state.locks,
-					{
-						taskId,
-						lockedBy,
-						lockType,
-						lockedAt: new Date().toISOString(),
-						reason,
-					},
-				],
-			};
-		});
-	},
-
-	unlockTask: (taskId) => {
-		set((state) => ({
-			locks: state.locks.filter((l) => l.taskId !== taskId),
-		}));
-	},
-
-	isTaskLocked: (taskId) => {
-		return get().locks.some((l) => l.taskId === taskId);
-	},
-
-	getTaskLock: (taskId) => {
-		return get().locks.find((l) => l.taskId === taskId);
-	},
-
-	// -- Chat ----------------------------------------------------------------
-
-	addChatMessage: (message) => {
-		set((state) => {
-			const newState: Partial<CollaborationState> = {
-				chatMessages: [...state.chatMessages, message],
-			};
-			if (!state.chatOpen && message.senderId !== state.currentUserId) {
-				newState.unreadChatCount = state.unreadChatCount + 1;
-			}
-			return newState as CollaborationState;
-		});
-	},
-
-	sendMessage: (content) => {
+	applyUpdate: (update) => {
 		const state = get();
-		if (!content.trim() || !state.currentUserId) return;
+		if (!state.projectId || update.projectId !== state.projectId) return;
+		const notice = (n: NoticeBody) =>
+			[...state.notices, { ...n, seq: ++noticeSeq } as CollaborationNotice].slice(
+				-MAX_ACTIVITIES,
+			);
+		switch (update.kind) {
+			case "state":
+				set({
+					live: update.live,
+					me: update.me,
+					users: update.users,
+					locks: Object.fromEntries(update.locks.map((lock) => [lock.taskId, lock])),
+				});
+				return;
+			case "chat": {
+				const known = update.replace ? new Set<string>() : new Set(state.messages.map((m) => m.id));
+				const fresh = update.messages.filter((m) => !known.has(m.id));
+				const base = update.replace ? [] : state.messages;
+				const messages = [...base, ...fresh].slice(-MAX_MESSAGES);
+				// History is what was said before: only new messages count as unread.
+				const incoming = update.replace
+					? []
+					: fresh.filter((m) => m.authorId !== state.me?.id);
+				let notices = state.notices;
+				for (const m of incoming) {
+					if (mentions(m.message, state.me)) {
+						notices = [
+							...notices,
+							{ seq: ++noticeSeq, kind: "mention" as const, author: m.author, message: m.message },
+						].slice(-MAX_ACTIVITIES);
+					}
+				}
+				set({
+					messages,
+					notices,
+					unreadChatCount: state.chatOpen
+						? 0
+						: state.unreadChatCount + incoming.length,
+				});
+				return;
+			}
+			case "rejected":
+				set({
+					sendError: update.reason,
+					notices: notice({ kind: "rejected", reason: update.reason }),
+				});
+				return;
+			case "activity":
+				set({ notices: notice({ kind: "activity", activity: update.activity }) });
+				return;
+		}
+	},
 
-		_msgCounter++;
-		const message: ChatMessage = {
-			messageId: `msg-${_msgCounter.toString().padStart(6, "0")}`,
-			senderId: state.currentUserId,
-			senderName: state.currentUserName,
-			content: content.trim(),
-			timestamp: new Date().toISOString(),
-			replyTo: state.replyingTo?.messageId ?? "",
-			mentions: [],
-		};
+	sendMessage: async (content) => {
+		const { projectId, replyingTo } = get();
+		const text = content.trim();
+		if (!projectId || !text) return false;
+		const result = await globalThis.electronAPI?.sendTeamChat?.(
+			projectId,
+			text,
+			replyingTo?.id ?? "",
+		);
+		if (result?.success) {
+			set({ replyingTo: null, sendError: null });
+			return true;
+		}
+		set({ sendError: result?.error ?? "offline" });
+		return false;
+	},
 
-		set((s) => ({
-			chatMessages: [...s.chatMessages, message],
-			replyingTo: null,
-		}));
+	releaseLock: async (taskId) => {
+		const result = await globalThis.electronAPI?.releaseCardClaim?.(taskId);
+		return result?.success ? null : (result?.error ?? "unavailable");
 	},
 
 	setReplyingTo: (message) => set({ replyingTo: message }),
 
-	toggleChat: () =>
-		set((state) => ({
-			chatOpen: !state.chatOpen,
-			unreadChatCount: !state.chatOpen ? 0 : state.unreadChatCount,
-		})),
-
 	setChatOpen: (open) =>
-		set({
-			chatOpen: open,
-			unreadChatCount: open ? 0 : get().unreadChatCount,
-		}),
+		set((state) => ({ chatOpen: open, unreadChatCount: open ? 0 : state.unreadChatCount })),
 
-	markChatRead: () => set({ unreadChatCount: 0 }),
+	toggleChat: () => get().setChatOpen(!get().chatOpen),
 
-	// -- Conflicts -----------------------------------------------------------
-
-	addConflict: (conflict) => {
-		set((state) => ({
-			conflicts: [...state.conflicts, conflict],
-		}));
+	takeNotices: () => {
+		const { notices } = get();
+		if (notices.length > 0) set({ notices: [] });
+		return notices;
 	},
-
-	resolveConflict: (conflictId, resolvedValue) => {
-		set((state) => ({
-			conflicts: state.conflicts.map((c) =>
-				c.conflictId === conflictId
-					? { ...c, resolved: true, resolvedValue }
-					: c,
-			),
-		}));
-	},
-
-	// -- Events --------------------------------------------------------------
-
-	addEvent: (event) => {
-		_evtCounter++;
-		set((state) => ({
-			events: [
-				...state.events.slice(-99),
-				{
-					...event,
-					eventId:
-						event.eventId || `evt-${_evtCounter.toString().padStart(6, "0")}`,
-				},
-			],
-		}));
-	},
-
-	// -- Settings ------------------------------------------------------------
 
 	updateSettings: (updates) => {
-		set((state) => ({
-			settings: { ...state.settings, ...updates },
-		}));
-	},
-
-	// -- Computed ------------------------------------------------------------
-
-	getOnlineUsers: () => {
-		return get().users.filter((u) => u.status !== "offline");
-	},
-
-	getStats: () => {
-		const state = get();
-		const onlineUsers = state.users.filter((u) => u.status !== "offline");
-		return {
-			totalUsers: state.users.length,
-			onlineUsers: onlineUsers.length,
-			activeLocks: state.locks.length,
-			agentLocks: state.locks.filter((l) => l.lockType === "agent").length,
-			totalEvents: state.events.length,
-			chatMessages: state.chatMessages.length,
-			totalConflicts: state.conflicts.length,
-			unresolvedConflicts: state.conflicts.filter((c) => !c.resolved).length,
-		};
-	},
-
-	getUnresolvedConflicts: () => {
-		return get().conflicts.filter((c) => !c.resolved);
+		const settings = { ...get().settings, ...updates };
+		saveSettings(settings);
+		set({ settings });
 	},
 }));
+
+/** Follow the team room's updates from the main process; returns the cleanup. */
+export function setupCollaborationListeners(): () => void {
+	const off = globalThis.electronAPI?.onTeamRoomUpdate?.((update) =>
+		useCollaborationStore.getState().applyUpdate(update),
+	);
+	return off ?? (() => undefined);
+}

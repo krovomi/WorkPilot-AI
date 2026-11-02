@@ -120,6 +120,7 @@ import { registerServerAdminHandlers } from "./server-admin-handlers";
 import { registerServerAuthHandlers } from "./server-auth-handlers";
 import { registerServerProjectHandlers } from "./server-project-handlers";
 import { registerServerWorkspaceHandlers } from "./server-workspace-handlers";
+import { registerTeamRoomHandlers } from "./team-room-handlers";
 import { registerJevHandlers } from "./jev-handlers";
 import { registerSecureStorageHandlers } from "./secure-storage-handlers";
 import { registerSettingsHandlers } from "./settings-handlers";
@@ -319,6 +320,7 @@ export function setupIpcHandlers(
 	registerServerAdminHandlers();
 	registerServerProjectHandlers();
 	registerServerWorkspaceHandlers();
+	registerTeamRoomHandlers();
 
 	// File explorer handlers
 	registerFileHandlers();

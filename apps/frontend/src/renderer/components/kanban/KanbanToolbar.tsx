@@ -26,6 +26,7 @@ import {
 	type TaskSource,
 } from "../../lib/kanban-filter";
 import { cn } from "../../lib/utils";
+import { TeamRoomBar } from "../collaboration";
 import { useKanbanFilterStore } from "../../stores/kanban-filter-store";
 import { useProjectStore } from "../../stores/project-store";
 import { MultiRepoButton } from "../multi-repo/MultiRepoButton";
@@ -404,7 +405,11 @@ export function KanbanToolbar({ projectPath }: KanbanToolbarProps) {
 			{/* Quick Commands run on this computer: a server board has its notice
 			    instead, until commands run on the server. */}
 			{serverProject ? (
-				<ServerBoardNotice project={serverProject} />
+				<>
+					<ServerBoardNotice project={serverProject} />
+					<Separator orientation="vertical" className="h-5" />
+					<TeamRoomBar projectId={serverProject.id} />
+				</>
 			) : (
 				<QuickCommandBar
 					projectPath={projectPath}

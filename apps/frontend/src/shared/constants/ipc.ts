@@ -1275,6 +1275,13 @@ export const IPC_CHANNELS = {
 	SERVER_BOARD_WATCH: "server-board:watch",
 	SERVER_BOARD_UNWATCH: "server-board:unwatch",
 	SERVER_BOARD_LIVE: "server-board:live",
+	// Server mode: the team room of a shown server board: who is on it, the
+	// cards' claims, the team chat (main/server-team-room.ts; main → renderer)
+	TEAM_ROOM_JOIN: "team-room:join",
+	TEAM_ROOM_LEAVE: "team-room:leave",
+	TEAM_ROOM_UPDATE: "team-room:update",
+	TEAM_CHAT_SEND: "team-room:chat-send",
+	TEAM_LOCK_RELEASE: "team-room:lock-release",
 	// Server mode: follow a shown shared view of a server project (roadmap,
 	// ideation, Insights, context) on the project's stream (main → renderer)
 	SERVER_VIEW_WATCH: "server-view:watch",

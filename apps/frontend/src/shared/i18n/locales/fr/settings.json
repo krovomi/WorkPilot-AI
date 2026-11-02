@@ -1482,6 +1482,9 @@
 		"remove": "Retirer du serveur",
 		"unavailable": "Le serveur est injoignable"
 	},
+	"serverCollaboration": {
+		"navLabel": "Collaboration d'équipe"
+	},
 	"serverNeedsYou": {
 		"navLabel": "Mes notifications du serveur",
 		"title": "Besoin de toi : mes notifications du serveur",

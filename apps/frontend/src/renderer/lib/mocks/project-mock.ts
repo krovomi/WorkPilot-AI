@@ -34,6 +34,16 @@ export const projectMock = {
 
 	onServerBoardLive: () => () => {},
 
+	joinTeamRoom: async () => ({ success: false }),
+
+	leaveTeamRoom: async () => ({ success: true }),
+
+	sendTeamChat: async () => ({ success: false, error: "notJoined" }),
+
+	releaseCardClaim: async () => ({ success: false, error: "notFound" }),
+
+	onTeamRoomUpdate: () => () => undefined,
+
 	watchServerView: async () => ({ success: false }),
 
 	unwatchServerView: async () => ({ success: true }),

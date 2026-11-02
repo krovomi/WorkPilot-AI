@@ -10,7 +10,15 @@
 
 import { existsSync } from "node:fs";
 import path from "node:path";
-import type { IPCResult, Project, Task, TaskMetadata } from "../shared/types";
+import type {
+	CardEditConflict,
+	IPCResult,
+	Project,
+	Task,
+	TaskMetadata,
+	TaskUpdateResult,
+} from "../shared/types";
+import { CARD_EDIT_CONFLICT } from "../shared/types/team-room";
 import { getRemoteTasks, parseServerTaskId } from "./remote-board";
 import { serverImageUploads } from "./server-card-images";
 import { patchServerCardSettings, settingsFromMetadata } from "./server-card-settings";
@@ -108,10 +116,38 @@ export async function createServerCard(
 	return reread({ project, cardId });
 }
 
+/**
+ * Weigh an edit against the card as it now is on the server. `base` is the
+ * card as the dialog opened it. A field this person left as it was is not
+ * sent, so a teammate's change to it stays; a field both changed is a
+ * conflict, for the person to settle. Without a base (another caller, or the
+ * person chose "last write wins"), the edit is taken as it is.
+ */
+export function reconcileEdit(
+	base: unknown,
+	changes: Readonly<Record<string, string>>,
+	current: Pick<Task, "title" | "description">,
+): { changes: Record<string, string>; conflicts: CardEditConflict[] } {
+	const kept = { ...changes };
+	if (!base || typeof base !== "object") return { changes: kept, conflicts: [] };
+	const was = base as Record<string, unknown>;
+	const conflicts: CardEditConflict[] = [];
+	for (const field of ["title", "description"] as const) {
+		const mine = kept[field];
+		const raw = was[field];
+		if (mine === undefined || typeof raw !== "string") continue;
+		const before = field === "title" ? raw.trim() : raw;
+		const theirs = current[field] ?? "";
+		if (mine === before) delete kept[field];
+		else if (before !== theirs) conflicts.push({ field, mine, theirs });
+	}
+	return { changes: kept, conflicts };
+}
+
 export async function updateServerCard(
 	card: ServerCard,
 	updates: unknown,
-): Promise<IPCResult<Task>> {
+): Promise<TaskUpdateResult> {
 	const raw = (updates && typeof updates === "object" ? updates : {}) as Record<
 		string,
 		unknown
@@ -120,13 +156,15 @@ export async function updateServerCard(
 	if (!current.success || !current.data) return { success: false, error: current.error };
 	// Only what changed: the edit dialog sends the text back unchanged, and the
 	// server refuses a text edit once work started, while the engine may change.
-	const body: Record<string, string> = {};
+	const asked: Record<string, string> = {};
 	if (typeof raw.title === "string" && raw.title.trim() !== current.data.title) {
-		body.title = raw.title.trim();
+		asked.title = raw.title.trim();
 	}
 	if (typeof raw.description === "string" && raw.description !== current.data.description) {
-		body.description = raw.description;
+		asked.description = raw.description;
 	}
+	const { changes: body, conflicts } = reconcileEdit(raw.base, asked, current.data);
+	if (conflicts.length > 0) return { success: false, error: CARD_EDIT_CONFLICT, conflicts };
 	if (body.title !== undefined && (!body.title || body.title.length > MAX_TITLE)) {
 		return { success: false, error: "Invalid title" };
 	}
@@ -150,8 +188,8 @@ export async function deleteServerCard(card: ServerCard): Promise<IPCResult> {
 	return result.ok ? { success: true } : { success: false, error: result.error };
 }
 
-/** The server's index id of a card, which its run routes take. */
-async function indexId(card: ServerCard): Promise<IPCResult<string>> {
+/** The server's index id of a card, which its run and claim routes take. */
+export async function serverCardIndexId(card: ServerCard): Promise<IPCResult<string>> {
 	const result = await authedFetch<unknown>(specsUrl(card.project), "GET");
 	if (!result.ok) return { success: false, error: result.error };
 	const row = Array.isArray(result.data)
@@ -172,7 +210,7 @@ export async function startRun(
 	phase: "spec" | "build" | "merge" | "pr",
 	pr?: Record<string, unknown>,
 ): Promise<IPCResult> {
-	const id = await indexId(card);
+	const id = await serverCardIndexId(card);
 	if (!id.success || !id.data) return { success: false, error: id.error };
 	const result = await authedFetch(
 		specsUrl(card.project, `/${encodeURIComponent(id.data)}/runs`),
@@ -205,7 +243,7 @@ export async function startServerCard(card: ServerCard): Promise<IPCResult> {
 
 /** Stop the card's run on the server, if one is queued or running. */
 export async function stopServerCard(card: ServerCard): Promise<IPCResult> {
-	const id = await indexId(card);
+	const id = await serverCardIndexId(card);
 	if (!id.success || !id.data) return { success: false, error: id.error };
 	const runs = await authedFetch<unknown>(
 		specsUrl(card.project, `/${encodeURIComponent(id.data)}/runs`),

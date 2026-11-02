@@ -1,139 +1,92 @@
 {
-	"title": "Collaboration",
-	"description": "Collaboration multi-utilisateurs en temps réel",
 	"presence": {
-		"title": "Présence de l'équipe",
-		"online": "En ligne",
-		"away": "Absent",
-		"busy": "Occupé",
-		"offline": "Hors ligne",
-		"usersOnline": "{{count}} utilisateur en ligne",
-		"usersOnline_other": "{{count}} utilisateurs en ligne",
-		"noUsersOnline": "Aucun utilisateur en ligne",
-		"workingOn": "Travaille sur {{task}}",
-		"idle": "Inactif",
 		"you": "(vous)",
-		"lastSeen": "Vu pour la dernière fois {{time}}",
-		"connectedSince": "Connecté depuis {{time}}"
+		"reconnecting": "Reconnexion…",
+		"usersOnline": "{{count}} sur ce projet",
+		"usersOnline_other": "{{count}} sur ce projet"
 	},
 	"locks": {
-		"title": "Verrous de tâches",
-		"lockedBy": "Verrouillé par {{user}}",
-		"lockedByAgent": "Verrouillé par l'agent {{agent}}",
-		"lockTask": "Verrouiller la tâche",
-		"unlockTask": "Déverrouiller la tâche",
-		"forceUnlock": "Forcer le déverrouillage",
-		"forceUnlockConfirm": "Êtes-vous sûr de vouloir forcer le déverrouillage ? L'utilisateur en cours d'édition perdra ses modifications non enregistrées.",
-		"lockReason": "Raison",
-		"taskLockedWarning": "Cette tâche est verrouillée par {{user}}. Vous ne pouvez pas la modifier tant qu'il n'a pas relâché le verrou.",
-		"agentLockedWarning": "Un agent travaille actuellement sur cette tâche. Veuillez patienter jusqu'à ce qu'il ait terminé.",
-		"lockExpired": "Verrou expiré",
-		"noActiveLocks": "Aucun verrou actif"
+		"someone": "un coéquipier",
+		"you": "Vous",
+		"claimedByYou": "Vous avez pris cette carte",
+		"claimedBy": "Prise par {{user}}",
+		"yourClaimHelp": "Votre travail tient cette carte : vos coéquipiers ne peuvent pas la lancer. Libérez-la pour qu'un autre la prenne.",
+		"claimHelp": "Le travail de {{user}} tient cette carte : seule cette personne peut la lancer. Un propriétaire du projet peut la libérer.",
+		"release": "Libérer",
+		"forceRelease": "Libérer la carte",
+		"releaseFailed": "Non libérée : {{reason}}"
 	},
 	"chat": {
 		"title": "Chat d'équipe",
-		"placeholder": "Tapez un message...",
-		"send": "Envoyer",
+		"close": "Fermer le chat",
+		"searchMessages": "Rechercher dans les messages…",
+		"searchNoResults": "Aucun message ne correspond",
+		"noMessages": "Aucun message pour l'instant. Saluez votre équipe !",
+		"inReplyTo": "En réponse à {{user}}",
 		"reply": "Répondre",
-		"replyTo": "En réponse à {{user}}",
+		"replyTo": "Réponse à {{user}}",
 		"cancelReply": "Annuler la réponse",
-		"mention": "Mentionner",
-		"noMessages": "Aucun message pour l'instant. Lancez la conversation !",
-		"searchMessages": "Rechercher des messages...",
-		"searchNoResults": "Aucun message ne correspond à votre recherche",
-		"today": "Aujourd'hui",
-		"yesterday": "Hier",
-		"newMessages": "{{count}} nouveau message",
-		"newMessages_other": "{{count}} nouveaux messages",
-		"messageDeleted": "Ce message a été supprimé",
-		"editMessage": "Modifier le message",
-		"deleteMessage": "Supprimer le message"
-	},
-	"conflicts": {
-		"title": "Résolution de conflits",
-		"detected": "Conflit détecté",
-		"description": "Deux utilisateurs ont modifié le même champ simultanément",
-		"fieldConflict": "Conflit sur le champ « {{field}} »",
-		"yourVersion": "Votre version",
-		"theirVersion": "Leur version ({{user}})",
-		"resolution": {
-			"title": "Choisir la résolution",
-			"keepMine": "Garder la mienne",
-			"keepTheirs": "Garder la leur",
-			"merge": "Fusionner manuellement",
-			"lastWriteWins": "Dernière écriture gagne (automatique)"
-		},
-		"resolved": "Conflit résolu",
-		"unresolvedCount": "{{count}} conflit non résolu",
-		"unresolvedCount_other": "{{count}} conflits non résolus",
-		"noConflicts": "Aucun conflit"
-	},
-	"notifications": {
-		"userJoined": "{{user}} a rejoint le projet",
-		"userLeft": "{{user}} a quitté le projet",
-		"taskLocked": "{{user}} a verrouillé la tâche #{{task}}",
-		"taskUnlocked": "{{user}} a déverrouillé la tâche #{{task}}",
-		"agentStarted": "L'agent {{agent}} a commencé à travailler sur #{{task}}",
-		"agentCompleted": "L'agent {{agent}} a terminé #{{task}}",
-		"agentFailed": "L'agent {{agent}} a échoué sur #{{task}}",
-		"taskMoved": "{{user}} a déplacé #{{task}} de {{from}} vers {{to}}",
-		"taskUpdated": "{{user}} a mis à jour la tâche #{{task}}",
-		"conflictDetected": "Conflit détecté sur la tâche #{{task}}",
-		"mentionedYou": "{{user}} vous a mentionné dans le chat"
-	},
-	"settings": {
-		"title": "Paramètres de collaboration",
-		"description": "Configurer le comportement de la collaboration multi-utilisateurs",
-		"conflictStrategy": {
-			"title": "Stratégie de résolution des conflits",
-			"description": "Comment gérer les modifications concurrentes",
-			"lastWriteWins": "Dernière écriture gagne",
-			"lastWriteWinsDesc": "Le changement le plus récent écrase les précédents",
-			"firstWriteWins": "Première écriture gagne",
-			"firstWriteWinsDesc": "Le premier changement est conservé, les suivants sont rejetés",
-			"manual": "Résolution manuelle",
-			"manualDesc": "Afficher un dialogue pour choisir quelle version conserver",
-			"merge": "Fusion automatique",
-			"mergeDesc": "Tenter de fusionner les changements automatiquement"
-		},
-		"presenceIndicator": {
-			"title": "Indicateur de présence",
-			"description": "Afficher qui est en ligne et sur quoi ils travaillent",
-			"enabled": "Afficher l'indicateur de présence"
-		},
-		"notifications": {
-			"title": "Notifications de collaboration",
-			"description": "Choisir les notifications à recevoir",
-			"userJoinLeave": "Arrivée/départ d'utilisateur",
-			"taskLocks": "Verrous de tâches",
-			"agentActivity": "Activité des agents",
-			"chatMentions": "Mentions dans le chat",
-			"conflicts": "Conflits"
-		},
-		"chat": {
-			"title": "Chat d'équipe",
-			"description": "Configurer les paramètres du chat d'équipe",
-			"enabled": "Activer le chat d'équipe",
-			"soundNotifications": "Notifications sonores pour les nouveaux messages",
-			"desktopNotifications": "Notifications bureau pour les mentions"
+		"placeholder": "Écrire à l'équipe…",
+		"send": "Envoyer",
+		"errors": {
+			"forbidden": "Votre rôle sur ce projet permet de lire le chat, pas d'y écrire.",
+			"invalid": "Ce message est vide ou trop long.",
+			"too_fast": "Trop de messages d'un coup. Patientez quelques secondes.",
+			"unavailable": "Le serveur n'a pas pu enregistrer le message. Réessayez.",
+			"offline": "Pas connecté au projet. Le message n'est pas parti."
 		}
 	},
-	"sync": {
-		"syncing": "Synchronisation...",
-		"synced": "Tous les changements synchronisés",
-		"syncError": "Erreur de synchronisation — cliquez pour réessayer",
-		"reconnecting": "Reconnexion...",
-		"disconnected": "Déconnecté"
+	"conflicts": {
+		"detected": "Un coéquipier a modifié cette carte",
+		"description": "Pendant votre modification, quelqu'un a enregistré une autre version du même texte. Choisissez celle à garder.",
+		"field": {
+			"title": "Titre",
+			"description": "Description"
+		},
+		"yourVersion": "Votre version",
+		"theirVersion": "Version sur le serveur",
+		"keepMine": "Garder la mienne",
+		"keepTheirs": "Garder la sienne"
 	},
-	"stats": {
-		"title": "Statistiques de collaboration",
-		"totalUsers": "Utilisateurs totaux",
-		"onlineUsers": "Utilisateurs en ligne",
-		"activeLocks": "Verrous actifs",
-		"agentLocks": "Verrous d'agents",
-		"totalEvents": "Événements totaux",
-		"chatMessages": "Messages de chat",
-		"totalConflicts": "Conflits totaux",
-		"unresolvedConflicts": "Conflits non résolus"
+	"notifications": {
+		"mentionedYou": "{{user}} vous a mentionné dans le chat",
+		"userJoined": "{{user}} a rejoint le projet",
+		"userLeft": "{{user}} a quitté le projet",
+		"taskClaimed": "{{user}} a pris {{task}}",
+		"taskReleased": "{{user}} a libéré {{task}}",
+		"run": {
+			"succeeded": "Le run de {{user}} sur {{task}} est terminé",
+			"failed": "Le run de {{user}} sur {{task}} a échoué",
+			"cancelled": "Le run de {{user}} sur {{task}} a été arrêté",
+			"phase": "Phase : {{phase}}"
+		}
+	},
+	"settings": {
+		"title": "Collaboration d'équipe",
+		"description": "Ce que le tableau d'un projet serveur montre de votre équipe, sur cet ordinateur",
+		"team": {
+			"title": "Équipe",
+			"description": "Qui est sur le projet, et le chat d'équipe",
+			"presence": "Afficher qui est sur le projet",
+			"chat": "Afficher le chat d'équipe"
+		},
+		"notifications": {
+			"title": "Notifications",
+			"description": "Ce que font vos coéquipiers et dont vous êtes prévenu",
+			"userJoinLeave": "Un coéquipier arrive ou part",
+			"taskLocks": "Une carte est prise ou libérée",
+			"agentActivity": "Le run d'un coéquipier se termine",
+			"chatMentions": "Un message vous mentionne (@nom)"
+		},
+		"conflictStrategy": {
+			"title": "Quand une modification croise celle d'un coéquipier",
+			"description": "Vous modifiez le titre ou la description d'une carte pendant qu'un coéquipier en enregistre une autre version",
+			"manual": "Me demander",
+			"manualDesc": "Montrer les deux versions et me laisser choisir",
+			"last_write_wins": "Garder la mienne",
+			"last_write_winsDesc": "Ma version remplace la sienne",
+			"first_write_wins": "Garder la sienne",
+			"first_write_winsDesc": "Sa version reste ; mes autres changements sont enregistrés"
+		}
 	}
 }

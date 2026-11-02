@@ -1,280 +1,256 @@
 /**
- * TeamChat — Integrated team chat panel for real-time communication.
- *
- * Features:
- * - Send/receive messages in real-time
- * - Reply to messages
- * - @mention users
- * - Search messages
- * - Unread message counter badge
- *
- * Feature 3.1 — Mode multi-utilisateurs en temps réel.
+ * The team chat of the shown server project (server mode): a button in the
+ * board's toolbar with the unread count, and the panel it opens. Messages go
+ * through the project's stream; the server stores them, so a teammate who
+ * arrives later reads the latest ones. A message is shown as text.
  */
 
-import {
-	ChevronDown,
-	MessageCircle,
-	Reply,
-	Search,
-	Send,
-	X,
-} from "lucide-react";
+import { MessageCircle, Reply, Search, Send, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { TEAM_CHAT_MAX, type TeamChatMessage } from "../../../shared/types";
 import { cn } from "../../lib/utils";
-import {
-	type ChatMessage,
-	useCollaborationStore,
-} from "../../stores/collaboration-store";
+import { avatarColor, useCollaborationStore } from "../../stores/collaboration-store";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
+import { initialsOf } from "./PresenceIndicator";
+
+const SEND_ERRORS = new Set(["forbidden", "invalid", "too_fast", "unavailable", "offline"]);
 
 function formatTime(iso: string): string {
-	try {
-		const d = new Date(iso);
-		return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-	} catch {
-		return "";
-	}
+	const d = new Date(iso);
+	return Number.isNaN(d.getTime())
+		? ""
+		: d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-function _formatDateSeparator(iso: string, t: (key: string) => string): string {
-	try {
-		const d = new Date(iso);
-		const today = new Date();
-		const yesterday = new Date(today);
-		yesterday.setDate(yesterday.getDate() - 1);
-
-		if (d.toDateString() === today.toDateString()) return t("chat.today");
-		if (d.toDateString() === yesterday.toDateString())
-			return t("chat.yesterday");
-		return d.toLocaleDateString();
-	} catch {
-		return "";
-	}
-}
-
-interface MessageBubbleProps {
-	message: ChatMessage;
+function MessageBubble({
+	message,
+	parent,
+	isOwn,
+	onReply,
+}: {
+	message: TeamChatMessage;
+	parent: TeamChatMessage | undefined;
 	isOwn: boolean;
-	onReply: (message: ChatMessage) => void;
-}
-
-function MessageBubble({ message, isOwn, onReply }: MessageBubbleProps) {
-	const users = useCollaborationStore((s) => s.users);
-	const senderColor =
-		users.find((u) => u.userId === message.senderId)?.avatarColor ?? "#6366f1";
-
+	onReply: (message: TeamChatMessage) => void;
+}) {
+	const { t } = useTranslation("collaboration");
 	return (
-		<div
-			className={cn(
-				"group flex gap-2",
-				isOwn ? "flex-row-reverse" : "flex-row",
-			)}
-		>
-			<div
+		<div className={cn("group flex gap-2", isOwn ? "flex-row-reverse" : "flex-row")}>
+			<span
 				className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white"
-				style={{ backgroundColor: senderColor }}
+				style={{ backgroundColor: avatarColor(message.authorId || message.author) }}
 			>
-				{message.senderName.slice(0, 2).toUpperCase()}
-			</div>
-			<div
-				className={cn(
-					"max-w-[75%] space-y-0.5",
-					isOwn ? "items-end" : "items-start",
-				)}
-			>
+				{initialsOf(message.author)}
+			</span>
+			<div className={cn("flex max-w-[75%] flex-col gap-0.5", isOwn ? "items-end" : "items-start")}>
 				<div className="flex items-center gap-1.5">
-					<span className="text-xs font-medium text-foreground">
-						{message.senderName}
-					</span>
-					<span className="text-[10px] text-muted-foreground">
-						{formatTime(message.timestamp)}
-					</span>
+					<span className="text-xs font-medium">{message.author}</span>
+					<span className="text-[10px] text-muted-foreground">{formatTime(message.at)}</span>
 				</div>
+				{parent && (
+					<span className="max-w-full truncate border-l-2 pl-1.5 text-[11px] text-muted-foreground">
+						{t("chat.inReplyTo", { user: parent.author })}: {parent.message}
+					</span>
+				)}
 				<div
 					className={cn(
-						"rounded-lg px-3 py-1.5 text-sm",
-						isOwn
-							? "bg-primary text-primary-foreground"
-							: "bg-muted text-foreground",
+						"whitespace-pre-wrap wrap-break-word rounded-lg px-3 py-1.5 text-sm",
+						isOwn ? "bg-primary text-primary-foreground" : "bg-muted",
 					)}
 				>
-					{message.content}
+					{message.message}
 				</div>
 				<button
 					type="button"
 					onClick={() => onReply(message)}
-					className="hidden text-xs text-muted-foreground hover:text-foreground group-hover:inline-flex items-center gap-0.5"
+					className="hidden items-center gap-0.5 text-xs text-muted-foreground hover:text-foreground group-hover:inline-flex"
 				>
 					<Reply className="h-3 w-3" />
+					{t("chat.reply")}
 				</button>
 			</div>
 		</div>
 	);
 }
 
+/** The toolbar button that opens the chat, with the unread count. */
+export function TeamChatButton() {
+	const { t } = useTranslation("collaboration");
+	const enabled = useCollaborationStore((s) => s.settings.chatEnabled);
+	const unread = useCollaborationStore((s) => s.unreadChatCount);
+	const toggleChat = useCollaborationStore((s) => s.toggleChat);
+	if (!enabled) return null;
+	return (
+		<Button
+			variant="ghost"
+			size="sm"
+			className="relative h-8 gap-1.5"
+			onClick={toggleChat}
+			aria-label={t("chat.title")}
+		>
+			<MessageCircle className="h-4 w-4" />
+			<span className="hidden lg:inline">{t("chat.title")}</span>
+			{unread > 0 && (
+				<span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
+					{unread > 99 ? "99+" : unread}
+				</span>
+			)}
+		</Button>
+	);
+}
+
 export function TeamChat() {
 	const { t } = useTranslation("collaboration");
 	const chatOpen = useCollaborationStore((s) => s.chatOpen);
-	const toggleChat = useCollaborationStore((s) => s.toggleChat);
-	const chatMessages = useCollaborationStore((s) => s.chatMessages);
-	const sendMessage = useCollaborationStore((s) => s.sendMessage);
-	const currentUserId = useCollaborationStore((s) => s.currentUserId);
-	const unreadCount = useCollaborationStore((s) => s.unreadChatCount);
-	const chatEnabled = useCollaborationStore((s) => s.settings.chatEnabled);
+	const enabled = useCollaborationStore((s) => s.settings.chatEnabled);
+	const messages = useCollaborationStore((s) => s.messages);
+	const me = useCollaborationStore((s) => s.me);
+	const live = useCollaborationStore((s) => s.live);
 	const replyingTo = useCollaborationStore((s) => s.replyingTo);
+	const sendError = useCollaborationStore((s) => s.sendError);
+	const sendMessage = useCollaborationStore((s) => s.sendMessage);
 	const setReplyingTo = useCollaborationStore((s) => s.setReplyingTo);
+	const setChatOpen = useCollaborationStore((s) => s.setChatOpen);
 
-	const [inputValue, setInputValue] = useState("");
-	const [searchQuery, setSearchQuery] = useState("");
-	const [showSearch, setShowSearch] = useState(false);
-	const messagesEndRef = useRef<HTMLDivElement>(null);
+	const [draft, setDraft] = useState("");
+	const [query, setQuery] = useState("");
+	const [searching, setSearching] = useState(false);
+	const endRef = useRef<HTMLDivElement>(null);
 	const inputRef = useRef<HTMLInputElement>(null);
 
+	// Down to the latest message when the panel opens and when one arrives.
+	const count = messages.length;
 	useEffect(() => {
-		messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-	}, []);
+		if (chatOpen && count > 0) endRef.current?.scrollIntoView?.({ behavior: "smooth" });
+	}, [count, chatOpen]);
 
 	useEffect(() => {
 		if (chatOpen) inputRef.current?.focus();
 	}, [chatOpen]);
 
-	if (!chatEnabled) return null;
+	if (!enabled || !chatOpen) return null;
 
-	const filteredMessages = searchQuery
-		? chatMessages.filter((m) =>
-				m.content.toLowerCase().includes(searchQuery.toLowerCase()),
+	const byId = new Map(messages.map((m) => [m.id, m]));
+	const needle = query.trim().toLowerCase();
+	const shown = needle
+		? messages.filter(
+				(m) => m.message.toLowerCase().includes(needle) || m.author.toLowerCase().includes(needle),
 			)
-		: chatMessages;
+		: messages;
 
-	const handleSend = () => {
-		if (!inputValue.trim()) return;
-		sendMessage(inputValue);
-		setInputValue("");
+	const send = async () => {
+		if (!draft.trim()) return;
+		if (await sendMessage(draft)) setDraft("");
 	};
-
-	const handleKeyDown = (e: React.KeyboardEvent) => {
-		if (e.key === "Enter" && !e.shiftKey) {
-			e.preventDefault();
-			handleSend();
-		}
-	};
-
-	// Floating toggle button
-	if (!chatOpen) {
-		return (
-			<button
-				type="button"
-				onClick={toggleChat}
-				className="fixed bottom-4 right-4 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-colors"
-				aria-label={t("chat.title")}
-			>
-				<MessageCircle className="h-5 w-5" />
-				{unreadCount > 0 && (
-					<span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
-						{unreadCount > 99 ? "99+" : unreadCount}
-					</span>
-				)}
-			</button>
-		);
-	}
 
 	return (
-		<div
-			className="fixed bottom-4 right-4 z-50 flex w-80 flex-col rounded-xl border bg-background shadow-2xl"
-			style={{ height: "28rem" }}
+		<section
+			className="fixed bottom-4 right-4 z-50 flex h-[28rem] w-80 flex-col rounded-xl border bg-background shadow-2xl"
+			aria-label={t("chat.title")}
 		>
-			{/* Header */}
-			<div className="flex items-center justify-between border-b px-3 py-2">
+			<header className="flex items-center justify-between border-b px-3 py-2">
 				<h3 className="text-sm font-semibold">{t("chat.title")}</h3>
 				<div className="flex items-center gap-1">
 					<button
 						type="button"
-						onClick={() => setShowSearch(!showSearch)}
+						onClick={() => setSearching(!searching)}
 						className="rounded p-1 hover:bg-accent"
+						aria-label={t("chat.searchMessages")}
 					>
 						<Search className="h-4 w-4" />
 					</button>
 					<button
 						type="button"
-						onClick={toggleChat}
+						onClick={() => setChatOpen(false)}
 						className="rounded p-1 hover:bg-accent"
+						aria-label={t("chat.close")}
 					>
-						<ChevronDown className="h-4 w-4" />
+						<X className="h-4 w-4" />
 					</button>
 				</div>
-			</div>
+			</header>
 
-			{/* Search bar */}
-			{showSearch && (
+			{searching && (
 				<div className="border-b px-3 py-2">
 					<Input
-						value={searchQuery}
-						onChange={(e) => setSearchQuery(e.target.value)}
+						value={query}
+						onChange={(e) => setQuery(e.target.value)}
 						placeholder={t("chat.searchMessages")}
 						className="h-7 text-xs"
 					/>
 				</div>
 			)}
 
-			{/* Messages */}
-			<div className="flex-1 overflow-y-auto px-3 py-2 space-y-3">
-				{filteredMessages.length === 0 ? (
-					<div className="flex h-full items-center justify-center">
-						<p className="text-xs text-muted-foreground text-center">
-							{searchQuery ? t("chat.searchNoResults") : t("chat.noMessages")}
-						</p>
-					</div>
+			<div className="flex-1 space-y-3 overflow-y-auto px-3 py-2">
+				{shown.length === 0 ? (
+					<p className="flex h-full items-center justify-center text-center text-xs text-muted-foreground">
+						{needle ? t("chat.searchNoResults") : t("chat.noMessages")}
+					</p>
 				) : (
-					filteredMessages.map((msg) => (
+					shown.map((m) => (
 						<MessageBubble
-							key={msg.messageId}
-							message={msg}
-							isOwn={msg.senderId === currentUserId}
+							key={m.id}
+							message={m}
+							parent={m.replyTo ? byId.get(m.replyTo) : undefined}
+							isOwn={m.authorId === me?.id}
 							onReply={setReplyingTo}
 						/>
 					))
 				)}
-				<div ref={messagesEndRef} />
+				<div ref={endRef} />
 			</div>
 
-			{/* Reply indicator */}
 			{replyingTo && (
-				<div className="flex items-center gap-2 border-t px-3 py-1.5 bg-muted/50">
+				<div className="flex items-center gap-2 border-t bg-muted/50 px-3 py-1.5">
 					<Reply className="h-3 w-3 text-muted-foreground" />
 					<span className="flex-1 truncate text-xs text-muted-foreground">
-						{t("chat.replyTo", { user: replyingTo.senderName })}
+						{t("chat.replyTo", { user: replyingTo.author })}
 					</span>
 					<button
 						type="button"
 						onClick={() => setReplyingTo(null)}
 						className="text-muted-foreground hover:text-foreground"
+						aria-label={t("chat.cancelReply")}
 					>
 						<X className="h-3 w-3" />
 					</button>
 				</div>
 			)}
 
-			{/* Input */}
+			{sendError && SEND_ERRORS.has(sendError) && (
+				<p className="border-t px-3 py-1 text-xs text-destructive" role="alert">
+					{t(`chat.errors.${sendError}`)}
+				</p>
+			)}
+
 			<div className="flex items-center gap-2 border-t px-3 py-2">
 				<Input
 					ref={inputRef}
-					value={inputValue}
-					onChange={(e) => setInputValue(e.target.value)}
-					onKeyDown={handleKeyDown}
-					placeholder={t("chat.placeholder")}
+					value={draft}
+					maxLength={TEAM_CHAT_MAX}
+					onChange={(e) => setDraft(e.target.value)}
+					onKeyDown={(e) => {
+						if (e.key === "Enter" && !e.shiftKey) {
+							e.preventDefault();
+							void send();
+						}
+					}}
+					placeholder={live ? t("chat.placeholder") : t("presence.reconnecting")}
+					disabled={!live}
 					className="h-8 text-sm"
 				/>
 				<Button
 					size="sm"
 					className="h-8 w-8 shrink-0 p-0"
-					onClick={handleSend}
-					disabled={!inputValue.trim()}
+					onClick={() => void send()}
+					disabled={!live || !draft.trim()}
+					aria-label={t("chat.send")}
 				>
 					<Send className="h-3.5 w-3.5" />
 				</Button>
 			</div>
-		</div>
+		</section>
 	);
 }

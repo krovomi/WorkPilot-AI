@@ -24,6 +24,7 @@ import type {
 	TaskLogStreamChunk,
 	TaskLogs,
 	TaskMetadata,
+	TaskUpdateResult,
 	TaskRecoveryResult,
 	TaskStartOptions,
 	TaskStatus,
@@ -56,8 +57,10 @@ export interface TaskAPI {
 			title?: string;
 			description?: string;
 			metadata?: Partial<TaskMetadata>;
+			/** The card as the edit began: a server card checks it for a teammate's change. */
+			base?: { title: string; description: string };
 		},
-	) => Promise<IPCResult<Task>>;
+	) => Promise<TaskUpdateResult>;
 	startTask: (taskId: string, options?: TaskStartOptions) => void;
 	stopTask: (taskId: string) => void;
 	submitReview: (
@@ -414,8 +417,9 @@ export const createTaskAPI = (): TaskAPI => ({
 			title?: string;
 			description?: string;
 			metadata?: Partial<TaskMetadata>;
+			base?: { title: string; description: string };
 		},
-	): Promise<IPCResult<Task>> =>
+	): Promise<TaskUpdateResult> =>
 		ipcRenderer.invoke(IPC_CHANNELS.TASK_UPDATE, taskId, updates),
 
 	startTask: (taskId: string, options?: TaskStartOptions): void =>
