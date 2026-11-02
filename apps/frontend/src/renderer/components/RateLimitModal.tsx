@@ -143,14 +143,20 @@ export function RateLimitModal() {
 				hideRateLimitModal();
 
 				// Direct user to Settings to complete authentication
-				alert(
-					`${t("profileCreated.title", { profileName })}\n\n` +
-						`${t("profileCreated.instructions")}\n` +
-						`1. ${t("profileCreated.step1")}\n` +
-						`2. ${t("profileCreated.step2")}\n` +
-						`3. ${t("profileCreated.step3")}\n\n` +
-						`${t("profileCreated.footer")}`,
-				);
+				toast({
+					variant: "success",
+					title: t("profileCreated.title", { profileName }),
+					description: (
+						<span className="whitespace-pre-line">
+							{`${t("profileCreated.instructions")}\n` +
+								`1. ${t("profileCreated.step1")}\n` +
+								`2. ${t("profileCreated.step2")}\n` +
+								`3. ${t("profileCreated.step3")}\n\n` +
+								t("profileCreated.footer")}
+						</span>
+					),
+					duration: 15000,
+				});
 			}
 		} catch (err) {
 			debugError("[RateLimitModal] Failed to add profile:", err);

@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import type { SharedAnalysisReport } from "../../../preload/api/modules/shared-analysis-api";
+import { formatAppDateTime } from "@/lib/date-format";
 
 /** When the report shown was saved on the server, for a server project. */
 export function SharedReportNote({
@@ -13,7 +14,7 @@ export function SharedReportNote({
 	if (Number.isNaN(date.getTime())) return null;
 	return (
 		<p className="text-xs text-(--text-secondary)">
-			{t("sharedAnalysis.lastReport", { date: date.toLocaleString() })}
+			{t("sharedAnalysis.lastReport", { date: formatAppDateTime(date) })}
 		</p>
 	);
 }

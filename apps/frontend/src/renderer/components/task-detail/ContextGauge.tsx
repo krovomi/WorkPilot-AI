@@ -48,6 +48,7 @@ import { Button } from "../ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { ProgressRing } from "../ui/progress-ring";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
+import { formatAppTime } from "@/lib/date-format";
 
 const ZONE_CLASS: Record<ContextZone, string> = {
 	ok: "text-success",
@@ -79,7 +80,7 @@ function formatTime(timestamp: string | undefined): string {
 	if (!timestamp) return "";
 	const date = new Date(timestamp);
 	if (Number.isNaN(date.getTime())) return "";
-	return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+	return formatAppTime(date, { hour: "2-digit", minute: "2-digit" });
 }
 
 export function ContextGaugeMini({ task }: { task: Task }) {

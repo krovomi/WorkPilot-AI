@@ -58,6 +58,7 @@ import {
 } from "../ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { TimeTravelPanel } from "./TimeTravelPanel";
+import { formatAppDateTime } from "@/lib/date-format";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -77,7 +78,7 @@ const formatTokens = (tokens: number) => {
 
 const formatCost = (cost: number) => `$${cost.toFixed(4)}`;
 
-const formatDate = (ts: number) => new Date(ts * 1000).toLocaleString();
+const formatDate = (ts: number) => formatAppDateTime(ts * 1000);
 
 const STEP_COLORS: Record<string, string> = {
 	session_start: "bg-green-500",

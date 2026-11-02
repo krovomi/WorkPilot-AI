@@ -9,6 +9,7 @@ import {
 } from "./ui/alert-dialog";
 import { Button } from "./ui/button";
 import { useTranslation } from "react-i18next";
+import { formatAppDate } from "@/lib/date-format";
 
 interface ExistingCompetitorAnalysisDialogProps {
 	open: boolean;
@@ -45,11 +46,11 @@ export function ExistingCompetitorAnalysisDialog({
 
 	const formatDate = (date?: Date) => {
 		if (!date) return "recently";
-		return new Intl.DateTimeFormat("en-US", {
+		return formatAppDate(date, {
 			month: "short",
 			day: "numeric",
 			year: "numeric",
-		}).format(date);
+		});
 	};
 
 	return (

@@ -11,6 +11,7 @@ import { Label } from "../ui/label";
 import { DebtHeatmap } from "./DebtHeatmap";
 import { DebtItemsTable } from "./DebtItemsTable";
 import { DebtTrendChart } from "./DebtTrendChart";
+import { formatAppDateTime } from "@/lib/date-format";
 
 interface Props {
 	readonly projectPath?: string;
@@ -213,7 +214,7 @@ export function TechDebtDashboard({ projectPath }: Props) {
 					{lastScannedAt && (
 						<span className="text-xs text-muted-foreground">
 							{t("techDebt:lastScanned", {
-								when: new Date(lastScannedAt * 1000).toLocaleString(),
+								when: formatAppDateTime(lastScannedAt * 1000),
 							})}
 						</span>
 					)}
