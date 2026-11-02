@@ -1,5 +1,13 @@
 {
 	"title": "Générateur de journal des modifications",
+	"server": {
+		"lastShared": "Dernier journal partagé sur le serveur : version {{version}}, généré le {{date}}",
+		"open": "Ouvrir",
+		"save": "Enregistrer pour l'équipe",
+		"saveTooltip": "Garder ce texte comme journal partagé du projet sur le serveur",
+		"savedTitle": "Journal partagé",
+		"savedDescription": "La version {{tag}} est le journal partagé du projet : chaque membre du projet le voit."
+	},
 	"steps": {
 		"step1": "Étape 1 : Sélectionner les tâches terminées à inclure",
 		"step2": "Étape 2 : Configurer et générer le journal",

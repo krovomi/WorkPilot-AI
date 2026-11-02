@@ -475,6 +475,48 @@ not name: nothing a program reads changed, so there is nothing to test.
 """
 
 
+def _inline_spec(spec_dir: Path) -> str:
+    try:
+        spec = (spec_dir / "spec.md").read_text(encoding="utf-8")
+    except OSError:
+        spec = f"(spec.md not readable — read `{spec_dir}/spec.md`)"
+    if len(spec) > LIGHT_QA_SPEC_MAX_CHARS:
+        spec = (
+            spec[:LIGHT_QA_SPEC_MAX_CHARS]
+            + f"\n\n[... truncated: read `{spec_dir}/spec.md` for the rest ...]"
+        )
+    return spec
+
+
+def _fill_scoped_prompt(
+    filename: str,
+    spec_dir: Path,
+    project_dir: Path,
+    replacements: dict[str, str],
+    diff: str,
+) -> str:
+    """A scoped QA prompt with its placeholders, the spec and the diff."""
+    prompt = _load_prompt_file(filename)
+    for key, value in {
+        "{{BASE_BRANCH}}": detect_base_branch(spec_dir, project_dir),
+        "{{SPEC_DIR}}": str(spec_dir),
+        **replacements,
+    }.items():
+        prompt = prompt.replace(key, value)
+    # Spec and diff last: they are data, and must not be scanned for
+    # placeholders themselves.
+    spec = _inline_spec(spec_dir)
+    prompt = prompt.replace("{{SPEC}}", spec.replace("{{", "{ {"), 1)
+    prompt = prompt.replace("{{DIFF}}", diff.replace("```", "``\u200b`"), 1)
+    header = (
+        "## SPEC LOCATION\n\n"
+        f"- Spec: `{spec_dir}/spec.md`\n"
+        f"- Implementation plan: `{spec_dir}/implementation_plan.json`\n\n"
+        f"The project root is: `{project_dir}`\n\n---\n\n"
+    )
+    return header + prompt
+
+
 def get_qa_reviewer_light_prompt(
     spec_dir: Path, project_dir: Path, scope: "ChangeScope"
 ) -> str:
@@ -489,15 +531,6 @@ def get_qa_reviewer_light_prompt(
     """
     from foundation.change_scope import change_diff
 
-    try:
-        spec = (spec_dir / "spec.md").read_text(encoding="utf-8")
-    except OSError:
-        spec = f"(spec.md not readable — read `{spec_dir}/spec.md`)"
-    if len(spec) > LIGHT_QA_SPEC_MAX_CHARS:
-        spec = (
-            spec[:LIGHT_QA_SPEC_MAX_CHARS]
-            + f"\n\n[... truncated: read `{spec_dir}/spec.md` for the rest ...]"
-        )
     empty_change = ""
     if scope.files:
         diff = change_diff(project_dir, scope, LIGHT_QA_DIFF_MAX_CHARS) or (
@@ -508,26 +541,58 @@ def get_qa_reviewer_light_prompt(
         diff = "(empty: no file differs from the base branch)"
         files = "none — see « If the change is empty » below"
         empty_change = LIGHT_QA_EMPTY_CHANGE
-    base_branch = detect_base_branch(spec_dir, project_dir)
-    prompt = _load_prompt_file("qa_reviewer_light.md")
-    for key, value in (
-        ("{{BASE_BRANCH}}", base_branch),
-        ("{{SPEC_DIR}}", str(spec_dir)),
-        ("{{FILES}}", files),
-        ("{{EMPTY_CHANGE}}", empty_change),
-    ):
-        prompt = prompt.replace(key, value)
-    # Spec and diff last: they are data, and must not be scanned for
-    # placeholders themselves.
-    prompt = prompt.replace("{{SPEC}}", spec.replace("{{", "{ {"), 1)
-    prompt = prompt.replace("{{DIFF}}", diff.replace("```", "``​`"), 1)
-    header = (
-        "## SPEC LOCATION\n\n"
-        f"- Spec: `{spec_dir}/spec.md`\n"
-        f"- Implementation plan: `{spec_dir}/implementation_plan.json`\n\n"
-        f"The project root is: `{project_dir}`\n\n---\n\n"
+    return _fill_scoped_prompt(
+        "qa_reviewer_light.md",
+        spec_dir,
+        project_dir,
+        {"{{FILES}}": files, "{{EMPTY_CHANGE}}": empty_change},
+        diff,
     )
-    return header + prompt
+
+
+def get_qa_reviewer_targeted_prompt(
+    spec_dir: Path, project_dir: Path, scope: "ChangeScope"
+) -> str:
+    """The QA reviewer prompt for a small code change with mapped tests.
+
+    `foundation.change_scope` found at most a few code files, each with tests
+    the naming conventions point to. The reviewer gets the spec, the diff and
+    the exact test files to run with coverage of the touched files, and no
+    instruction to run whole suites, start the environment or scan the
+    repository. Same sign-off contract plus `targeted_tests`, which the
+    loop's targeted gate (`qa.targeted_gate`) checks against `scope.tests`.
+    """
+    from foundation.change_scope import (
+        TARGETED_MAX_CHANGED_LINES,
+        TARGETED_MAX_CODE_FILES,
+        change_diff,
+    )
+    from foundation.touched_tests import PYTHON_EXTENSIONS
+
+    diff = change_diff(project_dir, scope, LIGHT_QA_DIFF_MAX_CHARS) or (
+        "(diff unavailable — read the changed files)"
+    )
+    test_map = "\n".join(
+        f"- `{src}` → " + ", ".join(f"`{t}`" for t in tests)
+        for src, tests in scope.test_map
+    )
+    py = [t for t in scope.tests if Path(t).suffix in PYTHON_EXTENSIONS]
+    ts = [t for t in scope.tests if t not in py]
+    return _fill_scoped_prompt(
+        "qa_reviewer_targeted.md",
+        spec_dir,
+        project_dir,
+        {
+            "{{FILES}}": ", ".join(f"`{f}`" for f in scope.files),
+            "{{TEST_MAP}}": test_map,
+            "{{PY_TESTS}}": " ".join(py) or "<test files>",
+            "{{TS_TESTS}}": " ".join(ts) or "<test files>",
+            "{{MAX_FILES}}": str(TARGETED_MAX_CODE_FILES),
+            "{{MAX_LINES}}": str(TARGETED_MAX_CHANGED_LINES),
+            "{{MIN_COVERAGE}}": str(_min_coverage()),
+        },
+        diff,
+    )
 
 
 def get_qa_fixer_prompt(spec_dir: Path, project_dir: Path) -> str:

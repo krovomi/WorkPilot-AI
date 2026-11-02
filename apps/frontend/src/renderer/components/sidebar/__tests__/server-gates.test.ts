@@ -27,6 +27,7 @@ describe("server project views", () => {
 			"accessibility-agent",
 			"administration",
 			"analytics",
+			"changelog",
 			"context",
 			"cost-estimator",
 			"dashboard",

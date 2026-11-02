@@ -88,7 +88,7 @@ import { TaskStatusMoveBadge } from "./TaskStatusMoveBadge";
 import { TaskFiles } from "./TaskFiles";
 import { TaskLogs } from "./TaskLogs";
 import { TaskPauseControls } from "./TaskPauseControls";
-import { TaskFailureBanner } from "./TaskFailureBanner";
+import { TaskWaitingBanner } from "./TaskWaitingBanner";
 import { TaskRunControls } from "./TaskRunControls";
 import { translateActivityMessage } from "./translateActivityMessage";
 import { pauseTask, resumeTask } from "../../stores/task-store";
@@ -1257,11 +1257,14 @@ function TaskDetailModalContent({
 							)}
 						</div>
 
-						{/* Why the task failed — above the tabs, because a user who
-						    finds a card in review with a red badge is looking for
-						    this sentence before anything else. Renders nothing when
-						    the task did not fail. */}
-						<TaskFailureBanner task={task} />
+						{/* What is waiting for the person (plan, CI, question, goal,
+						    failure, review), each leading to its card; then why the
+						    task failed. Both above the tabs, both render nothing
+						    when there is nothing to say. */}
+						<TaskWaitingBanner
+							task={task}
+							onShowOverview={() => state.setActiveTab("overview")}
+						/>
 
 						{/* Body - Single Column with Tabs */}
 						<div className="flex-1 min-h-0 overflow-hidden">
@@ -1346,10 +1349,8 @@ function TaskDetailModalContent({
 									value="overview"
 									className="flex-1 min-h-0 overflow-hidden mt-0"
 								>
-									{/* La vue d'ensemble possède sa zone de défilement : sa barre de
-									    raccourcis reste au-dessus, immobile. */}
-									{/* Rangée par la question que se pose la personne :
-									    à traiter, la tâche, le plan, la mémoire. */}
+									{/* Trois onglets : avancement, qualité, coûts et contexte
+									    (panel-sections.ts). La barre reste au-dessus du défilement. */}
 									<TaskOverview
 										task={task}
 										projectPath={taskProject?.path ?? activeProject?.path}

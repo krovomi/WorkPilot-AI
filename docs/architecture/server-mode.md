@@ -76,6 +76,15 @@ l'erreur citerait le jeton. Un run reçoit les jetons de qui l'a lancé (`USER_S
 sien remplace celui que l'opérateur aurait posé pour le déploiement : ce qu'il fait sur une forge
 ou un outil de tickets est fait au nom de cette personne.
 
+**Le thème de la personne la suit d'un appareil à l'autre** (`server/routers/preferences.py`,
+table `user_preferences`, révision `0009`). `GET /users/me/preferences` rend le mode (`light`,
+`dark`, `system`) et le thème de couleur (un des sept du bureau), `null` tant qu'elle n'a rien
+choisi ; `PUT` les remplace. La route ne nomme personne : chacun ne lit et n'écrit que sa ligne,
+être connecté est toute la permission, comme pour `/users/me/devices` et `/users/me/secrets`.
+Toute autre valeur, un champ en trop ou manquant est refusé (422). L'app de bureau la lit à la
+connexion et l'écrit quand le thème change (`main/server-ui-preferences.ts`), le téléphone de
+même ([mobile-app.md](mobile-app.md#les-thèmes)).
+
 ## Ce qu'un run voit sur le disque
 
 Tous les runs de toutes les organisations tournent sous le même utilisateur de l'OS, à côté des
@@ -118,6 +127,7 @@ du backend. Après chaque écriture, l'index du serveur est relu et un événeme
 | Lister les cartes résumées (l'app mobile, [mobile-app.md](mobile-app.md)) | `GET /api/board/cards` | `task.read`, un rôle sur le projet |
 | Lire une carte (texte, spec, rapport QA, approbation ; la copie de l'espace de build pendant un build) | `GET /api/board/cards/{id}` | `task.read`, un rôle sur le projet |
 | Créer | `POST /api/board/cards` | `task.write`, rôle `member` ou plus |
+| Lister les moteurs qu'une carte peut demander (l'écran Nouvelle carte du téléphone) | `GET /api/board/engines` | `task.read`, un rôle sur le projet ; en lecture seule : les providers de `capabilities/providers.yaml` qui ont un adaptateur, avec leur nom, leur façon de prendre l'effort et les modèles du catalogue (`services/provider_registry.py`) qui passent `MODEL_PATTERN` (`shared_board/engines.py`). Ne dit pas si les identifiants du déploiement sont configurés |
 | Modifier le titre ou la description | `PATCH /api/board/cards/{id}` | idem ; refusé (409) dès qu'une spec ou un espace de build existe |
 | Joindre des images à une carte | `images` de `request-changes`, `attachments` de la création | Au plus 10 images de 5 Mo, PNG, JPEG, GIF ou WebP dont les octets sont vérifiés (pas de SVG, qui peut porter du script) ; nom réduit à un nom de base sûr, rendu unique, jamais d'écrasement ; un dossier qui est un lien est refusé (`shared_board/attachments.py`) |
 | Régler le moteur, la priorité, la catégorie, l'objectif | `PATCH /api/board/cards/{id}/settings`, ou `settings` à la création | `task.write`, rôle `member` ou plus ; permis après le début du travail, refusé (409) pendant un run. Le provider doit être dans `capabilities/providers.yaml` (ses identifiants sont ceux du déploiement), le modèle est un identifiant borné, l'objectif est validé par `goal/spec.py`. Écrits dans `task_metadata.json` (`engineLocked`) et `.workpilot-goal.json`, dans le dossier de spec et sa copie de l'espace de build (`shared_board/settings.py`). Un champ omis est gardé, `null` l'efface ; `GET /api/board/cards/{id}` les rend sous `settings` |
@@ -157,7 +167,7 @@ toujours, sans le jeton de la session. Seul `authedFetch` (`server-connection.ts
 
 La barre latérale n'offre pour un projet du serveur que les vues qui passent par le serveur
 (`sidebar/server-gates.ts` : le Kanban, l'espace de travail, les features partagées, les vues de sa
-forge et l'administration) ; les autres agiraient sur le miroir. La liste des projets est relue quand la session change (connexion, déconnexion, autre
+forge, les analyses, le changelog et l'administration) ; les autres agiraient sur le miroir. La liste des projets est relue quand la session change (connexion, déconnexion, autre
 compte).
 
 Les actions du Kanban sur une carte du serveur partent au serveur (`main/server-board-actions.ts`),
@@ -443,6 +453,24 @@ tendance dans ce rapport ; transformer un élément en tâche crée une carte du
 | Lancer, arrêter une analyse | `POST /api/features/analyses/<analyse>/jobs`, `…/jobs/<id>/cancel` | `agent.execute`, `agent.cancel`, rôle `member` ou plus |
 | Suivre une analyse, lire son dernier rapport | `GET …/jobs/<id>`, `GET /api/features/analyses/<analyse>/report` | `insight.read` |
 
+**Le changelog est généré de même.** Pour un projet du serveur, la vue Changelog
+(`ipc-handlers/server-changelog.ts`) lance l'analyse `changelog` : `runners/changelog_runner.py`
+construit les prompts du bureau depuis les cartes terminées du tableau dans le clone ou son
+historique git, et appelle le modèle par `core.oneshot` ; le texte est le rapport partagé, que
+chaque membre ouvre depuis la vue. La requête est un modèle fermé (`changelog_generator/options.py`) :
+des ids de carte, des références git qui ne commencent jamais par un tiret et ne contiennent
+jamais `..`, des bornes à chaque champ ; une carte qui n'est pas terminée est écartée. Le reste de
+ce que la vue lit vient du clone, par trois routes de `shared_features/changelog.py`, montées sous
+le domaine des analyses. Le détail : [changelog.md](changelog.md).
+
+| Action | Route | Il faut |
+|---|---|---|
+| Générer, arrêter un changelog | `POST /api/features/analyses/changelog/jobs`, `…/jobs/<id>/cancel` | `agent.execute`, `agent.cancel`, rôle `member` ou plus |
+| Lire le dernier changelog | `GET /api/features/analyses/changelog/report` | `insight.read` |
+| Lire les branches, les tags, le `CHANGELOG.md` du clone | `GET /api/features/changelog/sources` | `insight.read` |
+| Lire les commits d'une plage | `GET /api/features/changelog/commits?mode=&type=&…` | `insight.read` ; plage refusée (422) hors du modèle fermé |
+| Corriger le changelog partagé | `PUT /api/features/changelog/report` | `insight.write`, rôle `member` ou plus ; refusé (409) pendant une génération |
+
 ## Les vues partagées en direct
 
 Le tableau n'est pas la seule vue qu'un collègue change : sa roadmap, ses idées, une conversation
@@ -569,5 +597,6 @@ description, comme une tâche locale dont le titre n'a pas pu être généré.
 ## Ce qui vient
 
 Le plan multi-tenant du 31 octobre, par lots : les autres features servies de la même façon
-(l'investigation et l'auto-fix des issues en jobs, les autres analyses, budgets d'un projet), et les vues de forge en direct (par
+(l'investigation et l'auto-fix des issues en jobs, les autres analyses — revue de code,
+documentation, génération de tests, visualiseur d'architecture, banc d'essai du dépôt —, budgets d'un projet), et les vues de forge en direct (par
 les webhooks de la forge). Ce fichier grandit avec chaque lot.

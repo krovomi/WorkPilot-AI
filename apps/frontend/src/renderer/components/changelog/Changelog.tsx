@@ -9,6 +9,7 @@ import { ChangelogHeader } from "./ChangelogHeader";
 import { ChangelogList } from "./ChangelogList";
 import { useChangelog } from "./hooks/useChangelog";
 import { useTranslation } from "react-i18next";
+import { SharedChangelogNote, useServerChangelogProject } from "./SharedChangelogNote";
 
 export function Changelog() {
 	const { t } = useTranslation();
@@ -75,6 +76,7 @@ export function Changelog() {
 		setCustomInstructions,
 		updateGeneratedChangelog,
 		setShowAdvanced,
+		setStep,
 		handleLoadCommitsPreview,
 		handleGenerate,
 		handleSave,
@@ -84,6 +86,7 @@ export function Changelog() {
 		handleDone,
 		handleRefresh,
 	} = useChangelog();
+	const serverProject = Boolean(useServerChangelogProject());
 
 	if (!selectedProjectId) {
 		return (
@@ -106,6 +109,16 @@ export function Changelog() {
 				<ChangelogHeader step={step} onRefresh={handleRefresh} />
 
 				{/* Content */}
+				{step === 1 && (
+					<SharedChangelogNote
+						isGenerating={isGenerating}
+						onOpen={(changelog, sharedVersion) => {
+							updateGeneratedChangelog(changelog);
+							if (sharedVersion) setVersion(sharedVersion);
+							setStep(2);
+						}}
+					/>
+				)}
 				{step === 1 && (
 					<div className="flex flex-1 overflow-hidden">
 						<ChangelogFilters
@@ -186,6 +199,7 @@ export function Changelog() {
 						onSave={handleSave}
 						onCopy={handleCopy}
 						onChangelogEdit={updateGeneratedChangelog}
+						serverProject={serverProject}
 					/>
 				)}
 				{step === 3 && selectedProjectId && (
@@ -195,6 +209,7 @@ export function Changelog() {
 						selectedTaskIds={selectedTaskIds}
 						doneTasks={doneTasks}
 						generatedChangelog={generatedChangelog}
+						serverProject={serverProject}
 						onDone={handleDone}
 					/>
 				)}

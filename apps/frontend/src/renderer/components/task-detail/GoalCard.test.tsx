@@ -83,6 +83,18 @@ describe("GoalCard", () => {
 		await waitFor(() => expect(api.getTaskGoal).toHaveBeenCalled());
 		expect(screen.queryByRole("button", { name: "Set a goal" })).not.toBeInTheDocument();
 	});
+
+	it("renders nothing without a goal while none can be set, so its tab can hide it", async () => {
+		const { container } = render(<GoalCard task={task} editable={false} />);
+		await waitFor(() => expect(api.getTaskGoal).toHaveBeenCalled());
+		expect(container).toBeEmptyDOMElement();
+	});
+
+	it("still shows a goal during a run", async () => {
+		api.getTaskGoal.mockResolvedValue({ success: true, data: { goal: { command: "pytest" } } });
+		render(<GoalCard task={task} editable={false} />);
+		expect(await screen.findByText("pytest")).toBeInTheDocument();
+	});
 });
 
 describe("draftToGoal", () => {

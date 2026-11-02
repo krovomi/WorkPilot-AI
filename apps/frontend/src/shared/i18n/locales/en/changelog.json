@@ -1,5 +1,13 @@
 {
 	"title": "Changelog Generator",
+	"server": {
+		"lastShared": "Last changelog shared on the server: version {{version}}, built on {{date}}",
+		"open": "Open",
+		"save": "Save for the team",
+		"saveTooltip": "Keep this text as the project's shared changelog on the server",
+		"savedTitle": "Changelog shared",
+		"savedDescription": "Version {{tag}} is the project's shared changelog: every member of the project sees it."
+	},
 	"steps": {
 		"step1": "Step 1: Select completed tasks to include",
 		"step2": "Step 2: Configure and generate changelog",

@@ -7,12 +7,12 @@ import {
 	Save,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Button } from "../ui/button";
 import { Textarea } from "../ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
-import { useTranslation } from "react-i18next";
 
 // Factory function to create markdown components with projectPath
 const createMarkdownComponents = (projectPath?: string): Components => ({
@@ -131,6 +131,8 @@ interface PreviewPanelProps {
 	readonly onDragOver: (e: React.DragEvent) => void;
 	readonly onDragLeave: (e: React.DragEvent) => void;
 	readonly onDrop: (e: React.DragEvent) => void;
+	/** A server project: the changelog is kept on the server, not in a file. */
+	readonly serverProject?: boolean;
 }
 
 export function PreviewPanel({
@@ -149,8 +151,9 @@ export function PreviewPanel({
 	onDragOver,
 	onDragLeave,
 	onDrop,
+	serverProject = false,
 }: PreviewPanelProps) {
-	const { t } = useTranslation();
+	const { t } = useTranslation("changelog");
 	const [viewMode, setViewMode] = useState<"markdown" | "preview">("markdown");
 
 	// Custom components for ReactMarkdown to handle local image paths
@@ -216,11 +219,17 @@ export function PreviewPanel({
 								) : (
 									<Save className="mr-2 h-4 w-4" />
 								)}
-								{saveSuccess ? t("changelog:previewPanel.saved") : t("changelog:previewPanel.saveToFile")}
+								{saveSuccess
+									? t("changelog:previewPanel.saved")
+									: serverProject
+										? t("server.save")
+										: t("changelog:previewPanel.saveToFile")}
 							</Button>
 						</TooltipTrigger>
 						<TooltipContent>
-							{t("changelog:previewPanel.prepend")}
+							{serverProject
+								? t("server.saveTooltip")
+								: t("changelog:previewPanel.prepend")}
 						</TooltipContent>
 					</Tooltip>
 				</div>
