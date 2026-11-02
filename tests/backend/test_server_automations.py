@@ -432,18 +432,20 @@ async def test_a_viewer_reads_and_changes_nothing(world):
 
     rule_id = (await _state(world))["rules"][0]["id"]
     async with _db() as db:
-        for call in (
-            delete_rule(
+        with pytest.raises(HTTPException) as refused:
+            await delete_rule(
                 rule_id,
                 _request("u-vic", "task.write"),
                 _scope(world, role="viewer"),
                 db,
-            ),
-            run_now(_request("u-vic", "task.write"), _scope(world, role="viewer"), db),
-        ):
-            with pytest.raises(HTTPException) as refused:
-                await call
-            assert refused.value.status_code == 403
+            )
+        assert refused.value.status_code == 403
+
+        with pytest.raises(HTTPException) as refused:
+            await run_now(
+                _request("u-vic", "task.write"), _scope(world, role="viewer"), db
+            )
+        assert refused.value.status_code == 403
 
 
 async def test_a_rule_that_starts_agents_needs_agent_execute(world):
