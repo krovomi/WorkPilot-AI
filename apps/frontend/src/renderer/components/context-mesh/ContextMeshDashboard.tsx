@@ -89,13 +89,13 @@ export function ContextMeshDashboard(): React.ReactElement {
 	}
 
 	return (
-		<div className="flex flex-col h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
+		<div className="flex flex-col h-full bg-background text-foreground">
 			{/* Header */}
-			<div className="px-6 py-4 border-b border-[var(--border-color)]">
+			<div className="px-6 py-4 border-b border-border">
 				<div className="flex items-center justify-between gap-6">
 					<div>
 						<h1 className="text-xl font-semibold">{t("contextMesh:title")}</h1>
-						<p className="text-sm text-[var(--text-secondary)] mt-0.5 max-w-3xl">
+						<p className="text-sm text-muted-foreground mt-0.5 max-w-3xl">
 							{t("contextMesh:description")}
 						</p>
 					</div>
@@ -108,7 +108,7 @@ export function ContextMeshDashboard(): React.ReactElement {
 										? unregisterProject(projectPath)
 										: registerProject(projectPath)
 								}
-								className="px-3 py-2 rounded-lg bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] transition-colors text-sm"
+								className="px-3 py-2 rounded-lg bg-card hover:bg-accent transition-colors text-sm"
 							>
 								{isRegistered
 									? t("contextMesh:projects.removeProject")
@@ -138,14 +138,14 @@ export function ContextMeshDashboard(): React.ReactElement {
 					</div>
 				</div>
 				{!canAnalyze && !isAnalyzing && (
-					<p className="text-xs text-[var(--text-secondary)] mt-2">
+					<p className="text-xs text-muted-foreground mt-2">
 						{t("contextMesh:errors.analysisRequired")}
 					</p>
 				)}
 			</div>
 
 			{/* Tabs */}
-			<div className="px-6 border-b border-[var(--border-color)] flex items-center gap-1 overflow-x-auto">
+			<div className="px-6 border-b border-border flex items-center gap-1 overflow-x-auto">
 				{TABS.map((tab) => {
 					const count = tabCount(tab);
 					return (
@@ -155,8 +155,8 @@ export function ContextMeshDashboard(): React.ReactElement {
 							onClick={() => setActiveTab(tab)}
 							className={`px-3 py-2.5 text-sm border-b-2 -mb-px transition-colors whitespace-nowrap ${
 								activeTab === tab
-									? "border-[var(--accent)] text-[var(--text-primary)] font-medium"
-									: "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+									? "border-[var(--accent)] text-foreground font-medium"
+									: "border-transparent text-muted-foreground hover:text-foreground"
 							}`}
 						>
 							{t(`contextMesh:tabs.${tab}`)}
@@ -192,10 +192,10 @@ export function ContextMeshDashboard(): React.ReactElement {
 								).map(([key, value]) => (
 									<div
 										key={key}
-										className="bg-[var(--bg-secondary)] rounded-lg p-3"
+										className="bg-card rounded-lg p-3"
 									>
 										<div className="text-2xl font-bold">{value}</div>
-										<div className="text-xs text-[var(--text-secondary)]">
+										<div className="text-xs text-muted-foreground">
 											{t(`contextMesh:overview.${key}`)}
 										</div>
 									</div>
@@ -212,7 +212,7 @@ export function ContextMeshDashboard(): React.ReactElement {
 													: "contextMesh:status.complete",
 											)}
 									</h2>
-									<pre className="text-xs font-mono text-[var(--text-secondary)] whitespace-pre-wrap bg-[var(--bg-secondary)] rounded-lg p-3">
+									<pre className="text-xs font-mono text-muted-foreground whitespace-pre-wrap bg-card rounded-lg p-3">
 										{streamingOutput}
 									</pre>
 								</div>
@@ -224,7 +224,7 @@ export function ContextMeshDashboard(): React.ReactElement {
 							<h3 className="text-lg font-medium mb-2">
 								{t("contextMesh:empty.title")}
 							</h3>
-							<p className="text-sm text-[var(--text-secondary)] max-w-md mx-auto">
+							<p className="text-sm text-muted-foreground max-w-md mx-auto">
 								{t("contextMesh:empty.description")}
 							</p>
 						</div>
@@ -233,7 +233,7 @@ export function ContextMeshDashboard(): React.ReactElement {
 				{/* Projects */}
 				{activeTab === "projects" &&
 					(projects.length === 0 ? (
-						<p className="text-sm text-[var(--text-secondary)]">
+						<p className="text-sm text-muted-foreground">
 							{t("contextMesh:empty.noProjects")}
 						</p>
 					) : (
@@ -244,7 +244,7 @@ export function ContextMeshDashboard(): React.ReactElement {
 							{projects.map((project) => (
 								<div
 									key={project.project_path}
-									className="bg-[var(--bg-secondary)] rounded-lg p-3"
+									className="bg-card rounded-lg p-3"
 								>
 									<div className="flex items-start justify-between gap-2">
 										<div className="min-w-0">
@@ -258,12 +258,12 @@ export function ContextMeshDashboard(): React.ReactElement {
 										<button
 											type="button"
 											onClick={() => unregisterProject(project.project_path)}
-											className="shrink-0 text-xs text-[var(--text-secondary)] hover:text-red-400 underline"
+											className="shrink-0 text-xs text-muted-foreground hover:text-red-400 underline"
 										>
 											{t("contextMesh:projects.removeProject")}
 										</button>
 									</div>
-									<div className="text-xs text-[var(--text-secondary)] mt-1">
+									<div className="text-xs text-muted-foreground mt-1">
 										{t("contextMesh:projects.patternCount", {
 											count: project.pattern_count,
 										})}
@@ -291,7 +291,7 @@ export function ContextMeshDashboard(): React.ReactElement {
 				{/* Patterns */}
 				{activeTab === "patterns" &&
 					(patterns.length === 0 ? (
-						<p className="text-sm text-[var(--text-secondary)]">
+						<p className="text-sm text-muted-foreground">
 							{t("contextMesh:empty.noPatterns")}
 						</p>
 					) : (
@@ -302,25 +302,25 @@ export function ContextMeshDashboard(): React.ReactElement {
 							{patterns.map((pattern) => (
 								<div
 									key={pattern.pattern_id}
-									className="bg-[var(--bg-secondary)] rounded-lg p-3"
+									className="bg-card rounded-lg p-3"
 								>
 									<div className="flex items-start justify-between gap-2 mb-1">
 										<div className="font-medium text-sm">{pattern.title}</div>
 										<div className="flex items-center gap-2 shrink-0">
-											<span className="text-xs text-[var(--text-secondary)]">
+											<span className="text-xs text-muted-foreground">
 												{t("contextMesh:patterns.confidence")}{" "}
 												{percent(pattern.confidence)}
 											</span>
 											<button
 												type="button"
 												onClick={() => deletePattern(pattern.pattern_id)}
-												className="text-xs text-[var(--text-secondary)] hover:text-red-400 underline"
+												className="text-xs text-muted-foreground hover:text-red-400 underline"
 											>
 												{t("contextMesh:actions.delete")}
 											</button>
 										</div>
 									</div>
-									<div className="text-xs text-[var(--text-secondary)] mb-1">
+									<div className="text-xs text-muted-foreground mb-1">
 										{pattern.description}
 									</div>
 									<div className="text-xs opacity-70">
@@ -351,7 +351,7 @@ export function ContextMeshDashboard(): React.ReactElement {
 											<summary className="text-xs text-[var(--accent)] cursor-pointer">
 												{t("contextMesh:patterns.codeExample")}
 											</summary>
-											<pre className="mt-1 text-xs font-mono whitespace-pre-wrap bg-[var(--bg-primary)] rounded p-2">
+											<pre className="mt-1 text-xs font-mono whitespace-pre-wrap bg-background rounded p-2">
 												{pattern.code_example}
 											</pre>
 										</details>
@@ -364,7 +364,7 @@ export function ContextMeshDashboard(): React.ReactElement {
 				{/* Handbook */}
 				{activeTab === "handbook" &&
 					(handbookEntries.length === 0 ? (
-						<p className="text-sm text-[var(--text-secondary)]">
+						<p className="text-sm text-muted-foreground">
 							{t("contextMesh:empty.noHandbook")}
 						</p>
 					) : (
@@ -377,12 +377,12 @@ export function ContextMeshDashboard(): React.ReactElement {
 							{handbookEntries.map((entry) => (
 								<div
 									key={entry.entry_id}
-									className="bg-[var(--bg-secondary)] rounded-lg p-3"
+									className="bg-card rounded-lg p-3"
 								>
 									<div className="flex items-start justify-between gap-2 mb-1">
 										<div className="font-medium text-sm">{entry.title}</div>
 										<div className="flex items-center gap-2 shrink-0">
-											<span className="text-xs text-[var(--text-secondary)]">
+											<span className="text-xs text-muted-foreground">
 												{t("contextMesh:handbook.version", {
 													version: entry.version,
 												})}
@@ -390,13 +390,13 @@ export function ContextMeshDashboard(): React.ReactElement {
 											<button
 												type="button"
 												onClick={() => deleteHandbookEntry(entry.entry_id)}
-												className="text-xs text-[var(--text-secondary)] hover:text-red-400 underline"
+												className="text-xs text-muted-foreground hover:text-red-400 underline"
 											>
 												{t("contextMesh:actions.delete")}
 											</button>
 										</div>
 									</div>
-									<div className="text-xs text-[var(--text-secondary)] mb-1">
+									<div className="text-xs text-muted-foreground mb-1">
 										{entry.description}
 									</div>
 									{entry.decision_rationale && (
@@ -422,7 +422,7 @@ export function ContextMeshDashboard(): React.ReactElement {
 				{/* Skill transfers */}
 				{activeTab === "transfers" &&
 					(skillTransfers.length === 0 ? (
-						<p className="text-sm text-[var(--text-secondary)]">
+						<p className="text-sm text-muted-foreground">
 							{t("contextMesh:empty.noTransfers")}
 						</p>
 					) : (
@@ -435,18 +435,18 @@ export function ContextMeshDashboard(): React.ReactElement {
 							{skillTransfers.map((transfer) => (
 								<div
 									key={transfer.transfer_id}
-									className="bg-[var(--bg-secondary)] rounded-lg p-3"
+									className="bg-card rounded-lg p-3"
 								>
 									<div className="flex items-start justify-between gap-2 mb-1">
 										<div className="font-medium text-sm">
 											{transfer.skill_name}
 										</div>
-										<span className="text-xs text-[var(--text-secondary)] shrink-0">
+										<span className="text-xs text-muted-foreground shrink-0">
 											{t("contextMesh:transfers.confidence")}{" "}
 											{percent(transfer.confidence)}
 										</span>
 									</div>
-									<div className="text-xs text-[var(--text-secondary)] mb-1">
+									<div className="text-xs text-muted-foreground mb-1">
 										{transfer.description}
 									</div>
 									<div className="text-xs opacity-70">
@@ -488,13 +488,13 @@ export function ContextMeshDashboard(): React.ReactElement {
 															"dismissed",
 														)
 													}
-													className="px-3 py-1.5 rounded-lg bg-[var(--bg-primary)] hover:bg-[var(--bg-hover)] transition-colors text-xs"
+													className="px-3 py-1.5 rounded-lg bg-background hover:bg-accent transition-colors text-xs"
 												>
 													{t("contextMesh:actions.dismiss")}
 												</button>
 											</div>
 										) : (
-											<span className="text-xs text-[var(--text-secondary)]">
+											<span className="text-xs text-muted-foreground">
 												{transfer.status === "accepted"
 													? t("contextMesh:transfers.statusAccepted")
 													: t("contextMesh:transfers.statusDismissed")}
@@ -509,7 +509,7 @@ export function ContextMeshDashboard(): React.ReactElement {
 				{/* Recommendations */}
 				{activeTab === "recommendations" &&
 					(recommendations.length === 0 ? (
-						<p className="text-sm text-[var(--text-secondary)]">
+						<p className="text-sm text-muted-foreground">
 							{t("contextMesh:empty.noRecommendations")}
 						</p>
 					) : (
@@ -522,16 +522,16 @@ export function ContextMeshDashboard(): React.ReactElement {
 							{recommendations.map((rec) => (
 								<div
 									key={rec.recommendation_id}
-									className="bg-[var(--bg-secondary)] rounded-lg p-3"
+									className="bg-card rounded-lg p-3"
 								>
 									<div className="flex items-start justify-between gap-2 mb-1">
 										<div className="font-medium text-sm">{rec.title}</div>
-										<span className="text-xs text-[var(--text-secondary)] shrink-0">
+										<span className="text-xs text-muted-foreground shrink-0">
 											{t("contextMesh:recommendations.relevance")}{" "}
 											{percent(rec.relevance_score)}
 										</span>
 									</div>
-									<div className="text-xs text-[var(--text-secondary)] mb-1">
+									<div className="text-xs text-muted-foreground mb-1">
 										{rec.description}
 									</div>
 									<div className="text-xs opacity-70">
@@ -569,7 +569,7 @@ export function ContextMeshDashboard(): React.ReactElement {
 														"dismissed",
 													)
 												}
-												className="px-3 py-1.5 rounded-lg bg-[var(--bg-primary)] hover:bg-[var(--bg-hover)] transition-colors text-xs"
+												className="px-3 py-1.5 rounded-lg bg-background hover:bg-accent transition-colors text-xs"
 											>
 												{t("contextMesh:actions.dismiss")}
 											</button>
