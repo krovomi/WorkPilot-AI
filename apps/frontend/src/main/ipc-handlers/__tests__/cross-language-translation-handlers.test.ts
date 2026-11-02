@@ -133,8 +133,10 @@ describe("cross-language translation handlers", () => {
 		});
 		const [run] = state.spawned;
 		expect(run.cmd).toBe("python3");
+		// resolve(): the handler resolves the app path, which adds the drive
+		// letter on Windows.
 		expect(run.args[0]).toBe(
-			path.join(
+			path.resolve(
 				"/repo",
 				"apps",
 				"backend",
