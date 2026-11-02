@@ -6,6 +6,7 @@
 import { cn } from "../lib/utils";
 import { Badge } from "./ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+import { useTranslation } from "react-i18next";
 
 interface QualityScoreBadgeProps {
 	score: number; // 0-100
@@ -52,6 +53,7 @@ export function QualityScoreBadge({
 	className,
 	showTooltip = true,
 }: QualityScoreBadgeProps) {
+	const { t } = useTranslation();
 	const colorClass =
 		GRADE_COLORS[grade] || "bg-gray-500 hover:bg-gray-600 text-white";
 	const emoji = GRADE_EMOJI[grade] || "📊";
@@ -77,12 +79,17 @@ export function QualityScoreBadge({
 			<TooltipTrigger asChild>{badge}</TooltipTrigger>
 			<TooltipContent>
 				<div className="text-sm">
-					<div className="font-semibold mb-1">Code Quality Score</div>
+					<div className="font-semibold mb-1">{t("common:qualityScore.title")}</div>
 					<div>
-						{score.toFixed(1)}/100 (Grade: {grade})
+						{t("common:qualityScore.scoreLine", {
+								score: score.toFixed(1),
+								grade,
+							})}
 					</div>
 					<div className="text-xs text-muted-foreground mt-1">
-						{isPassing ? "✅ Passing" : "❌ Failed"}
+						{isPassing
+								? t("common:qualityScore.passing")
+								: t("common:qualityScore.failed")}
 					</div>
 				</div>
 			</TooltipContent>

@@ -152,7 +152,9 @@ export function IdeaCard({
 										]
 									}
 								>
-									{(idea as PerformanceOptimizationIdea).impact} impact
+									{t("ideation:details.impactLevel", {
+									level: (idea as PerformanceOptimizationIdea).impact,
+								})}
 								</Badge>
 							)}
 							{isCodeQualityIdea(idea) && (

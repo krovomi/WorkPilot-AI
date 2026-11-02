@@ -100,7 +100,8 @@
 		"builtInReadOnly": "Built-in roles cannot be edited, so an upgrade that adds a permission reaches every organization. Create a custom role to define your own.",
 		"permissionCount": "{{count}} permissions",
 		"privileged": "Privileged action",
-		"selectPrompt": "Select a role to see the permissions it grants."
+		"selectPrompt": "Select a role to see the permissions it grants.",
+		"namePlaceholder": "Frontend Lead"
 	},
 	"organizations": {
 		"platformAdminOnly": "Only a platform administrator can manage organizations.",

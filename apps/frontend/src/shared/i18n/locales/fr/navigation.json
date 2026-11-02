@@ -284,5 +284,17 @@
 		"tooltip": "Ni document de conception ni test pour l'instant : cette vue peut changer ou disparaître.",
 		"hide": "Masquer les vues expérimentales",
 		"show": "Afficher les vues expérimentales ({{count}})"
+	},
+	"copilotCli": {
+		"requiresGh": "Nécessite GitHub CLI (gh)",
+		"installFrom": "Installer depuis",
+		"copilotLabel": "Copilot :",
+		"path": "Chemin :",
+		"auth": "Authentification :",
+		"lastChecked": "Dernière vérification :",
+		"login": "Se connecter",
+		"ghMissing": "gh absent",
+		"authenticated": "Authentifié",
+		"notAuthenticated": "Non authentifié"
 	}
 }

@@ -206,7 +206,6 @@ function ApiUrlInput({
 	value,
 	onChange,
 	placeholder,
-	// biome-ignore lint/correctness/noUnusedFunctionParameters: parameter kept for API compatibility
 	t,
 }: {
 	readonly value: string;
@@ -219,7 +218,7 @@ function ApiUrlInput({
 		<div className="space-y-2">
 			<Label htmlFor="apiUrl" className="flex items-center gap-2">
 				<Globe className="w-4 h-4" />
-				URL de l'API
+				{t("settings:apiKeyConfig.apiUrl")}
 			</Label>
 			<Input
 				id="apiUrl"
@@ -234,7 +233,6 @@ function ApiUrlInput({
 function ModelInput({
 	value,
 	onChange,
-	// biome-ignore lint/correctness/noUnusedFunctionParameters: parameter kept for API compatibility
 	t,
 }: {
 	readonly value: string;
@@ -244,10 +242,10 @@ function ModelInput({
 }) {
 	return (
 		<div className="space-y-2">
-			<Label htmlFor="model">Modèle par défaut</Label>
+			<Label htmlFor="model">{t("settings:apiKeyConfig.defaultModel")}</Label>
 			<Input
 				id="model"
-				placeholder="gpt-5.3, claude-4.6-opus, etc."
+				placeholder={t("settings:apiKeyConfig.modelPlaceholder")}
 				value={value}
 				onChange={(e) => onChange(e.target.value)}
 			/>

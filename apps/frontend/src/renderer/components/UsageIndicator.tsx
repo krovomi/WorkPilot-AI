@@ -737,7 +737,7 @@ export function UsageIndicator() {
 										{debugProfiles.length > 0 ? (
 											debugProfiles.map((p) => (
 												<li key={`${p.name}-${p.baseUrl}`}>
-													{p.name} | {p.baseUrl} | provider:{" "}
+													{p.name} | {p.baseUrl} | {t("common:usage.debugProvider")}{" "}
 													{p.detectedProvider}
 												</li>
 											))
@@ -985,7 +985,7 @@ export function UsageIndicator() {
 			return (
 				<span
 					className="text-xs font-semibold text-red-500"
-					title="Needs re-authentication"
+					title={t("common:usage.needsReauthTitle")}
 				>
 					!
 				</span>
@@ -1088,11 +1088,11 @@ export function UsageIndicator() {
 
 		return (
 			<div className="flex items-center gap-0.5 text-xs font-semibold font-mono">
-				<span className={sessionColorClass} title="Session usage">
+				<span className={sessionColorClass} title={t("common:usage.sessionUsage")}>
 					{Math.round(sessionPercent)}
 				</span>
 				<span className="text-muted-foreground/50">│</span>
-				<span className={weeklyUnavailable ? "text-muted-foreground/50" : weeklyColorClass} title="Weekly usage">
+				<span className={weeklyUnavailable ? "text-muted-foreground/50" : weeklyColorClass} title={t("common:usage.weeklyUsage")}>
 					{weeklyUnavailable ? "–" : Math.round(weeklyPercent)}
 				</span>
 			</div>

@@ -6,12 +6,14 @@ import {
 	CollapsibleContent,
 	CollapsibleTrigger,
 } from "../../ui/collapsible";
+import { useTranslation } from "react-i18next";
 
 interface MonitoringSectionProps {
 	readonly monitoring: ServiceInfo["monitoring"];
 }
 
 export function MonitoringSection({ monitoring }: MonitoringSectionProps) {
+	const { t } = useTranslation();
 	const [expanded, setExpanded] = useState(false);
 
 	if (!monitoring) {
@@ -27,7 +29,7 @@ export function MonitoringSection({ monitoring }: MonitoringSectionProps) {
 			<CollapsibleTrigger className="flex w-full items-center justify-between text-xs font-medium hover:text-foreground">
 				<div className="flex items-center gap-2">
 					<Activity className="h-3 w-3" />
-					Monitoring
+					{t("context:service.monitoring")}
 				</div>
 				{expanded ? (
 					<ChevronDown className="h-3 w-3" />
@@ -38,13 +40,17 @@ export function MonitoringSection({ monitoring }: MonitoringSectionProps) {
 			<CollapsibleContent className="mt-2 space-y-2 text-xs text-muted-foreground">
 				{monitoring.metrics_endpoint && (
 					<div>
-						Metrics:{" "}
+						{t("context:serviceSections.metrics")}{" "}
 						<code className="text-xs">{monitoring.metrics_endpoint}</code> (
 						{monitoring.metrics_type})
 					</div>
 				)}
 				{monitoring.health_checks && monitoring.health_checks.length > 0 && (
-					<div>Health: {monitoring.health_checks.join(", ")}</div>
+					<div>
+						{t("context:serviceSections.health", {
+							checks: monitoring.health_checks.join(", "),
+						})}
+					</div>
 				)}
 			</CollapsibleContent>
 		</Collapsible>

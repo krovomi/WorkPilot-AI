@@ -197,7 +197,7 @@
   "apps/frontend/src/renderer/components/settings/AccountPriorityList.tsx": 1,
   "apps/frontend/src/renderer/components/settings/AgentProfileSettings.tsx": 1,
   "apps/frontend/src/renderer/components/settings/AnomalyDetectionSettings.tsx": 1,
-  "apps/frontend/src/renderer/components/settings/ApiKeyConfigContent.tsx": 7,
+  "apps/frontend/src/renderer/components/settings/ApiKeyConfigContent.tsx": 5,
   "apps/frontend/src/renderer/components/settings/CleanProviderCard.tsx": 1,
   "apps/frontend/src/renderer/components/settings/CleanProviderGrid.tsx": 2,
   "apps/frontend/src/renderer/components/settings/CleanProviderSection.tsx": 5,

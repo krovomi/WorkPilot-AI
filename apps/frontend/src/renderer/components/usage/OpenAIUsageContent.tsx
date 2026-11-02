@@ -73,8 +73,11 @@ function OpenAIUsageDetailsComponent({ details }: OpenAIUsageDetailsProps) {
 						{details.completions.data && details.completions.data.length > 0 ? (
 							details.completions.data.map((item: OpenAICompletionItem) => (
 								<li key={`completions-${item.model}`}>
-									{item.model}: {item.n_input_tokens_total || 0} in,{" "}
-									{item.n_output_tokens_total || 0} out
+									{t("common:usage.inOut", {
+									model: item.model,
+									input: item.n_input_tokens_total || 0,
+									output: item.n_output_tokens_total || 0,
+								})}
 								</li>
 							))
 						) : (

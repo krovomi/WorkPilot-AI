@@ -2,12 +2,14 @@ import { AlertCircle, CheckCircle2, FileCode, Users } from "lucide-react";
 import { UIUX_CATEGORY_LABELS } from "../../../../shared/constants";
 import type { UIUXImprovementIdea } from "../../../../shared/types";
 import { Badge } from "../../ui/badge";
+import { useTranslation } from "react-i18next";
 
 interface UIUXDetailsProps {
 	idea: UIUXImprovementIdea;
 }
 
 export function UIUXDetails({ idea }: UIUXDetailsProps) {
+	const { t } = useTranslation();
 	return (
 		<>
 			{/* Category */}
@@ -21,7 +23,7 @@ export function UIUXDetails({ idea }: UIUXDetailsProps) {
 			<div>
 				<h3 className="text-sm font-medium mb-2 flex items-center gap-2">
 					<AlertCircle className="h-4 w-4" />
-					Current State
+					{t("ideation:performanceDetails.currentState")}
 				</h3>
 				<p className="text-sm text-muted-foreground">{idea.currentState}</p>
 			</div>
@@ -30,7 +32,7 @@ export function UIUXDetails({ idea }: UIUXDetailsProps) {
 			<div>
 				<h3 className="text-sm font-medium mb-2 flex items-center gap-2">
 					<CheckCircle2 className="h-4 w-4" />
-					Proposed Change
+					{t("ideation:details.proposedChange")}
 				</h3>
 				<p className="text-sm text-muted-foreground">{idea.proposedChange}</p>
 			</div>
@@ -39,7 +41,7 @@ export function UIUXDetails({ idea }: UIUXDetailsProps) {
 			<div>
 				<h3 className="text-sm font-medium mb-2 flex items-center gap-2">
 					<Users className="h-4 w-4" />
-					User Benefit
+					{t("ideation:details.userBenefit")}
 				</h3>
 				<p className="text-sm text-muted-foreground">{idea.userBenefit}</p>
 			</div>
@@ -49,7 +51,7 @@ export function UIUXDetails({ idea }: UIUXDetailsProps) {
 				<div>
 					<h3 className="text-sm font-medium mb-2 flex items-center gap-2">
 						<FileCode className="h-4 w-4" />
-						Affected Components
+						{t("ideation:details.affectedComponents")}
 					</h3>
 					<ul className="space-y-1">
 						{idea.affectedComponents.map((component, i) => (

@@ -19,6 +19,7 @@ import { cn } from "../../lib/utils";
 import type { AgentSlot, MCEvent } from "../../stores/mission-control-store";
 import { Badge } from "../ui/badge";
 import { ScrollArea } from "../ui/scroll-area";
+import { useTranslation } from "react-i18next";
 
 interface AgentEventLogProps {
 	readonly events: MCEvent[];
@@ -67,6 +68,7 @@ function formatTaskDisplay(task: unknown): string {
 }
 
 export function AgentEventLog({ events, agents }: AgentEventLogProps) {
+	const { t } = useTranslation();
 	const agentMap = useMemo(() => {
 		const map = new Map<string, string>();
 		for (const a of agents) {
@@ -80,7 +82,7 @@ export function AgentEventLog({ events, agents }: AgentEventLogProps) {
 	if (reversedEvents.length === 0) {
 		return (
 			<div className="flex items-center justify-center h-32 text-sm text-muted-foreground">
-				No events yet
+				{t("missionControl:noEvents")}
 			</div>
 		);
 	}

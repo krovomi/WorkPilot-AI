@@ -553,7 +553,7 @@ export function RoadmapGenerationProgress({
 								<Tooltip>
 									<TooltipTrigger asChild>
 										<span className="text-xs text-muted-foreground/70 cursor-help">
-											Â· {t("roadmapProgress.lastActivityPrefix")}{" "}
+											· {t("roadmapProgress.lastActivityPrefix")}{" "}
 											{lastActivityDisplay}
 										</span>
 									</TooltipTrigger>

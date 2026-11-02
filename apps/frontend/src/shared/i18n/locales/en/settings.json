@@ -274,8 +274,27 @@
 						"likes": "Likes",
 						"created": "Recent",
 						"modified": "Modified"
-					}
-				}
+					},
+					"minParamsAria": "Minimum size (parameters)",
+					"paramsAll": "Params: all",
+					"params24": "≥ 24B (planning)",
+					"maxDiskAria": "Max. estimated disk size (GB)",
+					"diskAll": "Disk: all",
+					"disk6": "≤ ~6 GB",
+					"disk12": "≤ ~12 GB",
+					"disk24": "≤ ~24 GB",
+					"disk48": "≤ ~48 GB",
+					"hideUnsuitable": "Hide unsuitable models (embeddings, too small)"
+				},
+				"legend": {
+					"recommended": "● Recommended",
+					"recommendedDetail": "— large enough (≥24B active parameters) and tool-calling capable: good for EVERY phase, planning included.",
+					"tooSmall": "● Too small to plan",
+					"tooSmallDetail": "— tool-calling capable but <24B: fine for coding / QA, not advised for planning.",
+					"unverified": "● Tool-calling to verify",
+					"unverifiedDetail": "— not confirmed from the name; open the model card. \"~GB\" sizes are estimates (4-bit quant)."
+				},
+				"estimatedSize": " · ~{{size}} GB"
 			}
 		},
 		"updates": {
@@ -566,7 +585,9 @@
 		"fineTuneDescription": "Adjust from 75% to 200% in 5% increments",
 		"default": "Default",
 		"comfortable": "Comfortable",
-		"large": "Large"
+		"large": "Large",
+		"resetToDefault": "Reset to default (100%)",
+		"applyChanges": "Apply scale changes"
 	},
 	"logOrder": {
 		"label": "Log Order",
@@ -675,7 +696,8 @@
 		"autoClaudePathDescription": "Relative path to workpilot-ai directory in projects",
 		"autoClaudePathPlaceholder": "workpilot-ai (default)",
 		"autoNameTerminals": "Automatically name terminals",
-		"autoNameTerminalsDescription": "Use AI to generate descriptive names for terminal tabs based on their activity"
+		"autoNameTerminalsDescription": "Use AI to generate descriptive names for terminal tabs based on their activity",
+		"detecting": "Detecting..."
 	},
 	"theme": {
 		"title": "Appearance",
@@ -695,7 +717,9 @@
 			"retro": "Warm and nostalgic amber atmospheres",
 			"neo": "Modern cyberpunk pink/magenta",
 			"forest": "Natural and earthy green tones"
-		}
+		},
+		"backgroundColor": "Background color",
+		"accentColor": "Accent color"
 	},
 	"devtools": {
 		"title": "Developer Tools",
@@ -760,7 +784,8 @@
 		"downloadStableVersion": "Download Stable Version",
 		"readOnlyVolumeTitle": "Cannot Install from Disk Image",
 		"readOnlyVolumeDescription": "WorkPilot AI is running from a read-only disk image (DMG). Please drag the app to your Applications folder and relaunch it from there to install updates.",
-		"downloadError": "Failed to download update"
+		"downloadError": "Failed to download update",
+		"unknownVersion": "Unknown"
 	},
 	"notifications": {
 		"title": "Notifications",
@@ -833,7 +858,20 @@
 		},
 		"claude": {
 			"title": "Claude Auth",
-			"description": "Claude authentication"
+			"description": "Claude authentication",
+			"override": "(Override)",
+			"connected": "Connected",
+			"notConnected": "Not Connected",
+			"authTitle": "Claude Authentication",
+			"loadingConfig": "Loading configuration...",
+			"usingGlobalToken": "Using global token",
+			"usingGlobalTokenDescription": "Using token from App Settings. Enter a project-specific token below to override.",
+			"pasteTokenFrom": "Paste a token from",
+			"authenticatedOAuth": "Authenticated via OAuth",
+			"notAuthenticated": "Not authenticated",
+			"statusUnknown": "Status unknown",
+			"reauthenticate": "Re-authenticate",
+			"setupOAuth": "Setup OAuth"
 		},
 		"linear": {
 			"title": "Linear",
@@ -901,7 +939,18 @@
 			"connectedToGitHub": "Connected to GitHub",
 			"notConnectedToGitHub": "Not connected to GitHub",
 			"failedToLoadBranches": "Failed to load branches",
-			"failedToLoadRepositories": "Failed to load repositories"
+			"failedToLoadRepositories": "Failed to load repositories",
+			"authenticatedViaOAuth": "Authenticated via GitHub OAuth (gh CLI)",
+			"tokenPlaceholder": "ghp_xxxxxxxx or github_pat_xxxxxxxx",
+			"projectSpecificTitle": "Project-Specific Configuration",
+			"projectSpecificBefore": "This GitHub repository is configured only for",
+			"projectSpecificAfter": ". Each project can have its own GitHub repository.",
+			"mainBranch": "Main Branch",
+			"mainBranchDescription": "The base branch for creating task worktrees. All new tasks will branch from here.",
+			"loadingBranches": "Loading branches...",
+			"selectMainBranch": "Select main branch",
+			"branchHintBefore": "Tasks will be created on branches like",
+			"branchHintFrom": "from"
 		},
 		"gitlab": {
 			"title": "GitLab",
@@ -1728,7 +1777,8 @@
 		"importConfirmButton": "Import {{count}} item(s)",
 		"selectedItems": "{{count}} item(s) selected",
 		"toggleSelection": "Toggle selection for work item {{id}}",
-		"importError": "Azure DevOps import failed"
+		"importError": "Azure DevOps import failed",
+		"repositoryLabel": "Repository:"
 	},
 	"azureDevOps": {
 		"enableSyncLabel": "Enable Azure DevOps Sync",
@@ -1789,7 +1839,10 @@
 		"modelAdded": "Model Added",
 		"modelAddedDesc": "{{name}} has been added to available models.",
 		"modelRemoved": "Model Removed",
-		"modelRemovedDesc": "Model has been removed from the list."
+		"modelRemovedDesc": "Model has been removed from the list.",
+		"integrationTitle": "Azure DevOps Integration",
+		"integrationDescription": "Configure and manage Azure DevOps work item synchronization",
+		"enableDescription": "Enable Azure DevOps integration to sync work items with your backlog"
 	},
 	"autoSwitching": {
 		"title": "Auto-switching",
@@ -1846,7 +1899,10 @@
 		"instance": "Instance",
 		"required": "*",
 		"fillAllFields": "Please fill in all required fields (Instance URL, Email, API Token)",
-		"bridgeUnavailable": "Connection testing is unavailable in this environment"
+		"bridgeUnavailable": "Connection testing is unavailable in this environment",
+		"instanceLabel": "Instance: {{url}}",
+		"projectSuffix": " • Project: {{project}}",
+		"initGuardDescription": "Enable Jira integration to sync issues with your backlog"
 	},
 	"channelNotifications": {
 		"navLabel": "Notifications (Teams, Slack…)",
@@ -1980,7 +2036,15 @@
 		"importConfirmTitle": "Import {{count}} issue(s)",
 		"importConfirmDescription": "The following items will be imported into the {{column}} column.",
 		"importConfirmButton": "Import {{count}} item(s)",
-		"selectedItems": "{{count}} item(s) selected"
+		"selectedItems": "{{count}} item(s) selected",
+		"assignee": "Assignee: {{name}}",
+		"selectedOfTotal": "{{selected}} / {{total}} selected",
+		"noJiraIssues": "No Jira issues found",
+		"typeLabel": "Type",
+		"statusLabel": "Status",
+		"allStatuses": "All Statuses",
+		"dragHint": "Drag selected issues to a Kanban column to import",
+		"resize": "Resize"
 	},
 	"instructions": {
 		"title": "GitHub Copilot Instructions",
@@ -2304,7 +2368,8 @@
 			"warn": "Warn",
 			"deny": "Deny",
 			"require_approval": "Require approval"
-		}
+		},
+		"fileContentPlaceholder": "file content…"
 	},
 	"search": {
 		"placeholder": "Search settings...",
@@ -2530,5 +2595,99 @@
 		},
 		"anyBranch": "any branch",
 		"reviewDrafts": "reviews wait for you"
+	},
+	"githubOAuth": {
+		"usingCli": "Using GitHub CLI {{version}}",
+		"openLink": "Open {{url}}",
+		"cliRequired": "GitHub CLI Required",
+		"cliRequiredDescription": "The GitHub CLI (gh) is required for OAuth authentication. This provides a secure way to authenticate without manually creating tokens.",
+		"installCli": "Install GitHub CLI",
+		"installed": "I've Installed It",
+		"installInstructions": "Installation instructions:",
+		"linuxVisit": "Linux: Visit",
+		"connectTitle": "Connect to GitHub",
+		"connectDescription": "Click the button below to authenticate with GitHub. This will open your browser where you can authorize the application.",
+		"authenticate": "Authenticate with GitHub",
+		"authenticating": "Authenticating...",
+		"oneTimeCode": "Your one-time code",
+		"copied": "Copied",
+		"copy": "Copy",
+		"connected": "Successfully Connected",
+		"manualTitle": "Complete Authentication Manually",
+		"manualDescription": "The browser couldn't be opened automatically. Please visit the URL below to complete authentication:",
+		"openUrl": "Open URL in Browser",
+		"enterCode": "When prompted, enter this code:",
+		"connectedAs": "Connected as {{username}}",
+		"completeInBrowser": "Please complete the authentication in your browser. This window will update automatically.",
+		"waitingStart": "Waiting for authentication flow to start...",
+		"enterCodeInBrowser": "Enter this code in your browser to complete authentication.",
+		"copyThenOpen": "Copy this code, then open the link below to authenticate.",
+		"accountConnected": "Your GitHub account is now connected",
+		"timedOut": "Authentication Timed Out",
+		"failed": "Authentication Failed"
+	},
+	"apiKeyConfig": {
+		"apiUrl": "API URL",
+		"defaultModel": "Default model",
+		"modelPlaceholder": "gpt-5.3, claude-4.6-opus, etc."
+	},
+	"customProvider": {
+		"modelNamePlaceholder": "Custom Model Name"
+	},
+	"customThemes": {
+		"title": "Custom Themes",
+		"description": "Create your own color themes or import shared ones",
+		"import": "Import",
+		"newTheme": "New Theme",
+		"themeName": "Theme Name",
+		"themeNamePlaceholder": "My Custom Theme",
+		"descriptionLabel": "Description",
+		"descriptionPlaceholder": "A brief description",
+		"preview": "Preview:",
+		"create": "Create Theme",
+		"export": "Export",
+		"empty": "No custom themes yet",
+		"emptyHint": "Create a new theme or import one to get started"
+	},
+	"projectSelector": {
+		"placeholder": "Select a project...",
+		"empty": "No projects yet",
+		"add": "Add Project...",
+		"emptyState": "Select a project to view and edit its settings",
+		"initializeFirst": "Initialize WorkPilot AI first to configure {{section}}"
+	},
+	"agentToolsPanel": {
+		"mcpServers": "MCP Servers",
+		"edit": "Edit"
+	},
+	"insightsModel": {
+		"custom": "Custom...",
+		"customDescription": "Choose model & thinking level"
+	},
+	"linearImport": {
+		"importButton_one": "Import {{count}} Task",
+		"importButton_other": "Import {{count}} Tasks",
+		"title": "Import Linear Tasks",
+		"description": "Select tasks from Linear to import into AutoBuild",
+		"imported_one": "Successfully imported {{count}} task",
+		"imported_other": "Successfully imported {{count}} tasks",
+		"processing": "Tasks are being processed. Check your Kanban board for progress.",
+		"moreLabels": "+{{count}} more",
+		"assignedTo": "Assigned to {{name}}",
+		"project": "Project: {{name}}",
+		"hideDescription": "Hide description",
+		"showDescription": "Show description",
+		"viewInLinear": "View in Linear",
+		"selectTeam": "Select a team to view issues",
+		"searchPlaceholder": "Search tasks...",
+		"allStates": "All states",
+		"selectedOfTotal": "{{selected}} of {{total}} selected",
+		"team": "Team",
+		"projectOptional": "Project (Optional)",
+		"allProjects": "All projects",
+		"noMatch": "No issues match your filters",
+		"empty": "No issues found",
+		"deselectAll": "Deselect all",
+		"selectAll": "Select all"
 	}
 }

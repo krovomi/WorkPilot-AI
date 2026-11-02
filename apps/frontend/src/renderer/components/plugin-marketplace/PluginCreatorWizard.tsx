@@ -223,7 +223,7 @@ function StepDetails({
 					onChange={(e) =>
 						onChange({ name: e.target.value, id: slugify(e.target.value) })
 					}
-					placeholder="My Awesome Plugin"
+					placeholder={t("common:pluginMarketplace.creator.namePlaceholder")}
 					className="w-full rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
 				/>
 			</div>
@@ -459,7 +459,7 @@ function StepPreview({
 						}}
 					/>
 					<span className="text-sm font-semibold">
-						{form.name || "Untitled"}
+						{form.name || t("common:pluginMarketplace.creator.untitled")}
 					</span>
 					<span className="text-xs font-mono text-muted-foreground ml-auto">
 						v{form.version}

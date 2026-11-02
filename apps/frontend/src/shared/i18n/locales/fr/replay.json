@@ -146,5 +146,39 @@
 		"confidence": "Confiance",
 		"impact": "Impact",
 		"fileImpact": "Impact par fichier"
-	}
+	},
+	"stepsCount": "{{count}} étapes",
+	"tokensCount": "{{value}} tokens",
+	"toolsCount": "{{count}} outils",
+	"filesCount": "{{count}} fichiers",
+	"tokensInOut": "{{input}} entrée / {{output}} sortie",
+	"compareSelectSecond": "Choisissez une deuxième session à comparer avec",
+	"abCompareTitle": "Comparaison A/B",
+	"breakpointTypes": {
+		"fileChange": "Modification de fichier",
+		"tokenThreshold": "Seuil de tokens",
+		"stepIndex": "Index d'étape",
+		"patternMatch": "Correspondance de motif"
+	},
+	"breakpointConditionPlaceholder": "ex. : write_file",
+	"stepDetail": {
+		"cumulative": "Cumulé",
+		"tool": "Outil",
+		"reasoning": "Raisonnement",
+		"toolInput": "Entrée de l'outil",
+		"toolOutput": "Sortie de l'outil",
+		"optionsConsidered": "Options envisagées",
+		"selectStep": "Choisissez une étape dans la chronologie."
+	},
+	"heatmapLines": "lignes",
+	"heatmapDescription": "Fichiers les plus souvent modifiés par l'agent",
+	"toolUsage": "Utilisation des outils",
+	"breakpoints": "Points d'arrêt",
+	"breakpointsDescription": "Placez des points d'arrêt pour suspendre la relecture à des événements précis",
+	"compareEmpty": "Choisissez deux sessions dans la liste pour les comparer côte à côte.",
+	"goToSessionList": "Aller à la liste des sessions",
+	"defaultAgentName": "Agent",
+	"noDescription": "Aucune description",
+	"anyCondition": "(toute)",
+	"untitled": "Sans titre"
 }

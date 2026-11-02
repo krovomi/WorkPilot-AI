@@ -24,5 +24,9 @@
 		"ended": "Ended"
 	},
 	"phases": "Phases",
-	"error": "Error"
+	"error": "Error",
+	"tokensCount_one": "{{formatted}} token",
+	"tokensCount_other": "{{formatted}} tokens",
+	"filesCount_one": "{{count}} file",
+	"filesCount_other": "{{count}} files"
 }

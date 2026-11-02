@@ -8,6 +8,7 @@ import {
 	AlertDialogTitle,
 } from "./ui/alert-dialog";
 import { Button } from "./ui/button";
+import { useTranslation } from "react-i18next";
 
 interface ExistingCompetitorAnalysisDialogProps {
 	open: boolean;
@@ -26,6 +27,7 @@ export function ExistingCompetitorAnalysisDialog({
 	onSkip,
 	analysisDate,
 }: ExistingCompetitorAnalysisDialogProps) {
+	const { t } = useTranslation();
 	const handleUseExisting = () => {
 		onUseExisting();
 		onOpenChange(false);
@@ -56,10 +58,10 @@ export function ExistingCompetitorAnalysisDialog({
 				<AlertDialogHeader>
 					<AlertDialogTitle className="flex items-center gap-2 text-foreground">
 						<TrendingUp className="h-5 w-5 text-primary" />
-						Competitor Analysis Options
+						{t("roadmap:competitorAnalysis.optionsTitle")}
 					</AlertDialogTitle>
 					<AlertDialogDescription className="text-muted-foreground">
-						This project has an existing competitor analysis from{" "}
+						{t("roadmap:competitorAnalysis.existingFrom")}{" "}
 						{formatDate(analysisDate)}
 					</AlertDialogDescription>
 				</AlertDialogHeader>
@@ -75,14 +77,13 @@ export function ExistingCompetitorAnalysisDialog({
 							<CheckCircle className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
 							<div className="flex-1">
 								<h4 className="text-sm font-medium text-foreground flex items-center gap-2">
-									Use existing analysis
+									{t("roadmap:competitorAnalysis.useExisting")}
 									<span className="text-xs text-primary font-normal">
-										(Recommended)
+										{t("roadmap:competitorAnalysis.recommended")}
 									</span>
 								</h4>
 								<p className="text-xs text-muted-foreground mt-1">
-									Reuse the competitor insights you already have. Faster and no
-									additional web searches.
+									{t("roadmap:competitorAnalysis.useExistingDescription")}
 								</p>
 							</div>
 						</div>
@@ -98,11 +99,10 @@ export function ExistingCompetitorAnalysisDialog({
 							<RefreshCw className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
 							<div className="flex-1">
 								<h4 className="text-sm font-medium text-foreground">
-									Run new analysis
+									{t("roadmap:competitorAnalysis.runNew")}
 								</h4>
 								<p className="text-xs text-muted-foreground mt-1">
-									Perform fresh web searches to get updated competitor
-									information. Takes longer.
+									{t("roadmap:competitorAnalysis.runNewDescription")}
 								</p>
 							</div>
 						</div>
@@ -118,10 +118,10 @@ export function ExistingCompetitorAnalysisDialog({
 							<Globe className="h-5 w-5 text-muted-foreground/60 flex-shrink-0 mt-0.5" />
 							<div className="flex-1">
 								<h4 className="text-sm font-medium text-muted-foreground">
-									Skip competitor analysis
+									{t("roadmap:competitorAnalysis.skip")}
 								</h4>
 								<p className="text-xs text-muted-foreground/80 mt-1">
-									Generate roadmap without any competitor insights.
+									{t("roadmap:competitorAnalysis.skipDescription")}
 								</p>
 							</div>
 						</div>
@@ -130,7 +130,7 @@ export function ExistingCompetitorAnalysisDialog({
 
 				<AlertDialogFooter className="sm:justify-start">
 					<Button variant="ghost" onClick={() => onOpenChange(false)}>
-						Cancel
+						{t("common:buttons.cancel")}
 					</Button>
 				</AlertDialogFooter>
 			</AlertDialogContent>

@@ -32,11 +32,12 @@ export function CompetitorAnalysisViewer({
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2">
 						<TrendingUp className="h-5 w-5 text-primary" />
-						Competitor Analysis Results
+						{t("roadmap:competitorAnalysis.resultsTitle")}
 					</DialogTitle>
 					<DialogDescription>
-						Analyzed {analysis.competitors.length} competitors to identify
-						market gaps and opportunities
+						{t("roadmap:competitorAnalysis.analyzed", {
+							count: analysis.competitors.length,
+						})}
 					</DialogDescription>
 				</DialogHeader>
 
@@ -80,7 +81,7 @@ export function CompetitorAnalysisViewer({
 											})}
 										>
 											<ExternalLink className="h-3 w-3" aria-hidden="true" />
-											Visit
+											{t("roadmap:competitorAnalysis.visit")}
 											<span className="sr-only">
 												({t("accessibility.opensInNewWindow")})
 											</span>
@@ -92,12 +93,14 @@ export function CompetitorAnalysisViewer({
 								<div>
 									<h4 className="text-sm font-medium mb-2 flex items-center gap-2">
 										<AlertCircle className="h-4 w-4 text-warning" />
-										Identified Pain Points ({competitor.painPoints.length})
+										{t("roadmap:competitorAnalysis.painPointsCount", {
+											count: competitor.painPoints.length,
+										})}
 									</h4>
 									<div className="space-y-2">
 										{competitor.painPoints.length === 0 ? (
 											<p className="text-sm text-muted-foreground italic">
-												No pain points identified
+												{t("roadmap:competitorAnalysis.noPainPoints")}
 											</p>
 										) : (
 											competitor.painPoints.map((painPoint) => {
@@ -128,7 +131,7 @@ export function CompetitorAnalysisViewer({
 															{painPoint.source && (
 																<div className="mt-2">
 																	<span className="text-xs text-muted-foreground">
-																		Source:{" "}
+																		{t("roadmap:competitorAnalysis.source")}{" "}
 																		<span className="italic">
 																			{painPoint.source}
 																		</span>
@@ -138,14 +141,16 @@ export function CompetitorAnalysisViewer({
 															{painPoint.frequency && (
 																<div className="mt-1">
 																	<span className="text-xs text-muted-foreground">
-																		Frequency: {painPoint.frequency}
+																		{t("roadmap:competitorAnalysis.frequency", {
+															value: painPoint.frequency,
+														})}
 																	</span>
 																</div>
 															)}
 															{painPoint.opportunity && (
 																<div className="mt-1">
 																	<span className="text-xs text-muted-foreground">
-																		Opportunity:{" "}
+																		{t("roadmap:competitorAnalysis.opportunity")}{" "}
 																		<span className="font-medium text-foreground">
 																			{painPoint.opportunity}
 																		</span>
@@ -167,13 +172,13 @@ export function CompetitorAnalysisViewer({
 						{analysis.insightsSummary && (
 							<div className="rounded-lg bg-primary/5 border border-primary/20 p-4 space-y-3">
 								<h4 className="text-sm font-semibold">
-									Market Insights Summary
+									{t("roadmap:competitorAnalysis.summaryTitle")}
 								</h4>
 
 								{analysis.insightsSummary.topPainPoints.length > 0 && (
 									<div>
 										<p className="text-xs font-medium text-muted-foreground mb-1">
-											Top Pain Points:
+											{t("roadmap:competitorAnalysis.topPainPoints")}
 										</p>
 										<ul className="text-sm space-y-1">
 											{analysis.insightsSummary.topPainPoints.map(
@@ -194,7 +199,7 @@ export function CompetitorAnalysisViewer({
 									0 && (
 									<div>
 										<p className="text-xs font-medium text-muted-foreground mb-1">
-											Differentiator Opportunities:
+											{t("roadmap:competitorAnalysis.differentiators")}
 										</p>
 										<ul className="text-sm space-y-1">
 											{analysis.insightsSummary.differentiatorOpportunities.map(
@@ -214,7 +219,7 @@ export function CompetitorAnalysisViewer({
 								{analysis.insightsSummary.marketTrends.length > 0 && (
 									<div>
 										<p className="text-xs font-medium text-muted-foreground mb-1">
-											Market Trends:
+											{t("roadmap:competitorAnalysis.marketTrends")}
 										</p>
 										<ul className="text-sm space-y-1">
 											{analysis.insightsSummary.marketTrends.map(

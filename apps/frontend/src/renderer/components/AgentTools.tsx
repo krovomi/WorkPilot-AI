@@ -771,7 +771,7 @@ function AgentCard({
 					<div>
 						<div className="flex items-center justify-between mb-2">
 							<h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-								MCP Servers
+								{t("settings:agentToolsPanel.mcpServers")}
 							</h4>
 							{availableMcps.length > 0 && (
 								<button
@@ -1895,14 +1895,14 @@ export function AgentTools() {
 																onClick={() => handleTestConnection(server)}
 																disabled={isTesting}
 																className="h-7 px-2 text-xs"
-																title="Test Connection"
+																title={t("dialogs:githubSetup.testConnection")}
 															>
 																{isTesting ? (
 																	<Loader2 className="h-3 w-3 animate-spin" />
 																) : (
 																	<RefreshCw className="h-3 w-3" />
 																)}
-																<span className="ml-1">Test</span>
+																<span className="ml-1">{t("common:buttons.test")}</span>
 															</Button>
 															{/* Edit/Delete - show on hover */}
 															<div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1913,7 +1913,7 @@ export function AgentTools() {
 																		setShowCustomMcpDialog(true);
 																	}}
 																	className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
-																	title="Edit"
+																	title={t("settings:agentToolsPanel.edit")}
 																>
 																	<Pencil className="h-3.5 w-3.5" />
 																</button>
@@ -1923,7 +1923,7 @@ export function AgentTools() {
 																		handleDeleteCustomServer(server.id)
 																	}
 																	className="p-1.5 text-muted-foreground hover:text-destructive transition-colors"
-																	title="Delete"
+																	title={t("common:buttons.delete")}
 																>
 																	<Trash2 className="h-3.5 w-3.5" />
 																</button>

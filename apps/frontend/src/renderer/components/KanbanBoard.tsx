@@ -2912,8 +2912,7 @@ export function KanbanBoard({
 										{t("kanban.tasksToComplete")}
 									</span>
 									<span className="rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-medium text-emerald-300">
-										{selectedTaskIds.size}{" "}
-										{selectedTaskIds.size === 1 ? "tâche" : "tâches"}
+										{t("common:selection.tasksCount", { count: selectedTaskIds.size })}
 									</span>
 								</div>
 								<ScrollArea className="h-32 rounded-xl border border-slate-700/50 bg-slate-800/50 p-3 backdrop-blur-sm">
@@ -2999,8 +2998,7 @@ export function KanbanBoard({
 										{t("kanban.tasksToDelete")}
 									</label>
 									<span className="rounded-full bg-red-500/20 px-3 py-1 text-xs font-medium text-red-300">
-										{selectedTaskIds.size}{" "}
-										{selectedTaskIds.size === 1 ? "tâche" : "tâches"}
+										{t("common:selection.tasksCount", { count: selectedTaskIds.size })}
 									</span>
 								</div>
 								<ScrollArea className="h-32 rounded-xl border border-slate-700/50 bg-slate-800/50 p-3 backdrop-blur-sm">

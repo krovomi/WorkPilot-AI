@@ -258,5 +258,6 @@
 	"SendGrid": "SendGrid",
 	"Twilio": "Twilio",
 	"Smtp": "SMTP",
-	"Firebase": "Firebase"
+	"Firebase": "Firebase",
+	"locationPlaceholder": "C:\\ ou /"
 }

@@ -58,5 +58,7 @@
 	"errors": {
 		"noProject": "Veuillez sélectionner un projet pour utiliser le Bac à sable",
 		"generic": "Une erreur inattendue est survenue. Veuillez réessayer."
-	}
+	},
+	"fileSizeBytes": "({{count}} octets)",
+	"previewTitle": "Aperçu du code"
 }

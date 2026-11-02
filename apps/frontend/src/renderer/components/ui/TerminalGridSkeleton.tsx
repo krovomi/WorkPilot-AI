@@ -1,5 +1,6 @@
 import { cn } from "../../lib/utils";
 import { Skeleton } from "./skeleton";
+import { useTranslation } from "react-i18next";
 
 interface TerminalGridSkeletonProps {
 	readonly panels?: number;
@@ -14,9 +15,10 @@ export function TerminalGridSkeleton({
 	panels = 4,
 	className,
 }: TerminalGridSkeletonProps) {
+	const { t } = useTranslation();
 	return (
 		<output
-			aria-label="Loading terminals..."
+			aria-label={t("common:terminalGrid.loadingAria")}
 			className={cn("grid grid-cols-2 gap-2 p-4 h-full", className)}
 		>
 			{Array.from({ length: panels }).map(() => (

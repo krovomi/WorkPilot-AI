@@ -73,7 +73,7 @@ export function DeepContextInsights({ deepContext }: DeepContextInsightsProps) {
 						variant="outline"
 						className="text-xs bg-indigo-500/10 text-indigo-500 border-indigo-500/30"
 					>
-						{sectionCount} {sectionCount === 1 ? "section" : "sections"}
+						{t("common:prReview.deepContextSections", { count: sectionCount })}
 					</Badge>
 					<span className="text-xs text-muted-foreground">
 						<Clock className="h-3 w-3 inline mr-1" />

@@ -164,5 +164,53 @@
 		"generationFailed": "Failed to generate changelog",
 		"saveFailed": "Failed to save changelog",
 		"loadFailed": "Failed to load data"
+	},
+	"archive": {
+		"archived_one": "{{count}} task archived!",
+		"archived_other": "{{count}} tasks archived!",
+		"description_one": "Archive {{count}} task to clean up your Kanban board. Archived tasks can be viewed using the \"Show Archived\" toggle.",
+		"description_other": "Archive {{count}} tasks to clean up your Kanban board. Archived tasks can be viewed using the \"Show Archived\" toggle.",
+		"button_one": "Archive {{count}} Task",
+		"button_other": "Archive {{count}} Tasks",
+		"title": "Archive Completed Tasks",
+		"archiving": "Archiving..."
+	},
+	"noProject": {
+		"title": "No Project Selected",
+		"description": "Select a project from the sidebar to generate changelogs."
+	},
+	"entry": {
+		"files_one": "{{count}} file",
+		"files_other": "{{count}} files",
+		"hasSpecs": "Has Specs"
+	},
+	"githubRelease": {
+		"description": "Create a new release {{tag}} on GitHub with the changelog as release notes.",
+		"create": "Create Release {{tag}}",
+		"title": "Create GitHub Release",
+		"created": "Release created successfully!",
+		"view": "View Release on GitHub",
+		"creating": "Creating Release..."
+	},
+	"previewPanel": {
+		"loadingImage": "Loading image...",
+		"preview": "Preview",
+		"copy": "Copy to clipboard",
+		"prepend": "Prepend to CHANGELOG.md in project root",
+		"aria": "Changelog preview with drag and drop support",
+		"dropImages": "Drop images here to add to changelog",
+		"pasteImages": "Paste images into the description to save them to the changelog",
+		"placeholder": "Generated changelog will appear here...",
+		"empty": "Click \"Generate Changelog\" to create release notes.",
+		"imageNotFound": "Image not found",
+		"copied": "Copied!",
+		"copyShort": "Copy",
+		"saved": "Saved!",
+		"saveToFile": "Save to CHANGELOG.md"
+	},
+	"success": {
+		"description": "Version {{tag}} has been added to CHANGELOG.md",
+		"title": "Changelog Saved!",
+		"done": "Done"
 	}
 }

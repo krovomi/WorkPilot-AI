@@ -286,7 +286,7 @@ export function CustomProviderConfig() {
 								</Label>
 								<Input
 									id="model-name"
-									placeholder="Custom Model Name"
+									placeholder={t("settings:customProvider.modelNamePlaceholder")}
 									value={newModelName}
 									onChange={(e) => setNewModelName(e.target.value)}
 									className="mt-1 h-8"

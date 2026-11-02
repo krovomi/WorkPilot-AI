@@ -1,6 +1,7 @@
 import type { ProjectSettings } from "../../../shared/types";
 import { Label } from "../ui/label";
 import { Switch } from "../ui/switch";
+import { useTranslation } from "react-i18next";
 
 interface NotificationsSectionProps {
 	readonly settings: ProjectSettings;
@@ -11,13 +12,14 @@ export function NotificationsSection({
 	settings,
 	onUpdateSettings,
 }: NotificationsSectionProps) {
+	const { t } = useTranslation();
 	return (
 		<section className="space-y-4">
-			<h3 className="text-sm font-semibold text-foreground">Notifications</h3>
+			<h3 className="text-sm font-semibold text-foreground">{t("settings:notifications.title")}</h3>
 			<div className="space-y-4">
 				<div className="flex items-center justify-between">
 					<Label className="font-normal text-foreground">
-						On Task Complete
+						{t("settings:notifications.onTaskComplete")}
 					</Label>
 					<Switch
 						checked={settings.notifications.onTaskComplete}
@@ -32,7 +34,7 @@ export function NotificationsSection({
 					/>
 				</div>
 				<div className="flex items-center justify-between">
-					<Label className="font-normal text-foreground">On Task Failed</Label>
+					<Label className="font-normal text-foreground">{t("settings:notifications.onTaskFailed")}</Label>
 					<Switch
 						checked={settings.notifications.onTaskFailed}
 						onCheckedChange={(checked) =>
@@ -47,7 +49,7 @@ export function NotificationsSection({
 				</div>
 				<div className="flex items-center justify-between">
 					<Label className="font-normal text-foreground">
-						On Review Needed
+						{t("settings:notifications.onReviewNeeded")}
 					</Label>
 					<Switch
 						checked={settings.notifications.onReviewNeeded}
@@ -62,7 +64,7 @@ export function NotificationsSection({
 					/>
 				</div>
 				<div className="flex items-center justify-between">
-					<Label className="font-normal text-foreground">Sound</Label>
+					<Label className="font-normal text-foreground">{t("settings:notifications.sound")}</Label>
 					<Switch
 						checked={settings.notifications.sound}
 						onCheckedChange={(checked) =>

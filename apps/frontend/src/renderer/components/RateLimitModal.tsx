@@ -315,7 +315,7 @@ export function RateLimitModal() {
 																rateLimitInfo?.suggestedProfileId && (
 																<Star
 																	className="h-3 w-3 text-yellow-500"
-																	aria-label="Recommended"
+																	aria-label={t("common:rateLimit.recommendedAria")}
 																/>
 															)}
 														</span>

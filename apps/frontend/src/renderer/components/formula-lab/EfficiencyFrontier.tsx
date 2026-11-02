@@ -193,7 +193,7 @@ export function EfficiencyFrontier({
 										p.f.effort,
 									)}\n${formatCost(p.f.expected_cost_usd)} · ${Math.round(
 										p.f.success_probability * 100,
-									)}% success`}
+									)}% ${t("formulaLab:frontier.success")}`}
 								</title>
 							</circle>
 						);

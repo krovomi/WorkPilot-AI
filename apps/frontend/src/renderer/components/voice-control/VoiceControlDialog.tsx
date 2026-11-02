@@ -347,7 +347,7 @@ function ResultView({
 	readonly result: VoiceControlResult;
 	readonly copied: boolean;
 	readonly onCopy: (text: string) => void;
-	readonly t: (key: string) => string;
+	readonly t: (key: string, options?: Record<string, unknown>) => string;
 }) {
 	return (
 		<div className="space-y-4">
@@ -359,7 +359,9 @@ function ResultView({
 					</Label>
 					<div className="flex items-center gap-2">
 						<Badge variant="outline" className="text-xs">
-							{Math.round(result.confidence * 100)}% confidence
+							{t("voiceControl:confidencePercent", {
+										percent: Math.round(result.confidence * 100),
+									})}
 						</Badge>
 						<Button
 							variant="ghost"

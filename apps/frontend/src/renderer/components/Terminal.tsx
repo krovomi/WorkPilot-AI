@@ -26,6 +26,7 @@ import { usePtyProcess } from "./terminal/usePtyProcess";
 import { useTerminalEvents } from "./terminal/useTerminalEvents";
 import { useTerminalFileDrop } from "./terminal/useTerminalFileDrop";
 import { useXterm } from "./terminal/useXterm";
+import { useTranslation } from "react-i18next";
 
 // Minimum dimensions to prevent PTY creation with invalid sizes
 const MIN_COLS = 10;
@@ -78,6 +79,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
 		},
 		ref,
 	) {
+	const { t } = useTranslation();
 		const isMountedRef = useRef(true);
 		const isCreatedRef = useRef(false);
 		// Track deliberate terminal recreation (e.g., worktree switching)
@@ -951,7 +953,7 @@ Please confirm you're ready by saying: I'm ready to work on ${selectedTask.title
 					<div className="absolute inset-0 bg-info/10 z-10 flex items-center justify-center pointer-events-none">
 						<div className="flex items-center gap-2 bg-info/90 text-info-foreground px-3 py-2 rounded-md">
 							<FileDown className="h-4 w-4" />
-							<span className="text-sm font-medium">Drop to insert path</span>
+							<span className="text-sm font-medium">{t("terminal:dropToInsertPath")}</span>
 						</div>
 					</div>
 				)}

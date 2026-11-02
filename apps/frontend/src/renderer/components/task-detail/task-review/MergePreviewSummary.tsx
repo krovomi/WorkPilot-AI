@@ -50,18 +50,19 @@ export function MergePreviewSummary({
 					{hasGitConflicts ? (
 						<>
 							<AlertTriangle className="h-4 w-4 text-warning" />
-							Branch Diverged - AI Will Resolve
+							{t("taskReview:mergePreview.divergedTitle")}
 						</>
 					) : !hasAIConflicts ? (
 						<>
 							<CheckCircle className="h-4 w-4 text-success" />
-							No Conflicts Detected
+							{t("taskReview:mergePreview.noConflicts")}
 						</>
 					) : (
 						<>
 							<AlertTriangle className="h-4 w-4 text-warning" />
-							{mergePreview.conflicts.length} Conflict
-							{mergePreview.conflicts.length !== 1 ? "s" : ""} Found
+							{t("taskReview:mergePreview.conflictsFound", {
+								count: mergePreview.conflicts.length,
+							})}
 						</>
 					)}
 				</span>
@@ -72,7 +73,7 @@ export function MergePreviewSummary({
 						onClick={() => onShowConflictDialog(true)}
 						className="h-7 text-xs"
 					>
-						View Details
+						{t("taskReview:mergePreview.viewDetails")}
 					</Button>
 				)}
 			</div>
@@ -80,7 +81,7 @@ export function MergePreviewSummary({
 			{hasGitConflicts && mergePreview.gitConflicts && (
 				<div className="mb-3 p-2 bg-warning/10 rounded text-xs border border-warning/30">
 					<p className="font-medium text-warning mb-1">
-						Branch has diverged - AI will resolve
+						{t("taskReview:mergePreview.diverged")}
 					</p>
 					<p className="text-muted-foreground mb-2">
 						{t("taskReview:merge.branchHasNewCommitsSinceWorktree", {
@@ -100,31 +101,44 @@ export function MergePreviewSummary({
 						))}
 					</ul>
 					<p className="mt-2 text-muted-foreground">
-						AI will automatically merge these conflicts when you click Stage
-						Changes.
+						{t("taskReview:mergePreview.aiWillMerge")}
 					</p>
 				</div>
 			)}
 
 			<div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-				<div>Files to merge: {mergePreview.summary.totalFiles}</div>
+				<div>
+					{t("taskReview:mergePreview.filesToMerge", {
+						count: mergePreview.summary.totalFiles,
+					})}
+				</div>
 				{hasGitConflicts ? (
-					<div className="text-warning">AI will resolve conflicts</div>
+					<div className="text-warning">{t("taskReview:mergePreview.aiWillResolve")}</div>
 				) : hasAIConflicts ? (
 					<>
-						<div>Auto-mergeable: {mergePreview.summary.autoMergeable}</div>
+						<div>
+							{t("taskReview:mergePreview.autoMergeable", {
+								count: mergePreview.summary.autoMergeable,
+							})}
+						</div>
 						{mergePreview.summary.aiResolved !== undefined && (
-							<div>AI resolved: {mergePreview.summary.aiResolved}</div>
+							<div>
+								{t("taskReview:mergePreview.aiResolved", {
+									count: mergePreview.summary.aiResolved,
+								})}
+							</div>
 						)}
 						{mergePreview.summary.humanRequired !== undefined &&
 							mergePreview.summary.humanRequired > 0 && (
 								<div className="text-warning">
-									Manual review: {mergePreview.summary.humanRequired}
+									{t("taskReview:mergePreview.manualReview", {
+										count: mergePreview.summary.humanRequired,
+									})}
 								</div>
 							)}
 					</>
 				) : (
-					<div className="text-success">Ready to merge</div>
+					<div className="text-success">{t("taskReview:mergePreview.ready")}</div>
 				)}
 			</div>
 		</div>

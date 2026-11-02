@@ -23,6 +23,7 @@ import type {
 	DecisionTree,
 } from "../../stores/mission-control-store";
 import { ScrollArea } from "../ui/scroll-area";
+import { useTranslation } from "react-i18next";
 
 interface DecisionTreeViewerProps {
 	readonly tree: DecisionTree;
@@ -59,10 +60,11 @@ const STATUS_INDICATORS: Record<
 };
 
 export function DecisionTreeViewer({ tree }: DecisionTreeViewerProps) {
+	const { t } = useTranslation();
 	if (!tree.root_id || tree.node_count === 0) {
 		return (
 			<div className="flex items-center justify-center h-32 text-sm text-muted-foreground">
-				No decisions recorded yet
+				{t("missionControl:noDecisions")}
 			</div>
 		);
 	}

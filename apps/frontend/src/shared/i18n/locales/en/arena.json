@@ -84,5 +84,7 @@
 	"errors": {
 		"startFailed": "Failed to start battle",
 		"voteFailed": "Failed to submit vote"
-	}
+	},
+	"tokensUsed": "{{value}} tokens",
+	"modelFallback": "Model {{label}}"
 }

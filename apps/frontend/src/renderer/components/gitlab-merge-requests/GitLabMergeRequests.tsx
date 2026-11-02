@@ -6,6 +6,7 @@ import { CreateMergeRequestDialog } from "./components/CreateMergeRequestDialog"
 import { MergeRequestList } from "./components/MergeRequestList";
 import { MRDetail } from "./components/MRDetail";
 import { useGitLabMRs } from "./hooks/useGitLabMRs";
+import { useTranslation } from "react-i18next";
 
 interface GitLabMergeRequestsProps {
 	readonly projectId: string;
@@ -16,6 +17,7 @@ export function GitLabMergeRequests({
 	projectId,
 	onOpenSettings: _onOpenSettings,
 }: GitLabMergeRequestsProps) {
+	const { t } = useTranslation();
 	const [stateFilter, setStateFilter] = useState<
 		"opened" | "closed" | "merged" | "all"
 	>("opened");
@@ -61,7 +63,7 @@ export function GitLabMergeRequests({
 				<AlertCircle className="h-12 w-12 text-destructive mb-4" />
 				<p className="text-sm text-muted-foreground text-center">{error}</p>
 				<Button variant="outline" onClick={refresh} className="mt-4">
-					Try Again
+					{t("gitlab:mergeRequests.tryAgain")}
 				</Button>
 			</div>
 		);
@@ -87,7 +89,7 @@ export function GitLabMergeRequests({
 						size="sm"
 					>
 						<Plus className="h-4 w-4" />
-						New Merge Request
+						{t("gitlab:mergeRequests.newMR")}
 					</Button>
 				</div>
 			</div>
@@ -115,7 +117,7 @@ export function GitLabMergeRequests({
 					/>
 				) : (
 					<div className="flex items-center justify-center h-full text-muted-foreground">
-						Select a merge request to view details
+						{t("gitlab:mergeRequests.selectMR")}
 					</div>
 				)}
 			</div>

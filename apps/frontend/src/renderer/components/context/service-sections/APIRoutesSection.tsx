@@ -7,12 +7,14 @@ import {
 	CollapsibleContent,
 	CollapsibleTrigger,
 } from "../../ui/collapsible";
+import { useTranslation } from "react-i18next";
 
 interface APIRoutesSectionProps {
 	readonly api: ServiceInfo["api"];
 }
 
 export function APIRoutesSection({ api }: APIRoutesSectionProps) {
+	const { t } = useTranslation();
 	const [expanded, setExpanded] = useState(false);
 
 	if (!api || api.total_routes === 0) {
@@ -28,7 +30,7 @@ export function APIRoutesSection({ api }: APIRoutesSectionProps) {
 			<CollapsibleTrigger className="flex w-full items-center justify-between text-xs font-medium hover:text-foreground">
 				<div className="flex items-center gap-2">
 					<Route className="h-3 w-3" />
-					API Routes ({api.total_routes})
+					{t("context:serviceSections.apiRoutes", { count: api.total_routes })}
 				</div>
 				{expanded ? (
 					<ChevronDown className="h-3 w-3" />

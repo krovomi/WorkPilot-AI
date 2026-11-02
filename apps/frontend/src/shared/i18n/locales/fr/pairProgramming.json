@@ -71,5 +71,8 @@
 	"errors": {
 		"startFailed": "Échec du démarrage de la session de pair programming",
 		"noProject": "Veuillez d'abord sélectionner un projet"
+	},
+	"session": {
+		"goal": "Objectif"
 	}
 }

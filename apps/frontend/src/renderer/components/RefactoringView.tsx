@@ -423,14 +423,14 @@ export function RefactoringView({ projectId }: Readonly<RefactoringViewProps>) {
 											<p className="text-sm text-muted-foreground">
 												{p.description}
 											</p>
-											p.impact && (
-											<p className="text-xs text-muted-foreground">
+											{p.impact && (
+												<p className="text-xs text-muted-foreground">
 												<span className="font-medium text-foreground">
 													{t("refactoring:proposals.impact")}:
 												</span>{" "}
 												{p.impact}
-											</p>
-											)
+												</p>
+											)}
 										</div>
 									);
 								})}

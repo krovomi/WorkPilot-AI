@@ -45,5 +45,6 @@
 	"disableStrict": "Turn off strict mode",
 	"disablingStrict": "Turning off…",
 	"disableStrictHint": "Keeps the local routing table; only the cloud block is lifted.",
-	"disableStrictFailed": "Could not turn it off: {{error}}"
+	"disableStrictFailed": "Could not turn it off: {{error}}",
+	"localAria": "local"
 }

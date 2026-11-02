@@ -22,5 +22,17 @@
 	"agentRole": "Role",
 	"provider": "Provider",
 	"model": "Model",
-	"createAgent": "Create Agent"
+	"createAgent": "Create Agent",
+	"agentNamePlaceholder": "e.g. Architecture Agent",
+	"noEvents": "No events yet",
+	"agentPanel": {
+		"files": "Files ({{count}})",
+		"remove": "Remove",
+		"thinking": "Thinking",
+		"taskPlaceholder": "Task description...",
+		"restart": "Restart",
+		"noModel": "No model",
+		"working": "Working..."
+	},
+	"noDecisions": "No decisions recorded yet"
 }

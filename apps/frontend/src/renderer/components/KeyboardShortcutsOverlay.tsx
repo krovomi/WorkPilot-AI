@@ -1,5 +1,6 @@
 import { Keyboard, X } from "lucide-react";
 import { useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -96,6 +97,7 @@ export function KeyboardShortcutsOverlay({
 	open,
 	onOpenChange,
 }: KeyboardShortcutsOverlayProps) {
+	const { t } = useTranslation();
 	const overlayRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
@@ -138,7 +140,7 @@ export function KeyboardShortcutsOverlay({
 					<div className="flex items-center gap-3">
 						<Keyboard className="h-5 w-5 text-primary" />
 						<h2 className="text-lg font-semibold text-foreground">
-							Keyboard Shortcuts
+							{t("common:shortcutsOverlay.title")}
 						</h2>
 					</div>
 					<button
@@ -178,8 +180,7 @@ export function KeyboardShortcutsOverlay({
 
 				{/* Footer */}
 				<div className="border-t border-border px-6 py-3 text-center text-xs text-muted-foreground">
-					Press <Kbd>Escape</Kbd> to close &middot; Single-key shortcuts work
-					when not typing in an input
+					{t("common:shortcutsOverlay.pressBefore")} <Kbd>{t("common:shortcutsOverlay.escapeKey")}</Kbd> {t("common:shortcutsOverlay.pressAfter")}
 				</div>
 			</div>
 		</div>

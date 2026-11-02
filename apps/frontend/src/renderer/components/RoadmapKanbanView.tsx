@@ -33,6 +33,7 @@ import { SortableFeatureCard } from "./SortableFeatureCard";
 import { Badge } from "./ui/badge";
 import { Card } from "./ui/card";
 import { ScrollArea } from "./ui/scroll-area";
+import { useTranslation } from "react-i18next";
 
 interface RoadmapKanbanViewProps {
 	readonly roadmap: Roadmap;
@@ -91,6 +92,7 @@ function DroppableStatusColumn({
 	onGoToTask,
 	isOver,
 }: DroppableStatusColumnProps) {
+	const { t } = useTranslation();
 	const { setNodeRef } = useDroppable({
 		id: column.id,
 	});
@@ -146,17 +148,17 @@ function DroppableStatusColumn({
 												<Plus className="h-4 w-4 text-primary" />
 											</div>
 											<span className="text-sm font-medium text-primary">
-												Drop here
+												{t("roadmap:kanbanView.dropHere")}
 											</span>
 										</>
 									) : (
 										<>
 											<Inbox className="h-6 w-6 text-muted-foreground/50" />
 											<span className="mt-2 text-sm font-medium text-muted-foreground/70">
-												No features
+												{t("roadmap:kanbanView.noFeatures")}
 											</span>
 											<span className="mt-0.5 text-xs text-muted-foreground/50">
-												Drag features here
+												{t("roadmap:kanbanView.dragHere")}
 											</span>
 										</>
 									)}

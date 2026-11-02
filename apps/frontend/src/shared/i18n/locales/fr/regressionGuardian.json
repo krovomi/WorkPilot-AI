@@ -19,5 +19,6 @@
 	"errors": {
 		"noProject": "Sélectionnez un projet pour lancer le Gardien des Régressions.",
 		"failed": "Échec de l'analyse : {{error}}"
-	}
+	},
+	"unknownException": "inconnue"
 }

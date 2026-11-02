@@ -11,6 +11,7 @@ import {
 	SelectValue,
 } from "../../ui/select";
 import type { LinearProject, LinearTeam } from "../types";
+import { useTranslation } from "react-i18next";
 
 interface TeamProjectSelectorProps {
 	teams: LinearTeam[];
@@ -33,10 +34,11 @@ export function TeamProjectSelector({
 	onTeamChange,
 	onProjectChange,
 }: TeamProjectSelectorProps) {
+	const { t } = useTranslation();
 	return (
 		<div className="flex gap-4 shrink-0">
 			<div className="flex-1 space-y-2">
-				<Label className="text-sm font-medium text-foreground">Team</Label>
+				<Label className="text-sm font-medium text-foreground">{t("settings:linearImport.team")}</Label>
 				<Select
 					value={selectedTeamId}
 					onValueChange={onTeamChange}
@@ -59,7 +61,7 @@ export function TeamProjectSelector({
 
 			<div className="flex-1 space-y-2">
 				<Label className="text-sm font-medium text-foreground">
-					Project (Optional)
+					{t("settings:linearImport.projectOptional")}
 				</Label>
 				<Select
 					value={selectedProjectId || "__all__"}
@@ -74,7 +76,7 @@ export function TeamProjectSelector({
 						/>
 					</SelectTrigger>
 					<SelectContent>
-						<SelectItem value="__all__">All projects</SelectItem>
+						<SelectItem value="__all__">{t("settings:linearImport.allProjects")}</SelectItem>
 						{projects.map((project) => (
 							<SelectItem key={project.id} value={project.id}>
 								{project.name}

@@ -253,7 +253,7 @@ export function ClaudeCodeStep({
 														className="truncate max-w-md"
 														title={versionInfo.path}
 													>
-														Path:{" "}
+														{t("onboarding:cli.pathLabel")}{" "}
 														<span className="font-mono">
 															{versionInfo.path}
 														</span>

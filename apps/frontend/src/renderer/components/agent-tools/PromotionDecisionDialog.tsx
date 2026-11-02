@@ -13,6 +13,7 @@ import {
 	type PromotionDecision,
 	fetchPromotionDecision,
 } from "../../lib/agent-tools-api";
+import { useTranslation } from "react-i18next";
 
 export interface PromotionDecisionDialogProps {
 	readonly open: boolean;
@@ -32,6 +33,7 @@ export function PromotionDecisionDialog({
 	specDir,
 	onAcceptPromotion,
 }: PromotionDecisionDialogProps) {
+	const { t } = useTranslation();
 	const [decision, setDecision] = useState<PromotionDecision | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -85,18 +87,17 @@ export function PromotionDecisionDialog({
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent className="max-w-xl">
 				<DialogHeader>
-					<DialogTitle>QA auto-promotion</DialogTitle>
+					<DialogTitle>{t("agentTools:promotion.title")}</DialogTitle>
 					<DialogDescription>
-						Score the QA outcome and decide whether to skip{" "}
-						<code className="text-xs">human_review</code>. Threshold is set via
-						the <code className="text-xs">WORKPILOT_AUTO_PROMOTE_THRESHOLD</code>{" "}
-						env var (unset = feature off).
+						{t("agentTools:promotion.descriptionBefore")}{" "}
+						<code className="text-xs">human_review</code>{t("agentTools:promotion.descriptionMiddle")} <code className="text-xs">WORKPILOT_AUTO_PROMOTE_THRESHOLD</code>{" "}
+						{t("agentTools:promotion.descriptionAfter")}
 					</DialogDescription>
 				</DialogHeader>
 
 				{loading && (
 					<div className="py-6 text-center text-sm text-muted-foreground">
-						Scoring…
+						{t("agentTools:promotion.scoring")}
 					</div>
 				)}
 
@@ -111,7 +112,7 @@ export function PromotionDecisionDialog({
 						<div className="flex items-center justify-between rounded-md border p-3">
 							<div>
 								<div className="text-xs text-muted-foreground">
-									Confidence score
+									{t("agentTools:promotion.confidence")}
 								</div>
 								<div className="text-2xl font-semibold">
 									{decision.score}
@@ -120,15 +121,15 @@ export function PromotionDecisionDialog({
 							</div>
 							{decision.threshold === null ? (
 								<Badge className="bg-slate-500/15 text-slate-700 dark:text-slate-300">
-									feature off
+									{t("agentTools:promotion.featureOff")}
 								</Badge>
 							) : decision.promote ? (
 								<Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
-									✓ ready to promote (≥ {decision.threshold})
+									{t("agentTools:promotion.ready", { threshold: decision.threshold })}
 								</Badge>
 							) : (
 								<Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300">
-									⚠ below threshold ({decision.threshold})
+									{t("agentTools:promotion.below", { threshold: decision.threshold })}
 								</Badge>
 							)}
 						</div>
@@ -138,7 +139,9 @@ export function PromotionDecisionDialog({
 						{decision.reasons.length > 0 && (
 							<details className="text-xs">
 								<summary className="cursor-pointer text-muted-foreground">
-									Reasoning ({decision.reasons.length})
+									{t("agentTools:promotion.reasoning", {
+										count: decision.reasons.length,
+									})}
 								</summary>
 								<ul className="mt-2 space-y-0.5">
 									{decision.reasons.map((r) => (
@@ -154,7 +157,7 @@ export function PromotionDecisionDialog({
 
 				<DialogFooter>
 					<Button variant="outline" onClick={() => onOpenChange(false)}>
-						Close
+						{t("common:buttons.close")}
 					</Button>
 					<Button
 						disabled={!decision?.promote}
@@ -163,7 +166,7 @@ export function PromotionDecisionDialog({
 							onOpenChange(false);
 						}}
 					>
-						Accept & skip human review
+						{t("agentTools:promotion.accept")}
 					</Button>
 				</DialogFooter>
 			</DialogContent>

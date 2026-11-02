@@ -557,7 +557,7 @@ function PreviewView({
 			<iframe
 				ref={previewRef}
 				className="w-full h-[400px] border rounded-lg bg-white"
-				title="Code Preview"
+				title={t("codePlayground:previewTitle")}
 				sandbox="allow-scripts allow-same-origin"
 			/>
 		</div>
@@ -572,7 +572,7 @@ function FilesView({
 	t,
 }: {
 	readonly result: PlaygroundResult;
-	readonly t: (key: string) => string;
+	readonly t: (key: string, options?: Record<string, unknown>) => string;
 }) {
 	return (
 		<div className="space-y-4">
@@ -597,7 +597,7 @@ function FilesView({
 									<Code className="h-4 w-4 text-primary" />
 									<span className="text-sm font-mono">{file.path}</span>
 									<span className="text-xs text-muted-foreground">
-										({file.size} bytes)
+										{t("codePlayground:fileSizeBytes", { count: file.size })}
 									</span>
 								</div>
 							))}

@@ -15,6 +15,7 @@ import {
 import type { ImageAttachment } from "../../shared/types";
 import { cn } from "../lib/utils";
 import { Button } from "./ui/button";
+import { useTranslation } from "react-i18next";
 
 interface ImageUploadProps {
 	readonly images: ImageAttachment[];
@@ -142,6 +143,7 @@ export function ImageUpload({
 	disabled = false,
 	className,
 }: ImageUploadProps) {
+	const { t } = useTranslation();
 	const [isDragOver, setIsDragOver] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const fileInputRef = useRef<HTMLInputElement>(null);
@@ -342,13 +344,17 @@ export function ImageUpload({
 				<div className="space-y-1">
 					<p className="text-sm font-medium text-foreground">
 						{canAddMore
-							? "Drop images here or click to browse"
-							: "Maximum images reached"}
+							? t("common:imageUpload.dropOrBrowse")
+							: t("common:imageUpload.maxReached")}
 					</p>
 					<p className="text-xs text-muted-foreground">
 						{canAddMore
-							? `${ALLOWED_IMAGE_TYPES_DISPLAY} up to 10MB each (${images.length}/${MAX_IMAGES_PER_TASK})`
-							: `${MAX_IMAGES_PER_TASK} images maximum`}
+							? t("common:imageUpload.limits", {
+									types: ALLOWED_IMAGE_TYPES_DISPLAY,
+									count: images.length,
+									max: MAX_IMAGES_PER_TASK,
+								})
+							: t("common:imageUpload.maxImages", { max: MAX_IMAGES_PER_TASK })}
 					</p>
 				</div>
 			</div>
@@ -414,7 +420,7 @@ export function ImageUpload({
 							{image.size > MAX_IMAGE_SIZE && (
 								<div
 									className="absolute top-1 left-1 p-1 rounded-full bg-warning/90"
-									title="Large file - consider compressing"
+									title={t("common:imageUpload.largeFile")}
 								>
 									<AlertCircle className="h-3 w-3 text-warning-foreground" />
 								</div>

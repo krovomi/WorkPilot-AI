@@ -415,7 +415,7 @@ export function DesignImportPanel() {
 											<div className="relative inline-block">
 												<img
 													src={imagePreview}
-													alt="Design preview"
+													alt={t("designToCode:previewAlt")}
 													className="max-h-48 rounded-lg shadow-md mx-auto"
 												/>
 												<button

@@ -647,7 +647,7 @@ export function CleanProviderCard({
 								{isTesting ? (
 									<>
 										<Loader2 className="w-3 h-3 mr-1 animate-spin" />
-										Test...
+										{t("common:buttons.testing")}
 									</>
 								) : (
 									t("sections.accounts.providerCard.test")

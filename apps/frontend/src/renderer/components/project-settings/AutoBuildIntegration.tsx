@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import type { AutoBuildVersionInfo } from "../../../shared/types";
 import { Button } from "../ui/button";
+import { useTranslation } from "react-i18next";
 
 interface AutoBuildIntegrationProps {
 	readonly autoBuildPath: string | null;
@@ -18,6 +19,7 @@ interface AutoBuildIntegrationProps {
 }
 
 export function AutoBuildIntegration(props: AutoBuildIntegrationProps) {
+	const { t } = useTranslation();
 	const {
 		autoBuildPath,
 		versionInfo,
@@ -29,7 +31,7 @@ export function AutoBuildIntegration(props: AutoBuildIntegrationProps) {
 	return (
 		<section className="space-y-4">
 			<h3 className="text-sm font-semibold text-foreground">
-				WorkPilot AI Integration
+				{t("settings:projectSections.autoBuild.title")}
 			</h3>
 			{autoBuildPath == null ? (
 				<div className="rounded-lg border border-border bg-muted/50 p-4">
@@ -37,11 +39,10 @@ export function AutoBuildIntegration(props: AutoBuildIntegrationProps) {
 						<AlertCircle className="h-5 w-5 text-warning mt-0.5 shrink-0" />
 						<div className="flex-1">
 							<p className="text-sm font-medium text-foreground">
-								Not Initialized
+								{t("settings:projectSections.autoBuild.notInitialized")}
 							</p>
 							<p className="text-xs text-muted-foreground mt-1">
-								Initialize WorkPilot AI to enable task creation and agent
-								workflows.
+								{t("settings:projectSections.autoBuild.notInitializedDescription")}
 							</p>
 							<Button
 								size="sm"
@@ -52,12 +53,12 @@ export function AutoBuildIntegration(props: AutoBuildIntegrationProps) {
 								{isUpdating ? (
 									<>
 										<RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-										Initializing...
+										{t("settings:projectSections.autoBuild.initializing")}
 									</>
 								) : (
 									<>
 										<Download className="mr-2 h-4 w-4" />
-										Initialize WorkPilot AI
+										{t("settings:projectSections.autoBuild.initializeButton")}
 									</>
 								)}
 							</Button>
@@ -70,7 +71,7 @@ export function AutoBuildIntegration(props: AutoBuildIntegrationProps) {
 						<div className="flex items-center gap-2">
 							<CheckCircle2 className="h-4 w-4 text-success" />
 							<span className="text-sm font-medium text-foreground">
-								Initialized
+								{t("settings:projectSections.autoBuild.initialized")}
 							</span>
 						</div>
 						<code className="text-xs bg-background px-2 py-1 rounded">
@@ -80,12 +81,12 @@ export function AutoBuildIntegration(props: AutoBuildIntegrationProps) {
 					{isCheckingVersion ? (
 						<div className="flex items-center gap-2 text-xs text-muted-foreground">
 							<Loader2 className="h-3 w-3 animate-spin" />
-							Checking status...
+							{t("settings:projectSections.autoBuild.checkingStatus")}
 						</div>
 					) : (
 						versionInfo && (
 							<div className="text-xs text-muted-foreground">
-								{versionInfo.isInitialized ? "Initialized" : "Not initialized"}
+								{versionInfo.isInitialized ? t("settings:projectSections.autoBuild.initialized") : t("settings:projectSections.autoBuild.notInitialized")}
 							</div>
 						)
 					)}

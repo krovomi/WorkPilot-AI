@@ -249,7 +249,8 @@
 			"deleted": "deleted",
 			"modified": "modified",
 			"renamed": "renamed"
-		}
+		},
+		"selectedSuffix": " ({{count}} selected)"
 	},
 	"bulkPR": {
 		"title": "Create Pull Requests",
@@ -292,6 +293,114 @@
 		"moreConflicts": "+ {{count}} more",
 		"errors": {
 			"unknown": "An unexpected error occurred during sync"
-		}
+		},
+		"local": "Local",
+		"remote": "Remote"
+	},
+	"prFiles": {
+		"renamedFrom": "(was: {{name}})",
+		"loadingTitle": "Loading PR files",
+		"loading": "Loading pull request files..."
+	},
+	"taskPanel": {
+		"noFilesInSubtask": "No files in this subtask",
+		"subtasksProgress": "{{completed}}/{{total}} subtasks",
+		"stuck": "Stuck",
+		"incomplete": "Incomplete",
+		"done": "Done",
+		"less": "Less",
+		"more": "More",
+		"subtaskLabel": "Subtask: {{name}}",
+		"progress": "Progress",
+		"phasePlanning": "Planning (0-20%)",
+		"phaseCoding": "Coding (20-80%)",
+		"phaseReview": "AI Review (80-95%)",
+		"phaseComplete": "Complete (95-100%)",
+		"editFilesTitle": "Edit Files: {{name}}",
+		"moreFiles": "+{{count}} more",
+		"noSubtasks": "No subtasks defined",
+		"noSubtasksHint": "Implementation subtasks will appear here after planning",
+		"editFiles": "Edit files",
+		"filesDeleted": "{{count}} file(s) deleted",
+		"filesModified": "{{count}} file(s) modified",
+		"saveChanges": "Save Changes",
+		"subtasksCompleted": "{{completed}}/{{total}} subtasks completed",
+		"noSubtasksYet": "No subtasks yet"
+	},
+	"conflicts": {
+		"detected_one": "{{count}} potential conflict detected.",
+		"detected_other": "{{count}} potential conflicts detected.",
+		"autoMergeable": "{{count}} can be auto-merged.",
+		"title": "Merge Conflicts Preview",
+		"autoMerge": "auto-merge",
+		"location": "Location:",
+		"reason": "Reason:",
+		"strategy": "Strategy:",
+		"none": "No conflicts detected",
+		"stageWithAi": "Stage with AI Merge",
+		"mergeWithAi": "Merge with AI"
+	},
+	"discard": {
+		"title": "Discard Build",
+		"confirmBefore": "Are you sure you want to discard all changes for",
+		"warning": "This will permanently delete the isolated workspace and all uncommitted changes. The task will be moved back to Planning status.",
+		"filesChanged": "Files changed:",
+		"lines": "Lines:",
+		"discarding": "Discarding..."
+	},
+	"mergePreview": {
+		"conflictsFound_one": "{{count}} Conflict Found",
+		"conflictsFound_other": "{{count}} Conflicts Found",
+		"filesToMerge": "Files to merge: {{count}}",
+		"autoMergeable": "Auto-mergeable: {{count}}",
+		"aiResolved": "AI resolved: {{count}}",
+		"manualReview": "Manual review: {{count}}",
+		"divergedTitle": "Branch Diverged - AI Will Resolve",
+		"noConflicts": "No Conflicts Detected",
+		"viewDetails": "View Details",
+		"diverged": "Branch has diverged - AI will resolve",
+		"aiWillMerge": "AI will automatically merge these conflicts when you click Stage Changes.",
+		"aiWillResolve": "AI will resolve conflicts",
+		"ready": "Ready to merge"
+	},
+	"staged": {
+		"title": "Changes Staged Successfully",
+		"aiMessage": "AI-generated commit message",
+		"copied": "Copied!",
+		"copy": "Copy",
+		"commitPlaceholder": "Commit message...",
+		"editHint": "Edit as needed, then copy and use with",
+		"nextSteps": "Next steps:",
+		"stepOpen": "Open your project in your IDE or terminal",
+		"stepReview": "Review the staged changes with",
+		"and": "and",
+		"stepCommit": "Commit when ready:"
+	},
+	"workspace": {
+		"updating": "Updating...",
+		"markDone": "Mark as Done",
+		"loadingPr": "Loading PR information...",
+		"proceedToCoding": "Proceed to Coding",
+		"stagedTitle": "Changes Staged in Project",
+		"stagedDescription": "This task's changes have been staged in your main project",
+		"stepReview": "Review staged changes with",
+		"stepPush": "Push to remote when satisfied",
+		"cleaningUp": "Cleaning up...",
+		"deleteAndDone": "Delete Worktree & Mark Done",
+		"markingDone": "Marking done...",
+		"markDoneOnly": "Mark Done Only",
+		"resetting": "Resetting...",
+		"reviewAgain": "Review Again",
+		"doneHint": "\"Delete Worktree & Mark Done\" cleans up the isolated workspace. \"Mark Done Only\" keeps it for reference.",
+		"openIn": "Open in {{app}}",
+		"uncommitted_one": "{{count}} uncommitted change in main project",
+		"uncommitted_other": "{{count}} uncommitted changes in main project",
+		"commitOrStash": "Commit or stash them in your terminal before staging to avoid conflicts.",
+		"stagedOn": " on {{date}}",
+		"humanReviewTitle": "Human Review Required",
+		"noWorkspaceTitle": "No Workspace Found",
+		"humanReviewDescription": "Human review required prior to coding. Review your spec.md for any necessary changes.",
+		"noWorkspaceDescription": "No isolated workspace was found for this task. The changes may have been made directly in your project.",
+		"commitsCount": "{{count}} commits"
 	}
 }

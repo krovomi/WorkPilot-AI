@@ -237,9 +237,9 @@ export function PRFilesModal({
 			<Dialog open={open} onOpenChange={onOpenChange}>
 				<DialogContent className="max-w-7xl max-h-[95vh] w-[95vw] h-[90vh] overflow-hidden flex flex-col">
 					<DialogHeader>
-						<DialogTitle className="sr-only">Loading PR files</DialogTitle>
+						<DialogTitle className="sr-only">{t("taskReview:prFiles.loadingTitle")}</DialogTitle>
 						<DialogDescription className="sr-only">
-							Loading pull request files...
+							{t("taskReview:prFiles.loading")}
 						</DialogDescription>
 					</DialogHeader>
 					<div className="flex flex-col items-center justify-center py-8 flex-1">
@@ -438,7 +438,9 @@ export function PRFilesModal({
 												</span>
 												{file.previous_filename && (
 													<span className="text-xs text-muted-foreground">
-														(was: {file.previous_filename})
+														{t("taskReview:prFiles.renamedFrom", {
+													name: file.previous_filename,
+												})}
 													</span>
 												)}
 												<ChevronRight

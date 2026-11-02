@@ -20,7 +20,11 @@
 	"tabs": {
 		"kanban": "Kanban",
 		"timeline": "Timeline",
-		"table": "Table"
+		"table": "Table",
+		"featuresCount": "{{count}} features",
+		"allFeatures": "All Features",
+		"byPriority": "By Priority",
+		"insight": "Insight"
 	},
 	"features": {
 		"title": "Features",
@@ -102,7 +106,28 @@
 			"optionalInfo": "You can generate a roadmap without competitor analysis if you prefer. The roadmap will still be based on your project structure and best practices.",
 			"skipButton": "No, Skip Analysis",
 			"enableButton": "Yes, Enable Analysis"
-		}
+		},
+		"analyzed": "Analyzed {{count}} competitors to identify market gaps and opportunities",
+		"painPointsCount": "Identified Pain Points ({{count}})",
+		"frequency": "Frequency: {{value}}",
+		"resultsTitle": "Competitor Analysis Results",
+		"visit": "Visit",
+		"noPainPoints": "No pain points identified",
+		"source": "Source:",
+		"opportunity": "Opportunity:",
+		"summaryTitle": "Market Insights Summary",
+		"topPainPoints": "Top Pain Points:",
+		"differentiators": "Differentiator Opportunities:",
+		"marketTrends": "Market Trends:",
+		"optionsTitle": "Competitor Analysis Options",
+		"existingFrom": "This project has an existing competitor analysis from",
+		"useExisting": "Use existing analysis",
+		"recommended": "(Recommended)",
+		"useExistingDescription": "Reuse the competitor insights you already have. Faster and no additional web searches.",
+		"runNew": "Run new analysis",
+		"runNewDescription": "Perform fresh web searches to get updated competitor information. Takes longer.",
+		"skip": "Skip competitor analysis",
+		"skipDescription": "Generate roadmap without any competitor insights."
 	},
 	"generation": {
 		"title": "Generating Roadmap",
@@ -154,5 +179,40 @@
 		"totalPhases": "Total Phases",
 		"completedPhases": "Completed Phases",
 		"currentPhase": "Current Phase"
+	},
+	"kanbanView": {
+		"dropHere": "Drop here",
+		"noFeatures": "No features",
+		"dragHere": "Drag features here"
+	},
+	"featureCard": {
+		"phase": "Phase: {{name}}",
+		"votes": "{{count}} votes from user feedback",
+		"importedFrom": "Imported from {{provider}}",
+		"competitorInsight": "This feature addresses competitor pain points",
+		"task": "Task",
+		"build": "Build",
+		"impact": "{{impact}} impact",
+		"competitorInsightTitle": "Competitor Insight",
+		"external": "External"
+	},
+	"featureDetail": {
+		"severity": "{{severity}} severity",
+		"deleteDescription": "This will permanently remove \"{{title}}\" from your roadmap.",
+		"rationale": "Rationale",
+		"complexity": "Complexity",
+		"impact": "Impact",
+		"userStories": "User Stories",
+		"addressesPainPoints": "Addresses Competitor Pain Points",
+		"convert": "Convert to WorkPilot AI Task",
+		"deleteTitle": "Delete Feature?"
+	},
+	"phaseCard": {
+		"featuresProgress": "{{completed}}/{{total}} features",
+		"featuresCount": "Features ({{count}})",
+		"moreFeatures": "+{{count}} more features",
+		"viewTask": "View Task",
+		"progress": "Progress",
+		"milestones": "Milestones"
 	}
 }

@@ -82,5 +82,6 @@
 		"nextjs": "Next.js",
 		"nuxt": "Nuxt",
 		"svelte": "Svelte"
-	}
+	},
+	"previewAlt": "Aperçu de la maquette"
 }

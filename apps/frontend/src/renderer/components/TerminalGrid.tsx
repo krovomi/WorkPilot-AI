@@ -582,7 +582,7 @@ export function TerminalGrid({
 			<div
 				className="flex h-full flex-col items-center justify-center gap-6 p-8"
 				role="region"
-				aria-label="Terminal grid empty state"
+				aria-label={t("common:terminalGrid.emptyAria")}
 			>
 				<div className="flex flex-col items-center gap-3 text-center">
 					<div className="rounded-full bg-card p-4">
@@ -653,8 +653,9 @@ export function TerminalGrid({
 										>
 											<span>{dateInfo.label}</span>
 											<span className="text-xs text-muted-foreground">
-												{dateInfo.sessionCount} session
-												{dateInfo.sessionCount === 1 ? "" : "s"}
+												{t("common:terminalGrid.sessionCount", {
+												count: dateInfo.sessionCount,
+											})}
 											</span>
 										</DropdownMenuItem>
 									))}
@@ -699,7 +700,7 @@ export function TerminalGrid({
 							<Plus className="h-3 w-3" />
 							{t("terminalGrid.newTerminal")}
 							<kbd className="ml-1 text-[10px] text-muted-foreground">
-								{navigator.platform.includes("Mac") ? "âŒ˜" : "Ctrl"}+T
+								{navigator.platform.includes("Mac") ? "⌘" : "Ctrl"}+T
 							</kbd>
 						</Button>
 						{/* File explorer toggle button */}
@@ -840,7 +841,7 @@ export function TerminalGrid({
 						<div className="flex items-center gap-2 bg-card border border-primary rounded-md px-3 py-2 shadow-lg">
 							<TerminalSquare className="h-4 w-4 text-primary" />
 							<span className="text-sm font-medium">
-								{draggingTerminal.title || "Terminal"}
+								{draggingTerminal.title || t("common:terminalGrid.defaultTitle")}
 							</span>
 						</div>
 					)}

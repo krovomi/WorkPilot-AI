@@ -1987,7 +1987,7 @@ export const CanvasPanel: React.FC = () => {
 										value={newProjectLocation}
 										onChange={(e) => setNewProjectLocation(e.target.value)}
 										className="w-full p-2 border rounded text-sm"
-										placeholder="C:\\ ou /"
+										placeholder={t("visualProgramming:locationPlaceholder")}
 									/>
 									<Button variant="secondary" onClick={handleBrowseLocation}>
 										{t("browse", "Parcourir")}

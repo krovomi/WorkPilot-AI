@@ -469,11 +469,10 @@ export function GitHubSetupModal({
 			<DialogHeader>
 				<DialogTitle className="flex items-center gap-2">
 					<Globe className="h-5 w-5" />
-					Confirm Repository
+					{t("dialogs:githubSetup.confirmRepo")}
 				</DialogTitle>
 				<DialogDescription>
-					We detected a GitHub repository for this project. Please confirm or
-					change it.
+					{t("dialogs:githubSetup.confirmRepoDescription")}
 				</DialogDescription>
 			</DialogHeader>
 
@@ -482,7 +481,7 @@ export function GitHubSetupModal({
 					<div className="flex items-center gap-3">
 						<CheckCircle2 className="h-6 w-6 text-green-500" />
 						<div>
-							<p className="font-medium">Repository Detected</p>
+							<p className="font-medium">{t("dialogs:githubSetup.repoDetected")}</p>
 							<p className="text-sm text-muted-foreground font-mono">
 								{detectedRepo}
 							</p>
@@ -503,11 +502,11 @@ export function GitHubSetupModal({
 
 			<DialogFooter>
 				<Button variant="outline" onClick={handleChangeRepo}>
-					Use Different Repository
+					{t("dialogs:githubSetup.useDifferentRepo")}
 				</Button>
 				<Button onClick={handleConfirmRepo}>
 					<CheckCircle2 className="mr-2 h-4 w-4" />
-					Confirm & Continue
+					{t("dialogs:githubSetup.confirmContinue")}
 				</Button>
 			</DialogFooter>
 		</>
@@ -518,11 +517,10 @@ export function GitHubSetupModal({
 			<DialogHeader>
 				<DialogTitle className="flex items-center gap-2">
 					<Globe className="h-5 w-5" />
-					Connect to GitHub
+					{t("dialogs:githubSetup.connectTitle")}
 				</DialogTitle>
 				<DialogDescription>
-					Your project needs a GitHub repository. Create a new one or link to an
-					existing repository.
+					{t("dialogs:githubSetup.needsRepo")}
 				</DialogDescription>
 			</DialogHeader>
 
@@ -537,9 +535,9 @@ export function GitHubSetupModal({
 							aria-label={t("githubSetup.createRepoAriaLabel")}
 						>
 							<Plus className="h-8 w-8 text-muted-foreground" />
-							<span className="text-sm font-medium">Create New Repo</span>
+							<span className="text-sm font-medium">{t("dialogs:githubSetup.createNewRepo")}</span>
 							<span className="text-xs text-muted-foreground text-center">
-								Create a new repository on GitHub
+								{t("dialogs:githubSetup.createNewRepoDescription")}
 							</span>
 						</button>
 						<button
@@ -549,9 +547,9 @@ export function GitHubSetupModal({
 							aria-label={t("githubSetup.linkRepoAriaLabel")}
 						>
 							<Link className="h-8 w-8 text-muted-foreground" />
-							<span className="text-sm font-medium">Link Existing</span>
+							<span className="text-sm font-medium">{t("dialogs:githubSetup.linkExisting")}</span>
 							<span className="text-xs text-muted-foreground text-center">
-								Connect to an existing repository
+								{t("dialogs:githubSetup.linkExistingDescription")}
 							</span>
 						</button>
 					</div>
@@ -573,7 +571,7 @@ export function GitHubSetupModal({
 			<DialogFooter>
 				{onSkip && (
 					<Button variant="outline" onClick={onSkip} disabled={isCreatingRepo}>
-						Skip for now
+						{t("dialogs:githubSetup.skipForNow")}
 					</Button>
 				)}
 				{repoAction === "create" && (
@@ -584,12 +582,12 @@ export function GitHubSetupModal({
 						{isCreatingRepo ? (
 							<>
 								<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-								Creating...
+								{t("common:buttons.creating")}
 							</>
 						) : (
 							<>
 								<Plus className="mr-2 h-4 w-4" />
-								Create Repository
+								{t("dialogs:githubSetup.createRepo")}
 							</>
 						)}
 					</Button>
@@ -602,12 +600,12 @@ export function GitHubSetupModal({
 						{isCreatingRepo ? (
 							<>
 								<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-								Linking...
+								{t("dialogs:githubSetup.linking")}
 							</>
 						) : (
 							<>
 								<Link className="mr-2 h-4 w-4" />
-								Link Repository
+								{t("dialogs:githubSetup.linkRepo")}
 							</>
 						)}
 					</Button>
@@ -621,10 +619,10 @@ export function GitHubSetupModal({
 						{isLoadingRepo ? (
 							<>
 								<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-								Checking...
+								{t("dialogs:githubSetup.checking")}
 							</>
 						) : (
-							"Retry Detection"
+							t("dialogs:githubSetup.retryDetection")
 						)}
 					</Button>
 				)}
@@ -641,16 +639,16 @@ export function GitHubSetupModal({
 					className="text-primary hover:underline"
 					aria-label={t("githubSetup.goBackAriaLabel")}
 				>
-					← Back
+					{t("dialogs:githubSetup.back")}
 				</button>
-				<span>Create a new repository</span>
+				<span>{t("dialogs:githubSetup.createRepoTitle")}</span>
 			</div>
 
 			{/* Owner selection */}
 			<OwnerSelection />
 
 			<div className="space-y-2">
-				<Label htmlFor="repo-name">Repository Name</Label>
+				<Label htmlFor="repo-name">{t("dialogs:githubSetup.repoName")}</Label>
 				<div className="flex items-center gap-2">
 					<span className="text-sm text-muted-foreground">
 						{selectedOwner || "..."} /
@@ -672,11 +670,11 @@ export function GitHubSetupModal({
 
 	const OwnerSelection = () => (
 		<div className="space-y-2">
-			<Label>Owner</Label>
+			<Label>{t("dialogs:githubSetup.owner")}</Label>
 			{isLoadingOrgs ? (
 				<div className="flex items-center gap-2 text-sm text-muted-foreground">
 					<Loader2 className="h-4 w-4 animate-spin" />
-					Loading accounts...
+					{t("dialogs:githubSetup.loadingAccounts")}
 				</div>
 			) : (
 				<div
@@ -733,7 +731,7 @@ export function GitHubSetupModal({
 			)}
 			{organizations.length > 0 && (
 				<p className="text-xs text-muted-foreground">
-					Select your personal account or an organization
+					{t("dialogs:githubSetup.ownerHint")}
 				</p>
 			)}
 		</div>
@@ -741,7 +739,7 @@ export function GitHubSetupModal({
 
 	const VisibilitySelection = () => (
 		<div className="space-y-2">
-			<Label>Visibility</Label>
+			<Label>{t("dialogs:githubSetup.visibility")}</Label>
 			<div
 				className="flex gap-2"
 				role="radiogroup"
@@ -764,7 +762,7 @@ export function GitHubSetupModal({
 					})}
 				>
 					<Lock className="h-4 w-4" />
-					<span className="text-sm">Private</span>
+					<span className="text-sm">{t("dialogs:githubSetup.private")}</span>
 				</button>
 				{/* biome-ignore lint/a11y/useSemanticElements: custom styled radio button within radiogroup */}
 				<button
@@ -783,7 +781,7 @@ export function GitHubSetupModal({
 					})}
 				>
 					<Globe className="h-4 w-4" />
-					<span className="text-sm">Public</span>
+					<span className="text-sm">{t("dialogs:githubSetup.public")}</span>
 				</button>
 			</div>
 		</div>
@@ -798,13 +796,13 @@ export function GitHubSetupModal({
 					className="text-primary hover:underline"
 					aria-label={t("githubSetup.goBackAriaLabel")}
 				>
-					← Back
+					{t("dialogs:githubSetup.back")}
 				</button>
-				<span>Link to existing repository</span>
+				<span>{t("dialogs:githubSetup.linkRepoTitle")}</span>
 			</div>
 
 			<div className="space-y-2">
-				<Label htmlFor="existing-repo">Repository</Label>
+				<Label htmlFor="existing-repo">{t("dialogs:githubSetup.repositoryLabel")}</Label>
 				<Input
 					id="existing-repo"
 					value={existingRepoName}
@@ -813,7 +811,7 @@ export function GitHubSetupModal({
 					disabled={isCreatingRepo}
 				/>
 				<p className="text-xs text-muted-foreground">
-					Enter the full repository path (e.g., octocat/hello-world)
+					{t("dialogs:githubSetup.repoPathHint")}
 				</p>
 			</div>
 		</div>
@@ -824,11 +822,10 @@ export function GitHubSetupModal({
 			<DialogHeader>
 				<DialogTitle className="flex items-center gap-2">
 					<GitBranch className="h-5 w-5" />
-					Select Base Branch
+					{t("dialogs:githubSetup.selectBranch")}
 				</DialogTitle>
 				<DialogDescription>
-					Choose which branch WorkPilot AI should use as the base for creating
-					task branches.
+					{t("dialogs:githubSetup.branchDescription")}
 				</DialogDescription>
 			</DialogHeader>
 
@@ -837,7 +834,7 @@ export function GitHubSetupModal({
 				{detectedRepo && (
 					<div className="flex items-center gap-2 text-sm">
 						<Globe className="h-4 w-4 text-muted-foreground" />
-						<span className="text-muted-foreground">Repository:</span>
+						<span className="text-muted-foreground">{t("dialogs:githubSetup.repositoryPrefix")}</span>
 						<code className="px-2 py-0.5 bg-muted rounded font-mono text-xs">
 							{detectedRepo}
 						</code>
@@ -854,12 +851,10 @@ export function GitHubSetupModal({
 						<Sparkles className="h-4 w-4 text-info mt-0.5" />
 						<div className="text-xs text-muted-foreground">
 							<p className="font-medium text-foreground">
-								Why select a branch?
+								{t("dialogs:githubSetup.whyBranch")}
 							</p>
 							<p className="mt-1">
-								WorkPilot AI creates isolated workspaces for each task.
-								Selecting the right base branch ensures your tasks start with
-								the latest code from your main development line.
+								{t("dialogs:githubSetup.branchExplanation")}
 							</p>
 						</div>
 					</div>
@@ -875,7 +870,7 @@ export function GitHubSetupModal({
 			<DialogFooter>
 				{onSkip && (
 					<Button variant="outline" onClick={onSkip}>
-						Skip for now
+						{t("dialogs:githubSetup.skipForNow")}
 					</Button>
 				)}
 				<Button
@@ -883,7 +878,7 @@ export function GitHubSetupModal({
 					disabled={!selectedBranch || isLoadingBranches}
 				>
 					<CheckCircle2 className="mr-2 h-4 w-4" />
-					Complete Setup
+					{t("dialogs:githubSetup.completeSetup")}
 				</Button>
 			</DialogFooter>
 		</>
@@ -891,7 +886,7 @@ export function GitHubSetupModal({
 
 	const BranchSelector = () => (
 		<div className="space-y-2">
-			<Label>Base Branch</Label>
+			<Label>{t("dialogs:githubSetup.baseBranch")}</Label>
 			<Select
 				value={selectedBranch || ""}
 				onValueChange={setSelectedBranch}
@@ -901,10 +896,10 @@ export function GitHubSetupModal({
 					{isLoadingBranches ? (
 						<div className="flex items-center gap-2">
 							<Loader2 className="h-3 w-3 animate-spin" />
-							<span>Loading branches...</span>
+							<span>{t("dialogs:githubSetup.loadingBranches")}</span>
 						</div>
 					) : (
-						<SelectValue placeholder="Select a branch" />
+						<SelectValue placeholder={t("dialogs:githubSetup.selectBranchPlaceholder")} />
 					)}
 				</SelectTrigger>
 				<SelectContent>
@@ -915,7 +910,7 @@ export function GitHubSetupModal({
 								{branch === recommendedBranch && (
 									<span className="flex items-center gap-1 text-xs text-success">
 										<Sparkles className="h-3 w-3" />
-										Recommended
+										{t("dialogs:githubSetup.recommended")}
 									</span>
 								)}
 							</div>
@@ -924,12 +919,12 @@ export function GitHubSetupModal({
 				</SelectContent>
 			</Select>
 			<p className="text-xs text-muted-foreground">
-				All tasks will be created from branches like{" "}
+				{t("dialogs:githubSetup.branchHintBefore")}{" "}
 				<code className="px-1 bg-muted rounded">auto-claude/task-name</code>
 				{selectedBranch && (
 					<>
 						{" "}
-						based on{" "}
+						{t("dialogs:githubSetup.branchHintBasedOn")}{" "}
 						<code className="px-1 bg-muted rounded">{selectedBranch}</code>
 					</>
 				)}
@@ -942,7 +937,7 @@ export function GitHubSetupModal({
 			<DialogHeader>
 				<DialogTitle className="flex items-center gap-2">
 					<CheckCircle2 className="h-5 w-5 text-success" />
-					Setup Complete
+					{t("dialogs:githubSetup.setupComplete")}
 				</DialogTitle>
 			</DialogHeader>
 
@@ -951,8 +946,7 @@ export function GitHubSetupModal({
 					<CheckCircle2 className="h-8 w-8 text-success" />
 				</div>
 				<p className="text-sm text-muted-foreground text-center">
-					WorkPilot AI is ready to use! You can now create tasks that will be
-					automatically based on{" "}
+					{t("dialogs:githubSetup.readyBefore")}{" "}
 					<code className="px-1 bg-muted rounded">{selectedBranch}</code>.
 				</p>
 			</div>

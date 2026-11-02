@@ -199,7 +199,7 @@ function ParticipantCard({
 						}
 					>
 						{participant.tokensUsed > 0
-							? `${participant.usageEstimated ? "~" : ""}${participant.tokensUsed.toLocaleString()} tokens`
+							? `${participant.usageEstimated ? "~" : ""}${t("arena:tokensUsed", { value: participant.tokensUsed.toLocaleString() })}`
 							: "—"}
 					</span>
 					{/* A cost the provider did not report is shown as unknown, never
@@ -734,7 +734,8 @@ function BattleTab() {
 									<strong>
 										{activeBattle.participants.find(
 											(p) => p.label === activeBattle.winnerLabel,
-										)?.modelName ?? `Model ${activeBattle.winnerLabel}`}
+										)?.modelName ??
+											t("arena:modelFallback", { label: activeBattle.winnerLabel })}
 									</strong>
 									<span className="opacity-70">
 										{" · "}
@@ -912,7 +913,7 @@ function BattleHistoryRow({ battle }: { readonly battle: ArenaBattle }) {
 							</p>
 							<p className="font-mono text-muted-foreground/70 mt-0.5">
 								{p.usageEstimated ? "~" : ""}
-								{p.tokensUsed.toLocaleString()} tokens
+								{t("arena:tokensUsed", { value: p.tokensUsed.toLocaleString() })}
 								{p.costUsd === undefined
 									? ""
 									: ` · $${p.costUsd.toFixed(5)}`}

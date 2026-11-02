@@ -21,6 +21,7 @@ import {
 } from "./constants";
 import { PRReviewCard } from "./PRReviewCard";
 import { formatDate } from "./utils";
+import { useTranslation } from "react-i18next";
 
 interface MemoryCardProps {
 	readonly memory: MemoryEpisode;
@@ -142,6 +143,7 @@ function isPRReviewMemory(memory: MemoryEpisode): boolean {
 }
 
 export function MemoryCard({ memory }: MemoryCardProps) {
+	const { t } = useTranslation();
 	const [expanded, setExpanded] = useState(false);
 	const parsed = useMemo(
 		() => parseMemoryContent(memory.content),
@@ -234,12 +236,12 @@ export function MemoryCard({ memory }: MemoryCardProps) {
 							{expanded ? (
 								<>
 									<ChevronUp className="h-4 w-4" />
-									Collapse
+									{t("context:memoryCard.collapse")}
 								</>
 							) : (
 								<>
 									<ChevronDown className="h-4 w-4" />
-									Expand
+									{t("context:memoryCard.expand")}
 								</>
 							)}
 						</Button>
@@ -254,7 +256,7 @@ export function MemoryCard({ memory }: MemoryCardProps) {
 							<div>
 								<SectionHeader
 									icon={CheckCircle2}
-									title="What Worked"
+									title={t("context:memoryCard.whatWorked")}
 									count={parsed.what_worked.length}
 								/>
 								<ul className="space-y-0.5">
@@ -275,7 +277,7 @@ export function MemoryCard({ memory }: MemoryCardProps) {
 							<div>
 								<SectionHeader
 									icon={XCircle}
-									title="What Failed"
+									title={t("context:memoryCard.whatFailed")}
 									count={parsed.what_failed.length}
 								/>
 								<ul className="space-y-0.5">
@@ -300,7 +302,7 @@ export function MemoryCard({ memory }: MemoryCardProps) {
 											? CheckCircle2
 											: AlertTriangle
 									}
-									title="Approach"
+									title={t("context:memoryCard.approach")}
 								/>
 								<div className="pl-4 space-y-2">
 									<p className="text-sm text-foreground">
@@ -326,7 +328,7 @@ export function MemoryCard({ memory }: MemoryCardProps) {
 							<div>
 								<SectionHeader
 									icon={Lightbulb}
-									title="Recommendations"
+									title={t("context:memoryCard.recommendations")}
 									count={
 										(parsed.recommendations_for_next_session?.length ?? 0) +
 										(parsed.discoveries?.recommendations?.length ?? 0)
@@ -353,7 +355,7 @@ export function MemoryCard({ memory }: MemoryCardProps) {
 								<div>
 									<SectionHeader
 										icon={Sparkles}
-										title="Patterns"
+										title={t("context:memoryCard.patterns")}
 										count={parsed.discoveries.patterns_discovered.length}
 									/>
 									<div className="flex flex-wrap gap-2 pl-4">
@@ -386,7 +388,7 @@ export function MemoryCard({ memory }: MemoryCardProps) {
 								<div>
 									<SectionHeader
 										icon={AlertTriangle}
-										title="Gotchas"
+										title={t("context:memoryCard.gotchas")}
 										count={parsed.discoveries.gotchas_discovered.length}
 									/>
 									<ul className="space-y-0.5">
@@ -416,7 +418,7 @@ export function MemoryCard({ memory }: MemoryCardProps) {
 								<div>
 									<SectionHeader
 										icon={FileCode}
-										title="Changed Files"
+										title={t("context:memoryCard.changedFiles")}
 										count={parsed.discoveries.changed_files.length}
 									/>
 									<div className="flex flex-wrap gap-1.5 pl-4">
@@ -439,7 +441,7 @@ export function MemoryCard({ memory }: MemoryCardProps) {
 								<div>
 									<SectionHeader
 										icon={FileCode}
-										title="File Insights"
+										title={t("context:memoryCard.fileInsights")}
 										count={parsed.discoveries.file_insights.length}
 									/>
 									<div className="space-y-2 pl-4">
@@ -478,7 +480,7 @@ export function MemoryCard({ memory }: MemoryCardProps) {
 								<div>
 									<SectionHeader
 										icon={CheckCircle2}
-										title="Subtasks Completed"
+										title={t("context:memoryCard.subtasksCompleted")}
 										count={parsed.subtasks_completed.length}
 									/>
 									<div className="flex flex-wrap gap-1.5 pl-4">

@@ -1,4 +1,5 @@
 import { cn } from "../../lib/utils";
+import { useTranslation } from "react-i18next";
 
 interface SkeletonProps extends React.OutputHTMLAttributes<HTMLOutputElement> {
 	/** Width of the skeleton element */
@@ -21,9 +22,10 @@ export function Skeleton({
 	style,
 	...props
 }: Readonly<SkeletonProps>) {
+	const { t } = useTranslation();
 	return (
 		<output
-			aria-label="Loading..."
+			aria-label={t("common:labels.loading")}
 			className={cn(
 				"animate-pulse bg-muted rounded-md border-0 p-0 m-0",
 				circle && "rounded-full",
@@ -74,9 +76,10 @@ export function SkeletonCard({
 	children,
 	...props
 }: Readonly<SkeletonCardProps>) {
+	const { t } = useTranslation();
 	return (
 		<output
-			aria-label="Loading..."
+			aria-label={t("common:labels.loading")}
 			className={cn(
 				"rounded-lg border border-border bg-card p-4 space-y-3",
 				className,

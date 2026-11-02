@@ -80,8 +80,8 @@ export function BrowserTab({ projectPath }: BrowserTabProps) {
 			{/* Browser toolbar */}
 			<div className="flex items-center gap-1.5 p-2 rounded-t-lg bg-gradient-to-r from-[var(--bg-secondary)] to-[var(--bg-secondary)] border border-[var(--border-primary)] border-b-0">
 				{/* Navigation buttons */}
-				<ToolbarButton icon={ArrowLeft} disabled title="Back" />
-				<ToolbarButton icon={ArrowRight} disabled title="Forward" />
+				<ToolbarButton icon={ArrowLeft} disabled title={t("common:buttons.back")} />
+				<ToolbarButton icon={ArrowRight} disabled title={t("browserAgent:browser.forward")} />
 				<ToolbarButton
 					icon={RotateCw}
 					onClick={handleRefresh}
@@ -215,7 +215,7 @@ export function BrowserTab({ projectPath }: BrowserTabProps) {
 				{browserScreenshot && (
 					<img
 						src={browserScreenshot}
-						alt="Browser screenshot"
+						alt={t("browserAgent:browser.screenshotAlt")}
 						className="max-w-full max-h-full object-contain"
 					/>
 				)}

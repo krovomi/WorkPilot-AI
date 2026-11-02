@@ -4,6 +4,7 @@
 
 import { Badge } from "../../ui/badge";
 import type { GitLabMRReviewFinding } from "../hooks/useGitLabMRs";
+import { useTranslation } from "react-i18next";
 
 interface FindingsSummaryProps {
 	findings: GitLabMRReviewFinding[];
@@ -14,6 +15,7 @@ export function FindingsSummary({
 	findings,
 	selectedCount,
 }: FindingsSummaryProps) {
+	const { t } = useTranslation();
 	// Count findings by severity
 	const counts = {
 		critical: findings.filter((f) => f.severity === "critical").length,
@@ -31,7 +33,7 @@ export function FindingsSummary({
 						variant="outline"
 						className="bg-red-500/10 text-red-500 border-red-500/30"
 					>
-						{counts.critical} Critical
+						{t("gitlab:findings.counts.critical", { count: counts.critical })}
 					</Badge>
 				)}
 				{counts.high > 0 && (
@@ -39,7 +41,7 @@ export function FindingsSummary({
 						variant="outline"
 						className="bg-orange-500/10 text-orange-500 border-orange-500/30"
 					>
-						{counts.high} High
+						{t("gitlab:findings.counts.high", { count: counts.high })}
 					</Badge>
 				)}
 				{counts.medium > 0 && (
@@ -47,7 +49,7 @@ export function FindingsSummary({
 						variant="outline"
 						className="bg-yellow-500/10 text-yellow-500 border-yellow-500/30"
 					>
-						{counts.medium} Medium
+						{t("gitlab:findings.counts.medium", { count: counts.medium })}
 					</Badge>
 				)}
 				{counts.low > 0 && (
@@ -55,12 +57,15 @@ export function FindingsSummary({
 						variant="outline"
 						className="bg-blue-500/10 text-blue-500 border-blue-500/30"
 					>
-						{counts.low} Low
+						{t("gitlab:findings.counts.low", { count: counts.low })}
 					</Badge>
 				)}
 			</div>
 			<span className="text-xs text-muted-foreground">
-				{selectedCount}/{counts.total} selected
+				{t("gitlab:findings.selectedOfTotal", {
+					selected: selectedCount,
+					total: counts.total,
+				})}
 			</span>
 		</div>
 	);

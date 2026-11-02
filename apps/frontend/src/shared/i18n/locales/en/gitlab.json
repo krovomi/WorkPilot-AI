@@ -55,7 +55,8 @@
 		"creating": "Creating...",
 		"cancel": "Cancel",
 		"done": "Done",
-		"close": "Close"
+		"close": "Close",
+		"investigateAria": "Investigate issue"
 	},
 	"settings": {
 		"enableIssues": "Enable GitLab Issues",
@@ -127,7 +128,23 @@
 			"closed": "Closed",
 			"merged": "Merged",
 			"all": "All"
-		}
+		},
+		"tryAgain": "Try Again",
+		"create": {
+			"title": "Create Merge Request",
+			"description": "Create a new merge request in GitLab",
+			"titleLabel": "Title",
+			"titlePlaceholder": "Merge request title",
+			"sourceBranch": "Source Branch",
+			"targetBranch": "Target Branch",
+			"descriptionLabel": "Description (optional)",
+			"descriptionPlaceholder": "Describe the changes in this merge request..."
+		},
+		"byAuthor": "by {{author}}",
+		"listTitle": "Merge Requests",
+		"searchPlaceholder": "Search merge requests...",
+		"noMatch": "No matching merge requests",
+		"empty": "No merge requests found"
 	},
 	"mrReview": {
 		"runReview": "Run AI Review",
@@ -184,7 +201,23 @@
 			"lowDesc": "À considérer",
 			"medium": "Recommandé",
 			"mediumDesc": "Améliore la qualité"
-		}
+		},
+		"followupWithCommits_one": "Follow-up Review ({{count}} new commit)",
+		"followupWithCommits_other": "Follow-up Review ({{count}} new commits)",
+		"postCount_one": "Post {{count}} Finding",
+		"postCount_other": "Post {{count}} Findings",
+		"postedCount_one": "Posted {{count}} finding to GitLab",
+		"postedCount_other": "Posted {{count}} findings to GitLab",
+		"newCommitsBadge_one": "{{count}} new commit",
+		"newCommitsBadge_other": "{{count}} new commits",
+		"resolvedCount": "{{count}} resolved",
+		"stillOpenCount": "{{count}} still open",
+		"newIssueCount_one": "{{count}} new issue",
+		"newIssueCount_other": "{{count}} new issues",
+		"reviewedAt": "Reviewed: {{date}}",
+		"atCommit": "at commit {{sha}}",
+		"runFollowup": "Run Follow-up Review",
+		"reviewFailed": "Review failed"
 	},
 	"findings": {
 		"summary": "selected",
@@ -213,6 +246,14 @@
 			"pattern": "Pattern",
 			"performance": "Performance",
 			"logic": "Logic"
-		}
+		},
+		"counts": {
+			"critical": "{{count}} Critical",
+			"high": "{{count}} High",
+			"medium": "{{count}} Medium",
+			"low": "{{count}} Low"
+		},
+		"selectedOfTotal": "{{selected}}/{{total}} selected",
+		"selectImportant": "Select Critical/High ({{count}})"
 	}
 }

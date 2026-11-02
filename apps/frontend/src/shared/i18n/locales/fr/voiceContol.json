@@ -35,5 +35,6 @@
 	"errors": {
 		"noProject": "Veuillez sélectionner un projet pour utiliser le contrôle vocal",
 		"generic": "Une erreur est survenue lors du traitement vocal"
-	}
+	},
+	"confidencePercent": "{{percent}} % de confiance"
 }

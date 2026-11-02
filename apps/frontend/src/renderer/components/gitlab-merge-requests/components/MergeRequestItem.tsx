@@ -1,6 +1,7 @@
 import { ExternalLink, GitMerge, GitPullRequest, Lock } from "lucide-react";
 import type { GitLabMergeRequest } from "../../../../shared/types";
 import { cn } from "../../../lib/utils";
+import { useTranslation } from "react-i18next";
 
 interface MergeRequestItemProps {
 	mr: GitLabMergeRequest;
@@ -13,6 +14,7 @@ export function MergeRequestItem({
 	isSelected,
 	onClick,
 }: MergeRequestItemProps) {
+	const { t } = useTranslation();
 	const stateColors = {
 		opened: "text-success",
 		closed: "text-destructive",
@@ -77,7 +79,9 @@ export function MergeRequestItem({
 						)}
 					</div>
 					<div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-						<span>by {mr.author.username}</span>
+						<span>
+					{t("gitlab:mergeRequests.byAuthor", { author: mr.author.username })}
+				</span>
 						<span>•</span>
 						<span>{formatDate(mr.createdAt)}</span>
 					</div>

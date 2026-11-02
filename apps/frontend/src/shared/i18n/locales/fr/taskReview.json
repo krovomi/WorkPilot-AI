@@ -249,7 +249,8 @@
 			"deleted": "supprimé",
 			"modified": "modifié",
 			"renamed": "renommé"
-		}
+		},
+		"selectedSuffix": " ({{count}} sélectionné(s))"
 	},
 	"bulkPR": {
 		"title": "Créer des Pull Requests",
@@ -292,6 +293,114 @@
 		"moreConflicts": "+ {{count}} autres",
 		"errors": {
 			"unknown": "Une erreur inattendue s'est produite lors de la synchronisation"
-		}
+		},
+		"local": "Locale",
+		"remote": "Distante"
+	},
+	"prFiles": {
+		"renamedFrom": "(anciennement : {{name}})",
+		"loadingTitle": "Chargement des fichiers de la PR",
+		"loading": "Chargement des fichiers de la pull request..."
+	},
+	"taskPanel": {
+		"noFilesInSubtask": "Aucun fichier dans cette sous-tâche",
+		"subtasksProgress": "{{completed}}/{{total}} sous-tâches",
+		"stuck": "Bloquée",
+		"incomplete": "Incomplète",
+		"done": "Terminé",
+		"less": "Moins",
+		"more": "Plus",
+		"subtaskLabel": "Sous-tâche : {{name}}",
+		"progress": "Avancement",
+		"phasePlanning": "Planification (0-20 %)",
+		"phaseCoding": "Code (20-80 %)",
+		"phaseReview": "Revue IA (80-95 %)",
+		"phaseComplete": "Terminé (95-100 %)",
+		"editFilesTitle": "Modifier les fichiers : {{name}}",
+		"moreFiles": "+{{count}} de plus",
+		"noSubtasks": "Aucune sous-tâche définie",
+		"noSubtasksHint": "Les sous-tâches d'implémentation apparaîtront ici après la planification",
+		"editFiles": "Modifier les fichiers",
+		"filesDeleted": "{{count}} fichier(s) supprimé(s)",
+		"filesModified": "{{count}} fichier(s) modifié(s)",
+		"saveChanges": "Enregistrer les modifications",
+		"subtasksCompleted": "{{completed}}/{{total}} sous-tâches terminées",
+		"noSubtasksYet": "Aucune sous-tâche pour l'instant"
+	},
+	"conflicts": {
+		"detected_one": "{{count}} conflit potentiel détecté.",
+		"detected_other": "{{count}} conflits potentiels détectés.",
+		"autoMergeable": "{{count}} fusionnable(s) automatiquement.",
+		"title": "Aperçu des conflits de fusion",
+		"autoMerge": "fusion auto",
+		"location": "Emplacement :",
+		"reason": "Raison :",
+		"strategy": "Stratégie :",
+		"none": "Aucun conflit détecté",
+		"stageWithAi": "Indexer avec fusion IA",
+		"mergeWithAi": "Fusionner avec l'IA"
+	},
+	"discard": {
+		"title": "Abandonner le build",
+		"confirmBefore": "Voulez-vous vraiment abandonner toutes les modifications de",
+		"warning": "L'espace de travail isolé et toutes les modifications non commitées seront supprimés définitivement. La tâche repassera au statut Planification.",
+		"filesChanged": "Fichiers modifiés :",
+		"lines": "Lignes :",
+		"discarding": "Abandon en cours..."
+	},
+	"mergePreview": {
+		"conflictsFound_one": "{{count}} conflit trouvé",
+		"conflictsFound_other": "{{count}} conflits trouvés",
+		"filesToMerge": "Fichiers à fusionner : {{count}}",
+		"autoMergeable": "Fusionnables automatiquement : {{count}}",
+		"aiResolved": "Résolus par l'IA : {{count}}",
+		"manualReview": "Revue manuelle : {{count}}",
+		"divergedTitle": "Branche divergente : l'IA résoudra",
+		"noConflicts": "Aucun conflit détecté",
+		"viewDetails": "Voir le détail",
+		"diverged": "La branche a divergé : l'IA résoudra",
+		"aiWillMerge": "L'IA fusionnera automatiquement ces conflits quand vous cliquerez sur Indexer les modifications.",
+		"aiWillResolve": "L'IA résoudra les conflits",
+		"ready": "Prêt à fusionner"
+	},
+	"staged": {
+		"title": "Modifications indexées",
+		"aiMessage": "Message de commit généré par l'IA",
+		"copied": "Copié !",
+		"copy": "Copier",
+		"commitPlaceholder": "Message de commit...",
+		"editHint": "Modifiez au besoin, puis copiez et utilisez avec",
+		"nextSteps": "Étapes suivantes :",
+		"stepOpen": "Ouvrez votre projet dans votre IDE ou votre terminal",
+		"stepReview": "Relisez les modifications indexées avec",
+		"and": "et",
+		"stepCommit": "Commitez quand c'est prêt :"
+	},
+	"workspace": {
+		"updating": "Mise à jour...",
+		"markDone": "Marquer comme terminée",
+		"loadingPr": "Chargement des informations de la PR...",
+		"proceedToCoding": "Passer au code",
+		"stagedTitle": "Modifications indexées dans le projet",
+		"stagedDescription": "Les modifications de cette tâche ont été indexées dans votre projet principal",
+		"stepReview": "Relisez les modifications indexées avec",
+		"stepPush": "Poussez vers le dépôt distant quand tout vous convient",
+		"cleaningUp": "Nettoyage...",
+		"deleteAndDone": "Supprimer le worktree et terminer",
+		"markingDone": "Passage à terminée...",
+		"markDoneOnly": "Terminer seulement",
+		"resetting": "Réinitialisation...",
+		"reviewAgain": "Relire de nouveau",
+		"doneHint": "« Supprimer le worktree et terminer » nettoie l'espace de travail isolé. « Terminer seulement » le garde pour référence.",
+		"openIn": "Ouvrir dans {{app}}",
+		"uncommitted_one": "{{count}} modification non commitée dans le projet principal",
+		"uncommitted_other": "{{count}} modifications non commitées dans le projet principal",
+		"commitOrStash": "Commitez-les ou mettez-les de côté (stash) dans votre terminal avant d'indexer, pour éviter les conflits.",
+		"stagedOn": " le {{date}}",
+		"humanReviewTitle": "Revue humaine requise",
+		"noWorkspaceTitle": "Aucun espace de travail trouvé",
+		"humanReviewDescription": "Une revue humaine est requise avant le code. Relisez votre spec.md pour y apporter les modifications nécessaires.",
+		"noWorkspaceDescription": "Aucun espace de travail isolé n'a été trouvé pour cette tâche. Les modifications ont peut-être été faites directement dans votre projet.",
+		"commitsCount": "{{count}} commits"
 	}
 }
