@@ -1,16 +1,14 @@
+import { formatAppDate } from "@/lib/date-format";
+
 /**
- * Helper function for formatting dates with validation and locale support
+ * A PR date with its time, in the app's language (fr-FR or en-US).
  * @param dateString - ISO date string to format
- * @param locale - Locale for formatting (defaults to 'en-US')
  * @returns Formatted date string or empty string if invalid
  */
-export function formatDate(
-	dateString: string,
-	locale: string = "en-US",
-): string {
+export function formatDate(dateString: string): string {
 	const date = new Date(dateString);
 	if (Number.isNaN(date.getTime())) return "";
-	return date.toLocaleDateString(locale, {
+	return formatAppDate(date, {
 		month: "short",
 		day: "numeric",
 		year: "numeric",

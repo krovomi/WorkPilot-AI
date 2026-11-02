@@ -22,6 +22,7 @@ import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
 import { ScrollArea } from "./ui/scroll-area";
+import { formatAppDateTime } from "@/lib/date-format";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -70,7 +71,7 @@ function formatDuration(seconds: number): string {
 function formatDateTime(iso: string): string {
 	try {
 		const d = new Date(iso);
-		return d.toLocaleString(undefined, {
+		return formatAppDateTime(d, {
 			month: "short",
 			day: "numeric",
 			hour: "2-digit",

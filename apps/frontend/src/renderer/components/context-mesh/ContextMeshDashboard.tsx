@@ -15,6 +15,7 @@ import {
 	useContextMeshStore,
 } from "../../stores/context-mesh-store";
 import { useProjectStore } from "../../stores/project-store";
+import { formatAppDate } from "@/lib/date-format";
 
 const TABS: ContextMeshTab[] = [
 	"overview",
@@ -84,7 +85,7 @@ export function ContextMeshDashboard(): React.ReactElement {
 		const parsed = new Date(value);
 		return Number.isNaN(parsed.getTime())
 			? t("contextMesh:projects.never")
-			: parsed.toLocaleDateString();
+			: formatAppDate(parsed);
 	}
 
 	return (

@@ -1,5 +1,6 @@
 import type { Incident } from "@shared/types/self-healing";
 import { useTranslation } from "react-i18next";
+import { formatAppDateTime } from "@/lib/date-format";
 
 interface IncidentCardProps {
 	readonly incident: Incident;
@@ -129,7 +130,7 @@ export function IncidentCard({
 				)}
 			</div>
 			<div className="mt-2 text-xs text-muted-foreground">
-				{new Date(incident.created_at).toLocaleString()}
+				{formatAppDateTime(incident.created_at)}
 			</div>
 		</div>
 	);

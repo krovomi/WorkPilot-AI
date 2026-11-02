@@ -32,6 +32,7 @@ import { MethodBadge } from "./api-explorer-shared";
 import { EnvironmentManager } from "./EnvironmentManager";
 import { ExportDialog } from "./ExportDialog";
 import { RequestPanel, CustomSelect } from "./RequestPanel";
+import { formatAppTime } from "@/lib/date-format";
 
 // ── Endpoint Detail ──────────────────────────────────────────────────────────
 
@@ -520,10 +521,10 @@ export function ApiExplorer() {
 										<span className="ml-1 opacity-60">
 											·{" "}
 											{t("apiExplorer:scan.scannedAt", {
-												time: new Date(lastProjectScanAt).toLocaleTimeString(
-													[],
-													{ hour: "2-digit", minute: "2-digit" },
-												),
+												time: formatAppTime(lastProjectScanAt, {
+													hour: "2-digit",
+													minute: "2-digit",
+												}),
 											})}
 										</span>
 									)}
