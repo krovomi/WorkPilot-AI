@@ -12,10 +12,15 @@ Two report formats are understood:
       projects produce TRX by default, never JUnit, so a JUnit-only
       detective always reported "0 tests" on a C# solution.
 
-Output protocol (one JSON object per line, prefixed):
-    FLAKY_EVENT:{"type": "progress", "data": {"status": "..."}}
+Three modes: ``scan`` reads the reports already in the project (the runs
+kept by ``run`` included), ``run`` runs the project's test command N times
+(``flaky_test_detective.suite_runs``) and analyses those runs, ``detect``
+lists the test commands the project's stack has.
+
+Output protocol (one JSON value per line, prefixed):
+    FLAKY_EVENT:{"type": "progress", "data": {"status": "...", "code": "..."}}
     FLAKY_RESULT:{...full report dict...}
-    FLAKY_ERROR:<message>
+    FLAKY_ERROR:"<code>: <message>"   (a JSON string; it may hold newlines)
 """
 
 from __future__ import annotations
@@ -23,6 +28,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
@@ -33,6 +39,14 @@ sys.path.insert(0, str(backend_path))
 from flaky_test_detective.flaky_analyzer import (  # noqa: E402
     FlakyAnalyzer,
     TestRun,
+)
+from flaky_test_detective.suite_runs import (  # noqa: E402
+    COMMAND_IDS,
+    HISTORY_DIR,
+    TestCommand,
+    detect_test_commands,
+    install_cancel_handler,
+    run_once,
 )
 
 REPORT_GLOBS = [
@@ -311,43 +325,204 @@ def _no_reports_message(project_path: Path) -> str:
     )
 
 
+def _progress(code: str, status: str, **data: Any) -> None:
+    """A progress event: ``code`` and its data for the UI to word, ``status``
+    in English for any older reader."""
+    _emit_event("progress", {"status": status, "code": code, **data})
+
+
+def _always_failing(runs: list[TestRun], min_runs: int) -> list[str]:
+    """Tests that failed in every run: broken, not flaky, but worth showing."""
+    outcomes: dict[str, list[bool]] = {}
+    for run in runs:
+        outcomes.setdefault(run.test_name, []).append(run.passed)
+    return sorted(
+        name
+        for name, results in outcomes.items()
+        if len(results) >= min_runs and not any(results)
+    )[:50]
+
+
+def _build_report(
+    project_path: Path,
+    runs: list[TestRun],
+    threshold: float,
+    min_runs: int,
+    *,
+    mode: str,
+    run_count: int,
+    report_count: int,
+) -> dict[str, Any]:
+    detected = [c.to_dict() for c in detect_test_commands(project_path)]
+    base: dict[str, Any] = {
+        "mode": mode,
+        "runCount": run_count,
+        "reportCount": report_count,
+        "detectedCommands": detected,
+        "minRuns": min_runs,
+    }
+    if not runs:
+        return {
+            **base,
+            "totalTests": 0,
+            "flakyCount": 0,
+            "flakyTests": [],
+            "alwaysFailing": [],
+            "summaryCode": "no_reports",
+            "summary": _no_reports_message(project_path),
+        }
+    analyzer = FlakyAnalyzer(flakiness_threshold=threshold, min_runs=min_runs)
+    report = analyzer.analyze(runs)
+    return {
+        **base,
+        "totalTests": report.total_tests_analysed,
+        "flakyCount": report.flaky_count,
+        "flakyTests": [_flaky_test_to_dict(t) for t in report.flaky_tests],
+        "alwaysFailing": _always_failing(runs, min_runs),
+        "summaryCode": "flaky" if report.flaky_count else "no_flaky",
+        "summary": report.summary,
+    }
+
+
 def run_scan(project_path: Path, threshold: float, min_runs: int) -> dict[str, Any]:
-    _emit_event("start", {"status": "Discovering test reports..."})
-    report_files = _discover_reports(project_path)
+    """Read the reports already in the project, the kept runs included."""
     _emit_event(
-        "progress",
-        {"status": f"Parsing {len(report_files)} test reports..."},
+        "start", {"status": "Discovering test reports...", "code": "discovering"}
+    )
+    report_files = _discover_reports(project_path)
+    _progress(
+        "parsing",
+        f"Parsing {len(report_files)} test reports...",
+        reports=len(report_files),
     )
 
     runs: list[TestRun] = []
     for idx, file in enumerate(report_files):
         runs.extend(_parse_report_file(file, run_id=f"{file.name}-{idx}"))
 
-    if not runs:
-        _emit_event("complete", {"flakyCount": 0, "totalTests": 0})
-        return {
-            "totalTests": 0,
-            "flakyCount": 0,
-            "flakyTests": [],
-            "summary": _no_reports_message(project_path),
-        }
-
-    _emit_event(
-        "progress",
-        {"status": f"Analysing {len(runs)} test runs..."},
+    result = _build_report(
+        project_path,
+        runs,
+        threshold,
+        min_runs,
+        mode="scan",
+        run_count=len(report_files),
+        report_count=len(report_files),
     )
-    analyzer = FlakyAnalyzer(flakiness_threshold=threshold, min_runs=min_runs)
-    report = analyzer.analyze(runs)
-
-    result = {
-        "totalTests": report.total_tests_analysed,
-        "flakyCount": report.flaky_count,
-        "flakyTests": [_flaky_test_to_dict(t) for t in report.flaky_tests],
-        "summary": report.summary,
-    }
     _emit_event(
         "complete",
-        {"flakyCount": report.flaky_count, "totalTests": report.total_tests_analysed},
+        {"flakyCount": result["flakyCount"], "totalTests": result["totalTests"]},
+    )
+    return result
+
+
+class RunError(Exception):
+    """The suite could not produce a single report; the message says why."""
+
+
+def _pick_command(project_path: Path, command_id: str) -> TestCommand:
+    """A command of the project's stack, never a command line from outside:
+    the caller names one of the detected commands, or takes the first."""
+    detected = detect_test_commands(project_path)
+    if command_id in ("", "auto"):
+        if not detected:
+            raise RunError("no_command: no test command was detected in this project")
+        return detected[0]
+    for command in detected:
+        if command.id == command_id:
+            return command
+    raise RunError(f"no_command: the {command_id} test command was not detected")
+
+
+def run_repeated(
+    project_path: Path,
+    *,
+    runs: int,
+    command_id: str,
+    threshold: float,
+    min_runs: int,
+    timeout_s: float,
+) -> dict[str, Any]:
+    """Run the suite ``runs`` times and analyse those runs together."""
+    command = _pick_command(project_path, command_id)
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    history = project_path / HISTORY_DIR / stamp
+    _emit_event(
+        "start",
+        {
+            "status": f"Running `{command.command}` {runs} times...",
+            "code": "running",
+            "command": command.command,
+            "runs": runs,
+        },
+    )
+    install_cancel_handler()
+
+    all_runs: list[TestRun] = []
+    produced = 0
+    last_tail = ""
+    for index in range(1, runs + 1):
+        _progress(
+            "run_started",
+            f"Run {index}/{runs}: {command.command}",
+            run=index,
+            runs=runs,
+        )
+        outcome = run_once(
+            command,
+            project_path,
+            history / f"run-{index:02d}",
+            timeout_s=timeout_s,
+            # The first run built the solution; the others test that build.
+            no_build=produced > 0,
+            report_globs=REPORT_GLOBS,
+        )
+        if outcome.error:
+            raise RunError(f"start_failed: {outcome.error}")
+        results: list[TestRun] = []
+        for file in outcome.reports:
+            results.extend(_parse_report_file(file, run_id=f"{stamp}-{index}"))
+        if results:
+            produced += 1
+        else:
+            last_tail = outcome.output_tail
+        all_runs.extend(results)
+        failed = sum(1 for r in results if not r.passed)
+        _progress(
+            "run_finished",
+            f"Run {index}/{runs}: {len(results) - failed} passed, {failed} failed",
+            run=index,
+            runs=runs,
+            passed=len(results) - failed,
+            failed=failed,
+            exitCode=outcome.exit_code,
+            timedOut=outcome.timed_out,
+            durationS=round(outcome.duration_s, 1),
+        )
+        if index == 1 and not results:
+            # Nothing to analyse if the very first run wrote no report: a
+            # build error, a missing tool. Running it again would not help.
+            break
+
+    if not all_runs:
+        raise RunError(
+            "no_results: the test command produced no test report.\n" + last_tail
+        )
+
+    _progress("analysing", f"Analysing {len(all_runs)} test results...")
+    result = _build_report(
+        project_path,
+        all_runs,
+        threshold,
+        min_runs,
+        mode="run",
+        run_count=produced,
+        report_count=produced,
+    )
+    result["command"] = command.command
+    _emit_event(
+        "complete",
+        {"flakyCount": result["flakyCount"], "totalTests": result["totalTests"]},
     )
     return result
 
@@ -355,6 +530,23 @@ def run_scan(project_path: Path, threshold: float, min_runs: int) -> dict[str, A
 def main() -> None:
     parser = argparse.ArgumentParser(description="Flaky Tests Runner")
     parser.add_argument("--project-path", required=True, help="Project root path")
+    parser.add_argument(
+        "--mode",
+        choices=("scan", "run", "detect"),
+        default="scan",
+        help="scan: read existing reports; run: run the suite N times; "
+        "detect: list the project's test commands",
+    )
+    parser.add_argument("--runs", type=int, default=5, help="Runs in run mode (2-50)")
+    parser.add_argument(
+        "--command-id",
+        choices=("auto", *COMMAND_IDS),
+        default="auto",
+        help="Which detected test command to run",
+    )
+    parser.add_argument(
+        "--timeout", type=float, default=1800, help="Seconds allowed per run"
+    )
     parser.add_argument(
         "--threshold",
         type=float,
@@ -375,7 +567,21 @@ def main() -> None:
         sys.exit(1)
 
     try:
-        result = run_scan(project_path, args.threshold, args.min_runs)
+        if args.mode == "detect":
+            commands = [c.to_dict() for c in detect_test_commands(project_path)]
+            _emit("FLAKY_RESULT", {"detectedCommands": commands})
+            return
+        if args.mode == "run":
+            result = run_repeated(
+                project_path,
+                runs=max(2, min(args.runs, 50)),
+                command_id=args.command_id,
+                threshold=args.threshold,
+                min_runs=args.min_runs,
+                timeout_s=max(10.0, args.timeout),
+            )
+        else:
+            result = run_scan(project_path, args.threshold, args.min_runs)
         _emit("FLAKY_RESULT", result)
     except Exception as exc:  # noqa: BLE001
         _emit("FLAKY_ERROR", str(exc))

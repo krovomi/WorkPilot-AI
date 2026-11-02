@@ -23,7 +23,7 @@ import type {
 } from "../../shared/types";
 import { authedFetch } from "../server-connection";
 import { relayServerJob } from "../server-features";
-import { chunkForLine } from "./output-lines";
+import { chunkForLine, createLineReader } from "./output-lines";
 
 const SESSION_ID = /^[A-Za-z0-9-]{1,64}$/;
 const MAX_MESSAGE = 20_000;
@@ -311,14 +311,15 @@ export async function askServer(
 	events.status({ phase: "thinking", message: "Processing your message..." });
 
 	const job = relayServerJob(project, "insights", { jobId });
-	let pending = "";
-	job.stdout.on("data", (data: Buffer) => {
-		const lines = (pending + data.toString("utf-8")).split("\n");
-		pending = lines.pop() ?? "";
+	const lineReader = createLineReader();
+	const handleLines = (lines: string[]) => {
 		for (const line of lines) {
 			const chunk = chunkForLine(line);
 			if (chunk) events.chunk(chunk);
 		}
+	};
+	job.stdout.on("data", (data: Buffer) => {
+		handleLines(lineReader.push(data.toString("utf-8")));
 	});
 	let failure = "";
 	job.stderr.on("data", (data: Buffer) => {
@@ -326,6 +327,7 @@ export async function askServer(
 	});
 	await new Promise<void>((resolve) => {
 		job.on("exit", (code: number | null) => {
+			handleLines(lineReader.flush());
 			void (async () => {
 				if (code === 0) {
 					events.chunk({ type: "done" });

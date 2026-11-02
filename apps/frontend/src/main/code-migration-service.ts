@@ -4,8 +4,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { app } from "electron";
 import { MODEL_ID_MAP } from "../shared/constants";
-import type { AppSettings } from "../shared/types";
-import { readSettingsFile } from "./settings-utils";
+import { pythonRunnerEnv } from "./utils/python-runner-env";
 
 export interface CodeMigrationResult {
 	status: string;
@@ -121,27 +120,17 @@ export class CodeMigrationService extends EventEmitter {
 		if (request.dryRun) args.push("--dry-run");
 		if (request.batchSize) args.push("--batch-size", String(request.batchSize));
 
-		const env = this.buildProcessEnvironment();
+		const env = await this.buildProcessEnvironment();
 		await this.executeProcess(args, env, sourcePath);
 	}
 
-	private buildProcessEnvironment(): Record<string, string> {
-		const env: Record<string, string> = {
-			...(process.env as Record<string, string>),
-		};
-		try {
-			// Through settings-utils: it decrypts the stored keys.
-			const settings = readSettingsFile() as Partial<AppSettings> | undefined;
-			if (settings) {
-				if (settings.globalClaudeOAuthToken)
-					env.CLAUDE_OAUTH_TOKEN = settings.globalClaudeOAuthToken;
-				if (settings.globalAnthropicApiKey)
-					env.ANTHROPIC_API_KEY = settings.globalAnthropicApiKey;
-			}
-		} catch {
-			/* ignore */
-		}
-		return env;
+	/**
+	 * The runner's environment: the provider the user chose and its key, the
+	 * Claude sign-in only when that provider needs it, and no other credential
+	 * of the app (`pythonRunnerEnv`).
+	 */
+	private buildProcessEnvironment(): Promise<Record<string, string>> {
+		return pythonRunnerEnv(this.getAutoBuildSourcePath() ?? "");
 	}
 
 	private async executeProcess(

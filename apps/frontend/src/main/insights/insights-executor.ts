@@ -16,7 +16,7 @@ import {
 	detectRateLimit,
 } from "../rate-limit-detector";
 import type { InsightsConfig } from "./config";
-import { chunkForLine } from "./output-lines";
+import { chunkForLine, createLineReader } from "./output-lines";
 
 /**
  * Message processor result
@@ -150,13 +150,9 @@ export class InsightsExecutor extends EventEmitter {
 			let allInsightsOutput = "";
 			let stderrOutput = "";
 
-			proc.stdout?.on("data", (data: Buffer) => {
-				const text = data.toString("utf-8");
-				// Collect output for rate limit detection (keep last 10KB)
-				allInsightsOutput = (allInsightsOutput + text).slice(-10000);
-
-				// Process output lines
-				for (const line of text.split("\n")) {
+			const lineReader = createLineReader();
+			const handleLines = (lines: string[]) => {
+				for (const line of lines) {
 					const chunk = chunkForLine(line);
 					if (!chunk) continue;
 					if (chunk.type === "task_suggestion") {
@@ -173,6 +169,15 @@ export class InsightsExecutor extends EventEmitter {
 					}
 					this.emit("stream-chunk", projectId, chunk);
 				}
+			};
+
+			proc.stdout?.on("data", (data: Buffer) => {
+				const text = data.toString("utf-8");
+				// Collect output for rate limit detection (keep last 10KB)
+				allInsightsOutput = (allInsightsOutput + text).slice(-10000);
+				// Whole lines only: a marker split across two chunks would
+				// otherwise be read as text, and a blank line lost.
+				handleLines(lineReader.push(text));
 			});
 
 			proc.stderr?.on("data", (data: Buffer) => {
@@ -184,6 +189,7 @@ export class InsightsExecutor extends EventEmitter {
 			});
 
 			proc.on("close", (code) => {
+				handleLines(lineReader.flush());
 				this.activeSessions.delete(projectId);
 
 				// Cleanup temp file
