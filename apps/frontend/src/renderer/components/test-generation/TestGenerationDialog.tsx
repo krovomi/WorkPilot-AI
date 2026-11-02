@@ -725,7 +725,7 @@ export function TestGenerationDialog({
 									})}
 								</Button>
 								<Button variant="outline" onClick={closeDialog}>
-									{t("common:buttons:close", { defaultValue: "Close" })}
+									{t("common:buttons.close", { defaultValue: "Close" })}
 								</Button>
 							</div>
 
@@ -790,7 +790,7 @@ export function TestGenerationDialog({
 
 				<DialogFooter>
 					<Button variant="outline" onClick={closeDialog}>
-						{t("common:buttons:close", { defaultValue: "Close" })}
+						{t("common:buttons.close", { defaultValue: "Close" })}
 					</Button>
 				</DialogFooter>
 			</DialogContent>

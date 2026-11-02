@@ -141,15 +141,15 @@ export function ClaudeCodeStep({
 		switch (status) {
 			case "loading":
 				return t(
-					"claudeCode.detecting",
+					"cli.detecting",
 					"Checking Claude Code installation...",
 				);
 			case "installed":
-				return t("claudeCode.status.installed", "Installed");
+				return t("cli.status.installed", "Installed");
 			case "outdated":
-				return t("claudeCode.status.outdated", "Update Available");
+				return t("cli.status.outdated", "Update Available");
 			case "not-found":
-				return t("claudeCode.status.notFound", "Not Installed");
+				return t("cli.status.notFound", "Not Installed");
 			case "error":
 				return error || "Error checking status";
 		}
@@ -181,11 +181,11 @@ export function ClaudeCodeStep({
 						</div>
 					</div>
 					<h1 className="text-2xl font-bold text-foreground tracking-tight">
-						{t("claudeCode.title", "Claude Code CLI")}
+						{t("cli.title", "Claude Code CLI")}
 					</h1>
 					<p className="mt-2 text-muted-foreground">
 						{t(
-							"claudeCode.description",
+							"cli.description",
 							"Install or update the Claude Code CLI to enable AI-powered features",
 						)}
 					</p>
@@ -200,11 +200,11 @@ export function ClaudeCodeStep({
 								<Info className="h-5 w-5 text-info shrink-0 mt-0.5" />
 								<div className="flex-1 space-y-3">
 									<p className="text-sm font-medium text-foreground">
-										{t("claudeCode.info.title", "What is Claude Code?")}
+										{t("cli.info.title", "What is Claude Code?")}
 									</p>
 									<p className="text-sm text-muted-foreground">
 										{t(
-											"claudeCode.info.description",
+											"cli.info.description",
 											"Claude Code is Anthropic's official CLI that powers WorkPilot AI's AI features. It provides secure authentication and direct access to Claude models.",
 										)}
 									</p>
@@ -231,7 +231,7 @@ export function ClaudeCodeStep({
 											<div className="mt-1 text-xs text-muted-foreground space-y-0.5">
 												{versionInfo.installed && (
 													<p>
-														{t("claudeCode.version.current", "Current Version")}
+														{t("cli.version.current", "Current Version")}
 														:{" "}
 														<span className="font-mono">
 															{versionInfo.installed}
@@ -241,7 +241,7 @@ export function ClaudeCodeStep({
 												{versionInfo.latest &&
 													versionInfo.latest !== "unknown" && (
 														<p>
-															{t("claudeCode.version.latest", "Latest Version")}
+															{t("cli.version.latest", "Latest Version")}
 															:{" "}
 															<span className="font-mono">
 																{versionInfo.latest}
@@ -294,13 +294,13 @@ export function ClaudeCodeStep({
 							<CardContent className="p-4">
 								<p className="text-sm text-green-700 dark:text-green-400">
 									{t(
-										"claudeCode.install.success",
+										"cli.install.success",
 										"Installation command sent to terminal. Please complete the installation there.",
 									)}
 								</p>
 								<p className="text-xs text-muted-foreground mt-2">
 									{t(
-										"claudeCode.install.instructions",
+										"cli.install.instructions",
 										"The installer will open in your terminal. Follow the prompts to complete installation.",
 									)}
 								</p>
@@ -321,14 +321,14 @@ export function ClaudeCodeStep({
 									{isInstalling ? (
 										<>
 											<Loader2 className="h-4 w-4 animate-spin" />
-											{t("claudeCode.install.inProgress", "Installing...")}
+											{t("cli.install.inProgress", "Installing...")}
 										</>
 									) : (
 										<>
 											<Download className="h-4 w-4" />
 											{status === "outdated"
-												? t("claudeCode.install.updating", "Update Claude Code")
-												: t("claudeCode.install.button", "Install Claude Code")}
+												? t("cli.install.updating", "Update Claude Code")
+												: t("cli.install.button", "Install Claude Code")}
 										</>
 									)}
 								</Button>
@@ -345,7 +345,7 @@ export function ClaudeCodeStep({
 								window.electronAPI?.openExternal?.("https://claude.ai/code")
 							}
 						>
-							{t("claudeCode.learnMore", "Learn more about Claude Code")}
+							{t("cli.learnMore", "Learn more about Claude Code")}
 							<ExternalLink className="h-3 w-3" />
 						</Button>
 					</div>

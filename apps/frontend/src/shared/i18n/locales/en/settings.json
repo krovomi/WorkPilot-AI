@@ -95,7 +95,8 @@
 					"accountName": "Name",
 					"accountPlan": "Plan",
 					"accountCredits": "Credits",
-					"accountFlowActions": "Flow Actions"
+					"accountFlowActions": "Flow Actions",
+					"tokenReceived": "Windsurf token received"
 				},
 				"openaiAuth": {
 					"codexCliAuth": "Reuse the ChatGPT session managed by Codex CLI.",
@@ -109,6 +110,37 @@
 					"notConnected": "No active Codex CLI authentication. Sign in first.",
 					"timeout": "Codex CLI authentication timed out. Try again.",
 					"checkError": "Could not verify Codex CLI authentication."
+				},
+				"savedTitle": "Provider saved",
+				"agentCli": {
+					"status": "CLI status",
+					"checking": "Checking the CLI…",
+					"installed": "Installed",
+					"installedVersion": "Installed (version {{version}})",
+					"notInstalled": "Not installed: {{executable}} was not found on the PATH.",
+					"install": "Install {{name}}",
+					"installing": "Installing…",
+					"recheck": "Check again",
+					"signInTitle": "Sign in",
+					"signInDescription": "{{name}} keeps its own sign-in: WorkPilot uses the account and the API keys you set up in the CLI. Sign in once, then every task can run with it.",
+					"signInCommand": "Command to run",
+					"openTerminal": "Sign in from a terminal",
+					"closeTerminal": "Close the terminal",
+					"docs": "Documentation",
+					"modelTitle": "Model",
+					"modelDescription": "Pick the model per task when you create it. \"Default\" uses the model configured in the CLI.",
+					"activate": "Use as default provider",
+					"activated": "{{name}} is now the default provider.",
+					"hints": {
+						"opencode": "Run the command, pick a provider (Anthropic, OpenAI, GitHub Copilot…) and paste its key or follow the browser sign-in.",
+						"pi": "Start pi, type /login and pick your provider. pi also reads API keys from environment variables such as ANTHROPIC_API_KEY.",
+						"antigravity": "Start agy once and sign in with your Google account; headless runs reuse that sign-in. GEMINI_API_KEY also works.",
+						"gemini-cli": "Start gemini once and choose \"Login with Google\" (or set GEMINI_API_KEY). WorkPilot then runs it with --acp."
+					},
+					"terminalTitle": "Sign in to {{name}}",
+					"terminalStep1": "Press Enter to run {{command}}",
+					"terminalStep2": "Follow the CLI's sign-in steps",
+					"terminalStep3": "Close this terminal once signed in"
 				}
 			},
 			"providerCard": {
@@ -179,7 +211,11 @@
 				"anthropic": "Anthropic Claude models",
 				"google": "Google and Google DeepMind API access",
 				"openai": "GPT-5 and other OpenAI models",
-				"loadError": "Failed to load provider list"
+				"loadError": "Failed to load provider list",
+				"opencode": "Open-source coding agent, driven through the opencode CLI",
+				"antigravity": "Google's coding agent, driven through the agy CLI",
+				"pi": "Minimal coding agent, driven through the pi CLI",
+				"gemini-cli": "Google's open-source Gemini CLI, driven over the Agent Client Protocol"
 			},
 			"providerToggle": {
 				"enabled": "Provider enabled",
@@ -1285,7 +1321,8 @@
 		"description": "Access logs and debug information for troubleshooting",
 		"errorReporting": {
 			"label": "Anonymous Error Reporting",
-			"description": "Send crash reports to help improve WorkPilot AI. No personal data or code is collected."
+			"description": "Send crash reports to help improve WorkPilot AI. No personal data or code is collected.",
+			"saveFailed": "Failed to save error reporting setting"
 		},
 		"openLogsFolder": "Open Logs Folder",
 		"copyDebugInfo": "Copy Debug Info",
@@ -1778,7 +1815,9 @@
 		"selectedItems": "{{count}} item(s) selected",
 		"toggleSelection": "Toggle selection for work item {{id}}",
 		"importError": "Azure DevOps import failed",
-		"repositoryLabel": "Repository:"
+		"repositoryLabel": "Repository:",
+		"sidePanelAriaLabel": "Azure DevOps import panel",
+		"resizeHandleAriaLabel": "Resize the panel"
 	},
 	"azureDevOps": {
 		"enableSyncLabel": "Enable Azure DevOps Sync",
@@ -2372,7 +2411,8 @@
 			"currentStatus": "Status:",
 			"configured": "Configured",
 			"useInstead": "Use a Personal Access Token instead",
-			"hide": "Hide"
+			"hide": "Hide",
+			"description": "A GitHub Personal Access Token with Copilot access."
 		},
 		"instructions": {
 			"title": "Instructions",
@@ -2690,7 +2730,40 @@
 		"modelPlaceholder": "gpt-5.3, claude-4.6-opus, etc."
 	},
 	"customProvider": {
-		"modelNamePlaceholder": "Custom Model Name"
+		"modelNamePlaceholder": "Custom Model Name",
+		"title": "Custom provider",
+		"description": "Connect any OpenAI-compatible endpoint and choose its models.",
+		"apiConfig": "API configuration",
+		"apiUrl": "API URL",
+		"apiKey": "API key",
+		"urlRequired": "URL required",
+		"urlRequiredDesc": "Enter the API URL before discovering models.",
+		"discoverModels": "Discover models",
+		"discovering": "Discovering…",
+		"modelsDiscovered": "Models found",
+		"modelsDiscoveredDesc": "{{count}} models found.",
+		"noModelsFound": "No models found",
+		"noModelsFoundDesc": "The endpoint did not return any model. Add them by hand below.",
+		"discoveryFailed": "Discovery failed",
+		"discoveryFailedDesc": "Could not reach the endpoint. Check the URL and the key.",
+		"manualModels": "Add a model by hand",
+		"modelName": "Model name",
+		"modelId": "Model ID",
+		"modelTier": "Tier",
+		"tierFlagship": "Flagship",
+		"tierStandard": "Standard",
+		"tierFast": "Fast",
+		"supportsThinking": "Supports extended thinking",
+		"addModel": "Add model",
+		"modelInfoRequired": "Model details required",
+		"modelInfoRequiredDesc": "Enter both the model name and its ID.",
+		"modelAdded": "Model added",
+		"modelAddedDesc": "{{name}} was added.",
+		"modelRemoved": "Model removed",
+		"modelRemovedDesc": "The model was removed from the list.",
+		"availableModels": "Available models",
+		"noModelsConfigured": "No model configured",
+		"addModelsDesc": "Discover the endpoint's models or add them by hand."
 	},
 	"customThemes": {
 		"title": "Custom Themes",
