@@ -280,10 +280,13 @@
 		}
 	},
 	"experimental": {
-		"badge": "Experimental",
-		"tooltip": "No design document and no test yet: this view may change or go away.",
-		"hide": "Hide experimental views",
-		"show": "Show experimental views ({{count}})"
+		"badge": "Beta",
+		"tooltip": "Beta: this view has no design document or test yet, so it may change or go away.",
+		"hide": "Hide beta views",
+		"show": "Show beta views ({{count}})",
+		"labelTooltip": "{{label}} (beta)",
+		"bannerTitle": "Beta feature",
+		"bannerBody": "This view has no design document or test yet: how it works may change, or it may go away. Your feedback helps decide whether it stays."
 	},
 	"copilotCli": {
 		"requiresGh": "Requires GitHub CLI (gh)",

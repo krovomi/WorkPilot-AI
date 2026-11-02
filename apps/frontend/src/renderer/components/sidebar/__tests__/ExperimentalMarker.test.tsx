@@ -8,12 +8,15 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+const t = (key: string, options?: Record<string, unknown>) =>
+	options ? `${key}:${JSON.stringify(options)}` : key;
+
 vi.mock("react-i18next", () => ({
-	useTranslation: () => ({ t: (key: string) => key }),
+	useTranslation: () => ({ t }),
 }));
 
 import { Activity } from "lucide-react";
-import { ExperimentalMarker, NavIcon } from "../ExperimentalMarker";
+import { BetaBanner, ExperimentalMarker, NavIcon, navLabelTitle } from "../ExperimentalMarker";
 
 describe("ExperimentalMarker", () => {
 	it("renders an icon with no visible text, named for screen readers", () => {
@@ -32,5 +35,19 @@ describe("ExperimentalMarker", () => {
 		expect(screen.getAllByTestId("experimental-marker")).toHaveLength(1);
 		rerender(<NavIcon icon={Activity} experimental={false} />);
 		expect(screen.queryByTestId("experimental-marker")).toBeNull();
+	});
+
+	it("says beta in the label's hover text of an experimental entry only", () => {
+		expect(navLabelTitle(t, "navigation:items.apiWatcher", true)).toBe(
+			'navigation:experimental.labelTooltip:{"label":"navigation:items.apiWatcher"}',
+		);
+		expect(navLabelTitle(t, "navigation:items.kanban", false)).toBe("navigation:items.kanban");
+	});
+
+	it("names the beta phase in the page banner", () => {
+		render(<BetaBanner />);
+		const note = screen.getByRole("note");
+		expect(note.textContent).toContain("navigation:experimental.bannerTitle");
+		expect(note.textContent).toContain("navigation:experimental.bannerBody");
 	});
 });
