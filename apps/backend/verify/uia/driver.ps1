@@ -22,7 +22,7 @@ $references = @(
     [System.Web.Script.Serialization.JavaScriptSerializer].Assembly.Location
 )
 
-Add-Type -ReferencedAssemblies $references -Language CSharp -TypeDefinition @'
+$source = @'
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -505,6 +505,39 @@ public static class WorkPilotUia
     }
 }
 '@
+
+# Compiling the C# above took 40 to 60 s on a cold Windows machine, every
+# time the helper started. The assembly is compiled once per version of this
+# source (its hash names the file) into the user's local app data, and loaded
+# from there afterwards. Only the same user can write there, and that user
+# already runs this script: the cache grants nothing new. A file that does
+# not load (a compile cut short) is compiled again; when writing the file
+# fails (two helpers compiling at once), the type is compiled in memory as
+# before. The first line tells verify/window.py a compile is under way, so it
+# waits with its own budget instead of the start budget.
+function Import-WorkPilotUia {
+    $cache = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'WorkPilot\uia'
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($source + '|' + ($references -join '|') + '|' + $PSVersionTable.CLRVersion)
+    $key = (($sha.ComputeHash($bytes) | ForEach-Object { $_.ToString('x2') }) -join '').Substring(0, 24)
+    $dll = Join-Path $cache "WorkPilotUia-$key.dll"
+    if (Test-Path -LiteralPath $dll) {
+        try { Add-Type -LiteralPath $dll; return } catch { }
+    }
+    [Console]::Out.WriteLine('{"compiling":true}')
+    [Console]::Out.Flush()
+    try {
+        New-Item -ItemType Directory -Force -Path $cache | Out-Null
+        Add-Type -ReferencedAssemblies $references -Language CSharp -TypeDefinition $source -OutputAssembly $dll -OutputType Library
+        if (-not ('WorkPilotUia' -as [type])) { Add-Type -LiteralPath $dll }
+    } catch {
+        if (-not ('WorkPilotUia' -as [type])) {
+            Add-Type -ReferencedAssemblies $references -Language CSharp -TypeDefinition $source
+        }
+    }
+}
+
+Import-WorkPilotUia
 
 [WorkPilotUia]::Init()
 [Console]::Out.WriteLine('{"ready":true}')

@@ -104,7 +104,7 @@ positif se traite par la règle S1 de [`security.md`](security.md), jamais par `
 
 | Workflow | Vérifie |
 |---|---|
-| `ci.yml` | pytest (3.13 sur Linux, Windows, macOS ; 3.12 sur Linux) et frontend (typecheck, tests, build) ; chaque test pytest en échec est aussi une annotation du job, lisible sans ouvrir le journal ; `server-image` construit `deploy/Dockerfile.server`, migre un Postgres 16 avec l'image et attend `/health` |
+| `ci.yml` | pytest 3.12 sur Linux, Windows, macOS en shards (`tests/ci_shard.py`), couverture additionnée par `coverage-python` ; 3.13 sur Linux après fusion (push) et frontend (typecheck, tests, build) ; chaque test pytest en échec est aussi une annotation du job, lisible sans ouvrir le journal ; `server-image` construit `deploy/Dockerfile.server`, migre un Postgres 16 avec l'image et attend `/health` |
 | `lint.yml` | ruff (dont `scripts/`), pyright sur les paquets de `apps/backend/pyrightconfig.json`, Biome, fraîcheur de `requirements.lock`, `--check` des fichiers vendorisés et des skills, évaluation des skills |
 | `quality-security.yml` | CodeQL étendu, Bandit, pip-audit, pnpm audit |
 | `codeql.yml` | CodeQL sur Actions, JS/TS, Python |

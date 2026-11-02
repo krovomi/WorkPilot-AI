@@ -435,7 +435,7 @@ whatever they touch: only `LICENSE` and the issue/PR templates are skipped.
 
 | Workflow | Trigger | What it checks |
 |----------|---------|----------------|
-| **CI** | Push to `develop`/`main`, PRs | Python tests (3.13 on Linux, Windows, macOS; 3.12 on Linux), frontend typecheck, tests and build, server image build + migration |
+| **CI** | Push to `develop`/`main`, PRs | Python tests (3.12 on Linux, Windows, macOS, split into shards, coverage on Linux; 3.13 on Linux after merge), frontend typecheck, tests and build, server image build + migration |
 | **Lint** | Push to `develop`/`main`, PRs | Ruff (Python, `scripts/` included), pyright (packages of `apps/backend/pyrightconfig.json`), Biome (frontend), Python lockfile freshness, vendored trees, skills |
 
 ### PR Requirements
@@ -443,7 +443,7 @@ whatever they touch: only `LICENSE` and the issue/PR templates are skipped.
 Before a PR can be merged:
 
 1. All CI checks must pass (green checkmarks)
-2. Python tests pass on Python 3.12 and 3.13
+2. Python tests pass on Python 3.12 (3.13 is checked once the PR lands on develop)
 3. Frontend tests pass
 4. Linting passes (no ruff or Biome errors)
 5. TypeScript type checking passes
