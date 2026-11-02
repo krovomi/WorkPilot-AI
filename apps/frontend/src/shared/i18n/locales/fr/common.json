@@ -879,7 +879,9 @@
 		"hoursAgo_other": "il y a {{count}} h",
 		"daysAgo": "il y a {{count}} j",
 		"daysAgo_one": "il y a {{count}} j",
-		"daysAgo_other": "il y a {{count}} j"
+		"daysAgo_other": "il y a {{count}} j",
+		"today": "Aujourd'hui",
+		"yesterday": "Hier"
 	},
 	"test": "Test",
 	"refresh": "Actualiser",

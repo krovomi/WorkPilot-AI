@@ -1,7 +1,5 @@
+import { formatAppDateTime } from "@/lib/date-format";
+
 export function formatDate(timestamp: string): string {
-	try {
-		return new Date(timestamp).toLocaleString();
-	} catch {
-		return timestamp;
-	}
+	return formatAppDateTime(timestamp) || timestamp;
 }

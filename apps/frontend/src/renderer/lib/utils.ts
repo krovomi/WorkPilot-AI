@@ -1,6 +1,7 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { isSubtaskDone } from "../../shared/progress";
+import { formatAppDate } from "@/lib/date-format";
 
 /**
  * Utility function to merge Tailwind CSS classes
@@ -83,7 +84,7 @@ export function formatRelativeTime(date: Date): string {
 	if (diffMins < 60) return `${diffMins}m ago`;
 	if (diffHours < 24) return `${diffHours}h ago`;
 	if (diffDays < 7) return `${diffDays}d ago`;
-	return new Date(date).toLocaleDateString();
+	return formatAppDate(date);
 }
 
 /**

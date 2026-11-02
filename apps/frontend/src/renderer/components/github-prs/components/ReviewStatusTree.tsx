@@ -49,7 +49,7 @@ export function ReviewStatusTree({
 	newCommitsCheck,
 	lastPostedAt,
 }: ReviewStatusTreeProps) {
-	const { t, i18n } = useTranslation("common");
+	const { t } = useTranslation("common");
 	const [isOpen, setIsOpen] = useState(true);
 
 	// Determine if this is a follow-up review in progress (for edge case handling)
@@ -382,7 +382,7 @@ export function ReviewStatusTree({
 								</div>
 								{step.date && (
 									<div className="text-xs text-muted-foreground mt-0.5">
-										{formatDate(step.date, i18n.language)}
+										{formatDate(step.date)}
 									</div>
 								)}
 							</div>
