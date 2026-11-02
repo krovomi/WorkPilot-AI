@@ -20,7 +20,7 @@ two things only:
 2. Wire the post-action callbacks to the existing build / restart code path.
 
 ```tsx
-import { AgentToolsButton } from "@/components/agent-tools";
+import { AgentToolsButton } from "@/components/agent-tools/AgentToolsButton";
 
 <AgentToolsButton
   projectDir={project.path}
