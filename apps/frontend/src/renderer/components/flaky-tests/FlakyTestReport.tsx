@@ -1,3 +1,4 @@
+import { AlertTriangle } from "lucide-react";
 import type React from "react";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
@@ -6,6 +7,7 @@ import { SharedReportNote } from "../analyses/SharedReportNote";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
+import { PageHeader } from "../ui/page-header";
 import { Progress } from "../ui/progress";
 import {
 	Select,
@@ -93,12 +95,12 @@ export function FlakyTestReport({
 
 	return (
 		<div className="flex flex-col gap-5 p-6 max-w-5xl bg-background text-foreground">
-			<header>
-				<h1 className="text-xl font-semibold">{t("title")}</h1>
-				<p className="text-sm text-muted-foreground mt-1">
-					{t("description")}
-				</p>
-			</header>
+			<PageHeader
+				variant="inline"
+				icon={AlertTriangle}
+				title={t("title")}
+				description={t("description")}
+			/>
 
 			{projectPath ? (
 				<RunPanel

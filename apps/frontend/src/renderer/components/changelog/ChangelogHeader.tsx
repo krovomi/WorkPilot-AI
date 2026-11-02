@@ -1,8 +1,9 @@
-import { Check, RefreshCw } from "lucide-react";
+import { Check, FileText, RefreshCw } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
 import type { WizardStep } from "./hooks/useChangelog";
+import { PageHeader } from "../ui/page-header";
 
 interface ChangelogHeaderProps {
 	step: WizardStep;
@@ -13,20 +14,18 @@ export function ChangelogHeader({ step, onRefresh }: ChangelogHeaderProps) {
 	const { t } = useTranslation("changelog");
 
 	return (
-		<div className="flex items-center justify-between border-b border-border px-6 py-4">
-			<div className="flex items-center gap-4">
-				<div>
-					<h1 className="text-xl font-semibold">{t("title")}</h1>
-					<p className="text-sm text-muted-foreground">
-						{step === 1
-							? t("steps.step1")
-							: step === 2
-								? t("steps.step2")
-								: t("steps.step3")}
-					</p>
-				</div>
-			</div>
-			<div className="flex items-center gap-2">
+		<PageHeader
+			icon={FileText}
+			title={t("title")}
+			description={
+				step === 1
+					? t("steps.step1")
+					: step === 2
+						? t("steps.step2")
+						: t("steps.step3")
+			}
+			actions={
+				<>
 				{/* Step indicators */}
 				<div className="flex items-center gap-2 mr-4">
 					<StepIndicator
@@ -51,8 +50,9 @@ export function ChangelogHeader({ step, onRefresh }: ChangelogHeaderProps) {
 					<RefreshCw className="mr-2 h-4 w-4" />
 					{t("actions.refresh")}
 				</Button>
-			</div>
-		</div>
+				</>
+			}
+		/>
 	);
 }
 

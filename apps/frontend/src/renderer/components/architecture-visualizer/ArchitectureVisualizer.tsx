@@ -10,6 +10,7 @@ import {
 } from "../../stores/architecture-visualizer-store";
 import { useProjectStore } from "../../stores/project-store";
 import { Button } from "../ui/button";
+import { PageHeader } from "../ui/page-header";
 
 export function ArchitectureVisualizer(): React.ReactElement {
 	const { t } = useTranslation(["architectureVisualizer"]);
@@ -41,16 +42,14 @@ export function ArchitectureVisualizer(): React.ReactElement {
 
 	return (
 		<div className="flex flex-col h-full bg-background text-foreground">
-			<header className="flex items-start justify-between gap-4 px-6 py-4 border-b border-border">
-				<div className="min-w-0">
-					<h1 className="text-xl font-semibold">
-						{t("architectureVisualizer:title")}
-					</h1>
-					<p className="text-sm text-muted-foreground mt-0.5">
+			<PageHeader
+				icon={Network}
+				title={t("architectureVisualizer:title")}
+				description={
+					<>
 						{t("architectureVisualizer:subtitle")}
-					</p>
 					{baseline && (
-						<p className="mt-1 text-xs text-muted-foreground">
+						<span className="mt-1 block text-xs">
 							{t("architectureVisualizer:model.components", {
 								count: baseline.components ?? 0,
 							})}
@@ -66,11 +65,12 @@ export function ArchitectureVisualizer(): React.ReactElement {
 									})}
 								</>
 							)}
-						</p>
+						</span>
 					)}
-				</div>
-				<div className="flex shrink-0 gap-2">
-					{isRunning ? (
+					</>
+				}
+				actions={
+					isRunning ? (
 						<Button
 							variant="outline"
 							size="sm"
@@ -92,9 +92,9 @@ export function ArchitectureVisualizer(): React.ReactElement {
 								? t("architectureVisualizer:actions.regenerate")
 								: t("architectureVisualizer:actions.generate")}
 						</Button>
-					)}
-				</div>
-			</header>
+					)
+				}
+			/>
 
 			{blockers.length > 0 && (
 				<section className="border-b border-amber-500/30 bg-amber-500/5 px-6 py-3">

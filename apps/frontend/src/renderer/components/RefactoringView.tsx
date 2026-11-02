@@ -19,6 +19,7 @@ import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
 import { ScrollArea } from "./ui/scroll-area";
 import { Textarea } from "./ui/textarea";
+import { PageHeader } from "./ui/page-header";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -177,18 +178,12 @@ export function RefactoringView({ projectId }: Readonly<RefactoringViewProps>) {
 	return (
 		<ScrollArea className="h-full">
 			<div className="p-6 space-y-6 max-w-5xl mx-auto">
-				{/* Header */}
-				<div className="flex items-center gap-3">
-					<Wand2 className="h-6 w-6 text-primary" />
-					<div>
-						<h1 className="text-xl font-bold text-foreground">
-							{t("refactoring:title")}
-						</h1>
-						<p className="text-sm text-muted-foreground">
-							{t("refactoring:description")}
-						</p>
-					</div>
-				</div>
+				<PageHeader
+					variant="inline"
+					icon={Wand2}
+					title={t("refactoring:title")}
+					description={t("refactoring:description")}
+				/>
 
 				{/* Source input */}
 				<Card>

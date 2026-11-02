@@ -17,6 +17,8 @@ import {
 	useLiveCompanionStore,
 } from "../../stores/live-companion-store";
 import { useProjectStore } from "../../stores/project-store";
+import { Radio } from "lucide-react";
+import { PageHeader } from "../ui/page-header";
 
 const PRIORITY_COLORS: Record<SuggestionPriority, string> = {
 	critical: "text-red-400 bg-red-500/10 border-red-500/20",
@@ -72,16 +74,12 @@ export function LiveCompanionDashboard(): React.ReactElement {
 
 	return (
 		<div className="flex flex-col h-full bg-background text-foreground">
-			{/* Header */}
-			<div className="px-6 py-4 border-b border-border">
-				<div className="flex items-center justify-between gap-6">
-					<div>
-						<h1 className="text-xl font-semibold">{t("liveCompanion:title")}</h1>
-						<p className="text-sm text-muted-foreground mt-0.5 max-w-3xl">
-							{t("liveCompanion:description")}
-						</p>
-					</div>
-					<div className="flex items-center gap-3 shrink-0">
+			<PageHeader
+				icon={Radio}
+				title={t("liveCompanion:title")}
+				description={t("liveCompanion:description")}
+				actions={
+					<>
 						<span
 							className={`text-xs px-2 py-1 rounded border font-medium ${
 								companionState.active
@@ -107,14 +105,15 @@ export function LiveCompanionDashboard(): React.ReactElement {
 								? t("liveCompanion:actions.stop")
 								: t("liveCompanion:actions.start")}
 						</button>
-					</div>
-				</div>
+					</>
+				}
+			>
 				{!projectPath && !companionState.active && (
-					<p className="text-xs text-muted-foreground mt-2">
+					<p className="text-xs text-muted-foreground">
 						{t("liveCompanion:errors.noProject")}
 					</p>
 				)}
-			</div>
+			</PageHeader>
 
 			<div className="flex flex-1 overflow-hidden">
 				{/* Left: session, options, recent changes */}

@@ -7,6 +7,8 @@ import {
 	useSpecApprovalStore,
 } from "../../stores/spec-approval-store";
 import { startTask, submitReview, useTaskStore } from "../../stores/task-store";
+import { ClipboardCheck } from "lucide-react";
+import { PageHeader } from "../ui/page-header";
 
 /**
  * The plans waiting for a person, across the project's board.
@@ -85,12 +87,11 @@ export function SpecApprovalDashboard(): React.ReactElement {
 
 	return (
 		<div className="flex flex-col h-full bg-background text-foreground">
-			<div className="px-6 py-4 border-b border-border">
-				<h1 className="text-xl font-semibold">{t("specApproval:title")}</h1>
-				<p className="text-sm text-muted-foreground mt-0.5">
-					{t("specApproval:subtitle")}
-				</p>
-			</div>
+			<PageHeader
+				icon={ClipboardCheck}
+				title={t("specApproval:title")}
+				description={t("specApproval:subtitle")}
+			/>
 
 			{!activeProject ? (
 				<div className="flex-1 flex items-center justify-center text-center p-8">
