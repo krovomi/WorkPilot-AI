@@ -45,8 +45,13 @@ import {
 import { envWithoutCredentials } from "../utils/child-env";
 import { readIfExists, updateExistingFile } from "../utils/existing-file";
 import { pythonRunnerEnv } from "../utils/python-runner-env";
+import { getEffectiveSourcePath } from "../updater/path-resolver";
+import { connectorsRoot } from "../utils/connectors-path";
 
-const connectorSrcPath = path.resolve(import.meta.dirname, "..", "..", "..", "..", "src");
+/** The shared connectors package, in the repository or in the installed app. */
+function connectorSrcPath(): string {
+	return path.join(connectorsRoot(getEffectiveSourcePath()), "src");
+}
 const backendPath = path.resolve(import.meta.dirname, "..", "..", "..", "backend");
 
 /**
@@ -117,7 +122,7 @@ import os
 from pathlib import Path
 
 # Add project root (parent of src/) at the front so it takes priority
-sys.path.insert(0, str(Path('${connectorSrcPath.replaceAll("\\", "\\\\")}').parent))
+sys.path.insert(0, str(Path('${connectorSrcPath().replaceAll("\\", "\\\\")}').parent))
 # Append apps/backend at the end (lower priority) for foundation.git_provider
 sys.path.append(str(Path('${backendPath.replaceAll("\\", "\\\\")}')))
 from src.connectors.azure_devops import AzureDevOpsConnector
@@ -437,7 +442,7 @@ import sys
 import json
 from pathlib import Path
 
-sys.path.insert(0, str(Path('${connectorSrcPath.replaceAll("\\", "\\\\")}').parent))
+sys.path.insert(0, str(Path('${connectorSrcPath().replaceAll("\\", "\\\\")}').parent))
 sys.path.insert(0, str(Path('${backendPath.replaceAll("\\", "\\\\")}')))
 
 try:
@@ -1380,8 +1385,8 @@ except Exception as e:
 import sys, json, os
 from pathlib import Path
 sys.path.insert(0, '${backendPath.replaceAll("\\", "\\\\")}')
-sys.path.insert(0, str(Path('${connectorSrcPath.replaceAll("\\", "\\\\")}').parent))
-sys.path.insert(0, '${connectorSrcPath.replaceAll("\\", "\\\\")}')
+sys.path.insert(0, str(Path('${connectorSrcPath().replaceAll("\\", "\\\\")}').parent))
+sys.path.insert(0, '${connectorSrcPath().replaceAll("\\", "\\\\")}')
 
 from src.config.settings import Settings
 from src.connectors.azure_devops.client import AzureDevOpsClient
