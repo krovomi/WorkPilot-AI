@@ -107,7 +107,8 @@
 		"guardrails": "Agent Guardrails",
 		"envSnapshot": "Environment Snapshots",
 		"offlineMode": "Offline Mode",
-		"administration": "Administration"
+		"administration": "Administration",
+		"smartEstimation": "Smart Estimation"
 	},
 	"search": {
 		"placeholder": "Search...",
@@ -284,5 +285,25 @@
 		"tooltip": "No design document and no test yet: this view may change or go away.",
 		"hide": "Hide experimental views",
 		"show": "Show experimental views ({{count}})"
+	},
+	"hubs": {
+		"agentHistory": "Agent history",
+		"costs": "Costs and estimation",
+		"mcpTools": "MCP tools",
+		"context": "Project context",
+		"gitImpact": "Git impact",
+		"gitHistory": "Git history",
+		"docs": "Docs and drift",
+		"onboarding": "Onboarding",
+		"debt": "Debt and refactoring",
+		"arena": "Arena",
+		"open": "Open {{name}}",
+		"launchers": {
+			"smart-estimation": "Scores how complex a task is from its description, using this project's build history.",
+			"context-aware-snippets": "Writes a code snippet that follows this project's context and coding style.",
+			"conflict-predictor": "Looks for conflicts between worktrees and branches before you merge them.",
+			"natural-language-git": "Turns a sentence into a git command for this project.",
+			"arena-mode": "Runs one prompt on two models side by side without saying which is which, and lets you vote."
+		}
 	}
 }

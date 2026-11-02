@@ -157,7 +157,10 @@ toujours, sans le jeton de la session. Seul `authedFetch` (`server-connection.ts
 
 La barre latérale n'offre pour un projet du serveur que les vues qui passent par le serveur
 (`sidebar/server-gates.ts` : le Kanban, l'espace de travail, les features partagées, les vues de sa
-forge et l'administration) ; les autres agiraient sur le miroir. La liste des projets est relue quand la session change (connexion, déconnexion, autre
+forge et l'administration) ; les autres agiraient sur le miroir. Un hub de la barre latérale
+(`sidebar/hubs.ts`) suit la même liste onglet par onglet : il n'apparaît que si l'un de ses onglets
+est offert, et n'affiche que ceux-là (pour « Historique des agents », seul « Historique des
+sessions »). La liste des projets est relue quand la session change (connexion, déconnexion, autre
 compte).
 
 Les actions du Kanban sur une carte du serveur partent au serveur (`main/server-board-actions.ts`),
