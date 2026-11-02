@@ -84,9 +84,14 @@ describe("availableActions", () => {
 		expect(availableActions(card(), details(), [])).toEqual(["start", "delete"]);
 	});
 
-	it("offers only stop while an agent works", () => {
-		expect(availableActions(card({ column: "in_progress" }), details(), [])).toEqual(["stop"]);
+	it("offers only stop while a run is queued or running", () => {
+		expect(availableActions(card({ column: "in_progress" }), details(), [run("running")])).toEqual(["stop"]);
 		expect(availableActions(card(), details(), [run("queued")])).toEqual(["stop"]);
+	});
+
+	it("offers retry on a working column with no run left, instead of a Stop that does nothing", () => {
+		expect(availableActions(card({ column: "in_progress" }), details(), [])).toEqual(["retry"]);
+		expect(availableActions(card({ column: "queue" }), details(), [run("failed")])).toEqual(["retry"]);
 	});
 
 	it("asks for approval of a spec under review", () => {
@@ -139,8 +144,14 @@ describe("card actions", () => {
 
 	it("stops the running run", async () => {
 		const api = fakeApi();
-		expect(await stopCard(api as unknown as Api, "p1", card())).toBe(true);
+		await stopCard(api as unknown as Api, "p1", card());
 		expect(api.cancelRun).toHaveBeenCalledWith("p1", "spec-1", "run-running");
+	});
+
+	it("says so when the server had nothing to stop", async () => {
+		const api = fakeApi();
+		api.cancelRun.mockResolvedValueOnce({ cancelled: false });
+		await expect(stopCard(api as unknown as Api, "p1", card())).rejects.toThrow("nothing_to_stop");
 	});
 
 	it("sends the work back then builds, and refuses empty feedback", async () => {

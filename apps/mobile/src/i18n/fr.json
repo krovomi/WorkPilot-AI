@@ -14,6 +14,7 @@
 		"generic": "Une erreur est survenue : {{message}}",
 		"card_not_indexed": "Le serveur n'a pas encore indexé cette carte. Tirez pour actualiser.",
 		"feedback_required": "Dites ce qu'il faut changer.",
+		"nothing_to_stop": "Plus rien ne tournait sur cette carte. Tire pour actualiser.",
 		"entra_disabled": "Ce serveur ne propose pas la connexion Microsoft.",
 		"entra_failed": "La connexion Microsoft n'a pas abouti.",
 		"entra_misconfigured": "Les réglages de connexion Microsoft du serveur sont invalides."
