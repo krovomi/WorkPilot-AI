@@ -350,7 +350,8 @@ class TestTransport:
         client, _, _, pat = stack
         headers = {"Authorization": f"Bearer {pat('alice')}"}
         assert client.get("/mcp", headers=headers).status_code == 405
-        assert client.delete("/mcp", headers=headers).status_code == 405
+        delete_res = client.delete("/mcp", headers=headers)
+        assert delete_res.status_code == 405
         assert client.get("/mcp").status_code == 401
 
 
