@@ -157,13 +157,13 @@ function GitHubCopilotTokenConfig({
 			<div className="space-y-2">
 				<Label htmlFor="copilot-token" className="flex items-center gap-2">
 					<Key className="w-4 h-4" />
-					{t("githubCopilot.token.label")}
+					{t("githubCopilot.token.inputLabel")}
 				</Label>
 				<div className="relative">
 					<Input
 						id="copilot-token"
 						type={showApiKey ? "text" : "password"}
-						placeholder={t("githubCopilot.token.placeholder")}
+						placeholder={t("githubCopilot.token.inputPlaceholder")}
 						className="font-mono pr-10"
 					/>
 					<Button
@@ -187,8 +187,8 @@ function GitHubCopilotTokenConfig({
 
 			{/* Token Actions */}
 			<div className="flex gap-2">
-				<Button>{t("common.save")}</Button>
-				<Button variant="outline">{t("common.remove")}</Button>
+				<Button>{t("githubCopilot.token.save")}</Button>
+				<Button variant="outline">{t("githubCopilot.token.remove")}</Button>
 			</div>
 
 			{/* Token Status */}

@@ -323,7 +323,7 @@ export function DevToolsSettings({
 					{settings.preferredIDE === "custom" && (
 						<div className="mt-3 space-y-2">
 							<Label htmlFor="custom-ide-path">
-								{t("devtools.customPath", "Custom path")}
+								{t("devtools.ide.customPath", "Custom path")}
 							</Label>
 							<div className="flex gap-2">
 								<Input
@@ -398,7 +398,7 @@ export function DevToolsSettings({
 					{settings.preferredTerminal === "custom" && (
 						<div className="mt-3 space-y-2">
 							<Label htmlFor="custom-terminal-path">
-								{t("devtools.customPath", "Custom path")}
+								{t("devtools.terminal.customPath", "Custom path")}
 							</Label>
 							<div className="flex gap-2">
 								<Input

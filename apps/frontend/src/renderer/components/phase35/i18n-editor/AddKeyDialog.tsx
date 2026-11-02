@@ -145,7 +145,7 @@ export function AddKeyDialog({
 
 				<DialogFooter>
 					<Button variant="ghost" size="sm" onClick={close}>
-						{t("common.cancel")}
+						{t("common:buttons.cancel")}
 					</Button>
 					<Button size="sm" onClick={submit} disabled={!canSubmit}>
 						{t("i18nEditor.addKeyConfirm")}
