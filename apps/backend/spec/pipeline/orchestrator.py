@@ -40,6 +40,7 @@ from ..compaction import (
     gather_phase_outputs,
     summarize_phase_output,
 )
+from ..source import record_spec_source
 from ..validate_pkg.spec_validator import SpecValidator
 from .agent_runner import AgentRunner
 from .models import (
@@ -504,6 +505,8 @@ class SpecOrchestrator:
         task_logger.end_phase(
             LogPhase.PLANNING, success=True, message="Spec creation complete"
         )
+        # The spec now answers this description; a later edit makes it stale.
+        record_spec_source(self.spec_dir)
 
         # Load task metadata to check requireReviewBeforeCoding setting
         task_metadata_file = self.spec_dir / "task_metadata.json"
