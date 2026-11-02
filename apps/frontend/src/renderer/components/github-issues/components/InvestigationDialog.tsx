@@ -258,17 +258,19 @@ export function InvestigationDialog({
 					</div>
 				) : (
 					<div className="space-y-4">
-						<div className="space-y-2">
-							<div className="flex items-center justify-between text-sm">
-								<span className="text-muted-foreground">
-									{investigationStatus.message}
-								</span>
-								<span className="text-foreground">
-									{investigationStatus.progress}%
-								</span>
+						{investigationStatus.phase !== "error" && (
+							<div className="space-y-2">
+								<div className="flex items-center justify-between text-sm">
+									<span className="text-muted-foreground">
+										{investigationStatus.message}
+									</span>
+									<span className="text-foreground">
+										{investigationStatus.progress}%
+									</span>
+								</div>
+								<Progress value={investigationStatus.progress} className="h-2" />
 							</div>
-							<Progress value={investigationStatus.progress} className="h-2" />
-						</div>
+						)}
 
 						{investigationStatus.phase === "error" && (
 							<div className="rounded-lg bg-destructive/10 border border-destructive/30 p-3 text-sm text-destructive">
@@ -298,12 +300,18 @@ export function InvestigationDialog({
 						</>
 					)}
 					{investigationStatus.phase !== "idle" &&
-						investigationStatus.phase !== "complete" && (
+						investigationStatus.phase !== "complete" &&
+						investigationStatus.phase !== "error" && (
 							<Button variant="outline" disabled>
 								<Loader2 className="h-4 w-4 mr-2 animate-spin" />
 								{t("common:buttons.creating")}
 							</Button>
 						)}
+					{investigationStatus.phase === "error" && (
+						<Button variant="outline" onClick={onClose}>
+							{t("common:buttons.close")}
+						</Button>
+					)}
 					{investigationStatus.phase === "complete" && (
 						<Button onClick={onClose}>{t("common:githubIssues.done")}</Button>
 					)}

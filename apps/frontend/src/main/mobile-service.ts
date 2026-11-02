@@ -178,7 +178,11 @@ export class MobileService extends EventEmitter {
 		return new Promise((resolve) => {
 			const proc = spawn(this.pythonPath, [runner, ...args], {
 				cwd: backend,
-				env: { ...process.env } as Record<string, string>,
+				// Device detection calls no model: no credential of the app.
+				env: envWithoutCredentials(process.env, {
+					PYTHONIOENCODING: "utf-8",
+					PYTHONUTF8: "1",
+				}),
 			});
 			this.detectionProcess = proc;
 

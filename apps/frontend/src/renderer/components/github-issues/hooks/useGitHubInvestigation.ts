@@ -45,10 +45,12 @@ export function useGitHubInvestigation(projectId: string | undefined) {
 			(eventProjectId, error) => {
 				if (eventProjectId === projectId) {
 					setError(error);
+					// `error` is what the dialog's red box shows.
 					setInvestigationStatus({
 						phase: "error",
 						progress: 0,
 						message: error,
+						error,
 					});
 				}
 			},

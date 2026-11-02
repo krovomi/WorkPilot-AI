@@ -4,8 +4,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { app } from "electron";
 import { MODEL_ID_MAP } from "../shared/constants";
-import type { AppSettings } from "../shared/types";
-import { readSettingsFile } from "./settings-utils";
+import { pythonRunnerEnv } from "./utils/python-runner-env";
 
 
 /**
@@ -118,20 +117,22 @@ export class LearningLoopService extends EventEmitter {
 			args.push("--outcome-details", details.slice(0, 2000));
 		}
 
-		try {
-			const proc = spawn(this.pythonPath, args, {
-				cwd: autoBuildSource,
-				env: this.buildProcessEnvironment(),
-				stdio: "ignore",
-				detached: true,
+		void this.buildProcessEnvironment()
+			.then((env) => {
+				const proc = spawn(this.pythonPath, args, {
+					cwd: autoBuildSource,
+					env,
+					stdio: "ignore",
+					detached: true,
+				});
+				proc.on("error", (err) => {
+					console.warn("[LearningLoop] Outcome recording failed:", err.message);
+				});
+				proc.unref();
+			})
+			.catch((err: unknown) => {
+				console.warn("[LearningLoop] Failed to spawn outcome recorder:", err);
 			});
-			proc.on("error", (err) => {
-				console.warn("[LearningLoop] Outcome recording failed:", err.message);
-			});
-			proc.unref();
-		} catch (err) {
-			console.warn("[LearningLoop] Failed to spawn outcome recorder:", err);
-		}
 	}
 
 	/**
@@ -177,7 +178,7 @@ export class LearningLoopService extends EventEmitter {
 		this.emit("status", "Initializing Learning Loop analysis...");
 
 		const args = this.buildCommandArgs(request, runnerPath);
-		const processEnv = this.buildProcessEnvironment();
+		const processEnv = await this.buildProcessEnvironment();
 
 		await this.executeProcess(args, processEnv, autoBuildSource);
 	}
@@ -202,28 +203,13 @@ export class LearningLoopService extends EventEmitter {
 		return args;
 	}
 
-	private buildProcessEnvironment(): Record<string, string> {
-		const processEnv: Record<string, string> = {
-			...(process.env as Record<string, string>),
-		};
-
-		// Read OAuth token from settings if available
-		try {
-			// Through settings-utils: it decrypts the stored keys.
-			const settings = readSettingsFile() as Partial<AppSettings> | undefined;
-			if (settings) {
-				if (settings.globalClaudeOAuthToken) {
-					processEnv.CLAUDE_OAUTH_TOKEN = settings.globalClaudeOAuthToken;
-				}
-				if (settings.globalAnthropicApiKey) {
-					processEnv.ANTHROPIC_API_KEY = settings.globalAnthropicApiKey;
-				}
-			}
-		} catch {
-			// Ignore settings read errors
-		}
-
-		return processEnv;
+	/**
+	 * The runner's environment: the provider the user chose and its key, the
+	 * Claude sign-in only when that provider needs it, and no other credential
+	 * of the app (`pythonRunnerEnv`).
+	 */
+	private buildProcessEnvironment(): Promise<Record<string, string>> {
+		return pythonRunnerEnv(this.getAutoBuildSourcePath() ?? "");
 	}
 
 	private async executeProcess(
