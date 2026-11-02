@@ -67,6 +67,21 @@ class I18nOptions(NoOptions):
 class FlakyOptions(NoOptions):
     threshold: float = Field(default=0.05, ge=0.0, le=1.0)
     min_runs: int = Field(default=2, ge=1, le=1000)
+    #: ``scan`` reads the reports in the clone; ``run`` runs the project's own
+    #: test command several times in the job. Only a detected command: a
+    #: command line of the member's own is a desktop option, never a server one.
+    mode: Literal["scan", "run"] = "scan"
+    runs: int = Field(default=5, ge=2, le=20)
+    command_id: Literal[
+        "auto", "dotnet", "pytest", "vitest", "jest", "maven", "gradle", "go"
+    ] = "auto"
+
+
+def _flaky_args(o: FlakyOptions) -> list[str]:
+    args = ["--threshold", str(o.threshold), "--min-runs", str(o.min_runs)]
+    if o.mode == "run":
+        args += ["--mode", "run", "--runs", str(o.runs), "--command-id", o.command_id]
+    return args
 
 
 def _prefixed(prefix: str) -> Callable[[str], Any]:
@@ -134,7 +149,7 @@ ANALYSES: tuple[Analysis, ...] = (
         key="flaky-tests",
         runner="flaky_tests_runner.py",
         options=FlakyOptions,
-        args=lambda o: ["--threshold", str(o.threshold), "--min-runs", str(o.min_runs)],
+        args=_flaky_args,
         report=_prefixed("FLAKY_RESULT"),
     ),
     Analysis(

