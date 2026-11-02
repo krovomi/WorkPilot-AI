@@ -674,17 +674,9 @@ export const IPC_CHANNELS = {
 	// MCP Marketplace operations
 	MCP_MARKETPLACE_GET_CATALOG: "mcpMarketplace:getCatalog", // Get full server catalog
 	MCP_MARKETPLACE_GET_SERVER: "mcpMarketplace:getServer", // Get single server details
-	MCP_MARKETPLACE_INSTALL: "mcpMarketplace:install", // Install a server
-	MCP_MARKETPLACE_UNINSTALL: "mcpMarketplace:uninstall", // Uninstall a server
-	MCP_MARKETPLACE_GET_INSTALLED: "mcpMarketplace:getInstalled", // Get installed servers
-	MCP_MARKETPLACE_UPDATE_SERVER: "mcpMarketplace:updateServer", // Update server config
-	MCP_MARKETPLACE_TOGGLE_SERVER: "mcpMarketplace:toggleServer", // Enable/disable server
-	MCP_MARKETPLACE_HEALTH_CHECK: "mcpMarketplace:healthCheck", // Health check installed server
-	MCP_MARKETPLACE_HEALTH_CHECK_ALL: "mcpMarketplace:healthCheckAll", // Health check all installed
 	MCP_MARKETPLACE_SAVE_BUILDER: "mcpMarketplace:saveBuilder", // Save builder project
 	MCP_MARKETPLACE_GET_BUILDER_PROJECTS: "mcpMarketplace:getBuilderProjects", // List builder projects
 	MCP_MARKETPLACE_DELETE_BUILDER: "mcpMarketplace:deleteBuilder", // Delete builder project
-	MCP_MARKETPLACE_EXPORT_BUILDER: "mcpMarketplace:exportBuilder", // Export builder as MCP server
 
 	// Hugging Face Hub discovery (via the official HF MCP server)
 	HUGGINGFACE_SEARCH_MODELS: "huggingface:searchModels", // Live model search on the Hub
@@ -1183,7 +1175,6 @@ export const IPC_CHANNELS = {
 	PLUGIN_MARKETPLACE_GET_INSTALLED: "pluginMarketplace:getInstalled",
 	PLUGIN_MARKETPLACE_INSTALL: "pluginMarketplace:install",
 	PLUGIN_MARKETPLACE_OPEN_LOCAL_FOLDER: "pluginMarketplace:openLocalFolder",
-	PLUGIN_MARKETPLACE_TOGGLE: "pluginMarketplace:toggle",
 	PLUGIN_MARKETPLACE_UNINSTALL: "pluginMarketplace:uninstall",
 	PROJECT_HAS_LOCAL_SOURCE: "project:has-local-source",
 	PROVIDERS_GET_CONFIGURED_PROVIDERS: "providers:getConfiguredProviders",
