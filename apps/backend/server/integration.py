@@ -221,6 +221,15 @@ async def _ensure_db_ready() -> None:
         await init_db()
         _db_ready = True
         logger.info("Server-mode database initialized")
+        # Runs a previous server process left queued or running would hold
+        # quota slots and show as running forever: nothing will finish them.
+        from server.services.run_manager import get_run_manager
+        from sqlalchemy.exc import SQLAlchemyError
+
+        try:
+            await get_run_manager().settle_orphans()
+        except SQLAlchemyError:
+            logger.exception("Could not settle runs interrupted by a restart")
 
 
 def mount_server_mode(app: FastAPI) -> bool:

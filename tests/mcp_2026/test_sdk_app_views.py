@@ -116,7 +116,8 @@ class TestTheViewIsKept:
         self, tmp_path, monkeypatch
     ):
         # `core.client._custom_servers` starts a command server with its
-        # command and arguments only; so does the side session.
+        # command, arguments and env (the API key a catalog server reads) and
+        # nothing else; so does the side session.
         opened = _count_sessions(monkeypatch)
         spec = tmp_path / "spec"
         spec.mkdir()
@@ -126,7 +127,8 @@ class TestTheViewIsKept:
         hook = make_app_view_hook(spec, [server])
         _post(hook, "mcp__weather__weather", {"city": "Paris"}, "sunny")
 
-        assert opened and "env" not in opened[0][0] and "extra" not in opened[0][0]
+        assert opened and "extra" not in opened[0][0]
+        assert opened[0][0]["env"] == {"EXTRA": "x"}
         assert len(_views(spec)) == 1
 
 

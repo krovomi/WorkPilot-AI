@@ -18,10 +18,18 @@ ne connaît ni Ollama, ni Copilot, ni Mistral, ni Google.
 
 **Un concurrent est un couple (fournisseur, modèle).** Son `id` est
 `fournisseur:modèle`, c'est la clé sous laquelle chaque statistique est classée,
-et l'identité voyage avec le participant — masquée par l'UI jusqu'au vote, ce
-qui est ce que « à l'aveugle » veut dire : cachée au *lecteur*, connue de
-l'enregistrement. L'historique applique la même règle : un combat en attente de
-vote n'y affiche pas les noms que l'onglet Combat cache.
+et l'identité voyage avec le participant. L'UI l'affiche dès le départ : chaque
+carte porte le nom du modèle et son fournisseur, l'historique aussi. Le combat
+était « à l'aveugle » (noms masqués jusqu'au vote) ; l'utilisateur, qui choisit
+lui-même les modèles, a demandé à voir lequel a écrit quoi. La lettre (A, B…)
+ne sert plus qu'à la couleur de la carte et au vote.
+
+**Une erreur n'est pas une réponse.** Un concurrent qui échoue (« Copilot auth
+error: … ») apparaît en erreur, sans bouton de vote, et le handler refuse un
+vote pour lui. Il faut deux réponses pour voter : sous ce seuil, le combat
+l'annonce au lieu de proposer le vote. Côté backend, `oneshot_completion` ne
+compte jamais une ligne `MessageRole.SYSTEM` (le statut qu'un client émet sur
+lui-même) comme du texte du modèle : seule, elle devient l'erreur de l'appel.
 
 **Rien ici ne détecte quoi que ce soit de nouveau.** Deux réponses que
 l'application possédait déjà sont jointes : quels fournisseurs sont configurés

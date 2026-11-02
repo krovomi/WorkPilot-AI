@@ -15,81 +15,95 @@ export type McpCategory =
 	| "documentation"
 	| "database"
 	| "cloud"
+	| "testing"
+	| "web"
 	| "security"
 	| "analytics"
 	| "ai"
 	| "custom";
 
-/** Installation status of an MCP server */
-export type McpInstallStatus =
-	| "not_installed"
-	| "installing"
-	| "installed"
-	| "update_available"
-	| "error";
-
 /** MCP server transport type */
 export type McpTransportType = "stdio" | "http" | "sse";
 
+/** A catalog text in each language the app ships. */
+export interface LocalizedText {
+	en: string;
+	fr: string;
+}
+
 /**
- * A server entry in the MCP Marketplace catalog.
+ * A value the user types when installing a catalog server.
+ *
+ * `${name}` in the entry's args, url or headers is replaced by the value; a
+ * variable no placeholder names goes to the server's environment (stdio only).
+ */
+export interface McpCatalogVar {
+	/** Variable name (an environment variable name, e.g. NOTION_TOKEN) */
+	name: string;
+	/** Short label (product terms, not translated) */
+	label: string;
+	/** Help text */
+	description: LocalizedText;
+	/** Must be filled before installing */
+	required: boolean;
+	/** Masked in the form */
+	secret: boolean;
+	/** Placeholder value */
+	placeholder?: string;
+	/** Page where the user gets the value */
+	helpUrl?: string;
+}
+
+/** Info about a tool provided by an MCP server */
+export interface McpToolInfo {
+	/** Tool name */
+	name: string;
+	/** Tool description */
+	description: string;
+}
+
+/**
+ * A server entry of the MCP Marketplace catalog
+ * (`shared/mcp-catalog/servers.json`). Installing it adds a
+ * `CustomMcpServer` to the project, which agents then start.
  */
 export interface McpMarketplaceServer {
-	/** Unique server identifier (e.g., 'slack', 'jira', 'github') */
+	/** Unique server identifier, also the project's custom server id */
 	id: string;
 	/** Display name */
 	name: string;
-	/** Short tagline */
-	tagline: string;
-	/** Full description (markdown supported) */
-	description: string;
-	/** Publisher / author name */
+	tagline: LocalizedText;
+	description: LocalizedText;
+	/** Publisher; "(community)" when the vendor does not maintain it */
 	author: string;
-	/** Category for filtering */
+	/** Maintained by the vendor of the product it connects to */
+	official: boolean;
 	category: McpCategory;
-	/** Icon name (lucide icon key) or URL */
-	icon: string;
 	/** Brand color (hex) */
 	color: string;
-	/** NPM package name or GitHub URL */
-	packageName: string;
-	/** Current version */
-	version: string;
-	/** Weekly download count (for popularity sorting) */
-	downloads: number;
-	/** Average rating (0-5) */
-	rating: number;
-	/** Number of ratings */
-	ratingCount: number;
-	/** Is this server verified / official */
-	verified: boolean;
-	/** Transport type */
+	/** npm or PyPI package, or the URL of a remote server */
+	package: string;
 	transport: McpTransportType;
-	/** Command to run (for stdio) */
+	/** Launcher for stdio (npx or uvx) */
 	command?: string;
-	/** Default args */
-	defaultArgs?: string[];
-	/** URL endpoint (for http/sse) */
+	/** Launcher args, may hold `${VAR}` placeholders */
+	args?: string[];
+	/** Remote server URL, may hold `${VAR}` placeholders */
 	url?: string;
-	/** Required environment variables (e.g., API keys) */
-	requiredEnvVars?: McpEnvVar[];
-	/** Optional environment variables */
-	optionalEnvVars?: McpEnvVar[];
-	/** List of tools provided by this server */
+	/** Remote server headers, may hold `${VAR}` placeholders */
+	headers?: Record<string, string>;
+	/** Fixed environment of a stdio server */
+	env?: Record<string, string>;
+	/** Values asked at install */
+	vars: McpCatalogVar[];
+	/** Tool the machine needs besides Node.js: uv (uvx) or the Azure CLI */
+	requires?: "uv" | "az";
 	tools: McpToolInfo[];
-	/** Tags for search */
 	tags: string[];
-	/** Homepage URL */
-	homepage?: string;
-	/** Repository URL */
-	repository?: string;
-	/** Date added to marketplace */
-	addedAt: string;
-	/** Last updated date */
-	updatedAt: string;
+	homepage: string;
 }
 
-/** Environment variable required by an MCP server */
+/** Environment variable of a builder project */
 export interface McpEnvVar {
 	/** Variable name (e.g., SLACK_BOT_TOKEN) */
 	name: string;
@@ -105,60 +119,6 @@ export interface McpEnvVar {
 	secret: boolean;
 	/** Link to obtain the value (e.g., API key creation page) */
 	helpUrl?: string;
-}
-
-/** Info about a tool provided by an MCP server */
-export interface McpToolInfo {
-	/** Tool name */
-	name: string;
-	/** Tool description */
-	description: string;
-}
-
-/**
- * An installed MCP server instance.
- */
-export interface McpInstalledServer {
-	/** References the marketplace server ID */
-	serverId: string;
-	/** Display name (can be customized) */
-	name: string;
-	/** Installed version */
-	version: string;
-	/** Installation status */
-	status: McpInstallStatus;
-	/** Whether the server is currently enabled */
-	enabled: boolean;
-	/** Transport type */
-	transport: McpTransportType;
-	/** Command to run */
-	command?: string;
-	/** Arguments */
-	args?: string[];
-	/** URL endpoint */
-	url?: string;
-	/** Configured environment variables (values stored securely) */
-	envVars: Record<string, string>;
-	/** Custom headers (for HTTP servers) */
-	headers?: Record<string, string>;
-	/** Date installed */
-	installedAt: string;
-	/** Last health check result */
-	lastHealthCheck?: McpServerHealthInfo;
-	/** Is this a custom-built server (from the builder)? */
-	isCustomBuilt: boolean;
-}
-
-/** Health check info for an installed server */
-export interface McpServerHealthInfo {
-	/** Is the server healthy? */
-	healthy: boolean;
-	/** Response time in ms */
-	responseTime?: number;
-	/** Error message if unhealthy */
-	error?: string;
-	/** Timestamp of last check */
-	checkedAt: string;
 }
 
 // ============================================
@@ -251,9 +211,9 @@ export interface McpBuilderProject {
 export interface McpMarketplaceFilters {
 	search: string;
 	category: McpCategory | "all";
-	sortBy: "popular" | "rating" | "newest" | "name";
+	sortBy: "featured" | "name";
 	showInstalledOnly: boolean;
-	showVerifiedOnly: boolean;
+	showOfficialOnly: boolean;
 }
 
 /** Active tab in the marketplace */

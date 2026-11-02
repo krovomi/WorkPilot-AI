@@ -257,6 +257,9 @@ except ImportError:
         return {}
 
 
+from core.custom_mcp_validation import (
+    validate_custom_mcp_server as _validate_custom_mcp_server,
+)
 from docintel.read_guard import make_read_guard_hook
 from harness.application.budget import session_budget_usd
 from harness.application.subagents import (
@@ -357,167 +360,6 @@ def _make_stop_hook(spec_dir: Path):
         return {}
 
     return _hook
-
-
-def _validate_custom_mcp_server(server: dict) -> bool:
-    """
-    Validate a custom MCP server configuration for security.
-
-    Ensures only expected fields with valid types are present.
-    Rejects configurations that could lead to command injection.
-
-    Args:
-        server: Dict representing a custom MCP server configuration
-
-    Returns:
-        True if valid, False otherwise
-    """
-    if not isinstance(server, dict):
-        return False
-
-    # Required fields
-    required_fields = {"id", "name", "type"}
-    if not all(field in server for field in required_fields):
-        logger.warning(
-            f"Custom MCP server missing required fields: {required_fields - server.keys()}"
-        )
-        return False
-
-    # Validate field types
-    if not isinstance(server.get("id"), str) or not server["id"]:
-        return False
-    if not isinstance(server.get("name"), str) or not server["name"]:
-        return False
-    # FIX: Changed from ('command', 'url') to ('command', 'http') to match actual usage
-    if server.get("type") not in ("command", "http"):
-        logger.warning(f"Invalid MCP server type: {server.get('type')}")
-        return False
-
-    # Allowlist of safe executable commands for MCP servers
-    # Only allow known package managers and interpreters - NO shell commands
-    SAFE_COMMANDS = {
-        "npx",
-        "npm",
-        "node",
-        "python",
-        "python3",
-        "uv",
-        "uvx",
-    }
-
-    # Blocklist of dangerous shell commands that should never be allowed
-    DANGEROUS_COMMANDS = {
-        "bash",
-        "sh",
-        "cmd",
-        "powershell",
-        "pwsh",  # PowerShell Core
-        "/bin/bash",
-        "/bin/sh",
-        "/bin/zsh",
-        "/usr/bin/bash",
-        "/usr/bin/sh",
-        "zsh",
-        "fish",
-    }
-
-    # Dangerous interpreter flags that allow arbitrary code execution
-    # Covers Python (-e, -c, -m, -p), Node.js (--eval, --print, loaders), and general
-    DANGEROUS_FLAGS = {
-        "--eval",
-        "-e",
-        "-c",
-        "--exec",
-        "-m",  # Python module execution
-        "-p",  # Python eval+print
-        "--print",  # Node.js print
-        "--input-type=module",  # Node.js ES module mode
-        "--experimental-loader",  # Node.js custom loaders
-        "--require",  # Node.js require injection
-        "-r",  # Node.js require shorthand
-    }
-
-    # Type-specific validation
-    if server["type"] == "command":
-        if not isinstance(server.get("command"), str) or not server["command"]:
-            logger.warning("Command-type MCP server missing 'command' field")
-            return False
-
-        # SECURITY FIX: Validate command is in safe list and not in dangerous list
-        command = server.get("command", "")
-
-        # Reject paths - commands must be bare names only (no / or \)
-        # This prevents path traversal like '/custom/malicious' or './evil'
-        if "/" in command or "\\" in command:
-            logger.warning(
-                f"Rejected command with path in MCP server: {command}. "
-                f"Commands must be bare names without path separators."
-            )
-            return False
-
-        if command in DANGEROUS_COMMANDS:
-            logger.warning(
-                f"Rejected dangerous command in MCP server: {command}. "
-                f"Shell commands are not allowed for security reasons."
-            )
-            return False
-
-        if command not in SAFE_COMMANDS:
-            logger.warning(
-                f"Rejected unknown command in MCP server: {command}. "
-                f"Only allowed commands: {', '.join(sorted(SAFE_COMMANDS))}"
-            )
-            return False
-
-        # Validate args is a list of strings if present
-        if "args" in server:
-            if not isinstance(server["args"], list):
-                return False
-            if not all(isinstance(arg, str) for arg in server["args"]):
-                return False
-            # Check for dangerous interpreter flags that allow code execution
-            for arg in server["args"]:
-                if arg in DANGEROUS_FLAGS:
-                    logger.warning(
-                        f"Rejected dangerous flag '{arg}' in MCP server args. "
-                        f"Interpreter code execution flags are not allowed."
-                    )
-                    return False
-    elif server["type"] == "http":
-        if not isinstance(server.get("url"), str) or not server["url"]:
-            logger.warning("HTTP-type MCP server missing 'url' field")
-            return False
-        # Validate headers is a dict of strings if present
-        if "headers" in server:
-            if not isinstance(server["headers"], dict):
-                return False
-            if not all(
-                isinstance(k, str) and isinstance(v, str)
-                for k, v in server["headers"].items()
-            ):
-                return False
-
-    # Optional description must be string if present
-    if "description" in server and not isinstance(server.get("description"), str):
-        return False
-
-    # Reject any unexpected fields that could be exploited
-    allowed_fields = {
-        "id",
-        "name",
-        "type",
-        "command",
-        "args",
-        "url",
-        "headers",
-        "description",
-    }
-    unexpected_fields = set(server.keys()) - allowed_fields
-    if unexpected_fields:
-        logger.warning(f"Custom MCP server has unexpected fields: {unexpected_fields}")
-        return False
-
-    return True
 
 
 def load_project_mcp_config(project_dir: Path) -> dict:
@@ -1501,6 +1343,8 @@ def _custom_servers(required_servers, mcp_config: dict) -> dict[str, dict]:
                 "command": custom.get("command", "npx"),
                 "args": custom.get("args", []),
             }
+            if custom.get("env"):
+                mcp_servers[server_id]["env"] = dict(custom["env"])
         elif server_type == "http":
             server_config = {
                 "type": "http",
