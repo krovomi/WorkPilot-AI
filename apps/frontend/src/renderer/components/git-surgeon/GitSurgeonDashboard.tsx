@@ -24,7 +24,7 @@ export function GitSurgeonDashboard({
 	const canRun = !!projectPath && !isScanning;
 
 	return (
-		<div className="flex flex-col gap-4 p-6 bg-(--bg-primary) text-(--text-primary)">
+		<div className="flex flex-col gap-4 p-6 bg-background text-foreground">
 			<div className="flex items-center gap-3 flex-wrap">
 				{isScanning ? (
 					<button
@@ -39,7 +39,7 @@ export function GitSurgeonDashboard({
 						type="button"
 						onClick={() => projectPath && startScan(projectPath)}
 						disabled={!canRun}
-						className="px-3 py-1.5 rounded bg-(--accent-color) text-white text-sm disabled:opacity-50"
+						className="px-3 py-1.5 rounded bg-primary text-white text-sm disabled:opacity-50"
 					>
 						{t("actions.runScan")}
 					</button>
@@ -48,7 +48,7 @@ export function GitSurgeonDashboard({
 					<button
 						type="button"
 						onClick={reset}
-						className="px-3 py-1.5 rounded bg-(--bg-secondary) border border-(--border-color) text-sm hover:bg-(--bg-tertiary)"
+						className="px-3 py-1.5 rounded bg-card border border-border text-sm hover:bg-muted"
 					>
 						{t("actions.reset")}
 					</button>
@@ -56,13 +56,13 @@ export function GitSurgeonDashboard({
 			</div>
 
 			{!projectPath && (
-				<div className="text-sm text-(--text-secondary)">
+				<div className="text-sm text-muted-foreground">
 					{t("errors.noProject")}
 				</div>
 			)}
 
 			{isScanning && (
-				<div className="text-sm text-(--text-secondary) animate-pulse">
+				<div className="text-sm text-muted-foreground animate-pulse">
 					{status || t("actions.scanning")}
 				</div>
 			)}
@@ -77,7 +77,7 @@ export function GitSurgeonDashboard({
 				<ReportBody plan={plan} t={t} />
 			) : (
 				phase === "idle" && (
-					<div className="flex items-center justify-center h-40 text-(--text-secondary)">
+					<div className="flex items-center justify-center h-40 text-muted-foreground">
 						<p>{t("noData")}</p>
 					</div>
 				)
@@ -97,7 +97,7 @@ function ReportBody({
 		<div className="flex flex-col gap-4">
 			<div>
 				<h2 className="text-lg font-semibold">{t("title")}</h2>
-				<p className="text-sm text-(--text-secondary)">
+				<p className="text-sm text-muted-foreground">
 					{plan.issues.length} {t("issues")} · ~
 					{plan.estimatedSizeSavingsMb.toFixed(1)} MB
 				</p>
@@ -113,7 +113,7 @@ function ReportBody({
 				{plan.issues.map((issue) => (
 					<div
 						key={issue.commitSha}
-						className="px-4 py-3 rounded-lg border border-(--border-color) hover:bg-(--bg-secondary) transition-colors"
+						className="px-4 py-3 rounded-lg border border-border hover:bg-card transition-colors"
 					>
 						<div className="flex items-center gap-2 mb-1">
 							<span className="text-xs font-medium uppercase text-yellow-400">
@@ -124,7 +124,7 @@ function ReportBody({
 							</span>
 						</div>
 						<p className="text-sm">{issue.description}</p>
-						<div className="flex items-center gap-4 text-xs text-(--text-secondary) mt-1">
+						<div className="flex items-center gap-4 text-xs text-muted-foreground mt-1">
 							<span className="font-mono">{issue.commitSha.slice(0, 8)}</span>
 							{issue.filePath && (
 								<span className="font-mono">{issue.filePath}</span>
@@ -139,14 +139,14 @@ function ReportBody({
 
 			{plan.actions.length > 0 && (
 				<div>
-					<h3 className="text-sm font-medium text-(--text-secondary) mb-2">
+					<h3 className="text-sm font-medium text-muted-foreground mb-2">
 						{t("plannedActions")}
 					</h3>
 					<div className="space-y-1">
 						{plan.actions.map((action) => (
 							<div
 								key={action.action}
-								className="flex items-center gap-2 px-3 py-2 rounded text-sm bg-(--bg-secondary)"
+								className="flex items-center gap-2 px-3 py-2 rounded text-sm bg-card"
 							>
 								<span className="text-purple-400 font-mono text-xs">
 									{action.action}
@@ -159,7 +159,7 @@ function ReportBody({
 			)}
 
 			{plan.summary && (
-				<p className="text-sm text-(--text-secondary) italic mt-2">
+				<p className="text-sm text-muted-foreground italic mt-2">
 					{plan.summary}
 				</p>
 			)}

@@ -48,7 +48,7 @@ export function I18nReportView({
 	const shared = useSharedAnalysisReport("i18n", projectPath, setReport, isScanning);
 
 	return (
-		<div className="flex flex-col gap-4 p-6 bg-(--bg-primary) text-(--text-primary)">
+		<div className="flex flex-col gap-4 p-6 bg-background text-foreground">
 			<Toolbar
 				canRun={canRun}
 				isScanning={isScanning}
@@ -65,20 +65,20 @@ export function I18nReportView({
 					value={searchQuery}
 					onChange={(e) => setSearchQuery(e.target.value)}
 					placeholder={t("search.placeholder")}
-					className="px-3 py-2 rounded bg-(--bg-secondary) border border-(--border-color) text-(--text-primary) text-sm focus:outline-none focus:ring-2 focus:ring-(--accent-color)"
+					className="px-3 py-2 rounded bg-card border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
 				/>
 			)}
 
 			{!isScanning && <SharedReportNote saved={shared} />}
 
 			{!projectPath && (
-				<div className="text-sm text-(--text-secondary)">
+				<div className="text-sm text-muted-foreground">
 					{t("errors.noProject")}
 				</div>
 			)}
 
 			{isScanning && (
-				<div className="text-sm text-(--text-secondary) animate-pulse">
+				<div className="text-sm text-muted-foreground animate-pulse">
 					{status || t("actions.scanning")}
 				</div>
 			)}
@@ -93,7 +93,7 @@ export function I18nReportView({
 				<ReportBody report={report} t={t} searchQuery={searchQuery} />
 			) : (
 				phase === "idle" && (
-					<div className="flex flex-col items-center justify-center h-40 text-(--text-secondary)">
+					<div className="flex flex-col items-center justify-center h-40 text-muted-foreground">
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
 							fill="none"
@@ -149,7 +149,7 @@ function Toolbar({
 					type="button"
 					onClick={onRun}
 					disabled={!canRun}
-					className="px-3 py-1.5 rounded bg-(--accent-color) text-white text-sm disabled:opacity-50"
+					className="px-3 py-1.5 rounded bg-primary text-white text-sm disabled:opacity-50"
 				>
 					{t("actions.runScan")}
 				</button>
@@ -159,7 +159,7 @@ function Toolbar({
 				<button
 					type="button"
 					onClick={onReset}
-					className="px-3 py-1.5 rounded bg-(--bg-secondary) border border-(--border-color) text-sm hover:bg-(--bg-tertiary)"
+					className="px-3 py-1.5 rounded bg-card border border-border text-sm hover:bg-muted"
 				>
 					{t("actions.reset")}
 				</button>
@@ -191,7 +191,7 @@ function ReportBody({
 		<div className="flex flex-col gap-4">
 			<div>
 				<h2 className="text-lg font-semibold">{t("title")}</h2>
-				<p className="text-sm text-(--text-secondary)">
+				<p className="text-sm text-muted-foreground">
 					{t("filesInfo", {
 						count: report.filesScanned,
 						locales: report.localesCompared.join(", ") || "—",
@@ -213,9 +213,9 @@ function ReportBody({
 						return (
 							<div
 								key={locale}
-								className="p-3 rounded-lg bg-(--bg-secondary) border border-(--border-color)"
+								className="p-3 rounded-lg bg-card border border-border"
 							>
-								<p className="text-xs text-(--text-secondary)">
+								<p className="text-xs text-muted-foreground">
 									{t("locale")}: {locale}
 								</p>
 								<p className={`text-xl font-bold ${coverageColor}`}>{pct}%</p>
@@ -227,7 +227,7 @@ function ReportBody({
 
 			<div className="space-y-2">
 				{filteredIssues.length === 0 && searchQuery ? (
-					<div className="text-sm text-(--text-secondary) text-center py-4">
+					<div className="text-sm text-muted-foreground text-center py-4">
 						{t("search.noResults")}
 					</div>
 				) : (
@@ -259,7 +259,7 @@ function ReportBody({
 			</div>
 
 			{report.summary && (
-				<p className="text-sm text-(--text-secondary) italic mt-2">
+				<p className="text-sm text-muted-foreground italic mt-2">
 					{report.summary}
 				</p>
 			)}
