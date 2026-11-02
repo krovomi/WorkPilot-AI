@@ -54,7 +54,7 @@ export function A11yReportView({
 	const shared = useSharedAnalysisReport("accessibility", projectPath, setReport, isScanning);
 
 	return (
-		<div className="flex flex-col gap-4 p-6 bg-(--bg-primary) text-(--text-primary)">
+		<div className="flex flex-col gap-4 p-6 bg-background text-foreground">
 			<Toolbar
 				targetLevel={targetLevel}
 				onTargetLevelChange={setTargetLevel}
@@ -71,13 +71,13 @@ export function A11yReportView({
 			{!isScanning && <SharedReportNote saved={shared} />}
 
 			{!projectPath && (
-				<div className="text-sm text-(--text-secondary)">
+				<div className="text-sm text-muted-foreground">
 					{t("errors.noProject")}
 				</div>
 			)}
 
 			{isScanning && (
-				<div className="text-sm text-(--text-secondary) animate-pulse">
+				<div className="text-sm text-muted-foreground animate-pulse">
 					{status || t("actions.scanning")}
 				</div>
 			)}
@@ -94,7 +94,7 @@ export function A11yReportView({
 				</div>
 			) : (
 				phase === "idle" && (
-					<div className="flex items-center justify-center h-40 text-(--text-secondary)">
+					<div className="flex items-center justify-center h-40 text-muted-foreground">
 						<p>{t("noData")}</p>
 					</div>
 				)
@@ -129,7 +129,7 @@ function Toolbar({
 	return (
 		<div className="flex items-center gap-3 flex-wrap">
 			<div className="flex items-center gap-2">
-				<span className="text-sm text-(--text-secondary)">{t("levels.label")}</span>
+				<span className="text-sm text-muted-foreground">{t("levels.label")}</span>
 				<Select
 					value={targetLevel}
 					disabled={disabled}
@@ -159,7 +159,7 @@ function Toolbar({
 					type="button"
 					onClick={onRun}
 					disabled={!canRun}
-					className="px-3 py-1.5 rounded bg-(--accent-color) text-white text-sm disabled:opacity-50"
+					className="px-3 py-1.5 rounded bg-primary text-white text-sm disabled:opacity-50"
 				>
 					{t("actions.runScan")}
 				</button>
@@ -169,7 +169,7 @@ function Toolbar({
 				<button
 					type="button"
 					onClick={onReset}
-					className="px-3 py-1.5 rounded bg-(--bg-secondary) border border-(--border-color) text-sm hover:bg-(--bg-tertiary)"
+					className="px-3 py-1.5 rounded bg-card border border-border text-sm hover:bg-muted"
 				>
 					{t("actions.reset")}
 				</button>
@@ -218,7 +218,7 @@ function ReportBody({
 		<div className="flex flex-col flex-1 gap-4">
 			<div>
 				<h2 className="text-lg font-semibold">{t("title")}</h2>
-				<p className="text-sm text-(--text-secondary)">
+				<p className="text-sm text-muted-foreground">
 					{t("targetInfo", {
 						targetLevel: report.targetLevel,
 						filesScanned: report.filesScanned,
@@ -232,7 +232,7 @@ function ReportBody({
 					placeholder={t("search.placeholder")}
 					value={searchQuery}
 					onChange={(e) => setSearchQuery(e.target.value)}
-					className="w-full px-3 py-2 rounded-lg bg-(--bg-secondary) border border-(--border-color) text-(--text-primary) placeholder:text-(--text-secondary) focus:outline-none focus:ring-2 focus:ring-(--accent-color)"
+					className="w-full px-3 py-2 rounded-lg bg-card border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
 				/>
 			</div>
 
@@ -304,7 +304,7 @@ function ReportBody({
 			</div>
 
 			{report.summary && (
-				<p className="text-sm text-(--text-secondary) italic mt-2">
+				<p className="text-sm text-muted-foreground italic mt-2">
 					{report.summary}
 				</p>
 			)}
@@ -328,12 +328,12 @@ function StatCard({
 	return (
 		<button
 			type="button"
-			className={`p-3 rounded-lg bg-(--bg-secondary) border border-(--border-color) cursor-pointer transition-colors hover:bg-(--bg-tertiary) text-left ${
-				isActive ? "ring-2 ring-(--accent-color)" : ""
+			className={`p-3 rounded-lg bg-card border border-border cursor-pointer transition-colors hover:bg-muted text-left ${
+				isActive ? "ring-2 ring-primary" : ""
 			}`}
 			onClick={onClick}
 		>
-			<p className="text-xs text-(--text-secondary)">{label}</p>
+			<p className="text-xs text-muted-foreground">{label}</p>
 			<p className={`text-2xl font-bold ${color}`}>{value}</p>
 		</button>
 	);
