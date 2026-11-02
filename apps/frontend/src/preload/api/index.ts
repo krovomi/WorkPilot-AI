@@ -162,6 +162,7 @@ import {
 	type FormulaMatrixAPI,
 } from "./modules/formula-matrix-api";
 import { type BenchAPI, createBenchAPI } from "./modules/bench-api";
+import { type BoardMcpAPI, createBoardMcpAPI } from "./modules/board-mcp-api";
 import { createDebugAPI, type DebugAPI } from "./modules/debug-api";
 import { createGitHubAPI, type GitHubAPI } from "./modules/github-api";
 import {
@@ -282,6 +283,7 @@ export interface ElectronAPI
 		CostPredictorAPI,
 		FormulaMatrixAPI,
 		BenchAPI,
+		BoardMcpAPI,
 		AccessibilityAPI,
 		SharedAnalysisAPI,
 		I18nAgentAPI,
@@ -428,6 +430,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createCostPredictorAPI(),
 		...createFormulaMatrixAPI(),
 		...createBenchAPI(),
+		...createBoardMcpAPI(),
 		...createAccessibilityAPI(),
 		...createSharedAnalysisAPI(),
 		...createI18nAgentAPI(),
