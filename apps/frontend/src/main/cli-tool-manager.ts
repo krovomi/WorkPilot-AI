@@ -20,6 +20,12 @@
  * - Graceful fallbacks when tools not found
  */
 
+import { debugLog } from "../shared/utils/debug-logger";
+import {
+	sameToolConfig,
+	type ToolConfig,
+	toolConfigFromSettings,
+} from "./cli-tool-config";
 import {
 	type ExecFileOptionsWithStringEncoding,
 	type ExecFileSyncOptions,
@@ -76,18 +82,7 @@ import {
  */
 export type CLITool = "python" | "git" | "gh" | "glab" | "claude" | "copilot";
 
-/**
- * User configuration for CLI tool paths
- * Maps to settings stored in settings.json
- */
-export interface ToolConfig {
-	pythonPath?: string;
-	gitPath?: string;
-	githubCLIPath?: string;
-	gitlabCLIPath?: string;
-	claudePath?: string;
-	copilotPath?: string;
-}
+export type { ToolConfig } from "./cli-tool-config";
 
 /**
  * Internal validation result for a CLI tool
@@ -314,20 +309,35 @@ class CLIToolManager {
 	private readonly cache: Map<CLITool, CacheEntry> = new Map();
 	private readonly toolInfoCache: Map<CLITool, ToolInfoCacheEntry> = new Map();
 	private userConfig: ToolConfig = {};
+	/** Async detections running, shared by concurrent callers. */
+	private readonly detecting: Map<CLITool, Promise<string>> = new Map();
+	/** Bumped on reset: a detection started before does not fill the cache. */
+	private generation = 0;
 
 	/**
-	 * Configure the tool manager with user settings
-	 *
-	 * Clears the cache to force re-detection with new configuration.
-	 * Call this when user changes CLI tool paths in Settings.
-	 *
-	 * @param config - User configuration for CLI tool paths
+	 * Configure the tool manager with user settings, clearing the cache to
+	 * force re-detection. An unchanged configuration changes nothing: settings
+	 * are read and saved often, and re-detecting each time is slow and noisy.
+	 * @returns Whether the configuration changed
 	 */
-	configure(config: ToolConfig): void {
+	configure(config: ToolConfig): boolean {
+		if (sameToolConfig(this.userConfig, config)) return false;
 		this.userConfig = config;
+		this.resetCaches();
+		debugLog("[CLI Tools] Configuration updated, cache cleared");
+		return true;
+	}
+
+	/** Change some paths, keep the others. */
+	update(changes: Partial<ToolConfig>): boolean {
+		return this.configure({ ...this.userConfig, ...changes });
+	}
+
+	private resetCaches(): void {
 		this.cache.clear();
 		this.toolInfoCache.clear();
-		console.warn("[CLI Tools] Configuration updated, cache cleared");
+		this.detecting.clear();
+		this.generation++;
 	}
 
 	/**
@@ -361,7 +371,7 @@ class CLIToolManager {
 				version: result.version,
 				source: result.source,
 			});
-			console.warn(
+			debugLog(
 				`[CLI Tools] Detected ${tool}: ${result.path} (${result.source})`,
 			);
 			return result.path;
@@ -1243,7 +1253,7 @@ class CLIToolManager {
 			const match = /(\d+\.\d+\.\d+)/.exec(version);
 			const versionStr = match ? match[1] : version.split("\n")[0];
 
-			console.warn(
+			debugLog(
 				`[Claude CLI] Validation succeeded for "${claudeCmd}": version ${versionStr}`,
 			);
 			return {
@@ -1346,15 +1356,29 @@ class CLIToolManager {
 			return cached.path;
 		}
 
-		// Detect asynchronously
+		// Detect asynchronously, once for every caller asking meanwhile
+		const running = this.detecting.get(tool);
+		if (running) return running;
+		const detection = this.detectAndCache(tool, this.generation).finally(
+			() => this.detecting.get(tool) === detection && this.detecting.delete(tool),
+		);
+		this.detecting.set(tool, detection);
+		return detection;
+	}
+
+	private async detectAndCache(
+		tool: CLITool,
+		generation: number,
+	): Promise<string> {
 		const result = await this.detectToolPathAsync(tool);
 		if (result.found && result.path) {
+			if (generation !== this.generation) return result.path; // Stale config
 			this.cache.set(tool, {
 				path: result.path,
 				version: result.version,
 				source: result.source,
 			});
-			console.warn(
+			debugLog(
 				`[CLI Tools] Detected ${tool}: ${result.path} (${result.source})`,
 			);
 			return result.path;
@@ -1523,7 +1547,7 @@ class CLIToolManager {
 			const match = /(\d+\.\d+\.\d+)/.exec(version);
 			const versionStr = match ? match[1] : version.split("\n")[0];
 
-			console.warn(
+			debugLog(
 				`[Claude CLI] Async validation succeeded for "${claudeCmd}": version ${versionStr}`,
 			);
 			return {
@@ -1899,7 +1923,7 @@ class CLIToolManager {
 	}
 
 	private async detectClaudeAsync(): Promise<ToolDetectionResult> {
-		console.warn("[Claude CLI] Starting detection...");
+		debugLog("[Claude CLI] Starting detection...");
 		const homeDir = os.homedir();
 		const paths = getClaudeDetectionPaths(homeDir);
 
@@ -2610,16 +2634,10 @@ class CLIToolManager {
 		);
 	}
 
-	/**
-	 * Clear cache manually
-	 *
-	 * Useful for testing or forcing re-detection.
-	 * Normally not needed as cache is cleared automatically on settings change.
-	 */
+	/** Clear the cache, to force re-detection (a settings change does it too). */
 	clearCache(): void {
-		this.cache.clear();
-		this.toolInfoCache.clear();
-		console.warn("[CLI Tools] Cache cleared");
+		this.resetCaches();
+		debugLog("[CLI Tools] Cache cleared");
 	}
 
 	/**
@@ -2699,27 +2717,24 @@ export function getClaudeCliPathForSdk(): string | null {
 }
 
 /**
- * Configure CLI tools with user settings
- *
- * Call this when user updates CLI tool paths in Settings.
- * Clears cache to force re-detection with new configuration.
- *
- * @param config - User configuration for CLI tool paths
- *
- * @example
- * ```typescript
- * import { configureTools } from './cli-tool-manager';
- *
- * // When settings are loaded or updated
- * configureTools({
- *   pythonPath: settings.pythonPath,
- *   gitPath: settings.gitPath,
- *   githubCLIPath: settings.githubCLIPath,
- * });
- * ```
+ * Configure CLI tools with user settings, clearing the cache to force
+ * re-detection — unless the configuration is unchanged.
+ * @returns Whether the configuration changed
  */
-export function configureTools(config: ToolConfig): void {
-	cliToolManager.configure(config);
+export function configureTools(config: ToolConfig): boolean {
+	return cliToolManager.configure(config);
+}
+
+/** Change some tool paths, keep the others; whether that changed anything. */
+export function updateToolConfig(changes: Partial<ToolConfig>): boolean {
+	return cliToolManager.update(changes);
+}
+
+/** Configure the tool paths from the app settings; unchanged ones change nothing. */
+export function configureToolsFromSettings(
+	settings: Partial<Record<keyof ToolConfig, unknown>>,
+): boolean {
+	return configureTools(toolConfigFromSettings(settings));
 }
 
 /**
@@ -2829,28 +2844,13 @@ export async function getClaudeCliPathForSdkAsync(): Promise<string | null> {
 }
 
 /**
- * Pre-warm the CLI tool cache asynchronously
- *
- * Call this during app startup to detect tools in the background.
- * Subsequent calls to getToolPath/getToolPathAsync will use cached values.
- *
- * @param tools - Array of tools to pre-warm (defaults to ['claude'])
- *
- * @example
- * ```typescript
- * import { preWarmToolCache } from './cli-tool-manager';
- *
- * // In app startup
- * app.whenReady().then(() => {
- *   // ... setup code ...
- *   preWarmToolCache(['claude', 'git', 'gh']);
- * });
- * ```
+ * Detect `tools` in the background (app startup, a changed configuration), so
+ * later getToolPath/getToolPathAsync calls answer from the cache.
  */
 export async function preWarmToolCache(
 	tools: CLITool[] = ["claude"],
 ): Promise<void> {
-	console.warn("[CLI Tools] Pre-warming cache for:", tools.join(", "));
+	debugLog("[CLI Tools] Pre-warming cache for:", tools.join(", "));
 	await Promise.all(tools.map((tool) => cliToolManager.getToolPathAsync(tool)));
-	console.warn("[CLI Tools] Cache pre-warming complete");
+	debugLog("[CLI Tools] Cache pre-warming complete");
 }

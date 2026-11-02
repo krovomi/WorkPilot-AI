@@ -3,7 +3,7 @@
 Each view used to style its own title: eleven combinations of size and weight
 (``text-2xl font-bold``, ``text-lg font-semibold``, ``text-xl``...), with or
 without an icon, a band or a description. Moving from one view to the next
-changed the type scale. F147 moved them to ``components/ui/page-header.tsx``;
+changed the type scale. F148 moved them to ``components/ui/page-header.tsx``;
 this test keeps new views on it.
 
 The screens left out are not views of the main window: the onboarding wizard

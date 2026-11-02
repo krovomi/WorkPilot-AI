@@ -63,6 +63,7 @@ vi.mock("@electron-toolkit/utils", () => ({
 
 vi.mock("../cli-tool-manager", () => ({
 	configureTools: vi.fn(),
+	configureToolsFromSettings: vi.fn(() => false),
 	getToolInfo: vi.fn(),
 	isPathFromWrongPlatform: vi.fn(() => false),
 	preWarmToolCache: vi.fn(() => Promise.resolve()),

@@ -5,6 +5,7 @@
  * organized by domain into separate handler modules.
  */
 
+import { debugLog } from "../../shared/utils/debug-logger";
 import path from "node:path";
 import { registerDictationHandlers } from "./dictation-handlers";
 import { app, type BrowserWindow } from "electron";
@@ -626,5 +627,5 @@ export function setupIpcHandlers(
 		getClaudeProfileManager(),
 	);
 
-	console.warn("[IPC] All handler modules registered successfully");
+	debugLog("[IPC] All handler modules registered successfully");
 }

@@ -65,36 +65,71 @@ function stateFilePath(): string {
 	return path.join(app.getPath("userData"), "server-connection.json");
 }
 
-function persist(): void {
+// Writes are chained so an older state never lands after a newer one.
+let persistChain: Promise<void> = Promise.resolve();
+
+async function encryptionAvailable(): Promise<boolean> {
 	try {
-		let encryptedRefreshToken: string | null = null;
-		if (refreshToken && safeStorage.isEncryptionAvailable()) {
-			encryptedRefreshToken = safeStorage
-				.encryptString(refreshToken)
-				.toString("base64");
-		}
-		const state: PersistedState = { mode, serverUrl, encryptedRefreshToken };
-		fs.writeFileSync(stateFilePath(), JSON.stringify(state), "utf-8");
-		configured = true;
-	} catch (err) {
-		console.error("[server-connection] Failed to persist state:", err);
+		return await safeStorage.isAsyncEncryptionAvailable();
+	} catch {
+		return false;
 	}
 }
 
-export function loadPersistedState(): void {
+async function writeState(state: {
+	mode: ConnectionMode;
+	serverUrl: string | null;
+	refreshToken: string | null;
+}): Promise<void> {
+	let encryptedRefreshToken: string | null = null;
+	if (state.refreshToken && (await encryptionAvailable())) {
+		encryptedRefreshToken = (
+			await safeStorage.encryptStringAsync(state.refreshToken)
+		).toString("base64");
+	}
+	const persisted: PersistedState = {
+		mode: state.mode,
+		serverUrl: state.serverUrl,
+		encryptedRefreshToken,
+	};
+	await fs.promises.writeFile(
+		stateFilePath(),
+		JSON.stringify(persisted),
+		"utf-8",
+	);
+}
+
+function persist(): void {
+	configured = true;
+	const snapshot = { mode, serverUrl, refreshToken };
+	persistChain = persistChain
+		.then(() => writeState(snapshot))
+		.catch((err) => {
+			console.error("[server-connection] Failed to persist state:", err);
+		});
+}
+
+/** Resolves once every state change so far is on disk. */
+export function flushPersistedState(): Promise<void> {
+	return persistChain;
+}
+
+export async function loadPersistedState(): Promise<void> {
 	try {
 		if (!fs.existsSync(stateFilePath())) return;
 		const raw = JSON.parse(
-			fs.readFileSync(stateFilePath(), "utf-8"),
+			await fs.promises.readFile(stateFilePath(), "utf-8"),
 		) as PersistedState;
 		// A persisted file means the user has already made a connection choice.
 		configured = true;
 		mode = raw.mode === "server" ? "server" : "local";
 		serverUrl = raw.serverUrl || null;
-		if (raw.encryptedRefreshToken && safeStorage.isEncryptionAvailable()) {
-			refreshToken = safeStorage.decryptString(
-				Buffer.from(raw.encryptedRefreshToken, "base64"),
-			);
+		if (raw.encryptedRefreshToken && (await encryptionAvailable())) {
+			refreshToken = (
+				await safeStorage.decryptStringAsync(
+					Buffer.from(raw.encryptedRefreshToken, "base64"),
+				)
+			).result;
 		}
 	} catch (err) {
 		console.error("[server-connection] Failed to load persisted state:", err);
