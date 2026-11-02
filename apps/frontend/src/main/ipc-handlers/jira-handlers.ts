@@ -15,8 +15,13 @@ import { readProjectEnv } from "../project-env-file";
 import { projectStore } from "../project-store";
 import { downloadJiraImageAttachments } from "./shared/jira-attachments";
 import { envWithoutCredentials } from "../utils/child-env";
+import { getEffectiveSourcePath } from "../updater/path-resolver";
+import { connectorsRoot } from "../utils/connectors-path";
 
-const connectorSrcPath = path.resolve(import.meta.dirname, "..", "..", "..", "..", "src");
+/** The shared connectors package, in the repository or in the installed app. */
+function connectorSrcPath(): string {
+	return path.join(connectorsRoot(getEffectiveSourcePath()), "src");
+}
 
 /**
  * Register all Jira-related IPC handlers
@@ -79,7 +84,7 @@ import os
 from pathlib import Path
 
 # Add project root (parent of src/) to sys.path
-sys.path.insert(0, str(Path('${connectorSrcPath.replace(/\\/g, "\\\\")}').parent))
+sys.path.insert(0, str(Path('${connectorSrcPath().replace(/\\/g, "\\\\")}').parent))
 
 from src.connectors.jira.client import JiraClient
 from src.connectors.jira.connector import JiraConnector
