@@ -5,6 +5,7 @@
  * Provides manual controls for checking, downloading, and installing updates.
  */
 
+import { debugLog } from "../../shared/utils/debug-logger";
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
 import type { AppUpdateInfo, IPCResult } from "../../shared/types";
@@ -21,7 +22,7 @@ import {
  * Register all app-update-related IPC handlers
  */
 export function registerAppUpdateHandlers(): void {
-	console.warn("[IPC] Registering app update handlers");
+	debugLog("[IPC] Registering app update handlers");
 
 	// ============================================
 	// App Update Operations
@@ -170,5 +171,5 @@ export function registerAppUpdateHandlers(): void {
 		},
 	);
 
-	console.warn("[IPC] App update handlers registered successfully");
+	debugLog("[IPC] App update handlers registered successfully");
 }

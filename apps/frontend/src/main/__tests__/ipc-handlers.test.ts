@@ -167,6 +167,7 @@ vi.mock("../cli-tool-manager", () => ({
 	clearCache: vi.fn(),
 	clearToolCache: vi.fn(),
 	configureTools: vi.fn(),
+	configureToolsFromSettings: vi.fn(() => false),
 	preWarmToolCache: vi.fn(() => Promise.resolve()),
 	getToolPathAsync: vi.fn((tool: string) => Promise.resolve(tool)),
 }));

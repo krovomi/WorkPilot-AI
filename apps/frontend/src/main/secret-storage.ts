@@ -13,9 +13,17 @@
  * Reading never destroys: a value that cannot be decrypted right now (keyring
  * locked, safeStorage not ready yet) is handed back unchanged by the field
  * helpers, so a later write keeps it instead of replacing the key with nothing.
+ *
+ * Electron deprecated the synchronous safeStorage calls. The readers and
+ * writers here stay synchronous (settings are read on every log line), so the
+ * crypto runs ahead of them: `initSecretStorage` probes the keyring and
+ * decrypts the secrets already on disk with the async API once `ready` fires,
+ * and `prepareSecrets` encrypts a new secret before it is written. The
+ * synchronous calls remain only as a fallback for a value neither has seen.
  */
 
-import { safeStorage } from "electron";
+import { readFile } from "node:fs/promises";
+import { app, safeStorage } from "electron";
 import type { SecureStorageStatus } from "../shared/types/ipc";
 import { isLinux } from "./platform";
 
@@ -36,15 +44,135 @@ const readableSecrets = new Map<string, readonly string[]>();
  * that from costing a DPAPI / keyring round trip per secret each time.
  */
 const decryptedCache = new Map<string, string>();
+/** Plaintext → the ciphertext already on disk for it, so a rewrite of an
+ * unchanged secret does not encrypt it again. */
+const encryptedCache = new Map<string, string>();
 const DECRYPTED_CACHE_LIMIT = 256;
+/** What `isAsyncEncryptionAvailable` answered; null until it has. */
+let asyncEncryptionAvailable: boolean | null = null;
+
+function remember(ciphertext: string, plaintext: string): void {
+	if (decryptedCache.size >= DECRYPTED_CACHE_LIMIT) {
+		decryptedCache.clear();
+		encryptedCache.clear();
+	}
+	decryptedCache.set(ciphertext, plaintext);
+	encryptedCache.set(plaintext, ciphertext);
+}
+
+function beforeReady(): boolean {
+	try {
+		return !app.isReady();
+	} catch {
+		return false; // No app (tests, a plain Node process): just probe.
+	}
+}
 
 /** safeStorage can run at all — enough to decrypt what is already stored. */
 function safeStorageReady(): boolean {
+	if (asyncEncryptionAvailable !== null) return asyncEncryptionAvailable;
+	// Before `ready` safeStorage cannot decrypt anyway (Linux, Windows); not
+	// asking spares the deprecated synchronous probe.
+	if (beforeReady()) return false;
 	try {
 		return safeStorage.isEncryptionAvailable();
 	} catch {
 		return false;
 	}
+}
+
+const ENCRYPTED_VALUE = /enc:([A-Za-z0-9+/]+=*)/g;
+
+async function decryptAhead(ciphertext: string): Promise<void> {
+	if (decryptedCache.has(ciphertext)) return;
+	try {
+		const { result } = await safeStorage.decryptStringAsync(
+			Buffer.from(ciphertext.slice(ENCRYPTED_SECRET_PREFIX.length), "base64"),
+		);
+		remember(ciphertext, result);
+	} catch {
+		// Left to decryptSecret, which keeps the value and warns once.
+	}
+}
+
+/**
+ * Probe the keyring with the async safeStorage API, then decrypt the `enc:`
+ * values `files` hold (see primeSecretFiles). Call once `ready` has fired,
+ * before anything reads those files.
+ */
+export async function initSecretStorage(
+	files: readonly string[] = [],
+): Promise<void> {
+	try {
+		asyncEncryptionAvailable = await safeStorage.isAsyncEncryptionAvailable();
+	} catch {
+		asyncEncryptionAvailable = false;
+	}
+	await primeSecretFiles(files);
+	publish();
+}
+
+/**
+ * Decrypt ahead, with the async safeStorage API, the `enc:` values `files`
+ * hold, so their synchronous readers find every secret already decrypted.
+ */
+export async function primeSecretFiles(files: readonly string[]): Promise<void> {
+	if (!asyncEncryptionAvailable) return;
+	for (const file of files) {
+		let content: string;
+		try {
+			content = await readFile(file, "utf-8");
+		} catch {
+			continue; // Not written yet.
+		}
+		const values = new Set(
+			Array.from(content.matchAll(ENCRYPTED_VALUE), (match) => match[0]),
+		);
+		await Promise.all([...values].map(decryptAhead));
+	}
+}
+
+/**
+ * Encrypt, with the async safeStorage API, the secrets about to be written, so
+ * `encryptSecret` finds their ciphertext ready. Values already `enc:`, empty
+ * or known are skipped; without a keyring this does nothing.
+ */
+export async function prepareSecrets(values: Iterable<unknown>): Promise<void> {
+	if (!asyncEncryptionAvailable || !keyringAvailable()) return;
+	const pending = new Set<string>();
+	for (const value of values) {
+		if (
+			typeof value === "string" &&
+			value !== "" &&
+			!isEncryptedSecret(value) &&
+			!encryptedCache.has(value)
+		) {
+			pending.add(value);
+		}
+	}
+	await Promise.all(
+		[...pending].map(async (value) => {
+			try {
+				const encrypted = await safeStorage.encryptStringAsync(value);
+				remember(
+					`${ENCRYPTED_SECRET_PREFIX}${encrypted.toString("base64")}`,
+					value,
+				);
+			} catch {
+				// encryptSecret retries synchronously and reports a failure.
+			}
+		}),
+	);
+}
+
+/** The values of `record`'s secret fields, for `prepareSecrets`. */
+export function secretFieldValues(
+	record: object,
+	isSecret: (key: string) => boolean,
+): unknown[] {
+	return Object.entries(record)
+		.filter(([key]) => isSecret(key))
+		.map(([, value]) => value);
 }
 
 function selectedBackend(): string | null {
@@ -152,9 +280,14 @@ export function encryptSecret(value: string): string {
 	if (!value || isEncryptedSecret(value)) return value;
 	noteSecretStored();
 	if (keyringAvailable()) {
+		const known = encryptedCache.get(value);
+		if (known !== undefined) return known;
 		try {
-			const encrypted = safeStorage.encryptString(value).toString("base64");
-			return `${ENCRYPTED_SECRET_PREFIX}${encrypted}`;
+			const encrypted = `${ENCRYPTED_SECRET_PREFIX}${safeStorage.encryptString(value).toString("base64")}`;
+			// Only this way round: reading it back still asks the keyring.
+			if (encryptedCache.size >= DECRYPTED_CACHE_LIMIT) encryptedCache.clear();
+			encryptedCache.set(value, encrypted);
+			return encrypted;
 		} catch (error) {
 			console.warn("[SecretStorage] safeStorage failed to encrypt:", error);
 		}
@@ -179,8 +312,7 @@ export function decryptSecret(stored: string): string | undefined {
 		const secret = safeStorage.decryptString(
 			Buffer.from(stored.slice(ENCRYPTED_SECRET_PREFIX.length), "base64"),
 		);
-		if (decryptedCache.size >= DECRYPTED_CACHE_LIMIT) decryptedCache.clear();
-		decryptedCache.set(stored, secret);
+		remember(stored, secret);
 		return secret;
 	} catch (error) {
 		if (!decryptWarned) {

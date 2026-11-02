@@ -19,7 +19,7 @@ import { registerTriageHandlers } from "./triage-handlers";
 
 // Debug logging helper
 const DEBUG =
-	process.env.DEBUG === "true" || process.env.NODE_ENV === "development";
+	process.env.DEBUG === "true";
 
 function debugLog(_message: string): void {
 	if (DEBUG) {

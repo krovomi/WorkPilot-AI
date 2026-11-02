@@ -29,37 +29,37 @@ export interface QualityAPI {
 	/**
 	 * Analyze code quality for given files
 	 * @param files Array of file paths to analyze
-	 * @param projectDir Project directory path
+	 * @param projectId The project, by id: the main process finds its folder
 	 * @returns Quality score and issues
 	 */
-	analyzeQuality(files: string[], projectDir?: string): Promise<QualityScore>;
+	analyzeQuality(files: string[], projectId?: string): Promise<QualityScore>;
 
 	/**
 	 * Analyze code quality for a PR
 	 * @param prNumber PR number
 	 * @param changedFiles Array of changed files
-	 * @param projectDir Project directory path
+	 * @param projectId The project, by id: the main process finds its folder
 	 * @returns Quality score and issues
 	 */
 	analyzePRQuality(
 		prNumber: number,
 		changedFiles: string[],
-		projectDir?: string,
+		projectId?: string,
 	): Promise<QualityScore>;
 }
 
 export const createQualityAPI = (): QualityAPI => ({
-	analyzeQuality: (files: string[], projectDir?: string) =>
-		ipcRenderer.invoke(IPC_CHANNELS.QUALITY_ANALYZE, { files, projectDir }),
+	analyzeQuality: (files: string[], projectId?: string) =>
+		ipcRenderer.invoke(IPC_CHANNELS.QUALITY_ANALYZE, { files, projectId }),
 
 	analyzePRQuality: (
 		prNumber: number,
 		changedFiles: string[],
-		projectDir?: string,
+		projectId?: string,
 	) =>
 		ipcRenderer.invoke(IPC_CHANNELS.QUALITY_ANALYZE_PR, {
 			prNumber,
 			changedFiles,
-			projectDir,
+			projectId,
 		}),
 });

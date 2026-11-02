@@ -1,3 +1,4 @@
+import { debugLog } from "../../../shared/utils/debug-logger";
 import {
 	cpSync,
 	type Dirent,
@@ -82,7 +83,7 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 			projectId: string,
 			options?: { forceRefresh?: boolean },
 		): Promise<IPCResult<Task[]>> => {
-			console.warn(
+			debugLog(
 				"[IPC] TASK_LIST called with projectId:",
 				projectId,
 				"options:",
@@ -105,7 +106,7 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 			if (serverProject) return getRemoteTasks(serverProject);
 
 			const tasks = projectStore.getTasks(projectId);
-			console.warn("[IPC] TASK_LIST returning", tasks.length, "tasks");
+			debugLog("[IPC] TASK_LIST returning", tasks.length, "tasks");
 			return { success: true, data: tasks };
 		},
 	);

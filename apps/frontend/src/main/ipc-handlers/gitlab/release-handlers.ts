@@ -12,7 +12,7 @@ import { encodeProjectPath, getGitLabConfig, gitlabFetch } from "./utils";
 
 // Debug logging helper
 const DEBUG =
-	process.env.DEBUG === "true" || process.env.NODE_ENV === "development";
+	process.env.DEBUG === "true";
 
 function debugLog(_message: string, data?: unknown): void {
 	if (DEBUG) {
