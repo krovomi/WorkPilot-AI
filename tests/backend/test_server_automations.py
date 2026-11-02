@@ -737,6 +737,16 @@ async def test_a_pr_of_someone_else_gets_one_draft_review(world, monkeypatch):
 
     import server.services.project_jobs as project_jobs
 
+    # Modules that bind ``get_project_jobs`` at import time must be imported
+    # before the patch: imported under it, they would keep this fake for the
+    # rest of the session (test_live_feature_events then got None from start).
+    import shared_features.analyses  # noqa: F401
+    import shared_features.api  # noqa: F401
+    import shared_features.changelog  # noqa: F401
+    import shared_features.forge_review  # noqa: F401
+    import shared_features.insights  # noqa: F401
+    import shared_features.workspace  # noqa: F401
+
     monkeypatch.setattr(project_jobs, "get_project_jobs", lambda: Jobs())
     rule_id = (await _save(world, _rule(trigger={"type": "pr_opened"})))["rules"][0][
         "id"
