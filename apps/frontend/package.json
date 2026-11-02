@@ -200,6 +200,14 @@
 				"to": "icon.png"
 			},
 			{
+				"from": "../../src",
+				"to": "backend/src",
+				"filter": [
+					"!**/__pycache__",
+					"!**/*.pyc"
+				]
+			},
+			{
 				"from": "../backend",
 				"to": "backend",
 				"filter": [
