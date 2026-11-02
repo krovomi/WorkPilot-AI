@@ -17,6 +17,12 @@ import {
 	githubFetch,
 	normalizeRepoReference,
 } from "../ipc-handlers/github/utils";
+import {
+	encodeProjectPath,
+	getGitLabConfig,
+	gitlabFetch,
+	normalizeProjectReference,
+} from "../ipc-handlers/gitlab/utils";
 import { projectStore } from "../project-store";
 import { createAutomationCard, issueNumbersOnBoard } from "./cards";
 import { livePRReviews } from "./pr-review";
@@ -29,10 +35,42 @@ import {
 	SourceError,
 	scheduleEvents,
 } from "./sources";
+import { type GitLabSource, gitlabIssueLabeledEvents } from "./sources-gitlab";
 import { readRules } from "./store";
 
 export const PASS_INTERVAL_MS = 5 * 60 * 1000;
 const FIRST_PASS_DELAY_MS = 30 * 1000;
+
+/**
+ * The project's issue tracker for an `issue_labeled` rule: its GitHub when
+ * connected, else its GitLab (Settings › GitLab), else an error naming both.
+ */
+async function issueSource(
+	project: Project,
+): Promise<{ github: GitHubSource } | { gitlab: GitLabSource }> {
+	if (getGitHubConfig(project)) return { github: githubSource(project) };
+	const config = await getGitLabConfig(project);
+	if (!config) {
+		throw new SourceError(
+			"forge_not_connected",
+			"Neither GitHub nor GitLab is connected for this project",
+		);
+	}
+	let host = config.instanceUrl;
+	try {
+		host = new URL(config.instanceUrl).host;
+	} catch {
+		// A malformed URL fails the fetch itself, with its own message.
+	}
+	const ref = normalizeProjectReference(config.project, config.instanceUrl);
+	const base = `/projects/${encodeProjectPath(ref)}`;
+	return {
+		gitlab: {
+			slug: `${host}/${ref}`,
+			fetch: (endpoint) => gitlabFetch(config.token, config.instanceUrl, `${base}${endpoint}`),
+		},
+	};
+}
 
 function githubSource(project: Project): GitHubSource {
 	const config = getGitHubConfig(project);
@@ -56,8 +94,12 @@ export function liveDeps(
 			const trigger = rule.trigger;
 			const seen = (key: string) => Boolean(ledger.seen[key]);
 			switch (trigger.type) {
-				case "issue_labeled":
-					return issueLabeledEvents({ ...rule, trigger }, githubSource(project), seen);
+				case "issue_labeled": {
+					const source = await issueSource(project);
+					return "github" in source
+						? issueLabeledEvents({ ...rule, trigger }, source.github, seen)
+						: gitlabIssueLabeledEvents({ ...rule, trigger }, source.gitlab, seen);
+				}
 				case "pr_opened":
 					return prOpenedEvents({ ...rule, trigger }, githubSource(project), seen);
 				case "ci_failed": {
@@ -118,7 +160,8 @@ export class AutomationScheduler {
 
 	async runAll(): Promise<void> {
 		for (const project of projectStore.getProjects()) {
-			if (!project.autoBuildPath) continue;
+			// A server project's rules run on the server, for the whole team.
+			if (project.remote || !project.autoBuildPath) continue;
 			if (!readRules(project).some((rule) => rule.enabled)) continue;
 			await this.run(project);
 		}
@@ -126,6 +169,8 @@ export class AutomationScheduler {
 
 	/** One pass for `project`; a pass already running is joined, not doubled. */
 	run(project: Project): Promise<RunSummary> {
+		// Never twice: the server runs a server project's rules.
+		if (project.remote) return Promise.resolve({ created: 0, reviews: 0, errors: 0 });
 		const running = this.passes.get(project.id);
 		if (running) return running;
 		const pass = runProjectAutomations(project, this.deps)
