@@ -167,7 +167,6 @@
   "apps/frontend/src/renderer/components/kanban/KanbanColumn.tsx": 3,
   "apps/frontend/src/renderer/components/learning-loop/LearningLoopDialog.tsx": 1,
   "apps/frontend/src/renderer/components/linear-import/components/IssueCard.tsx": 3,
-  "apps/frontend/src/renderer/components/mcp-marketplace/McpInstalledList.tsx": 1,
   "apps/frontend/src/renderer/components/mission-control/AgentPanel.tsx": 4,
   "apps/frontend/src/renderer/components/multi-repo/BreakingChangeBanner.tsx": 1,
   "apps/frontend/src/renderer/components/multi-repo/DependencyGraphView.tsx": 2,

@@ -160,14 +160,14 @@ describe("HubMain", () => {
 				sidebarPrefs: { ...DEFAULT_SIDEBAR_PREFS, hideExperimental: true },
 			},
 		}));
-		// MCP's two marketplaces are experimental, the overview is not.
-		const { unmount } = renderMain("agent-tools");
+		// Agent replay and the debugger are experimental, session history is not.
+		const { unmount } = renderMain("session-history");
 		expect(screen.queryByRole("tablist")).toBeNull();
 		unmount();
-		renderMain("mcp-marketplace");
+		renderMain("agent-replay");
 		expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
-			"navigation:items.agentTools",
-			"navigation:items.mcpMarketplace",
+			"navigation:items.sessionHistory",
+			"navigation:items.agentReplay",
 		]);
 	});
 

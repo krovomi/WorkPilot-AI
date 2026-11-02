@@ -13,6 +13,7 @@ import type {
 import { GeneralSettings } from "../../project-settings/GeneralSettings";
 import { InitializationGuard } from "../common/InitializationGuard";
 import { AutomationsIntegration } from "../integrations/AutomationsIntegration";
+import { BoardMcpIntegration } from "../integrations/BoardMcpIntegration";
 import { AzureDevOpsIntegration } from "../integrations/AzureDevOpsIntegration";
 import { ChannelNotificationsIntegration } from "../integrations/ChannelNotificationsIntegration";
 import { CICDPipelineIntegration } from "../integrations/CICDPipelineIntegration";
@@ -260,6 +261,22 @@ export function SectionRouter({
 					>
 						<AutomationsIntegration projectId={project.id} />
 					</InitializationGuard>
+				</SettingsSection>
+			);
+
+		case "board-mcp":
+			return (
+				<SettingsSection
+					title={t("boardMcp.title")}
+					description={t("boardMcp.description")}
+				>
+					{project.remote ? (
+						<p className="text-sm text-muted-foreground">
+							{t("boardMcp.errors.server_project")}
+						</p>
+					) : (
+						<BoardMcpIntegration projectId={project.id} />
+					)}
 				</SettingsSection>
 			);
 

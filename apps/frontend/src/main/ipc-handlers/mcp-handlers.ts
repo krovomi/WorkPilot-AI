@@ -14,7 +14,9 @@ import type {
 	McpTestConnectionResult,
 } from "../../shared/types/project";
 import { appLog } from "../app-logger";
+import { isDangerousEnvVar } from "../claude-code-settings/env-sanitizer";
 import { isWindows } from "../platform";
+import { envWithoutCredentials } from "../utils/child-env";
 
 /**
  * Defense-in-depth: Frontend-side command validation
@@ -75,6 +77,32 @@ function isCommandSafe(command: string | undefined): boolean {
 	// Reject commands with paths (defense against path traversal)
 	if (command.includes("/") || command.includes("\\")) return false;
 	return SAFE_COMMANDS.has(command);
+}
+
+/** Prefixes of variables that redirect a package manager or the linker. */
+const DENIED_ENV_PREFIXES = ["LD_", "DYLD_", "NPM_CONFIG_", "UV_", "PIP_", "YARN_", "PNPM_"];
+
+/**
+ * Validate the `env` of a command server, as `core.client._valid_mcp_server_env`
+ * does: plain names, no loader or package-manager variable, string values.
+ */
+export function isMcpEnvSafe(env: Record<string, string> | undefined): boolean {
+	if (env === undefined) return true;
+	if (typeof env !== "object" || env === null || Array.isArray(env)) return false;
+	const entries = Object.entries(env);
+	if (entries.length > 32) return false;
+	return entries.every(([name, value]) => {
+		const upper = name.toUpperCase();
+		return (
+			/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(name) &&
+			upper !== "PATH" &&
+			!isDangerousEnvVar(upper) &&
+			!DENIED_ENV_PREFIXES.some((prefix) => upper.startsWith(prefix)) &&
+			typeof value === "string" &&
+			!value.includes("\0") &&
+			value.length <= 8192
+		);
+	});
 }
 
 /**
@@ -477,11 +505,22 @@ async function testCommandConnection(
 			});
 		}
 
+		if (!isMcpEnvSafe(server.env)) {
+			return resolve({
+				serverId: server.id,
+				success: false,
+				message: "Env sets a variable that changes what the launcher runs",
+			});
+		}
+
 		const args = server.args || [];
 
 		// On Windows, use shell: true to properly handle .cmd/.bat scripts like npx
 		// biome-ignore lint/style/noNonNullAssertion: value is guaranteed by context
 		const proc = spawn(server.command!, args, {
+			// A third-party package: none of the app's credentials, only the
+			// server's own variables (its API key), as the agent starts it.
+			env: envWithoutCredentials(process.env, server.env ?? {}),
 			stdio: ["pipe", "pipe", "pipe"],
 			timeout: 15000, // OS-level timeout for reliable process termination
 			shell: isWindows(), // Required for Windows to run npx.cmd
