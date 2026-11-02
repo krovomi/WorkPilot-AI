@@ -12,7 +12,7 @@ import type { ProfilesFile } from "../../shared/types/profile";
 import { detectProvider } from "../../shared/utils/provider-detection";
 import { readSettingsFile, writeSettingsFile } from "../settings-utils";
 import { findExecutable } from "../env-utils";
-import { isWindows } from "../platform";
+import { isMacOS, isWindows } from "../platform";
 import { loadProfilesFile, saveProfilesFile } from "../utils/profile-manager";
 
 const execFileAsync = promisify(execFile);
@@ -1868,7 +1868,6 @@ export async function detectWindsurfLocalToken(): Promise<{
 	try {
 		const path = await import("node:path");
 		const fs = await import("node:fs");
-		const { isWindows, isMacOS } = await import("../platform/index");
 
 		// Determine the state.vscdb path based on platform
 		let dbPath: string;
@@ -2275,7 +2274,6 @@ export async function readWindsurfCachedPlanInfo(): Promise<{
 	try {
 		const path = await import("node:path");
 		const fs = await import("node:fs");
-		const { isWindows, isMacOS } = await import("../platform/index");
 
 		// Determine the state.vscdb path based on platform
 		let dbPath: string;

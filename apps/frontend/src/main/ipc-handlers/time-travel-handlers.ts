@@ -6,6 +6,7 @@
  * and decision scoring. Works with any LLM provider.
  */
 
+import { debugLog } from "../../shared/utils/debug-logger";
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
 
@@ -276,5 +277,5 @@ export function registerTimeTravelHandlers(): void {
 		},
 	);
 
-	console.warn("[IPC] Time Travel handlers registered");
+	debugLog("[IPC] Time Travel handlers registered");
 }

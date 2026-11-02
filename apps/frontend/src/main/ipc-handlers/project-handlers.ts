@@ -1,3 +1,4 @@
+import { debugLog } from "../../shared/utils/debug-logger";
 import { execFile, execFileSync } from "node:child_process";
 import { existsSync, renameSync } from "node:fs";
 import * as path from "node:path";
@@ -679,7 +680,7 @@ const configureServicesWithPython = (
 	autoBuildPath: string,
 	agentManager: AgentManager,
 ): void => {
-	console.warn("[IPC] Configuring services with Python:", pythonPath);
+	debugLog("[IPC] Configuring services with Python:", pythonPath);
 	agentManager.configure(pythonPath, autoBuildPath);
 	appEmulatorService.configure(pythonPath, autoBuildPath);
 	changelogService.configure(pythonPath, autoBuildPath);
@@ -712,7 +713,7 @@ const initializePythonEnvironment = async (
 		};
 	}
 
-	console.warn("[IPC] Initializing Python environment...");
+	debugLog("[IPC] Initializing Python environment...");
 	const status = await pythonEnvManager.initialize(autoBuildSource);
 
 	if (status.ready && status.pythonPath) {
@@ -829,7 +830,7 @@ export function registerProjectHandlers(
 				...projectStore.getProjects(),
 				...(await listServerProjects()),
 			];
-			console.warn("[IPC] PROJECT_LIST returning", projects.length, "projects");
+			debugLog("[IPC] PROJECT_LIST returning", projects.length, "projects");
 			return { success: true, data: projects };
 		},
 	);
@@ -1063,7 +1064,7 @@ export function registerProjectHandlers(
 
 	// Initialize Python environment on startup (non-blocking)
 	initializePythonEnvironment(pythonEnvManager, agentManager).then((status) => {
-		console.warn("[IPC] Python environment initialized:", status);
+		debugLog("[IPC] Python environment initialized:", status);
 	});
 
 	// IPC handler to get Python environment status

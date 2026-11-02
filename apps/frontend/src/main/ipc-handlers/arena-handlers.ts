@@ -20,6 +20,7 @@
  * is handed, and refuses a request that does not name a provider and a model.
  */
 
+import { debugLog } from "../../shared/utils/debug-logger";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { BrowserWindow } from "electron";
@@ -732,5 +733,5 @@ export function registerArenaHandlers(
 		}
 	});
 
-	appLog.info("[Arena] IPC handlers registered");
+	debugLog("[Arena] IPC handlers registered");
 }

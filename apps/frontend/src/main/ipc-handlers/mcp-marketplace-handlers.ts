@@ -5,6 +5,7 @@
  * health checks, and builder project management.
  */
 
+import { debugLog } from "../../shared/utils/debug-logger";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { app, ipcMain } from "electron";
@@ -1256,5 +1257,5 @@ export function registerMcpMarketplaceHandlers(): void {
 		},
 	);
 
-	appLog.info("[MCP Marketplace] All handlers registered");
+	debugLog("[MCP Marketplace] All handlers registered");
 }

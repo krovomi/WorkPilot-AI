@@ -20,6 +20,11 @@ vi.mock("electron", () => ({
 		handle: (channel: string, fn: (...args: unknown[]) => unknown) => state.handlers.set(channel, fn),
 	},
 }));
+// The PR review machinery is not under test here.
+vi.mock("../github/pr-handlers", () => ({
+	hasPRReview: vi.fn(async () => false),
+	startDraftPRReview: vi.fn(async () => undefined),
+}));
 vi.mock("../../project-store", () => ({
 	projectStore: {
 		getProject: (id: string) => state.projects.get(id),

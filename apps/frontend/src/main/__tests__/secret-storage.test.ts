@@ -6,6 +6,9 @@
  * reads says so. Rule S1.
  */
 
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	fakeEncrypted,
@@ -245,6 +248,87 @@ describe("secret-storage", () => {
 			expect(storage.hasPlaintextSecretFields({ apiKey: "" }, isSecret)).toBe(
 				false,
 			);
+		});
+	});
+
+	describe("with the async safeStorage API (Electron deprecated the sync one)", () => {
+		let dir: string;
+
+		beforeEach(() => {
+			dir = mkdtempSync(path.join(tmpdir(), "secret-storage-"));
+		});
+
+		afterEach(() => {
+			rmSync(dir, { recursive: true, force: true });
+		});
+
+		it("decrypts the secrets on disk ahead, so reading them never calls the sync API", async () => {
+			const settings = path.join(dir, "settings.json");
+			writeFileSync(
+				settings,
+				JSON.stringify({
+					globalOpenAIApiKey: fakeEncrypted("sk-openai"),
+					globalAnthropicApiKey: fakeEncrypted("sk-ant"),
+				}),
+				"utf-8",
+			);
+			const storage = await load();
+			const decryptSync = vi.spyOn(fake.safeStorage, "decryptString");
+			const encryptSync = vi.spyOn(fake.safeStorage, "encryptString");
+			const probeSync = vi.spyOn(fake.safeStorage, "isEncryptionAvailable");
+
+			await storage.initSecretStorage([settings, path.join(dir, "missing.json")]);
+
+			expect(storage.decryptSecret(fakeEncrypted("sk-openai"))).toBe("sk-openai");
+			expect(storage.decryptSecret(fakeEncrypted("sk-ant"))).toBe("sk-ant");
+			// Writing an unchanged secret back keeps its ciphertext.
+			expect(storage.encryptSecret("sk-ant")).toBe(fakeEncrypted("sk-ant"));
+			expect(storage.getSecureStorageStatus().keyringAvailable).toBe(true);
+			expect(decryptSync).not.toHaveBeenCalled();
+			expect(encryptSync).not.toHaveBeenCalled();
+			expect(probeSync).not.toHaveBeenCalled();
+		});
+
+		it("encrypts a new secret ahead of the sync write", async () => {
+			const storage = await load();
+			await storage.initSecretStorage();
+			const encryptSync = vi.spyOn(fake.safeStorage, "encryptString");
+			const decryptSync = vi.spyOn(fake.safeStorage, "decryptString");
+
+			await storage.prepareSecrets(
+				storage.secretFieldValues(
+					{ apiKey: "sk-new", name: "not a secret", other: fakeEncrypted("x") },
+					(key) => key === "apiKey",
+				),
+			);
+			const stored = storage.encryptSecret("sk-new");
+
+			expect(stored).toBe(fakeEncrypted("sk-new"));
+			expect(storage.decryptSecret(stored)).toBe("sk-new");
+			expect(encryptSync).not.toHaveBeenCalled();
+			expect(decryptSync).not.toHaveBeenCalled();
+		});
+
+		it("without a keyring, prepares nothing and still writes in clear", async () => {
+			fake.state.ready = false;
+			const storage = await load();
+			await storage.initSecretStorage();
+
+			await storage.prepareSecrets(["sk-clear"]);
+
+			expect(storage.encryptSecret("sk-clear")).toBe("sk-clear");
+			expect(storage.getSecureStorageStatus().secretsAtRisk).toBe(true);
+		});
+
+		it("leaves a value it cannot decrypt ahead to the reader, which keeps it", async () => {
+			const env = path.join(dir, ".env");
+			writeFileSync(env, `TOKEN=${fakeEncrypted("sk-locked")}\n`, "utf-8");
+			fake.state.failDecrypt = true;
+			const storage = await load();
+
+			await storage.initSecretStorage([env]);
+
+			expect(storage.decryptSecret(fakeEncrypted("sk-locked"))).toBeUndefined();
 		});
 	});
 });
