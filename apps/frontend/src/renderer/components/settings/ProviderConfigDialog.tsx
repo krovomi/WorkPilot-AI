@@ -11,6 +11,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "../ui/dialog";
+import { confirmAction } from "../ui/confirm-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { VisuallyHidden } from "../ui/visually-hidden";
 import { isAgentCliTool } from "../../../shared/types/agent-cli";
@@ -547,15 +548,16 @@ export function ProviderConfigDialog({
 		}
 	};
 
-	const handleDelete = () => {
+	const handleDelete = async () => {
 		if (!provider || !providerConfig) return;
 
 		if (
-			confirm(
-				t("sections.accounts.providerCard.deleteConfirm", {
+			await confirmAction({
+				title: t("sections.accounts.providerCard.deleteConfirm", {
 					providerName: provider.name,
 				}),
-			)
+				destructive: true,
+			})
 		) {
 			const newSettings = { ...settings };
 

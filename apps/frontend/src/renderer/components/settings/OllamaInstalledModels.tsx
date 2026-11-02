@@ -13,6 +13,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
+import { confirmAction } from "../ui/confirm-dialog";
 
 interface InstalledModel {
 	name: string;
@@ -83,11 +84,11 @@ export function OllamaInstalledModels({
 
 	const handleDelete = useCallback(
 		async (name: string) => {
-			if (
-				!confirm(t("sections.accounts.localModels.deleteConfirm", { name }))
-			) {
-				return;
-			}
+			const confirmed = await confirmAction({
+				title: t("sections.accounts.localModels.deleteConfirm", { name }),
+				destructive: true,
+			});
+			if (!confirmed) return;
 			setDeleting(name);
 			setError(null);
 			try {
