@@ -41,7 +41,7 @@ try:
     from sqlalchemy.exc import SQLAlchemyError
 
     _STORE_ERRORS += (SQLAlchemyError,)
-except ImportError:
+except ImportError:  # some test environments do not install SQLAlchemy
     pass
 
 PROJECT_PREFIX = "project:"
