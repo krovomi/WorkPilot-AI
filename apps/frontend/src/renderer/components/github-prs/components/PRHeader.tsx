@@ -49,7 +49,7 @@ function getFileStatusStyle(status: string) {
  * Shows PR metadata: state, number, title, author, dates, branches, and file stats
  */
 export function PRHeader({ pr, isLoadingFiles = false }: PRHeaderProps) {
-	const { t, i18n } = useTranslation("common");
+	const { t } = useTranslation("common");
 	const [showFiles, setShowFiles] = useState(false);
 	const hasFiles = pr.files && pr.files.length > 0;
 
@@ -149,7 +149,7 @@ export function PRHeader({ pr, isLoadingFiles = false }: PRHeaderProps) {
 
 				<div className="flex items-center gap-2">
 					<Clock className="h-4 w-4 opacity-70" />
-					<span>{formatDate(pr.createdAt, i18n.language)}</span>
+					<span>{formatDate(pr.createdAt)}</span>
 				</div>
 
 				<div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted/50 font-mono text-xs border border-border/50">

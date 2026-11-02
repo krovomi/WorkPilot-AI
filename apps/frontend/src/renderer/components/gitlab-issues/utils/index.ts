@@ -1,7 +1,8 @@
 import type { GitLabIssue } from "../../../../shared/types";
+import { formatAppDate } from "@/lib/date-format";
 
 export function formatDate(dateString: string): string {
-	return new Date(dateString).toLocaleDateString("en-US", {
+	return formatAppDate(dateString, {
 		year: "numeric",
 		month: "short",
 		day: "numeric",
