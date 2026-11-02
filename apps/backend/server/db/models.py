@@ -25,6 +25,8 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    event,
+    select,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -695,6 +697,20 @@ class AuditLog(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow
     )
+
+
+@event.listens_for(AuditLog, "before_insert")
+def _audit_org_from_project(_mapper, connection, target: AuditLog) -> None:
+    """An event about a project belongs to that project's organization.
+
+    The organization's history (``admin/overview``) filters on ``org_id``;
+    project and card routes wrote their events with only ``project_id``, so an
+    organization admin never saw who deleted a project or forced a claim.
+    """
+    if target.org_id is None and target.project_id is not None:
+        target.org_id = connection.scalar(
+            select(Project.org_id).where(Project.id == target.project_id)
+        )
 
 
 class DeploymentMarker(Base):
