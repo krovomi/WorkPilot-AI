@@ -201,12 +201,8 @@ class TestTokens:
         token_id = client.get("/users/me/access-tokens", headers=jwt("alice")).json()[
             0
         ]["id"]
-        assert (
-            client.delete(
-                f"/users/me/access-tokens/{token_id}", headers=jwt("vic")
-            ).status_code
-            == 404
-        )
+        res = client.delete(f"/users/me/access-tokens/{token_id}", headers=jwt("vic"))
+        assert res.status_code == 404
 
     def test_a_personal_token_opens_mcp_and_nothing_else(self, stack):
         client, _, _, pat = stack
