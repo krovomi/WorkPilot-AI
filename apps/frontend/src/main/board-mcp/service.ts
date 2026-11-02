@@ -12,7 +12,15 @@
  * `-X utf8` replaces `PYTHONUTF8`, which `-I` would ignore.
  */
 
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import {
+	constants as fsConstants,
+	copyFileSync,
+	existsSync,
+	mkdirSync,
+	readFileSync,
+	renameSync,
+	writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import {
 	type BoardMcpClientId,
@@ -70,8 +78,18 @@ function display(file: string, home: string): string {
 	return file.startsWith(home + path.sep) ? `~${file.slice(home.length)}` : file;
 }
 
+function errorCode(error: unknown): string | undefined {
+	return (error as NodeJS.ErrnoException | null)?.code;
+}
+
+/** The file's text, or "" when there is none (read once, never checked first). */
 function readText(file: string): string {
-	return existsSync(file) ? readFileSync(file, "utf-8") : "";
+	try {
+		return readFileSync(file, "utf-8");
+	} catch (error) {
+		if (errorCode(error) === "ENOENT") return "";
+		throw error;
+	}
 }
 
 function clientStatus(def: ClientDefinition, context: BoardMcpContext): BoardMcpClientStatus {
@@ -111,9 +129,12 @@ export function boardMcpStatus(context: BoardMcpContext): BoardMcpStatus {
  */
 function writeAtomically(file: string, text: string): void {
 	mkdirSync(path.dirname(file), { recursive: true });
-	const backup = `${file}.workpilot.bak`;
-	if (existsSync(file) && !existsSync(backup)) {
-		writeFileSync(backup, readFileSync(file, "utf-8"), "utf-8");
+	try {
+		// One call, no check before it: EXCL leaves an earlier copy alone.
+		copyFileSync(file, `${file}.workpilot.bak`, fsConstants.COPYFILE_EXCL);
+	} catch (error) {
+		const code = errorCode(error);
+		if (code !== "ENOENT" && code !== "EEXIST") throw error;
 	}
 	const temporary = `${file}.workpilot.tmp`;
 	writeFileSync(temporary, text, "utf-8");
