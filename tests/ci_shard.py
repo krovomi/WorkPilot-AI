@@ -14,11 +14,12 @@ time. Collection is not split: each shard imports every file, as a full run
 does, so what a file does to ``sys.modules`` at import time is the same
 everywhere.
 
-Refresh the weights from a full, unsharded Windows run's log (``pytest -v``
-prints one line per test, and the runner timestamps each line)::
+Refresh the weights from the logs of every Windows shard of one run (or of
+one unsharded run): ``pytest -v`` prints one line per test, and the runner
+timestamps each line::
 
-    gh run view --job <id> --log > win.log
-    python tests/ci_shard.py durations win.log
+    gh run view --job <id> --log > win1.log   # one per Windows shard
+    python tests/ci_shard.py durations win1.log win2.log win3.log win4.log
 """
 
 from __future__ import annotations
@@ -118,13 +119,15 @@ def durations_from_log(lines: Iterable[str]) -> dict[str, float]:
     return dict(spent)
 
 
-def _write_durations(log: Path) -> None:
-    spent = durations_from_log(
-        log.read_text(encoding="utf-8", errors="replace").splitlines()
-    )
+def _write_durations(logs: list[Path]) -> None:
+    # One log at a time: the gap between two logs is not a test's time.
+    spent: dict[str, float] = {}
+    for log in logs:
+        text = log.read_text(encoding="utf-8", errors="replace")
+        spent.update(durations_from_log(text.splitlines()))
     listed = {k: round(v, 1) for k, v in sorted(spent.items()) if v >= _LISTED_FROM}
     payload = {
-        "source": "test-python on windows-latest, full unsharded run (tests/ci_shard.py)",
+        "source": "test-python on windows-latest, every shard of one run (tests/ci_shard.py)",
         "files": listed,
     }
     DURATIONS.write_text(json.dumps(payload, indent=1) + "\n", encoding="utf-8")
@@ -132,6 +135,6 @@ def _write_durations(log: Path) -> None:
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3 or sys.argv[1] != "durations":
-        sys.exit("usage: python tests/ci_shard.py durations <github-actions-log>")
-    _write_durations(Path(sys.argv[2]))
+    if len(sys.argv) < 3 or sys.argv[1] != "durations":
+        sys.exit("usage: python tests/ci_shard.py durations <github-actions-log>...")
+    _write_durations([Path(arg) for arg in sys.argv[2:]])

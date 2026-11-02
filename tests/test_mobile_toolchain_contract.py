@@ -19,6 +19,8 @@ of that answer is the feature.
 
 from __future__ import annotations
 
+import socket
+import subprocess
 import sys
 from pathlib import Path
 
@@ -39,6 +41,31 @@ IS_MACOS = sys.platform == "darwin"
 # asks about a project that is not a mobile one, and it correctly answers with
 # the platform checks alone.
 SAMPLE_APP = REPO_ROOT / "tests" / "fixtures" / "android-sample"
+
+
+def _adb_daemon_running() -> bool:
+    """The adb server listens on 127.0.0.1:5037 while it runs."""
+    try:
+        with socket.create_connection(("127.0.0.1", 5037), timeout=0.5):
+            return True
+    except OSError:
+        return False
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _stop_the_adb_daemon_these_tests_started():
+    """`adb devices` starts a daemon that outlives the call.
+
+    The CI runner found it still running at the end of the job. Stopped here
+    only when these tests started it: one that was already up is someone's.
+    """
+    already_up = _adb_daemon_running()
+    yield
+    adb = find_tool("adb")
+    if adb and not already_up and _adb_daemon_running():
+        subprocess.run(  # noqa: S603 - fixed argv, the adb the tests used
+            [str(adb), "kill-server"], capture_output=True, timeout=30, check=False
+        )
 
 
 class TestItSurvivesTheRealMachine:
