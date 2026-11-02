@@ -15,6 +15,16 @@ phases:
     roster: verify
     dispatch: fresh-context
     always: true
+    companions:
+      hermes/systematic-debugging: >-
+        the cause is not visible from reading the code path, or a first
+        hypothesis turned out wrong
+      hermes/python-debugpy: >-
+        the defect is in Python and only its runtime state (locals, the call
+        stack at the failure) shows it
+      hermes/node-inspect-debugger: >-
+        the defect is in Node.js or Electron main-process code and only its
+        runtime state shows it
     description: >-
       The failing test or the command that shows the incident, the probable
       cause, the perimeter. Under pressure this is the phase most tempting

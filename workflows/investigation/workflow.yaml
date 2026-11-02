@@ -13,6 +13,11 @@ phases:
     roster: research
     dispatch: fresh-context
     always: true
+    companions:
+      hermes/systematic-debugging: >-
+        the question is why something fails: its root-cause and
+        pattern-analysis phases (read the evidence, trace the data flow, compare
+        with what works) read code and need no write access
     description: >-
       Read-only by construction — it runs under the `analyzer` agent, which
       cannot write — with the research roster: an architecture analyst and

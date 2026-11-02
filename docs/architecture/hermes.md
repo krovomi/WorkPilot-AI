@@ -39,6 +39,14 @@ left is what it genuinely adds: `systematic-debugging`, `spike`, the two runtime
 debuggers, `merge-reconciler`, `sdlc-review`, and the procedures for driving Claude
 Code, Codex and OpenCode.
 
+**The debugging procedures are offered to the builds that need them.** The `reproduce`
+phase of `bug-fix` and `hotfix` lists `systematic-debugging`, `python-debugpy` and
+`node-inspect-debugger` as `companions:`, each with its case, and `investigation`
+lists `systematic-debugging`; the model opens one when its case applies and keeps
+following WorkPilot's procedure (see [workflows.md](workflows.md)). The hermes tool
+names in them (`terminal`, `search_files`, `delegate_task`) are read as their
+equivalents on every provider.
+
 **As a proposer, its learning loop feeds ours.** Hermes writes skills from its own
 experience, on surfaces WorkPilot never sees — Telegram, Discord, a cron job on a VPS.
 Two closed loops writing skills is one too many, so there is no second loop here:
