@@ -2,11 +2,9 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { AppSettings } from "../shared/types";
 import { pythonEnvManager } from "./python-env-manager";
-import { credentialManager } from "./services/credential-manager";
-import { readSettingsFile } from "./settings-utils";
 import { getEffectiveSourcePath } from "./updater/path-resolver";
+import { pythonRunnerEnv } from "./utils/python-runner-env";
 
 /**
  * Design-to-Code service — bridges the renderer's "Import Design" panel to the
@@ -83,40 +81,13 @@ export class DesignToCodeService {
 		return "python";
 	}
 
-	private buildEnv(sourcePath: string): Record<string, string> {
-		const env: Record<string, string> = {
-			...(process.env as Record<string, string>),
-		};
-		env.PYTHONPATH = env.PYTHONPATH
-			? `${sourcePath}${path.delimiter}${env.PYTHONPATH}`
-			: sourcePath;
-		// Force UTF-8 stdio so status/result lines aren't mojibaked on Windows
-		// (Python defaults to cp1252 there, mangling "…" and accents).
-		env.PYTHONIOENCODING = "utf-8";
-		env.PYTHONUTF8 = "1";
-		env.PYTHONUNBUFFERED = "1";
-		try {
-			// Through settings-utils: it decrypts the stored keys.
-			const settings = readSettingsFile() as Partial<AppSettings> | undefined;
-			if (settings) {
-				if (settings.globalClaudeOAuthToken)
-					env.CLAUDE_OAUTH_TOKEN = settings.globalClaudeOAuthToken;
-				if (settings.globalAnthropicApiKey)
-					env.ANTHROPIC_API_KEY = settings.globalAnthropicApiKey;
-			}
-		} catch {
-			/* ignore */
-		}
-		// Provider-agnostic: inject the selected provider + its credentials
-		// (SELECTED_LLM_PROVIDER, OPENAI_API_KEY, GOOGLE_API_KEY, …) so vision and
-		// code-gen route to whatever LLM the user picked — not just Claude. Wins
-		// over the legacy Claude tokens above.
-		try {
-			Object.assign(env, credentialManager.getEnvironmentVariables());
-		} catch {
-			/* ignore */
-		}
-		return env;
+	/**
+	 * The runner's environment: the provider the user chose and its key, the
+	 * Claude sign-in only when that provider needs it, and no other credential
+	 * of the app (`pythonRunnerEnv`).
+	 */
+	private buildEnv(sourcePath: string): Promise<Record<string, string>> {
+		return pythonRunnerEnv(sourcePath);
 	}
 
 	/**
@@ -176,7 +147,7 @@ export class DesignToCodeService {
 		if (request.customInstructions)
 			args.push("--instructions", request.customInstructions);
 
-		const env = this.buildEnv(sourcePath);
+		const env = await this.buildEnv(sourcePath);
 		const pythonExe = this.resolvePythonExecutable();
 
 		return await new Promise<DesignToCodeResult>((resolve, reject) => {
