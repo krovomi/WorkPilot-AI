@@ -143,3 +143,70 @@ def test_the_claude_client_applies_the_chosen_effort(monkeypatch):
     from phase_config import get_thinking_budget
 
     assert budgets == [None, 0, get_thinking_budget("high")]
+
+
+class NoticeClient:
+    """Yields ``AgentMessage``s as a streaming client (Copilot, OpenAI…) does."""
+
+    def __init__(self, *messages):
+        self._messages = messages
+        self.last_usage = None
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
+
+    async def query(self, prompt):
+        return None
+
+    async def receive_response(self):
+        for message in self._messages:
+            yield message
+
+
+def _message(role_name: str, text: str):
+    from core.agent_client import (
+        AgentMessage,
+        ContentBlock,
+        ContentBlockType,
+        MessageRole,
+    )
+
+    return AgentMessage(
+        role=getattr(MessageRole, role_name),
+        content=[ContentBlock(type=ContentBlockType.TEXT, text=text)],
+    )
+
+
+COPILOT_AUTH_ERROR = (
+    "Copilot auth error: Copilot token exchange failed (403): 403 Forbidden."
+)
+
+
+def test_a_client_notice_is_a_failure_not_the_answer(monkeypatch):
+    """The Arena offered "Copilot auth error: …" as Copilot's answer to vote for."""
+    client = NoticeClient(_message("SYSTEM", COPILOT_AUTH_ERROR))
+    deltas, errors = [], []
+
+    text = run(monkeypatch, client, on_delta=deltas.append, on_error=errors.append)
+
+    assert text == ""
+    assert deltas == []
+    assert errors and "Copilot auth error" in errors[0]["message"]
+    assert errors[0]["code"] == "auth"
+
+
+def test_a_notice_beside_a_real_answer_stays_out_of_it(monkeypatch):
+    client = NoticeClient(
+        _message("SYSTEM", "⚠️ the model refused the effort setting"),
+        _message("ASSISTANT", "Hello!"),
+    )
+    deltas, errors = [], []
+
+    text = run(monkeypatch, client, on_delta=deltas.append, on_error=errors.append)
+
+    assert text == "Hello!"
+    assert deltas == ["Hello!"]
+    assert errors == []

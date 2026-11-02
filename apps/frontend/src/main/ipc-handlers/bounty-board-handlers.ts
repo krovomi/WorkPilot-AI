@@ -53,15 +53,28 @@ function resolveBackendPaths(): { backendPath: string; runnerPath: string } {
 	return { backendPath, runnerPath };
 }
 
-function resolveSpecDir(projectPath: string, specId: string): string {
-	const candidates = [
-		path.join(projectPath, ".workpilot", "specs", specId),
-		path.join(projectPath, ".autonomousbuild", "specs", specId),
-	];
-	for (const c of candidates) {
-		if (fs.existsSync(c)) return c;
+/**
+ * The spec folder a bounty runs on, or `null` when the project has none by
+ * that name.
+ *
+ * The renderer only offers specs that exist, but this channel is the one place
+ * every caller goes through: an id that names no folder (a typo, a spec
+ * deleted since the list was drawn, or a path such as `../x`) is refused here
+ * instead of becoming a round that burns every contestant's tokens on a spec
+ * nobody wrote.
+ */
+export function findSpecDir(projectPath: string, specId: string): string | null {
+	const id = specId.trim();
+	if (!id || id === "." || id === ".." || /[\\/]/.test(id)) return null;
+	for (const root of [".workpilot", ".autonomousbuild"]) {
+		const candidate = path.join(projectPath, root, "specs", id);
+		try {
+			if (fs.statSync(candidate).isDirectory()) return candidate;
+		} catch {
+			// absent under this root: try the next one
+		}
 	}
-	return candidates[0];
+	return null;
 }
 
 /**
@@ -129,6 +142,9 @@ export function registerBountyBoardHandlers(): void {
 		async (_event, req: StartRequest): Promise<StartResponse> => {
 			if (!req.projectPath || !req.specId) {
 				throw new Error("projectPath and specId are required");
+			}
+			if (!findSpecDir(req.projectPath, req.specId)) {
+				throw new Error(`Unknown spec "${req.specId}" in this project`);
 			}
 			if (!Array.isArray(req.contestants) || req.contestants.length === 0) {
 				throw new Error("At least one contestant is required");
@@ -224,7 +240,8 @@ export function registerBountyBoardHandlers(): void {
 			if (!req.projectPath || !req.specId) {
 				return { archives: [] };
 			}
-			const specDir = resolveSpecDir(req.projectPath, req.specId);
+			const specDir = findSpecDir(req.projectPath, req.specId);
+			if (!specDir) return { archives: [] };
 			const bountyDir = path.join(specDir, "bounty");
 			if (!fs.existsSync(bountyDir)) return { archives: [] };
 
