@@ -4,8 +4,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { app } from "electron";
 import { MODEL_ID_MAP } from "../shared/constants";
-import type { AppSettings } from "../shared/types";
-import { readSettingsFile } from "./settings-utils";
+import { pythonRunnerEnv } from "./utils/python-runner-env";
 
 const SENTINEL = "__ARCH_VIZ_RESULT__:";
 
@@ -251,7 +250,7 @@ export class ArchitectureVisualizerService extends EventEmitter {
 		}
 		await this.executeProcess(
 			[runnerPath, ...args],
-			this.buildProcessEnvironment(),
+			await this.buildProcessEnvironment(),
 			path.dirname(path.dirname(runnerPath)),
 		);
 	}
@@ -274,10 +273,11 @@ export class ArchitectureVisualizerService extends EventEmitter {
 				error: "architecture_visualizer_runner.py not found",
 			};
 		}
+		const env = await this.buildProcessEnvironment();
 		return new Promise((resolve) => {
 			const proc = spawn(this.pythonPath, [runnerPath, ...args], {
 				cwd: path.dirname(path.dirname(runnerPath)),
-				env: this.buildProcessEnvironment(),
+				env,
 				stdio: ["ignore", "pipe", "pipe"],
 			});
 			let stdout = "";
@@ -320,23 +320,13 @@ export class ArchitectureVisualizerService extends EventEmitter {
 		return null;
 	}
 
-	private buildProcessEnvironment(): Record<string, string> {
-		const env: Record<string, string> = {
-			...(process.env as Record<string, string>),
-		};
-		try {
-			// Through settings-utils: it decrypts the stored keys.
-			const settings = readSettingsFile() as Partial<AppSettings> | undefined;
-			if (settings) {
-				if (settings.globalClaudeOAuthToken)
-					env.CLAUDE_OAUTH_TOKEN = settings.globalClaudeOAuthToken;
-				if (settings.globalAnthropicApiKey)
-					env.ANTHROPIC_API_KEY = settings.globalAnthropicApiKey;
-			}
-		} catch {
-			/* settings are optional; the provider layer resolves its own auth */
-		}
-		return env;
+	/**
+	 * The runner's environment: the provider the user chose and its key, the
+	 * Claude sign-in only when that provider needs it, and no other credential
+	 * of the app (`pythonRunnerEnv`).
+	 */
+	private buildProcessEnvironment(): Promise<Record<string, string>> {
+		return pythonRunnerEnv(this.getAutoBuildSourcePath() ?? "");
 	}
 
 	private async executeProcess(

@@ -2829,7 +2829,7 @@
 		"title": "Use this project from other AI apps",
 		"description": "Claude Code, Codex, Gemini CLI, GitHub Copilot, Cursor, Claude Desktop, Windsurf or OpenCode can read this project's board and add cards to it, through the workpilot-board MCP server.",
 		"intro": "Each app starts the server itself, on this computer, under the name {{name}}. Add it to an app with one click, or copy what to paste when the app cannot be written to.",
-		"limits": "The server lists and reads cards, adds a card to the backlog and waits until a card is ready for your review. Starting a build, approving a plan and merging stay with you, on the card.",
+		"limits": "The server lists and reads cards and their specs, adds a card to the backlog, edits a card's text until work starts on it, waits until a card is ready for your review, and reads the roadmap and Ideation's ideas. Starting a build, approving a plan and merging stay with you, on the card.",
 		"loading": "Looking for your AI apps…",
 		"add": "Add",
 		"update": "Update",
