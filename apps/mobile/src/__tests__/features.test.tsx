@@ -87,6 +87,30 @@ describe("feature routes", () => {
 	});
 });
 
+describe("analysis report", () => {
+	async function reportFrom(body: unknown) {
+		const fetchImpl = jest.fn(async (url: string) => {
+			if (url.endsWith("/auth/login")) {
+				const user = { id: "u", email: "a@x", display_name: "A", role: "member" };
+				return new Response(JSON.stringify({ access_token: "a", refresh_token: "r", expires_in: 900, user }));
+			}
+			return new Response(JSON.stringify(body), { status: 200 });
+		}) as unknown as typeof fetch;
+		const client = new ServerClient({ baseUrl: "https://wp.example.com", fetchImpl });
+		await client.login("a@x", "pw");
+		return api(client).analysisReport("accessibility", "p1");
+	}
+
+	it("brings the run in progress with the saved report", async () => {
+		const job = { id: "j1", feature: "analysis-accessibility", status: "running" };
+		expect(await reportFrom({ report: null, job })).toEqual({ report: null, job });
+	});
+
+	it("reads a server that names no run", async () => {
+		expect(await reportFrom({ report: "{}" })).toEqual({ report: "{}", job: null });
+	});
+});
+
 describe("JobBar", () => {
 	const job = { id: "j", feature: "roadmap", started_by: null, started_at: null, finished_at: null, error: null };
 

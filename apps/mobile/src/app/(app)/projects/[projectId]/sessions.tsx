@@ -10,6 +10,7 @@ import type { WorkSession } from "../../../../insights/types";
 import { ErrorBanner, Loading } from "../../../../ui/components";
 import { formatDate } from "../../../../ui/format";
 import { RADIUS, SPACE, useTheme } from "../../../../ui/theme";
+import { phaseLabel } from "../../../../i18n/labels";
 
 export default function Sessions() {
 	const { projectId } = useLocalSearchParams<{ projectId: string }>();
@@ -37,7 +38,7 @@ export default function Sessions() {
 						<View style={styles.line}>
 							<Text style={{ color: theme.text, fontWeight: "600", flex: 1 }} numberOfLines={1}>
 								{item.spec ? `${item.spec.split("-")[0]} · ` : ""}
-								{word("runPhase", item.phase)}
+								{phaseLabel(item.phase)}
 							</Text>
 							<Text style={{ color }}>{word("runStatus", item.status)}</Text>
 						</View>

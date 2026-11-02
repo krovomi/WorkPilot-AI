@@ -210,7 +210,10 @@
 		"build": "Build",
 		"qa": "QA",
 		"merge": "Merge",
-		"pr": "Pull request"
+		"pr": "Pull request",
+		"ideation": "Ideas",
+		"github-review": "GitHub review",
+		"gitlab-review": "GitLab review"
 	},
 	"features": {
 		"insights": "Insights",
@@ -541,5 +544,15 @@
 		"approve": "Approve and build",
 		"view": "View",
 		"approveFailed": "The plan was not approved"
+	},
+	"orgRole": {
+		"owner": "Owner",
+		"admin": "Administrator",
+		"maintainer": "Maintainer",
+		"contributor": "Contributor",
+		"reviewer": "Reviewer",
+		"operator": "Operator",
+		"analyst": "Analyst",
+		"viewer": "Viewer"
 	}
 }

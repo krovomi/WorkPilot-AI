@@ -39,6 +39,12 @@ import json, sys
 print(json.dumps({"result": {"items": [{"id": "D1", "roi": 3.5}], "trend": [1, 2]}}), flush=True)
 """
 
+_FAKE_SLOW = """
+import time
+print("started", flush=True)
+time.sleep(30)
+"""
+
 _FAKE_FAILING = """
 import sys
 print("I18N_RESULT:{}", flush=True)
@@ -77,6 +83,7 @@ async def server(monkeypatch, tmp_path):
     (runners / "accessibility_runner.py").write_text(_FAKE_A11Y, encoding="utf-8")
     (runners / "tech_debt_runner.py").write_text(_FAKE_DEBT, encoding="utf-8")
     (runners / "i18n_runner.py").write_text(_FAKE_FAILING, encoding="utf-8")
+    (runners / "doc_drift_runner.py").write_text(_FAKE_SLOW, encoding="utf-8")
     monkeypatch.setattr(project_jobs, "BACKEND_DIR", backend)
 
     db_engine._engine = None
@@ -133,6 +140,13 @@ async def _db():
     return get_session_factory()()
 
 
+async def _report(kind: str, scope):
+    from shared_features.analyses import get_report
+
+    async with await _db() as db:
+        return await get_report(kind, scope, db)
+
+
 async def _wait_final(job_id: str):
     from server.db.models import ProjectJob
 
@@ -186,10 +200,11 @@ def test_each_analysis_is_its_runner_with_closed_options():
 
 @pytest.mark.asyncio
 async def test_a_member_runs_an_analysis_and_every_member_reads_its_report(server):
-    from shared_features.analyses import get_analysis_job, get_report, start_analysis
+    from shared_features.analyses import get_analysis_job, start_analysis
 
-    assert (await get_report("accessibility", _scope(server, "viewer"))) == {
-        "report": None
+    assert (await _report("accessibility", _scope(server, "viewer"))) == {
+        "report": None,
+        "job": None,
     }
     async with await _db() as db:
         job = await start_analysis(
@@ -209,38 +224,39 @@ async def test_a_member_runs_an_analysis_and_every_member_reads_its_report(serve
     assert followed["lines"][0] == "args --target-level AAA"
 
     saved = json.loads(
-        (await get_report("accessibility", _scope(server, "viewer")))["report"]
+        (await _report("accessibility", _scope(server, "viewer")))["report"]
     )
     # The last report the runner printed that reads as one.
     assert saved["report"] == {"violations": [{"rule": "alt-text"}], "level": "AAA"}
     assert saved["run_by"] == "u-ada"
     assert saved["finished_at"]
     # Another tenant's project has none of it.
-    assert (await get_report("accessibility", _scope(server, which=1))) == {
-        "report": None
+    assert (await _report("accessibility", _scope(server, which=1))) == {
+        "report": None,
+        "job": None,
     }
 
 
 @pytest.mark.asyncio
 async def test_a_runner_that_prints_its_result_as_an_object(server):
-    from shared_features.analyses import get_report, start_analysis
+    from shared_features.analyses import start_analysis
 
     async with await _db() as db:
         job = await start_analysis("tech-debt", _request(), {}, _scope(server), db)
     assert (await _wait_final(job["id"])).status == "succeeded"
-    saved = json.loads((await get_report("tech-debt", _scope(server)))["report"])
+    saved = json.loads((await _report("tech-debt", _scope(server)))["report"])
     assert saved["report"] == {"items": [{"id": "D1", "roi": 3.5}], "trend": [1, 2]}
 
 
 @pytest.mark.asyncio
 async def test_a_failed_analysis_saves_no_report(server):
-    from shared_features.analyses import get_report, start_analysis
+    from shared_features.analyses import start_analysis
 
     async with await _db() as db:
         job = await start_analysis("i18n", _request(), {}, _scope(server), db)
     done = await _wait_final(job["id"])
     assert done.status == "failed"
-    assert (await get_report("i18n", _scope(server))) == {"report": None}
+    assert (await _report("i18n", _scope(server))) == {"report": None, "job": None}
 
 
 @pytest.mark.asyncio
@@ -248,7 +264,6 @@ async def test_refusals(server):
     from shared_features.analyses import (
         cancel_analysis_job,
         get_analysis_job,
-        get_report,
         start_analysis,
     )
 
@@ -265,7 +280,7 @@ async def test_refusals(server):
     assert not (server["clones"][0] / ".workpilot").exists()
 
     with pytest.raises(HTTPException) as unknown:
-        await get_report("nope", _scope(server))
+        await _report("nope", _scope(server))
     assert unknown.value.status_code == 404
     async with await _db() as db:
         with pytest.raises(HTTPException) as missing:
@@ -282,7 +297,7 @@ async def test_refusals(server):
 async def test_a_report_directory_led_out_of_the_clone_is_neither_read_nor_written(
     server, tmp_path
 ):
-    from shared_features.analyses import ANALYSES, _save_report, get_report
+    from shared_features.analyses import ANALYSES, _save_report
 
     outside = tmp_path / "outside"
     outside.mkdir()
@@ -294,7 +309,7 @@ async def test_a_report_directory_led_out_of_the_clone_is_neither_read_nor_writt
     except (OSError, NotImplementedError):
         pytest.skip("no symlinks here")
     with pytest.raises(HTTPException) as refused:
-        await get_report("accessibility", _scope(server))
+        await _report("accessibility", _scope(server))
     assert refused.value.status_code == 409
     await _save_report(
         ANALYSES[0], server["clones"][0], "u-ada", "succeeded", ['A11Y_RESULT:{"x": 1}']
@@ -308,7 +323,7 @@ async def test_a_report_directory_led_out_of_the_clone_is_neither_read_nor_writt
 async def test_a_workpilot_directory_led_out_of_the_clone_is_not_written(
     server, tmp_path
 ):
-    from shared_features.analyses import ANALYSES, _save_report, get_report
+    from shared_features.analyses import ANALYSES, _save_report
 
     outside = tmp_path / "outside-workpilot"
     outside.mkdir()
@@ -322,8 +337,29 @@ async def test_a_workpilot_directory_led_out_of_the_clone_is_not_written(
     )
     assert list(outside.iterdir()) == []
     with pytest.raises(HTTPException) as refused:
-        await get_report("accessibility", _scope(server))
+        await _report("accessibility", _scope(server))
     assert refused.value.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_the_report_names_the_run_in_progress(server):
+    """A screen opened again while the analysis runs follows that run."""
+    from shared_features.analyses import cancel_analysis_job, start_analysis
+
+    async with await _db() as db:
+        job = await start_analysis("doc-drift", _request(), {}, _scope(server), db)
+    running = await _report("doc-drift", _scope(server, "viewer"))
+    assert running["report"] is None
+    assert running["job"]["id"] == job["id"]
+    # Another analysis of the project, or another project, runs nothing.
+    assert (await _report("i18n", _scope(server)))["job"] is None
+    assert (await _report("doc-drift", _scope(server, which=1)))["job"] is None
+    async with await _db() as db:
+        await cancel_analysis_job(
+            "doc-drift", job["id"], _request(), _scope(server), db
+        )
+    assert (await _wait_final(job["id"])).status == "cancelled"
+    assert (await _report("doc-drift", _scope(server)))["job"] is None
 
 
 def test_running_an_analysis_is_running_an_agent():
