@@ -818,7 +818,7 @@ class TestRoutes:
 
     def test_the_board_installs_the_approval_check(self):
         source = (_BACKEND / "shared_board" / "api.py").read_text(encoding="utf-8")
-        assert "set_approval_check(_plan_awaits_approval)" in source
+        assert "set_approval_check(_approval_pending)" in source
 
     def test_the_run_manager_calls_it(self):
         source = (_BACKEND / "server" / "services" / "run_manager.py").read_text(

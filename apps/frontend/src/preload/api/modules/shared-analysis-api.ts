@@ -2,7 +2,8 @@
  * Shared Analysis API
  *
  * The last report a member of a server project saved of one of its analyses
- * (accessibility, i18n, documentation drift, flaky tests, technical debt);
+ * (accessibility, i18n, documentation drift, flaky tests, technical debt) or
+ * of its changelog;
  * null for a local project.
  */
 
@@ -14,7 +15,8 @@ export type SharedAnalysisKind =
 	| "i18n"
 	| "doc-drift"
 	| "flaky-tests"
-	| "tech-debt";
+	| "tech-debt"
+	| "changelog";
 
 export interface SharedAnalysisReport {
 	report: unknown;

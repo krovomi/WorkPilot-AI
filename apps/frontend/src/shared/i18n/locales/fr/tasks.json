@@ -1615,25 +1615,50 @@
 			"handles": "{{from}} traite {{to}}."
 		}
 	},
-	"overview": {
-		"nav": "Sections de la vue d'ensemble",
+	"panel": {
+		"tabsLabel": "Sections du panneau de tâche",
 		"sections": {
-			"review": {
-				"title": "À traiter",
-				"hint": "La tâche attend votre revue : relisez, testez, puis mergez ou demandez des changements."
+			"progress": {
+				"title": "Avancement",
+				"hint": "Où en est la tâche et ce qu'il lui faut pour avancer : votre revue, la CI et la PR, la tâche elle-même, son objectif."
 			},
-			"task": {
-				"title": "La tâche",
-				"hint": "Ce qui est demandé : description, critères d'acceptation, contexte."
+			"quality": {
+				"title": "Qualité",
+				"hint": "Si ce qui a été construit est juste : second avis, couverture du spec, design system, écrans, vérification."
 			},
-			"plan": {
-				"title": "Plan d'exécution",
-				"hint": "Ce que les agents vont faire, avec quel effort, et ce qu'ils liront."
-			},
-			"learning": {
-				"title": "Mémoire & apprentissage",
-				"hint": "Ce que le système retient — et ce qui attend votre décision."
+			"costs": {
+				"title": "Coûts et contexte",
+				"hint": "Ce que le niveau d'effort achète, ce que lisent les agents, et ce que le système retient."
 			}
+		},
+		"empty": "Rien à montrer ici pour cette tâche pour l'instant.",
+		"pendingDecisions_one": "1 décision en attente",
+		"pendingDecisions_other": "{{count}} décisions en attente"
+	},
+	"waiting": {
+		"title": "Ce qui vous attend",
+		"items": {
+			"permission": "Un agent attend votre réponse à une question",
+			"plan": "Un plan attend votre approbation",
+			"failed": "Le build a échoué : voir pourquoi",
+			"ci": "La CI est rouge sur la branche de la tâche",
+			"prChecks": "Des checks sont rouges sur la pull request de la tâche",
+			"goal": "L'objectif n'est pas atteint",
+			"review": "Les changements attendent votre revue"
+		}
+	},
+	"ciPipeline": {
+		"title": "Pipeline CI",
+		"run": "{{provider}} {{run}} sur {{branch}}",
+		"open": "Ouvrir le run",
+		"repairing": "Un agent répare le build.",
+		"state": {
+			"queued": "En file",
+			"running": "En cours",
+			"succeeded": "Vert",
+			"partiallySucceeded": "Partiellement vert",
+			"failed": "Rouge",
+			"canceled": "Annulé"
 		}
 	},
 	"inlineEdit": {

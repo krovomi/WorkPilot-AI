@@ -118,7 +118,7 @@ exports it all as JSON (`buildViewUsageReport`,
 | `worktrees` | Worktrees | Git & Integrations | — |  |
 | `analytics` | Analytics | Planning | — |  |
 | `carbon-profiler` | Carbon / Energy Profiler | Planning | — | yes |
-| `changelog` | Changelog | Planning | — | yes |
+| `changelog` | Changelog | Planning | [changelog.md](changelog.md) |  |
 | `cost-estimator` | Cost Estimator | Planning | — |  |
 | `env-snapshot` | Environment Snapshots | Planning | — | yes |
 | `release-coordinator` | Release Train Coordinator | Planning | — | yes |

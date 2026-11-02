@@ -6,6 +6,7 @@
 import { createIpcListener, invokeIpc } from "./ipc-utils";
 import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 import type { IPCResult } from "../../../shared/types";
+import type { ColorTheme } from "../../../shared/types/settings";
 import type {
 	NeedsYouChannelKind,
 	NeedsYouEventKind,
@@ -127,6 +128,13 @@ export interface ServerAuthAPI {
 	logout: () => Promise<ServerAuthState>;
 	restore: () => Promise<ServerAuthState>;
 	onStateChanged: (callback: (state: ServerAuthState) => void) => () => void;
+	/** The person's theme from the server, already kept in the settings; null when none. */
+	pullUiPreferences: () => Promise<ServerUiPreferences | null>;
+}
+
+export interface ServerUiPreferences {
+	theme: "light" | "dark" | "system";
+	colorTheme: ColorTheme;
 }
 
 export const createServerAuthAPI = (): ServerAuthAPI => ({
@@ -190,6 +198,8 @@ export const createServerAuthAPI = (): ServerAuthAPI => ({
 		invokeIpc<IPCResult>(IPC_CHANNELS.SERVER_NEEDS_YOU_SAVE_PREFERENCES, prefs),
 	logout: () => invokeIpc<ServerAuthState>(IPC_CHANNELS.SERVER_AUTH_LOGOUT),
 	restore: () => invokeIpc<ServerAuthState>(IPC_CHANNELS.SERVER_AUTH_RESTORE),
+	pullUiPreferences: () =>
+		invokeIpc<ServerUiPreferences | null>(IPC_CHANNELS.SERVER_AUTH_PULL_UI_PREFERENCES),
 	onStateChanged: (callback) =>
 		createIpcListener<[ServerAuthState]>(IPC_CHANNELS.SERVER_AUTH_STATE_CHANGED, (state) =>
 			callback(state),

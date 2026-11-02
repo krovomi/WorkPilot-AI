@@ -1,5 +1,6 @@
 import { Stack } from "expo-router";
 import { useTranslation } from "react-i18next";
+import { LockGate } from "../../auth/LockGate";
 import { PushBridge } from "../../push/PushBridge";
 import { useTheme } from "../../ui/theme";
 
@@ -7,7 +8,7 @@ export default function SignedInLayout() {
 	const { t } = useTranslation();
 	const theme = useTheme();
 	return (
-		<>
+		<LockGate>
 			<PushBridge />
 			<Stack
 				screenOptions={{
@@ -19,6 +20,7 @@ export default function SignedInLayout() {
 			>
 				<Stack.Screen name="index" options={{ title: t("projects.title") }} />
 				<Stack.Screen name="settings" options={{ title: t("settings.title") }} />
+				<Stack.Screen name="share" options={{ title: t("share.title") }} />
 				<Stack.Screen name="projects/[projectId]/index" options={{ title: "" }} />
 				<Stack.Screen
 					name="projects/[projectId]/new"
@@ -46,6 +48,6 @@ export default function SignedInLayout() {
 				<Stack.Screen name="projects/[projectId]/forge/issues/[number]" options={{ title: "" }} />
 				<Stack.Screen name="projects/[projectId]/forge/pulls/[number]" options={{ title: "" }} />
 			</Stack>
-		</>
+		</LockGate>
 	);
 }

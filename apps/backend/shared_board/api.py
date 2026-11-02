@@ -35,6 +35,7 @@ from server.authz.principal import get_principal
 from server.authz.scope import ProjectScope, resolve_project_scope
 from server.db.engine import get_db
 from server.db.models import ProjectRole
+from server.services import push
 from server.services.events import emit_board_event
 from server.services.needs_you import set_approval_check
 from shared_board import attachments as card_images
@@ -408,6 +409,16 @@ async def approve_card(
     return {"approved": True, "approvedBy": review.approved_by}
 
 
+def _approval_pending(directory: Path) -> bool:
+    """The plan of this spec folder is not (or no longer) approved."""
+    from review.state import ReviewState
+
+    return not ReviewState.load(directory).is_approval_valid(directory)
+
+
+# A finished spec waiting for this approval is notified as a plan to approve.
+push.set_approval_check(_approval_pending)
+
 # The board as a list of summarised cards, for the phone app: its own module.
 router.add_api_route("/cards", listing.list_board_cards, methods=["GET"])
 
@@ -419,13 +430,6 @@ router.add_api_route(
 )
 
 
-def _plan_awaits_approval(directory: Path) -> bool:
-    """The plan of this spec folder is not (or no longer) approved."""
-    from review.state import ReviewState
-
-    return not ReviewState.load(directory).is_approval_valid(directory)
-
-
-# A finished spec still waiting for this approval rings its person's
-# "needs you" channels as a plan to approve (server/services/needs_you.py).
-set_approval_check(_plan_awaits_approval)
+# The same check rings its person's "needs you" channels as a plan to
+# approve (server/services/needs_you.py).
+set_approval_check(_approval_pending)
