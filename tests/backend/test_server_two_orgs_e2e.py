@@ -230,6 +230,23 @@ async def _drain(ws: Any, seconds: float) -> list[dict[str, Any]]:
     return got
 
 
+#: What the streaming server tells everyone on a project's channel about that
+#: project's own room: who is on it and its chat (``streaming/project_room.py``).
+ROOM_EVENTS = frozenset({"presence", "chat_history", "chat_message"})
+
+
+def _own_room(event: dict[str, Any], project_id: str, stranger: e2e.Person) -> bool:
+    """`event` is about `project_id`'s own room, and does not name `stranger`."""
+    if event.get("event_type") not in ROOM_EVENTS:
+        return False
+    if event.get("session_id") != f"project:{project_id}":
+        return False
+    # An unknown id names everyone: such an event counts as a leak.
+    return bool(stranger.user_id) and stranger.user_id not in json.dumps(
+        event.get("data")
+    )
+
+
 def _is(event_type: str, **data: Any):
     def match(event: dict[str, Any]) -> bool:
         payload = event.get("data") or {}
@@ -331,11 +348,14 @@ async def test_a_member_works_on_their_board_and_the_other_org_gets_404(
         assert st.call(me, "GET", path, params=in_mine).status_code == 404
 
         # Nothing of all that reached the other organization's stream, and
-        # its switch to my channel was never confirmed.
+        # its switch to my channel was never confirmed. What its own room says
+        # (who is on their project, its chat) is theirs, as long as it does
+        # not name me.
         leaked = [
             e
             for e in await _drain(their_stream, 1.5)
             if e.get("event_type") != "session_start"
+            and not _own_room(e, their_project, me)
         ]
         assert leaked == []
     finally:
