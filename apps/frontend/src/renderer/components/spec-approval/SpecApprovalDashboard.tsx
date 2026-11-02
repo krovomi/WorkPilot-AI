@@ -84,29 +84,29 @@ export function SpecApprovalDashboard(): React.ReactElement {
 	const canSubmitFeedback = feedback.trim().length > 0;
 
 	return (
-		<div className="flex flex-col h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
-			<div className="px-6 py-4 border-b border-[var(--border-color)]">
+		<div className="flex flex-col h-full bg-background text-foreground">
+			<div className="px-6 py-4 border-b border-border">
 				<h1 className="text-xl font-semibold">{t("specApproval:title")}</h1>
-				<p className="text-sm text-[var(--text-secondary)] mt-0.5">
+				<p className="text-sm text-muted-foreground mt-0.5">
 					{t("specApproval:subtitle")}
 				</p>
 			</div>
 
 			{!activeProject ? (
 				<div className="flex-1 flex items-center justify-center text-center p-8">
-					<p className="text-sm text-[var(--text-secondary)] max-w-sm">
+					<p className="text-sm text-muted-foreground max-w-sm">
 						{t("specApproval:empty.noProject")}
 					</p>
 				</div>
 			) : (
 				<div className="flex flex-1 overflow-hidden">
-					<div className="w-72 border-r border-[var(--border-color)] p-4 flex flex-col gap-5 overflow-auto">
+					<div className="w-72 border-r border-border p-4 flex flex-col gap-5 overflow-auto">
 						<div>
-							<h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
+							<h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
 								{t("specApproval:pending.heading", { count: pending.length })}
 							</h3>
 							{pending.length === 0 ? (
-								<p className="text-xs text-[var(--text-secondary)]">
+								<p className="text-xs text-muted-foreground">
 									{t("specApproval:pending.empty")}
 								</p>
 							) : (
@@ -119,11 +119,11 @@ export function SpecApprovalDashboard(): React.ReactElement {
 											className={`text-left rounded-lg p-2.5 transition-colors ${
 												selectedId === task.id
 													? "bg-[var(--accent)]/15 border border-[var(--accent)]/40"
-													: "bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border border-transparent"
+													: "bg-card hover:bg-accent border border-transparent"
 											}`}
 										>
 											<div className="text-sm font-medium truncate">{task.title}</div>
-											<div className="text-xs text-[var(--text-secondary)] font-mono">
+											<div className="text-xs text-muted-foreground font-mono">
 												{task.specId}
 											</div>
 										</button>
@@ -153,7 +153,7 @@ export function SpecApprovalDashboard(): React.ReactElement {
 									<h3 className="text-lg font-medium mb-2">
 										{t("specApproval:empty.title")}
 									</h3>
-									<p className="text-sm text-[var(--text-secondary)] max-w-sm">
+									<p className="text-sm text-muted-foreground max-w-sm">
 										{t("specApproval:empty.body")}
 									</p>
 								</div>
@@ -162,12 +162,12 @@ export function SpecApprovalDashboard(): React.ReactElement {
 							<>
 								<div className="flex-1 overflow-auto p-4">
 									<h2 className="text-base font-semibold mb-1">{selected.title}</h2>
-									<div className="text-xs text-[var(--text-secondary)] font-mono mb-4">
+									<div className="text-xs text-muted-foreground font-mono mb-4">
 										{selected.specId}
 									</div>
 
 									{isLoading && !content ? (
-										<p className="text-sm text-[var(--text-secondary)]">
+										<p className="text-sm text-muted-foreground">
 											{t("specApproval:content.loading")}
 										</p>
 									) : content?.spec_md || content?.implementation_plan_json ? (
@@ -177,7 +177,7 @@ export function SpecApprovalDashboard(): React.ReactElement {
 													<h3 className="text-sm font-semibold mb-1">
 														{t("specApproval:content.spec")}
 													</h3>
-													<pre className="text-xs font-mono whitespace-pre-wrap bg-[var(--bg-secondary)] rounded-lg p-3">
+													<pre className="text-xs font-mono whitespace-pre-wrap bg-card rounded-lg p-3">
 														{content.spec_md}
 													</pre>
 												</section>
@@ -187,7 +187,7 @@ export function SpecApprovalDashboard(): React.ReactElement {
 													<summary className="text-sm font-semibold cursor-pointer">
 														{t("specApproval:content.plan")}
 													</summary>
-													<pre className="mt-1 text-xs font-mono whitespace-pre-wrap bg-[var(--bg-secondary)] rounded-lg p-3">
+													<pre className="mt-1 text-xs font-mono whitespace-pre-wrap bg-card rounded-lg p-3">
 														{content.implementation_plan_json}
 													</pre>
 												</details>
@@ -197,7 +197,7 @@ export function SpecApprovalDashboard(): React.ReactElement {
 													<summary className="text-sm font-semibold cursor-pointer">
 														{t("specApproval:content.requirements")}
 													</summary>
-													<pre className="mt-1 text-xs font-mono whitespace-pre-wrap bg-[var(--bg-secondary)] rounded-lg p-3">
+													<pre className="mt-1 text-xs font-mono whitespace-pre-wrap bg-card rounded-lg p-3">
 														{content.requirements_json}
 													</pre>
 												</details>
@@ -207,23 +207,23 @@ export function SpecApprovalDashboard(): React.ReactElement {
 													<summary className="text-sm font-semibold cursor-pointer">
 														{t("specApproval:content.context")}
 													</summary>
-													<pre className="mt-1 text-xs font-mono whitespace-pre-wrap bg-[var(--bg-secondary)] rounded-lg p-3">
+													<pre className="mt-1 text-xs font-mono whitespace-pre-wrap bg-card rounded-lg p-3">
 														{content.context_json}
 													</pre>
 												</details>
 											)}
 										</div>
 									) : (
-										<p className="text-sm text-[var(--text-secondary)]">
+										<p className="text-sm text-muted-foreground">
 											{t("specApproval:content.unavailable")}
 										</p>
 									)}
 								</div>
 
-								<div className="border-t border-[var(--border-color)] p-4 flex flex-col gap-3">
+								<div className="border-t border-border p-4 flex flex-col gap-3">
 									<label
 										htmlFor="spec-approval-feedback"
-										className="text-xs text-[var(--text-secondary)]"
+										className="text-xs text-muted-foreground"
 									>
 										{t("specApproval:decision.feedbackLabel")}
 									</label>
@@ -233,7 +233,7 @@ export function SpecApprovalDashboard(): React.ReactElement {
 										onChange={(e) => setFeedback(e.target.value)}
 										rows={3}
 										placeholder={t("specApproval:decision.feedbackPlaceholder")}
-										className="w-full resize-none rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] p-2 text-sm"
+										className="w-full resize-none rounded-lg bg-card border border-border p-2 text-sm"
 									/>
 									<div className="flex items-center gap-2">
 										<button
@@ -253,7 +253,7 @@ export function SpecApprovalDashboard(): React.ReactElement {
 											{t("specApproval:decision.requestChanges")}
 										</button>
 										{!canSubmitFeedback && (
-											<span className="text-xs text-[var(--text-secondary)]">
+											<span className="text-xs text-muted-foreground">
 												{t("specApproval:decision.feedbackRequired")}
 											</span>
 										)}
