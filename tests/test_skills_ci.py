@@ -48,3 +48,20 @@ def test_the_weekly_sync_commits_the_rebuilt_outputs():
     commit = [i for i, run in enumerate(runs) if "git commit" in run]
     assert build and commit and build[0] < commit[0]
     assert "git add -A" in runs[commit[0]]
+
+
+def test_the_weekly_sync_builds_from_committed_content_only():
+    """The bootstrapped packs are gitignored; built with them on disk, the
+    outputs could not be reproduced by lint.yml's check (#683)."""
+    runs = _runs(_steps("skills-sync.yml", "sync"))
+    bootstrap = [i for i, run in enumerate(runs) if "skills_cli.py bootstrap" in run]
+    clean = [
+        i for i, run in enumerate(runs) if run.strip() == "git clean -fdX -- skills/"
+    ]
+    build = [
+        i
+        for i, run in enumerate(runs)
+        if run.strip() == "python3 scripts/skills_cli.py build"
+    ]
+    assert bootstrap and clean and build
+    assert bootstrap[0] < clean[0] < build[0]

@@ -62,6 +62,16 @@ jobs:
           ONLY_PACK: ${{ inputs.pack }}
         run: python3 scripts/skills_sync.py --apply --report "$GITHUB_STEP_SUMMARY"
 
+      # The packs bootstrapped above are gitignored: they were fetched only so
+      # the check could classify what moved. Built with them on disk, the
+      # outputs emit skills a fresh clone cannot reproduce, and lint.yml's
+      # `build --check` (which runs on what is committed) fails the PR. The
+      # 2026-11-02 sync (#683) emitted about fifty such skills. Dropping the
+      # ignored content keeps every tracked file, pack.json included.
+      - name: Drop the gitignored pack content before the build
+        if: steps.check.outputs.changed == 'true'
+        run: git clean -fdX -- skills/
+
       # The generated outputs (.agents/, the harness mirrors, skills-lock.json)
       # follow the sources in the same PR: lint.yml checks them as committed.
       - name: Rebuild the generated outputs
