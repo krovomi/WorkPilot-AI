@@ -158,7 +158,7 @@ import {
 	type SortableKind,
 } from "./sidebar/sortable-primitives";
 import { ActivityBadge } from "./sidebar/ActivityBadge";
-import { NavIcon } from "./sidebar/ExperimentalMarker";
+import { NavIcon, navLabelTitle } from "./sidebar/ExperimentalMarker";
 import { EXPERIMENTAL_VIEWS } from "./sidebar/experimental-views";
 import {
 	entryIdOfView,
@@ -1568,7 +1568,7 @@ export function Sidebar({
 					<NavIcon icon={Icon} experimental={isItemExperimental(item)} />
 					{!isCollapsed && (
 						<>
-							<span className="flex-1 text-left truncate" title={t(item.labelKey)}>
+							<span className="flex-1 text-left truncate" title={navLabelTitle(t, item.labelKey, isItemExperimental(item))}>
 								{t(item.labelKey)}
 							</span>
 							<ActivityBadge badge={badge} attention={hasAttention} />
@@ -1653,7 +1653,7 @@ export function Sidebar({
 				)}
 			>
 				<NavIcon icon={item.icon} experimental={isItemExperimental(item)} size="sm" />
-				<span className="flex-1 truncate" title={t(item.labelKey)}>{t(item.labelKey)}</span>
+				<span className="flex-1 truncate" title={navLabelTitle(t, item.labelKey, isItemExperimental(item))}>{t(item.labelKey)}</span>
 				<ActivityBadge badge={badge} />
 				{item.shortcut && (
 					<kbd className="rounded border border-border bg-secondary px-1 font-mono text-[9px]">

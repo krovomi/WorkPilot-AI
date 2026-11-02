@@ -3,6 +3,8 @@ import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useProjectStore } from "@/stores/project-store";
 import type { SidebarView } from "../Sidebar";
+import { BetaBanner } from "./ExperimentalMarker";
+import { EXPERIMENTAL_VIEWS } from "./experimental-views";
 import { HubLauncher } from "./HubLauncher";
 import { HubTabList, hubTabDomId } from "./HubTabList";
 import { hubOfView, rememberHubTab, shownHubTabs } from "./hubs";
@@ -76,6 +78,8 @@ export function HubMain({ activeView, onSelectView, children }: HubMainProps) {
 					idPrefix={TAB_PREFIX}
 				/>
 			)}
+			{/* Every experimental view says so on its page, not only in the menu. */}
+			{EXPERIMENTAL_VIEWS.has(activeView) && <BetaBanner />}
 			<div
 				{...(showTabs ? panelProps(activeView) : {})}
 				className={showTabs ? "min-h-0 flex-1 overflow-auto" : "min-h-0 flex-1 overflow-hidden"}

@@ -4,7 +4,7 @@
  *
  * @vitest-environment jsdom
  */
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useEffect } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -128,6 +128,14 @@ describe("HubMain", () => {
 		renderMain("agent-debugger");
 		const hub = SIDEBAR_HUBS.find((h) => h.id === "agent-history");
 		expect(hub && hubEntryTarget(hub, { serverProject: false })).toBe("agent-debugger");
+	});
+
+	it("puts a beta banner above every experimental view, and only those", () => {
+		renderMain("api-watcher");
+		expect(screen.getByRole("note").textContent).toContain("navigation:experimental.bannerTitle");
+		cleanup();
+		renderMain("kanban");
+		expect(screen.queryByTestId("beta-banner")).toBeNull();
 	});
 
 	it("shows no tabs outside a hub", () => {
