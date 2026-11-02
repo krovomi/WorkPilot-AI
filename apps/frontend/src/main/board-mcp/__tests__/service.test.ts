@@ -57,7 +57,7 @@ describe("boardMcpStatus", () => {
 		mkdirSync(path.join(home, ".cursor"));
 		const status = boardMcpStatus(context());
 		expect(status.serverName).toBe("workpilot-demo-app");
-		expect(status.clients).toHaveLength(9);
+		expect(status.clients).toHaveLength(10);
 		const cursor = status.clients.find((c) => c.id === "cursor");
 		expect(cursor).toMatchObject({ detected: true, writable: true, state: "absent" });
 		expect(cursor?.location.replaceAll("\\", "/")).toBe("~/.cursor/mcp.json");
@@ -84,6 +84,24 @@ describe("applyBoardMcp", () => {
 		const removed = await applyBoardMcp(context(), "gemini-cli", false);
 		expect(removed.state).toBe("absent");
 		expect(JSON.parse(readFileSync(file, "utf-8"))).toEqual({ theme: "x", mcpServers: {} });
+	});
+
+	it("writes hermes's YAML config under HERMES_HOME, keeping the person's comments", async () => {
+		const hermesHome = path.join(home, "hermes-home");
+		const file = path.join(hermesHome, "config.yaml");
+		mkdirSync(hermesHome);
+		writeFileSync(file, "# mine\nmodel:\n  default: x\n", "utf-8");
+		const ctx = context({ dirs: { home, appData: path.join(home, "AppData"), hermesHome } });
+		const added = await applyBoardMcp(ctx, "hermes", true);
+		expect(added.state).toBe("current");
+		const text = readFileSync(file, "utf-8");
+		expect(text).toContain("# mine");
+		expect(text).toContain("mcp_servers:");
+		expect(text).toContain(project);
+
+		const removed = await applyBoardMcp(ctx, "hermes", false);
+		expect(removed.state).toBe("absent");
+		expect(readFileSync(file, "utf-8")).toContain("# mine");
 	});
 
 	it("leaves an unreadable file as it is", async () => {

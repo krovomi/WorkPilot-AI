@@ -20,6 +20,7 @@ const CLIENT_NAMES: Record<BoardMcpClientId, string> = {
 	"claude-desktop": "Claude Desktop",
 	windsurf: "Windsurf",
 	opencode: "OpenCode",
+	hermes: "Hermes Agent",
 };
 
 interface BoardMcpIntegrationProps {

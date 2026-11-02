@@ -17,6 +17,7 @@ export const BOARD_MCP_CLIENTS = [
 	"claude-desktop",
 	"windsurf",
 	"opencode",
+	"hermes",
 ] as const;
 
 export type BoardMcpClientId = (typeof BOARD_MCP_CLIENTS)[number];

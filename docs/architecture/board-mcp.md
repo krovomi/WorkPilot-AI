@@ -29,6 +29,7 @@ detected), a button that writes the entry, and what to paste by hand:
 | Claude Desktop | `<appData>/Claude/claude_desktop_config.json`, `mcpServers` | JSON merge |
 | Windsurf | `~/.codeium/windsurf/mcp_config.json`, `mcpServers` | JSON merge |
 | OpenCode | `~/.config/opencode/opencode.json` (`XDG_CONFIG_HOME`), `mcp`, `command` as one array | JSON merge |
+| Hermes Agent | `~/.hermes/config.yaml` (`HERMES_HOME`; `%LOCALAPPDATA%\hermes` on Windows), `mcp_servers` | YAML document edit (`yaml`'s `parseDocument`): the entry alone, the person's comments kept; a file that does not parse or is not a mapping is left alone |
 
 The code is `main/board-mcp/` (formats in `clients.ts`, files in
 `service.ts`) and `main/ipc-handlers/board-mcp-handlers.ts`.

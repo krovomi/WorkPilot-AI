@@ -28,7 +28,7 @@ import {
 } from "../board-mcp/service";
 import { getToolInfo } from "../cli-tool-manager";
 import { getAugmentedEnv } from "../env-utils";
-import { getEnvVar, isSecurePath, requiresShell } from "../platform";
+import { getEnvVar, isSecurePath, isWindows, requiresShell } from "../platform";
 import { projectStore } from "../project-store";
 import { parsePythonCommand } from "../python-detector";
 import { pythonEnvManager } from "../python-env-manager";
@@ -69,6 +69,18 @@ function claudeRunner(): ClaudeRunner | null {
 		});
 }
 
+/**
+ * Where hermes-agent keeps its config: `HERMES_HOME`, else `%LOCALAPPDATA%\\hermes`
+ * on Windows, else `~/.hermes` (the default `clientDefinitions` applies).
+ */
+function hermesHome(): string | undefined {
+	const override = getEnvVar("HERMES_HOME");
+	if (override) return override;
+	if (!isWindows()) return undefined;
+	const local = getEnvVar("LOCALAPPDATA");
+	return path.join(local || path.join(os.homedir(), "AppData", "Local"), "hermes");
+}
+
 function context(projectId: unknown): BoardMcpContext | string {
 	if (typeof projectId !== "string" || !projectId) return "projectId is required";
 	const project = projectStore.getProject(projectId);
@@ -82,6 +94,7 @@ function context(projectId: unknown): BoardMcpContext | string {
 			appData: app.getPath("appData"),
 			codexHome: getEnvVar("CODEX_HOME"),
 			xdgConfig: getEnvVar("XDG_CONFIG_HOME"),
+			hermesHome: hermesHome(),
 		},
 		entry: buildEntry(parsePythonCommand(pythonPath), backendDir(), project.path),
 		projectName: project.name,
