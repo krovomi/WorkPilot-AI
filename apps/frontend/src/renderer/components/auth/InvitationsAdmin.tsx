@@ -11,6 +11,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button, Input, Label } from "@/components/ui";
 import type { InvitationPublic } from "../../../preload/api/modules/server-auth-api";
+import { formatAppDateTime } from "@/lib/date-format";
 
 export function InvitationsAdmin() {
 	const { t } = useTranslation("settings");
@@ -183,7 +184,7 @@ export function InvitationsAdmin() {
 									<div className="text-xs text-muted-foreground">
 										{inv.role} ·{" "}
 										{t("invitationsAdmin.expires", "expire le")}{" "}
-										{new Date(inv.expires_at).toLocaleString()}
+										{formatAppDateTime(inv.expires_at)}
 									</div>
 								</div>
 								<Button

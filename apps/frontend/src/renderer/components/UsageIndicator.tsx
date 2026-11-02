@@ -47,6 +47,7 @@ import { ProfileRenderer } from "./usage/ProfileRenderer";
 import { ReauthContent } from "./usage/ReauthContent";
 import { THRESHOLD_ELEVATED, THRESHOLD_WARNING } from "./usage/usageConstants";
 import { useContextUsage } from "../hooks/useContextUsage";
+import { formatAppDateTime } from "@/lib/date-format";
 
 // All provider keys from the canonical map (including both 'anthropic' and 'claude' aliases)
 const KNOWN_PROVIDERS = new Set(Object.keys(PROVIDER_MODELS_MAP));
@@ -942,9 +943,7 @@ export function UsageIndicator() {
 					<p className="text-[10px] text-muted-foreground leading-relaxed">
 						{subscription.source === "codex-session-log"
 							? t("common:usage.chatgptFromCodexLog", {
-									time: new Date(subscription.observedAt).toLocaleString(
-										i18n.language,
-									),
+									time: formatAppDateTime(subscription.observedAt),
 								})
 							: t("common:usage.chatgptFromApi")}
 					</p>
