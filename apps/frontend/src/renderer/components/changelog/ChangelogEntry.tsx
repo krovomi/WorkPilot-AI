@@ -7,6 +7,7 @@ import { cn } from "../../lib/utils";
 import { Badge } from "../ui/badge";
 import { Checkbox } from "../ui/checkbox";
 import { useTranslation } from "react-i18next";
+import { formatAppDate } from "@/lib/date-format";
 
 interface TaskCardProps {
 	readonly task: ChangelogTask;
@@ -16,7 +17,7 @@ interface TaskCardProps {
 
 export function TaskCard({ task, isSelected, onToggle }: TaskCardProps) {
 	const { t } = useTranslation();
-	const completedDate = new Date(task.completedAt).toLocaleDateString();
+	const completedDate = formatAppDate(task.completedAt);
 
 	return (
 		<label
@@ -64,7 +65,7 @@ interface CommitCardProps {
 
 export function CommitCard({ commit }: CommitCardProps) {
 	const { t } = useTranslation();
-	const commitDate = new Date(commit.date).toLocaleDateString();
+	const commitDate = formatAppDate(commit.date);
 
 	return (
 		<div className="flex items-start gap-3 rounded-lg border border-border p-3 bg-background">

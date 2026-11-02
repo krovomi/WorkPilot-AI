@@ -18,6 +18,7 @@ import { useTaskStore } from "../../stores/task-store";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { ScrollArea } from "../ui/scroll-area";
+import { formatAppDateTime } from "@/lib/date-format";
 
 interface TaskVisualProofProps {
 	task: Task;
@@ -373,7 +374,7 @@ export function TaskVisualProof({ task }: TaskVisualProofProps) {
 						label={t("tasks:visualProof.completedAt")}
 						value={
 							proof.completedAt
-								? new Date(proof.completedAt).toLocaleString()
+								? formatAppDateTime(proof.completedAt)
 								: "-"
 						}
 					/>
@@ -487,7 +488,7 @@ export function TaskVisualProof({ task }: TaskVisualProofProps) {
 											</span>
 											<span>
 												{screenshot.width} × {screenshot.height} ·{" "}
-												{new Date(screenshot.capturedAt).toLocaleString()}
+												{formatAppDateTime(screenshot.capturedAt)}
 											</span>
 										</figcaption>
 									</figure>
