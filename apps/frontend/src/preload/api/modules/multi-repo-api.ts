@@ -3,8 +3,6 @@ import type {
 	IPCResult,
 	MultiRepoCreateConfig,
 	MultiRepoOrchestration,
-	MultiRepoStatus,
-	RepoExecutionState,
 } from "../../../shared/types";
 import {
 	createIpcListener,
@@ -13,140 +11,57 @@ import {
 } from "./ipc-utils";
 
 /**
- * Multi-Repo Orchestration API
+ * Multi-Repo Orchestration API: one change across several repositories, each
+ * run as a Kanban task of its own project.
  */
 export interface MultiRepoAPI {
-	// Operations
 	createMultiRepoOrchestration: (
 		projectId: string,
 		config: MultiRepoCreateConfig,
 	) => Promise<IPCResult<MultiRepoOrchestration>>;
 
 	getMultiRepoOrchestration: (
-		orchestrationId: string,
 		projectId: string,
+		orchestrationId: string,
 	) => Promise<IPCResult<MultiRepoOrchestration | null>>;
 
 	listMultiRepoOrchestrations: (
 		projectId: string,
 	) => Promise<IPCResult<MultiRepoOrchestration[]>>;
 
+	/** Starts, or resumes where it stopped. */
 	startMultiRepoOrchestration: (
 		projectId: string,
 		orchestrationId: string,
 	) => Promise<IPCResult>;
 
-	stopMultiRepoOrchestration: (orchestrationId: string) => Promise<IPCResult>;
-
-	getMultiRepoStatus: (
-		orchestrationId: string,
+	stopMultiRepoOrchestration: (
 		projectId: string,
-	) => Promise<
-		IPCResult<{ status: MultiRepoStatus; repoStates: RepoExecutionState[] }>
-	>;
+		orchestrationId: string,
+	) => Promise<IPCResult>;
 
-	// Event listeners
-	onMultiRepoProgress: (
-		callback: (orchestrationId: string, data: Record<string, unknown>) => void,
-	) => IpcListenerCleanup;
-
-	onMultiRepoRepoStart: (
-		callback: (orchestrationId: string, data: Record<string, unknown>) => void,
-	) => IpcListenerCleanup;
-
-	onMultiRepoRepoComplete: (
-		callback: (orchestrationId: string, data: Record<string, unknown>) => void,
-	) => IpcListenerCleanup;
-
-	onMultiRepoComplete: (
-		callback: (orchestrationId: string, data: Record<string, unknown>) => void,
-	) => IpcListenerCleanup;
-
-	onMultiRepoError: (
-		callback: (orchestrationId: string, data: Record<string, unknown>) => void,
-	) => IpcListenerCleanup;
-
-	onMultiRepoBreakingChange: (
-		callback: (orchestrationId: string, data: Record<string, unknown>) => void,
-	) => IpcListenerCleanup;
-
-	onMultiRepoGraph: (
-		callback: (orchestrationId: string, data: Record<string, unknown>) => void,
+	/** The whole orchestration, each time it changes. */
+	onMultiRepoUpdated: (
+		callback: (orchestration: MultiRepoOrchestration) => void,
 	) => IpcListenerCleanup;
 }
 
-/**
- * Creates the Multi-Repo API implementation
- */
 export const createMultiRepoAPI = (): MultiRepoAPI => ({
-	// Operations
-	createMultiRepoOrchestration: (
-		projectId: string,
-		config: MultiRepoCreateConfig,
-	): Promise<IPCResult<MultiRepoOrchestration>> =>
+	createMultiRepoOrchestration: (projectId, config) =>
 		invokeIpc(IPC_CHANNELS.MULTI_REPO_CREATE, projectId, config),
 
-	getMultiRepoOrchestration: (
-		orchestrationId: string,
-		projectId: string,
-	): Promise<IPCResult<MultiRepoOrchestration | null>> =>
-		invokeIpc(IPC_CHANNELS.MULTI_REPO_GET, orchestrationId, projectId),
+	getMultiRepoOrchestration: (projectId, orchestrationId) =>
+		invokeIpc(IPC_CHANNELS.MULTI_REPO_GET, projectId, orchestrationId),
 
-	listMultiRepoOrchestrations: (
-		projectId: string,
-	): Promise<IPCResult<MultiRepoOrchestration[]>> =>
+	listMultiRepoOrchestrations: (projectId) =>
 		invokeIpc(IPC_CHANNELS.MULTI_REPO_LIST, projectId),
 
-	startMultiRepoOrchestration: (
-		projectId: string,
-		orchestrationId: string,
-	): Promise<IPCResult> =>
+	startMultiRepoOrchestration: (projectId, orchestrationId) =>
 		invokeIpc(IPC_CHANNELS.MULTI_REPO_START, projectId, orchestrationId),
 
-	stopMultiRepoOrchestration: (orchestrationId: string): Promise<IPCResult> =>
-		invokeIpc(IPC_CHANNELS.MULTI_REPO_STOP, orchestrationId),
+	stopMultiRepoOrchestration: (projectId, orchestrationId) =>
+		invokeIpc(IPC_CHANNELS.MULTI_REPO_STOP, projectId, orchestrationId),
 
-	getMultiRepoStatus: (
-		orchestrationId: string,
-		projectId: string,
-	): Promise<
-		IPCResult<{ status: MultiRepoStatus; repoStates: RepoExecutionState[] }>
-	> =>
-		invokeIpc(IPC_CHANNELS.MULTI_REPO_GET_STATUS, orchestrationId, projectId),
-
-	// Event listeners
-	onMultiRepoProgress: (
-		callback: (orchestrationId: string, data: Record<string, unknown>) => void,
-	): IpcListenerCleanup =>
-		createIpcListener(IPC_CHANNELS.MULTI_REPO_PROGRESS, callback),
-
-	onMultiRepoRepoStart: (
-		callback: (orchestrationId: string, data: Record<string, unknown>) => void,
-	): IpcListenerCleanup =>
-		createIpcListener(IPC_CHANNELS.MULTI_REPO_REPO_START, callback),
-
-	onMultiRepoRepoComplete: (
-		callback: (orchestrationId: string, data: Record<string, unknown>) => void,
-	): IpcListenerCleanup =>
-		createIpcListener(IPC_CHANNELS.MULTI_REPO_REPO_COMPLETE, callback),
-
-	onMultiRepoComplete: (
-		callback: (orchestrationId: string, data: Record<string, unknown>) => void,
-	): IpcListenerCleanup =>
-		createIpcListener(IPC_CHANNELS.MULTI_REPO_COMPLETE, callback),
-
-	onMultiRepoError: (
-		callback: (orchestrationId: string, data: Record<string, unknown>) => void,
-	): IpcListenerCleanup =>
-		createIpcListener(IPC_CHANNELS.MULTI_REPO_ERROR, callback),
-
-	onMultiRepoBreakingChange: (
-		callback: (orchestrationId: string, data: Record<string, unknown>) => void,
-	): IpcListenerCleanup =>
-		createIpcListener(IPC_CHANNELS.MULTI_REPO_BREAKING_CHANGE, callback),
-
-	onMultiRepoGraph: (
-		callback: (orchestrationId: string, data: Record<string, unknown>) => void,
-	): IpcListenerCleanup =>
-		createIpcListener(IPC_CHANNELS.MULTI_REPO_GRAPH, callback),
+	onMultiRepoUpdated: (callback) =>
+		createIpcListener(IPC_CHANNELS.MULTI_REPO_UPDATED, callback),
 });

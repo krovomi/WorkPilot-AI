@@ -8,6 +8,7 @@ git diffs, API contracts, shared types, and package versions.
 from __future__ import annotations
 
 import logging
+import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -16,6 +17,9 @@ from typing import Any
 from .repo_graph import DependencyType, RepoDependencyGraph
 
 logger = logging.getLogger(__name__)
+
+# A branch name as git accepts it, never an option (`-…`) nor a range.
+_REF_NAME = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_./-]{0,199}")
 
 
 @dataclass
@@ -68,65 +72,63 @@ class BreakingChangeDetector:
             repo_paths: Dict mapping repo name to local filesystem path.
         """
         self.repo_paths = repo_paths
+        # The revision range of the repo being analysed ("" = working tree).
+        self._diff_range = ""
 
-    def _get_git_diff(self, repo_path: Path, branch: str = "") -> str:
-        """Get git diff for a repo (worktree changes vs base branch)."""
+    @staticmethod
+    def diff_range_for(base_branch: str) -> str:
+        """`<base>...HEAD`, the changes of a task branch since it forked.
+
+        Empty when the base is unknown or not a plain ref name: the value
+        comes from settings, and it reaches `git diff` as an argument.
+        """
+        if (
+            not base_branch
+            or ".." in base_branch
+            or not _REF_NAME.fullmatch(base_branch)
+        ):
+            return ""
+        return f"{base_branch}...HEAD"
+
+    def _git_diff(self, repo_path: Path, *args: str) -> str:
+        """Run `git diff <args>` in repo_path; empty on any failure."""
         try:
-            cmd = ["git", "diff", "--stat"]
-            if branch:
-                cmd.append(branch)
             result = subprocess.run(
-                cmd,
+                ["git", "diff", *args],
                 cwd=str(repo_path),
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=30,
             )
-            return result.stdout
-        except Exception as e:
-            logger.warning(f"Failed to get git diff for {repo_path}: {e}")
+            return result.stdout or ""
+        except Exception as e:  # noqa: BLE001 - detection never fails a run
+            logger.warning(f"git diff failed in {repo_path}: {e}")
             return ""
 
-    def _get_changed_files(self, repo_path: Path, branch: str = "") -> list[str]:
+    def diff_stat(self, repo_path: Path, diff_range: str = "") -> str:
+        """`git diff --stat` of a repo (worktree changes or a revision range)."""
+        args = ["--stat", diff_range] if diff_range else ["--stat"]
+        return self._git_diff(repo_path, *args)
+
+    def _get_changed_files(self, repo_path: Path, diff_range: str = "") -> list[str]:
         """Get list of changed files in a repo."""
-        try:
-            cmd = ["git", "diff", "--name-only"]
-            if branch:
-                cmd.append(branch)
-            result = subprocess.run(
-                cmd,
-                cwd=str(repo_path),
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
-            return [f.strip() for f in result.stdout.strip().split("\n") if f.strip()]
-        except Exception:
-            return []
+        args = ["--name-only", diff_range] if diff_range else ["--name-only"]
+        output = self._git_diff(repo_path, *args)
+        return [f.strip() for f in output.strip().split("\n") if f.strip()]
 
-    def _get_file_diff(self, repo_path: Path, file_path: str, branch: str = "") -> str:
+    def _get_file_diff(self, repo_path: Path, file_path: str) -> str:
         """Get detailed diff for a specific file."""
-        try:
-            cmd = ["git", "diff"]
-            if branch:
-                cmd.append(branch)
-            cmd.append(file_path)
-            result = subprocess.run(
-                cmd,
-                cwd=str(repo_path),
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
-            return result.stdout
-        except Exception:
-            return ""
+        args = [self._diff_range] if self._diff_range else []
+        return self._git_diff(repo_path, *args, "--", file_path)
 
     async def detect_breaking_changes(
         self,
         completed_repos: list[str],
         dependency_graph: RepoDependencyGraph,
         worktree_paths: dict[str, Path] | None = None,
+        diff_ranges: dict[str, str] | None = None,
     ) -> list[BreakingChange]:
         """
         Detect breaking changes across completed repos.
@@ -137,17 +139,22 @@ class BreakingChangeDetector:
         Args:
             completed_repos: Repos that have completed their pipelines
             dependency_graph: The cross-repo dependency graph
-            worktree_paths: Optional override paths (worktrees instead of main repo)
+            worktree_paths: Where a repo's changes are, when not in its
+                checkout (the worktree of its task)
+            diff_ranges: Revision range per repo (`diff_range_for`); a repo
+                without one is compared on its working tree
         """
         breaking_changes: list[BreakingChange] = []
-        paths = worktree_paths or self.repo_paths
+        paths = {**self.repo_paths, **(worktree_paths or {})}
+        ranges = diff_ranges or {}
 
         for repo in completed_repos:
             repo_path = paths.get(repo)
             if not repo_path or not repo_path.exists():
                 continue
 
-            changed_files = self._get_changed_files(repo_path)
+            self._diff_range = ranges.get(repo, "")
+            changed_files = self._get_changed_files(repo_path, self._diff_range)
             if not changed_files:
                 continue
 
@@ -176,6 +183,7 @@ class BreakingChangeDetector:
                 )
                 breaking_changes.extend(repo_breaks)
 
+        self._diff_range = ""
         return breaking_changes
 
     def _analyze_changes_for_dependency(

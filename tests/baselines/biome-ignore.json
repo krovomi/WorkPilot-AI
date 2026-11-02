@@ -173,8 +173,6 @@
   "apps/frontend/src/renderer/components/mission-control/AgentPanel.tsx": 4,
   "apps/frontend/src/renderer/components/multi-repo/BreakingChangeBanner.tsx": 1,
   "apps/frontend/src/renderer/components/multi-repo/DependencyGraphView.tsx": 2,
-  "apps/frontend/src/renderer/components/multi-repo/MultiRepoDialog.tsx": 2,
-  "apps/frontend/src/renderer/components/multi-repo/RepoSelector.tsx": 2,
   "apps/frontend/src/renderer/components/onboarding/AuthChoiceStep.test.tsx": 5,
   "apps/frontend/src/renderer/components/onboarding/CompletionStep.tsx": 1,
   "apps/frontend/src/renderer/components/onboarding/FirstSpecStep.tsx": 1,

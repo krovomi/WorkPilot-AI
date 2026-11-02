@@ -1,38 +1,36 @@
 /**
  * Multi-Repo Orchestration Types
  *
- * Types for coordinating spec execution across multiple repositories.
+ * One change that spans several repositories. Every repository becomes an
+ * ordinary Kanban task of its own WorkPilot project; the orchestration starts
+ * them one after the other, providers first, and hands each the changes of
+ * the repositories done before it (docs/architecture/multi-repo.md).
  */
 
 /** Overall orchestration status */
 export type MultiRepoStatus =
 	| "pending"
 	| "analyzing"
-	| "planning"
 	| "executing"
-	| "creating_prs"
-	| "completed"
-	| "failed";
-
-/** Per-repo execution status */
-export type RepoExecutionStatus =
-	| "pending"
-	| "analyzing"
-	| "planning"
-	| "coding"
-	| "qa"
 	| "completed"
 	| "failed"
-	| "skipped";
+	| "stopped";
+
+/** Per-repo execution status, read from the repo's Kanban task */
+export type RepoExecutionStatus =
+	| "pending"
+	| "coding"
+	| "qa"
+	| "needs_you"
+	| "completed"
+	| "failed";
 
 /** A target repository in the orchestration */
 export interface RepoTarget {
 	id: string;
-	repo: string; // "owner/repo" or local path
+	repo: string; // display name (the repo's project name)
 	displayName: string;
 	localPath: string;
-	pathScope?: string; // For monorepo packages
-	isMonorepoPackage?: boolean;
 }
 
 /** Dependency type between repos */
@@ -67,12 +65,13 @@ export interface BreakingChange {
 export interface RepoExecutionState {
 	repo: string;
 	status: RepoExecutionStatus;
-	specId?: string;
+	/** The WorkPilot project that holds the repo's task. */
+	projectId?: string;
+	/** The repo's Kanban task, once created. */
+	taskId?: string;
 	prUrl?: string;
 	branchName?: string;
 	progress: number; // 0-100
-	currentPhase?: string;
-	errorMessage?: string;
 }
 
 /** The dependency graph structure */
@@ -84,35 +83,29 @@ export interface RepoDependencyGraph {
 /** Full orchestration state */
 export interface MultiRepoOrchestration {
 	id: string;
+	/** The project the orchestration was created from. */
+	projectId: string;
 	taskDescription: string;
 	status: MultiRepoStatus;
+	/** Why the run stopped or what it waits for, as a `multiRepo:` i18n key. */
+	statusKey?: string;
+	/** The repo the status is about, when there is one. */
+	statusRepo?: string;
+	/** Whether this app instance is driving it right now. */
+	running: boolean;
 	repos: RepoTarget[];
 	dependencyGraph: RepoDependencyGraph;
 	executionOrder: string[];
 	repoStates: RepoExecutionState[];
-	masterSpecDir: string;
 	breakingChanges: BreakingChange[];
 	overallProgress: number; // 0-100
 	createdAt: string;
 	updatedAt: string;
 }
 
-/** Progress update from the backend orchestrator */
-export interface MultiRepoProgress {
-	orchestrationId: string;
-	status: MultiRepoStatus;
-	currentRepo?: string;
-	repoStates: RepoExecutionState[];
-	message?: string;
-	overallProgress: number; // 0-100
-}
-
 /** Configuration for creating a new multi-repo orchestration */
 export interface MultiRepoCreateConfig {
-	repos: Array<{
-		repo: string;
-		localPath: string;
-		pathScope?: string;
-	}>;
+	/** Absolute paths: registered projects or folders picked in a dialog. */
+	repos: Array<{ localPath: string }>;
 	taskDescription: string;
 }

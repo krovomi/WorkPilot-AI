@@ -150,9 +150,8 @@ class TestCrossRepoSpecManager:
         )
         assert (tmp_path / "001-task" / "spec.md").exists()
         assert (tmp_path / "001-task" / "multi_repo_manifest.json").exists()
-        # Sub-spec dirs created with sanitised names (slashes → underscores).
-        assert (tmp_path / "001-task" / "repos" / "owner_frontend").is_dir()
-        assert (tmp_path / "001-task" / "repos" / "owner_backend").is_dir()
+        # No per-repo directory: each repo's spec is a task of its own project.
+        assert not (tmp_path / "001-task" / "repos").exists()
         assert manifest.task_description == "Add auth across services"
         assert len(manifest.repos) == 2
 
@@ -189,29 +188,25 @@ class TestCrossRepoSpecManager:
         mgr = CrossRepoSpecManager(tmp_path / "ghost")
         assert mgr.load_manifest() is None
 
-    def test_create_sub_spec_writes_implementation_plan_and_context(
-        self, tmp_path: Path
-    ) -> None:
+    def test_second_analysis_keeps_repo_fields(self, tmp_path: Path) -> None:
         mgr = CrossRepoSpecManager(tmp_path / "s4")
-        mgr.create_master_spec(
-            task_description="t",
-            repos=[{"repo": "owner/r", "repo_path": "/r"}],
-            dependency_graph={},
-            execution_order=["owner/r"],
+        repos = [{"repo": "api", "repo_path": "/api", "project_id": "p-api"}]
+        first = mgr.create_master_spec("t", repos, {}, ["api"])
+        assert first.repos[0].project_id == "p-api"
+        first.update_sub_spec_status(
+            "api", "completed", task_id="001-api", worktree_path="/wt"
         )
-        sub_dir = mgr.create_sub_spec(
-            "owner/r",
-            spec_content="# sub spec",
-            implementation_plan={"steps": [{"id": "s1"}]},
-            context={"upstream": ["x"]},
+        mgr.save_manifest(first)
+
+        again = mgr.create_master_spec("t", repos, {"repos": ["api"]}, ["api"])
+        sub = again.get_sub_spec("api")
+        assert sub is not None
+        assert (sub.status, sub.task_id, sub.worktree_path) == (
+            "completed",
+            "001-api",
+            "/wt",
         )
-        assert (sub_dir / "spec.md").read_text(encoding="utf-8") == "# sub spec"
-        plan = json.loads(
-            (sub_dir / "implementation_plan.json").read_text(encoding="utf-8")
-        )
-        ctx = json.loads((sub_dir / "context.json").read_text(encoding="utf-8"))
-        assert plan == {"steps": [{"id": "s1"}]}
-        assert ctx == {"upstream": ["x"]}
+        assert again.created_at == first.created_at
 
 
 class TestManifestHelpers:

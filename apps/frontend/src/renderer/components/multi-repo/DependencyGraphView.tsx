@@ -14,13 +14,11 @@ interface DependencyGraphViewProps {
 
 const STATUS_COLORS: Record<RepoExecutionStatus, string> = {
 	pending: "#6b7280", // gray
-	analyzing: "#3b82f6", // blue
-	planning: "#8b5cf6", // purple
 	coding: "#f59e0b", // amber
 	qa: "#06b6d4", // cyan
+	needs_you: "#8b5cf6", // purple
 	completed: "#22c55e", // green
 	failed: "#ef4444", // red
-	skipped: "#9ca3af", // light gray
 };
 
 /**
@@ -207,7 +205,7 @@ export function DependencyGraphView({
 									fill={color}
 									dominantBaseline="auto"
 								>
-									{status}
+									{t(`multiRepo:repoStatus.${status}`)}
 									{progress > 0 && progress < 100
 										? ` ${Math.round(progress)}%`
 										: ""}

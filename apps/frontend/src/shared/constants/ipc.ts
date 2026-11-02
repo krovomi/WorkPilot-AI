@@ -752,16 +752,9 @@ export const IPC_CHANNELS = {
 	MULTI_REPO_LIST: "multiRepo:list",
 	MULTI_REPO_START: "multiRepo:start",
 	MULTI_REPO_STOP: "multiRepo:stop",
-	MULTI_REPO_GET_STATUS: "multiRepo:getStatus",
 
-	// Multi-Repo events (main -> renderer)
-	MULTI_REPO_PROGRESS: "multiRepo:progress",
-	MULTI_REPO_REPO_START: "multiRepo:repoStart",
-	MULTI_REPO_REPO_COMPLETE: "multiRepo:repoComplete",
-	MULTI_REPO_COMPLETE: "multiRepo:complete",
-	MULTI_REPO_ERROR: "multiRepo:error",
-	MULTI_REPO_BREAKING_CHANGE: "multiRepo:breakingChange",
-	MULTI_REPO_GRAPH: "multiRepo:graph",
+	// Multi-Repo event (main -> renderer): the whole orchestration, as it now is
+	MULTI_REPO_UPDATED: "multiRepo:updated",
 
 	// Self-Healing Codebase + Incident Responder
 	SELF_HEALING_GET_DASHBOARD: "selfHealing:getDashboard",
