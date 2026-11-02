@@ -44,18 +44,6 @@ WorkPilot-specific fields live under `metadata.workpilot` (pack, version, target
 requires, min_effort, provenance) — a free-form space the Agent Skills spec reserves for
 tooling and that Claude Code ignores.
 
-**Python-side skills:** `apps/backend/skills/` holds two executable skills (`angular/`,
-`migration/`) loaded by `skill_manager.py` with progressive disclosure — metadata first,
-instructions on trigger, scripts on demand:
-
-```python
-from skills.skill_manager import SkillManager
-
-manager = SkillManager("apps/backend/skills")
-skill = manager.load_skill("framework-migration")
-result = skill.execute_script("analyze_stack.py", {"project-root": "/path/to/project"})
-```
-
 ## Gate 4 : un corps de skill ne s'adresse pas à l'agent
 
 Un skill n'est pas un document : `.agents/skills/<nom>/SKILL.md` est une procédure que tout agent

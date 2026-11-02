@@ -61,7 +61,6 @@ d'exécution d'agent.
 - `sandbox.py`, `anomaly_detector.py` : n'alimentent qu'un endpoint de statut.
 - `git_hooks.py`, `auto_integration.py` : `initialize_security` n'a aucun appelant, et le dépôt
   utilise `.husky/` (`core.hooksPath`), que `git_hooks.py install` ne touche pas.
-- `audit_trail.py`, `main.py` : sans importeur ; l'audit vivant est le paquet `audit_trail/`.
 - `secure_subprocess.py` : un seul appelant ; la plupart des sous-processus appellent
   `subprocess` directement (voir la règle S4).
 - `tool_input_validator.py` : extrait l'entrée d'un outil pour l'affichage, ne refuse rien.
