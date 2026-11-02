@@ -27,7 +27,7 @@ metadata:
     - requesting-code-review
   workpilot:
     pack: hermes
-    version: 0.1.0
+    version: 1.0.0
     content_sha256: 524786da3f450924f79ad05400076522fc2785488b04d56b790585362a08103f
 ---
 

@@ -25,7 +25,7 @@ metadata:
     - opencode
   workpilot:
     pack: hermes
-    version: 0.1.0
+    version: 1.0.0
     content_sha256: 0c8544a225ef392f0ac6024c032cb6eafb5942581dc26dac3df4d32650418fb0
 ---
 
