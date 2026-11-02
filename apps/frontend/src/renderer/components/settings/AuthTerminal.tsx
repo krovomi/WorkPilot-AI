@@ -29,6 +29,14 @@ interface AuthTerminalProps {
 	readonly onAuthSuccess?: (email?: string) => void;
 	/** Callback when authentication fails */
 	readonly onAuthError?: (error: string) => void;
+	/**
+	 * Command typed into the terminal (without Enter) instead of the Claude /
+	 * Codex / Copilot login picked from the terminal ID. Set for a coding-agent
+	 * CLI (OpenCode, pi…): the terminal then runs without CLAUDE_CONFIG_DIR.
+	 */
+	readonly loginCommand?: string;
+	/** Instruction box title and steps shown above that command. */
+	readonly instructions?: { readonly title: string; readonly steps: readonly string[] };
 }
 
 /**
@@ -43,6 +51,8 @@ export function AuthTerminal({
 	onClose,
 	onAuthSuccess,
 	onAuthError,
+	loginCommand,
+	instructions,
 }: AuthTerminalProps) {
 	const { t } = useTranslation("common");
 	const terminalRef = useRef<HTMLDivElement>(null);
@@ -152,9 +162,7 @@ export function AuthTerminal({
 					cols,
 					rows,
 					skipOAuthToken: true, // Don't inject existing token for auth terminals
-					env: {
-						CLAUDE_CONFIG_DIR: configDir,
-					},
+					env: loginCommand ? undefined : { CLAUDE_CONFIG_DIR: configDir },
 				});
 
 				if (!result.success) {
@@ -173,10 +181,13 @@ export function AuthTerminal({
 				setStatus("ready");
 
 				// Show instructions
-				const titleText = t("authTerminal.instructionTitle");
-				const step1Text = t("authTerminal.step1");
-				const step2Text = t("authTerminal.step2");
-				const step3Text = t("authTerminal.step3");
+				const titleText =
+					instructions?.title ?? t("authTerminal.instructionTitle");
+				const steps = instructions?.steps ?? [
+					t("authTerminal.step1"),
+					t("authTerminal.step2"),
+					t("authTerminal.step3"),
+				];
 
 				xterm.writeln(
 					"\x1b[1;36m╔════════════════════════════════════════════════════════════╗\x1b[0m",
@@ -190,15 +201,11 @@ export function AuthTerminal({
 				xterm.writeln(
 					"\x1b[1;36m║\x1b[0m                                                            \x1b[1;36m║\x1b[0m",
 				);
-				xterm.writeln(
-					`\x1b[1;36m║\x1b[0m   \x1b[33m1.\x1b[0m ${step1Text}${" ".repeat(Math.max(0, 60 - step1Text.length - 6))}\x1b[1;36m║\x1b[0m`,
-				);
-				xterm.writeln(
-					`\x1b[1;36m║\x1b[0m   \x1b[33m2.\x1b[0m ${step2Text}${" ".repeat(Math.max(0, 60 - step2Text.length - 6))}\x1b[1;36m║\x1b[0m`,
-				);
-				xterm.writeln(
-					`\x1b[1;36m║\x1b[0m   \x1b[33m3.\x1b[0m ${step3Text}${" ".repeat(Math.max(0, 60 - step3Text.length - 6))}\x1b[1;36m║\x1b[0m`,
-				);
+				steps.forEach((step, index) => {
+					xterm.writeln(
+						`\x1b[1;36m║\x1b[0m   \x1b[33m${index + 1}.\x1b[0m ${step}${" ".repeat(Math.max(0, 60 - step.length - 6))}\x1b[1;36m║\x1b[0m`,
+					);
+				});
 				xterm.writeln(
 					"\x1b[1;36m║\x1b[0m                                                            \x1b[1;36m║\x1b[0m",
 				);
@@ -233,7 +240,9 @@ export function AuthTerminal({
 
 							// Determine the appropriate command based on terminal type
 							let command: string;
-							if (isCodexAuth) {
+							if (loginCommand) {
+								command = loginCommand;
+							} else if (isCodexAuth) {
 								command = "codex login";
 							} else if (isCopilotAuth) {
 								command = "copilot update";
@@ -264,7 +273,7 @@ export function AuthTerminal({
 
 		createTerminal();
 		// eslint-disable-next-line react-hooks/exhaustive-deps -- configDir is stable for auth terminal lifecycle
-	}, [terminalId, onAuthError, configDir, t]);
+	}, [terminalId, onAuthError, configDir, t, loginCommand, instructions]);
 
 	// Setup terminal event listeners
 	useEffect(() => {

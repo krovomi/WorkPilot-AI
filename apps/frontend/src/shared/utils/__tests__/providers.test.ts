@@ -74,3 +74,31 @@ it.each([
 		false,
 	);
 });
+
+it.each(["opencode", "antigravity", "pi", "gemini-cli"])(
+	"reports the %s CLI configured once it is installed",
+	async (tool) => {
+		const checkAgentCli = vi
+			.fn()
+			.mockImplementation(async (name: string) => ({
+				tool: name,
+				installed: name === tool,
+			}));
+		vi.stubGlobal("electronAPI", { checkAgentCli });
+		const { status } = await getStaticProviders([], {});
+		expect(status[tool]).toBe(true);
+		expect(checkAgentCli).toHaveBeenCalledWith(tool);
+		for (const other of ["opencode", "antigravity", "pi", "gemini-cli"]) {
+			if (other !== tool) expect(status[other]).toBe(false);
+		}
+	},
+);
+
+it("keeps a CLI provider unconfigured when its check fails or IPC is missing", async () => {
+	vi.stubGlobal("electronAPI", {
+		checkAgentCli: vi.fn().mockRejectedValue(new Error("boom")),
+	});
+	expect((await getStaticProviders([], {})).status.opencode).toBe(false);
+	vi.stubGlobal("electronAPI", undefined);
+	expect((await getStaticProviders([], {})).status.pi).toBe(false);
+});

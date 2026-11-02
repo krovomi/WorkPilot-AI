@@ -84,6 +84,7 @@ import enReplay from "./locales/en/replay.json";
 import enRoadmap from "./locales/en/roadmap.json";
 import enSelfHealing from "./locales/en/selfHealing.json";
 import enSessionHistory from "./locales/en/sessionHistory.json";
+import enSmartEstimation from "./locales/en/smartEstimation.json";
 import enSettings from "./locales/en/settings.json";
 import enSetupHub from "./locales/en/setupHub.json";
 import enStreaming from "./locales/en/streaming.json";
@@ -180,6 +181,7 @@ import frReplay from "./locales/fr/replay.json";
 import frRoadmap from "./locales/fr/roadmap.json";
 import frSelfHealing from "./locales/fr/selfHealing.json";
 import frSessionHistory from "./locales/fr/sessionHistory.json";
+import frSmartEstimation from "./locales/fr/smartEstimation.json";
 import frSettings from "./locales/fr/settings.json";
 import frSetupHub from "./locales/fr/setupHub.json";
 import frStreaming from "./locales/fr/streaming.json";
@@ -262,6 +264,7 @@ export const resources = {
 		pixelOffice: enPixelOffice,
 		selfHealing: enSelfHealing,
 		sessionHistory: enSessionHistory,
+		smartEstimation: enSmartEstimation,
 		voiceControl: enVoiceControl,
 		ideation: enIdeation,
 		costEstimator: enCostEstimator,
@@ -358,6 +361,7 @@ export const resources = {
 		pixelOffice: frPixelOffice,
 		selfHealing: frSelfHealing,
 		sessionHistory: frSessionHistory,
+		smartEstimation: frSmartEstimation,
 		voiceControl: frVoiceControl,
 		ideation: frIdeation,
 		costEstimator: frCostEstimator,
@@ -461,6 +465,7 @@ i18n.use(initReactI18next).init({
 		"pixelOffice",
 		"selfHealing",
 		"sessionHistory",
+		"smartEstimation",
 		"voiceControl",
 		"ideation",
 		"costEstimator",

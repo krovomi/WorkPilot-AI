@@ -29,7 +29,12 @@
 		"readyToUse": "Votre projet est maintenant prêt à être utilisé avec WorkPilot AI !",
 		"skip": "Ignorer pour l'instant",
 		"initializeGit": "Initialiser Git",
-		"initialCommitMessage": "Commit initial"
+		"initialCommitMessage": "Commit initial",
+		"errorTitle": "Erreur lors de l'initialisation",
+		"errorDesc": "Impossible d'initialiser le dépôt Git.",
+		"skipTitle": "Dépôt Git ignoré",
+		"skipDesc": "Vous pourrez initialiser Git plus tard.",
+		"setupRemote": "Configurer le remote"
 	},
 	"githubSetup": {
 		"title": "Configurer GitHub",
@@ -274,7 +279,8 @@
 		"targetAlreadyExists": "Ce dossier existe déjà : la création échouera.",
 		"locationLooksLikeProject": "Cet emplacement est déjà un projet ({{markers}}). « Créer » y ajouterait un sous-dossier vide, et c’est ce dossier vide qui serait ajouté.",
 		"openThisFolderInstead": "Ouvrir plutôt ce dossier",
-		"locationInsideRepository": "Cet emplacement est à l’intérieur du dépôt {{repository}}. « Créer » y ajouterait un sous-dossier vide, et c’est ce dossier vide qui serait ajouté."
+		"locationInsideRepository": "Cet emplacement est à l’intérieur du dépôt {{repository}}. « Créer » y ajouterait un sous-dossier vide, et c’est ce dossier vide qui serait ajouté.",
+		"gitRootWarningTitle": "Configuration peut-être incorrecte"
 	},
 	"customModel": {
 		"title": "Configuration du modèle personnalisé",
@@ -431,5 +437,16 @@
 		"authenticateNew": "Authentifier un nouveau compte",
 		"hideToken": "Masquer le jeton",
 		"showToken": "Afficher le jeton"
+	},
+	"azureConfig": {
+		"title": "Configurer Azure DevOps",
+		"desc": "Renseignez l'URL de l'organisation et le token PAT.",
+		"orgUrl": "URL de l'organisation",
+		"orgUrlPlaceholder": "https://dev.azure.com/monorganisation",
+		"pat": "Token PAT",
+		"patPlaceholder": "Personal Access Token",
+		"required": "Tous les champs sont obligatoires.",
+		"invalidUrl": "URL Azure DevOps invalide.",
+		"save": "Valider"
 	}
 }

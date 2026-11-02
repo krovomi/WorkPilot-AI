@@ -13,6 +13,8 @@ import {
 } from "../ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { VisuallyHidden } from "../ui/visually-hidden";
+import { isAgentCliTool } from "../../../shared/types/agent-cli";
+import { AgentCliConfigContent } from "./AgentCliConfigContent";
 import { ApiKeyConfigContent } from "./ApiKeyConfigContent";
 import { DialogFooterActions } from "./DialogFooterActions";
 import { GitHubCopilotConfig } from "./GitHubCopilotConfig";
@@ -582,6 +584,28 @@ export function ProviderConfigDialog({
 			onOpenChange(false);
 		}
 	};
+
+	// Coding-agent CLIs (OpenCode, Antigravity, pi, Gemini CLI) have no key
+	// field: they sign in inside the CLI, so they get their own panel.
+	if (provider && isAgentCliTool(provider.id)) {
+		const cliContent = (
+			<AgentCliConfigContent
+				tool={provider.id}
+				providerName={provider.name}
+				description={provider.description}
+				onActivate={onProviderActivated}
+				onClose={() => onOpenChange(false)}
+			/>
+		);
+		if (useSheet) {
+			return <div className="max-h-[93vh] overflow-y-auto pr-1">{cliContent}</div>;
+		}
+		return (
+			<Dialog open={isOpen} onOpenChange={onOpenChange}>
+				<DialogContent className="max-w-[860px]">{cliContent}</DialogContent>
+			</Dialog>
+		);
+	}
 
 	if (!provider || !providerConfig) return null;
 

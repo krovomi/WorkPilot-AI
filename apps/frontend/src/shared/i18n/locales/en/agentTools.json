@@ -98,5 +98,7 @@
 		"stubNotice": "The HTTP endpoint runs in stub mode (deterministic fallback). For a full SDK-backed review, the agent runtime needs to wire an in-process invokable client.",
 		"running": "Running…",
 		"run": "Run virtual review"
-	}
+	},
+	"showTimeline": "Show timeline…",
+	"checkPromotion": "Check QA promotion…"
 }
