@@ -610,7 +610,7 @@ des canaux sont dans [needs-you.md](needs-you.md#en-mode-serveur).
 | Choisir les moments et la langue | `PUT /users/me/needs-you/preferences` | `task.read` |
 
 Une personne ne touche que ses lignes (`needs_you_channels`, `needs_you_preferences`, migration
-`0009`). Rien ne part sans `WORKPILOT_NEEDS_YOU_ENABLED`, et rien ne s'enregistre sans
+`0010`). Rien ne part sans `WORKPILOT_NEEDS_YOU_ENABLED`, et rien ne s'enregistre sans
 `WORKPILOT_SECRETS_MASTER_KEY` : un secret n'est jamais stocké en clair.
 
 ## Ce qui vient
