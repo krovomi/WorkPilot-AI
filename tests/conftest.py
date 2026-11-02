@@ -230,6 +230,19 @@ def pytest_collectstart(collector) -> None:
     _clean_mock_modules()
 
 
+@pytest.hookimpl(trylast=True)
+def pytest_collection_modifyitems(config, items) -> None:
+    """Keep only this CI shard's tests when WORKPILOT_TEST_SHARD is set (tests/ci_shard.py)."""
+    from tests.ci_shard import ENV, split
+
+    # Taken out of the environment: a test that starts pytest in a subprocess
+    # must collect its own files, not a shard of them.
+    kept, dropped = split(items, os.environ.pop(ENV, ""))
+    if dropped:
+        config.hook.pytest_deselected(items=dropped)
+        items[:] = kept
+
+
 def pytest_runtest_setup(item) -> None:
     """Remove MagicMock pollution from sys.modules before each test runs.
 

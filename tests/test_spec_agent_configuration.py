@@ -1,20 +1,31 @@
 """Spec execution must attribute logs to the same LLM used by the factory."""
 
 import asyncio
+import importlib
 from unittest.mock import AsyncMock, Mock
 
 
+def _core_client():
+    """The module `from core.client import ...` reads at call time.
+
+    The `core` package's `client` attribute can be an older copy (another
+    file's sys.modules cleanup), and a patch on it would not be seen.
+    """
+    return importlib.import_module("core.client")
+
+
 def test_spec_logs_and_factory_use_the_same_configuration(tmp_path, monkeypatch):
-    import core.client
     from spec.pipeline.agent_runner import AgentRunner
+
+    core_client = _core_client()
 
     factory = Mock(
         return_value=Mock(
             model="qwen2.5-coder:7b", provider_name=Mock(return_value="ollama")
         )
     )
-    monkeypatch.setattr(core.client, "_get_active_provider", lambda *_: "ollama")
-    monkeypatch.setattr(core.client, "create_agent_client", factory)
+    monkeypatch.setattr(core_client, "_get_active_provider", lambda *_: "ollama")
+    monkeypatch.setattr(core_client, "create_agent_client", factory)
     logger = Mock()
     runner = AgentRunner(tmp_path, tmp_path, "qwen3-coder:30b", logger)
     runner._run_with_agent_client = AsyncMock(return_value=(True, "done"))
@@ -144,7 +155,7 @@ def test_validation_tools_use_spec_directory_and_preserve_project_boundary(tmp_p
 
 
 def test_validation_launch_configures_local_working_directory(tmp_path, monkeypatch):
-    import core.client
+    core_client = _core_client()
     from core.agent_client import LocalAgentClient
     from spec.pipeline.agent_runner import AgentRunner
 
@@ -153,8 +164,8 @@ def test_validation_launch_configures_local_working_directory(tmp_path, monkeypa
     client = LocalAgentClient(
         model="qwen2.5-coder:7b", project_dir=str(tmp_path), offline_only=True
     )
-    monkeypatch.setattr(core.client, "_get_active_provider", lambda *_: "ollama")
-    monkeypatch.setattr(core.client, "create_agent_client", lambda **_: client)
+    monkeypatch.setattr(core_client, "_get_active_provider", lambda *_: "ollama")
+    monkeypatch.setattr(core_client, "create_agent_client", lambda **_: client)
     runner = AgentRunner(tmp_path, spec_dir, "qwen3-coder:30b")
     runner._run_with_agent_client = AsyncMock(return_value=(True, "fixed"))
     asyncio.run(runner.run_agent("validation_fixer.md"))
@@ -246,14 +257,14 @@ def test_the_researcher_and_the_self_critique_get_their_own_config():
 def test_a_non_claude_provider_gets_the_prompts_agent_type(
     tmp_path, monkeypatch, prompt_file, agent_type
 ):
-    import core.client
+    core_client = _core_client()
     from spec.pipeline.agent_runner import AgentRunner
 
     factory = Mock(
         return_value=Mock(model="m", provider_name=Mock(return_value="ollama"))
     )
-    monkeypatch.setattr(core.client, "_get_active_provider", lambda *_: "ollama")
-    monkeypatch.setattr(core.client, "create_agent_client", factory)
+    monkeypatch.setattr(core_client, "_get_active_provider", lambda *_: "ollama")
+    monkeypatch.setattr(core_client, "create_agent_client", factory)
     runner = AgentRunner(tmp_path, tmp_path, "m")
     runner._run_with_agent_client = AsyncMock(return_value=(True, "done"))
     asyncio.run(runner.run_agent(prompt_file))
@@ -261,7 +272,7 @@ def test_a_non_claude_provider_gets_the_prompts_agent_type(
 
 
 def test_claude_gets_the_prompts_agent_type(tmp_path, monkeypatch):
-    import core.client
+    core_client = _core_client()
     from spec.pipeline.agent_runner import AgentRunner
 
     class Stop(Exception):
@@ -275,8 +286,8 @@ def test_claude_gets_the_prompts_agent_type(tmp_path, monkeypatch):
             return False
 
     factory = Mock(return_value=Client())
-    monkeypatch.setattr(core.client, "_get_active_provider", lambda *_: "claude")
-    monkeypatch.setattr(core.client, "create_client", factory)
+    monkeypatch.setattr(core_client, "_get_active_provider", lambda *_: "claude")
+    monkeypatch.setattr(core_client, "create_client", factory)
     runner = AgentRunner(tmp_path, tmp_path, "claude-sonnet")
     success, _ = asyncio.run(runner.run_agent("spec_critic.md"))
     assert success is False
