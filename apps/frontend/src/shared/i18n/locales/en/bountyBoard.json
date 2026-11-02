@@ -2,12 +2,14 @@
 	"title": "Bounty Board",
 	"description": "Run N contestants in parallel with different provider/model combinations. An impartial judge picks the winner.",
 	"projectPath": "Project path",
-	"specId": "Spec id",
+	"specId": "Spec",
 	"selectSpec": "Select a spec",
+	"noSpecs": "No spec in this project",
 	"hint": {
 		"selectProject": "Select a project first.",
 		"selectSpec": "Choose a spec to launch.",
-		"addContestant": "Add at least one contestant."
+		"addContestant": "Add at least one contestant.",
+		"noSpecs": "This project has no spec yet: create a task first."
 	},
 	"contestants": "Contestants",
 	"contestantsCount": "{{count}} contestants",
