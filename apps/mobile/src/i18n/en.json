@@ -476,5 +476,23 @@
 				"project": "Project"
 			}
 		}
+	},
+	"lock": {
+		"title": "WorkPilot AI is locked",
+		"unlock": "Unlock",
+		"failed": "Not recognized. Try again.",
+		"prompt": "Unlock WorkPilot AI",
+		"actionPrompt": "Confirm it is you",
+		"approvePrompt": "Confirm it is you to approve the plan",
+		"section": "App lock",
+		"atLaunch": "Ask when the app opens",
+		"atLaunchHint": "Face ID, Touch ID or fingerprint, with your passcode as fallback. Asked again after a minute in the background.",
+		"sensitive": "Ask before merging, creating a pull request, deleting a card or approving from a notification",
+		"unavailable": "Set a passcode or biometrics on this phone to use the lock."
+	},
+	"push": {
+		"approve": "Approve and build",
+		"view": "View",
+		"approveFailed": "The plan was not approved"
 	}
 }
