@@ -36,6 +36,7 @@ import {
 	SelectValue,
 } from "./ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+import { formatAppTime } from "@/lib/date-format";
 
 interface ClaudeCodeStatusBadgeProps {
 	readonly className?: string;
@@ -624,7 +625,7 @@ export function ClaudeCodeStatusBadge({
 									<span>
 										{t("navigation:claudeCode.lastChecked", "Last checked")}:
 									</span>
-									<span>{lastChecked.toLocaleTimeString()}</span>
+									<span>{formatAppTime(lastChecked)}</span>
 								</div>
 							)}
 						</div>

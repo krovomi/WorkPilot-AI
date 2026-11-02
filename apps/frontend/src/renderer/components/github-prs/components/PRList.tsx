@@ -10,6 +10,7 @@ import type {
 	PRReviewProgress,
 	PRReviewResult,
 } from "../hooks/useGitHubPRs";
+import { formatAppDate } from "@/lib/date-format";
 
 /**
  * Status Flow Dots Component
@@ -207,7 +208,7 @@ function formatDate(dateString: string): string {
 	if (diffDays === 1) return "yesterday";
 	if (diffDays < 7) return `${diffDays}d ago`;
 	if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
-	return date.toLocaleDateString();
+	return formatAppDate(date);
 }
 
 export function PRList({

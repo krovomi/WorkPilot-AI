@@ -11,6 +11,7 @@ import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { ScrollArea } from "./ui/scroll-area";
 import { Separator } from "./ui/separator";
+import { formatAppDate } from "@/lib/date-format";
 
 interface WelcomeScreenProps {
 	readonly projects: Project[];
@@ -46,7 +47,7 @@ export function WelcomeScreen({
 		if (diffMins < 60) return t("common:time.minutesAgo", { count: diffMins });
 		if (diffHours < 24) return t("common:time.hoursAgo", { count: diffHours });
 		if (diffDays < 7) return t("common:time.daysAgo", { count: diffDays });
-		return new Date(date).toLocaleDateString();
+		return formatAppDate(date);
 	};
 
 	return (
