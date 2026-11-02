@@ -174,6 +174,9 @@ _COPILOT_REQUEST_RETRY_BACKOFF = 2.0
 #   * 500/502/503/529 — momentary server-side hiccups that usually clear on the
 #     next request.
 _COPILOT_RETRYABLE_STATUSES = frozenset({429, 500, 502, 503, 529})
+# Statuses with which copilot_internal/v2/token refuses a GitHub token that
+# api.githubcopilot.com still accepts directly (see `_get_copilot_token`).
+_EXCHANGE_REFUSED_STATUSES = frozenset({403, 404})
 # How many times to retry a transient/rate-limited response before giving up.
 # Generous because a per-minute window can need several short waits to clear.
 _COPILOT_RATE_LIMIT_MAX_RETRIES = int(_env_float("COPILOT_RATE_LIMIT_MAX_RETRIES", 6))
@@ -962,11 +965,13 @@ class CopilotAgentClient(AgentClient):
         Two-path authentication:
         1. (Preferred) Exchange a GitHub OAuth token at copilot_internal/v2/token
            for a short-lived session token (~30 min TTL).
-        2. (Fallback) Some Copilot Business/Enterprise accounts managed by an
-           organisation have the token-exchange endpoint restricted (returns 404).
-           In that case the raw GitHub OAuth token (gho_…) is accepted directly
-           as a Bearer token by api.githubcopilot.com.  We cache this as the
-           "session token" with a 30-minute TTL to match normal behaviour.
+        2. (Fallback) The exchange refuses the token: 404 when an organisation
+           restricts the endpoint (Copilot Business/Enterprise), 403 when the
+           token comes from an OAuth app GitHub does not reserve it for (the
+           GitHub CLI's, typically). In that case the raw GitHub OAuth token
+           (gho_…) is accepted directly as a Bearer token by
+           api.githubcopilot.com.  We cache this as the "session token" with a
+           30-minute TTL to match normal behaviour.
         """
         import time
 
@@ -1018,18 +1023,26 @@ class CopilotAgentClient(AgentClient):
                         "[CopilotAgentClient] Session token refreshed via exchange"
                     )
                     return self._copilot_token
-                elif resp.status == 404:
-                    # Copilot Business/Enterprise accounts managed by an organisation
-                    # often restrict the internal token-exchange endpoint.  Fall back
-                    # to using the raw GitHub OAuth token directly as Bearer auth —
-                    # api.githubcopilot.com accepts it for these account types.
+                elif resp.status in _EXCHANGE_REFUSED_STATUSES:
+                    # The internal exchange is closed to this token:
+                    # - 404: Copilot Business/Enterprise accounts managed by an
+                    #   organisation often restrict the endpoint;
+                    # - 403 ("For more on scraping GitHub…"): GitHub now keeps it
+                    #   for its own Copilot apps, and refuses tokens from any
+                    #   other OAuth app — the GitHub CLI's `gh auth token`
+                    #   included.
+                    # api.githubcopilot.com accepts the GitHub OAuth token itself
+                    # as Bearer auth, which is how GitHub's own Copilot CLI
+                    # authenticates with a `gh` token; use it directly.
+                    await resp.text()  # read the refusal before moving on
                     logger.info(
-                        "[CopilotAgentClient] Token exchange endpoint returned 404 "
-                        "(organisation-managed Copilot). Using GitHub token directly as Bearer."
+                        "[CopilotAgentClient] Token exchange endpoint returned %s. "
+                        "Using GitHub token directly as Bearer.",
+                        resp.status,
                     )
                     print(
                         "[CopilotAgentClient] [INFO] Token exchange not available "
-                        "(Copilot Business/Enterprise). Using GitHub token directly.",
+                        f"({resp.status}). Using GitHub token directly.",
                         flush=True,
                     )
                     self._copilot_token = self.github_token
