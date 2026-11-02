@@ -7,6 +7,7 @@ import {
 	Save,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Button } from "../ui/button";
@@ -129,6 +130,8 @@ interface PreviewPanelProps {
 	readonly onDragOver: (e: React.DragEvent) => void;
 	readonly onDragLeave: (e: React.DragEvent) => void;
 	readonly onDrop: (e: React.DragEvent) => void;
+	/** A server project: the changelog is kept on the server, not in a file. */
+	readonly serverProject?: boolean;
 }
 
 export function PreviewPanel({
@@ -147,7 +150,9 @@ export function PreviewPanel({
 	onDragOver,
 	onDragLeave,
 	onDrop,
+	serverProject = false,
 }: PreviewPanelProps) {
+	const { t } = useTranslation("changelog");
 	const [viewMode, setViewMode] = useState<"markdown" | "preview">("markdown");
 
 	// Custom components for ReactMarkdown to handle local image paths
@@ -213,11 +218,17 @@ export function PreviewPanel({
 								) : (
 									<Save className="mr-2 h-4 w-4" />
 								)}
-								{saveSuccess ? "Saved!" : "Save to CHANGELOG.md"}
+								{saveSuccess
+									? "Saved!"
+									: serverProject
+										? t("server.save")
+										: "Save to CHANGELOG.md"}
 							</Button>
 						</TooltipTrigger>
 						<TooltipContent>
-							Prepend to CHANGELOG.md in project root
+							{serverProject
+								? t("server.saveTooltip")
+								: "Prepend to CHANGELOG.md in project root"}
 						</TooltipContent>
 					</Tooltip>
 				</div>

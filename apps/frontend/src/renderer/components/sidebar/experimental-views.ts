@@ -15,7 +15,6 @@ export const EXPERIMENTAL_VIEWS: ReadonlySet<SidebarView> = new Set<SidebarView>
 	"api-watcher",
 	"blast-radius",
 	"carbon-profiler",
-	"changelog",
 	"compliance",
 	"cross-language-translation",
 	"doc-drift",

@@ -1,8 +1,8 @@
 """The analyses of a server project, run on the server, their reports shared.
 
 The desktop app's analysis views (accessibility, i18n, documentation drift,
-flaky tests, technical debt) start a runner of ``runners/`` in the project's
-folder and show the report it prints. A server project has no folder on the
+flaky tests, technical debt) and its changelog start a runner of
+``runners/`` in the project's folder and show the report it prints. A server project has no folder on the
 computer: the runner runs here, as a job on the project's clone
 (``project_jobs``, confined like every job), and its report is saved in the
 clone, ``.workpilot/analyses/<analysis>.json``, so every member of the
@@ -24,6 +24,7 @@ from functools import partial
 from pathlib import Path
 from typing import Any, Literal
 
+from changelog_generator.options import ChangelogOptions
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 from server.authz.principal import get_principal
@@ -92,7 +93,7 @@ class Analysis:
     key: str
     #: A file of ``runners/``.
     runner: str
-    options: type[NoOptions]
+    options: type[BaseModel]
     #: The runner's arguments after ``--project-path <clone>``.
     args: Callable[[Any], list[str]]
     #: The report, from one line the runner printed; None for any other line.
@@ -142,6 +143,15 @@ ANALYSES: tuple[Analysis, ...] = (
         options=NoOptions,
         args=lambda _o: ["--command", "scan"],
         report=_result_object,
+    ),
+    # The changelog of done cards or commits (``shared_features.changelog``):
+    # the whole request in one argument, checked again by the runner.
+    Analysis(
+        key="changelog",
+        runner="changelog_runner.py",
+        options=ChangelogOptions,
+        args=lambda o: [f"--options={o.model_dump_json()}"],
+        report=_prefixed("CHANGELOG_RESULT"),
     ),
 )
 
