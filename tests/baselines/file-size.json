@@ -1,7 +1,7 @@
 {
   "apps/backend/agents/coder.py": 2947,
   "apps/backend/agents/session.py": 2455,
-  "apps/backend/core/client.py": 3214,
+  "apps/backend/core/client.py": 3058,
   "apps/backend/core/workspace.py": 2249,
   "apps/backend/provider_api.py": 2078,
   "apps/frontend/src/main/app-emulator-service.ts": 3253,
