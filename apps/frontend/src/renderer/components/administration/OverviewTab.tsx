@@ -11,6 +11,7 @@ import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent } from "@/components/ui";
 import { useAdminStore } from "@/stores/admin-store";
+import { formatAppDateTime } from "@/lib/date-format";
 
 function StatCard({
 	icon: Icon,
@@ -236,7 +237,7 @@ export function OverviewTab() {
 								<div className="flex justify-between">
 									<span className="font-medium">{failure.phase}</span>
 									<span className="text-xs text-muted-foreground">
-										{new Date(failure.finished_at).toLocaleString()}
+										{formatAppDateTime(failure.finished_at)}
 									</span>
 								</div>
 								{failure.error ? (

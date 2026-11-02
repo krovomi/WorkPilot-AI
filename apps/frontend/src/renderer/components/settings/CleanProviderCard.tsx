@@ -20,6 +20,7 @@ import {
 import { GUIDE_ANCHORS } from "../guided-tour/anchors";
 import { Button } from "../ui/button";
 import { Switch } from "../ui/switch";
+import { formatAppDateTime } from "@/lib/date-format";
 
 interface CleanProviderCardProps {
 	provider: {
@@ -320,7 +321,7 @@ export function CleanProviderCard({
 	isAutoSwitchingOpen = false,
 	isTesting = false,
 }: Readonly<CleanProviderCardProps>) {
-	const { t, i18n } = useTranslation("settings");
+	const { t } = useTranslation("settings");
 	const [isExpanded, setIsExpanded] = useState(false);
 	const [showApiKey, setShowApiKey] = useState(false);
 
@@ -731,17 +732,14 @@ export function CleanProviderCard({
 						<div className="flex items-center justify-between text-xs text-gray-500">
 							<span>{t("sections.accounts.providerCard.lastTest")}</span>
 							<span>
-								{new Date(provider.lastTested).toLocaleDateString(
-									i18n.language === "fr" ? "fr-FR" : "en-US",
-									{
-										day: "2-digit",
-										month: "2-digit",
-										year: "numeric",
-										hour: "2-digit",
-										minute: "2-digit",
-										second: "2-digit",
-									},
-								)}
+								{formatAppDateTime(provider.lastTested, {
+									day: "2-digit",
+									month: "2-digit",
+									year: "numeric",
+									hour: "2-digit",
+									minute: "2-digit",
+									second: "2-digit",
+								})}
 							</span>
 						</div>
 					) : (
