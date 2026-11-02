@@ -523,6 +523,7 @@
 		"pickProject": "Create a card in which project?",
 		"nothing": "Nothing to make a card from: share text or a link.",
 		"back": "Back to projects"
+	},
 	"lock": {
 		"title": "WorkPilot AI is locked",
 		"unlock": "Unlock",
