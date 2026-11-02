@@ -42,6 +42,7 @@ Une ligne par fichier et par dossier de `scripts/`, et rien d'autre :
 | `changelog.py` | Valide les fragments de `changelog.d/` (`check`), montre les notes de la prochaine version (`preview`), les verse dans `CHANGELOG.md` (`release X.Y.Z "Titre"`). | `pre-push.js`, `tests/test_changelog_fragments.py` ; `release` à la main avant la release |
 | `bump-version.js` | Change la version partout où elle est écrite. | `prepare-release.yml` |
 | `update-readme.py` | Met à jour les badges et liens de téléchargement du README. | `release.yml`, `beta-release.yml` |
+| `readme-screenshots/` | Régénère les captures du README dans `.github/assets/screenshots/` : `capture-desktop.cjs` (aperçu navigateur du renderer), `capture-mobile.cjs` (bundle web de l'app mobile), avec les données inventées de `demo-data.js` ; sans backend ni compte. | à la main |
 | `validate-release.js` | Vérifie qu'une release est cohérente avant publication. | `bump-version.js` |
 | `cleanup-version-branches.sh` | Supprime les anciennes branches de version. | à la main |
 | `mobile_device_check.py` | Installe une app mobile sur un appareil réel et rend compte. | `mobile-device-check.yml`, à la main |

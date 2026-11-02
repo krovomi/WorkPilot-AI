@@ -70,8 +70,39 @@ def _json_file(path: Path) -> dict:
     return value if isinstance(value, dict) else {}
 
 
+def pr_arguments(options: dict | None, scratch: Path) -> list[str]:
+    """``run.py --create-pr`` arguments for the PR dialog's edits.
+
+    The body is a person's long text: it goes through a file in the run's
+    scratch directory, never argv. Fields were validated by
+    ``PullRequestOptions``.
+    """
+    if not options:
+        return []
+    args: list[str] = []
+    if options.get("title"):
+        # One token: a title starting with "-" is not read as an option.
+        args.append(f"--pr-title={options['title']}")
+    if options.get("body") is not None:
+        body_file = scratch / "pr_body.md"
+        body_file.write_text(str(options["body"]), encoding="utf-8")
+        args += ["--pr-body-file", str(body_file)]
+    if options.get("target_branch"):
+        args += ["--pr-target", str(options["target_branch"])]
+    if options.get("draft"):
+        args.append("--pr-draft")
+    if options.get("ignore_cross_review"):
+        args.append("--pr-ignore-cross-review")
+    return args
+
+
 def build_command(
-    phase: str, spec_name: str, server_path: str, model: str | None, scratch: Path
+    phase: str,
+    spec_name: str,
+    server_path: str,
+    model: str | None,
+    scratch: Path,
+    pr: dict | None = None,
 ) -> list[str]:
     """The argv of one run. `scratch` is a private directory the run may use."""
     if phase == SPEC_PHASE:
@@ -114,6 +145,8 @@ def build_command(
             server_path,
             *PHASE_ARGS[phase],
         ]
+        if phase == "pr":
+            cmd += pr_arguments(pr, scratch)
     if model:
         cmd += ["--model", model]
     return cmd
@@ -232,6 +265,7 @@ class RunManager:
         user_id: str,
         model: str | None = None,
         org_id: str | None = None,
+        pr: dict | None = None,
     ) -> AgentRun:
         """Queue a run and return its DB row immediately (status=queued).
 
@@ -284,6 +318,7 @@ class RunManager:
                 phase=phase,
                 user_id=user_id,
                 model=model,
+                pr=pr,
             )
         )
         return run
@@ -344,6 +379,7 @@ class RunManager:
         phase: str,
         user_id: str,
         model: str | None,
+        pr: dict | None = None,
     ) -> None:
         try:
             async with self._get_semaphore():
@@ -354,7 +390,7 @@ class RunManager:
 
                 with tempfile.TemporaryDirectory(prefix="workpilot-run-") as scratch:
                     cmd = build_command(
-                        phase, spec_name, server_path, model, Path(scratch)
+                        phase, spec_name, server_path, model, Path(scratch), pr
                     )
                     env = await self._build_env(user_id, run_id)
                     cmd = confine(cmd, project_id, server_path, Path(scratch), env)

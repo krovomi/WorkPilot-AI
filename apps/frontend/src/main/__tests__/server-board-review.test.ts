@@ -181,6 +181,41 @@ describe("a server card's review", () => {
 		expect(phases).toEqual(["merge", "pr"]);
 	});
 
+	it("sends the PR dialog's title, body, target and draft with the run", async () => {
+		const { card, review } = await setup();
+		const bodies: unknown[] = [];
+		serve({
+			...SPECS,
+			[`POST /projects/${PID}/specs/row-1/runs`]: (body) => {
+				bodies.push(body);
+				return { ok: true, data: { id: "run-1" } };
+			},
+		});
+		await review.createServerCardPR(card, {
+			title: "  Add login ",
+			customBody: "## Why\nUsers sign in.",
+			targetBranch: "develop",
+			draft: true,
+			allowCrossReviewDisagreement: true,
+			runVisualProof: true,
+		});
+		await review.createServerCardPR(card, { draft: false });
+		expect(bodies).toEqual([
+			{
+				phase: "pr",
+				pr: {
+					title: "Add login",
+					body: "## Why\nUsers sign in.",
+					target_branch: "develop",
+					draft: true,
+					ignore_cross_review: true,
+				},
+			},
+			// Nothing edited: the server writes the PR from the spec.
+			{ phase: "pr" },
+		]);
+	});
+
 	it("approves as this person, and sends the work back before building again", async () => {
 		const { card, review } = await setup();
 		const calls: string[] = [];
@@ -213,7 +248,25 @@ describe("a server card's review", () => {
 		expect(calls).toEqual(["request-changes", "run build"]);
 	});
 
-	it("refuses an empty request or images before asking the server", async () => {
+	it("sends the screenshots with the request for changes", async () => {
+		const { card, review } = await setup();
+		const sent: unknown[] = [];
+		serve({
+			...SPECS,
+			[`POST ${CARD}/request-changes${Q}`]: (body) => {
+				sent.push(body);
+				return { ok: true, data: { requested: true } };
+			},
+			[`POST /projects/${PID}/specs/row-1/runs`]: () => ({ ok: true, data: { id: "run-1" } }),
+		});
+		const image = { id: "i", filename: "cut.png", mimeType: "image/png", size: 3, data: "data:image/png;base64,iVBO" };
+		expect((await review.reviewServerCard(card, false, "The button is cut", [image])).success).toBe(true);
+		expect(sent).toEqual([
+			{ feedback: "The button is cut", images: [{ filename: "cut.png", mimeType: "image/png", data: "iVBO" }] },
+		]);
+	});
+
+	it("refuses an empty request or unsendable images before asking the server", async () => {
 		const { card, review } = await setup();
 		connection.authedFetch.mockClear();
 		expect((await review.reviewServerCard(card, false, "   ")).success).toBe(false);
@@ -223,6 +276,11 @@ describe("a server card's review", () => {
 		expect(
 			(await review.reviewServerCard(card, false, "Fix", [{ data: "x" }])).success,
 		).toBe(false);
+		// SVG can carry script: the server takes raster images only, so it is refused here.
+		const svg = { filename: "a.svg", mimeType: "image/svg+xml", data: "PHN2Zy8+" };
+		const refused = await review.reviewServerCard(card, false, "Fix", [svg]);
+		expect(refused.success).toBe(false);
+		expect(refused.error).toMatch(/PNG, JPEG, GIF and WebP/);
 		expect(connection.authedFetch).not.toHaveBeenCalled();
 	});
 

@@ -11,6 +11,7 @@
 
 import type {
 	IPCResult,
+	WorktreeCreatePROptions,
 	WorktreeCreatePRResult,
 	WorktreeDiff,
 	WorktreeDiffFile,
@@ -18,6 +19,7 @@ import type {
 	WorktreeStatus,
 } from "../shared/types";
 import { type ServerCard, startRun } from "./server-board-actions";
+import { serverImageUploads } from "./server-card-images";
 import { authedFetch } from "./server-connection";
 
 const MAX_FEEDBACK = 20_000;
@@ -154,15 +156,33 @@ export async function mergeServerCard(
 		: { success: false, error: run.error };
 }
 
+/** The PR dialog's edits, in the server's shape; the server checks them again. */
+export function serverPROptions(
+	options: WorktreeCreatePROptions | undefined,
+): Record<string, unknown> | undefined {
+	if (!options || typeof options !== "object") return undefined;
+	const pr: Record<string, unknown> = {};
+	if (typeof options.title === "string" && options.title.trim()) pr.title = options.title.trim();
+	if (typeof options.customBody === "string") pr.body = options.customBody;
+	if (typeof options.targetBranch === "string" && options.targetBranch.trim()) {
+		pr.target_branch = options.targetBranch.trim();
+	}
+	if (options.draft === true) pr.draft = true;
+	if (options.allowCrossReviewDisagreement === true) pr.ignore_cross_review = true;
+	return Object.keys(pr).length > 0 ? pr : undefined;
+}
+
 /**
  * Open the pull request from the server: a `pr` run, which needs
- * `vcs.pr.create` there. The server writes the title and body from the spec;
- * the dialog's own edits are not sent.
+ * `vcs.pr.create` there. The dialog's title, body, target branch and draft
+ * flag go with it; without them the server writes its own from the spec.
+ * Visual proof is not run for a server card.
  */
 export async function createServerCardPR(
 	card: ServerCard,
+	options?: WorktreeCreatePROptions,
 ): Promise<IPCResult<WorktreeCreatePRResult>> {
-	const run = await startRun(card, "pr");
+	const run = await startRun(card, "pr", serverPROptions(options));
 	return run.success
 		? {
 				success: true,
@@ -186,16 +206,15 @@ export async function reviewServerCard(
 		const result = await authedFetch(cardUrl(card, "approve"), "POST");
 		return result.ok ? { success: true } : { success: false, error: result.error };
 	}
-	if (Array.isArray(images) && images.length > 0) {
-		// Refused rather than dropped: the person would believe they were sent.
-		return { success: false, error: "Images cannot be sent to a server card yet" };
-	}
+	const uploads = serverImageUploads(images);
+	if (uploads.error) return { success: false, error: uploads.error };
 	const said = typeof feedback === "string" ? feedback.trim() : "";
 	if (!said || said.length > MAX_FEEDBACK) {
 		return { success: false, error: "Say what to change" };
 	}
 	const sent = await authedFetch(cardUrl(card, "request-changes"), "POST", {
 		feedback: said,
+		...(uploads.uploads?.length ? { images: uploads.uploads } : {}),
 	});
 	if (!sent.ok) return { success: false, error: sent.error };
 	return startRun(card, "build");

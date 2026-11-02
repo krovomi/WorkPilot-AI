@@ -59,7 +59,7 @@ export function registerWorktreeCreatePRHandlers(
 			options?: WorktreeCreatePROptions,
 		): Promise<IPCResult<WorktreeCreatePRResult>> => {
 			const serverCard = findServerCard(taskId);
-			if (serverCard) return createServerCardPR(serverCard);
+			if (serverCard) return createServerCardPR(serverCard, options);
 			const isDebugMode =
 				process.env.DEBUG === "true" || process.env.NODE_ENV === "development";
 			const debug = (...args: unknown[]) => {
