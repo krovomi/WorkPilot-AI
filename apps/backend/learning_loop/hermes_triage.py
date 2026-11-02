@@ -193,6 +193,12 @@ def _provided_names(repo_root: Path) -> set[str]:
     return names
 
 
+def _category_of(subdir: str) -> str:
+    """The hermes category a `--subdir` value belongs to."""
+    parts = [part for part in subdir.strip().strip("/").split("/") if part]
+    return parts[1] if len(parts) >= 2 else parts[-1]
+
+
 def read_scope(repo_root: Path) -> RepoScope:
     """Read this repository's standing decisions about hermes's catalogue.
 
@@ -204,10 +210,12 @@ def read_scope(repo_root: Path) -> RepoScope:
     try:
         argv = _pack_bootstrap(repo_root)
         # `--subdir skills/software-development` names a directory in hermes's
-        # own tree; the category is its last segment, which is also the
-        # directory name hermes keeps it under in `~/.hermes/skills/`.
+        # own tree; the category is its second segment, which is also the
+        # directory name hermes keeps it under in `~/.hermes/skills/`. A
+        # single skill taken from `optional-skills/<category>/<skill>` counts
+        # for its category, not as a category of its own.
         categories = {
-            value.rsplit("/", 1)[-1].strip()
+            _category_of(value)
             for value in _flag_values(argv, "--subdir")
             if value.strip()
         }
