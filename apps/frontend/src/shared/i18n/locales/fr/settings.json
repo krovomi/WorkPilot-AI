@@ -1443,6 +1443,59 @@
 		"remove": "Retirer du serveur",
 		"unavailable": "Le serveur est injoignable"
 	},
+	"serverNeedsYou": {
+		"navLabel": "Mes notifications du serveur",
+		"title": "Besoin de toi : mes notifications du serveur",
+		"description": "Quand un run que tu as lancé sur le serveur a besoin de toi (un plan à approuver, un travail à revoir, un arrêt sur erreur), le serveur te prévient sur tes propres canaux. Seuls le nom du projet et le numéro de la carte partent. Les secrets sont chiffrés sur le serveur et jamais réaffichés ; laisse un champ secret vide pour garder celui enregistré.",
+		"offOnServer": "L'opérateur de ton serveur n'a pas encore activé ces notifications. Tu peux configurer tes canaux ; rien ne part d'ici là.",
+		"noVault": "Le serveur n'a pas de clé maîtresse pour les secrets : les canaux ne peuvent pas être enregistrés. Demande à son opérateur de définir WORKPILOT_SECRETS_MASTER_KEY.",
+		"unavailable": "Le serveur est injoignable",
+		"unreadable": "Le serveur ne sait plus lire ce canal (sa clé a changé). Saisis à nouveau ses secrets.",
+		"moments": "Préviens-moi quand",
+		"events": {
+			"plan_review": "Un plan attend son approbation",
+			"review_ready": "Un travail est prêt pour ma revue",
+			"failed": "Un run s'est arrêté sur une erreur"
+		},
+		"language": "Langue des messages",
+		"enabled": "{{channel}} activé",
+		"stored": "Enregistré",
+		"replacePlaceholder": "Enregistré : saisis une nouvelle valeur pour le remplacer",
+		"save": "Enregistrer",
+		"test": "Envoyer un test",
+		"remove": "Retirer {{channel}} du serveur",
+		"results": {
+			"sent": "Test envoyé",
+			"refused": "Le service a refusé le message",
+			"blocked": "Destination refusée par le serveur",
+			"unreachable": "Le service est injoignable"
+		},
+		"ntfy": {
+			"title": "ntfy",
+			"description": "Une notification dans l'app ntfy. Sur ntfy.sh, le topic est le seul secret : choisis-en un long.",
+			"server": "Serveur",
+			"serverPlaceholder": "https://ntfy.sh",
+			"topic": "Topic",
+			"topicPlaceholder": "Au moins 16 caractères sur ntfy.sh",
+			"access_token": "Jeton d'accès (facultatif)",
+			"access_tokenPlaceholder": "Pour un topic protégé",
+			"generate": "Générer"
+		},
+		"telegram": {
+			"title": "Telegram",
+			"description": "Un message de ton propre bot (créé avec @BotFather) dans une conversation privée.",
+			"bot_token": "Jeton du bot",
+			"bot_tokenPlaceholder": "123456:ABC…",
+			"chat_id": "Identifiant de la conversation",
+			"chat_idPlaceholder": "L'identifiant numérique de ta conversation"
+		},
+		"teams": {
+			"title": "Microsoft Teams",
+			"description": "Une carte postée par un webhook entrant ou une URL Workflows d'un canal ou d'une conversation.",
+			"webhook_url": "URL du webhook",
+			"webhook_urlPlaceholder": "https://….webhook.office.com/… ou une URL Workflows"
+		}
+	},
 	"invitationsAdmin": {
 		"navLabel": "Invitations (équipe)",
 		"title": "Invitations",

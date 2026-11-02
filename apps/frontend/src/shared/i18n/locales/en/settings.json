@@ -1978,6 +1978,59 @@
 		"remove": "Remove from the server",
 		"unavailable": "The server could not be reached"
 	},
+	"serverNeedsYou": {
+		"navLabel": "My notifications from the server",
+		"title": "Needs you: my notifications from the server",
+		"description": "When a run you started on the server needs you (a plan to approve, work to review, a stop on an error), the server tells you on your own channels. Only the project's name and the card's number are sent. Secrets are stored encrypted on the server and never shown again; leave a secret field empty to keep the stored one.",
+		"offOnServer": "Your server's operator has not turned these notifications on yet. You can set up your channels; nothing is sent until then.",
+		"noVault": "The server has no master key for secrets, so channels cannot be stored. Ask its operator to set WORKPILOT_SECRETS_MASTER_KEY.",
+		"unavailable": "The server could not be reached",
+		"unreadable": "The server can no longer read this channel (its key changed). Enter its secrets again.",
+		"moments": "Tell me when",
+		"events": {
+			"plan_review": "A plan waits for approval",
+			"review_ready": "Work is ready for my review",
+			"failed": "A run stopped on an error"
+		},
+		"language": "Language of the messages",
+		"enabled": "{{channel}} on",
+		"stored": "Stored",
+		"replacePlaceholder": "Stored: type a new value to replace it",
+		"save": "Save",
+		"test": "Send a test",
+		"remove": "Remove {{channel}} from the server",
+		"results": {
+			"sent": "Test sent",
+			"refused": "The service refused the message",
+			"blocked": "Destination refused by the server",
+			"unreachable": "The service could not be reached"
+		},
+		"ntfy": {
+			"title": "ntfy",
+			"description": "A push to the ntfy app. On ntfy.sh the topic is the only secret: use a long one.",
+			"server": "Server",
+			"serverPlaceholder": "https://ntfy.sh",
+			"topic": "Topic",
+			"topicPlaceholder": "At least 16 characters on ntfy.sh",
+			"access_token": "Access token (optional)",
+			"access_tokenPlaceholder": "For a protected topic",
+			"generate": "Generate"
+		},
+		"telegram": {
+			"title": "Telegram",
+			"description": "A message from your own bot (created with @BotFather) in a private chat.",
+			"bot_token": "Bot token",
+			"bot_tokenPlaceholder": "123456:ABC…",
+			"chat_id": "Chat id",
+			"chat_idPlaceholder": "Your chat's numeric id"
+		},
+		"teams": {
+			"title": "Microsoft Teams",
+			"description": "A card posted by an incoming webhook or a Workflows URL of a channel or chat.",
+			"webhook_url": "Webhook URL",
+			"webhook_urlPlaceholder": "https://….webhook.office.com/… or a Workflows URL"
+		}
+	},
 	"invitationsAdmin": {
 		"navLabel": "Invitations (team)",
 		"title": "Invitations",

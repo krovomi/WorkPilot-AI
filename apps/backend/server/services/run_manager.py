@@ -29,6 +29,7 @@ from server.config import get_settings
 from server.db.engine import get_session_factory
 from server.db.models import AgentRun, SpecIndex, User
 from server.services.events import emit_board_event
+from server.services.needs_you import notify_needs_you
 from server.services.push import notify_run_finished
 from server.services.run_env import run_environment
 from server.services.run_isolation import (
@@ -458,6 +459,7 @@ class RunManager:
                 select(User.display_name).where(User.id == user_id)
             )
         notify_run_finished(project_id, spec_name, phase, status, user_id, spec_id)
+        notify_needs_you(project_id, spec_name, phase, status, user_id)
         emit_board_event(
             project_id,
             "spec_status_changed",

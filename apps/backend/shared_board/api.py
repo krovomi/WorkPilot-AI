@@ -37,6 +37,7 @@ from server.db.engine import get_db
 from server.db.models import ProjectRole
 from server.services import push
 from server.services.events import emit_board_event
+from server.services.needs_you import set_approval_check
 from shared_board import attachments as card_images
 from shared_board import listing, review
 from shared_board import settings as card_settings
@@ -427,3 +428,8 @@ router.add_api_route("/cards/{card_id}/changes", review.card_changes, methods=["
 router.add_api_route(
     "/cards/{card_id}/request-changes", review.request_changes, methods=["POST"]
 )
+
+
+# The same check rings its person's "needs you" channels as a plan to
+# approve (server/services/needs_you.py).
+set_approval_check(_approval_pending)
