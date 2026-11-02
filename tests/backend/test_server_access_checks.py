@@ -19,7 +19,6 @@ from tests.backend.test_admin_api import (  # noqa: F401  (fixtures)
     _client,
     _principal_for,
     _settings,
-    env,
 )
 
 pytestmark = pytest.mark.asyncio
