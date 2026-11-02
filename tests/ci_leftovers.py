@@ -17,7 +17,7 @@ import os
 OWNER = "WORKPILOT_TEST_SESSION_PID"
 os.environ.setdefault(OWNER, str(os.getpid()))
 
-#: A process younger than the session but this close to its start may be the
+#: An orphan younger than the session but this close to its start may be the
 #: runner's own (it starts things around the step): not ours to stop.
 _GRACE_SECONDS = 2.0
 
@@ -34,9 +34,15 @@ def leftovers() -> list:
     found = []
     for process in psutil.process_iter(["pid", "ppid", "create_time"]):
         info = process.info
-        if info["pid"] == me.pid or (info["create_time"] or 0) < started:
-            continue
-        if info["pid"] in mine or not psutil.pid_exists(info["ppid"] or 0):
+        if info["pid"] in mine:
+            found.append(process)
+        elif (
+            info["pid"] != me.pid
+            and (info["create_time"] or 0) >= started
+            and not psutil.pid_exists(info["ppid"] or 0)
+        ):
+            # An orphan born during the session: on Windows its parent's pid
+            # stays recorded after the parent exits.
             found.append(process)
     return found
 
@@ -58,6 +64,9 @@ def stop_leftovers() -> list[str]:
     if os.environ.get(OWNER) != str(os.getpid()):
         return []
     found = leftovers()
+    if not found:
+        # Also where psutil is missing (the lint job's bare toolchain).
+        return []
     described = [_describe(p) for p in found]
     if not os.environ.get("CI"):
         return described

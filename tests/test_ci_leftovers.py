@@ -44,3 +44,11 @@ def test_off_ci_it_only_names_them(monkeypatch):
     finally:
         process.kill()
         process.wait(timeout=10)
+
+
+def test_without_psutil_it_finds_nothing_and_raises_nothing(monkeypatch):
+    # The lint job's skills harness runs pytest with no psutil installed.
+    monkeypatch.setitem(sys.modules, "psutil", None)
+    monkeypatch.setenv("CI", "true")
+    assert ci_leftovers.leftovers() == []
+    assert ci_leftovers.stop_leftovers() == []
