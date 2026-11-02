@@ -29,6 +29,26 @@ vi.mock("../../project-store", () => ({
 	},
 }));
 
+const server = vi.hoisted(() => ({
+	projects: new Map<string, unknown>(),
+	calls: [] as string[],
+}));
+vi.mock("../../server-projects", () => ({
+	getServerProject: (id: unknown) => server.projects.get(id as string),
+}));
+vi.mock("../../server-automations", () => {
+	const answer = (name: string) => async (...args: unknown[]) => {
+		server.calls.push(`${name} ${JSON.stringify(args.slice(1))}`);
+		return { success: true, data: { rules: [], statuses: {}, activity: [], runsOn: "server" } };
+	};
+	return {
+		getServerAutomations: answer("get"),
+		saveServerAutomation: answer("save"),
+		deleteServerAutomation: answer("delete"),
+		runServerAutomations: answer("run"),
+	};
+});
+
 import { readLedger, writeLedger } from "../../automations/store";
 import { registerAutomationsHandlers } from "../automations-handlers";
 
@@ -104,5 +124,28 @@ describe("automations handlers", () => {
 		expect(run).toHaveBeenCalledWith(project);
 		expect(await call(IPC_CHANNELS.AUTOMATIONS_RUN, "nope")).toMatchObject({ success: false });
 		expect(run).toHaveBeenCalledTimes(1);
+	});
+
+	it("sends a server project's rules to the server, and runs nothing here", async () => {
+		const remote = { id: "srv-1", name: "Shop", path: root, autoBuildPath: ".workpilot", remote: {} };
+		server.projects.set("srv-1", remote);
+		server.calls.length = 0;
+		try {
+			expect((await call(IPC_CHANNELS.AUTOMATIONS_GET, "srv-1")).data?.runsOn).toBe("server");
+			await call(IPC_CHANNELS.AUTOMATIONS_SAVE, "srv-1", rule);
+			await call(IPC_CHANNELS.AUTOMATIONS_DELETE, "srv-1", "r-000000000001");
+			await call(IPC_CHANNELS.AUTOMATIONS_RUN, "srv-1");
+			expect(server.calls).toEqual([
+				"get []",
+				`save ${JSON.stringify([rule])}`,
+				'delete ["r-000000000001"]',
+				"run []",
+			]);
+			expect(run).not.toHaveBeenCalled();
+			// Nothing was written in the mirror on this computer.
+			expect(readLedger({ ...project, path: root }).statuses).toEqual({});
+		} finally {
+			server.projects.clear();
+		}
 	});
 });

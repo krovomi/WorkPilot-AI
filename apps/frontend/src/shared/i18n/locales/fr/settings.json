@@ -2543,13 +2543,13 @@
 			"base": "Branche de base"
 		},
 		"triggers": {
-			"issue_labeled": "Une issue GitHub reçoit une étiquette",
+			"issue_labeled": "Une issue reçoit une étiquette (GitHub ou GitLab)",
 			"ci_failed": "La CI passe au rouge sur une branche",
 			"schedule": "À une heure de la journée",
 			"pr_opened": "Quelqu'un d'autre ouvre une PR GitHub"
 		},
 		"help": {
-			"issue_labeled": "Seulement les issues étiquetées après la création de la règle. Une issue qui a déjà une carte n'est pas importée deux fois.",
+			"issue_labeled": "Seulement les issues étiquetées après la création de la règle, sur le GitHub du projet ou, à défaut, son GitLab. Une issue qui a déjà une carte n'est pas importée deux fois.",
 			"ci_failed": "Lu chez le fournisseur de CI réglé dans Réglages › Pipeline CI/CD. Une carte par série rouge : tant qu'elle est ouverte, un nouvel échec n'en crée pas d'autre.",
 			"schedule": "Se déclenche une fois par jour choisi, une fois l'heure passée. Un jour où l'app était fermée n'est pas rattrapé.",
 			"draft": "La carte attend dans le backlog que tu la lances.",
@@ -2594,10 +2594,15 @@
 			"own_pr": "tu as ouvert cette PR",
 			"bot_author": "un bot a ouvert cette PR",
 			"already_reviewed": "cette PR a déjà une revue",
-			"review_failed": "la revue n'a pas pu démarrer"
+			"review_failed": "la revue n'a pas pu démarrer",
+			"forge_not_connected": "ni GitHub ni GitLab n'est connecté pour ce projet",
+			"token_missing": "la personne qui a enregistré cette règle n'a pas de jeton pour cette forge sur le serveur (Réglages › Mes jetons sur le serveur)",
+			"owner_not_allowed": "la personne qui a enregistré cette règle ne peut plus la faire tourner sur ce projet : enregistrez-la à nouveau pour la reprendre"
 		},
 		"anyBranch": "n'importe quelle branche",
-		"reviewDrafts": "les revues t'attendent"
+		"reviewDrafts": "les revues t'attendent",
+		"serverIntro": "Une règle crée une carte Kanban quand son événement arrive, et la carte suit le cycle normal. Une règle sur les PR lance plutôt la revue IA, gardée en brouillon. Une règle ne merge, ne pousse et ne commente jamais rien. Ce projet est sur le serveur : ses règles sont celles de l'équipe, et le serveur les fait tourner toutes les 5 minutes, même quand personne n'a l'app ouverte. Chaque règle lit GitHub ou GitLab avec le jeton de la personne qui l'a enregistrée en dernier, et ses cartes sont créées par Automations. Les heures sont celles du serveur.",
+		"runsAs": "tourne avec les jetons de {{name}}"
 	},
 	"githubOAuth": {
 		"usingCli": "GitHub CLI {{version}} utilisé",

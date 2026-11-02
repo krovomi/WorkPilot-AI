@@ -2540,13 +2540,13 @@
 			"base": "Base branch"
 		},
 		"triggers": {
-			"issue_labeled": "A GitHub issue gets a label",
+			"issue_labeled": "An issue gets a label (GitHub or GitLab)",
 			"ci_failed": "The CI turns red on a branch",
 			"schedule": "At a time of day",
 			"pr_opened": "Someone else opens a GitHub PR"
 		},
 		"help": {
-			"issue_labeled": "Only issues labelled after the rule is created. An issue that already has a card is not imported twice.",
+			"issue_labeled": "Only issues labelled after the rule is created, on the project's GitHub or, without it, its GitLab. An issue that already has a card is not imported twice.",
 			"ci_failed": "Read from the CI provider set in Settings › CI/CD pipeline. One card per red streak: while that card is open, a new failed run does not create another.",
 			"schedule": "Fires once on each chosen day, once the time has passed. A day the app was closed is not made up.",
 			"draft": "The card waits in the backlog until you start it.",
@@ -2591,10 +2591,15 @@
 			"own_pr": "you opened this PR",
 			"bot_author": "a bot opened this PR",
 			"already_reviewed": "this PR already has a review",
-			"review_failed": "the review could not start"
+			"review_failed": "the review could not start",
+			"forge_not_connected": "neither GitHub nor GitLab is connected for this project",
+			"token_missing": "the person who saved this rule has no token for this forge on the server (Settings › My tokens on the server)",
+			"owner_not_allowed": "the person who saved this rule may no longer run it on this project: save it again to take it over"
 		},
 		"anyBranch": "any branch",
-		"reviewDrafts": "reviews wait for you"
+		"reviewDrafts": "reviews wait for you",
+		"serverIntro": "A rule creates a Kanban card when its event happens, and the card follows the normal cycle. A rule on PRs starts the AI review instead, kept as a draft. A rule never merges, pushes or comments. This project is on the server: its rules are the team's, and the server runs them every 5 minutes, even when nobody has the app open. Each rule reads GitHub or GitLab with the token of the person who saved it last, and its cards are created by Automations. Times are the server's.",
+		"runsAs": "runs with {{name}}'s tokens"
 	},
 	"githubOAuth": {
 		"usingCli": "Using GitHub CLI {{version}}",

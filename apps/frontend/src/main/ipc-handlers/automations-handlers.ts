@@ -2,6 +2,8 @@
  * Automations IPC: list, save, delete and run a project's rules. The renderer
  * names a project by id and sends a rule as data; the main process resolves
  * the project and checks every field of the rule (`automations/rules.ts`).
+ * A server project's rules are the server's: each handler sends them there by
+ * project id (`server-automations.ts`), and the server checks them again.
  */
 
 import type { BrowserWindow } from "electron";
@@ -13,6 +15,13 @@ import { isRuleId, MAX_RULES, parseRule } from "../automations/rules";
 import { AutomationScheduler, liveDeps } from "../automations/scheduler";
 import { forgetRule, readLedger, readRules, writeLedger, writeRules } from "../automations/store";
 import { projectStore } from "../project-store";
+import {
+	deleteServerAutomation,
+	getServerAutomations,
+	runServerAutomations,
+	saveServerAutomation,
+} from "../server-automations";
+import { getServerProject } from "../server-projects";
 
 let scheduler: AutomationScheduler | null = null;
 
@@ -45,6 +54,9 @@ export function registerAutomationsHandlers(
 	ipcMain.handle(
 		IPC_CHANNELS.AUTOMATIONS_GET,
 		async (_, projectId: unknown): Promise<IPCResult<AutomationsState>> => {
+			// A server project's rules are the team's, on the server.
+			const server = getServerProject(projectId);
+			if (server) return getServerAutomations(server);
 			const project = projectFor(projectId);
 			if (typeof project === "string") return { success: false, error: project };
 			return { success: true, data: automationsState(project) };
@@ -54,6 +66,8 @@ export function registerAutomationsHandlers(
 	ipcMain.handle(
 		IPC_CHANNELS.AUTOMATIONS_SAVE,
 		async (_, projectId: unknown, raw: unknown): Promise<IPCResult<AutomationsState>> => {
+			const server = getServerProject(projectId);
+			if (server) return saveServerAutomation(server, raw);
 			const project = projectFor(projectId);
 			if (typeof project === "string") return { success: false, error: project };
 			const rules = readRules(project);
@@ -78,6 +92,8 @@ export function registerAutomationsHandlers(
 	ipcMain.handle(
 		IPC_CHANNELS.AUTOMATIONS_DELETE,
 		async (_, projectId: unknown, ruleId: unknown): Promise<IPCResult<AutomationsState>> => {
+			const server = getServerProject(projectId);
+			if (server) return deleteServerAutomation(server, ruleId);
 			const project = projectFor(projectId);
 			if (typeof project === "string") return { success: false, error: project };
 			const rules = readRules(project);
@@ -98,6 +114,9 @@ export function registerAutomationsHandlers(
 	ipcMain.handle(
 		IPC_CHANNELS.AUTOMATIONS_RUN,
 		async (_, projectId: unknown): Promise<IPCResult<AutomationsState>> => {
+			// The server's pass, joined with its own; nothing runs on this computer.
+			const server = getServerProject(projectId);
+			if (server) return runServerAutomations(server);
 			const project = projectFor(projectId);
 			if (typeof project === "string") return { success: false, error: project };
 			if (!scheduler) return { success: false, error: "Automations are not running" };

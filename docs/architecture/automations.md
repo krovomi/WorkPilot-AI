@@ -30,13 +30,15 @@ apps/frontend/src/renderer/components/settings/integrations/AutomationsIntegrati
 ```
 
 Les règles se règlent par projet : Réglages › projet › Automatisations. Il n'y a
-pas de vue en plus dans la barre latérale.
+pas de vue en plus dans la barre latérale. Celles d'un projet du serveur sont
+enregistrées et exécutées sur le serveur (voir
+[Sur un serveur](#sur-un-serveur--les-règles-de-léquipe)).
 
 ## Les déclencheurs
 
 | Déclencheur | Source | Clé de dédoublonnage | Ce qui n'est pas un événement |
 |---|---|---|---|
-| `issue_labeled` | API GitHub, avec le jeton du projet (Réglages › GitHub) | `github-issue:<dépôt>#<n>` | une issue qui portait l'étiquette avant la règle ; une PR ; une issue qui a déjà une carte |
+| `issue_labeled` | API GitHub, avec le jeton du projet (Réglages › GitHub) ; sans GitHub connecté, l'API GitLab du projet (Réglages › GitLab, `sources-gitlab.ts`) | `github-issue:<dépôt>#<n>`, `gitlab-issue:<hôte>/<projet>#<iid>` | une issue qui portait l'étiquette avant la règle (GitLab : ses `resource_label_events`) ; une PR ; une issue qui a déjà une carte |
 | `ci_failed` | le fournisseur de CI du « Build rouge » (Azure DevOps, GitHub Actions, GitLab CI, Jenkins) | `ci:<fournisseur>:<branche>:<run>` | un run en cours ; un run vert, qui clôt la série rouge |
 | `schedule` | l'horloge locale, `HH:MM` et des jours de la semaine | `schedule:<règle>:<jour>` | l'heure pas encore passée ; un jour où l'app était fermée ; une règle créée après l'heure du jour |
 | `pr_opened` | API GitHub, avec le jeton du projet ; base optionnelle | `github-pr:<dépôt>#<n>` | une PR ouverte avant la règle ; une PR en brouillon (elle revient une fois prête) ; une PR de la personne elle-même ou d'un bot ; une PR qui a déjà une revue |
@@ -149,6 +151,98 @@ IA de GitHub PRs (G1). Il ne crée pas de carte.
 - **Le jeton GitHub reste dans le main.** Il est lu par `getGitHubConfig`, comme
   pour l'import, et n'apparaît ni dans le registre, ni dans le journal, ni dans
   un message d'erreur rendu à l'UI.
+
+## Sur un serveur : les règles de l'équipe
+
+Plan du 2 novembre, R6 S4. Le moteur ci-dessus tourne dans l'app ouverte : un
+projet du serveur n'avait aucune automatisation tant que personne ne l'avait
+ouvert. Ses règles sont donc enregistrées sur le serveur et exécutées par lui
+(`apps/backend/shared_features/automations/`), partagées par l'équipe.
+
+```
+apps/backend/shared_features/automations/
+  rules.py      les règles de rules.ts : même schéma, mêmes listes fermées, mêmes bornes
+  store.py      la ligne project_automations (Alembic 0010) : rules, ledger, owners
+  sources.py    issues étiquetées, PR/MR, CI (GitHub Actions, GitLab CI), horloge
+  forge_api.py  l'API de la forge du projet, avec le jeton de qui a enregistré la règle
+  cards.py      la carte du tableau partagé, écrite par le compte « Automations »
+  live.py       un passage sur le serveur : droits du propriétaire revérifiés, runs, revues
+  run.py        le passage de run.ts : dédoublonnage, plafond du jour, série rouge, journal
+  scheduler.py  un passage toutes les 5 min par projet, dans le processus du serveur
+  api.py        les routes, par project_id
+apps/frontend/src/main/server-automations.ts   le panneau parle à ces routes
+```
+
+- **Les mêmes règles.** `rules.py` reprend `rules.ts` champ par champ ; un test
+  lit `rules.ts` et `TASK_KINDS` et échoue si les bornes, les motifs ou les
+  listes divergent. Le registre a la forme de `ledger.json` (vus, plafond du
+  jour, série rouge, statuts, 100 lignes de journal), le panneau est le même.
+- **Le serveur fait tourner les règles.** La boucle part avec l'API, par le
+  `lifespan` du routeur, fusionné à celui de l'app quand il est monté, et
+  seulement en mode serveur ; un passage par projet à la fois, « Lancer
+  maintenant » rejoint celui en cours. Un projet qui échoue est journalisé, les
+  autres passent. Une sauvegarde et la fin d'un passage tiennent le verrou du
+  projet ; une règle supprimée pendant un passage emporte son historique.
+- **L'app ne la fait pas tourner deux fois.** Un projet du serveur n'est pas dans
+  le magasin local, et le planificateur de l'app saute de toute façon un projet
+  `remote`. Les canaux `AUTOMATIONS_*` envoient au serveur ce qui concerne un
+  projet du serveur, sans rien écrire dans son miroir.
+- **Chaque règle agit au nom de qui l'a enregistrée.** Enregistrer une règle en
+  fait la sienne (`owners`), et le panneau l'affiche (« tourne avec les jetons
+  de… »). À chaque passage, et pas seulement à l'enregistrement, le serveur
+  revérifie que cette personne est active, a un rôle `member` ou plus sur le
+  projet et `task.write`, et `agent.execute` pour une règle qui lance un agent
+  (cartes non brouillon, revue de PR). Sinon la règle s'arrête avec
+  `owner_not_allowed` ; la reprendre, c'est l'enregistrer à nouveau.
+- **La forge est lue avec le jeton de cette personne**, celui de « Mes jetons
+  sur le serveur » (`server/services/secrets.py`), sur la forge que le serveur
+  lit dans le `repo_url` du projet (`server/forges.py` : github.com, ou un hôte
+  GitLab de la liste de l'opérateur). Sans jeton, `token_missing`. Le jeton ne
+  va que dans l'en-tête de l'appel à la forge : ni le registre, ni le journal,
+  ni un message d'erreur (« GitHub answered 500 »), ni une réponse des routes ne
+  le contiennent. Les URL sont construites à partir du projet et de chemins fixes.
+- **Les cartes sont écrites par « Automations ».** Un compte de service, créé au
+  premier usage : inactif, sans identité (ni mot de passe ni SSO), d'adresse
+  `automations@service.workpilot.invalid` qu'aucune invitation ni fournisseur
+  d'identité ne peut prendre, membre d'aucune organisation. Il est l'auteur de
+  la carte (`createdBy`, `createdByName`, `specs_index.created_by`, l'événement
+  `spec_created`, le journal d'audit `automation.card.created`), et le tableau le
+  montre par un badge « Automations » (le nom de la règle au survol) sur toute
+  carte née d'une règle, locale comme serveur. Une carte non brouillon lance sa
+  phase `spec` au nom du même compte : un agent qui lit une issue que personne
+  n'a relue ne reçoit le jeton de forge de personne. La carte demande une revue
+  avant le code (`requireReviewBeforeCoding`). Une revue de PR (GitHub) ou de MR
+  (GitLab) est un job `forge_review` lancé au nom du propriétaire de la règle,
+  comme son clic, car elle lit la demande avec son jeton.
+- **Le contenu d'une issue est une donnée (S2).** Titre et étapes de CI passent
+  par `clean_untrusted`, le corps par `quote_untrusted`, qui le délimite comme
+  contenu non fiable dans la description de la carte. Rien de ce que dit la
+  forge ne choisit un outil, une commande, un chemin ou un droit.
+- **Ce qui change par rapport à l'app.** L'horloge est celle du serveur (`TZ` du
+  déploiement), ce que dit le panneau. Le déclencheur CI lit le pipeline de la
+  forge du projet (GitHub Actions ou GitLab CI) : le serveur n'a pas les autres
+  fournisseurs du « Build rouge ». `pr_opened` marche aussi pour une MR GitLab ;
+  un auteur GitLab est un bot s'il le dit ou si son nom est celui d'un jeton de
+  projet (`…_bot…`).
+
+| Action | Route | Il faut |
+|---|---|---|
+| Lire les règles, leur statut, le journal, qui les possède | `GET /api/board/automations` | `task.read`, un rôle sur le projet |
+| Ajouter ou modifier une règle (en devenir propriétaire) | `POST /api/board/automations/rules` | `task.write`, rôle `member` ou plus ; `agent.execute` pour une règle non brouillon ou `pr_opened` ; un moteur dont le provider est dans `capabilities/providers.yaml` |
+| Supprimer une règle et son historique | `DELETE /api/board/automations/rules/{rule_id}` | `task.write`, rôle `member` ou plus |
+| Lancer un passage maintenant | `POST /api/board/automations/run` | `task.write`, rôle `member` ou plus ; chaque règle agit toujours au nom de son propriétaire |
+
+Preuves : `tests/backend/test_server_automations.py` (les règles égales à
+`rules.ts` ; un lecteur lit et ne change rien ; `agent.execute` exigé ; une issue
+étiquetée devient une carte d'« Automations », son commentaire HTML caché retiré,
+le jeton seulement dans l'en-tête ; issue déjà au tableau, plafond ; issue
+GitLab ; propriétaire sans jeton puis sans rôle ; règle de build d'un relecteur ;
+horloge ; phase `spec` lancée par « Automations » ; une revue par PR, PR de la
+personne et de bot écartées ; une carte par série rouge ; forge en erreur ; la
+boucle ne part pas en local, un projet en échec n'arrête pas les autres) ;
+`src/main/__tests__/server-automations.test.ts`, `automations-handlers.test.ts`,
+`scheduler.test.ts` (un projet du serveur ne tourne pas ici ; GitLab sans GitHub),
+`sources-gitlab.test.ts`, `AutomationBadge.test.tsx`.
 
 ## Ce qui a été retiré
 

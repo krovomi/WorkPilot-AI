@@ -104,7 +104,9 @@
 		"sessionCompactionHint": "{{count}} execution phases — click to see the compacted summary",
 		"sessionCompaction": "Session Compaction",
 		"criticalPhases": "Key steps",
-		"lastError": "Last error"
+		"lastError": "Last error",
+		"automation": "Automations",
+		"automationTooltip": "Created by the automation rule “{{rule}}”"
 	},
 	"warnings": {
 		"stuck": {
@@ -610,7 +612,8 @@
 			"github": "GitHub",
 			"gitlab": "GitLab",
 			"visual-canvas": "Visual canvas",
-			"tech-debt": "Tech debt"
+			"tech-debt": "Tech debt",
+			"automation": "Automation"
 		}
 	},
 	"kind": {
