@@ -17,6 +17,7 @@ import { fileWatcher } from "../../file-watcher";
 import { checkGitStatus } from "../../project-initializer";
 import { projectStore } from "../../project-store";
 import { findTaskAndProject } from "./shared";
+import { discardSpecIfStale } from "./stale-spec";
 import {
 	convertTaskMetadataToSpecCreation,
 	getSpecPaths,
@@ -465,6 +466,7 @@ export function registerTaskRecoveryHandlers(ctx: ExecutionHandlerContext): void
 				specDirForWatcher,
 				AUTO_BUILD_PATHS.SPEC_FILE,
 			);
+			discardSpecIfStale(specDirForWatcher, task.subtasks.length);
 			const hasSpec = existsSync(specFilePath);
 			const needsSpecCreation = !hasSpec;
 

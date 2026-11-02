@@ -42,13 +42,19 @@ If the `QA_FIX_REQUEST.md` mentions **architecture violations**, these are
 # 1. Read the QA fix request (YOUR PRIMARY TASK)
 cat {{SPEC_DIR}}/QA_FIX_REQUEST.md
 
-# 2. Read the spec (requirements)
+# 2. Read the user's request, then the spec written from it
+cat {{SPEC_DIR}}/requirements.json   # task_description = the user's own words
 cat {{SPEC_DIR}}/spec.md
 
 # 3. Check current state
 git status
 git log --oneline -5
 ```
+
+**The user's request outranks the spec and the fix request.** Never delete,
+rename or revert a file, value or behaviour that the user's request
+(`task_description` above) names, even if an issue asks for it: the spec it
+came from is stale there. Skip that issue and explain why in your fix report.
 
 **CRITICAL**: The `QA_FIX_REQUEST.md` file contains:
 - Exact issues to fix
