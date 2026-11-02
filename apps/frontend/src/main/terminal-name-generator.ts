@@ -6,7 +6,7 @@ import { pythonEnvManager } from "./python-env-manager";
  * Debug logging - only logs when DEBUG=true or in development mode
  */
 const DEBUG =
-	process.env.DEBUG === "true" || process.env.NODE_ENV === "development";
+	process.env.DEBUG === "true";
 
 function debug(...args: unknown[]): void {
 	if (DEBUG) {

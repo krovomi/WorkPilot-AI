@@ -9,6 +9,7 @@
  * 2. Fallback: CLI /usage command parsing
  */
 
+import { spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { homedir } from "node:os";
 import type {
@@ -27,7 +28,15 @@ import {
 	getClaudeProfileManager,
 	initializeClaudeProfileManager,
 } from "../claude-profile-manager";
+import {
+	detectWindsurfLocalToken,
+	readWindsurfCachedPlanInfo,
+	type WindsurfCachedPlanInfo,
+} from "../services/credential-manager";
+import { getSpawnCommand, getSpawnOptions } from "../env-utils";
 import { loadProfilesFile } from "../services/profile";
+import { setActiveAPIProfile } from "../services/profile/profile-manager";
+import { readSettingsFile, writeSettingsFile } from "../settings-utils";
 import { codexLimitsToSnapshot, fetchCodexRateLimits } from "./codex-usage";
 import {
 	clearKeychainCache,
@@ -1688,7 +1697,6 @@ export class UsageMonitor extends EventEmitter {
 		// 2. globalWindsurfApiKey in settings.json (user configured Windsurf key in settings)
 		// 3. CredentialManager's active credential is windsurf-type
 		try {
-			const { readSettingsFile } = await import("../settings-utils");
 			const appSettings = readSettingsFile();
 			const selectedProvider = appSettings?.selectedProvider as
 				| string
@@ -1720,7 +1728,6 @@ export class UsageMonitor extends EventEmitter {
 				// so future checks are faster and the CredentialManager also picks it up
 				if (!selectedProvider && globalWindsurfKey && appSettings) {
 					try {
-						const { writeSettingsFile } = await import("../settings-utils");
 						appSettings.selectedProvider = "windsurf";
 						writeSettingsFile(appSettings);
 						this.debugLog(
@@ -3009,7 +3016,7 @@ export class UsageMonitor extends EventEmitter {
 	 *   - weeklyPercent  → % of billing cycle elapsed (time-based)
 	 */
 	private normalizeWindsurfCachedPlanInfo(
-		planInfo: import("../services/credential-manager").WindsurfCachedPlanInfo,
+		planInfo: WindsurfCachedPlanInfo,
 		profileId: string,
 		profileName: string,
 	): UsageSnapshot {
@@ -3440,10 +3447,6 @@ export class UsageMonitor extends EventEmitter {
 		);
 
 		try {
-			const { spawn } = await import("node:child_process");
-			const { getSpawnCommand, getSpawnOptions } = await import(
-				"../env-utils"
-			);
 
 			const result = await new Promise<{
 				stdout: string;
@@ -3753,9 +3756,6 @@ export class UsageMonitor extends EventEmitter {
 		} else {
 			// Switch API profile via profile-manager service
 			try {
-				const { setActiveAPIProfile } = await import(
-					"../services/profile/profile-manager"
-				);
 				await setActiveAPIProfile(bestAccount.id);
 			} catch (error) {
 				console.error(
@@ -3865,7 +3865,6 @@ export class UsageMonitor extends EventEmitter {
 		let authMode: string | undefined;
 		let hasApiKey = !!process.env.OPENAI_API_KEY?.trim();
 		try {
-			const { readSettingsFile } = await import("../settings-utils");
 			const settings = readSettingsFile();
 			authMode = settings?.globalOpenAIAuthMode as string | undefined;
 			const globalKey = settings?.globalOpenAIApiKey;
@@ -4068,9 +4067,6 @@ export class UsageMonitor extends EventEmitter {
 
 			// Strategy 1: Read local IDE cached plan info (primary source)
 			try {
-				const { readWindsurfCachedPlanInfo } = await import(
-					"../services/credential-manager"
-				);
 				const cached = await readWindsurfCachedPlanInfo();
 				if (cached.success && cached.planInfo) {
 					const rawMsgs = cached.planInfo.usage;
@@ -4150,7 +4146,6 @@ export class UsageMonitor extends EventEmitter {
 				// Fallback to global settings (globalWindsurfApiKey) for SSO users
 				if (!serviceKey) {
 					try {
-						const { readSettingsFile } = await import("../settings-utils");
 						const settings = readSettingsFile();
 						const globalKey = settings?.globalWindsurfApiKey as
 							| string
@@ -4181,9 +4176,6 @@ export class UsageMonitor extends EventEmitter {
 				// Fallback to auto-detection from local Windsurf IDE (SSO enterprise users)
 				if (!serviceKey) {
 					try {
-						const { detectWindsurfLocalToken } = await import(
-							"../services/credential-manager"
-						);
 						const detected = await detectWindsurfLocalToken();
 						if (detected.success && detected.apiKey) {
 							serviceKey = detected.apiKey;

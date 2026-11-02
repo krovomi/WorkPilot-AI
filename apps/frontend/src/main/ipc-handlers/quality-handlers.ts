@@ -1,166 +1,112 @@
 /**
- * Quality Scorer IPC Handlers
- * Handles communication between renderer and backend Python Quality Scorer
+ * Quality Scorer IPC handlers.
+ *
+ * The renderer names a project by id and the files a pull request changes;
+ * the main process finds the project's folder itself (the renderer is not
+ * trusted with a path, docs/rules/security.md S6) and runs the backend's
+ * `runners/quality_score_runner.py` there with the managed Python. The score
+ * is static analysis: the runner calls no model and gets no credential.
  */
 
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { app, ipcMain } from "electron";
-import { logger } from "../app-logger";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
-import { pythonRunnerEnv } from "../utils/python-runner-env";
+import { logger } from "../app-logger";
+import { projectStore } from "../project-store";
+import { pythonEnvManager } from "../python-env-manager";
+import { envWithoutCredentials } from "../utils/child-env";
+
+const RESULT = "QUALITY_RESULT:";
+const ERROR = "QUALITY_ERROR:";
+const TIMEOUT_MS = 120_000;
+const MAX_FILES = 500;
 
 interface QualityAnalyzeParams {
 	files: string[];
-	projectDir?: string;
+	projectId?: string;
 }
 
 interface QualityAnalyzePRParams {
 	prNumber: number;
 	changedFiles: string[];
-	projectDir?: string;
+	projectId?: string;
+}
+
+function backendPath(): string {
+	return app.isPackaged
+		? path.resolve(process.resourcesPath, "backend")
+		: path.resolve(app.getAppPath(), "..", "backend");
+}
+
+/** The project's folder, from its id; never a path from the renderer. */
+function projectFolder(projectId: unknown): string {
+	const project =
+		typeof projectId === "string" ? projectStore.getProject(projectId) : undefined;
+	if (!project?.path) throw new Error("Unknown project");
+	return project.path;
+}
+
+function fileList(files: unknown): string[] {
+	if (!Array.isArray(files)) return [];
+	return files
+		.filter((f): f is string => typeof f === "string" && f.length > 0 && f.length < 1024)
+		.slice(0, MAX_FILES);
+}
+
+/** Read the runner's answer from its output. */
+export function parseQualityOutput(stdout: string): unknown {
+	const lines = stdout.split(/\r?\n/);
+	const error = lines.find((l) => l.startsWith(ERROR));
+	if (error) throw new Error(error.slice(ERROR.length));
+	const result = lines.find((l) => l.startsWith(RESULT));
+	if (!result) throw new Error("The quality analysis returned no result");
+	return JSON.parse(result.slice(RESULT.length));
+}
+
+async function runQualityAnalysis(projectId: unknown, files: unknown): Promise<unknown> {
+	const projectDir = projectFolder(projectId);
+	const python = pythonEnvManager.getPythonPath();
+	if (!python) throw new Error("Python environment not ready");
+	const backend = backendPath();
+	const args = [
+		path.join(backend, "runners", "quality_score_runner.py"),
+		"--project-dir",
+		projectDir,
+		"--files",
+		...fileList(files),
+	];
+	return new Promise((resolve, reject) => {
+		const proc = spawn(python, args, {
+			cwd: backend,
+			env: envWithoutCredentials(process.env, { PYTHONUTF8: "1" }),
+			timeout: TIMEOUT_MS,
+		});
+		let stdout = "";
+		let stderr = "";
+		proc.stdout.on("data", (data: Buffer) => {
+			stdout += data.toString("utf-8");
+		});
+		proc.stderr.on("data", (data: Buffer) => {
+			stderr = (stderr + data.toString("utf-8")).slice(-4000);
+		});
+		proc.on("error", reject);
+		proc.on("close", (code) => {
+			try {
+				resolve(parseQualityOutput(stdout));
+			} catch (error) {
+				logger.warn("Quality analysis failed", { code, stderr });
+				reject(error);
+			}
+		});
+	});
 }
 
 export function setupQualityHandlers(): void {
-	// Handler: quality:analyze
-	ipcMain.handle(IPC_CHANNELS.QUALITY_ANALYZE, async (_, params: QualityAnalyzeParams) => {
-		try {
-			logger.info("Quality analysis requested", { files: params.files });
-
-			const projectDir = params.projectDir || process.cwd();
-			const backendPath = path.join(
-				app.getAppPath(),
-				"..",
-				"..",
-				"apps",
-				"backend",
-			);
-
-			// Call Python quality_cli.py script
-			return await runQualityAnalysis(params.files, projectDir, backendPath);
-		} catch (error) {
-			logger.error("Failed to analyze quality", error);
-			throw error;
-		}
-	});
-
-	// Handler: quality:analyze-pr
-	ipcMain.handle(
-		IPC_CHANNELS.QUALITY_ANALYZE_PR,
-		async (_, params: QualityAnalyzePRParams) => {
-			try {
-				logger.info("PR quality analysis requested", {
-					prNumber: params.prNumber,
-					files: params.changedFiles,
-				});
-
-				const projectDir = params.projectDir || process.cwd();
-				const backendPath = path.join(
-					app.getAppPath(),
-					"..",
-					"..",
-					"apps",
-					"backend",
-				);
-
-				// Call Python quality_cli.py script for PR files
-				return await runQualityAnalysis(
-					params.changedFiles,
-					projectDir,
-					backendPath,
-				);
-			} catch (error) {
-				logger.error("Failed to analyze PR quality", error);
-				throw error;
-			}
-		},
+	ipcMain.handle(IPC_CHANNELS.QUALITY_ANALYZE, (_, params: QualityAnalyzeParams) =>
+		runQualityAnalysis(params?.projectId, params?.files),
 	);
-}
-
-/**
- * Run quality analysis using Python backend
- */
-async function runQualityAnalysis(
-	files: string[],
-	projectDir: string,
-	backendPath: string,
-	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-): Promise<any> {
-	const env = await pythonRunnerEnv(backendPath);
-	return new Promise((resolve, reject) => {
-		// Build command to run quality_cli.py
-		const scriptPath = path.join(backendPath, "..", "..", "quality_cli.py");
-
-		const args = [
-			scriptPath,
-			"score",
-			"--files",
-			...files,
-			"--project-dir",
-			projectDir,
-			"--format",
-			"json",
-		];
-
-		logger.debug("Running quality analysis", { command: "python", args });
-
-		const proc = spawn("python", args, {
-			cwd: projectDir,
-			env,
-		});
-
-		let stdout = "";
-		let stderr = "";
-
-		proc.stdout.on("data", (data) => {
-			stdout += data.toString();
-		});
-
-		proc.stderr.on("data", (data) => {
-			stderr += data.toString();
-			logger.warn("Quality analysis stderr", { stderr: data.toString() });
-		});
-
-		proc.on("close", (code) => {
-			if (code !== 0 && code !== 1) {
-				// Code 1 is OK (means quality failed but analysis succeeded)
-				logger.error("Quality analysis failed", { code, stderr });
-				reject(
-					new Error(`Quality analysis failed with code ${code}: ${stderr}`),
-				);
-				return;
-			}
-
-			try {
-				// Parse JSON output from stdout
-				// The script outputs the JSON after the initial message
-				const jsonStart = stdout.indexOf("{");
-				if (jsonStart === -1) {
-					throw new Error("No JSON output found");
-				}
-
-				const jsonStr = stdout.substring(jsonStart);
-				const result = JSON.parse(jsonStr);
-
-				logger.info("Quality analysis completed", {
-					score: result.overall_score,
-					grade: result.grade,
-					issues: result.total_issues,
-				});
-
-				resolve(result);
-			} catch (error) {
-				logger.error("Failed to parse quality analysis output", {
-					error,
-					stdout,
-				});
-				reject(new Error(`Failed to parse output: ${error}`));
-			}
-		});
-
-		proc.on("error", (error) => {
-			logger.error("Failed to spawn quality analysis process", error);
-			reject(error);
-		});
-	});
+	ipcMain.handle(IPC_CHANNELS.QUALITY_ANALYZE_PR, (_, params: QualityAnalyzePRParams) =>
+		runQualityAnalysis(params?.projectId, params?.changedFiles),
+	);
 }

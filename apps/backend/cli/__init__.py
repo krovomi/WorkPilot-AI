@@ -13,6 +13,18 @@ This package provides a modular CLI structure:
 - utils.py: Shared utilities and configuration
 """
 
-from .main import main
-
 __all__ = ["main"]
+
+
+def __getattr__(name: str):
+    # Loaded on first use, not on import: `python -m cli.main` (the streaming
+    # server) imports this package first, and a cli.main already in
+    # sys.modules by then makes runpy warn (RuntimeWarning).
+    if name == "main":
+        from .main import main as entry_point
+
+        # Importing the submodule bound `cli.main` to the module: rebind the
+        # name to the function, as the eager import used to.
+        globals()["main"] = entry_point
+        return entry_point
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

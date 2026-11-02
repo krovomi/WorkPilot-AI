@@ -6,6 +6,7 @@
  * - Open terminal with installation command
  */
 
+import { debugLog } from "../../shared/utils/debug-logger";
 import { execFile, execFileSync, spawn } from "node:child_process";
 import { existsSync, promises as fsPromises, readFileSync } from "node:fs";
 import { mkdir, rename, unlink } from "node:fs/promises";
@@ -30,7 +31,7 @@ import { getUsageMonitor } from "../claude-profile/usage-monitor";
 import { getClaudeProfileManager } from "../claude-profile-manager";
 import {
 	clearToolCache,
-	configureTools,
+	updateToolConfig,
 	type ExecFileAsyncOptionsWithVerbatim,
 	getClaudeDetectionPaths,
 	getToolInfo,
@@ -38,6 +39,7 @@ import {
 } from "../cli-tool-manager";
 import { isLinux, isMacOS, isWindows } from "../platform";
 import { readSettingsFile, writeSettingsFile } from "../settings-utils";
+import { coalesceInFlight } from "../utils/coalesce-in-flight";
 import { isValidConfigDir } from "../utils/config-path-validator";
 import { isSecurePath } from "../utils/windows-paths";
 
@@ -1773,9 +1775,9 @@ export function registerClaudeCodeHandlers(): void {
 	ipcMain.handle(
 		IPC_CHANNELS.CLAUDE_CODE_CHECK_VERSION,
 
-		async (): Promise<IPCResult<ClaudeCodeVersionInfo>> => {
+		coalesceInFlight(async (): Promise<IPCResult<ClaudeCodeVersionInfo>> => {
 			try {
-				console.warn("[Claude Code] Checking version...");
+				debugLog("[Claude Code] Checking version...");
 
 				// Get installed version via cli-tool-manager
 
@@ -1785,7 +1787,7 @@ export function registerClaudeCodeHandlers(): void {
 				try {
 					detectionResult = getToolInfo("claude");
 
-					console.warn(
+					debugLog(
 						"[Claude Code] Detection result:",
 						JSON.stringify(detectionResult, null, 2),
 					);
@@ -1894,7 +1896,8 @@ export function registerClaudeCodeHandlers(): void {
 						if (!installed || installed === "unknown") {
 							try {
 								const shellOut = (
-									await execFileAsync("claude", ["--version"], {
+									// No args array with shell:true (DEP0190)
+									await execFileAsync("claude --version", {
 										encoding: "utf-8",
 										timeout: 5000,
 										windowsHide: true,
@@ -1907,7 +1910,7 @@ export function registerClaudeCodeHandlers(): void {
 									if (!detectionResult.found) {
 										detectionResult = { ...detectionResult, found: true };
 									}
-									console.warn("[Claude Code] Version from shell:", installed);
+									debugLog("[Claude Code] Version from shell:", installed);
 								}
 							} catch (e) {
 								console.warn("[Claude Code] shell fallback failed:", e);
@@ -1916,7 +1919,7 @@ export function registerClaudeCodeHandlers(): void {
 					}
 				}
 
-				console.warn("[Claude Code] Installed version:", installed);
+				debugLog("[Claude Code] Installed version:", installed);
 
 				// Fetch latest version from npm
 				// Pass installed version to invalidate cache if installed > cached (handles CLI update while app running)
@@ -1924,11 +1927,11 @@ export function registerClaudeCodeHandlers(): void {
 				let latest: string;
 
 				try {
-					console.warn("[Claude Code] Fetching latest version from npm...");
+					debugLog("[Claude Code] Fetching latest version from npm...");
 
 					latest = await fetchLatestVersion(installed);
 
-					console.warn("[Claude Code] Latest version:", latest);
+					debugLog("[Claude Code] Latest version:", latest);
 				} catch (error) {
 					console.warn(
 						"[Claude Code] Failed to fetch latest version, continuing with unknown:",
@@ -1974,7 +1977,7 @@ export function registerClaudeCodeHandlers(): void {
 					}
 				}
 
-				console.warn("[Claude Code] Check complete:", {
+				debugLog("[Claude Code] Check complete:", {
 					installed,
 					latest,
 					isOutdated,
@@ -2007,7 +2010,7 @@ export function registerClaudeCodeHandlers(): void {
 					error: `Failed to check Claude Code version: ${errorMsg}`,
 				};
 			}
-		},
+		}),
 	);
 
 	// Silent install/update of Claude Code — runs in background, no terminal.
@@ -2356,17 +2359,14 @@ export function registerClaudeCodeHandlers(): void {
 
 				const mergedSettings = {
 					...DEFAULT_APP_SETTINGS,
-
 					...currentSettings,
-
 					claudePath: normalizedPath,
 				} as Record<string, unknown>;
 
 				writeSettingsFile(mergedSettings);
 
 				// Update CLI tool manager cache
-
-				configureTools({ claudePath: normalizedPath });
+				updateToolConfig({ claudePath: normalizedPath });
 
 				return {
 					success: true,
@@ -2749,5 +2749,5 @@ export function registerClaudeCodeHandlers(): void {
 		}
 	});
 
-	console.warn("[IPC] Claude Code handlers registered");
+	debugLog("[IPC] Claude Code handlers registered");
 }
