@@ -30,15 +30,10 @@ import {
 	type ServerAccessTokenCreated,
 } from "../../../shared/types/board-mcp";
 import { httpSnippet } from "../../../shared/utils/board-mcp-http";
+import { formatAppDate } from "../../lib/date-format";
 
 const DURATIONS = [30, 90, 365] as const;
 type Scope = ServerAccessToken["scope"];
-
-function day(value: string | null, locale: string): string {
-	if (!value) return "";
-	const date = new Date(value);
-	return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString(locale);
-}
 
 function CopyButton({ text, label }: { readonly text: string; readonly label: string }) {
 	const [copied, setCopied] = useState(false);
@@ -126,7 +121,7 @@ function CreatedToken({
 }
 
 export function ServerMcpSettings() {
-	const { t, i18n } = useTranslation("settings");
+	const { t } = useTranslation("settings");
 	const [tokens, setTokens] = useState<ServerAccessToken[]>([]);
 	const [name, setName] = useState("");
 	const [scope, setScope] = useState<Scope>("read");
@@ -259,12 +254,10 @@ export function ServerMcpSettings() {
 									{t(`serverMcp.scope.${token.scope}`)}
 								</Badge>
 								<span className="text-xs text-muted-foreground">
-									{t("serverMcp.list.expires", { date: day(token.expiresAt, i18n.language) })}
+									{t("serverMcp.list.expires", { date: formatAppDate(token.expiresAt) })}
 									{" · "}
 									{token.lastUsedAt
-										? t("serverMcp.list.lastUsed", {
-												date: day(token.lastUsedAt, i18n.language),
-											})
+										? t("serverMcp.list.lastUsed", { date: formatAppDate(token.lastUsedAt) })
 										: t("serverMcp.list.neverUsed")}
 								</span>
 								<Button
