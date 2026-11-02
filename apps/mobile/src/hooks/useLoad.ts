@@ -8,6 +8,8 @@ export interface Loaded<T> {
 	loading: boolean;
 	refreshing: boolean;
 	reload(): Promise<void>;
+	/** Read again without the pull-to-refresh spinner: for background polling. */
+	refresh(): Promise<void>;
 }
 
 export function useLoad<T>(load: () => Promise<T>): Loaded<T> {
@@ -42,5 +44,5 @@ export function useLoad<T>(load: () => Promise<T>): Loaded<T> {
 		setRefreshing(false);
 	}, [run]);
 
-	return { data, error, loading, refreshing, reload };
+	return { data, error, loading, refreshing, reload, refresh: run };
 }
