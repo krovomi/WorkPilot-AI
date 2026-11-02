@@ -41,6 +41,7 @@ import {
 } from "./performance-profiler-store";
 import { setupPairRealtimeListeners } from "./phase35-stores";
 import { setupPipelineGeneratorListeners } from "./pipeline-generator-store";
+import { setupPrFollowupListeners } from "./pr-followup-store";
 import { setupPromptOptimizerListeners } from "./prompt-optimizer-store";
 import { setupRegressionGuardianListeners } from "./regression-guardian-store";
 import { setupReleaseCoordinatorListeners } from "./release-coordinator-store";
@@ -111,6 +112,8 @@ const SETUPS: ReadonlyArray<readonly [string, ListenerSetup]> = [
 	["PairRealtime", setupPairRealtimeListeners],
 	["PerformanceProfiler", setupPerformanceProfilerListeners],
 	["PipelineGenerator", setupPipelineGeneratorListeners],
+	// A task's PR follow-through, for its card and the panel's banner.
+	["PrFollowup", setupPrFollowupListeners],
 	["PromptOptimizer", setupPromptOptimizerListeners],
 	["RegressionGuardian", setupRegressionGuardianListeners],
 	["ReleaseCoordinator", setupReleaseCoordinatorListeners],
