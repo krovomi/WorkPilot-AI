@@ -2,11 +2,12 @@
  * @vitest-environment jsdom
  */
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import "../../../shared/i18n";
 import type { PrFollowupStatus, Task } from "../../../shared/types";
+import { usePrFollowupStore } from "../../stores/pr-followup-store";
 import { PrFollowupCard } from "./PrFollowupCard";
 
 const task: Task = {
@@ -51,6 +52,7 @@ Object.defineProperty(window, "electronAPI", { value: api, writable: true });
 describe("PrFollowupCard", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		usePrFollowupStore.setState({ byTask: {} });
 		api.getPrFollowupStatus.mockResolvedValue({ success: true, data: { running: false } });
 		api.onPrFollowupEvent.mockReturnValue(() => {
 			/* unsubscribe noop */
@@ -85,5 +87,15 @@ describe("PrFollowupCard", () => {
 		render(<PrFollowupCard task={task} />);
 		fireEvent.click(screen.getByRole("button", { name: "Follow the PR" }));
 		expect(await screen.findByText("Python environment not ready")).toBeInTheDocument();
+	});
+
+	it("follows the status the event stream puts in the store", async () => {
+		api.getPrFollowupStatus.mockResolvedValue({ success: false });
+		render(<PrFollowupCard task={task} />);
+		await waitFor(() => expect(api.getPrFollowupStatus).toHaveBeenCalledWith("task-1"));
+		act(() => usePrFollowupStore.getState().set("task-1", reverted));
+		expect(
+			await screen.findByText("Fix undone: it weakened a test or the pipeline"),
+		).toBeInTheDocument();
 	});
 });

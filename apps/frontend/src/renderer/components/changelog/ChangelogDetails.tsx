@@ -52,6 +52,8 @@ interface Step2ConfigureGenerateProps {
 	readonly onSave: () => void;
 	readonly onCopy: () => void;
 	readonly onChangelogEdit: (content: string) => void;
+	/** A server project: saving keeps the shared changelog on the server. */
+	readonly serverProject?: boolean;
 }
 
 export function Step2ConfigureGenerate(props: Step2ConfigureGenerateProps) {
@@ -122,6 +124,7 @@ export function Step2ConfigureGenerate(props: Step2ConfigureGenerateProps) {
 				projectPath={selectedProject?.path}
 				onSave={props.onSave}
 				onCopy={props.onCopy}
+				serverProject={props.serverProject}
 				onChangelogEdit={onChangelogEdit}
 				onPaste={imageUpload.handlePaste}
 				onDragOver={imageUpload.handleDragOver}
@@ -138,6 +141,7 @@ interface Step3ReleaseArchiveProps {
 	readonly selectedTaskIds: string[];
 	readonly doneTasks: ChangelogTask[];
 	readonly generatedChangelog: string;
+	readonly serverProject?: boolean;
 	readonly onDone: () => void;
 }
 

@@ -228,7 +228,6 @@
   "apps/frontend/src/renderer/components/task-detail/TaskChangeGraph.tsx": 1,
   "apps/frontend/src/renderer/components/task-detail/TaskLogs.tsx": 4,
   "apps/frontend/src/renderer/components/task-detail/TaskMetadata.tsx": 10,
-  "apps/frontend/src/renderer/components/task-detail/TaskOverview.tsx": 1,
   "apps/frontend/src/renderer/components/task-detail/TaskSubtasks.tsx": 1,
   "apps/frontend/src/renderer/components/task-detail/TaskVerify.tsx": 2,
   "apps/frontend/src/renderer/components/task-detail/task-review/ConflictDetailsDialog.tsx": 1,

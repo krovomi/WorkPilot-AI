@@ -50,7 +50,8 @@ export type AnalysisKind =
 	| "i18n"
 	| "doc-drift"
 	| "flaky-tests"
-	| "tech-debt";
+	| "tech-debt"
+	| "changelog";
 
 interface FeatureFiles {
 	directory: string;
