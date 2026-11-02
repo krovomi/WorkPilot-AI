@@ -523,6 +523,7 @@
 		"pickProject": "Créer une carte dans quel projet ?",
 		"nothing": "Rien pour faire une carte : partagez un texte ou un lien.",
 		"back": "Retour aux projets"
+	},
 	"lock": {
 		"title": "WorkPilot AI est verrouillé",
 		"unlock": "Déverrouiller",
