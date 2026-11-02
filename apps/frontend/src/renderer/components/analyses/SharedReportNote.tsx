@@ -13,7 +13,7 @@ export function SharedReportNote({
 	const date = new Date(saved.finishedAt);
 	if (Number.isNaN(date.getTime())) return null;
 	return (
-		<p className="text-xs text-(--text-secondary)">
+		<p className="text-xs text-muted-foreground">
 			{t("sharedAnalysis.lastReport", { date: formatAppDateTime(date) })}
 		</p>
 	);

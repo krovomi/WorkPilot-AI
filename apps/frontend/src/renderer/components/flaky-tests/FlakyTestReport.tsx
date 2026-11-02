@@ -31,7 +31,7 @@ type T = (key: string, opts?: Record<string, unknown>) => string;
 const CONFIDENCE_STYLES: Record<FlakyConfidence, string> = {
 	high: "text-red-400 bg-red-500/10",
 	medium: "text-yellow-400 bg-yellow-500/10",
-	low: "text-(--text-secondary) bg-(--bg-secondary)",
+	low: "text-muted-foreground bg-card",
 };
 
 const ERROR_CODES = ["no_command", "no_results", "start_failed"] as const;
@@ -92,10 +92,10 @@ export function FlakyTestReport({
 	}, [projectPath, detectedFor, detectCommands]);
 
 	return (
-		<div className="flex flex-col gap-5 p-6 max-w-5xl bg-(--bg-primary) text-(--text-primary)">
+		<div className="flex flex-col gap-5 p-6 max-w-5xl bg-background text-foreground">
 			<header>
 				<h1 className="text-xl font-semibold">{t("title")}</h1>
-				<p className="text-sm text-(--text-secondary) mt-1">
+				<p className="text-sm text-muted-foreground mt-1">
 					{t("description")}
 				</p>
 			</header>
@@ -112,7 +112,7 @@ export function FlakyTestReport({
 					t={t}
 				/>
 			) : (
-				<p className="text-sm text-(--text-secondary)">{t("errors.noProject")}</p>
+				<p className="text-sm text-muted-foreground">{t("errors.noProject")}</p>
 			)}
 
 			{!isScanning && <SharedReportNote saved={shared} />}
@@ -126,7 +126,7 @@ export function FlakyTestReport({
 			) : (
 				phase === "idle" &&
 				projectPath && (
-					<p className="text-sm text-(--text-secondary)">{t("noData")}</p>
+					<p className="text-sm text-muted-foreground">{t("noData")}</p>
 				)
 			)}
 		</div>
@@ -165,14 +165,14 @@ function RunPanel({
 	const canRun = !isScanning && (remote || commands.length > 0);
 
 	return (
-		<section className="rounded-lg border border-(--border-color) p-4 flex flex-col gap-4">
+		<section className="rounded-lg border border-border p-4 flex flex-col gap-4">
 			<h2 className="text-sm font-semibold">{t("run.title")}</h2>
 
 			{!known && (
-				<p className="text-sm text-(--text-secondary)">{t("run.detecting")}</p>
+				<p className="text-sm text-muted-foreground">{t("run.detecting")}</p>
 			)}
 			{known && remote && (
-				<p className="text-sm text-(--text-secondary)">{t("run.remote")}</p>
+				<p className="text-sm text-muted-foreground">{t("run.remote")}</p>
 			)}
 			{known && !remote && commands.length === 0 && (
 				<p className="text-sm text-yellow-400">{t("run.noCommand")}</p>
@@ -218,7 +218,7 @@ function RunPanel({
 				</div>
 			</div>
 
-			<p className="text-xs text-(--text-secondary)">{t("run.help")}</p>
+			<p className="text-xs text-muted-foreground">{t("run.help")}</p>
 
 			<div className="flex flex-wrap items-center gap-3">
 				{isScanning ? (
@@ -280,14 +280,14 @@ function ActivityView({
 	const done = activity.finished.length;
 	return (
 		<section className="flex flex-col gap-3" aria-live="polite">
-			<p className="text-sm text-(--text-secondary) animate-pulse">
+			<p className="text-sm text-muted-foreground animate-pulse">
 				{activityText(activity, status, t)}
 			</p>
 			{activity.mode === "run" && activity.runs > 0 && (
 				<Progress value={(done / activity.runs) * 100} animated />
 			)}
 			{done > 0 && (
-				<ul className="text-xs text-(--text-secondary) space-y-1 font-mono">
+				<ul className="text-xs text-muted-foreground space-y-1 font-mono">
 					{activity.finished.map((r) => (
 						<li key={r.run}>
 							{r.passed + r.failed === 0
@@ -324,7 +324,7 @@ function ErrorView({
 		<section className="rounded-lg border border-red-500/30 bg-red-500/5 p-4 flex flex-col gap-2">
 			<p className="text-sm text-red-400">{t(`errors.${code}`)}</p>
 			{output.trim() && (
-				<pre className="text-xs font-mono whitespace-pre-wrap max-h-64 overflow-auto text-(--text-secondary)">
+				<pre className="text-xs font-mono whitespace-pre-wrap max-h-64 overflow-auto text-muted-foreground">
 					{output.trim()}
 				</pre>
 			)}
@@ -362,9 +362,9 @@ function ReportBody({
 	if (code === "no_reports") {
 		const command = report.detectedCommands?.[0]?.command;
 		return (
-			<section className="rounded-lg border border-dashed border-(--border-color) p-6 text-center flex flex-col gap-2">
+			<section className="rounded-lg border border-dashed border-border p-6 text-center flex flex-col gap-2">
 				<p className="text-sm font-medium">{t("empty.noReports")}</p>
-				<p className="text-sm text-(--text-secondary)">
+				<p className="text-sm text-muted-foreground">
 					{command
 						? t("empty.noReportsHint", { command })
 						: t("empty.noReportsHintGeneric")}
@@ -379,7 +379,7 @@ function ReportBody({
 
 	return (
 		<div className="flex flex-col gap-4">
-			<p className="text-sm text-(--text-secondary)">{summaryText(report, t)}</p>
+			<p className="text-sm text-muted-foreground">{summaryText(report, t)}</p>
 
 			{fewRuns && (
 				<p className="text-sm text-yellow-400">
@@ -394,7 +394,7 @@ function ReportBody({
 				{report.flakyTests.map((test) => (
 					<div
 						key={test.testName}
-						className="px-4 py-3 rounded-lg border border-(--border-color) hover:bg-(--bg-secondary) transition-colors"
+						className="px-4 py-3 rounded-lg border border-border hover:bg-card transition-colors"
 					>
 						<div className="flex items-start justify-between gap-3 mb-1">
 							<p className="text-sm font-medium font-mono break-all">{test.testName}</p>
@@ -404,7 +404,7 @@ function ReportBody({
 								{t(`confidenceLevel.${test.confidence}`)}
 							</span>
 						</div>
-						<div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-(--text-secondary)">
+						<div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
 							<span>
 								{t("failedRuns", {
 									failures: test.failures,
@@ -421,10 +421,10 @@ function ReportBody({
 						</p>
 						{test.errorPatterns[0] && (
 							<details className="mt-2 text-xs">
-								<summary className="cursor-pointer text-(--text-secondary)">
+								<summary className="cursor-pointer text-muted-foreground">
 									{t("errorSample")}
 								</summary>
-								<pre className="mt-1 font-mono whitespace-pre-wrap text-(--text-secondary)">
+								<pre className="mt-1 font-mono whitespace-pre-wrap text-muted-foreground">
 									{test.errorPatterns[0]}
 								</pre>
 							</details>
@@ -434,11 +434,11 @@ function ReportBody({
 			</div>
 
 			{alwaysFailing.length > 0 && (
-				<details className="rounded-lg border border-(--border-color) px-4 py-3">
+				<details className="rounded-lg border border-border px-4 py-3">
 					<summary className="cursor-pointer text-sm font-medium">
 						{t("alwaysFailing.title", { count: alwaysFailing.length })}
 					</summary>
-					<p className="text-xs text-(--text-secondary) mt-2">
+					<p className="text-xs text-muted-foreground mt-2">
 						{t("alwaysFailing.description")}
 					</p>
 					<ul className="mt-2 space-y-1 text-xs font-mono break-all">

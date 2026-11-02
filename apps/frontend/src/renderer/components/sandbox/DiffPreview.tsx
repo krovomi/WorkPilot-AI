@@ -42,11 +42,11 @@ export function DiffPreview({
 	}
 
 	return (
-		<div className="flex h-full bg-(--bg-primary) text-(--text-primary)">
+		<div className="flex h-full bg-background text-foreground">
 			{/* File list sidebar */}
-			<div className="w-64 border-r border-(--border-color) overflow-y-auto">
-				<div className="px-3 py-2 border-b border-(--border-color)">
-					<p className="text-xs text-(--text-secondary)">
+			<div className="w-64 border-r border-border overflow-y-auto">
+				<div className="px-3 py-2 border-b border-border">
+					<p className="text-xs text-muted-foreground">
 						{t("sandbox:diffPreview.filesChanged", { count: diffs.length })}
 					</p>
 					<p className="text-xs">
@@ -60,9 +60,9 @@ export function DiffPreview({
 						key={diff.filePath}
 						type="button"
 						onClick={() => handleSelect(diff.filePath)}
-						className={`w-full text-left px-3 py-2 text-xs hover:bg-(--bg-secondary) flex items-center gap-2 transition-colors ${
+						className={`w-full text-left px-3 py-2 text-xs hover:bg-card flex items-center gap-2 transition-colors ${
 							diff.filePath === selectedFile
-								? "bg-(--bg-secondary)"
+								? "bg-card"
 								: ""
 						}`}
 					>
@@ -100,9 +100,9 @@ export function DiffPreview({
 							{activeDiff.hunks.map((hunk, _idx) => (
 								<div
 									key={`${activeDiff.filePath}-hunk-${hunk.oldStart}-${hunk.oldCount}-${hunk.newStart}-${hunk.newCount}`}
-									className="rounded-lg border border-(--border-color) overflow-hidden"
+									className="rounded-lg border border-border overflow-hidden"
 								>
-									<div className="px-3 py-1 text-xs bg-(--bg-secondary) text-(--text-secondary) font-mono">
+									<div className="px-3 py-1 text-xs bg-card text-muted-foreground font-mono">
 										@@ -{hunk.oldStart},{hunk.oldCount} +
 										{hunk.newStart},{hunk.newCount} @@
 									</div>
@@ -131,7 +131,7 @@ export function DiffPreview({
 						</div>
 					</div>
 				) : (
-					<div className="flex items-center justify-center h-full text-(--text-secondary)">
+					<div className="flex items-center justify-center h-full text-muted-foreground">
 						{t("sandbox:diffPreview.selectFile")}
 					</div>
 				)}

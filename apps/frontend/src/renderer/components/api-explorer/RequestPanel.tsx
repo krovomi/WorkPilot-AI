@@ -1710,7 +1710,7 @@ export function LangDropdown({
 									onChange(lang);
 									setOpen(false);
 								}}
-								className={`flex items-center gap-1.5 w-full px-2.5 py-1.5 text-[11px] text-left transition-colors hover:bg-(--color-bg-secondary) ${
+								className={`flex items-center gap-1.5 w-full px-2.5 py-1.5 text-[11px] text-left transition-colors hover:bg-card ${
 									lang === value
 										? "text-[var(--color-primary)]"
 										: "text-muted-foreground"
