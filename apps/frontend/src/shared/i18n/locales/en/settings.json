@@ -2823,5 +2823,35 @@
 		"empty": "No issues found",
 		"deselectAll": "Deselect all",
 		"selectAll": "Select all"
+	},
+	"boardMcp": {
+		"navLabel": "Use from other apps",
+		"title": "Use this project from other AI apps",
+		"description": "Claude Code, Codex, Gemini CLI, GitHub Copilot, Cursor, Claude Desktop, Windsurf or OpenCode can read this project's board and add cards to it, through the workpilot-board MCP server.",
+		"intro": "Each app starts the server itself, on this computer, under the name {{name}}. Add it to an app with one click, or copy what to paste when the app cannot be written to.",
+		"limits": "The server lists and reads cards, adds a card to the backlog and waits until a card is ready for your review. Starting a build, approving a plan and merging stay with you, on the card.",
+		"loading": "Looking for your AI apps…",
+		"add": "Add",
+		"update": "Update",
+		"remove": "Remove",
+		"copy": "Copy the configuration",
+		"showSnippet": "Show what to paste",
+		"hideSnippet": "Hide",
+		"location": "Configuration: {{location}}",
+		"restartHint": "Restart the app (or open a new session) for it to see the server.",
+		"state": {
+			"current": "Added",
+			"stale": "Out of date",
+			"absent": "Not added",
+			"notDetected": "Not detected"
+		},
+		"errors": {
+			"server_project": "A server project is shared through the team server: its MCP access comes with the server's access tokens.",
+			"python_not_ready": "The app's Python environment is not ready yet. Try again in a moment.",
+			"config_unreadable": "This app's configuration file could not be read (invalid JSON or comments). Nothing was changed: paste the configuration by hand.",
+			"client_not_found": "This app was not found on this computer. Copy the configuration instead.",
+			"claude_not_found": "The claude command could not be run from here. Paste the command in a terminal instead.",
+			"generic": "Could not do it: {{detail}}"
+		}
 	}
 }
