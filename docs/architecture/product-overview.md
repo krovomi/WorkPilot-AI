@@ -48,7 +48,8 @@ WorkPilot AI is a desktop application (+ CLI) where users describe a goal and AI
 - **Test Generation** — Automated test creation for existing code
 - **Conflict Predictor** — AI-powered git conflict prediction
 - **Arena Mode** — Compare AI model outputs side-by-side
-- **MCP Marketplace** — Browse and install Model Context Protocol servers
+- **MCP Marketplace** — 37 verified MCP servers (GitHub, GitLab, Azure DevOps, Linear, Jira, Notion, Sentry, Playwright, Microsoft Learn, PostgreSQL…), installed into a project and its agents in one click
+- **Plugin Marketplace** — 24 ready-made skills (security audit, .NET Clean Architecture, EF Core review, xUnit tests, ADR, user stories…) installed into the project's `.agents/skills`
 - **Multi-Tenancy & RBAC** — In server mode, one deployment serves several isolated organizations, with fine-grained `domain.action` permissions composed into built-in and custom roles, an administration console (members, roles, organizations, invitations, audit, quotas) and a per-tenant control dashboard
 - **Flexible Authentication** — Use a Claude Code subscription (OAuth) or API profiles with any Anthropic-compatible endpoint (e.g., Anthropic API, z.ai for GLM models)
 - **Multi-Account Swapping** — Register multiple Claude accounts; when one hits a rate limit, WorkPilot AI automatically switches to an available account
@@ -149,13 +150,13 @@ it, inside its hub. The hubs are listed in
 | `guardrails` | Agent Guardrails | Toolbox | — |  |
 | `i18n-agent` | i18n Scan | Toolbox | — |  |
 | `injection-guard` | Injection Guard | Toolbox | — |  |
-| `mcp-marketplace` | MCP Marketplace | Toolbox › MCP tools | — | yes |
+| `mcp-marketplace` | MCP Marketplace | Toolbox › MCP tools | [marketplaces.md](marketplaces.md) |  |
 | `migration` | Code Migration | Toolbox | — |  |
 | `notebook-agent` | Notebook Checks | Toolbox | — | yes |
 | `offline-mode` | Offline Mode | Toolbox | [offline-mode.md](offline-mode.md) |  |
 | `onboarding-agent` | Onboarding Pack | Development › Onboarding | — |  |
 | `pipeline-generator` | Pipeline Generator | Toolbox | — | yes |
-| `plugin-marketplace` | Plugin Marketplace | Toolbox › MCP tools | — | yes |
+| `plugin-marketplace` | Plugin Marketplace | Toolbox › MCP tools | [marketplaces.md](marketplaces.md) |  |
 | `prompt-optimizer` | Prompt Optimizer | Toolbox | — |  |
 | `regression-guardian` | Regression Guardian | Toolbox | — | yes |
 | `sandbox` | Change Preview | Toolbox | — |  |

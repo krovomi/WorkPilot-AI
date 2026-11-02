@@ -1,7 +1,9 @@
 /**
  * Plugin Marketplace Store
  *
- * Zustand store for the Plugin Marketplace feature.
+ * Zustand store for the Plugin Marketplace. A plugin installs as a skill of
+ * the selected project (`.agents/skills/<id>/` and `.claude/skills/<id>/`), so
+ * "installed" is read from that project's folders by the main process.
  */
 
 import { create } from "zustand";
@@ -13,101 +15,61 @@ import type {
 } from "../../shared/types/plugin-marketplace";
 
 interface PluginMarketplaceState {
-	// UI state
 	activeTab: PluginMarketplaceTab;
 	filters: PluginMarketplaceFilters;
-	selectedPluginId: string | null;
 	isInstalling: string | null;
 
-	// Data
 	catalog: MarketplacePlugin[];
+	/** Project whose skills `installed` lists */
+	projectId: string | null;
 	installed: InstalledPlugin[];
 
-	// Loading
 	isCatalogLoading: boolean;
 	isInstalledLoading: boolean;
 	error: string | null;
 
-	// Actions - UI
 	setActiveTab: (tab: PluginMarketplaceTab) => void;
 	setFilters: (filters: Partial<PluginMarketplaceFilters>) => void;
-	setSelectedPlugin: (pluginId: string | null) => void;
-
-	// Actions - Data
 	setCatalog: (catalog: MarketplacePlugin[]) => void;
-	setInstalled: (installed: InstalledPlugin[]) => void;
-	addInstalledPlugin: (plugin: InstalledPlugin) => void;
-	removeInstalledPlugin: (pluginId: string) => void;
-	updateInstalledPlugin: (
-		pluginId: string,
-		updates: Partial<InstalledPlugin>,
-	) => void;
-
-	// Actions - Loading
+	setInstalled: (projectId: string | null, installed: InstalledPlugin[]) => void;
 	setIsInstalling: (pluginId: string | null) => void;
 	setCatalogLoading: (loading: boolean) => void;
 	setInstalledLoading: (loading: boolean) => void;
 	setError: (error: string | null) => void;
 
-	// Computed helpers
 	getFilteredCatalog: () => MarketplacePlugin[];
 	isPluginInstalled: (pluginId: string) => boolean;
-	getInstalledPlugin: (pluginId: string) => InstalledPlugin | undefined;
 }
 
 const defaultFilters: PluginMarketplaceFilters = {
 	search: "",
 	type: "all",
-	sortBy: "popular",
+	sortBy: "featured",
 	showInstalledOnly: false,
-	showVerifiedOnly: false,
 };
 
 export const usePluginMarketplaceStore = create<PluginMarketplaceState>(
 	(set, get) => ({
-		// Initial state
 		activeTab: "catalog",
 		filters: { ...defaultFilters },
-		selectedPluginId: null,
 		isInstalling: null,
 		catalog: [],
+		projectId: null,
 		installed: [],
 		isCatalogLoading: false,
 		isInstalledLoading: false,
 		error: null,
 
-		// UI Actions
 		setActiveTab: (tab) => set({ activeTab: tab }),
 		setFilters: (updates) =>
 			set((state) => ({ filters: { ...state.filters, ...updates } })),
-		setSelectedPlugin: (pluginId) => set({ selectedPluginId: pluginId }),
-
-		// Data Actions
 		setCatalog: (catalog) => set({ catalog }),
-		setInstalled: (installed) => set({ installed }),
-
-		addInstalledPlugin: (plugin) =>
-			set((state) => ({ installed: [...state.installed, plugin] })),
-
-		removeInstalledPlugin: (pluginId) =>
-			set((state) => ({
-				installed: state.installed.filter((p) => p.pluginId !== pluginId),
-			})),
-
-		updateInstalledPlugin: (pluginId, updates) =>
-			set((state) => ({
-				installed: state.installed.map((p) =>
-					p.pluginId === pluginId ? { ...p, ...updates } : p,
-				),
-			})),
-
-		// Loading Actions
+		setInstalled: (projectId, installed) => set({ projectId, installed }),
 		setIsInstalling: (pluginId) => set({ isInstalling: pluginId }),
 		setCatalogLoading: (loading) => set({ isCatalogLoading: loading }),
 		setInstalledLoading: (loading) => set({ isInstalledLoading: loading }),
 		setError: (error) => set({ error }),
 
-		// Computed helpers
 		getFilteredCatalog: () => {
 			const { catalog, installed, filters } = get();
 			let filtered = [...catalog];
@@ -117,8 +79,10 @@ export const usePluginMarketplaceStore = create<PluginMarketplaceState>(
 				filtered = filtered.filter(
 					(p) =>
 						p.name.toLowerCase().includes(query) ||
-						p.tagline.toLowerCase().includes(query) ||
-						p.description.toLowerCase().includes(query) ||
+						p.tagline.en.toLowerCase().includes(query) ||
+						p.tagline.fr.toLowerCase().includes(query) ||
+						p.description.en.toLowerCase().includes(query) ||
+						p.description.fr.toLowerCase().includes(query) ||
 						p.tags.some((t) => t.toLowerCase().includes(query)),
 				);
 			}
@@ -132,26 +96,9 @@ export const usePluginMarketplaceStore = create<PluginMarketplaceState>(
 				filtered = filtered.filter((p) => installedIds.has(p.id));
 			}
 
-			if (filters.showVerifiedOnly) {
-				filtered = filtered.filter((p) => p.verified);
-			}
-
-			switch (filters.sortBy) {
-				case "popular":
-					filtered.sort((a, b) => b.downloads - a.downloads);
-					break;
-				case "rating":
-					filtered.sort((a, b) => b.rating - a.rating);
-					break;
-				case "newest":
-					filtered.sort(
-						(a, b) =>
-							new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime(),
-					);
-					break;
-				case "name":
-					filtered.sort((a, b) => a.name.localeCompare(b.name));
-					break;
+			// "featured" keeps the catalog's own order.
+			if (filters.sortBy === "name") {
+				filtered.sort((a, b) => a.name.localeCompare(b.name));
 			}
 
 			return filtered;
@@ -159,8 +106,6 @@ export const usePluginMarketplaceStore = create<PluginMarketplaceState>(
 
 		isPluginInstalled: (pluginId) =>
 			get().installed.some((p) => p.pluginId === pluginId),
-		getInstalledPlugin: (pluginId) =>
-			get().installed.find((p) => p.pluginId === pluginId),
 	}),
 );
 
@@ -190,16 +135,22 @@ export async function loadPluginCatalog(): Promise<void> {
 	}
 }
 
-export async function loadInstalledPlugins(): Promise<void> {
+/** Reads which catalog plugins the project has as skills. */
+export async function loadInstalledPlugins(
+	projectId: string | null | undefined,
+): Promise<void> {
 	const store = usePluginMarketplaceStore.getState();
+	if (!projectId) {
+		store.setInstalled(null, []);
+		return;
+	}
 	store.setInstalledLoading(true);
 	try {
 		const result = await globalThis.electronAPI?.invoke(
 			"pluginMarketplace:getInstalled",
+			{ projectId },
 		);
-		if (result?.success) {
-			store.setInstalled(result.data);
-		}
+		store.setInstalled(projectId, result?.success ? result.data : []);
 	} catch (err) {
 		console.error(
 			"[Plugin Marketplace] Failed to load installed plugins:",
@@ -211,21 +162,19 @@ export async function loadInstalledPlugins(): Promise<void> {
 }
 
 export async function installPlugin(
+	projectId: string,
 	pluginId: string,
-	config?: Record<string, string>,
 ): Promise<boolean> {
 	const store = usePluginMarketplaceStore.getState();
 	store.setIsInstalling(pluginId);
+	store.setError(null);
 	try {
 		const result = await globalThis.electronAPI?.invoke(
 			"pluginMarketplace:install",
-			{
-				pluginId,
-				config,
-			},
+			{ projectId, pluginId },
 		);
 		if (result?.success) {
-			store.addInstalledPlugin(result.data);
+			await loadInstalledPlugins(projectId);
 			return true;
 		}
 		store.setError(result?.error || "Installation failed");
@@ -238,37 +187,23 @@ export async function installPlugin(
 	}
 }
 
-export async function uninstallPlugin(pluginId: string): Promise<boolean> {
+export async function uninstallPlugin(
+	projectId: string,
+	pluginId: string,
+): Promise<boolean> {
+	const store = usePluginMarketplaceStore.getState();
 	try {
 		const result = await globalThis.electronAPI?.invoke(
 			"pluginMarketplace:uninstall",
-			{
-				pluginId,
-			},
+			{ projectId, pluginId },
 		);
 		if (result?.success) {
-			usePluginMarketplaceStore.getState().removeInstalledPlugin(pluginId);
+			await loadInstalledPlugins(projectId);
 			return true;
 		}
+		store.setError(result?.error || "Uninstall failed");
 		return false;
 	} catch {
 		return false;
-	}
-}
-
-export async function togglePlugin(
-	pluginId: string,
-	enabled: boolean,
-): Promise<void> {
-	try {
-		await globalThis.electronAPI?.invoke("pluginMarketplace:toggle", {
-			pluginId,
-			enabled,
-		});
-		usePluginMarketplaceStore
-			.getState()
-			.updateInstalledPlugin(pluginId, { enabled });
-	} catch (err) {
-		console.error("[Plugin Marketplace] Failed to toggle plugin:", err);
 	}
 }
