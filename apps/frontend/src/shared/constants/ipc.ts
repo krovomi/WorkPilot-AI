@@ -1047,6 +1047,8 @@ export const IPC_CHANNELS = {
 	BENCH_START: "bench:start",
 	BENCH_STATUS: "bench:status",
 	BLAST_RADIUS_ANALYZE: "blastRadius:analyze",
+	BOARD_MCP_APPLY: "boardMcp:apply",
+	BOARD_MCP_STATUS: "boardMcp:status",
 	BOUNTY_BOARD_LIST_ARCHIVES: "bountyBoard:listArchives",
 	BOUNTY_BOARD_START: "bountyBoard:start",
 	CANCEL_CONFLICT_PREDICTION: "cancel-conflict-prediction",
