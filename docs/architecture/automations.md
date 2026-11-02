@@ -162,7 +162,7 @@ ouvert. Ses règles sont donc enregistrées sur le serveur et exécutées par lu
 ```
 apps/backend/shared_features/automations/
   rules.py      les règles de rules.ts : même schéma, mêmes listes fermées, mêmes bornes
-  store.py      la ligne project_automations (Alembic 0009) : rules, ledger, owners
+  store.py      la ligne project_automations (Alembic 0010) : rules, ledger, owners
   sources.py    issues étiquetées, PR/MR, CI (GitHub Actions, GitLab CI), horloge
   forge_api.py  l'API de la forge du projet, avec le jeton de qui a enregistré la règle
   cards.py      la carte du tableau partagé, écrite par le compte « Automations »

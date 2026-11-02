@@ -1,6 +1,7 @@
 /**
  * The analyses of a server project (server mode): accessibility, i18n,
- * documentation drift, flaky tests, technical debt.
+ * documentation drift, flaky tests, technical debt, and its changelog
+ * (`server-changelog.ts`).
  *
  * A local project's analysis runs its runner on this computer, in the
  * project's folder. A server project has no folder here: its analysis runs
@@ -25,6 +26,7 @@ const PREFIX: Readonly<Record<AnalysisKind, string | null>> = {
 	"doc-drift": "DOC_DRIFT",
 	"flaky-tests": "FLAKY",
 	"tech-debt": null,
+	changelog: "CHANGELOG",
 };
 
 const KINDS = new Set<string>(Object.keys(PREFIX));

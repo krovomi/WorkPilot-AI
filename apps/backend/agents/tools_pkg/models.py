@@ -206,6 +206,16 @@ def is_electron_mcp_enabled() -> bool:
 # discovery); those whose whole input is in their prompt do not. The Claude SDK
 # reaches it over the `workpilot-code` server, every other provider through
 # `tool_executor`, which reads this same declaration.
+#
+# "setting_sources" is what a Claude session loads from disk besides the
+# project (`.claude/`, CLAUDE.md, skills, hooks): "user" adds the person's
+# ~/.claude (their CLAUDE.md, skills, hooks), "local" the project's
+# `.claude/settings.local.json`. A type that does not declare it gets the
+# project only (`setting_sources.py`): the planner, QA, the spec and analysis
+# phases judge the work, and must judge it the same way on every machine.
+
+#: The person's own Claude setup on top of the project's.
+USER_SETTING_SOURCES = ["project", "user", "local"]
 
 AGENT_CONFIGS = {
     # ═══════════════════════════════════════════════════════════════════════
@@ -290,6 +300,10 @@ AGENT_CONFIGS = {
             TOOL_GET_SESSION_CONTEXT,
         ],
         "thinking_default": "none",  # Coding doesn't use extended thinking
+        # The code is written the way its author works: their skills and their
+        # CLAUDE.md. AUTO_CLAUDE_CODER_USER_SETTINGS=false narrows it to the
+        # project; the planner and QA around it never load them.
+        "setting_sources": USER_SETTING_SOURCES,
     },
     # ═══════════════════════════════════════════════════════════════════════
     # QA PHASES (Read + test + browser)

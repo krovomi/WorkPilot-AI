@@ -6,8 +6,9 @@ memories (``context``); its GitHub repository or GitLab project, with each
 person's own token (``forge``, ``forge_gitlab``), and the AI review of its
 pull or merge requests as a job on the clone (``forge_review``); its analyses
 (accessibility, i18n, documentation drift, flaky tests, technical debt) as
-jobs whose reports every member reads (``analyses``); its dashboard,
-analytics, sessions and costs, computed from its runs, its jobs and the
+jobs whose reports every member reads (``analyses``), its changelog among
+them, with the branches, tags and commits it is chosen from (``changelog``);
+its dashboard, analytics, sessions and costs, computed from its runs, its jobs and the
 ledgers its agents keep in the clone (``workspace``, ``usage_ledger``); its
 automation rules, run by the server process (``automations``).
 
@@ -25,9 +26,11 @@ def mount_all(mount: Callable[[APIRouter, str], None]) -> None:
     """Mount each router with ``mount``, naming the feature its permission
     derives from (``server.authz.catalog.FEATURE_DOMAINS``)."""
     from shared_board.api import router as board
+    from shared_board.engines import router as board_engines
     from shared_features.analyses import router as analyses
     from shared_features.api import feature_router
     from shared_features.automations.api import router as automations
+    from shared_features.changelog import router as changelog
     from shared_features.context import router as context
     from shared_features.forge import router as forge
     from shared_features.forge_gitlab import router as forge_gitlab
@@ -39,6 +42,7 @@ def mount_all(mount: Callable[[APIRouter, str], None]) -> None:
     from shared_features.workspace import router as workspace
 
     mount(board, "board")
+    mount(board_engines, "board")
     mount(automations, "board")
     for feature in FEATURES.values():
         mount(feature_router(feature), feature.key)
@@ -51,4 +55,5 @@ def mount_all(mount: Callable[[APIRouter, str], None]) -> None:
     mount(GITHUB.router, "forge")
     mount(GITLAB.router, "forge")
     mount(analyses, "analyses")
+    mount(changelog, "analyses")
     mount(workspace, "workspace")

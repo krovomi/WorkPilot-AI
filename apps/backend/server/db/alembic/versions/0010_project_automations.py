@@ -1,7 +1,7 @@
 """Project automations: a server project's rules and their ledger.
 
-Revision ID: 0009_project_automations
-Revises: 0008_push_devices
+Revision ID: 0010_project_automations
+Revises: 0009_user_preferences
 Create Date: 2026-11-02
 
 One new table, nothing changed in the existing ones. Like ``0005``, the step
@@ -14,8 +14,8 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0009_project_automations"
-down_revision = "0008_push_devices"
+revision = "0010_project_automations"
+down_revision = "0009_user_preferences"
 branch_labels = None
 depends_on = None
 
