@@ -1,17 +1,18 @@
 /**
- * Arena Mode — Blind A/B Model Comparison
+ * Arena Mode — A/B Model Comparison
  *
- * Runs the same task against several real models in parallel, anonymizes the
- * results until the user votes, then accumulates stats for data-driven
- * auto-routing.
+ * Runs the same task against several real models in parallel, shows each
+ * answer under the name of the model that gave it, lets the user vote, then
+ * accumulates stats for data-driven auto-routing.
  *
  * **A contestant is a (provider, model) pair, not a profile.** The arena used
  * to name its contestants by an opaque `profileId` that only the Claude
  * credential store could resolve, and every participant was recorded as
  * `modelName: "Model A", provider: "unknown"` — so the reveal after the vote
  * revealed nothing, and the rankings ranked a label. The identity travels with
- * the participant now, hidden by the UI until the vote, which is what "blind"
- * means: hidden from the *reader*, known to the record.
+ * the participant now, and the UI shows it from the start: the user picked the
+ * models and asked to see which one wrote what. The letter only keys colours
+ * and the vote.
  */
 
 export type ArenaTaskType =
@@ -35,7 +36,7 @@ export type ArenaParticipantStatus =
 	| "completed"
 	| "error";
 
-/** Anonymous label shown during the blind voting phase */
+/** Slot of a contestant in a battle */
 export type ArenaLabel = "A" | "B" | "C" | "D";
 
 /** Where a contender's model id came from. Mirrors the provider catalog. */
@@ -67,17 +68,17 @@ export interface ArenaContender {
 
 /** One contestant in an arena battle */
 export interface ArenaParticipant {
-	/** Anonymous display id (A, B, C…) — the only identity shown before the vote */
+	/** Slot id (A, B, C…): keys the card colour and the vote */
 	label: ArenaLabel;
-	/** `${provider}:${model}` (hidden by the UI until the vote is cast) */
+	/** `${provider}:${model}` */
 	contenderId: string;
-	/** Canonical provider id (hidden until vote is cast) */
+	/** Canonical provider id */
 	provider: string;
-	/** Human-readable provider name (hidden until vote is cast) */
+	/** Human-readable provider name, shown on the card */
 	providerLabel: string;
-	/** Model id as sent to the API (hidden until vote is cast) */
+	/** Model id as sent to the API */
 	model: string;
-	/** Human-readable model name (hidden until vote is cast) */
+	/** Human-readable model name, the card's title */
 	modelName: string;
 	status: ArenaParticipantStatus;
 	/** Streamed output text */

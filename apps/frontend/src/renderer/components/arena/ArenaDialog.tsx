@@ -23,6 +23,7 @@ import {
 	Trophy,
 	X,
 } from "lucide-react";
+import type { TFunction } from "i18next";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ScrollArea } from "@/components/ui";
@@ -83,6 +84,19 @@ type ArenaTab = "battle" | "history" | "analytics" | "routing";
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
+/**
+ * The name a contestant is shown under: the model the user picked. Battles
+ * recorded before contestants carried their identity fall back to the letter.
+ */
+function participantName(
+	participant: ArenaParticipant,
+	t: TFunction,
+): string {
+	const name = participant.modelName?.trim();
+	if (name && !/^Model [A-D]$/.test(name)) return name;
+	return `${t("battle.model")} ${participant.label}`;
+}
+
 function ParticipantCard({
 	participant,
 	battle,
@@ -97,6 +111,11 @@ function ParticipantCard({
 	const { t } = useTranslation("arena");
 	const isWinner = battle.winnerLabel === participant.label;
 	const isRevealed = battle.revealed;
+	// A failed contestant has no answer to judge: its error is shown as an
+	// error, and it cannot be voted for.
+	const isFailed = participant.status === "error";
+	const votable = canVote && !isFailed;
+	const name = participantName(participant, t);
 
 	const getDisplayText = () => {
 		if (participant.status === "waiting") {
@@ -105,7 +124,7 @@ function ParticipantCard({
 		if (participant.status === "running") {
 			return t("battle.generating");
 		}
-		return participant.error || t("battle.noOutput");
+		return t("battle.noOutput");
 	};
 
 	return (
@@ -114,48 +133,46 @@ function ParticipantCard({
 			{/* biome-ignore lint/a11y/useAriaPropsSupportedByRole: ARIA attributes are valid for this role */}
 			{/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: votable arena card */}
 			<div
-				role={canVote ? "button" : undefined}
-				tabIndex={canVote ? 0 : undefined}
+				role={votable ? "button" : undefined}
+				tabIndex={votable ? 0 : undefined}
 				className={cn(
 					"flex flex-col rounded-xl border transition-all duration-300 text-left",
 					isWinner && isRevealed
 						? "border-yellow-500/60 bg-yellow-500/5 shadow-lg shadow-yellow-500/10"
 						: "border-border bg-card",
-					canVote &&
+					isFailed && "border-destructive/40",
+					votable &&
 						"cursor-pointer hover:border-primary/50 hover:bg-accent/30",
-					!canVote && "cursor-default",
+					!votable && "cursor-default",
 				)}
-				onClick={() => canVote && onVote(participant.label)}
+				onClick={() => votable && onVote(participant.label)}
 				onKeyDown={(e) =>
-					canVote &&
+					votable &&
 					(e.key === "Enter" || e.key === " ") &&
 					onVote(participant.label)
 				}
 				aria-label={
-					canVote
-						? `${t("battle.model")} ${participant.label}. ${isWinner && isRevealed ? t("battle.winner") : ""}`
+					votable
+						? `${name}. ${isWinner && isRevealed ? t("battle.winner") : ""}`
 						: undefined
 				}
 			>
 				{/* Header */}
 				<div className="flex items-center justify-between p-3 border-b border-border">
-					<div className="flex items-center gap-2">
+					<div className="flex items-center gap-2 min-w-0">
 						<Badge
 							variant="outline"
 							className={cn(
-								"font-bold text-sm px-2",
+								"font-bold text-sm px-2 truncate",
 								LABEL_COLORS[participant.label],
 							)}
+							title={participant.model || undefined}
 						>
-							{t("battle.model")} {participant.label}
+							{name}
 						</Badge>
-						{isRevealed && (
-							<span className="text-xs text-muted-foreground">
-								{participant.modelName}
-								<span className="opacity-60">
-									{" · "}
-									{participant.providerLabel}
-								</span>
+						{participant.providerLabel && (
+							<span className="text-xs text-muted-foreground truncate">
+								{participant.providerLabel}
 							</span>
 						)}
 					</div>
@@ -178,10 +195,21 @@ function ParticipantCard({
 				{/* Output */}
 				<ScrollArea className="flex-1 max-h-64">
 					<div className="p-3 text-sm font-mono whitespace-pre-wrap text-foreground/90 min-h-[120px]">
-						{participant.output || (
-							<span className="text-muted-foreground italic">
-								{getDisplayText()}
-							</span>
+						{isFailed ? (
+							<div className="flex flex-col gap-2 font-sans">
+								<span className="text-xs font-semibold text-destructive">
+									{t("battle.failed")}
+								</span>
+								<span className="font-mono text-xs text-destructive/90 break-words">
+									{participant.error || t("battle.noOutput")}
+								</span>
+							</div>
+						) : (
+							participant.output || (
+								<span className="text-muted-foreground italic">
+									{getDisplayText()}
+								</span>
+							)
 						)}
 						{participant.status === "running" && (
 							<span className="inline-block w-1.5 h-4 bg-primary animate-pulse ml-0.5 align-middle" />
@@ -223,7 +251,7 @@ function ParticipantCard({
 				</div>
 
 				{/* Vote button */}
-				{canVote && (
+				{votable && (
 					<div className="px-3 pb-3">
 						<Button
 							variant="outline"
@@ -574,7 +602,12 @@ function BattleTab() {
 		});
 	}, []);
 
-	const canVote = activeBattle?.status === "voting";
+	// A vote ranks one answer above another: it takes two that exist. A
+	// contestant that failed is not one of them.
+	const answeredCount =
+		activeBattle?.participants.filter((p) => p.status !== "error").length ?? 0;
+	const canVote = activeBattle?.status === "voting" && answeredCount >= 2;
+	const cannotVote = activeBattle?.status === "voting" && answeredCount < 2;
 	const isRunning = activeBattle?.status === "running";
 
 	return (
@@ -720,6 +753,12 @@ function BattleTab() {
 						<div className="flex items-center gap-2 p-3 rounded-xl border border-yellow-500/40 bg-yellow-500/5 text-sm text-yellow-400">
 							<Trophy className="h-4 w-4 shrink-0" />
 							<span>{t("battle.votePrompt")}</span>
+						</div>
+					)}
+					{cannotVote && (
+						<div className="flex items-center gap-2 p-3 rounded-xl border border-destructive/40 bg-destructive/5 text-sm text-destructive">
+							<AlertCircle className="h-4 w-4 shrink-0" />
+							<span>{t("battle.notEnoughAnswers")}</span>
 						</div>
 					)}
 
@@ -896,20 +935,19 @@ function BattleHistoryRow({ battle }: { readonly battle: ArenaBattle }) {
 							<div className="flex items-center justify-between mb-1">
 								<Badge
 									variant="outline"
-									className={cn("text-xs", LABEL_COLORS[p.label])}
+									className={cn("text-xs truncate", LABEL_COLORS[p.label])}
+									title={p.model || undefined}
 								>
-									{t("battle.model")} {p.label}
+									{participantName(p, t)}
 								</Badge>
 								{battle.winnerLabel === p.label && (
 									<Trophy className="h-3.5 w-3.5 text-yellow-500" />
 								)}
 							</div>
-							{/* A battle still awaiting its vote is still blind: the
-							    history must not reveal what the battle tab hides. */}
 							<p className="text-muted-foreground">
-								{battle.revealed
-									? `${p.modelName} · ${p.providerLabel}`
-									: t("history.hiddenUntilVote")}
+								{p.status === "error"
+									? t("battle.failed")
+									: p.providerLabel}
 							</p>
 							<p className="font-mono text-muted-foreground/70 mt-0.5">
 								{p.usageEstimated ? "~" : ""}
