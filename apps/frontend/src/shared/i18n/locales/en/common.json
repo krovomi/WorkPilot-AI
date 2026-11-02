@@ -908,7 +908,7 @@
 	"delete": "Delete",
 	"mcpMarketplace": {
 		"title": "MCP Marketplace",
-		"subtitle": "The universal integration ecosystem. Discover, install and build MCP servers.",
+		"subtitle": "Connect your agents to your tools: every server in the catalog was checked against its package or vendor docs. Installing adds it to the selected project.",
 		"installedCount": "installed",
 		"refresh": "Refresh",
 		"tabs": {
@@ -928,16 +928,15 @@
 			"cloud": "Cloud",
 			"security": "Security",
 			"analytics": "Analytics",
-			"ai": "AI & ML"
+			"ai": "AI & ML",
+			"testing": "Browser & testing",
+			"web": "Web search"
 		},
 		"sort": {
-			"popular": "Most Popular",
-			"rating": "Highest Rated",
-			"newest": "Newest",
+			"featured": "Featured",
 			"name": "Name A-Z"
 		},
 		"searchPlaceholder": "Search MCP servers...",
-		"verifiedOnly": "Verified",
 		"noResults": "No servers found",
 		"noResultsHint": "Try adjusting your search or filters.",
 		"install": "Install",
@@ -950,16 +949,18 @@
 		"homepage": "Homepage",
 		"installDialog": {
 			"title": "Install {{name}}",
-			"description": "Configure the required environment variables to complete installation.",
-			"optional": "Optional"
+			"description": "The server is added to project {{project}}. Values are stored in the project's .workpilot/.env.",
+			"optional": "Optional",
+			"agents": "Agents that use it",
+			"agentsHint": "You can change this later in Agent Tools.",
+			"noAgent": "Pick at least one agent."
 		},
 		"installedTab": {
-			"empty": "No servers installed",
-			"emptyHint": "Browse the catalog to discover and install MCP servers.",
-			"custom": "Custom",
-			"since": "Installed {{date}}",
-			"enable": "Enable server",
-			"disable": "Disable server"
+			"empty": "No MCP server in this project",
+			"emptyHint": "Install one from the catalog, or add your own in Agent Tools.",
+			"custom": "Added by hand",
+			"usedBy": "Used by: {{agents}}",
+			"notUsed": "No agent uses it yet: assign it in Agent Tools."
 		},
 		"builder": {
 			"newProject": "New Server",
@@ -994,6 +995,19 @@
 			"transformTemplate": "Transform Template",
 			"transformPlaceholder": "Template for transforming input data...",
 			"paramDescriptionPlaceholder": "Description"
+		},
+		"officialOnly": "Official",
+		"official": "Official",
+		"community": "Community",
+		"noProject": "Select a project: servers are installed per project.",
+		"requires": {
+			"uv": "Needs uv (uvx) on this machine.",
+			"az": "Needs the Azure CLI, signed in with az login."
+		},
+		"agents": {
+			"planner": "Planner",
+			"coder": "Coder",
+			"qa_reviewer": "QA reviewer"
 		}
 	},
 	"terminalGrid": {
@@ -1016,15 +1030,14 @@
 	},
 	"pluginMarketplace": {
 		"title": "Plugin Marketplace",
-		"subtitle": "Extend WorkPilot with community-built agents, integrations, and more",
+		"subtitle": "Ready-made skills for your agents: install one and it lands in the project's .agents/skills (and .claude/skills), usable as a / command in the Kanban and by Codex, Claude Code and pi.",
 		"installedBadge": "{{count}} installed",
 		"searchPlaceholder": "Search plugins...",
 		"noResults": "No plugins match your search",
 		"resultsCount": "{{count}} plugins",
 		"noInstalledPlugins": "No plugins installed yet",
-		"browseToInstall": "Browse the catalog to install your first plugin",
+		"browseToInstall": "Browse the catalog to install your first plugin into this project",
 		"installedCount": "{{count}} plugins installed",
-		"installedOn": "Installed on {{date}}",
 		"tabs": {
 			"catalog": "Catalog",
 			"installed": "Installed",
@@ -1038,13 +1051,10 @@
 			"customPrompt": "Custom Prompt"
 		},
 		"filters": {
-			"all": "All",
-			"verified": "Verified only"
+			"all": "All"
 		},
 		"sort": {
-			"popular": "Most Popular",
-			"rating": "Top Rated",
-			"newest": "Newest",
+			"featured": "Featured",
 			"name": "A–Z"
 		},
 		"actions": {
@@ -1125,7 +1135,12 @@
 			"namePlaceholder": "My Awesome Plugin",
 			"untitled": "Untitled"
 		},
-		"byAuthor": "by {{author}}"
+		"byAuthor": "by {{author}}",
+		"noProject": "Select a project: plugins are installed into a project's skills.",
+		"installedIn": "In {{paths}}",
+		"howToUse": "Run it with /{{id}} in the Kanban command bar, or let the agent pick it up.",
+		"showSkill": "Show the skill",
+		"hideSkill": "Hide the skill"
 	},
 	"chatHistory": {
 		"title": "Chat History",

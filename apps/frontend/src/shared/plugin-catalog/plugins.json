@@ -1,0 +1,593 @@
+{
+	"$comment": "Plugin Marketplace catalog. Installing a plugin writes its skill to <project>/.agents/skills/<id>/SKILL.md (Agent Skills standard) and the Claude Code mirror .claude/skills/<id>/SKILL.md; every body must pass skills_registry.injection_gate (tests/test_plugin_catalog.py).",
+	"plugins": [
+		{
+			"id": "security-audit",
+			"name": "Security Audit",
+			"type": "agent",
+			"author": "WorkPilot",
+			"color": "#ef4444",
+			"tags": [
+				"security",
+				"owasp",
+				"audit"
+			],
+			"tagline": {
+				"en": "OWASP Top 10 audit of the code with fixes ranked by risk",
+				"fr": "Audit OWASP Top 10 du code avec correctifs classés par risque"
+			},
+			"description": {
+				"en": "Walks the code for the OWASP Top 10 (injection, broken access control, secrets, unsafe deserialization, SSRF…) and reports each finding with its file, how it is exploited and the fix.",
+				"fr": "Parcourt le code à la recherche du Top 10 OWASP (injection, contrôle d'accès, secrets, désérialisation, SSRF…) et rend chaque constat avec son fichier, son exploitation et le correctif."
+			},
+			"skill": {
+				"description": "Audit code for OWASP Top 10 vulnerabilities and report findings ranked by risk, each with file, exploit path and fix. Use for a security review of a change or a module.",
+				"body": "# Security audit\n\nAudit the code in scope (the diff, or the module named by the user) for the OWASP Top 10.\n\n## Procedure\n\n1. Map the trust boundaries first: HTTP handlers, message consumers, CLI arguments, files read\n   from users, third-party API responses. Every finding starts at one of them.\n2. For each boundary, follow the data to where it is used and check:\n   - **Injection**: SQL built by string concatenation, shell commands with interpolated input,\n     template rendering of raw input, LDAP/XPath queries.\n   - **Broken access control**: a handler that reads an id from the request without checking the\n     caller owns the resource (IDOR), missing authorization attributes, admin routes reachable\n     without a role.\n   - **Cryptographic failures**: secrets in code or config files, weak hashing of passwords\n     (anything but bcrypt/scrypt/argon2/PBKDF2), homemade crypto, disabled TLS verification.\n   - **Insecure design**: missing rate limiting on login or reset, predictable tokens.\n   - **Misconfiguration**: permissive CORS (`*` with credentials), debug pages, verbose errors.\n   - **Vulnerable components**: dependencies with known CVEs (run the ecosystem's audit tool:\n     `npm audit`, `dotnet list package --vulnerable`, `pip-audit`).\n   - **Authentication**: tokens without expiry, JWT accepted without signature check.\n   - **Integrity**: deserialization of untrusted data into arbitrary types.\n   - **Logging**: secrets or personal data written to logs; security events not logged.\n   - **SSRF**: server-side fetch of a URL the user controls without an allowlist.\n3. Confirm each suspicion by reading the code path end to end. Do not report a pattern match\n   you have not traced.\n\n## Report\n\nOne section per finding, most severe first:\n\n- **Severity** (critical / high / medium / low) and the OWASP category.\n- **Where**: `path:line`.\n- **How it is exploited**, in two sentences.\n- **Fix**: the concrete change, as a code snippet when short.\n\nEnd with what was checked and found clean, so the reader knows the coverage.\n"
+			}
+		},
+		{
+			"id": "accessibility-audit",
+			"name": "Accessibility Audit",
+			"type": "agent",
+			"author": "WorkPilot",
+			"color": "#8b5cf6",
+			"tags": [
+				"accessibility",
+				"wcag",
+				"a11y",
+				"ui"
+			],
+			"tagline": {
+				"en": "WCAG 2.2 AA check of the UI with code fixes",
+				"fr": "Vérification WCAG 2.2 AA de l'interface avec correctifs"
+			},
+			"description": {
+				"en": "Checks components for WCAG 2.2 AA: names and roles, keyboard access, focus, contrast, forms and motion, then proposes the code fix for each problem.",
+				"fr": "Vérifie les composants selon WCAG 2.2 AA : noms et rôles, clavier, focus, contraste, formulaires et animations, puis propose le correctif de code de chaque problème."
+			},
+			"skill": {
+				"description": "Audit UI components against WCAG 2.2 AA and propose code fixes. Use when building or reviewing a screen, a form or a component library.",
+				"body": "# Accessibility audit (WCAG 2.2 AA)\n\nReview the UI code in scope and fix what blocks a keyboard or screen-reader user first.\n\n## Checklist\n\n1. **Name, role, value**: every interactive element is a native control (`button`, `a`,\n   `input`) or has the right ARIA role; icon-only buttons have an accessible name\n   (`aria-label`); images have `alt` (empty `alt=\"\"` when decorative).\n2. **Keyboard**: everything clickable is reachable with Tab and works with Enter/Space; no\n   `div` with only `onClick`; no keyboard trap; dialogs move focus in and restore it on close.\n3. **Focus visible**: focus styles are not removed (`outline: none` without replacement).\n4. **Contrast**: text 4.5:1 (3:1 for large text and UI component borders). Check tokens, not\n   one-off colors.\n5. **Forms**: each input has a `<label>`; errors are announced (`aria-describedby`,\n   `aria-invalid`) and say how to fix the value; required fields are marked in text.\n6. **Structure**: one `h1`, headings in order, landmarks (`main`, `nav`), lists as lists.\n7. **Dynamic content**: status messages use `aria-live`; loading states are announced.\n8. **Motion**: animations respect `prefers-reduced-motion`.\n9. **Target size**: pointer targets at least 24×24 CSS px (WCAG 2.2, 2.5.8).\n\n## Output\n\nA table: criterion, element (`path:line`), problem, fix. Then apply the fixes that are local\nand safe, and list the ones that need a design decision.\n"
+			}
+		},
+		{
+			"id": "performance-review",
+			"name": "Performance Review",
+			"type": "agent",
+			"author": "WorkPilot",
+			"color": "#f59e0b",
+			"tags": [
+				"performance",
+				"n+1",
+				"profiling"
+			],
+			"tagline": {
+				"en": "Find N+1 queries, needless work and memory leaks, measured",
+				"fr": "Trouver les requêtes N+1, le travail inutile et les fuites mémoire, mesurés"
+			},
+			"description": {
+				"en": "Looks for the costly patterns (N+1 queries, work in loops, missing indexes, re-renders, unbounded caches) and asks for a measurement before and after each change.",
+				"fr": "Cherche les schémas coûteux (requêtes N+1, travail dans les boucles, index manquants, re-rendus, caches sans borne) et demande une mesure avant et après chaque changement."
+			},
+			"skill": {
+				"description": "Review code for performance problems (N+1 queries, repeated work, missing indexes, unnecessary re-renders, leaks) and propose measured fixes.",
+				"body": "# Performance review\n\nOptimize what is measured, not what looks slow.\n\n## 1. Measure first\n\nFind or write a way to time the slow path: a benchmark (BenchmarkDotNet, pytest-benchmark,\n`console.time`), a profiler run, or the query log. Record the baseline number.\n\n## 2. Look for these patterns\n\n- **N+1 queries**: a query inside a loop over the results of another query. Fix with a join,\n  eager loading (`Include`, `select_related`) or one batched `IN (...)` query.\n- **Missing index**: a `WHERE`/`ORDER BY` on a column without an index on a large table. Check\n  the plan (`EXPLAIN ANALYZE`).\n- **Over-fetching**: selecting whole rows or entities to use two fields; loading a list to count it.\n- **Repeated work**: the same computation or call inside a loop; regex or serializer built per call.\n- **Synchronous I/O on a hot path**; sequential awaits that could run concurrently.\n- **UI**: components re-rendering on every parent render (unstable props, inline objects),\n  long lists without virtualization, large bundles imported for one function.\n- **Memory**: caches without a size or TTL, event handlers never removed, closures holding\n  large objects.\n\n## 3. Change one thing at a time\n\nApply one fix, measure again, keep it only if the number improves. Report each change with\nbefore/after figures and the test that proves behavior did not change.\n"
+			}
+		},
+		{
+			"id": "senior-code-review",
+			"name": "Senior Code Review",
+			"type": "custom-prompt",
+			"author": "WorkPilot",
+			"color": "#0ea5e9",
+			"tags": [
+				"code-review",
+				"quality",
+				"best-practices"
+			],
+			"tagline": {
+				"en": "A thorough review: correctness first, then design, tests and naming",
+				"fr": "Une revue approfondie : exactitude d'abord, puis conception, tests et nommage"
+			},
+			"description": {
+				"en": "Reviews a diff the way a senior engineer does: bugs and edge cases first, then design, tests, naming and readability, with each comment marked blocking or not.",
+				"fr": "Relit un diff comme un ingénieur senior : bugs et cas limites d'abord, puis conception, tests, nommage et lisibilité, chaque commentaire marqué bloquant ou non."
+			},
+			"skill": {
+				"description": "Review a diff like a senior engineer: correctness and edge cases first, then design, tests and readability, each comment marked blocking or optional.",
+				"body": "# Senior code review\n\nReview the diff in scope. Read the whole change before commenting.\n\n## Order of concerns\n\n1. **Correctness**: does it do what the task asked? Trace the edge cases: empty input, null,\n   zero, one element, very large input, concurrent calls, failure of each external call.\n2. **Safety**: input validation at boundaries, error handling that does not swallow failures,\n   resources released (connections, files, subscriptions), no secret in code or logs.\n3. **Design**: responsibilities in the right layer, no duplicated logic that already exists in\n   the codebase, dependencies pointing the right way, public API small.\n4. **Tests**: the behavior change is covered, including the failure path; tests assert outcomes,\n   not implementation details.\n5. **Readability**: names say what things are, functions do one thing, comments explain why.\n\n## Comment format\n\nPrefix each comment with **[blocking]**, **[should]** or **[nit]**, give `path:line`, say what is\nwrong and propose the change. Praise what is done well in one line at the end. If there is\nnothing blocking, say so explicitly.\n"
+			}
+		},
+		{
+			"id": "i18n-check",
+			"name": "i18n Check",
+			"type": "agent",
+			"author": "WorkPilot",
+			"color": "#10b981",
+			"tags": [
+				"i18n",
+				"localization",
+				"translation"
+			],
+			"tagline": {
+				"en": "Find hard-coded strings and missing translation keys",
+				"fr": "Trouver les textes en dur et les clés de traduction manquantes"
+			},
+			"description": {
+				"en": "Finds user-visible strings that bypass the translation system, keys missing from a locale, and dates, numbers or plurals formatted by hand.",
+				"fr": "Trouve les textes visibles qui contournent le système de traduction, les clés absentes d'une langue, et les dates, nombres ou pluriels formatés à la main."
+			},
+			"skill": {
+				"description": "Check a codebase for internationalization problems: hard-coded user-facing strings, keys missing in a locale, hand-formatted dates and numbers, broken plurals.",
+				"body": "# i18n check\n\n1. **Find the translation setup** (i18next, vue-i18n, .resx, gettext…) and the locale files.\n2. **Hard-coded strings**: search UI code for literal text shown to users (JSX text, button\n   labels, `placeholder`, `title`, `aria-label`, error messages returned to the UI). Each must\n   go through the translation function with a key.\n3. **Key parity**: every key used in code exists in every locale; no locale has keys the others\n   lack. List the gaps per locale.\n4. **Interpolation**: no string concatenation of translated parts (word order differs between\n   languages); use one key with variables.\n5. **Plurals**: counts use the library's plural forms, not `count > 1 ? \"s\" : \"\"`.\n6. **Formatting**: dates, times, numbers and currencies go through `Intl` (or the platform\n   culture API) with the user's locale, never a fixed pattern like `MM/DD/YYYY`.\n7. **Layout**: long translations (German, French) do not overflow fixed-width elements.\n\nReport findings grouped by file, then fix them: add keys to every locale, with a real\ntranslation, not the English text copied.\n"
+			}
+		},
+		{
+			"id": "test-writer",
+			"name": "Test Writer",
+			"type": "agent",
+			"author": "WorkPilot",
+			"color": "#22c55e",
+			"tags": [
+				"testing",
+				"unit-tests",
+				"coverage"
+			],
+			"tagline": {
+				"en": "Write the missing tests for a module, edge cases included",
+				"fr": "Écrire les tests manquants d'un module, cas limites compris"
+			},
+			"description": {
+				"en": "Reads a module, lists its behaviors and edge cases, and writes the tests that are missing in the project's own test framework and style.",
+				"fr": "Lit un module, liste ses comportements et cas limites, et écrit les tests manquants dans le framework et le style de test du projet."
+			},
+			"skill": {
+				"description": "Write missing unit tests for a module in the project's own framework and style, covering behaviors, edge cases and failure paths.",
+				"body": "# Test writer\n\n1. **Learn the project's testing style**: framework (xUnit, NUnit, Jest, Vitest, pytest…),\n   where tests live, naming, fixtures, mocking library. Copy that style exactly.\n2. **List the behaviors** of the module under test from its public API, one line each:\n   \"returns X when Y\". Add the edge cases: empty, null, boundary values, duplicates,\n   invalid input, and each dependency failing.\n3. **Check what exists**: skip behaviors already tested; note tests that assert nothing useful.\n4. **Write the tests**: one behavior per test, Arrange/Act/Assert, a name that states the\n   behavior, real objects where cheap and fakes only at I/O boundaries (network, clock, disk,\n   database). Assert on outcomes, not on calls to internals.\n5. **Run them**. A new test that passes on the first run without exercising a change is\n   suspicious: break the code briefly to see it fail, then restore it.\n\nReport the behaviors covered, the ones left out and why.\n"
+			}
+		},
+		{
+			"id": "dotnet-clean-architecture",
+			"name": ".NET Clean Architecture",
+			"type": "agent",
+			"author": "WorkPilot",
+			"color": "#512BD4",
+			"tags": [
+				"dotnet",
+				"csharp",
+				"clean-architecture",
+				"web-api"
+			],
+			"tagline": {
+				"en": "Build and review ASP.NET Core Web APIs in Clean Architecture",
+				"fr": "Construire et relire des Web API ASP.NET Core en Clean Architecture"
+			},
+			"description": {
+				"en": "Guides features through Domain, Application, Infrastructure and API layers with the dependency rule enforced: entities and value objects, use-case handlers, repositories behind interfaces, thin controllers or minimal APIs.",
+				"fr": "Fait passer une fonctionnalité par les couches Domain, Application, Infrastructure et API en respectant la règle de dépendance : entités et value objects, handlers de cas d'usage, repositories derrière des interfaces, contrôleurs ou minimal APIs minces."
+			},
+			"skill": {
+				"description": "Implement or review an ASP.NET Core Web API feature in Clean Architecture (Domain, Application, Infrastructure, API) with the dependency rule enforced.",
+				"body": "# .NET Clean Architecture\n\n## Layers and the dependency rule\n\n- **Domain**: entities, value objects, domain events, domain exceptions. No reference to any\n  other project, no EF Core, no ASP.NET.\n- **Application**: use cases (commands/queries and their handlers), interfaces for what it needs\n  (`IOrderRepository`, `IClock`, `IEmailSender`), DTOs, validation (FluentValidation). References\n  Domain only.\n- **Infrastructure**: EF Core `DbContext`, repository implementations, external clients,\n  options binding. References Application.\n- **API**: controllers or minimal API endpoints, DI composition, middleware, ProblemDetails.\n  References Application and Infrastructure (composition root only).\n\nCheck the `.csproj` references: an arrow pointing inward only.\n\n## Adding a feature\n\n1. Model the domain change: invariants live in the entity (private setters, factory methods,\n   guard clauses); use value objects for concepts with rules (Email, Money).\n2. Add the use case in Application: a command or query, its handler, its validator, and the\n   interfaces it needs. The handler orchestrates; it does not contain HTTP or SQL.\n3. Implement the interfaces in Infrastructure; add the EF Core configuration\n   (`IEntityTypeConfiguration<T>`) and a migration.\n4. Expose it in API: the endpoint maps the request to the command, sends it, maps the result\n   to a response. Errors become ProblemDetails (400 validation, 404 not found, 409 conflict).\n5. Tests: domain unit tests for invariants, handler tests with fakes, one integration test per\n   endpoint with `WebApplicationFactory`.\n\n## Review checklist\n\n- No `DbContext` or `HttpContext` in Application or Domain.\n- No business rule in a controller or a repository.\n- `CancellationToken` passed through every async call.\n- Async all the way: no `.Result` or `.Wait()`.\n- Options validated at startup (`ValidateOnStart`).\n"
+			}
+		},
+		{
+			"id": "ef-core-review",
+			"name": "EF Core Review",
+			"type": "custom-prompt",
+			"author": "WorkPilot",
+			"color": "#7C3AED",
+			"tags": [
+				"dotnet",
+				"ef-core",
+				"database",
+				"migrations"
+			],
+			"tagline": {
+				"en": "Review EF Core queries, mappings and migrations",
+				"fr": "Relire requêtes, mappings et migrations EF Core"
+			},
+			"description": {
+				"en": "Checks Entity Framework Core code for client evaluation, N+1 loading, tracking where it is not needed, unsafe migrations and missing indexes.",
+				"fr": "Vérifie le code Entity Framework Core : évaluation côté client, chargements N+1, tracking inutile, migrations risquées et index manquants."
+			},
+			"skill": {
+				"description": "Review Entity Framework Core code: queries, loading, tracking, mappings and migrations, for performance and data-safety problems.",
+				"body": "# EF Core review\n\n## Queries\n\n- Read-only queries use `AsNoTracking()` (or `AsNoTrackingWithIdentityResolution()`).\n- Project to DTOs with `Select` instead of loading whole entities to read a few fields.\n- No lazy loading inside loops (N+1); use `Include`/`ThenInclude` or a projection, and\n  `AsSplitQuery()` when several collection includes multiply rows.\n- No `ToList()` before `Where`/`OrderBy`/`Count`: filtering must run in SQL.\n- Pagination with `OrderBy` + `Skip`/`Take` (or keyset pagination for deep pages).\n- `FromSqlRaw` never receives concatenated input; use `FromSqlInterpolated` or parameters.\n- Async methods with a `CancellationToken`.\n\n## Model\n\n- Configuration in `IEntityTypeConfiguration<T>` classes, not attributes scattered on entities.\n- String lengths set (`HasMaxLength`), decimals with precision, required relationships explicit.\n- Indexes on foreign keys and on columns used in frequent filters; unique indexes for natural keys.\n- Concurrency token (`rowversion`/`IsRowVersion`) on aggregates edited concurrently.\n\n## Migrations\n\n- Read the generated migration: a rename must not appear as drop + add (data loss).\n- Adding a non-null column to a populated table needs a default or a backfill step.\n- Long operations (index on a big table) are flagged for a maintenance window.\n- `Down` is correct or explicitly unsupported.\n- Generate the SQL script (`dotnet ef migrations script --idempotent`) and review it.\n"
+			}
+		},
+		{
+			"id": "aspnet-api-review",
+			"name": "ASP.NET Core API Review",
+			"type": "custom-prompt",
+			"author": "WorkPilot",
+			"color": "#5C2D91",
+			"tags": [
+				"dotnet",
+				"aspnet",
+				"rest",
+				"api"
+			],
+			"tagline": {
+				"en": "REST conventions, validation, errors, security and versioning of an API",
+				"fr": "Conventions REST, validation, erreurs, sécurité et versioning d'une API"
+			},
+			"description": {
+				"en": "Reviews ASP.NET Core endpoints for HTTP semantics, validation, ProblemDetails errors, authorization, OpenAPI documentation and versioning.",
+				"fr": "Relit les endpoints ASP.NET Core : sémantique HTTP, validation, erreurs ProblemDetails, autorisation, documentation OpenAPI et versioning."
+			},
+			"skill": {
+				"description": "Review ASP.NET Core Web API endpoints for HTTP semantics, validation, error responses, authorization, OpenAPI and versioning.",
+				"body": "# ASP.NET Core API review\n\n## HTTP semantics\n\n- Nouns for resources, plural (`/orders/{id}`); verbs only for real actions (`/orders/{id}/cancel`).\n- `GET` is safe, `PUT`/`DELETE` idempotent; `POST` that creates returns `201 Created` with a\n  `Location` header; `204` for no content.\n- Status codes: 400 invalid input, 401 unauthenticated, 403 forbidden, 404 not found,\n  409 conflict, 422 only if the project uses it consistently.\n\n## Validation and errors\n\n- Every request DTO validated (data annotations or FluentValidation); `[ApiController]` or an\n  endpoint filter returns `ValidationProblemDetails`.\n- Errors are RFC 9457 ProblemDetails (`AddProblemDetails`, an exception handler), never a stack\n  trace or a raw exception message.\n\n## Security\n\n- Authorization on every endpoint (`[Authorize]`, policies, or `RequireAuthorization()` on the\n  group); `[AllowAnonymous]` is deliberate and rare.\n- Resource ownership checked in the handler, not only the role.\n- No over-posting: request DTOs, never entities bound from the body.\n- CORS lists origins explicitly; rate limiting on authentication endpoints.\n\n## Contract\n\n- OpenAPI documents responses (`Produces`, `ProducesProblem`), examples for complex bodies.\n- Versioning strategy applied consistently (URL segment or header).\n- Paging, filtering and sorting parameters follow one convention across endpoints.\n- `CancellationToken` accepted and passed down.\n"
+			}
+		},
+		{
+			"id": "csharp-unit-tests",
+			"name": "C# Unit Tests (xUnit)",
+			"type": "agent",
+			"author": "WorkPilot",
+			"color": "#68217A",
+			"tags": [
+				"dotnet",
+				"csharp",
+				"xunit",
+				"testing"
+			],
+			"tagline": {
+				"en": "xUnit tests with fakes, theories and integration tests for APIs",
+				"fr": "Tests xUnit avec fakes, theories et tests d'intégration pour les API"
+			},
+			"description": {
+				"en": "Writes xUnit tests the idiomatic way: one behavior per test, [Theory] for cases, NSubstitute or hand-written fakes at boundaries, FluentAssertions if the project uses it, and WebApplicationFactory for endpoints.",
+				"fr": "Écrit des tests xUnit de façon idiomatique : un comportement par test, [Theory] pour les cas, NSubstitute ou fakes faits main aux frontières, FluentAssertions si le projet l'utilise, et WebApplicationFactory pour les endpoints."
+			},
+			"skill": {
+				"description": "Write C# unit and integration tests with xUnit: theories for cases, fakes at boundaries, WebApplicationFactory for API endpoints.",
+				"body": "# C# unit tests with xUnit\n\n1. Match the existing test projects: naming (`Method_State_Expected` or sentences), assertion\n   library (FluentAssertions, Shouldly or plain `Assert`), mocking library (NSubstitute, Moq) or\n   hand-written fakes.\n2. **Unit tests**\n   - One behavior per `[Fact]`; use `[Theory]` with `[InlineData]`/`[MemberData]` for the same\n     behavior over several inputs.\n   - Arrange / Act / Assert, separated by a blank line.\n   - Fake only what crosses a boundary: repositories, HTTP clients, clock (`TimeProvider`),\n     file system. Domain objects are real.\n   - Async tests return `Task`, never `async void`; pass `TestContext.Current.CancellationToken`\n     (xUnit v3) where the API takes one.\n   - Test the failure paths: validation errors, not found, conflicts, exceptions mapped to results.\n3. **Integration tests for endpoints**\n   - `WebApplicationFactory<Program>` with services replaced in `ConfigureTestServices`.\n   - A real database in a container (Testcontainers) or SQLite in-memory when the queries allow it.\n   - Assert status code, ProblemDetails shape and the persisted state.\n4. Run `dotnet test` and report the result. Never leave a test skipped without a reason.\n"
+			}
+		},
+		{
+			"id": "tdd",
+			"name": "Test-Driven Development",
+			"type": "custom-prompt",
+			"author": "WorkPilot",
+			"color": "#16a34a",
+			"tags": [
+				"tdd",
+				"testing",
+				"red-green-refactor"
+			],
+			"tagline": {
+				"en": "Red, green, refactor: one failing test before each change",
+				"fr": "Rouge, vert, refactor : un test qui échoue avant chaque changement"
+			},
+			"description": {
+				"en": "Drives a change test-first: write the smallest failing test, make it pass with the simplest code, then refactor with the tests green.",
+				"fr": "Mène un changement en commençant par le test : le plus petit test qui échoue, le code le plus simple pour le faire passer, puis le refactoring avec les tests au vert."
+			},
+			"skill": {
+				"description": "Implement a change test-first with the red-green-refactor cycle: failing test, simplest code to pass, refactor with tests green.",
+				"body": "# Test-driven development\n\nRepeat in small steps until the task is done:\n\n1. **Red**: write one test for the next small piece of behavior. Run it and see it fail for the\n   expected reason (not a compile error or a typo).\n2. **Green**: write the simplest code that makes it pass. Hard-coding is allowed if the next test\n   will force the general solution.\n3. **Refactor**: remove duplication, improve names, extract functions. Run all tests after each\n   refactoring step; they stay green.\n\nRules:\n\n- Never write production code without a failing test that needs it.\n- For a bug fix, the first test reproduces the bug.\n- Keep each cycle short (minutes). If a test needs a lot of setup, the design is telling you\n  something: split the unit.\n- Commit at green.\n\nAt the end, list the tests written, in order, as the specification of the change.\n"
+			}
+		},
+		{
+			"id": "ddd-modeling",
+			"name": "DDD Modeling",
+			"type": "custom-prompt",
+			"author": "WorkPilot",
+			"color": "#6366f1",
+			"tags": [
+				"ddd",
+				"architecture",
+				"modeling"
+			],
+			"tagline": {
+				"en": "Bounded contexts, aggregates, invariants and ubiquitous language",
+				"fr": "Contextes délimités, agrégats, invariants et langage omniprésent"
+			},
+			"description": {
+				"en": "Analyzes a domain or a codebase through Domain-Driven Design: finds bounded contexts, aggregates and their invariants, value objects and domain events, and flags anemic models.",
+				"fr": "Analyse un domaine ou un code sous l'angle du Domain-Driven Design : contextes délimités, agrégats et leurs invariants, value objects et événements de domaine, et repère les modèles anémiques."
+			},
+			"skill": {
+				"description": "Model or review a domain with Domain-Driven Design: bounded contexts, aggregates and invariants, value objects, domain events, ubiquitous language.",
+				"body": "# DDD modeling\n\n1. **Ubiquitous language**: list the domain terms used by the business and check the code uses\n   the same words (classes, methods, tables). Note synonyms and terms with two meanings: they\n   often mark a context boundary.\n2. **Bounded contexts**: group the model by where a term keeps one meaning. Name each context,\n   its responsibility, and how contexts talk (shared kernel, customer/supplier, anti-corruption\n   layer, published events).\n3. **Aggregates**: for each context, find the consistency rules that must hold in one\n   transaction. The aggregate root enforces them; outside code changes the aggregate only\n   through the root's methods. Keep aggregates small; reference other aggregates by id.\n4. **Value objects**: concepts defined by their values (Money, Email, DateRange) are immutable\n   types that validate themselves.\n5. **Domain events**: facts the business cares about (`OrderPlaced`) raised by aggregates, used to\n   update other aggregates or contexts eventually.\n6. **Smells to report**: entities with only getters/setters and the rules in services (anemic\n   model), one aggregate per table by reflex, transactions spanning several aggregates,\n   primitives where a value object belongs.\n\nOutput a short context map, then per context: aggregates with their invariants, value objects,\nevents, and the refactorings proposed.\n"
+			}
+		},
+		{
+			"id": "adr-writer",
+			"name": "Architecture Decision Record",
+			"type": "spec-template",
+			"author": "WorkPilot",
+			"color": "#0f766e",
+			"tags": [
+				"adr",
+				"architecture",
+				"documentation"
+			],
+			"tagline": {
+				"en": "Write an ADR: context, options, decision and consequences",
+				"fr": "Rédiger un ADR : contexte, options, décision et conséquences"
+			},
+			"description": {
+				"en": "Turns a technical choice into an Architecture Decision Record in the MADR format, with the options weighed and the consequences stated.",
+				"fr": "Transforme un choix technique en Architecture Decision Record au format MADR, avec les options pesées et les conséquences énoncées."
+			},
+			"skill": {
+				"description": "Write an Architecture Decision Record (MADR format) for a technical choice: context, options considered, decision, consequences.",
+				"body": "# Architecture Decision Record\n\nWrite the ADR in `docs/adr/NNNN-title-in-kebab-case.md` (or where the project keeps them; use the\nnext number).\n\n```markdown\n# NNNN. <Decision title, as a statement>\n\n- Status: proposed | accepted | superseded by NNNN\n- Date: YYYY-MM-DD\n- Deciders: <names>\n\n## Context\n\nThe forces at play: the problem, constraints (deadline, team skills, budget, existing systems),\nand what happens if nothing is decided.\n\n## Options considered\n\n### Option A: <name>\n- Good: …\n- Bad: …\n\n### Option B: <name>\n- Good: …\n- Bad: …\n\n## Decision\n\nWe choose <option> because <the deciding reasons, tied to the forces above>.\n\n## Consequences\n\n- Positive: …\n- Negative, and how we live with them: …\n- Follow-up work: …\n```\n\nAsk for the missing facts instead of inventing them. Keep it to one page.\n"
+			}
+		},
+		{
+			"id": "refactoring-plan",
+			"name": "Refactoring Plan",
+			"type": "agent",
+			"author": "WorkPilot",
+			"color": "#ea580c",
+			"tags": [
+				"refactoring",
+				"tech-debt",
+				"legacy"
+			],
+			"tagline": {
+				"en": "Safe, step-by-step refactoring behind tests",
+				"fr": "Refactoring sûr, pas à pas, derrière des tests"
+			},
+			"description": {
+				"en": "Plans a refactoring as a series of small behavior-preserving steps, each verified by tests, with characterization tests first when coverage is missing.",
+				"fr": "Planifie un refactoring en une suite de petites étapes qui préservent le comportement, chacune vérifiée par les tests, avec des tests de caractérisation d'abord si la couverture manque."
+			},
+			"skill": {
+				"description": "Plan and carry out a refactoring as small behavior-preserving steps verified by tests, adding characterization tests first when needed.",
+				"body": "# Refactoring plan\n\n1. **State the goal** in one sentence (what becomes easier after the refactoring) and what must\n   not change (public API, behavior, performance).\n2. **Secure the behavior**: check the tests covering the code. If coverage is thin, write\n   characterization tests that pin the current behavior, including its odd cases.\n3. **Plan small steps**, each one leaving the build and tests green: rename, extract function,\n   move function, introduce parameter object, replace conditional with polymorphism, extract\n   interface, strangle an old path behind a new one.\n4. **Execute one step at a time**: change, run the tests, commit. Never mix a refactoring step\n   with a behavior change in the same commit.\n5. **Stop when the goal is reached**, not when the code is perfect.\n\nPresent the plan as a numbered list of steps with the tests that guard each one, then carry out\nthe steps the user approves.\n"
+			}
+		},
+		{
+			"id": "observability",
+			"name": "Observability (OpenTelemetry)",
+			"type": "agent",
+			"author": "WorkPilot",
+			"color": "#f97316",
+			"tags": [
+				"observability",
+				"opentelemetry",
+				"logging",
+				"tracing"
+			],
+			"tagline": {
+				"en": "Add structured logs, traces and metrics with OpenTelemetry",
+				"fr": "Ajouter logs structurés, traces et métriques avec OpenTelemetry"
+			},
+			"description": {
+				"en": "Instruments a service with OpenTelemetry: traces across calls, useful metrics, structured logs correlated by trace id, without logging secrets or personal data.",
+				"fr": "Instrumente un service avec OpenTelemetry : traces entre appels, métriques utiles, logs structurés corrélés par trace id, sans journaliser de secrets ni de données personnelles."
+			},
+			"skill": {
+				"description": "Instrument a service with OpenTelemetry traces, metrics and structured logs correlated by trace id, without leaking secrets.",
+				"body": "# Observability with OpenTelemetry\n\n1. **Set up the SDK** for the stack (OpenTelemetry .NET `AddOpenTelemetry()`, `@opentelemetry/sdk-node`,\n   `opentelemetry-sdk` for Python) with the OTLP exporter, the service name and version as\n   resource attributes, and the endpoint from configuration (`OTEL_EXPORTER_OTLP_ENDPOINT`).\n2. **Traces**: enable the auto-instrumentation for the HTTP server, HTTP client and database\n   driver. Add manual spans only around meaningful business operations, named\n   `verb object` (`process payment`), with attributes that help debugging (ids, counts), never\n   payloads.\n3. **Metrics**: the four golden signals for each entry point (rate, errors, duration,\n   saturation). Use histograms for durations; keep label cardinality low (no user ids).\n4. **Logs**: structured (message template + properties), with the trace and span ids attached\n   so logs and traces correlate. One log per meaningful event, at the right level.\n5. **Never record**: passwords, credentials, full card numbers, personal data beyond what\n   the policy allows. Add a redaction processor if payloads can leak in.\n6. Verify locally with a collector or Aspire dashboard / Jaeger and show one trace end to end.\n"
+			}
+		},
+		{
+			"id": "user-story",
+			"name": "User Story & Acceptance Criteria",
+			"type": "spec-template",
+			"author": "WorkPilot",
+			"color": "#2563eb",
+			"tags": [
+				"agile",
+				"user-story",
+				"gherkin",
+				"spec"
+			],
+			"tagline": {
+				"en": "Turn a request into a user story with Gherkin acceptance criteria",
+				"fr": "Transformer une demande en user story avec critères d'acceptation Gherkin"
+			},
+			"description": {
+				"en": "Writes a user story (As a… I want… so that…) with acceptance criteria in Given/When/Then, edge cases and what is out of scope.",
+				"fr": "Rédige une user story (En tant que… je veux… afin de…) avec des critères d'acceptation en Given/When/Then, les cas limites et ce qui est hors périmètre."
+			},
+			"skill": {
+				"description": "Write a user story with Given/When/Then acceptance criteria, edge cases and out-of-scope items from a feature request.",
+				"body": "# User story\n\n```markdown\n## <Short title>\n\n**As a** <type of user>\n**I want** <capability>\n**so that** <benefit>\n\n### Acceptance criteria\n\nScenario: <happy path>\n  Given <initial context>\n  When <action>\n  Then <observable outcome>\n\nScenario: <edge case or error>\n  Given …\n  When …\n  Then …\n\n### Out of scope\n- …\n\n### Open questions\n- …\n```\n\nRules: each scenario is testable and describes behavior the user can observe, not\nimplementation. Cover at least one error case and one boundary. Keep the story small enough\nto deliver in a few days; split it otherwise and say how.\n"
+			}
+		},
+		{
+			"id": "openapi-spec",
+			"name": "OpenAPI Spec Template",
+			"type": "spec-template",
+			"author": "WorkPilot",
+			"color": "#059669",
+			"tags": [
+				"openapi",
+				"rest",
+				"api",
+				"spec"
+			],
+			"tagline": {
+				"en": "Design an endpoint contract in OpenAPI 3.1 before coding it",
+				"fr": "Concevoir le contrat d'un endpoint en OpenAPI 3.1 avant de le coder"
+			},
+			"description": {
+				"en": "Produces the OpenAPI 3.1 contract of an API change: paths, parameters, request and response schemas, error responses and examples, consistent with the existing API.",
+				"fr": "Produit le contrat OpenAPI 3.1 d'un changement d'API : chemins, paramètres, schémas de requête et de réponse, erreurs et exemples, cohérent avec l'API existante."
+			},
+			"skill": {
+				"description": "Design an API change as an OpenAPI 3.1 contract (paths, schemas, errors, examples) consistent with the existing API, before implementation.",
+				"body": "# OpenAPI spec\n\n1. Read the existing OpenAPI document (or the controllers) to reuse its conventions: naming,\n   pagination, error format, authentication scheme, versioning.\n2. Write the change as OpenAPI 3.1 YAML:\n\n```yaml\npaths:\n  /orders/{orderId}:\n    get:\n      operationId: getOrder\n      summary: Get one order\n      tags: [Orders]\n      parameters:\n        - name: orderId\n          in: path\n          required: true\n          schema: { type: string, format: uuid }\n      responses:\n        \"200\":\n          description: The order\n          content:\n            application/json:\n              schema: { $ref: \"#/components/schemas/Order\" }\n        \"404\":\n          $ref: \"#/components/responses/NotFound\"\ncomponents:\n  schemas:\n    Order:\n      type: object\n      required: [id, status, total]\n      properties:\n        id: { type: string, format: uuid }\n        status: { type: string, enum: [pending, paid, shipped] }\n        total: { type: number, format: decimal }\n```\n\n3. Every operation has an `operationId`, documented error responses (ProblemDetails,\n   `application/problem+json`), and an example for non-trivial bodies.\n4. Validate the document with the project's linter (Spectral, Redocly) when available.\n"
+			}
+		},
+		{
+			"id": "bug-report",
+			"name": "Bug Report & Root Cause",
+			"type": "spec-template",
+			"author": "WorkPilot",
+			"color": "#dc2626",
+			"tags": [
+				"bug",
+				"debugging",
+				"root-cause"
+			],
+			"tagline": {
+				"en": "Reproduce, find the root cause and fix with a regression test",
+				"fr": "Reproduire, trouver la cause racine et corriger avec un test de non-régression"
+			},
+			"description": {
+				"en": "Structures a bug from report to fix: exact reproduction, expected versus actual, root cause found by elimination, fix with a regression test.",
+				"fr": "Structure un bug du signalement au correctif : reproduction exacte, attendu contre obtenu, cause racine trouvée par élimination, correctif avec un test de non-régression."
+			},
+			"skill": {
+				"description": "Investigate a bug: reproduce it, find the root cause by elimination, fix it with a regression test, and write it up.",
+				"body": "# Bug report and root cause\n\n1. **Reproduce**: write the exact steps, input and environment. Turn them into a failing\n   automated test when possible; that test is the definition of done.\n2. **Expected vs actual**: one sentence each.\n3. **Narrow down**: form hypotheses ranked by likelihood and test each with the cheapest\n   experiment (a log line, a breakpoint, `git bisect` between a good and a bad commit, removing\n   half of the input). Write down what each experiment ruled out.\n4. **Root cause**: the first point where the program's state diverges from what it should be,\n   not where the error surfaces. Explain why it happens.\n5. **Fix** the cause, not the symptom. The failing test now passes; run the whole suite.\n6. **Look around**: search for the same mistake elsewhere in the codebase.\n\nWrite-up:\n\n```markdown\n## Bug: <title>\n**Steps to reproduce** …\n**Expected** … **Actual** …\n**Root cause** …\n**Fix** … (commit / PR)\n**Regression test** `path/to/test`\n```\n"
+			}
+		},
+		{
+			"id": "release-notes",
+			"name": "Release Notes",
+			"type": "spec-template",
+			"author": "WorkPilot",
+			"color": "#9333ea",
+			"tags": [
+				"release",
+				"changelog",
+				"documentation"
+			],
+			"tagline": {
+				"en": "Write release notes users understand from the commits",
+				"fr": "Rédiger des notes de version compréhensibles à partir des commits"
+			},
+			"description": {
+				"en": "Turns the commits and merged pull requests since the last tag into release notes grouped by what users notice, in plain language, with breaking changes first.",
+				"fr": "Transforme les commits et pull requests fusionnées depuis le dernier tag en notes de version groupées par ce que l'utilisateur remarque, en langage simple, les changements cassants en premier."
+			},
+			"skill": {
+				"description": "Write release notes from the commits and merged pull requests since the last tag, grouped by user impact, breaking changes first.",
+				"body": "# Release notes\n\n1. Collect the changes since the last tag: `git log <last-tag>..HEAD --oneline` and the merged\n   pull requests. Ignore pure refactors, CI and test-only changes unless they matter to users.\n2. Group them:\n   - **Breaking changes** (with the migration step for each)\n   - **New features**\n   - **Improvements**\n   - **Fixes**\n   - **Security**\n3. Write each item for the user, not the developer: what they can now do or what no longer goes\n   wrong, in one sentence, present tense. Mention the PR number at the end.\n4. Follow the project's existing format (CHANGELOG.md, Keep a Changelog, GitHub release).\n5. Put a two-line summary at the top: the headline change and who should upgrade.\n"
+			}
+		},
+		{
+			"id": "conventional-commits",
+			"name": "Conventional Commits",
+			"type": "custom-prompt",
+			"author": "WorkPilot",
+			"color": "#0891b2",
+			"tags": [
+				"git",
+				"commits",
+				"conventional-commits"
+			],
+			"tagline": {
+				"en": "Clear commit messages in the Conventional Commits format",
+				"fr": "Des messages de commit clairs au format Conventional Commits"
+			},
+			"description": {
+				"en": "Writes commit messages in the Conventional Commits format from the staged diff: type, scope, imperative summary and a body that says why.",
+				"fr": "Rédige des messages de commit au format Conventional Commits à partir du diff indexé : type, portée, résumé à l'impératif et un corps qui dit pourquoi."
+			},
+			"skill": {
+				"description": "Write a commit message in the Conventional Commits format from the staged diff, with a body explaining why.",
+				"body": "# Conventional Commits\n\nRead the staged diff (`git diff --cached`) and write:\n\n```\n<type>(<scope>): <summary>\n\n<body>\n\n<footer>\n```\n\n- **type**: `feat` (new behavior), `fix` (bug fix), `refactor` (no behavior change), `perf`,\n  `test`, `docs`, `build`, `ci`, `chore`.\n- **scope**: the module or area, as used in the project's history (`git log --oneline`).\n- **summary**: imperative, lower case, no final period, 72 characters at most\n  (\"add order cancellation endpoint\").\n- **body**: why the change is needed and what it changes, wrapped at 72 columns. Not a list of\n  files.\n- **footer**: `BREAKING CHANGE: <what breaks and how to migrate>`, `Closes #123`.\n\nIf the diff mixes unrelated changes, say so and propose how to split it into several commits.\n"
+			}
+		},
+		{
+			"id": "docker-review",
+			"name": "Dockerfile Review",
+			"type": "custom-prompt",
+			"author": "WorkPilot",
+			"color": "#2496ED",
+			"tags": [
+				"docker",
+				"containers",
+				"devops",
+				"security"
+			],
+			"tagline": {
+				"en": "Smaller, faster, safer container images",
+				"fr": "Des images de conteneur plus petites, plus rapides et plus sûres"
+			},
+			"description": {
+				"en": "Reviews Dockerfiles and compose files: multi-stage builds, layer caching, pinned base images, non-root user, no secret in layers, health checks.",
+				"fr": "Relit Dockerfiles et fichiers compose : builds multi-étapes, cache des couches, images de base épinglées, utilisateur non root, aucun secret dans les couches, health checks."
+			},
+			"skill": {
+				"description": "Review Dockerfiles and compose files for image size, build caching, base image pinning, non-root execution, secrets and health checks.",
+				"body": "# Dockerfile review\n\n- **Base image**: official or vendor image, pinned to a version (and ideally a digest), slim or\n  distroless variant for runtime (`mcr.microsoft.com/dotnet/aspnet:<version>`, `node:<version>-slim`).\n- **Multi-stage**: build tools stay in the build stage; the runtime stage copies only the\n  published output.\n- **Caching**: copy dependency manifests first (`*.csproj` + `dotnet restore`, `package.json` +\n  lockfile + install), then the source, so code changes do not invalidate the dependency layer.\n- **Size**: no package manager caches left (`apk add --no-cache`, apt lists cleaned in the same layer), a\n  `.dockerignore` excluding `.git`, `bin/obj`, `node_modules`, local env files.\n- **Security**: run as a non-root `USER`; no secret in `ENV`, `ARG` or a copied file (use build\n  secrets `--mount=type=secret` or runtime configuration); no install script downloaded from an\n  unpinned URL and run in the build.\n- **Runtime**: `HEALTHCHECK` or an orchestrator probe, exec-form `ENTRYPOINT`, signals handled\n  for graceful shutdown, ports documented with `EXPOSE`.\n- **Compose**: no secrets in the file, named volumes for data, `depends_on` with health\n  conditions.\n\nGive each finding with the line and the corrected instruction.\n"
+			}
+		},
+		{
+			"id": "sql-review",
+			"name": "SQL Review",
+			"type": "custom-prompt",
+			"author": "WorkPilot",
+			"color": "#0369a1",
+			"tags": [
+				"sql",
+				"database",
+				"performance",
+				"migrations"
+			],
+			"tagline": {
+				"en": "Review SQL queries and schema changes for correctness and speed",
+				"fr": "Relire requêtes SQL et changements de schéma : exactitude et performance"
+			},
+			"description": {
+				"en": "Checks SQL for correctness (NULL handling, joins, transactions), performance (indexes, plans, sargable predicates) and safe schema migrations.",
+				"fr": "Vérifie le SQL : exactitude (NULL, jointures, transactions), performance (index, plans, prédicats indexables) et migrations de schéma sûres."
+			},
+			"skill": {
+				"description": "Review SQL queries and schema migrations for correctness, performance (indexes, plans) and safe deployment.",
+				"body": "# SQL review\n\n## Correctness\n\n- `NULL` semantics: `= NULL` never matches; `NOT IN` with a nullable subquery returns nothing.\n- Joins: a `LEFT JOIN` filtered in `WHERE` becomes an inner join; duplicates from one-to-many\n  joins inflate aggregates.\n- Transactions around multi-statement writes; isolation level adequate for the read-modify-write.\n- Parameters, never string concatenation of input.\n\n## Performance\n\n- Read the plan (`EXPLAIN ANALYZE`, actual execution plan). Look for scans on large tables,\n  key lookups in loops, sorts spilling to disk.\n- Predicates are sargable: no function on the indexed column (`WHERE YEAR(created_at) = 2026`\n  becomes a range), no leading wildcard `LIKE '%x'`.\n- Composite indexes match the filter + sort order; covering indexes for hot queries.\n- `SELECT *` replaced by the needed columns; pagination with keyset for deep pages.\n\n## Migrations\n\n- Backward compatible with the running version (expand, migrate, contract).\n- Index creation online/concurrently on big tables; long locks flagged.\n- Data backfills in batches.\n"
+			}
+		},
+		{
+			"id": "dependency-upgrade",
+			"name": "Dependency Upgrade",
+			"type": "agent",
+			"author": "WorkPilot",
+			"color": "#65a30d",
+			"tags": [
+				"dependencies",
+				"upgrade",
+				"security",
+				"maintenance"
+			],
+			"tagline": {
+				"en": "Upgrade dependencies safely, one breaking change at a time",
+				"fr": "Mettre à jour les dépendances sans risque, un changement cassant à la fois"
+			},
+			"description": {
+				"en": "Lists outdated and vulnerable packages, reads their changelogs for breaking changes, upgrades in safe batches and runs the tests after each.",
+				"fr": "Liste les paquets obsolètes et vulnérables, lit leurs changelogs pour les changements cassants, met à jour par lots sûrs et lance les tests après chaque lot."
+			},
+			"skill": {
+				"description": "Upgrade project dependencies safely: find outdated and vulnerable packages, read changelogs for breaking changes, upgrade in batches with tests.",
+				"body": "# Dependency upgrade\n\n1. **Inventory**: run the ecosystem's tools: `dotnet list package --outdated --vulnerable`,\n   `npm outdated` + `npm audit`, `pip list --outdated` + `pip-audit`. Note the current and\n   latest versions.\n2. **Prioritize**: security fixes first, then patch and minor versions, then majors one by one.\n3. **Read the changelog** of every major upgrade (release notes, migration guide) and list the\n   breaking changes that touch this codebase (search for the APIs mentioned).\n4. **Upgrade in batches**: all patch/minor updates together, each major separately. Update the\n   lockfile with the tool, never by hand.\n5. **Verify after each batch**: build, full test suite, and a quick run of the app. Fix what\n   breaks before the next batch.\n6. **Report**: a table of package, from, to, breaking changes handled, and what was left out\n   with the reason (blocked by another package, needs a decision).\n"
+			}
+		},
+		{
+			"id": "react-component-review",
+			"name": "React Component Review",
+			"type": "custom-prompt",
+			"author": "WorkPilot",
+			"color": "#61DAFB",
+			"tags": [
+				"react",
+				"frontend",
+				"typescript",
+				"hooks"
+			],
+			"tagline": {
+				"en": "Hooks, state, rendering and accessibility of React components",
+				"fr": "Hooks, état, rendu et accessibilité des composants React"
+			},
+			"description": {
+				"en": "Reviews React and TypeScript components: hook rules and effect dependencies, derived state, keys, memoization where it pays, accessibility and tests.",
+				"fr": "Relit des composants React et TypeScript : règles des hooks et dépendances des effets, état dérivé, clés, mémoïsation utile, accessibilité et tests."
+			},
+			"skill": {
+				"description": "Review React + TypeScript components for hook usage, state design, rendering performance, accessibility and testability.",
+				"body": "# React component review\n\n- **Effects**: an effect synchronizes with something outside React; data that can be computed\n  from props/state is computed during render, not stored and synced with `useEffect`. Every\n  dependency is listed; cleanups remove subscriptions and timers; fetches handle unmount or\n  race conditions.\n- **State**: minimal and not duplicated; lifted only as far as needed; server state in the\n  project's data library (React Query, SWR, store) rather than ad-hoc effects.\n- **Rendering**: list keys are stable ids, not indexes; `memo`/`useMemo`/`useCallback` only where\n  a measured re-render cost or a referential dependency needs it; big lists virtualized.\n- **Types**: props typed without `any`; event handlers typed; discriminated unions for variants.\n- **Accessibility**: native elements for interaction, labels for inputs, focus handling in\n  dialogs, no information conveyed by color alone.\n- **i18n**: no hard-coded user-visible text when the project translates.\n- **Tests**: behavior tested through the rendered output (Testing Library queries by role and\n  label), not through internal state.\n\nGive each finding with `path:line` and the corrected code.\n"
+			}
+		}
+	]
+}

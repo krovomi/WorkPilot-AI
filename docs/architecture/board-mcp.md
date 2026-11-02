@@ -8,7 +8,57 @@ MCP to any agent that speaks it.
 
 ## Starting it
 
-`apps/backend/runners/board_mcp.py`, stdio, one project per process:
+`apps/backend/runners/board_mcp.py`, stdio, one project per process. The
+client starts it; WorkPilot does not need to be open.
+
+### From the app
+
+Project settings → Integrations → **Use from other apps**
+(`renderer/components/settings/integrations/BoardMcpIntegration.tsx`). One
+row per client, each with its state (added, out of date, not added, not
+detected), a button that writes the entry, and what to paste by hand:
+
+| Client | Where the entry goes | How the app writes it |
+|---|---|---|
+| Claude Code | `~/.claude.json`, user scope | `claude mcp add-json --scope user` (Claude Code rewrites that file while it runs) |
+| Codex | `~/.codex/config.toml` (`CODEX_HOME`), `[mcp_servers.<name>]` | the table, alone, added or replaced |
+| Gemini CLI | `~/.gemini/settings.json`, `mcpServers` | JSON merge |
+| GitHub Copilot CLI | `~/.copilot/mcp-config.json`, `mcpServers`, `type: "local"` | JSON merge |
+| VS Code (Copilot Chat) | `<appData>/Code/User/mcp.json`, `servers`, `type: "stdio"` | JSON merge |
+| Cursor | `~/.cursor/mcp.json`, `mcpServers` | JSON merge |
+| Claude Desktop | `<appData>/Claude/claude_desktop_config.json`, `mcpServers` | JSON merge |
+| Windsurf | `~/.codeium/windsurf/mcp_config.json`, `mcpServers` | JSON merge |
+| OpenCode | `~/.config/opencode/opencode.json` (`XDG_CONFIG_HOME`), `mcp`, `command` as one array | JSON merge |
+
+The code is `main/board-mcp/` (formats in `clients.ts`, files in
+`service.ts`) and `main/ipc-handlers/board-mcp-handlers.ts`.
+
+- **The name** is `workpilot-<project>` (letters, digits, dashes), so two
+  projects live side by side in the same client.
+- **The command** is the app's own Python, isolated (`-I -X utf8`), on the
+  app's backend: `python -I -X utf8 <backend>/runners/board_mcp.py
+  --project-dir <project>`. `-I` keeps a client's `PYTHONHOME` or
+  `PYTHONPATH` out; the server needs only the standard library, and the
+  runner adds the backend folder itself. The renderer names a project and a
+  client from a closed list; the command and the files are found in the main
+  process.
+- **Out of date**: an entry of that name that runs another command (an older
+  install, another Python, a Linux AppImage mounted elsewhere) shows "Out of
+  date", and the button rewrites it.
+- **Files are kept**: only the entry changes, every other key stays. The
+  first write keeps a copy beside the file (`<file>.workpilot.bak`), and the
+  file is replaced through a temporary sibling. A file that does not parse
+  (JSON with comments, a section that is not an object) is never rewritten:
+  the row says so and offers the snippet.
+- **Not installed**: a client whose folder is missing gets no button, only
+  the snippet. The app does not create a client's configuration from nothing.
+- **Claude Code** is written only through its CLI, and only when `claude`
+  runs without a shell; a `.cmd` launcher (npm on Windows) gets the command to
+  paste instead.
+- **A server project** (server mode) has no entry here: its board is the
+  server's, reached over HTTP with the server's tokens.
+
+### By hand
 
 ```bash
 claude mcp add workpilot-board -- python <WorkPilot>/apps/backend/runners/board_mcp.py --project-dir <project>
@@ -84,11 +134,13 @@ there is nothing to subscribe to.
 ## Limits
 
 - One project per server process. A person with several projects adds one
-  server per project.
+  server per project (the app names each `workpilot-<project>`).
 - The server reads and writes the board's files; it does not talk to the
   running desktop app. The app sees a new card the next time it reads the
   project, as it sees the automations' cards.
 - No tool reads a card's logs or diff. `get_card` is a summary; the card in the
   app is the detail.
 
-Tests: `pytest tests/board_mcp -q`.
+Tests: `pytest tests/board_mcp -q`; the app side, `vitest run src/main/board-mcp
+src/renderer/components/settings/integrations` (from `apps/frontend`), which also
+runs the command written in a config and checks it answers `initialize`.

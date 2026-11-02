@@ -18,6 +18,7 @@ import {
 	Monitor,
 	Package,
 	Palette,
+	Plug,
 	Repeat,
 	Save,
 	Search,
@@ -157,6 +158,7 @@ export type ProjectSettingsSection =
 	| "figma"
 	| "cicd"
 	| "automations"
+	| "board-mcp"
 	| "github"
 	| "gitlab"
 	| "linear"
@@ -235,6 +237,12 @@ const createSettingsThemes = (t: {
 				id: "automations",
 				icon: Repeat,
 				label: t("automations.title"),
+				type: "project",
+			},
+			{
+				id: "board-mcp",
+				icon: Plug,
+				label: t("boardMcp.navLabel"),
 				type: "project",
 			},
 			{

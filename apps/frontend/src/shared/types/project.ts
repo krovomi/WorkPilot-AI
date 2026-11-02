@@ -441,6 +441,12 @@ export interface CustomMcpServer {
 	command?: string;
 	/** Arguments for the command (for type: 'command'). e.g., ['-y', 'my-mcp-server'] */
 	args?: string[];
+	/**
+	 * Environment of the process (for type: 'command'), e.g. the API key a
+	 * catalog server reads. The backend refuses loader variables (PATH,
+	 * NODE_OPTIONS, LD_*…): see `core.client._valid_mcp_server_env`.
+	 */
+	env?: Record<string, string>;
 	/** HTTP URL (for type: 'http'). e.g., 'https://mcp.example.com/mcp' */
 	url?: string;
 	/** HTTP headers (for type: 'http'). e.g., { "Authorization": "Bearer ..." } */
