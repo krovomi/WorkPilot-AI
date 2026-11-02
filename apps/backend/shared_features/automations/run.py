@@ -36,23 +36,31 @@ EXPECTED = (
 
 
 class Deps(Protocol):
-    def now(self) -> datetime: ...
+    def now(self) -> datetime:
+        """The time of this pass."""
 
     async def read_source(
         self, rule: dict[str, Any], ledger: dict[str, Any]
-    ) -> SourceResult: ...
+    ) -> SourceResult:
+        """The events of the rule's source not yet seen in its ledger."""
 
-    async def create_card(self, rule: dict[str, Any], event: Event) -> str: ...
+    async def create_card(self, rule: dict[str, Any], event: Event) -> str:
+        """Create the card for an event; returns its id."""
 
-    async def start_card(self, rule: dict[str, Any], card_id: str) -> None: ...
+    async def start_card(self, rule: dict[str, Any], card_id: str) -> None:
+        """Start the spec run of a card the rule created."""
 
-    def is_card_open(self, card_id: str) -> bool: ...
+    def is_card_open(self, card_id: str) -> bool:
+        """Whether the card is still on the board and not done."""
 
-    def issue_numbers_on_board(self, forge: str) -> set[int]: ...
+    def issue_numbers_on_board(self, forge: str) -> set[int]:
+        """The issue numbers of that forge already linked to a card."""
 
-    def has_pr_review(self, rule: dict[str, Any], number: int) -> bool: ...
+    def has_pr_review(self, rule: dict[str, Any], number: int) -> bool:
+        """Whether that PR or MR already has a review, saved or running."""
 
-    async def start_pr_review(self, rule: dict[str, Any], number: int) -> None: ...
+    async def start_pr_review(self, rule: dict[str, Any], number: int) -> None:
+        """Start the review job of that PR or MR as the rule's owner."""
 
 
 @dataclass

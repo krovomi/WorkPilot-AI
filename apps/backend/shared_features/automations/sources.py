@@ -44,9 +44,11 @@ class Forge(Protocol):
     forge: str
     slug: str
 
-    async def get(self, path: str, params: dict[str, str] | None = None) -> Any: ...
+    async def get(self, path: str, params: dict[str, str] | None = None) -> Any:
+        """GET below the project's API root; the decoded JSON."""
 
-    async def me(self) -> str: ...
+    async def me(self) -> str:
+        """The login of the token's owner on the forge."""
 
 
 @dataclass
