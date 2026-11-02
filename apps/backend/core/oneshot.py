@@ -37,7 +37,9 @@ logger = logging.getLogger(__name__)
 # For a build that is the right trade: the task runs. For a caller that is
 # *comparing* providers it is the wrong one, because the answer comes back
 # labelled with a vendor that never saw the prompt. `require_provider` is how
-# such a caller says so; see `oneshot_completion`.
+# such a caller says so; see `oneshot_completion`. It also keeps the model: a
+# client that would retry on another model when the provider refuses this one
+# (Copilot's `model_not_supported`) fails instead.
 _DIRECT_PROVIDERS = frozenset(
     {
         "claude",
@@ -261,6 +263,7 @@ def _build_client(
     *,
     chosen: bool = False,
     thinking_level: str | None = None,
+    exact_model: bool = False,
 ):
     cwd = str(Path(project_dir).resolve()) if project_dir else None
     from offline_policy import local_endpoint, resolve_offline_route
@@ -291,6 +294,9 @@ def _build_client(
             cwd=cwd,
             agent_type="commit_message",
             max_turns=max_turns,
+            # A caller that compares models wants this one's answer or a
+            # failure, never another model's answer under its name.
+            allow_model_fallback=not exact_model,
         )
 
     if provider == "openai":
@@ -528,6 +534,7 @@ async def oneshot_completion(
         max_turns,
         chosen=provider_chosen,
         thinking_level=thinking_level,
+        exact_model=require_provider,
     )
 
     text = ""

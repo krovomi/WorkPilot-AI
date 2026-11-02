@@ -13,9 +13,10 @@ from `models_registry.py`, so the UI never sees an empty dropdown — and a mode
 released after that file was last edited still reaches it.
 
 Supported providers (with live fetching):
-    anthropic, openai, google, mistral, deepseek, grok, ollama, lm-studio, llama-cpp
+    anthropic, openai, google, mistral, deepseek, grok, ollama, lm-studio,
+    llama-cpp, copilot (through the GitHub CLI's token)
 
-Other providers (copilot, aws, meta, custom, windsurf, …) get the static
+Other providers (aws, meta, custom, windsurf, …) get the static
 catalog without a live fetch.
 """
 
@@ -590,8 +591,25 @@ def _fetch_windsurf() -> list[dict[str, Any]]:
     return []
 
 
+def _fetch_copilot() -> list[dict[str, Any]]:
+    """The models GitHub serves to this account's Copilot (``/models``).
+
+    The registry lists every model released to Copilot; this list is the
+    account's: its plan, its organisation's policy, what the user enabled.
+    """
+    try:
+        from .copilot_models import fetch_catalog
+    except ImportError:
+        from copilot_models import fetch_catalog  # type: ignore[no-redef]
+
+    return [
+        {**entry, "tier": _tier_for_label(entry["label"])} for entry in fetch_catalog()
+    ]
+
+
 _FETCHERS = {
     "anthropic": _fetch_anthropic,
+    "copilot": _fetch_copilot,
     "claude": _fetch_anthropic,
     "openai": _fetch_openai,
     "google": _fetch_google,
