@@ -19,6 +19,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
 /** Product name: a proper noun, identical in every language. */
 const NAME = "Hermes Agent";
+const SHORT_NAME = "Hermes";
 const DOCS_URL = "https://github.com/NousResearch/hermes-agent";
 
 type BadgeState = "loading" | "ready" | "degraded" | "absent" | "error";
@@ -117,7 +118,7 @@ export function HermesStatusBadge({ isCollapsed = false }: HermesStatusBadgeProp
 							</div>
 							{!isCollapsed && (
 								<>
-									<span className="truncate">Hermes</span>
+									<span className="truncate">{SHORT_NAME}</span>
 									{pending > 0 && (
 										<span className="ml-auto text-[10px] bg-primary/15 text-primary px-1.5 py-0.5 rounded">
 											{pending}
