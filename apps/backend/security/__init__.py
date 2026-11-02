@@ -224,7 +224,7 @@ __all__ = [
 # `tests/backend/security_suite/test_injection_scanner.py`. The two were not
 # redundant: each caught what the other missed, which is why neither could
 # simply be deleted. Their catalogues are merged into `injection_guard`, the
-# one every caller already reaches (`security.untrusted`, `agents.base_agent`,
+# one every caller already reaches (`security.untrusted`,
 # `runners/injection_guard_runner.py`), and these names re-export it so an
 # existing `from security import InjectionScanner` keeps working.
 #

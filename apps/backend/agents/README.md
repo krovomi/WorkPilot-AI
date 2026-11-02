@@ -10,24 +10,19 @@ session runner, memory access, the specialised agents the UI exposes, and the
 apps/backend/agents/
 ├── __init__.py              # Public API (lazy exports, see below)
 ├── base.py                  # Shared constants (AUTO_CONTINUE_DELAY_SECONDS, HUMAN_INTERVENTION_FILE)
-├── base_agent.py            # BaseAgent abstraction shared by the specialised agents
 ├── scanner_base.py          # Base classes for "scanner-style" agents
 ├── utils.py                 # Git helpers and implementation-plan access
-├── memory.py                # Session memory in the shared brain
 ├── memory_manager.py        # Memory diagnostics / context retrieval used by the public API
 ├── session.py               # run_agent_session(), post_session_processing()
 ├── tool_display.py          # How a tool call reads in the activity feed and streaming view
-├── session_history.py       # Record and replay sessions
 ├── planner.py               # Follow-up planner
 ├── coder.py                 # run_autonomous_agent(): the main autonomous loop
 ├── hot_swap.py              # Switch provider / model / effort during a running phase
 ├── loop_detection.py        # Anti-burnout loop detector for the coder
 ├── debugger.py, debugger_store.py   # Breakpoints, inspection, persisted debug state
-├── decision_logger.py       # Decision-tree capture for the UI
 ├── agent_audit.py           # Audit-trail facade for coder / planner / QA
 ├── feedback_learning.py     # Collect user feedback on agent outputs
 ├── feature_wiring.py        # Wiring of the model router / cognitive context features
-├── pair_programming.py      # Interactive pair-programming mode
 ├── refactorer.py            # Refactoring with smell detection
 ├── documenter.py            # Documentation generation
 ├── impact_analyzer.py       # PR impact analysis

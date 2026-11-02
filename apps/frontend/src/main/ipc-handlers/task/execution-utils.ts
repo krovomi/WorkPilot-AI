@@ -41,6 +41,7 @@ import { checkGitStatus } from "../../project-initializer";
 import { readSettingsFile } from "../../settings-utils";
 import { taskStateManager } from "../../task-state-manager";
 import { findTaskAndProject } from "./shared";
+import { discardSpecIfStale } from "./stale-spec";
 import { allSpecDirs, getSpecPaths } from "./resume-task";
 
 /**
@@ -430,6 +431,7 @@ export function setupTaskExecution(
 
 	// Check if spec.md exists
 	const specFilePath = path.join(specDir, AUTO_BUILD_PATHS.SPEC_FILE);
+	discardSpecIfStale(specDir, task.subtasks.length);
 	const hasSpec = existsSync(specFilePath);
 	const needsSpecCreation = !hasSpec;
 	const needsImplementation = hasSpec && task.subtasks.length === 0;

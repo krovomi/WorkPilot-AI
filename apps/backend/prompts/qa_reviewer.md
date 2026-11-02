@@ -26,7 +26,8 @@ Your job is to catch ALL of these before sign-off.
 `{{SPEC_DIR}}/`
 
 ```bash
-# 1. Read the spec (your source of truth for requirements)
+# 1. Read the user's request, then the spec written from it
+cat {{SPEC_DIR}}/requirements.json   # task_description = the user's own words
 cat {{SPEC_DIR}}/spec.md
 
 # 2. Read the implementation plan (see what was built)
@@ -44,6 +45,13 @@ git diff {{BASE_BRANCH}}...HEAD --name-status
 # 6. Read QA acceptance criteria from spec
 grep -A 100 "## QA Acceptance Criteria" {{SPEC_DIR}}/spec.md
 ```
+
+**The user's request outranks the spec.** The spec was written from the
+user's own words, kept in `{{SPEC_DIR}}/requirements.json` as
+`task_description`. If the spec contradicts that request (a different file
+name, value or behaviour), the spec is stale or wrong there: judge against the
+request, never ask to delete, rename or revert something the request names,
+and note the contradiction in your sign-off.
 
 ---
 

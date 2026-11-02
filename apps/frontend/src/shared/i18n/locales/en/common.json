@@ -465,7 +465,9 @@
 			"canImportFrom": "Can import from: {{imports}}"
 		},
 		"deepContextSections_one": "{{count}} section",
-		"deepContextSections_other": "{{count}} sections"
+		"deepContextSections_other": "{{count}} sections",
+		"verdictOutdated": "AI verdict may be outdated",
+		"rerunReviewSuggestion": "Consider re-running the review after resolving these issues."
 	},
 	"downloads": {
 		"toggleExpand": "Toggle download details",
@@ -1493,5 +1495,24 @@
 		"more": "More",
 		"streaming": "Streaming",
 		"running": "Running"
+	},
+	"githubCopilot": {
+		"authTerminal": {
+			"failedToCreate": "Failed to create the terminal",
+			"unknownError": "Unknown error",
+			"instructionTitle": "GitHub Copilot authentication",
+			"step1": "Press Enter to run gh auth login",
+			"step2": "Complete the sign-in in your browser",
+			"step3": "Come back here: it is detected automatically",
+			"authFailed": "Authentication failed",
+			"connecting": "Connecting…",
+			"authenticate": "Authenticate: {{profileName}}",
+			"completeSetup": "Set up: {{profileName}}",
+			"authenticatedAs": "Authenticated as {{username}}",
+			"authenticated": "Authenticated!",
+			"authError": "Authentication error",
+			"authenticatingMessage": "Finish the sign-in in your browser…",
+			"successMessage": "Authentication succeeded! Closing…"
+		}
 	}
 }

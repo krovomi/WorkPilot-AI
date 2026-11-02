@@ -158,6 +158,7 @@ import {
 	type SortableKind,
 } from "./sidebar/sortable-primitives";
 import { ActivityBadge } from "./sidebar/ActivityBadge";
+import { NavIcon } from "./sidebar/ExperimentalMarker";
 import { EXPERIMENTAL_VIEWS } from "./sidebar/experimental-views";
 import {
 	entryIdOfView,
@@ -1564,20 +1565,12 @@ export function Sidebar({
 						getLayoutClasses(),
 					)}
 				>
-					<Icon className="h-4 w-4 shrink-0" />
+					<NavIcon icon={Icon} experimental={isItemExperimental(item)} />
 					{!isCollapsed && (
 						<>
-							<span className="flex-1 text-left truncate">
+							<span className="flex-1 text-left truncate" title={t(item.labelKey)}>
 								{t(item.labelKey)}
 							</span>
-							{isItemExperimental(item) && (
-								<span
-									title={t("navigation:experimental.tooltip")}
-									className="shrink-0 rounded border border-amber-400/40 px-1 text-[10px] uppercase tracking-wide text-amber-500"
-								>
-									{t("navigation:experimental.badge")}
-								</span>
-							)}
 							<ActivityBadge badge={badge} attention={hasAttention} />
 							{item.shortcut && (
 								<kbd
@@ -1612,6 +1605,9 @@ export function Sidebar({
 					<TooltipTrigger asChild>{button}</TooltipTrigger>
 					<TooltipContent side="right">
 						<span>{t(item.labelKey)}</span>
+						{isItemExperimental(item) && (
+							<span className="ml-2 text-amber-500">{t("navigation:experimental.badge")}</span>
+						)}
 						{item.shortcut && (
 							<kbd className="ml-2 rounded border border-border bg-secondary px-1 font-mono text-[10px]">
 								{item.shortcut}
@@ -1656,8 +1652,8 @@ export function Sidebar({
 					isActive && "bg-accent text-accent-foreground",
 				)}
 			>
-				<item.icon className="h-3 w-3 shrink-0" />
-				<span className="flex-1 truncate">{t(item.labelKey)}</span>
+				<NavIcon icon={item.icon} experimental={isItemExperimental(item)} size="sm" />
+				<span className="flex-1 truncate" title={t(item.labelKey)}>{t(item.labelKey)}</span>
 				<ActivityBadge badge={badge} />
 				{item.shortcut && (
 					<kbd className="rounded border border-border bg-secondary px-1 font-mono text-[9px]">

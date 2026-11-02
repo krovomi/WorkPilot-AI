@@ -25,6 +25,22 @@ export const AGENT_CLI_DOCS: Readonly<Record<AgentCliTool, string>> = {
 };
 
 /**
+ * What a user runs once to sign in to each CLI. WorkPilot types it into an
+ * embedded terminal and leaves Enter to the user: each CLI owns its login and
+ * stores its own credentials, which WorkPilot never reads.
+ * - OpenCode: `opencode auth login` picks a provider and stores its key.
+ * - pi: the interactive session, where `/login` signs in to a subscription.
+ * - Antigravity and Gemini CLI: the first interactive start asks for a
+ *   Google sign-in that later headless runs reuse.
+ */
+export const AGENT_CLI_LOGIN_COMMAND: Readonly<Record<AgentCliTool, string>> = {
+	opencode: "opencode auth login",
+	antigravity: "agy",
+	pi: "pi",
+	"gemini-cli": "gemini",
+};
+
+/**
  * How WorkPilot installs a CLI that is missing, from the vendor's own
  * channels: the npm package when there is one (and a Node.js recent enough
  * for it), else the vendor's install script. Each CLI still owns its sign-in.

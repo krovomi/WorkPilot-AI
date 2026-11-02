@@ -71,12 +71,7 @@ import { registerBenchHandlers } from "./bench-handlers";
 import { registerCredentialHandlers } from "./credential-handlers";
 import { registerCrossLanguageTranslationHandlers } from "./cross-language-translation-handlers";
 import { registerDebugHandlers } from "./debug-handlers";
-import { registerDecisionLoggerHandlers } from "./decision-logger-handlers";
 import { registerDocDriftHandlers } from "./doc-drift-handlers";
-import {
-	registerDocumentationAgentHandlers,
-	setupDocumentationAgentEventForwarding,
-} from "./documentation-agent-handlers";
 import { registerEnvHandlers } from "./env-handlers";
 import { registerEnvSnapshotHandlers } from "./env-snapshot-handlers";
 import { registerOfflineModeHandlers } from "./offline-mode-handlers";
@@ -193,12 +188,7 @@ export { registerCostPredictorHandlers } from "./cost-predictor-handlers";
 export { registerCredentialHandlers } from "./credential-handlers";
 export { registerCrossLanguageTranslationHandlers } from "./cross-language-translation-handlers";
 export { registerDebugHandlers } from "./debug-handlers";
-export { registerDecisionLoggerHandlers } from "./decision-logger-handlers";
 export { registerDocDriftHandlers } from "./doc-drift-handlers";
-export {
-	registerDocumentationAgentHandlers,
-	setupDocumentationAgentEventForwarding,
-} from "./documentation-agent-handlers";
 export { registerEnvHandlers } from "./env-handlers";
 export { registerEnvSnapshotHandlers } from "./env-snapshot-handlers";
 export { registerOfflineModeHandlers } from "./offline-mode-handlers";
@@ -464,13 +454,6 @@ export function setupIpcHandlers(
 	// Performance Profiler Agent handlers
 	registerPerformanceProfilerHandlers();
 	setupPerformanceProfilerEventForwarding(getMainWindow);
-
-	// Documentation Agent handlers
-	registerDocumentationAgentHandlers();
-	setupDocumentationAgentEventForwarding(getMainWindow);
-
-	// Agent Decision Logger handlers (Feature 30)
-	registerDecisionLoggerHandlers();
 
 	// AI Pair Programming handlers (Feature 10)
 	registerPairProgrammingHandlers(getMainWindow);

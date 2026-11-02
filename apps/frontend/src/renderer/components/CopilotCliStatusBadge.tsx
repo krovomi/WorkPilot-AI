@@ -362,22 +362,22 @@ export function CopilotCliStatusBadge({
 				return t("settings:copilot.copilotCliUpToDate", "Copilot CLI is up to date");
 			case "outdated":
 				return t(
-					"copilot:copilotCliUpdateAvailable",
+					"settings:copilot.copilotCliUpdateAvailable",
 					"Copilot CLI update available",
 				);
 			case "not-found":
 				return t(
-					"copilot:copilotCliExtensionNotInstalled",
+					"settings:copilot.copilotCliExtensionNotInstalled",
 					"Copilot CLI extension not installed",
 				);
 			case "gh-missing":
 				return t(
-					"copilot:gitHubCliNotFound",
+					"settings:copilot.gitHubCliNotFound",
 					"GitHub CLI (gh) not found — required for Copilot",
 				);
 			case "error":
 				return t(
-					"copilot:errorCheckingCopilotCli",
+					"settings:copilot.errorCheckingCopilotCli",
 					"Error checking Copilot CLI",
 				);
 		}
@@ -390,7 +390,7 @@ export function CopilotCliStatusBadge({
 		}
 		if (installationsError) {
 			return t(
-				"copilot:failedToLoadInstallations",
+				"settings:copilot.failedToLoadInstallations",
 				"Failed to load installations",
 			);
 		}
@@ -477,7 +477,7 @@ export function CopilotCliStatusBadge({
 										t("settings:copilot.updateAvailable", "Update available")}
 									{status === "not-found" &&
 										t(
-											"copilot:extensionNotInstalled",
+											"settings:copilot.extensionNotInstalled",
 											"Extension not installed",
 										)}
 									{status === "gh-missing" &&

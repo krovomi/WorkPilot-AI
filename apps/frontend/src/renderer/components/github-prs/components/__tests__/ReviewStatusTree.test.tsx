@@ -14,11 +14,12 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
-import type { NewCommitsCheck } from "@preload/api/modules/github-api";
+import type {
+	NewCommitsCheck,
+	PRReviewResult,
+} from "@preload/api/modules/github-api";
 import i18n from "@shared/i18n";
 import { render, screen } from "@testing-library/react";
-// @ts-expect-error - vitest resolves this correctly
-import type { PRReviewResult } from "../../../hooks/useGitHubPRs";
 import { type ReviewStatus, ReviewStatusTree } from "../ReviewStatusTree";
 
 /**

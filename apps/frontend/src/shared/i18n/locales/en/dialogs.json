@@ -29,7 +29,12 @@
 		"readyToUse": "Your project is now ready to use with WorkPilot AI!",
 		"skip": "Skip for now",
 		"initializeGit": "Initialize Git",
-		"initialCommitMessage": "Initial commit"
+		"initialCommitMessage": "Initial commit",
+		"errorTitle": "Initialization failed",
+		"errorDesc": "Could not initialize the Git repository.",
+		"skipTitle": "Git setup skipped",
+		"skipDesc": "You can initialize Git later.",
+		"setupRemote": "Set up the remote"
 	},
 	"githubSetup": {
 		"title": "Configure GitHub",
@@ -274,7 +279,8 @@
 		"targetAlreadyExists": "That folder already exists, so creating it will fail.",
 		"locationLooksLikeProject": "This location is already a project ({{markers}}). Creating would add an empty sub-folder inside it, and the empty folder is what gets added.",
 		"openThisFolderInstead": "Open this folder instead",
-		"locationInsideRepository": "This location is inside the repository at {{repository}}. Creating would add an empty sub-folder there, and the empty folder is what gets added."
+		"locationInsideRepository": "This location is inside the repository at {{repository}}. Creating would add an empty sub-folder there, and the empty folder is what gets added.",
+		"gitRootWarningTitle": "Possible misconfiguration"
 	},
 	"customModel": {
 		"title": "Custom Model Configuration",
@@ -431,5 +437,16 @@
 		"authenticateNew": "Authenticate New Account",
 		"hideToken": "Hide token",
 		"showToken": "Show token"
+	},
+	"azureConfig": {
+		"title": "Set up Azure DevOps",
+		"desc": "Enter the organization URL and a PAT token.",
+		"orgUrl": "Organization URL",
+		"orgUrlPlaceholder": "https://dev.azure.com/myorganisation",
+		"pat": "PAT token",
+		"patPlaceholder": "Personal Access Token",
+		"required": "All fields are required.",
+		"invalidUrl": "Invalid Azure DevOps URL.",
+		"save": "Confirm"
 	}
 }

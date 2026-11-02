@@ -98,5 +98,7 @@
 		"stubNotice": "Le point d'accès HTTP tourne en mode bouchon (repli déterministe). Pour une revue complète par le SDK, le runtime de l'agent doit brancher un client invocable dans le processus.",
 		"running": "En cours…",
 		"run": "Lancer la revue virtuelle"
-	}
+	},
+	"showTimeline": "Afficher la chronologie…",
+	"checkPromotion": "Vérifier la promotion QA…"
 }

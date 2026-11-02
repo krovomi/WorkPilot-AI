@@ -6,7 +6,7 @@ Two responsibilities:
    they survive process restarts. Format is a single flat file per
    monitor (default: ``.workpilot/agent_health/state.json``).
 
-2. **Ingest** historical agent runs from `analytics/collector.py`'s
+2. **Ingest** historical agent runs from the analytics database's
    `BuildPhase` table — phases that completed normally become `AgentRun`
    records the monitor can score against, even on a fresh process that
    has no in-memory history yet.

@@ -125,7 +125,8 @@
 					"saveSuccess": "Connexion Windsurf enregistrée avec succès !",
 					"terminalInstructions": "Cela ouvrira un terminal où vous pourrez exécuter la commande `/login` pour vous authentifier.",
 					"tokenDetected": "Clé API détectée",
-					"tokenLoaded": "Le jeton SSO Windsurf a été automatiquement chargé depuis votre environnement IDE local."
+					"tokenLoaded": "Le jeton SSO Windsurf a été automatiquement chargé depuis votre environnement IDE local.",
+					"tokenReceived": "Jeton Windsurf reçu"
 				},
 				"openaiAuth": {
 					"codexCliAuth": "Réutilisez la session ChatGPT gérée par Codex CLI.",
@@ -139,6 +140,37 @@
 					"notConnected": "Aucune authentification Codex CLI active. Connectez-vous d'abord.",
 					"timeout": "Le délai d'authentification Codex CLI est dépassé. Réessayez.",
 					"checkError": "Impossible de vérifier l'authentification Codex CLI."
+				},
+				"savedTitle": "Fournisseur enregistré",
+				"agentCli": {
+					"status": "État du CLI",
+					"checking": "Vérification du CLI…",
+					"installed": "Installé",
+					"installedVersion": "Installé (version {{version}})",
+					"notInstalled": "Non installé : {{executable}} est introuvable dans le PATH.",
+					"install": "Installer {{name}}",
+					"installing": "Installation…",
+					"recheck": "Vérifier à nouveau",
+					"signInTitle": "Connexion",
+					"signInDescription": "{{name}} gère sa propre connexion : WorkPilot utilise le compte et les clés API configurés dans le CLI. Connectez-vous une fois, puis toutes les tâches pourront l'utiliser.",
+					"signInCommand": "Commande à lancer",
+					"openTerminal": "Se connecter depuis un terminal",
+					"closeTerminal": "Fermer le terminal",
+					"docs": "Documentation",
+					"modelTitle": "Modèle",
+					"modelDescription": "Le modèle se choisit pour chaque tâche à sa création. « Par défaut » utilise le modèle configuré dans le CLI.",
+					"activate": "Utiliser comme fournisseur par défaut",
+					"activated": "{{name}} est maintenant le fournisseur par défaut.",
+					"hints": {
+						"opencode": "Lancez la commande, choisissez un fournisseur (Anthropic, OpenAI, GitHub Copilot…) puis collez sa clé ou suivez la connexion dans le navigateur.",
+						"pi": "Lancez pi, tapez /login et choisissez votre fournisseur. pi lit aussi les clés API des variables d'environnement comme ANTHROPIC_API_KEY.",
+						"antigravity": "Lancez agy une fois et connectez-vous avec votre compte Google ; les exécutions sans interface réutilisent cette connexion. GEMINI_API_KEY fonctionne aussi.",
+						"gemini-cli": "Lancez gemini une fois et choisissez « Login with Google » (ou définissez GEMINI_API_KEY). WorkPilot le lance ensuite avec --acp."
+					},
+					"terminalTitle": "Connexion à {{name}}",
+					"terminalStep1": "Appuyez sur Entrée : {{command}}",
+					"terminalStep2": "Suivez les étapes de connexion du CLI",
+					"terminalStep3": "Fermez ce terminal une fois connecté"
 				}
 			},
 			"providerToggle": {
@@ -269,7 +301,11 @@
 				"mistral": "Modèles Mistral AI (Mistral, Codéal, etc.)",
 				"ollama": "Modèles open-source locaux avec Ollama",
 				"openai": "GPT-5 et autres modèles OpenAI",
-				"windsurf": "Fournisseur IA Windsurf"
+				"windsurf": "Fournisseur IA Windsurf",
+				"opencode": "Agent de code open source, piloté via le CLI opencode",
+				"antigravity": "Agent de code de Google, piloté via le CLI agy",
+				"pi": "Agent de code minimaliste, piloté via le CLI pi",
+				"gemini-cli": "Gemini CLI, l'agent open source de Google, piloté via le protocole ACP"
 			},
 			"title": "Comptes"
 		},
@@ -966,7 +1002,9 @@
 		"titleWithRepository": "Importer les éléments de {{repository}}",
 		"toggleSelection": "Basculer la sélection pour l'élément de travail {{id}}",
 		"importError": "Échec de l'import Azure DevOps",
-		"repositoryLabel": "Dépôt :"
+		"repositoryLabel": "Dépôt :",
+		"sidePanelAriaLabel": "Panneau d'import Azure DevOps",
+		"resizeHandleAriaLabel": "Redimensionner le panneau"
 	},
 	"collaboration": {
 		"description": "Paramètres de collaboration multi-utilisateurs",
@@ -978,7 +1016,8 @@
 		"description": "Accéder aux logs et informations de debug pour le dépannage",
 		"errorReporting": {
 			"description": "Envoyer des rapports de crash pour aider à améliorer WorkPilot AI. Aucune donnée personnelle ou code n'est collecté.",
-			"label": "Rapports d'erreurs anonymes"
+			"label": "Rapports d'erreurs anonymes",
+			"saveFailed": "Impossible d'enregistrer le réglage des rapports d'erreurs"
 		},
 		"helpText": "Lors du signalement de bugs, cliquez sur « Copier les infos de debug » pour obtenir les informations système et erreurs récentes qui nous aident à diagnostiquer le problème.",
 		"helpTitle": "Signalement de problèmes",
@@ -2298,7 +2337,8 @@
 			"currentStatus": "Statut :",
 			"configured": "Configuré",
 			"useInstead": "Utiliser un Personal Access Token à la place",
-			"hide": "Masquer"
+			"hide": "Masquer",
+			"description": "Un Personal Access Token GitHub avec accès à Copilot."
 		},
 		"instructions": {
 			"title": "Instructions",
@@ -2693,7 +2733,40 @@
 		"modelPlaceholder": "gpt-5.3, claude-4.6-opus, etc."
 	},
 	"customProvider": {
-		"modelNamePlaceholder": "Nom du modèle personnalisé"
+		"modelNamePlaceholder": "Nom du modèle personnalisé",
+		"title": "Fournisseur personnalisé",
+		"description": "Connectez n'importe quel point d'accès compatible OpenAI et choisissez ses modèles.",
+		"apiConfig": "Configuration de l'API",
+		"apiUrl": "URL de l'API",
+		"apiKey": "Clé API",
+		"urlRequired": "URL requise",
+		"urlRequiredDesc": "Saisissez l'URL de l'API avant de rechercher les modèles.",
+		"discoverModels": "Rechercher les modèles",
+		"discovering": "Recherche…",
+		"modelsDiscovered": "Modèles trouvés",
+		"modelsDiscoveredDesc": "{{count}} modèles trouvés.",
+		"noModelsFound": "Aucun modèle trouvé",
+		"noModelsFoundDesc": "Le point d'accès n'a renvoyé aucun modèle. Ajoutez-les à la main ci-dessous.",
+		"discoveryFailed": "Échec de la recherche",
+		"discoveryFailedDesc": "Impossible de joindre le point d'accès. Vérifiez l'URL et la clé.",
+		"manualModels": "Ajouter un modèle à la main",
+		"modelName": "Nom du modèle",
+		"modelId": "Identifiant du modèle",
+		"modelTier": "Catégorie",
+		"tierFlagship": "Haut de gamme",
+		"tierStandard": "Standard",
+		"tierFast": "Rapide",
+		"supportsThinking": "Prend en charge la réflexion étendue",
+		"addModel": "Ajouter le modèle",
+		"modelInfoRequired": "Informations du modèle requises",
+		"modelInfoRequiredDesc": "Saisissez le nom du modèle et son identifiant.",
+		"modelAdded": "Modèle ajouté",
+		"modelAddedDesc": "{{name}} a été ajouté.",
+		"modelRemoved": "Modèle supprimé",
+		"modelRemovedDesc": "Le modèle a été retiré de la liste.",
+		"availableModels": "Modèles disponibles",
+		"noModelsConfigured": "Aucun modèle configuré",
+		"addModelsDesc": "Recherchez les modèles du point d'accès ou ajoutez-les à la main."
 	},
 	"customThemes": {
 		"title": "Thèmes personnalisés",

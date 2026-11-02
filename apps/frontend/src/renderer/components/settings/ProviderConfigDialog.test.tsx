@@ -244,3 +244,28 @@ it("waits for persistence before activating the provider", async () => {
 	expect(props.onProviderActivated).toHaveBeenCalledWith("openai");
 	expect(props.onOpenChange).toHaveBeenCalledWith(false);
 });
+
+describe("coding-agent CLI providers", () => {
+	it.each(["opencode", "antigravity", "pi", "gemini-cli"])(
+		"opens a configuration panel for %s instead of an empty dialog",
+		async (id) => {
+			window.electronAPI.checkAgentCli = vi
+				.fn()
+				.mockResolvedValue({ tool: id, installed: true });
+			await act(async () => {
+				render(
+					<ProviderConfigDialog
+						{...props}
+						provider={{ id, name: id, isConfigured: true }}
+					/>,
+				);
+			});
+			expect(
+				screen.getByText("sections.accounts.providerConfig.agentCli.signInTitle"),
+			).toBeTruthy();
+			expect(
+				screen.getByText("sections.accounts.providerConfig.agentCli.activate"),
+			).toBeTruthy();
+		},
+	);
+});

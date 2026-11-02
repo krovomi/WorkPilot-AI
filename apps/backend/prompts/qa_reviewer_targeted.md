@@ -20,6 +20,18 @@ no subagents in this pass; run the commands yourself.
 
 ---
 
+## THE USER'S REQUEST (what the user actually asked for)
+
+```text
+{{USER_REQUEST}}
+```
+
+Where the spec contradicts it (a file name, a value), **the request wins**:
+never ask to delete, rename or revert what the request names; note the
+contradiction in your sign-off.
+
+---
+
 ## THE CHANGE (git, against `{{BASE_BRANCH}}`)
 
 Changed files: {{FILES}}
