@@ -196,6 +196,19 @@ def _error_code(error: Exception, message: str) -> str:
     return classify(type(error).__name__, message)
 
 
+def _is_status_message(msg) -> bool:
+    """Whether ``msg`` is a status line the client emits about itself.
+
+    Every ``MessageRole.SYSTEM`` message an AgentClient yields is one (see
+    ``AgentClient.notice`` and ``agents.session``): a provider error such as
+    "Copilot auth error: …" arrives that way. Read as text, it became the
+    completion, and the Arena offered it as a model's answer to vote for.
+    """
+    from core.agent_client import MessageRole
+
+    return getattr(msg, "role", None) == MessageRole.SYSTEM
+
+
 def _extract_text(msg) -> str:
     """Collect plain text from a provider-agnostic AgentMessage."""
     from core.agent_client import ContentBlockType
@@ -518,6 +531,7 @@ async def oneshot_completion(
     )
 
     text = ""
+    status_lines: list[str] = []
     try:
         try:
             async with client:
@@ -526,6 +540,14 @@ async def oneshot_completion(
                     reported = _provider_reported_error(msg)
                     if reported is not None:
                         raise reported
+                    if _is_status_message(msg):
+                        # A line the client says about itself (an auth error, a
+                        # retry notice), never the model's answer: kept out of
+                        # the completion, and the reason if nothing else came.
+                        status = _extract_text(msg).strip()
+                        if status:
+                            status_lines.append(status)
+                        continue
                     delta = _extract_text(msg)
                     if not delta:
                         continue
@@ -537,6 +559,8 @@ async def oneshot_completion(
                             logger.debug(
                                 "[oneshot] on_delta callback raised", exc_info=True
                             )
+            if not text.strip() and status_lines:
+                raise ProviderReportedError("provider_error", status_lines[-1])
         except Exception as error:  # noqa: BLE001 — one-shot callers own degradation
             # Never echo a raw provider diagnostic: it may carry credential material.
             # ``ErrorDetail`` redacts it, which is what makes it safe to hand to the
