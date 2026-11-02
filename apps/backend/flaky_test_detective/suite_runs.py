@@ -17,6 +17,7 @@ test host, ``npx`` a node).
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import shutil
@@ -279,15 +280,12 @@ def _kill_tree(process: subprocess.Popen) -> None:
         children = psutil.Process(process.pid).children(recursive=True)
     except psutil.Error:
         children = []
+    # A process already gone is what we wanted.
     for proc in children:
-        try:
+        with contextlib.suppress(psutil.Error):
             proc.kill()
-        except psutil.Error:
-            pass
-    try:
+    with contextlib.suppress(OSError):
         process.kill()
-    except OSError:
-        pass
 
 
 def install_cancel_handler() -> None:
