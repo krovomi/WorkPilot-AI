@@ -4,7 +4,9 @@
 	"languages": {
 		"heading": "Languages",
 		"source": "From",
-		"target": "To"
+		"target": "To",
+		"swap": "Swap languages",
+		"same": "Pick two different languages."
 	},
 	"options": {
 		"heading": "Options",
@@ -16,21 +18,29 @@
 		"result": "Result ({{language}})",
 		"placeholder": "Paste the code to translate here.",
 		"resultEmpty": "The translation appears here once it runs.",
-		"translating": "Translating…"
+		"translating": "Translating…",
+		"tabs": {
+			"code": "Translation",
+			"tests": "Tests"
+		}
 	},
 	"history": {
 		"heading": "History",
 		"clear": "Clear",
-		"empty": "No translation yet for this project."
+		"empty": "No translation yet for this project.",
+		"lines_one": "{{count}} line",
+		"lines_other": "{{count}} lines"
 	},
 	"historyStatus": {
 		"pending": "In progress",
 		"complete": "Done",
-		"failed": "Failed"
+		"failed": "Failed",
+		"cancelled": "Cancelled"
 	},
 	"actions": {
 		"translate": "Translate",
 		"cancel": "Cancel",
-		"dismiss": "Dismiss"
+		"dismiss": "Dismiss",
+		"copy": "Copy result"
 	}
 }

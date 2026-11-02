@@ -15,7 +15,7 @@
 import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { ipcMain } from "electron";
+import { app, ipcMain } from "electron";
 import type { Project } from "../../shared/types";
 import {
 	getProjectEnvPath,
@@ -31,18 +31,13 @@ import { envWithoutCredentials } from "../utils/child-env";
 
 
 function getRunnerPath(): string {
-	return path.join(
-		import.meta.dirname,
-		"..",
-		"..",
-		"..",
-		"..",
-		"..",
-		"apps",
-		"backend",
-		"runners",
-		"cicd_triggers_runner.py",
-	);
+	// Bundled resources once packaged, `apps/backend` in dev (app path is
+	// `apps/frontend`). Walking up from `import.meta.dirname` (`out/main`)
+	// left the repository and the runner was never found.
+	const backendPath = app.isPackaged
+		? path.resolve(process.resourcesPath, "backend")
+		: path.resolve(app.getAppPath(), "..", "backend");
+	return path.join(backendPath, "runners", "cicd_triggers_runner.py");
 }
 
 /**

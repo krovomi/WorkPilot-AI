@@ -3,99 +3,163 @@
  *
  * Exposes channels for AI-powered code translation between programming languages:
  *   crossLangTranslation:getSupportedLanguages — List of supported source/target languages
- *   crossLangTranslation:translate             — Translate a file or snippet
+ *   crossLangTranslation:translate             — Translate a pasted snippet
  *   crossLangTranslation:cancel                — Cancel an in-progress translation
  *   crossLangTranslation:getHistory            — List recent translations
  *   crossLangTranslation:clearHistory          — Clear translation history
  *
- * Supported: Python↔TypeScript, TypeScript↔Python, Python↔Go, Java↔TypeScript, C#↔TypeScript
+ * The runner (`apps/backend/runners/cross_language_translation_runner.py`)
+ * answers with one marker per stdout line (`__DELTA__:`, `__RESULT__:`,
+ * `__ERROR__:`); only the model's text is streamed to the page.
+ *
+ * The renderer sends code, never a path to read or write: the snippet goes to
+ * a private temporary file the main process creates and removes.
  */
 
 import { type ChildProcess, spawn } from "node:child_process";
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
-import { ipcMain } from "electron";
+import { app, ipcMain } from "electron";
+import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { parsePythonCommand } from "../python-detector";
 import { getConfiguredPythonPath } from "../python-env-manager";
-import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { pythonRunnerEnv } from "../utils/python-runner-env";
 
+const RUNNER = "cross_language_translation_runner.py";
 
-function getRunnerPath(): string {
-	return path.join(
-		import.meta.dirname,
-		"..",
-		"..",
-		"..",
-		"..",
-		"..",
-		"apps",
-		"backend",
-		"runners",
-		"cross_language_translation_runner.py",
-	);
+/** The backend folder: bundled resources once packaged, `apps/backend` in dev. */
+export function resolveBackendPath(): string {
+	return app.isPackaged
+		? path.resolve(process.resourcesPath, "backend")
+		: path.resolve(app.getAppPath(), "..", "backend");
+}
+
+export function getRunnerPath(): string {
+	return path.join(resolveBackendPath(), "runners", RUNNER);
+}
+
+export interface TranslationResult {
+	translated_code: string;
+	test_code?: string | null;
+	source_lang?: string;
+	target_lang?: string;
+	lines_translated?: number;
+	lines_output?: number;
+}
+
+export type RunnerLine =
+	| { kind: "delta"; text: string }
+	| { kind: "result"; result: TranslationResult }
+	| { kind: "error"; message: string; code: string }
+	| { kind: "status"; status: string };
+
+const DELTA_MARKER = "__DELTA__:";
+const RESULT_MARKER = "__RESULT__:";
+const ERROR_MARKER = "__ERROR__:";
+const STATUS_MARKER = "__STATUS__:";
+
+/** One stdout line of the runner, or null for anything else (logs). */
+export function parseRunnerLine(line: string): RunnerLine | null {
+	const trimmed = line.trim();
+	try {
+		if (trimmed.startsWith(DELTA_MARKER)) {
+			const text = JSON.parse(trimmed.slice(DELTA_MARKER.length));
+			return typeof text === "string" ? { kind: "delta", text } : null;
+		}
+		if (trimmed.startsWith(RESULT_MARKER)) {
+			const result = JSON.parse(trimmed.slice(RESULT_MARKER.length));
+			if (result && typeof result.translated_code === "string") {
+				return { kind: "result", result };
+			}
+			return null;
+		}
+		if (trimmed.startsWith(ERROR_MARKER)) {
+			const err = JSON.parse(trimmed.slice(ERROR_MARKER.length));
+			return {
+				kind: "error",
+				message: String(err?.message ?? "Translation failed"),
+				code: String(err?.code ?? "unknown"),
+			};
+		}
+	} catch {
+		return null;
+	}
+	if (trimmed.startsWith(STATUS_MARKER)) {
+		return { kind: "status", status: trimmed.slice(STATUS_MARKER.length) };
+	}
+	return null;
 }
 
 let _currentProcess: ChildProcess | null = null;
+let _cancelled = false;
+
+type RunOutcome =
+	| { success: true; data: TranslationResult }
+	| { success: false; error: string; cancelled?: boolean };
 
 async function runRunner(
 	projectDir: string,
 	args: string[],
-	onChunk?: (chunk: string) => void,
-): Promise<{ success: boolean; data?: unknown; error?: string }> {
+	onDelta: (text: string) => void,
+): Promise<RunOutcome> {
 	if (_currentProcess) {
 		_currentProcess.kill("SIGTERM");
 		_currentProcess = null;
 	}
+	_cancelled = false;
 
-	const pythonPath = getConfiguredPythonPath();
-	const [cmd, pythonBaseArgs] = parsePythonCommand(pythonPath);
+	const backendPath = resolveBackendPath();
+	const [cmd, pythonBaseArgs] = parsePythonCommand(getConfiguredPythonPath());
 	const cmdArgs = [...pythonBaseArgs, getRunnerPath(), ...args];
+	const env = await pythonRunnerEnv(backendPath, {
+		extra: { PYTHONUNBUFFERED: "1" },
+	});
 
-	// The runner's own backend (…/apps/backend/runners/<runner>.py), then the
-	// variables of the project's `.env`, which the translation may need.
-	const env = await pythonRunnerEnv(path.dirname(path.dirname(getRunnerPath())));
 	return new Promise((resolve) => {
-		const envFilePath = path.join(projectDir, ".env");
-		if (fs.existsSync(envFilePath)) {
-			try {
-				for (const line of fs.readFileSync(envFilePath, "utf-8").split("\n")) {
-					const trimmed = line.trim();
-					if (!trimmed || trimmed.startsWith("#")) continue;
-					const eqIdx = trimmed.indexOf("=");
-					if (eqIdx < 0) continue;
-					env[trimmed.slice(0, eqIdx).trim()] = trimmed
-						.slice(eqIdx + 1)
-						.trim()
-						.replaceAll(/^["']|["']$/g, "");
-				}
-			} catch {
-				/* ignore */
-			}
-		}
-
 		const proc = spawn(cmd, cmdArgs, { env, cwd: projectDir });
 		_currentProcess = proc;
-		const stdout: string[] = [];
-		const stderr: string[] = [];
+		let buffer = "";
+		let stderrTail = "";
+		let result: TranslationResult | null = null;
+		let reported: string | null = null;
+
+		const handleLine = (line: string) => {
+			const parsed = parseRunnerLine(line);
+			if (!parsed) return;
+			if (parsed.kind === "delta") onDelta(parsed.text);
+			else if (parsed.kind === "result") result = parsed.result;
+			else if (parsed.kind === "error") reported = parsed.message;
+		};
+
 		proc.stdout?.on("data", (d: Buffer) => {
-			const chunk = d.toString();
-			stdout.push(chunk);
-			onChunk?.(chunk);
+			buffer += d.toString("utf-8");
+			let newline = buffer.indexOf("\n");
+			while (newline >= 0) {
+				handleLine(buffer.slice(0, newline));
+				buffer = buffer.slice(newline + 1);
+				newline = buffer.indexOf("\n");
+			}
 		});
-		proc.stderr?.on("data", (d: Buffer) => stderr.push(d.toString()));
+		proc.stderr?.on("data", (d: Buffer) => {
+			stderrTail = (stderrTail + d.toString("utf-8")).slice(-4000);
+		});
 
 		proc.on("close", (code) => {
+			if (buffer) handleLine(buffer);
 			if (proc === _currentProcess) _currentProcess = null;
-			const out = stdout.join("").trim();
-			if (code === 0) {
-				try {
-					resolve({ success: true, data: JSON.parse(out) });
-				} catch {
-					resolve({ success: true, data: { translated_code: out } });
-				}
+			if (result) {
+				resolve({ success: true, data: result });
+			} else if (_cancelled) {
+				resolve({ success: false, error: "cancelled", cancelled: true });
+			} else if (reported) {
+				resolve({ success: false, error: reported });
 			} else {
-				resolve({ success: false, error: stderr.join("").trim() || out });
+				const tail = stderrTail.trim().split("\n").slice(-3).join(" ");
+				resolve({
+					success: false,
+					error: `exit ${code ?? "?"}${tail ? ` — ${tail}` : ""}`,
+				});
 			}
 		});
 		proc.on("error", (err) => {
@@ -118,30 +182,63 @@ const SUPPORTED_LANGUAGES = [
 	{ id: "php", label: "PHP", extension: ".php" },
 ];
 
+const LANGUAGE_IDS = new Set(SUPPORTED_LANGUAGES.map((l) => l.id));
+
+type HistoryStatus = "pending" | "complete" | "failed" | "cancelled";
+
+interface HistoryEntry {
+	id: string;
+	started_at: string;
+	completed_at?: string;
+	source_lang: string;
+	target_lang: string;
+	lines?: number;
+	status: HistoryStatus;
+}
+
 function getHistoryPath(projectDir: string): string {
 	return path.join(projectDir, ".workpilot", "translation_history.json");
 }
 
-function loadHistory(projectDir: string): object[] {
+function loadHistory(projectDir: string): HistoryEntry[] {
 	const p = getHistoryPath(projectDir);
 	if (!fs.existsSync(p)) return [];
 	try {
-		return JSON.parse(fs.readFileSync(p, "utf-8"));
+		const parsed = JSON.parse(fs.readFileSync(p, "utf-8"));
+		return Array.isArray(parsed) ? parsed : [];
 	} catch {
 		return [];
 	}
 }
 
-function appendHistory(projectDir: string, entry: object): void {
-	const history = loadHistory(projectDir);
-	history.unshift(entry);
-	const trimmed = history.slice(0, 100);
+function saveHistory(projectDir: string, history: HistoryEntry[]): void {
 	fs.mkdirSync(path.dirname(getHistoryPath(projectDir)), { recursive: true });
 	fs.writeFileSync(
 		getHistoryPath(projectDir),
-		JSON.stringify(trimmed, null, 2),
+		JSON.stringify(history.slice(0, 100), null, 2),
 		"utf-8",
 	);
+}
+
+function updateHistory(
+	projectDir: string,
+	id: string,
+	patch: Partial<HistoryEntry>,
+): void {
+	const history = loadHistory(projectDir);
+	const entry = history.find((h) => h.id === id);
+	if (!entry) return;
+	Object.assign(entry, patch);
+	saveHistory(projectDir, history);
+}
+
+interface TranslateParams {
+	projectDir: string;
+	sourceLang: string;
+	targetLang: string;
+	code: string;
+	preserveComments?: boolean;
+	generateTests?: boolean;
 }
 
 export function registerCrossLanguageTranslationHandlers(): void {
@@ -152,91 +249,66 @@ export function registerCrossLanguageTranslationHandlers(): void {
 
 	ipcMain.handle(
 		IPC_CHANNELS.CROSS_LANG_TRANSLATION_TRANSLATE,
-		async (
-			event,
-			params: {
-				projectDir: string;
-				sourceLang: string;
-				targetLang: string;
-				code?: string;
-				filePath?: string;
-				outputPath?: string;
-				preserveComments?: boolean;
-				generateTests?: boolean;
-			},
-		) => {
-			const historyEntry = {
+		async (event, params: TranslateParams) => {
+			if (
+				!LANGUAGE_IDS.has(params?.sourceLang) ||
+				!LANGUAGE_IDS.has(params?.targetLang)
+			) {
+				return { success: false, error: "Unsupported language" };
+			}
+			if (typeof params.code !== "string" || !params.code.trim()) {
+				return { success: false, error: "Nothing to translate" };
+			}
+
+			const ext =
+				SUPPORTED_LANGUAGES.find((l) => l.id === params.sourceLang)
+					?.extension ?? ".txt";
+			const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "wp-translate-"));
+			const sourceFile = path.join(tempDir, `source${ext}`);
+			fs.writeFileSync(sourceFile, params.code, "utf-8");
+
+			const entry: HistoryEntry = {
 				id: Date.now().toString(),
 				started_at: new Date().toISOString(),
 				source_lang: params.sourceLang,
 				target_lang: params.targetLang,
-				file_path: params.filePath ?? "",
+				lines: params.code.replace(/\n+$/, "").split("\n").length,
 				status: "pending",
 			};
-			appendHistory(params.projectDir, historyEntry);
+			saveHistory(params.projectDir, [entry, ...loadHistory(params.projectDir)]);
 
 			const args = [
-				"--action",
-				"translate",
 				"--source-lang",
 				params.sourceLang,
 				"--target-lang",
 				params.targetLang,
 				"--project",
 				params.projectDir,
-				...(params.filePath ? ["--file", params.filePath] : []),
-				...(params.outputPath ? ["--output", params.outputPath] : []),
+				"--file",
+				sourceFile,
 				...(params.preserveComments ? ["--preserve-comments"] : []),
 				...(params.generateTests ? ["--generate-tests"] : []),
-				"--output-json",
 			];
 
-			// If inline code, write to a temp file
-			let tempFile: string | null = null;
-			if (params.code && !params.filePath) {
-				const ext =
-					SUPPORTED_LANGUAGES.find((l) => l.id === params.sourceLang)
-						?.extension ?? ".txt";
-				tempFile = path.join(
-					params.projectDir,
-					`.workpilot`,
-					`_translate_temp${ext}`,
-				);
-				fs.mkdirSync(path.dirname(tempFile), { recursive: true });
-				fs.writeFileSync(tempFile, params.code, "utf-8");
-				args.splice(args.indexOf("--file") + 1, 1, tempFile);
-				if (!args.includes("--file")) args.push("--file", tempFile);
+			let result: RunOutcome;
+			try {
+				result = await runRunner(params.projectDir, args, (text) => {
+					if (!event.sender.isDestroyed()) {
+						event.sender.send(IPC_CHANNELS.CROSS_LANG_TRANSLATION_STREAM_CHUNK, text);
+					}
+				});
+			} finally {
+				fs.rmSync(tempDir, { recursive: true, force: true });
 			}
 
-			const result = await runRunner(params.projectDir, args, (chunk) => {
-				event.sender.send(IPC_CHANNELS.CROSS_LANG_TRANSLATION_STREAM_CHUNK, chunk);
-			});
-
-			if (tempFile && fs.existsSync(tempFile)) {
-				try {
-					fs.unlinkSync(tempFile);
-				} catch {
-					/* ignore */
-				}
-			}
-
-			// Update history
-			const history = loadHistory(params.projectDir);
-			const idx = history.findIndex(
-				(h: unknown) => (h as { id: string }).id === historyEntry.id,
-			);
-			if (idx >= 0) {
-				(history[idx] as Record<string, unknown>).status = result.success
+			updateHistory(params.projectDir, entry.id, {
+				status: result.success
 					? "complete"
-					: "failed";
-				(history[idx] as Record<string, unknown>).completed_at =
-					new Date().toISOString();
-				fs.writeFileSync(
-					getHistoryPath(params.projectDir),
-					JSON.stringify(history, null, 2),
-					"utf-8",
-				);
-			}
+					: result.cancelled
+						? "cancelled"
+						: "failed",
+				completed_at: new Date().toISOString(),
+			});
 
 			return result;
 		},
@@ -244,6 +316,7 @@ export function registerCrossLanguageTranslationHandlers(): void {
 
 	ipcMain.handle(IPC_CHANNELS.CROSS_LANG_TRANSLATION_CANCEL, () => {
 		if (_currentProcess) {
+			_cancelled = true;
 			_currentProcess.kill("SIGTERM");
 			_currentProcess = null;
 			return { success: true };
