@@ -394,6 +394,7 @@ import { CommandPalette } from "./components/CommandPalette";
 import { GitHubSetupModal } from "./components/GitHubSetupModal";
 import { GlobalDownloadIndicator } from "./components/GlobalDownloadIndicator";
 import { FormulaLab } from "./components/formula-lab/FormulaLab";
+import { HubMain } from "./components/sidebar/HubMain";
 import { KeyboardShortcutsOverlay } from "./components/KeyboardShortcutsOverlay";
 import { ActivityCentre } from "./components/ActivityCentre";
 import { NavigationConfirmDialog } from "./components/NavigationConfirmDialog";
@@ -1699,8 +1700,7 @@ export function App() {
 										</DragOverlay>
 									</DndContext>
 								}
-								{/* Main content area */}
-								<main className="flex-1 overflow-hidden">
+								<HubMain activeView={activeView} onSelectView={handleViewChange}>
 									<Suspense
 										fallback={
 											<div className="flex items-center justify-center h-full">
@@ -2195,7 +2195,7 @@ export function App() {
 											</div>
 										)}
 									</Suspense>
-								</main>
+								</HubMain>
 							</div>
 						</div>
 

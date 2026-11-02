@@ -107,7 +107,8 @@
 		"guardrails": "Guardrails d'Agent",
 		"envSnapshot": "Snapshots d'Environnement",
 		"offlineMode": "Mode Hors-Ligne",
-		"administration": "Administration"
+		"administration": "Administration",
+		"smartEstimation": "Estimation intelligente"
 	},
 	"search": {
 		"placeholder": "Rechercher...",
@@ -284,5 +285,25 @@
 		"tooltip": "Ni document de conception ni test pour l'instant : cette vue peut changer ou disparaître.",
 		"hide": "Masquer les vues expérimentales",
 		"show": "Afficher les vues expérimentales ({{count}})"
+	},
+	"hubs": {
+		"agentHistory": "Historique des agents",
+		"costs": "Coûts et estimation",
+		"mcpTools": "Outils MCP",
+		"context": "Contexte du projet",
+		"gitImpact": "Impact Git",
+		"gitHistory": "Historique Git",
+		"docs": "Docs et dérive",
+		"onboarding": "Intégration",
+		"debt": "Dette et refactoring",
+		"arena": "Arène",
+		"open": "Ouvrir {{name}}",
+		"launchers": {
+			"smart-estimation": "Évalue la complexité d'une tâche à partir de sa description, d'après l'historique des builds du projet.",
+			"context-aware-snippets": "Écrit un extrait de code qui suit le contexte et le style de ce projet.",
+			"conflict-predictor": "Cherche les conflits entre worktrees et branches avant que vous ne les fusionniez.",
+			"natural-language-git": "Transforme une phrase en commande git pour ce projet.",
+			"arena-mode": "Lance un même prompt sur deux modèles côte à côte sans dire lequel est lequel, et vous laisse voter."
+		}
 	}
 }

@@ -26,9 +26,6 @@ import {
 	Activity,
 	AlertTriangle,
 	BarChart3,
-	Bug,
-	BookOpen,
-	BookOpenCheck,
 	Box,
 	Brain,
 	Building2,
@@ -38,7 +35,6 @@ import {
 	ClipboardCheck,
 	ChevronRight,
 	Code,
-	Coins,
 	Compass,
 	Database,
 	Download,
@@ -46,7 +42,6 @@ import {
 	FileJson,
 	FileText,
 	FlaskConical,
-	Gauge,
 	GitBranch,
 	GitFork,
 	GitMerge,
@@ -54,7 +49,6 @@ import {
 	Globe,
 	HeartPulse,
 	HelpCircle,
-	History,
 	Layers,
 	Languages,
 	LayoutGrid,
@@ -68,28 +62,22 @@ import {
 	PanelLeft,
 	PanelLeftClose,
 	Plus,
-	Puzzle,
 	Radio,
 	RefreshCcw,
 	Rocket,
-	RotateCcw,
 	Search,
 	Settings,
-	Share2,
 	Shield,
 	ShieldAlert,
 	ShieldCheck,
 	Sparkles,
 	Star,
-	Store,
-	Swords,
 	Target,
 	Terminal,
 	TestTube,
 	Trophy,
 	UserCheck,
 	Users,
-	Wand2,
 	WandSparkles,
 	WifiOff,
 	Workflow,
@@ -120,7 +108,6 @@ import {
 import { useProjectStore } from "@/stores/project-store";
 import {
 	selectGroupBadge,
-	selectViewBadge,
 	useActivityStore,
 	useAttentionView,
 } from "@/stores/activity-store";
@@ -172,6 +159,16 @@ import {
 } from "./sidebar/sortable-primitives";
 import { ActivityBadge } from "./sidebar/ActivityBadge";
 import { EXPERIMENTAL_VIEWS } from "./sidebar/experimental-views";
+import {
+	entryIdOfView,
+	getHub,
+	type HubTabGates,
+	hubEntryTarget,
+	isHubExperimental,
+	SIDEBAR_HUBS,
+	type SidebarHubId,
+	shownHubTabs,
+} from "./sidebar/hubs";
 import { serverForge, showsView, useServerNavGates } from "./sidebar/server-gates";
 import { useSidebarPrefs } from "./sidebar/use-sidebar-prefs";
 import { VoiceControlDialog } from "./voice-control/VoiceControlDialog";
@@ -254,7 +251,8 @@ export type SidebarView =
 	| "live-companion"
 	| "context-mesh"
 	| "administration"
-	| "phase35-hub";
+	| "phase35-hub"
+	| "smart-estimation";
 
 interface SidebarProps {
 	readonly onSettingsClick: () => void;
@@ -271,6 +269,37 @@ interface NavItem {
 	icon: React.ElementType;
 	shortcut?: string;
 	subGroup?: string; // i18n key for visual sub-group header within a group
+	hub?: SidebarHubId; // the entry stands for this hub's tabs (`sidebar/hubs.ts`)
+}
+
+function hubNavItem(id: SidebarHubId, subGroup?: string): NavItem {
+	const hub = getHub(id);
+	return { id: hub.tabs[0].view, labelKey: hub.labelKey, icon: hub.icon, hub: id, subGroup };
+}
+
+/** The views a menu entry stands for: a hub's tabs, or its own view. */
+function itemViews(item: NavItem): SidebarView[] {
+	return item.hub ? getHub(item.hub).tabs.map((tab) => tab.view) : [item.id];
+}
+
+/** A hub's tabs as menu entries, for the search and the shortcuts. */
+function hubTabItems(item: NavItem, gates: HubTabGates): NavItem[] {
+	if (!item.hub) return [item];
+	return shownHubTabs(getHub(item.hub), gates).map((tab) => ({ ...tab, id: tab.view, subGroup: item.subGroup }));
+}
+
+/** Whether a menu entry stands for this view. */
+function isOn(item: NavItem, view: SidebarView | null): boolean {
+	return view !== null && itemViews(item).includes(view);
+}
+
+function isItemExperimental(item: NavItem): boolean {
+	return item.hub ? isHubExperimental(getHub(item.hub)) : EXPERIMENTAL_VIEWS.has(item.id);
+}
+
+function itemShown(item: NavItem, gates: HubTabGates): boolean {
+	if (item.hub) return shownHubTabs(getHub(item.hub), gates).length > 0;
+	return !(gates.hideExperimental && isItemExperimental(item)) && showsView(item.id, gates.serverProject);
 }
 
 interface NavGroup {
@@ -306,12 +335,7 @@ const navGroups: NavGroup[] = [
 				icon: Rocket,
 				shortcut: "WM",
 			},
-			{
-				id: "session-history",
-				labelKey: "navigation:items.sessionHistory",
-				icon: History,
-				shortcut: "WS",
-			},
+			hubNavItem("agent-history"),
 			{
 				id: "phase35-hub",
 				labelKey: "navigation:items.phase35Hub",
@@ -339,29 +363,12 @@ const navGroups: NavGroup[] = [
 				shortcut: "PO",
 			},
 			{
-				id: "agent-replay",
-				labelKey: "navigation:items.agentReplay",
-				icon: RotateCcw,
-				shortcut: "AR",
-			},
-			{
-				id: "agent-debugger",
-				labelKey: "navigation:items.agentDebugger",
-				icon: Bug,
-				shortcut: "AG",
-			},
-			{
 				id: "self-healing",
 				labelKey: "navigation:items.selfHealing",
 				icon: HeartPulse,
 				shortcut: "SE",
 			},
-			{
-				id: "arena-mode",
-				labelKey: "navigation:items.arenaMode",
-				icon: Swords,
-				shortcut: "AM",
-			},
+			hubNavItem("arena"),
 			{
 				id: "repo-bench",
 				labelKey: "navigation:items.repoBench",
@@ -373,12 +380,6 @@ const navGroups: NavGroup[] = [
 				labelKey: "navigation:items.bountyBoard",
 				icon: Trophy,
 				shortcut: "BB",
-			},
-			{
-				id: "consensus-arbiter",
-				labelKey: "navigation:items.consensusArbiter",
-				icon: Users,
-				shortcut: "CA",
 			},
 			{
 				id: "agent-coach",
@@ -412,12 +413,7 @@ const navGroups: NavGroup[] = [
 				icon: FileCode2,
 				shortcut: "CR",
 			},
-			{
-				id: "refactoring",
-				labelKey: "navigation:items.refactoring",
-				icon: Wand2,
-				shortcut: "RF",
-			},
+			hubNavItem("debt"),
 			{
 				id: "test-generation",
 				labelKey: "navigation:items.testGeneration",
@@ -436,18 +432,8 @@ const navGroups: NavGroup[] = [
 				icon: WandSparkles,
 				shortcut: "VC",
 			},
-			{
-				id: "documentation",
-				labelKey: "navigation:items.documentation",
-				icon: BookOpenCheck,
-				shortcut: "DC",
-			},
-			{
-				id: "onboarding-guide",
-				labelKey: "navigation:items.onboardingGuide",
-				icon: BookOpen,
-				shortcut: "OG",
-			},
+			hubNavItem("docs"),
+			hubNavItem("onboarding"),
 			{
 				id: "flaky-tests",
 				labelKey: "navigation:items.flakyTests",
@@ -480,18 +466,7 @@ const navGroups: NavGroup[] = [
 				icon: Sparkles,
 				shortcut: "IN",
 			},
-			{
-				id: "context",
-				labelKey: "navigation:items.context",
-				icon: BookOpen,
-				shortcut: "CT",
-			},
-			{
-				id: "context-mesh",
-				labelKey: "navigation:items.contextMesh",
-				icon: Share2,
-				shortcut: "CM",
-			},
+			hubNavItem("context"),
 			{
 				id: "architecture-visualizer",
 				labelKey: "navigation:items.architectureVisualizer",
@@ -524,29 +499,13 @@ const navGroups: NavGroup[] = [
 				icon: GitBranch,
 				shortcut: "WT",
 			},
-			{
-				id: "natural-language-git",
-				labelKey: "navigation:items.naturalLanguageGit",
-				icon: GitBranch,
-				shortcut: "NG",
-			},
-			{
-				id: "conflict-predictor",
-				labelKey: "navigation:items.conflictPredictor",
-				icon: GitMerge,
-				shortcut: "CF",
-			},
+			hubNavItem("git-history"),
+			hubNavItem("git-impact"),
 			{
 				id: "cicd-triggers",
 				labelKey: "navigation:items.cicdTriggers",
 				icon: Workflow,
 				shortcut: "CD",
-			},
-			{
-				id: "git-surgeon",
-				labelKey: "navigation:items.gitSurgeon",
-				icon: GitBranch,
-				shortcut: "GU",
 			},
 		],
 		defaultExpanded: false,
@@ -568,12 +527,7 @@ const navGroups: NavGroup[] = [
 				icon: Database,
 				shortcut: "AN",
 			},
-			{
-				id: "cost-estimator",
-				labelKey: "navigation:items.costEstimator",
-				icon: Coins,
-				shortcut: "CE",
-			},
+			hubNavItem("costs"),
 			{
 				id: "spec-approval",
 				labelKey: "navigation:items.specApproval",
@@ -599,12 +553,6 @@ const navGroups: NavGroup[] = [
 				shortcut: "CB",
 			},
 			{
-				id: "tech-debt",
-				labelKey: "navigation:items.techDebt",
-				icon: Gauge,
-				shortcut: "TD",
-			},
-			{
 				id: "env-snapshot",
 				labelKey: "navigation:items.envSnapshot",
 				icon: Camera,
@@ -619,27 +567,7 @@ const navGroups: NavGroup[] = [
 		icon: Wrench,
 		items: [
 			// Extensions
-			{
-				id: "agent-tools",
-				labelKey: "navigation:items.agentTools",
-				icon: Wrench,
-				shortcut: "AT",
-				subGroup: "navigation:subGroups.extensions",
-			},
-			{
-				id: "mcp-marketplace",
-				labelKey: "navigation:items.mcpMarketplace",
-				icon: Store,
-				shortcut: "MK",
-				subGroup: "navigation:subGroups.extensions",
-			},
-			{
-				id: "plugin-marketplace",
-				labelKey: "navigation:items.pluginMarketplace",
-				icon: Puzzle,
-				shortcut: "PM",
-				subGroup: "navigation:subGroups.extensions",
-			},
+			hubNavItem("mcp-tools", "navigation:subGroups.extensions"),
 			// Code Quality & Testing
 			{
 				id: "regression-guardian",
@@ -670,33 +598,11 @@ const navGroups: NavGroup[] = [
 				subGroup: "navigation:subGroups.codeQuality",
 			},
 			{
-				id: "blast-radius",
-				labelKey: "navigation:items.blastRadius",
-				icon: Target,
-				shortcut: "BR",
-				subGroup: "navigation:subGroups.codeQuality",
-			},
-			{
 				id: "guardrails",
 				labelKey: "navigation:items.guardrails",
 				icon: Shield,
 				shortcut: "GR",
 				subGroup: "navigation:subGroups.codeQuality",
-			},
-			// Documentation & Spec
-			{
-				id: "onboarding-agent",
-				labelKey: "navigation:items.onboardingAgent",
-				icon: BookOpen,
-				shortcut: "OA",
-				subGroup: "navigation:subGroups.documentation",
-			},
-			{
-				id: "doc-drift",
-				labelKey: "navigation:items.docDrift",
-				icon: FileText,
-				shortcut: "DD",
-				subGroup: "navigation:subGroups.documentation",
 			},
 			// Accessibility & i18n
 			{
@@ -794,13 +700,6 @@ const navGroups: NavGroup[] = [
 				subGroup: "navigation:subGroups.utilities",
 			},
 			{
-				id: "context-aware-snippets",
-				labelKey: "navigation:items.contextAwareSnippets",
-				icon: Code,
-				shortcut: "CS",
-				subGroup: "navigation:subGroups.utilities",
-			},
-			{
 				id: "offline-mode",
 				labelKey: "navigation:items.offlineMode",
 				icon: WifiOff,
@@ -875,6 +774,8 @@ const NAV_LABEL_KEYS: Partial<Record<SidebarView, string>> = Object.fromEntries(
 		...navGroups.flatMap((group) => group.items),
 		...githubNavItems,
 		...gitlabNavItems,
+		// A hub's entry has its first tab's id: the tab's own name wins.
+		...SIDEBAR_HUBS.flatMap((hub) => hub.tabs.map((tab) => ({ ...tab, id: tab.view }))),
 	].map((item) => [item.id, item.labelKey]),
 );
 
@@ -899,15 +800,11 @@ export function Sidebar({
 	// instead of one hook per menu entry over ~80 entries.
 	const activities = useActivityStore((state) => state.activities);
 	const attentionView = useAttentionView();
-	const badgeFor = useCallback(
-		(view: SidebarView) => selectViewBadge(activities, view, selectedProjectId),
-		[activities, selectedProjectId],
-	);
 	const groupBadgeFor = useCallback(
 		(items: NavItem[]) =>
 			selectGroupBadge(
 				activities,
-				items.map((item) => item.id),
+				items.flatMap(itemViews),
 				selectedProjectId,
 			),
 		[activities, selectedProjectId],
@@ -921,6 +818,7 @@ export function Sidebar({
 	const {
 		prefs: sidebarPrefs,
 		toggleItemPin,
+		unpinItems,
 		toggleGroupPin,
 		reorderGroups,
 		reorderItems,
@@ -1077,7 +975,7 @@ export function Sidebar({
 
 		// Apply custom per-group item order, without the experimental views
 		// when the user hid them
-		const hideExperimental = sidebarPrefs.hideExperimental === true;
+		const gates = { serverProject, hideExperimental: sidebarPrefs.hideExperimental === true };
 		return orderedGroups
 			.map((group) => {
 				const actualItemIds = group.items.map((i) => i.id);
@@ -1087,8 +985,7 @@ export function Sidebar({
 				const items = orderedItemIds
 					.map((id) => itemById.get(id as SidebarView))
 					.filter((i): i is NavItem => Boolean(i))
-					.filter((i) => !(hideExperimental && EXPERIMENTAL_VIEWS.has(i.id)))
-					.filter((i) => showsView(i.id, serverProject));
+					.filter((i) => itemShown(i, gates));
 				return { ...group, items };
 			})
 			.filter((group) => group.items.length > 0);
@@ -1123,9 +1020,8 @@ export function Sidebar({
 			}
 		}
 		for (const itemId of sidebarPrefs.pinnedItems) {
-			if (seen.has(itemId)) continue;
-			const item = itemById.get(itemId as SidebarView);
-			if (!item) continue;
+			const item = itemById.get(entryIdOfView(itemId as SidebarView));
+			if (!item || seen.has(item.id)) continue;
 			seen.add(item.id);
 			collected.push(item);
 		}
@@ -1145,10 +1041,18 @@ export function Sidebar({
 		sidebarPrefs.pinnedItems,
 	]);
 
-	// Get all visible items for keyboard shortcuts
+	// The tabs a hub's entry leads to, under the same gates as the entries
+	const hubGates = useMemo<HubTabGates>(
+		() => ({ serverProject, hideExperimental: sidebarPrefs.hideExperimental === true }),
+		[serverProject, sidebarPrefs.hideExperimental],
+	);
+
+	// Get all visible items for keyboard shortcuts; a hub's tabs keep theirs
 	const visibleNavItems = useMemo(() => {
-		return visibleNavGroups.flatMap((group) => group.items);
-	}, [visibleNavGroups]);
+		return visibleNavGroups.flatMap((group) =>
+			group.items.flatMap((item) => hubTabItems(item, hubGates)),
+		);
+	}, [visibleNavGroups, hubGates]);
 
 	// Filter nav groups based on search query
 	const filteredNavGroups = useMemo(() => {
@@ -1157,12 +1061,16 @@ export function Sidebar({
 		return visibleNavGroups
 			.map((group) => ({
 				...group,
-				items: group.items.filter((item) =>
-					t(item.labelKey).toLowerCase().includes(query),
-				),
+				items: group.items.flatMap((item) => {
+					const hubMatches = item.hub && matches(item);
+					return hubTabItems(item, hubGates).filter((tab) => hubMatches || matches(tab));
+				}),
 			}))
 			.filter((group) => group.items.length > 0);
-	}, [visibleNavGroups, searchQuery, t]);
+		function matches(item: NavItem) {
+			return t(item.labelKey).toLowerCase().includes(query);
+		}
+	}, [visibleNavGroups, searchQuery, t, hubGates]);
 
 	// Load envConfig when project changes to ensure store is populated
 	useEffect(() => {
@@ -1472,6 +1380,14 @@ export function Sidebar({
 		onViewChange?.(view);
 	};
 
+	const openNavItem = (item: NavItem) => {
+		if (!item.hub) return handleNavClick(item.id);
+		setSearchQuery("");
+		setIsSearchOpen(false);
+		const target = hubEntryTarget(getHub(item.hub), hubGates);
+		if (target) onViewChange?.(target);
+	};
+
 	const toggleGroupExpansion = (groupId: string) => {
 		toggleGroupExpanded(groupId);
 	};
@@ -1572,11 +1488,11 @@ export function Sidebar({
 		isSubItem = false,
 		context: "default" | "favorites" = "default",
 	) => {
-		const isActive = activeView === item.id;
+		const isActive = isOn(item, activeView);
 		const Icon = item.icon;
-		const isPinned = pinnedItemsSet.has(item.id);
-		const badge = badgeFor(item.id);
-		const hasAttention = attentionView === item.id;
+		const isPinned = itemViews(item).some((view) => pinnedItemsSet.has(view));
+		const badge = groupBadgeFor([item]);
+		const hasAttention = isOn(item, attentionView);
 
 		// Determine CSS classes based on collapsed state and sub-item status
 		const getLayoutClasses = () => {
@@ -1599,7 +1515,8 @@ export function Sidebar({
 				type="button"
 				onClick={(e) => {
 					e.stopPropagation();
-					toggleItemPin(item.id);
+					if (isPinned && item.hub) unpinItems(itemViews(item));
+					else toggleItemPin(item.id);
 				}}
 				aria-label={
 					isPinned
@@ -1631,7 +1548,7 @@ export function Sidebar({
 			>
 				<button
 					type="button"
-					onClick={() => handleNavClick(item.id)}
+					onClick={() => openNavItem(item)}
 					// The console is deployment-scoped, not project-scoped.
 					disabled={!selectedProjectId && item.id !== "administration"}
 					aria-keyshortcuts={item.shortcut}
@@ -1653,7 +1570,7 @@ export function Sidebar({
 							<span className="flex-1 text-left truncate">
 								{t(item.labelKey)}
 							</span>
-							{EXPERIMENTAL_VIEWS.has(item.id) && (
+							{isItemExperimental(item) && (
 								<span
 									title={t("navigation:experimental.tooltip")}
 									className="shrink-0 rounded border border-amber-400/40 px-1 text-[10px] uppercase tracking-wide text-amber-500"
@@ -1723,13 +1640,13 @@ export function Sidebar({
 	};
 
 	const renderTooltipSubGroupItem = (item: NavItem) => {
-		const isActive = activeView === item.id;
-		const badge = badgeFor(item.id);
+		const isActive = isOn(item, activeView);
+		const badge = groupBadgeFor([item]);
 		return (
 			<button
 				key={item.id}
 				type="button"
-				onClick={() => handleNavClick(item.id)}
+				onClick={() => openNavItem(item)}
 				disabled={!selectedProjectId && item.id !== "administration"}
 				aria-keyshortcuts={item.shortcut}
 				className={cn(
@@ -1911,9 +1828,7 @@ export function Sidebar({
 		// On the rail there is no room for a row, so the group icon carries the
 		// rollup of everything folded behind it.
 		const groupBadge = groupBadgeFor(group.items);
-		const groupAttention = group.items.some(
-			(item) => attentionView === item.id,
-		);
+		const groupAttention = group.items.some((item) => isOn(item, attentionView));
 
 		return (
 			<Tooltip key={group.id}>
@@ -1958,7 +1873,7 @@ export function Sidebar({
 	) => {
 		const isFavorites = group.id === "__favorites__";
 		const isExpanded = getGroupExpandedState(group, isFavorites);
-		const hasActiveItem = group.items.some((item) => activeView === item.id);
+		const hasActiveItem = group.items.some((item) => isOn(item, activeView));
 		const isPinned = pinnedGroupsSet.has(group.id);
 
 		if (isCollapsed) {
@@ -2044,9 +1959,7 @@ export function Sidebar({
 		// A collapsed group hides its entries, so it carries the worst state
 		// among them — otherwise work in a folded group is invisible.
 		const groupBadge = isExpanded ? null : groupBadgeFor(group.items);
-		const groupAttention = group.items.some(
-			(item) => attentionView === item.id,
-		);
+		const groupAttention = group.items.some((item) => isOn(item, attentionView));
 		
 		const toggleExpand = () => {
 			if (isFavorites) {

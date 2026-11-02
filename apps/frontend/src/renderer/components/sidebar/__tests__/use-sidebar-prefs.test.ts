@@ -54,4 +54,17 @@ describe("useSidebarPrefs", () => {
 			}),
 		});
 	});
+
+	it("unpins several entries in one save", () => {
+		const { result } = renderHook(() => useSidebarPrefs());
+		act(() => result.current.toggleItemPin("session-history"));
+		act(() => result.current.toggleItemPin("kanban"));
+		act(() => result.current.toggleItemPin("agent-replay"));
+		saveSettings.mockClear();
+		act(() => result.current.unpinItems(["session-history", "agent-replay"]));
+		expect(saveSettings).toHaveBeenCalledTimes(1);
+		expect(saveSettings).toHaveBeenLastCalledWith({
+			sidebarPrefs: expect.objectContaining({ pinnedItems: ["kanban"] }),
+		});
+	});
 });
