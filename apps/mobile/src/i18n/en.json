@@ -14,6 +14,7 @@
 		"generic": "Something went wrong: {{message}}",
 		"card_not_indexed": "The server hasn't indexed this card yet. Pull to refresh.",
 		"feedback_required": "Say what needs to change.",
+		"nothing_to_stop": "Nothing was running on this card any more. Pull to refresh.",
 		"entra_disabled": "This server doesn't offer Microsoft sign-in.",
 		"entra_failed": "Microsoft sign-in didn't complete.",
 		"entra_misconfigured": "The server's Microsoft sign-in settings are invalid."
