@@ -14,6 +14,7 @@ import { avatarColor, useCollaborationStore } from "../../stores/collaboration-s
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { initialsOf } from "./PresenceIndicator";
+import { formatAppTime } from "@/lib/date-format";
 
 const SEND_ERRORS = new Set(["forbidden", "invalid", "too_fast", "unavailable", "offline"]);
 
@@ -21,7 +22,7 @@ function formatTime(iso: string): string {
 	const d = new Date(iso);
 	return Number.isNaN(d.getTime())
 		? ""
-		: d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+		: formatAppTime(d, { hour: "2-digit", minute: "2-digit" });
 }
 
 function MessageBubble({

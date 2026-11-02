@@ -27,6 +27,7 @@ import {
 	CollapsibleContent,
 	CollapsibleTrigger,
 } from "../../ui/collapsible";
+import { formatAppDateTime, formatAppTime } from "@/lib/date-format";
 
 interface PRLogsProps {
 	readonly prNumber: number;
@@ -220,7 +221,7 @@ export function PRLogs({
 						</div>
 						<div className="text-xs text-muted-foreground flex items-center gap-1">
 							<Clock className="h-3 w-3" />
-							{new Date(logs.updated_at).toLocaleString()}
+							{formatAppDateTime(logs.updated_at)}
 						</div>
 					</div>
 
@@ -523,7 +524,7 @@ function OrchestratorActivitySection({
 							className="flex items-start gap-2 text-[10px] text-muted-foreground/80 py-0.5"
 						>
 							<span className="text-muted-foreground/50 tabular-nums shrink-0">
-								{new Date(entry.timestamp).toLocaleTimeString("en-US", {
+								{formatAppTime(entry.timestamp, {
 									hour: "2-digit",
 									minute: "2-digit",
 									second: "2-digit",
@@ -700,7 +701,7 @@ function LogEntry({ entry }: LogEntryProps) {
 	const formatTime = (timestamp: string) => {
 		try {
 			const date = new Date(timestamp);
-			return date.toLocaleTimeString("en-US", {
+			return formatAppTime(date, {
 				hour: "2-digit",
 				minute: "2-digit",
 				second: "2-digit",

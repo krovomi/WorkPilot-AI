@@ -25,6 +25,7 @@ import { PlanApprovalSection } from "./PlanApprovalSection";
 import { TaskCodeEditor } from "./TaskCodeEditor";
 import { TaskResetButton } from "./TaskResetButton";
 import { SubtaskFilesViewer } from "./SubtaskFilesViewer";
+import { formatAppDateTime } from "@/lib/date-format";
 
 interface Phase {
 	name: string;
@@ -480,9 +481,7 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 											subtask.requestedAt && (
 												<p className="mt-0.5 text-[10px] text-violet-600/70 dark:text-violet-400/70">
 													{t("tasks:subtasks.requestedAt", {
-														date: new Date(
-															subtask.requestedAt,
-														).toLocaleString(),
+														date: formatAppDateTime(subtask.requestedAt),
 													})}
 												</p>
 											)}
