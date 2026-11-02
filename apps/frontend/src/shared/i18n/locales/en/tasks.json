@@ -1615,25 +1615,50 @@
 			"handles": "{{from}} handles {{to}}."
 		}
 	},
-	"overview": {
-		"nav": "Overview sections",
+	"panel": {
+		"tabsLabel": "Task panel sections",
 		"sections": {
-			"review": {
-				"title": "To do",
-				"hint": "The task is waiting for your review: read, test, then merge or request changes."
+			"progress": {
+				"title": "Progress",
+				"hint": "Where the task stands and what it needs to move on: your review, the CI and the PR, the task itself, its goal."
 			},
-			"task": {
-				"title": "The task",
-				"hint": "What is asked: description, acceptance criteria, context."
+			"quality": {
+				"title": "Quality",
+				"hint": "Whether what was built is right: second opinion, spec coverage, design system, screens, verification."
 			},
-			"plan": {
-				"title": "Execution plan",
-				"hint": "What the agents will do, at which effort, and what they will read."
-			},
-			"learning": {
-				"title": "Memory & learning",
-				"hint": "What the system remembers — and what is waiting for your decision."
+			"costs": {
+				"title": "Costs & context",
+				"hint": "What the effort level buys, what the agents read, and what the system remembers."
 			}
+		},
+		"empty": "Nothing to show here for this task yet.",
+		"pendingDecisions_one": "1 decision waiting",
+		"pendingDecisions_other": "{{count}} decisions waiting"
+	},
+	"waiting": {
+		"title": "Waiting for you",
+		"items": {
+			"permission": "An agent is waiting for your answer to a question",
+			"plan": "A plan is waiting for your approval",
+			"failed": "The build failed: see why",
+			"ci": "CI is red on the task's branch",
+			"prChecks": "Checks are red on the task's pull request",
+			"goal": "The goal is not met",
+			"review": "The changes are waiting for your review"
+		}
+	},
+	"ciPipeline": {
+		"title": "CI pipeline",
+		"run": "{{provider}} {{run}} on {{branch}}",
+		"open": "Open the run",
+		"repairing": "An agent is repairing the build.",
+		"state": {
+			"queued": "Queued",
+			"running": "Running",
+			"succeeded": "Green",
+			"partiallySucceeded": "Partly green",
+			"failed": "Red",
+			"canceled": "Canceled"
 		}
 	},
 	"inlineEdit": {

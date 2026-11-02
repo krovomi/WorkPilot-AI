@@ -6,6 +6,10 @@ import type {
 	PrFollowupStatus,
 	Task,
 } from "../../../shared/types";
+import {
+	loadPrFollowupStatus,
+	usePrFollowupStore,
+} from "../../stores/pr-followup-store";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 
@@ -36,6 +40,8 @@ export function decisionVariant(decision: PrFollowupDecision): Variant {
 
 const shortSha = (sha: string) => sha.slice(0, 8);
 
+const NOT_RUNNING: PrFollowupStatus = { running: false };
+
 /**
  * Le suivi de la PR, en une carte.
  *
@@ -51,34 +57,15 @@ const shortSha = (sha: string) => sha.slice(0, 8);
 export function PrFollowupCard({ task }: PrFollowupCardProps) {
 	const { t } = useTranslation(["tasks"]);
 	const prUrl = task.prUrl ?? task.metadata?.prUrl;
-	const [status, setStatus] = useState<PrFollowupStatus>({ running: false });
+	const status = usePrFollowupStore((s) => s.byTask[task.id]) ?? NOT_RUNNING;
+	const setStatus = (next: PrFollowupStatus) => usePrFollowupStore.getState().set(task.id, next);
 	const [error, setError] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
 
+	// The events reach the store through global-listeners.ts; this reads the
+	// status the main process already has, for a panel opened after the fact.
 	useEffect(() => {
-		if (!prUrl) return;
-		const api = globalThis.electronAPI;
-		let cancelled = false;
-		if (typeof api?.getPrFollowupStatus === "function") {
-			void api
-				.getPrFollowupStatus(task.id)
-				.then((result) => {
-					if (!cancelled && result.success && result.data) setStatus(result.data);
-				})
-				.catch(() => {
-					// Best-effort: the event stream keeps the card in sync.
-				});
-		}
-		const unsubscribe =
-			typeof api?.onPrFollowupEvent === "function"
-				? api.onPrFollowupEvent((taskId, next) => {
-						if (taskId === task.id) setStatus(next);
-					})
-				: undefined;
-		return () => {
-			cancelled = true;
-			unsubscribe?.();
-		};
+		if (prUrl) void loadPrFollowupStatus(task.id);
 	}, [task.id, prUrl]);
 
 	if (!prUrl) return null;
