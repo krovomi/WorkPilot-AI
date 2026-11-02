@@ -37,13 +37,13 @@ export function SelfHealingDashboard() {
 	return (
 		<div className="h-full flex flex-col overflow-hidden">
 			{/* Header */}
-			<div className="px-6 py-4 border-b border-[var(--border-primary)] bg-[var(--bg-primary)]">
+			<div className="px-6 py-4 border-b border-border bg-background">
 				<div className="flex items-center justify-between">
 					<div>
-						<h1 className="text-lg font-semibold text-[var(--text-primary)]">
+						<h1 className="text-lg font-semibold text-foreground">
 							{t("selfHealing:title")}
 						</h1>
-						<p className="text-xs text-[var(--text-tertiary)] mt-0.5">
+						<p className="text-xs text-muted-foreground mt-0.5">
 							{t("selfHealing:subtitle")}
 						</p>
 					</div>
@@ -78,7 +78,7 @@ export function SelfHealingDashboard() {
 			</div>
 
 			{/* Tab bar */}
-			<div className="flex border-b border-[var(--border-primary)] bg-[var(--bg-primary)] px-6">
+			<div className="flex border-b border-border bg-background px-6">
 				{TABS.map((tab) => (
 					<button
 						key={tab.id}
@@ -86,8 +86,8 @@ export function SelfHealingDashboard() {
 						onClick={() => setActiveTab(tab.id)}
 						className={`flex items-center gap-1.5 px-4 py-2.5 text-sm border-b-2 transition-colors ${
 							activeTab === tab.id
-								? "border-[var(--accent-primary)] text-[var(--accent-primary)]"
-								: "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+								? "border-primary text-primary"
+								: "border-transparent text-muted-foreground hover:text-foreground"
 						}`}
 					>
 						<span>{tab.icon}</span>
@@ -107,7 +107,7 @@ export function SelfHealingDashboard() {
 			<div className="flex-1 overflow-y-auto px-6 py-4">
 				{isLoading ? (
 					<div className="flex items-center justify-center h-32">
-						<div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[var(--accent-primary)]" />
+						<div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
 					</div>
 				) : (
 					<>
@@ -135,14 +135,14 @@ interface StatCardProps {
 
 function StatCard({ label, value, variant = "default" }: StatCardProps) {
 	const valueColors = {
-		default: "text-[var(--text-primary)]",
+		default: "text-foreground",
 		success: "text-green-400",
 		warning: "text-yellow-400",
 	};
 
 	return (
-		<div className="rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-2.5">
-			<p className="text-xs text-[var(--text-tertiary)]">{label}</p>
+		<div className="rounded-lg border border-border bg-card p-2.5">
+			<p className="text-xs text-muted-foreground">{label}</p>
 			<p className={`text-lg font-semibold ${valueColors[variant]}`}>{value}</p>
 		</div>
 	);

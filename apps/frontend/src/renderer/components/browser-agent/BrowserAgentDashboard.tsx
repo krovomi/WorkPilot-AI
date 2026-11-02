@@ -66,7 +66,7 @@ export function BrowserAgentDashboard() {
 				<div className="w-14 h-14 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
 					<MonitorX className="w-7 h-7 text-blue-400 opacity-60" />
 				</div>
-				<p className="text-sm text-[var(--text-tertiary)]">
+				<p className="text-sm text-muted-foreground">
 					{t("browserAgent:errors.noProject")}
 				</p>
 			</div>
@@ -76,16 +76,16 @@ export function BrowserAgentDashboard() {
 	return (
 		<div className="h-full flex flex-col overflow-hidden">
 			{/* Header */}
-			<div className="px-6 py-4 border-b border-[var(--border-primary)] bg-[var(--bg-primary)]">
+			<div className="px-6 py-4 border-b border-border bg-background">
 				<div className="flex items-center gap-3 mb-4">
 					<div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border border-blue-500/30 flex items-center justify-center">
 						<Globe className="w-5 h-5 text-blue-400" />
 					</div>
 					<div>
-						<h1 className="text-lg font-semibold text-[var(--text-primary)]">
+						<h1 className="text-lg font-semibold text-foreground">
 							{t("browserAgent:title")}
 						</h1>
-						<p className="text-xs text-[var(--text-tertiary)]">
+						<p className="text-xs text-muted-foreground">
 							{t("browserAgent:subtitle")}
 						</p>
 					</div>
@@ -127,7 +127,7 @@ export function BrowserAgentDashboard() {
 			</div>
 
 			{/* Tab bar */}
-			<div className="flex border-b border-[var(--border-primary)] bg-[var(--bg-primary)] px-6">
+			<div className="flex border-b border-border bg-background px-6">
 				{TABS.map((tab) => {
 					const Icon = tab.icon;
 					const isActive = activeTab === tab.id;
@@ -139,7 +139,7 @@ export function BrowserAgentDashboard() {
 							className={`flex items-center gap-2 px-4 py-2.5 text-sm border-b-2 transition-colors ${
 								isActive
 									? tab.activeColor
-									: "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+									: "border-transparent text-muted-foreground hover:text-foreground"
 							}`}
 						>
 							<Icon className={`w-4 h-4 ${isActive ? "" : ""}`} />
@@ -162,7 +162,7 @@ export function BrowserAgentDashboard() {
 				{isLoading ? (
 					<div className="flex flex-col items-center justify-center h-48 gap-3">
 						<div className="w-7 h-7 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
-						<p className="text-xs text-[var(--text-tertiary)]">
+						<p className="text-xs text-muted-foreground">
 							{t("browserAgent:browser.launching")}
 						</p>
 					</div>
@@ -243,7 +243,7 @@ function StatCard({
 		>
 			<Icon className={`w-4.5 h-4.5 ${colors.icon} shrink-0`} />
 			<div className="min-w-0">
-				<p className="text-[11px] text-[var(--text-tertiary)] truncate">
+				<p className="text-[11px] text-muted-foreground truncate">
 					{label}
 				</p>
 				<p className={`text-lg font-semibold ${colors.value} leading-tight`}>

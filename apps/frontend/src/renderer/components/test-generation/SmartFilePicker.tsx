@@ -201,7 +201,7 @@ export function SmartFilePicker({
 	const openStateClasses =
 		"border-[var(--color-accent)] bg-[var(--color-accent)]/5";
 	const hasValueClasses =
-		"border-[var(--color-border)] bg-[var(--color-bg-secondary)]";
+		"border-[var(--color-border)] bg-card";
 	const noValueClasses =
 		"border-dashed border-[var(--color-border)] bg-transparent";
 

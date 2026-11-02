@@ -63,7 +63,7 @@ export function SchemaViewer({ schema, spec, depth = 0 }: SchemaViewerProps) {
 	const description = resolved.description as string | undefined;
 
 	if (depth > 4)
-		return <span className="text-[var(--color-text-muted)] text-xs">...</span>;
+		return <span className="text-muted-foreground text-xs">...</span>;
 
 	if (type === "object" && properties) {
 		return (
@@ -75,7 +75,7 @@ export function SchemaViewer({ schema, spec, depth = 0 }: SchemaViewerProps) {
 				{Object.entries(properties).map(([key, val]) => (
 					<div key={key} className="py-0.5">
 						<div className="flex items-center gap-2 flex-wrap">
-							<span className="font-mono text-xs text-[var(--color-text-primary)] font-medium">
+							<span className="font-mono text-xs text-foreground font-medium">
 								{key}
 							</span>
 							{required?.includes(key) && (
@@ -87,7 +87,7 @@ export function SchemaViewer({ schema, spec, depth = 0 }: SchemaViewerProps) {
 								{(val.type as string) ?? (val.$ref ? "↗ ref" : "?")}
 							</span>
 							{!!val.description && (
-								<span className="text-xs text-[var(--color-text-muted)]">
+								<span className="text-xs text-muted-foreground">
 									— {String(val.description)}
 								</span>
 							)}
@@ -108,14 +108,14 @@ export function SchemaViewer({ schema, spec, depth = 0 }: SchemaViewerProps) {
 					depth > 0 ? "ml-3 border-l border-[var(--color-border)] pl-3" : ""
 				}
 			>
-				<span className="text-xs text-[var(--color-text-muted)]">items:</span>
+				<span className="text-xs text-muted-foreground">items:</span>
 				<SchemaViewer schema={items} spec={spec} depth={depth + 1} />
 			</div>
 		);
 	}
 
 	return (
-		<span className="text-xs text-[var(--color-text-muted)]">
+		<span className="text-xs text-muted-foreground">
 			{type ?? "any"}
 			{description ? ` — ${description}` : ""}
 		</span>
@@ -615,11 +615,11 @@ export function RequestPanel({
 		<div className="flex flex-col h-full overflow-hidden">
 			{/* URL bar — Postman-style */}
 			<div className="px-5 pt-4 pb-0 shrink-0">
-				<div className="flex items-stretch bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-lg overflow-hidden">
-					<div className="flex items-center px-3 border-r border-[var(--color-border)] shrink-0 bg-[var(--color-bg-tertiary)]">
+				<div className="flex items-stretch bg-card border border-[var(--color-border)] rounded-lg overflow-hidden">
+					<div className="flex items-center px-3 border-r border-[var(--color-border)] shrink-0 bg-muted">
 						<MethodBadge method={method} size="md" />
 					</div>
-					<span className="font-mono text-sm text-[var(--color-text-primary)] flex-1 px-3 py-2.5 truncate">
+					<span className="font-mono text-sm text-foreground flex-1 px-3 py-2.5 truncate">
 						{resolvedUrl}
 					</span>
 					<Button
@@ -648,8 +648,8 @@ export function RequestPanel({
 							onClick={() => setActiveTab(tab.id)}
 							className={`relative px-4 py-2 text-xs font-medium transition-colors flex items-center gap-1.5 ${
 								activeTab === tab.id
-									? "text-[var(--color-text-primary)]"
-									: "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
+									? "text-foreground"
+									: "text-muted-foreground hover:text-muted-foreground"
 							}`}
 						>
 							{tab.label}
@@ -668,7 +668,7 @@ export function RequestPanel({
 						<div className="space-y-4">
 							{pathParams.length > 0 && (
 								<div>
-									<div className="text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-2">
+									<div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
 										{t("apiExplorer:request.pathParams")}
 									</div>
 									{pathParams.map((p) => (
@@ -684,7 +684,7 @@ export function RequestPanel({
 							<div>
 								{queryParams.length > 0 && (
 									<>
-										<div className="text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-2">
+										<div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
 											{t("apiExplorer:request.queryParams")}
 										</div>
 										{queryParams.map((p) => (
@@ -717,7 +717,7 @@ export function RequestPanel({
 						<div className="space-y-3">
 							{headerParams.length > 0 && (
 								<div>
-									<div className="text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-2">
+									<div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
 										{t("apiExplorer:request.specHeaders")}
 									</div>
 									{headerParams.map((p) => (
@@ -748,7 +748,7 @@ export function RequestPanel({
 							{/* Auth type selector */}
 							<div>
 								{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-								<label className="text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider block mb-1.5">
+								<label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
 									{t("apiExplorer:auth.type")}
 								</label>
 								<CustomSelect
@@ -773,7 +773,7 @@ export function RequestPanel({
 							{/* Inherited from environment */}
 							{requestAuth.type === "inherited" && (
 								<div
-									className={`rounded-lg p-3 text-xs ${activeEnv?.token ? "bg-amber-400/5 border border-amber-400/20" : "bg-[var(--color-bg-secondary)] border border-[var(--color-border)]"}`}
+									className={`rounded-lg p-3 text-xs ${activeEnv?.token ? "bg-amber-400/5 border border-amber-400/20" : "bg-card border border-[var(--color-border)]"}`}
 								>
 									{activeEnv?.token ? (
 										<div className="flex items-start gap-2">
@@ -784,13 +784,13 @@ export function RequestPanel({
 														env: activeEnv.name,
 													})}
 												</div>
-												<div className="text-[var(--color-text-muted)] mt-0.5 font-mono">
+												<div className="text-muted-foreground mt-0.5 font-mono">
 													Authorization: Bearer ••••{activeEnv.token.slice(-6)}
 												</div>
 											</div>
 										</div>
 									) : (
-										<div className="text-[var(--color-text-muted)]">
+										<div className="text-muted-foreground">
 											{t("apiExplorer:auth.noEnvToken", {
 												env: activeEnv?.name ?? "Local",
 											})}
@@ -808,7 +808,7 @@ export function RequestPanel({
 
 							{/* No auth */}
 							{requestAuth.type === "none" && (
-								<div className="text-xs text-[var(--color-text-muted)] bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-lg p-3">
+								<div className="text-xs text-muted-foreground bg-card border border-[var(--color-border)] rounded-lg p-3">
 									{t("apiExplorer:auth.noAuthDesc")}
 								</div>
 							)}
@@ -817,13 +817,13 @@ export function RequestPanel({
 							{requestAuth.type === "bearer" && (
 								<div className="space-y-2">
 									{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-									<label className="text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider block">
+									<label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block">
 										{t("apiExplorer:auth.token")}
 									</label>
 									<div className="flex gap-2">
 										<input
 											type={showAuthToken ? "text" : "password"}
-											className="flex-1 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-3 py-2 text-sm font-mono text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-accent)]"
+											className="flex-1 bg-card border border-[var(--color-border)] rounded-md px-3 py-2 text-sm font-mono text-foreground focus:outline-none focus:border-[var(--color-accent)]"
 											value={requestAuth.bearer}
 											onChange={(e) =>
 												setRequestAuth({ bearer: e.target.value })
@@ -833,12 +833,12 @@ export function RequestPanel({
 										<button
 											type="button"
 											onClick={() => setShowAuthToken((v) => !v)}
-											className="px-3 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] border border-[var(--color-border)] rounded-md bg-[var(--color-bg-secondary)] transition-colors text-sm"
+											className="px-3 text-muted-foreground hover:text-foreground border border-[var(--color-border)] rounded-md bg-card transition-colors text-sm"
 										>
 											{showAuthToken ? "🙈" : "👁"}
 										</button>
 									</div>
-									<div className="text-[10px] text-[var(--color-text-muted)]">
+									<div className="text-[10px] text-muted-foreground">
 										{t("apiExplorer:auth.bearerHint")}
 									</div>
 								</div>
@@ -849,12 +849,12 @@ export function RequestPanel({
 								<div className="space-y-2">
 									<div>
 										{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-										<label className="text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider block mb-1">
+										<label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
 											{t("apiExplorer:auth.username")}
 										</label>
 										<input
 											type="text"
-											className="w-full bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-accent)]"
+											className="w-full bg-card border border-[var(--color-border)] rounded-md px-3 py-2 text-sm text-foreground focus:outline-none focus:border-[var(--color-accent)]"
 											value={requestAuth.username}
 											onChange={(e) =>
 												setRequestAuth({ username: e.target.value })
@@ -864,13 +864,13 @@ export function RequestPanel({
 									</div>
 									<div>
 										{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-										<label className="text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider block mb-1">
+										<label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
 											{t("apiExplorer:auth.password")}
 										</label>
 										<div className="flex gap-2">
 											<input
 												type={showAuthPassword ? "text" : "password"}
-												className="flex-1 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-accent)]"
+												className="flex-1 bg-card border border-[var(--color-border)] rounded-md px-3 py-2 text-sm text-foreground focus:outline-none focus:border-[var(--color-accent)]"
 												value={requestAuth.password}
 												onChange={(e) =>
 													setRequestAuth({ password: e.target.value })
@@ -880,13 +880,13 @@ export function RequestPanel({
 											<button
 												type="button"
 												onClick={() => setShowAuthPassword((v) => !v)}
-												className="px-3 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] border border-[var(--color-border)] rounded-md bg-[var(--color-bg-secondary)] transition-colors text-sm"
+												className="px-3 text-muted-foreground hover:text-foreground border border-[var(--color-border)] rounded-md bg-card transition-colors text-sm"
 											>
 												{showAuthPassword ? "🙈" : "👁"}
 											</button>
 										</div>
 									</div>
-									<div className="text-[10px] text-[var(--color-text-muted)]">
+									<div className="text-[10px] text-muted-foreground">
 										{t("apiExplorer:auth.basicHint")}
 									</div>
 								</div>
@@ -898,12 +898,12 @@ export function RequestPanel({
 									<div className="grid grid-cols-2 gap-2">
 										<div>
 											{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-											<label className="text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider block mb-1">
+											<label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
 												{t("apiExplorer:auth.keyName")}
 											</label>
 											<input
 												type="text"
-												className="w-full bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-3 py-2 text-sm font-mono text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-accent)]"
+												className="w-full bg-card border border-[var(--color-border)] rounded-md px-3 py-2 text-sm font-mono text-foreground focus:outline-none focus:border-[var(--color-accent)]"
 												value={requestAuth.keyName}
 												onChange={(e) =>
 													setRequestAuth({ keyName: e.target.value })
@@ -913,7 +913,7 @@ export function RequestPanel({
 										</div>
 										<div>
 											{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-											<label className="text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider block mb-1">
+											<label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
 												{t("apiExplorer:auth.addTo")}
 											</label>
 											<CustomSelect
@@ -938,12 +938,12 @@ export function RequestPanel({
 									</div>
 									<div>
 										{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-										<label className="text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider block mb-1">
+										<label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
 											{t("apiExplorer:auth.keyValue")}
 										</label>
 										<input
 											type="text"
-											className="w-full bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-3 py-2 text-sm font-mono text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-accent)]"
+											className="w-full bg-card border border-[var(--color-border)] rounded-md px-3 py-2 text-sm font-mono text-foreground focus:outline-none focus:border-[var(--color-accent)]"
 											value={requestAuth.keyValue}
 											onChange={(e) =>
 												setRequestAuth({ keyValue: e.target.value })
@@ -960,7 +960,7 @@ export function RequestPanel({
 									{/* Grant Type */}
 									<div>
 										{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-										<label className="text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider block mb-1">
+										<label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
 											{t("apiExplorer:auth.oauth2.grantType")}
 										</label>
 										<CustomSelect
@@ -993,7 +993,7 @@ export function RequestPanel({
 
 									{/* Configure New Token */}
 									<div className="border border-[var(--color-border)] rounded-lg p-3 space-y-2.5">
-										<div className="text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">
+										<div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
 											{t("apiExplorer:auth.oauth2.configureToken")}
 										</div>
 
@@ -1001,12 +1001,12 @@ export function RequestPanel({
 										{requestAuth.oauth2GrantType === "authorization_code" && (
 											<div>
 												{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-												<label className="text-[10px] text-[var(--color-text-muted)] block mb-1">
+												<label className="text-[10px] text-muted-foreground block mb-1">
 													{t("apiExplorer:auth.oauth2.authUrl")}
 												</label>
 												<input
 													type="url"
-													className="w-full bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-md px-3 py-1.5 text-xs font-mono text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-accent)]"
+													className="w-full bg-background border border-[var(--color-border)] rounded-md px-3 py-1.5 text-xs font-mono text-foreground focus:outline-none focus:border-[var(--color-accent)]"
 													value={requestAuth.oauth2AuthUrl}
 													onChange={(e) =>
 														setRequestAuth({ oauth2AuthUrl: e.target.value })
@@ -1020,12 +1020,12 @@ export function RequestPanel({
 										{requestAuth.oauth2GrantType !== "authorization_code" && (
 											<div>
 												{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-												<label className="text-[10px] text-[var(--color-text-muted)] block mb-1">
+												<label className="text-[10px] text-muted-foreground block mb-1">
 													{t("apiExplorer:auth.oauth2.tokenUrl")}
 												</label>
 												<input
 													type="url"
-													className="w-full bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-md px-3 py-1.5 text-xs font-mono text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-accent)]"
+													className="w-full bg-background border border-[var(--color-border)] rounded-md px-3 py-1.5 text-xs font-mono text-foreground focus:outline-none focus:border-[var(--color-accent)]"
 													value={requestAuth.oauth2TokenUrl}
 													onChange={(e) =>
 														setRequestAuth({ oauth2TokenUrl: e.target.value })
@@ -1038,12 +1038,12 @@ export function RequestPanel({
 										{/* Client ID */}
 										<div>
 											{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-											<label className="text-[10px] text-[var(--color-text-muted)] block mb-1">
+											<label className="text-[10px] text-muted-foreground block mb-1">
 												{t("apiExplorer:auth.oauth2.clientId")}
 											</label>
 											<input
 												type="text"
-												className="w-full bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-md px-3 py-1.5 text-xs font-mono text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-accent)]"
+												className="w-full bg-background border border-[var(--color-border)] rounded-md px-3 py-1.5 text-xs font-mono text-foreground focus:outline-none focus:border-[var(--color-accent)]"
 												value={requestAuth.oauth2ClientId}
 												onChange={(e) =>
 													setRequestAuth({ oauth2ClientId: e.target.value })
@@ -1055,13 +1055,13 @@ export function RequestPanel({
 										{/* Client Secret */}
 										<div>
 											{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-											<label className="text-[10px] text-[var(--color-text-muted)] block mb-1">
+											<label className="text-[10px] text-muted-foreground block mb-1">
 												{t("apiExplorer:auth.oauth2.clientSecret")}
 											</label>
 											<div className="flex gap-2">
 												<input
 													type={showOAuth2Secret ? "text" : "password"}
-													className="flex-1 bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-md px-3 py-1.5 text-xs font-mono text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-accent)]"
+													className="flex-1 bg-background border border-[var(--color-border)] rounded-md px-3 py-1.5 text-xs font-mono text-foreground focus:outline-none focus:border-[var(--color-accent)]"
 													value={requestAuth.oauth2ClientSecret}
 													onChange={(e) =>
 														setRequestAuth({
@@ -1073,7 +1073,7 @@ export function RequestPanel({
 												<button
 													type="button"
 													onClick={() => setShowOAuth2Secret((v) => !v)}
-													className="px-2.5 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] border border-[var(--color-border)] rounded-md bg-[var(--color-bg-primary)] transition-colors text-sm"
+													className="px-2.5 text-muted-foreground hover:text-foreground border border-[var(--color-border)] rounded-md bg-background transition-colors text-sm"
 												>
 													{showOAuth2Secret ? "🙈" : "👁"}
 												</button>
@@ -1083,12 +1083,12 @@ export function RequestPanel({
 										{/* Scope */}
 										<div>
 											{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-											<label className="text-[10px] text-[var(--color-text-muted)] block mb-1">
+											<label className="text-[10px] text-muted-foreground block mb-1">
 												{t("apiExplorer:auth.oauth2.scope")}
 											</label>
 											<input
 												type="text"
-												className="w-full bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-md px-3 py-1.5 text-xs font-mono text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-accent)]"
+												className="w-full bg-background border border-[var(--color-border)] rounded-md px-3 py-1.5 text-xs font-mono text-foreground focus:outline-none focus:border-[var(--color-accent)]"
 												value={requestAuth.oauth2Scope}
 												onChange={(e) =>
 													setRequestAuth({ oauth2Scope: e.target.value })
@@ -1102,12 +1102,12 @@ export function RequestPanel({
 											<div className="grid grid-cols-2 gap-2">
 												<div>
 													{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-													<label className="text-[10px] text-[var(--color-text-muted)] block mb-1">
+													<label className="text-[10px] text-muted-foreground block mb-1">
 														{t("apiExplorer:auth.username")}
 													</label>
 													<input
 														type="text"
-														className="w-full bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-md px-3 py-1.5 text-xs text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-accent)]"
+														className="w-full bg-background border border-[var(--color-border)] rounded-md px-3 py-1.5 text-xs text-foreground focus:outline-none focus:border-[var(--color-accent)]"
 														value={requestAuth.username}
 														onChange={(e) =>
 															setRequestAuth({ username: e.target.value })
@@ -1119,12 +1119,12 @@ export function RequestPanel({
 												</div>
 												<div>
 													{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-													<label className="text-[10px] text-[var(--color-text-muted)] block mb-1">
+													<label className="text-[10px] text-muted-foreground block mb-1">
 														{t("apiExplorer:auth.password")}
 													</label>
 													<input
 														type="password"
-														className="w-full bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-md px-3 py-1.5 text-xs text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-accent)]"
+														className="w-full bg-background border border-[var(--color-border)] rounded-md px-3 py-1.5 text-xs text-foreground focus:outline-none focus:border-[var(--color-accent)]"
 														value={requestAuth.password}
 														onChange={(e) =>
 															setRequestAuth({ password: e.target.value })
@@ -1160,13 +1160,13 @@ export function RequestPanel({
 
 									{/* Current Token */}
 									<div className="space-y-2">
-										<div className="text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">
+										<div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
 											{t("apiExplorer:auth.oauth2.currentToken")}
 										</div>
 										<div className="flex gap-2">
 											<input
 												type={showOAuth2Token ? "text" : "password"}
-												className="flex-1 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-3 py-2 text-sm font-mono text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-accent)]"
+												className="flex-1 bg-card border border-[var(--color-border)] rounded-md px-3 py-2 text-sm font-mono text-foreground focus:outline-none focus:border-[var(--color-accent)]"
 												value={requestAuth.oauth2AccessToken}
 												onChange={(e) =>
 													setRequestAuth({ oauth2AccessToken: e.target.value })
@@ -1178,18 +1178,18 @@ export function RequestPanel({
 											<button
 												type="button"
 												onClick={() => setShowOAuth2Token((v) => !v)}
-												className="px-3 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] border border-[var(--color-border)] rounded-md bg-[var(--color-bg-secondary)] transition-colors text-sm"
+												className="px-3 text-muted-foreground hover:text-foreground border border-[var(--color-border)] rounded-md bg-card transition-colors text-sm"
 											>
 												{showOAuth2Token ? "🙈" : "👁"}
 											</button>
 										</div>
 										<div className="flex items-center gap-2">
-											<span className="text-[10px] text-[var(--color-text-muted)]">
+											<span className="text-[10px] text-muted-foreground">
 												{t("apiExplorer:auth.oauth2.headerPrefix")}
 											</span>
 											<input
 												type="text"
-												className="w-24 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded px-2 py-1 text-xs font-mono text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-accent)]"
+												className="w-24 bg-card border border-[var(--color-border)] rounded px-2 py-1 text-xs font-mono text-foreground focus:outline-none focus:border-[var(--color-accent)]"
 												value={requestAuth.oauth2HeaderPrefix}
 												onChange={(e) =>
 													setRequestAuth({ oauth2HeaderPrefix: e.target.value })
@@ -1205,7 +1205,7 @@ export function RequestPanel({
 					{activeTab === "body" && hasBody && (
 						<div>
 							<textarea
-								className="w-full bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded p-2 text-xs font-mono text-[var(--color-text-primary)] resize-none focus:outline-none focus:border-[var(--color-accent)] min-h-[120px]"
+								className="w-full bg-card border border-[var(--color-border)] rounded p-2 text-xs font-mono text-foreground resize-none focus:outline-none focus:border-[var(--color-accent)] min-h-[120px]"
 								value={requestBody}
 								onChange={(e) => setRequestBody(e.target.value)}
 								placeholder={getBodyPlaceholder(operation, spec)}
@@ -1218,7 +1218,7 @@ export function RequestPanel({
 									if (placeholder && placeholder !== "{}")
 										setRequestBody(placeholder);
 								}}
-								className="mt-1.5 text-[10px] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors"
+								className="mt-1.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
 							>
 								{t("apiExplorer:request.fillExample")}
 							</button>
@@ -1229,31 +1229,31 @@ export function RequestPanel({
 						<div className="space-y-6">
 							{operation.description && (
 								<div>
-									<h4 className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-2">
+									<h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
 										{t("apiExplorer:detail.description")}
 									</h4>
-									<p className="text-sm text-[var(--color-text-secondary)] leading-relaxed">
+									<p className="text-sm text-muted-foreground leading-relaxed">
 										{operation.description}
 									</p>
 								</div>
 							)}
 							{(operation.parameters ?? []).length > 0 && (
 								<div>
-									<h4 className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-3">
+									<h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
 										{t("apiExplorer:detail.parameters")}
 									</h4>
 									<div className="space-y-2">
 										{(operation.parameters ?? []).map((p) => (
 											<div
 												key={`${p.in}-${p.name}`}
-												className="flex items-start gap-3 p-2.5 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)]"
+												className="flex items-start gap-3 p-2.5 rounded-lg bg-card border border-[var(--color-border)]"
 											>
 												<div className="flex-1 min-w-0">
 													<div className="flex items-center gap-2 flex-wrap">
-														<code className="text-xs font-mono font-semibold text-[var(--color-text-primary)]">
+														<code className="text-xs font-mono font-semibold text-foreground">
 															{p.name}
 														</code>
-														<span className="text-[10px] font-mono text-[var(--color-text-muted)] border border-[var(--color-border)] rounded px-1">
+														<span className="text-[10px] font-mono text-muted-foreground border border-[var(--color-border)] rounded px-1">
 															{p.in}
 														</span>
 														<span className="text-[10px] font-mono text-blue-400/80">
@@ -1266,7 +1266,7 @@ export function RequestPanel({
 														)}
 													</div>
 													{p.description && (
-														<p className="text-xs text-[var(--color-text-muted)] mt-1">
+														<p className="text-xs text-muted-foreground mt-1">
 															{p.description}
 														</p>
 													)}
@@ -1278,10 +1278,10 @@ export function RequestPanel({
 							)}
 							{requestBodySchema && (
 								<div>
-									<h4 className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-3">
+									<h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
 										{t("apiExplorer:detail.requestBody")}
 									</h4>
-									<div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-lg p-3">
+									<div className="bg-card border border-[var(--color-border)] rounded-lg p-3">
 										<SchemaViewer
 											schema={requestBodySchema as Record<string, unknown>}
 											spec={spec}
@@ -1291,7 +1291,7 @@ export function RequestPanel({
 							)}
 							{responseCodes.length > 0 && (
 								<div>
-									<h4 className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-3">
+									<h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
 										{t("apiExplorer:detail.responses")}
 									</h4>
 									<div className="space-y-2">
@@ -1302,18 +1302,18 @@ export function RequestPanel({
 												: null;
 											return (
 												<div key={code} className="space-y-1">
-													<div className="flex items-start gap-3 p-2.5 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)]">
+													<div className="flex items-start gap-3 p-2.5 rounded-lg bg-card border border-[var(--color-border)]">
 														<span
 															className={`font-mono text-sm font-bold shrink-0 ${getStatusColor(parseInt(code, 10))}`}
 														>
 															{code}
 														</span>
-														<span className="text-sm text-[var(--color-text-secondary)]">
+														<span className="text-sm text-muted-foreground">
 															{resp?.description ?? "—"}
 														</span>
 													</div>
 													{schema && (
-														<div className="ml-4 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-lg p-3">
+														<div className="ml-4 bg-card border border-[var(--color-border)] rounded-lg p-3">
 															<SchemaViewer
 																schema={schema as Record<string, unknown>}
 																spec={spec}
@@ -1330,7 +1330,7 @@ export function RequestPanel({
 								(operation.parameters ?? []).length === 0 &&
 								!requestBodySchema &&
 								responseCodes.length === 0 && (
-									<div className="text-sm text-[var(--color-text-muted)] text-center py-8">
+									<div className="text-sm text-muted-foreground text-center py-8">
 										{t("apiExplorer:detail.noSchema")}
 									</div>
 								)}
@@ -1363,7 +1363,7 @@ export function RequestPanel({
 						style={{ height: responsePanelHeight }}
 					>
 						{/* Response toolbar */}
-						<div className="flex items-center justify-between px-3 py-2 bg-[var(--color-bg-secondary)] border-b border-[var(--color-border)] shrink-0">
+						<div className="flex items-center justify-between px-3 py-2 bg-card border-b border-[var(--color-border)] shrink-0">
 							<div className="flex items-center gap-3">
 								{/* Body / Headers tabs */}
 								<div className="flex">
@@ -1374,8 +1374,8 @@ export function RequestPanel({
 											onClick={() => setResponseTab(tab)}
 											className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
 												responseTab === tab
-													? "text-[var(--color-text-primary)] bg-[var(--color-bg-primary)]"
-													: "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
+													? "text-foreground bg-background"
+													: "text-muted-foreground hover:text-muted-foreground"
 											}`}
 										>
 											{t(`apiExplorer:response.${tab}`)}
@@ -1386,13 +1386,13 @@ export function RequestPanel({
 								{responseTab === "body" && responseBody && (
 									<div className="flex items-center gap-1 border-l border-[var(--color-border)] pl-3">
 										{/* Segmented control wrapper */}
-										<div className="flex items-center rounded-md border border-[var(--color-border)] bg-[var(--color-bg-tertiary)] p-0.5 gap-0.5">
+										<div className="flex items-center rounded-md border border-[var(--color-border)] bg-muted p-0.5 gap-0.5">
 											{/* "Formaté" + language dropdown grouped */}
 											<div
 												className={`flex items-center rounded transition-colors ${
 													responseFormat === "pretty"
-														? "bg-[var(--color-bg-primary)] shadow-sm"
-														: "hover:bg-[var(--color-bg-secondary)]"
+														? "bg-background shadow-sm"
+														: "hover:bg-card"
 												}`}
 											>
 												<button
@@ -1400,8 +1400,8 @@ export function RequestPanel({
 													onClick={() => setResponseFormat("pretty")}
 													className={`px-2.5 py-1 text-[11px] font-medium transition-colors ${
 														responseFormat === "pretty"
-															? "text-[var(--color-text-primary)]"
-															: "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+															? "text-foreground"
+															: "text-muted-foreground hover:text-foreground"
 													}`}
 												>
 													{t("apiExplorer:response.format.pretty")}
@@ -1420,8 +1420,8 @@ export function RequestPanel({
 												onClick={() => setResponseFormat("raw")}
 												className={`px-2.5 py-1 text-[11px] font-medium rounded transition-colors ${
 													responseFormat === "raw"
-														? "bg-[var(--color-bg-primary)] text-[var(--color-text-primary)] shadow-sm"
-														: "text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-secondary)] hover:text-[var(--color-text-primary)]"
+														? "bg-background text-foreground shadow-sm"
+														: "text-muted-foreground hover:bg-card hover:text-foreground"
 												}`}
 											>
 												{t("apiExplorer:response.format.raw")}
@@ -1435,8 +1435,8 @@ export function RequestPanel({
 													onClick={() => setResponseFormat("preview")}
 													className={`px-2.5 py-1 text-[11px] font-medium rounded transition-colors ${
 														responseFormat === "preview"
-															? "bg-[var(--color-bg-primary)] text-[var(--color-text-primary)] shadow-sm"
-															: "text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-secondary)] hover:text-[var(--color-text-primary)]"
+															? "bg-background text-foreground shadow-sm"
+															: "text-muted-foreground hover:bg-card hover:text-foreground"
 													}`}
 												>
 													{t("apiExplorer:response.format.preview")}
@@ -1453,12 +1453,12 @@ export function RequestPanel({
 											{responseStatus} {responseStatusText}
 										</span>
 										{responseTime !== null && (
-											<span className="text-[var(--color-text-muted)]">
+											<span className="text-muted-foreground">
 												{responseTime}ms
 											</span>
 										)}
 										{responseBody && (
-											<span className="text-[var(--color-text-muted)]">
+											<span className="text-muted-foreground">
 												{(
 													new TextEncoder().encode(responseBody).length / 1024
 												).toFixed(1)}{" "}
@@ -1477,7 +1477,7 @@ export function RequestPanel({
 										className={`flex items-center gap-1.5 px-2 py-0.5 text-[11px] rounded border transition-colors ${
 											savedToken
 												? "text-emerald-400 border-emerald-500/40 bg-emerald-400/10"
-												: "text-[var(--color-text-muted)] border-[var(--color-border)] hover:text-[var(--color-primary)] hover:border-[var(--color-primary)]/40"
+												: "text-muted-foreground border-[var(--color-border)] hover:text-[var(--color-primary)] hover:border-[var(--color-primary)]/40"
 										}`}
 									>
 										{savedToken ? <Check size={11} /> : <Shield size={11} />}
@@ -1490,7 +1490,7 @@ export function RequestPanel({
 									<button
 										type="button"
 										onClick={copyResponse}
-										className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors"
+										className="text-muted-foreground hover:text-foreground transition-colors"
 									>
 										{copiedResponse ? (
 											<Check size={13} className="text-emerald-400" />
@@ -1505,7 +1505,7 @@ export function RequestPanel({
 						{/* Response content — fills remaining height */}
 						<div className="flex-1 min-h-0 overflow-auto">
 							{isSendingRequest && !responseBody ? (
-								<div className="flex items-center gap-2 text-sm text-[var(--color-text-muted)] h-full justify-center">
+								<div className="flex items-center gap-2 text-sm text-muted-foreground h-full justify-center">
 									<Loader2 size={15} className="animate-spin" />
 									{t("apiExplorer:request.sending")}
 								</div>
@@ -1521,7 +1521,7 @@ export function RequestPanel({
 								) : (
 									<div className="p-3">
 										{responseFormat === "raw" ? (
-											<pre className="text-xs font-mono text-[var(--color-text-primary)] whitespace-pre-wrap break-all">
+											<pre className="text-xs font-mono text-foreground whitespace-pre-wrap break-all">
 												{responseBody}
 											</pre>
 										) : (
@@ -1555,7 +1555,7 @@ export function RequestPanel({
 																	})}
 																</p>
 															)}
-															<pre className="text-xs font-mono text-[var(--color-text-primary)] whitespace-pre-wrap break-all">
+															<pre className="text-xs font-mono text-foreground whitespace-pre-wrap break-all">
 																{isXmlLike
 																	? prettifyXml(responseBody)
 																	: responseBody}
@@ -1565,7 +1565,7 @@ export function RequestPanel({
 												}
 												if (effectiveLang === "text") {
 													return (
-														<pre className="text-xs font-mono text-[var(--color-text-primary)] whitespace-pre-wrap break-all">
+														<pre className="text-xs font-mono text-foreground whitespace-pre-wrap break-all">
 															{responseBody}
 														</pre>
 													);
@@ -1605,10 +1605,10 @@ export function RequestPanel({
 								<div className="p-3 space-y-1">
 									{Object.entries(responseHeaders).map(([k, v]) => (
 										<div key={k} className="flex gap-2 text-xs">
-											<span className="font-mono text-[var(--color-text-muted)] shrink-0">
+											<span className="font-mono text-muted-foreground shrink-0">
 												{k}:
 											</span>
-											<span className="font-mono text-[var(--color-text-primary)] break-all">
+											<span className="font-mono text-foreground break-all">
 												{v}
 											</span>
 										</div>
@@ -1678,8 +1678,8 @@ export function LangDropdown({
 				onClick={handleOpen}
 				className={`flex items-center gap-0.5 pl-0 pr-1.5 py-1 text-[11px] transition-colors cursor-pointer ${
 					active
-						? "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
-						: "text-[var(--color-text-muted)]/60 hover:text-[var(--color-text-muted)]"
+						? "text-muted-foreground hover:text-foreground"
+						: "text-muted-foreground/60 hover:text-muted-foreground"
 				}`}
 			>
 				{t(`apiExplorer:response.format.lang.${value}`)}
@@ -1698,7 +1698,7 @@ export function LangDropdown({
 							top: dropdownPos.top,
 							left: dropdownPos.left,
 							zIndex: 2147483647,
-							backgroundColor: "var(--card, var(--color-bg-secondary))",
+							backgroundColor: "var(--card)",
 							isolation: "isolate",
 						}}
 					>
@@ -1713,7 +1713,7 @@ export function LangDropdown({
 								className={`flex items-center gap-1.5 w-full px-2.5 py-1.5 text-[11px] text-left transition-colors hover:bg-(--color-bg-secondary) ${
 									lang === value
 										? "text-[var(--color-primary)]"
-										: "text-[var(--color-text-secondary)]"
+										: "text-muted-foreground"
 								}`}
 							>
 								{lang === value && <Check size={10} className="shrink-0" />}
@@ -1768,12 +1768,12 @@ export function CustomSelect({
 			<button
 				type="button"
 				onClick={() => setOpen((v) => !v)}
-				className="flex items-center justify-between w-full bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-3 py-2 text-[length:inherit] text-[var(--color-text-primary)] hover:border-[var(--color-border-hover)] focus:outline-none focus:border-[var(--color-accent)] cursor-pointer transition-colors"
+				className="flex items-center justify-between w-full bg-card border border-[var(--color-border)] rounded-md px-3 py-2 text-[length:inherit] text-foreground hover:border-primary/40 focus:outline-none focus:border-[var(--color-accent)] cursor-pointer transition-colors"
 			>
 				<span>{selected?.label ?? value}</span>
 				<ChevronDown
 					size={14}
-					className={`text-[var(--color-text-muted)] shrink-0 ml-2 transition-transform ${open ? "rotate-180" : ""}`}
+					className={`text-muted-foreground shrink-0 ml-2 transition-transform ${open ? "rotate-180" : ""}`}
 				/>
 			</button>
 			{open && (
@@ -1789,10 +1789,10 @@ export function CustomSelect({
 								onChange(opt.value);
 								setOpen(false);
 							}}
-							className={`flex items-center gap-2 w-full px-3 py-2 text-[length:inherit] text-left transition-colors hover:bg-[var(--color-bg-secondary)] ${
+							className={`flex items-center gap-2 w-full px-3 py-2 text-[length:inherit] text-left transition-colors hover:bg-card ${
 								opt.value === value
-									? "text-[var(--color-text-primary)] bg-[var(--color-bg-secondary)]"
-									: "text-[var(--color-text-secondary)]"
+									? "text-foreground bg-card"
+									: "text-muted-foreground"
 							}`}
 						>
 							{opt.value === value && (
@@ -1852,13 +1852,13 @@ export function KeyValueEditor({
 						className="w-3.5 h-3.5 shrink-0 accent-[var(--color-primary)] cursor-pointer"
 					/>
 					<input
-						className="flex-1 min-w-0 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded px-2 py-1.5 text-xs font-mono text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
+						className="flex-1 min-w-0 bg-card border border-[var(--color-border)] rounded px-2 py-1.5 text-xs font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-[var(--color-accent)]"
 						value={row.key}
 						onChange={(e) => onUpdate(row.id, "key", e.target.value)}
 						placeholder={keyPlaceholder}
 					/>
 					<input
-						className="flex-1 min-w-0 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded px-2 py-1.5 text-xs font-mono text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
+						className="flex-1 min-w-0 bg-card border border-[var(--color-border)] rounded px-2 py-1.5 text-xs font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-[var(--color-accent)]"
 						value={row.value}
 						onChange={(e) => onUpdate(row.id, "value", e.target.value)}
 						placeholder={valuePlaceholder}
@@ -1866,7 +1866,7 @@ export function KeyValueEditor({
 					<button
 						type="button"
 						onClick={() => onRemove(row.id)}
-						className="shrink-0 p-1 text-[var(--color-text-muted)] hover:text-red-400 transition-colors"
+						className="shrink-0 p-1 text-muted-foreground hover:text-red-400 transition-colors"
 					>
 						<Trash2 size={13} />
 					</button>
@@ -1875,7 +1875,7 @@ export function KeyValueEditor({
 			<button
 				type="button"
 				onClick={onAdd}
-				className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors py-1"
+				className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
 			>
 				<Plus size={13} />
 				{addLabel}
@@ -1896,13 +1896,13 @@ export function ParamRow({
 	return (
 		<div className="flex items-center gap-2 mb-1.5">
 			<div className="w-32 shrink-0">
-				<span className="text-xs font-mono text-[var(--color-text-secondary)]">
+				<span className="text-xs font-mono text-muted-foreground">
 					{param.name}
 				</span>
 				{param.required && <span className="text-red-400 ml-0.5">*</span>}
 			</div>
 			<input
-				className="flex-1 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded px-2 py-1 text-xs font-mono text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-accent)]"
+				className="flex-1 bg-card border border-[var(--color-border)] rounded px-2 py-1 text-xs font-mono text-foreground focus:outline-none focus:border-[var(--color-accent)]"
 				value={value}
 				onChange={(e) => onChange(e.target.value)}
 				placeholder={

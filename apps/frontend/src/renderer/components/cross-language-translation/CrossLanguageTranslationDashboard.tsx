@@ -56,15 +56,15 @@ export function CrossLanguageTranslationDashboard(): React.ReactElement {
 	}
 
 	return (
-		<div className="flex flex-col h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
+		<div className="flex flex-col h-full bg-background text-foreground">
 			{/* Header */}
-			<div className="px-6 py-4 border-b border-[var(--border-color)]">
+			<div className="px-6 py-4 border-b border-border">
 				<div className="flex items-center justify-between">
 					<div>
 						<h1 className="text-xl font-semibold">
 							{t("crossLanguageTranslation:title")}
 						</h1>
-						<p className="text-sm text-[var(--text-secondary)] mt-0.5">
+						<p className="text-sm text-muted-foreground mt-0.5">
 							{t("crossLanguageTranslation:subtitle")}
 						</p>
 					</div>
@@ -91,14 +91,14 @@ export function CrossLanguageTranslationDashboard(): React.ReactElement {
 
 			<div className="flex flex-1 overflow-hidden">
 				{/* Left: languages, options, history */}
-				<div className="w-64 border-r border-[var(--border-color)] p-4 flex flex-col gap-5 overflow-auto">
+				<div className="w-64 border-r border-border p-4 flex flex-col gap-5 overflow-auto">
 					<div>
-						<h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-3">
+						<h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
 							{t("crossLanguageTranslation:languages.heading")}
 						</h3>
 						<label
 							htmlFor="translation-source"
-							className="block text-xs text-[var(--text-secondary)] mb-1"
+							className="block text-xs text-muted-foreground mb-1"
 						>
 							{t("crossLanguageTranslation:languages.source")}
 						</label>
@@ -107,7 +107,7 @@ export function CrossLanguageTranslationDashboard(): React.ReactElement {
 							value={sourceLang}
 							onChange={(e) => setSourceLang(e.target.value)}
 							disabled={isTranslating}
-							className="w-full px-2 py-1.5 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] text-sm mb-3"
+							className="w-full px-2 py-1.5 rounded-lg bg-card border border-border text-sm mb-3"
 						>
 							{languages.map((lang) => (
 								<option key={lang.id} value={lang.id}>
@@ -117,7 +117,7 @@ export function CrossLanguageTranslationDashboard(): React.ReactElement {
 						</select>
 						<label
 							htmlFor="translation-target"
-							className="block text-xs text-[var(--text-secondary)] mb-1"
+							className="block text-xs text-muted-foreground mb-1"
 						>
 							{t("crossLanguageTranslation:languages.target")}
 						</label>
@@ -126,7 +126,7 @@ export function CrossLanguageTranslationDashboard(): React.ReactElement {
 							value={targetLang}
 							onChange={(e) => setTargetLang(e.target.value)}
 							disabled={isTranslating}
-							className="w-full px-2 py-1.5 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] text-sm"
+							className="w-full px-2 py-1.5 rounded-lg bg-card border border-border text-sm"
 						>
 							{languages.map((lang) => (
 								<option key={lang.id} value={lang.id}>
@@ -137,7 +137,7 @@ export function CrossLanguageTranslationDashboard(): React.ReactElement {
 					</div>
 
 					<div>
-						<h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-3">
+						<h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
 							{t("crossLanguageTranslation:options.heading")}
 						</h3>
 						<label className="flex items-center gap-2 cursor-pointer mb-2">
@@ -168,21 +168,21 @@ export function CrossLanguageTranslationDashboard(): React.ReactElement {
 
 					<div className="flex-1">
 						<div className="flex items-center justify-between mb-2">
-							<h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
+							<h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
 								{t("crossLanguageTranslation:history.heading")}
 							</h3>
 							{history.length > 0 && (
 								<button
 									type="button"
 									onClick={() => projectPath && clearHistory(projectPath)}
-									className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] underline"
+									className="text-xs text-muted-foreground hover:text-foreground underline"
 								>
 									{t("crossLanguageTranslation:history.clear")}
 								</button>
 							)}
 						</div>
 						{history.length === 0 ? (
-							<p className="text-xs text-[var(--text-secondary)]">
+							<p className="text-xs text-muted-foreground">
 								{t("crossLanguageTranslation:history.empty")}
 							</p>
 						) : (
@@ -190,13 +190,13 @@ export function CrossLanguageTranslationDashboard(): React.ReactElement {
 								{history.map((entry) => (
 									<div
 										key={entry.id}
-										className="bg-[var(--bg-secondary)] rounded-lg p-2"
+										className="bg-card rounded-lg p-2"
 									>
 										<div className="text-xs font-medium">
 											{languageLabel(entry.source_lang)} →{" "}
 											{languageLabel(entry.target_lang)}
 										</div>
-										<div className="text-xs text-[var(--text-secondary)] font-mono truncate">
+										<div className="text-xs text-muted-foreground font-mono truncate">
 											{entry.file_path}
 										</div>
 										<div
@@ -246,7 +246,7 @@ export function CrossLanguageTranslationDashboard(): React.ReactElement {
 								disabled={isTranslating}
 								spellCheck={false}
 								placeholder={t("crossLanguageTranslation:editor.placeholder")}
-								className="flex-1 w-full resize-none rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] p-3 text-xs font-mono"
+								className="flex-1 w-full resize-none rounded-lg bg-card border border-border p-3 text-xs font-mono"
 							/>
 						</div>
 
@@ -256,13 +256,13 @@ export function CrossLanguageTranslationDashboard(): React.ReactElement {
 									language: languageLabel(targetLang),
 								})}
 							</h2>
-							<div className="flex-1 overflow-auto rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] p-3">
+							<div className="flex-1 overflow-auto rounded-lg bg-card border border-border p-3">
 								{displayedOutput ? (
 									<pre className="text-xs font-mono whitespace-pre-wrap">
 										{displayedOutput}
 									</pre>
 								) : (
-									<p className="text-xs text-[var(--text-secondary)]">
+									<p className="text-xs text-muted-foreground">
 										{isTranslating
 											? t("crossLanguageTranslation:editor.translating")
 											: t("crossLanguageTranslation:editor.resultEmpty")}
