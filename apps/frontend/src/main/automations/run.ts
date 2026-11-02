@@ -27,7 +27,7 @@ export interface RunDeps {
 	startCard(project: Project, card: AutomationCard): Promise<void> | void;
 	/** Whether the board still has the card open (not done, not archived). */
 	isCardOpen(project: Project, specId: string): boolean;
-	issueNumbersOnBoard(project: Project): Set<number>;
+	issueNumbersOnBoard(project: Project, forge?: "github" | "gitlab"): Set<number>;
 	/** Whether the PR already has a review, saved or running. */
 	hasPRReview(project: Project, prNumber: number): Promise<boolean>;
 	/** Starts the PR's review, never posted; resolves once launched. */
@@ -58,7 +58,16 @@ export async function runProjectAutomations(
 	const ledger = readLedger(project);
 	const now = deps.now();
 	const today = localDate(now);
-	let boardIssues: Set<number> | null = null;
+	// The board's issue cards, per forge, read once per pass.
+	const boardIssues = new Map<"github" | "gitlab", Set<number>>();
+	const issuesOf = (forge: "github" | "gitlab"): Set<number> => {
+		let numbers = boardIssues.get(forge);
+		if (!numbers) {
+			numbers = deps.issueNumbersOnBoard(project, forge);
+			boardIssues.set(forge, numbers);
+		}
+		return numbers;
+	};
 
 	for (const rule of rules) {
 		const previous = ledger.statuses[rule.id];
@@ -124,8 +133,7 @@ export async function runProjectAutomations(
 		for (const event of source.events) {
 			if (ledger.seen[event.key]) continue;
 			if (event.issue) {
-				boardIssues ??= deps.issueNumbersOnBoard(project);
-				if (boardIssues.has(event.issue.number)) {
+				if (issuesOf(event.issue.forge ?? "github").has(event.issue.number)) {
 					remember(event.key, "duplicate");
 					log("duplicate", event.subject, {
 						url: event.url,
@@ -183,7 +191,7 @@ export async function runProjectAutomations(
 			status.createdToday += 1;
 			created[today] = status.createdToday;
 			summary.created += 1;
-			if (event.issue) boardIssues?.add(event.issue.number);
+			if (event.issue) issuesOf(event.issue.forge ?? "github").add(event.issue.number);
 			if (rule.trigger.type === "ci_failed") ledger.openCi[rule.id] = card.specId;
 
 			let outcome: AutomationOutcome = "created";

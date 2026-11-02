@@ -104,7 +104,9 @@
 		"sessionCompactionHint": "{{count}} phases d'exécution — cliquez pour voir le résumé compacté",
 		"sessionCompaction": "Compaction de session",
 		"criticalPhases": "Étapes clés",
-		"lastError": "Dernière erreur"
+		"lastError": "Dernière erreur",
+		"automation": "Automations",
+		"automationTooltip": "Créée par la règle d'automatisation « {{rule}} »"
 	},
 	"warnings": {
 		"stuck": {
@@ -610,7 +612,8 @@
 			"github": "GitHub",
 			"gitlab": "GitLab",
 			"visual-canvas": "Canvas visuel",
-			"tech-debt": "Dette technique"
+			"tech-debt": "Dette technique",
+			"automation": "Automatisation"
 		}
 	},
 	"kind": {
