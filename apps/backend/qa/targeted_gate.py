@@ -139,7 +139,7 @@ def render_fix_request(scope: ChangeScope, failures: list[str]) -> str:
         f"**Date**: {datetime.now(UTC).isoformat()}",
         "",
         "Cette tâche est passée en QA ciblée : seuls les tests des fichiers "
-        "modifiés sont lancés, avec la couverture de ces fichiers.",
+        + "modifiés sont lancés, avec la couverture de ces fichiers.",
         "",
         "## Tests associés",
         "",
@@ -155,8 +155,8 @@ def render_fix_request(scope: ChangeScope, failures: list[str]) -> str:
         "## Après correctifs",
         "",
         "1. Corriger le code ou compléter les tests associés jusqu'à ce qu'ils "
-        "passent et couvrent les fichiers modifiés. Jamais de test factice "
-        "(assertion toujours vraie, test vidé) pour obtenir un chiffre.",
+        + "passent et couvrent les fichiers modifiés. Jamais de test factice "
+        + "(assertion toujours vraie, test vidé) pour obtenir un chiffre.",
         "2. Mettre `ready_for_qa_revalidation: true` pour relancer la QA.",
         "",
     ]
