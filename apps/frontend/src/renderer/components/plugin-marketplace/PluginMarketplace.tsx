@@ -8,6 +8,7 @@ import {
 	loadPluginCatalog,
 	usePluginMarketplaceStore,
 } from "@/stores/plugin-marketplace-store";
+import { useProjectStore } from "@/stores/project-store";
 import { InstalledPluginsView } from "./InstalledPluginsView";
 import { PluginCatalogView } from "./PluginCatalogView";
 import { PluginSDKView } from "./PluginSDKView";
@@ -35,10 +36,16 @@ export function PluginMarketplace() {
 	const { activeTab, setActiveTab, installed, error } =
 		usePluginMarketplaceStore();
 
+	const projectId = useProjectStore((state) => state.selectedProjectId);
+
 	useEffect(() => {
 		loadPluginCatalog();
-		loadInstalledPlugins();
 	}, []);
+
+	// Installed plugins are the selected project's skills
+	useEffect(() => {
+		loadInstalledPlugins(projectId);
+	}, [projectId]);
 
 	return (
 		<div className="flex flex-col h-full overflow-hidden bg-background">

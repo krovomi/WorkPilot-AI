@@ -139,7 +139,9 @@ def load_mcp_server_configs_for(
       `pr_reviewer` reading a hostile diff could call whatever a server wired
       up for the coder exposes.
     """
-    from core.client import _validate_custom_mcp_server
+    from core.custom_mcp_validation import (
+        validate_custom_mcp_server as _validate_custom_mcp_server,
+    )
 
     servers = [
         s
@@ -400,7 +402,16 @@ APP_VIEW_CAPTURE_TIMEOUT = 20.0
 
 # The fields of a CUSTOM_MCP_SERVERS entry Claude Code starts a server with
 # (`core.client._custom_servers`); the side session starts it the same way.
-_SDK_SERVER_FIELDS = ("id", "name", "type", "command", "args", "url", "headers")
+_SDK_SERVER_FIELDS = (
+    "id",
+    "name",
+    "type",
+    "command",
+    "args",
+    "env",
+    "url",
+    "headers",
+)
 
 
 def _sdk_tool_result(response: Any) -> dict[str, Any]:
