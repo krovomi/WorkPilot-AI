@@ -28,7 +28,14 @@ export interface AutomationEvent {
 	title: string;
 	description: string;
 	url?: string;
-	issue?: { number: number; url: string; labels: string[]; body?: string };
+	/** An issue; on GitHub unless `forge` says GitLab (`number` is then its IID). */
+	issue?: {
+		forge?: "github" | "gitlab";
+		number: number;
+		url: string;
+		labels: string[];
+		body?: string;
+	};
 	/** A PR to review instead of a card to create. */
 	pr?: { number: number; url: string };
 }

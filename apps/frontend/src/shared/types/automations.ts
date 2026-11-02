@@ -11,7 +11,7 @@ import type { EngineTrio, TaskKind } from "./task";
 
 export interface IssueLabeledTrigger {
 	type: "issue_labeled";
-	/** The GitHub label that asks for a card. */
+	/** The label that asks for a card, on the project's GitHub or GitLab. */
 	label: string;
 }
 
@@ -97,7 +97,13 @@ export type AutomationReason =
 	| "own_pr"
 	| "bot_author"
 	| "already_reviewed"
-	| "review_failed";
+	| "review_failed"
+	/** Neither GitHub nor GitLab is connected (on the server: the project is on neither). */
+	| "forge_not_connected"
+	/** Server: the person who saved the rule has no token for the forge there. */
+	| "token_missing"
+	/** Server: the person who saved the rule may no longer run it on the project. */
+	| "owner_not_allowed";
 
 export interface AutomationActivity {
 	at: string;
@@ -117,6 +123,13 @@ export interface AutomationsState {
 	rules: AutomationRule[];
 	statuses: Record<string, AutomationRuleStatus>;
 	activity: AutomationActivity[];
+	/**
+	 * `server` for a server project: the server runs its rules for the whole
+	 * team, whether or not the app is open. Absent: this computer runs them.
+	 */
+	runsOn?: "server";
+	/** Server: per rule, the name of whoever saved it last, whose tokens it reads with. */
+	owners?: Record<string, string>;
 }
 
 /** Pushed to the renderer after a pass that created cards, started reviews or failed. */

@@ -246,7 +246,9 @@ export function AutomationsIntegration({ projectId }: AutomationsIntegrationProp
 
 	return (
 		<div className="space-y-6">
-			<p className="text-sm text-muted-foreground">{t("automations.intro")}</p>
+			<p className="text-sm text-muted-foreground">
+				{t(state?.runsOn === "server" ? "automations.serverIntro" : "automations.intro")}
+			</p>
 
 			{error && (
 				<div
@@ -584,6 +586,12 @@ export function AutomationsIntegration({ projectId }: AutomationsIntegrationProp
 										<>
 											{" · "}
 											{t("automations.status.deferred", { count: status.deferred })}
+										</>
+									)}
+									{state.owners?.[rule.id] && (
+										<>
+											{" · "}
+											{t("automations.runsAs", { name: state.owners[rule.id] })}
 										</>
 									)}
 								</div>
