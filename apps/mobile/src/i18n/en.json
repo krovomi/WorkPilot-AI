@@ -83,7 +83,30 @@
 		"kind": "Type",
 		"requireReview": "Review the spec before coding",
 		"requireReviewHint": "The build waits until someone approves the spec and plan.",
-		"create": "Create"
+		"create": "Create",
+		"dictationHint": "Tip: the keyboard's microphone dictates the description.",
+		"fromShare": "Filled from what another app shared. Read it before creating the card.",
+		"default": "Default",
+		"provider": "Engine",
+		"model": "Model",
+		"modelPlaceholder": "Provider's default model",
+		"modelInvalid": "A model id has letters, digits and . _ : / @ + - only, without spaces.",
+		"effort": "Effort",
+		"effort_none": "none",
+		"effort_low": "low",
+		"effort_medium": "medium",
+		"effort_high": "high",
+		"effort_ultrathink": "ultrathink",
+		"priority": "Priority",
+		"images": "Images ({{count}}/{{max}})",
+		"fromLibrary": "Photo library",
+		"fromCamera": "Camera",
+		"removeImage": "Remove {{name}}",
+		"cameraDenied": "The camera is not allowed for WorkPilot AI. Allow it in the system settings.",
+		"imageRefused_tooMany": "{{name}} not added: a card takes at most {{max}} images.",
+		"imageRefused_tooLarge": "{{name}} not added: it is larger than {{mb}} MB.",
+		"imageRefused_unsupported": "{{name}} not added: only PNG, JPEG, GIF and WebP images are accepted.",
+		"imageRefused_unreadable": "{{name}} not added: it could not be read."
 	},
 	"card": {
 		"description": "Description",
@@ -163,6 +186,24 @@
 		"organization": "Organization",
 		"signOut": "Sign out",
 		"version": "Version {{version}}"
+	},
+	"theme": {
+		"title": "Appearance",
+		"hint": "Follows your account on every device you sign in on.",
+		"mode": "Mode",
+		"system": "System",
+		"light": "Light",
+		"dark": "Dark",
+		"colorTheme": "Color theme",
+		"colors": {
+			"default": "Default",
+			"dusk": "Dusk",
+			"lime": "Lime",
+			"ocean": "Ocean",
+			"retro": "Retro",
+			"neo": "Neo",
+			"forest": "Forest"
+		}
 	},
 	"runPhase": {
 		"spec": "Spec",
@@ -476,5 +517,28 @@
 				"project": "Project"
 			}
 		}
+	},
+	"share": {
+		"title": "Share to a card",
+		"pickProject": "Create a card in which project?",
+		"nothing": "Nothing to make a card from: share text or a link.",
+		"back": "Back to projects"
+	"lock": {
+		"title": "WorkPilot AI is locked",
+		"unlock": "Unlock",
+		"failed": "Not recognized. Try again.",
+		"prompt": "Unlock WorkPilot AI",
+		"actionPrompt": "Confirm it is you",
+		"approvePrompt": "Confirm it is you to approve the plan",
+		"section": "App lock",
+		"atLaunch": "Ask when the app opens",
+		"atLaunchHint": "Face ID, Touch ID or fingerprint, with your passcode as fallback. Asked again after a minute in the background.",
+		"sensitive": "Ask before merging, creating a pull request, deleting a card or approving from a notification",
+		"unavailable": "Set a passcode or biometrics on this phone to use the lock."
+	},
+	"push": {
+		"approve": "Approve and build",
+		"view": "View",
+		"approveFailed": "The plan was not approved"
 	}
 }
