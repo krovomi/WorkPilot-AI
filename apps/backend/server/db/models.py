@@ -252,6 +252,43 @@ class AuthSession(Base):
     )
 
 
+class AccessToken(Base):
+    """A personal access token for the board's MCP endpoint (``/mcp``).
+
+    Made by a person in the app, for one organization, to give an AI app
+    (Claude Code, Codex, Cursor...) their access to the boards of that
+    organization's projects. Only its SHA-256 hash is stored, with a short
+    prefix to tell tokens apart in a list. ``scope`` is ``read`` or ``write``:
+    a read token cannot create or edit a card whatever the person's role. It
+    opens ``/mcp`` and nothing else (``server/auth/access_tokens.py``,
+    ``shared_board/mcp_http.py``).
+    """
+
+    __tablename__ = "access_tokens"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    org_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(80))
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    prefix: Mapped[str] = mapped_column(String(16))
+    scope: Mapped[str] = mapped_column(String(10), default="read")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_used_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
 class Project(Base):
     __tablename__ = "projects"
 

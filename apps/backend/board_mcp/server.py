@@ -225,9 +225,18 @@ def slugify(title: str, max_length: int = 50) -> str:
 
 
 def create_card(
-    root: Path, title: Any, description: Any, kind: Any = None
+    root: Path,
+    title: Any,
+    description: Any,
+    kind: Any = None,
+    created_by: str | None = None,
 ) -> dict[str, Any]:
-    """A backlog card, written as the automations write one (`automations/cards.ts`)."""
+    """A backlog card, written as the automations write one (`automations/cards.ts`).
+
+    ``created_by`` is the server's user id when the card comes through the
+    team server's ``/mcp`` (``shared_board/mcp_http.py``), as its own routes
+    record it.
+    """
     from core.workspace.models import SpecNumberLockError
 
     title = _text(title, MAX_TITLE).replace("\n", " ")
@@ -237,6 +246,8 @@ def create_card(
     if kind is not None and kind not in KINDS:
         raise ValueError(f"kind must be one of {', '.join(KINDS)}")
     metadata: dict[str, Any] = {"sourceType": "mcp"}
+    if created_by:
+        metadata["createdBy"] = created_by
     if kind:
         # Chosen by whoever created the card: the classifier keeps it.
         metadata.update(kind=kind, kindSource="user", kindConfidence=1)

@@ -32,6 +32,11 @@ PUBLIC_PATHS = {
     "/openapi.json",
 }
 
+#: The one path a personal access token opens, and the only one where an
+#: access token does not work (``server/auth/access_tokens.py``,
+#: ``shared_board/mcp_http.py``).
+MCP_PATH = "/mcp"
+
 _db_ready = False
 _db_init_lock: asyncio.Lock | None = None
 
@@ -120,6 +125,32 @@ async def _attach_principal(request: Request, claims: dict) -> None:
         org_role_slug=org_role_slug,
         permissions=permissions,
     )
+
+
+async def _attach_token_principal(request: Request, raw: str) -> JSONResponse | None:
+    """Authenticate a personal access token for ``/mcp``; None when it passed."""
+    from server.auth.access_tokens import AccessTokenError, authenticate
+    from server.db.engine import get_session_factory
+
+    try:
+        async with get_session_factory()() as db:
+            use = await authenticate(db, raw)
+    except AccessTokenError as e:
+        # One answer for every reason, as for an access token; the reason is logged.
+        logger.warning("Server mode: rejected personal token: %s", e)
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Invalid, revoked or expired token"},
+            headers={"WWW-Authenticate": 'Bearer realm="workpilot"'},
+        )
+    principal = use.principal
+    request.state.user_id = principal.id
+    request.state.user_email = principal.email
+    request.state.user_role = principal.platform_role
+    request.state.org_id = principal.org_id
+    request.state.principal = principal
+    request.state.access_token_scope = use.token.scope
+    return None
 
 
 def _path_keys_in(payload: object) -> set[str]:
@@ -255,8 +286,19 @@ def mount_server_mode(app: FastAPI) -> bool:
         auth = request.headers.get("Authorization", "")
         if not auth.startswith("Bearer "):
             return JSONResponse(
-                status_code=401, content={"detail": "Authentication required"}
+                status_code=401,
+                content={"detail": "Authentication required"},
+                headers={"WWW-Authenticate": 'Bearer realm="workpilot"'},
             )
+        if request.url.path == MCP_PATH:
+            # A personal token, never an access token; and a personal token
+            # nowhere else, since every other path decodes a signed one below.
+            failure = await _attach_token_principal(
+                request, auth[len("Bearer ") :].strip()
+            )
+            if failure is not None:
+                return failure
+            return await call_next(request)
         try:
             claims = decode_access_token(auth[len("Bearer ") :].strip())
         except TokenError as e:
@@ -305,6 +347,7 @@ def mount_server_mode(app: FastAPI) -> bool:
         ("server.routers.devices", "devices"),
         ("server.routers.preferences", "preferences"),
         ("server.routers.needs_you", "needs-you"),
+        ("server.routers.access_tokens", "access-tokens"),
         ("server.routers.admin", "admin"),
     ):
         try:
