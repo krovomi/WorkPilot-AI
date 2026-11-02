@@ -196,15 +196,10 @@ If electron-rebuild fails on Windows, install Visual Studio Build Tools:
 
 ## Git Hooks
 
-This project uses Husky for Git hooks that run automatically:
-
-### Pre-commit Hook
-
-Runs before each commit:
-- **lint-staged**: Lints staged `.ts`/`.tsx` files
-- **typecheck**: TypeScript type checking
-- **lint**: ESLint checks
-- **npm audit**: Security vulnerability check (high severity)
+The hooks live in the repository's root `.husky/` folder (plain shell scripts, wired by
+`git config core.hooksPath .husky` on `pnpm install`): the pre-commit hook scans staged files
+for secrets, then lints and formats only what is staged. See
+[docs/CONTRIBUTING.md](../../docs/CONTRIBUTING.md) for details.
 
 ### Commit Message Format
 
