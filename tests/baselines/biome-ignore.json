@@ -44,7 +44,6 @@
   "apps/frontend/src/main/ipc-handlers/pr-details-handlers.ts": 5,
   "apps/frontend/src/main/ipc-handlers/profile-handlers.ts": 1,
   "apps/frontend/src/main/ipc-handlers/project-handlers.ts": 2,
-  "apps/frontend/src/main/ipc-handlers/quality-handlers.ts": 1,
   "apps/frontend/src/main/ipc-handlers/settings-handlers.ts": 1,
   "apps/frontend/src/main/ipc-handlers/smart-estimation-handlers.ts": 1,
   "apps/frontend/src/main/ipc-handlers/task/__tests__/duplicate-task.test.ts": 1,

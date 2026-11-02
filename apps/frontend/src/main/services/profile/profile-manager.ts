@@ -18,6 +18,7 @@ import {
 	decryptSecretFields,
 	encryptSecretFields,
 	hasPlaintextSecretFields,
+	prepareSecrets,
 } from "../../secret-storage";
 
 const isProfileSecret = (key: string): boolean => key === "apiKey";
@@ -31,6 +32,12 @@ export function encodeProfilesForDisk(data: ProfilesFile): ProfilesFile {
 			encryptSecretFields(profile, isProfileSecret),
 		),
 	};
+}
+
+/** Encrypt ahead, with the async safeStorage API, the keys about to be written. */
+export async function prepareProfilesForDisk(data: ProfilesFile): Promise<void> {
+	if (!Array.isArray(data.profiles)) return;
+	await prepareSecrets(data.profiles.map((profile) => profile.apiKey));
 }
 
 /**
@@ -156,6 +163,7 @@ export async function saveProfilesFile(data: ProfilesFile): Promise<void> {
 	await fs.mkdir(dir, { recursive: true });
 
 	// Write file with formatted JSON
+	await prepareProfilesForDisk(data);
 	const content = JSON.stringify(encodeProfilesForDisk(data), null, 2);
 	await fs.writeFile(filePath, content, { encoding: "utf-8", mode: 0o600 });
 
@@ -307,6 +315,7 @@ export async function atomicModifyProfiles(
 
 		try {
 			// Write to temp file
+			await prepareProfilesForDisk(modifiedFile);
 			const content = JSON.stringify(
 				encodeProfilesForDisk(modifiedFile),
 				null,

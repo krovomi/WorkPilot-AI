@@ -11,14 +11,14 @@ export function useQualityScore() {
 	const [error, setError] = useState<string | null>(null);
 
 	const analyzeFiles = useCallback(
-		async (files: string[], projectDir?: string) => {
+		async (files: string[], projectId?: string) => {
 			setIsLoading(true);
 			setError(null);
 
 			try {
 				const result = await window.electronAPI.quality.analyzeQuality(
 					files,
-					projectDir,
+					projectId,
 				);
 				setScore(result);
 				return result;
@@ -35,7 +35,7 @@ export function useQualityScore() {
 	);
 
 	const analyzePR = useCallback(
-		async (prNumber: number, changedFiles: string[], projectDir?: string) => {
+		async (prNumber: number, changedFiles: string[], projectId?: string) => {
 			setIsLoading(true);
 			setError(null);
 
@@ -43,7 +43,7 @@ export function useQualityScore() {
 				const result = await window.electronAPI.quality.analyzePRQuality(
 					prNumber,
 					changedFiles,
-					projectDir,
+					projectId,
 				);
 				setScore(result);
 				return result;

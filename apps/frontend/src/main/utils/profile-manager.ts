@@ -13,6 +13,7 @@ import type { ProfilesFile } from "../../shared/types/profile";
 import {
 	decodeProfilesFromDisk,
 	encodeProfilesForDisk,
+	prepareProfilesForDisk,
 } from "../services/profile/profile-manager";
 
 /**
@@ -64,6 +65,7 @@ export async function saveProfilesFile(data: ProfilesFile): Promise<void> {
 	}
 
 	// Write file with formatted JSON
+	await prepareProfilesForDisk(data);
 	const content = JSON.stringify(encodeProfilesForDisk(data), null, 2);
 	await fs.writeFile(filePath, content, { encoding: "utf-8", mode: 0o600 });
 	await validateFilePermissions(filePath);

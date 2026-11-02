@@ -21,7 +21,7 @@ metadata:
     related_skills: []
   workpilot:
     pack: hermes
-    version: 1.0.0
+    version: 0.1.0
     content_sha256: 09a781ac49ccd320562052d10c1a27c6b7fffc6f76e66bb35a64aacd60649c17
 ---
 

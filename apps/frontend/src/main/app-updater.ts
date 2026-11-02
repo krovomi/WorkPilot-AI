@@ -17,6 +17,7 @@
  * - APP_UPDATE_ERROR: Error during update process
  */
 
+import { debugLog } from "../shared/utils/debug-logger";
 import { accessSync, constants as fsConstants } from "node:fs";
 import path from "node:path";
 import type { BrowserWindow } from "electron";
@@ -27,15 +28,14 @@ import { IPC_CHANNELS } from "../shared/constants";
 import type { AppUpdateInfo } from "../shared/types";
 import { isMacOS } from "./platform";
 import { compareVersions } from "./updater/version-manager";
+import { coalesceInFlight } from "./utils/coalesce-in-flight";
 
 // GitHub repo info for API calls
 const GITHUB_OWNER = "krovomi";
 const GITHUB_REPO = "WorkPilot-AI";
 
 // Debug mode - DEBUG_UPDATER=true or development mode
-const DEBUG_UPDATER =
-	process.env.DEBUG_UPDATER === "true" ||
-	process.env.NODE_ENV === "development";
+const DEBUG_UPDATER = process.env.DEBUG_UPDATER === "true";
 
 // Configure electron-updater
 autoUpdater.autoDownload = true; // Automatically download updates when available
@@ -286,9 +286,14 @@ export function initializeAppUpdater(
  * Manually check for updates
  * Called from IPC handler when user requests manual check
  */
-export async function checkForUpdates(): Promise<AppUpdateInfo | null> {
+export const checkForUpdates: () => Promise<AppUpdateInfo | null> =
+	coalesceInFlight(runUpdateCheck);
+
+async function runUpdateCheck(): Promise<AppUpdateInfo | null> {
+	// Unpackaged (development) builds cannot update: nothing to ask GitHub.
+	if (!app.isPackaged && !DEBUG_UPDATER) return null;
 	try {
-		console.warn("[app-updater] Manual update check requested");
+		debugLog("[app-updater] Manual update check requested");
 		const result = await autoUpdater.checkForUpdates();
 
 		if (!result) {

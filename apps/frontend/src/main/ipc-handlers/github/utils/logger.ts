@@ -3,7 +3,7 @@
  */
 
 const DEBUG =
-	process.env.DEBUG === "true" || process.env.NODE_ENV === "development";
+	process.env.DEBUG === "true";
 
 /**
  * Create a context-specific logger
