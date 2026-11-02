@@ -1,3 +1,4 @@
+import { debugLog } from "../shared/utils/debug-logger";
 import {
 	type ChildProcess,
 	execSync,
@@ -604,7 +605,7 @@ export class PythonEnvManager extends EventEmitter {
 		this.isInitializing = true;
 		this.autoBuildSourcePath = autoBuildSourcePath;
 
-		console.warn(
+		debugLog(
 			"[PythonEnvManager] Initializing with path:",
 			autoBuildSourcePath,
 		);
@@ -648,7 +649,7 @@ export class PythonEnvManager extends EventEmitter {
 			}
 
 			// Fallback to venv-based setup (for development or if bundled packages missing)
-			console.warn(
+			debugLog(
 				"[PythonEnvManager] Using venv-based setup (development mode or bundled packages missing)",
 			);
 			this.usingBundledPackages = false;
@@ -670,7 +671,7 @@ export class PythonEnvManager extends EventEmitter {
 					};
 				}
 			} else {
-				console.warn("[PythonEnvManager] Venv already exists");
+				debugLog("[PythonEnvManager] Venv already exists");
 			}
 
 			// Check if deps are installed
@@ -693,7 +694,7 @@ export class PythonEnvManager extends EventEmitter {
 					};
 				}
 			} else {
-				console.warn("[PythonEnvManager] Dependencies already installed");
+				debugLog("[PythonEnvManager] Dependencies already installed");
 			}
 
 			this.pythonPath = this.getVenvPythonPath();
@@ -734,7 +735,7 @@ export class PythonEnvManager extends EventEmitter {
 			this.isInitializing = false;
 
 			this.emit("ready", this.pythonPath);
-			console.warn(
+			debugLog(
 				"[PythonEnvManager] Ready with Python path:",
 				this.pythonPath,
 			);

@@ -12,6 +12,7 @@
  * - Version registry: GitHub releases (github/copilot-cli), not npm
  */
 
+import { debugLog } from "../../shared/utils/debug-logger";
 import {
 	type ChildProcessWithoutNullStreams,
 	execFile,
@@ -21,6 +22,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 import { ipcMain } from "electron";
+import semver from "semver";
 import { DEFAULT_APP_SETTINGS, IPC_CHANNELS } from "../../shared/constants";
 import type { IPCResult } from "../../shared/types";
 import type {
@@ -30,13 +32,14 @@ import type {
 } from "../../shared/types/cli";
 import {
 	clearToolCache,
-	configureTools,
+	updateToolConfig,
 	getToolInfo,
 	getToolPath,
 } from "../cli-tool-manager";
 import { getAugmentedEnv } from "../env-utils";
 import { isMacOS, isWindows } from "../platform";
 import { readSettingsFile, writeSettingsFile } from "../settings-utils";
+import { coalesceInFlight } from "../utils/coalesce-in-flight";
 import { isSecurePath } from "../utils/windows-paths";
 
 const execFileAsync = promisify(execFile);
@@ -454,16 +457,16 @@ export function registerCopilotCliHandlers(): void {
 	// Check Copilot CLI version
 	ipcMain.handle(
 		IPC_CHANNELS.COPILOT_CLI_CHECK_VERSION,
-		async (): Promise<IPCResult<CopilotCliVersionInfo>> => {
+		coalesceInFlight(async (): Promise<IPCResult<CopilotCliVersionInfo>> => {
 			try {
-				console.warn("[Copilot CLI] Checking version...");
+				debugLog("[Copilot CLI] Checking version...");
 
 				// Get installed version via cli-tool-manager
 				// biome-ignore lint/suspicious/noImplicitAnyLet: type inferred from assignment
 				let detectionResult;
 				try {
 					detectionResult = getToolInfo("copilot");
-					console.warn(
+					debugLog(
 						"[Copilot CLI] Detection result:",
 						JSON.stringify(detectionResult, null, 2),
 					);
@@ -499,16 +502,15 @@ export function registerCopilotCliHandlers(): void {
 				let isOutdated = false;
 				if (installed && latest !== "unknown") {
 					try {
-						const semver = await import("semver");
 						const cleanInstalled = installed.replace(/^v/, "");
 						const cleanLatest = latest.replace(/^v/, "");
-						isOutdated = semver.default.lt(cleanInstalled, cleanLatest);
+						isOutdated = semver.lt(cleanInstalled, cleanLatest);
 					} catch {
 						isOutdated = false;
 					}
 				}
 
-				console.warn("[Copilot CLI] Check complete:", {
+				debugLog("[Copilot CLI] Check complete:", {
 					installed,
 					ghVersion,
 					latest,
@@ -533,7 +535,7 @@ export function registerCopilotCliHandlers(): void {
 					error: `Failed to check Copilot CLI version: ${errorMsg}`,
 				};
 			}
-		},
+		}),
 	);
 
 	// Install Copilot CLI extension (open terminal with install command)
@@ -815,7 +817,7 @@ export function registerCopilotCliHandlers(): void {
 				writeSettingsFile(mergedSettings);
 
 				// Update CLI tool manager cache
-				configureTools({ copilotPath: normalizedPath });
+				updateToolConfig({ copilotPath: normalizedPath });
 
 				return {
 					success: true,
@@ -925,5 +927,5 @@ export function registerCopilotCliHandlers(): void {
 		},
 	);
 
-	console.warn("[IPC] Copilot CLI handlers registered");
+	debugLog("[IPC] Copilot CLI handlers registered");
 }

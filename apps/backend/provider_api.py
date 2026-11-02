@@ -213,7 +213,7 @@ async def lifespan(app: FastAPI):
         from analytics import init_database
 
         init_database()
-        logging.getLogger(__name__).info("Analytics database initialized")
+        logging.getLogger(__name__).debug("Analytics database initialized")
     except Exception as e:
         logging.getLogger(__name__).warning(
             f"Could not initialize analytics database: {e}"

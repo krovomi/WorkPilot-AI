@@ -20,6 +20,11 @@ vi.mock("electron", () => ({
 		handle: (channel: string, fn: (...args: unknown[]) => unknown) => state.handlers.set(channel, fn),
 	},
 }));
+// The PR review machinery is not under test here.
+vi.mock("../github/pr-handlers", () => ({
+	hasPRReview: vi.fn(async () => false),
+	startDraftPRReview: vi.fn(async () => undefined),
+}));
 // The feature runners it can start build their environment there, which
 // needs the Electron app this test does not have.
 vi.mock("../../utils/python-runner-env", () => ({ pythonRunnerEnv: vi.fn(async () => ({})) }));

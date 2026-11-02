@@ -54,7 +54,9 @@ async function tryDirectCodexVersion(): Promise<string | undefined> {
  */
 async function tryShellCodexVersion(): Promise<string | undefined> {
 	try {
-		const result = await execFileAsync("codex", ["--version"], {
+		// One fixed command line: with shell:true, Node deprecates an args
+		// array (DEP0190) since it is concatenated, not escaped.
+		const result = await execFileAsync("codex --version", {
 			encoding: "utf-8",
 			timeout: 5000,
 			windowsHide: true,

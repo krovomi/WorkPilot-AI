@@ -7,7 +7,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 from server.auth.deps import CurrentUser
 from server.authz.deps import require_org, require_permission, require_platform_admin
-from server.authz.roles import DEFAULT_ORG_ROLE
+from server.authz.roles import DEFAULT_ORG_ROLE, ORG_SCOPE
 from server.db.engine import get_db
 from server.db.models import GroupMember, Organization, OrgMember, Role, User, UserGroup
 from server.schemas import (
@@ -144,14 +144,32 @@ async def delete_org(
 
 
 async def _role_in_scope(db: AsyncSession, org_id: str, slug: str) -> Role:
+    """A role of this organization (or built in) that applies org-wide: a
+    project-scoped role means nothing as someone's role in the organization."""
     role = await db.scalar(
         select(Role).where(
-            Role.slug == slug, or_(Role.org_id.is_(None), Role.org_id == org_id)
+            Role.slug == slug,
+            Role.scope == ORG_SCOPE,
+            or_(Role.org_id.is_(None), Role.org_id == org_id),
         )
     )
     if role is None:
         raise HTTPException(status_code=400, detail=f"Unknown role '{slug}'")
     return role
+
+
+#: Whoever holds it can manage members, so can repair any other mistake.
+ADMIN_PERMISSION = "org.member.write"
+
+
+async def _other_admin_exists(db: AsyncSession, org_id: str, user_id: str) -> bool:
+    """Whether a member other than ``user_id`` can manage the organization."""
+    rows = await db.scalars(
+        select(Role.permissions)
+        .join(OrgMember, OrgMember.role_id == Role.id)
+        .where(OrgMember.org_id == org_id, OrgMember.user_id != user_id)
+    )
+    return any(ADMIN_PERMISSION in (perms or ()) for perms in rows)
 
 
 @router.get("/members", response_model=list[OrgMemberPublic])
@@ -249,6 +267,20 @@ async def update_member_role(
 
     role = await _role_in_scope(db, org_id, body.role_slug)
     previous = member.role_id
+    if ADMIN_PERMISSION not in (role.permissions or ()):
+        # Same reason as removing yourself (below): demoting yourself, or the
+        # last member who can manage members, leaves the tenant with no
+        # administrator at all.
+        if member_user_id == actor.id:
+            raise HTTPException(
+                status_code=400,
+                detail="You cannot remove your own right to manage members",
+            )
+        if not await _other_admin_exists(db, org_id, member_user_id):
+            raise HTTPException(
+                status_code=400,
+                detail="The organization would be left without an administrator",
+            )
     member.role_id = role.id
 
     await record(

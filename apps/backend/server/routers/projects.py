@@ -20,6 +20,7 @@ from server.authz.principal import Principal, get_principal
 from server.db.engine import get_db
 from server.db.models import (
     AuditLog,
+    OrgMember,
     Project,
     ProjectMember,
     ProjectRole,
@@ -133,6 +134,10 @@ async def create_project(
                 "X-WorkPilot-Org header or call POST /auth/switch-org first."
             ),
         )
+    # Whoever may add to the board may register a project; a reader, a
+    # reviewer, or anyone of a suspended organization may not.
+    if not principal.has_any("task.write", "project.write"):
+        raise HTTPException(status_code=403, detail="Missing permission: task.write")
 
     await enforce_project_quota(db, org_id)
 
@@ -217,6 +222,7 @@ async def delete_project(
     db.add(
         AuditLog(
             user_id=user.id,
+            org_id=project.org_id,
             project_id=project_id,
             action="project.deleted",
             payload={"name": project.name},
@@ -272,6 +278,17 @@ async def add_member(
         raise HTTPException(status_code=400, detail=f"Invalid role: {body.role}")
     target = await db.get(User, body.user_id)
     if target is None or not target.is_active:
+        raise HTTPException(status_code=404, detail="User not found")
+    # Only someone of the project's own organization can join it.
+    project_org = await db.scalar(
+        select(Project.org_id).where(Project.id == project_id)
+    )
+    in_org = await db.scalar(
+        select(OrgMember.id).where(
+            OrgMember.org_id == project_org, OrgMember.user_id == body.user_id
+        )
+    )
+    if in_org is None:
         raise HTTPException(status_code=404, detail="User not found")
     existing = await db.scalar(
         select(ProjectMember).where(
