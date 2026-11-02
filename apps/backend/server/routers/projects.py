@@ -126,6 +126,10 @@ async def create_project(
                 "X-WorkPilot-Org header or call POST /auth/switch-org first."
             ),
         )
+    # Whoever may add to the board may register a project; a reader, a
+    # reviewer, or anyone of a suspended organization may not.
+    if not principal.has_any("task.write", "project.write"):
+        raise HTTPException(status_code=403, detail="Missing permission: task.write")
 
     await enforce_project_quota(db, org_id)
 

@@ -22,6 +22,17 @@ from server import config as server_config  # noqa: E402
 _VALID_SECRET = "x" * 48
 
 
+def _request(user_id: str, permissions=frozenset({"agent.cancel"})):
+    from server.authz.principal import Principal
+    from starlette.requests import Request
+
+    request = Request({"type": "http", "method": "POST", "path": "/", "headers": []})
+    request.state.principal = Principal(
+        id=user_id, email=f"{user_id}@x.test", permissions=frozenset(permissions)
+    )
+    return request
+
+
 @pytest.fixture(autouse=True)
 def _clean_settings(monkeypatch, tmp_path):
     for key in list(server_config.os.environ):
@@ -114,6 +125,7 @@ async def test_cancel_rejects_a_run_belonging_to_another_spec(monkeypatch):
                 project_id=mine.id,
                 spec_id=my_spec.id,
                 run_id=their_run.id,
+                request=_request("u-attacker"),
                 user=attacker,
                 db=db,
             )
@@ -161,6 +173,7 @@ async def test_cancel_accepts_a_run_of_the_addressed_spec(monkeypatch):
             project_id=project.id,
             spec_id=spec.id,
             run_id=run.id,
+            request=_request("u-owner"),
             user=user,
             db=db,
         )

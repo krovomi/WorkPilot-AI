@@ -213,3 +213,119 @@ class TestDeactivation:
 
         request = Request({"type": "http", "headers": [], "state": {}})
         assert await integration._attach_principal(request, claims) is False
+
+
+def _app_as(router, principal) -> AsyncClient:
+    """`router` with `principal` resolved, as the auth middleware leaves it."""
+    app = FastAPI()
+
+    @app.middleware("http")
+    async def _inject(request, call_next):
+        request.state.principal = principal
+        request.state.org_id = principal.org_id
+        return await call_next(request)
+
+    app.include_router(router)
+    return AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
+
+
+async def _spec_of_a_project_the_viewer_works_on(env) -> tuple[str, str]:
+    """A project of acme where `viewer` is a project member, and one spec."""
+    from server.db.engine import get_session_factory
+    from server.db.models import ProjectMember, SpecIndex
+
+    project_id = await _project(env["acme"], env["users"]["admin"])
+    async with get_session_factory()() as db:
+        db.add(
+            ProjectMember(
+                project_id=project_id, user_id=env["users"]["viewer"], role="member"
+            )
+        )
+        spec = SpecIndex(project_id=project_id, spec_name="001-x", status="backlog")
+        db.add(spec)
+        await db.commit()
+        return project_id, spec.id
+
+
+class TestWhatTheOrganizationRoleAllows:
+    """Project membership says where someone works; their organization role
+    says what they may do there."""
+
+    async def test_a_reader_cannot_register_a_project(self, env):
+        from server.routers.projects import router
+
+        principal = await _principal_for(env, "viewer")
+        async with _app_as(router, principal) as c:
+            resp = await c.post(
+                "/projects",
+                json={"name": "P", "repo_url": "https://example.test/p.git"},
+                headers=_bearer(env["users"]["viewer"]),
+            )
+        assert resp.status_code == 403
+
+    async def test_who_may_add_to_the_board_may_register_one(self, env, monkeypatch):
+        from server.routers import projects
+        from server.services.repos import RepoError
+
+        async def _no_clone(*_a):
+            raise RepoError("not cloned in tests")
+
+        monkeypatch.setattr(projects, "clone_project", _no_clone)
+        principal = await _principal_for(env, "admin")
+        async with _app_as(projects.router, principal) as c:
+            resp = await c.post(
+                "/projects",
+                json={"name": "P", "repo_url": "https://example.test/p.git"},
+                headers=_bearer(env["users"]["admin"]),
+            )
+        # Past the permission, stopped by the clone.
+        assert resp.status_code == 400
+
+    @pytest.mark.parametrize(
+        "path", ["/claim", "/release", "/runs/r1/cancel"], ids=lambda p: p
+    )
+    async def test_a_reader_of_the_project_cannot_claim_release_or_cancel(
+        self, env, path
+    ):
+        from server.routers.specs import router
+
+        project_id, spec_id = await _spec_of_a_project_the_viewer_works_on(env)
+        principal = await _principal_for(env, "viewer")
+        async with _app_as(router, principal) as c:
+            resp = await c.post(
+                f"/projects/{project_id}/specs/{spec_id}{path}",
+                json={},
+                headers=_bearer(env["users"]["viewer"]),
+            )
+        assert resp.status_code == 403
+
+    async def test_a_suspended_organization_cannot_claim(self, env):
+        from server.db.engine import get_session_factory
+        from server.db.models import Organization
+        from server.routers.specs import router
+
+        project_id, spec_id = await _spec_of_a_project_the_viewer_works_on(env)
+        async with get_session_factory()() as db:
+            (await db.get(Organization, env["acme"])).is_active = False
+            await db.commit()
+        principal = await _principal_for(env, "admin")
+        async with _app_as(router, principal) as c:
+            resp = await c.post(
+                f"/projects/{project_id}/specs/{spec_id}/claim",
+                json={},
+                headers=_bearer(env["users"]["admin"]),
+            )
+        assert resp.status_code == 403
+
+    async def test_a_contributor_still_claims(self, env):
+        from server.routers.specs import router
+
+        project_id, spec_id = await _spec_of_a_project_the_viewer_works_on(env)
+        principal = await _principal_for(env, "admin")
+        async with _app_as(router, principal) as c:
+            resp = await c.post(
+                f"/projects/{project_id}/specs/{spec_id}/claim",
+                json={},
+                headers=_bearer(env["users"]["admin"]),
+            )
+        assert resp.status_code == 200, resp.text
