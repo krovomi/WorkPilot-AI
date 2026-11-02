@@ -17,6 +17,7 @@ import type {
 } from "../../../../shared/types";
 import { cn } from "../../../lib/utils";
 import { Progress } from "../../ui/progress";
+import { formatAppTime } from "@/lib/date-format";
 
 interface MergeProgressOverlayProps {
 	mergeProgress: MergeProgress | null;
@@ -240,7 +241,7 @@ export function MergeProgressOverlay({
 										className="flex gap-2 text-xs font-mono"
 									>
 										<span className="text-muted-foreground shrink-0">
-											{new Date(entry.timestamp).toLocaleTimeString()}
+											{formatAppTime(entry.timestamp)}
 										</span>
 										<span className={cn(LOG_TYPE_COLORS[entry.type])}>
 											{entry.message}

@@ -2,6 +2,7 @@ import type { UsageSnapshot } from "@shared/types";
 import { AlertCircle, TrendingUp } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useContextUsage } from "../../hooks/useContextUsage";
+import { formatAppDate } from "@/lib/date-format";
 
 interface CopilotUsageContentProps {
 	readonly usage: UsageSnapshot;
@@ -143,11 +144,11 @@ function CopilotBackendUnavailable() {
 	);
 }
 
-function formatResetDate(raw: string | undefined, locale: string): string {
+function formatResetDate(raw: string | undefined): string {
 	if (!raw) return "";
 	const date = new Date(raw);
 	if (Number.isNaN(date.getTime())) return raw;
-	return date.toLocaleDateString(locale, {
+	return formatAppDate(date, {
 		day: "2-digit",
 		month: "short",
 		year: "numeric",
@@ -159,7 +160,7 @@ interface CopilotPremiumQuotasProps {
 }
 
 function CopilotPremiumQuotas({ usage }: CopilotPremiumQuotasProps) {
-	const { t, i18n } = useTranslation(["common"]);
+	const { t } = useTranslation(["common"]);
 	const details = usage.copilotUsageDetails;
 	if (!details) return null;
 
@@ -170,7 +171,7 @@ function CopilotPremiumQuotas({ usage }: CopilotPremiumQuotasProps) {
 	const unlimited = details.premiumRequestsUnlimited ?? false;
 	const plan = details.plan;
 	const org = details.organization;
-	const reset = formatResetDate(details.quotaResetDate, i18n.language);
+	const reset = formatResetDate(details.quotaResetDate);
 
 	const barColor =
 		percentUsed >= 90

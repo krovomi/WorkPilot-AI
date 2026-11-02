@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { formatAppDate } from "@/lib/date-format";
 
 /**
  * Hook to format a date as a relative time string with i18n support
@@ -17,6 +18,6 @@ export function useFormatRelativeTime() {
 		if (diffMins < 60) return t("common:time.minutesAgo", { count: diffMins });
 		if (diffHours < 24) return t("common:time.hoursAgo", { count: diffHours });
 		if (diffDays < 7) return t("common:time.daysAgo", { count: diffDays });
-		return new Date(date).toLocaleDateString();
+		return formatAppDate(date);
 	};
 }

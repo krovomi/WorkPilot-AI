@@ -10,6 +10,7 @@ import {
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Switch } from "../ui/switch";
+import { formatAppDate } from "@/lib/date-format";
 
 const TYPE_COLORS: Record<PluginType, string> = {
 	agent: "bg-purple-500/10 text-purple-500",
@@ -87,7 +88,7 @@ export function InstalledPluginsView() {
 							</div>
 							<p className="text-xs text-muted-foreground mt-0.5">
 								{t("common:pluginMarketplace.installedOn", {
-									date: new Date(plugin.installedAt).toLocaleDateString(),
+									date: formatAppDate(plugin.installedAt),
 								})}
 							</p>
 						</div>

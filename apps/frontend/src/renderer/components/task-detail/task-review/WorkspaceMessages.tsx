@@ -13,6 +13,7 @@ import { persistTaskStatus, startTask } from "../../../stores/task-store";
 import { Button } from "../../ui/button";
 import { PullRequestStats } from "./PullRequestStats";
 import { useTranslation } from "react-i18next";
+import { formatAppDate } from "@/lib/date-format";
 
 interface LoadingMessageProps {
 	readonly message?: string;
@@ -317,7 +318,7 @@ export function StagedInProjectMessage({
 				{t("taskReview:workspace.stagedDescription")}
 				{task.stagedAt
 					? t("taskReview:workspace.stagedOn", {
-							date: new Date(task.stagedAt).toLocaleDateString(),
+							date: formatAppDate(task.stagedAt),
 						})
 					: ""}
 				.

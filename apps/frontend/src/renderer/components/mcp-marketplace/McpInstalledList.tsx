@@ -24,6 +24,7 @@ import {
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Switch } from "../ui/switch";
+import { formatAppDate } from "@/lib/date-format";
 
 export function McpInstalledList() {
 	const { t } = useTranslation(["common"]);
@@ -111,7 +112,7 @@ export function McpInstalledList() {
 									<span>v{server.version}</span>
 									<span>
 										{t("mcpMarketplace.installedTab.since", {
-											date: new Date(server.installedAt).toLocaleDateString(),
+											date: formatAppDate(server.installedAt),
 										})}
 									</span>
 								</div>
