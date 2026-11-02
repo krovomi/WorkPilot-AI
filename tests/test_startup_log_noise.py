@@ -14,8 +14,7 @@ def test_importing_the_cli_package_does_not_load_cli_main():
         [
             sys.executable,
             "-c",
-            "import sys, cli; assert 'cli.main' not in sys.modules; "
-            "from cli import main; assert callable(main)",
+            "import sys, cli; assert 'cli.main' not in sys.modules; from cli import main; assert callable(main)",
         ],
         cwd=BACKEND,
         capture_output=True,
@@ -43,7 +42,7 @@ def test_analytics_database_initializes_once_and_quietly(monkeypatch, capsys):
     from analytics import database
 
     calls = []
-    monkeypatch.setattr(database, "_initialized", False)
+    monkeypatch.setitem(database._state, "initialized", False)
     monkeypatch.setattr(database, "create_tables", lambda: calls.append(1))
 
     database.init_database()

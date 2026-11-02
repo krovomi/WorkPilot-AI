@@ -59,15 +59,14 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
-_initialized = False
+_state = {"initialized": False}
 
 
 def init_database():
     """Initialize the analytics database (once per process: several entry
     points call it at startup)."""
-    global _initialized
-    if _initialized:
+    if _state["initialized"]:
         return
     create_tables()
-    _initialized = True
+    _state["initialized"] = True
     logger.debug("Analytics database initialized")
