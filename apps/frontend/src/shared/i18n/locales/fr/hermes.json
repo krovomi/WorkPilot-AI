@@ -105,5 +105,13 @@
 	"adopted": {
 		"title": "Skills gardés",
 		"description": "Écrits dans skills/{{pack}}/, un pack qui n'est pas listé dans .workpilot/skills.toml : aucun agent ne les charge encore. Lister ce pack est la décision qui les active — et le moment de réécrire les noms d'outils propres à hermes. Supprimer un dossier revient à le refuser."
+	},
+	"sidebar": {
+		"checking": "vérification…",
+		"tooltip": "{{name}} : {{state}}",
+		"description": "L'agent de Nous Research, qui apprend hors de WorkPilot. Ce qu'il apprend arrive dans la file de relecture, à traiter depuis le panneau d'une tâche.",
+		"pending_one": "{{count}} skill attend votre relecture dans le panneau d'une tâche.",
+		"pending_other": "{{count}} skills attendent votre relecture dans le panneau d'une tâche.",
+		"docs": "Documentation de {{name}}"
 	}
 }

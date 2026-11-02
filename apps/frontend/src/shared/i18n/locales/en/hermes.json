@@ -105,5 +105,13 @@
 	"adopted": {
 		"title": "Kept skills",
 		"description": "Written to skills/{{pack}}/, a pack not listed in .workpilot/skills.toml: no agent loads them yet. Listing that pack is the decision that activates them — and the moment to rewrite hermes-only tool names. Deleting a folder turns it down."
+	},
+	"sidebar": {
+		"checking": "checking…",
+		"tooltip": "{{name}}: {{state}}",
+		"description": "Nous Research's agent, which learns outside WorkPilot. What it learns reaches the review queue, which you answer from a task panel.",
+		"pending_one": "{{count}} skill waiting for your review in a task panel.",
+		"pending_other": "{{count}} skills waiting for your review in a task panel.",
+		"docs": "{{name}} documentation"
 	}
 }
