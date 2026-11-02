@@ -212,7 +212,7 @@ export class GitHubCopilotService extends EventEmitter {
 	async authenticate(): Promise<void> {
 		return new Promise((resolve, reject) => {
 			try {
-				const authProcess = spawn("gh", ["auth", "login"], {
+				const authProcess = spawn("gh auth login", {
 					stdio: "inherit",
 					shell: true,
 				});

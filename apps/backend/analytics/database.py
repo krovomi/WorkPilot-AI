@@ -2,6 +2,7 @@
 Database connection and session management for Build Analytics.
 """
 
+import logging
 import os
 from collections.abc import Generator
 from pathlib import Path
@@ -11,6 +12,8 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from .database_schema import Base
+
+logger = logging.getLogger(__name__)
 
 
 def _default_database_url() -> str:
@@ -56,7 +59,14 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
+_state = {"initialized": False}
+
+
 def init_database():
-    """Initialize the analytics database."""
+    """Initialize the analytics database (once per process: several entry
+    points call it at startup)."""
+    if _state["initialized"]:
+        return
     create_tables()
-    print("[Analytics] Database initialized successfully")
+    _state["initialized"] = True
+    logger.debug("Analytics database initialized")

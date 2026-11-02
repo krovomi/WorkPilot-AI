@@ -113,6 +113,32 @@ caller layers the Claude profile after it, so the profile's token still wins.
 The handler revalidates its argument (rule S6): the token is a string on one
 line, since the file holds one variable per line.
 
+## Async safeStorage behind synchronous readers
+
+Electron 45 deprecated the synchronous `safeStorage` calls
+(`isEncryptionAvailable`, `encryptString`, `decryptString`) in favour of
+`isAsyncEncryptionAvailable`, `encryptStringAsync` and `decryptStringAsync`.
+The readers above stay synchronous (`readSettingsFile` has dozens of callers and
+runs on every log line), so `secret-storage.ts` runs the crypto ahead of them:
+
+- `initSecretStorage(files)`, awaited in `main()` right after `ready`, asks
+  `isAsyncEncryptionAvailable()` once and decrypts every `enc:` value found in
+  `settings.json`, `profiles.json` and the Claude profiles with
+  `decryptStringAsync`; `primeSecretFiles` then does the same for each
+  project's `.workpilot/.env` and the backend's `.env` (listing them reads
+  `settings.json`, so it comes second).
+- `prepareSecrets(values)` encrypts with `encryptStringAsync` a secret about to
+  be written; `SETTINGS_SAVE` and the `profiles.json` writers call it first.
+- Both fill a two-way cache, so the synchronous `decryptSecret` and
+  `encryptSecret` find the answer there, and rewriting an unchanged secret
+  keeps its ciphertext instead of encrypting it again.
+
+The synchronous calls remain only as a fallback for a value neither path has
+seen (a token set from a terminal capture, the one-off migration below), and
+before `ready` nothing is asked: safeStorage cannot decrypt then on Linux and
+Windows anyway. The server-mode refresh token (`server-connection.ts`) uses
+the async API directly.
+
 ## Reading never destroys
 
 A value that cannot be decrypted right now — `safeStorage` not ready yet (Linux

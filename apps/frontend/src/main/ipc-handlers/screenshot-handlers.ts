@@ -8,6 +8,7 @@
  * due to macOS screen recording permission requirements for unsigned builds.
  * In dev mode, the handler returns a devMode flag so the UI can show a helpful message.
  */
+import { debugLog } from "../../shared/utils/debug-logger";
 import { app, desktopCapturer, ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import type {
@@ -120,5 +121,5 @@ export function registerScreenshotHandlers(): void {
 		},
 	);
 
-	console.warn("[IPC] Screenshot handlers registered");
+	debugLog("[IPC] Screenshot handlers registered");
 }
