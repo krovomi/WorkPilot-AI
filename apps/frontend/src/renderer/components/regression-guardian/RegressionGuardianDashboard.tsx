@@ -30,8 +30,8 @@ function StatCard({
 	readonly color: string;
 }): React.ReactElement {
 	return (
-		<div className="p-3 rounded-lg bg-(--bg-secondary) border border-(--border-color)">
-			<p className="text-xs text-(--text-secondary)">{label}</p>
+		<div className="p-3 rounded-lg bg-card border border-border">
+			<p className="text-xs text-muted-foreground">{label}</p>
 			<p className={`text-2xl font-bold ${color}`}>{value}</p>
 		</div>
 	);
@@ -67,12 +67,12 @@ function IncidentRow({
 		);
 	} else {
 		actionContent = (
-			<span className="text-xs text-(--text-secondary)">{t("noTest")}</span>
+			<span className="text-xs text-muted-foreground">{t("noTest")}</span>
 		);
 	}
 
 	return (
-		<div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-(--border-color) hover:bg-(--bg-secondary) transition-colors">
+		<div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-border hover:bg-card transition-colors">
 			<span
 				className={`px-2 py-0.5 rounded text-xs font-medium border ${SEVERITY_COLORS[incident.severity] ?? ""}`}
 			>
@@ -80,7 +80,7 @@ function IncidentRow({
 			</span>
 			<div className="flex-1 min-w-0">
 				<p className="text-sm font-medium truncate">{incident.title}</p>
-				<p className="text-xs text-(--text-secondary)">
+				<p className="text-xs text-muted-foreground">
 					{incident.source} · {incident.exceptionType || t("regressionGuardian:unknownException")}
 				</p>
 			</div>
@@ -114,7 +114,7 @@ export function RegressionGuardianDashboard({
 	const duplicates = results.filter((r) => r.isDuplicate);
 
 	return (
-		<div className="flex flex-col gap-4 p-6 bg-(--bg-primary) text-(--text-primary)">
+		<div className="flex flex-col gap-4 p-6 bg-background text-foreground">
 			<div className="flex items-center justify-between">
 				<h2 className="text-lg font-semibold">{t("title")}</h2>
 				<div className="flex gap-2">
@@ -141,7 +141,7 @@ export function RegressionGuardianDashboard({
 						<button
 							type="button"
 							onClick={reset}
-							className="px-3 py-1.5 rounded-md border border-(--border-color) hover:bg-(--bg-secondary) text-sm font-medium transition-colors"
+							className="px-3 py-1.5 rounded-md border border-border hover:bg-card text-sm font-medium transition-colors"
 						>
 							{t("actions.reset")}
 						</button>
@@ -150,13 +150,13 @@ export function RegressionGuardianDashboard({
 			</div>
 
 			{!projectPath && (
-				<p className="text-sm text-(--text-secondary)">
+				<p className="text-sm text-muted-foreground">
 					{t("errors.noProject")}
 				</p>
 			)}
 
 			{isScanning && (
-				<p className="text-sm text-(--text-secondary)">
+				<p className="text-sm text-muted-foreground">
 					{status || t("actions.scanning")}
 				</p>
 			)}
@@ -166,12 +166,12 @@ export function RegressionGuardianDashboard({
 			)}
 
 			{phase === "complete" && results.length === 0 && (
-				<p className="text-sm text-(--text-secondary)">{t("noData")}</p>
+				<p className="text-sm text-muted-foreground">{t("noData")}</p>
 			)}
 
 			{results.length > 0 && (
 				<>
-					<p className="text-sm text-(--text-secondary)">
+					<p className="text-sm text-muted-foreground">
 						{t("incidentsDetected", { count: results.length })}
 					</p>
 

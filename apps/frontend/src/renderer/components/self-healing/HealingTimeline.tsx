@@ -37,9 +37,9 @@ export function HealingTimeline({ operation }: HealingTimelineProps) {
 	}
 
 	return (
-		<div className="rounded-lg border border-(--border-primary) bg-(--bg-secondary) p-4">
+		<div className="rounded-lg border border-border bg-card p-4">
 			<div className="flex items-center justify-between mb-3">
-				<h4 className="text-sm font-medium text-(--text-primary)">
+				<h4 className="text-sm font-medium text-foreground">
 					{operation.incident?.title || t("selfHealing:healingOperation")}
 				</h4>
 				<span
@@ -57,7 +57,7 @@ export function HealingTimeline({ operation }: HealingTimelineProps) {
 					>
 						{/* Vertical line */}
 						{index < operation.steps.length - 1 && (
-							<div className="absolute left-0 top-3 w-px h-full bg-(--border-primary)" />
+							<div className="absolute left-0 top-3 w-px h-full bg-border" />
 						)}
 						{/* Dot */}
 						<div
@@ -66,7 +66,7 @@ export function HealingTimeline({ operation }: HealingTimelineProps) {
 						{/* Content */}
 						<div className="ml-3">
 							<div className="flex items-center gap-2">
-								<span className="text-sm text-(--text-primary)">
+								<span className="text-sm text-foreground">
 									{step.name}
 								</span>
 								{step.status === "skipped" && (
@@ -76,7 +76,7 @@ export function HealingTimeline({ operation }: HealingTimelineProps) {
 								)}
 							</div>
 							{step.detail && (
-								<p className="text-xs text-(--text-tertiary) mt-0.5">
+								<p className="text-xs text-muted-foreground mt-0.5">
 									{step.detail}
 								</p>
 							)}
@@ -86,7 +86,7 @@ export function HealingTimeline({ operation }: HealingTimelineProps) {
 			</div>
 
 			{operation.duration_seconds != null && (
-				<div className="mt-3 text-xs text-(--text-tertiary)">
+				<div className="mt-3 text-xs text-muted-foreground">
 					{t("selfHealing:duration")}: {operation.duration_seconds.toFixed(1)}s
 				</div>
 			)}
