@@ -168,6 +168,8 @@ FAKE_HELPER = textwrap.dedent(
         sys.exit(0)
     print("noise before the handshake", flush=True)
     if mode in ("compiling", "compiling-forever"):
+        print(json.dumps({"starting": True}), flush=True)
+        time.sleep(1.5 if mode == "compiling" else 0)
         print(json.dumps({"compiling": True}), flush=True)
         time.sleep(1.5 if mode == "compiling" else 30)
     print(json.dumps({"ready": True}), flush=True)
