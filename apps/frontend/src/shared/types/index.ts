@@ -7,6 +7,8 @@ export * from "./app-update";
 export * from "./automations";
 // Repo bench (finished cards replayed and judged by their own tests)
 export * from "./bench";
+// workpilot-board MCP server registered with other AI apps
+export * from "./board-mcp";
 export * from "./changelog";
 export * from "./cli";
 // Common types

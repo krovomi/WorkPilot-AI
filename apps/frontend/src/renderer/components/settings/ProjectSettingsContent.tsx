@@ -24,6 +24,7 @@ export type ProjectSettingsSection =
 	| "figma"
 	| "cicd"
 	| "automations"
+	| "board-mcp"
 	| "teams";
 
 interface ProjectSettingsContentProps {
