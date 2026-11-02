@@ -120,7 +120,7 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 | **Coder** | Context-aware implementation with parallel subagent spawning |
 | **QA Reviewer / Fixer** | Acceptance criteria validation and automated issue resolution |
 | **Test Generator** | Unit and integration test generation with live streaming of the code as it is written |
-| **Flaky Test Detective** | Parses test reports (JUnit XML, .NET TRX, …) to surface intermittently failing tests |
+| **Flaky Test Detective** | Runs your test suite several times (dotnet test, pytest, Vitest, Jest, Maven, Gradle, Go) and flags the tests whose result changes between runs; also reads existing JUnit XML and .NET TRX reports |
 | **Refactorer** | Safe code refactoring with pattern detection and API migration |
 | **Documenter** | README, API docs, and architecture documentation generation |
 | **Migration Agent** | Framework and library migration with breaking change detection |
