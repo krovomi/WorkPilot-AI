@@ -35,7 +35,7 @@ export default function CardScreen() {
 	const api = useApi();
 	const { can } = useSession();
 	const router = useRouter();
-	const { data, error, loading, refreshing, reload } = useCard(projectId, cardId);
+	const { data, error, loading, refreshing, reload, refresh } = useCard(projectId, cardId);
 	const [busy, setBusy] = useState<CardAction | null>(null);
 	const [actionError, setActionError] = useState<string | null>(null);
 	const [feedbackOpen, setFeedbackOpen] = useState(false);
@@ -47,9 +47,10 @@ export default function CardScreen() {
 	// changes move without anyone touching the phone.
 	useEffect(() => {
 		if (!working) return;
-		const timer = setInterval(() => void reload(), WORKING_POLL_MS);
+		// refresh, not reload: a background read must not spin pull-to-refresh.
+		const timer = setInterval(() => void refresh(), WORKING_POLL_MS);
 		return () => clearInterval(timer);
-	}, [working, reload]);
+	}, [working, refresh]);
 
 	if (loading && !data) return <Loading />;
 	if (!data) {

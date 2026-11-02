@@ -43,6 +43,9 @@ from sqlalchemy import select
 
 logger = logging.getLogger(__name__)
 
+#: Error of a run the server was running when it stopped.
+INTERRUPTED = "Interrupted: the server stopped while the run was queued or running"
+
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 
 #: Extra ``run.py`` args per phase, mirroring what the Electron AgentManager
@@ -242,6 +245,8 @@ class RunManager:
         self._active: dict[str, asyncio.subprocess.Process] = {}  # run_id -> proc
         self._running_specs: set[str] = set()
         self._cancelled: set[str] = set()  # run_ids terminated on request
+        # run_ids this process queued and has not finished: what a restart loses.
+        self._tracked: set[str] = set()
 
     def _get_semaphore(self) -> asyncio.Semaphore:
         if self._semaphore is None:
@@ -308,6 +313,7 @@ class RunManager:
         except Exception:
             self._running_specs.discard(spec.id)
             raise
+        self._tracked.add(run_id)
 
         asyncio.get_running_loop().create_task(
             self._execute(
@@ -329,12 +335,45 @@ class RunManager:
         return spec_id in self._running_specs
 
     async def cancel_run(self, run_id: str) -> bool:
-        proc = self._active.get(run_id)
-        if proc is None:
+        """Stop a run this process holds, whether it runs or still waits.
+
+        A queued run (waiting for a free slot, or building its environment)
+        has no process yet: it is marked, and :meth:`_execute` ends it as
+        cancelled instead of starting the agent. It used to answer False, so
+        Stop did nothing and the run started later anyway.
+        """
+        if run_id not in self._tracked:
             return False
         self._cancelled.add(run_id)
-        proc.terminate()
+        proc = self._active.get(run_id)
+        if proc is not None:
+            proc.terminate()
         return True
+
+    async def settle_orphans(self) -> int:
+        """Mark failed the runs left queued or running by a server that stopped.
+
+        Nothing will ever finish them: they showed as running forever and
+        counted against the organization's run quota, so every new run got a
+        429 after a restart during builds. Returns how many were settled.
+        """
+        async with get_session_factory()() as db:
+            runs = await db.scalars(
+                select(AgentRun).where(AgentRun.status.in_(("queued", "running")))
+            )
+            settled = 0
+            for run in runs:
+                if run.id in self._tracked:
+                    continue
+                run.status = "failed"
+                run.error = INTERRUPTED
+                run.finished_at = datetime.now(UTC)
+                settled += 1
+            if settled:
+                await db.commit()
+        if settled:
+            logger.info("Settled %d run(s) interrupted by a server stop", settled)
+        return settled
 
     async def _build_env(self, user_id: str, run_id: str) -> dict[str, str]:
         """Run env: the server env without its own secrets, the run's WS token,
@@ -384,6 +423,19 @@ class RunManager:
     ) -> None:
         try:
             async with self._get_semaphore():
+                if run_id in self._cancelled:
+                    # Stopped while it waited for a slot: never start the agent.
+                    await self._set_run_status(run_id, "cancelled")
+                    await self._notify(
+                        project_id,
+                        spec_id,
+                        spec_name,
+                        run_id,
+                        phase,
+                        user_id,
+                        "cancelled",
+                    )
+                    return
                 await self._set_run_status(run_id, "running")
                 await self._notify(
                     project_id, spec_id, spec_name, run_id, phase, user_id, "running"
@@ -406,6 +458,9 @@ class RunManager:
                         stderr=asyncio.subprocess.PIPE,
                     )
                     self._active[run_id] = proc
+                    if run_id in self._cancelled:
+                        # Stop arrived while the environment was being built.
+                        proc.terminate()
                     _, stderr = await proc.communicate()
 
                 if run_id in self._cancelled:
@@ -430,6 +485,7 @@ class RunManager:
             self._active.pop(run_id, None)
             self._running_specs.discard(spec_id)
             self._cancelled.discard(run_id)
+            self._tracked.discard(run_id)
 
     async def _set_run_status(
         self, run_id: str, status: str, error: str | None = None
