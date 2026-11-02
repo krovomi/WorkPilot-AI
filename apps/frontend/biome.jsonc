@@ -65,7 +65,9 @@
 				"noArrayIndexKey": "warn",
 				"noShadowRestrictedNames": "warn",
 				"noRedeclare": "warn",
-				"noSelfCompare": "warn"
+				"noSelfCompare": "warn",
+				// window.alert/confirm/prompt open an unthemed OS dialog: use toast() or confirmAction()
+				"noAlert": "error"
 			}
 		}
 	},
@@ -75,6 +77,17 @@
 		"enabled": false
 	},
 	"overrides": [
+		{
+			// The browser mock stands in for native file pickers with prompt().
+			"includes": ["src/renderer/lib/mocks/**"],
+			"linter": {
+				"rules": {
+					"suspicious": {
+						"noAlert": "off"
+					}
+				}
+			}
+		},
 		{
 			"includes": ["src/renderer/components/bounty-board/BountyBoardView.tsx"],
 			"linter": {
