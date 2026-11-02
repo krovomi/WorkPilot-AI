@@ -36,7 +36,7 @@ export function ApiWatcherDashboard({
 	const canRun = !!projectPath && !isScanning;
 
 	return (
-		<div className="flex flex-col gap-4 p-6 bg-(--bg-primary) text-(--text-primary)">
+		<div className="flex flex-col gap-4 p-6 bg-background text-foreground">
 			<div className="flex items-center gap-3 flex-wrap">
 				{isScanning ? (
 					<button
@@ -52,7 +52,7 @@ export function ApiWatcherDashboard({
 							type="button"
 							onClick={() => projectPath && startScan(projectPath, false)}
 							disabled={!canRun}
-							className="px-3 py-1.5 rounded bg-(--accent-color) text-white text-sm disabled:opacity-50"
+							className="px-3 py-1.5 rounded bg-primary text-white text-sm disabled:opacity-50"
 						>
 							{t("actions.runScan")}
 						</button>
@@ -60,7 +60,7 @@ export function ApiWatcherDashboard({
 							type="button"
 							onClick={() => projectPath && startScan(projectPath, true)}
 							disabled={!canRun}
-							className="px-3 py-1.5 rounded bg-(--bg-secondary) border border-(--border-color) text-sm disabled:opacity-50 hover:bg-(--bg-tertiary)"
+							className="px-3 py-1.5 rounded bg-card border border-border text-sm disabled:opacity-50 hover:bg-muted"
 						>
 							{t("actions.saveBaseline")}
 						</button>
@@ -70,7 +70,7 @@ export function ApiWatcherDashboard({
 					<button
 						type="button"
 						onClick={reset}
-						className="px-3 py-1.5 rounded bg-(--bg-secondary) border border-(--border-color) text-sm hover:bg-(--bg-tertiary)"
+						className="px-3 py-1.5 rounded bg-card border border-border text-sm hover:bg-muted"
 					>
 						{t("actions.reset")}
 					</button>
@@ -78,13 +78,13 @@ export function ApiWatcherDashboard({
 			</div>
 
 			{!projectPath && (
-				<div className="text-sm text-(--text-secondary)">
+				<div className="text-sm text-muted-foreground">
 					{t("errors.noProject")}
 				</div>
 			)}
 
 			{isScanning && (
-				<div className="text-sm text-(--text-secondary) animate-pulse">
+				<div className="text-sm text-muted-foreground animate-pulse">
 					{status || t("actions.scanning")}
 				</div>
 			)}
@@ -104,7 +104,7 @@ export function ApiWatcherDashboard({
 				/>
 			) : (
 				phase === "idle" && (
-					<div className="flex items-center justify-center h-40 text-(--text-secondary)">
+					<div className="flex items-center justify-center h-40 text-muted-foreground">
 						<p>{t("noData")}</p>
 					</div>
 				)
@@ -129,7 +129,7 @@ function ReportBody({
 		<div className="flex flex-col gap-4">
 			<div>
 				<h2 className="text-lg font-semibold">{t("title")}</h2>
-				<p className="text-sm text-(--text-secondary)">
+				<p className="text-sm text-muted-foreground">
 					{summary ||
 						(hasChanges
 							? t("changesDetected", { count: diff.changes.length })
@@ -169,9 +169,9 @@ function ReportBody({
 			</div>
 
 			{migrationGuideMarkdown && (
-				<div className="mt-4 p-4 rounded-lg bg-(--bg-secondary) border border-(--border-color)">
+				<div className="mt-4 p-4 rounded-lg bg-card border border-border">
 					<h3 className="text-sm font-medium mb-2">{t("migrationGuide")}</h3>
-					<pre className="text-xs whitespace-pre-wrap font-mono text-(--text-secondary)">
+					<pre className="text-xs whitespace-pre-wrap font-mono text-muted-foreground">
 						{migrationGuideMarkdown}
 					</pre>
 				</div>

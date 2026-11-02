@@ -6,7 +6,8 @@ declaration is invalid at computed-value time: the text falls back to the
 inherited color, the background and the border disappear. 635 such classes in
 24 views (API Explorer, Self-Healing, Browser Agent...) rendered that way until
 F145 mapped them to the theme tokens (``text-muted-foreground``, ``bg-card``,
-``border-border``...). This test keeps new ones out.
+``border-border``...), along with 320 more written in the Tailwind v4
+shorthand ``text-(--text-secondary)``. This test keeps new ones out.
 """
 
 from __future__ import annotations
@@ -17,8 +18,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 RENDERER = ROOT / "apps" / "frontend" / "src" / "renderer"
 
-#: ``var(--name`` in a class, a style object or a CSS string.
-VAR_USE = re.compile(r"var\(\s*(--[A-Za-z0-9-]+)")
+#: ``var(--name`` in a class, a style object or a CSS string, and the
+#: Tailwind v4 shorthand ``bg-(--name)``, which compiles to the same ``var()``.
+VAR_USE = re.compile(r"(?:var\(\s*|-\()(--[A-Za-z0-9-]+)")
 #: ``--name:`` in a stylesheet, or ``"--name":`` / ``setProperty("--name"`` in code.
 VAR_DEF = re.compile(r"""(--[A-Za-z0-9-]+)["']?\s*[:,]""")
 

@@ -25,8 +25,8 @@ function StatCard({
 	readonly color: string;
 }): React.ReactElement {
 	return (
-		<div className="p-3 rounded-lg bg-(--bg-secondary) border border-(--border-color)">
-			<p className="text-xs text-(--text-secondary)">{label}</p>
+		<div className="p-3 rounded-lg bg-card border border-border">
+			<p className="text-xs text-muted-foreground">{label}</p>
 			<p className={`text-lg font-bold truncate ${color}`}>{value}</p>
 		</div>
 	);
@@ -44,7 +44,7 @@ function ReportBody({
 	return (
 		<div className="flex flex-col gap-4">
 			<div>
-				<p className="text-sm text-(--text-secondary)">
+				<p className="text-sm text-muted-foreground">
 					{t("summary", {
 						runs: report.totalRuns,
 						successRate: (report.successRate * 100).toFixed(1),
@@ -106,7 +106,7 @@ function ReportBody({
 				))}
 			</div>
 
-			<p className="text-sm text-(--text-secondary) italic mt-2">
+			<p className="text-sm text-muted-foreground italic mt-2">
 				{t("summaryDetail", {
 					tips: report.tips.length,
 					runs: report.totalRuns,
@@ -143,7 +143,7 @@ export function CoachReportView({
 	const isScanning = phase === "scanning";
 
 	return (
-		<div className="flex flex-col gap-4 p-6 bg-(--bg-primary) text-(--text-primary)">
+		<div className="flex flex-col gap-4 p-6 bg-background text-foreground">
 			<div className="flex items-center justify-between">
 				<h2 className="text-lg font-semibold">{t("title")}</h2>
 				<div className="flex gap-2">
@@ -170,7 +170,7 @@ export function CoachReportView({
 						<button
 							type="button"
 							onClick={reset}
-							className="px-3 py-1.5 rounded-md border border-(--border-color) hover:bg-(--bg-secondary) text-sm font-medium transition-colors"
+							className="px-3 py-1.5 rounded-md border border-border hover:bg-card text-sm font-medium transition-colors"
 						>
 							{t("actions.reset")}
 						</button>
@@ -179,13 +179,13 @@ export function CoachReportView({
 			</div>
 
 			{!projectPath && (
-				<p className="text-sm text-(--text-secondary)">
+				<p className="text-sm text-muted-foreground">
 					{t("errors.noProject")}
 				</p>
 			)}
 
 			{isScanning && (
-				<p className="text-sm text-(--text-secondary)">
+				<p className="text-sm text-muted-foreground">
 					{status || t("actions.scanning")}
 				</p>
 			)}
@@ -195,7 +195,7 @@ export function CoachReportView({
 			)}
 
 			{phase === "complete" && report?.totalRuns === 0 && (
-				<p className="text-sm text-(--text-secondary)">{t("noData")}</p>
+				<p className="text-sm text-muted-foreground">{t("noData")}</p>
 			)}
 
 			{phase === "complete" && report && report.totalRuns > 0 && (
