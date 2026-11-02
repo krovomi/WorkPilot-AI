@@ -9,6 +9,7 @@ import {
 	useTaskPermissionStore,
 } from "../../stores/task-permission-store";
 import { Button } from "../ui/button";
+import { formatAppTime } from "@/lib/date-format";
 
 /** Allow first, then refuse: the order Gemini offers them in, kept stable. */
 const KIND_ORDER = ["allow_once", "allow_always", "reject_once", "reject_always"];
@@ -88,7 +89,7 @@ function PermissionQuestion({ request }: { readonly request: TaskPermissionReque
 			</div>
 			<p className="text-[11px] text-muted-foreground">
 				{t("tasks:permission.expires", {
-					time: new Date(request.expiresAt).toLocaleTimeString([], {
+					time: formatAppTime(request.expiresAt, {
 						hour: "2-digit",
 						minute: "2-digit",
 					}),

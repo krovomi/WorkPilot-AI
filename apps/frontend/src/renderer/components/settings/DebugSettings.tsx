@@ -25,6 +25,7 @@ import { Button } from "../ui/button";
 import { Label } from "../ui/label";
 import { Switch } from "../ui/switch";
 import { SettingsSection } from "./SettingsSection";
+import { formatAppDate } from "@/lib/date-format";
 
 interface DebugInfo {
 	systemInfo: Record<string, string>;
@@ -268,7 +269,7 @@ export function DebugSettings() {
 							"Visits and time spent per page, kept on this machine only.",
 						)}{" "}
 						{t("debug.viewUsage.since", {
-							date: new Date(usageSince).toLocaleDateString(),
+							date: formatAppDate(usageSince),
 							defaultValue: "Counting since {{date}}.",
 						})}
 					</p>

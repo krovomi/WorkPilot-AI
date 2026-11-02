@@ -20,6 +20,7 @@ import type { AgentSlot, MCEvent } from "../../stores/mission-control-store";
 import { Badge } from "../ui/badge";
 import { ScrollArea } from "../ui/scroll-area";
 import { useTranslation } from "react-i18next";
+import { formatAppTime } from "@/lib/date-format";
 
 interface AgentEventLogProps {
 	readonly events: MCEvent[];
@@ -96,7 +97,7 @@ export function AgentEventLog({ events, agents }: AgentEventLogProps) {
 					const agentId = event.data?.agent_id as string | undefined;
 					const agentName = agentId ? (agentMap.get(agentId) ?? agentId) : null;
 					const ts = new Date(event.timestamp * 1000);
-					const timeStr = ts.toLocaleTimeString([], {
+					const timeStr = formatAppTime(ts, {
 						hour: "2-digit",
 						minute: "2-digit",
 						second: "2-digit",
