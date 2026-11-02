@@ -163,10 +163,6 @@ import {
 } from "./modules/formula-matrix-api";
 import { type BenchAPI, createBenchAPI } from "./modules/bench-api";
 import { createDebugAPI, type DebugAPI } from "./modules/debug-api";
-import type { DecisionLoggerAPI } from "./modules/decision-logger-api";
-import { createDecisionLoggerAPI } from "./modules/decision-logger-api";
-import type { DocumentationAgentAPI } from "./modules/documentation-agent-api";
-import { createDocumentationAgentAPI } from "./modules/documentation-agent-api";
 import { createGitHubAPI, type GitHubAPI } from "./modules/github-api";
 import {
 	createEnvSnapshotAPI,
@@ -278,8 +274,6 @@ export interface ElectronAPI
 		ArchitectureVisualizerAPI,
 		CodeMigrationAPI,
 		PerformanceProfilerAPI,
-		DocumentationAgentAPI,
-		DecisionLoggerAPI,
 		PairProgrammingAPI,
 		PipelineGeneratorAPI,
 		ArenaAPI,
@@ -426,8 +420,6 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createArchitectureVisualizerAPI(),
 		...createCodeMigrationAPI(),
 		...createPerformanceProfilerAPI(),
-		...createDocumentationAgentAPI(),
-		...createDecisionLoggerAPI(),
 		...createPairProgrammingAPI(),
 		...createPipelineGeneratorAPI(),
 		...createArenaAPI(),
@@ -577,10 +569,6 @@ export type { DebugAPI } from "./modules/debug-api";
 export type { TaskSandboxAPI } from "./modules/task-sandbox-api";
 export { createTaskSandboxAPI } from "./modules/task-sandbox-api";
 export { createDebugAPI } from "./modules/debug-api";
-export type { DecisionLoggerAPI } from "./modules/decision-logger-api";
-export { createDecisionLoggerAPI } from "./modules/decision-logger-api";
-export type { DocumentationAgentAPI } from "./modules/documentation-agent-api";
-export { createDocumentationAgentAPI } from "./modules/documentation-agent-api";
 export type { GitHubAPI } from "./modules/github-api";
 export { createGitHubAPI } from "./modules/github-api";
 export type { McpAPI } from "./modules/mcp-api";

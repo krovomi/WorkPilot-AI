@@ -57,7 +57,6 @@ from ui import (
 )
 
 from .base import sanitize_error_message
-from .decision_logger import AgentDecisionLogger, create_decision_logger
 from .memory_manager import save_session_memory
 from .tool_display import (
     extract_streaming_command,
@@ -1156,24 +1155,6 @@ async def run_agent_session(
             _rr = None
             _rs_id = None
 
-    # Decision logger — structured record of agent decisions (non-blocking)
-    _phase_to_agent = {
-        LogPhase.PLANNING: "planner",
-        LogPhase.CODING: "coder",
-        LogPhase.VALIDATION: "qa_reviewer",
-        LogPhase.QA_FIX: "qa_fixer",
-    }
-    _decision_logger: AgentDecisionLogger | None = None
-    try:
-        _decision_logger = create_decision_logger(
-            spec_dir=spec_dir,
-            agent_type=_phase_to_agent.get(phase, phase.value),
-        )
-    except Exception:
-        logger.debug(
-            "Failed to create decision logger; continuing without it", exc_info=True
-        )
-
     try:
         # Send the query
         debug("session", "Sending query to Claude SDK...")
@@ -1312,14 +1293,6 @@ async def run_agent_session(
                                     )
                             except Exception:
                                 # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
-                                pass
-
-                        # Record tool call in decision log (non-blocking)
-                        if _decision_logger and inp is not None:
-                            try:
-                                _decision_logger.log_tool_call(tool_name, inp)
-                            except Exception:
-                                # Le journal de decisions est annexe : il n'interrompt pas l'agent.
                                 pass
 
                         # Stream tool use events to live view

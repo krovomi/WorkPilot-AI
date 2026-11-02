@@ -11,7 +11,6 @@ function mockService(name: string) {
 vi.mock("../architecture-visualizer-service", () => mockService("architectureVisualizerService"));
 vi.mock("../auto-refactor-service", () => mockService("autoRefactorService"));
 vi.mock("../code-migration-service", () => mockService("codeMigrationService"));
-vi.mock("../documentation-agent-service", () => mockService("documentationAgentService"));
 vi.mock("../performance-profiler-service", () => mockService("performanceProfilerService"));
 vi.mock("../pipeline-generator-service", () => mockService("pipelineGeneratorService"));
 vi.mock("../visual-programming-service", () => mockService("visualProgrammingService"));
@@ -26,7 +25,7 @@ describe("configurePythonFeatureServices", () => {
 
 	it("gives every feature service the managed Python and backend", () => {
 		configurePythonFeatureServices("/venv/bin/python", "/app/backend");
-		expect(configures.size).toBe(8);
+		expect(configures.size).toBe(7);
 		for (const [name, configure] of configures) {
 			expect(configure, name).toHaveBeenCalledWith(
 				"/venv/bin/python",
