@@ -65,7 +65,8 @@ when their integration is enabled, or, for the administration console, in
 server mode for someone allowed to administer.
 
 A view with neither a design file nor a test that names it is marked
-**Experimental** (lot M8): the sidebar shows a badge on it and lets the user
+**Experimental** (lot M8): the sidebar puts a small flask on the corner of its
+icon (its tooltip says why) and lets the user
 hide all of them. The list lives in
 `apps/frontend/src/renderer/components/sidebar/experimental-views.ts`; the last
 column below marks the same views, and the test fails when the two differ or
