@@ -16,6 +16,7 @@
  * banner says so.
  */
 
+import { debugLog } from "../shared/utils/debug-logger";
 import { spawnSync } from "node:child_process";
 import { app } from "electron";
 import { findExecutable, isLinux } from "./platform";
@@ -112,7 +113,7 @@ export function selectLinuxPasswordStore(): void {
 	});
 	if (!store) return;
 	app.commandLine.appendSwitch(PASSWORD_STORE_SWITCH, store);
-	console.warn(
+	debugLog(
 		`[SecretStorage] No desktop environment declared, but a Secret Service is running: safeStorage uses --${PASSWORD_STORE_SWITCH}=${store}.`,
 	);
 }

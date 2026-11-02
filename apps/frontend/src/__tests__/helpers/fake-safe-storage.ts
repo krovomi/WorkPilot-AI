@@ -28,6 +28,7 @@ export function createFakeSafeStorage() {
 
 	const safeStorage = {
 		isEncryptionAvailable: () => state.ready,
+		isAsyncEncryptionAvailable: async () => state.ready,
 		getSelectedStorageBackend: () => state.backend,
 		encryptString: (value: string): Buffer => {
 			calls.encrypt++;
@@ -38,6 +39,18 @@ export function createFakeSafeStorage() {
 			calls.decrypt++;
 			if (state.failDecrypt) throw new Error("decryption failed");
 			return xor(value).toString("utf-8");
+		},
+		encryptStringAsync: async (value: string): Promise<Buffer> => {
+			calls.encrypt++;
+			if (state.failEncrypt) throw new Error("encryption failed");
+			return xor(Buffer.from(value, "utf-8"));
+		},
+		decryptStringAsync: async (
+			value: Buffer,
+		): Promise<{ shouldReEncrypt: boolean; result: string }> => {
+			calls.decrypt++;
+			if (state.failDecrypt) throw new Error("decryption failed");
+			return { shouldReEncrypt: false, result: xor(value).toString("utf-8") };
 		},
 	};
 

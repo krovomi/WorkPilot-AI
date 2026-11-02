@@ -61,7 +61,7 @@ export function registerWorktreeCreatePRHandlers(
 			const serverCard = findServerCard(taskId);
 			if (serverCard) return createServerCardPR(serverCard, options);
 			const isDebugMode =
-				process.env.DEBUG === "true" || process.env.NODE_ENV === "development";
+				process.env.DEBUG === "true";
 			const debug = (...args: unknown[]) => {
 				if (isDebugMode) {
 					console.warn("[CREATE_PR DEBUG]", ...args);

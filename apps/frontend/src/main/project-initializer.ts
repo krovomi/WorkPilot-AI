@@ -21,7 +21,7 @@ const GIT_STATUS_TIMEOUT_MS = 10_000;
  * Debug logging - only logs when DEBUG=true or in development mode
  */
 const DEBUG =
-	process.env.DEBUG === "true" || process.env.NODE_ENV === "development";
+	process.env.DEBUG === "true";
 
 function debug(message: string, data?: Record<string, unknown>): void {
 	if (DEBUG) {

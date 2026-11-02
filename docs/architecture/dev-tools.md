@@ -3,6 +3,16 @@
 > Design rationale moved verbatim out of [`docs/CLAUDE.md`](../CLAUDE.md),
 > which stays the normative file: where the two disagree, `docs/CLAUDE.md` wins.
 
+## Dev console: quiet by default
+
+`pnpm dev` prints warnings and errors only. Information logs from the main
+process (handlers registered, Python environment, CLI detections, version
+checks) go through `debugLog` (`apps/frontend/src/shared/utils/debug-logger.ts`)
+and show with `DEBUG=true`, which `pnpm run dev:debug` sets. DevTools no longer
+open on every launch: press F12, or set `WORKPILOT_DEVTOOLS=1` to open them at
+startup (opening them made Chromium log `WebGL1 blocklisted` on a blocklisted
+GPU, WSLg included).
+
 ## E2E Testing (Electron MCP)
 
 QA agents can interact with the running Electron app via Chrome DevTools Protocol:
