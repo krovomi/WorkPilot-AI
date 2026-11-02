@@ -144,6 +144,7 @@ from agents.tools_pkg import (
     get_allowed_tools,
     get_required_mcp_servers,
     is_tools_available,
+    setting_sources_for,
     undeclared_builtin_tools,
 )
 from skills_registry.providers import acp_provider_names, get_provider_capabilities
@@ -940,13 +941,12 @@ def create_client(
         "cwd": str(project_dir.resolve()),
         "settings": str(settings_file.resolve()),
         # setting_sources auto-loads CLAUDE.md, project rules, skills, and
-        # filesystem-defined hooks from ~/.claude (user), <cwd>/.claude (project),
-        # and .claude/settings.local.json (local). The SDK handles prompt-cache
-        # prefixing automatically for these sources. CLAUDE.md and the rules
-        # files follow the project's `useClaudeMd` setting; skills and hooks
+        # filesystem-defined hooks from <cwd>/.claude (project) and, for the
+        # types that declare them, ~/.claude (user) and settings.local.json
+        # (local): the coder only, by default (`setting_sources_for`).
+        # CLAUDE.md and the rules files follow `useClaudeMd`; skills and hooks
         # do not (`apply_claude_md_setting`).
-        # See: code.claude.com/docs/en/agent-sdk/claude-code-features
-        "setting_sources": ["project", "user", "local"],
+        "setting_sources": setting_sources_for(agent_type),
         "env": sdk_env,  # Pass ANTHROPIC_BASE_URL etc. to subprocess
         "max_thinking_tokens": max_thinking_tokens,  # Extended thinking budget
         "max_buffer_size": 10

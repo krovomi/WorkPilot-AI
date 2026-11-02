@@ -4,7 +4,7 @@
  * A project of this computer keeps reading its own folder.
  */
 
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import type { Project } from "@shared/types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useProjectStore } from "../../stores/project-store";
@@ -98,7 +98,13 @@ beforeEach(() => {
 	useProjectStore.setState({ projects: [serverProject, localProject] });
 });
 
-afterEach(() => {
+afterEach(async () => {
+	// Let the views' pending loads settle while the DOM is still here: a load
+	// resolving after the last test of the file updates state once jsdom is
+	// gone ("window is not defined", an unhandled rejection that fails the run).
+	await act(async () => {
+		await new Promise((resolve) => setTimeout(resolve, 0));
+	});
 	vi.unstubAllGlobals();
 	useProjectStore.setState({ projects: [] });
 });
