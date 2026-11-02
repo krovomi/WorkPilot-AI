@@ -309,7 +309,16 @@ class TestWaiting:
 class TestProtocol:
     def test_no_tool_starts_approves_or_merges(self):
         names = {t["name"] for t in TOOLS}
-        assert names == {"list_cards", "get_card", "create_card", "wait_for_card"}
+        assert names == {
+            "list_cards",
+            "get_card",
+            "create_card",
+            "wait_for_card",
+            "get_spec",
+            "update_card",
+            "get_roadmap",
+            "list_ideas",
+        }
         for tool in TOOLS:
             properties = tool["inputSchema"].get("properties", {})
             # The project is fixed at start: no tool takes a path.

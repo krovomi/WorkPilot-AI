@@ -296,15 +296,21 @@ export function PRDetail({
 		}
 	}, [isReviewing]);
 
-	// Analyze code quality after review completes
+	// Analyze code quality once per reviewed PR and file list. The effect used
+	// to depend on the whole hook object, recreated on every render, and the
+	// analysis itself re-renders: each run started another Python process.
+	const { analyzePR } = qualityScore;
+	const qualityAnalyzedRef = useRef<string | null>(null);
 	useEffect(() => {
-		if (reviewResult?.success && pr.files && pr.files.length > 0) {
-			const fileNames = pr.files.map((f) => f.path);
-			qualityScore.analyzePR(pr.number, fileNames, projectId).catch((err) => {
-				console.error("Failed to analyze quality:", err);
-			});
-		}
-	}, [reviewResult?.success, pr.number, pr.files, projectId, qualityScore]);
+		if (!reviewResult?.success || !pr.files || pr.files.length === 0) return;
+		const fileNames = pr.files.map((f) => f.path);
+		const key = `${projectId}:${pr.number}:${fileNames.join("\n")}`;
+		if (qualityAnalyzedRef.current === key) return;
+		qualityAnalyzedRef.current = key;
+		analyzePR(pr.number, fileNames, projectId).catch((err) => {
+			console.error("Failed to analyze quality:", err);
+		});
+	}, [reviewResult?.success, pr.number, pr.files, projectId, analyzePR]);
 
 	// Load logs when logs section is expanded or when reviewing (for live logs)
 	useEffect(() => {

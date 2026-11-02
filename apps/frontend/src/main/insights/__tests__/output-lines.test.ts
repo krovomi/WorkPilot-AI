@@ -4,12 +4,13 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { chunkForLine } from "../output-lines";
+import { chunkForLine, createLineReader } from "../output-lines";
 
 describe("insights output lines", () => {
 	it("reads text and markers", () => {
 		expect(chunkForLine("Hello")).toEqual({ type: "text", content: "Hello\n" });
-		expect(chunkForLine("   ")).toBeNull();
+		// A blank line separates paragraphs: it is kept.
+		expect(chunkForLine("")).toEqual({ type: "text", content: "\n" });
 		expect(
 			chunkForLine('__TASK_SUGGESTION__:{"title":"Add tests","description":"x"}'),
 		).toEqual({
@@ -34,5 +35,22 @@ describe("insights output lines", () => {
 		expect(chunkForLine("__TOOL_START__:not json")).toBeNull();
 		expect(chunkForLine("__TASK_SUGGESTION__:[1,2]")).toBeNull();
 		expect(chunkForLine('__TASK_SUGGESTION__:{"description":"no title"}')).toBeNull();
+	});
+});
+
+describe("createLineReader", () => {
+	it("returns whole lines only, across chunks, and keeps blank ones", () => {
+		const reader = createLineReader();
+		expect(reader.push("first para")).toEqual([]);
+		expect(reader.push("graph\n\nsecond\r\n__TOOL_")).toEqual([
+			"first paragraph",
+			"",
+			"second",
+		]);
+		expect(reader.push('END__:{"name":"Grep"}\nlast')).toEqual([
+			'__TOOL_END__:{"name":"Grep"}',
+		]);
+		expect(reader.flush()).toEqual(["last"]);
+		expect(reader.flush()).toEqual([]);
 	});
 });
