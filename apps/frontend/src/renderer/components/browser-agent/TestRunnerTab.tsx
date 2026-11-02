@@ -96,10 +96,10 @@ export function TestRunnerTab({ projectPath }: TestRunnerTabProps) {
 						<FlaskConical className="w-10 h-10 text-emerald-400/70" />
 					</div>
 					<div className="text-center max-w-xs">
-						<p className="text-sm font-medium text-[var(--text-secondary)] mb-1">
+						<p className="text-sm font-medium text-muted-foreground mb-1">
 							{t("browserAgent:tests.noResultsTitle")}
 						</p>
-						<p className="text-xs text-[var(--text-tertiary)] leading-relaxed">
+						<p className="text-xs text-muted-foreground leading-relaxed">
 							{t("browserAgent:tests.noResults")}
 						</p>
 					</div>
@@ -108,7 +108,7 @@ export function TestRunnerTab({ projectPath }: TestRunnerTabProps) {
 
 			{/* Test results */}
 			{recentTestRun && (
-				<div className="rounded-lg border border-[var(--border-primary)] overflow-hidden">
+				<div className="rounded-lg border border-border overflow-hidden">
 					{recentTestRun.results.map((result, index) => {
 						const key = `${result.path}:${result.name}`;
 						const isExpanded = expandedTest === key;
@@ -125,21 +125,21 @@ export function TestRunnerTab({ projectPath }: TestRunnerTabProps) {
 								<button
 									type="button"
 									onClick={() => setExpandedTest(isExpanded ? null : key)}
-									className={`w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[var(--bg-hover)] text-left transition-colors ${
+									className={`w-full flex items-center gap-3 px-4 py-2.5 hover:bg-accent text-left transition-colors ${
 										!isLast || isExpanded
-											? "border-b border-[var(--border-primary)]"
+											? "border-b border-border"
 											: ""
-									} ${isExpanded ? "bg-[var(--bg-secondary)]" : ""}`}
+									} ${isExpanded ? "bg-card" : ""}`}
 								>
 									{/* Status icon */}
 									<StatusIcon className={`w-4 h-4 ${color} shrink-0`} />
 
 									{/* Test info */}
 									<div className="flex-1 min-w-0 flex items-center gap-2">
-										<span className="text-sm text-[var(--text-primary)] truncate">
+										<span className="text-sm text-foreground truncate">
 											{result.name}
 										</span>
-										<span className="text-[11px] text-[var(--text-tertiary)] truncate flex items-center gap-1">
+										<span className="text-[11px] text-muted-foreground truncate flex items-center gap-1">
 											<FileText className="w-3 h-3 shrink-0 text-indigo-400/50" />
 											{result.path}
 										</span>
@@ -152,9 +152,9 @@ export function TestRunnerTab({ projectPath }: TestRunnerTabProps) {
 										</span>
 										{result.errorMessage &&
 											(isExpanded ? (
-												<ChevronDown className="w-3.5 h-3.5 text-[var(--text-tertiary)]" />
+												<ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
 											) : (
-												<ChevronRight className="w-3.5 h-3.5 text-[var(--text-tertiary)]" />
+												<ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
 											))}
 									</div>
 								</button>
@@ -168,7 +168,7 @@ export function TestRunnerTab({ projectPath }: TestRunnerTabProps) {
 											<AlertCircle className="w-3 h-3" />
 											{t("browserAgent:tests.errorDetails")}
 										</p>
-										<pre className="text-xs text-[var(--text-secondary)] whitespace-pre-wrap font-mono leading-relaxed bg-black/20 rounded-md p-3 border border-rose-500/10">
+										<pre className="text-xs text-muted-foreground whitespace-pre-wrap font-mono leading-relaxed bg-black/20 rounded-md p-3 border border-rose-500/10">
 											{result.errorMessage}
 										</pre>
 									</div>
@@ -222,9 +222,9 @@ function getStatusConfig(status: string): {
 		default:
 			return {
 				icon: AlertCircle,
-				color: "text-[var(--text-tertiary)]",
-				bgColor: "bg-[var(--bg-secondary)]",
-				borderColor: "border-[var(--border-primary)]",
+				color: "text-muted-foreground",
+				bgColor: "bg-card",
+				borderColor: "border-border",
 			};
 	}
 }

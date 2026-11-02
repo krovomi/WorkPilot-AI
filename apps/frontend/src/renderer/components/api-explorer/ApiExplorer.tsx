@@ -57,11 +57,11 @@ function EndpointDetail({
 				<div className="flex items-start gap-2.5">
 					<MethodBadge method={method} size="md" />
 					<div className="flex-1 min-w-0">
-						<code className="text-sm font-mono text-[var(--color-text-primary)] break-all">
+						<code className="text-sm font-mono text-foreground break-all">
 							{path}
 						</code>
 						{operation.summary && (
-							<div className="text-xs text-[var(--color-text-secondary)] mt-0.5">
+							<div className="text-xs text-muted-foreground mt-0.5">
 								{operation.summary}
 							</div>
 						)}
@@ -346,16 +346,16 @@ export function ApiExplorer() {
 		emulatorBtnLabel = t("apiExplorer:emulator.running");
 
 	return (
-		<div className="flex flex-col h-full bg-[var(--color-bg-primary)] text-[var(--color-text-primary)]">
+		<div className="flex flex-col h-full bg-background text-foreground">
 			{/* Top bar */}
-			<div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--color-border)] shrink-0 bg-[var(--color-bg-primary)]">
+			<div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--color-border)] shrink-0 bg-background">
 				<div className="flex items-center gap-2 flex-1 min-w-0">
 					<Globe
 						size={16}
-						className="text-[var(--color-text-muted)] shrink-0"
+						className="text-muted-foreground shrink-0"
 					/>
 					<input
-						className="flex-1 min-w-0 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-2.5 py-1.5 text-xs font-mono text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-accent)]"
+						className="flex-1 min-w-0 bg-card border border-[var(--color-border)] rounded-md px-2.5 py-1.5 text-xs font-mono text-foreground focus:outline-none focus:border-[var(--color-accent)]"
 						value={urlInput}
 						onChange={(e) => setUrlInput(e.target.value)}
 						onKeyDown={(e) => e.key === "Enter" && applySpecUrl()}
@@ -430,7 +430,7 @@ export function ApiExplorer() {
 					<button
 						type="button"
 						onClick={() => setShowEnvManager(true)}
-						className="p-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-secondary)] rounded-md transition-colors"
+						className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-card rounded-md transition-colors"
 						title={t("apiExplorer:environments.manage")}
 					>
 						<Settings size={14} />
@@ -442,7 +442,7 @@ export function ApiExplorer() {
 					<button
 						type="button"
 						onClick={() => setShowExport(true)}
-						className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md transition-colors shrink-0"
+						className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-card border border-[var(--color-border)] rounded-md transition-colors shrink-0"
 					>
 						<Download size={13} />
 						{t("apiExplorer:actions.export")}
@@ -453,12 +453,12 @@ export function ApiExplorer() {
 			{/* Main layout */}
 			<div className="flex flex-1 min-h-0">
 				{/* Sidebar */}
-				<div className="w-64 shrink-0 flex flex-col border-r border-[var(--color-border)] bg-[var(--color-bg-primary)]">
+				<div className="w-64 shrink-0 flex flex-col border-r border-[var(--color-border)] bg-background">
 					{/* Spec info + scan status + search */}
 					<div className="p-3 border-b border-[var(--color-border)]">
 						{/* Scan status banner */}
 						{isProjectScanning && (
-							<div className="flex items-center gap-1.5 mb-2 text-[10px] text-[var(--color-text-muted)]">
+							<div className="flex items-center gap-1.5 mb-2 text-[10px] text-muted-foreground">
 								<Loader2 size={10} className="animate-spin shrink-0" />
 								<span>{t("apiExplorer:scan.scanning")}</span>
 							</div>
@@ -480,7 +480,7 @@ export function ApiExplorer() {
 						{spec && (
 							<div className="mb-2.5">
 								<div className="flex items-center gap-2 mb-0.5">
-									<div className="text-sm font-semibold text-[var(--color-text-primary)] truncate flex-1">
+									<div className="text-sm font-semibold text-foreground truncate flex-1">
 										{spec.info.title}
 									</div>
 									{/* Source badge */}
@@ -503,7 +503,7 @@ export function ApiExplorer() {
 										</span>
 									)}
 								</div>
-								<div className="text-[10px] text-[var(--color-text-muted)] font-mono">
+								<div className="text-[10px] text-muted-foreground font-mono">
 									v{spec.info.version} · {totalEndpoints}{" "}
 									{t("apiExplorer:sidebar.endpoints")}
 									{specSource === "file" && specFilePath && (
@@ -534,10 +534,10 @@ export function ApiExplorer() {
 						<div className="relative">
 							<Search
 								size={12}
-								className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]"
+								className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
 							/>
 							<input
-								className="w-full pl-7 pr-2 py-1.5 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
+								className="w-full pl-7 pr-2 py-1.5 bg-card border border-[var(--color-border)] rounded-md text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-[var(--color-accent)]"
 								value={searchQuery}
 								onChange={(e) => setSearchQuery(e.target.value)}
 								placeholder={t("apiExplorer:sidebar.search")}
@@ -546,7 +546,7 @@ export function ApiExplorer() {
 								<button
 									type="button"
 									onClick={() => setSearchQuery("")}
-									className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
+									className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
 								>
 									<X size={11} />
 								</button>
@@ -557,7 +557,7 @@ export function ApiExplorer() {
 					{/* Endpoint list */}
 					<div className="flex-1 overflow-y-auto">
 						{isLoadingSpec && (
-							<div className="flex items-center justify-center py-12 gap-2 text-sm text-[var(--color-text-muted)]">
+							<div className="flex items-center justify-center py-12 gap-2 text-sm text-muted-foreground">
 								<Loader2 size={15} className="animate-spin" />
 								{t("apiExplorer:sidebar.loading")}
 							</div>
@@ -583,7 +583,7 @@ export function ApiExplorer() {
 						)}
 
 						{!isLoadingSpec && !specError && groups.length === 0 && spec && (
-							<div className="text-xs text-[var(--color-text-muted)] text-center py-8">
+							<div className="text-xs text-muted-foreground text-center py-8">
 								{t("apiExplorer:sidebar.noResults")}
 							</div>
 						)}
@@ -595,25 +595,25 @@ export function ApiExplorer() {
 									<button
 										type="button"
 										onClick={() => toggleTag(group.tag)}
-										className="w-full flex items-center justify-between px-3 py-2 hover:bg-[var(--color-bg-secondary)] transition-colors group"
+										className="w-full flex items-center justify-between px-3 py-2 hover:bg-card transition-colors group"
 									>
 										<div className="flex items-center gap-1.5 min-w-0">
 											{isCollapsed ? (
 												<ChevronRight
 													size={12}
-													className="text-[var(--color-text-muted)] shrink-0"
+													className="text-muted-foreground shrink-0"
 												/>
 											) : (
 												<ChevronDown
 													size={12}
-													className="text-[var(--color-text-muted)] shrink-0"
+													className="text-muted-foreground shrink-0"
 												/>
 											)}
-											<span className="text-xs font-semibold text-[var(--color-text-secondary)] truncate">
+											<span className="text-xs font-semibold text-muted-foreground truncate">
 												{group.tag}
 											</span>
 										</div>
-										<span className="text-[10px] text-[var(--color-text-muted)] font-mono shrink-0 ml-1">
+										<span className="text-[10px] text-muted-foreground font-mono shrink-0 ml-1">
 											{group.endpoints.length}
 										</span>
 									</button>
@@ -634,15 +634,15 @@ export function ApiExplorer() {
 														className={`w-full flex items-center gap-2 px-3 py-2 text-left transition-colors group ${
 															isSelected
 																? "bg-[var(--color-accent)]/10 border-r-2 border-[var(--color-accent)]"
-																: "hover:bg-[var(--color-bg-secondary)]"
+																: "hover:bg-card"
 														}`}
 													>
 														<MethodBadge method={method} />
 														<span
 															className={`text-xs font-mono truncate flex-1 ${
 																isSelected
-																	? "text-[var(--color-text-primary)]"
-																	: "text-[var(--color-text-secondary)]"
+																	? "text-foreground"
+																	: "text-muted-foreground"
 															}`}
 															title={endpointTitle}
 														>
@@ -660,10 +660,10 @@ export function ApiExplorer() {
 
 					{/* Active env indicator */}
 					{activeEnv && (
-						<div className="px-3 py-2 border-t border-[var(--color-border)] bg-[var(--color-bg-secondary)]">
+						<div className="px-3 py-2 border-t border-[var(--color-border)] bg-card">
 							<div className="flex items-center gap-1.5">
 								<div className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-								<span className="text-[10px] font-mono text-[var(--color-text-muted)] truncate">
+								<span className="text-[10px] font-mono text-muted-foreground truncate">
 									{activeEnv.baseUrl}
 								</span>
 							</div>
@@ -710,17 +710,17 @@ function EmptyState({
 }) {
 	if (isLoading) return null;
 	return (
-		<div className="flex flex-col items-center justify-center h-full gap-4 text-[var(--color-text-muted)]">
-			<div className="w-16 h-16 rounded-2xl bg-[var(--color-bg-secondary)] border border-[var(--color-border)] flex items-center justify-center">
+		<div className="flex flex-col items-center justify-center h-full gap-4 text-muted-foreground">
+			<div className="w-16 h-16 rounded-2xl bg-card border border-[var(--color-border)] flex items-center justify-center">
 				<ExternalLink size={24} className="opacity-40" />
 			</div>
 			<div className="text-center">
-				<div className="text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+				<div className="text-sm font-medium text-muted-foreground mb-1">
 					{spec
 						? t("apiExplorer:empty.selectEndpoint")
 						: t("apiExplorer:empty.noSpec")}
 				</div>
-				<div className="text-xs text-[var(--color-text-muted)]">
+				<div className="text-xs text-muted-foreground">
 					{spec
 						? t("apiExplorer:empty.selectEndpointHint")
 						: t("apiExplorer:empty.noSpecHint")}
