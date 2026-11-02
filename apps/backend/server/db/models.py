@@ -520,6 +520,28 @@ class PushDevice(Base):
     )
 
 
+class ProjectAutomation(Base):
+    """A server project's automation rules and what they did
+    (``shared_features/automations``).
+
+    The rules are the desktop's (``rules.json``), shared by the team; the
+    ledger is the desktop's ``ledger.json``. ``owners`` names, per rule, the
+    person who saved it last: the rule reads the forge with their token.
+    """
+
+    __tablename__ = "project_automations"
+
+    project_id: Mapped[str] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True
+    )
+    rules: Mapped[list] = mapped_column(JSON, default=list)
+    owners: Mapped[dict] = mapped_column(JSON, default=dict)
+    ledger: Mapped[dict] = mapped_column(JSON, default=dict)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )
+
+
 class UserSecret(Base):
     """Per-user integration secret (Azure PAT, Jira token...), Fernet-encrypted."""
 

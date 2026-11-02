@@ -8,7 +8,8 @@ pull or merge requests as a job on the clone (``forge_review``); its analyses
 (accessibility, i18n, documentation drift, flaky tests, technical debt) as
 jobs whose reports every member reads (``analyses``); its dashboard,
 analytics, sessions and costs, computed from its runs, its jobs and the
-ledgers its agents keep in the clone (``workspace``, ``usage_ledger``).
+ledgers its agents keep in the clone (``workspace``, ``usage_ledger``); its
+automation rules, run by the server process (``automations``).
 
 See ``docs/architecture/server-mode.md``.
 """
@@ -26,6 +27,7 @@ def mount_all(mount: Callable[[APIRouter, str], None]) -> None:
     from shared_board.api import router as board
     from shared_features.analyses import router as analyses
     from shared_features.api import feature_router
+    from shared_features.automations.api import router as automations
     from shared_features.context import router as context
     from shared_features.forge import router as forge
     from shared_features.forge_gitlab import router as forge_gitlab
@@ -37,6 +39,7 @@ def mount_all(mount: Callable[[APIRouter, str], None]) -> None:
     from shared_features.workspace import router as workspace
 
     mount(board, "board")
+    mount(automations, "board")
     for feature in FEATURES.values():
         mount(feature_router(feature), feature.key)
     mount(roadmap, "roadmap")

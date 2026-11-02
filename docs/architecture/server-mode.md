@@ -21,6 +21,7 @@ Règles : [`rules/security.md`](../rules/security.md#s5--mode-serveur--authentif
 | Projets | `server/routers/projects.py`, `services/repos.py` | un projet est un dépôt distant que le serveur clone sous `WORKPILOT_REPOS_ROOT/<id>` ; ses membres et leur rôle (`viewer`, `member`, `owner`) |
 | Tableau | `server/routers/specs.py`, `services/spec_indexer.py` | les specs du clone indexées en base, la réservation d'une carte par une personne, les runs d'une carte |
 | Cartes | `shared_board/api.py` | créer, lire, modifier, supprimer une carte, approuver sa spec, par `project_id` |
+| Automatisations | `shared_features/automations/` | les règles d'un projet, partagées par l'équipe, que le serveur fait tourner toutes les 5 minutes ; leurs cartes écrites par le compte « Automations » ([automations.md](automations.md#sur-un-serveur--les-règles-de-léquipe)) |
 | Isolation des runs | `services/run_isolation.py`, `runners/confined_run.py`, `foundation/landlock.py` | ce qu'un run voit sur le disque : son clone, le home de son projet, son dossier temporaire ; le reste en lecture, les autres projets et l'état du serveur pas du tout |
 | Runs | `services/run_manager.py`, `services/run_env.py` | une phase (`spec`, `build`, `qa`, `merge`, `pr`) lancée sur le serveur pour une carte, sous un plafond de concurrence, sans entrée standard, avec l'environnement construit pour elle |
 | Flux en direct | `streaming/websocket_server.py`, `server/authz/ws_channels.py` | les événements du tableau (`project:<id>`) et d'un run (`run:<id>`), ouverts aux seuls membres du projet |
@@ -442,6 +443,22 @@ tendance dans ce rapport ; transformer un élément en tâche crée une carte du
 |---|---|---|
 | Lancer, arrêter une analyse | `POST /api/features/analyses/<analyse>/jobs`, `…/jobs/<id>/cancel` | `agent.execute`, `agent.cancel`, rôle `member` ou plus |
 | Suivre une analyse, lire son dernier rapport | `GET …/jobs/<id>`, `GET /api/features/analyses/<analyse>/report` | `insight.read` |
+
+**Les automatisations tournent sur le serveur.** Les règles d'un projet du serveur (une issue
+GitHub ou GitLab étiquetée, la CI de la forge au rouge, une heure, une PR ou une MR d'un autre)
+sont enregistrées en base (`project_automations`, Alembic `0009`) et le processus de l'API les
+fait tourner toutes les 5 minutes, que l'app soit ouverte ou non ; l'app ne les fait jamais
+tourner. Chaque règle agit au nom de qui l'a enregistrée en dernier, droits revérifiés à chaque
+passage, et lit la forge avec son jeton ; ses cartes ont pour auteur le compte de service
+« Automations », qui ne peut pas se connecter. Détail et preuves :
+[automations.md](automations.md#sur-un-serveur--les-règles-de-léquipe).
+
+| Action | Route | Il faut |
+|---|---|---|
+| Lire les règles et ce qu'elles ont fait | `GET /api/board/automations` | `task.read`, un rôle sur le projet |
+| Ajouter, modifier une règle | `POST /api/board/automations/rules` | `task.write`, rôle `member` ou plus ; `agent.execute` pour une règle qui lance un agent |
+| Supprimer une règle | `DELETE /api/board/automations/rules/{rule_id}` | `task.write`, rôle `member` ou plus |
+| Lancer un passage maintenant | `POST /api/board/automations/run` | `task.write`, rôle `member` ou plus |
 
 ## Les vues partagées en direct
 
