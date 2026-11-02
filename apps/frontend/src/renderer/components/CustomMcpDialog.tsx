@@ -210,6 +210,8 @@ export function CustomMcpDialog({
 				? {
 						command: formData.command,
 						args: argsInput.split(" ").filter(Boolean),
+						// The dialog has no field for it: keep what the catalog set.
+						...(formData.env ? { env: formData.env } : {}),
 					}
 				: {
 						url: formData.url,

@@ -29,6 +29,7 @@ import {
 	loadMarketplaceCatalog,
 	useMcpMarketplaceStore,
 } from "../../stores/mcp-marketplace-store";
+import { useProjectStore } from "../../stores/project-store";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -76,8 +77,8 @@ const CATEGORIES: { value: McpCategory | "all"; labelKey: string }[] = [
 	},
 	{ value: "database", labelKey: "mcpMarketplace.categories.database" },
 	{ value: "cloud", labelKey: "mcpMarketplace.categories.cloud" },
-	{ value: "security", labelKey: "mcpMarketplace.categories.security" },
-	{ value: "analytics", labelKey: "mcpMarketplace.categories.analytics" },
+	{ value: "testing", labelKey: "mcpMarketplace.categories.testing" },
+	{ value: "web", labelKey: "mcpMarketplace.categories.web" },
 	{ value: "ai", labelKey: "mcpMarketplace.categories.ai" },
 ];
 
@@ -93,20 +94,26 @@ export function McpMarketplace() {
 		isCatalogLoading,
 	} = useMcpMarketplaceStore();
 
+	const projectId = useProjectStore((state) => state.selectedProjectId);
+
 	const filteredCatalog = getFilteredCatalog();
 
 	// Load data on mount
 	useEffect(() => {
 		loadMarketplaceCatalog();
-		loadInstalledServers();
 		loadBuilderProjects();
 	}, []);
 
+	// Installed servers are the selected project's
+	useEffect(() => {
+		loadInstalledServers(projectId);
+	}, [projectId]);
+
 	const handleRefresh = useCallback(() => {
 		loadMarketplaceCatalog();
-		loadInstalledServers();
+		loadInstalledServers(projectId);
 		loadBuilderProjects();
-	}, []);
+	}, [projectId]);
 
 	return (
 		<div className="flex flex-col h-full overflow-hidden">
@@ -199,7 +206,7 @@ export function McpMarketplace() {
 							value={filters.sortBy}
 							onValueChange={(val) =>
 								setFilters({
-									sortBy: val as "popular" | "rating" | "newest" | "name",
+									sortBy: val as "featured" | "name",
 								})
 							}
 						>
@@ -208,14 +215,8 @@ export function McpMarketplace() {
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent>
-								<SelectItem value="popular">
-									{t("mcpMarketplace.sort.popular")}
-								</SelectItem>
-								<SelectItem value="rating">
-									{t("mcpMarketplace.sort.rating")}
-								</SelectItem>
-								<SelectItem value="newest">
-									{t("mcpMarketplace.sort.newest")}
+								<SelectItem value="featured">
+									{t("mcpMarketplace.sort.featured")}
 								</SelectItem>
 								<SelectItem value="name">
 									{t("mcpMarketplace.sort.name")}
@@ -224,20 +225,25 @@ export function McpMarketplace() {
 						</Select>
 
 						<Button
-							variant={filters.showVerifiedOnly ? "default" : "outline"}
+							variant={filters.showOfficialOnly ? "default" : "outline"}
 							size="sm"
 							className="h-9 gap-1.5"
 							onClick={() =>
-								setFilters({ showVerifiedOnly: !filters.showVerifiedOnly })
+								setFilters({ showOfficialOnly: !filters.showOfficialOnly })
 							}
 						>
 							<BadgeCheck className="h-3.5 w-3.5" />
-							{t("mcpMarketplace.verifiedOnly")}
+							{t("mcpMarketplace.officialOnly")}
 						</Button>
 					</div>
 
 					{/* Catalog grid */}
 					<div className="flex-1 overflow-auto p-6">
+						{!projectId && (
+							<p className="mb-4 text-sm text-muted-foreground">
+								{t("mcpMarketplace.noProject")}
+							</p>
+						)}
 						{(() => {
 							if (isCatalogLoading) {
 								return (
