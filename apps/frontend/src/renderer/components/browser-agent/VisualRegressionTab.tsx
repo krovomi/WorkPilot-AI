@@ -12,6 +12,7 @@ import {
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useBrowserAgentStore } from "@/stores/browser-agent-store";
+import { formatAppDate } from "@/lib/date-format";
 
 interface VisualRegressionTabProps {
 	readonly projectPath: string;
@@ -165,7 +166,7 @@ export function VisualRegressionTab({ projectPath }: VisualRegressionTabProps) {
 											</span>
 											<span>·</span>
 											<span>
-												{new Date(baseline.createdAt).toLocaleDateString()}
+												{formatAppDate(baseline.createdAt)}
 											</span>
 										</div>
 									</div>

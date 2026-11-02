@@ -25,6 +25,7 @@ import { Label } from "../../ui/label";
 import { Separator } from "../../ui/separator";
 import { Switch } from "../../ui/switch";
 import { Textarea } from "../../ui/textarea";
+import { dateLocale } from "@shared/utils/date-format";
 
 interface AutomationsIntegrationProps {
 	readonly projectId: string;
@@ -171,14 +172,14 @@ export function AutomationsIntegration({ projectId }: AutomationsIntegrationProp
 
 	const time = useMemo(
 		() =>
-			new Intl.DateTimeFormat(i18n.language, {
+			new Intl.DateTimeFormat(dateLocale(i18n.language), {
 				dateStyle: "short",
 				timeStyle: "short",
 			}),
 		[i18n.language],
 	);
 	const weekday = useMemo(
-		() => new Intl.DateTimeFormat(i18n.language, { weekday: "short" }),
+		() => new Intl.DateTimeFormat(dateLocale(i18n.language), { weekday: "short" }),
 		[i18n.language],
 	);
 	// 2023-01-01 was a Sunday: day `d` of the week is January 1 + d.
