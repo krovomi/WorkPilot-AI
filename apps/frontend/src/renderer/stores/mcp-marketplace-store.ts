@@ -1,52 +1,61 @@
 /**
  * MCP Marketplace Store
  *
- * Zustand store for the MCP Marketplace feature.
- * Manages catalog browsing, installed servers, and builder projects.
+ * Zustand store for the MCP Marketplace feature: the catalog, what the
+ * selected project has installed, and builder projects.
+ *
+ * "Installed" is read from the project's `.workpilot/.env`: a catalog server
+ * is installed when the project has a custom MCP server with its id
+ * (`CUSTOM_MCP_SERVERS`), and the agents that use it are those whose
+ * `AGENT_MCP_<agent>_ADD` names it. Installing writes both, so agents start
+ * the server on their next session.
  */
 
 import { create } from "zustand";
+import {
+	buildCatalogServer,
+	withoutServer,
+	withServerForAgents,
+} from "../../shared/mcp-catalog/install";
 import type {
 	McpBuilderProject,
-	McpInstalledServer,
 	McpMarketplaceFilters,
 	McpMarketplaceServer,
 	McpMarketplaceTab,
 } from "../../shared/types/mcp-marketplace";
+import type {
+	AgentMcpOverrides,
+	CustomMcpServer,
+} from "../../shared/types/project";
 
 interface McpMarketplaceState {
-	// UI state
 	activeTab: McpMarketplaceTab;
 	filters: McpMarketplaceFilters;
-	selectedServerId: string | null;
 	isInstalling: string | null;
 
-	// Data
 	catalog: McpMarketplaceServer[];
-	installed: McpInstalledServer[];
+	/** Project whose servers `installed` and `agentOverrides` describe */
+	projectId: string | null;
+	/** The project's custom MCP servers */
+	installed: CustomMcpServer[];
+	agentOverrides: AgentMcpOverrides;
 	builderProjects: McpBuilderProject[];
 
-	// Loading
 	isCatalogLoading: boolean;
 	isInstalledLoading: boolean;
 	isBuilderLoading: boolean;
 	error: string | null;
 
-	// Actions - UI
 	setActiveTab: (tab: McpMarketplaceTab) => void;
 	setFilters: (filters: Partial<McpMarketplaceFilters>) => void;
-	setSelectedServer: (serverId: string | null) => void;
 
-	// Actions - Data
 	setCatalog: (catalog: McpMarketplaceServer[]) => void;
-	setInstalled: (installed: McpInstalledServer[]) => void;
-	setBuilderProjects: (projects: McpBuilderProject[]) => void;
-	addInstalledServer: (server: McpInstalledServer) => void;
-	removeInstalledServer: (serverId: string) => void;
-	updateInstalledServer: (
-		serverId: string,
-		updates: Partial<McpInstalledServer>,
+	setProjectServers: (
+		projectId: string | null,
+		installed: CustomMcpServer[],
+		agentOverrides: AgentMcpOverrides,
 	) => void;
+	setBuilderProjects: (projects: McpBuilderProject[]) => void;
 	addBuilderProject: (project: McpBuilderProject) => void;
 	updateBuilderProject: (
 		projectId: string,
@@ -54,43 +63,39 @@ interface McpMarketplaceState {
 	) => void;
 	removeBuilderProject: (projectId: string) => void;
 
-	// Actions - Loading
 	setIsInstalling: (serverId: string | null) => void;
 	setCatalogLoading: (loading: boolean) => void;
 	setInstalledLoading: (loading: boolean) => void;
 	setBuilderLoading: (loading: boolean) => void;
 	setError: (error: string | null) => void;
 
-	// Computed helpers
 	getFilteredCatalog: () => McpMarketplaceServer[];
 	isServerInstalled: (serverId: string) => boolean;
-	getInstalledServer: (serverId: string) => McpInstalledServer | undefined;
 }
 
 const defaultFilters: McpMarketplaceFilters = {
 	search: "",
 	category: "all",
-	sortBy: "popular",
+	sortBy: "featured",
 	showInstalledOnly: false,
-	showVerifiedOnly: false,
+	showOfficialOnly: false,
 };
 
 export const useMcpMarketplaceStore = create<McpMarketplaceState>(
 	(set, get) => ({
-		// Initial state
 		activeTab: "catalog",
 		filters: { ...defaultFilters },
-		selectedServerId: null,
 		isInstalling: null,
 		catalog: [],
+		projectId: null,
 		installed: [],
+		agentOverrides: {},
 		builderProjects: [],
 		isCatalogLoading: false,
 		isInstalledLoading: false,
 		isBuilderLoading: false,
 		error: null,
 
-		// UI Actions
 		setActiveTab: (tab) => set({ activeTab: tab }),
 
 		setFilters: (updates) =>
@@ -98,31 +103,12 @@ export const useMcpMarketplaceStore = create<McpMarketplaceState>(
 				filters: { ...state.filters, ...updates },
 			})),
 
-		setSelectedServer: (serverId) => set({ selectedServerId: serverId }),
-
-		// Data Actions
 		setCatalog: (catalog) => set({ catalog }),
 
-		setInstalled: (installed) => set({ installed }),
+		setProjectServers: (projectId, installed, agentOverrides) =>
+			set({ projectId, installed, agentOverrides }),
 
 		setBuilderProjects: (projects) => set({ builderProjects: projects }),
-
-		addInstalledServer: (server) =>
-			set((state) => ({
-				installed: [...state.installed, server],
-			})),
-
-		removeInstalledServer: (serverId) =>
-			set((state) => ({
-				installed: state.installed.filter((s) => s.serverId !== serverId),
-			})),
-
-		updateInstalledServer: (serverId, updates) =>
-			set((state) => ({
-				installed: state.installed.map((s) =>
-					s.serverId === serverId ? { ...s, ...updates } : s,
-				),
-			})),
 
 		addBuilderProject: (project) =>
 			set((state) => ({
@@ -143,81 +129,55 @@ export const useMcpMarketplaceStore = create<McpMarketplaceState>(
 				),
 			})),
 
-		// Loading Actions
 		setIsInstalling: (serverId) => set({ isInstalling: serverId }),
 		setCatalogLoading: (loading) => set({ isCatalogLoading: loading }),
 		setInstalledLoading: (loading) => set({ isInstalledLoading: loading }),
 		setBuilderLoading: (loading) => set({ isBuilderLoading: loading }),
 		setError: (error) => set({ error }),
 
-		// Computed helpers
 		getFilteredCatalog: () => {
 			const { catalog, installed, filters } = get();
 			let filtered = [...catalog];
 
-			// Search
 			if (filters.search) {
 				const query = filters.search.toLowerCase();
 				filtered = filtered.filter(
 					(s) =>
 						s.name.toLowerCase().includes(query) ||
-						s.tagline.toLowerCase().includes(query) ||
-						s.description.toLowerCase().includes(query) ||
+						s.tagline.en.toLowerCase().includes(query) ||
+						s.tagline.fr.toLowerCase().includes(query) ||
+						s.description.en.toLowerCase().includes(query) ||
+						s.description.fr.toLowerCase().includes(query) ||
 						s.tags.some((t) => t.toLowerCase().includes(query)),
 				);
 			}
 
-			// Category
 			if (filters.category !== "all") {
 				filtered = filtered.filter((s) => s.category === filters.category);
 			}
 
-			// Installed only
 			if (filters.showInstalledOnly) {
-				const installedIds = new Set(installed.map((i) => i.serverId));
+				const installedIds = new Set(installed.map((i) => i.id));
 				filtered = filtered.filter((s) => installedIds.has(s.id));
 			}
 
-			// Verified only
-			if (filters.showVerifiedOnly) {
-				filtered = filtered.filter((s) => s.verified);
+			if (filters.showOfficialOnly) {
+				filtered = filtered.filter((s) => s.official);
 			}
 
-			// Sort
-			switch (filters.sortBy) {
-				case "popular":
-					filtered.sort((a, b) => b.downloads - a.downloads);
-					break;
-				case "rating":
-					filtered.sort((a, b) => b.rating - a.rating);
-					break;
-				case "newest":
-					filtered.sort(
-						(a, b) =>
-							new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime(),
-					);
-					break;
-				case "name":
-					filtered.sort((a, b) => a.name.localeCompare(b.name));
-					break;
+			// "featured" keeps the catalog's own order.
+			if (filters.sortBy === "name") {
+				filtered.sort((a, b) => a.name.localeCompare(b.name));
 			}
 
 			return filtered;
 		},
 
 		isServerInstalled: (serverId) => {
-			return get().installed.some((s) => s.serverId === serverId);
-		},
-
-		getInstalledServer: (serverId) => {
-			return get().installed.find((s) => s.serverId === serverId);
+			return get().installed.some((s) => s.id === serverId);
 		},
 	}),
 );
-
-// ============================================
-// Async action helpers (called from components)
-// ============================================
 
 export async function loadMarketplaceCatalog(): Promise<void> {
 	const store = useMcpMarketplaceStore.getState();
@@ -242,86 +202,113 @@ export async function loadMarketplaceCatalog(): Promise<void> {
 	}
 }
 
-export async function loadInstalledServers(): Promise<void> {
+/** Reads the project's custom MCP servers and agent overrides. */
+export async function loadInstalledServers(
+	projectId: string | null | undefined,
+): Promise<void> {
 	const store = useMcpMarketplaceStore.getState();
+	if (!projectId) {
+		store.setProjectServers(null, [], {});
+		return;
+	}
 	store.setInstalledLoading(true);
-
 	try {
-		const result = await globalThis.electronAPI?.invoke(
-			"mcpMarketplace:getInstalled",
-		);
-		if (result?.success) {
-			store.setInstalled(result.data);
+		const result = await globalThis.electronAPI.getProjectEnv(projectId);
+		if (result?.success && result.data) {
+			store.setProjectServers(
+				projectId,
+				result.data.customMcpServers ?? [],
+				result.data.agentMcpOverrides ?? {},
+			);
+		} else {
+			store.setProjectServers(projectId, [], {});
 		}
 	} catch (err) {
-		console.error("[MCP Marketplace] Failed to load installed servers:", err);
+		console.error("[MCP Marketplace] Failed to load project servers:", err);
 	} finally {
 		store.setInstalledLoading(false);
 	}
 }
 
-export async function installMarketplaceServer(
-	serverId: string,
-	envVars: Record<string, string> = {},
+/** Writes `servers` and `overrides` to the project, then mirrors them. */
+async function saveProjectServers(
+	projectId: string,
+	servers: CustomMcpServer[],
+	overrides: AgentMcpOverrides,
 ): Promise<boolean> {
 	const store = useMcpMarketplaceStore.getState();
-	store.setIsInstalling(serverId);
+	const result = await globalThis.electronAPI.updateProjectEnv(projectId, {
+		customMcpServers: servers,
+		agentMcpOverrides: overrides,
+	});
+	if (!result?.success) {
+		store.setError(result?.error || "Failed to save the project settings");
+		return false;
+	}
+	store.setProjectServers(projectId, servers, overrides);
+	return true;
+}
 
+/**
+ * Adds catalog server `serverId` to the project and to `agents`, with the
+ * values the user typed. Fails when a required value is empty or the project
+ * already has a server with that id.
+ */
+export async function installMarketplaceServer(
+	projectId: string,
+	serverId: string,
+	values: Record<string, string>,
+	agents: readonly string[],
+	language = "en",
+): Promise<boolean> {
+	const store = useMcpMarketplaceStore.getState();
+	const entry = store.catalog.find((s) => s.id === serverId);
+	if (!entry) {
+		store.setError(`Unknown server: ${serverId}`);
+		return false;
+	}
+	const built = buildCatalogServer(entry, values, language);
+	if (!built.ok) {
+		store.setError(`Missing: ${built.missing.join(", ")}`);
+		return false;
+	}
+	store.setIsInstalling(serverId);
 	try {
-		const result = await globalThis.electronAPI?.invoke(
-			"mcpMarketplace:install",
-			{ serverId, envVars },
-		);
-		if (result?.success) {
-			store.addInstalledServer(result.data);
-			store.setIsInstalling(null);
-			return true;
-		} else {
-			store.setError(result?.error || "Installation failed");
-			store.setIsInstalling(null);
+		// Read the file again: the Agent Tools panel may have changed it.
+		await loadInstalledServers(projectId);
+		const { installed, agentOverrides } = useMcpMarketplaceStore.getState();
+		if (installed.some((s) => s.id === serverId)) {
+			store.setError(`${entry.name} is already installed in this project`);
 			return false;
 		}
+		return await saveProjectServers(
+			projectId,
+			[...installed, built.server],
+			withServerForAgents(agentOverrides, serverId, agents),
+		);
 	} catch (err) {
 		store.setError(err instanceof Error ? err.message : "Installation failed");
-		store.setIsInstalling(null);
 		return false;
+	} finally {
+		store.setIsInstalling(null);
 	}
 }
 
+/** Removes `serverId` from the project and from every agent. */
 export async function uninstallMarketplaceServer(
+	projectId: string,
 	serverId: string,
 ): Promise<boolean> {
-	const store = useMcpMarketplaceStore.getState();
-
 	try {
-		const result = await globalThis.electronAPI?.invoke(
-			"mcpMarketplace:uninstall",
-			{ serverId },
+		await loadInstalledServers(projectId);
+		const { installed, agentOverrides } = useMcpMarketplaceStore.getState();
+		return await saveProjectServers(
+			projectId,
+			installed.filter((s) => s.id !== serverId),
+			withoutServer(agentOverrides, serverId),
 		);
-		if (result?.success) {
-			store.removeInstalledServer(serverId);
-			return true;
-		}
-		return false;
 	} catch {
 		return false;
-	}
-}
-
-export async function toggleMarketplaceServer(
-	serverId: string,
-	enabled: boolean,
-): Promise<void> {
-	const store = useMcpMarketplaceStore.getState();
-
-	try {
-		await globalThis.electronAPI?.invoke("mcpMarketplace:toggleServer", {
-			serverId,
-			enabled,
-		});
-		store.updateInstalledServer(serverId, { enabled });
-	} catch (err) {
-		console.error("[MCP Marketplace] Failed to toggle server:", err);
 	}
 }
 
