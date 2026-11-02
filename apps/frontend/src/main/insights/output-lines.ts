@@ -65,5 +65,31 @@ export function chunkForLine(line: string): InsightsStreamChunk | null {
 			return null;
 		}
 	}
-	return line.trim() ? { type: "text", content: `${line}\n` } : null;
+	// A blank line is text too: it separates Markdown paragraphs and stays
+	// inside code blocks. Dropping it glued the answer's paragraphs together.
+	return { type: "text", content: `${line}\n` };
+}
+
+/**
+ * Cut a process's output into whole lines. Output arrives in chunks that end
+ * anywhere, mid-line included: `push` returns the lines a chunk completes and
+ * keeps the rest for the next one, `flush` returns what is left at the end.
+ */
+export function createLineReader(): {
+	push(text: string): string[];
+	flush(): string[];
+} {
+	let pending = "";
+	return {
+		push(text) {
+			const lines = (pending + text).split("\n");
+			pending = lines.pop() ?? "";
+			return lines.map((line) => line.replace(/\r$/, ""));
+		},
+		flush() {
+			const rest = pending;
+			pending = "";
+			return rest ? [rest.replace(/\r$/, "")] : [];
+		},
+	};
 }

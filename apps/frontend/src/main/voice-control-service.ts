@@ -4,8 +4,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { app } from "electron";
 import { MODEL_ID_MAP } from "../shared/constants";
-import type { AppSettings } from "../shared/types";
-import { readSettingsFile } from "./settings-utils";
+import { pythonRunnerEnv } from "./utils/python-runner-env";
 
 
 /**
@@ -144,7 +143,7 @@ export class VoiceControlService extends EventEmitter {
 		this.emit("status", "Starting voice recording...");
 
 		const args = this.buildCommandArgs(request, runnerPath);
-		const processEnv = this.buildProcessEnvironment();
+		const processEnv = await this.buildProcessEnvironment();
 		const proc = spawn(this.pythonPath, args, {
 			cwd: autoBuildSource,
 			env: processEnv,
@@ -181,29 +180,12 @@ export class VoiceControlService extends EventEmitter {
 	}
 
 	/**
-	 * Build process environment with OAuth tokens
+	 * The runner's environment: the provider the user chose and its key, the
+	 * Claude sign-in only when that provider needs it, and no other credential
+	 * of the app (`pythonRunnerEnv`).
 	 */
-	private buildProcessEnvironment(): Record<string, string> {
-		const processEnv: Record<string, string> = {
-			...(process.env as Record<string, string>),
-		};
-
-		try {
-			// Through settings-utils: it decrypts the stored keys.
-			const settings = readSettingsFile() as Partial<AppSettings> | undefined;
-			if (settings) {
-				if (settings.globalClaudeOAuthToken) {
-					processEnv.CLAUDE_CODE_OAUTH_TOKEN = settings.globalClaudeOAuthToken;
-				}
-				if (settings.globalAnthropicApiKey) {
-					processEnv.ANTHROPIC_API_KEY = settings.globalAnthropicApiKey;
-				}
-			}
-		} catch {
-			// Ignore settings read errors
-		}
-
-		return processEnv;
+	private buildProcessEnvironment(): Promise<Record<string, string>> {
+		return pythonRunnerEnv(this.getAutoBuildSourcePath() ?? "");
 	}
 
 	/**

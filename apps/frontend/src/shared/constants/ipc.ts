@@ -1118,6 +1118,7 @@ export const IPC_CHANNELS = {
 	ENV_SNAPSHOT_REPLAY: "envSnapshot:replay",
 	EXECUTE_NATURAL_LANGUAGE_GIT: "execute-natural-language-git",
 	FLAKY_TESTS_CANCEL: "flakyTests:cancel",
+	FLAKY_TESTS_DETECT: "flakyTests:detect",
 	FLAKY_TESTS_ERROR: "flaky-tests-error",
 	FLAKY_TESTS_EVENT: "flaky-tests-event",
 	FLAKY_TESTS_RESULT: "flaky-tests-result",
