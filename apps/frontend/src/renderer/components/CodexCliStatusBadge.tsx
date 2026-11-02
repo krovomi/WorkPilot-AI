@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+import { formatAppTime } from "@/lib/date-format";
 
 interface CodexCliStatusBadgeProps {
 	readonly className?: string;
@@ -273,7 +274,7 @@ export function CodexCliStatusBadge({
 										<span>
 											{t("navigation:codex.lastChecked", "Last checked")}:
 										</span>
-										<span>{lastChecked.toLocaleTimeString()}</span>
+										<span>{formatAppTime(lastChecked)}</span>
 									</div>
 								)}
 							</div>

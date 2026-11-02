@@ -32,6 +32,7 @@ import {
 import { Input } from "./ui/input";
 import { ScrollArea } from "./ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+import { formatAppDate } from "@/lib/date-format";
 
 interface ChatHistorySidebarProps {
 	readonly sessions: InsightsSessionSummary[];
@@ -98,7 +99,7 @@ export function ChatHistorySidebar({
 		} else if (diffDays < 7) {
 			return t("chatHistory.daysAgo", { count: diffDays });
 		} else {
-			return d.toLocaleDateString(undefined, {
+			return formatAppDate(d, {
 				month: "short",
 				day: "numeric",
 			});

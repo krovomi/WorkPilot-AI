@@ -63,6 +63,7 @@ import {
 	DialogTitle,
 } from "./ui/dialog";
 import { ScrollArea } from "./ui/scroll-area";
+import { formatAppDate } from "@/lib/date-format";
 
 // Prefix constants for worktree ID parsing
 const TASK_PREFIX = "task:";
@@ -914,7 +915,7 @@ export function Worktrees({ projectId }: WorktreesProps) {
 												{wt.createdAt && (
 													<div className="text-xs text-muted-foreground mb-4">
 														{t("dialogs:worktrees.createdOn", {
-												date: new Date(wt.createdAt).toLocaleDateString(),
+												date: formatAppDate(wt.createdAt),
 											})}
 													</div>
 												)}

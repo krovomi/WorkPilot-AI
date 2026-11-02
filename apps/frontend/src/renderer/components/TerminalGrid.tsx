@@ -56,6 +56,7 @@ import {
 	DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { TerminalGridSkeleton } from "./ui/TerminalGridSkeleton";
+import { formatAppDayLabel } from "@/lib/date-format";
 
 interface TerminalGridProps {
 	readonly projectPath?: string;
@@ -651,7 +652,7 @@ export function TerminalGrid({
 											onClick={() => handleRestoreFromDate(dateInfo.date)}
 											className="flex items-center justify-between"
 										>
-											<span>{dateInfo.label}</span>
+											<span>{formatAppDayLabel(dateInfo.date)}</span>
 											<span className="text-xs text-muted-foreground">
 												{t("common:terminalGrid.sessionCount", {
 												count: dateInfo.sessionCount,
