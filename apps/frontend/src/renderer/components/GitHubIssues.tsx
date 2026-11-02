@@ -225,7 +225,17 @@ export function GitHubIssues({
 			{/* Investigation Dialog */}
 			<InvestigationDialog
 				open={showInvestigateDialog}
-				onOpenChange={setShowInvestigateDialog}
+				onOpenChange={(open) => {
+					// Closing with X or Escape after an error or a success must
+					// reset it too, or the next investigation opens on that state.
+					if (open) setShowInvestigateDialog(true);
+					else if (
+						investigationStatus.phase === "error" ||
+						investigationStatus.phase === "complete"
+					)
+						handleCloseDialog();
+					else setShowInvestigateDialog(false);
+				}}
 				selectedIssue={selectedIssueForInvestigation}
 				investigationStatus={investigationStatus}
 				onStartInvestigation={handleStartInvestigation}
