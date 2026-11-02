@@ -440,7 +440,8 @@ environment wins:
 | --- | ---: | --- |
 | `WORKPILOT_QA_MAX_ITERATIONS` | by effort | Review passes a task may run, whatever its QA effort. Capped at 50; a value below 1 or that is not a number is ignored. |
 | `WORKPILOT_QA_RECURRING_THRESHOLD` | 8 | Occurrences of the same issue, across passes, that make QA escalate to a human. Bounded by the budget; a value below 2 or that is not a number falls back to 8. |
-| `WORKPILOT_QA_LIGHT` | 1 | `0` reviews every task in full, text-only changes included (see *Text-only changes* below). |
+| `WORKPILOT_QA_LIGHT` | 1 | `0` reviews every task in full, text-only and small code changes included (see *Text-only changes* below). |
+| `WORKPILOT_QA_TARGETED` | 1 | `0` turns the targeted QA off alone: small code changes get the full review (see *Small code changes* below). |
 | `WORKPILOT_QA_MIN_COVERAGE` | 100 | Minimum coverage, in percent, of the `unit` **and** `integration` tests; `e2e` below it only warns. `0` disables the gate. Clamped to 0–100; a value that is not a number falls back to 100. |
 
 ### Review budget
@@ -488,6 +489,23 @@ changed. JSON, YAML, TOML, XML, `.env`, project files and scripts are read by a 
 always get the full review, and so does a change set git cannot read. The decision is made
 from git and file names only, so it is the same for every provider and model. With strict TDD
 on, a subtask whose files are all text-only is not run as a red-green-refactor cycle either.
+`requirements*.txt` and `constraints*.txt` are dependency manifests, not text.
+
+### Small code changes (targeted QA)
+
+When the change set has at most 3 code files and 150 changed lines in them (text files aside),
+all Python or TypeScript/JavaScript, and each has a test by naming convention (`test_x.py`,
+`x_test.py`, `x.test.ts`, `x.spec.tsx`, `__tests__/`), the pass is a **targeted QA** (« QA
+ciblée »): the reviewer gets the spec, the diff and the test files to run
+(`prompts/qa_reviewer_targeted.md`), runs only those, with coverage of the touched files, and
+has no subagents. Its approval stands only if each mapped test is recorded as passed **and**
+named by a command the reviewer ran, and the touched files reach `WORKPILOT_QA_MIN_COVERAGE`
+([apps/backend/qa/targeted_gate.py](../apps/backend/qa/targeted_gate.py)); this replaces the
+unit + integration coverage gate for that pass. Coverage is per touched file, not per diff line.
+Any doubt gives the full review: a file without a mapped test, another language, a generated,
+deleted or renamed file, `security/`, `server/auth*`, CI files, dependency manifests, lockfiles
+and tool configuration (`conftest.py`, `*.config.*`). The task log and `qa_report.md` say
+which tier ran. Details: [architecture/qa-tiers.md](architecture/qa-tiers.md).
 
 ## Verification loop (`verify`)
 

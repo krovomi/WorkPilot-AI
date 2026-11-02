@@ -648,6 +648,16 @@ def _tests_verdict(tests_passed: Any) -> str | None:
     return "pass" if seen else None
 
 
+#: The QA tier a sign-off declares (`foundation.change_scope`), as the report
+#: shows it so a person knows how much was run.
+_SCOPE_LABELS = {
+    "text_only": "light review — QA légère (text-only change)",
+    "light": "light review — QA légère (text-only change)",
+    "targeted": "targeted QA — QA ciblée (only the tests of the touched files)",
+    "full": "full QA",
+}
+
+
 def render_qa_report(spec_dir: Path, signoff: dict[str, Any] | None) -> bool:
     """Write `qa_report.md` from the reviewer's `qa_signoff`. Never raises.
 
@@ -662,6 +672,19 @@ def render_qa_report(spec_dir: Path, signoff: dict[str, Any] | None) -> bool:
     session = signoff.get("qa_session")
     if session is not None:
         lines.append(f"Session: {session}")
+    scope = _SCOPE_LABELS.get(str(signoff.get("review_scope") or "").lower())
+    if scope:
+        lines.append(f"Scope: {scope}")
+    targeted = signoff.get("targeted_tests")
+    if isinstance(targeted, list) and targeted:
+        lines.append(
+            "Targeted tests: "
+            + " · ".join(
+                f"{t.get('file')} {'pass' if t.get('passed') is True else 'fail'}"
+                for t in targeted
+                if isinstance(t, dict) and t.get("file")
+            )
+        )
     tests = signoff.get("tests_passed")
     if isinstance(tests, dict) and tests:
         lines.append(

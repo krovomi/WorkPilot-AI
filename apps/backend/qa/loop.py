@@ -10,7 +10,7 @@ import asyncio
 import os
 import subprocess
 import time as time_module
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -293,6 +293,9 @@ class _QaState:
     # The change set the last reviewer pass judged (`foundation.change_scope`).
     # Read by the coverage gate: a text-only change has no coverage to measure.
     review_scope: ChangeScope | None = None
+    # The shell commands the last reviewer pass ran: the targeted gate's
+    # evidence that the mapped tests were run, not only declared passed.
+    review_commands: list[str] = field(default_factory=list)
 
     def reset_errors(self) -> None:
         self.consecutive_errors = 0
@@ -525,7 +528,9 @@ async def run_qa_validation_loop(
             )
             gate = await _architecture_gate(
                 scope, state.qa_iteration, qa_model
-            ) or _coverage_gate(spec_dir, state.qa_iteration, state.review_scope)
+            ) or _coverage_gate(
+                spec_dir, state.qa_iteration, state.review_scope, state.review_commands
+            )
             if gate is None and goal is not None:
                 goal_gate = _goal_gate(scope, state, goal)
                 if goal_gate is _Next.FAILED:
@@ -838,6 +843,7 @@ async def _run_reviewer(
     qa_thinking_budget = get_phase_thinking_budget(spec_dir, "qa")
     qa_provider = get_phase_provider(spec_dir, phase="qa")
     state.review_scope = review_scope = _review_scope(scope)
+    state.review_commands = []
     debug(
         "qa_loop",
         "Creating client for QA reviewer session...",
@@ -853,8 +859,9 @@ async def _run_reviewer(
             max_thinking_tokens=qa_thinking_budget,
             provider=qa_provider,
             # A text-only change has nothing for a test-runner subagent to
-            # run: its roster would be context billed on every turn.
-            use_subagents=not review_scope.is_light,
+            # run, and a targeted one names its few tests: in both the roster
+            # would be context billed on every turn.
+            use_subagents=review_scope.is_full,
         )
     except Exception as e:
         debug_error("qa_loop", f"Failed to create QA reviewer client: {e}")
@@ -882,6 +889,7 @@ async def _run_reviewer(
                 jev_advice=advice,
                 previous_error=state.last_error_context,  # Pass error context for self-correction
                 review_scope=review_scope,
+                commands_seen=state.review_commands,
             )
     except Exception as e:
         # Prompt-too-long errors are not retryable — the conversation
@@ -936,6 +944,12 @@ def _review_scope(scope: _QaScope) -> ChangeScope:
             f"QA scope: light ({review_scope.reason}: "
             f"{', '.join(review_scope.files)}) — the reviewer checks the change "
             "against the spec; no test suite, coverage or repository scan."
+        )
+    elif review_scope.is_targeted:
+        message = (
+            f"QA scope: targeted — QA ciblée ({review_scope.reason}) — the "
+            f"reviewer runs only {', '.join(review_scope.tests)}, with coverage "
+            "of the touched files; no full suite, no subagent."
         )
     else:
         message = f"QA scope: full ({review_scope.reason})."
@@ -1114,7 +1128,10 @@ async def _architecture_gate(
 
 
 def _coverage_gate(
-    spec_dir: Path, qa_iteration: int, review_scope: ChangeScope | None = None
+    spec_dir: Path,
+    qa_iteration: int,
+    review_scope: ChangeScope | None = None,
+    review_commands: list[str] | None = None,
 ) -> tuple[list[dict], str] | None:
     """Coverage Enforcement Gate, run once QA and architecture approve.
 
@@ -1130,10 +1147,15 @@ def _coverage_gate(
     suite of the repository with coverage for a `.txt`, then the fixer to
     invent placeholder test projects to produce a number. Decided from
     `review_scope` (git), never from what the reviewer wrote in its sign-off.
+
+    A targeted pass is judged by `qa.targeted_gate` instead: its mapped tests
+    ran and passed, and the touched files reach the threshold.
     """
     if review_scope is not None and not review_scope.touches_code:
         debug("qa_loop", "Coverage gate not applicable: no code in the change set")
         return None
+    if review_scope is not None and review_scope.is_targeted:
+        return _targeted_gate(spec_dir, qa_iteration, review_scope, review_commands)
     try:
         from .coverage_gate import (
             build_coverage_issues,
@@ -1192,6 +1214,35 @@ def _coverage_gate(
             f"Coverage gate error (non-blocking): {e}",
         )
     return None
+
+
+def _targeted_gate(
+    spec_dir: Path,
+    qa_iteration: int,
+    review_scope: ChangeScope,
+    review_commands: list[str] | None,
+) -> tuple[list[dict], str] | None:
+    """The targeted tier's gate. Unlike the coverage gate, an error rejects:
+    the tier never approves without having seen its tests run."""
+    try:
+        from .targeted_gate import run_targeted_gate
+
+        issues = run_targeted_gate(spec_dir, review_scope, review_commands)
+    except (ImportError, OSError, ValueError, TypeError, KeyError, AttributeError) as e:
+        # Anything else propagates: a crash is not an approval either.
+        debug_warning("qa_loop", f"Targeted QA gate error, rejecting: {e}")
+        issues = [
+            {
+                "title": "QA ciblée : vérification impossible",
+                "description": f"Le contrôle des tests ciblés a échoué : {e}",
+                "type": "targeted_qa_gap",
+                "severity": "critical",
+            }
+        ]
+    if not issues:
+        return None
+    print(f"\n🎯 Targeted QA (QA ciblée): {len(issues)} requirement(s) not met")
+    return issues, f"QA pass #{qa_iteration} rejected by the targeted QA gate"
 
 
 def _goal_still_met(
