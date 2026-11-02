@@ -23,7 +23,7 @@ const PRIORITY_COLORS: Record<SuggestionPriority, string> = {
 	high: "text-orange-400 bg-orange-500/10 border-orange-500/20",
 	medium: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
 	low: "text-blue-400 bg-blue-500/10 border-blue-500/20",
-	info: "text-[var(--text-secondary)] bg-[var(--bg-secondary)] border-[var(--border-color)]",
+	info: "text-muted-foreground bg-card border-border",
 };
 
 /** The companion watches files in the main process and pushes nothing to the
@@ -71,13 +71,13 @@ export function LiveCompanionDashboard(): React.ReactElement {
 	}
 
 	return (
-		<div className="flex flex-col h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
+		<div className="flex flex-col h-full bg-background text-foreground">
 			{/* Header */}
-			<div className="px-6 py-4 border-b border-[var(--border-color)]">
+			<div className="px-6 py-4 border-b border-border">
 				<div className="flex items-center justify-between gap-6">
 					<div>
 						<h1 className="text-xl font-semibold">{t("liveCompanion:title")}</h1>
-						<p className="text-sm text-[var(--text-secondary)] mt-0.5 max-w-3xl">
+						<p className="text-sm text-muted-foreground mt-0.5 max-w-3xl">
 							{t("liveCompanion:description")}
 						</p>
 					</div>
@@ -86,7 +86,7 @@ export function LiveCompanionDashboard(): React.ReactElement {
 							className={`text-xs px-2 py-1 rounded border font-medium ${
 								companionState.active
 									? "text-green-400 bg-green-500/10 border-green-500/20"
-									: "text-[var(--text-secondary)] bg-[var(--bg-secondary)] border-[var(--border-color)]"
+									: "text-muted-foreground bg-card border-border"
 							}`}
 						>
 							{companionState.active
@@ -110,7 +110,7 @@ export function LiveCompanionDashboard(): React.ReactElement {
 					</div>
 				</div>
 				{!projectPath && !companionState.active && (
-					<p className="text-xs text-[var(--text-secondary)] mt-2">
+					<p className="text-xs text-muted-foreground mt-2">
 						{t("liveCompanion:errors.noProject")}
 					</p>
 				)}
@@ -118,9 +118,9 @@ export function LiveCompanionDashboard(): React.ReactElement {
 
 			<div className="flex flex-1 overflow-hidden">
 				{/* Left: session, options, recent changes */}
-				<div className="w-64 border-r border-[var(--border-color)] p-4 flex flex-col gap-5 overflow-auto">
+				<div className="w-64 border-r border-border p-4 flex flex-col gap-5 overflow-auto">
 					{companionState.active && companionState.watching_project && (
-						<div className="text-xs text-[var(--text-secondary)]">
+						<div className="text-xs text-muted-foreground">
 							{t("liveCompanion:state.watching", {
 								project: companionState.watching_project,
 							})}
@@ -128,31 +128,31 @@ export function LiveCompanionDashboard(): React.ReactElement {
 					)}
 
 					<div className="flex flex-col gap-2">
-						<div className="bg-[var(--bg-secondary)] rounded-lg p-2.5">
+						<div className="bg-card rounded-lg p-2.5">
 							<div className="text-lg font-bold">
 								{companionState.changes_detected}
 							</div>
-							<div className="text-xs text-[var(--text-secondary)]">
+							<div className="text-xs text-muted-foreground">
 								{t("liveCompanion:state.changesDetected", {
 									count: companionState.changes_detected,
 								})}
 							</div>
 						</div>
-						<div className="bg-[var(--bg-secondary)] rounded-lg p-2.5">
+						<div className="bg-card rounded-lg p-2.5">
 							<div className="text-lg font-bold">
 								{companionState.suggestions_generated}
 							</div>
-							<div className="text-xs text-[var(--text-secondary)]">
+							<div className="text-xs text-muted-foreground">
 								{t("liveCompanion:state.suggestionsGenerated", {
 									count: companionState.suggestions_generated,
 								})}
 							</div>
 						</div>
-						<div className="bg-[var(--bg-secondary)] rounded-lg p-2.5">
+						<div className="bg-card rounded-lg p-2.5">
 							<div className="text-lg font-bold">
 								{companionState.takeovers_proposed}
 							</div>
-							<div className="text-xs text-[var(--text-secondary)]">
+							<div className="text-xs text-muted-foreground">
 								{t("liveCompanion:state.takeoversPending", {
 									count: companionState.takeovers_proposed,
 								})}
@@ -162,7 +162,7 @@ export function LiveCompanionDashboard(): React.ReactElement {
 
 					{config && (
 						<div>
-							<h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
+							<h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
 								{t("liveCompanion:config.title")}
 							</h3>
 							<label className="flex items-center gap-2 cursor-pointer mb-2">
@@ -198,7 +198,7 @@ export function LiveCompanionDashboard(): React.ReactElement {
 
 					{recentChanges.length > 0 && (
 						<div>
-							<h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
+							<h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
 								{t("liveCompanion:fileChange.title")}
 							</h3>
 							<div className="flex flex-col gap-1">
@@ -208,7 +208,7 @@ export function LiveCompanionDashboard(): React.ReactElement {
 										className="text-xs"
 									>
 										<div className="font-mono truncate">{change.file_path}</div>
-										<div className="text-[var(--text-secondary)]">
+										<div className="text-muted-foreground">
 											{t(`liveCompanion:fileChange.${change.change_type}`)}
 										</div>
 									</div>
@@ -237,10 +237,10 @@ export function LiveCompanionDashboard(): React.ReactElement {
 										<div className="text-xs font-mono opacity-70 mb-1">
 											{proposal.file_path}
 										</div>
-										<div className="text-xs text-[var(--text-secondary)] mb-1">
+										<div className="text-xs text-muted-foreground mb-1">
 											{t("liveCompanion:takeover.reason")}: {proposal.reason}
 										</div>
-										<div className="text-xs text-[var(--text-secondary)] mb-2">
+										<div className="text-xs text-muted-foreground mb-2">
 											{proposal.description}
 										</div>
 										{proposal.ai_plan && (
@@ -248,7 +248,7 @@ export function LiveCompanionDashboard(): React.ReactElement {
 												<summary className="text-xs text-[var(--accent)] cursor-pointer">
 													{t("liveCompanion:actions.viewDetails")}
 												</summary>
-												<pre className="mt-1 text-xs font-mono whitespace-pre-wrap bg-[var(--bg-secondary)] rounded p-2">
+												<pre className="mt-1 text-xs font-mono whitespace-pre-wrap bg-card rounded p-2">
 													{proposal.ai_plan}
 												</pre>
 											</details>
@@ -264,7 +264,7 @@ export function LiveCompanionDashboard(): React.ReactElement {
 											<button
 												type="button"
 												onClick={() => declineTakeover(proposal.proposal_id)}
-												className="px-3 py-1.5 rounded-lg bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] transition-colors text-xs"
+												className="px-3 py-1.5 rounded-lg bg-card hover:bg-accent transition-colors text-xs"
 											>
 												{t("liveCompanion:takeover.decline")}
 											</button>
@@ -281,7 +281,7 @@ export function LiveCompanionDashboard(): React.ReactElement {
 						</h2>
 						{suggestions.length === 0 ? (
 							<div className="flex-1 flex items-center justify-center text-center py-12">
-								<p className="text-sm text-[var(--text-secondary)] max-w-sm">
+								<p className="text-sm text-muted-foreground max-w-sm">
 									{t("liveCompanion:suggestions.empty")}
 								</p>
 							</div>
@@ -332,7 +332,7 @@ export function LiveCompanionDashboard(): React.ReactElement {
 												<summary className="text-xs cursor-pointer underline">
 													{t("liveCompanion:suggestions.codeFix")}
 												</summary>
-												<pre className="mt-1 text-xs font-mono whitespace-pre-wrap bg-[var(--bg-primary)] rounded p-2">
+												<pre className="mt-1 text-xs font-mono whitespace-pre-wrap bg-background rounded p-2">
 													{suggestion.code_fix}
 												</pre>
 											</details>
@@ -350,7 +350,7 @@ export function LiveCompanionDashboard(): React.ReactElement {
 												onClick={() =>
 													dismissSuggestion(suggestion.suggestion_id)
 												}
-												className="px-3 py-1.5 rounded-lg bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] transition-colors text-xs"
+												className="px-3 py-1.5 rounded-lg bg-card hover:bg-accent transition-colors text-xs"
 											>
 												{t("liveCompanion:actions.dismiss")}
 											</button>
