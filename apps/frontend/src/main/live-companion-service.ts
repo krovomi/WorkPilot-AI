@@ -4,7 +4,6 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { app } from "electron";
-import type { AppSettings } from "../shared/types";
 import type {
 	CompanionConfig,
 	CompanionState,
@@ -12,7 +11,7 @@ import type {
 	LiveSuggestion,
 	TakeoverProposal,
 } from "../shared/types/live-companion";
-import { readSettingsFile } from "./settings-utils";
+import { pythonRunnerEnv } from "./utils/python-runner-env";
 
 
 const CONFIG_DIR = path.join(os.homedir(), ".workpilot", "live_companion");
@@ -428,7 +427,7 @@ export class LiveCompanionService extends EventEmitter {
 			tmpFile,
 		];
 
-		const processEnv = this.buildProcessEnvironment();
+		const processEnv = await this.buildProcessEnvironment();
 
 		const proc = spawn(this.pythonPath, args, {
 			cwd: autoBuildSource,
@@ -607,31 +606,13 @@ export class LiveCompanionService extends EventEmitter {
 		return null;
 	}
 
-	private buildProcessEnvironment(): Record<string, string> {
-		const processEnv: Record<string, string> = {
-			...(process.env as Record<string, string>),
-		};
-
-		try {
-			// Through settings-utils: it decrypts the stored keys.
-			const settings = readSettingsFile() as Partial<AppSettings> | undefined;
-			if (settings) {
-				if (settings.globalClaudeOAuthToken)
-					processEnv.CLAUDE_OAUTH_TOKEN = settings.globalClaudeOAuthToken;
-				if (settings.globalAnthropicApiKey)
-					processEnv.ANTHROPIC_API_KEY = settings.globalAnthropicApiKey;
-				if (settings.globalOpenAIApiKey)
-					processEnv.OPENAI_API_KEY = settings.globalOpenAIApiKey;
-				if (settings.globalGoogleApiKey)
-					processEnv.GOOGLE_API_KEY = settings.globalGoogleApiKey;
-				if (settings.globalOpenRouterApiKey)
-					processEnv.OPENROUTER_API_KEY = settings.globalOpenRouterApiKey;
-			}
-		} catch {
-			/* ignore */
-		}
-
-		return processEnv;
+	/**
+	 * The runner's environment: the provider the user chose and its key, the
+	 * Claude sign-in only when that provider needs it, and no other credential
+	 * of the app (`pythonRunnerEnv`).
+	 */
+	private buildProcessEnvironment(): Promise<Record<string, string>> {
+		return pythonRunnerEnv(this.getAutoBuildSourcePath() ?? "");
 	}
 
 	private detectLanguage(filePath: string): string {

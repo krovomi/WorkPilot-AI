@@ -8,8 +8,7 @@ import type {
 	SandboxType,
 } from "../renderer/stores/code-playground-store";
 import { MODEL_ID_MAP } from "../shared/constants";
-import type { AppSettings } from "../shared/types";
-import { readSettingsFile } from "./settings-utils";
+import { pythonRunnerEnv } from "./utils/python-runner-env";
 
 /**
  * Result of code playground generation
@@ -158,26 +157,7 @@ export class CodePlaygroundService extends EventEmitter {
 			args.push("--thinking-level", request.thinkingLevel);
 		}
 
-		// Build process environment
-		const processEnv: Record<string, string> = {
-			...(process.env as Record<string, string>),
-		};
-
-		// Read OAuth token from settings if available
-		try {
-			// Through settings-utils: it decrypts the stored keys.
-			const settings = readSettingsFile() as Partial<AppSettings> | undefined;
-			if (settings) {
-				if (settings.globalClaudeOAuthToken) {
-					processEnv.CLAUDE_OAUTH_TOKEN = settings.globalClaudeOAuthToken;
-				}
-				if (settings.globalAnthropicApiKey) {
-					processEnv.ANTHROPIC_API_KEY = settings.globalAnthropicApiKey;
-				}
-			}
-		} catch {
-			// Ignore settings read errors
-		}
+		const processEnv = await pythonRunnerEnv(autoBuildSource);
 
 		// Spawn Python process
 		const proc = spawn(this.pythonPath, args, {
