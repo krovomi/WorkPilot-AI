@@ -1,11 +1,12 @@
 /**
  * Toaster Component
  *
- * Renders the toast viewport where toasts are displayed.
- * Should be included once in the app root.
+ * Renders the toast viewport where toasts are displayed, and the host of
+ * `confirmAction()` dialogs. Should be included once in the app root.
  */
 
 import { useToast } from "../../hooks/use-toast";
+import { ConfirmDialogHost } from "./confirm-dialog";
 import {
 	Toast,
 	ToastClose,
@@ -49,6 +50,7 @@ export function Toaster() {
 				</Toast>
 			))}
 			<ToastViewport />
+			<ConfirmDialogHost />
 		</ToastProvider>
 	);
 }
