@@ -47,15 +47,15 @@ export function PerformanceProfilerDashboard(): React.ReactElement {
 		0;
 
 	return (
-		<div className="flex flex-col h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
+		<div className="flex flex-col h-full bg-background text-foreground">
 			{/* Header */}
-			<div className="px-6 py-4 border-b border-[var(--border-color)]">
+			<div className="px-6 py-4 border-b border-border">
 				<div className="flex items-center justify-between">
 					<div>
 						<h1 className="text-xl font-semibold">
 							{t("performanceProfiler:title")}
 						</h1>
-						<p className="text-sm text-[var(--text-secondary)] mt-0.5">
+						<p className="text-sm text-muted-foreground mt-0.5">
 							{t("performanceProfiler:subtitle")}
 						</p>
 					</div>
@@ -86,10 +86,10 @@ export function PerformanceProfilerDashboard(): React.ReactElement {
 
 			<div className="flex flex-1 overflow-hidden">
 				{/* Left sidebar */}
-				<div className="w-56 border-r border-[var(--border-color)] p-4 flex flex-col gap-4">
+				<div className="w-56 border-r border-border p-4 flex flex-col gap-4">
 					{/* Options */}
 					<div>
-						<h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-3">
+						<h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
 							{t("performanceProfiler:options.heading")}
 						</h3>
 						<label className="flex items-center gap-2 cursor-pointer">
@@ -104,7 +104,7 @@ export function PerformanceProfilerDashboard(): React.ReactElement {
 								<div className="text-sm font-medium">
 									{t("performanceProfiler:options.autoImplement")}
 								</div>
-								<div className="text-xs text-[var(--text-secondary)]">
+								<div className="text-xs text-muted-foreground">
 									{t("performanceProfiler:options.autoImplementHint")}
 								</div>
 							</div>
@@ -114,15 +114,15 @@ export function PerformanceProfilerDashboard(): React.ReactElement {
 					{/* Summary stats */}
 					{isComplete && result?.report?.summary && (
 						<div>
-							<h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
+							<h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
 								{t("performanceProfiler:summary.heading")}
 							</h3>
 							<div className="flex flex-col gap-2">
-								<div className="bg-[var(--bg-secondary)] rounded-lg p-2.5">
+								<div className="bg-card rounded-lg p-2.5">
 									<div className="text-lg font-bold">
 										{result.report.summary.total_bottlenecks}
 									</div>
-									<div className="text-xs text-[var(--text-secondary)]">
+									<div className="text-xs text-muted-foreground">
 										{t("performanceProfiler:summary.bottlenecks")}
 									</div>
 								</div>
@@ -146,11 +146,11 @@ export function PerformanceProfilerDashboard(): React.ReactElement {
 										</div>
 									</div>
 								)}
-								<div className="bg-[var(--bg-secondary)] rounded-lg p-2.5">
+								<div className="bg-card rounded-lg p-2.5">
 									<div className="text-lg font-bold">
 										{result.report.summary.total_suggestions}
 									</div>
-									<div className="text-xs text-[var(--text-secondary)]">
+									<div className="text-xs text-muted-foreground">
 										{t("performanceProfiler:summary.optimizations")}
 									</div>
 								</div>
@@ -161,7 +161,7 @@ export function PerformanceProfilerDashboard(): React.ReactElement {
 					{/* Phase indicator */}
 					{phase !== "idle" && (
 						<div className="mt-auto">
-							<div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+							<div className="flex items-center gap-2 text-sm text-muted-foreground">
 								{isRunning && (
 									// biome-ignore lint/a11y/noSvgWithoutTitle: SVG is decorative
 									<svg
@@ -187,7 +187,7 @@ export function PerformanceProfilerDashboard(): React.ReactElement {
 								<span className="text-xs">{phaseLabel(phase)}</span>
 							</div>
 							{status && status !== phaseLabel(phase) && (
-								<div className="text-xs text-[var(--text-secondary)] mt-1 ml-5">
+								<div className="text-xs text-muted-foreground mt-1 ml-5">
 									{status}
 								</div>
 							)}
@@ -225,9 +225,9 @@ export function PerformanceProfilerDashboard(): React.ReactElement {
 											<div
 												// biome-ignore lint/suspicious/noArrayIndexKey: list is static and never reordered
 												key={i}
-												className="bg-[var(--bg-secondary)] rounded-lg p-3"
+												className="bg-card rounded-lg p-3"
 											>
-												<div className="text-xs text-[var(--text-secondary)] mb-1">
+												<div className="text-xs text-muted-foreground mb-1">
 													{b.name}
 												</div>
 												<div className="text-sm font-mono">
@@ -254,7 +254,7 @@ export function PerformanceProfilerDashboard(): React.ReactElement {
 											<div
 												// biome-ignore lint/suspicious/noArrayIndexKey: no stable key available
 												key={i}
-												className={`rounded-lg p-3 border ${SEVERITY_COLORS[b.severity] ?? "border-[var(--border-color)]"}`}
+												className={`rounded-lg p-3 border ${SEVERITY_COLORS[b.severity] ?? "border-border"}`}
 											>
 												<div className="flex items-start justify-between gap-2 mb-1">
 													<div className="font-medium text-sm">
@@ -280,7 +280,7 @@ export function PerformanceProfilerDashboard(): React.ReactElement {
 									</div>
 								</div>
 							) : (
-								<div className="text-sm text-[var(--text-secondary)] text-center py-8">
+								<div className="text-sm text-muted-foreground text-center py-8">
 									{t("performanceProfiler:results.noBottlenecks")}
 								</div>
 							)}
@@ -298,15 +298,15 @@ export function PerformanceProfilerDashboard(): React.ReactElement {
 											<div
 												// biome-ignore lint/suspicious/noArrayIndexKey: list is static and never reordered
 												key={i}
-												className="bg-[var(--bg-secondary)] rounded-lg p-3"
+												className="bg-card rounded-lg p-3"
 											>
 												<div className="flex items-start justify-between gap-2 mb-1">
 													<div className="font-medium text-sm">{s.title}</div>
-													<span className="text-xs text-[var(--text-secondary)] shrink-0">
+													<span className="text-xs text-muted-foreground shrink-0">
 														{t(`performanceProfiler:effort.${s.effort}`, s.effort)}
 													</span>
 												</div>
-												<div className="text-xs text-[var(--text-secondary)] mb-2">
+												<div className="text-xs text-muted-foreground mb-2">
 													{s.description}
 												</div>
 												{s.estimated_improvement && (
@@ -319,7 +319,7 @@ export function PerformanceProfilerDashboard(): React.ReactElement {
 														<summary className="text-xs text-[var(--accent)] cursor-pointer">
 															{t("performanceProfiler:results.viewImplementation")}
 														</summary>
-														<pre className="mt-1 text-xs font-mono text-[var(--text-secondary)] whitespace-pre-wrap overflow-x-auto bg-[var(--bg-primary)] rounded p-2">
+														<pre className="mt-1 text-xs font-mono text-muted-foreground whitespace-pre-wrap overflow-x-auto bg-background rounded p-2">
 															{s.implementation}
 														</pre>
 													</details>
@@ -335,7 +335,7 @@ export function PerformanceProfilerDashboard(): React.ReactElement {
 					{/* Streaming output */}
 					{(isRunning || (!isComplete && streamingOutput)) && (
 						<div className="flex-1 overflow-auto p-4">
-							<pre className="text-xs font-mono text-[var(--text-secondary)] whitespace-pre-wrap">
+							<pre className="text-xs font-mono text-muted-foreground whitespace-pre-wrap">
 								{streamingOutput}
 							</pre>
 						</div>
@@ -349,7 +349,7 @@ export function PerformanceProfilerDashboard(): React.ReactElement {
 								<h3 className="text-lg font-medium mb-2">
 									{t("performanceProfiler:empty.title")}
 								</h3>
-								<p className="text-sm text-[var(--text-secondary)] max-w-sm">
+								<p className="text-sm text-muted-foreground max-w-sm">
 									{t("performanceProfiler:empty.body")}
 								</p>
 							</div>

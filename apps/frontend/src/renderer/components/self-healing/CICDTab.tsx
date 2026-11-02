@@ -27,12 +27,12 @@ export function CICDTab({ projectPath }: CICDTabProps) {
 	return (
 		<div className="space-y-4">
 			{/* Config panel */}
-			<div className="rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-4">
-				<h3 className="text-sm font-medium text-[var(--text-primary)] mb-3">
+			<div className="rounded-lg border border-border bg-card p-4">
+				<h3 className="text-sm font-medium text-foreground mb-3">
 					{t("selfHealing:cicdConfig")}
 				</h3>
 				<div className="grid grid-cols-2 gap-4">
-					<label className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+					<label className="flex items-center gap-2 text-sm text-muted-foreground">
 						<input
 							type="checkbox"
 							checked={cicdConfig.enabled}
@@ -43,7 +43,7 @@ export function CICDTab({ projectPath }: CICDTabProps) {
 						/>
 						{t("selfHealing:cicdEnabled")}
 					</label>
-					<label className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+					<label className="flex items-center gap-2 text-sm text-muted-foreground">
 						<input
 							type="checkbox"
 							checked={cicdConfig.autoFixEnabled}
@@ -54,7 +54,7 @@ export function CICDTab({ projectPath }: CICDTabProps) {
 						/>
 						{t("selfHealing:autoFix")}
 					</label>
-					<label className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+					<label className="flex items-center gap-2 text-sm text-muted-foreground">
 						<input
 							type="checkbox"
 							checked={cicdConfig.autoCreatePR}
@@ -71,7 +71,7 @@ export function CICDTab({ projectPath }: CICDTabProps) {
 			{/* Active operations */}
 			{cicdOperations.length > 0 && (
 				<div>
-					<h3 className="text-sm font-medium text-[var(--text-primary)] mb-2">
+					<h3 className="text-sm font-medium text-foreground mb-2">
 						{t("selfHealing:activeOperations")}
 					</h3>
 					<div className="space-y-2">
@@ -84,15 +84,15 @@ export function CICDTab({ projectPath }: CICDTabProps) {
 
 			{/* Incident list */}
 			<div>
-				<h3 className="text-sm font-medium text-[var(--text-primary)] mb-2">
+				<h3 className="text-sm font-medium text-foreground mb-2">
 					{t("selfHealing:incidents")} ({cicdIncidents.length})
 				</h3>
 				{cicdIncidents.length === 0 ? (
-					<div className="rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-6 text-center">
-						<p className="text-sm text-[var(--text-secondary)]">
+					<div className="rounded-lg border border-border bg-card p-6 text-center">
+						<p className="text-sm text-muted-foreground">
 							{t("selfHealing:noIncidents")}
 						</p>
-						<p className="text-xs text-[var(--text-tertiary)] mt-1">
+						<p className="text-xs text-muted-foreground mt-1">
 							{t("selfHealing:cicdDescription")}
 						</p>
 					</div>
