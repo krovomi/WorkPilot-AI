@@ -2826,5 +2826,35 @@
 		"empty": "Aucun ticket trouvé",
 		"deselectAll": "Tout désélectionner",
 		"selectAll": "Tout sélectionner"
+	},
+	"boardMcp": {
+		"navLabel": "Utiliser depuis d'autres apps",
+		"title": "Utiliser ce projet depuis d'autres apps d'IA",
+		"description": "Claude Code, Codex, Gemini CLI, GitHub Copilot, Cursor, Claude Desktop, Windsurf ou OpenCode peuvent lire le tableau de ce projet et y ajouter des cartes, grâce au serveur MCP workpilot-board.",
+		"intro": "Chaque app démarre le serveur elle-même, sur cet ordinateur, sous le nom {{name}}. Ajoute-le à une app en un clic, ou copie ce qu'il faut coller quand l'app ne peut pas être modifiée d'ici.",
+		"limits": "Le serveur liste et lit les cartes, ajoute une carte au backlog et attend qu'une carte soit prête pour ta revue. Lancer un build, approuver un plan et fusionner restent à toi, sur la carte.",
+		"loading": "Recherche de tes apps d'IA…",
+		"add": "Ajouter",
+		"update": "Mettre à jour",
+		"remove": "Retirer",
+		"copy": "Copier la configuration",
+		"showSnippet": "Voir ce qu'il faut coller",
+		"hideSnippet": "Masquer",
+		"location": "Configuration : {{location}}",
+		"restartHint": "Redémarre l'app (ou ouvre une nouvelle session) pour qu'elle voie le serveur.",
+		"state": {
+			"current": "Ajouté",
+			"stale": "À mettre à jour",
+			"absent": "Pas ajouté",
+			"notDetected": "Non détectée"
+		},
+		"errors": {
+			"server_project": "Un projet du serveur se partage par le serveur d'équipe : son accès MCP viendra avec les jetons d'accès du serveur.",
+			"python_not_ready": "L'environnement Python de l'app n'est pas encore prêt. Réessaie dans un instant.",
+			"config_unreadable": "Le fichier de configuration de cette app n'a pas pu être lu (JSON invalide ou commentaires). Rien n'a été modifié : colle la configuration à la main.",
+			"client_not_found": "Cette app n'a pas été trouvée sur cet ordinateur. Copie la configuration à la place.",
+			"claude_not_found": "La commande claude n'a pas pu être lancée d'ici. Colle la commande dans un terminal à la place.",
+			"generic": "Impossible : {{detail}}"
+		}
 	}
 }
