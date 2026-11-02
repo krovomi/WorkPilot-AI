@@ -16,11 +16,28 @@ MAIN_SRC = ROOT / "apps" / "frontend" / "src" / "main"
 BUNDLE_DIR = ROOT / "apps" / "frontend" / "out" / "main"
 
 # path.join(import.meta.dirname, "..", "backend", ...) / join(...) / resolve(...)
+# The arguments are captured as one span without parentheses and split
+# afterwards: a pattern repeating "optional spaces, literal, optional comma"
+# backtracks exponentially (CodeQL py/redos).
 CALL = re.compile(
-    r"(?:path\.)?(?:join|resolve)\(\s*import\.meta\.dirname\s*,((?:\s*\"[^\"]*\"\s*,?)+)\s*\)",
+    r"(?:path\.)?(?:join|resolve)\(\s*import\.meta\.dirname\s*,([^()]*)\)",
     re.MULTILINE,
 )
-LITERAL = re.compile(r"\"([^\"]*)\"")
+LITERAL = re.compile(r'"([^"]*)"')
+
+
+def _literal_parts(args: str) -> list[str] | None:
+    """The string literals of an argument list, or None if any is not one."""
+    parts = []
+    for raw in args.split(","):
+        item = raw.strip()
+        if not item:
+            continue
+        match = LITERAL.fullmatch(item)
+        if match is None:
+            return None
+        parts.append(match.group(1))
+    return parts
 
 
 def _backend_paths():
@@ -29,8 +46,8 @@ def _backend_paths():
             continue
         text = file.read_text(encoding="utf-8")
         for match in CALL.finditer(text):
-            parts = LITERAL.findall(match.group(1))
-            if "backend" not in parts:
+            parts = _literal_parts(match.group(1))
+            if not parts or "backend" not in parts:
                 continue
             line = text.count("\n", 0, match.start()) + 1
             yield file.relative_to(ROOT), line, parts
