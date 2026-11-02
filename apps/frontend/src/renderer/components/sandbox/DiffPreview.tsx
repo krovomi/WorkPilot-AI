@@ -114,7 +114,7 @@ export function DiffPreview({
 											} else if (line.startsWith("-")) {
 												lineClass = "bg-red-500/10 text-red-300";
 											} else {
-												lineClass = "text-[var(--text-secondary)]";
+												lineClass = "text-muted-foreground";
 											}
 											return (
 												<div
