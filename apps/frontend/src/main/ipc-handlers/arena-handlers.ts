@@ -662,6 +662,17 @@ export function registerArenaHandlers(
 			const battleIdx = battles.findIndex((b) => b.id === vote.battleId);
 
 			if (battleIdx !== -1) {
+				// A failed contestant has no answer: a vote for it would rank an
+				// error message, so the record refuses it like the UI does.
+				const winner = battles[battleIdx].participants.find(
+					(p) => p.label === vote.winnerLabel,
+				);
+				if (winner?.status === "error") {
+					return {
+						success: false,
+						error: "A model that failed cannot win a battle",
+					};
+				}
 				battles[battleIdx] = {
 					...battles[battleIdx],
 					status: "completed",
