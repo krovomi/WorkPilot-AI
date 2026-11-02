@@ -5,7 +5,11 @@
 
 import { createIpcListener, invokeIpc } from "./ipc-utils";
 import { IPC_CHANNELS } from "../../../shared/constants/ipc";
-import type { IPCResult } from "../../../shared/types";
+import type {
+	IPCResult,
+	ServerAccessToken,
+	ServerAccessTokenCreated,
+} from "../../../shared/types";
 import type { ColorTheme } from "../../../shared/types/settings";
 import type {
 	NeedsYouChannelKind,
@@ -109,6 +113,13 @@ export interface ServerAuthAPI {
 	revokeInvite: (
 		invitationId: string,
 	) => Promise<DataResult<{ revoked: boolean }>>;
+	listAccessTokens: () => Promise<IPCResult<ServerAccessToken[]>>;
+	createAccessToken: (
+		name: string,
+		scope: "read" | "write",
+		ttlDays: number,
+	) => Promise<IPCResult<ServerAccessTokenCreated>>;
+	revokeAccessToken: (id: string) => Promise<IPCResult>;
 	listSecrets: () => Promise<IPCResult<ServerSecretKind[]>>;
 	setSecret: (kind: ServerSecretKind, value: string) => Promise<IPCResult>;
 	deleteSecret: (kind: ServerSecretKind) => Promise<IPCResult>;
@@ -177,6 +188,17 @@ export const createServerAuthAPI = (): ServerAuthAPI => ({
 			IPC_CHANNELS.SERVER_AUTH_REVOKE_INVITE,
 			invitationId,
 		),
+	listAccessTokens: () =>
+		invokeIpc<IPCResult<ServerAccessToken[]>>(IPC_CHANNELS.SERVER_AUTH_LIST_ACCESS_TOKENS),
+	createAccessToken: (name, scope, ttlDays) =>
+		invokeIpc<IPCResult<ServerAccessTokenCreated>>(
+			IPC_CHANNELS.SERVER_AUTH_CREATE_ACCESS_TOKEN,
+			name,
+			scope,
+			ttlDays,
+		),
+	revokeAccessToken: (id) =>
+		invokeIpc<IPCResult>(IPC_CHANNELS.SERVER_AUTH_REVOKE_ACCESS_TOKEN, id),
 	listSecrets: () =>
 		invokeIpc<IPCResult<ServerSecretKind[]>>(IPC_CHANNELS.SERVER_AUTH_LIST_SECRETS),
 	setSecret: (kind, value) =>
