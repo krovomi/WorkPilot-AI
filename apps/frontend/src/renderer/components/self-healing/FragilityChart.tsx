@@ -29,8 +29,8 @@ export function FragilityChart({
 
 	if (displayReports.length === 0) {
 		return (
-			<div className="rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-6 text-center">
-				<p className="text-sm text-[var(--text-secondary)]">
+			<div className="rounded-lg border border-border bg-card p-6 text-center">
+				<p className="text-sm text-muted-foreground">
 					{t("selfHealing:noFragilityData")}
 				</p>
 			</div>
@@ -38,8 +38,8 @@ export function FragilityChart({
 	}
 
 	return (
-		<div className="rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-4">
-			<h4 className="text-sm font-medium text-[var(--text-primary)] mb-3">
+		<div className="rounded-lg border border-border bg-card p-4">
+			<h4 className="text-sm font-medium text-foreground mb-3">
 				{t("selfHealing:fragilityRiskMap")}
 			</h4>
 			<div className="space-y-2">
@@ -55,28 +55,28 @@ export function FragilityChart({
 						>
 							<div className="flex items-center justify-between mb-1">
 								<div className="flex-1 min-w-0 mr-2">
-									<span className="text-xs font-mono text-[var(--text-primary)] truncate block">
+									<span className="text-xs font-mono text-foreground truncate block">
 										{fileName}
 									</span>
 									{dirPath && (
-										<span className="text-xs font-mono text-[var(--text-tertiary)] truncate block">
+										<span className="text-xs font-mono text-muted-foreground truncate block">
 											{dirPath}/
 										</span>
 									)}
 								</div>
-								<span className="text-xs font-semibold text-[var(--text-primary)] whitespace-nowrap">
+								<span className="text-xs font-semibold text-foreground whitespace-nowrap">
 									{report.risk_score.toFixed(0)}%
 								</span>
 							</div>
 							{/* Risk bar */}
-							<div className="w-full bg-[var(--bg-tertiary)] rounded-full h-1.5">
+							<div className="w-full bg-muted rounded-full h-1.5">
 								<div
 									className={`h-1.5 rounded-full transition-all ${getRiskColor(report.risk_score)}`}
 									style={{ width: `${Math.min(report.risk_score, 100)}%` }}
 								/>
 							</div>
 							{/* Metrics */}
-							<div className="flex gap-3 mt-1 text-xs text-[var(--text-tertiary)]">
+							<div className="flex gap-3 mt-1 text-xs text-muted-foreground">
 								<span>
 									{t("selfHealing:complexity")}:{" "}
 									{report.cyclomatic_complexity.toFixed(0)}

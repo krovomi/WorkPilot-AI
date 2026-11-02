@@ -16,7 +16,7 @@ const PROVIDERS: Exclude<CICDProvider, "">[] = [
 ];
 
 const STATUS_COLORS: Record<PipelineRunStatus, string> = {
-	pending: "text-[var(--text-secondary)] bg-[var(--bg-secondary)]",
+	pending: "text-muted-foreground bg-card",
 	triggered: "text-blue-400 bg-blue-500/10 border-blue-500/20",
 	running: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
 	success: "text-green-400 bg-green-500/10 border-green-500/20",
@@ -62,13 +62,13 @@ export function CICDTriggersDashboard(): React.ReactElement {
 	}
 
 	return (
-		<div className="flex flex-col h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
+		<div className="flex flex-col h-full bg-background text-foreground">
 			{/* Header */}
-			<div className="px-6 py-4 border-b border-[var(--border-color)]">
+			<div className="px-6 py-4 border-b border-border">
 				<div className="flex items-center justify-between">
 					<div>
 						<h1 className="text-xl font-semibold">{t("cicdTriggers:title")}</h1>
-						<p className="text-sm text-[var(--text-secondary)] mt-0.5">
+						<p className="text-sm text-muted-foreground mt-0.5">
 							{t("cicdTriggers:subtitle")}
 						</p>
 					</div>
@@ -76,7 +76,7 @@ export function CICDTriggersDashboard(): React.ReactElement {
 						type="button"
 						onClick={() => projectPath && loadRuns(projectPath)}
 						disabled={!projectPath || isLoading}
-						className="px-3 py-2 rounded-lg bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+						className="px-3 py-2 rounded-lg bg-card hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
 					>
 						{t("cicdTriggers:actions.refresh")}
 					</button>
@@ -85,21 +85,21 @@ export function CICDTriggersDashboard(): React.ReactElement {
 
 			{!activeProject ? (
 				<div className="flex-1 flex items-center justify-center text-center p-8">
-					<p className="text-sm text-[var(--text-secondary)] max-w-sm">
+					<p className="text-sm text-muted-foreground max-w-sm">
 						{t("cicdTriggers:empty.noProject")}
 					</p>
 				</div>
 			) : (
 				<div className="flex flex-1 overflow-hidden">
 					{/* Left: provider + trigger */}
-					<div className="w-72 border-r border-[var(--border-color)] p-4 flex flex-col gap-5 overflow-auto">
+					<div className="w-72 border-r border-border p-4 flex flex-col gap-5 overflow-auto">
 						<div>
-							<h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-3">
+							<h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
 								{t("cicdTriggers:config.heading")}
 							</h3>
 							<label
 								htmlFor="cicd-provider"
-								className="block text-xs text-[var(--text-secondary)] mb-1"
+								className="block text-xs text-muted-foreground mb-1"
 							>
 								{t("cicdTriggers:config.provider")}
 							</label>
@@ -112,7 +112,7 @@ export function CICDTriggersDashboard(): React.ReactElement {
 										provider: e.target.value as CICDProvider,
 									})
 								}
-								className="w-full px-2 py-1.5 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] text-sm"
+								className="w-full px-2 py-1.5 rounded-lg bg-card border border-border text-sm"
 							>
 								<option value="">{t("cicdTriggers:config.noProvider")}</option>
 								{PROVIDERS.map((p) => (
@@ -171,12 +171,12 @@ export function CICDTriggersDashboard(): React.ReactElement {
 						</div>
 
 						<div>
-							<h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-3">
+							<h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
 								{t("cicdTriggers:trigger.heading")}
 							</h3>
 							<label
 								htmlFor="cicd-branch"
-								className="block text-xs text-[var(--text-secondary)] mb-1"
+								className="block text-xs text-muted-foreground mb-1"
 							>
 								{t("cicdTriggers:trigger.branch")}
 							</label>
@@ -186,11 +186,11 @@ export function CICDTriggersDashboard(): React.ReactElement {
 								value={branch}
 								onChange={(e) => setBranch(e.target.value)}
 								placeholder={t("cicdTriggers:trigger.branchPlaceholder")}
-								className="w-full px-2 py-1.5 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] text-sm mb-2"
+								className="w-full px-2 py-1.5 rounded-lg bg-card border border-border text-sm mb-2"
 							/>
 							<label
 								htmlFor="cicd-pr-url"
-								className="block text-xs text-[var(--text-secondary)] mb-1"
+								className="block text-xs text-muted-foreground mb-1"
 							>
 								{t("cicdTriggers:trigger.prUrl")}
 							</label>
@@ -200,7 +200,7 @@ export function CICDTriggersDashboard(): React.ReactElement {
 								value={prUrl}
 								onChange={(e) => setPrUrl(e.target.value)}
 								placeholder={t("cicdTriggers:trigger.prUrlPlaceholder")}
-								className="w-full px-2 py-1.5 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] text-sm mb-3"
+								className="w-full px-2 py-1.5 rounded-lg bg-card border border-border text-sm mb-3"
 							/>
 							<button
 								type="button"
@@ -213,7 +213,7 @@ export function CICDTriggersDashboard(): React.ReactElement {
 									: t("cicdTriggers:actions.trigger")}
 							</button>
 							{!provider && (
-								<p className="text-xs text-[var(--text-secondary)] mt-2">
+								<p className="text-xs text-muted-foreground mt-2">
 									{t("cicdTriggers:trigger.selectProviderFirst")}
 								</p>
 							)}
@@ -242,7 +242,7 @@ export function CICDTriggersDashboard(): React.ReactElement {
 									<h3 className="text-lg font-medium mb-2">
 										{t("cicdTriggers:empty.title")}
 									</h3>
-									<p className="text-sm text-[var(--text-secondary)] max-w-sm">
+									<p className="text-sm text-muted-foreground max-w-sm">
 										{t("cicdTriggers:empty.body")}
 									</p>
 								</div>
@@ -256,7 +256,7 @@ export function CICDTriggersDashboard(): React.ReactElement {
 									{runs.map((run) => (
 										<div
 											key={run.id}
-											className="bg-[var(--bg-secondary)] rounded-lg p-3"
+											className="bg-card rounded-lg p-3"
 										>
 											<div className="flex items-start justify-between gap-2 mb-1">
 												<div className="font-medium text-sm">
@@ -268,7 +268,7 @@ export function CICDTriggersDashboard(): React.ReactElement {
 													{t(`cicdTriggers:status.${run.status}`, run.status)}
 												</span>
 											</div>
-											<div className="text-xs text-[var(--text-secondary)]">
+											<div className="text-xs text-muted-foreground">
 												{t(`cicdTriggers:providers.${run.provider}`, {
 													defaultValue: run.provider,
 												})}

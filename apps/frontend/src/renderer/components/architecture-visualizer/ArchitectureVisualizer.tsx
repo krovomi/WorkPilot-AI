@@ -40,17 +40,17 @@ export function ArchitectureVisualizer(): React.ReactElement {
 	const canRun = Boolean(projectPath) && blockers.length === 0;
 
 	return (
-		<div className="flex flex-col h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
-			<header className="flex items-start justify-between gap-4 px-6 py-4 border-b border-[var(--border-color)]">
+		<div className="flex flex-col h-full bg-background text-foreground">
+			<header className="flex items-start justify-between gap-4 px-6 py-4 border-b border-border">
 				<div className="min-w-0">
 					<h1 className="text-xl font-semibold">
 						{t("architectureVisualizer:title")}
 					</h1>
-					<p className="text-sm text-[var(--text-secondary)] mt-0.5">
+					<p className="text-sm text-muted-foreground mt-0.5">
 						{t("architectureVisualizer:subtitle")}
 					</p>
 					{baseline && (
-						<p className="mt-1 text-xs text-[var(--text-secondary)]">
+						<p className="mt-1 text-xs text-muted-foreground">
 							{t("architectureVisualizer:model.components", {
 								count: baseline.components ?? 0,
 							})}
@@ -104,7 +104,7 @@ export function ArchitectureVisualizer(): React.ReactElement {
 							{t("architectureVisualizer:readiness.heading")}
 						</span>
 					</div>
-					<p className="mt-1 text-xs text-[var(--text-secondary)]">
+					<p className="mt-1 text-xs text-muted-foreground">
 						{t("architectureVisualizer:readiness.body")}
 					</p>
 					<ul className="mt-2 space-y-1">
@@ -112,7 +112,7 @@ export function ArchitectureVisualizer(): React.ReactElement {
 							<li key={condition.name} className="text-xs">
 								<span className="font-medium">{condition.name}</span>
 								{" — "}
-								<span className="text-[var(--text-secondary)]">
+								<span className="text-muted-foreground">
 									{condition.remedy || condition.detail}
 								</span>
 							</li>
@@ -129,20 +129,20 @@ export function ArchitectureVisualizer(): React.ReactElement {
 							{t("architectureVisualizer:error.heading")}
 						</span>
 					</div>
-					<p className="mt-1 text-xs text-[var(--text-secondary)]">{error}</p>
+					<p className="mt-1 text-xs text-muted-foreground">{error}</p>
 				</section>
 			)}
 
 			<div className="flex-1 min-h-0">
 				{isRunning ? (
 					<div className="flex h-full flex-col">
-						<div className="flex items-center gap-2 border-b border-[var(--border-color)] px-6 py-2">
+						<div className="flex items-center gap-2 border-b border-border px-6 py-2">
 							<Loader2 className="h-4 w-4 animate-spin" aria-hidden />
 							<span className="text-sm">
 								{status || t("architectureVisualizer:progress.checking")}
 							</span>
 						</div>
-						<pre className="flex-1 overflow-auto whitespace-pre-wrap px-6 py-3 font-mono text-xs text-[var(--text-secondary)]">
+						<pre className="flex-1 overflow-auto whitespace-pre-wrap px-6 py-3 font-mono text-xs text-muted-foreground">
 							{streamingOutput}
 						</pre>
 					</div>
@@ -159,13 +159,13 @@ export function ArchitectureVisualizer(): React.ReactElement {
 					<div className="flex h-full items-center justify-center p-8">
 						<div className="max-w-md text-center">
 							<Network
-								className="mx-auto h-10 w-10 text-[var(--text-secondary)]"
+								className="mx-auto h-10 w-10 text-muted-foreground"
 								aria-hidden
 							/>
 							<h2 className="mt-3 text-base font-medium">
 								{t("architectureVisualizer:empty.title")}
 							</h2>
-							<p className="mt-2 text-sm text-[var(--text-secondary)]">
+							<p className="mt-2 text-sm text-muted-foreground">
 								{t("architectureVisualizer:empty.body")}
 							</p>
 						</div>

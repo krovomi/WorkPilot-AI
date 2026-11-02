@@ -50,10 +50,10 @@ export function VisualRegressionTab({ projectPath }: VisualRegressionTabProps) {
 					<ScanEye className="w-10 h-10 text-purple-400/70" />
 				</div>
 				<div className="text-center max-w-xs">
-					<p className="text-sm font-medium text-[var(--text-secondary)] mb-1">
+					<p className="text-sm font-medium text-muted-foreground mb-1">
 						{t("browserAgent:regression.noBaselinesTitle")}
 					</p>
-					<p className="text-xs text-[var(--text-tertiary)] leading-relaxed">
+					<p className="text-xs text-muted-foreground leading-relaxed">
 						{t("browserAgent:regression.noBaselines")}
 					</p>
 				</div>
@@ -68,7 +68,7 @@ export function VisualRegressionTab({ projectPath }: VisualRegressionTabProps) {
 				<section>
 					<div className="flex items-center gap-2 mb-3">
 						<ImageIcon className="w-4 h-4 text-cyan-400" />
-						<h3 className="text-sm font-medium text-[var(--text-primary)]">
+						<h3 className="text-sm font-medium text-foreground">
 							{t("browserAgent:stats.screenshots")}
 						</h3>
 						<span className="text-xs text-cyan-400 px-1.5 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20">
@@ -83,16 +83,16 @@ export function VisualRegressionTab({ projectPath }: VisualRegressionTabProps) {
 							return (
 								<div
 									key={screenshot.path}
-									className="group p-3 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] hover:border-cyan-500/30 transition-colors"
+									className="group p-3 rounded-lg border border-border bg-card hover:border-cyan-500/30 transition-colors"
 								>
 									<div className="flex items-center justify-between mb-2">
 										<div className="flex items-center gap-2 min-w-0">
 											<ImageIcon className="w-3.5 h-3.5 text-cyan-400/70 shrink-0" />
-											<span className="text-sm font-medium text-[var(--text-primary)] truncate">
+											<span className="text-sm font-medium text-foreground truncate">
 												{screenshot.name}
 											</span>
 										</div>
-										<span className="text-[11px] text-[var(--text-tertiary)] font-mono shrink-0 ml-2">
+										<span className="text-[11px] text-muted-foreground font-mono shrink-0 ml-2">
 											{screenshot.width}x{screenshot.height}
 										</span>
 									</div>
@@ -138,7 +138,7 @@ export function VisualRegressionTab({ projectPath }: VisualRegressionTabProps) {
 				<section>
 					<div className="flex items-center gap-2 mb-3">
 						<Layers className="w-4 h-4 text-amber-400" />
-						<h3 className="text-sm font-medium text-[var(--text-primary)]">
+						<h3 className="text-sm font-medium text-foreground">
 							{t("browserAgent:regression.baseline")}s
 						</h3>
 						<span className="text-xs text-amber-400 px-1.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20">
@@ -149,17 +149,17 @@ export function VisualRegressionTab({ projectPath }: VisualRegressionTabProps) {
 						{baselines.map((baseline) => (
 							<div
 								key={baseline.name}
-								className="flex items-center justify-between p-3 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] hover:border-amber-500/25 transition-colors"
+								className="flex items-center justify-between p-3 rounded-lg border border-border bg-card hover:border-amber-500/25 transition-colors"
 							>
 								<div className="flex items-center gap-3 min-w-0">
 									<div className="w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
 										<Layers className="w-4 h-4 text-amber-400" />
 									</div>
 									<div className="min-w-0">
-										<p className="text-sm font-medium text-[var(--text-primary)] truncate">
+										<p className="text-sm font-medium text-foreground truncate">
 											{baseline.name}
 										</p>
-										<div className="flex items-center gap-2 text-[11px] text-[var(--text-tertiary)]">
+										<div className="flex items-center gap-2 text-[11px] text-muted-foreground">
 											<span className="font-mono">
 												{baseline.width}x{baseline.height}
 											</span>
@@ -205,7 +205,7 @@ export function VisualRegressionTab({ projectPath }: VisualRegressionTabProps) {
 				<section>
 					<div className="flex items-center gap-2 mb-3">
 						<GitCompareArrows className="w-4 h-4 text-indigo-400" />
-						<h3 className="text-sm font-medium text-[var(--text-primary)]">
+						<h3 className="text-sm font-medium text-foreground">
 							{t("browserAgent:regression.resultsTitle")}
 						</h3>
 					</div>
@@ -228,7 +228,7 @@ export function VisualRegressionTab({ projectPath }: VisualRegressionTabProps) {
 											) : (
 												<XCircle className="w-4.5 h-4.5 text-rose-400" />
 											)}
-											<span className="text-sm font-medium text-[var(--text-primary)]">
+											<span className="text-sm font-medium text-foreground">
 												{comparison.name}
 											</span>
 										</div>
@@ -247,7 +247,7 @@ export function VisualRegressionTab({ projectPath }: VisualRegressionTabProps) {
 											<MatchPercentage value={comparison.matchPercentage} />
 										</div>
 									</div>
-									<div className="flex gap-4 text-xs text-[var(--text-tertiary)]">
+									<div className="flex gap-4 text-xs text-muted-foreground">
 										<span>
 											{t("browserAgent:regression.diffPixels")}:{" "}
 											<span className="text-orange-400 font-mono">
