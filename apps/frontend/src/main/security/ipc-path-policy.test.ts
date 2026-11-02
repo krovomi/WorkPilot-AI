@@ -139,7 +139,7 @@ describe("argsAllowed", () => {
 	it("lets a registered project and its subfolders through", () => {
 		expect(argsAllowed("git:getBranches", [project])).toBe(true);
 		expect(
-			argsAllowed("agentDecision:getLog", [
+			argsAllowed("specApproval:getSpec", [
 				path.join(project, ".workpilot", "specs", "001"),
 			]),
 		).toBe(true);

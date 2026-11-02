@@ -1,7 +1,6 @@
 import { architectureVisualizerService } from "./architecture-visualizer-service";
 import { autoRefactorService } from "./auto-refactor-service";
 import { codeMigrationService } from "./code-migration-service";
-import { documentationAgentService } from "./documentation-agent-service";
 import { performanceProfilerService } from "./performance-profiler-service";
 import { pipelineGeneratorService } from "./pipeline-generator-service";
 import { visualProgrammingService } from "./visual-programming-service";
@@ -23,7 +22,6 @@ export function configurePythonFeatureServices(
 		architectureVisualizerService,
 		autoRefactorService,
 		codeMigrationService,
-		documentationAgentService,
 		performanceProfilerService,
 		pipelineGeneratorService,
 		visualProgrammingService,

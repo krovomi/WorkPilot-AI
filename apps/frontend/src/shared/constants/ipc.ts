@@ -133,11 +133,6 @@ export const IPC_CHANNELS = {
 	TASK_LOGS_STREAM: "task:logsStream", // Event: streaming log chunk (main -> renderer)
 	TASK_MERGE_PROGRESS: "task:mergeProgress", // Event: merge progress update (main -> renderer)
 
-	// Agent Decision Logger (Feature 30)
-	AGENT_DECISION_LOG_GET: "agentDecision:getLog", // Renderer → Main: load persisted log
-	AGENT_DECISION_LOG_CLEAR: "agentDecision:clearLog", // Renderer → Main: clear log file
-	AGENT_DECISION_LOG_ENTRY: "agentDecision:entry", // Main → Renderer: live entry stream
-
 	// Terminal operations
 	TERMINAL_CREATE: "terminal:create",
 	TERMINAL_DESTROY: "terminal:destroy",
@@ -835,15 +830,6 @@ export const IPC_CHANNELS = {
 	PERFORMANCE_PROFILER_COMPLETE: "performanceProfiler:complete",
 	PERFORMANCE_PROFILER_IMPLEMENTATION_COMPLETE:
 		"performanceProfiler:implementationComplete",
-
-	// Documentation Agent
-	DOCUMENTATION_AGENT_GENERATE: "documentationAgent:generate",
-	DOCUMENTATION_AGENT_CANCEL: "documentationAgent:cancel",
-	// Documentation Agent events (main -> renderer)
-	DOCUMENTATION_AGENT_STATUS: "documentationAgent:status",
-	DOCUMENTATION_AGENT_STREAM_CHUNK: "documentationAgent:streamChunk",
-	DOCUMENTATION_AGENT_ERROR: "documentationAgent:error",
-	DOCUMENTATION_AGENT_COMPLETE: "documentationAgent:complete",
 
 	// Pipeline Generator (Feature 23) — AI-powered CI/CD pipeline generation
 	PIPELINE_GENERATOR_GENERATE: "pipelineGenerator:generate",
