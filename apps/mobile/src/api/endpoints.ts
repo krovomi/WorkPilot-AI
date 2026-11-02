@@ -17,6 +17,7 @@ import type {
 	TaskLogs,
 } from "./types";
 import type { Memory } from "../context/index-file";
+import type { EngineOption, SettingsPayload } from "../new-card/engine";
 import type { AnalysisKind, CostSummary, DashboardSnapshot, WorkSession } from "../insights/types";
 import type {
 	FeatureJob,
@@ -54,6 +55,10 @@ export interface NewCard {
 	description: string;
 	kind?: CardKind | null;
 	requireReview: boolean;
+	/** Engine and priority; left out, the card runs with the deployment's default. */
+	settings?: SettingsPayload;
+	/** Images, already checked on the phone (`new-card/images.ts`); the server checks again. */
+	attachments?: { filename: string; mimeType: string; data: string }[];
 }
 
 export function api(client: ServerClient) {
@@ -71,7 +76,13 @@ export function api(client: ServerClient) {
 				description: card.description,
 				kind: card.kind ?? null,
 				require_review: card.requireReview,
+				...(card.settings ? { settings: card.settings } : {}),
+				...(card.attachments?.length ? { attachments: card.attachments } : {}),
 			}),
+		/** The providers and models a card may be created with (`shared_board/engines.py`). */
+		engines: async (projectId: string) =>
+			(await client.request<{ engines: EngineOption[] }>("GET", `/api/board/engines?project_id=${enc(projectId)}`))
+				.engines,
 		deleteCard: (projectId: string, cardId: string) => client.request("DELETE", cardsPath(projectId, cardId)),
 		approve: (projectId: string, cardId: string) => client.request("POST", cardsPath(projectId, cardId, "approve")),
 		changes: (projectId: string, cardId: string) =>
