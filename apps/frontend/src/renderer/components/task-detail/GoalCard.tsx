@@ -141,6 +141,10 @@ export function GoalCard({ task, editable = true }: GoalCardProps) {
 			setDraft((prev) => (prev ? { ...prev, [key]: event.target.value } : prev)),
 	});
 
+	// No goal and no way to set one (a run is going): the card would be a title
+	// over a sentence offering a button that is not there. Nothing to show.
+	if (!goal && !loadError && !draft && !editable) return null;
+
 	return (
 		<div className="rounded-lg border border-border bg-muted/20 p-3">
 			<div className="flex items-start justify-between gap-3">

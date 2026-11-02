@@ -8,6 +8,7 @@
 import { create } from "zustand";
 import { usePermissionsStore } from "./permissions-store";
 import { refreshProjects } from "./project-store";
+import { useSettingsStore } from "./settings-store";
 
 export interface ServerUser {
 	id: string;
@@ -57,6 +58,19 @@ interface ServerSessionState {
 	logout: () => Promise<void>;
 }
 
+/**
+ * Apply the theme the server keeps for the person (main already wrote it in
+ * the settings file); nothing when the server has none or cannot be reached.
+ */
+async function applyServerTheme(): Promise<void> {
+	try {
+		const prefs = await window.electronAPI.serverAuth.pullUiPreferences?.();
+		if (prefs) useSettingsStore.getState().updateSettings(prefs);
+	} catch {
+		// The desktop's own theme stays.
+	}
+}
+
 type AuthStatePayload = {
 	mode: "local" | "server";
 	serverUrl: string | null;
@@ -96,6 +110,8 @@ export const useServerSessionStore = create<ServerSessionState>((set, get) => {
 			const first = projectsSession === null && session === null;
 			projectsSession = session;
 			if (!first) void refreshProjects();
+			// The person's theme from the server, the same as on their phone.
+			if (session !== null) void applyServerTheme();
 		}
 	};
 

@@ -125,7 +125,7 @@ it, inside its hub. The hubs are listed in
 | `worktrees` | Worktrees | Git & Integrations | — |  |
 | `analytics` | Analytics | Planning | — |  |
 | `carbon-profiler` | Carbon / Energy Profiler | Planning | — | yes |
-| `changelog` | Changelog | Planning | — | yes |
+| `changelog` | Changelog | Planning | [changelog.md](changelog.md) |  |
 | `cost-estimator` | Cost Estimator | Planning › Costs and estimation | — |  |
 | `smart-estimation` | Smart Estimation | Planning › Costs and estimation | — |  |
 | `env-snapshot` | Environment Snapshots | Planning | — | yes |

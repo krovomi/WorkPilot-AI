@@ -155,6 +155,8 @@ def test_each_analysis_is_its_runner_with_closed_options():
         "doc-drift",
         "flaky-tests",
         "tech-debt",
+        # Its own tests: test_server_changelog.py.
+        "changelog",
     }
     for analysis in ANALYSES:
         assert (_BACKEND / "runners" / analysis.runner).is_file(), analysis.runner
