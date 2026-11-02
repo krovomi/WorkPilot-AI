@@ -8,6 +8,9 @@
 
 // Mock child_process before any imports that use it
 vi.mock("node:child_process", () => ({
+	execFile: vi.fn(),
+	execFileSync: vi.fn(),
+	execSync: vi.fn(),
 	spawn: vi.fn(() => {
 		const mockProcess = {
 			stdout: {
@@ -83,6 +86,11 @@ const mockLoadProfilesFile = vi.fn(async () => ({
 
 vi.mock("../services/profile/profile-manager", () => ({
 	loadProfilesFile: () => mockLoadProfilesFile(),
+}));
+
+vi.mock("../services/credential-manager", () => ({
+	detectWindsurfLocalToken: vi.fn(async () => ({ success: false })),
+	readWindsurfCachedPlanInfo: vi.fn(async () => ({ success: false })),
 }));
 
 // Mock credential-utils to return mock token instead of reading real credentials
