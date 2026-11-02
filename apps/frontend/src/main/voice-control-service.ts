@@ -72,8 +72,7 @@ export class VoiceControlService extends EventEmitter {
 		const possiblePaths = [
 			path.join(appPath, "..", "backend"), // dev: apps/backend
 			path.join(appPath, "..", "..", "apps", "backend"), // prod unpacked: resources/apps/backend
-			path.join(import.meta.dirname, "..", "..", "..", "apps", "backend"), // dev out/main → apps/backend
-			path.join(import.meta.dirname, "..", "..", "backend"), // alt build layout
+			path.join(import.meta.dirname, "..", "..", "..", "backend"), // dev out/main → apps/backend
 			path.join(process.cwd(), "apps", "backend"),
 			path.join(process.cwd(), "..", "backend"),
 			path.join(app.getPath("userData"), "..", "auto-claude"),

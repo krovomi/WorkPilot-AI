@@ -352,7 +352,7 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 								<div className="flex items-center justify-between">
 									<div>
 										<div className="flex items-center gap-2">
-											<div className="text-sm font-medium text-(--color-text-primary)">
+											<div className="text-sm font-medium text-foreground">
 												{env.name}
 											</div>
 											{env.token && (
