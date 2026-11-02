@@ -44,7 +44,12 @@ vi.mock("react-i18next", () => ({
 				// Common translations
 				"common:actions.close": "Close",
 			};
-			return translations[key] || key;
+			// Steps also call fully qualified keys (`onboarding:authChoice.title`).
+			return (
+				translations[key] ||
+				translations[key.replace(/^onboarding:/, "")] ||
+				key
+			);
 		},
 		i18n: { language: "en" },
 	}),

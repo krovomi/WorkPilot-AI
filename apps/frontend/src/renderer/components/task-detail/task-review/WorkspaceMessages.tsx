@@ -12,6 +12,7 @@ import { usePullRequestStats } from "../../../hooks/usePullRequestStats";
 import { persistTaskStatus, startTask } from "../../../stores/task-store";
 import { Button } from "../../ui/button";
 import { PullRequestStats } from "./PullRequestStats";
+import { useTranslation } from "react-i18next";
 
 interface LoadingMessageProps {
 	readonly message?: string;
@@ -51,6 +52,7 @@ export function NoWorkspaceMessage({
 	isCompleting,
 	onRequestComplete,
 }: NoWorkspaceMessageProps) {
+	const { t } = useTranslation();
 	const [isMarkingDone, setIsMarkingDone] = useState(false);
 	const [isProceeding, setIsProceeding] = useState(false);
 
@@ -112,12 +114,12 @@ export function NoWorkspaceMessage({
 						{closeBusy ? (
 							<>
 								<Loader2 className="h-4 w-4 mr-2 animate-spin" />
-								Updating...
+								{t("taskReview:workspace.updating")}
 							</>
 						) : (
 							<>
 								<Check className="h-4 w-4 mr-2" />
-								Mark as Done
+								{t("taskReview:workspace.markDone")}
 							</>
 						)}
 					</Button>
@@ -132,7 +134,7 @@ export function NoWorkspaceMessage({
 			<div className="rounded-xl border border-border bg-secondary/30 p-4">
 				<div className="flex items-center gap-2 text-muted-foreground">
 					<Loader2 className="h-4 w-4 animate-spin" />
-					<span className="text-sm">Loading PR information...</span>
+					<span className="text-sm">{t("taskReview:workspace.loadingPr")}</span>
 				</div>
 			</div>
 		);
@@ -143,12 +145,12 @@ export function NoWorkspaceMessage({
 		<div className="rounded-xl border border-border bg-secondary/30 p-4">
 			<h3 className="font-medium text-sm text-foreground mb-2 flex items-center gap-2">
 				<AlertCircle className="h-4 w-4 text-muted-foreground" />
-				{isPlanReview ? "Human Review Required" : "No Workspace Found"}
+				{isPlanReview ? t("taskReview:workspace.humanReviewTitle") : t("taskReview:workspace.noWorkspaceTitle")}
 			</h3>
 			<p className="text-sm text-muted-foreground mb-3">
 				{isPlanReview
-					? "Human review required prior to coding. Review your spec.md for any necessary changes."
-					: "No isolated workspace was found for this task. The changes may have been made directly in your project."}
+					? t("taskReview:workspace.humanReviewDescription")
+					: t("taskReview:workspace.noWorkspaceDescription")}
 			</p>
 
 			{/* Allow marking as done */}
@@ -163,12 +165,12 @@ export function NoWorkspaceMessage({
 					{isProceeding ? (
 						<>
 							<Loader2 className="h-4 w-4 mr-2 animate-spin" />
-							Updating...
+							{t("taskReview:workspace.updating")}
 						</>
 					) : (
 						<>
 							<Play className="h-4 w-4 mr-2" />
-							Proceed to Coding
+							{t("taskReview:workspace.proceedToCoding")}
 						</>
 					)}
 				</Button>
@@ -184,12 +186,12 @@ export function NoWorkspaceMessage({
 						{closeBusy ? (
 							<>
 								<Loader2 className="h-4 w-4 mr-2 animate-spin" />
-								Updating...
+								{t("taskReview:workspace.updating")}
 							</>
 						) : (
 							<>
 								<Check className="h-4 w-4 mr-2" />
-								Mark as Done
+								{t("taskReview:workspace.markDone")}
 							</>
 						)}
 					</Button>
@@ -217,6 +219,7 @@ export function StagedInProjectMessage({
 	onClose,
 	onReviewAgain,
 }: StagedInProjectMessageProps) {
+	const { t } = useTranslation();
 	const [isDeleting, setIsDeleting] = useState(false);
 	const [isMarkingDone, setIsMarkingDone] = useState(false);
 	const [isResetting, setIsResetting] = useState(false);
@@ -308,32 +311,34 @@ export function StagedInProjectMessage({
 		<div className="rounded-xl border border-success/30 bg-success/10 p-4">
 			<h3 className="font-medium text-sm text-foreground mb-2 flex items-center gap-2">
 				<GitMerge className="h-4 w-4 text-success" />
-				Changes Staged in Project
+				{t("taskReview:workspace.stagedTitle")}
 			</h3>
 			<p className="text-sm text-muted-foreground mb-3">
-				This task's changes have been staged in your main project
+				{t("taskReview:workspace.stagedDescription")}
 				{task.stagedAt
-					? ` on ${new Date(task.stagedAt).toLocaleDateString()}`
+					? t("taskReview:workspace.stagedOn", {
+							date: new Date(task.stagedAt).toLocaleDateString(),
+						})
 					: ""}
 				.
 			</p>
 			<div className="bg-background/50 rounded-lg p-3 mb-3">
-				<p className="text-xs text-muted-foreground mb-2">Next steps:</p>
+				<p className="text-xs text-muted-foreground mb-2">{t("taskReview:staged.nextSteps")}</p>
 				<ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
 					<li>
-						Review staged changes with{" "}
-						<code className="bg-background px-1 rounded">git status</code> and{" "}
+						{t("taskReview:workspace.stepReview")}{" "}
+						<code className="bg-background px-1 rounded">git status</code> {t("taskReview:staged.and")}{" "}
 						<code className="bg-background px-1 rounded">
 							git diff --staged
 						</code>
 					</li>
 					<li>
-						Commit when ready:{" "}
+						{t("taskReview:staged.stepCommit")}{" "}
 						<code className="bg-background px-1 rounded">
 							git commit -m "your message"
 						</code>
 					</li>
-					<li>Push to remote when satisfied</li>
+					<li>{t("taskReview:workspace.stepPush")}</li>
 				</ol>
 			</div>
 
@@ -352,12 +357,12 @@ export function StagedInProjectMessage({
 							{isDeleting ? (
 								<>
 									<Loader2 className="h-4 w-4 mr-2 animate-spin" />
-									Cleaning up...
+									{t("taskReview:workspace.cleaningUp")}
 								</>
 							) : (
 								<>
 									<Check className="h-4 w-4 mr-2" />
-									Delete Worktree & Mark Done
+									{t("taskReview:workspace.deleteAndDone")}
 								</>
 							)}
 						</Button>
@@ -372,12 +377,12 @@ export function StagedInProjectMessage({
 							{isMarkingDone ? (
 								<>
 									<Loader2 className="h-4 w-4 mr-2 animate-spin" />
-									Marking done...
+									{t("taskReview:workspace.markingDone")}
 								</>
 							) : (
 								<>
 									<Check className="h-4 w-4 mr-2" />
-									Mark as Done
+									{t("taskReview:workspace.markDone")}
 								</>
 							)}
 						</Button>
@@ -398,12 +403,12 @@ export function StagedInProjectMessage({
 							{isMarkingDone ? (
 								<>
 									<Loader2 className="h-4 w-4 mr-2 animate-spin" />
-									Marking done...
+									{t("taskReview:workspace.markingDone")}
 								</>
 							) : (
 								<>
 									<Check className="h-4 w-4 mr-2" />
-									Mark Done Only
+									{t("taskReview:workspace.markDoneOnly")}
 								</>
 							)}
 						</Button>
@@ -421,12 +426,12 @@ export function StagedInProjectMessage({
 							{isResetting ? (
 								<>
 									<Loader2 className="h-4 w-4 mr-2 animate-spin" />
-									Resetting...
+									{t("taskReview:workspace.resetting")}
 								</>
 							) : (
 								<>
 									<RotateCcw className="h-4 w-4 mr-2" />
-									Review Again
+									{t("taskReview:workspace.reviewAgain")}
 								</>
 							)}
 						</Button>
@@ -437,8 +442,7 @@ export function StagedInProjectMessage({
 
 				{hasWorktree && (
 					<p className="text-xs text-muted-foreground">
-						"Delete Worktree & Mark Done" cleans up the isolated workspace.
-						"Mark Done Only" keeps it for reference.
+						{t("taskReview:workspace.doneHint")}
 					</p>
 				)}
 			</div>

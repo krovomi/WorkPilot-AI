@@ -3,12 +3,14 @@ import { IDEATION_EFFORT_COLORS } from "../../../../shared/constants";
 import type { CodeImprovementIdea } from "../../../../shared/types";
 import { Badge } from "../../ui/badge";
 import { Card } from "../../ui/card";
+import { useTranslation } from "react-i18next";
 
 interface CodeImprovementDetailsProps {
 	readonly idea: CodeImprovementIdea;
 }
 
 export function CodeImprovementDetails({ idea }: CodeImprovementDetailsProps) {
+	const { t } = useTranslation();
 	return (
 		<>
 			{/* Metrics */}
@@ -19,13 +21,13 @@ export function CodeImprovementDetails({ idea }: CodeImprovementDetailsProps) {
 					>
 						{idea.estimatedEffort}
 					</div>
-					<div className="text-xs text-muted-foreground">Effort</div>
+					<div className="text-xs text-muted-foreground">{t("ideation:performanceDetails.effort")}</div>
 				</Card>
 				<Card className="p-3 text-center">
 					<div className="text-lg font-semibold">
 						{idea.affectedFiles?.length ?? 0}
 					</div>
-					<div className="text-xs text-muted-foreground">Files</div>
+					<div className="text-xs text-muted-foreground">{t("ideation:details.files")}</div>
 				</Card>
 			</div>
 
@@ -34,7 +36,7 @@ export function CodeImprovementDetails({ idea }: CodeImprovementDetailsProps) {
 				<div>
 					<h3 className="text-sm font-medium mb-2 flex items-center gap-2">
 						<TrendingUp className="h-4 w-4" />
-						Builds Upon
+						{t("ideation:details.buildsUpon")}
 					</h3>
 					<div className="flex flex-wrap gap-1">
 						{idea.buildsUpon.map((item) => (
@@ -51,7 +53,7 @@ export function CodeImprovementDetails({ idea }: CodeImprovementDetailsProps) {
 				<div>
 					<h3 className="text-sm font-medium mb-2 flex items-center gap-2">
 						<Code2 className="h-4 w-4" />
-						Implementation Approach
+						{t("ideation:details.implementationApproach")}
 					</h3>
 					<p className="text-sm text-muted-foreground">
 						{idea.implementationApproach}
@@ -64,7 +66,7 @@ export function CodeImprovementDetails({ idea }: CodeImprovementDetailsProps) {
 				<div>
 					<h3 className="text-sm font-medium mb-2 flex items-center gap-2">
 						<FileCode className="h-4 w-4" />
-						Affected Files
+						{t("tasks:metadata.affectedFiles")}
 					</h3>
 					<ul className="space-y-1">
 						{idea.affectedFiles.map((file) => (
@@ -82,7 +84,7 @@ export function CodeImprovementDetails({ idea }: CodeImprovementDetailsProps) {
 			{/* Existing Patterns */}
 			{idea.existingPatterns && idea.existingPatterns.length > 0 && (
 				<div>
-					<h3 className="text-sm font-medium mb-2">Patterns to Follow</h3>
+					<h3 className="text-sm font-medium mb-2">{t("ideation:details.patternsToFollow")}</h3>
 					<ul className="space-y-1">
 						{idea.existingPatterns.map((pattern) => (
 							<li

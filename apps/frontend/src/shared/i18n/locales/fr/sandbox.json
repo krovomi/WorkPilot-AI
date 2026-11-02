@@ -29,5 +29,9 @@
 	"modified": "modifiés",
 	"executionSteps": "Étapes d'exécution",
 	"fileChanges": "Modifications de fichiers",
-	"durationAndTokens": "{{duration}}ms · {{tokens}} tokens"
+	"durationAndTokens": "{{duration}}ms · {{tokens}} tokens",
+	"diffPreview": {
+		"filesChanged": "{{count}} fichiers modifiés",
+		"selectFile": "Choisissez un fichier pour voir le diff"
+	}
 }

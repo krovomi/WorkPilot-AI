@@ -55,7 +55,8 @@
 		"creating": "Création...",
 		"cancel": "Annuler",
 		"done": "Terminé",
-		"close": "Fermer"
+		"close": "Fermer",
+		"investigateAria": "Analyser l'issue"
 	},
 	"settings": {
 		"enableIssues": "Activer les issues GitLab",
@@ -127,7 +128,23 @@
 			"closed": "Fermées",
 			"merged": "Fusionnées",
 			"all": "Toutes"
-		}
+		},
+		"tryAgain": "Réessayer",
+		"create": {
+			"title": "Créer une merge request",
+			"description": "Créer une nouvelle merge request dans GitLab",
+			"titleLabel": "Titre",
+			"titlePlaceholder": "Titre de la merge request",
+			"sourceBranch": "Branche source",
+			"targetBranch": "Branche cible",
+			"descriptionLabel": "Description (facultative)",
+			"descriptionPlaceholder": "Décrivez les modifications de cette merge request..."
+		},
+		"byAuthor": "par {{author}}",
+		"listTitle": "Merge requests",
+		"searchPlaceholder": "Rechercher des merge requests...",
+		"noMatch": "Aucune merge request correspondante",
+		"empty": "Aucune merge request trouvée"
 	},
 	"mrReview": {
 		"runReview": "Lancer la revue IA",
@@ -184,7 +201,23 @@
 			"stillOpen": "encore ouvert(s)",
 			"newIssue": "nouveau problème",
 			"newIssues": "nouveaux problèmes"
-		}
+		},
+		"followupWithCommits_one": "Revue de suivi ({{count}} nouveau commit)",
+		"followupWithCommits_other": "Revue de suivi ({{count}} nouveaux commits)",
+		"postCount_one": "Publier {{count}} constat",
+		"postCount_other": "Publier {{count}} constats",
+		"postedCount_one": "{{count}} constat publié sur GitLab",
+		"postedCount_other": "{{count}} constats publiés sur GitLab",
+		"newCommitsBadge_one": "{{count}} nouveau commit",
+		"newCommitsBadge_other": "{{count}} nouveaux commits",
+		"resolvedCount": "{{count}} résolu(s)",
+		"stillOpenCount": "{{count}} encore ouvert(s)",
+		"newIssueCount_one": "{{count}} nouveau problème",
+		"newIssueCount_other": "{{count}} nouveaux problèmes",
+		"reviewedAt": "Revu le : {{date}}",
+		"atCommit": "au commit {{sha}}",
+		"runFollowup": "Lancer la revue de suivi",
+		"reviewFailed": "La revue a échoué"
 	},
 	"findings": {
 		"summary": "sélectionné(s)",
@@ -213,6 +246,14 @@
 			"pattern": "Pattern",
 			"performance": "Performance",
 			"logic": "Logique"
-		}
+		},
+		"counts": {
+			"critical": "{{count}} critique(s)",
+			"high": "{{count}} élevé(s)",
+			"medium": "{{count}} moyen(s)",
+			"low": "{{count}} faible(s)"
+		},
+		"selectedOfTotal": "{{selected}}/{{total}} sélectionné(s)",
+		"selectImportant": "Sélectionner critique/élevé ({{count}})"
 	}
 }

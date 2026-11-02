@@ -385,7 +385,7 @@ export function PairProgramming({ projectId }: PairProgrammingProps) {
 									{session.goal && (
 										<div>
 											<div className="text-xs font-medium text-muted-foreground mb-1">
-												Goal
+												{t("pairProgramming:session.goal")}
 											</div>
 											<p className="text-xs text-foreground leading-relaxed">
 												{session.goal}

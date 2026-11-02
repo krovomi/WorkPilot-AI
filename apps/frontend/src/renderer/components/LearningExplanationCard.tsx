@@ -15,6 +15,7 @@ import { cn } from "../lib/utils";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { useTranslation } from "react-i18next";
 
 interface LearningExplanationCardProps {
 	explanation: LearningExplanation;
@@ -53,6 +54,7 @@ export function LearningExplanationCard({
 	explanation,
 	defaultExpanded = false,
 }: LearningExplanationCardProps) {
+	const { t } = useTranslation();
 	const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
 	const Icon = CATEGORY_ICONS[explanation.category] || BookOpen;
@@ -79,7 +81,7 @@ export function LearningExplanationCard({
 									{categoryLabel}
 								</Badge>
 								<Badge variant="secondary" className="text-xs">
-									Niveau: {explanation.difficulty}
+									{t("common:learningMode.level", { level: explanation.difficulty })}
 								</Badge>
 							</div>
 						</div>
@@ -112,7 +114,7 @@ export function LearningExplanationCard({
 					{explanation.code_snippet && (
 						<div>
 							<div className="text-xs font-medium text-muted-foreground mb-2">
-								Exemple de code:
+								{t("common:learningMode.codeExample")}
 							</div>
 							<pre className="bg-muted p-3 rounded-md overflow-x-auto text-xs">
 								<code>{explanation.code_snippet}</code>
@@ -124,7 +126,7 @@ export function LearningExplanationCard({
 					{explanation.diagram && (
 						<div>
 							<div className="text-xs font-medium text-muted-foreground mb-2">
-								Diagramme:
+								{t("common:learningMode.diagram")}
 							</div>
 							<pre className="bg-muted p-3 rounded-md overflow-x-auto text-xs">
 								<code>{explanation.diagram}</code>
@@ -137,7 +139,7 @@ export function LearningExplanationCard({
 						explanation.alternative_approaches.length > 0 && (
 							<div>
 								<div className="text-xs font-medium text-muted-foreground mb-2">
-									Approches alternatives:
+									{t("common:learningMode.alternatives")}
 								</div>
 								<div className="space-y-2">
 									{explanation.alternative_approaches.map((alt, idx) => (
@@ -164,7 +166,7 @@ export function LearningExplanationCard({
 											)}
 											{alt.reason_rejected && (
 												<div className="text-muted-foreground italic mt-1">
-													Pourquoi pas choisi: {alt.reason_rejected}
+													{t("common:learningMode.whyNot", { reason: alt.reason_rejected })}
 												</div>
 											)}
 										</div>
@@ -177,7 +179,7 @@ export function LearningExplanationCard({
 					{explanation.references && explanation.references.length > 0 && (
 						<div>
 							<div className="text-xs font-medium text-muted-foreground mb-2">
-								Pour en savoir plus:
+								{t("common:learningMode.learnMore")}
 							</div>
 							<div className="space-y-1">
 								{explanation.references.map((ref, idx) => (

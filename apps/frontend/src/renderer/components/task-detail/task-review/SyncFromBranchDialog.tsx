@@ -179,7 +179,7 @@ export function SyncFromBranchDialog({
 									: t("taskReview:syncBranch.selectBranch")}
 							</option>
 							{localBranches.length > 0 && (
-								<optgroup label="Local">
+								<optgroup label={t("taskReview:syncBranch.local")}>
 									{localBranches.map((b) => (
 										<option key={b} value={b}>
 											{b}
@@ -188,7 +188,7 @@ export function SyncFromBranchDialog({
 								</optgroup>
 							)}
 							{remoteBranches.length > 0 && (
-								<optgroup label="Remote">
+								<optgroup label={t("taskReview:syncBranch.remote")}>
 									{remoteBranches.map((b) => (
 										<option key={b} value={b}>
 											{b}

@@ -224,14 +224,16 @@ export function TestGenerationDialog({
 						<div className="flex items-center justify-between mb-2">
 							<h4 className="font-mono text-sm">{gap.function.full_name}</h4>
 							<Badge className={PRIORITY_COLORS[gap.priority]}>
-								{gap.priority} priority
+								{t("testGeneration:gap.priority", { priority: gap.priority })}
 							</Badge>
 						</div>
 						<p className="mb-2 text-sm text-muted-foreground">{gap.reason}</p>
 						<div className="text-xs text-muted-foreground">
-							Line: {gap.function.line_number} | Complexity:{" "}
-							{gap.function.complexity} | Tests needed:{" "}
-							{gap.suggested_test_count}
+							{t("testGeneration:gap.details", {
+									line: gap.function.line_number,
+									complexity: gap.function.complexity,
+									tests: gap.suggested_test_count,
+								})}
 						</div>
 					</CardContent>
 				</Card>

@@ -147,13 +147,18 @@ function SessionCard({ session }: { readonly session: SessionEntry }) {
 						{session.tokens_used !== undefined && (
 							<span className="flex items-center gap-1">
 								<Zap className="h-3 w-3" />
-								{session.tokens_used.toLocaleString()} tokens
+								{t("sessionHistory:tokensCount", {
+												count: session.tokens_used,
+												formatted: session.tokens_used.toLocaleString(),
+											})}
 							</span>
 						)}
 						{session.files_changed !== undefined && (
 							<span className="flex items-center gap-1">
 								<FileCode2 className="h-3 w-3" />
-								{session.files_changed} files
+								{t("sessionHistory:filesCount", {
+												count: session.files_changed,
+											})}
 							</span>
 						)}
 						{session.cost !== undefined && (

@@ -35,5 +35,6 @@
 	"errors": {
 		"noProject": "Please select a project to use voice control",
 		"generic": "An error occurred during voice processing"
-	}
+	},
+	"confidencePercent": "{{percent}}% confidence"
 }

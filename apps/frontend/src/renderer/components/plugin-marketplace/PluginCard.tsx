@@ -122,7 +122,7 @@ export function PluginCard({
 					{typeLabel[plugin.type]}
 				</span>
 				<span className="text-xs text-muted-foreground truncate">
-					by {plugin.author}
+					{t("common:pluginMarketplace.byAuthor", { author: plugin.author })}
 				</span>
 			</div>
 

@@ -53,6 +53,25 @@ const { t } = useTranslation(['navigation', 'common']);
 <span>{t('errors:task.parseError', { error })}</span>
 ```
 
+La règle est vérifiée par `src/renderer/__tests__/jsx-literal-text.test.ts`. Il parse chaque `.tsx`
+du renderer (hors tests, mocks, stories) avec `parseAst` de Vite et refuse trois choses : un texte
+entre balises qui contient une lettre, une chaîne ou un gabarit rendu en enfant (directement ou
+dans une branche `?:`, `||`, `??`, `&&`), et un littéral dans `title`, `placeholder`, `alt`,
+`aria-label`, `label` ou `description`. `style/noJsxLiterals` de Biome a été écarté : il signale
+aussi la ponctuation, et sa seule exemption est un `biome-ignore`, que le plafond interdit.
+
+Ce qui reste littéral est déclaré dans `src/renderer/__tests__/jsx-literal-allowlist.ts` :
+
+- texte sous `<code>`, `<pre>`, `<kbd>`, `<samp>` (commande, chemin, touche) ;
+- un nom de produit (`NAMES`), ou un texte dont chaque mot est une marque, une unité, un sigle ou
+  une touche jamais traduits (`TERMS`), ou une adresse ;
+- un `placeholder` d'un seul jeton qui montre une valeur (`main`, `owner/repo`) ;
+- `FILE_EXEMPTIONS` : un littéral précis dans un fichier précis, **avec sa raison**. Une exemption
+  qui ne correspond plus à rien fait échouer le test.
+
+`PENDING` n'est pas une exemption : c'est la dette laissée dans des fichiers qu'une autre branche
+réécrit, comptée par fichier. Le compte ne peut que baisser ; une entrée à 0 se supprime.
+
 ## Multiplateforme
 
 Windows, macOS et Linux sont testés en CI. **Jamais `process.platform` en direct** : importer de

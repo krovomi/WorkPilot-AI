@@ -18,7 +18,8 @@
 			"domainAddendum": "domain addendum (+{{count}}ch)",
 			"tools": "{{count}} tools"
 		},
-		"allowedTools": "Allowed tools ({{count}})"
+		"allowedTools": "Allowed tools ({{count}})",
+		"defaultModel": "default"
 	},
 	"restartDialog": {
 		"title": "Restart agent",
@@ -43,5 +44,59 @@
 				"description": "Discard the current plan and start over. Most expensive — equivalent to a fresh build."
 			}
 		}
+	},
+	"costDialog": {
+		"unavailable": "Estimation unavailable: {{error}}",
+		"confidence": "{{level}} confidence",
+		"inOut": "{{input}} in / {{output}} out",
+		"title": "Estimated build cost",
+		"descriptionBefore": "Token usage and cost projection for",
+		"descriptionAfter": "before the agent starts.",
+		"estimating": "Estimating…",
+		"total": "Total estimate",
+		"start": "Start build"
+	},
+	"promotion": {
+		"ready": "✓ ready to promote (≥ {{threshold}})",
+		"below": "⚠ below threshold ({{threshold}})",
+		"reasoning": "Reasoning ({{count}})",
+		"title": "QA auto-promotion",
+		"descriptionBefore": "Score the QA outcome and decide whether to skip",
+		"descriptionMiddle": ". Threshold is set via the",
+		"descriptionAfter": "env var (unset = feature off).",
+		"scoring": "Scoring…",
+		"confidence": "Confidence score",
+		"featureOff": "feature off",
+		"accept": "Accept & skip human review"
+	},
+	"timeline": {
+		"events_one": "{{count}} event",
+		"events_other": "{{count}} events",
+		"duration": "duration: {{duration}}",
+		"chainBroken": "⚠ chain broken: {{reason}}",
+		"title": "Agent timeline",
+		"descriptionBefore": "Every audit-trail event for spec",
+		"descriptionAfter": ", in causal order. Click an event to inspect its payload.",
+		"loading": "Loading timeline…",
+		"chainIntact": "chain intact",
+		"empty": "No events recorded yet for this spec. Events will appear once an agent runs against it.",
+		"hidePayload": "▾ Hide payload",
+		"showPayload": "▸ Show payload"
+	},
+	"virtualReviewer": {
+		"chars": "{{label}}: {{count}}ch",
+		"title": "Virtual reviewer (advisory)",
+		"disclaimer": "Machine-generated commentary, not a human review.",
+		"writesBefore": "Writes",
+		"writesAfter": "at the spec root. Never signs in your name, never opens a PR. Enable via",
+		"loading": "Loading…",
+		"enabled": "enabled",
+		"disabled": "disabled (env flag off)",
+		"selfReviewPresent": "self_review.md present",
+		"diffTruncated": "diff truncated",
+		"written": "✓ virtual_review.md written",
+		"stubNotice": "The HTTP endpoint runs in stub mode (deterministic fallback). For a full SDK-backed review, the agent runtime needs to wire an in-process invokable client.",
+		"running": "Running…",
+		"run": "Run virtual review"
 	}
 }

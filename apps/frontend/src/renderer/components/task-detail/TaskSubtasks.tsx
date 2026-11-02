@@ -196,7 +196,9 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 					<div className="flex items-center gap-2">
 						<Code2 className="h-4 w-4" />
 						<span className="text-sm font-medium">
-							Edit Files: {selectedSubtaskForCodeEdit.title}
+							{t("taskReview:taskPanel.editFilesTitle", {
+									name: selectedSubtaskForCodeEdit.title,
+								})}
 						</span>
 					</div>
 					<Button
@@ -205,7 +207,7 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 						onClick={() => setSelectedSubtaskForCodeEdit(null)}
 						className="h-6"
 					>
-						Back
+						{t("common:buttons.back")}
 					</Button>
 				</div>
 				<div className="flex-1 overflow-hidden">
@@ -225,10 +227,10 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 					<div className="text-center py-12">
 						<ListChecks className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
 						<p className="text-sm font-medium text-muted-foreground mb-1">
-							No subtasks defined
+							{t("taskReview:taskPanel.noSubtasks")}
 						</p>
 						<p className="text-xs text-muted-foreground/70">
-							Implementation subtasks will appear here after planning
+							{t("taskReview:taskPanel.noSubtasksHint")}
 						</p>
 					</div>
 				</div>
@@ -519,7 +521,9 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 												))}
 												{subtask.files.length > 2 && (
 													<Badge variant="outline" className="text-xs">
-														+{subtask.files.length - 2} more
+														{t("taskReview:taskPanel.moreFiles", {
+											count: subtask.files.length - 2,
+										})}
 													</Badge>
 												)}
 												{subtask.status === "pending" && (
@@ -537,7 +541,7 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 																<Edit3 className="h-3 w-3" />
 															</Button>
 														</TooltipTrigger>
-														<TooltipContent>Edit files</TooltipContent>
+														<TooltipContent>{t("taskReview:taskPanel.editFiles")}</TooltipContent>
 													</Tooltip>
 												)}
 											</div>

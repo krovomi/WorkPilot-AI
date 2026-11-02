@@ -234,8 +234,27 @@
 						"likes": "Likes",
 						"created": "Récents",
 						"modified": "Modifiés"
-					}
-				}
+					},
+					"minParamsAria": "Taille minimale (paramètres)",
+					"paramsAll": "Params : tous",
+					"params24": "≥ 24B (planif.)",
+					"maxDiskAria": "Taille disque max. estimée (Go)",
+					"diskAll": "Disque : tous",
+					"disk6": "≤ ~6 Go",
+					"disk12": "≤ ~12 Go",
+					"disk24": "≤ ~24 Go",
+					"disk48": "≤ ~48 Go",
+					"hideUnsuitable": "Masquer les modèles inadaptés (embeddings, trop petits)"
+				},
+				"legend": {
+					"recommended": "● Recommandé",
+					"recommendedDetail": "— assez gros (≥24B de paramètres actifs) et compatible tool-calling : bon pour TOUTES les étapes, planification incluse.",
+					"tooSmall": "● Trop petit pour planifier",
+					"tooSmallDetail": "— compatible tool-calling mais <24B : ok codage / validation, déconseillé en planification.",
+					"unverified": "● Tool-calling à vérifier",
+					"unverifiedDetail": "— non confirmé d'après le nom ; ouvrez la carte du modèle. Les tailles « ~Go » sont estimées (quant 4-bit)."
+				},
+				"estimatedSize": " · ~{{size}} Go"
 			},
 			"providers": {
 				"anthropic": "Modèles Anthropic Claude",
@@ -896,7 +915,10 @@
 		"tierFlagship": "Flagship",
 		"tierStandard": "Standard",
 		"urlRequired": "URL requise",
-		"urlRequiredDesc": "Veuillez saisir l'URL de votre API avant de découvrir les modèles."
+		"urlRequiredDesc": "Veuillez saisir l'URL de votre API avant de découvrir les modèles.",
+		"integrationTitle": "Intégration Azure DevOps",
+		"integrationDescription": "Configurer et gérer la synchronisation des éléments de travail Azure DevOps",
+		"enableDescription": "Activez l'intégration Azure DevOps pour synchroniser les éléments de travail avec votre backlog"
 	},
 	"azureDevOpsImport": {
 		"cancel": "Annuler",
@@ -943,7 +965,8 @@
 		"title": "Importer les éléments Azure DevOps",
 		"titleWithRepository": "Importer les éléments de {{repository}}",
 		"toggleSelection": "Basculer la sélection pour l'élément de travail {{id}}",
-		"importError": "Échec de l'import Azure DevOps"
+		"importError": "Échec de l'import Azure DevOps",
+		"repositoryLabel": "Dépôt :"
 	},
 	"collaboration": {
 		"description": "Paramètres de collaboration multi-utilisateurs",
@@ -1113,7 +1136,8 @@
 		"sourceSystemPath": "PATH système",
 		"sourceUserConfig": "Configuration utilisateur",
 		"sourceVenv": "Environnement virtuel",
-		"thinkingLevel": "Niveau de réflexion"
+		"thinkingLevel": "Niveau de réflexion",
+		"detecting": "Détection..."
 	},
 	"instructions": {
 		"authCloseWarning": "Le terminal est en cours d'authentification. Êtes-vous sûr de vouloir fermer ?",
@@ -1340,7 +1364,10 @@
 		"projectKeyPlaceholder": "PROJ",
 		"required": "*",
 		"testConnection": "Tester la connexion",
-		"title": "Intégration Jira"
+		"title": "Intégration Jira",
+		"instanceLabel": "Instance : {{url}}",
+		"projectSuffix": " • Projet : {{project}}",
+		"initGuardDescription": "Activez l'intégration Jira pour synchroniser les tickets avec votre backlog"
 	},
 	"channelNotifications": {
 		"navLabel": "Notifications (Teams, Slack…)",
@@ -1527,7 +1554,15 @@
 		"successFailedSuffix": "{{count}} échoué(s).",
 		"successTitle": "Import réussi !",
 		"title": "Importer les tickets Jira",
-		"titleWithProject": "Importer les tickets de {{project}}"
+		"titleWithProject": "Importer les tickets de {{project}}",
+		"assignee": "Assigné : {{name}}",
+		"selectedOfTotal": "{{selected}} / {{total}} sélectionné(s)",
+		"noJiraIssues": "Aucun ticket Jira trouvé",
+		"typeLabel": "Type",
+		"statusLabel": "Statut",
+		"allStatuses": "Tous les statuts",
+		"dragHint": "Glissez les tickets sélectionnés dans une colonne du Kanban pour les importer",
+		"resize": "Redimensionner"
 	},
 	"language": {
 		"description": "Sélectionnez la langue de l'interface de l'application",
@@ -1756,7 +1791,20 @@
 		},
 		"claude": {
 			"description": "Authentification Claude",
-			"title": "Auth Claude"
+			"title": "Auth Claude",
+			"override": "(Remplacement)",
+			"connected": "Connecté",
+			"notConnected": "Non connecté",
+			"authTitle": "Authentification Claude",
+			"loadingConfig": "Chargement de la configuration...",
+			"usingGlobalToken": "Jeton global utilisé",
+			"usingGlobalTokenDescription": "Le jeton des paramètres de l'application est utilisé. Saisissez ci-dessous un jeton propre au projet pour le remplacer.",
+			"pasteTokenFrom": "Collez un jeton obtenu avec",
+			"authenticatedOAuth": "Authentifié via OAuth",
+			"notAuthenticated": "Non authentifié",
+			"statusUnknown": "Statut inconnu",
+			"reauthenticate": "Se réauthentifier",
+			"setupOAuth": "Configurer OAuth"
 		},
 		"customModelPlaceholder": "Saisir le nom du modèle (ex : llama3.3:latest)",
 		"flagshipModel": "Modèle flagship : {{model}}",
@@ -1827,7 +1875,18 @@
 			"connectedToGitHub": "Connecté à GitHub",
 			"notConnectedToGitHub": "Non connecté à GitHub",
 			"failedToLoadBranches": "Échec du chargement des branches",
-			"failedToLoadRepositories": "Échec du chargement des dépôts"
+			"failedToLoadRepositories": "Échec du chargement des dépôts",
+			"authenticatedViaOAuth": "Authentifié via OAuth GitHub (gh CLI)",
+			"tokenPlaceholder": "ghp_xxxxxxxx ou github_pat_xxxxxxxx",
+			"projectSpecificTitle": "Configuration propre au projet",
+			"projectSpecificBefore": "Ce dépôt GitHub est configuré uniquement pour",
+			"projectSpecificAfter": ". Chaque projet peut avoir son propre dépôt GitHub.",
+			"mainBranch": "Branche principale",
+			"mainBranchDescription": "La branche de base des worktrees de tâche. Toutes les nouvelles tâches partiront d'ici.",
+			"loadingBranches": "Chargement des branches...",
+			"selectMainBranch": "Choisir la branche principale",
+			"branchHintBefore": "Les tâches seront créées sur des branches comme",
+			"branchHintFrom": "à partir de"
 		},
 		"gitlab": {
 			"description": "Synchronisation des issues GitLab",
@@ -1958,7 +2017,9 @@
 		"fineTuneDescription": "Ajuster de 75 % à 200 % par incréments de 5 %",
 		"large": "Grand",
 		"presets": "Presets d'échelle",
-		"presetsDescription": "Options d'échelle rapides pour les préférences courantes"
+		"presetsDescription": "Options d'échelle rapides pour les préférences courantes",
+		"resetToDefault": "Revenir à la valeur par défaut (100 %)",
+		"applyChanges": "Appliquer le changement d'échelle"
 	},
 	"terminalFonts": {
 		"configActions": "Configuration :",
@@ -2113,7 +2174,9 @@
 			"retro": "Ambiances ambrées chaleureuses et nostalgiques",
 			"neo": "Rose/magenta cyberpunk moderne",
 			"forest": "Tons verts naturels et terreux"
-		}
+		},
+		"backgroundColor": "Couleur de fond",
+		"accentColor": "Couleur d'accent"
 	},
 	"updates": {
 		"appUpdateReady": "Mise à jour prête",
@@ -2143,7 +2206,8 @@
 		"unableToCheck": "Impossible de vérifier les mises à jour",
 		"updateDownloaded": "Mise à jour téléchargée ! Cliquez sur Installer pour redémarrer et appliquer la mise à jour.",
 		"version": "Version",
-		"viewRelease": "Voir la version complète sur GitHub"
+		"viewRelease": "Voir la version complète sur GitHub",
+		"unknownVersion": "Inconnue"
 	},
 	"workspace": {
 		"roles": {
@@ -2360,7 +2424,8 @@
 			"warn": "Avertir",
 			"deny": "Refuser",
 			"require_approval": "Demander une approbation"
-		}
+		},
+		"fileContentPlaceholder": "contenu du fichier…"
 	},
 	"search": {
 		"placeholder": "Rechercher un paramètre...",
@@ -2591,5 +2656,99 @@
 		"reviewDrafts": "les revues t'attendent",
 		"serverIntro": "Une règle crée une carte Kanban quand son événement arrive, et la carte suit le cycle normal. Une règle sur les PR lance plutôt la revue IA, gardée en brouillon. Une règle ne merge, ne pousse et ne commente jamais rien. Ce projet est sur le serveur : ses règles sont celles de l'équipe, et le serveur les fait tourner toutes les 5 minutes, même quand personne n'a l'app ouverte. Chaque règle lit GitHub ou GitLab avec le jeton de la personne qui l'a enregistrée en dernier, et ses cartes sont créées par Automations. Les heures sont celles du serveur.",
 		"runsAs": "tourne avec les jetons de {{name}}"
+	},
+	"githubOAuth": {
+		"usingCli": "GitHub CLI {{version}} utilisé",
+		"openLink": "Ouvrir {{url}}",
+		"cliRequired": "GitHub CLI requis",
+		"cliRequiredDescription": "Le GitHub CLI (gh) est requis pour l'authentification OAuth. Il permet de s'authentifier de façon sûre sans créer de jeton à la main.",
+		"installCli": "Installer GitHub CLI",
+		"installed": "Je l'ai installé",
+		"installInstructions": "Instructions d'installation :",
+		"linuxVisit": "Linux : consultez",
+		"connectTitle": "Se connecter à GitHub",
+		"connectDescription": "Cliquez sur le bouton ci-dessous pour vous authentifier auprès de GitHub. Votre navigateur s'ouvrira pour que vous autorisiez l'application.",
+		"authenticate": "S'authentifier avec GitHub",
+		"authenticating": "Authentification...",
+		"oneTimeCode": "Votre code à usage unique",
+		"copied": "Copié",
+		"copy": "Copier",
+		"connected": "Connexion réussie",
+		"manualTitle": "Terminer l'authentification manuellement",
+		"manualDescription": "Le navigateur n'a pas pu s'ouvrir automatiquement. Ouvrez l'URL ci-dessous pour terminer l'authentification :",
+		"openUrl": "Ouvrir l'URL dans le navigateur",
+		"enterCode": "Lorsque c'est demandé, saisissez ce code :",
+		"connectedAs": "Connecté en tant que {{username}}",
+		"completeInBrowser": "Terminez l'authentification dans votre navigateur. Cette fenêtre se mettra à jour automatiquement.",
+		"waitingStart": "En attente du démarrage de l'authentification...",
+		"enterCodeInBrowser": "Saisissez ce code dans votre navigateur pour terminer l'authentification.",
+		"copyThenOpen": "Copiez ce code puis ouvrez le lien ci-dessous pour vous authentifier.",
+		"accountConnected": "Votre compte GitHub est connecté",
+		"timedOut": "Délai d'authentification dépassé",
+		"failed": "Échec de l'authentification"
+	},
+	"apiKeyConfig": {
+		"apiUrl": "URL de l'API",
+		"defaultModel": "Modèle par défaut",
+		"modelPlaceholder": "gpt-5.3, claude-4.6-opus, etc."
+	},
+	"customProvider": {
+		"modelNamePlaceholder": "Nom du modèle personnalisé"
+	},
+	"customThemes": {
+		"title": "Thèmes personnalisés",
+		"description": "Créez vos propres thèmes de couleurs ou importez-en des partagés",
+		"import": "Importer",
+		"newTheme": "Nouveau thème",
+		"themeName": "Nom du thème",
+		"themeNamePlaceholder": "Mon thème personnalisé",
+		"descriptionLabel": "Description",
+		"descriptionPlaceholder": "Une brève description",
+		"preview": "Aperçu :",
+		"create": "Créer le thème",
+		"export": "Exporter",
+		"empty": "Aucun thème personnalisé pour l'instant",
+		"emptyHint": "Créez un thème ou importez-en un pour commencer"
+	},
+	"projectSelector": {
+		"placeholder": "Sélectionner un projet...",
+		"empty": "Aucun projet pour l'instant",
+		"add": "Ajouter un projet...",
+		"emptyState": "Sélectionnez un projet pour voir et modifier ses paramètres",
+		"initializeFirst": "Initialisez d'abord WorkPilot AI pour configurer : {{section}}"
+	},
+	"agentToolsPanel": {
+		"mcpServers": "Serveurs MCP",
+		"edit": "Modifier"
+	},
+	"insightsModel": {
+		"custom": "Personnalisé...",
+		"customDescription": "Choisir le modèle et le niveau de réflexion"
+	},
+	"linearImport": {
+		"importButton_one": "Importer {{count}} tâche",
+		"importButton_other": "Importer {{count}} tâches",
+		"title": "Importer des tâches Linear",
+		"description": "Sélectionnez les tâches Linear à importer dans AutoBuild",
+		"imported_one": "{{count}} tâche importée",
+		"imported_other": "{{count}} tâches importées",
+		"processing": "Les tâches sont en cours de traitement. Suivez leur avancement sur le tableau Kanban.",
+		"moreLabels": "+{{count}} de plus",
+		"assignedTo": "Assigné à {{name}}",
+		"project": "Projet : {{name}}",
+		"hideDescription": "Masquer la description",
+		"showDescription": "Afficher la description",
+		"viewInLinear": "Voir dans Linear",
+		"selectTeam": "Sélectionnez une équipe pour voir ses tickets",
+		"searchPlaceholder": "Rechercher des tâches...",
+		"allStates": "Tous les états",
+		"selectedOfTotal": "{{selected}} sur {{total}} sélectionnée(s)",
+		"team": "Équipe",
+		"projectOptional": "Projet (facultatif)",
+		"allProjects": "Tous les projets",
+		"noMatch": "Aucun ticket ne correspond à vos filtres",
+		"empty": "Aucun ticket trouvé",
+		"deselectAll": "Tout désélectionner",
+		"selectAll": "Tout sélectionner"
 	}
 }

@@ -286,6 +286,18 @@
 		"hide": "Masquer les vues expérimentales",
 		"show": "Afficher les vues expérimentales ({{count}})"
 	},
+	"copilotCli": {
+		"requiresGh": "Nécessite GitHub CLI (gh)",
+		"installFrom": "Installer depuis",
+		"copilotLabel": "Copilot :",
+		"path": "Chemin :",
+		"auth": "Authentification :",
+		"lastChecked": "Dernière vérification :",
+		"login": "Se connecter",
+		"ghMissing": "gh absent",
+		"authenticated": "Authentifié",
+		"notAuthenticated": "Non authentifié"
+	},
 	"hubs": {
 		"agentHistory": "Historique des agents",
 		"costs": "Coûts et estimation",

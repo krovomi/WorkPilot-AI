@@ -720,7 +720,7 @@ export function DiffViewDialog({
 								{t("taskReview:diff.selectAll")}
 								{selectedPaths.size > 0 &&
 									selectedPaths.size < filteredFiles.length &&
-									` (${selectedPaths.size} selected)`}
+									t("taskReview:diff.selectedSuffix", { count: selectedPaths.size })}
 							</span>
 						</div>
 					)}

@@ -159,7 +159,7 @@ export function RolesTab() {
 								<Input
 									id="role-name"
 									value={draftName}
-									placeholder="Frontend Lead"
+									placeholder={t("administration:roles.namePlaceholder")}
 									onChange={(e) => setDraftName(e.target.value)}
 								/>
 							</div>

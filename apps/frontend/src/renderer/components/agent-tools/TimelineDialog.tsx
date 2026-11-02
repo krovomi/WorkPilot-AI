@@ -15,6 +15,7 @@ import {
 	type TimelineEntry,
 	fetchTimeline,
 } from "../../lib/agent-tools-api";
+import { useTranslation } from "react-i18next";
 
 export interface TimelineDialogProps {
 	readonly open: boolean;
@@ -55,6 +56,7 @@ function formatDuration(seconds: number): string {
 }
 
 function EntryRow({ entry }: { readonly entry: TimelineEntry }) {
+	const { t } = useTranslation();
 	const [expanded, setExpanded] = useState(false);
 	const hasPayload = Object.keys(entry.payload).length > 0;
 	const phaseClass = PHASE_COLORS[entry.phase] ?? PHASE_COLORS.system;
@@ -85,7 +87,7 @@ function EntryRow({ entry }: { readonly entry: TimelineEntry }) {
 							className="text-[10px] text-muted-foreground hover:text-foreground mt-1 cursor-pointer bg-transparent border-none p-0"
 							onClick={() => setExpanded(!expanded)}
 						>
-							{expanded ? "▾ Hide payload" : "▸ Show payload"}
+							{expanded ? t("agentTools:timeline.hidePayload") : t("agentTools:timeline.showPayload")}
 						</button>
 					)}
 					{expanded && hasPayload && (
@@ -108,6 +110,7 @@ export function TimelineDialog({
 	projectDir,
 	correlationId,
 }: TimelineDialogProps) {
+	const { t } = useTranslation();
 	const [timeline, setTimeline] = useState<Timeline | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -134,17 +137,16 @@ export function TimelineDialog({
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent className="max-w-3xl">
 				<DialogHeader>
-					<DialogTitle>Agent timeline</DialogTitle>
+					<DialogTitle>{t("agentTools:timeline.title")}</DialogTitle>
 					<DialogDescription>
-						Every audit-trail event for spec{" "}
-						<code className="text-xs">{correlationId}</code>, in causal order.
-						Click an event to inspect its payload.
+						{t("agentTools:timeline.descriptionBefore")}{" "}
+						<code className="text-xs">{correlationId}</code>{t("agentTools:timeline.descriptionAfter")}
 					</DialogDescription>
 				</DialogHeader>
 
 				{loading && (
 					<div className="py-8 text-center text-sm text-muted-foreground">
-						Loading timeline…
+						{t("agentTools:timeline.loading")}
 					</div>
 				)}
 
@@ -158,18 +160,22 @@ export function TimelineDialog({
 					<div className="space-y-3">
 						<div className="flex flex-wrap gap-2 text-xs">
 							<Badge variant="outline">
-								{timeline.entry_count} event{timeline.entry_count !== 1 ? "s" : ""}
+								{t("agentTools:timeline.events", { count: timeline.entry_count })}
 							</Badge>
 							<Badge variant="outline">
-								duration: {formatDuration(timeline.duration_seconds)}
+								{t("agentTools:timeline.duration", {
+									duration: formatDuration(timeline.duration_seconds),
+								})}
 							</Badge>
 							{timeline.integrity.intact ? (
 								<Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
-									chain intact
+									{t("agentTools:timeline.chainIntact")}
 								</Badge>
 							) : (
 								<Badge className="bg-red-500/15 text-red-700 dark:text-red-300">
-									⚠ chain broken: {timeline.integrity.reason}
+									{t("agentTools:timeline.chainBroken", {
+										reason: timeline.integrity.reason,
+									})}
 								</Badge>
 							)}
 							{Object.entries(timeline.phase_counts).map(([phase, count]) => (
@@ -181,8 +187,7 @@ export function TimelineDialog({
 
 						{timeline.entries.length === 0 ? (
 							<div className="py-6 text-center text-sm text-muted-foreground">
-								No events recorded yet for this spec. Events will appear once
-								an agent runs against it.
+								{t("agentTools:timeline.empty")}
 							</div>
 						) : (
 							<ScrollArea className="h-96 rounded-md border">
@@ -197,7 +202,7 @@ export function TimelineDialog({
 				)}
 
 				<DialogFooter>
-					<Button onClick={() => onOpenChange(false)}>Close</Button>
+					<Button onClick={() => onOpenChange(false)}>{t("common:buttons.close")}</Button>
 				</DialogFooter>
 			</DialogContent>
 		</Dialog>

@@ -8,6 +8,7 @@ import { Badge } from "../../ui/badge";
 import { Checkbox } from "../../ui/checkbox";
 import { getCategoryIcon } from "../constants/severity-config";
 import type { GitLabMRReviewFinding } from "../hooks/useGitLabMRs";
+import { useTranslation } from "react-i18next";
 
 interface FindingItemProps {
 	finding: GitLabMRReviewFinding;
@@ -22,6 +23,7 @@ export function FindingItem({
 	posted = false,
 	onToggle,
 }: FindingItemProps) {
+	const { t } = useTranslation();
 	const CategoryIcon = getCategoryIcon(finding.category);
 
 	return (
@@ -55,7 +57,7 @@ export function FindingItem({
 								variant="outline"
 								className="text-xs shrink-0 text-success border-success/50"
 							>
-								Posted
+								{t("gitlab:findings.posted")}
 							</Badge>
 						)}
 						<span className="font-medium text-sm break-words">
@@ -80,7 +82,7 @@ export function FindingItem({
 			{finding.suggestedFix && (
 				<div className="ml-7 text-xs">
 					<span className="text-muted-foreground font-medium">
-						Suggested fix:
+						{t("gitlab:findings.suggestedFix")}
 					</span>
 					<pre className="mt-1 p-2 bg-muted rounded text-xs overflow-x-auto max-w-full whitespace-pre-wrap break-words">
 						{finding.suggestedFix}

@@ -58,5 +58,7 @@
 	"errors": {
 		"noProject": "Please select a project to use the Code Playground",
 		"generic": "An unexpected error occurred. Please try again."
-	}
+	},
+	"fileSizeBytes": "({{count}} bytes)",
+	"previewTitle": "Code Preview"
 }

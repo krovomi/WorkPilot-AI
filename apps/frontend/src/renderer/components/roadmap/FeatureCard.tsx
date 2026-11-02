@@ -10,6 +10,7 @@ import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import type { FeatureCardProps } from "./types";
+import { useTranslation } from "react-i18next";
 
 export function FeatureCard({
 	feature,
@@ -18,6 +19,7 @@ export function FeatureCard({
 	onGoToTask,
 	hasCompetitorInsight = false,
 }: FeatureCardProps) {
+	const { t } = useTranslation();
 	return (
 		<Card
 			className="p-4 hover:bg-muted/50 cursor-pointer transition-colors"
@@ -42,7 +44,7 @@ export function FeatureCard({
 							variant="outline"
 							className={`text-xs ${ROADMAP_IMPACT_COLORS[feature.impact]}`}
 						>
-							{feature.impact} impact
+							{t("roadmap:featureCard.impact", { impact: feature.impact })}
 						</Badge>
 						{hasCompetitorInsight && (
 							<Tooltip>
@@ -52,11 +54,11 @@ export function FeatureCard({
 										className="text-xs text-primary border-primary/50"
 									>
 										<TrendingUp className="h-3 w-3 mr-1" />
-										Competitor Insight
+										{t("roadmap:featureCard.competitorInsightTitle")}
 									</Badge>
 								</TooltipTrigger>
 								<TooltipContent>
-									This feature addresses competitor pain points
+									{t("roadmap:featureCard.competitorInsight")}
 								</TooltipContent>
 							</Tooltip>
 						)}
@@ -77,7 +79,7 @@ export function FeatureCard({
 						}}
 					>
 						<ExternalLink className="h-3 w-3 mr-1" />
-						Go to Task
+						{t("roadmap:features.goToTask")}
 					</Button>
 				) : (
 					feature.status !== "done" && (
@@ -90,7 +92,7 @@ export function FeatureCard({
 							}}
 						>
 							<Play className="h-3 w-3 mr-1" />
-							Build
+							{t("roadmap:featureCard.build")}
 						</Button>
 					)
 				)}

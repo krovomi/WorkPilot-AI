@@ -12,6 +12,7 @@ import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Progress } from "../ui/progress";
 import type { PhaseCardProps } from "./types";
+import { useTranslation } from "react-i18next";
 
 export function PhaseCard({
 	phase,
@@ -21,6 +22,7 @@ export function PhaseCard({
 	onConvertToSpec,
 	onGoToTask,
 }: Readonly<PhaseCardProps>) {
+	const { t } = useTranslation();
 	const completedCount = features.filter((f) => f.status === "done").length;
 	const progress =
 		features.length > 0 ? (completedCount / features.length) * 100 : 0;
@@ -54,7 +56,7 @@ export function PhaseCard({
 					}}
 				>
 					<ExternalLink className="h-3 w-3 mr-1" />
-					View Task
+					{t("roadmap:phaseCard.viewTask")}
 				</Button>
 			);
 		}
@@ -69,7 +71,7 @@ export function PhaseCard({
 				}}
 			>
 				<Play className="h-3 w-3 mr-1" />
-				Build
+				{t("roadmap:featureCard.build")}
 			</Button>
 		);
 	};
@@ -100,9 +102,12 @@ export function PhaseCard({
 			{/* Progress */}
 			<div className="mb-4">
 				<div className="flex items-center justify-between text-sm mb-1">
-					<span className="text-muted-foreground">Progress</span>
+					<span className="text-muted-foreground">{t("roadmap:phaseCard.progress")}</span>
 					<span>
-						{completedCount}/{features.length} features
+						{t("roadmap:phaseCard.featuresProgress", {
+								completed: completedCount,
+								total: features.length,
+							})}
 					</span>
 				</div>
 				<Progress value={progress} className="h-2" />
@@ -111,7 +116,7 @@ export function PhaseCard({
 			{/* Milestones */}
 			{phase.milestones.length > 0 && (
 				<div className="mb-4">
-					<h4 className="text-sm font-medium mb-2">Milestones</h4>
+					<h4 className="text-sm font-medium mb-2">{t("roadmap:phaseCard.milestones")}</h4>
 					<div className="space-y-2">
 						{phase.milestones.map((milestone) => (
 							<div
@@ -141,7 +146,7 @@ export function PhaseCard({
 			{/* Features */}
 			<div>
 				<h4 className="text-sm font-medium mb-2">
-					Features ({features.length})
+					{t("roadmap:phaseCard.featuresCount", { count: features.length })}
 				</h4>
 				<div className="grid gap-2">
 					{features.slice(0, 5).map((feature) => (
@@ -171,7 +176,7 @@ export function PhaseCard({
 					))}
 					{features.length > 5 && (
 						<div className="text-sm text-muted-foreground text-center py-1">
-							+{features.length - 5} more features
+							{t("roadmap:phaseCard.moreFeatures", { count: features.length - 5 })}
 						</div>
 					)}
 				</div>

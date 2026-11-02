@@ -412,7 +412,7 @@ export function WorkspaceStatus({
 							{t("taskReview:merge.status.aiWillResolve")} (
 							{hasPathMappedMerges
 								? `${pathMappedAIMergeCount} ${t("taskReview:merge.status.files")}`
-								: `${commitsBehind} commits`}
+								: t("taskReview:workspace.commitsCount", { count: commitsBehind })}
 							)
 						</span>
 					</div>
@@ -528,7 +528,7 @@ export function WorkspaceStatus({
 							className="h-7 px-2 text-xs"
 						>
 							<Code className="h-3.5 w-3.5 mr-1" />
-							Open in {IDE_LABELS[preferredIDE]}
+							{t("taskReview:workspace.openIn", { app: IDE_LABELS[preferredIDE] })}
 						</Button>
 						<Button
 							variant="outline"
@@ -537,7 +537,9 @@ export function WorkspaceStatus({
 							className="h-7 px-2 text-xs"
 						>
 							<Terminal className="h-3.5 w-3.5 mr-1" />
-							Open in {TERMINAL_LABELS[preferredTerminal]}
+							{t("taskReview:workspace.openIn", {
+								app: TERMINAL_LABELS[preferredTerminal],
+							})}
 						</Button>
 					</div>
 				)}
@@ -559,12 +561,10 @@ export function WorkspaceStatus({
 						<AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
 						<div className="flex-1 min-w-0">
 							<p className="text-sm font-medium text-warning">
-								{uncommittedCount} uncommitted{" "}
-								{uncommittedCount === 1 ? "change" : "changes"} in main project
+								{t("taskReview:workspace.uncommitted", { count: uncommittedCount })}
 							</p>
 							<p className="text-xs text-muted-foreground mt-0.5">
-								Commit or stash them in your terminal before staging to avoid
-								conflicts.
+								{t("taskReview:workspace.commitOrStash")}
 							</p>
 						</div>
 					</div>
@@ -574,7 +574,7 @@ export function WorkspaceStatus({
 				{isLoadingPreview && !mergePreview && (
 					<div className="flex items-center gap-2 text-muted-foreground text-sm py-2">
 						<Loader2 className="h-4 w-4 animate-spin" />
-						Checking for conflicts...
+						{t("taskReview:merge.checkingForConflicts")}
 					</div>
 				)}
 

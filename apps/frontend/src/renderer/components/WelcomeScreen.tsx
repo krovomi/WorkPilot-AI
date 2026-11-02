@@ -112,7 +112,7 @@ export function WelcomeScreen({
 												</span>
 												{project.autoBuildPath && (
 													<span className="text-[10px] px-1.5 py-0.5 rounded-full bg-success/20 text-success shrink-0">
-														Initialized
+														{t("settings:projectSections.autoBuild.initialized")}
 													</span>
 												)}
 											</div>

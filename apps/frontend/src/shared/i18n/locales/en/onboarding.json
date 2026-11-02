@@ -159,7 +159,8 @@
 			"success": "Installation command sent to terminal. Please complete the installation there.",
 			"instructions": "The installer will open in your terminal. Follow the prompts to complete installation."
 		},
-		"learnMore": "Learn more about AI CLI"
+		"learnMore": "Learn more about AI CLI",
+		"pathLabel": "Path:"
 	},
 	"devtools": {
 		"title": "Developer Tools",
@@ -171,12 +172,14 @@
 		"ide": {
 			"label": "Preferred IDE",
 			"description": "WorkPilot AI will open worktrees in this editor",
-			"customPath": "Custom IDE Path"
+			"customPath": "Custom IDE Path",
+			"placeholder": "Select IDE..."
 		},
 		"terminal": {
 			"label": "Preferred Terminal",
 			"description": "WorkPilot AI will open terminal sessions here",
-			"customPath": "Custom Terminal Path"
+			"customPath": "Custom Terminal Path",
+			"placeholder": "Select terminal..."
 		},
 		"detectedSummary": "Detected on your system:",
 		"noToolsDetected": "No additional tools detected (VS Code and system terminal will be used)",
@@ -199,6 +202,38 @@
 			"description": "Ollama is installed but not running. Start Ollama to use local embedding models.",
 			"retry": "Retry",
 			"fallbackNote": "Memory will still work with keyword search even without embeddings."
-		}
+		},
+		"dimensions": "({{count}} dim)",
+		"checking": "Checking Ollama models...",
+		"recommended": "Recommended",
+		"highestQuality": "Highest Quality",
+		"fastest": "Fastest",
+		"installed": "Installed",
+		"downloading": "Downloading...",
+		"download": "Download",
+		"selectHint": "Select an installed model for semantic search. Memory works with keyword search even without embeddings.",
+		"startingDownload": "Starting download..."
+	},
+	"authChoice": {
+		"title": "Choose Your Authentication Method",
+		"description": "Select how you want to authenticate with Claude. You can change this later in Settings.",
+		"oauthTitle": "Sign in with Anthropic",
+		"oauthDescription": "Use your Anthropic account to authenticate. Simple and secure OAuth flow.",
+		"apiKeyTitle": "Use Custom API Key",
+		"apiKeyDescription": "Bring your own API key from Anthropic or a compatible API provider. ⚠️ Highly experimental — may incur significant costs.",
+		"footer": "Both options provide full access to Claude Code features. Choose based on your preference.",
+		"skip": "Skip for now"
+	},
+	"firstSpec": {
+		"title": "Create Your First Task",
+		"description": "Describe what you want to build and let WorkPilot AI handle the rest",
+		"openedTitle": "Task Creator Opened",
+		"openedDescription": "Great! You can create your first task now or continue with the wizard. You can always create tasks later from the main dashboard.",
+		"tipsTitle": "Tips for Great Tasks",
+		"exampleTitle": "Example Task Description:",
+		"example": "\"Add a dark mode toggle to the settings page. It should persist the user's preference in localStorage and apply the theme immediately without page reload. Use the existing color variables in styles/theme.css.\"",
+		"open": "Open Task Creator",
+		"continueHint": "You can continue with the wizard now or create more tasks.",
+		"skipHint": "You can skip this step and create tasks later from the dashboard."
 	}
 }

@@ -7,12 +7,14 @@ import {
 	CollapsibleContent,
 	CollapsibleTrigger,
 } from "../../ui/collapsible";
+import { useTranslation } from "react-i18next";
 
 interface EnvironmentSectionProps {
 	readonly environment: ServiceInfo["environment"];
 }
 
 export function EnvironmentSection({ environment }: EnvironmentSectionProps) {
+	const { t } = useTranslation();
 	const [expanded, setExpanded] = useState(false);
 
 	if (!environment || environment.detected_count === 0) {
@@ -28,7 +30,9 @@ export function EnvironmentSection({ environment }: EnvironmentSectionProps) {
 			<CollapsibleTrigger className="flex w-full items-center justify-between text-xs font-medium hover:text-foreground">
 				<div className="flex items-center gap-2">
 					<Key className="h-3 w-3" />
-					Environment Variables ({environment.detected_count})
+					{t("context:serviceSections.environmentVariables", {
+						count: environment.detected_count,
+					})}
 				</div>
 				{expanded ? (
 					<ChevronDown className="h-3 w-3" />

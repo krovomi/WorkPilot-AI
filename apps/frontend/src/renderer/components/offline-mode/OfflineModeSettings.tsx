@@ -311,7 +311,7 @@ export function OfflineModeSettings({ projectPath }: Props) {
 												{isLocal && (
 													<Home
 														className="w-3 h-3 text-green-500"
-														aria-label="local"
+														aria-label={t("offlineMode:localAria")}
 													/>
 												)}
 											</span>

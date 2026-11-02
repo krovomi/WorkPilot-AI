@@ -295,7 +295,7 @@ export function MemoriesTab({
 												{result.type.replace("_", " ")}
 											</Badge>
 											<span className="text-xs text-muted-foreground">
-												Score: {result.score.toFixed(2)}
+												{t("context:memories.score", { score: result.score.toFixed(2) })}
 											</span>
 										</div>
 										<pre className="text-xs text-muted-foreground whitespace-pre-wrap font-mono max-h-40 overflow-auto">

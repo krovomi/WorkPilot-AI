@@ -177,12 +177,24 @@ vi.mock("@/components/ui/card", () => ({
 	),
 }));
 
-// Mock i18n
-vi.mock("react-i18next", () => ({
-	useTranslation: () => ({
-		t: (key: string) => key,
-	}),
-}));
+// Mock i18n: a plain key comes back as is; a key called with values renders
+// its English text, so "85% confidence" is asserted as the user reads it.
+vi.mock("react-i18next", async () => {
+	const en: Record<string, unknown> = (
+		await import("../../../../shared/i18n/locales/en/smartEstimation.json")
+	).default;
+	return {
+		useTranslation: () => ({
+			t: (key: string, values?: Record<string, unknown>) => {
+				const text = en[key.replace(/^smartEstimation:/, "")];
+				if (!values || typeof text !== "string") return key;
+				return text.replaceAll(/\{\{(\w+)\}\}/g, (_, name: string) =>
+					String(values[name]),
+				);
+			},
+		}),
+	};
+});
 
 // Mock lucide-react icons
 vi.mock("lucide-react", () => ({

@@ -33,6 +33,7 @@ import {
 	DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { Progress } from "../ui/progress";
+import { useTranslation } from "react-i18next";
 
 interface AgentPanelProps {
 	readonly agent: AgentSlot;
@@ -97,6 +98,7 @@ export function AgentPanel({
 	// biome-ignore lint/correctness/noUnusedFunctionParameters: parameter kept for API compatibility
 	onUpdateConfig,
 }: AgentPanelProps) {
+	const { t } = useTranslation();
 	const [taskInput, setTaskInput] = useState("");
 
 	const statusColor = STATUS_COLORS[agent.status] ?? STATUS_COLORS.idle;
@@ -139,12 +141,12 @@ export function AgentPanel({
 						<DropdownMenuContent align="end" className="w-44">
 							<DropdownMenuItem onClick={onShowDecisionTree}>
 								<GitBranch className="h-3.5 w-3.5 mr-2" />
-								Decision Tree
+								{t("missionControl:decisionTree")}
 							</DropdownMenuItem>
 							<DropdownMenuSeparator />
 							<DropdownMenuItem onClick={onRemove} className="text-destructive">
 								<Trash2 className="h-3.5 w-3.5 mr-2" />
-								Remove
+								{t("missionControl:agentPanel.remove")}
 							</DropdownMenuItem>
 						</DropdownMenuContent>
 					</DropdownMenu>
@@ -156,7 +158,7 @@ export function AgentPanel({
 					<span className="text-border">•</span>
 					<span className="truncate">
 						{agent.provider ? `${agent.provider}:` : ""}
-						{agent.model_label || agent.model || "No model"}
+						{agent.model_label || agent.model || t("missionControl:agentPanel.noModel")}
 					</span>
 				</div>
 
@@ -165,7 +167,7 @@ export function AgentPanel({
 					<div className="space-y-1">
 						<div className="flex items-center justify-between text-xs">
 							<span className="text-muted-foreground truncate">
-								{agent.current_step || agent.current_task || "Working..."}
+								{agent.current_step || agent.current_task || t("missionControl:agentPanel.working")}
 							</span>
 							<span className="text-muted-foreground shrink-0">
 								{Math.round(agent.progress * 100)}%
@@ -180,7 +182,7 @@ export function AgentPanel({
 					<div className="bg-muted/30 rounded-md p-2 text-xs text-muted-foreground">
 						<div className="flex items-center gap-1.5 mb-1 font-medium text-foreground/70">
 							<Brain className="h-3 w-3" />
-							Thinking
+							{t("missionControl:agentPanel.thinking")}
 						</div>
 						<p className="line-clamp-2 italic">{agent.current_thinking}</p>
 					</div>
@@ -204,7 +206,9 @@ export function AgentPanel({
 					<div className="space-y-1">
 						<div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
 							<FileCode className="h-3 w-3" />
-							Files ({agent.active_files.length})
+							{t("missionControl:agentPanel.files", {
+								count: agent.active_files.length,
+							})}
 						</div>
 						<div className="flex flex-wrap gap-1">
 							{agent.active_files.slice(-3).map((f) => (
@@ -227,15 +231,15 @@ export function AgentPanel({
 
 				{/* Stats Row */}
 				<div className="flex items-center gap-3 text-xs text-muted-foreground pt-1 border-t border-border/30">
-					<div className="flex items-center gap-1" title="Tokens">
+					<div className="flex items-center gap-1" title={t("missionControl:statTokens")}>
 						<Cpu className="h-3 w-3" />
 						{agent.tokens.total_tokens.toLocaleString()}
 					</div>
-					<div className="flex items-center gap-1" title="Cost">
+					<div className="flex items-center gap-1" title={t("missionControl:statCost")}>
 						<DollarSign className="h-3 w-3" />$
 						{agent.tokens.estimated_cost_usd.toFixed(4)}
 					</div>
-					<div className="flex items-center gap-1" title="Elapsed">
+					<div className="flex items-center gap-1" title={t("missionControl:statElapsed")}>
 						<Clock className="h-3 w-3" />
 						{formatElapsed(agent.elapsed_seconds)}
 					</div>
@@ -253,7 +257,7 @@ export function AgentPanel({
 						<>
 							<input
 								type="text"
-								placeholder="Task description..."
+								placeholder={t("missionControl:agentPanel.taskPlaceholder")}
 								value={taskInput}
 								onChange={(e) => setTaskInput(e.target.value)}
 								onKeyDown={(e) => {
@@ -327,7 +331,7 @@ export function AgentPanel({
 							onClick={() => onStart("")}
 						>
 							<Play className="h-3 w-3 mr-1" />
-							Restart
+							{t("missionControl:agentPanel.restart")}
 						</Button>
 					)}
 				</div>

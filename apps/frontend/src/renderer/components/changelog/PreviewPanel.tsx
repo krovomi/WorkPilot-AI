@@ -44,6 +44,7 @@ interface LocalImageProps {
 }
 
 function LocalImage({ src, alt, projectPath }: LocalImageProps) {
+	const { t } = useTranslation();
 	const [imageSrc, setImageSrc] = useState<string | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
@@ -97,7 +98,7 @@ function LocalImage({ src, alt, projectPath }: LocalImageProps) {
 		return (
 			<span className="inline-flex items-center gap-2 rounded border border-border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
 				<Loader2 className="h-4 w-4 animate-spin" />
-				<span>Loading image...</span>
+				<span>{t("changelog:previewPanel.loadingImage")}</span>
 			</span>
 		);
 	}
@@ -106,7 +107,7 @@ function LocalImage({ src, alt, projectPath }: LocalImageProps) {
 		return (
 			<span className="inline-flex items-center gap-2 rounded border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
 				<ImageIcon className="h-4 w-4" />
-				<span>{error || "Image not found"}</span>
+				<span>{error || t("changelog:previewPanel.imageNotFound")}</span>
 			</span>
 		);
 	}
@@ -166,7 +167,7 @@ export function PreviewPanel({
 			{/* Preview Header */}
 			<div className="flex items-center justify-between border-b border-border px-6 py-3">
 				<div className="flex items-center gap-3">
-					<h2 className="font-medium">Preview</h2>
+					<h2 className="font-medium">{t("changelog:previewPanel.preview")}</h2>
 					<div className="flex items-center gap-1 rounded-md border border-border p-1">
 						<Button
 							variant={viewMode === "markdown" ? "default" : "ghost"}
@@ -182,7 +183,7 @@ export function PreviewPanel({
 							onClick={() => setViewMode("preview")}
 							className="h-7 px-3 text-xs"
 						>
-							Preview
+							{t("changelog:previewPanel.preview")}
 						</Button>
 					</div>
 				</div>
@@ -200,10 +201,10 @@ export function PreviewPanel({
 								) : (
 									<Copy className="mr-2 h-4 w-4" />
 								)}
-								{copySuccess ? "Copied!" : "Copy"}
+								{copySuccess ? t("changelog:previewPanel.copied") : t("changelog:previewPanel.copyShort")}
 							</Button>
 						</TooltipTrigger>
-						<TooltipContent>Copy to clipboard</TooltipContent>
+						<TooltipContent>{t("changelog:previewPanel.copy")}</TooltipContent>
 					</Tooltip>
 					<Tooltip>
 						<TooltipTrigger asChild>
@@ -219,16 +220,16 @@ export function PreviewPanel({
 									<Save className="mr-2 h-4 w-4" />
 								)}
 								{saveSuccess
-									? "Saved!"
+									? t("changelog:previewPanel.saved")
 									: serverProject
 										? t("server.save")
-										: "Save to CHANGELOG.md"}
+										: t("changelog:previewPanel.saveToFile")}
 							</Button>
 						</TooltipTrigger>
 						<TooltipContent>
 							{serverProject
 								? t("server.saveTooltip")
-								: "Prepend to CHANGELOG.md in project root"}
+								: t("changelog:previewPanel.prepend")}
 						</TooltipContent>
 					</Tooltip>
 				</div>
@@ -238,7 +239,7 @@ export function PreviewPanel({
 			{/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: drag-and-drop zone */}
 			<section
 				className={`flex-1 overflow-hidden p-6 ${isDragOver ? "bg-muted/50" : ""}`}
-				aria-label="Changelog preview with drag and drop support"
+				aria-label={t("changelog:previewPanel.aria")}
 				onDragOver={onDragOver}
 				onDragLeave={onDragLeave}
 				onDrop={onDrop}
@@ -249,7 +250,7 @@ export function PreviewPanel({
 							<div className="mb-4 rounded-lg border-2 border-dashed border-primary/50 bg-primary/5 p-4 text-center">
 								<ImageIcon className="mx-auto h-8 w-8 text-primary/50" />
 								<p className="mt-2 text-sm text-primary/70">
-									Drop images here to add to changelog
+									{t("changelog:previewPanel.dropImages")}
 								</p>
 							</div>
 						)}
@@ -263,8 +264,7 @@ export function PreviewPanel({
 								<div className="flex items-center gap-2 text-xs text-muted-foreground">
 									<ImageIcon className="h-3.5 w-3.5" />
 									<span>
-										Paste images into the description to save them to the
-										changelog
+										{t("changelog:previewPanel.pasteImages")}
 									</span>
 								</div>
 								<Textarea
@@ -273,7 +273,7 @@ export function PreviewPanel({
 									value={generatedChangelog}
 									onChange={(e) => onChangelogEdit(e.target.value)}
 									onPaste={onPaste}
-									placeholder="Generated changelog will appear here..."
+									placeholder={t("changelog:previewPanel.placeholder")}
 								/>
 							</div>
 						) : (
@@ -294,13 +294,12 @@ export function PreviewPanel({
 						<div className="text-center">
 							<FileText className="mx-auto h-12 w-12 text-muted-foreground/30" />
 							<p className="mt-4 text-sm text-muted-foreground">
-								Click "Generate Changelog" to create release notes.
+								{t("changelog:previewPanel.empty")}
 							</p>
 							<p className="mt-2 text-xs text-muted-foreground flex items-center justify-center gap-2">
 								<ImageIcon className="h-3.5 w-3.5" />
 								<span>
-									Paste images into the description to save them to the
-									changelog
+									{t("changelog:previewPanel.pasteImages")}
 								</span>
 							</p>
 						</div>

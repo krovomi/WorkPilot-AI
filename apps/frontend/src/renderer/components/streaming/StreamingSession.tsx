@@ -592,7 +592,10 @@ export function StreamingSession({
 					<div className="px-4 py-2 border-b bg-muted/20">
 						<p className="text-sm font-mono text-muted-foreground truncate">
 							{selectedEvent
-								? `Event: ${selectedEvent.event_type} - ${new Date(selectedEvent.timestamp * 1000).toLocaleTimeString()}`
+								? t("streaming:eventLabel", {
+										type: selectedEvent.event_type,
+										time: new Date(selectedEvent.timestamp * 1000).toLocaleTimeString(),
+									})
 								: currentFile || t("streaming:codeView.noFile")}
 						</p>
 					</div>
@@ -718,7 +721,7 @@ export function StreamingSession({
 															selectedEvent?.event_type ===
 																event.event_type && (
 																<Badge variant="default" className="text-xs">
-																	Selected
+																	{t("streaming:selectedBadge")}
 																</Badge>
 															)}
 													</div>

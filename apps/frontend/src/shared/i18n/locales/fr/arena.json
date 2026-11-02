@@ -84,5 +84,7 @@
 	"errors": {
 		"startFailed": "Impossible de démarrer le combat",
 		"voteFailed": "Impossible de soumettre le vote"
-	}
+	},
+	"tokensUsed": "{{value}} tokens",
+	"modelFallback": "Modèle {{label}}"
 }

@@ -326,7 +326,7 @@ export function OllamaModelSelector({
 			<div className={cn("flex items-center justify-center py-8", className)}>
 				<Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
 				<span className="ml-2 text-sm text-muted-foreground">
-					Checking Ollama models...
+					{t("onboarding:ollama.checking")}
 				</span>
 			</div>
 		);
@@ -509,26 +509,26 @@ export function OllamaModelSelector({
 										<div className="flex items-center gap-2">
 											<span className="text-sm font-medium">{model.name}</span>
 											<span className="text-xs text-muted-foreground">
-												({model.dim} dim)
+												{t("onboarding:ollama.dimensions", { count: model.dim })}
 											</span>
 											{model.badge === "recommended" && (
 												<span className="inline-flex items-center rounded-full bg-primary/15 px-2 py-0.5 text-xs font-medium text-primary">
-													Recommended
+													{t("onboarding:ollama.recommended")}
 												</span>
 											)}
 											{model.badge === "quality" && (
 												<span className="inline-flex items-center rounded-full bg-violet-500/15 px-2 py-0.5 text-xs font-medium text-violet-600 dark:text-violet-400">
-													Highest Quality
+													{t("onboarding:ollama.highestQuality")}
 												</span>
 											)}
 											{model.badge === "fast" && (
 												<span className="inline-flex items-center rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400">
-													Fastest
+													{t("onboarding:ollama.fastest")}
 												</span>
 											)}
 											{model.installed && (
 												<span className="inline-flex items-center rounded-full bg-success/10 px-2 py-0.5 text-xs text-success">
-													Installed
+													{t("onboarding:ollama.installed")}
 												</span>
 											)}
 										</div>
@@ -553,12 +553,12 @@ export function OllamaModelSelector({
 										{isCurrentlyDownloading ? (
 											<>
 												<Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-												Downloading...
+												{t("onboarding:ollama.downloading")}
 											</>
 										) : (
 											<>
 												<Download className="h-3.5 w-3.5 mr-1.5" />
-												Download
+												{t("onboarding:ollama.download")}
 												{model.size_estimate && (
 													<span className="ml-1 text-muted-foreground">
 														({model.size_estimate})
@@ -592,7 +592,7 @@ export function OllamaModelSelector({
 										<span className="font-medium text-foreground">
 											{progress && progress.percentage > 0
 												? `${Math.round(progress.percentage)}%`
-												: "Starting download..."}
+												: t("onboarding:ollama.startingDownload")}
 										</span>
 										<div className="flex items-center gap-2">
 											{progress?.speed && <span>{progress.speed}</span>}
@@ -611,8 +611,7 @@ export function OllamaModelSelector({
 			</div>
 
 			<p className="text-xs text-muted-foreground">
-				Select an installed model for semantic search. Memory works with keyword
-				search even without embeddings.
+				{t("onboarding:ollama.selectHint")}
 			</p>
 		</div>
 	);

@@ -86,7 +86,7 @@ export function PromptPreviewDialog({
 					<div className="space-y-3">
 						<div className="flex flex-wrap gap-2 text-xs">
 							<Badge variant="outline">
-								{t("promptPreview.badges.model")} <code>{preview.model || "default"}</code>
+								{t("promptPreview.badges.model")} <code>{preview.model || t("agentTools:promptPreview.defaultModel")}</code>
 							</Badge>
 							<Badge variant="outline">
 								{t("promptPreview.badges.provider")} <code>{preview.provider}</code>

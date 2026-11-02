@@ -745,7 +745,7 @@ export function AzureDevOpsSidePanel({
 						{/* Repository info - display if available */}
 						{workItems.length > 0 && workItems[0]?.repository && (
 							<p className="text-sm text-foreground/70 mt-1">
-								<strong>Repository:</strong> {workItems[0].repository}
+								<strong>{t("settings:azureDevOpsImport.repositoryLabel")}</strong> {workItems[0].repository}
 							</p>
 						)}
 					</div>
@@ -1053,7 +1053,7 @@ export function AzureDevOpsSidePanel({
 					type="button"
 					className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/20 transition-colors border-0 bg-transparent p-0"
 					onMouseDown={handleResizeStart}
-					title="Redimensionner"
+					title={t("settings:jiraImport.resize")}
 					aria-label={t("azureDevOpsImport.resizeHandleAriaLabel")}
 				>
 					{/* Wider invisible hit area for easier grabbing */}

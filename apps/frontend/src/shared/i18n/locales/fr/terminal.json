@@ -46,5 +46,17 @@
 		"detached": "(détaché)",
 		"remotePushFailed": "Suivi distant non configure",
 		"remotePushFailedDescription": "L'arbre de travail a ete cree mais la branche n'a pas pu etre poussee vers le depot distant. Vous devrez peut-etre executer git push -u manuellement."
-	}
+	},
+	"dropToInsertPath": "Déposez pour insérer le chemin",
+	"taskSelector": {
+		"current": "Tâche en cours",
+		"switchTo": "Passer à...",
+		"clear": "Retirer la tâche",
+		"select": "Choisir une tâche...",
+		"available": "Tâches disponibles",
+		"add": "Ajouter une tâche",
+		"empty": "Aucune tâche disponible",
+		"emptyHint": "Créez des tâches dans le tableau Kanban"
+	},
+	"doubleClickToRename": "Double-cliquez pour renommer"
 }

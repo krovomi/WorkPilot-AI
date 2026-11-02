@@ -27,7 +27,9 @@
 		"openExternal": "Open in Browser",
 		"useEmulatorUrl": "Use Emulator URL",
 		"capturing": "Capturing...",
-		"errorHint": "Check that the URL is reachable and try again."
+		"errorHint": "Check that the URL is reachable and try again.",
+		"forward": "Forward",
+		"screenshotAlt": "Browser screenshot"
 	},
 	"regression": {
 		"setBaseline": "Set as Baseline",

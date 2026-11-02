@@ -325,7 +325,7 @@ export function GuardrailsSettings() {
 								className="w-full border rounded-md p-2 text-sm font-mono min-h-20 bg-background"
 								value={testContent}
 								onChange={(e) => setTestContent(e.target.value)}
-								placeholder="file content…"
+								placeholder={t("settings:guardrails.fileContentPlaceholder")}
 							/>
 						</>
 					)}

@@ -5,6 +5,7 @@ import { Label } from "../ui/label";
 import { CollapsibleSection } from "./CollapsibleSection";
 import { PasswordInput } from "./PasswordInput";
 import { StatusBadge } from "./StatusBadge";
+import { useTranslation } from "react-i18next";
 
 interface ClaudeAuthSectionProps {
 	isExpanded: boolean;
@@ -29,16 +30,17 @@ export function ClaudeAuthSection({
 	onClaudeSetup,
 	onUpdateConfig,
 }: ClaudeAuthSectionProps) {
+	const { t } = useTranslation();
 	const badge =
 		authStatus === "authenticated" ? (
-			<StatusBadge status="success" label="Connected" />
+			<StatusBadge status="success" label={t("settings:projectSections.claude.connected")} />
 		) : authStatus === "not_authenticated" ? (
-			<StatusBadge status="warning" label="Not Connected" />
+			<StatusBadge status="warning" label={t("settings:projectSections.claude.notConnected")} />
 		) : null;
 
 	return (
 		<CollapsibleSection
-			title="Claude Authentication"
+			title={t("settings:projectSections.claude.authTitle")}
 			icon={<Key className="h-4 w-4" />}
 			isExpanded={isExpanded}
 			onToggle={onToggle}
@@ -47,7 +49,7 @@ export function ClaudeAuthSection({
 			{isLoadingEnv ? (
 				<div className="flex items-center gap-2 text-sm text-muted-foreground">
 					<Loader2 className="h-4 w-4 animate-spin" />
-					Loading configuration...
+					{t("settings:projectSections.claude.loadingConfig")}
 				</div>
 			) : envConfig ? (
 				<>
@@ -60,12 +62,12 @@ export function ClaudeAuthSection({
 								</p>
 								<p className="text-xs text-muted-foreground">
 									{isCheckingAuth
-										? "Checking..."
+										? t("settings:projectSections.github.checking")
 										: authStatus === "authenticated"
-											? "Authenticated via OAuth"
+											? t("settings:projectSections.claude.authenticatedOAuth")
 											: authStatus === "not_authenticated"
-												? "Not authenticated"
-												: "Status unknown"}
+												? t("settings:projectSections.claude.notAuthenticated")
+												: t("settings:projectSections.claude.statusUnknown")}
 								</p>
 							</div>
 							<Button
@@ -80,8 +82,8 @@ export function ClaudeAuthSection({
 									<>
 										<ExternalLink className="h-4 w-4 mr-2" />
 										{authStatus === "authenticated"
-											? "Re-authenticate"
-											: "Setup OAuth"}
+											? t("settings:projectSections.claude.reauthenticate")
+											: t("settings:projectSections.claude.setupOAuth")}
 									</>
 								)}
 							</Button>
@@ -92,23 +94,25 @@ export function ClaudeAuthSection({
 					<div className="space-y-2">
 						<div className="flex items-center justify-between">
 							<Label className="text-sm font-medium text-foreground">
-								OAuth Token {envConfig.claudeTokenIsGlobal ? "(Override)" : ""}
+								{t("settings:accounts.form.oauthToken")}{" "}
+								{envConfig.claudeTokenIsGlobal
+									? t("settings:projectSections.claude.override")
+									: ""}
 							</Label>
 							{envConfig.claudeTokenIsGlobal && (
 								<span className="flex items-center gap-1 text-xs text-info">
 									<Globe className="h-3 w-3" />
-									Using global token
+									{t("settings:projectSections.claude.usingGlobalToken")}
 								</span>
 							)}
 						</div>
 						{envConfig.claudeTokenIsGlobal ? (
 							<p className="text-xs text-muted-foreground">
-								Using token from App Settings. Enter a project-specific token
-								below to override.
+								{t("settings:projectSections.claude.usingGlobalTokenDescription")}
 							</p>
 						) : (
 							<p className="text-xs text-muted-foreground">
-								Paste a token from{" "}
+								{t("settings:projectSections.claude.pasteTokenFrom")}{" "}
 								<code className="px-1 bg-muted rounded">
 									claude setup-token
 								</code>

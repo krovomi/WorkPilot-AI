@@ -19,5 +19,6 @@
 	"errors": {
 		"noProject": "Select a project to run the Regression Guardian scan.",
 		"failed": "Scan failed: {{error}}"
-	}
+	},
+	"unknownException": "unknown"
 }

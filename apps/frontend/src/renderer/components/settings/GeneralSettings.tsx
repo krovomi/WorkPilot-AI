@@ -52,7 +52,7 @@ function ToolDetectionDisplay({
 }: ToolDetectionDisplayProps) {
 	if (isLoading) {
 		return (
-			<div className="text-xs text-muted-foreground mt-1">Detecting...</div>
+			<div className="text-xs text-muted-foreground mt-1">{t("settings:general.detecting")}</div>
 		);
 	}
 

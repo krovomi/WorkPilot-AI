@@ -81,7 +81,7 @@ function IncidentRow({
 			<div className="flex-1 min-w-0">
 				<p className="text-sm font-medium truncate">{incident.title}</p>
 				<p className="text-xs text-(--text-secondary)">
-					{incident.source} · {incident.exceptionType || "unknown"}
+					{incident.source} · {incident.exceptionType || t("regressionGuardian:unknownException")}
 				</p>
 			</div>
 			{actionContent}

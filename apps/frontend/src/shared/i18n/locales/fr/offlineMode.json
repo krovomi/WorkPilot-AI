@@ -45,5 +45,6 @@
 	"disableStrict": "Désactiver le mode strict",
 	"disablingStrict": "Désactivation…",
 	"disableStrictHint": "La table de routage locale est conservée ; seul le blocage du cloud est levé.",
-	"disableStrictFailed": "Désactivation impossible : {{error}}"
+	"disableStrictFailed": "Désactivation impossible : {{error}}",
+	"localAria": "local"
 }

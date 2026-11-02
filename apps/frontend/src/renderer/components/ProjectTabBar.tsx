@@ -232,13 +232,13 @@ export function ProjectTabBar({
 							size="icon"
 							className="h-8 w-8 shrink-0"
 							onClick={() => scrollTabs("left")}
-							aria-label="Défiler vers la gauche"
+							aria-label={t("common:projectTab.scrollLeft")}
 						>
 							<ChevronLeft className="h-4 w-4" />
 						</Button>
 					</TooltipTrigger>
 					<TooltipContent>
-						<p>Défiler vers la gauche</p>
+						<p>{t("common:projectTab.scrollLeft")}</p>
 					</TooltipContent>
 				</Tooltip>
 			)}
@@ -298,13 +298,13 @@ export function ProjectTabBar({
 							size="icon"
 							className="h-8 w-8 shrink-0"
 							onClick={() => scrollTabs("right")}
-							aria-label="Défiler vers la droite"
+							aria-label={t("common:projectTab.scrollRight")}
 						>
 							<ChevronRight className="h-4 w-4" />
 						</Button>
 					</TooltipTrigger>
 					<TooltipContent>
-						<p>Défiler vers la droite</p>
+						<p>{t("common:projectTab.scrollRight")}</p>
 					</TooltipContent>
 				</Tooltip>
 			)}

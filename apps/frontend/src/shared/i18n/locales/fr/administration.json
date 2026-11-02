@@ -100,7 +100,8 @@
 		"builtInReadOnly": "Les rôles intégrés ne sont pas modifiables, afin qu'une mise à jour ajoutant une permission atteigne toutes les organisations. Créez un rôle personnalisé pour définir le vôtre.",
 		"permissionCount": "{{count}} permissions",
 		"privileged": "Action à privilège",
-		"selectPrompt": "Sélectionnez un rôle pour voir les permissions qu'il accorde."
+		"selectPrompt": "Sélectionnez un rôle pour voir les permissions qu'il accorde.",
+		"namePlaceholder": "Responsable frontend"
 	},
 	"organizations": {
 		"platformAdminOnly": "Seul un administrateur de la plateforme peut gérer les organisations.",

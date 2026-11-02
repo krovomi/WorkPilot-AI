@@ -447,7 +447,7 @@ export function CopilotCliStatusBadge({
 										status === "error") && (
 										<span className="ml-auto text-[10px] bg-destructive/20 text-destructive px-1.5 py-0.5 rounded">
 											{status === "gh-missing"
-												? "gh missing"
+												? t("navigation:copilotCli.ghMissing")
 												: t("common:install", "Install")}
 										</span>
 									)}
@@ -492,9 +492,9 @@ export function CopilotCliStatusBadge({
 					{/* gh-missing notice */}
 					{status === "gh-missing" && (
 						<div className="text-xs p-2 bg-destructive/10 text-destructive rounded-md">
-							<p className="font-medium">Requires GitHub CLI (gh)</p>
+							<p className="font-medium">{t("navigation:copilotCli.requiresGh")}</p>
 							<p className="mt-1 text-muted-foreground">
-								Install from{" "}
+								{t("navigation:copilotCli.installFrom")}{" "}
 								<button
 									type="button"
 									className="underline text-primary"
@@ -515,7 +515,7 @@ export function CopilotCliStatusBadge({
 						<div className="text-xs space-y-1 p-2 bg-muted rounded-md">
 							{versionInfo.installed && (
 								<div className="flex justify-between">
-									<span className="text-muted-foreground">Copilot:</span>
+									<span className="text-muted-foreground">{t("navigation:copilotCli.copilotLabel")}</span>
 									<span className="font-mono">{versionInfo.installed}</span>
 								</div>
 							)}
@@ -529,7 +529,7 @@ export function CopilotCliStatusBadge({
 								<div className="flex justify-between items-center gap-2">
 									<span className="text-muted-foreground flex items-center gap-1">
 										<FolderOpen className="h-3 w-3" />
-										Path:
+										{t("navigation:copilotCli.path")}
 									</span>
 									<span
 										className="font-mono text-[10px] truncate max-w-[140px]"
@@ -541,7 +541,7 @@ export function CopilotCliStatusBadge({
 							)}
 							{authStatus && (
 								<div className="flex justify-between">
-									<span className="text-muted-foreground">Auth:</span>
+									<span className="text-muted-foreground">{t("navigation:copilotCli.auth")}</span>
 									<span
 										className={
 											authStatus.authenticated
@@ -550,14 +550,14 @@ export function CopilotCliStatusBadge({
 										}
 									>
 										{authStatus.authenticated
-											? authStatus.username || "Authenticated"
-											: "Not authenticated"}
+											? authStatus.username || t("navigation:copilotCli.authenticated")
+											: t("navigation:copilotCli.notAuthenticated")}
 									</span>
 								</div>
 							)}
 							{lastChecked && (
 								<div className="flex justify-between text-muted-foreground">
-									<span>Last checked:</span>
+									<span>{t("navigation:copilotCli.lastChecked")}</span>
 									<span>{lastChecked.toLocaleTimeString()}</span>
 								</div>
 							)}
@@ -595,7 +595,7 @@ export function CopilotCliStatusBadge({
 									onClick={startAuth}
 								>
 									<LogIn className="h-3 w-3" />
-									Login
+									{t("navigation:copilotCli.login")}
 								</Button>
 							)}
 						<Button

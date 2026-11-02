@@ -12,6 +12,7 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
+import { useTranslation } from "react-i18next";
 
 interface LearningModeToggleProps {
 	readonly config?: LearningModeConfig;
@@ -52,6 +53,7 @@ export function LearningModeToggle({
 	onConfigChange,
 	disabled,
 }: LearningModeToggleProps) {
+	const { t } = useTranslation();
 	const [isOpen, setIsOpen] = useState(false);
 
 	const currentConfig: LearningModeConfig = config || {
@@ -100,7 +102,7 @@ export function LearningModeToggle({
 				)}
 			>
 				<GraduationCap className="mr-2 h-4 w-4" />
-				Mode Apprentissage
+				{t("common:learningMode.title")}
 			</Button>
 
 			{currentConfig.enabled && (
@@ -114,7 +116,7 @@ export function LearningModeToggle({
 						</Button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent align="end" className="w-80">
-						<DropdownMenuLabel>Niveau d'explication</DropdownMenuLabel>
+						<DropdownMenuLabel>{t("common:learningMode.explanationLevel")}</DropdownMenuLabel>
 						<DropdownMenuSeparator />
 						{EXPLANATION_LEVELS.map((level) => (
 							<DropdownMenuItem
@@ -129,7 +131,7 @@ export function LearningModeToggle({
 									<span className="font-medium">{level.label}</span>
 									{currentConfig.explanationLevel === level.value && (
 										<Badge variant="default" className="text-xs">
-											Actif
+											{t("common:learningMode.active")}
 										</Badge>
 									)}
 								</div>

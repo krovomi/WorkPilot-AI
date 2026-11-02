@@ -32,5 +32,8 @@
 		"recommendations": "Recommendations",
 		"similarTasks": "Similar Historical Tasks",
 		"similarTasksDescription": "Based on your build history, these similar tasks provide context for the estimation"
-	}
+	},
+	"confidencePercent": "{{percent}}% confidence",
+	"scoreLabel": "Score: {{score}}",
+	"similarPercent": "{{percent}}% similar"
 }

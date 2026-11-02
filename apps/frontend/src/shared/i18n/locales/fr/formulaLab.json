@@ -70,5 +70,8 @@
 		"appliedDesc": "{{model}} · {{effort}} sera utilisé pour chaque phase de cette tâche.",
 		"failedTitle": "Impossible d'appliquer la formule",
 		"failedDesc": "La configuration de la tâche n'a pas été enregistrée. Réessayez."
+	},
+	"frontier": {
+		"success": "de réussite"
 	}
 }

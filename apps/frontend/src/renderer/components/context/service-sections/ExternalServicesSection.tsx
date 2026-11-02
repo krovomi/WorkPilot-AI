@@ -15,6 +15,7 @@ import {
 	CollapsibleContent,
 	CollapsibleTrigger,
 } from "../../ui/collapsible";
+import { useTranslation } from "react-i18next";
 
 interface ExternalServicesSectionProps {
 	readonly services: ServiceInfo["services"];
@@ -23,6 +24,7 @@ interface ExternalServicesSectionProps {
 export function ExternalServicesSection({
 	services,
 }: ExternalServicesSectionProps) {
+	const { t } = useTranslation();
 	const [expanded, setExpanded] = useState(false);
 
 	if (
@@ -41,7 +43,7 @@ export function ExternalServicesSection({
 			<CollapsibleTrigger className="flex w-full items-center justify-between text-xs font-medium hover:text-foreground">
 				<div className="flex items-center gap-2">
 					<Server className="h-3 w-3" />
-					External Services
+					{t("context:service.externalServices")}
 				</div>
 				{expanded ? (
 					<ChevronDown className="h-3 w-3" />
@@ -52,7 +54,7 @@ export function ExternalServicesSection({
 			<CollapsibleContent className="mt-2 space-y-2">
 				{services.databases && services.databases.length > 0 && (
 					<div>
-						<span className="text-xs text-muted-foreground">Databases</span>
+						<span className="text-xs text-muted-foreground">{t("context:serviceSections.databases")}</span>
 						<div className="flex flex-wrap gap-1 mt-1">
 							{services.databases.map((db) => (
 								<Badge
@@ -69,7 +71,7 @@ export function ExternalServicesSection({
 				)}
 				{services.email && services.email.length > 0 && (
 					<div>
-						<span className="text-xs text-muted-foreground">Email</span>
+						<span className="text-xs text-muted-foreground">{t("context:serviceSections.email")}</span>
 						<div className="flex flex-wrap gap-1 mt-1">
 							{services.email.map((email) => (
 								<Badge
@@ -86,7 +88,7 @@ export function ExternalServicesSection({
 				)}
 				{services.payments && services.payments.length > 0 && (
 					<div>
-						<span className="text-xs text-muted-foreground">Payments</span>
+						<span className="text-xs text-muted-foreground">{t("context:serviceSections.payments")}</span>
 						<div className="flex flex-wrap gap-1 mt-1">
 							{services.payments.map((payment) => (
 								<Badge
@@ -103,7 +105,7 @@ export function ExternalServicesSection({
 				)}
 				{services.cache && services.cache.length > 0 && (
 					<div>
-						<span className="text-xs text-muted-foreground">Cache</span>
+						<span className="text-xs text-muted-foreground">{t("context:serviceSections.cache")}</span>
 						<div className="flex flex-wrap gap-1 mt-1">
 							{services.cache.map((cache) => (
 								<Badge

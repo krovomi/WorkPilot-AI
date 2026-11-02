@@ -206,13 +206,13 @@ export function SectionRouter({
 		case "azure-devops":
 			return (
 				<SettingsSection
-					title="Azure DevOps Integration"
-					description="Configure and manage Azure DevOps work item synchronization"
+					title={t("settings:azureDevOps.integrationTitle")}
+					description={t("settings:azureDevOps.integrationDescription")}
 				>
 					<InitializationGuard
 						initialized={!!project.autoBuildPath}
-						title="Azure DevOps Integration"
-						description="Enable Azure DevOps integration to sync work items with your backlog"
+						title={t("settings:azureDevOps.integrationTitle")}
+						description={t("settings:azureDevOps.enableDescription")}
 					>
 						<AzureDevOpsIntegration
 							projectId={project.id}
@@ -272,7 +272,7 @@ export function SectionRouter({
 					<InitializationGuard
 						initialized={!!project.autoBuildPath}
 						title={t("jira.title")}
-						description="Enable Jira integration to sync issues with your backlog"
+						description={t("settings:jira.initGuardDescription")}
 					>
 						<JiraIntegration
 							projectId={project.id}

@@ -18,7 +18,8 @@
 			"domainAddendum": "addendum de domaine (+{{count}}car)",
 			"tools": "{{count}} outils"
 		},
-		"allowedTools": "Outils autorisés ({{count}})"
+		"allowedTools": "Outils autorisés ({{count}})",
+		"defaultModel": "par défaut"
 	},
 	"restartDialog": {
 		"title": "Redémarrer l'agent",
@@ -43,5 +44,59 @@
 				"description": "Abandonner le plan actuel et recommencer. Le plus coûteux — équivalent à une nouvelle construction."
 			}
 		}
+	},
+	"costDialog": {
+		"unavailable": "Estimation indisponible : {{error}}",
+		"confidence": "confiance {{level}}",
+		"inOut": "{{input}} entrée / {{output}} sortie",
+		"title": "Coût estimé du build",
+		"descriptionBefore": "Projection des tokens et du coût pour",
+		"descriptionAfter": "avant le démarrage de l'agent.",
+		"estimating": "Estimation…",
+		"total": "Estimation totale",
+		"start": "Lancer le build"
+	},
+	"promotion": {
+		"ready": "✓ prêt à promouvoir (≥ {{threshold}})",
+		"below": "⚠ sous le seuil ({{threshold}})",
+		"reasoning": "Raisonnement ({{count}})",
+		"title": "Promotion automatique QA",
+		"descriptionBefore": "Noter le résultat de la QA et décider de sauter ou non",
+		"descriptionMiddle": ". Le seuil se règle avec la variable",
+		"descriptionAfter": "(non définie = fonction désactivée).",
+		"scoring": "Notation…",
+		"confidence": "Score de confiance",
+		"featureOff": "fonction désactivée",
+		"accept": "Accepter et sauter la revue humaine"
+	},
+	"timeline": {
+		"events_one": "{{count}} événement",
+		"events_other": "{{count}} événements",
+		"duration": "durée : {{duration}}",
+		"chainBroken": "⚠ chaîne rompue : {{reason}}",
+		"title": "Chronologie de l'agent",
+		"descriptionBefore": "Tous les événements d'audit de la spec",
+		"descriptionAfter": ", dans l'ordre causal. Cliquez sur un événement pour voir son contenu.",
+		"loading": "Chargement de la chronologie…",
+		"chainIntact": "chaîne intacte",
+		"empty": "Aucun événement pour cette spec. Ils apparaîtront dès qu'un agent tournera dessus.",
+		"hidePayload": "▾ Masquer le contenu",
+		"showPayload": "▸ Afficher le contenu"
+	},
+	"virtualReviewer": {
+		"chars": "{{label}} : {{count}} car.",
+		"title": "Relecteur virtuel (consultatif)",
+		"disclaimer": "Commentaire généré par la machine, pas une revue humaine.",
+		"writesBefore": "Écrit",
+		"writesAfter": "à la racine de la spec. Ne signe jamais en votre nom, n'ouvre jamais de PR. Activation via",
+		"loading": "Chargement…",
+		"enabled": "activé",
+		"disabled": "désactivé (variable d'environnement absente)",
+		"selfReviewPresent": "self_review.md présent",
+		"diffTruncated": "diff tronqué",
+		"written": "✓ virtual_review.md écrit",
+		"stubNotice": "Le point d'accès HTTP tourne en mode bouchon (repli déterministe). Pour une revue complète par le SDK, le runtime de l'agent doit brancher un client invocable dans le processus.",
+		"running": "En cours…",
+		"run": "Lancer la revue virtuelle"
 	}
 }

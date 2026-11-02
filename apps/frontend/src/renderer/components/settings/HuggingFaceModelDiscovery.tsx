@@ -628,25 +628,25 @@ export function HuggingFaceModelDiscovery({
 					value={minParamB}
 					onChange={(e) => setMinParamB(e.target.value)}
 					className={selectClass}
-					aria-label="Taille minimale (paramètres)"
+					aria-label={t("settings:sections.accounts.modelDiscovery.filters.minParamsAria")}
 				>
-					<option value="">Params : tous</option>
+					<option value="">{t("settings:sections.accounts.modelDiscovery.filters.paramsAll")}</option>
 					<option value="7">≥ 7B</option>
 					<option value="14">≥ 14B</option>
-					<option value="24">≥ 24B (planif.)</option>
+					<option value="24">{t("settings:sections.accounts.modelDiscovery.filters.params24")}</option>
 					<option value="70">≥ 70B</option>
 				</select>
 				<select
 					value={maxGb}
 					onChange={(e) => setMaxGb(e.target.value)}
 					className={selectClass}
-					aria-label="Taille disque max. estimée (Go)"
+					aria-label={t("settings:sections.accounts.modelDiscovery.filters.maxDiskAria")}
 				>
-					<option value="">Disque : tous</option>
-					<option value="6">≤ ~6 Go</option>
-					<option value="12">≤ ~12 Go</option>
-					<option value="24">≤ ~24 Go</option>
-					<option value="48">≤ ~48 Go</option>
+					<option value="">{t("settings:sections.accounts.modelDiscovery.filters.diskAll")}</option>
+					<option value="6">{t("settings:sections.accounts.modelDiscovery.filters.disk6")}</option>
+					<option value="12">{t("settings:sections.accounts.modelDiscovery.filters.disk12")}</option>
+					<option value="24">{t("settings:sections.accounts.modelDiscovery.filters.disk24")}</option>
+					<option value="48">{t("settings:sections.accounts.modelDiscovery.filters.disk48")}</option>
 				</select>
 			</div>
 
@@ -658,27 +658,22 @@ export function HuggingFaceModelDiscovery({
 					onChange={(e) => setAgenticOnly(e.target.checked)}
 					className="h-3.5 w-3.5 accent-success"
 				/>
-				Masquer les modèles inadaptés (embeddings, trop petits)
+				{t("settings:sections.accounts.modelDiscovery.filters.hideUnsuitable")}
 			</label>
 
 			{/* Explicit colour legend (what each model is good for). */}
 			<div className="space-y-0.5 text-[11px] text-muted-foreground">
 				<div>
-					<span className="font-medium text-success">● Recommandé</span> — assez
-					gros (≥24B de paramètres actifs) et compatible tool-calling : bon pour
-					TOUTES les étapes, planification incluse.
+					<span className="font-medium text-success">{t("settings:sections.accounts.modelDiscovery.legend.recommended")}</span> {t("settings:sections.accounts.modelDiscovery.legend.recommendedDetail")}
 				</div>
 				<div>
 					<span className="font-medium text-warning">
-						● Trop petit pour planifier
+						{t("settings:sections.accounts.modelDiscovery.legend.tooSmall")}
 					</span>{" "}
-					— compatible tool-calling mais &lt;24B : ok codage / validation,
-					déconseillé en planification.
+					{t("settings:sections.accounts.modelDiscovery.legend.tooSmallDetail")}
 				</div>
 				<div>
-					<span className="font-medium">● Tool-calling à vérifier</span> — non
-					confirmé d'après le nom ; ouvrez la carte du modèle. Les tailles « ~Go
-					» sont estimées (quant 4-bit).
+					<span className="font-medium">{t("settings:sections.accounts.modelDiscovery.legend.unverified")}</span> {t("settings:sections.accounts.modelDiscovery.legend.unverifiedDetail")}
 				</div>
 			</div>
 
@@ -760,7 +755,11 @@ export function HuggingFaceModelDiscovery({
 									>
 										{VERDICT_LABEL[assessment.verdict]}
 										{assessment.paramB != null ? ` · ${assessment.paramB}B` : ""}
-										{estGb != null ? ` · ~${estGb} Go` : ""}
+										{estGb != null
+											? t("settings:sections.accounts.modelDiscovery.estimatedSize", {
+													size: estGb,
+												})
+											: ""}
 									</span>
 									<span className="inline-flex items-center gap-1">
 										<Download className="h-3 w-3" />

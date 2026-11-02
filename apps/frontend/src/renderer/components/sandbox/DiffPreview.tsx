@@ -1,6 +1,7 @@
 import type React from "react";
 import { useState } from "react";
 import type { FileDiff } from "../../../shared/types/sandbox";
+import { useTranslation } from "react-i18next";
 
 interface DiffPreviewProps {
 	readonly diffs: FileDiff[];
@@ -25,6 +26,7 @@ export function DiffPreview({
 	diffs,
 	onFileSelect,
 }: DiffPreviewProps): React.ReactElement {
+	const { t } = useTranslation();
 	const [selectedFile, setSelectedFile] = useState<string | null>(
 		diffs[0]?.filePath ?? null,
 	);
@@ -45,7 +47,7 @@ export function DiffPreview({
 			<div className="w-64 border-r border-(--border-color) overflow-y-auto">
 				<div className="px-3 py-2 border-b border-(--border-color)">
 					<p className="text-xs text-(--text-secondary)">
-						{diffs.length} files changed
+						{t("sandbox:diffPreview.filesChanged", { count: diffs.length })}
 					</p>
 					<p className="text-xs">
 						<span className="text-green-400">+{totalAdditions}</span>
@@ -130,7 +132,7 @@ export function DiffPreview({
 					</div>
 				) : (
 					<div className="flex items-center justify-center h-full text-(--text-secondary)">
-						Select a file to view the diff
+						{t("sandbox:diffPreview.selectFile")}
 					</div>
 				)}
 			</div>

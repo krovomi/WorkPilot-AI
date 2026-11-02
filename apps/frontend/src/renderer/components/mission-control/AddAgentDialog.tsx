@@ -133,7 +133,7 @@ export function AddAgentDialog({
 						<Input
 							value={name}
 							onChange={(e) => setName(e.target.value)}
-							placeholder="e.g. Architecture Agent"
+							placeholder={t("missionControl:agentNamePlaceholder")}
 							className="text-sm"
 						/>
 					</div>

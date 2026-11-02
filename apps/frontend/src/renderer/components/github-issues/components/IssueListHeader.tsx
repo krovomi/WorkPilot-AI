@@ -62,7 +62,7 @@ export function IssueListHeader({
 				</div>
 				<div className="flex items-center gap-2">
 					<Badge variant="outline" className="text-xs">
-						{openIssuesCount} open
+						{t("common:githubIssues.openCount", { count: openIssuesCount })}
 					</Badge>
 					<Button
 						variant="ghost"
@@ -98,13 +98,12 @@ export function IssueListHeader({
 									) : (
 										<Layers className="h-4 w-4 mr-2" />
 									)}
-									Analyze & Group Issues
+									{t("common:githubIssues.batch.title")}
 								</Button>
 							</TooltipTrigger>
 							<TooltipContent side="bottom" className="max-w-xs">
 								<p>
-									Analyze up to 200 open issues, group similar ones, and review
-									proposed batches before creating tasks.
+									{t("common:githubIssues.batch.tooltip")}
 								</p>
 							</TooltipContent>
 						</Tooltip>
@@ -127,7 +126,7 @@ export function IssueListHeader({
 											htmlFor="auto-fix-toggle"
 											className="text-sm cursor-pointer whitespace-nowrap"
 										>
-											Auto-Fix New
+											{t("common:githubIssues.autoFix.newIssues")}
 										</Label>
 										<Switch
 											id="auto-fix-toggle"
@@ -138,13 +137,14 @@ export function IssueListHeader({
 									</div>
 								</TooltipTrigger>
 								<TooltipContent side="bottom" className="max-w-xs">
-									<p>Automatically fix new issues as they come in.</p>
+									<p>{t("common:githubIssues.autoFix.newIssuesDescription")}</p>
 									{autoFixRunning &&
 										autoFixProcessing !== undefined &&
 										autoFixProcessing > 0 && (
 											<p className="mt-1 text-primary">
-												Processing {autoFixProcessing} issue
-												{autoFixProcessing > 1 ? "s" : ""}...
+												{t("common:githubIssues.autoFix.processing", {
+												count: autoFixProcessing,
+											})}
 											</p>
 										)}
 								</TooltipContent>
@@ -159,7 +159,7 @@ export function IssueListHeader({
 				<div className="relative flex-1">
 					<Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
 					<Input
-						placeholder="Search issues..."
+						placeholder={t("common:githubIssues.searchPlaceholder")}
 						value={searchQuery}
 						onChange={(e) => onSearchChange(e.target.value)}
 						className="pl-9"
@@ -174,9 +174,9 @@ export function IssueListHeader({
 						<SelectValue />
 					</SelectTrigger>
 					<SelectContent>
-						<SelectItem value="open">Open</SelectItem>
-						<SelectItem value="closed">Closed</SelectItem>
-						<SelectItem value="all">All</SelectItem>
+						<SelectItem value="open">{t("common:githubIssues.filters.open")}</SelectItem>
+						<SelectItem value="closed">{t("common:githubIssues.filters.closed")}</SelectItem>
+						<SelectItem value="all">{t("common:githubIssues.filters.all")}</SelectItem>
 					</SelectContent>
 				</Select>
 			</div>

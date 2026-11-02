@@ -7,6 +7,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Separator } from "../ui/separator";
+import { useTranslation } from "react-i18next";
 
 /**
  * Custom theme definition stored in settings
@@ -52,6 +53,7 @@ export function CustomThemeEditor({
 	settings,
 	onSettingsChange,
 }: CustomThemeEditorProps) {
+	const { t } = useTranslation();
 	const updateStoreSettings = useSettingsStore((state) => state.updateSettings);
 	const [isCreating, setIsCreating] = useState(false);
 	const [editName, setEditName] = useState("");
@@ -184,10 +186,10 @@ export function CustomThemeEditor({
 				<div className="flex items-center justify-between">
 					<div>
 						<Label className="text-sm font-medium text-foreground">
-							Custom Themes
+							{t("settings:customThemes.title")}
 						</Label>
 						<p className="text-sm text-muted-foreground">
-							Create your own color themes or import shared ones
+							{t("settings:customThemes.description")}
 						</p>
 					</div>
 					<div className="flex gap-2">
@@ -198,7 +200,7 @@ export function CustomThemeEditor({
 							className="gap-1.5"
 						>
 							<Upload className="h-3.5 w-3.5" />
-							Import
+							{t("settings:customThemes.import")}
 						</Button>
 						<Button
 							size="sm"
@@ -207,7 +209,7 @@ export function CustomThemeEditor({
 							className="gap-1.5"
 						>
 							<Plus className="h-3.5 w-3.5" />
-							New Theme
+							{t("settings:customThemes.newTheme")}
 						</Button>
 					</div>
 				</div>
@@ -223,20 +225,20 @@ export function CustomThemeEditor({
 					<div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-4">
 						<div className="grid grid-cols-2 gap-3">
 							<div className="space-y-1.5">
-								<Label className="text-xs">Theme Name</Label>
+								<Label className="text-xs">{t("settings:customThemes.themeName")}</Label>
 								<Input
 									value={editName}
 									onChange={(e) => setEditName(e.target.value)}
-									placeholder="My Custom Theme"
+									placeholder={t("settings:customThemes.themeNamePlaceholder")}
 									className="h-8 text-sm"
 								/>
 							</div>
 							<div className="space-y-1.5">
-								<Label className="text-xs">Description</Label>
+								<Label className="text-xs">{t("settings:customThemes.descriptionLabel")}</Label>
 								<Input
 									value={editDescription}
 									onChange={(e) => setEditDescription(e.target.value)}
-									placeholder="A brief description"
+									placeholder={t("settings:customThemes.descriptionPlaceholder")}
 									className="h-8 text-sm"
 								/>
 							</div>
@@ -280,7 +282,7 @@ export function CustomThemeEditor({
 
 						{/* Preview */}
 						<div className="flex gap-2 items-center">
-							<span className="text-xs text-muted-foreground">Preview:</span>
+							<span className="text-xs text-muted-foreground">{t("settings:customThemes.preview")}</span>
 							<div className="flex -space-x-1">
 								<div
 									className="w-6 h-6 rounded-full border-2 border-background shadow-sm"
@@ -307,14 +309,14 @@ export function CustomThemeEditor({
 								variant="ghost"
 								onClick={() => setIsCreating(false)}
 							>
-								Cancel
+								{t("common:buttons.cancel")}
 							</Button>
 							<Button
 								size="sm"
 								onClick={handleCreate}
 								disabled={!editName.trim()}
 							>
-								Create Theme
+								{t("settings:customThemes.create")}
 							</Button>
 						</div>
 					</div>
@@ -390,7 +392,7 @@ export function CustomThemeEditor({
 											onClick={() => handleExport(theme)}
 										>
 											<Download className="h-3 w-3" />
-											Export
+											{t("settings:customThemes.export")}
 										</Button>
 										<Button
 											size="sm"
@@ -399,7 +401,7 @@ export function CustomThemeEditor({
 											onClick={() => handleDelete(theme.id)}
 										>
 											<Trash2 className="h-3 w-3" />
-											Delete
+											{t("common:buttons.delete")}
 										</Button>
 									</div>
 								</div>
@@ -412,10 +414,10 @@ export function CustomThemeEditor({
 					<div className="rounded-lg border border-dashed border-border p-6 text-center">
 						<Palette className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
 						<p className="text-sm text-muted-foreground">
-							No custom themes yet
+							{t("settings:customThemes.empty")}
 						</p>
 						<p className="text-xs text-muted-foreground mt-1">
-							Create a new theme or import one to get started
+							{t("settings:customThemes.emptyHint")}
 						</p>
 					</div>
 				)}

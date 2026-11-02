@@ -7,6 +7,7 @@ import {
 import type { DocumentationGapIdea } from "../../../../shared/types";
 import { Badge } from "../../ui/badge";
 import { Card } from "../../ui/card";
+import { useTranslation } from "react-i18next";
 
 interface DocumentationGapDetailsProps {
 	readonly idea: DocumentationGapIdea;
@@ -15,6 +16,7 @@ interface DocumentationGapDetailsProps {
 export function DocumentationGapDetails({
 	idea,
 }: DocumentationGapDetailsProps) {
+	const { t } = useTranslation();
 	return (
 		<>
 			{/* Metrics */}
@@ -23,7 +25,7 @@ export function DocumentationGapDetails({
 					<div className="text-lg font-semibold">
 						{DOCUMENTATION_CATEGORY_LABELS[idea.category]}
 					</div>
-					<div className="text-xs text-muted-foreground">Category</div>
+					<div className="text-xs text-muted-foreground">{t("ideation:performanceDetails.category")}</div>
 				</Card>
 				<Card className="p-3 text-center">
 					<div
@@ -31,7 +33,7 @@ export function DocumentationGapDetails({
 					>
 						{idea.estimatedEffort}
 					</div>
-					<div className="text-xs text-muted-foreground">Effort</div>
+					<div className="text-xs text-muted-foreground">{t("ideation:performanceDetails.effort")}</div>
 				</Card>
 			</div>
 
@@ -39,7 +41,7 @@ export function DocumentationGapDetails({
 			<div>
 				<h3 className="text-sm font-medium mb-2 flex items-center gap-2">
 					<Users className="h-4 w-4" />
-					Target Audience
+					{t("ideation:details.targetAudience")}
 				</h3>
 				<Badge variant="outline" className="capitalize">
 					{idea.targetAudience}
@@ -51,7 +53,7 @@ export function DocumentationGapDetails({
 				<div>
 					<h3 className="text-sm font-medium mb-2 flex items-center gap-2">
 						<AlertCircle className="h-4 w-4" />
-						Current Documentation
+						{t("ideation:details.currentDocumentation")}
 					</h3>
 					<p className="text-sm text-muted-foreground">
 						{idea.currentDocumentation}
@@ -63,7 +65,7 @@ export function DocumentationGapDetails({
 			<div>
 				<h3 className="text-sm font-medium mb-2 flex items-center gap-2">
 					<CheckCircle2 className="h-4 w-4" />
-					Proposed Content
+					{t("ideation:details.proposedContent")}
 				</h3>
 				<p className="text-sm text-muted-foreground">{idea.proposedContent}</p>
 			</div>
@@ -73,7 +75,7 @@ export function DocumentationGapDetails({
 				<div>
 					<h3 className="text-sm font-medium mb-2 flex items-center gap-2">
 						<FileCode className="h-4 w-4" />
-						Affected Areas
+						{t("ideation:performanceDetails.affectedAreas")}
 					</h3>
 					<ul className="space-y-1">
 						{idea.affectedAreas.map((area) => (
@@ -90,7 +92,7 @@ export function DocumentationGapDetails({
 
 			{/* Priority */}
 			<div>
-				<h3 className="text-sm font-medium mb-2">Priority</h3>
+				<h3 className="text-sm font-medium mb-2">{t("ideation:details.priority")}</h3>
 				<Badge
 					variant="outline"
 					className={IDEATION_IMPACT_COLORS[idea.priority]}

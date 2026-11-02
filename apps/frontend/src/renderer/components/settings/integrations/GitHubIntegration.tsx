@@ -398,7 +398,7 @@ export function GitHubIntegration({
 									data-guide={GUIDE_ANCHORS.github.token}
 									value={envConfig.githubToken || ""}
 									onChange={(value) => updateEnvConfig({ githubToken: value })}
-									placeholder="ghp_xxxxxxxx or github_pat_xxxxxxxx"
+									placeholder={t("settings:projectSections.github.tokenPlaceholder")}
 								/>
 							</div>
 

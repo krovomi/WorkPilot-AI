@@ -205,7 +205,7 @@ export function PRLogs({
 							PR #{prNumber}
 							{logs.is_followup && (
 								<Badge variant="outline" className="text-xs">
-									Follow-up
+									{t("common:prReview.followup")}
 								</Badge>
 							)}
 							{isStreaming && (
@@ -214,7 +214,7 @@ export function PRLogs({
 									className="text-xs bg-blue-500/10 text-blue-500 border-blue-500/30 flex items-center gap-1"
 								>
 									<Loader2 className="h-2.5 w-2.5 animate-spin" />
-									Live
+									{t("common:prLogs.live")}
 								</Badge>
 							)}
 						</div>
@@ -288,6 +288,7 @@ function PhaseLogSection({
 	expandedAgents,
 	onToggleAgent,
 }: PhaseLogSectionProps) {
+	const { t } = useTranslation();
 	const Icon = PHASE_ICONS[phase];
 	const status = phaseLog?.status || "pending";
 	const hasEntries = (phaseLog?.entries.length || 0) > 0;
@@ -301,7 +302,7 @@ function PhaseLogSection({
 					className="text-xs bg-info/10 text-info border-info/30 flex items-center gap-1"
 				>
 					<Loader2 className="h-3 w-3 animate-spin" />
-					{isStreaming ? "Streaming" : "Running"}
+					{isStreaming ? t("common:prLogs.streaming") : t("common:prLogs.running")}
 				</Badge>
 			);
 		}
@@ -311,7 +312,7 @@ function PhaseLogSection({
 		if (isStreaming && status === "completed" && !hasEntries) {
 			return (
 				<Badge variant="secondary" className="text-xs text-muted-foreground">
-					Pending
+					{t("common:prLogs.pending")}
 				</Badge>
 			);
 		}
@@ -324,7 +325,7 @@ function PhaseLogSection({
 						className="text-xs bg-success/10 text-success border-success/30 flex items-center gap-1"
 					>
 						<CheckCircle2 className="h-3 w-3" />
-						Complete
+						{t("common:prLogs.complete")}
 					</Badge>
 				);
 			case "failed":
@@ -334,13 +335,13 @@ function PhaseLogSection({
 						className="text-xs bg-destructive/10 text-destructive border-destructive/30 flex items-center gap-1"
 					>
 						<XCircle className="h-3 w-3" />
-						Failed
+						{t("common:prLogs.failed")}
 					</Badge>
 				);
 			default:
 				return (
 					<Badge variant="secondary" className="text-xs text-muted-foreground">
-						Pending
+						{t("common:prLogs.pending")}
 					</Badge>
 				);
 		}
@@ -377,7 +378,7 @@ function PhaseLogSection({
 						<span className="font-medium text-sm">{PHASE_LABELS[phase]}</span>
 						{hasEntries && (
 							<span className="text-xs text-muted-foreground">
-								({phaseLog?.entries.length} entries)
+								{t("common:prLogs.entries", { count: phaseLog?.entries.length })}
 							</span>
 						)}
 					</div>
@@ -394,7 +395,7 @@ function PhaseLogSection({
 							onToggleAgent={onToggleAgent}
 						/>
 					) : (
-						<p className="text-xs text-muted-foreground italic">No logs yet</p>
+						<p className="text-xs text-muted-foreground italic">{t("common:prLogs.empty")}</p>
 					)}
 				</div>
 			</CollapsibleContent>
@@ -692,6 +693,7 @@ interface LogEntryProps {
 }
 
 function LogEntry({ entry }: LogEntryProps) {
+	const { t } = useTranslation();
 	const [isExpanded, setIsExpanded] = useState(false);
 	const hasDetail = Boolean(entry.detail);
 
@@ -800,12 +802,12 @@ function LogEntry({ entry }: LogEntryProps) {
 						{isExpanded ? (
 							<>
 								<ChevronDown className="h-2.5 w-2.5" />
-								<span>Less</span>
+								<span>{t("common:prLogs.less")}</span>
 							</>
 						) : (
 							<>
 								<ChevronRight className="h-2.5 w-2.5" />
-								<span>More</span>
+								<span>{t("common:prLogs.more")}</span>
 							</>
 						)}
 					</button>

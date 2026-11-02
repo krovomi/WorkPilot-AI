@@ -247,7 +247,7 @@ export function TaskCodeEditor({
 					<div className="p-2 space-y-1">
 						{fileTree.length === 0 ? (
 							<p className="text-xs text-muted-foreground p-2">
-								No files in this subtask
+								{t("taskReview:taskPanel.noFilesInSubtask")}
 							</p>
 						) : (
 							fileTree.map((node) => (
@@ -280,7 +280,7 @@ export function TaskCodeEditor({
 									onClick={() => setSelectedFile(null)}
 									className="h-6"
 								>
-									Close
+									{t("common:buttons.close")}
 								</Button>
 							</div>
 						</div>
@@ -304,9 +304,11 @@ export function TaskCodeEditor({
 				{hasChanges && (
 					<div className="p-3 border-t border-border bg-muted/30 flex items-center justify-between">
 						<p className="text-xs text-muted-foreground">
-							{deletedFiles.size > 0 && `${deletedFiles.size} file(s) deleted`}
+							{deletedFiles.size > 0 &&
+								t("taskReview:taskPanel.filesDeleted", { count: deletedFiles.size })}
 							{deletedFiles.size > 0 && editedFiles.size > 0 && " • "}
-							{editedFiles.size > 0 && `${editedFiles.size} file(s) modified`}
+							{editedFiles.size > 0 &&
+								t("taskReview:taskPanel.filesModified", { count: editedFiles.size })}
 						</p>
 						<div className="flex gap-2">
 							<Button
@@ -320,7 +322,7 @@ export function TaskCodeEditor({
 								}}
 								disabled={isSaving}
 							>
-								Cancel
+								{t("common:buttons.cancel")}
 							</Button>
 							<Button
 								variant="default"
@@ -328,7 +330,7 @@ export function TaskCodeEditor({
 								onClick={handleSave}
 								disabled={isSaving}
 							>
-								{isSaving ? "Saving..." : "Save Changes"}
+								{isSaving ? t("common:buttons.saving") : t("taskReview:taskPanel.saveChanges")}
 							</Button>
 						</div>
 					</div>

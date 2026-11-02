@@ -11,6 +11,7 @@
 import { BellRing, Check, Loader2, Send, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { AVAILABLE_LANGUAGES } from "../../../shared/constants/i18n";
 import {
 	NEEDS_YOU_EVENTS,
 	type NeedsYouChannelKind,
@@ -188,8 +189,11 @@ export function ServerNeedsYouSettings() {
 								savePreferences(overview.events, e.target.value === "fr" ? "fr" : "en")
 							}
 						>
-							<option value="en">English</option>
-							<option value="fr">Français</option>
+							{AVAILABLE_LANGUAGES.map((lang) => (
+								<option key={lang.value} value={lang.value}>
+									{lang.nativeLabel}
+								</option>
+							))}
 						</select>
 					</div>
 				</div>

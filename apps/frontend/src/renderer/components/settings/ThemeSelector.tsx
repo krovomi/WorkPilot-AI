@@ -135,12 +135,12 @@ export function ThemeSelector({
 										<div
 											className="w-6 h-6 rounded-full border-2 border-background shadow-sm"
 											style={{ backgroundColor: bgColor }}
-											title="Background color"
+											title={t("settings:theme.backgroundColor")}
 										/>
 										<div
 											className="w-6 h-6 rounded-full border-2 border-background shadow-sm"
 											style={{ backgroundColor: accentColor }}
-											title="Accent color"
+											title={t("settings:theme.accentColor")}
 										/>
 									</div>
 								</div>

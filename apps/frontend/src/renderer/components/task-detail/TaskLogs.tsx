@@ -2304,7 +2304,7 @@ function LogEntry({ entry, query = "" }: LogEntryProps) {
 					>
 						<Icon className="h-3 w-3" />
 						<CheckCircle2 className="h-3 w-3 text-success" />
-						<span className="text-muted-foreground">Done</span>
+						<span className="text-muted-foreground">{t("taskReview:taskPanel.done")}</span>
 					</div>
 					{hasDetail && (
 						<button
@@ -2431,12 +2431,12 @@ function LogEntry({ entry, query = "" }: LogEntryProps) {
 						{isExpanded ? (
 							<>
 								<ChevronDown className="h-2.5 w-2.5" />
-								<span>Less</span>
+								<span>{t("taskReview:taskPanel.less")}</span>
 							</>
 						) : (
 							<>
 								<ChevronRight className="h-2.5 w-2.5" />
-								<span>More</span>
+								<span>{t("taskReview:taskPanel.more")}</span>
 							</>
 						)}
 					</button>

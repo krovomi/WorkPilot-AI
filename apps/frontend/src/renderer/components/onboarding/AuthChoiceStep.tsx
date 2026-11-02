@@ -4,6 +4,7 @@ import { useSettingsStore } from "../../stores/settings-store";
 import { ProfileEditDialog } from "../settings/ProfileEditDialog";
 import { Button } from "../ui/button";
 import { Card, CardContent } from "../ui/card";
+import { useTranslation } from "react-i18next";
 
 interface AuthChoiceStepProps {
 	readonly onNext: () => void;
@@ -76,6 +77,7 @@ export function AuthChoiceStep({
 	onSkip,
 	onAPIKeyPathComplete,
 }: AuthChoiceStepProps) {
+	const { t } = useTranslation();
 	const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
 	const profiles = useSettingsStore((state) => state.profiles);
 
@@ -127,11 +129,10 @@ export function AuthChoiceStep({
 							</div>
 						</div>
 						<h1 className="text-3xl font-bold text-foreground tracking-tight">
-							Choose Your Authentication Method
+							{t("onboarding:authChoice.title")}
 						</h1>
 						<p className="mt-3 text-muted-foreground text-lg">
-							Select how you want to authenticate with Claude. You can change
-							this later in Settings.
+							{t("onboarding:authChoice.description")}
 						</p>
 					</div>
 
@@ -139,16 +140,16 @@ export function AuthChoiceStep({
 					<div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
 						<AuthOptionCard
 							icon={<LogIn className="h-6 w-6" />}
-							title="Sign in with Anthropic"
-							description="Use your Anthropic account to authenticate. Simple and secure OAuth flow."
+							title={t("onboarding:authChoice.oauthTitle")}
+							description={t("onboarding:authChoice.oauthDescription")}
 							onClick={handleOAuthChoice}
 							variant="oauth"
 							data-testid="auth-option-oauth"
 						/>
 						<AuthOptionCard
 							icon={<Key className="h-6 w-6" />}
-							title="Use Custom API Key"
-							description="Bring your own API key from Anthropic or a compatible API provider. ⚠️ Highly experimental — may incur significant costs."
+							title={t("onboarding:authChoice.apiKeyTitle")}
+							description={t("onboarding:authChoice.apiKeyDescription")}
 							onClick={handleAPIKeyChoice}
 							data-testid="auth-option-apikey"
 						/>
@@ -157,8 +158,7 @@ export function AuthChoiceStep({
 					{/* Info text */}
 					<div className="text-center mb-8">
 						<p className="text-muted-foreground text-sm">
-							Both options provide full access to Claude Code features. Choose
-							based on your preference.
+							{t("onboarding:authChoice.footer")}
 						</p>
 					</div>
 
@@ -171,7 +171,7 @@ export function AuthChoiceStep({
 								onClick={onBack}
 								className="text-muted-foreground hover:text-foreground"
 							>
-								Back
+								{t("common:buttons.back")}
 							</Button>
 						)}
 						<Button
@@ -180,7 +180,7 @@ export function AuthChoiceStep({
 							onClick={onSkip}
 							className="text-muted-foreground hover:text-foreground"
 						>
-							Skip for now
+							{t("onboarding:authChoice.skip")}
 						</Button>
 					</div>
 				</div>

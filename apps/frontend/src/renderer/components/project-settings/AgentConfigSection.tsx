@@ -10,6 +10,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "../ui/select";
+import { useTranslation } from "react-i18next";
 
 interface AgentConfigSectionProps {
 	readonly settings: ProjectSettings;
@@ -20,6 +21,7 @@ export function AgentConfigSection({
 	settings,
 	onUpdateSettings,
 }: AgentConfigSectionProps) {
+	const { t } = useTranslation();
 	const { selectedProvider } = useProviderContext();
 	const { models } = useProviderModelCatalog(selectedProvider || "anthropic");
 	// A persisted alias / dated id may no longer appear verbatim in the
@@ -30,11 +32,11 @@ export function AgentConfigSection({
 	return (
 		<section className="space-y-4">
 			<h3 className="text-sm font-semibold text-foreground">
-				Agent Configuration
+				{t("settings:projectSections.agentConfiguration.title")}
 			</h3>
 			<div className="space-y-2">
 				<Label htmlFor="model" className="text-sm font-medium text-foreground">
-					Model
+					{t("settings:projectSections.agentConfiguration.modelGeneric")}
 				</Label>
 				<Select
 					value={selectedValue}

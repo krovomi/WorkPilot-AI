@@ -324,9 +324,13 @@ export function JiraIntegration({
 								</div>
 								{connectionStatus.connected && connectionStatus.instanceUrl && (
 									<p className="text-xs text-muted-foreground mt-1">
-										Instance: {connectionStatus.instanceUrl}
+										{t("settings:jira.instanceLabel", {
+											url: connectionStatus.instanceUrl,
+										})}
 										{connectionStatus.projectKey &&
-											` • Project: ${connectionStatus.projectKey}`}
+											t("settings:jira.projectSuffix", {
+												project: connectionStatus.projectKey,
+											})}
 									</p>
 								)}
 								{connectionStatus.error && (

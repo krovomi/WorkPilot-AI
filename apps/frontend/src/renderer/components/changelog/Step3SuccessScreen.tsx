@@ -41,12 +41,14 @@ export function Step3SuccessScreen({
 						<PartyPopper className="h-8 w-8 text-success" />
 					</div>
 					<h2 className="text-2xl font-semibold">
-						{serverProject ? t("server.savedTitle") : "Changelog Saved!"}
+						{serverProject
+							? t("server.savedTitle")
+							: t("changelog:success.title")}
 					</h2>
 					<p className="text-muted-foreground mt-2">
 						{serverProject
 							? t("server.savedDescription", { tag })
-							: `Version ${tag} has been added to CHANGELOG.md`}
+							: t("changelog:success.description", { tag })}
 					</p>
 				</div>
 
@@ -72,7 +74,7 @@ export function Step3SuccessScreen({
 				<div className="pt-4">
 					<Button className="w-full" size="lg" onClick={onDone}>
 						<Check className="mr-2 h-4 w-4" />
-						Done
+						{t("changelog:success.done")}
 					</Button>
 				</div>
 			</div>

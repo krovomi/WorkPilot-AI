@@ -174,7 +174,7 @@ export function DisplaySettings({
 										"hover:bg-accent text-muted-foreground hover:text-foreground",
 										"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
 									)}
-									title="Reset to default (100%)"
+									title={t("settings:scale.resetToDefault")}
 								>
 									<RotateCcw className="h-3.5 w-3.5" />
 								</button>
@@ -257,10 +257,10 @@ export function DisplaySettings({
 								"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
 								"disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary",
 							)}
-							title="Apply scale changes"
+							title={t("settings:scale.applyChanges")}
 						>
 							<Check className="h-4 w-4" />
-							<span className="text-sm font-medium">Apply</span>
+							<span className="text-sm font-medium">{t("common:buttons.apply")}</span>
 						</button>
 					</div>
 

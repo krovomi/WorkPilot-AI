@@ -333,7 +333,7 @@ export function AdvancedSettings({
 										{t("updates.newVersion")}
 									</p>
 									<p className="text-base font-medium text-foreground">
-										{appUpdateInfo?.version || "Unknown"}
+										{appUpdateInfo?.version || t("settings:updates.unknownVersion")}
 									</p>
 									{appUpdateInfo?.releaseDate && (
 										<p className="text-xs text-muted-foreground mt-1">
