@@ -26,7 +26,7 @@ function ResultBody({
 }): React.ReactElement {
 	return (
 		<>
-			<p className="text-sm text-(--text-secondary)">
+			<p className="text-sm text-muted-foreground">
 				{result.conflicts.length} {t("disagreements")} ·{" "}
 				{result.resolvedCount} {t("agreements")} · {result.escalatedCount}{" "}
 				{t("escalated")}
@@ -96,7 +96,7 @@ function ResultBody({
 			</div>
 
 			{result.consensusSummary && (
-				<p className="text-sm text-(--text-secondary) italic mt-2">
+				<p className="text-sm text-muted-foreground italic mt-2">
 					{result.consensusSummary}
 				</p>
 			)}
@@ -125,7 +125,7 @@ export function ConsensusView({
 	const isScanning = phase === "scanning";
 
 	return (
-		<div className="flex flex-col gap-4 p-6 bg-(--bg-primary) text-(--text-primary)">
+		<div className="flex flex-col gap-4 p-6 bg-background text-foreground">
 			<div className="flex items-center justify-between">
 				<h2 className="text-lg font-semibold">{t("title")}</h2>
 				<div className="flex gap-2">
@@ -152,7 +152,7 @@ export function ConsensusView({
 						<button
 							type="button"
 							onClick={reset}
-							className="px-3 py-1.5 rounded-md border border-(--border-color) hover:bg-(--bg-secondary) text-sm font-medium transition-colors"
+							className="px-3 py-1.5 rounded-md border border-border hover:bg-card text-sm font-medium transition-colors"
 						>
 							{t("actions.reset")}
 						</button>
@@ -161,13 +161,13 @@ export function ConsensusView({
 			</div>
 
 			{!projectPath && (
-				<p className="text-sm text-(--text-secondary)">
+				<p className="text-sm text-muted-foreground">
 					{t("errors.noProject")}
 				</p>
 			)}
 
 			{isScanning && (
-				<p className="text-sm text-(--text-secondary)">
+				<p className="text-sm text-muted-foreground">
 					{status || t("actions.scanning")}
 				</p>
 			)}
@@ -177,7 +177,7 @@ export function ConsensusView({
 			)}
 
 			{phase === "complete" && result?.conflicts.length === 0 && (
-				<p className="text-sm text-(--text-secondary)">{t("noData")}</p>
+				<p className="text-sm text-muted-foreground">{t("noData")}</p>
 			)}
 
 			{phase === "complete" && result && result.conflicts.length > 0 && (

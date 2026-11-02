@@ -36,7 +36,7 @@ export function ReleasePlanView({
 	const canRun = !!projectPath && !isPlanning;
 
 	return (
-		<div className="flex flex-col gap-4 p-6 bg-(--bg-primary) text-(--text-primary)">
+		<div className="flex flex-col gap-4 p-6 bg-background text-foreground">
 			<div className="flex items-center gap-3 flex-wrap">
 				{isPlanning ? (
 					<button
@@ -51,7 +51,7 @@ export function ReleasePlanView({
 						type="button"
 						onClick={() => projectPath && startPlan(projectPath)}
 						disabled={!canRun}
-						className="px-3 py-1.5 rounded bg-(--accent-color) text-white text-sm disabled:opacity-50"
+						className="px-3 py-1.5 rounded bg-primary text-white text-sm disabled:opacity-50"
 					>
 						{t("actions.runPlan")}
 					</button>
@@ -60,7 +60,7 @@ export function ReleasePlanView({
 					<button
 						type="button"
 						onClick={reset}
-						className="px-3 py-1.5 rounded bg-(--bg-secondary) border border-(--border-color) text-sm hover:bg-(--bg-tertiary)"
+						className="px-3 py-1.5 rounded bg-card border border-border text-sm hover:bg-muted"
 					>
 						{t("actions.reset")}
 					</button>
@@ -68,13 +68,13 @@ export function ReleasePlanView({
 			</div>
 
 			{!projectPath && (
-				<div className="text-sm text-(--text-secondary)">
+				<div className="text-sm text-muted-foreground">
 					{t("errors.noProject")}
 				</div>
 			)}
 
 			{isPlanning && (
-				<div className="text-sm text-(--text-secondary) animate-pulse">
+				<div className="text-sm text-muted-foreground animate-pulse">
 					{status || t("actions.planning")}
 				</div>
 			)}
@@ -89,7 +89,7 @@ export function ReleasePlanView({
 				<PlanBody plan={plan} t={t} />
 			) : (
 				phase === "idle" && (
-					<div className="flex items-center justify-center h-40 text-(--text-secondary)">
+					<div className="flex items-center justify-center h-40 text-muted-foreground">
 						<p>{t("noData")}</p>
 					</div>
 				)
@@ -112,7 +112,7 @@ function PlanBody({
 		<div className="flex flex-col gap-4">
 			<div>
 				<h2 className="text-lg font-semibold">{t("title")}</h2>
-				<p className="text-sm text-(--text-secondary)">
+				<p className="text-sm text-muted-foreground">
 					{plan.services.length} {t("services")} · {t("status")}: {statusLabel}
 				</p>
 			</div>
@@ -123,7 +123,7 @@ function PlanBody({
 					return (
 						<div
 							key={gate.name}
-							className={`p-2 rounded-lg border border-(--border-color) ${style.color}`}
+							className={`p-2 rounded-lg border border-border ${style.color}`}
 						>
 							<div className="flex items-center gap-1 text-xs">
 								<span>{style.icon}</span>
@@ -144,7 +144,7 @@ function PlanBody({
 					return (
 						<div
 							key={svc.name}
-							className="px-4 py-3 rounded-lg border border-(--border-color) hover:bg-(--bg-secondary) transition-colors"
+							className="px-4 py-3 rounded-lg border border-border hover:bg-card transition-colors"
 						>
 							<div className="flex items-center justify-between mb-1">
 								<p className="text-sm font-medium">{svc.name}</p>
@@ -152,7 +152,7 @@ function PlanBody({
 									{current} → {version}
 								</span>
 							</div>
-							<div className="flex items-center gap-2 text-xs text-(--text-secondary)">
+							<div className="flex items-center gap-2 text-xs text-muted-foreground">
 								<span className="uppercase">
 									{t(`bumpTypes.${svc.bumpType}`, { defaultValue: svc.bumpType })}
 								</span>
@@ -166,7 +166,7 @@ function PlanBody({
 				})}
 			</div>
 
-			<p className="text-sm text-(--text-secondary) italic mt-2">
+			<p className="text-sm text-muted-foreground italic mt-2">
 				{hasVersionChanges ? plan.summary : t("noVersionChanges")}
 			</p>
 		</div>

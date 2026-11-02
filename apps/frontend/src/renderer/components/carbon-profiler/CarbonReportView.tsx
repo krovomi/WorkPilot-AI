@@ -24,7 +24,7 @@ export function CarbonReportView({
 	const canRun = !!projectPath && !isScanning;
 
 	return (
-		<div className="flex flex-col gap-4 p-6 bg-(--bg-primary) text-(--text-primary)">
+		<div className="flex flex-col gap-4 p-6 bg-background text-foreground">
 			<div className="flex items-center gap-3 flex-wrap">
 				{isScanning ? (
 					<button
@@ -39,7 +39,7 @@ export function CarbonReportView({
 						type="button"
 						onClick={() => projectPath && startScan(projectPath)}
 						disabled={!canRun}
-						className="px-3 py-1.5 rounded bg-(--accent-color) text-white text-sm disabled:opacity-50"
+						className="px-3 py-1.5 rounded bg-primary text-white text-sm disabled:opacity-50"
 					>
 						{t("actions.runScan")}
 					</button>
@@ -48,7 +48,7 @@ export function CarbonReportView({
 					<button
 						type="button"
 						onClick={reset}
-						className="px-3 py-1.5 rounded bg-(--bg-secondary) border border-(--border-color) text-sm hover:bg-(--bg-tertiary)"
+						className="px-3 py-1.5 rounded bg-card border border-border text-sm hover:bg-muted"
 					>
 						{t("actions.reset")}
 					</button>
@@ -56,13 +56,13 @@ export function CarbonReportView({
 			</div>
 
 			{!projectPath && (
-				<div className="text-sm text-(--text-secondary)">
+				<div className="text-sm text-muted-foreground">
 					{t("errors.noProject")}
 				</div>
 			)}
 
 			{isScanning && (
-				<div className="text-sm text-(--text-secondary) animate-pulse">
+				<div className="text-sm text-muted-foreground animate-pulse">
 					{status || t("actions.scanning")}
 				</div>
 			)}
@@ -77,7 +77,7 @@ export function CarbonReportView({
 				<ReportBody report={report} t={t} />
 			) : (
 				phase === "idle" && (
-					<div className="flex items-center justify-center h-40 text-(--text-secondary)">
+					<div className="flex items-center justify-center h-40 text-muted-foreground">
 						<p>{t("noData")}</p>
 					</div>
 				)
@@ -96,8 +96,8 @@ function StatCard({
 	readonly color: string;
 }): React.ReactElement {
 	return (
-		<div className="p-3 rounded-lg bg-(--bg-secondary) border border-(--border-color)">
-			<p className="text-xs text-(--text-secondary)">{label}</p>
+		<div className="p-3 rounded-lg bg-card border border-border">
+			<p className="text-xs text-muted-foreground">{label}</p>
 			<p className={`text-xl font-bold ${color}`}>{value}</p>
 		</div>
 	);
@@ -114,7 +114,7 @@ function ReportBody({
 		<div className="flex flex-col gap-4">
 			<div>
 				<h2 className="text-lg font-semibold">{t("title")}</h2>
-				<p className="text-sm text-(--text-secondary)">
+				<p className="text-sm text-muted-foreground">
 					{report.periodStart || "—"} → {report.periodEnd || "—"}
 				</p>
 			</div>
@@ -139,16 +139,16 @@ function ReportBody({
 
 			{Object.keys(report.byProvider).length > 0 && (
 				<div>
-					<h3 className="text-sm font-medium text-(--text-secondary) mb-2">
+					<h3 className="text-sm font-medium text-muted-foreground mb-2">
 						{t("co2ByProvider")}
 					</h3>
 					<div className="grid grid-cols-4 gap-2">
 						{Object.entries(report.byProvider).map(([provider, co2]) => (
 							<div
 								key={provider}
-								className="p-2 rounded-lg bg-(--bg-secondary) border border-(--border-color)"
+								className="p-2 rounded-lg bg-card border border-border"
 							>
-								<p className="text-xs text-(--text-secondary) truncate">
+								<p className="text-xs text-muted-foreground truncate">
 									{provider}
 								</p>
 								<p className="text-sm font-bold text-orange-400">
@@ -162,16 +162,16 @@ function ReportBody({
 
 			{Object.keys(report.byModel).length > 0 && (
 				<div>
-					<h3 className="text-sm font-medium text-(--text-secondary) mb-2">
+					<h3 className="text-sm font-medium text-muted-foreground mb-2">
 						{t("co2ByModel")}
 					</h3>
 					<div className="grid grid-cols-4 gap-2">
 						{Object.entries(report.byModel).map(([model, co2]) => (
 							<div
 								key={model}
-								className="p-2 rounded-lg bg-(--bg-secondary) border border-(--border-color)"
+								className="p-2 rounded-lg bg-card border border-border"
 							>
-								<p className="text-xs text-(--text-secondary) truncate">
+								<p className="text-xs text-muted-foreground truncate">
 									{model}
 								</p>
 								<p className="text-sm font-bold text-purple-400">
@@ -185,16 +185,16 @@ function ReportBody({
 
 			{report.records.length > 0 && (
 				<div>
-					<h3 className="text-sm font-medium text-(--text-secondary) mb-2">
+					<h3 className="text-sm font-medium text-muted-foreground mb-2">
 						{t("recentRecords")}
 					</h3>
 					<div className="space-y-1">
 						{report.records.slice(0, 20).map((rec) => (
 							<div
 								key={rec.timestamp}
-								className="flex items-center gap-3 px-3 py-2 text-xs rounded hover:bg-(--bg-secondary) transition-colors"
+								className="flex items-center gap-3 px-3 py-2 text-xs rounded hover:bg-card transition-colors"
 							>
-								<span className="text-(--text-secondary) w-20 shrink-0">
+								<span className="text-muted-foreground w-20 shrink-0">
 									{rec.source}
 								</span>
 								<span className="font-mono w-28 shrink-0 truncate">
@@ -206,7 +206,7 @@ function ReportBody({
 								<span className="text-red-400 w-16 shrink-0">
 									{rec.co2G.toFixed(2)} g
 								</span>
-								<span className="text-(--text-secondary) ml-auto">
+								<span className="text-muted-foreground ml-auto">
 									{rec.durationS.toFixed(1)}s
 								</span>
 							</div>
@@ -216,7 +216,7 @@ function ReportBody({
 			)}
 
 			{report.summary && (
-				<p className="text-sm text-(--text-secondary) italic mt-2">
+				<p className="text-sm text-muted-foreground italic mt-2">
 					{report.summary}
 				</p>
 			)}

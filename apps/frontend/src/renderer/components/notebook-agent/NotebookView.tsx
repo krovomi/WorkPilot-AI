@@ -25,7 +25,7 @@ export function NotebookView({
 	const hasResults = notebooks.length > 0;
 
 	return (
-		<div className="flex flex-col gap-4 p-6 bg-(--bg-primary) text-(--text-primary)">
+		<div className="flex flex-col gap-4 p-6 bg-background text-foreground">
 			<div className="flex items-center gap-3 flex-wrap">
 				{isScanning ? (
 					<button
@@ -40,7 +40,7 @@ export function NotebookView({
 						type="button"
 						onClick={() => projectPath && startScan(projectPath)}
 						disabled={!canRun}
-						className="px-3 py-1.5 rounded bg-(--accent-color) text-white text-sm disabled:opacity-50"
+						className="px-3 py-1.5 rounded bg-primary text-white text-sm disabled:opacity-50"
 					>
 						{t("actions.runScan")}
 					</button>
@@ -49,7 +49,7 @@ export function NotebookView({
 					<button
 						type="button"
 						onClick={reset}
-						className="px-3 py-1.5 rounded bg-(--bg-secondary) border border-(--border-color) text-sm hover:bg-(--bg-tertiary)"
+						className="px-3 py-1.5 rounded bg-card border border-border text-sm hover:bg-muted"
 					>
 						{t("actions.reset")}
 					</button>
@@ -57,13 +57,13 @@ export function NotebookView({
 			</div>
 
 			{!projectPath && (
-				<div className="text-sm text-(--text-secondary)">
+				<div className="text-sm text-muted-foreground">
 					{t("errors.noProject")}
 				</div>
 			)}
 
 			{isScanning && (
-				<div className="text-sm text-(--text-secondary) animate-pulse">
+				<div className="text-sm text-muted-foreground animate-pulse">
 					{status || t("actions.scanning")}
 				</div>
 			)}
@@ -82,7 +82,7 @@ export function NotebookView({
 				</div>
 			) : (
 				phase === "idle" && (
-					<div className="flex items-center justify-center h-40 text-(--text-secondary)">
+					<div className="flex items-center justify-center h-40 text-muted-foreground">
 						<p>{t("noData")}</p>
 					</div>
 				)
@@ -102,7 +102,7 @@ function NotebookReport({
 		<div className="flex flex-col gap-3">
 			<div>
 				<h3 className="text-base font-semibold">{notebook.path}</h3>
-				<p className="text-xs text-(--text-secondary)">
+				<p className="text-xs text-muted-foreground">
 					{notebook.kernel} · {notebook.language}
 				</p>
 			</div>
@@ -183,8 +183,8 @@ function StatCard({
 	readonly color: string;
 }): React.ReactElement {
 	return (
-		<div className="p-3 rounded-lg bg-(--bg-secondary) border border-(--border-color)">
-			<p className="text-xs text-(--text-secondary)">{label}</p>
+		<div className="p-3 rounded-lg bg-card border border-border">
+			<p className="text-xs text-muted-foreground">{label}</p>
 			<p className={`text-2xl font-bold ${color}`}>{value}</p>
 		</div>
 	);
