@@ -9,7 +9,6 @@ Modules:
 - types.py: Data models for suggestions, file events, takeover state
 - analyzer.py: Incremental diff-based code analyzer
 - suggestion_engine.py: AI-powered suggestion generation
-- takeover_detector.py: Inactivity and complexity detection
 """
 
 from .types import (

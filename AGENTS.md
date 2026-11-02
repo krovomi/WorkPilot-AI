@@ -37,7 +37,7 @@ Une vulnérabilité se signale par [`docs/SECURITY.md`](docs/SECURITY.md), jamai
 
 Index locaux (chacun a un `CLAUDE.md` voisin qui l'importe pour Claude Code) :
 [backend](apps/backend/AGENTS.md) · [sécurité backend](apps/backend/security/AGENTS.md) ·
-[skills Python](apps/backend/skills/AGENTS.md) · [frontend](apps/frontend/AGENTS.md) ·
+[frontend](apps/frontend/AGENTS.md) ·
 [Kanban](apps/frontend/src/renderer/components/kanban/AGENTS.md) · [app mobile](apps/mobile/AGENTS.md).
 
 ## Carte du dépôt

@@ -6,7 +6,7 @@ for live pricing data.
 
 The router is intentionally simple: a heuristic decision table that can be
 overridden via a `RoutingPolicy`. A real production version would learn the
-mapping from execution history (`analytics/collector.py`), but the heuristic
+mapping from execution history (the analytics database), but the heuristic
 version already captures 80% of the savings — refactor 50 lines should not
 spend Opus tokens.
 

@@ -22,10 +22,7 @@ reads, starting with [where they are read from](#where-environment-variables-are
 
 Consumers:
 
-- **Backend Python** — [core/configured_providers.py](../apps/backend/core/configured_providers.py)
-  (typed loader with validation) and [provider_api.py](../apps/backend/provider_api.py#L1).
-  Validated against `ConfiguredProvider` at load time — malformed entries
-  raise immediately instead of silently propagating empty strings.
+- **Backend Python** — [provider_api.py](../apps/backend/provider_api.py#L1).
 - **Frontend TypeScript** — read at runtime over IPC
   (`providers:getConfiguredProviders`) by
   [`shared/services/providerService.ts`](../apps/frontend/src/shared/services/providerService.ts),
