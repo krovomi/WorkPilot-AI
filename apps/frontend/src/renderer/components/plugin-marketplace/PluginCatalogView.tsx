@@ -1,5 +1,5 @@
-import type { PluginType } from "@shared/types/plugin-marketplace";
-import { Search, SlidersHorizontal } from "lucide-react";
+import type { CatalogPluginType } from "@shared/types/plugin-marketplace";
+import { Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import {
@@ -7,22 +7,20 @@ import {
 	uninstallPlugin,
 	usePluginMarketplaceStore,
 } from "@/stores/plugin-marketplace-store";
-import { Button } from "../ui/button";
+import { useProjectStore } from "@/stores/project-store";
 import { Input } from "../ui/input";
 import { PluginCard } from "./PluginCard";
 
-const TYPE_FILTERS: Array<{ value: PluginType | "all"; labelKey: string }> = [
+const TYPE_FILTERS: Array<{
+	value: CatalogPluginType | "all";
+	labelKey: string;
+}> = [
 	{ value: "all", labelKey: "common:pluginMarketplace.filters.all" },
 	{ value: "agent", labelKey: "common:pluginMarketplace.types.agent" },
-	{
-		value: "integration",
-		labelKey: "common:pluginMarketplace.types.integration",
-	},
 	{
 		value: "spec-template",
 		labelKey: "common:pluginMarketplace.types.specTemplate",
 	},
-	{ value: "theme", labelKey: "common:pluginMarketplace.types.theme" },
 	{
 		value: "custom-prompt",
 		labelKey: "common:pluginMarketplace.types.customPrompt",
@@ -39,6 +37,8 @@ export function PluginCatalogView() {
 		getFilteredCatalog,
 		isPluginInstalled,
 	} = usePluginMarketplaceStore();
+
+	const projectId = useProjectStore((state) => state.selectedProjectId);
 
 	const filteredPlugins = getFilteredCatalog();
 
@@ -65,30 +65,13 @@ export function PluginCatalogView() {
 							}
 							className="h-8 rounded-md border border-input bg-background px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
 						>
-							<option value="popular">
-								{t("common:pluginMarketplace.sort.popular")}
-							</option>
-							<option value="rating">
-								{t("common:pluginMarketplace.sort.rating")}
-							</option>
-							<option value="newest">
-								{t("common:pluginMarketplace.sort.newest")}
+							<option value="featured">
+								{t("common:pluginMarketplace.sort.featured")}
 							</option>
 							<option value="name">
 								{t("common:pluginMarketplace.sort.name")}
 							</option>
 						</select>
-						<Button
-							variant={filters.showVerifiedOnly ? "default" : "outline"}
-							size="sm"
-							className="h-8 text-xs gap-1.5"
-							onClick={() =>
-								setFilters({ showVerifiedOnly: !filters.showVerifiedOnly })
-							}
-						>
-							<SlidersHorizontal className="h-3 w-3" />
-							{t("common:pluginMarketplace.filters.verified")}
-						</Button>
 					</div>
 				</div>
 
@@ -114,6 +97,11 @@ export function PluginCatalogView() {
 
 			{/* Plugin grid */}
 			<div className="flex-1 overflow-y-auto px-6 py-4">
+				{!projectId && (
+					<p className="mb-4 text-sm text-muted-foreground">
+						{t("common:pluginMarketplace.noProject")}
+					</p>
+				)}
 				{isCatalogLoading ? (
 					<div className="flex items-center justify-center h-32">
 						<div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
@@ -136,8 +124,11 @@ export function PluginCatalogView() {
 									plugin={plugin}
 									isInstalled={isPluginInstalled(plugin.id)}
 									isInstalling={isInstalling === plugin.id}
-									onInstall={() => installPlugin(plugin.id)}
-									onUninstall={() => uninstallPlugin(plugin.id)}
+									canInstall={Boolean(projectId)}
+									onInstall={() => projectId && installPlugin(projectId, plugin.id)}
+									onUninstall={() =>
+										projectId && uninstallPlugin(projectId, plugin.id)
+									}
 								/>
 							))}
 						</div>

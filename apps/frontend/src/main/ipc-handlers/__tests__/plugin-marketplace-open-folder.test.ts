@@ -23,6 +23,12 @@ vi.mock("electron", () => ({
 	shell: { openPath: (target: string) => openPath(target) },
 }));
 
+// The install handlers resolve a project through the store; these tests only
+// open folders, and the real store reads userData before it exists here.
+vi.mock("../../project-store", () => ({
+	projectStore: { getProject: vi.fn(() => undefined) },
+}));
+
 import {
 	registerPluginMarketplaceHandlers,
 	resolveLocalPluginFolder,
