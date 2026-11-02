@@ -38,6 +38,7 @@ import {
 	persistPlanStatus,
 } from "./plan-file-utils";
 import { findTaskAndProject } from "./shared";
+import { discardSpecIfStale } from "./stale-spec";
 import { convertTaskMetadataToSpecCreation } from "./resume-task";
 import { extractPrCreationError } from "./pr-error-utils";
 import { stripHtml } from "../shared/sanitize";
@@ -538,6 +539,7 @@ print(json.dumps(result))
 
 					// Check if spec.md exists
 					const specFilePath = path.join(specDir, AUTO_BUILD_PATHS.SPEC_FILE);
+					discardSpecIfStale(specDir, task.subtasks.length);
 					const hasSpec = existsSync(specFilePath);
 					const needsSpecCreation = !hasSpec;
 					const needsImplementation = hasSpec && task.subtasks.length === 0;

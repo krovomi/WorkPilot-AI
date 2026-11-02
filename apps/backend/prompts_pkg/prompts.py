@@ -488,6 +488,18 @@ def _inline_spec(spec_dir: Path) -> str:
     return spec
 
 
+def _user_request(spec_dir: Path) -> str:
+    """The user's own words (`requirements.json`), or "" when unreadable."""
+    try:
+        req = json.loads((spec_dir / "requirements.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return ""
+    value = req.get("task_description") if isinstance(req, dict) else None
+    if not isinstance(value, str):
+        return ""
+    return value.strip()[:LIGHT_QA_SPEC_MAX_CHARS]
+
+
 def _fill_scoped_prompt(
     filename: str,
     spec_dir: Path,
@@ -507,6 +519,10 @@ def _fill_scoped_prompt(
     # placeholders themselves.
     spec = _inline_spec(spec_dir)
     prompt = prompt.replace("{{SPEC}}", spec.replace("{{", "{ {"), 1)
+    request = _user_request(spec_dir) or "(not recorded)"
+    prompt = prompt.replace(
+        "{{USER_REQUEST}}", request.replace("{{", "{ {").replace("```", "``\u200b`"), 1
+    )
     prompt = prompt.replace("{{DIFF}}", diff.replace("```", "``\u200b`"), 1)
     header = (
         "## SPEC LOCATION\n\n"

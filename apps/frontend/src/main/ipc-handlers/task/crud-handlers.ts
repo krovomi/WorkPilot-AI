@@ -45,7 +45,11 @@ import { findTaskWorktree, isPathWithinBase } from "../../worktree-paths";
 import { inlineAzureDevOpsImages } from "../shared/azure-attachments";
 import { stripHtml } from "../shared/sanitize";
 import { findTaskAndProject } from "./shared";
-import { discardDescriptionDerivedFiles, specIsStale } from "./stale-spec";
+import {
+	copySpecSource,
+	discardDescriptionDerivedFiles,
+	specIsStale,
+} from "./stale-spec";
 import { resolveUnder } from "../../security/renderer-path";
 
 /** Charge le PAT et l'URL d'organisation Azure DevOps depuis le `.env` projet. */
@@ -541,6 +545,10 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 					);
 				}
 			}
+
+			// The copied spec answers the source's description: record it, so
+			// editing the copy regenerates its spec at the next start.
+			copySpecSource(sourceSpecDir, newSpecDir);
 
 			// 3. task_metadata.json — copy classification/config but drop fields
 			// that must not carry over to an independent clone (tracker links,
