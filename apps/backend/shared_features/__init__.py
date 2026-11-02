@@ -24,6 +24,7 @@ def mount_all(mount: Callable[[APIRouter, str], None]) -> None:
     """Mount each router with ``mount``, naming the feature its permission
     derives from (``server.authz.catalog.FEATURE_DOMAINS``)."""
     from shared_board.api import router as board
+    from shared_board.engines import router as board_engines
     from shared_features.analyses import router as analyses
     from shared_features.api import feature_router
     from shared_features.context import router as context
@@ -37,6 +38,7 @@ def mount_all(mount: Callable[[APIRouter, str], None]) -> None:
     from shared_features.workspace import router as workspace
 
     mount(board, "board")
+    mount(board_engines, "board")
     for feature in FEATURES.values():
         mount(feature_router(feature), feature.key)
     mount(roadmap, "roadmap")

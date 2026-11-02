@@ -12,6 +12,12 @@ name, the card's number, the phase and its result. Never the card's title or
 text, which are the team's and would otherwise sit in three vendors' logs.
 The phone opens the card from ``data`` (``projectId``, ``cardId``).
 
+A spec run that leaves the card waiting for its plan to be approved is told
+as such (``awaitingApproval: true``) and carries the ``plan_review`` category:
+the phone shows "Approve and build" and "View" buttons on it
+(``apps/mobile/src/push``). The button only calls the same routes the app
+does, as the person, after the phone's lock; the server checks them again.
+
 A token Expo reports as no longer registered (the app was removed, the
 person signed out on a phone that was offline) is deleted. Sending never
 blocks or fails a run: it runs in the background and only logs.
@@ -20,9 +26,12 @@ blocks or fails a run: it runs in the background and only logs.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import re
+from collections.abc import Callable
 from datetime import UTC, datetime
+from pathlib import Path
 
 import httpx
 from server.config import get_settings
@@ -71,7 +80,16 @@ _BODIES = {
     },
 }
 
+_PLAN_REVIEW = {
+    "en": "Plan ready for your approval on card {card}",
+    "fr": "Plan prêt à valider sur la carte {card}",
+}
+#: The category the app registers for a plan to approve. Expo forbids ``-``
+#: and ``:`` in its name.
+PLAN_REVIEW_CATEGORY = "plan_review"
+
 _background: set[asyncio.Task] = set()
+_approval_pending: Callable[[Path], bool] | None = None
 
 
 def valid_token(token: object) -> bool:
@@ -125,10 +143,18 @@ def build_messages(
     card_id: str,
     phase: str,
     status: str,
+    *,
+    spec_id: str | None = None,
+    awaiting_approval: bool = False,
 ) -> list[dict]:
-    """One message per phone, in its language; nothing for another status."""
+    """One message per phone, in its language; nothing for another status.
+
+    ``awaiting_approval`` (a spec run that succeeded on a card asking for a
+    review) makes it a plan to approve, with its buttons.
+    """
     match = _CARD_NUMBER.match(card_id)
     card = match.group(1) if match else card_id[:12]
+    review = awaiting_approval and phase == "spec" and status == "succeeded"
     messages = []
     for device in devices:
         locale = device.locale if device.locale in LOCALES else "en"
@@ -136,24 +162,66 @@ def build_messages(
         if template is None:
             continue
         label = _PHASES[locale].get(phase, phase)
-        messages.append(
-            {
-                "to": device.token,
-                "title": project_name[:80],
-                "body": template.format(phase=label, card=card),
-                "sound": "default",
-                # The Android channel the app creates (apps/mobile/src/push).
-                "channelId": "runs",
-                "data": {
-                    "type": "run_finished",
-                    "projectId": project_id,
-                    "cardId": card_id,
-                    "phase": phase,
-                    "status": status,
-                },
-            }
-        )
+        data = {
+            # Kept "run_finished": an older app still opens the card on a tap.
+            "type": "run_finished",
+            "projectId": project_id,
+            "cardId": card_id,
+            "phase": phase,
+            "status": status,
+        }
+        if spec_id:
+            data["specId"] = spec_id
+        if review:
+            data["awaitingApproval"] = True
+        message = {
+            "to": device.token,
+            "title": project_name[:80],
+            "body": (_PLAN_REVIEW[locale] if review else template).format(
+                phase=label, card=card
+            ),
+            "sound": "default",
+            # The Android channel the app creates (apps/mobile/src/push).
+            "channelId": "runs",
+            "data": data,
+        }
+        if review:
+            message["categoryId"] = PLAN_REVIEW_CATEGORY
+        messages.append(message)
     return messages
+
+
+def set_approval_check(check: Callable[[Path], bool] | None) -> None:
+    """Install how to tell a plan not yet approved, given its spec folder.
+
+    The board installs it (``shared_board.api``): the server imports no
+    feature unit (``tests/test_import_contracts.py``), and the approval the
+    build checks lives in ``review``.
+    """
+    global _approval_pending
+    _approval_pending = check
+
+
+def awaits_approval(server_path: str, card_id: str) -> bool:
+    """Whether the card has a spec its creator asked to review, not yet approved."""
+    if _approval_pending is None:
+        return False
+    specs = (Path(server_path) / ".workpilot" / "specs").resolve()
+    directory = (specs / card_id).resolve()
+    if directory.parent != specs or not (directory / "spec.md").is_file():
+        return False
+    try:
+        metadata = json.loads(
+            (directory / "task_metadata.json").read_text(encoding="utf-8")
+        )
+    except (OSError, ValueError):
+        metadata = {}
+    if (
+        isinstance(metadata, dict)
+        and metadata.get("requireReviewBeforeCoding") is False
+    ):
+        return False
+    return _approval_pending(directory)
 
 
 async def send(
@@ -189,7 +257,12 @@ async def send(
 
 
 async def _notify(
-    project_id: str, card_id: str, phase: str, status: str, user_id: str
+    project_id: str,
+    card_id: str,
+    phase: str,
+    status: str,
+    user_id: str,
+    spec_id: str | None = None,
 ) -> None:
     async with get_session_factory()() as db:
         devices = list(
@@ -199,7 +272,22 @@ async def _notify(
             return
         project = await db.get(Project, project_id)
         name = project.name if project else "WorkPilot"
-        messages = build_messages(devices, project_id, name, card_id, phase, status)
+        review = (
+            project is not None
+            and phase == "spec"
+            and status == "succeeded"
+            and awaits_approval(project.server_path, card_id)
+        )
+        messages = build_messages(
+            devices,
+            project_id,
+            name,
+            card_id,
+            phase,
+            status,
+            spec_id=spec_id,
+            awaiting_approval=review,
+        )
         gone = await send(messages)
         if gone:
             await db.execute(delete(PushDevice).where(PushDevice.token.in_(gone)))
@@ -207,7 +295,12 @@ async def _notify(
 
 
 def notify_run_finished(
-    project_id: str, card_id: str, phase: str, status: str, user_id: str | None
+    project_id: str,
+    card_id: str,
+    phase: str,
+    status: str,
+    user_id: str | None,
+    spec_id: str | None = None,
 ) -> None:
     """Tell the person who started the run, in the background, if push is on."""
     if not user_id or status not in {"succeeded", "failed"}:
@@ -217,7 +310,7 @@ def notify_run_finished(
 
     async def run() -> None:
         try:
-            await _notify(project_id, card_id, phase, status, user_id)
+            await _notify(project_id, card_id, phase, status, user_id, spec_id)
         # Never fail a run over a notification: Expo down, a bad answer, the DB.
         except (httpx.HTTPError, SQLAlchemyError, ValueError, OSError) as e:
             logger.warning("Push notification not sent: %s", type(e).__name__)
