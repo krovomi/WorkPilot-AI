@@ -1,38 +1,53 @@
 {
-	"title": "Multi-Repo Orchestration",
+	"title": "Multi-repo task",
+	"button": {
+		"label": "Multi-repo",
+		"title": "A change across several repositories: one card per repository, run in dependency order"
+	},
 	"dialog": {
-		"title": "Multi-Repo Orchestration",
-		"description": "Coordinate changes across multiple repositories simultaneously",
-		"stepRepos": "1. Target Repositories",
-		"stepTask": "2. Task Description",
-		"addRepo": "Add",
-		"removeRepo": "Remove",
-		"repoNamePlaceholder": "Repository name (e.g., owner/frontend)",
-		"repoPathPlaceholder": "Local path to repository",
-		"taskPlaceholder": "Describe what you want to build across these repositories...",
-		"noReposAdded": "Add at least 2 repositories to start a multi-repo orchestration",
-		"createOrchestration": "Create Orchestration",
+		"title": "Multi-repo task",
+		"description": "One change across several repositories. Each repository gets a card of its own project, started once the repositories it depends on passed QA.",
+		"stepRepos": "1. Repositories",
+		"stepTask": "2. What to change",
+		"taskPlaceholder": "Describe the change across these repositories...",
+		"howItRuns": "WorkPilot reads the repositories to order them (providers first), then runs each card through the usual spec, plan, code and QA. A card that needs you holds the run until you act on it from the board.",
+		"noProjects": "No project on this computer yet: add a folder.",
+		"pickedCount_one": "{{count}} repository picked (at least 2)",
+		"pickedCount_other": "{{count}} repositories picked (at least 2)",
+		"addFolder": "Add a folder",
+		"newOrchestration": "New multi-repo task",
+		"launch": "Launch",
 		"creating": "Creating...",
-		"startOrchestration": "Start Orchestration",
-		"cancel": "Cancel"
+		"start": "Start",
+		"resume": "Resume",
+		"stop": "Stop",
+		"back": "All multi-repo tasks"
 	},
 	"status": {
-		"pending": "Pending",
-		"analyzing": "Analyzing repositories...",
-		"planning": "Planning cross-repo changes...",
-		"executing": "Executing per-repo pipelines...",
-		"creating_prs": "Creating linked PRs...",
-		"completed": "Orchestration complete",
-		"failed": "Orchestration failed"
+		"pending": "Not started",
+		"analyzing": "Reading the repositories...",
+		"executing": "Running the cards",
+		"completed": "Every repository passed QA",
+		"failed": "Stopped on an error",
+		"stopped": "Stopped",
+		"waitingOnRepo": "Waiting for you on {{repo}}: open its card on the board."
+	},
+	"repoStatus": {
+		"pending": "Not started",
+		"coding": "In progress",
+		"qa": "QA",
+		"needs_you": "Needs you",
+		"completed": "Passed QA",
+		"failed": "Error"
 	},
 	"graph": {
-		"title": "Dependency Graph",
+		"title": "Dependency graph",
 		"noRepos": "No repositories configured",
 		"noEdges": "No dependencies detected between repos",
 		"executionOrder": "Execution order"
 	},
 	"breakingChanges": {
-		"title": "Breaking Changes Detected",
+		"title": "Breaking changes detected",
 		"severity": {
 			"warning": "Warning",
 			"error": "Error"
@@ -40,15 +55,32 @@
 		"noChanges": "No breaking changes detected"
 	},
 	"execution": {
-		"repoProgress": "{{repo}} progress",
-		"overall": "Overall progress"
+		"overall": "Overall progress",
+		"card": "Card {{task}}",
+		"noCardYet": "No card yet",
+		"branch": "Branch {{branch}}",
+		"pr": "Pull request: {{url}}"
 	},
 	"errors": {
-		"noRepos": "Please add at least two repositories",
-		"noDescription": "Please enter a task description",
-		"repoNotFound": "Repository not found: {{repo}}",
-		"circularDependency": "Circular dependency detected between repos",
-		"createFailed": "Failed to create orchestration",
-		"startFailed": "Failed to start orchestration"
+		"noRepos": "Pick at least two repositories.",
+		"tooManyRepos": "Pick at most 8 repositories.",
+		"repoNotAllowed": "A repository must be a project of this computer or a folder you picked.",
+		"duplicateRepo": "The same repository is picked twice.",
+		"repoNotUsable": "A repository could not be opened as a project: it must be a git repository with at least one commit.",
+		"noDescription": "Describe the change.",
+		"descriptionTooLong": "The description is too long.",
+		"projectNotFound": "This project is not on this computer.",
+		"notFound": "This multi-repo task no longer exists.",
+		"alreadyRunning": "This multi-repo task is already running.",
+		"createFailed": "The multi-repo task could not be created.",
+		"startFailed": "The multi-repo task could not start.",
+		"circularDependency": "The repositories depend on each other in a circle: there is no order to run them in.",
+		"analysisFailed": "The repositories could not be read.",
+		"projectUnavailable": "{{repo}} could not be opened as a project.",
+		"briefFailed": "The card of {{repo}} could not be described.",
+		"taskCreateFailed": "The card of {{repo}} could not be created.",
+		"taskStartFailed": "The card of {{repo}} could not start: open it on the board to see why, then resume.",
+		"taskMissing": "The card of {{repo}} was deleted.",
+		"unexpected": "The run stopped on an unexpected error."
 	}
 }

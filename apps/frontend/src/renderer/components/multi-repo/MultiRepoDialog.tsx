@@ -1,224 +1,187 @@
-import type { MultiRepoCreateConfig } from "@shared/types";
-import { useCallback } from "react";
+import type { MultiRepoOrchestration } from "@shared/types";
+import { ArrowLeft, Play, Plus, Square } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useMultiRepoStore } from "@/stores/multi-repo-store";
+import { Button } from "../ui/button";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "../ui/dialog";
+import { Textarea } from "../ui/textarea";
 import { BreakingChangeBanner } from "./BreakingChangeBanner";
 import { DependencyGraphView } from "./DependencyGraphView";
 import { ExecutionMonitor } from "./ExecutionMonitor";
 import { RepoSelector } from "./RepoSelector";
 
+function titleOf(o: MultiRepoOrchestration): string {
+	return o.taskDescription.split("\n").find((line) => line.trim())?.trim() ?? o.id;
+}
+
+/** Can be started again: never ran here, stopped, failed, or left by a closed app. */
+function canStart(o: MultiRepoOrchestration): boolean {
+	return !o.running && o.status !== "completed";
+}
+
+function OrchestrationList() {
+	const { t } = useTranslation(["multiRepo"]);
+	const orchestrations = useMultiRepoStore((s) => s.orchestrations);
+	const showDetail = useMultiRepoStore((s) => s.showDetail);
+	return (
+		<ul className="space-y-2">
+			{orchestrations.map((o) => (
+				<li key={o.id}>
+					<button
+						type="button"
+						onClick={() => showDetail(o.id)}
+						className="flex w-full items-center gap-3 rounded-lg border border-border bg-card p-3 text-left transition-colors hover:bg-accent/40"
+					>
+						<div className="min-w-0 flex-1">
+							<div className="truncate text-sm font-medium text-foreground">{titleOf(o)}</div>
+							<div className="truncate text-xs text-muted-foreground">
+								{o.repos.map((r) => r.repo).join(" · ")}
+							</div>
+						</div>
+						<span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+							{t(`multiRepo:status.${o.status}`)}
+						</span>
+						<span className="w-10 shrink-0 text-right text-xs text-muted-foreground">
+							{Math.round(o.overallProgress)}%
+						</span>
+					</button>
+				</li>
+			))}
+		</ul>
+	);
+}
+
+function NewOrchestration() {
+	const { t } = useTranslation(["multiRepo"]);
+	const taskDescription = useMultiRepoStore((s) => s.taskDescription);
+	const setTaskDescription = useMultiRepoStore((s) => s.setTaskDescription);
+	return (
+		<div className="space-y-6">
+			<section className="space-y-3">
+				<h3 className="text-sm font-medium text-foreground">{t("multiRepo:dialog.stepRepos")}</h3>
+				<RepoSelector />
+			</section>
+			<section className="space-y-2">
+				<label htmlFor="multi-repo-task" className="text-sm font-medium text-foreground">
+					{t("multiRepo:dialog.stepTask")}
+				</label>
+				<Textarea
+					id="multi-repo-task"
+					value={taskDescription}
+					onChange={(e) => setTaskDescription(e.target.value)}
+					placeholder={t("multiRepo:dialog.taskPlaceholder")}
+					rows={5}
+				/>
+				<p className="text-xs text-muted-foreground">{t("multiRepo:dialog.howItRuns")}</p>
+			</section>
+		</div>
+	);
+}
+
+function OrchestrationDetail({ orchestration }: { readonly orchestration: MultiRepoOrchestration }) {
+	return (
+		<div className="space-y-6">
+			<p className="whitespace-pre-wrap text-sm text-foreground">{orchestration.taskDescription}</p>
+			<ExecutionMonitor orchestration={orchestration} />
+			{orchestration.dependencyGraph.nodes.length > 0 && (
+				<DependencyGraphView
+					graph={orchestration.dependencyGraph}
+					executionOrder={orchestration.executionOrder}
+					repoStates={orchestration.repoStates}
+				/>
+			)}
+			<BreakingChangeBanner breakingChanges={orchestration.breakingChanges} />
+		</div>
+	);
+}
+
 /**
- * MultiRepoDialog - Main dialog for creating and monitoring multi-repo orchestrations
- *
- * Steps:
- * 1. Add repositories (RepoSelector)
- * 2. Describe the cross-repo task
- * 3. Review dependency graph
- * 4. Monitor execution progress
+ * MultiRepoDialog - one change across several repositories: the
+ * orchestrations of the project, a form for a new one, and the follow-up of
+ * a run (one Kanban card per repository, started in dependency order).
  */
 export function MultiRepoDialog() {
 	const { t } = useTranslation(["multiRepo", "common"]);
-	const {
-		isDialogOpen,
-		closeDialog,
-		targetRepos,
-		taskDescription,
-		setTaskDescription,
-		status,
-		repoStates,
-		dependencyGraph,
-		executionOrder,
-		breakingChanges,
-		overallProgress,
-		currentRepo,
-		statusMessage,
-		isCreating,
-		setIsCreating,
-		activeOrchestration,
-	} = useMultiRepoStore();
+	const isOpen = useMultiRepoStore((s) => s.isDialogOpen);
+	const view = useMultiRepoStore((s) => s.view);
+	const orchestrations = useMultiRepoStore((s) => s.orchestrations);
+	const activeId = useMultiRepoStore((s) => s.activeId);
+	const pickedRepos = useMultiRepoStore((s) => s.pickedRepos);
+	const taskDescription = useMultiRepoStore((s) => s.taskDescription);
+	const busy = useMultiRepoStore((s) => s.busy);
+	const error = useMultiRepoStore((s) => s.error);
+	const { closeDialog, showList, showNew, launch, start, stop } = useMultiRepoStore.getState();
 
-	const isExecuting =
-		status !== "pending" && status !== "completed" && status !== "failed";
-	const isConfiguring = status === "pending" && !activeOrchestration;
-
-	const handleCreate = useCallback(async () => {
-		if (targetRepos.length < 2 || !taskDescription.trim()) return;
-
-		setIsCreating(true);
-		try {
-			const config: MultiRepoCreateConfig = {
-				repos: targetRepos.map((r) => ({
-					repo: r.repo,
-					localPath: r.localPath,
-					pathScope: r.pathScope,
-				})),
-				taskDescription: taskDescription.trim(),
-			};
-
-			// The actual IPC call would be made by a hook or effect
-			// For now we just store the config
-			const result = await window.electronAPI.createMultiRepoOrchestration(
-				"", // projectId - will be resolved by the handler
-				config,
-			);
-
-			if (result?.success && result.data) {
-				useMultiRepoStore.getState().setActiveOrchestration(result.data);
-			}
-		} catch (error) {
-			console.error("[MultiRepo] Create failed:", error);
-		} finally {
-			setIsCreating(false);
-		}
-	}, [targetRepos, taskDescription, setIsCreating]);
-
-	const handleStart = useCallback(async () => {
-		if (!activeOrchestration) return;
-		try {
-			await window.electronAPI.startMultiRepoOrchestration(
-				"", // projectId
-				activeOrchestration.id,
-			);
-		} catch (error) {
-			console.error("[MultiRepo] Start failed:", error);
-		}
-	}, [activeOrchestration]);
-
-	if (!isDialogOpen) return null;
+	const active = orchestrations.find((o) => o.id === activeId) ?? null;
+	const canLaunch = pickedRepos.length >= 2 && taskDescription.trim().length > 0 && !busy;
 
 	return (
-		<div className="fixed inset-0 z-50 flex items-center justify-center">
-			{/* Backdrop */}
-			{/* biome-ignore lint/a11y/noStaticElementInteractions: intentional */}
-			<div
-				className="absolute inset-0 bg-black/50"
-				onClick={closeDialog}
-				onKeyDown={(e) => e.key === "Escape" && closeDialog()}
-				role="presentation"
-			/>
+		<Dialog open={isOpen} onOpenChange={(open) => !open && closeDialog()}>
+			<DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+				<DialogHeader>
+					<DialogTitle>{t("multiRepo:dialog.title")}</DialogTitle>
+					<DialogDescription>{t("multiRepo:dialog.description")}</DialogDescription>
+				</DialogHeader>
 
-			{/* Dialog */}
-			<div className="relative z-10 w-full max-w-2xl max-h-[85vh] overflow-auto rounded-xl border border-border bg-background shadow-xl">
-				{/* Header */}
-				<div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background px-6 py-4">
+				{view === "list" && <OrchestrationList />}
+				{view === "new" && <NewOrchestration />}
+				{view === "detail" && active && <OrchestrationDetail orchestration={active} />}
+
+				{error && (
+					<p role="alert" className="text-sm text-destructive">
+						{t(`multiRepo:${error}`, { defaultValue: t("multiRepo:errors.createFailed") })}
+					</p>
+				)}
+
+				<DialogFooter className="gap-2 sm:justify-between">
 					<div>
-						<h2 className="text-lg font-semibold text-foreground">
-							{t("multiRepo:dialog.title")}
-						</h2>
-						<p className="text-sm text-muted-foreground">
-							{t("multiRepo:dialog.description")}
-						</p>
+						{view !== "list" && orchestrations.length > 0 && (
+							<Button type="button" variant="ghost" onClick={showList}>
+								<ArrowLeft className="mr-2 h-4 w-4" aria-hidden="true" />
+								{t("multiRepo:dialog.back")}
+							</Button>
+						)}
 					</div>
-					<button
-						type="button"
-						onClick={closeDialog}
-						className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-					>
-						{/* biome-ignore lint/a11y/noSvgWithoutTitle: SVG is decorative, intentional  */}
-						<svg
-							className="h-5 w-5"
-							fill="none"
-							viewBox="0 0 24 24"
-							strokeWidth={1.5}
-							stroke="currentColor"
-						>
-							<path
-								strokeLinecap="round"
-								strokeLinejoin="round"
-								d="M6 18L18 6M6 6l12 12"
-							/>
-						</svg>
-					</button>
-				</div>
-
-				{/* Content */}
-				<div className="p-6 space-y-6">
-					{/* Step 1: Repos */}
-					{isConfiguring && (
-						<>
-							<section>
-								<h3 className="mb-3 text-sm font-medium text-foreground">
-									{t("multiRepo:dialog.stepRepos")}
-								</h3>
-								<RepoSelector />
-							</section>
-
-							{/* Step 2: Task description */}
-							<section>
-								<h3 className="mb-2 text-sm font-medium text-foreground">
-									{t("multiRepo:dialog.stepTask")}
-								</h3>
-								<textarea
-									value={taskDescription}
-									onChange={(e) => setTaskDescription(e.target.value)}
-									placeholder={t("multiRepo:dialog.taskPlaceholder")}
-									rows={4}
-									className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none"
-								/>
-							</section>
-						</>
-					)}
-
-					{/* Step 3: Dependency graph (shown after creation or during execution) */}
-					{dependencyGraph && dependencyGraph.nodes.length > 0 && (
-						<DependencyGraphView
-							graph={dependencyGraph}
-							executionOrder={executionOrder}
-							repoStates={repoStates}
-						/>
-					)}
-
-					{/* Breaking changes */}
-					<BreakingChangeBanner breakingChanges={breakingChanges} />
-
-					{/* Step 4: Execution monitor (shown during execution) */}
-					{(isExecuting || status === "completed" || status === "failed") && (
-						<ExecutionMonitor
-							status={status}
-							repoStates={repoStates}
-							overallProgress={overallProgress}
-							currentRepo={currentRepo}
-							statusMessage={statusMessage}
-						/>
-					)}
-				</div>
-
-				{/* Footer */}
-				<div className="sticky bottom-0 flex items-center justify-end gap-3 border-t border-border bg-background px-6 py-4">
-					<button
-						type="button"
-						onClick={closeDialog}
-						className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-accent transition-colors"
-					>
-						{t("common:cancel")}
-					</button>
-
-					{isConfiguring && (
-						<button
-							type="button"
-							onClick={handleCreate}
-							disabled={
-								targetRepos.length < 2 || !taskDescription.trim() || isCreating
-							}
-							className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-						>
-							{isCreating
-								? t("multiRepo:dialog.creating")
-								: t("multiRepo:dialog.createOrchestration")}
-						</button>
-					)}
-
-					{activeOrchestration && status === "pending" && (
-						<button
-							type="button"
-							onClick={handleStart}
-							className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-						>
-							{t("multiRepo:dialog.startOrchestration")}
-						</button>
-					)}
-				</div>
-			</div>
-		</div>
+					<div className="flex gap-2">
+						{view === "list" && (
+							<Button type="button" onClick={showNew}>
+								<Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+								{t("multiRepo:dialog.newOrchestration")}
+							</Button>
+						)}
+						{view === "new" && (
+							<Button type="button" onClick={() => void launch()} disabled={!canLaunch}>
+								<Play className="mr-2 h-4 w-4" aria-hidden="true" />
+								{busy ? t("multiRepo:dialog.creating") : t("multiRepo:dialog.launch")}
+							</Button>
+						)}
+						{view === "detail" && active?.running && (
+							<Button type="button" variant="outline" onClick={() => void stop(active.id)}>
+								<Square className="mr-2 h-4 w-4" aria-hidden="true" />
+								{t("multiRepo:dialog.stop")}
+							</Button>
+						)}
+						{view === "detail" && active && canStart(active) && (
+							<Button type="button" onClick={() => void start(active.id)}>
+								<Play className="mr-2 h-4 w-4" aria-hidden="true" />
+								{active.status === "pending"
+									? t("multiRepo:dialog.start")
+									: t("multiRepo:dialog.resume")}
+							</Button>
+						)}
+						<Button type="button" variant="outline" onClick={closeDialog}>
+							{t("common:buttons.close")}
+						</Button>
+					</div>
+				</DialogFooter>
+			</DialogContent>
+		</Dialog>
 	);
 }

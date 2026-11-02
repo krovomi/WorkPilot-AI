@@ -1,148 +1,85 @@
-import type { RepoTarget } from "@shared/types";
-import { useState } from "react";
+import { FolderPlus } from "lucide-react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useMultiRepoStore } from "@/stores/multi-repo-store";
+import { useProjectStore } from "@/stores/project-store";
+import { cn } from "../../lib/utils";
+import { Button } from "../ui/button";
 
 /**
- * RepoSelector - Add/remove/configure target repositories for multi-repo orchestration
+ * RepoSelector - the repositories of a multi-repo task: projects of this
+ * computer, or a folder picked in the system dialog (it becomes a project).
+ * Paths never come from typing: the main process only accepts those two.
  */
 export function RepoSelector() {
-	const { t } = useTranslation(["multiRepo", "common"]);
-	// biome-ignore lint/correctness/noUnusedVariables: variable kept for clarity
-	const { targetRepos, addRepo, removeRepo, updateRepo } = useMultiRepoStore();
-	const [repoInput, setRepoInput] = useState("");
-	const [pathInput, setPathInput] = useState("");
+	const { t } = useTranslation(["multiRepo"]);
+	const projects = useProjectStore((s) => s.projects);
+	const pickedRepos = useMultiRepoStore((s) => s.pickedRepos);
+	const toggleRepo = useMultiRepoStore((s) => s.toggleRepo);
 
-	const handleAddRepo = () => {
-		if (!repoInput.trim() || !pathInput.trim()) return;
-
-		const id = `${repoInput.replace(/[^\w-]/g, "_")}_${Date.now()}`;
-		const newRepo: RepoTarget = {
-			id,
-			repo: repoInput.trim(),
-			displayName: repoInput.trim().split("/").pop() || repoInput.trim(),
-			localPath: pathInput.trim(),
-		};
-
-		addRepo(newRepo);
-		setRepoInput("");
-		setPathInput("");
-	};
+	const localProjects = useMemo(() => projects.filter((p) => !p.remote), [projects]);
+	const extraFolders = pickedRepos.filter((r) => !localProjects.some((p) => p.path === r.path));
+	const isPicked = (path: string) => pickedRepos.some((r) => r.path === path);
 
 	const handleBrowse = async () => {
-		try {
-			const result = await window.electronAPI.selectDirectory();
-			if (result) {
-				setPathInput(result);
-				if (!repoInput.trim()) {
-					// Auto-fill repo name from directory name
-					const dirName = result.split(/[\\/]/).pop() || "";
-					setRepoInput(dirName);
-				}
-			}
-		} catch {
-			// User cancelled
-		}
+		const chosen = await window.electronAPI.selectDirectory();
+		if (!chosen || isPicked(chosen)) return;
+		toggleRepo({ path: chosen, name: chosen.split(/[\\/]/).filter(Boolean).pop() ?? chosen });
 	};
 
-	const handleKeyDown = (e: React.KeyboardEvent) => {
-		if (e.key === "Enter") {
-			e.preventDefault();
-			handleAddRepo();
-		}
-	};
+	const rows = [
+		...localProjects.map((p) => ({ path: p.path, name: p.name })),
+		...extraFolders,
+	];
 
 	return (
-		<div className="space-y-4">
-			{/* Add repo form */}
-			<div className="flex flex-col gap-2">
-				<div className="flex gap-2">
-					<input
-						type="text"
-						value={repoInput}
-						onChange={(e) => setRepoInput(e.target.value)}
-						onKeyDown={handleKeyDown}
-						placeholder={t("multiRepo:dialog.repoNamePlaceholder")}
-						className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-					/>
-				</div>
-				<div className="flex gap-2">
-					<input
-						type="text"
-						value={pathInput}
-						onChange={(e) => setPathInput(e.target.value)}
-						onKeyDown={handleKeyDown}
-						placeholder={t("multiRepo:dialog.repoPathPlaceholder")}
-						className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-					/>
-					<button
-						type="button"
-						onClick={handleBrowse}
-						className="rounded-md border border-border bg-muted px-3 py-2 text-sm text-foreground hover:bg-accent transition-colors"
-					>
-						{t("common:buttons.browse")}
-					</button>
-					<button
-						type="button"
-						onClick={handleAddRepo}
-						disabled={!repoInput.trim() || !pathInput.trim()}
-						className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-					>
-						{t("multiRepo:dialog.addRepo")}
-					</button>
-				</div>
-			</div>
-
-			{/* Repo list */}
-			{targetRepos.length > 0 && (
-				<div className="space-y-2">
-					{targetRepos.map((repo, index) => (
-						<div
-							key={repo.id}
-							className="flex items-center gap-3 rounded-lg border border-border bg-card p-3"
-						>
-							<div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
-								{index + 1}
-							</div>
-							<div className="flex-1 min-w-0">
-								<div className="font-medium text-sm text-foreground truncate">
-									{repo.repo}
-								</div>
-								<div className="text-xs text-muted-foreground truncate">
-									{repo.localPath}
-								</div>
-							</div>
-							<button
-								type="button"
-								onClick={() => removeRepo(repo.id)}
-								className="rounded-md p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-								title={t("multiRepo:dialog.removeRepo")}
+		<div className="space-y-3">
+			<ul className="max-h-64 space-y-1.5 overflow-y-auto">
+				{rows.map((row) => {
+					const picked = isPicked(row.path);
+					const order = pickedRepos.findIndex((r) => r.path === row.path) + 1;
+					return (
+						<li key={row.path}>
+							<label
+								className={cn(
+									"flex cursor-pointer items-center gap-3 rounded-lg border p-2.5 transition-colors",
+									picked ? "border-primary/50 bg-primary/5" : "border-border hover:bg-accent/40",
+								)}
 							>
-								{/* biome-ignore lint/a11y/noSvgWithoutTitle: SVG is decorative, intentional  */}
-								<svg
-									className="h-4 w-4"
-									fill="none"
-									viewBox="0 0 24 24"
-									strokeWidth={1.5}
-									stroke="currentColor"
-								>
-									<path
-										strokeLinecap="round"
-										strokeLinejoin="round"
-										d="M6 18L18 6M6 6l12 12"
-									/>
-								</svg>
-							</button>
-						</div>
-					))}
-				</div>
+								<input
+									type="checkbox"
+									className="h-4 w-4 accent-primary"
+									checked={picked}
+									onChange={() => toggleRepo(row)}
+								/>
+								<div className="min-w-0 flex-1">
+									<div className="truncate text-sm font-medium text-foreground">{row.name}</div>
+									<div className="truncate text-xs text-muted-foreground">{row.path}</div>
+								</div>
+								{picked && (
+									<span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+										{order}
+									</span>
+								)}
+							</label>
+						</li>
+					);
+				})}
+			</ul>
+			{rows.length === 0 && (
+				<p className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+					{t("multiRepo:dialog.noProjects")}
+				</p>
 			)}
-
-			{targetRepos.length === 0 && (
-				<div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-					{t("multiRepo:dialog.noReposAdded")}
-				</div>
-			)}
+			<div className="flex items-center justify-between gap-2">
+				<p className="text-xs text-muted-foreground">
+					{t("multiRepo:dialog.pickedCount", { count: pickedRepos.length })}
+				</p>
+				<Button type="button" variant="outline" size="sm" onClick={handleBrowse}>
+					<FolderPlus className="mr-2 h-4 w-4" aria-hidden="true" />
+					{t("multiRepo:dialog.addFolder")}
+				</Button>
+			</div>
 		</div>
 	);
 }

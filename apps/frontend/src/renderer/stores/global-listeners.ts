@@ -39,6 +39,7 @@ import { setupPairProgrammingListeners } from "./pair-programming-store";
 import {
 	setupPerformanceProfilerListeners,
 } from "./performance-profiler-store";
+import { setupMultiRepoListeners } from "./multi-repo-store";
 import { setupPairRealtimeListeners } from "./phase35-stores";
 import { setupPipelineGeneratorListeners } from "./pipeline-generator-store";
 import { setupPrFollowupListeners } from "./pr-followup-store";
@@ -105,6 +106,8 @@ const SETUPS: ReadonlyArray<readonly [string, ListenerSetup]> = [
 	["Insights", setupInsightsListeners],
 	["LearningLoop", setupLearningLoopListeners],
 	["Mobile", setupMobileListeners],
+	// A multi-repo run goes on in the main process with the dialog closed.
+	["MultiRepo", setupMultiRepoListeners],
 	["NaturalLanguageGit", setupNaturalLanguageGitListeners],
 	["NotebookAgent", setupNotebookAgentListeners],
 	["OnboardingAgent", setupOnboardingAgentListeners],

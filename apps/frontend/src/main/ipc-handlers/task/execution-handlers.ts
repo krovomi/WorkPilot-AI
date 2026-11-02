@@ -54,6 +54,22 @@ import { registerTaskStatusHandlers } from "./execution-status-handlers";
 import { registerTaskResumeHandlers } from "./execution-resume-handlers";
 import { registerTaskRecoveryHandlers } from "./execution-recovery-handlers";
 
+/** Starting and stopping a task from the main process, as the board does. */
+export interface TaskControl {
+	/** `false` when the task could not start (the board was told why). */
+	start(taskId: string, options?: TaskStartOptions): Promise<boolean>;
+	stop(taskId: string): void;
+	/** Whether the task's agents are running now. */
+	isRunning(taskId: string): boolean;
+}
+
+let taskControl: TaskControl | null = null;
+
+/** Set once the task handlers are registered; `null` before. */
+export function getTaskControl(): TaskControl | null {
+	return taskControl;
+}
+
 /**
  * Register task execution handlers (start, stop, review, status management, recovery)
  */
@@ -139,107 +155,116 @@ export function registerTaskExecutionHandlers(
 	}
 
 	/**
-	 * Start a task
+	 * Start a task: the board's Start button, and the main-process features
+	 * that run a card themselves (`getTaskControl`).
 	 */
-	ipcMain.on(
-		IPC_CHANNELS.TASK_START,
-		async (_, taskId: string, options?: TaskStartOptions) => {
-			console.warn(
-				"[TASK_START] Received request for taskId:",
-				taskId,
-				"with options:",
-				options,
-			);
-			const mainWindow = getMainWindow();
-			if (!mainWindow) {
-				console.warn("[TASK_START] No main window found");
-				return;
-			}
+	async function startTask(
+		taskId: string,
+		options?: TaskStartOptions,
+	): Promise<boolean> {
+		console.warn(
+			"[TASK_START] Received request for taskId:",
+			taskId,
+			"with options:",
+			options,
+		);
+		const mainWindow = getMainWindow();
+		if (!mainWindow) {
+			console.warn("[TASK_START] No main window found");
+			return false;
+		}
 
-			// A server card runs on the server; nothing starts on this computer.
-			const serverCard = findServerCard(taskId);
-			if (serverCard) {
-				const started = await startServerCard(serverCard);
-				if (!started.success) {
-					mainWindow.webContents.send(
-						IPC_CHANNELS.TASK_ERROR,
-						taskId,
-						started.error,
-					);
-				}
-				return;
-			}
-
-			// Validate prerequisites
-			const validation = await validateTaskPrerequisites(taskId, mainWindow);
-			if (!validation.success) {
+		// A server card runs on the server; nothing starts on this computer.
+		const serverCard = findServerCard(taskId);
+		if (serverCard) {
+			const started = await startServerCard(serverCard);
+			if (!started.success) {
 				mainWindow.webContents.send(
 					IPC_CHANNELS.TASK_ERROR,
 					taskId,
-					validation.error,
+					started.error,
 				);
-				return;
 			}
+			return started.success;
+		}
 
-			const { task, project } = validation;
-			console.warn(
-				"[TASK_START] Found task:",
-				task.specId,
-				"status:",
-				task.status,
-				"reviewReason:",
-				task.reviewReason,
-				"subtasks:",
-				task.subtasks.length,
-			);
-
-			// Determine and execute start event
-			const startEvent = determineStartEvent(taskId, task);
-			const taskToUse = startEvent.resetTask || task;
-
-			// Create proper event object based on type
-			let event: TaskEvent;
-			if (startEvent.type === "PR_CREATED") {
-				// This case shouldn't happen in start event, but handle for type safety
-				event = { type: startEvent.type, prUrl: "" };
-			} else {
-				event = { type: startEvent.type } as TaskEvent;
-			}
-
-			taskStateManager.handleUiEvent(taskId, event, taskToUse, project);
-
-			// Reset for new run
-			taskStateManager.resetForNewRun(taskId);
-
-			// Setup execution environment
-			const { specDir, needsSpecCreation, needsImplementation } =
-				setupTaskExecution(taskId, task, project);
-			console.warn(
-				"[TASK_START] hasSpec:",
-				!needsSpecCreation,
-				"needsSpecCreation:",
-				needsSpecCreation,
-				"needsImplementation:",
-				needsImplementation,
-			);
-
-			// The task runs on its own engine, never the default provider's.
-			ensureTaskEngine(task, project, specDir);
-			console.warn(
-				"[TASK_START] Provider:",
-				task.metadata?.provider ?? "none",
-			);
-
-			// Start execution
-			startTaskExecution(
+		// Validate prerequisites
+		const validation = await validateTaskPrerequisites(taskId, mainWindow);
+		if (!validation.success) {
+			mainWindow.webContents.send(
+				IPC_CHANNELS.TASK_ERROR,
 				taskId,
-				task,
-				project,
-				specDir,
-				needsSpecCreation,
-				needsImplementation,
-				options,
+				validation.error,
 			);
+			return false;
+		}
+
+		const { task, project } = validation;
+		console.warn(
+			"[TASK_START] Found task:",
+			task.specId,
+			"status:",
+			task.status,
+			"reviewReason:",
+			task.reviewReason,
+			"subtasks:",
+			task.subtasks.length,
+		);
+
+		// Determine and execute start event
+		const startEvent = determineStartEvent(taskId, task);
+		const taskToUse = startEvent.resetTask || task;
+
+		// Create proper event object based on type
+		let event: TaskEvent;
+		if (startEvent.type === "PR_CREATED") {
+			// This case shouldn't happen in start event, but handle for type safety
+			event = { type: startEvent.type, prUrl: "" };
+		} else {
+			event = { type: startEvent.type } as TaskEvent;
+		}
+
+		taskStateManager.handleUiEvent(taskId, event, taskToUse, project);
+
+		// Reset for new run
+		taskStateManager.resetForNewRun(taskId);
+
+		// Setup execution environment
+		const { specDir, needsSpecCreation, needsImplementation } =
+			setupTaskExecution(taskId, task, project);
+		console.warn(
+			"[TASK_START] hasSpec:",
+			!needsSpecCreation,
+			"needsSpecCreation:",
+			needsSpecCreation,
+			"needsImplementation:",
+			needsImplementation,
+		);
+
+		// The task runs on its own engine, never the default provider's.
+		ensureTaskEngine(task, project, specDir);
+		console.warn(
+			"[TASK_START] Provider:",
+			task.metadata?.provider ?? "none",
+		);
+
+		// Start execution
+		startTaskExecution(
+			taskId,
+			task,
+			project,
+			specDir,
+			needsSpecCreation,
+			needsImplementation,
+			options,
+		);
+		return true;
+	}
+
+	ipcMain.on(
+		IPC_CHANNELS.TASK_START,
+		(_, taskId: string, options?: TaskStartOptions) => {
+			void startTask(taskId, options);
 		},
 	);
 
@@ -320,10 +345,8 @@ export function registerTaskExecutionHandlers(
 		},
 	);
 
-	/**
-	 * Stop a task
-	 */
-	ipcMain.on(IPC_CHANNELS.TASK_STOP, (_, taskId: string) => {
+	/** Stop a task: the board's Stop button, and `getTaskControl`. */
+	function stopTask(taskId: string): void {
 		const serverCard = findServerCard(taskId);
 		if (serverCard) {
 			void stopServerCard(serverCard).then((stopped) => {
@@ -379,7 +402,15 @@ export function registerTaskExecutionHandlers(
 			task,
 			project,
 		);
-	});
+	}
+
+	ipcMain.on(IPC_CHANNELS.TASK_STOP, (_, taskId: string) => stopTask(taskId));
+
+	taskControl = {
+		start: startTask,
+		stop: stopTask,
+		isRunning: (taskId) => agentManager.isRunning(taskId),
+	};
 
 	const context: ExecutionHandlerContext = {
 		agentManager,
