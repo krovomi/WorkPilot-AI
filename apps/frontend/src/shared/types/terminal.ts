@@ -59,7 +59,7 @@ export interface TerminalRestoreResult {
  */
 export interface SessionDateInfo {
 	date: string; // YYYY-MM-DD format
-	label: string; // Human readable: "Today", "Yesterday", "Dec 10"
+	label: string; // English fallback ("Today", "Dec 10"); the renderer writes the day from `date` in the app language
 	sessionCount: number; // Total sessions across all projects
 	projectCount: number; // Number of projects with sessions
 }

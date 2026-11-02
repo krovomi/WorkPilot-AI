@@ -23,6 +23,7 @@ import {
 } from "../ui/select";
 import { ContestantCard } from "./ContestantCard";
 import { JudgeVerdictModal } from "./JudgeVerdictModal";
+import { formatAppDateTime } from "@/lib/date-format";
 
 const PROVIDERS = Object.keys(PROVIDER_MODELS_MAP).sort((a, b) =>
 	a.localeCompare(b),
@@ -394,7 +395,7 @@ export function BountyBoardView({ projectPath, specId }: Props) {
 						{archives.slice(0, 10).map((a) => (
 							<li key={a.id} className="flex gap-3 text-muted-foreground">
 								<span className="font-mono">
-									{new Date(a.createdAt).toLocaleString()}
+									{formatAppDateTime(a.createdAt)}
 								</span>
 								<span>
 									{t("bountyBoard:contestantsCount", {

@@ -53,6 +53,13 @@ const { t } = useTranslation(['navigation', 'common']);
 <span>{t('errors:task.parseError', { error })}</span>
 ```
 
+Les dates suivent la langue de l'app, pas la région du système : `fr` écrit `02/11/2026 16:30`,
+`en` écrit `11/2/2026, 4:30 PM`. Dans le renderer, une date s'affiche avec `formatAppDate`,
+`formatAppDateTime`, `formatAppTime` ou `formatAppDayLabel` de `src/renderer/lib/date-format.ts`
+(hors renderer : `formatDateIn(value, language)` de `src/shared/utils/date-format.ts`). Appeler
+`toLocaleDateString`, `toLocaleTimeString`, `new Date(…).toLocaleString` ou `Intl.DateTimeFormat`
+sans `dateLocale(…)` est refusé par `src/renderer/lib/__tests__/date-format.test.ts`.
+
 La règle est vérifiée par `src/renderer/__tests__/jsx-literal-text.test.ts`. Il parse chaque `.tsx`
 du renderer (hors tests, mocks, stories) avec `parseAst` de Vite et refuse trois choses : un texte
 entre balises qui contient une lettre, une chaîne ou un gabarit rendu en enfant (directement ou

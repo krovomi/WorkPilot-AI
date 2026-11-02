@@ -11,6 +11,7 @@ import { useTranslation } from "react-i18next";
 import { Button, Input } from "@/components/ui";
 import { useAdminStore } from "@/stores/admin-store";
 import { usePermission } from "@/stores/permissions-store";
+import { formatAppDateTime } from "@/lib/date-format";
 
 export function AuditTab() {
 	const { t } = useTranslation("administration");
@@ -77,7 +78,7 @@ export function AuditTab() {
 							{rows.map((entry) => (
 								<tr key={entry.id} className="border-b border-border last:border-0">
 									<td className="p-3 whitespace-nowrap text-muted-foreground">
-										{new Date(entry.created_at).toLocaleString()}
+										{formatAppDateTime(entry.created_at)}
 									</td>
 									<td className="p-3">{entry.user_email ?? "—"}</td>
 									<td className="p-3 font-mono text-xs">{entry.action}</td>

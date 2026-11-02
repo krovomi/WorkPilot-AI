@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useSharedAnalysisReport } from "../../hooks/useSharedAnalysisReport";
 import { useProjectStore } from "../../stores/project-store";
 import { Button } from "../ui/button";
+import { formatAppDateTime } from "@/lib/date-format";
 
 /** The changelog a member of a server project last built, as the server saved it. */
 interface SharedChangelog {
@@ -50,7 +51,7 @@ export function SharedChangelogNote({
 				<FileText className="h-4 w-4 shrink-0" />
 				{t("server.lastShared", {
 					version,
-					date: date && !Number.isNaN(date.getTime()) ? date.toLocaleString() : "",
+					date: date && !Number.isNaN(date.getTime()) ? formatAppDateTime(date) : "",
 				})}
 			</p>
 			<Button
