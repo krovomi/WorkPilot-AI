@@ -32,6 +32,9 @@ export const SERVER_PROJECT_VIEWS: ReadonlySet<SidebarView> = new Set<SidebarVie
 	"doc-drift",
 	"flaky-tests",
 	"tech-debt",
+	// Built on the server from its board and its clone, shared like an
+	// analysis (`ipc-handlers/server-changelog.ts`).
+	"changelog",
 	"administration",
 ]);
 

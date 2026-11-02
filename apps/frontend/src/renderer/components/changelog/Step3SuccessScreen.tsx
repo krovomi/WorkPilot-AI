@@ -1,4 +1,5 @@
 import { Check, PartyPopper } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { ChangelogTask } from "../../../shared/types";
 import { Button } from "../ui/button";
 import { ArchiveTasksCard } from "./ArchiveTasksCard";
@@ -11,6 +12,8 @@ interface Step3SuccessScreenProps {
 	selectedTaskIds: string[];
 	doneTasks: ChangelogTask[];
 	generatedChangelog: string;
+	/** A server project: its changelog is shared on the server, with no file or release here. */
+	serverProject?: boolean;
 	onDone: () => void;
 }
 
@@ -20,9 +23,13 @@ export function Step3SuccessScreen({
 	selectedTaskIds,
 	doneTasks,
 	generatedChangelog,
+	serverProject = false,
 	onDone,
 }: Step3SuccessScreenProps) {
-	const selectedTasks = doneTasks.filter((t) => selectedTaskIds.includes(t.id));
+	const { t } = useTranslation("changelog");
+	const selectedTasks = doneTasks.filter((task) =>
+		selectedTaskIds.includes(task.id),
+	);
 	const tag = formatVersionTag(version);
 
 	return (
@@ -33,27 +40,33 @@ export function Step3SuccessScreen({
 					<div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-success/10 mb-4">
 						<PartyPopper className="h-8 w-8 text-success" />
 					</div>
-					<h2 className="text-2xl font-semibold">Changelog Saved!</h2>
+					<h2 className="text-2xl font-semibold">
+						{serverProject ? t("server.savedTitle") : "Changelog Saved!"}
+					</h2>
 					<p className="text-muted-foreground mt-2">
-						Version {tag} has been added to CHANGELOG.md
+						{serverProject
+							? t("server.savedDescription", { tag })
+							: `Version ${tag} has been added to CHANGELOG.md`}
 					</p>
 				</div>
 
-				{/* Action Cards */}
-				<div className="space-y-4">
-					<GitHubReleaseCard
-						projectId={projectId}
-						version={version}
-						generatedChangelog={generatedChangelog}
-					/>
+				{/* Action Cards: a release and an archive act on this computer's project. */}
+				{!serverProject && (
+					<div className="space-y-4">
+						<GitHubReleaseCard
+							projectId={projectId}
+							version={version}
+							generatedChangelog={generatedChangelog}
+						/>
 
-					<ArchiveTasksCard
-						projectId={projectId}
-						version={version}
-						selectedTaskIds={selectedTaskIds}
-						selectedTasks={selectedTasks}
-					/>
-				</div>
+						<ArchiveTasksCard
+							projectId={projectId}
+							version={version}
+							selectedTaskIds={selectedTaskIds}
+							selectedTasks={selectedTasks}
+						/>
+					</div>
+				)}
 
 				{/* Done Button */}
 				<div className="pt-4">

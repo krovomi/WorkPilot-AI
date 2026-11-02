@@ -21,6 +21,16 @@ import type {
 import { changelogService } from "../changelog-service";
 import { projectStore } from "../project-store";
 import { resolveKnownProject, resolveUnder } from "../security/renderer-path";
+import { getServerProject } from "../server-projects";
+import {
+	generateServerChangelog,
+	saveServerChangelog,
+	serverChangelogCommits,
+	serverChangelogDoneTasks,
+	serverChangelogSources,
+	serverChangelogSpecs,
+	suggestVersionFromCommitTypes,
+} from "./server-changelog";
 
 /** The images the changelog view may read back, by extension. */
 const IMAGE_MIME_TYPES: Record<string, string> = {
@@ -32,8 +42,12 @@ const IMAGE_MIME_TYPES: Record<string, string> = {
 	".svg": "image/svg+xml",
 };
 
+/** A server project's changelog has no file or image on this computer. */
+const NOT_ON_SERVER = "Not available for a server project";
+
 /**
- * Register all changelog-related IPC handlers
+ * Register all changelog-related IPC handlers. A server project's changelog
+ * is the server's (`server-changelog.ts`): each handler sends it there.
  */
 export function registerChangelogHandlers(
 	getMainWindow: () => BrowserWindow | null,
@@ -117,6 +131,8 @@ export function registerChangelogHandlers(
 			projectId: string,
 			rendererTasks?: Task[],
 		): Promise<IPCResult<ChangelogTask[]>> => {
+			const remote = getServerProject(projectId);
+			if (remote) return serverChangelogDoneTasks(remote);
 			const project = projectStore.getProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
@@ -145,6 +161,8 @@ export function registerChangelogHandlers(
 			projectId: string,
 			taskIds: string[],
 		): Promise<IPCResult<TaskSpecContent[]>> => {
+			const remote = getServerProject(projectId);
+			if (remote) return serverChangelogSpecs(remote, taskIds);
 			const project = projectStore.getProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
@@ -170,6 +188,26 @@ export function registerChangelogHandlers(
 		async (_, request: ChangelogGenerationRequest) => {
 			const mainWindow = getMainWindow();
 			if (!mainWindow) return;
+
+			const remote = getServerProject(request?.projectId);
+			if (remote) {
+				await generateServerChangelog(remote, request, {
+					progress: (id, progress) =>
+						changelogService.emit("generation-progress", id, progress),
+					complete: (id, result) =>
+						changelogService.emit("generation-complete", id, result),
+					error: (id, error) => {
+						changelogService.emit("generation-progress", id, {
+							stage: "error",
+							progress: 0,
+							message: error,
+							error,
+						});
+						changelogService.emit("generation-error", id, error);
+					},
+				});
+				return;
+			}
 
 			const project = projectStore.getProject(request.projectId);
 			if (!project) {
@@ -214,6 +252,9 @@ export function registerChangelogHandlers(
 			_,
 			request: ChangelogSaveRequest,
 		): Promise<IPCResult<ChangelogSaveResult>> => {
+			// A server project's changelog is kept on the server, for the team.
+			const remote = getServerProject(request?.projectId);
+			if (remote) return saveServerChangelog(remote, request.content);
 			const project = projectStore.getProject(request.projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
@@ -235,6 +276,13 @@ export function registerChangelogHandlers(
 	ipcMain.handle(
 		IPC_CHANNELS.CHANGELOG_READ_EXISTING,
 		async (_, projectId: string): Promise<IPCResult<ExistingChangelog>> => {
+			const remote = getServerProject(projectId);
+			if (remote) {
+				const sources = await serverChangelogSources(remote);
+				return sources.success && sources.data
+					? { success: true, data: sources.data.existing }
+					: { success: false, error: sources.error };
+			}
 			const project = projectStore.getProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
@@ -252,25 +300,28 @@ export function registerChangelogHandlers(
 			projectId: string,
 			taskIds: string[],
 		): Promise<IPCResult<{ version: string; reason: string }>> => {
-			const project = projectStore.getProject(projectId);
+			const remote = getServerProject(projectId);
+			const project = remote ?? projectStore.getProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
 			}
 
 			try {
 				// Get current version from existing changelog
-				const existing = changelogService.readExistingChangelog(project.path);
-				const currentVersion = existing.lastVersion;
+				const existing = remote
+					? (await serverChangelogSources(remote)).data?.existing
+					: changelogService.readExistingChangelog(project.path);
+				const currentVersion = existing?.lastVersion;
 
 				// Load specs for selected tasks to analyze change types
-				const tasks = projectStore.getTasks(projectId);
-				const specsBaseDir = getSpecsDir(project.autoBuildPath);
-				const specs = await changelogService.loadTaskSpecs(
-					project.path,
-					taskIds,
-					tasks,
-					specsBaseDir,
-				);
+				const specs = remote
+					? ((await serverChangelogSpecs(remote, taskIds)).data ?? [])
+					: await changelogService.loadTaskSpecs(
+							project.path,
+							taskIds,
+							projectStore.getTasks(projectId),
+							getSpecsDir(project.autoBuildPath),
+						);
 
 				// Analyze specs and suggest version
 				const suggestedVersion = changelogService.suggestVersion(
@@ -313,6 +364,18 @@ export function registerChangelogHandlers(
 			projectId: string,
 			commits: GitCommit[],
 		): Promise<IPCResult<{ version: string; reason: string }>> => {
+			const remote = getServerProject(projectId);
+			if (remote) {
+				// Nothing of a server project goes to a model on this computer.
+				const sources = await serverChangelogSources(remote);
+				const current =
+					sources.data?.existing.lastVersion ??
+					sources.data?.tags[0]?.name.replace(/^v/, "");
+				return {
+					success: true,
+					data: suggestVersionFromCommitTypes(commits, current),
+				};
+			}
 			const project = projectStore.getProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
@@ -362,6 +425,13 @@ export function registerChangelogHandlers(
 	ipcMain.handle(
 		IPC_CHANNELS.CHANGELOG_GET_BRANCHES,
 		async (_, projectId: string): Promise<IPCResult<GitBranchInfo[]>> => {
+			const remote = getServerProject(projectId);
+			if (remote) {
+				const sources = await serverChangelogSources(remote);
+				return sources.success && sources.data
+					? { success: true, data: sources.data.branches }
+					: { success: false, error: sources.error };
+			}
 			const project = projectStore.getProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
@@ -383,6 +453,13 @@ export function registerChangelogHandlers(
 	ipcMain.handle(
 		IPC_CHANNELS.CHANGELOG_GET_TAGS,
 		async (_, projectId: string): Promise<IPCResult<GitTagInfo[]>> => {
+			const remote = getServerProject(projectId);
+			if (remote) {
+				const sources = await serverChangelogSources(remote);
+				return sources.success && sources.data
+					? { success: true, data: sources.data.tags }
+					: { success: false, error: sources.error };
+			}
 			const project = projectStore.getProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
@@ -408,6 +485,14 @@ export function registerChangelogHandlers(
 			options: GitHistoryOptions | BranchDiffOptions,
 			mode: "git-history" | "branch-diff",
 		): Promise<IPCResult<GitCommit[]>> => {
+			const remote = getServerProject(projectId);
+			if (remote) {
+				return serverChangelogCommits(
+					remote,
+					options,
+					mode === "branch-diff" ? "branch-diff" : "git-history",
+				);
+			}
 			const project = projectStore.getProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
@@ -453,6 +538,9 @@ export function registerChangelogHandlers(
 			imageData: string,
 			filename: string,
 		): Promise<IPCResult<{ relativePath: string; url: string }>> => {
+			if (getServerProject(projectId)) {
+				return { success: false, error: NOT_ON_SERVER };
+			}
 			const project = projectStore.getProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };

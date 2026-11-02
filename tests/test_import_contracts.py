@@ -52,6 +52,11 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # The board as an MCP server: the spec numbering lock and the MCP layer,
     # nothing that runs an agent (docs/architecture/board-mcp.md).
     "board_mcp": {"core", "mcp_tasks"},
+    # The changelog's prompts, git history and done cards, shared by its
+    # runner and the server's routes: the board, git and the untrusted-content
+    # fence, nothing that runs an agent (its model call is the runner's,
+    # through core.oneshot).
+    "changelog_generator": {"board_mcp", "foundation", "security"},
     # Stack detection, including the UI and test stacks moved here in M10.
     "project": {"mobile"},
     "mobile": {"foundation"},
