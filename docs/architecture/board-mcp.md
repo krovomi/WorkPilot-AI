@@ -79,10 +79,45 @@ does (`tests/test_entrypoints_redaction.py`).
 | `get_card(card_id)` | the card's description, subtasks done, QA verdict, goal, verification and cross review, scalars only |
 | `create_card(title, description?, kind?)` | a new card in the backlog |
 | `wait_for_card(card_id, columns?, timeout_seconds?)` | the card once it reaches a column (`human_review` by default), or as it is when time runs out (1 hour by default, 4 at most) |
+| `get_spec(card_id)` | the card's `spec.md` (20,000 characters at most, `specTruncated` past that, `null` before one is written) and its plan's phases and subtasks with their status |
+| `update_card(card_id, title?, description?)` | the card's title or description, while no work has started on it |
+| `get_roadmap()` | the roadmap the app shows: phases, then features with their priority, phase and status (200 at most) |
+| `list_ideas(status?)` | the ideas Ideation saved: type, title, description, status (200 at most) |
 
 The column is the board's: `implementation_plan.json`'s `status` mapped as
 `apps/frontend/src/main/project-store.ts` maps it. An unknown status reads as
 backlog, where the board shows it.
+
+### Editing a card
+
+`update_card` changes what a card asks for, not what was done about it. Once a
+spec is written or a build workspace exists, the spec and the plan were made
+from that text: editing it would leave the card saying one thing and the build
+doing another, so the tool refuses. The shared board's route
+(`PATCH` of a card in server mode) goes through the same function
+(`board_mcp.server.edit_card`) and answers 409 in that case.
+
+### Roadmap and ideas
+
+Both read the files the app writes (`.workpilot/roadmap/roadmap.json`,
+`.workpilot/ideation/ideation.json`), never through a link and never past
+2 MB. A project without one gets an empty answer, not an error. Insights
+conversations are not served: they are one person's chat, not the project's.
+
+## Resources
+
+For a client that attaches resources (Claude Code's `@`, VS Code, Cursor), the
+same content is offered as MCP resources, in both protocol eras
+(`mcp_tasks.Resources`):
+
+| URI | Contents |
+|---|---|
+| `workpilot://roadmap` | the roadmap, as `get_roadmap` |
+| `workpilot://cards/{card_id}` | a card and its spec, as `get_card` and `get_spec` together (also a resource template) |
+
+`resources/list` gives the roadmap (when there is one) and the cards
+`list_cards` gives. An unknown URI is error `-32002`, as the specification
+says.
 
 ## What it does not do
 
