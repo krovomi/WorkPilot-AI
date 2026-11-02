@@ -46,6 +46,7 @@ import type { Terminal } from "../../stores/terminal-store";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 
+import { Input } from "../ui/input";
 /**
  * Phase and activity icons.
  *
@@ -598,7 +599,8 @@ function TerminalPanel({
 			{!isExited && (
 				<div className="px-4 pb-3">
 					<div className="flex gap-2">
-						<input
+						<Input
+							spellCheck={false}
 							ref={inputRef}
 							type="text"
 							value={command}
@@ -609,7 +611,7 @@ function TerminalPanel({
 									? t("pixelOffice:bubble.sendPlaceholderWaiting")
 									: t("pixelOffice:bubble.sendPlaceholder")
 							}
-							className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white placeholder:text-white/30 font-mono focus:outline-none focus:border-white/30"
+							className="flex-1 px-3 py-1.5 text-xs font-mono h-auto"
 						/>
 						<Button
 							size="sm"

@@ -48,6 +48,7 @@ import {
 	type RowFilter,
 } from "./drafts";
 
+import { Input } from "../../ui/input";
 const PAGE = 150;
 
 export function TranslationEditor() {
@@ -172,7 +173,7 @@ export function TranslationEditor() {
 						<header className="flex flex-wrap items-center gap-2 border-b p-2">
 							<div className="relative min-w-40 flex-1">
 								<Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-								<input
+								<Input
 									value={query}
 									onChange={(e) => {
 										setQuery(e.target.value);
@@ -180,7 +181,7 @@ export function TranslationEditor() {
 									}}
 									placeholder={t("i18nEditor.searchKeys")}
 									aria-label={t("i18nEditor.searchKeys")}
-									className="w-full rounded border bg-background py-1.5 pl-7 pr-2 text-xs"
+									className="w-full py-1.5 pl-7 pr-2 text-xs h-auto"
 								/>
 							</div>
 							<div className="flex gap-1">
@@ -276,7 +277,8 @@ export function TranslationEditor() {
 											>
 												<td className="px-2 py-1.5">
 													{renaming === row.originalKey ? (
-														<input
+														<Input
+															spellCheck={false}
 															value={renameDraft}
 															onChange={(e) => setRenameDraft(e.target.value)}
 															onBlur={() => commitRename(row.originalKey)}
@@ -285,8 +287,7 @@ export function TranslationEditor() {
 																if (e.key === "Escape") setRenaming(null);
 															}}
 															aria-label={t("i18nEditor.renameKey")}
-															className="w-full rounded border bg-background px-1.5 py-1 font-mono text-xs"
-															// biome-ignore lint/a11y/noAutofocus: replaces the cell the user just clicked to rename
+															className="w-full px-1.5 py-1 font-mono text-xs h-auto"
 															autoFocus
 														/>
 													) : (

@@ -10,6 +10,7 @@ import { startTask, submitReview, useTaskStore } from "../../stores/task-store";
 import { ClipboardCheck } from "lucide-react";
 import { PageHeader } from "../ui/page-header";
 
+import { Textarea } from "../ui/textarea";
 /**
  * The plans waiting for a person, across the project's board.
  *
@@ -228,13 +229,13 @@ export function SpecApprovalDashboard(): React.ReactElement {
 									>
 										{t("specApproval:decision.feedbackLabel")}
 									</label>
-									<textarea
+									<Textarea
 										id="spec-approval-feedback"
 										value={feedback}
 										onChange={(e) => setFeedback(e.target.value)}
 										rows={3}
 										placeholder={t("specApproval:decision.feedbackPlaceholder")}
-										className="w-full resize-none rounded-lg bg-card border border-border p-2 text-sm"
+										className="w-full resize-none p-2 text-sm min-h-0"
 									/>
 									<div className="flex items-center gap-2">
 										<button

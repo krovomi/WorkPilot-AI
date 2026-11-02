@@ -35,6 +35,7 @@ import {
 import { Progress } from "../ui/progress";
 import { useTranslation } from "react-i18next";
 
+import { Input } from "../ui/input";
 interface AgentPanelProps {
 	readonly agent: AgentSlot;
 	readonly isSelected: boolean;
@@ -255,7 +256,7 @@ export function AgentPanel({
 				>
 					{agent.status === "idle" && (
 						<>
-							<input
+							<Input
 								type="text"
 								placeholder={t("missionControl:agentPanel.taskPlaceholder")}
 								value={taskInput}
@@ -266,7 +267,7 @@ export function AgentPanel({
 										setTaskInput("");
 									}
 								}}
-								className="flex-1 text-xs bg-muted/50 border border-border/50 rounded px-2 py-1 placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/30"
+								className="flex-1 text-xs px-2 py-1 h-auto"
 							/>
 							<Button
 								variant="default"

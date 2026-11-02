@@ -943,14 +943,14 @@ function AgentCard({
 					{/* Search */}
 					<div className="relative">
 						<Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-						<input
+						<Input
 							type="text"
 							value={mcpSearch}
 							onChange={(e) => setMcpSearch(e.target.value)}
 							placeholder={t("mcp.searchPlaceholder", {
 								defaultValue: "Search MCP servers…",
 							})}
-							className="w-full pl-9 pr-3 py-2 text-sm bg-muted/50 border border-border rounded-md outline-none focus:ring-1 focus:ring-primary/50"
+							className="w-full pl-9 pr-3 py-2 text-sm h-auto"
 						/>
 					</div>
 

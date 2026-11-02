@@ -29,6 +29,7 @@ import type {
 } from "../../../shared/types/visual-to-code-history";
 import { Button } from "../ui/button";
 
+import { Input } from "../ui/input";
 interface ArchitectureHistoryDockProps {
 	open: boolean;
 	architectureName: string;
@@ -217,7 +218,7 @@ export function ArchitectureHistoryDock({
 							/>
 							<div className="min-w-0 flex-1">
 								{editingId === version.id ? (
-									<input
+									<Input
 										ref={labelInputRef}
 										value={draftLabel}
 										onChange={(event) => setDraftLabel(event.target.value)}
@@ -228,7 +229,7 @@ export function ArchitectureHistoryDock({
 										}}
 										placeholder={t("historyLabelPlaceholder", "Nom de l'étape")}
 										aria-label={t("historyLabel", "Nommer cette étape")}
-										className="w-full rounded border bg-background px-1.5 py-0.5 text-xs outline-none focus:border-primary"
+										className="w-full px-1.5 py-0.5 text-xs h-auto"
 									/>
 								) : (
 									<p className="truncate text-xs font-medium">

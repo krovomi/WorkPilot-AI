@@ -38,6 +38,8 @@ import {
 	MethodBadge,
 } from "./api-explorer-shared";
 
+import { Input } from "../ui/input";
+import { Textarea } from "../ui/textarea";
 // ── Schema Viewer ────────────────────────────────────────────────────────────
 
 export interface SchemaViewerProps {
@@ -852,9 +854,9 @@ export function RequestPanel({
 										<label className="text-3xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
 											{t("apiExplorer:auth.username")}
 										</label>
-										<input
+										<Input
 											type="text"
-											className="w-full bg-card border border-[var(--color-border)] rounded-md px-3 py-2 text-sm text-foreground focus:outline-none focus:border-[var(--color-accent)]"
+											className="w-full px-3 py-2 text-sm h-auto"
 											value={requestAuth.username}
 											onChange={(e) =>
 												setRequestAuth({ username: e.target.value })
@@ -901,9 +903,10 @@ export function RequestPanel({
 											<label className="text-3xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
 												{t("apiExplorer:auth.keyName")}
 											</label>
-											<input
+											<Input
+												spellCheck={false}
 												type="text"
-												className="w-full bg-card border border-[var(--color-border)] rounded-md px-3 py-2 text-sm font-mono text-foreground focus:outline-none focus:border-[var(--color-accent)]"
+												className="w-full px-3 py-2 text-sm font-mono h-auto"
 												value={requestAuth.keyName}
 												onChange={(e) =>
 													setRequestAuth({ keyName: e.target.value })
@@ -941,9 +944,10 @@ export function RequestPanel({
 										<label className="text-3xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
 											{t("apiExplorer:auth.keyValue")}
 										</label>
-										<input
+										<Input
+											spellCheck={false}
 											type="text"
-											className="w-full bg-card border border-[var(--color-border)] rounded-md px-3 py-2 text-sm font-mono text-foreground focus:outline-none focus:border-[var(--color-accent)]"
+											className="w-full px-3 py-2 text-sm font-mono h-auto"
 											value={requestAuth.keyValue}
 											onChange={(e) =>
 												setRequestAuth({ keyValue: e.target.value })
@@ -1004,9 +1008,10 @@ export function RequestPanel({
 												<label className="text-3xs text-muted-foreground block mb-1">
 													{t("apiExplorer:auth.oauth2.authUrl")}
 												</label>
-												<input
+												<Input
+													spellCheck={false}
 													type="url"
-													className="w-full bg-background border border-[var(--color-border)] rounded-md px-3 py-1.5 text-xs font-mono text-foreground focus:outline-none focus:border-[var(--color-accent)]"
+													className="w-full px-3 py-1.5 text-xs font-mono h-auto"
 													value={requestAuth.oauth2AuthUrl}
 													onChange={(e) =>
 														setRequestAuth({ oauth2AuthUrl: e.target.value })
@@ -1023,9 +1028,10 @@ export function RequestPanel({
 												<label className="text-3xs text-muted-foreground block mb-1">
 													{t("apiExplorer:auth.oauth2.tokenUrl")}
 												</label>
-												<input
+												<Input
+													spellCheck={false}
 													type="url"
-													className="w-full bg-background border border-[var(--color-border)] rounded-md px-3 py-1.5 text-xs font-mono text-foreground focus:outline-none focus:border-[var(--color-accent)]"
+													className="w-full px-3 py-1.5 text-xs font-mono h-auto"
 													value={requestAuth.oauth2TokenUrl}
 													onChange={(e) =>
 														setRequestAuth({ oauth2TokenUrl: e.target.value })
@@ -1041,9 +1047,10 @@ export function RequestPanel({
 											<label className="text-3xs text-muted-foreground block mb-1">
 												{t("apiExplorer:auth.oauth2.clientId")}
 											</label>
-											<input
+											<Input
+												spellCheck={false}
 												type="text"
-												className="w-full bg-background border border-[var(--color-border)] rounded-md px-3 py-1.5 text-xs font-mono text-foreground focus:outline-none focus:border-[var(--color-accent)]"
+												className="w-full px-3 py-1.5 text-xs font-mono h-auto"
 												value={requestAuth.oauth2ClientId}
 												onChange={(e) =>
 													setRequestAuth({ oauth2ClientId: e.target.value })
@@ -1086,9 +1093,10 @@ export function RequestPanel({
 											<label className="text-3xs text-muted-foreground block mb-1">
 												{t("apiExplorer:auth.oauth2.scope")}
 											</label>
-											<input
+											<Input
+												spellCheck={false}
 												type="text"
-												className="w-full bg-background border border-[var(--color-border)] rounded-md px-3 py-1.5 text-xs font-mono text-foreground focus:outline-none focus:border-[var(--color-accent)]"
+												className="w-full px-3 py-1.5 text-xs font-mono h-auto"
 												value={requestAuth.oauth2Scope}
 												onChange={(e) =>
 													setRequestAuth({ oauth2Scope: e.target.value })
@@ -1105,9 +1113,9 @@ export function RequestPanel({
 													<label className="text-3xs text-muted-foreground block mb-1">
 														{t("apiExplorer:auth.username")}
 													</label>
-													<input
+													<Input
 														type="text"
-														className="w-full bg-background border border-[var(--color-border)] rounded-md px-3 py-1.5 text-xs text-foreground focus:outline-none focus:border-[var(--color-accent)]"
+														className="w-full px-3 py-1.5 text-xs h-auto"
 														value={requestAuth.username}
 														onChange={(e) =>
 															setRequestAuth({ username: e.target.value })
@@ -1122,9 +1130,9 @@ export function RequestPanel({
 													<label className="text-3xs text-muted-foreground block mb-1">
 														{t("apiExplorer:auth.password")}
 													</label>
-													<input
+													<Input
 														type="password"
-														className="w-full bg-background border border-[var(--color-border)] rounded-md px-3 py-1.5 text-xs text-foreground focus:outline-none focus:border-[var(--color-accent)]"
+														className="w-full px-3 py-1.5 text-xs h-auto"
 														value={requestAuth.password}
 														onChange={(e) =>
 															setRequestAuth({ password: e.target.value })
@@ -1187,9 +1195,10 @@ export function RequestPanel({
 											<span className="text-3xs text-muted-foreground">
 												{t("apiExplorer:auth.oauth2.headerPrefix")}
 											</span>
-											<input
+											<Input
+												spellCheck={false}
 												type="text"
-												className="w-24 bg-card border border-[var(--color-border)] rounded px-2 py-1 text-xs font-mono text-foreground focus:outline-none focus:border-[var(--color-accent)]"
+												className="w-24 px-2 py-1 text-xs font-mono h-auto"
 												value={requestAuth.oauth2HeaderPrefix}
 												onChange={(e) =>
 													setRequestAuth({ oauth2HeaderPrefix: e.target.value })
@@ -1204,8 +1213,8 @@ export function RequestPanel({
 
 					{activeTab === "body" && hasBody && (
 						<div>
-							<textarea
-								className="w-full bg-card border border-[var(--color-border)] rounded p-2 text-xs font-mono text-foreground resize-none focus:outline-none focus:border-[var(--color-accent)] min-h-[120px]"
+							<Textarea
+								className="w-full p-2 text-xs font-mono resize-none min-h-[120px]"
 								value={requestBody}
 								onChange={(e) => setRequestBody(e.target.value)}
 								placeholder={getBodyPlaceholder(operation, spec)}
@@ -1851,14 +1860,16 @@ export function KeyValueEditor({
 						onChange={(e) => onUpdate(row.id, "enabled", e.target.checked)}
 						className="w-3.5 h-3.5 shrink-0 accent-[var(--color-primary)] cursor-pointer"
 					/>
-					<input
-						className="flex-1 min-w-0 bg-card border border-[var(--color-border)] rounded px-2 py-1.5 text-xs font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-[var(--color-accent)]"
+					<Input
+						spellCheck={false}
+						className="flex-1 min-w-0 px-2 py-1.5 text-xs font-mono h-auto"
 						value={row.key}
 						onChange={(e) => onUpdate(row.id, "key", e.target.value)}
 						placeholder={keyPlaceholder}
 					/>
-					<input
-						className="flex-1 min-w-0 bg-card border border-[var(--color-border)] rounded px-2 py-1.5 text-xs font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-[var(--color-accent)]"
+					<Input
+						spellCheck={false}
+						className="flex-1 min-w-0 px-2 py-1.5 text-xs font-mono h-auto"
 						value={row.value}
 						onChange={(e) => onUpdate(row.id, "value", e.target.value)}
 						placeholder={valuePlaceholder}
@@ -1901,8 +1912,9 @@ export function ParamRow({
 				</span>
 				{param.required && <span className="text-red-400 ml-0.5">*</span>}
 			</div>
-			<input
-				className="flex-1 bg-card border border-[var(--color-border)] rounded px-2 py-1 text-xs font-mono text-foreground focus:outline-none focus:border-[var(--color-accent)]"
+			<Input
+				spellCheck={false}
+				className="flex-1 px-2 py-1 text-xs font-mono h-auto"
 				value={value}
 				onChange={(e) => onChange(e.target.value)}
 				placeholder={

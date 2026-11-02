@@ -14,6 +14,7 @@ import type { I18nNamespaceSummary } from "../../../../preload/api/modules/phase
 import { cn } from "../../../lib/utils";
 import { Button } from "../../ui/button";
 
+import { Input } from "../../ui/input";
 interface NamespaceListProps {
 	namespaces: I18nNamespaceSummary[];
 	locales: string[];
@@ -72,12 +73,12 @@ export function NamespaceList({
 			<div className="space-y-2 p-2">
 				<div className="relative">
 					<Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-					<input
+					<Input
 						value={query}
 						onChange={(e) => setQuery(e.target.value)}
 						placeholder={t("i18nEditor.searchNamespaces")}
 						aria-label={t("i18nEditor.searchNamespaces")}
-						className="w-full rounded border bg-background py-1.5 pl-7 pr-2 text-xs"
+						className="w-full py-1.5 pl-7 pr-2 text-xs h-auto"
 					/>
 				</div>
 				<div className="flex gap-1">

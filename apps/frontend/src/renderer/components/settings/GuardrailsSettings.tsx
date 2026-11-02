@@ -10,6 +10,7 @@ import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { SettingsSection } from "./SettingsSection";
 
+import { Textarea } from "../ui/textarea";
 const SELECT_CLASS =
 	"h-10 rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring";
 
@@ -321,8 +322,9 @@ export function GuardrailsSettings() {
 								onChange={(e) => setTestPath(e.target.value)}
 								placeholder="migrations/001.sql"
 							/>
-							<textarea
-								className="w-full border rounded-md p-2 text-sm font-mono min-h-20 bg-background"
+							<Textarea
+								spellCheck={false}
+								className="w-full p-2 text-sm font-mono min-h-20"
 								value={testContent}
 								onChange={(e) => setTestContent(e.target.value)}
 								placeholder={t("settings:guardrails.fileContentPlaceholder")}

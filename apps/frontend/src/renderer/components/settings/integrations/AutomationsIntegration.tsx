@@ -27,6 +27,7 @@ import { Switch } from "../../ui/switch";
 import { Textarea } from "../../ui/textarea";
 import { dateLocale } from "@shared/utils/date-format";
 
+import { NativeSelect } from "../../ui/native-select";
 interface AutomationsIntegrationProps {
 	readonly projectId: string;
 }
@@ -297,9 +298,9 @@ export function AutomationsIntegration({ projectId }: AutomationsIntegrationProp
 
 					<div className="space-y-2">
 						<Label htmlFor="automation-trigger">{t("automations.fields.trigger")}</Label>
-						<select
+						<NativeSelect
 							id="automation-trigger"
-							className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+							className="h-9 w-full px-3 text-sm"
 							value={editing.type}
 							// A saved rule keeps its trigger type: its history is about that event.
 							disabled={editing.id !== undefined}
@@ -319,7 +320,7 @@ export function AutomationsIntegration({ projectId }: AutomationsIntegrationProp
 									{t(`automations.triggers.${type}`)}
 								</option>
 							))}
-						</select>
+						</NativeSelect>
 					</div>
 
 					{editing.type === "issue_labeled" && (
@@ -433,9 +434,9 @@ export function AutomationsIntegration({ projectId }: AutomationsIntegrationProp
 						<>
 							<div className="space-y-2">
 								<Label htmlFor="automation-kind">{t("automations.fields.kind")}</Label>
-								<select
+								<NativeSelect
 									id="automation-kind"
-									className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+									className="h-9 w-full px-3 text-sm"
 									value={editing.kind}
 									onChange={(e) => setEditing({ ...editing, kind: e.target.value as TaskKind | "" })}
 								>
@@ -445,7 +446,7 @@ export function AutomationsIntegration({ projectId }: AutomationsIntegrationProp
 											{t(`tasks:kind.values.${kind}`)}
 										</option>
 									))}
-								</select>
+								</NativeSelect>
 							</div>
 
 							<div className="space-y-2">

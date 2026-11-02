@@ -33,6 +33,7 @@ import { ScrollArea } from "../ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { formatAppDateTime, formatAppTime } from "@/lib/date-format";
 
+import { Input } from "../ui/input";
 interface StreamingEvent {
 	event_type: string;
 	timestamp: number;
@@ -670,13 +671,13 @@ export function StreamingSession({
 
 							<div className="p-4 border-t">
 								<div className="flex gap-2">
-									<input
+									<Input
 										type="text"
 										value={chatInput}
 										onChange={(e) => setChatInput(e.target.value)}
 										onKeyDown={(e) => e.key === "Enter" && sendChatMessage()}
 										placeholder={t("streaming:chat.placeholder")}
-										className="flex-1 px-3 py-2 text-sm border rounded-md bg-background"
+										className="flex-1 px-3 py-2 text-sm h-auto"
 									/>
 									<Button size="sm" onClick={sendChatMessage}>
 										{t("streaming:chat.send")}

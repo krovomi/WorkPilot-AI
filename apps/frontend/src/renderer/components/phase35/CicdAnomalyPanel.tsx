@@ -12,6 +12,7 @@ import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { PanelShell } from "./_panel-shell";
 
+import { Textarea } from "../ui/textarea";
 const SEV_COLOR: Record<string, string> = {
 	critical: "bg-red-500/20 text-red-700 border-red-500/40",
 	high: "bg-orange-500/20 text-orange-700 border-orange-500/40",
@@ -55,7 +56,8 @@ export function CicdAnomalyPanel() {
 					<label htmlFor="log-textarea" className="block text-sm font-medium mb-1">
 						{t("cicdAnomaly.logLabel")}
 					</label>
-					<textarea
+					<Textarea
+						spellCheck={false}
 						id="log-textarea"
 						value={log}
 						onChange={(e) => setLog(e.target.value.slice(0, LOG_MAX_LEN))}
@@ -63,7 +65,7 @@ export function CicdAnomalyPanel() {
 						maxLength={LOG_MAX_LEN}
 						aria-invalid={Boolean(logError) || undefined}
 						aria-describedby={logError ? "log-error" : undefined}
-						className="w-full rounded border bg-background p-2 text-xs font-mono"
+						className="w-full p-2 text-xs font-mono min-h-0"
 						placeholder={t("cicdAnomaly.logPlaceholder")}
 					/>
 					{logError && (

@@ -14,6 +14,7 @@ import {
 	DialogTitle,
 } from "../ui/dialog";
 
+import { Textarea } from "../ui/textarea";
 interface SpecInterviewDialogProps {
 	readonly task: Task;
 	readonly open: boolean;
@@ -190,7 +191,7 @@ export function SpecInterviewDialog({
 										{question.rationale}
 									</p>
 								)}
-								<textarea
+								<Textarea
 									value={answers[question.id] ?? ""}
 									onChange={(e) =>
 										setAnswers((prev) => ({
@@ -199,7 +200,7 @@ export function SpecInterviewDialog({
 										}))
 									}
 									placeholder={t("tasks:interview.answerPlaceholder")}
-									className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+									className="w-full px-3 py-2 text-sm placeholder-muted-foreground resize-none min-h-0"
 									rows={2}
 									disabled={isSaving}
 								/>

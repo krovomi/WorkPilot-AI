@@ -14,6 +14,7 @@ import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useBrowserAgentStore } from "@/stores/browser-agent-store";
 
+import { Input } from "../ui/input";
 interface BrowserTabProps {
 	readonly projectPath: string;
 }
@@ -140,7 +141,7 @@ export function BrowserTab({ projectPath }: BrowserTabProps) {
 			{showCaptureBar && (
 				<div className="flex items-center gap-2 px-3 py-2 bg-purple-500/8 border-x border-purple-500/20">
 					<Camera className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-					<input
+					<Input
 						type="text"
 						value={screenshotName}
 						onChange={(e) => setScreenshotName(e.target.value)}
@@ -148,7 +149,7 @@ export function BrowserTab({ projectPath }: BrowserTabProps) {
 							if (e.key === "Enter") handleCapture();
 						}}
 						placeholder={t("browserAgent:browser.screenshotNamePlaceholder")}
-						className="flex-1 px-2.5 py-1 rounded bg-background border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-purple-400/50"
+						className="flex-1 px-2.5 py-1 text-sm h-auto"
 					/>
 					<button
 						type="button"

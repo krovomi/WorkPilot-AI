@@ -12,6 +12,7 @@ import type {
 	I18nSeverity,
 } from "../../../shared/types/i18n-agent";
 
+import { Input } from "../ui/input";
 const SEVERITY_STYLES: Record<I18nSeverity, string> = {
 	error: "text-red-400 bg-red-500/10 border-red-500/20",
 	warning: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
@@ -60,12 +61,12 @@ export function I18nReportView({
 			/>
 
 			{report && !isScanning && (
-				<input
+				<Input
 					type="text"
 					value={searchQuery}
 					onChange={(e) => setSearchQuery(e.target.value)}
 					placeholder={t("search.placeholder")}
-					className="px-3 py-2 rounded bg-card border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+					className="px-3 py-2 text-sm h-auto w-auto"
 				/>
 			)}
 

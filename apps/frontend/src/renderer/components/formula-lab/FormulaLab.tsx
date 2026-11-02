@@ -46,6 +46,8 @@ import {
 } from "./formula-utils";
 import { SuccessRing } from "./SuccessRing";
 
+import { Input } from "../ui/input";
+import { NativeSelect } from "../ui/native-select";
 // Generous cap: the full catalog is ~275 formulas, all renderable in the
 // scrollable table. The "+N more" hint only triggers for pathological sets.
 const MAX_ROWS = 500;
@@ -386,18 +388,18 @@ export function FormulaLab() {
 							<div className="flex flex-wrap items-center gap-2 text-xs">
 								<div className="relative">
 									<Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-									<input
+									<Input
 										type="search"
 										value={search}
 										onChange={(e) => setSearch(e.target.value)}
 										placeholder={t("formulaLab:filters.searchPlaceholder")}
-										className="h-8 w-44 rounded-md border border-border bg-card pl-7 pr-2 text-xs"
+										className="h-8 w-44 pl-7 pr-2 text-xs"
 									/>
 								</div>
-								<select
+								<NativeSelect
 									value={providerFilter}
 									onChange={(e) => setProviderFilter(e.target.value)}
-									className="h-8 rounded-md border border-border bg-card px-2 text-xs"
+									className="h-8 px-2 text-xs"
 								>
 									<option value="all">{t("formulaLab:filters.allProviders")}</option>
 									{providers.map((p) => (
@@ -405,7 +407,7 @@ export function FormulaLab() {
 											{p}
 										</option>
 									))}
-								</select>
+								</NativeSelect>
 								<div className="flex items-center gap-1">
 									{EFFORT_ORDER.map((effort) => (
 										<button

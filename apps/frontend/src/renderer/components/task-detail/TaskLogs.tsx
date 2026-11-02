@@ -80,7 +80,7 @@ import { debugError } from "../../../shared/utils/debug-logger";
 import { useProviderModelCatalog } from "../../hooks/useProviderModelCatalog";
 import { useOllamaModelDownload } from "../../hooks/useOllamaModelDownload";
 import { useDownloadStore } from "../../stores/download-store";
-import { Badge } from "../ui/badge";
+import { Badge, Input } from "../ui";
 import { OfficialModelSearch } from "./OfficialModelSearch";
 import {
 	AlertDialog,
@@ -790,7 +790,7 @@ export function TaskLogs({
 				<div className="shrink-0 border-b border-border/50 p-2">
 					<div className="relative">
 						<Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-						<input
+						<Input
 							type="text"
 							value={searchQuery}
 							onChange={(e) => setSearchQuery(e.target.value)}
@@ -802,7 +802,7 @@ export function TaskLogs({
 								"tasks:logs.search.ariaLabel",
 								"Rechercher dans les logs",
 							)}
-							className="h-8 w-full rounded-md border border-border bg-background pl-8 pr-24 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/30"
+							className="h-8 w-full pl-8 pr-24 text-xs"
 						/>
 						{isSearching && (
 							<div className="absolute right-1.5 top-1/2 flex -translate-y-1/2 items-center gap-1">
