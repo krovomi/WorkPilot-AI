@@ -51,21 +51,21 @@ export function CodeMigrationDashboard(): React.ReactElement {
 	}
 
 	return (
-		<div className="flex flex-col h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
+		<div className="flex flex-col h-full bg-background text-foreground">
 			{/* Header */}
-			<div className="px-6 py-4 border-b border-[var(--border-color)]">
+			<div className="px-6 py-4 border-b border-border">
 				<h1 className="text-xl font-semibold">{t("codeMigration:title")}</h1>
-				<p className="text-sm text-[var(--text-secondary)] mt-0.5">
+				<p className="text-sm text-muted-foreground mt-0.5">
 					{t("codeMigration:subtitle")}
 				</p>
 			</div>
 
 			<div className="flex flex-1 overflow-hidden gap-0">
 				{/* Left: Config panel */}
-				<div className="w-72 border-r border-[var(--border-color)] p-4 flex flex-col gap-4 overflow-y-auto">
+				<div className="w-72 border-r border-border p-4 flex flex-col gap-4 overflow-y-auto">
 					<div>
 						{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-						<label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
+						<label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
 							{t("codeMigration:config.descriptionLabel")}
 						</label>
 						<textarea
@@ -74,13 +74,13 @@ export function CodeMigrationDashboard(): React.ReactElement {
 							disabled={isRunning}
 							placeholder={t("codeMigration:config.descriptionPlaceholder")}
 							rows={4}
-							className="w-full rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] px-3 py-2 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-[var(--accent)] disabled:opacity-50"
+							className="w-full rounded-lg bg-card border border-border px-3 py-2 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-[var(--accent)] disabled:opacity-50"
 						/>
 					</div>
 
 					{/* Example migrations */}
 					<div>
-						<p className="text-xs text-[var(--text-secondary)] mb-2">
+						<p className="text-xs text-muted-foreground mb-2">
 							{t("codeMigration:config.examplesLabel")}
 						</p>
 						<div className="flex flex-col gap-1">
@@ -90,7 +90,7 @@ export function CodeMigrationDashboard(): React.ReactElement {
 									key={key}
 									onClick={() => handleExample(t(`codeMigration:examples.${key}`))}
 									disabled={isRunning}
-									className="text-left text-xs px-2 py-1.5 rounded-md bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-50"
+									className="text-left text-xs px-2 py-1.5 rounded-md bg-card hover:bg-muted text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
 								>
 									{t(`codeMigration:examples.${key}`)}
 								</button>
@@ -112,7 +112,7 @@ export function CodeMigrationDashboard(): React.ReactElement {
 								<div className="text-sm font-medium">
 									{t("codeMigration:config.dryRun")}
 								</div>
-								<div className="text-xs text-[var(--text-secondary)]">
+								<div className="text-xs text-muted-foreground">
 									{t("codeMigration:config.dryRunHint")}
 								</div>
 							</div>
@@ -148,7 +148,7 @@ export function CodeMigrationDashboard(): React.ReactElement {
 				<div className="flex-1 flex flex-col overflow-hidden">
 					{/* Phase indicator */}
 					{phase !== "idle" && (
-						<div className="px-4 py-2 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] flex items-center gap-3">
+						<div className="px-4 py-2 bg-card border-b border-border flex items-center gap-3">
 							{isRunning && (
 								// biome-ignore lint/a11y/noSvgWithoutTitle: SVG is decorative
 								<svg
@@ -171,18 +171,18 @@ export function CodeMigrationDashboard(): React.ReactElement {
 									/>
 								</svg>
 							)}
-							<span className="text-sm text-[var(--text-secondary)]">
+							<span className="text-sm text-muted-foreground">
 								{phaseLabel(phase)}
 							</span>
 							{status && status !== phaseLabel(phase) && (
-								<span className="text-sm text-[var(--text-secondary)] ml-1">
+								<span className="text-sm text-muted-foreground ml-1">
 									— {status}
 								</span>
 							)}
 							{/* Task progress */}
 							{taskProgress && taskProgress.total > 0 && (
 								<div className="ml-auto flex items-center gap-2">
-									<div className="w-32 h-1.5 bg-[var(--bg-tertiary)] rounded-full overflow-hidden">
+									<div className="w-32 h-1.5 bg-muted rounded-full overflow-hidden">
 										<div
 											className="h-full bg-[var(--accent)] transition-all duration-300"
 											style={{
@@ -190,7 +190,7 @@ export function CodeMigrationDashboard(): React.ReactElement {
 											}}
 										/>
 									</div>
-									<span className="text-xs text-[var(--text-secondary)]">
+									<span className="text-xs text-muted-foreground">
 										{taskProgress.current}/{taskProgress.total}
 									</span>
 								</div>
@@ -207,7 +207,7 @@ export function CodeMigrationDashboard(): React.ReactElement {
 
 					{/* Results */}
 					{isComplete && result && (
-						<div className="p-4 border-b border-[var(--border-color)]">
+						<div className="p-4 border-b border-border">
 							<div className="flex items-center gap-3 mb-3">
 								<span className="text-2xl">{result.dry_run ? "🔍" : "✅"}</span>
 								<div>
@@ -216,33 +216,33 @@ export function CodeMigrationDashboard(): React.ReactElement {
 											? t("codeMigration:results.dryRunComplete")
 											: t("codeMigration:results.migrationComplete")}
 									</h3>
-									<p className="text-sm text-[var(--text-secondary)]">
+									<p className="text-sm text-muted-foreground">
 										{result.migration_description}
 									</p>
 								</div>
 							</div>
 							<div className="grid grid-cols-3 gap-3">
-								<div className="bg-[var(--bg-secondary)] rounded-lg p-3 text-center">
+								<div className="bg-card rounded-lg p-3 text-center">
 									<div className="text-xl font-bold">
 										{result.summary.files_modified}
 									</div>
-									<div className="text-xs text-[var(--text-secondary)]">
+									<div className="text-xs text-muted-foreground">
 										{t("codeMigration:results.filesModified")}
 									</div>
 								</div>
-								<div className="bg-[var(--bg-secondary)] rounded-lg p-3 text-center">
+								<div className="bg-card rounded-lg p-3 text-center">
 									<div className="text-xl font-bold capitalize">
 										{result.summary.plan_status}
 									</div>
-									<div className="text-xs text-[var(--text-secondary)]">
+									<div className="text-xs text-muted-foreground">
 										{t("codeMigration:results.planStatus")}
 									</div>
 								</div>
-								<div className="bg-[var(--bg-secondary)] rounded-lg p-3 text-center">
+								<div className="bg-card rounded-lg p-3 text-center">
 									<div className="text-xl font-bold capitalize">
 										{result.summary.execution_status}
 									</div>
-									<div className="text-xs text-[var(--text-secondary)]">
+									<div className="text-xs text-muted-foreground">
 										{t("codeMigration:results.execution")}
 									</div>
 								</div>
@@ -253,7 +253,7 @@ export function CodeMigrationDashboard(): React.ReactElement {
 					{/* Streaming output */}
 					<div className="flex-1 overflow-auto p-4">
 						{streamingOutput ? (
-							<pre className="text-xs font-mono text-[var(--text-secondary)] whitespace-pre-wrap">
+							<pre className="text-xs font-mono text-muted-foreground whitespace-pre-wrap">
 								{streamingOutput}
 							</pre>
 						) : phase === "idle" ? (
@@ -263,7 +263,7 @@ export function CodeMigrationDashboard(): React.ReactElement {
 									<h3 className="text-lg font-medium mb-2">
 										{t("codeMigration:empty.title")}
 									</h3>
-									<p className="text-sm text-[var(--text-secondary)] max-w-sm">
+									<p className="text-sm text-muted-foreground max-w-sm">
 										{t("codeMigration:empty.body")}
 									</p>
 								</div>
