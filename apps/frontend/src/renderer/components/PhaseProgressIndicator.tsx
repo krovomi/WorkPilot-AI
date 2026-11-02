@@ -48,10 +48,10 @@ interface PhaseProgressIndicatorProps {
 const PHASE_COLORS: Record<ExecutionPhase, { color: string; bgColor: string }> =
 	{
 		idle: { color: "bg-muted-foreground", bgColor: "bg-muted" },
-		planning: { color: "bg-amber-500", bgColor: "bg-amber-500/20" },
+		planning: { color: "bg-warning", bgColor: "bg-warning/20" },
 		coding: { color: "bg-info", bgColor: "bg-info/20" },
 		rate_limit_paused: { color: "bg-orange-500", bgColor: "bg-orange-500/20" },
-		auth_failure_paused: { color: "bg-red-500", bgColor: "bg-red-500/20" },
+		auth_failure_paused: { color: "bg-destructive", bgColor: "bg-destructive/20" },
 		qa_review: { color: "bg-purple-500", bgColor: "bg-purple-500/20" },
 		qa_fixing: { color: "bg-orange-500", bgColor: "bg-orange-500/20" },
 		complete: { color: "bg-success", bgColor: "bg-success/20" },

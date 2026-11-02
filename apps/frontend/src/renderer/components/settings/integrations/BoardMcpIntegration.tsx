@@ -146,7 +146,7 @@ export function BoardMcpIntegration({ projectId }: BoardMcpIntegrationProps) {
 								{t("boardMcp.location", { location: client.location })}
 							</p>
 							{client.readError && (
-								<p className="text-xs text-amber-600">{t("boardMcp.errors.config_unreadable")}</p>
+								<p className="text-xs text-warning">{t("boardMcp.errors.config_unreadable")}</p>
 							)}
 							{clientError && <p className="text-xs text-destructive">{errorText(clientError)}</p>}
 							{client.state === "current" && (

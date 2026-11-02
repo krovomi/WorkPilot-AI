@@ -302,7 +302,7 @@ export function EnvSnapshotView({ projectPath }: Props) {
 							</div>
 
 							{lastExportedPath && (
-								<p className="text-xs text-green-600">
+								<p className="text-xs text-success">
 									{t("envSnapshot:exportedTo", "Exported to")}{" "}
 									<span className="font-mono">{lastExportedPath}</span>
 								</p>

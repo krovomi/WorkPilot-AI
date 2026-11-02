@@ -46,9 +46,9 @@ const SEVERITY_ICONS: Record<
 
 // Color mapping for severity
 const SEVERITY_COLORS: Record<string, string> = {
-	critical: "text-red-600 dark:text-red-400",
+	critical: "text-destructive ",
 	high: "text-orange-600 dark:text-orange-400",
-	medium: "text-yellow-600 dark:text-yellow-400",
+	medium: "text-warning ",
 	low: "text-blue-600 dark:text-blue-400",
 };
 
@@ -117,8 +117,8 @@ export function QualityScorePanel({
 						className={cn(
 							"font-medium",
 							score.is_passing
-								? "text-green-600 dark:text-green-400"
-								: "text-red-600 dark:text-red-400",
+								? "text-success "
+								: "text-destructive ",
 						)}
 					>
 						{score.is_passing ? `✅ ${t("passed")}` : `❌ ${t("failed")}`}
@@ -163,7 +163,7 @@ export function QualityScorePanel({
 									{score.issues.some((i) => i.severity === "medium") && (
 										<Badge
 											variant="secondary"
-											className="gap-1 bg-yellow-100 dark:bg-yellow-900/20"
+											className="gap-1 bg-warning/10 "
 										>
 											<AlertTriangle className="h-3 w-3" />
 											{

@@ -30,7 +30,7 @@ export function GitSurgeonDashboard({
 					<button
 						type="button"
 						onClick={() => cancelScan()}
-						className="px-3 py-1.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 text-sm hover:bg-red-500/20"
+						className="px-3 py-1.5 rounded bg-destructive/10 text-destructive border border-destructive/20 text-sm hover:bg-destructive/20"
 					>
 						{t("actions.cancel")}
 					</button>
@@ -68,7 +68,7 @@ export function GitSurgeonDashboard({
 			)}
 
 			{phase === "error" && error && (
-				<div className="text-sm text-red-400">
+				<div className="text-sm text-destructive">
 					{t("errors.failed", { error })}
 				</div>
 			)}
@@ -104,7 +104,7 @@ function ReportBody({
 			</div>
 
 			{plan.requiresForcePush && (
-				<div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+				<div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
 					{t("forcePushWarning")}
 				</div>
 			)}
@@ -116,7 +116,7 @@ function ReportBody({
 						className="px-4 py-3 rounded-lg border border-border hover:bg-card transition-colors"
 					>
 						<div className="flex items-center gap-2 mb-1">
-							<span className="text-xs font-medium uppercase text-yellow-400">
+							<span className="text-xs font-medium uppercase text-warning">
 								{issue.severity}
 							</span>
 							<span className="text-xs opacity-70">

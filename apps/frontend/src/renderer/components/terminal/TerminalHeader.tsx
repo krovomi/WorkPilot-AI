@@ -151,7 +151,7 @@ export function TerminalHeader({
 				{worktreeConfig ? (
 					<span
 						className={cn(
-							"flex items-center gap-1 text-[10px] font-medium text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded",
+							"flex items-center gap-1 text-[10px] font-medium text-warning bg-warning/10 px-1.5 py-0.5 rounded",
 							terminalCount >= 6
 								? "max-w-20"
 								: terminalCount >= 4

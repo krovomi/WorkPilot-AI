@@ -450,7 +450,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 								className={cn(
 									"text-[10px] px-1.5 py-0.5 flex items-center gap-1 cursor-help",
 									blockers.pending.length > 0 && task.status === "queue"
-										? "bg-amber-500/10 text-amber-600 border-amber-500/30 dark:text-amber-400"
+										? "bg-warning/10 text-warning border-warning/30 "
 										: "bg-muted text-muted-foreground border-border",
 								)}
 							>
@@ -487,7 +487,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 								</p>
 							)}
 							{blockers.missing.length > 0 && (
-								<p className="text-xs text-amber-600 dark:text-amber-400">
+								<p className="text-xs text-warning ">
 									{t("kanban.blockers.missing", {
 										count: blockers.missing.length,
 									})}
@@ -576,7 +576,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 			{task.metadata?.tddMode && (
 				<Badge
 					variant="outline"
-					className="text-[10px] px-1.5 py-0.5 flex items-center gap-1 bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+					className="text-[10px] px-1.5 py-0.5 flex items-center gap-1 bg-success/10 text-success border-success/30"
 				>
 					<FlaskConical className="h-2.5 w-2.5" />
 					{t("labels.tdd")}
@@ -612,7 +612,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 					className={cn(
 						"text-[10px] px-1.5 py-0.5 flex items-center gap-1",
 						task.verification.status === "pass"
-							? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+							? "bg-success/10 text-success border-success/30"
 							: "bg-destructive/10 text-destructive border-destructive/30",
 					)}
 					title={task.verification.reason || undefined}
@@ -637,7 +637,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 					className={cn(
 						"text-[10px] px-1.5 py-0.5 flex items-center gap-1",
 						task.crossReview.verdict === "agree"
-							? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+							? "bg-success/10 text-success border-success/30"
 							: task.crossReview.verdict === "disagree"
 								? "bg-destructive/10 text-destructive border-destructive/30"
 								: "bg-muted text-muted-foreground border-border",

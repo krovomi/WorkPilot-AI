@@ -132,7 +132,7 @@ export function NavigationConfirmDialog({
 
 					<Choice
 						icon={
-							<PauseCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
+							<PauseCircle className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
 						}
 						label={t("navigationConfirm.pauseTask")}
 						description={t("navigationConfirm.pauseTaskDescription")}

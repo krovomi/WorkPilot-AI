@@ -161,16 +161,16 @@ export function ScreenshotCapture({
 				<div className="flex-1 overflow-y-auto">
 					{/* Dev Mode Info State */}
 					{isDevMode && (
-						<div className="flex items-start gap-3 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg mb-4">
-							<Info className="h-5 w-5 text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
+						<div className="flex items-start gap-3 p-4 bg-warning/10 border border-warning/30 rounded-lg mb-4">
+							<Info className="h-5 w-5 text-warning shrink-0 mt-0.5" />
 							<div className="flex-1 space-y-2">
-								<p className="text-sm font-medium text-amber-700 dark:text-amber-400">
+								<p className="text-sm font-medium text-warning ">
 									{t("tasks:screenshot.devMode.title")}
 								</p>
-								<p className="text-sm text-amber-600 dark:text-amber-500">
+								<p className="text-sm text-warning ">
 									{t("tasks:screenshot.devMode.description")}
 								</p>
-								<p className="text-sm text-amber-600 dark:text-amber-500">
+								<p className="text-sm text-warning ">
 									{t("tasks:screenshot.devMode.hint", {
 										shortcut: getPasteShortcut(),
 									})}

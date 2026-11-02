@@ -218,9 +218,9 @@ export function AddAgentDialog({
 											<span
 												className={`text-[10px] capitalize px-1 rounded ${
 													m.tier === "flagship"
-														? "bg-amber-500/10 text-amber-600"
+														? "bg-warning/10 text-warning"
 														: m.tier === "fast"
-															? "bg-green-500/10 text-green-600"
+															? "bg-success/10 text-success"
 															: "bg-blue-500/10 text-blue-600"
 												}`}
 											>

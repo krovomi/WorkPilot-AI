@@ -405,7 +405,7 @@ export function ReviewWorkspace({
 								<span className="truncate">{entry.path}</span>
 							</button>
 							<span
-								className="shrink-0 font-mono text-[10px] text-amber-500"
+								className="shrink-0 font-mono text-[10px] text-warning"
 								title={t("workspace.gitStatus")}
 							>
 								{entry.status.trim()}

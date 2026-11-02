@@ -51,7 +51,7 @@ const PHASE_ICONS: Record<PRLogPhase, typeof FolderOpen> = {
 const PHASE_COLORS: Record<PRLogPhase, string> = {
 	context: "text-blue-500 bg-blue-500/10 border-blue-500/30",
 	analysis: "text-purple-500 bg-purple-500/10 border-purple-500/30",
-	synthesis: "text-green-500 bg-green-500/10 border-green-500/30",
+	synthesis: "text-success bg-success/10 border-success/30",
 };
 
 // Source colors for different log sources
@@ -62,24 +62,24 @@ const SOURCE_COLORS: Record<string, string> = {
 	ParallelOrchestrator: "bg-orange-500/20 text-orange-400",
 	Followup: "bg-cyan-500/20 text-cyan-400",
 	ParallelFollowup: "bg-cyan-500/20 text-cyan-400",
-	BotDetector: "bg-amber-500/20 text-amber-400",
-	Progress: "bg-green-500/20 text-green-400",
+	BotDetector: "bg-warning/20 text-warning",
+	Progress: "bg-success/20 text-success",
 	"PR Review Engine": "bg-indigo-500/20 text-indigo-400",
-	Summary: "bg-emerald-500/20 text-emerald-400",
+	Summary: "bg-success/20 text-success",
 	// Specialist agents (from parallel orchestrator - old Task tool approach)
 	"Agent:logic-reviewer": "bg-blue-600/20 text-blue-400",
 	"Agent:quality-reviewer": "bg-indigo-600/20 text-indigo-400",
-	"Agent:security-reviewer": "bg-red-600/20 text-red-400",
+	"Agent:security-reviewer": "bg-destructive/20 text-destructive",
 	"Agent:ai-triage-reviewer": "bg-slate-500/20 text-slate-400",
 	// Specialist agents (from parallel followup reviewer)
 	"Agent:resolution-verifier": "bg-teal-600/20 text-teal-400",
 	"Agent:new-code-reviewer": "bg-cyan-600/20 text-cyan-400",
 	"Agent:comment-analyzer": "bg-gray-500/20 text-gray-400",
 	// Parallel SDK specialists (new approach using parallel SDK sessions)
-	"Specialist:security": "bg-red-600/20 text-red-400",
+	"Specialist:security": "bg-destructive/20 text-destructive",
 	"Specialist:quality": "bg-indigo-600/20 text-indigo-400",
 	"Specialist:logic": "bg-blue-600/20 text-blue-400",
-	"Specialist:codebase-fit": "bg-emerald-600/20 text-emerald-400",
+	"Specialist:codebase-fit": "bg-success/20 text-success",
 	default: "bg-muted text-muted-foreground",
 };
 

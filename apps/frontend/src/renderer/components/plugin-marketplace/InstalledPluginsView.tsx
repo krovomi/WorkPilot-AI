@@ -10,7 +10,7 @@ import { Button } from "../ui/button";
 
 const TYPE_COLORS: Record<CatalogPluginType, string> = {
 	agent: "bg-purple-500/10 text-purple-500",
-	"spec-template": "bg-green-500/10 text-green-500",
+	"spec-template": "bg-success/10 text-success",
 	"custom-prompt": "bg-pink-500/10 text-pink-500",
 };
 

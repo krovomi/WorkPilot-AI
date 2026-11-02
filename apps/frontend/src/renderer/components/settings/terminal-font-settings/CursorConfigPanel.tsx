@@ -150,7 +150,7 @@ export function CursorConfigPanel({
 							className={cn(
 								"font-medium",
 								settings.cursorBlink
-									? "text-green-600 dark:text-green-400"
+									? "text-success "
 									: "text-muted-foreground",
 							)}
 						>

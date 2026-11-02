@@ -10,19 +10,19 @@ import { type OpenApiSpec } from "../../stores/api-explorer-store";
 
 export const HTTP_METHOD_COLORS: Record<string, string> = {
 	GET: "text-blue-400 bg-blue-400/10 border-blue-400/30",
-	POST: "text-emerald-400 bg-emerald-400/10 border-emerald-400/30",
-	PUT: "text-amber-400 bg-amber-400/10 border-amber-400/30",
-	DELETE: "text-red-400 bg-red-400/10 border-red-400/30",
+	POST: "text-success bg-success/10 border-success/30",
+	PUT: "text-warning bg-warning/10 border-warning/30",
+	DELETE: "text-destructive bg-destructive/10 border-destructive/30",
 	PATCH: "text-orange-400 bg-orange-400/10 border-orange-400/30",
 	HEAD: "text-purple-400 bg-purple-400/10 border-purple-400/30",
 	OPTIONS: "text-gray-400 bg-gray-400/10 border-gray-400/30",
 };
 
 export const STATUS_COLORS: Record<string, string> = {
-	"2": "text-emerald-400",
+	"2": "text-success",
 	"3": "text-blue-400",
-	"4": "text-amber-400",
-	"5": "text-red-400",
+	"4": "text-warning",
+	"5": "text-destructive",
 };
 
 export function getStatusColor(status: number): string {

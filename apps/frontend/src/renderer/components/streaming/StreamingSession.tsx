@@ -486,7 +486,7 @@ export function StreamingSession({
 		if (isConnected) {
 			return (
 				<>
-					<div className="w-2 h-2 bg-green-500 rounded-full animate-pulse mr-2" />
+					<div className="w-2 h-2 bg-success rounded-full animate-pulse mr-2" />
 					{t("streaming:status.live")}
 				</>
 			);

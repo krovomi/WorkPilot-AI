@@ -113,8 +113,8 @@ export function TaskProgress({
 						className={cn(
 							"transition-all duration-300",
 							executionPhase === "planning"
-								? "bg-amber-500"
-								: "bg-amber-500/30",
+								? "bg-warning"
+								: "bg-warning/30",
 						)}
 						style={{ width: "20%" }}
 						title={t("taskReview:taskPanel.phasePlanning")}

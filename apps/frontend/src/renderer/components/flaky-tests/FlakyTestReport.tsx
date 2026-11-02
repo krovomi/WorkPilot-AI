@@ -31,8 +31,8 @@ import {
 type T = (key: string, opts?: Record<string, unknown>) => string;
 
 const CONFIDENCE_STYLES: Record<FlakyConfidence, string> = {
-	high: "text-red-400 bg-red-500/10",
-	medium: "text-yellow-400 bg-yellow-500/10",
+	high: "text-destructive bg-destructive/10",
+	medium: "text-warning bg-warning/10",
 	low: "text-muted-foreground bg-card",
 };
 
@@ -177,7 +177,7 @@ function RunPanel({
 				<p className="text-sm text-muted-foreground">{t("run.remote")}</p>
 			)}
 			{known && !remote && commands.length === 0 && (
-				<p className="text-sm text-yellow-400">{t("run.noCommand")}</p>
+				<p className="text-sm text-warning">{t("run.noCommand")}</p>
 			)}
 
 			<div className="flex flex-wrap items-end gap-4">
@@ -318,13 +318,13 @@ function ErrorView({
 }): React.ReactElement {
 	const { code, detail } = parseRunnerError(error);
 	if (!code) {
-		return <p className="text-sm text-red-400">{t("errors.failed", { error })}</p>;
+		return <p className="text-sm text-destructive">{t("errors.failed", { error })}</p>;
 	}
 	// The first line repeats the code in English; the rest is the tool's output.
 	const output = detail.split("\n").slice(code === "no_results" ? 1 : 0).join("\n");
 	return (
-		<section className="rounded-lg border border-red-500/30 bg-red-500/5 p-4 flex flex-col gap-2">
-			<p className="text-sm text-red-400">{t(`errors.${code}`)}</p>
+		<section className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 flex flex-col gap-2">
+			<p className="text-sm text-destructive">{t(`errors.${code}`)}</p>
 			{output.trim() && (
 				<pre className="text-xs font-mono whitespace-pre-wrap max-h-64 overflow-auto text-muted-foreground">
 					{output.trim()}
@@ -384,12 +384,12 @@ function ReportBody({
 			<p className="text-sm text-muted-foreground">{summaryText(report, t)}</p>
 
 			{fewRuns && (
-				<p className="text-sm text-yellow-400">
+				<p className="text-sm text-warning">
 					{t("empty.fewRuns", { runs: report.runCount, min: minRuns })}
 				</p>
 			)}
 			{code === "no_flaky" && !fewRuns && (
-				<p className="text-sm text-green-400">{t("empty.noFlaky")}</p>
+				<p className="text-sm text-success">{t("empty.noFlaky")}</p>
 			)}
 
 			<div className="space-y-2">
@@ -418,7 +418,7 @@ function ReportBody({
 								{t("cause")} {t(`causes.${test.probableCause}`)}
 							</span>
 						</div>
-						<p className="text-xs mt-2 text-green-400">
+						<p className="text-xs mt-2 text-success">
 							{t(`fixes.${test.probableCause}`)}
 						</p>
 						{test.errorPatterns[0] && (

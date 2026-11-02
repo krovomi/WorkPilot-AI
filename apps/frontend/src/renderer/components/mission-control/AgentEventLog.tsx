@@ -38,10 +38,10 @@ const EVENT_ICONS: Record<string, React.ElementType> = {
 };
 
 const EVENT_COLORS: Record<string, string> = {
-	agent_created: "text-green-500",
-	agent_removed: "text-red-500",
+	agent_created: "text-success",
+	agent_removed: "text-destructive",
 	agent_started: "text-blue-500",
-	agent_paused: "text-yellow-500",
+	agent_paused: "text-warning",
 	agent_resumed: "text-cyan-500",
 	agent_stopped: "text-gray-500",
 	agent_config_updated: "text-purple-500",

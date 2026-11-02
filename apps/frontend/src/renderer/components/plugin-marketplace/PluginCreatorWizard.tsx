@@ -661,8 +661,8 @@ export function PluginCreatorWizard({ onClose }: PluginCreatorWizardProps) {
 			<div className="flex-1 px-6 py-6 max-w-2xl">
 				{created ? (
 					<div className="flex flex-col items-center justify-center py-12 text-center space-y-4">
-						<div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-green-500/10">
-							<Check className="h-8 w-8 text-green-500" />
+						<div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-success/10">
+							<Check className="h-8 w-8 text-success" />
 						</div>
 						<h3 className="text-lg font-bold">
 							{t("common:pluginMarketplace.creator.successTitle")}
@@ -758,7 +758,7 @@ export function PluginCreatorWizard({ onClose }: PluginCreatorWizardProps) {
 							type="button"
 							onClick={handleCreate}
 							disabled={creating}
-							className="inline-flex items-center gap-1.5 rounded-md bg-green-600 px-4 py-2 text-xs font-medium text-white hover:bg-green-700 transition-colors disabled:opacity-50"
+							className="inline-flex items-center gap-1.5 rounded-md bg-success px-4 py-2 text-xs font-medium text-success-foreground hover:bg-success/90 transition-colors disabled:opacity-50"
 						>
 							{creating ? (
 								<>

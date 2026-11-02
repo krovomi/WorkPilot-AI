@@ -341,7 +341,7 @@ export function AgentProfileSettings() {
 								{profile.name}
 							</h3>
 							{isCustomized && (
-								<span className="inline-flex items-center rounded bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-medium text-amber-600 dark:text-amber-400">
+								<span className="inline-flex items-center rounded bg-warning/10 px-1.5 py-0.5 text-[9px] font-medium text-warning ">
 									{t("agentProfile.customized")}
 								</span>
 							)}

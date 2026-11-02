@@ -311,7 +311,7 @@ const createSettingsThemes = (t: {
 	development: {
 		title: "Développement & Outils",
 		icon: Code,
-		color: "text-green-600",
+		color: "text-success",
 		sections: [
 			{
 				id: "devtools",

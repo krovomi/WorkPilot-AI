@@ -91,7 +91,7 @@ export function FormulaCard({
 							(formula.installed ? (
 								<Badge
 									variant="outline"
-									className="gap-1 border-emerald-500/40 text-[9px] normal-case text-emerald-600 dark:text-emerald-400"
+									className="gap-1 border-success/40 text-[9px] normal-case text-success "
 									title={t("formulaLab:local.installedTooltip")}
 								>
 									<HardDriveDownload className="h-2.5 w-2.5" />

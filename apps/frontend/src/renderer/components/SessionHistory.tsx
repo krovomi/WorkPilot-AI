@@ -44,15 +44,15 @@ function StatusIcon({ status }: { readonly status: string }) {
 	switch (status.toLowerCase()) {
 		case "completed":
 		case "success":
-			return <CheckCircle2 className="h-4 w-4 text-emerald-500" />;
+			return <CheckCircle2 className="h-4 w-4 text-success" />;
 		case "failed":
 		case "error":
-			return <XCircle className="h-4 w-4 text-red-500" />;
+			return <XCircle className="h-4 w-4 text-destructive" />;
 		case "running":
 		case "in_progress":
 			return <Play className="h-4 w-4 text-blue-500" />;
 		case "paused":
-			return <Pause className="h-4 w-4 text-amber-500" />;
+			return <Pause className="h-4 w-4 text-warning" />;
 		default:
 			return <Clock className="h-4 w-4 text-muted-foreground" />;
 	}
@@ -93,10 +93,10 @@ function SessionCard({ session }: { readonly session: SessionEntry }) {
 	const [expanded, setExpanded] = useState(false);
 
 	const statusColor: Record<string, string> = {
-		completed: "border-emerald-500/30",
-		success: "border-emerald-500/30",
-		failed: "border-red-500/30",
-		error: "border-red-500/30",
+		completed: "border-success/30",
+		success: "border-success/30",
+		failed: "border-destructive/30",
+		error: "border-destructive/30",
 		running: "border-blue-500/30",
 		in_progress: "border-blue-500/30",
 	};
@@ -175,7 +175,7 @@ function SessionCard({ session }: { readonly session: SessionEntry }) {
 			{expanded && (
 				<div className="mt-3 pl-9 space-y-3">
 					{session.error && (
-						<div className="rounded-md bg-red-500/10 p-3 text-xs text-red-500">
+						<div className="rounded-md bg-destructive/10 p-3 text-xs text-destructive">
 							<span className="font-medium">{t("error")}: </span>
 							{session.error}
 						</div>
@@ -346,7 +346,7 @@ export function SessionHistory({ projectId }: SessionHistoryProps) {
 					</Card>
 					<Card>
 						<CardContent className="p-3 text-center">
-							<p className="text-lg font-bold text-emerald-500">
+							<p className="text-lg font-bold text-success">
 								{stats.completed}
 							</p>
 							<p className="text-xs text-muted-foreground">
@@ -356,7 +356,7 @@ export function SessionHistory({ projectId }: SessionHistoryProps) {
 					</Card>
 					<Card>
 						<CardContent className="p-3 text-center">
-							<p className="text-lg font-bold text-red-500">{stats.failed}</p>
+							<p className="text-lg font-bold text-destructive">{stats.failed}</p>
 							<p className="text-xs text-muted-foreground">
 								{t("stats.failed")}
 							</p>
@@ -408,8 +408,8 @@ export function SessionHistory({ projectId }: SessionHistoryProps) {
 
 				{/* Error */}
 				{error && (
-					<Card className="border-red-500/30">
-						<CardContent className="p-4 flex items-center gap-3 text-red-500">
+					<Card className="border-destructive/30">
+						<CardContent className="p-4 flex items-center gap-3 text-destructive">
 							<AlertTriangle className="h-5 w-5 shrink-0" />
 							<p className="text-sm">{error}</p>
 						</CardContent>

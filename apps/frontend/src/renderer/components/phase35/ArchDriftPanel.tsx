@@ -17,10 +17,10 @@ interface ArchDriftPanelProps {
 
 const SEV_COLOR: Record<string, string> = {
 	none: "bg-muted text-muted-foreground",
-	low: "bg-amber-500/20 text-amber-700 border-amber-500/40",
+	low: "bg-warning/20 text-warning border-warning/40",
 	medium: "bg-orange-500/20 text-orange-700 border-orange-500/40",
-	high: "bg-red-500/20 text-red-700 border-red-500/40",
-	critical: "bg-red-700/30 text-red-900 border-red-700/40",
+	high: "bg-destructive/20 text-destructive border-destructive/40",
+	critical: "bg-destructive/30 text-destructive border-destructive/40",
 };
 
 export function ArchDriftPanel({ projectPath }: ArchDriftPanelProps) {

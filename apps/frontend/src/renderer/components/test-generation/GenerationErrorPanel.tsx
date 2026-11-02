@@ -204,7 +204,7 @@ export function GenerationErrorPanel({
 							className="flex flex-none items-center gap-1 rounded-md border border-border bg-muted/40 px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted"
 						>
 							{copied ? (
-								<Check className="h-3 w-3 text-emerald-400" aria-hidden="true" />
+								<Check className="h-3 w-3 text-success" aria-hidden="true" />
 							) : (
 								<Copy className="h-3 w-3" aria-hidden="true" />
 							)}

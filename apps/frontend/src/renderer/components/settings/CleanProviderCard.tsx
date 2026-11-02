@@ -371,7 +371,7 @@ export function CleanProviderCard({
 
 	const getStatusColor = () => {
 		if (!provider.isConfigured) return "text-muted-foreground";
-		if (needsReauth) return "text-amber-600 dark:text-amber-500";
+		if (needsReauth) return "text-warning ";
 		if (provider.isWorking === false) return "text-destructive";
 		return "text-foreground";
 	};
@@ -467,14 +467,14 @@ export function CleanProviderCard({
 		if (needsReauth) {
 			return (
 				<div className="flex items-center gap-2 min-w-0">
-					<span className="px-2 py-1 rounded text-xs font-medium text-amber-700 dark:text-amber-500 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 truncate">
+					<span className="px-2 py-1 rounded text-xs font-medium text-warning bg-warning/10 border border-warning/30 truncate">
 						{t("sections.accounts.providerCard.needsReauth")}
 					</span>
 					<Button
 						variant="ghost"
 						size="sm"
 						onClick={handleReconnect}
-						className="h-6 px-2 text-xs shrink-0 text-amber-700 dark:text-amber-500 hover:bg-amber-100/60 dark:hover:bg-amber-500/15"
+						className="h-6 px-2 text-xs shrink-0 text-warning hover:bg-warning/10 dark:hover:bg-warning/15"
 					>
 						<LogIn className="w-3 h-3 mr-1" />
 						{t("common:usage.reauthToastAction")}
@@ -503,7 +503,7 @@ export function CleanProviderCard({
 
 		if (authMethod === "oauth") {
 			return (
-				<div className="px-2 py-1 bg-green-50 rounded text-xs font-medium text-green-700 border border-green-200">
+				<div className="px-2 py-1 bg-success/10 rounded text-xs font-medium text-success border border-success/30">
 					{t("sections.accounts.providerCard.oauthConnected")}
 				</div>
 			);
@@ -579,7 +579,7 @@ export function CleanProviderCard({
 						</p>
 					)}
 					{keyNeedsRenewal && (
-						<p className="text-xs text-amber-700 dark:text-amber-500 mt-0.5">
+						<p className="text-xs text-warning mt-0.5">
 							{t("sections.accounts.providerCard.keyRenewal", {
 								count: keyAgeDays,
 								threshold: SECRET_RENEWAL_DAYS,
@@ -602,7 +602,7 @@ export function CleanProviderCard({
 								!provider.isConfigured && "bg-muted-foreground",
 								provider.isConfigured &&
 									needsReauth &&
-									"bg-amber-500 motion-safe:animate-pulse",
+									"bg-warning motion-safe:animate-pulse",
 								provider.isConfigured &&
 									!needsReauth &&
 									provider.isWorking === false &&
@@ -610,7 +610,7 @@ export function CleanProviderCard({
 								provider.isConfigured &&
 									!needsReauth &&
 									provider.isWorking !== false &&
-									"bg-green-500",
+									"bg-success",
 							)}
 						/>
 						<span
@@ -710,7 +710,7 @@ export function CleanProviderCard({
 							className={cn(
 								"flex items-center justify-between text-xs",
 								keyNeedsRenewal
-									? "text-amber-700 dark:text-amber-500"
+									? "text-warning "
 									: "text-gray-500",
 							)}
 						>

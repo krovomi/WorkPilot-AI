@@ -153,7 +153,7 @@ export const SessionCompactionBadge = memo(
 										)}
 									</div>
 									{phase.critical && (
-										<span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400/80" />
+										<span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-warning/80" />
 									)}
 								</div>
 							))}

@@ -14,10 +14,10 @@ interface Props {
 const STATUS_STYLES: Record<BountyContestant["status"], string> = {
 	queued: "bg-muted text-muted-foreground",
 	running: "bg-blue-500/15 text-blue-500",
-	completed: "bg-green-500/15 text-green-500",
+	completed: "bg-success/15 text-success",
 	archived: "bg-zinc-500/15 text-zinc-500",
-	error: "bg-red-500/15 text-red-500",
-	winner: "bg-yellow-500/15 text-yellow-500",
+	error: "bg-destructive/15 text-destructive",
+	winner: "bg-warning/15 text-warning",
 };
 
 /**
@@ -28,8 +28,8 @@ const STATUS_STYLES: Record<BountyContestant["status"], string> = {
  * the total instead of scoring it zero.
  */
 const TEST_STATUS_STYLES: Record<BountyEvidence["tests"]["status"], string> = {
-	passed: "text-green-500",
-	failed: "text-red-500",
+	passed: "text-success",
+	failed: "text-destructive",
 	timeout: "text-muted-foreground",
 	"no-command": "text-muted-foreground",
 	"no-change": "text-muted-foreground",
@@ -79,14 +79,14 @@ export function ContestantCard({ contestant, isWinner, rationale }: Props) {
 
 	return (
 		<div
-			className={`border rounded-md p-3 bg-card flex flex-col gap-2 ${isWinner ? "ring-2 ring-yellow-500/60" : ""}`}
+			className={`border rounded-md p-3 bg-card flex flex-col gap-2 ${isWinner ? "ring-2 ring-warning/60" : ""}`}
 		>
 			<div className="flex items-center justify-between">
 				<div className="flex items-center gap-2">
 					<span className="text-sm font-semibold">{contestant.label}</span>
-					{isWinner && <Trophy className="w-4 h-4 text-yellow-500" />}
+					{isWinner && <Trophy className="w-4 h-4 text-warning" />}
 					{contestant.status === "error" && (
-						<X className="w-4 h-4 text-red-500" />
+						<X className="w-4 h-4 text-destructive" />
 					)}
 				</div>
 				<span
@@ -161,7 +161,7 @@ export function ContestantCard({ contestant, isWinner, rationale }: Props) {
 			)}
 
 			{contestant.error && (
-				<div className="text-[11px] text-red-500 border-t border-red-500/30 pt-2">
+				<div className="text-[11px] text-destructive border-t border-destructive/30 pt-2">
 					{contestant.error}
 				</div>
 			)}

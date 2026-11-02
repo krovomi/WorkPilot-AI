@@ -475,7 +475,7 @@ function TaskPanel({
 					<Button
 						size="sm"
 						variant="ghost"
-						className="h-7 px-2.5 text-[11px] text-red-400/70 hover:text-red-300 hover:bg-red-400/10 ml-auto"
+						className="h-7 px-2.5 text-[11px] text-destructive/70 hover:text-destructive hover:bg-destructive/10 ml-auto"
 						onClick={onStopTask}
 					>
 						<Square className="h-3 w-3 mr-1" />
@@ -654,7 +654,7 @@ function TerminalPanel({
 					<Button
 						size="sm"
 						variant="ghost"
-						className="h-7 px-2.5 text-[11px] text-amber-400/80 hover:text-amber-300 hover:bg-amber-400/10"
+						className="h-7 px-2.5 text-[11px] text-warning/80 hover:text-warning hover:bg-warning/10"
 						onClick={onInterrupt}
 					>
 						<Square className="h-3 w-3 mr-1" />
@@ -678,7 +678,7 @@ function TerminalPanel({
 					<Button
 						size="sm"
 						variant="ghost"
-						className="h-7 px-2.5 text-[11px] text-red-400/70 hover:text-red-300 hover:bg-red-400/10 ml-auto"
+						className="h-7 px-2.5 text-[11px] text-destructive/70 hover:text-destructive hover:bg-destructive/10 ml-auto"
 						onClick={onKill}
 					>
 						<X className="h-3 w-3 mr-1" />
@@ -914,7 +914,7 @@ export function AddAgentButton({
 		<Button
 			variant="outline"
 			size="sm"
-			className="h-8 px-3 text-xs font-mono border-dashed border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-400"
+			className="h-8 px-3 text-xs font-mono border-dashed border-success/50 text-success hover:bg-success/10 hover:border-success"
 			onClick={onClick}
 			disabled={disabled}
 		>

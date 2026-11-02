@@ -103,7 +103,7 @@ export function VisualRegressionTab({ projectPath }: VisualRegressionTabProps) {
 												type="button"
 												onClick={() => handleSetBaseline(screenshot.name)}
 												disabled={isLoading}
-												className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md bg-amber-500 text-white hover:bg-amber-400 disabled:opacity-50 transition-colors"
+												className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md bg-warning text-warning-foreground hover:bg-warning disabled:opacity-50 transition-colors"
 											>
 												<Bookmark className="w-3 h-3" />
 												{t("browserAgent:regression.setBaseline")}
@@ -138,11 +138,11 @@ export function VisualRegressionTab({ projectPath }: VisualRegressionTabProps) {
 			{baselines.length > 0 && (
 				<section>
 					<div className="flex items-center gap-2 mb-3">
-						<Layers className="w-4 h-4 text-amber-400" />
+						<Layers className="w-4 h-4 text-warning" />
 						<h3 className="text-sm font-medium text-foreground">
 							{t("browserAgent:regression.baseline")}s
 						</h3>
-						<span className="text-xs text-amber-400 px-1.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20">
+						<span className="text-xs text-warning px-1.5 py-0.5 rounded-full bg-warning/10 border border-warning/20">
 							{baselines.length}
 						</span>
 					</div>
@@ -150,11 +150,11 @@ export function VisualRegressionTab({ projectPath }: VisualRegressionTabProps) {
 						{baselines.map((baseline) => (
 							<div
 								key={baseline.name}
-								className="flex items-center justify-between p-3 rounded-lg border border-border bg-card hover:border-amber-500/25 transition-colors"
+								className="flex items-center justify-between p-3 rounded-lg border border-border bg-card hover:border-warning/25 transition-colors"
 							>
 								<div className="flex items-center gap-3 min-w-0">
-									<div className="w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
-										<Layers className="w-4 h-4 text-amber-400" />
+									<div className="w-9 h-9 rounded-lg bg-warning/10 border border-warning/20 flex items-center justify-center">
+										<Layers className="w-4 h-4 text-warning" />
 									</div>
 									<div className="min-w-0">
 										<p className="text-sm font-medium text-foreground truncate">
@@ -189,7 +189,7 @@ export function VisualRegressionTab({ projectPath }: VisualRegressionTabProps) {
 										type="button"
 										onClick={() => deleteBaseline(projectPath, baseline.name)}
 										disabled={isLoading}
-										className="p-1.5 rounded-md border border-red-500/20 text-red-400/70 hover:text-red-400 hover:bg-red-500/10 disabled:opacity-50 transition-colors"
+										className="p-1.5 rounded-md border border-destructive/20 text-destructive/70 hover:text-destructive hover:bg-destructive/10 disabled:opacity-50 transition-colors"
 										title={t("browserAgent:regression.deleteBaseline")}
 									>
 										<Trash2 className="w-3.5 h-3.5" />
@@ -218,14 +218,14 @@ export function VisualRegressionTab({ projectPath }: VisualRegressionTabProps) {
 									key={comparison.name}
 									className={`p-4 rounded-lg border ${
 										passed
-											? "border-emerald-500/25 bg-emerald-500/5"
+											? "border-success/25 bg-success/5"
 											: "border-rose-500/25 bg-rose-500/5"
 									}`}
 								>
 									<div className="flex items-center justify-between mb-2">
 										<div className="flex items-center gap-2">
 											{passed ? (
-												<CheckCircle2 className="w-4.5 h-4.5 text-emerald-400" />
+												<CheckCircle2 className="w-4.5 h-4.5 text-success" />
 											) : (
 												<XCircle className="w-4.5 h-4.5 text-rose-400" />
 											)}
@@ -237,7 +237,7 @@ export function VisualRegressionTab({ projectPath }: VisualRegressionTabProps) {
 											<span
 												className={`text-xs px-2.5 py-0.5 rounded-full font-medium border ${
 													passed
-														? "bg-emerald-500/10 text-emerald-400 border-emerald-500/25"
+														? "bg-success/10 text-success border-success/25"
 														: "bg-rose-500/10 text-rose-400 border-rose-500/25"
 												}`}
 											>
@@ -277,21 +277,21 @@ export function VisualRegressionTab({ projectPath }: VisualRegressionTabProps) {
 function MatchPercentage({ value }: { readonly value: number }) {
 	const color =
 		value >= 95
-			? "text-emerald-400"
+			? "text-success"
 			: value >= 85
-				? "text-amber-400"
+				? "text-warning"
 				: "text-rose-400";
 	const bgColor =
 		value >= 95
-			? "bg-emerald-400"
+			? "bg-success"
 			: value >= 85
-				? "bg-amber-400"
+				? "bg-warning"
 				: "bg-rose-400";
 	const trackColor =
 		value >= 95
-			? "bg-emerald-500/15"
+			? "bg-success/15"
 			: value >= 85
-				? "bg-amber-500/15"
+				? "bg-warning/15"
 				: "bg-rose-500/15";
 
 	return (

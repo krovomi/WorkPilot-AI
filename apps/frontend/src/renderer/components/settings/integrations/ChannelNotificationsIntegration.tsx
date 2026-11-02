@@ -195,7 +195,7 @@ function ChannelRow({
 						</Button>
 
 						{testStatus === "success" && (
-							<span className="flex items-center gap-1 text-sm text-emerald-600">
+							<span className="flex items-center gap-1 text-sm text-success">
 								<CheckCircle2 className="h-4 w-4" />
 								{t("settings:channelNotifications.testSuccess")}
 							</span>
@@ -281,11 +281,11 @@ export function ChannelNotificationsIntegration({
 				</Label>
 				<ul className="space-y-1.5 text-sm text-muted-foreground">
 					<li className="flex items-center gap-2">
-						<CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+						<CheckCircle2 className="h-3.5 w-3.5 text-success shrink-0" />
 						{t("settings:channelNotifications.triggerTaskDone")}
 					</li>
 					<li className="flex items-center gap-2">
-						<CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+						<CheckCircle2 className="h-3.5 w-3.5 text-success shrink-0" />
 						{t("settings:channelNotifications.triggerPrCreated")}
 					</li>
 				</ul>

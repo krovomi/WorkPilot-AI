@@ -43,8 +43,8 @@ const TABS: Array<{
 		id: "test-runner",
 		icon: FlaskConical,
 		labelKey: "browserAgent:tabs.testRunner",
-		color: "text-emerald-400",
-		activeColor: "border-emerald-400 text-emerald-400",
+		color: "text-success",
+		activeColor: "border-success text-success",
 	},
 ];
 
@@ -140,9 +140,9 @@ export function BrowserAgentDashboard() {
 
 			{/* Error banner */}
 			{error && (
-				<div className="px-6 py-2 bg-red-500/10 border-b border-red-500/20 flex items-center gap-2">
-					<AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0" />
-					<p className="text-xs text-red-400">{error}</p>
+				<div className="px-6 py-2 bg-destructive/10 border-b border-destructive/20 flex items-center gap-2">
+					<AlertTriangle className="w-3.5 h-3.5 text-destructive shrink-0" />
+					<p className="text-xs text-destructive">{error}</p>
 				</div>
 			)}
 
@@ -188,10 +188,10 @@ const STAT_COLORS: Record<
 		border: "border-blue-500/20",
 	},
 	emerald: {
-		icon: "text-emerald-400",
-		value: "text-emerald-400",
-		bg: "bg-emerald-500/10",
-		border: "border-emerald-500/20",
+		icon: "text-success",
+		value: "text-success",
+		bg: "bg-success/10",
+		border: "border-success/20",
 	},
 	purple: {
 		icon: "text-purple-400",
@@ -206,10 +206,10 @@ const STAT_COLORS: Record<
 		border: "border-orange-500/20",
 	},
 	amber: {
-		icon: "text-amber-400",
-		value: "text-amber-400",
-		bg: "bg-amber-500/10",
-		border: "border-amber-500/20",
+		icon: "text-warning",
+		value: "text-warning",
+		bg: "bg-warning/10",
+		border: "border-warning/20",
 	},
 };
 

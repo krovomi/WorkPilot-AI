@@ -805,7 +805,7 @@ export const DroppableColumn = memo(function DroppableColumn({
 										className={cn(
 											"h-6 w-6 transition-colors",
 											isLocked
-												? "text-amber-500 bg-amber-500/10 hover:bg-amber-500/20"
+												? "text-warning bg-warning/10 hover:bg-warning/20"
 												: "hover:bg-muted-foreground/10 hover:text-muted-foreground kanban-col-tool",
 										)}
 										onClick={onToggleLocked}

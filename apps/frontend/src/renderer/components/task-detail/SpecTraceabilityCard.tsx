@@ -67,12 +67,12 @@ export function SpecTraceabilityCard({
 	}
 
 	return (
-		<div className="rounded-lg border border-amber-500/40 bg-amber-500/5">
+		<div className="rounded-lg border border-warning/40 bg-warning/5">
 			<div className="flex items-start justify-between gap-3 p-3">
 				<div className="min-w-0">
 					<div className="flex items-center gap-2">
 						<ListChecks
-							className="h-4 w-4 shrink-0 text-amber-500"
+							className="h-4 w-4 shrink-0 text-warning"
 							aria-hidden
 						/>
 						<span className="text-sm font-medium">
@@ -117,7 +117,7 @@ export function SpecTraceabilityCard({
 			</div>
 
 			{expanded && (
-				<div className="border-t border-amber-500/20 p-3 space-y-3">
+				<div className="border-t border-warning/20 p-3 space-y-3">
 					{questions.length > 0 && (
 						<section>
 							<h4 className="text-xs font-medium">
@@ -130,7 +130,7 @@ export function SpecTraceabilityCard({
 										className="flex items-start gap-2 text-xs text-muted-foreground"
 									>
 										<CircleHelp
-											className="mt-0.5 h-3 w-3 shrink-0 text-amber-500"
+											className="mt-0.5 h-3 w-3 shrink-0 text-warning"
 											aria-hidden
 										/>
 										<span>

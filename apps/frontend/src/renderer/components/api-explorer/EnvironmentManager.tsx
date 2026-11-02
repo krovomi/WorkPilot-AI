@@ -356,7 +356,7 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 												{env.name}
 											</div>
 											{env.token && (
-												<span className="text-[9px] font-mono bg-amber-400/10 text-amber-400 border border-amber-400/20 rounded px-1 py-0.5">
+												<span className="text-[9px] font-mono bg-warning/10 text-warning border border-warning/20 rounded px-1 py-0.5">
 													Bearer ••••
 												</span>
 											)}
@@ -377,7 +377,7 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 											<button
 												type="button"
 												onClick={() => removeEnvironment(env.id)}
-												className="text-muted-foreground hover:text-red-400 p-1 rounded transition-colors"
+												className="text-muted-foreground hover:text-destructive p-1 rounded transition-colors"
 											>
 												<Trash2 size={14} />
 											</button>
@@ -391,9 +391,9 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 
 				{/* Auto-detected environments */}
 				{detectedEnvs.length > 0 && (
-					<div className="mt-3 border border-emerald-400/20 bg-emerald-400/5 rounded-lg p-3">
+					<div className="mt-3 border border-success/20 bg-success/5 rounded-lg p-3">
 						<div className="flex items-center justify-between mb-2.5">
-							<span className="text-xs font-semibold text-emerald-400">
+							<span className="text-xs font-semibold text-success">
 								{t("apiExplorer:environments.detected")} ({detectedEnvs.length})
 							</span>
 							<div className="flex gap-1.5">
@@ -424,7 +424,7 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 										type="checkbox"
 										checked={selectedDetected.has(idx)}
 										onChange={() => toggleDetected(idx)}
-										className="accent-emerald-400 shrink-0"
+										className="accent-success shrink-0"
 									/>
 									<div className="flex-1 min-w-0">
 										<div className="flex items-center gap-2">
@@ -435,7 +435,7 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 												{env.source}
 											</span>
 										</div>
-										<span className="text-[10px] font-mono text-emerald-400/80 truncate block">
+										<span className="text-[10px] font-mono text-success/80 truncate block">
 											{env.baseUrl}
 										</span>
 									</div>
@@ -512,7 +512,7 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 								type="button"
 								onClick={runDetection}
 								disabled={isDetecting}
-								className="flex-1 border border-dashed border-emerald-400/30 rounded-lg py-2 text-sm text-emerald-400/70 hover:text-emerald-400 hover:border-emerald-400/50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+								className="flex-1 border border-dashed border-success/30 rounded-lg py-2 text-sm text-success/70 hover:text-success hover:border-success/50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
 							>
 								{isDetecting ? (
 									<Loader2 size={13} className="animate-spin" />

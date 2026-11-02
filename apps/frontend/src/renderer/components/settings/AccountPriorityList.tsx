@@ -56,20 +56,20 @@ const THRESHOLD_ELEVATED = 71; // Yellow: Moderate usage
  * Get color class based on usage percentage
  */
 const getColorClass = (percent: number): string => {
-	if (percent >= THRESHOLD_CRITICAL) return "text-red-500";
+	if (percent >= THRESHOLD_CRITICAL) return "text-destructive";
 	if (percent >= THRESHOLD_WARNING) return "text-orange-500";
-	if (percent >= THRESHOLD_ELEVATED) return "text-yellow-500";
-	return "text-green-500";
+	if (percent >= THRESHOLD_ELEVATED) return "text-warning";
+	return "text-success";
 };
 
 /**
  * Get background class for progress bars
  */
 const getBarColorClass = (percent: number): string => {
-	if (percent >= THRESHOLD_CRITICAL) return "bg-red-500";
+	if (percent >= THRESHOLD_CRITICAL) return "bg-destructive";
 	if (percent >= THRESHOLD_WARNING) return "bg-orange-500";
-	if (percent >= THRESHOLD_ELEVATED) return "bg-yellow-500";
-	return "bg-green-500";
+	if (percent >= THRESHOLD_ELEVATED) return "bg-warning";
+	return "bg-success";
 };
 
 /**
@@ -291,14 +291,14 @@ function SortableAccountItem({ account, index }: SortableAccountItemProps) {
 							<span
 								className={cn(
 									"text-[10px] px-1.5 py-0.5 rounded shrink-0",
-									statusKey === "healthy" && "bg-green-500/10 text-green-600",
+									statusKey === "healthy" && "bg-success/10 text-success",
 									statusKey === "moderate" &&
-										"bg-yellow-500/10 text-yellow-600",
+										"bg-warning/10 text-warning",
 									statusKey === "highUsage" &&
 										"bg-orange-500/10 text-orange-600",
-									statusKey === "nearLimit" && "bg-red-500/10 text-red-600",
+									statusKey === "nearLimit" && "bg-destructive/10 text-destructive",
 									statusKey === "rateLimited" &&
-										"bg-red-500/20 text-red-600 font-medium",
+										"bg-destructive/20 text-destructive font-medium",
 								)}
 							>
 								{t(`accounts.priority.status.${statusKey}`)}

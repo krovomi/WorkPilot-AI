@@ -590,7 +590,7 @@ export function PixelOffice({
 					{counts.active > 0 && (
 						<Badge
 							variant="default"
-							className="font-mono text-xs bg-emerald-600"
+							className="font-mono text-xs bg-success"
 						>
 							{t("pixelOffice:badges.active", { count: counts.active })}
 						</Badge>

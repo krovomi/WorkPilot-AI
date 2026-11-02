@@ -74,8 +74,8 @@ export function LicensePanel({ projectPath }: LicensePanelProps) {
 							<Badge
 								className={
 									report.passed
-										? "bg-green-500/20 text-green-700 border-green-500/40"
-										: "bg-red-500/20 text-red-700 border-red-500/40"
+										? "bg-success/20 text-success border-success/40"
+										: "bg-destructive/20 text-destructive border-destructive/40"
 								}
 							>
 								{report.passed ? t("license.passed") : t("license.failed")}

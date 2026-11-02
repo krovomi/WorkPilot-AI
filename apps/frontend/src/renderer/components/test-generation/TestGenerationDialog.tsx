@@ -250,7 +250,7 @@ export function TestGenerationDialog({
 					<Card key={test.test_name} className="overflow-hidden">
 						<CardContent className="flex flex-col gap-2 pt-4">
 							<div className="flex items-center gap-2">
-								<span className="grid h-5 w-5 flex-none place-items-center rounded-full bg-emerald-500/15 text-emerald-400">
+								<span className="grid h-5 w-5 flex-none place-items-center rounded-full bg-success/15 text-success">
 									<Check className="h-3 w-3" />
 								</span>
 								<span className="flex-1 break-all font-mono text-sm font-medium">
@@ -549,7 +549,7 @@ export function TestGenerationDialog({
 										defaultValue: "Describe the user story or scenario...",
 									})}
 									rows={4}
-									className="border-2 border-yellow-400 focus:border-yellow-500 focus-visible:border-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-200"
+									className="border-2 border-warning focus:border-warning focus-visible:border-warning focus:outline-none focus:ring-2 focus:ring-warning/30"
 									style={{
 										border: "2px solid rgb(250, 204, 21)",
 										borderRadius: "0.5rem",

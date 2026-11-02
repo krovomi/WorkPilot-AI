@@ -62,15 +62,15 @@ const LANE_HEADER = 44;
 const LANE_PADDING = 16;
 
 const STATUS_STYLES: Record<ChangeStatus, string> = {
-	added: "border-emerald-500/70 bg-emerald-500/10",
-	modified: "border-amber-500/70 bg-amber-500/10",
-	deleted: "border-red-500/70 bg-red-500/10 opacity-80",
+	added: "border-success/70 bg-success/10",
+	modified: "border-warning/70 bg-warning/10",
+	deleted: "border-destructive/70 bg-destructive/10 opacity-80",
 };
 
 const STATUS_DOT: Record<ChangeStatus, string> = {
-	added: "bg-emerald-500",
-	modified: "bg-amber-500",
-	deleted: "bg-red-500",
+	added: "bg-success",
+	modified: "bg-warning",
+	deleted: "bg-destructive",
 };
 
 interface ChangeNodeData {
@@ -118,8 +118,8 @@ function ChangeNodeCard({ data }: NodeProps<ChangeNodeData>) {
 			</div>
 			<div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
 				<span>{data.statusLabel}</span>
-				<span className="text-emerald-600 dark:text-emerald-400">+{node.additions}</span>
-				<span className="text-red-600 dark:text-red-400">−{node.deletions}</span>
+				<span className="text-success ">+{node.additions}</span>
+				<span className="text-destructive ">−{node.deletions}</span>
 				{node.members.length > 0 && <span>· {node.members.length} ◆</span>}
 			</div>
 		</div>

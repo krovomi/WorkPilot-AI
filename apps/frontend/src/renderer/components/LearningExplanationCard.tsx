@@ -43,7 +43,7 @@ const CATEGORY_COLORS = {
 		"bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20",
 	decision:
 		"bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20",
-	code: "bg-green-500/10 text-green-700 dark:text-green-300 border-green-500/20",
+	code: "bg-success/10 text-success border-success/20",
 	pattern:
 		"bg-orange-500/10 text-orange-700 dark:text-orange-300 border-orange-500/20",
 	best_practice:
@@ -155,12 +155,12 @@ export function LearningExplanationCard({
 												</div>
 											)}
 											{alt.pros && (
-												<div className="text-green-600 dark:text-green-400">
+												<div className="text-success ">
 													+ {alt.pros}
 												</div>
 											)}
 											{alt.cons && (
-												<div className="text-red-600 dark:text-red-400">
+												<div className="text-destructive ">
 													- {alt.cons}
 												</div>
 											)}
