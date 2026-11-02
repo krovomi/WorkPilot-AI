@@ -68,9 +68,10 @@ ACTIONS = ("click", "fill", "toggle", "select", "expand", "collapse")
 _REF = re.compile(r"^e\d{1,5}$")
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 _START_SECONDS = 60.0
-#: Compiling the helper's C# the first time on a machine (driver.ps1 caches the
-#: assembly afterwards). A cold Windows machine took 40 to 60 s and sometimes
-#: more: the helper says it is compiling, and the start waits this long instead.
+#: Loading UI Automation and compiling the helper's C# the first time on a
+#: machine (driver.ps1 caches the assembly afterwards). A cold Windows machine
+#: took more than the start budget: the helper says it is starting, then
+#: compiling, and the start waits this long after each of those lines.
 _COMPILE_SECONDS = 240.0
 _REQUEST_SECONDS = 30.0
 
@@ -236,7 +237,11 @@ class UiaDriver:
         self._process = process
         try:
             ready = json.loads(self._wait_line(self.start_timeout))
-            if isinstance(ready, dict) and ready.get("compiling"):
+            # The helper says it is alive, then that it is compiling: each
+            # sign of life gives the rest of the start the compile budget.
+            while isinstance(ready, dict) and (
+                ready.get("starting") or ready.get("compiling")
+            ):
                 ready = json.loads(self._wait_line(self.compile_timeout))
         except (DriverError, ValueError) as exc:
             self.close()
