@@ -37,7 +37,11 @@ from foundation.debug import (
     debug_success,
     debug_warning,
 )
-from prompts_pkg import get_qa_reviewer_light_prompt, get_qa_reviewer_prompt
+from prompts_pkg import (
+    get_qa_reviewer_light_prompt,
+    get_qa_reviewer_prompt,
+    get_qa_reviewer_targeted_prompt,
+)
 from security.tool_input_validator import get_safe_tool_input
 from task_logger import (
     LogEntryType,
@@ -239,6 +243,23 @@ def _programmatic_qa_signoff(
     return save_implementation_plan(spec_dir, plan)
 
 
+def _note_command(commands_seen: list[str] | None, inp: Any) -> None:
+    """Keep the shell command of a tool call, whatever the provider named it.
+
+    The targeted gate reads them to check that each mapped test was run in
+    the session, not only declared passed in the sign-off.
+    """
+    if commands_seen is None or not isinstance(inp, dict):
+        return
+    for key in ("command", "cmd"):
+        value = inp.get(key)
+        if value:
+            commands_seen.append(
+                " ".join(map(str, value)) if isinstance(value, list) else str(value)
+            )
+            return
+
+
 def _what_went_wrong(error_type: str | None) -> str:
     """The self-correction paragraph for the kind of error the last pass hit."""
     if error_type == "invalid_implementation_plan_json":
@@ -275,6 +296,7 @@ async def run_qa_agent_session(
     previous_error: dict | None = None,
     jev_advice: str = "",
     review_scope: ChangeScope | None = None,
+    commands_seen: list[str] | None = None,
 ) -> tuple[str, str]:
     """
     Run a QA reviewer agent session.
@@ -295,7 +317,10 @@ async def run_qa_agent_session(
         review_scope: The change set's scope (`foundation.change_scope`). A
             light scope gets the text-only prompt with the spec and the diff
             inlined, and none of the memory or learned code patterns: they
-            are about code this change did not touch.
+            are about code this change did not touch. A targeted scope gets
+            the prompt that names the tests to run, without them either.
+        commands_seen: When given, every shell command the reviewer ran is
+            appended to it (the targeted gate's evidence).
 
     Returns:
         (status, response_text) where status is:
@@ -357,9 +382,11 @@ async def run_qa_agent_session(
 
     # Load QA prompt with dynamically-injected project-specific MCP tools
     # This includes Electron validation for Electron apps, Puppeteer for web, etc.
-    light = review_scope is not None and review_scope.is_light
-    if light:
+    scoped = review_scope is not None and not review_scope.is_full
+    if review_scope is not None and review_scope.is_light:
         prompt = get_qa_reviewer_light_prompt(spec_dir, project_dir, review_scope)
+    elif review_scope is not None and review_scope.is_targeted:
+        prompt = get_qa_reviewer_targeted_prompt(spec_dir, project_dir, review_scope)
     else:
         prompt = get_qa_reviewer_prompt(spec_dir, project_dir)
     if jev_advice:
@@ -374,7 +401,7 @@ async def run_qa_agent_session(
     # Retrieve memory context for QA (past patterns, gotchas, validation insights)
     qa_memory_context = (
         ""
-        if light
+        if scoped
         else await get_memory_context(
             spec_dir,
             project_dir,
@@ -394,7 +421,7 @@ async def run_qa_agent_session(
         from learning_loop.prompt_injection import get_learning_context
 
         learning_context = (
-            "" if light else get_learning_context(project_dir, "qa_review")
+            "" if scoped else get_learning_context(project_dir, "qa_review")
         )
         if learning_context:
             prompt += "\n\n" + learning_context
@@ -509,6 +536,7 @@ This is attempt {previous_error.get("consecutive_errors", 1) + 1}. If you fail t
             _rs_id,
             plan_before=plan_before,
             session_started_at=session_started_at,
+            commands_seen=commands_seen,
         )
 
     # ── Claude SDK path (backward compatible) ──
@@ -602,6 +630,7 @@ This is attempt {previous_error.get("consecutive_errors", 1) + 1}. If you fail t
 
                         # Safely extract tool input (handles None, non-dict, etc.)
                         inp = get_safe_tool_input(block)
+                        _note_command(commands_seen, inp)
 
                         # Extract tool input for display (full command/path)
                         if inp:
@@ -805,6 +834,7 @@ async def _run_qa_agent_client_session(
     _rs_id: Any,
     plan_before: str | None = None,
     session_started_at: float | None = None,
+    commands_seen: list[str] | None = None,
 ) -> tuple[str, str]:
     """
     Provider-agnostic QA reviewer session using normalized AgentMessage stream.
@@ -886,6 +916,7 @@ async def _run_qa_agent_client_session(
                     tool_count += 1
                     tool_input_display = None
                     inp = block.tool_input or {}
+                    _note_command(commands_seen, inp)
 
                     if inp:
                         if "file_path" in inp:

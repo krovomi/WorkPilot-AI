@@ -4,10 +4,12 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { visiblePages } from "../../admin/pages";
+import { LockSection } from "../../auth/LockSection";
 import { useSession } from "../../auth/session";
 import { describeError } from "../../i18n";
 import { Button, ErrorBanner, Section } from "../../ui/components";
 import { RADIUS, SPACE, useTheme } from "../../ui/theme";
+import { ThemeSection } from "../../ui/ThemeSection";
 
 export default function Settings() {
 	const { t } = useTranslation();
@@ -43,6 +45,8 @@ export default function Settings() {
 					{serverUrl}
 				</Text>
 			</Section>
+			<ThemeSection />
+			<LockSection />
 			{administers ? (
 				<Section title={t("admin.title")}>
 					<Text style={{ color: theme.textMuted }}>{t("admin.summary")}</Text>

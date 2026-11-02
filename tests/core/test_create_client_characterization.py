@@ -30,6 +30,8 @@ _ENV_TO_CLEAR = (
     "AUTO_CLAUDE_MAX_TURNS",
     "AUTO_CLAUDE_EFFORT",
     "AUTO_CLAUDE_AGENT_DEBUGGER",
+    "AUTO_CLAUDE_SETTING_SOURCES",
+    "AUTO_CLAUDE_CODER_USER_SETTINGS",
     "CLAUDE_CLI_PATH",
     "CONTEXT7_API_KEY",
     "CHROME_DEVTOOLS_PORT",
@@ -351,6 +353,13 @@ def test_the_session_defaults(harness):
         assert absent not in options
     for absent in ("agents", "disallowed_tools", "effort"):
         assert absent not in options
+
+
+@pytest.mark.parametrize("agent_type", ["planner", "qa_reviewer", "qa_fixer"])
+def test_the_phases_around_the_coder_load_the_project_settings_only(
+    harness, agent_type
+):
+    assert harness.build(agent_type=agent_type)["setting_sources"] == ["project"]
 
 
 def test_the_turn_cap_and_output_format_follow_the_caller(harness, monkeypatch):

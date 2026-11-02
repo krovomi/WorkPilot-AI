@@ -440,7 +440,8 @@ environment wins:
 | --- | ---: | --- |
 | `WORKPILOT_QA_MAX_ITERATIONS` | by effort | Review passes a task may run, whatever its QA effort. Capped at 50; a value below 1 or that is not a number is ignored. |
 | `WORKPILOT_QA_RECURRING_THRESHOLD` | 8 | Occurrences of the same issue, across passes, that make QA escalate to a human. Bounded by the budget; a value below 2 or that is not a number falls back to 8. |
-| `WORKPILOT_QA_LIGHT` | 1 | `0` reviews every task in full, text-only changes included (see *Text-only changes* below). |
+| `WORKPILOT_QA_LIGHT` | 1 | `0` reviews every task in full, text-only and small code changes included (see *Text-only changes* below). |
+| `WORKPILOT_QA_TARGETED` | 1 | `0` turns the targeted QA off alone: small code changes get the full review (see *Small code changes* below). |
 | `WORKPILOT_QA_MIN_COVERAGE` | 100 | Minimum coverage, in percent, of the `unit` **and** `integration` tests; `e2e` below it only warns. `0` disables the gate. Clamped to 0–100; a value that is not a number falls back to 100. |
 
 ### Review budget
@@ -488,6 +489,23 @@ changed. JSON, YAML, TOML, XML, `.env`, project files and scripts are read by a 
 always get the full review, and so does a change set git cannot read. The decision is made
 from git and file names only, so it is the same for every provider and model. With strict TDD
 on, a subtask whose files are all text-only is not run as a red-green-refactor cycle either.
+`requirements*.txt` and `constraints*.txt` are dependency manifests, not text.
+
+### Small code changes (targeted QA)
+
+When the change set has at most 3 code files and 150 changed lines in them (text files aside),
+all Python or TypeScript/JavaScript, and each has a test by naming convention (`test_x.py`,
+`x_test.py`, `x.test.ts`, `x.spec.tsx`, `__tests__/`), the pass is a **targeted QA** (« QA
+ciblée »): the reviewer gets the spec, the diff and the test files to run
+(`prompts/qa_reviewer_targeted.md`), runs only those, with coverage of the touched files, and
+has no subagents. Its approval stands only if each mapped test is recorded as passed **and**
+named by a command the reviewer ran, and the touched files reach `WORKPILOT_QA_MIN_COVERAGE`
+([apps/backend/qa/targeted_gate.py](../apps/backend/qa/targeted_gate.py)); this replaces the
+unit + integration coverage gate for that pass. Coverage is per touched file, not per diff line.
+Any doubt gives the full review: a file without a mapped test, another language, a generated,
+deleted or renamed file, `security/`, `server/auth*`, CI files, dependency manifests, lockfiles
+and tool configuration (`conftest.py`, `*.config.*`). The task log and `qa_report.md` say
+which tier ran. Details: [architecture/qa-tiers.md](architecture/qa-tiers.md).
 
 ## Verification loop (`verify`)
 
@@ -603,6 +621,8 @@ planner, coder, QA…).
 | `AUTO_CLAUDE_MAX_BUDGET_USD` | 5.0 | Spending cap, in US dollars, of one session — not of the task — on every provider. Past it the session ends (the Claude SDK ends it itself; for the other providers the session runner does, from each call's measured usage and the model's price in `cost_intelligence/catalog.py`) and the Kanban offers to resume. A model without a known price is not capped. 0 or less removes the cap; a value that is not a number falls back to 5.0. |
 | `AUTO_CLAUDE_EFFORT` | the phase's thinking level | Forces the SDK `effort` level (`low`, `medium`, `high`, `xhigh`, `max`) of sessions on an Opus model; other models ignore it. Without it, the effort follows the thinking level the user chose for the phase: `none` and `low` → `low`, `medium` → `medium`, `high` → `high`, `ultrathink` → `xhigh`. Opus 5.5 takes no thinking budget, so this is its only reasoning control. |
 | `AUTO_CLAUDE_OTEL_ENDPOINT` | — | OTLP endpoint, such as `http://localhost:4318`. When set, each session exports traces, metrics and logs over OTLP `http/protobuf` as the service `workpilot-<agent type>`, and these settings replace any `OTEL_*` variable of the same name. It also turns on WorkPilot's own GenAI spans for every provider (`invoke_agent`, `chat`, `execute_tool`; no prompt or output), sent to `<endpoint>/v1/traces` as the service `workpilot`, with any key read from `OTEL_EXPORTER_OTLP_HEADERS` ([genai-traces.md](architecture/genai-traces.md)). Point it only at a collector you control. |
+| `AUTO_CLAUDE_CODER_USER_SETTINGS` | on | `0`, `false`, `no` or `off`: the coder loads the project's Claude settings only, without your own `~/.claude` (your CLAUDE.md, skills and hooks) or the project's `.claude/settings.local.json`. Every other agent type (planner, QA, spec, analysis, PR review…) loads the project's settings only, whatever this says ([agent-instructions.md](architecture/agent-instructions.md)). |
+| `AUTO_CLAUDE_SETTING_SOURCES` | per agent type | Comma list among `project`, `user` and `local`, for every agent type, beating the variable above. `project` is always kept; other names are ignored, and an empty value is no override. `project,user,local` restores the former behaviour, your settings in every session. |
 | `AUTO_CLAUDE_AGENT_DEBUGGER` | off | `1`, `true`, `yes` or `on` attaches the Agent Debugger's breakpoints to every session, even when the debugger was not opened for that task. |
 | `CLAUDE_CLI_PATH` | the SDK's bundled CLI | `claude` executable the SDK launches. Ignored when it is not an existing file or holds shell metacharacters, `..` or a variable reference. The desktop app sets it from detection or the Claude path setting. |
 | `CLAUDE_CODE_GIT_BASH_PATH` | detected | Windows only: the Git for Windows `bash.exe` the Claude Code CLI needs; WorkPilot also looks for `git.exe` next to it. The desktop app sets it when it finds one. |

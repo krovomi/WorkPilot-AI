@@ -1,11 +1,14 @@
 /**
- * The desktop's default theme (Oscura, `apps/frontend/design.json`) for the
- * phone: the same backgrounds, text, accent and semantic colours, light and
- * dark following the device.
+ * The phone's colours: the desktop's colour themes (`palettes.ts`), light
+ * or dark, as the person chose them (`ThemeProvider.tsx`). Every screen
+ * reads its palette with `useTheme()`.
  */
 
+import { createContext, useContext } from "react";
 import { useColorScheme } from "react-native";
 import type { Column } from "../api/types";
+import { PALETTES } from "./palettes";
+import { type ColorThemeId, DEFAULT_PREFS, type ThemeMode, type ThemePrefs } from "./theme-ids";
 
 export interface Theme {
 	dark: boolean;
@@ -25,44 +28,30 @@ export interface Theme {
 	dangerSoft: string;
 }
 
-export const LIGHT: Theme = {
-	dark: false,
-	background: "#F2F2ED",
-	surface: "#FFFFFF",
-	elevated: "#E8E8E3",
-	text: "#0B0B0F",
-	textMuted: "#5C6974",
-	textFaint: "#868F97",
-	accent: "#8E8F5A",
-	accentSoft: "#EFEFE0",
-	onAccent: "#FFFFFF",
-	border: "#DEDED9",
-	success: "#2E8F6D",
-	warning: "#8A8C0E",
-	danger: "#D84F68",
-	dangerSoft: "#FCE8EC",
-};
+/** The palette of a colour theme in a mode; `system` follows the device's scheme. */
+export function paletteFor(colorTheme: ColorThemeId, mode: ThemeMode, deviceScheme: string | null | undefined): Theme {
+	const dark = mode === "dark" || (mode === "system" && deviceScheme === "dark");
+	const theme = PALETTES[colorTheme] ?? PALETTES.default;
+	return dark ? theme.dark : theme.light;
+}
 
-export const DARK: Theme = {
-	dark: true,
-	background: "#0B0B0F",
-	surface: "#121216",
-	elevated: "#1A1A1F",
-	text: "#E6E6E6",
-	textMuted: "#868F97",
-	textFaint: "#5C6974",
-	accent: "#D6D876",
-	accentSoft: "#2A2A1F",
-	onAccent: "#0B0B0F",
-	border: "#232323",
-	success: "#4EBE96",
-	warning: "#D2D714",
-	danger: "#FF5C5C",
-	dangerSoft: "#2A1A1A",
-};
+export interface ThemeChoice {
+	prefs: ThemePrefs;
+	/** Apply a choice at once, keep it on the phone, send it to the server. */
+	choose(prefs: ThemePrefs): void;
+}
+
+/** Outside a provider (a test, a preview): the default theme, following the device. */
+export const ThemeContext = createContext<ThemeChoice>({ prefs: DEFAULT_PREFS, choose: () => undefined });
+
+export function useThemeChoice(): ThemeChoice {
+	return useContext(ThemeContext);
+}
 
 export function useTheme(): Theme {
-	return useColorScheme() === "dark" ? DARK : LIGHT;
+	const { prefs } = useContext(ThemeContext);
+	const scheme = useColorScheme();
+	return paletteFor(prefs.colorTheme, prefs.theme, scheme);
 }
 
 /** The dot that marks a column. */

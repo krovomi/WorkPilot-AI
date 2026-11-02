@@ -33,6 +33,7 @@ from agents.tools_pkg import (
     get_default_thinking_level,
     hooked_grants,
     mcp_tools_for_servers,
+    setting_sources_for,
     undeclared_builtin_tools,
 )
 from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient
@@ -150,8 +151,9 @@ def create_simple_client(
     # Get environment variables for SDK (including CLAUDE_CONFIG_DIR if set)
     sdk_env = get_sdk_env_vars()
 
-    # No `setting_sources` here means every source, CLAUDE.md included: the
-    # project's `useClaudeMd` setting decides, as in `create_client`.
+    # The project's `useClaudeMd` setting decides whether CLAUDE.md loads, as
+    # in `create_client`; the type's `setting_sources` below, whether the
+    # user's own ~/.claude does.
     from core.client import apply_claude_md_setting
 
     apply_claude_md_setting(sdk_env)
@@ -177,6 +179,9 @@ def create_simple_client(
         "max_turns": max_turns,
         "cwd": str(cwd.resolve()) if cwd else None,
         "env": sdk_env,
+        # Left out, the SDK loads every source, ~/.claude included, for a
+        # commit message or a PR review as for the coder.
+        "setting_sources": setting_sources_for(agent_type),
     }
 
     if mcp_servers:

@@ -49,9 +49,47 @@ comble l'écart :
 Les clients qui lisent déjà le fichier eux-mêmes (Claude, Copilot, Codex, pi, OpenCode, ACP) ne le
 reçoivent pas une seconde fois.
 
+## Les réglages de la personne (`~/.claude`) selon le type d'agent
+
+Une session Claude charge ce que ses `setting_sources` lui disent de lire sur le disque : `project`
+(le `.claude/` du worktree, son `CLAUDE.md`, ses skills et ses hooks), `user` (le `~/.claude` de la
+personne : son `CLAUDE.md` à elle, ses skills, ses hooks) et `local`
+(`.claude/settings.local.json`). Jusqu'ici toutes les sessions recevaient les trois, le planner et
+la QA compris, et le client simple n'en passait aucune, ce que le SDK lit comme « toutes ».
+
+Le choix est maintenant déclaré par type dans `AGENT_CONFIGS` (`"setting_sources"`) et résolu par
+`agents/tools_pkg/setting_sources.py`, que les deux fabriques appellent (`create_client`,
+`create_simple_client`) :
+
+- **le coder** déclare `["project", "user", "local"]` : le code s'écrit comme son auteur travaille,
+  avec ses skills et son `CLAUDE.md` ;
+- **tous les autres types** (planner, QA reviewer et fixer, phases de spec, analyses, revues de PR,
+  utilitaires) ne déclarent rien et reçoivent `["project"]` : ils jugent ou préparent le travail, et
+  doivent le juger de la même façon sur toutes les machines, sans instructions ni hooks que personne
+  d'autre ne voit ;
+- **un type inconnu** reçoit aussi `["project"]` : un type ajouté demain n'est pas encore passé par
+  cette décision, et ce que `project` apporte est partagé et revu avec le code.
+
+Deux variables le règlent ([CONFIGURATION.md](../CONFIGURATION.md#claude-agent-sdk-sessions)) :
+`AUTO_CLAUDE_CODER_USER_SETTINGS=false` ramène le coder au projet seul, et
+`AUTO_CLAUDE_SETTING_SOURCES` impose une liste à tous les types (`project` y est toujours gardé :
+c'est lui qui porte le `CLAUDE.md` du projet, que `useClaudeMd` gouverne).
+
+Aucune source n'accorde d'outil : ce qu'un type peut appeler reste sa déclaration
+`AGENT_CONFIGS[...]["tools"]`, que `disallowed_tools` impose quoi que disent les règles `allow` d'un
+`settings.json` chargé (`undeclared_builtin_tools`, règle 2). Seul ce qui guide le modèle change.
+
+Les CLI des autres providers lisent aussi les instructions globales de la personne, pour tous les
+types : Codex son `$CODEX_HOME/AGENTS.md`, Gemini CLI son `~/.gemini/` (fichier de
+`context.fileName`), OpenCode et pi leurs `AGENTS.md` globaux. Aucun ne propose, à notre
+connaissance, un réglage d'une ligne qui sépare ces instructions de celles du projet sans déplacer
+aussi son répertoire personnel, où vivent ses identifiants : rien n'y est changé.
+
 ## Ce que les tests tiennent
 
 `tests/test_docs_context.py` : ce que Claude Code charge à chaque session (racine et imports) reste
 sous son plafond, une chaîne d'`AGENTS.md` tient dans les 32 KiB de Codex, Gemini CLI est réglé sur
 `AGENTS.md`, `copilot-instructions.md` reste un renvoi. `tests/core/test_project_instructions.py` :
 lecture, imports, plafond, interrupteur, refus d'un fichier suspect, place dans le préfixe.
+`tests/core/test_setting_sources.py` : les sources de chaque type, le défaut d'un type inconnu, les
+deux variables, et ce que les deux fabriques passent au SDK.
