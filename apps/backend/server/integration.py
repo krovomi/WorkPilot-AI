@@ -85,17 +85,28 @@ CLIENT_PATH_PARAMS = frozenset(
 _FORM_TYPES = frozenset({"application/x-www-form-urlencoded", "multipart/form-data"})
 
 
-async def _attach_principal(request: Request, claims: dict) -> None:
-    """Resolve tenant + permissions and put a Principal on ``request.state``."""
+async def _attach_principal(request: Request, claims: dict) -> bool:
+    """Resolve tenant + permissions and put a Principal on ``request.state``.
+
+    False when the account was deactivated: an access token outlives that by
+    up to its lifetime, and deactivation must take effect on the next request,
+    not when the token expires. (An unknown account resolves to no
+    organization, hence no permission, below.)
+    """
     from server.authz.engine import resolve_permissions
     from server.authz.principal import Principal
     from server.authz.tenancy import ORG_HEADER, resolve_org_id
     from server.db.engine import get_session_factory
+    from server.db.models import User
+    from sqlalchemy import select
 
     user_id = claims["sub"]
     platform_role = claims.get("role", "member")
 
     async with get_session_factory()() as db:
+        active = await db.scalar(select(User.is_active).where(User.id == user_id))
+        if active is False:
+            return False
         org_id = await resolve_org_id(
             db,
             user_id=user_id,
@@ -120,6 +131,7 @@ async def _attach_principal(request: Request, claims: dict) -> None:
         org_role_slug=org_role_slug,
         permissions=permissions,
     )
+    return True
 
 
 def _path_keys_in(payload: object) -> set[str]:
@@ -271,11 +283,16 @@ def mount_server_mode(app: FastAPI) -> bool:
         # legacy ones included — has an authorized principal available, and pays
         # for it exactly once.
         try:
-            await _attach_principal(request, claims)
+            attached = await _attach_principal(request, claims)
         except Exception:
             logger.exception("Failed to resolve the principal for a request")
             return JSONResponse(
                 status_code=500, content={"detail": "Authorization unavailable"}
+            )
+
+        if attached is False:
+            return JSONResponse(
+                status_code=401, content={"detail": "Invalid or expired token"}
             )
 
         forbidden = await _reject_client_supplied_paths(request)
