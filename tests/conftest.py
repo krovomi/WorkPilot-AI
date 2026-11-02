@@ -245,14 +245,12 @@ def pytest_collection_modifyitems(config, items) -> None:
 
 def pytest_sessionfinish(session, exitstatus) -> None:
     """Stop what the tests left running, and name it (tests/ci_leftovers.py)."""
-    from tests.ci_leftovers import stop_leftovers
-
-    stop_leftovers()
+    _leftovers.stop_leftovers()
 
 
-# Imported early so the outermost session claims tests/ci_leftovers.OWNER
-# before any test starts pytest in a subprocess.
-import tests.ci_leftovers  # noqa: E402, F401
+# Imported when conftest loads, so the outermost session claims
+# tests/ci_leftovers.OWNER before any test starts pytest in a subprocess.
+from tests import ci_leftovers as _leftovers  # noqa: E402
 
 
 def pytest_runtest_setup(item) -> None:
