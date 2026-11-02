@@ -34,6 +34,13 @@ import {
 	listServerSecrets,
 	setServerSecret,
 } from "../server-user-secrets";
+import {
+	deleteServerNeedsYouChannel,
+	getServerNeedsYou,
+	saveServerNeedsYouChannel,
+	saveServerNeedsYouPreferences,
+	testServerNeedsYouChannel,
+} from "../server-needs-you";
 
 const ENTRA_SCOPES = "openid profile email";
 const LOOPBACK_TIMEOUT_MS = 5 * 60 * 1000;
@@ -255,6 +262,21 @@ export function registerServerAuthHandlers(
 	);
 	ipcMain.handle(IPC_CHANNELS.SERVER_AUTH_DELETE_SECRET, (_e, kind: unknown) =>
 		deleteServerSecret(kind),
+	);
+
+	ipcMain.handle(IPC_CHANNELS.SERVER_NEEDS_YOU_GET, () => getServerNeedsYou());
+	ipcMain.handle(
+		IPC_CHANNELS.SERVER_NEEDS_YOU_SAVE_CHANNEL,
+		(_e, channel: unknown, input: unknown) => saveServerNeedsYouChannel(channel, input),
+	);
+	ipcMain.handle(IPC_CHANNELS.SERVER_NEEDS_YOU_DELETE_CHANNEL, (_e, channel: unknown) =>
+		deleteServerNeedsYouChannel(channel),
+	);
+	ipcMain.handle(IPC_CHANNELS.SERVER_NEEDS_YOU_TEST_CHANNEL, (_e, channel: unknown) =>
+		testServerNeedsYouChannel(channel),
+	);
+	ipcMain.handle(IPC_CHANNELS.SERVER_NEEDS_YOU_SAVE_PREFERENCES, (_e, prefs: unknown) =>
+		saveServerNeedsYouPreferences(prefs),
 	);
 
 	ipcMain.handle(IPC_CHANNELS.SERVER_AUTH_LOGOUT, async () => {

@@ -520,6 +520,49 @@ class PushDevice(Base):
     )
 
 
+class NeedsYouChannel(Base):
+    """Where a person is told a card needs them: ntfy, Telegram or Teams.
+
+    One row per person and channel (``services/needs_you.py``). ``settings``
+    holds what is not a secret (the ntfy server, the Telegram chat id);
+    ``encrypted_secrets`` the rest (the topic, a token, a webhook URL), as one
+    Fernet-encrypted JSON object, never read back by any route.
+    """
+
+    __tablename__ = "needs_you_channels"
+    __table_args__ = (
+        UniqueConstraint("user_id", "channel", name="uq_needs_you_channel"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    channel: Mapped[str] = mapped_column(String(20))  # ntfy / telegram / teams
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    settings: Mapped[str] = mapped_column(Text, default="{}")
+    encrypted_secrets: Mapped[str] = mapped_column(Text)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )
+
+
+class NeedsYouPreference(Base):
+    """Which moments call a person, and in which language they are told."""
+
+    __tablename__ = "needs_you_preferences"
+
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    #: The moments turned off, a JSON list (``needs_you.EVENTS``).
+    muted_events: Mapped[str] = mapped_column(Text, default="[]")
+    locale: Mapped[str] = mapped_column(String(8), default="en")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )
+
+
 class UserSecret(Base):
     """Per-user integration secret (Azure PAT, Jira token...), Fernet-encrypted."""
 

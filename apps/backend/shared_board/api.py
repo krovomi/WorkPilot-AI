@@ -36,6 +36,7 @@ from server.authz.scope import ProjectScope, resolve_project_scope
 from server.db.engine import get_db
 from server.db.models import ProjectRole
 from server.services.events import emit_board_event
+from server.services.needs_you import set_approval_check
 from shared_board import attachments as card_images
 from shared_board import listing, review
 from shared_board import settings as card_settings
@@ -416,3 +417,15 @@ router.add_api_route("/cards/{card_id}/changes", review.card_changes, methods=["
 router.add_api_route(
     "/cards/{card_id}/request-changes", review.request_changes, methods=["POST"]
 )
+
+
+def _plan_awaits_approval(directory: Path) -> bool:
+    """The plan of this spec folder is not (or no longer) approved."""
+    from review.state import ReviewState
+
+    return not ReviewState.load(directory).is_approval_valid(directory)
+
+
+# A finished spec still waiting for this approval rings its person's
+# "needs you" channels as a plan to approve (server/services/needs_you.py).
+set_approval_check(_plan_awaits_approval)

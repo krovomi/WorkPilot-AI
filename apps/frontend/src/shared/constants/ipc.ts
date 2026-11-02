@@ -1280,6 +1280,13 @@ export const IPC_CHANNELS = {
 	SERVER_AUTH_LIST_SECRETS: "server-auth:list-secrets",
 	SERVER_AUTH_SET_SECRET: "server-auth:set-secret",
 	SERVER_AUTH_DELETE_SECRET: "server-auth:delete-secret",
+	// The person's own "needs you" channels on the server (ntfy, Telegram,
+	// Teams): secrets set, masked, never read back (main/server-needs-you.ts).
+	SERVER_NEEDS_YOU_GET: "server-needs-you:get",
+	SERVER_NEEDS_YOU_SAVE_CHANNEL: "server-needs-you:save-channel",
+	SERVER_NEEDS_YOU_DELETE_CHANNEL: "server-needs-you:delete-channel",
+	SERVER_NEEDS_YOU_TEST_CHANNEL: "server-needs-you:test-channel",
+	SERVER_NEEDS_YOU_SAVE_PREFERENCES: "server-needs-you:save-preferences",
 	// Server mode: register or delete a project on the server, for the team
 	SERVER_PROJECT_CREATE: "server-project:create",
 	SERVER_PROJECT_DELETE: "server-project:delete",

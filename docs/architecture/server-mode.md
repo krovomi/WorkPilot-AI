@@ -566,6 +566,25 @@ un défaut, corrigé avec son test : une carte créée sans titre, ce que le dia
 refusée par l'app avant d'atteindre le serveur ; elle prend désormais la première ligne de sa
 description, comme une tâche locale dont le titre n'a pas pu être généré.
 
+## « Besoin de toi » depuis le serveur
+
+Une carte du serveur qui attend quelqu'un n'a pas de bureau qui la regarde. Quand un run se
+termine, le run manager appelle `services/needs_you.py`, qui prévient la personne qui l'a lancé
+sur ses propres canaux : ntfy, Telegram ou un webhook Teams. Les moments, les textes et les règles
+des canaux sont dans [needs-you.md](needs-you.md#en-mode-serveur).
+
+| Action | Route | Il faut |
+|---|---|---|
+| Lire ses réglages (un secret n'y paraît que masqué) | `GET /users/me/needs-you` | `task.read` |
+| Enregistrer un canal (`ntfy`, `telegram`, `teams`) | `PUT /users/me/needs-you/channels/{canal}` | `agent.execute` : le serveur postera vers un hôte choisi par la personne |
+| Envoyer un test depuis ce qui est enregistré | `POST /users/me/needs-you/channels/{canal}/test` | `agent.execute` ; 409 si l'opérateur ne l'a pas activé, 429 à moins de 10 s du précédent |
+| Retirer un canal | `DELETE /users/me/needs-you/channels/{canal}` | `task.read` |
+| Choisir les moments et la langue | `PUT /users/me/needs-you/preferences` | `task.read` |
+
+Une personne ne touche que ses lignes (`needs_you_channels`, `needs_you_preferences`, migration
+`0009`). Rien ne part sans `WORKPILOT_NEEDS_YOU_ENABLED`, et rien ne s'enregistre sans
+`WORKPILOT_SECRETS_MASTER_KEY` : un secret n'est jamais stocké en clair.
+
 ## Ce qui vient
 
 Le plan multi-tenant du 31 octobre, par lots : les autres features servies de la même façon

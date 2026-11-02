@@ -6,6 +6,13 @@
 import { createIpcListener, invokeIpc } from "./ipc-utils";
 import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 import type { IPCResult } from "../../../shared/types";
+import type {
+	NeedsYouChannelKind,
+	NeedsYouEventKind,
+	ServerNeedsYouChannelInput,
+	ServerNeedsYouOverview,
+	ServerNeedsYouTestResult,
+} from "../../../shared/types/server-needs-you";
 
 /** The person's integration tokens the server can hold (never read back). */
 export type ServerSecretKind =
@@ -104,6 +111,19 @@ export interface ServerAuthAPI {
 	listSecrets: () => Promise<IPCResult<ServerSecretKind[]>>;
 	setSecret: (kind: ServerSecretKind, value: string) => Promise<IPCResult>;
 	deleteSecret: (kind: ServerSecretKind) => Promise<IPCResult>;
+	getNeedsYou: () => Promise<IPCResult<ServerNeedsYouOverview>>;
+	saveNeedsYouChannel: (
+		channel: NeedsYouChannelKind,
+		input: ServerNeedsYouChannelInput,
+	) => Promise<IPCResult>;
+	deleteNeedsYouChannel: (channel: NeedsYouChannelKind) => Promise<IPCResult>;
+	testNeedsYouChannel: (
+		channel: NeedsYouChannelKind,
+	) => Promise<IPCResult<ServerNeedsYouTestResult>>;
+	saveNeedsYouPreferences: (prefs: {
+		events: Record<NeedsYouEventKind, boolean>;
+		locale: "en" | "fr";
+	}) => Promise<IPCResult>;
 	logout: () => Promise<ServerAuthState>;
 	restore: () => Promise<ServerAuthState>;
 	onStateChanged: (callback: (state: ServerAuthState) => void) => () => void;
@@ -155,6 +175,19 @@ export const createServerAuthAPI = (): ServerAuthAPI => ({
 		invokeIpc<IPCResult>(IPC_CHANNELS.SERVER_AUTH_SET_SECRET, kind, value),
 	deleteSecret: (kind) =>
 		invokeIpc<IPCResult>(IPC_CHANNELS.SERVER_AUTH_DELETE_SECRET, kind),
+	getNeedsYou: () =>
+		invokeIpc<IPCResult<ServerNeedsYouOverview>>(IPC_CHANNELS.SERVER_NEEDS_YOU_GET),
+	saveNeedsYouChannel: (channel, input) =>
+		invokeIpc<IPCResult>(IPC_CHANNELS.SERVER_NEEDS_YOU_SAVE_CHANNEL, channel, input),
+	deleteNeedsYouChannel: (channel) =>
+		invokeIpc<IPCResult>(IPC_CHANNELS.SERVER_NEEDS_YOU_DELETE_CHANNEL, channel),
+	testNeedsYouChannel: (channel) =>
+		invokeIpc<IPCResult<ServerNeedsYouTestResult>>(
+			IPC_CHANNELS.SERVER_NEEDS_YOU_TEST_CHANNEL,
+			channel,
+		),
+	saveNeedsYouPreferences: (prefs) =>
+		invokeIpc<IPCResult>(IPC_CHANNELS.SERVER_NEEDS_YOU_SAVE_PREFERENCES, prefs),
 	logout: () => invokeIpc<ServerAuthState>(IPC_CHANNELS.SERVER_AUTH_LOGOUT),
 	restore: () => invokeIpc<ServerAuthState>(IPC_CHANNELS.SERVER_AUTH_RESTORE),
 	onStateChanged: (callback) =>
