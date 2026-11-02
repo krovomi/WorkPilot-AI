@@ -1,18 +1,83 @@
 {
 	"title": "Flaky Test Detective",
-	"noData": "No scan run yet. Click \"Run scan\" to start.",
-	"summary": "{{flaky}} flaky out of {{total}} total tests",
-	"confidence": "{{level}} confidence",
+	"description": "A flaky test passes and fails on the same code. The detective runs your test suite several times and flags the tests whose result changes from one run to the next.",
+	"noData": "No analysis yet. Run your tests several times, or analyse the test reports already in the project.",
+	"summary": "{{flaky}} flaky out of {{total}} tests",
+	"summaryRun": "{{flaky}} flaky out of {{total}} tests, over {{runs}} runs of {{command}}",
+	"summaryScan": "{{flaky}} flaky out of {{total}} tests, from {{reports}} test reports",
+	"confidenceLevel": {
+		"high": "High confidence",
+		"medium": "Medium confidence",
+		"low": "Low confidence"
+	},
 	"cause": "Cause:",
-	"failures": "failures",
+	"failedRuns": "failed {{failures}} of {{total}} runs ({{rate}}%)",
+	"errorSample": "Last error",
+	"causes": {
+		"timing": "timing",
+		"test_order": "test order",
+		"shared_state": "shared state",
+		"network": "network",
+		"randomness": "randomness",
+		"resource_leak": "resource leak",
+		"concurrency": "concurrency",
+		"environment": "environment",
+		"unknown": "unknown"
+	},
+	"fixes": {
+		"timing": "Replace fixed sleeps and timeouts with explicit waits or polling, or raise the timeout.",
+		"test_order": "Make each test set up and clean up its own state so it no longer depends on the order tests run in.",
+		"shared_state": "Isolate shared state per test: a fresh database transaction or an in-memory store per test.",
+		"network": "Mock external network calls (WireMock, nock, responses…) instead of reaching real services.",
+		"randomness": "Seed random generators and use fixed GUIDs, UUIDs and dates in tests.",
+		"resource_leak": "Close files, connections and handles in the teardown (Dispose, afterEach, tearDown).",
+		"concurrency": "Synchronise shared access and use thread-safe assertions.",
+		"environment": "Pin environment variables and system dependencies, for example by running tests in a container.",
+		"unknown": "Run the test on its own several times to confirm it, and add logging around the failing assertion."
+	},
+	"run": {
+		"title": "Run the tests several times",
+		"command": "Test command",
+		"runs": "Number of runs",
+		"detecting": "Detecting the project's test command…",
+		"remote": "Server project: the tests run on the server, with the test command detected there.",
+		"noCommand": "No supported test command was found in this project. Supported: .NET (dotnet test), pytest, Vitest, Jest with jest-junit, Maven, Gradle and Go.",
+		"help": "Each run executes the whole suite and writes its report to .workpilot/flaky-tests/, so later analyses take it into account too. .NET builds once, then reuses that build.",
+		"start": "Run {{count}} times"
+	},
 	"actions": {
-		"runScan": "Run scan",
+		"runScan": "Analyse existing reports",
 		"cancel": "Cancel",
-		"scanning": "Scanning...",
+		"scanning": "Analysing...",
 		"reset": "Reset"
+	},
+	"progress": {
+		"discovering": "Looking for test reports…",
+		"parsing": "Reading {{count}} test reports…",
+		"starting": "Starting {{command}}…",
+		"run": "Run {{run}} of {{runs}}: {{command}}",
+		"analysing": "Analysing the results…",
+		"runResult": "Run {{run}}: {{passed}} passed, {{failed}} failed ({{duration}} s)",
+		"timedOut": "timed out",
+		"noReport": "Run {{run}}: no test report written"
+	},
+	"empty": {
+		"noReports": "No test report found in this project.",
+		"noReportsHint": "Run the tests several times above: the detective will run {{command}} and keep each run's report.",
+		"noReportsHintGeneric": "Run the tests several times above, or have your test runner write JUnit XML or TRX reports.",
+		"noFlaky": "No flaky test: every test gave the same result in every run.",
+		"fewRuns": "Only {{runs}} run(s) analysed: a flaky test needs at least {{min}} runs to show. Run the tests more times."
+	},
+	"alwaysFailing": {
+		"title": "{{count}} test(s) failed in every run",
+		"description": "These tests are broken rather than flaky: they never passed."
 	},
 	"errors": {
 		"noProject": "Select a project before running a scan.",
-		"failed": "Scan failed: {{error}}"
+		"failed": "Scan failed: {{error}}",
+		"no_command": "No supported test command was found in this project.",
+		"no_results": "The test command wrote no test report: it probably failed before running the tests (build error, missing tool). Its output:",
+		"start_failed": "The test command could not start. Is the tool installed and on the PATH?",
+		"details": "Details"
 	}
 }

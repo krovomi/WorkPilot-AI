@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import json
 import shutil
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -83,12 +82,6 @@ class CardCreate(BaseModel):
 class CardUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=MAX_TITLE)
     description: str | None = Field(default=None, max_length=MAX_DESCRIPTION)
-
-
-def _started(scope: ProjectScope, directory: Path) -> bool:
-    """Whether work began: a spec was written or a build workspace exists."""
-    worktree = scope.path / ".workpilot" / "worktrees" / "tasks" / directory.name
-    return (directory / "spec.md").exists() or worktree.exists()
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -284,36 +277,26 @@ async def update_card(
     request: Request,
     scope: ProjectScope = Depends(resolve_project_scope),
 ) -> dict[str, Any]:
-    from board_mcp.server import summary
+    from board_mcp.server import CardStartedError, edit_card
 
     principal = get_principal(request)
     _require_writer(scope, principal)
     directory = _card_or_404(scope, card_id)
-    if _started(scope, directory):
+    try:
+        card = edit_card(scope.path, directory, body.title, body.description)
+    except CardStartedError as exc:
         # The spec and the plan were written from this text; editing it now
         # would leave the card saying one thing and the build doing another.
         raise HTTPException(
             status_code=409, detail="Work has started on this card; it cannot be edited"
-        )
-
-    plan_path = directory / "implementation_plan.json"
-    requirements_path = directory / "requirements.json"
-    plan = _read_json(plan_path)
-    requirements = _read_json(requirements_path)
-    if body.title is not None:
-        plan["feature"] = " ".join(body.title.split())
-    if body.description is not None:
-        text = body.description.strip() or plan.get("feature") or card_id
-        plan["description"] = text
-        requirements["task_description"] = text
-    plan["updated_at"] = datetime.now(UTC).isoformat()
-    _write_json(plan_path, plan)
-    _write_json(requirements_path, requirements)
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     emit_board_event(
         scope.project_id, "spec_updated", {"spec": card_id, "by": principal.id}
     )
-    return summary(directory)
+    return card
 
 
 @router.patch("/cards/{card_id}/settings")

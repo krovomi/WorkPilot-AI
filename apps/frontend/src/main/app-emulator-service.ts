@@ -2351,7 +2351,7 @@ exit $launched.ExitCode
 				[runnerPath, "--project-dir", projectDir],
 				{
 					cwd: autoBuildSource,
-					env: { ...process.env } as Record<string, string>,
+					env: envWithoutCredentials(process.env, { PYTHONUTF8: "1" }), // detection: no model
 				},
 			);
 
