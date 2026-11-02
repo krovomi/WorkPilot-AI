@@ -174,6 +174,49 @@ describe("server card actions", () => {
 		});
 	});
 
+	it("settles an edit against a teammate's change made while it was open", async () => {
+		const { actions } = await setup();
+		const card = actions.findServerCard(`server:${PID}:001-login`);
+		if (!card) throw new Error("card");
+		const sent: unknown[] = [];
+		serve({
+			[`PATCH /api/board/cards/001-login${Q}`]: (body) => {
+				sent.push(body);
+				return { ok: true, data: {} };
+			},
+			[`GET /api/board/snapshot${Q}`]: () =>
+				snapshot({ "001-login": { "requirements.json": REQUIREMENTS } }),
+		});
+		const current = await actions.serverCardTask(card.project, card.cardId);
+		const title = current.data?.title ?? "";
+
+		// A teammate wrote "Users sign in." over "Old text" while this person
+		// wrote "Mine": nothing is sent, both versions come back.
+		const met = await actions.updateServerCard(card, {
+			title,
+			description: "Mine",
+			base: { title, description: "Old text" },
+		});
+		expect(met).toEqual({
+			success: false,
+			error: "cardEditConflict",
+			conflicts: [{ field: "description", mine: "Mine", theirs: "Users sign in." }],
+		});
+		expect(sent).toEqual([]);
+
+		// A field this person left as it opened is not sent: the teammate's stays.
+		await actions.updateServerCard(card, {
+			title: "Stale title",
+			description: "Mine",
+			base: { title: "Stale title", description: "Users sign in." },
+		});
+		expect(sent).toEqual([{ description: "Mine" }]);
+
+		// Without a base ("last write wins"), the edit is taken as it is.
+		await actions.updateServerCard(card, { title: "Stale title" });
+		expect(sent.at(-1)).toEqual({ title: "Stale title" });
+	});
+
 	it("sends the engine, priority and category, even once work started", async () => {
 		const { actions } = await setup();
 		const card = actions.findServerCard(`server:${PID}:001-login`);

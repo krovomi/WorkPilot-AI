@@ -77,7 +77,6 @@
   "apps/frontend/src/preload/api/modules/test-generation-api.ts": 8,
   "apps/frontend/src/preload/api/modules/voice-control-api.ts": 2,
   "apps/frontend/src/renderer/App.tsx": 1,
-  "apps/frontend/src/renderer/__tests__/collaboration-store.test.ts": 2,
   "apps/frontend/src/renderer/__tests__/task-order.test.ts": 4,
   "apps/frontend/src/renderer/__tests__/task-store.test.ts": 1,
   "apps/frontend/src/renderer/components/AgentTools.tsx": 1,

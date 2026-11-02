@@ -37,6 +37,7 @@ import {
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AutomationBadge } from "./kanban/AutomationBadge";
+import { TaskLockBadge } from "./collaboration/TaskLockBadge";
 import { useFormatRelativeTime } from "@/hooks/useFormatRelativeTime";
 import AzureDevOpsLogo from "../assets/logos/azure-devops.svg";
 import JiraLogo from "../assets/logos/jira.svg";
@@ -1574,6 +1575,8 @@ export const TaskCard = memo(function TaskCard({
 						<TrackerBadge task={task} t={t} />
 						{/* Created by an automation rule (on a server: the Automations account) */}
 						<AutomationBadge task={task} />
+						{/* Server card: whose claim holds it (server mode) */}
+						<TaskLockBadge taskId={task.id} className="ml-1" />
 
 						{/* Title - full width, no wrapper */}
 						<h3

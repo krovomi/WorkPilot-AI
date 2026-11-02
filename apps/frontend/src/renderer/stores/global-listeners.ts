@@ -14,6 +14,7 @@ import { setupBenchListeners } from "./bench-store";
 import { setupCarbonProfilerListeners } from "./carbon-profiler-store";
 import { setupCodeMigrationListeners } from "./code-migration-store";
 import { setupCodePlaygroundListeners } from "./code-playground-store";
+import { setupCollaborationListeners } from "./collaboration-store";
 import { setupComplianceListeners } from "./compliance-store";
 import { setupConflictPredictorListeners } from "./conflict-predictor-store";
 import { setupConsensusArbiterListeners } from "./consensus-arbiter-store";
@@ -89,6 +90,7 @@ const SETUPS: ReadonlyArray<readonly [string, ListenerSetup]> = [
 	["CarbonProfiler", setupCarbonProfilerListeners],
 	["CodeMigration", setupCodeMigrationListeners],
 	["CodePlayground", setupCodePlaygroundListeners],
+	["Collaboration", setupCollaborationListeners],
 	["Compliance", setupComplianceListeners],
 	["ConflictPredictor", setupConflictPredictorListeners],
 	["ConsensusArbiter", setupConsensusArbiterListeners],

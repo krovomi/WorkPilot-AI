@@ -27,6 +27,7 @@ import {
 } from "../server-connection";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { unwatchAllServerBoards } from "../server-board-live";
+import { leaveAllTeamRooms } from "../server-team-room";
 import { unwatchAllServerCardLogs } from "../server-card-logs";
 import { unwatchAllServerViews } from "../server-live-views";
 import {
@@ -286,6 +287,7 @@ export function registerServerAuthHandlers(
 
 	ipcMain.handle(IPC_CHANNELS.SERVER_AUTH_LOGOUT, async () => {
 		unwatchAllServerBoards();
+		leaveAllTeamRooms();
 		unwatchAllServerViews();
 		unwatchAllServerCardLogs();
 		await logout();

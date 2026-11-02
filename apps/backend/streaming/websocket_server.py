@@ -27,6 +27,7 @@ except ImportError:
     WEBSOCKETS_AVAILABLE = False
     WebSocketServerProtocol = None
 
+from .project_room import ProjectRooms
 from .session_recorder import SessionRecorder
 from .streaming_manager import get_streaming_manager
 
@@ -239,6 +240,8 @@ class StreamingWebSocketServer:
         self.session_recorder = SessionRecorder()
         self._server = None
         self._clients: dict[str, set[Any]] = {}
+        # Server mode: who is on each project, and its team chat.
+        self._rooms = ProjectRooms()
         self._connection_paths: dict[int, str] = {}  # Store path by connection ID
 
     async def start(self):
@@ -443,6 +446,7 @@ class StreamingWebSocketServer:
         clients = self._clients.get(session_id)
         if clients is not None:
             clients.discard(websocket)
+        self._rooms.leave_soon(session_id, websocket)
         self.streaming_manager.unsubscribe(session_id, websocket)
         logger.info(f"Client cleanup completed for session {session_id}")
 
@@ -564,6 +568,7 @@ class StreamingWebSocketServer:
         # Send welcome message
         session_info = self.streaming_manager.get_session_info(ctx["session_id"])
         await self._send_welcome_message(ctx["session_id"], websocket, session_info)
+        await self._rooms.enter(ctx, websocket)
 
     async def _authorize_channel(self, ctx: dict, channel: str):
         """Server mode: the grant this connection's token has on `channel`.
@@ -668,7 +673,11 @@ class StreamingWebSocketServer:
                 if self._may(ctx, "can_publish"):
                     await self._handle_agent_event(session_id, data, websocket, ctx)
             elif msg_type == "chat_message":
-                if self._may(ctx, "can_interact"):
+                if self._rooms.is_room(ctx, websocket):
+                    await self._rooms.chat(
+                        ctx, websocket, data, allowed=self._may(ctx, "can_interact")
+                    )
+                elif self._may(ctx, "can_interact"):
                     await self._handle_chat_message(session_id, data, ctx)
             elif msg_type == "control":
                 if self._may(ctx, "can_interact"):
@@ -724,6 +733,7 @@ class StreamingWebSocketServer:
         if old_session_id in self._clients:
             self._clients[old_session_id].discard(websocket)
         self.streaming_manager.unsubscribe(old_session_id, websocket)
+        await self._rooms.leave(old_session_id, websocket)
         logger.info(f"Unsubscribed from old session: {old_session_id}")
 
         # Update context
@@ -737,6 +747,7 @@ class StreamingWebSocketServer:
             self._clients[new_session_id] = set()
         self._clients[new_session_id].add(websocket)
         self.streaming_manager.subscribe(new_session_id, websocket)
+        await self._rooms.enter(ctx, websocket)
         logger.info(f"Subscribed to new session: {new_session_id}")
 
     async def _ensure_session_exists(self, session_id: str):

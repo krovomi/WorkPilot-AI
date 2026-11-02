@@ -191,6 +191,23 @@ export function holdProjectStream(
 	};
 }
 
+/**
+ * Send a message on a project's open stream (the team chat). False when the
+ * stream is not open: nothing is queued, the caller says it was not sent.
+ */
+export function sendOnProjectStream(projectId: string, message: object): boolean {
+	const stream = streams.get(projectId);
+	if (!stream?.live || !stream.socket || stream.socket.readyState !== WebSocket.OPEN) {
+		return false;
+	}
+	try {
+		stream.socket.send(JSON.stringify(message));
+		return true;
+	} catch {
+		return false;
+	}
+}
+
 /** How many holders a project's stream has (0 when it is closed). */
 export function streamHolders(projectId: string): number {
 	return streams.get(projectId)?.holders.size ?? 0;

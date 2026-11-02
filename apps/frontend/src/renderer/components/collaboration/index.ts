@@ -1,11 +1,9 @@
 /**
- * Collaboration components barrel export.
- * Feature 3.1 — Mode multi-utilisateurs en temps réel.
+ * The team of a server project: presence, claims, chat, edit conflicts,
+ * notifications and settings (server mode, `stores/collaboration-store.ts`).
  */
 
-export { CollaborationNotifications } from "./CollaborationNotifications";
 export { CollaborationSettings } from "./CollaborationSettings";
 export { ConflictResolver } from "./ConflictResolver";
-export { PresenceIndicator } from "./PresenceIndicator";
 export { TaskLockBadge } from "./TaskLockBadge";
-export { TeamChat } from "./TeamChat";
+export { TeamRoomBar } from "./TeamRoomBar";

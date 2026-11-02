@@ -711,3 +711,30 @@ class DeploymentMarker(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow
     )
+
+
+class TeamChatMessage(Base):
+    """One message of a server project's team chat (``services/team_chat.py``).
+
+    The members of a project write it from the app, over the project's stream;
+    the WebSocket server checks who may write and stores the message here, so
+    the chat outlives a restart. ``author_name`` is the name at the time of
+    writing: a removed account leaves its messages, without a user.
+    """
+
+    __tablename__ = "team_chat_messages"
+    __table_args__ = (Index("ix_team_chat_project_time", "project_id", "created_at"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    project_id: Mapped[str] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE")
+    )
+    user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    author_name: Mapped[str] = mapped_column(String(200))
+    body: Mapped[str] = mapped_column(Text)
+    reply_to: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )

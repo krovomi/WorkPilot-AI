@@ -1,179 +1,83 @@
 /**
- * CollaborationNotifications — Real-time toast notifications for collaboration events.
- *
- * Listens to the collaboration store events and displays toasts for:
- * - User join/leave
- * - Task lock/unlock
- * - Agent started/completed
- * - Conflict detected
- * - Chat mentions
- *
- * Feature 3.1 — Mode multi-utilisateurs en temps réel.
+ * Toasts for what teammates did on the shown server project (server mode):
+ * someone arrived or left, claimed or released a card, a run of theirs ended,
+ * a message mentions me, or the server did not take my message. Each kind
+ * can be turned off in the collaboration settings.
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "../../hooks/use-toast";
 import {
-	type RealtimeEvent,
+	type CollaborationNotice,
+	type CollaborationSettings,
 	useCollaborationStore,
 } from "../../stores/collaboration-store";
 
+type Translate = (key: string, options?: Record<string, unknown>) => string;
+
+interface Toast {
+	title: string;
+	description?: string;
+	variant?: "default" | "destructive";
+}
+
+/** The toast of a notice, or null when the settings turn it off. */
+export function toastOf(
+	notice: CollaborationNotice,
+	settings: CollaborationSettings,
+	t: Translate,
+): Toast | null {
+	if (notice.kind === "mention") {
+		if (!settings.notifyChatMentions) return null;
+		return { title: t("notifications.mentionedYou", { user: notice.author }), description: notice.message };
+	}
+	if (notice.kind === "rejected") {
+		// The chat panel says it too; a toast when the panel is closed.
+		return { title: t(`chat.errors.${notice.reason}`), variant: "destructive" };
+	}
+	const a = notice.activity;
+	switch (a.type) {
+		case "joined":
+		case "left":
+			return settings.notifyUserJoinLeave
+				? { title: t(a.type === "joined" ? "notifications.userJoined" : "notifications.userLeft", { user: a.user }) }
+				: null;
+		case "claimed":
+		case "released":
+			return settings.notifyTaskLocks
+				? {
+						title: t(a.type === "claimed" ? "notifications.taskClaimed" : "notifications.taskReleased", {
+							user: a.user,
+							task: a.card,
+						}),
+					}
+				: null;
+		case "run_finished":
+			if (!settings.notifyAgentActivity) return null;
+			return {
+				title: t(`notifications.run.${a.status}`, { user: a.user, task: a.card }),
+				description: a.phase ? t("notifications.run.phase", { phase: a.phase }) : undefined,
+				variant: a.status === "failed" ? "destructive" : "default",
+			};
+	}
+}
+
 export function CollaborationNotifications() {
 	const { t } = useTranslation("collaboration");
-	const events = useCollaborationStore((s) => s.events);
+	const notices = useCollaborationStore((s) => s.notices);
 	const settings = useCollaborationStore((s) => s.settings);
-	const currentUserId = useCollaborationStore((s) => s.currentUserId);
-	const lastProcessed = useRef(0);
+	const chatOpen = useCollaborationStore((s) => s.chatOpen);
+	const takeNotices = useCollaborationStore((s) => s.takeNotices);
 
 	useEffect(() => {
-		if (events.length <= lastProcessed.current) return;
-
-		const newEvents = events.slice(lastProcessed.current);
-		lastProcessed.current = events.length;
-
-		for (const event of newEvents) {
-			if (event.senderId === currentUserId) continue;
-
-			const notification = getNotification(event, t, settings);
-			if (notification) {
-				toast({
-					title: notification.title,
-					description: notification.description,
-					variant: notification.variant as
-						| "default"
-						| "destructive"
-						| undefined,
-				});
-			}
+		if (notices.length === 0) return;
+		for (const notice of takeNotices()) {
+			if (notice.kind === "rejected" && chatOpen) continue;
+			const shown = toastOf(notice, settings, t);
+			if (shown) toast(shown);
 		}
-	}, [events, currentUserId, settings, t]);
+	}, [notices, settings, chatOpen, takeNotices, t]);
 
 	return null;
-}
-
-interface NotificationInfo {
-	title: string;
-	description: string;
-	variant: string;
-}
-
-function getNotification(
-	event: RealtimeEvent,
-	t: (key: string, opts?: Record<string, unknown>) => string,
-	settings: {
-		notifyUserJoinLeave: boolean;
-		notifyTaskLocks: boolean;
-		notifyAgentActivity: boolean;
-		notifyConflicts: boolean;
-		notifyChatMentions: boolean;
-	},
-): NotificationInfo | null {
-	const data = event.data as Record<string, string>;
-
-	switch (event.eventType) {
-		case "user_joined":
-			if (!settings.notifyUserJoinLeave) return null;
-			return {
-				title:
-					"👤 " +
-					t("notifications.userJoined", {
-						user: data.display_name || data.user_id,
-					}),
-				description: "",
-				variant: "default",
-			};
-
-		case "user_left":
-			if (!settings.notifyUserJoinLeave) return null;
-			return {
-				title:
-					"👤 " +
-					t("notifications.userLeft", {
-						user: data.display_name || data.user_id,
-					}),
-				description: "",
-				variant: "default",
-			};
-
-		case "task_locked":
-			if (!settings.notifyTaskLocks) return null;
-			return {
-				title:
-					"🔒 " +
-					t("notifications.taskLocked", {
-						user: data.locked_by,
-						task: data.task_id,
-					}),
-				description: data.reason || "",
-				variant: "default",
-			};
-
-		case "task_unlocked":
-			if (!settings.notifyTaskLocks) return null;
-			return {
-				title:
-					"🔓 " +
-					t("notifications.taskUnlocked", {
-						user: data.unlocked_by,
-						task: data.task_id,
-					}),
-				description: "",
-				variant: "default",
-			};
-
-		case "agent_started":
-			if (!settings.notifyAgentActivity) return null;
-			return {
-				title:
-					"🤖 " +
-					t("notifications.agentStarted", {
-						agent: data.agent_type,
-						task: data.task_id,
-					}),
-				description: "",
-				variant: "default",
-			};
-
-		case "agent_completed":
-			if (!settings.notifyAgentActivity) return null;
-			return {
-				title:
-					(data.success === "true" ? "✅ " : "❌ ") +
-					(data.success === "true"
-						? t("notifications.agentCompleted", {
-								agent: data.agent_type,
-								task: data.task_id,
-							})
-						: t("notifications.agentFailed", {
-								agent: data.agent_type,
-								task: data.task_id,
-							})),
-				description: "",
-				variant: data.success === "true" ? "default" : "destructive",
-			};
-
-		case "conflict_detected":
-			if (!settings.notifyConflicts) return null;
-			return {
-				title: `⚠️ ${t("notifications.conflictDetected", { task: data.task_id })}`,
-				description: "",
-				variant: "destructive",
-			};
-
-		case "task_moved":
-			return {
-				title: t("notifications.taskMoved", {
-					user: event.senderId,
-					task: data.task_id,
-					from: data.from_column,
-					to: data.to_column,
-				}),
-				description: "",
-				variant: "default",
-			};
-
-		default:
-			return null;
-	}
 }

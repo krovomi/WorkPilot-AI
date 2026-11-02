@@ -2017,6 +2017,9 @@
 		"remove": "Remove from the server",
 		"unavailable": "The server could not be reached"
 	},
+	"serverCollaboration": {
+		"navLabel": "Team collaboration"
+	},
 	"serverNeedsYou": {
 		"navLabel": "My notifications from the server",
 		"title": "Needs you: my notifications from the server",
