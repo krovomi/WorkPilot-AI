@@ -145,7 +145,7 @@
   --accent: #EFEFE0;
   --accent-foreground: #A5A66A;
 
-  --destructive: #D84F68;
+  --destructive: #CC2D4A;
   --destructive-foreground: #FFFFFF;
 
   --border: #DEDED9;
@@ -159,13 +159,13 @@
   --popover-foreground: #0B0B0F;
 
   /* Semantic colors */
-  --success: #4EBE96;
+  --success: #2D795E;
   --success-foreground: #FFFFFF;
   --success-light: #E0F5ED;
-  --warning: #D2D714;
-  --warning-foreground: #0B0B0F;
+  --warning: #6E700A;
+  --warning-foreground: #FFFFFF;
   --warning-light: #F5F5D0;
-  --info: #479FFA;
+  --info: #066BD3;
   --info-foreground: #FFFFFF;
   --info-light: #E8F4FF;
   --error: #D84F68;
@@ -271,7 +271,7 @@
   --accent-foreground: #B8B978;
 
   /* Destructive */
-  --destructive: #D84F68;
+  --destructive: #CE2E4B;
   --destructive-foreground: #FFFFFF;
 
   /* Borders and inputs */
@@ -288,13 +288,13 @@
   --popover-foreground: #131419;
 
   /* Semantic colors */
-  --success: #4EBE96;
+  --success: #2D7B5F;
   --success-foreground: #FFFFFF;
   --success-light: #E0F5ED;
-  --warning: #D2D714;
-  --warning-foreground: #131419;
+  --warning: #70730B;
+  --warning-foreground: #FFFFFF;
   --warning-light: #F5F5D0;
-  --info: #479FFA;
+  --info: #066CD5;
   --info-foreground: #FFFFFF;
   --info-light: #E8F4FF;
   --error: #D84F68;
@@ -338,7 +338,7 @@
   --accent-foreground: #E6E7A3;
 
   /* Destructive */
-  --destructive: #D84F68;
+  --destructive: #DA5971;
   --destructive-foreground: #131419;
 
   /* Borders and inputs */
@@ -398,14 +398,14 @@
 
   /* Muted */
   --muted: #F8FAFC;
-  --muted-foreground: #64748B;
+  --muted-foreground: #5D6B81;
 
   /* Accent */
   --accent: #EDE9FE;
   --accent-foreground: #7C3AED;
 
   /* Destructive */
-  --destructive: #DC2626;
+  --destructive: #CF2121;
   --destructive-foreground: #FFFFFF;
 
   /* Borders and inputs */
@@ -422,13 +422,13 @@
   --popover-foreground: #1A1A2E;
 
   /* Semantic colors */
-  --success: #059669;
+  --success: #047854;
   --success-foreground: #FFFFFF;
   --success-light: #D1FAE5;
-  --warning: #D97706;
+  --warning: #A05804;
   --warning-foreground: #FFFFFF;
   --warning-light: #FEF3C7;
-  --info: #2563EB;
+  --info: #1E5EEA;
   --info-foreground: #FFFFFF;
   --info-light: #DBEAFE;
   --error: #DC2626;
@@ -532,14 +532,14 @@
 
   /* Muted */
   --muted: #F8FAFC;
-  --muted-foreground: #64748B;
+  --muted-foreground: #5D6B81;
 
   /* Accent */
   --accent: #E0F2FE;
   --accent-foreground: #0284C7;
 
   /* Destructive */
-  --destructive: #DC2626;
+  --destructive: #D12222;
   --destructive-foreground: #FFFFFF;
 
   /* Borders and inputs */
@@ -556,10 +556,10 @@
   --popover-foreground: #0C4A6E;
 
   /* Semantic colors */
-  --success: #059669;
+  --success: #047B56;
   --success-foreground: #FFFFFF;
   --success-light: #D1FAE5;
-  --warning: #D97706;
+  --warning: #A25904;
   --warning-foreground: #FFFFFF;
   --warning-light: #FEF3C7;
   --info: #2563EB;
@@ -606,7 +606,7 @@
   --accent-foreground: #38BDF8;
 
   /* Destructive */
-  --destructive: #F87171;
+  --destructive: #FAA2A2;
   --destructive-foreground: #082F49;
 
   /* Borders and inputs */
@@ -629,7 +629,7 @@
   --warning: #FBBF24;
   --warning-foreground: #082F49;
   --warning-light: #451A03;
-  --info: #60A5FA;
+  --info: #8ABDFB;
   --info-foreground: #082F49;
   --info-light: #1E3A8A;
   --error: #F87171;
@@ -693,8 +693,8 @@
   --success: #15803D;
   --success-foreground: #FFFFFF;
   --success-light: #DCFCE7;
-  --warning: #CA8A04;
-  --warning-foreground: #78350F;
+  --warning: #936403;
+  --warning-foreground: #FFFFFF;
   --warning-light: #FEF9C3;
   --info: #1D4ED8;
   --info-foreground: #FFFFFF;
@@ -740,7 +740,7 @@
   --accent-foreground: #FBBF24;
 
   /* Destructive */
-  --destructive: #F87171;
+  --destructive: #FA9191;
   --destructive-foreground: #1C1917;
 
   /* Borders and inputs */
@@ -763,7 +763,7 @@
   --warning: #FACC15;
   --warning-foreground: #1C1917;
   --warning-light: #422006;
-  --info: #60A5FA;
+  --info: #76B2FB;
   --info-foreground: #1C1917;
   --info-light: #1E3A8A;
   --error: #F87171;
@@ -807,7 +807,7 @@
   --accent-foreground: #D946EF;
 
   /* Destructive */
-  --destructive: #E11D48;
+  --destructive: #DA1C46;
   --destructive-foreground: #FFFFFF;
 
   /* Borders and inputs */
@@ -824,13 +824,13 @@
   --popover-foreground: #581C87;
 
   /* Semantic colors */
-  --success: #06B6D4;
+  --success: #047A8F;
   --success-foreground: #FFFFFF;
   --success-light: #CFFAFE;
-  --warning: #F59E0B;
-  --warning-foreground: #581C87;
+  --warning: #9B6406;
+  --warning-foreground: #FFFFFF;
   --warning-light: #FEF3C7;
-  --info: #8B5CF6;
+  --info: #7F4BF5;
   --info-foreground: #FFFFFF;
   --info-light: #EDE9FE;
   --error: #E11D48;
@@ -941,7 +941,7 @@
   --accent-foreground: #16A34A;
 
   /* Destructive */
-  --destructive: #DC2626;
+  --destructive: #D52222;
   --destructive-foreground: #FFFFFF;
 
   /* Borders and inputs */
@@ -958,13 +958,13 @@
   --popover-foreground: #14532D;
 
   /* Semantic colors */
-  --success: #059669;
+  --success: #047D58;
   --success-foreground: #FFFFFF;
   --success-light: #D1FAE5;
-  --warning: #CA8A04;
-  --warning-foreground: #14532D;
+  --warning: #936403;
+  --warning-foreground: #FFFFFF;
   --warning-light: #FEF9C3;
-  --info: #0284C7;
+  --info: #0273AE;
   --info-foreground: #FFFFFF;
   --info-light: #E0F2FE;
   --error: #DC2626;
@@ -1008,7 +1008,7 @@
   --accent-foreground: #4ADE80;
 
   /* Destructive */
-  --destructive: #F87171;
+  --destructive: #FCC4C4;
   --destructive-foreground: #052E16;
 
   /* Borders and inputs */
@@ -1025,13 +1025,13 @@
   --popover-foreground: #F0FDF4;
 
   /* Semantic colors */
-  --success: #34D399;
+  --success: #7DE3BE;
   --success-foreground: #052E16;
   --success-light: #064E3B;
-  --warning: #FBBF24;
+  --warning: #FCC945;
   --warning-foreground: #052E16;
   --warning-light: #451A03;
-  --info: #38BDF8;
+  --info: #8EDAFB;
   --info-foreground: #052E16;
   --info-light: #0C4A6E;
   --error: #F87171;
