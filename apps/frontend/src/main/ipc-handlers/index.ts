@@ -435,7 +435,7 @@ export function setupIpcHandlers(
 	registerMcpMarketplaceHandlers();
 
 	// Multi-Repo Orchestration handlers
-	registerMultiRepoHandlers(agentManager, getMainWindow);
+	registerMultiRepoHandlers(getMainWindow);
 
 	// Self-Healing Codebase + Incident Responder handlers
 	registerSelfHealingHandlers(getMainWindow);

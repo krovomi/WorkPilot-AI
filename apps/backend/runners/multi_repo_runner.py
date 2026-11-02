@@ -1,22 +1,27 @@
 """
 Multi-Repo Orchestration Runner
 =================================
-CLI entry point for running tasks across multiple repositories simultaneously.
+The analysis steps of a multi-repo orchestration, called by the desktop main
+process (``apps/frontend/src/main/multi-repo/``), which runs each repository
+as a Kanban task of its own project. See ``orchestration/orchestrator.py``.
 
 Usage:
-    python runners/multi_repo_runner.py --task "Add auth across services" \
-        --repos "/path/to/frontend,/path/to/backend,/path/to/shared-lib" \
-        --project-dir /path/to/workspace
+    python runners/multi_repo_runner.py analyze --spec-dir DIR \
+        --task "Add auth across services" \
+        --repos "frontend::/path/to/frontend,backend::/path/to/backend"
 
-    python runners/multi_repo_runner.py --task "Update API contracts" \
-        --repos "owner/frontend::/local/frontend,owner/backend::/local/backend" \
-        --model opus --fail-fast
+    python runners/multi_repo_runner.py brief --spec-dir DIR --repo frontend
+
+    python runners/multi_repo_runner.py check --spec-dir DIR
+
+Every step prints ``[MULTI_REPO] {json}`` lines; exit code 0 on success.
 """
 
 from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import logging
 import sys
 from pathlib import Path
@@ -29,171 +34,111 @@ from orchestration import MultiRepoOrchestrator
 logger = logging.getLogger(__name__)
 
 
+def _emit(event: str, **data: object) -> None:
+    print(f"[MULTI_REPO] {json.dumps({'event': event, **data})}", flush=True)
+
+
 def parse_repos(repos_str: str) -> list[dict[str, str]]:
     """
     Parse comma-separated repo specifications.
 
     Formats supported:
-    - /path/to/repo                     (local path only, repo name inferred)
-    - owner/repo::/path/to/repo         (explicit name + local path)
-    - owner/repo                        (remote, path must be resolved)
+    - name::/path/to/repo               (explicit name + local path)
+    - /path/to/repo                     (local path only, name inferred)
     """
     repos = []
     for entry in repos_str.split(","):
         entry = entry.strip()
         if not entry:
             continue
-
         if "::" in entry:
-            # Explicit name::path format
             name, path = entry.split("::", 1)
             repos.append({"repo": name.strip(), "repo_path": path.strip()})
-        elif "/" in entry and not Path(entry).exists():
-            # Looks like owner/repo format without path
-            # Try to find it relative to project dir
-            repos.append({"repo": entry, "repo_path": entry})
         else:
-            # Local path, infer repo name from directory
             path = Path(entry).resolve()
-            name = path.name
-            repos.append({"repo": name, "repo_path": str(path)})
-
+            repos.append({"repo": path.name, "repo_path": str(path)})
     return repos
 
 
-def create_master_spec_dir(project_dir: Path, task: str) -> Path:
-    """Create and return the master spec directory for this orchestration."""
-    specs_dir = project_dir / ".workpilot" / "specs"
-    specs_dir.mkdir(parents=True, exist_ok=True)
-
-    # Find next available spec number
-    existing = [d.name for d in specs_dir.iterdir() if d.is_dir()]
-    max_num = 0
-    for name in existing:
-        try:
-            num = int(name.split("-")[0])
-            max_num = max(max_num, num)
-        except (ValueError, IndexError):
-            pass
-
-    # Create a slug from the task description
-    import re
-
-    slug = re.sub(r"[^\w\s-]", "", task.lower())
-    slug = re.sub(r"[\s]+", "-", slug)[:50].strip("-")
-
-    spec_name = f"{max_num + 1:03d}-multi-repo-{slug}"
-    spec_dir = specs_dir / spec_name
-    spec_dir.mkdir(parents=True, exist_ok=True)
-
-    return spec_dir
+def _orchestrator(spec_dir: Path) -> MultiRepoOrchestrator:
+    """An orchestrator for an existing manifest (brief, check)."""
+    manifest_path = spec_dir / "multi_repo_manifest.json"
+    with open(manifest_path, encoding="utf-8") as f:
+        data = json.load(f)
+    repos = [
+        {"repo": r.get("repo", ""), "repo_path": r.get("repo_path", "")}
+        for r in data.get("repos", [])
+    ]
+    return MultiRepoOrchestrator(spec_dir, repos, data.get("task_description", ""))
 
 
-def main() -> int:
+def run_analyze(args: argparse.Namespace) -> int:
+    repos = parse_repos(args.repos)
+    if len(repos) < 2:
+        _emit("error", code="too_few_repos", message="At least 2 repositories")
+        return 1
+    for repo_info in repos:
+        if not Path(repo_info["repo_path"]).is_dir():
+            _emit("error", code="repo_not_found", repo=repo_info["repo"])
+            return 1
+    orchestrator = MultiRepoOrchestrator(args.spec_dir, repos, args.task)
+    manifest = asyncio.run(orchestrator.analyze())
+    return 0 if manifest is not None else 1
+
+
+def run_brief(args: argparse.Namespace) -> int:
+    brief = _orchestrator(args.spec_dir).build_brief(args.repo)
+    _emit("brief", repo=args.repo, description=brief)
+    return 0
+
+
+def run_check(args: argparse.Namespace) -> int:
+    asyncio.run(_orchestrator(args.spec_dir).check_breaking_changes())
+    return 0
+
+
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Multi-Repo Orchestration Runner - coordinate changes across multiple repositories"
+        description="Analysis steps of a multi-repo orchestration"
     )
-    parser.add_argument(
-        "--task",
-        type=str,
-        required=True,
-        help="Task description for the cross-repo orchestration",
-    )
-    parser.add_argument(
+    parser.add_argument("--verbose", action="store_true", help="Verbose logging")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    analyze = sub.add_parser("analyze", help="Dependency graph and execution order")
+    analyze.add_argument("--spec-dir", type=Path, required=True)
+    analyze.add_argument("--task", type=str, required=True)
+    analyze.add_argument(
         "--repos",
         type=str,
         required=True,
-        help="Comma-separated repo paths or owner/repo::path specifications",
+        help="Comma-separated name::path specifications",
     )
-    parser.add_argument(
-        "--project-dir",
-        type=Path,
-        default=Path.cwd(),
-        help="Base project directory (default: current directory)",
-    )
-    parser.add_argument(
-        "--model",
-        type=str,
-        default="sonnet",
-        help="Model to use for AI agents (default: sonnet)",
-    )
-    parser.add_argument(
-        "--thinking-level",
-        type=str,
-        default="medium",
-        choices=["none", "low", "medium", "high", "ultrathink"],
-        help="Thinking budget level (default: medium)",
-    )
-    parser.add_argument(
-        "--fail-fast",
-        action="store_true",
-        help="Stop on first repo failure",
-    )
-    parser.add_argument(
-        "--spec-dir",
-        type=Path,
-        default=None,
-        help="Use existing master spec directory instead of creating a new one",
-    )
-    parser.add_argument(
-        "--verbose",
-        action="store_true",
-        help="Enable verbose logging",
-    )
+    analyze.set_defaults(handler=run_analyze)
 
-    args = parser.parse_args()
+    brief = sub.add_parser("brief", help="Description of one repo's task")
+    brief.add_argument("--spec-dir", type=Path, required=True)
+    brief.add_argument("--repo", type=str, required=True)
+    brief.set_defaults(handler=run_brief)
 
-    # Setup logging
-    log_level = logging.DEBUG if args.verbose else logging.INFO
+    check = sub.add_parser("check", help="Breaking changes of the completed repos")
+    check.add_argument("--spec-dir", type=Path, required=True)
+    check.set_defaults(handler=run_check)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
     logging.basicConfig(
-        level=log_level,
+        level=logging.DEBUG if args.verbose else logging.WARNING,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        stream=sys.stderr,
     )
-
-    # Parse repos
-    repos = parse_repos(args.repos)
-    if len(repos) < 2:
-        print(
-            '[MULTI_REPO] {"event": "error", "message": "At least 2 repositories are required for multi-repo orchestration"}',
-            flush=True,
-        )
+    try:
+        return args.handler(args)
+    except (OSError, ValueError, KeyError) as e:
+        logger.exception("multi-repo %s failed", args.command)
+        _emit("error", code="step_failed", message=str(e))
         return 1
-
-    # Validate repo paths exist
-    for repo_info in repos:
-        repo_path = Path(repo_info["repo_path"])
-        if not repo_path.exists():
-            print(
-                f'[MULTI_REPO] {{"event": "error", "message": "Repository path not found: {repo_path}"}}',
-                flush=True,
-            )
-            return 1
-
-    # Create or use existing spec dir
-    if args.spec_dir:
-        master_spec_dir = args.spec_dir
-    else:
-        master_spec_dir = create_master_spec_dir(args.project_dir, args.task)
-
-    logger.info(
-        f"Multi-repo orchestration: {len(repos)} repos, spec dir: {master_spec_dir}"
-    )
-    for repo_info in repos:
-        logger.info(f"  - {repo_info['repo']} @ {repo_info['repo_path']}")
-
-    # Run orchestration
-    orchestrator = MultiRepoOrchestrator(
-        master_spec_dir=master_spec_dir,
-        project_dir=args.project_dir,
-        repos=repos,
-        task_description=args.task,
-        model=args.model,
-        thinking_level=args.thinking_level,
-        fail_fast=args.fail_fast,
-    )
-
-    success = asyncio.run(orchestrator.run())
-    return 0 if success else 1
 
 
 if __name__ == "__main__":

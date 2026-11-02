@@ -27,6 +27,8 @@ import {
 } from "../../lib/kanban-filter";
 import { cn } from "../../lib/utils";
 import { useKanbanFilterStore } from "../../stores/kanban-filter-store";
+import { useProjectStore } from "../../stores/project-store";
+import { MultiRepoButton } from "../multi-repo/MultiRepoButton";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
@@ -129,6 +131,7 @@ export function KanbanToolbar({ projectPath }: KanbanToolbarProps) {
 	const deleteView = useKanbanFilterStore((s) => s.deleteView);
 	const [viewName, setViewName] = useState("");
 	const serverProject = useSelectedServerProject();
+	const projectId = useProjectStore((s) => s.selectedProjectId);
 
 	const count = activeFilterCount(filters);
 	const filtersActive = hasActiveFilters(filters);
@@ -388,6 +391,15 @@ export function KanbanToolbar({ projectPath }: KanbanToolbarProps) {
 			</Popover>
 
 			<Separator orientation="vertical" className="h-5" />
+
+			{/* A change across several repositories: one card per repository,
+			    run on this computer, so not on a server board. */}
+			{!serverProject && projectId && (
+				<>
+					<MultiRepoButton projectId={projectId} />
+					<Separator orientation="vertical" className="h-5" />
+				</>
+			)}
 
 			{/* Quick Commands run on this computer: a server board has its notice
 			    instead, until commands run on the server. */}
