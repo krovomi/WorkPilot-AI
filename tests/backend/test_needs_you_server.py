@@ -751,12 +751,14 @@ class TestRoutes:
             == 403
         )
         assert client.post("/users/me/needs-you/channels/teams/test").status_code == 403
-        assert client.delete("/users/me/needs-you/channels/teams").status_code == 200
+        deleted = client.delete("/users/me/needs-you/channels/teams")
+        assert deleted.status_code == 200
 
     def test_reading_needs_task_read(self, make_client):
         client = make_client(frozenset())
         assert client.get("/users/me/needs-you").status_code == 403
-        assert client.delete("/users/me/needs-you/channels/teams").status_code == 403
+        deleted = client.delete("/users/me/needs-you/channels/teams")
+        assert deleted.status_code == 403
         assert client.put("/users/me/needs-you/preferences", json={}).status_code == 403
 
     def test_test_is_off_when_the_server_is(self, make_client):
@@ -788,7 +790,8 @@ class TestRoutes:
         assert (
             client.put("/users/me/needs-you/channels/slack", json={}).status_code == 422
         )
-        assert client.delete("/users/me/needs-you/channels/slack").status_code == 404
+        deleted = client.delete("/users/me/needs-you/channels/slack")
+        assert deleted.status_code == 404
         assert (
             client.put(
                 "/users/me/needs-you/preferences", json={"events": {"merged": True}}
@@ -806,9 +809,8 @@ class TestRoutes:
         assert second.get("/users/me/needs-you").json()["channels"]["telegram"] == {
             "configured": False
         }
-        assert second.delete("/users/me/needs-you/channels/telegram").json() == {
-            "deleted": False
-        }
+        deleted = second.delete("/users/me/needs-you/channels/telegram")
+        assert deleted.json() == {"deleted": False}
 
     def test_the_route_is_mounted_in_server_mode(self):
         source = (_BACKEND / "server" / "integration.py").read_text(encoding="utf-8")
