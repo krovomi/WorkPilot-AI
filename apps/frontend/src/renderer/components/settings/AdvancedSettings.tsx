@@ -27,6 +27,7 @@ import { Progress } from "../ui/progress";
 import { Switch } from "../ui/switch";
 import { NeedsYouChannels } from "./NeedsYouChannels";
 import { SettingsSection } from "./SettingsSection";
+import { formatAppDate } from "@/lib/date-format";
 
 /**
  * Release notes renderer that handles both HTML and markdown input.
@@ -338,7 +339,7 @@ export function AdvancedSettings({
 									{appUpdateInfo?.releaseDate && (
 										<p className="text-xs text-muted-foreground mt-1">
 											{t("updates.released")}{" "}
-											{new Date(appUpdateInfo.releaseDate).toLocaleDateString()}
+											{formatAppDate(appUpdateInfo.releaseDate)}
 										</p>
 									)}
 								</div>
@@ -521,9 +522,7 @@ export function AdvancedSettings({
 									{stableDowngradeInfo.releaseDate && (
 										<p className="text-xs text-muted-foreground mt-1">
 											{t("updates.released")}{" "}
-											{new Date(
-												stableDowngradeInfo.releaseDate,
-											).toLocaleDateString()}
+											{formatAppDate(stableDowngradeInfo.releaseDate)}
 										</p>
 									)}
 								</div>

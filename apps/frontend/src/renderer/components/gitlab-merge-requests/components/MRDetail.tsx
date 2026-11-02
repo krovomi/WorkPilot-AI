@@ -33,6 +33,7 @@ import type {
 	GitLabMRReviewResult,
 } from "../hooks/useGitLabMRs";
 import { ReviewFindings } from "./ReviewFindings";
+import { formatAppDate } from "@/lib/date-format";
 
 interface MRDetailProps {
 	projectId?: string;
@@ -52,7 +53,7 @@ interface MRDetailProps {
 }
 
 function formatDate(dateString: string): string {
-	return new Date(dateString).toLocaleDateString("en-US", {
+	return formatAppDate(dateString, {
 		month: "short",
 		day: "numeric",
 		year: "numeric",

@@ -108,6 +108,7 @@ import { ModelDownloadChip } from "./ModelDownloadChip";
 import { TaskPhaseBar } from "./TaskPhaseBar";
 import { buildPhaseSubSteps } from "./task-log-substep";
 import { translateLogMessage } from "./translateLogMessage";
+import { formatAppDateTime } from "@/lib/date-format";
 
 interface TaskLogsProps {
 	task: Task;
@@ -2245,8 +2246,7 @@ function LogEntry({ entry, query = "" }: LogEntryProps) {
 	const formatTime = (timestamp: string) => {
 		try {
 			const date = new Date(timestamp);
-			// Use system locale for date and time formatting
-			return date.toLocaleString();
+			return formatAppDateTime(date);
 		} catch {
 			return "";
 		}

@@ -166,11 +166,12 @@ export function OAuthStep({ onNext, onBack, onSkip }: OAuthStepProps) {
 						authResult.data,
 					);
 				} else {
-					alert(
-						t("oauth.alerts.profileCreatedAuthFailed", {
+					toast({
+						variant: "destructive",
+						title: t("oauth.alerts.profileCreatedAuthFailed", {
 							error: authResult.error || t("oauth.toast.tryAgain"),
 						}),
-					);
+					});
 				}
 			}
 		} catch (err) {
@@ -285,11 +286,12 @@ export function OAuthStep({ onNext, onBack, onSkip }: OAuthStepProps) {
 				await globalThis.electronAPI.authenticateClaudeProfile(profileId);
 
 			if (!result.success || !result.data) {
-				alert(
-					t("oauth.alerts.authPrepareFailed", {
+				toast({
+					variant: "destructive",
+					title: t("oauth.alerts.authPrepareFailed", {
 						error: result.error || t("oauth.toast.tryAgain"),
 					}),
-				);
+				});
 				setAuthenticatingProfileId(null);
 				return;
 			}
@@ -307,7 +309,10 @@ export function OAuthStep({ onNext, onBack, onSkip }: OAuthStepProps) {
 			setError(
 				err instanceof Error ? err.message : "Failed to authenticate profile",
 			);
-			alert(t("oauth.alerts.authStartFailedMessage"));
+			toast({
+				variant: "destructive",
+				title: t("oauth.alerts.authStartFailedMessage"),
+			});
 			setAuthenticatingProfileId(null);
 		}
 	};
