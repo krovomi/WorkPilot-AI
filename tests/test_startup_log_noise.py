@@ -15,7 +15,7 @@ def test_importing_the_cli_package_does_not_load_cli_main():
             sys.executable,
             "-c",
             "import sys, cli; assert 'cli.main' not in sys.modules; "
-            "from cli import main; assert callable(main)",
+            + "from cli import main; assert callable(main)",
         ],
         cwd=BACKEND,
         capture_output=True,
