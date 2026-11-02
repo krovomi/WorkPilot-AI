@@ -31,7 +31,6 @@ _AGENT_MODULES = [
     "agents.base_agent",
     "agents.coder",
     "agents.debugger",
-    "agents.decision_logger",
     "agents.documenter",
     "agents.feedback_learning",
     "agents.memory",
@@ -175,18 +174,6 @@ def test_enum_well_formed(module_name: str, enum_name: str) -> None:
 
 # ---------------------------------------------------------------------------
 # Stateless helper classes — constructor smoke
-
-
-def test_decision_logger_constructs(tmp_path) -> None:
-    from agents.decision_logger import AgentDecisionLogger
-
-    logger = AgentDecisionLogger(
-        spec_dir=tmp_path,
-        agent_type="planner",
-        session_id="sess-1",
-        emit_events=False,
-    )
-    assert logger is not None
 
 
 def test_debugger_registry_constructs() -> None:

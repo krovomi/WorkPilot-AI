@@ -23,7 +23,6 @@ apps/backend/agents/
 ├── hot_swap.py              # Switch provider / model / effort during a running phase
 ├── loop_detection.py        # Anti-burnout loop detector for the coder
 ├── debugger.py, debugger_store.py   # Breakpoints, inspection, persisted debug state
-├── decision_logger.py       # Decision-tree capture for the UI
 ├── agent_audit.py           # Audit-trail facade for coder / planner / QA
 ├── feedback_learning.py     # Collect user feedback on agent outputs
 ├── feature_wiring.py        # Wiring of the model router / cognitive context features

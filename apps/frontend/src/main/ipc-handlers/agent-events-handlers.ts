@@ -499,18 +499,6 @@ export function registerAgenteventsHandlers(
 			return;
 		}
 
-		// Forward decision log entries directly to renderer without going through XState (Feature 30)
-		if (event.type === "DECISION_LOG_ENTRY") {
-			safeSendToRenderer(
-				getMainWindow,
-				IPC_CHANNELS.AGENT_DECISION_LOG_ENTRY,
-				taskId,
-				event.entry,
-				projectId,
-			);
-			return; // Skip XState processing — decision entries are not state transitions
-		}
-
 		// An MCP App view a tool call kept: the task panel lists it; not a state.
 		if (event.type === "MCP_APP_VIEW") {
 			const view = parseMcpAppViewEvent(event);

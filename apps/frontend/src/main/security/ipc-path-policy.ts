@@ -22,8 +22,6 @@ import { resolveInProject } from "./renderer-path";
 
 /** Channel → positions (after the event) of its directory arguments. */
 export const DIRECTORY_ARGS: Readonly<Record<string, readonly number[]>> = {
-	"agentDecision:clearLog": [0],
-	"agentDecision:getLog": [0],
 	"analyses:sharedReport": [1],
 	"apiExplorer:probeLiveSpec": [0],
 	"apiExplorer:scanRoutes": [0],
