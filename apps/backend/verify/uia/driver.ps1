@@ -11,6 +11,11 @@
 $ErrorActionPreference = 'Stop'
 [Console]::InputEncoding = New-Object System.Text.UTF8Encoding $false
 [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false
+# Alive: what follows (loading UI Automation, compiling the C# below) took
+# more than a minute on a cold Windows machine. verify/window.py gives the
+# start its own budget once it reads this line.
+[Console]::Out.WriteLine('{"starting":true}')
+[Console]::Out.Flush()
 
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes, WindowsBase, System.Drawing, System.Web.Extensions
 
