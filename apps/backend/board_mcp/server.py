@@ -128,11 +128,16 @@ def card_dir(root: Path, card_id: Any) -> Path | None:
     """The card's directory, or None for an id that is not one of this board's."""
     if not isinstance(card_id, str) or not CARD_ID.match(card_id):
         return None
-    specs = (root / SPECS).resolve()
-    path = (specs / card_id).resolve()
-    if path.parent != specs or not path.is_dir():
+    # realpath, then a prefix check on the result: the id comes from an MCP
+    # client (over HTTP in server mode), and links are followed before the
+    # check, so a card directory linked elsewhere is not one of this board's.
+    specs = os.path.realpath(root / SPECS)
+    candidate = os.path.realpath(os.path.join(specs, card_id))
+    if not candidate.startswith(specs + os.sep):
         return None
-    return path
+    if os.path.dirname(candidate) != specs or not os.path.isdir(candidate):
+        return None
+    return Path(candidate)
 
 
 def _clip(value: Any, limit: int) -> str:
