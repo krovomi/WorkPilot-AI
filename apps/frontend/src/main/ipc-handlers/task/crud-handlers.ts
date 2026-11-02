@@ -45,6 +45,7 @@ import { findTaskWorktree, isPathWithinBase } from "../../worktree-paths";
 import { inlineAzureDevOpsImages } from "../shared/azure-attachments";
 import { stripHtml } from "../shared/sanitize";
 import { findTaskAndProject } from "./shared";
+import { discardDescriptionDerivedFiles, specIsStale } from "./stale-spec";
 import { resolveUnder } from "../../security/renderer-path";
 
 /** Charge le PAT et l'URL d'organisation Azure DevOps depuis le `.env` projet. */
@@ -1069,9 +1070,13 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 					specDir,
 					AUTO_BUILD_PATHS.IMPLEMENTATION_PLAN,
 				);
+				let previousDescription: string | undefined = task.description;
 				try {
 					const planContent = readFileSync(planPath, "utf-8");
 					const plan = JSON.parse(planContent);
+					if (typeof plan.description === "string") {
+						previousDescription = plan.description;
+					}
 
 					if (finalTitle !== undefined) {
 						plan.feature = finalTitle;
@@ -1090,6 +1095,15 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 							planErr,
 						);
 					}
+				}
+
+				// A new description on a task that has not run yet: the spec
+				// written for the old one would still drive it (stale-spec.ts).
+				if (
+					descriptionProvided &&
+					specIsStale(task.status, previousDescription, aiDescription ?? "")
+				) {
+					discardDescriptionDerivedFiles(specDir);
 				}
 
 				// Update spec.md if it exists
