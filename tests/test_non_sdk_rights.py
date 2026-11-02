@@ -133,7 +133,8 @@ class TestTheBridgeOffersWhatTheTypeIsGiven:
                 "name": "x",
                 "type": "command",
                 "command": "npx",
-                "env": {"A": "b"},
+                # `env` is allowed, but not a variable that loads code.
+                "env": {"NODE_OPTIONS": "--require /tmp/evil.js"},
             },
             {"id": "x", "type": "http", "url": "http://x"},
         ],

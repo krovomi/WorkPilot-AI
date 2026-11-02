@@ -89,10 +89,6 @@ export const GENERIC_INVOKE_CHANNELS = [
 	IPC_CHANNELS.LIVE_COMPANION_DECLINE_TAKEOVER,
 	// MCP marketplace (mcp-marketplace-store)
 	IPC_CHANNELS.MCP_MARKETPLACE_GET_CATALOG,
-	IPC_CHANNELS.MCP_MARKETPLACE_GET_INSTALLED,
-	IPC_CHANNELS.MCP_MARKETPLACE_INSTALL,
-	IPC_CHANNELS.MCP_MARKETPLACE_UNINSTALL,
-	IPC_CHANNELS.MCP_MARKETPLACE_TOGGLE_SERVER,
 	IPC_CHANNELS.MCP_MARKETPLACE_GET_BUILDER_PROJECTS,
 	IPC_CHANNELS.MCP_MARKETPLACE_SAVE_BUILDER,
 	IPC_CHANNELS.MCP_MARKETPLACE_DELETE_BUILDER,
@@ -101,7 +97,6 @@ export const GENERIC_INVOKE_CHANNELS = [
 	"pluginMarketplace:getInstalled",
 	"pluginMarketplace:install",
 	"pluginMarketplace:uninstall",
-	"pluginMarketplace:toggle",
 	"pluginMarketplace:create",
 	"pluginMarketplace:openLocalFolder",
 	// Spec approval (spec-approval-store)
