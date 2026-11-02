@@ -7,6 +7,7 @@ import {
 	useCICDTriggersStore,
 } from "../../stores/cicd-triggers-store";
 import { useProjectStore } from "../../stores/project-store";
+import { formatAppDateTime } from "@/lib/date-format";
 
 const PROVIDERS: Exclude<CICDProvider, "">[] = [
 	"github",
@@ -273,7 +274,7 @@ export function CICDTriggersDashboard(): React.ReactElement {
 													defaultValue: run.provider,
 												})}
 												{" · "}
-												{new Date(run.triggered_at).toLocaleString()}
+												{formatAppDateTime(run.triggered_at)}
 											</div>
 											{run.pr_url && (
 												<div className="text-xs font-mono opacity-70 mt-1 break-all">

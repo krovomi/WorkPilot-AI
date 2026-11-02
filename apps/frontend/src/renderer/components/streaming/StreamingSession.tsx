@@ -31,6 +31,7 @@ import { Card } from "../ui/card";
 import { Progress } from "../ui/progress";
 import { ScrollArea } from "../ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
+import { formatAppDateTime, formatAppTime } from "@/lib/date-format";
 
 interface StreamingEvent {
 	event_type: string;
@@ -104,7 +105,7 @@ export function StreamingSession({
 		const { event_type, data, timestamp } = event;
 
 		let content = `Event Type: ${event_type}\n`;
-		content += `Timestamp: ${new Date(timestamp * 1000).toLocaleString()}\n\n`;
+		content += `Timestamp: ${formatAppDateTime(timestamp * 1000)}\n\n`;
 		content += `Data:\n${JSON.stringify(data, null, 2)}`;
 
 		return content;
@@ -594,7 +595,7 @@ export function StreamingSession({
 							{selectedEvent
 								? t("streaming:eventLabel", {
 										type: selectedEvent.event_type,
-										time: new Date(selectedEvent.timestamp * 1000).toLocaleTimeString(),
+										time: formatAppTime(selectedEvent.timestamp * 1000),
 									})
 								: currentFile || t("streaming:codeView.noFile")}
 						</p>
@@ -657,9 +658,7 @@ export function StreamingSession({
 														{msg.author}
 													</span>
 													<span className="text-xs text-muted-foreground">
-														{new Date(
-															msg.timestamp * 1000,
-														).toLocaleTimeString()}
+														{formatAppTime(msg.timestamp * 1000)}
 													</span>
 												</div>
 												<p className="text-sm">{msg.message}</p>
@@ -713,9 +712,7 @@ export function StreamingSession({
 															{event.event_type}
 														</Badge>
 														<span className="text-xs text-muted-foreground">
-															{new Date(
-																event.timestamp * 1000,
-															).toLocaleTimeString()}
+															{formatAppTime(event.timestamp * 1000)}
 														</span>
 														{selectedEvent?.timestamp === event.timestamp &&
 															selectedEvent?.event_type ===

@@ -36,6 +36,7 @@ import {
 	SelectValue,
 } from "./ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+import { formatAppTime } from "@/lib/date-format";
 
 interface CopilotCliStatusBadgeProps {
 	readonly className?: string;
@@ -558,7 +559,7 @@ export function CopilotCliStatusBadge({
 							{lastChecked && (
 								<div className="flex justify-between text-muted-foreground">
 									<span>{t("navigation:copilotCli.lastChecked")}</span>
-									<span>{lastChecked.toLocaleTimeString()}</span>
+									<span>{formatAppTime(lastChecked)}</span>
 								</div>
 							)}
 						</div>
