@@ -2,7 +2,9 @@
  * MCP Server Card
  *
  * Displays a single MCP server in the marketplace catalog grid.
- * Shows name, description, stats, and install/uninstall actions.
+ * Shows name, description, launcher, and install/uninstall actions.
+ * Installing adds the server to the selected project and to the agents
+ * picked in the dialog (see `stores/mcp-marketplace-store.ts`).
  */
 
 import {
@@ -14,21 +16,28 @@ import {
 	Eye,
 	EyeOff,
 	Globe,
+	Info,
 	Loader2,
-	Star,
 	Terminal,
 	Trash2,
 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import {
+	DEFAULT_MCP_AGENTS,
+	localized,
+	missingCatalogVars,
+} from "../../../shared/mcp-catalog/install";
 import type { McpMarketplaceServer } from "../../../shared/types/mcp-marketplace";
 import {
 	installMarketplaceServer,
 	uninstallMarketplaceServer,
 	useMcpMarketplaceStore,
 } from "../../stores/mcp-marketplace-store";
+import { useProjectStore } from "../../stores/project-store";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { Checkbox } from "../ui/checkbox";
 import {
 	Dialog,
 	DialogContent,
@@ -44,57 +53,121 @@ interface McpServerCardProps {
 	readonly server: McpMarketplaceServer;
 }
 
-function formatDownloads(n: number): string {
-	if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-	if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
-	return String(n);
-}
-
 export function McpServerCard({ server }: McpServerCardProps) {
-	const { t } = useTranslation(["common"]);
+	const { t, i18n } = useTranslation(["common"]);
 	const { isServerInstalled, isInstalling } = useMcpMarketplaceStore();
+	const projectId = useProjectStore((state) => state.selectedProjectId);
+	const projectName = useProjectStore(
+		(state) => state.projects.find((p) => p.id === state.selectedProjectId)?.name,
+	);
 
 	const installed = isServerInstalled(server.id);
 	const installing = isInstalling === server.id;
+	const language = i18n.language;
 
 	const [showInstallDialog, setShowInstallDialog] = useState(false);
 	const [showDetails, setShowDetails] = useState(false);
-	const [envVars, setEnvVars] = useState<Record<string, string>>({});
+	const [values, setValues] = useState<Record<string, string>>({});
 	const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
+	const [agents, setAgents] = useState<string[]>([...DEFAULT_MCP_AGENTS]);
 
-	const hasRequiredEnvVars = (server.requiredEnvVars?.length ?? 0) > 0;
+	const requiredVars = server.vars.filter((v) => v.required);
+	const optionalVars = server.vars.filter((v) => !v.required);
 
 	const handleInstallClick = () => {
-		if (hasRequiredEnvVars) {
-			// Initialize env vars with empty values
-			const initial: Record<string, string> = {};
-			server.requiredEnvVars?.forEach((v) => {
-				initial[v.name] = "";
-			});
-			server.optionalEnvVars?.forEach((v) => {
-				initial[v.name] = "";
-			});
-			setEnvVars(initial);
-			setShowInstallDialog(true);
-		} else {
-			installMarketplaceServer(server.id);
-		}
+		setValues({});
+		setAgents([...DEFAULT_MCP_AGENTS]);
+		setShowInstallDialog(true);
 	};
 
 	const handleConfirmInstall = async () => {
-		const success = await installMarketplaceServer(server.id, envVars);
+		if (!projectId) return;
+		const success = await installMarketplaceServer(
+			projectId,
+			server.id,
+			values,
+			agents,
+			language,
+		);
 		if (success) {
 			setShowInstallDialog(false);
 		}
 	};
 
 	const handleUninstall = () => {
-		uninstallMarketplaceServer(server.id);
+		if (projectId) uninstallMarketplaceServer(projectId, server.id);
+	};
+
+	const toggleAgent = (agent: string, checked: boolean) => {
+		setAgents((prev) =>
+			checked ? [...prev, agent] : prev.filter((a) => a !== agent),
+		);
 	};
 
 	const canInstall =
-		!hasRequiredEnvVars ||
-		server.requiredEnvVars?.every((v) => envVars[v.name]?.trim());
+		Boolean(projectId) &&
+		agents.length > 0 &&
+		missingCatalogVars(server, values).length === 0;
+
+	const renderVar = (envVar: McpMarketplaceServer["vars"][number]) => (
+		<div key={envVar.name} className="space-y-1.5">
+			<Label className="text-sm flex items-center gap-1">
+				{envVar.label}
+				{envVar.required && <span className="text-destructive">*</span>}
+			</Label>
+			<p className="text-xs text-muted-foreground">
+				{localized(envVar.description, language)}
+			</p>
+			<div className="flex gap-2">
+				<div className="relative flex-1">
+					<Input
+						type={
+							envVar.secret && !showSecrets[envVar.name] ? "password" : "text"
+						}
+						placeholder={envVar.placeholder}
+						value={values[envVar.name] || ""}
+						onChange={(e) =>
+							setValues((prev) => ({
+								...prev,
+								[envVar.name]: e.target.value,
+							}))
+						}
+						className="h-9 pr-9"
+					/>
+					{envVar.secret && (
+						<button
+							type="button"
+							onClick={() =>
+								setShowSecrets((prev) => ({
+									...prev,
+									[envVar.name]: !prev[envVar.name],
+								}))
+							}
+							className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+						>
+							{showSecrets[envVar.name] ? (
+								<EyeOff className="h-4 w-4" />
+							) : (
+								<Eye className="h-4 w-4" />
+							)}
+						</button>
+					)}
+				</div>
+				{envVar.helpUrl && (
+					<Button
+						variant="outline"
+						size="icon"
+						className="h-9 w-9 shrink-0"
+						asChild
+					>
+						<a href={envVar.helpUrl} target="_blank" rel="noopener noreferrer">
+							<ExternalLink className="h-4 w-4" />
+						</a>
+					</Button>
+				)}
+			</div>
+		</div>
+	);
 
 	return (
 		<>
@@ -119,36 +192,36 @@ export function McpServerCard({ server }: McpServerCardProps) {
 								<h3 className="font-semibold text-sm truncate">
 									{server.name}
 								</h3>
-								{server.verified && (
+								{server.official && (
 									<BadgeCheck className="h-4 w-4 text-blue-500 shrink-0" />
 								)}
 							</div>
-							<p className="text-xs text-muted-foreground truncate mt-0.5">
-								{server.tagline}
+							<p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+								{localized(server.tagline, language)}
 							</p>
 						</div>
 					</div>
 
-					{/* Stats row */}
+					{/* Launcher row */}
 					<div className="flex items-center gap-3 text-xs text-muted-foreground mb-3">
-						<span className="flex items-center gap-1">
-							<Download className="h-3 w-3" />
-							{formatDownloads(server.downloads)}
-						</span>
-						<span className="flex items-center gap-1">
-							<Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-							{server.rating.toFixed(1)}
-						</span>
 						<span className="flex items-center gap-1">
 							{server.transport === "stdio" ? (
 								<Terminal className="h-3 w-3" />
 							) : (
 								<Globe className="h-3 w-3" />
 							)}
-							{server.transport}
+							{server.transport === "stdio" ? server.command : server.transport}
 						</span>
-						<span className="ml-auto text-[10px] opacity-60">
-							v{server.version}
+						<Badge
+							variant={server.official ? "secondary" : "outline"}
+							className="text-[10px] px-1.5 py-0"
+						>
+							{server.official
+								? t("mcpMarketplace.official")
+								: t("mcpMarketplace.community")}
+						</Badge>
+						<span className="ml-auto text-[10px] opacity-60 truncate max-w-[45%]">
+							{server.package}
 						</span>
 					</div>
 
@@ -188,7 +261,13 @@ export function McpServerCard({ server }: McpServerCardProps) {
 
 					{showDetails && (
 						<div className="text-xs text-muted-foreground mb-3 space-y-2">
-							<p>{server.description}</p>
+							<p>{localized(server.description, language)}</p>
+							{server.requires && (
+								<p className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
+									<Info className="h-3 w-3 shrink-0" />
+									{t(`mcpMarketplace.requires.${server.requires}`)}
+								</p>
+							)}
 							<div className="flex flex-wrap gap-1">
 								{server.tags.map((tag) => (
 									<span
@@ -199,13 +278,13 @@ export function McpServerCard({ server }: McpServerCardProps) {
 									</span>
 								))}
 							</div>
-							{server.requiredEnvVars && server.requiredEnvVars.length > 0 && (
+							{requiredVars.length > 0 && (
 								<div>
 									<span className="font-medium text-foreground">
 										{t("mcpMarketplace.requiredConfig")}:
 									</span>
 									<ul className="list-disc list-inside mt-1">
-										{server.requiredEnvVars.map((v) => (
+										{requiredVars.map((v) => (
 											<li key={v.name}>{v.label}</li>
 										))}
 									</ul>
@@ -248,7 +327,8 @@ export function McpServerCard({ server }: McpServerCardProps) {
 							<Button
 								className="w-full h-8 text-xs"
 								onClick={handleInstallClick}
-								disabled={installing}
+								disabled={installing || !projectId}
+								title={projectId ? undefined : t("mcpMarketplace.noProject")}
 							>
 								{installing ? (
 									<>
@@ -281,105 +361,60 @@ export function McpServerCard({ server }: McpServerCardProps) {
 							{t("mcpMarketplace.installDialog.title", { name: server.name })}
 						</DialogTitle>
 						<DialogDescription>
-							{t("mcpMarketplace.installDialog.description")}
+							{t("mcpMarketplace.installDialog.description", {
+								project: projectName ?? "",
+							})}
 						</DialogDescription>
 					</DialogHeader>
 
-					<div className="space-y-4 py-2">
-						{/* Required env vars */}
-						{server.requiredEnvVars?.map((envVar) => (
-							<div key={envVar.name} className="space-y-1.5">
-								<Label className="text-sm flex items-center gap-1">
-									{envVar.label}
-									{envVar.required && (
-										<span className="text-destructive">*</span>
-									)}
-								</Label>
-								<p className="text-xs text-muted-foreground">
-									{envVar.description}
-								</p>
-								<div className="flex gap-2">
-									<div className="relative flex-1">
-										<Input
-											type={
-												envVar.secret && !showSecrets[envVar.name]
-													? "password"
-													: "text"
-											}
-											placeholder={envVar.placeholder}
-											value={envVars[envVar.name] || ""}
-											onChange={(e) =>
-												setEnvVars((prev) => ({
-													...prev,
-													[envVar.name]: e.target.value,
-												}))
-											}
-											className="h-9 pr-9"
-										/>
-										{envVar.secret && (
-											<button
-												type="button"
-												onClick={() =>
-													setShowSecrets((prev) => ({
-														...prev,
-														[envVar.name]: !prev[envVar.name],
-													}))
-												}
-												className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-											>
-												{showSecrets[envVar.name] ? (
-													<EyeOff className="h-4 w-4" />
-												) : (
-													<Eye className="h-4 w-4" />
-												)}
-											</button>
-										)}
-									</div>
-									{envVar.helpUrl && (
-										<Button
-											variant="outline"
-											size="icon"
-											className="h-9 w-9 shrink-0"
-											asChild
-										>
-											<a
-												href={envVar.helpUrl}
-												target="_blank"
-												rel="noopener noreferrer"
-											>
-												<ExternalLink className="h-4 w-4" />
-											</a>
-										</Button>
-									)}
-								</div>
-							</div>
-						))}
+					<div className="space-y-4 py-2 max-h-[60vh] overflow-y-auto">
+						{server.requires && (
+							<p className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+								<Info className="h-3.5 w-3.5 shrink-0" />
+								{t(`mcpMarketplace.requires.${server.requires}`)}
+							</p>
+						)}
 
-						{/* Optional env vars */}
-						{server.optionalEnvVars && server.optionalEnvVars.length > 0 && (
+						{requiredVars.map(renderVar)}
+
+						{optionalVars.length > 0 && (
 							<>
 								<div className="text-xs font-medium text-muted-foreground uppercase tracking-wider pt-2">
 									{t("mcpMarketplace.installDialog.optional")}
 								</div>
-								{server.optionalEnvVars.map((envVar) => (
-									<div key={envVar.name} className="space-y-1.5">
-										<Label className="text-sm">{envVar.label}</Label>
-										<Input
-											type={envVar.secret ? "password" : "text"}
-											placeholder={envVar.placeholder}
-											value={envVars[envVar.name] || ""}
-											onChange={(e) =>
-												setEnvVars((prev) => ({
-													...prev,
-													[envVar.name]: e.target.value,
-												}))
-											}
-											className="h-9"
-										/>
-									</div>
-								))}
+								{optionalVars.map(renderVar)}
 							</>
 						)}
+
+						<div className="space-y-2 pt-2">
+							<Label className="text-sm">
+								{t("mcpMarketplace.installDialog.agents")}
+							</Label>
+							<div className="flex flex-wrap gap-4">
+								{DEFAULT_MCP_AGENTS.map((agent) => (
+									<div key={agent} className="flex items-center gap-2">
+										<Checkbox
+											id={`mcp-agent-${server.id}-${agent}`}
+											checked={agents.includes(agent)}
+											onCheckedChange={(checked) =>
+												toggleAgent(agent, checked === true)
+											}
+										/>
+										<Label
+											htmlFor={`mcp-agent-${server.id}-${agent}`}
+											className="text-sm font-normal cursor-pointer"
+										>
+											{t(`mcpMarketplace.agents.${agent}`)}
+										</Label>
+									</div>
+								))}
+							</div>
+							<p className="text-xs text-muted-foreground">
+								{agents.length === 0
+									? t("mcpMarketplace.installDialog.noAgent")
+									: t("mcpMarketplace.installDialog.agentsHint")}
+							</p>
+						</div>
 					</div>
 
 					<DialogFooter>
