@@ -24,7 +24,7 @@ ccstatusline Configuration:
         "widgets": [
             {
                 "type": "custom_command",
-                "command": "python /path/to/auto-claude/statusline.py",
+                "command": "python /path/to/WorkPilot-AI/apps/backend/ui/statusline.py",
                 "refresh": 5000
             }
         ]

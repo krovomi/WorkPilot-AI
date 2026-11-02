@@ -4,7 +4,7 @@ In-memory session manager for multi-user collaborative coding rooms.
 Handles participant join/leave, operation broadcast (edits, cursor moves,
 chat), and replay of recent history for late joiners.
 
-Different from `agents/pair_programming.py` which is a single-user
+Different from `runners/pair_programming_runner.py`, a single-user
 interactive session with an LLM (the AI proposes, the user approves).
 This module is **multi-user**: several humans + optionally an AI all
 talking to the same room, each operation broadcast to every other
