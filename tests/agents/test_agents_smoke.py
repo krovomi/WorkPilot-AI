@@ -28,21 +28,17 @@ import pytest
 
 _AGENT_MODULES = [
     "agents.base",
-    "agents.base_agent",
     "agents.coder",
     "agents.debugger",
     "agents.decision_logger",
     "agents.documenter",
     "agents.feedback_learning",
-    "agents.memory",
     "agents.memory_manager",
-    "agents.pair_programming",
     "agents.planner",
     "agents.pr_template_filler",
     "agents.refactorer",
     "agents.scanner_base",
     "agents.session",
-    "agents.session_history",
     "agents.utils",
 ]
 
