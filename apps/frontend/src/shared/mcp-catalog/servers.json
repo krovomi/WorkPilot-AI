@@ -1,0 +1,2163 @@
+{
+	"$comment": "MCP Marketplace catalog. Every package and URL was checked against npm, PyPI or the vendor's docs on 2026-11-02. ${NAME} in args, url or headers is replaced by the value the user types for the variable NAME; a variable no placeholder names goes to the server's environment. Generated entries must pass core.client._validate_custom_mcp_server (tests/test_mcp_catalog.py).",
+	"servers": [
+		{
+			"id": "github",
+			"name": "GitHub",
+			"tagline": {
+				"en": "Repositories, issues, pull requests and Actions (official remote server)",
+				"fr": "Dépôts, issues, pull requests et Actions (serveur distant officiel)"
+			},
+			"description": {
+				"en": "GitHub's official MCP server, hosted by GitHub. Agents browse code, read and open issues and pull requests, follow workflow runs and review changes. Authenticates with a personal access token.",
+				"fr": "Le serveur MCP officiel de GitHub, hébergé par GitHub. Les agents parcourent le code, lisent et ouvrent des issues et des pull requests, suivent les workflows et relisent les changements. S'authentifie avec un jeton d'accès personnel."
+			},
+			"author": "GitHub",
+			"official": true,
+			"category": "version-control",
+			"color": "#24292e",
+			"package": "https://api.githubcopilot.com/mcp/",
+			"transport": "http",
+			"url": "https://api.githubcopilot.com/mcp/",
+			"headers": {
+				"Authorization": "Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN}"
+			},
+			"vars": [
+				{
+					"name": "GITHUB_PERSONAL_ACCESS_TOKEN",
+					"label": "GitHub token",
+					"description": {
+						"en": "Personal access token (fine-grained or classic with repo scope).",
+						"fr": "Jeton d'accès personnel (fine-grained, ou classique avec le scope repo)."
+					},
+					"required": true,
+					"secret": true,
+					"placeholder": "github_pat_…",
+					"helpUrl": "https://github.com/settings/personal-access-tokens"
+				}
+			],
+			"tools": [
+				{
+					"name": "search_code",
+					"description": "Search code across repositories"
+				},
+				{
+					"name": "get_file_contents",
+					"description": "Read a file or directory"
+				},
+				{
+					"name": "list_issues",
+					"description": "List issues"
+				},
+				{
+					"name": "create_issue",
+					"description": "Open an issue"
+				},
+				{
+					"name": "create_pull_request",
+					"description": "Open a pull request"
+				},
+				{
+					"name": "list_workflow_runs",
+					"description": "List GitHub Actions runs"
+				}
+			],
+			"tags": [
+				"github",
+				"git",
+				"issues",
+				"pull-requests",
+				"actions"
+			],
+			"homepage": "https://github.com/github/github-mcp-server"
+		},
+		{
+			"id": "gitlab",
+			"name": "GitLab",
+			"tagline": {
+				"en": "Projects, issues, merge requests and pipelines on gitlab.com or self-hosted",
+				"fr": "Projets, issues, merge requests et pipelines sur gitlab.com ou auto-hébergé"
+			},
+			"description": {
+				"en": "The most complete GitLab MCP server: projects, files, issues, merge requests, discussions and CI/CD pipelines. Works with gitlab.com and self-managed instances.",
+				"fr": "Le serveur MCP GitLab le plus complet : projets, fichiers, issues, merge requests, discussions et pipelines CI/CD. Fonctionne avec gitlab.com et les instances auto-hébergées."
+			},
+			"author": "zereight (community)",
+			"official": false,
+			"category": "version-control",
+			"color": "#FC6D26",
+			"package": "@zereight/mcp-gitlab",
+			"transport": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"@zereight/mcp-gitlab"
+			],
+			"vars": [
+				{
+					"name": "GITLAB_PERSONAL_ACCESS_TOKEN",
+					"label": "GitLab token",
+					"description": {
+						"en": "Personal access token with the api scope.",
+						"fr": "Jeton d'accès personnel avec le scope api."
+					},
+					"required": true,
+					"secret": true,
+					"placeholder": "glpat-…",
+					"helpUrl": "https://gitlab.com/-/user_settings/personal_access_tokens"
+				},
+				{
+					"name": "GITLAB_API_URL",
+					"label": "API URL",
+					"description": {
+						"en": "Only for a self-managed instance, e.g. https://gitlab.example.com/api/v4.",
+						"fr": "Seulement pour une instance auto-hébergée, par ex. https://gitlab.example.com/api/v4."
+					},
+					"required": false,
+					"secret": false,
+					"placeholder": "https://gitlab.com/api/v4"
+				}
+			],
+			"tools": [
+				{
+					"name": "get_merge_request",
+					"description": "Read a merge request"
+				},
+				{
+					"name": "create_merge_request",
+					"description": "Open a merge request"
+				},
+				{
+					"name": "list_issues",
+					"description": "List issues"
+				},
+				{
+					"name": "list_pipelines",
+					"description": "List CI/CD pipelines"
+				},
+				{
+					"name": "get_file_contents",
+					"description": "Read a file"
+				}
+			],
+			"tags": [
+				"gitlab",
+				"git",
+				"merge-requests",
+				"ci"
+			],
+			"homepage": "https://github.com/zereight/gitlab-mcp"
+		},
+		{
+			"id": "git",
+			"name": "Git",
+			"tagline": {
+				"en": "Read history, diffs, branches and blame of a local repository",
+				"fr": "Lire l'historique, les diffs, les branches et le blame d'un dépôt local"
+			},
+			"description": {
+				"en": "Reference MCP server for Git. Gives agents structured access to log, diff, show, branches and staging of a local repository. Needs uv (uvx).",
+				"fr": "Serveur MCP de référence pour Git. Donne aux agents un accès structuré au log, aux diffs, aux branches et à l'index d'un dépôt local. Nécessite uv (uvx)."
+			},
+			"author": "Model Context Protocol",
+			"official": true,
+			"category": "version-control",
+			"color": "#F05032",
+			"package": "mcp-server-git",
+			"transport": "stdio",
+			"command": "uvx",
+			"args": [
+				"mcp-server-git"
+			],
+			"vars": [],
+			"tools": [
+				{
+					"name": "git_log",
+					"description": "Commit history"
+				},
+				{
+					"name": "git_diff",
+					"description": "Diff between revisions"
+				},
+				{
+					"name": "git_show",
+					"description": "Show a commit"
+				},
+				{
+					"name": "git_branch",
+					"description": "List branches"
+				}
+			],
+			"tags": [
+				"git",
+				"history",
+				"diff",
+				"local"
+			],
+			"homepage": "https://github.com/modelcontextprotocol/servers/tree/main/src/git",
+			"requires": "uv"
+		},
+		{
+			"id": "azure-devops",
+			"name": "Azure DevOps",
+			"tagline": {
+				"en": "Work items, repos, pull requests, pipelines and wikis (official)",
+				"fr": "Work items, dépôts, pull requests, pipelines et wikis (officiel)"
+			},
+			"description": {
+				"en": "Microsoft's official Azure DevOps MCP server. Signs in with your Azure CLI session: run `az login` once on this machine.",
+				"fr": "Le serveur MCP officiel de Microsoft pour Azure DevOps. Se connecte avec votre session Azure CLI : lancez `az login` une fois sur cette machine."
+			},
+			"author": "Microsoft",
+			"official": true,
+			"category": "version-control",
+			"color": "#0078D4",
+			"package": "@azure-devops/mcp",
+			"transport": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"@azure-devops/mcp",
+				"${ADO_ORGANIZATION}",
+				"--authentication",
+				"azcli"
+			],
+			"vars": [
+				{
+					"name": "ADO_ORGANIZATION",
+					"label": "Organization",
+					"description": {
+						"en": "Your organization name, as in dev.azure.com/<organization>.",
+						"fr": "Le nom de votre organisation, comme dans dev.azure.com/<organisation>."
+					},
+					"required": true,
+					"secret": false,
+					"placeholder": "contoso"
+				}
+			],
+			"tools": [
+				{
+					"name": "wit_get_work_item",
+					"description": "Read a work item"
+				},
+				{
+					"name": "wit_create_work_item",
+					"description": "Create a work item"
+				},
+				{
+					"name": "repo_list_pull_requests_by_repo",
+					"description": "List pull requests"
+				},
+				{
+					"name": "pipelines_get_builds",
+					"description": "List builds"
+				},
+				{
+					"name": "wiki_get_page_content",
+					"description": "Read a wiki page"
+				}
+			],
+			"tags": [
+				"azure",
+				"devops",
+				"work-items",
+				"pipelines",
+				"microsoft"
+			],
+			"homepage": "https://github.com/microsoft/azure-devops-mcp",
+			"requires": "az"
+		},
+		{
+			"id": "linear",
+			"name": "Linear",
+			"tagline": {
+				"en": "Issues, projects and cycles (official remote server)",
+				"fr": "Issues, projets et cycles (serveur distant officiel)"
+			},
+			"description": {
+				"en": "Linear's official MCP server. Agents find, create and update issues, projects and comments. Use a personal API key; a key with read permission only keeps it read-only.",
+				"fr": "Le serveur MCP officiel de Linear. Les agents cherchent, créent et mettent à jour issues, projets et commentaires. Utilisez une clé d'API personnelle ; une clé en lecture seule le garde en lecture seule."
+			},
+			"author": "Linear",
+			"official": true,
+			"category": "project-management",
+			"color": "#5E6AD2",
+			"package": "https://mcp.linear.app/mcp",
+			"transport": "http",
+			"url": "https://mcp.linear.app/mcp",
+			"headers": {
+				"Authorization": "Bearer ${LINEAR_API_KEY}"
+			},
+			"vars": [
+				{
+					"name": "LINEAR_API_KEY",
+					"label": "Linear API key",
+					"description": {
+						"en": "Personal API key (Settings → Security & access).",
+						"fr": "Clé d'API personnelle (Settings → Security & access)."
+					},
+					"required": true,
+					"secret": true,
+					"placeholder": "lin_api_…",
+					"helpUrl": "https://linear.app/settings/account/security"
+				}
+			],
+			"tools": [
+				{
+					"name": "list_issues",
+					"description": "List issues"
+				},
+				{
+					"name": "get_issue",
+					"description": "Read an issue"
+				},
+				{
+					"name": "create_issue",
+					"description": "Create an issue"
+				},
+				{
+					"name": "update_issue",
+					"description": "Update an issue"
+				},
+				{
+					"name": "list_projects",
+					"description": "List projects"
+				}
+			],
+			"tags": [
+				"linear",
+				"issues",
+				"tickets",
+				"planning"
+			],
+			"homepage": "https://linear.app/docs/mcp"
+		},
+		{
+			"id": "jira",
+			"name": "Jira",
+			"tagline": {
+				"en": "Search, create and update Jira issues (Cloud or Data Center)",
+				"fr": "Chercher, créer et mettre à jour des tickets Jira (Cloud ou Data Center)"
+			},
+			"description": {
+				"en": "Jira through mcp-atlassian, the most used Atlassian MCP server: JQL search, issue creation, transitions, comments and sprints. Needs uv (uvx).",
+				"fr": "Jira via mcp-atlassian, le serveur MCP Atlassian le plus utilisé : recherche JQL, création de tickets, transitions, commentaires et sprints. Nécessite uv (uvx)."
+			},
+			"author": "sooperset (community)",
+			"official": false,
+			"category": "project-management",
+			"color": "#0052CC",
+			"package": "mcp-atlassian",
+			"transport": "stdio",
+			"command": "uvx",
+			"args": [
+				"mcp-atlassian"
+			],
+			"vars": [
+				{
+					"name": "JIRA_URL",
+					"label": "Jira URL",
+					"description": {
+						"en": "Your site, e.g. https://your-company.atlassian.net.",
+						"fr": "Votre site, par ex. https://votre-societe.atlassian.net."
+					},
+					"required": true,
+					"secret": false,
+					"placeholder": "https://your-company.atlassian.net"
+				},
+				{
+					"name": "JIRA_USERNAME",
+					"label": "Email",
+					"description": {
+						"en": "The email of the Atlassian account.",
+						"fr": "L'e-mail du compte Atlassian."
+					},
+					"required": true,
+					"secret": false,
+					"placeholder": "you@company.com"
+				},
+				{
+					"name": "JIRA_API_TOKEN",
+					"label": "API token",
+					"description": {
+						"en": "Atlassian API token.",
+						"fr": "Jeton d'API Atlassian."
+					},
+					"required": true,
+					"secret": true,
+					"helpUrl": "https://id.atlassian.com/manage-profile/security/api-tokens"
+				}
+			],
+			"tools": [
+				{
+					"name": "jira_search",
+					"description": "Search with JQL"
+				},
+				{
+					"name": "jira_get_issue",
+					"description": "Read an issue"
+				},
+				{
+					"name": "jira_create_issue",
+					"description": "Create an issue"
+				},
+				{
+					"name": "jira_transition_issue",
+					"description": "Move an issue to another status"
+				},
+				{
+					"name": "jira_add_comment",
+					"description": "Comment on an issue"
+				}
+			],
+			"tags": [
+				"jira",
+				"atlassian",
+				"tickets",
+				"agile"
+			],
+			"homepage": "https://github.com/sooperset/mcp-atlassian",
+			"requires": "uv"
+		},
+		{
+			"id": "confluence",
+			"name": "Confluence",
+			"tagline": {
+				"en": "Search and read Confluence pages, create and update them",
+				"fr": "Chercher et lire des pages Confluence, les créer et les modifier"
+			},
+			"description": {
+				"en": "Confluence through mcp-atlassian: CQL search, page content, children, comments and page updates. Needs uv (uvx).",
+				"fr": "Confluence via mcp-atlassian : recherche CQL, contenu des pages, sous-pages, commentaires et mise à jour de pages. Nécessite uv (uvx)."
+			},
+			"author": "sooperset (community)",
+			"official": false,
+			"category": "documentation",
+			"color": "#172B4D",
+			"package": "mcp-atlassian",
+			"transport": "stdio",
+			"command": "uvx",
+			"args": [
+				"mcp-atlassian"
+			],
+			"vars": [
+				{
+					"name": "CONFLUENCE_URL",
+					"label": "Confluence URL",
+					"description": {
+						"en": "e.g. https://your-company.atlassian.net/wiki.",
+						"fr": "par ex. https://votre-societe.atlassian.net/wiki."
+					},
+					"required": true,
+					"secret": false,
+					"placeholder": "https://your-company.atlassian.net/wiki"
+				},
+				{
+					"name": "CONFLUENCE_USERNAME",
+					"label": "Email",
+					"description": {
+						"en": "The email of the Atlassian account.",
+						"fr": "L'e-mail du compte Atlassian."
+					},
+					"required": true,
+					"secret": false,
+					"placeholder": "you@company.com"
+				},
+				{
+					"name": "CONFLUENCE_API_TOKEN",
+					"label": "API token",
+					"description": {
+						"en": "Atlassian API token.",
+						"fr": "Jeton d'API Atlassian."
+					},
+					"required": true,
+					"secret": true,
+					"helpUrl": "https://id.atlassian.com/manage-profile/security/api-tokens"
+				}
+			],
+			"tools": [
+				{
+					"name": "confluence_search",
+					"description": "Search with CQL"
+				},
+				{
+					"name": "confluence_get_page",
+					"description": "Read a page"
+				},
+				{
+					"name": "confluence_create_page",
+					"description": "Create a page"
+				},
+				{
+					"name": "confluence_update_page",
+					"description": "Update a page"
+				}
+			],
+			"tags": [
+				"confluence",
+				"atlassian",
+				"wiki",
+				"docs"
+			],
+			"homepage": "https://github.com/sooperset/mcp-atlassian",
+			"requires": "uv"
+		},
+		{
+			"id": "notion",
+			"name": "Notion",
+			"tagline": {
+				"en": "Search, read and edit pages and databases (official)",
+				"fr": "Chercher, lire et modifier pages et bases de données (officiel)"
+			},
+			"description": {
+				"en": "Notion's official MCP server. Share the pages the integration may see from Notion, then agents can search them, read them and add content.",
+				"fr": "Le serveur MCP officiel de Notion. Partagez depuis Notion les pages que l'intégration peut voir ; les agents peuvent alors les chercher, les lire et y ajouter du contenu."
+			},
+			"author": "Notion",
+			"official": true,
+			"category": "documentation",
+			"color": "#000000",
+			"package": "@notionhq/notion-mcp-server",
+			"transport": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"@notionhq/notion-mcp-server"
+			],
+			"vars": [
+				{
+					"name": "NOTION_TOKEN",
+					"label": "Integration token",
+					"description": {
+						"en": "Internal integration secret.",
+						"fr": "Secret d'une intégration interne."
+					},
+					"required": true,
+					"secret": true,
+					"placeholder": "ntn_…",
+					"helpUrl": "https://www.notion.so/profile/integrations"
+				}
+			],
+			"tools": [
+				{
+					"name": "API-post-search",
+					"description": "Search pages and databases"
+				},
+				{
+					"name": "API-retrieve-a-page",
+					"description": "Read a page"
+				},
+				{
+					"name": "API-post-page",
+					"description": "Create a page"
+				},
+				{
+					"name": "API-query-data-source",
+					"description": "Query a database"
+				}
+			],
+			"tags": [
+				"notion",
+				"docs",
+				"wiki",
+				"knowledge"
+			],
+			"homepage": "https://github.com/makenotion/notion-mcp-server"
+		},
+		{
+			"id": "slack",
+			"name": "Slack",
+			"tagline": {
+				"en": "Read channels, threads and search messages",
+				"fr": "Lire canaux et fils, chercher des messages"
+			},
+			"description": {
+				"en": "The most used Slack MCP server: channel history, threads, search and users. Posting stays off unless you enable it on the server side.",
+				"fr": "Le serveur MCP Slack le plus utilisé : historique des canaux, fils, recherche et utilisateurs. L'envoi de messages reste désactivé tant que vous ne l'activez pas côté serveur."
+			},
+			"author": "korotovsky (community)",
+			"official": false,
+			"category": "communication",
+			"color": "#4A154B",
+			"package": "slack-mcp-server",
+			"transport": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"slack-mcp-server@latest",
+				"--transport",
+				"stdio"
+			],
+			"vars": [
+				{
+					"name": "SLACK_MCP_XOXP_TOKEN",
+					"label": "User OAuth token",
+					"description": {
+						"en": "A Slack user token (xoxp-…).",
+						"fr": "Un jeton utilisateur Slack (xoxp-…)."
+					},
+					"required": true,
+					"secret": true,
+					"placeholder": "xoxp-…",
+					"helpUrl": "https://api.slack.com/apps"
+				}
+			],
+			"tools": [
+				{
+					"name": "conversations_history",
+					"description": "Read a channel"
+				},
+				{
+					"name": "conversations_replies",
+					"description": "Read a thread"
+				},
+				{
+					"name": "conversations_search_messages",
+					"description": "Search messages"
+				},
+				{
+					"name": "channels_list",
+					"description": "List channels"
+				}
+			],
+			"tags": [
+				"slack",
+				"chat",
+				"messages"
+			],
+			"homepage": "https://github.com/korotovsky/slack-mcp-server"
+		},
+		{
+			"id": "sentry",
+			"name": "Sentry",
+			"tagline": {
+				"en": "Errors, issues, traces and Seer root-cause analysis (official)",
+				"fr": "Erreurs, issues, traces et analyse de cause par Seer (officiel)"
+			},
+			"description": {
+				"en": "Sentry's official MCP server. Agents read issues and events with their stack traces, search errors and ask Seer for a root cause. Set the host for a self-hosted Sentry.",
+				"fr": "Le serveur MCP officiel de Sentry. Les agents lisent issues et événements avec leur pile d'appels, cherchent des erreurs et demandent une cause à Seer. Renseignez l'hôte pour un Sentry auto-hébergé."
+			},
+			"author": "Sentry",
+			"official": true,
+			"category": "monitoring",
+			"color": "#362D59",
+			"package": "@sentry/mcp-server",
+			"transport": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"@sentry/mcp-server@latest"
+			],
+			"vars": [
+				{
+					"name": "SENTRY_AUTH_TOKEN",
+					"label": "Sentry token",
+					"description": {
+						"en": "User auth token.",
+						"fr": "Jeton d'authentification utilisateur."
+					},
+					"required": true,
+					"secret": true,
+					"placeholder": "sntryu_…",
+					"helpUrl": "https://sentry.io/settings/account/api/auth-tokens/"
+				},
+				{
+					"name": "SENTRY_HOST",
+					"label": "Host",
+					"description": {
+						"en": "Only for self-hosted Sentry, e.g. sentry.example.com.",
+						"fr": "Seulement pour un Sentry auto-hébergé, par ex. sentry.example.com."
+					},
+					"required": false,
+					"secret": false,
+					"placeholder": "sentry.io"
+				}
+			],
+			"tools": [
+				{
+					"name": "search_issues",
+					"description": "Search issues"
+				},
+				{
+					"name": "get_issue_details",
+					"description": "Read an issue and its stack trace"
+				},
+				{
+					"name": "search_events",
+					"description": "Search events"
+				},
+				{
+					"name": "analyze_issue_with_seer",
+					"description": "Root-cause analysis"
+				}
+			],
+			"tags": [
+				"sentry",
+				"errors",
+				"monitoring",
+				"observability"
+			],
+			"homepage": "https://github.com/getsentry/sentry-mcp"
+		},
+		{
+			"id": "datadog",
+			"name": "Datadog",
+			"tagline": {
+				"en": "Logs, metrics, monitors, incidents and traces",
+				"fr": "Logs, métriques, moniteurs, incidents et traces"
+			},
+			"description": {
+				"en": "Datadog MCP server: query logs and metrics, list monitors, incidents, dashboards and APM traces.",
+				"fr": "Serveur MCP Datadog : interroger logs et métriques, lister moniteurs, incidents, dashboards et traces APM."
+			},
+			"author": "winor30 (community)",
+			"official": false,
+			"category": "monitoring",
+			"color": "#632CA6",
+			"package": "@winor30/mcp-server-datadog",
+			"transport": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"@winor30/mcp-server-datadog"
+			],
+			"vars": [
+				{
+					"name": "DATADOG_API_KEY",
+					"label": "API key",
+					"description": {
+						"en": "Datadog API key.",
+						"fr": "Clé d'API Datadog."
+					},
+					"required": true,
+					"secret": true,
+					"helpUrl": "https://app.datadoghq.com/organization-settings/api-keys"
+				},
+				{
+					"name": "DATADOG_APP_KEY",
+					"label": "Application key",
+					"description": {
+						"en": "Datadog application key.",
+						"fr": "Clé d'application Datadog."
+					},
+					"required": true,
+					"secret": true,
+					"helpUrl": "https://app.datadoghq.com/organization-settings/application-keys"
+				},
+				{
+					"name": "DATADOG_SITE",
+					"label": "Site",
+					"description": {
+						"en": "e.g. datadoghq.eu for the EU site.",
+						"fr": "par ex. datadoghq.eu pour le site européen."
+					},
+					"required": false,
+					"secret": false,
+					"placeholder": "datadoghq.com"
+				}
+			],
+			"tools": [
+				{
+					"name": "get_logs",
+					"description": "Search logs"
+				},
+				{
+					"name": "query_metrics",
+					"description": "Query metrics"
+				},
+				{
+					"name": "get_monitors",
+					"description": "List monitors"
+				},
+				{
+					"name": "list_incidents",
+					"description": "List incidents"
+				},
+				{
+					"name": "list_traces",
+					"description": "List APM traces"
+				}
+			],
+			"tags": [
+				"datadog",
+				"logs",
+				"metrics",
+				"apm",
+				"monitoring"
+			],
+			"homepage": "https://github.com/winor30/mcp-server-datadog"
+		},
+		{
+			"id": "figma",
+			"name": "Figma",
+			"tagline": {
+				"en": "Turn Figma frames into layout and style data agents can code from",
+				"fr": "Transformer les frames Figma en données de mise en page et de style à coder"
+			},
+			"description": {
+				"en": "Framelink's Figma MCP server: simplifies a file or frame into layout, styles and components so an agent can implement the design faithfully.",
+				"fr": "Le serveur MCP Figma de Framelink : simplifie un fichier ou une frame en mise en page, styles et composants pour qu'un agent implémente le design fidèlement."
+			},
+			"author": "Framelink (community)",
+			"official": false,
+			"category": "design",
+			"color": "#F24E1E",
+			"package": "figma-developer-mcp",
+			"transport": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"figma-developer-mcp",
+				"--stdio"
+			],
+			"vars": [
+				{
+					"name": "FIGMA_API_KEY",
+					"label": "Figma token",
+					"description": {
+						"en": "Personal access token.",
+						"fr": "Jeton d'accès personnel."
+					},
+					"required": true,
+					"secret": true,
+					"placeholder": "figd_…",
+					"helpUrl": "https://help.figma.com/hc/en-us/articles/8085703771159"
+				}
+			],
+			"tools": [
+				{
+					"name": "get_figma_data",
+					"description": "Layout and styles of a file or node"
+				},
+				{
+					"name": "download_figma_images",
+					"description": "Export images and icons"
+				}
+			],
+			"tags": [
+				"figma",
+				"design",
+				"ui",
+				"design-to-code"
+			],
+			"homepage": "https://github.com/GLips/Figma-Context-MCP"
+		},
+		{
+			"id": "playwright",
+			"name": "Playwright",
+			"tagline": {
+				"en": "Drive a real browser from its accessibility tree (official)",
+				"fr": "Piloter un vrai navigateur via son arbre d'accessibilité (officiel)"
+			},
+			"description": {
+				"en": "Microsoft's Playwright MCP server. Agents open pages, click, type and read the page through its accessibility snapshot, without screenshots. Replaces the deprecated Puppeteer server.",
+				"fr": "Le serveur MCP Playwright de Microsoft. Les agents ouvrent des pages, cliquent, saisissent et lisent la page via son instantané d'accessibilité, sans captures. Remplace le serveur Puppeteer déprécié."
+			},
+			"author": "Microsoft",
+			"official": true,
+			"category": "testing",
+			"color": "#2EAD33",
+			"package": "@playwright/mcp",
+			"transport": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"@playwright/mcp@latest"
+			],
+			"vars": [],
+			"tools": [
+				{
+					"name": "browser_navigate",
+					"description": "Open a URL"
+				},
+				{
+					"name": "browser_snapshot",
+					"description": "Accessibility snapshot of the page"
+				},
+				{
+					"name": "browser_click",
+					"description": "Click an element"
+				},
+				{
+					"name": "browser_type",
+					"description": "Type text"
+				},
+				{
+					"name": "browser_take_screenshot",
+					"description": "Screenshot"
+				}
+			],
+			"tags": [
+				"playwright",
+				"browser",
+				"e2e",
+				"testing",
+				"automation"
+			],
+			"homepage": "https://github.com/microsoft/playwright-mcp"
+		},
+		{
+			"id": "chrome-devtools",
+			"name": "Chrome DevTools",
+			"tagline": {
+				"en": "Performance traces, network, console and DOM of a live Chrome (official)",
+				"fr": "Traces de performance, réseau, console et DOM d'un Chrome en direct (officiel)"
+			},
+			"description": {
+				"en": "The Chrome DevTools team's MCP server. Agents record performance traces, inspect network requests and console messages, and debug a page in a real Chrome.",
+				"fr": "Le serveur MCP de l'équipe Chrome DevTools. Les agents enregistrent des traces de performance, inspectent requêtes réseau et console, et déboguent une page dans un vrai Chrome."
+			},
+			"author": "Google Chrome",
+			"official": true,
+			"category": "testing",
+			"color": "#4285F4",
+			"package": "chrome-devtools-mcp",
+			"transport": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"chrome-devtools-mcp@latest"
+			],
+			"vars": [],
+			"tools": [
+				{
+					"name": "performance_start_trace",
+					"description": "Record a performance trace"
+				},
+				{
+					"name": "list_network_requests",
+					"description": "List network requests"
+				},
+				{
+					"name": "list_console_messages",
+					"description": "Read console messages"
+				},
+				{
+					"name": "take_snapshot",
+					"description": "DOM snapshot"
+				}
+			],
+			"tags": [
+				"chrome",
+				"devtools",
+				"performance",
+				"debugging",
+				"browser"
+			],
+			"homepage": "https://github.com/ChromeDevTools/chrome-devtools-mcp"
+		},
+		{
+			"id": "postman",
+			"name": "Postman",
+			"tagline": {
+				"en": "Workspaces, collections, environments and API specs (official)",
+				"fr": "Espaces, collections, environnements et specs d'API (officiel)"
+			},
+			"description": {
+				"en": "Postman's official MCP server: read and update collections, requests, environments and API specifications in your workspaces.",
+				"fr": "Le serveur MCP officiel de Postman : lire et modifier collections, requêtes, environnements et spécifications d'API de vos espaces."
+			},
+			"author": "Postman",
+			"official": true,
+			"category": "testing",
+			"color": "#FF6C37",
+			"package": "@postman/postman-mcp-server",
+			"transport": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"@postman/postman-mcp-server"
+			],
+			"vars": [
+				{
+					"name": "POSTMAN_API_KEY",
+					"label": "Postman API key",
+					"description": {
+						"en": "Personal API key.",
+						"fr": "Clé d'API personnelle."
+					},
+					"required": true,
+					"secret": true,
+					"placeholder": "PMAK-…",
+					"helpUrl": "https://go.postman.co/settings/me/api-keys"
+				}
+			],
+			"tools": [
+				{
+					"name": "getCollections",
+					"description": "List collections"
+				},
+				{
+					"name": "getCollection",
+					"description": "Read a collection"
+				},
+				{
+					"name": "createCollectionRequest",
+					"description": "Add a request"
+				},
+				{
+					"name": "getEnvironments",
+					"description": "List environments"
+				}
+			],
+			"tags": [
+				"postman",
+				"api",
+				"testing",
+				"collections"
+			],
+			"homepage": "https://github.com/postmanlabs/postman-mcp-server"
+		},
+		{
+			"id": "microsoft-learn",
+			"name": "Microsoft Learn",
+			"tagline": {
+				"en": "Up-to-date .NET, Azure and Microsoft docs and code samples (official, no key)",
+				"fr": "Docs et exemples de code .NET, Azure et Microsoft à jour (officiel, sans clé)"
+			},
+			"description": {
+				"en": "Microsoft's official docs server. Agents search Microsoft Learn and fetch whole pages and code samples, so .NET, C# and Azure answers follow the current documentation. Free, no sign-in.",
+				"fr": "Le serveur de docs officiel de Microsoft. Les agents cherchent dans Microsoft Learn et récupèrent pages entières et exemples de code : les réponses .NET, C# et Azure suivent la documentation actuelle. Gratuit, sans connexion."
+			},
+			"author": "Microsoft",
+			"official": true,
+			"category": "documentation",
+			"color": "#0078D4",
+			"package": "https://learn.microsoft.com/api/mcp",
+			"transport": "http",
+			"url": "https://learn.microsoft.com/api/mcp",
+			"vars": [],
+			"tools": [
+				{
+					"name": "microsoft_docs_search",
+					"description": "Search Microsoft Learn"
+				},
+				{
+					"name": "microsoft_docs_fetch",
+					"description": "Fetch a whole page"
+				},
+				{
+					"name": "microsoft_code_sample_search",
+					"description": "Search code samples"
+				}
+			],
+			"tags": [
+				"microsoft",
+				"dotnet",
+				"csharp",
+				"azure",
+				"docs"
+			],
+			"homepage": "https://learn.microsoft.com/training/support/mcp"
+		},
+		{
+			"id": "deepwiki",
+			"name": "DeepWiki",
+			"tagline": {
+				"en": "Ask questions about any public GitHub repository (no key)",
+				"fr": "Poser des questions sur n'importe quel dépôt GitHub public (sans clé)"
+			},
+			"description": {
+				"en": "DeepWiki answers questions about a public repository from its generated wiki: architecture, where a feature lives, how to use a library. Free, no sign-in.",
+				"fr": "DeepWiki répond aux questions sur un dépôt public à partir de son wiki généré : architecture, où vit une fonctionnalité, comment utiliser une bibliothèque. Gratuit, sans connexion."
+			},
+			"author": "Cognition",
+			"official": true,
+			"category": "documentation",
+			"color": "#0EA5E9",
+			"package": "https://mcp.deepwiki.com/mcp",
+			"transport": "http",
+			"url": "https://mcp.deepwiki.com/mcp",
+			"vars": [],
+			"tools": [
+				{
+					"name": "read_wiki_structure",
+					"description": "Topics of a repository's wiki"
+				},
+				{
+					"name": "read_wiki_contents",
+					"description": "Read the wiki"
+				},
+				{
+					"name": "ask_question",
+					"description": "Ask about a repository"
+				}
+			],
+			"tags": [
+				"github",
+				"docs",
+				"open-source",
+				"knowledge"
+			],
+			"homepage": "https://docs.devin.ai/work-with-devin/deepwiki-mcp"
+		},
+		{
+			"id": "cloudflare-docs",
+			"name": "Cloudflare Docs",
+			"tagline": {
+				"en": "Search Cloudflare's developer documentation (official, no key)",
+				"fr": "Chercher dans la documentation développeur de Cloudflare (officiel, sans clé)"
+			},
+			"description": {
+				"en": "Cloudflare's documentation server: Workers, Pages, R2, D1, KV and the rest of the platform, always current.",
+				"fr": "Le serveur de documentation de Cloudflare : Workers, Pages, R2, D1, KV et le reste de la plateforme, toujours à jour."
+			},
+			"author": "Cloudflare",
+			"official": true,
+			"category": "documentation",
+			"color": "#F38020",
+			"package": "https://docs.mcp.cloudflare.com/mcp",
+			"transport": "http",
+			"url": "https://docs.mcp.cloudflare.com/mcp",
+			"vars": [],
+			"tools": [
+				{
+					"name": "search_cloudflare_documentation",
+					"description": "Search the docs"
+				}
+			],
+			"tags": [
+				"cloudflare",
+				"workers",
+				"docs",
+				"edge"
+			],
+			"homepage": "https://github.com/cloudflare/mcp-server-cloudflare"
+		},
+		{
+			"id": "aws-docs",
+			"name": "AWS Documentation",
+			"tagline": {
+				"en": "Search and read AWS documentation (official, no key)",
+				"fr": "Chercher et lire la documentation AWS (officiel, sans clé)"
+			},
+			"description": {
+				"en": "AWS Labs' documentation server: search the AWS docs, read a page as markdown and get related pages. Needs uv (uvx).",
+				"fr": "Le serveur de documentation d'AWS Labs : chercher dans la doc AWS, lire une page en markdown et obtenir les pages liées. Nécessite uv (uvx)."
+			},
+			"author": "AWS Labs",
+			"official": true,
+			"category": "documentation",
+			"color": "#FF9900",
+			"package": "awslabs.aws-documentation-mcp-server",
+			"transport": "stdio",
+			"command": "uvx",
+			"args": [
+				"awslabs.aws-documentation-mcp-server@latest"
+			],
+			"vars": [],
+			"tools": [
+				{
+					"name": "search_documentation",
+					"description": "Search the docs"
+				},
+				{
+					"name": "read_documentation",
+					"description": "Read a page"
+				},
+				{
+					"name": "recommend",
+					"description": "Related pages"
+				}
+			],
+			"tags": [
+				"aws",
+				"cloud",
+				"docs"
+			],
+			"homepage": "https://github.com/awslabs/mcp/tree/main/src/aws-documentation-mcp-server",
+			"env": {
+				"FASTMCP_LOG_LEVEL": "ERROR"
+			},
+			"requires": "uv"
+		},
+		{
+			"id": "huggingface",
+			"name": "Hugging Face",
+			"tagline": {
+				"en": "Search the Hub for models, datasets, Spaces and papers (live)",
+				"fr": "Chercher modèles, datasets, Spaces et articles sur le Hub (en direct)"
+			},
+			"description": {
+				"en": "Official Hugging Face MCP server. Agents search the Hub in real time, which also helps find local models (GGUF) to run with Ollama or LM Studio. A free token is optional and raises rate limits.",
+				"fr": "Le serveur MCP officiel de Hugging Face. Les agents cherchent sur le Hub en temps réel, ce qui aide aussi à trouver des modèles locaux (GGUF) pour Ollama ou LM Studio. Un jeton gratuit est facultatif et relève les limites."
+			},
+			"author": "Hugging Face",
+			"official": true,
+			"category": "ai",
+			"color": "#FFD21E",
+			"package": "https://huggingface.co/mcp",
+			"transport": "http",
+			"url": "https://huggingface.co/mcp",
+			"headers": {
+				"Authorization": "Bearer ${HF_TOKEN}"
+			},
+			"vars": [
+				{
+					"name": "HF_TOKEN",
+					"label": "Hugging Face token",
+					"description": {
+						"en": "Optional read token.",
+						"fr": "Jeton de lecture facultatif."
+					},
+					"required": false,
+					"secret": true,
+					"placeholder": "hf_…",
+					"helpUrl": "https://huggingface.co/settings/tokens"
+				}
+			],
+			"tools": [
+				{
+					"name": "hub_repo_search",
+					"description": "Search models, datasets and Spaces"
+				},
+				{
+					"name": "hub_repo_details",
+					"description": "Details of a repository"
+				},
+				{
+					"name": "paper_search",
+					"description": "Search papers"
+				}
+			],
+			"tags": [
+				"huggingface",
+				"models",
+				"hub",
+				"llm",
+				"ai"
+			],
+			"homepage": "https://huggingface.co/mcp"
+		},
+		{
+			"id": "brave-search",
+			"name": "Brave Search",
+			"tagline": {
+				"en": "Web, news, image and local search (official)",
+				"fr": "Recherche web, actualités, images et lieux (officiel)"
+			},
+			"description": {
+				"en": "Brave's official search server, with its own independent index. Free plan available.",
+				"fr": "Le serveur de recherche officiel de Brave, avec son propre index indépendant. Offre gratuite disponible."
+			},
+			"author": "Brave",
+			"official": true,
+			"category": "web",
+			"color": "#FB542B",
+			"package": "@brave/brave-search-mcp-server",
+			"transport": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"@brave/brave-search-mcp-server"
+			],
+			"vars": [
+				{
+					"name": "BRAVE_API_KEY",
+					"label": "Brave API key",
+					"description": {
+						"en": "Brave Search API key.",
+						"fr": "Clé de l'API Brave Search."
+					},
+					"required": true,
+					"secret": true,
+					"helpUrl": "https://api-dashboard.search.brave.com/app/keys"
+				}
+			],
+			"tools": [
+				{
+					"name": "brave_web_search",
+					"description": "Web search"
+				},
+				{
+					"name": "brave_news_search",
+					"description": "News search"
+				},
+				{
+					"name": "brave_local_search",
+					"description": "Local search"
+				}
+			],
+			"tags": [
+				"search",
+				"web",
+				"news"
+			],
+			"homepage": "https://github.com/brave/brave-search-mcp-server"
+		},
+		{
+			"id": "tavily",
+			"name": "Tavily",
+			"tagline": {
+				"en": "Search, extract and crawl the web for agents (official)",
+				"fr": "Chercher, extraire et explorer le web pour les agents (officiel)"
+			},
+			"description": {
+				"en": "Tavily's search API built for agents: answers with sources, page extraction, site maps and crawls.",
+				"fr": "L'API de recherche de Tavily conçue pour les agents : réponses sourcées, extraction de pages, plans de site et exploration."
+			},
+			"author": "Tavily",
+			"official": true,
+			"category": "web",
+			"color": "#4F46E5",
+			"package": "tavily-mcp",
+			"transport": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"tavily-mcp@latest"
+			],
+			"vars": [
+				{
+					"name": "TAVILY_API_KEY",
+					"label": "Tavily API key",
+					"description": {
+						"en": "API key (free tier available).",
+						"fr": "Clé d'API (offre gratuite disponible)."
+					},
+					"required": true,
+					"secret": true,
+					"placeholder": "tvly-…",
+					"helpUrl": "https://app.tavily.com/home"
+				}
+			],
+			"tools": [
+				{
+					"name": "tavily-search",
+					"description": "Search the web"
+				},
+				{
+					"name": "tavily-extract",
+					"description": "Extract page content"
+				},
+				{
+					"name": "tavily-crawl",
+					"description": "Crawl a site"
+				}
+			],
+			"tags": [
+				"search",
+				"web",
+				"research",
+				"scraping"
+			],
+			"homepage": "https://github.com/tavily-ai/tavily-mcp"
+		},
+		{
+			"id": "exa",
+			"name": "Exa",
+			"tagline": {
+				"en": "Neural web search and code context (official)",
+				"fr": "Recherche web neuronale et contexte de code (officiel)"
+			},
+			"description": {
+				"en": "Exa's official server: semantic web search, page fetch and code examples from the web.",
+				"fr": "Le serveur officiel d'Exa : recherche web sémantique, lecture de pages et exemples de code venus du web."
+			},
+			"author": "Exa",
+			"official": true,
+			"category": "web",
+			"color": "#1E40AF",
+			"package": "exa-mcp-server",
+			"transport": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"exa-mcp-server"
+			],
+			"vars": [
+				{
+					"name": "EXA_API_KEY",
+					"label": "Exa API key",
+					"description": {
+						"en": "API key.",
+						"fr": "Clé d'API."
+					},
+					"required": true,
+					"secret": true,
+					"helpUrl": "https://dashboard.exa.ai/api-keys"
+				}
+			],
+			"tools": [
+				{
+					"name": "web_search_exa",
+					"description": "Search the web"
+				},
+				{
+					"name": "web_fetch_exa",
+					"description": "Fetch a page"
+				},
+				{
+					"name": "get_code_context_exa",
+					"description": "Code examples"
+				}
+			],
+			"tags": [
+				"search",
+				"web",
+				"code",
+				"research"
+			],
+			"homepage": "https://github.com/exa-labs/exa-mcp-server"
+		},
+		{
+			"id": "firecrawl",
+			"name": "Firecrawl",
+			"tagline": {
+				"en": "Scrape, crawl and turn websites into clean markdown (official)",
+				"fr": "Extraire, explorer et convertir des sites en markdown propre (officiel)"
+			},
+			"description": {
+				"en": "Firecrawl's official server: scrape a page to markdown, crawl a site, map its URLs and extract structured data.",
+				"fr": "Le serveur officiel de Firecrawl : extraire une page en markdown, explorer un site, cartographier ses URL et en tirer des données structurées."
+			},
+			"author": "Firecrawl",
+			"official": true,
+			"category": "web",
+			"color": "#FF4F00",
+			"package": "firecrawl-mcp",
+			"transport": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"firecrawl-mcp"
+			],
+			"vars": [
+				{
+					"name": "FIRECRAWL_API_KEY",
+					"label": "Firecrawl API key",
+					"description": {
+						"en": "API key.",
+						"fr": "Clé d'API."
+					},
+					"required": true,
+					"secret": true,
+					"placeholder": "fc-…",
+					"helpUrl": "https://www.firecrawl.dev/app/api-keys"
+				}
+			],
+			"tools": [
+				{
+					"name": "firecrawl_scrape",
+					"description": "Scrape a page"
+				},
+				{
+					"name": "firecrawl_crawl",
+					"description": "Crawl a site"
+				},
+				{
+					"name": "firecrawl_map",
+					"description": "Map a site's URLs"
+				},
+				{
+					"name": "firecrawl_extract",
+					"description": "Extract structured data"
+				}
+			],
+			"tags": [
+				"scraping",
+				"crawl",
+				"web",
+				"markdown"
+			],
+			"homepage": "https://github.com/firecrawl/firecrawl-mcp-server"
+		},
+		{
+			"id": "fetch",
+			"name": "Fetch",
+			"tagline": {
+				"en": "Fetch a URL and read it as markdown (no key)",
+				"fr": "Récupérer une URL et la lire en markdown (sans clé)"
+			},
+			"description": {
+				"en": "Reference MCP server that fetches a web page and converts it to markdown, in chunks. Needs uv (uvx).",
+				"fr": "Serveur MCP de référence qui récupère une page web et la convertit en markdown, par morceaux. Nécessite uv (uvx)."
+			},
+			"author": "Model Context Protocol",
+			"official": true,
+			"category": "web",
+			"color": "#6B7280",
+			"package": "mcp-server-fetch",
+			"transport": "stdio",
+			"command": "uvx",
+			"args": [
+				"mcp-server-fetch"
+			],
+			"vars": [],
+			"tools": [
+				{
+					"name": "fetch",
+					"description": "Fetch a URL as markdown"
+				}
+			],
+			"tags": [
+				"fetch",
+				"web",
+				"markdown"
+			],
+			"homepage": "https://github.com/modelcontextprotocol/servers/tree/main/src/fetch",
+			"requires": "uv"
+		},
+		{
+			"id": "postgres",
+			"name": "PostgreSQL",
+			"tagline": {
+				"en": "Schema, read-only SQL, explain plans and index advice",
+				"fr": "Schéma, SQL en lecture seule, plans d'exécution et conseils d'index"
+			},
+			"description": {
+				"en": "Postgres MCP Pro, in restricted (read-only) mode: list schemas and tables, run read-only queries, explain plans, check database health and get index recommendations. Needs uv (uvx).",
+				"fr": "Postgres MCP Pro, en mode restreint (lecture seule) : schémas et tables, requêtes en lecture seule, plans d'exécution, santé de la base et recommandations d'index. Nécessite uv (uvx)."
+			},
+			"author": "Crystal DBA",
+			"official": false,
+			"category": "database",
+			"color": "#336791",
+			"package": "postgres-mcp",
+			"transport": "stdio",
+			"command": "uvx",
+			"args": [
+				"postgres-mcp",
+				"--access-mode=restricted"
+			],
+			"vars": [
+				{
+					"name": "DATABASE_URI",
+					"label": "Connection string",
+					"description": {
+						"en": "A postgresql:// URL with the user and password of a read-only role, host, port and database.",
+						"fr": "Une URL postgresql:// avec l'utilisateur et le mot de passe d'un rôle en lecture seule, l'hôte, le port et la base."
+					},
+					"required": true,
+					"secret": true,
+					"placeholder": "postgresql://localhost:5432/app"
+				}
+			],
+			"tools": [
+				{
+					"name": "list_schemas",
+					"description": "List schemas"
+				},
+				{
+					"name": "execute_sql",
+					"description": "Run a read-only query"
+				},
+				{
+					"name": "explain_query",
+					"description": "Explain a query"
+				},
+				{
+					"name": "analyze_db_health",
+					"description": "Database health"
+				},
+				{
+					"name": "get_top_queries",
+					"description": "Slowest queries"
+				}
+			],
+			"tags": [
+				"postgres",
+				"sql",
+				"database",
+				"performance"
+			],
+			"homepage": "https://github.com/crystaldba/postgres-mcp",
+			"requires": "uv"
+		},
+		{
+			"id": "mongodb",
+			"name": "MongoDB",
+			"tagline": {
+				"en": "Query collections and inspect schemas, read-only (official)",
+				"fr": "Interroger les collections et inspecter les schémas, en lecture seule (officiel)"
+			},
+			"description": {
+				"en": "MongoDB's official MCP server, started read-only: find, aggregate, count, list collections and infer schemas.",
+				"fr": "Le serveur MCP officiel de MongoDB, lancé en lecture seule : find, aggregate, count, liste des collections et inférence de schémas."
+			},
+			"author": "MongoDB",
+			"official": true,
+			"category": "database",
+			"color": "#47A248",
+			"package": "mongodb-mcp-server",
+			"transport": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"mongodb-mcp-server@latest",
+				"--readOnly"
+			],
+			"vars": [
+				{
+					"name": "MDB_MCP_CONNECTION_STRING",
+					"label": "Connection string",
+					"description": {
+						"en": "mongodb:// or mongodb+srv:// URI.",
+						"fr": "URI mongodb:// ou mongodb+srv://."
+					},
+					"required": true,
+					"secret": true,
+					"placeholder": "mongodb://localhost:27017/app"
+				}
+			],
+			"tools": [
+				{
+					"name": "find",
+					"description": "Find documents"
+				},
+				{
+					"name": "aggregate",
+					"description": "Run an aggregation"
+				},
+				{
+					"name": "list-collections",
+					"description": "List collections"
+				},
+				{
+					"name": "collection-schema",
+					"description": "Infer a collection's schema"
+				}
+			],
+			"tags": [
+				"mongodb",
+				"nosql",
+				"database"
+			],
+			"homepage": "https://github.com/mongodb-js/mongodb-mcp-server"
+		},
+		{
+			"id": "supabase",
+			"name": "Supabase",
+			"tagline": {
+				"en": "Tables, SQL, migrations, logs and docs of a project, read-only (official)",
+				"fr": "Tables, SQL, migrations, logs et docs d'un projet, en lecture seule (officiel)"
+			},
+			"description": {
+				"en": "Supabase's official MCP server, started read-only: list tables and migrations, run read-only SQL, read logs and search the Supabase docs. Scope it to one project with its reference.",
+				"fr": "Le serveur MCP officiel de Supabase, lancé en lecture seule : tables et migrations, SQL en lecture seule, logs et recherche dans la doc Supabase. Limitez-le à un projet avec sa référence."
+			},
+			"author": "Supabase",
+			"official": true,
+			"category": "database",
+			"color": "#3ECF8E",
+			"package": "@supabase/mcp-server-supabase",
+			"transport": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"@supabase/mcp-server-supabase@latest",
+				"--read-only",
+				"--project-ref=${SUPABASE_PROJECT_REF}"
+			],
+			"vars": [
+				{
+					"name": "SUPABASE_ACCESS_TOKEN",
+					"label": "Access token",
+					"description": {
+						"en": "Personal access token.",
+						"fr": "Jeton d'accès personnel."
+					},
+					"required": true,
+					"secret": true,
+					"placeholder": "sbp_…",
+					"helpUrl": "https://supabase.com/dashboard/account/tokens"
+				},
+				{
+					"name": "SUPABASE_PROJECT_REF",
+					"label": "Project reference",
+					"description": {
+						"en": "Recommended: limits the server to this project.",
+						"fr": "Recommandé : limite le serveur à ce projet."
+					},
+					"required": false,
+					"secret": false,
+					"placeholder": "abcdefghijklmnop"
+				}
+			],
+			"tools": [
+				{
+					"name": "list_tables",
+					"description": "List tables"
+				},
+				{
+					"name": "execute_sql",
+					"description": "Run SQL"
+				},
+				{
+					"name": "list_migrations",
+					"description": "List migrations"
+				},
+				{
+					"name": "get_logs",
+					"description": "Read logs"
+				},
+				{
+					"name": "search_docs",
+					"description": "Search the docs"
+				}
+			],
+			"tags": [
+				"supabase",
+				"postgres",
+				"database",
+				"backend"
+			],
+			"homepage": "https://github.com/supabase-community/supabase-mcp"
+		},
+		{
+			"id": "neon",
+			"name": "Neon",
+			"tagline": {
+				"en": "Serverless Postgres: projects, branches, SQL and migrations (official)",
+				"fr": "Postgres serverless : projets, branches, SQL et migrations (officiel)"
+			},
+			"description": {
+				"en": "Neon's official remote server: manage projects and branches, run SQL and prepare migrations on a temporary branch.",
+				"fr": "Le serveur distant officiel de Neon : gérer projets et branches, lancer du SQL et préparer des migrations sur une branche temporaire."
+			},
+			"author": "Neon",
+			"official": true,
+			"category": "database",
+			"color": "#00E599",
+			"package": "https://mcp.neon.tech/mcp",
+			"transport": "http",
+			"url": "https://mcp.neon.tech/mcp",
+			"headers": {
+				"Authorization": "Bearer ${NEON_API_KEY}"
+			},
+			"vars": [
+				{
+					"name": "NEON_API_KEY",
+					"label": "Neon API key",
+					"description": {
+						"en": "API key.",
+						"fr": "Clé d'API."
+					},
+					"required": true,
+					"secret": true,
+					"helpUrl": "https://console.neon.tech/app/settings/api-keys"
+				}
+			],
+			"tools": [
+				{
+					"name": "list_projects",
+					"description": "List projects"
+				},
+				{
+					"name": "create_branch",
+					"description": "Create a branch"
+				},
+				{
+					"name": "run_sql",
+					"description": "Run SQL"
+				},
+				{
+					"name": "prepare_database_migration",
+					"description": "Prepare a migration"
+				}
+			],
+			"tags": [
+				"neon",
+				"postgres",
+				"serverless",
+				"database"
+			],
+			"homepage": "https://neon.com/docs/ai/neon-mcp-server"
+		},
+		{
+			"id": "azure",
+			"name": "Azure",
+			"tagline": {
+				"en": "Azure resources: storage, Cosmos DB, Key Vault, monitor and more (official)",
+				"fr": "Ressources Azure : stockage, Cosmos DB, Key Vault, monitoring et plus (officiel)"
+			},
+			"description": {
+				"en": "Microsoft's official Azure MCP server. Uses your Azure CLI session (`az login`) to list and query resources across many Azure services.",
+				"fr": "Le serveur MCP officiel de Microsoft pour Azure. Utilise votre session Azure CLI (`az login`) pour lister et interroger les ressources de nombreux services Azure."
+			},
+			"author": "Microsoft",
+			"official": true,
+			"category": "cloud",
+			"color": "#0089D6",
+			"package": "@azure/mcp",
+			"transport": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"@azure/mcp@latest",
+				"server",
+				"start"
+			],
+			"vars": [],
+			"tools": [
+				{
+					"name": "subscription_list",
+					"description": "List subscriptions"
+				},
+				{
+					"name": "group_list",
+					"description": "List resource groups"
+				},
+				{
+					"name": "storage",
+					"description": "Storage accounts and blobs"
+				},
+				{
+					"name": "monitor",
+					"description": "Query logs and metrics"
+				}
+			],
+			"tags": [
+				"azure",
+				"cloud",
+				"microsoft",
+				"infrastructure"
+			],
+			"homepage": "https://github.com/microsoft/mcp/tree/main/servers/Azure.Mcp.Server",
+			"requires": "az"
+		},
+		{
+			"id": "kubernetes",
+			"name": "Kubernetes",
+			"tagline": {
+				"en": "Pods, deployments, logs and events of your clusters (non-destructive)",
+				"fr": "Pods, déploiements, logs et événements de vos clusters (non destructif)"
+			},
+			"description": {
+				"en": "Kubernetes MCP server using your kubeconfig. Installed with destructive tools turned off: agents read resources, logs and events, and can scale or restart, but not delete.",
+				"fr": "Serveur MCP Kubernetes qui utilise votre kubeconfig. Installé sans les outils destructifs : les agents lisent ressources, logs et événements, et peuvent mettre à l'échelle ou redémarrer, mais pas supprimer."
+			},
+			"author": "Flux159 (community)",
+			"official": false,
+			"category": "cloud",
+			"color": "#326CE5",
+			"package": "mcp-server-kubernetes",
+			"transport": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"mcp-server-kubernetes"
+			],
+			"vars": [],
+			"tools": [
+				{
+					"name": "kubectl_get",
+					"description": "Get resources"
+				},
+				{
+					"name": "kubectl_describe",
+					"description": "Describe a resource"
+				},
+				{
+					"name": "kubectl_logs",
+					"description": "Read logs"
+				},
+				{
+					"name": "kubectl_scale",
+					"description": "Scale a deployment"
+				}
+			],
+			"tags": [
+				"kubernetes",
+				"k8s",
+				"cloud",
+				"devops"
+			],
+			"homepage": "https://github.com/Flux159/mcp-server-kubernetes",
+			"env": {
+				"ALLOW_ONLY_NON_DESTRUCTIVE_TOOLS": "true"
+			}
+		},
+		{
+			"id": "heroku",
+			"name": "Heroku",
+			"tagline": {
+				"en": "Apps, dynos, add-ons, logs and Postgres (official)",
+				"fr": "Apps, dynos, add-ons, logs et Postgres (officiel)"
+			},
+			"description": {
+				"en": "Heroku's official MCP server: list apps, read logs, scale dynos, manage add-ons and inspect Heroku Postgres.",
+				"fr": "Le serveur MCP officiel de Heroku : lister les apps, lire les logs, dimensionner les dynos, gérer les add-ons et inspecter Heroku Postgres."
+			},
+			"author": "Heroku",
+			"official": true,
+			"category": "cloud",
+			"color": "#430098",
+			"package": "@heroku/mcp-server",
+			"transport": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"@heroku/mcp-server"
+			],
+			"vars": [
+				{
+					"name": "HEROKU_API_KEY",
+					"label": "Heroku API key",
+					"description": {
+						"en": "Authorization token (heroku authorizations:create).",
+						"fr": "Jeton d'autorisation (heroku authorizations:create)."
+					},
+					"required": true,
+					"secret": true,
+					"helpUrl": "https://dashboard.heroku.com/account/applications"
+				}
+			],
+			"tools": [
+				{
+					"name": "list_apps",
+					"description": "List apps"
+				},
+				{
+					"name": "get_app_logs",
+					"description": "Read logs"
+				},
+				{
+					"name": "ps_scale",
+					"description": "Scale dynos"
+				},
+				{
+					"name": "pg_info",
+					"description": "Postgres info"
+				}
+			],
+			"tags": [
+				"heroku",
+				"paas",
+				"cloud",
+				"deploy"
+			],
+			"homepage": "https://github.com/heroku/heroku-mcp-server"
+		},
+		{
+			"id": "stripe",
+			"name": "Stripe",
+			"tagline": {
+				"en": "Customers, payments, subscriptions and Stripe docs (official)",
+				"fr": "Clients, paiements, abonnements et docs Stripe (officiel)"
+			},
+			"description": {
+				"en": "Stripe's official remote server. Use an agent API key (with the Agent badge); a test-mode key keeps agents away from live data.",
+				"fr": "Le serveur distant officiel de Stripe. Utilisez une clé d'API d'agent (badge Agent) ; une clé du mode test tient les agents loin des données réelles."
+			},
+			"author": "Stripe",
+			"official": true,
+			"category": "cloud",
+			"color": "#635BFF",
+			"package": "https://mcp.stripe.com",
+			"transport": "http",
+			"url": "https://mcp.stripe.com",
+			"headers": {
+				"Authorization": "Bearer ${STRIPE_API_KEY}"
+			},
+			"vars": [
+				{
+					"name": "STRIPE_API_KEY",
+					"label": "Stripe agent key",
+					"description": {
+						"en": "Agent API key, preferably from test mode.",
+						"fr": "Clé d'API d'agent, de préférence du mode test."
+					},
+					"required": true,
+					"secret": true,
+					"placeholder": "sk_test_…",
+					"helpUrl": "https://dashboard.stripe.com/apikeys"
+				}
+			],
+			"tools": [
+				{
+					"name": "search_stripe_documentation",
+					"description": "Search the docs"
+				},
+				{
+					"name": "list_customers",
+					"description": "List customers"
+				},
+				{
+					"name": "list_payment_intents",
+					"description": "List payments"
+				},
+				{
+					"name": "list_subscriptions",
+					"description": "List subscriptions"
+				}
+			],
+			"tags": [
+				"stripe",
+				"payments",
+				"billing"
+			],
+			"homepage": "https://docs.stripe.com/mcp"
+		},
+		{
+			"id": "shopify-dev",
+			"name": "Shopify Dev",
+			"tagline": {
+				"en": "Shopify docs, GraphQL schemas and Liquid validation (official, no key)",
+				"fr": "Docs Shopify, schémas GraphQL et validation Liquid (officiel, sans clé)"
+			},
+			"description": {
+				"en": "Shopify's developer server: search the docs, introspect the Admin GraphQL schema and validate GraphQL and Liquid code.",
+				"fr": "Le serveur développeur de Shopify : chercher dans la doc, explorer le schéma GraphQL Admin et valider du code GraphQL et Liquid."
+			},
+			"author": "Shopify",
+			"official": true,
+			"category": "documentation",
+			"color": "#96BF48",
+			"package": "@shopify/dev-mcp",
+			"transport": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"@shopify/dev-mcp@latest"
+			],
+			"vars": [],
+			"tools": [
+				{
+					"name": "search_docs_chunks",
+					"description": "Search the docs"
+				},
+				{
+					"name": "introspect_graphql_schema",
+					"description": "Explore the GraphQL schema"
+				},
+				{
+					"name": "validate_graphql_codeblocks",
+					"description": "Validate GraphQL"
+				}
+			],
+			"tags": [
+				"shopify",
+				"ecommerce",
+				"graphql",
+				"docs"
+			],
+			"homepage": "https://shopify.dev/docs/apps/build/devmcp"
+		},
+		{
+			"id": "sequential-thinking",
+			"name": "Sequential Thinking",
+			"tagline": {
+				"en": "Step-by-step reasoning the agent can revise and branch",
+				"fr": "Raisonnement pas à pas que l'agent peut réviser et ramifier"
+			},
+			"description": {
+				"en": "Reference MCP server that gives the agent a structured scratchpad for long problems: numbered thoughts it can revise or branch.",
+				"fr": "Serveur MCP de référence qui donne à l'agent un brouillon structuré pour les problèmes longs : des pensées numérotées qu'il peut réviser ou ramifier."
+			},
+			"author": "Model Context Protocol",
+			"official": true,
+			"category": "ai",
+			"color": "#8B5CF6",
+			"package": "@modelcontextprotocol/server-sequential-thinking",
+			"transport": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"@modelcontextprotocol/server-sequential-thinking"
+			],
+			"vars": [],
+			"tools": [
+				{
+					"name": "sequentialthinking",
+					"description": "Record a reasoning step"
+				}
+			],
+			"tags": [
+				"reasoning",
+				"planning",
+				"thinking"
+			],
+			"homepage": "https://github.com/modelcontextprotocol/servers/tree/main/src/sequentialthinking"
+		},
+		{
+			"id": "memory",
+			"name": "Memory",
+			"tagline": {
+				"en": "A knowledge graph the agent keeps between sessions",
+				"fr": "Un graphe de connaissances que l'agent garde d'une session à l'autre"
+			},
+			"description": {
+				"en": "Reference MCP server storing entities, relations and observations in a local file, so an agent remembers facts between sessions.",
+				"fr": "Serveur MCP de référence qui stocke entités, relations et observations dans un fichier local, pour qu'un agent retienne des faits d'une session à l'autre."
+			},
+			"author": "Model Context Protocol",
+			"official": true,
+			"category": "ai",
+			"color": "#EC4899",
+			"package": "@modelcontextprotocol/server-memory",
+			"transport": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"@modelcontextprotocol/server-memory"
+			],
+			"vars": [],
+			"tools": [
+				{
+					"name": "create_entities",
+					"description": "Add entities"
+				},
+				{
+					"name": "create_relations",
+					"description": "Link entities"
+				},
+				{
+					"name": "search_nodes",
+					"description": "Search the graph"
+				},
+				{
+					"name": "read_graph",
+					"description": "Read the graph"
+				}
+			],
+			"tags": [
+				"memory",
+				"knowledge-graph",
+				"persistence"
+			],
+			"homepage": "https://github.com/modelcontextprotocol/servers/tree/main/src/memory"
+		},
+		{
+			"id": "time",
+			"name": "Time",
+			"tagline": {
+				"en": "Current time and time-zone conversions",
+				"fr": "Heure actuelle et conversions de fuseaux horaires"
+			},
+			"description": {
+				"en": "Reference MCP server: the current time in any IANA time zone and conversions between zones. Needs uv (uvx).",
+				"fr": "Serveur MCP de référence : l'heure actuelle dans tout fuseau IANA et les conversions entre fuseaux. Nécessite uv (uvx)."
+			},
+			"author": "Model Context Protocol",
+			"official": true,
+			"category": "ai",
+			"color": "#14B8A6",
+			"package": "mcp-server-time",
+			"transport": "stdio",
+			"command": "uvx",
+			"args": [
+				"mcp-server-time"
+			],
+			"vars": [],
+			"tools": [
+				{
+					"name": "get_current_time",
+					"description": "Current time in a zone"
+				},
+				{
+					"name": "convert_time",
+					"description": "Convert between zones"
+				}
+			],
+			"tags": [
+				"time",
+				"timezone",
+				"utility"
+			],
+			"homepage": "https://github.com/modelcontextprotocol/servers/tree/main/src/time",
+			"requires": "uv"
+		}
+	]
+}
