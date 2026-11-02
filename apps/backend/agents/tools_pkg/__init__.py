@@ -62,6 +62,7 @@ from .permissions import (
     undeclared_builtin_tools,
 )
 from .registry import create_auto_claude_mcp_server, is_tools_available
+from .setting_sources import setting_sources_for
 
 __all__ = [
     # Main API
@@ -72,6 +73,7 @@ __all__ = [
     "undeclared_builtin_tools",
     "hooked_grants",
     "mcp_tools_for_servers",
+    "setting_sources_for",
     "is_tools_available",
     # Agent configuration registry
     "AGENT_CONFIGS",
