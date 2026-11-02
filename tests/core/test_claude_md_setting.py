@@ -152,7 +152,7 @@ class TestTheSessionFollowsTheSetting:
 
 
 class TestTheSimpleClientFollowsItToo:
-    """It passes no `setting_sources`: every source, CLAUDE.md included."""
+    """Its types load the "project" source, CLAUDE.md included."""
 
     @pytest.mark.parametrize("value", ["true", None])
     def test_on_the_cli_loads_claude_md(self, project, monkeypatch, value):
