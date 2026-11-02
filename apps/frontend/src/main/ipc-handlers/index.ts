@@ -69,6 +69,7 @@ import { registerCostHandlers } from "./cost-handlers";
 import { registerCostPredictorHandlers } from "./cost-predictor-handlers";
 import { registerFormulaMatrixHandlers } from "./formula-matrix-handlers";
 import { registerBenchHandlers } from "./bench-handlers";
+import { registerBoardMcpHandlers } from "./board-mcp-handlers";
 import { registerCredentialHandlers } from "./credential-handlers";
 import { registerCrossLanguageTranslationHandlers } from "./cross-language-translation-handlers";
 import { registerDebugHandlers } from "./debug-handlers";
@@ -574,6 +575,9 @@ export function setupIpcHandlers(
 
 	// Repo bench: finished cards replayed per engine, judged by their own tests
 	registerBenchHandlers(agentManager, getMainWindow);
+
+	// workpilot-board MCP server: registered with Claude Code, Codex, Cursor...
+	registerBoardMcpHandlers();
 
 	// Agent Debugger handlers (Feature 1)
 	registerAgentDebuggerHandlers();
