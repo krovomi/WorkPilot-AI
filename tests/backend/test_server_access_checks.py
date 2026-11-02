@@ -15,11 +15,16 @@ import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
+from tests.backend import test_admin_api as _admin_fixtures
 from tests.backend.test_admin_api import (  # noqa: F401  (fixtures)
     _client,
     _principal_for,
     _settings,
 )
+
+# pytest finds fixtures by name in the module, so `env` must be bound here even
+# though no line below reads it: every test takes it as a parameter.
+env = _admin_fixtures.env
 
 pytestmark = pytest.mark.asyncio
 
