@@ -34,8 +34,12 @@ export function availableActions(
 	runs: readonly AgentRun[],
 ): CardAction[] {
 	if (!card.specId) return [];
-	const running = !!activeRun(runs) || ACTIVE_COLUMNS.has(card.column);
-	if (running) return ["stop"];
+	if (activeRun(runs)) return ["stop"];
+	// The column says an agent works on it, but no run is queued or running:
+	// the build crashed, the server restarted, or sending it back could not
+	// start a new build. Offering only Stop (which had nothing to stop) left
+	// the card stuck; start it again instead.
+	if (ACTIVE_COLUMNS.has(card.column)) return ["retry"];
 	const hasSpec = !!details?.spec;
 	const needsApproval = hasSpec && !!details?.requireReview && !details.approval.approved;
 	switch (card.column) {
@@ -72,13 +76,16 @@ export async function startCard(
 	await client.startRun(projectId, card.specId, "build");
 }
 
-/** Cancel the card's queued or running run; false when there was none. */
-export async function stopCard(client: Api, projectId: string, card: BoardCard): Promise<boolean> {
-	if (!card.specId) return false;
+/**
+ * Cancel the card's queued or running run. Throws `nothing_to_stop` when the
+ * server had none to cancel, so the screen says so instead of looking done.
+ */
+export async function stopCard(client: Api, projectId: string, card: BoardCard): Promise<void> {
+	if (!card.specId) throw new Error("card_not_indexed");
 	const run = activeRun(await client.runs(projectId, card.specId));
-	if (!run) return false;
+	if (!run) throw new Error("nothing_to_stop");
 	const result = await client.cancelRun(projectId, card.specId, run.id);
-	return result.cancelled;
+	if (!result.cancelled) throw new Error("nothing_to_stop");
 }
 
 /** Send the work back with what to change, then build again. */
