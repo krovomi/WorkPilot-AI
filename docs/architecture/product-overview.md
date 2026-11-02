@@ -76,20 +76,27 @@ page since a date it shows, lists the experimental pages never opened, and
 exports it all as JSON (`buildViewUsageReport`,
 `apps/frontend/src/renderer/stores/view-usage-store.ts`).
 
+Views that answer the same question share one sidebar entry, a **hub**, and
+are its tabs (lot R7): the Group column then reads `group › hub`. A hub's
+entry opens the tab last used in the session, and a view's own id still opens
+it, inside its hub. The hubs are listed in
+`apps/frontend/src/renderer/components/sidebar/hubs.ts`; their design is in
+[frontend-architecture.md](frontend-architecture.md#sidebar-hubs-sidebarhubsts).
+
 | View | Label | Group | Design | Experimental |
 |---|---|---|---|---|
 | `dashboard` | Dashboard | Workspace | — |  |
 | `kanban` | Kanban Board | Workspace | [kanban-task-types.md](kanban-task-types.md), [frontend-task-panel.md](frontend-task-panel.md) |  |
 | `mission-control` | Mission Control | Workspace | — |  |
 | `phase35-hub` | Advanced Features | Workspace | — |  |
-| `session-history` | Session History | Workspace | — |  |
+| `session-history` | Session History | Workspace › Agent history | — |  |
 | `agent-coach` | Personal Agent Coach | Agents | — |  |
-| `agent-debugger` | Agent Debugger | Agents | — | yes |
-| `agent-replay` | Agent Replay | Agents | — | yes |
-| `arena-mode` | Arena Mode | Agents | [arena.md](arena.md) |  |
+| `agent-debugger` | Agent Debugger | Workspace › Agent history | — | yes |
+| `agent-replay` | Agent Replay | Workspace › Agent history | — | yes |
+| `arena-mode` | Arena Mode | Agents › Arena | [arena.md](arena.md) |  |
 | `repo-bench` | Repo bench | Agents | [repo-bench.md](repo-bench.md) |  |
 | `bounty-board` | Bounty Board | Agents | [bounty-board.md](bounty-board.md) |  |
-| `consensus-arbiter` | Cross-Agent Consensus Arbiter | Agents | — |  |
+| `consensus-arbiter` | Cross-Agent Consensus Arbiter | Agents › Arena | — |  |
 | `live-companion` | Live Companion | Agents | — |  |
 | `pixel-office` | Pixel Office | Agents | [frontend-architecture.md](frontend-architecture.md) |  |
 | `self-healing` | Self-Healing | Agents | — |  |
@@ -97,55 +104,56 @@ exports it all as JSON (`buildViewUsageReport`,
 | `code-playground` | Code Playground | Development | — |  |
 | `code-review` | Code Review | Development | — |  |
 | `cross-language-translation` | Cross-Language Translation | Development | — | yes |
-| `documentation` | Documentation | Development | — |  |
+| `documentation` | Documentation | Development › Docs and drift | — |  |
 | `flaky-tests` | Flaky Test Detective | Development | — |  |
-| `onboarding-guide` | Onboarding Guide | Development | — |  |
+| `onboarding-guide` | Onboarding Guide | Development › Onboarding | — |  |
 | `pair-programming` | Pair Programming | Development | — |  |
 | `performance-profiler` | Performance Profiler | Development | — | yes |
-| `refactoring` | Refactoring | Development | — |  |
+| `refactoring` | Refactoring | Development › Debt and refactoring | — |  |
 | `test-generation` | Test Generation | Development | [test-generation.md](test-generation.md) |  |
 | `visual-to-code` | Visual to Code | Development | [visual-to-code.md](visual-to-code.md) |  |
 | `architecture-visualizer` | Architecture Visualizer | Explore | [archify.md](archify.md) |  |
-| `context-mesh` | Context Mesh | Explore | — |  |
-| `context` | Context | Explore | — |  |
+| `context-mesh` | Context Mesh | Explore › Project context | — |  |
+| `context` | Context | Explore › Project context | — |  |
 | `ideation` | Ideation | Explore | [agent-prompts.md](agent-prompts.md) |  |
 | `insights` | Insights | Explore | [agent-prompts.md](agent-prompts.md) |  |
 | `learning-loop` | Learning Loop | Explore | — |  |
 | `cicd-triggers` | CI/CD Triggers | Git & Integrations | — |  |
-| `conflict-predictor` | Conflict Predictor | Git & Integrations | — |  |
-| `git-surgeon` | Git History Surgeon | Git & Integrations | — |  |
-| `natural-language-git` | Natural Language Git | Git & Integrations | — |  |
+| `conflict-predictor` | Conflict Predictor | Git & Integrations › Git impact | — |  |
+| `git-surgeon` | Git History Surgeon | Git & Integrations › Git history | — |  |
+| `natural-language-git` | Natural Language Git | Git & Integrations › Git history | — |  |
 | `worktrees` | Worktrees | Git & Integrations | — |  |
 | `analytics` | Analytics | Planning | — |  |
 | `carbon-profiler` | Carbon / Energy Profiler | Planning | — | yes |
 | `changelog` | Changelog | Planning | [changelog.md](changelog.md) |  |
-| `cost-estimator` | Cost Estimator | Planning | — |  |
+| `cost-estimator` | Cost Estimator | Planning › Costs and estimation | — |  |
+| `smart-estimation` | Smart Estimation | Planning › Costs and estimation | — |  |
 | `env-snapshot` | Environment Snapshots | Planning | — | yes |
 | `release-coordinator` | Release Train Coordinator | Planning | — | yes |
 | `roadmap` | Roadmap | Planning | [agent-prompts.md](agent-prompts.md) |  |
 | `spec-approval` | Spec Approval | Planning | — |  |
-| `tech-debt` | Tech Debt Dashboard | Planning | — |  |
+| `tech-debt` | Tech Debt Dashboard | Development › Debt and refactoring | — |  |
 | `accessibility-agent` | Accessibility Scan | Toolbox | — |  |
-| `agent-tools` | MCP Overview | Toolbox | — |  |
+| `agent-tools` | MCP Overview | Toolbox › MCP tools | — |  |
 | `api-explorer` | API Studio | Toolbox | — |  |
 | `api-watcher` | API Contract Watcher | Toolbox | — | yes |
 | `app-emulator` | App Emulator | Toolbox | [app-emulator.md](app-emulator.md) |  |
-| `blast-radius` | Impact Blast Radius | Toolbox | — | yes |
+| `blast-radius` | Impact Blast Radius | Git & Integrations › Git impact | — | yes |
 | `browser-agent` | Browser Agent | Toolbox | — |  |
 | `compliance` | Compliance Evidence Collector | Toolbox | — | yes |
-| `context-aware-snippets` | Context-Aware Snippets | Toolbox | — |  |
+| `context-aware-snippets` | Context-Aware Snippets | Explore › Project context | — |  |
 | `dependency-sentinel` | Dependency Sentinel | Toolbox | — |  |
-| `doc-drift` | Documentation Drift Detector | Toolbox | — | yes |
+| `doc-drift` | Documentation Drift Detector | Development › Docs and drift | — | yes |
 | `guardrails` | Agent Guardrails | Toolbox | — |  |
 | `i18n-agent` | i18n Scan | Toolbox | — |  |
 | `injection-guard` | Injection Guard | Toolbox | — |  |
-| `mcp-marketplace` | MCP Marketplace | Toolbox | — | yes |
+| `mcp-marketplace` | MCP Marketplace | Toolbox › MCP tools | — | yes |
 | `migration` | Code Migration | Toolbox | — |  |
 | `notebook-agent` | Notebook Checks | Toolbox | — | yes |
 | `offline-mode` | Offline Mode | Toolbox | [offline-mode.md](offline-mode.md) |  |
-| `onboarding-agent` | Onboarding Pack | Toolbox | — |  |
+| `onboarding-agent` | Onboarding Pack | Development › Onboarding | — |  |
 | `pipeline-generator` | Pipeline Generator | Toolbox | — | yes |
-| `plugin-marketplace` | Plugin Marketplace | Toolbox | — | yes |
+| `plugin-marketplace` | Plugin Marketplace | Toolbox › MCP tools | — | yes |
 | `prompt-optimizer` | Prompt Optimizer | Toolbox | — |  |
 | `regression-guardian` | Regression Guardian | Toolbox | — | yes |
 | `sandbox` | Change Preview | Toolbox | — |  |
