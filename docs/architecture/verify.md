@@ -44,6 +44,7 @@ endpoints are still called. The verifier is told the target renders pages.
 ```
 apps/backend/verify/
   detect.py     which targets, their launch command, port and readiness URL (a learned recipe first)
+  target.py     Target, the thing to launch, and the file helpers detectors share
   web_stacks.py pages a backend renders; PHP, Ruby, Rust and static-site targets
   launch.py     own process group, a free port injected, readiness on loopback, the log captured
   errors.py     stack traces (docintel/stacktrace), build codes (foundation/ci_logs), console and network errors

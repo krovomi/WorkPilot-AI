@@ -22,7 +22,7 @@ import re
 import sys
 from pathlib import Path
 
-from .detect import _SKIP, Target, _read_json, _relative
+from .target import _SKIP, Target, _read_json, _relative
 
 __all__ = [
     "EXTRA_DETECTORS",
