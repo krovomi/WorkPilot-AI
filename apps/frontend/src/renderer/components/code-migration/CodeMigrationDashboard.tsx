@@ -126,7 +126,7 @@ export function CodeMigrationDashboard(): React.ReactElement {
 							<button
 								type="button"
 								onClick={cancelCodeMigration}
-								className="w-full px-4 py-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors text-sm font-medium"
+								className="w-full px-4 py-2 rounded-lg bg-destructive/20 text-destructive hover:bg-destructive/30 transition-colors text-sm font-medium"
 							>
 								{t("codeMigration:actions.cancel")}
 							</button>
@@ -201,7 +201,7 @@ export function CodeMigrationDashboard(): React.ReactElement {
 
 					{/* Error */}
 					{error && (
-						<div className="m-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+						<div className="m-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
 							{error}
 						</div>
 					)}

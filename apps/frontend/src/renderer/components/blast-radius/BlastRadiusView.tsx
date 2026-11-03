@@ -8,9 +8,9 @@ import { Label } from "../ui/label";
 
 import { Textarea } from "../ui/textarea";
 const SCORE_STYLES: Record<"low" | "medium" | "high", string> = {
-	low: "bg-green-500/15 text-green-500 border-green-500/30",
-	medium: "bg-yellow-500/15 text-yellow-500 border-yellow-500/30",
-	high: "bg-red-500/15 text-red-500 border-red-500/30",
+	low: "bg-success/15 text-success border-success/30",
+	medium: "bg-warning/15 text-warning border-warning/30",
+	high: "bg-destructive/15 text-destructive border-destructive/30",
 };
 
 interface Props {
@@ -105,7 +105,7 @@ export function BlastRadiusView({ projectRoot }: Props) {
 
 					{report.flags.length > 0 && (
 						<div className="text-xs">
-							<div className="flex items-center gap-1 text-yellow-500 font-medium">
+							<div className="flex items-center gap-1 text-warning font-medium">
 								<AlertTriangle className="w-3 h-3" />
 								{t("blastRadius:flags", "Feature flags referenced")}
 							</div>

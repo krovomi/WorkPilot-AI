@@ -47,11 +47,11 @@ export function RtkSavingsCard({ projectPath }: { projectPath?: string }) {
 	const unmet = readiness.checks.filter((c) => !c.ok);
 
 	return (
-		<div className="rounded-lg border border-amber-500/40 bg-amber-500/5">
+		<div className="rounded-lg border border-warning/40 bg-warning/5">
 			<div className="flex items-start justify-between gap-3 p-3">
 				<div className="min-w-0">
 					<div className="flex items-center gap-2">
-						<Zap className="h-4 w-4 shrink-0 text-amber-500" aria-hidden />
+						<Zap className="h-4 w-4 shrink-0 text-warning" aria-hidden />
 						<span className="text-sm font-medium">{t("rtk:title")}</span>
 						<Badge variant="outline" className="text-3xs">
 							{t(`rtk:state.${readiness.state}`)}
@@ -99,7 +99,7 @@ export function RtkSavingsCard({ projectPath }: { projectPath?: string }) {
 			</div>
 
 			{expanded && (
-				<div className="space-y-3 border-t border-amber-500/20 p-3">
+				<div className="space-y-3 border-t border-warning/20 p-3">
 					<section>
 						<h4 className="text-xs font-medium">{t("rtk:checks.title")}</h4>
 						<ul className="mt-1 space-y-1">
@@ -110,12 +110,12 @@ export function RtkSavingsCard({ projectPath }: { projectPath?: string }) {
 								>
 									{check.ok ? (
 										<CircleCheck
-											className="mt-0.5 h-3 w-3 shrink-0 text-emerald-500"
+											className="mt-0.5 h-3 w-3 shrink-0 text-success"
 											aria-hidden
 										/>
 									) : (
 										<CircleAlert
-											className="mt-0.5 h-3 w-3 shrink-0 text-amber-500"
+											className="mt-0.5 h-3 w-3 shrink-0 text-warning"
 											aria-hidden
 										/>
 									)}

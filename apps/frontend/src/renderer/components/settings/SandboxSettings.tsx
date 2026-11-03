@@ -151,7 +151,7 @@ export function SandboxSettings() {
 									className={cn(
 										"rounded-full px-2 py-0.5 text-3xs font-medium",
 										rule.access === "write"
-											? "bg-amber-500/15 text-amber-600"
+											? "bg-warning/15 text-warning"
 											: "bg-blue-500/15 text-blue-600",
 									)}
 								>
@@ -290,7 +290,7 @@ export function SandboxSettings() {
 					</p>
 					<div className="rounded-md border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
 						<div className="flex items-start gap-2">
-							<AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+							<AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
 							<span>{t("sections.sandbox.snapshots.warning")}</span>
 						</div>
 					</div>

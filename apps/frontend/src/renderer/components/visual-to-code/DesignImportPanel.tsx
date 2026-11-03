@@ -62,12 +62,12 @@ const PHASE_CONFIG: Record<
 	code_generation: {
 		icon: Code,
 		labelKey: "phases.code_generation",
-		color: "text-green-500",
+		color: "text-success",
 	},
 	design_token_integration: {
 		icon: Palette,
 		labelKey: "phases.design_token_integration",
-		color: "text-amber-500",
+		color: "text-warning",
 	},
 	visual_test_generation: {
 		icon: TestTube,
@@ -82,12 +82,12 @@ const PHASE_CONFIG: Record<
 	complete: {
 		icon: Check,
 		labelKey: "phases.complete",
-		color: "text-green-600",
+		color: "text-success",
 	},
 	error: {
 		icon: AlertTriangle,
 		labelKey: "phases.error",
-		color: "text-red-500",
+		color: "text-destructive",
 	},
 };
 
@@ -120,12 +120,12 @@ const LANGUAGE_COLORS: Record<string, string> = {
 	tsx: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
 	jsx: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
 	ts: "bg-blue-600/10 text-blue-800 dark:text-blue-300",
-	js: "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400",
+	js: "bg-warning/10 text-warning ",
 	css: "bg-purple-500/10 text-purple-700 dark:text-purple-400",
 	scss: "bg-pink-500/10 text-pink-700 dark:text-pink-400",
-	vue: "bg-green-500/10 text-green-700 dark:text-green-400",
+	vue: "bg-success/10 text-success ",
 	svelte: "bg-orange-500/10 text-orange-700 dark:text-orange-400",
-	html: "bg-red-500/10 text-red-700 dark:text-red-400",
+	html: "bg-destructive/10 text-destructive ",
 	text: "bg-gray-500/10 text-gray-700 dark:text-gray-400",
 };
 
@@ -302,7 +302,7 @@ export function DesignImportPanel() {
 						if (isActive) {
 							phaseStatusClass = `${config.color} bg-current/5 ring-1 ring-current/20`;
 						} else if (isDone) {
-							phaseStatusClass = "text-green-600 bg-green-500/5";
+							phaseStatusClass = "text-success bg-success/5";
 						} else {
 							phaseStatusClass = "text-muted-foreground/50";
 						}
@@ -316,7 +316,7 @@ export function DesignImportPanel() {
 							phaseIconElement = <Icon className="h-3 w-3" />;
 						}
 
-						const connectorClass = isDone ? "bg-green-500/40" : "bg-border";
+						const connectorClass = isDone ? "bg-success/40" : "bg-border";
 
 						return (
 							<div key={p} className="flex items-center flex-1">
@@ -396,7 +396,7 @@ export function DesignImportPanel() {
 										isDragging
 											? "border-violet-500 bg-violet-500/5"
 											: imagePreview
-												? "border-green-500/50 bg-green-500/5"
+												? "border-success/50 bg-success/5"
 												: "border-border hover:border-violet-500/50 hover:bg-accent/50"
 									}`}
 									onDrop={handleDrop}
@@ -426,7 +426,7 @@ export function DesignImportPanel() {
 														e.stopPropagation();
 														clearImage();
 													}}
-													className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+													className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 hover:bg-destructive/90 transition-colors"
 												>
 													<X className="h-3 w-3" />
 												</button>
@@ -605,7 +605,7 @@ export function DesignImportPanel() {
 
 								{/* Error display */}
 								{error && (
-									<div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 text-red-700 dark:text-red-400 text-sm">
+									<div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
 										<AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
 										<p>{error}</p>
 									</div>
@@ -673,7 +673,7 @@ export function DesignImportPanel() {
 									{Object.keys(result.design_spec.color_palette).length > 0 && (
 										<div>
 											<h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-												<Palette className="h-4 w-4 text-amber-500" />
+												<Palette className="h-4 w-4 text-warning" />
 												{t("spec.colorPalette")}
 											</h3>
 											<div className="flex flex-wrap gap-2">
@@ -914,7 +914,7 @@ export function DesignImportPanel() {
 							{result?.design_tokens_used?.length ? (
 								<div className="space-y-3 pr-4">
 									<div className="flex items-center gap-2 mb-2">
-										<Palette className="h-4 w-4 text-amber-500" />
+										<Palette className="h-4 w-4 text-warning" />
 										<span className="text-sm font-semibold">
 											{t("tokens.designTokensIntegrated")} (
 											{result.design_tokens_used.length})
@@ -977,7 +977,7 @@ export function DesignImportPanel() {
 				<div className="flex items-center gap-2 text-xs text-muted-foreground">
 					{phase === "complete" && result && (
 						<>
-							<Check className="h-3.5 w-3.5 text-green-500" />
+							<Check className="h-3.5 w-3.5 text-success" />
 							<span>
 								{result.generated_files.length} {t("footer.files")} •{" "}
 								{result.visual_tests.length} {t("footer.tests")} •{" "}

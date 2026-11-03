@@ -114,7 +114,7 @@ export const SortableTaskCard = memo(function SortableTaskCard({
 						"pointer-events-none absolute left-0 top-2 bottom-2 z-10 w-1 rounded-full",
 						agingLevel === "stuck"
 							? "bg-destructive/80"
-							: "bg-amber-500/70",
+							: "bg-warning/70",
 					)}
 				/>
 			)}

@@ -412,7 +412,7 @@ export function SDKRateLimitModal() {
 													{selectedProfile?.name || t("common:rateLimit.selectAccount")}
 													{selectedProfileId ===
 														sdkRateLimitInfo.suggestedProfile?.id && (
-														<Star className="h-3 w-3 text-yellow-500" />
+														<Star className="h-3 w-3 text-warning" />
 													)}
 												</span>
 												<ChevronDown className="h-4 w-4 shrink-0 ml-2" />
@@ -433,7 +433,7 @@ export function SDKRateLimitModal() {
 														{profile.id ===
 															sdkRateLimitInfo.suggestedProfile?.id && (
 															<Star
-																className="h-3 w-3 text-yellow-500"
+																className="h-3 w-3 text-warning"
 																aria-label={t("common:rateLimit.recommendedAria")}
 															/>
 														)}

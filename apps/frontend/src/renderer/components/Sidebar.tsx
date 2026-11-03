@@ -1529,12 +1529,12 @@ export function Sidebar({
 					"hover:bg-accent/60 hover:scale-110",
 					"opacity-0 group-hover/nav-item:opacity-100 focus-visible:opacity-100",
 					isPinned
-						? "text-amber-400"
-						: "text-muted-foreground/40 hover:text-amber-400",
+						? "text-warning"
+						: "text-muted-foreground/40 hover:text-warning",
 				)}
 			>
 				<Star
-					className={cn("h-3.5 w-3.5", isPinned && "fill-amber-400")}
+					className={cn("h-3.5 w-3.5", isPinned && "fill-warning")}
 				/>
 			</button>
 		) : null;
@@ -1558,7 +1558,7 @@ export function Sidebar({
 						isPinned &&
 							!isActive &&
 							context !== "favorites" &&
-							"ring-1 ring-inset ring-amber-400/20 shadow-[inset_0_0_12px_-6px_rgba(251,191,36,0.25)]",
+							"ring-1 ring-inset ring-warning/20 shadow-[inset_0_0_12px_-6px_rgba(251,191,36,0.25)]",
 						getLayoutClasses(),
 					)}
 				>
@@ -1603,7 +1603,7 @@ export function Sidebar({
 					<TooltipContent side="right">
 						<span>{t(item.labelKey)}</span>
 						{isItemExperimental(item) && (
-							<span className="ml-2 text-amber-500">{t("navigation:experimental.badge")}</span>
+							<span className="ml-2 text-warning">{t("navigation:experimental.badge")}</span>
 						)}
 						{item.shortcut && (
 							<kbd className="ml-2 rounded border border-border bg-secondary px-1 font-mono text-3xs">
@@ -1806,7 +1806,7 @@ export function Sidebar({
 	// Helper function to get icon container className
 	const getIconContainerClassName = (isFavorites: boolean, hasActiveItem: boolean): string => {
 		if (isFavorites) {
-			return "bg-amber-400/10 text-amber-400";
+			return "bg-warning/10 text-warning";
 		}
 		if (hasActiveItem) {
 			return "bg-primary/10 text-primary";
@@ -1833,13 +1833,13 @@ export function Sidebar({
 								hasActiveItem
 									? "bg-accent text-accent-foreground shadow-sm"
 									: "hover:bg-accent hover:text-accent-foreground",
-								isFavorites && "ring-1 ring-amber-400/40",
+								isFavorites && "ring-1 ring-warning/40",
 							)}
 						>
 							<GroupIcon
 								className={cn(
 									"h-4 w-4",
-									isFavorites && "fill-amber-400 text-amber-400",
+									isFavorites && "fill-warning text-warning",
 								)}
 							/>
 							<ActivityBadge
@@ -1904,12 +1904,12 @@ export function Sidebar({
 					"hover:bg-accent/60 hover:scale-110",
 					"opacity-0 group-hover/group-header:opacity-100 focus-visible:opacity-100",
 					isPinned
-						? "text-amber-400"
-						: "text-muted-foreground/40 hover:text-amber-400",
+						? "text-warning"
+						: "text-muted-foreground/40 hover:text-warning",
 				)}
 			>
 				<Star
-					className={cn("h-3.5 w-3.5", isPinned && "fill-amber-400")}
+					className={cn("h-3.5 w-3.5", isPinned && "fill-warning")}
 				/>
 			</button>
 		);
@@ -1982,7 +1982,7 @@ export function Sidebar({
 					<GroupIcon
 						className={cn(
 							"h-4 w-4",
-							isFavorites && "fill-amber-400 text-amber-400",
+							isFavorites && "fill-warning text-warning",
 						)}
 					/>
 				</div>
@@ -2004,7 +2004,7 @@ export function Sidebar({
 						className={cn(
 							"text-xs px-1.5 py-0.5 rounded-full",
 							isFavorites
-								? "text-amber-400 bg-amber-400/10"
+								? "text-warning bg-warning/10"
 								: "text-muted-foreground bg-muted",
 						)}
 					>
@@ -2027,7 +2027,7 @@ export function Sidebar({
 				className={cn(
 					"space-y-1",
 					isFavorites &&
-						"rounded-lg bg-linear-to-b from-amber-400/5 to-transparent border border-amber-400/20 p-1",
+						"rounded-lg bg-linear-to-b from-amber-400/5 to-transparent border border-warning/20 p-1",
 				)}
 			>
 				<div className="group/group-header relative flex items-center">

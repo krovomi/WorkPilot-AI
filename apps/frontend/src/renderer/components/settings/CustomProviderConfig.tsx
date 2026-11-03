@@ -16,7 +16,7 @@ function getTierClasses(tier: ProviderModel["tier"]): string {
 	const tierClassMap: Record<ProviderModel["tier"], string> = {
 		flagship: "bg-primary/10 text-primary",
 		standard: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
-		fast: "bg-green-500/10 text-green-600 dark:text-green-400",
+		fast: "bg-success/10 text-success ",
 		local: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
 	};
 	return tierClassMap[tier];

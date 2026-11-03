@@ -31,7 +31,7 @@ export function NotebookView({
 					<button
 						type="button"
 						onClick={() => cancelScan()}
-						className="px-3 py-1.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 text-sm hover:bg-red-500/20"
+						className="px-3 py-1.5 rounded bg-destructive/10 text-destructive border border-destructive/20 text-sm hover:bg-destructive/20"
 					>
 						{t("actions.cancel")}
 					</button>
@@ -69,7 +69,7 @@ export function NotebookView({
 			)}
 
 			{phase === "error" && error && (
-				<div className="text-sm text-red-400">
+				<div className="text-sm text-destructive">
 					{t("errors.failed", { error })}
 				</div>
 			)}
@@ -116,7 +116,7 @@ function NotebookReport({
 				<StatCard
 					label={t("codeCells")}
 					value={notebook.codeCells}
-					color="text-green-400"
+					color="text-success"
 				/>
 				<StatCard
 					label={t("markdown")}
@@ -126,7 +126,7 @@ function NotebookReport({
 				<StatCard
 					label={t("issues")}
 					value={notebook.issues.length}
-					color="text-red-400"
+					color="text-destructive"
 				/>
 			</div>
 
@@ -136,10 +136,10 @@ function NotebookReport({
 						let severityClass: string;
 						if (issue.severity === "error") {
 							severityClass =
-								"border-red-500/20 bg-red-500/10 text-red-400";
+								"border-destructive/20 bg-destructive/10 text-destructive";
 						} else if (issue.severity === "warning") {
 							severityClass =
-								"border-yellow-500/20 bg-yellow-500/10 text-yellow-400";
+								"border-warning/20 bg-warning/10 text-warning";
 						} else {
 							severityClass =
 								"border-blue-500/20 bg-blue-500/10 text-blue-400";
@@ -160,7 +160,7 @@ function NotebookReport({
 								</div>
 								<p className="text-sm">{issue.message}</p>
 								{issue.suggestion && (
-									<p className="text-xs mt-1 text-green-400">
+									<p className="text-xs mt-1 text-success">
 										💡 {t("suggestion")}: {issue.suggestion}
 									</p>
 								)}

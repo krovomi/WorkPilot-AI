@@ -63,14 +63,14 @@ function VerdictBadge({ verdict }: { readonly verdict: string }) {
 	switch (verdict) {
 		case "approve":
 			return (
-				<Badge className="bg-green-500/10 text-green-400 border-green-500/30 gap-1">
+				<Badge className="bg-success/10 text-success border-success/30 gap-1">
 					<CheckCircle className="h-3 w-3" />
 					{t("common:prReview.approved")}
 				</Badge>
 			);
 		case "request_changes":
 			return (
-				<Badge className="bg-amber-500/10 text-amber-400 border-amber-500/30 gap-1">
+				<Badge className="bg-warning/10 text-warning border-warning/30 gap-1">
 					<XCircle className="h-3 w-3" />
 					{t("common:prReview.changesRequested")}
 				</Badge>
@@ -101,9 +101,9 @@ function SeverityBadge({
 	if (count === 0) return null;
 
 	const colorMap: Record<string, string> = {
-		critical: "bg-red-600/20 text-red-400 border-red-600/30",
+		critical: "bg-destructive/20 text-destructive border-destructive/30",
 		high: "bg-orange-500/20 text-orange-400 border-orange-500/30",
-		medium: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+		medium: "bg-warning/20 text-warning border-warning/30",
 		low: "bg-blue-500/20 text-blue-400 border-blue-500/30",
 	};
 
@@ -271,11 +271,11 @@ export function PRReviewCard({ memory }: PRReviewCardProps) {
 												{(() => {
 													let severityClass: string;
 													if (finding.severity === "critical") {
-														severityClass = "bg-red-600/20 text-red-400";
+														severityClass = "bg-destructive/20 text-destructive";
 													} else if (finding.severity === "high") {
 														severityClass = "bg-orange-500/20 text-orange-400";
 													} else if (finding.severity === "medium") {
-														severityClass = "bg-amber-500/20 text-amber-400";
+														severityClass = "bg-warning/20 text-warning";
 													} else {
 														severityClass = "bg-blue-500/20 text-blue-400";
 													}
@@ -312,7 +312,7 @@ export function PRReviewCard({ memory }: PRReviewCardProps) {
 						{hasGotchas && (
 							<div>
 								<div className="flex items-center gap-2 mb-2">
-									<AlertTriangle className="h-4 w-4 text-red-400" />
+									<AlertTriangle className="h-4 w-4 text-destructive" />
 									<span className="text-sm font-medium text-foreground">
 										{t("context:prReviewCard.gotchas")}
 									</span>
@@ -324,7 +324,7 @@ export function PRReviewCard({ memory }: PRReviewCardProps) {
 									{parsed.gotchas.map((gotcha) => (
 										<li
 											key={gotcha.slice(0, 50)}
-											className="text-sm text-red-400/80 py-1 pl-4 relative before:content-['•'] before:absolute before:left-0 before:text-red-500/50"
+											className="text-sm text-destructive/80 py-1 pl-4 relative before:content-['•'] before:absolute before:left-0 before:text-destructive/50"
 										>
 											{gotcha}
 										</li>

@@ -543,11 +543,11 @@ export function JiraSidePanel({
 	const getTypeColor = (type: string): string => {
 		switch (type.toLowerCase()) {
 			case "bug":
-				return "bg-red-500/10 text-red-500 border-red-500/20";
+				return "bg-destructive/10 text-destructive border-destructive/20";
 			case "task":
 				return "bg-blue-500/10 text-blue-500 border-blue-500/20";
 			case "story":
-				return "bg-green-500/10 text-green-500 border-green-500/20";
+				return "bg-success/10 text-success border-success/20";
 			case "epic":
 				return "bg-orange-500/10 text-orange-500 border-orange-500/20";
 			case "sub-task":
@@ -562,11 +562,11 @@ export function JiraSidePanel({
 		switch (priority?.toLowerCase()) {
 			case "highest":
 			case "critical":
-				return "bg-red-500/10 text-red-500 border-red-500/20";
+				return "bg-destructive/10 text-destructive border-destructive/20";
 			case "high":
 				return "bg-orange-500/10 text-orange-500 border-orange-500/20";
 			case "medium":
-				return "bg-yellow-500/10 text-yellow-500 border-yellow-500/20";
+				return "bg-warning/10 text-warning border-warning/20";
 			case "low":
 				return "bg-blue-500/10 text-blue-500 border-blue-500/20";
 			case "lowest":
@@ -780,8 +780,8 @@ export function JiraSidePanel({
 
 				{/* Error Banner */}
 				{error && (
-					<div className="mx-4 mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-md">
-						<p className="text-sm text-red-500 mb-3">{error}</p>
+					<div className="mx-4 mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+						<p className="text-sm text-destructive mb-3">{error}</p>
 						{onOpenSettings && (
 							<Button
 								variant="outline"

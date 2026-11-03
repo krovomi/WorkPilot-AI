@@ -18,17 +18,17 @@ interface QualityScoreBadgeProps {
 
 // Color mapping for grades
 const GRADE_COLORS: Record<string, string> = {
-	"A+": "bg-emerald-500 hover:bg-emerald-600 text-white",
-	A: "bg-green-500 hover:bg-green-600 text-white",
-	"A-": "bg-green-400 hover:bg-green-500 text-white",
+	"A+": "bg-success hover:bg-success/90 text-success-foreground",
+	A: "bg-success hover:bg-success/90 text-success-foreground",
+	"A-": "bg-success hover:bg-success/90 text-success-foreground",
 	"B+": "bg-lime-500 hover:bg-lime-600 text-white",
-	B: "bg-yellow-500 hover:bg-yellow-600 text-white",
-	"B-": "bg-yellow-400 hover:bg-yellow-500 text-gray-900",
+	B: "bg-warning hover:bg-warning/90 text-warning-foreground",
+	"B-": "bg-warning hover:bg-warning/90 text-warning-foreground",
 	"C+": "bg-orange-400 hover:bg-orange-500 text-white",
 	C: "bg-orange-500 hover:bg-orange-600 text-white",
 	"C-": "bg-orange-600 hover:bg-orange-700 text-white",
-	D: "bg-red-500 hover:bg-red-600 text-white",
-	F: "bg-red-600 hover:bg-red-700 text-white",
+	D: "bg-destructive hover:bg-destructive/90 text-destructive-foreground",
+	F: "bg-destructive hover:bg-destructive/90 text-destructive-foreground",
 };
 
 // Emoji for grades

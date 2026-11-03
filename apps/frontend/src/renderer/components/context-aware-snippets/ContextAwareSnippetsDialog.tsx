@@ -203,7 +203,7 @@ export function ContextAwareSnippetsDialog({
 						>
 							<SelectTrigger
 								id="snippet-type-select"
-								className="border-2 border-yellow-400 focus:border-yellow-500 focus-visible:border-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-200"
+								className="border-2 border-warning focus:border-warning focus-visible:border-warning focus:outline-none focus:ring-2 focus:ring-warning/30"
 								style={{
 									border: "2px solid rgb(250, 204, 21)",
 									borderRadius: "0.5rem",
@@ -243,7 +243,7 @@ export function ContextAwareSnippetsDialog({
 							placeholder={t(
 								"contextAwareSnippets:snippetDescription.placeholder",
 							)}
-							className="min-h-[100px] border-2 border-yellow-400 focus:border-yellow-500 focus-visible:border-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-200"
+							className="min-h-[100px] border-2 border-warning focus:border-warning focus-visible:border-warning focus:outline-none focus:ring-2 focus:ring-warning/30"
 							style={{
 								border: "2px solid rgb(250, 204, 21)",
 								borderRadius: "0.5rem",
@@ -278,7 +278,7 @@ export function ContextAwareSnippetsDialog({
 						>
 							<SelectTrigger
 								id="language-select"
-								className="border-2 border-yellow-400 focus:border-yellow-500 focus-visible:border-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-200"
+								className="border-2 border-warning focus:border-warning focus-visible:border-warning focus:outline-none focus:ring-2 focus:ring-warning/30"
 								style={{
 									border: "2px solid rgb(250, 204, 21)",
 									borderRadius: "0.5rem",

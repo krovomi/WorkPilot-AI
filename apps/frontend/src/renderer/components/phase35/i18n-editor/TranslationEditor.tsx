@@ -220,8 +220,8 @@ export function TranslationEditor() {
 						</header>
 
 						{stale && (
-							<div className="flex items-center gap-2 border-b bg-amber-500/10 px-3 py-2 text-xs">
-								<AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+							<div className="flex items-center gap-2 border-b bg-warning/10 px-3 py-2 text-xs">
+								<AlertTriangle className="h-4 w-4 shrink-0 text-warning" />
 								<span className="flex-1">{t("i18nEditor.staleNotice")}</span>
 								<Button
 									size="sm"
@@ -318,7 +318,7 @@ export function TranslationEditor() {
 															)}
 															{row.placeholderMismatch && (
 																<span
-																	className="shrink-0 text-amber-600"
+																	className="shrink-0 text-warning"
 																	title={t("i18nEditor.mismatchHint", {
 																		vars: placeholdersOf(
 																			row.values[referenceLocale] ?? "",

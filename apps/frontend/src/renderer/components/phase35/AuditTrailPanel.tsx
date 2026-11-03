@@ -171,8 +171,8 @@ export function AuditTrailPanel({ projectPath = "" }: AuditTrailPanelProps) {
 						<Badge
 							className={
 								integrity.is_intact
-									? "bg-green-500/20 text-green-700 border-green-500/40"
-									: "bg-red-500/20 text-red-700 border-red-500/40"
+									? "bg-success/20 text-success border-success/40"
+									: "bg-destructive/20 text-destructive border-destructive/40"
 							}
 						>
 							{integrity.is_intact ? t("audit.intact") : t("audit.tampered")}

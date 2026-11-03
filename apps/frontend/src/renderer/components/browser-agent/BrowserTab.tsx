@@ -224,10 +224,10 @@ export function BrowserTab({ projectPath }: BrowserTabProps) {
 				{/* Error state */}
 				{browserStatus === "error" && !browserScreenshot && (
 					<div className="flex flex-col items-center gap-3 text-center max-w-xs">
-						<div className="w-14 h-14 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
-							<WifiOff className="w-7 h-7 text-red-400" />
+						<div className="w-14 h-14 rounded-xl bg-destructive/10 border border-destructive/20 flex items-center justify-center">
+							<WifiOff className="w-7 h-7 text-destructive" />
 						</div>
-						<p className="text-sm font-medium text-red-400">
+						<p className="text-sm font-medium text-destructive">
 							{t("browserAgent:errors.screenshotFailed")}
 						</p>
 						<p className="text-xs text-muted-foreground">
@@ -242,8 +242,8 @@ export function BrowserTab({ projectPath }: BrowserTabProps) {
 				<div className="flex items-center gap-2 px-3 py-1.5 text-2xs">
 					{browserStatus === "ready" ? (
 						<>
-							<Wifi className="w-3 h-3 text-emerald-400" />
-							<span className="text-emerald-400/80 font-medium">
+							<Wifi className="w-3 h-3 text-success" />
+							<span className="text-success/80 font-medium">
 								{t("browserAgent:browser.ready")}
 							</span>
 							<span className="text-muted-foreground">·</span>
@@ -253,8 +253,8 @@ export function BrowserTab({ projectPath }: BrowserTabProps) {
 						</>
 					) : browserStatus === "error" ? (
 						<>
-							<WifiOff className="w-3 h-3 text-red-400" />
-							<span className="text-red-400/80 font-medium">
+							<WifiOff className="w-3 h-3 text-destructive" />
+							<span className="text-destructive/80 font-medium">
 								{t("browserAgent:errors.screenshotFailed")}
 							</span>
 						</>

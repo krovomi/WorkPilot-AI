@@ -69,7 +69,7 @@ function EndpointDetail({
 						)}
 					</div>
 					{operation.deprecated && (
-						<span className="text-3xs font-mono border border-amber-400/30 text-amber-400 bg-amber-400/10 rounded px-1.5 py-0.5 shrink-0">
+						<span className="text-3xs font-mono border border-warning/30 text-warning bg-warning/10 rounded px-1.5 py-0.5 shrink-0">
 							deprecated
 						</span>
 					)}
@@ -334,7 +334,7 @@ export function ApiExplorer() {
 		emulatorPhase === "detecting" || emulatorPhase === "starting";
 	const isEmulatorRunning = emulatorPhase === "running";
 	const emulatorBtnClass = isEmulatorRunning
-		? "shrink-0 gap-1.5 border-emerald-500/50 text-emerald-400 hover:bg-emerald-400/10"
+		? "shrink-0 gap-1.5 border-success/50 text-success hover:bg-success/10"
 		: "shrink-0 gap-1.5";
 	const emulatorBtnTitle = isEmulatorRunning
 		? emulatorStatus || emulatorUrl || ""
@@ -411,7 +411,7 @@ export function ApiExplorer() {
 						{!isEmulatorBusy && <Play size={13} />}
 						<span className="text-2xs">{emulatorBtnLabel}</span>
 						{isEmulatorRunning && (
-							<span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+							<span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse shrink-0" />
 						)}
 					</Button>
 				</div>
@@ -469,12 +469,12 @@ export function ApiExplorer() {
 
 						{/* Project scan error */}
 						{projectScanError && !isProjectScanning && (
-							<div className="flex items-start gap-1.5 mb-2 p-2 bg-amber-400/10 border border-amber-400/20 rounded-md">
+							<div className="flex items-start gap-1.5 mb-2 p-2 bg-warning/10 border border-warning/20 rounded-md">
 								<AlertCircle
 									size={11}
-									className="text-amber-400 shrink-0 mt-0.5"
+									className="text-warning shrink-0 mt-0.5"
 								/>
-								<span className="text-3xs text-amber-400/80 break-all">
+								<span className="text-3xs text-warning/80 break-all">
 									{projectScanError}
 								</span>
 							</div>
@@ -488,7 +488,7 @@ export function ApiExplorer() {
 									</div>
 									{/* Source badge */}
 									{specSource === "scan" && (
-										<span className="shrink-0 text-3xs font-medium px-1.5 py-0.5 rounded bg-emerald-400/10 text-emerald-400 border border-emerald-400/20">
+										<span className="shrink-0 text-3xs font-medium px-1.5 py-0.5 rounded bg-success/10 text-success border border-success/20">
 											{t("apiExplorer:scan.sourceBadge")}
 										</span>
 									)}
@@ -568,16 +568,16 @@ export function ApiExplorer() {
 
 						{specError && (
 							<div className="p-3">
-								<div className="flex items-start gap-2 p-3 bg-red-400/10 border border-red-400/20 rounded-lg">
+								<div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
 									<AlertCircle
 										size={14}
-										className="text-red-400 shrink-0 mt-0.5"
+										className="text-destructive shrink-0 mt-0.5"
 									/>
 									<div>
-										<div className="text-xs font-medium text-red-400">
+										<div className="text-xs font-medium text-destructive">
 											{t("apiExplorer:sidebar.loadError")}
 										</div>
-										<div className="text-3xs text-red-400/70 mt-1 font-mono break-all">
+										<div className="text-3xs text-destructive/70 mt-1 font-mono break-all">
 											{specError}
 										</div>
 									</div>
@@ -665,7 +665,7 @@ export function ApiExplorer() {
 					{activeEnv && (
 						<div className="px-3 py-2 border-t border-[var(--color-border)] bg-card">
 							<div className="flex items-center gap-1.5">
-								<div className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+								<div className="w-1.5 h-1.5 rounded-full bg-success shrink-0" />
 								<span className="text-3xs font-mono text-muted-foreground truncate">
 									{activeEnv.baseUrl}
 								</span>

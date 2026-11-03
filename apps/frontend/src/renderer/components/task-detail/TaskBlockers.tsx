@@ -86,7 +86,7 @@ export function TaskBlockers({ task }: TaskBlockersProps) {
 	return (
 		<div>
 			<h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
-				<Lock className="h-3 w-3 text-amber-400" />
+				<Lock className="h-3 w-3 text-warning" />
 				{t("tasks:metadata.blockedBy.title")}
 			</h3>
 
@@ -141,7 +141,7 @@ export function TaskBlockers({ task }: TaskBlockersProps) {
 					<Badge
 						key={id}
 						variant="outline"
-						className="text-xs pl-1.5 pr-1 py-0.5 flex items-center gap-1.5 bg-amber-500/10 text-amber-600 border-amber-500/30 dark:text-amber-400"
+						className="text-xs pl-1.5 pr-1 py-0.5 flex items-center gap-1.5 bg-warning/10 text-warning border-warning/30 "
 					>
 						<span title={t("tasks:metadata.blockedBy.missingHint")}>
 							{t("tasks:metadata.blockedBy.missingChip", { id })}

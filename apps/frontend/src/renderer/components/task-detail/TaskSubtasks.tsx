@@ -60,7 +60,7 @@ function getSubtaskStatusIcon(status: string) {
 		case "blocked":
 			// Counts as "done" for progress, but the agent gave up — flag it amber
 			// so it reads as "needs attention", never as a clean (green) pass.
-			return <AlertTriangle className="h-4 w-4 text-amber-500" />;
+			return <AlertTriangle className="h-4 w-4 text-warning" />;
 		case "failed":
 			return <XCircle className="h-4 w-4 text-[var(--error)]" />;
 		default:
@@ -75,7 +75,7 @@ function getStatusBadgeClass(status: string): string {
 		case "in_progress":
 			return "bg-info/20 text-info";
 		case "blocked":
-			return "bg-amber-500/20 text-amber-600 dark:text-amber-400";
+			return "bg-warning/20 text-warning ";
 		case "failed":
 			return "bg-destructive/20 text-destructive";
 		default:
@@ -258,7 +258,7 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 								})}
 							</span>
 							{blockedCount > 0 && (
-								<span className="text-amber-600 dark:text-amber-400">
+								<span className="text-warning ">
 									· {t("tasks:subtasks.blockedCount", { count: blockedCount })}
 								</span>
 							)}
@@ -422,7 +422,7 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 									subtask.status === "completed" &&
 										"border-[var(--success)]/50 bg-[var(--success-light)]",
 									subtask.status === "blocked" &&
-										"border-amber-500/50 bg-amber-500/10",
+										"border-warning/50 bg-warning/10",
 									subtask.status === "failed" &&
 										"border-[var(--error)]/50 bg-[var(--error-light)]",
 									// User-requested changes get a distinct violet treatment so they
@@ -488,7 +488,7 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 												</p>
 											)}
 										{subtask.status === "blocked" && (
-											<div className="mt-1.5 flex items-start gap-1.5 rounded-md bg-amber-500/10 px-2 py-1 text-2xs text-amber-700 dark:text-amber-400">
+											<div className="mt-1.5 flex items-start gap-1.5 rounded-md bg-warning/10 px-2 py-1 text-2xs text-warning ">
 												<AlertTriangle className="h-3 w-3 mt-0.5 flex-shrink-0" />
 												<span>
 													{subtask.blockedReason

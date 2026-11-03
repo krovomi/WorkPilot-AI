@@ -292,7 +292,7 @@ export function FormulaLab() {
 								<p
 									className={`mt-2 flex items-center gap-1.5 text-2xs ${
 										(matrix.history_tasks ?? 0) > 0
-											? "text-emerald-600 dark:text-emerald-400"
+											? "text-success dark:text-success"
 											: "text-muted-foreground"
 									}`}
 								>
@@ -308,7 +308,7 @@ export function FormulaLab() {
 										: t("formulaLab:costBasis.heuristic")}
 								</p>
 								{(matrix.bench_samples ?? 0) > 0 && (
-									<p className="mt-1 flex items-center gap-1.5 text-2xs text-emerald-600 dark:text-emerald-400">
+									<p className="mt-1 flex items-center gap-1.5 text-2xs text-success ">
 										<FlaskConical className="h-3 w-3 shrink-0" />
 										{t("formulaLab:costBasis.bench", {
 											count: matrix.bench_samples,
@@ -316,7 +316,7 @@ export function FormulaLab() {
 									</p>
 								)}
 								{refineError && (
-									<p className="mt-1.5 text-2xs text-amber-600 dark:text-amber-400">
+									<p className="mt-1.5 text-2xs text-warning ">
 										{t("formulaLab:refine.error")}
 									</p>
 								)}
@@ -480,7 +480,7 @@ export function FormulaLab() {
 																(f.installed ? (
 																	<Badge
 																		variant="outline"
-																		className="gap-1 border-emerald-500/40 text-3xs text-emerald-600 dark:text-emerald-400"
+																		className="gap-1 border-success/40 text-3xs text-success "
 																		title={t("formulaLab:local.installedTooltip")}
 																	>
 																		<HardDriveDownload className="h-2.5 w-2.5" />
@@ -511,7 +511,7 @@ export function FormulaLab() {
 															{f.cost_basis === "measured" && (
 																<span
 																	title={t("formulaLab:costBasis.measuredTooltip")}
-																	className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"
+																	className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-success"
 																/>
 															)}
 															{formatCostBand(f)}

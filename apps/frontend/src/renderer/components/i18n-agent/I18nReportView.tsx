@@ -14,8 +14,8 @@ import type {
 
 import { Input } from "../ui/input";
 const SEVERITY_STYLES: Record<I18nSeverity, string> = {
-	error: "text-red-400 bg-red-500/10 border-red-500/20",
-	warning: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
+	error: "text-destructive bg-destructive/10 border-destructive/20",
+	warning: "text-warning bg-warning/10 border-warning/20",
 	info: "text-blue-400 bg-blue-500/10 border-blue-500/20",
 };
 
@@ -85,7 +85,7 @@ export function I18nReportView({
 			)}
 
 			{phase === "error" && error && (
-				<div className="text-sm text-red-400">
+				<div className="text-sm text-destructive">
 					{t("errors.failed", { error })}
 				</div>
 			)}
@@ -141,7 +141,7 @@ function Toolbar({
 				<button
 					type="button"
 					onClick={onCancel}
-					className="px-3 py-1.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 text-sm hover:bg-red-500/20"
+					className="px-3 py-1.5 rounded bg-destructive/10 text-destructive border border-destructive/20 text-sm hover:bg-destructive/20"
 				>
 					{t("actions.cancel")}
 				</button>
@@ -205,11 +205,11 @@ function ReportBody({
 					{Object.entries(report.coverageByLocale).map(([locale, pct]) => {
 						let coverageColor: string;
 						if (pct >= 90) {
-							coverageColor = "text-green-400";
+							coverageColor = "text-success";
 						} else if (pct >= 70) {
-							coverageColor = "text-yellow-400";
+							coverageColor = "text-warning";
 						} else {
-							coverageColor = "text-red-400";
+							coverageColor = "text-destructive";
 						}
 						return (
 							<div
@@ -252,7 +252,7 @@ function ReportBody({
 								{issue.locale ? ` · ${t("localeLabel")}: ${issue.locale}` : ""}
 							</p>
 							{issue.suggestion && (
-								<p className="text-xs mt-1 text-green-400">{issue.suggestion}</p>
+								<p className="text-xs mt-1 text-success">{issue.suggestion}</p>
 							)}
 						</div>
 					))

@@ -81,7 +81,7 @@ export function SchemaViewer({ schema, spec, depth = 0 }: SchemaViewerProps) {
 								{key}
 							</span>
 							{required?.includes(key) && (
-								<span className="text-3xs text-red-400 font-mono border border-red-400/30 rounded px-1">
+								<span className="text-3xs text-destructive font-mono border border-destructive/30 rounded px-1">
 									required
 								</span>
 							)}
@@ -656,7 +656,7 @@ export function RequestPanel({
 						>
 							{tab.label}
 							{"badge" in tab && tab.badge && (
-								<span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+								<span className="w-1.5 h-1.5 rounded-full bg-warning shrink-0" />
 							)}
 							{activeTab === tab.id && (
 								<span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--color-primary)]" />
@@ -775,13 +775,13 @@ export function RequestPanel({
 							{/* Inherited from environment */}
 							{requestAuth.type === "inherited" && (
 								<div
-									className={`rounded-lg p-3 text-xs ${activeEnv?.token ? "bg-amber-400/5 border border-amber-400/20" : "bg-card border border-[var(--color-border)]"}`}
+									className={`rounded-lg p-3 text-xs ${activeEnv?.token ? "bg-warning/5 border border-warning/20" : "bg-card border border-[var(--color-border)]"}`}
 								>
 									{activeEnv?.token ? (
 										<div className="flex items-start gap-2">
-											<span className="text-amber-400 mt-0.5">🔑</span>
+											<span className="text-warning mt-0.5">🔑</span>
 											<div>
-												<div className="font-medium text-amber-400">
+												<div className="font-medium text-warning">
 													{t("apiExplorer:auth.inheritedFrom", {
 														env: activeEnv.name,
 													})}
@@ -1145,7 +1145,7 @@ export function RequestPanel({
 
 										{/* Error */}
 										{oauth2TokenError && (
-											<div className="text-xs text-red-400 bg-red-400/10 border border-red-400/20 rounded-md px-2.5 py-1.5">
+											<div className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-2.5 py-1.5">
 												{oauth2TokenError}
 											</div>
 										)}
@@ -1269,7 +1269,7 @@ export function RequestPanel({
 															{p.schema?.type ?? "any"}
 														</span>
 														{p.required && (
-															<span className="text-3xs text-red-400 border border-red-400/30 rounded px-1">
+															<span className="text-3xs text-destructive border border-destructive/30 rounded px-1">
 																required
 															</span>
 														)}
@@ -1485,7 +1485,7 @@ export function RequestPanel({
 										title={t("apiExplorer:response.saveTokenTitle")}
 										className={`flex items-center gap-1.5 px-2 py-0.5 text-2xs rounded border transition-colors ${
 											savedToken
-												? "text-emerald-400 border-emerald-500/40 bg-emerald-400/10"
+												? "text-success border-success/40 bg-success/10"
 												: "text-muted-foreground border-[var(--color-border)] hover:text-[var(--color-primary)] hover:border-[var(--color-primary)]/40"
 										}`}
 									>
@@ -1502,7 +1502,7 @@ export function RequestPanel({
 										className="text-muted-foreground hover:text-foreground transition-colors"
 									>
 										{copiedResponse ? (
-											<Check size={13} className="text-emerald-400" />
+											<Check size={13} className="text-success" />
 										) : (
 											<Copy size={13} />
 										)}
@@ -1558,7 +1558,7 @@ export function RequestPanel({
 													return (
 														<>
 															{!isXmlLike && responseLanguage !== "auto" && (
-																<p className="mb-2 text-2xs text-amber-400">
+																<p className="mb-2 text-2xs text-warning">
 																	{t("apiExplorer:response.format.mismatch", {
 																		format: effectiveLang.toUpperCase(),
 																	})}
@@ -1589,7 +1589,7 @@ export function RequestPanel({
 												return (
 													<>
 														{!isValidJson && responseLanguage !== "auto" && (
-															<p className="mb-2 text-2xs text-amber-400">
+															<p className="mb-2 text-2xs text-warning">
 																{t("apiExplorer:response.format.mismatch", {
 																	format: "JSON",
 																})}
@@ -1877,7 +1877,7 @@ export function KeyValueEditor({
 					<button
 						type="button"
 						onClick={() => onRemove(row.id)}
-						className="shrink-0 p-1 text-muted-foreground hover:text-red-400 transition-colors"
+						className="shrink-0 p-1 text-muted-foreground hover:text-destructive transition-colors"
 					>
 						<Trash2 size={13} />
 					</button>
@@ -1910,7 +1910,7 @@ export function ParamRow({
 				<span className="text-xs font-mono text-muted-foreground">
 					{param.name}
 				</span>
-				{param.required && <span className="text-red-400 ml-0.5">*</span>}
+				{param.required && <span className="text-destructive ml-0.5">*</span>}
 			</div>
 			<Input
 				spellCheck={false}

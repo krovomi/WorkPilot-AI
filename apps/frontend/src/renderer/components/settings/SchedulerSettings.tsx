@@ -73,10 +73,10 @@ export function SchedulerSettings() {
 
 	const statusColor: Record<string, string> = {
 		pending: "bg-blue-500/15 text-blue-600",
-		running: "bg-green-500/15 text-green-600",
-		paused: "bg-amber-500/15 text-amber-600",
-		completed: "bg-emerald-500/15 text-emerald-600",
-		failed: "bg-red-500/15 text-red-600",
+		running: "bg-success/15 text-success",
+		paused: "bg-warning/15 text-warning",
+		completed: "bg-success/15 text-success",
+		failed: "bg-destructive/15 text-destructive",
 	};
 
 	return (
@@ -248,7 +248,7 @@ export function SchedulerSettings() {
 											"rounded px-2 py-0.5 text-3xs font-mono";
 										if (isCompleted) {
 											taskStyleClass +=
-												" bg-green-500/15 text-green-600 line-through";
+												" bg-success/15 text-success line-through";
 										} else if (isCurrent) {
 											taskStyleClass +=
 												" bg-primary/15 text-primary font-medium";

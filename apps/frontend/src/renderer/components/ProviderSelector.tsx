@@ -599,7 +599,7 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
 				<AlertDialogContent>
 					<AlertDialogHeader>
 						<AlertDialogTitle className="flex items-center gap-2">
-							<AlertCircle className="h-5 w-5 text-amber-500" />
+							<AlertCircle className="h-5 w-5 text-warning" />
 							{t("dialogs:providerSelector.authDialog.title")}
 						</AlertDialogTitle>
 						<AlertDialogDescription>

@@ -215,7 +215,7 @@ export function SpecInterviewDialog({
 										}
 										className="flex items-start gap-1.5 text-left text-xs text-muted-foreground hover:text-foreground transition-colors"
 									>
-										<Lightbulb className="h-3.5 w-3.5 mt-0.5 shrink-0 text-amber-500" />
+										<Lightbulb className="h-3.5 w-3.5 mt-0.5 shrink-0 text-warning" />
 										<span>
 											{t("tasks:interview.useSuggestion")} : {question.suggestion}
 										</span>

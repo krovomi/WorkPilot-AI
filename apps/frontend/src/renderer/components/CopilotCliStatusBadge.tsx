@@ -333,9 +333,9 @@ export function CopilotCliStatusBadge({
 	const getStatusColor = () => {
 		switch (status) {
 			case "installed":
-				return "bg-green-500";
+				return "bg-success";
 			case "outdated":
-				return "bg-yellow-500";
+				return "bg-warning";
 			case "not-found":
 			case "gh-missing":
 			case "error":
@@ -424,7 +424,7 @@ export function CopilotCliStatusBadge({
 									? "text-destructive"
 									: "",
 								status === "outdated"
-									? "text-yellow-600 dark:text-yellow-500"
+									? "text-warning "
 									: "",
 								className,
 							)}
@@ -447,7 +447,7 @@ export function CopilotCliStatusBadge({
 											: ""}
 									</span>
 									{status === "outdated" && (
-										<span className="ml-auto text-3xs bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 px-1.5 py-0.5 rounded">
+										<span className="ml-auto text-3xs bg-warning/20 text-warning px-1.5 py-0.5 rounded">
 											{t("common:update", "Update")}
 										</span>
 									)}
@@ -554,7 +554,7 @@ export function CopilotCliStatusBadge({
 									<span
 										className={
 											authStatus.authenticated
-												? "text-green-600"
+												? "text-success"
 												: "text-destructive"
 										}
 									>

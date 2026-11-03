@@ -479,7 +479,7 @@ export function GitHubSetupModal({
 			<div className="py-4 space-y-4">
 				<div className="rounded-lg border bg-muted/50 p-4">
 					<div className="flex items-center gap-3">
-						<CheckCircle2 className="h-6 w-6 text-green-500" />
+						<CheckCircle2 className="h-6 w-6 text-success" />
 						<div>
 							<p className="font-medium">{t("dialogs:githubSetup.repoDetected")}</p>
 							<p className="text-sm text-muted-foreground font-mono">

@@ -14,9 +14,9 @@ import { PanelShell } from "./_panel-shell";
 
 import { Textarea } from "../ui/textarea";
 const SEV_COLOR: Record<string, string> = {
-	critical: "bg-red-500/20 text-red-700 border-red-500/40",
+	critical: "bg-destructive/20 text-destructive border-destructive/40",
 	high: "bg-orange-500/20 text-orange-700 border-orange-500/40",
-	medium: "bg-amber-500/20 text-amber-700 border-amber-500/40",
+	medium: "bg-warning/20 text-warning border-warning/40",
 	low: "bg-muted text-muted-foreground",
 };
 
