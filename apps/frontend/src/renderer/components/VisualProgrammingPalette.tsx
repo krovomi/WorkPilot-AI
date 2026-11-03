@@ -8,6 +8,7 @@ import {
 	filterBlocks,
 } from "../lib/architecture-blocks";
 
+import { Input } from "./ui/input";
 interface PaletteProps {
 	compact?: boolean;
 	/**
@@ -100,13 +101,13 @@ export const VisualProgrammingPalette: React.FC<PaletteProps> = ({
 				</div>
 				<div className="relative">
 					<Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-					<input
+					<Input
 						type="search"
 						value={query}
 						onChange={(e) => setQuery(e.target.value)}
 						placeholder={t("searchBlocks", "Rechercher un bloc…")}
 						aria-label={t("searchBlocks", "Rechercher un bloc…")}
-						className="w-full rounded-md border bg-background py-1.5 pl-7 pr-7 text-xs outline-none placeholder:text-muted-foreground focus:border-primary"
+						className="w-full py-1.5 pl-7 pr-7 text-xs h-auto"
 					/>
 					{query && (
 						<button

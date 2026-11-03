@@ -41,6 +41,8 @@ import { Button } from "../ui/button";
 import { ScrollArea } from "../ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 
+import { Input } from "../ui/input";
+import { Textarea } from "../ui/textarea";
 // Phase metadata for UI display
 const PHASE_CONFIG: Record<
 	PipelinePhase,
@@ -462,13 +464,13 @@ export function DesignImportPanel() {
 										<Palette className="h-4 w-4" />
 										{t("upload.figmaUrl")}
 									</label>
-									<input
+									<Input
 										id="figma-url-input"
 										type="text"
 										placeholder={t("upload.figmaUrlPlaceholder")}
 										value={figmaUrl}
 										onChange={(e) => setFigmaUrl(e.target.value)}
-										className="w-full px-3 py-2 text-sm rounded-md border bg-background focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+										className="w-full px-3 py-2 text-sm h-auto"
 									/>
 									<p className="text-xs text-muted-foreground">
 										{t("upload.figmaUrlHelp")}
@@ -545,12 +547,12 @@ export function DesignImportPanel() {
 												<label className="text-xs font-medium">
 													{t("upload.designSystemPath")}
 												</label>
-												<input
+												<Input
 													type="text"
 													placeholder={t("upload.designSystemPathPlaceholder")}
 													value={designSystemPath}
 													onChange={(e) => setDesignSystemPath(e.target.value)}
-													className="w-full px-3 py-1.5 text-sm rounded-md border bg-background focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+													className="w-full px-3 py-1.5 text-sm h-auto"
 												/>
 											</div>
 
@@ -585,7 +587,7 @@ export function DesignImportPanel() {
 												<label className="text-xs font-medium">
 													{t("upload.customInstructions")}
 												</label>
-												<textarea
+												<Textarea
 													placeholder={t(
 														"upload.customInstructionsPlaceholder",
 													)}
@@ -594,7 +596,7 @@ export function DesignImportPanel() {
 														setCustomInstructions(e.target.value)
 													}
 													rows={3}
-													className="w-full px-3 py-1.5 text-sm rounded-md border bg-background resize-none focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+													className="w-full px-3 py-1.5 text-sm resize-none min-h-0"
 												/>
 											</div>
 										</div>

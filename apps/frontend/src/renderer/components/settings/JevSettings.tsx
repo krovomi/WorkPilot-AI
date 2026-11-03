@@ -6,6 +6,7 @@ import { saveSettings, useSettingsStore } from "../../stores/settings-store";
 import { useJevStore } from "../../stores/jev-store";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
+import { NativeSelect } from "../ui/native-select";
 export function JevSettings() {
 	const { t } = useTranslation("settings");
 	const saved = useSettingsStore((s) => s.settings.jev);
@@ -101,10 +102,15 @@ export function JevSettings() {
 			</div>
 			<h3 className="font-medium">{t("jev.workflows")}</h3>
 			{workflows.map((id) => (
-				<label key={id} className="flex items-center justify-between gap-3">
+				<label
+					key={id}
+					htmlFor={`jev-workflow-${id}`}
+					className="flex items-center justify-between gap-3"
+				>
 					{t("jev.workflowNames." + id, { defaultValue: id })}
-					<select
-						className="rounded border bg-background p-2"
+					<NativeSelect
+						id={`jev-workflow-${id}`}
+						className="p-2 h-auto"
 						value={config.workflows?.[id] ?? "inherit"}
 						onChange={(e) =>
 							setConfig({
@@ -121,7 +127,7 @@ export function JevSettings() {
 								{t("jev.modes." + mode)}
 							</option>
 						))}
-					</select>
+					</NativeSelect>
 				</label>
 			))}
 			<label htmlFor="jev-workflow" className="block">

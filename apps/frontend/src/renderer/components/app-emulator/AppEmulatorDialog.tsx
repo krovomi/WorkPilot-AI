@@ -43,6 +43,7 @@ import {
 } from "../ui/dialog";
 import { ScrollArea } from "../ui/scroll-area";
 
+import { Input } from "../ui/input";
 /** Special tab value for the webview preview panel. */
 const PREVIEW_TAB = "__preview__";
 
@@ -449,12 +450,12 @@ export function AppEmulatorDialog() {
 							<div className="flex items-center gap-2 px-3 py-1.5 border-b border-border shrink-0">
 								<div className="flex-1 relative">
 									<Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-									<input
+									<Input
 										type="text"
 										value={searchQuery}
 										onChange={(e) => setSearchQuery(e.target.value)}
 										placeholder={t("appEmulator:output.searchPlaceholder")}
-										className="w-full h-7 pl-7 pr-7 text-xs rounded-md border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+										className="w-full h-7 pl-7 pr-7 text-xs"
 									/>
 									{searchQuery && (
 										<button
@@ -518,12 +519,12 @@ export function AppEmulatorDialog() {
 								</span>
 								<div className="flex-1 relative">
 									<Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-									<input
+									<Input
 										type="text"
 										value={searchQuery}
 										onChange={(e) => setSearchQuery(e.target.value)}
 										placeholder={t("appEmulator:output.searchPlaceholder")}
-										className="w-full h-7 pl-7 pr-7 text-xs rounded-md border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+										className="w-full h-7 pl-7 pr-7 text-xs"
 									/>
 									{searchQuery && (
 										<button

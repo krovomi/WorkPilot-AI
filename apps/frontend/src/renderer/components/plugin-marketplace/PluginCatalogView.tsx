@@ -11,6 +11,7 @@ import { useProjectStore } from "@/stores/project-store";
 import { Input } from "../ui/input";
 import { PluginCard } from "./PluginCard";
 
+import { NativeSelect } from "../ui/native-select";
 const TYPE_FILTERS: Array<{
 	value: CatalogPluginType | "all";
 	labelKey: string;
@@ -58,12 +59,12 @@ export function PluginCatalogView() {
 						/>
 					</div>
 					<div className="flex items-center gap-2">
-						<select
+						<NativeSelect
 							value={filters.sortBy}
 							onChange={(e) =>
 								setFilters({ sortBy: e.target.value as typeof filters.sortBy })
 							}
-							className="h-8 rounded-md border border-input bg-background px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+							className="h-8 px-3 text-xs"
 						>
 							<option value="featured">
 								{t("common:pluginMarketplace.sort.featured")}
@@ -71,7 +72,7 @@ export function PluginCatalogView() {
 							<option value="name">
 								{t("common:pluginMarketplace.sort.name")}
 							</option>
-						</select>
+						</NativeSelect>
 					</div>
 				</div>
 

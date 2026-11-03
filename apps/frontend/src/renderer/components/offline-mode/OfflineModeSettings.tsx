@@ -22,6 +22,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 
+import { NativeSelect } from "../ui/native-select";
 const LOCAL_PROVIDERS = new Set<string>(LOCAL_PROVIDER_IDS);
 
 function formatAge(seconds: number): string {
@@ -253,12 +254,16 @@ export function OfflineModeSettings({ projectPath }: Props) {
 							{t("offlineMode:hybridDescription")}
 						</p>
 					)}
-					<label className="flex items-center gap-2 text-sm">
+					<label
+						htmlFor="offline-default-provider"
+						className="flex items-center gap-2 text-sm"
+					>
 						{t("offlineMode:defaultProvider")}
-						<select
+						<NativeSelect
+							id="offline-default-provider"
 							value={policy.defaultProvider}
 							onChange={(e) => setDefaultProvider(e.target.value)}
-							className="h-8 rounded-md border border-input bg-background px-2"
+							className="h-8 px-2"
 						>
 							{!LOCAL_PROVIDERS.has(policy.defaultProvider) && (
 								<option value={policy.defaultProvider} disabled>
@@ -271,7 +276,7 @@ export function OfflineModeSettings({ projectPath }: Props) {
 									{provider}
 								</option>
 							))}
-						</select>
+						</NativeSelect>
 					</label>
 					<p className="text-xs text-muted-foreground">
 						{t("offlineMode:defaultDescription")}
@@ -317,7 +322,7 @@ export function OfflineModeSettings({ projectPath }: Props) {
 											</span>
 										</td>
 										<td className="py-1 pr-2">
-											<select
+											<NativeSelect
 												value={entry.provider}
 												onChange={(e) => {
 													const nextProvider = e.target.value;
@@ -325,7 +330,7 @@ export function OfflineModeSettings({ projectPath }: Props) {
 													const nextModel = nextModels[0] ?? "";
 													setRouting(task, nextProvider, nextModel);
 												}}
-												className="h-7 w-full rounded-md border border-input bg-background px-2 text-sm"
+												className="h-7 w-full px-2 text-sm"
 											>
 												{!LOCAL_PROVIDERS.has(entry.provider) && (
 													<option value={entry.provider} disabled>
@@ -338,7 +343,7 @@ export function OfflineModeSettings({ projectPath }: Props) {
 														{p}
 													</option>
 												))}
-											</select>
+											</NativeSelect>
 										</td>
 										<td className="py-1 pr-2">
 											<select
