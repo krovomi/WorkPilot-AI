@@ -34,6 +34,7 @@ import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
 import { Input } from "../ui/input";
+import { PageHeader } from "../ui/page-header";
 
 export const MAX_CASES = 20;
 export const MAX_ENGINES = 4;
@@ -378,13 +379,12 @@ export function RepoBenchView({ projectId }: Props) {
 
 	return (
 		<div className="mx-auto max-w-6xl space-y-6 p-6">
-			<header className="space-y-1">
-				<h1 className="flex items-center gap-2 text-xl font-semibold">
-					<FlaskConical className="h-5 w-5" />
-					{t("bench:title")}
-				</h1>
-				<p className="text-sm text-muted-foreground">{t("bench:description")}</p>
-			</header>
+			<PageHeader
+				variant="inline"
+				icon={FlaskConical}
+				title={t("bench:title")}
+				description={t("bench:description")}
+			/>
 
 			{error && (
 				<div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">

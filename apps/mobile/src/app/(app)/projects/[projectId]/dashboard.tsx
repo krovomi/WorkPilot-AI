@@ -8,6 +8,7 @@ import { describeError } from "../../../../i18n";
 import { count, Figures, money, top } from "../../../../insights/Figures";
 import { Button, ErrorBanner, Loading, Section } from "../../../../ui/components";
 import { SPACE, useTheme } from "../../../../ui/theme";
+import { statusLabel } from "../../../../i18n/labels";
 
 export default function Dashboard() {
 	const { projectId } = useLocalSearchParams<{ projectId: string }>();
@@ -23,7 +24,6 @@ export default function Dashboard() {
 
 	if (loading && !data) return <Loading />;
 	const lang = i18n.language;
-	const label = (group: string, key: string) => (i18n.exists(`${group}.${key}`) ? t(`${group}.${key}`) : key);
 	return (
 		<ScrollView
 			contentContainerStyle={styles.content}
@@ -49,7 +49,7 @@ export default function Dashboard() {
 					<Section title={t("dashboard.cards")}>
 						<Figures
 							rows={top(data.snapshot.tasks_by_status, 12).map(([status, n]) => ({
-								label: label("dashboard.status", status),
+								label: statusLabel(status),
 								value: count(n, lang),
 							}))}
 						/>

@@ -82,6 +82,8 @@ def served(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(catalog, "CACHE_PATH", tmp_path / "catalog.json")
     monkeypatch.setattr(catalog, "_api_key_for", lambda _: None)
+    # Nor a GitHub CLI login: Copilot's own list is not asked for either.
+    monkeypatch.setitem(catalog._FETCHERS, "copilot", lambda: [])
     monkeypatch.delenv("MODEL_REGISTRY_ENABLED", raising=False)
     return calls
 

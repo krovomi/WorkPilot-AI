@@ -300,10 +300,18 @@ async def cancel_analysis_job(
 async def get_report(
     kind: str,
     scope: ProjectScope = Depends(resolve_project_scope),
-) -> dict[str, str | None]:
-    """The last saved report of the analysis, as saved; null if none."""
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """The last saved report of the analysis, as saved (null if none), and
+    the job running it now (null if none), so that a screen opened again
+    follows the run it left."""
     analysis = analysis_named(kind)
     directory = _report_dir(scope.path)
     if directory is None:
         raise HTTPException(status_code=409, detail="Reports unavailable")
-    return {"report": read_file(directory, analysis.report_file, MAX_REPORT)}
+    running = get_project_jobs().running_job(scope.project_id, analysis.feature)
+    job = await db.get(ProjectJob, running) if running else None
+    return {
+        "report": read_file(directory, analysis.report_file, MAX_REPORT),
+        "job": job_public(job) if job is not None else None,
+    }

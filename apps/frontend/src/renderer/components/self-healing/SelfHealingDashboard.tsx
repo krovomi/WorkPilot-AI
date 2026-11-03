@@ -6,6 +6,8 @@ import { useSelfHealingStore } from "@/stores/self-healing-store";
 import { CICDTab } from "./CICDTab";
 import { ProactiveTab } from "./ProactiveTab";
 import { ProductionTab } from "./ProductionTab";
+import { HeartPulse } from "lucide-react";
+import { PageHeader } from "../ui/page-header";
 
 const TABS: Array<{ id: IncidentMode; icon: string; labelKey: string }> = [
 	{ id: "cicd", icon: "\uD83D\uDD04", labelKey: "selfHealing:tabCICD" },
@@ -36,21 +38,12 @@ export function SelfHealingDashboard() {
 
 	return (
 		<div className="h-full flex flex-col overflow-hidden">
-			{/* Header */}
-			<div className="px-6 py-4 border-b border-border bg-background">
-				<div className="flex items-center justify-between">
-					<div>
-						<h1 className="text-lg font-semibold text-foreground">
-							{t("selfHealing:title")}
-						</h1>
-						<p className="text-xs text-muted-foreground mt-0.5">
-							{t("selfHealing:subtitle")}
-						</p>
-					</div>
-				</div>
-
-				{/* Stats summary */}
-				<div className="grid grid-cols-5 gap-3 mt-3">
+			<PageHeader
+				icon={HeartPulse}
+				title={t("selfHealing:title")}
+				description={t("selfHealing:subtitle")}
+			>
+				<div className="grid grid-cols-5 gap-3">
 					<StatCard
 						label={t("selfHealing:totalIncidents")}
 						value={stats.totalIncidents}
@@ -75,7 +68,7 @@ export function SelfHealingDashboard() {
 						variant="success"
 					/>
 				</div>
-			</div>
+			</PageHeader>
 
 			{/* Tab bar */}
 			<div className="flex border-b border-border bg-background px-6">

@@ -31,6 +31,13 @@ l'annonce au lieu de proposer le vote. Côté backend, `oneshot_completion` ne
 compte jamais une ligne `MessageRole.SYSTEM` (le statut qu'un client émet sur
 lui-même) comme du texte du modèle : seule, elle devient l'erreur de l'appel.
 
+**Un modèle Copilot est celui du compte, ou rien.** Les modèles Copilot viennent
+de `api.githubcopilot.com/models` interrogé avec le jeton du compte
+(`copilot_models.py`), pas du registre public, qui liste tout ce que GitHub a
+publié quel que soit l'abonnement. Et `require_provider` interdit aussi à
+Copilot de remplacer un modèle refusé (`model_not_supported`) par un autre : la
+réponse serait créditée au modèle demandé.
+
 **Rien ici ne détecte quoi que ce soit de nouveau.** Deux réponses que
 l'application possédait déjà sont jointes : quels fournisseurs sont configurés
 (`getStaticProviders`, la source du sélecteur de fournisseur) et quels

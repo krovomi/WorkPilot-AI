@@ -24,6 +24,7 @@ import { useDocintelVisualStore } from "../../stores/docintel-visual-store";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { ScrollArea } from "../ui/scroll-area";
+import { EmptyState as SharedEmptyState } from "../ui/empty-state";
 
 interface TaskMobilePreviewProps {
 	taskId: string;
@@ -358,13 +359,12 @@ function EmptyState({
 	description: string;
 }) {
 	return (
-		<div className="flex h-full items-center justify-center p-8 text-center">
-			<div className="space-y-3">
-				<Smartphone className="mx-auto h-10 w-10 text-muted-foreground/40" />
-				<h3 className="text-base font-semibold">{title}</h3>
-				<p className="max-w-md text-sm text-muted-foreground">{description}</p>
-			</div>
-		</div>
+		<SharedEmptyState
+			className="h-full"
+			icon={Smartphone}
+			title={title}
+			description={description}
+		/>
 	);
 }
 

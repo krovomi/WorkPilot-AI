@@ -16,6 +16,8 @@ import {
 } from "../../stores/context-mesh-store";
 import { useProjectStore } from "../../stores/project-store";
 import { formatAppDate } from "@/lib/date-format";
+import { Share2 } from "lucide-react";
+import { PageHeader } from "../ui/page-header";
 
 const TABS: ContextMeshTab[] = [
 	"overview",
@@ -90,16 +92,12 @@ export function ContextMeshDashboard(): React.ReactElement {
 
 	return (
 		<div className="flex flex-col h-full bg-background text-foreground">
-			{/* Header */}
-			<div className="px-6 py-4 border-b border-border">
-				<div className="flex items-center justify-between gap-6">
-					<div>
-						<h1 className="text-xl font-semibold">{t("contextMesh:title")}</h1>
-						<p className="text-sm text-muted-foreground mt-0.5 max-w-3xl">
-							{t("contextMesh:description")}
-						</p>
-					</div>
-					<div className="flex items-center gap-3 shrink-0">
+			<PageHeader
+				icon={Share2}
+				title={t("contextMesh:title")}
+				description={t("contextMesh:description")}
+				actions={
+					<>
 						{projectPath && (
 							<button
 								type="button"
@@ -135,14 +133,15 @@ export function ContextMeshDashboard(): React.ReactElement {
 									: t("contextMesh:actions.analyze")}
 							</button>
 						)}
-					</div>
-				</div>
+					</>
+				}
+			>
 				{!canAnalyze && !isAnalyzing && (
-					<p className="text-xs text-muted-foreground mt-2">
+					<p className="text-xs text-muted-foreground">
 						{t("contextMesh:errors.analysisRequired")}
 					</p>
 				)}
-			</div>
+			</PageHeader>
 
 			{/* Tabs */}
 			<div className="px-6 border-b border-border flex items-center gap-1 overflow-x-auto">

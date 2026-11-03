@@ -33,6 +33,7 @@ import { EnvironmentManager } from "./EnvironmentManager";
 import { ExportDialog } from "./ExportDialog";
 import { RequestPanel, CustomSelect } from "./RequestPanel";
 import { formatAppTime } from "@/lib/date-format";
+import { EmptyState as SharedEmptyState } from "../ui/empty-state";
 
 // ── Endpoint Detail ──────────────────────────────────────────────────────────
 
@@ -710,22 +711,19 @@ function EmptyState({
 }) {
 	if (isLoading) return null;
 	return (
-		<div className="flex flex-col items-center justify-center h-full gap-4 text-muted-foreground">
-			<div className="w-16 h-16 rounded-2xl bg-card border border-[var(--color-border)] flex items-center justify-center">
-				<ExternalLink size={24} className="opacity-40" />
-			</div>
-			<div className="text-center">
-				<div className="text-sm font-medium text-muted-foreground mb-1">
-					{spec
-						? t("apiExplorer:empty.selectEndpoint")
-						: t("apiExplorer:empty.noSpec")}
-				</div>
-				<div className="text-xs text-muted-foreground">
-					{spec
-						? t("apiExplorer:empty.selectEndpointHint")
-						: t("apiExplorer:empty.noSpecHint")}
-				</div>
-			</div>
-		</div>
+		<SharedEmptyState
+			className="h-full"
+			icon={ExternalLink}
+			title={
+				spec
+					? t("apiExplorer:empty.selectEndpoint")
+					: t("apiExplorer:empty.noSpec")
+			}
+			description={
+				spec
+					? t("apiExplorer:empty.selectEndpointHint")
+					: t("apiExplorer:empty.noSpecHint")
+			}
+		/>
 	);
 }

@@ -1,6 +1,6 @@
 import {
 	AlertTriangle,
-	BookOpen,
+	BookOpenCheck,
 	Check,
 	CheckCircle2,
 	Copy,
@@ -18,6 +18,7 @@ import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
 import { ScrollArea } from "./ui/scroll-area";
 import { FilePathAutocomplete } from "./FilePathAutocomplete";
+import { PageHeader } from "./ui/page-header";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -268,18 +269,12 @@ export function DocumentationView({ projectId }: DocumentationViewProps) {
 	return (
 		<ScrollArea className="h-full">
 			<div className="p-6 space-y-6 max-w-5xl mx-auto">
-				{/* Header */}
-				<div className="flex items-center gap-3">
-					<BookOpen className="h-6 w-6 text-primary" />
-					<div>
-						<h1 className="text-xl font-bold text-foreground">
-							{t("documentation:title")}
-						</h1>
-						<p className="text-sm text-muted-foreground">
-							{t("documentation:description")}
-						</p>
-					</div>
-				</div>
+				<PageHeader
+					variant="inline"
+					icon={BookOpenCheck}
+					title={t("documentation:title")}
+					description={t("documentation:description")}
+				/>
 
 				{/* Coverage check */}
 				<Card>

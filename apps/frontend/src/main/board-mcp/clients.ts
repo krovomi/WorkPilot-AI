@@ -12,11 +12,14 @@
  * - VS Code (Copilot Chat): `servers`, `type: "stdio"`;
  * - OpenCode: `mcp`, `type: "local"`, `command` as one array;
  * - Codex: a `[mcp_servers.<name>]` table of `~/.codex/config.toml`;
+ * - hermes-agent: `mcp_servers.<name>` in `<HERMES_HOME>/config.yaml`,
+ *   edited as a YAML document so the comments a person wrote there stay;
  * - Claude Code: `~/.claude.json`, which Claude Code itself rewrites while it
  *   runs, so the app only reads it and writes through `claude mcp add-json`.
  */
 
 import path from "node:path";
+import { isMap, parseDocument } from "yaml";
 import type { BoardMcpClientId } from "../../shared/types/board-mcp";
 
 export interface ServerEntry {
@@ -30,6 +33,7 @@ export type ClientFormat =
 	| "vscode"
 	| "opencode"
 	| "codex-toml"
+	| "hermes-yaml"
 	| "claude-code";
 
 export interface ClientDefinition {
@@ -47,12 +51,15 @@ export interface ClientDirs {
 	appData: string;
 	codexHome?: string;
 	xdgConfig?: string;
+	/** `HERMES_HOME`, or `%LOCALAPPDATA%\\hermes` on Windows; `~/.hermes` otherwise. */
+	hermesHome?: string;
 }
 
 export function clientDefinitions(dirs: ClientDirs): ClientDefinition[] {
 	const { home, appData } = dirs;
 	const codex = dirs.codexHome || path.join(home, ".codex");
 	const xdg = dirs.xdgConfig || path.join(home, ".config");
+	const hermes = dirs.hermesHome || path.join(home, ".hermes");
 	const def = (
 		id: BoardMcpClientId,
 		format: ClientFormat,
@@ -73,6 +80,7 @@ export function clientDefinitions(dirs: ClientDirs): ClientDefinition[] {
 		),
 		def("windsurf", "mcp-servers", path.join(home, ".codeium", "windsurf", "mcp_config.json")),
 		def("opencode", "opencode", path.join(xdg, "opencode", "opencode.json")),
+		def("hermes", "hermes-yaml", path.join(hermes, "config.yaml")),
 	];
 }
 
@@ -91,7 +99,7 @@ export function serverName(projectName: string): string {
 
 // ── JSON clients ─────────────────────────────────────────────────────────
 
-const JSON_KEY: Record<Exclude<ClientFormat, "codex-toml">, string> = {
+const JSON_KEY: Record<Exclude<ClientFormat, "codex-toml" | "hermes-yaml">, string> = {
 	"mcp-servers": "mcpServers",
 	copilot: "mcpServers",
 	vscode: "servers",
@@ -231,6 +239,50 @@ function writeToml(text: string, name: string, entry: ServerEntry | null): strin
 	return `${body ? `${body}\n\n` : ""}${block.join("\n")}`;
 }
 
+// ── hermes-agent (YAML) ──────────────────────────────────────────────────
+
+const HERMES_KEY = "mcp_servers";
+
+/** The document, refusing one a rewrite could damage. */
+function parseYamlConfig(text: string) {
+	const doc = parseDocument(text);
+	if (doc.errors.length > 0) throw new ConfigParseError(doc.errors[0].message);
+	if (doc.contents !== null && !isMap(doc.contents)) {
+		throw new ConfigParseError("not a YAML mapping");
+	}
+	const section = doc.get(HERMES_KEY);
+	if (section !== undefined && section !== null && !isMap(section)) {
+		throw new ConfigParseError(`"${HERMES_KEY}" is not a mapping`);
+	}
+	return doc;
+}
+
+function readYaml(text: string, name: string): string[] | null | undefined {
+	const doc = parseYamlConfig(text);
+	if (!doc.hasIn([HERMES_KEY, name])) return undefined;
+	const value: unknown = doc.toJS()?.[HERMES_KEY]?.[name];
+	return storedCommand("hermes-yaml", value);
+}
+
+function writeYaml(text: string, name: string, entry: ServerEntry | null): string {
+	const doc = parseYamlConfig(text);
+	if (entry) doc.setIn([HERMES_KEY, name], { command: entry.command, args: entry.args });
+	else if (doc.hasIn([HERMES_KEY, name])) doc.deleteIn([HERMES_KEY, name]);
+	else return text;
+	return doc.toString();
+}
+
+function yamlBlock(name: string, entry: ServerEntry): string {
+	return [
+		`${HERMES_KEY}:`,
+		`  ${name}:`,
+		`    command: ${JSON.stringify(entry.command)}`,
+		"    args:",
+		...entry.args.map((arg) => `      - ${JSON.stringify(arg)}`),
+		"",
+	].join("\n");
+}
+
 // ── One API over every format ────────────────────────────────────────────
 
 /** The stored entry's state; throws `ConfigParseError` on an unreadable file. */
@@ -242,6 +294,11 @@ export function entryState(
 ): "absent" | "current" | "stale" {
 	if (format === "codex-toml") {
 		const stored = readToml(text, name);
+		if (stored === undefined) return "absent";
+		return sameCommand(stored, entry) ? "current" : "stale";
+	}
+	if (format === "hermes-yaml") {
+		const stored = readYaml(text, name);
 		if (stored === undefined) return "absent";
 		return sameCommand(stored, entry) ? "current" : "stale";
 	}
@@ -258,6 +315,7 @@ export function withEntry(
 	entry: ServerEntry | null,
 ): string {
 	if (format === "codex-toml") return writeToml(text, name, entry);
+	if (format === "hermes-yaml") return writeYaml(text, name, entry);
 	const config = parseJsonObject(text);
 	const key = JSON_KEY[format];
 	const section = { ...jsonSection(config, key) };
@@ -283,6 +341,7 @@ export function snippet(format: ClientFormat, name: string, entry: ServerEntry):
 			.join(" ");
 	}
 	if (format === "codex-toml") return tomlBlock(name, entry);
+	if (format === "hermes-yaml") return yamlBlock(name, entry);
 	return JSON.stringify(
 		{ [JSON_KEY[format]]: { [name]: renderEntry(format, entry) } },
 		null,
