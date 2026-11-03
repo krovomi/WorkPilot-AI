@@ -728,7 +728,7 @@ export function UsageIndicator() {
 									</span>
 								</p>
 								{openaiError && (
-									<div className="mt-2 p-1 bg-red-50 border border-red-200 rounded text-3xs text-red-700">
+									<div className="mt-2 p-1 bg-destructive/10 border border-destructive/30 rounded text-3xs text-destructive">
 										<b>{t("common:usage.openaiError")}</b> {openaiError}
 									</div>
 								)}
@@ -848,7 +848,7 @@ export function UsageIndicator() {
 	const isUnmeasured = usage.usageUnmeasured === true;
 	let badgeColorClasses: string;
 	if (usage.needsReauthentication) {
-		badgeColorClasses = "text-red-500 bg-red-500/10 border-red-500/20";
+		badgeColorClasses = "text-destructive bg-destructive/10 border-destructive/20";
 	} else if (isUnmeasured) {
 		badgeColorClasses = "text-muted-foreground bg-muted/50 border-border";
 	} else {
@@ -983,7 +983,7 @@ export function UsageIndicator() {
 		if (usage.needsReauthentication) {
 			return (
 				<span
-					className="text-xs font-semibold text-red-500"
+					className="text-xs font-semibold text-destructive"
 					title={t("common:usage.needsReauthTitle")}
 				>
 					!
@@ -1009,7 +1009,7 @@ export function UsageIndicator() {
 			return (
 				<div className="flex items-center gap-0.5 text-xs font-semibold font-mono">
 					<span
-						className={cost ? "text-green-500" : "text-muted-foreground/60"}
+						className={cost ? "text-success" : "text-muted-foreground/60"}
 						title={t("common:usage.openaiCostLabel")}
 					>
 						${cost ?? "–"}
@@ -1025,7 +1025,7 @@ export function UsageIndicator() {
 				const pct = contextUsage.percentUsed;
 				const colorClass =
 					pct >= THRESHOLD_WARNING
-						? "text-red-500"
+						? "text-destructive"
 						: pct >= THRESHOLD_ELEVATED
 							? "text-orange-500"
 							: "text-blue-500";
@@ -1151,14 +1151,14 @@ export function UsageIndicator() {
 							<div
 								className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
 									usage.needsReauthentication
-										? "bg-red-500/10"
+										? "bg-destructive/10"
 										: "bg-primary/10"
 								}`}
 							>
 								<span
 									className={`text-xs font-semibold ${
 										usage.needsReauthentication
-											? "text-red-500"
+											? "text-destructive"
 											: "text-primary"
 									}`}
 								>
@@ -1169,7 +1169,7 @@ export function UsageIndicator() {
 							</div>
 							{/* Status dot for re-auth needed */}
 							{usage.needsReauthentication && (
-								<div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-background" />
+								<div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-destructive rounded-full border-2 border-background" />
 							)}
 						</div>
 
@@ -1180,7 +1180,7 @@ export function UsageIndicator() {
 									{t("common:usage.activeAccount")}
 								</span>
 								{usage.needsReauthentication && (
-									<span className="text-3xs px-1.5 py-0.5 bg-red-500/10 text-destructive rounded font-semibold">
+									<span className="text-3xs px-1.5 py-0.5 bg-destructive/10 text-destructive rounded font-semibold">
 										{t("common:usage.needsReauth")}
 									</span>
 								)}

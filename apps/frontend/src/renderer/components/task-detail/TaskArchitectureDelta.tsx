@@ -238,7 +238,7 @@ function Notice({
 			<div className="max-w-md">
 				<div className="flex items-center gap-2">
 					{tone === "warning" && (
-						<AlertTriangle className="h-4 w-4 text-amber-500" aria-hidden />
+						<AlertTriangle className="h-4 w-4 text-warning" aria-hidden />
 					)}
 					<h3 className="text-sm font-medium">{title}</h3>
 				</div>

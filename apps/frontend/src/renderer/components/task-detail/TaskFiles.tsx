@@ -29,7 +29,7 @@ const ALLOWED_EXTENSIONS = [".md", ".json"];
 // Get icon for file type
 function getFileIcon(filename: string) {
 	if (filename.endsWith(".json")) {
-		return <FileJson className="h-4 w-4 text-amber-500" />;
+		return <FileJson className="h-4 w-4 text-warning" />;
 	}
 	return <FileText className="h-4 w-4 text-blue-500" />;
 }

@@ -220,7 +220,7 @@ export function AgentCliStatusBadge({
 
 	const statusColor = {
 		loading: "bg-muted-foreground",
-		installed: "bg-green-500",
+		installed: "bg-success",
 		"not-found": "bg-destructive",
 		error: "bg-destructive",
 	}[status];

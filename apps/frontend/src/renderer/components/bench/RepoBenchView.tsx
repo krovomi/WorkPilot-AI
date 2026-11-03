@@ -138,8 +138,8 @@ function BuildCell({
 	if (build.state === "judged") {
 		label = build.resolved ? t("run.resolved") : t("run.notResolved");
 		tone = build.resolved
-			? "text-emerald-600 dark:text-emerald-400"
-			: "text-red-600 dark:text-red-400";
+			? "text-success "
+			: "text-destructive ";
 	} else if (build.state === "skipped") {
 		label = t("run.notCounted");
 	} else {
@@ -392,7 +392,7 @@ export function RepoBenchView({ projectId }: Props) {
 				</div>
 			)}
 			{status?.error && (
-				<div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
+				<div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
 					{status.error}
 				</div>
 			)}

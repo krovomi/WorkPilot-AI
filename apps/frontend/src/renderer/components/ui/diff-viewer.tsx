@@ -71,8 +71,8 @@ function UnifiedDiff({ lines }: { lines: DiffLine[] }) {
 					data-diff-hunk={line.type === "hunk" ? "true" : undefined}
 					className={cn(
 						"flex diff-line",
-						line.type === "added" && "bg-green-500/20",
-						line.type === "removed" && "bg-red-500/20",
+						line.type === "added" && "bg-success/20",
+						line.type === "removed" && "bg-destructive/20",
 						line.type === "hunk" && "bg-blue-500/20",
 						line.type === "context" && "bg-transparent",
 					)}
@@ -86,8 +86,8 @@ function UnifiedDiff({ lines }: { lines: DiffLine[] }) {
 						<div
 							className={cn(
 								"w-10 text-right pr-2",
-								line.type === "added" && "text-green-400 font-medium",
-								line.type === "removed" && "text-red-400 font-medium",
+								line.type === "added" && "text-success font-medium",
+								line.type === "removed" && "text-destructive font-medium",
 								line.type === "context" && "text-muted-foreground",
 								line.type === "hunk" && "text-blue-400 font-medium",
 							)}
@@ -97,8 +97,8 @@ function UnifiedDiff({ lines }: { lines: DiffLine[] }) {
 						<div
 							className={cn(
 								"w-10 text-right pr-2 border-l border-border",
-								line.type === "added" && "text-green-400 font-medium",
-								line.type === "removed" && "text-red-400 font-medium",
+								line.type === "added" && "text-success font-medium",
+								line.type === "removed" && "text-destructive font-medium",
 								line.type === "context" && "text-muted-foreground",
 								line.type === "hunk" && "text-blue-400 font-medium",
 							)}
@@ -109,8 +109,8 @@ function UnifiedDiff({ lines }: { lines: DiffLine[] }) {
 					<div
 						className={cn(
 							"flex-1 px-2 py-0.5 whitespace-pre overflow-x-auto",
-							line.type === "added" && "text-green-400 font-medium",
-							line.type === "removed" && "text-red-400 font-medium",
+							line.type === "added" && "text-success font-medium",
+							line.type === "removed" && "text-destructive font-medium",
 							line.type === "hunk" && "text-blue-400 font-medium",
 							line.type === "context" && "text-foreground",
 						)}
@@ -158,7 +158,7 @@ function SplitDiff({ lines }: { lines: DiffLine[] }) {
 						<div
 							className={cn(
 								"px-2 text-right select-none border-r border-border tabular-nums",
-								leftRemoved ? "text-red-400" : "text-muted-foreground",
+								leftRemoved ? "text-destructive" : "text-muted-foreground",
 								!row.left && "bg-muted/30",
 							)}
 						>
@@ -167,7 +167,7 @@ function SplitDiff({ lines }: { lines: DiffLine[] }) {
 						<div
 							className={cn(
 								"px-2 py-0.5 whitespace-pre overflow-x-auto border-r border-border",
-								leftRemoved && "bg-red-500/20 text-red-400",
+								leftRemoved && "bg-destructive/20 text-destructive",
 								!leftRemoved && row.left && "text-foreground",
 								!row.left && "bg-muted/30",
 							)}
@@ -179,7 +179,7 @@ function SplitDiff({ lines }: { lines: DiffLine[] }) {
 						<div
 							className={cn(
 								"px-2 text-right select-none border-r border-border tabular-nums",
-								rightAdded ? "text-green-400" : "text-muted-foreground",
+								rightAdded ? "text-success" : "text-muted-foreground",
 								!row.right && "bg-muted/30",
 							)}
 						>
@@ -188,7 +188,7 @@ function SplitDiff({ lines }: { lines: DiffLine[] }) {
 						<div
 							className={cn(
 								"px-2 py-0.5 whitespace-pre overflow-x-auto",
-								rightAdded && "bg-green-500/20 text-green-400",
+								rightAdded && "bg-success/20 text-success",
 								!rightAdded && row.right && "text-foreground",
 								!row.right && "bg-muted/30",
 							)}

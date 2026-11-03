@@ -70,8 +70,8 @@ export function PromotionDecisionDialog({
 						<span
 							className={
 								delta >= 0
-									? "text-emerald-700 dark:text-emerald-300"
-									: "text-red-700 dark:text-red-300"
+									? "text-success "
+									: "text-destructive "
 							}
 						>
 							{delta >= 0 ? "+" : ""}
@@ -102,7 +102,7 @@ export function PromotionDecisionDialog({
 				)}
 
 				{error && (
-					<div className="rounded-md bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
+					<div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive ">
 						{error}
 					</div>
 				)}
@@ -124,11 +124,11 @@ export function PromotionDecisionDialog({
 									{t("agentTools:promotion.featureOff")}
 								</Badge>
 							) : decision.promote ? (
-								<Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+								<Badge className="bg-success/15 text-success ">
 									{t("agentTools:promotion.ready", { threshold: decision.threshold })}
 								</Badge>
 							) : (
-								<Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300">
+								<Badge className="bg-warning/15 text-warning ">
 									{t("agentTools:promotion.below", { threshold: decision.threshold })}
 								</Badge>
 							)}

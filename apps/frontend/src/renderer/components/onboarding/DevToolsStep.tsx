@@ -348,7 +348,7 @@ export function DevToolsStep({ onNext, onBack }: DevToolsStepProps) {
 											<div className="flex items-center gap-2">
 												<span>{option.label}</span>
 												{option.detected && (
-													<Check className="h-3 w-3 text-green-500" />
+													<Check className="h-3 w-3 text-success" />
 												)}
 											</div>
 										</SelectItem>
@@ -402,7 +402,7 @@ export function DevToolsStep({ onNext, onBack }: DevToolsStepProps) {
 											<div className="flex items-center gap-2">
 												<span>{option.label}</span>
 												{option.detected && (
-													<Check className="h-3 w-3 text-green-500" />
+													<Check className="h-3 w-3 text-success" />
 												)}
 											</div>
 										</SelectItem>

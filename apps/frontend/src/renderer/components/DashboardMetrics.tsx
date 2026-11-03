@@ -53,9 +53,9 @@ function KpiCard({
 }) {
 	const colorClasses = {
 		primary: "text-primary bg-primary/10",
-		green: "text-emerald-500 bg-emerald-500/10",
-		amber: "text-amber-500 bg-amber-500/10",
-		red: "text-red-500 bg-red-500/10",
+		green: "text-success bg-success/10",
+		amber: "text-warning bg-warning/10",
+		red: "text-destructive bg-destructive/10",
 		blue: "text-blue-500 bg-blue-500/10",
 	};
 
@@ -73,8 +73,8 @@ function KpiCard({
 						)}
 						{trend && (
 							<div className="mt-2 flex items-center gap-1">
-								<TrendingUp className="h-3 w-3 text-emerald-500" />
-								<span className="text-xs text-emerald-500 font-medium">
+								<TrendingUp className="h-3 w-3 text-success" />
+								<span className="text-xs text-success font-medium">
 									{trend}
 								</span>
 							</div>
@@ -102,10 +102,10 @@ function StatusBar({ data }: { data: Record<string, number> }) {
 		);
 
 	const statusColors: Record<string, string> = {
-		completed: "bg-emerald-500",
+		completed: "bg-success",
 		in_progress: "bg-blue-500",
-		pending: "bg-amber-500",
-		failed: "bg-red-500",
+		pending: "bg-warning",
+		failed: "bg-destructive",
 		cancelled: "bg-gray-400",
 	};
 
@@ -527,8 +527,8 @@ export function DashboardMetrics({ projectPath }: DashboardMetricsProps) {
 						</h3>
 						<div className="flex items-center gap-8">
 							<div className="flex items-center gap-3">
-								<div className="h-10 w-10 rounded-full bg-emerald-500/10 flex items-center justify-center">
-									<Zap className="h-5 w-5 text-emerald-500" />
+								<div className="h-10 w-10 rounded-full bg-success/10 flex items-center justify-center">
+									<Zap className="h-5 w-5 text-success" />
 								</div>
 								<div>
 									<p className="text-lg font-bold text-foreground">
@@ -540,8 +540,8 @@ export function DashboardMetrics({ projectPath }: DashboardMetricsProps) {
 								</div>
 							</div>
 							<div className="flex items-center gap-3">
-								<div className="h-10 w-10 rounded-full bg-amber-500/10 flex items-center justify-center">
-									<GitMerge className="h-5 w-5 text-amber-500" />
+								<div className="h-10 w-10 rounded-full bg-warning/10 flex items-center justify-center">
+									<GitMerge className="h-5 w-5 text-warning" />
 								</div>
 								<div>
 									<p className="text-lg font-bold text-foreground">

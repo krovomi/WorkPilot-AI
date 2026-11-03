@@ -30,13 +30,13 @@ export interface PRHeaderProps {
 function getFileStatusStyle(status: string) {
 	switch (status.toLowerCase()) {
 		case "added":
-			return "bg-emerald-500/15 text-emerald-500 border-emerald-500/30";
+			return "bg-success/15 text-success border-success/30";
 		case "removed":
 		case "deleted":
-			return "bg-red-500/15 text-red-500 border-red-500/30";
+			return "bg-destructive/15 text-destructive border-destructive/30";
 		case "modified":
 		case "changed":
-			return "bg-amber-500/15 text-amber-500 border-amber-500/30";
+			return "bg-warning/15 text-warning border-warning/30";
 		case "renamed":
 			return "bg-blue-500/15 text-blue-500 border-blue-500/30";
 		default:
@@ -77,11 +77,11 @@ export function PRHeader({ pr, isLoadingFiles = false }: PRHeaderProps) {
 						{file.status}
 					</Badge>
 					<div className="flex items-center gap-1.5 text-xs font-mono shrink-0">
-						<span className="text-emerald-500 flex items-center gap-0.5">
+						<span className="text-success flex items-center gap-0.5">
 							<Plus className="h-3 w-3" />
 							{file.additions}
 						</span>
-						<span className="text-red-500 flex items-center gap-0.5">
+						<span className="text-destructive flex items-center gap-0.5">
 							<Minus className="h-3 w-3" />
 							{file.deletions}
 						</span>
@@ -115,7 +115,7 @@ export function PRHeader({ pr, isLoadingFiles = false }: PRHeaderProps) {
 						className={cn(
 							"capitalize px-2.5 py-0.5",
 							pr.state.toLowerCase() === "open"
-								? "bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25 border-emerald-500/20"
+								? "bg-success/15 text-success hover:bg-success/25 border-success/20"
 								: "",
 						)}
 					>
@@ -188,10 +188,10 @@ export function PRHeader({ pr, isLoadingFiles = false }: PRHeaderProps) {
 							))}
 					</button>
 					<div className="flex items-center gap-2 text-xs font-mono">
-						<span className="text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+						<span className="text-success bg-success/10 px-1.5 py-0.5 rounded">
 							+{pr.additions}
 						</span>
-						<span className="text-red-500 bg-red-500/10 px-1.5 py-0.5 rounded">
+						<span className="text-destructive bg-destructive/10 px-1.5 py-0.5 rounded">
 							-{pr.deletions}
 						</span>
 					</div>

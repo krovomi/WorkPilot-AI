@@ -36,7 +36,7 @@ export function TestRunnerTab({ projectPath }: TestRunnerTabProps) {
 					type="button"
 					onClick={handleRunTests}
 					disabled={isRunningTests}
-					className="px-4 py-2 rounded-lg bg-emerald-500 text-white text-sm font-medium hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors shadow-sm shadow-emerald-500/20"
+					className="px-4 py-2 rounded-lg bg-success text-success-foreground text-sm font-medium hover:bg-success disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors shadow-sm shadow-emerald-500/20"
 				>
 					{isRunningTests ? (
 						<Loader2 className="w-4 h-4 animate-spin" />
@@ -81,7 +81,7 @@ export function TestRunnerTab({ projectPath }: TestRunnerTabProps) {
 
 			{/* Progress bar during test run */}
 			{isRunningTests && (
-				<div className="w-full h-1.5 rounded-full bg-emerald-500/10 overflow-hidden">
+				<div className="w-full h-1.5 rounded-full bg-success/10 overflow-hidden">
 					<div
 						className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full animate-pulse"
 						style={{ width: "60%" }}
@@ -92,8 +92,8 @@ export function TestRunnerTab({ projectPath }: TestRunnerTabProps) {
 			{/* Empty state */}
 			{!recentTestRun && !isRunningTests && (
 				<div className="flex flex-col items-center justify-center h-56 gap-4">
-					<div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-emerald-500/15 to-teal-500/15 border border-emerald-500/20 flex items-center justify-center shadow-lg shadow-emerald-500/5">
-						<FlaskConical className="w-10 h-10 text-emerald-400/70" />
+					<div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-emerald-500/15 to-teal-500/15 border border-success/20 flex items-center justify-center shadow-lg shadow-emerald-500/5">
+						<FlaskConical className="w-10 h-10 text-success/70" />
 					</div>
 					<div className="text-center max-w-xs">
 						<p className="text-sm font-medium text-muted-foreground mb-1">
@@ -194,9 +194,9 @@ function getStatusConfig(status: string): {
 		case "passed":
 			return {
 				icon: CheckCircle2,
-				color: "text-emerald-400",
-				bgColor: "bg-emerald-500/5",
-				borderColor: "border-emerald-500/15",
+				color: "text-success",
+				bgColor: "bg-success/5",
+				borderColor: "border-success/15",
 			};
 		case "failed":
 			return {
@@ -208,16 +208,16 @@ function getStatusConfig(status: string): {
 		case "skipped":
 			return {
 				icon: MinusCircle,
-				color: "text-amber-400",
-				bgColor: "bg-amber-500/5",
-				borderColor: "border-amber-500/15",
+				color: "text-warning",
+				bgColor: "bg-warning/5",
+				borderColor: "border-warning/15",
 			};
 		case "error":
 			return {
 				icon: AlertCircle,
-				color: "text-red-500",
-				bgColor: "bg-red-500/5",
-				borderColor: "border-red-500/15",
+				color: "text-destructive",
+				bgColor: "bg-destructive/5",
+				borderColor: "border-destructive/15",
 			};
 		default:
 			return {
@@ -243,9 +243,9 @@ function SummaryBadge({
 	readonly label: string;
 }) {
 	const colorClasses = {
-		emerald: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+		emerald: "text-success bg-success/10 border-success/20",
 		rose: "text-rose-400 bg-rose-500/10 border-rose-500/20",
-		amber: "text-amber-400 bg-amber-500/10 border-amber-500/20",
+		amber: "text-warning bg-warning/10 border-warning/20",
 	};
 
 	return (

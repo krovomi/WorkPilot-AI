@@ -105,7 +105,7 @@ export function BrainTaskCard({ task, projectPath }: BrainTaskCardProps) {
 						{proposals.length > 0 && (
 							<Badge
 								variant="outline"
-								className="border-amber-500/60 text-3xs text-amber-600"
+								className="border-warning/60 text-3xs text-warning"
 							>
 								{t("brain:card.badge.proposals", { count: proposals.length })}
 							</Badge>

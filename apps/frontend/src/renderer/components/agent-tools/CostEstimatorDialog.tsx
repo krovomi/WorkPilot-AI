@@ -24,9 +24,9 @@ export interface CostEstimatorDialogProps {
 }
 
 const CONFIDENCE_COLORS: Record<CostEstimate["confidence"], string> = {
-	high: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
-	medium: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
-	low: "bg-red-500/15 text-red-700 dark:text-red-300",
+	high: "bg-success/15 text-success ",
+	medium: "bg-warning/15 text-warning ",
+	low: "bg-destructive/15 text-destructive ",
 };
 
 const formatCost = (usd: number): string => {
@@ -89,7 +89,7 @@ export function CostEstimatorDialog({
 				)}
 
 				{error && (
-					<div className="rounded-md bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
+					<div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive ">
 						{t("agentTools:costDialog.unavailable", { error })}
 					</div>
 				)}
@@ -141,7 +141,7 @@ export function CostEstimatorDialog({
 						</div>
 
 						{estimate.warnings.length > 0 && (
-							<ul className="text-xs text-amber-700 dark:text-amber-300 space-y-0.5">
+							<ul className="text-xs text-warning space-y-0.5">
 								{estimate.warnings.map((w) => (
 									<li key={w}>⚠ {w}</li>
 								))}

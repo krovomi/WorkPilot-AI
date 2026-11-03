@@ -205,7 +205,7 @@ export function DebugSettings() {
 					>
 						{copySuccess ? (
 							<>
-								<Check className="h-4 w-4 text-green-500" />
+								<Check className="h-4 w-4 text-success" />
 								{t("debug.copied", "Copied!")}
 							</>
 						) : (
@@ -348,7 +348,7 @@ export function DebugSettings() {
 						{debugInfo.recentErrors.length > 0 && (
 							<div className="rounded-lg border border-border p-4">
 								<h4 className="font-medium text-sm mb-3 flex items-center gap-2">
-									<AlertCircle className="h-4 w-4 text-amber-500" />
+									<AlertCircle className="h-4 w-4 text-warning" />
 									{t("debug.recentErrors", "Recent Errors")} (
 									{debugInfo.recentErrors.length})
 								</h4>
@@ -369,7 +369,7 @@ export function DebugSettings() {
 						{debugInfo.recentErrors.length === 0 && (
 							<div className="rounded-lg border border-border p-4">
 								<div className="flex items-center gap-2 text-sm text-muted-foreground">
-									<Check className="h-4 w-4 text-green-500" />
+									<Check className="h-4 w-4 text-success" />
 									{t("debug.noRecentErrors", "No recent errors")}
 								</div>
 							</div>

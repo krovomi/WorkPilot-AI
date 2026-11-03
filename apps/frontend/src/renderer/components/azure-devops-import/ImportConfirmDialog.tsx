@@ -62,11 +62,11 @@ export function ImportConfirmDialog({
 	const getTypeColor = (type: string): string => {
 		switch (type.toLowerCase()) {
 			case "bug":
-				return "bg-red-500/10 text-red-500 border-red-500/20";
+				return "bg-destructive/10 text-destructive border-destructive/20";
 			case "task":
 				return "bg-blue-500/10 text-blue-500 border-blue-500/20";
 			case "user story":
-				return "bg-green-500/10 text-green-500 border-green-500/20";
+				return "bg-success/10 text-success border-success/20";
 			case "feature":
 				return "bg-purple-500/10 text-purple-500 border-purple-500/20";
 			case "epic":
