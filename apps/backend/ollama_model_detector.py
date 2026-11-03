@@ -277,6 +277,28 @@ def get_ollama_version(base_url: str) -> str | None:
     return None
 
 
+def installed_models(result: dict | None) -> list[dict]:
+    """The model records of an ``/api/tags`` answer, objects only.
+
+    ``{"models": null}`` (or no field, or a non-object answer) means nothing is
+    installed; iterating it directly used to raise ``TypeError``.
+    """
+    models = result.get("models") if isinstance(result, dict) else None
+    if not isinstance(models, list):
+        return []
+    return [model for model in models if isinstance(model, dict)]
+
+
+def _model_name(model: dict) -> str:
+    name = model.get("name")
+    return name if isinstance(name, str) else ""
+
+
+def _model_size(model: dict) -> int:
+    size = model.get("size")
+    return size if isinstance(size, int) and not isinstance(size, bool) else 0
+
+
 def is_embedding_model(model_name: str) -> bool:
     """Check if a model name suggests it's an embedding model."""
     name_lower = model_name.lower()
@@ -392,12 +414,10 @@ def cmd_list_models(args) -> None:
         output_error(f"Could not connect to Ollama at {base_url}")
         return
 
-    models = result.get("models", [])
-
     model_list = []
-    for model in models:
-        name = model.get("name", "")
-        size = model.get("size", 0)
+    for model in installed_models(result):
+        name = _model_name(model)
+        size = _model_size(model)
         modified = model.get("modified_at", "")
 
         model_info = {
@@ -437,11 +457,9 @@ def cmd_list_embedding_models(args) -> None:
         output_error(f"Could not connect to Ollama at {base_url}")
         return
 
-    models = result.get("models", [])
-
     embedding_models = []
-    for model in models:
-        name = model.get("name", "")
+    for model in installed_models(result):
+        name = _model_name(model)
 
         if is_embedding_model(name):
             embedding_dim = get_embedding_dim(name)
@@ -451,8 +469,8 @@ def cmd_list_embedding_models(args) -> None:
                     "name": name,
                     "embedding_dim": embedding_dim,
                     "description": get_embedding_description(name),
-                    "size_bytes": model.get("size", 0),
-                    "size_gb": round(model.get("size", 0) / (1024**3), 2),
+                    "size_bytes": _model_size(model),
+                    "size_gb": round(_model_size(model) / (1024**3), 2),
                 }
             )
 
@@ -480,8 +498,8 @@ def cmd_get_recommended_models(args) -> None:
     result = fetch_ollama_api(base_url, "api/tags")
     installed_names = set()
     if result:
-        for model in result.get("models", []):
-            name = model.get("name", "")
+        for model in installed_models(result):
+            name = _model_name(model)
             # Normalize name (remove :latest suffix for comparison)
             base_name = name.split(":")[0] if ":" in name else name
             installed_names.add(name)
@@ -540,8 +558,8 @@ def model_is_installed(base_url: str, model_name: str) -> bool:
     wanted = (model_name or "").strip().lower()
     if not wanted:
         return False
-    for model in result.get("models", []):
-        name = str(model.get("name", "")).strip().lower()
+    for model in installed_models(result):
+        name = _model_name(model).strip().lower()
         # A bare name IS the `:latest` tag, and only that one. This used to also
         # accept any other tag of the same family, which is wrong in the
         # direction that matters: with only `llama3.3:70b` on disk, asking

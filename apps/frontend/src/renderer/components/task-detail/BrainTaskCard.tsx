@@ -89,7 +89,7 @@ export function BrainTaskCard({ task, projectPath }: BrainTaskCardProps) {
 						<Brain className="h-4 w-4 shrink-0 text-violet-500" aria-hidden />
 						<span className="text-sm font-medium">{t("brain:card.title")}</span>
 						{build && (
-							<Badge variant="outline" className="text-[10px]">
+							<Badge variant="outline" className="text-3xs">
 								{t(
 									build.status === "merged"
 										? "brain:card.state.merged"
@@ -98,14 +98,14 @@ export function BrainTaskCard({ task, projectPath }: BrainTaskCardProps) {
 							</Badge>
 						)}
 						{notes.length > 0 && (
-							<Badge variant="outline" className="text-[10px]">
+							<Badge variant="outline" className="text-3xs">
 								{t("brain:card.badge.notes", { count: notes.length })}
 							</Badge>
 						)}
 						{proposals.length > 0 && (
 							<Badge
 								variant="outline"
-								className="border-amber-500/60 text-[10px] text-amber-600"
+								className="border-amber-500/60 text-3xs text-amber-600"
 							>
 								{t("brain:card.badge.proposals", { count: proposals.length })}
 							</Badge>
@@ -168,7 +168,7 @@ export function BrainTaskCard({ task, projectPath }: BrainTaskCardProps) {
 							<h4 className="text-xs font-medium">
 								{t("brain:card.proposalsTitle")}
 							</h4>
-							<p className="mt-1 text-[10px] text-muted-foreground">
+							<p className="mt-1 text-3xs text-muted-foreground">
 								{t("brain:card.proposalsHint")}
 							</p>
 							<ul className="mt-1 space-y-1">
@@ -241,7 +241,7 @@ function NoteRow({
 		<div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
 			<span className="min-w-0 truncate">
 				<span className="text-foreground">{note.title}</span>
-				<Badge variant="outline" className="ml-2 text-[10px]">
+				<Badge variant="outline" className="ml-2 text-3xs">
 					{t(`brain:card.kind.${kind}`)}
 				</Badge>
 				{note.agents.length > 0 && (

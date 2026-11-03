@@ -142,7 +142,7 @@ export function SchedulerSettings() {
 								onChange={(e) => setCheckInterval(Number(e.target.value))}
 								className="w-full accent-primary"
 							/>
-							<p className="text-[10px] text-muted-foreground">
+							<p className="text-3xs text-muted-foreground">
 								{t("tasks.settings.checkInterval.description")}
 							</p>
 						</div>
@@ -204,7 +204,7 @@ export function SchedulerSettings() {
 										<td className="px-3 py-2 text-center">
 											<span
 												className={cn(
-													"rounded-full px-2 py-0.5 text-[10px] font-medium",
+													"rounded-full px-2 py-0.5 text-3xs font-medium",
 													statusColor[task.status],
 												)}
 											>
@@ -245,7 +245,7 @@ export function SchedulerSettings() {
 										const isCurrent = taskIndex === chain.currentStep;
 
 										let taskStyleClass =
-											"rounded px-2 py-0.5 text-[10px] font-mono";
+											"rounded px-2 py-0.5 text-3xs font-mono";
 										if (isCompleted) {
 											taskStyleClass +=
 												" bg-green-500/15 text-green-600 line-through";

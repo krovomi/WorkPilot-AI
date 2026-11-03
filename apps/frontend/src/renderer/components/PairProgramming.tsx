@@ -232,7 +232,7 @@ function MessageBubble({ message }: { message: PairMessage }) {
 				isUser ? "items-end" : "items-start",
 			)}
 		>
-			<span className="text-[10px] text-muted-foreground px-1">
+			<span className="text-3xs text-muted-foreground px-1">
 				{isUser
 					? t("chat.you")
 					: message.isQuestion
@@ -478,7 +478,7 @@ export function PairProgramming({ projectId }: PairProgrammingProps) {
 					)}
 
 					{/* Action log */}
-					<div className="px-3 py-2 border-b border-border/50 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+					<div className="px-3 py-2 border-b border-border/50 text-3xs font-semibold text-muted-foreground uppercase tracking-wide">
 						{t("aiWork.actionLog")}
 					</div>
 					<ScrollArea className="flex-1">

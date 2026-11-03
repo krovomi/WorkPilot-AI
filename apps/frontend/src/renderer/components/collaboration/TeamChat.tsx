@@ -40,7 +40,7 @@ function MessageBubble({
 	return (
 		<div className={cn("group flex gap-2", isOwn ? "flex-row-reverse" : "flex-row")}>
 			<span
-				className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white"
+				className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-3xs font-semibold text-white"
 				style={{ backgroundColor: avatarColor(message.authorId || message.author) }}
 			>
 				{initialsOf(message.author)}
@@ -48,10 +48,10 @@ function MessageBubble({
 			<div className={cn("flex max-w-[75%] flex-col gap-0.5", isOwn ? "items-end" : "items-start")}>
 				<div className="flex items-center gap-1.5">
 					<span className="text-xs font-medium">{message.author}</span>
-					<span className="text-[10px] text-muted-foreground">{formatTime(message.at)}</span>
+					<span className="text-3xs text-muted-foreground">{formatTime(message.at)}</span>
 				</div>
 				{parent && (
-					<span className="max-w-full truncate border-l-2 pl-1.5 text-[11px] text-muted-foreground">
+					<span className="max-w-full truncate border-l-2 pl-1.5 text-2xs text-muted-foreground">
 						{t("chat.inReplyTo", { user: parent.author })}: {parent.message}
 					</span>
 				)}
@@ -94,7 +94,7 @@ export function TeamChatButton() {
 			<MessageCircle className="h-4 w-4" />
 			<span className="hidden lg:inline">{t("chat.title")}</span>
 			{unread > 0 && (
-				<span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
+				<span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-3xs font-bold text-destructive-foreground">
 					{unread > 99 ? "99+" : unread}
 				</span>
 			)}

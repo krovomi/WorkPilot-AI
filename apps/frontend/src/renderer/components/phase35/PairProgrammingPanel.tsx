@@ -172,7 +172,7 @@ export function PairProgrammingPanel() {
 										<span className="text-muted-foreground">
 											#{op.sequence}
 										</span>{" "}
-										<Badge variant="outline" className="text-[10px]">
+										<Badge variant="outline" className="text-3xs">
 											{op.kind}
 										</Badge>{" "}
 										<span>{op.actor}</span>

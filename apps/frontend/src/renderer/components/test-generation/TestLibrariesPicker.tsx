@@ -114,7 +114,7 @@ export function TestLibrariesPicker({
 			<div className="grid gap-3 sm:grid-cols-2">
 				{groups.map(([category, libraries]) => (
 					<div key={category} className="space-y-1.5">
-						<span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+						<span className="text-2xs font-medium uppercase tracking-wide text-muted-foreground">
 							{t(CATEGORY_LABELS[category] ?? category)}
 						</span>
 						{libraries.map((library) => {
@@ -145,7 +145,7 @@ export function TestLibrariesPicker({
 											{library.installed ? (
 												<Badge
 													variant="outline"
-													className="h-4 gap-1 px-1 text-[10px] text-success"
+													className="h-4 gap-1 px-1 text-3xs text-success"
 												>
 													<Check className="h-2.5 w-2.5" />
 													{t("testGeneration:libraries.installed")}
@@ -154,14 +154,14 @@ export function TestLibrariesPicker({
 												picked && (
 													<Badge
 														variant="outline"
-														className="h-4 px-1 text-[10px] text-warning"
+														className="h-4 px-1 text-3xs text-warning"
 													>
 														{t("testGeneration:libraries.toAdd")}
 													</Badge>
 												)
 											)}
 										</span>
-										<span className="block break-all font-mono text-[10px] text-muted-foreground">
+										<span className="block break-all font-mono text-3xs text-muted-foreground">
 											{library.package}
 										</span>
 									</Label>
@@ -181,7 +181,7 @@ export function TestLibrariesPicker({
 						})}
 					</p>
 					{selection.installCommands.length > 0 && (
-						<pre className="overflow-x-auto rounded bg-muted/40 p-2 font-mono text-[10px] text-muted-foreground">
+						<pre className="overflow-x-auto rounded bg-muted/40 p-2 font-mono text-3xs text-muted-foreground">
 							{selection.installCommands.join("\n")}
 						</pre>
 					)}
@@ -221,7 +221,7 @@ export function TestLibrariesPicker({
 						.map((step) => (
 							<pre
 								key={step.command.join(" ")}
-								className="overflow-x-auto rounded bg-muted/40 p-2 font-mono text-[10px] text-muted-foreground"
+								className="overflow-x-auto rounded bg-muted/40 p-2 font-mono text-3xs text-muted-foreground"
 							>
 								{step.output}
 							</pre>
@@ -231,7 +231,7 @@ export function TestLibrariesPicker({
 							<p className="text-muted-foreground">
 								{t("testGeneration:libraries.runByHand")}
 							</p>
-							<pre className="overflow-x-auto rounded bg-muted/40 p-2 font-mono text-[10px] text-muted-foreground">
+							<pre className="overflow-x-auto rounded bg-muted/40 p-2 font-mono text-3xs text-muted-foreground">
 								{report.manualCommands.join("\n")}
 							</pre>
 						</>

@@ -123,11 +123,11 @@ export function WorkflowProfileCard({
 						<span className="text-sm font-medium">
 							{t("workflowProfile:title")}
 						</span>
-						<Badge variant="outline" className="text-[10px]">
+						<Badge variant="outline" className="text-3xs">
 							{profile.workflow}
 						</Badge>
 						{previewEffort !== null && (
-							<Badge className="text-[10px]">
+							<Badge className="text-3xs">
 								{t("workflowProfile:levels.preview")}
 							</Badge>
 						)}
@@ -275,27 +275,27 @@ function PhaseRow({ phase }: { readonly phase: WorkflowPhasePayload }) {
 					<span className="font-medium">{phase.id}</span>
 					<span className="text-muted-foreground">{phase.impl}</span>
 					{phase.dispatch !== "inline" && (
-						<Badge variant="outline" className="text-[10px]">
+						<Badge variant="outline" className="text-3xs">
 							{dispatchLabel}
 						</Badge>
 					)}
 					{phase.hardGate && (
-						<Badge variant="outline" className="text-[10px]">
+						<Badge variant="outline" className="text-3xs">
 							{t("workflowProfile:phase.hardGate", { gate: phase.hardGate })}
 						</Badge>
 					)}
 					{phase.deterministic && (
-						<Badge variant="outline" className="text-[10px]">
+						<Badge variant="outline" className="text-3xs">
 							{t("workflowProfile:phase.deterministic")}
 						</Badge>
 					)}
 					{phase.gate === "human" && (
-						<Badge variant="outline" className="text-[10px]">
+						<Badge variant="outline" className="text-3xs">
 							{t("workflowProfile:phase.humanGate")}
 						</Badge>
 					)}
 					{phase.irreversible && (
-						<Badge variant="destructive" className="text-[10px]">
+						<Badge variant="destructive" className="text-3xs">
 							{t("workflowProfile:phase.irreversible")}
 						</Badge>
 					)}
@@ -378,7 +378,7 @@ function LevelComparison({
 							key={level}
 							type="button"
 							onClick={() => onPreview(level)}
-							className={`rounded border px-2 py-1 text-[11px] transition-colors ${
+							className={`rounded border px-2 py-1 text-2xs transition-colors ${
 								isCurrent
 									? "border-primary/60 bg-primary/10"
 									: "border-border hover:bg-muted"
@@ -396,7 +396,7 @@ function LevelComparison({
 				<Button
 					size="sm"
 					variant="ghost"
-					className="mt-1.5 h-6 px-2 text-[11px]"
+					className="mt-1.5 h-6 px-2 text-2xs"
 					onClick={() => onPreview(null)}
 				>
 					{t("workflowProfile:levels.backToTask")}

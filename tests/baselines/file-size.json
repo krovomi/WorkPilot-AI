@@ -8,7 +8,7 @@
   "apps/frontend/src/main/claude-profile/credential-utils.ts": 2998,
   "apps/frontend/src/main/claude-profile/usage-monitor.ts": 4629,
   "apps/frontend/src/main/cli-tool-manager.ts": 2856,
-  "apps/frontend/src/main/ipc-handlers/claude-code-handlers.ts": 2753,
+  "apps/frontend/src/main/ipc-handlers/claude-code-handlers.ts": 2586,
   "apps/frontend/src/main/ipc-handlers/github/pr-handlers.ts": 2153,
   "apps/frontend/src/main/services/credential-manager.ts": 2476,
   "apps/frontend/src/main/terminal/claude-integration-handler.ts": 2079,

@@ -79,11 +79,11 @@ export function SchemaViewer({ schema, spec, depth = 0 }: SchemaViewerProps) {
 								{key}
 							</span>
 							{required?.includes(key) && (
-								<span className="text-[9px] text-red-400 font-mono border border-red-400/30 rounded px-1">
+								<span className="text-3xs text-red-400 font-mono border border-red-400/30 rounded px-1">
 									required
 								</span>
 							)}
-							<span className="text-[10px] font-mono text-blue-400/80">
+							<span className="text-3xs font-mono text-blue-400/80">
 								{(val.type as string) ?? (val.$ref ? "↗ ref" : "?")}
 							</span>
 							{!!val.description && (
@@ -668,7 +668,7 @@ export function RequestPanel({
 						<div className="space-y-4">
 							{pathParams.length > 0 && (
 								<div>
-									<div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+									<div className="text-3xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
 										{t("apiExplorer:request.pathParams")}
 									</div>
 									{pathParams.map((p) => (
@@ -684,7 +684,7 @@ export function RequestPanel({
 							<div>
 								{queryParams.length > 0 && (
 									<>
-										<div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+										<div className="text-3xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
 											{t("apiExplorer:request.queryParams")}
 										</div>
 										{queryParams.map((p) => (
@@ -717,7 +717,7 @@ export function RequestPanel({
 						<div className="space-y-3">
 							{headerParams.length > 0 && (
 								<div>
-									<div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+									<div className="text-3xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
 										{t("apiExplorer:request.specHeaders")}
 									</div>
 									{headerParams.map((p) => (
@@ -748,7 +748,7 @@ export function RequestPanel({
 							{/* Auth type selector */}
 							<div>
 								{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-								<label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
+								<label className="text-3xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
 									{t("apiExplorer:auth.type")}
 								</label>
 								<CustomSelect
@@ -817,7 +817,7 @@ export function RequestPanel({
 							{requestAuth.type === "bearer" && (
 								<div className="space-y-2">
 									{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-									<label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block">
+									<label className="text-3xs font-semibold text-muted-foreground uppercase tracking-wider block">
 										{t("apiExplorer:auth.token")}
 									</label>
 									<div className="flex gap-2">
@@ -838,7 +838,7 @@ export function RequestPanel({
 											{showAuthToken ? "🙈" : "👁"}
 										</button>
 									</div>
-									<div className="text-[10px] text-muted-foreground">
+									<div className="text-3xs text-muted-foreground">
 										{t("apiExplorer:auth.bearerHint")}
 									</div>
 								</div>
@@ -849,7 +849,7 @@ export function RequestPanel({
 								<div className="space-y-2">
 									<div>
 										{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-										<label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
+										<label className="text-3xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
 											{t("apiExplorer:auth.username")}
 										</label>
 										<input
@@ -864,7 +864,7 @@ export function RequestPanel({
 									</div>
 									<div>
 										{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-										<label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
+										<label className="text-3xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
 											{t("apiExplorer:auth.password")}
 										</label>
 										<div className="flex gap-2">
@@ -886,7 +886,7 @@ export function RequestPanel({
 											</button>
 										</div>
 									</div>
-									<div className="text-[10px] text-muted-foreground">
+									<div className="text-3xs text-muted-foreground">
 										{t("apiExplorer:auth.basicHint")}
 									</div>
 								</div>
@@ -898,7 +898,7 @@ export function RequestPanel({
 									<div className="grid grid-cols-2 gap-2">
 										<div>
 											{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-											<label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
+											<label className="text-3xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
 												{t("apiExplorer:auth.keyName")}
 											</label>
 											<input
@@ -913,7 +913,7 @@ export function RequestPanel({
 										</div>
 										<div>
 											{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-											<label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
+											<label className="text-3xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
 												{t("apiExplorer:auth.addTo")}
 											</label>
 											<CustomSelect
@@ -938,7 +938,7 @@ export function RequestPanel({
 									</div>
 									<div>
 										{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-										<label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
+										<label className="text-3xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
 											{t("apiExplorer:auth.keyValue")}
 										</label>
 										<input
@@ -960,7 +960,7 @@ export function RequestPanel({
 									{/* Grant Type */}
 									<div>
 										{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-										<label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
+										<label className="text-3xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
 											{t("apiExplorer:auth.oauth2.grantType")}
 										</label>
 										<CustomSelect
@@ -993,7 +993,7 @@ export function RequestPanel({
 
 									{/* Configure New Token */}
 									<div className="border border-[var(--color-border)] rounded-lg p-3 space-y-2.5">
-										<div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+										<div className="text-3xs font-semibold text-muted-foreground uppercase tracking-wider">
 											{t("apiExplorer:auth.oauth2.configureToken")}
 										</div>
 
@@ -1001,7 +1001,7 @@ export function RequestPanel({
 										{requestAuth.oauth2GrantType === "authorization_code" && (
 											<div>
 												{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-												<label className="text-[10px] text-muted-foreground block mb-1">
+												<label className="text-3xs text-muted-foreground block mb-1">
 													{t("apiExplorer:auth.oauth2.authUrl")}
 												</label>
 												<input
@@ -1020,7 +1020,7 @@ export function RequestPanel({
 										{requestAuth.oauth2GrantType !== "authorization_code" && (
 											<div>
 												{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-												<label className="text-[10px] text-muted-foreground block mb-1">
+												<label className="text-3xs text-muted-foreground block mb-1">
 													{t("apiExplorer:auth.oauth2.tokenUrl")}
 												</label>
 												<input
@@ -1038,7 +1038,7 @@ export function RequestPanel({
 										{/* Client ID */}
 										<div>
 											{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-											<label className="text-[10px] text-muted-foreground block mb-1">
+											<label className="text-3xs text-muted-foreground block mb-1">
 												{t("apiExplorer:auth.oauth2.clientId")}
 											</label>
 											<input
@@ -1055,7 +1055,7 @@ export function RequestPanel({
 										{/* Client Secret */}
 										<div>
 											{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-											<label className="text-[10px] text-muted-foreground block mb-1">
+											<label className="text-3xs text-muted-foreground block mb-1">
 												{t("apiExplorer:auth.oauth2.clientSecret")}
 											</label>
 											<div className="flex gap-2">
@@ -1083,7 +1083,7 @@ export function RequestPanel({
 										{/* Scope */}
 										<div>
 											{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-											<label className="text-[10px] text-muted-foreground block mb-1">
+											<label className="text-3xs text-muted-foreground block mb-1">
 												{t("apiExplorer:auth.oauth2.scope")}
 											</label>
 											<input
@@ -1102,7 +1102,7 @@ export function RequestPanel({
 											<div className="grid grid-cols-2 gap-2">
 												<div>
 													{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-													<label className="text-[10px] text-muted-foreground block mb-1">
+													<label className="text-3xs text-muted-foreground block mb-1">
 														{t("apiExplorer:auth.username")}
 													</label>
 													<input
@@ -1119,7 +1119,7 @@ export function RequestPanel({
 												</div>
 												<div>
 													{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-													<label className="text-[10px] text-muted-foreground block mb-1">
+													<label className="text-3xs text-muted-foreground block mb-1">
 														{t("apiExplorer:auth.password")}
 													</label>
 													<input
@@ -1160,7 +1160,7 @@ export function RequestPanel({
 
 									{/* Current Token */}
 									<div className="space-y-2">
-										<div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+										<div className="text-3xs font-semibold text-muted-foreground uppercase tracking-wider">
 											{t("apiExplorer:auth.oauth2.currentToken")}
 										</div>
 										<div className="flex gap-2">
@@ -1184,7 +1184,7 @@ export function RequestPanel({
 											</button>
 										</div>
 										<div className="flex items-center gap-2">
-											<span className="text-[10px] text-muted-foreground">
+											<span className="text-3xs text-muted-foreground">
 												{t("apiExplorer:auth.oauth2.headerPrefix")}
 											</span>
 											<input
@@ -1218,7 +1218,7 @@ export function RequestPanel({
 									if (placeholder && placeholder !== "{}")
 										setRequestBody(placeholder);
 								}}
-								className="mt-1.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+								className="mt-1.5 text-3xs text-muted-foreground hover:text-foreground transition-colors"
 							>
 								{t("apiExplorer:request.fillExample")}
 							</button>
@@ -1253,14 +1253,14 @@ export function RequestPanel({
 														<code className="text-xs font-mono font-semibold text-foreground">
 															{p.name}
 														</code>
-														<span className="text-[10px] font-mono text-muted-foreground border border-[var(--color-border)] rounded px-1">
+														<span className="text-3xs font-mono text-muted-foreground border border-[var(--color-border)] rounded px-1">
 															{p.in}
 														</span>
-														<span className="text-[10px] font-mono text-blue-400/80">
+														<span className="text-3xs font-mono text-blue-400/80">
 															{p.schema?.type ?? "any"}
 														</span>
 														{p.required && (
-															<span className="text-[9px] text-red-400 border border-red-400/30 rounded px-1">
+															<span className="text-3xs text-red-400 border border-red-400/30 rounded px-1">
 																required
 															</span>
 														)}
@@ -1398,7 +1398,7 @@ export function RequestPanel({
 												<button
 													type="button"
 													onClick={() => setResponseFormat("pretty")}
-													className={`px-2.5 py-1 text-[11px] font-medium transition-colors ${
+													className={`px-2.5 py-1 text-2xs font-medium transition-colors ${
 														responseFormat === "pretty"
 															? "text-foreground"
 															: "text-muted-foreground hover:text-foreground"
@@ -1418,7 +1418,7 @@ export function RequestPanel({
 											<button
 												type="button"
 												onClick={() => setResponseFormat("raw")}
-												className={`px-2.5 py-1 text-[11px] font-medium rounded transition-colors ${
+												className={`px-2.5 py-1 text-2xs font-medium rounded transition-colors ${
 													responseFormat === "raw"
 														? "bg-background text-foreground shadow-sm"
 														: "text-muted-foreground hover:bg-card hover:text-foreground"
@@ -1433,7 +1433,7 @@ export function RequestPanel({
 												<button
 													type="button"
 													onClick={() => setResponseFormat("preview")}
-													className={`px-2.5 py-1 text-[11px] font-medium rounded transition-colors ${
+													className={`px-2.5 py-1 text-2xs font-medium rounded transition-colors ${
 														responseFormat === "preview"
 															? "bg-background text-foreground shadow-sm"
 															: "text-muted-foreground hover:bg-card hover:text-foreground"
@@ -1474,7 +1474,7 @@ export function RequestPanel({
 										type="button"
 										onClick={saveTokenToEnv}
 										title={t("apiExplorer:response.saveTokenTitle")}
-										className={`flex items-center gap-1.5 px-2 py-0.5 text-[11px] rounded border transition-colors ${
+										className={`flex items-center gap-1.5 px-2 py-0.5 text-2xs rounded border transition-colors ${
 											savedToken
 												? "text-emerald-400 border-emerald-500/40 bg-emerald-400/10"
 												: "text-muted-foreground border-[var(--color-border)] hover:text-[var(--color-primary)] hover:border-[var(--color-primary)]/40"
@@ -1549,7 +1549,7 @@ export function RequestPanel({
 													return (
 														<>
 															{!isXmlLike && responseLanguage !== "auto" && (
-																<p className="mb-2 text-[11px] text-amber-400">
+																<p className="mb-2 text-2xs text-amber-400">
 																	{t("apiExplorer:response.format.mismatch", {
 																		format: effectiveLang.toUpperCase(),
 																	})}
@@ -1580,7 +1580,7 @@ export function RequestPanel({
 												return (
 													<>
 														{!isValidJson && responseLanguage !== "auto" && (
-															<p className="mb-2 text-[11px] text-amber-400">
+															<p className="mb-2 text-2xs text-amber-400">
 																{t("apiExplorer:response.format.mismatch", {
 																	format: "JSON",
 																})}
@@ -1676,7 +1676,7 @@ export function LangDropdown({
 				ref={btnRef}
 				type="button"
 				onClick={handleOpen}
-				className={`flex items-center gap-0.5 pl-0 pr-1.5 py-1 text-[11px] transition-colors cursor-pointer ${
+				className={`flex items-center gap-0.5 pl-0 pr-1.5 py-1 text-2xs transition-colors cursor-pointer ${
 					active
 						? "text-muted-foreground hover:text-foreground"
 						: "text-muted-foreground/60 hover:text-muted-foreground"
@@ -1710,7 +1710,7 @@ export function LangDropdown({
 									onChange(lang);
 									setOpen(false);
 								}}
-								className={`flex items-center gap-1.5 w-full px-2.5 py-1.5 text-[11px] text-left transition-colors hover:bg-card ${
+								className={`flex items-center gap-1.5 w-full px-2.5 py-1.5 text-2xs text-left transition-colors hover:bg-card ${
 									lang === value
 										? "text-[var(--color-primary)]"
 										: "text-muted-foreground"

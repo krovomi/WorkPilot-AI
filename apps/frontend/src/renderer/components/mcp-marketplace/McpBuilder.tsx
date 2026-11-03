@@ -250,7 +250,7 @@ export function McpBuilder() {
 							}`}
 						>
 							<div
-								className="w-5 h-5 rounded shrink-0 flex items-center justify-center text-white text-[10px] font-bold"
+								className="w-5 h-5 rounded shrink-0 flex items-center justify-center text-white text-3xs font-bold"
 								style={{ backgroundColor: project.color }}
 							>
 								{project.name?.charAt(0) || "?"}
@@ -415,7 +415,7 @@ export function McpBuilder() {
 													{tool.name ||
 														t("mcpMarketplace.builder.untitledTool")}
 												</span>
-												<Badge variant="secondary" className="text-[9px] px-1">
+												<Badge variant="secondary" className="text-3xs px-1">
 													{tool.action.type === "http_request"
 														? "HTTP"
 														: tool.action.type}

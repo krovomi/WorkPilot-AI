@@ -126,7 +126,7 @@ export function MethodBadge({ method, size = "sm" }: MethodBadgeProps) {
 		HTTP_METHOD_COLORS[method.toUpperCase()] ??
 		"text-gray-400 bg-gray-400/10 border-gray-400/30";
 	const padding =
-		size === "md" ? "px-2.5 py-1 text-xs" : "px-1.5 py-0.5 text-[10px]";
+		size === "md" ? "px-2.5 py-1 text-xs" : "px-1.5 py-0.5 text-3xs";
 	return (
 		<span
 			className={`inline-block font-mono font-bold rounded border ${padding} ${colors}`}

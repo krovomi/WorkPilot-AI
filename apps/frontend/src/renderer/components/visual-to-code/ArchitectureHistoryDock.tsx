@@ -235,7 +235,7 @@ export function ArchitectureHistoryDock({
 										{version.label ?? changeLine(version.summary)}
 									</p>
 								)}
-								<p className="truncate text-[11px] text-muted-foreground">
+								<p className="truncate text-2xs text-muted-foreground">
 									{relativeTime(version.createdAt, i18n.language)}
 									{" · "}
 									{t("historyCounts", {
@@ -247,12 +247,12 @@ export function ArchitectureHistoryDock({
 								{/* A named step still has to say what it was, or naming it
 								    costs the information it replaced. */}
 								{version.label && (
-									<p className="truncate text-[11px] text-muted-foreground/80">
+									<p className="truncate text-2xs text-muted-foreground/80">
 										{changeLine(version.summary)}
 									</p>
 								)}
 								{version.restoredFrom && (
-									<p className="truncate text-[11px] text-violet-600 dark:text-violet-400">
+									<p className="truncate text-2xs text-violet-600 dark:text-violet-400">
 										{t("historyRestoredMark", "Retour à une étape antérieure")}
 									</p>
 								)}
@@ -263,7 +263,7 @@ export function ArchitectureHistoryDock({
 							<Button
 								size="sm"
 								variant="outline"
-								className="h-6 gap-1 px-1.5 text-[11px]"
+								className="h-6 gap-1 px-1.5 text-2xs"
 								onClick={() => onRestore(version.id)}
 								title={t("historyRestoreHint", {
 									defaultValue:
@@ -317,7 +317,7 @@ export function ArchitectureHistoryDock({
 				))}
 			</div>
 
-			<p className="shrink-0 border-t px-3 py-2 text-[11px] leading-snug text-muted-foreground">
+			<p className="shrink-0 border-t px-3 py-2 text-2xs leading-snug text-muted-foreground">
 				<Check className="mr-1 inline h-3 w-3" />
 				{t(
 					"historyFootnote",

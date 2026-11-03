@@ -174,7 +174,7 @@ function BudgetBar({
 					{budget.forecast_end_of_month > budget.monthly_budget && (
 						<Badge
 							variant="outline"
-							className="text-[10px] text-red-500 border-red-500/20"
+							className="text-3xs text-red-500 border-red-500/20"
 						>
 							{t("budget.overBudget")}
 						</Badge>
@@ -251,7 +251,7 @@ function ProviderBreakdown({
 						{unused.map(([name]) => (
 							<span
 								key={name}
-								className="text-[10px] text-muted-foreground/60 capitalize"
+								className="text-3xs text-muted-foreground/60 capitalize"
 							>
 								{name} — {formatAmount(0, 2)}
 							</span>

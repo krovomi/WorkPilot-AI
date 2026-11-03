@@ -81,7 +81,7 @@ export function PluginMarketplace() {
 							<Icon className="h-4 w-4" />
 							{t(labelKey)}
 							{id === "installed" && installed.length > 0 && (
-								<span className="ml-1 rounded-full bg-primary/10 px-1.5 text-[10px] font-medium text-primary">
+								<span className="ml-1 rounded-full bg-primary/10 px-1.5 text-3xs font-medium text-primary">
 									{installed.length}
 								</span>
 							)}

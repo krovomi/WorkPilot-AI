@@ -32,7 +32,7 @@ export function TaskSandboxNotice({ taskId, specId }: TaskSandboxNoticeProps) {
 		.join("\n");
 	return (
 		<div
-			className="mt-2 flex items-center gap-1 text-[11px] text-warning"
+			className="mt-2 flex items-center gap-1 text-2xs text-warning"
 			title={details}
 			data-testid="task-sandbox-notice"
 		>

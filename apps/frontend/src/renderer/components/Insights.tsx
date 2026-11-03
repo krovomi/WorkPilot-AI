@@ -703,7 +703,7 @@ function ToolUsageHistory({ tools }: ToolUsageHistoryProps) {
 						: t("insights:tools.tools")}{" "}
 					{t("insights:tools.used")}
 				</span>
-				<span className="text-[10px]">{expanded ? "▲" : "▼"}</span>
+				<span className="text-3xs">{expanded ? "▲" : "▼"}</span>
 			</button>
 
 			{expanded && (

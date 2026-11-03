@@ -187,7 +187,7 @@ export function FileAutocomplete({
 					</button>
 				))}
 			</div>
-			<div className="border-t border-border px-3 py-1.5 text-[10px] text-muted-foreground bg-muted/30">
+			<div className="border-t border-border px-3 py-1.5 text-3xs text-muted-foreground bg-muted/30">
 				{t("tasks:fileAutocomplete.hint")}
 			</div>
 		</div>

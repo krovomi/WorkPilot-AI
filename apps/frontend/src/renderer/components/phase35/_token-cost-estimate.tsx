@@ -114,7 +114,7 @@ export function TokenCostEstimate({
 			<div className="text-muted-foreground" title={breakdown}>
 				{subtitle}
 			</div>
-			<div className="text-muted-foreground/80 font-mono text-[10px]">
+			<div className="text-muted-foreground/80 font-mono text-3xs">
 				{breakdown}
 			</div>
 		</div>

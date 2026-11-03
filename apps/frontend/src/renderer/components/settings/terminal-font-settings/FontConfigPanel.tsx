@@ -190,7 +190,7 @@ export function FontConfigPanel({
 					})}
 				/>
 				{/* Current font chain display */}
-				<p className="text-[11px] text-muted-foreground">
+				<p className="text-2xs text-muted-foreground">
 					{t("terminalFonts.fontConfig.fontChain", {
 						defaultValue: "Font chain:",
 					})}{" "}
@@ -300,7 +300,7 @@ export function FontConfigPanel({
 							"Font weight from 100 (thin) to 900 (black), in steps of 100",
 					})}
 				</p>
-				<p className="text-[11px] text-muted-foreground">
+				<p className="text-2xs text-muted-foreground">
 					{t("terminalFonts.fontConfig.commonWeights", {
 						defaultValue: "Common: 400 (normal), 600 (semi-bold), 700 (bold)",
 					})}

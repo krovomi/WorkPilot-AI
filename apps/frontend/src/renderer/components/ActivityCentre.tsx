@@ -74,7 +74,7 @@ export function ActivityCentre({ activeView, onOpen }: ActivityCentreProps) {
 									<span className="block truncate text-foreground">
 										{activity.label ?? t(activity.labelKey)}
 									</span>
-									<span className="block truncate text-[10px] text-muted-foreground">
+									<span className="block truncate text-3xs text-muted-foreground">
 										{pageName(t, activity)}
 									</span>
 								</span>
