@@ -331,6 +331,18 @@ BENCHMARK_PROMPTS: dict[str, str] = {
 # ── HTTP helper ────────────────────────────────────────────────────
 
 
+def _records(data: Any, key: str) -> list[dict[str, Any]]:
+    """The ``key`` list of a runtime's model-list answer, objects only.
+
+    Ollama answers ``{"data": null}`` / ``{"models": null}`` when no model is
+    pulled; iterating that ``None`` raised ``TypeError``.
+    """
+    items = data.get(key) if isinstance(data, dict) else None
+    if not isinstance(items, list):
+        return []
+    return [item for item in items if isinstance(item, dict)]
+
+
 def _fetch_json(url: str, timeout: int = 5) -> dict[str, Any] | None:
     """Fetch JSON from a URL.
 
@@ -455,7 +467,7 @@ class LocalModelManager:
             return RuntimeStatus(runtime_type=RuntimeType.OLLAMA, running=False)
 
         tags_data = _fetch_json(f"{self.ollama_url}/api/tags")
-        model_count = len(tags_data.get("models", [])) if tags_data else 0
+        model_count = len(_records(tags_data, "models"))
 
         return RuntimeStatus(
             runtime_type=RuntimeType.OLLAMA,
@@ -475,7 +487,7 @@ class LocalModelManager:
         if not models_data:
             return RuntimeStatus(runtime_type=RuntimeType.LMSTUDIO, running=False)
 
-        model_count = len(models_data.get("data", []))
+        model_count = len(_records(models_data, "data"))
 
         return RuntimeStatus(
             runtime_type=RuntimeType.LMSTUDIO,
@@ -516,9 +528,9 @@ class LocalModelManager:
             return []
 
         models: list[LocalModel] = []
-        for model_data in data.get("models", []):
-            name = model_data.get("name", "")
-            size_bytes = model_data.get("size", 0)
+        for model_data in _records(data, "models"):
+            name = model_data.get("name") or ""
+            size_bytes = model_data.get("size") or 0
 
             # Look up known capabilities
             known = KNOWN_MODELS.get(name, {})
@@ -561,8 +573,8 @@ class LocalModelManager:
             return []
 
         models: list[LocalModel] = []
-        for model_data in data.get("data", []):
-            name = model_data.get("id", "")
+        for model_data in _records(data, "data"):
+            name = model_data.get("id") or ""
             models.append(
                 LocalModel(
                     name=name,

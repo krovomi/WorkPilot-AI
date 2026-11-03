@@ -275,7 +275,7 @@ export function BountyBoardView({ projectPath, specId }: Props) {
 							className="grid grid-cols-12 gap-2 items-end border rounded-md p-2 bg-card"
 						>
 							<div className="col-span-4">
-								<Label className="text-[10px]">
+								<Label className="text-3xs">
 									{t("bountyBoard:field.provider", "Provider")}
 								</Label>
 								<Select
@@ -305,7 +305,7 @@ export function BountyBoardView({ projectPath, specId }: Props) {
 									</SelectContent>
 								</Select>
 								{degradesTo(c.provider) && (
-									<p className="text-[10px] text-destructive mt-1">
+									<p className="text-3xs text-destructive mt-1">
 										{t("bountyBoard:noAdapter", {
 											provider: c.provider,
 											target: degradesTo(c.provider),
@@ -316,7 +316,7 @@ export function BountyBoardView({ projectPath, specId }: Props) {
 								)}
 							</div>
 							<div className="col-span-4">
-								<Label className="text-[10px]">
+								<Label className="text-3xs">
 									{t("bountyBoard:field.model", "Model")}
 								</Label>
 								<ContestantModelSelect
@@ -326,7 +326,7 @@ export function BountyBoardView({ projectPath, specId }: Props) {
 								/>
 							</div>
 							<div className="col-span-3">
-								<Label className="text-[10px]">
+								<Label className="text-3xs">
 									{t("bountyBoard:field.profile", "Profile (optional)")}
 								</Label>
 								<Input

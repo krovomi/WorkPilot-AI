@@ -560,7 +560,7 @@ export function GlobalAutoSwitching({
 									</span>
 									<div className="min-w-0">
 										<span className="text-xs font-medium block">{s.label}</span>
-										<p className="text-[10px] text-muted-foreground leading-tight mt-0.5">
+										<p className="text-3xs text-muted-foreground leading-tight mt-0.5">
 											{s.desc}
 										</p>
 									</div>

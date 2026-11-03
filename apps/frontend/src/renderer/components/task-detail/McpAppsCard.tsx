@@ -65,7 +65,7 @@ export function McpAppsCard({ task }: McpAppsCardProps) {
 			<div className="flex items-center gap-2">
 				<AppWindow className="h-4 w-4 shrink-0 text-primary" aria-hidden />
 				<span className="text-sm font-medium">{t("tasks:mcpApps.title")}</span>
-				<Badge variant="outline" className="text-[10px]">
+				<Badge variant="outline" className="text-3xs">
 					{t("tasks:mcpApps.count", { count: views.length })}
 				</Badge>
 			</div>

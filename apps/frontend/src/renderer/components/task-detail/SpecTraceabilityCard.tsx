@@ -79,14 +79,14 @@ export function SpecTraceabilityCard({
 							{t("traceability:title")}
 						</span>
 						{questions.length > 0 && (
-							<Badge variant="outline" className="text-[10px]">
+							<Badge variant="outline" className="text-3xs">
 								{t("traceability:badge.questions", {
 									count: questions.length,
 								})}
 							</Badge>
 						)}
 						{uncovered.length > 0 && (
-							<Badge variant="outline" className="text-[10px]">
+							<Badge variant="outline" className="text-3xs">
 								{t("traceability:badge.uncovered", {
 									count: uncovered.length,
 								})}
@@ -155,7 +155,7 @@ export function SpecTraceabilityCard({
 							</p>
 							<div className="mt-1 flex flex-wrap gap-1">
 								{uncovered.map((id) => (
-									<Badge key={id} variant="outline" className="text-[10px]">
+									<Badge key={id} variant="outline" className="text-3xs">
 										{id}
 									</Badge>
 								))}
@@ -173,7 +173,7 @@ export function SpecTraceabilityCard({
 							</p>
 							<div className="mt-1 flex flex-wrap gap-1">
 								{unknown.map((id) => (
-									<Badge key={id} variant="outline" className="text-[10px]">
+									<Badge key={id} variant="outline" className="text-3xs">
 										{id}
 									</Badge>
 								))}

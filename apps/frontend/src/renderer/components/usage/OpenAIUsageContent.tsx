@@ -24,7 +24,7 @@ export function OpenAIUsageContent({ usage }: OpenAIUsageContentProps) {
 					<p className="text-xs font-medium text-primary">
 						{t("common:usage.openaiCostLabel", "Coût OpenAI (mois en cours)")}
 					</p>
-					<p className="text-[10px] text-muted-foreground leading-relaxed">
+					<p className="text-3xs text-muted-foreground leading-relaxed">
 						{t(
 							"common:usage.openaiCostDescription",
 							"Le coût affiché correspond à la consommation OpenAI du mois en cours (estimation).",
@@ -60,7 +60,7 @@ function OpenAIUsageDetailsComponent({ details }: OpenAIUsageDetailsProps) {
 	const { t } = useTranslation(["common"]);
 
 	return (
-		<div className="bg-muted/30 rounded p-2 text-[11px]">
+		<div className="bg-muted/30 rounded p-2 text-2xs">
 			<div className="font-semibold mb-1">
 				{t("common:usage.openaiDetailTitle")}
 			</div>
@@ -128,7 +128,7 @@ function OpenAIUsageDetailsComponent({ details }: OpenAIUsageDetailsProps) {
 					<div className="font-medium">
 						{t("common:usage.moderationsLabel")}
 					</div>
-					<pre className="whitespace-pre-wrap text-[10px]">
+					<pre className="whitespace-pre-wrap text-3xs">
 						{JSON.stringify(details.moderations, null, 2)}
 					</pre>
 				</div>

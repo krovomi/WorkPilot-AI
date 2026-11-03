@@ -60,23 +60,23 @@ export function VerifyLoopCard({ task, projectPath, onOpenDetails }: VerifyLoopC
 					<div className="flex flex-wrap items-center gap-2">
 						<ShieldCheck className="h-4 w-4 shrink-0 text-primary" aria-hidden />
 						<span className="text-sm font-medium">{t("tasks:verify.title")}</span>
-						<Badge variant={statusVariant(record.status)} className="text-[10px]">
+						<Badge variant={statusVariant(record.status)} className="text-3xs">
 							{t(`tasks:verify.status.${record.status}`)}
 						</Badge>
 						{score !== null && (
-							<Badge variant="outline" className="text-[10px]">
+							<Badge variant="outline" className="text-3xs">
 								{t("tasks:verify.badge.score", { score })}
 							</Badge>
 						)}
 						{rounds > 0 && (
-							<Badge variant="outline" className="text-[10px]">
+							<Badge variant="outline" className="text-3xs">
 								{t("tasks:verify.badge.rounds", { count: rounds, fixed })}
 							</Badge>
 						)}
 						{endpoints.called > 0 && (
 							<Badge
 								variant={endpoints.ok === endpoints.called ? "outline" : "destructive"}
-								className="text-[10px]"
+								className="text-3xs"
 							>
 								{t("tasks:verify.badge.endpoints", {
 									ok: endpoints.ok,
@@ -85,7 +85,7 @@ export function VerifyLoopCard({ task, projectPath, onOpenDetails }: VerifyLoopC
 							</Badge>
 						)}
 						{errors > 0 && (
-							<Badge variant="destructive" className="text-[10px]">
+							<Badge variant="destructive" className="text-3xs">
 								{t("tasks:verify.badge.errors", { count: errors })}
 							</Badge>
 						)}

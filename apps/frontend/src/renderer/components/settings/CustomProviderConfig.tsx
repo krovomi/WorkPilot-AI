@@ -386,14 +386,14 @@ export function CustomProviderConfig() {
 													({model.value})
 												</span>
 												<span
-													className={`inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-medium ${tierClasses}`}
+													className={`inline-flex items-center rounded px-1.5 py-0.5 text-3xs font-medium ${tierClasses}`}
 												>
 													{t(
 														`customProvider.tier${model.tier.charAt(0).toUpperCase() + model.tier.slice(1)}`,
 													)}
 												</span>
 												{model.supportsThinking && (
-													<span className="inline-flex items-center rounded bg-violet-500/10 px-1 py-0.5 text-[9px] font-medium text-violet-600 dark:text-violet-400">
+													<span className="inline-flex items-center rounded bg-violet-500/10 px-1 py-0.5 text-3xs font-medium text-violet-600 dark:text-violet-400">
 														{t("agentProfile.supportsThinking")}
 													</span>
 												)}

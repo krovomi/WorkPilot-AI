@@ -404,7 +404,7 @@ export function WorktreeSelector({
 				<div className="flex flex-col min-w-0 flex-1">
 					<span className="truncate font-medium">{name}</span>
 					{branchLabel && (
-						<span className="text-[10px] text-muted-foreground truncate">
+						<span className="text-3xs text-muted-foreground truncate">
 							{branchLabel}
 						</span>
 					)}
@@ -514,7 +514,7 @@ export function WorktreeSelector({
 									{/* Terminal Worktrees */}
 									{terminalItems.length > 0 && (
 										<>
-											<div className="px-2 py-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+											<div className="px-2 py-1 text-3xs font-medium text-muted-foreground uppercase tracking-wider">
 												{t("terminal:worktree.existing")}
 											</div>
 											{terminalItems.map((item, i) =>
@@ -529,7 +529,7 @@ export function WorktreeSelector({
 											{terminalItems.length > 0 && (
 												<div className="border-t border-border my-1" />
 											)}
-											<div className="px-2 py-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+											<div className="px-2 py-1 text-3xs font-medium text-muted-foreground uppercase tracking-wider">
 												{t("terminal:worktree.taskWorktrees")}
 											</div>
 											{taskItems.map((item, i) =>
@@ -544,7 +544,7 @@ export function WorktreeSelector({
 											{(terminalItems.length > 0 || taskItems.length > 0) && (
 												<div className="border-t border-border my-1" />
 											)}
-											<div className="px-2 py-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+											<div className="px-2 py-1 text-3xs font-medium text-muted-foreground uppercase tracking-wider">
 												{t("terminal:worktree.otherWorktrees")}
 											</div>
 											{otherItems.map((item, i) =>

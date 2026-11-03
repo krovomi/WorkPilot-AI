@@ -169,7 +169,7 @@ export const PageLlmSelector: React.FC<PageLlmSelectorProps> = ({ page }) => {
 						})}
 					</span>
 					{resolved.hasOverride && (
-						<Badge variant="secondary" className="h-4 px-1 text-[10px]">
+						<Badge variant="secondary" className="h-4 px-1 text-3xs">
 							{t("dialogs:pageLlm.pageBadge")}
 						</Badge>
 					)}

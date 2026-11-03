@@ -88,7 +88,7 @@ export function SwarmModeSettings() {
 								}
 								className="w-full accent-primary"
 							/>
-							<div className="flex justify-between text-[10px] text-muted-foreground px-0.5">
+							<div className="flex justify-between text-3xs text-muted-foreground px-0.5">
 								<span>2</span>
 								<span>4</span>
 								<span>6</span>
@@ -174,7 +174,7 @@ export function SwarmModeSettings() {
 								}
 								className="w-full accent-primary"
 							/>
-							<div className="flex justify-between text-[10px] text-muted-foreground px-0.5">
+							<div className="flex justify-between text-3xs text-muted-foreground px-0.5">
 								<span>0</span>
 								<span>1</span>
 								<span>2</span>

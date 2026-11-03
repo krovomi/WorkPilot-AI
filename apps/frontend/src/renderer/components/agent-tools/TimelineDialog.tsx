@@ -68,14 +68,14 @@ function EntryRow({ entry }: { readonly entry: TimelineEntry }) {
 				<span className="text-sm font-mono w-4 shrink-0">{icon}</span>
 				<div className="flex-1 min-w-0">
 					<div className="flex items-center gap-2 flex-wrap">
-						<Badge className={`text-[10px] ${phaseClass}`}>
+						<Badge className={`text-3xs ${phaseClass}`}>
 							{entry.actor}
 						</Badge>
 						<span className="text-xs text-muted-foreground font-mono">
 							{entry.kind}
 						</span>
 						{entry.delta_seconds > 0 && (
-							<span className="text-[10px] text-muted-foreground">
+							<span className="text-3xs text-muted-foreground">
 								{formatDelta(entry.delta_seconds)}
 							</span>
 						)}
@@ -84,19 +84,19 @@ function EntryRow({ entry }: { readonly entry: TimelineEntry }) {
 					{hasPayload && (
 						<button
 							type="button"
-							className="text-[10px] text-muted-foreground hover:text-foreground mt-1 cursor-pointer bg-transparent border-none p-0"
+							className="text-3xs text-muted-foreground hover:text-foreground mt-1 cursor-pointer bg-transparent border-none p-0"
 							onClick={() => setExpanded(!expanded)}
 						>
 							{expanded ? t("agentTools:timeline.hidePayload") : t("agentTools:timeline.showPayload")}
 						</button>
 					)}
 					{expanded && hasPayload && (
-						<pre className="mt-1 text-[10px] bg-muted/50 p-2 rounded overflow-x-auto">
+						<pre className="mt-1 text-3xs bg-muted/50 p-2 rounded overflow-x-auto">
 							{JSON.stringify(entry.payload, null, 2)}
 						</pre>
 					)}
 				</div>
-				<span className="text-[10px] text-muted-foreground shrink-0 font-mono">
+				<span className="text-3xs text-muted-foreground shrink-0 font-mono">
 					#{entry.sequence}
 				</span>
 			</div>

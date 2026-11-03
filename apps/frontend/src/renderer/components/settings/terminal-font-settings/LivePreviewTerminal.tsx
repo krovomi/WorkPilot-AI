@@ -238,7 +238,7 @@ export function LivePreviewTerminal({ settings }: LivePreviewTerminalProps) {
 			</div>
 
 			{/* Info text */}
-			<p className="text-[11px] leading-relaxed text-muted-foreground">
+			<p className="text-2xs leading-relaxed text-muted-foreground">
 				{t("terminalFonts.preview.infoText", {
 					defaultValue:
 						"Preview updates within 300ms of setting changes. This is a read-only terminal for demonstration purposes.",

@@ -198,7 +198,7 @@ export function GlobalDownloadIndicator() {
 											)}
 										</div>
 										{(download.speed || download.timeRemaining) && (
-											<div className="flex items-center justify-between text-[10px] text-muted-foreground">
+											<div className="flex items-center justify-between text-3xs text-muted-foreground">
 												<span>{download.speed || ""}</span>
 												<span className="text-primary">
 													{download.timeRemaining || ""}
@@ -210,14 +210,14 @@ export function GlobalDownloadIndicator() {
 
 								{/* Error message for failed downloads */}
 								{download.status === "failed" && download.error && (
-									<p className="text-[10px] text-destructive/80 truncate">
+									<p className="text-3xs text-destructive/80 truncate">
 										{download.error}
 									</p>
 								)}
 							</div>
 						))}
 						{hasActive && (
-							<p className="px-3 py-2 text-[10px] text-muted-foreground">
+							<p className="px-3 py-2 text-3xs text-muted-foreground">
 								{t("downloads.hint")}
 							</p>
 						)}

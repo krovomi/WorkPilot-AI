@@ -510,7 +510,7 @@ function OrchestratorActivitySection({
 				</div>
 				<Badge
 					variant="outline"
-					className="text-[9px] px-1.5 py-0 bg-orange-500/10 text-orange-400 border-orange-500/30"
+					className="text-3xs px-1.5 py-0 bg-orange-500/10 text-orange-400 border-orange-500/30"
 				>
 					{summary}
 				</Badge>
@@ -521,7 +521,7 @@ function OrchestratorActivitySection({
 					{entries.map((entry) => (
 						<div
 							key={`activity-${entry.timestamp}`}
-							className="flex items-start gap-2 text-[10px] text-muted-foreground/80 py-0.5"
+							className="flex items-start gap-2 text-3xs text-muted-foreground/80 py-0.5"
 						>
 							<span className="text-muted-foreground/50 tabular-nums shrink-0">
 								{formatAppTime(entry.timestamp, {
@@ -628,7 +628,7 @@ function AgentLogGroup({ group, isExpanded, onToggle }: AgentLogGroupProps) {
 					<Badge
 						variant="outline"
 						className={cn(
-							"text-[10px] px-1.5 py-0.5",
+							"text-3xs px-1.5 py-0.5",
 							getSourceColor(agentName),
 						)}
 					>
@@ -639,7 +639,7 @@ function AgentLogGroup({ group, isExpanded, onToggle }: AgentLogGroupProps) {
 							type="button"
 							onClick={onToggle}
 							className={cn(
-								"flex items-center gap-1 text-[10px] px-2 py-0.5 rounded transition-colors",
+								"flex items-center gap-1 text-3xs px-2 py-0.5 rounded transition-colors",
 								"text-muted-foreground hover:text-foreground hover:bg-secondary/50",
 								isExpanded && "bg-secondary/50 text-foreground",
 							)}
@@ -727,7 +727,7 @@ function LogEntry({ entry }: LogEntryProps) {
 							type="button"
 							onClick={() => setIsExpanded(!isExpanded)}
 							className={cn(
-								"flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded shrink-0",
+								"flex items-center gap-1 text-3xs px-1.5 py-0.5 rounded shrink-0",
 								"text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors",
 								isExpanded && "bg-secondary/50",
 							)}
@@ -742,7 +742,7 @@ function LogEntry({ entry }: LogEntryProps) {
 				</div>
 				{hasDetail && isExpanded && (
 					<div className="mt-1.5 ml-4 p-2 bg-destructive/5 rounded-md border border-destructive/20 overflow-x-auto">
-						<pre className="text-[10px] text-destructive/80 whitespace-pre-wrap wrap-break-word font-mono max-h-[300px] overflow-y-auto">
+						<pre className="text-3xs text-destructive/80 whitespace-pre-wrap wrap-break-word font-mono max-h-[300px] overflow-y-auto">
 							{entry.detail}
 						</pre>
 					</div>
@@ -773,14 +773,14 @@ function LogEntry({ entry }: LogEntryProps) {
 	return (
 		<div className="flex flex-col">
 			<div className="flex items-start gap-2 text-xs text-muted-foreground py-0.5">
-				<span className="text-[10px] text-muted-foreground/60 tabular-nums shrink-0">
+				<span className="text-3xs text-muted-foreground/60 tabular-nums shrink-0">
 					{formatTime(entry.timestamp)}
 				</span>
 				{entry.source && (
 					<Badge
 						variant="outline"
 						className={cn(
-							"text-[9px] px-1 py-0 shrink-0",
+							"text-3xs px-1 py-0 shrink-0",
 							getSourceColor(entry.source),
 						)}
 					>
@@ -795,7 +795,7 @@ function LogEntry({ entry }: LogEntryProps) {
 						type="button"
 						onClick={() => setIsExpanded(!isExpanded)}
 						className={cn(
-							"flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded shrink-0",
+							"flex items-center gap-1 text-3xs px-1.5 py-0.5 rounded shrink-0",
 							"text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors",
 							isExpanded && "bg-secondary/50",
 						)}
@@ -816,7 +816,7 @@ function LogEntry({ entry }: LogEntryProps) {
 			</div>
 			{hasDetail && isExpanded && (
 				<div className="mt-1.5 ml-12 p-2 bg-secondary/30 rounded-md border border-border/50 overflow-x-auto">
-					<pre className="text-[10px] text-muted-foreground whitespace-pre-wrap wrap-break-word font-mono max-h-[300px] overflow-y-auto">
+					<pre className="text-3xs text-muted-foreground whitespace-pre-wrap wrap-break-word font-mono max-h-[300px] overflow-y-auto">
 						{entry.detail}
 					</pre>
 				</div>

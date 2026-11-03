@@ -75,7 +75,7 @@ export function StagedSuccessMessage({
 						className="font-mono text-xs min-h-[100px] bg-background/80 resize-y"
 						placeholder={t("taskReview:staged.commitPlaceholder")}
 					/>
-					<p className="text-[10px] text-muted-foreground mt-1.5">
+					<p className="text-3xs text-muted-foreground mt-1.5">
 						{t("taskReview:staged.editHint")}{" "}
 						<code className="bg-background px-1 rounded">
 							git commit -m "..."

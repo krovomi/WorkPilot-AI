@@ -556,7 +556,7 @@ export function PRFilterBar({
 						renderItem={(contributor) => (
 							<div className="flex items-center gap-2 min-w-0">
 								<div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-									<span className="text-[10px] font-medium text-primary">
+									<span className="text-3xs font-medium text-primary">
 										{contributor.slice(0, 2).toUpperCase()}
 									</span>
 								</div>
