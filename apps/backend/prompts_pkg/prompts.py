@@ -583,7 +583,8 @@ def get_qa_reviewer_targeted_prompt(
         TARGETED_MAX_CODE_FILES,
         change_diff,
     )
-    from foundation.touched_tests import PYTHON_EXTENSIONS
+    from foundation.test_conventions import run_examples
+    from foundation.touched_tests import PYTHON_EXTENSIONS, SCRIPT_EXTENSIONS
 
     diff = change_diff(project_dir, scope, LIGHT_QA_DIFF_MAX_CHARS) or (
         "(diff unavailable — read the changed files)"
@@ -592,8 +593,24 @@ def get_qa_reviewer_targeted_prompt(
         f"- `{src}` → " + ", ".join(f"`{t}`" for t in tests)
         for src, tests in scope.test_map
     )
-    py = [t for t in scope.tests if Path(t).suffix in PYTHON_EXTENSIONS]
-    ts = [t for t in scope.tests if t not in py]
+    py = [t for t in scope.tests if Path(t).suffix.lower() in PYTHON_EXTENSIONS]
+    ts = [t for t in scope.tests if Path(t).suffix.lower() in SCRIPT_EXTENSIONS]
+    examples = []
+    if py:
+        examples.append(
+            "# Python (pytest-cov): one --cov per touched source directory or "
+            f"module\npytest {' '.join(py)} --cov=<touched module or directory> "
+            "--cov-branch --cov-report=term-missing"
+        )
+    if ts:
+        examples.append(
+            "# Vitest (React, Vue/Nuxt, Svelte, Next.js...)\n"
+            f"npx vitest run {' '.join(ts)} --coverage "
+            "--coverage.include=<touched file>\n"
+            "# Jest (or Angular's ng test / Karma with --code-coverage)\n"
+            f"npx jest {' '.join(ts)} --coverage --collectCoverageFrom=<touched file>"
+        )
+    examples += run_examples([t for t in scope.tests if t not in py and t not in ts])
     return _fill_scoped_prompt(
         "qa_reviewer_targeted.md",
         spec_dir,
@@ -601,8 +618,7 @@ def get_qa_reviewer_targeted_prompt(
         {
             "{{FILES}}": ", ".join(f"`{f}`" for f in scope.files),
             "{{TEST_MAP}}": test_map,
-            "{{PY_TESTS}}": " ".join(py) or "<test files>",
-            "{{TS_TESTS}}": " ".join(ts) or "<test files>",
+            "{{RUN_EXAMPLES}}": "\n".join(examples) or "<the project's runner> <tests>",
             "{{MAX_FILES}}": str(TARGETED_MAX_CODE_FILES),
             "{{MAX_LINES}}": str(TARGETED_MAX_CHANGED_LINES),
             "{{MIN_COVERAGE}}": str(_min_coverage()),

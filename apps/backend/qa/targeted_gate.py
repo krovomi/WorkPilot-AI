@@ -7,7 +7,10 @@ only when, deterministically:
 - every mapped test file is recorded in ``qa_signoff.targeted_tests`` with
   ``passed: true``;
 - every mapped test file appears in a shell command the reviewer ran in this
-  session (the evidence its session left, whatever the provider);
+  session (the evidence its session left, whatever the provider): by its
+  path or name, or, where the language runs tests by class or package, by
+  its class (``dotnet test --filter FooTests``) or directory
+  (``go test ./pkg/foo``);
 - the coverage of the touched files reaches ``WORKPILOT_QA_MIN_COVERAGE``
   (``qa_signoff.coverage.touched_files``, and each ``per_file`` value given).
 
@@ -28,6 +31,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from foundation.change_scope import ChangeScope
+from foundation.test_conventions import run_evidence, runs_by_name
 
 from .coverage_gate import get_min_coverage, parse_coverage_value
 from .criteria import (
@@ -65,9 +69,16 @@ def _recorded(signoff: dict, test: str) -> dict | None:
 
 def _was_run(test: str, commands: list[str]) -> bool:
     """A command named the test file (by its path or, run from a sub-folder,
-    its name)."""
+    its name), or, for a language that runs tests by class, package or target
+    (.NET, the JVM, Go, Rust, Swift...), the test's class or its directory
+    (`foundation.test_conventions.run_evidence`)."""
     name = PurePosixPath(test).name
-    return any(test in _norm(c) or name in c for c in commands)
+    if any(test in _norm(c) or name in c for c in commands):
+        return True
+    if not runs_by_name(test):
+        return False
+    evidence = run_evidence(test)
+    return any(evidence.search(_norm(c)) for c in commands)
 
 
 def evaluate_targeted(
