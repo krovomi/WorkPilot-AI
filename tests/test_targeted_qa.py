@@ -159,8 +159,10 @@ def test_blocker_reasons_name_the_file():
     assert "CI" in targeted_blocker(".github/actions/run.js")
     assert "generated" in targeted_blocker("web/dist/a.js")
     assert "configuration" in targeted_blocker("tests/conftest.py")
-    assert "file type" in targeted_blocker("main.go")
+    assert "file type" in targeted_blocker("pom.xml")
+    assert "configuration" in targeted_blocker("src/Program.cs")
     assert targeted_blocker("src/calc.py") is None
+    assert targeted_blocker("main.go") is None  # Go has a known test convention
 
 
 def test_requirements_files_are_not_text_only():
