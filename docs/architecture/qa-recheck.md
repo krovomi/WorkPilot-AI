@@ -1,7 +1,7 @@
 # Re-review after a fix (QA by delta)
 
 [`qa/recheck.py`](../../apps/backend/qa/recheck.py), wired in
-[`qa/loop.py`](../../apps/backend/qa/loop.py). Finding F152.
+[`qa/loop.py`](../../apps/backend/qa/loop.py). Finding F153.
 
 ## Why
 
