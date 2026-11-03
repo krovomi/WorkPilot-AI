@@ -26,6 +26,7 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "./ui/alert-dialog";
+import { type CliPresence, useReportCliPresence } from "./cli-tool-order";
 import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import {
@@ -43,6 +44,8 @@ interface CopilotCliStatusBadgeProps {
 	readonly onNavigateToTerminals?: () => void;
 	// Mode replié de la sidebar : affiche uniquement l'icône pour éviter le débordement
 	readonly isCollapsed?: boolean;
+	/** Where the « Outils CLI » panel places this badge, once its check answers. */
+	readonly onPresenceChange?: (presence: CliPresence) => void;
 }
 
 interface CopilotIconProps {
@@ -96,6 +99,7 @@ export function CopilotCliStatusBadge({
 	className,
 	onNavigateToTerminals,
 	isCollapsed = false,
+	onPresenceChange,
 }: CopilotCliStatusBadgeProps) {
 	const { t } = useTranslation(["common", "navigation", "settings"]);
 	const { data, refreshCopilot } = useCliStatus();
@@ -129,6 +133,10 @@ export function CopilotCliStatusBadge({
 
 	// Use data from context
 	const status = copilot.status;
+	useReportCliPresence(
+		onPresenceChange,
+		status === "loading" ? null : status === "not-found" || status === "gh-missing" || status === "error" ? "missing" : "installed",
+	);
 	const versionInfo = copilot.versionInfo;
 	const authStatus = copilot.authStatus;
 	const lastChecked = copilot.lastChecked;
