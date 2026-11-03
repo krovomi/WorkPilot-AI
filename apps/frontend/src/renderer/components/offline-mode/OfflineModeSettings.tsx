@@ -85,8 +85,8 @@ export function OfflineModeSettings({ projectPath }: Props) {
 
 	const confidentiality = report?.confidentialityLevel ?? "unknown";
 	const confidentialityStyle: Record<string, string> = {
-		local: "bg-green-500/15 text-green-500 border-green-500/30",
-		mixed: "bg-yellow-500/15 text-yellow-500 border-yellow-500/30",
+		local: "bg-success/15 text-success border-success/30",
+		mixed: "bg-warning/15 text-warning border-warning/30",
 		unknown: "bg-muted text-muted-foreground border-border",
 	};
 	const confidentialityIcon =
@@ -154,7 +154,7 @@ export function OfflineModeSettings({ projectPath }: Props) {
 							<span className="w-24">Ollama</span>
 							{status.runtimes.ollama.available ? (
 								<>
-									<Badge variant="outline" className="bg-green-500/10">
+									<Badge variant="outline" className="bg-success/10">
 										{t("offlineMode:available", "available")}
 									</Badge>
 									<span className="text-xs text-muted-foreground">
@@ -171,7 +171,7 @@ export function OfflineModeSettings({ projectPath }: Props) {
 						<li className="flex items-center gap-2">
 							<span className="w-24">llama.cpp</span>
 							{status.runtimes.llamaCpp.available ? (
-								<Badge variant="outline" className="bg-green-500/10">
+								<Badge variant="outline" className="bg-success/10">
 									{t("offlineMode:available", "available")}
 								</Badge>
 							) : (
@@ -183,7 +183,7 @@ export function OfflineModeSettings({ projectPath }: Props) {
 						<li className="flex items-center gap-2">
 							<span className="w-24">LM Studio</span>
 							{status.runtimes.lmStudio.available ? (
-								<Badge variant="outline" className="bg-green-500/10">
+								<Badge variant="outline" className="bg-success/10">
 									{t("offlineMode:available", "available")}
 								</Badge>
 							) : (
@@ -277,7 +277,7 @@ export function OfflineModeSettings({ projectPath }: Props) {
 						{t("offlineMode:defaultDescription")}
 					</p>
 					{!validPolicy && (
-						<p className="text-sm text-yellow-600" role="alert">
+						<p className="text-sm text-warning" role="alert">
 							{t("offlineMode:invalidPolicy")}
 						</p>
 					)}
@@ -310,7 +310,7 @@ export function OfflineModeSettings({ projectPath }: Props) {
 												{task}
 												{isLocal && (
 													<Home
-														className="w-3 h-3 text-green-500"
+														className="w-3 h-3 text-success"
 														aria-label={t("offlineMode:localAria")}
 													/>
 												)}
@@ -347,7 +347,7 @@ export function OfflineModeSettings({ projectPath }: Props) {
 													setRouting(task, entry.provider, e.target.value)
 												}
 												className={`h-7 w-full rounded-md border bg-background px-2 text-sm ${
-													modelMissing ? "border-yellow-500/60" : "border-input"
+													modelMissing ? "border-warning/60" : "border-input"
 												}`}
 											>
 												{modelMissing && (

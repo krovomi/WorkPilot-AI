@@ -164,7 +164,7 @@ export function UiUxDesignCard({ task, projectPath }: UiUxDesignCardProps) {
 			)}
 
 			{record?.status === "withheld" && (
-				<p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+				<p className="mt-2 text-xs text-warning ">
 					{t("tasks:uiux.withheld")}
 				</p>
 			)}

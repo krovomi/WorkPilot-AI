@@ -182,11 +182,11 @@ export function CleanProviderGrid({
 						<div className="px-2 py-1 bg-primary/10 text-primary rounded">
 							{t("providerGrid.stats.total", { count: stats.total })}
 						</div>
-						<div className="px-2 py-1 bg-green-500/10 text-green-600 rounded">
+						<div className="px-2 py-1 bg-success/10 text-success rounded">
 							{t("providerGrid.stats.configured", { count: stats.configured })}
 						</div>
 						{stats.errors > 0 && (
-							<div className="px-2 py-1 bg-red-500/10 text-red-600 rounded">
+							<div className="px-2 py-1 bg-destructive/10 text-destructive rounded">
 								{t("providerGrid.stats.errors", { count: stats.errors })}
 							</div>
 						)}

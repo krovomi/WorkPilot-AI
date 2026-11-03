@@ -1167,7 +1167,7 @@ ${t("prReview.blockedStatusMessageFooter")}`;
 									onClick={handleAutoApprove}
 									disabled={isPosting || isPostingCleanReview}
 									variant="default"
-									className="flex-1 sm:flex-none bg-emerald-600 hover:bg-emerald-700 text-white"
+									className="flex-1 sm:flex-none bg-success hover:bg-success/90 text-success-foreground"
 								>
 									{isPosting ? (
 										<>
@@ -1197,7 +1197,7 @@ ${t("prReview.blockedStatusMessageFooter")}`;
 								onClick={handleApprove}
 								disabled={isPosting}
 								variant="default"
-								className="flex-1 sm:flex-none bg-emerald-600 hover:bg-emerald-700 text-white"
+								className="flex-1 sm:flex-none bg-success hover:bg-success/90 text-success-foreground"
 							>
 								{isPosting ? (
 									<Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1230,14 +1230,14 @@ ${t("prReview.blockedStatusMessageFooter")}`;
 						)}
 
 						{postSuccess && (
-							<div className="ml-auto flex items-center gap-2 text-emerald-600 text-sm font-medium animate-pulse">
+							<div className="ml-auto flex items-center gap-2 text-success text-sm font-medium animate-pulse">
 								<CheckCircle className="h-4 w-4" />
 								{t("prReview.postedFindings", { count: postSuccess.count })}
 							</div>
 						)}
 
 						{cleanReviewPosted && !postSuccess && (
-							<div className="ml-auto flex items-center gap-2 text-emerald-600 text-sm font-medium animate-pulse">
+							<div className="ml-auto flex items-center gap-2 text-success text-sm font-medium animate-pulse">
 								<CheckCircle className="h-4 w-4" />
 								{t("prReview.cleanReviewPosted")}
 							</div>
@@ -1287,7 +1287,7 @@ ${t("prReview.blockedStatusMessageFooter")}`;
 
 						{/* Blocked status posted success message */}
 						{blockedStatusPosted && !postSuccess && !cleanReviewPosted && (
-							<div className="ml-auto flex items-center gap-2 text-amber-600 text-sm font-medium animate-pulse">
+							<div className="ml-auto flex items-center gap-2 text-warning text-sm font-medium animate-pulse">
 								<CheckCircle className="h-4 w-4" />
 								{t("prReview.blockedStatusPosted")}
 							</div>

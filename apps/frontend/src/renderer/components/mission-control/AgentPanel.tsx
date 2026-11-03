@@ -58,19 +58,19 @@ interface AgentPanelProps {
 
 const STATUS_COLORS: Record<string, string> = {
 	idle: "bg-gray-500/10 text-gray-500 border-gray-500/30",
-	running: "bg-green-500/10 text-green-500 border-green-500/30",
-	paused: "bg-yellow-500/10 text-yellow-500 border-yellow-500/30",
+	running: "bg-success/10 text-success border-success/30",
+	paused: "bg-warning/10 text-warning border-warning/30",
 	completed: "bg-blue-500/10 text-blue-500 border-blue-500/30",
-	error: "bg-red-500/10 text-red-500 border-red-500/30",
+	error: "bg-destructive/10 text-destructive border-destructive/30",
 	waiting: "bg-purple-500/10 text-purple-500 border-purple-500/30",
 };
 
 const STATUS_DOT: Record<string, string> = {
 	idle: "bg-gray-500",
-	running: "bg-green-500 animate-pulse",
-	paused: "bg-yellow-500",
+	running: "bg-success animate-pulse",
+	paused: "bg-warning",
 	completed: "bg-blue-500",
-	error: "bg-red-500",
+	error: "bg-destructive",
 	waiting: "bg-purple-500 animate-pulse",
 };
 

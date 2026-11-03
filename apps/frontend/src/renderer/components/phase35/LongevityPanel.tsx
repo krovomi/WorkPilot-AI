@@ -16,11 +16,11 @@ interface LongevityPanelProps {
 }
 
 const GRADE_COLOR: Record<string, string> = {
-	A: "bg-green-500/20 text-green-700 border-green-500/40",
-	B: "bg-emerald-500/20 text-emerald-700 border-emerald-500/40",
-	C: "bg-amber-500/20 text-amber-700 border-amber-500/40",
+	A: "bg-success/20 text-success border-success/40",
+	B: "bg-success/20 text-success border-success/40",
+	C: "bg-warning/20 text-warning border-warning/40",
 	D: "bg-orange-500/20 text-orange-700 border-orange-500/40",
-	F: "bg-red-500/20 text-red-700 border-red-500/40",
+	F: "bg-destructive/20 text-destructive border-destructive/40",
 };
 
 export function LongevityPanel({ projectPath }: LongevityPanelProps) {

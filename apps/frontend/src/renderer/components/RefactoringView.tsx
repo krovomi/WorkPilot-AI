@@ -55,17 +55,17 @@ const SEVERITY_CONFIG: Record<
 	string,
 	{ color: string; bg: string; label: string }
 > = {
-	critical: { color: "text-red-500", bg: "bg-red-500/10", label: "Critical" },
-	high: { color: "text-red-400", bg: "bg-red-400/10", label: "High" },
-	medium: { color: "text-amber-500", bg: "bg-amber-500/10", label: "Medium" },
+	critical: { color: "text-destructive", bg: "bg-destructive/10", label: "Critical" },
+	high: { color: "text-destructive", bg: "bg-destructive/10", label: "High" },
+	medium: { color: "text-warning", bg: "bg-warning/10", label: "Medium" },
 	low: { color: "text-blue-500", bg: "bg-blue-500/10", label: "Low" },
 	info: { color: "text-gray-400", bg: "bg-gray-400/10", label: "Info" },
 };
 
 const RISK_CONFIG: Record<string, { color: string; bg: string }> = {
-	high: { color: "text-red-500", bg: "bg-red-500/10" },
-	medium: { color: "text-amber-500", bg: "bg-amber-500/10" },
-	low: { color: "text-emerald-500", bg: "bg-emerald-500/10" },
+	high: { color: "text-destructive", bg: "bg-destructive/10" },
+	medium: { color: "text-warning", bg: "bg-warning/10" },
+	low: { color: "text-success", bg: "bg-success/10" },
 };
 
 // ---------------------------------------------------------------------------
@@ -269,8 +269,8 @@ export function RefactoringView({ projectId }: Readonly<RefactoringViewProps>) {
 
 				{/* Error */}
 				{error && (
-					<Card className="border-red-500/30">
-						<CardContent className="p-4 flex items-center gap-3 text-red-500">
+					<Card className="border-destructive/30">
+						<CardContent className="p-4 flex items-center gap-3 text-destructive">
 							<AlertTriangle className="h-5 w-5 shrink-0" />
 							<p className="text-sm">{error}</p>
 						</CardContent>

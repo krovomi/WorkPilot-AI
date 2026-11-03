@@ -17,11 +17,11 @@ const PROPOSED_BELOW = 0.6;
 const KIND_COLORS: Record<TaskKind, string> = {
 	feature: "border-sky-500/40 text-sky-700 dark:text-sky-300",
 	bug_fix: "border-rose-500/40 text-rose-700 dark:text-rose-300",
-	hotfix: "border-red-600/60 text-red-700 dark:text-red-300 font-semibold",
+	hotfix: "border-destructive/60 text-destructive font-semibold",
 	investigation: "border-violet-500/40 text-violet-700 dark:text-violet-300",
-	run: "border-amber-500/40 text-amber-700 dark:text-amber-300",
+	run: "border-warning/40 text-warning ",
 	refactoring: "border-teal-500/40 text-teal-700 dark:text-teal-300",
-	test: "border-emerald-500/40 text-emerald-700 dark:text-emerald-300",
+	test: "border-success/40 text-success ",
 	docs: "border-slate-500/40 text-slate-700 dark:text-slate-300",
 	spike: "border-fuchsia-500/40 text-fuchsia-700 dark:text-fuchsia-300",
 };

@@ -250,11 +250,11 @@ function WindsurfAuthContent({
 	if (windsurfSsoToken) {
 		return (
 			<div className="space-y-4">
-				<div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-					<p className="text-sm text-green-800">
+				<div className="p-4 bg-success/10 border border-success/30 rounded-lg">
+					<p className="text-sm text-success">
 						{t("sections.accounts.providerConfig.windsurfAuth.tokenReceived")}
 					</p>
-					<p className="text-xs text-green-600 mt-1 font-mono break-all">
+					<p className="text-xs text-success mt-1 font-mono break-all">
 						{windsurfSsoToken.substring(0, 20)}...
 					</p>
 				</div>
@@ -370,9 +370,9 @@ export function OpenAICodexAuthContent({
 			</p>
 
 			{isAuthenticated && (
-				<div className="rounded-lg border border-green-500/30 bg-green-500/10 p-4">
+				<div className="rounded-lg border border-success/30 bg-success/10 p-4">
 					<div className="flex items-center gap-2 text-sm font-medium">
-						<CheckCircle className="w-4 h-4 text-green-600" />
+						<CheckCircle className="w-4 h-4 text-success" />
 						{t("sections.accounts.providerConfig.openaiAuth.connected")}
 					</div>
 					{profileName && <p className="mt-1 text-xs">{profileName}</p>}

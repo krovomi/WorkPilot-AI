@@ -202,8 +202,8 @@ export function MemoriesTab({
 													{t("context:memories.prReviews")}
 												</div>
 											</div>
-											<div className="text-center p-2 rounded-lg bg-amber-500/10">
-												<div className="text-lg font-semibold text-amber-400">
+											<div className="text-center p-2 rounded-lg bg-warning/10">
+												<div className="text-lg font-semibold text-warning">
 													{memoryCounts.sessions}
 												</div>
 												<div className="text-xs text-muted-foreground">
@@ -226,8 +226,8 @@ export function MemoriesTab({
 													{t("context:memories.patterns")}
 												</div>
 											</div>
-											<div className="text-center p-2 rounded-lg bg-red-500/10">
-												<div className="text-lg font-semibold text-red-400">
+											<div className="text-center p-2 rounded-lg bg-destructive/10">
+												<div className="text-lg font-semibold text-destructive">
 													{memoryCounts.gotchas}
 												</div>
 												<div className="text-xs text-muted-foreground">

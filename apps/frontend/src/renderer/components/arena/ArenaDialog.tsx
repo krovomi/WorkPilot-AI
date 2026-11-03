@@ -57,7 +57,7 @@ const TASK_TYPES: { value: ArenaTaskType; labelKey: string; icon: string }[] = [
 const LABEL_COLORS: Record<ArenaLabel, string> = {
 	A: "bg-blue-500/20 text-blue-400 border-blue-500/40",
 	B: "bg-purple-500/20 text-purple-400 border-purple-500/40",
-	C: "bg-emerald-500/20 text-emerald-400 border-emerald-500/40",
+	C: "bg-success/20 text-success border-success/40",
 	D: "bg-orange-500/20 text-orange-400 border-orange-500/40",
 };
 
@@ -67,8 +67,8 @@ const MIN_CONTENDERS = 2;
 
 const CONFIDENCE_COLOR: Record<string, string> = {
 	low: "text-orange-400 bg-orange-500/10 border-orange-500/30",
-	medium: "text-yellow-400 bg-yellow-500/10 border-yellow-500/30",
-	high: "text-emerald-400 bg-emerald-500/10 border-emerald-500/30",
+	medium: "text-warning bg-warning/10 border-warning/30",
+	high: "text-success bg-success/10 border-success/30",
 };
 
 const ARENA_TABS = [
@@ -138,7 +138,7 @@ function ParticipantCard({
 				className={cn(
 					"flex flex-col rounded-xl border transition-all duration-300 text-left",
 					isWinner && isRevealed
-						? "border-yellow-500/60 bg-yellow-500/5 shadow-lg shadow-yellow-500/10"
+						? "border-warning/60 bg-warning/5 shadow-lg shadow-yellow-500/10"
 						: "border-border bg-card",
 					isFailed && "border-destructive/40",
 					votable &&
@@ -181,13 +181,13 @@ function ParticipantCard({
 							<Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
 						)}
 						{participant.status === "completed" && (
-							<CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+							<CheckCircle2 className="h-3.5 w-3.5 text-success" />
 						)}
 						{participant.status === "error" && (
 							<AlertCircle className="h-3.5 w-3.5 text-destructive" />
 						)}
 						{isWinner && isRevealed && (
-							<Trophy className="h-4 w-4 text-yellow-500" />
+							<Trophy className="h-4 w-4 text-warning" />
 						)}
 					</div>
 				</div>
@@ -713,7 +713,7 @@ function BattleTab() {
 							{canVote && (
 								<Badge
 									variant="outline"
-									className="gap-1 text-yellow-500 border-yellow-500/50 bg-yellow-500/10"
+									className="gap-1 text-warning border-warning/50 bg-warning/10"
 								>
 									<Trophy className="h-3 w-3" />
 									{t("battle.statusVoting")}
@@ -722,7 +722,7 @@ function BattleTab() {
 							{activeBattle.status === "completed" && (
 								<Badge
 									variant="outline"
-									className="gap-1 text-emerald-500 border-emerald-500/50 bg-emerald-500/10"
+									className="gap-1 text-success border-success/50 bg-success/10"
 								>
 									<CheckCircle2 className="h-3 w-3" />
 									{t("battle.statusCompleted")}
@@ -750,7 +750,7 @@ function BattleTab() {
 
 					{/* Vote prompt */}
 					{canVote && (
-						<div className="flex items-center gap-2 p-3 rounded-xl border border-yellow-500/40 bg-yellow-500/5 text-sm text-yellow-400">
+						<div className="flex items-center gap-2 p-3 rounded-xl border border-warning/40 bg-warning/5 text-sm text-warning">
 							<Trophy className="h-4 w-4 shrink-0" />
 							<span>{t("battle.votePrompt")}</span>
 						</div>
@@ -766,9 +766,9 @@ function BattleTab() {
 					{activeBattle.status === "completed" &&
 						activeBattle.revealed &&
 						activeBattle.winnerLabel && (
-							<div className="flex items-center gap-2 p-3 rounded-xl border border-yellow-500/40 bg-yellow-500/5 text-sm">
-								<Trophy className="h-4 w-4 text-yellow-500 shrink-0" />
-								<span className="text-yellow-400">
+							<div className="flex items-center gap-2 p-3 rounded-xl border border-warning/40 bg-warning/5 text-sm">
+								<Trophy className="h-4 w-4 text-warning shrink-0" />
+								<span className="text-warning">
 									{t("battle.winner")}:{" "}
 									<strong>
 										{activeBattle.participants.find(
@@ -897,7 +897,7 @@ function BattleHistoryRow({ battle }: { readonly battle: ArenaBattle }) {
 					{battle.status === "completed" && winner && (
 						<Badge
 							variant="outline"
-							className="gap-1 text-yellow-500 border-yellow-500/40"
+							className="gap-1 text-warning border-warning/40"
 						>
 							<Trophy className="h-3 w-3" />
 							{winner.modelName}
@@ -906,7 +906,7 @@ function BattleHistoryRow({ battle }: { readonly battle: ArenaBattle }) {
 					{battle.status === "voting" && (
 						<Badge
 							variant="outline"
-							className="text-yellow-500 border-yellow-500/40"
+							className="text-warning border-warning/40"
 						>
 							{t("history.awaitingVote")}
 						</Badge>
@@ -928,7 +928,7 @@ function BattleHistoryRow({ battle }: { readonly battle: ArenaBattle }) {
 							className={cn(
 								"rounded-lg border p-2 text-xs",
 								battle.winnerLabel === p.label
-									? "border-yellow-500/50 bg-yellow-500/5"
+									? "border-warning/50 bg-warning/5"
 									: "border-border",
 							)}
 						>
@@ -941,7 +941,7 @@ function BattleHistoryRow({ battle }: { readonly battle: ArenaBattle }) {
 									{participantName(p, t)}
 								</Badge>
 								{battle.winnerLabel === p.label && (
-									<Trophy className="h-3.5 w-3.5 text-yellow-500" />
+									<Trophy className="h-3.5 w-3.5 text-warning" />
 								)}
 							</div>
 							<p className="text-muted-foreground">
@@ -972,7 +972,7 @@ function AnalyticsTab() {
 
 	const getRankingStyle = (rank: number) => {
 		if (rank === 0) {
-			return "bg-yellow-500/20 text-yellow-500";
+			return "bg-warning/20 text-warning";
 		}
 		if (rank === 1) {
 			return "bg-zinc-400/20 text-zinc-400";

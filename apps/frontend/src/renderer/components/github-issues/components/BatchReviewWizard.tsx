@@ -401,8 +401,8 @@ export function BatchReviewWizard({
 
 	const renderDone = () => (
 		<div className="flex flex-col items-center justify-center py-8 space-y-6">
-			<div className="p-4 rounded-full bg-green-500/10">
-				<CheckCircle2 className="h-12 w-12 text-green-500" />
+			<div className="p-4 rounded-full bg-success/10">
+				<CheckCircle2 className="h-12 w-12 text-success" />
 			</div>
 			<div className="text-center space-y-2">
 				<h3 className="text-lg font-semibold">{t("common:githubIssues.batch.created")}</h3>
@@ -496,10 +496,10 @@ function BatchCard({
 	const { t } = useTranslation();
 	const confidenceColor =
 		batch.confidence >= 0.8
-			? "text-green-500"
+			? "text-success"
 			: batch.confidence >= 0.6
-				? "text-yellow-500"
-				: "text-red-500";
+				? "text-warning"
+				: "text-destructive";
 
 	return (
 		<div

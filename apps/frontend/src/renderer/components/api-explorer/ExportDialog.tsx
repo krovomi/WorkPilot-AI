@@ -382,7 +382,7 @@ export function ExportDialog({ spec, onClose }: ExportDialogProps) {
 						className="w-full flex items-center justify-center gap-2 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
 					>
 						{copied ? (
-							<Check size={14} className="text-emerald-400" />
+							<Check size={14} className="text-success" />
 						) : (
 							<Copy size={14} />
 						)}

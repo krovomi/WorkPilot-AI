@@ -54,17 +54,17 @@ interface Vulnerability {
 }
 
 const STATUS_COLORS = {
-	secure: "bg-green-100 text-green-800",
-	vulnerable: "bg-red-100 text-red-800",
-	outdated: "bg-yellow-100 text-yellow-800",
+	secure: "bg-success/10 text-success",
+	vulnerable: "bg-destructive/10 text-destructive",
+	outdated: "bg-warning/10 text-warning",
 	unknown: "bg-gray-100 text-gray-800",
 };
 
 const SEVERITY_COLORS = {
 	low: "bg-blue-100 text-blue-800",
-	medium: "bg-yellow-100 text-yellow-800",
+	medium: "bg-warning/10 text-warning",
 	high: "bg-orange-100 text-orange-800",
-	critical: "bg-red-100 text-red-800",
+	critical: "bg-destructive/10 text-destructive",
 };
 
 /**
@@ -194,7 +194,7 @@ export function DependencySentinelDialog() {
 								)}
 								value={searchQuery}
 								onChange={(e) => setSearchQuery(e.target.value)}
-								className="pl-10 border-2 border-yellow-400 focus:border-yellow-500 focus-visible:border-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-200"
+								className="pl-10 border-2 border-warning focus:border-warning focus-visible:border-warning focus:outline-none focus:ring-2 focus:ring-warning/30"
 								style={{
 									border: "2px solid rgb(250, 204, 21)",
 									borderRadius: "0.5rem",
@@ -312,8 +312,8 @@ export function DependencySentinelDialog() {
 													</p>
 													{dep.recommendation && (
 														<div className="flex items-start gap-2 text-sm">
-															<CheckCircle className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
-															<span className="text-green-700">
+															<CheckCircle className="h-4 w-4 text-success mt-0.5 shrink-0" />
+															<span className="text-success">
 																{dep.recommendation}
 															</span>
 														</div>

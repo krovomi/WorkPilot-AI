@@ -584,9 +584,9 @@ function StatusIndicator({
 	}
 	switch (health?.status) {
 		case "healthy":
-			return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />;
+			return <CheckCircle2 className="h-3.5 w-3.5 text-success" />;
 		case "needs_auth":
-			return <Lock className="h-3.5 w-3.5 text-amber-500" />;
+			return <Lock className="h-3.5 w-3.5 text-warning" />;
 		case "unhealthy":
 			return <AlertCircle className="h-3.5 w-3.5 text-destructive" />;
 		default:
@@ -814,7 +814,7 @@ function AgentCard({
 												className="flex items-center gap-2 text-sm text-left rounded px-1 -mx-1 hover:bg-muted/60 transition-colors"
 												title={t("mcp.configureServer")}
 											>
-												<CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+												<CheckCircle2 className="h-3.5 w-3.5 text-success" />
 												<ServerIcon className="h-3.5 w-3.5 text-muted-foreground" />
 												<span className="font-medium group-hover:underline">
 													{serverInfo?.name || server}
@@ -991,7 +991,7 @@ function AgentCard({
 																{server?.name || mcpId}
 															</span>
 															{needsSetup && (
-																<span className="text-3xs px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium shrink-0">
+																<span className="text-3xs px-1.5 py-0.5 rounded bg-warning/10 text-warning font-medium shrink-0">
 																	{t("mcp.setupRequired", {
 																		defaultValue: "Setup required",
 																	})}

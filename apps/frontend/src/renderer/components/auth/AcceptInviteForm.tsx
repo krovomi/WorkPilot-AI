@@ -135,9 +135,9 @@ export function AcceptInviteForm({ onBack }: { onBack: () => void }) {
 	const strengthColors = [
 		"bg-destructive",
 		"bg-destructive",
-		"bg-amber-500",
-		"bg-emerald-500",
-		"bg-emerald-600",
+		"bg-warning",
+		"bg-success",
+		"bg-success",
 	];
 
 	return (

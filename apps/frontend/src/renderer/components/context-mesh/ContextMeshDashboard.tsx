@@ -117,7 +117,7 @@ export function ContextMeshDashboard(): React.ReactElement {
 							<button
 								type="button"
 								onClick={() => stopContextMeshAnalysis()}
-								className="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors text-sm font-medium"
+								className="px-4 py-2 rounded-lg bg-destructive/20 text-destructive hover:bg-destructive/30 transition-colors text-sm font-medium"
 							>
 								{t("contextMesh:actions.stop")}
 							</button>
@@ -168,7 +168,7 @@ export function ContextMeshDashboard(): React.ReactElement {
 			</div>
 
 			{error && (
-				<div className="m-4 mb-0 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+				<div className="m-4 mb-0 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
 					{error}
 				</div>
 			)}
@@ -257,7 +257,7 @@ export function ContextMeshDashboard(): React.ReactElement {
 										<button
 											type="button"
 											onClick={() => unregisterProject(project.project_path)}
-											className="shrink-0 text-xs text-muted-foreground hover:text-red-400 underline"
+											className="shrink-0 text-xs text-muted-foreground hover:text-destructive underline"
 										>
 											{t("contextMesh:projects.removeProject")}
 										</button>
@@ -313,7 +313,7 @@ export function ContextMeshDashboard(): React.ReactElement {
 											<button
 												type="button"
 												onClick={() => deletePattern(pattern.pattern_id)}
-												className="text-xs text-muted-foreground hover:text-red-400 underline"
+												className="text-xs text-muted-foreground hover:text-destructive underline"
 											>
 												{t("contextMesh:actions.delete")}
 											</button>
@@ -389,7 +389,7 @@ export function ContextMeshDashboard(): React.ReactElement {
 											<button
 												type="button"
 												onClick={() => deleteHandbookEntry(entry.entry_id)}
-												className="text-xs text-muted-foreground hover:text-red-400 underline"
+												className="text-xs text-muted-foreground hover:text-destructive underline"
 											>
 												{t("contextMesh:actions.delete")}
 											</button>
@@ -475,7 +475,7 @@ export function ContextMeshDashboard(): React.ReactElement {
 															"accepted",
 														)
 													}
-													className="px-3 py-1.5 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors text-xs font-medium"
+													className="px-3 py-1.5 rounded-lg bg-success/20 text-success hover:bg-success/30 transition-colors text-xs font-medium"
 												>
 													{t("contextMesh:actions.accept")}
 												</button>
@@ -556,7 +556,7 @@ export function ContextMeshDashboard(): React.ReactElement {
 														"applied",
 													)
 												}
-												className="px-3 py-1.5 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors text-xs font-medium"
+												className="px-3 py-1.5 rounded-lg bg-success/20 text-success hover:bg-success/30 transition-colors text-xs font-medium"
 											>
 												{t("contextMesh:actions.apply")}
 											</button>

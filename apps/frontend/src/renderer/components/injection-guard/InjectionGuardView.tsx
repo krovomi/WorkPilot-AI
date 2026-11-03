@@ -8,15 +8,15 @@ import type {
 } from "../../../shared/types/injection-guard";
 
 const THREAT_STYLES: Record<ThreatLevel, string> = {
-	safe: "text-green-400 bg-green-500/10 border-green-500/20",
-	suspect: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
-	blocked: "text-red-400 bg-red-500/10 border-red-500/20",
+	safe: "text-success bg-success/10 border-success/20",
+	suspect: "text-warning bg-warning/10 border-warning/20",
+	blocked: "text-destructive bg-destructive/10 border-destructive/20",
 };
 
 const SEVERITY_COLORS: Record<string, string> = {
-	critical: "text-red-400",
+	critical: "text-destructive",
 	high: "text-orange-400",
-	medium: "text-yellow-400",
+	medium: "text-warning",
 	low: "text-blue-400",
 };
 
@@ -118,7 +118,7 @@ export function InjectionGuardView({
 						<button
 							type="button"
 							onClick={() => void cancelScan()}
-							className="px-3 py-1.5 rounded-md bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition-colors"
+							className="px-3 py-1.5 rounded-md bg-destructive hover:bg-destructive/90 text-destructive-foreground text-sm font-medium transition-colors"
 						>
 							{t("actions.cancel")}
 						</button>
@@ -148,7 +148,7 @@ export function InjectionGuardView({
 			)}
 
 			{phase === "error" && error && (
-				<p className="text-sm text-red-400">{error}</p>
+				<p className="text-sm text-destructive">{error}</p>
 			)}
 
 			{phase === "complete" && results.length === 0 && (
@@ -162,19 +162,19 @@ export function InjectionGuardView({
 							<p className="text-xs text-muted-foreground">
 								{t("stats.blocked")}
 							</p>
-							<p className="text-2xl font-bold text-red-400">{blocked}</p>
+							<p className="text-2xl font-bold text-destructive">{blocked}</p>
 						</div>
 						<div className="p-3 rounded-lg bg-card border border-border">
 							<p className="text-xs text-muted-foreground">
 								{t("stats.suspect")}
 							</p>
-							<p className="text-2xl font-bold text-yellow-400">{suspect}</p>
+							<p className="text-2xl font-bold text-warning">{suspect}</p>
 						</div>
 						<div className="p-3 rounded-lg bg-card border border-border">
 							<p className="text-xs text-muted-foreground">
 								{t("stats.safe")}
 							</p>
-							<p className="text-2xl font-bold text-green-400">{safe}</p>
+							<p className="text-2xl font-bold text-success">{safe}</p>
 						</div>
 					</div>
 

@@ -122,11 +122,11 @@ export function ConflictPredictorDialog() {
 	};
 
 	const getAssessmentColor = (assessment: string) => {
-		if (assessment.includes("CRITICAL")) return "text-red-600";
+		if (assessment.includes("CRITICAL")) return "text-destructive";
 		if (assessment.includes("HIGH")) return "text-orange-600";
-		if (assessment.includes("MEDIUM")) return "text-yellow-600";
-		if (assessment.includes("LOW")) return "text-green-600";
-		return "text-green-600";
+		if (assessment.includes("MEDIUM")) return "text-warning";
+		if (assessment.includes("LOW")) return "text-success";
+		return "text-success";
 	};
 
 	interface ConflictSummary {
@@ -244,10 +244,10 @@ export function ConflictPredictorDialog() {
 									<Loader2 className="h-4 w-4 animate-spin" />
 								)}
 								{phase === "complete" && (
-									<Check className="h-4 w-4 text-green-600" />
+									<Check className="h-4 w-4 text-success" />
 								)}
 								{phase === "error" && (
-									<AlertTriangle className="h-4 w-4 text-red-600" />
+									<AlertTriangle className="h-4 w-4 text-destructive" />
 								)}
 								<span className="text-sm font-medium">
 									{phase === "error"
@@ -317,7 +317,7 @@ export function ConflictPredictorDialog() {
 										</Card>
 										<Card>
 											<CardContent className="pt-6">
-												<div className="text-2xl font-bold text-red-600">
+												<div className="text-2xl font-bold text-destructive">
 													{result.summary.total_conflicts}
 												</div>
 												<p className="text-xs text-muted-foreground">
@@ -338,7 +338,7 @@ export function ConflictPredictorDialog() {
 										</Card>
 										<Card>
 											<CardContent className="pt-6">
-												<div className="text-2xl font-bold text-green-600">
+												<div className="text-2xl font-bold text-success">
 													{result.modified_files.length}
 												</div>
 												<p className="text-xs text-muted-foreground">
@@ -405,7 +405,7 @@ export function ConflictPredictorDialog() {
 									<div className="space-y-3">
 										{result.conflicts_detected.length === 0 ? (
 											<div className="text-center py-8 text-muted-foreground">
-												<Check className="h-12 w-12 mx-auto mb-4 text-green-600" />
+												<Check className="h-12 w-12 mx-auto mb-4 text-success" />
 												<p>{t("conflictPredictor:result.noConflicts")}</p>
 											</div>
 										) : (
@@ -473,12 +473,12 @@ export function ConflictPredictorDialog() {
 													</Badge>
 													<div className="text-xs text-muted-foreground">
 														{file.lines_added > 0 && (
-															<span className="text-green-600">
+															<span className="text-success">
 																+{file.lines_added}
 															</span>
 														)}
 														{file.lines_removed > 0 && (
-															<span className="text-red-600">
+															<span className="text-destructive">
 																-{file.lines_removed}
 															</span>
 														)}
@@ -534,7 +534,7 @@ export function ConflictPredictorDialog() {
 																.replaceAll(/\s+/g, "-")}
 															className="flex items-center gap-2 text-sm"
 														>
-															<div className="w-2 h-2 rounded-full bg-red-500"></div>
+															<div className="w-2 h-2 rounded-full bg-destructive"></div>
 															<span>{area}</span>
 														</div>
 													))}
@@ -549,9 +549,9 @@ export function ConflictPredictorDialog() {
 
 					{/* Error */}
 					{error && (
-						<Card className="border-red-200 bg-red-50">
+						<Card className="border-destructive/30 bg-destructive/10">
 							<CardContent className="pt-6">
-								<div className="flex items-center gap-2 text-red-600">
+								<div className="flex items-center gap-2 text-destructive">
 									<AlertTriangle className="h-4 w-4" />
 									<span className="text-sm">{error}</span>
 								</div>

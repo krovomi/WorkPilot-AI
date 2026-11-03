@@ -119,7 +119,7 @@ export function WorkflowProfileCard({
 			<div className="flex items-start justify-between gap-3 p-3">
 				<div className="min-w-0">
 					<div className="flex items-center gap-2">
-						<Zap className="h-4 w-4 shrink-0 text-amber-500" aria-hidden />
+						<Zap className="h-4 w-4 shrink-0 text-warning" aria-hidden />
 						<span className="text-sm font-medium">
 							{t("workflowProfile:title")}
 						</span>
@@ -174,7 +174,7 @@ export function WorkflowProfileCard({
 			</div>
 
 			{profile.enabled === false && (
-				<div className="mx-3 mb-3 rounded border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
+				<div className="mx-3 mb-3 rounded border border-warning/40 bg-warning/10 p-2 text-xs">
 					<div className="font-medium">
 						{t("workflowProfile:disabled.title")}
 					</div>
@@ -187,7 +187,7 @@ export function WorkflowProfileCard({
 			{profile.missing.length > 0 && (
 				<div className="mx-3 mb-3 flex items-start gap-2 rounded border border-border bg-background/50 p-2 text-xs">
 					<AlertTriangle
-						className="mt-0.5 h-3 w-3 shrink-0 text-amber-500"
+						className="mt-0.5 h-3 w-3 shrink-0 text-warning"
 						aria-hidden
 					/>
 					<div>
@@ -262,9 +262,9 @@ function PhaseRow({ phase }: { readonly phase: WorkflowPhasePayload }) {
 			<span className="mt-0.5 shrink-0" aria-hidden>
 				{phase.runs ? (
 					phase.hardGate ? (
-						<Lock className="h-3 w-3 text-emerald-600" />
+						<Lock className="h-3 w-3 text-success" />
 					) : (
-						<CircleDashed className="h-3 w-3 text-emerald-600" />
+						<CircleDashed className="h-3 w-3 text-success" />
 					)
 				) : (
 					<MinusCircle className="h-3 w-3 text-muted-foreground" />
@@ -301,7 +301,7 @@ function PhaseRow({ phase }: { readonly phase: WorkflowPhasePayload }) {
 					)}
 				</div>
 				{phase.degradedFrom && (
-					<div className="mt-0.5 text-amber-600 dark:text-amber-400">
+					<div className="mt-0.5 text-warning ">
 						{t("workflowProfile:phase.degraded", {
 							from: phase.degradedFrom,
 							reason: phase.degradedReason,
@@ -309,7 +309,7 @@ function PhaseRow({ phase }: { readonly phase: WorkflowPhasePayload }) {
 					</div>
 				)}
 				{phase.substitutedFrom && (
-					<div className="mt-0.5 text-amber-600 dark:text-amber-400">
+					<div className="mt-0.5 text-warning ">
 						{t("workflowProfile:phase.substituted", {
 							from: phase.substitutedFrom,
 							reason: phase.substitutionReason,
