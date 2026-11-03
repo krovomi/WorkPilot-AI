@@ -27,6 +27,7 @@ def mount_all(mount: Callable[[APIRouter, str], None]) -> None:
     derives from (``server.authz.catalog.FEATURE_DOMAINS``)."""
     from shared_board.api import router as board
     from shared_board.engines import router as board_engines
+    from shared_board.mcp_http import router as board_mcp_http
     from shared_features.analyses import router as analyses
     from shared_features.api import feature_router
     from shared_features.automations.api import router as automations
@@ -43,6 +44,7 @@ def mount_all(mount: Callable[[APIRouter, str], None]) -> None:
 
     mount(board, "board")
     mount(board_engines, "board")
+    mount(board_mcp_http, "board")
     mount(automations, "board")
     for feature in FEATURES.values():
         mount(feature_router(feature), feature.key)

@@ -71,6 +71,9 @@ ROUTE_OVERRIDES: dict[tuple[str, str], str] = {
     ("POST", "/api/features/ideation/jobs"): "agent.execute",
     ("POST", "/api/features/ideation/jobs/{job_id}/cancel"): "agent.cancel",
     ("POST", "/api/features/ideation/ideas/{idea_id}/convert"): "task.write",
+    # The boards over MCP: reading is the floor; each tool then asks for its
+    # own permission (``shared_board/mcp_http.py``).
+    ("POST", "/mcp"): "task.read",
     ("POST", "/api/features/context/jobs"): "agent.execute",
     ("POST", "/api/features/context/jobs/{job_id}/cancel"): "agent.cancel",
     # The forge relays: a read and a query are reads, whatever their verb.

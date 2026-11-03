@@ -128,11 +128,16 @@ def card_dir(root: Path, card_id: Any) -> Path | None:
     """The card's directory, or None for an id that is not one of this board's."""
     if not isinstance(card_id, str) or not CARD_ID.match(card_id):
         return None
-    specs = (root / SPECS).resolve()
-    path = (specs / card_id).resolve()
-    if path.parent != specs or not path.is_dir():
+    # realpath, then a prefix check on the result: the id comes from an MCP
+    # client (over HTTP in server mode), and links are followed before the
+    # check, so a card directory linked elsewhere is not one of this board's.
+    specs = os.path.realpath(root / SPECS)
+    candidate = os.path.realpath(os.path.join(specs, card_id))
+    if not candidate.startswith(specs + os.sep):
         return None
-    return path
+    if os.path.dirname(candidate) != specs or not os.path.isdir(candidate):
+        return None
+    return Path(candidate)
 
 
 def _clip(value: Any, limit: int) -> str:
@@ -225,9 +230,18 @@ def slugify(title: str, max_length: int = 50) -> str:
 
 
 def create_card(
-    root: Path, title: Any, description: Any, kind: Any = None
+    root: Path,
+    title: Any,
+    description: Any,
+    kind: Any = None,
+    created_by: str | None = None,
 ) -> dict[str, Any]:
-    """A backlog card, written as the automations write one (`automations/cards.ts`)."""
+    """A backlog card, written as the automations write one (`automations/cards.ts`).
+
+    ``created_by`` is the server's user id when the card comes through the
+    team server's ``/mcp`` (``shared_board/mcp_http.py``), as its own routes
+    record it.
+    """
     from core.workspace.models import SpecNumberLockError
 
     title = _text(title, MAX_TITLE).replace("\n", " ")
@@ -237,6 +251,8 @@ def create_card(
     if kind is not None and kind not in KINDS:
         raise ValueError(f"kind must be one of {', '.join(KINDS)}")
     metadata: dict[str, Any] = {"sourceType": "mcp"}
+    if created_by:
+        metadata["createdBy"] = created_by
     if kind:
         # Chosen by whoever created the card: the classifier keeps it.
         metadata.update(kind=kind, kindSource="user", kindConfidence=1)

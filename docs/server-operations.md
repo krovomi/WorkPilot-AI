@@ -393,6 +393,23 @@ la suppression d'une organisation.
 désactiver son compte, révoquer ses sessions (elle doit se reconnecter). Le rôle de plateforme
 (`admin`, `member`, `viewer`) se change par `POST /admin/users/{id}/platform-role`.
 
+### Accès MCP des apps d'IA
+
+Chacun peut relier Claude Code, Codex, Cursor… aux tableaux du serveur par `POST /mcp`
+(Streamable HTTP), avec un jeton d'accès personnel fait dans **Réglages → Intégrations → Accès MCP
+au serveur** ([board-mcp.md](architecture/board-mcp.md#on-the-team-server-over-http)). Rien à
+activer : la route passe par le proxy comme le reste de l'API.
+
+- Un jeton (`wpat_…`) vaut pour une organisation, en lecture seule ou en écriture, 365 jours au
+  plus, 20 actifs par personne. Le serveur n'en garde que l'empreinte SHA-256 (table
+  `access_tokens`, migration `0013`).
+- Il n'ouvre que `/mcp` : présenté à une autre route, il est refusé comme un jeton invalide.
+- Retirer une personne de l'organisation, désactiver son compte ou ôter `task.read` à son rôle
+  coupe aussitôt ses jetons ; il n'y a rien d'autre à révoquer.
+- Créations et révocations sont dans l'audit (`access_token.create`, `access_token.revoke`).
+- Une requête dont l'`Origin` désigne un autre hôte est refusée (403) ; 240 requêtes par minute et
+  par adresse.
+
 ### Changer les clés
 
 - **Clé JWT** (`WORKPILOT_JWT_SECRET`) : possible, une clé à la fois. Remplacez la valeur dans
